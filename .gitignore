@@ -1,0 +1,18 @@
+# OMC / Claude Code 로컬 상태
+.omc/
+.claude/settings.local.json
+
+# macOS
+.DS_Store
+
+# 의존성 / 빌드 산출물
+node_modules/
+dist/
+build/
+.next/
+*.log
+
+# 환경 변수
+.env
+.env.*
+!.env.example
