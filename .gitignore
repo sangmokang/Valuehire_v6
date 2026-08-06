@@ -16,3 +16,6 @@ build/
 .env
 .env.*
 !.env.example
+
+# 비밀 패턴 파일 (verify.sh 스캔 기준 — 로컬 전용, 절대 커밋 금지)
+.secret-patterns
