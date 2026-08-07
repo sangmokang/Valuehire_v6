@@ -10,6 +10,15 @@
 # 이 스크립트는 자기 자신을 검사 대상에서 제외하지 않는다(P13).
 set -euo pipefail
 
+# 재진입 가드 — 이 스크립트는 시연 5에서 push 를 시도하고, pre-push 는 acceptance-*.sh
+# 전량을 실행한다. 그 목록에 이 파일이 포함되므로 가드가 없으면 무한 재귀가 된다
+# (2026-08-07 실측: exit 144 로 중단됨).
+if [ "${ACCEPTANCE_0_7_ACTIVE:-}" = "1" ]; then
+  echo "SKIP: 0-7 재진입 감지 (샌드박스 pre-push 내부 호출) — 정상"
+  exit 0
+fi
+export ACCEPTANCE_0_7_ACTIVE=1
+
 TOTAL=6
 fail=0
 step=0
@@ -21,7 +30,10 @@ orig_state() { (cd "$REPO_ROOT" && git status --porcelain | LC_ALL=C sort | shas
 ORIG_BEFORE=$(orig_state)
 
 sandbox=$(mktemp -d) || { echo "FAIL: 샌드박스 생성 실패"; exit 1; }
-cleanup() { rm -rf "$sandbox"; }
+# 시연 출력은 샌드박스와 분리된 곳에 쓴다. 시연 중 clone 디렉터리가 정리되면
+# 같은 트리에 있던 로그까지 함께 사라져 판정 근거를 잃는다(2026-08-07 실측).
+outdir=$(mktemp -d) || { echo "FAIL: 로그 디렉터리 생성 실패"; exit 1; }
+cleanup() { rm -rf "$sandbox" "$outdir"; }
 trap cleanup EXIT
 trap 'cleanup; trap - EXIT; exit 143' TERM
 trap 'cleanup; trap - EXIT; exit 130' INT
@@ -52,14 +64,17 @@ echo
 
 # --- 샌드박스 clone + 훅 설치 -------------------------------------------------
 git clone -q "$REPO_ROOT" "$sandbox/repo" || { echo "FAIL: clone 실패"; exit 1; }
+# push 시연 전용 bare 원격 — 원본 저장소를 원격으로 삼으면 push 가 원본에 간섭한다.
+git init -q --bare "$sandbox/remote.git" || { echo "FAIL: bare 원격 생성 실패"; exit 1; }
 cd "$sandbox/repo"
+git remote add sandbox "$sandbox/remote.git"
 git config user.email "acceptance@local"
 git config user.name "acceptance"
 
 bash scripts/install-hooks.sh >/dev/null 2>&1 || { echo "FAIL: install-hooks.sh 실패"; exit 1; }
 
 # readback: 설치가 실제로 됐는지 (install 스크립트의 자기 보고를 믿지 않는다)
-hp=$(git config --get core.hooksPath || true)
+hp=$(git config --get core.hooksPath) || hp=""
 [ "$hp" = "hooks" ] || { echo "FAIL: core.hooksPath='$hp' (기대 'hooks') — 훅이 연결되지 않음"; exit 1; }
 [ -x hooks/pre-commit ] || { echo "FAIL: clone 에서 pre-commit 실행 권한 없음"; exit 1; }
 echo "=== 시연 (샌드박스: $sandbox/repo) ==="
@@ -71,12 +86,13 @@ demo() {
   step=$((step + 1))
   local body; body=$(cat)
   set +e
-  ( eval "$body" ) >"$sandbox/out.$step" 2>&1
+  ( eval "$body" ) >"$outdir/out.$step" 2>&1
   local rc=$?
   set -e
   if [ "$rc" -ne 0 ]; then
     echo "[$step/$TOTAL] $name → BLOCKED (exit=$rc)"
-    sed 's/^/         /' "$sandbox/out.$step" | grep -m1 'BLOCKED' || true
+    # awk 는 매칭이 없어도 exit 0 이다 — grep 을 쓰면 실패를 삼키는 구문이 필요해진다
+    awk '/BLOCKED/{print "         " $0; exit}' "$outdir/out.$step"
   else
     echo "[$step/$TOTAL] $name → PASSED ← 결함 (차단되지 않음)"
     fail=1
@@ -114,7 +130,7 @@ BODY
 # 5. 커밋 안 된 변경을 둔 채 push (78f3631 ② 재현)
 demo "미커밋 상태로 push" <<'BODY'
   echo "dirty" > uncommitted.txt
-  git push --dry-run origin HEAD:refs/heads/probe-0-7
+  git push --dry-run sandbox HEAD:refs/heads/probe-0-7
 BODY
 
 # 6. 외부 효과 코드에 네트워크 호출이 0건 (§0 E5 gptreview.js 재현)
