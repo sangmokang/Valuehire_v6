@@ -25,9 +25,41 @@ if [ -n "$dirty" ]; then
   exit 1
 fi
 
-# ── 2) 로컬 검사 전량 재실행 ─────────────────────────────────────────────────
-checks=$(find . -maxdepth 2 \( -name 'verify.sh' -o -name 'acceptance-*.sh' \) \
-         -not -path './worktrees/*' -not -path './.git/*' | LC_ALL=C sort)
+# ── 2) push 안전성 검사 ──────────────────────────────────────────────────────
+#
+# pre-push 가 판정하는 것은 "이 push 가 안전한가"이지 "저장소가 이상적 상태인가"가
+# 아니다. 아래 3개는 push 안전성과 무관하거나 논리적으로 성립할 수 없어 CI 로 이관한다
+# (2026-08-07 실측 — 셋 다 실제로 push 를 영구 차단했다):
+#
+#   acceptance-0-2 : 히스토리 정리 완결성(unreachable==0). 차단된 커밋 시도나 reset
+#                    만으로도 unreachable 이 생기므로 개발 중 상시 실패한다.
+#   acceptance-0-5 : "push 가 완료됐는가"(origin/main==main) 검사. push 직전에는
+#                    논리적으로 성립할 수 없다 — pre-push 와 상호배타.
+#   acceptance-0-7 : 훅이 작동하는가를 검증하는 메타 테스트. 이 훅 안에서 실행하면
+#                    순환이 된다(단독 실행 exit 0 / pre-push 내부 exit 3 실측).
+#
+# 이관은 삭제가 아니다. 아래 3-a 가 CI 에 실제로 남아 있는지 확인하며, 없으면 차단한다.
+PUSH_CHECKS="verify.sh scripts/acceptance-0-6.sh"
+DEFERRED="acceptance-0-2 acceptance-0-5 acceptance-0-7"
+
+# 3-a) 이관한 검사가 CI 에 실제로 있는가 (이관이 조용한 삭제가 되는 것을 막는다)
+WF=.github/workflows/verify.yml
+if [ ! -f "$WF" ]; then
+  block "$WF 없음 — CI 로 이관한 검사를 아무도 실행하지 않는다 (fail-closed)"
+else
+  for d in $DEFERRED; do
+    if ! grep -q "$d" "$WF"; then
+      block "$d 가 CI($WF)에 없다 — pre-push 에서 뺀 검사는 CI 가 반드시 실행해야 한다"
+    fi
+  done
+fi
+
+checks=""
+for c in $PUSH_CHECKS; do
+  if [ -f "$c" ]; then checks="${checks}${c}
+"; fi
+done
+checks=$(printf '%s' "$checks")
 
 n=$(printf '%s\n' "$checks" | awk 'NF{c++} END{print c+0}')
 if [ "$n" -eq 0 ]; then

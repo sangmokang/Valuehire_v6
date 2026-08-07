@@ -65,6 +65,24 @@ jobs:
       - name: 인수 검사 0-6 (가짜 검증 스크립트 0건)
         run: bash scripts/acceptance-0-6.sh
 
+      # ↓ 아래 3개는 pre-push 에서 CI 로 이관된 검사다(2026-08-07).
+      #   pre-push 는 "이 push 가 안전한가"만 판정하며, 저장소 위생·메타 검사는 여기서 돈다.
+      #   hooks/pre-push 가 이 이름들이 이 파일에 실제로 있는지 확인한다 — 지우면 push 가 막힌다.
+
+      - name: 인수 검사 0-2 (히스토리 정리 완결성 · unreachable 0)
+        # 로컬 전용 .secret-patterns 는 CI 에 없다. 커밋된 기본 패턴으로 대체한다.
+        env:
+          SECRET_PATTERNS_FILE: .secret-patterns.default
+        run: bash scripts/acceptance-0-2.sh
+
+      - name: 인수 검사 0-7 (훅이 위반 6종을 실제로 차단하는가)
+        run: bash scripts/acceptance-0-7.sh
+
+      - name: 인수 검사 0-5 (push · CI 연결)
+        # origin/main==main 을 검사하므로 main 참조가 유효한 경우에만 의미가 있다.
+        if: github.ref == 'refs/heads/main'
+        run: bash scripts/acceptance-0-5.sh
+
       - name: 셸 스크립트 문법 검사
         run: |
           fail=0
