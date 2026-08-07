@@ -108,6 +108,17 @@ checks=""
 while IFS= read -r c; do
   if [ -z "$c" ]; then continue; fi
   if head -20 "$c" | grep -q '^# PUSH-PERFORMING'; then
+    # 마커는 "면제"가 아니라 "CI 로 옮긴다는 선언"이다. 옮기지 않았으면 차단한다.
+    #
+    # 이 검증이 없으면 마커가 자기선언 탈출구가 된다(2026-08-07 실측): 실패하는 검사에
+    # 주석 한 줄만 붙이면 pre-commit 통과 · pre-push skip · CI 언급 0건 으로
+    # 검사가 아무 데서도 돌지 않는다. 게다가 P13 약화 탐지는 매칭 전에 주석을 떼므로
+    # 주석 전용 줄을 원리적으로 잡을 수 없어, 패턴을 추가해도 소용이 없다.
+    # DEFERRED 에 이미 적용하던 검증을 그대로 재사용한다.
+    base=$(basename "$c")
+    if ! printf '%s\n' "${ACTIVE:-}" | grep -qE "run:.*${base}|^[[:space:]]*bash .*${base}"; then
+      block "$c 가 PUSH-PERFORMING 을 선언했으나 CI 의 실행 줄(run:)에 없다 — 아무도 실행하지 않는다"
+    fi
     printf '  skip %s (PUSH-PERFORMING · CI 담당)\n' "$c" >&2
     continue
   fi
