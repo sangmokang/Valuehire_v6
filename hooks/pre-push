@@ -77,9 +77,16 @@ else
   # 주석 줄을 제거한 '실제로 실행되는' 워크플로 본문
   ACTIVE=$(grep -v '^[[:space:]]*#' "$WF")
 
+  # 실행 동사를 요구한다. 이름만 보면 `run: echo scripts/acceptance-0-7.sh` 한 줄로
+  # 뚫린다(2026-08-07 실측 — 0-7 이 CI 에서 전혀 안 도는데 push 통과).
+  # 이것으로 근본 해결은 안 된다. `run: cat s | bash` 류 변형이 남는다.
+  # 워크플로를 문자열로 파싱하는 접근은 규칙을 하나 추가할 때마다 우회도 하나씩 는다
+  # (막힌 것: 주석 처리·if: false·본문 삭제·echo 대체 / 뚫린 것: if: ${{ false }}·임의
+  #  항상-거짓 조건·파이프 변형). 근본은 실행 증명이며 후속 이슈로 남긴다.
+  RUNVERB='run:[[:space:]]*(bash|sh|\./)[^|]*'
   for d in $DEFERRED; do
-    if ! printf '%s\n' "$ACTIVE" | grep -qE "run:.*${d}|^[[:space:]]*bash .*${d}"; then
-      block "$d 가 CI($WF)의 실행 줄(run:)에 없다 — 주석 처리·본문 삭제 여부를 확인하라"
+    if ! printf '%s\n' "$ACTIVE" | grep -qE "${RUNVERB}${d}|^[[:space:]]*(bash|sh|\./)[^|]*${d}"; then
+      block "$d 가 CI($WF)의 실행 줄에 없다 — 주석 처리·본문 삭제·echo 대체 여부를 확인하라"
     fi
   done
 
@@ -116,8 +123,8 @@ while IFS= read -r c; do
     # 주석 전용 줄을 원리적으로 잡을 수 없어, 패턴을 추가해도 소용이 없다.
     # DEFERRED 에 이미 적용하던 검증을 그대로 재사용한다.
     base=$(basename "$c")
-    if ! printf '%s\n' "${ACTIVE:-}" | grep -qE "run:.*${base}|^[[:space:]]*bash .*${base}"; then
-      block "$c 가 PUSH-PERFORMING 을 선언했으나 CI 의 실행 줄(run:)에 없다 — 아무도 실행하지 않는다"
+    if ! printf '%s\n' "${ACTIVE:-}" | grep -qE "run:[[:space:]]*(bash|sh|\./)[^|]*${base}|^[[:space:]]*(bash|sh|\./)[^|]*${base}"; then
+      block "$c 가 PUSH-PERFORMING 을 선언했으나 CI 의 실행 줄에 없다 — 아무도 실행하지 않는다"
     fi
     printf '  skip %s (PUSH-PERFORMING · CI 담당)\n' "$c" >&2
     continue

@@ -57,7 +57,10 @@ fi
 red=0
 while IFS= read -r c; do
   if [ -z "$c" ]; then continue; fi
-  bash "$c" >/dev/null 2>&1 || red=$((red + 1))
+  # SECRET_PATTERNS_FILE 을 비워 고정한다. 상속하면 환경변수 하나로 세션 브리핑이
+  # 실패 건수를 축소 보고한다 — AC-5 의 존재 이유가 정직한 보고이고, P14 는 판정
+  # 수치를 코드가 만들 것을 요구한다. 훅 2종에 넣은 것과 같은 한 줄이다.
+  SECRET_PATTERNS_FILE= bash "$c" >/dev/null 2>&1 || red=$((red + 1))
 done <<< "$checks"
 
 printf 'RED: %d/%d (%s 제외 — CI 담당)\n' "$red" "$total" "$EXCLUDED"
