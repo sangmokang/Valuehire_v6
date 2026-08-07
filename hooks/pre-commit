@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # pre-commit — 커밋 시점 로컬 강제 장치 (P4·P13·P14·P22)
 #
-# 계약: docs/engineering/hook-enforcement-goal-2026-08-07.md ⑩
+# 계약: docs/sot/hook-contracts.md
 #   출력  : exit 0 (통과) | exit 1 (차단)
 #   차단 시 stderr: "BLOCKED: <사유> — <파일경로>"
 #   ※ 매칭된 실제 비밀 값은 절대 출력하지 않는다 (패턴 이름과 경로만)

@@ -6,7 +6,7 @@
 #
 # 0-7 인수 스크립트 — 로컬 강제 장치(git hook)가 실제로 위반을 차단하는가.
 #
-# 계약: docs/engineering/hook-enforcement-goal-2026-08-07.md ⑩
+# 계약: docs/sot/hook-contracts.md
 #   출력  : exit 0 (6종 전부 BLOCKED) | exit 1 (하나라도 통과·위양성·셋업 실패)
 #   불변식: 모든 시연은 mktemp -d 안의 clone 에서 수행한다. 원본 저장소를 건드리지 않는다.
 #          검사를 실행하지 못한 경우도 실패로 판정한다(fail-closed).

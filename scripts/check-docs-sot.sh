@@ -13,7 +13,10 @@ fail=0
 pass() { printf 'PASS: %s\n' "$1"; }
 bad()  { printf 'FAIL: %s\n' "$1" >&2; fail=1; }
 
-# AC-1: docs/sot/ 필수 파일 5개가 존재하고 각각 300줄을 넘지 않는다.
+# AC-1: docs/sot/ 필수 파일 5개가 존재하고 각각 20,000바이트를 넘지 않는다.
+#   (수정 이력: 최초 구현은 wc -l<=300 로 쟀으나, coding-principles.md 처럼 원칙
+#    표의 각 행이 개행 없이 한 줄에 긴 문장을 담는 경우 줄 수가 실제 분량을
+#    반영하지 못함을 실행 중 발견(70줄인데 15,424바이트). 바이트 크기로 교정.)
 REQUIRED_FILES=(
   "docs/sot/INDEX.md"
   "docs/sot/coding-principles.md"
@@ -21,16 +24,17 @@ REQUIRED_FILES=(
   "docs/sot/git-workflow.md"
   "docs/sot/verification-commands.md"
 )
+MAX_BYTES=20000
 for f in "${REQUIRED_FILES[@]}"; do
   if [ ! -f "$f" ]; then
     bad "필수 SOT 파일 없음: $f"
     continue
   fi
-  lines=$(wc -l < "$f" | tr -d ' ')
-  if [ "$lines" -gt 300 ]; then
-    bad "$f 가 300줄 초과 (${lines}줄) — 계약과 서술이 다시 섞였을 가능성"
+  bytes=$(wc -c < "$f" | tr -d ' ')
+  if [ "$bytes" -gt "$MAX_BYTES" ]; then
+    bad "$f 가 ${MAX_BYTES}바이트 초과 (${bytes}바이트) — 계약과 서술이 다시 섞였을 가능성"
   else
-    pass "$f 존재, ${lines}줄 (<=300)"
+    pass "$f 존재, ${bytes}바이트 (<=${MAX_BYTES})"
   fi
 done
 

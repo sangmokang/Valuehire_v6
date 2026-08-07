@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # install-hooks.sh — 로컬 강제 장치를 이 저장소에 연결한다.
 #
-# 계약: docs/engineering/hook-enforcement-goal-2026-08-07.md ⑩
+# 계약: docs/sot/hook-contracts.md
 #   동작  : git config core.hooksPath hooks && chmod +x hooks/*
 #   불변식: 실행 후 core.hooksPath 를 재조회해 실제로 설정됐는지 확인한다(readback).
 #          자기 보고를 신뢰하지 않는다 — 불일치 시 exit 1

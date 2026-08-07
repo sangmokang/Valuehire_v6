@@ -169,6 +169,8 @@
 
 ## ⑩ 계약 스펙 — 입출력
 
+> **2026-08-08 이관**: 이 절의 계약 정본은 `docs/sot/hook-contracts.md`로 이동했다. `hooks/pre-commit` 등 5개 실행 파일도 이제 그 경로를 계약으로 참조한다. 아래는 이관 당시 원본을 그대로 보존한 것이며, 갱신은 SOT 쪽에서만 한다(근거: `docs/engineering/docs-sot-restructure-goal-2026-08-08.md`).
+
 ### `hooks/pre-commit`
 ```
 입력  : stdin 없음. 스테이징된 파일 목록(git diff --cached --name-only)
