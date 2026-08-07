@@ -62,8 +62,13 @@ clean_patterns() { sed -e 's/[[:space:]]*#.*//' -e '/^[[:space:]]*$/d' "$1"; }
 if [ ! -f verify.sh ]; then
   block "verify.sh 없음 — 비밀 스캔 불가 (fail-closed)"
 else
+  # SECRET_PATTERNS_FILE 을 비워 고정한다. 상속하면 호출자가
+  #   SECRET_PATTERNS_FILE=/tmp/weak.txt git commit
+  # 로 "유효하지만 아무것도 안 잡는" 패턴 파일을 주입해 스캔을 무력화할 수 있다
+  # (2026-08-07 실측: AKIA…·ghp_… 가 그대로 커밋됨). 빈 값이면 verify.sh 가
+  # .secret-patterns.default + .secret-patterns 합집합이라는 기본 경로를 탄다.
   vrc=0
-  VERIFY_SCAN_SOURCE=index bash verify.sh >/dev/null 2>&1 || vrc=$?
+  SECRET_PATTERNS_FILE= VERIFY_SCAN_SOURCE=index bash verify.sh >/dev/null 2>&1 || vrc=$?
   if [ "$vrc" -ne 0 ]; then
     block "비밀 스캔 실패 (verify.sh --index exit=$vrc). 상세: VERIFY_SCAN_SOURCE=index bash verify.sh"
   fi
@@ -114,12 +119,17 @@ if printf '%s\n' "$staged" | grep -qx 'suppressions.yaml'; then
     block "억제 항목 ${n_check}건 중 expiry 가 ${n_exp}건뿐 — 만료일 없는 억제는 영구화된다 (P13)"
   fi
   # 개수만 맞추면 expiry: 1999-01-01 도 통과한다. 날짜 자체를 본다.
+  # 값 정제를 하지 않는다 — gsub 로 숫자만 남기면 'never' 가 빈 문자열이 되어
+  # 형식 검사를 빠져나간다. 원문 그대로 받아 YYYY-MM-DD 인지 먼저 확인한다.
+  # (빈 값 / '99-01-01' / 'never' / '9999-99-99' 가 전부 통과하던 것을 막는다)
   today=$(date +%Y-%m-%d)
   while IFS= read -r e; do
-    if [ -n "$e" ] && [ "$e" \< "$today" ]; then
+    if ! printf '%s' "$e" | grep -qE '^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$'; then
+      block "expiry 형식이 YYYY-MM-DD 가 아니다: '${e}' — 만료를 판정할 수 없는 억제는 무기한 억제다 (P13)"
+    elif [ "$e" \< "$today" ]; then
       block "만료된 억제가 남아 있다 (expiry: $e < 오늘 $today) — 유예는 기한이 지나면 해제되어야 한다 (P13)"
     fi
-  done <<< "$(printf '%s\n' "$sup" | awk '/^ *expiry:/{gsub(/[^0-9-]/,"",$2); print $2}')"
+  done <<< "$(printf '%s\n' "$sup" | awk '/^ *expiry:/{sub(/^ *expiry: */,""); gsub(/["\x27]/,""); print}')"
 fi
 
 # ── 5) LLM 출력 숫자를 판정 필드에 (P14 · v4 QA-094 재현 방지) ────────────────

@@ -21,6 +21,13 @@
 # 이 스크립트를 실행 대상에서 제외하고, 그 사실을 화면에 출력한다.
 set -euo pipefail
 
+# 형제 스크립트(0-2·0-5)와 동일한 격리. 이 변수들이 환경에 남아 있으면 샌드박스의 git 이
+# 실저장소를 가리켜 검증이 실저장소를 오염시키거나 위양성 PASS 를 낸다.
+# 0-7 은 이 unset 이 없어서, 중첩 실행 시 git push 가 넘긴 GIT_DIR 때문에
+# `git remote add` 가 실패해 우연히 재귀가 끊기고 있었다(V1 2026-08-07 규명).
+# 우연에 기대지 않도록 형제와 같게 맞춘다.
+unset GIT_DIR GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_WORK_TREE GIT_COMMON_DIR GIT_ALTERNATE_OBJECT_DIRECTORIES
+
 TOTAL=6
 fail=0
 step=0

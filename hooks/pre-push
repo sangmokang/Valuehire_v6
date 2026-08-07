@@ -77,12 +77,14 @@ else
   fi
 fi
 
-checks=""
-for c in $PUSH_CHECKS; do
-  if [ -f "$c" ]; then checks="${checks}${c}
-"; fi
-done
-checks=$(printf '%s' "$checks")
+# 글로브 + 명시적 제외로 찾는다. 고정 목록이면 새로 추가된 인수 스크립트를 조용히
+# 누락한다(2026-08-07 실측: acceptance-9-9.sh 를 추가해도 "검사 2개 실행"으로 통과).
+# 제외 대상은 위 DEFERRED 3종뿐이며, 그 3종은 CI 가 실행한다(3-a 가 확인).
+checks=$(find . -maxdepth 2 \( -name 'verify.sh' -o -name 'acceptance-*.sh' \) \
+         -not -name 'acceptance-0-2.sh' \
+         -not -name 'acceptance-0-5.sh' \
+         -not -name 'acceptance-0-7.sh' \
+         -not -path './worktrees/*' -not -path './.git/*' | LC_ALL=C sort)
 
 n=$(printf '%s\n' "$checks" | awk 'NF{c++} END{print c+0}')
 if [ "$n" -eq 0 ]; then
