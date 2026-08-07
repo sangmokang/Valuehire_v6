@@ -214,6 +214,104 @@
 
 ---
 
+## 실행 결과 (2026-08-07)
+
+### AC 판정
+
+| AC | 검증 명령 | 결과 |
+|---|---|---|
+| AC-1 | `git status --porcelain \| grep -c '^??'` → 0 / `git ls-files docs/engineering/ \| wc -l` → 15 | **PASS** |
+| AC-2 | `grep -c 'HEAD 재확인' docs/engineering/v6-coding-principles-goal-2026-08-06.md` | **PASS** |
+| AC-3 | `acceptance-0-7.sh` 시연 1·2·3·4·6 전부 BLOCKED | **PASS** |
+| AC-4 | `acceptance-0-7.sh` 시연 5 BLOCKED | **PASS** |
+| AC-5 | `bash scripts/session-status.sh` → exit 0, HEAD·ORIGIN·RED 3줄 출력 | **PASS** |
+| AC-6 | `bash scripts/acceptance-0-7.sh` → **exit 0** | **PASS** |
+
+```
+[1/6] 검사기 자기 제외        → BLOCKED (exit=1)
+[2/6] 검사 약화(|| true)      → BLOCKED (exit=1)
+[3/6] 만료일 없는 억제         → BLOCKED (exit=1)
+[4/6] LLM 출력→판정 필드      → BLOCKED (exit=1)
+[5/6] 미커밋 상태로 push      → BLOCKED (exit=1)
+[6/6] 가짜 외부효과 모듈       → BLOCKED (exit=1)
+OK: 원본 저장소 무변경 확인 (da39a3ee5e6b4b0d3255bfef95601890afd80709)
+PASS: 위반 6 종이 전부 차단됨
+```
+
+### 게이트 4 — 로컬 검사 전량
+
+```
+verify.sh                        exit=0
+scripts/acceptance-0-2.sh        exit=0
+scripts/acceptance-0-5.sh        exit=0
+scripts/acceptance-0-6.sh        exit=0
+scripts/acceptance-0-7.sh        exit=0
+```
+
+### 게이트 5 — CI (PR #1, run 이후 `64f808e`)
+
+```
+✅ 비밀 스캔 (verify.sh)
+✅ 히스토리 전량 스캔 (도달 가능한 모든 blob)
+✅ 인수 검사 0-6 (가짜 검증 스크립트 0건)
+✅ 인수 검사 0-7 (훅이 위반 6종을 실제로 차단하는가)   ← 우분투 fresh clone 에서도 통과
+⏭️ 인수 검사 0-5 (main 아님 — 조건부 스킵)
+✅ 셸 스크립트 문법 검사
+✅ 패턴 파일 자체에 실제 비밀이 없는지
+conclusion: success
+```
+
+---
+
 ## 적대 검증 로그
 
-*(V1 Codex 감시자 판정 · V2 Claude 재현 결과를 아래에 본문 그대로 append)*
+### V1 — Codex 감시자 (격리, 구현 **전** 베이스라인 확정)
+
+판정 파일: `scratchpad/v1-watchdog-verdict.md` (246줄)
+
+> `VERDICT: BASELINE ESTABLISHED (구현 전) — 미추적 13파일·훅 0개·settings.json 부재·Makefile 부재·소스 0줄을
+> 실측 기록했고, 6개 AC의 진짜/가짜 판정 기준을 사전 확정했다. 구현 전 이미 실증한 구조적 지뢰 3개:
+> ①`acceptance-0-5.sh`의 `origin/main==main` 검사는 pre-push와 논리적으로 상호배타(클론에서 exit=1 재현)
+> ②`acceptance-0-2.sh`의 `unreachable==0`은 `git add`+reset 만으로 깨짐(0→1→2 실측)
+> ③AC-1로 커밋할 `goal-prompts/...md`가 금지 패턴을 포함해 `acceptance-0-6.sh`의 기존 경로 면제에 의존해야만 통과한다.
+> 훅 fail-open 4경로도 실측 확인(실행비트 없음·문법오류·`--no-verify`는 통과, 실행비트 있는 `exit 1`만 차단).
+> 이 세 지뢰의 처리 방식이 이번 구현의 진위를 가른다.`
+
+**이 판정의 가치**: 구현 전에 지뢰를 예측했고, **①②가 실제로 그대로 발현했다.**
+
+| 지뢰 | 예측 | 실제 |
+|---|---|---|
+| ② `unreachable==0` | `git add`+reset 만으로 깨짐 | **적중.** push 가 `acceptance-0-2 exit=1` 로 차단. `gc --prune=now` 로 해소했으나 개발을 계속하자 11건 재발 → CI 이관 |
+| ① `0-5` ↔ pre-push 상호배타 | 논리적으로 동시 성립 불가 | **조건부 발현.** 작업 브랜치에서는 `main`이 origin 과 동기라 통과(`ok ./scripts/acceptance-0-5.sh` 실측). `main` 직접 push 시에만 데드락 → CI 이관 + `if: github.ref == 'refs/heads/main'` |
+| ③ `goal-prompts` 금지 패턴 | `0-6` 경로 면제 의존 | **미검증 — V1 최종 판정에 정조준 요청함** |
+
+### V2 — Claude 자체 발견·수정 (구현 중, 전부 실행으로 확인)
+
+| # | 결함 | 어떻게 드러났나 | 조치 |
+|---|---|---|---|
+| 1 | **fail-open** — `grep` 의 exit 1(매칭 없음)과 exit ≥2(실행 오류)를 구분하지 않아, 이스케이프가 깨져 검사가 **돌지 않은** 경우까지 통과 | `4ce8892` 커밋 시 `grep: brackets ([ ]) not balanced` 가 6번 출력됐는데 **커밋이 성공** | `scan()`/`scan_added()` 도입, exit ≥2 를 차단 처리 |
+| 2 | **판정기 중복(원칙 A 위반)** — 비밀 스캔을 pre-commit 에 자체 구현했더니 `verify.sh` 와 판정이 갈림: 합집합 vs 단일 파일 / CRLF 정규화 유무 / `grep -i` 유무 | 자체 구현만 패턴이 깨짐 | `verify.sh` 에 위임 |
+| 3 | **P20 위반** — `session-status.sh` 가 검사 스크립트 **0개**를 찾고도 `RED: 0/0` 을 정상처럼 보고 | 워크트리 절대경로가 `-not -path '*/worktrees/*'` 에 자기 자신이 걸림 | 상대경로 + `total==0` 이면 UNKNOWN·exit 1 |
+| 4 | **무한 재귀** — pre-push 가 `acceptance-*.sh` 전량을 실행하는데 그 목록에 0-7 자신이 포함 | exit 144 / 2분 타임아웃 | 재진입 가드 + pre-push 조기 종료 |
+| 5 | **워크트리 배송 원천 차단(P6)** — `.secret-patterns` 가 gitignore 라 워크트리에 없어 `0-2` 가 exit 2 → push 불가. harness 가 워크트리를 강제하므로 실질적 차단 | 게이트 4 실행 중 | `install-hooks.sh` 가 메인 파일을 심볼릭 링크 |
+| 6 | **CI 자기 매칭** — `0-2` 를 `.secret-patterns.default` 로 CI 에서 돌리자 **패턴 파일 자신이 매칭** | CI run 31176518944 실패, blob `09b233e` = 패턴 파일 자신 | 0-2 를 CI 에서 제거, 등가물(「히스토리 전량 스캔」) 존재를 pre-push 가 확인 |
+
+### 훅이 자기 저장소에 실전 적용된 사례
+
+**pre-commit 이 이 작업의 커밋을 2회 차단했고, 둘 다 정당했다.**
+
+1. `acceptance-0-7.sh` 의 `sed ... | grep -m1 'BLOCKED' || true` — 실패를 삼키는 구문 → `awk` 로 교체
+2. `hp=$(git config --get core.hooksPath || true)` → `|| hp=""` 로 교체
+
+즉 P13(검사 약화 금지)이 **문서가 아니라 실제로 코드를 막았다.**
+
+### 알려진 한계 (숨기지 않음)
+
+- `git push --no-verify` 로 pre-push 우회 가능 → **CI 가 최종 방어선**
+- `main` 직접 push 시 `0-5` 와 상호배타로 데드락 → §4 규약(main 직접 push 금지) 준수 시 미발현
+- `pre-push` 의 CI 존재 확인은 `grep -q` 이므로 **이름만 있으면 통과** — 스텝이 `if: false` 로 바뀌면 우회 가능 (V1 정조준 항목 2)
+- P13 오탐이 잦아지면 라벨을 습관적으로 붙이게 되고 그 순간 P13 도 무력화 → 탐지 패턴을 좁게 시작
+
+### V1 최종 판정
+
+*(진행 중 — `scratchpad/v1-watchdog-final.md` 도착 시 본문 그대로 append)*
