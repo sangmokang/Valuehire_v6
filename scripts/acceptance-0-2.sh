@@ -105,6 +105,22 @@ if [ "$unreach" -ne 0 ]; then
   fail=1
 fi
 
+# 5-b. 도달 가능한 모든 지점(refs + reflog 포함)의 blob 전수 스캔 — 상시 회귀 조건.
+#      SHA 화이트리스트는 "과거의 알려진 오염"만 잡는다. 미래에 새로 유입되는 비밀은
+#      내용 기반으로만 잡을 수 있으므로, --reflog 포함 전 객체를 실제로 열어 확인한다.
+while IFS= read -r sha; do
+  [ -z "$sha" ] && continue
+  if [ "$(git cat-file -t "$sha" 2>/dev/null)" = blob ] \
+     && git cat-file blob "$sha" 2>/dev/null | grep -qF "$LIT"; then
+    echo "FAIL: 도달 가능 blob에 리터럴 잔존: $sha"; fail=1
+  fi
+done < <(git rev-list --all --reflog --objects 2>/dev/null | awk '{print $1}' | sort -u)
+
+# 6~8. 종료상태(end-state) 전용 검사 — 청소 **직후**에만 참인 조건이다.
+#      ref 화이트리스트·pseudoref 부재·워크트리 0개는 이후 정상적인 개발(워크트리 생성, fetch)에서
+#      당연히 깨진다. 오염 객체가 이미 소멸한 뒤에는 이 경로들이 비밀을 되살릴 수 없으므로
+#      상시 회귀 조건이 아니다. 청소 절차 검증 시 ACCEPTANCE_ENDSTATE=1 로 켠다.
+if [ -n "${ACCEPTANCE_ENDSTATE:-}" ]; then
 # 6. ref 화이트리스트 — main·origin/main 외 ref(브랜치/태그/스태시/notes/replace 등) 잔존 금지
 extra=$(git for-each-ref --format='%(refname)' | grep -vE '^refs/(heads/main|remotes/origin/main)$' || true)
 if [ -n "$extra" ]; then
@@ -134,5 +150,6 @@ if [ -d "$GCD/worktrees" ] && [ -n "$(/bin/ls -A "$GCD/worktrees" 2>/dev/null)" 
   echo "FAIL: 워크트리 admin dir 잔존: $GCD/worktrees/ 아래 $(/bin/ls -A "$GCD/worktrees" | tr '\n' ' ')"
   fail=1
 fi
+fi  # ACCEPTANCE_ENDSTATE
 
-[ "$fail" -eq 0 ] && echo "PASS: 0-2 완료 — 히스토리·객체·refs·pseudoref·docs 리터럴 0건, 스캐너 뮤테이션 검출 확인" || exit 1
+[ "$fail" -eq 0 ] && echo "PASS: 0-2 — 히스토리·객체·reflog·docs 리터럴 0건, 스캐너 뮤테이션 검출 확인${ACCEPTANCE_ENDSTATE:+ (+종료상태 검사)}" || exit 1
