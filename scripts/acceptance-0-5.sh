@@ -55,15 +55,24 @@ if [ "$clone_rc" -eq 0 ]; then
     fail=1
   fi
   # 카나리: CI 환경에서도 검출력이 살아있는가 (기본 패턴이 잡아야 하는 형태를 심는다)
-  # 카나리 문자열은 조립해서 만든다 — 이 스크립트 자신이 스캔에 걸리지 않도록(자기 매칭 방지)
-  ( cd "$sandbox/repo" \
-      && printf 'CHATGPT_%s=hunter2example\n' 'PASSWORD' > leak-canary.env.txt \
-      && git add leak-canary.env.txt \
-      && bash verify.sh >/dev/null 2>&1 )
-  canary_rc=$?
-  if [ "$canary_rc" -eq 0 ]; then
-    echo "FAIL: 기본 패턴이 명백한 자격증명 대입문을 못 잡음 — CI 스캔이 무의미"
+  # 카나리 문자열은 조립해서 만든다 — 이 스크립트 자신이 스캔에 걸리지 않도록(자기 매칭 방지).
+  # V2 지적 반영: 심기(plant) 단계와 검출 단계를 분리한다. &&로 묶으면 git add 실패까지
+  # "스캐너가 잡았다"로 오독돼, 카나리가 한 번도 안 돌아도 통과하는 조용한 위양성이 된다.
+  ( cd "$sandbox/repo" && printf 'CHATGPT_%s=hunter2example\n' 'PASSWORD' > leak-canary.env.txt )
+  plant_rc=$?
+  ( cd "$sandbox/repo" && git add leak-canary.env.txt )
+  add_rc=$?
+  ( cd "$sandbox/repo" && git ls-files --error-unmatch leak-canary.env.txt >/dev/null 2>&1 )
+  staged_rc=$?
+  if [ "$plant_rc" -ne 0 ] || [ "$add_rc" -ne 0 ] || [ "$staged_rc" -ne 0 ]; then
+    echo "FAIL: 카나리를 심지 못함(plant=$plant_rc add=$add_rc staged=$staged_rc) — 검출력 검증 자체가 무효"
     fail=1
+  else
+    ( cd "$sandbox/repo" && bash verify.sh >/dev/null 2>&1 )
+    if [ $? -eq 0 ]; then
+      echo "FAIL: 기본 패턴이 명백한 자격증명 대입문을 못 잡음 — CI 스캔이 무의미"
+      fail=1
+    fi
   fi
 else
   echo "FAIL: 격리 클론 생성 실패(exit=$clone_rc) — 4번 검증 불가"; fail=1

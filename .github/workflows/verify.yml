@@ -17,13 +17,33 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # 히스토리 전량 — 비밀 스캔·인수 검사가 과거 커밋까지 본다
+          fetch-depth: 0   # 아래 "히스토리 전량 스캔" 스텝이 과거 커밋의 blob까지 열어보는 데 필요
 
       - name: 비밀 스캔 (verify.sh)
         # 패턴은 커밋된 .secret-patterns.default 를 쓴다.
         # 실제 비밀값은 CI에 올리지 않는다 — 저장소 시크릿에 넣는 것도 유출 경로를 늘리는 일이다.
         # 로컬 전용 .secret-patterns 는 gitignore 되어 여기 없다.
         run: bash verify.sh
+
+      - name: 히스토리 전량 스캔 (도달 가능한 모든 blob)
+        # verify.sh는 현재 체크아웃의 추적 파일만 본다. 과거 커밋에 들어갔다가 지워진 비밀은
+        # 그것만으로는 잡히지 않으므로, reflog 포함 도달 가능한 모든 blob을 직접 열어 검사한다.
+        run: |
+          CLEAN=$(mktemp)
+          tr -d '\r' < .secret-patterns.default | grep -vE '^[[:space:]]*(#|$)' > "$CLEAN"
+          [ -s "$CLEAN" ] || { echo "FAIL: 유효 패턴 0개"; exit 2; }
+          hit=0
+          while IFS= read -r sha; do
+            [ -z "$sha" ] && continue
+            [ "$(git cat-file -t "$sha" 2>/dev/null)" = blob ] || continue
+            if git cat-file blob "$sha" 2>/dev/null | grep -qEif "$CLEAN"; then
+              echo "FAIL: 히스토리 blob에 자격증명 패턴 매치: $sha"
+              git rev-list --all --objects | awk -v s="$sha" '$1==s {print "  경로: "$2}'
+              hit=1
+            fi
+          done < <(git rev-list --all --reflog --objects | awk '{print $1}' | sort -u)
+          [ "$hit" -eq 0 ] && echo "PASS: 히스토리 전량 blob 스캔 0건"
+          exit $hit
 
       - name: 인수 검사 0-6 (가짜 검증 스크립트 0건)
         run: bash scripts/acceptance-0-6.sh
