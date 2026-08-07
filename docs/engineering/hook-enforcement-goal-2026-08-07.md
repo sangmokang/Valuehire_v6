@@ -45,6 +45,12 @@
 
 ### AC-1 — 미추적 산출물 0건
 
+> **판정 기록 (V1 지뢰 ③ 정조준 결과, 2026-08-07)**: AC-1 로 커밋한
+> `docs/engineering/goal-prompts/2026-08-06-merge-verify-gptreview-reimpl.md` 가 금지 패턴을 포함하고 있어,
+> `acceptance-0-6.sh` 의 **기존 `docs/engineering/` 경로 면제 덕분에** 통과했다.
+> 면제를 새로 넓히지는 않았다 — `git diff 7e20bd4..HEAD -- scripts/acceptance-0-6.sh` 는 비어 있다.
+> 그러나 **이 통과가 면제에 의존한다는 사실 자체를 기록에 남긴다.** 면제가 사라지면 AC-1 은 깨진다.
+
 - **검증**: `git status --porcelain | grep -c '^??'` → **`0`**
 - **EARS**: When 작업 산출물이 생성되면, 시스템은 그것을 추적 상태로 커밋해야 한다.
 - **counter-AC**: `.gitignore` 에 추가해서 `??` 를 0으로 만드는 것은 **가짜**. 실제 커밋 여부를
