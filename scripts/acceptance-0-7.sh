@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# PUSH-PERFORMING
+#   이 선언은 hooks/pre-push 가 읽는다. push 를 수행하는 스크립트를 pre-push 안에서
+#   실행하면 무한 재귀가 되므로, pre-push 는 이 마커가 있는 스크립트를 건너뛰고
+#   CI 가 대신 실행한다. 이름이 아니라 성질로 제외하기 위한 선언이다.
+#
 # 0-7 인수 스크립트 — 로컬 강제 장치(git hook)가 실제로 위반을 차단하는가.
 #
 # 계약: docs/engineering/hook-enforcement-goal-2026-08-07.md ⑩
@@ -27,6 +32,17 @@ set -euo pipefail
 # `git remote add` 가 실패해 우연히 재귀가 끊기고 있었다(V1 2026-08-07 규명).
 # 우연에 기대지 않도록 형제와 같게 맞춘다.
 unset GIT_DIR GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_WORK_TREE GIT_COMMON_DIR GIT_ALTERNATE_OBJECT_DIRECTORIES
+
+# 재귀 방지 — 실패 방향에 주의한다.
+# 이 변수가 있으면 SKIP(exit 0) 하면 안 된다. 그러면 외부에서 주입하는 것만으로 6종
+# 시연 전체를 초록으로 건너뛸 수 있는 무력화 스위치가 된다(ACCEPTANCE_0_7_ACTIVE 가 그랬다).
+# 그래서 **시연 불가 환경 = 실패**로 처리한다. 주입해도 통과가 아니라 빨간불이 된다.
+if [ -n "${VH_PREPUSH_DEPTH:-}" ]; then
+  echo "FAIL: pre-push 컨텍스트에서 0-7 이 호출됐다 (VH_PREPUSH_DEPTH=${VH_PREPUSH_DEPTH})."
+  echo "      이 스크립트는 push 를 시연하므로 pre-push 안에서 돌면 재귀가 된다."
+  echo "      pre-push 는 헤더의 '# PUSH-PERFORMING' 선언을 보고 이 파일을 건너뛰어야 한다."
+  exit 1
+fi
 
 TOTAL=6
 fail=0

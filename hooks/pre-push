@@ -15,6 +15,22 @@ cd "$REPO"
 fail=0
 block() { printf 'BLOCKED: %s\n' "$1" >&2; fail=1; }
 
+# ── 0) 재귀 깊이 가드 ────────────────────────────────────────────────────────
+#
+# push 를 수행하는 검사 스크립트가 pre-push 안에서 돌면 무한 재귀가 된다
+# (2026-08-07 실측: 프로세스 20개 도달). 이름으로 제외하면 새 스크립트를 못 막는다.
+#
+# 실패 방향이 중요하다. 이 변수를 "있으면 통과"로 쓰면 그 자체가 무력화 스위치가 된다
+# (ACCEPTANCE_0_7_ACTIVE 가 그랬다). 그래서 **있으면 차단**으로 둔다 — 외부에서 주입해도
+# 통과가 아니라 빨간불이 되므로 킬 스위치로 쓸 수 없다.
+VH_PREPUSH_DEPTH=$(( ${VH_PREPUSH_DEPTH:-0} + 1 ))
+export VH_PREPUSH_DEPTH
+if [ "$VH_PREPUSH_DEPTH" -gt 1 ]; then
+  printf 'BLOCKED: pre-push 재귀 감지 (depth=%s) — push 를 수행하는 검사가 pre-push 안에서 돌고 있다\n' \
+    "$VH_PREPUSH_DEPTH" >&2
+  exit 1
+fi
+
 # ── 1) 작업트리 청결 (P15 · 78f3631 ② 몰래 되돌림 재현 방지) ──────────────────
 dirty=$(git status --porcelain)
 if [ -n "$dirty" ]; then
@@ -39,7 +55,8 @@ fi
 #                    순환이 된다(단독 실행 exit 0 / pre-push 내부 exit 3 실측).
 #
 # 이관은 삭제가 아니다. 아래 3-a 가 CI 에 실제로 남아 있는지 확인하며, 없으면 차단한다.
-PUSH_CHECKS="verify.sh scripts/acceptance-0-6.sh"
+# (PUSH_CHECKS 고정 목록은 글로브 도입과 함께 제거했다 — 남겨두면 다음 편집자가 그것을
+#  고치고 검사 목록이 바뀐 줄 착각한다.)
 DEFERRED="acceptance-0-5 acceptance-0-7"
 
 # 3-a) 이관한 검사가 CI 에 실제로 있는가 (이관이 조용한 삭제가 되는 것을 막는다)
@@ -77,14 +94,32 @@ else
   fi
 fi
 
-# 글로브 + 명시적 제외로 찾는다. 고정 목록이면 새로 추가된 인수 스크립트를 조용히
-# 누락한다(2026-08-07 실측: acceptance-9-9.sh 를 추가해도 "검사 2개 실행"으로 통과).
-# 제외 대상은 위 DEFERRED 3종뿐이며, 그 3종은 CI 가 실행한다(3-a 가 확인).
-checks=$(find . -maxdepth 2 \( -name 'verify.sh' -o -name 'acceptance-*.sh' \) \
-         -not -name 'acceptance-0-2.sh' \
-         -not -name 'acceptance-0-5.sh' \
-         -not -name 'acceptance-0-7.sh' \
-         -not -path './worktrees/*' -not -path './.git/*' | LC_ALL=C sort)
+# 글로브로 찾는다. 고정 목록이면 새로 추가된 인수 스크립트를 조용히 누락한다
+# (2026-08-07 실측: acceptance-9-9.sh 를 추가해도 "검사 2개 실행"으로 통과).
+found=$(find . -maxdepth 2 \( -name 'verify.sh' -o -name 'acceptance-*.sh' \) \
+        -not -path './worktrees/*' -not -path './.git/*' | LC_ALL=C sort)
+
+# 제외는 이름이 아니라 성질로 판별한다. 이름 기반 제외는 글로브(신규 자동 포함)와
+# 정면 충돌해, push 를 수행하는 스크립트가 하나만 더 생기면 그날 재귀가 부활한다
+# (2026-08-07 실측: acceptance-0-8.sh 를 넣자 프로세스 20개 도달).
+#   · 헤더에 `# PUSH-PERFORMING` 을 선언한 스크립트 → push 를 수행하므로 여기서 실행 불가
+#   · DEFERRED(0-2·0-5)          → push 안전성과 무관하거나 논리적으로 성립 불가. CI 담당
+checks=""
+while IFS= read -r c; do
+  if [ -z "$c" ]; then continue; fi
+  if head -20 "$c" | grep -q '^# PUSH-PERFORMING'; then
+    printf '  skip %s (PUSH-PERFORMING · CI 담당)\n' "$c" >&2
+    continue
+  fi
+  case "$(basename "$c")" in
+    acceptance-0-2.sh|acceptance-0-5.sh)
+      printf '  skip %s (DEFERRED · CI 담당)\n' "$c" >&2
+      continue
+      ;;
+  esac
+  checks="${checks}${c}"$'\n'
+done <<< "$found"
+checks="${checks%$'\n'}"
 
 n=$(printf '%s\n' "$checks" | awk 'NF{c++} END{print c+0}')
 if [ "$n" -eq 0 ]; then
@@ -94,7 +129,11 @@ else
   while IFS= read -r c; do
     if [ -z "$c" ]; then continue; fi
     rc=0
-    bash "$c" >/dev/null 2>&1 || rc=$?
+    # SECRET_PATTERNS_FILE 을 비워 고정한다. 상속하면 다음으로 원격 유출이 완성된다
+    # (2026-08-07 실측 — 비밀 커밋이 실제로 원격에 도달했다):
+    #   git commit --no-verify (문서화된 허용 경로)
+    #   → SECRET_PATTERNS_FILE=/tmp/weak.txt git push  → exit 0 통과
+    SECRET_PATTERNS_FILE= bash "$c" >/dev/null 2>&1 || rc=$?
     if [ "$rc" -ne 0 ]; then
       block "$c exit=$rc"
     else
