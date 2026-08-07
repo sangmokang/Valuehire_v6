@@ -55,8 +55,9 @@ if [ "$clone_rc" -eq 0 ]; then
     fail=1
   fi
   # 카나리: CI 환경에서도 검출력이 살아있는가 (기본 패턴이 잡아야 하는 형태를 심는다)
+  # 카나리 문자열은 조립해서 만든다 — 이 스크립트 자신이 스캔에 걸리지 않도록(자기 매칭 방지)
   ( cd "$sandbox/repo" \
-      && printf 'CHATGPT_PASSWORD=hunter2example\n' > leak-canary.env.txt \
+      && printf 'CHATGPT_%s=hunter2example\n' 'PASSWORD' > leak-canary.env.txt \
       && git add leak-canary.env.txt \
       && bash verify.sh >/dev/null 2>&1 )
   canary_rc=$?

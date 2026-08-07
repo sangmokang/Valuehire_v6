@@ -7,28 +7,47 @@
 #  ② fail-open 차단 — -f/-r 검사, CRLF 정규화, 유효 패턴 0개 시 exit 2, grep stderr를 실패로 취급
 set -euo pipefail
 
-PATTERNS="${SECRET_PATTERNS_FILE:-.secret-patterns}"
-if [ ! -f "$PATTERNS" ] || [ ! -r "$PATTERNS" ] || [ ! -s "$PATTERNS" ]; then
-  echo "FAIL: secret patterns file missing/not-a-file/unreadable/empty: $PATTERNS (exit 2)"
-  echo "      로컬: 저장소 루트에 .secret-patterns 배치 / CI: SECRET_PATTERNS_FILE로 주입."
+# 패턴 소스 결정:
+#  - SECRET_PATTERNS_FILE 지정 시 → 그 파일만 사용(테스트·CI 주입용, 기존 계약 유지)
+#  - 미지정 시 → 커밋된 .secret-patterns.default + gitignore된 .secret-patterns 합집합.
+#    전자는 "모양"(일반 자격증명 패턴), 후자는 이 프로젝트의 알려진 실제 리터럴.
+#    CI에는 후자가 없으므로 전자만으로 동작한다 — 실제 비밀을 CI에 올리지 않기 위한 설계.
+SOURCES=()
+if [ -n "${SECRET_PATTERNS_FILE:-}" ]; then
+  SOURCES=("$SECRET_PATTERNS_FILE")
+else
+  [ -e .secret-patterns.default ] && SOURCES+=(.secret-patterns.default)
+  [ -e .secret-patterns ] && SOURCES+=(.secret-patterns)
+fi
+
+if [ ${#SOURCES[@]} -eq 0 ]; then
+  echo "FAIL: no secret patterns file found (.secret-patterns.default / .secret-patterns) (exit 2)"
   echo "      조용한 스킵 금지 — 패턴 없이는 스캔 자체가 무효다."
   exit 2
 fi
+for p in "${SOURCES[@]}"; do
+  if [ ! -f "$p" ] || [ ! -r "$p" ] || [ ! -s "$p" ]; then
+    echo "FAIL: secret patterns file missing/not-a-file/unreadable/empty: $p (exit 2)"
+    echo "      로컬: 저장소 루트에 .secret-patterns 배치 / CI: .secret-patterns.default 사용."
+    exit 2
+  fi
+done
 
 CLEAN=$(mktemp) ERRS=$(mktemp)
 trap 'rm -f "$CLEAN" "$ERRS"' EXIT
 
 # CRLF 제거 + 주석(#)·공백뿐인 줄 제거 → 유효 패턴이 0개면 조용한 no-op 금지
-tr -d '\r' < "$PATTERNS" | grep -vE '^[[:space:]]*(#|$)' > "$CLEAN" || true
+cat "${SOURCES[@]}" | tr -d '\r' | grep -vE '^[[:space:]]*(#|$)' > "$CLEAN" || true
 if [ ! -s "$CLEAN" ]; then
-  echo "FAIL: no effective secret patterns in $PATTERNS (주석/빈 줄뿐, exit 2)"
+  echo "FAIL: no effective secret patterns in: ${SOURCES[*]} (주석/빈 줄뿐, exit 2)"
   exit 2
 fi
 
 FAIL=0
 
 set +e
-LEAKS=$(git ls-files -z | xargs -0 grep -lEf "$CLEAN" -- 2>"$ERRS")
+# -i: 자격증명 키워드는 대소문자를 가리지 않는다(`password:` / `PASSWORD=` 둘 다 잡아야 함)
+LEAKS=$(git ls-files -z | xargs -0 grep -lEif "$CLEAN" -- 2>"$ERRS")
 set -e
 if [ -s "$ERRS" ]; then
   echo "FAIL: scanner error — fail-closed (grep/xargs stderr):"

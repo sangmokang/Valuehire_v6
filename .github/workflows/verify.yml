@@ -1,0 +1,46 @@
+name: verify
+
+# "CI 초록 전까지 완료 없음"을 시스템으로 강제한다.
+# 로컬 검증은 실행자가 주장하는 것이고, 이 워크플로우는 GitHub이 판정하는 것이다.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # 히스토리 전량 — 비밀 스캔·인수 검사가 과거 커밋까지 본다
+
+      - name: 비밀 스캔 (verify.sh)
+        # 패턴은 커밋된 .secret-patterns.default 를 쓴다.
+        # 실제 비밀값은 CI에 올리지 않는다 — 저장소 시크릿에 넣는 것도 유출 경로를 늘리는 일이다.
+        # 로컬 전용 .secret-patterns 는 gitignore 되어 여기 없다.
+        run: bash verify.sh
+
+      - name: 인수 검사 0-6 (가짜 검증 스크립트 0건)
+        run: bash scripts/acceptance-0-6.sh
+
+      - name: 셸 스크립트 문법 검사
+        run: |
+          fail=0
+          while IFS= read -r -d '' f; do
+            bash -n "$f" || { echo "syntax error: $f"; fail=1; }
+          done < <(git ls-files -z '*.sh')
+          exit $fail
+
+      - name: 패턴 파일 자체에 실제 비밀이 없는지 (자기 오염 방지)
+        run: |
+          # .secret-patterns.default 는 "모양"만 담아야 한다. 값처럼 보이는 긴 리터럴이 있으면 실패.
+          if grep -nE "^[^#]*=[A-Za-z0-9]{8,}[[:space:]]*$" .secret-patterns.default; then
+            echo "FAIL: 기본 패턴 파일에 실제 값처럼 보이는 리터럴이 있음"
+            exit 1
+          fi
+          echo "PASS: 기본 패턴 파일에 실값 없음"
