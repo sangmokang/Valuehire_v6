@@ -69,11 +69,11 @@ jobs:
       #   pre-push 는 "이 push 가 안전한가"만 판정하며, 저장소 위생·메타 검사는 여기서 돈다.
       #   hooks/pre-push 가 이 이름들이 이 파일에 실제로 있는지 확인한다 — 지우면 push 가 막힌다.
 
-      - name: 인수 검사 0-2 (히스토리 정리 완결성 · unreachable 0)
-        # 로컬 전용 .secret-patterns 는 CI 에 없다. 커밋된 기본 패턴으로 대체한다.
-        env:
-          SECRET_PATTERNS_FILE: .secret-patterns.default
-        run: bash scripts/acceptance-0-2.sh
+      # acceptance-0-2 는 여기서 돌리지 않는다. 그 검사는 "로컬 전용 .secret-patterns 에
+      # 적힌 실제 리터럴이 히스토리에서 제거됐는가"를 보는데, CI 에는 그 파일이 없다.
+      # 기본 패턴으로 대체하면 패턴 파일 자신이 매칭돼 상시 실패한다(실측: run 31176518944,
+      # blob 09b233e = .secret-patterns.default 자신). CI 에서의 등가물은 위의
+      # "히스토리 전량 스캔" 스텝이며, hooks/pre-push 가 그 스텝의 존재를 확인한다.
 
       - name: 인수 검사 0-7 (훅이 위반 6종을 실제로 차단하는가)
         run: bash scripts/acceptance-0-7.sh

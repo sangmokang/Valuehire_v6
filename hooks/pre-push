@@ -40,9 +40,14 @@ fi
 #
 # 이관은 삭제가 아니다. 아래 3-a 가 CI 에 실제로 남아 있는지 확인하며, 없으면 차단한다.
 PUSH_CHECKS="verify.sh scripts/acceptance-0-6.sh"
-DEFERRED="acceptance-0-2 acceptance-0-5 acceptance-0-7"
+DEFERRED="acceptance-0-5 acceptance-0-7"
 
 # 3-a) 이관한 검사가 CI 에 실제로 있는가 (이관이 조용한 삭제가 되는 것을 막는다)
+#
+# acceptance-0-2 는 이 목록에 없다. 그 검사는 로컬 전용 .secret-patterns 의 실제
+# 리터럴을 기준으로 하는데 CI 에는 그 파일이 없고, 기본 패턴으로 대체하면 패턴 파일
+# 자신이 매칭돼 상시 실패한다(실측: CI run 31176518944). CI 에서의 등가물은
+# "히스토리 전량 스캔" 스텝이므로 그것의 존재를 대신 확인한다.
 WF=.github/workflows/verify.yml
 if [ ! -f "$WF" ]; then
   block "$WF 없음 — CI 로 이관한 검사를 아무도 실행하지 않는다 (fail-closed)"
@@ -52,6 +57,9 @@ else
       block "$d 가 CI($WF)에 없다 — pre-push 에서 뺀 검사는 CI 가 반드시 실행해야 한다"
     fi
   done
+  if ! grep -q '히스토리 전량 스캔' "$WF"; then
+    block "CI 에 '히스토리 전량 스캔' 스텝이 없다 — acceptance-0-2 의 CI 등가물이 사라졌다"
+  fi
 fi
 
 checks=""
