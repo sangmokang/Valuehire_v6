@@ -45,9 +45,32 @@ fi
 
 FAIL=0
 
+# 스캔 소스 (V1 2026-08-07 지적 반영):
+#   worktree(기본) — 작업트리 파일 내용을 읽는다. CI·수동 검사용.
+#   index          — 인덱스(스테이지)에 등록된 blob 내용을 읽는다. pre-commit 용.
+#
+# 왜 나눠야 하나: 목록만 인덱스에서 읽고 내용을 작업트리에서 읽으면 다음으로 우회된다.
+#   git add <비밀파일> → 작업트리만 깨끗한 내용으로 덮어씀 → git commit → 통과
+#   (실측: 커밋된 blob 에 AKIA… 가 들어갔는데 스캔은 PASS)
+SCAN_SOURCE="${VERIFY_SCAN_SOURCE:-worktree}"
+
 set +e
 # -i: 자격증명 키워드는 대소문자를 가리지 않는다(`password:` / `PASSWORD=` 둘 다 잡아야 함)
-LEAKS=$(git ls-files -z | xargs -0 grep -lEif "$CLEAN" -- 2>"$ERRS")
+if [ "$SCAN_SOURCE" = "index" ]; then
+  LEAKS=""
+  while IFS= read -r -d '' f; do
+    rc=0
+    git show ":$f" 2>>"$ERRS" | grep -qEif "$CLEAN" || rc=$?
+    if [ "$rc" -eq 0 ]; then
+      LEAKS="${LEAKS}${f}"$'\n'
+    elif [ "$rc" -gt 1 ]; then
+      printf 'grep 실행 오류(rc=%s): %s\n' "$rc" "$f" >> "$ERRS"
+    fi
+  done < <(git ls-files -z)
+  LEAKS="${LEAKS%$'\n'}"
+else
+  LEAKS=$(git ls-files -z | xargs -0 grep -lEif "$CLEAN" -- 2>"$ERRS")
+fi
 set -e
 if [ -s "$ERRS" ]; then
   echo "FAIL: scanner error — fail-closed (grep/xargs stderr):"

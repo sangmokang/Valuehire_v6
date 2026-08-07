@@ -48,17 +48,32 @@ DEFERRED="acceptance-0-5 acceptance-0-7"
 # 리터럴을 기준으로 하는데 CI 에는 그 파일이 없고, 기본 패턴으로 대체하면 패턴 파일
 # 자신이 매칭돼 상시 실패한다(실측: CI run 31176518944). CI 에서의 등가물은
 # "히스토리 전량 스캔" 스텝이므로 그것의 존재를 대신 확인한다.
+#
+# 이름 검색만으로는 부족하다(V1 2026-08-07 실측). 아래 4종이 전부 통과했다:
+#   ① run: 을 # run: 으로 주석 처리   ② 스텝에 if: false 추가
+#   ③ 스텝 본문 통째 삭제(주석에 이름만 잔존)  ④ 조건을 없는 ref 로 변경
+# 그래서 주석을 걷어낸 뒤 "실행되는 run: 줄"에 있는지를 본다.
 WF=.github/workflows/verify.yml
 if [ ! -f "$WF" ]; then
   block "$WF 없음 — CI 로 이관한 검사를 아무도 실행하지 않는다 (fail-closed)"
 else
+  # 주석 줄을 제거한 '실제로 실행되는' 워크플로 본문
+  ACTIVE=$(grep -v '^[[:space:]]*#' "$WF")
+
   for d in $DEFERRED; do
-    if ! grep -q "$d" "$WF"; then
-      block "$d 가 CI($WF)에 없다 — pre-push 에서 뺀 검사는 CI 가 반드시 실행해야 한다"
+    if ! printf '%s\n' "$ACTIVE" | grep -qE "run:.*${d}|^[[:space:]]*bash .*${d}"; then
+      block "$d 가 CI($WF)의 실행 줄(run:)에 없다 — 주석 처리·본문 삭제 여부를 확인하라"
     fi
   done
-  if ! grep -q '히스토리 전량 스캔' "$WF"; then
-    block "CI 에 '히스토리 전량 스캔' 스텝이 없다 — acceptance-0-2 의 CI 등가물이 사라졌다"
+
+  # 스텝 비활성화 금지
+  if printf '%s\n' "$ACTIVE" | grep -qE '^[[:space:]]*if:[[:space:]]*(false|\x27false\x27|"false")'; then
+    block "CI 워크플로에 if: false 로 비활성화된 스텝이 있다 (P13 — 검사 약화)"
+  fi
+
+  # acceptance-0-2 의 CI 등가물: 이름이 아니라 본문(도달 가능 blob 을 실제로 여는 코드)을 확인
+  if ! printf '%s\n' "$ACTIVE" | grep -q 'cat-file blob'; then
+    block "CI 의 '히스토리 전량 스캔' 본문이 사라졌다 (cat-file blob 없음) — acceptance-0-2 의 등가물이 없다"
   fi
 fi
 

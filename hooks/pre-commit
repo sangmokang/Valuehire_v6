@@ -56,14 +56,16 @@ clean_patterns() { sed -e 's/[[:space:]]*#.*//' -e '/^[[:space:]]*$/d' "$1"; }
 # 여기서 자체 스캔을 구현하면 판정기가 2벌이 되고, 실제로 갈렸다(2026-08-07 실측):
 #   verify.sh          : .default + .secret-patterns 합집합 / tr -d '\r' 정규화 / grep -i
 #   자체 구현(폐기)    : 둘 중 하나만 / 정규화 없음 / -i 없음  → 같은 저장소에서 다른 판정
-# git ls-files 는 인덱스를 읽으므로 방금 add 한 파일도 포함된다 — 커밋 직전 검사로 충분하다.
+# VERIFY_SCAN_SOURCE=index 로 부른다. 기본(worktree) 모드는 목록만 인덱스에서 읽고
+# 내용은 작업트리에서 읽으므로 다음으로 우회된다(V1 2026-08-07 실측):
+#   git add <비밀> → 작업트리만 깨끗하게 덮어씀 → git commit → 통과, 커밋에는 비밀이 들어감
 if [ ! -f verify.sh ]; then
   block "verify.sh 없음 — 비밀 스캔 불가 (fail-closed)"
 else
   vrc=0
-  bash verify.sh >/dev/null 2>&1 || vrc=$?
+  VERIFY_SCAN_SOURCE=index bash verify.sh >/dev/null 2>&1 || vrc=$?
   if [ "$vrc" -ne 0 ]; then
-    block "비밀 스캔 실패 (verify.sh exit=$vrc). 상세: bash verify.sh"
+    block "비밀 스캔 실패 (verify.sh --index exit=$vrc). 상세: VERIFY_SCAN_SOURCE=index bash verify.sh"
   fi
 fi
 

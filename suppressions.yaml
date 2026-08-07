@@ -1,0 +1,24 @@
+# 억제 원장 (P13③)
+#
+# 검사를 끄거나 줄이는 모든 결정은 여기에 기록한다. 필수 필드: check · reason · owner · expiry · issue.
+# hooks/pre-commit 이 ① expiry 누락 ② 만료 경과 를 커밋 시점에 차단한다.
+#
+# 왜 이 파일이 필요한가: v5 `98d923f` 에서 검증자가 찾은 결함 5건을 "실패해도 됨"으로
+# 넘겼고, 기한이 없어 프리랜서·전문대 하드제외 우회가 35일간 살아 있었다(§0-C 사례 B).
+# 유예는 해결이 아니며, 기한 없는 유예는 해결이 영원히 오지 않는다.
+
+- check: acceptance-0-2
+  reason: >-
+    히스토리 정리 완결성 검사. pre-push 에서 CI 로 이관하려 했으나 CI 에서도 돌지 못해
+    현재 어느 게이트도 실행하지 않는 상태다. 두 가지 이유가 겹쳤다.
+    (1) unreachable==0 조건이 git add·reset·amend 만으로 깨져 개발 중 상시 실패한다.
+    (2) 로컬 전용 .secret-patterns 를 요구하는데 CI 에는 없고, .secret-patterns.default 로
+    대체하면 패턴 파일 자신이 자기매칭한다(CI run 31176518944, blob 09b233e).
+    로컬에서 현재 exit 1(unreachable 잔존)이다.
+  owner: sangmokang
+  expiry: 2026-08-21
+  issue: >-
+    분할 이관한다. 0-2 의 뮤테이션 테스트는 합성 카나리(ACCEPTANCE-MUTATION-CANARY-42)만
+    쓰므로 로컬 패턴 파일이 필요 없다 — CI 로 그대로 옮길 수 있다. 이것이 스캐너 무력화를
+    탐지하는 핵심이므로 최우선이다. unreachable 검사는 커밋 시점 검사가 아니라 주기 점검으로
+    옮기고, 히스토리 리터럴 검사는 CI 의 '히스토리 전량 스캔' 스텝이 이미 등가로 수행한다.
