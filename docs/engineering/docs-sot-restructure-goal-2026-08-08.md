@@ -97,8 +97,68 @@ EXIT CODE: 0
 
 ## 적대 검증 로그
 
-### V1 — Codex (격리)
-(진행 예정 — 이 절은 `/codex:rescue` 실행 후 판정 본문 그대로 append)
+### V1 — Codex (격리, `codex:codex-rescue` 에이전트, agentId `a3f7759eb79df572f`)
 
-### V2 — Claude 재현
-(V1 이후 진행)
+최초 응답이 "Done."뿐이라(빈 결과, 판정 무효) 판정 본문을 명시적으로 재요청해 재현했다. 아래는 그 판정 본문 그대로.
+
+```
+VERDICT: CONDITIONAL
+
+1. 문구 무결성 — 통과. `git show c078210^:...v6-coding-principles...`의 P1~P22 표와
+   `docs/sot/coding-principles.md:14` 표를 byte-for-byte 비교했다. SHA-256이 둘 다
+   `c1a9…09e03`이고 P1~P22가 각각 1회씩 존재했다. 누락·수치·판정 변형을 깨뜨리려
+   했으나 발견되지 않았다.
+
+2. 훅 로직 오염 — 통과. `git show 3c22e64 -- hooks/ scripts/`에서 5개 대상은 각각
+   `1 insertion, 1 deletion`이며 계약 주석만 바뀌었다. 계약 주석을 제거한 뒤 커밋
+   전후 본문 해시도 5개 모두 동일했다. 새 계약도 원본 §⑩과 byte-exact다.
+
+3. 20,000바이트 지표 — 조건부 통과. 경계 공격 결과 15424/19999/20000 => PASS,
+   20001 => FAIL. 현재 최대 문서(coding-principles)는 15,424바이트라 상한까지
+   22.9%만 남아 있어 무의미하게 큰 상한은 아니다. 다만 "분량" 게이트일 뿐 영구
+   규칙/세션 기록의 의미적 혼합까지 검출하지는 못한다.
+
+4. 고아·미배선 — 통과. docs/sot/*.md 5개 모두 INDEX.md 링크 + 5개 소비자(훅/스크립트)
+   주석에서 역참조됨을 rg -l로 확인. 고아 파일을 찾으려 했으나 발견하지 못했다.
+
+5. 원본 훼손 — 통과. 원본 2개 파일 numstat이 각각 `2 0`, `4 0` — 삭제·본문 교체
+   없이 이관 각주만 추가됐다. git diff --check exit 0.
+
+6. 가짜 완료 재현 — 부분 통과. check-docs-sot.sh는 재현됐으나, codex 자신의 실행
+   환경에서는 verify.sh:36의 mktemp 두 호출이 권한 거부로 exit 1 — 비밀 스캔 PASS를
+   codex 환경에서는 독립 재현하지 못했다.
+
+결론: 구조·원문 무결성·훅 비약화는 실제 diff/해시 대조로 확인됐지만, verify.sh의
+실제 PASS를 현재 환경에서 재현하지 못했으므로 무조건 PASS는 부적절하다. mktemp
+권한 문제의 원인을 규명한 뒤 재검증하는 것을 조건으로 CONDITIONAL PASS를 부여한다.
+```
+
+### V2 — Claude 재현 (격리 재현 + 양방향 재공격)
+
+**항목 6(verify.sh 미재현) 재공격** — codex의 환경 한정 문제인지, 실제 결함인지 직접 재현:
+```
+$ mktemp && mktemp -d          # 이 워크트리 환경에서
+/var/folders/.../tmp.3ndFRu89XT   (exit 0)
+/var/folders/.../tmp.T9qraykN4p   (exit 0)
+$ bash verify.sh
+PASS: no secret-pattern match in any tracked file, .env not tracked   (exit 0)
+$ git status --short   → 빈 출력 (clean)
+```
+→ 이 환경에서는 mktemp·verify.sh 모두 정상 동작. codex가 걸었던 CONDITIONAL 사유는 **codex 자신의 샌드박스가 mktemp 쓰기를 거부한 환경 제약**이었고, verify.sh 자체나 이번 변경의 결함이 아니었음을 확인했다(양방향 의심 — codex의 FAIL을 그대로 받아들이지 않고 재현해 반박).
+
+**codex가 검증 범위에 넣지 않은 부분 자체 발견(놓친 것 없나)** — codex의 정조준 항목 1은 `coding-principles.md`만 지목했다. `git-workflow.md`·`hook-contracts.md`는 codex의 명시적 문구 대조 대상이 아니었으므로 V2가 직접 라인 단위로 재대조했다:
+
+| 파일 | 대조 방법 | 결과 |
+|---|---|---|
+| `docs/sot/hook-contracts.md` §⑩ 본문 | 원본 172~219행 vs 추출본 라인 대조 | byte-exact (내가 추가한 "시행 지점"/"비범위" 섹션만 순증가, 계약 본문은 무변형) |
+| `docs/sot/git-workflow.md` "현재 규칙" | 원본 304~319행 vs 추출본 라인 대조 | **불일치 발견** — 헤딩을 볼드체 문장으로, 개조식 문장을 풀어쓴 문장으로 재서술했고, 특히 `P11(코드 예산)`의 **원칙 번호(P11)가 누락**된 채 "코드 예산 원칙"으로만 남아 있었다. 원문 그대로로 즉시 재작성 후 재대조해 byte-exact 확인 |
+| `docs/sot/coding-principles.md` 캡션 1줄 | 원본 153행 vs 추출본 11행 | **불일치 발견** — "대응 관계는 §2 판정표에 있다" 뒤에 "원본 goal 문서"를 임의로 삽입해 놓았다. "시행 지점" 절에 이미 같은 안내가 있어 중복이기도 해 원문 그대로 복원 |
+
+**정정 표(V1 vs V2)**
+
+| 구분 | 건수 | 내용 |
+|---|---|---|
+| V1이 잡고 V2가 확인 | 1건 | verify.sh 미재현 — 원인은 codex 환경 제약으로 판명, 실제 결함 아님(항목 6 CONDITIONAL 사유는 해소) |
+| V2가 추가로 잡은 것(V1이 놓친 문구 이관 오류) | 2건 | `git-workflow.md`의 P11 번호 누락 + 문체 재서술, `coding-principles.md` 캡션 1줄의 임의 삽입 — 둘 다 즉시 원문 그대로로 재작성해 수정 완료 |
+
+수정 후 재실행: `bash scripts/check-docs-sot.sh` 10건 PASS(exit 0), `bash verify.sh` PASS(exit 0), `git status --short` clean. 최종 판정: **PASS** — codex가 CONDITIONAL로 걸었던 사유는 환경 아티팩트로 해소됐고, V2가 새로 찾은 2건의 문구 이관 오류는 그 자리에서 고쳐 재검증을 통과했다.
