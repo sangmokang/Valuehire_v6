@@ -318,6 +318,93 @@ conclusion: success
 - `pre-push` 의 CI 존재 확인은 `grep -q` 이므로 **이름만 있으면 통과** — 스텝이 `if: false` 로 바뀌면 우회 가능 (V1 정조준 항목 2)
 - P13 오탐이 잦아지면 라벨을 습관적으로 붙이게 되고 그 순간 P13 도 무력화 → 탐지 패턴을 좁게 시작
 
-### V1 최종 판정
+### V1 1차 최종 판정 — `조건부 REJECT`
 
-*(진행 중 — `scratchpad/v1-watchdog-final.md` 도착 시 본문 그대로 append)*
+판정서: `scratchpad/v1-watchdog-final.md`
+
+> `VERDICT: 조건부 REJECT — 게이트는 진짜인데 시연이 가짜이고 배송이 불가능하다.`
+> AC-1 PASS / AC-2 PASS / AC-3 PASS(도중 가짜였다가 수정됨) / AC-4 부분 PASS / AC-5 PASS / **AC-6 FAIL**
+
+**방법론**: 모든 "차단됨"에 대해 `core.hooksPath=/dev/null` 로 훅만 끈 **대조군**을 돌렸다.
+훅 ON 에서 exit≠0 이고 훅 OFF 에서 exit 0 이어야만 훅이 원인임이 증명된다. **6종 중 5종이 통과, 1종 탈락.**
+
+**[P0] AC-6 시연 1 은 가짜 차단이었다.**
+`sed -i.bak "s|^LEAKS=.*|…grep -v…|"` 의 `|` 가 구분자와 충돌해 BSD sed 가 파싱에 실패했고(`bad flag in substitute command: 'r'`),
+`verify.sh` 는 전혀 변조되지 않았다. `git commit` 이 `nothing to commit` 으로 exit 1 을 냈고 0-7 이 그것을 BLOCKED 로 계수했다.
+**훅 OFF 대조군도 exit 1** — 훅은 아무 역할도 하지 않았다. **P13④ 게이트는 한 번도 실행된 적이 없다.**
+0-7 출력에서 시연 1 만 `BLOCKED:` 사유 줄이 비어 있던 것이 그 흔적이며, G(Claude)는 그것을 보고도 넘겼다.
+
+V2 재현: `sed exit=0` 이지만 해시 불변(`c3f6ba25…` 동일), 훅 ON=1 / 훅 OFF=1 → **CONFIRMED.**
+
+**[P0] 환경변수 하나로 AC-6 전체가 무력화된다.** `ACCEPTANCE_0_7_ACTIVE=1` → 6종 미실행 exit 0, 화면엔 "정상".
+G 가 무한재귀를 막으려 넣은 가드가 그대로 킬 스위치가 됐다. → **CONFIRMED, 가드 제거.**
+
+**[P1] `hooks/` 없는 브랜치에선 강제가 조용히 0개.** `core.hooksPath` 는 저장소 전역 config 인데 `hooks/` 는 브랜치 내용이다.
+→ **CONFIRMED** (`7e20bd4` 체크아웃 후 `AKIA…` 커밋 exit 0).
+
+### V1 2차 판정 — `조건부 승인`
+
+판정서: `scratchpad/v1-watchdog-final2.md`
+
+> `VERDICT: 조건부 승인 — 1차 지적은 전부 해소됐고 그 해소가 진짜임을 증명했으나, 같은 계열의 신규 결함 3건이 나왔다.`
+
+**AC-6 판정이 뒤집혔다 — 뮤테이션 1:1 대응으로.**
+훅 ON/OFF 대조만으로는 "어떤 훅이 원인"만 증명되고 "**의도한 그 게이트**가 원인"은 증명되지 않는다.
+그래서 게이트를 하나씩 no-op 으로 죽이고 0-7 을 재실행했다.
+
+```
+자기제외 죽임 → 시연 1만 빨강     약화탐지 → 2만      억제 → 3만
+LLM       → 4만                외부효과 → 6만      pre-push청결 → 5만
+6/6 완벽 대응 · 번짐 0건 · 무변조 기준선 exit 0
+```
+
+> *"AC-6 은 이제 이 저장소에서 가장 신뢰할 만한 장치입니다."*
+
+**V1 이 자기 1차 예측을 철회했다**: "머지 후 main push 는 반드시 터진다" → 로컬 bare 원격에 머지 후 실제 push 결과
+`85f24f4..95768bc main -> main` exit 0. 0-5 가 `PUSH_CHECKS` 에서 빠졌으므로 데드락이 성립하지 않는다.
+
+**신규 결함 3건 (전부 V2 재현 CONFIRMED)**
+
+| # | 결함 | 실측 | 조치 |
+|---|---|---|---|
+| 1 | **`SECRET_PATTERNS_FILE` 이 비밀 스캔 킬 스위치** | `SECRET_PATTERNS_FILE=/tmp/weak.txt git commit` → exit 0, `AKIA…`·`ghp_…` 커밋됨. 빈 파일·없는 파일은 fail-closed 였으나 "유효하지만 아무것도 안 잡는" 파일이 구멍 | pre-commit 이 `SECRET_PATTERNS_FILE=` 로 비워 고정 |
+| 2 | **`PUSH_CHECKS` 고정 목록이 신규 검사를 조용히 누락** | `acceptance-9-9.sh`(항상 exit 1) 추가 → "검사 2개 실행" / push exit 0 | 글로브 + 명시적 제외 3종(DEFERRED)으로 복귀 |
+| 3 | **0-7 에 `unset GIT_DIR` 없음** | 형제 0-2·0-5 는 갖고 있다. 중첩 실행 시 `git push` 가 넘긴 `GIT_DIR` 때문에 `git remote add` 가 실패해 **우연히** 재귀가 끊기고 있었다 | 형제와 동일하게 추가 — 우연이 아니라 명시적 제외에 의존하게 |
+| 4 | **expiry 우회 4종** | 빈 값 / `99-01-01`(문자열 비교라 먼 미래) / `never` / `9999-99-99` 전부 통과. 원인은 `gsub` 로 숫자만 남기는 정제가 `never` 를 빈 문자열로 만든 것 | 원문 그대로 받아 `YYYY-MM-DD` 정규식으로 먼저 검증 |
+| 5 | **커밋된 억제가 썩는 것을 아무도 안 봄** | pre-commit 의 expiry 검사는 `suppressions.yaml` 이 **스테이징된 커밋에서만** 돈다. CI 내 expiry 언급 0건 — 이 게이트가 막겠다고 인용한 `98d923f`(35일 방치) 시나리오 그 자체 | **CI 「억제 만료 스캔」 스텝 신설** — 매 push 마다 전량 검사 |
+| 6 | `hooks/` 없는 브랜치 | 로컬에서는 원리적으로 막을 수 없음 | **CI 「강제 장치 존재 검사」 스텝 신설** — 원격에서 막는다 |
+
+**수정 후 검증 (전부 clone 대조 실측, HEAD `d57c0b8`)**
+
+```
+A 킬 스위치 (SECRET_PATTERNS_FILE=/tmp/weak.txt)  → commit exit=1  차단
+B 새 검사 누락 (acceptance-9-9.sh)                → push exit=1, "검사 3개 실행", BLOCKED 9-9
+C expiry 빈값 / 99-01-01 / never / 9999-99-99     → 전부 exit=1   차단
+  expiry 2026-12-31 (유효)                        → exit=0       통과
+D 정상 커밋 오탐                                   → exit=0       없음
+0-7 (unset GIT_DIR 추가 후)                       → 6/6 PASS 유지
+CI (스텝 9개, 신설 2종 포함)                       → success
+```
+
+### 채택하지 않은 V1 제안 1건 (판단 기록)
+
+V1 제안: *"시연 5의 실제 push 를 `bash hooks/pre-push` 직접 호출로 교체하면 재귀·글로브 복귀·`unset GIT_DIR` 3건이 한꺼번에 풀린다."*
+
+**채택하지 않았다.** `demo()` 는 훅 ON/OFF 대조군으로 판정하는데, `bash hooks/pre-push` 를 직접 부르면
+`core.hooksPath=/dev/null` 이 무력해져 **훅 OFF 대조군이 항상 ON 과 같은 결과**를 낸다. 그러면 "훅이 원인"을
+증명할 수 없어 1차에 지적받은 위양성 구조로 되돌아간다. 대신 글로브에서 0-7 만 제외해 재귀를 끊고
+신규 검사는 자동 포함되게 했다. **이 판단은 3차 재검증에 정조준 항목으로 올려 두었다.**
+
+### 후속 이슈로 남긴 것
+
+| 항목 | 이유 |
+|---|---|
+| **CI 이관 보증을 파싱 → 실행 증명으로** | `if: ${{ false }}`, `if: github.event_name == 'never'`, 조건 ref 변경 등 **항상-거짓 조건은 열거로 막을 수 없다**(V1). 주석 처리·`if: false`·본문 삭제 3종만 현재 차단. CI 가 마커를 남기고 pre-push 가 조회하는 구조로 가야 하며 설계 변경이 크다 |
+| P13 약화 탐지가 **추가된 줄만** 봄 | 삭제는 원리적으로 미탐지. 삭제 diff 검사는 리팩터링마다 오탐이 나서 보류 |
+| 0-2 뮤테이션 테스트 CI 이관 | `suppressions.yaml` 에 expiry `2026-08-21` 로 등록. 기한이 지나면 **CI 만료 스캔이 push 를 막는다** |
+| 자기제외 탐지 범위 | `.github/workflows/*`, `.claude/skills/*/local-checks.sh` 가 범위 밖 |
+| 외부효과 게이트 파일명 기반 | `src/api/types.ts` 오탐 / `authenticate.js` 회피 가능 |
+
+### V1 3차 판정
+
+*(진행 중 — `scratchpad/v1-watchdog-final3.md` 도착 시 본문 그대로 append)*
