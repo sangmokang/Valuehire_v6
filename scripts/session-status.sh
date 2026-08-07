@@ -4,7 +4,7 @@
 # 왜 필요한가: 긴 세션 중 다른 세션이 커밋을 쌓으면, 세션 시작 시점의 HEAD 를 계속
 # 믿고 작업하다가 이미 끝난 일을 다시 하게 된다(2026-08-07 실제 발생).
 #
-# 계약: docs/engineering/hook-enforcement-goal-2026-08-07.md ⑩
+# 계약: docs/sot/hook-contracts.md
 #   출력  : stdout 3줄 + exit 0
 #   불변식: git 조회 실패 시 해당 줄에 UNKNOWN 을 출력하고 exit 1 (조용한 성공 금지)
 set -uo pipefail

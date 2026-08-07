@@ -147,6 +147,8 @@
 
 ---
 
+> **2026-08-08 이관**: 이 §1(+§1-B, 검증 체제)과 §4의 "결론/규약" 부분의 정본은 각각 `docs/sot/coding-principles.md`, `docs/sot/git-workflow.md`로 이동했다. 아래는 이관 당시 원본을 그대로 보존한 것이며, 갱신은 SOT 쪽에서만 한다(근거: `docs/engineering/docs-sot-restructure-goal-2026-08-08.md`).
+
 ## §1. 확정 원칙 — 오너 27개 + 추가 6개 + Claude/Codex 자체제안 23개(A~O) + v4 전수조사 자체제안 12개를 **P1~P22**로 통합
 
 **압축 기준(P1의 자기 적용)**: 통과하는 기계 장치를 가질 수 없는 항목은 남기지 않는다.
@@ -300,6 +302,8 @@ make verify       현재 상태 검사. 초록/빨강만 나옴. pre-push에 걸
 ---
 
 ## §4. GitHub 전략
+
+> **2026-08-08 이관**: "결론/규약" 부분의 정본은 `docs/sot/git-workflow.md`로 이동했다("CI가 강제할 것" 매핑표는 여기 그대로 남는다).
 
 ### 결론: Trunk-based + 수명 짧은 worktree 브랜치 + 태그 릴리스
 

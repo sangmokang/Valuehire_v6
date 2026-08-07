@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # pre-push — push 시점 로컬 강제 장치 (P15)
 #
-# 계약: docs/engineering/hook-enforcement-goal-2026-08-07.md ⑩
+# 계약: docs/sot/hook-contracts.md
 #   입력  : stdin 으로 <local ref> <local sha> <remote ref> <remote sha> (git 표준, 읽지 않아도 됨)
 #   출력  : exit 0 | exit 1
 #   불변식: 검사 스크립트가 0개 발견되면 exit 1 — "검사할 게 없어서 통과"를 금지한다
