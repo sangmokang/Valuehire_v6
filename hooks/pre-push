@@ -131,7 +131,9 @@ while IFS= read -r c; do
     # basename 이 아니라 상대 경로로 대조한다. 파일명만 보면 CI 에 등록된 적 없는
     # 파일이 동명이인 덕에 면제된다(2026-08-07 실측: CI 는 scripts/acceptance-8-8.sh 를
     # 실행하는데 other/acceptance-8-8.sh 가 면제받고 skip 됐다).
-    rel="${c#./}"
+    # 정규식 메타문자를 이스케이프한다. 안 하면 `.` 가 와일드카드로 동작해
+    # `bash scripts/acceptance-0-7Xsh` 같은 줄이 통과한다(미탐 방향, V1 6차 실측).
+    rel=$(printf '%s' "${c#./}" | sed 's/[].[*^$+?(){}|\\]/\\&/g')
     if ! printf '%s\n' "${ACTIVE:-}" | grep -qE "run:[[:space:]]*((bash|sh)[[:space:]]+|\./)[^-|]*${rel}|^[[:space:]]*((bash|sh)[[:space:]]+|\./)[^-|]*${rel}"; then
       block "$c 가 PUSH-PERFORMING 을 선언했으나 CI 의 실행 줄에 없다 — 아무도 실행하지 않는다"
     fi

@@ -22,3 +22,43 @@
     쓰므로 로컬 패턴 파일이 필요 없다 — CI 로 그대로 옮길 수 있다. 이것이 스캐너 무력화를
     탐지하는 핵심이므로 최우선이다. unreachable 검사는 커밋 시점 검사가 아니라 주기 점검으로
     옮기고, 히스토리 리터럴 검사는 CI 의 '히스토리 전량 스캔' 스텝이 이미 등가로 수행한다.
+
+- check: ci-transfer-guarantee
+  reason: >-
+    pre-push 의 "이관한 검사가 CI 에 실제로 있는가" 보증이 워크플로를 문자열로 파싱한다.
+    막을 때마다 새 우회가 나왔다 — 주석 처리 / if: false / 스텝 본문 삭제 / echo 대체 /
+    bash -n / bash -c / sh -c : 까지 막았으나, V1 6차에서 다시 4종이 통과했다:
+    `bash ; echo <path>` · `bash /dev/null <path>` · `bash "" <path>` · `sh /dev/null <path>`.
+    넷 다 스크립트를 한 줄도 실행하지 않는다. `if: ${{ false }}` 같은 임의 항상-거짓 조건과
+    파이프 변형도 남아 있다. 문자열 규칙을 하나 추가할 때마다 우회도 하나씩 늘어난다.
+    현재 이 보증은 방어 심도이지 1차 방어선이 아니며, 비밀 게이트 3중(pre-commit --index /
+    pre-push 고정 / CI 히스토리 blob 스캔)은 이 우회에 영향받지 않는다.
+  owner: sangmokang
+  expiry: 2026-09-15
+  issue: >-
+    파싱을 정교화하는 방향은 수익이 체감한다. 실행 증명으로 바꾼다 — CI 가 각 인수 스크립트
+    완료 시 마커(job summary·아티팩트·check-run)를 남기고 pre-push 가 최근 성공 run 에서
+    조회한다. 워크플로를 어떻게 편집하든 실행하지 않으면 통과할 수 없으므로, 위 우회 전부와
+    항상-거짓 조건이 한꺼번에 닫힌다.
+
+- check: p13-deletion-blindspot
+  reason: >-
+    P13 약화 탐지가 diff 의 추가된 줄(+)만 본다. 검사 줄을 삭제하는 약화는 원리적으로
+    탐지되지 않는다. 삭제 diff 검사를 전면 도입하면 리팩터링마다 오탐이 나서 보류했다.
+  owner: sangmokang
+  expiry: 2026-09-15
+  issue: >-
+    범위를 CI 워크플로 파일(.github/workflows/*)로 한정하면 오탐이 거의 없다는 데
+    V1 과 합의했다 — 그 파일에서 스텝 삭제는 거의 항상 약화다. 그 범위부터 도입한다.
+
+- check: gate-scope-gaps
+  reason: >-
+    두 게이트의 적용 범위가 좁다. (1) 자기제외 탐지가 verify.sh·scripts/*.sh·hooks/* 만
+    보고 .github/workflows/*, .claude/skills/*/local-checks.sh 는 범위 밖이다.
+    (2) 외부효과 네트워크 검사가 파일명 기반이라 src/api/types.ts 를 오탐하고
+    authenticate.js 를 놓친다.
+  owner: sangmokang
+  expiry: 2026-09-30
+  issue: >-
+    (1)은 case 패턴에 두 경로를 추가하면 된다. (2)는 파일명이 아니라 import/호출 그래프
+    기반으로 "외부 효과를 내는 모듈"을 판별해야 하며, 소스가 생긴 뒤에 설계한다.
