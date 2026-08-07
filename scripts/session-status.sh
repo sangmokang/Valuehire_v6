@@ -39,7 +39,12 @@ fi
 # 상대 경로로 찾는다 — 절대 경로로 하면 워크트리(.../worktrees/<name>/)에서
 # 자기 자신이 제외 패턴에 걸려 검사 0개가 되고, 그것이 "RED 0/0"으로 조용히 통과한다.
 cd "$root"
+# acceptance-0-7 은 제외한다. clone 6회 + 훅 ON/OFF 대조 12회를 돌아 세션 시작마다
+# 실행하기엔 무겁고, 자신이 push 를 시연하므로 훅과 얽힌다. CI 가 매 push 마다 돌린다.
+# 조용히 빼지 않고 출력에 명시한다 — 소리 없는 제외는 위반유형 E(검사 skip 전환)다.
+EXCLUDED=acceptance-0-7.sh
 checks=$(find . -maxdepth 2 \( -name 'verify.sh' -o -name 'acceptance-*.sh' \) \
+         -not -name "$EXCLUDED" \
          -not -path './worktrees/*' -not -path './.git/*' | LC_ALL=C sort)
 total=$(printf '%s\n' "$checks" | awk 'NF{c++} END{print c+0}')
 
@@ -55,5 +60,5 @@ while IFS= read -r c; do
   bash "$c" >/dev/null 2>&1 || red=$((red + 1))
 done <<< "$checks"
 
-printf 'RED: %d/%d\n' "$red" "$total"
+printf 'RED: %d/%d (%s 제외 — CI 담당)\n' "$red" "$total" "$EXCLUDED"
 exit "$rc"
