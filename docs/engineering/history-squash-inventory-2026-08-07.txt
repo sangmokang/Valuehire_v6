@@ -1,0 +1,39 @@
+=== 사전 인벤토리 2026-08-07 07:13:09 ===
+--- refs ---
+refs/heads/main 6e52c77c4577832f3707904c1849fee92d05a2d3
+refs/heads/task/gptreview-verify-skills 4d53eac48c957e70ece5d04a600b2e53527f384a
+refs/heads/task/history-squash 71b118637fce9e3ec9ef65df144a34d04017cea7
+refs/remotes/origin/main 9d0ffd93580ce4ee523fe07f6e1315aa8dc40464
+--- worktrees ---
+worktree /Users/kangsangmo/Desktop/Valuehire_v6
+HEAD 6e52c77c4577832f3707904c1849fee92d05a2d3
+branch refs/heads/main
+
+worktree /Users/kangsangmo/Desktop/Valuehire_v6/worktrees/history-squash
+HEAD 71b118637fce9e3ec9ef65df144a34d04017cea7
+branch refs/heads/task/history-squash
+
+--- pseudorefs ---
+ls: .git/FETCH_HEAD: No such file or directory
+-rw-r--r--@ 1 kangsangmo  staff  41 Aug  6 20:04 .git/ORIG_HEAD
+-rw-r--r--@ 1 kangsangmo  staff  41 Aug  7 05:46 .git/worktrees/history-squash/ORIG_HEAD
+--- reflog counts ---
+       5 .git/logs/HEAD
+       8 .git/worktrees/history-squash/logs/HEAD
+      13 total
+--- objects ---
+count: 92
+size: 368
+in-pack: 0
+packs: 0
+size-pack: 0
+prune-packable: 0
+garbage: 0
+size-garbage: 0
+--- 오염 커밋 6 / blob 6 ---
+965f084fed098db8daeae376ca05f3e21b814d41
+2f45b7b6dda007976ee493b6cca9b0a4bece25be
+ce814451f3d83a0f9b6360ec6ab9218a15a03c2c
+e951c59c7dede7762bfcf17aeb9a026c4894609f
+c32d5fd091748f17259e16236e76098ef325479e
+4d53eac48c957e70ece5d04a600b2e53527f384a
