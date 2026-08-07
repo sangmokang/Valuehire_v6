@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# pre-push — push 시점 로컬 강제 장치 (P15)
+#
+# 계약: docs/engineering/hook-enforcement-goal-2026-08-07.md ⑩
+#   입력  : stdin 으로 <local ref> <local sha> <remote ref> <remote sha> (git 표준, 읽지 않아도 됨)
+#   출력  : exit 0 | exit 1
+#   불변식: 검사 스크립트가 0개 발견되면 exit 1 — "검사할 게 없어서 통과"를 금지한다
+#          미추적/미커밋 변경이 있으면 exit 1 (P15)
+#   한계  : git push --no-verify 로 우회 가능. CI(.github/workflows/verify.yml)가 최종 방어선이다.
+set -euo pipefail
+
+REPO=$(git rev-parse --show-toplevel)
+cd "$REPO"
+
+fail=0
+block() { printf 'BLOCKED: %s\n' "$1" >&2; fail=1; }
+
+# ── 1) 작업트리 청결 (P15 · 78f3631 ② 몰래 되돌림 재현 방지) ──────────────────
+dirty=$(git status --porcelain)
+if [ -n "$dirty" ]; then
+  block "작업트리가 깨끗하지 않다 — 미커밋/미추적 변경이 있는 상태의 push (P15)"
+  printf '%s\n' "$dirty" | sed 's/^/         /' >&2
+fi
+
+# ── 2) 로컬 검사 전량 재실행 ─────────────────────────────────────────────────
+checks=$(find . -maxdepth 2 \( -name 'verify.sh' -o -name 'acceptance-*.sh' \) \
+         -not -path './worktrees/*' -not -path './.git/*' | LC_ALL=C sort)
+
+n=$(printf '%s\n' "$checks" | awk 'NF{c++} END{print c+0}')
+if [ "$n" -eq 0 ]; then
+  block "검사 스크립트를 하나도 찾지 못했다 (fail-closed — 검사할 게 없어서 통과는 금지)"
+else
+  printf 'pre-push: 검사 %d개 실행\n' "$n" >&2
+  while IFS= read -r c; do
+    if [ -z "$c" ]; then continue; fi
+    rc=0
+    bash "$c" >/dev/null 2>&1 || rc=$?
+    if [ "$rc" -ne 0 ]; then
+      block "$c exit=$rc"
+    else
+      printf '  ok  %s\n' "$c" >&2
+    fi
+  done <<< "$checks"
+fi
+
+exit "$fail"
