@@ -65,6 +65,60 @@ jobs:
       - name: 인수 검사 0-6 (가짜 검증 스크립트 0건)
         run: bash scripts/acceptance-0-6.sh
 
+      # ↓ 아래 3개는 pre-push 에서 CI 로 이관된 검사다(2026-08-07).
+      #   pre-push 는 "이 push 가 안전한가"만 판정하며, 저장소 위생·메타 검사는 여기서 돈다.
+      #   hooks/pre-push 가 이 이름들이 이 파일에 실제로 있는지 확인한다 — 지우면 push 가 막힌다.
+
+      # acceptance-0-2 는 여기서 돌리지 않는다. 그 검사는 "로컬 전용 .secret-patterns 에
+      # 적힌 실제 리터럴이 히스토리에서 제거됐는가"를 보는데, CI 에는 그 파일이 없다.
+      # 기본 패턴으로 대체하면 패턴 파일 자신이 매칭돼 상시 실패한다(실측: run 31176518944,
+      # blob 09b233e = .secret-patterns.default 자신). CI 에서의 등가물은 위의
+      # "히스토리 전량 스캔" 스텝이며, hooks/pre-push 가 그 스텝의 존재를 확인한다.
+
+      - name: 인수 검사 0-7 (훅이 위반 6종을 실제로 차단하는가)
+        run: bash scripts/acceptance-0-7.sh
+
+      - name: 인수 검사 0-5 (push · CI 연결)
+        # origin/main==main 을 검사하므로 main 참조가 유효한 경우에만 의미가 있다.
+        if: github.ref == 'refs/heads/main'
+        run: bash scripts/acceptance-0-5.sh
+
+      - name: 억제 만료 스캔 (suppressions.yaml)
+        # pre-commit 의 expiry 검사는 suppressions.yaml 이 '스테이징된 커밋'에서만 돈다.
+        # 이미 커밋된 억제가 시간이 지나 썩는 것은 아무도 보지 않는다 — 이 게이트가
+        # 막겠다고 인용한 98d923f(35일 방치) 시나리오 그 자체다. 그래서 매 push 마다 훑는다.
+        run: |
+          [ -f suppressions.yaml ] || { echo "PASS: 억제 없음"; exit 0; }
+          today=$(date +%Y-%m-%d); fail=0; n=0
+          while IFS= read -r e; do
+            n=$((n+1))
+            if ! printf '%s' "$e" | grep -qE '^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$'; then
+              echo "FAIL: expiry 형식 오류 '${e}' — 만료를 판정할 수 없는 억제는 무기한 억제다"; fail=1
+            elif [ "$e" \< "$today" ]; then
+              echo "FAIL: 만료된 억제 (expiry $e < 오늘 $today) — 유예 기한이 지났다"; fail=1
+            fi
+          done < <(awk '/^ *expiry:/{sub(/^ *expiry: */,""); gsub(/["\x27]/,""); print}' suppressions.yaml)
+          nc=$(awk '/^- *check:/{c++} END{print c+0}' suppressions.yaml)
+          if [ "$nc" -ne "$n" ]; then
+            echo "FAIL: 억제 ${nc}건 중 expiry 가 ${n}건뿐"; fail=1
+          fi
+          [ "$fail" -eq 0 ] && echo "PASS: 억제 ${nc}건 전부 유효 기한 내"
+          exit $fail
+
+      - name: 강제 장치 존재 검사 (hooks/)
+        # core.hooksPath 는 저장소 전역 config 이고 hooks/ 는 브랜치 내용이다.
+        # hooks/ 가 없는 브랜치에서는 로컬 강제가 조용히 0개가 되며 로컬에서는 막을 수
+        # 없다. 원격에서라도 막는다 — 이것이 P15③ 이 말하는 "판정 권한은 CI에 있다"의 실체다.
+        run: |
+          fail=0
+          for h in hooks/pre-commit hooks/pre-push; do
+            if [ ! -f "$h" ]; then echo "FAIL: $h 없음 — 이 브랜치엔 로컬 강제 장치가 없다"; fail=1
+            elif [ ! -x "$h" ]; then echo "FAIL: $h 실행 권한 없음 — 훅은 존재해도 조용히 통과한다"; fail=1
+            fi
+          done
+          [ "$fail" -eq 0 ] && echo "PASS: 훅 2종 존재·실행가능"
+          exit $fail
+
       - name: 셸 스크립트 문법 검사
         run: |
           fail=0

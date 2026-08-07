@@ -1,0 +1,16 @@
+# 검사 약화 탐지 패턴 (P13) — hooks/pre-commit 이 읽는다.
+# 이 패턴들을 훅 소스에 literal 로 두면 훅 자신이 자기 매칭에 걸리므로 분리한다.
+# (acceptance-0-5.sh 의 "카나리는 조립해서 만든다 — 자기 매칭 방지"와 같은 이유)
+#
+# 형식: 확장 정규식(ERE) 한 줄에 하나. '#' 로 시작하는 줄과 빈 줄은 무시.
+# 추가된 줄(diff 의 +)에만 적용된다.
+
+\|\| *true
+continue-on-error: *true
+allow_failure
+--no-verify
+\.skip\(
+xfail
+^ *skip *:
+if: *always\(\)
+2> */dev/null *\|\|

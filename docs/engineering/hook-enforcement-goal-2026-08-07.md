@@ -45,6 +45,12 @@
 
 ### AC-1 — 미추적 산출물 0건
 
+> **판정 기록 (V1 지뢰 ③ 정조준 결과, 2026-08-07)**: AC-1 로 커밋한
+> `docs/engineering/goal-prompts/2026-08-06-merge-verify-gptreview-reimpl.md` 가 금지 패턴을 포함하고 있어,
+> `acceptance-0-6.sh` 의 **기존 `docs/engineering/` 경로 면제 덕분에** 통과했다.
+> 면제를 새로 넓히지는 않았다 — `git diff 7e20bd4..HEAD -- scripts/acceptance-0-6.sh` 는 비어 있다.
+> 그러나 **이 통과가 면제에 의존한다는 사실 자체를 기록에 남긴다.** 면제가 사라지면 AC-1 은 깨진다.
+
 - **검증**: `git status --porcelain | grep -c '^??'` → **`0`**
 - **EARS**: When 작업 산출물이 생성되면, 시스템은 그것을 추적 상태로 커밋해야 한다.
 - **counter-AC**: `.gitignore` 에 추가해서 `??` 를 0으로 만드는 것은 **가짜**. 실제 커밋 여부를
@@ -214,6 +220,317 @@
 
 ---
 
+## 실행 결과 (2026-08-07)
+
+### AC 판정
+
+| AC | 검증 명령 | 결과 |
+|---|---|---|
+| AC-1 | `git status --porcelain \| grep -c '^??'` → 0 / `git ls-files docs/engineering/ \| wc -l` → 15 | **PASS** |
+| AC-2 | `grep -c 'HEAD 재확인' docs/engineering/v6-coding-principles-goal-2026-08-06.md` | **PASS** |
+| AC-3 | `acceptance-0-7.sh` 시연 1·2·3·4·6 전부 BLOCKED | **PASS** |
+| AC-4 | `acceptance-0-7.sh` 시연 5 BLOCKED | **PASS** |
+| AC-5 | `bash scripts/session-status.sh` → exit 0, HEAD·ORIGIN·RED 3줄 출력 | **PASS** |
+| AC-6 | `bash scripts/acceptance-0-7.sh` → **exit 0** | **PASS** |
+
+```
+[1/6] 검사기 자기 제외        → BLOCKED (exit=1)
+[2/6] 검사 약화(|| true)      → BLOCKED (exit=1)
+[3/6] 만료일 없는 억제         → BLOCKED (exit=1)
+[4/6] LLM 출력→판정 필드      → BLOCKED (exit=1)
+[5/6] 미커밋 상태로 push      → BLOCKED (exit=1)
+[6/6] 가짜 외부효과 모듈       → BLOCKED (exit=1)
+OK: 원본 저장소 무변경 확인 (da39a3ee5e6b4b0d3255bfef95601890afd80709)
+PASS: 위반 6 종이 전부 차단됨
+```
+
+### 게이트 4 — 로컬 검사 전량
+
+```
+verify.sh                        exit=0
+scripts/acceptance-0-2.sh        exit=0
+scripts/acceptance-0-5.sh        exit=0
+scripts/acceptance-0-6.sh        exit=0
+scripts/acceptance-0-7.sh        exit=0
+```
+
+### 게이트 5 — CI (PR #1, run 이후 `64f808e`)
+
+```
+✅ 비밀 스캔 (verify.sh)
+✅ 히스토리 전량 스캔 (도달 가능한 모든 blob)
+✅ 인수 검사 0-6 (가짜 검증 스크립트 0건)
+✅ 인수 검사 0-7 (훅이 위반 6종을 실제로 차단하는가)   ← 우분투 fresh clone 에서도 통과
+⏭️ 인수 검사 0-5 (main 아님 — 조건부 스킵)
+✅ 셸 스크립트 문법 검사
+✅ 패턴 파일 자체에 실제 비밀이 없는지
+conclusion: success
+```
+
+---
+
 ## 적대 검증 로그
 
-*(V1 Codex 감시자 판정 · V2 Claude 재현 결과를 아래에 본문 그대로 append)*
+### V1 — Codex 감시자 (격리, 구현 **전** 베이스라인 확정)
+
+판정 파일: `scratchpad/v1-watchdog-verdict.md` (246줄)
+
+> `VERDICT: BASELINE ESTABLISHED (구현 전) — 미추적 13파일·훅 0개·settings.json 부재·Makefile 부재·소스 0줄을
+> 실측 기록했고, 6개 AC의 진짜/가짜 판정 기준을 사전 확정했다. 구현 전 이미 실증한 구조적 지뢰 3개:
+> ①`acceptance-0-5.sh`의 `origin/main==main` 검사는 pre-push와 논리적으로 상호배타(클론에서 exit=1 재현)
+> ②`acceptance-0-2.sh`의 `unreachable==0`은 `git add`+reset 만으로 깨짐(0→1→2 실측)
+> ③AC-1로 커밋할 `goal-prompts/...md`가 금지 패턴을 포함해 `acceptance-0-6.sh`의 기존 경로 면제에 의존해야만 통과한다.
+> 훅 fail-open 4경로도 실측 확인(실행비트 없음·문법오류·`--no-verify`는 통과, 실행비트 있는 `exit 1`만 차단).
+> 이 세 지뢰의 처리 방식이 이번 구현의 진위를 가른다.`
+
+**이 판정의 가치**: 구현 전에 지뢰를 예측했고, **①②가 실제로 그대로 발현했다.**
+
+| 지뢰 | 예측 | 실제 |
+|---|---|---|
+| ② `unreachable==0` | `git add`+reset 만으로 깨짐 | **적중.** push 가 `acceptance-0-2 exit=1` 로 차단. `gc --prune=now` 로 해소했으나 개발을 계속하자 11건 재발 → CI 이관 |
+| ① `0-5` ↔ pre-push 상호배타 | 논리적으로 동시 성립 불가 | **조건부 발현.** 작업 브랜치에서는 `main`이 origin 과 동기라 통과(`ok ./scripts/acceptance-0-5.sh` 실측). `main` 직접 push 시에만 데드락 → CI 이관 + `if: github.ref == 'refs/heads/main'` |
+| ③ `goal-prompts` 금지 패턴 | `0-6` 경로 면제 의존 | **미검증 — V1 최종 판정에 정조준 요청함** |
+
+### V2 — Claude 자체 발견·수정 (구현 중, 전부 실행으로 확인)
+
+| # | 결함 | 어떻게 드러났나 | 조치 |
+|---|---|---|---|
+| 1 | **fail-open** — `grep` 의 exit 1(매칭 없음)과 exit ≥2(실행 오류)를 구분하지 않아, 이스케이프가 깨져 검사가 **돌지 않은** 경우까지 통과 | `4ce8892` 커밋 시 `grep: brackets ([ ]) not balanced` 가 6번 출력됐는데 **커밋이 성공** | `scan()`/`scan_added()` 도입, exit ≥2 를 차단 처리 |
+| 2 | **판정기 중복(원칙 A 위반)** — 비밀 스캔을 pre-commit 에 자체 구현했더니 `verify.sh` 와 판정이 갈림: 합집합 vs 단일 파일 / CRLF 정규화 유무 / `grep -i` 유무 | 자체 구현만 패턴이 깨짐 | `verify.sh` 에 위임 |
+| 3 | **P20 위반** — `session-status.sh` 가 검사 스크립트 **0개**를 찾고도 `RED: 0/0` 을 정상처럼 보고 | 워크트리 절대경로가 `-not -path '*/worktrees/*'` 에 자기 자신이 걸림 | 상대경로 + `total==0` 이면 UNKNOWN·exit 1 |
+| 4 | **무한 재귀** — pre-push 가 `acceptance-*.sh` 전량을 실행하는데 그 목록에 0-7 자신이 포함 | exit 144 / 2분 타임아웃 | 재진입 가드 + pre-push 조기 종료 |
+| 5 | **워크트리 배송 원천 차단(P6)** — `.secret-patterns` 가 gitignore 라 워크트리에 없어 `0-2` 가 exit 2 → push 불가. harness 가 워크트리를 강제하므로 실질적 차단 | 게이트 4 실행 중 | `install-hooks.sh` 가 메인 파일을 심볼릭 링크 |
+| 6 | **CI 자기 매칭** — `0-2` 를 `.secret-patterns.default` 로 CI 에서 돌리자 **패턴 파일 자신이 매칭** | CI run 31176518944 실패, blob `09b233e` = 패턴 파일 자신 | 0-2 를 CI 에서 제거, 등가물(「히스토리 전량 스캔」) 존재를 pre-push 가 확인 |
+
+### 훅이 자기 저장소에 실전 적용된 사례
+
+**pre-commit 이 이 작업의 커밋을 2회 차단했고, 둘 다 정당했다.**
+
+1. `acceptance-0-7.sh` 의 `sed ... | grep -m1 'BLOCKED' || true` — 실패를 삼키는 구문 → `awk` 로 교체
+2. `hp=$(git config --get core.hooksPath || true)` → `|| hp=""` 로 교체
+
+즉 P13(검사 약화 금지)이 **문서가 아니라 실제로 코드를 막았다.**
+
+### 알려진 한계 (숨기지 않음)
+
+- `git push --no-verify` 로 pre-push 우회 가능 → **CI 가 최종 방어선**
+- `main` 직접 push 시 `0-5` 와 상호배타로 데드락 → §4 규약(main 직접 push 금지) 준수 시 미발현
+- `pre-push` 의 CI 존재 확인은 `grep -q` 이므로 **이름만 있으면 통과** — 스텝이 `if: false` 로 바뀌면 우회 가능 (V1 정조준 항목 2)
+- P13 오탐이 잦아지면 라벨을 습관적으로 붙이게 되고 그 순간 P13 도 무력화 → 탐지 패턴을 좁게 시작
+
+### V1 1차 최종 판정 — `조건부 REJECT`
+
+판정서: `scratchpad/v1-watchdog-final.md`
+
+> `VERDICT: 조건부 REJECT — 게이트는 진짜인데 시연이 가짜이고 배송이 불가능하다.`
+> AC-1 PASS / AC-2 PASS / AC-3 PASS(도중 가짜였다가 수정됨) / AC-4 부분 PASS / AC-5 PASS / **AC-6 FAIL**
+
+**방법론**: 모든 "차단됨"에 대해 `core.hooksPath=/dev/null` 로 훅만 끈 **대조군**을 돌렸다.
+훅 ON 에서 exit≠0 이고 훅 OFF 에서 exit 0 이어야만 훅이 원인임이 증명된다. **6종 중 5종이 통과, 1종 탈락.**
+
+**[P0] AC-6 시연 1 은 가짜 차단이었다.**
+`sed -i.bak "s|^LEAKS=.*|…grep -v…|"` 의 `|` 가 구분자와 충돌해 BSD sed 가 파싱에 실패했고(`bad flag in substitute command: 'r'`),
+`verify.sh` 는 전혀 변조되지 않았다. `git commit` 이 `nothing to commit` 으로 exit 1 을 냈고 0-7 이 그것을 BLOCKED 로 계수했다.
+**훅 OFF 대조군도 exit 1** — 훅은 아무 역할도 하지 않았다. **P13④ 게이트는 한 번도 실행된 적이 없다.**
+0-7 출력에서 시연 1 만 `BLOCKED:` 사유 줄이 비어 있던 것이 그 흔적이며, G(Claude)는 그것을 보고도 넘겼다.
+
+V2 재현: `sed exit=0` 이지만 해시 불변(`c3f6ba25…` 동일), 훅 ON=1 / 훅 OFF=1 → **CONFIRMED.**
+
+**[P0] 환경변수 하나로 AC-6 전체가 무력화된다.** `ACCEPTANCE_0_7_ACTIVE=1` → 6종 미실행 exit 0, 화면엔 "정상".
+G 가 무한재귀를 막으려 넣은 가드가 그대로 킬 스위치가 됐다. → **CONFIRMED, 가드 제거.**
+
+**[P1] `hooks/` 없는 브랜치에선 강제가 조용히 0개.** `core.hooksPath` 는 저장소 전역 config 인데 `hooks/` 는 브랜치 내용이다.
+→ **CONFIRMED** (`7e20bd4` 체크아웃 후 `AKIA…` 커밋 exit 0).
+
+### V1 2차 판정 — `조건부 승인`
+
+판정서: `scratchpad/v1-watchdog-final2.md`
+
+> `VERDICT: 조건부 승인 — 1차 지적은 전부 해소됐고 그 해소가 진짜임을 증명했으나, 같은 계열의 신규 결함 3건이 나왔다.`
+
+**AC-6 판정이 뒤집혔다 — 뮤테이션 1:1 대응으로.**
+훅 ON/OFF 대조만으로는 "어떤 훅이 원인"만 증명되고 "**의도한 그 게이트**가 원인"은 증명되지 않는다.
+그래서 게이트를 하나씩 no-op 으로 죽이고 0-7 을 재실행했다.
+
+```
+자기제외 죽임 → 시연 1만 빨강     약화탐지 → 2만      억제 → 3만
+LLM       → 4만                외부효과 → 6만      pre-push청결 → 5만
+6/6 완벽 대응 · 번짐 0건 · 무변조 기준선 exit 0
+```
+
+> *"AC-6 은 이제 이 저장소에서 가장 신뢰할 만한 장치입니다."*
+
+**V1 이 자기 1차 예측을 철회했다**: "머지 후 main push 는 반드시 터진다" → 로컬 bare 원격에 머지 후 실제 push 결과
+`85f24f4..95768bc main -> main` exit 0. 0-5 가 `PUSH_CHECKS` 에서 빠졌으므로 데드락이 성립하지 않는다.
+
+**신규 결함 3건 (전부 V2 재현 CONFIRMED)**
+
+| # | 결함 | 실측 | 조치 |
+|---|---|---|---|
+| 1 | **`SECRET_PATTERNS_FILE` 이 비밀 스캔 킬 스위치** | `SECRET_PATTERNS_FILE=/tmp/weak.txt git commit` → exit 0, `AKIA…`·`ghp_…` 커밋됨. 빈 파일·없는 파일은 fail-closed 였으나 "유효하지만 아무것도 안 잡는" 파일이 구멍 | pre-commit 이 `SECRET_PATTERNS_FILE=` 로 비워 고정 |
+| 2 | **`PUSH_CHECKS` 고정 목록이 신규 검사를 조용히 누락** | `acceptance-9-9.sh`(항상 exit 1) 추가 → "검사 2개 실행" / push exit 0 | 글로브 + 명시적 제외 3종(DEFERRED)으로 복귀 |
+| 3 | **0-7 에 `unset GIT_DIR` 없음** | 형제 0-2·0-5 는 갖고 있다. 중첩 실행 시 `git push` 가 넘긴 `GIT_DIR` 때문에 `git remote add` 가 실패해 **우연히** 재귀가 끊기고 있었다 | 형제와 동일하게 추가 — 우연이 아니라 명시적 제외에 의존하게 |
+| 4 | **expiry 우회 4종** | 빈 값 / `99-01-01`(문자열 비교라 먼 미래) / `never` / `9999-99-99` 전부 통과. 원인은 `gsub` 로 숫자만 남기는 정제가 `never` 를 빈 문자열로 만든 것 | 원문 그대로 받아 `YYYY-MM-DD` 정규식으로 먼저 검증 |
+| 5 | **커밋된 억제가 썩는 것을 아무도 안 봄** | pre-commit 의 expiry 검사는 `suppressions.yaml` 이 **스테이징된 커밋에서만** 돈다. CI 내 expiry 언급 0건 — 이 게이트가 막겠다고 인용한 `98d923f`(35일 방치) 시나리오 그 자체 | **CI 「억제 만료 스캔」 스텝 신설** — 매 push 마다 전량 검사 |
+| 6 | `hooks/` 없는 브랜치 | 로컬에서는 원리적으로 막을 수 없음 | **CI 「강제 장치 존재 검사」 스텝 신설** — 원격에서 막는다 |
+
+**수정 후 검증 (전부 clone 대조 실측, HEAD `d57c0b8`)**
+
+```
+A 킬 스위치 (SECRET_PATTERNS_FILE=/tmp/weak.txt)  → commit exit=1  차단
+B 새 검사 누락 (acceptance-9-9.sh)                → push exit=1, "검사 3개 실행", BLOCKED 9-9
+C expiry 빈값 / 99-01-01 / never / 9999-99-99     → 전부 exit=1   차단
+  expiry 2026-12-31 (유효)                        → exit=0       통과
+D 정상 커밋 오탐                                   → exit=0       없음
+0-7 (unset GIT_DIR 추가 후)                       → 6/6 PASS 유지
+CI (스텝 9개, 신설 2종 포함)                       → success
+```
+
+### 채택하지 않은 V1 제안 1건 (판단 기록)
+
+V1 제안: *"시연 5의 실제 push 를 `bash hooks/pre-push` 직접 호출로 교체하면 재귀·글로브 복귀·`unset GIT_DIR` 3건이 한꺼번에 풀린다."*
+
+**채택하지 않았다.** `demo()` 는 훅 ON/OFF 대조군으로 판정하는데, `bash hooks/pre-push` 를 직접 부르면
+`core.hooksPath=/dev/null` 이 무력해져 **훅 OFF 대조군이 항상 ON 과 같은 결과**를 낸다. 그러면 "훅이 원인"을
+증명할 수 없어 1차에 지적받은 위양성 구조로 되돌아간다. 대신 글로브에서 0-7 만 제외해 재귀를 끊고
+신규 검사는 자동 포함되게 했다. **이 판단은 3차 재검증에 정조준 항목으로 올려 두었다.**
+
+### 후속 이슈로 남긴 것
+
+| 항목 | 이유 |
+|---|---|
+| **CI 이관 보증을 파싱 → 실행 증명으로** | `if: ${{ false }}`, `if: github.event_name == 'never'`, 조건 ref 변경 등 **항상-거짓 조건은 열거로 막을 수 없다**(V1). 주석 처리·`if: false`·본문 삭제 3종만 현재 차단. CI 가 마커를 남기고 pre-push 가 조회하는 구조로 가야 하며 설계 변경이 크다 |
+| P13 약화 탐지가 **추가된 줄만** 봄 | 삭제는 원리적으로 미탐지. 삭제 diff 검사는 리팩터링마다 오탐이 나서 보류 |
+| 0-2 뮤테이션 테스트 CI 이관 | `suppressions.yaml` 에 expiry `2026-08-21` 로 등록. 기한이 지나면 **CI 만료 스캔이 push 를 막는다** |
+| 자기제외 탐지 범위 | `.github/workflows/*`, `.claude/skills/*/local-checks.sh` 가 범위 밖 |
+| 외부효과 게이트 파일명 기반 | `src/api/types.ts` 오탐 / `authenticate.js` 회피 가능 |
+
+### V1 3차 판정 — `조건부 REJECT` (실제 원격 유출 발견)
+
+판정서: `scratchpad/v1-watchdog-final3.md`
+
+**[P0] 킬 스위치가 pre-push 로 옮겨갔고, 원격 유출까지 재현됐다.**
+pre-commit 은 막혔으나 `hooks/pre-push` 가 검사를 **호출자 환경 그대로** 실행했다.
+
+```
+git commit --no-verify                          (문서화된 허용 경로)
+정상 push                                → exit 1  차단
+SECRET_PATTERNS_FILE=/tmp/weak.txt push  → exit 0  통과
+원격 refs/heads/t2                        → AWS_ACCESS_KEY=AKIA…  실제 도달
+```
+
+> *"pre-commit 우회는 로컬에 그치지만 이건 실제 원격 유출입니다."* — V1
+
+**[P0] 이름 기반 제외가 글로브와 정면 충돌해 포크밤이 부활했다.**
+push 를 수행하는 `acceptance-0-8.sh` 를 넣자 프로세스 **20개 도달**(V1 이 상한 걸고 중단).
+제외가 이름 기준인데 글로브는 신규를 자동 포함하도록 일부러 바꾼 것이라 구조적으로 충돌한다.
+
+**[P2] `PUSH_CHECKS` 가 죽은 변수** — 글로브 도입 후 아무 데서도 안 쓰이는데 남아 있어,
+다음 편집자가 그것을 고치고 목록이 바뀐 줄 착각할 수 있다.
+
+**V1 이 자기 제안을 철회했다.** *"`bash hooks/pre-push` 직접 호출 안을 거부하신 이유가 정확합니다.
+직접 호출하면 `core.hooksPath=/dev/null` 이 무력해져 대조군이 죽습니다. **제 제안이 제 지적과 모순됐습니다.**"*
+
+**조치**: pre-push 실행부에 `SECRET_PATTERNS_FILE=` 고정 / 이름 기반 → **성질 기반 제외**(`# PUSH-PERFORMING` 선언) /
+**깊이 가드를 실패 방향 뒤집어** 도입 / 죽은 변수 제거.
+
+### V1 4차 판정 — `승인 권고` (포크밤 해소를 결정적으로 증명)
+
+판정서: `scratchpad/v1-watchdog-final4.md`
+
+V2 가 "수동 주입은 실제 재귀 경로가 아니다"라고 자기 검증의 약점을 짚어 물었고,
+V1 이 **마커 없이 push 를 수행하는 신규 스크립트에 깊이 기록을 심어 실제 재귀를 태웠다**(상한 12).
+
+```
+깊이 추적: 1회  "0-8 시작 depth=1"     ← 정확히 1단계에서 종료
+최대 동시 3 · 폭주 없음                (3차에는 상한 20 도달)
+```
+
+깊이 가드의 실패 방향도 전수 확인됐다.
+
+```
+VH_PREPUSH_DEPTH = 0 / 1 / 5  →  0-7 전부 exit=1
+미설정                        →  0-7 exit=0
+```
+
+> *"**어떤 값으로도 통과시킬 수 없습니다.** `ACCEPTANCE_0_7_ACTIVE` 와 정반대 설계입니다."* — V1
+
+**[P1] 가짜 `run:` 줄 하나로 CI 검증이 뚫렸다.**
+`run: bash …` → `run: echo …` 로 바꾸면 통과. 마커 경로·DEFERRED 경로 **양쪽에 동시에** 통했다.
+
+> *"이것이 제가 2차에 지적한 '워크플로 파싱으로는 이길 수 없다'의 **세 번째 사례**입니다.
+> 막은 것은 주석 처리·`if: false`·본문 삭제, 뚫린 것은 `if: ${{ false }}`·임의 항상-거짓 조건·`echo` 대체 —
+> **문자열 규칙을 하나 추가할 때마다 우회도 하나씩 늘어납니다.**"* — V1
+
+**[P2] `session-status.sh` 가 `SECRET_PATTERNS_FILE` 을 상속**해 실패를 축소 보고(`4/4` → `2/4`).
+
+### V1 5차 판정 — `승인`
+
+판정서: `scratchpad/v1-watchdog-final5.md`
+
+> `VERDICT: 승인 — 잔여 2건은 각각 한 줄 수정이며 배송을 막지 않습니다.`
+
+**`head -20` 경계에 대한 답이 특히 중요하다.** V2 가 "21번째 줄에 마커를 숨기면?"이라고 물었고:
+
+> *"숨기면 검사가 **더 돌지 덜 돌지 않습니다.** 다만 근거를 정정합니다 — '자기 손해라서'가 아니라
+> **fail-safe 라서**입니다. 마커 의미가 반대(있으면 실행/없으면 제외)였다면 똑같은 한계가
+> 곧바로 취약점이 됩니다. 지금 안전한 건 우연이 아니라 **의미 방향을 옳게 잡았기 때문**입니다."* — V1
+
+**잔여 2건** (각각 한 줄, 오탐 없음): `basename` → 경로 매칭 / `bash -n` 차단.
+`bash -n` 은 워크플로 diff 에서 **정상 lint 스텝과 구분되지 않아** 특히 위험하다고 지적됐다.
+
+### V2 자체 발견 — 우회 차단만 보고 오탐 확인을 건너뛸 뻔했다
+
+5차 잔여 2건을 고치면서 `[^-|]`(1회)를 썼는데, 그것이 **경로의 첫 글자를 소비**해
+깨끗한 clone 에서도 push 가 막혔다. 우회 4종은 전부 차단되는데 정상까지 막히는 상태였다.
+`[^-|]*`(0회 이상)로 수정.
+
+> **차단 검증과 오탐 검증은 반드시 짝으로 간다.** 우회가 막히는 것만 확인하고 배송하면
+> 게이트가 모든 것을 막는 상태로 나간다. 이후 모든 검증에 "기준선(무변조) 통과" 항목을 넣는다.
+
+### 최종 검증 (HEAD `23b6707`)
+
+```
+기준선  깨끗한 clone 정상 push        → exit 0
+우회    bash -n / bash -c / sh -c : / echo  → 전부 exit 1
+경로    other/acceptance-8-8.sh 면제  → exit 1
+최종    정상 push 재확인              → exit 0
+0-7     6/6 PASS (훅 OFF 대조 통과)
+회귀    verify·0-5·0-6 exit 0 / 0-2 만 exit 1(등록된 유예)
+CI      success (스텝 11개)
+```
+
+### 여섯 라운드 총결산 — 잡힌 결함 16건
+
+| 등급 | 결함 |
+|---|---|
+| **실제 유출 가능 (2)** | 스테이지-작업트리 괴리(비밀이 커밋됨) · `SECRET_PATTERNS_FILE` 킬 스위치(**원격 도달 확인**) |
+| **검증 무력화 (6)** | AC-6 시연 1 가짜 · `demo()` 오독 구조 · `ACCEPTANCE_0_7_ACTIVE` · 자기선언 탈출구 · 가짜 `run:` 줄 · `bash -n` 우회 |
+| **기계 마비 (2)** | 무한재귀 포크밤(2회 발동) · 워크트리 배송 원천 차단 |
+| **탐지 누락 (6)** | 패턴파일 파괴 fail-open · expiry 우회 4종 · 신규 검사 누락 · 커밋된 억제 방치 · 죽은 변수 · 동명이인 면제 |
+
+**전부 실행이 찾았다.** 문서만 읽어서 찾은 것은 G 와 V1 이 겹쳤고, 위 16건 중 문서 독해로 나온 것은 없다.
+
+**그리고 G 가 만든 "안전장치"가 세 번 뒷문이 됐다** — 재귀 방지 가드, 패턴 주입 편의 기능, PUSH-PERFORMING 마커.
+전부 좋은 의도의 편의가 그대로 우회로가 됐다.
+
+### V1 총평 — 원칙으로 승격할 두 가지
+
+> **① 자기 선언은 검증 없이는 항상 탈출구가 된다.**
+> `ACCEPTANCE_0_7_ACTIVE` · `# PUSH-PERFORMING` · `suppressions.yaml` 의 expiry — 셋 다
+> *"내가 괜찮다고 말하면 괜찮다"* 는 구조였고, 셋 다 **다른 쪽에서 실제로 확인하는 장치**를
+> 붙여서만 닫혔다. 새 면제 기제를 만들 때 질문 하나면 된다: **"이 선언이 참인지 누가 확인하는가?"**
+
+> **② 실패 방향을 뒤집는 것이 이번 작업 최대의 설계 성과다.**
+> `ACCEPTANCE_0_7_ACTIVE`(있으면 통과) → `VH_PREPUSH_DEPTH`(있으면 차단).
+> **같은 메커니즘인데 하나는 킬 스위치였고 하나는 안전장치다.**
+
+### 후속 이슈 (V1 과 합의)
+
+| # | 항목 | 근거 |
+|---|---|---|
+| 1 | **CI 검증을 파싱 → 실행 증명으로** | 워크플로를 문자열로 파싱하는 접근은 이길 수 없다. 막을 때마다 새 우회가 나왔다(주석·`if: false`·본문 삭제·`echo`·`bash -n`·`bash -c`·파이프). CI 가 실행 마커를 남기고 pre-push 가 조회하면 **이 소모전이 끝난다** |
+| 2 | P13 삭제 diff 검사 (CI 워크플로 파일 한정) | 그 범위면 오탐이 거의 없다는 데 양측 동의 |
+| 3 | 0-2 뮤테이션 테스트 CI 이관 | `suppressions.yaml` expiry **2026-08-21**. 넘기면 CI 만료 스캔이 push 를 막는다 |
+| 4 | 자기제외 탐지 범위 확장 | `.github/workflows/*`, `.claude/skills/*/local-checks.sh` 가 범위 밖 |
+| 5 | 외부효과 게이트를 파일명 기반에서 탈피 | `src/api/types.ts` 오탐 / `authenticate.js` 회피 |

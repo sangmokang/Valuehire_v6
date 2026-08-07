@@ -1,0 +1,174 @@
+#!/usr/bin/env bash
+# pre-push — push 시점 로컬 강제 장치 (P15)
+#
+# 계약: docs/engineering/hook-enforcement-goal-2026-08-07.md ⑩
+#   입력  : stdin 으로 <local ref> <local sha> <remote ref> <remote sha> (git 표준, 읽지 않아도 됨)
+#   출력  : exit 0 | exit 1
+#   불변식: 검사 스크립트가 0개 발견되면 exit 1 — "검사할 게 없어서 통과"를 금지한다
+#          미추적/미커밋 변경이 있으면 exit 1 (P15)
+#   한계  : git push --no-verify 로 우회 가능. CI(.github/workflows/verify.yml)가 최종 방어선이다.
+set -euo pipefail
+
+REPO=$(git rev-parse --show-toplevel)
+cd "$REPO"
+
+fail=0
+block() { printf 'BLOCKED: %s\n' "$1" >&2; fail=1; }
+
+# ── 0) 재귀 깊이 가드 ────────────────────────────────────────────────────────
+#
+# push 를 수행하는 검사 스크립트가 pre-push 안에서 돌면 무한 재귀가 된다
+# (2026-08-07 실측: 프로세스 20개 도달). 이름으로 제외하면 새 스크립트를 못 막는다.
+#
+# 실패 방향이 중요하다. 이 변수를 "있으면 통과"로 쓰면 그 자체가 무력화 스위치가 된다
+# (ACCEPTANCE_0_7_ACTIVE 가 그랬다). 그래서 **있으면 차단**으로 둔다 — 외부에서 주입해도
+# 통과가 아니라 빨간불이 되므로 킬 스위치로 쓸 수 없다.
+VH_PREPUSH_DEPTH=$(( ${VH_PREPUSH_DEPTH:-0} + 1 ))
+export VH_PREPUSH_DEPTH
+if [ "$VH_PREPUSH_DEPTH" -gt 1 ]; then
+  printf 'BLOCKED: pre-push 재귀 감지 (depth=%s) — push 를 수행하는 검사가 pre-push 안에서 돌고 있다\n' \
+    "$VH_PREPUSH_DEPTH" >&2
+  exit 1
+fi
+
+# ── 1) 작업트리 청결 (P15 · 78f3631 ② 몰래 되돌림 재현 방지) ──────────────────
+dirty=$(git status --porcelain)
+if [ -n "$dirty" ]; then
+  block "작업트리가 깨끗하지 않다 — 미커밋/미추적 변경이 있는 상태의 push (P15)"
+  printf '%s\n' "$dirty" | sed 's/^/         /' >&2
+  # 즉시 종료한다. 더러운 상태에서 전체 검사를 돌려봐야 그 결과는 커밋될 트리의
+  # 것이 아니므로 의미가 없고, 시간만 든다.
+  exit 1
+fi
+
+# ── 2) push 안전성 검사 ──────────────────────────────────────────────────────
+#
+# pre-push 가 판정하는 것은 "이 push 가 안전한가"이지 "저장소가 이상적 상태인가"가
+# 아니다. 아래 3개는 push 안전성과 무관하거나 논리적으로 성립할 수 없어 CI 로 이관한다
+# (2026-08-07 실측 — 셋 다 실제로 push 를 영구 차단했다):
+#
+#   acceptance-0-2 : 히스토리 정리 완결성(unreachable==0). 차단된 커밋 시도나 reset
+#                    만으로도 unreachable 이 생기므로 개발 중 상시 실패한다.
+#   acceptance-0-5 : "push 가 완료됐는가"(origin/main==main) 검사. push 직전에는
+#                    논리적으로 성립할 수 없다 — pre-push 와 상호배타.
+#   acceptance-0-7 : 훅이 작동하는가를 검증하는 메타 테스트. 이 훅 안에서 실행하면
+#                    순환이 된다(단독 실행 exit 0 / pre-push 내부 exit 3 실측).
+#
+# 이관은 삭제가 아니다. 아래 3-a 가 CI 에 실제로 남아 있는지 확인하며, 없으면 차단한다.
+# (PUSH_CHECKS 고정 목록은 글로브 도입과 함께 제거했다 — 남겨두면 다음 편집자가 그것을
+#  고치고 검사 목록이 바뀐 줄 착각한다.)
+DEFERRED="acceptance-0-5 acceptance-0-7"
+
+# 3-a) 이관한 검사가 CI 에 실제로 있는가 (이관이 조용한 삭제가 되는 것을 막는다)
+#
+# acceptance-0-2 는 이 목록에 없다. 그 검사는 로컬 전용 .secret-patterns 의 실제
+# 리터럴을 기준으로 하는데 CI 에는 그 파일이 없고, 기본 패턴으로 대체하면 패턴 파일
+# 자신이 매칭돼 상시 실패한다(실측: CI run 31176518944). CI 에서의 등가물은
+# "히스토리 전량 스캔" 스텝이므로 그것의 존재를 대신 확인한다.
+#
+# 이름 검색만으로는 부족하다(V1 2026-08-07 실측). 아래 4종이 전부 통과했다:
+#   ① run: 을 # run: 으로 주석 처리   ② 스텝에 if: false 추가
+#   ③ 스텝 본문 통째 삭제(주석에 이름만 잔존)  ④ 조건을 없는 ref 로 변경
+# 그래서 주석을 걷어낸 뒤 "실행되는 run: 줄"에 있는지를 본다.
+WF=.github/workflows/verify.yml
+if [ ! -f "$WF" ]; then
+  block "$WF 없음 — CI 로 이관한 검사를 아무도 실행하지 않는다 (fail-closed)"
+else
+  # 주석 줄을 제거한 '실제로 실행되는' 워크플로 본문
+  ACTIVE=$(grep -v '^[[:space:]]*#' "$WF")
+
+  # 실행 동사를 요구한다. 이름만 보면 `run: echo scripts/acceptance-0-7.sh` 한 줄로
+  # 뚫린다(2026-08-07 실측 — 0-7 이 CI 에서 전혀 안 도는데 push 통과).
+  # 이것으로 근본 해결은 안 된다. `run: cat s | bash` 류 변형이 남는다.
+  # 워크플로를 문자열로 파싱하는 접근은 규칙을 하나 추가할 때마다 우회도 하나씩 는다
+  # (막힌 것: 주석 처리·if: false·본문 삭제·echo 대체 / 뚫린 것: if: ${{ false }}·임의
+  #  항상-거짓 조건·파이프 변형). 근본은 실행 증명이며 후속 이슈로 남긴다.
+  # 동사 바로 뒤에 옵션(-)이 오는 것을 막는다. `bash -n <script>` 는 문법 검사일 뿐
+  # 실행하지 않는데, 워크플로 diff 에서 정상 lint 스텝과 구분되지 않아 특히 위험하다
+  # (2026-08-07 실측: `bash -n`·`bash -c`·`bash --version #`·`sh -c :` 전부 통과했다).
+  # `[^-|]*` 는 0회 이상이다. 하나(`[^-|]`)로 두면 경로의 첫 글자를 소비해 정상 줄까지
+  # 매칭에 실패한다(실측: 깨끗한 clone 에서 오탐 발생). 0회 매칭이 허용되므로
+  # `bash <path>` 는 통과하고, `bash -n <path>` 는 `-` 를 소비할 수 없어 차단된다.
+  RUNVERB='run:[[:space:]]*((bash|sh)[[:space:]]+|\./)[^-|]*'
+  for d in $DEFERRED; do
+    if ! printf '%s\n' "$ACTIVE" | grep -qE "${RUNVERB}${d}|^[[:space:]]*((bash|sh)[[:space:]]+|\./)[^-|]*${d}"; then
+      block "$d 가 CI($WF)의 실행 줄에 없다 — 주석 처리·본문 삭제·echo 대체 여부를 확인하라"
+    fi
+  done
+
+  # 스텝 비활성화 금지
+  if printf '%s\n' "$ACTIVE" | grep -qE '^[[:space:]]*if:[[:space:]]*(false|\x27false\x27|"false")'; then
+    block "CI 워크플로에 if: false 로 비활성화된 스텝이 있다 (P13 — 검사 약화)"
+  fi
+
+  # acceptance-0-2 의 CI 등가물: 이름이 아니라 본문(도달 가능 blob 을 실제로 여는 코드)을 확인
+  if ! printf '%s\n' "$ACTIVE" | grep -q 'cat-file blob'; then
+    block "CI 의 '히스토리 전량 스캔' 본문이 사라졌다 (cat-file blob 없음) — acceptance-0-2 의 등가물이 없다"
+  fi
+fi
+
+# 글로브로 찾는다. 고정 목록이면 새로 추가된 인수 스크립트를 조용히 누락한다
+# (2026-08-07 실측: acceptance-9-9.sh 를 추가해도 "검사 2개 실행"으로 통과).
+found=$(find . -maxdepth 2 \( -name 'verify.sh' -o -name 'acceptance-*.sh' \) \
+        -not -path './worktrees/*' -not -path './.git/*' | LC_ALL=C sort)
+
+# 제외는 이름이 아니라 성질로 판별한다. 이름 기반 제외는 글로브(신규 자동 포함)와
+# 정면 충돌해, push 를 수행하는 스크립트가 하나만 더 생기면 그날 재귀가 부활한다
+# (2026-08-07 실측: acceptance-0-8.sh 를 넣자 프로세스 20개 도달).
+#   · 헤더에 `# PUSH-PERFORMING` 을 선언한 스크립트 → push 를 수행하므로 여기서 실행 불가
+#   · DEFERRED(0-2·0-5)          → push 안전성과 무관하거나 논리적으로 성립 불가. CI 담당
+checks=""
+while IFS= read -r c; do
+  if [ -z "$c" ]; then continue; fi
+  if head -20 "$c" | grep -q '^# PUSH-PERFORMING'; then
+    # 마커는 "면제"가 아니라 "CI 로 옮긴다는 선언"이다. 옮기지 않았으면 차단한다.
+    #
+    # 이 검증이 없으면 마커가 자기선언 탈출구가 된다(2026-08-07 실측): 실패하는 검사에
+    # 주석 한 줄만 붙이면 pre-commit 통과 · pre-push skip · CI 언급 0건 으로
+    # 검사가 아무 데서도 돌지 않는다. 게다가 P13 약화 탐지는 매칭 전에 주석을 떼므로
+    # 주석 전용 줄을 원리적으로 잡을 수 없어, 패턴을 추가해도 소용이 없다.
+    # DEFERRED 에 이미 적용하던 검증을 그대로 재사용한다.
+    # basename 이 아니라 상대 경로로 대조한다. 파일명만 보면 CI 에 등록된 적 없는
+    # 파일이 동명이인 덕에 면제된다(2026-08-07 실측: CI 는 scripts/acceptance-8-8.sh 를
+    # 실행하는데 other/acceptance-8-8.sh 가 면제받고 skip 됐다).
+    # 정규식 메타문자를 이스케이프한다. 안 하면 `.` 가 와일드카드로 동작해
+    # `bash scripts/acceptance-0-7Xsh` 같은 줄이 통과한다(미탐 방향, V1 6차 실측).
+    rel=$(printf '%s' "${c#./}" | sed 's/[].[*^$+?(){}|\\]/\\&/g')
+    if ! printf '%s\n' "${ACTIVE:-}" | grep -qE "run:[[:space:]]*((bash|sh)[[:space:]]+|\./)[^-|]*${rel}|^[[:space:]]*((bash|sh)[[:space:]]+|\./)[^-|]*${rel}"; then
+      block "$c 가 PUSH-PERFORMING 을 선언했으나 CI 의 실행 줄에 없다 — 아무도 실행하지 않는다"
+    fi
+    printf '  skip %s (PUSH-PERFORMING · CI 담당)\n' "$c" >&2
+    continue
+  fi
+  case "$(basename "$c")" in
+    acceptance-0-2.sh|acceptance-0-5.sh)
+      printf '  skip %s (DEFERRED · CI 담당)\n' "$c" >&2
+      continue
+      ;;
+  esac
+  checks="${checks}${c}"$'\n'
+done <<< "$found"
+checks="${checks%$'\n'}"
+
+n=$(printf '%s\n' "$checks" | awk 'NF{c++} END{print c+0}')
+if [ "$n" -eq 0 ]; then
+  block "검사 스크립트를 하나도 찾지 못했다 (fail-closed — 검사할 게 없어서 통과는 금지)"
+else
+  printf 'pre-push: 검사 %d개 실행\n' "$n" >&2
+  while IFS= read -r c; do
+    if [ -z "$c" ]; then continue; fi
+    rc=0
+    # SECRET_PATTERNS_FILE 을 비워 고정한다. 상속하면 다음으로 원격 유출이 완성된다
+    # (2026-08-07 실측 — 비밀 커밋이 실제로 원격에 도달했다):
+    #   git commit --no-verify (문서화된 허용 경로)
+    #   → SECRET_PATTERNS_FILE=/tmp/weak.txt git push  → exit 0 통과
+    SECRET_PATTERNS_FILE= bash "$c" >/dev/null 2>&1 || rc=$?
+    if [ "$rc" -ne 0 ]; then
+      block "$c exit=$rc"
+    else
+      printf '  ok  %s\n' "$c" >&2
+    fi
+  done <<< "$checks"
+fi
+
+exit "$fail"
