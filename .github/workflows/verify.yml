@@ -135,3 +135,6 @@ jobs:
             exit 1
           fi
           echo "PASS: 기본 패턴 파일에 실값 없음"
+
+      - name: 인수 검사 hs-a3 (세션 계열 자격증명 탐지)
+        run: bash scripts/acceptance-hs-a3.sh
