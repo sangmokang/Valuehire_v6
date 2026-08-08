@@ -161,4 +161,36 @@ while IFS= read -r f; do
   esac
 done <<< "$staged"
 
+# ── 7) 대용량 파일 · 산출물 경로 (P21 · AC-A4) ────────────────────────────────
+#
+# 왜: v6 는 후보자 개인정보(이름·학력·경력·프로필URL)를 로컬 SQLite 와 artifacts/ 에
+# 쌓는다. 구현 계획 §8 은 그 보호를 "gitignore + 1MB 차단"에 기대는데, 2026-08-08
+# 실측에서 **둘 다 존재하지 않았다**. gitignore 만으로는 부족하다 — `git add -f` 가
+# 무시 규칙을 건너뛰므로, 경로 차단을 훅에도 둔다(차단 지점 2곳).
+#
+# 크기는 작업트리가 아니라 **인덱스 blob** 에서 잰다. 작업트리를 재면
+# `git add <큰 파일>` 후 작업트리만 작은 내용으로 덮어써서 우회할 수 있다
+# (§1 비밀 스캔이 VERIFY_SCAN_SOURCE=index 를 쓰는 것과 같은 이유).
+MAX_BYTES=1048576
+while IFS= read -r f; do
+  if [ -z "$f" ]; then continue; fi
+  case "$f" in
+    artifacts/*|data/*|private-reviews/*|*.db|*.sqlite|*.sqlite3)
+      block "산출물·데이터 경로는 커밋하지 않는다 — $f (P21 · 후보자 PII)"
+      continue
+      ;;
+  esac
+  sz=$(git cat-file -s ":$f" 2>&1) || sz=""
+  case "$sz" in
+    ''|*[!0-9]*)
+      block "스테이지된 blob 크기를 읽지 못했다 — $f (fail-closed)"
+      ;;
+    *)
+      if [ "$sz" -gt "$MAX_BYTES" ]; then
+        block "1MB 초과 파일 — $f (${sz} 바이트, P21). 데이터는 git 밖에 둔다"
+      fi
+      ;;
+  esac
+done <<< "$staged"
+
 exit "$fail"

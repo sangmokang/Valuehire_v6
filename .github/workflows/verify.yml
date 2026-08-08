@@ -135,3 +135,32 @@ jobs:
             exit 1
           fi
           echo "PASS: 기본 패턴 파일에 실값 없음"
+
+      - name: 대용량 파일 · 산출물 경로 스캔 (P21 · AC-A4)
+        # 로컬 훅은 우회 옵션으로 건너뛸 수 있으므로 같은 검사를 CI 에도 둔다(P15③).
+        # 훅은 '이번 커밋에 스테이지된 것'만 보고, 여기서는 '이미 추적 중인 전체'를 본다.
+        run: |
+          set -o pipefail
+          MAX=1048576; fail=0; n=0
+          while IFS= read -r -d '' f; do
+            n=$((n+1))
+            case "$f" in
+              artifacts/*|data/*|private-reviews/*|*.db|*.sqlite|*.sqlite3)
+                echo "FAIL: 산출물·데이터 경로가 추적됨: $f (P21 · 후보자 PII)"; fail=1; continue;;
+            esac
+            sz=$(git cat-file -s ":$f") || sz=""
+            case "$sz" in
+              ''|*[!0-9]*) echo "FAIL: blob 크기를 읽지 못함: $f (fail-closed)"; fail=1; continue;;
+            esac
+            if [ "$sz" -gt "$MAX" ]; then
+              echo "FAIL: 1MB 초과: $f (${sz} 바이트)"; fail=1
+            fi
+          done < <(git ls-files -z)
+          if [ "$n" -eq 0 ]; then
+            echo "FAIL: 검사 대상 0개 — 스캔 무효 (P20)"; exit 2
+          fi
+          if [ "$fail" -eq 0 ]; then echo "PASS: 추적 파일 ${n}개 검사, 위반 0건"; fi
+          exit $fail
+
+      - name: 인수 검사 hs-a4 (대용량·산출물 차단이 실제로 도는가)
+        run: bash scripts/acceptance-hs-a4.sh

@@ -27,3 +27,14 @@ verify-*.json
 
 # 워크트리 (harness 작업 격리용, 커밋 대상 아님)
 worktrees/
+
+# 산출물·데이터 (P21 · AC-A4) — 후보자 PII 와 대용량 데이터는 git 에 넣지 않는다.
+# 근거: docs/engineering/humansearch-v6-implementation-plan-2026-08-08.md §4-2·§8
+artifacts/
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# 비공개 리뷰 결과 (루트). 기존 규칙은 .claude/private-reviews/ 만 덮고 있었다.
+private-reviews/

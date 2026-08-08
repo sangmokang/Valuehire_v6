@@ -11,6 +11,14 @@
 출력  : exit 0 (통과) | exit 1 (차단)
         차단 시 stderr: "BLOCKED: <검사이름> — <파일경로> (패턴: <패턴이름>)"
         ※ 매칭된 실제 값은 절대 출력하지 않는다
+검사  : ① 비밀 스캔(verify.sh 위임, VERIFY_SCAN_SOURCE=index) ② 검사기 자기 제외
+        ③ 검사 약화 패턴 ④ 만료 없는/지난 억제 ⑤ LLM 출력→판정 수치 ⑥ 외부효과 모듈 네트워크 0건
+        ⑦ 대용량 파일(1,048,576 바이트 초과) · 산출물 경로(artifacts/·data/·private-reviews/·
+          *.db·*.sqlite·*.sqlite3) 차단 — P21. gitignore 가 `git add -f` 로 우회되므로
+          차단 지점을 훅에도 둔다. 크기는 작업트리가 아니라 **인덱스 blob**에서 잰다
+          (작업트리를 재면 add 후 덮어쓰기로 우회된다 — ①과 같은 이유).
+          CI 등가물: `.github/workflows/verify.yml` 의 "대용량 파일 · 산출물 경로 스캔"
+          (훅은 이번 커밋의 스테이지분만, CI 는 추적 파일 전체를 본다)
 불변식: set -euo pipefail. 검사를 실행하지 못하면 exit 1 (fail-closed)
 제외  : 없음. 자기 자신(hooks/)도 검사 대상이다
 ```
