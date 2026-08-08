@@ -20,7 +20,9 @@ cd "$REPO"
 fail=0
 block() { printf 'BLOCKED: %s\n' "$1" >&2; fail=1; }
 
-staged=$(git diff --cached --name-only --diff-filter=ACM)
+# R(rename)을 넣지 않으면 `git mv notes.txt leak.db` 가 staged 목록에서 빠져
+# 훅을 그대로 통과한다(2026-08-09 실측). 이름만 바꿔도 내용은 그대로다.
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
 if [ -z "$staged" ]; then exit 0; fi
 
 # scan <설명> <파일> <grep 인자...>
@@ -181,7 +183,9 @@ done <<< "$staged"
 MAX_BYTES=1048576
 while IFS= read -r f; do
   if [ -z "$f" ]; then continue; fi
-  case "$f" in
+  # 확장자 비교는 대소문자를 무시한다. dump.DB 가 그냥 통과했다(2026-08-09 실측).
+  lf=$(printf '%s' "$f" | tr '[:upper:]' '[:lower:]')
+  case "$lf" in
     artifacts/*|*/artifacts/*|data/*|*/data/*|private-reviews/*|*/private-reviews/*|\
     *.db|*.db-*|*.sqlite|*.sqlite-*|*.sqlite3|*.sqlite3-*|*.jsonl|*.ndjson|*.parquet)
       block "산출물·데이터 경로는 커밋하지 않는다 — $f (P21 · 후보자 PII)"

@@ -25,6 +25,9 @@ cd "$REPO"
 MAX_BYTES=1048576
 fail=0
 checked=0
+TMPDIRS=""
+# 중단 시 임시 디렉터리를 남기지 않는다.
+trap 'for d in $TMPDIRS; do [ -n "$d" ] && [ -d "$d" ] && rm -rf "$d"; done' EXIT
 
 ok()  { checked=$((checked + 1)); printf 'PASS: %s\n' "$1"; }
 bad() { checked=$((checked + 1)); printf 'FAIL: %s\n' "$1"; fail=1; }
@@ -117,6 +120,78 @@ run_hook_case "하위 경로 데이터"       "tools/data/cand.json"       make_
 run_hook_case "SQLite WAL 사이드카"    "humansearch.db-wal"         make_small "$PATHRULE"
 # 후보자 덤프의 실제 형식
 run_hook_case "JSONL 덤프"             "candidates.jsonl"           make_small "$PATHRULE"
+# 대문자 확장자 — case 비교는 대소문자를 구분한다(2026-08-09 실측: dump.DB 통과)
+run_hook_case "대문자 확장자"          "dump.DB"                    make_small "$PATHRULE"
+# 디렉터리 규칙만으로 걸려야 하는 것들. 확장자 규칙과 겹치지 않아 규칙을 분리 검증한다
+# (data/humansearch.sqlite3 는 확장자에도 걸려 디렉터리 규칙의 작동을 증명하지 못한다)
+run_hook_case "디렉터리 규칙(확장자 무해)" "data/notes.txt"          make_small "$PATHRULE"
+run_hook_case "비공개 리뷰 경로"       "private-reviews/r.md"       make_small "$PATHRULE"
+
+# ── 3-b) 크기를 인덱스 blob 에서 재는가 (계약서 명시 사항) ────────────────────
+# add 후 작업트리만 작은 내용으로 덮어써도 인덱스에는 큰 blob 이 남는다.
+# 작업트리를 재는 구현(wc -c 등)으로 바꾸면 이 케이스만 빨개진다.
+tmp=$(mktemp -d) || bad "임시 저장소 생성 실패 (인덱스 측정 검사)"
+if [ -n "$tmp" ] && [ -d "$tmp" ]; then
+  TMPDIRS="$TMPDIRS $tmp"
+  git init -q "$tmp"; mkdir -p "$tmp/hooks"
+  cp hooks/pre-commit hooks/pre-push "$tmp/hooks/"
+  cp verify.sh .secret-patterns.default .check-weakening-patterns .gitignore "$tmp/"
+  [ -f suppressions.yaml ] && cp suppressions.yaml "$tmp/"
+  chmod +x "$tmp/hooks/pre-commit" "$tmp/hooks/pre-push"
+  out=$(
+    cd "$tmp" || exit 9
+    git config core.hooksPath hooks; git config user.email a@b.c; git config user.name t
+    dd if=/dev/zero of=payload.bin bs=1024 count=1200 status=none
+    git add -f payload.bin >/dev/null 2>&1
+    printf 'x\n' > payload.bin          # 작업트리만 작게 덮어쓴다
+    bash hooks/pre-commit 2>&1
+  )
+  rc=$?
+  rm -rf "$tmp"
+  if [ "$rc" -ne 0 ] && printf '%s\n' "$out" | grep -q '1MB 초과 파일'; then
+    ok "인덱스 blob 기준 측정 확인 (작업트리 덮어쓰기로 우회 불가)"
+  else
+    bad "작업트리 덮어쓰기로 크기 검사를 우회했다 (rc=$rc) — 인덱스가 아니라 작업트리를 재고 있다"
+  fi
+fi
+
+# ── 3-c) rename 이 검사 대상에 포함되는가 ────────────────────────────────────
+tmp=$(mktemp -d) || bad "임시 저장소 생성 실패 (rename 검사)"
+if [ -n "$tmp" ] && [ -d "$tmp" ]; then
+  git init -q "$tmp"; mkdir -p "$tmp/hooks"
+  cp hooks/pre-commit hooks/pre-push "$tmp/hooks/"
+  cp verify.sh .secret-patterns.default .check-weakening-patterns .gitignore "$tmp/"
+  [ -f suppressions.yaml ] && cp suppressions.yaml "$tmp/"
+  chmod +x "$tmp/hooks/pre-commit" "$tmp/hooks/pre-push"
+  out=$(
+    cd "$tmp" || exit 9
+    git config user.email a@b.c; git config user.name t
+    # 씨앗 커밋은 훅을 붙이기 **전에** 만든다. 훅 우회 옵션을 쓰면 그 리터럴 자체가
+    # 검사 약화 패턴이라 이 스크립트가 커밋되지 않는다(2026-08-09 실측 — 훅이 나를 막았다).
+    printf 'notes\n' > notes.txt
+    git add notes.txt >/dev/null 2>&1
+    git commit -q -m seed >/dev/null 2>&1
+    git config core.hooksPath hooks
+    git mv notes.txt leak.db >/dev/null 2>&1
+    bash hooks/pre-commit 2>&1
+  )
+  rc=$?
+  rm -rf "$tmp"
+  if [ "$rc" -ne 0 ] && printf '%s\n' "$out" | grep -q '산출물·데이터 경로'; then
+    ok "rename 도 검사 대상 (git mv 로 우회 불가)"
+  else
+    bad "git mv 로 검사를 우회했다 (rc=$rc) — diff-filter 에 R 이 빠졌다"
+  fi
+fi
+
+# ── 3-d) 정상 소스가 '조용히' 사라지지 않는가 (P3) ───────────────────────────
+# gitignore 디렉터리 규칙에 앵커가 없으면 src/data/schema.json 같은 정상 소스가
+# 아무 메시지 없이 무시된다. 하위 경로 산출물은 훅이 '소리 내어' 막는 쪽이 옳다.
+if git check-ignore -q src/data/schema.json; then
+  bad "src/data/schema.json 이 조용히 무시된다 — gitignore 디렉터리 규칙에 앵커가 없다 (P3)"
+else
+  ok "하위 경로 정상 소스는 조용히 사라지지 않는다 (앵커 확인)"
+fi
 
 # ── 4) 대조군: 정상 파일은 통과해야 한다 (차단이 전부 막는 것이면 게이트가 아니다) ──
 tmp=$(mktemp -d)

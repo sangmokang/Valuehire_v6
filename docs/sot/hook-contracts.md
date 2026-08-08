@@ -7,7 +7,8 @@
 
 ### `hooks/pre-commit`
 ```
-입력  : stdin 없음. 스테이징된 파일 목록(git diff --cached --name-only)
+입력  : stdin 없음. 스테이징된 파일 목록(git diff --cached --name-only --diff-filter=ACMR)
+        ※ R(rename) 포함. 빼면 `git mv notes.txt leak.db` 가 목록에서 사라져 그대로 통과한다
 출력  : exit 0 (통과) | exit 1 (차단)
         차단 시 stderr: "BLOCKED: <검사이름> — <파일경로> (패턴: <패턴이름>)"
         ※ 매칭된 실제 값은 절대 출력하지 않는다
@@ -17,6 +18,9 @@
           *.db·*.sqlite·*.sqlite3) 차단 — P21. gitignore 가 `git add -f` 로 우회되므로
           차단 지점을 훅에도 둔다. 크기는 작업트리가 아니라 **인덱스 blob**에서 잰다
           (작업트리를 재면 add 후 덮어쓰기로 우회된다 — ①과 같은 이유).
+          경로/확장자 비교는 **소문자로 정규화**한 뒤 수행한다(dump.DB 가 통과했다).
+          디렉터리 규칙은 하위 경로까지 덮고, `.gitignore` 는 최상위로 앵커한다 —
+          앵커가 없으면 src/data/schema.json 같은 정상 소스가 조용히 사라진다(P3).
           CI 등가물: `.github/workflows/verify.yml` 의 "대용량 파일 · 산출물 경로 스캔"
           (훅은 이번 커밋의 스테이지분만, CI 는 추적 파일 전체를 본다)
 불변식: set -euo pipefail. 검사를 실행하지 못하면 exit 1 (fail-closed)
