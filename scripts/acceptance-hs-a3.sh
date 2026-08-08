@@ -110,6 +110,7 @@ must_catch "세션 쿠키 키(무따옴표 YAML)" "${K_LI}: ${VAL}"
 must_catch "세션 쿠키 키(.env 형태)"     "${K_JS}=${AJAXV}"
 must_catch "${H_SETCOOKIE} 응답 헤더"    "${H_SETCOOKIE}: ${K_LI}=${VAL}; Path=/; HttpOnly"
 must_catch "${H_COOKIE} 요청 헤더"       "  \"${H_COOKIE}\": \"${K_LI}=${VAL}\""
+must_catch "무따옴표 Cookie 헤더(Copy as cURL)" "curl -H '${H_COOKIE}: sess_x=Zm9vYmFyYmF6cXV4'"
 must_catch "Bearer 인증 헤더"            "  \"${H_AUTH}\": \"Bearer ${JWT_HEAD}${JWTSEG}.${JWT_HEAD}${JWTSEG}.${JWTSEG}\""
 
 # ── ④ 오탐 대조군 — 평범한 코드·문서는 막히면 안 된다 ────────────────────────
@@ -118,6 +119,45 @@ must_not_catch "상태 상수"           "  '$(printf 'P%s' 'W')': 'PENDING_WRIT
 must_not_catch "헤더 '이름' 설정"    "  \"sessionIdHeader\": \"x-request-session\""
 must_not_catch "i18n 안내 문구"      "  \"$(printf 'p%s' 'w')\": \"비밀번호를 입력하세요\""
 must_not_catch "산문 속 키 이름 언급" "비밀 스캔이 ${K_LI} 와 ${H_COOKIE} 를 놓친다고 실측했다"
+
+# ── ⑤ 종단: 스캐너가 실제로 이 패턴을 쓰는가 (판정기 2벌 방지) ───────────────
+#
+# ①~④ 는 "정규식이 맞는가"만 증명한다. verify.sh 가 그 패턴을 실제로 그렇게 쓰는지는
+# 별개 문제다 — 예컨대 verify.sh 에서 `grep -i` 하나만 빠지면 신규 패턴이 전부 대문자라
+# 실제 소문자 쿠키를 놓치는데, 위 검사는 자기 파이프라인으로 판정하므로 **전부 초록인 채**
+# 스캐너만 뚫린다(2026-08-09 품질 재검증 실증). 규칙을 복사하는 것이 곧 판정기 2벌이다
+# (hooks/pre-commit:54-61 에 같은 사고가 기록돼 있다). 그래서 verify.sh 를 실제로 태운다.
+e2e() {
+  local desc="$1" content="$2" want_rc="$3"
+  local tmp rc=0
+  checked=$((checked + 1))
+  tmp=$(mktemp -d) || { printf 'FAIL: 임시 저장소 생성 실패 — %s (fail-closed)\n' "$desc"; fail=1; return; }
+  if [ -z "$tmp" ] || [ ! -d "$tmp" ]; then
+    printf 'FAIL: 임시 저장소 경로가 비었다 — %s (fail-closed)\n' "$desc"; fail=1; return
+  fi
+  git init -q "$tmp"
+  cp verify.sh "$PATTERNS" "$tmp/"
+  (
+    cd "$tmp" || exit 9
+    printf '%s\n' "$content" > payload.json
+    git add payload.json >/dev/null 2>&1
+    SECRET_PATTERNS_FILE= VERIFY_SCAN_SOURCE=index bash verify.sh
+  ) >/dev/null 2>&1
+  rc=$?
+  rm -rf "$tmp"
+  if [ "$rc" -eq "$want_rc" ]; then
+    printf 'PASS: 스캐너 종단 — %s (verify.sh exit=%s)\n' "$desc" "$rc"
+  else
+    printf 'FAIL: 스캐너 종단 — %s (기대 exit=%s, 실제 %s)\n' "$desc" "$want_rc" "$rc"
+    fail=1
+  fi
+}
+
+# 카나리는 **소문자 키 + 모양 없는 값**이어야 판별력이 있다.
+# 값이 AQED… 처럼 대문자 모양이면 `grep -i` 가 빠져도 대문자 패턴이 그대로 잡아버려
+# 이 종단 검사가 -i 손실을 못 잡는다(2026-08-09 실측 — 첫 카나리가 그랬다).
+e2e "세션 쿠키 파일을 verify.sh 가 차단" "${K_LI}: Zm9vYmFyYmF6cXV4cXV1eA" 1
+e2e "정상 파일은 verify.sh 가 통과"      "{\"position\":\"AX Sales\",\"pages\":20}"        0
 
 if [ "$checked" -eq 0 ]; then
   echo "FAIL: 검사 항목 0개 — 0건 처리로 통과는 금지한다 (P20)"
