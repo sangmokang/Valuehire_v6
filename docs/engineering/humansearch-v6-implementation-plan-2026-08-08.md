@@ -197,8 +197,8 @@ eligible(candidate) -> bool     # 유일한 경계 함수
 |---|---|---|---|
 | **A1** | *When 인수 스크립트가 CI 실행 줄에 없으면, then `suppressions.yaml`에 만료와 함께 등록돼 있어야 하고 없으면 차단해야 한다* | `bash scripts/acceptance-hs-a1.sh` | `PASS: 인수 스크립트 N개 (CI등록 M · 원장등록 K, M+K==N)` · `PASS: 원장 항목 전부 만료 이내` / `CHECKED: 3` |
 | **A2** | *When 파이썬 소스가 존재하면, then ruff·mypy 검사 대상 수가 `git ls-files '*.py'` 개수와 **일치**하고 pytest 수집 케이스가 **1건 이상**이어야 한다* | `bash scripts/acceptance-hs-a2.sh` | `PASS: ruff K == ls-files K` · `PASS: mypy K` · `PASS: pytest 수집 T >= 1` / `CHECKED: 3` |
-| **A3** | *If 세션 계열 자격증명이 추적 파일에 있으면, then 스캔이 실패해야 한다* | `bash scripts/acceptance-hs-a3.sh` | `PASS: 실형식 4 + 값모양 2 + 키=값 5 전부 탐지` · `PASS: 오탐 대조군 5종 전부 통과` / `CHECKED: 17` |
-| **A4** | *If 1MB를 넘는 파일 또는 DB·아티팩트 경로가(하위 디렉터리 포함) 커밋되려 하면, then `pre-commit`과 CI가 **양쪽 다** 차단해야 한다* | `bash scripts/acceptance-hs-a4.sh` | `PASS: 차단 7종(사유 일치 확인)` · `PASS: gitignore 5경로` · `PASS: CI 경로 패턴이 훅과 동치` / `CHECKED: 16` |
+| **A3** | *If 세션 계열 자격증명이 추적 파일에 있으면, then 스캔이 실패해야 한다* | `bash scripts/acceptance-hs-a3.sh` | `PASS: 실형식 4 + 값모양 2 + 키=값 6 전부 탐지` · `PASS: 스캐너 종단 2건(verify.sh 실제 실행)` · `PASS: 오탐 대조군 5종 전부 통과` / `CHECKED: 20` |
+| **A4** | *If 1MB를 넘는 파일 또는 DB·아티팩트 경로가(하위 디렉터리 포함) 커밋되려 하면, then `pre-commit`과 CI가 **양쪽 다** 차단해야 한다* | `bash scripts/acceptance-hs-a4.sh` | `PASS: 차단 10종(사유 일치)` · `PASS: 인덱스 측정·rename·앵커 3건` · `PASS: gitignore 5경로` · `PASS: CI 경로 패턴이 훅과 동치` / `CHECKED: 22` |
 | **A5** | *When P4 시뮬레이션 검사가 돌면, then 외부 효과 모듈 판별이 **파일명이 아니라 선언된 목록**(`contracts/external-effect-modules.txt`)을 근거로 해야 한다* | `bash scripts/acceptance-hs-a5.sh` | `PASS: tools/live_*.py 전부 커버` · `PASS: 네트워크 0건 모듈 차단 시연` / `CHECKED: 2` |
 | **A6** | *When `session-status.sh`가 RED를 세면, then 억제된 RED를 **출력에 명시하며** 분리 계상해야 한다* | `bash scripts/acceptance-hs-a6.sh` | `PASS: RED 0/4 (1건 억제: acceptance-0-2 expiry 2026-08-21)` / `CHECKED: 2` |
 
