@@ -57,10 +57,20 @@ fi
 
 # ── 3) pre-commit 이 실제로 차단하는가 (임시 저장소에서 실행) ────────────────
 run_hook_case() {
-  # run_hook_case <설명> <파일경로> <내용생성함수>
-  local desc="$1" path="$2" maker="$3"
-  local tmp rc=0
-  tmp=$(mktemp -d)
+  # run_hook_case <설명> <파일경로> <내용생성함수> <기대 차단사유 정규식>
+  #
+  # ⚠️ 종료코드만 보면 안 된다. 훅이 **다른 이유로** exit 1 을 내도 "차단 확인"으로
+  # 읽히기 때문이다(거짓 초록). 그래서 stderr 의 BLOCKED 사유까지 대조한다.
+  local desc="$1" path="$2" maker="$3" want="$4"
+  local tmp rc=0 out=""
+  # mktemp 실패를 통과로 처리하면 검증기가 오염원이 된다: tmp="" 일 때 `cd ""` 는
+  # rc=0 이라 현재 디렉터리(= 실제 저장소)에 머물고, git config·git add 가 거기서 돈다
+  # (2026-08-09 실측: user.name·hooksPath 가 덮어써지고 1.2MB 파일이 스테이지됐다).
+  tmp=$(mktemp -d) || { bad "임시 저장소 생성 실패 — $desc (fail-closed)"; return; }
+  if [ -z "$tmp" ] || [ ! -d "$tmp" ]; then
+    bad "임시 저장소 경로가 비었거나 디렉터리가 아니다 — $desc (fail-closed)"
+    return
+  fi
   git init -q "$tmp"
   mkdir -p "$tmp/hooks" "$tmp/scripts"
   cp hooks/pre-commit hooks/pre-push "$tmp/hooks/"
@@ -70,7 +80,8 @@ run_hook_case() {
   cp .gitignore "$tmp/"
   [ -f suppressions.yaml ] && cp suppressions.yaml "$tmp/"
   chmod +x "$tmp/hooks/pre-commit" "$tmp/hooks/pre-push"
-  (
+  # 한 번만 실행하고 종료코드와 출력(BLOCKED 사유)을 함께 받는다.
+  out=$(
     cd "$tmp" || exit 9
     git config core.hooksPath hooks
     git config user.email a@b.c
@@ -78,23 +89,34 @@ run_hook_case() {
     mkdir -p "$(dirname "$path")"
     "$maker" "$path"
     git add -f "$path" >/dev/null 2>&1
-    bash hooks/pre-commit
-  ) >/dev/null 2>&1
+    bash hooks/pre-commit 2>&1
+  )
   rc=$?
   rm -rf "$tmp"
-  if [ "$rc" -ne 0 ]; then
-    ok "pre-commit 차단 확인 — $desc (exit=$rc)"
-  else
+  if [ "$rc" -eq 0 ]; then
     bad "pre-commit 통과함 — $desc (차단되어야 한다)"
+  elif printf '%s\n' "$out" | grep -qE "$want"; then
+    ok "pre-commit 차단 확인 — $desc (exit=$rc · 사유 일치)"
+  else
+    bad "pre-commit 이 막긴 했으나 사유가 다르다 — $desc (기대: $want / 실제: ${out%%$'\n'*})"
   fi
 }
 
 make_big()   { dd if=/dev/zero of="$1" bs=1024 count=1200 status=none; }
 make_small() { printf 'x\n' > "$1"; }
 
-run_hook_case "1MB 초과 파일"        "big.bin"                    make_big
-run_hook_case "SQLite 파일"          "data/humansearch.sqlite3"   make_small
-run_hook_case "아티팩트 스크린샷"    "artifacts/nav.png"          make_small
+SZ='1MB 초과 파일'
+PATHRULE='산출물·데이터 경로'
+run_hook_case "1MB 초과 파일"          "big.bin"                    make_big   "$SZ"
+run_hook_case "SQLite 파일"            "data/humansearch.sqlite3"   make_small "$PATHRULE"
+run_hook_case "아티팩트 스크린샷"      "artifacts/nav.png"          make_small "$PATHRULE"
+# 하위 디렉터리 우회 (2026-08-09 보안 재검증에서 뚫린 경로)
+run_hook_case "하위 경로 아티팩트"     "src/artifacts/nav.png"      make_small "$PATHRULE"
+run_hook_case "하위 경로 데이터"       "tools/data/cand.json"       make_small "$PATHRULE"
+# SQLite 사이드카 — WAL 은 아직 본체에 반영 안 된 행 전체를 담는다
+run_hook_case "SQLite WAL 사이드카"    "humansearch.db-wal"         make_small "$PATHRULE"
+# 후보자 덤프의 실제 형식
+run_hook_case "JSONL 덤프"             "candidates.jsonl"           make_small "$PATHRULE"
 
 # ── 4) 대조군: 정상 파일은 통과해야 한다 (차단이 전부 막는 것이면 게이트가 아니다) ──
 tmp=$(mktemp -d)
@@ -132,6 +154,17 @@ else
     ok "CI 에 크기 검사 본문 존재 (cat-file -s)"
   else
     bad "CI 에 크기 검사 본문이 없다 — 로컬 훅은 우회 옵션으로 건너뛸 수 있다 (P15③)"
+  fi
+  # 판정기가 두 벌이 되면 갈린다(이 저장소가 이미 겪은 사고 — hooks/pre-commit §1 주석).
+  # 훅과 CI 가 같은 경로 패턴을 쓰는지 대조한다. 하나만 넓히면 조용히 갈라진다.
+  miss=""
+  for pat in '\*/artifacts/\*' '\*/data/\*' '\*\.db-\*' '\*\.jsonl'; do
+    if ! printf '%s\n' "$ACTIVE" | grep -q -- "$pat"; then miss="${miss} ${pat}"; fi
+  done
+  if [ -z "$miss" ]; then
+    ok "CI 경로 패턴이 훅과 동치 (하위경로·사이드카·덤프 포함)"
+  else
+    bad "CI 경로 패턴이 훅보다 좁다 — 누락:${miss} (판정기 2벌 · P15③)"
   fi
 fi
 

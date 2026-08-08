@@ -145,7 +145,8 @@ jobs:
           while IFS= read -r -d '' f; do
             n=$((n+1))
             case "$f" in
-              artifacts/*|data/*|private-reviews/*|*.db|*.sqlite|*.sqlite3)
+              artifacts/*|*/artifacts/*|data/*|*/data/*|private-reviews/*|*/private-reviews/*|\
+              *.db|*.db-*|*.sqlite|*.sqlite-*|*.sqlite3|*.sqlite3-*|*.jsonl|*.ndjson|*.parquet)
                 echo "FAIL: 산출물·데이터 경로가 추적됨: $f (P21 · 후보자 PII)"; fail=1; continue;;
             esac
             sz=$(git cat-file -s ":$f") || sz=""
