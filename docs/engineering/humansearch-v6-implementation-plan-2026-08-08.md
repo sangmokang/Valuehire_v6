@@ -197,12 +197,15 @@ eligible(candidate) -> bool     # 유일한 경계 함수
 |---|---|---|---|
 | **A1** | *When 인수 스크립트가 CI 실행 줄에 없으면, then `suppressions.yaml`에 만료와 함께 등록돼 있어야 하고 없으면 차단해야 한다* | `bash scripts/acceptance-hs-a1.sh` | `PASS: 인수 스크립트 N개 (CI등록 M · 원장등록 K, M+K==N)` · `PASS: 원장 항목 전부 만료 이내` / `CHECKED: 3` |
 | **A2** | *When 파이썬 소스가 존재하면, then ruff·mypy 검사 대상 수가 `git ls-files '*.py'` 개수와 **일치**하고 pytest 수집 케이스가 **1건 이상**이어야 한다* | `bash scripts/acceptance-hs-a2.sh` | `PASS: ruff K == ls-files K` · `PASS: mypy K` · `PASS: pytest 수집 T >= 1` / `CHECKED: 3` |
-| **A3** | *If 세션 계열 자격증명 패턴이 추적 파일에 있으면, then 스캔이 실패해야 한다* | `bash scripts/acceptance-hs-a3.sh` | `PASS: 카나리 7종 전부 탐지(li_at·cookie·JSESSIONID·set-cookie·pw·session_id·JWT)` / `CHECKED: 7` |
-| **A4** | *If 1MB를 넘는 파일 또는 DB·아티팩트 경로가 커밋되려 하면, then `pre-commit`과 CI가 **양쪽 다** 차단해야 한다* | `bash scripts/acceptance-hs-a4.sh` | `PASS: 1MB 초과 차단(로컬·CI)` · `PASS: artifacts/·*.db·*.sqlite*·data/ gitignore` / `CHECKED: 4` |
+| **A3** | *If 세션 계열 자격증명이 추적 파일에 있으면, then 스캔이 실패해야 한다* | `bash scripts/acceptance-hs-a3.sh` | `PASS: 실형식 4 + 값모양 2 + 키=값 5 전부 탐지` · `PASS: 오탐 대조군 5종 전부 통과` / `CHECKED: 17` |
+| **A4** | *If 1MB를 넘는 파일 또는 DB·아티팩트 경로가(하위 디렉터리 포함) 커밋되려 하면, then `pre-commit`과 CI가 **양쪽 다** 차단해야 한다* | `bash scripts/acceptance-hs-a4.sh` | `PASS: 차단 7종(사유 일치 확인)` · `PASS: gitignore 5경로` · `PASS: CI 경로 패턴이 훅과 동치` / `CHECKED: 16` |
 | **A5** | *When P4 시뮬레이션 검사가 돌면, then 외부 효과 모듈 판별이 **파일명이 아니라 선언된 목록**(`contracts/external-effect-modules.txt`)을 근거로 해야 한다* | `bash scripts/acceptance-hs-a5.sh` | `PASS: tools/live_*.py 전부 커버` · `PASS: 네트워크 0건 모듈 차단 시연` / `CHECKED: 2` |
 | **A6** | *When `session-status.sh`가 RED를 세면, then 억제된 RED를 **출력에 명시하며** 분리 계상해야 한다* | `bash scripts/acceptance-hs-a6.sh` | `PASS: RED 0/4 (1건 억제: acceptance-0-2 expiry 2026-08-21)` / `CHECKED: 2` |
 
 - **A3~A5는 보안 리뷰 Critical 2 + Medium 1을 선행으로 당긴 것이다.** 셋 다 소스 0줄로 끝난다.
+- **A3의 의도적 구멍(근거를 패턴 파일에 남긴다)**: `pw`/`pwd` 짧은 키와 `SESSION_ID`/`SESSIONID` 키는 **잡지 않는다.** 실측에서 오탐 4종(빌드 경로 `"pwd":"/Users/…"` · 상태 상수 `'PW':'PENDING_WRITE'` · 헤더 이름 설정 · i18n 문구)이 여기서 났고, **비밀 스캔에는 억제 경로가 없어 오탐이 곧 작업 중단**이다. 진짜는 놓치고 더미는 막는 비대칭이 훅 우회 습관을 만든다. 자격증명은 Keychain 단일 출처라 파일에 남을 경로가 정책상 없다(창립 스펙 §3-6). 세션 값은 키 이름이 아니라 **값 모양**으로 잡는다.
+- **A4의 의도적 허용**: `*.sql`(마이그레이션은 정상 산출물) · `*.csv`(소형 픽스처와 구분 불가). 크기 검사와 내용 검사에 맡긴다.
+- **1MB 문턱의 한계**: 크기로는 **1MB 미만 PII를 못 막는다.** `receipts/`·`fixtures/live/`는 계획상 커밋 대상이라 차단 목록 밖이며, 그 방어선은 A3의 내용 검사와 **AC-B2(픽스처 텍스트 노드 0건)**뿐이다. B2가 붙기 전까지 그 두 경로는 사실상 무방비다 — §10에 한계로 적었다.
 - **A6은 게이트 0 통과 조건을 만든다**(1-4·1-14). 조용한 제외 금지 — `session-status.sh:45`의 `EXCLUDED` 명시 선례를 따른다.
 - **산출물**: `hooks/pre-commit`(+크기·+P4 목록) · `hooks/pre-push`(+A1) · `verify.yml`(+스텝 5) · `.gitignore` · `.secret-patterns.default` · `contracts/external-effect-modules.txt` · `pyproject.toml`·`uv.lock`·`.python-version` · 인수 스크립트 6개 · **SOT diff 2건**(`verification-commands.md`·`hook-contracts.md`)
 - **LOC 예산**: 훅 2개 각 +80줄 이내(현재 pre-commit 164·pre-push 174 → hard 600 여유), 인수 스크립트 각 100줄 이내
@@ -356,6 +359,8 @@ eligible(candidate) -> bool     # 유일한 경계 함수
 - **사고유형 [14](서치 범위 축소)** 1건 미해결. `search_url` 화이트리스트로 부분만 덮인다.
 - **유형 [5](자격증명)는 "덮음"이 아니라 "부분"**이다 — 2판은 §8의 PII AC를 근거로 "덮음"이라 셌는데 같은 문서가 그 AC를 "얇다"고 적었고(이중장부), 보안 리뷰는 그 방어의 두 다리가 **실재하지 않는다**고 확인했다. A4·Phase 0으로 실체를 만든 뒤에야 "덮음"이 된다.
 - **잡코리아·LinkedIn은 B-2·B-3 전까지 순회 불가**(의도된 fail-closed). 3사 전체 범위는 그 두 PR 완료 시 충족된다.
+- **1MB 미만 PII는 크기 문턱으로 못 막는다.** 특히 `receipts/`·`fixtures/live/`는 계획상 **커밋 대상**이라 A4의 경로 차단 밖에 있다. 그 두 경로의 유일한 방어선은 A3의 내용 검사와 AC-B2(픽스처 텍스트 노드 0건)이며, **B2 병합 전까지는 방어가 한 겹뿐**이다.
+- **A3는 세션 값 '모양'에 의존한다.** LinkedIn이 쿠키 값 형식을 바꾸면 값-모양 패턴이 무력해지고 키 이름 패턴만 남는다. 형식 변경은 예고 없이 일어난다 — 정기 재확인이 필요하며 이 계획에 그 주기가 없다.
 - **`suppressions.yaml` 만료 3건**(08-21 · 09-15 ×2)이 작업 기간과 겹친다. `ci-transfer-guarantee`는 **A1이 재사용하는 마커 검증 패턴이 4종 우회로 뚫려 있다는 원장**이다 — A1은 그것을 해소하지 않는다(방어 심도).
 - **작업량·세션 수 견적은 내지 않는다.**
 - probe 커밋 `6538bac`는 unreachable 객체로 잔존(워크트리·브랜치는 제거). `acceptance-0-2`를 빨간불로 유지하는 조건 중 하나다.
