@@ -22,8 +22,19 @@
 #   실제 비밀값을 쓰지 않는다. 값은 더미이며 어떤 파일로도 기록하지 않는다.
 set -uo pipefail
 
+# ⚠️ git 훅은 GIT_DIR·GIT_INDEX_FILE 등을 자식 프로세스로 export 한다. 그 상태에서는
+# 임시 저장소로 `cd` 해도 git 명령이 **실제 저장소**에 붙는다 — 2026-08-09 실측:
+# `git push` 중 이 검사가 돌면서 실제 워크트리 인덱스에 테스트 파일 12개가 스테이지되고
+# README.md 가 덮어써졌다(push 는 fail-closed 로 막혀 원격에는 안 갔다).
+# 검증기가 검증 대상을 오염시키면 그 판정은 무효다. 여기서 상속을 끊는다.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY \
+      GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_PREFIX GIT_QUARANTINE_PATH
+
 REPO=$(git rev-parse --show-toplevel 2>/dev/null) || { echo "NOT_RUN: git 저장소가 아니다"; echo "CHECKED: 0"; exit 2; }
 cd "$REPO"
+
+# 자기 오염 감지 — 이 검사가 끝난 뒤 저장소 상태가 시작과 달라지면 판정 자체가 무효다.
+SNAP0=$(git status --porcelain)
 
 PATTERNS=.secret-patterns.default
 if [ ! -f "$PATTERNS" ] || [ ! -s "$PATTERNS" ]; then
@@ -163,6 +174,17 @@ if [ "$checked" -eq 0 ]; then
   echo "FAIL: 검사 항목 0개 — 0건 처리로 통과는 금지한다 (P20)"
   echo "CHECKED: 0"
   exit 1
+fi
+
+SNAP1=$(git status --porcelain)
+if [ "$SNAP0" != "$SNAP1" ]; then
+  checked=$((checked + 1))
+  echo "FAIL: 이 검사가 저장소를 오염시켰다 — 시작/종료 상태가 다르다 (판정 무효)"
+  printf '%s\n' "$SNAP1" | sed 's/^/       /'
+  fail=1
+else
+  checked=$((checked + 1))
+  echo "PASS: 저장소 무오염 (시작/종료 상태 동일)"
 fi
 
 printf 'CHECKED: %d\n' "$checked"
