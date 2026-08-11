@@ -1,0 +1,7 @@
+# HumanSearch G1 clean-room deny patterns (case-insensitive ERE).
+# Patterns are shaped so this contract does not match itself.
+
+Valuehire_v[1-5]
+cce928[0]
+cdp_driv[e]r
+/(Users|home|private|tmp|opt|var|srv|root|Volumes|mnt|data|workspace|workspaces)/.*/worktre[e]s/
