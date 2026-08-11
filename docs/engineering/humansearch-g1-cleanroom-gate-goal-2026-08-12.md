@@ -21,9 +21,9 @@
 | 시작 게이트는 현재 통과한다. | `bash scripts/session-status.sh` → `HEAD: 32ce698 (synced)`, `ORIGIN: 32ce698`, `RED: 0/4` |
 | 한 AC는 한 task worktree/branch/PR로 격리해야 한다. | `docs/sot/git-workflow.md:14-23` |
 
-G1 핵심 구현 `6a9ae52`에는 fail-closed 스캐너 1개, deny-pattern 계약 1개, 고정 회귀 계약 5개가
-있다. 최신 main `0459a37`을 merge한 배송 HEAD에서도 CI는 G1 스크립트 6개를 명시 실행하고
-pre-push는 같은 6개를 글로브로 회수한다.
+G1 핵심 구현 `4256e3f`에는 fail-closed 스캐너 1개, deny-pattern 계약 1개, 고정 회귀 계약 7개가
+있다. 최신 main `0459a37`을 merge한 배송 HEAD에서 CI는 G1 스크립트 8개를 명시 실행하고
+pre-push는 같은 8개를 글로브로 회수한다.
 
 ## 2. 근본 원인
 
@@ -61,8 +61,8 @@ G1 검사기는 `docs/engineering/**`만 계약상 제외한다. 검사기 자�
 | 0 시작 자격 | PASS | `bash scripts/session-status.sh` → `RED: 0/4` |
 | 1 스펙 | PASS | 이 문서와 GitHub issue `#7`에 G1 단언 1개만 두었다. |
 | 2 격리/RED | PASS | 별도 worktree에서 `bash scripts/acceptance-hs-cleanroom-mutations.sh` → `FAIL: required G1 implementation missing: scripts/acceptance-hs-cleanroom.sh`, `RED_EXIT=1`. |
-| 3 최소 구현 | PASS | 다섯 RED→GREEN 쌍을 분리했고 각 RED 파일은 대응 GREEN에서 byte diff 0이다. |
-| 4 검증 | PASS_LOCAL_ADVERSARIAL | G1 6개, `verify.sh`, 0-2/0-5/0-6/0-7, 병합 후 pre-push 10개, `RED: 0/12`, Fable5 PASS, Codex V2 PASS를 확인했다. |
+| 3 최소 구현 | PASS | 일곱 RED→GREEN 쌍을 분리했고 각 RED 파일은 대응 GREEN에서 byte diff 0이다. |
+| 4 검증 | PASS_LOCAL_ADVERSARIAL | G1 8개, `verify.sh`, 0-2/0-5/0-6/0-7, pre-push 12개, Fable5 PASS, Codex V2 PASS를 확인했다. |
 | 5 배송 | NOT_RUN | task 브랜치 push와 PR/CI까지만 수행한다. 병합은 하지 않는다. |
 | 6 종료 | NOT_RUN | 오너 병합 전이므로 worktree를 제거하지 않는다. |
 
@@ -84,8 +84,8 @@ G1 검사기는 `docs/engineering/**`만 계약상 제외한다. 검사기 자�
 - [x] `docs/sot/hook-contracts.md`의 pre-push 글로브와 fail-closed 계약을 확인했다.
 - [x] `docs/sot/verification-commands.md`의 실제 bash 검증 배관을 확인했다.
 - [x] `docs/sot/git-workflow.md`의 한 AC = 한 branch/worktree/PR 규약을 적용했다.
-- [x] 다섯 RED `257eecd`, `602a131`, `e5197cf`, `f60d95c`, `8fb7a80`과 대응 GREEN을 별도 커밋으로 남겼다.
-- [x] 최신 main 병합 후 pre-push 실행 10개 중 G1 6개가 포함됐고 `.github/workflows/verify.yml`에도 6개가 모두 명시됐다.
+- [x] 일곱 RED `257eecd`, `602a131`, `e5197cf`, `f60d95c`, `8fb7a80`, `177ec14`, `9596e63`과 대응 GREEN을 별도 커밋으로 남겼다.
+- [x] 최신 main 병합 후 pre-push 실행 12개 중 G1 8개가 포함됐고 `.github/workflows/verify.yml`에도 8개가 모두 명시됐다.
 - [x] Fable5 1차 판정과 Codex 재현 결과를 아래 로그에 원문/명령과 함께 남겼다.
 
 ## 7. 비범위
@@ -107,7 +107,9 @@ G1 검사기는 `docs/engineering/**`만 계약상 제외한다. 검사기 자�
 | Fable5 문맥 재공격 | 7건 발견 | root-only, array, backtick, redirect, escaped space, brace, double-slash. RED `e5197cf` → GREEN `467fe5c`. |
 | Fable5 콜론 재공격 | 4건 발견 | PATH 목록과 `host:/...` 문맥. RED `f60d95c` → GREEN `9cf5df2`. |
 | Fable5 file URL 재공격 | 2건 발견 + 과차단 1건 | `file:///...`를 막고 `$(pwd)/...`를 허용했다. RED `8fb7a80` → GREEN `6a9ae52`. |
-| 최종 Fable5 → Codex V2 | 모두 PASS | Fable5 차단 fuzz 43/43·허용 16/16, Codex 차단 31/31·허용 16/16, RED 역사 5/5. |
+| 실제 `git push` pre-push | hook 환경 결함 발견 | 다섯 샌드박스가 호출자 index를 덮었다. index-only 복원 뒤 RED `177ec14` → GREEN `e9f8d03`. 원격 변경 0건. |
+| Fable5 hook 재공격 | 회귀 게이트 1건 발견 | 실제 `GIT_DIR` 단일 회귀를 기존 테스트가 놓쳤다. RED `9596e63` → GREEN `4256e3f`. |
+| 최종 Fable5 → Codex V2 | 모두 PASS | unset 변이 6/6, routing 5/5, 주석 우회 1/1, G1/CI/SOT 8/8. |
 
 ### Fable5 최종 1차
 
@@ -196,9 +198,70 @@ PASS: Codex V2 adversarial verification; official G1 6/6; worktree clean
 Fable5가 최종 PASS 전에 놓쳤고 Codex가 먼저 찾은 material 결함은 임의 루트 1개 클래스였다. 이후
 Fable5가 문맥 7개, 콜론 4개, file URL 2개를 추가로 찾았다. 최종 교정 뒤 양쪽의 material 불일치는 0개다.
 
+### 실제 hook 결함 교정 뒤 최종 재공격
+
+Fable5 명령:
+
+```bash
+env -u ANTHROPIC_API_KEY claude --safe-mode --no-session-persistence --permission-mode bypassPermissions --tools Read,Grep,Bash --model claude-fable-5 --effort high -p "$(sed -n '1,$p' /tmp/humansearch-g1-fable5-routing-final-prompt.txt)"
+```
+
+원문(ANSI 없음):
+
+> ## 검증 결과 요약
+>
+> HEAD `4256e3f`에서 G1 게이트에 대한 최종 적대적 검증을 완료했습니다. **차단(BLOCKING)·중대(MATERIAL) 결함은 발견하지 못했습니다.** 워크트리는 읽기 전용으로 유지했고, 모든 변이 실험은 `/tmp`의 합성 임시 저장소에서 수행 후 삭제했으며, push는 하지 않았습니다.
+>
+> ### 1. 이전 MATERIAL 발견에 대한 재공격 — 해소 확인
+>
+> - **RED 파일 바이트 동일성**: `scripts/acceptance-hs-cleanroom-hook-env-mutations.sh`의 SHA-256이 RED `9596e63`, GREEN `4256e3f`, 작업트리 모두 `0fd58917…`로 동일합니다.
+> - **RED 재현**: 임시 클론에서 `9596e63`을 체크아웃해 실행하니 여섯 변이 전부 `exit=0`으로 탈출하고 `FAIL: … blocked 0/6`(exit 1)이었습니다. 구버전 hook-env가 넘겨준 mutant suite root를 무시했다는 진단 그대로입니다.
+> - **GREEN 수리 내용**: `scripts/acceptance-hs-cleanroom-hook-env.sh:17-25`가 suite root 인자를 실제로 소비하고(2개 이상 인자·부재 디렉터리는 exit 2), `:88-94`에서 여섯 Git 변수를 전부 scratch 저장소로 주입하며, `:99-102`에서 scratch의 index/objects/refs 전후 해시를, `:62,111-115`에서 라이브 index를 비교합니다.
+>
+> ### 2. 독립 변이 재검증 (변이 스크립트를 신뢰하지 않고 직접 수행)
+>
+> - **변수별 6종 변이**: mutation 스크립트는 첫 번째 스위트만 변이하므로, 저는 여섯 변수를 다섯 스위트에 **순환 배치**해 각각 다른 스위트에서 unset을 제거하고 실제 게이트를 호출했습니다. 6/6 전부 `rc=1`, `FAIL: hook Git environment isolated 4/5`로 빨간불이 됩니다. 즉 하니스는 첫 스위트만이 아니라 다섯 스위트 전부를 검사합니다.
+> - **grep 우회형 행동 변이**: `unset` 줄에서 GIT_DIR을 빼고 말미 주석(`# GIT_DIR`)으로 정적 grep을 통과시키는 적대적 변이를 만들어도, 행동 검사(scratch 주입 실행)가 스위트 실패(exit=128)를 잡아 게이트가 `rc=1`로 떨어집니다. 정적 검사와 행동 검사가 서로의 사각을 메우는 것을 실측했습니다.
+> - **linked-worktree 유사 구성의 GIT_DIR**: 합성 메인 저장소 + `git worktree add`로 만든 연결 워크트리에서 (a) `git rev-parse --git-path index`가 워크트리 전용 index(`.git/worktrees/linked/index`)를 올바르게 가리키고, (b) 훅 방식으로 GIT_DIR을 상속시킨 baseline이 5/5 PASS, (c) GIT_DIR unset 제거 변이와 행동 누출 변이 모두 `rc=1`, (d) 호출자(연결 워크트리) index가 변조되지 않음을 확인했습니다. 커밋 메시지가 주장한 "linked-worktree가 GIT_DIR로 라우팅되는" 시나리오가 실제로 커버됩니다.
+>
+> ### 3. G1 8개 스크립트·배선·기존 커버리지
+>
+> - **8/8 실행**: 워크트리에서 8개 스크립트 전부 `rc=0` — 스캐너 `PASS: forbidden runtime refs 0 / escaping symlinks 0 / CHECKED: 38`, 변이 스위트 `10/10`, 절대경로 `3/3`, 문맥 `7/7`, 콜론 `4/4`, file URL `2/2`(https·`$(pwd)` 동적 경로는 과차단하지 않음), hook-env `5/5`, unset 변이 `6/6`.
+> - **CI 명시 8/8**: `.github/workflows/verify.yml`의 "HumanSearch G1 클린룸 경계" 스텝에 8개 전부 개별 `bash` 실행 줄로 존재합니다.
+> - **pre-push 발견 8/8**: `hooks/pre-push`의 글로브·필터 로직을 그대로 시뮬레이션한 결과 실행 집합에 cleanroom 스크립트 8개가 모두 포함되고, 어느 것도 `PUSH-PERFORMING` 마커나 DEFERRED 제외에 걸리지 않습니다.
+> - **SOT 8/8**: `docs/sot/verification-commands.md:28-35`에 8개 전부 등재.
+> - **fail-closed**: 패턴 계약 부재·유효 패턴 0건 모두 `rc=2` 실측. 스캐너는 `docs/engineering/*`만 제외하고 자기 자신과 패턴 파일도 스캔하며, 패턴은 자기매칭 회피형으로 작성돼 있습니다.
+> - **억제·약화 없음**: `suppressions.yaml`의 4건은 전부 G1 이전부터 있던 무관 항목(0-2 이관, CI 파싱 보증 한계 등)이고 만료 기한이 모두 미래입니다. cleanroom 스크립트에 `|| true`/`exit 0`류 약화 없음. `verify.sh` PASS, 작업트리 clean, 임시 디렉터리 전부 삭제 확인.
+>
+> ### 관찰 사항 (결함 아님, 조치 불요)
+>
+> - unset 변이 검출의 1차 경로는 정적 grep이고 일부 변수(예: `GIT_ALTERNATE_OBJECT_DIRECTORIES`)는 행동 검사만으로는 무해할 수 있으나, 요구사항인 "각 변이에서 게이트가 빨간불"은 두 경로의 합으로 6/6 충족되며, grep을 우회하는 누출도 행동 검사가 잡는 것을 실측했습니다.
+>
+> VERDICT: PASS
+
+Codex 명령: `bash -n /tmp/humansearch-g1-codex-hook-final.sh && bash /tmp/humansearch-g1-codex-hook-final.sh`
+
+원문:
+
+```text
+PASS: Codex reproduced hook mutation RED->GREEN history 1/1
+PASS: Codex reproduced six-variable routing and mutations 5/5 + 6/6
+PASS: Codex blocked static-check comment bypass behaviorally 1/1
+PASS: Codex verified G1 execution and CI/SOT wiring 8/8
+PASS: Codex final adversarial verification; worktree and live index unchanged
+```
+
+최종 Fable5와 Codex 사이 material 불일치는 0개다.
+
 ## 로컬 검증 로그
 
 ```text
+$ bash scripts/acceptance-hs-cleanroom-hook-env-mutations.sh
+PASS: hook environment unset mutations blocked 6/6
+
+$ bash scripts/acceptance-hs-cleanroom-hook-env.sh
+PASS: hook Git environment isolated 5/5
+
 $ bash scripts/acceptance-hs-cleanroom-file-urls.sh
 PASS: local file URLs blocked without URL/dynamic overreach 2/2
 
@@ -217,7 +280,7 @@ PASS: clean-room mutations blocked 10/10
 $ bash scripts/acceptance-hs-cleanroom.sh
 PASS: forbidden runtime refs 0
 PASS: escaping symlinks 0
-CHECKED: 36
+CHECKED: 38
 
 $ bash verify.sh
 PASS: no secret-pattern match in any tracked file, .env not tracked
@@ -235,7 +298,7 @@ $ bash scripts/acceptance-0-7.sh
 PASS: 위반 6 종이 전부 차단됨 (각 건 훅 OFF 대조 통과)
 
 $ hooks/pre-push
-pre-push: 검사 10개 실행
+pre-push: 검사 12개 실행
   ok  ./scripts/acceptance-0-6.sh
   ok  ./scripts/acceptance-hs-a3.sh
   ok  ./scripts/acceptance-hs-a4.sh
@@ -243,17 +306,20 @@ pre-push: 검사 10개 실행
   ok  ./scripts/acceptance-hs-cleanroom-absolute-paths.sh
   ok  ./scripts/acceptance-hs-cleanroom-colon-paths.sh
   ok  ./scripts/acceptance-hs-cleanroom-file-urls.sh
+  ok  ./scripts/acceptance-hs-cleanroom-hook-env-mutations.sh
+  ok  ./scripts/acceptance-hs-cleanroom-hook-env.sh
   ok  ./scripts/acceptance-hs-cleanroom-mutations.sh
   ok  ./scripts/acceptance-hs-cleanroom.sh
   ok  ./verify.sh
 
 $ bash scripts/session-status.sh
-HEAD: da01771 (ahead 14 / behind 0)
+HEAD: 4256e3f (ahead 19 / behind 0)
 ORIGIN: 0459a37
-RED: 0/12 (acceptance-0-7.sh 제외 — CI 담당)
+RED: 0/14 (acceptance-0-7.sh 제외 — CI 담당)
 ```
 
 task worktree에는 ignore된 `.secret-patterns`가 없어서 첫 `acceptance-0-2`가 exit 2였고, 환경변수를
 전역 주입하면 `acceptance-0-5`의 격리 clone까지 오염됐다. v6 루트의 로컬 패턴 파일을 ignore된
 `.secret-patterns` symlink로 연결한 뒤 각 스크립트의 기본 경로를 보존해 최신 main 병합 후 최종
-`RED: 0/12`를 얻었다.
+`RED: 0/14`를 얻었다. 공유 객체 DB의 다른 active worktree staged index가 만든 tree는 현재 G1 변경과
+무관하므로 보존했고, 최종 0-2는 현재 G1 브랜치의 no-local clean clone에서 PASS를 재확인했다.
