@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+unset GIT_DIR GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_WORK_TREE GIT_COMMON_DIR
+unset GIT_ALTERNATE_OBJECT_DIRECTORIES
+
 REPO=$(git rev-parse --show-toplevel) || {
   echo "FAIL: repository root unavailable"
   exit 2
