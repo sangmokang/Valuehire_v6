@@ -4,4 +4,6 @@
 Valuehire_v[1-5]
 cce928[0]
 cdp_driv[e]r
-/(Users|home|private|tmp|opt|var|srv|root|Volumes|mnt|data|workspace|workspaces)/.*/worktre[e]s/
+(^|[[:space:]=(:,])"/([^$"]*/)?worktre[e]s/
+(^|[[:space:]=(:,])'/([^$']*/)?worktre[e]s/
+(^|[[:space:]=(:,])/([^$[:space:]"'{}]+/)*worktre[e]s/
