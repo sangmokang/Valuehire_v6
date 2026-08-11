@@ -25,6 +25,12 @@ bash scripts/acceptance-0-5.sh    # main 브랜치에서만 (if: github.ref == '
 bash scripts/acceptance-hs-a3.sh  # 2026-08-12 추가 (AC-A3 · 세션 계열 자격증명)
 bash scripts/scan-data-exposure.sh all   # 2026-08-12 추가 (AC-A4) — 데이터 노출 판정기
 bash scripts/acceptance-hs-a4.sh  # 2026-08-12 추가 (AC-A4 · 차단이 실제로 도는가)
+bash scripts/acceptance-hs-cleanroom.sh                    # 2026-08-12 추가 (G1 · 실제 트리)
+bash scripts/acceptance-hs-cleanroom-mutations.sh          # G1 · 구버전 참조/symlink 변이
+bash scripts/acceptance-hs-cleanroom-absolute-paths.sh     # G1 · 임의 절대 루트
+bash scripts/acceptance-hs-cleanroom-absolute-contexts.sh  # G1 · 경계 문자 문맥
+bash scripts/acceptance-hs-cleanroom-colon-paths.sh        # G1 · PATH/remote 콜론 문맥
+bash scripts/acceptance-hs-cleanroom-file-urls.sh          # G1 · 로컬 file URL
 ```
 
 **CI는 고정 목록이고 로컬 `pre-push`는 글로브(이름 규칙 자동 수집)다.** 그래서 새 인수 스크립트를 만들면 로컬에서는 저절로 돌지만 CI에서는 한 줄도 안 돈다 — P15③("로컬에만 있는 검사는 없는 것으로 친다")에 걸린다. **새 `scripts/acceptance-*.sh`를 추가하는 PR은 `verify.yml`과 이 표 양쪽에 자기 줄을 함께 넣어야 한다.**

@@ -101,7 +101,7 @@ G1 검사기는 `docs/engineering/**`만 계약상 제외한다. 검사기 자�
 
 | 공격 | 판정 | 재현·조치 |
 |---|---|---|
-| 초기 Fable5의 `verification-commands.md` 선갱신 요구 | 기각 | 구현 계약 357-358행이 실제 명령을 만드는 G2 뒤에만 갱신하라고 명시한다. G1에서 고치면 계약 위반이다. |
+| 초기 Fable5의 `verification-commands.md` 선갱신 요구 | 당시 기각, 최신 SOT 병합 뒤 반영 | 구현 계약 357-358행 때문에 초기 main에서는 G2 전 선기재가 금지됐다. 이후 main `0459a37`의 최신 SOT가 새 acceptance PR의 실제 명령 동시 기재를 의무화해, 검증 완료된 G1 6개만 추가하고 G2 명령은 기재하지 않았다. |
 | 초기 Fable5 PASS 뒤 Codex 재공격 | 1건 발견 | 임의 루트의 절대 worktree 경로가 통과했다. RED `602a131` → GREEN `3ed8f13`. |
 | Fable5 문맥 재공격 | 7건 발견 | root-only, array, backtick, redirect, escaped space, brace, double-slash. RED `e5197cf` → GREEN `467fe5c`. |
 | Fable5 콜론 재공격 | 4건 발견 | PATH 목록과 `host:/...` 문맥. RED `f60d95c` → GREEN `9cf5df2`. |
@@ -134,7 +134,7 @@ env -u ANTHROPIC_API_KEY claude --safe-mode --no-session-persistence --permissio
 > - 5개 인수 스크립트: mutations 10/10, absolute-paths 3/3, absolute-contexts 7/7, colon-paths 4/4, file-urls 2/2 — 모두 exit 0.
 > - `verify.sh` PASS, `session-status.sh` → `RED: 0/10`.
 > - pre-push 발견: `hooks/pre-push:112`의 글로브가 G1 스크립트 6개 전부를 자동 회수해 실행했고(검사 8개, exit 0), CI는 `.github/workflows/verify.yml:28-35`의 전용 스텝에서 동일 6개를 `bash scripts/...`로 명시 실행합니다. 로컬/CI 동등성 성립.
-> - `docs/sot/`는 브랜치 전체에서 diff 0 — `verification-commands.md` 변경을 요구하지 않으며 계약대로 G2로 유보됨.
+> - `docs/sot/`는 검증 당시 브랜치 전체에서 diff 0 — 당시 `verification-commands.md` 변경을 요구하지 않으며 계약대로 G2로 유보됨. 이후 main `0459a37` 병합으로 최신 SOT가 새 acceptance 명령의 동시 기재를 요구해 G1 6개만 후속 반영했다.
 >
 > ## 2. RED-before-GREEN 5쌍 — byte 불변 + 역사적 실패 재현
 >
