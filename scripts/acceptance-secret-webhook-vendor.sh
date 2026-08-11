@@ -139,7 +139,10 @@ must_catch "Anthropic 벤더 키(하이픈 접두 · 중립 변수명)" \
 # 구분이 불가능하다. 비밀 스캔에는 억제 경로가 없어 오탐 1건이 곧 작업 중단이므로,
 # URL 값 판정은 벤더 규칙(discord/slack)에 맡기고 이 키워드 규칙은 불투명 토큰만 본다.
 # 그 결정의 대가(3사 밖 벤더 웹훅 URL 미탐)는 아래 ⑥ 한계 대조군으로 명시한다.
-must_catch "${K_WH} 계열 .env 대입(불투명 토큰)" "${K_WH}_SECRET_VALUE=${TOK}"
+# ⚠️ 키 이름에 SECRET/TOKEN 등 기존 키워드를 쓰면 안 된다 — 기존 (2) 규칙이 이름만
+# 보고 잡아서, 신규 규칙을 지워도 이 항목이 초록으로 남는다(2026-08-12 V2 뮤테이션
+# 실측: _SECRET_VALUE 이름일 때 신규 규칙 삭제에도 '탐지됨'. D5 와 같은 죽은 카나리).
+must_catch "${K_WH} 계열 .env 대입(불투명 토큰)" "${K_WH}_SIGNING_VALUE=${TOK}"
 must_catch "${K_CR} 계열 .env 대입" "export SERVICE_${K_CR}=${TOK}"
 must_catch "${K_PK} 한 줄 형태"     "${K_PK}=MIIEvQIBADANBgkqhkiG9w0BAQEFAASC"
 # 회귀 방지 — 이 한 건은 기존 패턴(.secret-patterns.default:11 의 TOKEN)이 **이미** 덮는다.
