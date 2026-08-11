@@ -264,6 +264,101 @@ else
   fi
 fi
 
+# ── 6) 공용 데이터 노출 판정기 — 문자열이 아니라 **실행**으로 검증한다 ──────────
+#
+# 왜 공용 스크립트인가(2026-08-12 V1 적대검증 D4): 이전 판은 CI 워크플로 본문에 특정
+# 문자열이 있는지만 봤다. 그래서 크기검사 스텝에 `if: ${{ false }}` 를 넣어 영구히 꺼도
+# 인수검사·pre-commit·pre-push 가 전부 초록이었다(V2 재현). 규칙을 두 벌로 적으면 항상
+# 이렇게 갈라진다 — 판정을 스크립트 하나로 모으고, CI 도 인수검사도 **같은 것을 실행**한다.
+JUDGE=scripts/scan-data-exposure.sh
+
+if [ ! -f "$JUDGE" ] || [ ! -x "$JUDGE" ]; then
+  bad "공용 판정기 없음/실행불가 — $JUDGE (D1·D2 방어가 존재하지 않는다)"
+else
+  # 임시 저장소에서 실제 시나리오를 만들고 판정기를 그대로 태운다.
+  judge_case() {
+    # judge_case <설명> <모드> <시나리오함수> <기대 exit>
+    local desc="$1" mode="$2" scenario="$3" want="$4" tmp rc=0
+    tmp=$(mktemp -d) || { bad "임시 저장소 생성 실패 — $desc (fail-closed)"; return; }
+    [ -d "$tmp" ] || { bad "임시 저장소 경로 없음 — $desc (fail-closed)"; return; }
+    cp "$JUDGE" "$tmp/judge.sh"
+    ( cd "$tmp" || exit 9
+      git init -q .
+      git config user.email a@b.c; git config user.name t
+      "$scenario"
+      bash judge.sh "$mode"
+    ) >/dev/null 2>&1
+    rc=$?
+    rm -rf "$tmp"
+    if [ "$rc" -eq "$want" ]; then
+      ok "판정기 실행 — $desc (exit=$rc)"
+    else
+      bad "판정기 실행 — $desc (기대 exit=$want, 실제 $rc)"
+    fi
+  }
+
+  # D1: 큰 파일을 커밋한 뒤 다음 커밋에서 지운다. 현재 파일 목록에는 없지만 기록에는 남는다.
+  sc_history_big() {
+    local oid; oid=$(dd if=/dev/zero bs=1024 count=1200 2>/dev/null | git hash-object -w --stdin)
+    git update-index --add --cacheinfo 100644,"$oid",exports/candidates.csv
+    git commit -q -m one
+    git update-index --force-remove exports/candidates.csv
+    printf 'ok\n' > README.md; git add README.md; git commit -q -m two
+  }
+  sc_history_clean() { printf 'ok\n' > README.md; git add README.md; git commit -q -m one; }
+
+  # D2: 후보자 개인정보 컬럼 조합. 1MB 미만이고 확장자가 허용 목록이라 크기·경로로는 안 잡힌다.
+  sc_pii_csv() {
+    printf 'name,email,phone,school,profile_url\n홍길동,a@b.c,010-1234-5678,서울대,https://x/1\n' > cand.csv
+    git add cand.csv; git commit -q -m pii
+  }
+  sc_pii_sql() {
+    printf "INSERT INTO candidates(name,email,phone,school) VALUES('홍','a@b.c','010-1','서울대');\n" > seed.sql
+    git add seed.sql; git commit -q -m pii
+  }
+  # 대조군 — 정상 CSV·마이그레이션 SQL 은 막히면 안 된다. 전부 막는 건 게이트가 아니라 벽이다.
+  sc_ok_csv() {
+    printf 'position,count,stage\nAX Sales,20,screening\n' > metrics.csv
+    git add metrics.csv; git commit -q -m ok
+  }
+  sc_ok_sql() {
+    printf 'CREATE TABLE positions(id INTEGER PRIMARY KEY, title TEXT NOT NULL);\n' > 001_init.sql
+    git add 001_init.sql; git commit -q -m ok
+  }
+
+  judge_case "기록에만 남은 1MB 초과 파일을 잡는다 (D1)"      history "sc_history_big"   1
+  judge_case "깨끗한 기록은 통과시킨다 (차단과 통과가 한 쌍)" history "sc_history_clean" 0
+  judge_case "후보자 컬럼 CSV 를 잡는다 (D2)"                 pii     "sc_pii_csv"       1
+  judge_case "후보자 컬럼 SQL 을 잡는다 (D2)"                 pii     "sc_pii_sql"       1
+  judge_case "정상 지표 CSV 는 통과시킨다 (오탐 대조군)"      pii     "sc_ok_csv"        0
+  judge_case "정상 마이그레이션 SQL 은 통과시킨다 (오탐 대조군)" pii  "sc_ok_sql"        0
+fi
+
+# D4: CI 가 그 판정기를 **실행 줄**에서 부르는가 + 그 스텝이 조건으로 꺼져 있지 않은가.
+# 문자열 대조가 남지만, 판정 본문은 위에서 실제 실행으로 검증했으므로 여기서는
+# "배선이 살아 있는가"만 본다 — 두 벌 판정기 문제가 사라진다.
+WF=.github/workflows/verify.yml
+if [ ! -f "$WF" ]; then
+  bad "CI 워크플로 없음 — $WF"
+else
+  if grep -qE "^[[:space:]]*run:[[:space:]]*(bash[[:space:]]+)?\.?/?${JUDGE//\//\\/}" "$WF"; then
+    ok "CI 가 공용 판정기를 실행 줄에서 호출한다"
+  else
+    bad "CI 가 공용 판정기를 호출하지 않는다 — 로컬 전용 검사가 된다 (P15③)"
+  fi
+  # 판정기를 부르는 스텝 블록 안에 if: 가 있으면 영구 비활성화가 가능하다.
+  if awk -v j="$JUDGE" '
+      /^[[:space:]]*- name:/ { inblk=1; hasif=0; hasjudge=0 }
+      inblk && /^[[:space:]]*if:/ { hasif=1 }
+      inblk && index($0, j) { hasjudge=1 }
+      inblk && hasjudge && hasif { print "DISABLED"; exit }
+    ' "$WF" | grep -q DISABLED; then
+    bad "판정기 스텝에 if: 조건이 붙어 있다 — 영구 비활성화가 가능하다 (P13)"
+  else
+    ok "판정기 스텝에 비활성화 조건 없음"
+  fi
+fi
+
 if [ "$checked" -eq 0 ]; then
   echo "FAIL: 검사 항목 0개 — 0건 처리로 통과는 금지한다 (P20)"
   echo "CHECKED: 0"
