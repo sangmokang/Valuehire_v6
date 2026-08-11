@@ -134,6 +134,8 @@ scripts/hs_import_spy.py       # pytest 플러그인: 세션 종료 시 sys.modu
 
 G3(portal locator·운영 상수 검사), B1~B5, L0, C, 사업 로직·브라우저·native host, v1~v5 열람/복사/import/실행, 외부 포털·PII 접근, main 직접 수정.
 
+**단언 품질(assertion quality)은 G2 비범위 — 계약이 P5로 배정한다.** G2는 "정적·단위 테스트가 실제 모듈을 import·실행하고 0건이면 실패"를 강제한다(AC §3). "수집된 테스트의 단언이 그 모듈을 의미있게 검증하는가"(예: 준비 파일에서만 import하고 시험 본문은 tautology)는 별개 층이며, 계약 291-293행이 요구하는 순수 판정 함수의 속성 기반 테스트(Hypothesis, P5)가 그 판정 함수가 처음 생기는 단계에서 강제한다. 근거: Codex 2차가 이 지점을 item-4로 지적했고, 이를 G2에서 소스-정규식으로 막으려 했으나 `importlib.import_module("humansearch")`로 모듈을 실제 쓰는 정상 테스트를 거짓 불합격시키는 회귀가 실측돼(적대 검증 로그 V2 참조) 되돌렸다. 유효한 테스트를 거부하는 검사는 막으려던 약점보다 해롭다.
+
 ## 9. 롤백 (L3)
 
 `git revert <squash 커밋>` 한 번으로 전체 원복(추가 전용 변경). CI의 G2 스텝도 같은 revert에 포함되므로 별도 조치 불요.
@@ -197,6 +199,45 @@ Codex 반증 기록(요약 아님, 원문 보존): §2-1 미리쓴 JSON 위조�
 
 일치/불일치: codex FAIL 2건 모두 V2가 재현했고, 수정 후 두 우회가 exit 1로 막힘을 재현. 정정 건수 0(과장·누락 없음). V2 원본 명령·출력: `private-reviews/g2-verify2.log` 및 이 문서 커밋 이력.
 
-### V1 2차 (Codex 재검증) — 수정 후
+### V1 2차 (Codex 재검증) — PARTIAL, item-4 지적
 
-NOT_RUN → 재실행 예정. (1차 재검증 세션 rollout-2026-08-12T06-55-16 은 판정 미완결로 무효 처리 — §8-7 "빈 결과 ≠ 통과".)
+세션 rollout-2026-08-12T07-14-14. 판정 원문(발췌, 원본은 codex 세션 jsonl):
+
+```text
+## Verdict
+- PARTIAL
+- 항목 1 수집 수 위조: PASS, 차단됨
+- 항목 3 외부 import 경로 위조: PASS, 차단됨
+- 항목 4 tautology 테스트 + spy/independent 값 일치: FAIL, 우회됨
+## Risks
+- scripts/acceptance-hs-gates.sh 의 spy 는 "pytest 세션 중 humansearch 가 import됨"만 증명한다.
+- 따라서 테스트가 실제로 패키지 동작을 검증하는지는 증명하지 못한다. 항목 4가 그 결함을 재현했다.
+```
+
+→ **뭘 했나:** 수정본 게이트에 1차 결함 2건 + 새 우회들을 다시 걸었습니다.
+→ **결과:** 1차 결함(수집 수 위조·경로 위조)은 막혔고, 새로 "준비 파일에서만 import + 껍데기 시험"(item-4)이 통과했습니다.
+→ **의미:** 고심각도 2건 수정은 유효 확인, item-4는 단언 품질 층의 지적입니다(§8 비범위 참조).
+
+### item-4 처리 결정 (V2 실측 기반)
+
+item-4를 소스-정규식(`test_imports`)으로 막는 GREEN을 만들었다가(커밋 d0d374f RED → 4125a28), V2 자체공격에서 회귀를 발견해 **되돌렸다**(HEAD를 e18e52d로 reset). 실측:
+
+```text
+[noqa-dead-import]        exit=0 COLLECTED 1   (시험파일 import + tautology → 통과)
+[test_importer+tautology] exit=1 FAIL          (conftest-only 계열 → 차단됨)
+[importlib-real-use]      exit=1 FAIL ← 회귀    (importlib 로 실제 사용하는 정상 시험을 거짓 불합격)
+```
+
+→ **뭘 했나:** item-4 수정본에 세 변형을 먹였습니다.
+→ **결과:** 정상적인 `importlib.import_module("humansearch")` 사용 시험을 게이트가 거짓 불합격시켰습니다.
+→ **의미:** 나쁜 소식이라 되돌렸습니다. 유효한 테스트를 거부하는 검사는 막으려던 약점보다 해롭습니다. item-4는 §8대로 P5(속성 기반 테스트) 범위로 이관합니다. 결정 카드는 작업 보고에 있습니다.
+
+### V1 3차 (Codex 재검증, item-4 수정본 대상) — 미완결
+
+세션 rollout-2026-08-12T07-41-10. 항목4 변형(test_*.py 위장·noqa·importlib·sys.modules·spy JSON 위조)을 공격하던 중 VERDICT 없이 종료 → §8-7 "빈 결과 ≠ 통과"로 무효. 이후 item-4 수정 자체를 되돌렸으므로 이 대상은 폐기. 대신 위 세 변형을 V2가 직접 실행해 회귀를 확정했다.
+
+### 최종 상태 (HEAD e18e52d 기준)
+
+- 고심각도 2건(증거 위조·CI 끄기) 봉쇄 — Codex 확정 + V2 재현 일치.
+- item-4(단언 품질) — G2 비범위로 문서화(§8), P5 이관.
+- 남은 위험: conftest-only import + tautology 시험이 게이트를 통과할 수 있음(단, 독립 프로세스가 모듈 import·실행을 증명하고 수집≥1·pytest 통과는 유지 → AC §3 충족). 후속 P5에서 정밀 봉쇄.
