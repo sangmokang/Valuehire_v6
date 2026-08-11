@@ -148,3 +148,9 @@ jobs:
 
       - name: 인수 검사 hs-a4 (대용량·산출물 차단이 실제로 도는가)
         run: bash scripts/acceptance-hs-a4.sh
+
+      - name: 인수 검사 verify-ac-m (mechanism 명부 대조 · AC-M)
+        # 명부(docs/sot/mechanism-registry.yaml)와 실제 검사 장치의 일치를 강제한다.
+        # 검사기 1벌(scripts/verify/check-mechanism-registry.sh)을 로컬 pre-push
+        # 글로브와 CI 가 같은 인수 스크립트로 실행한다 (판정기 2벌 금지 · P16).
+        run: bash scripts/acceptance-verify-ac-m.sh
