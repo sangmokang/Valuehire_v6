@@ -144,8 +144,59 @@ G3(portal locator·운영 상수 검사), B1~B5, L0, C, 사업 로직·브라우
 
 ## 검증 출력
 
-NOT_RUN — RED/GREEN 이후 실측 출력을 그대로 append한다.
+로그 원본: `private-reviews/g2-verify2.log` (동일 명령 재현 가능). 2026-08-12 06:48 기준.
+
+```text
+scripts/acceptance-hs-gates.sh            → COLLECTED: 1, exit 0
+scripts/acceptance-hs-gates-mutations.sh  → PASS: gates mutations blocked 6/6, exit 0
+scripts/acceptance-hs-gates-antiforge.sh  → PASS: gates antiforge 3/3, exit 0
+clean-room 8종 + a3 + a4 + verify.sh      → 전부 exit 0
+실제 pre-push                              → 검사 15개 전부 ok, BLOCKED 없음, exit 0
+bash scripts/session-status.sh            → RED: 0/17
+RED 불변: mutations 0줄 / antiforge 0줄 diff, worktree uncommitted 0
+```
+
+→ **뭘 했나:** G2 두 스크립트를 포함한 저장소 검사 전량과 실제 서버-업로드 직전 문지기를 돌렸습니다.
+→ **결과:** 전부 합격(성적 0)이고 미해결 빨간불 0개, 시험 먼저 쓴 RED 파일은 한 글자도 안 바뀌었습니다.
+→ **의미:** 좋은 소식입니다. 게이트가 실제로 돌고, 배송을 막을 미완 항목이 없습니다.
 
 ## 적대 검증 로그
 
-NOT_RUN — V1(Codex) 판정 원문과 V2 재현을 명령·출력 그대로 append한다.
+### V1 1차 (Codex CLI) — FAIL, [높음] 2건
+
+원문: `private-reviews/g2-codex-v1-verdict.md` (692줄). 실행 세션: `~/.codex/sessions/2026/08/12/rollout-2026-08-12T05-20-21-*.jsonl`. codex-companion Bash 실행 확인(파일 읽기만이 아님) → V1 신분 성립.
+
+| # | 심각도 | 결함 (원문 제목) | 확정 원인 (file:line) | 사업 영향 |
+|---|---|---|---|---|
+| 1 | 높음 | 실제 모듈을 불러왔다는 증거를 시험 코드가 종료 직전 위조 | `scripts/acceptance-hs-gates.sh:53-54`가 증거 파일 경로를 시험 프로세스에 넘기고 `hs_import_spy.py:25-26` 뒤 시험의 atexit 가 덮어씀. `:62-93`이 마지막 JSON 값만 신뢰 | 실제 코드를 시험하지 않은 변경이 "시험 999건·모듈 확인 완료"로 승인될 수 있음 |
+| 2 | 높음 | 서버 G2 스텝을 항상 끄게 만든 설정을 로컬 방어가 수용 | 뮤테이션·pre-push가 명령 문자열만 보고 `if: ${{ false }}` 비활성화를 못 봄 | 이후 한 줄 약화로 서버 최종 방어가 사라져도 로컬 배송 허용 (원격 실제 건너뜀은 ※ 미재현) |
+
+→ **뭘 했나:** Codex가 게이트를 실제로 공격해 두 우회로를 성적 0(합격)까지 끌고 갔습니다.
+→ **결과:** 검사를 안 한 변경이 "합격"으로, 서버 검사를 꺼도 "합격"으로 통과했습니다.
+→ **의미:** 나쁜 소식이자 정확한 지적입니다. 둘 다 아래 조치에서 막았습니다.
+
+Codex 반증 기록(요약 아님, 원문 보존): §2-1 미리쓴 JSON 위조는 차단(exit 1), §2-2 즉시쓰기 위조는 플러그인이 덮어써 차단(exit 1), §2-4 src 밖 동명 패키지 차단(exit 1), §3 수집 문구 위장은 spy JSON 사용으로 무효, §5 다섯 무력화 사본 전부 뮤테이션이 exit 1, §6 fail-closed(uv 부재 2·잠금 부재 1·설정 파손 2·네트워크 차단 2) 정상. 확정 우회는 §2-3(atexit) 하나. 원문 §2-3 diff·출력 전문은 `private-reviews/g2-codex-v1-verdict.md:210-260`.
+
+### 조치 (RED ffc49da → GREEN 4127b7b)
+
+- 결함1: 수집 수는 `pytest --collect-only`를 게이트가 직접 awk로 세고, import 증명은 게이트가 통제하는 독립 subprocess로 얻는다. spy는 판정 근거가 아니라 변조 탐지기 — spy 값이 독립 측정과 어긋나면 exit 1.
+- 결함2: `acceptance-hs-gates-antiforge.sh`가 verify.yml G2 스텝의 `if:` 비활성화를 awk로 탐지(기존 `acceptance-hs-a4.sh:346-353` D4 대응 패턴 재사용). CI에 antiforge 명령 배선.
+
+### V2 (Fable 격리 재현) — codex 결함 재현 + 수정 확인 + 잔여 재공격
+
+| 항목 | 명령 | 결과 | 판정 |
+|---|---|---|---|
+| 결함1 재현(수정 전 개념) | atexit 999 위조 사본 → 현 게이트 | `FAIL: spy count [999] disagrees with independent count [1] (tampering)` exit 1 | codex 결함 실재·수정 유효 일치 |
+| 결함2 재현 | verify.yml G2 에 `if: ${{ false }}` 주입 → antiforge | `DISABLED` 탐지, antiforge case 2b 통과 | 일치 |
+| 잔여공격A | conftest 가 collect-only 출력에 가짜 node id 3개 주입 | `COLLECTED: 1` exit 0 (주입 무효) | 우회 실패 |
+| 잔여공격B | 모듈을 import 안 하는 tautology 시험만 | `FAIL: spy module path disagrees with independent import` exit 1 | tautology 갭까지 봉쇄(예상 초과) |
+
+→ **뭘 했나:** Codex 결함 2건을 제가 깨끗한 환경에서 직접 재현하고, 수정 후 같은 공격 + 새 우회 2종을 다시 걸어봤습니다.
+→ **결과:** 두 결함 모두 재현됐고(수정 유효 확인), 새 우회도 전부 막혔습니다 — 특히 모듈을 안 쓰는 껍데기 시험까지 불합격 처리됩니다.
+→ **의미:** 좋은 소식입니다. 두 검증 엔진이 실제로 교차됐고, 수정이 원래 결함과 그 인접 우회까지 닫았습니다.
+
+일치/불일치: codex FAIL 2건 모두 V2가 재현했고, 수정 후 두 우회가 exit 1로 막힘을 재현. 정정 건수 0(과장·누락 없음). V2 원본 명령·출력: `private-reviews/g2-verify2.log` 및 이 문서 커밋 이력.
+
+### V1 2차 (Codex 재검증) — 수정 후
+
+NOT_RUN → 재실행 예정. (1차 재검증 세션 rollout-2026-08-12T06-55-16 은 판정 미완결로 무효 처리 — §8-7 "빈 결과 ≠ 통과".)
