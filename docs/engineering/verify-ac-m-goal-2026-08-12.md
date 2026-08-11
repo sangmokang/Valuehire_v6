@@ -31,7 +31,7 @@
 
 **AC-M**: When AC-1의 규칙이 `mechanism_id`를 선언하거나 AC-3 원장 항목이 `checked_by`를 선언하면, then 그 값은 `docs/sot/mechanism-registry.yaml`의 `id`와 정확히 문자열 일치해야 한다. 이번 PR의 범위는 그 전제가 되는 **명부 파일 + 대조 검사기 + 인수 검사**다.
 
-검증 명령: `bash scripts/acceptance-verify-ac-m.sh` (exit 0 = 전부 통과, 마지막 줄 `CHECKED: 13`)
+검증 명령: `bash scripts/acceptance-verify-ac-m.sh` (exit 0 = 전부 통과, 마지막 줄 `CHECKED: 15`)
 
 검사기(`scripts/verify/check-mechanism-registry.sh`)가 하는 일 5가지 (정본 80행 그대로):
 1. YAML 파싱 후 `id` 유일성 — 중복이면 exit 1
@@ -48,7 +48,7 @@ counter-AC (이런 모습이면 가짜 합격):
 - 명부에 없는 임의 문자열 ID가 통과하면 가짜
 - 아무도 안 부르는 죽은 `target`이 통과하면 가짜
 - `stage: manual`을 아무 항목에나 붙여 호출 검사를 회피하면 가짜 (`manual_reason` 필수 + 이번 명부에는 manual 항목 자체가 없음)
-- 검사 항목이 줄어도 초록이면 가짜 (CHECKED 정확값 강제 — `checked -ne 13`이면 exit 1)
+- 검사 항목이 줄어도 초록이면 가짜 (CHECKED 정확값 강제 — `checked -ne 15`이면 exit 1)
 - 인수 검사가 저장소에 파일을 남기거나 상태를 바꾸면 판정 무효
 
 ## ④ Harness 게이트 진행 계획

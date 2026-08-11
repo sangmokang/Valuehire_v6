@@ -5,7 +5,7 @@
 #   정본: docs/engineering/verify-unification-goal-2026-08-10.md:78-81 (AC-M)
 #   출력 : 항목마다 PASS:/FAIL: 전부 출력, 마지막 줄 `CHECKED: <검사 수>`
 #   exit : 0 = PASS | 1 = FAIL | 2 = NOT_RUN
-#   불변식: CHECKED 는 정확히 13 이어야 한다 — 검사가 몇 개 사라져도 초록이면 가짜다
+#   불변식: CHECKED 는 정확히 15 이어야 한다 — 검사가 몇 개 사라져도 초록이면 가짜다
 #           (PR #6 결함 D3 의 교훈: checked==0 만 막으면 3개를 지워도 통과했다 · P20)
 #
 # 쓰기 규칙: 이 검사는 저장소에 어떤 파일도 만들지 않는다. 동적 fixture 는 전부
@@ -24,7 +24,7 @@ SNAP0=$(git status --porcelain)
 CHECKER=scripts/verify/check-mechanism-registry.sh
 FIXDIR=scripts/verify/fixtures/mechanism-registry
 REGISTRY=docs/sot/mechanism-registry.yaml
-EXPECTED_CHECKED=13
+EXPECTED_CHECKED=15
 
 TMP=$(mktemp -d) || { echo "NOT_RUN: mktemp 실패"; echo "CHECKED: 0"; exit 2; }
 trap 'rm -rf "$TMP"' EXIT
@@ -126,10 +126,29 @@ cat > "$TMP/bad-ci-job.yaml" <<'EOF'
 EOF
 expect_rc "ci_mirror_job 불일치 → 불합격" "$TMP/bad-ci-job.yaml" 1
 
-# ── 11) 실제 명부가 검사기를 통과하는가 ──────────────────────────────────────
+# 필수 필드 누락 (stage 없음) — 조용히 skip 하면 안 된다
+cat > "$TMP/missing-field.yaml" <<'EOF'
+- id: "missing-stage-mechanism"
+  path: "hooks/pre-commit"
+  target: "SECRET_PATTERNS_FILE= VERIFY_SCAN_SOURCE=index bash verify.sh"
+  required: true
+EOF
+expect_rc "필수 필드(stage) 누락 → 불합격" "$TMP/missing-field.yaml" 1
+
+# 빈 문자열 값 — 계약(goal ⑩): 빈 값 = 누락으로 취급
+cat > "$TMP/empty-value.yaml" <<'EOF'
+- id: "empty-path-mechanism"
+  path: ""
+  target: "SECRET_PATTERNS_FILE= VERIFY_SCAN_SOURCE=index bash verify.sh"
+  stage: "pre-commit"
+  required: true
+EOF
+expect_rc "빈 문자열 path → 불합격" "$TMP/empty-value.yaml" 1
+
+# ── 13) 실제 명부가 검사기를 통과하는가 ──────────────────────────────────────
 expect_rc "실제 명부(docs/sot/mechanism-registry.yaml) → 통과" "$REGISTRY" 0
 
-# ── 12) 실제 명부의 항목 수 = 검사기 CHECKED 보고 수 (누락·부풀림 방지) ──────
+# ── 14) 실제 명부의 항목 수 = 검사기 CHECKED 보고 수 (누락·부풀림 방지) ──────
 checked=$((checked + 1))
 if [ -f "$REGISTRY" ]; then
   entries=$(grep -c '^- id:' "$REGISTRY")
@@ -144,7 +163,7 @@ else
   fail=1
 fi
 
-# ── 13) 무오염 ───────────────────────────────────────────────────────────────
+# ── 15) 무오염 ───────────────────────────────────────────────────────────────
 SNAP1=$(git status --porcelain)
 checked=$((checked + 1))
 if [ "$SNAP0" != "$SNAP1" ]; then
