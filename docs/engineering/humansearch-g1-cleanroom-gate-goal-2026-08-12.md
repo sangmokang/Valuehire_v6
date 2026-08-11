@@ -21,8 +21,9 @@
 | 시작 게이트는 현재 통과한다. | `bash scripts/session-status.sh` → `HEAD: 32ce698 (synced)`, `ORIGIN: 32ce698`, `RED: 0/4` |
 | 한 AC는 한 task worktree/branch/PR로 격리해야 한다. | `docs/sot/git-workflow.md:14-23` |
 
-최종 구현 HEAD `6a9ae52`에는 fail-closed 스캐너 1개, deny-pattern 계약 1개, 고정 회귀 계약 5개가
-있다. CI는 G1 스크립트 6개를 명시 실행하고 pre-push는 같은 6개를 글로브로 회수한다.
+G1 핵심 구현 `6a9ae52`에는 fail-closed 스캐너 1개, deny-pattern 계약 1개, 고정 회귀 계약 5개가
+있다. 최신 main `0459a37`을 merge한 배송 HEAD에서도 CI는 G1 스크립트 6개를 명시 실행하고
+pre-push는 같은 6개를 글로브로 회수한다.
 
 ## 2. 근본 원인
 
@@ -61,7 +62,7 @@ G1 검사기는 `docs/engineering/**`만 계약상 제외한다. 검사기 자�
 | 1 스펙 | PASS | 이 문서와 GitHub issue `#7`에 G1 단언 1개만 두었다. |
 | 2 격리/RED | PASS | 별도 worktree에서 `bash scripts/acceptance-hs-cleanroom-mutations.sh` → `FAIL: required G1 implementation missing: scripts/acceptance-hs-cleanroom.sh`, `RED_EXIT=1`. |
 | 3 최소 구현 | PASS | 다섯 RED→GREEN 쌍을 분리했고 각 RED 파일은 대응 GREEN에서 byte diff 0이다. |
-| 4 검증 | PASS_LOCAL_ADVERSARIAL | G1 6개, `verify.sh`, 0-2/0-5/0-6/0-7, pre-push 8개, `RED: 0/10`, Fable5 PASS, Codex V2 PASS를 확인했다. |
+| 4 검증 | PASS_LOCAL_ADVERSARIAL | G1 6개, `verify.sh`, 0-2/0-5/0-6/0-7, 병합 후 pre-push 10개, `RED: 0/12`, Fable5 PASS, Codex V2 PASS를 확인했다. |
 | 5 배송 | NOT_RUN | task 브랜치 push와 PR/CI까지만 수행한다. 병합은 하지 않는다. |
 | 6 종료 | NOT_RUN | 오너 병합 전이므로 worktree를 제거하지 않는다. |
 
@@ -84,7 +85,7 @@ G1 검사기는 `docs/engineering/**`만 계약상 제외한다. 검사기 자�
 - [x] `docs/sot/verification-commands.md`의 실제 bash 검증 배관을 확인했다.
 - [x] `docs/sot/git-workflow.md`의 한 AC = 한 branch/worktree/PR 규약을 적용했다.
 - [x] 다섯 RED `257eecd`, `602a131`, `e5197cf`, `f60d95c`, `8fb7a80`과 대응 GREEN을 별도 커밋으로 남겼다.
-- [x] pre-push 실행 8개 중 G1 6개가 포함됐고 `.github/workflows/verify.yml`에도 6개가 모두 명시됐다.
+- [x] 최신 main 병합 후 pre-push 실행 10개 중 G1 6개가 포함됐고 `.github/workflows/verify.yml`에도 6개가 모두 명시됐다.
 - [x] Fable5 1차 판정과 Codex 재현 결과를 아래 로그에 원문/명령과 함께 남겼다.
 
 ## 7. 비범위
@@ -216,7 +217,7 @@ PASS: clean-room mutations blocked 10/10
 $ bash scripts/acceptance-hs-cleanroom.sh
 PASS: forbidden runtime refs 0
 PASS: escaping symlinks 0
-CHECKED: 33
+CHECKED: 36
 
 $ bash verify.sh
 PASS: no secret-pattern match in any tracked file, .env not tracked
@@ -234,8 +235,10 @@ $ bash scripts/acceptance-0-7.sh
 PASS: 위반 6 종이 전부 차단됨 (각 건 훅 OFF 대조 통과)
 
 $ hooks/pre-push
-pre-push: 검사 8개 실행
+pre-push: 검사 10개 실행
   ok  ./scripts/acceptance-0-6.sh
+  ok  ./scripts/acceptance-hs-a3.sh
+  ok  ./scripts/acceptance-hs-a4.sh
   ok  ./scripts/acceptance-hs-cleanroom-absolute-contexts.sh
   ok  ./scripts/acceptance-hs-cleanroom-absolute-paths.sh
   ok  ./scripts/acceptance-hs-cleanroom-colon-paths.sh
@@ -245,11 +248,12 @@ pre-push: 검사 8개 실행
   ok  ./verify.sh
 
 $ bash scripts/session-status.sh
-HEAD: 6a9ae52 (ahead 11 / behind 0)
-ORIGIN: 32ce698
-RED: 0/10 (acceptance-0-7.sh 제외 — CI 담당)
+HEAD: da01771 (ahead 14 / behind 0)
+ORIGIN: 0459a37
+RED: 0/12 (acceptance-0-7.sh 제외 — CI 담당)
 ```
 
 task worktree에는 ignore된 `.secret-patterns`가 없어서 첫 `acceptance-0-2`가 exit 2였고, 환경변수를
 전역 주입하면 `acceptance-0-5`의 격리 clone까지 오염됐다. v6 루트의 로컬 패턴 파일을 ignore된
-`.secret-patterns` symlink로 연결한 뒤 각 스크립트의 기본 경로를 보존해 최종 `RED: 0/10`을 얻었다.
+`.secret-patterns` symlink로 연결한 뒤 각 스크립트의 기본 경로를 보존해 최신 main 병합 후 최종
+`RED: 0/12`를 얻었다.
