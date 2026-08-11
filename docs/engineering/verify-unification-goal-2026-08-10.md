@@ -76,9 +76,9 @@ When verify가 diff를 받으면, then diff의 변경 심볼 + 그 호출자/피
 counter-AC: 직접 호출자 1건만 포함하고 간접호출을 누락하면 가짜(착수 시 적용).
 
 **AC-M (mechanism_id / checked_by 레지스트리)**
-When AC-1의 규칙이 `mechanism_id`를 선언하거나 AC-3 원장 항목이 `checked_by`를 선언하면, then 그 값은 `docs/sot/mechanism-registry.yaml`의 `id` 필드와 정확히 문자열 일치해야 한다(`path:target` 합성 문자열 금지). 등록된 `id`라도 `path`가 실제로 존재하지 않거나 `stage`(pre-commit|pre-push|ci)가 명시된 훅 파일에서 실제로 호출되지 않으면(죽은 target) 등록 자체가 거부된다. **`checked_by`는 "이 검사가 어디서 도는지"만 가리킨다 — 위반 시 머지를 막는다는 의미는 어디에도 없다.**
-검증: 존재하지 않는 ID 참조 거부 + 등록된 ID의 `path`/`target`이 실제 `hooks/pre-commit`·`hooks/pre-push`·`.github/workflows/verify.yml` 안에서 발견되는지 확인
-counter-AC: 레지스트리에 없는 임의 문자열을 ID로 써도 통과하거나, 아무도 안 부르는 죽은 target이 통과하면 가짜.
+When AC-1의 규칙이 `mechanism_id`를 선언하거나 AC-3 원장 항목이 `checked_by`를 선언하면, then 그 값은 `docs/sot/mechanism-registry.yaml`의 `id` 필드와 정확히 문자열 일치해야 한다. 각 레지스트리 항목은 `id, path, target, stage(pre-commit|pre-push|ci|manual), required, ci_mirror_job(stage:ci일 때만 필수)`를 가진다. **`target`은 함수명이 아니라 그 `path` 파일 안에서 실제로 나타나는 정확한 명령 문자열이다**(예: 실제 `hooks/pre-commit:71`의 `SECRET_PATTERNS_FILE= VERIFY_SCAN_SOURCE=index bash verify.sh`처럼 — 존재하지 않는 함수를 지어내지 않는다). `stage: manual`은 git hook도 CI job도 아니고 goal 작성 시점에 사람이 실행하는 검사(예: AC-20)를 위한 것이며, 이 경우 "훅 파일에서 호출되는지" 검사는 면제되고 대신 "그 검사 스크립트가 실행 가능한 파일로 실제 존재하는지"만 확인한다. **`checked_by`는 "이 검사가 어디서 도는지"만 가리킨다 — 위반 시 머지를 막는다는 의미는 어디에도 없다.**
+검증: `scripts/verify/check-mechanism-registry.sh`(신설, 이 AC의 GREEN 산출물)가 다음을 수행한다 — (1) YAML 파싱 후 `id` 유일성 확인, exit 1 if 중복 (2) 각 항목의 `path`가 `[ -f "$path" ]`로 실존하는지 확인, 없으면 exit 1 (3) `stage`가 `pre-commit|pre-push`면 `grep -qF -- "$target" "$path"`로 `target` 문자열이 그 훅 파일 안에 있는지 확인, 없으면 exit 1(죽은 target) (4) `stage: ci`면 `ci_mirror_job` 값이 `.github/workflows/verify.yml`의 `jobs:` 키 중 하나와 일치하는지 확인 (5) `stage: manual`이면 `path`가 실행권한(`-x`)을 가진 파일인지만 확인. fixture 3종: 정상 항목(exit 0), `path` 없는 항목(exit 1), `target` 문자열이 실제 훅에 없는 항목(exit 1) — 이 셋을 `scripts/verify/fixtures/mechanism-registry/`에 두고 `check-mechanism-registry.sh`가 각각 기대한 exit code를 내는지 RED 테스트가 확인한다.
+counter-AC: 레지스트리에 없는 임의 문자열을 ID로 써도 통과하거나, 아무도 안 부르는 죽은 target이 통과하면 가짜. `stage: manual`을 아무 항목에나 붙여서 "훅에서 호출되는지" 검사를 회피하면 가짜 — `manual`은 AC-M 구현 시점에 실제로 `stage: manual`이 필요한 항목(AC-20 하나)에만 예외적으로 허용되고, 그 근거를 원장 자체에 `manual_reason` 필드로 남겨야 한다.
 
 **AC-3 (지시 원장 스키마 + 시맨틱 검증기)**
 When 지시가 원장에 등록되면, then `id, text, status, supersedes, repo, scope, file_or_module_tags, expiry, checked_by` 필드를 가져야 하고, 별도 시맨틱 검증기가 ID 유일성·`supersedes` 참조/순환 없음·`repo`/`scope` 정합·`expiry` 의미(달력 파싱)까지 검사해야 한다. `checked_by`의 레지스트리 존재 여부 검사는 AC-M 완료 전까지 "비어있지 않은 문자열"만 확인하는 완화 모드로 동작하고, AC-M 완료 후 전체 검증으로 전환된다.
@@ -87,13 +87,14 @@ counter-AC: 필드가 채워지기만 하면(값 검증 없이) 통과하면 가
 
 **AC-5 (3상태 집계기 — 로컬 리포트 전용, 머지 게이트 아님)**
 When verify가 실행되면, then `docs/sot/mechanism-registry.yaml`에 등록되고 `required: true`로 표시된 항목 전부를 실행하고, 각각의 `PASS|FAIL|NOT_RUN`을 있는 그대로 출력해야 한다. **하나라도 `NOT_RUN`이면 최종 요약을 "전체 통과"라고 쓸 수 없다** — 이건 머지를 막는 규칙이 아니라, 사장님께 보여주는 리포트가 실제 상태를 정직하게 반영해야 한다는 규칙이다(P3).
-검증: `required: true` 규칙 중 하나를 일부러 `NOT_RUN` 상태로 만들고, verify 최종 요약이 "통과"가 아니라 "NOT_RUN 존재"로 나오는지 확인
-counter-AC: `required: true` 검사를 레지스트리에서 통째로 지워서 `NOT_RUN`조차 안 만들면 가짜. `NOT_RUN`이 있는데도 최종 줄에 "PASS"나 "통과"라고 쓰면 가짜.
+검증: `required: true` 규칙 중 하나를 일부러 `NOT_RUN` 상태로 만들고, verify 최종 요약이 "통과"가 아니라 "NOT_RUN 존재"로 나오는지 확인. **AC-1 원장의 `required:true` 규칙 수와 AC-M 레지스트리의 `required:true` 항목 수를 비교할 때 개수가 아니라 `mechanism_id`/`checked_by` 값의 집합(set) 자체가 정확히 일치하는지 확인**(개수만 같고 ID가 다른 경우를 잡기 위함)
+counter-AC: `required: true` 검사를 레지스트리에서 통째로 지워서 `NOT_RUN`조차 안 만들면 가짜. `NOT_RUN`이 있는데도 최종 줄에 "PASS"나 "통과"라고 쓰면 가짜. **원장의 규칙 A(`required:true`)를 지우고 무관한 규칙 B(`required:true`)를 새로 만들어 개수를 맞추면(ID는 다른데 개수만 같음) 지금처럼 개수만 비교하면 못 잡는다 — ID 집합 비교로 잡아야 한다.**
 
 **AC-20 (과거 프롬프팅 지시 대조 — MEMORY.md 회수 자동화)**
 When 새 AC의 goal/RED 작성 시점(게이트 0~1)이 오면, then `scripts/memory-recall-check.sh "<AC 제목·키워드>"`가 이 프로젝트의 auto-memory 인덱스(`~/.claude/projects/<이 저장소 경로>/memory/*.md`, `MEMORY.md`)를 키워드로 전수 검색해, 관련 가능성 있는 메모리 파일을 전부 나열해야 한다. **이건 "코드가 과거 지시와 충돌하는지" 자동 판정이 아니다** — 코드 호출관계 분석 없이 순수 텍스트 검색만으로 관련 후보를 놓치지 않고 goal 문서 앞에 늘어놓는 것까지가 기계의 역할이고, "정말 어긋나는가"는 그 목록을 보고 사람(또는 goal 작성자)이 판단한다. 검색 결과는 goal 문서의 회수(C) 절에 그대로 첨부돼야 한다.
 검증: 알려진 feedback 메모리 파일(예: `feedback_no_tool_boundary_redesign.md`)의 키워드로 검색했을 때 그 파일이 결과 목록에 실제로 나오는지 확인 + goal 문서에 그 결과가 첨부됐는지 확인
 counter-AC: 검색을 안 하거나, 검색은 했는데 결과를 goal 문서에 옮겨적지 않으면 가짜. 검색 범위를 `MEMORY.md`의 인덱스 목록으로만 제한하고 실제 메모리 파일 본문은 안 읽으면(제목만 보고 관련 없다고 오판할 위험) 가짜 — 본문까지 grep해야 한다.
+**AC-M 연동**: 이 스크립트는 `docs/sot/mechanism-registry.yaml`에 `stage: manual`(AC-M §manual 정의, `manual_reason` 필드 포함)로 등록돼야 AC-5의 집계 대상이 된다 — git hook이나 CI job이 아니라 goal 작성 시점에 사람이 직접 실행하는 유일한 `required: true` 항목이다.
 
 **AC-9 (검증 대상 diff 시작 시 고정)**
 When verify가 AC-11의 격리 스냅샷을 확보하면, then base/head SHA·diff SHA-256을 그 스냅샷 시점에 고정하고, 이후 모든 단계는 이 고정된 스냅샷만 참조해야 한다.
@@ -153,7 +154,8 @@ counter-AC: 큰 경고만 출력하고 exit 0으로 끝나면 가짜.
 ## ⑤ SOT 체크리스트
 
 - `docs/sot/verification-commands.md` — 게이트 4 명령 정본, 수정 필요
-- `docs/sot/coding-principles.md` — P3·P11과 정합화
+- `docs/sot/coding-principles.md` — P3·P11과 정합화. **추가(2026-08-11 외부 검증 지적): P13 등에 남아있는 "시스템으로 강제", "CI가 최종 방어선" 같은 문구가 v5의 "강제장치 없음" 결정과 충돌한다 — AC-1~AC-20 배송 시 이 문구들을 "리포트 도구, 최종 판단은 사람" 톤으로 diff 동봉**
+- `docs/sot/hook-contracts.md` — 동일 사유로 "판정 권한은 CI" 류 문구 정합화 필요
 - 신설: `docs/sot/instruction-ledger.schema.json`, `docs/sot/always-apply-rules.yaml`, `docs/sot/mechanism-registry.yaml`(AC-M), `docs/sot/verify-environment-manifest.json`(AC-17)
 - 신설(정보용, CI 강제 아님): `docs/sot/verify-known-limitations.md` — "순차 2-PR 공격은 이 도구로 못 막는다"는 사실만 기록. 존재 여부를 어떤 check도 조건으로 삼지 않는다(v4에서는 AC-6이 이걸 조건으로 삼았으나 AC-6 자체가 삭제됨)
 
@@ -191,13 +193,18 @@ verify 최종 판정 스키마:
 ```json
 { "check_id": "string", "subject_sha": "string(40)", "status": "PASS|FAIL|NOT_RUN", "detail": "string|null" }
 ```
-mechanism 레지스트리(`docs/sot/mechanism-registry.yaml`) 스키마 (AC-M):
+mechanism 레지스트리(`docs/sot/mechanism-registry.yaml`) 스키마 (AC-M, 실제 훅 문구로 정정됨):
 ```yaml
-- id: "secrets-render-check"
-  kind: "hook"          # hook | ci-job
+- id: "secrets-scan-precommit"
   path: "hooks/pre-commit"
-  target: "check_secret_render"
-  stage: "pre-commit"    # pre-commit | pre-push | ci
+  target: "SECRET_PATTERNS_FILE= VERIFY_SCAN_SOURCE=index bash verify.sh"   # hooks/pre-commit:71과 문자 그대로 일치해야 함
+  stage: "pre-commit"    # pre-commit | pre-push | ci | manual
+  required: true
+- id: "memory-recall-check"     # AC-20용 — stage:manual의 유일한 정당 사례
+  path: "scripts/memory-recall-check.sh"
+  target: "scripts/memory-recall-check.sh"
+  stage: "manual"
+  manual_reason: "goal 작성 시점(게이트 0~1)에 사람이 실행하는 검사라 git hook/CI 어디에도 배선되지 않는다 — AC-M §manual 정의 참조"
   required: true
 ```
 

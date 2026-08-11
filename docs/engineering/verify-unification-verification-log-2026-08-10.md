@@ -1,4 +1,25 @@
-# 검증 이력 — verify·codeaudit 통합 goal (v1~v5)
+# 검증 이력 — verify·codeaudit 통합 goal (v1~v6)
+
+### v6-라운드 (2026-08-12, v5 착수 전 최종 점검 — `/codex:rescue a86e46d4aa31af9bb` → codex task `task-msotec9m-mpeyct`)
+
+**V — Codex(이 세션의 codex:rescue 호출)**
+- **VERDICT: 재작성 필요**(codex 판정). 8개 결함 제시.
+
+**Claude 재현 (직접 실행)**
+
+| # | codex 주장 | 재현 결과 | 판정 |
+|---|---|---|---|
+| 1 | Gate 0 측정기가 거짓 GREEN(here-string 생성 실패했는데 RED:0/4 출력) | `bash scripts/session-status.sh` 직접 재실행 → 정상 동작, `RED: 0/4` 정확히 출력. 이 세션에서 이미 여러 번 실제 상태변화(1/4→원인특정→고침→0/4)를 정확히 추적한 이력 있음 | **반증됨 — codex 자신의 샌드박스가 임시파일 생성을 막아서 생긴 codex 쪽 아티팩트로 판정. 스크립트 결함 아님** |
+| 2 | AC-M 예시 `target: check_secret_render`가 죽은 참조 | `grep -n "check_secret_render" hooks/pre-commit` → 0건. 실제 훅은 `SECRET_PATTERNS_FILE= VERIFY_SCAN_SOURCE=index bash verify.sh`(`hooks/pre-commit:71`) 호출 | **일치 — 확인, 수정 완료**(예시를 실제 문구로 교체) |
+| 3 | AC-M 검증절이 산문뿐, 실행 명령·fixture 없음 | goal 문서 AC-M 본문 재확인 | **일치 — 확인, 수정 완료**(check-mechanism-registry.sh 스펙 + fixture 3종 추가) |
+| 4 | AC-20이 레지스트리 stage에 못 들어감(pre-commit/pre-push/ci만 있고 수동 실행 단계 없음) | 스키마 재확인 | **일치 — 확인, 수정 완료**(`stage: manual` + `manual_reason` 필드 신설) |
+| 5 | AC-1/AC-5가 개수만 비교하고 ID 집합은 비교 안 함 | AC-5 counter-AC 재확인 | **일치 — 확인, 수정 완료**(ID 집합 비교로 강화) |
+| 6 | SOT(coding-principles.md 등)에 "강제"·"CI가 최종방어선" 문구가 남아 v5 결정과 불일치 | 별도 미재현(문서 존재는 이미 앎) | **타당 — SOT 체크리스트에 정정 항목 추가** |
+| 7 | 장기보류 문서의 AC 목록에 AC-20 누락 | 문서 재확인 | **일치 — 확인, 수정 완료** |
+
+**조치**: AC-M·AC-20·AC-5·SOT체크리스트·장기보류문서 수정 완료(v5→v6 goal 본문 자체 갱신, 별도 버전 문서 안 만들고 같은 파일에 즉시 반영). Gate 0 측정기 관련 지적(#1)은 반증됐으므로 대응 없음 — 단, 이 스크립트가 `<<<`(here-string)를 쓰는 한 극단적으로 제한된 셸 환경에서 이론상 조용히 실패할 잠재 취약점은 낮은 우선순위로 인지만 해둠(이 저장소의 실제 실행 환경 — 로컬 macOS·GitHub Actions — 에서는 해당 안 됨).
+
+**G(이 세션)·V(codex)·V2(이 세션 재현) 정합**: 7개 중 6개 일치(반영 완료), 1개(Gate0) 반증. 갈리지 않음 — AC-M 착수 가능으로 판단.
 
 ### v5-라운드 (2026-08-11, 문서 v4 대상 — 세션 밖 외부 Codex 적대검증)
 
