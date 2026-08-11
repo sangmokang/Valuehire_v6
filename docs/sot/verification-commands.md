@@ -17,16 +17,25 @@
 
 ### CI(`​.github/workflows/verify.yml`)가 실제로 돌리는 것
 
-```
-bash verify.sh                    # 비밀 스캔(추적 파일 전체)
-bash scripts/acceptance-0-6.sh
-bash scripts/acceptance-0-7.sh    # 로컬 훅 6종 위반 시연 — 재귀 방지로 pre-push 안에서는 스킵, CI가 담당
-bash scripts/acceptance-0-5.sh    # main 브랜치에서만 (if: github.ref == 'refs/heads/main')
-bash scripts/acceptance-hs-a3.sh  # 2026-08-12 추가 (AC-A3 · 세션 계열 자격증명)
-bash scripts/scan-data-exposure.sh all   # 2026-08-12 추가 (AC-A4) — 데이터 노출 판정기
-bash scripts/acceptance-hs-a4.sh  # 2026-08-12 추가 (AC-A4 · 차단이 실제로 도는가)
-bash scripts/acceptance-secret-webhook-vendor.sh   # 2026-08-12 추가 (AC-S1 · 웹훅·벤더 키)
-```
+**워크플로 스텝 13개 전부**를 적는다(2026-08-12 V1 D6: 이전 판은 `bash ...` 직접 명령만 적어 인라인 본문 스텝이 목록에서 빠졌고, 운영자가 실제로 무엇이 도는지 잘못 판단할 수 있었다).
+
+| # | 스텝 이름 | 실행 내용 |
+|---|---|---|
+| 1 | 비밀 스캔 (verify.sh) | `bash verify.sh` — 추적 파일 전체 |
+| 2 | 히스토리 전량 스캔 | 인라인 — 도달 가능한 모든 blob 을 열어 자격증명 패턴 대조 |
+| 3 | 인수 검사 0-6 | `bash scripts/acceptance-0-6.sh` |
+| 4 | 인수 검사 0-7 | `bash scripts/acceptance-0-7.sh` — 훅 위반 6종 시연 |
+| 5 | 인수 검사 0-5 | `bash scripts/acceptance-0-5.sh` — **`main` 브랜치에서만** (`if: github.ref`) |
+| 6 | 억제 만료 스캔 | 인라인 — `suppressions.yaml` 의 expiry 형식·경과 |
+| 7 | 강제 장치 존재 검사 | 인라인 — `hooks/pre-commit`·`pre-push` 존재·실행권한 |
+| 8 | 셸 스크립트 문법 검사 | 인라인 — `git ls-files '*.sh'` 전부 `bash -n` |
+| 9 | 패턴 파일 자체 실값 검사 | 인라인 — `.secret-patterns.default` 에 값 리터럴 없는지 |
+| 10 | 인수 검사 hs-a3 | `bash scripts/acceptance-hs-a3.sh` — 세션 계열 자격증명 (AC-A3) |
+| 11 | 데이터 노출 스캔 | `bash scripts/scan-data-exposure.sh all` — 크기·금지경로·기록·개인정보 (AC-A4) |
+| 12 | 인수 검사 hs-a4 | `bash scripts/acceptance-hs-a4.sh` — 차단이 실제로 도는가 (AC-A4) |
+| 13 | 인수 검사 secret-webhook-vendor | `bash scripts/acceptance-secret-webhook-vendor.sh` — 웹훅·벤더 키 (AC-S1) |
+
+*(1번 앞에 `actions/checkout` 이 있고 `fetch-depth: 0` 이다 — 2번이 과거 blob 을 열려면 필요하다.)*
 
 **CI는 고정 목록이고 로컬 `pre-push`는 글로브(이름 규칙 자동 수집)다.** 그래서 새 인수 스크립트를 만들면 로컬에서는 저절로 돌지만 CI에서는 한 줄도 안 돈다 — P15③("로컬에만 있는 검사는 없는 것으로 친다")에 걸린다. **새 `scripts/acceptance-*.sh`를 추가하는 PR은 `verify.yml`과 이 표 양쪽에 자기 줄을 함께 넣어야 한다.**
 

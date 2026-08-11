@@ -32,7 +32,10 @@ cd "$REPO" || { echo "NOT_RUN: 저장소 루트로 이동 실패"; echo "CHECKED
 # 세 축을 잡는다(2026-08-12 V1 D4): 파일 상태(무시 파일 포함) · HEAD · git 객체 수.
 SNAP0=$(git status --porcelain --ignored 2>/dev/null)
 HEAD0=$(git rev-parse HEAD 2>/dev/null)
-OBJ0=$(find "$(git rev-parse --git-dir)/objects" -type f 2>/dev/null | wc -l | tr -d ' ')
+# ⚠️ 워크트리에서는 --git-dir 이 .git/worktrees/<이름> 을 가리키고 그 아래엔 objects 가
+# 없다. --git-common-dir 을 써야 실제 객체 저장소를 본다(2026-08-12 실측: --git-dir 기준
+# 이면 개수가 항상 0이라 이 검사가 아무것도 못 잡았다).
+OBJ0=$(find "$(git rev-parse --git-common-dir)/objects" -type f 2>/dev/null | wc -l | tr -d ' ')
 
 PATTERNS=.secret-patterns.default
 if [ ! -f "$PATTERNS" ] || [ ! -s "$PATTERNS" ]; then
@@ -242,7 +245,7 @@ e2e "정상 파일은 verify.sh 가 통과" \
 # ③ 이 '잠깐 생겼다 지운' 경로를 잡는다: git 은 객체를 쓰면 지워도 파일이 남기 때문이다.
 SNAP1=$(git status --porcelain --ignored 2>/dev/null)
 HEAD1=$(git rev-parse HEAD 2>/dev/null)
-OBJ1=$(find "$(git rev-parse --git-dir)/objects" -type f 2>/dev/null | wc -l | tr -d ' ')
+OBJ1=$(find "$(git rev-parse --git-common-dir)/objects" -type f 2>/dev/null | wc -l | tr -d ' ')
 checked=$((checked + 1))
 if [ "$SNAP0" != "$SNAP1" ]; then
   echo "FAIL: 이 검사가 작업트리를 오염시켰다 — 시작/종료 상태가 다르다 (무시 파일 포함 · 판정 무효)"
