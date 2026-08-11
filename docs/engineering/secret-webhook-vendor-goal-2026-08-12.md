@@ -118,11 +118,11 @@ MISSED : 환경변수 참조
 
 ## ⑥ SOT 체크리스트
 
-- `docs/sot/verification-commands.md` — 게이트 명령 정본. **수정 불필요**(새 스크립트는 `acceptance-*.sh` 이름 규칙으로 자동 수집됨. `scripts/session-status.sh:46-48`의 `find -maxdepth 2` 글로브가 잡는다)
-- `docs/sot/hook-contracts.md` — 훅 계약. **수정 불필요**(훅 로직 변경 없음, 패턴 데이터만 추가)
+- `docs/sot/verification-commands.md` — **수정함(드리프트 차단)**. 처음에는 "수정 불필요"로 적었으나 배선 증명(게이트 3.5)에서 뒤집혔다: **로컬 `pre-push`는 글로브라 새 스크립트를 자동 수집하지만 CI는 고정 목록**이라 한 줄도 안 돈다(`.github/workflows/verify.yml`). 그대로 두면 이 검사가 "로컬에만 있는 검사"가 되어 P15③에 걸린다. `verify.yml`에 스텝을 등록했고, 그 결과 이 SOT 문서의 "CI가 실제로 돌리는 것" 목록이 낡았으므로 같은 PR에서 갱신했다. 다음 사람이 같은 함정에 빠지지 않도록 **"새 인수 스크립트는 양쪽에 등록"** 규칙 한 줄을 그 문서에 추가했다.
+- `docs/sot/hook-contracts.md` — 훅 계약. **수정 불필요**(훅 로직 변경 0, 패턴 데이터만 추가)
 - `docs/sot/coding-principles.md` — P13(검사 약화 금지)·P20(공허 통과 금지)·P22(패턴은 데이터) 준수. **수정 불필요**
 - `docs/sot/git-workflow.md` — 작업 1개 = 워크트리 1개 = AC 1개 준수
-- **결론: 이 변경은 SOT 문구를 바꾸지 않는다.** 패턴 파일은 데이터이고, 그 데이터가 늘어나는 것은 SOT가 이미 허용한 동작이다.
+- **결론: SOT 1건을 같은 PR에서 함께 고친다.** 패턴 데이터가 늘어나는 것 자체는 SOT를 안 바꾸지만, **CI 실행 목록을 바꾼 것**이 SOT 기술 내용을 바꾼다.
 
 ## ⑦ 비범위
 

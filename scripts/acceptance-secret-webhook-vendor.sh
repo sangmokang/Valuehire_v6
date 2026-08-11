@@ -125,7 +125,10 @@ must_catch "Anthropic 벤더 키(하이픈 접두 · 중립 변수명)" \
   "  cfg.value = \"${SKA}api03-${LONGK}\""
 
 # ── ③ .env 대입문 키워드 확장 ────────────────────────────────────────────────
-must_catch "${K_WH} 계열 .env 대입" "${K_WH}_URL=https://${DC}.com/api/${WH}/${SNOW}/${TOK}"
+# ⚠️ 이 카나리의 값에 Discord 웹훅 URL 을 쓰면 안 된다. 그러면 위 ① 의 웹훅 패턴이
+# 값을 보고 잡아버려서, 키워드 패턴을 지워도 이 항목이 초록으로 남는다(2026-08-12
+# 뮤테이션 M4 에서 실측 — 이중 커버로 판별력이 0이었다). 값은 중립 URL 이어야 한다.
+must_catch "${K_WH} 계열 .env 대입" "${K_WH}_URL=https://ops.example.com/ingest/${TOK}"
 must_catch "${K_CR} 계열 .env 대입" "export SERVICE_${K_CR}=${TOK}"
 must_catch "${K_PK} 한 줄 형태"     "${K_PK}=MIIEvQIBADANBgkqhkiG9w0BAQEFAASC"
 # 회귀 방지 — 이 한 건은 기존 패턴(.secret-patterns.default:11 의 TOKEN)이 **이미** 덮는다.
