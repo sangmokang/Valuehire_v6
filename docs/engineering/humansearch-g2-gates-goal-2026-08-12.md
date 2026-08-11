@@ -89,7 +89,7 @@ exit  : 0 | 1 | 2(전제 부재)
 
 `humansearch/` 패키지 (사업 동작 없음 — G2 배관 성립용 최소 경계)
 ```
-humansearch/pyproject.toml     # name=humansearch, requires-python>=3.14, dev: ruff·mypy·pytest·hypothesis 핀 고정
+humansearch/pyproject.toml     # name=humansearch, requires-python>=3.14, dev: ruff·mypy·pytest (uv.lock으로 핀 고정; hypothesis는 순수 판정 함수가 처음 생기는 단계에서 P5와 함께 추가 — 지금 넣으면 안 쓰는 의존성 = 고아)
 humansearch/uv.lock            # 재현 가능한 도구 버전 잠금
 humansearch/.python-version    # 3.14.1 (C-8)
 humansearch/src/humansearch/__init__.py  # 상수/버전만. 로직 0
