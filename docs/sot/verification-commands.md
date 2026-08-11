@@ -21,8 +21,14 @@
 bash verify.sh                    # 비밀 스캔(추적 파일 전체)
 bash scripts/acceptance-0-6.sh
 bash scripts/acceptance-0-7.sh    # 로컬 훅 6종 위반 시연 — 재귀 방지로 pre-push 안에서는 스킵, CI가 담당
-bash scripts/acceptance-0-5.sh
+bash scripts/acceptance-0-5.sh    # main 브랜치에서만 (if: github.ref == 'refs/heads/main')
+(대용량 파일 · 산출물 경로 스캔)   # 2026-08-12 추가 (AC-A4) — 인라인 스텝, 추적 파일 전체
+bash scripts/acceptance-hs-a4.sh  # 2026-08-12 추가 (AC-A4 · 차단이 실제로 도는가)
 ```
+
+**CI는 고정 목록이고 로컬 `pre-push`는 글로브(이름 규칙 자동 수집)다.** 그래서 새 인수 스크립트를 만들면 로컬에서는 저절로 돌지만 CI에서는 한 줄도 안 돈다 — P15③("로컬에만 있는 검사는 없는 것으로 친다")에 걸린다. **새 `scripts/acceptance-*.sh`를 추가하는 PR은 `verify.yml`과 이 표 양쪽에 자기 줄을 함께 넣어야 한다.**
+
+**CI의 크기·경로 스캔은 "지금 추적 중인 파일"만 본다.** 커밋했다가 다음 커밋에서 지운 파일의 과거 본문은 이 스캔이 보지 못한다(2026-08-12 실측: 1,228,800바이트가 도달 가능한 채로 "위반 0건" 통과). 억제 원장 `a4-history-scan` 참조.
 
 ## 시행 지점
 

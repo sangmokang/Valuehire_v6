@@ -55,18 +55,28 @@ for p in artifacts/x.png data/humansearch.sqlite3 humansearch.db run.sqlite priv
 done
 
 # ── 2) 이미 추적 중인 파일에 위반이 없는가 (CI 가 매번 보는 것과 같은 검사) ──
+#
+# ⚠️ 대상 수(seen)를 반드시 센다(2026-08-12 V1 적대검증 D7). 이전 판은 큰 파일 수(big)만
+# 세고 대상 수를 안 봐서, **추적 파일이 0개인 빈 저장소에서도 "초과 0건"으로 성공**했다.
+# 0건 처리를 통과로 세는 것이 P20 이 금지하는 공허 통과다. 검사 대상이 없으면 그것은
+# "깨끗함"이 아니라 "검사기가 대상을 못 찾음"이며 fail-closed 로 처리한다.
+# (CI 쪽 verify.yml 은 이미 `n -eq 0` 에서 exit 2 로 같은 방어를 한다 — 로컬만 비어 있었다.)
 big=0
+seen=0
 while IFS= read -r -d '' f; do
+  seen=$((seen + 1))
   sz=$(git cat-file -s ":$f" 2>/dev/null) || continue
   if [ "$sz" -gt "$MAX_BYTES" ]; then
     printf '  큰 파일: %s (%s 바이트)\n' "$f" "$sz"
     big=$((big + 1))
   fi
 done < <(git ls-files -z)
-if [ "$big" -eq 0 ]; then
-  ok "추적 파일 중 ${MAX_BYTES} 바이트 초과 0건"
+if [ "$seen" -eq 0 ]; then
+  bad "추적 파일 0개 — 스캔 무효 (P20 · 검사 대상을 못 찾은 것이지 깨끗한 것이 아니다)"
+elif [ "$big" -eq 0 ]; then
+  ok "추적 파일 ${seen}개 중 ${MAX_BYTES} 바이트 초과 0건"
 else
-  bad "추적 파일 중 ${MAX_BYTES} 바이트 초과 ${big}건"
+  bad "추적 파일 ${seen}개 중 ${MAX_BYTES} 바이트 초과 ${big}건"
 fi
 
 # ── 3) pre-commit 이 실제로 차단하는가 (임시 저장소에서 실행) ────────────────
@@ -260,15 +270,21 @@ if [ "$checked" -eq 0 ]; then
   exit 1
 fi
 
+# ⚠️ 이름을 증명 범위에 맞춘다(2026-08-12 V1 적대검증 D3 · V2 재현 확인).
+# `git status --porcelain` 은 **추적/미추적 파일 상태만** 본다. git 설정(`git config`),
+# 참조(refs), 내부 객체(.git/objects), 과거 기록, 무시된 파일은 보지 못하고, 중간에
+# 오염시켰다가 되돌린 사실도 원리상 볼 수 없다. V2 재현: 검사 도중 `git config` 를 바꾸고
+# 객체 1개를 저장해도(객체 파일 45→46) 이 비교는 "동일"로 나왔다.
+# 따라서 "저장소 무오염"이라 부르면 과장이다 — 실제로 증명한 범위만 이름에 담는다.
 SNAP1=$(git status --porcelain)
 if [ "$SNAP0" != "$SNAP1" ]; then
   checked=$((checked + 1))
-  echo "FAIL: 이 검사가 저장소를 오염시켰다 — 시작/종료 상태가 다르다 (판정 무효)"
+  echo "FAIL: 이 검사가 작업트리를 오염시켰다 — 시작/종료 파일 상태가 다르다 (판정 무효)"
   printf '%s\n' "$SNAP1" | sed 's/^/       /'
   fail=1
 else
   checked=$((checked + 1))
-  echo "PASS: 저장소 무오염 (시작/종료 상태 동일)"
+  echo "PASS: 작업트리 무오염 (git status 기준 — git 설정·내부 객체·참조는 범위 밖)"
 fi
 
 printf 'CHECKED: %d\n' "$checked"
