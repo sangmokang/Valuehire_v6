@@ -124,3 +124,48 @@ fixture 3종 (`scripts/verify/fixtures/mechanism-registry/`):
 ## 적대 검증 로그
 
 (V1·V2 판정을 이 절에 append 한다)
+
+### 게이트 2~4 검증 증거 (2026-08-12 04:2x~04:3x, 구현 세션)
+
+RED (커밋 6d90ded → 보강 cc12b96):
+```
+acceptance_rc=1 / FAIL 14건 / CHECKED: 15
+FAIL: 검사기 없음/실행불가 — scripts/verify/check-mechanism-registry.sh (기대 동작이 아직 없다)
+FAIL: fixture 정상 명부 → 통과 (기대 exit=0, 실제 127)
+```
+→ 뭘 시켰나: 검사기·명부를 만들기 전에 인수 검사를 먼저 실행했습니다.
+→ 뭐가 나왔나: 15건 중 14건이 "검사기가 없다"(127 = 셸이 파일을 못 찾음)로 실패했습니다.
+→ 의미: 좋은 소식 — 문법 오류가 아니라 기대 동작 부재로 빨간, 올바른 RED입니다.
+
+GREEN (검사기+명부 커밋 후):
+```
+PASS 15건 / FAIL 0건 / CHECKED: 15 / acceptance_rc=0
+검사기 단독(실제 명부): PASS 3건 / CHECKED: 3 / rc=0
+```
+→ 뭘 시켰나: 검사기와 명부 3항목을 구현한 뒤 같은 인수 검사를 재실행했습니다.
+→ 뭐가 나왔나: 15건 전부 통과, 실제 명부 3항목도 전부 통과했습니다.
+→ 의미: RED→GREEN 전환이 계약값(CHECKED 15) 그대로 이뤄졌습니다.
+
+뮤테이션 점검 (격리 클론에서 구현을 한 줄씩 파괴):
+```
+M1 rule2_path_check_removed   rc=1 fail=1  ← fixture 격리(ci 전환) 후. 격리 전엔 rc=0 생존
+M2 rule3_dead_target_removed  rc=1 fail=1 (죽은 target fixture 만 빨감)
+M3 rule1_dup_check_removed    rc=1 fail=1 (id 중복 항목만 빨감)
+M4 rule4_ci_job_removed       rc=1 fail=2 (ci 포함 fixture·실제 명부 빨감)
+M5 registry_fake_target       rc=1 fail=1 (실제 명부 항목만 빨감)
+M6 acceptance_one_check_deleted rc=1 fail=1 (CHECKED 14≠15 — D3 방어 작동)
+```
+→ 뭘 시켰나: 검사기 규칙 4개·명부 target·인수 검사 항목 수를 각각 일부러 깨봤습니다.
+→ 뭐가 나왔나: 6종 전부 빨간불. 단 M1은 처음에 살아남아 fixture 를 ci 로 격리해 잡았습니다(커밋 메시지에 기록).
+→ 의미: 검사가 장식이 아니라 실제로 각 규칙의 삭제를 감지합니다. M1 생존은 "실패 경로 중복이 삭제를 가린다"는 PR #6 D5 와 같은 유형을 제 fixture 에서 잡아 고친 것입니다.
+
+배선 증명 (R4 · 런타임):
+```
+$ bash hooks/pre-push origin https://example.invalid </dev/null
+  ok  ./scripts/acceptance-verify-ac-m.sh
+pre-push: 검사 5개 실행
+pre-push_rc=0
+```
+→ 뭘 시켰나: 코드 올리기 직전 문지기(pre-push)를 실제로 통째로 돌렸습니다.
+→ 뭐가 나왔나: 글로브(이름 규칙 자동 수집)가 새 인수 검사를 스스로 찾아 실행했고 전체 합격했습니다.
+→ 의미: 새 검사는 고아가 아닙니다 — 로컬 문지기(자동 수집)와 CI(명시 등록) 양쪽에 배선됐습니다.
