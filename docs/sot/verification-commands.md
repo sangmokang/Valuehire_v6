@@ -22,6 +22,7 @@ bash verify.sh                    # 비밀 스캔(추적 파일 전체)
 bash scripts/acceptance-0-6.sh
 bash scripts/acceptance-0-7.sh    # 로컬 훅 6종 위반 시연 — 재귀 방지로 pre-push 안에서는 스킵, CI가 담당
 bash scripts/acceptance-0-5.sh    # main 브랜치에서만 (if: github.ref == 'refs/heads/main')
+bash scripts/acceptance-hs-a3.sh  # 2026-08-12 추가 (AC-A3 · 세션 계열 자격증명)
 bash scripts/scan-data-exposure.sh all   # 2026-08-12 추가 (AC-A4) — 데이터 노출 판정기
 bash scripts/acceptance-hs-a4.sh  # 2026-08-12 추가 (AC-A4 · 차단이 실제로 도는가)
 ```
