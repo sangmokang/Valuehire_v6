@@ -1,0 +1,6 @@
+# fixture: path 가 존재하지 않는 항목 — 검사기가 exit 1 을 내야 한다 (AC-M fixture 2/3)
+- id: "ghost-mechanism"
+  path: "scripts/this-file-does-not-exist.sh"
+  target: "bash scripts/this-file-does-not-exist.sh"
+  stage: "pre-push"
+  required: true
