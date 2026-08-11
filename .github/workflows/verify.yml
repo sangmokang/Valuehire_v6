@@ -34,6 +34,7 @@ jobs:
           bash scripts/acceptance-hs-cleanroom-colon-paths.sh
           bash scripts/acceptance-hs-cleanroom-file-urls.sh
           bash scripts/acceptance-hs-cleanroom-hook-env.sh
+          bash scripts/acceptance-hs-cleanroom-hook-env-mutations.sh
 
       - name: 히스토리 전량 스캔 (도달 가능한 모든 blob)
         # verify.sh는 현재 체크아웃의 추적 파일만 본다. 과거 커밋에 들어갔다가 지워진 비밀은
