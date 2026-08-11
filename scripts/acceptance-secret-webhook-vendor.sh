@@ -197,6 +197,14 @@ must_not_catch "접미사 위장 도메인(${NOT_DC}.com)" \
   "https://${NOT_DC}.com/api/${WH}/${SNOW}/${TOK}"
 must_not_catch "접미사 위장 도메인(${NOT_SLACK_HOST})" \
   "https://${NOT_SLACK_HOST}/${SVC}/T01ABCDEFGH/B01ABCDEFGH/${TOK}"
+# ④-c V2 재검증이 잡은 잔여 오탐 (2026-08-12): 글자로 된 짧은 설정값.
+# 키워드 규칙이 "글자 1개 + 5자"만 요구해 keychain(8자)·PKCS12(6자) 같은
+# 저장 방식·형식 이름이 비밀로 오인됐다. 값 하한을 12자로 올려 해소한다 —
+# 12자 미만의 실제 비밀은 놓친다(대가, 위 143행 카나리 12자는 유지되는 하한).
+must_not_catch "${K_CR} 저장 방식 이름(글자 설정값)" \
+  "${K_CR}_PROVIDER=keychain"
+must_not_catch "${K_PK} 형식 이름(짧은 글자+숫자 설정값)" \
+  "${K_PK}_FORMAT=PKCS12"
 
 # ── ⑤ 종단: 스캐너가 실제로 이 패턴을 쓰는가 (판정기 2벌 방지) ───────────────
 #
@@ -266,9 +274,11 @@ fi
 # (CHECKED: 14 로 통과). bash 버전 차이·편집 실수로 검사가 조용히 사라지는 것이
 # 이 저장소의 실제 사고 유형이다(같은 날 ${VAR^^} 로 3건이 사라졌다).
 # 그래서 기대 개수를 코드에 못박고 **적으면 실패**한다(P20 · P2).
-EXPECTED_CHECKS=27
-if [ "$checked" -lt "$EXPECTED_CHECKS" ]; then
-  printf 'FAIL: 검사 항목이 %d개뿐이다 — 기대 %d개 (검사가 사라졌다 · P20)\n' "$checked" "$EXPECTED_CHECKS"
+EXPECTED_CHECKS=29
+# -lt(하한)가 아니라 -ne(정확값)로 조인다: 하한만 보면 새 검사 3개를 넣고 기존 3개를
+# 지워도 초록이다. V1 판정서의 설계 결정("checked == 기대값 강제")과도 이쪽이 일치한다.
+if [ "$checked" -ne "$EXPECTED_CHECKS" ]; then
+  printf 'FAIL: 검사 항목 %d개 ≠ 계약값 %d개 (검사가 사라졌거나 무단 추가됐다 · P20)\n' "$checked" "$EXPECTED_CHECKS"
   printf 'CHECKED: %d\n' "$checked"
   exit 1
 fi
