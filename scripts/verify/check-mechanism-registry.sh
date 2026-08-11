@@ -5,12 +5,15 @@
 #   정본: docs/engineering/verify-unification-goal-2026-08-10.md:78-81
 #   입력 : $1 = 명부 경로 (기본 docs/sot/mechanism-registry.yaml)
 #          WORKFLOW_FILE = CI 워크플로 경로 (기본 .github/workflows/verify.yml)
-#   출력 : 항목마다 PASS:/FAIL:, 마지막 줄 `CHECKED: <항목 수>`
-#   exit : 0 = 전부 통과 | 1 = 위반 | 2 = NOT_RUN(명부 없음·항목 0개)
+#   출력 : 항목마다 PASS:/FAIL: (PASS 줄에 적용 규칙 표기), 마지막 줄 `CHECKED: <항목 수>`
+#   exit : 0 = 전부 통과 | 1 = 위반(문법 오류 포함) | 2 = NOT_RUN(명부 없음·항목 0개)
 #
-# 파서 계약(이 밖의 형태는 전부 exit 1 — fail-closed):
-#   항목은 `- id: 값` 으로 시작하고, 필드는 2칸 들여쓴 `key: 값`.
-#   전체 줄 주석(#)과 빈 줄만 허용. 값의 앞뒤 따옴표는 벗겨 비교. 빈 값 = 누락.
+# 파서 계약(이 밖의 형태는 전부 exit 1 — fail-closed · 2026-08-12 V1 D5·D6 반영):
+#   항목은 `- id: 값`, 필드는 2칸 들여쓴 `key: 값`. 전체 줄 주석(#)과 빈 줄만 허용.
+#   값은 "..." / '...' 로 정확히 감싸거나(닫힘 필수, 뒤에 아무것도 없어야), 영숫자·._- 만.
+#   같은 항목에 같은 필드 2회 금지. 빈 값 = 누락. path 는 저장소 루트 기준 상대경로만
+#   (절대경로·`..` 금지 — V1 D4). ci_mirror_job 은 stage:ci, manual_reason 은
+#   stage:manual 에서만 허용(불일치 필드 = 위반).
 #
 # ⚠️ bash 3.2 호환 — `${VAR^^}` 계열 금지(맥 기본 bash 실측 함정), 연관배열 금지.
 set -uo pipefail
@@ -26,6 +29,7 @@ fi
 
 fail=0
 checked=0
+syntax_fail=0
 seen_ids=""
 
 # 워크플로의 jobs: 키 목록 (규칙 4 대조용)
@@ -34,82 +38,116 @@ if [ -f "$WORKFLOW_FILE" ]; then
   ci_jobs=$(awk '/^jobs:[[:space:]]*$/{f=1;next} f&&/^[^[:space:]]/{f=0} f&&/^  [A-Za-z0-9_-]+:[[:space:]]*$/{s=$1;sub(/:$/,"",s);print s}' "$WORKFLOW_FILE")
 fi
 
-unquote() {
+# 값 검증 + 정제 — PV_VAL 에 결과. return 1 = 계약 밖 형태 (V1 D5: 미닫힘 따옴표·
+# 인라인 주석·따옴표 섞임을 값에 흡수한 채 조용히 통과하던 것을 여기서 끊는다).
+PV_VAL=""
+parse_value() {
   local v="$1"
-  case "$v" in
-    \"*\") v=${v#\"}; v=${v%\"} ;;
-    \'*\') v=${v#\'}; v=${v%\'} ;;
-  esac
-  printf '%s' "$v"
+  PV_VAL=""
+  if printf '%s' "$v" | grep -qE '^"[^"]*"$'; then
+    PV_VAL=${v#\"}; PV_VAL=${PV_VAL%\"}; return 0
+  fi
+  if printf '%s' "$v" | grep -qE "^'[^']*'\$"; then
+    PV_VAL=${v#\'}; PV_VAL=${PV_VAL%\'}; return 0
+  fi
+  if printf '%s' "$v" | grep -qE '^[A-Za-z0-9._-]+$'; then
+    PV_VAL=$v; return 0
+  fi
+  return 1
 }
 
 # 현재 항목 상태
 e_id="" e_path="" e_target="" e_stage="" e_required="" e_ci_job="" e_reason=""
-in_entry=0
+e_keys="" in_entry=0
 
-reset_entry() { e_id="" e_path="" e_target="" e_stage="" e_required="" e_ci_job="" e_reason=""; }
+reset_entry() {
+  e_id="" e_path="" e_target="" e_stage="" e_required="" e_ci_job="" e_reason=""
+  e_keys=""
+}
+
+# 스키마 검증(규칙 1 + 필수 필드 + path 형태) — 위반 사유를 stdout 으로, return 1
+validate_schema() {
+  if [ -z "$e_id" ]; then echo "id 없음"; return 1; fi
+  if printf '%s\n' "$seen_ids" | grep -qxF -- "$e_id"; then
+    echo "id 중복 — $e_id"; return 1
+  fi
+  if [ -z "$e_path" ]; then echo "path 누락/빈 값"; return 1; fi
+  if [ -z "$e_target" ]; then echo "target 누락/빈 값"; return 1; fi
+  if [ -z "$e_stage" ]; then echo "stage 누락/빈 값"; return 1; fi
+  if [ -z "$e_required" ]; then echo "required 누락/빈 값"; return 1; fi
+  case "$e_required" in true|false) : ;; *) echo "required 값 오류 — $e_required"; return 1 ;; esac
+  # V1 D4: 저장소 루트 기준 상대경로만 — 절대경로·상위 이동은 통제 범위 밖 파일을 가리킨다
+  case "$e_path" in
+    /*) echo "절대경로 금지 — $e_path (저장소 루트 기준 상대경로만)"; return 1 ;;
+    ..*|*/..*|*/../*) echo "상위 이동(..) 금지 — $e_path"; return 1 ;;
+  esac
+  # V1 D5-d: stage 와 맞지 않는 필드는 오타·오해의 신호다 — 조용히 무시하지 않는다
+  if [ -n "$e_ci_job" ] && [ "$e_stage" != "ci" ]; then
+    echo "ci_mirror_job 은 stage:ci 전용 — stage:$e_stage 에 있음"; return 1
+  fi
+  if [ -n "$e_reason" ] && [ "$e_stage" != "manual" ]; then
+    echo "manual_reason 은 stage:manual 전용 — stage:$e_stage 에 있음"; return 1
+  fi
+  if [ ! -f "$e_path" ]; then echo "path 실존하지 않음 — $e_path"; return 1; fi
+  return 0
+}
+
+# stage 별 대조(규칙 3~5) — 위반 사유를 stdout 으로, return 1
+validate_stage() {
+  case "$e_stage" in
+    pre-commit|pre-push)
+      if ! grep -qF -- "$e_target" "$e_path"; then
+        echo "죽은 target — '$e_target' 이(가) $e_path 안에 없다"; return 1
+      fi
+      ;;
+    ci)
+      if [ -z "$e_ci_job" ]; then
+        echo "stage:ci 인데 ci_mirror_job 누락"; return 1
+      fi
+      if ! printf '%s\n' "$ci_jobs" | grep -qxF -- "$e_ci_job"; then
+        echo "ci_mirror_job '$e_ci_job' 이(가) $WORKFLOW_FILE 의 jobs: 키에 없다"; return 1
+      fi
+      # V1 D1: 작업 이름만 보면 존재하지 않는 명령을 '실행 중'이라 적어도 통과한다.
+      # ci 도 target 문자열이 그 워크플로 파일에 실재해야 한다(정본의 target 계약).
+      if ! grep -qF -- "$e_target" "$e_path"; then
+        echo "죽은 ci target — '$e_target' 이(가) $e_path 안에 없다"; return 1
+      fi
+      ;;
+    manual)
+      if [ -z "$e_reason" ]; then
+        echo "stage:manual 인데 manual_reason 누락 — 호출 검사 회피 금지"; return 1
+      fi
+      if [ ! -x "$e_path" ]; then
+        echo "manual path 가 실행권한 없음 — $e_path"; return 1
+      fi
+      ;;
+    *)
+      echo "알 수 없는 stage — $e_stage"; return 1
+      ;;
+  esac
+  return 0
+}
+
+rules_label() {
+  case "$e_stage" in
+    pre-commit|pre-push) printf '규칙 1·2·3' ;;
+    ci)                  printf '규칙 1·2·4' ;;
+    manual)              printf '규칙 1·2·5' ;;
+  esac
+}
 
 flush_entry() {
   [ "$in_entry" -eq 1 ] || return 0
   checked=$((checked + 1))
   local bad=""
-
-  # 규칙 1 — id 유일성 + 필수
-  if [ -z "$e_id" ]; then
-    bad="id 없음"
-  elif printf '%s\n' "$seen_ids" | grep -qxF -- "$e_id"; then
-    bad="id 중복 — $e_id"
+  bad=$(validate_schema)
+  if [ -z "$bad" ]; then
+    bad=$(validate_stage)
   fi
   seen_ids="$seen_ids
 $e_id"
-
-  # 필수 필드 (빈 값 = 누락)
   if [ -z "$bad" ]; then
-    if [ -z "$e_path" ]; then bad="path 누락/빈 값"
-    elif [ -z "$e_target" ]; then bad="target 누락/빈 값"
-    elif [ -z "$e_stage" ]; then bad="stage 누락/빈 값"
-    elif [ -z "$e_required" ]; then bad="required 누락/빈 값"
-    fi
-  fi
-  if [ -z "$bad" ]; then
-    case "$e_required" in true|false) : ;; *) bad="required 값 오류 — $e_required" ;; esac
-  fi
-
-  # 규칙 2 — path 실존
-  if [ -z "$bad" ] && [ ! -f "$e_path" ]; then
-    bad="path 실존하지 않음 — $e_path"
-  fi
-
-  # 규칙 3~5 — stage 별 대조 (알 수 없는 stage 는 조용히 skip 하지 않는다)
-  if [ -z "$bad" ]; then
-    case "$e_stage" in
-      pre-commit|pre-push)
-        if ! grep -qF -- "$e_target" "$e_path"; then
-          bad="죽은 target — '$e_target' 이(가) $e_path 안에 없다"
-        fi
-        ;;
-      ci)
-        if [ -z "$e_ci_job" ]; then
-          bad="stage:ci 인데 ci_mirror_job 누락"
-        elif ! printf '%s\n' "$ci_jobs" | grep -qxF -- "$e_ci_job"; then
-          bad="ci_mirror_job '$e_ci_job' 이(가) $WORKFLOW_FILE 의 jobs: 키에 없다"
-        fi
-        ;;
-      manual)
-        if [ -z "$e_reason" ]; then
-          bad="stage:manual 인데 manual_reason 누락 — 호출 검사 회피 금지"
-        elif [ ! -x "$e_path" ]; then
-          bad="manual path 가 실행권한 없음 — $e_path"
-        fi
-        ;;
-      *)
-        bad="알 수 없는 stage — $e_stage"
-        ;;
-    esac
-  fi
-
-  if [ -z "$bad" ]; then
-    printf 'PASS: %s (%s)\n' "$e_id" "$e_stage"
+    printf 'PASS: %s (%s · %s)\n' "$e_id" "$e_stage" "$(rules_label)"
   else
     printf 'FAIL: %s — %s\n' "${e_id:-<id없음>}" "$bad"
     fail=1
@@ -117,36 +155,53 @@ $e_id"
   reset_entry
 }
 
-syntax_fail=0
+set_field() {
+  local key="$1" val="$2"
+  # V1 D5-a: 같은 필드 2회 = 마지막 값이 조용히 이기는 사고 — 중복 자체를 위반으로
+  if printf '%s\n' "$e_keys" | grep -qxF -- "$key"; then
+    echo "FAIL: 필드 중복 — ${e_id:-<id없음>} 의 $key"
+    syntax_fail=1
+    return
+  fi
+  e_keys="$e_keys
+$key"
+  case "$key" in
+    path)          e_path="$val" ;;
+    target)        e_target="$val" ;;
+    stage)         e_stage="$val" ;;
+    required)      e_required="$val" ;;
+    ci_mirror_job) e_ci_job="$val" ;;
+    manual_reason) e_reason="$val" ;;
+    *) echo "FAIL: 알 수 없는 키 — $key"; syntax_fail=1 ;;
+  esac
+}
+
 while IFS= read -r raw || [ -n "$raw" ]; do
   line=$(printf '%s' "$raw" | tr -d '\r')
-  # 전체 줄 주석·빈 줄
-  case "$line" in
-    ''|\#*|[[:space:]]*\#*)
-      stripped=$(printf '%s' "$line" | sed 's/^[[:space:]]*//')
-      case "$stripped" in ''|\#*) continue ;; esac
-      ;;
-  esac
   stripped=$(printf '%s' "$line" | sed 's/^[[:space:]]*//')
-  [ -z "$stripped" ] && continue
+  case "$stripped" in ''|\#*) continue ;; esac
   case "$line" in
     '- id:'*)
       flush_entry
       in_entry=1
-      e_id=$(unquote "$(printf '%s' "${line#- id:}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')")
+      rawval=$(printf '%s' "${line#- id:}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+      if parse_value "$rawval"; then
+        e_id="$PV_VAL"
+        e_keys="id"
+      else
+        echo "FAIL: id 값이 계약 밖 형태 — $rawval"
+        syntax_fail=1
+      fi
       ;;
     '  '[a-z_]*:*)
       key=${stripped%%:*}
-      val=$(unquote "$(printf '%s' "${stripped#*:}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')")
-      case "$key" in
-        path)          e_path="$val" ;;
-        target)        e_target="$val" ;;
-        stage)         e_stage="$val" ;;
-        required)      e_required="$val" ;;
-        ci_mirror_job) e_ci_job="$val" ;;
-        manual_reason) e_reason="$val" ;;
-        *) echo "FAIL: 알 수 없는 키 — $key"; syntax_fail=1 ;;
-      esac
+      rawval=$(printf '%s' "${stripped#*:}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+      if parse_value "$rawval"; then
+        set_field "$key" "$PV_VAL"
+      else
+        echo "FAIL: $key 값이 계약 밖 형태 — $rawval"
+        syntax_fail=1
+      fi
       ;;
     *)
       echo "FAIL: 파서 계약 밖의 줄 — $line"
@@ -157,7 +212,13 @@ done < "$REGISTRY"
 flush_entry
 [ "$syntax_fail" -eq 1 ] && fail=1
 
+# V1 D6: 문법 오류가 있으면 항목 0개여도 '검사 불능(2)'이 아니라 '위반(1)'이다 —
+# 잘못 쓴 명부는 대응 주체가 다르다(작성자 수정 vs 환경 복구).
 if [ "$checked" -eq 0 ]; then
+  if [ "$syntax_fail" -eq 1 ]; then
+    echo "CHECKED: 0"
+    exit 1
+  fi
   echo "NOT_RUN: 항목 0개 — 0건 대조로 통과는 금지한다 (P20)"
   echo "CHECKED: 0"
   exit 2
