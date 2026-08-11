@@ -245,22 +245,19 @@ WF=.github/workflows/verify.yml
 if [ ! -f "$WF" ]; then
   bad "$WF 없음 — CI 등가물을 확인할 수 없다"
 else
-  ACTIVE=$(grep -v '^[[:space:]]*#' "$WF")
-  if printf '%s\n' "$ACTIVE" | grep -q 'cat-file -s'; then
-    ok "CI 에 크기 검사 본문 존재 (cat-file -s)"
-  else
-    bad "CI 에 크기 검사 본문이 없다 — 로컬 훅은 우회 옵션으로 건너뛸 수 있다 (P15③)"
-  fi
   # 판정기가 두 벌이 되면 갈린다(이 저장소가 이미 겪은 사고 — hooks/pre-commit §1 주석).
-  # 훅과 CI 가 같은 경로 패턴을 쓰는지 대조한다. 하나만 넓히면 조용히 갈라진다.
+  # CI 본문은 이제 공용 판정기(scripts/scan-data-exposure.sh)로 옮겼으므로 CI↔판정기
+  # 대조는 필요 없다 — 같은 파일이다. 남은 갈림길은 **훅 ↔ 판정기** 한 곳뿐이다.
+  # 훅은 '스테이지된 것'만 보므로 별도 코드로 남아 있고, 그래서 목록이 갈라질 수 있다.
   miss=""
-  for pat in '\*/artifacts/\*' '\*/data/\*' '\*\.db-\*' '\*\.jsonl'; do
-    if ! printf '%s\n' "$ACTIVE" | grep -q -- "$pat"; then miss="${miss} ${pat}"; fi
+  for pat in '\*/artifacts/\*' '\*/data/\*' '\*\.db-\*' '\*\.jsonl' '\*/private-reviews/\*' '\*\.parquet'; do
+    if ! grep -q -- "$pat" scripts/scan-data-exposure.sh; then miss="${miss} ${pat}(판정기)"; fi
+    if ! grep -q -- "$pat" hooks/pre-commit;              then miss="${miss} ${pat}(훅)"; fi
   done
   if [ -z "$miss" ]; then
-    ok "CI 경로 패턴이 훅과 동치 (하위경로·사이드카·덤프 포함)"
+    ok "훅과 공용 판정기의 금지 경로 패턴이 동치 (하위경로·사이드카·덤프·비공개리뷰 포함)"
   else
-    bad "CI 경로 패턴이 훅보다 좁다 — 누락:${miss} (판정기 2벌 · P15③)"
+    bad "훅과 판정기의 경로 패턴이 갈렸다 — 누락:${miss} (판정기 2벌 · P15③)"
   fi
 fi
 

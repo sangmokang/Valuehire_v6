@@ -22,13 +22,28 @@ bash verify.sh                    # 비밀 스캔(추적 파일 전체)
 bash scripts/acceptance-0-6.sh
 bash scripts/acceptance-0-7.sh    # 로컬 훅 6종 위반 시연 — 재귀 방지로 pre-push 안에서는 스킵, CI가 담당
 bash scripts/acceptance-0-5.sh    # main 브랜치에서만 (if: github.ref == 'refs/heads/main')
-(대용량 파일 · 산출물 경로 스캔)   # 2026-08-12 추가 (AC-A4) — 인라인 스텝, 추적 파일 전체
+bash scripts/scan-data-exposure.sh all   # 2026-08-12 추가 (AC-A4) — 데이터 노출 판정기
 bash scripts/acceptance-hs-a4.sh  # 2026-08-12 추가 (AC-A4 · 차단이 실제로 도는가)
 ```
 
 **CI는 고정 목록이고 로컬 `pre-push`는 글로브(이름 규칙 자동 수집)다.** 그래서 새 인수 스크립트를 만들면 로컬에서는 저절로 돌지만 CI에서는 한 줄도 안 돈다 — P15③("로컬에만 있는 검사는 없는 것으로 친다")에 걸린다. **새 `scripts/acceptance-*.sh`를 추가하는 PR은 `verify.yml`과 이 표 양쪽에 자기 줄을 함께 넣어야 한다.**
 
-**CI의 크기·경로 스캔은 "지금 추적 중인 파일"만 본다.** 커밋했다가 다음 커밋에서 지운 파일의 과거 본문은 이 스캔이 보지 못한다(2026-08-12 실측: 1,228,800바이트가 도달 가능한 채로 "위반 0건" 통과). 억제 원장 `a4-history-scan` 참조.
+### 데이터 노출 판정기 — `scripts/scan-data-exposure.sh`
+
+후보자 데이터가 git으로 새는 세 경로를 **한 판정기**로 막는다. CI도 인수 검사도 **같은 파일을 실행**한다 — 규칙을 두 벌로 적으면 반드시 갈라진다(2026-08-12 실측: 인라인 본문 시절엔 CI 스텝에 `if: ${{ false }}`를 넣어 영구히 꺼도 로컬 방어 셋이 전부 초록이었다).
+
+| 모드 | 무엇을 보나 |
+|---|---|
+| `tracked` | 지금 추적 중인 파일의 크기(1MB)·금지 경로 |
+| `history` | **도달 가능한 모든 blob**의 크기·금지 경로 — 커밋 후 지운 파일의 과거 본문까지 |
+| `pii` | `*.csv`·`*.tsv`·`*.sql`의 **개인정보 컬럼 조합** — 크기·확장자로는 안 잡히는 것 |
+| `all` | 셋 다 (CI가 쓰는 모드) |
+
+종료값 `0=PASS / 1=FAIL / 2=NOT_RUN`. **검사 대상 0건은 통과가 아니라 `NOT_RUN`이다**(P20).
+
+`pii`는 오탐을 막기 위해 **두 조건을 모두** 만족해야 차단한다 — ① 개인정보 컬럼 낱말 2종 이상 ② 실제 데이터를 담은 형태(CSV는 데이터 행 1줄 이상, SQL은 `INSERT`/`VALUES`/`COPY`). 그래서 **`CREATE TABLE candidates(name, email)` 같은 스키마 정의는 통과한다** — 정상 마이그레이션까지 막으면 개발이 멈춘다.
+
+**금지 경로 목록은 `hooks/pre-commit`과 이 판정기 두 곳에 있다**(훅은 '스테이지된 것'만 보므로 별도 코드다). 한쪽만 넓히면 조용히 갈라지므로 `scripts/acceptance-hs-a4.sh`가 두 목록의 동치를 검사한다.
 
 ## 시행 지점
 
