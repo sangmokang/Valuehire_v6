@@ -60,6 +60,14 @@ checked=0
 K_LI=$(printf 'li%s' '_at')
 K_LIRM=$(printf 'li%s' '_rm')
 K_JS=$(printf 'JSESSION%s' 'ID')
+# 선언된 쿠키 이름 7종 중 위 3종만 카나리로 덮여 있었다. 나머지 4종은 패턴에서 지워도
+# 검사가 전부 초록이었다(2026-08-12 V1 적대검증 D5 · V2 재현 확인:
+# `perl -pi -e 's/\|BCOOKIE\|BSCOOKIE//g'` 후에도 CHECKED: 21 / exit 0).
+# 이름별 앵커를 붙여 어느 하나가 사라져도 그 항목만 빨개지게 한다.
+K_LIDC=$(printf 'LI%s' 'DC')
+K_PHP=$(printf 'PHPSESS%s' 'ID')
+K_BC=$(printf 'BCOO%s' 'KIE')
+K_BSC=$(printf 'BSCOO%s' 'KIE')
 NAMEF=$(printf 'na%s' 'me')
 H_SETCOOKIE=$(printf 'Set-%s' 'Cookie')
 H_COOKIE=$(printf 'Coo%s' 'kie')
@@ -124,6 +132,17 @@ must_catch "${H_COOKIE} 요청 헤더"       "  \"${H_COOKIE}\": \"${K_LI}=${VAL
 must_catch "무따옴표 Cookie 헤더(Copy as cURL)" "curl -H '${H_COOKIE}: sess_x=Zm9vYmFyYmF6cXV4'"
 must_catch "Bearer 인증 헤더"            "  \"${H_AUTH}\": \"Bearer ${JWT_HEAD}${JWTSEG}.${JWT_HEAD}${JWTSEG}.${JWTSEG}\""
 
+# ── ③-b 이름별 회귀 앵커 — 선언한 쿠키 이름 하나가 사라지면 그 항목만 빨개진다 ────
+#
+# 값은 **모양이 없는** 문자열이어야 한다. AQED…·ajax:… 를 쓰면 값-모양 패턴이 대신
+# 잡아버려 이름이 지워져도 초록이 남는다(= 이 앵커가 아무것도 앵커하지 못한다).
+# 값에 `=` 를 넣어도 안 된다 — Cookie 헤더 패턴이 대신 잡는다. 둘 다 D5 와 같은 실수다.
+OPAQUE=Zm9vYmFyYmF6cXV4
+must_catch "쿠키 이름 앵커 — ${K_LIDC}"  "  \"${K_LIDC}\": \"${OPAQUE}\""
+must_catch "쿠키 이름 앵커 — ${K_PHP}"   "  \"${K_PHP}\": \"${OPAQUE}\""
+must_catch "쿠키 이름 앵커 — ${K_BC}"    "  \"${K_BC}\": \"${OPAQUE}\""
+must_catch "쿠키 이름 앵커 — ${K_BSC}"   "  \"${K_BSC}\": \"${OPAQUE}\""
+
 # ── ④ 오탐 대조군 — 평범한 코드·문서는 막히면 안 된다 ────────────────────────
 must_not_catch "빌드 경로 값"        "  \"$(printf 'p%s' 'wd')\": \"/Users/runner/work/repo\""
 must_not_catch "상태 상수"           "  '$(printf 'P%s' 'W')': 'PENDING_WRITE'"
@@ -176,15 +195,21 @@ if [ "$checked" -eq 0 ]; then
   exit 1
 fi
 
+# ⚠️ 이름을 증명 범위에 맞춘다(2026-08-12 V1 적대검증 D3 · V2 재현 확인).
+# `git status --porcelain` 은 **추적/미추적 파일 상태만** 본다. git 설정(`git config`),
+# 참조(refs), 내부 객체(.git/objects), 과거 기록, 무시된 파일은 보지 못하고, 중간에
+# 오염시켰다가 되돌린 사실도 원리상 볼 수 없다. V2 재현: 검사 도중 `git config` 를 바꾸고
+# 객체 1개를 저장해도(객체 파일 45→46) 이 비교는 "동일"로 나왔다.
+# 따라서 "저장소 무오염"이라 부르면 과장이다 — 실제로 증명한 범위만 이름에 담는다.
 SNAP1=$(git status --porcelain)
 if [ "$SNAP0" != "$SNAP1" ]; then
   checked=$((checked + 1))
-  echo "FAIL: 이 검사가 저장소를 오염시켰다 — 시작/종료 상태가 다르다 (판정 무효)"
+  echo "FAIL: 이 검사가 작업트리를 오염시켰다 — 시작/종료 파일 상태가 다르다 (판정 무효)"
   printf '%s\n' "$SNAP1" | sed 's/^/       /'
   fail=1
 else
   checked=$((checked + 1))
-  echo "PASS: 저장소 무오염 (시작/종료 상태 동일)"
+  echo "PASS: 작업트리 무오염 (git status 기준 — git 설정·내부 객체·참조는 범위 밖)"
 fi
 
 printf 'CHECKED: %d\n' "$checked"
