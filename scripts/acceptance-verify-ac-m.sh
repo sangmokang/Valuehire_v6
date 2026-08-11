@@ -5,7 +5,7 @@
 #   정본: docs/engineering/verify-unification-goal-2026-08-10.md:78-81 (AC-M)
 #   출력 : 항목마다 PASS:/FAIL: 전부 출력, 마지막 줄 `CHECKED: <검사 수>`
 #   exit : 0 = PASS | 1 = FAIL | 2 = NOT_RUN
-#   불변식: CHECKED 는 정확히 15 이어야 한다 — 검사가 몇 개 사라져도 초록이면 가짜다
+#   불변식: CHECKED 는 정확히 24 이어야 한다 — 검사가 몇 개 사라져도 초록이면 가짜다
 #           (PR #6 결함 D3 의 교훈: checked==0 만 막으면 3개를 지워도 통과했다 · P20)
 #
 # 쓰기 규칙: 이 검사는 저장소에 어떤 파일도 만들지 않는다. 동적 fixture 는 전부
@@ -24,7 +24,7 @@ SNAP0=$(git status --porcelain)
 CHECKER=scripts/verify/check-mechanism-registry.sh
 FIXDIR=scripts/verify/fixtures/mechanism-registry
 REGISTRY=docs/sot/mechanism-registry.yaml
-EXPECTED_CHECKED=15
+EXPECTED_CHECKED=24
 
 TMP=$(mktemp -d) || { echo "NOT_RUN: mktemp 실패"; echo "CHECKED: 0"; exit 2; }
 trap 'rm -rf "$TMP"' EXIT
@@ -98,16 +98,105 @@ EOF
 expect_rc "manual 인데 사유 없음 → 불합격" "$TMP/manual-no-reason.yaml" 1
 
 # manual + 사유 + 실행권한 path → 통과 (규칙 5 의 정상 경로)
-printf '#!/bin/sh\nexit 0\n' > "$TMP/runnable.sh" && chmod +x "$TMP/runnable.sh"
-cat > "$TMP/manual-ok.yaml" <<EOF
+# ⚠️ path 는 저장소 안 상대경로여야 한다 — 절대경로는 계약 위반으로 거부된다(V1 D4).
+cat > "$TMP/manual-ok.yaml" <<'EOF'
 - id: "manual-ok"
-  path: "$TMP/runnable.sh"
-  target: "$TMP/runnable.sh"
+  path: "scripts/session-status.sh"
+  target: "scripts/session-status.sh"
   stage: "manual"
   manual_reason: "goal 작성 시점에 사람이 실행하는 검사 (fixture)"
   required: true
 EOF
 expect_rc "manual 정상(사유+실행권한) → 통과" "$TMP/manual-ok.yaml" 0
+
+# ── V1 적대검증(2026-08-12, FAIL 9건)이 뚫은 경계 — 반례를 고정한다 ─────────
+# V1 D2: 존재하지만 실행권한이 없는 manual path — 규칙 5의 유일한 판별 반례.
+# (사유 없음·정상 파일만으로는 -x 검사 한 줄을 지워도 전체가 초록이었다 — 실측)
+# 절대경로 거부(D4)와 분리해 시험하기 위해 저장소 안 상대경로가 필요하다.
+# 저장소를 오염시키지 않도록, 이미 커밋돼 있는 비실행(644) 파일을 가리킨다.
+cat > "$TMP/manual-not-exec.yaml" <<'EOF'
+- id: "manual-not-exec"
+  path: "scripts/verify/fixtures/mechanism-registry/normal.yaml"
+  target: "x"
+  stage: "manual"
+  manual_reason: "실행권한 없는 파일을 가리키는 반례 (fixture)"
+  required: true
+EOF
+expect_rc "manual 인데 실행권한 없음 → 불합격" "$TMP/manual-not-exec.yaml" 1
+
+# V1 D1: ci 항목의 target 이 워크플로 파일에 없는 거짓 명령 — 규칙 4가 작업 이름만
+# 보면 존재하지 않는 명령을 '실행 중'이라고 명부에 적어도 통과한다(실측 CHECKED:15 rc=0).
+cat > "$TMP/ci-fake-target.yaml" <<'EOF'
+- id: "ci-fake-target"
+  path: ".github/workflows/verify.yml"
+  target: "run: bash scripts/fake-never-called.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
+EOF
+expect_rc "ci 인데 거짓 target → 불합격" "$TMP/ci-fake-target.yaml" 1
+
+# V1 D4: 저장소 밖 절대경로 — 계약(⑩)은 저장소 루트 기준 상대경로다.
+cat > "$TMP/abs-path.yaml" <<'EOF'
+- id: "abs-path"
+  path: "/bin/sh"
+  target: "/bin/sh"
+  stage: "manual"
+  manual_reason: "절대경로 반례 (fixture)"
+  required: true
+EOF
+expect_rc "절대경로 path → 불합격" "$TMP/abs-path.yaml" 1
+
+# V1 D5-a: 같은 항목에 같은 필드 2회 — 마지막 값이 조용히 이긴다.
+# ⚠️ 마지막 값이 모든 규칙을 통과하는 형태여야 판별력이 있다 — 마지막 값이 어차피
+# 다른 규칙에 걸리면 중복 감지가 없어도 빨개져서 이 반례가 아무것도 증명 못 한다.
+cat > "$TMP/dup-field.yaml" <<'EOF'
+- id: "dup-field"
+  path: "hooks/pre-push"
+  path: "hooks/pre-commit"
+  target: "SECRET_PATTERNS_FILE= VERIFY_SCAN_SOURCE=index bash verify.sh"
+  stage: "pre-commit"
+  required: true
+EOF
+expect_rc "필드 중복(path 2회, 마지막 값 유효) → 불합격" "$TMP/dup-field.yaml" 1
+
+# V1 D5-b: 값 뒤 인라인 주석 — id·사유 같은 자유 문자열 필드에서는 주석·따옴표가
+# 값에 통째로 흡수된 채 조용히 통과한다(enum 필드는 값 오류로 자기방어되므로 제외).
+cat > "$TMP/inline-comment.yaml" <<'EOF'
+- id: "inline-comment" # 주석이 id 에 흡수된다
+  path: "hooks/pre-commit"
+  target: "SECRET_PATTERNS_FILE= VERIFY_SCAN_SOURCE=index bash verify.sh"
+  stage: "pre-commit"
+  required: true
+EOF
+expect_rc "id 뒤 인라인 주석 → 불합격" "$TMP/inline-comment.yaml" 1
+
+# V1 D5-c: 닫히지 않은 따옴표 — 따옴표 문자가 id 에 섞인 채 통과했다.
+cat > "$TMP/unmatched-quote.yaml" <<'EOF'
+- id: "unmatched
+  path: "hooks/pre-commit"
+  target: "SECRET_PATTERNS_FILE= VERIFY_SCAN_SOURCE=index bash verify.sh"
+  stage: "pre-commit"
+  required: true
+EOF
+expect_rc "닫히지 않은 따옴표 → 불합격" "$TMP/unmatched-quote.yaml" 1
+
+# V1 D5-d: stage 와 맞지 않는 필드 — pre-commit 항목의 ci_mirror_job.
+cat > "$TMP/stage-mismatch.yaml" <<'EOF'
+- id: "stage-mismatch"
+  path: "hooks/pre-commit"
+  target: "SECRET_PATTERNS_FILE= VERIFY_SCAN_SOURCE=index bash verify.sh"
+  stage: "pre-commit"
+  ci_mirror_job: "verify"
+  required: true
+EOF
+expect_rc "stage 불일치 필드(ci_mirror_job) → 불합격" "$TMP/stage-mismatch.yaml" 1
+
+# V1 D6: 문법 오류만 있고 인식 항목 0개 — '검사 불능(2)'이 아니라 '위반(1)'이어야 한다.
+cat > "$TMP/syntax-only.yaml" <<'EOF'
+  - id: "misindented"
+EOF
+expect_rc "문법 오류·항목 0개 → 위반(1)" "$TMP/syntax-only.yaml" 1
 
 # 항목 0개(주석뿐) → NOT_RUN (0건 통과 금지 · P20)
 cat > "$TMP/empty.yaml" <<'EOF'
@@ -144,6 +233,20 @@ cat > "$TMP/empty-value.yaml" <<'EOF'
   required: true
 EOF
 expect_rc "빈 문자열 path → 불합격" "$TMP/empty-value.yaml" 1
+
+# ── V1 D3: CI 배선 자기검사 ──────────────────────────────────────────────────
+# 이 인수 검사의 실행 줄이 서버 자동검사(verify.yml)에 조건 없이 정확히 1회 있는가.
+# CI 스텝을 if 로 끄거나 지워도 로컬 검사가 전부 초록이었다(V1 실측 · P15③).
+checked=$((checked + 1))
+WF=.github/workflows/verify.yml
+run_lines=$(grep -c 'run: bash scripts/acceptance-verify-ac-m.sh' "$WF")
+step_block=$(awk '/- name: 인수 검사 verify-ac-m/,/run: bash scripts\/acceptance-verify-ac-m.sh/' "$WF")
+if [ "$run_lines" -eq 1 ] && [ -n "$step_block" ] && ! printf '%s\n' "$step_block" | grep -qE '^[[:space:]]*(if:|continue-on-error:)'; then
+  echo "PASS: CI 배선 — verify.yml 에 무조건 실행 스텝 정확히 1회"
+else
+  printf 'FAIL: CI 배선 — 실행 줄 %s회 또는 조건부/오류무시 스텝 (로컬에만 있는 검사는 없는 것으로 친다 · P15③)\n' "$run_lines"
+  fail=1
+fi
 
 # ── 13) 실제 명부가 검사기를 통과하는가 ──────────────────────────────────────
 expect_rc "실제 명부(docs/sot/mechanism-registry.yaml) → 통과" "$REGISTRY" 0
