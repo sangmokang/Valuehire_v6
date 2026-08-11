@@ -144,3 +144,16 @@ jobs:
             exit 1
           fi
           echo "PASS: 기본 패턴 파일에 실값 없음"
+
+      - name: 인수 검사 hs-a3 (세션 계열 자격증명 탐지)
+        run: bash scripts/acceptance-hs-a3.sh
+      - name: 데이터 노출 스캔 (크기 · 금지경로 · 기록 · 개인정보 내용)
+        # 판정 본문은 scripts/scan-data-exposure.sh 한 곳에 있다. CI 도 인수검사도
+        # **같은 파일을 실행**한다 — 규칙을 두 벌로 적으면 반드시 갈라진다.
+        # 2026-08-12 V1 적대검증 D4: 인라인 본문 시절엔 이 스텝에 `if: ${{ false }}` 를
+        # 넣어 영구히 꺼도 인수검사·pre-commit·pre-push 가 전부 초록이었다.
+        # all = tracked(현재 파일) + history(도달 가능한 모든 blob · D1) + pii(csv/sql 내용 · D2)
+        run: bash scripts/scan-data-exposure.sh all
+
+      - name: 인수 검사 hs-a4 (대용량·산출물 차단이 실제로 도는가)
+        run: bash scripts/acceptance-hs-a4.sh
