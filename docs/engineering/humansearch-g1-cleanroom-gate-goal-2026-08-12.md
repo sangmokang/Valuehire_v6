@@ -57,8 +57,8 @@ G1 검사기는 `docs/engineering/**`만 계약상 제외한다. 검사기 자�
 | 0 시작 자격 | PASS | `bash scripts/session-status.sh` → `RED: 0/4` |
 | 1 스펙 | PASS | 이 문서와 GitHub issue `#7`에 G1 단언 1개만 두었다. |
 | 2 격리/RED | PASS | 별도 worktree에서 `bash scripts/acceptance-hs-cleanroom-mutations.sh` → `FAIL: required G1 implementation missing: scripts/acceptance-hs-cleanroom.sh`, `RED_EXIT=1`. |
-| 3 최소 구현 | NOT_RUN | RED 커밋 뒤 테스트 파일을 바꾸지 않고 검사기·패턴·CI 배선만 추가한다. |
-| 4 검증 | NOT_RUN | G1 두 명령, `bash verify.sh`, 기존 acceptance, 실제 pre-push 호출을 실행한다. |
+| 3 최소 구현 | PASS | RED `257eecd` 뒤 mutation 파일 diff 0을 유지하고 GREEN `d57f0b6`에 검사기·패턴·CI 배선만 추가했다. |
+| 4 검증 | PASS_LOCAL | G1 두 명령, `bash verify.sh`, 기존 acceptance 전량, 실제 pre-push 호출, `RED: 0/6`을 확인했다. Claude/Codex 적대검증과 원격 CI는 아직 남았다. |
 | 5 배송 | NOT_RUN | task 브랜치 push와 PR/CI까지만 수행한다. 병합은 하지 않는다. |
 | 6 종료 | NOT_RUN | 오너 병합 전이므로 worktree를 제거하지 않는다. |
 
@@ -80,8 +80,8 @@ G1 검사기는 `docs/engineering/**`만 계약상 제외한다. 검사기 자�
 - [x] `docs/sot/hook-contracts.md`의 pre-push 글로브와 fail-closed 계약을 확인했다.
 - [x] `docs/sot/verification-commands.md`의 실제 bash 검증 배관을 확인했다.
 - [x] `docs/sot/git-workflow.md`의 한 AC = 한 branch/worktree/PR 규약을 적용했다.
-- [ ] RED와 GREEN을 별도 커밋으로 남긴다.
-- [ ] 신규 acceptance를 실제 pre-push와 CI 양쪽에 배선한다.
+- [x] RED `257eecd`와 GREEN `d57f0b6`을 별도 커밋으로 남겼다.
+- [x] pre-push 글로브 실행 4개 중 G1 두 명령이 포함됐고, `.github/workflows/verify.yml:28-31`에도 둘 다 배선됐다.
 - [ ] Claude 1차 판정과 Codex 재현 결과를 아래 로그에 원문/명령과 함께 남긴다.
 
 ## 7. 비범위
@@ -95,3 +95,46 @@ G1 검사기는 `docs/engineering/**`만 계약상 제외한다. 검사기 자�
 ## 적대 검증 로그
 
 NOT_RUN — G1 GREEN과 로컬 검증 뒤 `claude -p` 1차, Codex 2차 순서로 append한다.
+
+## 로컬 검증 로그
+
+```text
+$ bash scripts/acceptance-hs-cleanroom-mutations.sh
+PASS: clean-room mutations blocked 10/10
+
+$ bash scripts/acceptance-hs-cleanroom.sh
+PASS: forbidden runtime refs 0
+PASS: escaping symlinks 0
+CHECKED: 29
+
+$ bash verify.sh
+PASS: no secret-pattern match in any tracked file, .env not tracked
+
+$ bash scripts/acceptance-0-2.sh
+PASS: 0-2 — 히스토리·객체·reflog·docs 리터럴 0건, 스캐너 뮤테이션 검출 확인
+
+$ bash scripts/acceptance-0-5.sh
+PASS: 0-5 완료 — CI 비밀스캔 강제 + push 완료 + 원격 트리 비밀 0건
+
+$ bash scripts/acceptance-0-6.sh
+PASS: 병합 완료, 가짜 검증 스크립트 0건
+
+$ bash scripts/acceptance-0-7.sh
+PASS: 위반 6 종이 전부 차단됨 (각 건 훅 OFF 대조 통과)
+
+$ hooks/pre-push
+pre-push: 검사 4개 실행
+  ok  ./scripts/acceptance-0-6.sh
+  ok  ./scripts/acceptance-hs-cleanroom-mutations.sh
+  ok  ./scripts/acceptance-hs-cleanroom.sh
+  ok  ./verify.sh
+
+$ bash scripts/session-status.sh
+HEAD: d57f0b6 (ahead 2 / behind 0)
+ORIGIN: 32ce698
+RED: 0/6 (acceptance-0-7.sh 제외 — CI 담당)
+```
+
+task worktree에는 ignore된 `.secret-patterns`가 없어서 첫 `acceptance-0-2`가 exit 2였고, 환경변수를
+전역 주입하면 `acceptance-0-5`의 격리 clone까지 오염됐다. v6 루트의 로컬 패턴 파일을 ignore된
+`.secret-patterns` symlink로 연결한 뒤 각 스크립트의 기본 경로를 보존해 최종 `RED: 0/6`을 얻었다.
