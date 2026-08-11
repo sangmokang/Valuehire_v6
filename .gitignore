@@ -27,3 +27,16 @@ verify-*.json
 
 # 워크트리 (harness 작업 격리용, 커밋 대상 아님)
 worktrees/
+
+# 산출물·데이터 (P21 · AC-A4) — 후보자 PII 와 대용량 데이터는 git 에 넣지 않는다.
+# 디렉터리는 **최상위로 앵커**한다. 앵커가 없으면 src/data/schema.json 같은 정상 소스가
+# 조용히 무시돼 사라진다(P3 조용한 실패). 하위 경로의 산출물은 훅/CI 가 '소리 내어' 막는다.
+# 근거: docs/engineering/humansearch-v6-implementation-plan-2026-08-08.md §4-2·§8
+/artifacts/
+/data/
+*.db
+*.sqlite
+*.sqlite3
+
+# 비공개 리뷰 결과 (루트). 기존 규칙은 .claude/private-reviews/ 만 덮고 있었다.
+/private-reviews/
