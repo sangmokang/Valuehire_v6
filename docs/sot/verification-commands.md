@@ -1,6 +1,6 @@
 # Valuehire v6 — 이 저장소의 실제 게이트 명령 (SOT)
 
-최종 갱신: 2026-08-08 (전부 실행으로 확인, 가정 없음)
+최종 갱신: 2026-08-12 (전부 실행으로 확인, 가정 없음)
 근거: `docs/engineering/docs-sot-restructure-goal-2026-08-08.md`
 
 ## 현재 규칙
@@ -11,31 +11,33 @@
 |---|---|---|
 | 0 — 시작 자격(RED 미해결 확인) | `make red-ledger` | `bash scripts/session-status.sh` (stdout 3번째 줄 `RED: N/M`) |
 | 2 — 워크트리 파기 | `make task NAME=...` | `git worktree add worktrees/<name> -b task/<name>` |
-| 4 — 검증 | `./verify.sh` | `bash verify.sh` (비밀 스캔) — CI(`verify.yml`)는 추가로 `scripts/acceptance-0-5.sh`, `scripts/acceptance-0-6.sh`, `scripts/acceptance-0-7.sh`를 실행한다. `scripts/acceptance-0-2.sh`는 로컬 전용(`.secret-patterns`에 실제 리터럴이 있어야 해서 CI에 못 올림, 스크립트 주석에 명시) |
+| 4 — 검증 | `./verify.sh` | `bash verify.sh` (비밀 스캔) — CI(`verify.yml`)가 실제로 도는 검사 전체는 아래 "CI가 실제로 돌리는 것" 표가 정본이다(요약을 여기 두 번 적으면 반드시 갈라진다 — 2026-08-12 REV2-D2 실측). `scripts/acceptance-0-2.sh`는 로컬 전용(`.secret-patterns`에 실제 리터럴이 있어야 해서 CI에 못 올림, 스크립트 주석에 명시) |
 | 5 — 배송 | `make ship` | 아직 스크립트 없음 — `git push -u origin task/<name>` 후 `gh pr create` 수동 실행. push 시 `hooks/pre-push`가 verify.sh + acceptance-*.sh 전량(glob)을 재실행 |
 | 6 — 종료 | `make task-done NAME=...` | `git worktree remove worktrees/<name>` 수동 실행 |
 
 ### CI(`​.github/workflows/verify.yml`)가 실제로 돌리는 것
 
-```
-bash verify.sh                    # 비밀 스캔(추적 파일 전체)
-bash scripts/acceptance-0-6.sh
-bash scripts/acceptance-0-7.sh    # 로컬 훅 6종 위반 시연 — 재귀 방지로 pre-push 안에서는 스킵, CI가 담당
-bash scripts/acceptance-0-5.sh    # main 브랜치에서만 (if: github.ref == 'refs/heads/main')
-bash scripts/acceptance-hs-a3.sh  # 2026-08-12 추가 (AC-A3 · 세션 계열 자격증명)
-bash scripts/scan-data-exposure.sh all   # 2026-08-12 추가 (AC-A4) — 데이터 노출 판정기
-bash scripts/acceptance-hs-a4.sh  # 2026-08-12 추가 (AC-A4 · 차단이 실제로 도는가)
-bash scripts/acceptance-hs-cleanroom.sh                    # 2026-08-12 추가 (G1 · 실제 트리)
-bash scripts/acceptance-hs-cleanroom-mutations.sh          # G1 · 구버전 참조/symlink 변이
-bash scripts/acceptance-hs-cleanroom-absolute-paths.sh     # G1 · 임의 절대 루트
-bash scripts/acceptance-hs-cleanroom-absolute-contexts.sh  # G1 · 경계 문자 문맥
-bash scripts/acceptance-hs-cleanroom-colon-paths.sh        # G1 · PATH/remote 콜론 문맥
-bash scripts/acceptance-hs-cleanroom-file-urls.sh          # G1 · 로컬 file URL
-bash scripts/acceptance-hs-cleanroom-hook-env.sh           # G1 · 실제 Git hook 환경 격리
-bash scripts/acceptance-hs-cleanroom-hook-env-mutations.sh # G1 · hook 변수 unset 변이
-bash scripts/acceptance-hs-gates.sh           # 2026-08-12 추가 (G2 · 정적 ruff/mypy + pytest 수집·runtime import 증명, uv 필요)
-bash scripts/acceptance-hs-gates-mutations.sh # G2 · 게이트 무력화 행동 뮤테이션 6종 + baseline
-```
+**워크플로 스텝 15개 전부**를 적는다(2026-08-12 V1 D6: 이전 판은 `bash ...` 직접 명령만 적어 인라인 본문 스텝이 목록에서 빠졌고, 운영자가 실제로 무엇이 도는지 잘못 판단할 수 있었다). 아래는 `verify.yml` 의 `- name:` 스텝 순서 그대로다(#6·#9 G1·#11 G2 병합 후 합집합 — 2026-08-12).
+
+| # | 스텝 이름 | 실행 내용 |
+|---|---|---|
+| 1 | 비밀 스캔 (verify.sh) | `bash verify.sh` — 추적 파일 전체 |
+| 2 | HumanSearch G1 클린룸 경계 | 인라인 8개 — `acceptance-hs-cleanroom.sh` + `-mutations`·`-absolute-paths`·`-absolute-contexts`·`-colon-paths`·`-file-urls`·`-hook-env`·`-hook-env-mutations` |
+| 3 | HumanSearch G2 테스트 게이트 | 인라인 — `uv` 설치 후 `acceptance-hs-gates.sh` + `-mutations`·`-antiforge` (정적 ruff/mypy + pytest 수집·runtime import 증명) |
+| 4 | 히스토리 전량 스캔 | 인라인 — 도달 가능한 모든 blob 을 열어 자격증명 패턴 대조 |
+| 5 | 인수 검사 0-6 | `bash scripts/acceptance-0-6.sh` |
+| 6 | 인수 검사 0-7 | `bash scripts/acceptance-0-7.sh` — 훅 위반 6종 시연 |
+| 7 | 인수 검사 0-5 | `bash scripts/acceptance-0-5.sh` — **`main` 브랜치에서만** (`if: github.ref == 'refs/heads/main'`) |
+| 8 | 억제 만료 스캔 | 인라인 — `suppressions.yaml` 의 expiry 형식·경과 |
+| 9 | 강제 장치 존재 검사 | 인라인 — `hooks/pre-commit`·`pre-push` 존재·실행권한 |
+| 10 | 셸 스크립트 문법 검사 | 인라인 — `git ls-files '*.sh'` 전부 `bash -n` |
+| 11 | 패턴 파일 자체 실값 검사 | 인라인 — `.secret-patterns.default` 에 값 리터럴 없는지 |
+| 12 | 인수 검사 hs-a3 | `bash scripts/acceptance-hs-a3.sh` — 세션 계열 자격증명 (AC-A3) |
+| 13 | 데이터 노출 스캔 | `bash scripts/scan-data-exposure.sh all` — 크기·금지경로·기록·개인정보 (AC-A4) |
+| 14 | 인수 검사 hs-a4 | `bash scripts/acceptance-hs-a4.sh` — 차단이 실제로 도는가 (AC-A4) |
+| 15 | 인수 검사 secret-webhook-vendor | `bash scripts/acceptance-secret-webhook-vendor.sh` — 웹훅·벤더 키 (AC-S1) |
+
+*(1번 앞에 `actions/checkout` 이 있고 `fetch-depth: 0` 이다 — 4번이 과거 blob 을 열려면 필요하다.)*
 
 **CI는 고정 목록이고 로컬 `pre-push`는 글로브(이름 규칙 자동 수집)다.** 그래서 새 인수 스크립트를 만들면 로컬에서는 저절로 돌지만 CI에서는 한 줄도 안 돈다 — P15③("로컬에만 있는 검사는 없는 것으로 친다")에 걸린다. **새 `scripts/acceptance-*.sh`를 추가하는 PR은 `verify.yml`과 이 표 양쪽에 자기 줄을 함께 넣어야 한다.**
 
