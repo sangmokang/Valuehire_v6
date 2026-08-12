@@ -15,6 +15,15 @@ find_elemen[t]
 \.locato[r]\(
 wait_for_selecto[r]
 
+# 의미 기반 화면 찾기 API — Playwright get_by_* 계열 (V1 3차 F2)
+get_by_ro[l]e
+get_by_lab[e]l
+get_by_test_i[d]
+get_by_tex[t]
+get_by_placeholde[r]
+get_by_titl[e]
+get_by_al[t]_text
+
 # XPath 리터럴 (// + 식별자 + [@ 속성 — 공백 변형 포함, V1 결함 D1)
 //[a-z*][a-z0-9]*[[:space:]]*\[[[:space:]]*[@]
 

@@ -10,7 +10,9 @@
 #   허용 구역은 git ls-files 상대 경로의 정확한 `contracts/` 접두뿐이다. 부분 문자열
 #   (a/contracts/, contracts-evil/) 은 전부 검사 대상이다. contracts/ 값에는 금지 패턴을
 #   적용하지 않는 대신 구역 자체를 검사한다(정규 파일·비실행·허용 확장자만).
-#   docs/ 는 문서라 금지 패턴 대상이 아니며 CHECKED 에 세지 않는다(카운트 부풀리기 차단).
+#   docs/ 는 "문서 확장자(md·yaml·yml·txt·html)이며 실행 권한 없는(100644) 파일"만 면제하고
+#   CHECKED 에 세지 않는다. 그 조건 밖 docs 파일(실행 코드·실행 권한 문서)은 전역 검사 대상이다
+#   — 디렉터리 통 면제는 은닉 경로가 된다(V1 결함 D5·F3 로 축소).
 #   그 밖의 모든 추적 파일 — 이 검사기 자신·scripts/·hooks/·.github/ 포함 — 은 전역
 #   패턴으로 검사한다. 자기면제 없음(P13④). 제품 루트는 전역 + 제품 전용 패턴 둘 다.
 set -euo pipefail
@@ -171,26 +173,62 @@ done <<G3EOF
 $G3_FILES
 G3EOF
 
-# G3 스텝 블록은 허용 목록으로 검사한다: 주석·빈 줄·`run: |`·G3 실행 줄만 허용.
-# "정확한 줄이 있는가"만 보면 셸 제어문(if false; then ... fi)으로 감싸 실행 0회로
-# 만들 수 있다(V1 2차 N2 — 치명). 그래서 블록 안의 모든 이물질 줄을 배선 훼손으로 본다
-# — 선행 종료·실패 중단 해제·echo·후미 무력화·조건 키까지 한 규칙으로 잡힌다.
+# G3 스텝의 `run: |` 리터럴 블록만 실행 줄로 인정한다. "정확한 줄이 있는가"만 보면
+# 셸 제어문(if false; then ... fi)으로 감싸거나(V1 2차 N2 · 치명), 실행되지 않는 env
+# 값 문자열 안에 가짜 단계를 넣어(V1 3차 F1 · 치명) 실행 0회로 만들 수 있다.
+#
+# 그래서 워크플로를 들여쓰기로 읽어 ⑴ `env:` 키 하위(값 문자열 전체)는 실행 칸이
+# 아니므로 배제하고 ⑵ tgt 가 실제 `run: |` 블록 안에 있으며 그 블록이 주석·빈 줄·
+# 허용된 G3 실행 줄만 담을 때에만 통과시킨다. 완벽한 YAML 파싱은 아니다 — 텍스트 검사의
+# 근본 한계와 "실제 CI 실행 영수증"은 저장소 공통 후속 과제다(hooks/pre-push:82-85 가
+# 같은 한계를 자인). 이 검사는 알려진 구체 우회(셸 감싸기·env 값 은닉)를 닫는다.
 ci_line_ok() {
   local tgt="$1"
   awk -v tgt="$tgt" -v cmds="$ALLOWED_CMDS" '
-    BEGIN { n = split(cmds, arr, ";"); for (i = 1; i <= n; i++) if (arr[i] != "") allow[arr[i]] = 1 }
-    function flush() { if (has && ok) good = 1 }
-    /^[[:space:]]*-[[:space:]]*name:/ { flush(); has = 0; ok = 1; inblk = 1; next }
+    BEGIN { n = split(cmds, arr, ";"); for (i = 1; i <= n; i++) if (arr[i] != "") allow[arr[i]] = 1
+            has = 0; ok = 1; cond = 0 }
+    function ind(s) { match(s, /^ */); return RLENGTH }
+    # 스텝 단위로 판정한다: tgt 를 담은 run 블록이 깨끗하고(ok) 그 스텝에 조건/오류무시
+    # 키(cond)가 없어야 통과. run 블록 종료로는 판정을 확정하지 않고 스텝 경계·파일 끝에서만
+    # 확정한다 — run 뒤에 오는 스텝 레벨 if:/continue-on-error 도 함께 보기 위함이다.
+    function flush() { if (has && ok && !cond) good = 1; has = 0; ok = 1; cond = 0; in_run = 0 }
     {
-      if (!inblk) next
-      line = $0
+      raw = $0
+      i = ind(raw)
+      line = raw
       sub(/^[[:space:]]+/, "", line)
       sub(/[[:space:]]+$/, "", line)
       if (line == "") next
+
+      # env: 서브트리(값 문자열 전체)는 실행 칸이 아니다 — 통째로 배제한다.
+      if (in_env) {
+        if (i > env_ind) next
+        in_env = 0
+      }
+
+      # run 블록 종료: run 키와 같거나 더 얕은 들여쓰기의 비어있지 않은 줄 → 블록만 닫고
+      # 판정은 미룬다(스텝은 이어진다).
+      if (in_run && i <= run_ind) in_run = 0
+
+      # 스텝 경계(리스트 항목) — 스텝 판정을 확정하고 초기화.
+      if (line ~ /^-[[:space:]]/) { flush(); next }
+
+      # env: 키 진입 — 이 스텝의 run 블록을 닫고 하위를 배제한다.
+      if (line ~ /^env:([[:space:]]|$)/) { in_run = 0; in_env = 1; env_ind = i; next }
+
+      # 스텝 레벨 조건/오류무시 — run 블록 밖에서 만나면 이 스텝은 조건부 실행이다 (mutations
+      # if_false·continue-on-error 회귀 방어). run 블록 안의 `if ...` 는 아래 이물질로 잡힌다.
+      if (!in_run && (line ~ /^if:/ || index(line, "continue" "-on-" "error") == 1)) { cond = 1; next }
+
+      if (!in_run) {
+        if (line ~ /^run:[[:space:]]*\|/) { in_run = 1; run_ind = i }
+        next
+      }
+
+      # run 블록 내용
       if (line ~ /^#/) next
       if (line == tgt) { has = 1; next }
       if (line in allow) next
-      if (line == "run: |") next
       ok = 0
     }
     END { flush(); exit good ? 0 : 1 }
