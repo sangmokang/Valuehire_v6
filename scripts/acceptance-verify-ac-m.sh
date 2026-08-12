@@ -5,7 +5,7 @@
 #   정본: docs/engineering/verify-unification-goal-2026-08-10.md:78-81 (AC-M)
 #   출력 : 항목마다 PASS:/FAIL: 전부 출력, 마지막 줄 `CHECKED: <검사 수>`
 #   exit : 0 = PASS | 1 = FAIL | 2 = NOT_RUN
-#   불변식: CHECKED 는 정확히 24 이어야 한다 — 검사가 몇 개 사라져도 초록이면 가짜다
+#   불변식: CHECKED 는 정확히 25 이어야 한다 — 검사가 몇 개 사라져도 초록이면 가짜다
 #           (PR #6 결함 D3 의 교훈: checked==0 만 막으면 3개를 지워도 통과했다 · P20)
 #
 # 쓰기 규칙: 이 검사는 저장소에 어떤 파일도 만들지 않는다. 동적 fixture 는 전부
@@ -24,7 +24,7 @@ SNAP0=$(git status --porcelain)
 CHECKER=scripts/verify/check-mechanism-registry.sh
 FIXDIR=scripts/verify/fixtures/mechanism-registry
 REGISTRY=docs/sot/mechanism-registry.yaml
-EXPECTED_CHECKED=24
+EXPECTED_CHECKED=25
 
 TMP=$(mktemp -d) || { echo "NOT_RUN: mktemp 실패"; echo "CHECKED: 0"; exit 2; }
 trap 'rm -rf "$TMP"' EXIT
@@ -146,6 +146,29 @@ cat > "$TMP/abs-path.yaml" <<'EOF'
   required: true
 EOF
 expect_rc "절대경로 path → 불합격" "$TMP/abs-path.yaml" 1
+
+# codeaudit(2026-08-12) AC-M-F3: 상대경로 심볼릭 링크가 저장소 밖 실행파일을 가리키면
+# 절대경로 검사(/*)를 우회하고 [ -x ] 가 심링크를 따라가 통과했다. "저장소 안 상대경로만"
+# 경계가 심링크로 뚫린 것 — 저장소 안 추적 파일이 아니라 각 실행 기계의 임의 파일을 가리킬 수 있다.
+# ⚠️ 저장소를 오염시키지 않으려고 심링크를 $TMP 안에 만들고, 검사기를 $TMP 를 cwd 로
+# 실행해 상대경로 "sl" 이 그 심링크로 풀리게 한다(검사기는 cwd 기준 상대경로를 본다).
+ln -s /bin/sh "$TMP/sl" 2>/dev/null
+cat > "$TMP/symlink-rel.yaml" <<'EOF'
+- id: "symlink-rel"
+  path: "sl"
+  target: "y"
+  stage: "manual"
+  manual_reason: "저장소 안 상대경로 심링크 → 밖 실행파일 (fixture)"
+  required: true
+EOF
+symrc=$( cd "$TMP" && bash "$REPO/$CHECKER" symlink-rel.yaml >/dev/null 2>&1; echo $? )
+checked=$((checked + 1))
+if [ "$symrc" -eq 1 ]; then
+  echo "PASS: 상대경로 심볼릭 링크 → 불합격 (exit=1)"
+else
+  echo "FAIL: 상대경로 심볼릭 링크 → 불합격 (기대 exit=1, 실제 $symrc)"
+  fail=1
+fi
 
 # V1 D5-a: 같은 항목에 같은 필드 2회 — 마지막 값이 조용히 이긴다.
 # ⚠️ 마지막 값이 모든 규칙을 통과하는 형태여야 판별력이 있다 — 마지막 값이 어차피

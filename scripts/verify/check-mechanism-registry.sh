@@ -88,6 +88,10 @@ validate_schema() {
   if [ -n "$e_reason" ] && [ "$e_stage" != "manual" ]; then
     echo "manual_reason 은 stage:manual 전용 — stage:$e_stage 에 있음"; return 1
   fi
+  # codeaudit 2026-08-12 AC-M-F3: 심볼릭 링크는 상대경로 검사(/*·..)를 우회해 저장소 밖
+  # 실행파일을 가리킬 수 있다([ -x ]·[ -f ] 가 링크를 따라간다). 명부 항목은 저장소 안
+  # 추적된 실제 파일이어야 하므로 링크 자체를 거부한다(재현성·통제 범위 유지).
+  if [ -L "$e_path" ]; then echo "심볼릭 링크 금지 — $e_path (저장소 안 실제 파일만)"; return 1; fi
   if [ ! -f "$e_path" ]; then echo "path 실존하지 않음 — $e_path"; return 1; fi
   return 0
 }
