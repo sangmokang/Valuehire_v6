@@ -208,6 +208,16 @@ must_not_catch "${K_CR} 저장 방식 이름(글자 설정값)" \
   "${K_CR}_PROVIDER=keychain"
 must_not_catch "${K_PK} 형식 이름(짧은 글자+숫자 설정값)" \
   "${K_PK}_FORMAT=PKCS12"
+# ④-d codeaudit(2026-08-12) 이 잡은 헛경보 — 벤더 규칙의 왼쪽 경계 누락/과대.
+# 억제 경로가 없어 이 오탐 1건이 곧 작업 중단이므로 반드시 막는다.
+# D5: sk-ant 규칙에 왼쪽 경계가 없어 평범한 식별자 안의 'sk-ant-' 조각을 잡았다.
+must_not_catch "sk-ant 조각을 품은 평범한 식별자(왼쪽 경계)" \
+  "module: mask-ant-colony-observation-notes-2026-final"
+# D4: discord/slack 규칙의 경계 [^A-Za-z0-9-] 가 밑줄을 통과시켜 위장 도메인을 잡았다.
+must_not_catch "밑줄 접두 위장 ${DC} 도메인" \
+  "url=my_${DC}.com/api/${WH}/${SNOW}/${TOK}"
+must_not_catch "밑줄 접두 위장 slack 도메인" \
+  "url=team_${SLK}/${SVC}/T01ABCDEFGH/B01ABCDEFGH/${TOK}"
 
 # ── ⑤ 종단: 스캐너가 실제로 이 패턴을 쓰는가 (판정기 2벌 방지) ───────────────
 #
@@ -277,7 +287,7 @@ fi
 # (CHECKED: 14 로 통과). bash 버전 차이·편집 실수로 검사가 조용히 사라지는 것이
 # 이 저장소의 실제 사고 유형이다(같은 날 ${VAR^^} 로 3건이 사라졌다).
 # 그래서 기대 개수를 코드에 못박고 **적으면 실패**한다(P20 · P2).
-EXPECTED_CHECKS=29
+EXPECTED_CHECKS=32
 # -lt(하한)가 아니라 -ne(정확값)로 조인다: 하한만 보면 새 검사 3개를 넣고 기존 3개를
 # 지워도 초록이다. V1 판정서의 설계 결정("checked == 기대값 강제")과도 이쪽이 일치한다.
 if [ "$checked" -ne "$EXPECTED_CHECKS" ]; then

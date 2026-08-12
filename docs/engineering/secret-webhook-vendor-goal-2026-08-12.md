@@ -83,8 +83,8 @@ MISSED : 환경변수 참조
 > *If 추적 파일에 Discord/Slack 웹훅 URL, `sk-ant-` 형식 벤더 키, 또는 `WEBHOOK|CREDENTIAL|BOT_TOKEN|PRIVATE_KEY` 계열 `.env` 대입문이 있으면, then 비밀 스캔이 실패(exit 1)해야 한다. 동시에 평범한 코드·문서·환경변수 참조는 막히지 않아야 한다.*
 
 - **검증 명령**: `bash scripts/acceptance-secret-webhook-vendor.sh`
-- **기대 출력**: `PASS × 29` / `CHECKED: 29` / `exit 0` (V1·REV2 반영으로 17 → 27 → 29 로 확장. 2026-08-12 REV2-D4 정정)
-  - 탐지 14건 · 오탐 대조군 11건 · 스캐너 종단 3건 · 3축 종료 상태 대조 1건
+- **기대 출력**: `PASS × 32` / `CHECKED: 32` / `exit 0` (V1·REV2 반영으로 17 → 27 → 29 로 확장. 2026-08-12 REV2-D4 정정)
+  - 탐지 14건 · 오탐 대조군 14건 · 스캐너 종단 3건 · 3축 종료 상태 대조 1건
 - **counter-AC (가짜 완료의 모습)**
   1. 시험 문자열을 패턴에서 그대로 베껴 와 자기충족으로 통과하면 가짜(tautology).
   2. 정규식만 맞추고 `verify.sh`를 실제로 태우지 않으면 가짜 — 판정기가 두 벌이 된다.
@@ -161,10 +161,14 @@ scripts/acceptance-secret-webhook-vendor.sh
 
 ```
 .secret-patterns.default  (추가되는 패턴 — ERE, 한 줄 1개)
-  discord(app)?\.com/api/webhooks/[0-9]{15,}/[A-Za-z0-9_-]{20,}
-  hooks\.slack\.com/services/T[A-Za-z0-9]+/B[A-Za-z0-9]+/[A-Za-z0-9]{20,}
-  sk-ant-[A-Za-z0-9_-]{40,}
-  ^[[:space:]]*(export[[:space:]]+)?[A-Za-z0-9_]*(WEBHOOK|CREDENTIAL|BOT_TOKEN|PRIVATE_KEY)[A-Za-z0-9_]*=[A-Za-z0-9][^[:space:]'"#$<>{}()]{5,}[[:space:]]*$
+  ⚠️ 아래는 이 문서 작성 시점(RED 이전)의 초안이다. V1·REV2·codeaudit 적대검증을 거쳐
+     실제 패턴은 크게 바뀌었다(왼쪽 경계 추가·discord v10 경로·slack-gov·sk-ant 24자·
+     BOT_TOKEN 제거). 정본은 항상 실제 파일 .secret-patterns.default:72-94 이다.
+     이 초안 블록은 "왜 이 규칙이 필요한가"의 출발점 기록으로만 남긴다(codeaudit D7 정정).
+  (초안) discord(app)?\.com/api/webhooks/[0-9]{15,}/[A-Za-z0-9_-]{20,}
+  (초안) hooks\.slack\.com/services/T[A-Za-z0-9]+/B[A-Za-z0-9]+/[A-Za-z0-9]{20,}
+  (초안) sk-ant-[A-Za-z0-9_-]{40,}
+  (초안) ^…(WEBHOOK|CREDENTIAL|BOT_TOKEN|PRIVATE_KEY)…=…{5,}$
   ※ 실제 비밀값은 이 파일에 절대 넣지 않는다 — 여기 있는 것은 '모양'이지 '값'이 아니다
 ```
 
@@ -208,3 +212,26 @@ scripts/acceptance-secret-webhook-vendor.sh
 - 잔여 한계(반영 안 함, 문서화만):
   - 일반(3사 밖) 벤더의 웹훅 URL 값 미탐 — codex 가 오탐 트레이드오프로 명시 제외(패턴 파일 주석). 벤더 추가 시 규칙 추가.
   - D4 의 "고쳤다 되돌린 추적 파일"은 3축 감시로도 못 본다 — 권한 격리 실행(V1 권고안)은 채택 안 됨. 후속 AC 후보.
+
+### codeaudit 자기+codex 감사 (2026-08-12) — 헛경보 3종·문서 드리프트 반영
+
+codex 경쟁 감사(AC-S1 결함 10건 보고)와 Claude 자기감사 교차 결과, **실측으로 확인된
+실제 결함만** 반영했다:
+
+- **D4·D5 (중간·헛경보): 벤더 규칙 왼쪽 경계 결함.** sk-ant 규칙에 왼쪽 경계가 없어
+  `mask-ant-colony-…` 같은 평범한 식별자의 `sk-ant-` 조각을 잡았고, discord/slack 경계가
+  밑줄을 통과시켜 `my_discord.com`·`team_hooks.slack.com` 위장 도메인을 잡았다. 억제 경로가
+  없어 오탐 1건이 곧 작업 중단이므로 반드시 막는다. → 왼쪽 경계에 `_` 추가 + sk-ant 경계 추가.
+  RED(오탐 3종만 빨감, CHECKED 29→32) → GREEN(32/32) → 정상 탐지 4종 회귀 없음 실측.
+  안전성: 실제 벤더 키·주소는 값이라 항상 비영숫자로 구분되므로 경계 추가는 탐지 손실 없음.
+- **D7 (중간·문서): goal 계약 블록에 옛 패턴(40자·경계없음·BOT_TOKEN)이 잔존.** 초안임을
+  명시하고 정본을 실제 파일로 못박음.
+
+**보고만 하고 반영 안 함(판단·범위):**
+- codex D1(공백 든 값 미탐)·D3(base64·url-encoding 미탐): `.env` 값 문자셋과 "인코딩 복원
+  안 함"은 V1 이 이미 자기신고한 한계다. 벤더/키워드 규칙의 구조적 경계이며 별도 설계 필요.
+- codex D2(정상 이름 오탐): Claude 재현에서 제시 입력(aws_secrets_manager 등)은 **오탐되지
+  않았다** — 기존 base 규칙의 키이름 매칭을 codex 가 다른 문맥으로 시험한 것으로 추정(※).
+- codex D6(검사 교체 우회)·Claude 자기감사(개수 -ne 교체): 개수 강제의 원리적 한계. 인수
+  스크립트 자체를 편집해야 하므로 방어선은 그 파일 코드 리뷰.
+- codex D8·D9·D10: pre-commit 훅·정본 문서의 기존 동작(이 PR 이 만든 것 아님). 별도 트랙.
