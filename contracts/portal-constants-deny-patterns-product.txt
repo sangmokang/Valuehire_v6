@@ -1,0 +1,20 @@
+# HumanSearch G3 portal-constants deny patterns — 제품 코드 전용 계층 (case-insensitive ERE).
+# 적용: 제품 루트(humansearch/src·humansearch/tests)의 추적 파일에만, 전역 계층에 더해서.
+# 제품 코드에는 어떤 운영 주소·도메인·포트도 있을 수 없다 — 값은 contracts/ 데이터로만 (P22).
+# 표현은 자기 자신과 매치하지 않게 설계한다.
+
+# 모든 scheme URL (http·ws·ftp 등 전부)
+[a-z][a-z0-9+.-]*:/[/]
+
+# 일반 도메인 리터럴 (흔한 TLD 집합)
+[a-z0-9]([a-z0-9-]*[a-z0-9])?\.(co[m]|ne[t]|or[g]|i[o]|k[r]|de[v]|ap[p]|invali[d]|tes[t]|exampl[e])([^a-z0-9-]|$)
+
+# 호스트:포트
+(localhos[t]|127\.0\.0\.1|0\.0\.0\.0):[0-9]{2,5}
+
+# 따옴표 CSS 셀렉터 (id · 결합자)
+["'][#][a-z][a-z0-9_-]*["']
+["'][.][a-z][a-z0-9_-]*[[:space:]]*[>~+][^"']*["']
+
+# 포트 대입문
+(^|[^a-z])por[t][[:space:]]*=[[:space:]]*[0-9]{4,5}

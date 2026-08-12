@@ -1,0 +1,29 @@
+# HumanSearch G3 portal-constants deny patterns — 전역 계층 (case-insensitive ERE).
+# 적용: docs/·contracts/ 를 뺀 모든 추적 파일 (검사기 자신·scripts/·hooks/ 포함, 자기면제 없음).
+# 표현은 자기 자신과 매치하지 않게 설계한다 (cleanroom-deny-patterns.txt:1-2 방식).
+# 이 계층에 "모든 URL"을 넣지 않는 이유: uv.lock 의 정당한 패키지 주소, 기존 보안 검사기의
+# 시험용 주소가 오탐된다 — 그 계층은 -product.txt 가 제품 코드에만 건다.
+
+# DOM/드라이버 locator API — 셀렉터는 코드가 아니라 데이터다 (웹 자동화 5조 1번)
+querySelecto[r]
+getElementsB[y]
+getElementByI[d]
+CSS_SELECTO[R]
+find_elemen[t]
+\.locato[r]\(
+wait_for_selecto[r]
+
+# XPath 리터럴 (// + 식별자 + [@ 속성)
+//[a-z*][a-z0-9]*\[@
+
+# CDP(브라우저 원격조종) 디버그 포트 — 플래그와 관례 대역(922x)
+remote-debugging-por[t]
+(localhos[t]|127\.0\.0\.1|0\.0\.0\.0):922[0-9]
+
+# 채용 포털 브랜드 도메인 (dotted 형태만 — 산문 속 브랜드 언급은 잡지 않는다)
+saram[i]n\.
+jobkore[a]\.
+linkedi[n]\.co
+wanted\.co\.k[r]
+incrui[t]\.co
+jobplane[t]\.
