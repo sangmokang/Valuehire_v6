@@ -2691,3 +2691,47 @@ COMMANDS_RUN: 264
 
 ---8<--- codex verdict 3차 원문 끝 ---8<---
 
+### V2-codeaudit 2차 (2026-08-13, 구현자 자체 감사 — 판정: 결함 1건 발견·봉쇄)
+
+codex 3차 이후 배송 대기 중, 구현자가 자기 코드를 codeaudit 로 재감사했다. codex 3라운드가
+못 본 각도에서 **치명 결함 1건**을 실행으로 재현했다.
+
+- **A2 (치명)** — 실제 G3 CI 스텝을 지우고 임의 리터럴 스칼라 키(`description:`/`note:`/`summary:`/
+  `run-name:`/`comment:`/`memo:` 등 `키: |`) 안에 가짜 G3 단계를 숨기면 배선 검사가 실행 0회를
+  정상으로 오인한다(exit 0). 이는 V1 3차 F1(env 값 은닉)과 **동형**이며, GREEN4 가 `env:` 하나만
+  배제해 다른 키로 우회가 남은 미봉이었다(상관 블라인드스팟 — codex 도 구현자도 env 만 봤다).
+
+```text
+[description: | 은닉]  exit=0   [note: | 은닉]     exit=0
+[summary: | 은닉]      exit=0   [run-name: | 은닉] exit=0
+[G3 스텝 통삭제]        exit=1   ← 대조군은 정상 차단
+```
+→ 뭘 했나: 진짜 G3 스텝을 지우고 여러 이름의 여러 줄 텍스트 칸에 가짜 5줄을 숨겨 검사기를 돌렸다.
+→ 뭐가 나왔나: 네 종류 전부 통과(exit 0). 단순 삭제만 차단됐다.
+→ 의미: 나쁜 소식. 서버 검사에 G3 가 등록된 것처럼 보이지만 실제로는 한 번도 안 돌 수 있었다.
+
+### 조치 — 5차 RED→GREEN (RED5 `f4b4bae` · GREEN5 `3f9ee88` + SOT `f3d4be3`)
+
+- RED5 (`scripts/acceptance-hs-portal-constants-hardening4.sh`, 8케이스): 6개 키 이름으로 은닉을
+  재현. 커밋 직전 실측: `FAIL: hardening4 [리터럴 스칼라 은닉: description] exit=0` → exit 1(올바른 RED).
+- GREEN5: 배선 파서의 `env:` 특수 배제를 **"run: | 이 아닌 모든 `키: |`/`키: >` 리터럴/폴디드
+  블록 스칼라 하위를 실행 칸에서 배제"** 로 일반화. 키 이름 열거 대신 리터럴 스칼라 전체를 한 번에
+  닫는다 — 새 키 이름으로 우회할 여지를 원리적으로 없앤다.
+
+```text
+GREEN5 재검증 (2026-08-13 00:43~00:52 KST):
+  hardening4: cases 8 (blocked-mutations 6, clean-baselines 1, wiring-present 1) exit=0
+  A2 우회 4종(description/note/summary/run-name) → 전부 wiring broken exit 1 · 정상 6줄 스텝 exit 0
+  동결 회귀: mutations 24/35·hardening 15/18·hardening2 16·hardening3 8 전부 exit 0 · RED 5벌 diff 0줄
+  실저장소 검사기 exit 0 (PRODUCT_FILES 2·CHECKED 53·CONTRACT_FILES 3)
+  G1 8·G2 3·AC-S1·AC-M·0-2/0-5/0-6/a3/a4·verify.sh·bash -n 32개 전부 exit 0
+  pre-push 실호출: 검사 23개 전부 ok · session-status → RED 0/25
+```
+→ 뭘 했나: 결함을 시험으로 먼저 고정·봉쇄한 뒤 검증 전량을 다시 돌렸다.
+→ 결과: 전부 통과. A2 우회는 이제 전부 차단, 정상 설정은 통과.
+→ 의미: env 만 막던 미봉을 리터럴 스칼라 일반 배제로 닫아, 같은 부류의 우회를 원리적으로 없앴다.
+
+**남는 근본 한계(불변):** "텍스트로 CI 실제 실행 영수증을 증명 못 한다"는 저장소 공통 한계는 이번에도
+그대로다(hooks/pre-push:82-85). 이번 조치는 알려진 구체 우회를 닫은 것이지 실행 영수증을 만든 것이
+아니다 — 실행 영수증 인프라는 여전히 issue #12 후속 AC 로 남긴다.
+
