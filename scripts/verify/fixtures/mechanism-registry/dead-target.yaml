@@ -1,0 +1,7 @@
+# fixture: path 는 실존하나 target 문자열이 그 파일 안에 없는 항목(죽은 target)
+# — 검사기가 exit 1 을 내야 한다 (AC-M fixture 3/3)
+- id: "dead-target-mechanism"
+  path: "hooks/pre-commit"
+  target: "bash scripts/nonexistent-check-never-called-anywhere.sh"
+  stage: "pre-commit"
+  required: true

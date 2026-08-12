@@ -1,0 +1,24 @@
+# mechanism-registry.yaml — 이 저장소의 검사 장치 명부 (SOT · AC-M)
+#
+# 계약: docs/engineering/verify-ac-m-goal-2026-08-12.md §⑩ (파서가 받는 유일한 형태)
+# 대조: scripts/verify/check-mechanism-registry.sh 가 pre-push 글로브와 CI 에서
+#       이 명부의 모든 항목을 실제 파일·문구와 대조한다. 명부가 실제와 어긋나면 빨간불.
+# 규칙: target 은 함수명이 아니라 path 파일 안에 문자 그대로 존재하는 명령 문자열이다.
+#       stage: manual 은 AC-20(memory-recall-check.sh) 착수 시에만 추가하고
+#       manual_reason 필수 (verify-unification-goal-2026-08-10.md AC-M counter-AC).
+- id: "secrets-scan-precommit"
+  path: "hooks/pre-commit"
+  target: "SECRET_PATTERNS_FILE= VERIFY_SCAN_SOURCE=index bash verify.sh"
+  stage: "pre-commit"
+  required: true
+- id: "acceptance-glob-prepush"
+  path: "hooks/pre-push"
+  target: "-name 'verify.sh' -o -name 'acceptance-*.sh'"
+  stage: "pre-push"
+  required: true
+- id: "ci-secret-scan"
+  path: ".github/workflows/verify.yml"
+  target: "run: bash verify.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true

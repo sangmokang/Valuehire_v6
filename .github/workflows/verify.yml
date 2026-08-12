@@ -174,3 +174,9 @@ jobs:
         # 여기 등록하지 않으면 이 검사는 '로컬에만 있는 검사'가 되고, P15③ 은 그것을
         # 없는 것으로 친다(이 파일 111행 주석의 "판정 권한은 CI에 있다"와 같은 근거).
         run: bash scripts/acceptance-secret-webhook-vendor.sh
+
+      - name: 인수 검사 verify-ac-m (mechanism 명부 대조 · AC-M)
+        # 명부(docs/sot/mechanism-registry.yaml)와 실제 검사 장치의 일치를 강제한다.
+        # 검사기 1벌(scripts/verify/check-mechanism-registry.sh)을 로컬 pre-push
+        # 글로브와 CI 가 같은 인수 스크립트로 실행한다 (판정기 2벌 금지 · P16).
+        run: bash scripts/acceptance-verify-ac-m.sh
