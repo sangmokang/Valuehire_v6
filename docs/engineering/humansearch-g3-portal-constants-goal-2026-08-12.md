@@ -200,9 +200,85 @@ merge 후 문제 시: ① `git revert <squash SHA>` 한 커밋이면 끝(신규 
 - PII·인증·과금 경로 접촉 없음(검사기는 읽기 전용, 저장소 텍스트만 읽는다). 데이터 안전 AC 불요.
   단 L3 등급 유지 — 공유 검증 인프라(CI·pre-push)를 건드리기 때문.
 
-## 검증 출력 (Gate 4에서 채움 — 출력 숫자 그대로)
+## 검증 출력 (Gate 4 — 출력 숫자 그대로, 2026-08-12 13:53~14:05 KST)
 
-(RED·GREEN·회귀 전량 실행 후 이 절에 append)
+### RED 증명 (구현 부재 상태, 커밋 9bab751 직전)
+
+```text
+$ bash scripts/acceptance-hs-portal-constants.sh
+bash: scripts/acceptance-hs-portal-constants.sh: No such file or directory
+exit=127
+
+$ bash scripts/acceptance-hs-portal-constants-mutations.sh
+FAIL: required G3 implementation missing: scripts/acceptance-hs-portal-constants.sh
+exit=1
+```
+→ 뭘 했나: 구현이 없는 상태에서 검사기와 mutation 시험을 실행했습니다.
+→ 결과: 검사기는 파일 부재(127), 시험은 "구현 없음"이라는 올바른 이유의 exit 1.
+→ 의미: RED 가 문법 오류가 아니라 기대 동작 부재로 빨갛다는 증명입니다 — 좋은 소식.
+
+### GREEN (커밋 b3a3db0)
+
+```text
+$ bash scripts/acceptance-hs-portal-constants.sh
+PASS: portal constants outside contracts 0
+PASS: contracts zone violations 0
+PASS: ci/pre-push wiring intact
+PRODUCT_FILES: 2
+CHECKED: 49
+CONTRACT_FILES: 3
+exit=0
+
+$ bash scripts/acceptance-hs-portal-constants-mutations.sh   # 마지막 줄
+PASS: portal-constants mutations blocked 24/35 (allowed 3, notrun 8)
+exit=0
+```
+→ 뭘 했나: 깨끗한 실제 저장소에서 검사기를, 고장 샌드박스 35개에서 mutation 시험을 돌렸습니다.
+→ 결과: 실저장소는 위반 0(제품 2·비문서 49·계약 3파일), 시험은 차단 24건(전부 정확히 exit 1)·
+  허용 3건(정확히 0)·검사불능 8건(정확히 2) 전부 기대값 일치.
+→ 의미: 오탐(깨끗한데 빨강)과 미탐(가짜 값 통과)과 exit code 혼동이 모두 없다는 뜻 — 좋은 소식.
+
+### 회귀 전량 (마지막 줄 :: exit)
+
+```text
+G1 8종: cleanroom(CHECKED: 58)·mutations(10/10)·absolute-paths(3/3)·absolute-contexts(7/7)
+        ·colon-paths(4/4)·file-urls(2/2)·hook-env(5/5)·hook-env-mutations(6/6) — 전부 exit=0
+G2 3종: gates(COLLECTED: 1)·gates-mutations(6/6)·gates-antiforge(3/3) — 전부 exit=0
+AC-S1: acceptance-secret-webhook-vendor.sh CHECKED: 32 exit=0
+AC-M : acceptance-verify-ac-m.sh CHECKED: 25 exit=0
+기존  : acceptance-0-2(PASS)·0-5(PASS)·0-6(PASS)·hs-a3(CHECKED: 25)·hs-a4(CHECKED: 30) — 전부 exit=0
+verify.sh exit=0 · bash -n 추적 셸 28개 전부 통과
+```
+→ 뭘 했나: 오늘 병합분(AC-S1·AC-M)을 포함한 기존 검사 전부를 다시 돌렸습니다.
+→ 결과: 전부 exit 0 — G3 추가가 기존 검사를 하나도 깨지 않았습니다. 좋은 소식.
+
+### 배선 실측 (pre-push 실호출 + RED 원장)
+
+```text
+$ bash hooks/pre-push origin https://github.com/sangmokang/Valuehire_v6.git </dev/null
+pre-push: 검사 19개 실행
+  ok  ./scripts/acceptance-hs-portal-constants-mutations.sh
+  ok  ./scripts/acceptance-hs-portal-constants.sh
+  (나머지 17개 전부 ok)
+pre-push exit=0
+
+$ bash scripts/session-status.sh
+HEAD: b3a3db0 (ahead 2 / behind 0)
+ORIGIN: 682f00e
+RED: 0/21 (acceptance-0-7.sh 제외 — CI 담당)
+```
+→ 뭘 했나: 코드 올리기 직전 문지기를 실제로 호출하고, 미해결 검사 원장을 다시 계산했습니다.
+→ 결과: G3 검사기 2개가 글로브(이름 규칙 자동 수집)로 저절로 편입돼 실행됐고, 실패 0/21.
+→ 의미: 로컬 배선은 실행으로 증명됐습니다. 분모는 지시서 전망(20)과 달리 21 — G3 가 검사기와
+  mutation 시험 2개 파일을 추가했기 때문이며, 실측치를 그대로 보고합니다.
+
+### RED 불변 증명
+
+```text
+$ git diff 9bab751 -- scripts/acceptance-hs-portal-constants-mutations.sh | wc -l
+0
+```
+→ RED 커밋의 시험 파일이 GREEN 이후에도 한 바이트도 바뀌지 않았습니다 (P5·P15④).
 
 ## 적대 검증 로그 (V1·V2 — 판정 원문 100% 보존)
 
