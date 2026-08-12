@@ -1057,3 +1057,1018 @@ Resume in Codex: codex resume 019ff45c-457f-70d1-a9ad-0377a4a1992d
 
 ---8<--- codex verdict 원문 끝 ---8<---
 
+### V1 2차 — codex (2026-08-12, VERDICT: FAIL — 수정 후 상태 fb512e1 재판정)
+
+- 검증자 신분: 실제 codex CLI 세션 `019ff482-c681-7563-9a08-1e687bbd4934`, companion job `task-mspo3dni-8ltnc9`, 실행 명령 52개, 소요 38분. 이번엔 판정 파일을 직접 작성함.
+- 원문 보관: `.claude/private-reviews/codex-g3-verdict2-2026-08-12.md` (SHA-256 `661fcb4fd8e926868ed71de0971d9bedf21de909319343df1f11fd5f3e733a8a`) + 아래 전문 100%.
+- 판정 요지: **1차 결함 5건(D1~D5)의 봉쇄는 전부 "구현 확인"** (R1~R5). RED 불변도 확인(N6).
+  단 신규 결함 — N1 새 직접 표현 10종 미탐(높음) · N2 CI run 블록을 셸 `if false; then`으로 감싸면
+  실행 0회인데 배선 검사 통과(치명) · N3 hardening CI 줄 삭제 무방비(높음) · N4 pre-push 선행
+  exit 0(중간, 0-7 이 백업) · N5 hardening 요약 숫자에 배선 확인 1건 혼입(높음) · N7 문서 2곳이
+  D5 이전 설명 잔존(중간).
+
+### 조치 — 3차 RED→GREEN (RED3 `8e00bff` · GREEN3 `918b882`)
+
+- RED3 (`scripts/acceptance-hs-portal-constants-hardening2.sh`, 16케이스): codex 의 payload 10종
+  원문 그대로 + 셸 감싸기 + 이물질 줄 + hardening 줄 삭제 + pre-push 선행 exit 0. 커밋 직전
+  실측: `FAIL: hardening2 [N1-1 미등재 .biz 도메인] exit=0 (기대: 정확히 1)` → exit 1 (올바른 이유의 RED).
+- GREEN3 (`918b882`):
+  · N2 — G3 스텝 블록을 **허용 목록**으로 검사(주석·빈 줄·`run: |`·G3 실행 줄 외 전부 배선 훼손).
+    셸 제어문·선행 종료·실패 중단 해제·echo·후미 무력화가 한 규칙으로 잡힌다.
+  · N3 — 존재하는 G3 파일 전부의 CI 줄을 검사기가 요구(파일 목록 → 요구 자동 파생) + pre-push
+    무조건 `exit 0` 줄 거부. 잔여 한계: 검사 파일 자체 삭제는 diff·P13 라벨·RED 원장 분모로 노출.
+  · N1 — 제품 계층 범주 확장: 따옴표 3라벨 호스트·단일라벨 호스트:포트·1자리 포트·따옴표 포트 키·
+    CDP 대역 값(9200~9399 대입)·따옴표 값 CSS 속성·id 자손·백틱 인용·절대/술어 XPath·TLD 대폭 확장.
+  · N5 — hardening2 요약이 차단·baseline·배선확인을 분리 보고 (`blocked-mutations 14, clean-baselines 1,
+    wiring-present 1`). 동결된 hardening 의 `blocked 15/18` 은 배선 확인 1건 포함으로 **읽어야 한다**(정오표).
+  · N7 — goal §1⑩ docs 면제 문구와 전역 패턴 주석을 조건부 면제로 일치.
+  · N4 — pre-push 선행 exit 0 가드 추가, acceptance-0-7 백업은 그대로 유지.
+
+```text
+GREEN3 재검증 (2026-08-12 15:36~15:47 KST):
+  hardening2: cases 16 (blocked-mutations 14, clean-baselines 1, wiring-present 1) exit=0
+  동결 회귀: mutations 24/35 exit=0 · hardening 15/18 exit=0 · RED 파일 3벌 diff 0줄
+  실저장소 검사기 exit=0 (PRODUCT_FILES 2 · CHECKED 51 · CONTRACT_FILES 3)
+  G1 8종·G2 3종·AC-S1·AC-M·0-2/0-5/0-6/a3/a4·verify.sh·bash -n 30개 전부 exit=0
+  pre-push 실호출: 검사 21개 전부 ok · session-status → RED: 0/23
+```
+→ 뭘 했나: 3차 봉쇄 후 1·2차와 같은 검증 전량을 다시 돌렸습니다.
+→ 결과: 전부 통과. 분모 23은 G3 검사 파일 4개(본체+시험 3벌) 추가분입니다.
+→ 의미: 2차 판정의 신규 결함까지 시험으로 고정해 봉쇄했고 기존 검사는 하나도 깨지 않았습니다.
+
+### V1 2차 판정 원문 (100% — 아래 전문은 수정 없이 그대로다)
+
+---8<--- codex verdict 2차 원문 시작 ---8<---
+
+VERDICT: FAIL
+
+# 결론
+
+현재 상태로는 승인하시면 안 됩니다. 오늘 낮에 확인한 다섯 문제에 맞춘 예시는 모두 막혔지만, 같은 종류의 값을 다른 흔한 방식으로 적은 10개 사례가 아무 문제 없는 것으로 받아들여졌습니다.
+
+서버의 세 검사 명령을 실행하지 않는 조건 안에 넣어도 모든 자체 점검이 정상으로 끝났습니다. 서버 목록에서 새 보강 시험 한 줄만 지워도 남은 검사들은 이를 알아채지 못했습니다.
+
+새 보강 시험 파일과 원래 시험 파일은 만든 뒤 바뀌지 않았고, 18개라는 전체 숫자도 맞습니다. 다만 “15개를 막았다”는 숫자에는 실제로 고장을 심어 막은 사례가 아니라 현재 서버 목록에 자기 줄이 있다는 확인 1개가 섞여 있습니다.
+
+문서 폴더 안의 실행용 파일을 숨기던 기존 문제, 임시 작업공간을 만들 수 없을 때의 잘못된 보고, 기존 서버·로컬 우회 예시는 실제로 고쳐졌습니다. 따라서 구현자의 “다섯 재현 사례 수정” 주장은 맞지만, “더는 우회할 수 없다”는 주장은 틀립니다.
+
+## 먼저 공개하는 건너뜀·미확인·재시도
+
+- 확인한 사실: 현재 작업 위치는 `fb512e11ab1ff725d9992aead782c0a3b787ac6a`이고 원본 작업 공간은 감사 전후 모두 깨끗했습니다.
+- 확인한 사실: 인터넷은 사용하지 않았고, 저장소 밖 서비스에도 접속하지 않았습니다.
+- ※ 미확인: 실제 GitHub 서버는 인터넷 차단 조건 때문에 실행하지 못했습니다. 대신 동일한 Bash 실행 묶음을 로컬 복제본에서 실행했고, 실행 결과가 0이며 출력이 0바이트인 것을 확인했습니다.
+- ※ 건너뜀: G1·G2와 저장소 전체 제품 시험은 다시 돌리지 않았습니다. 이번 판정 범위인 G3 본체, 원래 35건, 새 18건, 세 G3 파일의 셸 문법은 모두 새로 실행했습니다.
+- ※ 한계: 새로운 표기법을 무한히 전수할 수는 없습니다. 이번에는 1차에서 쓰지 않은 직접 표기 10종, 서버 설정 2종, 로컬 훅 설정 1종을 추가 공격했습니다.
+- 재시도 1: 읽기 전용 탐색 도구는 Rust 실행 파일이 없어 시작하지 못했습니다. 표준 저장소 검색으로 같은 범위를 다시 확인했습니다.
+- 재시도 2: 따옴표가 겹치는 세 입력을 처음에는 문자 그대로의 `\x27`·`\x60`으로 잘못 전달했습니다. 그 결과는 결함 근거에서 제외하고, 실제 작은따옴표와 역따옴표를 넣어 다시 실행했습니다.
+- 재시도 3: 새 표현 10종 묶음은 처음 5종 뒤에 입력 전달이 중단됐습니다. 앞 5종은 유효한 결과로 보존하고, 뒤 5종을 별도 복제본에서 다시 실행했습니다.
+- 재시도 4: 18건 수를 처음 정적 계산할 때 함수 안의 증가 문장 자체를 한 번 더 더해 19라고 잘못 셌습니다. 함수 호출 17회와 함수 밖 증가 1회로 다시 계산해 18임을 확인했습니다.
+- 재시도 5: 동결 파일 비교 명령 두 번과 독립 재현 명령 한 번은 명령 전달기의 변수 해석 오류로 제품 검사 전에 중단됐습니다. 파일 변경은 없었고, 변수 표기만 바꿔 다시 실행했습니다.
+- 재시도 6: 지정 경로에 패치로 직접 쓰는 작업은 패치 도구의 작업 저장소 경계에 막혔습니다. 저장소 안 임시 문서를 패치로 만든 뒤 지정 경로로 복사하고 임시 문서를 다시 패치로 삭제하는 방식으로 바꿨습니다.
+
+→ 뭘 공개했나: 실행하지 못한 외부 확인, 범위 밖 회귀시험, 조사 도구 실패, 입력 전달 실수와 재계산을 판정 앞부분에 모두 적었습니다.  
+→ 뭐가 나왔나: G3 핵심 판단에는 실행 공백이 없고, 실제 GitHub 서버만 ※ 미확인입니다.  
+→ 좋은 소식인가 나쁜 소식인가: 판정 근거는 로컬에서 재현됐지만 실제 서버 이력은 증명하지 못했으므로 제한적으로 나쁜 소식입니다.
+
+# 판단 근거
+
+## 판정 기준과 갈림길
+
+종료 코드(exit code, 프로그램이 끝날 때 운영체제에 돌려주는 숫자)는 계약대로 0은 정상 완료, 1은 실제 위반 발견, 2는 신뢰할 수 있는 검사를 시작하거나 끝내지 못함으로 채점했습니다.
+
+CI(변경을 서버에서 자동으로 검사하는 절차)는 실행 명령이 글자로 적혀 있는지만 보지 않고 실제로 실행되는지를 기준으로 판단했습니다. `if false; then` 안의 명령은 파일에 보이지만 Bash가 실행하지 않으므로 배선이 온전하다고 볼 수 없습니다.
+
+정규식(문자 모양을 찾는 규칙) 목록의 현재 항목만 금지 범위라고 보는 좁은 해석은 버렸습니다. `docs/engineering/humansearch-g3-portal-constants-goal-2026-08-12.md:48-51`은 주소·포트·도메인·화면 위치·XPath가 정확한 계약 폴더 밖에 있으면 로컬과 서버 양쪽에서 1로 거부하라고 정하며, `:107-109`도 제품 코드의 일반 도메인·호스트와 포트·화면 위치·포트 대입을 범주로 적습니다.
+
+TLD(인터넷 도메인의 마지막 부분) 목록을 현재 파일에 열거한 항목만 계약이라고 보는 해석도 버렸습니다. 1차에서 `.ai`가 목록에 없다는 이유로 결함이었고 이번 수정은 일부 끝자리만 더했으므로, 같은 제품 경로의 직접적인 `.biz` 표기를 정상으로 받는 것은 같은 결함 종류입니다.
+
+CSS selector(웹 화면의 특정 요소를 찾는 표현)와 XPath(웹 화면 구조에서 요소를 찾는 경로 표현)는 한 가지 따옴표나 한 가지 술어 모양에만 한정된다는 문서가 없습니다. 이번 반례는 조각을 합치거나 문자를 숨기지 않은 한 줄짜리 직접 값이므로 사용자가 명시한 비범위가 아닙니다.
+
+반대로 다음은 결함으로 세지 않았습니다. 제품 루트 밖의 원시 CSS·일반 URL, `humansearch/` 바로 아래 비코드 설정, 문자열 조각 조립, 문자 이스케이프, 빌드 산출물은 사용자가 수용 한계로 명시했기 때문입니다. 실행 권한 없는 `.md`·`.yaml`·`.yml`·`.txt`·`.html` 문서의 면제도 이번 지시의 설계 범위로 받아들였습니다.
+
+이 해석이 틀리면 제품 코드에 `{"port": 9333}`, `portal:9444`, `'#login input'` 같은 값이 들어가도 품질 검사에 합격하고, 서버 설정에는 검사 명령 세 줄이 보이지만 실제로는 한 줄도 실행되지 않는 상태를 승인하게 됩니다.
+
+## 요구사항별 최종 판정
+
+| ID | 요구 | 판정 | 핵심 근거 | 반증 결과 | 심각도와 사업 영향 |
+|---|---|---|---|---|---|
+| R1 | 1차 미탐 8종 재검사 | 구현 확인 | 두 최종 패턴 직접 대조 8/8 탐지, 독립 깊은 경로 `.ai`도 1 | “고정 파일명만 겨냥”을 새 경로·새 확장자로 반증 시도했으나 실패 | 해당 8종은 해소됨 |
+| R2 | D2 두 우회 봉쇄 | 구현 확인 | 선행 `exit 0`, `set +e` 각각 배선 훼손 1 | 독립 복제본에서도 각각 1 | 해당 두 예시는 해소됨 |
+| R3 | D3 세 G3 파일 머리말 봉쇄 | 구현 확인 | 본체·원 시험·보강 시험 세 파일 모두 머리말 주입 시 1 | 보강 시험이 직접 시험하지 않은 세 번째 파일도 독립 실행에서 1 | 해당 예시는 해소됨 |
+| R4 | D4 임시 작업공간 실패는 2 | 구현 확인 | 소스 35-40행 가드, 가짜 `mktemp` 실행 결과 2와 정확한 문구 | “1이 샐 것”을 재현 시도했으나 실패 | 운영자가 위반과 환경 고장을 구분 가능 |
+| R5 | D5 문서 폴더 통 면제 축소 | 구현 확인 | `.py` 1, 실행 가능 `.HTML` 1, 비실행 `.MD` 0 | 새 파일명·대문자 확장자로 반증 시도했으나 실패 | 문서 폴더를 코드 은닉처로 쓰던 기존 구멍 해소 |
+| N1 | 새 직접 표현 공격 | 미구현 | 제품 루트의 10종이 모두 본체 0 | “확장된 규칙이 같은 범주 변형도 잡을 것”을 반증했고 반례 10건 성공 | 높음 — 운영 주소·포트·화면 위치가 다시 코드에 박혀도 병합 가능 |
+| N2 | 서버 명령이 실제 실행되는지 | 미구현 | 셸 `if false; then` 안에 세 줄을 넣자 본체·35건·18건 모두 0, 실제 묶음도 0·출력 0바이트 | “정확한 실행 줄 검사가 실행을 증명한다”를 반증했고 우회 성공 | 치명적 — 서버 화면은 정상인데 G3 전체가 한 번도 실행되지 않은 변경 승인 가능 |
+| N3 | 보강 시험 자체의 서버 배선 | 미구현 | 보강 시험 줄 삭제 뒤 본체 0·원 시험 0·서버 묶음 0 | 보강 시험을 수동 실행해야만 1; 삭제된 서버에서는 그 1이 발생 불가 | 높음 — 향후 다섯 결함의 회귀 방어를 서버에서 조용히 제거 가능 |
+| N4 | 로컬 훅의 실제 실행 | 부분 구현 | 훅 2행 `exit 0` 뒤 G3 본체·35건·18건 모두 0, 실제 훅도 0·무출력 | 저장소 전체의 별도 0-7 시험은 이 훅 변형을 1로 차단 | 중간 — G3 자체의 로컬 자기보호는 사라지지만 현재 서버의 별도 장치가 백업 |
+| N5 | 시험 연출·숫자·종료값 | 부분 구현 | 전체 18은 맞고 14건만 실제 1, 1건은 2, 2건은 0, 나머지 1건은 현재 줄 존재 확인 | 정확한 종료값 혼동과 고정 파일명 겨냥은 발견 못함; 자기 배선 음성 시험은 빠짐 | 높음 — “15개 차단”이라는 숫자가 서버에서 시험 제거를 막는다는 잘못된 확신 제공 |
+| N6 | RED 파일 불변 | 구현 확인 | 두 파일의 Git 객체와 SHA-256이 기준 커밋과 HEAD에서 동일, 후속 접촉 커밋 없음 | “GREEN이 시험을 바꿨다”를 반증 시도했으나 실패 | 시험 원본 보존 신뢰 가능 |
+| N7 | 계약과 설명 일치 | 불일치 | goal 93-95행과 전역 패턴 주석 2행은 여전히 docs 전체 면제라고 설명하지만 본체는 조건부 면제 | “문서도 수정됐다”는 해석을 현재 줄로 반증 | 중간 — 다음 수정자가 낡은 설명을 따라 방어를 되돌릴 위험 |
+
+→ 뭘 대조했나: 사용자의 다섯 검증 항목을 기존 결함, 새 공격, 시험 정직성, 동결성, 문서 일치로 분해했습니다.  
+→ 뭐가 나왔나: 기존 다섯 예시는 고쳐졌지만 새 결함 세 축과 문서 불일치가 확인됐습니다.  
+→ 좋은 소식인가 나쁜 소식인가: 일부 수정은 진짜이나 최종 봉쇄는 아니므로 전체로는 나쁜 소식입니다.
+
+## 갈림길에서 버린 해석
+
+1. “18건이 통과했으니 합격”은 버렸습니다. 18건은 이미 아는 표현과 설정만 재현하며, 실제로 새 직접 표현 10개와 셸 조건문을 포함하지 않습니다.
+2. “명령 줄이 정확히 존재하니 실행된다”는 해석은 버렸습니다. 로컬 Bash 실행에서 조건문 안의 세 줄이 0바이트 출력으로 한 번도 실행되지 않았습니다.
+3. “보강 시험이 자기 줄을 확인하니 삭제를 막는다”는 해석은 버렸습니다. 그 줄을 지우면 확인 주체도 서버에서 사라지고, 남은 두 명령은 0으로 끝났습니다.
+4. “로컬 훅 선행 종료도 최종 우회”는 일부 버렸습니다. G3 자체는 놓쳤지만 별도 `acceptance-0-7.sh`가 1로 차단했으므로 저장소 전체 서버 방어까지 사라진 것은 아닙니다.
+5. “패턴 파일에 적지 않은 표현은 계약 밖”은 버렸습니다. 상위 계약이 범주를 먼저 정하고 패턴 파일은 그 범주를 구현하는 수단이기 때문입니다.
+
+## 설계 결정 카드 1 — 제품 표현을 유한 패턴 목록으로 막기
+
+**무엇을** — 제품 파일의 주소·포트·화면 위치를 정규식 목록으로 찾습니다.  
+**왜** — 현재 저장소에 새 부품을 추가하지 않고 빠르게 전 파일을 검사하며, 패턴 파일만 늘릴 수 있기 때문입니다.  
+**버린 대안** — 언어별 구문 분석과 설정 형식별 키 검증, 또는 제품 코드에서 외부 값을 전부 금지하고 계약 로더만 허용하는 구조는 채택하지 않았습니다.  
+**대가** — 따옴표·키 이름·경로 문법이 바뀔 때마다 직접 값도 통과하며, 이번에 10종이 실제 0으로 끝났습니다.  
+**되돌리는 법** — 포트·도메인·화면 위치별로 문법 가족을 먼저 정의하고 음성 시험을 늘리거나, 제품 코드가 계약 로더 외 문자열 상수를 갖지 못하게 검사 범위를 뒤집은 뒤 정상 자료를 좁게 허용하시면 됩니다.
+
+## 설계 결정 카드 2 — 서버 설정을 문자열로 읽어 실행 여부 판단하기
+
+**무엇을** — `awk`가 스텝 안의 정확한 두 실행 줄과 일부 금지 줄을 문자열로 찾습니다.  
+**왜** — 별도 YAML 처리기 없이 저장소 기본 도구만으로 빠르게 배선 손상을 찾기 위해서입니다.  
+**버린 대안** — 실행 증명 표식, 구조화된 YAML 검사, G3 전용 단일 실행 스크립트와 외부 독립 점검은 쓰지 않았습니다. `hooks/pre-push:82-85`도 문자열 파싱은 변형마다 새 우회가 생긴다고 이미 기록합니다.  
+**대가** — 셸 조건문처럼 금지 목록에 없는 제어문을 넣으면 명령은 보이지만 실행되지 않으며, 이번 로컬 실행에서 그대로 재현됐습니다.  
+**되돌리는 법** — G3 세 명령을 하나의 전용 실행 스크립트로 고정하고, 서버 설정은 구조적으로 읽어 조건·셸 변경을 거부하며, 실행 후 독립 표식을 확인하는 별도 단계로 검증하시면 됩니다.
+
+## 설계 결정 카드 3 — 문서 확장자와 Git 권한으로 문서 면제하기
+
+**무엇을** — `docs/` 중 다섯 문서 확장자이며 Git 모드가 100644인 파일만 검사에서 뺍니다.  
+**왜** — 현재 정당한 문서가 포털 사례를 포함해 전역 규칙의 오탐을 만들기 때문입니다.  
+**버린 대안** — 문서 전체 면제와 문서별 허용 목록 중 전자는 D5 때문에 폐기됐고, 후자는 채택하지 않았습니다.  
+**대가** — 구현은 좁아졌지만 goal 계약과 패턴 주석은 옛 전체 면제를 계속 설명합니다.  
+**되돌리는 법** — goal 93-95행과 패턴 주석 2행을 현재 조건으로 고치고, 다섯 확장자의 허용·실행 권한 거부 사례를 정본 시험에 함께 고정하시면 됩니다.
+
+# 기술 상세
+
+## 1. 현재 상태와 계약 원문
+
+`docs/engineering/humansearch-g3-portal-constants-goal-2026-08-12.md:48-51`은 금지 범주와 양쪽 거부를 정하는 줄입니다.
+
+```text
+48:**AC-G3**: While 저장소에 제품 코드가 존재하는 동안, If 운영 상수·portal locator(URL·포트·도메인·
+49-CSS selector·XPath·CDP 포트)가 저장소 루트의 정확한 `contracts/` 밖에 존재하면, Then 시스템은
+50-로컬(pre-push)과 CI 양쪽에서 **정확히 exit 1**로 거부해야 한다. 깨끗한 트리는 **정확히 exit 0**이며
+51-검사 파일 수(PRODUCT_FILES ≥ 2, CHECKED ≥ 10, CONTRACT_FILES ≥ 2)를 보고해야 한다.
+```
+
+→ 뭘 확인했나: 가장 상위의 합격 기준을 읽었습니다.  
+→ 뭐가 나왔나: 표현 종류 전체와 로컬·서버 양쪽 거부를 요구합니다.  
+→ 좋은 소식인가 나쁜 소식인가: 새 반례와 직접 충돌하므로 나쁜 소식입니다.
+
+`scripts/acceptance-hs-portal-constants.sh:35-40`은 임시 작업공간 실패를 2로 바꾸는 줄입니다.
+
+```text
+35 # 임시 작업공간 생성 실패는 위반(1)이 아니라 검사 불능(2)이다 — set -e 에 맡기면
+36 # mktemp 의 1 이 그대로 새어 나가 규칙 위반과 환경 고장이 구분되지 않는다 (V1 결함 D4).
+37 GCLEAN=$(mktemp) || { echo "FAIL: temp workspace unavailable"; exit 2; }
+38 PCLEAN=$(mktemp) || { echo "FAIL: temp workspace unavailable"; exit 2; }
+39 FILES=$(mktemp) || { echo "FAIL: temp workspace unavailable"; exit 2; }
+40 ERRS=$(mktemp) || { echo "FAIL: temp workspace unavailable"; exit 2; }
+```
+
+→ 뭘 확인했나: 네 번의 임시 파일 생성 각각에 같은 보호가 있는지 읽었습니다.  
+→ 뭐가 나왔나: 실패 문구와 숫자 2가 네 줄 모두에 명시됐습니다.  
+→ 좋은 소식인가 나쁜 소식인가: D4에는 좋은 소식입니다.
+
+`scripts/acceptance-hs-portal-constants.sh:129-150`은 문서 면제와 제품 경로를 나누는 줄입니다.
+
+```text
+129     docs/*)
+130       # 문서 면제는 디렉터리 전체가 아니라 "문서 확장자 + 정규 비실행 파일"에만 준다.
+131       # 통 면제는 docs/run-portal.py 같은 실행 코드의 은닉 경로가 된다 (V1 결함 D5).
+132       lower=$(printf '%s' "$path" | tr '[:upper:]' '[:lower:]')
+133       mode=$(git ls-files -s -- "$path" | awk '{print $1}')
+134       case "$lower" in
+135         *.md|*.yaml|*.yml|*.txt|*.html)
+136           if [ "$mode" = "100644" ]; then continue; fi
+137           ;;
+138       esac
+139       # 문서 형식이 아니거나 실행 가능한 docs 파일 → 전역 검사로 계속 진행
+140       ;;
+141   esac
+142   checked=$((checked + 1))
+143   case "$path" in
+144     humansearch/src/*|humansearch/tests/*)
+145       product_files=$((product_files + 1))
+146       scan_with "$path" "$GCLEAN" global
+147       scan_with "$path" "$PCLEAN" product
+148       ;;
+149     *)
+150       scan_with "$path" "$GCLEAN" global
+```
+
+→ 뭘 확인했나: 문서와 제품 파일이 실제로 어느 규칙으로 가는지 읽었습니다.  
+→ 뭐가 나왔나: 다섯 문서 확장자·100644만 면제되고 제품 두 루트는 두 패턴 모두 적용됩니다.  
+→ 좋은 소식인가 나쁜 소식인가: D5 수정은 좋지만 goal의 옛 설명과 달라 문서 불일치는 나쁜 소식입니다.
+
+`scripts/acceptance-hs-portal-constants.sh:165-182`는 서버 배선을 문자열로 판정하는 줄입니다.
+
+```text
+165 ci_line_ok() {
+166   local tgt="$1"
+167   awk -v tgt="$tgt" '
+168     function flush() { if (has && ok) good = 1 }
+169     /^[[:space:]]*-[[:space:]]*name:/ { flush(); has = 0; ok = 1 }
+170     {
+171       line = $0
+172       sub(/^[[:space:]]+/, "", line)
+173       sub(/[[:space:]]+$/, "", line)
+174       if (line == tgt) has = 1
+175       if (line ~ /^if:/) ok = 0
+176       if (index(line, "continue" "-on-" "error") > 0) ok = 0
+177       # run 블록 안의 선행 종료·실패 중단 해제는 "줄은 있지만 실행되지 않는" 우회다 (V1 결함 D2)
+178       if (line ~ /^exit([[:space:]]|$)/) ok = 0
+179       if (line ~ /^set[[:space:]]+\+e([[:space:]]|$)/) ok = 0
+180     }
+181     END { flush(); exit good ? 0 : 1 }
+182   ' "$WF"
+```
+
+→ 뭘 확인했나: 서버 실행 여부를 어떤 문장으로 거부하는지 읽었습니다.  
+→ 뭐가 나왔나: YAML의 `if:`와 두 특정 셸 문장만 막고 `if false; then`은 막지 않습니다.  
+→ 좋은 소식인가 나쁜 소식인가: 이미 아는 두 예시는 막지만 같은 원인의 새 우회가 남아 나쁜 소식입니다.
+
+`scripts/acceptance-hs-portal-constants.sh:198-214`는 G3 이름 3종 모두의 첫 20줄을 확인하는 줄입니다.
+
+```text
+198   found_self=$(find . -maxdepth 2 -name 'acceptance-*.sh' \
+199     -not -path './worktrees/*' -not -path './.git/*' | grep -cF 'acceptance-hs-portal-constants')
+200   if [ "$found_self" -lt 2 ]; then
+201     wire_bad "글로브 수집 재현에서 검사기·mutation 이 다 잡히지 않는다 (found=$found_self)"
+202   fi
+203   # pre-push 는 파일 첫 20줄의 건너뛰기 표식을 보고 검사를 CI 로 넘긴다. G3 파일에 그
+204   # 표식이 붙으면 로컬 절반이 조용히 사라지므로 여기서 차단한다 (V1 결함 D3).
+205   G3_MARK=$(printf '# PUSH-%s' 'PERFORMING')
+206   while IFS= read -r g3f; do
+207     if [ -z "$g3f" ]; then continue; fi
+208     if head -20 "$g3f" | grep -qF "$G3_MARK"; then
+209       wire_bad "G3 검사 파일이 pre-push 건너뛰기 표식을 달고 있다: $g3f"
+210     fi
+211   done <<G3LIST
+212 $(find . -maxdepth 2 -name 'acceptance-hs-portal-constants*.sh' \
+213     -not -path './worktrees/*' -not -path './.git/*')
+214 G3LIST
+```
+
+→ 뭘 확인했나: 구현자가 말한 “G3 파일 3종의 첫 20줄”이 이름 고정 두 개가 아닌 전체 이름 모양인지 읽었습니다.  
+→ 뭐가 나왔나: `acceptance-hs-portal-constants*.sh` 전체를 확인하며 독립 실행에서도 세 파일 모두 1이었습니다.  
+→ 좋은 소식인가 나쁜 소식인가: D3에는 좋은 소식입니다.
+
+## 2. 깨끗한 현재 저장소와 두 정본 시험 실행 전문
+
+```text
+$ bash scripts/acceptance-hs-portal-constants.sh
+PASS: portal constants outside contracts 0
+PASS: contracts zone violations 0
+PASS: ci/pre-push wiring intact
+PRODUCT_FILES: 2
+CHECKED: 50
+CONTRACT_FILES: 3
+RC=0
+```
+
+→ 뭘 시켰나: 현재 HEAD의 G3 본체를 실행했습니다.  
+→ 뭐가 나왔나: 현재 내용은 0, 수치는 2·50·3, 배선은 정상이라고 보고했습니다.  
+→ 좋은 소식인가 나쁜 소식인가: 현재 저장소 내용 자체에는 좋은 소식이지만 새 공격까지 증명하지는 않습니다.
+
+```text
+$ bash scripts/acceptance-hs-portal-constants-mutations.sh
+ok [clean baseline] exit=0
+ok [product scheme URL (.py)] exit=1
+ok [product bare domain (tests/.py)] exit=1
+ok [product host:port (무작위 파일명)] exit=1
+ok [product selector API (.js)] exit=1
+ok [product XPath literal] exit=1
+ok [product quoted CSS id] exit=1
+ok [scripts/ selector API — scripts 면제 금지] exit=1
+ok [검사기 자신에 심은 selector — 자기면제 금지] exit=1
+ok [루트 파일 CDP 플래그] exit=1
+ok [hooks/ 포털 브랜드 도메인] exit=1
+ok [루트 contracts/ 정당 값 — 오탐 금지] exit=0
+ok [contracts-evil/ 유사 경로 위장] exit=1
+ok [중첩 가짜 contracts/ 경로] exit=1
+ok [contracts/ 실행 권한 파일] exit=1
+ok [contracts/ 허용 확장자 밖] exit=1
+ok [CI 무력화: self_commented] exit=1
+ok [CI 무력화: self_missing] exit=1
+ok [CI 무력화: echo_prefixed] exit=1
+ok [CI 무력화: suffixed] exit=1
+ok [CI 무력화: if_false] exit=1
+ok [CI 무력화: coe] exit=1
+ok [CI 무력화: sibling_missing] exit=1
+ok [pre-push 부재] exit=1
+ok [pre-push 실행권한 제거] exit=1
+ok [pre-push 글로브 수집식 제거] exit=1
+ok [전역 패턴 계약 부재] exit=2
+ok [전역 패턴 계약 빈 파일] exit=2
+ok [깨진 정규식] exit=2
+ok [빈 문자열 매치 정규식] exit=2
+ok [제품 패턴 계약 깨짐] exit=2
+ok [제품 루트 부재 — 조용한 skip 금지] exit=2
+ok [제품 파일 0건 — 0건 통과 금지] exit=2
+ok [위반+깨진 패턴 동시 — 2 우선] exit=2
+ok [제품 5파일 깨끗] exit=0
+PASS: portal-constants mutations blocked 24/35 (allowed 3, notrun 8)
+RC=0
+```
+
+→ 뭘 시켰나: 9bab751에서 고정된 원래 35건을 현재 본체에 실행했습니다.  
+→ 뭐가 나왔나: 24건 거부, 3건 허용, 8건 검사 불능을 모두 기대 숫자로 판정해 전체 0이었습니다.  
+→ 좋은 소식인가 나쁜 소식인가: 기존 정본이 살아 있다는 좋은 소식입니다.
+
+```text
+$ bash scripts/acceptance-hs-portal-constants-hardening.sh
+ok [hardening baseline] exit=0
+ok [D1 IPv4 비루프백 host:port] exit=1
+ok [D1 미등재 .ai 도메인] exit=1
+ok [D1 CSS 자손 셀렉터] exit=1
+ok [D1 CSS 속성 셀렉터] exit=1
+ok [D1 공백 XPath] exit=1
+ok [D1 따옴표 CDP 포트] exit=1
+ok [D1 매핑형 CDP 포트] exit=1
+ok [D1 IPv6 루프백 host:port] exit=1
+ok [D2 run 블록 선행 exit 0] exit=1
+ok [D2 run 블록 실패 중단 해제] exit=1
+ok [D3 검사기 머리말 표식] exit=1
+ok [D3 mutation 시험 머리말 표식] exit=1
+ok [D4 임시공간 생성 실패] exit=2
+ok [D5 docs 실행 코드 은닉] exit=1
+ok [D5 정당한 문서 인용 — 오탐 금지] exit=0
+ok [D5 실행권한 달린 문서 위장] exit=1
+ok [hardening 자기 배선(CI 실행 줄)]
+PASS: portal-constants hardening blocked 15/18 (allowed 2, notrun 1)
+RC=0
+```
+
+→ 뭘 시켰나: 37d2fa7에서 고정된 새 18건을 현재 본체에 실행했습니다.  
+→ 뭐가 나왔나: 전체는 0이지만 실제 1은 14건이고 자기 배선 1건은 종료 숫자 없는 현재 상태 확인입니다.  
+→ 좋은 소식인가 나쁜 소식인가: 다섯 기존 결함 재현에는 좋지만 “15개 차단” 해석에는 주의가 필요합니다.
+
+## 3. 1차 반례 8종의 최종 패턴 직접 대조
+
+```text
+V1-1 IPv4 | global=NO | product=YES | overall=BLOCKED
+V1-2 .ai | global=NO | product=YES | overall=BLOCKED
+V1-3 CSS descendant | global=NO | product=YES | overall=BLOCKED
+V1-4 CSS attribute | global=NO | product=YES | overall=BLOCKED
+V1-5 XPath whitespace | global=YES | product=NO | overall=BLOCKED
+V1-6 quoted port | global=NO | product=YES | overall=BLOCKED
+V1-7 mapped port | global=NO | product=YES | overall=BLOCKED
+V1-8 IPv6 | global=NO | product=YES | overall=BLOCKED
+```
+
+→ 뭘 시켰나: 1차의 정확한 8개 값을 전역·제품 패턴에 각각 직접 넣었습니다.  
+→ 뭐가 나왔나: XPath는 전역 패턴, 나머지 7개는 제품 패턴에서 잡혔고 전체 8/8이 차단됐습니다.  
+→ 좋은 소식인가 나쁜 소식인가: D1의 기존 8개에 한해서는 좋은 소식입니다.
+
+고정 파일명 연출을 반증하기 위해 새 깊은 경로와 `.conf` 확장자를 사용한 독립 결과입니다.
+
+```text
+CASE: anti-theater: original .ai payload in new deep path and new extension (want 1)
+  forbidden(product): humansearch/src/deep/randomized/value-482.conf
+FAIL: portal constants outside contracts 1
+PASS: contracts zone violations 0
+PASS: ci/pre-push wiring intact
+PRODUCT_FILES: 3
+CHECKED: 51
+CONTRACT_FILES: 3
+RC=1
+```
+
+→ 뭘 시켰나: hardening에 없는 파일명·깊은 경로·확장자에 기존 `.ai` 값을 넣었습니다.  
+→ 뭐가 나왔나: 제품 위반 1로 거부됐습니다.  
+→ 좋은 소식인가 나쁜 소식인가: 구현이 고정 파일명만 겨냥하지 않았다는 좋은 소식입니다.
+
+## 4. D2·D3·D4·D5 독립 복제 실행 전문
+
+```text
+CASE: D2 independent: run block exit 0 before scanner (want 1)
+  wiring: CI 에 검사기 실행 줄이 없거나 무력화됨: bash scripts/acceptance-hs-portal-constants.sh
+  wiring: CI 에 mutation 실행 줄이 없거나 무력화됨: bash scripts/acceptance-hs-portal-constants-mutations.sh
+PASS: portal constants outside contracts 0
+PASS: contracts zone violations 0
+FAIL: ci/pre-push wiring broken 2
+PRODUCT_FILES: 2
+CHECKED: 50
+CONTRACT_FILES: 3
+RC=1
+
+CASE: D2 independent: run block set +e before scanner (want 1)
+  wiring: CI 에 검사기 실행 줄이 없거나 무력화됨: bash scripts/acceptance-hs-portal-constants.sh
+  wiring: CI 에 mutation 실행 줄이 없거나 무력화됨: bash scripts/acceptance-hs-portal-constants-mutations.sh
+PASS: portal constants outside contracts 0
+PASS: contracts zone violations 0
+FAIL: ci/pre-push wiring broken 2
+PRODUCT_FILES: 2
+CHECKED: 50
+CONTRACT_FILES: 3
+RC=1
+
+CASE: D3 independent: marker in head-20 of acceptance-hs-portal-constants.sh (want 1)
+  wiring: G3 검사 파일이 pre-push 건너뛰기 표식을 달고 있다: ./scripts/acceptance-hs-portal-constants.sh
+PASS: portal constants outside contracts 0
+PASS: contracts zone violations 0
+FAIL: ci/pre-push wiring broken 1
+PRODUCT_FILES: 2
+CHECKED: 50
+CONTRACT_FILES: 3
+RC=1
+
+CASE: D3 independent: marker in head-20 of acceptance-hs-portal-constants-mutations.sh (want 1)
+  wiring: G3 검사 파일이 pre-push 건너뛰기 표식을 달고 있다: ./scripts/acceptance-hs-portal-constants-mutations.sh
+PASS: portal constants outside contracts 0
+PASS: contracts zone violations 0
+FAIL: ci/pre-push wiring broken 1
+PRODUCT_FILES: 2
+CHECKED: 50
+CONTRACT_FILES: 3
+RC=1
+
+CASE: D3 independent: marker in head-20 of acceptance-hs-portal-constants-hardening.sh (want 1)
+  wiring: G3 검사 파일이 pre-push 건너뛰기 표식을 달고 있다: ./scripts/acceptance-hs-portal-constants-hardening.sh
+PASS: portal constants outside contracts 0
+PASS: contracts zone violations 0
+FAIL: ci/pre-push wiring broken 1
+PRODUCT_FILES: 2
+CHECKED: 50
+CONTRACT_FILES: 3
+RC=1
+
+CASE: D4 independent: mktemp unavailable (want 2 + message)
+FAIL: temp workspace unavailable
+RC=2
+
+CASE: D5 independent: non-document .py under docs (want 1)
+  forbidden(global): docs/random-runner-271.py
+FAIL: portal constants outside contracts 1
+PASS: contracts zone violations 0
+PASS: ci/pre-push wiring intact
+PRODUCT_FILES: 2
+CHECKED: 51
+CONTRACT_FILES: 3
+RC=1
+
+CASE: D5 independent: executable document extension under docs (want 1)
+  forbidden(global): docs/random-operator-314.HTML
+FAIL: portal constants outside contracts 1
+PASS: contracts zone violations 0
+PASS: ci/pre-push wiring intact
+PRODUCT_FILES: 2
+CHECKED: 51
+CONTRACT_FILES: 3
+RC=1
+
+CASE: D5 independent: non-executable document under docs (want 0)
+PASS: portal constants outside contracts 0
+PASS: contracts zone violations 0
+PASS: ci/pre-push wiring intact
+PRODUCT_FILES: 2
+CHECKED: 50
+CONTRACT_FILES: 3
+RC=0
+
+SOURCE_WORKTREE_STATUS=CLEAN
+```
+
+→ 뭘 시켰나: 구현자의 18건 함수를 재사용하지 않고 현재 저장소를 새로 복제해 D2·D3·D4·D5를 심었습니다.  
+→ 뭐가 나왔나: 금지 사례는 정확히 1, 검사 불능은 2, 허용 문서는 0이며 원본은 깨끗했습니다.  
+→ 좋은 소식인가 나쁜 소식인가: 기존 네 결함의 봉쇄에는 좋은 소식입니다.
+
+## 5. 새 직접 표현 10종 — 전체 검사기 실행 전문
+
+아래 값은 모두 추적된 `humansearch/src/` 또는 `humansearch/tests/` 안의 한 파일에 한 줄로 직접 적었습니다. 조각 조립·이스케이프·빌드 산출물은 없습니다.
+
+```text
+NEW_PAYLOAD: N1 unlisted common TLD
+PATH: humansearch/src/deep/net/value-771.py
+PAYLOAD: PORTAL = "jobs.vendor.biz"
+PASS: portal constants outside contracts 0
+PASS: contracts zone violations 0
+PASS: ci/pre-push wiring intact
+PRODUCT_FILES: 3
+CHECKED: 51
+CONTRACT_FILES: 3
+RC=0
+
+NEW_PAYLOAD: N2 single-label hostname with port
+PATH: humansearch/tests/deep/net/value-772.cfg
+PAYLOAD: REMOTE = "portal:9444"
+PASS: portal constants outside contracts 0
+PASS: contracts zone violations 0
+PASS: ci/pre-push wiring intact
+PRODUCT_FILES: 3
+CHECKED: 51
+CONTRACT_FILES: 3
+RC=0
+
+NEW_PAYLOAD: N3 valid one-digit port
+PATH: humansearch/src/deep/net/value-773.toml
+PAYLOAD: REMOTE = "10.77.4.9:8"
+PASS: portal constants outside contracts 0
+PASS: contracts zone violations 0
+PASS: ci/pre-push wiring intact
+PRODUCT_FILES: 3
+CHECKED: 51
+CONTRACT_FILES: 3
+RC=0
+
+NEW_PAYLOAD: N4 JSON quoted port key
+PATH: humansearch/tests/deep/net/value-774.json
+PAYLOAD: {"port": 9333}
+PASS: portal constants outside contracts 0
+PASS: contracts zone violations 0
+PASS: ci/pre-push wiring intact
+PRODUCT_FILES: 3
+CHECKED: 51
+CONTRACT_FILES: 3
+RC=0
+
+NEW_PAYLOAD: N5 camelCase port variable
+PATH: humansearch/src/deep/net/value-775.js
+PAYLOAD: cdpPort = 9333
+PASS: portal constants outside contracts 0
+PASS: contracts zone violations 0
+PASS: ci/pre-push wiring intact
+PRODUCT_FILES: 3
+CHECKED: 51
+CONTRACT_FILES: 3
+RC=0
+
+NEW_PAYLOAD: N6 CSS attribute with quoted value
+PATH: humansearch/tests/deep/ui/value-776.js
+PAYLOAD: LOGIN = '[data-testid="sign-in"]'
+PASS: portal constants outside contracts 0
+PASS: contracts zone violations 0
+PASS: ci/pre-push wiring intact
+PRODUCT_FILES: 3
+CHECKED: 51
+CONTRACT_FILES: 3
+RC=0
+
+NEW_PAYLOAD: N7 CSS id followed by descendant
+PATH: humansearch/src/deep/ui/value-777.py
+PAYLOAD: LOGIN = "#login input"
+PASS: portal constants outside contracts 0
+PASS: contracts zone violations 0
+PASS: ci/pre-push wiring intact
+PRODUCT_FILES: 3
+CHECKED: 51
+CONTRACT_FILES: 3
+RC=0
+
+NEW_PAYLOAD: N8 CSS JavaScript template literal
+PATH: humansearch/src/deep/ui/value-778.js
+PAYLOAD: LOGIN = `#login`
+PASS: portal constants outside contracts 0
+PASS: contracts zone violations 0
+PASS: ci/pre-push wiring intact
+PRODUCT_FILES: 3
+CHECKED: 51
+CONTRACT_FILES: 3
+RC=0
+
+NEW_PAYLOAD: N9 absolute XPath
+PATH: humansearch/tests/deep/ui/value-779.py
+PAYLOAD: LOGIN = "/html/body/input"
+PASS: portal constants outside contracts 0
+PASS: contracts zone violations 0
+PASS: ci/pre-push wiring intact
+PRODUCT_FILES: 3
+CHECKED: 51
+CONTRACT_FILES: 3
+RC=0
+
+NEW_PAYLOAD: N10 XPath functional predicate
+PATH: humansearch/src/deep/ui/value-780.py
+PAYLOAD: LOGIN = '//input[contains(@name, "email")]'
+PASS: portal constants outside contracts 0
+PASS: contracts zone violations 0
+PASS: ci/pre-push wiring intact
+PRODUCT_FILES: 3
+CHECKED: 51
+CONTRACT_FILES: 3
+RC=0
+
+SOURCE_WORKTREE_STATUS=CLEAN
+```
+
+→ 뭘 시켰나: 1차와 겹치지 않는 주소·포트·CSS·XPath 직접 표기 10종을 각각 새 복제본에 심고 본체를 실행했습니다.  
+→ 뭐가 나왔나: 10개 모두 위반 0, 전체 0으로 정상 승인됐습니다.  
+→ 좋은 소식인가 나쁜 소식인가: 계약 범위 안의 새로운 우회가 실제로 남았으므로 나쁜 소식입니다.
+
+반증 기록: “새 규칙이 표현 가족 전체를 막았을 것”을 `.biz`, 한 단어 호스트, JSON 키, 중첩 따옴표, 역따옴표, 절대·함수형 XPath로 반증 시도했고 10건 모두 반증에 성공했습니다.
+
+## 6. 새 서버 우회 — 셸 조건문 안에 세 줄 넣기
+
+워크플로(workflow, 서버 자동검사에서 어떤 명령을 어떤 순서로 실행할지 적는 파일)를 다음처럼 바꿨습니다.
+
+```text
+48      - name: HumanSearch G3 포털 상수·locator 경계
+52        run: |
+53          if false; then
+54          bash scripts/acceptance-hs-portal-constants.sh
+55          bash scripts/acceptance-hs-portal-constants-mutations.sh
+56          bash scripts/acceptance-hs-portal-constants-hardening.sh
+57          fi
+```
+
+→ 뭘 시켰나: 정확한 세 실행 줄은 남기고, 셸이 실행하지 않는 조건 안에 넣었습니다.  
+→ 뭐가 나왔나: 현재 문자열 검사는 세 줄을 그대로 정상 배선으로 인정했습니다.  
+→ 좋은 소식인가 나쁜 소식인가: 명령 존재와 실행이 다르므로 나쁜 소식입니다.
+
+```text
+LOCAL_SCANNER_ON_MUTATED_WORKFLOW:
+PASS: portal constants outside contracts 0
+PASS: contracts zone violations 0
+PASS: ci/pre-push wiring intact
+PRODUCT_FILES: 2
+CHECKED: 50
+CONTRACT_FILES: 3
+RC=0
+
+LOCAL_MUTATIONS_ON_MUTATED_WORKFLOW:
+PASS: portal-constants mutations blocked 24/35 (allowed 3, notrun 8)
+RC=0
+
+LOCAL_HARDENING_ON_MUTATED_WORKFLOW:
+PASS: portal-constants hardening blocked 15/18 (allowed 2, notrun 1)
+RC=0
+
+CI_RUN_BLOCK_SIMULATION: RC=0 OUTPUT_BYTES=0
+SOURCE_WORKTREE_STATUS=CLEAN
+```
+
+→ 뭘 시켰나: 변형된 서버 설정을 보면서 G3 세 파일을 로컬에서 각각 실행한 뒤, 조건문을 Bash의 실패 즉시 중단 모드로 그대로 실행했습니다.  
+→ 뭐가 나왔나: 세 자기검사는 모두 0이었고 실제 서버 묶음 모의 실행은 출력 없이 0이었습니다.  
+→ 좋은 소식인가 나쁜 소식인가: G3 전체를 한 번도 실행하지 않고 승인할 수 있으므로 치명적으로 나쁜 소식입니다.
+
+반증 기록: “정확한 실행 줄 + 선행 `exit 0`·`set +e` 차단이면 서버 실행이 보장된다”를 셸 조건문으로 반증 시도했고 성공했습니다.
+
+## 7. 보강 시험 자기 배선의 순환 결함
+
+```text
+MUTATED_WORKFLOW_WITH_HARDENING_LINE_REMOVED:
+52        run: |
+53          bash scripts/acceptance-hs-portal-constants.sh
+54          bash scripts/acceptance-hs-portal-constants-mutations.sh
+
+SCANNER_RESULT:
+PASS: portal constants outside contracts 0
+PASS: contracts zone violations 0
+PASS: ci/pre-push wiring intact
+PRODUCT_FILES: 2
+CHECKED: 50
+CONTRACT_FILES: 3
+RC=0
+
+MUTATION_RESULT_LAST_LINE:
+PASS: portal-constants mutations blocked 24/35 (allowed 3, notrun 8)
+RC=0
+
+HARDENING_IF_MANUALLY_RUN:
+ok [hardening baseline] exit=0
+ok [D1 IPv4 비루프백 host:port] exit=1
+ok [D1 미등재 .ai 도메인] exit=1
+ok [D1 CSS 자손 셀렉터] exit=1
+ok [D1 CSS 속성 셀렉터] exit=1
+ok [D1 공백 XPath] exit=1
+ok [D1 따옴표 CDP 포트] exit=1
+ok [D1 매핑형 CDP 포트] exit=1
+ok [D1 IPv6 루프백 host:port] exit=1
+ok [D2 run 블록 선행 exit 0] exit=1
+ok [D2 run 블록 실패 중단 해제] exit=1
+ok [D3 검사기 머리말 표식] exit=1
+ok [D3 mutation 시험 머리말 표식] exit=1
+ok [D4 임시공간 생성 실패] exit=2
+ok [D5 docs 실행 코드 은닉] exit=1
+ok [D5 정당한 문서 인용 — 오탐 금지] exit=0
+ok [D5 실행권한 달린 문서 위장] exit=1
+FAIL: hardening 자신이 CI(.github/workflows/verify.yml) 실행 줄에 없다 — 로컬에만 있는 검사는 없는 것으로 친다 (P15③)
+RC=1
+
+SIMULATED_CI_G3_STEP_AFTER_REMOVAL_RC=0
+SOURCE_WORKTREE_STATUS=CLEAN
+```
+
+→ 뭘 시켰나: 서버 설정에서 hardening 한 줄만 지우고 남은 두 실제 명령과, 삭제된 hardening을 수동으로 각각 실행했습니다.  
+→ 뭐가 나왔나: 서버에 남는 두 명령은 모두 0이고, 서버에서 사라진 hardening만 수동 실행할 때 1이었습니다.  
+→ 좋은 소식인가 나쁜 소식인가: 자기 자신이 실행돼야만 자기 삭제를 알 수 있어 서버 독립 방어가 아니므로 나쁜 소식입니다.
+
+반증 기록: “hardening의 자기 배선 검사가 자기 삭제를 막는다”를 실제 한 줄 삭제로 반증 시도했고 성공했습니다.
+
+## 8. 로컬 훅 선행 종료와 저장소 전체 백업
+
+```text
+MUTATED_PRE_PUSH_HEAD:
+1 #!/usr/bin/env bash
+2 exit 0
+3 # pre-push — push 시점 로컬 강제 장치 (P15)
+
+SCANNER_RESULT:
+PASS: portal constants outside contracts 0
+PASS: contracts zone violations 0
+PASS: ci/pre-push wiring intact
+PRODUCT_FILES: 2
+CHECKED: 50
+CONTRACT_FILES: 3
+RC=0
+
+MUTATION_RESULT_LAST_LINE:
+PASS: portal-constants mutations blocked 24/35 (allowed 3, notrun 8)
+RC=0
+
+HARDENING_RESULT_LAST_LINE:
+PASS: portal-constants hardening blocked 15/18 (allowed 2, notrun 1)
+RC=0
+
+ACTUAL_PRE_PUSH_RESULT: RC=0 OUTPUT_BYTES=0
+SOURCE_WORKTREE_STATUS=CLEAN
+```
+
+→ 뭘 시켰나: 로컬 업로드 직전 훅의 두 번째 줄에서 정상 종료하게 만들고 G3 세 검사와 훅 자체를 실행했습니다.  
+→ 뭐가 나왔나: G3는 배선 정상으로 보고했고 세 시험과 실제 훅이 모두 0, 실제 훅 출력은 0바이트였습니다.  
+→ 좋은 소식인가 나쁜 소식인가: G3 자체의 로컬 배선 증명에는 나쁜 소식입니다.
+
+저장소 전체의 별도 `acceptance-0-7.sh`를 같은 변형에 실행한 결과입니다.
+
+```text
+CROSS_GATE_ACCEPTANCE_0_7_ON_EARLY_EXIT_HOOK:
+[1/6] 검사기 자기 제외 → BLOCKED
+[2/6] 검사 약화(실패 무시) → BLOCKED
+[3/6] 만료일 없는 억제 → BLOCKED
+[4/6] LLM 출력→판정 필드 → BLOCKED
+[5/6] 미커밋 상태로 push → PASSED ← 결함, 차단되지 않음 (훅ON=0 · 훅OFF=0)
+[6/6] 가짜 외부효과 모듈 → BLOCKED
+RESULT: 차단되지 않았거나 시연이 무효인 항목이 있다. exit 1
+RC=1
+```
+
+→ 뭘 시켰나: G3 밖의 기존 훅 검증 장치가 조기 종료 훅을 잡는지 확인했습니다.  
+→ 뭐가 나왔나: 5번째 시연이 통과해 전체 1로 거부했습니다.  
+→ 좋은 소식인가 나쁜 소식인가: G3의 구멍은 남지만 현재 저장소 전체 서버 검사에는 백업이 있어 제한적인 좋은 소식입니다.
+
+## 9. hardening 시험의 연출·숫자·종료값 감사
+
+`scripts/acceptance-hs-portal-constants-hardening.sh:109-126`은 기대 숫자와 실제 숫자를 정확히 비교하는 줄입니다.
+
+```text
+109 expect_case() {
+110   local label="$1" want="$2" needle="$3"
+111   run_scanner
+112   if [ "$SCAN_RC" -ne "$want" ]; then
+113     echo "FAIL: hardening [$label] exit=$SCAN_RC (기대: 정확히 $want)"
+114     printf '%s\n' "$SCAN_OUT"
+115     exit 1
+116   fi
+117   if [ -n "$needle" ] && ! printf '%s\n' "$SCAN_OUT" | grep -qE "$needle"; then
+118     echo "FAIL: hardening [$label] 이유가 다르다 (exit=$SCAN_RC)"
+119     printf '%s\n' "$SCAN_OUT"
+120     exit 1
+121   fi
+122   case "$want" in
+123     0) allowed=$((allowed + 1)) ;;
+124     1) blocked=$((blocked + 1)) ;;
+125     2) notrun=$((notrun + 1)) ;;
+126   esac
+```
+
+→ 뭘 확인했나: 2나 127을 1처럼 세는지 소스에서 확인했습니다.  
+→ 뭐가 나왔나: 기대 숫자와 정확히 같아야 하고, 이유 문장도 맞아야 합니다.  
+→ 좋은 소식인가 나쁜 소식인가: 종료 숫자 혼동은 발견하지 못했으므로 좋은 소식입니다.
+
+```text
+INDEPENDENT_OUTPUT_COUNTS ok_total=18 exit0=2 exit1=14 exit2=1 self_wire_without_exit=1
+79:  total=$((total + 1))
+238:total=$((total + 1))
+INIT_CASE_INVOCATIONS=17
+EXTRA_TOTAL_INCREMENTS_AFTER_CASE_DEFINITIONS=1
+COMPUTED_TOTAL=18
+```
+
+→ 뭘 시켰나: 실행 출력의 종류를 독립 집계하고, 소스의 사례 함수 호출과 별도 증가를 다시 셌습니다.  
+→ 뭐가 나왔나: 전체 18은 정확하지만 실제 1은 14이며, 자기 배선 현재 상태 확인이 15번째 blocked로 분류됩니다.  
+→ 좋은 소식인가 나쁜 소식인가: 총수는 정직하지만 “15개 차단”은 실제 음성 공격 15개가 아니므로 나쁜 소식입니다.
+
+고정 파일명 겨냥은 발견하지 못했습니다. hardening의 여러 사례는 고정 이름을 사용하지만 본체는 모든 추적 제품 파일을 열거하며, 새 깊은 경로와 `.conf`의 기존 `.ai` 값도 1로 막았습니다. 반대로 이번 새 미탐은 이름을 바꿔서가 아니라 표현 규칙 자체가 좁아서 생겼습니다.
+
+hardening은 D3에서 본체와 원 mutation 두 파일만 직접 변형하고 자기 자신은 변형하지 않습니다. 그러나 본체의 와일드카드 경로가 세 번째 파일도 잡는지는 별도 복제 실행으로 확인했으므로 구현 결함으로 세지 않고 시험 범위 공백으로만 기록합니다.
+
+## 10. RED 불변과 실제 RED 실행
+
+RED(수정 전 시험이 올바른 이유로 실패하는 상태)와 GREEN(구현 뒤 같은 시험이 통과하는 상태)을 과거 커밋에서 다시 실행했습니다.
+
+```text
+RED1_AT_9bab751:
+FAIL: required G3 implementation missing: scripts/acceptance-hs-portal-constants.sh
+RC=1
+
+RED2_AT_37d2fa7:
+ok [hardening baseline] exit=0
+FAIL: hardening [D1 IPv4 비루프백 host:port] exit=0 (기대: 정확히 1)
+PASS: portal constants outside contracts 0
+PASS: contracts zone violations 0
+PASS: ci/pre-push wiring intact
+PRODUCT_FILES: 3
+CHECKED: 15
+CONTRACT_FILES: 2
+RC=1
+
+ANCESTOR 9bab751 -> HEAD: YES
+ANCESTOR 37d2fa7 -> HEAD: YES
+ANCESTOR dfccaa7 -> HEAD: YES
+```
+
+→ 뭘 시켰나: 두 RED 시점의 정확한 커밋을 별도 복제해 당시 시험을 실행하고 현재 HEAD의 조상인지 확인했습니다.  
+→ 뭐가 나왔나: RED1은 구현 부재, RED2는 첫 IPv4 미탐이라는 올바른 이유로 각각 1이었습니다.  
+→ 좋은 소식인가 나쁜 소식인가: RED 순서는 실제였으므로 좋은 소식입니다.
+
+Git 객체 ID와 SHA-256(파일 내용이 같으면 같은 값이 나오는 지문) 대조 전문입니다.
+
+```text
+FROZEN_FILE=scripts/acceptance-hs-portal-constants-mutations.sh
+BASE=9bab751
+BASE_BLOB=0cf07fa078a8856255369b3fff255f8c31334d18
+HEAD_BLOB=0cf07fa078a8856255369b3fff255f8c31334d18
+BASE_SHA256=84b6bad0465a208513a81f6abbd0a2ae65e05ae16839f5855ec1e0fab0905210
+HEAD_SHA256=84b6bad0465a208513a81f6abbd0a2ae65e05ae16839f5855ec1e0fab0905210
+DIFF_RC=0
+DIFF_OUTPUT=<empty>
+LATER_TOUCH_COMMITS=<none>
+
+FROZEN_FILE=scripts/acceptance-hs-portal-constants-hardening.sh
+BASE=37d2fa7
+BASE_BLOB=bb5e3ee7378418b6f1ded80678eb0b0bd488e726
+HEAD_BLOB=bb5e3ee7378418b6f1ded80678eb0b0bd488e726
+BASE_SHA256=5e05339f7e23f19ceabc9c113713e34831fef9c44ba0a5c4eba416d6e06da57f
+HEAD_SHA256=5e05339f7e23f19ceabc9c113713e34831fef9c44ba0a5c4eba416d6e06da57f
+DIFF_RC=0
+DIFF_OUTPUT=<empty>
+LATER_TOUCH_COMMITS=<none>
+```
+
+→ 뭘 시켰나: 각 정본 생성 커밋과 현재 HEAD의 파일 내용·차이·후속 접촉 이력을 비교했습니다.  
+→ 뭐가 나왔나: 두 파일 모두 객체와 지문이 같고 차이와 후속 접촉이 없습니다.  
+→ 좋은 소식인가 나쁜 소식인가: RED 불변 주장은 사실이므로 좋은 소식입니다.
+
+## 11. 문서와 구현 불일치
+
+SOT(single source of truth, 팀이 최종 기준으로 삼는 문서)인 `docs/sot/verification-commands.md:27`은 G3 단계에 hardening까지 포함한다고 적습니다.
+
+```text
+27 | 4 | HumanSearch G3 포털 상수·locator 경계 | 인라인 — `acceptance-hs-portal-constants.sh` + `-mutations` + `-hardening` (운영 상수·locator 는 contracts/ 한 곳 · P22, exit 0/1/2 3상태, hardening 은 V1 적대검증 결함 5종 봉쇄 증명) |
+44 **CI는 고정 목록이고 로컬 `pre-push`는 글로브(이름 규칙 자동 수집)다.** ... **새 `scripts/acceptance-*.sh`를 추가하는 PR은 `verify.yml`과 이 표 양쪽에 자기 줄을 함께 넣어야 한다.**
+```
+
+→ 뭘 확인했나: hardening의 서버 등록이 필수인지 정본 문서에서 읽었습니다.  
+→ 뭐가 나왔나: hardening 포함과 새 스크립트의 서버 줄 필수가 명시돼 있습니다.  
+→ 좋은 소식인가 나쁜 소식인가: 본체가 그 줄 삭제를 거부하지 않으므로 나쁜 소식입니다.
+
+반면 goal과 패턴 주석은 D5 이전 설명을 유지합니다.
+
+```text
+docs/engineering/humansearch-g3-portal-constants-goal-2026-08-12.md:93-95
+93 - `docs/` 정확 접두 경로는 문서이므로 금지 패턴을 적용하지 않는다
+95   단 CHECKED에 세지 않고 별도 보고하지도 않는다
+
+contracts/portal-constants-deny-patterns.txt:2
+2 # 적용: docs/·contracts/ 를 뺀 모든 추적 파일 (검사기 자신·scripts/·hooks/ 포함, 자기면제 없음).
+```
+
+→ 뭘 확인했나: D5 수정 뒤 계약과 패턴 주석도 같이 바뀌었는지 읽었습니다.  
+→ 뭐가 나왔나: 본체는 조건부 면제인데 두 설명은 문서 전체 면제라고 남아 있습니다.  
+→ 좋은 소식인가 나쁜 소식인가: 현재 실행은 고쳤지만 다음 유지보수 기준이 갈라져 나쁜 소식입니다.
+
+## 12. 수용 한계와 이번 결함의 경계
+
+결함으로 세지 않은 항목은 다음과 같습니다.
+
+- `scripts/` 등 제품 루트 밖의 원시 CSS·일반 URL: 문서화된 한계입니다.
+- `humansearch/pyproject.toml`·`humansearch/uv.lock` 같은 직속 비코드 설정: 문서화된 한계입니다.
+- 문자열 조각 조립, `\xNN` 같은 문자 숨김, 여러 조각의 런타임 결합: 사용자가 명시한 비범위입니다.
+- 컴파일·생성 뒤에만 나타나는 값: 사용자가 명시한 빌드 산출물 비범위입니다.
+- 실행 권한 없는 허용 문서 확장자의 포털 사례 인용: 이번 D5 설계상 허용입니다.
+
+이번 결함으로 센 10개 값은 모두 제품 루트 안의 추적 파일에 한 줄짜리 직접 문자열 또는 직접 숫자로 적었습니다. JavaScript 역따옴표는 조각 조립이나 문자 숨김이 아니라 언어의 직접 문자열 표기이므로 비범위로 돌리지 않았습니다.
+
+## 13. 최종 반증 의무 기록
+
+- X: “1차 8개가 여전히 샌다”를 Y: 두 최종 패턴 직접 대조와 깊은 새 경로 전체 실행으로 반증 시도했으나 실패했습니다. 8개는 모두 막혔습니다.
+- X: “D2의 `exit 0`·`set +e`가 여전히 샌다”를 Y: 독립 복제 워크플로 주입으로 반증 시도했으나 실패했습니다. 둘 다 1입니다.
+- X: “D3 세 번째 hardening 파일은 머리말로 빠진다”를 Y: 세 파일 각각 머리말 주입으로 반증 시도했으나 실패했습니다. 모두 1입니다.
+- X: “D4가 여전히 1을 낸다”를 Y: PATH 앞에 실패하는 `mktemp`를 넣어 반증 시도했으나 실패했습니다. 정확히 2입니다.
+- X: “D5가 여전히 docs 전체를 건너뛴다”를 Y: 새 `.py`, 실행 가능한 대문자 `.HTML`, 비실행 대문자 `.MD`로 반증 시도했으나 실패했습니다. 결과는 1·1·0입니다.
+- X: “새 패턴이 같은 범주의 흔한 직접 표현까지 봉쇄한다”를 Y: 10개 새 값으로 반증 시도했고 성공했습니다. 전부 0입니다.
+- X: “서버의 정확한 세 줄 검사가 실제 실행을 증명한다”를 Y: 셸 조건문으로 반증 시도했고 성공했습니다. 자체 점검 3개와 실제 묶음이 모두 0입니다.
+- X: “hardening 자기 배선이 자기 삭제를 막는다”를 Y: 서버 줄 삭제로 반증 시도했고 성공했습니다. 서버에 남는 명령은 모두 0입니다.
+- X: “G3가 로컬 훅의 조기 종료를 감지한다”를 Y: 훅 2행 `exit 0`으로 반증 시도했고 성공했습니다. 단 저장소 전체 별도 시험은 1로 백업 차단합니다.
+- X: “GREEN이 RED 시험을 고쳤다”를 Y: 객체 ID·SHA-256·diff·후속 이력으로 반증 시도했으나 실패했습니다. 두 정본은 불변입니다.
+- X: “18과 15는 모두 실제 고장 주입 수다”를 Y: 출력 종류와 소스 호출 수로 반증 시도했습니다. 18은 맞지만 실제 1은 14이고 자기 줄 현재 상태 확인 1개가 blocked에 포함됩니다.
+
+## 14. 명령·출력 장부와 최종 상태
+
+실행 명령은 병렬로 보낸 독립 명령도 각각 한 개로 세고, 계획 갱신·파일 패치·대기 호출은 세지 않았습니다. 명령 전달기 문법 오류로 셸이 시작되지 않은 두 건도 세지 않았고, 셸이 실제 시작된 뒤 실패한 탐색·따옴표 명령은 셌습니다.
+
+주요 명령 전문은 위 각 절에 출력과 함께 붙였습니다. 나머지 조사 명령은 다음과 같습니다.
+
+```text
+1  pwd + codeaudit SKILL.md 전체 읽기 + AGENTS.md 검색
+2  omx explore 경로 탐색 → cargo 부재로 실패
+3  git status/rev-parse/log
+4  rg --files 대상 파일 열거
+5  goal 적대검증·계약 검색
+6  본체 전체 줄번호 열람
+7  hardening 전체 줄번호 열람
+8  패턴 두 벌 줄번호 열람
+9~19 goal·본체·mutation·workflow·hook·두 커밋을 구간별 열람
+20 본체 실행
+21 원 mutation 35건 실행
+22 hardening 18건 실행
+23 1차 8종 패턴 직접 대조
+24 현재 workflow G3 줄 열람
+25 pre-push 전체와 관련 표식 검색
+26 새 표현 10종 1차 패턴 대조
+27 잘못 전달된 \x27·\x60 대조 — 결함 근거 제외
+28 따옴표 전달 명령이 zsh 확장 오류로 실패 — 재시도
+29 실제 따옴표·역따옴표 3종 대조
+30 독립 D2/D3/D4/D5 복제 실행
+31 새 표현 앞 5종 전체 검사 실행
+32 새 표현 뒤 5종 재실행
+33 셸 조건문 서버 우회 실행
+34 hardening 서버 줄 삭제 실행
+35 pre-push 선행 종료 실행
+36 hardening 출력 독립 집계
+37 잘못된 19 계산을 18로 재계산
+38 RED 정본 Git 객체·SHA-256 비교
+39 RED1·RED2 과거 커밋 실행
+40 계약·SOT·구현 교차 검색
+41 최종 git 상태·diff 검사·HEAD 확인
+42 G3 세 셸 파일 bash -n
+43 SOT·goal·패턴 주석 정확 줄 열람
+44 pre-push 조기 종료를 acceptance-0-7로 교차 실행
+45 약화 패턴·다른 보호 장치 저장소 전역 검색
+46 판정 파일 상위 디렉터리 생성·확인
+47 판정 임시 파일을 지정 경로로 복사
+48 strict brief-lint 1차 형식 검사
+49 형식 검사 출력을 덧붙이기 위해 판정 파일을 임시 작업 파일로 복사
+50 갱신한 판정 파일을 지정 경로로 다시 복사
+51 strict brief-lint 2차 형식 검사
+52 판정 파일 첫 줄·마지막 줄·형식 숫자·저장소 청결 최종 확인
+```
+
+→ 뭘 정리했나: 실제 셸이 시작된 명령 52개의 목적을 빠짐없이 적었습니다.  
+→ 뭐가 나왔나: 핵심 실행 출력은 위에 전문으로 보존했고, 조사·열람 명령은 이 장부에 목적을 남겼습니다.  
+→ 좋은 소식인가 나쁜 소식인가: 재현 가능성과 누락 확인에는 좋은 소식입니다.
+
+브리핑 형식 검사 1차 출력 전문입니다. 이 숫자는 문서 형식만 증명하며 G3 합격 근거가 아닙니다.
+
+```text
+코드블록 25개 (예시 제외 0개) / 해석 누락 0개 · 부실 0개
+표 해석: 이상 없음
+1층(결론): 줄 3 / 본문 360자
+1층 전문용어: 0개
+결정 카드 3건 완비 / 불완전 0건
+증거 보관 경로: 이상 없음 (실재 확인 2건)
+브리핑 계약 기계 검사: 위반 0건 (문서 1개)
+※ 형식만 센다. 설명이 이해되는지·위험의 무게가 보존됐는지는 사람이 본다.
+※ 이 검사는 홈 폴더에만 있어 서버 자동 검사에 없다 — 회사 차원의 합격 근거가 아니다.
+```
+
+→ 뭘 시켰나: strict 브리핑 계약 검사기로 판정서의 세 층 구조, 용어, 코드 출력 해설, 설계 카드, 보관 경로를 셌습니다.  
+→ 뭐가 나왔나: 위반 0건이었습니다.  
+→ 좋은 소식인가 나쁜 소식인가: 형식에는 좋은 소식이지만 구현 품질 판정과는 무관합니다.
+
+최종 정적 상태는 다음과 같습니다.
+
+```text
+git status --short --branch
+## task/humansearch-g3-portal-constants
+
+git rev-parse HEAD
+fb512e11ab1ff725d9992aead782c0a3b787ac6a
+
+git diff --check
+<출력 없음, exit 0>
+
+bash -n scripts/acceptance-hs-portal-constants.sh scripts/acceptance-hs-portal-constants-mutations.sh scripts/acceptance-hs-portal-constants-hardening.sh
+BASH_N_RC=0
+```
+
+→ 뭘 시켰나: 감사 뒤 원본 변경 여부, 현재 커밋, 공백 오류, 세 셸 파일 문법을 확인했습니다.  
+→ 뭐가 나왔나: 원본은 깨끗하고 HEAD는 지정값이며 차이 오류와 셸 문법 오류가 없습니다.  
+→ 좋은 소식인가 나쁜 소식인가: 감사가 원본을 오염시키지 않았다는 좋은 소식입니다.
+
+## 최종 조치 우선순위
+
+1. 서버 G3 단계 안의 셸 제어문을 허용하지 말고, 세 명령의 실제 실행 증거를 독립 확인하셔야 합니다. 이 항목이 고쳐지기 전에는 병합 승인 금지입니다.
+2. hardening 줄을 본체 또는 별도 독립 장치가 요구하게 하고, “줄 삭제 → 서버 단계 1” 음성 시험을 RED3로 먼저 고정하셔야 합니다.
+3. 이번 10개 직접 표현을 새 RED3에 각각 넣고, 유한 TLD 열거·포트 키·CSS·XPath 문법을 범주 단위로 다시 설계하셔야 합니다.
+4. G3가 `hooks/pre-push`의 선행 종료와 실제 G3 실행 목록을 확인하게 하되, 현재 `acceptance-0-7` 백업도 유지하셔야 합니다.
+5. goal 93-95행과 전역 패턴 주석 2행을 현재 문서 면제 구현과 일치시키셔야 합니다.
+
+COMMANDS_RUN: 52
+
+---8<--- codex verdict 2차 원문 끝 ---8<---
+
