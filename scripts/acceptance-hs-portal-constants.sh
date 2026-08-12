@@ -29,8 +29,6 @@ PRODUCT_PATTERNS=contracts/portal-constants-deny-patterns-product.txt
 PRODUCT_ROOTS="humansearch/src humansearch/tests"
 WF=.github/workflows/verify.yml
 HOOK=hooks/pre-push
-SELF_LINE="bash scripts/acceptance-hs-portal-constants.sh"
-SIBLING_LINE="bash scripts/acceptance-hs-portal-constants-mutations.sh"
 
 # 임시 작업공간 생성 실패는 위반(1)이 아니라 검사 불능(2)이다 — set -e 에 맡기면
 # mktemp 의 1 이 그대로 새어 나가 규칙 위반과 환경 고장이 구분되지 않는다 (V1 결함 D4).
@@ -152,31 +150,48 @@ while IFS= read -r -d '' path; do
   esac
 done < "$FILES"
 
-# ── 배선 자기 검사 (사전감사 벡터 1·2) ─────────────────────────────────────────
+# ── 배선 자기 검사 (사전감사 벡터 1·2, V1 결함 D2·D3, V1 2차 결함 N2·N3) ──────
 # CI 는 수동 열거(verify.yml)라 여기 등록되지 않으면 "로컬에만 있는 검사"가 되고,
-# P15③ 은 그것을 없는 것으로 친다. 이 검사기 자신이 양쪽 배선을 확인한다 —
-# 이 검사기가 pre-push 글로브로도 CI 로도 돌기 때문에, 어느 한쪽을 끊는 변경은
-# 남은 한쪽에서 이 검사가 exit 1 을 낸다.
+# P15③ 은 그것을 없는 것으로 친다. 이 검사기 자신이 양쪽 배선을 확인한다.
 wiring_fail=0
 wire_bad() { wiring_fail=$((wiring_fail + 1)); printf '  wiring: %s\n' "$1"; }
 
-# 실행 줄 검사: 주석 제거 후 정확한 한 줄(접두 echo·옵션·후미 파이프/무력화 불가)이
-# 있어야 하고, 그 줄이 속한 스텝 블록에 if: 조건·오류 무시 설정이 없어야 한다.
+# 존재하는 G3 검사 파일 전부가 각자 CI 실행 줄을 가져야 한다. 요구 목록을 파일
+# 존재에서 만들므로 새 G3 검사를 추가하면 CI 줄도 자동으로 요구된다 (V1 2차 N3).
+# 잔여 한계: 검사 파일 자체를 지우면 요구도 사라진다 — 그 삭제는 diff·P13 라벨·
+# RED 원장 분모 감소로 드러난다 (goal 문서 한계 절).
+G3_FILES=$(find . -maxdepth 2 -name 'acceptance-hs-portal-constants*.sh' \
+  -not -path './worktrees/*' -not -path './.git/*' | sed 's|^\./||' | LC_ALL=C sort)
+# awk -v 는 개행을 못 받으므로(BSD awk) 세미콜론으로 잇는다 — 경로에 ; 는 없다.
+ALLOWED_CMDS=""
+while IFS= read -r g3f; do
+  if [ -z "$g3f" ]; then continue; fi
+  ALLOWED_CMDS="${ALLOWED_CMDS}bash ${g3f};"
+done <<G3EOF
+$G3_FILES
+G3EOF
+
+# G3 스텝 블록은 허용 목록으로 검사한다: 주석·빈 줄·`run: |`·G3 실행 줄만 허용.
+# "정확한 줄이 있는가"만 보면 셸 제어문(if false; then ... fi)으로 감싸 실행 0회로
+# 만들 수 있다(V1 2차 N2 — 치명). 그래서 블록 안의 모든 이물질 줄을 배선 훼손으로 본다
+# — 선행 종료·실패 중단 해제·echo·후미 무력화·조건 키까지 한 규칙으로 잡힌다.
 ci_line_ok() {
   local tgt="$1"
-  awk -v tgt="$tgt" '
+  awk -v tgt="$tgt" -v cmds="$ALLOWED_CMDS" '
+    BEGIN { n = split(cmds, arr, ";"); for (i = 1; i <= n; i++) if (arr[i] != "") allow[arr[i]] = 1 }
     function flush() { if (has && ok) good = 1 }
-    /^[[:space:]]*-[[:space:]]*name:/ { flush(); has = 0; ok = 1 }
+    /^[[:space:]]*-[[:space:]]*name:/ { flush(); has = 0; ok = 1; inblk = 1; next }
     {
+      if (!inblk) next
       line = $0
       sub(/^[[:space:]]+/, "", line)
       sub(/[[:space:]]+$/, "", line)
-      if (line == tgt) has = 1
-      if (line ~ /^if:/) ok = 0
-      if (index(line, "continue" "-on-" "error") > 0) ok = 0
-      # run 블록 안의 선행 종료·실패 중단 해제는 "줄은 있지만 실행되지 않는" 우회다 (V1 결함 D2)
-      if (line ~ /^exit([[:space:]]|$)/) ok = 0
-      if (line ~ /^set[[:space:]]+\+e([[:space:]]|$)/) ok = 0
+      if (line == "") next
+      if (line ~ /^#/) next
+      if (line == tgt) { has = 1; next }
+      if (line in allow) next
+      if (line == "run: |") next
+      ok = 0
     }
     END { flush(); exit good ? 0 : 1 }
   ' "$WF"
@@ -185,8 +200,12 @@ ci_line_ok() {
 if [ ! -f "$WF" ]; then
   wire_bad "CI 워크플로($WF) 부재 — 판정 권한이 있는 쪽이 비어 있다"
 else
-  ci_line_ok "$SELF_LINE" || wire_bad "CI 에 검사기 실행 줄이 없거나 무력화됨: $SELF_LINE"
-  ci_line_ok "$SIBLING_LINE" || wire_bad "CI 에 mutation 실행 줄이 없거나 무력화됨: $SIBLING_LINE"
+  while IFS= read -r g3f; do
+    if [ -z "$g3f" ]; then continue; fi
+    ci_line_ok "bash $g3f" || wire_bad "CI 실행 줄이 없거나 블록이 오염됨: bash $g3f"
+  done <<G3EOF2
+$G3_FILES
+G3EOF2
 fi
 
 if [ ! -f "$HOOK" ] || [ ! -x "$HOOK" ]; then
@@ -195,8 +214,12 @@ else
   if ! grep -qF -- "-o -name 'acceptance-*.sh'" "$HOOK"; then
     wire_bad "pre-push 의 acceptance 글로브 수집식이 사라졌다"
   fi
-  found_self=$(find . -maxdepth 2 -name 'acceptance-*.sh' \
-    -not -path './worktrees/*' -not -path './.git/*' | grep -cF 'acceptance-hs-portal-constants')
+  # 훅 상단의 무조건 exit 0 은 수집 이전에 훅 전체를 무력화한다 (V1 2차 N3 절반).
+  # 순정 pre-push 에는 순수 `exit 0` 줄이 없다(실측: exit 1 두 곳과 exit "$fail" 뿐).
+  if sed -e 's/[[:space:]]*#.*//' "$HOOK" | grep -qE '^[[:space:]]*exit[[:space:]]+0[[:space:]]*$'; then
+    wire_bad "pre-push 에 무조건 exit 0 줄이 있다 — 훅이 검사 전에 통과한다"
+  fi
+  found_self=$(printf '%s\n' "$G3_FILES" | grep -cF 'acceptance-hs-portal-constants')
   if [ "$found_self" -lt 2 ]; then
     wire_bad "글로브 수집 재현에서 검사기·mutation 이 다 잡히지 않는다 (found=$found_self)"
   fi
@@ -208,10 +231,9 @@ else
     if head -20 "$g3f" | grep -qF "$G3_MARK"; then
       wire_bad "G3 검사 파일이 pre-push 건너뛰기 표식을 달고 있다: $g3f"
     fi
-  done <<G3LIST
-$(find . -maxdepth 2 -name 'acceptance-hs-portal-constants*.sh' \
-    -not -path './worktrees/*' -not -path './.git/*')
-G3LIST
+  done <<G3EOF3
+$G3_FILES
+G3EOF3
 fi
 
 # ── 판정 ─────────────────────────────────────────────────────────────────────

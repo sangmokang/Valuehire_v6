@@ -24,7 +24,7 @@
 | 1 | 비밀 스캔 (verify.sh) | `bash verify.sh` — 추적 파일 전체 |
 | 2 | HumanSearch G1 클린룸 경계 | 인라인 8개 — `acceptance-hs-cleanroom.sh` + `-mutations`·`-absolute-paths`·`-absolute-contexts`·`-colon-paths`·`-file-urls`·`-hook-env`·`-hook-env-mutations` |
 | 3 | HumanSearch G2 테스트 게이트 | 인라인 — `uv` 설치 후 `acceptance-hs-gates.sh` + `-mutations`·`-antiforge` (정적 ruff/mypy + pytest 수집·runtime import 증명) |
-| 4 | HumanSearch G3 포털 상수·locator 경계 | 인라인 — `acceptance-hs-portal-constants.sh` + `-mutations` + `-hardening` (운영 상수·locator 는 contracts/ 한 곳 · P22, exit 0/1/2 3상태, hardening 은 V1 적대검증 결함 5종 봉쇄 증명) |
+| 4 | HumanSearch G3 포털 상수·locator 경계 | 인라인 — `acceptance-hs-portal-constants.sh` + `-mutations` + `-hardening` + `-hardening2` (운영 상수·locator 는 contracts/ 한 곳 · P22, exit 0/1/2 3상태, hardening/-2 는 V1 적대검증 1·2차 결함 봉쇄 증명. 검사기가 존재하는 G3 파일 전부의 CI 실행 줄을 요구하고 스텝 블록을 허용 목록으로 검사) |
 | 5 | 히스토리 전량 스캔 | 인라인 — 도달 가능한 모든 blob 을 열어 자격증명 패턴 대조 |
 | 6 | 인수 검사 0-6 | `bash scripts/acceptance-0-6.sh` |
 | 7 | 인수 검사 0-7 | `bash scripts/acceptance-0-7.sh` — 훅 위반 6종 시연 |
