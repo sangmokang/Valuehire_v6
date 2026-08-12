@@ -1,0 +1,29 @@
+[project]
+name = "humansearch"
+version = "0.1.0"
+description = "HumanSearch v6 clean-room package boundary (G2 verification plumbing only)"
+requires-python = ">=3.14"
+
+# hypothesis 는 순수 판정 함수가 처음 생기는 단계에서 P5 와 함께 추가한다 —
+# 지금 넣으면 호출자 0 인 의존성(고아)이다. 계약 291-293행의 허용 목록 안에서만 고른다.
+[dependency-groups]
+dev = [
+    "ruff>=0.9",
+    "mypy>=1.14",
+    "pytest>=8.3",
+]
+
+# 사업 로직이 없는 검증 배관 단계라 배포 패키지 빌드는 하지 않는다.
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.mypy]
+strict = true
+mypy_path = "src"
+
+[tool.ruff]
+line-length = 100

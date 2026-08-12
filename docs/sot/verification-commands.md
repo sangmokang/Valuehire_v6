@@ -33,6 +33,8 @@ bash scripts/acceptance-hs-cleanroom-colon-paths.sh        # G1 · PATH/remote �
 bash scripts/acceptance-hs-cleanroom-file-urls.sh          # G1 · 로컬 file URL
 bash scripts/acceptance-hs-cleanroom-hook-env.sh           # G1 · 실제 Git hook 환경 격리
 bash scripts/acceptance-hs-cleanroom-hook-env-mutations.sh # G1 · hook 변수 unset 변이
+bash scripts/acceptance-hs-gates.sh           # 2026-08-12 추가 (G2 · 정적 ruff/mypy + pytest 수집·runtime import 증명, uv 필요)
+bash scripts/acceptance-hs-gates-mutations.sh # G2 · 게이트 무력화 행동 뮤테이션 6종 + baseline
 ```
 
 **CI는 고정 목록이고 로컬 `pre-push`는 글로브(이름 규칙 자동 수집)다.** 그래서 새 인수 스크립트를 만들면 로컬에서는 저절로 돌지만 CI에서는 한 줄도 안 돈다 — P15③("로컬에만 있는 검사는 없는 것으로 친다")에 걸린다. **새 `scripts/acceptance-*.sh`를 추가하는 PR은 `verify.yml`과 이 표 양쪽에 자기 줄을 함께 넣어야 한다.**
