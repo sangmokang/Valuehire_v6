@@ -25,6 +25,26 @@ jobs:
         # 로컬 전용 .secret-patterns 는 gitignore 되어 여기 없다.
         run: bash verify.sh
 
+      - name: HumanSearch G1 클린룸 경계
+        run: |
+          bash scripts/acceptance-hs-cleanroom.sh
+          bash scripts/acceptance-hs-cleanroom-mutations.sh
+          bash scripts/acceptance-hs-cleanroom-absolute-paths.sh
+          bash scripts/acceptance-hs-cleanroom-absolute-contexts.sh
+          bash scripts/acceptance-hs-cleanroom-colon-paths.sh
+          bash scripts/acceptance-hs-cleanroom-file-urls.sh
+          bash scripts/acceptance-hs-cleanroom-hook-env.sh
+          bash scripts/acceptance-hs-cleanroom-hook-env-mutations.sh
+
+      - name: HumanSearch G2 테스트 게이트 (정적·단위 + runtime import 증명)
+        # uv 버전은 계약 C-8(0.11.3)에 고정. Python 3.14.1은 uv가 .python-version으로 내려받는다.
+        run: |
+          command -v uv > /dev/null 2>&1 || pipx install uv==0.11.3
+          uv --version
+          bash scripts/acceptance-hs-gates.sh
+          bash scripts/acceptance-hs-gates-mutations.sh
+          bash scripts/acceptance-hs-gates-antiforge.sh
+
       - name: 히스토리 전량 스캔 (도달 가능한 모든 blob)
         # verify.sh는 현재 체크아웃의 추적 파일만 본다. 과거 커밋에 들어갔다가 지워진 비밀은
         # 그것만으로는 잡히지 않으므로, reflog 포함 도달 가능한 모든 blob을 직접 열어 검사한다.
@@ -148,6 +168,12 @@ jobs:
 
       - name: 인수 검사 hs-a4 (대용량·산출물 차단이 실제로 도는가)
         run: bash scripts/acceptance-hs-a4.sh
+
+      - name: 인수 검사 secret-webhook-vendor (웹훅·벤더 키 탐지 · AC-S1)
+        # 로컬 pre-push 는 acceptance-*.sh 를 글로브로 전량 실행하지만 CI 는 고정 목록이다.
+        # 여기 등록하지 않으면 이 검사는 '로컬에만 있는 검사'가 되고, P15③ 은 그것을
+        # 없는 것으로 친다(이 파일 111행 주석의 "판정 권한은 CI에 있다"와 같은 근거).
+        run: bash scripts/acceptance-secret-webhook-vendor.sh
 
       - name: 인수 검사 verify-ac-m (mechanism 명부 대조 · AC-M)
         # 명부(docs/sot/mechanism-registry.yaml)와 실제 검사 장치의 일치를 강제한다.

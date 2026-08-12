@@ -40,3 +40,11 @@ worktrees/
 
 # 비공개 리뷰 결과 (루트). 기존 규칙은 .claude/private-reviews/ 만 덮고 있었다.
 /private-reviews/
+
+# Python (G2 게이트가 humansearch/ 에서 만드는 로컬 산출물 — 커밋 금지)
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
