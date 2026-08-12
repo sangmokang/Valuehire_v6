@@ -174,14 +174,17 @@ $G3_FILES
 G3EOF
 
 # G3 스텝의 `run: |` 리터럴 블록만 실행 줄로 인정한다. "정확한 줄이 있는가"만 보면
-# 셸 제어문(if false; then ... fi)으로 감싸거나(V1 2차 N2 · 치명), 실행되지 않는 env
-# 값 문자열 안에 가짜 단계를 넣어(V1 3차 F1 · 치명) 실행 0회로 만들 수 있다.
+# 셸 제어문(if false; then ... fi)으로 감싸거나(V1 2차 N2 · 치명), 실행되지 않는 값
+# 문자열 안에 가짜 단계를 넣어(V1 3차 F1 · env / codeaudit A2 · 임의 키 · 둘 다 치명)
+# 실행 0회로 만들 수 있다.
 #
-# 그래서 워크플로를 들여쓰기로 읽어 ⑴ `env:` 키 하위(값 문자열 전체)는 실행 칸이
-# 아니므로 배제하고 ⑵ tgt 가 실제 `run: |` 블록 안에 있으며 그 블록이 주석·빈 줄·
-# 허용된 G3 실행 줄만 담을 때에만 통과시킨다. 완벽한 YAML 파싱은 아니다 — 텍스트 검사의
+# 그래서 워크플로를 들여쓰기로 읽어 ⑴ `run: |` 이 아닌 모든 `키: |`/`키: >` 리터럴
+# 블록 스칼라 하위(값 문자열 전체)는 실행 칸이 아니므로 통째로 배제하고 ⑵ tgt 가
+# 실제 `run: |` 블록 안에 있으며 그 블록이 주석·빈 줄·허용된 G3 실행 줄만 담을 때에만
+# 통과시킨다. env: 하나만 배제하던 열거식은 다른 키 이름마다 구멍이 났으므로(A2 실측)
+# 리터럴 스칼라 전체를 일반 배제로 닫는다. 완벽한 YAML 파싱은 아니다 — 텍스트 검사의
 # 근본 한계와 "실제 CI 실행 영수증"은 저장소 공통 후속 과제다(hooks/pre-push:82-85 가
-# 같은 한계를 자인). 이 검사는 알려진 구체 우회(셸 감싸기·env 값 은닉)를 닫는다.
+# 같은 한계를 자인). 이 검사는 알려진 구체 우회(셸 감싸기·값 문자열 은닉)를 닫는다.
 ci_line_ok() {
   local tgt="$1"
   awk -v tgt="$tgt" -v cmds="$ALLOWED_CMDS" '
@@ -200,10 +203,12 @@ ci_line_ok() {
       sub(/[[:space:]]+$/, "", line)
       if (line == "") next
 
-      # env: 서브트리(값 문자열 전체)는 실행 칸이 아니다 — 통째로 배제한다.
-      if (in_env) {
-        if (i > env_ind) next
-        in_env = 0
+      # 비-run 리터럴 스칼라 서브트리(값 문자열 전체)는 실행 칸이 아니다 — 통째 배제.
+      # env: 뿐 아니라 description:/note:/run-name: 등 임의 `키: |`/`키: >` 가 대상이다
+      # (codeaudit A2: env 만 배제하면 다른 키로 우회됨).
+      if (in_lit) {
+        if (i > lit_ind) next
+        in_lit = 0
       }
 
       # run 블록 종료: run 키와 같거나 더 얕은 들여쓰기의 비어있지 않은 줄 → 블록만 닫고
@@ -213,17 +218,20 @@ ci_line_ok() {
       # 스텝 경계(리스트 항목) — 스텝 판정을 확정하고 초기화.
       if (line ~ /^-[[:space:]]/) { flush(); next }
 
-      # env: 키 진입 — 이 스텝의 run 블록을 닫고 하위를 배제한다.
-      if (line ~ /^env:([[:space:]]|$)/) { in_run = 0; in_env = 1; env_ind = i; next }
+      # run: | 실행 칸 진입.
+      if (!in_run && line ~ /^run:[[:space:]]*\|/) { in_run = 1; run_ind = i; next }
+
+      # run 이 아닌 리터럴/폴디드 블록 스칼라 진입 → 하위 배제. `키: |`, `키: >` 와
+      # 그 인디케이터 변형(|-, |+, >-, +숫자)을 덮는다.
+      if (!in_run && line ~ /^[^[:space:]#][^:]*:[[:space:]]*[|>][+-]?[0-9]*[[:space:]]*$/) {
+        in_lit = 1; lit_ind = i; next
+      }
 
       # 스텝 레벨 조건/오류무시 — run 블록 밖에서 만나면 이 스텝은 조건부 실행이다 (mutations
       # if_false·continue-on-error 회귀 방어). run 블록 안의 `if ...` 는 아래 이물질로 잡힌다.
       if (!in_run && (line ~ /^if:/ || index(line, "continue" "-on-" "error") == 1)) { cond = 1; next }
 
-      if (!in_run) {
-        if (line ~ /^run:[[:space:]]*\|/) { in_run = 1; run_ind = i }
-        next
-      }
+      if (!in_run) next
 
       # run 블록 내용
       if (line ~ /^#/) next
