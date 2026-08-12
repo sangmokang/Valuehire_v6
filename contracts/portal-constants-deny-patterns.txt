@@ -13,8 +13,8 @@ find_elemen[t]
 \.locato[r]\(
 wait_for_selecto[r]
 
-# XPath 리터럴 (// + 식별자 + [@ 속성)
-//[a-z*][a-z0-9]*\[@
+# XPath 리터럴 (// + 식별자 + [@ 속성 — 공백 변형 포함, V1 결함 D1)
+//[a-z*][a-z0-9]*[[:space:]]*\[[[:space:]]*[@]
 
 # CDP(브라우저 원격조종) 디버그 포트 — 플래그와 관례 대역(922x)
 remote-debugging-por[t]

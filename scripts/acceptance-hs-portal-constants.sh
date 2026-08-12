@@ -32,10 +32,12 @@ HOOK=hooks/pre-push
 SELF_LINE="bash scripts/acceptance-hs-portal-constants.sh"
 SIBLING_LINE="bash scripts/acceptance-hs-portal-constants-mutations.sh"
 
-GCLEAN=$(mktemp)
-PCLEAN=$(mktemp)
-FILES=$(mktemp)
-ERRS=$(mktemp)
+# 임시 작업공간 생성 실패는 위반(1)이 아니라 검사 불능(2)이다 — set -e 에 맡기면
+# mktemp 의 1 이 그대로 새어 나가 규칙 위반과 환경 고장이 구분되지 않는다 (V1 결함 D4).
+GCLEAN=$(mktemp) || { echo "FAIL: temp workspace unavailable"; exit 2; }
+PCLEAN=$(mktemp) || { echo "FAIL: temp workspace unavailable"; exit 2; }
+FILES=$(mktemp) || { echo "FAIL: temp workspace unavailable"; exit 2; }
+ERRS=$(mktemp) || { echo "FAIL: temp workspace unavailable"; exit 2; }
 cleanup() { rm -f -- "$GCLEAN" "$PCLEAN" "$FILES" "$ERRS"; }
 trap cleanup EXIT
 trap 'cleanup; trap - EXIT; exit 143' TERM
@@ -124,7 +126,18 @@ while IFS= read -r -d '' path; do
       esac
       continue
       ;;
-    docs/*) continue ;;
+    docs/*)
+      # 문서 면제는 디렉터리 전체가 아니라 "문서 확장자 + 정규 비실행 파일"에만 준다.
+      # 통 면제는 docs/run-portal.py 같은 실행 코드의 은닉 경로가 된다 (V1 결함 D5).
+      lower=$(printf '%s' "$path" | tr '[:upper:]' '[:lower:]')
+      mode=$(git ls-files -s -- "$path" | awk '{print $1}')
+      case "$lower" in
+        *.md|*.yaml|*.yml|*.txt|*.html)
+          if [ "$mode" = "100644" ]; then continue; fi
+          ;;
+      esac
+      # 문서 형식이 아니거나 실행 가능한 docs 파일 → 전역 검사로 계속 진행
+      ;;
   esac
   checked=$((checked + 1))
   case "$path" in
@@ -161,6 +174,9 @@ ci_line_ok() {
       if (line == tgt) has = 1
       if (line ~ /^if:/) ok = 0
       if (index(line, "continue" "-on-" "error") > 0) ok = 0
+      # run 블록 안의 선행 종료·실패 중단 해제는 "줄은 있지만 실행되지 않는" 우회다 (V1 결함 D2)
+      if (line ~ /^exit([[:space:]]|$)/) ok = 0
+      if (line ~ /^set[[:space:]]+\+e([[:space:]]|$)/) ok = 0
     }
     END { flush(); exit good ? 0 : 1 }
   ' "$WF"
@@ -184,6 +200,18 @@ else
   if [ "$found_self" -lt 2 ]; then
     wire_bad "글로브 수집 재현에서 검사기·mutation 이 다 잡히지 않는다 (found=$found_self)"
   fi
+  # pre-push 는 파일 첫 20줄의 건너뛰기 표식을 보고 검사를 CI 로 넘긴다. G3 파일에 그
+  # 표식이 붙으면 로컬 절반이 조용히 사라지므로 여기서 차단한다 (V1 결함 D3).
+  G3_MARK=$(printf '# PUSH-%s' 'PERFORMING')
+  while IFS= read -r g3f; do
+    if [ -z "$g3f" ]; then continue; fi
+    if head -20 "$g3f" | grep -qF "$G3_MARK"; then
+      wire_bad "G3 검사 파일이 pre-push 건너뛰기 표식을 달고 있다: $g3f"
+    fi
+  done <<G3LIST
+$(find . -maxdepth 2 -name 'acceptance-hs-portal-constants*.sh' \
+    -not -path './worktrees/*' -not -path './.git/*')
+G3LIST
 fi
 
 # ── 판정 ─────────────────────────────────────────────────────────────────────
