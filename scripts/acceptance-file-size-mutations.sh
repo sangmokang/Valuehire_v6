@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 계약: docs/engineering/file-size-gate-goal-2026-08-15.md AC-FS1·AC-FS2·§⑩
-# 501줄 차단, 500줄 허용, 검사 대상 0개 차단을 격리된 Git 저장소에서 검증한다.
+# 경계·0개 차단과 tests·.venv 디렉터리 제외를 격리된 Git 저장소에서 검증한다.
 set -euo pipefail
 
 unset GIT_DIR GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_WORK_TREE GIT_COMMON_DIR
@@ -26,6 +26,7 @@ trap 'cleanup; trap - EXIT; exit 129' HUP
 
 total=0
 passed=0
+failed=0
 CASE_DIR=""
 
 init_case() {
@@ -42,28 +43,36 @@ make_lines() {
 }
 
 run_case() {
-  local label="$1" expected_rc="$2" expected_text="$3" output rc=0
+  local label="$1" expected_rc="$2" output rc=0 expected_text
+  shift 2
   output=$(cd "$CASE_DIR" && FILE_SIZE_ROOTS=humansearch/src bash "$GATE" 2>&1) || rc=$?
 
   if [ "$rc" -ne "$expected_rc" ]; then
     echo "FAIL: $label 종료값 불일치 (기대=$expected_rc, 실제=$rc)"
     printf '%s\n' "$output"
-    exit 1
+    failed=$((failed + 1))
+    return
   fi
-  if ! printf '%s\n' "$output" | grep -qF -- "$expected_text"; then
-    echo "FAIL: $label 필수 출력 누락: $expected_text"
-    printf '%s\n' "$output"
-    exit 1
-  fi
+  for expected_text in "$@"; do
+    if ! printf '%s\n' "$output" | grep -qF -- "$expected_text"; then
+      echo "FAIL: $label 필수 출력 누락: $expected_text"
+      printf '%s\n' "$output"
+      failed=$((failed + 1))
+      return
+    fi
+  done
 
   printf 'PASS: %s (exit=%s)\n' "$label" "$rc"
   passed=$((passed + 1))
 }
 
 init_case
-make_lines 501 "$CASE_DIR/humansearch/src/too-large.py"
-git -C "$CASE_DIR" add humansearch/src/too-large.py
-run_case "501줄 파일 차단" 1 "초과: humansearch/src/too-large.py 501줄"
+make_lines 501 "$CASE_DIR/humansearch/src/my_tests_util.py"
+make_lines 501 "$CASE_DIR/humansearch/src/contests.py"
+git -C "$CASE_DIR" add humansearch/src/my_tests_util.py humansearch/src/contests.py
+run_case "tests 글자가 이름에 든 501줄 일반 파일 차단" 1 \
+  "초과: humansearch/src/my_tests_util.py 501줄" \
+  "초과: humansearch/src/contests.py 501줄"
 
 init_case
 make_lines 500 "$CASE_DIR/humansearch/src/at-limit.ts"
@@ -75,5 +84,30 @@ init_case
 printf 'not source\n' > "$CASE_DIR/humansearch/src/README.md"
 git -C "$CASE_DIR" add humansearch/src/README.md
 run_case "검사 대상 0개 차단" 1 "FAIL: 검사 대상 0개"
+
+init_case
+mkdir -p "$CASE_DIR/humansearch/src/feature/tests/fixtures"
+printf 'small\n' > "$CASE_DIR/humansearch/src/app.py"
+make_lines 501 "$CASE_DIR/humansearch/src/feature/tests/fixtures/test_oversized.py"
+git -C "$CASE_DIR" add -- \
+  humansearch/src/app.py \
+  humansearch/src/feature/tests/fixtures/test_oversized.py
+run_case "깊은 tests 디렉터리의 추적 501줄 파일 제외" 0 \
+  "PASS: 검사 대상 1개, 500줄 한도 준수"
+
+init_case
+mkdir -p "$CASE_DIR/humansearch/src/vendor/.venv/lib"
+printf 'small\n' > "$CASE_DIR/humansearch/src/app.py"
+make_lines 501 "$CASE_DIR/humansearch/src/vendor/.venv/lib/vendor.py"
+git -C "$CASE_DIR" add -f -- \
+  humansearch/src/app.py \
+  humansearch/src/vendor/.venv/lib/vendor.py
+run_case "깊은 .venv 디렉터리의 추적 501줄 파일 제외" 0 \
+  "PASS: 검사 대상 1개, 500줄 한도 준수"
+
+if [ "$failed" -ne 0 ]; then
+  echo "FAIL: file-size mutations 통과 $passed/$total, 실패 $failed"
+  exit 1
+fi
 
 echo "PASS: file-size mutations $passed/$total"
