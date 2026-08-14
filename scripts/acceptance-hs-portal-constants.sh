@@ -219,13 +219,33 @@ ci_line_ok() {
       set[command] = true
     end
     workflow_defaults = workflow["defaults"]
-    workflow_shell = workflow_defaults.is_a?(Hash) && workflow_defaults["run"].is_a?(Hash) && workflow_defaults["run"].key?("shell")
+    workflow_run = workflow_defaults.is_a?(Hash) ? workflow_defaults["run"] : nil
+    workflow_shell = workflow_run.is_a?(Hash) && workflow_run.key?("shell")
+    workflow_working_directory = workflow_run.is_a?(Hash) && workflow_run.key?("working-directory")
+    forbidden_env_keys = ["BASH_ENV", "ENV", "SHELLOPTS", "PATH"]
+    unsafe_env = lambda do |owner|
+      owner.is_a?(Hash) && owner["env"].is_a?(Hash) &&
+        owner["env"].keys.map(&:to_s).any? { |key| forbidden_env_keys.include?(key) }
+    end
+    workflow_unsafe_env = unsafe_env.call(workflow)
 
     unsafe_g3_execution = false
     good = jobs.values.map do |job|
       next false unless job.is_a?(Hash) && job["steps"].is_a?(Array)
       job_defaults = job["defaults"]
-      job_shell = job_defaults.is_a?(Hash) && job_defaults["run"].is_a?(Hash) && job_defaults["run"].key?("shell")
+      job_run = job_defaults.is_a?(Hash) ? job_defaults["run"] : nil
+      job_shell = job_run.is_a?(Hash) && job_run.key?("shell")
+      job_working_directory = job_run.is_a?(Hash) && job_run.key?("working-directory")
+      job_unsafe_env = unsafe_env.call(job)
+      runs_on = job["runs-on"]
+      runs_on_valid = case runs_on
+                      when String
+                        !runs_on.strip.empty?
+                      when Array
+                        !runs_on.empty? && runs_on.all? { |label| label.is_a?(String) && !label.strip.empty? }
+                      else
+                        false
+                      end
       job_disqualified = job.key?("if") || job.key?("needs") || (job.key?("continue-on-error") && job["continue-on-error"] != false)
       job["steps"].map do |step|
         next false unless step.is_a?(Hash)
@@ -233,7 +253,11 @@ ci_line_ok() {
         next false unless run.is_a?(String)
 
         lines = run.each_line.map(&:strip).reject { |line| line.empty? || line.start_with?("#") }
-        unsafe_g3_execution = true if lines.include?(target) && (!job.key?("runs-on") || workflow_shell || job_shell || step.key?("shell"))
+        unsafe_g3_execution = true if lines.include?(target) && (
+          !runs_on_valid || workflow_shell || workflow_working_directory || workflow_unsafe_env ||
+          job_shell || job_working_directory || job_unsafe_env ||
+          step.key?("shell") || step.key?("working-directory") || unsafe_env.call(step)
+        )
         next false if job_disqualified || step.key?("if") || step.key?("continue-on-error")
         lines.include?(target) && lines.all? { |line| allowed.key?(line) }
       end.any?
