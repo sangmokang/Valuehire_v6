@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 계약: docs/engineering/file-size-gate-goal-2026-08-15.md AC-FS1·AC-FS2·§⑩
-# 제품 src 아래의 Git 추적 소스만 세되 tests·.venv 경로와 미추적 산출물 오탐을 막는다.
+# 제품 src 아래 Git 추적 소스만 세되 tests·.venv는 제외하고 추적 심볼릭 링크는 차단한다.
 #
 # 오탐 예외 절차: 임의 skip은 금지한다. 예외가 실제로 필요하면 경로·사유·책임자와
 # 만료일(YYYY-MM-DD)을 가진 명시적 목록, 만료 시 실패하는 자기시험, CI·SOT 배선을
@@ -61,7 +61,7 @@ trap 'cleanup; trap - EXIT; exit 130' INT
 trap 'cleanup; trap - EXIT; exit 129' HUP
 
 if [ "$#" -gt 0 ]; then
-  if ! git ls-files -z -- "$@" > "$FILES"; then
+  if ! git ls-files -z --stage -- "$@" > "$FILES"; then
     echo "FAIL: 검사 불능: Git 추적 파일 목록을 읽을 수 없음"
     exit 2
   fi
@@ -73,7 +73,14 @@ checked=0
 over_limit=0
 unreadable=0
 
-while IFS= read -r -d '' path; do
+while IFS= read -r -d '' entry; do
+  mode=${entry%% *}
+  path=${entry#*$'\t'}
+  if [ "$mode" = 120000 ]; then
+    echo "FAIL: 검사 불능: 추적 경로가 심볼릭 링크임: $path"
+    exit 2
+  fi
+
   case "/$path/" in
     */tests/*|*/.venv/*) continue ;;
   esac
