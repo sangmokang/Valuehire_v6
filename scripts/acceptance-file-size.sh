@@ -101,7 +101,7 @@ while IFS= read -r -d '' entry; do
   esac
 
   case "$path" in
-    *.py|*.ts|*.tsx|*.js|*.sh) ;;
+    *.[pP][yY]|*.[tT][sS]|*.[tT][sS][xX]|*.[jJ][sS]|*.[sS][hH]) ;;
     *) continue ;;
   esac
 
@@ -113,6 +113,28 @@ while IFS= read -r -d '' entry; do
   fi
   if [ ! -f "$path" ] || [ ! -r "$path" ]; then
     echo "FAIL: 검사 불능: 추적 파일을 읽을 수 없음: $path"
+    unreadable=1
+    continue
+  fi
+
+  LC_ALL=C grep -q $'\r' "$path"
+  cr_rc=$?
+  if [ "$cr_rc" -eq 0 ]; then
+    lf_count=$(LC_ALL=C wc -l < "$path")
+    wc_rc=$?
+    if [ "$wc_rc" -ne 0 ] || \
+      ! printf '%s\n' "$lf_count" | grep -qE '^[[:space:]]*[0-9]+[[:space:]]*$'; then
+      echo "FAIL: 검사 불능: 개행 문자를 셀 수 없음: $path"
+      unreadable=1
+      continue
+    fi
+    if [ "$lf_count" -eq 0 ]; then
+      echo "FAIL: 검사 불능: CR은 있지만 LF가 없는 파일: $path"
+      unreadable=1
+      continue
+    fi
+  elif [ "$cr_rc" -ne 1 ]; then
+    echo "FAIL: 검사 불능: 개행 형식을 읽을 수 없음: $path"
     unreadable=1
     continue
   fi
