@@ -54,9 +54,9 @@ for root in $ROOTS; do
     echo "FAIL: 검사 불능: 검사 루트가 심볼릭 링크임: $root"
     exit 2
   fi
-  if [ -d "$root" ]; then
-    set -- "$@" "$root"
-  fi
+  # 작업 폴더에 보이는 디렉터리만 고르면 skip-worktree로 숨긴 색인 항목을 놓친다.
+  # 존재 여부는 아래 git ls-files 결과로 판정하도록 모든 계약 루트를 조회한다.
+  set -- "$@" "$root"
 done
 
 FILES=$(mktemp "$REPO/.tmp-file-size-list.XXXXXX") || {
