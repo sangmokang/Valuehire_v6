@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # 계약: docs/engineering/file-size-gate-goal-2026-08-15.md AC-FS1·AC-FS2·§⑩
-# 경계·0개 차단, tests·.venv 제외, 추적 심볼릭 링크 차단을 격리 저장소에서 검증한다.
+# 경계·0개 차단, tests·.venv 제외, 시험 오버라이드 격리,
+# 추적 심볼릭 링크·하위 저장소 연결 차단을 격리 저장소에서 검증한다.
 set -euo pipefail
 
 unset GIT_DIR GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_WORK_TREE GIT_COMMON_DIR
@@ -42,11 +43,9 @@ make_lines() {
     > "$destination"
 }
 
-run_case() {
-  local label="$1" expected_rc="$2" output rc=0 expected_text
-  shift 2
-  output=$(cd "$CASE_DIR" && FILE_SIZE_ROOTS=humansearch/src bash "$GATE" 2>&1) || rc=$?
-
+record_result() {
+  local label="$1" expected_rc="$2" rc="$3" output="$4" expected_text
+  shift 4
   if [ "$rc" -ne "$expected_rc" ]; then
     echo "FAIL: $label 종료값 불일치 (기대=$expected_rc, 실제=$rc)"
     printf '%s\n' "$output"
@@ -64,6 +63,23 @@ run_case() {
 
   printf 'PASS: %s (exit=%s)\n' "$label" "$rc"
   passed=$((passed + 1))
+}
+
+run_case() {
+  local label="$1" expected_rc="$2" output rc=0
+  shift 2
+  output=$(cd "$CASE_DIR" && FILE_SIZE_TEST=1 \
+    FILE_SIZE_ROOTS=humansearch/src FILE_SIZE_LIMIT=500 bash "$GATE" 2>&1) || rc=$?
+  record_result "$label" "$expected_rc" "$rc" "$output" "$@"
+}
+
+run_without_test_override() {
+  local label="$1" expected_rc="$2" output rc=0
+  shift 2
+  output=$(cd "$CASE_DIR" && \
+    env -u FILE_SIZE_TEST -u FILE_SIZE_LIMIT \
+      FILE_SIZE_ROOTS=humansearch/src/allowed bash "$GATE" 2>&1) || rc=$?
+  record_result "$label" "$expected_rc" "$rc" "$output" "$@"
 }
 
 init_case
@@ -116,6 +132,26 @@ git -C "$CASE_DIR" add -- \
   humansearch/src/product
 run_case "일반 이름의 추적 디렉터리 링크 차단" 2 \
   "FAIL: 검사 불능: 추적 경로가 심볼릭 링크임: humansearch/src/product"
+
+init_case
+mkdir -p "$CASE_DIR/humansearch/src/allowed" "$CASE_DIR/humansearch/src/blocked"
+printf 'small\n' > "$CASE_DIR/humansearch/src/allowed/app.py"
+make_lines 501 "$CASE_DIR/humansearch/src/blocked/oversized.py"
+git -C "$CASE_DIR" add -- \
+  humansearch/src/allowed/app.py \
+  humansearch/src/blocked/oversized.py
+run_without_test_override "FILE_SIZE_TEST 없는 검사 루트 축소 무시" 1 \
+  "INFO: FILE_SIZE_TEST=1이 없어 시험용 오버라이드를 무시함" \
+  "초과: humansearch/src/blocked/oversized.py 501줄"
+
+init_case
+printf 'small\n' > "$CASE_DIR/humansearch/src/app.py"
+git -C "$CASE_DIR" add -- humansearch/src/app.py
+gitlink_sha=$(git -C "$REPO" rev-parse HEAD)
+git -C "$CASE_DIR" update-index --add \
+  --cacheinfo "160000,$gitlink_sha,humansearch/src/product"
+run_case "대상 루트 아래 하위 저장소 연결 차단" 2 \
+  "FAIL: 검사 불능: 추적 경로가 하위 저장소 연결임: humansearch/src/product"
 
 if [ "$failed" -ne 0 ]; then
   echo "FAIL: file-size mutations 통과 $passed/$total, 실패 $failed"
