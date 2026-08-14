@@ -6,7 +6,9 @@
 #   N1 G3 명령을 담은 작업에 작업 수준 if 키가 있으면 정확히 exit 1
 #   N2 G3 명령을 담은 작업에 작업 수준 continue-on-error: true가 있으면 정확히 exit 1
 #   N3 워크플로가 수동 실행 전용이면 정확히 exit 1
-#   정상 표본은 push와 pull_request 자동 실행 조건을 모두 가지며 정확히 exit 0
+#   N4 G3 단계·작업 기본값·워크플로 기본값의 shell 키가 있으면 정확히 exit 1
+#   N5 G3 명령을 담은 작업에 runs-on 키가 없으면 정확히 exit 1
+#   정상 표본은 push와 pull_request 자동 실행 조건 및 runs-on을 가지며 정확히 exit 0
 set -euo pipefail
 
 unset GIT_DIR GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_WORK_TREE GIT_COMMON_DIR
@@ -24,9 +26,9 @@ PRODUCT_PATTERNS_SOURCE=${G3_PRODUCT_PATTERNS_SOURCE:-contracts/portal-constants
 MODE=${1:-all}
 
 case "$MODE" in
-  all|n1|n2|n3) ;;
+  all|n1|n2|n3|step_shell|job_default_shell|workflow_default_shell|missing_runs_on|step_shell_duplicate|job_default_shell_duplicate|missing_runs_on_duplicate|step_shell_after_safe|job_default_shell_after_safe|missing_runs_on_after_safe) ;;
   *)
-    echo "FAIL: usage: $0 [all|n1|n2|n3]"
+    echo "FAIL: usage: $0 [all|n1|n2|n3|step_shell|job_default_shell|workflow_default_shell|missing_runs_on|step_shell_duplicate|job_default_shell_duplicate|missing_runs_on_duplicate|step_shell_after_safe|job_default_shell_after_safe|missing_runs_on_after_safe]"
     exit 1
     ;;
 esac
@@ -68,20 +70,54 @@ write_wf() {
       n3_paths_ignore) printf 'on:\n  push:\n    paths-ignore:\n      - "**"\n  pull_request:\n    paths-ignore:\n      - "**"\n' ;;
       *)               printf 'on:\n  push:\n  pull_request:\n' ;;
     esac
+    if [ "$variant" = workflow_default_shell ]; then
+      printf 'defaults:\n  run:\n    shell: echo {0}\n'
+    fi
     printf 'jobs:\n'
     if [ "$variant" = n1_needs ]; then
-      printf '  gate:\n    if: false\n    steps:\n      - run: echo skipped\n'
+      printf '  gate:\n    runs-on: ubuntu-latest\n    if: false\n    steps:\n      - run: echo skipped\n'
       printf '  verify:\n    needs: gate\n'
     else
       printf '  verify:\n'
     fi
     case "$variant" in
+      missing_runs_on|missing_runs_on_duplicate) ;;
+      *) printf '    runs-on: ubuntu-latest\n' ;;
+    esac
+    case "$variant" in
       n1)            printf '    if: false\n' ;;
       n2)            printf '    continue-on-error: %s\n' 'true' ;;
       n2_expression) printf '    continue-on-error: ${{ true }}\n' ;;
+      job_default_shell|job_default_shell_duplicate) printf '    defaults:\n      run:\n        shell: echo {0}\n' ;;
     esac
-    printf '    steps:\n      - name: g3\n        run: |\n'
+    printf '    steps:\n      - name: g3\n'
+    case "$variant" in
+      step_shell|step_shell_duplicate) printf '        shell: echo {0}\n' ;;
+    esac
+    printf '        run: |\n'
     write_commands '          '
+    case "$variant" in
+      step_shell_duplicate)
+        printf '      - name: g3 duplicate safe step\n        run: |\n'
+        write_commands '          '
+        ;;
+      job_default_shell_duplicate|missing_runs_on_duplicate)
+        printf '  verify_backup:\n    runs-on: ubuntu-latest\n    steps:\n      - name: g3 duplicate safe job\n        run: |\n'
+        write_commands '          '
+        ;;
+      step_shell_after_safe)
+        printf '      - name: g3 unsafe step after safe step\n        shell: echo {0}\n        run: |\n'
+        write_commands '          '
+        ;;
+      job_default_shell_after_safe)
+        printf '  verify_unsafe:\n    runs-on: ubuntu-latest\n    defaults:\n      run:\n        shell: echo {0}\n    steps:\n      - name: g3 unsafe job after safe job\n        run: |\n'
+        write_commands '          '
+        ;;
+      missing_runs_on_after_safe)
+        printf '  verify_unsafe:\n    steps:\n      - name: g3 job missing runs-on after safe job\n        run: |\n'
+        write_commands '          '
+        ;;
+    esac
   } > "$d/.github/workflows/verify.yml"
 }
 
@@ -170,6 +206,66 @@ assert_n3_paths_ignore_shape() {
   printf '%s\n' "$shape"
 }
 
+assert_execution_shape() {
+  local wf="$1" want_runs_on="$2" want_step_shell="$3"
+  local want_job_shell="$4" want_workflow_shell="$5" shape
+  shape=$(ruby -ryaml -e '
+    data = YAML.safe_load(File.read(ARGV.fetch(0)), [], [], false)
+    job = data.fetch("jobs").fetch("verify")
+    step = job.fetch("steps").find do |candidate|
+      candidate.is_a?(Hash) && candidate["run"].to_s.include?("acceptance-hs-portal-constants.sh")
+    end
+    abort "G3 step missing" unless step
+    job_defaults = job["defaults"]
+    workflow_defaults = data["defaults"]
+    puts "RUNS_ON=#{job.fetch("runs-on", "ABSENT")}"
+    puts "STEP_SHELL=#{step.fetch("shell", "ABSENT")}"
+    puts "JOB_DEFAULT_SHELL=#{job_defaults.is_a?(Hash) && job_defaults["run"].is_a?(Hash) ? job_defaults["run"].fetch("shell", "ABSENT") : "ABSENT"}"
+    puts "WORKFLOW_DEFAULT_SHELL=#{workflow_defaults.is_a?(Hash) && workflow_defaults["run"].is_a?(Hash) ? workflow_defaults["run"].fetch("shell", "ABSENT") : "ABSENT"}"
+  ' "$wf") || {
+    echo "FAIL: hardening6 execution fixture is not valid YAML"
+    exit 1
+  }
+  if [ "$shape" != "$(printf 'RUNS_ON=%s\nSTEP_SHELL=%s\nJOB_DEFAULT_SHELL=%s\nWORKFLOW_DEFAULT_SHELL=%s' \
+    "$want_runs_on" "$want_step_shell" "$want_job_shell" "$want_workflow_shell")" ]; then
+    echo "FAIL: hardening6 execution fixture has the wrong YAML ownership"
+    printf '%s\n' "$shape"
+    exit 1
+  fi
+  printf '%s\n' "$shape"
+}
+
+assert_duplicate_shape() {
+  local wf="$1" expected="$2" shape
+  shape=$(ruby -ryaml -e '
+    data = YAML.safe_load(File.read(ARGV.fetch(0)), [], [], false)
+    g3_jobs = data.fetch("jobs").values.select do |job|
+      job.is_a?(Hash) && job["steps"].is_a?(Array) && job["steps"].any? do |step|
+        step.is_a?(Hash) && step["run"].to_s.include?("acceptance-hs-portal-constants.sh")
+      end
+    end
+    g3_steps = g3_jobs.flat_map do |job|
+      job["steps"].select do |step|
+        step.is_a?(Hash) && step["run"].to_s.include?("acceptance-hs-portal-constants.sh")
+      end
+    end
+    puts "G3_JOBS=#{g3_jobs.length}"
+    puts "G3_STEPS=#{g3_steps.length}"
+    puts "RUNS_ON=#{g3_jobs.map { |job| job.fetch("runs-on", "ABSENT") }.join(",")}"
+    puts "STEP_SHELLS=#{g3_steps.map { |step| step.fetch("shell", "ABSENT") }.join(",")}"
+    puts "JOB_DEFAULT_SHELLS=#{g3_jobs.map { |job| job["defaults"].is_a?(Hash) && job["defaults"]["run"].is_a?(Hash) ? job["defaults"]["run"].fetch("shell", "ABSENT") : "ABSENT" }.join(",")}"
+  ' "$wf") || {
+    echo "FAIL: hardening6 duplicate fixture is not valid YAML"
+    exit 1
+  }
+  if [ "$shape" != "$expected" ]; then
+    echo "FAIL: hardening6 duplicate fixture has the wrong YAML ownership"
+    printf '%s\n' "$shape"
+    exit 1
+  fi
+  printf '%s\n' "$shape"
+}
+
 total=0
 blocked=0
 allowed=0
@@ -233,7 +329,88 @@ WIRE_RE='^FAIL: ci/pre-push wiring broken [1-9][0-9]*$'
 
 init_case
 assert_fixture_shape "$CASE_DIR/.github/workflows/verify.yml" ABSENT ABSENT true
+assert_execution_shape "$CASE_DIR/.github/workflows/verify.yml" ubuntu-latest ABSENT ABSENT ABSENT
 expect_case "hardening6 baseline" 0 '^PASS: ci/pre-push wiring intact$'
+
+if [ "$MODE" = all ] || [ "$MODE" = step_shell ]; then
+  init_case
+  write_wf "$CASE_DIR" step_shell
+  git -C "$CASE_DIR" add .github/workflows/verify.yml
+  assert_execution_shape "$CASE_DIR/.github/workflows/verify.yml" ubuntu-latest 'echo {0}' ABSENT ABSENT
+  expect_case "N4 step-level shell key" 1 "$WIRE_RE"
+fi
+
+if [ "$MODE" = all ] || [ "$MODE" = job_default_shell ]; then
+  init_case
+  write_wf "$CASE_DIR" job_default_shell
+  git -C "$CASE_DIR" add .github/workflows/verify.yml
+  assert_execution_shape "$CASE_DIR/.github/workflows/verify.yml" ubuntu-latest ABSENT 'echo {0}' ABSENT
+  expect_case "N4 job defaults.run.shell key" 1 "$WIRE_RE"
+fi
+
+if [ "$MODE" = all ] || [ "$MODE" = workflow_default_shell ]; then
+  init_case
+  write_wf "$CASE_DIR" workflow_default_shell
+  git -C "$CASE_DIR" add .github/workflows/verify.yml
+  assert_execution_shape "$CASE_DIR/.github/workflows/verify.yml" ubuntu-latest ABSENT ABSENT 'echo {0}'
+  expect_case "N4 workflow defaults.run.shell key" 1 "$WIRE_RE"
+fi
+
+if [ "$MODE" = all ] || [ "$MODE" = missing_runs_on ]; then
+  init_case
+  write_wf "$CASE_DIR" missing_runs_on
+  git -C "$CASE_DIR" add .github/workflows/verify.yml
+  assert_execution_shape "$CASE_DIR/.github/workflows/verify.yml" ABSENT ABSENT ABSENT ABSENT
+  expect_case "N5 missing runs-on key" 1 "$WIRE_RE"
+fi
+
+if [ "$MODE" = all ] || [ "$MODE" = step_shell_duplicate ]; then
+  init_case
+  write_wf "$CASE_DIR" step_shell_duplicate
+  git -C "$CASE_DIR" add .github/workflows/verify.yml
+  assert_duplicate_shape "$CASE_DIR/.github/workflows/verify.yml" $'G3_JOBS=1\nG3_STEPS=2\nRUNS_ON=ubuntu-latest\nSTEP_SHELLS=echo {0},ABSENT\nJOB_DEFAULT_SHELLS=ABSENT'
+  expect_case "N4 bad step plus duplicate safe step" 1 "$WIRE_RE"
+fi
+
+if [ "$MODE" = all ] || [ "$MODE" = job_default_shell_duplicate ]; then
+  init_case
+  write_wf "$CASE_DIR" job_default_shell_duplicate
+  git -C "$CASE_DIR" add .github/workflows/verify.yml
+  assert_duplicate_shape "$CASE_DIR/.github/workflows/verify.yml" $'G3_JOBS=2\nG3_STEPS=2\nRUNS_ON=ubuntu-latest,ubuntu-latest\nSTEP_SHELLS=ABSENT,ABSENT\nJOB_DEFAULT_SHELLS=echo {0},ABSENT'
+  expect_case "N4 bad job defaults plus duplicate safe job" 1 "$WIRE_RE"
+fi
+
+if [ "$MODE" = all ] || [ "$MODE" = missing_runs_on_duplicate ]; then
+  init_case
+  write_wf "$CASE_DIR" missing_runs_on_duplicate
+  git -C "$CASE_DIR" add .github/workflows/verify.yml
+  assert_duplicate_shape "$CASE_DIR/.github/workflows/verify.yml" $'G3_JOBS=2\nG3_STEPS=2\nRUNS_ON=ABSENT,ubuntu-latest\nSTEP_SHELLS=ABSENT,ABSENT\nJOB_DEFAULT_SHELLS=ABSENT,ABSENT'
+  expect_case "N5 missing runs-on plus duplicate safe job" 1 "$WIRE_RE"
+fi
+
+if [ "$MODE" = all ] || [ "$MODE" = step_shell_after_safe ]; then
+  init_case
+  write_wf "$CASE_DIR" step_shell_after_safe
+  git -C "$CASE_DIR" add .github/workflows/verify.yml
+  assert_duplicate_shape "$CASE_DIR/.github/workflows/verify.yml" $'G3_JOBS=1\nG3_STEPS=2\nRUNS_ON=ubuntu-latest\nSTEP_SHELLS=ABSENT,echo {0}\nJOB_DEFAULT_SHELLS=ABSENT'
+  expect_case "N4 unsafe step after duplicate safe step" 1 "$WIRE_RE"
+fi
+
+if [ "$MODE" = all ] || [ "$MODE" = job_default_shell_after_safe ]; then
+  init_case
+  write_wf "$CASE_DIR" job_default_shell_after_safe
+  git -C "$CASE_DIR" add .github/workflows/verify.yml
+  assert_duplicate_shape "$CASE_DIR/.github/workflows/verify.yml" $'G3_JOBS=2\nG3_STEPS=2\nRUNS_ON=ubuntu-latest,ubuntu-latest\nSTEP_SHELLS=ABSENT,ABSENT\nJOB_DEFAULT_SHELLS=ABSENT,echo {0}'
+  expect_case "N4 unsafe job defaults after duplicate safe job" 1 "$WIRE_RE"
+fi
+
+if [ "$MODE" = all ] || [ "$MODE" = missing_runs_on_after_safe ]; then
+  init_case
+  write_wf "$CASE_DIR" missing_runs_on_after_safe
+  git -C "$CASE_DIR" add .github/workflows/verify.yml
+  assert_duplicate_shape "$CASE_DIR/.github/workflows/verify.yml" $'G3_JOBS=2\nG3_STEPS=2\nRUNS_ON=ubuntu-latest,ABSENT\nSTEP_SHELLS=ABSENT,ABSENT\nJOB_DEFAULT_SHELLS=ABSENT,ABSENT'
+  expect_case "N5 missing runs-on after duplicate safe job" 1 "$WIRE_RE"
+fi
 
 if [ "$MODE" = all ] || [ "$MODE" = n1 ]; then
   init_case
