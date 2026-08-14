@@ -1,0 +1,300 @@
+#!/usr/bin/env bash
+# acceptance-hs-portal-constants-hardening6.sh — G3 CI 작업과 자동 실행 조건의 우회를
+# 독립 표본으로 증명한다. 기존 RED 원장 3벌의 공격 내용과 기대값은 바꾸지 않는다.
+#
+# 계약:
+#   N1 G3 명령을 담은 작업에 작업 수준 if 키가 있으면 정확히 exit 1
+#   N2 G3 명령을 담은 작업에 작업 수준 continue-on-error: true가 있으면 정확히 exit 1
+#   N3 워크플로가 수동 실행 전용이면 정확히 exit 1
+#   정상 표본은 push와 pull_request 자동 실행 조건을 모두 가지며 정확히 exit 0
+set -euo pipefail
+
+unset GIT_DIR GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_WORK_TREE GIT_COMMON_DIR
+unset GIT_ALTERNATE_OBJECT_DIRECTORIES
+
+REPO=$(git rev-parse --show-toplevel) || {
+  echo "FAIL: repository root unavailable"
+  exit 1
+}
+cd "$REPO"
+
+SCANNER_SOURCE=${G3_SCANNER_SOURCE:-scripts/acceptance-hs-portal-constants.sh}
+GLOBAL_PATTERNS_SOURCE=${G3_GLOBAL_PATTERNS_SOURCE:-contracts/portal-constants-deny-patterns.txt}
+PRODUCT_PATTERNS_SOURCE=${G3_PRODUCT_PATTERNS_SOURCE:-contracts/portal-constants-deny-patterns-product.txt}
+MODE=${1:-all}
+
+case "$MODE" in
+  all|n1|n2|n3) ;;
+  *)
+    echo "FAIL: usage: $0 [all|n1|n2|n3]"
+    exit 1
+    ;;
+esac
+
+for required in "$SCANNER_SOURCE" "$GLOBAL_PATTERNS_SOURCE" "$PRODUCT_PATTERNS_SOURCE"; do
+  if [ ! -f "$required" ]; then
+    echo "FAIL: required G3 source missing: $required"
+    exit 1
+  fi
+done
+if ! command -v ruby >/dev/null 2>&1; then
+  echo "FAIL: Ruby YAML parser unavailable"
+  exit 1
+fi
+
+SNAP0=$(git status --porcelain)
+SANDBOX=$(mktemp -d "$REPO/.g3-hardening6.XXXXXX")
+cleanup() { rm -rf -- "$SANDBOX"; }
+trap cleanup EXIT
+trap 'cleanup; trap - EXIT; exit 143' TERM
+trap 'cleanup; trap - EXIT; exit 130' INT
+trap 'cleanup; trap - EXIT; exit 129' HUP
+
+G3_NAMES="acceptance-hs-portal-constants acceptance-hs-portal-constants-mutations acceptance-hs-portal-constants-hardening acceptance-hs-portal-constants-hardening2 acceptance-hs-portal-constants-hardening3 acceptance-hs-portal-constants-hardening4 acceptance-hs-portal-constants-hardening5 acceptance-hs-portal-constants-hardening6"
+
+write_commands() {
+  local indent="$1" g
+  for g in $G3_NAMES; do
+    printf '%sbash scripts/%s.sh\n' "$indent" "$g"
+  done
+}
+
+write_wf() {
+  local d="$1" variant="$2"
+  {
+    printf 'name: verify\n'
+    case "$variant" in
+      n3)              printf 'on:\n  workflow_dispatch:\n' ;;
+      n3_paths_ignore) printf 'on:\n  push:\n    paths-ignore:\n      - "**"\n  pull_request:\n    paths-ignore:\n      - "**"\n' ;;
+      *)               printf 'on:\n  push:\n  pull_request:\n' ;;
+    esac
+    printf 'jobs:\n'
+    if [ "$variant" = n1_needs ]; then
+      printf '  gate:\n    if: false\n    steps:\n      - run: echo skipped\n'
+      printf '  verify:\n    needs: gate\n'
+    else
+      printf '  verify:\n'
+    fi
+    case "$variant" in
+      n1)            printf '    if: false\n' ;;
+      n2)            printf '    continue-on-error: %s\n' 'true' ;;
+      n2_expression) printf '    continue-on-error: ${{ true }}\n' ;;
+    esac
+    printf '    steps:\n      - name: g3\n        run: |\n'
+    write_commands '          '
+  } > "$d/.github/workflows/verify.yml"
+}
+
+assert_fixture_shape() {
+  local wf="$1" want_if="$2" want_coe="$3" want_auto="$4" shape
+  shape=$(ruby -ryaml -e '
+    data = YAML.safe_load(File.read(ARGV.fetch(0)), [], [], false)
+    trigger = data.key?("on") ? data["on"] : data[true]
+    events = case trigger
+             when String then [trigger]
+             when Array then trigger
+             when Hash then trigger.keys
+             else []
+             end.map(&:to_s)
+    job = data.fetch("jobs").fetch("verify")
+    puts "JOB_IF=#{job.key?("if") ? job["if"] : "ABSENT"}"
+    puts "JOB_CONTINUE_ON_ERROR=#{job.key?("continue-on-error") ? job["continue-on-error"] : "ABSENT"}"
+    puts "AUTO_TRIGGER=#{events.any? { |event| ["push", "pull_request"].include?(event) }}"
+  ' "$wf") || {
+    echo "FAIL: hardening6 fixture is not valid YAML"
+    exit 1
+  }
+  if [ "$shape" != "$(printf 'JOB_IF=%s\nJOB_CONTINUE_ON_ERROR=%s\nAUTO_TRIGGER=%s' "$want_if" "$want_coe" "$want_auto")" ]; then
+    echo "FAIL: hardening6 fixture has the wrong YAML ownership"
+    printf '%s\n' "$shape"
+    exit 1
+  fi
+  printf '%s\n' "$shape"
+}
+
+assert_n1_needs_shape() {
+  local wf="$1" shape
+  shape=$(ruby -ryaml -e '
+    data = YAML.safe_load(File.read(ARGV.fetch(0)), [], [], false)
+    jobs = data.fetch("jobs")
+    puts "G3_JOB_NEEDS=#{jobs.fetch("verify").fetch("needs", "ABSENT")}"
+    gate = jobs.fetch("gate")
+    puts "GATE_IF=#{gate.key?("if") ? gate["if"] : "ABSENT"}"
+  ' "$wf") || {
+    echo "FAIL: hardening6 N1 needs fixture is not valid YAML"
+    exit 1
+  }
+  if [ "$shape" != $'G3_JOB_NEEDS=gate\nGATE_IF=false' ]; then
+    echo "FAIL: hardening6 N1 needs fixture has the wrong YAML ownership"
+    printf '%s\n' "$shape"
+    exit 1
+  fi
+  printf '%s\n' "$shape"
+}
+
+assert_n2_expression_shape() {
+  local wf="$1" shape
+  shape=$(ruby -ryaml -e '
+    data = YAML.safe_load(File.read(ARGV.fetch(0)), [], [], false)
+    value = data.fetch("jobs").fetch("verify").fetch("continue-on-error")
+    puts "JOB_CONTINUE_ON_ERROR_CLASS=#{value.class}"
+    puts "JOB_CONTINUE_ON_ERROR=#{value}"
+  ' "$wf") || {
+    echo "FAIL: hardening6 N2 expression fixture is not valid YAML"
+    exit 1
+  }
+  if [ "$shape" != "$(printf 'JOB_CONTINUE_ON_ERROR_CLASS=String\nJOB_CONTINUE_ON_ERROR=%s' '${{ true }}')" ]; then
+    echo "FAIL: hardening6 N2 expression fixture has the wrong YAML ownership"
+    printf '%s\n' "$shape"
+    exit 1
+  fi
+  printf '%s\n' "$shape"
+}
+
+assert_n3_paths_ignore_shape() {
+  local wf="$1" shape
+  shape=$(ruby -ryaml -e '
+    data = YAML.safe_load(File.read(ARGV.fetch(0)), [], [], false)
+    trigger = data.key?("on") ? data["on"] : data[true]
+    puts "PUSH_PATHS_IGNORE=#{trigger.fetch("push").fetch("paths-ignore").join(",")}"
+    puts "PULL_REQUEST_PATHS_IGNORE=#{trigger.fetch("pull_request").fetch("paths-ignore").join(",")}"
+  ' "$wf") || {
+    echo "FAIL: hardening6 N3 filtered fixture is not valid YAML"
+    exit 1
+  }
+  if [ "$shape" != $'PUSH_PATHS_IGNORE=**\nPULL_REQUEST_PATHS_IGNORE=**' ]; then
+    echo "FAIL: hardening6 N3 filtered fixture has the wrong YAML ownership"
+    printf '%s\n' "$shape"
+    exit 1
+  fi
+  printf '%s\n' "$shape"
+}
+
+total=0
+blocked=0
+allowed=0
+wiring=0
+CASE_DIR=""
+
+init_case() {
+  total=$((total + 1))
+  CASE_DIR="$SANDBOX/case-$total"
+  mkdir -p "$CASE_DIR/scripts" "$CASE_DIR/contracts" "$CASE_DIR/hooks" \
+    "$CASE_DIR/.github/workflows" "$CASE_DIR/humansearch/src/humansearch" \
+    "$CASE_DIR/humansearch/tests" "$CASE_DIR/lib" "$CASE_DIR/.tmp"
+  git -C "$CASE_DIR" init -q
+  cp "$SCANNER_SOURCE" "$CASE_DIR/scripts/acceptance-hs-portal-constants.sh"
+  local f
+  for f in mutations hardening hardening2 hardening3 hardening4 hardening5 hardening6; do
+    printf '#!/usr/bin/env bash\n# wiring probe placeholder\n' \
+      > "$CASE_DIR/scripts/acceptance-hs-portal-constants-$f.sh"
+  done
+  cp "$GLOBAL_PATTERNS_SOURCE" "$CASE_DIR/contracts/portal-constants-deny-patterns.txt"
+  cp "$PRODUCT_PATTERNS_SOURCE" "$CASE_DIR/contracts/portal-constants-deny-patterns-product.txt"
+  cp hooks/pre-push "$CASE_DIR/hooks/pre-push"
+  chmod +x "$CASE_DIR/hooks/pre-push"
+  write_wf "$CASE_DIR" ok
+  printf 'PACKAGE_NAME = "humansearch"\n' > "$CASE_DIR/humansearch/src/humansearch/__init__.py"
+  printf 'def test_boundary():\n    assert True\n' > "$CASE_DIR/humansearch/tests/test_boundary.py"
+  local i
+  for i in 1 2 3 4 5 6 7 8; do
+    printf 'safe fixture %s\n' "$i" > "$CASE_DIR/lib/filler-$i.txt"
+  done
+  git -C "$CASE_DIR" add -A
+}
+
+run_scanner() {
+  SCAN_RC=0
+  SCAN_OUT=$(cd "$CASE_DIR" && TMPDIR="$CASE_DIR/.tmp" \
+    bash scripts/acceptance-hs-portal-constants.sh 2>&1) || SCAN_RC=$?
+}
+
+expect_case() {
+  local label="$1" want="$2" needle="$3"
+  run_scanner
+  if [ "$SCAN_RC" -ne "$want" ]; then
+    echo "FAIL: hardening6 [$label] exit=$SCAN_RC (기대: 정확히 $want)"
+    printf '%s\n' "$SCAN_OUT"
+    exit 1
+  fi
+  if ! printf '%s\n' "$SCAN_OUT" | grep -qE "$needle"; then
+    echo "FAIL: hardening6 [$label] 이유가 다르다 (exit=$SCAN_RC)"
+    printf '%s\n' "$SCAN_OUT"
+    exit 1
+  fi
+  case "$want" in
+    0) allowed=$((allowed + 1)) ;;
+    1) blocked=$((blocked + 1)) ;;
+  esac
+  printf 'ok [%s] exit=%s\n' "$label" "$want"
+}
+
+WIRE_RE='^FAIL: ci/pre-push wiring broken [1-9][0-9]*$'
+
+init_case
+assert_fixture_shape "$CASE_DIR/.github/workflows/verify.yml" ABSENT ABSENT true
+expect_case "hardening6 baseline" 0 '^PASS: ci/pre-push wiring intact$'
+
+if [ "$MODE" = all ] || [ "$MODE" = n1 ]; then
+  init_case
+  write_wf "$CASE_DIR" n1
+  git -C "$CASE_DIR" add .github/workflows/verify.yml
+  assert_fixture_shape "$CASE_DIR/.github/workflows/verify.yml" false ABSENT true
+  expect_case "N1 job-level if key" 1 "$WIRE_RE"
+
+  init_case
+  write_wf "$CASE_DIR" n1_needs
+  git -C "$CASE_DIR" add .github/workflows/verify.yml
+  assert_n1_needs_shape "$CASE_DIR/.github/workflows/verify.yml"
+  expect_case "N1 skipped prerequisite job" 1 "$WIRE_RE"
+fi
+
+if [ "$MODE" = all ] || [ "$MODE" = n2 ]; then
+  init_case
+  write_wf "$CASE_DIR" n2
+  git -C "$CASE_DIR" add .github/workflows/verify.yml
+  assert_fixture_shape "$CASE_DIR/.github/workflows/verify.yml" ABSENT true true
+  expect_case "N2 job-level continue-on-error true" 1 "$WIRE_RE"
+
+  init_case
+  write_wf "$CASE_DIR" n2_expression
+  git -C "$CASE_DIR" add .github/workflows/verify.yml
+  assert_n2_expression_shape "$CASE_DIR/.github/workflows/verify.yml"
+  expect_case "N2 job-level continue-on-error expression" 1 "$WIRE_RE"
+fi
+
+if [ "$MODE" = all ] || [ "$MODE" = n3 ]; then
+  init_case
+  write_wf "$CASE_DIR" n3
+  git -C "$CASE_DIR" add .github/workflows/verify.yml
+  assert_fixture_shape "$CASE_DIR/.github/workflows/verify.yml" ABSENT ABSENT false
+  expect_case "N3 workflow_dispatch-only trigger" 1 "$WIRE_RE"
+
+  init_case
+  write_wf "$CASE_DIR" n3_paths_ignore
+  git -C "$CASE_DIR" add .github/workflows/verify.yml
+  assert_n3_paths_ignore_shape "$CASE_DIR/.github/workflows/verify.yml"
+  expect_case "N3 automatic events filtered out" 1 "$WIRE_RE"
+fi
+
+if [ "$MODE" = all ]; then
+  total=$((total + 1))
+  if ! grep -v '^[[:space:]]*#' .github/workflows/verify.yml | grep -qE \
+    '^[[:space:]]*bash scripts/acceptance-hs-portal-constants-hardening6\.sh[[:space:]]*$'; then
+    echo "FAIL: hardening6 자신이 CI 실행 줄에 없다"
+    exit 1
+  fi
+  blocked=$((blocked + 1))
+  wiring=1
+  printf 'ok [%s]\n' "hardening6 자기 배선(CI 실행 줄)"
+fi
+
+cleanup
+trap - EXIT
+SNAP1=$(git status --porcelain)
+if [ "$SNAP0" != "$SNAP1" ]; then
+  echo "FAIL: hardening6 시험이 원본 저장소를 변형했다"
+  exit 1
+fi
+
+echo "PASS: portal-constants hardening6 cases $total (blocked-mutations $((blocked - wiring)), clean-baselines $allowed, wiring-present $wiring)"
