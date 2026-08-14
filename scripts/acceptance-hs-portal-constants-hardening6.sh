@@ -8,6 +8,10 @@
 #   N3 워크플로가 수동 실행 전용이면 정확히 exit 1
 #   N4 G3 단계·작업 기본값·워크플로 기본값의 shell 키가 있으면 정확히 exit 1
 #   N5 G3 명령을 담은 작업에 runs-on 키가 없으면 정확히 exit 1
+#   N6 G3 단계·작업 기본값·워크플로 기본값의 working-directory 키가 있으면 정확히 exit 1
+#   N7 G3 단계·작업·워크플로 env의 BASH_ENV·ENV·SHELLOPTS·PATH 키가 있으면 정확히 exit 1
+#   N8 runs-on은 비어 있지 않은 문자열 또는 그런 문자열의 비어 있지 않은 목록만 허용
+#   다른 무해한 env 키는 허용하며 정확히 exit 0
 #   정상 표본은 push와 pull_request 자동 실행 조건 및 runs-on을 가지며 정확히 exit 0
 set -euo pipefail
 
@@ -26,9 +30,9 @@ PRODUCT_PATTERNS_SOURCE=${G3_PRODUCT_PATTERNS_SOURCE:-contracts/portal-constants
 MODE=${1:-all}
 
 case "$MODE" in
-  all|n1|n2|n3|step_shell|job_default_shell|workflow_default_shell|missing_runs_on|step_shell_duplicate|job_default_shell_duplicate|missing_runs_on_duplicate|step_shell_after_safe|job_default_shell_after_safe|missing_runs_on_after_safe) ;;
+  all|n1|n2|n3|step_shell|job_default_shell|workflow_default_shell|missing_runs_on|step_shell_duplicate|job_default_shell_duplicate|missing_runs_on_duplicate|step_shell_after_safe|job_default_shell_after_safe|missing_runs_on_after_safe|step_working_directory|job_default_working_directory|workflow_default_working_directory|step_bash_env|job_bash_env|workflow_bash_env|step_env|job_shellopts_env|workflow_path_env|safe_env|runs_on_null|runs_on_empty_list|runs_on_false) ;;
   *)
-    echo "FAIL: usage: $0 [all|n1|n2|n3|step_shell|job_default_shell|workflow_default_shell|missing_runs_on|step_shell_duplicate|job_default_shell_duplicate|missing_runs_on_duplicate|step_shell_after_safe|job_default_shell_after_safe|missing_runs_on_after_safe]"
+    echo "FAIL: usage: $0 [all|n1|n2|n3|step_shell|job_default_shell|workflow_default_shell|missing_runs_on|step_shell_duplicate|job_default_shell_duplicate|missing_runs_on_duplicate|step_shell_after_safe|job_default_shell_after_safe|missing_runs_on_after_safe|step_working_directory|job_default_working_directory|workflow_default_working_directory|step_bash_env|job_bash_env|workflow_bash_env|step_env|job_shellopts_env|workflow_path_env|safe_env|runs_on_null|runs_on_empty_list|runs_on_false]"
     exit 1
     ;;
 esac
@@ -70,9 +74,13 @@ write_wf() {
       n3_paths_ignore) printf 'on:\n  push:\n    paths-ignore:\n      - "**"\n  pull_request:\n    paths-ignore:\n      - "**"\n' ;;
       *)               printf 'on:\n  push:\n  pull_request:\n' ;;
     esac
-    if [ "$variant" = workflow_default_shell ]; then
-      printf 'defaults:\n  run:\n    shell: echo {0}\n'
-    fi
+    case "$variant" in
+      workflow_default_shell)             printf 'defaults:\n  run:\n    shell: echo {0}\n' ;;
+      workflow_default_working_directory) printf 'defaults:\n  run:\n    working-directory: fake-checks\n' ;;
+      workflow_bash_env)                  printf 'env:\n  BASH_ENV: .g3-early-success.sh\n' ;;
+      workflow_path_env)                  printf 'env:\n  PATH: /tmp/fake-bin\n' ;;
+      safe_env)                           printf 'env:\n  SAFE_WORKFLOW_FLAG: enabled\n' ;;
+    esac
     printf 'jobs:\n'
     if [ "$variant" = n1_needs ]; then
       printf '  gate:\n    runs-on: ubuntu-latest\n    if: false\n    steps:\n      - run: echo skipped\n'
@@ -82,17 +90,28 @@ write_wf() {
     fi
     case "$variant" in
       missing_runs_on|missing_runs_on_duplicate) ;;
-      *) printf '    runs-on: ubuntu-latest\n' ;;
+      runs_on_null)                       printf '    runs-on:\n' ;;
+      runs_on_empty_list)                 printf '    runs-on: []\n' ;;
+      runs_on_false)                      printf '    runs-on: false\n' ;;
+      *)                                  printf '    runs-on: ubuntu-latest\n' ;;
     esac
     case "$variant" in
       n1)            printf '    if: false\n' ;;
       n2)            printf '    continue-on-error: %s\n' 'true' ;;
       n2_expression) printf '    continue-on-error: ${{ true }}\n' ;;
       job_default_shell|job_default_shell_duplicate) printf '    defaults:\n      run:\n        shell: echo {0}\n' ;;
+      job_default_working_directory)                 printf '    defaults:\n      run:\n        working-directory: fake-checks\n' ;;
+      job_bash_env)                                  printf '    env:\n      BASH_ENV: .g3-early-success.sh\n' ;;
+      job_shellopts_env)                             printf '    env:\n      SHELLOPTS: errexit\n' ;;
+      safe_env)                                      printf '    env:\n      SAFE_JOB_FLAG: enabled\n' ;;
     esac
     printf '    steps:\n      - name: g3\n'
     case "$variant" in
       step_shell|step_shell_duplicate) printf '        shell: echo {0}\n' ;;
+      step_working_directory)          printf '        working-directory: fake-checks\n' ;;
+      step_bash_env)                    printf '        env:\n          BASH_ENV: .g3-early-success.sh\n' ;;
+      step_env)                         printf '        env:\n          ENV: .g3-early-success.sh\n' ;;
+      safe_env)                         printf '        env:\n          SAFE_STEP_FLAG: enabled\n' ;;
     esac
     printf '        run: |\n'
     write_commands '          '
@@ -235,6 +254,71 @@ assert_execution_shape() {
   printf '%s\n' "$shape"
 }
 
+assert_working_directory_shape() {
+  local wf="$1" want_step="$2" want_job="$3" want_workflow="$4" shape
+  shape=$(ruby -ryaml -e '
+    data = YAML.safe_load(File.read(ARGV.fetch(0)), [], [], false)
+    job = data.fetch("jobs").fetch("verify")
+    step = job.fetch("steps").find { |candidate| candidate.is_a?(Hash) && candidate["run"].to_s.include?("acceptance-hs-portal-constants.sh") }
+    abort "G3 step missing" unless step
+    job_run = job["defaults"].is_a?(Hash) ? job["defaults"]["run"] : nil
+    workflow_run = data["defaults"].is_a?(Hash) ? data["defaults"]["run"] : nil
+    puts "STEP_WORKING_DIRECTORY=#{step.fetch("working-directory", "ABSENT")}"
+    puts "JOB_DEFAULT_WORKING_DIRECTORY=#{job_run.is_a?(Hash) ? job_run.fetch("working-directory", "ABSENT") : "ABSENT"}"
+    puts "WORKFLOW_DEFAULT_WORKING_DIRECTORY=#{workflow_run.is_a?(Hash) ? workflow_run.fetch("working-directory", "ABSENT") : "ABSENT"}"
+  ' "$wf") || {
+    echo "FAIL: hardening6 working-directory fixture is not valid YAML"
+    exit 1
+  }
+  if [ "$shape" != "$(printf 'STEP_WORKING_DIRECTORY=%s\nJOB_DEFAULT_WORKING_DIRECTORY=%s\nWORKFLOW_DEFAULT_WORKING_DIRECTORY=%s' "$want_step" "$want_job" "$want_workflow")" ]; then
+    echo "FAIL: hardening6 working-directory fixture has the wrong YAML ownership"
+    printf '%s\n' "$shape"
+    exit 1
+  fi
+  printf '%s\n' "$shape"
+}
+
+assert_env_shape() {
+  local wf="$1" want_step="$2" want_job="$3" want_workflow="$4" shape
+  shape=$(ruby -ryaml -e '
+    data = YAML.safe_load(File.read(ARGV.fetch(0)), [], [], false)
+    job = data.fetch("jobs").fetch("verify")
+    step = job.fetch("steps").find { |candidate| candidate.is_a?(Hash) && candidate["run"].to_s.include?("acceptance-hs-portal-constants.sh") }
+    abort "G3 step missing" unless step
+    keys = ->(owner) { owner.is_a?(Hash) && owner["env"].is_a?(Hash) ? owner["env"].keys.map(&:to_s).sort.join(",") : "ABSENT" }
+    puts "STEP_ENV_KEYS=#{keys.call(step)}"
+    puts "JOB_ENV_KEYS=#{keys.call(job)}"
+    puts "WORKFLOW_ENV_KEYS=#{keys.call(data)}"
+  ' "$wf") || {
+    echo "FAIL: hardening6 env fixture is not valid YAML"
+    exit 1
+  }
+  if [ "$shape" != "$(printf 'STEP_ENV_KEYS=%s\nJOB_ENV_KEYS=%s\nWORKFLOW_ENV_KEYS=%s' "$want_step" "$want_job" "$want_workflow")" ]; then
+    echo "FAIL: hardening6 env fixture has the wrong YAML ownership"
+    printf '%s\n' "$shape"
+    exit 1
+  fi
+  printf '%s\n' "$shape"
+}
+
+assert_runs_on_shape() {
+  local wf="$1" want_class="$2" want_value="$3" shape
+  shape=$(ruby -ryaml -e '
+    value = YAML.safe_load(File.read(ARGV.fetch(0)), [], [], false).fetch("jobs").fetch("verify").fetch("runs-on")
+    puts "RUNS_ON_CLASS=#{value.class}"
+    puts "RUNS_ON_VALUE=#{value.inspect}"
+  ' "$wf") || {
+    echo "FAIL: hardening6 runs-on fixture is not valid YAML"
+    exit 1
+  }
+  if [ "$shape" != "$(printf 'RUNS_ON_CLASS=%s\nRUNS_ON_VALUE=%s' "$want_class" "$want_value")" ]; then
+    echo "FAIL: hardening6 runs-on fixture has the wrong YAML value"
+    printf '%s\n' "$shape"
+    exit 1
+  fi
+  printf '%s\n' "$shape"
+}
+
 assert_duplicate_shape() {
   local wf="$1" expected="$2" shape
   shape=$(ruby -ryaml -e '
@@ -277,7 +361,8 @@ init_case() {
   CASE_DIR="$SANDBOX/case-$total"
   mkdir -p "$CASE_DIR/scripts" "$CASE_DIR/contracts" "$CASE_DIR/hooks" \
     "$CASE_DIR/.github/workflows" "$CASE_DIR/humansearch/src/humansearch" \
-    "$CASE_DIR/humansearch/tests" "$CASE_DIR/lib" "$CASE_DIR/.tmp"
+    "$CASE_DIR/humansearch/tests" "$CASE_DIR/lib" "$CASE_DIR/.tmp" \
+    "$CASE_DIR/fake-checks/scripts"
   git -C "$CASE_DIR" init -q
   cp "$SCANNER_SOURCE" "$CASE_DIR/scripts/acceptance-hs-portal-constants.sh"
   local f
@@ -285,6 +370,13 @@ init_case() {
     printf '#!/usr/bin/env bash\n# wiring probe placeholder\n' \
       > "$CASE_DIR/scripts/acceptance-hs-portal-constants-$f.sh"
   done
+  local fake_name
+  for fake_name in $G3_NAMES; do
+    printf '#!/usr/bin/env bash\n%s %s\n' 'exit' '0' \
+      > "$CASE_DIR/fake-checks/scripts/$fake_name.sh"
+    chmod +x "$CASE_DIR/fake-checks/scripts/$fake_name.sh"
+  done
+  printf '%s %s\n' 'exit' '0' > "$CASE_DIR/.g3-early-success.sh"
   cp "$GLOBAL_PATTERNS_SOURCE" "$CASE_DIR/contracts/portal-constants-deny-patterns.txt"
   cp "$PRODUCT_PATTERNS_SOURCE" "$CASE_DIR/contracts/portal-constants-deny-patterns-product.txt"
   cp hooks/pre-push "$CASE_DIR/hooks/pre-push"
@@ -331,6 +423,110 @@ init_case
 assert_fixture_shape "$CASE_DIR/.github/workflows/verify.yml" ABSENT ABSENT true
 assert_execution_shape "$CASE_DIR/.github/workflows/verify.yml" ubuntu-latest ABSENT ABSENT ABSENT
 expect_case "hardening6 baseline" 0 '^PASS: ci/pre-push wiring intact$'
+
+if [ "$MODE" = all ] || [ "$MODE" = step_working_directory ]; then
+  init_case
+  write_wf "$CASE_DIR" step_working_directory
+  git -C "$CASE_DIR" add -A
+  assert_working_directory_shape "$CASE_DIR/.github/workflows/verify.yml" fake-checks ABSENT ABSENT
+  expect_case "N6 step-level working-directory key" 1 "$WIRE_RE"
+fi
+
+if [ "$MODE" = all ] || [ "$MODE" = job_default_working_directory ]; then
+  init_case
+  write_wf "$CASE_DIR" job_default_working_directory
+  git -C "$CASE_DIR" add -A
+  assert_working_directory_shape "$CASE_DIR/.github/workflows/verify.yml" ABSENT fake-checks ABSENT
+  expect_case "N6 job defaults.run.working-directory key" 1 "$WIRE_RE"
+fi
+
+if [ "$MODE" = all ] || [ "$MODE" = workflow_default_working_directory ]; then
+  init_case
+  write_wf "$CASE_DIR" workflow_default_working_directory
+  git -C "$CASE_DIR" add -A
+  assert_working_directory_shape "$CASE_DIR/.github/workflows/verify.yml" ABSENT ABSENT fake-checks
+  expect_case "N6 workflow defaults.run.working-directory key" 1 "$WIRE_RE"
+fi
+
+if [ "$MODE" = all ] || [ "$MODE" = step_bash_env ]; then
+  init_case
+  write_wf "$CASE_DIR" step_bash_env
+  git -C "$CASE_DIR" add -A
+  assert_env_shape "$CASE_DIR/.github/workflows/verify.yml" BASH_ENV ABSENT ABSENT
+  expect_case "N7 step env BASH_ENV key" 1 "$WIRE_RE"
+fi
+
+if [ "$MODE" = all ] || [ "$MODE" = job_bash_env ]; then
+  init_case
+  write_wf "$CASE_DIR" job_bash_env
+  git -C "$CASE_DIR" add -A
+  assert_env_shape "$CASE_DIR/.github/workflows/verify.yml" ABSENT BASH_ENV ABSENT
+  expect_case "N7 job env BASH_ENV key" 1 "$WIRE_RE"
+fi
+
+if [ "$MODE" = all ] || [ "$MODE" = workflow_bash_env ]; then
+  init_case
+  write_wf "$CASE_DIR" workflow_bash_env
+  git -C "$CASE_DIR" add -A
+  assert_env_shape "$CASE_DIR/.github/workflows/verify.yml" ABSENT ABSENT BASH_ENV
+  expect_case "N7 workflow env BASH_ENV key" 1 "$WIRE_RE"
+fi
+
+if [ "$MODE" = all ] || [ "$MODE" = step_env ]; then
+  init_case
+  write_wf "$CASE_DIR" step_env
+  git -C "$CASE_DIR" add -A
+  assert_env_shape "$CASE_DIR/.github/workflows/verify.yml" ENV ABSENT ABSENT
+  expect_case "N7 step env ENV key" 1 "$WIRE_RE"
+fi
+
+if [ "$MODE" = all ] || [ "$MODE" = job_shellopts_env ]; then
+  init_case
+  write_wf "$CASE_DIR" job_shellopts_env
+  git -C "$CASE_DIR" add -A
+  assert_env_shape "$CASE_DIR/.github/workflows/verify.yml" ABSENT SHELLOPTS ABSENT
+  expect_case "N7 job env SHELLOPTS key" 1 "$WIRE_RE"
+fi
+
+if [ "$MODE" = all ] || [ "$MODE" = workflow_path_env ]; then
+  init_case
+  write_wf "$CASE_DIR" workflow_path_env
+  git -C "$CASE_DIR" add -A
+  assert_env_shape "$CASE_DIR/.github/workflows/verify.yml" ABSENT ABSENT PATH
+  expect_case "N7 workflow env PATH key" 1 "$WIRE_RE"
+fi
+
+if [ "$MODE" = all ] || [ "$MODE" = safe_env ]; then
+  init_case
+  write_wf "$CASE_DIR" safe_env
+  git -C "$CASE_DIR" add -A
+  assert_env_shape "$CASE_DIR/.github/workflows/verify.yml" SAFE_STEP_FLAG SAFE_JOB_FLAG SAFE_WORKFLOW_FLAG
+  expect_case "harmless env keys remain allowed" 0 '^PASS: ci/pre-push wiring intact$'
+fi
+
+if [ "$MODE" = all ] || [ "$MODE" = runs_on_null ]; then
+  init_case
+  write_wf "$CASE_DIR" runs_on_null
+  git -C "$CASE_DIR" add -A
+  assert_runs_on_shape "$CASE_DIR/.github/workflows/verify.yml" NilClass nil
+  expect_case "N8 runs-on null" 1 "$WIRE_RE"
+fi
+
+if [ "$MODE" = all ] || [ "$MODE" = runs_on_empty_list ]; then
+  init_case
+  write_wf "$CASE_DIR" runs_on_empty_list
+  git -C "$CASE_DIR" add -A
+  assert_runs_on_shape "$CASE_DIR/.github/workflows/verify.yml" Array '[]'
+  expect_case "N8 runs-on empty list" 1 "$WIRE_RE"
+fi
+
+if [ "$MODE" = all ] || [ "$MODE" = runs_on_false ]; then
+  init_case
+  write_wf "$CASE_DIR" runs_on_false
+  git -C "$CASE_DIR" add -A
+  assert_runs_on_shape "$CASE_DIR/.github/workflows/verify.yml" FalseClass false
+  expect_case "N8 runs-on false" 1 "$WIRE_RE"
+fi
 
 if [ "$MODE" = all ] || [ "$MODE" = step_shell ]; then
   init_case
