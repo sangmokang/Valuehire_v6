@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 계약: docs/engineering/file-size-gate-goal-2026-08-15.md AC-FS1·AC-FS2·§⑩
-# 제품 src 아래의 Git 추적 소스만 세어 외부 라이브러리·미추적 산출물 오탐을 막는다.
+# 제품 src 아래의 Git 추적 소스만 세되 tests·.venv 경로와 미추적 산출물 오탐을 막는다.
 #
 # 오탐 예외 절차: 임의 skip은 금지한다. 예외가 실제로 필요하면 경로·사유·책임자와
 # 만료일(YYYY-MM-DD)을 가진 명시적 목록, 만료 시 실패하는 자기시험, CI·SOT 배선을
@@ -74,6 +74,10 @@ over_limit=0
 unreadable=0
 
 while IFS= read -r -d '' path; do
+  case "/$path/" in
+    */tests/*|*/.venv/*) continue ;;
+  esac
+
   case "$path" in
     *.py|*.ts|*.tsx|*.js|*.sh) ;;
     *) continue ;;
