@@ -22,3 +22,9 @@
   stage: "ci"
   ci_mirror_job: "verify"
   required: true
+- id: "ci-file-size-gate"
+  path: ".github/workflows/verify.yml"
+  target: "bash scripts/acceptance-file-size.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true

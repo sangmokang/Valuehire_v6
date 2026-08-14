@@ -1,6 +1,6 @@
 # Valuehire v6 — 이 저장소의 실제 게이트 명령 (SOT)
 
-최종 갱신: 2026-08-12 (전부 실행으로 확인, 가정 없음)
+최종 갱신: 2026-08-15 (전부 실행으로 확인, 가정 없음)
 근거: `docs/engineering/docs-sot-restructure-goal-2026-08-08.md`
 
 ## 현재 규칙
@@ -17,7 +17,7 @@
 
 ### CI(`​.github/workflows/verify.yml`)가 실제로 돌리는 것
 
-**워크플로 스텝 16개 전부**를 적는다(2026-08-12 V1 D6: 이전 판은 `bash ...` 직접 명령만 적어 인라인 본문 스텝이 목록에서 빠졌고, 운영자가 실제로 무엇이 도는지 잘못 판단할 수 있었다). 아래는 `verify.yml` 의 `- name:` 스텝 순서 그대로다(#6·#9 G1·#11 G2·#8 AC-M 병합 후 합집합 — 2026-08-12).
+**워크플로 스텝 17개 전부**를 적는다(2026-08-12 V1 D6: 이전 판은 `bash ...` 직접 명령만 적어 인라인 본문 스텝이 목록에서 빠졌고, 운영자가 실제로 무엇이 도는지 잘못 판단할 수 있었다). 아래는 `verify.yml` 의 `- name:` 스텝 순서 그대로다(#6·#9 G1·#11 G2·#8 AC-M 병합 후 합집합, AC-FS 추가 — 2026-08-15).
 
 | # | 스텝 이름 | 실행 내용 |
 |---|---|---|
@@ -36,7 +36,8 @@
 | 13 | 데이터 노출 스캔 | `bash scripts/scan-data-exposure.sh all` — 크기·금지경로·기록·개인정보 (AC-A4) |
 | 14 | 인수 검사 hs-a4 | `bash scripts/acceptance-hs-a4.sh` — 차단이 실제로 도는가 (AC-A4) |
 | 15 | 인수 검사 secret-webhook-vendor | `bash scripts/acceptance-secret-webhook-vendor.sh` — 웹훅·벤더 키 (AC-S1) |
-| 16 | 인수 검사 verify-ac-m | `bash scripts/acceptance-verify-ac-m.sh` — mechanism 명부 대조 (AC-M) |
+| 16 | 인수 검사 file-size | `bash scripts/acceptance-file-size.sh` + `bash scripts/acceptance-file-size-mutations.sh` — 코드 파일 500줄 상한과 경계값 자기시험 (AC-FS) |
+| 17 | 인수 검사 verify-ac-m | `bash scripts/acceptance-verify-ac-m.sh` — mechanism 명부 대조 (AC-M) |
 
 *(1번 앞에 `actions/checkout` 이 있고 `fetch-depth: 0` 이다 — 4번이 과거 blob 을 열려면 필요하다.)*
 
