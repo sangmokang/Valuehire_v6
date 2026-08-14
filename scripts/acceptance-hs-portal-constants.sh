@@ -218,21 +218,27 @@ ci_line_ok() {
     allowed = allowed_text.split(";").reject(&:empty?).each_with_object({}) do |command, set|
       set[command] = true
     end
+    workflow_defaults = workflow["defaults"]
+    workflow_shell = workflow_defaults.is_a?(Hash) && workflow_defaults["run"].is_a?(Hash) && workflow_defaults["run"].key?("shell")
 
-    good = jobs.values.any? do |job|
+    unsafe_g3_execution = false
+    good = jobs.values.map do |job|
       next false unless job.is_a?(Hash) && job["steps"].is_a?(Array)
-      next false if job.key?("if") || job.key?("needs")
-      next false if job.key?("continue-on-error") && job["continue-on-error"] != false
-      job["steps"].any? do |step|
+      job_defaults = job["defaults"]
+      job_shell = job_defaults.is_a?(Hash) && job_defaults["run"].is_a?(Hash) && job_defaults["run"].key?("shell")
+      job_disqualified = job.key?("if") || job.key?("needs") || (job.key?("continue-on-error") && job["continue-on-error"] != false)
+      job["steps"].map do |step|
         next false unless step.is_a?(Hash)
-        next false if step.key?("if") || step.key?("continue-on-error")
         run = step["run"]
         next false unless run.is_a?(String)
 
         lines = run.each_line.map(&:strip).reject { |line| line.empty? || line.start_with?("#") }
+        unsafe_g3_execution = true if lines.include?(target) && (!job.key?("runs-on") || workflow_shell || job_shell || step.key?("shell"))
+        next false if job_disqualified || step.key?("if") || step.key?("continue-on-error")
         lines.include?(target) && lines.all? { |line| allowed.key?(line) }
-      end
-    end
+      end.any?
+    end.any?
+    exit 1 if unsafe_g3_execution
     exit(good ? 0 : 1)
   ' "$WF" "$tgt" "$ALLOWED_CMDS"
 }
