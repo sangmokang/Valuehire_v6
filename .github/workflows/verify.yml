@@ -57,6 +57,7 @@ jobs:
           bash scripts/acceptance-hs-portal-constants-hardening3.sh
           bash scripts/acceptance-hs-portal-constants-hardening4.sh
           bash scripts/acceptance-hs-portal-constants-hardening5.sh
+          bash scripts/acceptance-hs-portal-constants-hardening6.sh
 
       - name: 히스토리 전량 스캔 (도달 가능한 모든 blob)
         # verify.sh는 현재 체크아웃의 추적 파일만 본다. 과거 커밋에 들어갔다가 지워진 비밀은

@@ -196,12 +196,33 @@ ci_line_ok() {
 
     jobs = workflow.is_a?(Hash) ? workflow["jobs"] : nil
     exit 2 unless jobs.is_a?(Hash)
+    trigger = workflow.key?("on") ? workflow["on"] : workflow[true]
+    automatic_event = case trigger
+                      when String
+                        ["push", "pull_request"].include?(trigger)
+                      when Array
+                        trigger.map(&:to_s).any? { |event| ["push", "pull_request"].include?(event) }
+                      when Hash
+                        trigger.any? do |event, config|
+                          next false unless ["push", "pull_request"].include?(event.to_s)
+                          next true if config.nil? || (config.is_a?(Hash) && config.empty?)
+                          next false unless config.is_a?(Hash)
+
+                          keys = config.keys.map(&:to_s)
+                          keys == ["branches"] && Array(config["branches"]).map(&:to_s) == ["**"]
+                        end
+                      else
+                        false
+                      end
+    exit 1 unless automatic_event
     allowed = allowed_text.split(";").reject(&:empty?).each_with_object({}) do |command, set|
       set[command] = true
     end
 
     good = jobs.values.any? do |job|
       next false unless job.is_a?(Hash) && job["steps"].is_a?(Array)
+      next false if job.key?("if") || job.key?("needs")
+      next false if job.key?("continue-on-error") && job["continue-on-error"] != false
       job["steps"].any? do |step|
         next false unless step.is_a?(Hash)
         next false if step.key?("if") || step.key?("continue-on-error")
