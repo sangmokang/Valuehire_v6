@@ -10,9 +10,9 @@
 #   허용 구역은 git ls-files 상대 경로의 정확한 `contracts/` 접두뿐이다. 부분 문자열
 #   (a/contracts/, contracts-evil/) 은 전부 검사 대상이다. contracts/ 값에는 금지 패턴을
 #   적용하지 않는 대신 구역 자체를 검사한다(정규 파일·비실행·허용 확장자만).
-#   docs/ 는 "문서 확장자(md·yaml·yml·txt·html)이며 실행 권한 없는(100644) 파일"만 면제하고
-#   CHECKED 에 세지 않는다. 그 조건 밖 docs 파일(실행 코드·실행 권한 문서)은 전역 검사 대상이다
-#   — 디렉터리 통 면제는 은닉 경로가 된다(V1 결함 D5·F3 로 축소).
+#   docs/ 디렉터리 전체를 면제하지 않는다. 그 안에서도 문서 확장자(md·yaml·yml·txt·html)이고
+#   Git 추적 모드가 100644인 정규 비실행 파일만 면제하며 CHECKED 에 세지 않는다. 그 조건을
+#   벗어난 docs 파일(실행 코드·실행 권한 문서)은 전역 검사 대상이다(V1 결함 D5·F3).
 #   그 밖의 모든 추적 파일 — 이 검사기 자신·scripts/·hooks/·.github/ 포함 — 은 전역
 #   패턴으로 검사한다. 자기면제 없음(P13④). 제품 루트는 전역 + 제품 전용 패턴 둘 다.
 set -euo pipefail
@@ -173,82 +173,68 @@ done <<G3EOF
 $G3_FILES
 G3EOF
 
-# G3 스텝의 `run: |` 리터럴 블록만 실행 줄로 인정한다. "정확한 줄이 있는가"만 보면
-# 셸 제어문(if false; then ... fi)으로 감싸거나(V1 2차 N2 · 치명), 실행되지 않는 값
-# 문자열 안에 가짜 단계를 넣어(V1 3차 F1 · env / codeaudit A2 · 임의 키 · 둘 다 치명)
-# 실행 0회로 만들 수 있다.
+# 워크플로를 YAML 구조로 읽고 jobs.*.steps[*].run 문자열만 실행 칸으로 인정한다. 파일
+# 어딘가에 명령 글자가 있다는 이유만으로 통과시키면 env.NOTE 같은 실행되지 않는 값 안의
+# 가짜 단계도 배선으로 오인한다(V1 3차 F1). Ruby 표준 YAML 해석기를 쓰므로 새 의존성은 없다.
 #
-# 그래서 워크플로를 들여쓰기로 읽어 ⑴ `run: |` 이 아닌 모든 `키: |`/`키: >` 리터럴
-# 블록 스칼라 하위(값 문자열 전체)는 실행 칸이 아니므로 통째로 배제하고 ⑵ tgt 가
-# 실제 `run: |` 블록 안에 있으며 그 블록이 주석·빈 줄·허용된 G3 실행 줄만 담을 때에만
-# 통과시킨다. env: 하나만 배제하던 열거식은 다른 키 이름마다 구멍이 났으므로(A2 실측)
-# 리터럴 스칼라 전체를 일반 배제로 닫는다. 완벽한 YAML 파싱은 아니다 — 텍스트 검사의
-# 근본 한계와 "실제 CI 실행 영수증"은 저장소 공통 후속 과제다(hooks/pre-push:82-85 가
-# 같은 한계를 자인). 이 검사는 알려진 구체 우회(셸 감싸기·값 문자열 은닉)를 닫는다.
+# target 명령이 있는 run 문자열은 주석·빈 줄·현재 G3 실행 줄만 담아야 하고, 그 스텝에 if 또는
+# continue-on-error 키가 있으면 인정하지 않는다. 이로써 기존 셸 감싸기·오류 무시 방어도 유지한다.
 ci_line_ok() {
   local tgt="$1"
-  awk -v tgt="$tgt" -v cmds="$ALLOWED_CMDS" '
-    BEGIN { n = split(cmds, arr, ";"); for (i = 1; i <= n; i++) if (arr[i] != "") allow[arr[i]] = 1
-            has = 0; ok = 1; cond = 0 }
-    function ind(s) { match(s, /^ */); return RLENGTH }
-    # 스텝 단위로 판정한다: tgt 를 담은 run 블록이 깨끗하고(ok) 그 스텝에 조건/오류무시
-    # 키(cond)가 없어야 통과. run 블록 종료로는 판정을 확정하지 않고 스텝 경계·파일 끝에서만
-    # 확정한다 — run 뒤에 오는 스텝 레벨 if:/continue-on-error 도 함께 보기 위함이다.
-    function flush() { if (has && ok && !cond) good = 1; has = 0; ok = 1; cond = 0; in_run = 0 }
-    {
-      raw = $0
-      i = ind(raw)
-      line = raw
-      sub(/^[[:space:]]+/, "", line)
-      sub(/[[:space:]]+$/, "", line)
-      if (line == "") next
+  ruby -ryaml -e '
+    workflow_path, target, allowed_text = ARGV
+    begin
+      workflow = YAML.safe_load(
+        File.read(workflow_path),
+        permitted_classes: [],
+        permitted_symbols: [],
+        aliases: true
+      )
+    rescue Psych::Exception, SystemCallError
+      exit 2
+    end
 
-      # 비-run 리터럴 스칼라 서브트리(값 문자열 전체)는 실행 칸이 아니다 — 통째 배제.
-      # env: 뿐 아니라 description:/note:/run-name: 등 임의 `키: |`/`키: >` 가 대상이다
-      # (codeaudit A2: env 만 배제하면 다른 키로 우회됨).
-      if (in_lit) {
-        if (i > lit_ind) next
-        in_lit = 0
-      }
+    jobs = workflow.is_a?(Hash) ? workflow["jobs"] : nil
+    exit 2 unless jobs.is_a?(Hash)
+    allowed = allowed_text.split(";").reject(&:empty?).each_with_object({}) do |command, set|
+      set[command] = true
+    end
 
-      # run 블록 종료: run 키와 같거나 더 얕은 들여쓰기의 비어있지 않은 줄 → 블록만 닫고
-      # 판정은 미룬다(스텝은 이어진다).
-      if (in_run && i <= run_ind) in_run = 0
+    good = jobs.values.any? do |job|
+      next false unless job.is_a?(Hash) && job["steps"].is_a?(Array)
+      job["steps"].any? do |step|
+        next false unless step.is_a?(Hash)
+        next false if step.key?("if") || step.key?("continue-on-error")
+        run = step["run"]
+        next false unless run.is_a?(String)
 
-      # 스텝 경계(리스트 항목) — 스텝 판정을 확정하고 초기화.
-      if (line ~ /^-[[:space:]]/) { flush(); next }
-
-      # run: | 실행 칸 진입.
-      if (!in_run && line ~ /^run:[[:space:]]*\|/) { in_run = 1; run_ind = i; next }
-
-      # run 이 아닌 리터럴/폴디드 블록 스칼라 진입 → 하위 배제. `키: |`, `키: >` 와
-      # 그 인디케이터 변형(|-, |+, >-, +숫자)을 덮는다.
-      if (!in_run && line ~ /^[^[:space:]#][^:]*:[[:space:]]*[|>][+-]?[0-9]*[[:space:]]*$/) {
-        in_lit = 1; lit_ind = i; next
-      }
-
-      # 스텝 레벨 조건/오류무시 — run 블록 밖에서 만나면 이 스텝은 조건부 실행이다 (mutations
-      # if_false·continue-on-error 회귀 방어). run 블록 안의 `if ...` 는 아래 이물질로 잡힌다.
-      if (!in_run && (line ~ /^if:/ || index(line, "continue" "-on-" "error") == 1)) { cond = 1; next }
-
-      if (!in_run) next
-
-      # run 블록 내용
-      if (line ~ /^#/) next
-      if (line == tgt) { has = 1; next }
-      if (line in allow) next
-      ok = 0
-    }
-    END { flush(); exit good ? 0 : 1 }
-  ' "$WF"
+        lines = run.each_line.map(&:strip).reject { |line| line.empty? || line.start_with?("#") }
+        lines.include?(target) && lines.all? { |line| allowed.key?(line) }
+      end
+    end
+    exit(good ? 0 : 1)
+  ' "$WF" "$tgt" "$ALLOWED_CMDS"
 }
 
 if [ ! -f "$WF" ]; then
   wire_bad "CI 워크플로($WF) 부재 — 판정 권한이 있는 쪽이 비어 있다"
+elif ! command -v ruby >/dev/null 2>&1; then
+  echo "FAIL: YAML parser unavailable: ruby"
+  exit 2
 else
   while IFS= read -r g3f; do
     if [ -z "$g3f" ]; then continue; fi
-    ci_line_ok "bash $g3f" || wire_bad "CI 실행 줄이 없거나 블록이 오염됨: bash $g3f"
+    ci_rc=0
+    ci_line_ok "bash $g3f" || ci_rc=$?
+    case "$ci_rc" in
+      0) ;;
+      1) wire_bad "CI 실행 줄이 없거나 블록이 오염됨: bash $g3f" ;;
+      *)
+        errors=$((errors + 1))
+        printf 'CI workflow YAML parse failed: %s\n' "$WF" >> "$ERRS"
+        break
+        ;;
+    esac
   done <<G3EOF2
 $G3_FILES
 G3EOF2
