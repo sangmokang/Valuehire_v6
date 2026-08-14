@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # 계약: docs/engineering/file-size-gate-goal-2026-08-15.md AC-FS1·AC-FS2·§⑩
-# 제품 src 아래 Git 추적 소스만 세되 tests·.venv는 제외하고 추적 심볼릭 링크는 차단한다.
+# 제품 src 아래 Git 추적 소스만 세되 tests·.venv는 제외하고,
+# 추적 심볼릭 링크·하위 저장소 연결은 차단한다.
 #
 # 오탐 예외 절차: 임의 skip은 금지한다. 예외가 실제로 필요하면 경로·사유·책임자와
 # 만료일(YYYY-MM-DD)을 가진 명시적 목록, 만료 시 실패하는 자기시험, CI·SOT 배선을
@@ -20,17 +21,25 @@ cd "$REPO" || {
   exit 2
 }
 
-LIMIT=${FILE_SIZE_LIMIT:-500}
+DEFAULT_LIMIT=500
+DEFAULT_ROOTS="humansearch/src extension/src bot/src"
+LIMIT=$DEFAULT_LIMIT
+ROOTS=$DEFAULT_ROOTS
+
+# FILE_SIZE_LIMIT·FILE_SIZE_ROOTS는 격리 자기시험에서만 바꿀 수 있다.
+# 일반 실행에서는 외부 환경값을 무시해 검사 범위나 한도를 축소·완화할 수 없게 한다.
+if [ "${FILE_SIZE_TEST:-}" = 1 ]; then
+  LIMIT=${FILE_SIZE_LIMIT:-$DEFAULT_LIMIT}
+  if [ "${FILE_SIZE_ROOTS+x}" = x ]; then
+    ROOTS=$FILE_SIZE_ROOTS
+  fi
+elif [ "${FILE_SIZE_LIMIT+x}" = x ] || [ "${FILE_SIZE_ROOTS+x}" = x ]; then
+  echo "INFO: FILE_SIZE_TEST=1이 없어 시험용 오버라이드를 무시함"
+fi
+
 if ! printf '%s\n' "$LIMIT" | grep -qE '^[0-9]+$'; then
   echo "FAIL: 검사 불능: FILE_SIZE_LIMIT는 0 이상의 정수여야 함: $LIMIT"
   exit 2
-fi
-
-# FILE_SIZE_ROOTS는 시험에서만 쓰며, 여러 경로는 공백으로 구분한다.
-if [ "${FILE_SIZE_ROOTS+x}" = x ]; then
-  ROOTS=$FILE_SIZE_ROOTS
-else
-  ROOTS="humansearch/src extension/src bot/src"
 fi
 
 set --
@@ -76,10 +85,16 @@ unreadable=0
 while IFS= read -r -d '' entry; do
   mode=${entry%% *}
   path=${entry#*$'\t'}
-  if [ "$mode" = 120000 ]; then
-    echo "FAIL: 검사 불능: 추적 경로가 심볼릭 링크임: $path"
-    exit 2
-  fi
+  case "$mode" in
+    120000)
+      echo "FAIL: 검사 불능: 추적 경로가 심볼릭 링크임: $path"
+      exit 2
+      ;;
+    160000)
+      echo "FAIL: 검사 불능: 추적 경로가 하위 저장소 연결임: $path"
+      exit 2
+      ;;
+  esac
 
   case "/$path/" in
     */tests/*|*/.venv/*) continue ;;
