@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 계약: docs/engineering/file-size-gate-goal-2026-08-15.md AC-FS1·AC-FS2·§⑩
 # 경계·0개 차단, tests·.venv 제외, 시험 오버라이드 격리,
-# 추적 심볼릭 링크·하위 저장소 연결 차단을 격리 저장소에서 검증한다.
+# 추적 심볼릭 링크·하위 저장소 연결 차단과 pre-push 환경 격리를 검증한다.
 set -euo pipefail
 
 unset GIT_DIR GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_WORK_TREE GIT_COMMON_DIR
@@ -12,9 +12,14 @@ REPO=$(git rev-parse --show-toplevel) || {
   exit 2
 }
 GATE="$REPO/scripts/acceptance-file-size.sh"
+HOOK="$REPO/hooks/pre-push"
 
 if [ ! -f "$GATE" ]; then
   echo "FAIL: 본체 부재: scripts/acceptance-file-size.sh"
+  exit 1
+fi
+if [ ! -f "$HOOK" ]; then
+  echo "FAIL: 훅 부재: hooks/pre-push"
   exit 1
 fi
 
@@ -79,6 +84,33 @@ run_without_test_override() {
   output=$(cd "$CASE_DIR" && \
     env -u FILE_SIZE_TEST -u FILE_SIZE_LIMIT \
       FILE_SIZE_ROOTS=humansearch/src/allowed bash "$GATE" 2>&1) || rc=$?
+  record_result "$label" "$expected_rc" "$rc" "$output" "$@"
+}
+
+prepare_hook_case() {
+  mkdir -p "$CASE_DIR/hooks" "$CASE_DIR/scripts" "$CASE_DIR/.github/workflows"
+  cp "$HOOK" "$CASE_DIR/hooks/pre-push"
+  chmod +x "$CASE_DIR/hooks/pre-push"
+  cat > "$CASE_DIR/.github/workflows/verify.yml" <<'EOF'
+steps:
+  - run: bash scripts/acceptance-0-5.sh
+  - run: bash scripts/acceptance-0-7.sh
+  - run: git cat-file blob "$object"
+EOF
+}
+
+commit_hook_case() {
+  git -C "$CASE_DIR" add -- .
+  git -C "$CASE_DIR" -c user.name='File Size Test' \
+    -c user.email='file-size-test@example.invalid' commit -qm baseline
+}
+
+run_default_roots_case() {
+  local label="$1" expected_rc="$2" output rc=0
+  shift 2
+  output=$(cd "$CASE_DIR" && \
+    env -u BASH_ENV -u ENV -u FILE_SIZE_TEST -u FILE_SIZE_ROOTS -u FILE_SIZE_LIMIT \
+      bash "$GATE" 2>&1) || rc=$?
   record_result "$label" "$expected_rc" "$rc" "$output" "$@"
 }
 
@@ -152,6 +184,78 @@ git -C "$CASE_DIR" update-index --add \
   --cacheinfo "160000,$gitlink_sha,humansearch/src/product"
 run_case "대상 루트 아래 하위 저장소 연결 차단" 2 \
   "FAIL: 검사 불능: 추적 경로가 하위 저장소 연결임: humansearch/src/product"
+
+init_case
+mkdir -p "$CASE_DIR/humansearch/src/allowed" "$CASE_DIR/humansearch/src/blocked"
+printf 'small\n' > "$CASE_DIR/humansearch/src/allowed/app.py"
+make_lines 501 "$CASE_DIR/humansearch/src/blocked/oversized.py"
+prepare_hook_case
+cp "$GATE" "$CASE_DIR/scripts/acceptance-file-size.sh"
+printf '%s\n' \
+  'if [ "$PWD" = "'"$CASE_DIR"'" ]; then' \
+  '  export FILE_SIZE_TEST=1' \
+  '  export FILE_SIZE_ROOTS=humansearch/src/allowed' \
+  '  export FILE_SIZE_LIMIT=999999' \
+  'fi' > "$CASE_DIR/reinject-file-size-env.sh"
+commit_hook_case
+output=""
+rc=0
+output=$(cd "$CASE_DIR" && \
+  env -u BASH_ENV -u ENV -u FILE_SIZE_TEST -u FILE_SIZE_ROOTS -u FILE_SIZE_LIMIT \
+    -u VH_PREPUSH_DEPTH BASH_ENV="$CASE_DIR/reinject-file-size-env.sh" \
+    bash hooks/pre-push origin https://example.invalid/valuehire.git 2>&1) || rc=$?
+record_result "pre-push 자식 Bash의 BASH_ENV 오버라이드 재주입 차단" 1 "$rc" "$output" \
+  "BLOCKED: ./scripts/acceptance-file-size.sh exit=1"
+
+init_case
+prepare_hook_case
+cat > "$CASE_DIR/scripts/acceptance-env-probe.sh" <<'EOF'
+#!/usr/bin/env bash
+if [ -n "${FILE_SIZE_TEST+x}" ]; then exit 41; fi
+if [ -n "${FILE_SIZE_ROOTS+x}" ]; then exit 42; fi
+if [ -n "${FILE_SIZE_LIMIT+x}" ]; then exit 43; fi
+if [ -n "${BASH_ENV+x}" ]; then exit 44; fi
+if [ -n "${ENV+x}" ]; then exit 45; fi
+exit 0
+EOF
+chmod +x "$CASE_DIR/scripts/acceptance-env-probe.sh"
+printf '%s\n' \
+  'export FILE_SIZE_TEST=1' \
+  'export FILE_SIZE_ROOTS=humansearch/src/allowed' \
+  'export FILE_SIZE_LIMIT=999999' > "$CASE_DIR/reinject-file-size-env.sh"
+commit_hook_case
+output=""
+rc=0
+output=$(cd "$CASE_DIR" && \
+  env -u BASH_ENV -u ENV -u FILE_SIZE_TEST -u FILE_SIZE_ROOTS -u FILE_SIZE_LIMIT \
+    -u VH_PREPUSH_DEPTH BASH_ENV="$CASE_DIR/reinject-file-size-env.sh" \
+    ENV="$CASE_DIR/reinject-file-size-env.sh" \
+    bash hooks/pre-push origin https://example.invalid/valuehire.git 2>&1) || rc=$?
+record_result "pre-push 인수 스크립트 환경 5종 제거" 0 "$rc" "$output" \
+  "ok  ./scripts/acceptance-env-probe.sh"
+
+init_case
+mkdir -p "$CASE_DIR/extension/src"
+printf 'small\n' > "$CASE_DIR/extension/src/app.ts"
+git -C "$CASE_DIR" add -- extension/src/app.ts
+gitlink_sha=$(git -C "$REPO" rev-parse HEAD)
+git -C "$CASE_DIR" update-index --add \
+  --cacheinfo "160000,$gitlink_sha,humansearch/src"
+rmdir "$CASE_DIR/humansearch/src"
+git -C "$CASE_DIR" update-index --skip-worktree humansearch/src
+run_default_roots_case "작업 폴더에서 숨긴 대상 루트 하위 저장소 연결 차단" 2 \
+  "FAIL: 검사 불능: 추적 경로가 하위 저장소 연결임: humansearch/src"
+
+init_case
+mkdir -p "$CASE_DIR/extension/src"
+printf 'small\n' > "$CASE_DIR/extension/src/app.ts"
+rmdir "$CASE_DIR/humansearch/src"
+ln -s elsewhere "$CASE_DIR/humansearch/src"
+git -C "$CASE_DIR" add -- extension/src/app.ts humansearch/src
+unlink "$CASE_DIR/humansearch/src"
+git -C "$CASE_DIR" update-index --skip-worktree humansearch/src
+run_default_roots_case "작업 폴더에서 숨긴 대상 루트 심볼릭 링크 차단" 2 \
+  "FAIL: 검사 불능: 추적 경로가 심볼릭 링크임: humansearch/src"
 
 if [ "$failed" -ne 0 ]; then
   echo "FAIL: file-size mutations 통과 $passed/$total, 실패 $failed"
