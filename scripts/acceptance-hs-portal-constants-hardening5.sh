@@ -66,7 +66,7 @@ write_commands() {
 
 write_wf_ok() {
   {
-    printf 'name: verify\non:\n  push:\n  pull_request:\njobs:\n  verify:\n    steps:\n'
+    printf 'name: verify\non:\n  push:\n  pull_request:\njobs:\n  verify:\n    runs-on: ubuntu-latest\n    steps:\n'
     printf '      - name: g3\n        run: |\n'
     write_commands '          '
   } > "$1/.github/workflows/verify.yml"
@@ -76,7 +76,7 @@ write_wf_ok() {
 # 실행 칸은 echo 한 줄뿐이며, G3 명령은 env.NOTE 문자열에만 존재한다.
 write_wf_env_only() {
   {
-    printf 'name: verify\non:\n  push:\n  pull_request:\njobs:\n  verify:\n    steps:\n'
+    printf 'name: verify\non:\n  push:\n  pull_request:\njobs:\n  verify:\n    runs-on: ubuntu-latest\n    steps:\n'
     printf '      - name: harmless carrier\n'
     printf '        run: echo "G3 disabled; payload only in env"\n'
     printf '        env:\n'
