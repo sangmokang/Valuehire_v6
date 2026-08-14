@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 계약: docs/engineering/file-size-gate-goal-2026-08-15.md AC-FS1·AC-FS2·§⑩
-# 경계·0개 차단과 tests·.venv 디렉터리 제외를 격리된 Git 저장소에서 검증한다.
+# 경계·0개 차단, tests·.venv 제외, 추적 심볼릭 링크 차단을 격리 저장소에서 검증한다.
 set -euo pipefail
 
 unset GIT_DIR GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_WORK_TREE GIT_COMMON_DIR
@@ -104,6 +104,18 @@ git -C "$CASE_DIR" add -f -- \
   humansearch/src/vendor/.venv/lib/vendor.py
 run_case "깊은 .venv 디렉터리의 추적 501줄 파일 제외" 0 \
   "PASS: 검사 대상 1개, 500줄 한도 준수"
+
+init_case
+mkdir -p "$CASE_DIR/humansearch/src/feature/tests/product"
+printf 'small\n' > "$CASE_DIR/humansearch/src/app.py"
+make_lines 501 "$CASE_DIR/humansearch/src/feature/tests/product/oversized.py"
+ln -s feature/tests/product "$CASE_DIR/humansearch/src/product"
+git -C "$CASE_DIR" add -- \
+  humansearch/src/app.py \
+  humansearch/src/feature/tests/product/oversized.py \
+  humansearch/src/product
+run_case "일반 이름의 추적 디렉터리 링크 차단" 2 \
+  "FAIL: 검사 불능: 추적 경로가 심볼릭 링크임: humansearch/src/product"
 
 if [ "$failed" -ne 0 ]; then
   echo "FAIL: file-size mutations 통과 $passed/$total, 실패 $failed"
