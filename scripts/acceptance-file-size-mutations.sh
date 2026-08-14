@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 계약: docs/engineering/file-size-gate-goal-2026-08-15.md AC-FS1·AC-FS2·§⑩
-# 경계·0개 차단, tests·.venv 제외, 시험 오버라이드 격리,
+# 경계·0개 차단, 확장자 대소문자·개행 규칙, tests·.venv 제외, 시험 오버라이드 격리,
 # 추적 심볼릭 링크·하위 저장소 연결 차단과 pre-push 환경 격리를 검증한다.
 set -euo pipefail
 
@@ -45,6 +45,18 @@ init_case() {
 make_lines() {
   local count="$1" destination="$2"
   awk -v count="$count" 'BEGIN { for (i = 1; i <= count; i++) print "sample" }' \
+    > "$destination"
+}
+
+make_cr_only_lines() {
+  local count="$1" destination="$2"
+  awk -v count="$count" 'BEGIN { for (i = 1; i <= count; i++) printf "sample\r" }' \
+    > "$destination"
+}
+
+make_crlf_lines() {
+  local count="$1" destination="$2"
+  awk -v count="$count" 'BEGIN { for (i = 1; i <= count; i++) printf "sample\r\n" }' \
     > "$destination"
 }
 
@@ -121,6 +133,31 @@ git -C "$CASE_DIR" add humansearch/src/my_tests_util.py humansearch/src/contests
 run_case "tests 글자가 이름에 든 501줄 일반 파일 차단" 1 \
   "초과: humansearch/src/my_tests_util.py 501줄" \
   "초과: humansearch/src/contests.py 501줄"
+
+init_case
+printf 'small\n' > "$CASE_DIR/humansearch/src/app.py"
+for source in upper.PY upper.TS upper.TSX upper.JS mixed.Sh; do
+  make_lines 501 "$CASE_DIR/humansearch/src/$source"
+done
+git -C "$CASE_DIR" add -- humansearch/src
+run_case "대문자·혼합 확장자 5종의 501줄 파일 차단" 1 \
+  "초과: humansearch/src/upper.PY 501줄" \
+  "초과: humansearch/src/upper.TS 501줄" \
+  "초과: humansearch/src/upper.TSX 501줄" \
+  "초과: humansearch/src/upper.JS 501줄" \
+  "초과: humansearch/src/mixed.Sh 501줄"
+
+init_case
+make_cr_only_lines 501 "$CASE_DIR/humansearch/src/cr-only.py"
+git -C "$CASE_DIR" add -- humansearch/src/cr-only.py
+run_case "CR 전용 501줄 파일 검사 불능" 2 \
+  "FAIL: 검사 불능: CR은 있지만 LF가 없는 파일: humansearch/src/cr-only.py"
+
+init_case
+make_crlf_lines 500 "$CASE_DIR/humansearch/src/crlf-at-limit.py"
+git -C "$CASE_DIR" add -- humansearch/src/crlf-at-limit.py
+run_case "CRLF 500줄 파일 허용" 0 \
+  "PASS: 검사 대상 1개, 500줄 한도 준수"
 
 init_case
 make_lines 500 "$CASE_DIR/humansearch/src/at-limit.ts"
