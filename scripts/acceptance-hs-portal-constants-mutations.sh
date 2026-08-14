@@ -65,7 +65,7 @@ write_wf() {
   local self='bash scripts/acceptance-hs-portal-constants.sh'
   local sib='bash scripts/acceptance-hs-portal-constants-mutations.sh'
   {
-    printf 'name: verify\njobs:\n  verify:\n    steps:\n'
+    printf 'name: verify\non:\n  push:\n  pull_request:\njobs:\n  verify:\n    steps:\n'
     printf '      - name: g3\n'
     case "$v" in
       if_false) printf '        %s\n' "$WK_IF" ;;

@@ -59,7 +59,7 @@ write_wf() {
   local hard2='bash scripts/acceptance-hs-portal-constants-hardening2.sh'
   local hard3='bash scripts/acceptance-hs-portal-constants-hardening3.sh'
   {
-    printf 'name: verify\njobs:\n  verify:\n    steps:\n'
+    printf 'name: verify\non:\n  push:\n  pull_request:\njobs:\n  verify:\n    steps:\n'
     case "$v" in
       env_carrier)
         # 실제 G3 스텝은 삭제, 실행 명령은 echo. 정확한 5줄은 env 값 문자열 안에만 존재.

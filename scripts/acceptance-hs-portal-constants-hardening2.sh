@@ -50,7 +50,7 @@ write_wf() {
   local sib='bash scripts/acceptance-hs-portal-constants-mutations.sh'
   local hard='bash scripts/acceptance-hs-portal-constants-hardening.sh'
   {
-    printf 'name: verify\njobs:\n  verify:\n    steps:\n'
+    printf 'name: verify\non:\n  push:\n  pull_request:\njobs:\n  verify:\n    steps:\n'
     printf '      - name: g3\n'
     printf '        run: %s\n' '|'
     printf '          # G3 boundary step\n'

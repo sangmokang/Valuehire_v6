@@ -45,7 +45,7 @@ G3_NAMES="acceptance-hs-portal-constants acceptance-hs-portal-constants-mutation
 
 write_wf_ok() {
   {
-    printf 'name: verify\njobs:\n  verify:\n    steps:\n'
+    printf 'name: verify\non:\n  push:\n  pull_request:\njobs:\n  verify:\n    steps:\n'
     printf '      - name: g3\n        run: |\n'
     local g
     for g in $G3_NAMES; do printf '          bash scripts/%s.sh\n' "$g"; done
@@ -56,7 +56,7 @@ write_wf_ok() {
 write_wf_hidden() {
   local d="$1" key="$2"
   {
-    printf 'name: verify\njobs:\n  verify:\n    steps:\n'
+    printf 'name: verify\non:\n  push:\n  pull_request:\njobs:\n  verify:\n    steps:\n'
     printf '      - name: decoy\n        %s: |\n' "$key"
     printf '          - name: fake g3\n            run: |\n'
     local g
