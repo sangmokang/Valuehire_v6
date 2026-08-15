@@ -250,8 +250,42 @@ ci_line_ok() {
       matrix_valid = if !strategy.is_a?(Hash) || !strategy.key?("matrix")
                        true
                      elsif strategy["matrix"].is_a?(Hash)
-                       static_axes = strategy["matrix"].reject { |axis, _| ["include", "exclude"].include?(axis.to_s) }
-                       !static_axes.empty? && static_axes.values.all? { |values| values.is_a?(Array) && !values.empty? }
+                       matrix = strategy["matrix"]
+                       static_axes = matrix.reject { |axis, _| ["include", "exclude"].include?(axis.to_s) }
+                       includes = matrix.key?("include") ? matrix["include"] : []
+                       excludes = matrix.key?("exclude") ? matrix["exclude"] : []
+                       expression = lambda do |value|
+                         case value
+                         when String then value.include?("${{")
+                         when Array then value.any? { |item| expression.call(item) }
+                         when Hash then value.any? { |key, item| expression.call(key) || expression.call(item) }
+                         else false
+                         end
+                       end
+                       controls_valid = includes.is_a?(Array) && includes.all? { |entry| entry.is_a?(Hash) } &&
+                         excludes.is_a?(Array) && excludes.all? { |entry| entry.is_a?(Hash) }
+                       if !controls_valid || expression.call(matrix)
+                         false
+                       elsif static_axes.empty?
+                         matrix.keys.all? { |axis| axis.to_s == "include" } && !includes.empty?
+                       elsif !static_axes.values.all? { |values| values.is_a?(Array) && !values.empty? }
+                         false
+                       else
+                         combinations = static_axes.reduce([{}]) do |product, (axis, values)|
+                           product.flat_map { |combination| values.map { |value| combination.merge(axis => value) } }
+                         end
+                         combinations.reject! do |combination|
+                           excludes.any? do |entry|
+                             entry.all? { |axis, value| combination.key?(axis) && combination[axis] == value }
+                           end
+                         end
+                         include_additions = includes.count do |entry|
+                           combinations.none? do |combination|
+                             entry.all? { |axis, value| !static_axes.key?(axis) || combination[axis] == value }
+                           end
+                         end
+                         combinations.length + include_additions >= 1
+                       end
                      else
                        false
                      end
