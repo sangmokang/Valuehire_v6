@@ -339,3 +339,26 @@ ORPHAN_TEMP_REMAINS[.g3-hardening6.yJAtdd]=0
 → 종료값 130은 이 실행에서 중단 신호로 끝났다는 뜻입니다. 판정 본문이 없으므로 다른 엔진 검증은 미실행으로 처리했고, 그 실행이 남긴 워크트리 내부 임시 폴더는 모두 제거했습니다.
 
 Claude 판정이 없으므로 그 판정을 재현하는 Codex 2차 교차검증은 수행할 수 없었습니다. 대신 구현자가 빈 축·정상 축·식·`include`/`exclude` 단독을 각각 실행하고, 새 방어 한 줄을 무력화한 뒤 실패와 원복 재통과를 직접 확인했습니다. 다른 안전한 작업이 위험한 G3 작업을 숨기는지는 `unsafe_g3_execution` 누적값이 전체 작업 순회를 마친 뒤 한 번만 판정되는 `scripts/acceptance-hs-portal-constants.sh` 구조를 다시 대조했습니다. ※ 별도 엔진의 독립 판정은 확보하지 못했습니다.
+
+---
+
+## 최종 검증 사슬 (2026-08-15) — 실행 무력화 부류 봉쇄
+
+이 문서(shell·runs-on 확장)와 원래 G3 계약(`humansearch-g3-portal-constants-goal-2026-08-12.md`)이 함께 다루는 것은 하나다: **"CI 워크플로에 G3 검사 단계가 적혀 있어도, 그 단계·작업·워크플로를 실행되지 않게 만드는 우회"를 저장소 텍스트 수준에서 차단**한다. 만든 뒤 검증자(V1=codex, V2=Claude 격리)가 우회를 찾고, 그 우회를 재현하는 실패 시험(RED)을 먼저 커밋한 뒤 최소 수정(GREEN)으로 닫기를 반복했다. 판정 원문은 저장소 안 `.claude/private-reviews/`에 지문과 함께 보존.
+
+| 라운드 | 검증자 | 판정 | 닫은 우회 부류 | 판정서·지문 |
+|---|---|---|---|---|
+| verdict4 | V1(codex) | FAIL | 실행 칸 밖 YAML 값(env·임의키)에 명령 은닉 / 화면탐색 명령 4종 미탐 | codex-g3-verdict4 `2df37f81` |
+| verdict5 | V1(codex) | FAIL | 작업 수준 if·continue-on-error / 수동 전용 트리거(on: workflow_dispatch만) | codex-g3-verdict5 `dd3f5a07` |
+| verdict6 | V1(codex) | FAIL | 작업 실행 위치 바꿔치기(working-directory 3위치) / BASH_ENV 3위치 / runs-on 빈값 | codex-g3-verdict6 `9724ce87` |
+| — | V1(codex) 시도 | (중단) | codex 자체 사이버보안 필터가 "새 우회 탐색"을 거부 → V2로 대체(메모리 기록된 알려진 벽) | codex 로그 |
+| verdict7(V2) | V2(Claude 격리) | FAIL | 신규: 빈 조합표(strategy.matrix 빈 축)로 작업 0회 실행 | claude-g3-v2-verdict7 `0fb8644c` |
+| verdict8(V2) | V2(Claude 격리) | FAIL | 신규: exclude로 유일 조합 제거 → 조합 0개(빈 축 수정의 옆문) | claude-g3-v2-verdict8 `03e84dfe` |
+| verdict9(V2) | V2(Claude 격리) | **PASS** | matrix 조합 수 계산(곱집합-exclude+include)으로 "조합 0개=작업 0회" 부류 전체 봉쇄 | claude-g3-v2-verdict9 `c5f7eda6` |
+
+→ **이 표가 말하는 것:** G3 검사기는 "검사가 초록인데 실제로는 한 줄도 안 돈다"는 우회에 여러 겹으로 취약했고, 이번 세션에 그 우회를 부류별로 닫았다. codex(V1)가 자기 사이버보안 필터에 막힌 지점(우회를 새로 찾아보라는 지시 거부)은 Claude 격리 세션(V2)이 대체했고, V2가 codex가 못 찾은 결함 3건(빈 조합표·exclude 제거·그 봉쇄 검증)을 잡았다 — 두 검증 도구를 바꿔 쓴 것이 실제로 값을 했다.
+
+**정직한 잔여 한계 (V2 verdict9 §잔여 우회 목록 — 이번에 막지 않음, 전부 "모델 밖"):**
+- 검사기의 위협 모델은 "저장소 글자만으로 무력화가 **확정 계산되는** 우회"를 막는 것이다. 아래 6종은 무력화 여부가 **서버 동작에 달려** 저장소 글자만으로는 "조용한 초록"임이 확정되지 않아, 이번 범위에서 뺐다(사장님 결정 2026-08-15: "V2 한 번 더 확인만"): `strategy.max-parallel: 0`, `timeout-minutes: 0`(작업·단계), 없는 `container:` 이미지, `runs-on: ${{ }}` 식 비우기, `concurrency` 취소 유발. 이 중 상당수는 서버에서 **빨간 실패**로 끝나 오히려 안전할 수 있다.
+- 최종 강제선은 서버 검사(CI)다. 서버에서 작업이 실제로 돌았는지는 `hooks/pre-push:82-85`가 자인하듯 텍스트 검사로 증명 불가 — push 후 CI 초록으로만 최종 해소된다.
+- GitHub이 앞으로 추가할 새 실행 제어 키는 유한한 텍스트 규칙이 원리상 전수 차단할 수 없다. 이 검사기는 "알려진 부류를 확정 계산으로 막는다"까지가 정직한 약속이다.
