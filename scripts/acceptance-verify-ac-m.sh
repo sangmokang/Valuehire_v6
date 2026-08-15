@@ -5,7 +5,7 @@
 #   정본: docs/engineering/verify-unification-goal-2026-08-10.md:78-81 (AC-M)
 #   출력 : 항목마다 PASS:/FAIL: 전부 출력, 마지막 줄 `CHECKED: <검사 수>`
 #   exit : 0 = PASS | 1 = FAIL | 2 = NOT_RUN
-#   불변식: CHECKED 는 정확히 26 이어야 한다 — 검사가 몇 개 사라져도 초록이면 가짜다
+#   불변식: CHECKED 는 정확히 27 이어야 한다 — 검사가 몇 개 사라져도 초록이면 가짜다
 #           (PR #6 결함 D3 의 교훈: checked==0 만 막으면 3개를 지워도 통과했다 · P20)
 #
 # 쓰기 규칙: 이 검사는 저장소에 어떤 파일도 만들지 않는다. 동적 fixture 는 전부
@@ -24,7 +24,7 @@ SNAP0=$(git status --porcelain)
 CHECKER=scripts/verify/check-mechanism-registry.sh
 FIXDIR=scripts/verify/fixtures/mechanism-registry
 REGISTRY=docs/sot/mechanism-registry.yaml
-EXPECTED_CHECKED=26
+EXPECTED_CHECKED=27
 
 TMP=$(mktemp -d) || { echo "NOT_RUN: mktemp 실패"; echo "CHECKED: 0"; exit 2; }
 trap 'rm -rf "$TMP"' EXIT
@@ -45,6 +45,16 @@ expect_rc() {
     printf 'FAIL: %s (기대 exit=%s, 실제 %s)\n' "$desc" "$want" "$rc"
     fail=1
   fi
+}
+
+# 이 인수 검사 자신의 CI 배선을 확인한다. 두 번째 인수의 워크플로를 받는 이유는
+# 주석만 남은 가짜 배선을 임시 fixture 로 재현해 이 검사 자체도 시험하기 위해서다.
+own_ci_wiring_is_unconditional() {
+  local wf="$1" run_lines step_block
+  run_lines=$(grep -c 'run: bash scripts/acceptance-verify-ac-m.sh' "$wf")
+  step_block=$(awk '/- name: 인수 검사 verify-ac-m/,/run: bash scripts\/acceptance-verify-ac-m.sh/' "$wf")
+  [ "$run_lines" -eq 1 ] && [ -n "$step_block" ] && \
+    ! printf '%s\n' "$step_block" | grep -qE '^[[:space:]]*(if:|continue-on-error:)'
 }
 
 # ── 1) 검사기 실존 + 실행권한 ────────────────────────────────────────────────
@@ -289,17 +299,37 @@ cat > "$TMP/empty-value.yaml" <<'EOF'
 EOF
 expect_rc "빈 문자열 path → 불합격" "$TMP/empty-value.yaml" 1
 
+# ── codeaudit 2026-08-15 D1: 주석만 남은 자기배선 반례 ───────────────────────
+mkdir -p "$TMP/self-comment/.github/workflows"
+cat > "$TMP/self-comment/.github/workflows/verify.yml" <<'EOF'
+name: verify
+on: push
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 인수 검사 verify-ac-m
+        run: |
+          # run: bash scripts/acceptance-verify-ac-m.sh
+          echo skipped
+EOF
+checked=$((checked + 1))
+if own_ci_wiring_is_unconditional "$TMP/self-comment/.github/workflows/verify.yml"; then
+  echo "FAIL: CI 자기배선 target 이 셸 주석에만 있는데 합격했다"
+  fail=1
+else
+  echo "PASS: CI 자기배선 target 이 셸 주석에만 있음 → 불합격"
+fi
+
 # ── V1 D3: CI 배선 자기검사 ──────────────────────────────────────────────────
 # 이 인수 검사의 실행 줄이 서버 자동검사(verify.yml)에 조건 없이 정확히 1회 있는가.
 # CI 스텝을 if 로 끄거나 지워도 로컬 검사가 전부 초록이었다(V1 실측 · P15③).
 checked=$((checked + 1))
 WF=.github/workflows/verify.yml
-run_lines=$(grep -c 'run: bash scripts/acceptance-verify-ac-m.sh' "$WF")
-step_block=$(awk '/- name: 인수 검사 verify-ac-m/,/run: bash scripts\/acceptance-verify-ac-m.sh/' "$WF")
-if [ "$run_lines" -eq 1 ] && [ -n "$step_block" ] && ! printf '%s\n' "$step_block" | grep -qE '^[[:space:]]*(if:|continue-on-error:)'; then
+if own_ci_wiring_is_unconditional "$WF"; then
   echo "PASS: CI 배선 — verify.yml 에 무조건 실행 스텝 정확히 1회"
 else
-  printf 'FAIL: CI 배선 — 실행 줄 %s회 또는 조건부/오류무시 스텝 (로컬에만 있는 검사는 없는 것으로 친다 · P15③)\n' "$run_lines"
+  echo 'FAIL: CI 배선 — 정확한 비주석 실행 줄 1회가 아니거나 조건부/오류무시 스텝 (로컬에만 있는 검사는 없는 것으로 친다 · P15③)'
   fail=1
 fi
 
