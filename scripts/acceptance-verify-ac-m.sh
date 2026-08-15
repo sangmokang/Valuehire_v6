@@ -5,7 +5,7 @@
 #   정본: docs/engineering/verify-unification-goal-2026-08-10.md:78-81 (AC-M)
 #   출력 : 항목마다 PASS:/FAIL: 전부 출력, 마지막 줄 `CHECKED: <검사 수>`
 #   exit : 0 = PASS | 1 = FAIL | 2 = NOT_RUN
-#   불변식: CHECKED 는 정확히 27 이어야 한다 — 검사가 몇 개 사라져도 초록이면 가짜다
+#   불변식: CHECKED 는 정확히 28 이어야 한다 — 검사가 몇 개 사라져도 초록이면 가짜다
 #           (PR #6 결함 D3 의 교훈: checked==0 만 막으면 3개를 지워도 통과했다 · P20)
 #
 # 쓰기 규칙: 이 검사는 저장소에 어떤 파일도 만들지 않는다. 동적 fixture 는 전부
@@ -24,7 +24,7 @@ SNAP0=$(git status --porcelain)
 CHECKER=scripts/verify/check-mechanism-registry.sh
 FIXDIR=scripts/verify/fixtures/mechanism-registry
 REGISTRY=docs/sot/mechanism-registry.yaml
-EXPECTED_CHECKED=27
+EXPECTED_CHECKED=28
 
 TMP=$(mktemp -d) || { echo "NOT_RUN: mktemp 실패"; echo "CHECKED: 0"; exit 2; }
 trap 'rm -rf "$TMP"' EXIT
@@ -175,6 +175,36 @@ if [ "$comment_only_rc" -eq 1 ]; then
   echo "PASS: ci target 이 주석에만 있음 → 불합격 (exit=1)"
 else
   echo "FAIL: ci target 이 주석에만 있음 → 불합격 (기대 exit=1, 실제 $comment_only_rc)"
+  fail=1
+fi
+
+# codeaudit 2026-08-15 D4: 명령은 run 안에 있지만 step 자체가 if:false 로 꺼진 경우.
+mkdir -p "$TMP/if-false/.github/workflows"
+cat > "$TMP/if-false/.github/workflows/verify.yml" <<'EOF'
+name: verify
+on: push
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 꺼진 목표 명령
+        if: false
+        run: bash scripts/acceptance-hs-portal-constants.sh
+EOF
+cat > "$TMP/if-false/registry.yaml" <<'EOF'
+- id: "ci-if-false-target"
+  path: ".github/workflows/verify.yml"
+  target: "bash scripts/acceptance-hs-portal-constants.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
+EOF
+if_false_rc=$(cd "$TMP/if-false" && bash "$REPO/$CHECKER" registry.yaml >/dev/null 2>&1; echo $?)
+checked=$((checked + 1))
+if [ "$if_false_rc" -eq 1 ]; then
+  echo "PASS: ci target step 이 if:false 로 꺼짐 → 불합격 (exit=1)"
+else
+  echo "FAIL: ci target step 이 if:false 로 꺼짐 → 불합격 (기대 exit=1, 실제 $if_false_rc)"
   fail=1
 fi
 
