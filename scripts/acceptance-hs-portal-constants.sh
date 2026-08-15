@@ -246,6 +246,15 @@ ci_line_ok() {
                       else
                         false
                       end
+      strategy = job["strategy"]
+      matrix_valid = if !strategy.is_a?(Hash) || !strategy.key?("matrix")
+                       true
+                     elsif strategy["matrix"].is_a?(Hash)
+                       static_axes = strategy["matrix"].reject { |axis, _| ["include", "exclude"].include?(axis.to_s) }
+                       !static_axes.empty? && static_axes.values.all? { |values| values.is_a?(Array) && !values.empty? }
+                     else
+                       false
+                     end
       job_disqualified = job.key?("if") || job.key?("needs") || (job.key?("continue-on-error") && job["continue-on-error"] != false)
       job["steps"].map do |step|
         next false unless step.is_a?(Hash)
@@ -254,7 +263,7 @@ ci_line_ok() {
 
         lines = run.each_line.map(&:strip).reject { |line| line.empty? || line.start_with?("#") }
         unsafe_g3_execution = true if lines.include?(target) && (
-          !runs_on_valid || workflow_shell || workflow_working_directory || workflow_unsafe_env ||
+          !runs_on_valid || !matrix_valid || workflow_shell || workflow_working_directory || workflow_unsafe_env ||
           job_shell || job_working_directory || job_unsafe_env ||
           step.key?("shell") || step.key?("working-directory") || unsafe_env.call(step)
         )
