@@ -11,7 +11,7 @@
 #   N6 G3 단계·작업 기본값·워크플로 기본값의 working-directory 키가 있으면 정확히 exit 1
 #   N7 G3 단계·작업·워크플로 env의 BASH_ENV·ENV·SHELLOPTS·PATH 키가 있으면 정확히 exit 1
 #   N8 runs-on은 비어 있지 않은 문자열 또는 그런 문자열의 비어 있지 않은 목록만 허용
-#   N9 strategy.matrix는 비어 있지 않은 목록 축을 하나 이상 가져야 하며 식·include/exclude 단독은 거부
+#   N9 strategy.matrix의 정적 최종 조합 수가 1 이상이어야 하며 계산 불가 형태는 거부
 #   다른 무해한 env 키는 허용하며 정확히 exit 0
 #   정상 표본은 push와 pull_request 자동 실행 조건 및 runs-on을 가지며 matrix 없음·정상 matrix는 정확히 exit 0
 set -euo pipefail
@@ -31,9 +31,9 @@ PRODUCT_PATTERNS_SOURCE=${G3_PRODUCT_PATTERNS_SOURCE:-contracts/portal-constants
 MODE=${1:-all}
 
 case "$MODE" in
-  all|n1|n2|n3|step_shell|job_default_shell|workflow_default_shell|missing_runs_on|step_shell_duplicate|job_default_shell_duplicate|missing_runs_on_duplicate|step_shell_after_safe|job_default_shell_after_safe|missing_runs_on_after_safe|step_working_directory|job_default_working_directory|workflow_default_working_directory|step_bash_env|job_bash_env|workflow_bash_env|step_env|job_shellopts_env|workflow_path_env|safe_env|runs_on_null|runs_on_empty_list|runs_on_false|matrix_empty_axis|matrix_nonempty_axis|matrix_expression|matrix_include_only|matrix_exclude_only) ;;
+  all|n1|n2|n3|step_shell|job_default_shell|workflow_default_shell|missing_runs_on|step_shell_duplicate|job_default_shell_duplicate|missing_runs_on_duplicate|step_shell_after_safe|job_default_shell_after_safe|missing_runs_on_after_safe|step_working_directory|job_default_working_directory|workflow_default_working_directory|step_bash_env|job_bash_env|workflow_bash_env|step_env|job_shellopts_env|workflow_path_env|safe_env|runs_on_null|runs_on_empty_list|runs_on_false|matrix_empty_axis|matrix_nonempty_axis|matrix_expression|matrix_axis_item_expression|matrix_include_only|matrix_include_empty|matrix_exclude_only|matrix_exclude_single_all|matrix_exclude_cartesian_all|matrix_exclude_partial|matrix_exclude_all_include_restore|matrix_include_expression|matrix_include_value_expression|matrix_exclude_expression|matrix_exclude_value_expression) ;;
   *)
-    echo "FAIL: usage: $0 [all|n1|n2|n3|step_shell|job_default_shell|workflow_default_shell|missing_runs_on|step_shell_duplicate|job_default_shell_duplicate|missing_runs_on_duplicate|step_shell_after_safe|job_default_shell_after_safe|missing_runs_on_after_safe|step_working_directory|job_default_working_directory|workflow_default_working_directory|step_bash_env|job_bash_env|workflow_bash_env|step_env|job_shellopts_env|workflow_path_env|safe_env|runs_on_null|runs_on_empty_list|runs_on_false|matrix_empty_axis|matrix_nonempty_axis|matrix_expression|matrix_include_only|matrix_exclude_only]"
+    echo "FAIL: usage: $0 [all|n1|n2|n3|step_shell|job_default_shell|workflow_default_shell|missing_runs_on|step_shell_duplicate|job_default_shell_duplicate|missing_runs_on_duplicate|step_shell_after_safe|job_default_shell_after_safe|missing_runs_on_after_safe|step_working_directory|job_default_working_directory|workflow_default_working_directory|step_bash_env|job_bash_env|workflow_bash_env|step_env|job_shellopts_env|workflow_path_env|safe_env|runs_on_null|runs_on_empty_list|runs_on_false|matrix_empty_axis|matrix_nonempty_axis|matrix_expression|matrix_axis_item_expression|matrix_include_only|matrix_include_empty|matrix_exclude_only|matrix_exclude_single_all|matrix_exclude_cartesian_all|matrix_exclude_partial|matrix_exclude_all_include_restore|matrix_include_expression|matrix_include_value_expression|matrix_exclude_expression|matrix_exclude_value_expression]"
     exit 1
     ;;
 esac
@@ -110,8 +110,18 @@ write_wf() {
       matrix_empty_axis)    printf '    strategy:\n      matrix:\n        shard: %s\n' '[]' ;;
       matrix_nonempty_axis) printf '    strategy:\n      matrix:\n        shard:\n          - one\n          - two\n' ;;
       matrix_expression)    printf '    strategy:\n      matrix: %s\n' '${{ fromJSON(vars.G3_MATRIX) }}' ;;
+      matrix_axis_item_expression) printf '    strategy:\n      matrix:\n        shard:\n          - %s\n' '${{ vars.G3_SHARD }}' ;;
       matrix_include_only)  printf '    strategy:\n      matrix:\n        include:\n          - shard: one\n' ;;
+      matrix_include_empty) printf '    strategy:\n      matrix:\n        include: %s\n' '[]' ;;
       matrix_exclude_only)  printf '    strategy:\n      matrix:\n        exclude:\n          - shard: one\n' ;;
+      matrix_exclude_single_all) printf '    strategy:\n      matrix:\n        shard: [one]\n        exclude:\n          - shard: one\n' ;;
+      matrix_exclude_cartesian_all) printf '    strategy:\n      matrix:\n        os: [linux, mac]\n        shard: [one, two]\n        exclude:\n          - os: linux\n          - os: mac\n' ;;
+      matrix_exclude_partial) printf '    strategy:\n      matrix:\n        os: [linux, mac]\n        shard: [one, two]\n        exclude:\n          - os: linux\n            shard: one\n' ;;
+      matrix_exclude_all_include_restore) printf '    strategy:\n      matrix:\n        shard: [one]\n        exclude:\n          - shard: one\n        include:\n          - shard: one\n' ;;
+      matrix_include_expression) printf '    strategy:\n      matrix:\n        shard: [one]\n        include: %s\n' '${{ fromJSON(vars.G3_INCLUDE) }}' ;;
+      matrix_include_value_expression) printf '    strategy:\n      matrix:\n        shard: [one]\n        include:\n          - shard: %s\n' '${{ vars.G3_SHARD }}' ;;
+      matrix_exclude_expression) printf '    strategy:\n      matrix:\n        shard: [one]\n        exclude: %s\n' '${{ fromJSON(vars.G3_EXCLUDE) }}' ;;
+      matrix_exclude_value_expression) printf '    strategy:\n      matrix:\n        shard: [one]\n        exclude:\n          - shard: %s\n' '${{ vars.G3_SHARD }}' ;;
     esac
     printf '    steps:\n      - name: g3\n'
     case "$variant" in
@@ -352,6 +362,23 @@ assert_matrix_shape() {
   printf '%s\n' "$shape"
 }
 
+assert_matrix_value() {
+  local wf="$1" expected="$2" value
+  value=$(ruby -ryaml -e '
+    matrix = YAML.safe_load(File.read(ARGV.fetch(0)), [], [], false).fetch("jobs").fetch("verify").fetch("strategy").fetch("matrix")
+    puts matrix.inspect
+  ' "$wf") || {
+    echo "FAIL: hardening6 matrix fixture is not valid YAML"
+    exit 1
+  }
+  if [ "$value" != "$expected" ]; then
+    echo "FAIL: hardening6 matrix fixture has the wrong parsed value"
+    printf '%s\n' "$value"
+    exit 1
+  fi
+  printf 'MATRIX_VALUE=%s\n' "$value"
+}
+
 assert_duplicate_shape() {
   local wf="$1" expected="$2" shape
   shape=$(ruby -ryaml -e '
@@ -585,12 +612,28 @@ if [ "$MODE" = all ] || [ "$MODE" = matrix_expression ]; then
   expect_case "N9 matrix expression" 1 "$WIRE_RE"
 fi
 
+if [ "$MODE" = all ] || [ "$MODE" = matrix_axis_item_expression ]; then
+  init_case
+  write_wf "$CASE_DIR" matrix_axis_item_expression
+  git -C "$CASE_DIR" add -A
+  assert_matrix_value "$CASE_DIR/.github/workflows/verify.yml" "$(printf '{\"shard\"=>[\"%s\"]}' '${{ vars.G3_SHARD }}')"
+  expect_case "N9 matrix axis item expression" 1 "$WIRE_RE"
+fi
+
 if [ "$MODE" = all ] || [ "$MODE" = matrix_include_only ]; then
   init_case
   write_wf "$CASE_DIR" matrix_include_only
   git -C "$CASE_DIR" add -A
   assert_matrix_shape "$CASE_DIR/.github/workflows/verify.yml" $'MATRIX_CLASS=Hash\nMATRIX_KEYS=include\nSTATIC_AXIS_VALUES='
-  expect_case "N9 matrix include-only" 1 "$WIRE_RE"
+  expect_case "include-only matrix entries remain allowed" 0 '^PASS: ci/pre-push wiring intact$'
+fi
+
+if [ "$MODE" = all ] || [ "$MODE" = matrix_include_empty ]; then
+  init_case
+  write_wf "$CASE_DIR" matrix_include_empty
+  git -C "$CASE_DIR" add -A
+  assert_matrix_value "$CASE_DIR/.github/workflows/verify.yml" '{"include"=>[]}'
+  expect_case "N9 empty include-only matrix" 1 "$WIRE_RE"
 fi
 
 if [ "$MODE" = all ] || [ "$MODE" = matrix_exclude_only ]; then
@@ -599,6 +642,70 @@ if [ "$MODE" = all ] || [ "$MODE" = matrix_exclude_only ]; then
   git -C "$CASE_DIR" add -A
   assert_matrix_shape "$CASE_DIR/.github/workflows/verify.yml" $'MATRIX_CLASS=Hash\nMATRIX_KEYS=exclude\nSTATIC_AXIS_VALUES='
   expect_case "N9 matrix exclude-only" 1 "$WIRE_RE"
+fi
+
+if [ "$MODE" = all ] || [ "$MODE" = matrix_exclude_single_all ]; then
+  init_case
+  write_wf "$CASE_DIR" matrix_exclude_single_all
+  git -C "$CASE_DIR" add -A
+  assert_matrix_value "$CASE_DIR/.github/workflows/verify.yml" '{"shard"=>["one"], "exclude"=>[{"shard"=>"one"}]}'
+  expect_case "N9 exclude removes the sole combination" 1 "$WIRE_RE"
+fi
+
+if [ "$MODE" = all ] || [ "$MODE" = matrix_exclude_cartesian_all ]; then
+  init_case
+  write_wf "$CASE_DIR" matrix_exclude_cartesian_all
+  git -C "$CASE_DIR" add -A
+  assert_matrix_value "$CASE_DIR/.github/workflows/verify.yml" '{"os"=>["linux", "mac"], "shard"=>["one", "two"], "exclude"=>[{"os"=>"linux"}, {"os"=>"mac"}]}'
+  expect_case "N9 exclude removes a multi-axis cartesian product" 1 "$WIRE_RE"
+fi
+
+if [ "$MODE" = all ] || [ "$MODE" = matrix_exclude_partial ]; then
+  init_case
+  write_wf "$CASE_DIR" matrix_exclude_partial
+  git -C "$CASE_DIR" add -A
+  assert_matrix_value "$CASE_DIR/.github/workflows/verify.yml" '{"os"=>["linux", "mac"], "shard"=>["one", "two"], "exclude"=>[{"os"=>"linux", "shard"=>"one"}]}'
+  expect_case "matrix with combinations remaining after exclude" 0 '^PASS: ci/pre-push wiring intact$'
+fi
+
+if [ "$MODE" = all ] || [ "$MODE" = matrix_exclude_all_include_restore ]; then
+  init_case
+  write_wf "$CASE_DIR" matrix_exclude_all_include_restore
+  git -C "$CASE_DIR" add -A
+  assert_matrix_value "$CASE_DIR/.github/workflows/verify.yml" '{"shard"=>["one"], "exclude"=>[{"shard"=>"one"}], "include"=>[{"shard"=>"one"}]}'
+  expect_case "include restores a combination after exclude" 0 '^PASS: ci/pre-push wiring intact$'
+fi
+
+if [ "$MODE" = all ] || [ "$MODE" = matrix_include_expression ]; then
+  init_case
+  write_wf "$CASE_DIR" matrix_include_expression
+  git -C "$CASE_DIR" add -A
+  assert_matrix_value "$CASE_DIR/.github/workflows/verify.yml" "$(printf '{\"shard\"=>[\"one\"], \"include\"=>\"%s\"}' '${{ fromJSON(vars.G3_INCLUDE) }}')"
+  expect_case "N9 matrix include expression" 1 "$WIRE_RE"
+fi
+
+if [ "$MODE" = all ] || [ "$MODE" = matrix_include_value_expression ]; then
+  init_case
+  write_wf "$CASE_DIR" matrix_include_value_expression
+  git -C "$CASE_DIR" add -A
+  assert_matrix_value "$CASE_DIR/.github/workflows/verify.yml" "$(printf '{\"shard\"=>[\"one\"], \"include\"=>[{\"shard\"=>\"%s\"}]}' '${{ vars.G3_SHARD }}')"
+  expect_case "N9 matrix include value expression" 1 "$WIRE_RE"
+fi
+
+if [ "$MODE" = all ] || [ "$MODE" = matrix_exclude_expression ]; then
+  init_case
+  write_wf "$CASE_DIR" matrix_exclude_expression
+  git -C "$CASE_DIR" add -A
+  assert_matrix_value "$CASE_DIR/.github/workflows/verify.yml" "$(printf '{\"shard\"=>[\"one\"], \"exclude\"=>\"%s\"}' '${{ fromJSON(vars.G3_EXCLUDE) }}')"
+  expect_case "N9 matrix exclude expression" 1 "$WIRE_RE"
+fi
+
+if [ "$MODE" = all ] || [ "$MODE" = matrix_exclude_value_expression ]; then
+  init_case
+  write_wf "$CASE_DIR" matrix_exclude_value_expression
+  git -C "$CASE_DIR" add -A
+  assert_matrix_value "$CASE_DIR/.github/workflows/verify.yml" "$(printf '{\"shard\"=>[\"one\"], \"exclude\"=>[{\"shard\"=>\"%s\"}]}' '${{ vars.G3_SHARD }}')"
+  expect_case "N9 matrix exclude value expression" 1 "$WIRE_RE"
 fi
 
 if [ "$MODE" = all ] || [ "$MODE" = step_shell ]; then
