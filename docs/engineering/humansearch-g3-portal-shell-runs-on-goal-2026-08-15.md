@@ -2,6 +2,8 @@
 
 검사 명령의 글자만 남겨 두고 실제 실행을 없애는 설정을 모두 거부하도록 고칩니다. 기존 실행 처리기 세 위치에 더해, 실행 시작 폴더 세 위치와 실행 전 개입 환경값 세 위치를 차단하고 실행할 기계의 값도 실제 이름을 담은 형태인지 확인합니다. 실패를 먼저 재현하고 최소 수정 뒤 전체 과거 시험을 다시 통과시킬 때까지만 완료로 보겠습니다.
 
+검사 작업의 실행 묶음 수를 정하는 표에 빈 목록이 하나라도 있거나, 실행 전에 실제 묶음 수를 확정할 수 없는 형태라면 거부합니다. 이 표가 없거나 각 목록에 값이 하나 이상 있으면 기존처럼 허용합니다.
+
 # 판단 근거
 
 현재 검사는 실행할 명령, 일부 건너뛰기 설정, 실행 처리기 세 위치, 실행 기계 키의 존재를 확인합니다. 그러나 같은 이름의 가짜 검사 폴더로 시작 위치를 바꾸는 설정, 검사 본문보다 먼저 셸을 끝내는 환경값, 실행 기계 키의 실제 값은 확인하지 않으므로 아무 검사도 하지 않거나 시작조차 할 수 없는 설정을 정상으로 인정할 수 있습니다.
@@ -33,6 +35,8 @@
 
 YAML(= 들여쓰기로 서버 자동 실행 구조를 적는 설정 형식)을 구조적으로 읽은 뒤에도 `run` 문자열과 일부 키 존재 중심으로만 정상 여부를 정합니다. 같은 명령의 실제 시작 위치와 시작 전 환경, 실행 기계 값의 유효성이 정상 조건에 포함되지 않은 것이 G6-1~G6-3의 공통 원인입니다.
 
+G9의 근본 원인은 G3 명령이 든 작업을 찾고도 `strategy.matrix`(= 한 작업을 여러 실행 묶음으로 펼치는 조합표)를 읽지 않아, 빈 목록 축으로 실행 묶음이 0개가 되는 설정을 정상으로 인정한 것입니다.
+
 ## 인수 기준
 
 1. 단계 `shell` 키가 있는 G3 표본은 본체가 정확히 종료값 1을 냅니다.
@@ -51,6 +55,11 @@ YAML(= 들여쓰기로 서버 자동 실행 구조를 적는 설정 형식)을 �
 14. `runs-on`의 null·빈 목록·불리언 거짓값 표본은 각각 본체가 정확히 종료값 1을 냅니다.
 15. 실제 `.github/workflows/verify.yml`에 G3 실행 경로의 금지 환경값·실행 시작 폴더가 없고 `runs-on: ubuntu-latest`가 있으며, 본체 종료값 0을 유지합니다.
 16. `working-directory` 방어 한 줄을 임시 무력화하면 `hardening6`이 종료값 1이고, 원복 뒤 다시 0입니다.
+17. G3 작업의 `strategy.matrix`에 값이 빈 목록인 축이 하나라도 있으면 본체가 정확히 종료값 1을 냅니다.
+18. G3 작업의 `strategy.matrix`에 비어 있지 않은 목록 축이 하나 이상 있고 모든 정적 축이 비어 있지 않으면 본체가 종료값 0을 냅니다.
+19. G3 작업에 `strategy.matrix`가 없으면 본체가 종료값 0을 유지합니다.
+20. `strategy.matrix`가 `${{ }}` 식이거나 `include` 또는 `exclude`만 가져 정적 축을 하나도 확정할 수 없으면 본체가 정확히 종료값 1을 냅니다.
+21. 빈 matrix 축 방어 한 줄을 임시 무력화하면 `hardening6`이 종료값 1이고, 원복 뒤 다시 0입니다.
 
 여기서 종료값(= 프로그램이 끝나며 남기는 성적)은 이 본체에서 0이 합격, 1이 규칙 위반, 2가 검사를 수행할 수 없음입니다.
 
@@ -64,6 +73,7 @@ YAML(= 들여쓰기로 서버 자동 실행 구조를 적는 설정 형식)을 �
 - 게이트 5: 로컬 커밋까지만 허용합니다. `git push`, 합치기, 배포는 하지 않습니다.
 - 게이트 6: 이 작업에서는 워크트리를 제거하지 않습니다.
 - G6 갱신: `hardening6`에 실행 시작 폴더 3개, `BASH_ENV` 소유 위치 3개, `ENV`·`SHELLOPTS`·`PATH` 각 1개, 실행 기계 무효값 3개, 무해한 환경값 1개를 먼저 추가합니다. 현행 본체가 위험 표본을 잘못 0으로 승인하는 RED를 각 표본에서 관측한 뒤에만 본체를 수정합니다.
+- G9 갱신: `hardening6`에 빈 목록 축, 값이 든 정상 축, 식, `include` 단독, `exclude` 단독 표본을 먼저 추가합니다. 현행 본체가 정상 축은 0으로 유지하면서 네 위험 표본을 잘못 0으로 승인하는 RED를 관측한 뒤에만 본체를 수정합니다.
 
 ## 적대 검증 항목
 
@@ -73,6 +83,7 @@ YAML(= 들여쓰기로 서버 자동 실행 구조를 적는 설정 형식)을 �
 - 실행 시작 폴더가 단계·작업·파일 어느 위치에 있어도 안전한 중복 단계나 작업으로 숨길 수 없는지 확인합니다.
 - 금지 환경값 키 비교가 대소문자 계약을 정확히 따르며, 다른 무해한 키까지 과잉 차단하지 않는지 확인합니다.
 - `runs-on` 문자열의 공백값과 목록 원소의 빈 문자열까지 잘못 허용하지 않는지 확인합니다.
+- matrix의 정적 축 중 하나라도 빈 목록이면 거부하고, 비어 있지 않은 목록 축은 허용하며, 식·`include`/`exclude` 단독은 보수적으로 거부하는지 확인합니다.
 - Claude에게 변경 파일과 전체 회귀 증거를 읽기 전용으로 공격하게 하고, 그 판정의 모든 근거를 Codex가 다시 실행해 양방향으로 검토합니다.
 
 ## SOT 체크리스트
@@ -248,3 +259,83 @@ OUT_OF_SCOPE_TMP_REMOVAL_EXIT=0
 ```
 
 → 작업 폴더 밖 임시 쓰기는 절차 위반이었습니다. 잔여물은 0으로 제거했으며, 완료 근거는 작업 폴더 안의 `hardening6`, 전체 회귀, 무력화·원복 시험만 사용합니다.
+
+### G9 fix5 빈 matrix 축 RED·GREEN 기록
+
+RED 핵심 출력:
+
+```text
+MATRIX_CLASS=Hash
+MATRIX_KEYS=shard
+STATIC_AXIS_VALUES=shard:Array:0
+FAIL: hardening6 [N9 matrix empty axis] exit=0 (기대: 정확히 1)
+RED_HARDENING6_MATRIX_EMPTY_AXIS_EXIT=1
+MATRIX_CLASS=Hash
+MATRIX_KEYS=shard
+STATIC_AXIS_VALUES=shard:Array:2
+ok [non-empty static matrix axis remains allowed] exit=0
+RED_HARDENING6_MATRIX_NONEMPTY_AXIS_EXIT=0
+```
+
+→ 빈 목록 축에서는 옛 본체가 잘못 0을 냈기 때문에 새 시험이 1로 실패했습니다. 값이 든 정상 축은 옛 본체에서도 0이어서 과잉 차단 기준을 함께 고정했습니다.
+
+GREEN 핵심 출력:
+
+```text
+ok [N9 matrix empty axis] exit=1
+ok [non-empty static matrix axis remains allowed] exit=0
+ok [N9 matrix expression] exit=1
+ok [N9 matrix include-only] exit=1
+ok [N9 matrix exclude-only] exit=1
+PASS: portal-constants hardening6 cases 36 (blocked-mutations 32, clean-baselines 3, wiring-present 1)
+REGRESSION_HARDENING6_FINAL_EXIT=0
+```
+
+→ 빈 축·식·`include` 단독·`exclude` 단독은 본체가 정확히 1로 거부했고, 값이 든 정적 축은 0을 유지했습니다. 과거 표본을 합친 36개 전체도 0입니다.
+
+전량 회귀 종료값:
+
+```text
+REGRESSION_SCANNER_EXIT=0
+REGRESSION_HARDENING1_EXIT=0
+REGRESSION_HARDENING2_EXIT=0
+REGRESSION_HARDENING3_EXIT=0
+REGRESSION_HARDENING4_EXIT=0
+REGRESSION_HARDENING5_EXIT=0
+REGRESSION_HARDENING6_FINAL_EXIT=0
+REGRESSION_MUTATIONS_FINAL_EXIT=0
+BASH_N_FILE_COUNT=34
+BASH_N_ALL_EXIT=0
+VERIFY_SH_EXIT=0
+CURRENT_VERIFY_YML_MATRIX_SHAPE_EXIT=0
+```
+
+→ 사용자께서 요구한 본체·hardening 1~6·mutations·추적 셸 전량 문법·현행 `verify.yml`이 모두 0입니다. `verify.sh` 비밀정보 검사도 추가로 0이었습니다.
+
+방어 무력화와 원복:
+
+```text
+FAIL: hardening6 [N9 matrix empty axis] exit=0 (기대: 정확히 1)
+MUTATION_MATRIX_DEFENSE_DISABLED_HARDENING6_EXIT=1
+MUTATION_RESTORED_TARGET_EXIT=0
+PASS: portal-constants hardening6 cases 36 (blocked-mutations 32, clean-baselines 3, wiring-present 1)
+MUTATION_RESTORED_FULL_HARDENING6_EXIT=0
+```
+
+→ 새 방어 조건 한 줄을 잠시 끄자 빈 축을 본체가 다시 0으로 승인해 시험이 1로 실패했습니다. 같은 줄을 원복한 뒤 표적 시험과 36개 전체가 다시 0이었습니다.
+
+### G9 fix5 다른 엔진 검증과 Codex 재공격
+
+다른 엔진은 워크트리 내부 임시 설정만 사용해 두 번 실행했습니다. 첫 실행은 프로세스 출력이 회수되지 않아 판정으로 인정하지 않았고, 마지막 실행은 3분 동안 출력이 없어 중단했습니다.
+
+```text
+CLAUDE_ADVERSARIAL_FINAL_EXIT=130
+CLAUDE_FINAL_TEMP_CLEANUP_EXIT=0
+CLAUDE_FINAL_TEMP_REMAINS=0
+ORPHAN_TEMP_REMAINS[.g3-fix5-claude-review]=0
+ORPHAN_TEMP_REMAINS[.g3-hardening6.yJAtdd]=0
+```
+
+→ 종료값 130은 이 실행에서 중단 신호로 끝났다는 뜻입니다. 판정 본문이 없으므로 다른 엔진 검증은 미실행으로 처리했고, 그 실행이 남긴 워크트리 내부 임시 폴더는 모두 제거했습니다.
+
+Claude 판정이 없으므로 그 판정을 재현하는 Codex 2차 교차검증은 수행할 수 없었습니다. 대신 구현자가 빈 축·정상 축·식·`include`/`exclude` 단독을 각각 실행하고, 새 방어 한 줄을 무력화한 뒤 실패와 원복 재통과를 직접 확인했습니다. 다른 안전한 작업이 위험한 G3 작업을 숨기는지는 `unsafe_g3_execution` 누적값이 전체 작업 순회를 마친 뒤 한 번만 판정되는 `scripts/acceptance-hs-portal-constants.sh` 구조를 다시 대조했습니다. ※ 별도 엔진의 독립 판정은 확보하지 못했습니다.
