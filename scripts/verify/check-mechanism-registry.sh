@@ -13,7 +13,8 @@
 #   값은 "..." / '...' 로 정확히 감싸거나(닫힘 필수, 뒤에 아무것도 없어야), 영숫자·._- 만.
 #   같은 항목에 같은 필드 2회 금지. 빈 값 = 누락. path 는 저장소 루트 기준 상대경로만
 #   (절대경로·`..` 금지 — V1 D4). ci_mirror_job 은 stage:ci, manual_reason 은
-#   stage:manual 에서만 허용(불일치 필드 = 위반).
+#   stage:manual 에서만 허용(불일치 필드 = 위반). stage:ci 의 target 은 지정한
+#   job 아래 step.run 에 있는 정확한 비주석 명령줄이어야 한다.
 #
 # ⚠️ bash 3.2 호환 — `${VAR^^}` 계열 금지(맥 기본 bash 실측 함정), 연관배열 금지.
 set -uo pipefail
@@ -97,6 +98,42 @@ validate_schema() {
 }
 
 # stage 별 대조(규칙 3~5) — 위반 사유를 stdout 으로, return 1
+ci_target_is_run_command() {
+  local workflow="$1" job="$2" target="$3"
+  case "$target" in
+    'run: '*) target=${target#run: } ;;
+  esac
+
+  CI_JOB="$job" CI_TARGET="$target" ruby -ryaml -e '
+    begin
+      workflow = YAML.safe_load(
+        File.read(ARGV.fetch(0)),
+        permitted_classes: [],
+        permitted_symbols: [],
+        aliases: false
+      )
+      jobs = workflow.is_a?(Hash) ? workflow["jobs"] : nil
+      selected = jobs.is_a?(Hash) ? jobs[ENV.fetch("CI_JOB")] : nil
+      steps = selected.is_a?(Hash) ? selected["steps"] : nil
+      exit 2 unless steps.is_a?(Array)
+
+      target = ENV.fetch("CI_TARGET")
+      found = steps.any? do |step|
+        run = step.is_a?(Hash) ? step["run"] : nil
+        next false unless run.is_a?(String)
+
+        run.lines.any? do |line|
+          command = line.strip
+          !command.empty? && !command.start_with?("#") && command == target
+        end
+      end
+      exit(found ? 0 : 1)
+    rescue StandardError
+      exit 2
+    end
+  ' "$workflow" 2>/dev/null
+}
+
 validate_stage() {
   case "$e_stage" in
     pre-commit|pre-push)
@@ -111,10 +148,10 @@ validate_stage() {
       if ! printf '%s\n' "$ci_jobs" | grep -qxF -- "$e_ci_job"; then
         echo "ci_mirror_job '$e_ci_job' 이(가) $WORKFLOW_FILE 의 jobs: 키에 없다"; return 1
       fi
-      # V1 D1: 작업 이름만 보면 존재하지 않는 명령을 '실행 중'이라 적어도 통과한다.
-      # ci 도 target 문자열이 그 워크플로 파일에 실재해야 한다(정본의 target 계약).
-      if ! grep -qF -- "$e_target" "$e_path"; then
-        echo "죽은 ci target — '$e_target' 이(가) $e_path 안에 없다"; return 1
+      # V1 D1 + codeaudit 2026-08-15 A2: 파일 전체 grep 은 target 이 주석에만 있어도
+      # '실행 중'으로 오인했다. 지정 job 의 step.run 안에 있는 정확한 비주석 명령만 인정한다.
+      if ! ci_target_is_run_command "$e_path" "$e_ci_job" "$e_target"; then
+        echo "죽은 ci target — '$e_target' 이(가) $e_ci_job 작업의 실제 run 명령에 없다"; return 1
       fi
       ;;
     manual)
