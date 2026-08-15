@@ -117,24 +117,35 @@ while IFS= read -r -d '' entry; do
     continue
   fi
 
-  LC_ALL=C grep -q $'\r' "$path"
-  cr_rc=$?
-  if [ "$cr_rc" -eq 0 ]; then
-    lf_count=$(LC_ALL=C wc -l < "$path")
-    wc_rc=$?
-    if [ "$wc_rc" -ne 0 ] || \
-      ! printf '%s\n' "$lf_count" | grep -qE '^[[:space:]]*[0-9]+[[:space:]]*$'; then
-      echo "FAIL: 검사 불능: 개행 문자를 셀 수 없음: $path"
-      unreadable=1
-      continue
-    fi
-    if [ "$lf_count" -eq 0 ]; then
-      echo "FAIL: 검사 불능: CR은 있지만 LF가 없는 파일: $path"
-      unreadable=1
-      continue
-    fi
-  elif [ "$cr_rc" -ne 1 ]; then
+  lf_count=$(LC_ALL=C wc -l < "$path")
+  wc_rc=$?
+  if [ "$wc_rc" -ne 0 ] || \
+    ! printf '%s\n' "$lf_count" | grep -qE '^[[:space:]]*[0-9]+[[:space:]]*$'; then
+    echo "FAIL: 검사 불능: 개행 문자를 셀 수 없음: $path"
+    unreadable=1
+    continue
+  fi
+
+  bare_cr=$(LC_ALL=C awk -v lf_count="$lf_count" '
+    index($0, "\r") {
+      record = $0
+      if (NR > lf_count || substr(record, length(record), 1) != "\r") {
+        bare = 1
+        next
+      }
+      sub(/\r$/, "", record)
+      if (index(record, "\r")) bare = 1
+    }
+    END { print bare + 0 }
+  ' "$path")
+  bare_cr_rc=$?
+  if [ "$bare_cr_rc" -ne 0 ] || ! printf '%s\n' "$bare_cr" | grep -qE '^[01]$'; then
     echo "FAIL: 검사 불능: 개행 형식을 읽을 수 없음: $path"
+    unreadable=1
+    continue
+  fi
+  if [ "$bare_cr" -ne 0 ]; then
+    echo "FAIL: 검사 불능: LF가 바로 뒤따르지 않는 CR이 있음: $path"
     unreadable=1
     continue
   fi
