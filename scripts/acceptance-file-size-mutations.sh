@@ -60,6 +60,25 @@ make_crlf_lines() {
     > "$destination"
 }
 
+make_mixed_newline_lines() {
+  local destination="$1"
+  awk 'BEGIN {
+    for (i = 1; i <= 499; i++) printf "sample\r\n"
+    printf "sample\r"
+    printf "sample\r\n"
+  }' > "$destination"
+}
+
+make_lf_crlf_mixed_lines() {
+  local count="$1" destination="$2"
+  awk -v count="$count" 'BEGIN {
+    for (i = 1; i <= count; i++) {
+      if (i % 2) printf "sample\n"
+      else printf "sample\r\n"
+    }
+  }' > "$destination"
+}
+
 record_result() {
   local label="$1" expected_rc="$2" rc="$3" output="$4" expected_text
   shift 4
@@ -151,13 +170,37 @@ init_case
 make_cr_only_lines 501 "$CASE_DIR/humansearch/src/cr-only.py"
 git -C "$CASE_DIR" add -- humansearch/src/cr-only.py
 run_case "CR 전용 501줄 파일 검사 불능" 2 \
-  "FAIL: 검사 불능: CR은 있지만 LF가 없는 파일: humansearch/src/cr-only.py"
+  "FAIL: 검사 불능: LF가 바로 뒤따르지 않는 CR이 있음: humansearch/src/cr-only.py"
+
+init_case
+make_mixed_newline_lines "$CASE_DIR/humansearch/src/mixed-newlines.py"
+git -C "$CASE_DIR" add -- humansearch/src/mixed-newlines.py
+run_case "혼합 줄바꿈 501줄 파일 검사 불능" 2 \
+  "FAIL: 검사 불능: LF가 바로 뒤따르지 않는 CR이 있음: humansearch/src/mixed-newlines.py"
 
 init_case
 make_crlf_lines 500 "$CASE_DIR/humansearch/src/crlf-at-limit.py"
 git -C "$CASE_DIR" add -- humansearch/src/crlf-at-limit.py
 run_case "CRLF 500줄 파일 허용" 0 \
   "PASS: 검사 대상 1개, 500줄 한도 준수"
+
+init_case
+make_crlf_lines 501 "$CASE_DIR/humansearch/src/crlf-over-limit.py"
+git -C "$CASE_DIR" add -- humansearch/src/crlf-over-limit.py
+run_case "CRLF 501줄 파일 차단" 1 \
+  "초과: humansearch/src/crlf-over-limit.py 501줄"
+
+init_case
+make_lf_crlf_mixed_lines 500 "$CASE_DIR/humansearch/src/lf-crlf-at-limit.py"
+git -C "$CASE_DIR" add -- humansearch/src/lf-crlf-at-limit.py
+run_case "LF·CRLF 혼합 500줄 파일 허용" 0 \
+  "PASS: 검사 대상 1개, 500줄 한도 준수"
+
+init_case
+make_lf_crlf_mixed_lines 501 "$CASE_DIR/humansearch/src/lf-crlf-over-limit.py"
+git -C "$CASE_DIR" add -- humansearch/src/lf-crlf-over-limit.py
+run_case "LF·CRLF 혼합 501줄 파일 차단" 1 \
+  "초과: humansearch/src/lf-crlf-over-limit.py 501줄"
 
 init_case
 make_lines 500 "$CASE_DIR/humansearch/src/at-limit.ts"
