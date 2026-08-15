@@ -161,7 +161,7 @@ write_wf() {
 assert_fixture_shape() {
   local wf="$1" want_if="$2" want_coe="$3" want_auto="$4" shape
   shape=$(ruby -ryaml -e '
-    data = YAML.safe_load(File.read(ARGV.fetch(0)), [], [], false)
+    data = YAML.safe_load(File.read(ARGV.fetch(0)), permitted_classes: [], permitted_symbols: [], aliases: false)
     trigger = data.key?("on") ? data["on"] : data[true]
     events = case trigger
              when String then [trigger]
@@ -188,7 +188,7 @@ assert_fixture_shape() {
 assert_n1_needs_shape() {
   local wf="$1" shape
   shape=$(ruby -ryaml -e '
-    data = YAML.safe_load(File.read(ARGV.fetch(0)), [], [], false)
+    data = YAML.safe_load(File.read(ARGV.fetch(0)), permitted_classes: [], permitted_symbols: [], aliases: false)
     jobs = data.fetch("jobs")
     puts "G3_JOB_NEEDS=#{jobs.fetch("verify").fetch("needs", "ABSENT")}"
     gate = jobs.fetch("gate")
@@ -208,7 +208,7 @@ assert_n1_needs_shape() {
 assert_n2_expression_shape() {
   local wf="$1" shape
   shape=$(ruby -ryaml -e '
-    data = YAML.safe_load(File.read(ARGV.fetch(0)), [], [], false)
+    data = YAML.safe_load(File.read(ARGV.fetch(0)), permitted_classes: [], permitted_symbols: [], aliases: false)
     value = data.fetch("jobs").fetch("verify").fetch("continue-on-error")
     puts "JOB_CONTINUE_ON_ERROR_CLASS=#{value.class}"
     puts "JOB_CONTINUE_ON_ERROR=#{value}"
@@ -227,7 +227,7 @@ assert_n2_expression_shape() {
 assert_n3_paths_ignore_shape() {
   local wf="$1" shape
   shape=$(ruby -ryaml -e '
-    data = YAML.safe_load(File.read(ARGV.fetch(0)), [], [], false)
+    data = YAML.safe_load(File.read(ARGV.fetch(0)), permitted_classes: [], permitted_symbols: [], aliases: false)
     trigger = data.key?("on") ? data["on"] : data[true]
     puts "PUSH_PATHS_IGNORE=#{trigger.fetch("push").fetch("paths-ignore").join(",")}"
     puts "PULL_REQUEST_PATHS_IGNORE=#{trigger.fetch("pull_request").fetch("paths-ignore").join(",")}"
@@ -247,7 +247,7 @@ assert_execution_shape() {
   local wf="$1" want_runs_on="$2" want_step_shell="$3"
   local want_job_shell="$4" want_workflow_shell="$5" shape
   shape=$(ruby -ryaml -e '
-    data = YAML.safe_load(File.read(ARGV.fetch(0)), [], [], false)
+    data = YAML.safe_load(File.read(ARGV.fetch(0)), permitted_classes: [], permitted_symbols: [], aliases: false)
     job = data.fetch("jobs").fetch("verify")
     step = job.fetch("steps").find do |candidate|
       candidate.is_a?(Hash) && candidate["run"].to_s.include?("acceptance-hs-portal-constants.sh")
@@ -275,7 +275,7 @@ assert_execution_shape() {
 assert_working_directory_shape() {
   local wf="$1" want_step="$2" want_job="$3" want_workflow="$4" shape
   shape=$(ruby -ryaml -e '
-    data = YAML.safe_load(File.read(ARGV.fetch(0)), [], [], false)
+    data = YAML.safe_load(File.read(ARGV.fetch(0)), permitted_classes: [], permitted_symbols: [], aliases: false)
     job = data.fetch("jobs").fetch("verify")
     step = job.fetch("steps").find { |candidate| candidate.is_a?(Hash) && candidate["run"].to_s.include?("acceptance-hs-portal-constants.sh") }
     abort "G3 step missing" unless step
@@ -299,7 +299,7 @@ assert_working_directory_shape() {
 assert_env_shape() {
   local wf="$1" want_step="$2" want_job="$3" want_workflow="$4" shape
   shape=$(ruby -ryaml -e '
-    data = YAML.safe_load(File.read(ARGV.fetch(0)), [], [], false)
+    data = YAML.safe_load(File.read(ARGV.fetch(0)), permitted_classes: [], permitted_symbols: [], aliases: false)
     job = data.fetch("jobs").fetch("verify")
     step = job.fetch("steps").find { |candidate| candidate.is_a?(Hash) && candidate["run"].to_s.include?("acceptance-hs-portal-constants.sh") }
     abort "G3 step missing" unless step
@@ -322,7 +322,7 @@ assert_env_shape() {
 assert_runs_on_shape() {
   local wf="$1" want_class="$2" want_value="$3" shape
   shape=$(ruby -ryaml -e '
-    value = YAML.safe_load(File.read(ARGV.fetch(0)), [], [], false).fetch("jobs").fetch("verify").fetch("runs-on")
+    value = YAML.safe_load(File.read(ARGV.fetch(0)), permitted_classes: [], permitted_symbols: [], aliases: false).fetch("jobs").fetch("verify").fetch("runs-on")
     puts "RUNS_ON_CLASS=#{value.class}"
     puts "RUNS_ON_VALUE=#{value.inspect}"
   ' "$wf") || {
@@ -340,7 +340,7 @@ assert_runs_on_shape() {
 assert_matrix_shape() {
   local wf="$1" expected="$2" shape
   shape=$(ruby -ryaml -e '
-    matrix = YAML.safe_load(File.read(ARGV.fetch(0)), [], [], false).fetch("jobs").fetch("verify").fetch("strategy").fetch("matrix")
+    matrix = YAML.safe_load(File.read(ARGV.fetch(0)), permitted_classes: [], permitted_symbols: [], aliases: false).fetch("jobs").fetch("verify").fetch("strategy").fetch("matrix")
     puts "MATRIX_CLASS=#{matrix.class}"
     if matrix.is_a?(Hash)
       keys = matrix.keys.map(&:to_s).sort
@@ -365,7 +365,7 @@ assert_matrix_shape() {
 assert_matrix_value() {
   local wf="$1" expected="$2" value
   value=$(ruby -ryaml -e '
-    matrix = YAML.safe_load(File.read(ARGV.fetch(0)), [], [], false).fetch("jobs").fetch("verify").fetch("strategy").fetch("matrix")
+    matrix = YAML.safe_load(File.read(ARGV.fetch(0)), permitted_classes: [], permitted_symbols: [], aliases: false).fetch("jobs").fetch("verify").fetch("strategy").fetch("matrix")
     puts matrix.inspect
   ' "$wf") || {
     echo "FAIL: hardening6 matrix fixture is not valid YAML"
@@ -382,7 +382,7 @@ assert_matrix_value() {
 assert_duplicate_shape() {
   local wf="$1" expected="$2" shape
   shape=$(ruby -ryaml -e '
-    data = YAML.safe_load(File.read(ARGV.fetch(0)), [], [], false)
+    data = YAML.safe_load(File.read(ARGV.fetch(0)), permitted_classes: [], permitted_symbols: [], aliases: false)
     g3_jobs = data.fetch("jobs").values.select do |job|
       job.is_a?(Hash) && job["steps"].is_a?(Array) && job["steps"].any? do |step|
         step.is_a?(Hash) && step["run"].to_s.include?("acceptance-hs-portal-constants.sh")

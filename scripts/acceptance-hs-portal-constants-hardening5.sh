@@ -90,7 +90,7 @@ write_wf_env_only() {
 assert_env_only_shape() {
   local wf="$1" shape
   shape=$(ruby -ryaml -e '
-    data = YAML.safe_load(File.read(ARGV.fetch(0)), [], [], false)
+    data = YAML.safe_load(File.read(ARGV.fetch(0)), permitted_classes: [], permitted_symbols: [], aliases: false)
     steps = data.fetch("jobs").values.flat_map { |job| job.fetch("steps", []) }
     needle = "bash scripts/acceptance-hs-portal-constants.sh"
     runs = steps.count { |step| step.is_a?(Hash) && step["run"].to_s.include?(needle) }
