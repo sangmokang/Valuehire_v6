@@ -5,7 +5,7 @@
 #   정본: docs/engineering/verify-unification-goal-2026-08-10.md:78-81 (AC-M)
 #   출력 : 항목마다 PASS:/FAIL: 전부 출력, 마지막 줄 `CHECKED: <검사 수>`
 #   exit : 0 = PASS | 1 = FAIL | 2 = NOT_RUN
-#   불변식: CHECKED 는 정확히 25 이어야 한다 — 검사가 몇 개 사라져도 초록이면 가짜다
+#   불변식: CHECKED 는 정확히 26 이어야 한다 — 검사가 몇 개 사라져도 초록이면 가짜다
 #           (PR #6 결함 D3 의 교훈: checked==0 만 막으면 3개를 지워도 통과했다 · P20)
 #
 # 쓰기 규칙: 이 검사는 저장소에 어떤 파일도 만들지 않는다. 동적 fixture 는 전부
@@ -24,7 +24,7 @@ SNAP0=$(git status --porcelain)
 CHECKER=scripts/verify/check-mechanism-registry.sh
 FIXDIR=scripts/verify/fixtures/mechanism-registry
 REGISTRY=docs/sot/mechanism-registry.yaml
-EXPECTED_CHECKED=25
+EXPECTED_CHECKED=26
 
 TMP=$(mktemp -d) || { echo "NOT_RUN: mktemp 실패"; echo "CHECKED: 0"; exit 2; }
 trap 'rm -rf "$TMP"' EXIT
@@ -135,6 +135,38 @@ cat > "$TMP/ci-fake-target.yaml" <<'EOF'
   required: true
 EOF
 expect_rc "ci 인데 거짓 target → 불합격" "$TMP/ci-fake-target.yaml" 1
+
+# codeaudit(2026-08-15) 후속 A2: ci target 문자열이 실제 run 명령에는 없고 주석에만
+# 있어도 파일 전체 grep은 통과했다. 명부는 "실제로 실행되는 장치"의 명부이므로,
+# 작업의 run 값 안에 있는 정확한 명령줄만 근거로 인정해야 한다.
+mkdir -p "$TMP/comment-only/.github/workflows"
+cat > "$TMP/comment-only/.github/workflows/verify.yml" <<'EOF'
+name: verify
+on: push
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 목표 명령을 주석에만 둔 가짜 배선
+        # bash scripts/acceptance-hs-portal-constants.sh
+        run: echo clean
+EOF
+cat > "$TMP/comment-only/registry.yaml" <<'EOF'
+- id: "ci-comment-only-target"
+  path: ".github/workflows/verify.yml"
+  target: "bash scripts/acceptance-hs-portal-constants.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
+EOF
+comment_only_rc=$(cd "$TMP/comment-only" && bash "$REPO/$CHECKER" registry.yaml >/dev/null 2>&1; echo $?)
+checked=$((checked + 1))
+if [ "$comment_only_rc" -eq 1 ]; then
+  echo "PASS: ci target 이 주석에만 있음 → 불합격 (exit=1)"
+else
+  echo "FAIL: ci target 이 주석에만 있음 → 불합격 (기대 exit=1, 실제 $comment_only_rc)"
+  fail=1
+fi
 
 # V1 D4: 저장소 밖 절대경로 — 계약(⑩)은 저장소 루트 기준 상대경로다.
 cat > "$TMP/abs-path.yaml" <<'EOF'
