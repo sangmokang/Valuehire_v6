@@ -14,7 +14,7 @@
 #   같은 항목에 같은 필드 2회 금지. 빈 값 = 누락. path 는 저장소 루트 기준 상대경로만
 #   (절대경로·`..` 금지 — V1 D4). ci_mirror_job 은 stage:ci, manual_reason 은
 #   stage:manual 에서만 허용(불일치 필드 = 위반). stage:ci 의 target 은 지정한
-#   job 아래 step.run 에 있는 정확한 비주석 명령줄이어야 한다.
+#   job 아래 조건부 실행·오류 무시가 없는 step.run 의 정확한 비주석 명령줄이어야 한다.
 #
 # ⚠️ bash 3.2 호환 — `${VAR^^}` 계열 금지(맥 기본 bash 실측 함정), 연관배열 금지.
 set -uo pipefail
@@ -104,6 +104,9 @@ ci_target_is_run_command() {
     'run: '*) target=${target#run: } ;;
   esac
 
+  command -v ruby >/dev/null 2>&1 || return 2
+  ruby -e 'exit 0' >/dev/null 2>&1 || return 2
+
   CI_JOB="$job" CI_TARGET="$target" ruby -ryaml -e '
     begin
       workflow = YAML.safe_load(
@@ -121,6 +124,7 @@ ci_target_is_run_command() {
       found = steps.any? do |step|
         run = step.is_a?(Hash) ? step["run"] : nil
         next false unless run.is_a?(String)
+        next false if step.key?("if") || step.key?("continue-on-error")
 
         run.lines.any? do |line|
           command = line.strip
@@ -150,9 +154,17 @@ validate_stage() {
       fi
       # V1 D1 + codeaudit 2026-08-15 A2: 파일 전체 grep 은 target 이 주석에만 있어도
       # '실행 중'으로 오인했다. 지정 job 의 step.run 안에 있는 정확한 비주석 명령만 인정한다.
-      if ! ci_target_is_run_command "$e_path" "$e_ci_job" "$e_target"; then
-        echo "죽은 ci target — '$e_target' 이(가) $e_ci_job 작업의 실제 run 명령에 없다"; return 1
-      fi
+      ci_target_is_run_command "$e_path" "$e_ci_job" "$e_target"
+      ci_target_rc=$?
+      case "$ci_target_rc" in
+        0) : ;;
+        1)
+          echo "죽은 ci target — '$e_target' 이(가) $e_ci_job 작업의 무조건 실행되는 run 명령에 없다"; return 1
+          ;;
+        *)
+          echo "ci target 검사 불능 — $e_path 의 YAML 구조 또는 Ruby 실행 환경을 확인해야 한다"; return 1
+          ;;
+      esac
       ;;
     manual)
       if [ -z "$e_reason" ]; then

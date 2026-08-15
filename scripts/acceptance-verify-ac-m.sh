@@ -50,11 +50,37 @@ expect_rc() {
 # 이 인수 검사 자신의 CI 배선을 확인한다. 두 번째 인수의 워크플로를 받는 이유는
 # 주석만 남은 가짜 배선을 임시 fixture 로 재현해 이 검사 자체도 시험하기 위해서다.
 own_ci_wiring_is_unconditional() {
-  local wf="$1" run_lines step_block
-  run_lines=$(grep -c 'run: bash scripts/acceptance-verify-ac-m.sh' "$wf")
-  step_block=$(awk '/- name: 인수 검사 verify-ac-m/,/run: bash scripts\/acceptance-verify-ac-m.sh/' "$wf")
-  [ "$run_lines" -eq 1 ] && [ -n "$step_block" ] && \
-    ! printf '%s\n' "$step_block" | grep -qE '^[[:space:]]*(if:|continue-on-error:)'
+  local wf="$1"
+  ruby -ryaml -e '
+    begin
+      workflow = YAML.safe_load(
+        File.read(ARGV.fetch(0)),
+        permitted_classes: [],
+        permitted_symbols: [],
+        aliases: false
+      )
+      jobs = workflow.is_a?(Hash) ? workflow["jobs"] : nil
+      selected = jobs.is_a?(Hash) ? jobs["verify"] : nil
+      steps = selected.is_a?(Hash) ? selected["steps"] : nil
+      exit 2 unless steps.is_a?(Array)
+
+      target = "bash scripts/acceptance-verify-ac-m.sh"
+      matches = steps.count do |step|
+        next false unless step.is_a?(Hash)
+        next false if step.key?("if") || step.key?("continue-on-error")
+        run = step["run"]
+        next false unless run.is_a?(String)
+
+        run.lines.any? do |line|
+          command = line.strip
+          !command.empty? && !command.start_with?("#") && command == target
+        end
+      end
+      exit(matches == 1 ? 0 : 1)
+    rescue StandardError
+      exit 2
+    end
+  ' "$wf" 2>/dev/null
 }
 
 # ── 1) 검사기 실존 + 실행권한 ────────────────────────────────────────────────
