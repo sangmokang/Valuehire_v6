@@ -3,7 +3,7 @@ set -euo pipefail
 
 selector="${1:-}"
 
-if [ "$selector" != "node-version" ] && [ "$selector" != "pnpm-version" ] && [ "$selector" != "root-workspace" ]; then
+if [ "$selector" != "node-version" ] && [ "$selector" != "pnpm-version" ] && [ "$selector" != "root-workspace" ] && [ "$selector" != "artifact-ignore" ]; then
   echo "FAIL: unsupported admin foundation selector: ${selector:-<missing>}"
   echo "ADMIN_FOUNDATION_NODE_VERSION checkedVersionFiles=0 targetCount=0 expected=24.19.0 reason=unsupported-selector"
   exit 2
@@ -100,6 +100,50 @@ fi
 
 echo "PASS: package.json packageManager is exactly ${expected}"
 echo "ADMIN_FOUNDATION_PNPM_VERSION checkedPackageManagerFields=${checked_package_manager_fields} targetCount=${target_count} expected=${expected} reason=null"
+exit 0
+fi
+
+if [ "$selector" = "artifact-ignore" ]; then
+required_paths=(
+  "node_modules/.artifact-canary"
+  "apps/admin/.next/.artifact-canary"
+  "apps/admin/test-results/.artifact-canary"
+  "apps/admin/playwright-report/.artifact-canary"
+  "apps/admin/coverage/.artifact-canary"
+)
+required_count=${#required_paths[@]}
+ignored_count=0
+tracked_count=0
+missing_ignore_paths=()
+tracked_paths=()
+
+for required_path in "${required_paths[@]}"; do
+  if git check-ignore --no-index --quiet -- "$required_path"; then
+    ignored_count=$((ignored_count + 1))
+  else
+    missing_ignore_paths+=("$required_path")
+  fi
+
+  if git ls-files --error-unmatch -- "$required_path" >/dev/null 2>&1; then
+    tracked_count=$((tracked_count + 1))
+    tracked_paths+=("$required_path")
+  fi
+done
+
+if [ "$tracked_count" -ne 0 ]; then
+  printf 'FAIL: forbidden generated artifact is tracked: %s\n' "${tracked_paths[*]}"
+  echo "ADMIN_FOUNDATION_ARTIFACT_IGNORE required=${required_count} ignored=${ignored_count} tracked=${tracked_count} targetCount=${required_count} reason=tracked-forbidden-artifact"
+  exit 1
+fi
+
+if [ "$ignored_count" -ne "$required_count" ]; then
+  printf 'FAIL: required generated artifact path is not ignored: %s\n' "${missing_ignore_paths[*]}"
+  echo "ADMIN_FOUNDATION_ARTIFACT_IGNORE required=${required_count} ignored=${ignored_count} tracked=${tracked_count} targetCount=${required_count} reason=missing-artifact-ignore"
+  exit 1
+fi
+
+echo "PASS: required generated artifact paths are ignored and untracked"
+echo "ADMIN_FOUNDATION_ARTIFACT_IGNORE required=${required_count} ignored=${ignored_count} tracked=${tracked_count} targetCount=${required_count} reason=null"
 exit 0
 fi
 
