@@ -16,10 +16,11 @@ YAML merge key를 해석한 뒤 각 child row는 사용자 지정 15개 필드�
 - supersedes: AC21-M01-tracked-secrets-and-mail-address-scan, AC21-M02-admin-artifact-log-scan
 - supersedes: AC22-M05-inactive-session-rejected, AC22-M06-synthetic-tampered-or-expired-token-rejected
 - supersedes: AC31-M1-live-readonly-mailbox-evidence-receipt
-- supersedes: AC36-M01, AC36-M02, AC36-M03
-- supersedes: AC37-M01, AC37-M02
-- supersedes: AC38-M1, AC38-M2
-- retained without change: AC17-M3, AC22-M01~M04, AC36-M04, AC37-M03~M05, AC38-M3~M4
+- supersedes: AC36-M01-oidc-issuer-audience-azp-rejected, AC36-M02-oidc-nonce-state-exp-rejected, AC36-M03-oidc-email-verified-and-hosted-domain-rejected
+- supersedes: AC36-M04-next-runtime-auth-screen-playwright
+- supersedes: AC37-M01-non-get-wrong-origin-host-403, AC37-M02-csrf-missing-or-reused-403
+- supersedes: AC38-M1-active-write-key-exactly-one, AC38-M2-retired-destroyed-key-use-rejected
+- retained without change: AC17-M3-ui-runtime-source-fail-not-rendered-as-zero, AC22-M01-viewer-aggregate-allowed, AC22-M02-viewer-sensitive-drilldown-403, AC22-M03-operator-sensitive-read-audit, AC22-M04-owner-sensitive-read-audit, AC37-M03-insufficient-role-403, AC37-M04-successful-mutation-audit-evidence, AC37-M05-denied-sensitive-attempt-audit-evidence, AC38-M3-key-state-projection-event-consistency, AC38-M4-destroyed-requires-provider-receipt
 
 ## Canonical replacement rows
 
@@ -228,6 +229,29 @@ x-ac36-claim: &ac36-claim
   single_observable_result: hosted domain 불일치 token은 401이고 binding을 만들지 않는다
   single_failure_reason: 허용되지 않은 hosted domain이 통과한다
   mutation_method: disposable clone에서 hosted-domain assertion을 제거한다
+
+x-ac36-runtime: &ac36-runtime
+  parent_ac: AC-36
+  rollback_unit: 한 auth runtime guard + Next route + Playwright direct test + micro goal
+  dependencies: [canonical dependency overlay]
+  allowed_files: [apps/admin/src/app/admin/dashboard/page.tsx, apps/admin/src/app/api/auth/callback/google/route.ts, apps/admin/tests/e2e/auth-screen.spec.ts, apps/admin/playwright.config.ts, scripts/acceptance-admin-ui.sh, docs/engineering/admin-weekly-dashboard-v6-ac36-runtime-*-goal-2026-08-17.md]
+  forbidden_scope: [Google live redirect, production origin, claim unit matrix, other dashboard UI]
+  red_command: pnpm --filter admin exec playwright test tests/e2e/auth-screen.spec.ts
+  green_command: pnpm --filter admin exec playwright test tests/e2e/auth-screen.spec.ts && bash scripts/acceptance-admin-ui.sh
+  production_call_path: local Next runtime -> auth route boundary -> browser-visible response
+  target_count_method: selected Playwright auth scenario=1 and local Next requests>0
+  cannot_split_reason: 한 runtime auth 실패 원인과 직접 browser 결과를 묶는 분할 금지 invariant
+  external_side_effect_count_expected: 0
+- <<: *ac36-runtime
+  micro_id: AC36-M04A-unauthenticated-dashboard-runtime
+  single_observable_result: 실제 local Next runtime에서 비인증 GET /admin/dashboard는 로그인 화면 또는 인증 redirect를 반환한다
+  single_failure_reason: 비인증 browser가 보호된 dashboard 내용을 받는다
+  mutation_method: disposable clone에서 dashboard auth guard를 제거한다
+- <<: *ac36-runtime
+  micro_id: AC36-M04B-invalid-callback-no-session
+  single_observable_result: 실제 local Next runtime에서 합성 invalid callback은 401이고 session cookie를 만들지 않는다
+  single_failure_reason: invalid callback이 admin session cookie를 만든다
+  mutation_method: disposable clone에서 callback rejection branch가 session cookie를 쓰게 바꾼다
 
 x-ac37-deny: &ac37-deny
   parent_ac: AC-37

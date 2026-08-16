@@ -10,7 +10,7 @@
 
 지정 작업공간·작업 가지·기준 기록은 요청값과 정확히 일치했고 그 작업공간은 깨끗했습니다. 기본 작업공간에는 사용자의 미추적 파일 15개가 있어 계속 읽기 전용으로 둡니다.
 
-시작 검사는 45초 안에 끝나 기존 실패 1/19를 그대로 재현했습니다. 다만 목표 문서가 적은 과거 실패 사유와 현재 직접 실행 사유가 달랐습니다. 현재 직접 실행은 비밀 탐지 규칙 파일이 없어 판정할 수 없다는 결과였고, 이를 전체 합격으로 바꾸지 않습니다.
+source worktree 시작 검사는 기존 실패 1/19를 재현했습니다. 감사용 disposable clone은 2/19였는데, 추가 실패는 clone에 local `main` ref가 없어 배송 검사가 실패한 환경 차이였습니다. source의 같은 검사는 통과하므로 두 baseline을 분리하고 어느 쪽도 전체 합격으로 바꾸지 않습니다.
 
 여섯 명의 새 읽기 전용 조사자가 40개 조건을 서로 겹치지 않게 나눠 조사했습니다. 그 원문은 phase0, phase1, phase2a, phase2b, phase3, auth-security 여섯 atomic-research 문서에 나눠 보존했습니다. 아래 계획은 조사자의 제안을 그대로 믿지 않고, 최소 시작 순서·금지 범위·실제 고장 변조·한 결과 원칙을 controller가 다시 고정한 감사 후보입니다.
 
@@ -65,6 +65,19 @@ program result: 0
 ~~~
 
 → 지정 기준에서 시작 검사가 정상 종료됐고, 기존 실패 한 건을 숨기지 않았습니다. 19개 중 1개가 실패하므로 전체 저장소는 합격이 아닙니다.
+
+~~~text
+$ bash scripts/session-status.sh  # disposable local clone at candidate
+RED: 2/19 (acceptance-0-7.sh 제외 — CI 담당)
+
+$ bash scripts/acceptance-0-5.sh  # source worktree
+PASS: 0-5 완료
+
+$ bash scripts/acceptance-0-5.sh  # disposable clone
+FAIL: origin/main과 local main 불일치 — clone에는 local main ref가 없음
+~~~
+
+→ 감사 v1의 2/19는 source 회귀가 아니라 clone topology 차이입니다. 이후 감사는 source baseline 1/19와 clone baseline 2/19를 각각 비교하고, clone의 추가 실패 집합이 acceptance-0-5 한 건인지 확인합니다.
 
 ~~~text
 $ bash verify.sh
@@ -155,7 +168,7 @@ program result: 2
 7. 외부 connector row는 이번 실행에서 합성 adapter 호출만 허용하고 network call은 0이다.
 8. 모든 row의 external_side_effect_count_expected는 0이며 다르면 FAIL이다.
 9. 현재 존재하지 않는 경로는 계획된 target이다. writer는 allowed_files 밖을 수정하면 즉시 중지한다.
-10. dependencies는 아래 단계 순서와 각 선행 micro의 PASS audit hash를 모두 요구한다.
+10. 모든 기존 dependencies 필드는 docs/engineering/admin-weekly-dashboard-v6-canonical-dependencies-2026-08-17.md가 덮어쓴다. exact prerequisite micro마다 실제 PASS codeaudit SHA-256이 writer CONTRACT에 없으면 BLOCKED다.
 
 ### 상태 등록부
 
@@ -165,6 +178,7 @@ program result: 2
 | AC05-M02 | BLOCKED_EXTERNAL_INPUT | 승인된 연말 경계 예시 2건 없음 | label 없는 NOT_RUN 경로만 구현 가능 |
 | AC07-M01~M04 | DECISION_REQUIRED_DEPENDENCY | DOM parser가 필요하지만 고정 의존성 목록에 없음 | 의존성 추가 없이 중지 |
 | AC13-M01~M02 | BLOCKED_SOT_CONFLICT | UNCLASSIFIED 계약과 ETC 최신 지시 충돌 | 정본 변경 또는 최신 지시 철회 필요 |
+| AC28-M01~M02 | BLOCKED_SOT_CONTRACT_GAP | pii payload table의 exact column/constraint 계약이 목표에 없음 | schema 계약 결정 전 migration 작성 금지 |
 | AC20 visual comparison | BLOCKED_UI_REFERENCE/NOT_RUN | 인증된 기준 화면 없음 | 차단 판정과 shadow 골격만 구현 |
 | AC23 live purge | SYNTHETIC_ONLY | 실제 보관기간·열람권한·삭제 명령·key provider 미정 | 합성 정책·가짜 저장소 시험만 |
 | AC31 | LIVE_NOT_RUN | Gmail 실제 읽기 금지·권한/정책 미완료 | 네 mailbox 합성 receipt와 live 차단만 |
@@ -194,7 +208,7 @@ program result: 2
 | AC-39 | atomic-plan-phase0 P0-15~P0-19 및 P0-22 |
 | 전체 | AC-01~AC-40 누락 0 |
 
-→ 조사 원문은 각 row의 15개 필드를 보존하고, 이 controller 문서는 실제 순서·차단·mutation·고정 acceptance 이름을 정규화합니다.
+→ 조사 원문은 각 row의 15개 필드를 보존하고, controller·expansion·dependency overlay가 실제 순서·차단·mutation·고정 acceptance 이름을 정규화합니다.
 
 ### Phase 0 canonical rows
 
@@ -203,6 +217,7 @@ Phase 0의 15개 필드 전체 row는 docs/engineering/admin-weekly-dashboard-v6
 ### Phase 1~3 canonical corrections
 
 - AC36의 issuer, audience, azp, nonce, state replay, exp, email_verified, hosted domain은 각각 별도 micro로 더 쪼갠다. 연구 원문의 세 묶음은 SUPERSEDED_NON_ATOMIC이다.
+- AC36의 비인증 dashboard runtime과 invalid callback/no-session runtime도 별도 micro다. 연구 원문의 AC36-M04는 SUPERSEDED_NON_ATOMIC이다.
 - AC37의 Origin, Host, CSRF 누락, CSRF 재사용, 부족 role은 각각 별도 micro다. audit 성공·audit 거부는 각각 유지한다.
 - AC38의 ACTIVE 0개, ACTIVE 복수, RETIRED 사용, DESTROYED 사용은 각각 별도 micro다. 연구 원문의 두 묶음은 SUPERSEDED_NON_ATOMIC이다.
 - AC22의 inactive user, revoked session, expired session, tampered session token은 각각 별도 micro다. viewer 집계·viewer drilldown·operator audit·owner audit은 유지한다.
@@ -216,6 +231,8 @@ Phase 0의 15개 필드 전체 row는 docs/engineering/admin-weekly-dashboard-v6
 - 연구 원문의 모든 connector row는 synthetic adapter call count를 기록하고 live call count 0을 확인한다.
 
 ### 의존 관계 요약
+
+아래 그림은 Phase 흐름만 보여 줍니다. 실행 권한을 주는 exact edge와 필수 감사 SHA-256 계약은 docs/engineering/admin-weekly-dashboard-v6-canonical-dependencies-2026-08-17.md만 정본입니다.
 
 ~~~text
 P0-01
@@ -251,6 +268,16 @@ P0-01
 - forbidden bundle split count 0
 - sensitive value copied to repo count 0
 - plan auditor verdict PASS
+
+### 계획 감사 v1 rework ledger
+
+| v1 finding | 재공격 판정 | v2 조치 |
+|---|---|---|
+| disposable clone baseline 2/19가 source 1/19와 다름 | source 재현은 계속 1/19; clone에 local main ref가 없어 acceptance-0-5만 추가 실패 | 두 환경의 실패 집합을 별도 baseline으로 고정 |
+| dependency가 산문/range라 DAG 증명 불가 | 구현을 막는 실제 계획 결함 | canonical-dependencies overlay에 active micro 132개 exact 등록, unknown/cycle 0 |
+| AC36-M04가 두 runtime 결과를 결합 | 독립 실패 원인 2개라 비원자적 | AC36-M04A와 AC36-M04B로 분할하고 원행 supersede |
+
+→ v1 원문과 SHA-256 metadata는 별도 evidence-only commit에 보존했고 수정하지 않습니다.
 
 ### 현재 중지선
 

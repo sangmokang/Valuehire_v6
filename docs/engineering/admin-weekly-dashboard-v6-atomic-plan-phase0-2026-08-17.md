@@ -19,7 +19,7 @@
   single_failure_reason: 계획 감사 PASS 없이 제품 writer가 시작된다
   rollback_unit: 이 controller plan과 plan-audit evidence commit
   dependencies: [a02a3da]
-  allowed_files: [docs/engineering/admin-weekly-dashboard-v6-atomic-research-*-2026-08-17.md, docs/engineering/admin-weekly-dashboard-v6-controller-goal-2026-08-17.md, docs/engineering/admin-weekly-dashboard-v6-atomic-plan-phase0-2026-08-17.md, docs/engineering/admin-weekly-dashboard-v6-canonical-expansions-2026-08-17.md, docs/engineering/admin-weekly-dashboard-v6-plan-audit-*.md]
+  allowed_files: [docs/engineering/admin-weekly-dashboard-v6-atomic-research-*-2026-08-17.md, docs/engineering/admin-weekly-dashboard-v6-controller-goal-2026-08-17.md, docs/engineering/admin-weekly-dashboard-v6-atomic-plan-phase0-2026-08-17.md, docs/engineering/admin-weekly-dashboard-v6-canonical-expansions-2026-08-17.md, docs/engineering/admin-weekly-dashboard-v6-canonical-dependencies-2026-08-17.md, docs/engineering/admin-weekly-dashboard-v6-plan-audit-*.md]
   forbidden_scope: [제품 코드, dependency install, main 변경, 외부 호출]
   red_command: fresh auditor가 계획 후보에서 CODEAUDIT SPEC v2를 실행
   green_command: fresh auditor verdict PASS와 계획 PASS 조건 결함 0
