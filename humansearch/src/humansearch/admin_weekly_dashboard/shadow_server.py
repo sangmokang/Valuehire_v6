@@ -185,6 +185,9 @@ def create_shadow_server(
 
 
 def _load_assets(assets: Path) -> Mapping[str, tuple[str, bytes]]:
+    asset_root = assets.resolve(strict=True)
+    if not asset_root.is_dir():
+        raise NotADirectoryError("shadow asset root must be a directory")
     route_files = {
         "/": ("text/html; charset=utf-8", "index.html"),
         "/styles.css": ("text/css; charset=utf-8", "styles.css"),
@@ -192,7 +195,9 @@ def _load_assets(assets: Path) -> Mapping[str, tuple[str, bytes]]:
     }
     loaded: dict[str, tuple[str, bytes]] = {}
     for route, (content_type, filename) in route_files.items():
-        path = assets / filename
+        path = asset_root / filename
+        if path.is_symlink():
+            raise ValueError(f"shadow asset must not be a symlink: {filename}")
         if not path.is_file():
             raise FileNotFoundError(f"required shadow asset missing: {filename}")
         loaded[route] = (content_type, path.read_bytes())

@@ -98,7 +98,7 @@
       const section = element("section", "metric-group");
       section.setAttribute("aria-labelledby", `group-${group.id}`);
       const heading = element("div", "metric-group-heading");
-      const title = element("h3", "", group.display_label);
+      const title = element("h2", "", group.display_label);
       title.id = `group-${group.id}`;
       heading.append(title, element("p", "", group.description));
       const grid = element("div", "metric-grid");
