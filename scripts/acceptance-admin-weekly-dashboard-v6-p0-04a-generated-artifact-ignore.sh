@@ -117,7 +117,7 @@ drop_ignore_rule_and_assert_red() {
   local tracked_forbidden
   local checked_ignored
 
-  perl -0pi -e "s/\\Q$pattern\\E\\n//" .gitignore
+  perl -0pi -e 'BEGIN { $pattern = shift @ARGV } s/\Q$pattern\E\n//g' "$pattern" .gitignore
   tracked_forbidden=$(count_tracked_forbidden_targets)
   checked_ignored=$(count_ignored_targets)
   receipt "$checked_ignored" "$tracked_forbidden" "ignore-coverage"
