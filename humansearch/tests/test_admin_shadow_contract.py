@@ -3,9 +3,8 @@
 import json
 from pathlib import Path
 
-from humansearch.admin_weekly_dashboard.shadow_server import build_shadow_dashboard
-
 from humansearch.admin_weekly_dashboard import load_metric_contract
+from humansearch.admin_weekly_dashboard.shadow_server import build_shadow_dashboard
 
 CONTRACT_PATH = (
     Path(__file__).parents[2]
