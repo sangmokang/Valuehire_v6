@@ -10,6 +10,9 @@ node_modules/
 dist/
 build/
 .next/
+/apps/admin/test-results/
+/apps/admin/playwright-report/
+/apps/admin/coverage/
 *.log
 
 # 환경 변수
