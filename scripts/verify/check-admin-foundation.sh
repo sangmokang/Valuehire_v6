@@ -3,6 +3,61 @@ set -euo pipefail
 
 selector="${1:-}"
 
+if [ "$selector" = "root-workspace" ]; then
+  package_file="package.json"
+  workspace_file="pnpm-workspace.yaml"
+  checked_private_fields=0
+  workspace_pattern_count=0
+  target_count=2
+
+  if [ ! -f "$package_file" ]; then
+    echo "FAIL: package.json missing"
+    echo "ADMIN_FOUNDATION_ROOT_WORKSPACE checkedPrivateFields=${checked_private_fields} workspacePatternCount=${workspace_pattern_count} targetCount=${target_count} expectedPrivate=true expectedPattern=apps/* reason=missing-package-json"
+    exit 1
+  fi
+
+  actual_private="$(
+    ruby -rjson -e '
+      package = JSON.parse(File.read(ARGV.fetch(0)))
+      value = package["private"]
+      exit 3 unless value == true || value == false
+      print value
+    ' "$package_file"
+  )" || status=$?
+
+  if [ "${status:-0}" -ne 0 ]; then
+    echo "FAIL: package.json private must be boolean true"
+    echo "ADMIN_FOUNDATION_ROOT_WORKSPACE checkedPrivateFields=${checked_private_fields} workspacePatternCount=${workspace_pattern_count} targetCount=${target_count} expectedPrivate=true expectedPattern=apps/* reason=private-missing-or-malformed"
+    exit 1
+  fi
+
+  checked_private_fields=1
+
+  if [ "$actual_private" != "true" ]; then
+    echo "FAIL: package.json private must be true"
+    echo "ADMIN_FOUNDATION_ROOT_WORKSPACE checkedPrivateFields=${checked_private_fields} workspacePatternCount=${workspace_pattern_count} targetCount=${target_count} expectedPrivate=true actualPrivate=${actual_private} expectedPattern=apps/* reason=private-not-true"
+    exit 1
+  fi
+
+  if [ ! -f "$workspace_file" ]; then
+    echo "FAIL: pnpm-workspace.yaml missing"
+    echo "ADMIN_FOUNDATION_ROOT_WORKSPACE checkedPrivateFields=${checked_private_fields} workspacePatternCount=${workspace_pattern_count} targetCount=${target_count} expectedPrivate=true actualPrivate=${actual_private} expectedPattern=apps/* reason=missing-pnpm-workspace"
+    exit 1
+  fi
+
+  if ! cmp -s "$workspace_file" <(printf 'packages:\n  - apps/*\n'); then
+    echo "FAIL: pnpm-workspace.yaml must declare exactly one package pattern: apps/*"
+    echo "ADMIN_FOUNDATION_ROOT_WORKSPACE checkedPrivateFields=${checked_private_fields} workspacePatternCount=${workspace_pattern_count} targetCount=${target_count} expectedPrivate=true actualPrivate=${actual_private} expectedPattern=apps/* reason=workspace-pattern-mismatch"
+    exit 1
+  fi
+
+  workspace_pattern_count=1
+
+  echo "PASS: root package is private and pnpm workspace declares exactly apps/*"
+  echo "ADMIN_FOUNDATION_ROOT_WORKSPACE checkedPrivateFields=${checked_private_fields} workspacePatternCount=${workspace_pattern_count} targetCount=${target_count} expectedPrivate=true actualPrivate=${actual_private} expectedPattern=apps/* reason=null"
+  exit 0
+fi
+
 if [ "$selector" = "pnpm-version" ]; then
   expected="pnpm@11.22.0"
   package_file="package.json"
