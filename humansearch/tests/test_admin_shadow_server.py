@@ -60,6 +60,24 @@ def test_server_rejects_non_loopback_hosts(host: str) -> None:
         )
 
 
+def test_server_rejects_symlinked_static_assets(tmp_path: Path) -> None:
+    secret = tmp_path / "private.txt"
+    secret.write_text("must-not-be-served", encoding="utf-8")
+    assets = tmp_path / "assets"
+    assets.mkdir()
+    (assets / "index.html").symlink_to(secret)
+    (assets / "styles.css").write_text("", encoding="utf-8")
+    (assets / "app.js").write_text("", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="symlink"):
+        create_shadow_server(
+            assets=assets,
+            contract_path=CONTRACT_PATH,
+            host="127.0.0.1",
+            port=0,
+        )
+
+
 def test_dashboard_api_matches_the_precomputed_server_payload() -> None:
     with running_server() as (server, port):
         response, body = request(port, "/api/dashboard")
