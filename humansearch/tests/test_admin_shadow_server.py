@@ -39,9 +39,9 @@ def running_server() -> Iterator[tuple[ShadowServer, int]]:
         thread.join(timeout=5)
 
 
-def request(port: int, path: str) -> tuple[HTTPResponse, bytes]:
+def request(port: int, path: str, *, method: str = "GET") -> tuple[HTTPResponse, bytes]:
     connection = HTTPConnection("127.0.0.1", port, timeout=5)
-    connection.request("GET", path)
+    connection.request(method, path)
     response = connection.getresponse()
     body = response.read()
     connection.close()
@@ -112,3 +112,17 @@ def test_every_response_has_no_store_and_browser_security_headers() -> None:
         assert "connect-src 'self'" in csp
         assert "object-src 'none'" in csp
         assert "frame-ancestors 'none'" in csp
+
+
+@pytest.mark.parametrize("method", ["HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
+def test_unsupported_methods_fail_closed_with_safe_headers(method: str) -> None:
+    with running_server() as (_, port):
+        response, body = request(port, "/api/dashboard", method=method)
+
+    assert response.status == 405
+    assert response.getheader("Cache-Control") == "no-store"
+    assert response.getheader("Content-Security-Policy") is not None
+    if method == "HEAD":
+        assert body == b""
+    else:
+        assert json.loads(body) == {"status": "FAIL", "reason": "method_not_allowed"}
