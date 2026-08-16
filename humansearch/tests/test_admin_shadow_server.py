@@ -91,6 +91,13 @@ def test_exact_public_routes_are_served(
     assert marker in body.decode("utf-8")
 
 
+def test_server_does_not_disclose_the_python_runtime_version() -> None:
+    with running_server() as (_, port):
+        response, _ = request(port, "/healthz")
+
+    assert response.getheader("Server") == "ValueHireShadow/1"
+
+
 @pytest.mark.parametrize("path", ["/index.html", "/../README.md", "/api/dashboard?x=1"])
 def test_unlisted_paths_fail_closed(path: str) -> None:
     with running_server() as (_, port):

@@ -42,6 +42,15 @@ def test_shadow_history_has_one_collected_week_and_eleven_not_run_weeks() -> Non
     assert dashboard["weeks"][-1]["status"] == "PASS"
 
 
+def test_shadow_view_model_exposes_the_inclusive_saturday_end_date() -> None:
+    dashboard = build_shadow_dashboard(load_metric_contract(CONTRACT_PATH))
+    current_week = dashboard["weeks"][-1]
+
+    assert current_week["event_start_kst"].startswith("2026-08-09T00:00:00")
+    assert current_week["event_end_exclusive_kst"].startswith("2026-08-16T00:00:00")
+    assert current_week["event_end_inclusive_date_kst"] == "2026-08-15"
+
+
 def test_shadow_metrics_keep_units_and_failure_states_truthful() -> None:
     dashboard = build_shadow_dashboard(load_metric_contract(CONTRACT_PATH))
     snapshot = dashboard["weeks"][-1]["snapshot"]
