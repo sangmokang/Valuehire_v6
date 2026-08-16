@@ -114,7 +114,7 @@ cp hooks/pre-commit hooks/pre-push "$tmp/hooks/"
 실측 (클론에서 재현):
 ```
 --- before: hooksPath=[] README md5=0b9a3c85… status=[]
---- after : hooksPath=[hooks] README md5=487deb05… 
+--- after : hooksPath=[hooks] README md5=487deb05…
 M  README.md
 ```
 스크립트 자신의 오염 감지가 `README.md` 변경은 잡아 exit 1을 냈지만, **`core.hooksPath` 변경은 `git status`에 안 나오므로 감지되지 않고 영구히 남는다**.
