@@ -99,6 +99,50 @@ if [ "$selector" = "pnpm-version" ]; then
   exit 0
 fi
 
+if [ "$selector" = "artifact-ignore" ]; then
+  target_count=5
+  required_ignore_paths=(
+    "node_modules/.artifact-canary"
+    "apps/admin/.next/.artifact-canary"
+    "apps/admin/test-results/.artifact-canary"
+    "apps/admin/playwright-report/.artifact-canary"
+    "apps/admin/coverage/.artifact-canary"
+  )
+  required_ignore_path_count="${#required_ignore_paths[@]}"
+  checked_ignored_path_count=0
+  tracked_forbidden_artifact_count=0
+
+  for required_path in "${required_ignore_paths[@]}"; do
+    if git check-ignore --quiet -- "$required_path"; then
+      checked_ignored_path_count=$((checked_ignored_path_count + 1))
+    fi
+  done
+
+  while IFS= read -r -d '' tracked_path; do
+    case "$tracked_path" in
+      node_modules/*|apps/admin/.next/*|apps/admin/test-results/*|apps/admin/playwright-report/*|apps/admin/coverage/*)
+        tracked_forbidden_artifact_count=$((tracked_forbidden_artifact_count + 1))
+        ;;
+    esac
+  done < <(git ls-files -z -- node_modules apps/admin/.next apps/admin/test-results apps/admin/playwright-report apps/admin/coverage)
+
+  if [ "$checked_ignored_path_count" -ne "$required_ignore_path_count" ]; then
+    echo "FAIL: admin generated artifact paths must be ignored by Git"
+    echo "ADMIN_FOUNDATION_ARTIFACT_IGNORE requiredIgnorePathCount=${required_ignore_path_count} checkedIgnoredPathCount=${checked_ignored_path_count} trackedForbiddenArtifactCount=${tracked_forbidden_artifact_count} targetCount=${target_count} reason=required-path-not-ignored"
+    exit 1
+  fi
+
+  if [ "$tracked_forbidden_artifact_count" -ne 0 ]; then
+    echo "FAIL: generated artifact paths must not be tracked"
+    echo "ADMIN_FOUNDATION_ARTIFACT_IGNORE requiredIgnorePathCount=${required_ignore_path_count} checkedIgnoredPathCount=${checked_ignored_path_count} trackedForbiddenArtifactCount=${tracked_forbidden_artifact_count} targetCount=${target_count} reason=tracked-forbidden-artifact"
+    exit 1
+  fi
+
+  echo "PASS: pnpm/admin generated artifact paths are ignored and no forbidden artifacts are tracked"
+  echo "ADMIN_FOUNDATION_ARTIFACT_IGNORE requiredIgnorePathCount=${required_ignore_path_count} checkedIgnoredPathCount=${checked_ignored_path_count} trackedForbiddenArtifactCount=${tracked_forbidden_artifact_count} targetCount=${target_count} reason=null"
+  exit 0
+fi
+
 if [ "$selector" != "node-version" ]; then
   echo "FAIL: unsupported admin foundation selector: ${selector:-<missing>}"
   echo "ADMIN_FOUNDATION_NODE_VERSION checkedVersionFiles=0 targetCount=0 expected=24.19.0 reason=unsupported-selector"
