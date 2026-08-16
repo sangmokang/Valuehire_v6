@@ -158,7 +158,6 @@ def _input_sha256(
 
 
 def _event_for_hash(event: MetricEvent) -> dict[str, object]:
-    private_payload_sha256 = _sha256(dict(sorted(event.private_payload.items())))
     return {
         "source_collection": event.source_collection,
         "source_system": event.source_system,
@@ -167,7 +166,6 @@ def _event_for_hash(event: MetricEvent) -> dict[str, object]:
         "occurred_at_utc": event.occurred_at.astimezone(UTC).isoformat(),
         "position_source_id": event.position_source_id,
         "candidate_source_key_hmac": event.candidate_source_key_hmac,
-        "private_payload_sha256": private_payload_sha256,
     }
 
 

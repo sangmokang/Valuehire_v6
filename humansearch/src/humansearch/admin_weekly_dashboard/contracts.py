@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -21,6 +22,20 @@ class MetricStatus(str, Enum):
     NOT_RUN = "NOT_RUN"
 
 
+class SourceFailureReason(str, Enum):
+    """PII-safe reason codes allowed to cross the dashboard API boundary."""
+
+    CALENDAR_EVENT_ID_MISSING = "calendar_event_id_missing"
+    CONTRACT_MISMATCH = "contract_mismatch"
+    GMAIL_TIMEOUT = "gmail_timeout"
+    IDENTITY_LINK_CONTRACT_MISSING = "identity_link_contract_missing"
+    PERMISSION_DENIED = "permission_denied"
+    RETENTION_POLICY_MISSING = "retention_policy_missing"
+    SOURCE_STATE_MISSING = "source_state_missing"
+    SOURCE_TIMEOUT = "source_timeout"
+    SOURCE_UNAVAILABLE = "source_unavailable"
+
+
 class Aggregation(str, Enum):
     """Operations supported by the contract-driven pure aggregator."""
 
@@ -29,18 +44,28 @@ class Aggregation(str, Enum):
     NOT_RUN = "not_run"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, init=False)
 class SourceState:
     """Whether one source collection was read successfully for this snapshot."""
 
     status: MetricStatus
-    reason: str | None = None
+    reason: SourceFailureReason | None
 
-    def __post_init__(self) -> None:
-        if self.status is MetricStatus.PASS and self.reason is not None:
+    def __init__(
+        self,
+        *,
+        status: MetricStatus,
+        reason: SourceFailureReason | str | None = None,
+    ) -> None:
+        if not isinstance(status, MetricStatus):
+            raise TypeError("status must be a MetricStatus")
+        normalized_reason = _source_failure_reason(reason)
+        if status is MetricStatus.PASS and normalized_reason is not None:
             raise ValueError("PASS source state cannot have a failure reason")
-        if self.status is not MetricStatus.PASS and not self.reason:
+        if status is not MetricStatus.PASS and normalized_reason is None:
             raise ValueError("FAIL and NOT_RUN source states require a reason")
+        object.__setattr__(self, "status", status)
+        object.__setattr__(self, "reason", normalized_reason)
 
 
 @dataclass(frozen=True, init=False)
@@ -82,9 +107,8 @@ class MetricEvent:
             raise ValueError("occurred_at must be timezone-aware")
 
         position_source_id = _optional_string(values.get("position_source_id"), "position_source_id")
-        candidate_key = _optional_string(
+        candidate_key = _candidate_hmac(
             values.get("candidate_source_key_hmac"),
-            "candidate_source_key_hmac",
         )
         private_payload = _private_payload(values.get("private_payload", {}))
 
@@ -108,7 +132,7 @@ class MetricDefinition:
     event_type: str
     aggregation: Aggregation
     distinct_fields: tuple[str, ...] = ()
-    not_run_reason: str | None = None
+    not_run_reason: SourceFailureReason | None = None
 
 
 @dataclass(frozen=True)
@@ -126,7 +150,7 @@ class MetricResult:
 
     status: MetricStatus
     value: int | None
-    reason: str | None
+    reason: SourceFailureReason | None
     metric_contract_version: str
     source_collection: str
     source_row_count: int
@@ -138,7 +162,7 @@ class MetricResult:
         return {
             "status": self.status.value,
             "value": self.value,
-            "reason": self.reason,
+            "reason": self.reason.value if self.reason is not None else None,
             "metric_contract_version": self.metric_contract_version,
             "source_collection": self.source_collection,
             "source_row_count": self.source_row_count,
@@ -251,7 +275,7 @@ def _metric_definition(raw: object) -> MetricDefinition:
         raise ValueError("only distinct aggregation may define distinct_fields")
 
     reason_raw = data.get("not_run_reason")
-    not_run_reason = _optional_string(reason_raw, "not_run_reason")
+    not_run_reason = _source_failure_reason(reason_raw)
     if aggregation is Aggregation.NOT_RUN and not not_run_reason:
         raise ValueError("not_run aggregation requires not_run_reason")
     if aggregation is not Aggregation.NOT_RUN and not_run_reason is not None:
@@ -281,6 +305,33 @@ def _optional_string(value: object, name: str) -> str | None:
     if not isinstance(value, str) or not value:
         raise TypeError(f"{name} must be a non-empty string or None")
     return value
+
+
+HMAC_SHA256_PATTERN = re.compile(r"^[a-f0-9]{64}$")
+
+
+def _candidate_hmac(value: object) -> str | None:
+    candidate_hmac = _optional_string(value, "candidate_source_key_hmac")
+    if candidate_hmac is None:
+        return None
+    if HMAC_SHA256_PATTERN.fullmatch(candidate_hmac) is None:
+        raise ValueError(
+            "candidate_source_key_hmac must be a 64-character lowercase HMAC-SHA256 hex value"
+        )
+    return candidate_hmac
+
+
+def _source_failure_reason(value: object) -> SourceFailureReason | None:
+    if value is None:
+        return None
+    if isinstance(value, SourceFailureReason):
+        return value
+    if not isinstance(value, str):
+        raise TypeError("source failure reason must be a string code or None")
+    try:
+        return SourceFailureReason(value)
+    except ValueError as error:
+        raise ValueError("source failure reason must be allowlisted") from error
 
 
 def _private_payload(value: object) -> Mapping[str, str]:
