@@ -70,7 +70,7 @@ def test_snapshot_keeps_business_units_separate() -> None:
             primary_key="discovery-1",
             event_type="candidate_discovery",
             position_id="position-1",
-            candidate_key_hmac="candidate-1-hmac",
+            candidate_key_hmac="a" * 64,
         ),
         event(
             collection="candidate_discoveries",
@@ -78,7 +78,7 @@ def test_snapshot_keeps_business_units_separate() -> None:
             primary_key="discovery-2",
             event_type="candidate_discovery",
             position_id="position-1",
-            candidate_key_hmac="candidate-1-hmac",
+            candidate_key_hmac="a" * 64,
         ),
         event(
             collection="candidate_discoveries",
@@ -86,7 +86,7 @@ def test_snapshot_keeps_business_units_separate() -> None:
             primary_key="discovery-3",
             event_type="candidate_discovery",
             position_id="position-2",
-            candidate_key_hmac="candidate-2-hmac",
+            candidate_key_hmac="b" * 64,
         ),
         *[
             event(

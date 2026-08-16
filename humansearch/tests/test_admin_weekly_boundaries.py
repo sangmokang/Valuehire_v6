@@ -87,7 +87,7 @@ def test_cross_source_unique_candidate_metric_stays_not_run() -> None:
         "event_type": "candidate_discovery",
         "occurred_at": datetime(2026, 8, 12, 12, 0, tzinfo=KST),
         "position_source_id": "position-1",
-        "candidate_source_key_hmac": "same-looking-source-key",
+        "candidate_source_key_hmac": "c" * 64,
     }
     events = [
         MetricEvent(
