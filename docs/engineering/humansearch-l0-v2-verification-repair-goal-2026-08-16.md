@@ -511,3 +511,69 @@ CHECKED: 25
 성공했습니다. 따라서 최종 하네스는 실패한 wrapper를 쓰지 않고, exact Bash allowlist + OS 임시 경로
 `allowWrite` + Git config 차단 조합을 사용합니다. 이 설정으로 전체 최종 V1을 다시 실행하기 전에는
 아직 완료로 세지 않습니다.
+
+#### 10.6 최종 Claude V1 유효 판정
+
+`a5ca9726f58e0deb5c3b9bbf956792f3f817ed41`을 다음 일회용 clone에서 검사했습니다.
+
+```text
+AUDIT_REPO=/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/humansearch-l0-doc-v1-accepted.mGd8JC/repo
+CLAUDE_RC=0
+VERDICT: PASS
+
+# 1) 결론
+
+a5ca972의 문서 하네스는 현재 상태로 배송해도 됩니다. 요구된 검증 축 전부(3 roles/5 states/16조합/fail-closed/L2-L3 분리, tombstone, Gate0 exact RED 차단, branch-only checkpoint와 evidence buffer, origin/main 주입, 전 범위 diff, exact Bash allowlist, sandbox allowWrite 경계, target 지문, CI 규칙, 금지 scope)을 원문과 diff로 대조했고, 계약 모순·검증 우회·권한 확장·증거 과장을 찾지 못했습니다. 이전 실패 4종(상위 TMPDIR, inline TMPDIR, env -i, wrapper)은 최종 diff에서 실제로 제거됐고, 공식 allowWrite direct command 방식이 그 자리를 대체했음을 commit 단위로 확인했습니다. 필수 검사 3종을 직접 실행해 verify.sh exit 0, docs SOT exit 0, AC-M exit 0에 CHECKED: 25를 모두 얻었습니다.
+
+session-status는 RED: 4/19를 보고했으며 이를 성공으로 바꾸지 않습니다. 이 빨간 상태는 결함이 아니라 v2 지시서의 Gate 0이 차단하도록 설계된 바로 그 상황입니다.
+
+NOT_RUN: gh 원격 조회, RED 4/19 중 acceptance-0-2 외 3건의 개별 식별, home의 brief-lint. 원격과 home은 sandbox 경계로 차단했습니다.
+
+# 2) 판단 근거
+
+origin/main..HEAD 전체 변경 경로를 먼저 확인한 뒤 수리 commit 체인과 상세 diff를 읽었습니다. 필수 로컬 검사와 wrapper 삭제, allowlist 교체는 실측과 일치했습니다. RED라는 이유만으로 FAIL로 바꾸지 않은 이유는 Gate 0이 정확히 그 상태를 exit 23으로 차단하기 때문입니다. OS 임시 루트 allowWrite는 exact Bash, home 읽기 차단, network 0, target 지문 대조가 함께 남고 좁은 대안 4종이 모두 실증 실패했으므로 낮음 관찰로 남겼습니다.
+
+# 3) 낮음 관찰
+
+1. [낮음] allowWrite가 OS 임시 루트 전체입니다. exact Bash allowlist와 network 0으로 실질 위험은 낮고, 좁은 대안 4종의 실패 뒤 선택했습니다.
+2. [낮음] 수리 goal의 중간 판본 문구 `--strict humansearch/src humansearch/tests`와 최종 allowlist `cd humansearch && uv run --offline mypy --strict src tests`의 문자열은 다르지만 이력 보존이고 엄격도는 같습니다.
+3. [정보] clone은 RED 4/19, 원본 worktree 기록은 RED 1/19입니다. Gate 0 해소 전에는 구현이 BLOCKED됩니다.
+
+# 4) 실행 출력
+
+$ bash verify.sh -> exit 0
+PASS: no secret-pattern match in any tracked file, .env not tracked
+
+$ bash scripts/check-docs-sot.sh -> exit 0
+OK: docs/sot 재구성 AC 전부 충족
+
+$ bash scripts/acceptance-verify-ac-m.sh -> exit 0
+CHECKED: 25
+
+$ bash scripts/session-status.sh -> exit 0
+HEAD: a5ca972 (ahead 10 / behind 1)
+ORIGIN: 4fdef31
+RED: 4/19 (acceptance-0-7.sh 제외 — CI 담당)
+
+TARGET_HEAD_UNCHANGED=yes
+TARGET_STATUS_UNCHANGED=yes
+TARGET_REFS_UNCHANGED=yes
+```
+
+→ 첫 줄 형식, 필수 로컬 검사 3종, 빨간 상태의 비합격 처리, target 불변 3종이 모두 충족돼 이 V1을
+유효 판정으로 채택했습니다. 원격 조회와 home helper는 실행하지 않은 것으로 그대로 남겼습니다.
+
+#### 10.7 최종 Codex V2 재현·재공격
+
+| ID | Claude 관찰 | Codex 재현 | 판정 |
+|---|---|---|---|
+| FINAL-1 | OS 임시 루트 `allowWrite`가 전용 하위 경로보다 넓음 | native sandbox에서 좁은 상위·inline TMPDIR, `env -i`, wrapper 실패와 공식 `allowWrite` direct smoke 성공을 대조 | 재현·수용. exact 명령, home/network 차단, target 지문을 함께 유지하는 의도적 대가 |
+| FINAL-2 | 중간 mypy 수리 문구와 최종 exact 문자열이 다름 | goal 452행과 prompt의 최종 allowlist를 직접 대조 | 재현·수용. 중간 finding의 당시 조치 기록이며 최종 명령은 구현자와 같은 cwd·strict·src·tests |
+| FINAL-3 | clone RED 4/19, target RED 1/19 | target에서 `bash scripts/session-status.sh`를 fresh 실행 | 재현. target은 `RED: 1/19`; 둘 다 Gate 0 exact 정규식에 불일치해 제품 변경 없이 BLOCKED |
+| FINAL-4 | final diff의 제품·script·CI 변경 net 0 | `git diff --name-status origin/main...HEAD -- humansearch scripts .github contracts hooks suppressions.yaml verify.sh` | 출력 0줄. transient wrapper는 최종 diff에서 삭제됨 |
+| FINAL-5 | Gate 0 적대 입력은 정확한 한 줄만 통과 | 8개 입력을 같은 `grep -E` 정규식으로 실행 | 정확한 `RED: 0/19 (...)` 1개만 match |
+| FINAL-6 | 필수 로컬 검사 성공 | target에서 verify, docs SOT, AC-M을 재실행 | exit 0, exit 0, exit 0·`CHECKED: 25` |
+
+→ Claude finding 2건은 모두 Codex가 재현했고 숨기거나 기각한 finding은 0건입니다. 두 항목은 가짜
+합격이 아니라 명시된 대가·이력 차이이므로 수리 loop를 더 열지 않았습니다. 제품 변경을 막아야 하는
+현재 Gate 0 빨간 상태도 fresh target 출력으로 다시 확인했습니다.
