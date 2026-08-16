@@ -2,9 +2,12 @@
 
 from .contracts import (
     Aggregation,
+    MetricCatalogPayload,
     MetricContract,
     MetricDefinition,
     MetricEvent,
+    MetricGroupDefinition,
+    MetricGroupPayload,
     MetricResult,
     MetricStatus,
     SourceFailureReason,
@@ -17,9 +20,12 @@ from .weekly_window import WeeklyWindow, weekly_window
 
 __all__ = [
     "Aggregation",
+    "MetricCatalogPayload",
     "MetricContract",
     "MetricDefinition",
     "MetricEvent",
+    "MetricGroupDefinition",
+    "MetricGroupPayload",
     "MetricResult",
     "MetricStatus",
     "SourceFailureReason",

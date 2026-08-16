@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <title>ValueHire Admin Weekly Dashboard · Local Shadow</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/app.js" defer></script>
+  </head>
+  <body data-mode="local-shadow">
+    <header class="topbar">
+      <div>
+        <p class="environment">LOCAL SHADOW · 운영 아님</p>
+        <h1>Admin Weekly Dashboard</h1>
+        <p class="lede">한 주의 숫자보다, 숫자가 어디서 왔는지 먼저 봅니다.</p>
+      </div>
+      <dl class="window-summary" aria-label="집계 기간">
+        <div><dt>실적 창</dt><dd id="window-range">불러오는 중</dd></div>
+        <div><dt>회의 주차</dt><dd id="week-label">—</dd></div>
+      </dl>
+    </header>
+
+    <main id="dashboard" aria-busy="true">
+      <section class="audit-strip" aria-labelledby="audit-heading">
+        <h2 id="audit-heading" class="visually-hidden">자료 감사 상태</h2>
+        <dl id="audit-items"></dl>
+      </section>
+
+      <section class="panel-section" aria-labelledby="heatmap-heading">
+        <div class="section-heading">
+          <div><p class="section-kicker">History</p><h2 id="heatmap-heading">12주 집계 상태</h2></div>
+          <p>실제 수집하지 않은 주는 비워 둡니다.</p>
+        </div>
+        <div class="heatmap-panel">
+          <ol id="heatmap" class="heatmap" aria-label="최근 12주 집계 상태"></ol>
+          <p id="heatmap-detail" class="heatmap-detail" aria-live="polite">
+            주차를 선택하면 집계 상태를 확인할 수 있습니다.
+          </p>
+          <div class="legend" aria-label="상태 범례">
+            <span><i class="legend-swatch is-empty"></i>미집계</span>
+            <span><i class="legend-swatch is-collected"></i>수집됨</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel-section" aria-labelledby="metrics-heading">
+        <div class="section-heading">
+          <div><p class="section-kicker">Weekly ledger</p><h2 id="metrics-heading">이번 주 원자료</h2></div>
+          <p>실행 · 포지션 · 후보 · 메일을 한 숫자로 섞지 않습니다.</p>
+        </div>
+        <div id="metric-groups" class="metric-groups"></div>
+      </section>
+
+      <section class="panel-section" aria-labelledby="provenance-heading">
+        <div class="section-heading">
+          <div><p class="section-kicker">Provenance</p><h2 id="provenance-heading">판정 근거</h2></div>
+          <p>화면 값과 같은 snapshot의 지문입니다.</p>
+        </div>
+        <div class="provenance-panel"><dl id="provenance"></dl></div>
+      </section>
+
+      <p id="load-state" class="load-state" role="status" aria-live="polite">대시보드를 불러오는 중입니다.</p>
+    </main>
+  </body>
+</html>

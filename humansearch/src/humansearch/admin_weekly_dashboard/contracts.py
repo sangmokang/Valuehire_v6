@@ -28,6 +28,7 @@ class SourceFailureReason(str, Enum):
     CALENDAR_EVENT_ID_MISSING = "calendar_event_id_missing"
     CONTRACT_MISMATCH = "contract_mismatch"
     GMAIL_TIMEOUT = "gmail_timeout"
+    HISTORY_NOT_COLLECTED = "history_not_collected"
     IDENTITY_LINK_CONTRACT_MISSING = "identity_link_contract_missing"
     PERMISSION_DENIED = "permission_denied"
     RETENTION_POLICY_MISSING = "retention_policy_missing"
@@ -123,16 +124,61 @@ class MetricEvent:
 
 
 @dataclass(frozen=True)
+class MetricGroupDefinition:
+    """Display metadata for one ordered metric group."""
+
+    group_id: str
+    display_label: str
+    description: str
+    order: int
+
+    def to_payload(self) -> MetricGroupPayload:
+        return {
+            "id": self.group_id,
+            "display_label": self.display_label,
+            "description": self.description,
+            "order": self.order,
+        }
+
+
+class MetricGroupPayload(TypedDict):
+    id: str
+    display_label: str
+    description: str
+    order: int
+
+
+@dataclass(frozen=True)
 class MetricDefinition:
     """One display metric loaded from the repository contract."""
 
     metric_id: str
+    display_label: str
     description: str
+    group: str
+    unit: str
     source_collection: str
     event_type: str
     aggregation: Aggregation
     distinct_fields: tuple[str, ...] = ()
     not_run_reason: SourceFailureReason | None = None
+
+    def to_catalog_payload(self) -> MetricCatalogPayload:
+        return {
+            "id": self.metric_id,
+            "display_label": self.display_label,
+            "description": self.description,
+            "group": self.group,
+            "unit": self.unit,
+        }
+
+
+class MetricCatalogPayload(TypedDict):
+    id: str
+    display_label: str
+    description: str
+    group: str
+    unit: str
 
 
 @dataclass(frozen=True)
@@ -140,8 +186,15 @@ class MetricContract:
     """Validated metric definitions and the external-effect boundary."""
 
     version: str
+    groups: tuple[MetricGroupDefinition, ...]
     metrics: tuple[MetricDefinition, ...]
     external_effects: Mapping[str, str]
+
+    def group_catalog(self) -> list[MetricGroupPayload]:
+        return [group.to_payload() for group in sorted(self.groups, key=lambda item: item.order)]
+
+    def metric_catalog(self) -> list[MetricCatalogPayload]:
+        return [metric.to_catalog_payload() for metric in self.metrics]
 
 
 @dataclass(frozen=True)
@@ -222,6 +275,17 @@ def load_metric_contract(path: Path) -> MetricContract:
     root = cast(dict[str, object], raw)
     version = _required_string(root, "version")
 
+    groups_raw = root.get("groups")
+    if not isinstance(groups_raw, list) or not groups_raw:
+        raise ValueError("metric contract must contain at least one group")
+    groups = tuple(_metric_group(item) for item in groups_raw)
+    group_ids = [group.group_id for group in groups]
+    if len(group_ids) != len(set(group_ids)):
+        raise ValueError("metric group ids must be unique")
+    group_orders = [group.order for group in groups]
+    if len(group_orders) != len(set(group_orders)):
+        raise ValueError("metric group order values must be unique")
+
     metrics_raw = root.get("metrics")
     if not isinstance(metrics_raw, list) or not metrics_raw:
         raise ValueError("metric contract must contain at least one metric")
@@ -229,6 +293,9 @@ def load_metric_contract(path: Path) -> MetricContract:
     metric_ids = [metric.metric_id for metric in metrics]
     if len(metric_ids) != len(set(metric_ids)):
         raise ValueError("metric ids must be unique")
+    unknown_groups = {metric.group for metric in metrics} - set(group_ids)
+    if unknown_groups:
+        raise ValueError(f"metrics reference unknown groups: {sorted(unknown_groups)}")
 
     effects_raw = root.get("external_effects")
     if not isinstance(effects_raw, dict) or not effects_raw:
@@ -243,6 +310,7 @@ def load_metric_contract(path: Path) -> MetricContract:
 
     return MetricContract(
         version=version,
+        groups=groups,
         metrics=metrics,
         external_effects=external_effects,
     )
@@ -283,12 +351,30 @@ def _metric_definition(raw: object) -> MetricDefinition:
 
     return MetricDefinition(
         metric_id=_required_string(data, "id"),
+        display_label=_required_string(data, "display_label"),
         description=_required_string(data, "description"),
+        group=_required_string(data, "group"),
+        unit=_required_string(data, "unit"),
         source_collection=_required_string(data, "source_collection"),
         event_type=_required_string(data, "event_type"),
         aggregation=aggregation,
         distinct_fields=distinct_fields,
         not_run_reason=not_run_reason,
+    )
+
+
+def _metric_group(raw: object) -> MetricGroupDefinition:
+    if not isinstance(raw, dict):
+        raise TypeError("each metric group must be an object")
+    data = cast(dict[str, object], raw)
+    order = data.get("order")
+    if not isinstance(order, int) or isinstance(order, bool) or order < 1:
+        raise ValueError("metric group order must be a positive integer")
+    return MetricGroupDefinition(
+        group_id=_required_string(data, "id"),
+        display_label=_required_string(data, "display_label"),
+        description=_required_string(data, "description"),
+        order=order,
     )
 
 
