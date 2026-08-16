@@ -370,3 +370,55 @@ deny network-outbound example.com:443 (user denied)
 
 → 실제 Claude native sandbox 설정에서 exact pytest는 통과했고 외부 network는 403으로 차단됐습니다.
 `failIfUnavailable=true`와 `allowUnsandboxedCommands=false`도 넣어 sandbox 없는 조용한 실행을 막았습니다.
+
+#### 10.3 수리 뒤 Claude V1 재검증과 Codex V2 재공격
+
+`c701a3340e950f1f8155bc390dd4716e81c8cf5b`를 다음 일회용 clone에서 다시 검사했습니다.
+
+```text
+/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/humansearch-l0-doc-final.hrGgmU/repo
+```
+
+→ 원본 worktree가 아니라 폐기 가능한 clone 경로에서 읽기 전용 검증을 실행했습니다.
+
+Claude의 유효 판정 첫 줄과 target 불변 증거는 다음과 같습니다.
+
+```text
+VERDICT: PASS
+CLAUDE_RC=0
+TARGET_HEAD_UNCHANGED=yes
+TARGET_STATUS_UNCHANGED=yes
+TARGET_REFS_UNCHANGED=yes
+```
+
+→ 원본 target의 commit, working tree, ref는 바뀌지 않았습니다. 다만 PASS 안에 저심각 finding과
+`NOT_RUN`이 남아 있었으므로 완료로 세지 않고 Codex가 전부 다시 공격했습니다.
+
+| ID | Claude 판정 | Codex 재현 | 결과 | 조치 |
+|---|---|---|---|---|
+| V1F-1 | LOW: 최종 V1/V2 증거 미완료 | 이 문서의 마지막 닫힌 단계와 commit을 대조 | 일치 | 새 commit에서 V1과 V2를 다시 실행하고 원문을 append |
+| V1F-2 | LOW: REVIEW 전 dirty 규칙이 활성 RED/GREEN 파일까지 막음 | prompt의 evidence buffer 문장과 phase 허용 표 대조 | 일치 | open phase 표식과 RED/GREEN별 dirty 허용 범위를 명시 |
+| V1F-3 | LOW: sandbox 기본 `TMPDIR`가 clone 밖이라 `mktemp` 검사 실패 | Claude 출력의 `Operation not permitted`와 기본 `/var/folders/...` 경로 대조 | 일치 | clone 안 `.audit-tmp`를 만들고 Claude 환경의 `TMPDIR`로 고정 |
+| V1F-4 | 제한: 상세 diff 허용 파일만 보여 범위 밖 변경을 독립 확인하지 못함 | exact allowlist와 `origin/main...HEAD` 전체 name-status 부재 대조 | 일치 | option wildcard 없는 전체 경로 name-status 명령을 추가 |
+| V1F-5 | 제한: portal constant script 실제 8개를 Claude가 못 셈 | 아래 `git ls-tree`로 원격 branch를 독립 조회 | 정확히 8개 일치 | 예상 목록을 유지하고 다음 V1에서도 preparation gate로 재검사 |
+
+→ Claude가 남긴 항목을 Codex가 하나씩 재현했고, 미완료 1건은 다음 검증으로 넘기며 나머지는 문서
+수리 또는 독립 조회로 닫았습니다.
+
+```text
+$ git ls-tree -r --name-only origin/task/humansearch-g3-portal-constants -- scripts \
+  | LC_ALL=C sort | grep '^scripts/acceptance-hs-portal-constants.*\.sh$'
+scripts/acceptance-hs-portal-constants-hardening.sh
+scripts/acceptance-hs-portal-constants-hardening2.sh
+scripts/acceptance-hs-portal-constants-hardening3.sh
+scripts/acceptance-hs-portal-constants-hardening4.sh
+scripts/acceptance-hs-portal-constants-hardening5.sh
+scripts/acceptance-hs-portal-constants-hardening6.sh
+scripts/acceptance-hs-portal-constants-mutations.sh
+scripts/acceptance-hs-portal-constants.sh
+```
+
+→ finding 5건을 숨기거나 기각하지 않았습니다. V1F-2~4는 프롬프트 수리로 닫았고, V1F-1은 이
+수리 commit 뒤의 새 Claude V1과 Codex V2 증거가 생겨야만 닫힙니다. V1F-3 때문에 Claude sandbox
+안에서 실행되지 못했던 `verify.sh`와 `acceptance-verify-ac-m.sh`는 아직 `NOT_RUN`이며, 다음 V1에서
+실제 성공 출력이 나오기 전에는 완료로 바꾸지 않습니다.
