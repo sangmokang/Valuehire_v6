@@ -1,5 +1,11 @@
 # Admin Dashboard "몰입도 잔디밭" 구현 스펙 — 적대적 검증 (2026-08-16)
 
+## 1층 — 결론
+
+> **역사 기록 — 구현 정본 아님.** 이 문서가 검토한 “몰입도 잔디밭” 초안은 현재 관리자 주간 대시보드 구현 계약으로 사용하지 않는다. 주간 경계, 데이터 원장, Gmail·ClickUp 범위와 clean-room 교체 기준은 docs/engineering/admin-weekly-dashboard-v6-replacement-goal-2026-08-16.md가 대체한다. 아래 내용은 폐기된 초안에서 무엇이 실패했는지 보존하는 검토 기록이다.
+
+## 3층 — 검토 당시 메타데이터와 증거
+
 - 검토 대상: Codex가 작성한 "STRICT IMPLEMENTATION PROMPT: Admin Dashboard 몰입도 잔디밭" (strict/mixed/L3)
 - 대상 URL(스펙 원문 기준): `https://admin.valuehire.cc/admin/dashboard`
 - 검토자: Claude (Sonnet 5), Valuehire_v6 저장소 기준
