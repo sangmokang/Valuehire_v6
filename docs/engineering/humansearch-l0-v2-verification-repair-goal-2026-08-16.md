@@ -422,3 +422,35 @@ scripts/acceptance-hs-portal-constants.sh
 수리 commit 뒤의 새 Claude V1과 Codex V2 증거가 생겨야만 닫힙니다. V1F-3 때문에 Claude sandbox
 안에서 실행되지 못했던 `verify.sh`와 `acceptance-verify-ac-m.sh`는 아직 `NOT_RUN`이며, 다음 V1에서
 실제 성공 출력이 나오기 전에는 완료로 바꾸지 않습니다.
+
+#### 10.4 최종 Claude V1 시도 1 기각
+
+`4627ddb60091b2db0df9814acbfcdacb8a149e09`를
+`/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/humansearch-l0-doc-v1-final.noatLV/repo`에서
+검사한 Claude는 첫 줄 `VERDICT: PASS`와 target 불변 3건을 냈습니다. 그러나 성공의 필수 조건으로
+정한 두 검사가 다음처럼 끝났습니다.
+
+```text
+$ bash verify.sh                          (exit 1)
+mktemp: mkstemp failed on /var/folders/4h/.../T/tmp.qZCSSn3pWC: Operation not permitted
+mktemp: mkstemp failed on /var/folders/4h/.../T/tmp.FELLwGO5cW: Operation not permitted
+
+$ bash scripts/acceptance-verify-ac-m.sh  (exit 2)
+mktemp: mkdtemp failed on /var/folders/4h/.../T/tmp.fDWI9Q0sC4: Operation not permitted
+NOT_RUN: mktemp 실패
+CHECKED: 0
+```
+
+→ 상위 `claude` process에 준 `TMPDIR`가 Claude의 Bash 명령에는 보존되지 않았습니다. 따라서 PASS라는
+문구와 관계없이 이 시도는 기각했습니다. 원본 target의 HEAD·전체 status·refs 지문은 모두 `yes`로
+불변이었습니다.
+
+Claude가 추가한 저심각 finding도 Codex가 재현했습니다.
+
+| ID | Claude 판정 | Codex 재현 | 최종 조치 |
+|---|---|---|---|
+| V1FF-1 | LOW: Claude mypy가 구현자보다 약함 | Claude allowlist의 `mypy humansearch/src`와 LOCAL_VERIFY의 `mypy --strict src tests` 대조 | exact 명령을 `--strict humansearch/src humansearch/tests`로 일치시킴 |
+| V1FF-2 | LOW: bare `mktemp`가 제한된 임시 경로에서 실패 | 위 `verify.sh`·AC-M 실제 출력으로 재현 | 각 허용 검사 명령 자체에 clone 내부 `TMPDIR`를 inline 고정 |
+
+→ 두 finding 모두 받아들였고 기각해 숨긴 finding은 0건입니다. 다음 V1에서 inline `TMPDIR`로 두 검사가
+실제 성공하기 전까지 V1F-1은 미완료입니다.

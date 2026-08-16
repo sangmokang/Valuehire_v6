@@ -704,21 +704,21 @@ CLAUDE_OUTPUT="$(
       'Bash(git diff --name-status --no-renames --no-ext-diff origin/main...HEAD -- .)' \
       'Bash(git diff --no-ext-diff --no-textconv origin/main...HEAD -- humansearch/src/humansearch/auth_surface.py humansearch/src/humansearch/__init__.py humansearch/tests/test_auth_surface.py humansearch/pyproject.toml humansearch/uv.lock <GOAL_PATH>)' \
       'Bash(git ls-files -- humansearch/src/humansearch/auth_surface.py humansearch/src/humansearch/__init__.py humansearch/tests/test_auth_surface.py humansearch/pyproject.toml humansearch/uv.lock <GOAL_PATH>)' \
-      'Bash(uv run --project humansearch --offline pytest -q humansearch/tests/test_auth_surface.py)' \
-      'Bash(uv run --project humansearch --offline pytest -q humansearch/tests)' \
-      'Bash(uv run --project humansearch --offline ruff check humansearch/src humansearch/tests)' \
-      'Bash(uv run --project humansearch --offline mypy humansearch/src)' \
-      'Bash(bash scripts/acceptance-hs-gates.sh)' \
-      'Bash(bash scripts/acceptance-hs-gates-mutations.sh)' \
-      'Bash(bash scripts/acceptance-hs-gates-antiforge.sh)' \
-      'Bash(bash scripts/acceptance-hs-portal-constants.sh)' \
-      'Bash(bash scripts/acceptance-hs-portal-constants-mutations.sh)' \
-      'Bash(bash scripts/acceptance-hs-portal-constants-hardening.sh)' \
-      'Bash(bash scripts/acceptance-hs-portal-constants-hardening2.sh)' \
-      'Bash(bash scripts/acceptance-hs-portal-constants-hardening3.sh)' \
-      'Bash(bash scripts/acceptance-hs-portal-constants-hardening4.sh)' \
-      'Bash(bash scripts/acceptance-hs-portal-constants-hardening5.sh)' \
-      'Bash(bash scripts/acceptance-hs-portal-constants-hardening6.sh)' \
+      'Bash(TMPDIR="$PWD/.audit-tmp" uv run --project humansearch --offline pytest -q humansearch/tests/test_auth_surface.py)' \
+      'Bash(TMPDIR="$PWD/.audit-tmp" uv run --project humansearch --offline pytest -q humansearch/tests)' \
+      'Bash(TMPDIR="$PWD/.audit-tmp" uv run --project humansearch --offline ruff check humansearch/src humansearch/tests)' \
+      'Bash(TMPDIR="$PWD/.audit-tmp" uv run --project humansearch --offline mypy --strict humansearch/src humansearch/tests)' \
+      'Bash(TMPDIR="$PWD/.audit-tmp" bash scripts/acceptance-hs-gates.sh)' \
+      'Bash(TMPDIR="$PWD/.audit-tmp" bash scripts/acceptance-hs-gates-mutations.sh)' \
+      'Bash(TMPDIR="$PWD/.audit-tmp" bash scripts/acceptance-hs-gates-antiforge.sh)' \
+      'Bash(TMPDIR="$PWD/.audit-tmp" bash scripts/acceptance-hs-portal-constants.sh)' \
+      'Bash(TMPDIR="$PWD/.audit-tmp" bash scripts/acceptance-hs-portal-constants-mutations.sh)' \
+      'Bash(TMPDIR="$PWD/.audit-tmp" bash scripts/acceptance-hs-portal-constants-hardening.sh)' \
+      'Bash(TMPDIR="$PWD/.audit-tmp" bash scripts/acceptance-hs-portal-constants-hardening2.sh)' \
+      'Bash(TMPDIR="$PWD/.audit-tmp" bash scripts/acceptance-hs-portal-constants-hardening3.sh)' \
+      'Bash(TMPDIR="$PWD/.audit-tmp" bash scripts/acceptance-hs-portal-constants-hardening4.sh)' \
+      'Bash(TMPDIR="$PWD/.audit-tmp" bash scripts/acceptance-hs-portal-constants-hardening5.sh)' \
+      'Bash(TMPDIR="$PWD/.audit-tmp" bash scripts/acceptance-hs-portal-constants-hardening6.sh)' \
     --disallowedTools Edit Write NotebookEdit \
       'Read(../**)' \
       'Bash(git add *)' 'Bash(git commit *)' 'Bash(git push *)' \
@@ -769,8 +769,9 @@ fi
 도구를 세 종류로 줄이고, `--allowedTools`는 clone 내부 Read/Grep, option wildcard가 없는 Git 조회,
 고정된 검사 명령만 정확히 연다. test는 미리 잠근 의존성을 준비한 뒤 Claude native sandbox와 offline
 `uv` 안에서 실행한다. sandbox는 사용할 수 없으면 실패하고, clone 밖 쓰기·network·unsandboxed escape를
-닫는다. `TMPDIR`, uv cache도 clone 내부 전용 경로로 고정한다. `--disallowedTools`는 파일·Git·GitHub
-변경 명령을 다시 닫는다. test가 cache나 임시 파일을 써도 복제본 안에만 남는다. 출력 형식 블록도
+닫는다. Claude 상위 환경뿐 아니라 각 허용 검사 명령에도 `TMPDIR="$PWD/.audit-tmp"`를 붙이고, uv
+cache도 clone 내부 전용 경로로 고정한다. `--disallowedTools`는 파일·Git·GitHub 변경 명령을 다시
+닫는다. test가 cache나 임시 파일을 써도 복제본 안에만 남는다. 출력 형식 블록도
 명령에 포함해야 한다. 실행 전후에는 target HEAD, 전체 status, ref
 목록의 지문을 비교한다. 하나라도 달라지면 Claude 판정 내용과 관계없이 24로 중단한다.
 
