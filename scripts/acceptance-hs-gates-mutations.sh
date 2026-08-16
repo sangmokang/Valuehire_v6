@@ -16,7 +16,8 @@ GATES="scripts/acceptance-hs-gates.sh"
 
 for required in "$GATES" "scripts/hs_import_spy.py" "humansearch/pyproject.toml" \
   "humansearch/uv.lock" "humansearch/.python-version" \
-  "humansearch/src/humansearch/__init__.py" "humansearch/tests"; do
+  "humansearch/src/humansearch/__init__.py" "humansearch/tests" \
+  "contracts/admin-weekly-dashboard/metric-contract-v1.json"; do
   if [ ! -e "$required" ]; then
     echo "FAIL: required G2 implementation missing: $required"
     exit 1
@@ -36,6 +37,13 @@ trap cleanup EXIT
 trap 'cleanup; trap - EXIT; exit 143' TERM
 trap 'cleanup; trap - EXIT; exit 130' INT
 trap 'cleanup; trap - EXIT; exit 129' HUP
+
+# Dashboard tests load their product contract from the repository-level contracts tree.
+# Every isolated project lives one directory below SANDBOX, so this preserves the same
+# relative boundary without letting a mutation case read files from the real worktree.
+mkdir -p "$SANDBOX/contracts/admin-weekly-dashboard"
+cp contracts/admin-weekly-dashboard/metric-contract-v1.json \
+  "$SANDBOX/contracts/admin-weekly-dashboard/"
 
 total=0
 blocked=0
