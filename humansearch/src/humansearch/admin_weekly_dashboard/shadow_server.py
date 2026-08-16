@@ -43,6 +43,7 @@ class HistoryWeekPayload(TypedDict):
     meeting_iso_week: str
     event_start_kst: str
     event_end_exclusive_kst: str
+    event_end_inclusive_date_kst: str
     status: str
     reason: str | None
     snapshot: SnapshotPayload | None
@@ -82,6 +83,9 @@ def build_shadow_dashboard(metric_contract: MetricContract) -> DashboardPayload:
                 "meeting_iso_week": historical_window.meeting_iso_week,
                 "event_start_kst": historical_window.event_start_kst,
                 "event_end_exclusive_kst": historical_window.event_end_exclusive_kst,
+                "event_end_inclusive_date_kst": _inclusive_end_date(
+                    historical_window.event_end_exclusive_kst
+                ),
                 "status": MetricStatus.NOT_RUN.value,
                 "reason": SourceFailureReason.HISTORY_NOT_COLLECTED.value,
                 "snapshot": None,
@@ -92,6 +96,9 @@ def build_shadow_dashboard(metric_contract: MetricContract) -> DashboardPayload:
             "meeting_iso_week": current_snapshot.window.meeting_iso_week,
             "event_start_kst": current_snapshot.window.event_start_kst,
             "event_end_exclusive_kst": current_snapshot.window.event_end_exclusive_kst,
+            "event_end_inclusive_date_kst": _inclusive_end_date(
+                current_snapshot.window.event_end_exclusive_kst
+            ),
             "status": MetricStatus.PASS.value,
             "reason": None,
             "snapshot": current_snapshot.to_api_dict(),
@@ -139,6 +146,10 @@ def _shadow_events() -> list[MetricEvent]:
         for primary_key, position_id, candidate_key in discovery_rows
     )
     return events
+
+
+def _inclusive_end_date(event_end_exclusive_kst: str) -> str:
+    return (datetime.fromisoformat(event_end_exclusive_kst).date() - timedelta(days=1)).isoformat()
 
 
 class ShadowServer(ThreadingHTTPServer):
@@ -190,6 +201,9 @@ def _load_assets(assets: Path) -> Mapping[str, tuple[str, bytes]]:
 
 class _ShadowRequestHandler(BaseHTTPRequestHandler):
     server: ShadowServer
+
+    def version_string(self) -> str:
+        return "ValueHireShadow/1"
 
     def do_GET(self) -> None:
         if self.path == "/api/dashboard":

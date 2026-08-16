@@ -16,10 +16,9 @@
     return { currentWeek, snapshot: currentWeek.snapshot };
   }
 
-  function renderWindow(snapshot) {
-    const windowData = snapshot.window;
-    byId("window-range").textContent = `${windowData.event_start_kst.slice(5, 10)} — ${windowData.event_end_exclusive_kst.slice(5, 10)}`;
-    byId("week-label").textContent = windowData.meeting_iso_week;
+  function renderWindow(currentWeek) {
+    byId("window-range").textContent = `${currentWeek.event_start_kst.slice(5, 10)} — ${currentWeek.event_end_inclusive_date_kst.slice(5, 10)}`;
+    byId("week-label").textContent = currentWeek.meeting_iso_week;
   }
 
   function addAuditItem(list, label, value) {
@@ -136,8 +135,8 @@
       const response = await fetch("/api/dashboard", { cache: "no-store", headers: { Accept: "application/json" } });
       if (!response.ok) throw new Error("dashboard_request_failed");
       const dashboard = await response.json();
-      const { snapshot } = currentSnapshot(dashboard);
-      renderWindow(snapshot);
+      const { currentWeek, snapshot } = currentSnapshot(dashboard);
+      renderWindow(currentWeek);
       renderAudit(dashboard, snapshot);
       renderHeatmap(dashboard);
       renderMetrics(dashboard, snapshot);
