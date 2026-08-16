@@ -142,3 +142,92 @@ Phase B와 같은 별도 기저 결함으로 공개한다.
 - 운영 도메인 연결·배포·기존 서비스 삭제
 - 실제 과거 12주 값 생성 또는 추정
 - 기존 운영 화면과의 픽셀 일치 합격 주장
+
+## 실행 증거 — 2026-08-17
+
+### RED 고정
+
+- 최초 계약·서버 테스트는 `shadow_server` 모듈 부재로 collection error가 났다.
+- 미지원 method 회귀 시험은 `HEAD/PUT/PATCH/DELETE/OPTIONS`가 기본 501로 빠져
+  `5 failed, 1 passed`였다.
+- 포함 종료일·서버 식별 시험은 `event_end_inclusive_date_kst` 부재와
+  `BaseHTTP/0.6 Python/3.14.1` 노출로 `2 failed`였다.
+- symlink 자산 시험은 `index.html`이 외부 파일을 가리켜도 서버가 생성되어
+  `DID NOT RAISE ValueError`로 실패했다.
+
+### GREEN 및 저장소 게이트
+
+```text
+$ cd humansearch
+$ uv run --no-sync pytest -q tests/test_admin_shadow_contract.py tests/test_admin_shadow_server.py
+26 passed
+$ uv run --no-sync ruff check src tests
+All checks passed!
+$ uv run --no-sync mypy --strict src tests
+Success: no issues found in 13 source files
+
+$ bash scripts/acceptance-hs-gates.sh
+PASS: ruff clean in 13 python files
+PASS: mypy strict clean in 13 source files
+PASS: pytest collected 40 and passed
+COLLECTED: 40
+$ bash scripts/acceptance-hs-gates-mutations.sh
+PASS: gates mutations blocked 6/6
+$ bash scripts/acceptance-hs-gates-antiforge.sh
+PASS: gates antiforge 3/3 (evidence forgery + CI disable blocked)
+$ bash verify.sh
+PASS: no secret-pattern match in any tracked file, .env not tracked
+$ bash scripts/scan-data-exposure.sh all
+PASS: 추적 파일 101개 검사, 위반 0건
+PASS: 기록 전량 blob 432개 검사, 크기·경로 위반 0건
+PASS: csv/tsv/sql 0개 검사(추적 101개 중), 개인정보 적재 0건
+```
+
+### 브라우저·시각 판정
+
+- 설치된 Chrome을 Playwright CLI로 구동하고 `body[data-ready="true"]`를 기다린 뒤
+  1440×1100과 실제 390px viewport를 캡처했다.
+- 최종 화면:
+  - `.omx/state/admin-dashboard-shadow-ui/generated-1440-v4.png`
+  - `.omx/state/admin-dashboard-shadow-ui/generated-390-full-v4.png`
+- 390px에서는 H1이 두 줄로 래핑되고 metric은 한 열, 12주 표만 명시적 가로 scroll 영역이다.
+- `visual-verdict`는 `86 revise → 93 pass → 93 pass`였고 전체 기록은
+  `.omx/state/admin-dashboard-shadow-ui/ralph-progress.json`에 남겼다.
+- 첫 판정에서 발견한 `08-16` 배타 경계 오표시는 API view model의 포함 종료일 `08-15`로
+  교정했다. 집계 snapshot의 `[08-09, 08-16)` 경계는 바꾸지 않았다.
+
+### 적대 검증 V1 — Claude CLI
+
+다음 명령으로 도구를 끄고 Phase C diff만 표준 입력으로 전달했다.
+
+```text
+git diff 1a285e0..HEAD -- <Phase C paths> |
+  env -u ANTHROPIC_API_KEY claude -p --tools '' --output-format text '<review prompt>'
+```
+
+- 60초 동안 stdout/stderr가 모두 0 byte였다.
+- `SIGINT`로 중단했고 종료 코드는 `130`이었다.
+- 판정: `NOT_RUN`. 출력이 없으므로 Claude의 PASS 또는 지적을 주장하지 않는다.
+- 같은 CLI hang은 Phase B의 세 가지 입력 방식에서도 재현됐다. 단순 `OK` 요청은 성공했으므로
+  실행 파일 부재가 아니라 repository/diff review 경로의 미해결 hang으로 분리한다.
+
+### 적대 검증 V2 — Codex 재공격
+
+- `CONFIRM → FIXED`: 고정 route 파일이 symlink면 asset root 밖의 로컬 파일을 읽을 수 있었다.
+  RED 시험을 추가하고 `_load_assets()`가 읽기 전에 symlink를 거부하도록 고쳤다.
+- `CONFIRM → FIXED`: metric group 제목이 목표의 `h2` 대신 `h3`였다.
+- `CONFIRM → FIXED`: 목표 문서 끝의 여분 blank line을 제거했다.
+- `REFUTE`: 390px H1 잘림 지적은 Chrome 직접 실행의 최소 layout viewport를 390px 이미지로
+  crop한 초기 캡처에만 나타났다. Playwright가 설정한 실제 390px viewport의 v2~v4 전체 캡처에서는
+  `Admin Weekly` / `Dashboard` 두 줄로 viewport 안에 표시된다.
+- 코드 리뷰·보안 리뷰 모두 critical/high 잔여 지적은 없었다.
+
+## 명시적 NOT_RUN 및 기저 제약
+
+- 인증된 운영 화면 reference와의 pixel match: `NOT_RUN` (reference는 요구사항 기반 wireframe).
+- Firefox/WebKit cross-browser와 보조기기 실사용: `NOT_RUN`.
+- live Gmail/ClickUp/캘린더/채용사이트, 운영 DB, 배포, 관리자 인증: 비범위로 `NOT_RUN`.
+- Claude V1: 위 hang 때문에 `NOT_RUN`; 따라서 strict 총합 PASS를 주장하지 않는다.
+- main 저장소에서 `bash scripts/acceptance-0-2.sh`를 재실행한 결과 tracked secret scan은
+  PASS했지만 기존 unreachable 객체 `17건` 때문에 RED다. 이 단계에서는 reflog expire/GC 같은
+  파괴적 정리를 실행하지 않았다.
