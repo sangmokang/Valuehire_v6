@@ -175,6 +175,12 @@ jobs:
         # 없는 것으로 친다(이 파일 111행 주석의 "판정 권한은 CI에 있다"와 같은 근거).
         run: bash scripts/acceptance-secret-webhook-vendor.sh
 
+      - name: 인수 검사 file-size (코드 파일 500줄 상한 · AC-FS)
+        # 본체와 경계값 자기시험을 함께 실행해 501줄·0개 차단 로직의 약화를 막는다.
+        run: |
+          bash scripts/acceptance-file-size.sh
+          bash scripts/acceptance-file-size-mutations.sh
+
       - name: 인수 검사 verify-ac-m (mechanism 명부 대조 · AC-M)
         # 명부(docs/sot/mechanism-registry.yaml)와 실제 검사 장치의 일치를 강제한다.
         # 검사기 1벌(scripts/verify/check-mechanism-registry.sh)을 로컬 pre-push

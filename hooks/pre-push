@@ -162,7 +162,12 @@ else
     # (2026-08-07 실측 — 비밀 커밋이 실제로 원격에 도달했다):
     #   git commit --no-verify (문서화된 허용 경로)
     #   → SECRET_PATTERNS_FILE=/tmp/weak.txt git push  → exit 0 통과
-    SECRET_PATTERNS_FILE= bash "$c" >/dev/null 2>&1 || rc=$?
+    (
+      # 파일 크기 게이트의 시험용 값과 자식 Bash 시작 파일은 push 호출자의 환경에서
+      # 상속하지 않는다. 훅 경계에서 제거해 인수 스크립트 시작 때의 재주입도 막는다.
+      unset FILE_SIZE_TEST FILE_SIZE_ROOTS FILE_SIZE_LIMIT BASH_ENV ENV
+      SECRET_PATTERNS_FILE= bash "$c"
+    ) >/dev/null 2>&1 || rc=$?
     if [ "$rc" -ne 0 ]; then
       block "$c exit=$rc"
     else
