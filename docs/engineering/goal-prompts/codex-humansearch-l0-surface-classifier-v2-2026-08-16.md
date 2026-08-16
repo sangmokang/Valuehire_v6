@@ -320,15 +320,17 @@ phase별 허용 파일 범위도 checkpoint 계약의 일부다.
 → branch만 남은 재개에서도 commit 순서뿐 아니라 실제 파일 범위를 대조한다. 범위 밖 파일, 알 수 없는
 phase, 빠진 `Attempt:`/`Fix-for:`, 같은 phase 중복이 하나라도 있으면 연결하지 않고 `BLOCKED`다.
 
-PLAN commit 뒤부터 REVIEW commit 직전까지 구현 goal 한 파일의 미커밋 변경은 **공식 evidence
-buffer**다. RED 실행, GREEN 검증, mutation, Claude V1, Codex V2의 명령과 출력을 이 파일에 순서대로
-append하므로 정상적인 dirty 상태다. 이때 허용되는 미커밋 파일은 goal 정확히 한 개뿐이다.
+PLAN commit 뒤부터 EVIDENCE commit 직전까지의 허용된 미커밋 변경은 **공식 evidence buffer**다.
+RED 실행, GREEN 검증, mutation, Claude V1, Codex V2의 명령과 출력을 구현 goal에 순서대로 append한다.
+REVIEW commit 전에는 goal 정확히 한 파일만 dirty여야 한다. REVIEW commit 뒤에는 goal과 §17의 고정
+경로 owner-gated next prompt, 정확히 두 파일까지만 dirty일 수 있다.
 
 - 재개 시 buffer를 버리거나 되돌리지 않는다.
 - 마지막으로 닫힌 제목, 명령 블록, 출력 블록, `→` 해석까지 읽어 다음 미실행 단계만 이어간다.
 - 닫히지 않은 block, 명령만 있고 출력이 없는 항목, 서로 다른 attempt 로그 혼합이 있으면 추측해서
   완성하지 않고 `BLOCKED`다.
-- REVIEW commit 전까지 이 buffer는 해당 worktree에만 있으므로 원격 보존됐다고 주장하지 않는다.
+- 각 checkpoint commit 뒤에 새로 append한 buffer는 해당 worktree에만 있으므로 다음 checkpoint 전에는
+  원격 보존됐다고 주장하지 않는다.
 - buffer가 사라졌으면 실행하지 않은 출력을 재구성하지 않는다. 마지막 commit checkpoint부터 fresh
   명령을 다시 실행해 새 증거를 만든다.
 
@@ -633,6 +635,7 @@ Claude 출력 본문을 한 글자도 요약하지 않고 같은 파일의 `## �
 ```bash
 TARGET_ROOT="$(git rev-parse --show-toplevel)"
 TARGET_HEAD_BEFORE="$(git rev-parse HEAD)"
+TARGET_ORIGIN_MAIN_BEFORE="$(git rev-parse origin/main)"
 TARGET_STATUS_BEFORE="$(git status --porcelain=v1 --untracked-files=all)"
 TARGET_REFS_BEFORE="$(git show-ref | LC_ALL=C sort | shasum -a 256 | awk '{print $1}')"
 AUDIT_BASE="${TMPDIR:-/tmp}"
@@ -656,30 +659,62 @@ trap 'cleanup_v1_copy; trap - EXIT; exit 130' INT
 trap 'cleanup_v1_copy; trap - EXIT; exit 143' TERM
 git clone --quiet --no-local --no-hardlinks "$TARGET_ROOT" "$AUDIT_REPO"
 git -C "$AUDIT_REPO" checkout --quiet --detach "$TARGET_HEAD_BEFORE"
+git -C "$AUDIT_REPO" update-ref refs/remotes/origin/main "$TARGET_ORIGIN_MAIN_BEFORE"
 cp "$TARGET_ROOT/<GOAL_PATH>" "$AUDIT_REPO/<GOAL_PATH>"
+mkdir -p "$AUDIT_REPO/.uv-cache"
+EXPECTED_PORTAL_SCRIPTS='scripts/acceptance-hs-portal-constants-hardening.sh
+scripts/acceptance-hs-portal-constants-hardening2.sh
+scripts/acceptance-hs-portal-constants-hardening3.sh
+scripts/acceptance-hs-portal-constants-hardening4.sh
+scripts/acceptance-hs-portal-constants-hardening5.sh
+scripts/acceptance-hs-portal-constants-hardening6.sh
+scripts/acceptance-hs-portal-constants-mutations.sh
+scripts/acceptance-hs-portal-constants.sh'
+ACTUAL_PORTAL_SCRIPTS="$(
+  cd "$AUDIT_REPO" &&
+  find scripts -maxdepth 1 -type f -name 'acceptance-hs-portal-constants*.sh' -print |
+    LC_ALL=C sort
+)"
+if [ "$(git -C "$AUDIT_REPO" rev-parse origin/main)" != "$TARGET_ORIGIN_MAIN_BEFORE" ] ||
+   [ "$ACTUAL_PORTAL_SCRIPTS" != "$EXPECTED_PORTAL_SCRIPTS" ] ||
+   ! (cd "$AUDIT_REPO" && uv sync --project humansearch --frozen); then
+  printf '%s\n' 'BLOCKED: Claude V1 격리 검사 준비 실패'
+  exit 27
+fi
 
 claude_rc=0
 CLAUDE_OUTPUT="$(
   (
   cd "$AUDIT_REPO" &&
-  env -u ANTHROPIC_API_KEY claude --safe-mode --no-session-persistence \
+  env -u ANTHROPIC_API_KEY GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null \
+    UV_NO_CONFIG=1 UV_OFFLINE=1 UV_CACHE_DIR="$AUDIT_REPO/.uv-cache" \
+    claude --safe-mode --no-session-persistence \
+    --settings '{"sandbox":{"enabled":true,"failIfUnavailable":true,"autoAllowBashIfSandboxed":false,"allowUnsandboxedCommands":false,"filesystem":{"denyRead":["~/"],"allowRead":["."]},"network":{"allowedDomains":[]}}}' \
     --permission-mode dontAsk --tools Read,Grep,Bash \
-    --allowedTools Read Grep \
+    --allowedTools 'Read(./**)' Grep \
       'Bash(git status --short)' \
-      'Bash(git rev-parse *)' \
-      'Bash(git log *)' \
-      'Bash(git show *)' \
-      'Bash(git diff *)' \
-      'Bash(git diff-tree *)' \
-      'Bash(git ls-files *)' \
-      'Bash(uv run --project humansearch pytest *)' \
-      'Bash(uv run --project humansearch ruff *)' \
-      'Bash(uv run --project humansearch mypy *)' \
+      'Bash(git rev-parse HEAD)' \
+      'Bash(git rev-parse origin/main)' \
+      'Bash(git log --format=fuller --decorate origin/main..HEAD)' \
+      'Bash(git diff --no-ext-diff --no-textconv origin/main...HEAD -- humansearch/src/humansearch/auth_surface.py humansearch/src/humansearch/__init__.py humansearch/tests/test_auth_surface.py humansearch/pyproject.toml humansearch/uv.lock <GOAL_PATH>)' \
+      'Bash(git ls-files -- humansearch/src/humansearch/auth_surface.py humansearch/src/humansearch/__init__.py humansearch/tests/test_auth_surface.py humansearch/pyproject.toml humansearch/uv.lock <GOAL_PATH>)' \
+      'Bash(uv run --project humansearch --offline pytest -q humansearch/tests/test_auth_surface.py)' \
+      'Bash(uv run --project humansearch --offline pytest -q humansearch/tests)' \
+      'Bash(uv run --project humansearch --offline ruff check humansearch/src humansearch/tests)' \
+      'Bash(uv run --project humansearch --offline mypy humansearch/src)' \
       'Bash(bash scripts/acceptance-hs-gates.sh)' \
       'Bash(bash scripts/acceptance-hs-gates-mutations.sh)' \
       'Bash(bash scripts/acceptance-hs-gates-antiforge.sh)' \
-      'Bash(bash scripts/acceptance-hs-portal-constants*.sh)' \
+      'Bash(bash scripts/acceptance-hs-portal-constants.sh)' \
+      'Bash(bash scripts/acceptance-hs-portal-constants-mutations.sh)' \
+      'Bash(bash scripts/acceptance-hs-portal-constants-hardening.sh)' \
+      'Bash(bash scripts/acceptance-hs-portal-constants-hardening2.sh)' \
+      'Bash(bash scripts/acceptance-hs-portal-constants-hardening3.sh)' \
+      'Bash(bash scripts/acceptance-hs-portal-constants-hardening4.sh)' \
+      'Bash(bash scripts/acceptance-hs-portal-constants-hardening5.sh)' \
+      'Bash(bash scripts/acceptance-hs-portal-constants-hardening6.sh)' \
     --disallowedTools Edit Write NotebookEdit \
+      'Read(../**)' \
       'Bash(git add *)' 'Bash(git commit *)' 'Bash(git push *)' \
       'Bash(git checkout *)' 'Bash(git switch *)' 'Bash(git reset *)' \
       'Bash(git clean *)' 'Bash(git restore *)' 'Bash(git fetch *)' \
@@ -689,7 +724,7 @@ CLAUDE_OUTPUT="$(
       'Bash(touch *)' 'Bash(mkdir *)' 'Bash(sed -i *)' \
       'Bash(python *)' 'Bash(node *)' 'Bash(perl *)' \
     -p \
-    '당신은 구현자가 아닌 독립 적대검증자입니다. 현재 디렉터리는 버릴 수 있는 local clone입니다. 허용된 읽기 명령과 test 명령만 실행하고 파일·Git ref·원격·GitHub 상태를 바꾸지 마십시오. 저장소 현재 branch의 docs/sot/humansearch-l0-surface-contract.md, <GOAL_PATH>, humansearch/src/humansearch/auth_surface.py, humansearch/src/humansearch/__init__.py, humansearch/tests/test_auth_surface.py, humansearch/pyproject.toml, humansearch/uv.lock과 origin/main...HEAD diff를 읽으십시오. 구현자의 요약을 믿지 말고 명령을 직접 실행하십시오. 16개 정상 조합의 완전성, invalid input fail-closed, 정확히 5 states/3 roles, L2/L3 상태 누출 0, RED 뒤 test 불변, Hypothesis가 실제 수집되는지, runtime import, 기존 G2/G3 gate가 새 파일을 덮는지, mutation 증거가 타당한지, 고아 export인지, 금지 I/O/portal literal인지, goal의 명령·출력 과장 여부를 공격하십시오. 모든 finding은 file:line과 재현 명령/전체 출력으로 증명하십시오. 실행하지 못한 것은 NOT_RUN입니다. 마지막 판정은 PASS 또는 FAIL입니다.
+    '당신은 구현자가 아닌 독립 적대검증자입니다. 현재 디렉터리는 버릴 수 있는 local clone입니다. Git 조회와 test는 적힌 exact 명령만 쓰십시오. Bash는 Claude native sandbox 안에서 실행되며 network와 clone 밖 쓰기가 금지되고 unsandboxed escape도 닫혀 있습니다. test가 clone 안에 cache를 만들 수는 있지만 원본 worktree·Git ref·원격·GitHub 상태는 바꾸지 마십시오. 저장소 현재 branch의 docs/sot/humansearch-l0-surface-contract.md, <GOAL_PATH>, humansearch/src/humansearch/auth_surface.py, humansearch/src/humansearch/__init__.py, humansearch/tests/test_auth_surface.py, humansearch/pyproject.toml, humansearch/uv.lock과 origin/main...HEAD diff를 읽으십시오. 구현자의 요약을 믿지 말고 명령을 직접 실행하십시오. 16개 정상 조합의 완전성, invalid input fail-closed, 정확히 5 states/3 roles, L2/L3 상태 누출 0, RED 뒤 test 불변, Hypothesis가 실제 수집되는지, runtime import, 기존 G2/G3 gate가 새 파일을 덮는지, mutation 증거가 타당한지, 고아 export인지, 금지 I/O/portal literal인지, goal의 명령·출력 과장 여부를 공격하십시오. 모든 finding은 file:line과 재현 명령/전체 출력으로 증명하십시오. 실행하지 못한 것은 NOT_RUN입니다. 마지막 판정은 PASS 또는 FAIL입니다.
 
 [출력 형식 — 반드시 지킬 것]
 읽는 사람은 기술 배경이 없는 사업 책임자다. 판정 내용은 절대 축소하지 말고, 표현만 풀어 써라.
@@ -725,10 +760,12 @@ fi
 ```
 
 → Claude는 버릴 수 있는 복제본에서만 실제 repository와 tests를 공격한다. `--tools`는 사용 가능한
-도구를 세 종류로 줄이고, `--allowedTools`는 승인 없이 실행할 읽기·검사 명령을 정확히 열며,
-`--disallowedTools`는 파일·Git·GitHub 변경 명령을 다시 닫는다. test가 cache를 써도 복제본 안에만
-남는다. 출력 형식 블록도 명령에 포함해야 한다. 실행 전후에는 target HEAD, 전체 status, ref 목록의
-지문을 비교한다. 하나라도 달라지면 Claude 판정 내용과 관계없이 24로 중단한다.
+도구를 세 종류로 줄이고, `--allowedTools`는 clone 내부 Read/Grep, option wildcard가 없는 Git 조회,
+고정된 검사 명령만 정확히 연다. test는 미리 잠근 의존성을 준비한 뒤 Claude native sandbox와 offline
+`uv` 안에서 실행한다. sandbox는 사용할 수 없으면 실패하고, clone 밖 쓰기·network·unsandboxed escape를
+닫는다. `--disallowedTools`는 파일·Git·GitHub 변경 명령을 다시 닫는다. test가 cache를 써도 복제본
+안에만 남는다. 출력 형식 블록도 명령에 포함해야 한다. 실행 전후에는 target HEAD, 전체 status, ref
+목록의 지문을 비교한다. 하나라도 달라지면 Claude 판정 내용과 관계없이 24로 중단한다.
 
 Claude 출력이 비었거나 `Done` 한 줄이거나 `VERDICT:`가 없으면 검증 실패다. 형식만 어겼지만 대상
 작업은 맞으면 형식 블록을 강조해 같은 attempt에서 최대 한 번 재실행한다. 대상 자체가 불명확하면
