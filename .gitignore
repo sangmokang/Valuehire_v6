@@ -12,6 +12,11 @@ build/
 .next/
 *.log
 
+# Admin 로컬 테스트 산출물
+/apps/admin/test-results/
+/apps/admin/playwright-report/
+/apps/admin/coverage/
+
 # 환경 변수
 .env
 .env.*
