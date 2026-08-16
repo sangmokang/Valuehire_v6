@@ -101,7 +101,7 @@ Claude V1 단계에서만 수행한다.
 | `REVIEW_CHECKPOINT` | V1/V2 재현 완료 | `SHIP` 또는 `FIX_RED` | `BLOCKED` |
 | `SHIP` | V1/V2 합의·clean tree | `CI_WAIT` | `BLOCKED` |
 | `CI_WAIT` | PR head 일치 | `HANDOFF` | `FIX_RED` 또는 `BLOCKED` |
-| `HANDOFF` | 모든 required check green | `DONE` | `BLOCKED` |
+| `HANDOFF` | 현재 PR head를 검사한 관측 CI가 모두 success | `DONE` | `BLOCKED` |
 
 → 이 표는 자율 실행의 프로그램 카운터다. 성공 조건 없이 다음 상태로 건너뛰지 말고, 실패 시 허용된
 복구 상태만 사용한다. `BLOCKED`와 `DONE`은 둘 다 실행 종료 상태다.
@@ -252,9 +252,10 @@ git show origin/main:docs/engineering/humansearch-v6-clean-room-rebuild-goal-202
    root를 못 찾으면 추측 경로를 만들지 않고 `BLOCKED`다.
 2. 둘 다 있으면 `git worktree list --porcelain`로 해당 branch가 해당 path에 정확히 묶였는지 확인하고
    그 worktree에서 재개한다.
-3. branch만 있고 worktree가 없으면 branch가 `origin/main`에서 시작했고 예상 범위의 commit만 갖는지
-   `git log --oneline origin/main..task/humansearch-l0-surface-classifier`로 확인한 뒤 그 branch를 worktree에
-   연결한다.
+3. branch만 있고 worktree가 없으면 `git log --format=fuller --decorate`와 commit별
+   `git diff-tree --no-commit-id --name-only -r <SHA>`를 읽는다. 아래 §7의 phase/attempt 순서와 파일
+   범위를 모든 commit이 만족하고 branch가 `origin/main`에서 갈라졌음을 증명한 경우에만 그 branch를
+   worktree에 연결한다. “예상한 commit”을 사람이 추측하거나 제목만 보고 통과시키지 않는다.
 4. worktree만 있거나 path/branch가 다르거나 예상 밖 commit이 있으면 자동 삭제·reset하지 않고
    `BLOCKED`다.
 
@@ -264,11 +265,24 @@ target worktree 진입 후 다음을 실행한다.
 git status --short --branch
 git rev-parse HEAD
 git rev-parse origin/main
-bash scripts/session-status.sh
+session_status_rc=0
+session_status_out="$(bash scripts/session-status.sh 2>&1)" || session_status_rc=$?
+printf '%s\n' "$session_status_out"
+red_line="$(printf '%s\n' "$session_status_out" | sed -n '/^RED: /p')"
+red_line_count="$(printf '%s\n' "$red_line" | sed '/^$/d' | wc -l | tr -d ' ')"
+if [ "$session_status_rc" -ne 0 ] || [ "$red_line_count" -ne 1 ] ||
+   ! printf '%s\n' "$red_line" |
+     grep -Eq '^RED: 0/[1-9][0-9]* \(acceptance-0-7\.sh 제외 — CI 담당\)$'; then
+  printf 'BLOCKED: Gate 0 failed rc=%s red=%s\n' \
+    "$session_status_rc" "${red_line:-MISSING}"
+  exit 23
+fi
 ```
 
-→ 새 작업이면 HEAD와 `origin/main`이 같고 변경 0이어야 한다. 재개라면 아래 checkpoint 규칙으로
-이미 끝난 단계와 변경의 소유권을 증명해야 한다.
+→ 새 작업이면 HEAD와 `origin/main`이 같고 변경 0이어야 한다. 시작 검사도 끝까지 실행해 실패가 정확히
+0건인지 읽는다. 실행 불가, 출력 누락, 실패 1건 이상은 모두 23으로 중단한다. `.secret-patterns`를 다른
+worktree에서 복사하거나 회수 가능한 Git 객체를 자동 삭제해 이 관문을 억지로 통과시키지 않는다.
+재개라면 아래 checkpoint 규칙으로 이미 끝난 단계와 변경의 소유권을 증명해야 한다.
 
 ### 7. 재개와 checkpoint 규칙
 
@@ -292,6 +306,31 @@ bash scripts/session-status.sh
   못하면 덮어쓰거나 버리지 않고 `BLOCKED`다.
 - 이미 open PR이 있으면 새 PR을 만들지 않고 그 번호를 재사용한다.
 - remote branch가 있으면 force push하지 않는다. fast-forward 일반 push만 허용한다.
+
+phase별 허용 파일 범위도 checkpoint 계약의 일부다.
+
+| Phase | 허용 파일 |
+|---|---|
+| `PLAN` | 날짜가 확정된 구현 goal 한 파일 |
+| `RED` | `humansearch/tests/test_auth_surface.py`, `humansearch/pyproject.toml`, `humansearch/uv.lock` 중 현재 attempt에 필요한 파일만 |
+| `GREEN` | `humansearch/src/humansearch/auth_surface.py`, `humansearch/src/humansearch/__init__.py` 중 현재 finding에 필요한 파일만 |
+| `REVIEW` | 구현 goal 한 파일 |
+| `EVIDENCE` | 구현 goal 한 파일과 고정 경로의 owner-gated next prompt 한 파일 |
+
+→ branch만 남은 재개에서도 commit 순서뿐 아니라 실제 파일 범위를 대조한다. 범위 밖 파일, 알 수 없는
+phase, 빠진 `Attempt:`/`Fix-for:`, 같은 phase 중복이 하나라도 있으면 연결하지 않고 `BLOCKED`다.
+
+PLAN commit 뒤부터 REVIEW commit 직전까지 구현 goal 한 파일의 미커밋 변경은 **공식 evidence
+buffer**다. RED 실행, GREEN 검증, mutation, Claude V1, Codex V2의 명령과 출력을 이 파일에 순서대로
+append하므로 정상적인 dirty 상태다. 이때 허용되는 미커밋 파일은 goal 정확히 한 개뿐이다.
+
+- 재개 시 buffer를 버리거나 되돌리지 않는다.
+- 마지막으로 닫힌 제목, 명령 블록, 출력 블록, `→` 해석까지 읽어 다음 미실행 단계만 이어간다.
+- 닫히지 않은 block, 명령만 있고 출력이 없는 항목, 서로 다른 attempt 로그 혼합이 있으면 추측해서
+  완성하지 않고 `BLOCKED`다.
+- REVIEW commit 전까지 이 buffer는 해당 worktree에만 있으므로 원격 보존됐다고 주장하지 않는다.
+- buffer가 사라졌으면 실행하지 않은 출력을 재구성하지 않는다. 마지막 commit checkpoint부터 fresh
+  명령을 다시 실행해 새 증거를 만든다.
 
 ### 8. `PLAN` — 코드보다 goal 문서를 먼저 고정
 
@@ -584,16 +623,73 @@ push, stash 어디에도 남기지 않는다.
 
 ### 14. `CLAUDE_V1` — 다른 엔진의 1차 적대검증
 
-모든 local 검증과 mutation이 끝난 clean tree에서 실행한다. API key를 환경에서 제거해야 한다.
+모든 local 검증과 mutation이 끝난 뒤 실행한다. Claude는 target worktree가 아니라 현재 commit을 복제한
+일회용 local clone에서만 명령을 실행한다. target의 구현 goal evidence buffer는 그 clone에 복사해
+읽게 하되, target 절대 경로는 Claude prompt에 넣지 않는다. API key를 환경에서 제거해야 한다.
 
 아래 `<GOAL_PATH>`는 이번 구현 goal 실제 경로로 바꾼다. 명령 전문을 goal에 먼저 기록하고 실행 후
 Claude 출력 본문을 한 글자도 요약하지 않고 같은 파일의 `## 적대 검증 로그`에 넣는다.
 
 ```bash
-env -u ANTHROPIC_API_KEY claude --safe-mode --no-session-persistence \
-  --permission-mode dontAsk --tools Read,Grep,Bash --allowedTools Read,Grep,Bash \
-  --disallowedTools Edit,Write -p \
-  '당신은 구현자가 아닌 독립 적대검증자입니다. Bash는 읽기와 test 실행에만 사용하고 파일·Git·GitHub 상태를 바꾸지 마십시오. 저장소 현재 branch의 docs/sot/humansearch-l0-surface-contract.md, <GOAL_PATH>, humansearch/src/humansearch/auth_surface.py, humansearch/src/humansearch/__init__.py, humansearch/tests/test_auth_surface.py, humansearch/pyproject.toml, humansearch/uv.lock과 origin/main...HEAD diff를 읽으십시오. 구현자의 요약을 믿지 말고 명령을 직접 실행하십시오. 16개 정상 조합의 완전성, invalid input fail-closed, 정확히 5 states/3 roles, L2/L3 상태 누출 0, RED 뒤 test 불변, Hypothesis가 실제 수집되는지, runtime import, 기존 G2/G3 gate가 새 파일을 덮는지, mutation 증거가 타당한지, 고아 export인지, 금지 I/O/portal literal인지, goal의 명령·출력 과장 여부를 공격하십시오. 모든 finding은 file:line과 재현 명령/전체 출력으로 증명하십시오. 실행하지 못한 것은 NOT_RUN입니다. 마지막 판정은 PASS 또는 FAIL입니다.
+TARGET_ROOT="$(git rev-parse --show-toplevel)"
+TARGET_HEAD_BEFORE="$(git rev-parse HEAD)"
+TARGET_STATUS_BEFORE="$(git status --porcelain=v1 --untracked-files=all)"
+TARGET_REFS_BEFORE="$(git show-ref | LC_ALL=C sort | shasum -a 256 | awk '{print $1}')"
+AUDIT_BASE="${TMPDIR:-/tmp}"
+AUDIT_BASE="${AUDIT_BASE%/}"
+AUDIT_PARENT="$(mktemp -d "$AUDIT_BASE/humansearch-l0-v1.XXXXXX")"
+AUDIT_REPO="$AUDIT_PARENT/repo"
+cleanup_v1_copy() {
+  case "$AUDIT_PARENT" in
+    "$AUDIT_BASE"/humansearch-l0-v1.*)
+      test -d "$AUDIT_PARENT" && rm -rf -- "$AUDIT_PARENT"
+      ;;
+    *)
+      printf 'BLOCKED: unsafe audit temp path: %s\n' "$AUDIT_PARENT" >&2
+      return 1
+      ;;
+  esac
+}
+trap cleanup_v1_copy EXIT
+trap 'cleanup_v1_copy; trap - EXIT; exit 129' HUP
+trap 'cleanup_v1_copy; trap - EXIT; exit 130' INT
+trap 'cleanup_v1_copy; trap - EXIT; exit 143' TERM
+git clone --quiet --no-local --no-hardlinks "$TARGET_ROOT" "$AUDIT_REPO"
+git -C "$AUDIT_REPO" checkout --quiet --detach "$TARGET_HEAD_BEFORE"
+cp "$TARGET_ROOT/<GOAL_PATH>" "$AUDIT_REPO/<GOAL_PATH>"
+
+claude_rc=0
+CLAUDE_OUTPUT="$(
+  (
+  cd "$AUDIT_REPO" &&
+  env -u ANTHROPIC_API_KEY claude --safe-mode --no-session-persistence \
+    --permission-mode dontAsk --tools Read,Grep,Bash \
+    --allowedTools Read Grep \
+      'Bash(git status --short)' \
+      'Bash(git rev-parse *)' \
+      'Bash(git log *)' \
+      'Bash(git show *)' \
+      'Bash(git diff *)' \
+      'Bash(git diff-tree *)' \
+      'Bash(git ls-files *)' \
+      'Bash(uv run --project humansearch pytest *)' \
+      'Bash(uv run --project humansearch ruff *)' \
+      'Bash(uv run --project humansearch mypy *)' \
+      'Bash(bash scripts/acceptance-hs-gates.sh)' \
+      'Bash(bash scripts/acceptance-hs-gates-mutations.sh)' \
+      'Bash(bash scripts/acceptance-hs-gates-antiforge.sh)' \
+      'Bash(bash scripts/acceptance-hs-portal-constants*.sh)' \
+    --disallowedTools Edit Write NotebookEdit \
+      'Bash(git add *)' 'Bash(git commit *)' 'Bash(git push *)' \
+      'Bash(git checkout *)' 'Bash(git switch *)' 'Bash(git reset *)' \
+      'Bash(git clean *)' 'Bash(git restore *)' 'Bash(git fetch *)' \
+      'Bash(git pull *)' 'Bash(git merge *)' 'Bash(git rebase *)' \
+      'Bash(git update-ref *)' 'Bash(gh *)' 'Bash(curl *)' \
+      'Bash(rm *)' 'Bash(mv *)' 'Bash(cp *)' 'Bash(tee *)' \
+      'Bash(touch *)' 'Bash(mkdir *)' 'Bash(sed -i *)' \
+      'Bash(python *)' 'Bash(node *)' 'Bash(perl *)' \
+    -p \
+    '당신은 구현자가 아닌 독립 적대검증자입니다. 현재 디렉터리는 버릴 수 있는 local clone입니다. 허용된 읽기 명령과 test 명령만 실행하고 파일·Git ref·원격·GitHub 상태를 바꾸지 마십시오. 저장소 현재 branch의 docs/sot/humansearch-l0-surface-contract.md, <GOAL_PATH>, humansearch/src/humansearch/auth_surface.py, humansearch/src/humansearch/__init__.py, humansearch/tests/test_auth_surface.py, humansearch/pyproject.toml, humansearch/uv.lock과 origin/main...HEAD diff를 읽으십시오. 구현자의 요약을 믿지 말고 명령을 직접 실행하십시오. 16개 정상 조합의 완전성, invalid input fail-closed, 정확히 5 states/3 roles, L2/L3 상태 누출 0, RED 뒤 test 불변, Hypothesis가 실제 수집되는지, runtime import, 기존 G2/G3 gate가 새 파일을 덮는지, mutation 증거가 타당한지, 고아 export인지, 금지 I/O/portal literal인지, goal의 명령·출력 과장 여부를 공격하십시오. 모든 finding은 file:line과 재현 명령/전체 출력으로 증명하십시오. 실행하지 못한 것은 NOT_RUN입니다. 마지막 판정은 PASS 또는 FAIL입니다.
 
 [출력 형식 — 반드시 지킬 것]
 읽는 사람은 기술 배경이 없는 사업 책임자다. 판정 내용은 절대 축소하지 말고, 표현만 풀어 써라.
@@ -609,11 +705,30 @@ env -u ANTHROPIC_API_KEY claude --safe-mode --no-session-persistence \
 - 이번에 건너뛴 것·확인하지 못한 것·중간에 실패해서 다시 한 것을 판정 앞부분에 명시해라.
 - 추정과 확인된 사실을 구분 표시해라(확인 못 한 것은 ※).
 - 한국어 존칭체. 초등학생용 비유는 쓰지 마라 — 성인 의사결정자 수준으로 써라.'
+  ) 2>&1
+)" || claude_rc=$?
+printf '%s\n' "$CLAUDE_OUTPUT"
+
+TARGET_HEAD_AFTER="$(git -C "$TARGET_ROOT" rev-parse HEAD)"
+TARGET_STATUS_AFTER="$(git -C "$TARGET_ROOT" status --porcelain=v1 --untracked-files=all)"
+TARGET_REFS_AFTER="$(git -C "$TARGET_ROOT" show-ref | LC_ALL=C sort | shasum -a 256 | awk '{print $1}')"
+if [ "$TARGET_HEAD_BEFORE" != "$TARGET_HEAD_AFTER" ] ||
+   [ "$TARGET_STATUS_BEFORE" != "$TARGET_STATUS_AFTER" ] ||
+   [ "$TARGET_REFS_BEFORE" != "$TARGET_REFS_AFTER" ]; then
+  printf '%s\n' 'BLOCKED: Claude V1 동안 target worktree 또는 refs가 바뀌었다'
+  exit 24
+fi
+if [ "$claude_rc" -ne 0 ]; then
+  printf 'BLOCKED: Claude V1 command failed rc=%s\n' "$claude_rc"
+  exit 25
+fi
 ```
 
-→ Claude가 다른 엔진으로 실제 repository와 tests를 공격한다. `--tools`는 사용 가능한 도구,
-`--allowedTools`는 무인 실행에서 승인 없이 쓸 수 있는 읽기 도구를 각각 제한한다. 출력 형식 블록도
-명령에 포함해야 한다. 실행 직전과 직후 `git status --short`를 읽어 파일 변경 0도 증명한다.
+→ Claude는 버릴 수 있는 복제본에서만 실제 repository와 tests를 공격한다. `--tools`는 사용 가능한
+도구를 세 종류로 줄이고, `--allowedTools`는 승인 없이 실행할 읽기·검사 명령을 정확히 열며,
+`--disallowedTools`는 파일·Git·GitHub 변경 명령을 다시 닫는다. test가 cache를 써도 복제본 안에만
+남는다. 출력 형식 블록도 명령에 포함해야 한다. 실행 전후에는 target HEAD, 전체 status, ref 목록의
+지문을 비교한다. 하나라도 달라지면 Claude 판정 내용과 관계없이 24로 중단한다.
 
 Claude 출력이 비었거나 `Done` 한 줄이거나 `VERDICT:`가 없으면 검증 실패다. 형식만 어겼지만 대상
 작업은 맞으면 형식 블록을 강조해 같은 attempt에서 최대 한 번 재실행한다. 대상 자체가 불명확하면
@@ -772,33 +887,66 @@ gh pr list --head task/humansearch-l0-surface-classifier --state open \
 
 ### 19. `CI_WAIT` — 같은 SHA의 서버 검사 확인
 
-push 직후 다음 네 SHA를 비교한다.
+push 직후 local, remote branch, PR head를 먼저 비교한다. 그 뒤 서버 run 목록에서 실제 검사 대상 SHA를
+읽어 네 번째 비교값으로 쓴다.
 
 ```bash
-git rev-parse HEAD
-git rev-parse origin/task/humansearch-l0-surface-classifier
-gh pr view <PR_NUMBER> --json headRefOid,baseRefName,url,mergeStateStatus
+EXPECTED_SHA="$(git rev-parse HEAD)"
+REMOTE_SHA="$(git rev-parse origin/task/humansearch-l0-surface-classifier)"
+PR_JSON="$(gh pr view <PR_NUMBER> \
+  --json headRefOid,baseRefName,url,mergeStateStatus)"
+printf '%s\n' "$EXPECTED_SHA"
+printf '%s\n' "$REMOTE_SHA"
+printf '%s\n' "$PR_JSON"
+PR_SHA="$(jq -r '.headRefOid' <<<"$PR_JSON")"
+if [ "$EXPECTED_SHA" != "$REMOTE_SHA" ] || [ "$EXPECTED_SHA" != "$PR_SHA" ]; then
+  exit 26
+fi
 ```
 
-→ local, remote, PR head가 완전히 같아야 한다. 다르면 CI 결과를 기다리지 말고 원인을 해결하거나
-`BLOCKED`다.
+→ local, remote, PR head가 완전히 같아야 한다. 다르면 서버 결과를 기다리지 말고 원인을 해결하거나
+26으로 `BLOCKED`다. 아직 서버 run이 생기기 전이므로 여기서는 세 값만 비교한다.
 
 CI는 한 번에 60초 넘게 잠드는 명령으로 방치하지 않는다. 30초 간격으로 상태를 읽고 최대 45분 동안
 기다린다. pending 동안 사용자에게 60초 안에 짧은 진행 상황을 알린다.
 
-각 poll에서 `gh pr checks <PR_NUMBER> --json name,state,bucket,link`를 실행한다.
+각 poll에서 아래 두 조회를 모두 실행한다.
+
+```bash
+RUNS_JSON="$(gh run list \
+  --branch task/humansearch-l0-surface-classifier \
+  --commit "$EXPECTED_SHA" \
+  --workflow verify.yml \
+  --limit 20 \
+  --json databaseId,event,headSha,status,conclusion,url,workflowName)"
+CHECKS_JSON="$(gh pr checks <PR_NUMBER> \
+  --json name,state,bucket,link,event,workflow)"
+printf '%s\n' "$RUNS_JSON"
+printf '%s\n' "$CHECKS_JSON"
+```
+
+→ 첫 조회는 현재 코드 지문을 대상으로 실행된 서버 작업의 대상 지문·상태·최종 성적을 읽는다. 둘째는
+검토 요청 화면에 실제로 붙은 검사 전부를 읽는다. 저장소 보호 설정이 “필수 검사”를 지정했다고
+가정하지 않고 관측된 검사를 모두 판정한다.
 
 - pending이 있으면 30초 뒤 다시 확인.
-- required failure가 있으면 해당 run의 실패 log를 읽는다.
+- `RUNS_JSON`의 모든 `headSha`는 `EXPECTED_SHA`와 같아야 한다. 다른 값은 이번 증거로 세지 않는다.
+- 현재 SHA의 `push`와 `pull_request` event가 각각 한 건 이상 있어야 한다. 둘 중 하나라도 0건이면
+  `NOT_RUN`이며 계속 기다리다가 45분에 `BLOCKED`다.
+- 현재 SHA에서 관측된 run은 모두 `status=completed`, `conclusion=success`여야 한다. 실패, 취소,
+  건너뜀, 시간 초과, 중립, 오래됨, 조치 필요, 결론 없음은 PASS가 아니다.
+- `CHECKS_JSON`은 한 건 이상이어야 하고 모든 `bucket`이 `pass`여야 한다. `pending`은 기다리고,
+  `fail`, `skipping`, `cancel`은 실패 원인을 읽는다.
+- 관측된 failure가 있으면 해당 run의 실패 log를 읽는다.
 - 같은 AC 안에서 재현 가능한 code 결함이면 다음 attempt의
   `FIX_RED→FIX_GREEN→LOCAL_VERIFY→MUTATION→CLAUDE_V1→CODEX_V2→REVIEW_CHECKPOINT→EVIDENCE→SHIP`
   순서를 전부 다시 수행한다.
 - infra, secret, permission, unrelated existing failure이면 우회하지 않고 `BLOCKED`.
-- check 0개는 PASS가 아니라 `NOT_RUN`; `BLOCKED`.
+- run 또는 check 0개는 PASS가 아니라 `NOT_RUN`; `BLOCKED`.
 - 45분을 넘으면 timeout `BLOCKED`; 완료로 쓰지 않는다.
 
-모든 required check가 green이면 `gh pr view`로 final head SHA와 merge state를 다시 읽는다. merge는 하지
-않는다.
+현재 SHA의 push·pull_request run과 PR에 관측된 check가 모두 success/pass이면 `gh pr view`로 final
+head SHA와 merge state를 다시 읽는다. merge는 하지 않는다.
 
 ### 20. `HANDOFF` / `DONE` 출력 계약
 
@@ -845,8 +993,9 @@ CI는 한 번에 60초 넘게 잠드는 명령으로 방치하지 않는다. 30�
 - mutation이 실패를 잡고 원복 뒤 PASS+clean
 - Claude V1 본문과 Codex V2 전 finding 재현 완료, 미해결 불일치 0
 - clean 일반 push, pre-push PASS
-- PR head=remote head=local head
-- 관측된 CI check 1개 이상이 있고 모두 green이며 skip/cancel이 0개
+- PR head=remote head=local head=관측된 모든 CI run head
+- 현재 SHA의 push·pull_request run이 각각 1개 이상이고 전부 success이며, PR에 관측된 check도 모두
+  pass이고 fail/skip/cancel/pending이 0개
 - goal과 owner-gated next prompt가 Git에 추적됨
 - merge/deploy/live/browser/login/PII/registration/send 모두 0회
 
