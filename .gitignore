@@ -12,6 +12,13 @@ build/
 .next/
 *.log
 
+# Admin generated artifacts (P0-04A)
+/node_modules/
+/apps/admin/.next/
+/apps/admin/test-results/
+/apps/admin/playwright-report/
+/apps/admin/coverage/
+
 # 환경 변수
 .env
 .env.*
