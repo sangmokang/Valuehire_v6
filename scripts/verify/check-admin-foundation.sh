@@ -3,10 +3,50 @@ set -euo pipefail
 
 selector="${1:-}"
 
-if [ "$selector" != "node-version" ] && [ "$selector" != "pnpm-version" ] && [ "$selector" != "root-workspace" ]; then
+if [ "$selector" != "node-version" ] && [ "$selector" != "pnpm-version" ] && [ "$selector" != "root-workspace" ] && [ "$selector" != "artifact-ignore" ]; then
   echo "FAIL: unsupported admin foundation selector: ${selector:-<missing>}"
   echo "ADMIN_FOUNDATION_NODE_VERSION checkedVersionFiles=0 targetCount=0 expected=24.19.0 reason=unsupported-selector"
   exit 2
+fi
+
+if [ "$selector" = "artifact-ignore" ]; then
+required_artifacts=(
+  "node_modules/.artifact-canary"
+  "apps/admin/.next/.artifact-canary"
+  "apps/admin/test-results/.artifact-canary"
+  "apps/admin/playwright-report/.artifact-canary"
+  "apps/admin/coverage/.artifact-canary"
+)
+required_count=${#required_artifacts[@]}
+ignored_count=0
+tracked_count=0
+target_count=$required_count
+
+for artifact_path in "${required_artifacts[@]}"; do
+  if git check-ignore --no-index --quiet -- "$artifact_path"; then
+    ignored_count=$((ignored_count + 1))
+  fi
+
+  if [ -n "$(git ls-files -- "$artifact_path")" ]; then
+    tracked_count=$((tracked_count + 1))
+  fi
+done
+
+if [ "$tracked_count" -ne 0 ]; then
+  echo "FAIL: admin generated artifact canary paths must not be tracked"
+  echo "ADMIN_FOUNDATION_ARTIFACT_IGNORE required=${required_count} ignored=${ignored_count} tracked=${tracked_count} targetCount=${target_count} reason=tracked-forbidden-artifact"
+  exit 1
+fi
+
+if [ "$ignored_count" -ne "$required_count" ]; then
+  echo "FAIL: admin generated artifact canary paths must all be ignored"
+  echo "ADMIN_FOUNDATION_ARTIFACT_IGNORE required=${required_count} ignored=${ignored_count} tracked=${tracked_count} targetCount=${target_count} reason=required-artifact-not-ignored"
+  exit 1
+fi
+
+echo "PASS: admin generated artifact canary paths are ignored and untracked"
+echo "ADMIN_FOUNDATION_ARTIFACT_IGNORE required=${required_count} ignored=${ignored_count} tracked=${tracked_count} targetCount=${target_count} reason=null"
+exit 0
 fi
 
 if [ "$selector" = "node-version" ]; then
