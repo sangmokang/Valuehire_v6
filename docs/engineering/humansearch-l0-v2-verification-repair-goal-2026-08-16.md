@@ -7,8 +7,7 @@
 바꿀 수 있고, 중단 뒤 이어갈 때 두 곳에서 추측이 필요합니다. 이 다섯 곳을 고치기 전에는 최종
 실행 지시서로 내보내지 않습니다.
 
-현재 제품 코드와 실제 채용 사이트는 건드리지 않습니다. 문서와 Claude 격리 검사용 전용 wrapper만
-고칩니다. 선행 변경 세 건을 합치는 일과 회수 가능한
+현재 제품 코드와 실제 채용 사이트는 건드리지 않습니다. 선행 변경 세 건을 합치는 일과 회수 가능한
 저장소 기록 여덟 건을 지우는 일도 자동으로 하지 않습니다. 이번 판단에서 사장님이 바로 결정할 것은
 없고, 수리·재검증·서버 검사까지 끝난 문서만 다음 실행 지시서로 드립니다.
 
@@ -42,8 +41,8 @@
 **대가** — 실행 지시서가 더 길어지고, 기존 저장소 시작 검사가 빨간 상태면 제품 구현은 실제로
 멈춥니다.
 
-**되돌리기** — 수리가 과도하다고 확인되면 이번 문서와 전용 검증 wrapper 변경 기록만 되돌리면
-됩니다. 제품 코드와 운영 자료는 이번 범위에 없으므로 되돌림 비용은 하네스 재검증입니다.
+**되돌리기** — 수리가 과도하다고 확인되면 이번 문서 전용 변경 기록만 되돌리면 됩니다. 제품 코드와
+운영 자료는 이번 범위에 없으므로 되돌림 비용은 문서 재검증입니다.
 
 ## 3층 — 계약·증거
 
@@ -127,8 +126,7 @@ FAIL: unreachable 객체 8건 잔존 (reflog expire/gc --prune=now 미완)
 - Gate 1: 이 문서의 단일 인수 기준으로 수리 범위를 고정합니다.
 - Gate 2: 기존 `worktrees/docs-snapshot`과 PR #15를 재사용합니다. 새 가지·작업 폴더·검토 요청을
   중복 생성하지 않습니다.
-- Gate 3: 문서와 Claude 격리 검사용 전용 wrapper만 수리합니다. 제품 코드·제품 시험·의존 파일은
-  변경하지 않습니다.
+- Gate 3: 문서 수리만 수행합니다. 제품 코드·시험·의존 파일은 변경하지 않습니다.
 - Gate 4: 정본 대조, 저장소 검사, 형식 보조 검사, Claude V1, Codex V2, 서버 검사를 실행합니다.
 - Gate 5: 기존 PR #15의 일반 업로드만 허용합니다. 합치기와 자동 합치기는 금지합니다.
 - Gate 6: PR이 합쳐지지 않았으므로 종료 정리는 실행하지 않습니다.
@@ -489,3 +487,27 @@ sandbox에서 실패해 둘 다 `BLOCKED: not inside a Git worktree`, exit 65로
 `SMOKE: FAIL`로 보존했습니다. Claude의 현재 디렉터리는 이미 parent가 clone root로 고정하므로 wrapper의
 중복 Git 탐지를 제거하고, 현재 디렉터리에 `verify.sh`, L0 SOT, wrapper 자신이 모두 있는지를 sentinel로
 검사하도록 바꿨습니다. 다음 smoke에서 자식 검사들의 실제 Git 사용까지 통과해야만 수리로 인정합니다.
+
+두 번째 wrapper smoke도 `verify` exit 1, AC-M exit 2·`CHECKED: 0`으로 실패했습니다. wrapper 안에서
+export한 환경도 sandbox가 자식 process를 만들 때 다시 덮으므로 환경 전달과 wrapper 방식 모두
+기각했습니다. 실패한 wrapper는 최종 diff에서 삭제했습니다.
+
+Claude 공식 sandbox 문서의 임시 디렉터리 계약과 `sandbox.filesystem.allowWrite` 권장 방식을 적용해,
+native sandbox가 실제 사용하는 OS 임시 디렉터리를 쓰기 허용하고 home 읽기·network·unsandboxed
+escape는 계속 닫는 direct-command smoke를 실행했습니다. 첫 smoke는 `verify.sh`는 성공했지만 Git의
+home config 탐색이 막혀 AC-M이 `NOT_RUN: git 저장소가 아니다`로 실패했습니다. 기존 하네스처럼
+`GIT_CONFIG_GLOBAL=/dev/null`, `GIT_CONFIG_SYSTEM=/dev/null`을 상위 환경에 고정한 두 번째 smoke 결과는
+다음과 같습니다.
+
+```text
+SMOKE: PASS
+bash verify.sh -> exit 0
+PASS: no secret-pattern match in any tracked file, .env not tracked
+bash scripts/acceptance-verify-ac-m.sh -> exit 0
+CHECKED: 25
+```
+
+→ 두 exact 명령을 각각 한 번 실행했고 필수 로컬 검사 둘이 처음으로 native sandbox 안에서 실제
+성공했습니다. 따라서 최종 하네스는 실패한 wrapper를 쓰지 않고, exact Bash allowlist + OS 임시 경로
+`allowWrite` + Git config 차단 조합을 사용합니다. 이 설정으로 전체 최종 V1을 다시 실행하기 전에는
+아직 완료로 세지 않습니다.

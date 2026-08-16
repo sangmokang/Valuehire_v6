@@ -646,6 +646,20 @@ AUDIT_BASE="${TMPDIR:-/tmp}"
 AUDIT_BASE="${AUDIT_BASE%/}"
 AUDIT_PARENT="$(mktemp -d "$AUDIT_BASE/humansearch-l0-v1.XXXXXX")"
 AUDIT_REPO="$AUDIT_PARENT/repo"
+case "$AUDIT_BASE:$AUDIT_REPO" in
+  /*) ;;
+  *)
+    printf '%s\n' 'BLOCKED: audit paths must be absolute'
+    exit 27
+    ;;
+esac
+case "$AUDIT_BASE:$AUDIT_REPO" in
+  *[!A-Za-z0-9_./:-]*)
+    printf '%s\n' 'BLOCKED: audit paths cannot be represented safely in sandbox JSON'
+    exit 27
+    ;;
+esac
+CLAUDE_SETTINGS='{"sandbox":{"enabled":true,"failIfUnavailable":true,"autoAllowBashIfSandboxed":false,"allowUnsandboxedCommands":false,"filesystem":{"denyRead":["~/"],"allowRead":["'"$AUDIT_REPO"'"],"allowWrite":["'"$AUDIT_REPO"'","'"$AUDIT_BASE"'"]},"network":{"allowedDomains":[]}}}'
 cleanup_v1_copy() {
   case "$AUDIT_PARENT" in
     "$AUDIT_BASE"/humansearch-l0-v1.*)
@@ -665,7 +679,7 @@ git clone --quiet --no-local --no-hardlinks "$TARGET_ROOT" "$AUDIT_REPO"
 git -C "$AUDIT_REPO" checkout --quiet --detach "$TARGET_HEAD_BEFORE"
 git -C "$AUDIT_REPO" update-ref refs/remotes/origin/main "$TARGET_ORIGIN_MAIN_BEFORE"
 cp "$TARGET_ROOT/<GOAL_PATH>" "$AUDIT_REPO/<GOAL_PATH>"
-mkdir -p "$AUDIT_REPO/.uv-cache" "$AUDIT_REPO/.audit-tmp" "$AUDIT_REPO/.audit-home"
+mkdir -p "$AUDIT_REPO/.uv-cache"
 EXPECTED_PORTAL_SCRIPTS='scripts/acceptance-hs-portal-constants-hardening.sh
 scripts/acceptance-hs-portal-constants-hardening2.sh
 scripts/acceptance-hs-portal-constants-hardening3.sh
@@ -691,10 +705,9 @@ CLAUDE_OUTPUT="$(
   (
   cd "$AUDIT_REPO" &&
   env -u ANTHROPIC_API_KEY GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null \
-    TMPDIR="$AUDIT_REPO/.audit-tmp" \
     UV_NO_CONFIG=1 UV_OFFLINE=1 UV_CACHE_DIR="$AUDIT_REPO/.uv-cache" \
     claude --safe-mode --no-session-persistence \
-    --settings '{"sandbox":{"enabled":true,"failIfUnavailable":true,"autoAllowBashIfSandboxed":false,"allowUnsandboxedCommands":false,"filesystem":{"denyRead":["~/"],"allowRead":["."]},"network":{"allowedDomains":[]}}}' \
+    --settings "$CLAUDE_SETTINGS" \
     --permission-mode dontAsk --tools Read,Grep,Bash \
     --allowedTools 'Read(./**)' Grep \
       'Bash(git status --short)' \
@@ -704,21 +717,21 @@ CLAUDE_OUTPUT="$(
       'Bash(git diff --name-status --no-renames --no-ext-diff origin/main...HEAD -- .)' \
       'Bash(git diff --no-ext-diff --no-textconv origin/main...HEAD -- humansearch/src/humansearch/auth_surface.py humansearch/src/humansearch/__init__.py humansearch/tests/test_auth_surface.py humansearch/pyproject.toml humansearch/uv.lock <GOAL_PATH>)' \
       'Bash(git ls-files -- humansearch/src/humansearch/auth_surface.py humansearch/src/humansearch/__init__.py humansearch/tests/test_auth_surface.py humansearch/pyproject.toml humansearch/uv.lock <GOAL_PATH>)' \
-      'Bash(bash scripts/humansearch-l0-claude-audit.sh pytest-auth)' \
-      'Bash(bash scripts/humansearch-l0-claude-audit.sh pytest-all)' \
-      'Bash(bash scripts/humansearch-l0-claude-audit.sh ruff)' \
-      'Bash(bash scripts/humansearch-l0-claude-audit.sh mypy)' \
-      'Bash(bash scripts/humansearch-l0-claude-audit.sh gates)' \
-      'Bash(bash scripts/humansearch-l0-claude-audit.sh gates-mutations)' \
-      'Bash(bash scripts/humansearch-l0-claude-audit.sh gates-antiforge)' \
-      'Bash(bash scripts/humansearch-l0-claude-audit.sh portal)' \
-      'Bash(bash scripts/humansearch-l0-claude-audit.sh portal-mutations)' \
-      'Bash(bash scripts/humansearch-l0-claude-audit.sh portal-hardening)' \
-      'Bash(bash scripts/humansearch-l0-claude-audit.sh portal-hardening2)' \
-      'Bash(bash scripts/humansearch-l0-claude-audit.sh portal-hardening3)' \
-      'Bash(bash scripts/humansearch-l0-claude-audit.sh portal-hardening4)' \
-      'Bash(bash scripts/humansearch-l0-claude-audit.sh portal-hardening5)' \
-      'Bash(bash scripts/humansearch-l0-claude-audit.sh portal-hardening6)' \
+      'Bash(cd humansearch && uv run --offline pytest -q tests/test_auth_surface.py)' \
+      'Bash(cd humansearch && uv run --offline pytest -q tests)' \
+      'Bash(cd humansearch && uv run --offline ruff check src tests)' \
+      'Bash(cd humansearch && uv run --offline mypy --strict src tests)' \
+      'Bash(bash scripts/acceptance-hs-gates.sh)' \
+      'Bash(bash scripts/acceptance-hs-gates-mutations.sh)' \
+      'Bash(bash scripts/acceptance-hs-gates-antiforge.sh)' \
+      'Bash(bash scripts/acceptance-hs-portal-constants.sh)' \
+      'Bash(bash scripts/acceptance-hs-portal-constants-mutations.sh)' \
+      'Bash(bash scripts/acceptance-hs-portal-constants-hardening.sh)' \
+      'Bash(bash scripts/acceptance-hs-portal-constants-hardening2.sh)' \
+      'Bash(bash scripts/acceptance-hs-portal-constants-hardening3.sh)' \
+      'Bash(bash scripts/acceptance-hs-portal-constants-hardening4.sh)' \
+      'Bash(bash scripts/acceptance-hs-portal-constants-hardening5.sh)' \
+      'Bash(bash scripts/acceptance-hs-portal-constants-hardening6.sh)' \
     --disallowedTools Edit Write NotebookEdit \
       'Read(../**)' \
       'Bash(git add *)' 'Bash(git commit *)' 'Bash(git push *)' \
@@ -730,7 +743,7 @@ CLAUDE_OUTPUT="$(
       'Bash(touch *)' 'Bash(mkdir *)' 'Bash(sed -i *)' \
       'Bash(python *)' 'Bash(node *)' 'Bash(perl *)' \
     -p \
-    '당신은 구현자가 아닌 독립 적대검증자입니다. 현재 디렉터리는 버릴 수 있는 local clone입니다. Git 조회와 test는 적힌 exact 명령만 쓰십시오. Bash는 Claude native sandbox 안에서 실행되며 network와 clone 밖 쓰기가 금지되고 unsandboxed escape도 닫혀 있습니다. test가 clone 안에 cache와 임시 파일을 만들 수는 있지만 원본 worktree·Git ref·원격·GitHub 상태는 바꾸지 마십시오. 저장소 현재 branch의 docs/sot/humansearch-l0-surface-contract.md, <GOAL_PATH>, humansearch/src/humansearch/auth_surface.py, humansearch/src/humansearch/__init__.py, humansearch/tests/test_auth_surface.py, humansearch/pyproject.toml, humansearch/uv.lock을 읽으십시오. 먼저 고정된 `git diff --name-status --no-renames --no-ext-diff origin/main...HEAD -- .`로 저장소 전체 변경 경로를 확인하고, 그 뒤 고정 파일의 상세 diff를 읽으십시오. 구현자의 요약을 믿지 말고 명령을 직접 실행하십시오. 16개 정상 조합의 완전성, invalid input fail-closed, 정확히 5 states/3 roles, L2/L3 상태 누출 0, RED 뒤 test 불변, Hypothesis가 실제 수집되는지, runtime import, 기존 G2/G3 gate가 새 파일을 덮는지, mutation 증거가 타당한지, 고아 export인지, 금지 I/O/portal literal인지, goal의 명령·출력 과장 여부를 공격하십시오. 모든 finding은 file:line과 재현 명령/전체 출력으로 증명하십시오. 실행하지 못한 것은 NOT_RUN입니다. 마지막 판정은 PASS 또는 FAIL입니다.
+    '당신은 구현자가 아닌 독립 적대검증자입니다. 현재 디렉터리는 버릴 수 있는 local clone입니다. Git 조회와 test는 적힌 exact 명령만 쓰십시오. Bash는 Claude native sandbox 안에서 실행되며 network, home 읽기, 원본 worktree 쓰기, unsandboxed escape가 닫혀 있습니다. test가 clone과 OS 임시 디렉터리에 fixture·cache를 만들 수는 있지만 원본 worktree·Git ref·원격·GitHub 상태는 바꾸지 마십시오. 저장소 현재 branch의 docs/sot/humansearch-l0-surface-contract.md, <GOAL_PATH>, humansearch/src/humansearch/auth_surface.py, humansearch/src/humansearch/__init__.py, humansearch/tests/test_auth_surface.py, humansearch/pyproject.toml, humansearch/uv.lock을 읽으십시오. 먼저 고정된 `git diff --name-status --no-renames --no-ext-diff origin/main...HEAD -- .`로 저장소 전체 변경 경로를 확인하고, 그 뒤 고정 파일의 상세 diff를 읽으십시오. 구현자의 요약을 믿지 말고 명령을 직접 실행하십시오. 16개 정상 조합의 완전성, invalid input fail-closed, 정확히 5 states/3 roles, L2/L3 상태 누출 0, RED 뒤 test 불변, Hypothesis가 실제 수집되는지, runtime import, 기존 G2/G3 gate가 새 파일을 덮는지, mutation 증거가 타당한지, 고아 export인지, 금지 I/O/portal literal인지, goal의 명령·출력 과장 여부를 공격하십시오. 모든 finding은 file:line과 재현 명령/전체 출력으로 증명하십시오. 실행하지 못한 것은 NOT_RUN입니다. 마지막 판정은 PASS 또는 FAIL입니다.
 
 [출력 형식 — 반드시 지킬 것]
 읽는 사람은 기술 배경이 없는 사업 책임자다. 판정 내용은 절대 축소하지 말고, 표현만 풀어 써라.
@@ -768,11 +781,12 @@ fi
 → Claude는 버릴 수 있는 복제본에서만 실제 repository와 tests를 공격한다. `--tools`는 사용 가능한
 도구를 세 종류로 줄이고, `--allowedTools`는 clone 내부 Read/Grep, option wildcard가 없는 Git 조회,
 고정된 검사 명령만 정확히 연다. test는 미리 잠근 의존성을 준비한 뒤 Claude native sandbox와 offline
-`uv` 안에서 실행한다. sandbox는 사용할 수 없으면 실패하고, clone 밖 쓰기·network·unsandboxed escape를
-닫는다. Claude가 새 Bash를 시작할 때 상위 환경을 덮는 경우까지 막기 위해 각 검사는 추적된 전용
-wrapper를 호출한다. wrapper 본문이 시작된 뒤 `HOME`, `TMPDIR`, uv cache를 clone 내부로 다시 export하고
-고정된 check ID만 실행한다. `--disallowedTools`는 파일·Git·GitHub 변경 명령을 다시 닫는다. test가
-cache나 임시 파일을 써도 복제본 안에만 남는다. 출력 형식 블록도
+`uv` 안에서 실행한다. sandbox는 사용할 수 없으면 실패하고, target worktree 쓰기·network·unsandboxed
+escape를 닫는다. Claude native sandbox가 sandboxed command마다 지정하는 OS 임시 디렉터리는 실제 gate가
+`mktemp` fixture를 만들 수 있도록 `allowWrite`에 명시하되, home 읽기와 network는 계속 막는다. 경로를
+JSON에 넣기 전 따옴표·역슬래시·개행을 거부한다. `--disallowedTools`는 파일·Git·GitHub 변경 명령을
+다시 닫는다. test가 만든 clone·임시 fixture는 폐기 대상이고 target 지문에는 영향을 주지 않는다.
+출력 형식 블록도
 명령에 포함해야 한다. 실행 전후에는 target HEAD, 전체 status, ref
 목록의 지문을 비교한다. 하나라도 달라지면 Claude 판정 내용과 관계없이 24로 중단한다.
 
