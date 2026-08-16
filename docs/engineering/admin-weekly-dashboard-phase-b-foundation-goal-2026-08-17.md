@@ -140,3 +140,164 @@ bash verify.sh
 - 배포, 운영 주소 전환, 기존 서비스 삭제
 - 기존 git unreachable object의 reflog 만료 또는 GC
 
+## 실행 증거
+
+### RED — 구현 전 계약 고정
+
+```bash
+cd humansearch
+uv run --no-sync pytest -q tests/test_admin_weekly_window.py \
+  tests/test_admin_weekly_snapshot.py tests/test_admin_weekly_boundaries.py
+```
+
+```text
+ERROR tests/test_admin_weekly_window.py
+ERROR tests/test_admin_weekly_snapshot.py
+ERROR tests/test_admin_weekly_boundaries.py
+ModuleNotFoundError: No module named 'humansearch.admin_weekly_dashboard'
+3 errors in 0.10s
+```
+
+→ 시험 러너가 없는 첫 시도는 `NOT_RUN`으로 버리고 `uv sync --locked` 후 다시 실행했다.
+위 출력은 시험 3개가 의도한 미구현 모듈 때문에 collection RED가 된 실행 결과다.
+
+### GREEN — 순수 계약 구현
+
+```bash
+cd humansearch
+uv run --no-sync pytest -q tests/test_admin_weekly_window.py \
+  tests/test_admin_weekly_snapshot.py tests/test_admin_weekly_boundaries.py
+uv run --no-sync ruff check src tests
+uv run --no-sync mypy --strict src tests
+```
+
+```text
+.........                                                                [100%]
+9 passed in 0.02s
+All checks passed!
+Success: no issues found in 9 source files
+```
+
+→ 주간 경계, metric 단위, provenance, 실패 상태, 개인정보 비노출, 외부효과 금지의 첫
+9개 시험이 통과했고 lint/type 검사 대상도 0건이 아니다.
+
+### 반대 시험
+
+1. `event_start_date`를 월요일이 되도록 8일 전에서 7일 전으로 고쳤을 때
+   `test_admin_weekly_window.py`가 `2 failed, 1 passed`로 일요일 누락을 잡았다.
+2. 실패 source의 `value=None`을 `value=0`으로 바꿨을 때
+   `test_failed_and_not_run_sources_are_not_rendered_as_zero`가 실패했다.
+3. 전사 고유 후보 metric을 `NOT_RUN`에서 출처 무시 distinct로 바꿨을 때
+   `test_cross_source_unique_candidate_metric_stays_not_run`이 `PASS != NOT_RUN`으로 실패했다.
+
+→ 세 변이는 모두 RED를 확인한 뒤 `apply_patch`로 원복했고 같은 표적 시험을 다시 통과시켰다.
+
+### 로컬 적대검토에서 추가로 재현한 결함
+
+코드 검토는 raw status 문자열이 `SourceState`를 통과한 뒤 직렬화에서 깨질 수 있음을 찾았다.
+보안 검토는 자유형 `reason`의 개인정보 누출, 후보키의 HMAC 형식 미검증, private payload 기반
+공개 hash oracle을 찾았다. 다음 네 회귀시험을 테스트 전용 커밋 `939912f`로 먼저 RED로 만들었다.
+
+```text
+FAILED test_source_state_rejects_runtime_status_strings — DID NOT RAISE TypeError
+FAILED test_source_state_rejects_uncontrolled_failure_text — DID NOT RAISE ValueError
+FAILED test_candidate_key_requires_lowercase_hmac_sha256_shape — DID NOT RAISE ValueError
+FAILED test_private_payload_does_not_create_a_public_hash_oracle — hash mismatch
+4 failed, 6 passed in 0.05s
+```
+
+구현 커밋 `46e7a80`에서 status enum 강제, reason code allowlist, HMAC-SHA256 형태 검증,
+private payload의 공개 hash 제외를 적용했다.
+
+```text
+.............                                                            [100%]
+13 passed in 0.04s
+All checks passed!
+Success: no issues found in 10 source files
+```
+
+→ 네 지적은 모두 `CONFIRM→FIXED`다. HMAC 비밀키 보관과 실제 생성은 adapter가 생기는 다음
+단계의 별도 계약이며, 이 단계는 전달값의 소문자 64자리 형식만 강제한다.
+
+### 기존 mutation 게이트 배선 결함
+
+첫 전체 검증에서 `scripts/acceptance-hs-gates-mutations.sh`는 고장 코드를 판정하기 전에 임시
+프로젝트에 루트 metric 계약이 없어 7개 시험이 `FileNotFoundError`로 실패했다. 계약을 패키지
+안에 복제하지 않고, mutation sandbox의 동일한 저장소 상대 경계에 계약 한 벌을 복사하도록
+`fedb6c6`에서 수정했다.
+
+```bash
+bash scripts/acceptance-hs-gates-mutations.sh
+```
+
+```text
+PASS: gates mutations blocked 6/6
+```
+
+→ 깨진 시험·타입·lint·0건 수집·import·source 삭제의 여섯 변이가 이제 각자 의도한 이유로
+차단되고 깨끗한 baseline도 통과한다.
+
+## 1차 적대검증 — Claude CLI `NOT_RUN`
+
+첫 시도는 worktree에서 API 키 환경변수를 제거하고 목표·SOT·전체 diff를 직접 읽도록 했다.
+
+```bash
+env -u ANTHROPIC_API_KEY claude -p 'Read docs/engineering/admin-weekly-dashboard-phase-b-foundation-goal-2026-08-17.md, docs/sot/coding-principles.md, and the full git diff origin/main...HEAD in this repository. Perform an adversarial code review of the new admin weekly dashboard Phase B foundation. Run read-only tests or small pure probes if needed. Look specifically for Sunday-to-Saturday boundary errors, metric-unit conflation, nondeterministic hashes, source failure rendered as zero, PII leakage, misleading provenance, fail-open contract parsing, hidden external effects, and tests that can pass while behavior is wrong. Output: VERDICT PASS or FAIL, then ranked findings with exact file:line, a reproduction command or concrete input for every finding, and state whether each acceptance criterion AC-B1 through AC-B7 is proven, disproven, or not run. Do not modify files.'
+```
+
+```text
+NO_OUTPUT — 180 seconds; interrupted; no verdict body
+```
+
+중립 디렉터리에서 CLI 자체를 분리 진단한 요청은 성공했다.
+
+```bash
+cd /private/tmp
+env -u ANTHROPIC_API_KEY claude -p 'Reply with exactly OK.'
+```
+
+```text
+OK
+```
+
+같은 중립 디렉터리에서 절대경로 저장소 검토를 시킨 두 번째 요청도 180초 동안 본문 0자였다.
+마지막으로 Claude의 도구 사용을 없애기 위해 전체 diff를 stdin으로 직접 전달했다.
+
+```bash
+git -C /Users/kangsangmo/Desktop/Valuehire_v6/worktrees/admin-dashboard-foundation \
+  diff --no-ext-diff --unified=5 origin/main...HEAD | \
+  env -u ANTHROPIC_API_KEY claude -p 'The complete Phase B goal, contract, implementation, and tests diff is provided on stdin. Do not use tools or read files. Review only this diff adversarially. Output VERDICT PASS or FAIL, then ranked findings with exact diff file and line context. Check weekly boundary, metric separation, deterministic hash, failure versus zero, PII leakage, input validation, fail-closed contract behavior, hidden external effects, and test gaps. End with AC-B1 through AC-B7 as PROVEN, DISPROVEN, or NOT_RUN.'
+```
+
+```text
+NO_OUTPUT — 120 seconds; interrupted; exit 130; no verdict body
+```
+
+→ Claude 프로그램은 짧은 응답에는 정상이나 세 검토 경로 모두 판정 본문을 만들지 못했다.
+외부 판정을 추정하거나 PASS로 바꾸지 않으며 strict V1은 `NOT_RUN`이다.
+
+## 2차 — Codex 재공격
+
+Claude의 주장이 0건이라 재현할 V1 finding은 없다. 대신 독립 코드·보안 검토의 네 finding과
+목표의 AC를 직접 실행으로 다시 공격했다.
+
+| 항목 | 판정 | 근거 |
+|---|---|---|
+| AC-B1 주간 경계 | PROVEN | 월·화 동일 창, 시작 포함·끝 제외 시험과 월요일 변이 RED |
+| AC-B2 단위 분리 | PROVEN | run 2 / position 2 / raw 3 / source-unique 2 / mail 4 단언 |
+| AC-B3 단일 입력·provenance | PROVEN | 역순 입력도 동일 API payload와 hash, 모든 metric provenance 필드 단언 |
+| AC-B4 실패와 0 구분 | PROVEN | FAIL/NOT_RUN은 null, PASS 빈 입력만 0; zero 변이 RED |
+| AC-B5 개인정보·외부효과 | PROVEN(Phase B) | 원문 비노출, private hash oracle 제거, 계약상 5개 외부효과 DISABLED |
+| AC-B6 출처 간 신원 과장 금지 | PROVEN | source 내부 2와 global NOT_RUN 분리, global distinct 변이 RED |
+| AC-B7 저장소 게이트 | PROVEN(기능 범위) | G2 14 tests, ruff/mypy 10 files, mutation 6/6, antiforge 3/3, verify PASS |
+
+기존 `acceptance-0-2.sh`의 unreachable object 11건은 작업 전부터 있던 별도 RED다. 비밀 추적
+파일 검사는 PASS이고 이를 고치기 위한 reflog expire/GC는 이번 비범위라 실행하지 않았다.
+
+## 현재 결론
+
+`Phase B 기능 계약: PASS / Claude V1: NOT_RUN / 운영 제품·화면: NOT_RUN`
+
+- Phase B의 순수 weekly snapshot 계약은 구현·회귀·변이·기존 게이트로 검증됐다.
+- Claude V1이 없으므로 strict 전체 합격을 주장하지 않는다.
+- 웹 UI, 관리자 인증, DB, 실제 읽기 연결은 다음 Phase C의 별도 goal/worktree 대상이다.
