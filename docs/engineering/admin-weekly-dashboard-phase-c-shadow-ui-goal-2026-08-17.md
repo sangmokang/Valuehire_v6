@@ -231,3 +231,31 @@ git diff 1a285e0..HEAD -- <Phase C paths> |
 - main 저장소에서 `bash scripts/acceptance-0-2.sh`를 재실행한 결과 tracked secret scan은
   PASS했지만 기존 unreachable 객체 `17건` 때문에 RED다. 이 단계에서는 reflog expire/GC 같은
   파괴적 정리를 실행하지 않았다.
+
+### clean clone pre-push 증거
+
+공유 object DB의 기저 결함을 우회해 숨기지 않고 원인과 기능 브랜치를 분리하기 위해,
+현재 브랜치를 `git clone --no-local`로 임시 clone했다. 이 방식은 reachable commit만 복사하며
+원본 object DB·reflog를 수정하거나 삭제하지 않는다.
+
+```text
+$ bash scripts/acceptance-0-2.sh
+PASS: 0-2 — 히스토리·객체·reflog·docs 리터럴 0건, 스캐너 뮤테이션 검출 확인
+$ bash scripts/acceptance-hs-gates.sh
+PASS: pytest collected 40 and passed
+$ bash scripts/acceptance-hs-gates-mutations.sh
+PASS: gates mutations blocked 6/6
+$ bash scripts/acceptance-hs-gates-antiforge.sh
+PASS: gates antiforge 3/3 (evidence forgery + CI disable blocked)
+$ bash scripts/check-docs-sot.sh
+OK: docs/sot 재구성 AC 전부 충족
+$ bash verify.sh
+PASS: no secret-pattern match in any tracked file, .env not tracked
+$ bash scripts/scan-data-exposure.sh all
+PASS: 추적 파일 101개 검사, 위반 0건
+PASS: 기록 전량 blob 385개 검사, 크기·경로 위반 0건
+PASS: csv/tsv/sql 0개 검사(추적 101개 중), 개인정보 적재 0건
+```
+
+push/PR은 이 clean clone에서만 수행한다. 원본 main의 unreachable 17건은 별도 저장소 정리
+작업으로 남으며 이 기능 PR이 해결했다고 주장하지 않는다.
