@@ -8,10 +8,13 @@ if [ "$#" -ne 1 ]; then
   exit 64
 fi
 
-ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || {
-  printf '%s\n' 'BLOCKED: not inside a Git worktree' >&2
+ROOT="$PWD"
+if [ ! -f "$ROOT/verify.sh" ] ||
+   [ ! -f "$ROOT/docs/sot/humansearch-l0-surface-contract.md" ] ||
+   [ ! -f "$ROOT/scripts/humansearch-l0-claude-audit.sh" ]; then
+  printf '%s\n' 'BLOCKED: current directory is not the HumanSearch audit root' >&2
   exit 65
-}
+fi
 cd "$ROOT"
 
 for audit_dir in .audit-home .audit-tmp .uv-cache; do

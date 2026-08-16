@@ -483,3 +483,9 @@ Codex V2는 환경 전달에 더는 의존하지 않고, Claude가 허용된 `ba
 인자를 받지 않고 고정 ID 외에는 exit 64, clone 내부 audit 디렉터리가 없으면 exit 66으로 닫힙니다.
 제품 source·test·dependency는 바꾸지 않습니다. 다음 Claude smoke에서 wrapper 경로로 `verify.sh`와
 AC-M 25가 실제 성공하기 전에는 이 결정도 완료로 세지 않습니다.
+
+첫 wrapper smoke는 두 exact 명령이 allowlist를 통과했지만, wrapper의 첫 `git rev-parse`가 native
+sandbox에서 실패해 둘 다 `BLOCKED: not inside a Git worktree`, exit 65로 끝났습니다. 이 실패도
+`SMOKE: FAIL`로 보존했습니다. Claude의 현재 디렉터리는 이미 parent가 clone root로 고정하므로 wrapper의
+중복 Git 탐지를 제거하고, 현재 디렉터리에 `verify.sh`, L0 SOT, wrapper 자신이 모두 있는지를 sentinel로
+검사하도록 바꿨습니다. 다음 smoke에서 자식 검사들의 실제 Git 사용까지 통과해야만 수리로 인정합니다.
