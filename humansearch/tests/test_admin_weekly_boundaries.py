@@ -13,7 +13,6 @@ from humansearch.admin_weekly_dashboard import (
     load_metric_contract,
 )
 
-
 KST = ZoneInfo("Asia/Seoul")
 CONTRACT_PATH = (
     Path(__file__).parents[2]
@@ -120,4 +119,3 @@ def test_cross_source_unique_candidate_metric_stays_not_run() -> None:
     assert global_unique.status is MetricStatus.NOT_RUN
     assert global_unique.value is None
     assert global_unique.reason == "identity_link_contract_missing"
-

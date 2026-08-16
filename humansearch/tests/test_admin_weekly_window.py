@@ -5,7 +5,6 @@ from zoneinfo import ZoneInfo
 
 from humansearch.admin_weekly_dashboard import weekly_window
 
-
 KST = ZoneInfo("Asia/Seoul")
 
 
@@ -33,4 +32,3 @@ def test_weekly_window_includes_start_and_excludes_end_boundary() -> None:
     assert window.contains(datetime(2026, 8, 9, 0, 0, 0, tzinfo=KST))
     assert window.contains(datetime(2026, 8, 15, 23, 59, 59, tzinfo=KST))
     assert not window.contains(datetime(2026, 8, 16, 0, 0, 0, tzinfo=KST))
-

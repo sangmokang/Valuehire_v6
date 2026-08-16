@@ -12,7 +12,6 @@ from humansearch.admin_weekly_dashboard import (
     load_metric_contract,
 )
 
-
 KST = ZoneInfo("Asia/Seoul")
 CONTRACT_PATH = (
     Path(__file__).parents[2]
@@ -197,4 +196,3 @@ def test_failed_and_not_run_sources_are_not_rendered_as_zero() -> None:
         0,
         None,
     )
-
