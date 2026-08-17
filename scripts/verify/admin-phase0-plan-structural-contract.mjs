@@ -97,21 +97,35 @@ function parseDependencyGraph(text, errors) {
     const match = lines[index].match(/^\s*- consumers:\s*(\[.*])$/);
     if (!match) continue;
     const consumers = parseList(match[1]);
+    if (consumers.length === 0) errors.push("dependency group has zero consumers");
     let required = null;
-    let blockers = [];
+    let blockers = null;
     for (let cursor = index + 1; cursor < lines.length; cursor += 1) {
       if (/^\s*- consumers:/.test(lines[cursor])) break;
       const requiredMatch = lines[cursor].match(/^\s+requires_micro_ids:\s*(\[.*])$/);
-      if (requiredMatch) required = parseList(requiredMatch[1]);
+      if (requiredMatch) {
+        if (required !== null) {
+          errors.push(`duplicate dependency field: ${consumers.join(",")}.requires_micro_ids`);
+        } else {
+          required = parseList(requiredMatch[1]);
+        }
+      }
       const blockerMatch = lines[cursor].match(/^\s+requires_blocker_ids:\s*(\[.*])$/);
-      if (blockerMatch) blockers = parseList(blockerMatch[1]);
+      if (blockerMatch) {
+        if (blockers !== null) {
+          errors.push(`duplicate dependency field: ${consumers.join(",")}.requires_blocker_ids`);
+        } else {
+          blockers = parseList(blockerMatch[1]);
+        }
+      }
     }
     if (required === null) {
       errors.push(`dependency group has no requires_micro_ids: ${consumers.join(",")}`);
       continue;
     }
+    const blockerList = blockers ?? [];
     const repeatedMicroDependencies = required.filter((value, position) => required.indexOf(value) !== position);
-    const repeatedBlockerDependencies = blockers.filter((value, position) => blockers.indexOf(value) !== position);
+    const repeatedBlockerDependencies = blockerList.filter((value, position) => blockerList.indexOf(value) !== position);
     for (const consumer of consumers) {
       if (graph.has(consumer)) duplicateConsumers.push(consumer);
       for (const dependency of repeatedMicroDependencies) {
@@ -121,7 +135,7 @@ function parseDependencyGraph(text, errors) {
         duplicateBlockerDependencies.push(`${consumer}->${blocker}`);
       }
       graph.set(consumer, required);
-      blockerGraph.set(consumer, blockers);
+      blockerGraph.set(consumer, blockerList);
     }
   }
   return {

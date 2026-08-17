@@ -345,6 +345,45 @@ const mutations = [
         fs.writeFileSync(file, text);
       },
     },
+    {
+      name: "duplicate-requires-micro-field",
+      expected: "duplicate dependency field: P0-06-lockfile-resolution.requires_micro_ids",
+      apply(tempRoot) {
+        const file = path.join(tempRoot, relativePaths.dependencies);
+        const text = replaceOnce(
+          fs.readFileSync(file, "utf8"),
+          "  - consumers: [P0-06-lockfile-resolution]\n    requires_micro_ids: [P0-05-admin-exact-package-contract]",
+          "  - consumers: [P0-06-lockfile-resolution]\n    requires_micro_ids: [DOES-NOT-EXIST]\n    requires_micro_ids: [P0-05-admin-exact-package-contract]",
+        );
+        fs.writeFileSync(file, text);
+      },
+    },
+    {
+      name: "duplicate-requires-blocker-field",
+      expected: "duplicate dependency field: P0-02-node-version-pin.requires_blocker_ids",
+      apply(tempRoot) {
+        const file = path.join(tempRoot, relativePaths.dependencies);
+        const text = replaceOnce(
+          fs.readFileSync(file, "utf8"),
+          "  - consumers: [P0-02-node-version-pin]\n    requires_micro_ids: [P0-01-baseline-and-audited-plan]\n    requires_blocker_ids: [BLK-NODE-RUNTIME-CONSUMER]",
+          "  - consumers: [P0-02-node-version-pin]\n    requires_micro_ids: [P0-01-baseline-and-audited-plan]\n    requires_blocker_ids: [BLK-NOT-DEFINED]\n    requires_blocker_ids: [BLK-NODE-RUNTIME-CONSUMER]",
+        );
+        fs.writeFileSync(file, text);
+      },
+    },
+    {
+      name: "zero-consumer-dependency-group",
+      expected: "dependency group has zero consumers",
+      apply(tempRoot) {
+        const file = path.join(tempRoot, relativePaths.dependencies);
+        const text = replaceOnce(
+          fs.readFileSync(file, "utf8"),
+          "groups:\n",
+          "groups:\n  - consumers: []\n    requires_micro_ids: []\n",
+        );
+        fs.writeFileSync(file, text);
+      },
+    },
   ];
 
 function runSelfTest(root) {
