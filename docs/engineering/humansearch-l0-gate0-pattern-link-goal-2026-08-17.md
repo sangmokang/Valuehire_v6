@@ -28,17 +28,13 @@
 
 **무엇을** — 새 작업 공간을 만든 뒤 기존 로컬 규칙 연결기를 실행하고, 연결 대상·내용 존재·변경 기록
 제외를 확인한 다음 시작 검사를 실행합니다.
-
 **왜** — 연결 기능은 이미 구현돼 있지만 HumanSearch 지시서의 실제 실행 순서에서 호출되지 않아 시작
 검사가 실행 불가로 끝나기 때문입니다.
-
 **버린 길** — 검사를 약하게 만드는 길과 실제 규칙을 복사하는 길을 버렸습니다. 전자는 검출력을
 낮추고, 후자는 민감한 값을 불필요하게 복제합니다.
-
 **대가** — 새 작업 공간을 시작할 때 연결 확인 단계가 추가되고, 기본 작업 공간에 로컬 규칙이 없으면
 계속 중단됩니다. 이는 검사 결과를 꾸며 통과시키지 않기 위해 감수하는 제한입니다.
-
-**되돌리** — 이번 지시서 변경만 되돌리면 됩니다. 연결은 변경 기록 밖의 로컬 파일 하나이므로 잘못된
+**되돌리기** — 이번 지시서 변경만 되돌리면 됩니다. 연결은 변경 기록 밖의 로컬 파일 하나이므로 잘못된
 연결은 해당 작업 공간에서 제거하고 기존 지시서 상태로 돌아갈 수 있습니다.
 
 ## 3층 — 계약과 증거
@@ -140,7 +136,57 @@ PROMPT_ORDER_EXIT=1
 
 ### 9. 검증 로그
 
-수리 뒤 실행한 명령과 전체 출력, 종료 성적, 해석을 이 절에 덧붙입니다.
+지시서 변경 뒤 실제 설치기를 현재 작업 공간에서 실행하고 연결 상태를 다시 읽었습니다.
+
+```text
+$ bash scripts/install-hooks.sh
+core.hooksPath = hooks
+설치된 훅:
+  hooks/pre-commit
+  hooks/pre-push
+EXPECTED=/Users/kangsangmo/Desktop/Valuehire_v6/.secret-patterns
+LINKED=/Users/kangsangmo/Desktop/Valuehire_v6/.secret-patterns
+EXPECTED_NONEMPTY=yes
+LINK_NONEMPTY=yes
+TRACKED_COUNT=0
+IGNORED_RC=0
+```
+
+→ 기본 작업 공간의 로컬 규칙을 가리키는 상징 연결이 정확히 만들어졌고 원본과 연결 파일은 비어 있지
+않습니다. 이 파일은 Git 추적 0건이고 무시 규칙 성적 0이므로 변경 기록에 들어가지 않습니다. 실제 규칙
+내용은 읽거나 출력하지 않았습니다.
+
+지시서 안의 실행 순서를 줄 번호로 대조했습니다.
+
+```text
+INSTALL_LINE=279
+STATUS_LINE=315
+PROMPT_ORDER_EXIT=0
+```
+
+→ 설치기 호출은 시작 검사 호출보다 36줄 앞에 있고 순서 검사 성적은 0입니다. 새 작업과 재개 작업은
+공통 대상 경로를 정한 뒤 이 한 절을 모두 통과해야 다음 단계로 갑니다.
+
+현재 PR #15 가지의 기존 검사와 별도 수리 PR #21의 검사 파일을 같은 작업 공간에서 차례로 실행했습니다.
+
+```text
+$ bash scripts/acceptance-0-2.sh
+PASS: no secret-pattern match in any tracked file, .env not tracked
+FAIL: unreachable 객체 35건 잔존 (reflog expire/gc --prune=now 미완)
+CURRENT_BRANCH_ACCEPTANCE_EXIT=1
+
+$ bash /Users/kangsangmo/Desktop/Valuehire_v6/worktrees/humansearch-g0-unreachable-secret-scan/scripts/acceptance-0-2.sh
+PASS: no secret-pattern match in any tracked file, .env not tracked
+PASS: 0-2 — 히스토리·객체·reflog·docs 리터럴 0건, 스캐너 뮤테이션 검출 확인
+REPAIR_PR_ACCEPTANCE_EXIT=0
+```
+
+→ 연결 누락은 해결됐지만 PR #15가 아직 기반으로 삼는 기존 검사는 비밀과 무관한 복구 기록 35개를
+개수만으로 막아 성적 1입니다. 수리 PR #21의 같은 검사 파일을 사용하면 실제 비밀 내용 검사는 유지한 채
+성적 0입니다. 따라서 #21을 먼저 오너가 합친 뒤 #15를 합치는 순서가 강제되며, 그전에는 제품 구현을
+시작하지 않습니다.
+
+수리 PR: https://github.com/sangmokang/Valuehire_v6/pull/21
 
 ### 10. 적대 검증 로그
 

@@ -236,15 +236,27 @@ git show origin/main:docs/engineering/humansearch-v6-clean-room-rebuild-goal-202
 - worktree: 저장소 공용 루트 아래 `worktrees/humansearch-l0-surface-classifier`
 - base: preflight에서 fetch한 `origin/main`
 
+어느 재개 분기에서도 같은 경로를 쓰도록 먼저 두 절대 경로를 고정한다.
+
+```bash
+PRIMARY_ROOT="$(git worktree list --porcelain | sed -n '1s/^worktree //p')"
+if [ -z "$PRIMARY_ROOT" ]; then
+  printf '%s\n' 'BLOCKED: primary worktree root를 확인할 수 없다'
+  exit 21
+fi
+TARGET_ROOT="$PRIMARY_ROOT/worktrees/humansearch-l0-surface-classifier"
+```
+
+→ 기본 작업 공간과 L0 작업 공간의 위치를 한 번만 계산한다. 새 작업과 재개 작업이 서로 다른 경로를
+추측하지 않게 하며, 기본 위치를 읽지 못하면 21로 중단한다.
+
 다음 분기를 지킨다.
 
 1. worktree와 branch 둘 다 없으면 아래처럼 primary worktree의 절대 경로를 먼저 구한 뒤 만든다.
 
    ```bash
-   PRIMARY_ROOT="$(git worktree list --porcelain | sed -n '1s/^worktree //p')"
-   test -n "$PRIMARY_ROOT"
    git -C "$PRIMARY_ROOT" worktree add \
-     "$PRIMARY_ROOT/worktrees/humansearch-l0-surface-classifier" \
+     "$TARGET_ROOT" \
      -b task/humansearch-l0-surface-classifier origin/main
    ```
 
@@ -259,7 +271,41 @@ git show origin/main:docs/engineering/humansearch-v6-clean-room-rebuild-goal-202
 4. worktree만 있거나 path/branch가 다르거나 예상 밖 commit이 있으면 자동 삭제·reset하지 않고
    `BLOCKED`다.
 
-target worktree 진입 후 다음을 실행한다.
+target worktree 진입 후 시작 검사보다 먼저 로컬 검사 규칙을 연결하고 실제 연결 상태를 다시 읽는다.
+
+```bash
+cd "$TARGET_ROOT"
+bootstrap_rc=0
+bootstrap_out="$(bash scripts/install-hooks.sh 2>&1)" || bootstrap_rc=$?
+printf '%s\n' "$bootstrap_out"
+
+expected_patterns="$PRIMARY_ROOT/.secret-patterns"
+linked_patterns="$(readlink .secret-patterns 2>/dev/null || true)"
+tracked_count="$(git ls-files -- .secret-patterns | awk 'NF{c++} END{print c+0}')"
+ignored_rc=0
+git check-ignore -q -- .secret-patterns || ignored_rc=$?
+
+if [ "$bootstrap_rc" -ne 0 ] ||
+   [ ! -L .secret-patterns ] ||
+   [ "$linked_patterns" != "$expected_patterns" ] ||
+   [ ! -s "$expected_patterns" ] ||
+   [ ! -s .secret-patterns ] ||
+   [ "$tracked_count" -ne 0 ] ||
+   [ "$ignored_rc" -ne 0 ]; then
+  printf 'BLOCKED: local secret pattern link invalid rc=%s link=%s expected=%s tracked=%s ignored_rc=%s\n' \
+    "$bootstrap_rc" "${linked_patterns:-MISSING}" "$expected_patterns" \
+    "$tracked_count" "$ignored_rc"
+  exit 22
+fi
+printf 'PATTERN_LINK: PASS target=%s tracked=%s ignored_rc=%s\n' \
+  "$linked_patterns" "$tracked_count" "$ignored_rc"
+```
+
+→ `scripts/install-hooks.sh`가 기본 작업 공간의 로컬 전용 규칙을 복사하지 않고 상징 연결한다. 그 뒤
+링크 대상이 정확한지, 원본과 링크가 모두 비어 있지 않은지, Git 추적 대상이 아닌지, 무시 규칙이 실제로
+적용되는지를 확인한다. 하나라도 다르면 22로 중단한다. 새 작업과 재개 작업은 모두 이 절차를 거친다.
+
+연결 확인이 끝난 뒤에만 다음 시작 검사를 실행한다.
 
 ```bash
 git status --short --branch
@@ -280,8 +326,9 @@ fi
 ```
 
 → 새 작업이면 HEAD와 `origin/main`이 같고 변경 0이어야 한다. 시작 검사도 끝까지 실행해 실패가 정확히
-0건인지 읽는다. 실행 불가, 출력 누락, 실패 1건 이상은 모두 23으로 중단한다. `.secret-patterns`를 다른
-worktree에서 복사하거나 회수 가능한 Git 객체를 자동 삭제해 이 관문을 억지로 통과시키지 않는다.
+0건인지 읽는다. 실행 불가, 출력 누락, 실패 1건 이상은 모두 23으로 중단한다. `.secret-patterns`는 앞선
+설치기가 기본 작업 공간의 파일을 가리키게 할 뿐 복사하거나 Git에 추가하지 않는다. 회수 가능한 Git
+객체를 자동 삭제해 이 관문을 억지로 통과시키지도 않는다.
 재개라면 아래 checkpoint 규칙으로 이미 끝난 단계와 변경의 소유권을 증명해야 한다.
 
 ### 7. 재개와 checkpoint 규칙
