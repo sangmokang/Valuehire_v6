@@ -15,82 +15,114 @@
 ~~~yaml
 - parent_ac: RUN-CONTRACT
   micro_id: P0-01-baseline-and-audited-plan
-  single_observable_result: exact source 상태, 기존 RED 1/19, 40 parent mapping, audit PASS hash가 보존된다
-  single_failure_reason: 계획 감사 PASS 없이 제품 writer가 시작된다
-  rollback_unit: 이 controller plan과 plan-audit evidence commit
-  dependencies: [a02a3da]
-  allowed_files: [docs/engineering/admin-weekly-dashboard-v6-atomic-research-*-2026-08-17.md, docs/engineering/admin-weekly-dashboard-v6-controller-goal-2026-08-17.md, docs/engineering/admin-weekly-dashboard-v6-atomic-plan-phase0-2026-08-17.md, docs/engineering/admin-weekly-dashboard-v6-canonical-expansions-2026-08-17.md, docs/engineering/admin-weekly-dashboard-v6-canonical-dependencies-2026-08-17.md, docs/engineering/admin-weekly-dashboard-v6-plan-audit-*.md]
+  single_observable_result: 상위 요구 전수 매핑과 원자성 검사를 포함한 fresh plan audit PASS 1건만 실행 허가로 보존된다
+  single_failure_reason: 요구 누락·비원자 행이 남거나 무효 처리된 과거 감사가 실행 허가로 사용된다
+  rollback_unit: 복구된 controller/Phase 0/dependency plan + v2 audit 무효화 기록 + fresh audit evidence
+  dependencies: [a02a3da, BLK-RUNNER-ONLY-AUDIT-EVIDENCE]
+  allowed_files: [docs/engineering/admin-weekly-dashboard-v6-atomic-research-*-2026-08-17.md, docs/engineering/admin-weekly-dashboard-v6-controller-goal-2026-08-17.md, docs/engineering/admin-weekly-dashboard-v6-atomic-plan-phase0-2026-08-17.md, docs/engineering/admin-weekly-dashboard-v6-canonical-expansions-2026-08-17.md, docs/engineering/admin-weekly-dashboard-v6-canonical-dependencies-2026-08-17.md, docs/engineering/admin-weekly-dashboard-v6-plan-audit-*.md, docs/engineering/admin-weekly-dashboard-v6-phase0-plan-repair-goal-2026-08-17.md]
   forbidden_scope: [제품 코드, dependency install, main 변경, 외부 호출]
-  red_command: fresh auditor가 계획 후보에서 CODEAUDIT SPEC v2를 실행
-  green_command: fresh auditor verdict PASS와 계획 PASS 조건 결함 0
-  mutation_method: parent AC 하나 또는 필수 필드 하나를 폐기 가능한 계획 사본에서 제거해 audit FAIL 확인
-  production_call_path: 사용자 계약 -> controller plan -> writer packet
-  target_count_method: parent AC distinct count=40, required field missing count=0
-  cannot_split_reason: baseline과 audited plan은 제품 작업 시작 자격이라는 단일 결과
+  red_command: bash scripts/acceptance-admin-phase0-plan.sh && fresh auditor가 복구 후보에서 CODEAUDIT SPEC을 실행
+  green_command: runner-only 원문 보존 아래 fresh auditor verdict PASS와 계획 PASS 조건 결함 0
+  mutation_method: engines.node 행을 제거하거나 private/workspace를 다시 묶은 폐기 가능한 사본에서 audit FAIL 확인
+  production_call_path: 사용자 계약 -> 저장소 계획 검사 -> runner-only fresh audit -> writer packet
+  target_count_method: parent AC distinct=40, active micro=134, required field missing=0, invalidated audit execution_permission=false
+  cannot_split_reason: 실행 허가를 내는 fresh audit 한 건의 입력과 판정은 함께 보존해야 한다
   external_side_effect_count_expected: 0
 
 - parent_ac: AC-01
   micro_id: P0-02-node-version-pin
-  single_observable_result: .node-version이 정확히 24.19.0 한 줄이다
-  single_failure_reason: Node pin이 없거나 다른 값이다
-  rollback_unit: .node-version + 직접 shell contract test + micro goal
-  dependencies: [P0-01 PASS hash]
-  allowed_files: [.node-version, scripts/verify/check-admin-foundation.sh, docs/engineering/admin-weekly-dashboard-v6-p0-02-node-version-pin-goal-2026-08-17.md]
+  single_observable_result: 실제 local/CI runtime bootstrap이 정확한 .node-version을 소비해 Node 24.19.0을 실행한다
+  single_failure_reason: 파일 값과 실제 실행 Node 버전이 다르거나 runtime consumer가 없다
+  rollback_unit: .node-version + local/CI runtime bootstrap + runtime contract test + micro goal
+  dependencies: [P0-01-baseline-and-audited-plan PASS hash, BLK-NODE-RUNTIME-CONSUMER]
+  allowed_files: [.node-version, scripts/bootstrap-admin-runtime.sh, scripts/verify/check-admin-foundation.sh, scripts/acceptance-admin-runtime.sh, .github/workflows/verify.yml, docs/sot/verification-commands.md, docs/sot/mechanism-registry.yaml, docs/engineering/admin-weekly-dashboard-v6-p0-02-node-version-pin-goal-2026-08-17.md]
   forbidden_scope: [package.json, pnpm, apps/admin, lockfile]
-  red_command: bash scripts/verify/check-admin-foundation.sh node-version
-  green_command: bash scripts/verify/check-admin-foundation.sh node-version
-  mutation_method: disposable clone에서 .node-version을 24.19.1로 바꾼다
-  production_call_path: .node-version -> local/CI runtime bootstrap contract
-  target_count_method: checked version files=1
-  cannot_split_reason: 단일 파일의 단일 exact value
+  red_command: bash scripts/acceptance-admin-runtime.sh node-version
+  green_command: bash scripts/acceptance-admin-runtime.sh node-version
+  mutation_method: disposable clone에서 .node-version을 24.19.1로 바꾸거나 저장소 밖 파일을 가리키는 symlink로 바꾼다
+  production_call_path: .node-version -> 선택된 local/CI runtime bootstrap -> node --version
+  target_count_method: checked version files=1, runtime invocations>0, observed Node version=24.19.0
+  cannot_split_reason: 버전 파일이 실제 runtime을 선택한다는 한 결과를 증명한다
   external_side_effect_count_expected: 0
 
 - parent_ac: AC-01
   micro_id: P0-03-pnpm-version-pin
-  single_observable_result: root packageManager가 정확히 pnpm@11.22.0이다
-  single_failure_reason: packageManager가 없거나 다른 값이다
-  rollback_unit: root package.json의 packageManager field + 직접 contract test + micro goal
-  dependencies: [P0-02 PASS hash]
-  allowed_files: [package.json, scripts/verify/check-admin-foundation.sh, docs/engineering/admin-weekly-dashboard-v6-p0-03-pnpm-version-pin-goal-2026-08-17.md]
+  single_observable_result: Corepack이 root packageManager의 정확한 pnpm@11.22.0을 소비해 pnpm 11.22.0을 실행한다
+  single_failure_reason: exact 문자열이 아니거나 Corepack 실행 버전이 11.22.0이 아니다
+  rollback_unit: root package.json packageManager field + Corepack runtime contract test + micro goal
+  dependencies: [P0-02-node-version-pin PASS hash]
+  allowed_files: [package.json, scripts/verify/check-admin-foundation.sh, scripts/acceptance-admin-runtime.sh, docs/engineering/admin-weekly-dashboard-v6-p0-03-pnpm-version-pin-goal-2026-08-17.md]
   forbidden_scope: [workspace declaration, apps/admin, lockfile]
-  red_command: bash scripts/verify/check-admin-foundation.sh pnpm-version
-  green_command: bash scripts/verify/check-admin-foundation.sh pnpm-version
-  mutation_method: disposable clone에서 packageManager를 pnpm@11.22.1로 바꾼다
+  red_command: bash scripts/acceptance-admin-runtime.sh pnpm-version
+  green_command: bash scripts/acceptance-admin-runtime.sh pnpm-version
+  mutation_method: disposable clone에서 packageManager를 pnpm@11.22.1 또는 pnpm@11.22.0\n 문자열로 바꾼다
   production_call_path: package.json packageManager -> Corepack/pnpm invocation
-  target_count_method: checked packageManager fields=1
-  cannot_split_reason: 단일 field의 단일 exact value
+  target_count_method: checked packageManager fields=1, Corepack pnpm invocations>0, observed pnpm version=11.22.0
+  cannot_split_reason: packageManager 값이 실제 Corepack 실행 버전을 선택한다는 한 결과를 증명한다
   external_side_effect_count_expected: 0
 
 - parent_ac: AC-01
-  micro_id: P0-04-root-private-workspace
-  single_observable_result: root package가 private이고 apps/*만 포함하는 pnpm workspace다
-  single_failure_reason: publish 가능하거나 apps/admin이 workspace에서 빠진다
-  rollback_unit: package.json private/workspaces + pnpm-workspace.yaml + direct contract test
-  dependencies: [P0-03 PASS hash]
-  allowed_files: [package.json, pnpm-workspace.yaml, scripts/verify/check-admin-foundation.sh, docs/engineering/admin-weekly-dashboard-v6-p0-04-root-private-workspace-goal-2026-08-17.md]
-  forbidden_scope: [apps/admin package, dependencies, lockfile]
-  red_command: bash scripts/verify/check-admin-foundation.sh root-workspace
-  green_command: bash scripts/verify/check-admin-foundation.sh root-workspace
-  mutation_method: disposable clone에서 private를 false로 바꾸거나 workspace package 경로를 제거한다
-  production_call_path: pnpm-workspace.yaml -> pnpm workspace discovery
-  target_count_method: workspace patterns=1 and root private fields=1
-  cannot_split_reason: private root workspace라는 하나의 package-manager boundary
+  micro_id: P0-03A-node-engine-pin
+  single_observable_result: pnpm engine 검사가 package.json engines.node=24.19.0을 읽어 맞는 runtime은 허용하고 다른 runtime은 거부한다
+  single_failure_reason: engines.node가 없거나 exact 24.19.0이 아니거나 package manager가 이를 무시한다
+  rollback_unit: root package.json engines.node field + engine enforcement runtime test + micro goal
+  dependencies: [P0-03-pnpm-version-pin PASS hash]
+  allowed_files: [package.json, scripts/verify/check-admin-foundation.sh, scripts/acceptance-admin-runtime.sh, docs/engineering/admin-weekly-dashboard-v6-p0-03a-node-engine-pin-goal-2026-08-17.md]
+  forbidden_scope: [.node-version, workspace declaration, apps/admin, lockfile]
+  red_command: bash scripts/acceptance-admin-runtime.sh node-engine
+  green_command: bash scripts/acceptance-admin-runtime.sh node-engine
+  mutation_method: disposable clone에서 engines.node를 삭제하거나 24.19.1 또는 범위 문자열로 바꾸고 wrong-runtime 거부가 유지되는지 확인한다
+  production_call_path: package.json engines.node -> pnpm engine-strict evaluation -> allow/reject result
+  target_count_method: checked engines.node fields=1, allowed runtime results=1, rejected wrong-runtime results=1
+  cannot_split_reason: exact engine 선언이 실제 package manager 경계에서 강제되는 한 결과다
+  external_side_effect_count_expected: 0
+
+- parent_ac: AC-01
+  micro_id: P0-04-root-private
+  single_observable_result: root package.json이 private=true라서 pnpm readback이 true가 된다
+  single_failure_reason: private가 없거나 boolean true가 아니거나 pnpm readback이 true가 아니다
+  rollback_unit: package.json private field + pnpm readback contract test + micro goal
+  dependencies: [P0-03A-node-engine-pin PASS hash]
+  allowed_files: [package.json, scripts/verify/check-admin-foundation.sh, docs/engineering/admin-weekly-dashboard-v6-p0-04-root-private-goal-2026-08-17.md]
+  forbidden_scope: [pnpm-workspace.yaml, apps/admin package, dependencies, lockfile]
+  red_command: bash scripts/verify/check-admin-foundation.sh root-private
+  green_command: bash scripts/verify/check-admin-foundation.sh root-private && pnpm pkg get private
+  mutation_method: disposable clone에서 private를 false·문자열 true·누락으로 각각 바꾼다
+  production_call_path: package.json private -> pnpm pkg get private -> true readback
+  target_count_method: checked private fields=1, pnpm readback results=1
+  cannot_split_reason: root private field의 package-manager readback 한 결과다
+  external_side_effect_count_expected: 0
+
+- parent_ac: AC-01
+  micro_id: P0-04-workspace-declaration
+  single_observable_result: pnpm-workspace.yaml을 소비한 pnpm이 apps/admin workspace를 정확히 1개 발견한다
+  single_failure_reason: apps/admin 발견 수가 0이거나 2개 이상이거나 선언 밖 package가 포함된다
+  rollback_unit: pnpm-workspace.yaml + 최소 apps/admin manifest + workspace discovery contract test + micro goal
+  dependencies: [P0-04-root-private PASS hash]
+  allowed_files: [pnpm-workspace.yaml, apps/admin/package.json, scripts/verify/check-admin-foundation.sh, docs/engineering/admin-weekly-dashboard-v6-p0-04-workspace-declaration-goal-2026-08-17.md]
+  forbidden_scope: [dependency declarations, lockfile, admin source]
+  red_command: bash scripts/verify/check-admin-foundation.sh workspace-declaration
+  green_command: bash scripts/verify/check-admin-foundation.sh workspace-declaration && pnpm --recursive list --depth -1
+  mutation_method: disposable clone에서 apps/* 선언을 제거·오타 변경하거나 예상 밖 두 번째 package를 추가한다
+  production_call_path: pnpm-workspace.yaml -> pnpm recursive workspace discovery -> apps/admin exact one
+  target_count_method: workspace patterns=1, discovered admin packages=1, unexpected packages=0
+  cannot_split_reason: workspace 선언이 실제 pnpm 발견 결과 1건을 만든다는 한 결과다
   external_side_effect_count_expected: 0
 
 - parent_ac: AC-01
   micro_id: P0-04A-generated-artifact-ignore
-  single_observable_result: pnpm와 admin build/test가 만드는 local artifact가 git status 대상에서 제외되고 tracked artifact는 0건이다
-  single_failure_reason: node_modules 또는 admin build/test artifact가 사용자 변경처럼 worktree에 남거나 추적된다
-  rollback_unit: root .gitignore + direct artifact-ignore contract test + micro goal
-  dependencies: [P0-04 PASS hash]
-  allowed_files: [.gitignore, scripts/verify/check-admin-foundation.sh, docs/engineering/admin-weekly-dashboard-v6-p0-04a-generated-artifact-ignore-goal-2026-08-17.md]
-  forbidden_scope: [실제 artifact 생성, 기존 ignore 규칙 삭제, source file ignore]
-  red_command: bash scripts/verify/check-admin-foundation.sh artifact-ignore
-  green_command: bash scripts/verify/check-admin-foundation.sh artifact-ignore
-  mutation_method: disposable clone에서 node_modules 또는 apps/admin/.next ignore 항목을 제거한다
-  production_call_path: package/build/test outputs -> git status boundary
-  target_count_method: required ignore patterns exact count and tracked forbidden artifacts=0
-  cannot_split_reason: 생성물로 인한 worktree 오염을 막는 하나의 repository boundary
+  single_observable_result: 모든 금지 artifact prefix 아래의 Git 추적 파일이 0건이고 guard가 어떤 파일명이든 차단한다
+  single_failure_reason: 금지 prefix 아래 파일 하나라도 추적되거나 검사 대상 root가 0건이다
+  rollback_unit: root .gitignore + shared tracked-prefix selector + pre-commit/CI registration + micro goal
+  dependencies: [P0-04-workspace-declaration PASS hash]
+  allowed_files: [.gitignore, hooks/pre-commit, scripts/verify/check-admin-foundation.sh, scripts/scan-data-exposure.sh, scripts/acceptance-admin-artifact-boundary.sh, .github/workflows/verify.yml, docs/sot/hook-contracts.md, docs/sot/verification-commands.md, docs/sot/mechanism-registry.yaml, docs/engineering/admin-weekly-dashboard-v6-p0-04a-generated-artifact-ignore-goal-2026-08-17.md]
+  forbidden_scope: [실제 dependency install, 기존 ignore 규칙 삭제, source file ignore]
+  red_command: bash scripts/acceptance-admin-artifact-boundary.sh
+  green_command: bash scripts/acceptance-admin-artifact-boundary.sh
+  mutation_method: disposable clone에서 각 금지 디렉터리 아래 임의 이름의 추적 파일을 만들고 prefix guard가 전부 거부하는지 확인한다
+  production_call_path: git index -> shared forbidden-prefix scan -> pre-commit and CI block
+  target_count_method: required artifact prefix roots>0, files enumerated by prefix scan>0 in mutation, tracked forbidden artifacts=0 in baseline
+  cannot_split_reason: 같은 shared selector를 쓰는 local/CI repository boundary 한 결과다
   external_side_effect_count_expected: 0
 
 - parent_ac: AC-01

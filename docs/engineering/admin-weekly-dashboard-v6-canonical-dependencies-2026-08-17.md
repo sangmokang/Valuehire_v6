@@ -20,6 +20,8 @@ dependency_hash_contract:
   missing_rule: BLOCKED_MISSING_DEPENDENCY_HASH
 
 blockers:
+  - BLK-RUNNER-ONLY-AUDIT-EVIDENCE
+  - BLK-NODE-RUNTIME-CONSUMER
   - BLK-EXACT-REACT-TYPES-VERSIONS
   - BLK-DOM-PARSER-EXACT-VERSION
   - BLK-AC13-SOT-CONFLICT
@@ -34,14 +36,20 @@ blockers:
 groups:
   - consumers: [P0-01-baseline-and-audited-plan]
     requires_micro_ids: []
+    requires_blocker_ids: [BLK-RUNNER-ONLY-AUDIT-EVIDENCE]
   - consumers: [P0-02-node-version-pin]
     requires_micro_ids: [P0-01-baseline-and-audited-plan]
+    requires_blocker_ids: [BLK-NODE-RUNTIME-CONSUMER]
   - consumers: [P0-03-pnpm-version-pin]
     requires_micro_ids: [P0-02-node-version-pin]
-  - consumers: [P0-04-root-private-workspace]
+  - consumers: [P0-03A-node-engine-pin]
     requires_micro_ids: [P0-03-pnpm-version-pin]
+  - consumers: [P0-04-root-private]
+    requires_micro_ids: [P0-03A-node-engine-pin]
+  - consumers: [P0-04-workspace-declaration]
+    requires_micro_ids: [P0-04-root-private]
   - consumers: [P0-04A-generated-artifact-ignore]
-    requires_micro_ids: [P0-04-root-private-workspace]
+    requires_micro_ids: [P0-04-workspace-declaration]
   - consumers: [P0-05-admin-exact-package-contract]
     requires_micro_ids: [P0-04A-generated-artifact-ignore]
     requires_blocker_ids: [BLK-EXACT-REACT-TYPES-VERSIONS]

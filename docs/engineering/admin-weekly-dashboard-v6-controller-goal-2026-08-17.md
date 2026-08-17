@@ -174,7 +174,9 @@ program result: 2
 
 | 대상 | 현재 상태 | 이유 | 다음 안전 행동 |
 |---|---|---|---|
-| P0-05 이후 TypeScript/Next 경로 | DECISION_REQUIRED_DEPENDENCY | 목표 고정 목록에 @types/react와 @types/react-dom의 exact version이 없음 | P0-02~P0-04A까지만 진행 가능; 의존성 버전 결정 전 package install 금지 |
+| P0-01 계획 실행 허가 | BLOCKED_EVIDENCE_AUTHORITY | 기존 v2 감사가 누락 요구와 비원자 행을 PASS했고 runner-only 원문 보존도 없다 | 기존 PASS는 실행 허가가 없다; 증거 권한 분리 뒤 fresh audit |
+| P0-02 Node runtime | BLOCKED_RUNTIME_CONSUMER | `.node-version`은 있으나 현재 실제 Node는 22.19.0이고 local/CI consumer가 미정이다 | runtime consumer를 독립 결정한 뒤 실제 24.19.0 실행 증명 |
+| P0-05 이후 TypeScript/Next 경로 | DECISION_REQUIRED_DEPENDENCY | 목표 고정 목록에 @types/react와 @types/react-dom의 exact version이 없음 | 새 P0-01 audit와 P0-02~P0-04A가 독립 PASS여도 의존성 버전 결정 전 package install 금지 |
 | AC05-M02 | BLOCKED_EXTERNAL_INPUT | 승인된 연말 경계 예시 2건 없음 | label 없는 NOT_RUN 경로만 구현 가능 |
 | AC07-M01~M04 | DECISION_REQUIRED_DEPENDENCY | DOM parser가 필요하지만 고정 의존성 목록에 없음 | 의존성 추가 없이 중지 |
 | AC13-M01~M02 | BLOCKED_SOT_CONFLICT | UNCLASSIFIED 계약과 ETC 최신 지시 충돌 | 정본 변경 또는 최신 지시 철회 필요 |
@@ -197,7 +199,7 @@ program result: 2
 
 | parent | canonical micro source |
 |---|---|
-| AC-01 | atomic-plan-phase0 P0-02~P0-12, P0-04A 포함 |
+| AC-01 | atomic-plan-phase0 P0-02~P0-12, 별도 P0-03A·P0-04-workspace·P0-04A 포함 |
 | AC-02 | atomic-plan-phase0 P0-13~P0-14 |
 | AC-03 | atomic-plan-phase0 P0-20~P0-21 |
 | AC-04~AC-07, AC-13 | atomic-research-phase1; 상태 등록부와 전역 규칙 적용 |
@@ -212,7 +214,7 @@ program result: 2
 
 ### Phase 0 canonical rows
 
-Phase 0의 15개 필드 전체 row는 docs/engineering/admin-weekly-dashboard-v6-atomic-plan-phase0-2026-08-17.md에 분리했습니다. 이 controller goal과 그 파일을 하나의 계획 묶음으로 감사합니다. P0-01부터 P0-22까지이며, P0-04A는 dependency install 전에 생성물로 worktree가 오염되지 않게 하는 선행 원자 작업입니다.
+Phase 0의 15개 필드 전체 row 25개는 docs/engineering/admin-weekly-dashboard-v6-atomic-plan-phase0-2026-08-17.md에 분리했습니다. 전체 active micro는 134개입니다. 이 controller goal과 그 파일을 하나의 계획 묶음으로 감사합니다. P0-03A-node-engine-pin은 빠졌던 `engines.node`를 별도로 검증하고, P0-04-root-private와 P0-04-workspace-declaration은 독립 결과로 분리합니다. P0-04A는 고정 canary가 아니라 모든 금지 prefix 아래의 임의 이름 추적 파일을 막는 선행 작업입니다.
 
 ### Phase 1~3 canonical corrections
 
@@ -236,7 +238,13 @@ Phase 0의 15개 필드 전체 row는 docs/engineering/admin-weekly-dashboard-v6
 
 ~~~text
 P0-01
- -> P0-02 -> P0-03 -> P0-04 -> P0-04A -> P0-05(BLOCKED) -> P0-06
+ -> P0-02-node-version-pin(BLOCKED_RUNTIME_CONSUMER)
+ -> P0-03-pnpm-version-pin
+ -> P0-03A-node-engine-pin
+ -> P0-04-root-private
+ -> P0-04-workspace-declaration
+ -> P0-04A-generated-artifact-ignore
+ -> P0-05(BLOCKED) -> P0-06
  -> P0-07 -> P0-08 -> P0-09 -> P0-10 -> P0-11 -> P0-12
  -> P0-13 -> P0-14
  -> P0-15 -> P0-16 -> P0-17 -> P0-18
@@ -257,8 +265,10 @@ P0-01
 ### 계획 감사 합격 조건
 
 - parent AC distinct count 40
+- active micro count 134
 - unmapped parent count 0
 - mis-mapped requirement count 0
+- parent requirement sentence coverage gap count 0
 - missing required row field count 0
 - P0/P1 finding count 0
 - independently splittable canonical micro count 0
@@ -267,7 +277,9 @@ P0-01
 - external side effect planned count 0
 - forbidden bundle split count 0
 - sensitive value copied to repo count 0
-- plan auditor verdict PASS
+- invalidated audit execution permission count 0
+- runner-only evidence authority confirmed
+- fresh plan auditor verdict PASS
 
 ### 계획 감사 v1 rework ledger
 
@@ -279,9 +291,21 @@ P0-01
 
 → v1 원문과 SHA-256 metadata는 별도 evidence-only commit에 보존했고 수정하지 않습니다.
 
+### 계획 감사 v2 무효화 ledger
+
+| v2 PASS 결함 | 현재 판정 | 복구 조치 |
+|---|---|---|
+| 상위 목표의 `engines.node` 작업 누락 | INVALIDATED_REQUIREMENT_GAP | P0-03A-node-engine-pin 별도 행과 exact dependency를 추가 |
+| P0-04가 private와 workspace 결과를 결합 | INVALIDATED_NON_ATOMIC | P0-04-root-private와 P0-04-workspace-declaration으로 분리 |
+| P0-03 exact 문자열 검사가 끝 개행을 잃음 | INVALIDATED_FALSE_PASS | 계획 mutation에 `pnpm@11.22.0\n` 반례와 Corepack 실제 실행 경로를 고정 |
+| P0-04A가 고정 canary 파일명만 확인 | INVALIDATED_FALSE_PASS | 모든 금지 prefix 아래 임의 이름의 tracked file mutation을 고정 |
+| auditor 원문을 controller가 직접 보존 | BLOCKED_EVIDENCE_AUTHORITY | BLK-RUNNER-ONLY-AUDIT-EVIDENCE 해결 전 P0-01 PASS 금지 |
+
+→ `docs/engineering/admin-weekly-dashboard-v6-plan-audit-v2-invalidation-2026-08-17.md`가 과거 감사의 정확한 지문과 `execution_permission: false`를 보존합니다. 과거 PASS는 실행 허가가 없다.
+
 ### 현재 중지선
 
-계획 감사가 PASS가 아니면 제품 코드를 쓰지 않습니다. PASS이면 첫 writer packet은 P0-02만 포함하고 exact input commit과 plan-audit evidence hash를 고정합니다.
+현재 v2 계획 감사는 무효이며 제품 코드를 쓰지 않습니다. runner-only 증거 권한과 Node runtime consumer가 해결되고 fresh plan audit이 PASS인 경우에만 첫 writer packet P0-02를 만들며, exact input commit과 새 plan-audit evidence hash를 고정합니다.
 
 ## 감사 전 셀프 확인
 

@@ -1,11 +1,11 @@
 # Valuehire v6 — 이 저장소의 실제 게이트 명령 (SOT)
 
-최종 갱신: 2026-08-12 (전부 실행으로 확인, 가정 없음)
+최종 갱신: 2026-08-17 (게이트 명령과 현재 루트 manifest 존재를 실행으로 재확인)
 근거: `docs/engineering/docs-sot-restructure-goal-2026-08-08.md`
 
 ## 현재 규칙
 
-**이 저장소는 make 레포도 npm 레포도 아니다.** `Makefile`·`package.json`이 없고, `make -n red-ledger`는 `No rule to make target` 로 실패한다(2026-08-08 실행 확인). `~/.claude/skills/harness/SKILL.md`가 기본 전제하는 `make task` / `make verify` / `make ship` 은 이 저장소에 아직 없다 — 아래가 대신 쓰는 실제 명령이다.
+**루트 `package.json`은 존재하지만 `scripts` 필드가 없고 `Makefile`도 없으므로, 이 저장소는 make 레포도 npm harness 레포는 아니다.** `make -n red-ledger`는 `No rule to make target`로 실패하며, 루트 manifest로 실행 가능한 `npm run red-ledger`·`npm run verify`·`npm run ship`도 없다(2026-08-17 실행 확인). `~/.claude/skills/harness/SKILL.md`가 기본 전제하는 명령 대신 아래 실제 명령을 사용한다.
 
 | 게이트 | harness 스킬의 기본 명령 | 이 저장소의 실제 명령 |
 |---|---|---|
