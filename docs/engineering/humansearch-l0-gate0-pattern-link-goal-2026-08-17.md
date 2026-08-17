@@ -191,3 +191,25 @@ REPAIR_PR_ACCEPTANCE_EXIT=0
 ### 10. 적대 검증 로그
 
 Claude 1차 판정의 명령 전문과 본문, Codex 2차 재현 명령·출력·일치 여부를 이 절에 덧붙입니다.
+
+#### REVIEW-RED — 계약 누락과 두 실패 처리 경계
+
+Claude V1은 전체 판정 `PASS`와 함께 중간 위험 1건, 낮은 위험 2건을 지적했습니다. Codex가 같은 세
+항목을 현재 파일에서 직접 재현했습니다.
+
+```text
+$ rg -n 'secret-patterns|워크트리|worktree' docs/sot/hook-contracts.md
+SOT_LINK_CONTRACT_EXIT=1
+
+$ rg -n 'tracked_count=.*git ls-files.*\|' docs/engineering/goal-prompts/codex-humansearch-l0-surface-classifier-v2-2026-08-16.md
+284:tracked_count="$(git ls-files -- .secret-patterns | awk 'NF{c++} END{print c+0}')"
+PIPELINE_PRESENT_EXIT=0
+
+$ rg -n 'PRIMARY_ROOT=.*pwd -P|PRIMARY_ROOT=.*realpath' docs/engineering/goal-prompts/codex-humansearch-l0-surface-classifier-v2-2026-08-16.md
+PRIMARY_CANONICAL_EXIT=1
+```
+
+→ 공식 훅 계약에는 로컬 규칙 연결 동작이 한 줄도 없고, 추적 여부 계산은 앞 명령 실패를 뒤 계산의
+성공으로 가릴 수 있으며, 기본 작업 공간 경로는 설치기의 실제 물리 경로 계산과 같은 방식으로 정규화되지
+않았습니다. 모두 잘못된 통과보다 중단 쪽 위험이 크지만, 정본과 실행 지시가 갈라진 채 남지 않도록 새
+REVIEW-RED로 채택합니다.
