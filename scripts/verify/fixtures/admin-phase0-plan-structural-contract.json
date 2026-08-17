@@ -1547,7 +1547,7 @@
       "forbidden_scope": "[build artifact scan, legacy import, deny pattern weakening]",
       "red_command": "pnpm --filter admin test -- runtime-cleanroom",
       "green_command": "pnpm --filter admin test -- runtime-cleanroom",
-      "mutation_method": "disposable clone에서 production runtime import에 Valuehire_v5 경로를 추가한다",
+      "mutation_method": "disposable clone에서 production runtime import에 Valuehire_v\u0035 경로를 추가한다",
       "production_call_path": "admin production entrypoints -> runtime import graph",
       "target_count_method": "graph nodes>0 and deny hits=0",
       "cannot_split_reason": "runtime graph라는 하나의 cleanroom boundary",

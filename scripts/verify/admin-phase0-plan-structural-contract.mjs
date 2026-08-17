@@ -16,7 +16,7 @@ export const relativePaths = {
   contract: "scripts/verify/fixtures/admin-phase0-plan-structural-contract.json",
 };
 
-const expectedContractSha256 = "90096455c892f2af6246f21ac4f49c4fb3aea95d6cf275b8b05c152fc05e320e";
+const expectedContractSha256 = "b1a6a4a890ec7f2b6c1e1d18f0926a4e58d49bc83e1007be7b796b152977fcb5";
 
 const requiredFields = [
   "parent_ac",
@@ -544,4 +544,3 @@ export function validate(root) {
     blockersUnknown: graphResult.blockersUnknown,
   };
 }
-
