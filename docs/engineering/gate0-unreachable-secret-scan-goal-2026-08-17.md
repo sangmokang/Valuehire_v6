@@ -936,3 +936,124 @@ mutation_rc=1
 → 무엇을 시켰나: 실제 판정기에서 비blob 객체를 의도적으로 건너뛰게 만든 뒤 새 시험을 다시 실행했습니다.
 → 뭐가 나왔나: commit·tree·tag와 알 수 없는 형식이 모두 가짜 합격으로 뒤집혔고, 바깥 훅 재현도 그 실패를 전파했습니다.
 → 의미: 새 객체형 시험은 구현을 따라 쓴 장식이 아니라 해당 보호 분기가 사라지면 즉시 실패하는 유효한 회귀 장치입니다.
+
+#### 12-8. GREEN 최소 수정과 환경 독립 실행
+
+GREEN은 `scripts/acceptance-0-2-unreachable-content.sh` 진입부에서 `SECRET_PATTERNS_FILE`을 비우는 한 줄과
+그 이유를 적은 주석만 추가했습니다. `scripts/acceptance-0-2.sh`의 실제 객체 판정 코드는 바꾸지 않았고,
+RED 커밋의 13개 기대 결과도 그대로 유지했습니다.
+
+```text
+$ bash scripts/acceptance-0-2-unreachable-content.sh
+[1/13] SECRET_PATTERNS_FILE=/dev/null 상속을 격리 -> PASS (exit=0)
+[2/13] SECRET_PATTERNS_FILE=.secret-patterns.default 상속을 격리 -> PASS (exit=0)
+[3/13] 일반 실행은 무해한 unreachable blob을 허용 -> PASS (exit=0)
+[4/13] 일반 실행은 금지값이 든 unreachable blob을 차단 -> BLOCKED (exit=1)
+[5/13] unreachable commit message의 금지값을 차단 -> BLOCKED (exit=1)
+[6/13] unreachable tree path의 금지값을 차단 -> BLOCKED (exit=1)
+[7/13] unreachable annotated tag message의 금지값을 차단 -> BLOCKED (exit=1)
+[8/13] git fsck 실패는 검사 대상 없음으로 통과하지 않음 -> BLOCKED (exit=1)
+[9/13] unreachable 객체 읽기 실패는 조용히 통과하지 않음 -> BLOCKED (exit=1)
+[10/13] 알 수 없는 unreachable 객체형은 읽기 실패로 차단 -> BLOCKED (exit=1)
+[11/13] 큰 unreachable blob 앞쪽의 금지값도 차단 -> BLOCKED (exit=1)
+[12/13] 종료상태 실행은 무해한 unreachable blob도 차단 -> BLOCKED (exit=1)
+[13/13] Git hook 환경에서도 바깥 저장소 무오염 -> PASS (exit=0)
+CHECKED: 13
+PASS: AC-19 일반 내용 검사와 종료상태 0건 조건 분리
+green_rc=0
+```
+
+→ 무엇을 시켰나: 호출 환경을 따로 주지 않은 기본 실행으로 13개 사례를 다시 돌렸습니다.
+→ 뭐가 나왔나: 허용해야 할 4개 실행은 통과했고 차단해야 할 9개 실행은 모두 차단됐으며 전체 성적은 합격입니다.
+→ 의미: 환경 격리 한 줄이 RED 두 건을 닫았고 기존 객체형·대용량·실패 차단은 그대로 남았습니다.
+
+```text
+$ SECRET_PATTERNS_FILE=/dev/null bash scripts/acceptance-0-2-unreachable-content.sh
+[1/13] SECRET_PATTERNS_FILE=/dev/null 상속을 격리 -> PASS (exit=0)
+[2/13] SECRET_PATTERNS_FILE=.secret-patterns.default 상속을 격리 -> PASS (exit=0)
+[3/13] 일반 실행은 무해한 unreachable blob을 허용 -> PASS (exit=0)
+[4/13] 일반 실행은 금지값이 든 unreachable blob을 차단 -> BLOCKED (exit=1)
+[5/13] unreachable commit message의 금지값을 차단 -> BLOCKED (exit=1)
+[6/13] unreachable tree path의 금지값을 차단 -> BLOCKED (exit=1)
+[7/13] unreachable annotated tag message의 금지값을 차단 -> BLOCKED (exit=1)
+[8/13] git fsck 실패는 검사 대상 없음으로 통과하지 않음 -> BLOCKED (exit=1)
+[9/13] unreachable 객체 읽기 실패는 조용히 통과하지 않음 -> BLOCKED (exit=1)
+[10/13] 알 수 없는 unreachable 객체형은 읽기 실패로 차단 -> BLOCKED (exit=1)
+[11/13] 큰 unreachable blob 앞쪽의 금지값도 차단 -> BLOCKED (exit=1)
+[12/13] 종료상태 실행은 무해한 unreachable blob도 차단 -> BLOCKED (exit=1)
+[13/13] Git hook 환경에서도 바깥 저장소 무오염 -> PASS (exit=0)
+CHECKED: 13
+PASS: AC-19 일반 내용 검사와 종료상태 0건 조건 분리
+```
+
+→ 무엇을 시켰나: 호출자가 빈 패턴 파일을 강제로 넘긴 환경에서 같은 13개 사례를 실행했습니다.
+→ 뭐가 나왔나: 기본 실행과 같은 13개 판정과 전체 합격이 나왔습니다.
+→ 의미: 외부의 빈 경로가 합성 시험을 무력화하거나 거짓 실패로 바꾸지 못합니다.
+
+```text
+$ SECRET_PATTERNS_FILE=.secret-patterns.default bash scripts/acceptance-0-2-unreachable-content.sh
+[1/13] SECRET_PATTERNS_FILE=/dev/null 상속을 격리 -> PASS (exit=0)
+[2/13] SECRET_PATTERNS_FILE=.secret-patterns.default 상속을 격리 -> PASS (exit=0)
+[3/13] 일반 실행은 무해한 unreachable blob을 허용 -> PASS (exit=0)
+[4/13] 일반 실행은 금지값이 든 unreachable blob을 차단 -> BLOCKED (exit=1)
+[5/13] unreachable commit message의 금지값을 차단 -> BLOCKED (exit=1)
+[6/13] unreachable tree path의 금지값을 차단 -> BLOCKED (exit=1)
+[7/13] unreachable annotated tag message의 금지값을 차단 -> BLOCKED (exit=1)
+[8/13] git fsck 실패는 검사 대상 없음으로 통과하지 않음 -> BLOCKED (exit=1)
+[9/13] unreachable 객체 읽기 실패는 조용히 통과하지 않음 -> BLOCKED (exit=1)
+[10/13] 알 수 없는 unreachable 객체형은 읽기 실패로 차단 -> BLOCKED (exit=1)
+[11/13] 큰 unreachable blob 앞쪽의 금지값도 차단 -> BLOCKED (exit=1)
+[12/13] 종료상태 실행은 무해한 unreachable blob도 차단 -> BLOCKED (exit=1)
+[13/13] Git hook 환경에서도 바깥 저장소 무오염 -> PASS (exit=0)
+CHECKED: 13
+PASS: AC-19 일반 내용 검사와 종료상태 0건 조건 분리
+```
+
+→ 무엇을 시켰나: 호출자가 저장소 기본 패턴 파일을 넘긴 환경에서도 같은 시험을 실행했습니다.
+→ 뭐가 나왔나: 합성 fixture 내부의 카나리만 사용해 기본 실행과 동일한 결과가 나왔습니다.
+→ 의미: PR #21의 유효한 환경 격리 의도가 PR #23의 더 강한 13개 시험에 흡수됐습니다.
+
+#### 12-9. 억제 원장과 실행 게이트 일치성
+
+| 질문 | 실제 실행 주체와 범위 | 근거 |
+|---|---|---|
+| 실제 로컬 저장소 검사를 누가 실행하는가 | 세션 시작의 `scripts/session-status.sh`가 실제 `scripts/acceptance-0-2.sh`를 포함한 검사를 실행합니다. `hooks/pre-push`는 실제 로컬 값이 필요한 이 파일 하나는 의도적으로 건너뜁니다. | `scripts/session-status.sh:46-64`, `hooks/pre-push:143-147` |
+| 합성 AC-19 시험을 로컬 push에서 누가 실행하는가 | `hooks/pre-push`가 이름 규칙으로 인수 스크립트를 모으고, 정확히 `acceptance-0-2.sh`와 `acceptance-0-5.sh`만 제외하므로 `acceptance-0-2-unreachable-content.sh`를 실행합니다. | `hooks/pre-push:110-171` |
+| 같은 합성 시험을 서버에서 누가 실행하는가 | GitHub 서버 검사 5번째 단계가 같은 파일을 직접 실행합니다. | `.github/workflows/verify.yml:85-88`, `docs/sot/verification-commands.md:20-40` |
+| 도달 가능한 객체는 어디서 다루는가 | 실제 로컬 검사의 5-c와 서버의 히스토리 전량 검사가 refs·되돌림 기록이 가리키는 blob 내용을 검사합니다. 현재 추적 파일은 `verify.sh`가 별도로 검사합니다. | `scripts/acceptance-0-2.sh:137-146`, `.github/workflows/verify.yml:48-83`, `verify.sh:49-73` |
+| 도달 불가능한 객체는 어디서 다루는가 | 실제 로컬 검사의 5-b가 blob·commit·tree·tag를 객체형 그대로 열고, 합성 AC-19가 네 형식과 실패 분기를 로컬 push·서버에서 동일하게 재현합니다. | `scripts/acceptance-0-2.sh:102-135`, `scripts/acceptance-0-2-unreachable-content.sh` |
+| PR #23 뒤에도 남는 범위는 무엇인가 | 현재 refs나 되돌림 기록이 가리키는 commit message·tree path·annotated tag message는 blob 전용 경로에서 빠져 있으며 이슈 #22가 담당합니다. HumanSearch L0 제품 코드는 시작하지 않습니다. | GitHub 이슈 #22, `scripts/acceptance-0-2.sh:137-146` |
+
+→ 무엇을 대조했나: 로컬 세션 검사, push 직전 문지기, GitHub 서버 단계, 실제 객체 판정기와 정본 표를 한 행씩 연결했습니다.
+→ 뭐가 나왔나: 실제 로컬 값 검사는 세션 시작에, 합성 AC-19는 로컬 push와 서버 양쪽에 배선돼 있으며 17개 서버 단계와 정본 표도 같습니다.
+→ 의미: 억제 사유의 “어느 게이트도 실행하지 않는다”는 현재 사실이 아니지만, 별도 이슈 #22의 도달 가능한 비blob 범위는 정직하게 남습니다.
+
+```text
+$ git show origin/task/humansearch-g0-unreachable-secret-scan:suppressions.yaml | rg -n 'acceptance-0-2'
+출력 없음
+pr21_match_rc=1
+$ rg -n 'acceptance-0-2' suppressions.yaml
+출력 없음
+pr23_match_rc=1
+$ git diff --unified=0 f28511e8df4793bf33f6fbaf6cb473c1de9a951f..HEAD -- suppressions.yaml
+@@ -10,16 +9,0 @@
+-- check: acceptance-0-2
+-  reason: >-
+-    히스토리 정리 완결성 검사. pre-push 에서 CI 로 이관하려 했으나 CI 에서도 돌지 못해
+-    현재 어느 게이트도 실행하지 않는 상태다. 두 가지 이유가 겹쳤다.
+-    (1) unreachable==0 조건이 git add·reset·amend 만으로 깨져 개발 중 상시 실패한다.
+-    (2) 로컬 전용 .secret-patterns 를 요구하는데 CI 에는 없고, .secret-patterns.default 로
+-    대체하면 패턴 파일 자신이 자기매칭한다(CI run 31176518944, blob 09b233e).
+-    로컬에서 현재 exit 1(unreachable 잔존)이다.
+-  owner: sangmokang
+-  expiry: 2026-08-21
+-  issue: >-
+-    분할 이관한다. 0-2 의 뮤테이션 테스트는 합성 카나리(ACCEPTANCE-MUTATION-CANARY-42)만
+-    쓰므로 로컬 패턴 파일이 필요 없다 — CI 로 그대로 옮길 수 있다. 이것이 스캐너 무력화를
+-    탐지하는 핵심이므로 최우선이다. unreachable 검사는 커밋 시점 검사가 아니라 주기 점검으로
+-    옮기고, 히스토리 리터럴 검사는 CI 의 '히스토리 전량 스캔' 스텝이 이미 등가로 수행한다.
+```
+
+→ 무엇을 시켰나: PR #21, 현재 PR #23 작업본, 원격 PR #23 기준점의 억제 원장 차이를 직접 비교했습니다.
+→ 뭐가 나왔나: PR #21과 현재 작업본 모두 해당 억제가 0건이고, 현재 작업본은 원격 PR #23에서 그 한 항목만 삭제했습니다.
+→ 의미: 일반 실행의 개수 오판과 서버 미실행이라는 기존 사유가 모두 해소돼 삭제가 맞으며, 다른 억제 항목은 건드리지 않았습니다.

@@ -2,6 +2,8 @@
 # AC-19 — acceptance-0-2의 상시 내용 검사와 일회성 종료상태 검사를 분리한다.
 set -euo pipefail
 
+# 합성 fixture는 호출자가 고른 실제 패턴 파일이 아니라 아래 합성 카나리만 사용한다.
+unset SECRET_PATTERNS_FILE
 ROOT=$(git rev-parse --show-toplevel)
 unset GIT_DIR GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_WORK_TREE GIT_COMMON_DIR \
   GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_PREFIX
