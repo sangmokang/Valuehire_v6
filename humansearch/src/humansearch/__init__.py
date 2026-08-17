@@ -1,6 +1,19 @@
-"""HumanSearch v6 clean-room package boundary.
+"""HumanSearch v6 public package boundary."""
 
-G2 verification plumbing only — no business behavior lives here yet.
-"""
+from .auth_surface import (
+    AuthSurfaceState,
+    InvalidObservation,
+    SurfaceObservation,
+    SurfaceRole,
+    classify_auth_surface,
+)
 
 PACKAGE_NAME = "humansearch"
+
+__all__ = (
+    "AuthSurfaceState",
+    "InvalidObservation",
+    "SurfaceObservation",
+    "SurfaceRole",
+    "classify_auth_surface",
+)
