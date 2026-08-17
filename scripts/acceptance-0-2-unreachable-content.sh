@@ -5,12 +5,13 @@ set -euo pipefail
 ROOT=$(git rev-parse --show-toplevel)
 TARGET="$ROOT/scripts/acceptance-0-2.sh"
 VERIFY="$ROOT/verify.sh"
+SELF="$ROOT/scripts/acceptance-0-2-unreachable-content.sh"
 REAL_GIT=$(command -v git)
 TMP=$(mktemp -d)
 trap 'rm -rf -- "$TMP"' EXIT
 
 CANARY='AC19-CANARY-8842'
-TOTAL=5
+if [ -n "${AC19_INNER_HOOK_PROBE:-}" ]; then TOTAL=5; else TOTAL=6; fi
 checked=0
 failed=0
 
@@ -99,6 +100,46 @@ printf 'harmless unreachable object\n' |
   git -C "$endstate" hash-object -w --stdin >/dev/null
 run_case '종료상태 실행은 무해한 unreachable blob도 차단' blocked "$endstate" \
   env ACCEPTANCE_ENDSTATE=1 bash scripts/acceptance-0-2.sh
+
+if [ -z "${AC19_INNER_HOOK_PROBE:-}" ]; then
+  hook_outer="$TMP/hook-env-outer"
+  mkdir -p "$hook_outer/scripts" "$hook_outer/docs"
+  cp "$TARGET" "$hook_outer/scripts/acceptance-0-2.sh"
+  cp "$SELF" "$hook_outer/scripts/acceptance-0-2-unreachable-content.sh"
+  cp "$VERIFY" "$hook_outer/verify.sh"
+  printf '.secret-patterns\nouter-only-ignore\n' > "$hook_outer/.gitignore"
+  printf '%s\n' "$CANARY" > "$hook_outer/.secret-patterns"
+  printf 'outer repository sentinel\n' > "$hook_outer/docs/README.md"
+  git -C "$hook_outer" init -q -b main
+  git -C "$hook_outer" config user.email acceptance@local
+  git -C "$hook_outer" config user.name acceptance
+  git -C "$hook_outer" add .gitignore docs/README.md scripts verify.sh
+  git -C "$hook_outer" commit -qm outer-fixture
+
+  hook_before_head=$(git -C "$hook_outer" rev-parse HEAD)
+  hook_before_status=$(git -C "$hook_outer" status --porcelain --untracked-files=all)
+  hook_git_dir=$(git -C "$hook_outer" rev-parse --absolute-git-dir)
+  hook_rc=0
+  hook_output=$(cd "$hook_outer" && env -u GIT_WORK_TREE GIT_DIR="$hook_git_dir" \
+    AC19_INNER_HOOK_PROBE=1 bash scripts/acceptance-0-2-unreachable-content.sh 2>&1) || hook_rc=$?
+  hook_after_head=$(git -C "$hook_outer" rev-parse HEAD)
+  hook_after_status=$(git -C "$hook_outer" status --porcelain --untracked-files=all)
+  checked=$((checked + 1))
+  if [ "$hook_rc" -eq 0 ] \
+     && [ "$hook_before_head" = "$hook_after_head" ] \
+     && [ "$hook_before_status" = "$hook_after_status" ]; then
+    printf '[%d/%d] Git hook 환경에서도 바깥 저장소 무오염 -> PASS (exit=0)\n' \
+      "$checked" "$TOTAL"
+  else
+    printf '[%d/%d] Git hook 환경에서도 바깥 저장소 무오염 -> UNEXPECTED' \
+      "$checked" "$TOTAL"
+    printf ' (exit=%d, head_same=%s, status_same=%s)\n' "$hook_rc" \
+      "$([ "$hook_before_head" = "$hook_after_head" ] && printf YES || printf NO)" \
+      "$([ "$hook_before_status" = "$hook_after_status" ] && printf YES || printf NO)"
+    printf '%s\n' "$hook_output"
+    failed=$((failed + 1))
+  fi
+fi
 
 printf 'CHECKED: %d\n' "$checked"
 if [ "$failed" -ne 0 ]; then
