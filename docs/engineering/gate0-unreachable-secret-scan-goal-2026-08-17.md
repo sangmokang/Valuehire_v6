@@ -16,6 +16,10 @@
 이번 수리가 만든 문제가 아니어서 별도 이슈 #22로 분리했습니다. 서버 검사 결과와 책임자 승인은 아직
 남았고, 전용 자동화 설정 검사 도구는 이 환경에 없어 실행하지 못했습니다.
 
+첫 일반 push는 새 합성 시험이 훅의 저장소 위치를 물려받아 실제 작업 브랜치에 가짜 커밋을 만드는
+문제까지 찾아 차단됐습니다. 원격에는 아무것도 올라가지 않았고, 가짜 커밋은 역사에서 제거했습니다.
+같은 훅 환경을 합성 바깥 저장소로 재현하는 여섯 번째 실패 시험과 환경 격리 수리를 추가했습니다.
+
 ## 2층 — 판단 근거
 
 시작 검사 19개 중 실패한 것은 하나뿐입니다. 추적 파일과 현재 기록에서 금지값을 찾는 검사는
@@ -100,7 +104,8 @@ FAIL: unreachable 객체 27건 잔존 (reflog expire/gc --prune=now 미완)
 때 `scripts/acceptance-0-2.sh` 일반 실행은 종료 성적 0이어야 합니다. 같은 blob에 로컬 금지값이 있거나
 unreachable 객체 읽기 자체가 실패하거나, 50MiB 큰 blob의 앞쪽에 금지값이 있으면 일반 실행은 0이
 아닌 성적이어야 합니다. 무해한 blob이라도 `ACCEPTANCE_ENDSTATE=1` 실행은 0이 아닌 성적이어야 합니다.
-이 다섯 경우를 검사하는 인수 스크립트는 로컬 push 검사와 서버 자동 검사에서 모두 실행되어야 합니다.
+Git 훅 환경에서도 합성 시험이 바깥 저장소의 HEAD·파일 상태를 바꾸지 않아야 합니다. 이 여섯 경우를
+검사하는 인수 스크립트는 로컬 push 검사와 서버 자동 검사에서 모두 실행되어야 합니다.
 
 #### 가짜 합격을 막는 반대 사례
 
@@ -117,7 +122,7 @@ unreachable 객체 읽기 자체가 실패하거나, 50MiB 큰 blob의 앞쪽에
 - Gate 0: `RED: 1/19`; 이 작업이 닫아야 할 선행 실패로 확인했습니다.
 - Gate 1: GitHub 이슈 #19, 단일 인수 기준 AC-19를 만들었습니다.
 - Gate 2: `worktrees/gate0-unreachable-secret-scan`, `task/gate0-unreachable-secret-scan`으로 격리했습니다.
-- Gate 3 RED: 합성 저장소 세 경우를 실행하는 시험만 먼저 커밋하고 기존 코드에서 실패함을 확인합니다.
+- Gate 3 RED: 최초 세 사례와 적대검증 추가 두 사례, 훅 환경 무오염 한 사례를 각각 코드보다 먼저 실패로 고정합니다.
 - Gate 3 GREEN: RED 시험을 바꾸지 않고 대상 판정기와 필요한 서버 연결만 최소 수정합니다.
 - Gate 4: 대상 시험, 시작 검사, 비밀 스캔, 문서·장치 대조, 셸 문법, 변조 시험을 실행합니다.
 - Gate 4.5: Claude가 1차로 공격하고 Codex가 모든 증거를 직접 재현합니다.
@@ -419,6 +424,71 @@ implementation_restored=YES
 → 무엇을 시켰나: 최종 코드의 값 비교를 다시 고의로 무력화하고 시험한 뒤 정확히 원복했습니다.
 → 뭐가 나왔나: 작은 값과 큰 값 두 사례가 모두 실패했고 원복 뒤 HEAD와 차이가 0건입니다.
 → 좋은 소식인가 나쁜 소식인가: 새 두 방어를 포함한 최종 시험이 실제 약화를 잡고 흔적도 남지 않아 좋은 소식입니다.
+
+#### 8-7. 첫 일반 push가 찾은 Git 훅 환경 오염과 수리
+
+```text
+$ git push -u origin task/gate0-unreachable-secret-scan
+pre-push: 검사 18개 실행
+BLOCKED: ./scripts/acceptance-0-2-unreachable-content.sh exit=1
+BLOCKED: ./scripts/acceptance-0-6.sh exit=1
+BLOCKED: ./scripts/acceptance-hs-cleanroom.sh exit=2
+BLOCKED: ./verify.sh exit=1
+error: failed to push some refs
+$ git log -1 --oneline
+e794579 fixture
+$ git status --short
+ M .gitignore
+ D docs/README.md
+```
+
+→ 무엇을 시켰나: 모든 로컬 검증 뒤 훅을 우회하지 않는 첫 일반 push를 실행하고 HEAD·파일 상태를 확인했습니다.
+→ 뭐가 나왔나: push는 차단됐지만 새 합성 시험이 훅의 저장소 위치를 상속해 원본 브랜치에 fixture 커밋을 만들었습니다.
+→ 좋은 소식인가 나쁜 소식인가: 원격 유출은 막혔지만 로컬 원본 오염은 심각한 나쁜 소식이어서 PR 진행을 중단했습니다.
+
+직접 실행 때는 Git 저장소 위치 환경값이 없었지만 pre-push 자식은 연결 worktree의 절대 `GIT_DIR`을
+상속했습니다. 합성 저장소의 `git -C`보다 이 환경값이 우선해 원본 index·branch를 사용한 것이
+직접 원인입니다. 작업 파일 상태가 push 전 `a066daa`와 완전히 같음을 먼저 증명하고 임시 역변경
+커밋으로 복구한 뒤, 원인 커밋과 복구 커밋은 최종 rebase에서 함께 제거했습니다.
+
+```text
+$ 합성 바깥 저장소에서 절대 GIT_DIR만 상속하고 기존 시험 실행  # 322d523 RED
+[1/6] 일반 실행은 무해한 unreachable blob을 허용 -> PASS (exit=0)
+[2/6] 일반 실행은 금지값이 든 unreachable blob을 차단 -> BLOCKED (exit=1)
+[3/6] unreachable 객체 읽기 실패는 조용히 통과하지 않음 -> BLOCKED (exit=1)
+[4/6] 큰 unreachable blob 앞쪽의 금지값도 차단 -> BLOCKED (exit=1)
+[5/6] 종료상태 실행은 무해한 unreachable blob도 차단 -> BLOCKED (exit=1)
+[6/6] Git hook 환경에서도 바깥 저장소 무오염 -> UNEXPECTED (exit=1, head_same=NO, status_same=NO)
+CHECKED: 6
+FAIL: AC-19 예상과 다른 사례 1건
+hook_env_red_rc=1
+real_worktree_unchanged=YES
+```
+
+→ 무엇을 시켰나: 실제 훅과 같은 절대 저장소 위치를 합성 바깥 저장소에만 주고 시험 자체의 오염을 관찰했습니다.
+→ 뭐가 나왔나: 합성 바깥 저장소 HEAD와 파일 상태가 둘 다 바뀌어 여섯 번째 사례가 RED였고 실제 worktree는 그대로였습니다.
+→ 좋은 소식인가 나쁜 소식인가: 위험을 원본이 아닌 합성 저장소에서 재현해 수리 기준을 고정한 올바른 RED입니다.
+
+```text
+$ ROOT 고정 직후 Git 로컬 환경값 7종 unset  # 56cc258 GREEN
+$ bash scripts/acceptance-0-2-unreachable-content.sh
+[1/6] 일반 실행은 무해한 unreachable blob을 허용 -> PASS (exit=0)
+[2/6] 일반 실행은 금지값이 든 unreachable blob을 차단 -> BLOCKED (exit=1)
+[3/6] unreachable 객체 읽기 실패는 조용히 통과하지 않음 -> BLOCKED (exit=1)
+[4/6] 큰 unreachable blob 앞쪽의 금지값도 차단 -> BLOCKED (exit=1)
+[5/6] 종료상태 실행은 무해한 unreachable blob도 차단 -> BLOCKED (exit=1)
+[6/6] Git hook 환경에서도 바깥 저장소 무오염 -> PASS (exit=0)
+CHECKED: 6
+PASS: AC-19 일반 내용 검사와 종료상태 0건 조건 분리
+hook_env_green_rc=0
+real_repository_unchanged=YES
+$ git rebase --onto a066daa 4f65be1 task/gate0-unreachable-secret-scan
+Successfully rebased and updated refs/heads/task/gate0-unreachable-secret-scan.
+```
+
+→ 무엇을 시켰나: 실제 ROOT만 먼저 고정하고 Git 로컬 환경을 지운 뒤 같은 여섯 사례를 실행하고 무효 두 커밋을 역사에서 제거했습니다.
+→ 뭐가 나왔나: 6/6 통과, 실제 HEAD·상태 불변, 최종 역사에는 Lore를 지키지 않은 fixture와 임시 복구 커밋이 없습니다.
+→ 좋은 소식인가 나쁜 소식인가: 실제 pre-push가 찾은 원본 오염 경로를 회귀 시험으로 닫아 좋은 소식입니다.
 
 ### 9. 적대 검증 로그
 

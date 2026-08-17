@@ -25,7 +25,7 @@
 | 2 | HumanSearch G1 클린룸 경계 | 인라인 8개 — `acceptance-hs-cleanroom.sh` + `-mutations`·`-absolute-paths`·`-absolute-contexts`·`-colon-paths`·`-file-urls`·`-hook-env`·`-hook-env-mutations` |
 | 3 | HumanSearch G2 테스트 게이트 | 인라인 — `uv` 설치 후 `acceptance-hs-gates.sh` + `-mutations`·`-antiforge` (정적 ruff/mypy + pytest 수집·runtime import 증명) |
 | 4 | 히스토리 전량 스캔 | 인라인 — 도달 가능한 모든 blob 을 열어 자격증명 패턴 대조 |
-| 5 | 인수 검사 0-2 상시/종료상태 분리 | `bash scripts/acceptance-0-2-unreachable-content.sh` — 합성 저장소 5개 사례 (AC-19) |
+| 5 | 인수 검사 0-2 상시/종료상태 분리 | `bash scripts/acceptance-0-2-unreachable-content.sh` — 합성 저장소 6개 사례 (AC-19) |
 | 6 | 인수 검사 0-6 | `bash scripts/acceptance-0-6.sh` |
 | 7 | 인수 검사 0-7 | `bash scripts/acceptance-0-7.sh` — 훅 위반 6종 시연 |
 | 8 | 인수 검사 0-5 | `bash scripts/acceptance-0-5.sh` — **`main` 브랜치에서만** (`if: github.ref == 'refs/heads/main'`) |
