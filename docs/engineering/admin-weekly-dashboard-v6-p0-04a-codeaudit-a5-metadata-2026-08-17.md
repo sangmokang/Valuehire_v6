@@ -1,0 +1,24 @@
+# P0-04A codeaudit a5 evidence metadata
+
+- verdict: `PASS_MICRO_ONLY`
+- parent_ac_status: `PARTIAL_PARENT_AC`
+- auditor_id: `/root/p0_04a_codeaudit_a5`
+- original_base_commit: `f91b59c7cd8e0c423f83225336ce61d46bb72597`
+- red_commit: `bd12c2e9f1e4067a0fccad302c8d0017ff2c462a`
+- previous_candidate_commit: `2298f95f21b305f1a7623bbac3d434a0d32ae788`
+- candidate_commit: `0f93d1f1f9e61be84dd75b5e56e38e6795d7dd37`
+- prior_failed_audit_evidence_commit: `b45afa58f9296dc4324481371b15b10dfce7233f`
+- raw_evidence_path: `docs/engineering/admin-weekly-dashboard-v6-p0-04a-codeaudit-a5-2026-08-17.md`
+- raw_evidence_sha256: `6bf9305a8d9915867e10b91eba6abe0a5f645ad3ea2944ad7b7c4c7602b3e2e5`
+- raw_evidence_bytes: `5080`
+- stored_at_utc: `2026-08-17T00:23:03Z`
+- redaction: `none`
+- original_request_sha256_confirmed: `b00f70061c0958bc1c818fb9e74334abb604fc8fe7e9d82e4228fc2c95d7c9da`
+- severity_counts: `P0=0 P1=0 core-P2=0`
+- red_receipt: `required=5 ignored=2 tracked=0 targetCount=5 exit=1`
+- green_receipt: `required=5 ignored=5 tracked=0 targetCount=5 exit=0`
+- mutation_receipts: `node=5/4/0/5 exit1; next-coverage=5/4/0/5 exit1; force-track=5/5/1/5 exit1`
+- goal_anchor_validation: `48/48`
+- source_baseline: `RED 1/19`
+- external_side_effect_count: `0`
+- validation_limit: `admin runtime/build/test, install, artifact generation, CI, deployment, live connectors, network, credentials, push/PR/merge remain NOT_RUN`
