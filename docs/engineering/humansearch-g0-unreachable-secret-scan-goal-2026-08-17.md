@@ -675,3 +675,69 @@ be7532f fixture
 원인은 시험 진입부가 비밀 파일 경로만 비우고 Git 저장소 위치 환경은 상속한 것입니다. 원본 작업 공간에서
 같은 재현 중 생긴 제 합성 커밋은 원격 전송 전에 직전 지문 `0f36836`으로 되돌렸고, 작업 파일과 인덱스가
 깨끗함을 다시 확인했습니다. 복제본의 임시 경로는 증거 보관처가 아니라 재현 위치입니다.
+
+#### 배송 GREEN — 실제 업로드 경로 재검증
+
+`4eb423a`는 합성 시험 진입부에서 실제 패턴 경로와 Git 저장소 위치 환경을 모두 비웁니다. 같은 Git 위치
+환경을 상속해도 네 사례가 통과했고, 실행 전후 가지 지문과 작업 상태 지문이 같았습니다.
+
+```text
+BEFORE_HEAD=26855618ac11aa7dcf466c0e27d9a562b51d7207
+AFTER_HEAD=26855618ac11aa7dcf466c0e27d9a562b51d7207
+BEFORE_STATUS=c031b3aae5eb0d4f0d32fba4d5c24a51754262a852bc247e8d77d41cf1186109
+AFTER_STATUS=c031b3aae5eb0d4f0d32fba4d5c24a51754262a852bc247e8d77d41cf1186109
+CHECKED: 4
+PASS: 무해한 복구 객체 허용·비밀 객체 차단·최종 정리 0개 조건 보존
+```
+
+→ 실행 전후 가지와 작업 상태가 한 글자도 달라지지 않았고 네 합성 사례가 모두 통과했습니다. 첫 push에서
+확인된 실저장소 커밋 부작용은 닫혔습니다.
+
+```text
+$ git push -u origin task/humansearch-g0-unreachable-secret-scan
+  skip ./scripts/acceptance-0-2.sh (DEFERRED · CI 담당)
+  skip ./scripts/acceptance-0-5.sh (DEFERRED · CI 담당)
+  skip ./scripts/acceptance-0-7.sh (PUSH-PERFORMING · CI 담당)
+pre-push: 검사 18개 실행
+  ok  ./scripts/acceptance-0-2-unreachable-objects.sh
+  ok  ./scripts/acceptance-0-6.sh
+  ok  ./scripts/acceptance-hs-a3.sh
+  ok  ./scripts/acceptance-hs-a4.sh
+  ok  ./scripts/acceptance-hs-cleanroom-absolute-contexts.sh
+  ok  ./scripts/acceptance-hs-cleanroom-absolute-paths.sh
+  ok  ./scripts/acceptance-hs-cleanroom-colon-paths.sh
+  ok  ./scripts/acceptance-hs-cleanroom-file-urls.sh
+  ok  ./scripts/acceptance-hs-cleanroom-hook-env-mutations.sh
+  ok  ./scripts/acceptance-hs-cleanroom-hook-env.sh
+  ok  ./scripts/acceptance-hs-cleanroom-mutations.sh
+  ok  ./scripts/acceptance-hs-cleanroom.sh
+  ok  ./scripts/acceptance-hs-gates-antiforge.sh
+  ok  ./scripts/acceptance-hs-gates-mutations.sh
+  ok  ./scripts/acceptance-hs-gates.sh
+  ok  ./scripts/acceptance-secret-webhook-vendor.sh
+  ok  ./scripts/acceptance-verify-ac-m.sh
+  ok  ./verify.sh
+remote:
+remote: Create a pull request for 'task/humansearch-g0-unreachable-secret-scan' on GitHub by visiting:
+remote:      https://github.com/sangmokang/Valuehire_v6/pull/new/task/humansearch-g0-unreachable-secret-scan
+remote:
+To https://github.com/sangmokang/Valuehire_v6.git
+ * [new branch] task/humansearch-g0-unreachable-secret-scan -> task/humansearch-g0-unreachable-secret-scan
+branch 'task/humansearch-g0-unreachable-secret-scan' set up to track 'origin/task/humansearch-g0-unreachable-secret-scan'.
+```
+
+→ 두 번째 일반 push는 업로드 전 검사 18개를 전부 통과해 원격 작업 가지만 만들었습니다. main 직접 push,
+병합, 배포는 하지 않았습니다.
+
+```text
+$ bash scripts/session-status.sh
+HEAD: 4eb423a (ahead 8 / behind 0)
+ORIGIN: 4fdef31
+RED: 0/20 (acceptance-0-7.sh 제외 — CI 담당)
+```
+
+→ 원격에 올라간 코드 지문 `4eb423a`에서 시작 검사 20개는 실패 0건입니다. 제외된 차단 시연 6종은 앞선
+검증 로그에서 별도로 모두 통과했습니다.
+
+**최종 교차 판정: PASS.** Claude가 찾은 상속 환경 1건과 실제 push가 찾은 Git 위치 환경 1건을 모두
+RED 뒤 GREEN으로 닫았습니다. 미해결 결함은 0건이며, 다음 강제 관문은 GitHub 서버 자동 검사입니다.
