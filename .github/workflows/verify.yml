@@ -95,6 +95,10 @@ jobs:
       # blob 09b233e = .secret-patterns.default 자신). CI 에서의 등가물은 위의
       # "히스토리 전량 스캔" 스텝이며, hooks/pre-push 가 그 스텝의 존재를 확인한다.
 
+      - name: 인수 검사 0-2 복구 객체 판정
+        # 로컬 실제 값은 쓰지 않고 합성 값으로 정상 개발 기록·비밀 기록·최종 정리 모드를 모두 실행한다.
+        run: bash scripts/acceptance-0-2-unreachable-objects.sh
+
       - name: 인수 검사 0-7 (훅이 위반 6종을 실제로 차단하는가)
         run: bash scripts/acceptance-0-7.sh
 

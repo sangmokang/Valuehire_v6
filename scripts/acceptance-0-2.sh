@@ -98,9 +98,41 @@ for sha in $CONTAMINATED_BLOBS; do
     echo "FAIL: 오염 blob 객체 잔존(cat-file -p로 평문 복원 가능): $sha"; fail=1
   fi
 done
-# --no-reflogs 필수: reflog를 root로 치면 reflog-잔존 객체가 0으로 보고된다 (V2 실측: 3 vs 0)
-unreach=$(git fsck --full --no-reflogs --unreachable 2>/dev/null | grep -c '^unreachable' || true)
-if [ "$unreach" -ne 0 ]; then
+# --no-reflogs 필수: reflog가 가리키지 않는 복구 가능 객체까지 열어 실제 리터럴을 검사한다.
+# 객체 개수 0은 과거 오염 정리 직후에만 참인 종료상태다. 평소 개발에서는 amend/reset 등으로
+# 무해한 복구 객체가 생기므로, 내용과 관계없이 개수만으로 실패시키면 Gate 0이 상시 막힌다.
+fsck_rc=0
+fsck_out=$(git fsck --full --no-reflogs --unreachable 2>/dev/null) || fsck_rc=$?
+if [ "$fsck_rc" -ne 0 ]; then
+  echo "FAIL: git fsck 실행 실패(exit=$fsck_rc) — 복구 가능 객체 검사 무효"
+  fail=1
+fi
+unreachable_objects=$(printf '%s\n' "$fsck_out" | awk '$1 == "unreachable" && NF >= 3 {print $2, $3}')
+unreach=$(printf '%s\n' "$unreachable_objects" | awk 'NF{c++} END{print c+0}')
+
+while read -r object_type sha; do
+  [ -z "${sha:-}" ] && continue
+  [ "$object_type" = blob ] || continue
+
+  set +e
+  git cat-file blob "$sha" 2>/dev/null | grep -aF "$LIT" >/dev/null
+  object_pipe_status=("${PIPESTATUS[@]}")
+  set -e
+  cat_rc=${object_pipe_status[0]}
+  grep_rc=${object_pipe_status[1]}
+  if [ "$cat_rc" -ne 0 ]; then
+    echo "FAIL: 복구 가능 blob 읽기 실패: $sha (exit=$cat_rc)"
+    fail=1
+  elif [ "$grep_rc" -eq 0 ]; then
+    echo "FAIL: 복구 가능 blob에 리터럴 잔존: $sha"
+    fail=1
+  elif [ "$grep_rc" -ne 1 ]; then
+    echo "FAIL: 복구 가능 blob 내용 검사 실패: $sha (exit=$grep_rc)"
+    fail=1
+  fi
+done <<< "$unreachable_objects"
+
+if [ -n "${ACCEPTANCE_ENDSTATE:-}" ] && [ "$unreach" -ne 0 ]; then
   echo "FAIL: unreachable 객체 ${unreach}건 잔존 (reflog expire/gc --prune=now 미완)"
   fail=1
 fi
