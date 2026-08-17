@@ -114,7 +114,7 @@ Phase B와 C는 정확한 주간 집계와 안전한 화면을 먼저 만들었�
 ### AC-D1 — 기존 표 재사용 운영 결정 계약
 
 - **EARS 단언:** When 운영 원본 계약을 읽고 수집 결과·후보자 비교·캘린더 목록을 판정하면, 시스템은 기존 Supabase 표를 정본으로 가리키고, 15분 단일 실행, Gmail 원문 영구 복사 금지, 후보자 자동 병합 금지, 전체 완료 전 `FAIL`, 캘린더 하나 확인 전 `NOT_RUN`을 일관되게 반환해야 합니다.
-- **검증 명령:** `cd humansearch && uv run --no-sync pytest -q tests/test_admin_source_policy.py`와 저장소 Python 게이트 전체를 실행합니다.
+- **검증 명령:** `cd humansearch && uv run --no-sync pytest -q tests/test_admin_source_policy.py`, `cd humansearch && PYTHONPATH=src uv run --no-sync python -m humansearch.admin_weekly_dashboard.source_policy_cli --contract ../contracts/admin-weekly-dashboard/source-contract-v1.json`, 저장소 Python 게이트 전체를 실행합니다.
 - **counter-AC:** 새 원본 표를 만들거나, Gmail 본문 영구 저장을 허용하거나, 이름·학교·회사 일치로 자동 병합하거나, 일부 페이지만 읽고 `PASS`를 반환하거나, `sangmokang`을 목록 확인 없이 실제 고유값으로 쓰면 가짜 합격입니다.
 
 ## Harness 게이트 진행 계획

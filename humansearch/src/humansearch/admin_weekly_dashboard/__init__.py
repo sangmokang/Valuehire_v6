@@ -16,10 +16,26 @@ from .contracts import (
     load_metric_contract,
 )
 from .snapshot import build_weekly_snapshot
+from .source_policy import (
+    CalendarReference,
+    CalendarResolution,
+    CandidateIdentityEvidence,
+    CandidateLinkDecision,
+    SourcePolicy,
+    SupabaseSource,
+    candidate_link_decision,
+    collection_state,
+    load_source_policy,
+    resolve_calendar_alias,
+)
 from .weekly_window import WeeklyWindow, weekly_window
 
 __all__ = [
     "Aggregation",
+    "CalendarReference",
+    "CalendarResolution",
+    "CandidateIdentityEvidence",
+    "CandidateLinkDecision",
     "MetricCatalogPayload",
     "MetricContract",
     "MetricDefinition",
@@ -29,10 +45,16 @@ __all__ = [
     "MetricResult",
     "MetricStatus",
     "SourceFailureReason",
+    "SourcePolicy",
     "SourceState",
+    "SupabaseSource",
     "WeeklySnapshot",
     "WeeklyWindow",
     "build_weekly_snapshot",
+    "candidate_link_decision",
+    "collection_state",
     "load_metric_contract",
+    "load_source_policy",
+    "resolve_calendar_alias",
     "weekly_window",
 ]

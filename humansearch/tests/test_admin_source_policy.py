@@ -1,5 +1,9 @@
 """Acceptance tests for pre-live source, retention, and identity decisions."""
 
+import json
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -14,6 +18,7 @@ from humansearch.admin_weekly_dashboard.source_policy import (
     load_source_policy,
     resolve_calendar_alias,
 )
+from humansearch.admin_weekly_dashboard.source_policy_cli import main as source_policy_main
 
 SOURCE_CONTRACT = (
     Path(__file__).parents[2]
@@ -21,6 +26,7 @@ SOURCE_CONTRACT = (
     / "admin-weekly-dashboard"
     / "source-contract-v1.json"
 )
+PROJECT_ROOT = Path(__file__).parents[1]
 
 
 def test_source_contract_reuses_existing_supabase_tables_without_raw_gmail_fields() -> None:
@@ -60,6 +66,87 @@ def test_source_contract_reuses_existing_supabase_tables_without_raw_gmail_field
     assert gmail_fields.isdisjoint(
         {"body_text", "classified_payload", "from_email", "source_member_email", "subject"}
     )
+
+
+def test_source_policy_cli_is_a_pii_free_production_readback(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert source_policy_main(["--contract", str(SOURCE_CONTRACT)]) == 0
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["readiness"] == {"status": "NOT_RUN", "reason": "precondition_missing"}
+    assert payload["refresh"] == {
+        "interval_minutes": 15,
+        "overlap_reason": "collection_overlap",
+        "overlap_result": "NOT_RUN",
+    }
+    assert payload["retention"]["gmail_raw_permanent_copy"] is False
+    assert payload["candidate_identity"]["auto_merge"] is False
+    serialized = json.dumps(payload, ensure_ascii=False, sort_keys=True)
+    for forbidden in ("body_text", "classified_payload", "from_email", "source_member_email"):
+        assert forbidden not in serialized
+
+
+def test_source_policy_cli_runs_through_the_real_module_entrypoint() -> None:
+    env = os.environ.copy()
+    env["PYTHONPATH"] = "src"
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "humansearch.admin_weekly_dashboard.source_policy_cli",
+            "--contract",
+            str(SOURCE_CONTRACT),
+        ],
+        cwd=PROJECT_ROOT,
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["readiness"] == {"status": "NOT_RUN", "reason": "precondition_missing"}
+
+
+@pytest.mark.parametrize(
+    ("original", "replacement", "error"),
+    [
+        ('"gmail_raw_permanent_copy": "FORBIDDEN"', '"gmail_raw_permanent_copy": "ALLOWED"', "permanent Gmail"),
+        ('"auto_merge": false', '"auto_merge": true', "never auto-merge"),
+        ('"interval_minutes": 15', '"interval_minutes": 30', "must be 15 minutes"),
+        (
+            '"admin-weekly-dashboard-sources/v1"',
+            '"admin-weekly-dashboard-sources/v999"',
+            "version must be",
+        ),
+        ('"requested_alias": "sangmokang"', '"requested_alias": "other"', "must be sangmokang"),
+        (
+            '"public.gmail_derived_events"',
+            '"public.gmail_messages"',
+            "approved existing Supabase source",
+        ),
+        (
+            '"supabase_writes": "DISABLED"',
+            '"supabase_writes": "ENABLED"',
+            "external effects must remain",
+        ),
+    ],
+)
+def test_source_contract_rejects_unsafe_policy_mutations(
+    tmp_path: Path,
+    original: str,
+    replacement: str,
+    error: str,
+) -> None:
+    source = SOURCE_CONTRACT.read_text(encoding="utf-8")
+    assert source.count(original) == 1
+    mutated = tmp_path / "mutated-source-contract.json"
+    mutated.write_text(source.replace(original, replacement), encoding="utf-8")
+
+    with pytest.raises(ValueError, match=error):
+        load_source_policy(mutated)
 
 
 @pytest.mark.parametrize(

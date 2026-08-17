@@ -1,0 +1,67 @@
+{
+  "version": "admin-weekly-dashboard-sources/v1",
+  "refresh": {
+    "interval_minutes": 15,
+    "overlap_policy": "SKIP_AS_NOT_RUN",
+    "overlap_reason": "collection_overlap"
+  },
+  "calendar": {
+    "requested_alias": "sangmokang",
+    "match_fields": ["id", "summary"],
+    "ambiguous_result": "NOT_RUN",
+    "not_found_result": "NOT_RUN"
+  },
+  "retention": {
+    "gmail_raw_permanent_copy": "FORBIDDEN",
+    "weekly_anonymized_aggregates": "INDEFINITE",
+    "deletion_request": "REQUIRED"
+  },
+  "candidate_identity": {
+    "evidence": ["name", "school", "company"],
+    "auto_merge": false,
+    "all_exact": "REVIEW_REQUIRED"
+  },
+  "supabase_reuse": {
+    "candidate_cards": {
+      "table": "public.pipeline_candidates",
+      "select_fields": ["clickup_task_id", "name", "resume_data", "last_synced_at"],
+      "processing": "TRANSIENT_IDENTITY_REVIEW"
+    },
+    "gmail_cursor": {
+      "table": "public.gmail_sync_state",
+      "select_fields": ["last_success_at"],
+      "processing": "AGGREGATE_READ_ONLY"
+    },
+    "gmail_events": {
+      "table": "public.gmail_derived_events",
+      "select_fields": ["id", "event_type", "status", "occurred_at", "classifier_version"],
+      "processing": "AGGREGATE_READ_ONLY"
+    },
+    "gmail_runs": {
+      "table": "public.gmail_ingestion_runs",
+      "select_fields": ["run_id", "status", "pagination_exhausted", "last_success_at"],
+      "processing": "AGGREGATE_READ_ONLY"
+    },
+    "position_cards": {
+      "table": "public.pipeline_position_cards",
+      "select_fields": ["id", "company_name", "imported_at", "last_updated_at"],
+      "processing": "AGGREGATE_READ_ONLY"
+    },
+    "sourcing_results": {
+      "table": "public.sourcing_results",
+      "select_fields": ["id", "run_id", "position_id"],
+      "processing": "AGGREGATE_READ_ONLY"
+    },
+    "sourcing_runs": {
+      "table": "public.sourcing_runs",
+      "select_fields": ["id", "triggered_at"],
+      "processing": "AGGREGATE_READ_ONLY"
+    }
+  },
+  "external_effects": {
+    "calendar": "READ_ONLY_NOT_CONNECTED",
+    "clickup": "READ_ONLY_NOT_CONNECTED",
+    "gmail": "READ_ONLY_NOT_CONNECTED",
+    "supabase_writes": "DISABLED"
+  }
+}
