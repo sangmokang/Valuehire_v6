@@ -3,6 +3,8 @@
 set -euo pipefail
 
 ROOT=$(git rev-parse --show-toplevel)
+unset GIT_DIR GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_WORK_TREE GIT_COMMON_DIR \
+  GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_PREFIX
 TARGET="$ROOT/scripts/acceptance-0-2.sh"
 VERIFY="$ROOT/verify.sh"
 SELF="$ROOT/scripts/acceptance-0-2-unreachable-content.sh"
