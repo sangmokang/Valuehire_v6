@@ -161,15 +161,20 @@ function parseBlockerDeclarations(text) {
 function parseVerifySteps(workflow) {
   const lines = workflow.split(/\r?\n/);
   const verifyIndex = lines.findIndex((line) => /^  verify:\s*$/.test(line));
-  if (verifyIndex < 0) return [];
-  const stepsIndex = lines.findIndex((line, index) => index > verifyIndex && /^    steps:\s*$/.test(line));
-  if (stepsIndex < 0) return [];
+  if (verifyIndex < 0) return { steps: [], verifyFound: false, stepsFound: false };
+  const nextJobIndex = lines.findIndex(
+    (line, index) => index > verifyIndex && /^  [A-Za-z0-9_-]+:\s*$/.test(line),
+  );
+  const verifyEnd = nextJobIndex < 0 ? lines.length : nextJobIndex;
+  const stepsIndex = lines.findIndex(
+    (line, index) => index > verifyIndex && index < verifyEnd && /^    steps:\s*$/.test(line),
+  );
+  if (stepsIndex < 0) return { steps: [], verifyFound: true, stepsFound: false };
 
   const steps = [];
   let step = null;
-  for (let index = stepsIndex + 1; index < lines.length; index += 1) {
+  for (let index = stepsIndex + 1; index < verifyEnd; index += 1) {
     const line = lines[index];
-    if (line.trim() !== "" && !/^\s*#/.test(line) && /^  \S/.test(line)) break;
     if (/^      -\s+/.test(line)) {
       if (step) steps.push(step);
       step = { lines: [line] };
@@ -179,12 +184,16 @@ function parseVerifySteps(workflow) {
   }
   if (step) steps.push(step);
 
-  return steps.map((entry) => {
+  return {
+    verifyFound: true,
+    stepsFound: true,
+    steps: steps.map((entry) => {
     const activeLines = entry.lines.filter((line) => !/^\s*#/.test(line));
     const name = activeLines.map((line) => line.match(/^\s*(?:-\s+)?name:\s*(.*)$/)?.[1]).find(Boolean) ?? null;
     const run = activeLines.map((line) => line.match(/^\s*(?:-\s+)?run:\s*(.*)$/)?.[1]).find(Boolean) ?? null;
     return { activeLines, name, run };
-  });
+    }),
+  };
 }
 
 function parseSotCiRowCount(text) {
@@ -487,7 +496,10 @@ function validateEvidenceBindings(files, errors) {
 }
 
 function validateCi(files, contract, errors) {
-  const steps = parseVerifySteps(files.workflow);
+  const parsed = parseVerifySteps(files.workflow);
+  const { steps } = parsed;
+  if (!parsed.verifyFound) errors.push("CI workflow must define jobs.verify");
+  if (!parsed.stepsFound) errors.push("CI verify job must contain steps");
   const stepName = contract.ci?.phase0StepName;
   const run = contract.ci?.run;
   const candidates = steps.filter((step) => step.name === stepName || step.run === run);
@@ -501,10 +513,10 @@ function validateCi(files, contract, errors) {
     if (step.name !== stepName || step.run !== run) {
       errors.push("CI workflow must include run: bash scripts/acceptance-admin-phase0-plan.sh");
     }
-    if (step.activeLines.some((line) => /^\s*if\s*:/.test(line))) {
+    if (step.activeLines.some((line) => /^\s*(?:-\s+)?(?:if|"if"|'if')\s*:/.test(line))) {
       errors.push("CI Phase 0 plan step must not contain if");
     }
-    if (step.activeLines.some((line) => /^\s*continue-on-error\s*:/.test(line))) {
+    if (step.activeLines.some((line) => /^\s*(?:-\s+)?(?:continue-on-error|"continue-on-error"|'continue-on-error')\s*:/.test(line))) {
       errors.push("CI Phase 0 plan step must not contain continue-on-error");
     }
     if (step.activeLines.some((line) => /\|\|\s*true(?:\s|$)/.test(line))) {

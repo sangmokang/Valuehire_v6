@@ -41,11 +41,7 @@ function copyBundle(sourceRoot, targetRoot) {
   }
 }
 
-function runSelfTest(root) {
-  const baseline = validate(root);
-  if (baseline.errors.length > 0) return baseline;
-
-  const mutations = [
+const mutations = [
     {
       name: "missing-engines-row",
       expected: "required phase row missing: P0-03A-node-engine-pin",
@@ -284,7 +280,76 @@ function runSelfTest(root) {
         fs.writeFileSync(dependencyFile, dependencies);
       },
     },
+    {
+      name: "ci-verify-steps-moved-to-decoy-job",
+      expected: "CI verify job must contain steps",
+      apply(tempRoot) {
+        const file = path.join(tempRoot, relativePaths.workflow);
+        const text = replaceOnce(
+          fs.readFileSync(file, "utf8"),
+          "  verify:\n    runs-on: ubuntu-latest\n    steps:",
+          "  verify:\n    runs-on: ubuntu-latest\n\n  decoy:\n    runs-on: ubuntu-latest\n    steps:",
+        );
+        fs.writeFileSync(file, text);
+      },
+    },
+    {
+      name: "ci-if-as-first-step-key",
+      expected: "CI Phase 0 plan step must not contain if",
+      apply(tempRoot) {
+        const file = path.join(tempRoot, relativePaths.workflow);
+        const text = replaceOnce(
+          fs.readFileSync(file, "utf8"),
+          "      - name: 관리자 대시보드 Phase 0 계획 복구 계약\n        # 요구 누락·비원자 작업·무효 감사 재사용·SOT/CI 미배선을 같은 판정기로 막는다.\n        run: bash scripts/acceptance-admin-phase0-plan.sh",
+          "      - if: github.ref == 'refs/heads/main'\n        name: 관리자 대시보드 Phase 0 계획 복구 계약\n        # 요구 누락·비원자 작업·무효 감사 재사용·SOT/CI 미배선을 같은 판정기로 막는다.\n        run: bash scripts/acceptance-admin-phase0-plan.sh",
+        );
+        fs.writeFileSync(file, text);
+      },
+    },
+    {
+      name: "ci-continue-on-error-as-first-step-key",
+      expected: "CI Phase 0 plan step must not contain continue-on-error",
+      apply(tempRoot) {
+        const file = path.join(tempRoot, relativePaths.workflow);
+        const text = replaceOnce(
+          fs.readFileSync(file, "utf8"),
+          "      - name: 관리자 대시보드 Phase 0 계획 복구 계약\n        # 요구 누락·비원자 작업·무효 감사 재사용·SOT/CI 미배선을 같은 판정기로 막는다.\n        run: bash scripts/acceptance-admin-phase0-plan.sh",
+          "      - continue-on-error: true\n        name: 관리자 대시보드 Phase 0 계획 복구 계약\n        # 요구 누락·비원자 작업·무효 감사 재사용·SOT/CI 미배선을 같은 판정기로 막는다.\n        run: bash scripts/acceptance-admin-phase0-plan.sh",
+        );
+        fs.writeFileSync(file, text);
+      },
+    },
+    {
+      name: "ci-quoted-if-as-first-step-key",
+      expected: "CI Phase 0 plan step must not contain if",
+      apply(tempRoot) {
+        const file = path.join(tempRoot, relativePaths.workflow);
+        const text = replaceOnce(
+          fs.readFileSync(file, "utf8"),
+          "      - name: 관리자 대시보드 Phase 0 계획 복구 계약\n        # 요구 누락·비원자 작업·무효 감사 재사용·SOT/CI 미배선을 같은 판정기로 막는다.\n        run: bash scripts/acceptance-admin-phase0-plan.sh",
+          "      - 'if': github.ref == 'refs/heads/main'\n        name: 관리자 대시보드 Phase 0 계획 복구 계약\n        # 요구 누락·비원자 작업·무효 감사 재사용·SOT/CI 미배선을 같은 판정기로 막는다.\n        run: bash scripts/acceptance-admin-phase0-plan.sh",
+        );
+        fs.writeFileSync(file, text);
+      },
+    },
+    {
+      name: "ci-quoted-continue-on-error-as-first-step-key",
+      expected: "CI Phase 0 plan step must not contain continue-on-error",
+      apply(tempRoot) {
+        const file = path.join(tempRoot, relativePaths.workflow);
+        const text = replaceOnce(
+          fs.readFileSync(file, "utf8"),
+          "      - name: 관리자 대시보드 Phase 0 계획 복구 계약\n        # 요구 누락·비원자 작업·무효 감사 재사용·SOT/CI 미배선을 같은 판정기로 막는다.\n        run: bash scripts/acceptance-admin-phase0-plan.sh",
+          "      - 'continue-on-error': true\n        name: 관리자 대시보드 Phase 0 계획 복구 계약\n        # 요구 누락·비원자 작업·무효 감사 재사용·SOT/CI 미배선을 같은 판정기로 막는다.\n        run: bash scripts/acceptance-admin-phase0-plan.sh",
+        );
+        fs.writeFileSync(file, text);
+      },
+    },
   ];
+
+function runSelfTest(root) {
+  const baseline = validate(root);
+  if (baseline.errors.length > 0) return baseline;
 
   let caught = 0;
   for (const mutation of mutations) {
