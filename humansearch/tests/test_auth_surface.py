@@ -92,6 +92,10 @@ ROLE_SET_STRATEGY = st.sets(
 ).map(frozenset)
 
 
+def _is_authenticated(state: AuthSurfaceState) -> bool:
+    return state is AuthSurfaceState.AUTHENTICATED
+
+
 @given(roles=ROLE_SET_STRATEGY, contract_valid=st.booleans())
 def test_classification_properties(
     roles: frozenset[SurfaceRole], *, contract_valid: bool
@@ -111,7 +115,7 @@ def test_classification_properties(
         assert first is AuthSurfaceState.DRIFTED
     if contract_valid and not roles:
         assert first is AuthSurfaceState.UNKNOWN
-        assert first is not AuthSurfaceState.AUTHENTICATED
+        assert not _is_authenticated(first)
 
 
 def test_contract_has_exact_public_values() -> None:
