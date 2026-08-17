@@ -2,7 +2,7 @@
 
 ## 1층 — 결론
 
-이 문서를 새 작업 창에 통째로 넣으면, 실행자는 먼저 필요한 앞 작업 세 개가 실제로 합쳐졌는지
+이 문서를 새 작업 창에 통째로 넣으면, 실행자는 먼저 필요한 앞 작업 네 개가 실제로 합쳐졌는지
 확인합니다. 하나라도 준비되지 않았으면 코드를 전혀 바꾸지 않고 이유와 다음 행동만 남깁니다.
 
 준비가 끝났으면 한 가지 작은 기능만 만듭니다. 실패하는 시험을 먼저 남기고, 그 시험을 통과시키는
@@ -59,7 +59,7 @@ Claude V1 단계에서만 수행한다.
 권한 밖인 작업:
 
 - `main` 직접 수정·직접 push·merge·auto-merge·배포
-- PR #13, #14, #15를 대신 merge하거나 내용을 고치는 일
+- PR #23, #13, #14, #15를 대신 merge하거나 내용을 고치는 일
 - 실제 채용 포털 접속, browser/MCP 접속, 로그인, 세션, 자격증명, DOM/ARIA 캡처
 - 후보자 개인정보, raw fixture, screenshot, 검색, 등록, 발송
 - L2/L3/runner/C1 구현
@@ -88,7 +88,7 @@ Claude V1 단계에서만 수행한다.
 | 상태 | 진입 조건 | 성공 시 다음 | 실패 시 |
 |---|---|---|---|
 | `PREFLIGHT` | 프롬프트 시작 | `CONTRACT` | `BLOCKED` |
-| `CONTRACT` | 선행 PR 세 개가 main에 병합됨 | `PLAN` | `BLOCKED` |
+| `CONTRACT` | 선행 PR 네 개가 main에 병합됨 | `PLAN` | `BLOCKED` |
 | `PLAN` | 정본과 worktree가 안전함 | `RED` | `BLOCKED` |
 | `RED` | goal commit 완료 | `GREEN` | `BLOCKED` |
 | `GREEN` | 유효한 RED commit 완료 | `LOCAL_VERIFY` | `BLOCKED` |
@@ -136,9 +136,10 @@ gh auth status
 - 기존 target worktree/branch가 서로 다른 commit을 가리켜 안전하게 재개할 수 없다.
 - `main` worktree의 미추적 파일은 건드리지 않는다. target worktree만 clean하면 된다.
 
-### 4. `CONTRACT` — 세 선행 PR의 실제 병합 증명
+### 4. `CONTRACT` — 네 선행 PR의 실제 병합 증명
 
-선행 PR은 #13, #14, #15다. `CLOSED`, branch 이름 존재, CI green만으로 병합을 추정하지 않는다.
+선행 PR은 시작 검사 수리 #23과 제품 문지기·정본 #13, #14, #15다. `CLOSED`, branch 이름 존재,
+CI green만으로 병합을 추정하지 않는다.
 각 PR에 대해 GitHub가 주는 merge commit을 읽고, 그 commit이 fresh `origin/main`의 조상인지 확인한다.
 이 저장소는 squash merge를 쓰므로 원래 head commit의 ancestry를 요구하면 안 된다.
 
@@ -147,7 +148,7 @@ gh auth status
 ```bash
 set -euo pipefail
 blocked=0
-for pr_number in 13 14 15; do
+for pr_number in 23 13 14 15; do
   pr_json="$(gh pr view "$pr_number" \
     --json number,state,baseRefName,headRefName,headRefOid,mergedAt,mergeCommit,url)"
   printf '%s\n' "$pr_json"
@@ -175,7 +176,7 @@ if [ "$blocked" -ne 0 ]; then
 fi
 ```
 
-→ 세 PR의 상태·base·merge commit을 모두 출력하고, 각 merge commit이 로컬에 존재하며 현재 main에
+→ 네 PR의 상태·base·merge commit을 모두 출력하고, 각 merge commit이 로컬에 존재하며 현재 main에
 포함됐는지 검사한다. 모두 합격이면 0, 하나라도 준비되지 않으면 이 script에서 20을 남긴다.
 
 하나라도 `MERGED`가 아니거나 ancestry가 0이 아니면:
@@ -404,7 +405,7 @@ dirty면 `BLOCKED`다. REVIEW commit 뒤에는 goal과 §17의 고정 경로 own
 반드시 포함할 내용:
 
 1. 1층 결론, 2층 판단 근거, 3층 증거
-2. current HEAD, `origin/main`, 선행 PR 세 개의 merge 증거
+2. current HEAD, `origin/main`, 선행 PR 네 개의 merge 증거
 3. 기존 구현 검색 범위와 결과
 4. 근본 원인: 화면 분류와 run lifecycle 혼합
 5. AC-L0-1~5와 counter-AC
@@ -1101,7 +1102,7 @@ head SHA와 merge state를 다시 읽는다. merge는 하지 않는다.
 
 아래가 전부 참일 때만 `DONE`이다.
 
-- 선행 PR #13/#14/#15의 merge commit이 fresh `origin/main`에 있음
+- 선행 PR #23/#13/#14/#15의 merge commit이 fresh `origin/main`에 있음
 - tracked SOT가 3 roles/5 states/16 inputs를 정의함
 - goal 문서가 code보다 먼저 PLAN commit에 있음
 - RED가 정확히 25 target tests를 수집하고 기능 부재로 실패함
