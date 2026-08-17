@@ -13,7 +13,13 @@ TMP=$(mktemp -d)
 trap 'rm -rf -- "$TMP"' EXIT
 
 CANARY='AC19-CANARY-8842'
-if [ -n "${AC19_INNER_HOOK_PROBE:-}" ]; then TOTAL=5; else TOTAL=6; fi
+if [ -n "${AC19_PATTERN_ENV_PROBE:-}" ]; then
+  TOTAL=1
+elif [ -n "${AC19_INNER_HOOK_PROBE:-}" ]; then
+  TOTAL=10
+else
+  TOTAL=13
+fi
 checked=0
 failed=0
 
@@ -62,6 +68,13 @@ run_case() {
   failed=$((failed + 1))
 }
 
+if [ -z "${AC19_PATTERN_ENV_PROBE:-}" ] && [ -z "${AC19_INNER_HOOK_PROBE:-}" ]; then
+  run_case 'SECRET_PATTERNS_FILE=/dev/null 상속을 격리' pass "$ROOT" \
+    env SECRET_PATTERNS_FILE=/dev/null AC19_PATTERN_ENV_PROBE=1 bash "$SELF"
+  run_case 'SECRET_PATTERNS_FILE=.secret-patterns.default 상속을 격리' pass "$ROOT" \
+    env SECRET_PATTERNS_FILE=.secret-patterns.default AC19_PATTERN_ENV_PROBE=1 bash "$SELF"
+fi
+
 harmless="$TMP/harmless"
 make_fixture "$harmless"
 printf 'harmless unreachable object\n' |
@@ -69,11 +82,48 @@ printf 'harmless unreachable object\n' |
 run_case '일반 실행은 무해한 unreachable blob을 허용' pass "$harmless" \
   bash scripts/acceptance-0-2.sh
 
+if [ -z "${AC19_PATTERN_ENV_PROBE:-}" ]; then
 tainted="$TMP/tainted"
 make_fixture "$tainted"
 printf '%s\n' "$CANARY" |
   git -C "$tainted" hash-object -w --stdin >/dev/null
 run_case '일반 실행은 금지값이 든 unreachable blob을 차단' blocked "$tainted" \
+  bash scripts/acceptance-0-2.sh
+
+tainted_commit="$TMP/tainted-commit"
+make_fixture "$tainted_commit"
+tainted_commit_tree=$(git -C "$tainted_commit" rev-parse 'HEAD^{tree}')
+printf '%s\n' "$CANARY" |
+  git -C "$tainted_commit" commit-tree "$tainted_commit_tree" >/dev/null
+run_case 'unreachable commit message의 금지값을 차단' blocked "$tainted_commit" \
+  bash scripts/acceptance-0-2.sh
+
+tainted_tree="$TMP/tainted-tree"
+make_fixture "$tainted_tree"
+tainted_tree_blob=$(printf 'harmless tree payload\n' |
+  git -C "$tainted_tree" hash-object -w --stdin)
+printf '100644 blob %s\tpath-%s.txt\n' "$tainted_tree_blob" "$CANARY" |
+  git -C "$tainted_tree" mktree >/dev/null
+run_case 'unreachable tree path의 금지값을 차단' blocked "$tainted_tree" \
+  bash scripts/acceptance-0-2.sh
+
+tainted_tag="$TMP/tainted-tag"
+make_fixture "$tainted_tag"
+tainted_tag_target=$(git -C "$tainted_tag" rev-parse HEAD)
+printf 'object %s\ntype commit\ntag ac19-probe\ntagger acceptance <acceptance@example.invalid> 1 +0000\n\n%s\n' \
+  "$tainted_tag_target" "$CANARY" | git -C "$tainted_tag" mktag >/dev/null
+run_case 'unreachable annotated tag message의 금지값을 차단' blocked "$tainted_tag" \
+  bash scripts/acceptance-0-2.sh
+
+fsck_failure="$TMP/fsck-failure"
+make_fixture "$fsck_failure"
+mkdir -p "$fsck_failure/bin"
+printf '%s\n' '#!/usr/bin/env bash' \
+  'if [ "${1:-}" = fsck ]; then exit 72; fi' \
+  'exec "$REAL_GIT" "$@"' > "$fsck_failure/bin/git"
+chmod +x "$fsck_failure/bin/git"
+run_case 'git fsck 실패는 검사 대상 없음으로 통과하지 않음' blocked "$fsck_failure" \
+  env PATH="$fsck_failure/bin:$PATH" REAL_GIT="$REAL_GIT" \
   bash scripts/acceptance-0-2.sh
 
 read_failure="$TMP/read-failure"
@@ -88,6 +138,22 @@ chmod +x "$read_failure/bin/git"
 run_case 'unreachable 객체 읽기 실패는 조용히 통과하지 않음' blocked "$read_failure" \
   env PATH="$read_failure/bin:$PATH" REAL_GIT="$REAL_GIT" \
   FAIL_CAT_FILE_SHA="$read_failure_sha" bash scripts/acceptance-0-2.sh
+
+unknown_type="$TMP/unknown-type"
+make_fixture "$unknown_type"
+unknown_type_sha=$(git -C "$unknown_type" rev-parse HEAD)
+mkdir -p "$unknown_type/bin"
+printf '%s\n' '#!/usr/bin/env bash' \
+  'if [ "${1:-}" = fsck ]; then' \
+  '  "$REAL_GIT" "$@" || exit $?' \
+  '  printf "unreachable mystery %s\\n" "$FAIL_UNKNOWN_SHA"' \
+  '  exit 0' \
+  'fi' \
+  'exec "$REAL_GIT" "$@"' > "$unknown_type/bin/git"
+chmod +x "$unknown_type/bin/git"
+run_case '알 수 없는 unreachable 객체형은 읽기 실패로 차단' blocked "$unknown_type" \
+  env PATH="$unknown_type/bin:$PATH" REAL_GIT="$REAL_GIT" \
+  FAIL_UNKNOWN_SHA="$unknown_type_sha" bash scripts/acceptance-0-2.sh
 
 large_tainted="$TMP/large-tainted"
 make_fixture "$large_tainted"
@@ -141,6 +207,7 @@ if [ -z "${AC19_INNER_HOOK_PROBE:-}" ]; then
     printf '%s\n' "$hook_output"
     failed=$((failed + 1))
   fi
+fi
 fi
 
 printf 'CHECKED: %d\n' "$checked"

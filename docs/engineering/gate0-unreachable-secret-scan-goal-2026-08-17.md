@@ -720,3 +720,219 @@ PR #23은 더 강한 여섯 사례와 실패 닫힘을 보존하지만 임시 �
 
 이 절 아래에 임시 예외 제거, 대상 시험, 전체 검사, Claude V1, Codex V2, 원격 서버 결과를 순서대로
 추가합니다. 과거 1~10절의 증거는 고치거나 삭제하지 않습니다.
+
+### 12. Attempt 2 — PR #23 단일 정본 강화
+
+#### 12-1. 결론
+
+PR #23의 검사 본체는 PR #21보다 더 많은 실패를 막지만, 시험 프로그램이 호출자의 패턴 파일 설정을
+그대로 물려받는 한 가지 약점이 남아 있습니다. 이 약점을 먼저 실패 시험으로 고정하고, 파일 조각뿐
+아니라 기록 설명문·파일 이름·주석 태그까지 실제 시험으로 증명한 뒤 PR #23 하나만 남깁니다.
+
+PR #21의 코드는 합치거나 복사하지 않습니다. 그 요청에서 유효한 환경 격리 한 줄의 의도만 PR #23의
+더 강한 시험에 흡수하고, 로컬·서버 검사와 두 검토자가 모두 동의한 뒤 PR #21을 중복으로 닫습니다.
+
+#### 12-2. 판단 근거와 현재 상태
+
+현재 작업 폴더는 깨끗하지만 사용자가 예상한 `f28511e`보다 로컬 커밋 두 개가 앞서 있습니다. 두 커밋은
+이 문서에 정리 계획을 더하고 `acceptance-0-2` 임시 억제 한 항목을 삭제했으며, reset·stash·checkout
+없이 현재 `e8e402d`를 새 감사 기준으로 삼습니다.
+
+PR #21의 유효한 추가 보호는 합성 시험 시작부의 `unset SECRET_PATTERNS_FILE`입니다. PR #23의
+`scripts/acceptance-0-2-unreachable-content.sh:5-7`은 Git 저장소 위치 환경은 비우지만 이 값은 비우지
+않습니다. 실제 판정기 `scripts/acceptance-0-2.sh:12-14`는 이 값이 있으면 fixture의 합성 패턴 대신
+호출자 경로를 우선하므로 동일 시험이 실행 환경에 따라 달라집니다.
+
+```text
+$ SECRET_PATTERNS_FILE=/dev/null bash scripts/acceptance-0-2-unreachable-content.sh
+[1/6] 일반 실행은 무해한 unreachable blob을 허용 -> UNEXPECTED (exit=2, expected=pass)
+FAIL: /dev/null 없음/빈 파일 — AC 판정 불가
+[2/6] 일반 실행은 금지값이 든 unreachable blob을 차단 -> BLOCKED (exit=2)
+[3/6] unreachable 객체 읽기 실패는 조용히 통과하지 않음 -> BLOCKED (exit=2)
+[4/6] 큰 unreachable blob 앞쪽의 금지값도 차단 -> BLOCKED (exit=2)
+[5/6] 종료상태 실행은 무해한 unreachable blob도 차단 -> BLOCKED (exit=2)
+[6/6] Git hook 환경에서도 바깥 저장소 무오염 -> UNEXPECTED (exit=1, head_same=YES, status_same=YES)
+[1/5] 일반 실행은 무해한 unreachable blob을 허용 -> UNEXPECTED (exit=2, expected=pass)
+FAIL: /dev/null 없음/빈 파일 — AC 판정 불가
+[2/5] 일반 실행은 금지값이 든 unreachable blob을 차단 -> BLOCKED (exit=2)
+[3/5] unreachable 객체 읽기 실패는 조용히 통과하지 않음 -> BLOCKED (exit=2)
+[4/5] 큰 unreachable blob 앞쪽의 금지값도 차단 -> BLOCKED (exit=2)
+[5/5] 종료상태 실행은 무해한 unreachable blob도 차단 -> BLOCKED (exit=2)
+CHECKED: 5
+FAIL: AC-19 예상과 다른 사례 1건
+CHECKED: 6
+FAIL: AC-19 예상과 다른 사례 2건
+rc_null=1
+$ SECRET_PATTERNS_FILE=.secret-patterns.default bash scripts/acceptance-0-2-unreachable-content.sh
+[1/6] 일반 실행은 무해한 unreachable blob을 허용 -> UNEXPECTED (exit=2, expected=pass)
+FAIL: .secret-patterns.default 없음/빈 파일 — AC 판정 불가
+[2/6] 일반 실행은 금지값이 든 unreachable blob을 차단 -> BLOCKED (exit=2)
+[3/6] unreachable 객체 읽기 실패는 조용히 통과하지 않음 -> BLOCKED (exit=2)
+[4/6] 큰 unreachable blob 앞쪽의 금지값도 차단 -> BLOCKED (exit=2)
+[5/6] 종료상태 실행은 무해한 unreachable blob도 차단 -> BLOCKED (exit=2)
+[6/6] Git hook 환경에서도 바깥 저장소 무오염 -> UNEXPECTED (exit=1, head_same=YES, status_same=YES)
+[1/5] 일반 실행은 무해한 unreachable blob을 허용 -> UNEXPECTED (exit=2, expected=pass)
+FAIL: .secret-patterns.default 없음/빈 파일 — AC 판정 불가
+[2/5] 일반 실행은 금지값이 든 unreachable blob을 차단 -> BLOCKED (exit=2)
+[3/5] unreachable 객체 읽기 실패는 조용히 통과하지 않음 -> BLOCKED (exit=2)
+[4/5] 큰 unreachable blob 앞쪽의 금지값도 차단 -> BLOCKED (exit=2)
+[5/5] 종료상태 실행은 무해한 unreachable blob도 차단 -> BLOCKED (exit=2)
+CHECKED: 5
+FAIL: AC-19 예상과 다른 사례 1건
+CHECKED: 6
+FAIL: AC-19 예상과 다른 사례 2건
+rc_default=1
+```
+
+→ 무엇을 시켰나: 호출자가 빈 파일과 저장소 기본 패턴 경로를 각각 넘긴 상태에서 현재 합성 시험을 실행했습니다.
+→ 뭐가 나왔나: 두 실행 모두 무해한 사례가 시험 환경 때문에 실패했고, 바깥 저장소의 기록 위치와 파일 상태는 그대로였습니다.
+→ 의미: 검사 본체의 보안 차단이 아니라 시험 격리가 실패한 올바른 RED이며, PR #21의 환경 격리 의도를 흡수해야 합니다.
+
+#### 12-3. 계약 스펙과 인수 기준
+
+입력은 `SECRET_PATTERNS_FILE`, `GIT_DIR`, `GIT_WORK_TREE` 등 호출자 환경과 합성 객체 종류입니다. 출력은
+사례별 `PASS` 또는 `BLOCKED`, 전체 검사 수, 전체 종료 성적입니다. 실제 로컬 값은 읽거나 출력하지 않고
+고정된 합성 카나리만 사용합니다.
+
+**AC-19-R2.** 일반 실행은 무해한 미도달 객체를 허용하고, 합성 금지값이 든 blob·commit message·tree
+path·annotated tag message를 모두 차단해야 합니다. 50MiB 이상 객체 앞부분의 값, `git fsck` 실패,
+`git cat-file` 실패, 알 수 없는 객체형도 통과시켜서는 안 됩니다. `ACCEPTANCE_ENDSTATE=1`이면 내용과
+무관하게 미도달 객체 한 개도 차단해야 합니다.
+
+**AC-19-R3.** 합성 시험은 호출자가 `/dev/null`, `.secret-patterns.default`, Git 훅 저장소 위치 환경을
+넘겨도 같은 판정을 내고, 바깥 저장소와 현재 작업 폴더의 HEAD·파일 상태를 바꾸지 않아야 합니다.
+
+가짜 합격은 다음과 같습니다.
+
+- 파일 조각만 검사하고 commit·tree·tag를 건너뜁니다.
+- 큰 객체에서 값을 찾은 뒤 읽기 프로그램의 파이프 종료를 값 없음으로 오판합니다.
+- `git fsck` 또는 `git cat-file` 실패를 검사 대상 없음으로 바꿉니다.
+- 환경 상속 실행이 실패하는데 기본 실행만 통과했다고 보고합니다.
+- RED 시험의 기대 결과를 GREEN에서 바꾸거나 새 사례를 삭제합니다.
+- 실제 로컬 금지값을 시험 입력이나 출력에 사용합니다.
+
+#### 12-4. Harness·적대검증 계획
+
+- RED: 환경 상속 두 경우, 네 객체형, 큰 객체, 두 Git 명령 실패, 종료상태, 훅 환경 무오염을 시험에 고정합니다.
+- RED 뮤테이션: 비blob 처리 한 줄을 임시로 끄면 commit·tree·tag 사례가 실제로 실패하는지 확인하고 즉시 원복합니다.
+- GREEN: 합성 시험 진입부에서 `SECRET_PATTERNS_FILE`만 비우며 객체 판정 본체는 유지합니다.
+- VERIFY: 사용자 지정 명령 전부, 셸 문법, 서버 단계·정본 목록, RED 불변, 비blob·파이프 판정 뮤테이션을 실행합니다.
+- REVIEW: Claude V1이 원본 차이와 실행 원문을 공격하고, Codex V2가 환경·큰 객체·객체형·도구 실패·오염·억제·서버 배선을 재현합니다.
+- SHIP: 중간 이상 결함 0건일 때만 일반 push, PR #23 갱신, 같은 기록 위치의 서버 성공 확인, PR #21 중복 종료까지 수행합니다.
+
+#### 12-5. SOT·영향·비범위
+
+읽은 정본은 `docs/sot/INDEX.md`, `coding-principles.md`, `git-workflow.md`, `hook-contracts.md`,
+`verification-commands.md`입니다. P3의 검사 실패 차단, P13의 검사 약화 표시, P15의 로컬·서버 동시 배선,
+P20의 0건 가짜 합격 금지를 적용합니다. 검사 동작과 실행 표가 달라지면 같은 변경에서 함께 고칩니다.
+
+영향 범위는 시작 검사, 합성 회귀시험, 로컬 push 문지기, GitHub 서버 검사, 억제 원장과 PR 설명입니다.
+틀리면 무해한 작업을 다시 막거나 복구 가능한 금지값을 놓칩니다. 되돌릴 때는 Attempt 2의 RED와 GREEN
+커밋을 역순으로 되돌리되, 과거 억제를 되살리면 해당 사유가 다시 사실인지 별도 확인해야 합니다.
+
+비범위는 main 수정·병합·배포, PR #13/#14/#15, 이슈 #22의 도달 가능한 commit message·tree path·tag
+확장, HumanSearch L0 제품 코드, 실제 포털·브라우저·로그인·세션·후보자 자료, 실제 비밀값입니다.
+
+#### 12-6. Attempt 2 실행·적대검증 로그
+
+이 절 아래에 RED 커밋, GREEN 커밋, 전체 실행 원문, Claude V1 원문, Codex V2 재현 표, 원격 결과와
+PR #21 중복 종료 근거를 순서대로 덧붙입니다. 기존 1~11절의 과거 증거는 고치거나 삭제하지 않습니다.
+
+#### 12-7. RED 시험과 비blob 변형 증거
+
+```text
+$ bash -n scripts/acceptance-0-2-unreachable-content.sh
+syntax_rc=0
+$ bash scripts/acceptance-0-2-unreachable-content.sh
+[1/13] SECRET_PATTERNS_FILE=/dev/null 상속을 격리 -> UNEXPECTED (exit=1, expected=pass)
+[1/1] 일반 실행은 무해한 unreachable blob을 허용 -> UNEXPECTED (exit=2, expected=pass)
+FAIL: /dev/null 없음/빈 파일 — AC 판정 불가
+CHECKED: 1
+FAIL: AC-19 예상과 다른 사례 1건
+[2/13] SECRET_PATTERNS_FILE=.secret-patterns.default 상속을 격리 -> UNEXPECTED (exit=1, expected=pass)
+[1/1] 일반 실행은 무해한 unreachable blob을 허용 -> UNEXPECTED (exit=2, expected=pass)
+FAIL: .secret-patterns.default 없음/빈 파일 — AC 판정 불가
+CHECKED: 1
+FAIL: AC-19 예상과 다른 사례 1건
+[3/13] 일반 실행은 무해한 unreachable blob을 허용 -> PASS (exit=0)
+[4/13] 일반 실행은 금지값이 든 unreachable blob을 차단 -> BLOCKED (exit=1)
+[5/13] unreachable commit message의 금지값을 차단 -> BLOCKED (exit=1)
+[6/13] unreachable tree path의 금지값을 차단 -> BLOCKED (exit=1)
+[7/13] unreachable annotated tag message의 금지값을 차단 -> BLOCKED (exit=1)
+[8/13] git fsck 실패는 검사 대상 없음으로 통과하지 않음 -> BLOCKED (exit=1)
+[9/13] unreachable 객체 읽기 실패는 조용히 통과하지 않음 -> BLOCKED (exit=1)
+[10/13] 알 수 없는 unreachable 객체형은 읽기 실패로 차단 -> BLOCKED (exit=1)
+[11/13] 큰 unreachable blob 앞쪽의 금지값도 차단 -> BLOCKED (exit=1)
+[12/13] 종료상태 실행은 무해한 unreachable blob도 차단 -> BLOCKED (exit=1)
+[13/13] Git hook 환경에서도 바깥 저장소 무오염 -> PASS (exit=0)
+CHECKED: 13
+FAIL: AC-19 예상과 다른 사례 2건
+red_rc=1
+```
+
+→ 무엇을 시켰나: 구현을 바꾸기 전에 13개 회귀 사례의 문법과 실제 판정을 실행했습니다.
+→ 뭐가 나왔나: 문법은 정상이었고 환경 상속 두 사례만 예상대로 실패했으며, 새 객체형·도구 실패 사례는 기존 강한 판정이 막았습니다.
+→ 의미: RED는 환경 격리 누락을 정확히 가리키며, 이미 동작하는 보안 분기를 약화하지 않고 GREEN 한 줄을 요구합니다.
+
+`scripts/acceptance-0-2.sh`의 객체 반복문에 blob이 아닌 형식을 건너뛰는 한 줄을 임시로 넣고 같은 시험을
+실행한 뒤 즉시 제거했습니다. 아래 변형은 작업 상태에 남지 않았고 커밋 대상에도 포함하지 않습니다.
+
+```text
+$ bash scripts/acceptance-0-2-unreachable-content.sh  # 임시 비blob 건너뛰기 변형 상태
+[1/13] SECRET_PATTERNS_FILE=/dev/null 상속을 격리 -> UNEXPECTED (exit=1, expected=pass)
+[1/1] 일반 실행은 무해한 unreachable blob을 허용 -> UNEXPECTED (exit=2, expected=pass)
+FAIL: /dev/null 없음/빈 파일 — AC 판정 불가
+CHECKED: 1
+FAIL: AC-19 예상과 다른 사례 1건
+[2/13] SECRET_PATTERNS_FILE=.secret-patterns.default 상속을 격리 -> UNEXPECTED (exit=1, expected=pass)
+[1/1] 일반 실행은 무해한 unreachable blob을 허용 -> UNEXPECTED (exit=2, expected=pass)
+FAIL: .secret-patterns.default 없음/빈 파일 — AC 판정 불가
+CHECKED: 1
+FAIL: AC-19 예상과 다른 사례 1건
+[3/13] 일반 실행은 무해한 unreachable blob을 허용 -> PASS (exit=0)
+[4/13] 일반 실행은 금지값이 든 unreachable blob을 차단 -> BLOCKED (exit=1)
+[5/13] unreachable commit message의 금지값을 차단 -> UNEXPECTED (exit=0, expected=blocked)
+PASS: no secret-pattern match in any tracked file, .env not tracked
+PASS: 0-2 — 히스토리·객체·reflog·docs 리터럴 0건, 스캐너 뮤테이션 검출 확인
+[6/13] unreachable tree path의 금지값을 차단 -> UNEXPECTED (exit=0, expected=blocked)
+PASS: no secret-pattern match in any tracked file, .env not tracked
+PASS: 0-2 — 히스토리·객체·reflog·docs 리터럴 0건, 스캐너 뮤테이션 검출 확인
+[7/13] unreachable annotated tag message의 금지값을 차단 -> UNEXPECTED (exit=0, expected=blocked)
+PASS: no secret-pattern match in any tracked file, .env not tracked
+PASS: 0-2 — 히스토리·객체·reflog·docs 리터럴 0건, 스캐너 뮤테이션 검출 확인
+[8/13] git fsck 실패는 검사 대상 없음으로 통과하지 않음 -> BLOCKED (exit=1)
+[9/13] unreachable 객체 읽기 실패는 조용히 통과하지 않음 -> BLOCKED (exit=1)
+[10/13] 알 수 없는 unreachable 객체형은 읽기 실패로 차단 -> UNEXPECTED (exit=0, expected=blocked)
+PASS: no secret-pattern match in any tracked file, .env not tracked
+PASS: 0-2 — 히스토리·객체·reflog·docs 리터럴 0건, 스캐너 뮤테이션 검출 확인
+[11/13] 큰 unreachable blob 앞쪽의 금지값도 차단 -> BLOCKED (exit=1)
+[12/13] 종료상태 실행은 무해한 unreachable blob도 차단 -> BLOCKED (exit=1)
+[13/13] Git hook 환경에서도 바깥 저장소 무오염 -> UNEXPECTED (exit=1, head_same=YES, status_same=YES)
+[1/10] 일반 실행은 무해한 unreachable blob을 허용 -> PASS (exit=0)
+[2/10] 일반 실행은 금지값이 든 unreachable blob을 차단 -> BLOCKED (exit=1)
+[3/10] unreachable commit message의 금지값을 차단 -> UNEXPECTED (exit=0, expected=blocked)
+PASS: no secret-pattern match in any tracked file, .env not tracked
+PASS: 0-2 — 히스토리·객체·reflog·docs 리터럴 0건, 스캐너 뮤테이션 검출 확인
+[4/10] unreachable tree path의 금지값을 차단 -> UNEXPECTED (exit=0, expected=blocked)
+PASS: no secret-pattern match in any tracked file, .env not tracked
+PASS: 0-2 — 히스토리·객체·reflog·docs 리터럴 0건, 스캐너 뮤테이션 검출 확인
+[5/10] unreachable annotated tag message의 금지값을 차단 -> UNEXPECTED (exit=0, expected=blocked)
+PASS: no secret-pattern match in any tracked file, .env not tracked
+PASS: 0-2 — 히스토리·객체·reflog·docs 리터럴 0건, 스캐너 뮤테이션 검출 확인
+[6/10] git fsck 실패는 검사 대상 없음으로 통과하지 않음 -> BLOCKED (exit=1)
+[7/10] unreachable 객체 읽기 실패는 조용히 통과하지 않음 -> BLOCKED (exit=1)
+[8/10] 알 수 없는 unreachable 객체형은 읽기 실패로 차단 -> UNEXPECTED (exit=0, expected=blocked)
+PASS: no secret-pattern match in any tracked file, .env not tracked
+PASS: 0-2 — 히스토리·객체·reflog·docs 리터럴 0건, 스캐너 뮤테이션 검출 확인
+[9/10] 큰 unreachable blob 앞쪽의 금지값도 차단 -> BLOCKED (exit=1)
+[10/10] 종료상태 실행은 무해한 unreachable blob도 차단 -> BLOCKED (exit=1)
+CHECKED: 10
+FAIL: AC-19 예상과 다른 사례 4건
+CHECKED: 13
+FAIL: AC-19 예상과 다른 사례 7건
+mutation_rc=1
+```
+
+→ 무엇을 시켰나: 실제 판정기에서 비blob 객체를 의도적으로 건너뛰게 만든 뒤 새 시험을 다시 실행했습니다.
+→ 뭐가 나왔나: commit·tree·tag와 알 수 없는 형식이 모두 가짜 합격으로 뒤집혔고, 바깥 훅 재현도 그 실패를 전파했습니다.
+→ 의미: 새 객체형 시험은 구현을 따라 쓴 장식이 아니라 해당 보호 분기가 사라지면 즉시 실패하는 유효한 회귀 장치입니다.
