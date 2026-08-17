@@ -1,0 +1,15 @@
+schema_version: admin-phase0-plan-checker-hardening-codeaudit/v1
+audit_scope: structural-checker-only
+base_sha: 7c038bea1025937ff34b5161320d74e9468ac089
+red_sha: ed7c11e85f4c6703502ca1259686b9d6043f36b7
+candidate_sha: 276af11c30173412ea7f9b68e578224237a6e2aa
+audit_sha256: 230dce09e5b63e390c554005950a8eddd63ac7874b2b8f580bc03e1a0e3127d0
+verdict: PASS
+p0_findings_open: 0
+p1_findings_open: 0
+semantic_audit_required: true
+execution_permission: false
+claude_status: CLAUDE_NOT_RUN_SAFEGUARD_AND_TIMEOUT
+strict_workflow_status: IN_PROGRESS
+push_allowed: false
+pr_allowed: false

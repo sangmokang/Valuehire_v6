@@ -28,7 +28,7 @@
 
 **무엇을** — 성공 문구는 고정 후보와 구조·서버 등록이 일치한다는 범위로 줄이고, 의미 재감사 필요와 실행 불허를 항상 함께 출력합니다.
 
-**왜** — 열여덟 반례를 잡는 것은 정해 둔 구조를 지켰다는 증거이지, 사업 요구 전체가 맞다는 증거가 아닙니다.
+**왜** — 최소 열여덟 반례와 fresh 감사에서 추가된 반례를 잡는 것은 정해 둔 구조를 지켰다는 증거이지, 사업 요구 전체가 맞다는 증거가 아닙니다.
 
 **버린 길** — 시험 개수만으로 계획 전체가 옳다고 부르는 길은 이전 잘못된 합격을 반복하므로 버립니다.
 
@@ -118,7 +118,7 @@ program result: 0
 
 ### 단일 인수 기준
 
-**AC-CHECKER-HARDENING-01** — `bash scripts/acceptance-admin-phase0-plan.sh`는 정상 후보에서만 성적 0을 내고, 기존 9개와 신규 9개 고장 사본에서는 각 고장에 지정된 정확한 이유를 확인한 뒤 모두 0이 아닌 성적을 내야 합니다.
+**AC-CHECKER-HARDENING-01** — `bash scripts/acceptance-admin-phase0-plan.sh`는 정상 후보에서만 성적 0을 내고, 기존 9개·필수 신규 9개·fresh 감사 신규 8개 고장 사본에서는 각 고장에 지정된 정확한 이유를 확인한 뒤 모두 0이 아닌 성적을 내야 합니다.
 
 정상 출력에는 다음 값이 모두 있어야 합니다.
 
@@ -128,8 +128,8 @@ program result: 0
 - `unknownDependencies=0`
 - `dependencyCycles=0`
 - `blockersUnknown=0`
-- `mutationsCaught=18`
-- `mutationsRequired=18`
+- `mutationsCaught=26`
+- `mutationsRequired=26`
 - `structuralContract=PASS`
 - `semanticAuditRequired=true`
 - `executionPermission=false`
@@ -145,7 +145,7 @@ program result: 0
 7. 성공 문구를 구조 범위로 줄이고 의미 재감사 필요와 실행 불허를 출력합니다.
 8. 필수 대상 0건은 실패합니다. 각 mutation은 적용 대상 0건, baseline 선행 오류, 예상과 다른 오류를 자기 성공으로 세지 않습니다.
 
-### 열여덟 고장 시험
+### 최소 열여덟 고장 시험과 fresh 감사 확장
 
 기존 9개는 삭제·skip·완화하지 않습니다. 신규 고장 시험은 다음 순서로 추가합니다.
 
@@ -158,6 +158,14 @@ program result: 0
 16. replacement goal의 `engines.node` 요구 제거
 17. Phase 0 행에 같은 field를 중복 선언
 18. 한 active ID를 Phase 0 plan과 dependency graph 양쪽에서 같은 가짜 ID로 변경
+19. `verify` job의 steps를 뒤의 decoy job으로 이동
+20. `if`를 관리자 step의 첫 key로 이동
+21. `continue-on-error`를 관리자 step의 첫 key로 이동
+22. 따옴표로 감싼 `if`를 관리자 step의 첫 key로 이동
+23. 따옴표로 감싼 `continue-on-error`를 관리자 step의 첫 key로 이동
+24. `requires_micro_ids`를 나쁜 값 뒤 좋은 값으로 중복 선언
+25. `requires_blocker_ids`를 나쁜 값 뒤 좋은 값으로 중복 선언
+26. consumer가 0개인 dependency group 추가
 
 ### RED에서 GREEN으로 가는 기록 순서
 
@@ -481,9 +489,114 @@ program result: 0
 
 NOT_RUN — GREEN과 전체 로컬 검증 전입니다.
 
+#### Claude 1차 — CLAUDE_NOT_RUN_SAFEGUARD_AND_TIMEOUT
+
+첫 호출은 사용자 지정 형식인 `env -u ANTHROPIC_API_KEY claude -p '<감사 프롬프트 전문>'`으로 실행했습니다.
+
+~~~text
+API Error: Fable 5's safeguards flagged this message (https://www.anthropic.com/legal/aup).
+This sometimes happens with safe, normal conversations. Claude Code can't respond to this message with Fable 5.
+
+Try rephrasing the request in a new session or change your model.
+
+Request ID: req_011Ce81pc5NcMVoStMqrv7eL
+program result: 1
+~~~
+
+→ 첫 호출은 코드 판정 본문을 한 줄도 만들지 못하고 서비스 safeguard로 끝났습니다. 사용자 계약상 유효 Claude 감사가 아닙니다.
+
+공격성 표현을 제거하고 같은 file:line·재현 명령·읽기 전용 요구를 유지한 새 세션으로 재호출했습니다. 약 2분 동안 출력이 0바이트였고 종료 입력 뒤 `Execution error`만 남았습니다.
+
+~~~text
+$ env -u ANTHROPIC_API_KEY claude -p '<읽기 전용 소프트웨어 정확성 검토 전문>'
+stdout: 0 bytes for approximately 120 seconds
+termination output: Execution error
+valid VERDICT body: 0
+~~~
+
+→ 재호출도 빈 출력·timeout 조건에 해당합니다. 따라서 Claude가 잡은 Codex 과장 수와 Claude 주장 재현 수는 계산할 본문 자체가 없으며, `Claude 판정 본문 확보` 완료 조건은 실패입니다.
+
+#### Codex 독립 재공격 — 실행했으나 Claude 교차검증 완료로 세지 않음
+
+Claude 본문을 대신했다고 주장하지 않고 폐기 가능한 local clone에서 다음을 직접 실행했습니다.
+
+~~~text
+dependency-changed-to-blocker-id: exit=1, unknownDependencies=1
+ci-expression-condition: exit=1, CI Phase 0 plan step must not contain if
+plan-graph-contract-id-renamed: exit=1, structural contract SHA-256 mismatch
+blocker-declaration-and-edge-deleted: exit=1, required historical blocker missing
+broken-baseline-before-self-test: exit=1, mutationsCaught=0
+unknown-blocker-reference: exit=1, blockersUnknown=1
+ci-or-true: exit=1, must not ignore errors with || true
+ci-command-comment-and-other-job: exit=1, required run missing
+dependency-cycle: exit=1, dependencyCycles=1
+duplicate-consumer: exit=1, duplicateConsumers=1
+duplicate-blocker-declaration: exit=1, duplicate blocker declaration
+same-author-contract-and-hash-rewrite-boundary: exit=0, semanticAuditRequired=true executionPermission=false
+~~~
+
+→ 요구된 Codex mutation은 모두 실행했습니다. 고정 evaluator에서는 잘못된 사본이 실패하지만 같은 작성자가 plan·graph·contract·evaluator hash를 함께 바꾸면 구조 검사가 통과합니다. 이는 fresh semantic audit와 runner-only evidence가 맡아야 할 공개된 권한 경계입니다.
+
+첫 Codex 후보 `986a1ade03712911c17a8b5c4dd47f86bec2b74a`를 더 공격해 다음 여섯 거짓 합격을 찾았습니다.
+
+~~~text
+verify-job-without-steps-decoy-has-original-steps: exit=0
+if-as-first-step-key: exit=0
+continue-on-error-as-first-step-key: exit=0
+duplicate-requires-micro-field-bad-then-good: exit=0
+duplicate-requires-blocker-field-bad-then-good: exit=0
+empty-consumer-group: exit=0
+~~~
+
+→ 좋은 소식이 아닙니다. CI parser가 job 경계를 넘고 첫 key를 놓쳤으며 dependency parser가 마지막 값으로 덮어썼습니다. `1ca0263`과 `276af11`에서 여섯 결함을 수정하고 self-test를 26개로 늘렸습니다.
+
+~~~text
+$ bash scripts/acceptance-admin-phase0-plan.sh
+PASS: Phase 0 structural contract and CI registration match the pinned candidate
+ADMIN_PHASE0_PLAN_CHECK phase0Rows=26 consumers=135 duplicateConsumers=0 unknownDependencies=0 dependencyCycles=0 blockersUnknown=0 mutationsCaught=26 mutationsRequired=26 structuralContract=PASS semanticAuditRequired=true executionPermission=false reason=null
+program result: 0
+
+verify-steps-moved-postfix: exit=1, CI verify job must contain steps
+quoted-if-first-key-postfix: exit=1, CI Phase 0 plan step must not contain if
+duplicate-dependency-field-postfix: exit=1, duplicate dependency field
+same-author-boundary-postfix: exit=0, semanticAuditRequired=true executionPermission=false
+~~~
+
+→ 수정 뒤 발견된 거짓 합격 세 종류는 모두 실패로 바뀌었고, 중복 관계와 0건 group도 고정 mutation으로 남았습니다. 동일 작성자 권한 경계는 의도대로 실행 불허를 계속 출력합니다.
+
+| Claude 주장 | Codex 재현 결과 | 일치/불일치 | 최종 판정 | 증거 |
+|---|---|---|---|---|
+| 유효 주장 본문 없음 | 재현할 Claude 주장 0건 | 비교 불가 | `CLAUDE_NOT_RUN_SAFEGUARD_AND_TIMEOUT` | Request ID와 빈 출력 재호출 |
+| ※ 미확인 | Codex 독립 공격에서 신규 거짓 합격 6건 발견 후 수정 | 비교 불가 | Codex 단독 증거, 교차검증 아님 | `1ca0263`, `276af11` |
+
+→ Claude가 잡은 Codex 과장 0건, Codex가 Claude에서 잡은 과장·누락도 산정 불가입니다. Claude가 아무 판정도 내지 않았기 때문이며, 0건 일치라고 바꾸지 않습니다.
+
 ### fresh codeaudit
 
 NOT_RUN — Claude와 Codex 교차검증 전입니다.
+
+상태 전환 — Claude 교차검증은 미실행으로 남겼지만, Codex fresh codeaudit은 `276af11c30173412ea7f9b68e578224237a6e2aa`를 읽기 전용으로 감사한 뒤 별도 문서에 보존했습니다.
+
+- 감사 원문: `docs/engineering/admin-weekly-dashboard-v6-phase0-plan-checker-hardening-codeaudit-2026-08-17.md`
+- metadata: `docs/engineering/admin-weekly-dashboard-v6-phase0-plan-checker-hardening-codeaudit-metadata-2026-08-17.yaml`
+- 감사 SHA-256: `230dce09e5b63e390c554005950a8eddd63ac7874b2b8f580bc03e1a0e3127d0`
+- scoped verdict: PASS
+- open P0/P1: 0/0
+- semantic audit: required
+- execution permission: false
+- strict workflow: IN_PROGRESS
+
+~~~text
+$ bash ~/.claude/skills/strict/brief-lint.sh --strict docs/engineering/admin-weekly-dashboard-v6-phase0-plan-checker-hardening-codeaudit-2026-08-17.md
+코드블록 3개 · 표 2개 (면제 0개) / 해석 누락 0개
+1층(결론): 줄 5 / 본문 345자
+1층 기술 표기: 없음
+결정 카드 1건
+브리핑 계약 기계 검사: 위반 0건 (문서 1개)
+program result: 0
+~~~
+
+→ brief-lint는 문서 형식 누락만 세며 감사 내용의 진실성이나 회사 차원의 합격을 증명하지 않습니다. fresh codeaudit도 다른 엔진 독립성은 없으므로 Claude 완료 조건을 대신하지 않습니다.
 
 ### 외부 부작용 예상값
 
@@ -495,9 +608,9 @@ NOT_RUN — Claude와 Codex 교차검증 전입니다.
 - ClickUp write: 0
 - email sent: 0
 - user files deleted/overwritten: 0
-- 임시 clone 생성·삭제: 0/0
-- network read: `session-status.sh`의 origin fetch와 GitHub issue/PR readback, Claude CLI에 한정
-- network write: GitHub issue 1건과 모든 게이트 통과 시 branch push·PR 각 1건까지. merge·deploy·메일은 0
+- 임시 clone 생성·삭제: 5/5
+- network read: `session-status.sh`의 origin fetch, GitHub issue readback, Claude CLI 2회
+- network write: GitHub issue 1건. Claude 유효 본문이 없으므로 branch push·PR은 0으로 유지
 
 ## 제출 전 셀프 감사
 
