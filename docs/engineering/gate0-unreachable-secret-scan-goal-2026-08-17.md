@@ -587,7 +587,59 @@ OPEN — 현재 커밋 설명문·파일 경로의 로컬 금지값도 차단한
 → 뭐가 나왔나: 5개 사례 3회 동일, 네 객체형과 검사 실패 전부 차단, 실제 값 미출력, 17단계·#22가 확인됐습니다.
 → 좋은 소식인가 나쁜 소식인가: V1 PASS와 Codex V2가 일치해 AC-19 범위의 적대검증은 통과했습니다.
 
-#### 9-5. 제출 직전 사람 셀프 감사 (§8-6b)
+#### 9-5. 훅 환경 수리 후 Claude V1
+
+`env -u ANTHROPIC_API_KEY claude -p --model sonnet --effort medium`으로 322d523·56cc258·0235b9b를
+읽기 전용 재검토했습니다. 프롬프트 끝에는 strict §8-7 출력 형식 원문을 다시 붙였습니다.
+
+```text
+VERDICT: PASS
+
+- 별도 임시 clone에서 322d523의 6번째 사례가 head_same=NO, status_same=NO로 RED임을 재현했습니다.
+- 56cc258은 ROOT 다음 Git 환경 unset 두 줄만 추가했고 같은 사례가 6/6 GREEN임을 재현했습니다.
+- 실제 worktree는 시작/종료 모두 HEAD=0235b9b, status 없음으로 불변이었습니다.
+- 별도 연결 worktree의 실제 pre-push에서 GIT_DIR 절대경로·GIT_WORK_TREE unset을 관찰했습니다.
+- 수정 전에는 가짜 폴더 명령이 실제 branch HEAD를 바꾸고, 수정 후에는 HEAD/status가 불변임을 재현했습니다.
+- e794579·4f65be1는 refs 역사에 없고 최종 diff에 .gitignore·docs/README가 없음을 확인했습니다.
+- 실제 훅을 설치한 별도 clone의 로컬 bare push에서 18개 검사가 전부 통과했습니다.
+- 범위 안 중간 이상 결함은 0건입니다.
+```
+
+→ 무엇을 시켰나: 시험 자기판정이 아니라 실제 연결 worktree의 push 환경과 수정 전후 바깥 저장소 변화를 독립 재현하게 했습니다.
+→ 뭐가 나왔나: RED·두 줄 GREEN·역사 정리·6개 SOT·실제 훅 push가 모두 확인돼 PASS였습니다.
+→ 좋은 소식인가 나쁜 소식인가: 첫 실제 push에서 찾은 새 범위 안 결함도 다른 엔진 검증을 통과해 좋은 소식입니다.
+
+#### 9-6. 훅 환경 수리 Codex V2
+
+```text
+$ bash scripts/acceptance-0-2-unreachable-content.sh
+[1/6] 일반 실행은 무해한 unreachable blob을 허용 -> PASS (exit=0)
+[2/6] 일반 실행은 금지값이 든 unreachable blob을 차단 -> BLOCKED (exit=1)
+[3/6] unreachable 객체 읽기 실패는 조용히 통과하지 않음 -> BLOCKED (exit=1)
+[4/6] 큰 unreachable blob 앞쪽의 금지값도 차단 -> BLOCKED (exit=1)
+[5/6] 종료상태 실행은 무해한 unreachable blob도 차단 -> BLOCKED (exit=1)
+[6/6] Git hook 환경에서도 바깥 저장소 무오염 -> PASS (exit=0)
+CHECKED: 6
+PASS: AC-19 일반 내용 검사와 종료상태 0건 조건 분리
+$ git diff --unified=0 322d523 56cc258 -- scripts/acceptance-0-2-unreachable-content.sh
++unset GIT_DIR GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_WORK_TREE GIT_COMMON_DIR \
++  GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_PREFIX
+$ git log --all --format='%H' | grep '<e794579-or-4f65be1>'
+출력 없음
+$ git diff --name-status origin/main..HEAD
+M .github/workflows/verify.yml
+A docs/engineering/gate0-unreachable-secret-scan-goal-2026-08-17.md
+M docs/sot/verification-commands.md
+A scripts/acceptance-0-2-unreachable-content.sh
+M scripts/acceptance-0-2.sh
+PASS HEAD/status unchanged
+```
+
+→ 무엇을 시켰나: V1의 여섯 사례, 두 줄 최소 변경, 무효 역사 부재, 최종 파일 목록과 실제 worktree 불변을 다시 확인했습니다.
+→ 뭐가 나왔나: V1과 전부 일치했고 사고 파일·커밋은 refs와 최종 diff에 없습니다.
+→ 좋은 소식인가 나쁜 소식인가: 훅 환경 수리에 대한 V1/V2 교차검증도 일치해 좋은 소식입니다.
+
+#### 9-7. 제출 직전 사람 셀프 감사 (§8-6b)
 
 - 아니오 — 1층 결론에 풀이 없는 전문용어가 없습니다.
 - 아니오 — 해석이 없는 출력 블록·표가 없습니다.
@@ -596,7 +648,7 @@ OPEN — 현재 커밋 설명문·파일 경로의 로컬 금지값도 차단한
 - 아니오 — 줄 위치를 들 때 그 줄의 역할을 함께 설명했습니다.
 - 아니오 — 쉽게 쓰기 위해 실패·수치·검증 공백을 빼지 않았습니다.
 - 아니오 — 초등학생용 비유로 내용을 축소하지 않았습니다.
-- 아니오 — 건너뛴 `actionlint`, 첫 Gate 흔들림, 첫 Claude 거부와 재시도를 숨기지 않았습니다.
+- 아니오 — 건너뛴 `actionlint`, 첫 Gate 흔들림, 첫 Claude 거부·첫 push 오염과 재시도를 숨기지 않았습니다.
 - 아니오 — 확인하지 못한 서버 CI와 #22를 확인된 완료처럼 쓰지 않았습니다.
 
 ### 10. 도구 제약
