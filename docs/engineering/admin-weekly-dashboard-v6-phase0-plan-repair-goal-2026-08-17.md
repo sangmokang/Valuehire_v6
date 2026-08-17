@@ -6,6 +6,8 @@
 
 이번 작업은 계획과 그 판정 장치만 고칩니다. 관리자 화면, 의존성 설치, 외부 서비스 호출은 하지 않습니다.
 
+복구된 계획 후보는 로컬 검사를 통과했지만 엄격 완료는 아닙니다. Claude 외부 공격이 크레딧 부족으로 본문을 내지 못했고 기존 감사 원문의 공백 결함도 남아 있어, 이 브랜치는 push·PR이나 후속 micro 실행으로 넘기지 않습니다.
+
 ## 2층 — 판단 근거
 
 기존 계획은 실행 환경 버전을 두 곳에 고정하라는 상위 요구 중 한 곳만 작업으로 만들었습니다. 또한 공개 방지 설정과 작업 폴더 선언이라는 서로 다른 결과를 한 작업에 묶었습니다.
@@ -137,4 +139,106 @@ GitHub 이슈: https://github.com/sangmokang/Valuehire_v6/issues/18
 
 ## 적대 검증 로그
 
-아직 실행하지 않았습니다. 구현과 로컬 검증 뒤 Claude 원문 및 Codex 재현 결과를 이 절 아래에 그대로 보존합니다.
+### RED와 GREEN
+
+~~~text
+$ bash scripts/acceptance-admin-phase0-plan.sh  # P0-04A/P0-04T 분리 전 RED
+FAIL: phase0 row count must be 26, got 25
+FAIL: required phase row missing: P0-04T-tracked-generated-artifact-guard
+FAIL: active dependency consumer count must be 135, got 134
+FAIL: P0-05-admin-exact-package-contract dependencies must be [P0-04T-tracked-generated-artifact-guard], got [P0-04A-generated-artifact-ignore]
+ADMIN_PHASE0_PLAN_CHECK phase0Rows=25 consumers=134 mutationsCaught=0 mutationsRequired=0 reason=contract-mismatch
+program result: 1
+
+$ bash scripts/acceptance-admin-phase0-plan.sh  # 복구 후보 GREEN
+PASS: repaired Phase 0 plan, invalidation, dependency graph, SOT, and CI registration agree
+ADMIN_PHASE0_PLAN_CHECK phase0Rows=26 consumers=135 mutationsCaught=9 mutationsRequired=9 reason=null
+program result: 0
+~~~
+
+→ RED 검사와 GREEN 문서 변경은 별도 Lore commit으로 보존했습니다. GREEN에서는 검사 파일을 바꾸지 않았습니다.
+
+### Claude 1차 공격
+
+앞선 세 시도 중 첫 시도는 safeguard 오류로 성적 1을 냈고, Sonnet과 Haiku 재시도는 각각 약 3분과 90초 동안 본문 0 byte여서 중단했습니다. 마지막 시도는 아래 명령과 결과로 재현했습니다.
+
+~~~text
+$ claude -p 'Read only. Audit the current repository candidate for the Admin Weekly Dashboard v6 Phase 0 plan repair. Inspect docs/engineering/admin-weekly-dashboard-v6-phase0-plan-repair-goal-2026-08-17.md, docs/engineering/admin-weekly-dashboard-v6-atomic-plan-phase0-2026-08-17.md, docs/engineering/admin-weekly-dashboard-v6-canonical-dependencies-2026-08-17.md, docs/engineering/admin-weekly-dashboard-v6-plan-audit-v2-invalidation-2026-08-17.md, and scripts/verify/check-admin-phase0-plan.mjs. Try to falsify atomicity, requirement coverage, dependency count 135, mutation adequacy, evidence authority, and execution permission. Do not edit files or use network. Return a concise Korean verdict PASS or REQUEST_CHANGES with exact file:line evidence.' --model sonnet --permission-mode dontAsk --allowedTools Read,Grep,Glob,Bash --max-budget-usd 1
+2.1.233 (Claude Code)
+claude.ai connectors are disabled because ANTHROPIC_API_KEY or another auth source is set and takes precedence over your claude.ai login
+[60초 동안 감사 본문 없음]
+Credit balance is too low
+program result: 1
+~~~
+
+→ Claude CLI 자체는 실행됐지만 감사 본문은 한 글자도 생성되지 않았으므로 외부 공격은 합격도 불합격도 아닌 실행 불가입니다.
+
+- Claude verdict: `CLAUDE_NOT_RUN_CREDIT`
+- 감사 본문: 0 byte
+- 대체 판정: 없음. 로컬 검사나 Codex 자체 재공격을 Claude PASS로 간주하지 않습니다.
+
+### Codex 자체 재공격
+
+Claude 본문을 받기 전에 계획과 검사기가 공유한 가정을 다시 공격했습니다. 그 결과 첫 복구 후보의 P0-04A가 ignore rule 소유권과 tracked prefix 차단을 다시 한 행에 묶었다는 비원자 결함 1건을 찾았습니다.
+
+- 발견 전 후보: Phase 0 25행, active micro 134개, 생성물 경계 1행
+- 수정 후 후보: Phase 0 26행, active micro 135개, P0-04A ignore owner와 P0-04T tracked guard 분리
+- mutation: 누락 engines, private/workspace 재결합, 무효화 제거, stale SOT, CI 제거, dependency skip, 생성물 경계 재결합, ignore overlap 누락, arbitrary-name 계약 누락을 각각 훼손해 9/9 거부
+- 독립 DAG 재계산: consumers=135, duplicates=0, unknown=0, cycles=0
+- 판정: `CODEX_SELF_REATTACK_PASS_LOCAL_ONLY`
+
+→ 이 결과는 복구 후보의 로컬 방어력을 높였지만 strict의 Claude 1차 공격을 대신하지 않습니다. 따라서 정식 “Codex 2차” 완료나 P0-01 PASS를 주장하지 않습니다.
+
+### 전체 로컬 검증
+
+~~~text
+$ bash hooks/pre-push
+pre-push: 검사 18개 실행
+18개 모두 ok
+program result: 0
+
+$ bash verify.sh
+PASS: no secret-pattern match in any tracked file, .env not tracked
+program result: 0
+
+$ bash scripts/verify/check-mechanism-registry.sh
+CHECKED: 4
+program result: 0
+
+$ bash scripts/scan-data-exposure.sh all
+PASS: 추적 파일 120개 검사, 위반 0건
+PASS: 기록 전량 blob 554개 검사, 크기·경로 위반 0건
+PASS: csv/tsv/sql 0개 검사(추적 120개 중), 개인정보 적재 0건
+program result: 0
+
+$ bash scripts/session-status.sh
+HEAD: af8283b (ahead 23 / behind 0)
+ORIGIN: 4fdef31
+RED: 1/20 (acceptance-0-7.sh 제외 — CI 담당)
+program result: 0
+
+$ git diff --check 43f09018065f409f361aadb63aa44092cf90ddcc..HEAD
+program result: 0
+
+$ git diff --check a02a3da8f36e22997028b0d620de4e7e970f76d8..HEAD
+docs/engineering/admin-weekly-dashboard-v6-p0-04-codeaudit-a3-2026-08-17.md:7-13: trailing whitespace 7건
+program result: 2
+~~~
+
+→ 복구 변경 자체는 공백 위반 0건입니다. 전체 이력은 과거 감사 원문 보존과 충돌해 계속 `BLK-HISTORICAL-EVIDENCE-DIFF-CHECK`입니다.
+
+### 최종 상태와 부작용
+
+- local plan candidate: PASS
+- strict completion: BLOCKED
+- P0-01 execution permission: 0
+- push: 0
+- PR: 0
+- merge: 0
+- deploy: 0
+- Gmail/Calendar/ClickUp live call: 0
+- ClickUp write: 0
+- email sent: 0
+- user files deleted/overwritten: 0
+- GitHub issue write: 1 (`#18`)
+- network read/write가 0이라는 주장은 하지 않음: `session-status.sh`의 GitHub fetch, 이슈 작성·조회, Claude CLI 호출이 있었음
