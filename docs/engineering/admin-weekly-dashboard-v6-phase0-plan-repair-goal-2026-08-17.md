@@ -60,6 +60,7 @@
 - `docs/engineering/admin-weekly-dashboard-v6-plan-audit-v2-2026-08-17.md:5`는 결함이 있는 계획에 PASS를 부여합니다. 이 원문은 과거 증거로 보존합니다.
 - `docs/sot/verification-commands.md:8`은 `package.json`이 없다고 쓰지만 현재 루트 `package.json`은 존재합니다. 실행 명령 자체는 여전히 make 기반도 npm script 기반도 아닙니다.
 - `bash scripts/session-status.sh`의 현재 결과는 `RED: 1/19`입니다. 이번 작업은 이 실패를 무시한 신규 제품 작업이 아니라 계획 합격 무효를 복구하는 연속 작업입니다.
+- `git diff --check a02a3da..HEAD`는 과거 P0-04 감사 원문의 끝 공백 7건으로 성적 2를 냈습니다. 이번 복구 변경만 검사하면 성적 0이므로, 원문 보존과 전체 기록 검사 충돌을 별도 blocker로 둡니다.
 
 ### 근본 원인
 

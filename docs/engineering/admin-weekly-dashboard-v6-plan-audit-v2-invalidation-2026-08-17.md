@@ -40,7 +40,7 @@ VERDICT: INVALIDATED
 - prior_scaffold_value_confirmed_count: 4
 - active_micro_count: 134
 - invalidated_micro_ids: P0-01-baseline-and-audited-plan, P0-02-node-version-pin, P0-03-pnpm-version-pin, P0-04-root-private-workspace, P0-04A-generated-artifact-ignore
-- blocking_findings: missing engines.node micro, non-atomic P0-04, P0-03 newline false PASS, P0-04A fixed-canary false PASS, runner-only audit evidence authority missing
+- blocking_findings: missing engines.node micro, non-atomic P0-04, P0-03 newline false PASS, P0-04A fixed-canary false PASS, runner-only audit evidence authority missing, historical raw Markdown full-chain diff-check violations=7
 
 → 기존 감사 파일의 현재 바이트를 다시 계산한 지문과 Git 내부 파일 지문을 기록했습니다. 값이 달라지면 이 무효화 문서도 다시 검토해야 하며, 현재 값이 맞더라도 과거 PASS가 되살아나지는 않습니다.
 
@@ -62,6 +62,7 @@ VERDICT: INVALIDATED
 3. P0-03 false PASS — `pnpm@11.22.0\n`이 Bash command substitution에서 끝 개행을 잃고 정상값처럼 비교됐습니다.
 4. P0-04A false PASS — `apps/admin/coverage/actual-report.json` 같은 임의 이름의 추적 파일을 고정 canary 검사와 기존 노출 스캔이 놓쳤습니다.
 5. 증거 권한 미분리 — 구현자와 증거 작성자가 같은 권한을 가지므로 원문 보존을 구조적으로 강제하지 못했습니다.
+6. 원문과 공백 검사 충돌 — `git diff --check a02a3da..HEAD`가 과거 P0-04 감사 원문 끝 공백 7건으로 성적 2를 냈습니다. 원문을 덮어쓰거나 Markdown 전체 검사를 끄지 않고 별도 해결해야 합니다.
 
 ### 실행하지 않은 항목
 

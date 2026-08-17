@@ -21,6 +21,7 @@ dependency_hash_contract:
 
 blockers:
   - BLK-RUNNER-ONLY-AUDIT-EVIDENCE
+  - BLK-HISTORICAL-EVIDENCE-DIFF-CHECK
   - BLK-NODE-RUNTIME-CONSUMER
   - BLK-EXACT-REACT-TYPES-VERSIONS
   - BLK-DOM-PARSER-EXACT-VERSION
@@ -36,7 +37,7 @@ blockers:
 groups:
   - consumers: [P0-01-baseline-and-audited-plan]
     requires_micro_ids: []
-    requires_blocker_ids: [BLK-RUNNER-ONLY-AUDIT-EVIDENCE]
+    requires_blocker_ids: [BLK-RUNNER-ONLY-AUDIT-EVIDENCE, BLK-HISTORICAL-EVIDENCE-DIFF-CHECK]
   - consumers: [P0-02-node-version-pin]
     requires_micro_ids: [P0-01-baseline-and-audited-plan]
     requires_blocker_ids: [BLK-NODE-RUNTIME-CONSUMER]

@@ -18,14 +18,14 @@
   single_observable_result: 상위 요구 전수 매핑과 원자성 검사를 포함한 fresh plan audit PASS 1건만 실행 허가로 보존된다
   single_failure_reason: 요구 누락·비원자 행이 남거나 무효 처리된 과거 감사가 실행 허가로 사용된다
   rollback_unit: 복구된 controller/Phase 0/dependency plan + v2 audit 무효화 기록 + fresh audit evidence
-  dependencies: [a02a3da, BLK-RUNNER-ONLY-AUDIT-EVIDENCE]
+  dependencies: [a02a3da, BLK-RUNNER-ONLY-AUDIT-EVIDENCE, BLK-HISTORICAL-EVIDENCE-DIFF-CHECK]
   allowed_files: [docs/engineering/admin-weekly-dashboard-v6-atomic-research-*-2026-08-17.md, docs/engineering/admin-weekly-dashboard-v6-controller-goal-2026-08-17.md, docs/engineering/admin-weekly-dashboard-v6-atomic-plan-phase0-2026-08-17.md, docs/engineering/admin-weekly-dashboard-v6-canonical-expansions-2026-08-17.md, docs/engineering/admin-weekly-dashboard-v6-canonical-dependencies-2026-08-17.md, docs/engineering/admin-weekly-dashboard-v6-plan-audit-*.md, docs/engineering/admin-weekly-dashboard-v6-phase0-plan-repair-goal-2026-08-17.md]
   forbidden_scope: [제품 코드, dependency install, main 변경, 외부 호출]
   red_command: bash scripts/acceptance-admin-phase0-plan.sh && fresh auditor가 복구 후보에서 CODEAUDIT SPEC을 실행
   green_command: runner-only 원문 보존 아래 fresh auditor verdict PASS와 계획 PASS 조건 결함 0
   mutation_method: engines.node 행을 제거하거나 private/workspace를 다시 묶은 폐기 가능한 사본에서 audit FAIL 확인
   production_call_path: 사용자 계약 -> 저장소 계획 검사 -> runner-only fresh audit -> writer packet
-  target_count_method: parent AC distinct=40, active micro=134, required field missing=0, invalidated audit execution_permission=false
+  target_count_method: parent AC distinct=40, active micro=134, required field missing=0, invalidated audit execution_permission=false, full-chain diff-check violations=0
   cannot_split_reason: 실행 허가를 내는 fresh audit 한 건의 입력과 판정은 함께 보존해야 한다
   external_side_effect_count_expected: 0
 

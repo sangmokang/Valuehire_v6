@@ -174,7 +174,7 @@ program result: 2
 
 | 대상 | 현재 상태 | 이유 | 다음 안전 행동 |
 |---|---|---|---|
-| P0-01 계획 실행 허가 | BLOCKED_EVIDENCE_AUTHORITY | 기존 v2 감사가 누락 요구와 비원자 행을 PASS했고 runner-only 원문 보존도 없다 | 기존 PASS는 실행 허가가 없다; 증거 권한 분리 뒤 fresh audit |
+| P0-01 계획 실행 허가 | BLOCKED_EVIDENCE_AUTHORITY_AND_DIFF | 기존 v2 감사가 누락 요구와 비원자 행을 PASS했고 runner-only 원문 보존도 없으며 전체 기록 공백 검사가 7건 실패한다 | 기존 PASS는 실행 허가가 없다; 증거 권한과 원문 보존·공백 검사 충돌을 분리 해결한 뒤 fresh audit |
 | P0-02 Node runtime | BLOCKED_RUNTIME_CONSUMER | `.node-version`은 있으나 현재 실제 Node는 22.19.0이고 local/CI consumer가 미정이다 | runtime consumer를 독립 결정한 뒤 실제 24.19.0 실행 증명 |
 | P0-05 이후 TypeScript/Next 경로 | DECISION_REQUIRED_DEPENDENCY | 목표 고정 목록에 @types/react와 @types/react-dom의 exact version이 없음 | 새 P0-01 audit와 P0-02~P0-04A가 독립 PASS여도 의존성 버전 결정 전 package install 금지 |
 | AC05-M02 | BLOCKED_EXTERNAL_INPUT | 승인된 연말 경계 예시 2건 없음 | label 없는 NOT_RUN 경로만 구현 가능 |
@@ -279,6 +279,7 @@ P0-01
 - sensitive value copied to repo count 0
 - invalidated audit execution permission count 0
 - runner-only evidence authority confirmed
+- full-chain diff-check violation count 0
 - fresh plan auditor verdict PASS
 
 ### 계획 감사 v1 rework ledger
@@ -300,12 +301,13 @@ P0-01
 | P0-03 exact 문자열 검사가 끝 개행을 잃음 | INVALIDATED_FALSE_PASS | 계획 mutation에 `pnpm@11.22.0\n` 반례와 Corepack 실제 실행 경로를 고정 |
 | P0-04A가 고정 canary 파일명만 확인 | INVALIDATED_FALSE_PASS | 모든 금지 prefix 아래 임의 이름의 tracked file mutation을 고정 |
 | auditor 원문을 controller가 직접 보존 | BLOCKED_EVIDENCE_AUTHORITY | BLK-RUNNER-ONLY-AUDIT-EVIDENCE 해결 전 P0-01 PASS 금지 |
+| 원문 Markdown 보존과 전체 diff-check 충돌 | BLOCKED_HISTORICAL_EVIDENCE_DIFF_CHECK | BLK-HISTORICAL-EVIDENCE-DIFF-CHECK 해결 전 P0-01 PASS 금지; 원문 덮어쓰기나 전역 검사 약화 금지 |
 
 → `docs/engineering/admin-weekly-dashboard-v6-plan-audit-v2-invalidation-2026-08-17.md`가 과거 감사의 정확한 지문과 `execution_permission: false`를 보존합니다. 과거 PASS는 실행 허가가 없다.
 
 ### 현재 중지선
 
-현재 v2 계획 감사는 무효이며 제품 코드를 쓰지 않습니다. runner-only 증거 권한과 Node runtime consumer가 해결되고 fresh plan audit이 PASS인 경우에만 첫 writer packet P0-02를 만들며, exact input commit과 새 plan-audit evidence hash를 고정합니다.
+현재 v2 계획 감사는 무효이며 제품 코드를 쓰지 않습니다. runner-only 증거 권한, 과거 원문과 전체 diff-check의 충돌, Node runtime consumer가 모두 해결되고 fresh plan audit이 PASS인 경우에만 첫 writer packet P0-02를 만들며, exact input commit과 새 plan-audit evidence hash를 고정합니다.
 
 ## 감사 전 셀프 확인
 
