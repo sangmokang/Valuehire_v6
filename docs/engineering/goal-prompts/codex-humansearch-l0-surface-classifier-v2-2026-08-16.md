@@ -239,9 +239,16 @@ git show origin/main:docs/engineering/humansearch-v6-clean-room-rebuild-goal-202
 어느 재개 분기에서도 같은 경로를 쓰도록 먼저 두 절대 경로를 고정한다.
 
 ```bash
-PRIMARY_ROOT="$(git worktree list --porcelain | sed -n '1s/^worktree //p')"
-if [ -z "$PRIMARY_ROOT" ]; then
+primary_root_candidate="$(git worktree list --porcelain | sed -n '1s/^worktree //p')"
+if [ -z "$primary_root_candidate" ]; then
   printf '%s\n' 'BLOCKED: primary worktree root를 확인할 수 없다'
+  exit 21
+fi
+primary_root_rc=0
+PRIMARY_ROOT="$(cd "$primary_root_candidate" && pwd -P)" || primary_root_rc=$?
+if [ "$primary_root_rc" -ne 0 ] || [ -z "$PRIMARY_ROOT" ]; then
+  printf 'BLOCKED: primary worktree physical root를 확인할 수 없다 rc=%s candidate=%s\n' \
+    "$primary_root_rc" "$primary_root_candidate"
   exit 21
 fi
 TARGET_ROOT="$PRIMARY_ROOT/worktrees/humansearch-l0-surface-classifier"
@@ -281,20 +288,23 @@ printf '%s\n' "$bootstrap_out"
 
 expected_patterns="$PRIMARY_ROOT/.secret-patterns"
 linked_patterns="$(readlink .secret-patterns 2>/dev/null || true)"
-tracked_count="$(git ls-files -- .secret-patterns | awk 'NF{c++} END{print c+0}')"
+tracked_rc=0
+tracked_out="$(git ls-files -- .secret-patterns 2>/dev/null)" || tracked_rc=$?
+tracked_count="$(printf '%s\n' "$tracked_out" | awk 'NF{c++} END{print c+0}')"
 ignored_rc=0
 git check-ignore -q -- .secret-patterns || ignored_rc=$?
 
 if [ "$bootstrap_rc" -ne 0 ] ||
+   [ "$tracked_rc" -ne 0 ] ||
    [ ! -L .secret-patterns ] ||
    [ "$linked_patterns" != "$expected_patterns" ] ||
    [ ! -s "$expected_patterns" ] ||
    [ ! -s .secret-patterns ] ||
    [ "$tracked_count" -ne 0 ] ||
    [ "$ignored_rc" -ne 0 ]; then
-  printf 'BLOCKED: local secret pattern link invalid rc=%s link=%s expected=%s tracked=%s ignored_rc=%s\n' \
-    "$bootstrap_rc" "${linked_patterns:-MISSING}" "$expected_patterns" \
-    "$tracked_count" "$ignored_rc"
+  printf 'BLOCKED: local secret pattern link invalid bootstrap_rc=%s tracked_rc=%s link=%s expected=%s tracked=%s ignored_rc=%s\n' \
+    "$bootstrap_rc" "$tracked_rc" "${linked_patterns:-MISSING}" \
+    "$expected_patterns" "$tracked_count" "$ignored_rc"
   exit 22
 fi
 printf 'PATTERN_LINK: PASS target=%s tracked=%s ignored_rc=%s\n' \

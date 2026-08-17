@@ -1,6 +1,6 @@
 # Valuehire v6 — 로컬 강제 장치(git hook) 계약 (SOT)
 
-최종 갱신: 2026-08-08
+최종 갱신: 2026-08-17
 근거(도입 배경·적대검증·6종 위반 시연): `docs/engineering/hook-enforcement-goal-2026-08-07.md`
 
 ## 현재 규칙 — 입출력 계약
@@ -62,8 +62,13 @@
 ```
 입력  : 없음
 동작  : git config core.hooksPath hooks && chmod +x hooks/*
+        linked worktree에서 실행하고 primary worktree의 `.secret-patterns`가 비어 있지 않으면,
+        현재 worktree에 같은 이름이 없을 때만 primary의 물리 절대 경로를 가리키는 심볼릭 링크를 만든다.
+        기존 파일·링크는 덮어쓰지 않고, 실제 규칙 내용을 복사·출력·Git 추적하지 않는다.
 출력  : exit 0 + 설치된 훅 목록
 불변식: 실행 후 core.hooksPath 를 재조회해 실제로 설정됐는지 확인(readback). 불일치 시 exit 1
+        호출자는 링크 여부·정확한 대상·원본과 링크의 내용 존재·Git 비추적·무시 규칙을 재조회하고,
+        하나라도 다르면 다음 검사를 실행하지 않는다.
 ```
 
 ## 시행 지점
