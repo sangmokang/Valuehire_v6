@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 
 const relativePaths = {
+  replacementGoal: "docs/engineering/admin-weekly-dashboard-v6-replacement-goal-2026-08-16.md",
   plan: "docs/engineering/admin-weekly-dashboard-v6-atomic-plan-phase0-2026-08-17.md",
   dependencies: "docs/engineering/admin-weekly-dashboard-v6-canonical-dependencies-2026-08-17.md",
   controller: "docs/engineering/admin-weekly-dashboard-v6-controller-goal-2026-08-17.md",
@@ -325,6 +326,14 @@ function replaceOnce(text, from, to) {
   return `${text.slice(0, index)}${to}${text.slice(index + from.length)}`;
 }
 
+function replaceExactCount(text, from, to, expectedCount) {
+  const count = text.split(from).length - 1;
+  if (count !== expectedCount) {
+    throw new Error(`mutation target count mismatch: expected ${expectedCount}, got ${count}: ${from}`);
+  }
+  return text.split(from).join(to);
+}
+
 function copyBundle(sourceRoot, targetRoot) {
   for (const relativePath of Object.values(relativePaths)) {
     const source = path.join(sourceRoot, relativePath);
@@ -370,7 +379,11 @@ function runSelfTest(root) {
       expected: "verification SOT must include 루트 `package.json`은 존재",
       apply(tempRoot) {
         const file = path.join(tempRoot, relativePaths.sot);
-        const text = fs.readFileSync(file, "utf8").replace("루트 `package.json`은 존재", "`package.json`이 없고");
+        const text = replaceOnce(
+          fs.readFileSync(file, "utf8"),
+          "루트 `package.json`은 존재",
+          "`package.json`이 없고",
+        );
         fs.writeFileSync(file, text);
       },
     },
@@ -379,16 +392,21 @@ function runSelfTest(root) {
       expected: "CI workflow must include run: bash scripts/acceptance-admin-phase0-plan.sh",
       apply(tempRoot) {
         const file = path.join(tempRoot, relativePaths.workflow);
-        const text = fs.readFileSync(file, "utf8").replace("run: bash scripts/acceptance-admin-phase0-plan.sh", "run: echo phase0-plan-check-disabled");
+        const text = replaceOnce(
+          fs.readFileSync(file, "utf8"),
+          "run: bash scripts/acceptance-admin-phase0-plan.sh",
+          "run: echo phase0-plan-check-disabled",
+        );
         fs.writeFileSync(file, text);
       },
     },
     {
       name: "dependency-skip",
-      expected: "P0-03A-node-engine-pin dependencies must be [P0-03-pnpm-version-pin]",
+      expected: "P0-03A-node-engine-pin dependencies must be [P0-03-pnpm-version-pin], got [P0-02-node-version-pin]",
       apply(tempRoot) {
         const file = path.join(tempRoot, relativePaths.dependencies);
-        const text = fs.readFileSync(file, "utf8").replace(
+        const text = replaceOnce(
+          fs.readFileSync(file, "utf8"),
           "  - consumers: [P0-03A-node-engine-pin]\n    requires_micro_ids: [P0-03-pnpm-version-pin]",
           "  - consumers: [P0-03A-node-engine-pin]\n    requires_micro_ids: [P0-02-node-version-pin]",
         );
@@ -415,7 +433,11 @@ function runSelfTest(root) {
       expected: "P0-04A result must include overlapping fallback=0",
       apply(tempRoot) {
         const file = path.join(tempRoot, relativePaths.plan);
-        const text = fs.readFileSync(file, "utf8").replace("overlapping fallback=0", "fallback count unchecked");
+        const text = replaceOnce(
+          fs.readFileSync(file, "utf8"),
+          "overlapping fallback=0",
+          "fallback count unchecked",
+        );
         fs.writeFileSync(file, text);
       },
     },
@@ -424,8 +446,144 @@ function runSelfTest(root) {
       expected: "P0-04T mutation must include 임의",
       apply(tempRoot) {
         const file = path.join(tempRoot, relativePaths.plan);
-        const text = fs.readFileSync(file, "utf8").replace("임의 이름의 추적 파일", "고정 canary 추적 파일");
+        const text = replaceOnce(
+          fs.readFileSync(file, "utf8"),
+          "임의 이름의 추적 파일",
+          "고정 canary 추적 파일",
+        );
         fs.writeFileSync(file, text);
+      },
+    },
+    {
+      name: "unknown-dependency",
+      expected: "unknown dependencies: [P0-06-lockfile-resolution->DOES-NOT-EXIST]",
+      apply(tempRoot) {
+        const file = path.join(tempRoot, relativePaths.dependencies);
+        const text = replaceOnce(
+          fs.readFileSync(file, "utf8"),
+          "  - consumers: [P0-06-lockfile-resolution]\n    requires_micro_ids: [P0-05-admin-exact-package-contract]",
+          "  - consumers: [P0-06-lockfile-resolution]\n    requires_micro_ids: [DOES-NOT-EXIST]",
+        );
+        fs.writeFileSync(file, text);
+      },
+    },
+    {
+      name: "fake-active-consumer",
+      expected: "active micro set mismatch: missing=[AC04-M01] unexpected=[FAKE-MICRO]",
+      apply(tempRoot) {
+        const file = path.join(tempRoot, relativePaths.dependencies);
+        const text = replaceOnce(
+          fs.readFileSync(file, "utf8"),
+          "  - consumers: [AC04-M01]",
+          "  - consumers: [FAKE-MICRO]",
+        );
+        fs.writeFileSync(file, text);
+      },
+    },
+    {
+      name: "historical-blocker-removed",
+      expected: "required blockers missing: [BLK-HISTORICAL-EVIDENCE-DIFF-CHECK]",
+      apply(tempRoot) {
+        const planFile = path.join(tempRoot, relativePaths.plan);
+        const dependencyFile = path.join(tempRoot, relativePaths.dependencies);
+        let plan = fs.readFileSync(planFile, "utf8");
+        let dependencies = fs.readFileSync(dependencyFile, "utf8");
+        plan = replaceOnce(
+          plan,
+          "dependencies: [a02a3da, BLK-RUNNER-ONLY-AUDIT-EVIDENCE, BLK-HISTORICAL-EVIDENCE-DIFF-CHECK]",
+          "dependencies: [a02a3da, BLK-RUNNER-ONLY-AUDIT-EVIDENCE]",
+        );
+        dependencies = replaceOnce(dependencies, "  - BLK-HISTORICAL-EVIDENCE-DIFF-CHECK\n", "");
+        dependencies = replaceOnce(
+          dependencies,
+          "requires_blocker_ids: [BLK-RUNNER-ONLY-AUDIT-EVIDENCE, BLK-HISTORICAL-EVIDENCE-DIFF-CHECK]",
+          "requires_blocker_ids: [BLK-RUNNER-ONLY-AUDIT-EVIDENCE]",
+        );
+        fs.writeFileSync(planFile, plan);
+        fs.writeFileSync(dependencyFile, dependencies);
+      },
+    },
+    {
+      name: "phase-result-gutted",
+      expected: "phase contract mismatch: P0-06-lockfile-resolution.single_observable_result",
+      apply(tempRoot) {
+        const file = path.join(tempRoot, relativePaths.plan);
+        const text = replaceOnce(
+          fs.readFileSync(file, "utf8"),
+          "single_observable_result: 고정 runtime에서 frozen install이 성공하고 lockfile importer/package targetCount가 0보다 크다",
+          "single_observable_result: 아무 문장이나 있으면 된다",
+        );
+        fs.writeFileSync(file, text);
+      },
+    },
+    {
+      name: "ci-main-only",
+      expected: "CI Phase 0 plan step must not contain if",
+      apply(tempRoot) {
+        const file = path.join(tempRoot, relativePaths.workflow);
+        const text = replaceOnce(
+          fs.readFileSync(file, "utf8"),
+          "      - name: 관리자 대시보드 Phase 0 계획 복구 계약\n        # 요구 누락·비원자 작업·무효 감사 재사용·SOT/CI 미배선을 같은 판정기로 막는다.\n        run: bash scripts/acceptance-admin-phase0-plan.sh",
+          "      - name: 관리자 대시보드 Phase 0 계획 복구 계약\n        # 요구 누락·비원자 작업·무효 감사 재사용·SOT/CI 미배선을 같은 판정기로 막는다.\n        if: github.ref == 'refs/heads/main'\n        run: bash scripts/acceptance-admin-phase0-plan.sh",
+        );
+        fs.writeFileSync(file, text);
+      },
+    },
+    {
+      name: "ci-continue-on-error",
+      expected: "CI Phase 0 plan step must not contain continue-on-error",
+      apply(tempRoot) {
+        const file = path.join(tempRoot, relativePaths.workflow);
+        const text = replaceOnce(
+          fs.readFileSync(file, "utf8"),
+          "        run: bash scripts/acceptance-admin-phase0-plan.sh",
+          "        continue-on-error: true\n        run: bash scripts/acceptance-admin-phase0-plan.sh",
+        );
+        fs.writeFileSync(file, text);
+      },
+    },
+    {
+      name: "replacement-goal-engines-requirement-removed",
+      expected: "replacement goal must require engines.node",
+      apply(tempRoot) {
+        const file = path.join(tempRoot, relativePaths.replacementGoal);
+        const text = replaceOnce(
+          fs.readFileSync(file, "utf8"),
+          "Node는 루트 `.node-version`과 `engines.node`, pnpm은 루트 `packageManager`에 각각 고정한다.",
+          "Node는 루트 `.node-version`, pnpm은 루트 `packageManager`에 각각 고정한다.",
+        );
+        fs.writeFileSync(file, text);
+      },
+    },
+    {
+      name: "duplicate-phase-field",
+      expected: "duplicate phase field: P0-06-lockfile-resolution.single_observable_result",
+      apply(tempRoot) {
+        const file = path.join(tempRoot, relativePaths.plan);
+        const value = "  single_observable_result: 고정 runtime에서 frozen install이 성공하고 lockfile importer/package targetCount가 0보다 크다";
+        const text = replaceOnce(fs.readFileSync(file, "utf8"), value, `${value}\n${value}`);
+        fs.writeFileSync(file, text);
+      },
+    },
+    {
+      name: "plan-and-graph-id-renamed-together",
+      expected: "active micro set mismatch: missing=[P0-06-lockfile-resolution] unexpected=[P0-06-FAKE-lockfile-resolution]",
+      apply(tempRoot) {
+        const planFile = path.join(tempRoot, relativePaths.plan);
+        const dependencyFile = path.join(tempRoot, relativePaths.dependencies);
+        const plan = replaceOnce(
+          fs.readFileSync(planFile, "utf8"),
+          "  micro_id: P0-06-lockfile-resolution",
+          "  micro_id: P0-06-FAKE-lockfile-resolution",
+        );
+        const dependencies = replaceExactCount(
+          fs.readFileSync(dependencyFile, "utf8"),
+          "P0-06-lockfile-resolution",
+          "P0-06-FAKE-lockfile-resolution",
+          2,
+        );
+        fs.writeFileSync(planFile, plan);
+        fs.writeFileSync(dependencyFile, dependencies);
       },
     },
   ];
@@ -437,7 +595,7 @@ function runSelfTest(root) {
       copyBundle(root, tempRoot);
       mutation.apply(tempRoot);
       const result = validate(tempRoot);
-      if (!result.errors.some((error) => error.includes(mutation.expected))) {
+      if (!result.errors.includes(mutation.expected)) {
         return {
           errors: [`mutation ${mutation.name} was not caught with expected reason: ${mutation.expected}`],
           phaseRows: baseline.phaseRows,
