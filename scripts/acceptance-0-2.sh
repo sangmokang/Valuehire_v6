@@ -114,8 +114,22 @@ unreachable_objects=$(printf '%s\n' "$fsck_output" |
   awk '$1 == "unreachable" { print $2, $3 }')
 while read -r object_type sha; do
   [ -z "${object_type:-}" ] && continue
-  if git cat-file "$object_type" "$sha" 2>/dev/null | grep -qF "$LIT"; then
+  if git cat-file "$object_type" "$sha" 2>/dev/null |
+     LC_ALL=C grep -aF "$LIT" >/dev/null; then
+    object_scan_status=("${PIPESTATUS[@]}")
+  else
+    object_scan_status=("${PIPESTATUS[@]}")
+  fi
+  cat_file_rc=${object_scan_status[0]:-1}
+  grep_rc=${object_scan_status[1]:-2}
+  if [ "$cat_file_rc" -ne 0 ]; then
+    echo "FAIL: unreachable ${object_type} 읽기 실패: $sha (exit=$cat_file_rc)"
+    fail=1
+  elif [ "$grep_rc" -eq 0 ]; then
     echo "FAIL: unreachable ${object_type}에 리터럴 잔존: $sha"
+    fail=1
+  elif [ "$grep_rc" -ne 1 ]; then
+    echo "FAIL: unreachable ${object_type} 내용 대조 실패: $sha (exit=$grep_rc)"
     fail=1
   fi
 done <<< "$unreachable_objects"
