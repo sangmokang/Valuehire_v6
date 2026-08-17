@@ -5,6 +5,8 @@ set -euo pipefail
 # 합성 fixture가 호출자 셸의 실제 패턴 경로를 물려받으면 같은 시험이 환경마다 달라진다.
 # 자동 훅뿐 아니라 직접 실행도 반드시 아래 fixture의 .secret-patterns만 사용한다.
 unset SECRET_PATTERNS_FILE
+# pre-push가 넘기는 저장소 위치를 물려받으면 합성 git 명령이 실제 저장소를 바꾼다.
+unset GIT_DIR GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_WORK_TREE GIT_COMMON_DIR GIT_ALTERNATE_OBJECT_DIRECTORIES
 
 ROOT=$(git rev-parse --show-toplevel)
 TMP_ROOT=$(mktemp -d)
