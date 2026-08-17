@@ -59,6 +59,29 @@ EXPECTED_EXTERNAL_EFFECTS = {
     "gmail": "READ_ONLY_NOT_CONNECTED",
     "supabase_writes": "DISABLED",
 }
+NOT_RUN_ONLY_REASONS = frozenset(
+    {
+        SourceFailureReason.CALENDAR_ALIAS_AMBIGUOUS,
+        SourceFailureReason.CALENDAR_ALIAS_NOT_FOUND,
+        SourceFailureReason.COLLECTION_NOT_SCHEDULED,
+        SourceFailureReason.COLLECTION_OVERLAP,
+        SourceFailureReason.HISTORY_NOT_COLLECTED,
+        SourceFailureReason.IDENTITY_LINK_CONTRACT_MISSING,
+        SourceFailureReason.PRECONDITION_MISSING,
+        SourceFailureReason.RETENTION_POLICY_MISSING,
+        SourceFailureReason.SOURCE_STATE_MISSING,
+    }
+)
+FAIL_ONLY_REASONS = frozenset(
+    {
+        SourceFailureReason.CALENDAR_EVENT_ID_MISSING,
+        SourceFailureReason.COLLECTION_INCOMPLETE,
+        SourceFailureReason.CONTRACT_MISMATCH,
+        SourceFailureReason.GMAIL_TIMEOUT,
+        SourceFailureReason.SOURCE_TIMEOUT,
+        SourceFailureReason.SOURCE_UNAVAILABLE,
+    }
+)
 
 
 class CandidateLinkDecision(str, Enum):
@@ -301,12 +324,12 @@ def resolve_calendar_alias(
     normalized_alias = _normalize(alias)
     if normalized_alias is None:
         raise ValueError("calendar alias must be non-empty")
-    matches = {
-        calendar.calendar_id: calendar
+    matches = [
+        calendar
         for calendar in calendars
         if normalized_alias
         in {_normalize(calendar.calendar_id), _normalize(calendar.summary)}
-    }
+    ]
     if not matches:
         return CalendarResolution(
             state=SourceState(
@@ -323,7 +346,7 @@ def resolve_calendar_alias(
             ),
             calendar_id=None,
         )
-    calendar_id = next(iter(matches))
+    calendar_id = matches[0].calendar_id
     return CalendarResolution(
         state=SourceState(status=MetricStatus.PASS),
         calendar_id=calendar_id,
@@ -343,21 +366,32 @@ def collection_state(
         raise ValueError("unplanned collection cannot be attempted")
     if pagination_exhausted and not attempted:
         raise ValueError("pagination cannot be exhausted without an attempt")
+    normalized_reason = None if reason is None else SourceFailureReason(reason)
     if pagination_exhausted:
-        if reason is not None:
+        if normalized_reason is not None:
             raise ValueError("a completed collection cannot have a failure reason")
         return SourceState(status=MetricStatus.PASS)
     if attempted:
+        failure_reason = normalized_reason or SourceFailureReason.COLLECTION_INCOMPLETE
+        if failure_reason in NOT_RUN_ONLY_REASONS:
+            raise ValueError("an attempted collection cannot use a NOT_RUN-only reason")
         return SourceState(
             status=MetricStatus.FAIL,
-            reason=reason or SourceFailureReason.COLLECTION_INCOMPLETE,
+            reason=failure_reason,
         )
-    default_reason = (
-        SourceFailureReason.PRECONDITION_MISSING
-        if planned
-        else SourceFailureReason.COLLECTION_NOT_SCHEDULED
-    )
-    return SourceState(status=MetricStatus.NOT_RUN, reason=reason or default_reason)
+    if not planned:
+        if normalized_reason not in {None, SourceFailureReason.COLLECTION_NOT_SCHEDULED}:
+            raise ValueError("an unplanned collection must use collection_not_scheduled")
+        return SourceState(
+            status=MetricStatus.NOT_RUN,
+            reason=SourceFailureReason.COLLECTION_NOT_SCHEDULED,
+        )
+    not_run_reason = normalized_reason or SourceFailureReason.PRECONDITION_MISSING
+    if not_run_reason is SourceFailureReason.COLLECTION_NOT_SCHEDULED:
+        raise ValueError("a planned collection cannot use collection_not_scheduled")
+    if not_run_reason in FAIL_ONLY_REASONS:
+        raise ValueError("an unattempted collection cannot use a FAIL-only reason")
+    return SourceState(status=MetricStatus.NOT_RUN, reason=not_run_reason)
 
 
 def _object(value: object, label: str) -> dict[str, object]:

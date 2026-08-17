@@ -10,6 +10,8 @@ import pytest
 
 from humansearch.admin_weekly_dashboard.contracts import MetricStatus, SourceFailureReason
 from humansearch.admin_weekly_dashboard.source_policy import (
+    FAIL_ONLY_REASONS,
+    NOT_RUN_ONLY_REASONS,
     CalendarReference,
     CandidateIdentityEvidence,
     CandidateLinkDecision,
@@ -189,6 +191,39 @@ def test_collection_verdict_rejects_an_attempt_that_was_not_planned() -> None:
         )
 
 
+def test_every_failure_reason_has_an_explicit_collection_status_class() -> None:
+    assert NOT_RUN_ONLY_REASONS.isdisjoint(FAIL_ONLY_REASONS)
+    assert set(SourceFailureReason) == (
+        NOT_RUN_ONLY_REASONS
+        | FAIL_ONLY_REASONS
+        | {SourceFailureReason.PERMISSION_DENIED}
+    )
+
+
+@pytest.mark.parametrize(
+    ("planned", "attempted", "reason", "error"),
+    [
+        (True, True, "precondition_missing", "NOT_RUN-only"),
+        (True, False, "collection_incomplete", "FAIL-only"),
+        (True, False, "collection_not_scheduled", "planned collection"),
+        (False, False, "precondition_missing", "unplanned collection"),
+    ],
+)
+def test_collection_verdict_rejects_reasons_that_contradict_attempt_state(
+    planned: bool,
+    attempted: bool,
+    reason: str,
+    error: str,
+) -> None:
+    with pytest.raises(ValueError, match=error):
+        collection_state(
+            planned=planned,
+            attempted=attempted,
+            pagination_exhausted=False,
+            reason=reason,
+        )
+
+
 def test_candidate_all_exact_creates_review_suggestion_but_never_auto_merge() -> None:
     left = CandidateIdentityEvidence(name=" 김 민수 ", school="서울 대학교", company="Acme")
     right = CandidateIdentityEvidence(name="김 민수", school="서울   대학교", company="acme")
@@ -259,4 +294,18 @@ def test_calendar_alias_missing_or_ambiguous_is_not_run(
 
     assert resolution.state.status is MetricStatus.NOT_RUN
     assert resolution.state.reason is reason
+    assert resolution.calendar_id is None
+
+
+def test_duplicate_calendar_list_entries_are_ambiguous_even_with_the_same_id() -> None:
+    resolution = resolve_calendar_alias(
+        "sangmokang",
+        [
+            CalendarReference(calendar_id="calendar-1", summary="sangmokang"),
+            CalendarReference(calendar_id="calendar-1", summary="sangmokang"),
+        ],
+    )
+
+    assert resolution.state.status is MetricStatus.NOT_RUN
+    assert resolution.state.reason is SourceFailureReason.CALENDAR_ALIAS_AMBIGUOUS
     assert resolution.calendar_id is None
