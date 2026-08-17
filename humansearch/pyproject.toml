@@ -8,6 +8,7 @@ requires-python = ">=3.14"
 # 지금 넣으면 호출자 0 인 의존성(고아)이다. 계약 291-293행의 허용 목록 안에서만 고른다.
 [dependency-groups]
 dev = [
+    "hypothesis>=6.0",
     "ruff>=0.9",
     "mypy>=1.14",
     "pytest>=8.3",
