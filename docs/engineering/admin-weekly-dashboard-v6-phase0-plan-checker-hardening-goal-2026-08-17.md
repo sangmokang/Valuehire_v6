@@ -1,6 +1,6 @@
 # Admin Weekly Dashboard v6 Phase 0 계획 검사기 보강 goal — 2026-08-17
 
-## 1층 — 쉬운 결론
+## 1층 — 결론 — 쉬운 결론
 
 현재 계획 검사기는 잘못된 계획 다섯 가지를 모두 합격시킵니다. 이번 작업은 이 거짓 합격과 추가 우회를 막는 검사만 보강하며, 관리자 대시보드 제품 구현은 시작하지 않습니다.
 
@@ -256,9 +256,226 @@ Claude 판정 본문이 없거나 빈 출력·한 줄 완료·서비스 거절·
 
 NOT_RUN — 신규 고장 시험 커밋 전입니다.
 
+상태 전환 — RED를 별도 Lore commit `ed7c11e85f4c6703502ca1259686b9d6043f36b7`로 고정했습니다. 기존 9개 뒤에 신규 9개를 추가했으며, 정상 baseline은 통과하지만 첫 신규 반례인 unknown dependency를 검사기가 놓치는 상태를 확인했습니다.
+
+~~~text
+$ node --check scripts/verify/check-admin-phase0-plan.mjs
+program result: 0
+
+$ bash -n scripts/acceptance-admin-phase0-plan.sh
+program result: 0
+
+$ bash scripts/acceptance-admin-phase0-plan.sh
+FAIL: mutation unknown-dependency was not caught with expected reason: unknown dependencies: [P0-06-lockfile-resolution->DOES-NOT-EXIST]
+ADMIN_PHASE0_PLAN_CHECK phase0Rows=26 consumers=135 mutationsCaught=9 mutationsRequired=18 reason=contract-mismatch
+program result: 1
+~~~
+
+→ 새 반례의 시험 문법은 유효하지만 기존 validator가 존재하지 않는 선행 작업을 합격시켰습니다. RED 변경 뒤 mutation 정의 블록 SHA-256은 GREEN에서도 `c396e5d0c15ff489d2865c81a99aac9b092dbc6a9d7cf82654852a2fe6baf326`으로 같았습니다.
+
 ### GREEN과 전체 로컬 검증
 
 NOT_RUN — 구현 전입니다.
+
+상태 전환 — GREEN은 `ab6752a60be001c437381de34f65ab3ea6e814a7`, 실행 비트 복원은 `a2c371850daaac4782ad2949b46d8ca5d62c7eea`, clean-room byte encoding 보정은 `bd77c6a39a9533674bf7ce35e8fa380e2e587354`입니다. RED와 GREEN을 합치거나 amend하지 않았습니다.
+
+독립 inventory 생성 규칙은 Phase 0 canonical plan 26개 + Phase 1 18개 + Phase 2a 16개 + Phase 2b 21개 + Phase 3 13개 + auth/security 22개에서 superseded 15개를 빼고 canonical replacement 34개를 더하는 방식입니다. dependency overlay는 inventory 산출 입력에서 제외했습니다. 첫 독립 parser는 Phase 2a의 TSV 형식을 Markdown 표로 오인해 119개를 냈고, 파일 형식을 직접 확인한 뒤 TSV parser로 고쳐 아래 135개 결과를 얻었습니다.
+
+~~~text
+$ node --check scripts/verify/check-admin-phase0-plan.mjs
+$ node --check scripts/verify/admin-phase0-plan-structural-contract.mjs
+$ bash -n scripts/acceptance-admin-phase0-plan.sh
+program result: 0
+
+$ bash scripts/acceptance-admin-phase0-plan.sh
+PASS: Phase 0 structural contract and CI registration match the pinned candidate
+ADMIN_PHASE0_PLAN_CHECK phase0Rows=26 consumers=135 duplicateConsumers=0 unknownDependencies=0 dependencyCycles=0 blockersUnknown=0 mutationsCaught=18 mutationsRequired=18 structuralContract=PASS semanticAuditRequired=true executionPermission=false reason=null
+program result: 0
+
+$ independent Node parser
+phase0=26
+phase1=18
+phase2a=16
+phase2b=21
+phase3=13
+authSecurity=22
+superseded=15
+replacements=34
+independentActive=135
+graphConsumers=135
+duplicateConsumers=0
+unknownDependencies=0
+dependencyCycles=0
+missingFromGraph=[]
+unexpectedInGraph=[]
+contractMissing=[]
+contractUnexpected=[]
+program result: 0
+
+$ bash scripts/acceptance-verify-ac-m.sh
+PASS: 검사기 실존·실행가능 — scripts/verify/check-mechanism-registry.sh
+PASS: fixture 정상 명부 → 통과 (exit=0)
+PASS: fixture path 없는 항목 → 불합격 (exit=1)
+PASS: fixture 죽은 target → 불합격 (exit=1)
+PASS: id 중복 → 불합격 (exit=1)
+PASS: 알 수 없는 stage → 불합격 (exit=1)
+PASS: manual 인데 사유 없음 → 불합격 (exit=1)
+PASS: manual 정상(사유+실행권한) → 통과 (exit=0)
+PASS: manual 인데 실행권한 없음 → 불합격 (exit=1)
+PASS: ci 인데 거짓 target → 불합격 (exit=1)
+PASS: 절대경로 path → 불합격 (exit=1)
+PASS: 상대경로 심볼릭 링크 → 불합격 (exit=1)
+PASS: 필드 중복(path 2회, 마지막 값 유효) → 불합격 (exit=1)
+PASS: id 뒤 인라인 주석 → 불합격 (exit=1)
+PASS: 닫히지 않은 따옴표 → 불합격 (exit=1)
+PASS: stage 불일치 필드(ci_mirror_job) → 불합격 (exit=1)
+PASS: 문법 오류·항목 0개 → 위반(1) (exit=1)
+PASS: 항목 0개 명부 → NOT_RUN (exit=2)
+PASS: ci_mirror_job 불일치 → 불합격 (exit=1)
+PASS: 필수 필드(stage) 누락 → 불합격 (exit=1)
+PASS: 빈 문자열 path → 불합격 (exit=1)
+PASS: CI 배선 — verify.yml 에 무조건 실행 스텝 정확히 1회
+PASS: 실제 명부(docs/sot/mechanism-registry.yaml) → 통과 (exit=0)
+PASS: 명부 항목 4개 = 검사기 보고 4개 (하한 3)
+PASS: 저장소 무오염 (시작/종료 상태 동일)
+CHECKED: 25
+program result: 0
+
+$ bash scripts/verify/check-mechanism-registry.sh
+PASS: secrets-scan-precommit (pre-commit · 규칙 1·2·3)
+PASS: acceptance-glob-prepush (pre-push · 규칙 1·2·3)
+PASS: ci-secret-scan (ci · 규칙 1·2·4)
+PASS: admin-phase0-plan-ci (ci · 규칙 1·2·4)
+CHECKED: 4
+program result: 0
+~~~
+
+→ 구문, 18개 직접 반례, 독립 inventory, mechanism 등록이 모두 통과했습니다. fixture JSON은 파싱 뒤 원문 필드와 exact하게 같지만 clean-room 금지 토큰은 byte layer에서 Unicode escape로 보존하며, 고정 SHA-256은 `b1a6a4a890ec7f2b6c1e1d18f0926a4e58d49bc83e1007be7b796b152977fcb5`입니다.
+
+첫 pre-push는 새 JSON fixture에 그대로 저장된 legacy 경로 토큰 때문에 기존 clean-room gate가 실패했습니다. scanner를 약화하지 않고 JSON byte encoding만 고쳐 재실행했습니다.
+
+~~~text
+$ bash hooks/pre-push
+skip ./scripts/acceptance-0-2.sh (DEFERRED · CI 담당)
+skip ./scripts/acceptance-0-5.sh (DEFERRED · CI 담당)
+skip ./scripts/acceptance-0-7.sh (PUSH-PERFORMING · CI 담당)
+pre-push: 검사 18개 실행
+ok ./scripts/acceptance-0-6.sh
+ok ./scripts/acceptance-admin-phase0-plan.sh
+ok ./scripts/acceptance-hs-a3.sh
+ok ./scripts/acceptance-hs-a4.sh
+ok ./scripts/acceptance-hs-cleanroom-absolute-contexts.sh
+ok ./scripts/acceptance-hs-cleanroom-absolute-paths.sh
+ok ./scripts/acceptance-hs-cleanroom-colon-paths.sh
+ok ./scripts/acceptance-hs-cleanroom-file-urls.sh
+ok ./scripts/acceptance-hs-cleanroom-hook-env-mutations.sh
+ok ./scripts/acceptance-hs-cleanroom-hook-env.sh
+ok ./scripts/acceptance-hs-cleanroom-mutations.sh
+BLOCKED: ./scripts/acceptance-hs-cleanroom.sh exit=1
+ok ./scripts/acceptance-hs-gates-antiforge.sh
+ok ./scripts/acceptance-hs-gates-mutations.sh
+ok ./scripts/acceptance-hs-gates.sh
+ok ./scripts/acceptance-secret-webhook-vendor.sh
+ok ./scripts/acceptance-verify-ac-m.sh
+ok ./verify.sh
+program result: 1
+
+$ bash scripts/acceptance-hs-cleanroom.sh
+forbidden: scripts/verify/fixtures/admin-phase0-plan-structural-contract.json
+FAIL: forbidden runtime refs 1
+PASS: escaping symlinks 0
+CHECKED: 62
+program result: 1
+
+$ bash scripts/acceptance-hs-cleanroom.sh  # byte encoding 보정 뒤
+PASS: forbidden runtime refs 0
+PASS: escaping symlinks 0
+CHECKED: 62
+program result: 0
+
+$ bash hooks/pre-push  # 최종 재실행
+skip ./scripts/acceptance-0-2.sh (DEFERRED · CI 담당)
+skip ./scripts/acceptance-0-5.sh (DEFERRED · CI 담당)
+skip ./scripts/acceptance-0-7.sh (PUSH-PERFORMING · CI 담당)
+pre-push: 검사 18개 실행
+ok ./scripts/acceptance-0-6.sh
+ok ./scripts/acceptance-admin-phase0-plan.sh
+ok ./scripts/acceptance-hs-a3.sh
+ok ./scripts/acceptance-hs-a4.sh
+ok ./scripts/acceptance-hs-cleanroom-absolute-contexts.sh
+ok ./scripts/acceptance-hs-cleanroom-absolute-paths.sh
+ok ./scripts/acceptance-hs-cleanroom-colon-paths.sh
+ok ./scripts/acceptance-hs-cleanroom-file-urls.sh
+ok ./scripts/acceptance-hs-cleanroom-hook-env-mutations.sh
+ok ./scripts/acceptance-hs-cleanroom-hook-env.sh
+ok ./scripts/acceptance-hs-cleanroom-mutations.sh
+ok ./scripts/acceptance-hs-cleanroom.sh
+ok ./scripts/acceptance-hs-gates-antiforge.sh
+ok ./scripts/acceptance-hs-gates-mutations.sh
+ok ./scripts/acceptance-hs-gates.sh
+ok ./scripts/acceptance-secret-webhook-vendor.sh
+ok ./scripts/acceptance-verify-ac-m.sh
+ok ./verify.sh
+program result: 0
+~~~
+
+→ 첫 실패는 이 작업의 새 fixture가 유발한 회귀였고 그대로 두지 않았습니다. 최종 production pre-push 호출 경로는 새 Phase 0 검사와 기존 17개 검사를 모두 통과했습니다. 세 CI 전용 항목은 훅 계약대로 로컬에서 실행하지 않았습니다.
+
+~~~text
+$ bash verify.sh
+PASS: no secret-pattern match in any tracked file, .env not tracked
+program result: 0
+
+$ bash scripts/scan-data-exposure.sh all
+PASS: 추적 파일 123개 검사, 위반 0건
+PASS: 기록 전량 blob 596개 검사, 크기·경로 위반 0건
+PASS: csv/tsv/sql 0개 검사(추적 123개 중), 개인정보 적재 0건
+program result: 0
+
+$ git diff --check 7c038bea1025937ff34b5161320d74e9468ac089..HEAD
+program result: 0
+
+$ git diff --check a02a3da8f36e22997028b0d620de4e7e970f76d8..HEAD
+docs/engineering/admin-weekly-dashboard-v6-p0-04-codeaudit-a3-2026-08-17.md:7: trailing whitespace.
++auditor_id: `p0_04_codeaudit_a3`
+docs/engineering/admin-weekly-dashboard-v6-p0-04-codeaudit-a3-2026-08-17.md:8: trailing whitespace.
++clone_locator: `/tmp/p0-04-audit-a3.Tz3QwC/clone`
+docs/engineering/admin-weekly-dashboard-v6-p0-04-codeaudit-a3-2026-08-17.md:9: trailing whitespace.
++source_at_candidate: `/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/admin-weekly-dashboard-v6-p0-04-root-private-workspace-audit-a3`
+docs/engineering/admin-weekly-dashboard-v6-p0-04-codeaudit-a3-2026-08-17.md:10: trailing whitespace.
++base: `55b71bb7ee8bf0b2877f040e57e92382fd45b6af`
+docs/engineering/admin-weekly-dashboard-v6-p0-04-codeaudit-a3-2026-08-17.md:11: trailing whitespace.
++RED: `f4717691d065b8b42fd1932091cfdb14d0ab30a0`
+docs/engineering/admin-weekly-dashboard-v6-p0-04-codeaudit-a3-2026-08-17.md:12: trailing whitespace.
++candidate: `33679e9a66f6bdb5c1faa9e3a40374b46e7479ce`
+docs/engineering/admin-weekly-dashboard-v6-p0-04-codeaudit-a3-2026-08-17.md:13: trailing whitespace.
++P0-03 audit sha256: `360dc78c3b9ca92892048cfb1913ab10f3e145d75bd710d63c23c97b4e0af161`
+program result: 2
+
+$ bash scripts/session-status.sh
+HEAD: bd77c6a (ahead 29 / behind 0)
+ORIGIN: 4fdef31
+RED: 2/20 (acceptance-0-7.sh 제외 — CI 담당)
+program result: 0
+
+$ git status --short
+program result: 0
+~~~
+
+→ 새 작업 구간 공백 위반은 0입니다. 전체 이력은 알려진 과거 감사 원문 7건만 남아 성적 2이며 이를 합격으로 바꾸지 않았습니다. `session-status.sh` 자체는 성적 0이지만 저장소 상태는 여전히 RED 2/20입니다.
+
+~~~text
+$ bash ~/.claude/skills/strict/brief-lint.sh --strict docs/engineering/admin-weekly-dashboard-v6-phase0-plan-checker-hardening-goal-2026-08-17.md
+코드블록 2개 · 표 0개 (면제 0개) / 해석 누락 0개
+1층(결론): 줄 3 / 본문 175자
+1층 기술 표기: 없음 (※ 한글 전문용어는 못 잡는다 — 사람이 본다)
+결정 카드 3건
+증거 보관 경로: 임시 외 실재 파일 6건
+브리핑 계약 기계 검사: 위반 0건 (문서 1개)
+program result: 0
+~~~
+
+→ 이 검사는 형식상 명백한 누락만 세며 내용의 진실성·판단 품질을 증명하지 않습니다. 홈 폴더에만 있어 서버 자동 검사나 회사 차원의 합격 근거도 아닙니다.
 
 ### 적대 검증 로그
 
