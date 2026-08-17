@@ -1,5 +1,7 @@
 # 고객사 × 포지션 맵 ("잔디밭") — 확정 스펙 2026-08-17
 
+> **⚠️ 개정 대기 (2026-08-17 저녁 감사 결과):** 이 문서의 §4(색 판정)·§5(연결)·§6(발송 원장)·§7(배치 수)은 같은 날 혼합 감사(codex 공격 + Claude 교차 재확인)에서 반증되었다 — **그 절들은 그대로 구현 금지.** §8(화면)·§2 결정 1~3(위치·미러 재사용·시간 축)은 유효. 감사 원문: `admin-position-map-spec-v1-adversarial-audit-2026-08-17.md`, 후속 개정·구현 지시: `goal-prompts/admin-position-map-v2-impl-kickoff-2026-08-17.md`. v2 문서가 나오면 그쪽이 정본이다.
+
 > 작성: Claude (Fable 5), 사장님 인터뷰 3회(구현 위치·시간 축·노랑 정의·설계 승인) 반영.
 > 선행 문서: `admin-dashboard-engagement-heatmap-spec-adversarial-review-2026-08-16.md`(적대적 검증),
 > `admin-weekly-dashboard-v6-replacement-goal-2026-08-16.md`(주차 계약).
