@@ -43,7 +43,8 @@ const expectedChain = new Map([
   ["P0-04-root-private", ["P0-03A-node-engine-pin"]],
   ["P0-04-workspace-declaration", ["P0-04-root-private"]],
   ["P0-04A-generated-artifact-ignore", ["P0-04-workspace-declaration"]],
-  ["P0-05-admin-exact-package-contract", ["P0-04A-generated-artifact-ignore"]],
+  ["P0-04T-tracked-generated-artifact-guard", ["P0-04A-generated-artifact-ignore"]],
+  ["P0-05-admin-exact-package-contract", ["P0-04T-tracked-generated-artifact-guard"]],
 ]);
 
 function read(root, relativePath) {
@@ -155,7 +156,7 @@ function validate(root) {
       if (!(field in row) || row[field] === "") errors.push(`${row.micro_id} missing required field: ${field}`);
     }
   }
-  if (rows.length !== 25) errors.push(`phase0 row count must be 25, got ${rows.length}`);
+  if (rows.length !== 26) errors.push(`phase0 row count must be 26, got ${rows.length}`);
 
   const requireRow = (id) => {
     const row = rowById.get(id);
@@ -199,14 +200,21 @@ function validate(root) {
   }
 
   const p004a = requireRow("P0-04A-generated-artifact-ignore");
-  requireIncludes(errors, p004a.single_observable_result, "모든", "P0-04A result");
-  requireIncludes(errors, p004a.single_observable_result, "추적", "P0-04A result");
-  requireIncludes(errors, p004a.mutation_method, "임의", "P0-04A mutation");
-  requireIncludes(errors, p004a.target_count_method, "prefix", "P0-04A target count");
-  requireIncludes(errors, p004a.production_call_path, "CI", "P0-04A production path");
+  requireIncludes(errors, p004a.single_observable_result, "git check-ignore -v", "P0-04A result");
+  requireIncludes(errors, p004a.single_observable_result, "overlapping fallback=0", "P0-04A result");
+  requireExcludes(errors, p004a.single_observable_result, "추적", "P0-04A result");
+  requireIncludes(errors, p004a.mutation_method, "중복", "P0-04A mutation");
+
+  const p004t = requireRow("P0-04T-tracked-generated-artifact-guard");
+  requireIncludes(errors, p004t.single_observable_result, "모든", "P0-04T result");
+  requireIncludes(errors, p004t.single_observable_result, "추적", "P0-04T result");
+  requireExcludes(errors, p004t.single_observable_result, "ignore", "P0-04T result");
+  requireIncludes(errors, p004t.mutation_method, "임의", "P0-04T mutation");
+  requireIncludes(errors, p004t.target_count_method, "prefix", "P0-04T target count");
+  requireIncludes(errors, p004t.production_call_path, "CI", "P0-04T production path");
 
   const { graph, blockerGraph } = parseDependencyGraph(files.dependencies, errors);
-  if (graph.size !== 134) errors.push(`active dependency consumer count must be 134, got ${graph.size}`);
+  if (graph.size !== 135) errors.push(`active dependency consumer count must be 135, got ${graph.size}`);
   for (const id of rowById.keys()) {
     if (!graph.has(id)) errors.push(`phase micro missing from dependency graph: ${id}`);
   }
@@ -247,12 +255,13 @@ function validate(root) {
 
   requireIncludes(errors, files.controller, "P0-03A-node-engine-pin", "controller");
   requireIncludes(errors, files.controller, "P0-04-workspace-declaration", "controller");
+  requireIncludes(errors, files.controller, "P0-04T-tracked-generated-artifact-guard", "controller");
   requireIncludes(errors, files.controller, "실행 허가가 없다", "controller invalidation rule");
 
   requireIncludes(errors, files.invalidation, "VERDICT: INVALIDATED", "audit invalidation");
   requireIncludes(errors, files.invalidation, "execution_permission: false", "audit invalidation");
   requireIncludes(errors, files.invalidation, "strict_micro_pass_count: 0", "audit invalidation");
-  requireIncludes(errors, files.invalidation, "active_micro_count: 134", "audit invalidation");
+  requireIncludes(errors, files.invalidation, "active_micro_count: 135", "audit invalidation");
   requireIncludes(errors, files.invalidation, "engines.node", "audit invalidation");
   requireIncludes(errors, files.invalidation, "P0-04", "audit invalidation");
   const auditHashMatch = files.invalidation.match(/invalidated_audit_sha256:\s*([a-f0-9]{64})/);
@@ -387,8 +396,32 @@ function runSelfTest(root) {
       },
     },
     {
+      name: "recombined-artifact-boundaries",
+      expected: "P0-04A result must not include 추적",
+      apply(tempRoot) {
+        const file = path.join(tempRoot, relativePaths.plan);
+        let text = fs.readFileSync(file, "utf8");
+        text = removeRow(text, "P0-04T-tracked-generated-artifact-guard");
+        text = replaceOnce(
+          text,
+          "각 required artifact root의 canary를 git check-ignore -v로 확인했을 때 canonical root rule이 owner이고 overlapping fallback=0이다",
+          "각 required artifact root의 ignore와 추적 검사가 함께 통과하고 overlapping fallback=0이다",
+        );
+        fs.writeFileSync(file, text);
+      },
+    },
+    {
+      name: "artifact-ignore-owner-contract-removed",
+      expected: "P0-04A result must include overlapping fallback=0",
+      apply(tempRoot) {
+        const file = path.join(tempRoot, relativePaths.plan);
+        const text = fs.readFileSync(file, "utf8").replace("overlapping fallback=0", "fallback count unchecked");
+        fs.writeFileSync(file, text);
+      },
+    },
+    {
       name: "artifact-arbitrary-name-contract-removed",
-      expected: "P0-04A mutation must include 임의",
+      expected: "P0-04T mutation must include 임의",
       apply(tempRoot) {
         const file = path.join(tempRoot, relativePaths.plan);
         const text = fs.readFileSync(file, "utf8").replace("임의 이름의 추적 파일", "고정 canary 추적 파일");
