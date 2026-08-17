@@ -445,3 +445,116 @@ PR #21의 임시 예외 종료와 검토 표시도 후속 교정으로 반영합
 
 이 절 아래에 PR #23 최종 코드 실행, 현재 실행 지시 교정, Claude V1, Codex V2, 원격 서버 결과를
 순서대로 추가합니다. 위의 과거 #21 원문과 판정은 변경하지 않습니다.
+
+## 2026-08-18 재개 결과 — 전체 시작 검사에서 중단
+
+### 결론
+
+너무 일찍 닫혔던 중복 변경 요청은 오너 지시에 따라 다시 열었습니다. 더 강한 최종 수리의 작은 시험도
+전부 통과했습니다. 그러나 다른 작업이 보유한 기본 작업공간의 여섯 변경 기록이 아직 원격에 없어서
+전체 시작 검사 한 건이 실패합니다. 그 작업공간을 건드리지 말라는 경계를 지키기 위해 #15의 다음
+수정·검토·업로드는 시작하지 않습니다.
+
+### 판단 근거
+
+현재 strict 계약은 상태 보고 프로그램이 성적 0으로 끝나는 것만으로는 부족하고, 보고 내용도
+`RED: 0/N`이어야 전체 시작 검사 합격으로 인정합니다. 이번 원명령은 성적 0이지만 `RED: 1/20`을
+보고했습니다. 실패한 한 건을 분리하자 #23 코드가 아니라 로컬 `main`이 `origin/main`보다 여섯
+커밋 앞선 상태를 차단했습니다.
+
+이 작업의 금지사항은 기본 main 작업공간 수정·정리·직접 push입니다. 따라서 커밋을 버리거나 숨기거나
+원격 main에 올려 빨간불을 없애는 길은 모두 금지됩니다. 작은 시험 통과나 기존 #23 서버 성공으로
+필수 시작 검사 실패를 대체하지도 않습니다.
+
+### 결정 카드
+
+**무엇을** — PR #21을 다시 열고, #15는 전체 시작 검사 실패 지점에서 멈춥니다.
+
+**왜** — 오너가 소유한 main 변경을 침범하지 않으면서 필수 검사 실패를 합격으로 꾸미지 않아야 합니다.
+
+**버린 길** — main 직접 push·reset·stash·checkout, 실패 검사 제외, 작은 시험 통과로 전체 합격 대체를
+모두 버렸습니다.
+
+**대가** — #15의 최신 문구 수정, Claude V1, Codex V2, 일반 push와 서버 검사가 다음 재개로 미뤄집니다.
+
+**되돌리기** — 이 절은 실행 증거이므로 삭제하지 않습니다. main이 승인된 절차로 origin/main과 같아진
+뒤 원명령을 다시 실행해 `RED: 0/N`을 얻고 새 재개 절을 뒤에 추가합니다.
+
+### 증거 원문
+
+```text
+$ gh pr reopen 21
+✓ Reopened pull request sangmokang/Valuehire_v6#21 (fix: 무해한 복구 기록이 HumanSearch 시작을 막지 않게 수정)
+$ gh pr view 21 --json state,closedAt,mergedAt,headRefOid,updatedAt,url
+state=OPEN
+closedAt=null
+mergedAt=null
+headRefOid=a5dd7cb8473f6bd5193e4c0cd909d1684643b7ab
+```
+
+→ 무엇을 시켰나: 너무 일찍 닫힌 PR #21을 오너 승인에 따라 다시 열고 원격 상태를 재조회했습니다.
+→ 뭐가 나왔나: 병합 없이 열린 상태로 복구됐습니다.
+→ 의미: #23 승인·병합 뒤에만 #21을 중복 종료한다는 원래 순서가 다시 살아났습니다.
+
+```text
+$ bash -n scripts/acceptance-0-2.sh
+BASH_N_ACCEPTANCE_0_2_RC=0
+$ bash -n scripts/acceptance-0-2-unreachable-content.sh
+BASH_N_AC19_RC=0
+$ bash scripts/acceptance-0-2-unreachable-content.sh
+[1/13] SECRET_PATTERNS_FILE=/dev/null 상속을 격리 -> PASS (exit=0)
+[2/13] SECRET_PATTERNS_FILE=.secret-patterns.default 상속을 격리 -> PASS (exit=0)
+[3/13] 일반 실행은 무해한 unreachable blob을 허용 -> PASS (exit=0)
+[4/13] 일반 실행은 금지값이 든 unreachable blob을 차단 -> BLOCKED (exit=1)
+[5/13] unreachable commit message의 금지값을 차단 -> BLOCKED (exit=1)
+[6/13] unreachable tree path의 금지값을 차단 -> BLOCKED (exit=1)
+[7/13] unreachable annotated tag message의 금지값을 차단 -> BLOCKED (exit=1)
+[8/13] git fsck 실패는 검사 대상 없음으로 통과하지 않음 -> BLOCKED (exit=1)
+[9/13] unreachable 객체 읽기 실패는 조용히 통과하지 않음 -> BLOCKED (exit=1)
+[10/13] 알 수 없는 unreachable 객체형은 읽기 실패로 차단 -> BLOCKED (exit=1)
+[11/13] 큰 unreachable blob 앞쪽의 금지값도 차단 -> BLOCKED (exit=1)
+[12/13] 종료상태 실행은 무해한 unreachable blob도 차단 -> BLOCKED (exit=1)
+[13/13] Git hook 환경에서도 바깥 저장소 무오염 -> PASS (exit=0)
+CHECKED: 13
+PASS: AC-19 일반 내용 검사와 종료상태 0건 조건 분리
+AC19_DEFAULT_RC=0
+```
+
+→ 무엇을 시켰나: #23 최종 코드의 셸 문법과 환경·객체형·도구 실패·대용량·훅 환경 13개 사례를 실행했습니다.
+→ 뭐가 나왔나: 문법 2개와 합성 사례 13개가 모두 계약대로 끝났습니다.
+→ 의미: #23의 작은 회귀시험은 합격했지만 다음 전체 시작 검사를 대신하지 않습니다.
+
+```text
+$ bash scripts/session-status.sh
+HEAD: 3ec842f (ahead 16 / behind 0)
+ORIGIN: 4fdef31
+RED: 1/20 (acceptance-0-7.sh 제외 — CI 담당)
+SESSION_STATUS_RC=0
+$ SECRET_PATTERNS_FILE= bash scripts/acceptance-0-5.sh
+FAIL: origin/main(4fdef31fe75c8519091cebe8a6c4cbf5be1893ae) != main(74bde5cd88dace72c7dada8285478888a89a3f61) — push 미완료
+ACCEPTANCE_0_5_RC=1
+$ git rev-list --count origin/main..main
+6
+$ git rev-list --count main..origin/main
+0
+```
+
+→ 무엇을 시켰나: 필수 전체 시작 검사를 실행하고 실패한 한 항목을 독립 실행한 뒤 main의 앞뒤 개수를 셌습니다.
+→ 뭐가 나왔나: 상태 보고기는 정상 종료했지만 20개 중 1개가 실패했고, 원인은 로컬 main이 원격보다 여섯 커밋 앞선 상태입니다.
+→ 의미: strict의 합격 조건은 `RED: 0/N`이므로 현재 Gate 0은 `FAIL`이며, main을 건드릴 권한이 없어 이 작업은 `BLOCKED`입니다.
+
+### 아직 시작하지 않은 후속 단계
+
+- #15 활성 실행 문서에 남은 “세 번호·세 개” 두 표현과 #23 “여섯 사례” 표현 교정
+- `bash verify.sh`, 업로드 전 검사, Claude V1, Codex V2
+- #15 goal과 PR 본문 최종화, 일반 push, 동일 HEAD 서버 검사
+
+위 단계는 임의로 `SKIPPED` 처리하지 않습니다. 필수 시작 검사가 합격한 다음 재개해야 합니다.
+
+### 비범위 준수
+
+- 기본 main 작업공간 변경·정리·push 0회
+- PR merge·auto-merge 0회
+- HumanSearch 제품 분류기·시험 파일 생성 0건
+- 실제 포털·브라우저·로그인·세션·후보자 정보 접근 0회
+- 이슈 #22 구현 0건
