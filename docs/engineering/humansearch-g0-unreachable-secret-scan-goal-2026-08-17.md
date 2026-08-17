@@ -622,3 +622,56 @@ Codex는 Claude가 실행하지 못한 명령을 최종 지문 `08a96c3`에서 �
 **Codex V2 최종 판정: PASS.** 확인된 결함 1건은 `4fecc43` RED와 `08a96c3` GREEN으로 닫혔고,
 미해결 치명·높음·중간·낮음 결함은 0건입니다. 실제 포털, 브라우저, 로그인, 후보자 개인정보, 제품
 분류기, 병합과 배포는 범위 밖이라 실행하지 않았습니다.
+
+#### 배송 RED — 업로드 훅이 넘기는 Git 위치 환경
+
+첫 일반 push는 원격에 아무것도 올리기 전에 로컬 훅에서 멈췄습니다.
+
+```text
+$ git push -u origin task/humansearch-g0-unreachable-secret-scan
+  skip ./scripts/acceptance-0-2.sh (DEFERRED · CI 담당)
+  skip ./scripts/acceptance-0-5.sh (DEFERRED · CI 담당)
+  skip ./scripts/acceptance-0-7.sh (PUSH-PERFORMING · CI 담당)
+pre-push: 검사 18개 실행
+BLOCKED: ./scripts/acceptance-0-2-unreachable-objects.sh exit=1
+  ok  ./scripts/acceptance-0-6.sh
+  ok  ./scripts/acceptance-hs-a3.sh
+  ok  ./scripts/acceptance-hs-a4.sh
+  ok  ./scripts/acceptance-hs-cleanroom-absolute-contexts.sh
+  ok  ./scripts/acceptance-hs-cleanroom-absolute-paths.sh
+  ok  ./scripts/acceptance-hs-cleanroom-colon-paths.sh
+  ok  ./scripts/acceptance-hs-cleanroom-file-urls.sh
+  ok  ./scripts/acceptance-hs-cleanroom-hook-env-mutations.sh
+  ok  ./scripts/acceptance-hs-cleanroom-hook-env.sh
+  ok  ./scripts/acceptance-hs-cleanroom-mutations.sh
+  ok  ./scripts/acceptance-hs-cleanroom.sh
+  ok  ./scripts/acceptance-hs-gates-antiforge.sh
+  ok  ./scripts/acceptance-hs-gates-mutations.sh
+  ok  ./scripts/acceptance-hs-gates.sh
+  ok  ./scripts/acceptance-secret-webhook-vendor.sh
+  ok  ./scripts/acceptance-verify-ac-m.sh
+  ok  ./verify.sh
+error: failed to push some refs to 'https://github.com/sangmokang/Valuehire_v6.git'
+```
+
+→ 업로드 전 자동 수집은 새 시험을 포함한 18개를 실제 실행했고 새 시험 한 개만 불합격시켰습니다.
+원격 전송 전에 멈췄으므로 이 지문은 GitHub에 올라가지 않았습니다.
+
+같은 Git 위치 환경을 격리 복제본에 넣어 부작용을 재현했습니다.
+
+```text
+$ GIT_DIR="$exported_git_dir" bash scripts/acceptance-0-2-unreachable-objects.sh
+FIXTURE_ROOT=/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/tmp.8eN4uJXcdN
+BEFORE=0f36836f3a1fa61403f2c3bdd36e62332096c318
+AFTER=be7532f010bc0a667a75789befe70a59a30a067a
+RUN_EXIT=1
+be7532f fixture
+ .gitignore | 49 -------------------------------------------------
+ 1 file changed, 49 deletions(-)
+ M .gitignore
+```
+
+→ 시험은 성적 1로 실패했을 뿐 아니라 합성 커밋을 격리 저장소가 아니라 복제본의 실제 가지에 만들었습니다.
+원인은 시험 진입부가 비밀 파일 경로만 비우고 Git 저장소 위치 환경은 상속한 것입니다. 원본 작업 공간에서
+같은 재현 중 생긴 제 합성 커밋은 원격 전송 전에 직전 지문 `0f36836`으로 되돌렸고, 작업 파일과 인덱스가
+깨끗함을 다시 확인했습니다. 복제본의 임시 경로는 증거 보관처가 아니라 재현 위치입니다.
