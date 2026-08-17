@@ -73,7 +73,8 @@ else
   echo "NOTE: docs/ 없음(워크트리에서 실행 중) — 최종 판정은 main에서 재실행 필수"
 fi
 
-# 5. 객체 수준 — 오염 객체가 저장소(object db)에서 실제로 소멸했는가 (V1-④ + V2-④d 반영)
+# 5-a. 객체 수준 — 알려진 오염 객체가 저장소(object db)에서 실제로 소멸했는가
+#      (V1-④ + V2-④d 반영)
 #    "log --all 0건"은 live-ref 음성일 뿐이다. 비밀의 실체는 blob이므로 커밋 SHA만으론 증명 불가 —
 #    2026-08-07 사전 전수 열거한 오염 blob 6개 + -S 히트 커밋 6개의 객체 부재를 직접 검사한다.
 CONTAMINATED_COMMITS="4d53eac48c957e70ece5d04a600b2e53527f384a
@@ -98,14 +99,28 @@ for sha in $CONTAMINATED_BLOBS; do
     echo "FAIL: 오염 blob 객체 잔존(cat-file -p로 평문 복원 가능): $sha"; fail=1
   fi
 done
-# --no-reflogs 필수: reflog를 root로 치면 reflog-잔존 객체가 0으로 보고된다 (V2 실측: 3 vs 0)
-unreach=$(git fsck --full --no-reflogs --unreachable 2>/dev/null | grep -c '^unreachable' || true)
-if [ "$unreach" -ne 0 ]; then
-  echo "FAIL: unreachable 객체 ${unreach}건 잔존 (reflog expire/gc --prune=now 미완)"
+# 5-b. 미래의 미도달 객체 내용 검사 — 상시 회귀 조건.
+#      실패한 commit/reset만으로도 unrelated unreachable 객체는 정상 개발 중 생긴다. 개수 0을
+#      상시 요구하면 Gate 0을 영구 차단하므로, 일반 실행에서는 객체 내용을 실제 리터럴과 대조한다.
+#      commit message·tree path·tag에도 값이 들어갈 수 있어 blob만이 아니라 모든 객체형을 연다.
+#      --no-reflogs 필수: reflog가 가리키는 객체는 아래 5-c에서 별도로 전수 검사한다.
+fsck_rc=0
+fsck_output=$(git fsck --full --no-reflogs --unreachable 2>&1) || fsck_rc=$?
+if [ "$fsck_rc" -ne 0 ]; then
+  echo "FAIL: git fsck 실행 실패 (exit=$fsck_rc) — 미도달 객체 검사 무효"
   fail=1
 fi
+unreachable_objects=$(printf '%s\n' "$fsck_output" |
+  awk '$1 == "unreachable" { print $2, $3 }')
+while read -r object_type sha; do
+  [ -z "${object_type:-}" ] && continue
+  if git cat-file "$object_type" "$sha" 2>/dev/null | grep -qF "$LIT"; then
+    echo "FAIL: unreachable ${object_type}에 리터럴 잔존: $sha"
+    fail=1
+  fi
+done <<< "$unreachable_objects"
 
-# 5-b. 도달 가능한 모든 지점(refs + reflog 포함)의 blob 전수 스캔 — 상시 회귀 조건.
+# 5-c. 도달 가능한 모든 지점(refs + reflog 포함)의 blob 전수 스캔 — 상시 회귀 조건.
 #      SHA 화이트리스트는 "과거의 알려진 오염"만 잡는다. 미래에 새로 유입되는 비밀은
 #      내용 기반으로만 잡을 수 있으므로, --reflog 포함 전 객체를 실제로 열어 확인한다.
 while IFS= read -r sha; do
@@ -116,12 +131,19 @@ while IFS= read -r sha; do
   fi
 done < <(git rev-list --all --reflog --objects 2>/dev/null | awk '{print $1}' | sort -u)
 
-# 6~8. 종료상태(end-state) 전용 검사 — 청소 **직후**에만 참인 조건이다.
-#      ref 화이트리스트·pseudoref 부재·워크트리 0개는 이후 정상적인 개발(워크트리 생성, fetch)에서
-#      당연히 깨진다. 오염 객체가 이미 소멸한 뒤에는 이 경로들이 비밀을 되살릴 수 없으므로
-#      상시 회귀 조건이 아니다. 청소 절차 검증 시 ACCEPTANCE_ENDSTATE=1 로 켠다.
+# 6~9. 종료상태(end-state) 전용 검사 — 청소 **직후**에만 참인 조건이다.
+#      unreachable 객체 0개·ref 화이트리스트·pseudoref 부재·워크트리 0개는 이후 정상적인
+#      개발(commit/reset, worktree 생성, fetch)에서 당연히 깨진다. 일반 실행은 위 5-b에서
+#      unreachable 객체의 실제 내용을 검사한다. 청소 절차 검증 시 ACCEPTANCE_ENDSTATE=1 로 켠다.
 if [ -n "${ACCEPTANCE_ENDSTATE:-}" ]; then
-# 6. ref 화이트리스트 — main·origin/main 외 ref(브랜치/태그/스태시/notes/replace 등) 잔존 금지
+# 6. unreachable 객체 0개 — 비밀 이력 청소를 끝낸 바로 그 시점의 완결성
+unreach=$(printf '%s\n' "$unreachable_objects" | awk 'NF{c++} END{print c+0}')
+if [ "$unreach" -ne 0 ]; then
+  echo "FAIL: unreachable 객체 ${unreach}건 잔존 (reflog expire/gc --prune=now 미완)"
+  fail=1
+fi
+
+# 7. ref 화이트리스트 — main·origin/main 외 ref(브랜치/태그/스태시/notes/replace 등) 잔존 금지
 extra=$(git for-each-ref --format='%(refname)' | grep -vE '^refs/(heads/main|remotes/origin/main)$' || true)
 if [ -n "$extra" ]; then
   echo "FAIL: 허용 외 ref 잔존(오염 조상 복구 경로일 수 있음):"
@@ -129,7 +151,7 @@ if [ -n "$extra" ]; then
   fail=1
 fi
 
-# 7. pseudoref — common dir + 워크트리별 ORIG_HEAD/FETCH_HEAD 잔존 금지 (V1-④ + V2-④c)
+# 8. pseudoref — common dir + 워크트리별 ORIG_HEAD/FETCH_HEAD 잔존 금지 (V1-④ + V2-④c)
 GCD=$(git rev-parse --git-common-dir)
 for p in ORIG_HEAD FETCH_HEAD; do
   if [ -e "$GCD/$p" ]; then echo "FAIL: $p 잔존 ($GCD/$p)"; fail=1; fi
@@ -138,7 +160,7 @@ for p in ORIG_HEAD FETCH_HEAD; do
   done
 done
 
-# 8. 워크트리 admin dir — stale admin dir는 gc --prune=now를 무력화하는 gc root (V2-④b)
+# 9. 워크트리 admin dir — stale admin dir는 gc --prune=now를 무력화하는 gc root (V2-④b)
 #    최종 상태에선 등록 워크트리 0개 + prunable 0개 + admin dir 잔존 0개여야 한다.
 prunable=$(git worktree list --porcelain | grep -c '^prunable' || true)
 if [ "$prunable" -ne 0 ]; then

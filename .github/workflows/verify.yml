@@ -82,6 +82,11 @@ jobs:
           [ "$hit" -eq 0 ] && echo "PASS: 히스토리 전량 blob 스캔 0건 (blob ${blobs}개 검사)"
           exit $hit
 
+      - name: 인수 검사 0-2 상시 내용 검사와 종료상태 분리 (AC-19)
+        # 실제 로컬 리터럴은 CI에 올리지 않는다. 합성 저장소와 합성 값으로 동일 판정기를 실행해
+        # 무해한 unreachable 객체 허용, 값이 든 객체 차단, 종료상태 0건 요구를 모두 증명한다.
+        run: bash scripts/acceptance-0-2-unreachable-content.sh
+
       - name: 인수 검사 0-6 (가짜 검증 스크립트 0건)
         run: bash scripts/acceptance-0-6.sh
 
