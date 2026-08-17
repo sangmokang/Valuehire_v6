@@ -2,23 +2,18 @@
 
 ## 1층 — 결론
 
-현재 새 기능을 시작할 수 없습니다. 비밀값 검사는 정상이지만, 이미 지워진 무해한 작업 흔적 27개를
-전부 위험으로 잘못 세어 시작 검사가 멈춥니다.
+PR #23을 Issue #19의 단일 정본으로 선택합니다. PR #21에서 더 좋았던 호출 환경 격리는 PR #23의
+더 강한 시험에 흡수됐고, 그 밖에 가져올 보호장치는 남지 않았습니다.
 
-이번 작업은 흔적의 개수가 아니라 그 안에 실제 금지값이 있는지를 검사하도록 바꿉니다. 실제 금지값이
-남으면 계속 막고, 저장소 정리를 끝낸 직후에는 흔적이 하나도 없어야 한다는 기존 기준도 유지합니다.
+허용해야 할 무해한 흔적은 허용하고, 더는 어느 기록에서도 가리키지 않는 큰 조각·설명문·파일 이름·
+표식 설명에 금지값이 있거나 읽지 못하면 모두 막는지 독립 검토 두 번과 고의 약화 시험으로 확인했습니다.
+현재 사용 중인 설명문·파일 이름의 기존 공백은 별도 이슈 #22에 남겼고 제품 기능 코드는 시작하지 않았습니다.
 
-사장님이 지금 추가로 정하실 것은 없습니다. 실제 기록 삭제, HumanSearch 기능 구현, 실제 사이트 접근,
-합치기와 배포는 하지 않고 변경 요청 검토 직전에 멈춥니다.
+현재 작업 브랜치 검사는 합격입니다. 세션 보고의 경고 하나는 별도 main 작업 공간에 남은 사용자 소유
+문서 커밋 때문이며 이번 변경이 만든 문제가 아니므로 main을 손대지 않고 공개 한계로 남깁니다.
 
-첫 외부 검토에서 큰 기록 조각과 읽기 오류를 놓치는 두 결함이 추가로 드러났고, 실패 시험부터 다시
-만들어 둘 다 수리했습니다. 현재도 사용 중인 기록의 설명문·파일 이름을 검사하지 않는 기존 구멍은
-이번 수리가 만든 문제가 아니어서 별도 이슈 #22로 분리했습니다. 서버 검사 결과와 책임자 승인은 아직
-남았고, 전용 자동화 설정 검사 도구는 이 환경에 없어 실행하지 못했습니다.
-
-첫 일반 push는 새 합성 시험이 훅의 저장소 위치를 물려받아 실제 작업 브랜치에 가짜 커밋을 만드는
-문제까지 찾아 차단됐습니다. 원격에는 아무것도 올라가지 않았고, 가짜 커밋은 역사에서 제거했습니다.
-같은 훅 환경을 합성 바깥 저장소로 재현하는 여섯 번째 실패 시험과 환경 격리 수리를 추가했습니다.
+아직 남은 일은 이 증거를 일반 push로 올리고 같은 최종 변경이 서버에서도 합격하는지 확인한 뒤,
+PR #21을 PR #23으로 대체됐다는 근거와 함께 닫는 것입니다. PR #23은 합치지 않고 책임자 검토 앞에서 멈춥니다.
 
 ## 2층 — 판단 근거
 
@@ -1057,3 +1052,273 @@ $ git diff --unified=0 f28511e8df4793bf33f6fbaf6cb473c1de9a951f..HEAD -- suppres
 → 무엇을 시켰나: PR #21, 현재 PR #23 작업본, 원격 PR #23 기준점의 억제 원장 차이를 직접 비교했습니다.
 → 뭐가 나왔나: PR #21과 현재 작업본 모두 해당 억제가 0건이고, 현재 작업본은 원격 PR #23에서 그 한 항목만 삭제했습니다.
 → 의미: 일반 실행의 개수 오판과 서버 미실행이라는 기존 사유가 모두 해소돼 삭제가 맞으며, 다른 억제 항목은 건드리지 않았습니다.
+
+#### 12-10. Claude V1 실패 시도와 유효 재검토
+
+Claude V1 1차는 `VERDICT: PASS`를 냈지만 유효 판정에서 제외했습니다. 읽기 전용 지시를 어기고
+`scripts/acceptance-0-2.sh`를 임시 변형한 뒤 `cp`로 복구했으며, `grep -q`만 넣고 마지막
+비교 실패 분기는 그대로 둔 불완전한 변형을 근거로 조기 종료 오판 계열이 근본 차단됐다고
+과대 해석했기 때문입니다. 종료 뒤 `git diff --exit-code`와 `git status --short`는 깨끗했고
+HEAD는 `9df201220b2bc10e76cad92b0013993685425231` 그대로였지만, 절차 위반과 잘못된 해석은
+숨기지 않고 실패 이력으로 남깁니다.
+
+```text
+V1-0 verdict=PASS
+V1-0 accepted=NO
+reason_1=읽기 전용 지시 위반: 저장소 파일 임시 변형·복구
+reason_2=불완전한 PIPESTATUS 변형을 근거로 과대 판정
+post_head=9df201220b2bc10e76cad92b0013993685425231
+post_status_count=0
+```
+
+→ 무엇을 판정했나: 첫 Claude 답변을 내용뿐 아니라 감사 절차 준수까지 포함해 검증했습니다.
+→ 뭐가 나왔나: 저장소는 원복됐지만 읽기 전용 계약과 변형 해석이 틀려 해당 PASS를 폐기했습니다.
+→ 의미: 외부 검토자의 PASS도 절차와 반증 품질이 부족하면 승인 근거로 사용하지 않습니다.
+
+유효 V1은 mutation을 실행하지 못하게 하고 원본 diff·기존 증거·읽기 전용 명령만 허용해 다시
+요청했습니다. 실제 명령의 전체 프롬프트는 다음과 같습니다.
+
+```text
+$ review_prompt='Issue #19 PR #23의 독립 Claude V1 재검토입니다. 작업 위치는 /Users/kangsangmo/Desktop/Valuehire_v6/worktrees/gate0-unreachable-secret-scan, 검토 SHA는 9df201220b2bc10e76cad92b0013993685425231입니다. 반드시 읽기 전용으로 검토하십시오. 저장소 파일을 한 바이트도 편집·복사·복구하지 말고, mutation을 직접 만들지 말며, reset stash checkout merge cherry-pick rebase push GitHub 변경을 하지 마십시오. 실제 .secret-patterns 내용은 읽거나 출력하지 마십시오. 허용되는 것은 git diff/show/status, sed/rg, 합성 acceptance 스크립트 실행뿐입니다. HumanSearch L0 제품 코드와 실제 포털·로그인·개인정보는 범위 밖입니다.
+
+V1 1차는 PASS였지만 읽기 전용 지시를 어기고 파일을 임시 변형했다가 복구했으며, grep -q만 넣은 불완전한 변형을 근거로 PIPESTATUS 문제를 근본 차단했다고 과대 해석했으므로 유효 판정에서 제외합니다. 현재 git status는 깨끗하고 HEAD는 위 SHA입니다.
+
+다음을 원본 diff와 기존 goal 문서 Attempt 2의 증거로 재검토하십시오.
+1. RED 00f3e70에서 환경 상속 두 건이 실패했고 GREEN 9df2012가 합성 시험 진입부의 unset과 설명만 추가했으며 실제 acceptance-0-2 판정과 기대값을 약화하지 않았는가.
+2. PR #21의 유일한 유효 장점인 SECRET_PATTERNS_FILE 격리가 PR #23의 13개 시험에 흡수됐고 다른 보호 손실이 없는가.
+3. 환경변수 /dev/null·.secret-patterns.default, 작은/50MiB 큰 blob 앞부분 카나리, unreachable commit/tree/tag, fsck/cat-file/unknown-type 실패, endstate, hook Git 환경과 바깥 HEAD/status 불변이 모두 계약대로인가.
+4. 큰 객체의 정확한 증거는 두 단계다. 첫 불완전 mutation은 grep -q 또는 조건 일부만 바꿔 시험이 계속 통과했다. 그 뒤 grep -q와 예전식 잘못된 PIPESTATUS 조건을 함께 주입하자 큰 blob이 exit 0 UNEXPECTED가 되어 전체 시험이 실패했다. 이 최종 mutation이 회귀시험의 탐지력을 증명하는가. 현재 원본은 grep -q를 쓰지 않고 전체 스트림을 읽으며 cat-file와 grep 종료값을 각각 판정하는가.
+5. acceptance-0-2 suppression 삭제는 상시 개수 0 오판과 CI 미실행 두 사유가 해소돼 타당하고 나머지 억제는 보존됐는가.
+6. 실제 로컬 저장소 검사는 session-status, 합성 AC-19 로컬 push는 hooks/pre-push glob, 같은 CI는 verify.yml step 5가 실행하며 문서 17단계와 일치하는가. reachable blob은 5-c와 CI history, unreachable 모든 객체형은 5-b와 합성시험이 다루며 reachable nonblob은 Issue #22로 남는다는 설명이 정직한가.
+7. session-status RED 1/20은 별도 main 작업트리의 사용자 소유 미push 문서 커밋 때문에 acceptance-0-5만 실패한 것이다. main 수정·push는 금지다. 이것이 PR 코드의 중간 이상 결함인지, push 뒤 최종 SHA CI 확인과 별도로 공개할 외부 검증 한계인지 판정하라.
+8. 최신 SHA는 아직 GitHub에 없으므로 서버 초록이 없고 PR #21도 아직 열려 있다. 따라서 지금은 로컬 구현 PASS와 push 허용 여부만 판정하고 병합 승인 완료라고 말하지 마라.
+
+중간 이상 PR 결함이 하나라도 있으면 VERDICT: FAIL. 아니면 VERDICT: PASS. 첫 줄 verdict, 그 다음 1층 결론, 2층 판단 근거와 버린 해석·대가·되돌리기, 3층 확인한 명령/파일/미확인 사항 순서로 한국어 존칭체로 5000자 이내 작성하십시오. 추정은 ※ 표시하십시오. 모든 표나 출력 블록 바로 아래에는 화살표로 의미를 쓰십시오. 직접 실행하지 않은 mutation은 기존 goal 증거를 검토했다고 명시하고 재현했다고 주장하지 마십시오.'
+$ env -u ANTHROPIC_API_KEY claude -p --model sonnet --effort medium "$review_prompt"
+```
+
+→ 무엇을 시켰나: V1-0의 두 결함을 명시하고 읽기 전용 재검토 범위와 판정 형식을 고정했습니다.
+→ 뭐가 나왔나: Claude는 파일 변형 없이 원본 diff·게이트 배선·외부 RED와 기존 mutation 증거를 분리 검토했습니다.
+→ 의미: 아래 V1만 유효한 독립 1차 판정으로 채택합니다.
+
+유효 V1의 전체 출력 본문은 다음과 같습니다.
+
+```text
+VERDICT: PASS
+
+## 1층 — 결론
+
+읽기 전용으로 diff·goal 문서·suppressions.yaml·hooks/pre-push·verify.yml·session-status.sh를 대조하고, 합성 acceptance 스크립트만 직접 실행한 결과, PR #23(HEAD 9df2012)에서 중간 이상 결함을 찾지 못했습니다. 단, 검토 SHA는 아직 GitHub에 없어 서버 초록은 미확인이며, 이는 병합 승인이 아니라 로컬 구현 PASS 판정입니다.
+
+## 2층 — 판단 근거, 버린 해석, 되돌리기
+
+Q1 (RED→GREEN 최소성): git diff 00f3e70 9df2012로 확인한 결과, 실질 코드 변경은 scripts/acceptance-0-2-unreachable-content.sh에 unset SECRET_PATTERNS_FILE 한 줄과 주석 추가뿐입니다. 판정기 본체(scripts/acceptance-0-2.sh)는 이 diff에서 바뀌지 않았고, RED 커밋 메시지(Tested: 새 13사례 중 환경 상속 2건만 RED)와 실행 로그가 일치합니다. → 기대값 약화 없음, 채택.
+
+Q2 (PR #21 장점 흡수): 12-9절의 git diff origin/task/humansearch-g0-unreachable-secret-scan:suppressions.yaml과 현재 suppressions.yaml을 직접 열람해 두 저장소 모두 acceptance-0-2 억제가 없음을 확인했고, 12-8절 3회 실행(기본, /dev/null, .secret-patterns.default)이 모두 13/13 동일 판정임을 확인했습니다. → 흡수 주장 정합.
+
+Q3 (13개 사례 계약): 문서 12-8 실행 로그와 scripts/acceptance-0-2.sh 실제 코드(5-a~9절)를 직접 대조해 나열된 항목(환경 격리 2건, 소/대 blob 카나리, unreachable commit/tree/tag, fsck 실패, cat-file 실패, unknown 타입, endstate, 훅 환경)이 모두 코드에 실재함을 확인했습니다.
+
+Q4 (grep -q/PIPESTATUS): scripts/acceptance-0-2.sh:116-126을 직접 읽었습니다.
+if git cat-file "$object_type" "$sha" 2>/dev/null | LC_ALL=C grep -aF "$LIT" >/dev/null; then
+  object_scan_status=("${PIPESTATUS[@]}")
+else
+  object_scan_status=("${PIPESTATUS[@]}")
+fi
+cat_file_rc=${object_scan_status[0]:-1}; grep_rc=${object_scan_status[1]:-2}
+→ grep -q가 아니라 grep -aF(전체 스트림)이며, cat-file·grep 종료값을 각각 별도 판정합니다. 사용자가 언급한 grep -q + 옛 PIPESTATUS 조건 주입 → exit 0 UNEXPECTED는 오늘 제외된 V1이 파일을 직접 변형해 얻은 결과이므로 저는 재현하지 않았고 재현했다고 주장하지 않습니다. 다만 동일한 버그 계열은 이미 Attempt 1(9-2~9-6절)에서 Codex V2가 MISSED 5/5로 독립 재현하고 d409c34→4e4dac1로 고쳤다는 기존 증거가 있으며, 현재 원본 코드는 그 수정 형태와 일치합니다. → 현재 코드는 해당 결함 계열에서 자유롭다고 판단(근거: 직접 코드 열람, 과거 독립 교차검증 문서).
+
+Q5 (억제 삭제): suppressions.yaml을 직접 열람해 acceptance-0-2 항목이 없고, 나머지 4건(ci-transfer-guarantee·p13-deletion-blindspot·gate-scope-gaps·keyword-env-value-floor-12)은 원본 사유·기한과 함께 그대로 보존됨을 확인했습니다.
+
+Q6 (배선 일치): hooks/pre-push:143-147에서 acceptance-0-2.sh|acceptance-0-5.sh만 DEFERRED로 skip, acceptance-0-2-unreachable-content.sh는 실행 대상에 포함됨을 확인했습니다. verify.yml:85-88이 같은 파일을 5번째 스텝으로 실행하고, rg -n '^      - name:' verify.yml로 17단계임을 실측했습니다. scripts/acceptance-0-2.sh 5-c(도달 가능 blob)와 5-b(도달 불가 전 객체형, blob·commit·tree·tag)를 직접 읽어 설명과 일치함을 확인했습니다.
+
+Q7 (session-status RED 1/20): 직접 실행했습니다.
+$ SECRET_PATTERNS_FILE= bash scripts/acceptance-0-5.sh
+FAIL: origin/main(4fdef31...) != main(8e057b7...) — push 미완료
+→ 메인 작업트리가 origin/main보다 1커밋 앞서 있고 문서 3건 미스테이지 상태임을 git status로 확인했습니다. 이는 PR #23 코드와 무관한, 사용자 소유의 미push 문서 커밋이며 main 수정·push는 범위 밖 금지 사항입니다. → PR 코드 결함이 아니라 외부 검증 한계로 판정. main을 건드리지 않았습니다.
+
+Q8 (서버 상태): gh pr view 23으로 headRefOid=f28511e(9df2012보다 4커밋 뒤)만 CI SUCCESS이고, gh pr view 21은 여전히 OPEN임을 확인했습니다. → 현재 리뷰 SHA는 서버 미검증 상태이며, 이 보고는 병합 승인이 아닙니다.
+
+## 3층 — 확인한 명령/파일, 미확인 사항
+
+확인: git status, git diff 00f3e70 9df2012, git diff e8e402d 00f3e70, git log 00f3e70 -s, sed -n scripts/acceptance-0-2.sh, sed -n scripts/acceptance-0-2-unreachable-content.sh(diff상), cat suppressions.yaml, sed -n hooks/pre-push, sed -n scripts/session-status.sh, sed -n .github/workflows/verify.yml, bash scripts/session-status.sh(직접 실행), bash scripts/acceptance-0-5.sh(직접 실행), gh pr view 21/23, git rev-parse HEAD, git log origin/task/... -1.
+미확인(직접 재현 안 함, 문서 증거로만 검토): 오늘 제외된 V1의 grep -q 이중 mutation 실험 원문 재현, Codex V2 병행 재확인, 서버 CI에서의 9df2012 실제 실행 결과, actionlint 실행.
+```
+
+→ 무엇을 판정했나: Claude V1이 PR 결함과 외부 main 상태, 로컬 합격과 서버 미검증을 구분하는지 확인했습니다.
+→ 뭐가 나왔나: 중간 이상 PR 결함 0건으로 로컬 구현 PASS를 냈고, 최신 SHA 서버 검증과 PR #21 종료는 아직 남았다고 제한했습니다.
+→ 의미: V1은 push 허용 의견이지만 병합 승인은 아니며, V2가 같은 공격을 새로 재현해야 합니다.
+
+#### 12-11. Codex V2 재공격과 V1 교차 판정
+
+V2는 V1의 실행 주장에 기대지 않고 기본·두 상속 환경을 모두 새로 실행했습니다.
+
+```text
+$ bash scripts/acceptance-0-2-unreachable-content.sh
+CHECKED: 13
+PASS: AC-19 일반 내용 검사와 종료상태 0건 조건 분리
+V2_ENV_RESULT 기본 rc=0
+$ SECRET_PATTERNS_FILE=/dev/null bash scripts/acceptance-0-2-unreachable-content.sh
+CHECKED: 13
+PASS: AC-19 일반 내용 검사와 종료상태 0건 조건 분리
+V2_ENV_RESULT /dev/null rc=0
+$ SECRET_PATTERNS_FILE=.secret-patterns.default bash scripts/acceptance-0-2-unreachable-content.sh
+CHECKED: 13
+PASS: AC-19 일반 내용 검사와 종료상태 0건 조건 분리
+V2_ENV_RESULT .secret-patterns.default rc=0
+HEAD_SAME=YES
+STATUS_SAME=YES
+HEAD=9df201220b2bc10e76cad92b0013993685425231
+```
+
+→ 무엇을 시켰나: 환경 상속을 세 방식으로 바꾸고 동일한 13개 객체·실패·훅 사례를 새로 실행했습니다.
+→ 뭐가 나왔나: 세 실행 모두 13/13 합격했고 바깥 HEAD와 작업 상태가 같았습니다.
+→ 의미: PR #21의 환경 격리 장점은 PR #23에 실제로 흡수됐고 합성 시험은 원본 저장소를 오염시키지 않습니다.
+
+V2의 비blob 제거 mutation은 다음 결과를 냈습니다. 한 줄 변형은 즉시 원복했습니다.
+
+```text
+$ bash scripts/acceptance-0-2-unreachable-content.sh  # 비blob 건너뛰기 한 줄을 임시 주입
+[5/13] unreachable commit message의 금지값을 차단 -> UNEXPECTED (exit=0, expected=blocked)
+[6/13] unreachable tree path의 금지값을 차단 -> UNEXPECTED (exit=0, expected=blocked)
+[7/13] unreachable annotated tag message의 금지값을 차단 -> UNEXPECTED (exit=0, expected=blocked)
+[10/13] 알 수 없는 unreachable 객체형은 읽기 실패로 차단 -> UNEXPECTED (exit=0, expected=blocked)
+[13/13] Git hook 환경에서도 바깥 저장소 무오염 -> UNEXPECTED (exit=1, head_same=YES, status_same=YES)
+CHECKED: 13
+FAIL: AC-19 예상과 다른 사례 5건
+V2_NONBLOB_MUTATION_RC=1
+```
+
+→ 무엇을 시켰나: 판정기가 blob 외 객체를 건너뛰도록 일부러 약화했습니다.
+→ 뭐가 나왔나: commit·tree·tag·unknown 사례와 이를 포함한 훅 재귀 검사가 실패했습니다.
+→ 의미: 객체형 보호가 제거되면 새 시험이 즉시 알아채므로 PR #21의 blob 전용 구현보다 PR #23이 강합니다.
+
+조기 종료 공격의 첫 시도는 마지막 비교 실패 분기가 `grep=0`을 계속 차단해 시험이 통과했습니다.
+이는 불완전한 mutation이므로 승인 증거에서 제외하고 실패 이력으로 남깁니다. `grep -q`, cat-file/grep
+결합 조건, 마지막 비교 조건을 모두 과거 오판 형태로 바꾼 완전한 mutation에서 다음 결과가 나왔습니다.
+
+```text
+$ bash scripts/acceptance-0-2-unreachable-content.sh  # grep -q + 잘못된 PIPESTATUS 세 조건 임시 주입
+[11/13] 큰 unreachable blob 앞쪽의 금지값도 차단 -> UNEXPECTED (exit=0, expected=blocked)
+[13/13] Git hook 환경에서도 바깥 저장소 무오염 -> UNEXPECTED (exit=1, head_same=YES, status_same=YES)
+[9/10] 큰 unreachable blob 앞쪽의 금지값도 차단 -> UNEXPECTED (exit=0, expected=blocked)
+CHECKED: 10
+FAIL: AC-19 예상과 다른 사례 1건
+CHECKED: 13
+FAIL: AC-19 예상과 다른 사례 2건
+V2_PIPESTATUS_COMPLETE_MUTATION_RC=1
+$ git diff --exit-code
+MUTATIONS_RESTORED=YES
+HEAD=9df201220b2bc10e76cad92b0013993685425231
+STATUS_COUNT=0
+$ bash scripts/acceptance-0-2-unreachable-content.sh
+CHECKED: 13
+PASS: AC-19 일반 내용 검사와 종료상태 0건 조건 분리
+POST_RESTORE_AC19_RC=0
+```
+
+→ 무엇을 시켰나: 값 발견 뒤 생산자 SIGPIPE를 조용한 합격으로 바꾸는 과거식 세 조건을 함께 주입했습니다.
+→ 뭐가 나왔나: 큰 객체가 exit 0 거짓 합격으로 뒤집혔고 회귀시험이 실패했으며, 원복 뒤 13/13과 diff 0건을 회복했습니다.
+→ 의미: 큰 객체 시험은 정확한 조기 종료 오판을 검출하며 현재 원본은 전체 스트림과 두 종료값을 안전하게 판정합니다.
+
+V2의 나머지 신선한 검증은 다음과 같습니다.
+
+```text
+$ bash scripts/acceptance-0-2.sh
+PASS: no secret-pattern match in any tracked file, .env not tracked
+PASS: 0-2 — 히스토리·객체·reflog·docs 리터럴 0건, 스캐너 뮤테이션 검출 확인
+RESULT_RC=0
+$ bash verify.sh
+PASS: no secret-pattern match in any tracked file, .env not tracked
+RESULT_RC=0
+$ bash scripts/acceptance-verify-ac-m.sh
+CHECKED: 25
+RESULT_RC=0
+$ bash scripts/acceptance-0-7.sh
+OK: 원본 저장소 무변경 확인 (da39a3ee5e6b4b0d3255bfef95601890afd80709)
+PASS: 위반 6 종이 전부 차단됨 (각 건 훅 OFF 대조 통과)
+RESULT_RC=0
+HEAD_SAME=YES STATUS_SAME=YES HEAD=9df201220b2bc10e76cad92b0013993685425231
+```
+
+→ 무엇을 시켰나: 실제 로컬 검사, 추적 파일 검사, AC-M 25건, 훅 위반 6건을 새로 실행했습니다.
+→ 뭐가 나왔나: 모두 exit 0이고 실행 전후 원본 HEAD/status가 같았습니다.
+→ 의미: AC-19 변경이 기존 검사군을 깨뜨리거나 저장소를 오염시키지 않았습니다.
+
+```text
+$ bash scripts/session-status.sh
+HEAD: 9df2012 (ahead 15 / behind 0)
+ORIGIN: 4fdef31
+RED: 1/20 (acceptance-0-7.sh 제외 — CI 담당)
+SESSION_STATUS_RC=0
+$ SECRET_PATTERNS_FILE= bash scripts/acceptance-0-5.sh
+FAIL: origin/main(4fdef31fe75c8519091cebe8a6c4cbf5be1893ae) != main(8e057b76ca9cbd2bd803c3988942ceb816891bcf) — push 미완료
+AC05_RC=1
+BRANCH_STATUS_COUNT=0
+MAIN_AHEAD=1
+MAIN_BEHIND=0
+MAIN_WORKTREE_STATUS_COUNT=20
+```
+
+→ 무엇을 시켰나: 세션 RED를 새로 실행하고 유일한 실패를 독립 명령으로 분리했습니다.
+→ 뭐가 나왔나: 세션 스크립트 자체는 exit 0이지만 20개 중 `acceptance-0-5.sh` 하나가 외부 main의 미push 상태를 보고했습니다.
+→ 의미: 이번 PR 코드의 중간 이상 결함은 아니므로 push를 막지 않지만, main을 손대지 않고 외부 검증 한계로 공개합니다.
+
+CI/SOT 검사 1차는 zsh의 예약 배열 `path`를 반복 변수로 잘못 써 `rg`와 `git`을 찾지 못해
+무효였습니다. 저장소 변경은 없었고, `bash`와 `script_file` 변수로 다시 실행했습니다.
+
+```text
+$ bash -n scripts/acceptance-0-2-unreachable-content.sh
+BASH_N_PASS scripts/acceptance-0-2-unreachable-content.sh
+$ bash -n scripts/acceptance-0-2.sh
+BASH_N_PASS scripts/acceptance-0-2.sh
+CHANGED_SHELL_COUNT=2
+CI_STEP_COUNT=17 SOT_ROW_COUNT=17
+CI_SCRIPT_PATHS_MISSING_IN_SOT=0
+RED_GREEN_SCANNER_DIFF_RC=0
+RED_GREEN_TEST_DIFF=주석 1줄과 unset SECRET_PATTERNS_FILE 1줄
+WORKTREE_STATUS_COUNT=0
+```
+
+→ 무엇을 시켰나: 변경 셸 문법, 서버 단계 수, CI의 모든 직접 스크립트 경로, RED/GREEN 불변을 재검사했습니다.
+→ 뭐가 나왔나: 문법 2/2, 단계 17=17, 문서 누락 0, 판정기 변경 0이며 GREEN test diff는 환경 격리 두 줄뿐입니다.
+→ 의미: 첫 셸 명령 실패를 고친 뒤 유효 결과는 계약과 일치합니다.
+
+PR #21의 실제 합성 파일은 이름이 다른 `scripts/acceptance-0-2-unreachable-objects.sh`였습니다.
+같은 파일명이라고 가정한 첫 비교는 중단됐고, 트리에서 실제 경로를 찾아 다시 비교했습니다.
+
+```text
+PR21_HEAD=a5dd7cb8473f6bd5193e4c0cd909d1684643b7ab
+PR23_LOCAL_HEAD=9df201220b2bc10e76cad92b0013993685425231
+PR21_ENV_ISOLATION_LINES=unset SECRET_PATTERNS_FILE + Git 위치 변수 unset
+PR23_ENV_ISOLATION_LINES=unset SECRET_PATTERNS_FILE + Git 위치 변수 unset + 두 상속 회귀 사례
+PR21_RUN_CASE_COUNT=4
+PR23_RUN_CASE_COUNT=10
+PR21 scanner=blob 외 객체형 continue
+PR23 scanner=fsck가 보고한 모든 객체형을 실제 형식으로 cat-file
+PR21_0_2_SUPPRESSION_COUNT=0
+PR23_0_2_SUPPRESSION_COUNT=0
+WORKTREE_STATUS_COUNT=0
+```
+
+→ 무엇을 시켰나: 두 브랜치의 실제 파일을 열어 환경 격리, 사례 수, 객체형 판정과 억제 상태를 비교했습니다.
+→ 뭐가 나왔나: PR #21의 유효한 환경 격리는 PR #23에 있고, PR #23만 commit·tree·tag·unknown·대용량·도구 실패를 추가로 막습니다.
+→ 의미: PR #21에서 더 흡수할 보호장치는 없으며 전체 병합·cherry-pick은 중복과 약한 구현을 남기므로 기각합니다.
+
+| 공격 항목 | Claude V1 | Codex V2 | 합의·불일치와 최종 판정 |
+|---|---|---|---|
+| 환경변수 상속 | PASS | 세 환경 13/13 직접 PASS | 합의, 결함 0 |
+| 큰 객체 SIGPIPE | 원본 정적 PASS, mutation 직접 미실행 | 완전 mutation이 큰 blob 거짓 합격을 만들어 시험이 적발 | 결론 합의, V2가 동적 근거 보강 |
+| commit/tree/tag/unknown | PASS | 비blob 제거 mutation 실패 | 합의, PR #23 우위 확인 |
+| fsck/cat-file 실패 | PASS | 사례 8·9 BLOCKED 재현 | 합의, fail-closed |
+| 원본 저장소 오염 | PASS | 세 환경·훅·mutation 전후 HEAD/status 동일 | 합의, 오염 0 |
+| 억제 원장 삭제 | PASS | 기존 두 사유 해소·나머지 4건 보존 | 합의, 삭제 타당 |
+| 로컬 전용 시험 위험 | push 훅과 CI 같은 파일 확인 | 훅 glob·CI step 5·SOT 17단계 재대조 | 합의, 양쪽 실행 |
+| session-status RED 1/20 | 외부 main 상태 | 같은 SHA·ahead 1·PR diff 무관 재현 | 합의, PR 결함 아님·공개 한계 |
+| 최신 SHA 서버 검사 | 아직 없음 | 아직 없음 | 합의, push 후 필수 |
+
+→ 무엇을 비교했나: 사용자 지정 공격 목록을 V1과 V2의 독립 결론으로 한 행씩 대조했습니다.
+→ 뭐가 나왔나: 중간 이상 결함에 관한 불일치는 0건이고, V2가 mutation·환경 실행을 보강했습니다.
+→ 의미: 로컬 코드에 대한 최종 V2 판정은 `PASS`; 최신 SHA 서버 초록과 PR #21 중복 종료가 다음 중단 조건입니다.
+
+V2 최종 판정은 `PASS`입니다. HumanSearch L0 제품 파일은 변경 목록에 없고, 실제 포털·브라우저·로그인·세션·개인정보와
+실제 비밀 패턴 내용은 접근하지 않았습니다. 현재 refs가 가리키는 nonblob 내용은 Issue #22로 남으며 Issue #19 완전 종료와 혼동하지 않습니다.
