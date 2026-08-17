@@ -5,10 +5,12 @@ set -euo pipefail
 ROOT=$(git rev-parse --show-toplevel)
 TARGET="$ROOT/scripts/acceptance-0-2.sh"
 VERIFY="$ROOT/verify.sh"
+REAL_GIT=$(command -v git)
 TMP=$(mktemp -d)
 trap 'rm -rf -- "$TMP"' EXIT
 
 CANARY='AC19-CANARY-8842'
+TOTAL=5
 checked=0
 failed=0
 
@@ -43,16 +45,16 @@ run_case() {
   checked=$((checked + 1))
 
   if [ "$expected" = pass ] && [ "$rc" -eq 0 ]; then
-    printf '[%d/3] %s -> PASS (exit=0)\n' "$checked" "$label"
+    printf '[%d/%d] %s -> PASS (exit=0)\n' "$checked" "$TOTAL" "$label"
     return
   fi
   if [ "$expected" = blocked ] && [ "$rc" -ne 0 ]; then
-    printf '[%d/3] %s -> BLOCKED (exit=%d)\n' "$checked" "$label" "$rc"
+    printf '[%d/%d] %s -> BLOCKED (exit=%d)\n' "$checked" "$TOTAL" "$label" "$rc"
     return
   fi
 
-  printf '[%d/3] %s -> UNEXPECTED (exit=%d, expected=%s)\n' \
-    "$checked" "$label" "$rc" "$expected"
+  printf '[%d/%d] %s -> UNEXPECTED (exit=%d, expected=%s)\n' \
+    "$checked" "$TOTAL" "$label" "$rc" "$expected"
   printf '%s\n' "$output"
   failed=$((failed + 1))
 }
@@ -69,6 +71,26 @@ make_fixture "$tainted"
 printf '%s\n' "$CANARY" |
   git -C "$tainted" hash-object -w --stdin >/dev/null
 run_case '일반 실행은 금지값이 든 unreachable blob을 차단' blocked "$tainted" \
+  bash scripts/acceptance-0-2.sh
+
+read_failure="$TMP/read-failure"
+make_fixture "$read_failure"
+read_failure_sha=$(printf 'harmless unreachable object\n' |
+  git -C "$read_failure" hash-object -w --stdin)
+mkdir -p "$read_failure/bin"
+printf '%s\n' '#!/usr/bin/env bash' \
+  'if [ "${1:-}" = cat-file ] && [ "${3:-}" = "${FAIL_CAT_FILE_SHA:-}" ]; then exit 71; fi' \
+  'exec "$REAL_GIT" "$@"' > "$read_failure/bin/git"
+chmod +x "$read_failure/bin/git"
+run_case 'unreachable 객체 읽기 실패는 조용히 통과하지 않음' blocked "$read_failure" \
+  env PATH="$read_failure/bin:$PATH" REAL_GIT="$REAL_GIT" \
+  FAIL_CAT_FILE_SHA="$read_failure_sha" bash scripts/acceptance-0-2.sh
+
+large_tainted="$TMP/large-tainted"
+make_fixture "$large_tainted"
+{ printf '%s\n' "$CANARY"; dd if=/dev/zero bs=1048576 count=50 2>/dev/null; } |
+  git -C "$large_tainted" hash-object -w --stdin >/dev/null
+run_case '큰 unreachable blob 앞쪽의 금지값도 차단' blocked "$large_tainted" \
   bash scripts/acceptance-0-2.sh
 
 endstate="$TMP/endstate"
