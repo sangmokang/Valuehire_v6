@@ -14,7 +14,7 @@ VERDICT: INVALIDATED
 
 또한 도구 버전 검사는 값 끝의 개행을 잃어 잘못된 문자열을 통과시킬 수 있었고, 자동 생성 파일 검사는 정해진 파일명 다섯 개만 확인해 다른 이름의 실제 추적 파일을 놓쳤습니다.
 
-따라서 기존 감사의 행 수와 연결 관계 계산이 맞더라도 요구 완전성과 검사 신뢰성을 증명하지 못합니다. 현재 계획 후보에는 누락 행과 분리 행을 추가해 active micro count를 132개에서 134개로 고쳤지만, runner-only evidence authority(= 검증 원문을 구현자가 수정할 수 없게 분리하는 권한 장치)가 없으므로 fresh audit 실행 허가는 아직 차단합니다.
+따라서 기존 감사의 행 수와 연결 관계 계산이 맞더라도 요구 완전성과 검사 신뢰성을 증명하지 못합니다. 현재 계획 후보에는 누락 행 1개와 분리 행 2개를 추가해 active micro count를 132개에서 135개로 고쳤지만, runner-only evidence authority(= 검증 원문을 구현자가 수정할 수 없게 분리하는 권한 장치)가 없으므로 fresh audit 실행 허가는 아직 차단합니다.
 
 ### 결정 카드 — 과거 감사 보존과 실행 허가 회수
 
@@ -38,7 +38,7 @@ VERDICT: INVALIDATED
 - execution_permission: false
 - strict_micro_pass_count: 0
 - prior_scaffold_value_confirmed_count: 4
-- active_micro_count: 134
+- active_micro_count: 135
 - invalidated_micro_ids: P0-01-baseline-and-audited-plan, P0-02-node-version-pin, P0-03-pnpm-version-pin, P0-04-root-private-workspace, P0-04A-generated-artifact-ignore
 - blocking_findings: missing engines.node micro, non-atomic P0-04, P0-03 newline false PASS, P0-04A fixed-canary false PASS, runner-only audit evidence authority missing, historical raw Markdown full-chain diff-check violations=7
 
@@ -50,7 +50,7 @@ VERDICT: INVALIDATED
 |---|---:|---|
 | 엄격하게 재검증된 준비 작업 | 0/5 | 기존 다섯 합격은 다음 작업의 근거가 아님 |
 | 파일값 일부가 확인된 준비 작업 | 4/5 | 설정 존재와 실행 경로 검증은 다른 판단 |
-| 복구된 계획 후보의 전체 작업 | 134 | 누락 행 1개와 분리 행 1개가 늘어남 |
+| 복구된 계획 후보의 전체 작업 | 135 | 누락 행 1개와 분리 행 2개가 늘어남 |
 | 현재 실행 허가 | 0 | 새 독립 감사 전 제품 작업 금지 |
 
 → 숫자가 늘어난 것은 구현이 더 끝났다는 뜻이 아닙니다. 빠뜨렸던 일을 계획에 다시 넣어 미완료 범위를 정직하게 센 결과입니다.
@@ -60,7 +60,7 @@ VERDICT: INVALIDATED
 1. `engines.node` 누락 — 상위 목표의 명시 요구가 실행 그래프에 없었습니다.
 2. P0-04 비원자 — `private=true`와 workspace discovery가 서로 독립적으로 실패할 수 있습니다.
 3. P0-03 false PASS — `pnpm@11.22.0\n`이 Bash command substitution에서 끝 개행을 잃고 정상값처럼 비교됐습니다.
-4. P0-04A false PASS — `apps/admin/coverage/actual-report.json` 같은 임의 이름의 추적 파일을 고정 canary 검사와 기존 노출 스캔이 놓쳤습니다.
+4. P0-04A false PASS — `apps/admin/coverage/actual-report.json` 같은 임의 이름의 추적 파일을 고정 canary 검사와 기존 노출 스캔이 놓쳤습니다. 복구 과정에서도 ignore owner와 tracked prefix 차단을 한 행에 묶은 결함을 재공격으로 발견해 P0-04A와 P0-04T로 다시 분리했습니다.
 5. 증거 권한 미분리 — 구현자와 증거 작성자가 같은 권한을 가지므로 원문 보존을 구조적으로 강제하지 못했습니다.
 6. 원문과 공백 검사 충돌 — `git diff --check a02a3da..HEAD`가 과거 P0-04 감사 원문 끝 공백 7건으로 성적 2를 냈습니다. 원문을 덮어쓰거나 Markdown 전체 검사를 끄지 않고 별도 해결해야 합니다.
 

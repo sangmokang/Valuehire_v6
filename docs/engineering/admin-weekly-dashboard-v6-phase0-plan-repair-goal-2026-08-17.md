@@ -50,6 +50,18 @@
 
 **되돌리기** — 새 무효화 기록을 되돌릴 수 있지만, 그러려면 누락과 비원자 결함이 없다는 새 독립 증거가 먼저 있어야 합니다.
 
+### 결정 카드 4 — 생성물 무시와 추적 차단 분리
+
+**무엇을** — canonical ignore rule 소유권을 확인하는 `P0-04A`와 금지 prefix의 모든 추적 파일을 막는 `P0-04T`를 별도 작업으로 둡니다.
+
+**왜** — 파일이 올바른 규칙으로 무시되는지와 이미 Git index에 들어간 파일이 없는지는 독립적으로 실패하고 되돌릴 수 있습니다.
+
+**버린 길** — 두 검사를 하나의 “생성물 경계” 작업에 계속 묶는 길은 복구 계획 안에서 원자성 결함을 되풀이하므로 버립니다.
+
+**대가** — Phase 0 행과 전체 active micro가 각각 하나 늘고, 두 직접 시험과 두 mutation이 필요합니다.
+
+**되돌리기** — 두 행을 다시 합치면 계획 합격도 함께 취소해야 합니다.
+
 ## 3층 — 실행 계약
 
 ### 현재 상태와 직접 확인 근거
@@ -59,7 +71,7 @@
 - 같은 계획의 기존 P0-04 행은 `private=true`와 workspace 선언을 하나의 결과·실패 이유·되돌림으로 묶습니다.
 - `docs/engineering/admin-weekly-dashboard-v6-plan-audit-v2-2026-08-17.md:5`는 결함이 있는 계획에 PASS를 부여합니다. 이 원문은 과거 증거로 보존합니다.
 - `docs/sot/verification-commands.md:8`은 `package.json`이 없다고 쓰지만 현재 루트 `package.json`은 존재합니다. 실행 명령 자체는 여전히 make 기반도 npm script 기반도 아닙니다.
-- `bash scripts/session-status.sh`의 현재 결과는 `RED: 1/19`입니다. 이번 작업은 이 실패를 무시한 신규 제품 작업이 아니라 계획 합격 무효를 복구하는 연속 작업입니다.
+- 작업 시작 시 `bash scripts/session-status.sh` 결과는 `RED: 1/19`였고 새 인수 검사를 등록한 뒤에는 `RED: 1/20`입니다. 이번 작업은 이 실패를 무시한 신규 제품 작업이 아니라 계획 합격 무효를 복구하는 연속 작업입니다.
 - `git diff --check a02a3da..HEAD`는 과거 P0-04 감사 원문의 끝 공백 7건으로 성적 2를 냈습니다. 이번 복구 변경만 검사하면 성적 0이므로, 원문 보존과 전체 기록 검사 충돌을 별도 blocker로 둡니다.
 
 ### 근본 원인
@@ -74,8 +86,8 @@ GitHub 이슈: https://github.com/sangmokang/Valuehire_v6/issues/18
 
 1. Phase 0 계획에 `.node-version`과 `engines.node`가 별도 작업으로 존재합니다.
 2. 루트 `private=true`와 `pnpm-workspace.yaml` 선언이 별도 작업입니다.
-3. 생성물 작업은 모든 금지 디렉터리 아래 임의 이름의 추적 파일을 잡도록 후속 구현 계약을 명시합니다.
-4. 정확한 의존 관계 문서가 새 작업 둘을 포함하고 순서를 건너뛰지 않습니다.
+3. 생성물 무시 규칙 소유권과 모든 금지 디렉터리 아래 임의 이름 추적 파일 차단이 별도 작업입니다.
+4. 정확한 의존 관계 문서가 새 작업들을 포함하고 순서를 건너뛰지 않습니다.
 5. 과거 계획 감사 PASS는 실행 허가가 없다는 무효화 기록으로 연결됩니다.
 6. 정본 문서가 현재 루트 설정 파일의 존재와 실제 게이트 방식을 정확히 설명합니다.
 7. 검사 자체가 로컬 업로드 전 검사와 서버 자동 검사 양쪽에 연결됩니다.
@@ -99,6 +111,8 @@ GitHub 이슈: https://github.com/sangmokang/Valuehire_v6/issues/18
 - 새 인수 검사를 서버 자동 검사에서 제거했는데 로컬 검사만으로 합격하는가.
 - 행 이름만 맞고 의존 관계가 기존 P0-02에서 P0-03으로 건너뛰는데 합격하는가.
 - 생성물 후속 계약이 고정 canary 파일명만 검사하도록 남았는데 합격하는가.
+- 생성물 ignore owner와 tracked prefix 차단을 다시 한 행에 묶었는데 합격하는가.
+- 더 넓은 중복 ignore 규칙이 실제 owner가 되어도 합격하는가.
 
 ### SOT 체크리스트
 
@@ -115,7 +129,7 @@ GitHub 이슈: https://github.com/sangmokang/Valuehire_v6/issues/18
 ### 비범위
 
 - `package.json`, `.node-version`, `pnpm-workspace.yaml`, `.gitignore` 값 자체 수정
-- P0-02~P0-04A 구현 검사기 수정
+- P0-02~P0-04T 제품 경로와 구현 검사기 수정
 - 의존성 설치와 lockfile 생성
 - 관리자 애플리케이션 lint, typecheck, unit, build, start, Playwright
 - PostgreSQL, Gmail, Calendar, ClickUp 연결

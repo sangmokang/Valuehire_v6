@@ -25,7 +25,7 @@
   green_command: runner-only 원문 보존 아래 fresh auditor verdict PASS와 계획 PASS 조건 결함 0
   mutation_method: engines.node 행을 제거하거나 private/workspace를 다시 묶은 폐기 가능한 사본에서 audit FAIL 확인
   production_call_path: 사용자 계약 -> 저장소 계획 검사 -> runner-only fresh audit -> writer packet
-  target_count_method: parent AC distinct=40, active micro=134, required field missing=0, invalidated audit execution_permission=false, full-chain diff-check violations=0
+  target_count_method: parent AC distinct=40, active micro=135, required field missing=0, invalidated audit execution_permission=false, full-chain diff-check violations=0
   cannot_split_reason: 실행 허가를 내는 fresh audit 한 건의 입력과 판정은 함께 보존해야 한다
   external_side_effect_count_expected: 0
 
@@ -111,18 +111,34 @@
 
 - parent_ac: AC-01
   micro_id: P0-04A-generated-artifact-ignore
-  single_observable_result: 모든 금지 artifact prefix 아래의 Git 추적 파일이 0건이고 guard가 어떤 파일명이든 차단한다
-  single_failure_reason: 금지 prefix 아래 파일 하나라도 추적되거나 검사 대상 root가 0건이다
-  rollback_unit: root .gitignore + shared tracked-prefix selector + pre-commit/CI registration + micro goal
+  single_observable_result: 각 required artifact root의 canary를 git check-ignore -v로 확인했을 때 canonical root rule이 owner이고 overlapping fallback=0이다
+  single_failure_reason: canonical root rule이 없거나 다른 규칙이 owner이거나 overlapping fallback이 남는다
+  rollback_unit: root .gitignore + ignore-owner contract test + micro goal
   dependencies: [P0-04-workspace-declaration PASS hash]
-  allowed_files: [.gitignore, hooks/pre-commit, scripts/verify/check-admin-foundation.sh, scripts/scan-data-exposure.sh, scripts/acceptance-admin-artifact-boundary.sh, .github/workflows/verify.yml, docs/sot/hook-contracts.md, docs/sot/verification-commands.md, docs/sot/mechanism-registry.yaml, docs/engineering/admin-weekly-dashboard-v6-p0-04a-generated-artifact-ignore-goal-2026-08-17.md]
+  allowed_files: [.gitignore, scripts/verify/check-admin-foundation.sh, scripts/acceptance-admin-artifact-boundary.sh, docs/sot/verification-commands.md, docs/engineering/admin-weekly-dashboard-v6-p0-04a-generated-artifact-ignore-goal-2026-08-17.md]
   forbidden_scope: [실제 dependency install, 기존 ignore 규칙 삭제, source file ignore]
-  red_command: bash scripts/acceptance-admin-artifact-boundary.sh
-  green_command: bash scripts/acceptance-admin-artifact-boundary.sh
+  red_command: bash scripts/acceptance-admin-artifact-boundary.sh ignore-owner
+  green_command: bash scripts/acceptance-admin-artifact-boundary.sh ignore-owner
+  mutation_method: disposable clone에서 각 canonical root rule을 제거하거나 더 넓은 중복 규칙을 추가해 owner 또는 overlapping fallback 검사가 실패하는지 확인한다
+  production_call_path: generated artifact root canary -> git check-ignore -v -> canonical root owner
+  target_count_method: required artifact roots>0, canonical owner matches=required roots, overlapping fallback=0
+  cannot_split_reason: 각 생성물 root가 하나의 canonical ignore rule에 귀속된다는 한 결과다
+  external_side_effect_count_expected: 0
+
+- parent_ac: AC-01
+  micro_id: P0-04T-tracked-generated-artifact-guard
+  single_observable_result: 모든 금지 artifact prefix 아래의 Git 추적 파일이 0건이고 guard가 파일명과 무관하게 차단한다
+  single_failure_reason: 금지 prefix 아래 파일 하나라도 추적되거나 검사 대상 root가 0건이다
+  rollback_unit: shared tracked-prefix selector + pre-commit/CI registration + micro goal
+  dependencies: [P0-04A-generated-artifact-ignore PASS hash]
+  allowed_files: [hooks/pre-commit, scripts/verify/check-admin-foundation.sh, scripts/scan-data-exposure.sh, scripts/acceptance-admin-artifact-boundary.sh, .github/workflows/verify.yml, docs/sot/hook-contracts.md, docs/sot/verification-commands.md, docs/sot/mechanism-registry.yaml, docs/engineering/admin-weekly-dashboard-v6-p0-04t-tracked-generated-artifact-guard-goal-2026-08-17.md]
+  forbidden_scope: [실제 dependency install, ignore rule 소유권 변경, source file 제외]
+  red_command: bash scripts/acceptance-admin-artifact-boundary.sh tracked-prefix
+  green_command: bash scripts/acceptance-admin-artifact-boundary.sh tracked-prefix
   mutation_method: disposable clone에서 각 금지 디렉터리 아래 임의 이름의 추적 파일을 만들고 prefix guard가 전부 거부하는지 확인한다
   production_call_path: git index -> shared forbidden-prefix scan -> pre-commit and CI block
   target_count_method: required artifact prefix roots>0, files enumerated by prefix scan>0 in mutation, tracked forbidden artifacts=0 in baseline
-  cannot_split_reason: 같은 shared selector를 쓰는 local/CI repository boundary 한 결과다
+  cannot_split_reason: 같은 shared selector가 local과 CI에서 모든 금지 prefix를 막는 한 결과다
   external_side_effect_count_expected: 0
 
 - parent_ac: AC-01
@@ -130,7 +146,7 @@
   single_observable_result: apps/admin package가 goal의 모든 npm package exact version을 범위 기호 없이 선언한다
   single_failure_reason: 필수 package 누락·추가·버전 drift가 있다
   rollback_unit: apps/admin/package.json + version contract test
-  dependencies: [P0-04A PASS hash]
+  dependencies: [P0-04T-tracked-generated-artifact-guard PASS hash]
   allowed_files: [apps/admin/package.json, scripts/verify/check-admin-foundation.sh, docs/engineering/admin-weekly-dashboard-v6-p0-05-admin-exact-package-contract-goal-2026-08-17.md]
   forbidden_scope: [install, lockfile, source route, goal 밖 dependency]
   red_command: bash scripts/verify/check-admin-foundation.sh admin-package-versions

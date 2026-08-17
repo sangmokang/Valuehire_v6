@@ -176,7 +176,7 @@ program result: 2
 |---|---|---|---|
 | P0-01 계획 실행 허가 | BLOCKED_EVIDENCE_AUTHORITY_AND_DIFF | 기존 v2 감사가 누락 요구와 비원자 행을 PASS했고 runner-only 원문 보존도 없으며 전체 기록 공백 검사가 7건 실패한다 | 기존 PASS는 실행 허가가 없다; 증거 권한과 원문 보존·공백 검사 충돌을 분리 해결한 뒤 fresh audit |
 | P0-02 Node runtime | BLOCKED_RUNTIME_CONSUMER | `.node-version`은 있으나 현재 실제 Node는 22.19.0이고 local/CI consumer가 미정이다 | runtime consumer를 독립 결정한 뒤 실제 24.19.0 실행 증명 |
-| P0-05 이후 TypeScript/Next 경로 | DECISION_REQUIRED_DEPENDENCY | 목표 고정 목록에 @types/react와 @types/react-dom의 exact version이 없음 | 새 P0-01 audit와 P0-02~P0-04A가 독립 PASS여도 의존성 버전 결정 전 package install 금지 |
+| P0-05 이후 TypeScript/Next 경로 | DECISION_REQUIRED_DEPENDENCY | 목표 고정 목록에 @types/react와 @types/react-dom의 exact version이 없음 | 새 P0-01 audit와 P0-02~P0-04T가 독립 PASS여도 의존성 버전 결정 전 package install 금지 |
 | AC05-M02 | BLOCKED_EXTERNAL_INPUT | 승인된 연말 경계 예시 2건 없음 | label 없는 NOT_RUN 경로만 구현 가능 |
 | AC07-M01~M04 | DECISION_REQUIRED_DEPENDENCY | DOM parser가 필요하지만 고정 의존성 목록에 없음 | 의존성 추가 없이 중지 |
 | AC13-M01~M02 | BLOCKED_SOT_CONFLICT | UNCLASSIFIED 계약과 ETC 최신 지시 충돌 | 정본 변경 또는 최신 지시 철회 필요 |
@@ -199,7 +199,7 @@ program result: 2
 
 | parent | canonical micro source |
 |---|---|
-| AC-01 | atomic-plan-phase0 P0-02~P0-12, 별도 P0-03A·P0-04-workspace·P0-04A 포함 |
+| AC-01 | atomic-plan-phase0 P0-02~P0-12, 별도 P0-03A·P0-04-workspace·P0-04A·P0-04T 포함 |
 | AC-02 | atomic-plan-phase0 P0-13~P0-14 |
 | AC-03 | atomic-plan-phase0 P0-20~P0-21 |
 | AC-04~AC-07, AC-13 | atomic-research-phase1; 상태 등록부와 전역 규칙 적용 |
@@ -214,7 +214,7 @@ program result: 2
 
 ### Phase 0 canonical rows
 
-Phase 0의 15개 필드 전체 row 25개는 docs/engineering/admin-weekly-dashboard-v6-atomic-plan-phase0-2026-08-17.md에 분리했습니다. 전체 active micro는 134개입니다. 이 controller goal과 그 파일을 하나의 계획 묶음으로 감사합니다. P0-03A-node-engine-pin은 빠졌던 `engines.node`를 별도로 검증하고, P0-04-root-private와 P0-04-workspace-declaration은 독립 결과로 분리합니다. P0-04A는 고정 canary가 아니라 모든 금지 prefix 아래의 임의 이름 추적 파일을 막는 선행 작업입니다.
+Phase 0의 15개 필드 전체 row 26개는 docs/engineering/admin-weekly-dashboard-v6-atomic-plan-phase0-2026-08-17.md에 분리했습니다. 전체 active micro는 135개입니다. 이 controller goal과 그 파일을 하나의 계획 묶음으로 감사합니다. P0-03A-node-engine-pin은 빠졌던 `engines.node`를 별도로 검증하고, P0-04-root-private와 P0-04-workspace-declaration은 독립 결과로 분리합니다. P0-04A는 각 생성물 root의 canonical ignore owner를 확인하고, P0-04T는 모든 금지 prefix 아래의 임의 이름 추적 파일을 막습니다.
 
 ### Phase 1~3 canonical corrections
 
@@ -244,6 +244,7 @@ P0-01
  -> P0-04-root-private
  -> P0-04-workspace-declaration
  -> P0-04A-generated-artifact-ignore
+ -> P0-04T-tracked-generated-artifact-guard
  -> P0-05(BLOCKED) -> P0-06
  -> P0-07 -> P0-08 -> P0-09 -> P0-10 -> P0-11 -> P0-12
  -> P0-13 -> P0-14
@@ -265,7 +266,7 @@ P0-01
 ### 계획 감사 합격 조건
 
 - parent AC distinct count 40
-- active micro count 134
+- active micro count 135
 - unmapped parent count 0
 - mis-mapped requirement count 0
 - parent requirement sentence coverage gap count 0
@@ -299,7 +300,7 @@ P0-01
 | 상위 목표의 `engines.node` 작업 누락 | INVALIDATED_REQUIREMENT_GAP | P0-03A-node-engine-pin 별도 행과 exact dependency를 추가 |
 | P0-04가 private와 workspace 결과를 결합 | INVALIDATED_NON_ATOMIC | P0-04-root-private와 P0-04-workspace-declaration으로 분리 |
 | P0-03 exact 문자열 검사가 끝 개행을 잃음 | INVALIDATED_FALSE_PASS | 계획 mutation에 `pnpm@11.22.0\n` 반례와 Corepack 실제 실행 경로를 고정 |
-| P0-04A가 고정 canary 파일명만 확인 | INVALIDATED_FALSE_PASS | 모든 금지 prefix 아래 임의 이름의 tracked file mutation을 고정 |
+| P0-04A가 고정 canary 파일명만 확인 | INVALIDATED_FALSE_PASS | P0-04A는 canonical ignore owner, P0-04T는 모든 금지 prefix 아래 임의 이름의 tracked file mutation으로 분리 |
 | auditor 원문을 controller가 직접 보존 | BLOCKED_EVIDENCE_AUTHORITY | BLK-RUNNER-ONLY-AUDIT-EVIDENCE 해결 전 P0-01 PASS 금지 |
 | 원문 Markdown 보존과 전체 diff-check 충돌 | BLOCKED_HISTORICAL_EVIDENCE_DIFF_CHECK | BLK-HISTORICAL-EVIDENCE-DIFF-CHECK 해결 전 P0-01 PASS 금지; 원문 덮어쓰기나 전역 검사 약화 금지 |
 
