@@ -137,3 +137,28 @@ GREEN 뒤 실행한 명령·전체 출력·종료 성적과 해석을 이 절에
 ### 10. 적대 검증 로그
 
 Claude 1차 판정의 명령 전문·본문과 Codex 2차 재현 명령·출력·일치 여부를 이 절에 덧붙입니다.
+
+#### REVIEW-RED — 상속 환경이 합성 시험을 바꾸는가
+
+Claude 1차 판정은 자동 실행 경로는 외부 값을 비워 안전하지만, 개발자가 회귀 시험을 직접 실행할 때
+`SECRET_PATTERNS_FILE` 환경변수가 상속되면 합성 규칙 대신 외부 파일을 읽는 낮은 위험을 지적했습니다.
+Codex가 저장소의 공개 기본 규칙 파일을 외부 값처럼 지정해 재현했습니다.
+
+```text
+$ SECRET_PATTERNS_FILE="$PWD/.secret-patterns.default" bash scripts/acceptance-0-2-unreachable-objects.sh
+[no-unreachable] exit=1 expected=0
+FAIL: 심은 카나리를 verify.sh가 못 잡음 — 스캐너가 조용히 무력화됨
+FAIL: no-unreachable 종료 성적 불일치
+[harmless-unreachable] exit=1 expected=0
+FAIL: harmless-unreachable 종료 성적 불일치
+[endstate-requires-zero] exit=1 expected=1
+FAIL: unreachable 객체 1건 잔존 (reflog expire/gc --prune=now 미완)
+[secret-unreachable] exit=1 expected=1
+FAIL: secret-unreachable 필수 판정 문구 누락: 복구 가능 blob에 리터럴 잔존
+CHECKED: 4
+INHERITED_OVERRIDE_EXIT=1
+```
+
+→ 외부 환경변수 하나만으로 같은 합성 시험의 결과가 달라졌고 전체 성적은 1이었습니다. 자동 훅과
+세션 검사는 이 변수를 이미 비우지만, 회귀 시험 자체도 실행 경로와 무관하게 같은 결과를 내도록 해야
+하므로 새 REVIEW-RED로 채택합니다. 실제 비밀값은 읽거나 출력하지 않았습니다.
