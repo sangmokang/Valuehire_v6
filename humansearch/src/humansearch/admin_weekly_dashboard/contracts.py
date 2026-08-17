@@ -25,12 +25,18 @@ class MetricStatus(str, Enum):
 class SourceFailureReason(str, Enum):
     """PII-safe reason codes allowed to cross the dashboard API boundary."""
 
+    CALENDAR_ALIAS_AMBIGUOUS = "calendar_alias_ambiguous"
+    CALENDAR_ALIAS_NOT_FOUND = "calendar_alias_not_found"
     CALENDAR_EVENT_ID_MISSING = "calendar_event_id_missing"
+    COLLECTION_INCOMPLETE = "collection_incomplete"
+    COLLECTION_NOT_SCHEDULED = "collection_not_scheduled"
+    COLLECTION_OVERLAP = "collection_overlap"
     CONTRACT_MISMATCH = "contract_mismatch"
     GMAIL_TIMEOUT = "gmail_timeout"
     HISTORY_NOT_COLLECTED = "history_not_collected"
     IDENTITY_LINK_CONTRACT_MISSING = "identity_link_contract_missing"
     PERMISSION_DENIED = "permission_denied"
+    PRECONDITION_MISSING = "precondition_missing"
     RETENTION_POLICY_MISSING = "retention_policy_missing"
     SOURCE_STATE_MISSING = "source_state_missing"
     SOURCE_TIMEOUT = "source_timeout"
