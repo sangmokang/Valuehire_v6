@@ -11,6 +11,11 @@
 사장님이 지금 추가로 정하실 것은 없습니다. 실제 기록 삭제, HumanSearch 기능 구현, 실제 사이트 접근,
 합치기와 배포는 하지 않고 변경 요청 검토 직전에 멈춥니다.
 
+첫 외부 검토에서 큰 기록 조각과 읽기 오류를 놓치는 두 결함이 추가로 드러났고, 실패 시험부터 다시
+만들어 둘 다 수리했습니다. 현재도 사용 중인 기록의 설명문·파일 이름을 검사하지 않는 기존 구멍은
+이번 수리가 만든 문제가 아니어서 별도 이슈 #22로 분리했습니다. 서버 검사 결과와 책임자 승인은 아직
+남았고, 전용 자동화 설정 검사 도구는 이 환경에 없어 실행하지 못했습니다.
+
 ## 2층 — 판단 근거
 
 시작 검사 19개 중 실패한 것은 하나뿐입니다. 추적 파일과 현재 기록에서 금지값을 찾는 검사는
@@ -92,14 +97,16 @@ FAIL: unreachable 객체 27건 잔존 (reflog expire/gc --prune=now 미완)
 ### 3. 단일 인수 기준
 
 **AC-19.** 합성 저장소에 무해한 unreachable blob(= 현재 브랜치에서 가리키지 않는 파일 조각)만 있을
-때 `scripts/acceptance-0-2.sh` 일반 실행은 종료 성적 0이어야 합니다. 같은 blob에 로컬 금지값이 있으면
-일반 실행은 0이 아닌 성적이어야 하고, 무해한 blob이라도 `ACCEPTANCE_ENDSTATE=1` 실행은 0이 아닌
-성적이어야 합니다. 이 세 경우를 검사하는 인수 스크립트는 로컬 push 검사와 서버 자동 검사에서 모두
-실행되어야 합니다.
+때 `scripts/acceptance-0-2.sh` 일반 실행은 종료 성적 0이어야 합니다. 같은 blob에 로컬 금지값이 있거나
+unreachable 객체 읽기 자체가 실패하거나, 50MiB 큰 blob의 앞쪽에 금지값이 있으면 일반 실행은 0이
+아닌 성적이어야 합니다. 무해한 blob이라도 `ACCEPTANCE_ENDSTATE=1` 실행은 0이 아닌 성적이어야 합니다.
+이 다섯 경우를 검사하는 인수 스크립트는 로컬 push 검사와 서버 자동 검사에서 모두 실행되어야 합니다.
 
 #### 가짜 합격을 막는 반대 사례
 
 - 모든 unreachable 객체를 허용해 지운 비밀값까지 놓치면 실패입니다.
+- 객체를 읽거나 내용을 대조하는 도구가 실패했는데 통과하면 실패입니다.
+- 큰 binary 객체의 앞쪽에서 값을 찾은 뒤 파이프가 먼저 닫혀 통과하면 실패입니다.
 - 무해한 unreachable 객체 하나만 있어도 일반 시작 검사가 실패하면 실패입니다.
 - 정리 완료 실행이 unreachable 객체 0개를 요구하지 않으면 실패입니다.
 - 새 인수 스크립트가 로컬에서만 돌고 서버 자동 검사에 연결되지 않으면 실패입니다.
@@ -120,7 +127,7 @@ FAIL: unreachable 객체 27건 잔존 (reflog expire/gc --prune=now 미완)
 ### 5. 적대검증 항목
 
 1. 관련 없는 unreachable 객체를 허용한다는 명목으로 실제 비밀값까지 놓치는가.
-2. blob 외 commit 또는 tree 안의 금지값을 놓치는가. 이 계약이 blob만 대상으로 해도 되는 근거가 있는가.
+2. blob 외 commit·tree·tag 안의 금지값을 놓치는가.
 3. 알려진 과거 오염 객체의 고정 SHA 검사가 그대로 유지되는가.
 4. refs와 reflog가 가리키는 현재 내용 전수 검사가 그대로 유지되는가.
 5. `ACCEPTANCE_ENDSTATE=1`에서 unreachable 객체 0개 요구가 실제로 남는가.
@@ -129,6 +136,8 @@ FAIL: unreachable 객체 27건 잔존 (reflog expire/gc --prune=now 미완)
 8. 시험이 원본 저장소 객체를 만들거나 지우는가.
 9. 출력에 실제 로컬 금지값이 노출되는가.
 10. `session-status.sh`가 최종적으로 `RED: 0/N`을 만드는가.
+11. `git cat-file` 또는 `grep` 실패가 값 없음과 같은 통과로 처리되는가.
+12. 큰 binary 객체 앞부분의 값이 `grep -q` 조기 종료와 `pipefail` 조합 때문에 누락되는가.
 
 ### 6. SOT 체크리스트
 
@@ -150,11 +159,375 @@ FAIL: unreachable 객체 27건 잔존 (reflog expire/gc --prune=now 미완)
 
 ### 8. 실행·검증 로그
 
-RED, GREEN, 변조 시험, 전체 검증의 명령과 전체 출력은 실행 순서대로 아래에 추가합니다.
+#### 8-1. RED — 구현 전 실패 고정
+
+```text
+$ bash scripts/acceptance-0-2-unreachable-content.sh
+[1/3] 일반 실행은 무해한 unreachable blob을 허용 -> UNEXPECTED (exit=1, expected=pass)
+PASS: no secret-pattern match in any tracked file, .env not tracked
+FAIL: unreachable 객체 1건 잔존 (reflog expire/gc --prune=now 미완)
+[2/3] 일반 실행은 금지값이 든 unreachable blob을 차단 -> BLOCKED (exit=1)
+[3/3] 종료상태 실행은 무해한 unreachable blob도 차단 -> BLOCKED (exit=1)
+CHECKED: 3
+FAIL: AC-19 예상과 다른 사례 1건
+red_rc=1
+```
+
+→ 무엇을 시켰나: 실제 대상 스크립트를 합성 저장소 세 개에서 실행하는 시험만 먼저 만들었습니다.
+→ 뭐가 나왔나: 기존 코드는 무해한 객체도 차단해 첫 사례가 실패했습니다.
+→ 좋은 소식인가 나쁜 소식인가: 구현 전에는 의도대로 RED이며, 시험이 기존 동작과 새 계약을 구분합니다.
+
+첫 커밋 시도는 시험 변수 이름에 비밀처럼 보이는 단어가 들어가 pre-commit에서 차단됐습니다. 실제 값은
+아니었지만 이름을 `CANARY`와 `tainted`로 바꾼 뒤 다시 같은 RED를 확인해 시험 커밋
+`c7f2dcf`로 고정했습니다.
+
+```text
+$ git diff --exit-code c7f2dcf -- scripts/acceptance-0-2-unreachable-content.sh
+red_test_unchanged_rc=0
+```
+
+→ 무엇을 시켰나: GREEN 뒤 시험 파일이 RED 커밋과 같은지 Git으로 대조했습니다.
+→ 뭐가 나왔나: 차이가 0건입니다.
+→ 좋은 소식인가 나쁜 소식인가: 기대값을 바꿔 가짜 GREEN을 만들지 않았으므로 좋은 소식입니다.
+
+#### 8-2. GREEN — 최소 구현
+
+```text
+$ bash scripts/acceptance-0-2-unreachable-content.sh
+[1/3] 일반 실행은 무해한 unreachable blob을 허용 -> PASS (exit=0)
+[2/3] 일반 실행은 금지값이 든 unreachable blob을 차단 -> BLOCKED (exit=1)
+[3/3] 종료상태 실행은 무해한 unreachable blob도 차단 -> BLOCKED (exit=1)
+CHECKED: 3
+PASS: AC-19 일반 내용 검사와 종료상태 0건 조건 분리
+targeted_rc=0
+```
+
+→ 무엇을 시켰나: RED 시험을 바꾸지 않고 수정한 판정기를 다시 실행했습니다.
+→ 뭐가 나왔나: 일반 실행의 무해한 객체만 허용되고 나머지 두 위험·종료상태 사례는 차단됐습니다.
+→ 좋은 소식인가 나쁜 소식인가: AC-19의 세 문장을 각각 실행으로 증명했으므로 좋은 소식입니다.
+
+```text
+$ SECRET_PATTERNS_FILE= bash scripts/acceptance-0-2.sh
+PASS: no secret-pattern match in any tracked file, .env not tracked
+PASS: 0-2 — 히스토리·객체·reflog·docs 리터럴 0건, 스캐너 뮤테이션 검출 확인
+acceptance_rc=0
+```
+
+→ 무엇을 시켰나: 합성 값이 아니라 현재 저장소의 로컬 패턴 파일을 사용해 0-2 전체를 실행했습니다.
+→ 뭐가 나왔나: 실제 패턴은 출력하지 않은 채 현재 파일·기록·객체 검사가 통과했습니다.
+→ 좋은 소식인가 나쁜 소식인가: 기존 27개 무해한 객체 때문에 막히던 시작 조건이 내용 검사로 통과해 좋은 소식입니다.
+
+#### 8-3. 전체 Gate 0와 관련 검사
+
+GREEN 직후 첫 묶음 실행은 아래처럼 1건을 보고했습니다.
+
+```text
+$ bash scripts/session-status.sh
+HEAD: 8402572 (ahead 3 / behind 0)
+ORIGIN: 4fdef31
+RED: 1/20 (acceptance-0-7.sh 제외 — CI 담당)
+```
+
+→ 무엇을 시켰나: 새 인수 시험을 포함한 시작 검사 전체를 묶음으로 실행했습니다.
+→ 뭐가 나왔나: 대상 이름을 숨기는 요약에서 20개 중 1개가 실패했습니다.
+→ 좋은 소식인가 나쁜 소식인가: 한 번이라도 흔들린 것은 나쁜 소식이라 성공으로 세지 않고 전부 분리했습니다.
+
+```text
+$ for each Gate-0 check; do SECRET_PATTERNS_FILE= bash "$check"; done
+PASS ./scripts/acceptance-0-2-unreachable-content.sh
+PASS ./scripts/acceptance-0-2.sh
+PASS ./scripts/acceptance-0-5.sh
+PASS ./scripts/acceptance-0-6.sh
+PASS ./scripts/acceptance-hs-a3.sh
+PASS ./scripts/acceptance-hs-a4.sh
+PASS ./scripts/acceptance-hs-cleanroom-absolute-contexts.sh
+PASS ./scripts/acceptance-hs-cleanroom-absolute-paths.sh
+PASS ./scripts/acceptance-hs-cleanroom-colon-paths.sh
+PASS ./scripts/acceptance-hs-cleanroom-file-urls.sh
+PASS ./scripts/acceptance-hs-cleanroom-hook-env-mutations.sh
+PASS ./scripts/acceptance-hs-cleanroom-hook-env.sh
+PASS ./scripts/acceptance-hs-cleanroom-mutations.sh
+PASS ./scripts/acceptance-hs-cleanroom.sh
+PASS ./scripts/acceptance-hs-gates-antiforge.sh
+PASS ./scripts/acceptance-hs-gates-mutations.sh
+PASS ./scripts/acceptance-hs-gates.sh
+PASS ./scripts/acceptance-secret-webhook-vendor.sh
+PASS ./scripts/acceptance-verify-ac-m.sh
+PASS ./verify.sh
+```
+
+→ 무엇을 시켰나: 묶음과 같은 20개를 같은 순서·환경으로 하나씩 실행하고 각 이름을 드러냈습니다.
+→ 뭐가 나왔나: 20개가 모두 통과해 첫 실패는 재현되지 않았습니다.
+→ 좋은 소식인가 나쁜 소식인가: 현재 실패 검사는 없지만 첫 흔들림은 PR의 잔여 위험으로 공개해야 합니다.
+
+```text
+$ bash scripts/session-status.sh
+HEAD: 8402572 (ahead 3 / behind 0)
+ORIGIN: 4fdef31
+RED: 0/20 (acceptance-0-7.sh 제외 — CI 담당)
+```
+
+→ 무엇을 시켰나: 분리 실행 뒤 동일한 묶음 검사를 다시 실행했습니다.
+→ 뭐가 나왔나: 시작 검사가 0/20으로 통과했습니다.
+→ 좋은 소식인가 나쁜 소식인가: 현재 Gate 0는 GREEN이지만, 서버 CI와 추가 반복 전까지 완료 판정은 보류합니다.
+
+```text
+$ bash verify.sh
+PASS: no secret-pattern match in any tracked file, .env not tracked
+$ bash scripts/check-docs-sot.sh
+OK: docs/sot 재구성 AC 전부 충족
+$ bash scripts/verify/check-mechanism-registry.sh
+CHECKED: 3
+$ bash scripts/acceptance-verify-ac-m.sh
+CHECKED: 25
+$ git ls-files '*.sh' | while read f; do bash -n "$f"; done
+exit=0
+$ actionlint .github/workflows/verify.yml
+NOT_RUN: actionlint unavailable
+```
+
+→ 무엇을 시켰나: 비밀 스캔, SOT 참조, 검사 장치 명부, 명부 변조 25종, 모든 셸 문법과 워크플로 정적 검사를 확인했습니다.
+→ 뭐가 나왔나: 설치된 검사들은 모두 통과했고 `actionlint`만 환경에 없어 실행하지 못했습니다.
+→ 좋은 소식인가 나쁜 소식인가: 저장소 자체 검사 결과는 좋지만 워크플로 전용 정적 도구 미실행은 공개할 검증 공백입니다.
+
+```text
+$ bash scripts/acceptance-0-7.sh
+[1/6] 검사기 자기 제외 → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+[2/6] 검사 약화(실패 무시) → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+[3/6] 만료일 없는 억제 → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+[4/6] LLM 출력→판정 필드 → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+[5/6] 미커밋 상태로 push → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+[6/6] 가짜 외부효과 모듈 → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+OK: 원본 저장소 무변경 확인 (da39a3ee5e6b4b0d3255bfef95601890afd80709)
+PASS: 위반 6 종이 전부 차단됨 (각 건 훅 OFF 대조 통과)
+```
+
+→ 무엇을 시켰나: 시작 검사에서 비용 때문에 제외하는 CI 전용 훅 시연도 별도로 실행했습니다.
+→ 뭐가 나왔나: 위반 6종은 훅이 켜졌을 때만 전부 차단됐고 원본 저장소는 변하지 않았습니다.
+→ 좋은 소식인가 나쁜 소식인가: 로컬에서 CI 전용 방어까지 통과했으므로 좋은 소식입니다.
+
+#### 8-4. 뮤테이션 — 시험이 구현 약화를 잡는지 확인
+
+대상 코드의 내용 비교만 임시 문자열로 바꿔 실제 금지값을 놓치도록 만든 뒤 시험했습니다.
+
+```text
+$ bash scripts/acceptance-0-2-unreachable-content.sh
+[1/3] 일반 실행은 무해한 unreachable blob을 허용 -> PASS (exit=0)
+[2/3] 일반 실행은 금지값이 든 unreachable blob을 차단 -> UNEXPECTED (exit=0, expected=blocked)
+PASS: no secret-pattern match in any tracked file, .env not tracked
+PASS: 0-2 — 히스토리·객체·reflog·docs 리터럴 0건, 스캐너 뮤테이션 검출 확인
+[3/3] 종료상태 실행은 무해한 unreachable blob도 차단 -> BLOCKED (exit=1)
+CHECKED: 3
+FAIL: AC-19 예상과 다른 사례 1건
+mutation_rc=1
+```
+
+→ 무엇을 시켰나: 구현의 핵심 비교를 고의로 무력화하고 RED 시험을 그대로 실행했습니다.
+→ 뭐가 나왔나: 위험 객체를 놓친 두 번째 사례가 `UNEXPECTED`로 실패했습니다.
+→ 좋은 소식인가 나쁜 소식인가: 시험이 실제 구현 약화를 잡으므로 좋은 소식입니다.
+
+```text
+$ git diff --exit-code HEAD -- scripts/acceptance-0-2.sh
+implementation_restored=YES
+$ git diff --exit-code c7f2dcf -- scripts/acceptance-0-2-unreachable-content.sh
+red_test_unchanged=YES
+$ bash scripts/acceptance-0-2-unreachable-content.sh
+PASS: AC-19 일반 내용 검사와 종료상태 0건 조건 분리
+```
+
+→ 무엇을 시켰나: 임시 약화를 정확히 복구하고 구현은 HEAD, 시험은 RED 커밋과 대조한 뒤 재실행했습니다.
+→ 뭐가 나왔나: 구현·시험 모두 원래 바이트와 같고 세 사례가 다시 통과했습니다.
+→ 좋은 소식인가 나쁜 소식인가: 뮤테이션 흔적이 남지 않았으므로 좋은 소식입니다.
+
+#### 8-5. V1/V2가 찾은 추가 RED와 GREEN
+
+첫 Claude V1은 새 코드의 객체 읽기 실패를 조용히 통과시키는 중간 결함을 찾았습니다. Codex V2는 이를
+재현했고, Claude가 안전하다고 본 큰 객체 파이프는 반대로 5회 모두 값을 놓치는 것도 재현했습니다.
+
+```text
+$ bash /tmp/codex-v2-gate0-probe.sh <worktree>
+CASE reachable_commit_message rc=0 result=MISSED
+CASE unreachable_commit_message rc=1 result=BLOCKED
+CASE cat_file_failure rc=0 result=SILENT_PASS
+CASE large_blob_run_1 rc=0 result=MISSED
+CASE large_blob_run_2 rc=0 result=MISSED
+CASE large_blob_run_3 rc=0 result=MISSED
+CASE large_blob_run_4 rc=0 result=MISSED
+CASE large_blob_run_5 rc=0 result=MISSED
+```
+
+→ 무엇을 시켰나: 합성 저장소에서 현재 커밋 설명문, 지운 커밋 설명문, 강제 객체 읽기 실패, 50MiB 객체 앞쪽 값을 각각 실행했습니다.
+→ 뭐가 나왔나: 범위 안 읽기 실패와 큰 객체가 통과했고, 범위 밖 현재 커밋 설명문 누락도 재현됐습니다.
+→ 좋은 소식인가 나쁜 소식인가: 첫 GREEN이 불완전했다는 나쁜 소식이어서, 별도 RED 없이는 수정하지 않았습니다.
+
+현재 커밋 설명문·tree 경로·tag를 놓치는 문제는 `origin/main`에도 있던 기존 reachable 경계이며 AC-19가
+수리하는 unreachable 개수/내용 경계와 다릅니다. 이를 숨기거나 범위를 조용히 넓히지 않고 GitHub
+[#22](https://github.com/sangmokang/Valuehire_v6/issues/22)로 분리했습니다.
+
+```text
+$ bash scripts/acceptance-0-2-unreachable-content.sh  # d409c34 RED
+[1/5] 일반 실행은 무해한 unreachable blob을 허용 -> PASS (exit=0)
+[2/5] 일반 실행은 금지값이 든 unreachable blob을 차단 -> BLOCKED (exit=1)
+[3/5] unreachable 객체 읽기 실패는 조용히 통과하지 않음 -> UNEXPECTED (exit=0, expected=blocked)
+[4/5] 큰 unreachable blob 앞쪽의 금지값도 차단 -> UNEXPECTED (exit=0, expected=blocked)
+[5/5] 종료상태 실행은 무해한 unreachable blob도 차단 -> BLOCKED (exit=1)
+CHECKED: 5
+FAIL: AC-19 예상과 다른 사례 2건
+adversarial_red_rc=1
+```
+
+→ 무엇을 시켰나: V1/V2가 찾은 범위 안 두 결함을 기존 세 사례에 추가한 시험만 먼저 실행했습니다.
+→ 뭐가 나왔나: 읽기 실패와 큰 객체 두 사례가 정확히 RED였습니다.
+→ 좋은 소식인가 나쁜 소식인가: 결함이 실행으로 고정됐으므로 이후 코드만 바꿔야 하는 올바른 RED입니다.
+
+```text
+$ bash scripts/acceptance-0-2-unreachable-content.sh  # 4e4dac1 GREEN
+[1/5] 일반 실행은 무해한 unreachable blob을 허용 -> PASS (exit=0)
+[2/5] 일반 실행은 금지값이 든 unreachable blob을 차단 -> BLOCKED (exit=1)
+[3/5] unreachable 객체 읽기 실패는 조용히 통과하지 않음 -> BLOCKED (exit=1)
+[4/5] 큰 unreachable blob 앞쪽의 금지값도 차단 -> BLOCKED (exit=1)
+[5/5] 종료상태 실행은 무해한 unreachable blob도 차단 -> BLOCKED (exit=1)
+CHECKED: 5
+PASS: AC-19 일반 내용 검사와 종료상태 0건 조건 분리
+$ git diff --exit-code d409c34 4e4dac1 -- scripts/acceptance-0-2-unreachable-content.sh
+exit=0
+$ git diff --name-status d409c34 4e4dac1
+M scripts/acceptance-0-2.sh
+```
+
+→ 무엇을 시켰나: 같은 RED 시험을 수정 뒤 실행하고 두 커밋 사이 시험 불변과 변경 파일을 대조했습니다.
+→ 뭐가 나왔나: 5/5 통과했고 GREEN 커밋은 대상 코드만 바꿨습니다.
+→ 좋은 소식인가 나쁜 소식인가: 시험 기대값을 낮추지 않은 진짜 GREEN이라 좋은 소식입니다.
+
+#### 8-6. 최종 뮤테이션
+
+```text
+$ 대상의 실제 값 비교를 임시 문자열로 교체
+$ bash scripts/acceptance-0-2-unreachable-content.sh
+[1/5] 일반 실행은 무해한 unreachable blob을 허용 -> PASS (exit=0)
+[2/5] 일반 실행은 금지값이 든 unreachable blob을 차단 -> UNEXPECTED (exit=0, expected=blocked)
+[3/5] unreachable 객체 읽기 실패는 조용히 통과하지 않음 -> BLOCKED (exit=1)
+[4/5] 큰 unreachable blob 앞쪽의 금지값도 차단 -> UNEXPECTED (exit=0, expected=blocked)
+[5/5] 종료상태 실행은 무해한 unreachable blob도 차단 -> BLOCKED (exit=1)
+CHECKED: 5
+FAIL: AC-19 예상과 다른 사례 2건
+final_mutation_rc=1
+$ git diff --exit-code HEAD -- scripts/acceptance-0-2.sh
+implementation_restored=YES
+```
+
+→ 무엇을 시켰나: 최종 코드의 값 비교를 다시 고의로 무력화하고 시험한 뒤 정확히 원복했습니다.
+→ 뭐가 나왔나: 작은 값과 큰 값 두 사례가 모두 실패했고 원복 뒤 HEAD와 차이가 0건입니다.
+→ 좋은 소식인가 나쁜 소식인가: 새 두 방어를 포함한 최종 시험이 실제 약화를 잡고 흔적도 남지 않아 좋은 소식입니다.
 
 ### 9. 적대 검증 로그
 
-Claude V1 명령·판정 본문과 Codex V2 재현 명령·전체 출력·일치표를 아래에 추가합니다.
+#### 9-1. Claude V1 호출 이력
+
+첫 `env -u ANTHROPIC_API_KEY claude -p` 호출은 코드 판정이 아니라 제공사 안전장치 오탐으로 응답 없이
+끝났습니다. 엄격 스킬이 허용한 한 번의 재시도에서 모델과 합성 값 범위를 좁혀 실제 판정을 받았습니다.
+
+```text
+API Error: Fable 5's safeguards flagged this message.
+Try rephrasing the request in a new session or change your model.
+Request ID: req_011Ce7VZ1pwCDT1X6UN1QYh6
+```
+
+→ 무엇을 시켰나: 실제 값을 읽지 않는 읽기 전용 적대검증을 Claude에 요청했습니다.
+→ 뭐가 나왔나: 첫 호출은 내용 판정 없이 제공사 안전장치가 거부했습니다.
+→ 좋은 소식인가 나쁜 소식인가: 검증 증거가 아니므로 실패로 기록하고 한 번만 다시 실행했습니다.
+
+재시도 명령은 `env -u ANTHROPIC_API_KEY claude -p --model sonnet`이며, 프롬프트 끝에는 strict §8-7
+출력 형식 블록을 원문 그대로 붙였습니다. 검증자는 `VERDICT: FAIL`을 냈습니다.
+
+```text
+VERDICT: FAIL
+
+1) AC-19의 원래 세 사례는 직접 재현해 모두 확인했습니다.
+2) [HIGH] 현재 reachable commit 메시지의 금지값을 기존 전체 검사가 놓칩니다.
+3) [MEDIUM] 신규 cat-file 조회 실패가 값 없음과 같은 통과로 처리됩니다.
+4) 큰 50MiB 객체는 5회 모두 탐지됐다고 판정했습니다.
+5) RED 시험 불변, 로컬·CI 배선, CI 17단계 일치를 확인했습니다.
+6) actionlint는 설치되지 않아 실행하지 못했습니다.
+```
+
+→ 무엇을 시켰나: diff·goal·합성 저장소를 읽고 가짜 완료, 객체형, 오류 처리, 큰 객체, 배선을 공격하게 했습니다.
+→ 뭐가 나왔나: 범위 안 중간 결함 1건, 기존 높은 결함 1건을 보고했고 큰 객체는 안전하다고 봤습니다.
+→ 좋은 소식인가 나쁜 소식인가: PASS가 아니므로 구현을 멈추고 Codex V2로 모든 주장을 다시 재현했습니다.
+
+#### 9-2. Codex V2 1차 재공격
+
+| V1 주장 | Codex 재현 | 일치 여부 | 처리 |
+|---|---|---|---|
+| 기존 reachable commit 설명문 누락 | `rc=0`, MISSED | 일치 | 기존 결함 #22로 분리 |
+| 신규 `cat-file` 실패 조용한 통과 | `rc=0`, SILENT_PASS | 일치 | d409c34 RED → 4e4dac1 GREEN |
+| 50MiB 큰 객체 5회 탐지 | `rc=0`, MISSED 5/5 | **불일치** | V1 판정을 무효화하고 RED 추가 |
+| RED 시험 불변 | diff exit 0 | 일치 | 유지 |
+| 로컬·CI 배선과 17단계 | 각 1회·17개 | 일치 | 유지 |
+
+→ 무엇을 시켰나: V1의 각 사실 주장을 독립 합성 저장소와 Git diff로 재실행했습니다.
+→ 뭐가 나왔나: 두 주장은 일치했고, 큰 객체 안전 주장은 5/5 반대로 재현돼 틀렸습니다.
+→ 좋은 소식인가 나쁜 소식인가: 다른 엔진의 PASS성 주장도 그대로 믿지 않고 실제 결함 하나를 더 찾았습니다.
+
+Claude의 `pipefail` 설명은 “가장 오른쪽 명령의 결과가 이긴다”였지만 Bash의 `pipefail`은 가장 오른쪽의
+**0이 아닌** 결과를 돌려줍니다. `grep -q`가 값을 찾고 먼저 닫히면 앞단 `git cat-file`이 SIGPIPE로
+끝나 전체 조건이 거짓이 될 수 있으며, Codex 실측 5/5 누락이 그 결과입니다.
+
+#### 9-3. 수정 후 Claude V1 재검토
+
+수정 후 같은 출력 형식으로 `env -u ANTHROPIC_API_KEY claude -p --model sonnet --effort medium`을 실행했습니다.
+
+```text
+VERDICT: PASS
+
+- d409c34에서 읽기 실패·50MiB 앞쪽 값 두 사례가 RED였음을 재현했습니다.
+- 4e4dac1에서 시험 파일은 불변이고 대상 스크립트만 바뀌었음을 확인했습니다.
+- 현재 5개 사례를 3회 실행해 매번 5/5 통과를 확인했습니다.
+- 로컬 pre-push와 GitHub CI 배선을 확인했습니다.
+- #22 reachable 경계는 기존 별도 위험으로 남겼습니다.
+- actionlint는 설치되지 않아 실행하지 못했습니다.
+- SOT가 아직 3개 사례라고 적은 낮은 문서 결함을 찾았습니다.
+```
+
+→ 무엇을 시켰나: 두 추가 커밋의 RED→GREEN, 5개 사례 반복, 종료값 분리, 배선을 재검토하게 했습니다.
+→ 뭐가 나왔나: 범위 안 중간 이상 결함 0건으로 PASS했고 문서 숫자 1건을 찾았습니다.
+→ 좋은 소식인가 나쁜 소식인가: 코드 판정은 PASS이며 문서 숫자는 `cb1a78c`에서 즉시 5개로 고쳤습니다.
+
+#### 9-4. Codex V2 최종 재현
+
+```text
+$ for n in 1 2 3; do bash scripts/acceptance-0-2-unreachable-content.sh; done
+run 1: CHECKED: 5 / PASS
+run 2: CHECKED: 5 / PASS
+run 3: CHECKED: 5 / PASS
+$ bash /tmp/codex-v2-object-types.sh <worktree>
+BLOCKED type=blob exit=1 literal_not_echoed=YES
+BLOCKED type=commit exit=1 literal_not_echoed=YES
+BLOCKED type=tree exit=1 literal_not_echoed=YES
+BLOCKED type=tag exit=1 literal_not_echoed=YES
+BLOCKED fsck_failure exit=1
+PASS: all unreachable object types and fsck failure are fail-closed
+$ rg -c '^      - name:' .github/workflows/verify.yml
+17
+$ gh issue view 22
+OPEN — 현재 커밋 설명문·파일 경로의 로컬 금지값도 차단한다
+```
+
+→ 무엇을 시켰나: V1 PASS의 반복성, 모든 Git 객체형, `fsck` 실패, 문서·CI 단계 수, 잔여 이슈를 직접 재현했습니다.
+→ 뭐가 나왔나: 5개 사례 3회 동일, 네 객체형과 검사 실패 전부 차단, 실제 값 미출력, 17단계·#22가 확인됐습니다.
+→ 좋은 소식인가 나쁜 소식인가: V1 PASS와 Codex V2가 일치해 AC-19 범위의 적대검증은 통과했습니다.
+
+#### 9-5. 제출 직전 사람 셀프 감사 (§8-6b)
+
+- 아니오 — 1층 결론에 풀이 없는 전문용어가 없습니다.
+- 아니오 — 해석이 없는 출력 블록·표가 없습니다.
+- 아니오 — 1층에 결정할 사항과 승인 전 정지 상태가 빠지지 않았습니다.
+- 아니오 — 결정 카드에 버린 길과 대가가 있습니다.
+- 아니오 — 줄 위치를 들 때 그 줄의 역할을 함께 설명했습니다.
+- 아니오 — 쉽게 쓰기 위해 실패·수치·검증 공백을 빼지 않았습니다.
+- 아니오 — 초등학생용 비유로 내용을 축소하지 않았습니다.
+- 아니오 — 건너뛴 `actionlint`, 첫 Gate 흔들림, 첫 Claude 거부와 재시도를 숨기지 않았습니다.
+- 아니오 — 확인하지 못한 서버 CI와 #22를 확인된 완료처럼 쓰지 않았습니다.
 
 ### 10. 도구 제약
 
