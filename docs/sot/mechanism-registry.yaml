@@ -22,3 +22,9 @@
   stage: "ci"
   ci_mirror_job: "verify"
   required: true
+- id: "admin-phase0-plan-ci"
+  path: ".github/workflows/verify.yml"
+  target: "run: bash scripts/acceptance-admin-phase0-plan.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
