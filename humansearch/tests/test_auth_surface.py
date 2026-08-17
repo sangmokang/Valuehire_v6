@@ -2,17 +2,17 @@ from itertools import combinations
 from typing import Any
 
 import pytest
-from humansearch.auth_surface import (
+from hypothesis import given
+from hypothesis import strategies as st
+
+import humansearch
+from humansearch import (
     AuthSurfaceState,
     InvalidObservation,
     SurfaceObservation,
     SurfaceRole,
     classify_auth_surface,
 )
-from hypothesis import given
-from hypothesis import strategies as st
-
-import humansearch
 
 
 def _role_subsets() -> list[frozenset[SurfaceRole]]:
