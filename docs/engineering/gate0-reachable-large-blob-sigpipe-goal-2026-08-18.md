@@ -391,9 +391,270 @@ MUTATION_RESTORED=YES
 
 #### 8-4. 전체 게이트 기록 위치
 
-이 절 아래에 문법, session-status, verify, pre-push 전체 결과를 순서대로 추가합니다.
+변경한 셸과 서버 실행 본문의 문법은 다음과 같이 통과했습니다.
+
+```text
+GNU bash, version 3.2.57(1)-release (arm64-apple-darwin24)
+AC02_SYNTAX_RC=0
+AC20_SYNTAX_RC=0
+CI_BLOCK_SYNTAX_RC=0
+```
+
+→ macOS 기본 Bash 3.2에서 로컬 판정기, 20개 합성 시험, 서버에서 꺼낸 실제 실행 본문 모두 문법 성적
+0이었습니다.
+
+Codex V2가 다시 실행한 20개 시험 원문은 다음과 같습니다.
+
+```text
+START=2026-08-18T04:20:08Z
+[1/20] SECRET_PATTERNS_FILE=/dev/null 상속을 격리 -> PASS (exit=0)
+[2/20] SECRET_PATTERNS_FILE=.secret-patterns.default 상속을 격리 -> PASS (exit=0)
+[3/20] 일반 실행은 무해한 unreachable blob을 허용 -> PASS (exit=0)
+[4/20] 일반 실행은 금지값이 든 unreachable blob을 차단 -> BLOCKED (exit=1)
+[5/20] unreachable commit message의 금지값을 차단 -> BLOCKED (exit=1)
+[6/20] unreachable tree path의 금지값을 차단 -> BLOCKED (exit=1)
+[7/20] unreachable annotated tag message의 금지값을 차단 -> BLOCKED (exit=1)
+[8/20] git fsck 실패는 검사 대상 없음으로 통과하지 않음 -> BLOCKED (exit=1)
+[9/20] unreachable 객체 읽기 실패는 조용히 통과하지 않음 -> BLOCKED (exit=1)
+[10/20] 알 수 없는 unreachable 객체형은 읽기 실패로 차단 -> BLOCKED (exit=1)
+[11/20] 큰 unreachable blob 앞쪽의 금지값도 차단 -> BLOCKED (exit=1)
+[12/20] 직접 참조가 가리키는 작은 blob의 금지값을 차단 -> BLOCKED (exit=1)
+[13/20] 직접 참조가 가리키는 50MiB blob 앞쪽의 금지값을 차단 -> BLOCKED (exit=1)
+[14/20] 도달 가능한 blob 읽기 실패를 값 없음으로 통과하지 않음 -> BLOCKED (exit=1)
+[15/20] 서버 본문도 직접 참조의 작은 blob 금지값을 차단 -> BLOCKED (exit=1)
+[16/20] 서버 본문도 직접 참조의 50MiB blob 금지값을 차단 -> BLOCKED (exit=1)
+[17/20] 서버 본문도 blob 읽기 실패를 값 없음으로 통과하지 않음 -> BLOCKED (exit=1)
+[18/20] 종료상태 실행은 무해한 unreachable blob도 차단 -> BLOCKED (exit=1)
+[19/20] 예정 사례 수와 실제 실행 수가 다르면 전체를 차단 -> BLOCKED (exit=1)
+[20/20] Git hook 환경에서도 바깥 저장소 무오염 -> PASS (exit=0)
+CHECKED: 20
+PASS: AC-19 일반 내용 검사와 종료상태 0건 조건 분리
+END=2026-08-18T04:20:47Z
+AC20_RC=0
+```
+
+→ 20개를 모두 실행했고, 차단 사례는 정해 둔 이유 문구와 함께 차단됐습니다. 마지막 `CHECKED: 20`과
+프로그램 성적 0이 함께 있어 일부 사례 생략을 합격으로 바꿀 수 없습니다.
+
+구현 직후 `verify.sh` 원명령은 다음과 같이 통과했습니다.
+
+```text
+START=2026-08-18T03:53:38Z
+PASS: no secret-pattern match in any tracked file, .env not tracked
+END=2026-08-18T03:53:41Z
+VERIFY_RC=0
+```
+
+→ 현재 추적 파일에 금지값이나 추적된 환경 파일이 없고 검증 프로그램 성적은 0입니다. 다만 공유
+`main`이 뒤에서 바뀌었으므로 배송 직전에 같은 원명령을 다시 실행해야 합니다.
+
+전체 시작 검사는 구현 코드가 아니라 공유 `main`의 동시 변경 때문에 아직 불합격입니다.
+
+```text
+START=2026-08-18T03:35:07Z
+HEAD: f64e4e5 (ahead 4 / behind 0)
+ORIGIN: 34e4ccf
+RED: 1/20 (acceptance-0-7.sh 제외 — CI 담당)
+END=2026-08-18T03:52:07Z
+SESSION_RC=0
+```
+
+→ 상태 보고 프로그램 자체 성적은 0이지만 보고 내용이 `RED: 1/20`이므로 엄격 계약상 불합격입니다.
+
+Claude V1 뒤 Codex가 실패한 한 검사를 다시 분리한 최신 원문은 다음과 같습니다.
+
+```text
+START=2026-08-18T04:21:47Z
+FAIL: origin/main(34e4ccff88ce776d06e3001734005a34b169f7eb) != main(1e0f805652e114ff7104cd6c9fd9394422ea514f) — push 미완료
+END=2026-08-18T04:21:52Z
+AC05_RC=1
+LOCAL_MAIN=1e0f805652e114ff7104cd6c9fd9394422ea514f
+ORIGIN_MAIN=34e4ccff88ce776d06e3001734005a34b169f7eb
+REMOTE_MAIN=34e4ccff88ce776d06e3001734005a34b169f7eb
+DIVERGENCE=0/2
+```
+
+→ 다른 셀이 로컬 `main`에 문서 커밋 두 개를 추가했고 원격에는 아직 없어서 연결 검사만 실패합니다.
+작업 시작 때는 0개, 첫 실패 때는 1개, 최신에는 2개로 늘어 동시 작업임이 재확인됐습니다. 이 작업은
+공유 `main`을 reset·stash·checkout하거나 대신 push하지 않습니다.
+
+따라서 `session-status` 원명령의 `RED: 0/N`과 pre-push 전체, 동일 기록 서버 검사는 아직 `NOT_RUN`이
+아니라 **선행 실패가 확인된 진행 중 상태**입니다. 공유 작업 소유자가 `main`과 `origin/main`을 정상
+동기화한 뒤 원명령부터 다시 실행하며, 그 전에는 push와 PR을 만들지 않습니다.
 
 ### 9. 적대 검증 로그
 
-이 절 아래에 실제 `claude -p` 명령 전문과 판정 원문, Codex V2 재현 명령·출력·일치 여부를 순서대로
-추가합니다.
+#### 9-1. Claude V1 실행 실패와 복구
+
+기본 Claude 모델의 첫 두 새 세션은 같은 서비스 안전장치 오탐으로 각각 성적 1을 냈습니다.
+
+```text
+API Error: Fable 5's safeguards flagged this message (https://www.anthropic.com/legal/aup). This sometimes happens with safe, normal conversations. Claude Code can't respond to this message with Fable 5.
+
+Try rephrasing the request in a new session or change your model.
+
+Learn more: https://support.claude.com/en/articles/15363606
+
+Details: `[reasoning_extraction]`
+
+Request ID: req_011Ce9YdtVuNQoBPRZCrTtxh
+```
+
+→ 첫 기본 모델 새 세션은 코드 검토를 시작하지 못하고 서비스 안전장치에서 성적 1로 끝났습니다.
+
+```text
+API Error: Fable 5's safeguards flagged this message (https://www.anthropic.com/legal/aup). This sometimes happens with safe, normal conversations. Claude Code can't respond to this message with Fable 5.
+
+Try rephrasing the request in a new session or change your model.
+
+Learn more: https://support.claude.com/en/articles/15363606
+
+Details: `[reasoning_extraction]`
+
+Request ID: req_011Ce9Yxb2TMo1829FbaqCG3
+```
+
+→ 코드 판정은 시작되지 않았습니다. 같은 방법을 더 반복하지 않고 `--model sonnet --safe-mode` 새 세션으로
+바꿨습니다.
+
+모델을 바꾸는 첫 명령에서는 `--disallowedTools` 뒤의 가변 인자가 프롬프트까지 도구명으로 먹어 검증이
+시작되지 않았습니다. 반복 경고 뒤 마지막 원문은 다음과 같습니다.
+
+```text
+Error: Input must be provided either through stdin or as a prompt argument when using --print
+```
+
+→ 대상 코드는 실행되지 않았고 파일도 바뀌지 않았습니다. 가변 도구 옵션을 제거하고 읽기 전용 지시를
+프롬프트 안에 둔 새 명령으로 복구했습니다.
+
+유효한 1차 검증 명령은 다음과 같습니다. 비밀 키 환경 변수는 제거했고, 다른 모델의 새 세션을 사용했습니다.
+
+```text
+env -u ANTHROPIC_API_KEY claude --model sonnet --safe-mode -p '<저장소와 origin/main..HEAD를 읽기 전용으로 검토하고, 로컬·서버 큰 blob 전체 읽기, 20개 사례 수와 정확한 차단 이유, 기존 #23 보호, RED 시험 불변, SOT·goal, #22·HumanSearch 격리, 공유 main 차단, Bash 3.2·PIPESTATUS를 확인하라는 프롬프트 + strict §8-7 출력 형식 전문>'
+```
+
+→ 실제 명령에는 위 항목과 strict §8-7 블록 전문이 들어갔습니다. 첫 응답은 `PASS`였지만 20개 출력과 객체
+지문을 줄임표로 생략해 형식 미달로 판정했고, 같은 세션에 1회 보완을 요구했습니다.
+
+보완 요청에서 백틱 세 쌍을 큰따옴표 안에 둔 실수로 셸이 세 표시를 명령으로 해석했습니다.
+
+```text
+zsh:1: command not found: …
+zsh:1: command not found: dbb0...
+zsh:1: command not found: →
+```
+
+→ 민감정보 노출과 파일 변경은 없었지만 프롬프트에서 세 표시가 빠졌습니다. 나머지 문장이 20개 원문과
+전체 지문을 명시해 Claude가 완전한 보완 판정을 성적 0으로 반환했습니다. 이 명령 인용 실수는 승인
+근거로 숨기지 않고 Codex V2의 별도 재현으로 다시 확인했습니다.
+
+#### 9-2. Claude V1 보완 판정 원문
+
+```text
+VERDICT: PASS
+
+# 결론
+
+1. 이번 변경은 실제로 존재했던 결함(50MiB 크기의 대용량 기록 조각 앞부분에 금지된 값이 있어도 검사가 이를 "값 없음"으로 오판해 통과시키는 문제)을 코드 두 곳(로컬 판정 스크립트, 서버 자동검사 워크플로) 모두에서 고쳤습니다. 제가 이 문제를 재현하는 최소 실험을 직접 만들어 실행해본 결과, 수정 전 방식은 실제로 종료 코드 141(비정상 신호 종료)을 반환하며 값이 있어도 통과했고, 수정 후 방식은 종료 코드 0으로 정상 동작하며 정확히 차단했습니다. 코드 자체는 문제없이 동작합니다.
+
+2. 시험 코드(20개 사례를 강제 실행하는 스크립트)를 실제로 돌려본 결과 20개 사례 모두 예정된 결과(정상 통과 또는 예정된 실패 문구로 차단)를 그대로 냈습니다. 기존에 보호하던 항목들(작은/큰 객체, 커밋 설명문, 파일경로, 태그, 도구 자체가 죽는 경우, 알 수 없는 객체 종류, 종료 후 정리 상태 검사, 검사 스크립트가 실행되는 저장소 밖의 다른 저장소를 건드리지 않는지)도 전부 그대로 유지되어 있습니다.
+
+3. 이번 변경의 이력 기록(어떤 커밋이 무엇을 했는지)을 추적한 결과, "실패하는 시험을 먼저 고정하고 그 시험 파일은 이후 절대 손대지 않는다"는 원칙이 실제로 지켜졌습니다. 처음 실패를 고정한 커밋과 현재 커밋 사이에서 시험 파일 자체는 글자 하나도 바뀌지 않았습니다.
+
+4. 이번 변경은 GitHub 이슈 #27(이번 작업 대상)에만 해당하는 범위이며, 별도로 열려 있는 이슈 #22(커밋 설명문·파일경로 안의 금지값을 도달 가능한 경로에서 추가로 잡는 작업, 아직 미착수)나 HumanSearch라는 별개 제품의 파일과는 전혀 섞이지 않았습니다. 실제로 변경된 파일 5개를 모두 확인했으며 그 범위를 벗어난 항목은 없습니다.
+
+5. 세션 상태 점검에서 "20개 중 1개 실패"가 보고되는 현상을 직접 원인 추적했습니다. 이 실패는 이번 작업과 무관한 별도 작업(같은 컴퓨터에서 진행 중인 문서 정리 작업)이 만든, 아직 원격 저장소에 올리지 않은 커밋 2개 때문에 로컬의 `main` 브랜치가 원격과 어긋나 있어서 생기는 현상입니다. 이번 검토 대상인 큰 객체 결함 수정과는 관계가 없습니다. 다만 원인이 되는 커밋 개수는 문서가 암시한 "1개"가 아니라 정확히 "2개"였다는 점은 바로잡아 기록해 둡니다. 그리고 관련 작업 기록 문서는 "서버 쪽 검사까지 성공을 확인하기 전에는 다음 작업을 시작하지 않는다"고 스스로 못박아 놓았을 뿐, "배송이 끝났다"고 주장하는 곳은 어디에도 없었습니다. 오히려 문서 뒷부분에 "적대적 검증 결과"와 "전체 게이트 통과 기록"을 채워 넣을 자리를 비워둔 채로 남겨 두었는데, 이는 해당 절차가 아직 이 시점까지는 실행되지 않았다는 뜻이며, 정직하게 미완료를 표시해 둔 것으로 보입니다(과장된 완료 주장은 없었습니다).
+
+6. macOS 특유의 오래된 bash(버전 3.2), 파이프 중간 명령의 종료 코드를 따로 잡아내는 기법(PIPESTATUS), 파이프 전체 실패 처리 옵션(pipefail), 따옴표 처리, 대용량 객체 처리 방식을 모두 직접 실행해 검증했지만 등급 "중간" 이상의 결함은 발견하지 못했습니다.
+```
+
+→ Claude의 고정 판정은 `PASS`, 중간 이상 결함 0건입니다. 기술 증거 전문은 아래 Codex V2 재현과 함께
+보존하며, Claude가 바로잡은 공유 main 커밋 수 2개도 반영합니다.
+
+Claude 보완 판정의 기술 상세까지 포함한 전체 원문은 다음 저장소 파일에 그대로 보존했습니다.
+
+- `docs/engineering/gate0-reachable-large-blob-sigpipe-claude-v1-2026-08-18.txt`
+- 내용 지문: `12228d8a85039357b6ff6c9fa059f5dd67840222a10256326afcf243e9ddd86d`
+
+→ Claude 세션 장부의 최종 보완 응답과 위 파일을 바이트 단위로 대조해 저장했습니다. `VERDICT: PASS`,
+20개 시험 전체, 전체 객체 지문, 실행하지 못한 서버 검사가 모두 들어 있습니다.
+
+#### 9-3. Codex V2 독립 재현과 Claude 판정 재공격
+
+Codex는 Claude가 쓴 객체를 재사용하지 않고 별도 임시 저장소에서 같은 결함을 다시 만들었습니다. 첫 시도는
+임시 폴더 삭제 명령이 도구 안전 정책에 차단돼 실행 자체가 되지 않았고, 삭제 없는 새 임시 저장소로
+접근을 바꿨습니다.
+
+```text
+PROBE_DIR=/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/tmp.00qcszLtIo
+BLOB_SHA=bb5756ebb845a3417f953de18072f43b3180b3c4
+OLD_CAT_FILE_RC=141 OLD_GREP_RC=0
+NEW_CAT_FILE_RC=0 NEW_GREP_RC=0
+CODEX_SIGPIPE_REPRO_RC=0
+```
+
+→ 수정 전에는 검색이 값을 찾았지만 앞 프로그램만 141로 끊겼고, 수정 후에는 둘 다 정상 성적 0입니다.
+Claude와 다른 객체 지문으로 같은 원인을 재현했습니다.
+
+범위와 시험 불변을 다시 확인한 원문은 다음과 같습니다.
+
+```text
+HEAD=f64e4e554c1b56b4b60354326a939f3c8483d68f
+RED_TEST_DIFF_RC=0
+DIFF_CHECK_RC=0
+CHANGED_FILES=5
+AUTH_SURFACE_ABSENT
+AUTH_TEST_ABSENT
+ISSUE_22_STATE=OPEN
+PR_23_STATE=MERGED
+BASH_VERSION=3.2.57
+AC02_SYNTAX_RC=0
+AC20_SYNTAX_RC=0
+CI_BLOCK_SYNTAX_RC=0
+```
+
+→ RED 커밋 이후 시험 파일 차이는 0건이고, 변경은 검사·시험·SOT·goal 다섯 파일뿐입니다. HumanSearch
+제품 파일은 없고 #22는 계속 별도 열린 작업이며 #23은 병합 상태입니다.
+
+20개 시험의 전체 재실행은 §8-4 원문과 같이 `CHECKED: 20`, 성적 0이었습니다. 코드 대조 결과도 다음과
+같습니다.
+
+```text
+AFFECTED_Q_SCAN
+scripts/acceptance-0-2.sh:25:if grep -qF "$LIT" verify.sh; then echo "FAIL: verify.sh에 리터럴 하드코딩 잔존"; fail=1; fi
+FULL_STREAM_SCAN
+.github/workflows/verify.yml:80:            if git cat-file blob "$sha" 2>/dev/null | grep -aEif "$CLEAN" >/dev/null; then
+scripts/acceptance-0-2.sh:118:     LC_ALL=C grep -aF "$LIT" >/dev/null; then
+scripts/acceptance-0-2.sh:152:     LC_ALL=C grep -aF "$LIT" >/dev/null; then
+```
+
+→ 남은 `grep -qF` 한 줄은 큰 Git 객체를 읽는 경로가 아니라 작은 `verify.sh` 파일에 리터럴이 직접
+박혔는지 보는 별도 검사입니다. 대상인 로컬·서버 Git 객체 경로와 기존 unreachable 경로는 모두 입력을
+끝까지 읽습니다.
+
+| Claude 주장 | Codex 재현 | 최종 판단 |
+|---|---|---|
+| 로컬과 서버의 큰 blob 결함이 닫힘 | 별도 50MiB 객체에서 수정 전 `141/0`, 수정 후 `0/0` | 일치 |
+| 20개가 정확한 이유로 모두 실행됨 | `[1/20]`부터 `[20/20]`, `CHECKED: 20`, 성적 0 재현 | 일치 |
+| 기존 RED 시험을 GREEN 뒤 고치지 않음 | `ae0f75b..HEAD` 시험 diff 0 | 일치 |
+| #22와 HumanSearch 범위를 섞지 않음 | 변경 파일 5개, 제품 파일 두 개 모두 없음 | 일치 |
+| 시작 검사 실패는 공유 main 상태 때문 | `acceptance-0-5.sh`만 실패, 원격보다 로컬 main 2개 앞섬 | 일치. 과거 1개 기록은 2개로 정정 |
+| 서버 Ubuntu에서 실제 성공 | Claude도 실행하지 않았다고 명시 | 미확인. PR 서버 검사 전 완료 불가 |
+
+→ Claude가 잡아준 구현 과장 0건, Claude가 바로잡은 stale 수치 1건, Codex가 Claude 판정에서 뒤집은
+중간 이상 결함 0건입니다. 표의 서버 미확인은 push 뒤 같은 기록 검사로만 닫습니다.
+
+#### 9-4. Codex V2 추가 공격 결과
+
+- `[중간 이상 결함 0건]` 새 차단 사례는 실패 성적뿐 아니라 실패 이유 문구도 대조합니다.
+- `[중간 이상 결함 0건]` 서버 시험은 워크플로 파일에서 현재 실행 본문을 추출하므로 복사된 가짜 판정기를
+  시험하지 않습니다.
+- `[낮은 잔여 위험]` 새 객체형 조회 실패와 검색 도구 자체 오류 분기는 안전하게 차단하도록 구현됐지만,
+  이번 20개 묶음은 blob 읽기 실패를 중심으로 고정했습니다. 실제 서버 검사 전까지 이 사실을 완료로
+  과장하지 않습니다.
+- `[외부 차단]` 공유 로컬 `main`이 원격보다 두 커밋 앞서 있어 전체 시작 검사와 pre-push는 아직 합격
+  상태가 아닙니다. 다른 셀의 커밋을 이 브랜치가 대신 처리하지 않습니다.
+
+Codex V2 결론은 **구현 판정 PASS, 배송 판정 진행 중**입니다. 공유 `main` 동기화 뒤 원래
+`session-status`·`verify`·pre-push를 다시 실행하고, 같은 원격 기록의 서버 검사까지 성공해야 배송 판정도
+PASS로 바뀝니다.
