@@ -1,0 +1,36 @@
+schema_version: admin-phase0-plan-checker-hardening-audit/v1
+audited_code_head: 8ce7bfbc327be2790790ee335a5185725b25e9e4
+claude:
+  verdict: PASS
+  valid_audit_count: 1
+  invalid_audit_count: 5
+  omissions_reproduced_by_codex: 6
+  overstatements: 2
+  artifact: docs/engineering/admin-weekly-dashboard-v6-phase0-plan-checker-hardening-claude-audit-2026-08-18.md
+  artifact_sha256: 22ff12cfa1b62766a26027832aded38fbe5fdd8c7f00312b2838b5b9c20f2ee7
+codex_reproduction:
+  verdict: PASS_AFTER_FIXES
+  mutation_count: 32
+  mutations_caught: 32
+  artifact: docs/engineering/admin-weekly-dashboard-v6-phase0-plan-checker-hardening-codex-reproduction-2026-08-18.md
+  artifact_sha256: 47ccc7e59bfefb8dca46cea599d72dbe7f743c5d6138ec950c9db69792d6e1ab
+fresh_codeaudit:
+  verdict: PASS
+  p0: 0
+  p1: 0
+  p2: 1
+  artifact: docs/engineering/admin-weekly-dashboard-v6-phase0-plan-checker-hardening-fresh-codeaudit-2026-08-18.md
+  artifact_sha256: 4a67f1aae694ddfd2c649125f9443490440fc89769c90e241004712e428bf960
+  brief_lint_violations: 0
+gates:
+  new_range_diff_check_violations: 0
+  historical_full_chain_trailing_whitespace: 7
+  pre_push: PASS
+  worktree_clean_before_evidence: true
+  checker_hardening_push_allowed: true
+  semantic_audit_required: true
+  execution_permission: false
+p0_01_blockers:
+  - runner-only audit evidence authority
+  - historical full-chain diff-check blocker
+  - fresh semantic plan audit PASS
