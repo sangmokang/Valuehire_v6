@@ -114,6 +114,15 @@ fi
 # HEAD로 조용히 대체하지 않는다 — 그 폴백 자체가 방금 고친 D3 취약점을 그대로 재도입하므로
 # (P13 검사약화 탐지가 이 이유로 실제 커밋을 막아 잡아낸 결함, 2026-08-19). origin/main 참조
 # 자체를 못 찾으면 사람이 볼 수 있게 실패한다(fail-closed) — 조용히 격하하지 않는다.
+# codex(V1) D3 2차 반증(2026-08-19, 치명적): 로컬에 저장된 "origin/main"은 마지막으로 내려받은
+# 시점의 사본일 뿐이다 — 서버는 이미 새 기준으로 앞서 있는데 이 컴퓨터가 그걸 안 내려받았으면,
+# 오래된(파일이 아직 없던) 사본과 비교해 회귀 검사 자체가 통째로 생략된다. 매번 비교 직전
+# 실제로 새로 내려받는다 — `|| true`로 실패를 삼키지 않는다(fail-closed. 기존 관례인
+# acceptance-0-5.sh:85의 `git fetch ... || true`는 이 자리에서 그대로 베끼지 않는다).
+if ! git fetch --quiet origin main; then
+  echo "FAIL: git fetch origin main 실패 — 서버 최신 기준을 확인할 수 없어 안전하게 실패 처리(fail-closed). 네트워크·자격증명을 확인하라"
+  exit 1
+fi
 BASE_REF="origin/main"
 if ! git cat-file -e "$BASE_REF" 2>/dev/null; then
   echo "FAIL: $BASE_REF 참조를 찾을 수 없음 — 회귀 비교 기준이 없어 안전하게 실패 처리(fail-closed). 'git fetch origin'을 먼저 실행하라"
