@@ -22,3 +22,9 @@
   stage: "ci"
   ci_mirror_job: "verify"
   required: true
+- id: "ci-review-gate-advisory"
+  path: ".github/workflows/review-gate.yml"
+  target: "python3 scripts/review_gate.py"
+  stage: "ci"
+  ci_mirror_job: "review-gate"
+  required: true

@@ -4,7 +4,7 @@
 # 계약: docs/engineering/verify-ac-m-goal-2026-08-12.md §⑩
 #   정본: docs/engineering/verify-unification-goal-2026-08-10.md:78-81
 #   입력 : $1 = 명부 경로 (기본 docs/sot/mechanism-registry.yaml)
-#          WORKFLOW_FILE = CI 워크플로 경로 (기본 .github/workflows/verify.yml)
+#          stage:ci 항목은 각 항목의 path가 가리키는 workflow에서 job·target을 대조한다.
 #   출력 : 항목마다 PASS:/FAIL: (PASS 줄에 적용 규칙 표기), 마지막 줄 `CHECKED: <항목 수>`
 #   exit : 0 = 전부 통과 | 1 = 위반(문법 오류 포함) | 2 = NOT_RUN(명부 없음·항목 0개)
 #
@@ -19,7 +19,6 @@
 set -uo pipefail
 
 REGISTRY=${1:-docs/sot/mechanism-registry.yaml}
-WORKFLOW_FILE=${WORKFLOW_FILE:-.github/workflows/verify.yml}
 
 if [ ! -f "$REGISTRY" ]; then
   echo "NOT_RUN: 명부 없음 — $REGISTRY"
@@ -31,12 +30,6 @@ fail=0
 checked=0
 syntax_fail=0
 seen_ids=""
-
-# 워크플로의 jobs: 키 목록 (규칙 4 대조용)
-ci_jobs=""
-if [ -f "$WORKFLOW_FILE" ]; then
-  ci_jobs=$(awk '/^jobs:[[:space:]]*$/{f=1;next} f&&/^[^[:space:]]/{f=0} f&&/^  [A-Za-z0-9_-]+:[[:space:]]*$/{s=$1;sub(/:$/,"",s);print s}' "$WORKFLOW_FILE")
-fi
 
 # 값 검증 + 정제 — PV_VAL 에 결과. return 1 = 계약 밖 형태 (V1 D5: 미닫힘 따옴표·
 # 인라인 주석·따옴표 섞임을 값에 흡수한 채 조용히 통과하던 것을 여기서 끊는다).
@@ -105,11 +98,13 @@ validate_stage() {
       fi
       ;;
     ci)
+      local path_ci_jobs=""
       if [ -z "$e_ci_job" ]; then
         echo "stage:ci 인데 ci_mirror_job 누락"; return 1
       fi
-      if ! printf '%s\n' "$ci_jobs" | grep -qxF -- "$e_ci_job"; then
-        echo "ci_mirror_job '$e_ci_job' 이(가) $WORKFLOW_FILE 의 jobs: 키에 없다"; return 1
+      path_ci_jobs=$(awk '/^jobs:[[:space:]]*$/{f=1;next} f&&/^[^[:space:]]/{f=0} f&&/^  [A-Za-z0-9_-]+:[[:space:]]*$/{s=$1;sub(/:$/,"",s);print s}' "$e_path")
+      if ! printf '%s\n' "$path_ci_jobs" | grep -qxF -- "$e_ci_job"; then
+        echo "ci_mirror_job '$e_ci_job' 이(가) $e_path 의 jobs: 키에 없다"; return 1
       fi
       # V1 D1: 작업 이름만 보면 존재하지 않는 명령을 '실행 중'이라 적어도 통과한다.
       # ci 도 target 문자열이 그 워크플로 파일에 실재해야 한다(정본의 target 계약).

@@ -17,7 +17,7 @@
 
 ### CI(`​.github/workflows/verify.yml`)가 실제로 돌리는 것
 
-**워크플로 스텝 17개 전부**를 적는다(2026-08-12 V1 D6: 이전 판은 `bash ...` 직접 명령만 적어 인라인 본문 스텝이 목록에서 빠졌고, 운영자가 실제로 무엇이 도는지 잘못 판단할 수 있었다). 아래는 `verify.yml` 의 `- name:` 스텝 순서 그대로다(#6·#9 G1·#11 G2·#8 AC-M 병합 후 합집합과 #19 AC-19의 13개 합성 사례 — 2026-08-17).
+**워크플로 스텝 18개 전부**를 적는다(2026-08-12 V1 D6: 이전 판은 `bash ...` 직접 명령만 적어 인라인 본문 스텝이 목록에서 빠졌고, 운영자가 실제로 무엇이 도는지 잘못 판단할 수 있었다). 아래는 `verify.yml` 의 `- name:` 스텝 순서 그대로다(#6·#9 G1·#11 G2·#8 AC-M 병합 후 합집합과 #19 AC-19의 13개 합성 사례, #30 review-gate — 2026-08-18).
 
 | # | 스텝 이름 | 실행 내용 |
 |---|---|---|
@@ -38,10 +38,21 @@
 | 15 | 인수 검사 hs-a4 | `bash scripts/acceptance-hs-a4.sh` — 차단이 실제로 도는가 (AC-A4) |
 | 16 | 인수 검사 secret-webhook-vendor | `bash scripts/acceptance-secret-webhook-vendor.sh` — 웹훅·벤더 키 (AC-S1) |
 | 17 | 인수 검사 verify-ac-m | `bash scripts/acceptance-verify-ac-m.sh` — mechanism 명부 대조 (AC-M) |
+| 18 | 인수 검사 review-gate | `bash scripts/acceptance-review-gate.sh` — 현재 기록 명부·위험 분류·권한·서버 배선 20개 사례 (AC-30) |
 
 *(1번 앞에 `actions/checkout` 이 있고 `fetch-depth: 0` 이다 — 4번이 과거 blob 을 열려면 필요하다.)*
 
 **CI는 고정 목록이고 로컬 `pre-push`는 글로브(이름 규칙 자동 수집)다.** 그래서 새 인수 스크립트를 만들면 로컬에서는 저절로 돌지만 CI에서는 한 줄도 안 돈다 — P15③("로컬에만 있는 검사는 없는 것으로 친다")에 걸린다. **새 `scripts/acceptance-*.sh`를 추가하는 PR은 `verify.yml`과 이 표 양쪽에 자기 줄을 함께 넣어야 한다.**
+
+### 조언형 검토 판정 — `.github/workflows/review-gate.yml`
+
+`pull_request`의 `opened`, `synchronize`, `reopened`에서만 실행합니다. `contents: read` 외 권한은 없고,
+`pull_request_target`을 사용하지 않습니다. `scripts/review_gate.py`가 현재 base/head 기록을 직접 확인해
+커밋 수·파일 수·전체 파일 명부·위험도·특수 위험 신호·권장 검사를 JSON과 GitHub 화면 요약으로 냅니다.
+
+상태값은 항상 `advisory`입니다. 라벨을 읽거나 쓰지 않으며 `main` 보호도 아직 꺼져 있으므로 이 판정은
+병합을 막는 필수 검사가 아닙니다. head가 바뀌면 GitHub의 `synchronize` 사건으로 다시 실행되고, 판정 지문도
+새 head와 명부를 반영해 달라집니다. 라벨 화면 투영과 필수 검사 전환은 별도 후속 작업입니다.
 
 ### 데이터 노출 판정기 — `scripts/scan-data-exposure.sh`
 

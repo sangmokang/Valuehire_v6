@@ -171,3 +171,130 @@ RED_RC=1
 → 무엇을 시켰나: 실제 판정기나 서버 설정을 만들기 전에 합격 조건 20개를 먼저 실행했습니다.
 → 무엇이 나왔나: 잘못된 기록·0건·무오염 4개만 기존 셸 실패 특성으로 예정대로 통과했고, 구현이 필요한 16개는 실패했습니다.
 → 좋은 소식인가: 판정기·권한 제한·서버 연결이 실제로 없으면 전체 성적 1이므로, 이후 구현이 무엇을 증명해야 하는지 빨간불로 고정됐습니다.
+
+### 9-2. GREEN — 판정기·권한·서버 배선 20개 통과
+
+```text
+$ bash scripts/acceptance-review-gate.sh
+PASS: 판정기 실존 — scripts/review_gate.py
+PASS: 공백 경로를 포함한 문서 변경 1개 → 낮은 위험과 현재 head 명부
+PASS: 같은 입력 → 같은 판정 지문
+PASS: 새 커밋 → 과거 판정과 다른 head·판정 지문
+PASS: 일반 코드 변경 → 중간 위험
+PASS: 검사·계약 변경 → 높은 위험과 weakens_check
+PASS: 보안 경계 변경 → 높은 위험과 touches_security
+PASS: 데이터 경계 변경 → 높은 위험과 touches_data
+PASS: 외부 의존 경계 변경 → 높은 위험과 touches_external
+PASS: 검사 약화 문구 → 가장 높은 위험
+PASS: 검사 파일 삭제 → 가장 높은 위험
+PASS: 없는 base 기록 → NOT_RUN (exit=2)
+PASS: 없는 head 기록 → NOT_RUN (exit=2)
+PASS: base와 head가 같아 변경 0건 → NOT_RUN (exit=2)
+PASS: workflow는 세 사건·읽기 권한·현재 요청 단위 동시성만 사용
+PASS: workflow가 현재 base/head로 실제 판정기를 실행하고 화면 요약을 남김
+PASS: 판정기와 workflow에 라벨/API 쓰기 권한 없음
+PASS: 기존 verify workflow에 인수 검사 무조건 1회 배선
+PASS: 실제 작업 브랜치의 현재 head·파일 수와 판정 명부 일치
+PASS: 검사 전후 저장소 상태 동일
+CHECKED: 20
+GREEN_RC=0
+```
+
+→ 무엇을 시켰나: RED 시험을 바꾸지 않고 판정기·별도 workflow·기존 서버 검사 연결을 추가한 뒤 같은 20개를 다시 실행했습니다.
+→ 무엇이 나왔나: 정상 분류·변조·잘못된 입력·권한·배선·무오염 20개가 모두 예정대로 통과했고 성적은 0이었습니다.
+→ 좋은 소식인가: 로컬 합성 경로와 실제 작업 브랜치 호출 경로는 현재 합격입니다. 실제 GitHub 서버 실행은 push 뒤 별도로 확인해야 합니다.
+
+### 9-3. 필수 장치 명부 검사 실패와 복구
+
+최초 실패 실행은 시작·종료 시각을 별도 줄로 기록하지 못했습니다. 이 기록 누락을 숨기지 않으며,
+도구가 보고한 경과 시간과 전체 출력, 실패 커밋, 복구 뒤 원명령 재실행을 아래에 보존합니다.
+
+```text
+$ bash scripts/verify/check-mechanism-registry.sh docs/sot/mechanism-registry.yaml
+PASS: secrets-scan-precommit (pre-commit · 규칙 1·2·3)
+PASS: acceptance-glob-prepush (pre-push · 규칙 1·2·3)
+PASS: ci-secret-scan (ci · 규칙 1·2·4)
+FAIL: ci-review-gate-advisory — ci_mirror_job 'review-gate' 이(가) .github/workflows/verify.yml 의 jobs: 키에 없다
+CHECKED: 4
+RC=1
+```
+
+→ 무엇을 시켰나: 새 `review-gate.yml` 실행 줄을 장치 명부에 등록하고 실제 파일·작업 이름과 맞는지 검사했습니다.
+→ 무엇이 나왔나: 기존 검사기가 모든 서버 항목의 작업 이름을 `verify.yml` 한 파일에서만 찾아 성적 1을 냈습니다.
+→ 나쁜 소식인가: 필수 검사가 실패했으므로 완료할 수 없었습니다. 명부를 거짓으로 바꾸지 않고 검사기 복구로 전환했습니다.
+
+검사기 수정 전 커밋 `bdb0ce0`에 두 번째 workflow 자기 대조 사례를 RED로 고정했습니다.
+
+```text
+$ bash scripts/acceptance-verify-ac-m.sh
+PASS: 검사기 실존·실행가능 — scripts/verify/check-mechanism-registry.sh
+PASS: fixture 정상 명부 → 통과 (exit=0)
+PASS: fixture path 없는 항목 → 불합격 (exit=1)
+PASS: fixture 죽은 target → 불합격 (exit=1)
+PASS: id 중복 → 불합격 (exit=1)
+PASS: 알 수 없는 stage → 불합격 (exit=1)
+PASS: manual 인데 사유 없음 → 불합격 (exit=1)
+PASS: manual 정상(사유+실행권한) → 통과 (exit=0)
+PASS: manual 인데 실행권한 없음 → 불합격 (exit=1)
+PASS: ci 인데 거짓 target → 불합격 (exit=1)
+FAIL: ci 항목은 자기 path workflow의 job·target을 대조 → 통과 (기대 exit=0, 실제 1)
+PASS: 절대경로 path → 불합격 (exit=1)
+PASS: 상대경로 심볼릭 링크 → 불합격 (exit=1)
+PASS: 필드 중복(path 2회, 마지막 값 유효) → 불합격 (exit=1)
+PASS: id 뒤 인라인 주석 → 불합격 (exit=1)
+PASS: 닫히지 않은 따옴표 → 불합격 (exit=1)
+PASS: stage 불일치 필드(ci_mirror_job) → 불합격 (exit=1)
+PASS: 문법 오류·항목 0개 → 위반(1) (exit=1)
+PASS: 항목 0개 명부 → NOT_RUN (exit=2)
+PASS: ci_mirror_job 불일치 → 불합격 (exit=1)
+PASS: 필수 필드(stage) 누락 → 불합격 (exit=1)
+PASS: 빈 문자열 path → 불합격 (exit=1)
+PASS: CI 배선 — verify.yml 에 무조건 실행 스텝 정확히 1회
+PASS: 실제 명부(docs/sot/mechanism-registry.yaml) → 통과 (exit=0)
+PASS: 명부 항목 3개 = 검사기 보고 3개 (하한 3)
+PASS: 저장소 무오염 (시작/종료 상태 동일)
+CHECKED: 26
+AC_M_RED_RC=1
+```
+
+→ 무엇을 시켰나: 기존 25개 경계에 “각 서버 항목이 자기 설정 파일의 작업 이름을 읽는가” 한 사례를 더했습니다.
+→ 무엇이 나왔나: 새 사례 하나만 기대와 달랐고 전체 성적 1이었습니다. 기존 경계는 모두 유지됐습니다.
+→ 좋은 소식인가: 검사기 결함을 다른 실패에 묻지 않고 한 사례로 고정했습니다.
+
+검사기가 각 명부 항목의 `path`에서 작업 이름과 실행 줄을 함께 읽도록 최소 수정한 뒤 원명령을 다시 실행했습니다.
+
+```text
+$ bash scripts/acceptance-verify-ac-m.sh
+PASS: 검사기 실존·실행가능 — scripts/verify/check-mechanism-registry.sh
+PASS: fixture 정상 명부 → 통과 (exit=0)
+PASS: fixture path 없는 항목 → 불합격 (exit=1)
+PASS: fixture 죽은 target → 불합격 (exit=1)
+PASS: id 중복 → 불합격 (exit=1)
+PASS: 알 수 없는 stage → 불합격 (exit=1)
+PASS: manual 인데 사유 없음 → 불합격 (exit=1)
+PASS: manual 정상(사유+실행권한) → 통과 (exit=0)
+PASS: manual 인데 실행권한 없음 → 불합격 (exit=1)
+PASS: ci 인데 거짓 target → 불합격 (exit=1)
+PASS: ci 항목은 자기 path workflow의 job·target을 대조 → 통과 (exit=0)
+PASS: 절대경로 path → 불합격 (exit=1)
+PASS: 상대경로 심볼릭 링크 → 불합격 (exit=1)
+PASS: 필드 중복(path 2회, 마지막 값 유효) → 불합격 (exit=1)
+PASS: id 뒤 인라인 주석 → 불합격 (exit=1)
+PASS: 닫히지 않은 따옴표 → 불합격 (exit=1)
+PASS: stage 불일치 필드(ci_mirror_job) → 불합격 (exit=1)
+PASS: 문법 오류·항목 0개 → 위반(1) (exit=1)
+PASS: 항목 0개 명부 → NOT_RUN (exit=2)
+PASS: ci_mirror_job 불일치 → 불합격 (exit=1)
+PASS: 필수 필드(stage) 누락 → 불합격 (exit=1)
+PASS: 빈 문자열 path → 불합격 (exit=1)
+PASS: CI 배선 — verify.yml 에 무조건 실행 스텝 정확히 1회
+PASS: 실제 명부(docs/sot/mechanism-registry.yaml) → 통과 (exit=0)
+PASS: 명부 항목 4개 = 검사기 보고 4개 (하한 3)
+PASS: 저장소 무오염 (시작/종료 상태 동일)
+CHECKED: 26
+FINAL_RC=0
+```
+
+→ 무엇을 시켰나: 실패했던 원명령을 검사기 수정 뒤 그대로 다시 실행했습니다.
+→ 무엇이 나왔나: 기존 25개와 새 자기-workflow 사례까지 26개 모두 통과했고 성적은 0이었습니다.
+→ 좋은 소식인가: 필수 게이트의 임시 실패는 PASS로 승격됐고, 장치 명부도 실제 별도 workflow를 정직하게 가리킵니다.

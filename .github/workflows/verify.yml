@@ -185,3 +185,6 @@ jobs:
         # 검사기 1벌(scripts/verify/check-mechanism-registry.sh)을 로컬 pre-push
         # 글로브와 CI 가 같은 인수 스크립트로 실행한다 (판정기 2벌 금지 · P16).
         run: bash scripts/acceptance-verify-ac-m.sh
+
+      - name: 인수 검사 review-gate
+        run: bash scripts/acceptance-review-gate.sh
