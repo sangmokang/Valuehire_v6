@@ -384,6 +384,19 @@ const mutations = [
         fs.writeFileSync(file, text);
       },
     },
+    {
+      name: "ci-verify-job-quoted-if-after-unnamed-step",
+      expected: "CI verify job must not contain if",
+      apply(tempRoot) {
+        const file = path.join(tempRoot, relativePaths.workflow);
+        const text = replaceOnce(
+          fs.readFileSync(file, "utf8"),
+          "        run: bash scripts/acceptance-admin-phase0-plan.sh",
+          "        run: bash scripts/acceptance-admin-phase0-plan.sh\n\n      - uses: actions/checkout@v4\n    'if': github.event_name == 'workflow_dispatch'",
+        );
+        fs.writeFileSync(file, text);
+      },
+    },
   ];
 
 function runSelfTest(root) {
