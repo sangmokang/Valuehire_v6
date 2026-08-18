@@ -1,0 +1,229 @@
+# docs/sot/principles.yaml
+# P1의 키스톤 요구사항("principles.yaml 전 항목이 mechanism을 갖고 CI가 확인") 구현.
+# 원문(principle 필드)의 정본은 docs/sot/coding-principles.md — 표현이 갈리면 그쪽이 맞다.
+# status 값은 scripts/acceptance-principles-check.sh(AC3)가 이전 커밋 대비 회귀(등급 하락)를 차단한다.
+# 최초 작성: 2026-08-19, 실측 근거: docs/engineering/strict-principles-yaml-goal-2026-08-19.md
+
+- id: P1
+  principle: "기계 장치 없는 원칙은 삭제한다 (키스톤)"
+  mechanism_expected: "principles.yaml 전 항목이 mechanism을 갖고 CI가 확인"
+  mechanism_found: "docs/sot/mechanism-registry.yaml + scripts/verify/check-mechanism-registry.sh (pre-push+CI 등록); 본 파일 자체"
+  status: "부분"
+  evidence: "mechanism-registry.yaml은 존재하고 pre-push/CI에서 실행되나 등록 3항목뿐(secrets-scan-precommit 등). 본 파일이 P1~P22 전체를 덮는 확장판."
+
+- id: P2
+  principle: "인수 기준은 실행 가능한 명령이다"
+  mechanism_expected: "PR 본문에 검증 명령+기대 출력 없으면 CI 실패"
+  mechanism_found: null
+  status: "없음"
+  evidence: "find . -iname PULL_REQUEST_TEMPLATE* 결과 없음. PR 본문 파싱 CI job 없음."
+
+- id: P3
+  principle: "조용한 실패 금지 (3상태 PASS/FAIL/NOT_RUN)"
+  mechanism_expected: "3상태 판정 + bare except/catch 금지 lint + 핸들러 DB 기록"
+  mechanism_found: "scripts/session-status.sh, scripts/scan-data-exposure.sh 등 다수가 NOT_RUN 상태 출력"
+  status: "부분"
+  evidence: "grep 결과 다수 acceptance-*.sh에서 NOT_RUN 사용 확인. bare except/catch lint, ?? 기본값류 금지 lint는 미발견."
+
+- id: P4
+  principle: "가짜 구현 금지 (네트워크 차단 CI 레인)"
+  mechanism_expected: "외부 효과 모듈이 네트워크 차단 레인에서 반드시 실패"
+  mechanism_found: null
+  status: "없음"
+  evidence: "acceptance-hs-cleanroom*.sh 등에서 network/offline 격리 레인 전용 CI job 미발견."
+
+- id: P5
+  principle: "테스트 통과용 코드 금지"
+  mechanism_expected: "RED 이후 테스트파일 불변 검사 + 속성기반 테스트 + 뮤테이션 표본"
+  mechanism_found: "scripts/acceptance-hs-gates-mutations.sh, acceptance-hs-cleanroom-mutations.sh 등"
+  status: "부분"
+  evidence: "뮤테이션 시험 다수 존재·실행 확인(2026-08-18 PR#13 세션에서 직접 실행). 속성기반 테스트(hypothesis/fast-check)는 미발견."
+
+- id: P6
+  principle: "실행 환경은 제품의 일부"
+  mechanism_expected: "launchd plist가 저장소 경로 참조시 CI 실패 + doctor/install/reconcile/status/uninstall"
+  mechanism_found: null
+  status: "없음"
+  evidence: "plist는 저장소 밖(~/Library/LaunchAgents)이라 이 저장소 CI가 원리적으로 검사 불가. install-hooks.sh는 있으나 doctor/reconcile/uninstall 풀세트 미발견."
+
+- id: P7
+  principle: "되돌릴 수 있어야 배포다"
+  mechanism_expected: "이전 digest로 한 명령 롤백 + N-1 마이그레이션 호환 검사"
+  mechanism_found: null
+  status: "해당없음"
+  evidence: "v6에 태그 릴리스·digest 배포 파이프라인 자체가 아직 없음."
+
+- id: P8
+  principle: "단일 좌석은 lease로만 접근한다"
+  mechanism_expected: "TTL DB lease + fencing token, 오너 Chrome 점유 감지"
+  mechanism_found: null
+  status: "해당없음"
+  evidence: "3사 계정 동시접속 라이브 소싱 기능이 이 저장소 코드에 아직 없음."
+
+- id: P9
+  principle: "외부 효과는 멱등키 + readback"
+  mechanism_expected: "(position,candidate,channel) DB unique 제약 + write-ahead + readback"
+  mechanism_found: null
+  status: "해당없음"
+  evidence: "발송·DB 기능 자체가 이 저장소엔 아직 없음."
+
+- id: P10
+  principle: "사업 결과를 매일 박스 밖으로"
+  mechanism_expected: "일일 접촉 후보자 수 외부 감시자 전송, 24h 0건시 알림"
+  mechanism_found: null
+  status: "해당없음"
+  evidence: "AI Search·발송 기능이 아직 없어 보낼 사업 데이터 자체가 없음."
+
+- id: P11
+  principle: "코드 예산 (파일/PR 크기)"
+  mechanism_expected: "파일 soft300/hard600, 함수 soft60/hard100, 3000줄 초과 PR 절대금지"
+  mechanism_found: "scripts/acceptance-file-size.sh (PR#14, main 병합 완료)"
+  status: "완전"
+  evidence: "G·V1(codex)·V2(Claude) 수렴 PASS, main 병합 완료 확인(2026-08-15)."
+
+- id: P12
+  principle: "회수 — 만들기 전에 기계가 확인"
+  mechanism_expected: "capabilities.yaml 자동생성 + 미참조 export 스캔 + gitignore 산출물 포함 + session-status.sh HEAD 재확인"
+  mechanism_found: "scripts/session-status.sh (HEAD·origin 동기·RED 자동출력)"
+  status: "부분"
+  evidence: "session-status.sh는 오늘도 다회 실행 확인. capabilities.yaml 없음. gitignore 산출물 회수는 /strict 규칙 C에도 repo에도 없음(2026-08-19 확인된 갭)."
+
+- id: P13
+  principle: "검사는 약화될 수 없다"
+  mechanism_expected: "weakens-check 라벨 강제 + 억제패턴 탐지 + suppressions.yaml expiry 강제 + 자기제외 금지 + 적대검증 첨부 CI 확인"
+  mechanism_found: "hooks/pre-push (acceptance-0-7.sh 시연 [1/6][2/6][3/6])"
+  status: "완전"
+  evidence: "2026-08-18 PR#13 작업 중 bash scripts/acceptance-0-7.sh 실제 출력에서 3개 위반 시연 전부 BLOCKED 직접 확인."
+
+- id: P14
+  principle: "판정 수치는 코드가 만든다"
+  mechanism_expected: "LLM 출력→판정 필드 변환 금지 lint + 입력해시+계산함수버전 저장"
+  mechanism_found: "hooks/pre-commit:137-144 (acceptance-0-7.sh [4/6])"
+  status: "완전"
+  evidence: "동일 실행 출력에서 '[4/6] LLM 출력→판정 필드 → BLOCKED ...(P14)' 직접 확인."
+
+- id: P15
+  principle: "검증을 우회할 수 없다"
+  mechanism_expected: "작업트리 청결 확인 + revert의 테스트/검사파일 변경 차단 + expect값 변경 단독커밋 강제"
+  mechanism_found: "acceptance-0-7.sh [5/6]"
+  status: "부분"
+  evidence: "'[5/6] 미커밋 상태로 push → BLOCKED ...(P15)' 직접 확인. revert-커밋 차단, expect값 단독커밋 강제는 미발견."
+
+- id: P16
+  principle: "테스트는 런타임 동작을 검사한다"
+  mechanism_expected: ".contract.test.* 접미사 강제 + 런타임 import 필수 + 테스트/결함 상관계수 CI 계산"
+  mechanism_found: "scripts/acceptance-hs-a4.sh, scripts/hs_import_spy.py"
+  status: "완전"
+  evidence: "731줄→17줄 스텁 변조시 테스트가 실제로 깨지는지 실증하는 스크립트 + 런타임 임포트 스파이 존재·실행 확인."
+
+- id: P17
+  principle: "증거는 만든 자가 쓸 수 없다"
+  mechanism_expected: "판정서 쓰기 경로는 러너 전용 권한, 에이전트 쓰기 권한 자체 없음"
+  mechanism_found: null
+  status: "없음"
+  evidence: "현재 판정서(V1/V2 verdict) 파일은 에이전트가 Write 도구로 직접 쓸 수 있는 구조. 권한 분리 장치 없음(2026-08-18 PR#13에서 직접 목격)."
+
+- id: P18
+  principle: "위험한 동작은 금지하지 않고 능력을 없앤다"
+  mechanism_expected: "사후 가드 대신 구조적으로 불가능하게 권한·참조·토큰 회수"
+  mechanism_found: null
+  status: "미확인"
+  evidence: "설계 철학에 가까워 grep으로 존재 확인이 어려움. 구체 사례(P8)가 해당없음이라 실증 사례 미발견."
+
+- id: P19
+  principle: "외부 의존 경계는 라이브 스모크가 배송 조건"
+  mechanism_expected: "파일경로 자동분류 → 해당 PR은 라이브 스모크 1건 CI 요구"
+  mechanism_found: null
+  status: "없음"
+  evidence: "경로 기반 자동 분류 + 라이브 스모크 요구 CI job 미발견."
+
+- id: P20
+  principle: "CI는 0건 처리 통과를 스스로 의심한다"
+  mechanism_expected: "typecheck/test 스텝이 처리 건수 로그 + 최소치 미만시 FAIL"
+  mechanism_found: "scripts/acceptance-hs-gates.sh (COLLECTED: 25 로그 패턴)"
+  status: "부분"
+  evidence: "처리 건수 로그 패턴 확인('PASS: pytest collected 25 and passed'). 최소치 미달시 자동 FAIL 임계값 검사는 전수 확인 못함."
+
+- id: P21
+  principle: "데이터는 git에 넣지 않는다"
+  mechanism_expected: "1MB 초과 데이터 파일 pre-commit 차단"
+  mechanism_found: "hooks/pre-commit:183,202"
+  status: "완전"
+  evidence: "MAX_BYTES=1048576(183행), block '1MB 초과 파일...(P21)'(202행) 원문 확인."
+
+- id: P22
+  principle: "하드코딩 금지 + 자격증명은 소스·화면 모두 금지"
+  mechanism_expected: "운영상수 contracts/*.json 단일화 + JSX 렌더 대상까지 자격증명 검사"
+  mechanism_found: "contracts/cleanroom-deny-patterns.txt, contracts/portal-constants-deny-patterns.txt"
+  status: "부분"
+  evidence: "contracts/ 기반 금지패턴 파일 존재 확인. 운영상수 전면 단일화·JSX 렌더 전용 검사는 별도 미확인."
+
+- id: "§1-B-1"
+  principle: "셀렉터는 코드가 아니라 데이터다"
+  mechanism_expected: "contracts/*/markers.json 단일화"
+  mechanism_found: "contracts/*.txt (deny-patterns류, 동일 사상)"
+  status: "부분"
+  evidence: "정확히 markers.json 이름은 없으나 contracts/ 디렉터리에 데이터 파일로 패턴을 두는 동일 사상 파일 존재(PR#13이 이 계열 작업)."
+
+- id: "§1-B-2"
+  principle: "판정기는 하나다 (자동로그인·증거캡처 동일 함수)"
+  mechanism_expected: null
+  mechanism_found: null
+  status: "미확인"
+  evidence: "소스 전체 확인이 필요해 이번 조사 범위에서 미확인으로 남김."
+
+- id: "§1-B-3"
+  principle: "브라우저 계층은 한 벌이다"
+  mechanism_expected: null
+  mechanism_found: null
+  status: "미확인"
+  evidence: "동일 사유로 미확인."
+
+- id: "§1-B-4"
+  principle: "테스트는 실캡처 스냅샷으로만"
+  mechanism_expected: null
+  mechanism_found: null
+  status: "미확인"
+  evidence: "동일 사유로 미확인."
+
+- id: "§1-B-5"
+  principle: "개입 감지는 구조로 (드라이버 포트 감싸기)"
+  mechanism_expected: null
+  mechanism_found: null
+  status: "미확인"
+  evidence: "동일 사유로 미확인."
+
+- id: V-1
+  principle: "검증자는 실행 산출물을 제출한다"
+  mechanism_expected: "/strict §5"
+  mechanism_found: "~/.claude/skills/strict/SKILL.md §5 — codex 실행 산출물(판정 파일) 수령·확인 체계"
+  status: "완전"
+  evidence: "2026-08-18 PR#13에서 codex-rescue 에이전트 실제 실행, 실행 로그·재현 명령 포함 판정 파일 수령·재현 확인."
+
+- id: V-2
+  principle: "V1은 다른 모델 계열, V2는 재현 전담"
+  mechanism_expected: "/strict §6"
+  mechanism_found: "~/.claude/skills/strict/SKILL.md §6"
+  status: "완전"
+  evidence: "2026-08-18 codex(V1) FAIL 판정을 Claude(V2)가 동일 스크립트 재실행으로 재현·반박한 실제 사례."
+
+- id: V-3
+  principle: "V3 = 라이브 1건, 기계 영수증 없이 완료 없음"
+  mechanism_expected: "make ship 거부"
+  mechanism_found: null
+  status: "부분"
+  evidence: "'make ship' 명령 자체는 이 저장소에 없음(make/npm 레포 아님). pre-push+CI가 유사 역할 수행하나 이름 그대로의 강제 명령은 없음."
+
+- id: V-4
+  principle: "외부 모델 의견은 가설, 로컬 재현 전까지 결함 아님"
+  mechanism_expected: "문서 규약 + PR 템플릿"
+  mechanism_found: null
+  status: "부분"
+  evidence: "PR 템플릿 자체는 없음(P2와 동일 갭). 2026-08-18 세션에서 원칙대로 행동한 실천 사례는 있으나 문서화된 강제 장치는 없음."
+
+- id: V-5
+  principle: "G·V1·V2가 갈리면 결론 내지 않는다"
+  mechanism_expected: "/strict 기존 규칙"
+  mechanism_found: "~/.claude/skills/strict/SKILL.md §6.5"
+  status: "완전"
+  evidence: "명문화돼 있고, 2026-08-18 codex FAIL vs Claude PASS 재현이 갈렸을 때 원인 규명 후 정정하는 방식으로 실제 적용."
