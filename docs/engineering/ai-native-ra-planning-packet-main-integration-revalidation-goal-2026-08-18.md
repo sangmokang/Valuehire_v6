@@ -166,3 +166,140 @@ RED: 1/20 (acceptance-0-7.sh 제외 — CI 담당)
 ## 실행 증거 및 적대 검증 로그
 
 이 절에는 결합 뒤 실행한 원명령, 전체 출력, 프로그램 성적, Claude V1 원문, Codex V2 재현을 순서대로 덧붙입니다. 필수 항목에 실행 전 상태를 남긴 채 완료로 바꾸지 않습니다.
+
+### 결합 결과
+
+```text
+0f8541e start main/origin/main
+0e34b89 Establish the proof boundary before integrating the RA packet
+f8e031b Preserve the reviewed AI-native RA plan before owner decisions
+source packet: 39a3c5302cb29c2cd25147c4f4a5880e804cfb70
+source/result stable patch-id: 939e1f771ccf7e3867d1b712034c4a428a5c737c
+source/result stat: 39 files changed, 3917 insertions(+)
+```
+
+→ 목표 문서가 먼저 기록됐고, 기획 패킷은 충돌 없이 그 뒤에 같은 내용 지문과 같은 파일 수로 결합됐습니다.
+
+### 시작 자격 실패 복구
+
+첫 `session-status.sh`는 `RED: 1/20`이었습니다. 20개 원명령을 이름별로 다시 실행해 다음 한 건을 찾았습니다.
+
+```text
+DIAG FAIL ./scripts/acceptance-0-2.sh exit=2
+FAIL: .secret-patterns 없음/빈 파일 — AC 판정 불가
+DIAG SUMMARY total=20 failed=1
+```
+
+→ 새 작업공간에 저장소가 무시하는 로컬 전용 패턴 파일이 없어 검사가 시작되지 못한 것이 원인이었습니다. 기본 작업공간의 기존 파일 내용을 출력하거나 복사하지 않고, `.gitignore:21`이 무시하는 같은 로컬 파일을 가리키는 연결만 만들었습니다.
+
+원명령 재실행:
+
+```text
+PASS: 0-2 — 히스토리·객체·reflog·docs 리터럴 0건, 스캐너 뮤테이션 검출 확인
+ACCEPTANCE_0_2_RECOVERY_EXIT=0
+
+HEAD: f8e031b (ahead 2 / behind 1)
+ORIGIN: 34e4ccf
+RED: 0/20 (acceptance-0-7.sh 제외 — CI 담당)
+```
+
+→ 검사 환경 문제는 원명령 합격과 최종 실패 0/20으로 복구됐습니다. 다만 이 출력은 공식 기준이 시작보다 한 기록 이동했다는 별도 차단도 함께 보여줍니다.
+
+### 문서 계약과 반대 시험
+
+```text
+PASS planning_packet goal=1 plan=1 prompts=28 required_sections=11 atomic_commands=28 p00a_owned_artifacts=3 links=all-present
+AC_PLAN_NORMAL_EXIT=0
+AC_PLAN_COUNTER_EXIT=1
+P00A_OWNED_ARTIFACT_COUNT=3
+CONFLICT_MARKER_GREP_EXIT=1 (expected 1=no matches)
+```
+
+→ 정상 문서 묶음은 합격했고 P00A 자기 검사 소유권 한 줄만 제거한 임시 사본은 의도대로 불합격했습니다. P00A의 세 산출물과 충돌 표시 0건도 재확인했습니다.
+
+28개 읽기 전용 검색:
+
+```text
+SUMMARY prompts=28 goal_required_but_not_owned=27 script_exact_required_but_not_owned=27 script_generic_wording_requires_interpretation=2
+```
+
+→ 전체 28개를 읽었고 기존 후보 수 27·27·2가 그대로 재현됐습니다. 이 27개 문서는 수정하지 않았습니다.
+
+### 최신 검증 정본 실행 결과
+
+| 단계 | 결과 |
+|---|---|
+| 1 비밀 검사 | 작업 내용·인덱스 기준 모두 PASS |
+| 2 HumanSearch 경계 8종 | 검사 55, 변조 10/10, 경로·주소·환경 검사 전부 PASS |
+| 3 HumanSearch 테스트 3종 | ruff 2파일, mypy 2파일, pytest 1개, 변조 6/6, 위조 방지 3/3 PASS |
+| 4 과거 기록 전량 | 객체 2,082개 중 blob 680개 검사, 일치 0건 PASS |
+| 5 AC-19 | 합성 사례 13/13 기대대로 차단·허용, PASS |
+| 6 가짜 검사 잔존 | PASS |
+| 7 훅 위반 시연 | 6/6 모두 훅이 차단, PASS |
+| 8 기준 브랜치 전용 연결 검사 | 서버에서는 작업 브랜치라 실행 대상 아님. 로컬 원명령은 세션 검사에서 PASS |
+| 9 억제 만료 | 4건 모두 유효, PASS |
+| 10 훅 존재 | 2종 존재·실행 가능, PASS |
+| 11 셸 문법 | 추적 셸 파일 27개 PASS |
+| 12 기본 패턴 실값 | 0건, PASS |
+| 13 세션 자격증명 | 25개 검사 PASS |
+| 14 데이터 노출 | 추적 153개·과거 blob 684개·자료 파일 0개, 위반 0건 PASS |
+| 15 데이터 차단 인수 | 30개 검사 PASS |
+| 16 웹훅·벤더 키 | 32개 검사 PASS |
+| 17 검사 장치 명부 | 25개 검사, 명부 3개 대응 PASS |
+
+→ 정본의 17개 단계 가운데 이 작업 브랜치에서 서버 실행 대상인 16개를 모두 같은 명령으로 실행했습니다. 기준 브랜치 전용 1개는 정본 조건상 서버 실행 대상이 아니지만, 그 원명령은 세션 상태 20개 검사 안에서 직접 통과했습니다. “서버 17개가 전부 실행됐다”고 과장하지 않습니다.
+
+### Claude V1
+
+첫 Fable 호출은 안전 필터가 요청을 오인해 성적 1로 끝났고 검증으로 세지 않았습니다. Sonnet 안전 모드 재호출은 실제 작업공간과 명령을 직접 읽어 다음 판정을 냈습니다. 실행 프롬프트와 판정 보존본은 `docs/engineering/ai-native-ra-planning-packet-main-integration-revalidation-claude-v1-2026-08-18.md`에 있습니다.
+
+```text
+VERDICT: FAIL
+미해결 BLOCKER 수: 1건.
+BLOCKER: start main/origin/main 0f8541e != current main/origin/main 34e4ccf
+문서 결합·패치 동일성·AC-PLAN-1·반대 시험·P00A 세 산출물·RED 0/20: 결함 없음
+```
+
+→ Claude는 결합 내용 자체가 아니라 종료 기준 이동 한 건 때문에 최신 기준 재검증이 필요하다고 판정했습니다.
+
+### Codex V2 — Claude 판정 재공격
+
+```text
+HEAD=f8e031b7f5d13b4bd72e30d5240e1ff3d5e2983c
+HEAD^=0e34b892fdf21f9a03a61dc913a8931a86f0159e
+HEAD^^=0f8541ef7f56fdf43f12f90c81ec4bd1b0233711
+main=origin/main=34e4ccff88ce776d06e3001734005a34b169f7eb
+source/result patch-id=939e1f771ccf7e3867d1b712034c4a428a5c737c
+source/result stat=39 files changed, 3917 insertions(+)
+git diff --check=0
+conflict marker grep=1 (matches 0)
+start..new-main=1 commit, one added document
+packet/new-main path intersection=0
+SOT rows=17, workflow named steps=17
+session-status RED=0/20
+```
+
+→ V2가 Claude의 기준 이동·패치 동일성·검사 수·청결 주장 모두를 다시 재현했습니다. 새 기준의 한 문서와 기획 패킷 경로가 겹치지 않는다는 사실도 맞지만, 사용자가 정한 종료 불변 조건을 없애지는 못합니다.
+
+| Claude 지적 | V2 재현 | 최종 판정 |
+|---|---|---|
+| 기준이 `0f8541e`에서 `34e4ccf`로 이동 | 두 기준 지문 직접 재조회 | 일치, 미해결 차단 1건 |
+| 기획 패킷은 변형 없이 결합 | 같은 내용 지문·39파일·3917줄 | 일치 |
+| 문서 계약과 반대 시험 정상 | 정상 0, 누락 사본 1 | 일치 |
+| P00A 제품 산출물은 만들지 않음 | 해당 결정 문서·자기 검사 검색 0건 | 일치 |
+| 17단계 중 1개는 기준 브랜치 전용 | 정본과 workflow 같은 조건 | 일치, 표현 주의 |
+| 인라인 단계는 V1에서 미실행 | Codex가 9~12를 포함해 직접 실행 | V1 누락 보완, 새 결함 없음 |
+
+→ Claude가 잡아준 Codex 과장은 0건이고, Codex가 Claude 판정에서 바로잡은 결함 과장도 0건입니다. V1이 직접 실행하지 않은 인라인 네 단계는 V2가 이미 실행한 원문 출력으로 보완했습니다.
+
+### 최종 상태
+
+```text
+START_MAIN=0f8541ef7f56fdf43f12f90c81ec4bd1b0233711
+CURRENT_MAIN=34e4ccff88ce776d06e3001734005a34b169f7eb
+CURRENT_ORIGIN_MAIN=34e4ccff88ce776d06e3001734005a34b169f7eb
+UNRESOLVED_BLOCKERS=1
+STATUS=REVALIDATION_REQUIRED
+```
+
+→ 기획 패킷 결합 트리는 검사상 깨끗하지만 시작 기준이 바뀌었으므로 이번 작업은 완료가 아니라 최신 기준 재검증 필요 상태입니다. P00A로 넘어가지 않습니다.
