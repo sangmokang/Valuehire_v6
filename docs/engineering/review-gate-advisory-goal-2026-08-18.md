@@ -137,3 +137,37 @@ https://github.com/sangmokang/Valuehire_v6/issues/30
 ## 8. 적대 검증 로그
 
 구현과 원검증이 끝난 뒤 `claude -p` 전체 명령·판정 원문과 Codex 재현 명령·일치 표를 이 절에 그대로 추가합니다.
+
+## 9. RED → GREEN 실행 로그
+
+### 9-1. RED — 판정기·서버 배선이 없어서 실패
+
+```text
+$ bash scripts/acceptance-review-gate.sh
+FAIL: 판정기 없음 — scripts/review_gate.py
+FAIL: 문서 변경 판정 불일치 (exit=2)
+FAIL: 같은 입력의 판정 지문이 달라짐
+FAIL: 새 커밋이 과거 판정을 무효화하지 못함
+FAIL: 일반 코드 변경 위험도 불일치
+FAIL: 검사·계약 변경 신호 불일치
+FAIL: 보안 경계 신호 불일치
+FAIL: 데이터 경계 신호 불일치
+FAIL: 외부 의존 경계 신호 불일치
+FAIL: 검사 약화 문구를 가장 높은 위험으로 올리지 못함
+FAIL: 검사 파일 삭제를 가장 높은 위험으로 올리지 못함
+PASS: 없는 base 기록 → NOT_RUN (exit=2)
+PASS: 없는 head 기록 → NOT_RUN (exit=2)
+PASS: base와 head가 같아 변경 0건 → NOT_RUN (exit=2)
+FAIL: workflow 사건·권한·동시성 계약 위반
+FAIL: workflow 실제 판정기 배선 없음
+FAIL: 라벨/API 쓰기 경로가 있거나 파일이 없음
+FAIL: 기존 verify workflow 인수 검사 배선 불일치 (실행 줄 0회)
+FAIL: 실제 작업 브랜치 명부 불일치 (exit=2, git=1, manifest=)
+PASS: 검사 전후 저장소 상태 동일
+CHECKED: 20
+RED_RC=1
+```
+
+→ 무엇을 시켰나: 실제 판정기나 서버 설정을 만들기 전에 합격 조건 20개를 먼저 실행했습니다.
+→ 무엇이 나왔나: 잘못된 기록·0건·무오염 4개만 기존 셸 실패 특성으로 예정대로 통과했고, 구현이 필요한 16개는 실패했습니다.
+→ 좋은 소식인가: 판정기·권한 제한·서버 연결이 실제로 없으면 전체 성적 1이므로, 이후 구현이 무엇을 증명해야 하는지 빨간불로 고정됐습니다.
