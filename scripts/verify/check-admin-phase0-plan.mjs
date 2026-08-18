@@ -423,6 +423,46 @@ const mutations = [
         fs.writeFileSync(file, text);
       },
     },
+    {
+      name: "ci-pull-request-trigger-removed",
+      expected: "CI workflow SHA-256 does not match the pinned checker workflow",
+      apply(tempRoot) {
+        const file = path.join(tempRoot, relativePaths.workflow);
+        const text = replaceOnce(fs.readFileSync(file, "utf8"), "  pull_request:\n", "");
+        fs.writeFileSync(file, text);
+      },
+    },
+    {
+      name: "ci-verify-needs-skipped-decoy",
+      expected: "CI workflow SHA-256 does not match the pinned checker workflow",
+      apply(tempRoot) {
+        const file = path.join(tempRoot, relativePaths.workflow);
+        let text = replaceOnce(
+          fs.readFileSync(file, "utf8"),
+          "jobs:\n  verify:",
+          "jobs:\n  decoy:\n    if: ${{ false }}\n    runs-on: ubuntu-latest\n    steps:\n      - run: true\n\n  verify:",
+        );
+        text = replaceOnce(
+          text,
+          "        run: bash scripts/acceptance-admin-phase0-plan.sh",
+          "        run: bash scripts/acceptance-admin-phase0-plan.sh\n\n      - uses: actions/checkout@v4\n    needs: decoy",
+        );
+        fs.writeFileSync(file, text);
+      },
+    },
+    {
+      name: "ci-phase0-custom-shell-short-circuit",
+      expected: "CI workflow SHA-256 does not match the pinned checker workflow",
+      apply(tempRoot) {
+        const file = path.join(tempRoot, relativePaths.workflow);
+        const text = replaceOnce(
+          fs.readFileSync(file, "utf8"),
+          "        run: bash scripts/acceptance-admin-phase0-plan.sh",
+          "        run: bash scripts/acceptance-admin-phase0-plan.sh\n        shell: bash -c 'exit 0' {0}",
+        );
+        fs.writeFileSync(file, text);
+      },
+    },
   ];
 
 function runSelfTest(root) {
