@@ -77,9 +77,9 @@
 - id: P11
   principle: "코드 예산 (파일/PR 크기)"
   mechanism_expected: "파일 soft300/hard600, 함수 soft60/hard100, 3000줄 초과 PR 절대금지"
-  mechanism_found: "scripts/acceptance-file-size.sh (PR#14, main 병합 완료)"
-  status: "완전"
-  evidence: "G·V1(codex)·V2(Claude) 수렴 PASS, main 병합 완료 확인(2026-08-15)."
+  mechanism_found: "scripts/acceptance-file-size.sh (task/file-size-gate 브랜치에만 존재, main·본 브랜치엔 없음)"
+  status: "부분"
+  evidence: "codex(V1) 2026-08-19 재현: origin/main·현재 브랜치 양쪽에 scripts/acceptance-file-size.sh 부재 확인(git cat-file -e 실패). G·V1·V2 수렴 PASS 기록은 실재하나 아직 main에 병합되지 않아 현재 운영 코드는 아님 — 이전 판정(완전)은 과장이었음."
 
 - id: P12
   principle: "회수 — 만들기 전에 기계가 확인"
@@ -112,9 +112,9 @@
 - id: P16
   principle: "테스트는 런타임 동작을 검사한다"
   mechanism_expected: ".contract.test.* 접미사 강제 + 런타임 import 필수 + 테스트/결함 상관계수 CI 계산"
-  mechanism_found: "scripts/acceptance-hs-a4.sh, scripts/hs_import_spy.py"
-  status: "완전"
-  evidence: "731줄→17줄 스텁 변조시 테스트가 실제로 깨지는지 실증하는 스크립트 + 런타임 임포트 스파이 존재·실행 확인."
+  mechanism_found: "scripts/acceptance-hs-a4.sh, scripts/hs_import_spy.py (런타임 import 요구 1개만 확인)"
+  status: "부분"
+  evidence: "codex(V1) 2026-08-19 재현: 런타임 임포트 스파이는 실행 확인됨. 그러나 .contract.test.* 접미사 강제 lint, 테스트/결함 상관계수 CI 계산 장치는 저장소에서 찾지 못함 — 요구 3개 중 1개만 충족, 이전 판정(완전)은 과장이었음."
 
 - id: P17
   principle: "증거는 만든 자가 쓸 수 없다"
