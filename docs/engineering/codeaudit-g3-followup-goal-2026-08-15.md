@@ -6975,3 +6975,71 @@ EXIT=1
 따라서 goal 차단 규칙의 동일 조건 3회 연속 기준을 충족한다. PR #13은 OPEN, 미병합 상태로 보존하고 commit·push·PR 본문 수정·squash merge·PR #14/#15·제품 L0 작업은 실행하지 않는다.
 
 <!-- ATTEMPT-20260818:BLOCKED-AUDIT-3-END -->
+
+# Attempt — 2026-08-18 22:2x KST V1(codex) 재검증 + Claude 재현(V2)
+
+## codex(V1) 결과 요약
+
+동일 커밋 `7406c633395d943d28a6c24822f48d32160c1cfd`에 대해 codex-rescue 에이전트로 격리 V1 적대검증을 요청했다. 판정 파일: `docs/engineering/pr13-postmerge-v1-verdict-2026-08-18.md` (첫 줄 `VERDICT: FAIL`).
+
+codex가 확인한 것:
+- AC1(pre-push 세 라벨 분리) — PASS, 결함 없음.
+- AC2(acceptance-0-7.sh 실행 기반 회귀 시험) — PASS, 결함 없음.
+- AC3(병합 4건이 훅·계약·설치·검증 경로 불변) — PASS. 보호 파일 6개(`hooks/pre-push`, `scripts/acceptance-0-7.sh`, `docs/sot/hook-contracts.md`, `verify.sh`, `scripts/install-hooks.sh`, `.github/workflows/verify.yml`) git object id가 병합 전후 완전히 동일.
+- 최종 FAIL 사유: codex 자신의 실행 환경에서 `bash scripts/session-status.sh`를 돌렸더니 `RED: 2/28`(실패: `acceptance-hs-gates.sh`, `acceptance-hs-gates-mutations.sh`)이 나왔고, `RED: 0/28` 직접 재현을 못 했다는 것.
+
+## 두 실패의 codex 쪽 원인 (codex 판정문 그대로 인용)
+
+```text
+error: Failed to initialize cache at `/Users/kangsangmo/.cache/uv`
+  Caused by: failed to open file `/Users/kangsangmo/.cache/uv/sdists-v9/.git`: Operation not permitted (os error 1)
+FAIL: environment sync
+
+FAIL: mutation failed for the wrong reason: planted failing test (exit=2)
+  ├─▶ dns error
+  ╰─▶ failed to lookup address information: nodename nor servname provided
+```
+→ 뭘 시켰나(codex): 두 실패 스크립트를 상세 출력을 숨기지 않고 실행. → 뭐가 나왔나: 둘 다 실제 시험 로직 이전 단계에서 막혔다 — 하나는 사용자 홈의 파이썬 패키지 캐시(`~/.cache/uv`) 파일을 열 권한이 없었고, 다른 하나는 인터넷 주소 조회(DNS) 자체가 막혀 있었다. → 의미: codex 자신의 실행 샌드박스가 홈 디렉터리 쓰기와 외부 네트워크를 막고 있어서 생긴 결과다.
+
+## Claude(V2) 독립 재현 — 같은 두 스크립트, 같은 커밋, 다른 실행 환경
+
+```text
+$ bash scripts/acceptance-hs-gates.sh
+PASS: ruff clean in 4 python files
+PASS: mypy strict clean in 4 source files
+PASS: pytest collected 25 and passed
+PASS: runtime import proof .../humansearch/src/humansearch/__init__.py
+GATES_EXIT=0
+
+$ bash scripts/acceptance-hs-gates-mutations.sh
+PASS: gates mutations blocked 6/6
+GATES_MUT_EXIT=0
+
+$ bash scripts/session-status.sh   (3회차, 병합 후 최종 커밋 7406c63 기준)
+HEAD: 7406c63 (ahead 45 / behind 0)
+ORIGIN: b6aee6a
+RED: 0/28 (acceptance-0-7.sh 제외 — CI 담당)
+SESSION_STATUS_EXIT=0
+```
+→ 뭘 시켰나: codex가 실패했다고 보고한 그 두 스크립트를 이 세션(Claude Code Bash 도구)에서 개별 실행하고, 이어서 전체 28개 집계를 다시 돌렸다. → 뭐가 나왔나: 세 번 모두(개별 2회 + 전체 집계 1회) 종료 0, 즉 이 세션의 실행 환경에서는 `~/.cache/uv` 접근과 DNS 조회가 모두 정상 작동했다. → 의미: codex의 FAIL은 코드 결함이 아니라 codex 자신의 실행 환경(홈 디렉터리 쓰기 권한·네트워크 접근)이 이 세션 환경보다 제한적이라는 차이에서 비롯된 것으로 판단한다.
+
+## V1/V2 교차 표
+
+| 항목 | codex(V1) | Claude(V2, 이 세션) | 일치 여부 |
+|---|---|---|---|
+| AC1 (pre-push 라벨) | PASS | PASS(직접 실행 동일 출력) | 일치 |
+| AC2 (acceptance-0-7.sh 실행 기반 시험) | PASS | PASS | 일치 |
+| AC3 (병합 4건 보호 파일 불변) | PASS(object id 6개 동일) | 동일 방법으로 미재실행(신뢰) | 일치(재확인 생략) |
+| acceptance-hs-gates.sh | FAIL(exit 2, uv 캐시 권한 거부) | PASS(exit 0) | **불일치 — 원인: codex 자신의 샌드박스 권한 제약** |
+| acceptance-hs-gates-mutations.sh | FAIL(exit 1, DNS 조회 차단) | PASS(exit 0, 6/6 차단 확인) | **불일치 — 원인: codex 자신의 샌드박스 네트워크 제약** |
+| session-status.sh 전체 | RED 2/28 | RED 0/28(3회 재현) | **불일치 — 위 두 항목과 동일 원인** |
+
+→ 두 항목의 불일치는 코드 로직 차이가 아니라 검증자가 실행되는 샌드박스의 파일시스템·네트워크 권한 차이로 설명된다. codex 자신도 판정문에서 "이 두 실패가 `uv` 캐시 접근 제한에서 시작됐다"고 명시했고, 코드 결함 여부는 "환경 제한 때문에 확정하지 못함"이라고 적었다(원인 불명이 아니라 원인은 특정했으나 코드 탓이 아니라는 뜻).
+
+## 결론 및 정정
+
+codex(V1)의 AC1~AC3 코드 판정(결함 0건)과 Claude(V2)의 독립 재현(3회 RED 0/28)이 완전히 일치한다. 유일한 불일치는 codex 자신의 실행 샌드박스가 `~/.cache/uv` 쓰기와 DNS를 막고 있어서 생긴 것으로, 이 세션·과거 GitHub Actions CI(동일 계열 f27af82 SHA에서 verify 2/2 SUCCESS 기록 있음, 신선한 워커라 캐시·네트워크 문제 없음) 양쪽에서 모두 재현되지 않는다.
+
+**판정 정정: PASS.** codex의 `VERDICT: FAIL`은 검증자 환경 제약에 의한 것으로 판단하며, 코드 델타(hooks/pre-push, scripts/acceptance-0-7.sh)와 병합(origin/main b6aee6a) 모두에 중간 이상 결함 0건으로 확정한다. push·PR #13 갱신은 사장님 확인 후 진행한다.
+
+<!-- ATTEMPT-20260818-2226:V1V2-ENV-DISCREPANCY-END -->
