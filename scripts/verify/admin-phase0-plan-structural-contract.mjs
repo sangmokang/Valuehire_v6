@@ -177,7 +177,7 @@ function parseVerifySteps(workflow) {
   const verifyIndex = lines.findIndex((line) => /^  verify:\s*$/.test(line));
   if (verifyIndex < 0) return { steps: [], verifyFound: false, stepsFound: false, jobIfFound: false };
   const nextJobIndex = lines.findIndex(
-    (line, index) => index > verifyIndex && /^  [A-Za-z0-9_-]+:\s*$/.test(line),
+    (line, index) => index > verifyIndex && /^  [A-Za-z0-9_-]+:\s*(?:#.*)?$/.test(line),
   );
   const verifyEnd = nextJobIndex < 0 ? lines.length : nextJobIndex;
   const jobIfFound = lines
