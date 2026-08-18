@@ -397,6 +397,19 @@ const mutations = [
         fs.writeFileSync(file, text);
       },
     },
+    {
+      name: "ci-verify-steps-moved-to-commented-decoy-job",
+      expected: "CI verify job must contain steps",
+      apply(tempRoot) {
+        const file = path.join(tempRoot, relativePaths.workflow);
+        const text = replaceOnce(
+          fs.readFileSync(file, "utf8"),
+          "  verify:\n    runs-on: ubuntu-latest\n    steps:",
+          "  verify:\n    runs-on: ubuntu-latest\n\n  decoy: # evade job boundary\n    runs-on: ubuntu-latest\n    steps:",
+        );
+        fs.writeFileSync(file, text);
+      },
+    },
   ];
 
 function runSelfTest(root) {
