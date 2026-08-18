@@ -410,6 +410,19 @@ const mutations = [
         fs.writeFileSync(file, text);
       },
     },
+    {
+      name: "ci-bash-env-short-circuit",
+      expected: "CI workflow must not define BASH_ENV",
+      apply(tempRoot) {
+        const file = path.join(tempRoot, relativePaths.workflow);
+        const text = replaceOnce(
+          fs.readFileSync(file, "utf8"),
+          "        run: bash scripts/acceptance-admin-phase0-plan.sh",
+          "        run: bash scripts/acceptance-admin-phase0-plan.sh\n        env:\n          BASH_ENV: scripts/short-circuit.sh",
+        );
+        fs.writeFileSync(file, text);
+      },
+    },
   ];
 
 function runSelfTest(root) {
