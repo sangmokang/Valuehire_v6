@@ -658,3 +658,103 @@ scripts/acceptance-0-2.sh:152:     LC_ALL=C grep -aF "$LIT" >/dev/null; then
 Codex V2 결론은 **구현 판정 PASS, 배송 판정 진행 중**입니다. 공유 `main` 동기화 뒤 원래
 `session-status`·`verify`·pre-push를 다시 실행하고, 같은 원격 기록의 서버 검사까지 성공해야 배송 판정도
 PASS로 바뀝니다.
+
+#### 9-5. 공유 main 불일치의 비침범 복구
+
+공유 `main` 소유 작업이 계속 실행 중인 사실을 확인했습니다.
+
+```text
+PROCESS=RUNNING
+COMMAND=codex position-map P0 implementation
+LOCAL_MAIN=1e0f805652e114ff7104cd6c9fd9394422ea514f
+ORIGIN_MAIN=34e4ccff88ce776d06e3001734005a34b169f7eb
+DIVERGENCE=0/2
+```
+
+→ 두 커밋을 되돌리거나 대신 push하면 다른 작업을 침범합니다. 기다리기만 하는 대신 원격에서 격리된
+검증 복제본을 만들고, 이 브랜치 기록만 가져와 원래 명령을 실행했습니다.
+
+격리 복제본의 자격은 다음과 같습니다.
+
+```text
+HEAD=332bbbaa2da1f25c3e07a229a1f728b672f70b3d
+MAIN=34e4ccff88ce776d06e3001734005a34b169f7eb
+ORIGIN_MAIN=34e4ccff88ce776d06e3001734005a34b169f7eb
+HOOKS=hooks
+```
+
+→ 구현·시험·적대검증 증거가 든 당시 최종 브랜치 기록을 그대로 가져왔고, 검증 복제본의 로컬 main과
+원격 main은 같습니다. 공유 루트의 ref·파일·프로세스는 바꾸지 않았습니다.
+
+먼저 기존 실패 원명령을 다시 실행했습니다.
+
+```text
+START=2026-08-18T04:37:08Z
+PASS: 0-5 완료 — CI 비밀스캔 강제 + push 완료 + 원격 트리 비밀 0건
+END=2026-08-18T04:37:12Z
+AC05_ISOLATED_RC=0
+```
+
+→ 같은 연결 검사가 공유 루트에서는 성적 1, 깨끗한 격리 복제본에서는 성적 0이므로 구현 결함이 아니라
+공유 ref 충돌이었다는 원인 분리가 끝났습니다.
+
+전체 시작 검사 원명령 재실행 결과는 다음과 같습니다.
+
+```text
+START=2026-08-18T04:37:18Z
+HEAD: 332bbba (ahead 5 / behind 0)
+ORIGIN: 34e4ccf
+RED: 0/20 (acceptance-0-7.sh 제외 — CI 담당)
+END=2026-08-18T04:39:51Z
+SESSION_ISOLATED_RC=0
+```
+
+→ 미해결 0건, 전체 20건, 알 수 없는 상태 0건, 프로그램 성적 0으로 엄격 시작 자격을 충족했습니다.
+
+전체 검증 원명령 재실행 결과는 다음과 같습니다.
+
+```text
+START=2026-08-18T04:40:02Z
+PASS: no secret-pattern match in any tracked file, .env not tracked
+END=2026-08-18T04:40:03Z
+VERIFY_ISOLATED_RC=0
+```
+
+→ 추적 파일 금지값 0건, 추적된 환경 파일 0건, 프로그램 성적 0입니다.
+
+업로드 훅 전체 원명령 재실행 결과는 다음과 같습니다.
+
+```text
+START=2026-08-18T04:40:10Z
+skip ./scripts/acceptance-0-2.sh (DEFERRED · CI 담당)
+skip ./scripts/acceptance-0-5.sh (DEFERRED · CI 담당)
+skip ./scripts/acceptance-0-7.sh (PUSH-PERFORMING · CI 담당)
+pre-push: 검사 18개 실행
+ok ./scripts/acceptance-0-2-unreachable-content.sh
+ok ./scripts/acceptance-0-6.sh
+ok ./scripts/acceptance-hs-a3.sh
+ok ./scripts/acceptance-hs-a4.sh
+ok ./scripts/acceptance-hs-cleanroom-absolute-contexts.sh
+ok ./scripts/acceptance-hs-cleanroom-absolute-paths.sh
+ok ./scripts/acceptance-hs-cleanroom-colon-paths.sh
+ok ./scripts/acceptance-hs-cleanroom-file-urls.sh
+ok ./scripts/acceptance-hs-cleanroom-hook-env-mutations.sh
+ok ./scripts/acceptance-hs-cleanroom-hook-env.sh
+ok ./scripts/acceptance-hs-cleanroom-mutations.sh
+ok ./scripts/acceptance-hs-cleanroom.sh
+ok ./scripts/acceptance-hs-gates-antiforge.sh
+ok ./scripts/acceptance-hs-gates-mutations.sh
+ok ./scripts/acceptance-hs-gates.sh
+ok ./scripts/acceptance-secret-webhook-vendor.sh
+ok ./scripts/acceptance-verify-ac-m.sh
+ok ./verify.sh
+END=2026-08-18T04:41:30Z
+PRE_PUSH_ISOLATED_RC=0
+```
+
+→ 훅이 실제 실행하는 18개가 모두 합격했습니다. 기존 훅의 `0-2`·`0-5` 안내 문구 결함은 PR #13의
+별도 범위이며 이 작업에 섞지 않았습니다. 훅 앞에서 건너뛴 `0-2`는 §8-2 실제 로컬 실행, `0-5`는 위
+복구 실행으로 따로 성적 0을 확보했습니다. `0-7`은 서버가 push 수행 중 확인할 항목입니다.
+
+이 복구 뒤 배송 판정은 **로컬 필수 검사 PASS, 서버 검사 대기**로 승격합니다. 다음 커밋으로 이 증거를
+포함한 최종 기록을 만든 뒤, 그 정확한 기록에서 세 원명령과 일반 push를 다시 실행합니다.
