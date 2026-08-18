@@ -1590,6 +1590,7 @@
   ],
   "ci": {
     "jobId": "verify",
+    "workflowSha256": "dcddcd1f8c4f5f84618e622e495a32f1d5d6db1c5948b085687f048ac181b80c",
     "namedStepCount": 17,
     "phase0StepName": "관리자 대시보드 Phase 0 계획 복구 계약",
     "run": "bash scripts/acceptance-admin-phase0-plan.sh"

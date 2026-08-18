@@ -16,7 +16,7 @@ export const relativePaths = {
   contract: "scripts/verify/fixtures/admin-phase0-plan-structural-contract.json",
 };
 
-const expectedContractSha256 = "b1a6a4a890ec7f2b6c1e1d18f0926a4e58d49bc83e1007be7b796b152977fcb5";
+const expectedContractSha256 = "4bd91efdef2a83d55241949a501f44ac7a9bbb8e51be226b5715027e49ade7e4";
 
 const requiredFields = [
   "parent_ac",
@@ -517,6 +517,9 @@ function validateCi(files, contract, errors) {
   const parsed = parseVerifySteps(files.workflow);
   const { steps } = parsed;
   const activeWorkflowLines = files.workflow.split(/\r?\n/).filter((line) => !/^\s*#/.test(line));
+  if (sha256(files.workflow) !== contract.ci?.workflowSha256) {
+    errors.push("CI workflow SHA-256 does not match the pinned checker workflow");
+  }
   if (!parsed.verifyFound) errors.push("CI workflow must define jobs.verify");
   if (!parsed.stepsFound) errors.push("CI verify job must contain steps");
   if (parsed.jobIfFound) errors.push("CI verify job must not contain if");
