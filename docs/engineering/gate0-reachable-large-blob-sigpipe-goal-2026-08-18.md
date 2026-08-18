@@ -240,7 +240,158 @@ RED에서 가짜 합격했던 로컬·서버 대용량 blob과 읽기 실패 네
 
 #### 8-3. 후속 검증 기록 위치
 
-이 절 아래에 실제 저장소 검사, 변조 시험과 원복 확인을 순서대로 추가합니다.
+실제 저장소의 로컬 패턴 파일은 내용을 복사하거나 출력하지 않고 main 작업공간의 무시된 파일을 가리키는
+심볼릭 링크로만 연결했습니다.
+
+```text
+$ SECRET_PATTERNS_FILE= bash scripts/acceptance-0-2.sh
+START=2026-08-18T03:11:22Z
+PASS: no secret-pattern match in any tracked file, .env not tracked
+PASS: 0-2 — 히스토리·객체·reflog·docs 리터럴 0건, 스캐너 뮤테이션 검출 확인
+END=2026-08-18T03:15:36Z
+AC02_RC=0
+```
+
+→ 합성 시험뿐 아니라 실제 저장소의 시작 판정 경로도 끝까지 실행돼 성적 0을 냈습니다. 실제 패턴 내용은
+읽거나 출력하지 않았습니다.
+
+##### 8-3-1. 변조 Attempt 1 — 잘못된 로컬 위치를 공격해 승인 증거에서 제외
+
+첫 변조는 로컬의 두 비슷한 검색 줄 중 reachable이 아니라 unreachable 큰 객체 줄을 바꿨습니다. 서버 줄은
+정확히 바뀌었지만 로컬 목표를 공격하지 못했으므로 결과를 승인 증거에서 제외하고 실패 이력으로 남깁니다.
+
+```text
+$ bash scripts/acceptance-0-2-unreachable-content.sh
+START=2026-08-18T03:16:10Z
+[1/20] SECRET_PATTERNS_FILE=/dev/null 상속을 격리 -> PASS (exit=0)
+[2/20] SECRET_PATTERNS_FILE=.secret-patterns.default 상속을 격리 -> PASS (exit=0)
+[3/20] 일반 실행은 무해한 unreachable blob을 허용 -> PASS (exit=0)
+[4/20] 일반 실행은 금지값이 든 unreachable blob을 차단 -> BLOCKED (exit=1)
+[5/20] unreachable commit message의 금지값을 차단 -> BLOCKED (exit=1)
+[6/20] unreachable tree path의 금지값을 차단 -> BLOCKED (exit=1)
+[7/20] unreachable annotated tag message의 금지값을 차단 -> BLOCKED (exit=1)
+[8/20] git fsck 실패는 검사 대상 없음으로 통과하지 않음 -> BLOCKED (exit=1)
+[9/20] unreachable 객체 읽기 실패는 조용히 통과하지 않음 -> BLOCKED (exit=1)
+[10/20] 알 수 없는 unreachable 객체형은 읽기 실패로 차단 -> BLOCKED (exit=1)
+[11/20] 큰 unreachable blob 앞쪽의 금지값도 차단 -> UNEXPECTED (exit=1, expected=blocked)
+PASS: no secret-pattern match in any tracked file, .env not tracked
+FAIL: unreachable blob 읽기 실패: 715094b63b611ca4e3a813970dba62c7f6f55dad (exit=141)
+[12/20] 직접 참조가 가리키는 작은 blob의 금지값을 차단 -> BLOCKED (exit=1)
+[13/20] 직접 참조가 가리키는 50MiB blob 앞쪽의 금지값을 차단 -> BLOCKED (exit=1)
+[14/20] 도달 가능한 blob 읽기 실패를 값 없음으로 통과하지 않음 -> BLOCKED (exit=1)
+[15/20] 서버 본문도 직접 참조의 작은 blob 금지값을 차단 -> BLOCKED (exit=1)
+[16/20] 서버 본문도 직접 참조의 50MiB blob 금지값을 차단 -> UNEXPECTED (exit=1, expected=blocked)
+스캔 대상 객체:        9개
+FAIL: 히스토리 blob 읽기 실패: 715094b63b611ca4e3a813970dba62c7f6f55dad (exit=141)
+[17/20] 서버 본문도 blob 읽기 실패를 값 없음으로 통과하지 않음 -> BLOCKED (exit=1)
+[18/20] 종료상태 실행은 무해한 unreachable blob도 차단 -> BLOCKED (exit=1)
+[19/20] 예정 사례 수와 실제 실행 수가 다르면 전체를 차단 -> BLOCKED (exit=1)
+[20/20] Git hook 환경에서도 바깥 저장소 무오염 -> UNEXPECTED (exit=1, head_same=YES, status_same=YES)
+[1/16] 일반 실행은 무해한 unreachable blob을 허용 -> PASS (exit=0)
+[2/16] 일반 실행은 금지값이 든 unreachable blob을 차단 -> BLOCKED (exit=1)
+[3/16] unreachable commit message의 금지값을 차단 -> BLOCKED (exit=1)
+[4/16] unreachable tree path의 금지값을 차단 -> BLOCKED (exit=1)
+[5/16] unreachable annotated tag message의 금지값을 차단 -> BLOCKED (exit=1)
+[6/16] git fsck 실패는 검사 대상 없음으로 통과하지 않음 -> BLOCKED (exit=1)
+[7/16] unreachable 객체 읽기 실패는 조용히 통과하지 않음 -> BLOCKED (exit=1)
+[8/16] 알 수 없는 unreachable 객체형은 읽기 실패로 차단 -> BLOCKED (exit=1)
+[9/16] 큰 unreachable blob 앞쪽의 금지값도 차단 -> UNEXPECTED (exit=1, expected=blocked)
+PASS: no secret-pattern match in any tracked file, .env not tracked
+FAIL: unreachable blob 읽기 실패: 715094b63b611ca4e3a813970dba62c7f6f55dad (exit=141)
+[10/16] 직접 참조가 가리키는 작은 blob의 금지값을 차단 -> BLOCKED (exit=1)
+[11/16] 직접 참조가 가리키는 50MiB blob 앞쪽의 금지값을 차단 -> BLOCKED (exit=1)
+[12/16] 도달 가능한 blob 읽기 실패를 값 없음으로 통과하지 않음 -> BLOCKED (exit=1)
+[13/16] 서버 본문도 직접 참조의 작은 blob 금지값을 차단 -> BLOCKED (exit=1)
+[14/16] 서버 본문도 직접 참조의 50MiB blob 금지값을 차단 -> UNEXPECTED (exit=1, expected=blocked)
+스캔 대상 객체:        9개
+FAIL: 히스토리 blob 읽기 실패: 715094b63b611ca4e3a813970dba62c7f6f55dad (exit=141)
+[15/16] 서버 본문도 blob 읽기 실패를 값 없음으로 통과하지 않음 -> BLOCKED (exit=1)
+[16/16] 종료상태 실행은 무해한 unreachable blob도 차단 -> BLOCKED (exit=1)
+CHECKED: 16
+FAIL: AC-19 예상과 다른 사례 2건
+CHECKED: 20
+FAIL: AC-19 예상과 다른 사례 3건
+END=2026-08-18T03:23:59Z
+MUTATION_RC=1
+```
+
+→ 시험 자체는 실패했지만 로컬 목표 줄을 공격하지 못했습니다. 이 결과를 근거로 로컬 reachable 검출력을
+승인하지 않고, 원복 후 정확한 줄을 다시 공격했습니다.
+
+##### 8-3-2. 변조 Attempt 2 — 로컬·서버 reachable 줄을 정확히 공격
+
+```text
+$ bash scripts/acceptance-0-2-unreachable-content.sh
+START=2026-08-18T03:24:57Z
+[1/20] SECRET_PATTERNS_FILE=/dev/null 상속을 격리 -> PASS (exit=0)
+[2/20] SECRET_PATTERNS_FILE=.secret-patterns.default 상속을 격리 -> PASS (exit=0)
+[3/20] 일반 실행은 무해한 unreachable blob을 허용 -> PASS (exit=0)
+[4/20] 일반 실행은 금지값이 든 unreachable blob을 차단 -> BLOCKED (exit=1)
+[5/20] unreachable commit message의 금지값을 차단 -> BLOCKED (exit=1)
+[6/20] unreachable tree path의 금지값을 차단 -> BLOCKED (exit=1)
+[7/20] unreachable annotated tag message의 금지값을 차단 -> BLOCKED (exit=1)
+[8/20] git fsck 실패는 검사 대상 없음으로 통과하지 않음 -> BLOCKED (exit=1)
+[9/20] unreachable 객체 읽기 실패는 조용히 통과하지 않음 -> BLOCKED (exit=1)
+[10/20] 알 수 없는 unreachable 객체형은 읽기 실패로 차단 -> BLOCKED (exit=1)
+[11/20] 큰 unreachable blob 앞쪽의 금지값도 차단 -> BLOCKED (exit=1)
+[12/20] 직접 참조가 가리키는 작은 blob의 금지값을 차단 -> BLOCKED (exit=1)
+[13/20] 직접 참조가 가리키는 50MiB blob 앞쪽의 금지값을 차단 -> UNEXPECTED (exit=1, expected=blocked)
+PASS: no secret-pattern match in any tracked file, .env not tracked
+FAIL: 도달 가능 blob 읽기 실패: 715094b63b611ca4e3a813970dba62c7f6f55dad (exit=141)
+[14/20] 도달 가능한 blob 읽기 실패를 값 없음으로 통과하지 않음 -> BLOCKED (exit=1)
+[15/20] 서버 본문도 직접 참조의 작은 blob 금지값을 차단 -> BLOCKED (exit=1)
+[16/20] 서버 본문도 직접 참조의 50MiB blob 금지값을 차단 -> UNEXPECTED (exit=1, expected=blocked)
+스캔 대상 객체:        9개
+FAIL: 히스토리 blob 읽기 실패: 715094b63b611ca4e3a813970dba62c7f6f55dad (exit=141)
+[17/20] 서버 본문도 blob 읽기 실패를 값 없음으로 통과하지 않음 -> BLOCKED (exit=1)
+[18/20] 종료상태 실행은 무해한 unreachable blob도 차단 -> BLOCKED (exit=1)
+[19/20] 예정 사례 수와 실제 실행 수가 다르면 전체를 차단 -> BLOCKED (exit=1)
+[20/20] Git hook 환경에서도 바깥 저장소 무오염 -> UNEXPECTED (exit=1, head_same=YES, status_same=YES)
+[1/16] 일반 실행은 무해한 unreachable blob을 허용 -> PASS (exit=0)
+[2/16] 일반 실행은 금지값이 든 unreachable blob을 차단 -> BLOCKED (exit=1)
+[3/16] unreachable commit message의 금지값을 차단 -> BLOCKED (exit=1)
+[4/16] unreachable tree path의 금지값을 차단 -> BLOCKED (exit=1)
+[5/16] unreachable annotated tag message의 금지값을 차단 -> BLOCKED (exit=1)
+[6/16] git fsck 실패는 검사 대상 없음으로 통과하지 않음 -> BLOCKED (exit=1)
+[7/16] unreachable 객체 읽기 실패는 조용히 통과하지 않음 -> BLOCKED (exit=1)
+[8/16] 알 수 없는 unreachable 객체형은 읽기 실패로 차단 -> BLOCKED (exit=1)
+[9/16] 큰 unreachable blob 앞쪽의 금지값도 차단 -> BLOCKED (exit=1)
+[10/16] 직접 참조가 가리키는 작은 blob의 금지값을 차단 -> BLOCKED (exit=1)
+[11/16] 직접 참조가 가리키는 50MiB blob 앞쪽의 금지값을 차단 -> UNEXPECTED (exit=1, expected=blocked)
+PASS: no secret-pattern match in any tracked file, .env not tracked
+FAIL: 도달 가능 blob 읽기 실패: 715094b63b611ca4e3a813970dba62c7f6f55dad (exit=141)
+[12/16] 도달 가능한 blob 읽기 실패를 값 없음으로 통과하지 않음 -> BLOCKED (exit=1)
+[13/16] 서버 본문도 직접 참조의 작은 blob 금지값을 차단 -> BLOCKED (exit=1)
+[14/16] 서버 본문도 직접 참조의 50MiB blob 금지값을 차단 -> UNEXPECTED (exit=1, expected=blocked)
+스캔 대상 객체:        9개
+FAIL: 히스토리 blob 읽기 실패: 715094b63b611ca4e3a813970dba62c7f6f55dad (exit=141)
+[15/16] 서버 본문도 blob 읽기 실패를 값 없음으로 통과하지 않음 -> BLOCKED (exit=1)
+[16/16] 종료상태 실행은 무해한 unreachable blob도 차단 -> BLOCKED (exit=1)
+CHECKED: 16
+FAIL: AC-19 예상과 다른 사례 2건
+CHECKED: 20
+FAIL: AC-19 예상과 다른 사례 3건
+END=2026-08-18T03:32:29Z
+REACHABLE_MUTATION_RC=1
+```
+
+→ 로컬과 서버의 큰 reachable blob 사례가 모두 값 발견이 아닌 읽기 실패로 뒤집혀 예정 문구 대조에서
+잡혔고, 바깥 저장소 불변도 유지됐습니다. 작은 객체와 실제 읽기 실패 대조군은 계속 예정대로 차단됐습니다.
+
+변조 두 줄을 원복한 직후 상태는 다음과 같습니다.
+
+```text
+HEAD=1b0b73e0678c8f6929982b24835713a353265fde
+RED_TEST_IMMUTABLE=YES
+MUTATION_RESTORED=YES
+```
+
+→ 추적 파일과 스테이지 차이는 0건이고, RED 시험은 `ae0f75b`와 같으며 두 구현 파일은 GREEN 커밋과 다시
+일치합니다.
+
+#### 8-4. 전체 게이트 기록 위치
+
+이 절 아래에 문법, session-status, verify, pre-push 전체 결과를 순서대로 추가합니다.
 
 ### 9. 적대 검증 로그
 
