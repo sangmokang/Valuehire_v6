@@ -1,0 +1,7 @@
+name: second-workflow-fixture
+
+jobs:
+  review-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - run: python3 scripts/review_gate.py
