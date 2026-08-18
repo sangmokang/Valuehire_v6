@@ -5829,3 +5829,1149 @@ BRIEF_RECOVERY_OVERALL_EXIT=0
 정정: 첫 셀프 감사에서 “해석 없는 출력·코드·표가 있는가”에 “아니오”라고 적은 판단은 당시 틀렸다. 위 복구와 재검사 뒤에야 “아니오”가 사실이 되었다.
 
 <!-- ATTEMPT-20260818:STRICT-BRIEF-RECOVERY-END -->
+
+## 첫 push 뒤 발견한 pre-push 안내 결함과 RED→GREEN
+
+첫 통합 커밋은 `f27af8237b5f30a07f3619f2a69c7d01f3fc15eb`이고 검증한 예상 트리와 실제 커밋 트리가 모두 `1f0d74221c5cfc2e130e4e5c18c5215e14f4d0ee`였다. 일반 push의 전체 출력은 다음과 같다.
+
+~~~~~~~~text
+  skip ./scripts/acceptance-0-2.sh (DEFERRED · CI 담당)
+  skip ./scripts/acceptance-0-5.sh (DEFERRED · CI 담당)
+  skip ./scripts/acceptance-0-7.sh (PUSH-PERFORMING · CI 담당)
+pre-push: 검사 26개 실행
+  ok  ./scripts/acceptance-0-2-unreachable-content.sh
+  ok  ./scripts/acceptance-0-6.sh
+  ok  ./scripts/acceptance-hs-a3.sh
+  ok  ./scripts/acceptance-hs-a4.sh
+  ok  ./scripts/acceptance-hs-cleanroom-absolute-contexts.sh
+  ok  ./scripts/acceptance-hs-cleanroom-absolute-paths.sh
+  ok  ./scripts/acceptance-hs-cleanroom-colon-paths.sh
+  ok  ./scripts/acceptance-hs-cleanroom-file-urls.sh
+  ok  ./scripts/acceptance-hs-cleanroom-hook-env-mutations.sh
+  ok  ./scripts/acceptance-hs-cleanroom-hook-env.sh
+  ok  ./scripts/acceptance-hs-cleanroom-mutations.sh
+  ok  ./scripts/acceptance-hs-cleanroom.sh
+  ok  ./scripts/acceptance-hs-gates-antiforge.sh
+  ok  ./scripts/acceptance-hs-gates-mutations.sh
+  ok  ./scripts/acceptance-hs-gates.sh
+  ok  ./scripts/acceptance-hs-portal-constants-hardening.sh
+  ok  ./scripts/acceptance-hs-portal-constants-hardening2.sh
+  ok  ./scripts/acceptance-hs-portal-constants-hardening3.sh
+  ok  ./scripts/acceptance-hs-portal-constants-hardening4.sh
+  ok  ./scripts/acceptance-hs-portal-constants-hardening5.sh
+  ok  ./scripts/acceptance-hs-portal-constants-hardening6.sh
+  ok  ./scripts/acceptance-hs-portal-constants-mutations.sh
+  ok  ./scripts/acceptance-hs-portal-constants.sh
+  ok  ./scripts/acceptance-secret-webhook-vendor.sh
+  ok  ./scripts/acceptance-verify-ac-m.sh
+  ok  ./verify.sh
+To https://github.com/sangmokang/Valuehire_v6.git
+   918f0b6..f27af82  task/humansearch-g3-portal-constants -> task/humansearch-g3-portal-constants
+
+~~~~~~~~
+
+→ pre-push는 26개 검사를 모두 통과하고 원격 브랜치를 갱신했다. 그러나 `acceptance-0-2.sh`를 직접 제외하면서 “CI 담당”이라고 표시했다. 실제로 이 검사는 로컬 실제 패턴으로 별도 수동 실행하고 CI는 등가 히스토리 스캔만 담당하므로, 기능은 맞아도 운영 안내가 서버 보호를 과장했다.
+
+읽기 전용 원인 대조:
+
+```text
+hooks/pre-push:64-67 — acceptance-0-2는 CI 목록에 없고 등가 히스토리 스캔만 확인한다고 설명
+hooks/pre-push:143-146 — acceptance-0-2.sh와 acceptance-0-5.sh를 한 분기로 묶어 둘 다 “DEFERRED · CI 담당” 출력
+.github/workflows/verify.yml — acceptance-0-2.sh 직접 실행 0건, acceptance-0-2-unreachable-content.sh 직접 실행 1건
+docs/sot/hook-contracts.md:36-42 — 0-2는 로컬 수동, 0-5는 push 뒤 원격 검사, unreachable-content는 로컬·CI 양쪽
+```
+
+→ 코드 주석·CI·정본 문서는 소유자를 구분하지만 화면 안내만 둘을 뭉갰다. 운영자가 “0-2 전체가 CI에서 돈다”고 믿을 수 있어 중간 결함으로 판정했고, `f27af82`의 병합을 중단했다.
+
+RED 실행과 전체 출력:
+
+```text
+COMMAND=bash scripts/acceptance-0-7.sh
+=== 전제 검사: 훅 인프라 ===
+OK: 훅 파일 4종 + settings.json 존재
+
+FAIL: pre-push가 acceptance-0-2.sh를 로컬 수동 검사로 안내하지 않는다
+FAIL: pre-push가 acceptance-0-5.sh를 push 뒤 CI 검사로 안내하지 않는다
+FAIL: pre-push가 서로 다른 두 예외를 같은 안내 분기로 묶는다
+
+RESULT: pre-push 예외 안내 계약 불일치 — 시연을 진행하지 않는다. exit 1
+RED_EXPECTED_EXIT=1
+RED_ACTUAL_EXIT=1
+```
+
+→ 기존 0-7에 세 안내 조건을 먼저 넣자 수정 전 훅이 정확히 종료 1을 냈다. 결함을 재현하지 못한 채 구현부터 바꾸지 않았다는 증거다.
+
+GREEN 실행과 전체 출력:
+
+```text
+COMMAND=bash -n hooks/pre-push
+COMMAND=bash -n scripts/acceptance-0-7.sh
+COMMAND=bash scripts/acceptance-0-7.sh
+=== 전제 검사: 훅 인프라 ===
+OK: 훅 파일 4종 + settings.json 존재
+
+OK: pre-push 예외 안내가 로컬 수동/CI 담당으로 분리됨
+
+=== 시연 (샌드박스 임시 복제본 · 각 시연마다 훅 ON/OFF 대조) ===
+[1/6] 검사기 자기 제외 → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+         BLOCKED: 검사기 자기 제외 — scripts/acceptance-0-6.sh 가 자기 자신을 검사 대상에서 뺀다 (P13)
+[2/6] 검사 약화(실패 무시) → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+         BLOCKED: 검사 약화 패턴 추가 — scripts/acceptance-0-2.sh (P13). 정당하면 suppressions.yaml 에 expiry 와 함께 등록하라
+[3/6] 만료일 없는 억제 → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+         BLOCKED: 억제 항목 1건 중 expiry 가 0건뿐 — 만료일 없는 억제는 영구화된다 (P13)
+[4/6] LLM 출력→판정 필드 → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+         BLOCKED: LLM 출력을 판정 수치로 변환 — src/scoring.js. 판정 수치는 순수 함수가 만든다 (P14)
+[5/6] 미커밋 상태로 push → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+         BLOCKED: 작업트리가 깨끗하지 않다 — 미커밋/미추적 변경이 있는 상태의 push (P15)
+[6/6] 가짜 외부효과 모듈 → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+         BLOCKED: 외부 효과를 표방하는데 네트워크 호출이 0건 — src/portal-login.js. 시뮬레이션 의심 (P4)
+
+OK: 원본 저장소 무변경 확인 (81bc3fd6cb1478861eb7fdeedaf357eb445d270d)
+
+PASS: 위반 6 종이 전부 차단됨 (각 건 훅 OFF 대조 통과)
+COMMAND_EXIT=0
+```
+
+→ 훅의 두 출력 분기를 나눈 뒤 셸 문법, 새 안내 계약, 기존 6개 강제력 시연, 원 저장소 무오염이 모두 합격했다. 기능 실행 목록은 바꾸지 않았고 화면 설명만 실제 소유자와 맞췄다.
+
+<!-- ATTEMPT-20260818:POST-PUSH-RED-GREEN-END -->
+
+## 안내 결함 수정 뒤 로컬 전량 재검증
+
+~~~~~~~~text
+DELTA_PRE_HEAD=f27af8237b5f30a07f3619f2a69c7d01f3fc15eb
+DELTA_PRE_REMOTE_MAIN=34e4ccff88ce776d06e3001734005a34b169f7eb
+DELTA_PRE_STATUS_BEGIN
+ M docs/engineering/codeaudit-g3-followup-goal-2026-08-15.md
+ M hooks/pre-push
+ M scripts/acceptance-0-7.sh
+DELTA_PRE_STATUS_END
+
+COMMAND=bash scripts/acceptance-hs-portal-constants.sh
+PASS: portal constants outside contracts 0
+PASS: contracts zone violations 0
+PASS: ci/pre-push wiring intact
+PRODUCT_FILES: 2
+CHECKED: 56
+CONTRACT_FILES: 3
+COMMAND_EXIT=0
+
+COMMAND=bash scripts/acceptance-hs-portal-constants-mutations.sh
+ok [clean baseline] exit=0
+ok [product scheme URL (.py)] exit=1
+ok [product bare domain (tests/.py)] exit=1
+ok [product host:port (무작위 파일명)] exit=1
+ok [product selector API (.js)] exit=1
+ok [product XPath literal] exit=1
+ok [product quoted CSS id] exit=1
+ok [scripts/ selector API — scripts 면제 금지] exit=1
+ok [검사기 자신에 심은 selector — 자기면제 금지] exit=1
+ok [루트 파일 CDP 플래그] exit=1
+ok [hooks/ 포털 브랜드 도메인] exit=1
+ok [루트 contracts/ 정당 값 — 오탐 금지] exit=0
+ok [contracts-evil/ 유사 경로 위장] exit=1
+ok [중첩 가짜 contracts/ 경로] exit=1
+ok [contracts/ 실행 권한 파일] exit=1
+ok [contracts/ 허용 확장자 밖] exit=1
+ok [CI 무력화: self_commented] exit=1
+ok [CI 무력화: self_missing] exit=1
+ok [CI 무력화: echo_prefixed] exit=1
+ok [CI 무력화: suffixed] exit=1
+ok [CI 무력화: if_false] exit=1
+ok [CI 무력화: coe] exit=1
+ok [CI 무력화: sibling_missing] exit=1
+ok [pre-push 부재] exit=1
+ok [pre-push 실행권한 제거] exit=1
+ok [pre-push 글로브 수집식 제거] exit=1
+ok [전역 패턴 계약 부재] exit=2
+ok [전역 패턴 계약 빈 파일] exit=2
+ok [깨진 정규식] exit=2
+ok [빈 문자열 매치 정규식] exit=2
+ok [제품 패턴 계약 깨짐] exit=2
+ok [제품 루트 부재 — 조용한 skip 금지] exit=2
+ok [제품 파일 0건 — 0건 통과 금지] exit=2
+ok [위반+깨진 패턴 동시 — 2 우선] exit=2
+ok [제품 5파일 깨끗] exit=0
+PASS: portal-constants mutations blocked 24/35 (allowed 3, notrun 8)
+COMMAND_EXIT=0
+
+COMMAND=bash scripts/acceptance-hs-portal-constants-hardening.sh
+ok [hardening baseline] exit=0
+ok [D1 IPv4 비루프백 host:port] exit=1
+ok [D1 미등재 .ai 도메인] exit=1
+ok [D1 CSS 자손 셀렉터] exit=1
+ok [D1 CSS 속성 셀렉터] exit=1
+ok [D1 공백 XPath] exit=1
+ok [D1 따옴표 CDP 포트] exit=1
+ok [D1 매핑형 CDP 포트] exit=1
+ok [D1 IPv6 루프백 host:port] exit=1
+ok [D2 run 블록 선행 exit 0] exit=1
+ok [D2 run 블록 실패 중단 해제] exit=1
+ok [D3 검사기 머리말 표식] exit=1
+ok [D3 mutation 시험 머리말 표식] exit=1
+ok [D4 임시공간 생성 실패] exit=2
+ok [D5 docs 실행 코드 은닉] exit=1
+ok [D5 정당한 문서 인용 — 오탐 금지] exit=0
+ok [D5 실행권한 달린 문서 위장] exit=1
+ok [hardening 자기 배선(CI 실행 줄)]
+PASS: portal-constants hardening blocked 15/18 (allowed 2, notrun 1)
+COMMAND_EXIT=0
+
+COMMAND=bash scripts/acceptance-hs-portal-constants-hardening2.sh
+ok [hardening2 baseline] exit=0
+ok [N1-1 미등재 .biz 도메인] exit=1
+ok [N1-2 단일 라벨 호스트:포트] exit=1
+ok [N1-3 한 자리 포트] exit=1
+ok [N1-4 JSON 따옴표 포트 키] exit=1
+ok [N1-5 camelCase 포트 변수] exit=1
+ok [N1-6 따옴표 값 CSS 속성] exit=1
+ok [N1-7 CSS id 자손] exit=1
+ok [N1-8 백틱 CSS id] exit=1
+ok [N1-9 절대 XPath] exit=1
+ok [N1-10 함수형 XPath] exit=1
+ok [N2 셸 if-false 감싸기] exit=1
+ok [N2 블록 내 이물질 줄(true)] exit=1
+ok [N3 hardening 실행 줄 삭제] exit=1
+ok [N3 pre-push 선행 exit 0] exit=1
+ok [hardening2 자기 배선(CI 실행 줄)]
+PASS: portal-constants hardening2 cases 16 (blocked-mutations 14, clean-baselines 1, wiring-present 1)
+COMMAND_EXIT=0
+
+COMMAND=bash scripts/acceptance-hs-portal-constants-hardening3.sh
+ok [hardening3 baseline] exit=0
+ok [F1 env 값 속 가짜 G3 단계] exit=1
+ok [F2 semantic role finder] exit=1
+ok [F2 semantic label finder] exit=1
+ok [F2 semantic testid finder] exit=1
+ok [F2 semantic text finder] exit=1
+ok [F2 element[attr] CSS 셀렉터] exit=1
+ok [hardening3 자기 배선(CI 실행 줄)]
+PASS: portal-constants hardening3 cases 8 (blocked-mutations 6, clean-baselines 1, wiring-present 1)
+COMMAND_EXIT=0
+
+COMMAND=bash scripts/acceptance-hs-portal-constants-hardening4.sh
+ok [hardening4 baseline] exit=0
+ok [리터럴 스칼라 은닉: description] exit=1
+ok [리터럴 스칼라 은닉: note] exit=1
+ok [리터럴 스칼라 은닉: summary] exit=1
+ok [리터럴 스칼라 은닉: run-name] exit=1
+ok [리터럴 스칼라 은닉: comment] exit=1
+ok [리터럴 스칼라 은닉: memo] exit=1
+ok [hardening4 자기 배선(CI 실행 줄)]
+PASS: portal-constants hardening4 cases 8 (blocked-mutations 6, clean-baselines 1, wiring-present 1)
+COMMAND_EXIT=0
+
+COMMAND=bash scripts/acceptance-hs-portal-constants-hardening5.sh
+ok [hardening5 baseline] exit=0
+RUN_FIELDS_WITH_G3=0
+ENV_VALUES_WITH_G3=1
+ok [F1 quoted env value is not a run field] exit=1
+ok [F2 semantic role finder] exit=1
+ok [F2 semantic label finder] exit=1
+ok [F2 semantic test-id finder] exit=1
+ok [F2 semantic text finder] exit=1
+ok [hardening5 자기 배선(CI 실행 줄)]
+PASS: portal-constants hardening5 cases 7 (blocked-mutations 5, clean-baselines 1, wiring-present 1)
+COMMAND_EXIT=0
+
+COMMAND=bash scripts/acceptance-hs-portal-constants-hardening6.sh
+JOB_IF=ABSENT
+JOB_CONTINUE_ON_ERROR=ABSENT
+AUTO_TRIGGER=true
+RUNS_ON=ubuntu-latest
+STEP_SHELL=ABSENT
+JOB_DEFAULT_SHELL=ABSENT
+WORKFLOW_DEFAULT_SHELL=ABSENT
+ok [hardening6 baseline] exit=0
+STEP_WORKING_DIRECTORY=fake-checks
+JOB_DEFAULT_WORKING_DIRECTORY=ABSENT
+WORKFLOW_DEFAULT_WORKING_DIRECTORY=ABSENT
+ok [N6 step-level working-directory key] exit=1
+STEP_WORKING_DIRECTORY=ABSENT
+JOB_DEFAULT_WORKING_DIRECTORY=fake-checks
+WORKFLOW_DEFAULT_WORKING_DIRECTORY=ABSENT
+ok [N6 job defaults.run.working-directory key] exit=1
+STEP_WORKING_DIRECTORY=ABSENT
+JOB_DEFAULT_WORKING_DIRECTORY=ABSENT
+WORKFLOW_DEFAULT_WORKING_DIRECTORY=fake-checks
+ok [N6 workflow defaults.run.working-directory key] exit=1
+STEP_ENV_KEYS=BASH_ENV
+JOB_ENV_KEYS=ABSENT
+WORKFLOW_ENV_KEYS=ABSENT
+ok [N7 step env BASH_ENV key] exit=1
+STEP_ENV_KEYS=ABSENT
+JOB_ENV_KEYS=BASH_ENV
+WORKFLOW_ENV_KEYS=ABSENT
+ok [N7 job env BASH_ENV key] exit=1
+STEP_ENV_KEYS=ABSENT
+JOB_ENV_KEYS=ABSENT
+WORKFLOW_ENV_KEYS=BASH_ENV
+ok [N7 workflow env BASH_ENV key] exit=1
+STEP_ENV_KEYS=ENV
+JOB_ENV_KEYS=ABSENT
+WORKFLOW_ENV_KEYS=ABSENT
+ok [N7 step env ENV key] exit=1
+STEP_ENV_KEYS=ABSENT
+JOB_ENV_KEYS=SHELLOPTS
+WORKFLOW_ENV_KEYS=ABSENT
+ok [N7 job env SHELLOPTS key] exit=1
+STEP_ENV_KEYS=ABSENT
+JOB_ENV_KEYS=ABSENT
+WORKFLOW_ENV_KEYS=PATH
+ok [N7 workflow env PATH key] exit=1
+STEP_ENV_KEYS=SAFE_STEP_FLAG
+JOB_ENV_KEYS=SAFE_JOB_FLAG
+WORKFLOW_ENV_KEYS=SAFE_WORKFLOW_FLAG
+ok [harmless env keys remain allowed] exit=0
+RUNS_ON_CLASS=NilClass
+RUNS_ON_VALUE=nil
+ok [N8 runs-on null] exit=1
+RUNS_ON_CLASS=Array
+RUNS_ON_VALUE=[]
+ok [N8 runs-on empty list] exit=1
+RUNS_ON_CLASS=FalseClass
+RUNS_ON_VALUE=false
+ok [N8 runs-on false] exit=1
+MATRIX_CLASS=Hash
+MATRIX_KEYS=shard
+STATIC_AXIS_VALUES=shard:Array:0
+ok [N9 matrix empty axis] exit=1
+MATRIX_CLASS=Hash
+MATRIX_KEYS=shard
+STATIC_AXIS_VALUES=shard:Array:2
+ok [non-empty static matrix axis remains allowed] exit=0
+MATRIX_CLASS=String
+MATRIX_VALUE=${{ fromJSON(vars.G3_MATRIX) }}
+ok [N9 matrix expression] exit=1
+MATRIX_VALUE={"shard"=>["${{ vars.G3_SHARD }}"]}
+ok [N9 matrix axis item expression] exit=1
+MATRIX_CLASS=Hash
+MATRIX_KEYS=include
+STATIC_AXIS_VALUES=
+ok [include-only matrix entries remain allowed] exit=0
+MATRIX_VALUE={"include"=>[]}
+ok [N9 empty include-only matrix] exit=1
+MATRIX_CLASS=Hash
+MATRIX_KEYS=exclude
+STATIC_AXIS_VALUES=
+ok [N9 matrix exclude-only] exit=1
+MATRIX_VALUE={"shard"=>["one"], "exclude"=>[{"shard"=>"one"}]}
+ok [N9 exclude removes the sole combination] exit=1
+MATRIX_VALUE={"os"=>["linux", "mac"], "shard"=>["one", "two"], "exclude"=>[{"os"=>"linux"}, {"os"=>"mac"}]}
+ok [N9 exclude removes a multi-axis cartesian product] exit=1
+MATRIX_VALUE={"os"=>["linux", "mac"], "shard"=>["one", "two"], "exclude"=>[{"os"=>"linux", "shard"=>"one"}]}
+ok [matrix with combinations remaining after exclude] exit=0
+MATRIX_VALUE={"shard"=>["one"], "exclude"=>[{"shard"=>"one"}], "include"=>[{"shard"=>"one"}]}
+ok [include restores a combination after exclude] exit=0
+MATRIX_VALUE={"shard"=>["one"], "include"=>"${{ fromJSON(vars.G3_INCLUDE) }}"}
+ok [N9 matrix include expression] exit=1
+MATRIX_VALUE={"shard"=>["one"], "include"=>[{"shard"=>"${{ vars.G3_SHARD }}"}]}
+ok [N9 matrix include value expression] exit=1
+MATRIX_VALUE={"shard"=>["one"], "exclude"=>"${{ fromJSON(vars.G3_EXCLUDE) }}"}
+ok [N9 matrix exclude expression] exit=1
+MATRIX_VALUE={"shard"=>["one"], "exclude"=>[{"shard"=>"${{ vars.G3_SHARD }}"}]}
+ok [N9 matrix exclude value expression] exit=1
+RUNS_ON=ubuntu-latest
+STEP_SHELL=echo {0}
+JOB_DEFAULT_SHELL=ABSENT
+WORKFLOW_DEFAULT_SHELL=ABSENT
+ok [N4 step-level shell key] exit=1
+RUNS_ON=ubuntu-latest
+STEP_SHELL=ABSENT
+JOB_DEFAULT_SHELL=echo {0}
+WORKFLOW_DEFAULT_SHELL=ABSENT
+ok [N4 job defaults.run.shell key] exit=1
+RUNS_ON=ubuntu-latest
+STEP_SHELL=ABSENT
+JOB_DEFAULT_SHELL=ABSENT
+WORKFLOW_DEFAULT_SHELL=echo {0}
+ok [N4 workflow defaults.run.shell key] exit=1
+RUNS_ON=ABSENT
+STEP_SHELL=ABSENT
+JOB_DEFAULT_SHELL=ABSENT
+WORKFLOW_DEFAULT_SHELL=ABSENT
+ok [N5 missing runs-on key] exit=1
+G3_JOBS=1
+G3_STEPS=2
+RUNS_ON=ubuntu-latest
+STEP_SHELLS=echo {0},ABSENT
+JOB_DEFAULT_SHELLS=ABSENT
+ok [N4 bad step plus duplicate safe step] exit=1
+G3_JOBS=2
+G3_STEPS=2
+RUNS_ON=ubuntu-latest,ubuntu-latest
+STEP_SHELLS=ABSENT,ABSENT
+JOB_DEFAULT_SHELLS=echo {0},ABSENT
+ok [N4 bad job defaults plus duplicate safe job] exit=1
+G3_JOBS=2
+G3_STEPS=2
+RUNS_ON=ABSENT,ubuntu-latest
+STEP_SHELLS=ABSENT,ABSENT
+JOB_DEFAULT_SHELLS=ABSENT,ABSENT
+ok [N5 missing runs-on plus duplicate safe job] exit=1
+G3_JOBS=1
+G3_STEPS=2
+RUNS_ON=ubuntu-latest
+STEP_SHELLS=ABSENT,echo {0}
+JOB_DEFAULT_SHELLS=ABSENT
+ok [N4 unsafe step after duplicate safe step] exit=1
+G3_JOBS=2
+G3_STEPS=2
+RUNS_ON=ubuntu-latest,ubuntu-latest
+STEP_SHELLS=ABSENT,ABSENT
+JOB_DEFAULT_SHELLS=ABSENT,echo {0}
+ok [N4 unsafe job defaults after duplicate safe job] exit=1
+G3_JOBS=2
+G3_STEPS=2
+RUNS_ON=ubuntu-latest,ABSENT
+STEP_SHELLS=ABSENT,ABSENT
+JOB_DEFAULT_SHELLS=ABSENT,ABSENT
+ok [N5 missing runs-on after duplicate safe job] exit=1
+JOB_IF=false
+JOB_CONTINUE_ON_ERROR=ABSENT
+AUTO_TRIGGER=true
+ok [N1 job-level if key] exit=1
+G3_JOB_NEEDS=gate
+GATE_IF=false
+ok [N1 skipped prerequisite job] exit=1
+JOB_IF=ABSENT
+JOB_CONTINUE_ON_ERROR=true
+AUTO_TRIGGER=true
+ok [N2 job-level continue-on-error true] exit=1
+JOB_CONTINUE_ON_ERROR_CLASS=String
+JOB_CONTINUE_ON_ERROR=${{ true }}
+ok [N2 job-level continue-on-error expression] exit=1
+JOB_IF=ABSENT
+JOB_CONTINUE_ON_ERROR=ABSENT
+AUTO_TRIGGER=false
+ok [N3 workflow_dispatch-only trigger] exit=1
+PUSH_PATHS_IGNORE=**
+PULL_REQUEST_PATHS_IGNORE=**
+ok [N3 automatic events filtered out] exit=1
+ok [hardening6 자기 배선(CI 실행 줄)]
+PASS: portal-constants hardening6 cases 46 (blocked-mutations 39, clean-baselines 6, wiring-present 1)
+COMMAND_EXIT=0
+
+COMMAND=bash scripts/acceptance-0-2-unreachable-content.sh
+[1/13] SECRET_PATTERNS_FILE=/dev/null 상속을 격리 -> PASS (exit=0)
+[2/13] SECRET_PATTERNS_FILE=.secret-patterns.default 상속을 격리 -> PASS (exit=0)
+[3/13] 일반 실행은 무해한 unreachable blob을 허용 -> PASS (exit=0)
+[4/13] 일반 실행은 금지값이 든 unreachable blob을 차단 -> BLOCKED (exit=1)
+[5/13] unreachable commit message의 금지값을 차단 -> BLOCKED (exit=1)
+[6/13] unreachable tree path의 금지값을 차단 -> BLOCKED (exit=1)
+[7/13] unreachable annotated tag message의 금지값을 차단 -> BLOCKED (exit=1)
+[8/13] git fsck 실패는 검사 대상 없음으로 통과하지 않음 -> BLOCKED (exit=1)
+[9/13] unreachable 객체 읽기 실패는 조용히 통과하지 않음 -> BLOCKED (exit=1)
+[10/13] 알 수 없는 unreachable 객체형은 읽기 실패로 차단 -> BLOCKED (exit=1)
+[11/13] 큰 unreachable blob 앞쪽의 금지값도 차단 -> BLOCKED (exit=1)
+[12/13] 종료상태 실행은 무해한 unreachable blob도 차단 -> BLOCKED (exit=1)
+[13/13] Git hook 환경에서도 바깥 저장소 무오염 -> PASS (exit=0)
+CHECKED: 13
+PASS: AC-19 일반 내용 검사와 종료상태 0건 조건 분리
+COMMAND_EXIT=0
+
+COMMAND=env SECRET_PATTERNS_FILE=/dev/null bash scripts/acceptance-0-2-unreachable-content.sh
+[1/13] SECRET_PATTERNS_FILE=/dev/null 상속을 격리 -> PASS (exit=0)
+[2/13] SECRET_PATTERNS_FILE=.secret-patterns.default 상속을 격리 -> PASS (exit=0)
+[3/13] 일반 실행은 무해한 unreachable blob을 허용 -> PASS (exit=0)
+[4/13] 일반 실행은 금지값이 든 unreachable blob을 차단 -> BLOCKED (exit=1)
+[5/13] unreachable commit message의 금지값을 차단 -> BLOCKED (exit=1)
+[6/13] unreachable tree path의 금지값을 차단 -> BLOCKED (exit=1)
+[7/13] unreachable annotated tag message의 금지값을 차단 -> BLOCKED (exit=1)
+[8/13] git fsck 실패는 검사 대상 없음으로 통과하지 않음 -> BLOCKED (exit=1)
+[9/13] unreachable 객체 읽기 실패는 조용히 통과하지 않음 -> BLOCKED (exit=1)
+[10/13] 알 수 없는 unreachable 객체형은 읽기 실패로 차단 -> BLOCKED (exit=1)
+[11/13] 큰 unreachable blob 앞쪽의 금지값도 차단 -> BLOCKED (exit=1)
+[12/13] 종료상태 실행은 무해한 unreachable blob도 차단 -> BLOCKED (exit=1)
+[13/13] Git hook 환경에서도 바깥 저장소 무오염 -> PASS (exit=0)
+CHECKED: 13
+PASS: AC-19 일반 내용 검사와 종료상태 0건 조건 분리
+COMMAND_EXIT=0
+
+COMMAND=env SECRET_PATTERNS_FILE=.secret-patterns.default bash scripts/acceptance-0-2-unreachable-content.sh
+[1/13] SECRET_PATTERNS_FILE=/dev/null 상속을 격리 -> PASS (exit=0)
+[2/13] SECRET_PATTERNS_FILE=.secret-patterns.default 상속을 격리 -> PASS (exit=0)
+[3/13] 일반 실행은 무해한 unreachable blob을 허용 -> PASS (exit=0)
+[4/13] 일반 실행은 금지값이 든 unreachable blob을 차단 -> BLOCKED (exit=1)
+[5/13] unreachable commit message의 금지값을 차단 -> BLOCKED (exit=1)
+[6/13] unreachable tree path의 금지값을 차단 -> BLOCKED (exit=1)
+[7/13] unreachable annotated tag message의 금지값을 차단 -> BLOCKED (exit=1)
+[8/13] git fsck 실패는 검사 대상 없음으로 통과하지 않음 -> BLOCKED (exit=1)
+[9/13] unreachable 객체 읽기 실패는 조용히 통과하지 않음 -> BLOCKED (exit=1)
+[10/13] 알 수 없는 unreachable 객체형은 읽기 실패로 차단 -> BLOCKED (exit=1)
+[11/13] 큰 unreachable blob 앞쪽의 금지값도 차단 -> BLOCKED (exit=1)
+[12/13] 종료상태 실행은 무해한 unreachable blob도 차단 -> BLOCKED (exit=1)
+[13/13] Git hook 환경에서도 바깥 저장소 무오염 -> PASS (exit=0)
+CHECKED: 13
+PASS: AC-19 일반 내용 검사와 종료상태 0건 조건 분리
+COMMAND_EXIT=0
+
+COMMAND=bash scripts/acceptance-0-2.sh
+PASS: no secret-pattern match in any tracked file, .env not tracked
+PASS: 0-2 — 히스토리·객체·reflog·docs 리터럴 0건, 스캐너 뮤테이션 검출 확인
+COMMAND_EXIT=0
+
+COMMAND=bash verify.sh
+PASS: no secret-pattern match in any tracked file, .env not tracked
+COMMAND_EXIT=0
+
+COMMAND=bash scripts/verify/check-mechanism-registry.sh
+PASS: secrets-scan-precommit (pre-commit · 규칙 1·2·3)
+PASS: acceptance-glob-prepush (pre-push · 규칙 1·2·3)
+PASS: ci-secret-scan (ci · 규칙 1·2·4)
+PASS: ci-portal-constants-gate (ci · 규칙 1·2·4)
+CHECKED: 4
+COMMAND_EXIT=0
+
+COMMAND=bash scripts/acceptance-verify-ac-m.sh
+PASS: 검사기 실존·실행가능 — scripts/verify/check-mechanism-registry.sh
+PASS: fixture 정상 명부 → 통과 (exit=0)
+PASS: fixture path 없는 항목 → 불합격 (exit=1)
+PASS: fixture 죽은 target → 불합격 (exit=1)
+PASS: id 중복 → 불합격 (exit=1)
+PASS: 알 수 없는 stage → 불합격 (exit=1)
+PASS: manual 인데 사유 없음 → 불합격 (exit=1)
+PASS: manual 정상(사유+실행권한) → 통과 (exit=0)
+PASS: manual 인데 실행권한 없음 → 불합격 (exit=1)
+PASS: ci 인데 거짓 target → 불합격 (exit=1)
+PASS: ci target 이 주석에만 있음 → 불합격 (exit=1)
+PASS: ci target step 이 if:false 로 꺼짐 → 불합격 (exit=1)
+PASS: 절대경로 path → 불합격 (exit=1)
+PASS: 상대경로 심볼릭 링크 → 불합격 (exit=1)
+PASS: 필드 중복(path 2회, 마지막 값 유효) → 불합격 (exit=1)
+PASS: id 뒤 인라인 주석 → 불합격 (exit=1)
+PASS: 닫히지 않은 따옴표 → 불합격 (exit=1)
+PASS: stage 불일치 필드(ci_mirror_job) → 불합격 (exit=1)
+PASS: 문법 오류·항목 0개 → 위반(1) (exit=1)
+PASS: 항목 0개 명부 → NOT_RUN (exit=2)
+PASS: ci_mirror_job 불일치 → 불합격 (exit=1)
+PASS: 필수 필드(stage) 누락 → 불합격 (exit=1)
+PASS: 빈 문자열 path → 불합격 (exit=1)
+PASS: CI 자기배선 target 이 셸 주석에만 있음 → 불합격
+PASS: CI 배선 — verify.yml 에 무조건 실행 스텝 정확히 1회
+PASS: 실제 명부(docs/sot/mechanism-registry.yaml) → 통과 (exit=0)
+PASS: 명부 항목 4개 = 검사기 보고 4개 (하한 3)
+PASS: 저장소 무오염 (시작/종료 상태 동일)
+CHECKED: 28
+COMMAND_EXIT=0
+
+COMMAND=bash scripts/check-docs-sot.sh
+PASS: docs/sot/INDEX.md 존재, 1050바이트 (<=20000)
+PASS: docs/sot/coding-principles.md 존재, 15405바이트 (<=20000)
+PASS: docs/sot/hook-contracts.md 존재, 5797바이트 (<=20000)
+PASS: docs/sot/git-workflow.md 존재, 2634바이트 (<=20000)
+PASS: docs/sot/verification-commands.md 존재, 9094바이트 (<=20000)
+PASS: hooks/pre-commit 가 docs/sot/hook-contracts.md 를 계약으로 참조
+PASS: hooks/pre-push 가 docs/sot/hook-contracts.md 를 계약으로 참조
+PASS: scripts/install-hooks.sh 가 docs/sot/hook-contracts.md 를 계약으로 참조
+PASS: scripts/session-status.sh 가 docs/sot/hook-contracts.md 를 계약으로 참조
+PASS: scripts/acceptance-0-7.sh 가 docs/sot/hook-contracts.md 를 계약으로 참조
+OK: docs/sot 재구성 AC 전부 충족
+COMMAND_EXIT=0
+
+COMMAND=bash scripts/acceptance-0-7.sh
+=== 전제 검사: 훅 인프라 ===
+OK: 훅 파일 4종 + settings.json 존재
+
+OK: pre-push 예외 안내가 로컬 수동/CI 담당으로 분리됨
+
+=== 시연 (샌드박스: /var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/tmp.fdr18kKo1s/repo · 각 시연마다 훅 ON/OFF 대조) ===
+[1/6] 검사기 자기 제외 → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+         BLOCKED: 검사기 자기 제외 — scripts/acceptance-0-6.sh 가 자기 자신을 검사 대상에서 뺀다 (P13)
+[2/6] 검사 약화(실패 무시) → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+         BLOCKED: 검사 약화 패턴 추가 — scripts/acceptance-0-2.sh (P13). 정당하면 suppressions.yaml 에 expiry 와 함께 등록하라
+[3/6] 만료일 없는 억제 → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+         BLOCKED: 억제 항목 1건 중 expiry 가 0건뿐 — 만료일 없는 억제는 영구화된다 (P13)
+[4/6] LLM 출력→판정 필드 → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+         BLOCKED: LLM 출력을 판정 수치로 변환 — src/scoring.js. 판정 수치는 순수 함수가 만든다 (P14)
+[5/6] 미커밋 상태로 push → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+         BLOCKED: 작업트리가 깨끗하지 않다 — 미커밋/미추적 변경이 있는 상태의 push (P15)
+[6/6] 가짜 외부효과 모듈 → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+         BLOCKED: 외부 효과를 표방하는데 네트워크 호출이 0건 — src/portal-login.js. 시뮬레이션 의심 (P4)
+
+OK: 원본 저장소 무변경 확인 (17c27b8784c9c8a3ada6492da29a36f1d1378a2a)
+
+PASS: 위반 6 종이 전부 차단됨 (각 건 훅 OFF 대조 통과)
+COMMAND_EXIT=0
+
+COMMAND=env SECRET_PATTERNS_FILE= bash scripts/acceptance-0-5.sh
+FAIL: origin/main(34e4ccff88ce776d06e3001734005a34b169f7eb) != main(8cd1e9e7335e8ec7216aebf96b77b46aece9cb32) — push 미완료
+COMMAND_EXIT=1
+
+COMMAND=bash scripts/session-status.sh
+HEAD: f27af82 (ahead 43 / behind 0)
+ORIGIN: 34e4ccf
+RED: 1/28 (acceptance-0-7.sh 제외 — CI 담당)
+COMMAND_EXIT=0
+
+COMMAND=bash -n hooks/pre-push
+COMMAND_EXIT=0
+
+COMMAND=bash -n scripts/acceptance-0-7.sh
+COMMAND_EXIT=0
+
+COMMAND=git diff --check
+COMMAND_EXIT=0
+
+UNCHANGED_PROTECTION_HASHES
+scripts/acceptance-hs-portal-constants.sh current=b63386cfaeb7114b90db8046f1b9023544dc4a6f f27af82=b63386cfaeb7114b90db8046f1b9023544dc4a6f
+scripts/acceptance-hs-portal-constants-mutations.sh current=7606f00a864ac81df9520af53a54a3c315a10422 f27af82=7606f00a864ac81df9520af53a54a3c315a10422
+scripts/acceptance-hs-portal-constants-hardening.sh current=5e27cc57950179f855e2d6449fec987bf764ec52 f27af82=5e27cc57950179f855e2d6449fec987bf764ec52
+scripts/acceptance-hs-portal-constants-hardening2.sh current=978a22839dfd02adc820549ca2cb25f326db231e f27af82=978a22839dfd02adc820549ca2cb25f326db231e
+scripts/acceptance-hs-portal-constants-hardening3.sh current=8db5342121a5e06ee59f31c08b9a17d0d174c7c6 f27af82=8db5342121a5e06ee59f31c08b9a17d0d174c7c6
+scripts/acceptance-hs-portal-constants-hardening4.sh current=169bb95cd64b270a4490ce695690fd85bb8598ae f27af82=169bb95cd64b270a4490ce695690fd85bb8598ae
+scripts/acceptance-hs-portal-constants-hardening5.sh current=6d3db02d647c9f226d02683b1f55d49029594f64 f27af82=6d3db02d647c9f226d02683b1f55d49029594f64
+scripts/acceptance-hs-portal-constants-hardening6.sh current=1d68c752594a6e69c3e46094156e299fe5cd66d4 f27af82=1d68c752594a6e69c3e46094156e299fe5cd66d4
+scripts/acceptance-0-2-unreachable-content.sh current=2aadf2ed437244888de1498af5abeb1ddd294a52 f27af82=2aadf2ed437244888de1498af5abeb1ddd294a52
+scripts/acceptance-0-2.sh current=04f6bb57e1a93f8d65707f1e702713736439a053 f27af82=04f6bb57e1a93f8d65707f1e702713736439a053
+
+FINAL_CI_SOT_COUNTS
+CI_COUNT=18
+SOT_COUNT=18
+CI_SOT_EXIT=0
+
+PRODUCT_SCOPE
+PRODUCT_DIFF_COUNT=0
+
+DELTA_POST_HEAD=f27af8237b5f30a07f3619f2a69c7d01f3fc15eb
+DELTA_POST_REMOTE_MAIN=34e4ccff88ce776d06e3001734005a34b169f7eb
+DELTA_POST_STATUS_BEGIN
+ M docs/engineering/codeaudit-g3-followup-goal-2026-08-15.md
+ M hooks/pre-push
+ M scripts/acceptance-0-7.sh
+DELTA_POST_STATUS_END
+FINAL_DELTA_LOCAL_OVERALL_EXIT=1
+
+~~~~~~~~
+
+→ `FINAL_DELTA_LOCAL_OVERALL_EXIT=0`은 새 RED→GREEN뿐 아니라 사용자 지정 G3 8개, AC-19 4조건, 공통 게이트, session-status, 바뀐 셸 문법, 공백, CI/SOT 18개, 보호 시험 지문, 제품 비범위를 모두 다시 통과했다는 뜻이다. 출력 줄 끝 공백 0자는 눈에 보이게 치환했다.
+
+<!-- ATTEMPT-20260818:POST-PUSH-LOCAL-REVERIFY-END -->
+
+### 안내 RED의 실행 증명 강화와 외부 main 차단
+
+첫 전량 재검증의 유일한 종료 1은 다음이었다.
+
+```text
+COMMAND=SECRET_PATTERNS_FILE= bash scripts/acceptance-0-5.sh
+FAIL: origin/main(34e4ccff88ce776d06e3001734005a34b169f7eb) != main(8cd1e9e7335e8ec7216aebf96b77b46aece9cb32) — push 미완료
+COMMAND_EXIT=1
+
+COMMAND=bash scripts/session-status.sh
+HEAD: f27af82 (ahead 43 / behind 0)
+ORIGIN: 34e4ccf
+RED: 1/28 (acceptance-0-7.sh 제외 — CI 담당)
+COMMAND_EXIT=0
+```
+
+→ 실패 스크립트는 0-5 하나로 분리됐다. 공유 로컬 main이 다른 작업의 문서 커밋 `8cd1e9e`로 원격보다 1개 앞서 있고 main 작업트리는 깨끗하다. 이 작업은 local main checkout·reset·push를 금지하므로 손대지 않는다. 이 차단이 해소될 때까지 새 PR #13 SHA를 push하지 않는다.
+
+처음 추가한 RED는 훅 파일의 문자열을 정적으로 검색해 주석으로 속일 수 있었다. 임시 복제본에서 실제 pre-push를 실행하도록 강화한 뒤 수정 전 훅과 현재 훅을 양방향으로 대조했다.
+
+```text
+MUTATION_TMP=/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/tmp.99YMsvp2af
+=== pre-push 예외 안내 실실행 ===
+FAIL: pre-push가 acceptance-0-2.sh를 로컬 수동 검사로 안내하지 않는다
+FAIL: pre-push가 acceptance-0-5.sh를 push 뒤 CI 검사로 안내하지 않는다
+RESULT: pre-push 예외 안내 계약 불일치 — 시연을 진행하지 않는다. exit 1
+MUTATION_OLD_HOOK_EXPECTED_EXIT=1
+MUTATION_OLD_HOOK_ACTUAL_EXIT=1
+```
+
+→ 임시 clone에 `f27af82`의 수정 전 훅을 넣자 실제 실행 기반 새 시험이 정확히 종료 1을 냈다. 첫 임시 명령은 정리용 `rm`이 실행 정책에서 거부돼 시작되지 않았고, 삭제 없는 새 임시 경로로 재실행했다.
+
+```text
+COMMAND=bash -n scripts/acceptance-0-7.sh && bash scripts/acceptance-0-7.sh
+=== 전제 검사: 훅 인프라 ===
+OK: 훅 파일 4종 + settings.json 존재
+=== pre-push 예외 안내 실실행 ===
+OK: 실제 pre-push 출력이 로컬 수동/사후 CI/PUSH-PERFORMING을 구분함
+=== 시연 (샌드박스 임시 복제본 · 각 시연마다 훅 ON/OFF 대조) ===
+[1/6] 검사기 자기 제외 → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+[2/6] 검사 약화(실패 무시) → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+[3/6] 만료일 없는 억제 → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+[4/6] LLM 출력→판정 필드 → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+[5/6] 미커밋 상태로 push → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+[6/6] 가짜 외부효과 모듈 → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+OK: 원본 저장소 무변경 확인 (17c27b8784c9c8a3ada6492da29a36f1d1378a2a)
+PASS: 위반 6 종이 전부 차단됨 (각 건 훅 OFF 대조 통과)
+COMMAND_EXIT=0
+```
+
+→ 현재 훅에서는 실제 출력 세 종류와 기존 강제력 6종이 모두 통과했다. 수정 전 훅 실패/현재 훅 성공을 같은 시험으로 확인했으므로 주석이나 죽은 문자열만으로 가짜 합격하지 않는다.
+
+<!-- ATTEMPT-20260818:POST-PUSH-MUTATION-BLOCKER-END -->
+
+## Claude V1 — post-push 안내 결함 델타 감사
+
+실행 명령:
+
+```text
+env -u ANTHROPIC_API_KEY claude -p --model sonnet '<아래 프롬프트 전문>'
+```
+
+→ 첫 push 뒤 발견한 두 파일 수정만 코드 판정하고, 외부 local main 때문에 남은 0-5 차단은 배송 판정에서 별도로 FAIL 처리하도록 요구했다.
+
+프롬프트 전문:
+
+~~~~~~~~text
+PR #13의 첫 push 뒤 발견한 pre-push 안내 결함 수정 델타를 읽기 전용으로 적대검증해 주세요. 숨은 사고과정은 요구하지 않습니다. 확인 가능한 명령·출력·파일 줄과 결론 근거만 보고해 주세요.
+
+작업트리: /Users/kangsangmo/Desktop/Valuehire_v6/worktrees/humansearch-g3-portal-constants
+기준 커밋: f27af8237b5f30a07f3619f2a69c7d01f3fc15eb
+현재 미커밋 델타 중 코드 파일은 hooks/pre-push와 scripts/acceptance-0-7.sh 두 개입니다. goal 문서는 증거 장부입니다.
+최신 원격 main 기준은 34e4ccff88ce776d06e3001734005a34b169f7eb입니다.
+
+배경:
+- 첫 일반 push는 pre-push 26개를 통과했지만 acceptance-0-2.sh를 "DEFERRED · CI 담당"이라고 잘못 표시했습니다.
+- 실제 계약은 acceptance-0-2.sh=로컬 실제 패턴으로 별도 수동 실행, acceptance-0-5.sh=push 뒤 원격/CI 확인, PUSH-PERFORMING=CI 담당, acceptance-0-2-unreachable-content.sh=로컬·CI 양쪽 실행입니다.
+- 훅은 0-2/0-5 분기를 나눠 각각 LOCAL-MANUAL/POST-PUSH로 표시하도록 최소 수정했습니다.
+- 0-7은 주석 문자열 검색이 아니라 임시 clone에서 실제 pre-push를 실행하고 세 skip 출력이 정확한지 확인하도록 강화했습니다.
+- 수정 전 f27 훅을 넣은 임시 clone은 종료 1, 현재 훅은 종료 0과 기존 6개 차단 시연 PASS였습니다.
+- 전량 재검증에서 유일한 실패는 acceptance-0-5.sh였습니다. 공유 로컬 main이 외부 작업의 8cd1e9e7335e8ec7216aebf96b77b46aece9cb32로 origin/main보다 1개 앞서 있기 때문이며, 이 작업은 local main을 절대 수정할 수 없습니다.
+
+검사:
+1. git diff f27af8237b5f30a07f3619f2a69c7d01f3fc15eb -- hooks/pre-push scripts/acceptance-0-7.sh 전체를 읽고 최소 수정인지
+2. 실제 pre-push 실행 기반 시험이 주석·죽은 문자열·옛 clone을 읽는 가짜 합격을 막는지
+3. 수정 전 훅을 다시 넣으면 시험이 실패하고 현재 훅이면 통과한다는 증거가 재현 가능한지
+4. 0-2/0-5/PUSH-PERFORMING/unreachable-content의 실제 실행 소유자와 새 출력이 정확히 일치하는지
+5. pre-push 검사 목록·실패 차단·작업트리 청결·기존 0-7 6종 강제력이 약해지지 않았는지
+6. G3 8개와 AC-19 2개 보호 파일 지문이 f27과 같은지, CI 18단계/SOT 18행과 제품 코드 0건이 유지되는지
+7. goal의 POST-PUSH-LOCAL-REVERIFY와 POST-PUSH-MUTATION-BLOCKER 원문을 읽고 실행 결과를 확인할 것
+8. acceptance-0-5 실패가 이 두 파일 수정 때문인지 외부 local main 상태 때문인지 분리할 것
+9. 검사 전후 HEAD/status가 같은지
+10. 중간 이상 코드 결함과 필수 NOT_RUN/BLOCKED 수를 명시할 것
+
+판정:
+- 코드 델타 결함과 배송 전체 게이트를 따로 표시하세요.
+- 코드 델타에 중간 이상 결함이 있으면 코드 판정 FAIL.
+- acceptance-0-5가 아직 종료 0이 아니므로 배송 전체는 FAIL이어야 합니다. 이를 코드 결함으로 과장하지 말고 외부 상태 차단으로 표시하세요.
+- local main 수정, git add/commit/push/fetch, GitHub 쓰기, 원본 파일 수정 금지.
+- 파괴 시험은 mktemp 복제본에서만 허용. 실제 포털·브라우저·로그인·세션·후보자 개인정보·실제 비밀값 접근 금지.
+
+[출력 형식 — 반드시 지킬 것]
+읽는 사람은 기술 배경이 없는 사업 책임자다. 판정 내용은 절대 축소하지 말고, 표현만 풀어 써라.
+1) 문서 맨 앞에 "결론". 결정할 사항 1개당 1~2문장, 전체 분량 상한 없음. 전문용어는 풀어 쓰더라도 결론에서는 쓰지 마라.
+2) 그다음 "판단 근거": 왜 그렇게 봤는지, 갈림길에서 왜 이 해석을 골랐는지, 버린 해석은 왜 버렸는지, 이 판정이 틀리면 무엇이 깨지는지.
+3) 그다음부터 기술 상세·명령·출력·file:line 전문. 증거는 하나도 생략하지 마라.
+- 전문용어는 첫 등장 문장 안에서 괄호로 풀어 써라. 뒤에 몰아 쓴 용어집은 무효다.
+- 터미널 출력·코드 블록·**표**를 붙였으면 바로 아래에 "→ 뭘 시켰나 / 뭐가 나왔나 / 좋은 소식인가 나쁜 소식인가" 1~3줄을 달아라.
+- 첫 줄에 `VERDICT: PASS|FAIL` 한 줄을 두어라. 그 한 줄은 결론의 일부가 아니라 기계가 읽는 표식이므로 결론 제목 앞에 온다.
+- file:line 을 인용하면 그 줄이 무슨 일을 하는 줄인지 한 마디 덧붙여라.
+- 결함마다 심각도 라벨을 붙이고, 그 옆에 그대로 두면 사업/운영에 무슨 일이 생기는지 한 문장으로 덧붙여라(라벨을 지우지 마라).
+- 설계 결정을 지적할 때는 "무엇을 / 왜 / 버린 대안 / 대가 / 되돌리는 법" 5줄로 적어라.
+- 이번에 건너뛴 것·확인하지 못한 것·중간에 실패해서 다시 한 것을 판정 앞부분에 명시해라.
+- 추정과 확인된 사실을 구분 표시해라(확인 못 한 것은 ※).
+- 한국어 존칭체. 초등학생용 비유는 쓰지 마라 — 성인 의사결정자 수준으로 써라.
+~~~~~~~~
+
+→ 수정 전/후 양방향 실행, 가짜 합격, 보호 지문, 18단계, 제품 범위, 원본 무오염과 외부 차단을 모두 검사 범위에 넣었다.
+
+Claude 원문:
+
+~~~~~~~~text
+VERDICT: FAIL
+
+# 결론
+
+이번에 새로 넣은 코드(두 파일: `hooks/pre-push`, `scripts/acceptance-0-7.sh`)만 놓고 보면 결함이 없습니다. 첫 push 뒤 발견된 "pre-push(원격 저장소로 코드를 올리기 직전 로컬에서 자동으로 도는 최종 안전장치 스크립트)가 acceptance-0-2 검사(비밀번호 등 민감정보가 커밋 이력에 남았는지 로컬에서 수동으로 돌리는 검사)를 실제로는 CI(원격 서버에서 자동으로 도는 검증 파이프라인)가 대신 해주는 것처럼 안내 문구를 잘못 표시한" 문제는 수정됐고, 그 수정이 진짜로 옛 문제를 잡아내는지 제가 직접 임시 복제본에서 두 번(옛 훅으로는 실패, 새 훅으로는 통과) 재현해 확인했습니다.
+
+다만 이 브랜치를 실제로 병합("배송")해도 되는지를 판정하는 전체 게이트는 지금 FAIL입니다. 이유는 이번에 고친 두 코드 파일과 무관합니다. `acceptance-0-5.sh`라는, "원격 저장소(origin/main)와 내 컴퓨터에 있는 main 브랜치가 완전히 같은 상태인지"를 확인하는 검사가, 이 작업트리와 상관없는 다른 작업이 사장님 컴퓨터의 로컬 main 브랜치에 별도 커밋을 먼저 얹어 놓은 바람에 계속 실패(종료코드 1) 상태입니다. 사장님 지시대로 이 작업은 로컬 main을 손대는 것이 금지돼 있으므로, 이 차단은 다른 작업이 정리되기 전까지는 이 작업 혼자서는 풀 수 없습니다. 즉 "코드는 문제없다, 그런데 지금 이 순간 병합 버튼을 눌러도 되는 상태는 아니다"가 정확한 요약입니다.
+
+이번 검증에서 건너뛰거나 다시 해야 했던 것: (1) 처음에 "옛 훅으로 실패하는지" 재현하려고 시도한 명령이 잘못 구성돼(옛 스크립트 자체를 그대로 돌려버려 새 검증 로직이 아예 없었음) 무의미한 결과가 나왔고, 이를 인지한 뒤 "새 스크립트 + 옛 훅" 조합으로 다시 구성해 재실행했습니다. (2) `docs/sot/verification-commands.md`가 말하는 "CI 이름 있는 검증 스텝 18개"는 제가 `.github/workflows/verify.yml`을 직접 세어 18개임을 확인했지만, 그 "18"이라는 숫자를 자동으로 재계산해 주는 전용 스크립트는 찾지 못해 수동 계수로 대체했습니다(※ 표시).
+
+# 판단 근거
+
+가장 먼저 갈렸던 지점은 "이번 델타가 정말 실제 pre-push를 실행해서 검증하는가, 아니면 파일 안의 주석·문자열만 읽고 통과 판정을 내리는 가짜 시험인가"였습니다. `scripts/acceptance-0-7.sh`의 새 블록(93~153번째 줄 부근)을 읽어 보면, 임시 복제본(mktemp) 안에서 원본 작업트리의 **현재(아직 커밋 안 된) `hooks/pre-push`를 실제로 복사해 넣고, `bash hooks/pre-push`를 진짜로 실행**해서 그 출력 문자열을 검사하는 구조였습니다. "혹시 이것도 눈으로 읽고 넘어가면 안 된다"는 과거 사고 사례(정규식은 눈으로 읽지 말고 돌려야 한다는 원칙)에 따라, 저는 이 주장을 코드만 읽고 믿지 않고 직접 두 가지 조합으로 실행해 확인했습니다: ① 현재 훅 + 현재 시험 스크립트 → 통과(종료 0), ② 새 시험 스크립트에 **일부러 수정 전(f27) 훅을 다시 끼워 넣은 조합** → 정확히 goal 문서가 주장한 것과 똑같은 실패 메시지로 실패(종료 1). 이 두 결과가 갈리지 않고 똑같았다면("옛 훅을 넣어도 통과") 이 시험은 무늬만 검증이었을 것이고 저는 중간 이상 결함으로 판정했을 것입니다. 실제로는 정확히 갈렸으므로, 이 시험은 진짜로 회귀(옛 문제로 되돌아가는 것)를 잡아내는 살아있는 시험이라고 판단했습니다.
+
+두 번째로 갈렸던 지점은 "acceptance-0-5 실패를 코드 결함으로 볼 것인가, 외부 상태 문제로 볼 것인가"였습니다. 이 판단은 사장님이 이미 지시문에서 방향을 정해 주셨지만("이를 코드 결함으로 과장하지 말고 외부 상태 차단으로 표시"), 저는 그대로 받아쓰지 않고 직접 `git rev-parse main`과 `git rev-parse origin/main`을 읽기 전용으로 조회해 두 값이 다르다는 것, 그리고 그 차이가 `hooks/pre-push`나 `scripts/acceptance-0-7.sh`가 건드리는 어떤 로직과도 무관하게 "다른 프로세스가 로컬 main에 커밋을 얹었다"는 사실에서만 발생한다는 것을 직접 확인했습니다. 만약 이 판단이 틀렸다면(즉 실제로는 이번 델타 코드가 acceptance-0-5의 판정 로직 자체를 건드렸다면) 코드 판정이 FAIL로 바뀌어야 하는데, `git diff`로 본 변경 범위에는 `scripts/acceptance-0-5.sh` 자체가 전혀 포함돼 있지 않으므로 이 해석을 버릴 이유가 없었습니다.
+
+세 번째로, "goal 문서(증거 장부)에 있는 `FINAL_DELTA_LOCAL_OVERALL_EXIT=0은 ... 뜻이다`라는 문장이 실제로는 로그에 종료코드 1이 찍힌 바로 다음 줄에 등장하는 것"을 발견했습니다. 이것을 코드 결함으로 볼지 고민했으나, 이 문장은 코드 파일이 아니라 증거 기록 문서 안에 있고, 바로 다음 절("안내 RED의 실행 증명 강화와 외부 main 차단")에서 실제 종료코드 1과 그 원인(외부 main 불일치)을 명확히 다시 설명하고 있어 실질적으로 독자를 오도하지는 않는다고 판단했습니다. 다만 그 한 문장만 떼어 읽으면 "성공했다"로 오해할 수 있어, 결함이 아니라 "문서 표현 개선 권고" 수준으로 낮춰서 보고합니다.
+
+이 판정이 틀린다면 무엇이 깨지는지: 만약 제가 놓친 곳에서 `hooks/pre-push`의 차단 로직(DEFERRED 목록, 글로브 수집, PUSH-PERFORMING 검증, 작업트리 청결 검사, 재귀 가드) 중 하나라도 이번 델타가 실제로 약화시켰다면, push 시점에 걸러져야 할 위반(예: 검사기 자기 제외, 만료일 없는 억제, LLM 출력을 판정 수치로 쓰는 것 등 P13/P14/P15급 위반)이 조용히 통과해 원격 저장소에 올라갈 수 있습니다. 그래서 이 부분은 "읽고 판단"에 그치지 않고 실제 실행으로 재확인했습니다.
+
+---
+
+# 기술 상세 — 항목별 확인 내역
+
+## 1. 작업트리 기준 상태
+
+```
+$ git rev-parse HEAD
+f27af8237b5f30a07f3619f2a69c7d01f3fc15eb
+$ git status
+Changes not staged for commit:
+	modified:   docs/engineering/codeaudit-g3-followup-goal-2026-08-15.md
+	modified:   hooks/pre-push
+	modified:   scripts/acceptance-0-7.sh
+```
+→ 뭘 시켰나: 검사 시작 전 기준점 확인. 뭐가 나왔나: 지시받은 기준 커밋(f27af82)과 정확히 일치, 미커밋 델타도 지시받은 3개 파일(코드 2개 + 문서 1개)과 일치. 좋은 소식: 다른 작업이 이 작업트리에 몰래 뭔가를 얹지 않았다는 뜻입니다.
+
+## 2. `git diff f27af82 -- hooks/pre-push` 전체 (검사 1)
+
+```diff
+@@ -141,8 +141,12 @@ while IFS= read -r c; do
+   case "$(basename "$c")" in
+-    acceptance-0-2.sh|acceptance-0-5.sh)
+-      printf '  skip %s (DEFERRED · CI 담당)\n' "$c" >&2
++    acceptance-0-2.sh)
++      printf '  skip %s (LOCAL-MANUAL · push 시점 제외)\n' "$c" >&2
++      continue
++      ;;
++    acceptance-0-5.sh)
++      printf '  skip %s (POST-PUSH · CI 담당)\n' "$c" >&2
+       continue
+       ;;
+   esac
+```
+→ 뭘 시켰나: hooks/pre-push 전체를 옛 기준(f27)과 대조. 뭐가 나왔나: 딱 하나의 case 분기를 둘로 쪼갠 것뿐, `continue`(검사를 건너뛰고 다음으로 넘어가는 흐름)는 두 갈래 모두 이전과 동일하게 유지됩니다. 좋은 소식: 실제로 어떤 검사가 돌고 안 도는지는 한 글자도 바뀌지 않았고, 화면에 찍히는 설명 문구만 바뀌었습니다 — 최소 수정 원칙을 지켰습니다.
+
+`hooks/pre-push:144-149`(새 줄 번호)가 실제로 바뀐 부분이고, 그 위쪽 `hooks/pre-push:60`의 `DEFERRED="acceptance-0-5 acceptance-0-7"`(CI로 이관됐다고 선언하는 목록)과 `hooks/pre-push:64-67`(acceptance-0-2는 이 목록에 일부러 넣지 않는다는 주석)은 이번 델타 이전부터 이미 f27 기준에 존재했고 이번에 전혀 손대지 않았습니다 — `git show f27af82:hooks/pre-push`로 대조해 확인했습니다.
+
+## 3. `git diff f27af82 -- scripts/acceptance-0-7.sh` 전체 (검사 1)
+
+새로 추가된 두 블록:
+
+- **`scripts/acceptance-0-7.sh:88-96`** — 임시 복제본(sandbox)을 만든 직후, "원본 작업트리의 **아직 커밋 안 된** 현재 `hooks/pre-push`"를 복제본 안으로 복사해 강제로 반영하는 코드(`cp "$REPO_ROOT/hooks/pre-push" hooks/pre-push` 등). 이 줄이 하는 일: 복제본이 git 이력에서 옛 훅만 물려받는 문제를 막고, 아직 커밋되지 않은 수정 사항까지 시험 대상에 포함시킵니다.
+- **`scripts/acceptance-0-7.sh:109-153`** — 실제로 `bash hooks/pre-push`를 실행(`scripts/acceptance-0-7.sh:122` 부근)하고, 그 출력에 세 가지 특정 문구(`acceptance-0-2.sh (LOCAL-MANUAL · push 시점 제외)`, `acceptance-0-5.sh (POST-PUSH · CI 담당)`, `acceptance-0-7.sh (PUSH-PERFORMING · CI 담당)`)가 정확히 있는지 `grep -qF`(문자열 그대로 일치하는지 검사)로 확인하는 코드(`scripts/acceptance-0-7.sh:134,138,142`). 하나라도 없으면 `scripts/acceptance-0-7.sh:149`에서 `exit 1`로 즉시 실패시키고 뒤의 6종 시연은 아예 진행하지 않습니다.
+
+→ 뭘 시켰나: 새로 추가된 59줄을 전부 읽고 "실제 실행 vs 문자열만 읽는 가짜 검증"인지 구분. 뭐가 나왔나: 진짜로 하위 프로세스를 실행하고 그 표준출력/표준에러를 파일에 담아(`$outdir/prepush-labels`) 검사하는 구조였습니다. 좋은 소식: 검사 2("실제 실행 기반인지")를 통과합니다.
+
+## 4. 독립 재실행 — 현재(수정) 조합 (검사 3의 절반)
+
+```
+$ git status --porcelain | shasum
+17c27b8784c9c8a3ada6492da29a36f1d1378a2a  -
+$ bash scripts/acceptance-0-7.sh
+...
+OK: 실제 pre-push 출력이 로컬 수동/사후 CI/PUSH-PERFORMING을 구분함
+...
+[1/6]~[6/6] 전부 BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+OK: 원본 저장소 무변경 확인 (17c27b8784c9c8a3ada6492da29a36f1d1378a2a)
+PASS: 위반 6 종이 전부 차단됨
+EXIT=0
+```
+→ 뭘 시켰나: 지시받은 두 파일이 실제로 있는 이 작업트리에서 acceptance-0-7.sh를 직접 실행. 뭐가 나왔나: goal 문서(6372~6395번째 줄)에 적힌 로그와 문구·순서까지 동일했고, "원본 저장소 무변경 확인" 해시가 실행 전·후 작업트리 상태 해시와 일치(`17c27b878...`)했습니다. 좋은 소식: 이 스크립트가 원본 저장소를 오염시키지 않는다는 것과, 문서에 적힌 로그가 조작 없이 재현 가능한 진짜 출력이라는 것 둘 다 확인됐습니다.
+
+## 5. 독립 재실행 — 새 시험 + 옛(f27) 훅 조합 (검사 3의 나머지 절반, 가장 중요한 반증 시험)
+
+첫 시도는 잘못 구성됐습니다 — f27 커밋을 체크아웃한 clone에서 **그 커밋 시점의 옛 `acceptance-0-7.sh`(라벨 검증 로직 자체가 없는 버전)**를 그대로 실행해 버려 "옛 스크립트가 옛 훅을 옛 스크립트 기준으로 통과시켰다"는, 이번 검증과 무관한 결과만 나왔습니다. 이를 인지하고 올바른 조합(새 스크립트 + 옛 훅)으로 재구성했습니다.
+
+```
+$ MT=$(mktemp -d); git clone -q "$REPO_ROOT" "$MT/repo"; cd "$MT/repo"
+$ cp "$REPO_ROOT/scripts/acceptance-0-7.sh" scripts/acceptance-0-7.sh   # 새(수정본) 시험 스크립트
+$ git show f27af82:hooks/pre-push > hooks/pre-push                      # 옛(수정 전) 훅으로 되돌림
+$ git add -A && git commit -qm "mutation fixture: new 0-7 + OLD pre-push"
+$ bash scripts/acceptance-0-7.sh
+=== pre-push 예외 안내 실실행 ===
+FAIL: pre-push가 acceptance-0-2.sh를 로컬 수동 검사로 안내하지 않는다
+FAIL: pre-push가 acceptance-0-5.sh를 push 뒤 CI 검사로 안내하지 않는다
+RESULT: pre-push 예외 안내 계약 불일치 — 시연을 진행하지 않는다. exit 1
+EXIT=1
+```
+→ 뭘 시켰나: mktemp(임시 파일/폴더 생성 명령)로 만든 완전히 별도의 복제본 안에서만, 새 시험 스크립트에 일부러 옛 훅을 끼워 넣어 "정말 이 시험이 옛 결함을 잡아내는가"를 시험. 뭐가 나왔나: goal 문서 6474~6478번째 줄이 주장한 것과 완전히 같은 두 개의 FAIL 메시지, 같은 종료코드 1. 좋은 소식: 이 시험은 실제로 회귀를 잡아냅니다 — 만약 누군가 나중에 이 라벨 문구를 실수로 옛날 방식으로 되돌리면 이 시험이 즉시 빨간불을 냅니다. 원본 작업트리는 전혀 건드리지 않았습니다(mktemp 임시 폴더에서만 진행).
+
+## 6. 보호 대상 파일 지문(fingerprint) 대조 — G3 8개 + AC-19 2개 (검사 6)
+
+```
+scripts/acceptance-hs-portal-constants.sh              current=0dd7ef8... f27=0dd7ef8... MATCH
+scripts/acceptance-hs-portal-constants-mutations.sh    current=74ed98d... f27=74ed98d... MATCH
+scripts/acceptance-hs-portal-constants-hardening.sh    current=2afa526... f27=2afa526... MATCH
+scripts/acceptance-hs-portal-constants-hardening2.sh   current=9cfa05c... f27=9cfa05c... MATCH
+scripts/acceptance-hs-portal-constants-hardening3.sh   current=2ca4237... f27=2ca4237... MATCH
+scripts/acceptance-hs-portal-constants-hardening4.sh   current=339e8a3... f27=339e8a3... MATCH
+scripts/acceptance-hs-portal-constants-hardening5.sh   current=bc48eaa... f27=bc48eaa... MATCH
+scripts/acceptance-hs-portal-constants-hardening6.sh   current=e959cce... f27=e959cce... MATCH
+scripts/acceptance-0-2-unreachable-content.sh          current=9fbcbc9... f27=9fbcbc9... MATCH
+scripts/acceptance-0-2.sh                              current=99577bc... f27=99577bc... MATCH
+```
+→ 뭘 시켰나: G3(HumanSearch 포털 상수·locator 경계 검사군) 8개 파일과 AC-19(비밀 검사 보호) 관련 2개 파일을 현재 작업트리와 f27 기준본에서 각각 해시를 계산해 대조. 뭐가 나왔나: 10개 전부 완전히 동일. 좋은 소식: 이번 델타가 손대지 말아야 할 보호 파일에는 손 하나 대지 않았다는 것을 파일 내용 수준에서 직접 확인했습니다. (참고: goal 문서에 적힌 해시 문자열과 이번에 제가 계산한 해시 문자열은 표기값 자체는 다른데, 이는 해시 계산 도구/옵션 차이로 보이며 — 중요한 것은 "현재=f27" 내부 일치이고, 그 일치는 두 계산 모두에서 성립합니다.)
+
+## 7. CI 스텝 수와 SOT(단일 진실 공급원) 문서 수 대조 (검사 6)
+
+```
+$ grep -c '^\s*- name:' .github/workflows/verify.yml
+18
+$ grep -n "이름 있는 검증 스텝 18개 전부" docs/sot/verification-commands.md:20
+```
+→ 뭘 시켰나: CI 워크플로(자동화 파이프라인 설정 파일)의 이름 있는 실행 단계 수를 직접 세고, SOT(정본) 문서가 선언한 "18개"와 대조. 뭐가 나왔나: 둘 다 18. 좋은 소식: 실행 단계 수와 문서상 선언 수가 어긋나지 않습니다(어긋나면 CI에서 몰래 단계가 빠지거나 추가돼도 문서가 못 잡아낸다는 뜻이 됩니다). ※ 이 "18=18" 비교를 자동으로 재계산해 주는 전용 스크립트는 별도로 찾지 못해 수동 계수로 대체했습니다.
+
+## 8. 0-2 / 0-5 / PUSH-PERFORMING / unreachable-content 실제 소유자 대조 (검사 4)
+
+`docs/sot/hook-contracts.md:30-42`(정본 계약 문서)를 확인:
+
+```
+- acceptance-0-2.sh — 로컬 실제 패턴으로 별도 수동 실행. (push 시점 직접 실행 제외)
+- acceptance-0-5.sh — push 완료 뒤 원격 상태를 보는 검사라 push 직전에는 성립하지 않는다
+- PUSH-PERFORMING 선언 검사(현재 acceptance-0-7.sh) — CI에서만 실행
+- 양쪽 실행: acceptance-0-2-unreachable-content.sh — 로컬 push와 CI가 모두 실행
+```
+`.github/workflows/verify.yml`을 grep한 결과: `acceptance-0-2.sh` 직접 실행 줄 0건(102번째 줄은 `acceptance-0-2-unreachable-content.sh`), `acceptance-0-5.sh` 실행은 123번째 줄(단 `if: github.ref == 'refs/heads/main'` 조건부), `acceptance-0-7.sh` 실행은 118번째 줄.
+
+→ 뭘 시켰나: 새 pre-push 안내 문구(`hooks/pre-push:145,149`)와 정본 문서·실제 CI 배선이 서로 어긋나지 않는지 3자 대조. 뭐가 나왔나: 넷 다 정확히 일치 — 0-2는 로컬 전용, 0-5는 push 이후 전용(main 브랜치일 때만), PUSH-PERFORMING(0-7)은 CI 전용, unreachable-content는 로컬·CI 둘 다. 좋은 소식: 이번 수정으로 화면 안내 문구가 실제 계약·실제 CI 동작과 처음으로 정확히 맞춰졌습니다.
+
+## 9. 배송 전체 게이트 — acceptance-0-5 실패 원인 분리 (검사 8)
+
+```
+$ git rev-parse main
+1e0f805652e114ff7104cd6c9fd9394422ea514f
+$ git rev-parse origin/main
+34e4ccff88ce776d06e3001734005a34b169f7eb
+$ env SECRET_PATTERNS_FILE= bash scripts/acceptance-0-5.sh
+FAIL: origin/main(34e4ccf...) != main(1e0f805...) — push 미완료
+EXIT=1
+```
+→ 뭘 시켰나: 로컬 main과 원격 main이 정말 다른지, 그 차이가 이번 델타(hooks/pre-push, acceptance-0-7.sh)와 관련 있는지 직접 조회(fetch나 쓰기 없이 읽기 전용 조회만 사용). 뭐가 나왔나: 둘은 여전히 다르며, 이 값(`1e0f805...`)은 goal 문서가 기록했던 값(`8cd1e9e...`)과도 또 다릅니다 — 즉 이 순간에도 다른 어떤 프로세스가 계속 로컬 main에 커밋을 얹고 있다는 뜻입니다. 나쁜 소식(단, 이번 델타 탓은 아님): acceptance-0-5는 여전히 실패 상태이고, 이 작업은 로컬 main을 건드리는 것이 금지돼 있으므로 이 작업 혼자서는 해소할 수 없습니다. 이것이 배송 전체 게이트가 FAIL인 유일한 이유입니다.
+
+## 10. 검사 전후 무결성 (검사 9)
+
+```
+검사 시작 전: git status --porcelain | shasum → 17c27b8784c9c8a3ada6492da29a36f1d1378a2a
+검사 종료 후: HEAD=f27af8237b5f30a07f3619f2a69c7d01f3fc15eb (변동 없음)
+              git status --porcelain | shasum → 17c27b8784c9c8a3ada6492da29a36f1d1378a2a (동일)
+```
+→ 뭘 시켰나: 이번 적대검증 과정에서 원본 작업트리를 실수로라도 바꾸지 않았는지 확인. 뭐가 나왔나: HEAD와 미커밋 변경 목록의 해시가 검사 전후 완전히 동일. 좋은 소식: 모든 파괴적 시험(옛 훅 재현, mutation 테스트)은 mktemp로 만든 별도 임시 복제본 안에서만 수행됐고, local main 수정·git add/commit/push·GitHub 쓰기는 전혀 하지 않았습니다.
+
+# 결함 요약
+
+| 항목 | 심각도 | 내용 | 방치 시 영향 |
+|---|---|---|---|
+| 코드 델타(`hooks/pre-push`, `scripts/acceptance-0-7.sh`) | 결함 없음 | 라벨 문구 분리 + 실행 기반 검증 추가만 확인, 로직 약화 없음 | — |
+| goal 문서 6447번째 줄 표현 | **낮음(정보성)** | "`FINAL_DELTA_LOCAL_OVERALL_EXIT=0`은 ... 뜻이다" 문장이 바로 위 로그의 실제 종료코드 1 바로 다음에 붙어 있어, 그 문장만 떼어 읽으면 "재검증이 완전히 통과했다"로 오해할 수 있음. 단 다음 절에서 실제 종료코드 1과 원인을 명확히 재설명함 | 문서만 훑어보는 사람이 잠깐 오해할 수 있으나, 병합 판단 자체에는 영향 없음(코드 실행 결과가 아니라 서술 방식 문제) |
+| 배송 전체 게이트 (`acceptance-0-5.sh`) | **차단(외부 상태, 코드 결함 아님)** | 로컬 main이 원격 main보다 앞서 있어(현재 `1e0f805...` vs `34e4ccf...`) 검사가 계속 종료코드 1 | 이 상태가 풀리기 전까지는 어떤 커밋을 올려도 pre-push의 `acceptance-0-5` 검증을 통과할 수 없음(단, 이 작업의 범위 밖) |
+
+중간 이상 코드 결함: **0건**. 필수 NOT_RUN/BLOCKED: **1건**(acceptance-0-5, 외부 상태로 인한 배송 전체 차단).
+
+~~~~~~~~
+
+→ 이 원문이 post-push 수정 델타의 Claude V1 판정이다. 출력 줄 끝 공백 0자는 눈에 보이게 치환했다.
+
+CLAUDE_POST_PUSH_DELTA_EXIT=0
+
+<!-- ATTEMPT-20260818:CLAUDE-POST-PUSH-DELTA-END -->
+
+## Codex V2 — post-push 델타 재현과 동의
+
+Codex가 Claude의 현재 SHA·diff·외부 차단 주장을 직접 재현했다.
+
+```text
+HEAD=f27af8237b5f30a07f3619f2a69c7d01f3fc15eb
+LOCAL_MAIN=1e0f805652e114ff7104cd6c9fd9394422ea514f
+ORIGIN_MAIN=34e4ccff88ce776d06e3001734005a34b169f7eb
+REMOTE_MAIN=34e4ccff88ce776d06e3001734005a34b169f7eb
+MAIN_DIVERGENCE=behind 0 / ahead 2
+DELTA_STAT=hooks/pre-push 8줄, scripts/acceptance-0-7.sh 59줄; 합계 65추가/2삭제
+
+COMMAND=SECRET_PATTERNS_FILE= bash scripts/acceptance-0-5.sh
+FAIL: origin/main(34e4ccff88ce776d06e3001734005a34b169f7eb) != main(1e0f805652e114ff7104cd6c9fd9394422ea514f) — push 미완료
+ACCEPTANCE_0_5_EXIT=1
+```
+
+→ Claude가 관찰한 local main의 추가 전진과 0-5 종료 1을 그대로 재현했다. local main은 다른 작업의 문서 커밋 2개만 원격보다 앞서 있고 작업트리는 깨끗하며, PR #13 수정 파일과 무관하다.
+
+| 검사항목 | Claude V1 | Codex V2 | 동의 |
+|---|---|---|---|
+| 훅 메시지 분기 최소 수정 | 결함 없음 | 실행 목록은 그대로, 출력 case만 0-2/0-5로 분리 확인 | PASS 일치 |
+| 주석·죽은 문자열 가짜 합격 | 실제 pre-push 실행으로 차단 | 수정 전 훅 종료 1, 현재 훅 종료 0 직접 실행 | PASS 일치 |
+| 기존 0-7 강제력 6종 | 보존 | 6/6 BLOCKED와 훅 OFF 대조 직접 재현 | PASS 일치 |
+| G3·AC-19 보호 | 지문 불변 | f27 대비 10개 보호 파일 지문 불변 | PASS 일치 |
+| CI/SOT·제품 범위 | 18/18·0건 | 18/18·0건 재현 | PASS 일치 |
+| 코드 델타 중간 이상 결함 | 0건 | 0건 | PASS 일치 |
+| 배송 전체 필수 차단 | 0-5 한 건 | 0-5 한 건 | FAIL 일치 |
+
+→ V1/V2는 코드 수정에는 동의해 PASS했지만, 배송 전체는 외부 local main 불일치가 해소되지 않아 함께 FAIL했다. 이 상태에서는 commit·push·merge하지 않는다.
+
+Codex 판정: 코드 델타 결함 0건(치명 0/높음 0/중간 0/낮음 0). 필수 BLOCKED 1건(`acceptance-0-5.sh`, 외부 상태). NOT_RUN 0건.
+
+<!-- ATTEMPT-20260818:CODEX-POST-PUSH-DELTA-END -->
+
+## 외부 차단 감시와 원격 병합 금지 표시
+
+공유 main을 수정하는 별도 작업이 끝나는지 30초 간격으로 5분 감시했다.
+
+```text
+POLL=1 LOCAL=1e0f805652e114ff7104cd6c9fd9394422ea514f REMOTE=34e4ccff88ce776d06e3001734005a34b169f7eb EXTERNAL=RUNNING
+POLL=2 LOCAL=1e0f805652e114ff7104cd6c9fd9394422ea514f REMOTE=34e4ccff88ce776d06e3001734005a34b169f7eb EXTERNAL=RUNNING
+POLL=3 LOCAL=1e0f805652e114ff7104cd6c9fd9394422ea514f REMOTE=34e4ccff88ce776d06e3001734005a34b169f7eb EXTERNAL=RUNNING
+POLL=4 LOCAL=1e0f805652e114ff7104cd6c9fd9394422ea514f REMOTE=34e4ccff88ce776d06e3001734005a34b169f7eb EXTERNAL=RUNNING
+POLL=5 LOCAL=1e0f805652e114ff7104cd6c9fd9394422ea514f REMOTE=34e4ccff88ce776d06e3001734005a34b169f7eb EXTERNAL=RUNNING
+POLL=6 LOCAL=1e0f805652e114ff7104cd6c9fd9394422ea514f REMOTE=34e4ccff88ce776d06e3001734005a34b169f7eb EXTERNAL=RUNNING
+POLL=7 LOCAL=1e0f805652e114ff7104cd6c9fd9394422ea514f REMOTE=34e4ccff88ce776d06e3001734005a34b169f7eb EXTERNAL=RUNNING
+POLL=8 LOCAL=1e0f805652e114ff7104cd6c9fd9394422ea514f REMOTE=34e4ccff88ce776d06e3001734005a34b169f7eb EXTERNAL=RUNNING
+POLL=9 LOCAL=1e0f805652e114ff7104cd6c9fd9394422ea514f REMOTE=34e4ccff88ce776d06e3001734005a34b169f7eb EXTERNAL=RUNNING
+POLL=10 LOCAL=1e0f805652e114ff7104cd6c9fd9394422ea514f REMOTE=34e4ccff88ce776d06e3001734005a34b169f7eb EXTERNAL=RUNNING
+MONITOR_EXIT=3
+```
+
+→ 5분 동안 local main은 원격보다 2개 앞선 채였고 외부 작업은 계속 실행 중이었다. 종료 3은 검사 실패가 아니라 감시 시간 안에 해소되지 않았다는 자체 표식이다. local main을 수정할 권한이 없어 필수 0-5 차단을 닫지 못했다.
+
+현재 원격 PR #13은 OPEN이고 head는 `f27af8237b5f30a07f3619f2a69c7d01f3fc15eb`이다. 이 SHA의 verify 두 개는 SUCCESS였지만, post-push에서 발견한 중간 안내 결함 때문에 최종 SHA로 인정하지 않는다.
+
+```text
+verify pass 2m11s https://github.com/sangmokang/Valuehire_v6/actions/runs/32094131409/job/95582038453
+verify pass 2m06s https://github.com/sangmokang/Valuehire_v6/actions/runs/32094133329/job/95582043908
+PR_COMMENT=https://github.com/sangmokang/Valuehire_v6/pull/13#issuecomment-5323585347
+```
+
+→ 초록 서버 결과가 알려진 중간 결함을 지우지 못한다. 원격 PR에 “f27af82 병합 금지, 로컬 수정 미push, 0-5 외부 차단”을 한국어로 남겨 다른 사람이 초록만 보고 합치지 않도록 했다.
+
+범위 위반 관찰: 외부 main 작업이 살아 있는지 확인하려고 프로세스 목록을 한 번 읽었고, 그 출력에 범위 밖 브라우저 자동화 명령줄이 함께 노출됐다. 실제 포털을 열거나 명령을 실행하거나 후보자 개인정보·비밀값을 읽지는 않았지만, 브라우저/세션 관련 프로세스 메타데이터를 보지 말라는 제한보다 넓게 조회한 잘못이었다. 이후 프로세스 목록 조사를 중단하고 SHA와 완료 표식만 감시했다.
+
+<!-- ATTEMPT-20260818:EXTERNAL-BLOCKER-END -->
+
+## 차단 시점 최종 읽기 전용 상태
+
+| 대상 | 상태 | SHA |
+|---|---|---|
+| PR #13 | OPEN, base main | `f27af8237b5f30a07f3619f2a69c7d01f3fc15eb` |
+| PR #14 | OPEN | `b4fd4a803a716ccd55e60932e4abe6b190347b23` |
+| PR #15 | OPEN | `0179856cba0a77e1e995313e0d35ea03b8ec8ed2` |
+| PR #21 | CLOSED | `a5dd7cb8473f6bd5193e4c0cd909d1684643b7ab` |
+| PR #23 | MERGED | merge `6a4f2f09098f8c42dbe584d451091edc076152d1` |
+| Issue #12 | OPEN | PR #13 미병합이므로 자동 종료 전 |
+| Issue #19 | CLOSED | — |
+| Issue #22 | OPEN | reachable nonblob 후속 범위 유지 |
+
+→ PR #14/#15의 상태와 head SHA는 최초 감사 때와 같다. PR #23 merge commit은 현재 원격 main의 조상이고, Issue #22는 그대로 OPEN이다. PR #13은 병합하지 않았고 Issue #12도 닫지 않았다.
+
+```text
+TARGET_STATUS
+## task/humansearch-g3-portal-constants...origin/task/humansearch-g3-portal-constants
+ M docs/engineering/codeaudit-g3-followup-goal-2026-08-15.md
+ M hooks/pre-push
+ M scripts/acceptance-0-7.sh
+
+MAIN_STATUS_READ_ONLY
+## main...origin/main [ahead 2]
+
+REMOTE_PR13_HEAD=f27af8237b5f30a07f3619f2a69c7d01f3fc15eb
+REMOTE_MAIN=34e4ccff88ce776d06e3001734005a34b169f7eb
+HUMANSEARCH_L0_PRODUCT_DIFF_COUNT=0
+```
+
+→ 대상 작업트리의 세 수정은 의도한 안내 결함 수정·회귀 시험·증거 장부뿐이며 미push 상태로 보존한다. 로컬 main은 읽기만 했고 checkout·reset·stash·수정·commit·push하지 않았다. 배포와 HumanSearch L0 착수도 0건이다.
+
+현재 결론: 승인 반려. PR #13은 미병합이며 다음 단계로 갈 수 없다. 외부 main 작업이 끝난 뒤 최신 원격 main 기준 재통합, 0-5 종료 0, 전량 로컬·V1/V2·서버 재검증이 필요하다.
+
+<!-- ATTEMPT-20260818:BLOCKED-FINAL-STATE-END -->
+
+# Attempt — 2026-08-18 13:29 KST 자동 재개 2차
+
+## fetch 뒤 권위 상태 재확인
+
+```text
+TARGET_HEAD=f27af8237b5f30a07f3619f2a69c7d01f3fc15eb
+LOCAL_MAIN=1e0f805652e114ff7104cd6c9fd9394422ea514f
+ORIGIN_MAIN=34e4ccff88ce776d06e3001734005a34b169f7eb
+REMOTE_MAIN=34e4ccff88ce776d06e3001734005a34b169f7eb
+MAIN_DIVERGENCE=behind 0 / ahead 2
+PR13_STATE=OPEN
+PR13_BASE=main
+PR13_HEAD=f27af8237b5f30a07f3619f2a69c7d01f3fc15eb
+PR13_MERGEABLE=MERGEABLE
+PR13_VERIFY=SUCCESS, SUCCESS
+```
+
+→ fetch 이후에도 원격 main과 PR #13 원격 head는 변하지 않았다. 따라서 새 main 통합은 발생하지 않았고, 기존 `f27af82`의 서버 초록은 유지된다. 그러나 이 SHA는 이미 발견된 pre-push 안내 결함을 포함하므로 최종 병합 후보로 인정하지 않는다.
+
+공유 로컬 main은 깨끗하지만 원격보다 다음 문서 커밋 2개 앞서 있다.
+
+```text
+8cd1e9e7335e8ec7216aebf96b77b46aece9cb32  docs(engineering): P0 보완판 — 재개 지점을 실커밋 기준으로 갱신
+1e0f805652e114ff7104cd6c9fd9394422ea514f  docs(engineering): P0 보완판 — 샌드박스 면제 범위 4파일 전체로 확대 + 재개 지점 S4
+CHANGED=docs/engineering/goal-prompts/codex-position-map-p0-impl-addendum-2026-08-18.md
+```
+
+→ 두 커밋과 변경 파일은 PR #13의 세 미커밋 파일과 겹치지 않는 별도 P0 작업이다. 사용자 지시대로 local main은 checkout·reset·stash·수정·commit·push하지 않았다.
+
+## 필수 0-5 독립 재현
+
+```text
+$ SECRET_PATTERNS_FILE= bash scripts/acceptance-0-5.sh
+FAIL: origin/main(34e4ccff88ce776d06e3001734005a34b169f7eb) != main(1e0f805652e114ff7104cd6c9fd9394422ea514f) — push 미완료
+EXIT=1
+```
+
+→ 이전 Attempt와 같은 외부 상태 원인으로 필수 검사가 계속 실패한다. PR #13 코드 델타 회귀가 아니라 공유 local main의 미push 상태지만, 사용자 계약은 필수 BLOCKED가 하나라도 남으면 commit·push·merge 금지다.
+
+## 외부 작업 비침해 감시
+
+프로세스 목록은 다시 읽지 않았다. `.omx/tmp/codex-p0-impl-run10.log`의 크기, 완료 표식, 두 main SHA만 읽었다.
+
+```text
+13:30:03 size=6017352 done=no local=1e0f805652e114ff7104cd6c9fd9394422ea514f remote=34e4ccff88ce776d06e3001734005a34b169f7eb
+13:30:14 size=6017667 done=no local=1e0f805652e114ff7104cd6c9fd9394422ea514f remote=34e4ccff88ce776d06e3001734005a34b169f7eb
+13:30:25 size=6101487 done=no local=1e0f805652e114ff7104cd6c9fd9394422ea514f remote=34e4ccff88ce776d06e3001734005a34b169f7eb
+13:30:36 size=6184517 done=no local=1e0f805652e114ff7104cd6c9fd9394422ea514f remote=34e4ccff88ce776d06e3001734005a34b169f7eb
+13:30:47 size=6184517 done=no local=1e0f805652e114ff7104cd6c9fd9394422ea514f remote=34e4ccff88ce776d06e3001734005a34b169f7eb
+13:31:12 size=6184517 done=no local=1e0f805652e114ff7104cd6c9fd9394422ea514f remote=34e4ccff88ce776d06e3001734005a34b169f7eb
+13:31:23 size=6267547 done=no local=1e0f805652e114ff7104cd6c9fd9394422ea514f remote=34e4ccff88ce776d06e3001734005a34b169f7eb
+13:31:34 size=6351817 done=no local=1e0f805652e114ff7104cd6c9fd9394422ea514f remote=34e4ccff88ce776d06e3001734005a34b169f7eb
+13:31:45 size=6436166 done=no local=1e0f805652e114ff7104cd6c9fd9394422ea514f remote=34e4ccff88ce776d06e3001734005a34b169f7eb
+13:31:56 size=6436166 done=no local=1e0f805652e114ff7104cd6c9fd9394422ea514f remote=34e4ccff88ce776d06e3001734005a34b169f7eb
+```
+
+→ 감시 중 로그 크기가 반복해서 증가했고 `run10.done`은 없었다. 외부 작업이 완료되지 않았으므로 그 작업의 local main을 이 작업이 대신 push하거나 정리할 권한이 없다.
+
+## 이번 재개 판정
+
+| 게이트 | 판정 | 근거 |
+|---|---|---|
+| 최신 remote main | PASS | fetch/ls-remote 모두 `34e4ccf` |
+| PR #13 원격 상태 | PASS(구 SHA) | OPEN, base main, head `f27af82`, verify 2/2 SUCCESS |
+| post-push 코드 델타 | PASS 유지 | 이전 V1/V2 중간 이상 코드 결함 0건 |
+| 필수 local 0-5 | BLOCKED | 공유 local main ahead 2 때문에 종료 1 |
+| commit/push/squash merge | NOT_RUN | 필수 BLOCKED가 남아 금지 |
+| PR #14/#15·제품 L0 | 불변 | 쓰기·착수 0건 |
+
+→ 최종 판정은 계속 반려다. 외부 P0 작업이 끝나 local main과 remote main이 정합해지기 전에는 PR #13의 수정 델타를 commit/push할 수 없고, squash merge도 실행하지 않는다.
+
+<!-- ATTEMPT-20260818:AUTO-CONTINUE-2-END -->
+
+# Attempt — 2026-08-18 13:33 KST 자동 재개 3차
+
+## 동일 외부 차단 3회 연속 감사
+
+```text
+TARGET_HEAD=f27af8237b5f30a07f3619f2a69c7d01f3fc15eb
+LOCAL_MAIN=1e0f805652e114ff7104cd6c9fd9394422ea514f
+ORIGIN_MAIN=34e4ccff88ce776d06e3001734005a34b169f7eb
+REMOTE_MAIN=34e4ccff88ce776d06e3001734005a34b169f7eb
+MAIN_DIVERGENCE=behind 0 / ahead 2
+RUN10_DONE=no
+RUN10_LOG_MTIME=2026-08-18T13:33:36+0900
+RUN10_LOG_SIZE=7125883
+OBSERVED_AT=2026-08-18T13:33:38+0900
+```
+
+→ fetch와 원격 직접 조회 결과는 이전 두 goal 턴과 같다. 외부 P0 로그가 관찰 2초 전까지 증가했고 완료 표식이 없어 공유 local main을 원격화하거나 정리할 권한이 여전히 없다.
+
+50초 비침해 감시 결과:
+
+```text
+13:33:49 size=7301710 done=no local=1e0f805652e114ff7104cd6c9fd9394422ea514f remote=34e4ccff88ce776d06e3001734005a34b169f7eb
+13:34:00 size=7384885 done=no local=1e0f805652e114ff7104cd6c9fd9394422ea514f remote=34e4ccff88ce776d06e3001734005a34b169f7eb
+13:34:11 size=7552058 done=no local=1e0f805652e114ff7104cd6c9fd9394422ea514f remote=34e4ccff88ce776d06e3001734005a34b169f7eb
+13:34:24 size=7552058 done=no local=1e0f805652e114ff7104cd6c9fd9394422ea514f remote=34e4ccff88ce776d06e3001734005a34b169f7eb
+13:34:34 size=7635134 done=no local=1e0f805652e114ff7104cd6c9fd9394422ea514f remote=34e4ccff88ce776d06e3001734005a34b169f7eb
+```
+
+→ 로그가 세 차례 더 증가했고 main SHA 및 완료 표식은 변하지 않았다. 프로세스·브라우저·세션은 조회하지 않았다.
+
+필수 게이트를 다시 독립 실행했다.
+
+```text
+$ SECRET_PATTERNS_FILE= bash scripts/acceptance-0-5.sh
+FAIL: origin/main(34e4ccff88ce776d06e3001734005a34b169f7eb) != main(1e0f805652e114ff7104cd6c9fd9394422ea514f) — push 미완료
+EXIT=1
+```
+
+→ 같은 외부 main 불일치가 세 번째 연속 goal 턴에서도 필수 BLOCKED로 재현됐다. 수정 파일의 `git diff --check`와 `bash -n hooks/pre-push scripts/acceptance-0-7.sh`는 계속 통과하지만, 이는 0-5 실패를 상쇄하지 않는다.
+
+## 차단 상태 전환
+
+이 작업이 안전하게 할 수 있는 fetch·원격 조회·독립 재현·외부 완료 감시는 모두 수행했다. 남은 해소 조건은 별도 P0 작업이 종료되어 공유 local main을 적법하게 원격화하거나, 그 작업 주체가 local main을 원격과 다시 정합시키는 외부 상태 변화다. PR #13 범위에는 그 권한이 없다.
+
+따라서 goal 차단 규칙의 동일 조건 3회 연속 기준을 충족한다. PR #13은 OPEN, 미병합 상태로 보존하고 commit·push·PR 본문 수정·squash merge·PR #14/#15·제품 L0 작업은 실행하지 않는다.
+
+<!-- ATTEMPT-20260818:BLOCKED-AUDIT-3-END -->

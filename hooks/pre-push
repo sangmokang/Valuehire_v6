@@ -141,8 +141,12 @@ while IFS= read -r c; do
     continue
   fi
   case "$(basename "$c")" in
-    acceptance-0-2.sh|acceptance-0-5.sh)
-      printf '  skip %s (DEFERRED · CI 담당)\n' "$c" >&2
+    acceptance-0-2.sh)
+      printf '  skip %s (LOCAL-MANUAL · push 시점 제외)\n' "$c" >&2
+      continue
+      ;;
+    acceptance-0-5.sh)
+      printf '  skip %s (POST-PUSH · CI 담당)\n' "$c" >&2
       continue
       ;;
   esac

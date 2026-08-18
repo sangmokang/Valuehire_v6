@@ -86,6 +86,15 @@ cd "$sandbox/repo"
 git remote add sandbox "$sandbox/remote.git"
 git config user.email "acceptance@local"
 git config user.name "acceptance"
+# 커밋 전 RED→GREEN도 시험할 수 있도록 clone의 옛 훅 대신 원본 작업트리의 현재 훅을 쓴다.
+# 변형 시험이 옛 훅을 넣은 별도 원본 clone에서 이 스크립트를 실행하면 그 옛 훅이 복사되므로
+# 같은 경로로 수정 전/후를 양방향 대조할 수 있다.
+cp "$REPO_ROOT/hooks/pre-push" hooks/pre-push
+git config core.hooksPath /dev/null
+git add hooks/pre-push
+if ! git diff --cached --quiet; then
+  git commit -qm "fixture: current pre-push under test"
+fi
 bash scripts/install-hooks.sh >/dev/null 2>&1 || { echo "FAIL: install-hooks.sh 실패"; exit 1; }
 
 hp=$(git config --get core.hooksPath) || hp=""
@@ -93,6 +102,56 @@ hp=$(git config --get core.hooksPath) || hp=""
 [ -x hooks/pre-commit ] || { echo "FAIL: clone 에서 pre-commit 실행 권한 없음"; exit 1; }
 
 BASE=$(git rev-parse HEAD)
+
+# pre-push가 직접 실행하지 않는 두 검사의 소유자를 같은 말로 뭉개면 안 된다.
+# 주석·죽은 문자열로 가짜 합격하지 않도록 훅을 실제 실행한다. 다른 인수 스크립트는
+# 이 문구 시험의 잡음이 되지 않게 샌드박스 안에서만 성공 스텁으로 바꾼다.
+echo "=== pre-push 예외 안내 실실행 ==="
+git config core.hooksPath /dev/null
+for f in scripts/acceptance-*.sh; do
+  case "$(basename "$f")" in
+    acceptance-0-7.sh)
+      printf '#!/usr/bin/env bash\n# PUSH-PERFORMING\nexit 0\n' > "$f"
+      ;;
+    *)
+      printf '#!/usr/bin/env bash\nexit 0\n' > "$f"
+      ;;
+  esac
+done
+printf '#!/usr/bin/env bash\nexit 0\n' > verify.sh
+chmod +x verify.sh scripts/acceptance-*.sh
+git add verify.sh scripts/acceptance-*.sh
+git commit -qm "fixture: pre-push skip labels"
+set +e
+bash hooks/pre-push </dev/null >"$outdir/prepush-labels" 2>&1
+labels_rc=$?
+set -e
+if [ "$labels_rc" -ne 0 ]; then
+  echo "FAIL: pre-push 안내 실실행 실패(exit=$labels_rc)"
+  sed 's/^/       /' "$outdir/prepush-labels" | head -10
+  fail=1
+fi
+if ! grep -qF 'skip ./scripts/acceptance-0-2.sh (LOCAL-MANUAL · push 시점 제외)' "$outdir/prepush-labels"; then
+  echo "FAIL: pre-push가 acceptance-0-2.sh를 로컬 수동 검사로 안내하지 않는다"
+  fail=1
+fi
+if ! grep -qF 'skip ./scripts/acceptance-0-5.sh (POST-PUSH · CI 담당)' "$outdir/prepush-labels"; then
+  echo "FAIL: pre-push가 acceptance-0-5.sh를 push 뒤 CI 검사로 안내하지 않는다"
+  fail=1
+fi
+if ! grep -qF 'skip ./scripts/acceptance-0-7.sh (PUSH-PERFORMING · CI 담당)' "$outdir/prepush-labels"; then
+  echo "FAIL: pre-push가 PUSH-PERFORMING 검사를 CI 담당으로 안내하지 않는다"
+  fail=1
+fi
+git reset -q --hard "$BASE"
+git config core.hooksPath hooks
+if [ "$fail" -ne 0 ]; then
+  echo; echo "RESULT: pre-push 예외 안내 계약 불일치 — 시연을 진행하지 않는다. exit 1"
+  exit 1
+fi
+echo "OK: 실제 pre-push 출력이 로컬 수동/사후 CI/PUSH-PERFORMING을 구분함"
+echo
+
 echo "=== 시연 (샌드박스: $sandbox/repo · 각 시연마다 훅 ON/OFF 대조) ==="
 
 reset_tree() {
