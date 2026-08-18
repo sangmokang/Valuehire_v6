@@ -135,7 +135,78 @@ blob 읽기를 일부러 실패시키면 값 없음으로 합격하지 않아야
 
 ### 8. RED→GREEN 실행 로그
 
-이 절 아래에 RED 명령·전체 출력, GREEN 명령·전체 출력, 변조 시험과 원복 확인을 순서대로 추가합니다.
+#### 8-1. RED — 실제 판정기보다 시험을 먼저 고정
+
+```text
+$ bash scripts/acceptance-0-2-unreachable-content.sh
+START=2026-08-18T02:57:33Z
+[1/20] SECRET_PATTERNS_FILE=/dev/null 상속을 격리 -> PASS (exit=0)
+[2/20] SECRET_PATTERNS_FILE=.secret-patterns.default 상속을 격리 -> PASS (exit=0)
+[3/20] 일반 실행은 무해한 unreachable blob을 허용 -> PASS (exit=0)
+[4/20] 일반 실행은 금지값이 든 unreachable blob을 차단 -> BLOCKED (exit=1)
+[5/20] unreachable commit message의 금지값을 차단 -> BLOCKED (exit=1)
+[6/20] unreachable tree path의 금지값을 차단 -> BLOCKED (exit=1)
+[7/20] unreachable annotated tag message의 금지값을 차단 -> BLOCKED (exit=1)
+[8/20] git fsck 실패는 검사 대상 없음으로 통과하지 않음 -> BLOCKED (exit=1)
+[9/20] unreachable 객체 읽기 실패는 조용히 통과하지 않음 -> BLOCKED (exit=1)
+[10/20] 알 수 없는 unreachable 객체형은 읽기 실패로 차단 -> BLOCKED (exit=1)
+[11/20] 큰 unreachable blob 앞쪽의 금지값도 차단 -> BLOCKED (exit=1)
+[12/20] 직접 참조가 가리키는 작은 blob의 금지값을 차단 -> BLOCKED (exit=1)
+[13/20] 직접 참조가 가리키는 50MiB blob 앞쪽의 금지값을 차단 -> UNEXPECTED (exit=0, expected=blocked)
+PASS: no secret-pattern match in any tracked file, .env not tracked
+PASS: 0-2 — 히스토리·객체·reflog·docs 리터럴 0건, 스캐너 뮤테이션 검출 확인
+[14/20] 도달 가능한 blob 읽기 실패를 값 없음으로 통과하지 않음 -> UNEXPECTED (exit=0, expected=blocked)
+PASS: no secret-pattern match in any tracked file, .env not tracked
+PASS: 0-2 — 히스토리·객체·reflog·docs 리터럴 0건, 스캐너 뮤테이션 검출 확인
+[15/20] 서버 본문도 직접 참조의 작은 blob 금지값을 차단 -> BLOCKED (exit=1)
+[16/20] 서버 본문도 직접 참조의 50MiB blob 금지값을 차단 -> UNEXPECTED (exit=0, expected=blocked)
+스캔 대상 객체:        9개
+PASS: 히스토리 전량 blob 스캔 0건 (blob 5개 검사)
+[17/20] 서버 본문도 blob 읽기 실패를 값 없음으로 통과하지 않음 -> UNEXPECTED (exit=0, expected=blocked)
+스캔 대상 객체:        9개
+PASS: 히스토리 전량 blob 스캔 0건 (blob 5개 검사)
+[18/20] 종료상태 실행은 무해한 unreachable blob도 차단 -> BLOCKED (exit=1)
+[19/20] 예정 사례 수와 실제 실행 수가 다르면 전체를 차단 -> BLOCKED (exit=1)
+[20/20] Git hook 환경에서도 바깥 저장소 무오염 -> UNEXPECTED (exit=1, head_same=YES, status_same=YES)
+[1/16] 일반 실행은 무해한 unreachable blob을 허용 -> PASS (exit=0)
+[2/16] 일반 실행은 금지값이 든 unreachable blob을 차단 -> BLOCKED (exit=1)
+[3/16] unreachable commit message의 금지값을 차단 -> BLOCKED (exit=1)
+[4/16] unreachable tree path의 금지값을 차단 -> BLOCKED (exit=1)
+[5/16] unreachable annotated tag message의 금지값을 차단 -> BLOCKED (exit=1)
+[6/16] git fsck 실패는 검사 대상 없음으로 통과하지 않음 -> BLOCKED (exit=1)
+[7/16] unreachable 객체 읽기 실패는 조용히 통과하지 않음 -> BLOCKED (exit=1)
+[8/16] 알 수 없는 unreachable 객체형은 읽기 실패로 차단 -> BLOCKED (exit=1)
+[9/16] 큰 unreachable blob 앞쪽의 금지값도 차단 -> BLOCKED (exit=1)
+[10/16] 직접 참조가 가리키는 작은 blob의 금지값을 차단 -> BLOCKED (exit=1)
+[11/16] 직접 참조가 가리키는 50MiB blob 앞쪽의 금지값을 차단 -> UNEXPECTED (exit=0, expected=blocked)
+PASS: no secret-pattern match in any tracked file, .env not tracked
+PASS: 0-2 — 히스토리·객체·reflog·docs 리터럴 0건, 스캐너 뮤테이션 검출 확인
+[12/16] 도달 가능한 blob 읽기 실패를 값 없음으로 통과하지 않음 -> UNEXPECTED (exit=0, expected=blocked)
+PASS: no secret-pattern match in any tracked file, .env not tracked
+PASS: 0-2 — 히스토리·객체·reflog·docs 리터럴 0건, 스캐너 뮤테이션 검출 확인
+[13/16] 서버 본문도 직접 참조의 작은 blob 금지값을 차단 -> BLOCKED (exit=1)
+[14/16] 서버 본문도 직접 참조의 50MiB blob 금지값을 차단 -> UNEXPECTED (exit=0, expected=blocked)
+스캔 대상 객체:        9개
+PASS: 히스토리 전량 blob 스캔 0건 (blob 5개 검사)
+[15/16] 서버 본문도 blob 읽기 실패를 값 없음으로 통과하지 않음 -> UNEXPECTED (exit=0, expected=blocked)
+스캔 대상 객체:        9개
+PASS: 히스토리 전량 blob 스캔 0건 (blob 5개 검사)
+[16/16] 종료상태 실행은 무해한 unreachable blob도 차단 -> BLOCKED (exit=1)
+CHECKED: 16
+FAIL: AC-19 예상과 다른 사례 4건
+CHECKED: 20
+FAIL: AC-19 예상과 다른 사례 5건
+END=2026-08-18T03:02:09Z
+RED_RC=1
+```
+
+→ 기존 13개 보호와 작은 reachable blob 대조군은 예상대로 동작했습니다. 로컬·서버의 큰 reachable blob과
+읽기 실패 네 경계는 모두 가짜 합격했고, 훅 내부 재실행도 같은 네 결함을 재현해 전체 시험을 실패시켰습니다.
+사례 수 불일치 자체도 예정 문구와 성적으로 차단됐으며 바깥 HEAD·파일 상태는 같았습니다.
+
+#### 8-2. GREEN 이후 기록 위치
+
+이 절 아래에 GREEN 명령·전체 출력, 변조 시험과 원복 확인을 순서대로 추가합니다.
 
 ### 9. 적대 검증 로그
 
