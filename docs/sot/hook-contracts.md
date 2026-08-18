@@ -1,6 +1,6 @@
 # Valuehire v6 — 로컬 강제 장치(git hook) 계약 (SOT)
 
-최종 갱신: 2026-08-15
+최종 갱신: 2026-08-18
 근거(도입 배경·적대검증·6종 위반 시연): `docs/engineering/hook-enforcement-goal-2026-08-07.md`
 
 ## 현재 규칙 — 입출력 계약
@@ -31,7 +31,15 @@
 ```
 입력  : stdin 으로 <local ref> <local sha> <remote ref> <remote sha> (git 표준)
 출력  : exit 0 | exit 1
-        실행: verify.sh, scripts/acceptance-*.sh 전량 (glob — 새 스크립트 추가 시 자동 포함)
+        후보 수집: verify.sh, scripts/acceptance-*.sh (glob — 새 스크립트 추가 시 자동 포함)
+        직접 실행 제외:
+        - acceptance-0-2.sh — 로컬 실제 패턴으로 별도 수동 실행. push 시점에는 정상 Git 작업이
+          만든 unreachable 객체가 있을 수 있어 종료상태 0건 조건을 요구하지 않는다
+        - acceptance-0-5.sh — push 완료 뒤 원격 상태를 보는 검사라 push 직전에는 성립하지 않는다
+        - 헤더에 PUSH-PERFORMING을 선언한 검사 — push 재귀를 막기 위해 CI에서만 실행한다.
+          현재 acceptance-0-7.sh가 이에 해당하며, CI 실제 실행 줄이 없으면 pre-push가 차단한다
+        양쪽 실행: acceptance-0-2-unreachable-content.sh — 위 예외에 해당하지 않으므로 로컬
+        push와 CI가 모두 실행해 AC-19 합성 사례 13개를 검사한다
         차단 시 stderr: "BLOCKED: <스크립트경로> exit=<code>"
 불변식: 스크립트가 0개 발견되면 exit 1 (fail-closed — "검사할 게 없어서 통과"를 금지)
         미추적 파일(??) 존재 시 exit 1 (P15)

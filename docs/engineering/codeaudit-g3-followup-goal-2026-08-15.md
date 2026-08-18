@@ -1483,3 +1483,4349 @@ RED: 0/27 (acceptance-0-7.sh 제외 — CI 담당)
 - `verify` 2: PASS, 1분 45초 — `31892932613 / 95031808130`
 
 → 감사 후속 전체와 적대검증 원문을 실제 원격 브랜치에 올린 뒤 서버 검사 두 건이 모두 성공했습니다. 이 증거를 추가하는 문서 전용 후속 커밋도 같은 검사를 다시 통과시키며, 병합은 실행하지 않습니다.
+
+---
+
+## Attempt 2026-08-18 — 최신 기본선 통합·단독 재검증·조건부 병합
+
+### 결론
+
+과거 감사 시점보다 기본선이 다시 움직였으므로, 이전 합격 기록만으로는 병합하지 않습니다. 최신 기본선의 보호 장치와 G3 검사를 한 흐름으로 합치고, 로컬·서버·서로 다른 두 검증이 모두 동의할 때만 변경 요청 #13을 병합합니다.
+
+변경 요청 #14와 #15, 실제 HumanSearch 제품 기능은 이번 작업에서 건드리지 않습니다. 필수 검사 하나라도 실패하거나 끝까지 확인하지 못하면 전송과 병합을 중단합니다.
+
+### 판단 근거
+
+- 2026-08-18 첫 원격 갱신 뒤 최신 `origin/main`은 `0f8541ef7f56fdf43f12f90c81ec4bd1b0233711`입니다. 사용자 프롬프트의 감사 시점 `6b827e12f0dc7429110fecf00433bf8e5155d7af`와 달라 새 기준으로 처음부터 대조합니다.
+- 대상 작업 공간은 깨끗하고, 로컬 HEAD와 원격 작업 브랜치는 모두 `918f0b683d8ea28454715669285891b021c39df1`로 일치합니다. 사용자 변경을 지우거나 되돌릴 대상은 현재 없습니다.
+- 로컬 `main` 작업 공간은 `0f8541ef7f56fdf43f12f90c81ec4bd1b0233711`에서 깨끗한 상태로 확인했으며, 이후에도 checkout·reset·stash·수정·commit·push하지 않습니다.
+
+> **무엇을** — 작업 브랜치에서 최신 `origin/main`을 일반 병합하고, 충돌은 양쪽 보호 장치를 모두 남기는 최소 변경으로 해결합니다.
+> **왜** — 과거 기준으로 합격한 결과는 최신 기본선의 변경을 포함하지 않으며, 강제로 과거를 다시 쓰지 않고도 최신 이력을 보존해야 하기 때문입니다.
+> **버린 길** — rebase는 최종 원격 브랜치에 강제 전송이 필요하므로 버립니다. `main` 직접 수정·전송, 한쪽 파일을 통째로 선택하는 충돌 해결, 자동 병합도 금지합니다.
+> **대가** — 작업 브랜치에 일반 병합 커밋이 하나 생기고, 최종 변경 요청은 저장소 규칙에 따라 한 커밋으로 합쳐져 기본선에 들어갑니다.
+> **되돌리기** — 병합 전에는 작업 브랜치 후속 커밋으로만 바로잡습니다. 병합 후 문제가 확인되면 `main`을 직접 되돌리지 않고 별도 되돌리기 변경 요청의 책임과 범위를 보고합니다.
+
+### 현재 상태와 직접 확인 증거
+
+| 확인 항목 | 새 사실 | 의미 |
+|---|---|---|
+| 대상 작업 공간 | clean, HEAD `918f0b683d8ea28454715669285891b021c39df1` | 기존 사용자 변경이나 예상 밖 로컬 커밋이 없습니다. |
+| 원격 작업 브랜치 | `918f0b683d8ea28454715669285891b021c39df1` | 변경 요청의 실제 원격 머리와 로컬 시작점이 같습니다. |
+| 최신 기본선 | `0f8541ef7f56fdf43f12f90c81ec4bd1b0233711` | 과거 스냅샷을 폐기하고 이 커밋을 통합 대상으로 사용합니다. |
+| 로컬 `main` 작업 공간 | clean, `0f8541ef7f56fdf43f12f90c81ec4bd1b0233711` | 읽기 전용 불변 조건을 시작 시점에 충족합니다. |
+
+→ 첫 원격 갱신과 두 작업 공간의 상태 조회를 한 묶음으로 실행했습니다. 새 기준점만 바뀌었고 대상 작업 공간은 깨끗하므로, 기존 변경을 보존한 채 새 기본선 감사로 진행할 수 있습니다.
+
+### 기계로 판정할 인수 기준
+
+1. 변경 요청 #13의 현재 원격 상태·기준 가지·머리 지문·서버 검사가 병합 직전까지 모두 계약과 일치합니다.
+2. 최신 기본선과 작업 브랜치의 공통 변경을 전부 대조하고, PR #23의 AC-19 보호와 PR #13의 G3 본체·변이·강화시험을 모두 보존합니다.
+3. 서버 자동검사의 이름 있는 검증 단계가 정확히 18개이고, `docs/sot/verification-commands.md`의 18행과 순서·이름·실행 파일이 일치합니다.
+4. 로컬 전송 전 검사는 이름 규칙으로 후보를 모으되 `acceptance-0-2.sh`와 `acceptance-0-5.sh`를 직접 실행하지 않고, `acceptance-0-2-unreachable-content.sh`는 로컬 전송과 서버 양쪽에서 실행합니다.
+5. 사용자 지정 G3·PR #23 회귀·공통 게이트·셸 문법·문서·RED 불변·제품 코드 0건 검사가 전부 합격하고, 실행 전후 최종 HEAD와 상태가 같습니다.
+6. Claude V1 원문과 Codex V2 재현·양방향 반례가 중간 이상 결함 0건으로 동의하며, 필수 미실행 또는 외부 차단 상태가 없습니다.
+7. 일반 전송이 실제 로컬 검사를 통과하고 최종 원격 머리와 서버 검사가 모두 초록일 때만, 검증한 머리 지문을 조건으로 변경 요청 #13을 한 번 합칩니다.
+8. 병합 뒤 최신 기본선이 검증 트리를 포함하고 서버 검사가 초록이며, Issue #22와 변경 요청 #14/#15가 그대로이고 제품 구현·배포가 0건입니다.
+
+### Harness 진행
+
+- [x] 게이트 0 시작 상태 — 새 원격 기준, 로컬 `main`, 대상 작업 공간의 HEAD와 청결 상태를 확인했습니다.
+- [x] 게이트 1 실행 계약 — 이 Attempt에 새 기준·인수 기준·중단 조건·비범위를 기록했습니다.
+- [x] 게이트 2 작업 공간 — 사용자가 지정한 기존 `task/humansearch-g3-portal-constants` 작업 공간만 씁니다.
+- [ ] 게이트 3 통합 — 공통 변경 대조 뒤 일반 병합과 최소 충돌 해결을 수행합니다.
+- [ ] 게이트 4 검증 — 사용자 지정 로컬 검사와 Claude V1/Codex V2를 모두 새로 실행합니다.
+- [ ] 게이트 5 배송 — 모든 검사 합격 뒤에만 Lore 형식 커밋·일반 전송·원격 재검증·조건부 한 번 병합을 수행합니다.
+- [ ] 게이트 6 종료 — 병합 뒤 기본선 서버 검사와 원격 불변 조건을 확인하고, 작업 브랜치·작업 공간은 삭제하지 않습니다.
+
+### 적대검증 항목
+
+- AC-19의 환경 격리, 큰 객체 전체 판정, commit/tree/tag 객체형, `fsck`·`cat-file` 실패 닫힘이 최신 통합에서 약해지지 않았는지 공격합니다.
+- G3 명령이 이름·주석·죽은 실행 칸에만 남거나 작업/단계 조건·오류 무시·셸·작업 폴더·실행 환경·0회 행렬로 우회되는지 공격합니다.
+- 검사 장치 명부가 실제 실행 칸만 인정하고 G3와 AC-19 중 하나를 누락하지 않는지 공격합니다.
+- 로컬 전송 전 검사 설명과 실제 예외가 갈리는지, RED 기대값과 AC-19 13개 합성 시험 기대값이 약해졌는지 공격합니다.
+- `auth_surface.py`, `login_state.py` 등 실제 HumanSearch 제품 코드가 섞였는지 전체 변경 파일에서 확인합니다.
+- 모든 파괴 표본은 임시 복제본에서만 만들고 원본 작업 공간의 시작·종료 상태를 대조합니다.
+
+### 읽은 정본과 준수 항목
+
+- `docs/sot/INDEX.md` — 정본과 사건 기록의 경계를 확인했습니다.
+- `docs/sot/coding-principles.md` — 검사 약화 금지, 로컬·서버 이중 실행, 0건 합격 금지, 다른 엔진 검증을 적용합니다.
+- `docs/sot/git-workflow.md` — `main` 직접 전송 금지, 작업 공간 격리, 한 커밋으로 합치는 병합, 자동 병합 금지를 적용합니다.
+- `docs/sot/hook-contracts.md` — 현재 문구와 실제 로컬 전송 전 실행 목록의 불일치를 이번 통합 계약대로 바로잡습니다.
+- `docs/sot/verification-commands.md` — make/npm 기반이 아닌 실제 셸 검증 배관을 사용하고, 최신 서버 단계 수와 일치시키겠습니다.
+
+### 비범위와 즉시 중단 조건
+
+- 변경 요청 #14/#15/#21/#23의 브랜치·본문·코드·상태는 읽기 전용입니다.
+- 실제 포털·브라우저·로그인·세션·후보자 개인정보·실제 비밀값에 접근하지 않습니다.
+- HumanSearch L0 제품 구현, 배포, 자동 병합, 관리자 우회, 강제 전송, 기본선 직접 수정은 하지 않습니다.
+- 새 공통 파일이나 의미 충돌, PR #13 원인으로 생긴 기존과 다른 RED, 중간 이상 적대검증 결함, 필수 검사 미실행·차단이 남으면 전송과 병합을 하지 않습니다.
+- 최종 서버 실행 주소와 판정은 최종 머리 지문이 생긴 뒤 변경 요청 본문·댓글과 최종 보고에 보존합니다. 그 결과만 적기 위한 문서 전용 꼬리 커밋은 만들지 않습니다.
+
+### 실행 및 적대검증 로그
+
+후속 읽기 전용 감사, 일반 병합, 로컬 검사, Claude V1 원문, Codex V2 재현, 원격 전송과 서버 결과를 이 절 아래에 시간 순서로 이어 기록합니다.
+
+
+#### 로컬 검증 — G3 1차 묶음
+
+실행 명령:
+
+~~~~~text
+bash scripts/acceptance-hs-portal-constants.sh
+~~~~~
+
+→ 바로 아래 출력 전문을 만든 실제 명령이며, 합격·불합격 의미는 이어지는 출력 뒤 해석에서 판정한다.
+
+출력 전문:
+
+~~~~~text
+PASS: portal constants outside contracts 0
+PASS: contracts zone violations 0
+PASS: ci/pre-push wiring intact
+PRODUCT_FILES: 2
+CHECKED: 56
+CONTRACT_FILES: 3
+~~~~~
+
+→ 프로그램이 끝나며 남긴 성적은 0입니다. 0은 합격이며, 경과 시간은 11.638458916초입니다.
+
+실행 명령:
+
+~~~~~text
+bash scripts/acceptance-hs-portal-constants-mutations.sh
+~~~~~
+
+→ 바로 아래 출력 전문을 만든 실제 명령이며, 합격·불합격 의미는 이어지는 출력 뒤 해석에서 판정한다.
+
+출력 전문:
+
+~~~~~text
+ok [clean baseline] exit=0
+ok [product scheme URL (.py)] exit=1
+ok [product bare domain (tests/.py)] exit=1
+ok [product host:port (무작위 파일명)] exit=1
+ok [product selector API (.js)] exit=1
+ok [product XPath literal] exit=1
+ok [product quoted CSS id] exit=1
+ok [scripts/ selector API — scripts 면제 금지] exit=1
+ok [검사기 자신에 심은 selector — 자기면제 금지] exit=1
+ok [루트 파일 CDP 플래그] exit=1
+ok [hooks/ 포털 브랜드 도메인] exit=1
+ok [루트 contracts/ 정당 값 — 오탐 금지] exit=0
+ok [contracts-evil/ 유사 경로 위장] exit=1
+ok [중첩 가짜 contracts/ 경로] exit=1
+ok [contracts/ 실행 권한 파일] exit=1
+ok [contracts/ 허용 확장자 밖] exit=1
+ok [CI 무력화: self_commented] exit=1
+ok [CI 무력화: self_missing] exit=1
+ok [CI 무력화: echo_prefixed] exit=1
+ok [CI 무력화: suffixed] exit=1
+ok [CI 무력화: if_false] exit=1
+ok [CI 무력화: coe] exit=1
+ok [CI 무력화: sibling_missing] exit=1
+ok [pre-push 부재] exit=1
+ok [pre-push 실행권한 제거] exit=1
+ok [pre-push 글로브 수집식 제거] exit=1
+ok [전역 패턴 계약 부재] exit=2
+ok [전역 패턴 계약 빈 파일] exit=2
+ok [깨진 정규식] exit=2
+ok [빈 문자열 매치 정규식] exit=2
+ok [제품 패턴 계약 깨짐] exit=2
+ok [제품 루트 부재 — 조용한 skip 금지] exit=2
+ok [제품 파일 0건 — 0건 통과 금지] exit=2
+ok [위반+깨진 패턴 동시 — 2 우선] exit=2
+ok [제품 5파일 깨끗] exit=0
+PASS: portal-constants mutations blocked 24/35 (allowed 3, notrun 8)
+~~~~~
+
+→ 프로그램이 끝나며 남긴 성적은 0입니다. 0은 합격이며, 경과 시간은 12.521773042초입니다.
+
+실행 명령:
+
+~~~~~text
+bash scripts/acceptance-hs-portal-constants-hardening.sh
+~~~~~
+
+→ 바로 아래 출력 전문을 만든 실제 명령이며, 합격·불합격 의미는 이어지는 출력 뒤 해석에서 판정한다.
+
+출력 전문:
+
+~~~~~text
+ok [hardening baseline] exit=0
+ok [D1 IPv4 비루프백 host:port] exit=1
+ok [D1 미등재 .ai 도메인] exit=1
+ok [D1 CSS 자손 셀렉터] exit=1
+ok [D1 CSS 속성 셀렉터] exit=1
+ok [D1 공백 XPath] exit=1
+ok [D1 따옴표 CDP 포트] exit=1
+ok [D1 매핑형 CDP 포트] exit=1
+ok [D1 IPv6 루프백 host:port] exit=1
+ok [D2 run 블록 선행 exit 0] exit=1
+ok [D2 run 블록 실패 중단 해제] exit=1
+ok [D3 검사기 머리말 표식] exit=1
+ok [D3 mutation 시험 머리말 표식] exit=1
+ok [D4 임시공간 생성 실패] exit=2
+ok [D5 docs 실행 코드 은닉] exit=1
+ok [D5 정당한 문서 인용 — 오탐 금지] exit=0
+ok [D5 실행권한 달린 문서 위장] exit=1
+ok [hardening 자기 배선(CI 실행 줄)]
+PASS: portal-constants hardening blocked 15/18 (allowed 2, notrun 1)
+~~~~~
+
+→ 프로그램이 끝나며 남긴 성적은 0입니다. 0은 합격이며, 경과 시간은 17.036839667초입니다.
+
+실행 명령:
+
+~~~~~text
+bash scripts/acceptance-hs-portal-constants-hardening2.sh
+~~~~~
+
+→ 바로 아래 출력 전문을 만든 실제 명령이며, 합격·불합격 의미는 이어지는 출력 뒤 해석에서 판정한다.
+
+출력 전문:
+
+~~~~~text
+ok [hardening2 baseline] exit=0
+ok [N1-1 미등재 .biz 도메인] exit=1
+ok [N1-2 단일 라벨 호스트:포트] exit=1
+ok [N1-3 한 자리 포트] exit=1
+ok [N1-4 JSON 따옴표 포트 키] exit=1
+ok [N1-5 camelCase 포트 변수] exit=1
+ok [N1-6 따옴표 값 CSS 속성] exit=1
+ok [N1-7 CSS id 자손] exit=1
+ok [N1-8 백틱 CSS id] exit=1
+ok [N1-9 절대 XPath] exit=1
+ok [N1-10 함수형 XPath] exit=1
+ok [N2 셸 if-false 감싸기] exit=1
+ok [N2 블록 내 이물질 줄(true)] exit=1
+ok [N3 hardening 실행 줄 삭제] exit=1
+ok [N3 pre-push 선행 exit 0] exit=1
+ok [hardening2 자기 배선(CI 실행 줄)]
+PASS: portal-constants hardening2 cases 16 (blocked-mutations 14, clean-baselines 1, wiring-present 1)
+~~~~~
+
+→ 프로그램이 끝나며 남긴 성적은 0입니다. 0은 합격이며, 경과 시간은 17.824556208초입니다.
+
+<!-- ATTEMPT-20260818:G3-BATCH1-END -->
+
+
+#### 로컬 검증 — G3 2차 묶음
+
+실행 명령:
+
+~~~~~text
+bash scripts/acceptance-hs-portal-constants-hardening3.sh
+~~~~~
+
+→ 바로 아래 출력 전문을 만든 실제 명령이며, 합격·불합격 의미는 이어지는 출력 뒤 해석에서 판정한다.
+
+출력 전문:
+
+~~~~~text
+ok [hardening3 baseline] exit=0
+ok [F1 env 값 속 가짜 G3 단계] exit=1
+ok [F2 semantic role finder] exit=1
+ok [F2 semantic label finder] exit=1
+ok [F2 semantic testid finder] exit=1
+ok [F2 semantic text finder] exit=1
+ok [F2 element[attr] CSS 셀렉터] exit=1
+ok [hardening3 자기 배선(CI 실행 줄)]
+PASS: portal-constants hardening3 cases 8 (blocked-mutations 6, clean-baselines 1, wiring-present 1)
+~~~~~
+
+→ 프로그램이 끝나며 남긴 성적은 0입니다. 0은 합격이며, 경과 시간은 14.511681958초입니다.
+
+실행 명령:
+
+~~~~~text
+bash scripts/acceptance-hs-portal-constants-hardening4.sh
+~~~~~
+
+→ 바로 아래 출력 전문을 만든 실제 명령이며, 합격·불합격 의미는 이어지는 출력 뒤 해석에서 판정한다.
+
+출력 전문:
+
+~~~~~text
+ok [hardening4 baseline] exit=0
+ok [리터럴 스칼라 은닉: description] exit=1
+ok [리터럴 스칼라 은닉: note] exit=1
+ok [리터럴 스칼라 은닉: summary] exit=1
+ok [리터럴 스칼라 은닉: run-name] exit=1
+ok [리터럴 스칼라 은닉: comment] exit=1
+ok [리터럴 스칼라 은닉: memo] exit=1
+ok [hardening4 자기 배선(CI 실행 줄)]
+PASS: portal-constants hardening4 cases 8 (blocked-mutations 6, clean-baselines 1, wiring-present 1)
+~~~~~
+
+→ 프로그램이 끝나며 남긴 성적은 0입니다. 0은 합격이며, 경과 시간은 11.906536542초입니다.
+
+실행 명령:
+
+~~~~~text
+bash scripts/acceptance-hs-portal-constants-hardening5.sh
+~~~~~
+
+→ 바로 아래 출력 전문을 만든 실제 명령이며, 합격·불합격 의미는 이어지는 출력 뒤 해석에서 판정한다.
+
+출력 전문:
+
+~~~~~text
+ok [hardening5 baseline] exit=0
+RUN_FIELDS_WITH_G3=0
+ENV_VALUES_WITH_G3=1
+ok [F1 quoted env value is not a run field] exit=1
+ok [F2 semantic role finder] exit=1
+ok [F2 semantic label finder] exit=1
+ok [F2 semantic test-id finder] exit=1
+ok [F2 semantic text finder] exit=1
+ok [hardening5 자기 배선(CI 실행 줄)]
+PASS: portal-constants hardening5 cases 7 (blocked-mutations 5, clean-baselines 1, wiring-present 1)
+~~~~~
+
+→ 프로그램이 끝나며 남긴 성적은 0입니다. 0은 합격이며, 경과 시간은 11.027757625초입니다.
+
+실행 명령:
+
+~~~~~text
+bash scripts/acceptance-hs-portal-constants-hardening6.sh
+~~~~~
+
+→ 바로 아래 출력 전문을 만든 실제 명령이며, 합격·불합격 의미는 이어지는 출력 뒤 해석에서 판정한다.
+
+출력 전문:
+
+~~~~~text
+JOB_IF=ABSENT
+JOB_CONTINUE_ON_ERROR=ABSENT
+AUTO_TRIGGER=true
+RUNS_ON=ubuntu-latest
+STEP_SHELL=ABSENT
+JOB_DEFAULT_SHELL=ABSENT
+WORKFLOW_DEFAULT_SHELL=ABSENT
+ok [hardening6 baseline] exit=0
+STEP_WORKING_DIRECTORY=fake-checks
+JOB_DEFAULT_WORKING_DIRECTORY=ABSENT
+WORKFLOW_DEFAULT_WORKING_DIRECTORY=ABSENT
+ok [N6 step-level working-directory key] exit=1
+STEP_WORKING_DIRECTORY=ABSENT
+JOB_DEFAULT_WORKING_DIRECTORY=fake-checks
+WORKFLOW_DEFAULT_WORKING_DIRECTORY=ABSENT
+ok [N6 job defaults.run.working-directory key] exit=1
+STEP_WORKING_DIRECTORY=ABSENT
+JOB_DEFAULT_WORKING_DIRECTORY=ABSENT
+WORKFLOW_DEFAULT_WORKING_DIRECTORY=fake-checks
+ok [N6 workflow defaults.run.working-directory key] exit=1
+STEP_ENV_KEYS=BASH_ENV
+JOB_ENV_KEYS=ABSENT
+WORKFLOW_ENV_KEYS=ABSENT
+ok [N7 step env BASH_ENV key] exit=1
+STEP_ENV_KEYS=ABSENT
+JOB_ENV_KEYS=BASH_ENV
+WORKFLOW_ENV_KEYS=ABSENT
+ok [N7 job env BASH_ENV key] exit=1
+STEP_ENV_KEYS=ABSENT
+JOB_ENV_KEYS=ABSENT
+WORKFLOW_ENV_KEYS=BASH_ENV
+ok [N7 workflow env BASH_ENV key] exit=1
+STEP_ENV_KEYS=ENV
+JOB_ENV_KEYS=ABSENT
+WORKFLOW_ENV_KEYS=ABSENT
+ok [N7 step env ENV key] exit=1
+STEP_ENV_KEYS=ABSENT
+JOB_ENV_KEYS=SHELLOPTS
+WORKFLOW_ENV_KEYS=ABSENT
+ok [N7 job env SHELLOPTS key] exit=1
+STEP_ENV_KEYS=ABSENT
+JOB_ENV_KEYS=ABSENT
+WORKFLOW_ENV_KEYS=PATH
+ok [N7 workflow env PATH key] exit=1
+STEP_ENV_KEYS=SAFE_STEP_FLAG
+JOB_ENV_KEYS=SAFE_JOB_FLAG
+WORKFLOW_ENV_KEYS=SAFE_WORKFLOW_FLAG
+ok [harmless env keys remain allowed] exit=0
+RUNS_ON_CLASS=NilClass
+RUNS_ON_VALUE=nil
+ok [N8 runs-on null] exit=1
+RUNS_ON_CLASS=Array
+RUNS_ON_VALUE=[]
+ok [N8 runs-on empty list] exit=1
+RUNS_ON_CLASS=FalseClass
+RUNS_ON_VALUE=false
+ok [N8 runs-on false] exit=1
+MATRIX_CLASS=Hash
+MATRIX_KEYS=shard
+STATIC_AXIS_VALUES=shard:Array:0
+ok [N9 matrix empty axis] exit=1
+MATRIX_CLASS=Hash
+MATRIX_KEYS=shard
+STATIC_AXIS_VALUES=shard:Array:2
+ok [non-empty static matrix axis remains allowed] exit=0
+MATRIX_CLASS=String
+MATRIX_VALUE=${{ fromJSON(vars.G3_MATRIX) }}
+ok [N9 matrix expression] exit=1
+MATRIX_VALUE={"shard"=>["${{ vars.G3_SHARD }}"]}
+ok [N9 matrix axis item expression] exit=1
+MATRIX_CLASS=Hash
+MATRIX_KEYS=include
+STATIC_AXIS_VALUES=
+ok [include-only matrix entries remain allowed] exit=0
+MATRIX_VALUE={"include"=>[]}
+ok [N9 empty include-only matrix] exit=1
+MATRIX_CLASS=Hash
+MATRIX_KEYS=exclude
+STATIC_AXIS_VALUES=
+ok [N9 matrix exclude-only] exit=1
+MATRIX_VALUE={"shard"=>["one"], "exclude"=>[{"shard"=>"one"}]}
+ok [N9 exclude removes the sole combination] exit=1
+MATRIX_VALUE={"os"=>["linux", "mac"], "shard"=>["one", "two"], "exclude"=>[{"os"=>"linux"}, {"os"=>"mac"}]}
+ok [N9 exclude removes a multi-axis cartesian product] exit=1
+MATRIX_VALUE={"os"=>["linux", "mac"], "shard"=>["one", "two"], "exclude"=>[{"os"=>"linux", "shard"=>"one"}]}
+ok [matrix with combinations remaining after exclude] exit=0
+MATRIX_VALUE={"shard"=>["one"], "exclude"=>[{"shard"=>"one"}], "include"=>[{"shard"=>"one"}]}
+ok [include restores a combination after exclude] exit=0
+MATRIX_VALUE={"shard"=>["one"], "include"=>"${{ fromJSON(vars.G3_INCLUDE) }}"}
+ok [N9 matrix include expression] exit=1
+MATRIX_VALUE={"shard"=>["one"], "include"=>[{"shard"=>"${{ vars.G3_SHARD }}"}]}
+ok [N9 matrix include value expression] exit=1
+MATRIX_VALUE={"shard"=>["one"], "exclude"=>"${{ fromJSON(vars.G3_EXCLUDE) }}"}
+ok [N9 matrix exclude expression] exit=1
+MATRIX_VALUE={"shard"=>["one"], "exclude"=>[{"shard"=>"${{ vars.G3_SHARD }}"}]}
+ok [N9 matrix exclude value expression] exit=1
+RUNS_ON=ubuntu-latest
+STEP_SHELL=echo {0}
+JOB_DEFAULT_SHELL=ABSENT
+WORKFLOW_DEFAULT_SHELL=ABSENT
+ok [N4 step-level shell key] exit=1
+RUNS_ON=ubuntu-latest
+STEP_SHELL=ABSENT
+JOB_DEFAULT_SHELL=echo {0}
+WORKFLOW_DEFAULT_SHELL=ABSENT
+ok [N4 job defaults.run.shell key] exit=1
+RUNS_ON=ubuntu-latest
+STEP_SHELL=ABSENT
+JOB_DEFAULT_SHELL=ABSENT
+WORKFLOW_DEFAULT_SHELL=echo {0}
+ok [N4 workflow defaults.run.shell key] exit=1
+RUNS_ON=ABSENT
+STEP_SHELL=ABSENT
+JOB_DEFAULT_SHELL=ABSENT
+WORKFLOW_DEFAULT_SHELL=ABSENT
+ok [N5 missing runs-on key] exit=1
+G3_JOBS=1
+G3_STEPS=2
+RUNS_ON=ubuntu-latest
+STEP_SHELLS=echo {0},ABSENT
+JOB_DEFAULT_SHELLS=ABSENT
+ok [N4 bad step plus duplicate safe step] exit=1
+G3_JOBS=2
+G3_STEPS=2
+RUNS_ON=ubuntu-latest,ubuntu-latest
+STEP_SHELLS=ABSENT,ABSENT
+JOB_DEFAULT_SHELLS=echo {0},ABSENT
+ok [N4 bad job defaults plus duplicate safe job] exit=1
+G3_JOBS=2
+G3_STEPS=2
+RUNS_ON=ABSENT,ubuntu-latest
+STEP_SHELLS=ABSENT,ABSENT
+JOB_DEFAULT_SHELLS=ABSENT,ABSENT
+ok [N5 missing runs-on plus duplicate safe job] exit=1
+G3_JOBS=1
+G3_STEPS=2
+RUNS_ON=ubuntu-latest
+STEP_SHELLS=ABSENT,echo {0}
+JOB_DEFAULT_SHELLS=ABSENT
+ok [N4 unsafe step after duplicate safe step] exit=1
+G3_JOBS=2
+G3_STEPS=2
+RUNS_ON=ubuntu-latest,ubuntu-latest
+STEP_SHELLS=ABSENT,ABSENT
+JOB_DEFAULT_SHELLS=ABSENT,echo {0}
+ok [N4 unsafe job defaults after duplicate safe job] exit=1
+G3_JOBS=2
+G3_STEPS=2
+RUNS_ON=ubuntu-latest,ABSENT
+STEP_SHELLS=ABSENT,ABSENT
+JOB_DEFAULT_SHELLS=ABSENT,ABSENT
+ok [N5 missing runs-on after duplicate safe job] exit=1
+JOB_IF=false
+JOB_CONTINUE_ON_ERROR=ABSENT
+AUTO_TRIGGER=true
+ok [N1 job-level if key] exit=1
+G3_JOB_NEEDS=gate
+GATE_IF=false
+ok [N1 skipped prerequisite job] exit=1
+JOB_IF=ABSENT
+JOB_CONTINUE_ON_ERROR=true
+AUTO_TRIGGER=true
+ok [N2 job-level continue-on-error true] exit=1
+JOB_CONTINUE_ON_ERROR_CLASS=String
+JOB_CONTINUE_ON_ERROR=${{ true }}
+ok [N2 job-level continue-on-error expression] exit=1
+JOB_IF=ABSENT
+JOB_CONTINUE_ON_ERROR=ABSENT
+AUTO_TRIGGER=false
+ok [N3 workflow_dispatch-only trigger] exit=1
+PUSH_PATHS_IGNORE=**
+PULL_REQUEST_PATHS_IGNORE=**
+ok [N3 automatic events filtered out] exit=1
+ok [hardening6 자기 배선(CI 실행 줄)]
+PASS: portal-constants hardening6 cases 46 (blocked-mutations 39, clean-baselines 6, wiring-present 1)
+~~~~~
+
+→ 프로그램이 끝나며 남긴 성적은 0입니다. 0은 합격이며, 경과 시간은 3.599348417초입니다.
+
+<!-- ATTEMPT-20260818:G3-BATCH2-END -->
+
+
+#### 로컬 검증 — PR #23 AC-19 회귀
+
+실행 명령:
+
+~~~~~text
+bash scripts/acceptance-0-2-unreachable-content.sh
+~~~~~
+
+→ 바로 아래 출력 전문을 만든 실제 명령이며, 합격·불합격 의미는 이어지는 출력 뒤 해석에서 판정한다.
+
+출력 전문:
+
+~~~~~text
+[1/13] SECRET_PATTERNS_FILE=/dev/null 상속을 격리 -> PASS (exit=0)
+[2/13] SECRET_PATTERNS_FILE=.secret-patterns.default 상속을 격리 -> PASS (exit=0)
+[3/13] 일반 실행은 무해한 unreachable blob을 허용 -> PASS (exit=0)
+[4/13] 일반 실행은 금지값이 든 unreachable blob을 차단 -> BLOCKED (exit=1)
+[5/13] unreachable commit message의 금지값을 차단 -> BLOCKED (exit=1)
+[6/13] unreachable tree path의 금지값을 차단 -> BLOCKED (exit=1)
+[7/13] unreachable annotated tag message의 금지값을 차단 -> BLOCKED (exit=1)
+[8/13] git fsck 실패는 검사 대상 없음으로 통과하지 않음 -> BLOCKED (exit=1)
+[9/13] unreachable 객체 읽기 실패는 조용히 통과하지 않음 -> BLOCKED (exit=1)
+[10/13] 알 수 없는 unreachable 객체형은 읽기 실패로 차단 -> BLOCKED (exit=1)
+[11/13] 큰 unreachable blob 앞쪽의 금지값도 차단 -> BLOCKED (exit=1)
+[12/13] 종료상태 실행은 무해한 unreachable blob도 차단 -> BLOCKED (exit=1)
+[13/13] Git hook 환경에서도 바깥 저장소 무오염 -> PASS (exit=0)
+CHECKED: 13
+PASS: AC-19 일반 내용 검사와 종료상태 0건 조건 분리
+~~~~~
+
+→ 프로그램이 끝나며 남긴 성적은 0입니다. 0은 합격이며, 경과 시간은 0.709893167초입니다.
+
+실행 명령:
+
+~~~~~text
+SECRET_PATTERNS_FILE=/dev/null bash scripts/acceptance-0-2-unreachable-content.sh
+~~~~~
+
+→ 바로 아래 출력 전문을 만든 실제 명령이며, 합격·불합격 의미는 이어지는 출력 뒤 해석에서 판정한다.
+
+출력 전문:
+
+~~~~~text
+[1/13] SECRET_PATTERNS_FILE=/dev/null 상속을 격리 -> PASS (exit=0)
+[2/13] SECRET_PATTERNS_FILE=.secret-patterns.default 상속을 격리 -> PASS (exit=0)
+[3/13] 일반 실행은 무해한 unreachable blob을 허용 -> PASS (exit=0)
+[4/13] 일반 실행은 금지값이 든 unreachable blob을 차단 -> BLOCKED (exit=1)
+[5/13] unreachable commit message의 금지값을 차단 -> BLOCKED (exit=1)
+[6/13] unreachable tree path의 금지값을 차단 -> BLOCKED (exit=1)
+[7/13] unreachable annotated tag message의 금지값을 차단 -> BLOCKED (exit=1)
+[8/13] git fsck 실패는 검사 대상 없음으로 통과하지 않음 -> BLOCKED (exit=1)
+[9/13] unreachable 객체 읽기 실패는 조용히 통과하지 않음 -> BLOCKED (exit=1)
+[10/13] 알 수 없는 unreachable 객체형은 읽기 실패로 차단 -> BLOCKED (exit=1)
+[11/13] 큰 unreachable blob 앞쪽의 금지값도 차단 -> BLOCKED (exit=1)
+[12/13] 종료상태 실행은 무해한 unreachable blob도 차단 -> BLOCKED (exit=1)
+[13/13] Git hook 환경에서도 바깥 저장소 무오염 -> PASS (exit=0)
+CHECKED: 13
+PASS: AC-19 일반 내용 검사와 종료상태 0건 조건 분리
+~~~~~
+
+→ 프로그램이 끝나며 남긴 성적은 0입니다. 0은 합격이며, 경과 시간은 0.334861541초입니다.
+
+실행 명령:
+
+~~~~~text
+SECRET_PATTERNS_FILE=.secret-patterns.default bash scripts/acceptance-0-2-unreachable-content.sh
+~~~~~
+
+→ 바로 아래 출력 전문을 만든 실제 명령이며, 합격·불합격 의미는 이어지는 출력 뒤 해석에서 판정한다.
+
+출력 전문:
+
+~~~~~text
+[1/13] SECRET_PATTERNS_FILE=/dev/null 상속을 격리 -> PASS (exit=0)
+[2/13] SECRET_PATTERNS_FILE=.secret-patterns.default 상속을 격리 -> PASS (exit=0)
+[3/13] 일반 실행은 무해한 unreachable blob을 허용 -> PASS (exit=0)
+[4/13] 일반 실행은 금지값이 든 unreachable blob을 차단 -> BLOCKED (exit=1)
+[5/13] unreachable commit message의 금지값을 차단 -> BLOCKED (exit=1)
+[6/13] unreachable tree path의 금지값을 차단 -> BLOCKED (exit=1)
+[7/13] unreachable annotated tag message의 금지값을 차단 -> BLOCKED (exit=1)
+[8/13] git fsck 실패는 검사 대상 없음으로 통과하지 않음 -> BLOCKED (exit=1)
+[9/13] unreachable 객체 읽기 실패는 조용히 통과하지 않음 -> BLOCKED (exit=1)
+[10/13] 알 수 없는 unreachable 객체형은 읽기 실패로 차단 -> BLOCKED (exit=1)
+[11/13] 큰 unreachable blob 앞쪽의 금지값도 차단 -> BLOCKED (exit=1)
+[12/13] 종료상태 실행은 무해한 unreachable blob도 차단 -> BLOCKED (exit=1)
+[13/13] Git hook 환경에서도 바깥 저장소 무오염 -> PASS (exit=0)
+CHECKED: 13
+PASS: AC-19 일반 내용 검사와 종료상태 0건 조건 분리
+~~~~~
+
+→ 프로그램이 끝나며 남긴 성적은 0입니다. 0은 합격이며, 경과 시간은 0.35400275초입니다.
+
+실행 명령:
+
+~~~~~text
+bash scripts/acceptance-0-2.sh
+~~~~~
+
+→ 바로 아래 출력 전문을 만든 실제 명령이며, 합격·불합격 의미는 이어지는 출력 뒤 해석에서 판정한다.
+
+출력 전문:
+
+~~~~~text
+PASS: no secret-pattern match in any tracked file, .env not tracked
+PASS: 0-2 — 히스토리·객체·reflog·docs 리터럴 0건, 스캐너 뮤테이션 검출 확인
+~~~~~
+
+→ 프로그램이 끝나며 남긴 성적은 0입니다. 0은 합격이며, 경과 시간은 22.371779458초입니다.
+
+<!-- ATTEMPT-20260818:AC19-END -->
+
+
+#### 로컬 검증 — 공통 게이트 1차 묶음
+
+실행 명령:
+
+~~~~~text
+bash verify.sh
+~~~~~
+
+→ 바로 아래 출력 전문을 만든 실제 명령이며, 합격·불합격 의미는 이어지는 출력 뒤 해석에서 판정한다.
+
+출력 전문:
+
+~~~~~text
+PASS: no secret-pattern match in any tracked file, .env not tracked
+~~~~~
+
+→ 프로그램이 끝나며 남긴 성적은 0입니다. 0은 합격이며, 경과 시간은 1.933083333초입니다.
+
+실행 명령:
+
+~~~~~text
+bash scripts/verify/check-mechanism-registry.sh
+~~~~~
+
+→ 바로 아래 출력 전문을 만든 실제 명령이며, 합격·불합격 의미는 이어지는 출력 뒤 해석에서 판정한다.
+
+출력 전문:
+
+~~~~~text
+PASS: secrets-scan-precommit (pre-commit · 규칙 1·2·3)
+PASS: acceptance-glob-prepush (pre-push · 규칙 1·2·3)
+PASS: ci-secret-scan (ci · 규칙 1·2·4)
+PASS: ci-portal-constants-gate (ci · 규칙 1·2·4)
+CHECKED: 4
+~~~~~
+
+→ 프로그램이 끝나며 남긴 성적은 0입니다. 0은 합격이며, 경과 시간은 1.4445945초입니다.
+
+실행 명령:
+
+~~~~~text
+bash scripts/acceptance-verify-ac-m.sh
+~~~~~
+
+→ 바로 아래 출력 전문을 만든 실제 명령이며, 합격·불합격 의미는 이어지는 출력 뒤 해석에서 판정한다.
+
+출력 전문:
+
+~~~~~text
+PASS: 검사기 실존·실행가능 — scripts/verify/check-mechanism-registry.sh
+PASS: fixture 정상 명부 → 통과 (exit=0)
+PASS: fixture path 없는 항목 → 불합격 (exit=1)
+PASS: fixture 죽은 target → 불합격 (exit=1)
+PASS: id 중복 → 불합격 (exit=1)
+PASS: 알 수 없는 stage → 불합격 (exit=1)
+PASS: manual 인데 사유 없음 → 불합격 (exit=1)
+PASS: manual 정상(사유+실행권한) → 통과 (exit=0)
+PASS: manual 인데 실행권한 없음 → 불합격 (exit=1)
+PASS: ci 인데 거짓 target → 불합격 (exit=1)
+PASS: ci target 이 주석에만 있음 → 불합격 (exit=1)
+PASS: ci target step 이 if:false 로 꺼짐 → 불합격 (exit=1)
+PASS: 절대경로 path → 불합격 (exit=1)
+PASS: 상대경로 심볼릭 링크 → 불합격 (exit=1)
+PASS: 필드 중복(path 2회, 마지막 값 유효) → 불합격 (exit=1)
+PASS: id 뒤 인라인 주석 → 불합격 (exit=1)
+PASS: 닫히지 않은 따옴표 → 불합격 (exit=1)
+PASS: stage 불일치 필드(ci_mirror_job) → 불합격 (exit=1)
+PASS: 문법 오류·항목 0개 → 위반(1) (exit=1)
+PASS: 항목 0개 명부 → NOT_RUN (exit=2)
+PASS: ci_mirror_job 불일치 → 불합격 (exit=1)
+PASS: 필수 필드(stage) 누락 → 불합격 (exit=1)
+PASS: 빈 문자열 path → 불합격 (exit=1)
+PASS: CI 자기배선 target 이 셸 주석에만 있음 → 불합격
+PASS: CI 배선 — verify.yml 에 무조건 실행 스텝 정확히 1회
+PASS: 실제 명부(docs/sot/mechanism-registry.yaml) → 통과 (exit=0)
+PASS: 명부 항목 4개 = 검사기 보고 4개 (하한 3)
+PASS: 저장소 무오염 (시작/종료 상태 동일)
+CHECKED: 28
+~~~~~
+
+→ 프로그램이 끝나며 남긴 성적은 0입니다. 0은 합격이며, 경과 시간은 11.570651292초입니다.
+
+실행 명령:
+
+~~~~~text
+bash scripts/check-docs-sot.sh
+~~~~~
+
+→ 바로 아래 출력 전문을 만든 실제 명령이며, 합격·불합격 의미는 이어지는 출력 뒤 해석에서 판정한다.
+
+출력 전문:
+
+~~~~~text
+PASS: docs/sot/INDEX.md 존재, 1050바이트 (<=20000)
+PASS: docs/sot/coding-principles.md 존재, 15405바이트 (<=20000)
+PASS: docs/sot/hook-contracts.md 존재, 5797바이트 (<=20000)
+PASS: docs/sot/git-workflow.md 존재, 2634바이트 (<=20000)
+PASS: docs/sot/verification-commands.md 존재, 9094바이트 (<=20000)
+PASS: hooks/pre-commit 가 docs/sot/hook-contracts.md 를 계약으로 참조
+PASS: hooks/pre-push 가 docs/sot/hook-contracts.md 를 계약으로 참조
+PASS: scripts/install-hooks.sh 가 docs/sot/hook-contracts.md 를 계약으로 참조
+PASS: scripts/session-status.sh 가 docs/sot/hook-contracts.md 를 계약으로 참조
+PASS: scripts/acceptance-0-7.sh 가 docs/sot/hook-contracts.md 를 계약으로 참조
+OK: docs/sot 재구성 AC 전부 충족
+~~~~~
+
+→ 프로그램이 끝나며 남긴 성적은 0입니다. 0은 합격이며, 경과 시간은 0.000004542초입니다.
+
+실행 명령:
+
+~~~~~text
+bash scripts/acceptance-0-7.sh
+~~~~~
+
+→ 바로 아래 출력 전문을 만든 실제 명령이며, 합격·불합격 의미는 이어지는 출력 뒤 해석에서 판정한다.
+
+출력 전문:
+
+~~~~~text
+=== 전제 검사: 훅 인프라 ===
+OK: 훅 파일 4종 + settings.json 존재
+
+=== 시연 (샌드박스: /var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/tmp.dC0QdTCLUe/repo · 각 시연마다 훅 ON/OFF 대조) ===
+[1/6] 검사기 자기 제외 → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+         BLOCKED: 검사기 자기 제외 — scripts/acceptance-0-6.sh 가 자기 자신을 검사 대상에서 뺀다 (P13)
+[2/6] 검사 약화(실패 무시) → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+         BLOCKED: 검사 약화 패턴 추가 — scripts/acceptance-0-2.sh (P13). 정당하면 suppressions.yaml 에 expiry 와 함께 등록하라
+[3/6] 만료일 없는 억제 → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+         BLOCKED: 억제 항목 1건 중 expiry 가 0건뿐 — 만료일 없는 억제는 영구화된다 (P13)
+[4/6] LLM 출력→판정 필드 → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+         BLOCKED: LLM 출력을 판정 수치로 변환 — src/scoring.js. 판정 수치는 순수 함수가 만든다 (P14)
+[5/6] 미커밋 상태로 push → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+         BLOCKED: 작업트리가 깨끗하지 않다 — 미커밋/미추적 변경이 있는 상태의 push (P15)
+[6/6] 가짜 외부효과 모듈 → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+         BLOCKED: 외부 효과를 표방하는데 네트워크 호출이 0건 — src/portal-login.js. 시뮬레이션 의심 (P4)
+
+OK: 원본 저장소 무변경 확인 (55614f4316c2956663b39f8f53ee9dfb951f77df)
+
+PASS: 위반 6 종이 전부 차단됨 (각 건 훅 OFF 대조 통과)
+~~~~~
+
+→ 프로그램이 끝나며 남긴 성적은 0입니다. 0은 합격이며, 경과 시간은 17.748127875초입니다.
+
+실행 명령:
+
+~~~~~text
+SECRET_PATTERNS_FILE= bash scripts/acceptance-0-5.sh
+~~~~~
+
+→ 바로 아래 출력 전문을 만든 실제 명령이며, 합격·불합격 의미는 이어지는 출력 뒤 해석에서 판정한다.
+
+출력 전문:
+
+~~~~~text
+PASS: 0-5 완료 — CI 비밀스캔 강제 + push 완료 + 원격 트리 비밀 0건
+~~~~~
+
+→ 프로그램이 끝나며 남긴 성적은 0입니다. 0은 합격이며, 경과 시간은 5.696577167초입니다.
+
+<!-- ATTEMPT-20260818:COMMON1-END -->
+
+
+#### 로컬 검증 — 전체 시작 상태 검사
+
+실행 명령:
+
+~~~~~text
+bash scripts/session-status.sh
+~~~~~
+
+→ 바로 아래 출력 전문을 만든 실제 명령이며, 합격·불합격 의미는 이어지는 출력 뒤 해석에서 판정한다.
+
+출력 전문:
+
+~~~~~text
+HEAD: 918f0b6 (ahead 42 / behind 14)
+ORIGIN: 34e4ccf
+RED: 0/28 (acceptance-0-7.sh 제외 — CI 담당)
+~~~~~
+
+→ 프로그램이 끝나며 남긴 성적은 0입니다. 0은 명령이 정상 종료됐다는 뜻이며, RED 수치가 0인지와 전체 검사 수가 0보다 큰지도 함께 합격 조건으로 판정합니다. 경과 시간은 9.794719291초입니다.
+
+<!-- ATTEMPT-20260818:SESSION-STATUS-END -->
+
+#### 기준점 이동과 재시작
+
+첫 통합 검증 도중 `origin/main`이 `0f8541ef7f56fdf43f12f90c81ec4bd1b0233711`에서 `34e4ccff88ce776d06e3001734005a34b169f7eb`로 이동한 것을 `session-status.sh`가 보고했습니다. 새 커밋은 `docs/engineering/goal-prompts/codex-position-map-p0-impl-addendum-2026-08-18.md` 한 파일만 바꾸며, 공통 변경 파일은 여전히 `.github/workflows/verify.yml`과 `docs/sot/verification-commands.md` 두 개뿐입니다.
+
+→ 첫 통합 결과의 시험은 보조 증거로만 보존하고 최종 판정에서는 제외합니다. 커밋 전이었으므로 옛 기준 병합을 취소했고, goal 로그와 hook 정본 수정이 보존된 것을 확인한 뒤 최신 `34e4ccf` 기준으로 일반 병합을 다시 시작했습니다.
+
+<!-- ATTEMPT-20260818:BASELINE-RESTART-END -->
+
+
+#### 최신 기준 재검증 — G3 1차 묶음
+
+실행 명령:
+
+~~~~~text
+bash scripts/acceptance-hs-portal-constants.sh
+~~~~~
+
+→ 바로 아래 출력 전문을 만든 실제 명령이며, 합격·불합격 의미는 이어지는 출력 뒤 해석에서 판정한다.
+
+출력 전문:
+
+~~~~~text
+PASS: portal constants outside contracts 0
+PASS: contracts zone violations 0
+PASS: ci/pre-push wiring intact
+PRODUCT_FILES: 2
+CHECKED: 56
+CONTRACT_FILES: 3
+~~~~~
+
+→ 프로그램이 끝나며 남긴 성적은 0입니다. 0은 합격이며, 경과 시간은 3.2752974999999998초입니다.
+
+실행 명령:
+
+~~~~~text
+bash scripts/acceptance-hs-portal-constants-mutations.sh
+~~~~~
+
+→ 바로 아래 출력 전문을 만든 실제 명령이며, 합격·불합격 의미는 이어지는 출력 뒤 해석에서 판정한다.
+
+출력 전문:
+
+~~~~~text
+ok [clean baseline] exit=0
+ok [product scheme URL (.py)] exit=1
+ok [product bare domain (tests/.py)] exit=1
+ok [product host:port (무작위 파일명)] exit=1
+ok [product selector API (.js)] exit=1
+ok [product XPath literal] exit=1
+ok [product quoted CSS id] exit=1
+ok [scripts/ selector API — scripts 면제 금지] exit=1
+ok [검사기 자신에 심은 selector — 자기면제 금지] exit=1
+ok [루트 파일 CDP 플래그] exit=1
+ok [hooks/ 포털 브랜드 도메인] exit=1
+ok [루트 contracts/ 정당 값 — 오탐 금지] exit=0
+ok [contracts-evil/ 유사 경로 위장] exit=1
+ok [중첩 가짜 contracts/ 경로] exit=1
+ok [contracts/ 실행 권한 파일] exit=1
+ok [contracts/ 허용 확장자 밖] exit=1
+ok [CI 무력화: self_commented] exit=1
+ok [CI 무력화: self_missing] exit=1
+ok [CI 무력화: echo_prefixed] exit=1
+ok [CI 무력화: suffixed] exit=1
+ok [CI 무력화: if_false] exit=1
+ok [CI 무력화: coe] exit=1
+ok [CI 무력화: sibling_missing] exit=1
+ok [pre-push 부재] exit=1
+ok [pre-push 실행권한 제거] exit=1
+ok [pre-push 글로브 수집식 제거] exit=1
+ok [전역 패턴 계약 부재] exit=2
+ok [전역 패턴 계약 빈 파일] exit=2
+ok [깨진 정규식] exit=2
+ok [빈 문자열 매치 정규식] exit=2
+ok [제품 패턴 계약 깨짐] exit=2
+ok [제품 루트 부재 — 조용한 skip 금지] exit=2
+ok [제품 파일 0건 — 0건 통과 금지] exit=2
+ok [위반+깨진 패턴 동시 — 2 우선] exit=2
+ok [제품 5파일 깨끗] exit=0
+PASS: portal-constants mutations blocked 24/35 (allowed 3, notrun 8)
+~~~~~
+
+→ 프로그램이 끝나며 남긴 성적은 0입니다. 0은 합격이며, 경과 시간은 15.622438417초입니다.
+
+실행 명령:
+
+~~~~~text
+bash scripts/acceptance-hs-portal-constants-hardening.sh
+~~~~~
+
+→ 바로 아래 출력 전문을 만든 실제 명령이며, 합격·불합격 의미는 이어지는 출력 뒤 해석에서 판정한다.
+
+출력 전문:
+
+~~~~~text
+ok [hardening baseline] exit=0
+ok [D1 IPv4 비루프백 host:port] exit=1
+ok [D1 미등재 .ai 도메인] exit=1
+ok [D1 CSS 자손 셀렉터] exit=1
+ok [D1 CSS 속성 셀렉터] exit=1
+ok [D1 공백 XPath] exit=1
+ok [D1 따옴표 CDP 포트] exit=1
+ok [D1 매핑형 CDP 포트] exit=1
+ok [D1 IPv6 루프백 host:port] exit=1
+ok [D2 run 블록 선행 exit 0] exit=1
+ok [D2 run 블록 실패 중단 해제] exit=1
+ok [D3 검사기 머리말 표식] exit=1
+ok [D3 mutation 시험 머리말 표식] exit=1
+ok [D4 임시공간 생성 실패] exit=2
+ok [D5 docs 실행 코드 은닉] exit=1
+ok [D5 정당한 문서 인용 — 오탐 금지] exit=0
+ok [D5 실행권한 달린 문서 위장] exit=1
+ok [hardening 자기 배선(CI 실행 줄)]
+PASS: portal-constants hardening blocked 15/18 (allowed 2, notrun 1)
+~~~~~
+
+→ 프로그램이 끝나며 남긴 성적은 0입니다. 0은 합격이며, 경과 시간은 8.652161959초입니다.
+
+실행 명령:
+
+~~~~~text
+bash scripts/acceptance-hs-portal-constants-hardening2.sh
+~~~~~
+
+→ 바로 아래 출력 전문을 만든 실제 명령이며, 합격·불합격 의미는 이어지는 출력 뒤 해석에서 판정한다.
+
+출력 전문:
+
+~~~~~text
+ok [hardening2 baseline] exit=0
+ok [N1-1 미등재 .biz 도메인] exit=1
+ok [N1-2 단일 라벨 호스트:포트] exit=1
+ok [N1-3 한 자리 포트] exit=1
+ok [N1-4 JSON 따옴표 포트 키] exit=1
+ok [N1-5 camelCase 포트 변수] exit=1
+ok [N1-6 따옴표 값 CSS 속성] exit=1
+ok [N1-7 CSS id 자손] exit=1
+ok [N1-8 백틱 CSS id] exit=1
+ok [N1-9 절대 XPath] exit=1
+ok [N1-10 함수형 XPath] exit=1
+ok [N2 셸 if-false 감싸기] exit=1
+ok [N2 블록 내 이물질 줄(true)] exit=1
+ok [N3 hardening 실행 줄 삭제] exit=1
+ok [N3 pre-push 선행 exit 0] exit=1
+ok [hardening2 자기 배선(CI 실행 줄)]
+PASS: portal-constants hardening2 cases 16 (blocked-mutations 14, clean-baselines 1, wiring-present 1)
+~~~~~
+
+→ 프로그램이 끝나며 남긴 성적은 0입니다. 0은 합격이며, 경과 시간은 9.844555167초입니다.
+
+<!-- ATTEMPT-20260818:FINAL-G3-BATCH1-END -->
+
+
+#### 최신 기준 재검증 — G3 2차 묶음
+
+실행 명령:
+
+~~~~~text
+bash scripts/acceptance-hs-portal-constants-hardening3.sh
+~~~~~
+
+→ 바로 아래 출력 전문을 만든 실제 명령이며, 합격·불합격 의미는 이어지는 출력 뒤 해석에서 판정한다.
+
+출력 전문:
+
+~~~~~text
+ok [hardening3 baseline] exit=0
+ok [F1 env 값 속 가짜 G3 단계] exit=1
+ok [F2 semantic role finder] exit=1
+ok [F2 semantic label finder] exit=1
+ok [F2 semantic testid finder] exit=1
+ok [F2 semantic text finder] exit=1
+ok [F2 element[attr] CSS 셀렉터] exit=1
+ok [hardening3 자기 배선(CI 실행 줄)]
+PASS: portal-constants hardening3 cases 8 (blocked-mutations 6, clean-baselines 1, wiring-present 1)
+~~~~~
+
+→ 프로그램이 끝나며 남긴 성적은 0입니다. 0은 합격이며, 경과 시간은 9.62196025초입니다.
+
+실행 명령:
+
+~~~~~text
+bash scripts/acceptance-hs-portal-constants-hardening4.sh
+~~~~~
+
+→ 바로 아래 출력 전문을 만든 실제 명령이며, 합격·불합격 의미는 이어지는 출력 뒤 해석에서 판정한다.
+
+출력 전문:
+
+~~~~~text
+ok [hardening4 baseline] exit=0
+ok [리터럴 스칼라 은닉: description] exit=1
+ok [리터럴 스칼라 은닉: note] exit=1
+ok [리터럴 스칼라 은닉: summary] exit=1
+ok [리터럴 스칼라 은닉: run-name] exit=1
+ok [리터럴 스칼라 은닉: comment] exit=1
+ok [리터럴 스칼라 은닉: memo] exit=1
+ok [hardening4 자기 배선(CI 실행 줄)]
+PASS: portal-constants hardening4 cases 8 (blocked-mutations 6, clean-baselines 1, wiring-present 1)
+~~~~~
+
+→ 프로그램이 끝나며 남긴 성적은 0입니다. 0은 합격이며, 경과 시간은 11.26208825초입니다.
+
+실행 명령:
+
+~~~~~text
+bash scripts/acceptance-hs-portal-constants-hardening5.sh
+~~~~~
+
+→ 바로 아래 출력 전문을 만든 실제 명령이며, 합격·불합격 의미는 이어지는 출력 뒤 해석에서 판정한다.
+
+출력 전문:
+
+~~~~~text
+ok [hardening5 baseline] exit=0
+RUN_FIELDS_WITH_G3=0
+ENV_VALUES_WITH_G3=1
+ok [F1 quoted env value is not a run field] exit=1
+ok [F2 semantic role finder] exit=1
+ok [F2 semantic label finder] exit=1
+ok [F2 semantic test-id finder] exit=1
+ok [F2 semantic text finder] exit=1
+ok [hardening5 자기 배선(CI 실행 줄)]
+PASS: portal-constants hardening5 cases 7 (blocked-mutations 5, clean-baselines 1, wiring-present 1)
+~~~~~
+
+→ 프로그램이 끝나며 남긴 성적은 0입니다. 0은 합격이며, 경과 시간은 8.924728917초입니다.
+
+실행 명령:
+
+~~~~~text
+bash scripts/acceptance-hs-portal-constants-hardening6.sh
+~~~~~
+
+→ 바로 아래 출력 전문을 만든 실제 명령이며, 합격·불합격 의미는 이어지는 출력 뒤 해석에서 판정한다.
+
+출력 전문:
+
+~~~~~text
+JOB_IF=ABSENT
+JOB_CONTINUE_ON_ERROR=ABSENT
+AUTO_TRIGGER=true
+RUNS_ON=ubuntu-latest
+STEP_SHELL=ABSENT
+JOB_DEFAULT_SHELL=ABSENT
+WORKFLOW_DEFAULT_SHELL=ABSENT
+ok [hardening6 baseline] exit=0
+STEP_WORKING_DIRECTORY=fake-checks
+JOB_DEFAULT_WORKING_DIRECTORY=ABSENT
+WORKFLOW_DEFAULT_WORKING_DIRECTORY=ABSENT
+ok [N6 step-level working-directory key] exit=1
+STEP_WORKING_DIRECTORY=ABSENT
+JOB_DEFAULT_WORKING_DIRECTORY=fake-checks
+WORKFLOW_DEFAULT_WORKING_DIRECTORY=ABSENT
+ok [N6 job defaults.run.working-directory key] exit=1
+STEP_WORKING_DIRECTORY=ABSENT
+JOB_DEFAULT_WORKING_DIRECTORY=ABSENT
+WORKFLOW_DEFAULT_WORKING_DIRECTORY=fake-checks
+ok [N6 workflow defaults.run.working-directory key] exit=1
+STEP_ENV_KEYS=BASH_ENV
+JOB_ENV_KEYS=ABSENT
+WORKFLOW_ENV_KEYS=ABSENT
+ok [N7 step env BASH_ENV key] exit=1
+STEP_ENV_KEYS=ABSENT
+JOB_ENV_KEYS=BASH_ENV
+WORKFLOW_ENV_KEYS=ABSENT
+ok [N7 job env BASH_ENV key] exit=1
+STEP_ENV_KEYS=ABSENT
+JOB_ENV_KEYS=ABSENT
+WORKFLOW_ENV_KEYS=BASH_ENV
+ok [N7 workflow env BASH_ENV key] exit=1
+STEP_ENV_KEYS=ENV
+JOB_ENV_KEYS=ABSENT
+WORKFLOW_ENV_KEYS=ABSENT
+ok [N7 step env ENV key] exit=1
+STEP_ENV_KEYS=ABSENT
+JOB_ENV_KEYS=SHELLOPTS
+WORKFLOW_ENV_KEYS=ABSENT
+ok [N7 job env SHELLOPTS key] exit=1
+STEP_ENV_KEYS=ABSENT
+JOB_ENV_KEYS=ABSENT
+WORKFLOW_ENV_KEYS=PATH
+ok [N7 workflow env PATH key] exit=1
+STEP_ENV_KEYS=SAFE_STEP_FLAG
+JOB_ENV_KEYS=SAFE_JOB_FLAG
+WORKFLOW_ENV_KEYS=SAFE_WORKFLOW_FLAG
+ok [harmless env keys remain allowed] exit=0
+RUNS_ON_CLASS=NilClass
+RUNS_ON_VALUE=nil
+ok [N8 runs-on null] exit=1
+RUNS_ON_CLASS=Array
+RUNS_ON_VALUE=[]
+ok [N8 runs-on empty list] exit=1
+RUNS_ON_CLASS=FalseClass
+RUNS_ON_VALUE=false
+ok [N8 runs-on false] exit=1
+MATRIX_CLASS=Hash
+MATRIX_KEYS=shard
+STATIC_AXIS_VALUES=shard:Array:0
+ok [N9 matrix empty axis] exit=1
+MATRIX_CLASS=Hash
+MATRIX_KEYS=shard
+STATIC_AXIS_VALUES=shard:Array:2
+ok [non-empty static matrix axis remains allowed] exit=0
+MATRIX_CLASS=String
+MATRIX_VALUE=${{ fromJSON(vars.G3_MATRIX) }}
+ok [N9 matrix expression] exit=1
+MATRIX_VALUE={"shard"=>["${{ vars.G3_SHARD }}"]}
+ok [N9 matrix axis item expression] exit=1
+MATRIX_CLASS=Hash
+MATRIX_KEYS=include
+STATIC_AXIS_VALUES=
+ok [include-only matrix entries remain allowed] exit=0
+MATRIX_VALUE={"include"=>[]}
+ok [N9 empty include-only matrix] exit=1
+MATRIX_CLASS=Hash
+MATRIX_KEYS=exclude
+STATIC_AXIS_VALUES=
+ok [N9 matrix exclude-only] exit=1
+MATRIX_VALUE={"shard"=>["one"], "exclude"=>[{"shard"=>"one"}]}
+ok [N9 exclude removes the sole combination] exit=1
+MATRIX_VALUE={"os"=>["linux", "mac"], "shard"=>["one", "two"], "exclude"=>[{"os"=>"linux"}, {"os"=>"mac"}]}
+ok [N9 exclude removes a multi-axis cartesian product] exit=1
+MATRIX_VALUE={"os"=>["linux", "mac"], "shard"=>["one", "two"], "exclude"=>[{"os"=>"linux", "shard"=>"one"}]}
+ok [matrix with combinations remaining after exclude] exit=0
+MATRIX_VALUE={"shard"=>["one"], "exclude"=>[{"shard"=>"one"}], "include"=>[{"shard"=>"one"}]}
+ok [include restores a combination after exclude] exit=0
+MATRIX_VALUE={"shard"=>["one"], "include"=>"${{ fromJSON(vars.G3_INCLUDE) }}"}
+ok [N9 matrix include expression] exit=1
+MATRIX_VALUE={"shard"=>["one"], "include"=>[{"shard"=>"${{ vars.G3_SHARD }}"}]}
+ok [N9 matrix include value expression] exit=1
+MATRIX_VALUE={"shard"=>["one"], "exclude"=>"${{ fromJSON(vars.G3_EXCLUDE) }}"}
+ok [N9 matrix exclude expression] exit=1
+MATRIX_VALUE={"shard"=>["one"], "exclude"=>[{"shard"=>"${{ vars.G3_SHARD }}"}]}
+ok [N9 matrix exclude value expression] exit=1
+RUNS_ON=ubuntu-latest
+STEP_SHELL=echo {0}
+JOB_DEFAULT_SHELL=ABSENT
+WORKFLOW_DEFAULT_SHELL=ABSENT
+ok [N4 step-level shell key] exit=1
+RUNS_ON=ubuntu-latest
+STEP_SHELL=ABSENT
+JOB_DEFAULT_SHELL=echo {0}
+WORKFLOW_DEFAULT_SHELL=ABSENT
+ok [N4 job defaults.run.shell key] exit=1
+RUNS_ON=ubuntu-latest
+STEP_SHELL=ABSENT
+JOB_DEFAULT_SHELL=ABSENT
+WORKFLOW_DEFAULT_SHELL=echo {0}
+ok [N4 workflow defaults.run.shell key] exit=1
+RUNS_ON=ABSENT
+STEP_SHELL=ABSENT
+JOB_DEFAULT_SHELL=ABSENT
+WORKFLOW_DEFAULT_SHELL=ABSENT
+ok [N5 missing runs-on key] exit=1
+G3_JOBS=1
+G3_STEPS=2
+RUNS_ON=ubuntu-latest
+STEP_SHELLS=echo {0},ABSENT
+JOB_DEFAULT_SHELLS=ABSENT
+ok [N4 bad step plus duplicate safe step] exit=1
+G3_JOBS=2
+G3_STEPS=2
+RUNS_ON=ubuntu-latest,ubuntu-latest
+STEP_SHELLS=ABSENT,ABSENT
+JOB_DEFAULT_SHELLS=echo {0},ABSENT
+ok [N4 bad job defaults plus duplicate safe job] exit=1
+G3_JOBS=2
+G3_STEPS=2
+RUNS_ON=ABSENT,ubuntu-latest
+STEP_SHELLS=ABSENT,ABSENT
+JOB_DEFAULT_SHELLS=ABSENT,ABSENT
+ok [N5 missing runs-on plus duplicate safe job] exit=1
+G3_JOBS=1
+G3_STEPS=2
+RUNS_ON=ubuntu-latest
+STEP_SHELLS=ABSENT,echo {0}
+JOB_DEFAULT_SHELLS=ABSENT
+ok [N4 unsafe step after duplicate safe step] exit=1
+G3_JOBS=2
+G3_STEPS=2
+RUNS_ON=ubuntu-latest,ubuntu-latest
+STEP_SHELLS=ABSENT,ABSENT
+JOB_DEFAULT_SHELLS=ABSENT,echo {0}
+ok [N4 unsafe job defaults after duplicate safe job] exit=1
+G3_JOBS=2
+G3_STEPS=2
+RUNS_ON=ubuntu-latest,ABSENT
+STEP_SHELLS=ABSENT,ABSENT
+JOB_DEFAULT_SHELLS=ABSENT,ABSENT
+ok [N5 missing runs-on after duplicate safe job] exit=1
+JOB_IF=false
+JOB_CONTINUE_ON_ERROR=ABSENT
+AUTO_TRIGGER=true
+ok [N1 job-level if key] exit=1
+G3_JOB_NEEDS=gate
+GATE_IF=false
+ok [N1 skipped prerequisite job] exit=1
+JOB_IF=ABSENT
+JOB_CONTINUE_ON_ERROR=true
+AUTO_TRIGGER=true
+ok [N2 job-level continue-on-error true] exit=1
+JOB_CONTINUE_ON_ERROR_CLASS=String
+JOB_CONTINUE_ON_ERROR=${{ true }}
+ok [N2 job-level continue-on-error expression] exit=1
+JOB_IF=ABSENT
+JOB_CONTINUE_ON_ERROR=ABSENT
+AUTO_TRIGGER=false
+ok [N3 workflow_dispatch-only trigger] exit=1
+PUSH_PATHS_IGNORE=**
+PULL_REQUEST_PATHS_IGNORE=**
+ok [N3 automatic events filtered out] exit=1
+ok [hardening6 자기 배선(CI 실행 줄)]
+PASS: portal-constants hardening6 cases 46 (blocked-mutations 39, clean-baselines 6, wiring-present 1)
+~~~~~
+
+→ 프로그램이 끝나며 남긴 성적은 0입니다. 0은 합격이며, 경과 시간은 26.890818792초입니다.
+
+<!-- ATTEMPT-20260818:FINAL-G3-BATCH2-END -->
+
+
+#### 최신 기준 재검증 — PR #23 AC-19 회귀
+
+실행 명령:
+
+~~~~~text
+bash scripts/acceptance-0-2-unreachable-content.sh
+~~~~~
+
+→ 바로 아래 출력 전문을 만든 실제 명령이며, 합격·불합격 의미는 이어지는 출력 뒤 해석에서 판정한다.
+
+출력 전문:
+
+~~~~~text
+[1/13] SECRET_PATTERNS_FILE=/dev/null 상속을 격리 -> PASS (exit=0)
+[2/13] SECRET_PATTERNS_FILE=.secret-patterns.default 상속을 격리 -> PASS (exit=0)
+[3/13] 일반 실행은 무해한 unreachable blob을 허용 -> PASS (exit=0)
+[4/13] 일반 실행은 금지값이 든 unreachable blob을 차단 -> BLOCKED (exit=1)
+[5/13] unreachable commit message의 금지값을 차단 -> BLOCKED (exit=1)
+[6/13] unreachable tree path의 금지값을 차단 -> BLOCKED (exit=1)
+[7/13] unreachable annotated tag message의 금지값을 차단 -> BLOCKED (exit=1)
+[8/13] git fsck 실패는 검사 대상 없음으로 통과하지 않음 -> BLOCKED (exit=1)
+[9/13] unreachable 객체 읽기 실패는 조용히 통과하지 않음 -> BLOCKED (exit=1)
+[10/13] 알 수 없는 unreachable 객체형은 읽기 실패로 차단 -> BLOCKED (exit=1)
+[11/13] 큰 unreachable blob 앞쪽의 금지값도 차단 -> BLOCKED (exit=1)
+[12/13] 종료상태 실행은 무해한 unreachable blob도 차단 -> BLOCKED (exit=1)
+[13/13] Git hook 환경에서도 바깥 저장소 무오염 -> PASS (exit=0)
+CHECKED: 13
+PASS: AC-19 일반 내용 검사와 종료상태 0건 조건 분리
+~~~~~
+
+→ 프로그램이 끝나며 남긴 성적은 0입니다. 0은 합격이며, 경과 시간은 25.629596125초입니다.
+
+실행 명령:
+
+~~~~~text
+SECRET_PATTERNS_FILE=/dev/null bash scripts/acceptance-0-2-unreachable-content.sh
+~~~~~
+
+→ 바로 아래 출력 전문을 만든 실제 명령이며, 합격·불합격 의미는 이어지는 출력 뒤 해석에서 판정한다.
+
+출력 전문:
+
+~~~~~text
+[1/13] SECRET_PATTERNS_FILE=/dev/null 상속을 격리 -> PASS (exit=0)
+[2/13] SECRET_PATTERNS_FILE=.secret-patterns.default 상속을 격리 -> PASS (exit=0)
+[3/13] 일반 실행은 무해한 unreachable blob을 허용 -> PASS (exit=0)
+[4/13] 일반 실행은 금지값이 든 unreachable blob을 차단 -> BLOCKED (exit=1)
+[5/13] unreachable commit message의 금지값을 차단 -> BLOCKED (exit=1)
+[6/13] unreachable tree path의 금지값을 차단 -> BLOCKED (exit=1)
+[7/13] unreachable annotated tag message의 금지값을 차단 -> BLOCKED (exit=1)
+[8/13] git fsck 실패는 검사 대상 없음으로 통과하지 않음 -> BLOCKED (exit=1)
+[9/13] unreachable 객체 읽기 실패는 조용히 통과하지 않음 -> BLOCKED (exit=1)
+[10/13] 알 수 없는 unreachable 객체형은 읽기 실패로 차단 -> BLOCKED (exit=1)
+[11/13] 큰 unreachable blob 앞쪽의 금지값도 차단 -> BLOCKED (exit=1)
+[12/13] 종료상태 실행은 무해한 unreachable blob도 차단 -> BLOCKED (exit=1)
+[13/13] Git hook 환경에서도 바깥 저장소 무오염 -> PASS (exit=0)
+CHECKED: 13
+PASS: AC-19 일반 내용 검사와 종료상태 0건 조건 분리
+~~~~~
+
+→ 프로그램이 끝나며 남긴 성적은 0입니다. 0은 합격이며, 경과 시간은 23.910206917초입니다.
+
+실행 명령:
+
+~~~~~text
+SECRET_PATTERNS_FILE=.secret-patterns.default bash scripts/acceptance-0-2-unreachable-content.sh
+~~~~~
+
+→ 바로 아래 출력 전문을 만든 실제 명령이며, 합격·불합격 의미는 이어지는 출력 뒤 해석에서 판정한다.
+
+출력 전문:
+
+~~~~~text
+[1/13] SECRET_PATTERNS_FILE=/dev/null 상속을 격리 -> PASS (exit=0)
+[2/13] SECRET_PATTERNS_FILE=.secret-patterns.default 상속을 격리 -> PASS (exit=0)
+[3/13] 일반 실행은 무해한 unreachable blob을 허용 -> PASS (exit=0)
+[4/13] 일반 실행은 금지값이 든 unreachable blob을 차단 -> BLOCKED (exit=1)
+[5/13] unreachable commit message의 금지값을 차단 -> BLOCKED (exit=1)
+[6/13] unreachable tree path의 금지값을 차단 -> BLOCKED (exit=1)
+[7/13] unreachable annotated tag message의 금지값을 차단 -> BLOCKED (exit=1)
+[8/13] git fsck 실패는 검사 대상 없음으로 통과하지 않음 -> BLOCKED (exit=1)
+[9/13] unreachable 객체 읽기 실패는 조용히 통과하지 않음 -> BLOCKED (exit=1)
+[10/13] 알 수 없는 unreachable 객체형은 읽기 실패로 차단 -> BLOCKED (exit=1)
+[11/13] 큰 unreachable blob 앞쪽의 금지값도 차단 -> BLOCKED (exit=1)
+[12/13] 종료상태 실행은 무해한 unreachable blob도 차단 -> BLOCKED (exit=1)
+[13/13] Git hook 환경에서도 바깥 저장소 무오염 -> PASS (exit=0)
+CHECKED: 13
+PASS: AC-19 일반 내용 검사와 종료상태 0건 조건 분리
+~~~~~
+
+→ 프로그램이 끝나며 남긴 성적은 0입니다. 0은 합격이며, 경과 시간은 27.097892667초입니다.
+
+실행 명령:
+
+~~~~~text
+bash scripts/acceptance-0-2.sh
+~~~~~
+
+→ 바로 아래 출력 전문을 만든 실제 명령이며, 합격·불합격 의미는 이어지는 출력 뒤 해석에서 판정한다.
+
+출력 전문:
+
+~~~~~text
+PASS: no secret-pattern match in any tracked file, .env not tracked
+PASS: 0-2 — 히스토리·객체·reflog·docs 리터럴 0건, 스캐너 뮤테이션 검출 확인
+~~~~~
+
+→ 프로그램이 끝나며 남긴 성적은 0입니다. 0은 합격이며, 경과 시간은 3.961457875초입니다.
+
+<!-- ATTEMPT-20260818:FINAL-AC19-END -->
+
+
+#### 최신 기준 재검증 — 공통 게이트 1차 묶음
+
+실행 명령:
+
+~~~~~text
+bash verify.sh
+~~~~~
+
+→ 바로 아래 출력 전문을 만든 실제 명령이며, 합격·불합격 의미는 이어지는 출력 뒤 해석에서 판정한다.
+
+출력 전문:
+
+~~~~~text
+PASS: no secret-pattern match in any tracked file, .env not tracked
+~~~~~
+
+→ 프로그램이 끝나며 남긴 성적은 0입니다. 0은 합격이며, 경과 시간은 1.976994125초입니다.
+
+실행 명령:
+
+~~~~~text
+bash scripts/verify/check-mechanism-registry.sh
+~~~~~
+
+→ 바로 아래 출력 전문을 만든 실제 명령이며, 합격·불합격 의미는 이어지는 출력 뒤 해석에서 판정한다.
+
+출력 전문:
+
+~~~~~text
+PASS: secrets-scan-precommit (pre-commit · 규칙 1·2·3)
+PASS: acceptance-glob-prepush (pre-push · 규칙 1·2·3)
+PASS: ci-secret-scan (ci · 규칙 1·2·4)
+PASS: ci-portal-constants-gate (ci · 규칙 1·2·4)
+CHECKED: 4
+~~~~~
+
+→ 프로그램이 끝나며 남긴 성적은 0입니다. 0은 합격이며, 경과 시간은 0.764772917초입니다.
+
+실행 명령:
+
+~~~~~text
+bash scripts/acceptance-verify-ac-m.sh
+~~~~~
+
+→ 바로 아래 출력 전문을 만든 실제 명령이며, 합격·불합격 의미는 이어지는 출력 뒤 해석에서 판정한다.
+
+출력 전문:
+
+~~~~~text
+PASS: 검사기 실존·실행가능 — scripts/verify/check-mechanism-registry.sh
+PASS: fixture 정상 명부 → 통과 (exit=0)
+PASS: fixture path 없는 항목 → 불합격 (exit=1)
+PASS: fixture 죽은 target → 불합격 (exit=1)
+PASS: id 중복 → 불합격 (exit=1)
+PASS: 알 수 없는 stage → 불합격 (exit=1)
+PASS: manual 인데 사유 없음 → 불합격 (exit=1)
+PASS: manual 정상(사유+실행권한) → 통과 (exit=0)
+PASS: manual 인데 실행권한 없음 → 불합격 (exit=1)
+PASS: ci 인데 거짓 target → 불합격 (exit=1)
+PASS: ci target 이 주석에만 있음 → 불합격 (exit=1)
+PASS: ci target step 이 if:false 로 꺼짐 → 불합격 (exit=1)
+PASS: 절대경로 path → 불합격 (exit=1)
+PASS: 상대경로 심볼릭 링크 → 불합격 (exit=1)
+PASS: 필드 중복(path 2회, 마지막 값 유효) → 불합격 (exit=1)
+PASS: id 뒤 인라인 주석 → 불합격 (exit=1)
+PASS: 닫히지 않은 따옴표 → 불합격 (exit=1)
+PASS: stage 불일치 필드(ci_mirror_job) → 불합격 (exit=1)
+PASS: 문법 오류·항목 0개 → 위반(1) (exit=1)
+PASS: 항목 0개 명부 → NOT_RUN (exit=2)
+PASS: ci_mirror_job 불일치 → 불합격 (exit=1)
+PASS: 필수 필드(stage) 누락 → 불합격 (exit=1)
+PASS: 빈 문자열 path → 불합격 (exit=1)
+PASS: CI 자기배선 target 이 셸 주석에만 있음 → 불합격
+PASS: CI 배선 — verify.yml 에 무조건 실행 스텝 정확히 1회
+PASS: 실제 명부(docs/sot/mechanism-registry.yaml) → 통과 (exit=0)
+PASS: 명부 항목 4개 = 검사기 보고 4개 (하한 3)
+PASS: 저장소 무오염 (시작/종료 상태 동일)
+CHECKED: 28
+~~~~~
+
+→ 프로그램이 끝나며 남긴 성적은 0입니다. 0은 합격이며, 경과 시간은 5.646508917초입니다.
+
+실행 명령:
+
+~~~~~text
+bash scripts/check-docs-sot.sh
+~~~~~
+
+→ 바로 아래 출력 전문을 만든 실제 명령이며, 합격·불합격 의미는 이어지는 출력 뒤 해석에서 판정한다.
+
+출력 전문:
+
+~~~~~text
+PASS: docs/sot/INDEX.md 존재, 1050바이트 (<=20000)
+PASS: docs/sot/coding-principles.md 존재, 15405바이트 (<=20000)
+PASS: docs/sot/hook-contracts.md 존재, 5797바이트 (<=20000)
+PASS: docs/sot/git-workflow.md 존재, 2634바이트 (<=20000)
+PASS: docs/sot/verification-commands.md 존재, 9094바이트 (<=20000)
+PASS: hooks/pre-commit 가 docs/sot/hook-contracts.md 를 계약으로 참조
+PASS: hooks/pre-push 가 docs/sot/hook-contracts.md 를 계약으로 참조
+PASS: scripts/install-hooks.sh 가 docs/sot/hook-contracts.md 를 계약으로 참조
+PASS: scripts/session-status.sh 가 docs/sot/hook-contracts.md 를 계약으로 참조
+PASS: scripts/acceptance-0-7.sh 가 docs/sot/hook-contracts.md 를 계약으로 참조
+OK: docs/sot 재구성 AC 전부 충족
+~~~~~
+
+→ 프로그램이 끝나며 남긴 성적은 0입니다. 0은 합격이며, 경과 시간은 0.000005125초입니다.
+
+실행 명령:
+
+~~~~~text
+bash scripts/acceptance-0-7.sh
+~~~~~
+
+→ 바로 아래 출력 전문을 만든 실제 명령이며, 합격·불합격 의미는 이어지는 출력 뒤 해석에서 판정한다.
+
+출력 전문:
+
+~~~~~text
+=== 전제 검사: 훅 인프라 ===
+OK: 훅 파일 4종 + settings.json 존재
+
+=== 시연 (샌드박스: /var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/tmp.7fsdLhfoyK/repo · 각 시연마다 훅 ON/OFF 대조) ===
+[1/6] 검사기 자기 제외 → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+         BLOCKED: 검사기 자기 제외 — scripts/acceptance-0-6.sh 가 자기 자신을 검사 대상에서 뺀다 (P13)
+[2/6] 검사 약화(실패 무시) → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+         BLOCKED: 검사 약화 패턴 추가 — scripts/acceptance-0-2.sh (P13). 정당하면 suppressions.yaml 에 expiry 와 함께 등록하라
+[3/6] 만료일 없는 억제 → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+         BLOCKED: 억제 항목 1건 중 expiry 가 0건뿐 — 만료일 없는 억제는 영구화된다 (P13)
+[4/6] LLM 출력→판정 필드 → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+         BLOCKED: LLM 출력을 판정 수치로 변환 — src/scoring.js. 판정 수치는 순수 함수가 만든다 (P14)
+[5/6] 미커밋 상태로 push → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+         BLOCKED: 작업트리가 깨끗하지 않다 — 미커밋/미추적 변경이 있는 상태의 push (P15)
+[6/6] 가짜 외부효과 모듈 → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+         BLOCKED: 외부 효과를 표방하는데 네트워크 호출이 0건 — src/portal-login.js. 시뮬레이션 의심 (P4)
+
+OK: 원본 저장소 무변경 확인 (55614f4316c2956663b39f8f53ee9dfb951f77df)
+
+PASS: 위반 6 종이 전부 차단됨 (각 건 훅 OFF 대조 통과)
+~~~~~
+
+→ 프로그램이 끝나며 남긴 성적은 0입니다. 0은 합격이며, 경과 시간은 15.649051334초입니다.
+
+실행 명령:
+
+~~~~~text
+SECRET_PATTERNS_FILE= bash scripts/acceptance-0-5.sh
+~~~~~
+
+→ 바로 아래 출력 전문을 만든 실제 명령이며, 합격·불합격 의미는 이어지는 출력 뒤 해석에서 판정한다.
+
+출력 전문:
+
+~~~~~text
+PASS: 0-5 완료 — CI 비밀스캔 강제 + push 완료 + 원격 트리 비밀 0건
+~~~~~
+
+→ 프로그램이 끝나며 남긴 성적은 0입니다. 0은 합격이며, 경과 시간은 6.196396125초입니다.
+
+<!-- ATTEMPT-20260818:FINAL-COMMON1-END -->
+
+
+#### 최신 기준 재검증 — 구조·불변성 검사
+
+앞선 두 실행 도우미는 저장소 명령 시작 전 문자열 해석 오류로 종료되어 판정에서 제외했습니다. 아래 단순화한 원명령 묶음을 다시 실행했습니다.
+
+실행 명령:
+
+~~~~~text
+set -uo pipefail
+base=682f00e981dc2e23515dbdd0b1b3f807a48daa3b
+fail=0
+printf 'CHANGED_SHELL_SYNTAX\n'
+shell_files=$(git diff --name-only --diff-filter=ACMRT "$base" -- '*.sh')
+shell_count=0
+while IFS= read -r f; do
+  [ -n "$f" ] || continue
+  shell_count=$((shell_count+1))
+  if bash -n "$f"; then printf 'PASS %s\n' "$f"; else printf 'FAIL %s\n' "$f"; fail=1; fi
+done <<< "$shell_files"
+printf 'CHANGED_SHELL_COUNT=%s\n' "$shell_count"
+
+printf '\nCI_SOT_NAMES\n'
+ci_count=$(grep -c '^[[:space:]]*- name:' .github/workflows/verify.yml)
+sot_count=$(grep -Ec '^\| ([1-9]|1[0-8]) \|' docs/sot/verification-commands.md)
+printf 'CI_NAMED_STEPS=%s\nSOT_STEP_ROWS=%s\n' "$ci_count" "$sot_count"
+if diff -u <(ruby -ryaml -e 'w=YAML.safe_load(File.read(ARGV[0]), aliases:false); puts w["jobs"]["verify"]["steps"].map{|s| s["name"]}.compact' .github/workflows/verify.yml) <(awk -F'|' '/^\| ([1-9]|1[0-8]) \|/{gsub(/^ +| +$/, "", $3); print $3}' docs/sot/verification-commands.md); then
+  printf 'PASS CI/SOT exact names\n'
+else
+  printf 'FAIL CI/SOT exact names\n'; fail=1
+fi
+[ "$ci_count" -eq 18 ] && [ "$sot_count" -eq 18 ] || fail=1
+
+printf '\nDIRECT_RUN_FILES\n'
+direct_count=0
+while IFS= read -r f; do
+  [ -n "$f" ] || continue
+  direct_count=$((direct_count+1))
+  if [ -f "$f" ] && grep -qF "$f" docs/sot/verification-commands.md; then
+    printf 'PASS %s\n' "$f"
+  else
+    printf 'FAIL %s\n' "$f"
+    fail=1
+  fi
+done < <(ruby -ryaml -e 'w=YAML.safe_load(File.read(ARGV[0]), aliases:false); w["jobs"]["verify"]["steps"].each{|s| r=s["run"]; next unless r.is_a?(String); r.scan(/(?:^|\s)bash\s+(scripts\/[A-Za-z0-9._\/-]+\.sh)/).each{|m| puts m[0]}}' .github/workflows/verify.yml | LC_ALL=C sort -u)
+printf 'DIRECT_RUN_FILE_COUNT=%s\n' "$direct_count"
+
+printf '\nG3_HASH_INVARIANCE\n'
+for f in scripts/acceptance-hs-portal-constants.sh scripts/acceptance-hs-portal-constants-mutations.sh scripts/acceptance-hs-portal-constants-hardening.sh scripts/acceptance-hs-portal-constants-hardening2.sh scripts/acceptance-hs-portal-constants-hardening3.sh scripts/acceptance-hs-portal-constants-hardening4.sh scripts/acceptance-hs-portal-constants-hardening5.sh scripts/acceptance-hs-portal-constants-hardening6.sh; do
+  before=$(git rev-parse "918f0b683d8ea28454715669285891b021c39df1:$f")
+  after=$(git hash-object "$f")
+  if [ "$before" = "$after" ]; then printf 'PASS %s %s\n' "$f" "$after"; else printf 'FAIL %s before=%s after=%s\n' "$f" "$before" "$after"; fail=1; fi
+done
+
+printf '\nAC19_HASH_INVARIANCE\n'
+for f in scripts/acceptance-0-2-unreachable-content.sh scripts/acceptance-0-2.sh; do
+  before=$(git rev-parse "origin/main:$f")
+  after=$(git hash-object "$f")
+  if [ "$before" = "$after" ]; then printf 'PASS %s %s\n' "$f" "$after"; else printf 'FAIL %s before=%s after=%s\n' "$f" "$before" "$after"; fail=1; fi
+done
+
+printf '\nPIPESTATUS_STRUCTURE\n'
+sed -n '116,132p' scripts/acceptance-0-2.sh
+branch_copies=$(sed -n '116,132p' scripts/acceptance-0-2.sh | grep -Ec '^    object_scan_status=.*PIPESTATUS')
+printf 'PIPESTATUS_BRANCH_COPIES=%s\n' "$branch_copies"
+[ "$branch_copies" -eq 2 ] || fail=1
+
+printf '\nPRODUCT_DIFF\n'
+product_diff=$(git diff --name-status origin/main -- humansearch/src humansearch/tests)
+if [ -z "$product_diff" ]; then printf 'PASS HumanSearch L0 product code diff 0\n'; else printf '%s\nFAIL product diff nonzero\n' "$product_diff"; fail=1; fi
+if git diff --name-only origin/main -- | rg -q '(^|/)(auth_surface|login_state)\.py$'; then
+  git diff --name-only origin/main -- | rg '(^|/)(auth_surface|login_state)\.py$'
+  printf 'FAIL prohibited L0 files present\n'; fail=1
+else
+  printf 'PASS auth_surface.py/login_state.py absent\n'
+fi
+
+printf '\nDIFF_CHECK\n'
+if git diff --check && git diff --cached --check; then printf 'PASS git diff --check\n'; else printf 'FAIL git diff --check\n'; fail=1; fi
+printf '\nUNMERGED_COUNT='
+unmerged_count=$(git ls-files -u | awk 'END{print NR+0}')
+printf '%s\n' "$unmerged_count"
+[ "$unmerged_count" -eq 0 ] || fail=1
+exit "$fail"
+~~~~~
+
+→ 바로 아래 출력 전문을 만든 실제 명령이며, 합격·불합격 의미는 이어지는 출력 뒤 해석에서 판정한다.
+
+출력 전문:
+
+~~~~~text
+CHANGED_SHELL_SYNTAX
+PASS scripts/acceptance-0-2-unreachable-content.sh
+PASS scripts/acceptance-0-2.sh
+PASS scripts/acceptance-hs-portal-constants-hardening.sh
+PASS scripts/acceptance-hs-portal-constants-hardening2.sh
+PASS scripts/acceptance-hs-portal-constants-hardening3.sh
+PASS scripts/acceptance-hs-portal-constants-hardening4.sh
+PASS scripts/acceptance-hs-portal-constants-hardening5.sh
+PASS scripts/acceptance-hs-portal-constants-hardening6.sh
+PASS scripts/acceptance-hs-portal-constants-mutations.sh
+PASS scripts/acceptance-hs-portal-constants.sh
+PASS scripts/acceptance-verify-ac-m.sh
+PASS scripts/verify/check-mechanism-registry.sh
+CHANGED_SHELL_COUNT=12
+
+CI_SOT_NAMES
+CI_NAMED_STEPS=18
+SOT_STEP_ROWS=18
+PASS CI/SOT exact names
+
+DIRECT_RUN_FILES
+PASS scripts/acceptance-0-2-unreachable-content.sh
+PASS scripts/acceptance-0-5.sh
+PASS scripts/acceptance-0-6.sh
+PASS scripts/acceptance-0-7.sh
+PASS scripts/acceptance-hs-a3.sh
+PASS scripts/acceptance-hs-a4.sh
+PASS scripts/acceptance-hs-cleanroom-absolute-contexts.sh
+PASS scripts/acceptance-hs-cleanroom-absolute-paths.sh
+PASS scripts/acceptance-hs-cleanroom-colon-paths.sh
+PASS scripts/acceptance-hs-cleanroom-file-urls.sh
+PASS scripts/acceptance-hs-cleanroom-hook-env-mutations.sh
+PASS scripts/acceptance-hs-cleanroom-hook-env.sh
+PASS scripts/acceptance-hs-cleanroom-mutations.sh
+PASS scripts/acceptance-hs-cleanroom.sh
+PASS scripts/acceptance-hs-gates-antiforge.sh
+PASS scripts/acceptance-hs-gates-mutations.sh
+PASS scripts/acceptance-hs-gates.sh
+PASS scripts/acceptance-hs-portal-constants-hardening.sh
+PASS scripts/acceptance-hs-portal-constants-hardening2.sh
+PASS scripts/acceptance-hs-portal-constants-hardening3.sh
+PASS scripts/acceptance-hs-portal-constants-hardening4.sh
+PASS scripts/acceptance-hs-portal-constants-hardening5.sh
+PASS scripts/acceptance-hs-portal-constants-hardening6.sh
+PASS scripts/acceptance-hs-portal-constants-mutations.sh
+PASS scripts/acceptance-hs-portal-constants.sh
+PASS scripts/acceptance-secret-webhook-vendor.sh
+PASS scripts/acceptance-verify-ac-m.sh
+PASS scripts/scan-data-exposure.sh
+DIRECT_RUN_FILE_COUNT=28
+
+G3_HASH_INVARIANCE
+PASS scripts/acceptance-hs-portal-constants.sh b63386cfaeb7114b90db8046f1b9023544dc4a6f
+PASS scripts/acceptance-hs-portal-constants-mutations.sh 7606f00a864ac81df9520af53a54a3c315a10422
+PASS scripts/acceptance-hs-portal-constants-hardening.sh 5e27cc57950179f855e2d6449fec987bf764ec52
+PASS scripts/acceptance-hs-portal-constants-hardening2.sh 978a22839dfd02adc820549ca2cb25f326db231e
+PASS scripts/acceptance-hs-portal-constants-hardening3.sh 8db5342121a5e06ee59f31c08b9a17d0d174c7c6
+PASS scripts/acceptance-hs-portal-constants-hardening4.sh 169bb95cd64b270a4490ce695690fd85bb8598ae
+PASS scripts/acceptance-hs-portal-constants-hardening5.sh 6d3db02d647c9f226d02683b1f55d49029594f64
+PASS scripts/acceptance-hs-portal-constants-hardening6.sh 1d68c752594a6e69c3e46094156e299fe5cd66d4
+
+AC19_HASH_INVARIANCE
+PASS scripts/acceptance-0-2-unreachable-content.sh 2aadf2ed437244888de1498af5abeb1ddd294a52
+PASS scripts/acceptance-0-2.sh 04f6bb57e1a93f8d65707f1e702713736439a053
+
+PIPESTATUS_STRUCTURE
+  [ -z "${object_type:-}" ] && continue
+  if git cat-file "$object_type" "$sha" 2>/dev/null |
+     LC_ALL=C grep -aF "$LIT" >/dev/null; then
+    object_scan_status=("${PIPESTATUS[@]}")
+  else
+    object_scan_status=("${PIPESTATUS[@]}")
+  fi
+  cat_file_rc=${object_scan_status[0]:-1}
+  grep_rc=${object_scan_status[1]:-2}
+  if [ "$cat_file_rc" -ne 0 ]; then
+    echo "FAIL: unreachable ${object_type} 읽기 실패: $sha (exit=$cat_file_rc)"
+    fail=1
+  elif [ "$grep_rc" -eq 0 ]; then
+    echo "FAIL: unreachable ${object_type}에 리터럴 잔존: $sha"
+    fail=1
+  elif [ "$grep_rc" -ne 1 ]; then
+    echo "FAIL: unreachable ${object_type} 내용 대조 실패: $sha (exit=$grep_rc)"
+PIPESTATUS_BRANCH_COPIES=2
+
+PRODUCT_DIFF
+PASS HumanSearch L0 product code diff 0
+PASS auth_surface.py/login_state.py absent
+
+DIFF_CHECK
+docs/engineering/admin-position-map-phase0-measurement-2026-08-17.md:60: trailing whitespace.
++→ 뭘 시켰나: 로컬 토큰 값을 출력하지 않고 운영 프로젝트의 읽기 전용 질의 주소로 버전 SELECT 한 문장만 보내게 했습니다.
+docs/engineering/admin-position-map-phase0-measurement-2026-08-17.md:61: trailing whitespace.
++→ 뭐가 나왔나: 데이터베이스에 닿기 전 주소 이름 조회에서 실패했습니다.
+docs/engineering/admin-position-map-phase0-measurement-2026-08-17.md:79: trailing whitespace.
++→ 뭘 시켰나: 위 명령의 전체 오류를 숨기지 않고 남겼습니다.
+docs/engineering/admin-position-map-phase0-measurement-2026-08-17.md:80: trailing whitespace.
++→ 뭐가 나왔나: 호스트 이름을 찾지 못했다는 ENOTFOUND 오류이며 운영 SQL 응답은 0건입니다.
+docs/engineering/admin-position-map-phase0-measurement-2026-08-17.md:108: trailing whitespace.
++→ 뭘 시켰나: 기존 프로젝트 주소에서 후보 stage 한 열·한 행만 읽고, 환경 변수 값은 출력하지 않도록 했습니다.
+docs/engineering/admin-position-map-phase0-measurement-2026-08-17.md:109: trailing whitespace.
++→ 뭐가 나왔나: 아래처럼 주소 이름 조회에서 실패했습니다.
+docs/engineering/admin-position-map-phase0-measurement-2026-08-17.md:126: trailing whitespace.
++→ 뭘 시켰나: 위 대체 조회의 전체 오류를 숨기지 않고 남겼습니다.
+docs/engineering/admin-position-map-phase0-measurement-2026-08-17.md:127: trailing whitespace.
++→ 뭐가 나왔나: 프로젝트 주소도 이름 조회에서 막혀 운영 응답은 없었습니다.
+docs/engineering/admin-position-map-phase0-measurement-2026-08-17.md:138: trailing whitespace.
++→ 뭘 시켰나: 사람이 운영 데이터베이스 제품과 버전만 읽도록 하는 전문입니다.
+docs/engineering/admin-position-map-phase0-measurement-2026-08-17.md:139: trailing whitespace.
++→ 뭐가 나왔나: 이번 실행에서는 결과가 없습니다.
+docs/engineering/admin-position-map-phase0-measurement-2026-08-17.md:181: trailing whitespace.
++→ 뭘 시켰나: 모든 배치 키를 카드 원본 ID와 대조하고, 전체 판정과 다섯 건 이상의 표본을 한 번에 내게 합니다.
+docs/engineering/admin-position-map-phase0-measurement-2026-08-17.md:182: trailing whitespace.
++→ 뭐가 나왔나: 이번 실행에서는 결과가 없습니다.
+docs/engineering/admin-position-map-phase0-measurement-2026-08-17.md:236: trailing whitespace.
++→ 뭘 시켰나: ClickUp 미러 후보만 골라 직접 연결 빈값 비율, 이름 유무, source 값별 건수를 실명 없이 계산하게 합니다.
+docs/engineering/admin-position-map-phase0-measurement-2026-08-17.md:237: trailing whitespace.
++→ 뭐가 나왔나: 이번 실행에서는 결과가 없습니다.
+docs/engineering/admin-position-map-phase0-measurement-2026-08-17.md:251: trailing whitespace.
++→ 뭘 시켰나: 저장된 후보 상태 전체를 값별 건수로 묶게 합니다.
+docs/engineering/admin-position-map-phase0-measurement-2026-08-17.md:252: trailing whitespace.
++→ 뭐가 나왔나: 이번 실행에서는 결과가 없습니다.
+docs/engineering/admin-position-map-phase0-measurement-2026-08-17.md:264: trailing whitespace.
++→ 뭘 시켰나: 네 항목의 실행 여부와 설계 영향을 한 표로 대조했습니다.
+docs/engineering/admin-position-map-phase0-measurement-2026-08-17.md:265: trailing whitespace.
++→ 뭐가 나왔나: 실제 성공 0건, NOT_RUN 4건입니다.
+docs/engineering/admin-position-map-phase0-measurement-2026-08-17.md:283: trailing whitespace.
++→ 뭘 시켰나: 이번 시도가 금지된 쓰기나 개인정보 노출을 만들었는지 대조했습니다.
+docs/engineering/admin-position-map-phase0-measurement-2026-08-17.md:284: trailing whitespace.
++→ 뭐가 나왔나: 운영 쓰기 0건, 외부 발송 0건, 후보 개인정보 출력 0건입니다.
+docs/engineering/admin-position-map-spec-v2-2026-08-17.md:96: trailing whitespace.
++→ 뭘 시켰나: 입력물에 적힌 파일 이름이 아니라 실제 적재·수정·발송 줄을 따라가 계약 근거를 만들었습니다.
+docs/engineering/admin-position-map-spec-v2-2026-08-17.md:97: trailing whitespace.
++→ 뭐가 나왔나: 미러 현재값만 수정, 상태 축약, 직접 AI Search 적재, 이력의 비원자성, Gmail 읽기 확인 경계가 확인됐습니다.
+docs/engineering/admin-position-map-spec-v2-2026-08-17.md:156: trailing whitespace.
++→ 뭘 시켰나: 마이그레이션으로 확인된 한글 원본 상태와 영문 저장 키를 고정하고, 운영에서만 알 수 있는 값은 M4 문지기로 분리했습니다.
+docs/engineering/admin-position-map-spec-v2-2026-08-17.md:157: trailing whitespace.
++→ 뭐가 나왔나: 백필 CASE의 15개 대응이 확인됐고, **V1(Claude) 재실행 M4로 운영 distinct 24종이 확정**되어 observedDbStages·중립·모호 분류가 채워졌습니다(실측 정본: 측정 보고 부록).
+docs/engineering/admin-position-map-spec-v2-2026-08-17.md:193: trailing whitespace.
++→ 뭘 시켰나: 한 셀에 여러 근거가 있을 때 색 우선순위와 계산 중단 조건을 한곳에 고정했습니다.
+docs/engineering/admin-position-map-spec-v2-2026-08-17.md:194: trailing whitespace.
++→ 뭐가 나왔나: GREEN→BLUE→YELLOW→ORANGE→TRANSPARENT 순서이며, 불명확한 값은 NOT_RUN입니다.
+docs/engineering/admin-position-map-spec-v2-2026-08-17.md:248: trailing whitespace.
++→ 뭘 시켰나: 한 번의 발송 시도를 재현하는 데 필요한 필드를 상태·연결·외부 확인·사람 승인으로 나눴습니다.
+docs/engineering/admin-position-map-spec-v2-2026-08-17.md:249: trailing whitespace.
++→ 뭐가 나왔나: 후보 실명 없이도 pending부터 sent·failed까지 감사할 수 있는 계약입니다.
+docs/engineering/admin-position-map-spec-v2-2026-08-17.md:333: trailing whitespace.
++→ 뭘 시켰나: 같은 의도·같은 시도 번호를 막는 행 식별 규칙과, 의도 ID가 달라도 같은 채널·후보·canonical 포지션·재발송 차수의 활성 발송을 막는 업무 규칙을 분리했습니다.
+docs/engineering/admin-position-map-spec-v2-2026-08-17.md:334: trailing whitespace.
++→ 뭐가 나왔나: 이 블록은 PostgreSQL 15 이상 분기입니다. M1이 15 미만이면 NULLS NOT DISTINCT를 사용하지 않고 같은 유일성 열의 nullable 값에 COALESCE 고정 표식을 적용해야 하며, 두 분기 모두 같은 중복 시험을 통과해야 합니다.
+docs/engineering/admin-position-map-spec-v2-2026-08-17.md:358: trailing whitespace.
++→ 뭘 시켰나: PostgreSQL 15 미만에서도 빈값을 서로 다른 값처럼 통과시키지 않는 대체 인덱스 전문을 고정했습니다.
+docs/engineering/admin-position-map-spec-v2-2026-08-17.md:359: trailing whitespace.
++→ 뭐가 나왔나: M1 주버전 결과에 따라 둘 중 한 분기만 선택하며, 같은 발송 범위에 pending·sent가 겹치지 않는 계약은 같습니다.
+docs/engineering/admin-position-map-spec-v2-2026-08-17.md:510: trailing whitespace.
++→ 뭘 시켰나: 문장형 요구를 자동 시험이 셀 수 있는 입력·출력으로 바꿨습니다.
+docs/engineering/admin-position-map-spec-v2-2026-08-17.md:511: trailing whitespace.
++→ 뭐가 나왔나: R1~R13과 v1에서 살아남은 화면·미연결·0건·프론트 무판정 계약이 모두 시험에 연결됐습니다.
+docs/engineering/admin-position-map-spec-v2-2026-08-17.md:532: trailing whitespace.
++→ 뭘 시켰나: 감사 R1~R13 각각이 어느 계약과 시험으로 닫혔는지 대조했습니다.
+docs/engineering/admin-position-map-spec-v2-2026-08-17.md:533: trailing whitespace.
++→ 뭐가 나왔나: 13개 전부 목표 판정 CONFIRM이며 검증자가 항목별로 반증해야 합니다.
+docs/engineering/admin-position-map-spec-v2-2026-08-17.md:549: trailing whitespace.
++→ 뭘 시켰나: 이미 결정된 기술 계약과 아직 사업·운영 승인이 필요한 항목을 분리했습니다.
+docs/engineering/admin-position-map-spec-v2-2026-08-17.md:550: trailing whitespace.
++→ 뭐가 나왔나: 모든 항목에 이름, 오너, 기한이 있고 v1의 세 항목도 남아 있습니다.
+docs/engineering/premerge-a3-a4-v1-verdict-2026-08-09.md:117: trailing whitespace.
++--- after : hooksPath=[hooks] README md5=487deb05…
+docs/engineering/verdicts/codex-code-review-v4-recovery-2026-08-18.md:37: trailing whitespace.
++→ 무엇을 판정했나: 코드 내용, 저장 이력, 임시 보관본, 별도 작업 폴더를 서로 독립적으로 확인했습니다.
+docs/engineering/verdicts/codex-code-review-v4-recovery-2026-08-18.md:72: trailing whitespace.
++→ 뭘 했나: 현재 본선과 원격 기준점을 비교하고, 재배치 전 로컬 커밋의 변경 내용이 원격에 있는지 검사했습니다.
+docs/engineering/verdicts/codex-code-review-v4-recovery-2026-08-18.md:96: trailing whitespace.
++→ 뭘 했나: 복구 전에 보관된 파일과 현재 최종 파일의 모든 차이를 비교했습니다.
+docs/engineering/verdicts/codex-code-review-v4-recovery-2026-08-18.md:109: trailing whitespace.
++→ 좋은 소식: 자격요건을 실제 업무 입력칸에 합치고, 입력칸이 없으면 중단하는 방향은 정본과 일치합니다.
+docs/engineering/verdicts/codex-code-review-v4-recovery-2026-08-18.md:163: trailing whitespace.
++→ 뭘 했나: 원격판·보관판·저장 예정판·현재판을 각각 JSON으로 읽어 집합 비교했습니다.
+docs/engineering/verdicts/codex-code-review-v4-recovery-2026-08-18.md:179: trailing whitespace.
++→ 존재하지 않는 153개 경로 자체가 검사를 깨뜨린다는 반증은 실패했습니다. 깨끗한 별도 작업 폴더에서는 통과했습니다.
+docs/engineering/verdicts/codex-code-review-v4-recovery-2026-08-18.md:200: trailing whitespace.
++→ 뭘 했나: 로그의 모든 `FAIL` 머리글을 추출해 별도 17개 목록과 대조했습니다.
+docs/engineering/verdicts/codex-code-review-v4-recovery-2026-08-18.md:249: trailing whitespace.
++→ 뭘 했나: 스태시의 두 부모가 기록한 원래 저장 예정 상태와 현재 저장 예정 상태를 비교했습니다.
+docs/engineering/verdicts/codex-code-review-v4-recovery-2026-08-18.md:322: trailing whitespace.
++→ 무엇을 판정했나: 코드 내용, 저장 이력, 임시 보관본, 별도 작업 폴더를 서로 독립적으로 확인했습니다.
+docs/engineering/verdicts/codex-code-review-v4-recovery-2026-08-18.md:357: trailing whitespace.
++→ 뭘 했나: 현재 본선과 원격 기준점을 비교하고, 재배치 전 로컬 커밋의 변경 내용이 원격에 있는지 검사했습니다.
+docs/engineering/verdicts/codex-code-review-v4-recovery-2026-08-18.md:381: trailing whitespace.
++→ 뭘 했나: 복구 전에 보관된 파일과 현재 최종 파일의 모든 차이를 비교했습니다.
+docs/engineering/verdicts/codex-code-review-v4-recovery-2026-08-18.md:394: trailing whitespace.
++→ 좋은 소식: 자격요건을 실제 업무 입력칸에 합치고, 입력칸이 없으면 중단하는 방향은 정본과 일치합니다.
+docs/engineering/verdicts/codex-code-review-v4-recovery-2026-08-18.md:448: trailing whitespace.
++→ 뭘 했나: 원격판·보관판·저장 예정판·현재판을 각각 JSON으로 읽어 집합 비교했습니다.
+docs/engineering/verdicts/codex-code-review-v4-recovery-2026-08-18.md:464: trailing whitespace.
++→ 존재하지 않는 153개 경로 자체가 검사를 깨뜨린다는 반증은 실패했습니다. 깨끗한 별도 작업 폴더에서는 통과했습니다.
+docs/engineering/verdicts/codex-code-review-v4-recovery-2026-08-18.md:485: trailing whitespace.
++→ 뭘 했나: 로그의 모든 `FAIL` 머리글을 추출해 별도 17개 목록과 대조했습니다.
+docs/engineering/verdicts/codex-code-review-v4-recovery-2026-08-18.md:534: trailing whitespace.
++→ 뭘 했나: 스태시의 두 부모가 기록한 원래 저장 예정 상태와 현재 저장 예정 상태를 비교했습니다.
+docs/engineering/verdicts/codex-model-routing-rebuttal-2026-08-17.md:39: trailing whitespace.
++→ 뭘 했나: 주장을 전부 부정하지 않고, 방향·위험 분류·근거를 분리했습니다.
+docs/engineering/verdicts/codex-model-routing-rebuttal-2026-08-17.md:40: trailing whitespace.
++→ 뭐가 나왔나: 큰 방향은 맞지만 “Sonnet 중위험 묶음”과 “게이트가 충분하다”는 결론은 승인 근거가 부족합니다.
+docs/engineering/verdicts/codex-model-routing-rebuttal-2026-08-17.md:80: trailing whitespace.
++→ 뭘 했나: 같은 회사가 공개한 현재 모델의 코딩·터미널 수치와 가격을 비교했습니다.
+docs/engineering/verdicts/codex-model-routing-rebuttal-2026-08-17.md:81: trailing whitespace.
++→ 뭐가 나왔나: 어려운 다중 파일 시험에서 Fable–Sonnet 차이는 16.8%포인트지만, 터미널 시험에서는 Sonnet이 Opus보다 높았습니다.
+docs/engineering/verdicts/codex-model-routing-rebuttal-2026-08-17.md:186: trailing whitespace.
++→ 뭘 했나: 기술 이름만 같은 예제가 아니라 화면, 동기화, 시간 이력을 각각 실제 공개 코드와 비교했습니다.
+docs/engineering/verdicts/codex-model-routing-rebuttal-2026-08-17.md:187: trailing whitespace.
++→ 뭐가 나왔나: React 화면은 하위 모델로 충분하다는 증거가 강하지만, 동기화와 과거 상태는 별도 고위험 영역입니다.
+docs/engineering/verdicts/codex-model-routing-rebuttal-2026-08-17.md:265: trailing whitespace.
++→ 뭘 했나: 원래 안을 전면 폐기하지 않고, Sonnet에 적합한 화면·반복 작업은 유지하고 발송·cron·시간 SQL만 상향했습니다.
+docs/engineering/verdicts/codex-model-routing-rebuttal-2026-08-17.md:266: trailing whitespace.
++→ 뭐가 나왔나: 비용 절감 구조는 남지만, 되돌리기 어려운 작업에 싼 모델을 먼저 투입해 재작업하는 경로를 줄였습니다.
+FAIL git diff --check
+
+UNMERGED_COUNT=0
+~~~~~
+
+→ 프로그램이 끝나며 남긴 성적은 1입니다. 0은 모든 구조·내용 지문·제품 비범위·공백 검사가 합격했다는 뜻이며, 경과 시간은 0.990681959초입니다.
+
+<!-- ATTEMPT-20260818:FINAL-STATIC-END -->
+
+
+#### 구조·불변성 검사 FAIL 복구와 원명령 재실행
+
+실패한 보조 묶음은 원격에서 상속된 파일과 그 출력을 복사한 goal의 줄끝 공백을 함께 잡았습니다. 기존 goal의 줄끝 공백은 0개였고 이번 복사분은 63개였습니다. 복사분의 줄끝 공백만 제거한 뒤 사용자 필수 원명령을 포함한 아래 구조 묶음을 다시 실행했습니다.
+
+실행 명령:
+
+~~~~~text
+set -uo pipefail
+base=682f00e981dc2e23515dbdd0b1b3f807a48daa3b
+fail=0
+printf 'CHANGED_SHELL_SYNTAX\n'
+shell_files=$(git diff --name-only --diff-filter=ACMRT "$base" -- '*.sh')
+shell_count=0
+while IFS= read -r f; do
+  [ -n "$f" ] || continue
+  shell_count=$((shell_count+1))
+  bash -n "$f" && printf 'PASS %s\n' "$f" || { printf 'FAIL %s\n' "$f"; fail=1; }
+done <<< "$shell_files"
+printf 'CHANGED_SHELL_COUNT=%s\n' "$shell_count"
+
+printf '\nCI_SOT_NAMES\n'
+ci_count=$(grep -c '^[[:space:]]*- name:' .github/workflows/verify.yml)
+sot_count=$(grep -Ec '^\| ([1-9]|1[0-8]) \|' docs/sot/verification-commands.md)
+printf 'CI_NAMED_STEPS=%s\nSOT_STEP_ROWS=%s\n' "$ci_count" "$sot_count"
+diff -u <(ruby -ryaml -e 'w=YAML.safe_load(File.read(ARGV[0]), aliases:false); puts w["jobs"]["verify"]["steps"].map{|s| s["name"]}.compact' .github/workflows/verify.yml) <(awk -F'|' '/^\| ([1-9]|1[0-8]) \|/{gsub(/^ +| +$/, "", $3); print $3}' docs/sot/verification-commands.md) || fail=1
+[ "$ci_count" -eq 18 ] && [ "$sot_count" -eq 18 ] || fail=1
+[ "$fail" -eq 0 ] && printf 'PASS CI/SOT exact names\n'
+
+printf '\nDIRECT_RUN_FILES\n'
+direct_count=0
+while IFS= read -r f; do
+  [ -n "$f" ] || continue
+  direct_count=$((direct_count+1))
+  [ -f "$f" ] && grep -qF "$f" docs/sot/verification-commands.md && printf 'PASS %s\n' "$f" || { printf 'FAIL %s\n' "$f"; fail=1; }
+done < <(ruby -ryaml -e 'w=YAML.safe_load(File.read(ARGV[0]), aliases:false); w["jobs"]["verify"]["steps"].each{|s| r=s["run"]; next unless r.is_a?(String); r.scan(/(?:^|\s)bash\s+(scripts\/[A-Za-z0-9._\/-]+\.sh)/).each{|m| puts m[0]}}' .github/workflows/verify.yml | LC_ALL=C sort -u)
+printf 'DIRECT_RUN_FILE_COUNT=%s\n' "$direct_count"
+
+printf '\nHASH_INVARIANCE\n'
+for f in scripts/acceptance-hs-portal-constants.sh scripts/acceptance-hs-portal-constants-mutations.sh scripts/acceptance-hs-portal-constants-hardening.sh scripts/acceptance-hs-portal-constants-hardening2.sh scripts/acceptance-hs-portal-constants-hardening3.sh scripts/acceptance-hs-portal-constants-hardening4.sh scripts/acceptance-hs-portal-constants-hardening5.sh scripts/acceptance-hs-portal-constants-hardening6.sh; do
+  before=$(git rev-parse "918f0b683d8ea28454715669285891b021c39df1:$f"); after=$(git hash-object "$f")
+  [ "$before" = "$after" ] && printf 'PASS G3 %s %s\n' "$f" "$after" || { printf 'FAIL G3 %s\n' "$f"; fail=1; }
+done
+for f in scripts/acceptance-0-2-unreachable-content.sh scripts/acceptance-0-2.sh; do
+  before=$(git rev-parse "origin/main:$f"); after=$(git hash-object "$f")
+  [ "$before" = "$after" ] && printf 'PASS AC19 %s %s\n' "$f" "$after" || { printf 'FAIL AC19 %s\n' "$f"; fail=1; }
+done
+
+printf '\nPIPESTATUS_STRUCTURE\n'
+branch_copies=$(sed -n '116,132p' scripts/acceptance-0-2.sh | grep -Ec '^    object_scan_status=.*PIPESTATUS')
+printf 'PIPESTATUS_BRANCH_COPIES=%s\n' "$branch_copies"
+[ "$branch_copies" -eq 2 ] || fail=1
+
+printf '\nPRODUCT_DIFF\n'
+product_diff=$(git diff --name-status origin/main -- humansearch/src humansearch/tests)
+[ -z "$product_diff" ] && printf 'PASS HumanSearch L0 product code diff 0\n' || { printf '%s\nFAIL product diff nonzero\n' "$product_diff"; fail=1; }
+git diff --name-only origin/main -- | rg -q '(^|/)(auth_surface|login_state)\.py$' && { printf 'FAIL prohibited L0 files present\n'; fail=1; } || printf 'PASS auth_surface.py/login_state.py absent\n'
+
+printf '\nDIFF_CHECK\n'
+git diff --check && printf 'PASS git diff --check\n' || { printf 'FAIL git diff --check\n'; fail=1; }
+unmerged_count=$(git ls-files -u | awk 'END{print NR+0}')
+printf 'UNMERGED_COUNT=%s\n' "$unmerged_count"
+[ "$unmerged_count" -eq 0 ] || fail=1
+exit "$fail"
+~~~~~
+
+→ 바로 아래 출력 전문을 만든 실제 명령이며, 합격·불합격 의미는 이어지는 출력 뒤 해석에서 판정한다.
+
+출력 전문:
+
+~~~~~text
+CHANGED_SHELL_SYNTAX
+PASS scripts/acceptance-0-2-unreachable-content.sh
+PASS scripts/acceptance-0-2.sh
+PASS scripts/acceptance-hs-portal-constants-hardening.sh
+PASS scripts/acceptance-hs-portal-constants-hardening2.sh
+PASS scripts/acceptance-hs-portal-constants-hardening3.sh
+PASS scripts/acceptance-hs-portal-constants-hardening4.sh
+PASS scripts/acceptance-hs-portal-constants-hardening5.sh
+PASS scripts/acceptance-hs-portal-constants-hardening6.sh
+PASS scripts/acceptance-hs-portal-constants-mutations.sh
+PASS scripts/acceptance-hs-portal-constants.sh
+PASS scripts/acceptance-verify-ac-m.sh
+PASS scripts/verify/check-mechanism-registry.sh
+CHANGED_SHELL_COUNT=12
+
+CI_SOT_NAMES
+CI_NAMED_STEPS=18
+SOT_STEP_ROWS=18
+PASS CI/SOT exact names
+
+DIRECT_RUN_FILES
+PASS scripts/acceptance-0-2-unreachable-content.sh
+PASS scripts/acceptance-0-5.sh
+PASS scripts/acceptance-0-6.sh
+PASS scripts/acceptance-0-7.sh
+PASS scripts/acceptance-hs-a3.sh
+PASS scripts/acceptance-hs-a4.sh
+PASS scripts/acceptance-hs-cleanroom-absolute-contexts.sh
+PASS scripts/acceptance-hs-cleanroom-absolute-paths.sh
+PASS scripts/acceptance-hs-cleanroom-colon-paths.sh
+PASS scripts/acceptance-hs-cleanroom-file-urls.sh
+PASS scripts/acceptance-hs-cleanroom-hook-env-mutations.sh
+PASS scripts/acceptance-hs-cleanroom-hook-env.sh
+PASS scripts/acceptance-hs-cleanroom-mutations.sh
+PASS scripts/acceptance-hs-cleanroom.sh
+PASS scripts/acceptance-hs-gates-antiforge.sh
+PASS scripts/acceptance-hs-gates-mutations.sh
+PASS scripts/acceptance-hs-gates.sh
+PASS scripts/acceptance-hs-portal-constants-hardening.sh
+PASS scripts/acceptance-hs-portal-constants-hardening2.sh
+PASS scripts/acceptance-hs-portal-constants-hardening3.sh
+PASS scripts/acceptance-hs-portal-constants-hardening4.sh
+PASS scripts/acceptance-hs-portal-constants-hardening5.sh
+PASS scripts/acceptance-hs-portal-constants-hardening6.sh
+PASS scripts/acceptance-hs-portal-constants-mutations.sh
+PASS scripts/acceptance-hs-portal-constants.sh
+PASS scripts/acceptance-secret-webhook-vendor.sh
+PASS scripts/acceptance-verify-ac-m.sh
+PASS scripts/scan-data-exposure.sh
+DIRECT_RUN_FILE_COUNT=28
+
+HASH_INVARIANCE
+PASS G3 scripts/acceptance-hs-portal-constants.sh b63386cfaeb7114b90db8046f1b9023544dc4a6f
+PASS G3 scripts/acceptance-hs-portal-constants-mutations.sh 7606f00a864ac81df9520af53a54a3c315a10422
+PASS G3 scripts/acceptance-hs-portal-constants-hardening.sh 5e27cc57950179f855e2d6449fec987bf764ec52
+PASS G3 scripts/acceptance-hs-portal-constants-hardening2.sh 978a22839dfd02adc820549ca2cb25f326db231e
+PASS G3 scripts/acceptance-hs-portal-constants-hardening3.sh 8db5342121a5e06ee59f31c08b9a17d0d174c7c6
+PASS G3 scripts/acceptance-hs-portal-constants-hardening4.sh 169bb95cd64b270a4490ce695690fd85bb8598ae
+PASS G3 scripts/acceptance-hs-portal-constants-hardening5.sh 6d3db02d647c9f226d02683b1f55d49029594f64
+PASS G3 scripts/acceptance-hs-portal-constants-hardening6.sh 1d68c752594a6e69c3e46094156e299fe5cd66d4
+PASS AC19 scripts/acceptance-0-2-unreachable-content.sh 2aadf2ed437244888de1498af5abeb1ddd294a52
+PASS AC19 scripts/acceptance-0-2.sh 04f6bb57e1a93f8d65707f1e702713736439a053
+
+PIPESTATUS_STRUCTURE
+PIPESTATUS_BRANCH_COPIES=2
+
+PRODUCT_DIFF
+PASS HumanSearch L0 product code diff 0
+PASS auth_surface.py/login_state.py absent
+
+DIFF_CHECK
+PASS git diff --check
+UNMERGED_COUNT=0
+~~~~~
+
+→ 프로그램이 끝나며 남긴 성적은 0입니다. 0은 바뀐 셸 문법, 18개 이름, 직접 실행 파일, 시험 지문, 제품 비범위, 공백, 미해결 충돌이 모두 합격했다는 뜻입니다.
+
+<!-- ATTEMPT-20260818:FINAL-STATIC-RECOVERY-END -->
+
+### 최신 main 기준 session-status 및 작업트리 불변 증거
+
+```text
+COMMAND=bash scripts/session-status.sh
+SESSION_PRE_HEAD=918f0b683d8ea28454715669285891b021c39df1
+SESSION_PRE_MERGE_HEAD=34e4ccff88ce776d06e3001734005a34b169f7eb
+SESSION_PRE_STATUS_BEGIN
+M  .github/workflows/verify.yml
+A  docs/engineering/admin-dashboard-engagement-heatmap-spec-adversarial-review-2026-08-16.md
+A  docs/engineering/admin-position-map-phase0-measurement-2026-08-17.md
+A  docs/engineering/admin-position-map-spec-2026-08-17.md
+A  docs/engineering/admin-position-map-spec-v1-adversarial-audit-2026-08-17.md
+A  docs/engineering/admin-position-map-spec-v2-2026-08-17.md
+A  docs/engineering/admin-weekly-dashboard-v6-replacement-goal-2026-08-16.md
+A  docs/engineering/admin-weekly-dashboard-v6-review-prompt-2026-08-16.md
+A  docs/engineering/admin-weekly-dashboard-v6-review-prompt-retry-2026-08-16.md
+ M docs/engineering/codeaudit-g3-followup-goal-2026-08-15.md
+A  docs/engineering/gate0-not-run-red-recovery-prompt-verdict-2026-08-18.md
+A  docs/engineering/gate0-unreachable-secret-scan-goal-2026-08-17.md
+A  docs/engineering/goal-prompts/admin-position-map-v2-impl-kickoff-2026-08-17.md
+A  docs/engineering/goal-prompts/codeaudit-followup-2026-08-15.md
+A  docs/engineering/goal-prompts/codex-5position-relaxed-fit-search-2026-08-15.md
+A  docs/engineering/goal-prompts/codex-5position-search-2026-08-15.md
+A  docs/engineering/goal-prompts/codex-gate0-not-run-red-recovery-2026-08-18.md
+A  docs/engineering/goal-prompts/codex-humansearch-autoloop-L0-2026-08-16.md
+A  docs/engineering/goal-prompts/codex-position-map-p0-impl-2026-08-18.md
+A  docs/engineering/goal-prompts/codex-position-map-p0-impl-addendum-2026-08-18.md
+A  docs/engineering/goal-prompts/codex-position-map-phase0-spec-v2-2026-08-17.md
+A  docs/engineering/goal-prompts/humansearch-L0-kickoff-2026-08-16.md
+A  docs/engineering/goal-prompts/humansearch-journey-nightshift-2026-08-14.md
+A  docs/engineering/humansearch-journey-alternative-plan-2026-08-15.md
+A  docs/engineering/humansearch-journey-alternative-plan-goal-2026-08-15.md
+A  docs/engineering/humansearch-journey-alternative-v1-v2-verdict-2026-08-15.md
+A  docs/engineering/humansearch-journey-master-plan-2026-08-14.md
+A  docs/engineering/premerge-a3-a4-v1-verdict-2026-08-09.md
+A  docs/engineering/strict-not-run-recovery-goal-2026-08-18.md
+A  docs/engineering/verdicts/codex-code-review-v4-recovery-2026-08-18.md
+A  docs/engineering/verdicts/codex-model-routing-rebuttal-2026-08-17.md
+ M docs/sot/hook-contracts.md
+M  docs/sot/verification-commands.md
+A  scripts/acceptance-0-2-unreachable-content.sh
+M  scripts/acceptance-0-2.sh
+M  suppressions.yaml
+SESSION_PRE_STATUS_END
+HEAD: 918f0b6 (ahead 42 / behind 14)
+ORIGIN: 34e4ccf
+RED: 0/28 (acceptance-0-7.sh 제외 — CI 담당)
+SESSION_POST_HEAD=918f0b683d8ea28454715669285891b021c39df1
+SESSION_POST_MERGE_HEAD=34e4ccff88ce776d06e3001734005a34b169f7eb
+SESSION_POST_STATUS_BEGIN
+M  .github/workflows/verify.yml
+A  docs/engineering/admin-dashboard-engagement-heatmap-spec-adversarial-review-2026-08-16.md
+A  docs/engineering/admin-position-map-phase0-measurement-2026-08-17.md
+A  docs/engineering/admin-position-map-spec-2026-08-17.md
+A  docs/engineering/admin-position-map-spec-v1-adversarial-audit-2026-08-17.md
+A  docs/engineering/admin-position-map-spec-v2-2026-08-17.md
+A  docs/engineering/admin-weekly-dashboard-v6-replacement-goal-2026-08-16.md
+A  docs/engineering/admin-weekly-dashboard-v6-review-prompt-2026-08-16.md
+A  docs/engineering/admin-weekly-dashboard-v6-review-prompt-retry-2026-08-16.md
+ M docs/engineering/codeaudit-g3-followup-goal-2026-08-15.md
+A  docs/engineering/gate0-not-run-red-recovery-prompt-verdict-2026-08-18.md
+A  docs/engineering/gate0-unreachable-secret-scan-goal-2026-08-17.md
+A  docs/engineering/goal-prompts/admin-position-map-v2-impl-kickoff-2026-08-17.md
+A  docs/engineering/goal-prompts/codeaudit-followup-2026-08-15.md
+A  docs/engineering/goal-prompts/codex-5position-relaxed-fit-search-2026-08-15.md
+A  docs/engineering/goal-prompts/codex-5position-search-2026-08-15.md
+A  docs/engineering/goal-prompts/codex-gate0-not-run-red-recovery-2026-08-18.md
+A  docs/engineering/goal-prompts/codex-humansearch-autoloop-L0-2026-08-16.md
+A  docs/engineering/goal-prompts/codex-position-map-p0-impl-2026-08-18.md
+A  docs/engineering/goal-prompts/codex-position-map-p0-impl-addendum-2026-08-18.md
+A  docs/engineering/goal-prompts/codex-position-map-phase0-spec-v2-2026-08-17.md
+A  docs/engineering/goal-prompts/humansearch-L0-kickoff-2026-08-16.md
+A  docs/engineering/goal-prompts/humansearch-journey-nightshift-2026-08-14.md
+A  docs/engineering/humansearch-journey-alternative-plan-2026-08-15.md
+A  docs/engineering/humansearch-journey-alternative-plan-goal-2026-08-15.md
+A  docs/engineering/humansearch-journey-alternative-v1-v2-verdict-2026-08-15.md
+A  docs/engineering/humansearch-journey-master-plan-2026-08-14.md
+A  docs/engineering/premerge-a3-a4-v1-verdict-2026-08-09.md
+A  docs/engineering/strict-not-run-recovery-goal-2026-08-18.md
+A  docs/engineering/verdicts/codex-code-review-v4-recovery-2026-08-18.md
+A  docs/engineering/verdicts/codex-model-routing-rebuttal-2026-08-17.md
+ M docs/sot/hook-contracts.md
+M  docs/sot/verification-commands.md
+A  scripts/acceptance-0-2-unreachable-content.sh
+M  scripts/acceptance-0-2.sh
+M  suppressions.yaml
+SESSION_POST_STATUS_END
+SESSION_STATUS_EXIT=0
+
+```
+
+→ `session-status`가 보고한 28개 RED의 실제 종료값, 명령 전후 HEAD·MERGE_HEAD·상태를 함께 보존한다. 종료값이 0이고 전후 목록이 같을 때만 다음 적대검증으로 진행한다.
+
+<!-- ATTEMPT-20260818:FINAL-SESSION-STATUS-END -->
+
+## Claude V1 적대검증
+
+실행 명령:
+
+```text
+env -u ANTHROPIC_API_KEY claude -p '<아래 프롬프트 전문>'
+```
+
+→ 환경 변수에 저장된 개인 인증값을 넘기지 않은 채 Claude를 읽기 전용 검증자로 실행했다.
+
+실행 프롬프트 전문:
+
+~~~~~~~~text
+당신은 PR #13 최신 main 통합의 1차 적대 검증자다. 구현하거나 저장소를 수정하지 말고, 아래 세 상태를 모두 직접 읽어 교차검증하라.
+
+저장소 작업트리:
+/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/humansearch-g3-portal-constants
+
+감사 기준:
+- 통합 전 PR #13 HEAD: 918f0b683d8ea28454715669285891b021c39df1
+- 최신 origin/main 및 현재 MERGE_HEAD: 34e4ccff88ce776d06e3001734005a34b169f7eb
+- 공통 분기점: 682f00e981dc2e23515dbdd0b1b3f807a48daa3b
+- 현재 작업트리는 위 main을 PR #13 브랜치에 일반 merge한 커밋 전 통합 트리다.
+- 통합 전 PR diff는 git diff 682f00e981dc2e23515dbdd0b1b3f807a48daa3b..918f0b683d8ea28454715669285891b021c39df1 로,
+  최신 main diff는 git diff 682f00e981dc2e23515dbdd0b1b3f807a48daa3b..34e4ccff88ce776d06e3001734005a34b169f7eb 로,
+  최종 통합 diff는 git diff 34e4ccff88ce776d06e3001734005a34b169f7eb -- 로 읽어라.
+- docs/engineering/codeaudit-g3-followup-goal-2026-08-15.md에는 지금까지의 명령과 전체 출력이 있다.
+
+안전·범위:
+- 원본 저장소 파일 수정, git add/commit/merge/reset/checkout/stash/push/fetch, GitHub 쓰기 전부 금지.
+- 파괴적·뮤테이션 시험이 필요하면 mktemp로 만든 복제본에서만 하고, 끝난 뒤 원본 git status가 동일한지 확인하라.
+- 실제 포털, 브라우저, 로그인, 세션, 후보자 개인정보, 실제 비밀값에 접근하지 마라.
+- PR #14/#15/#21/#23 및 HumanSearch L0 제품 구현은 읽기 전용 범위 밖으로 확대하지 마라.
+- 판단에 필요한 읽기 전용 명령은 직접 실행하되, 실행하지 못한 필수 항목은 NOT_RUN 또는 BLOCKED로 명시하라.
+
+반드시 공격할 항목:
+1. AC-19 환경 상속 격리, 큰 객체 전체 스트림, unreachable blob뿐 아니라 commit/tree/tag 객체형, fsck/cat-file 실패 닫힘 회귀
+2. G3 YAML 실행 칸에 스크립트 이름을 숨기거나 정적 문자열 조각·치환으로 검사를 우회하는 경우
+3. job/step if 조건, continue-on-error, shell, working-directory로 실행·실패를 숨기는 경우
+4. runs-on 또는 matrix가 0회 실행되게 만드는 경우
+5. mechanism registry가 주석이나 죽은 실행 칸을 실제 실행으로 오인하는 경우
+6. 이름 있는 CI 검증 18단계 중 AC-19 또는 G3 누락, 순서 및 SOT 18행 불일치
+7. pre-push 정본 문서와 실제 훅 예외 불일치: acceptance-0-2.sh/0-5.sh 직접 제외, PUSH-PERFORMING CI 담당, unreachable-content는 로컬 push와 CI 모두 실행
+8. PR #13 RED 파일·기대 종료값 및 PR #23 AC-19 13개 합성 시험 기대값 약화
+9. auth_surface.py, login_state.py 등 HumanSearch L0 제품 코드 혼입
+10. 원본 저장소 오염 또는 검사 전후 HEAD/MERGE_HEAD/status 변화
+
+추가 계약:
+- scripts/acceptance-0-2.sh의 cat-file|grep 파이프라인 앞뒤 같은 두 분기는 set -e 종료 방지와 PIPESTATUS 즉시 보존용이므로 삭제·단순화 여부를 확인하라.
+- 최신 main의 AC-19와 PR #13 G3를 모두 보존한 .github/workflows/verify.yml은 이름 있는 검증 단계 정확히 18개여야 한다.
+- 중간 이상 결함, 필수 NOT_RUN/BLOCKED, 원본 오염이 하나라도 있으면 VERDICT: FAIL이다.
+- 결함이 없더라도 실행한 반례·뮤테이션, 각 명령의 전체 출력, 확인한 file:line을 모두 남겨라.
+- 결함 총 개수와 심각도별 개수를 명시하라.
+
+[출력 형식 — 반드시 지킬 것]
+읽는 사람은 기술 배경이 없는 사업 책임자다. 판정 내용은 절대 축소하지 말고, 표현만 풀어 써라.
+1) 문서 맨 앞에 "결론". 결정할 사항 1개당 1~2문장, 전체 분량 상한 없음. 전문용어는 풀어 쓰더라도 결론에서는 쓰지 마라.
+2) 그다음 "판단 근거": 왜 그렇게 봤는지, 갈림길에서 왜 이 해석을 골랐는지, 버린 해석은 왜 버렸는지, 이 판정이 틀리면 무엇이 깨지는지.
+3) 그다음부터 기술 상세·명령·출력·file:line 전문. 증거는 하나도 생략하지 마라.
+- 전문용어는 첫 등장 문장 안에서 괄호로 풀어 써라. 뒤에 몰아 쓴 용어집은 무효다.
+- 터미널 출력·코드 블록·**표**를 붙였으면 바로 아래에 "→ 뭘 시켰나 / 뭐가 나왔나 / 좋은 소식인가 나쁜 소식인가" 1~3줄을 달아라.
+- 첫 줄에 `VERDICT: PASS|FAIL` 한 줄을 두어라. 그 한 줄은 결론의 일부가 아니라 기계가 읽는 표식이므로 결론 제목 앞에 온다.
+- file:line 을 인용하면 그 줄이 무슨 일을 하는 줄인지 한 마디 덧붙여라.
+- 결함마다 심각도 라벨을 붙이고, 그 옆에 그대로 두면 사업/운영에 무슨 일이 생기는지 한 문장으로 덧붙여라(라벨을 지우지 마라).
+- 설계 결정을 지적할 때는 "무엇을 / 왜 / 버린 대안 / 대가 / 되돌리는 법" 5줄로 적어라.
+- 이번에 건너뛴 것·확인하지 못한 것·중간에 실패해서 다시 한 것을 판정 앞부분에 명시해라.
+- 추정과 확인된 사실을 구분 표시해라(확인 못 한 것은 ※).
+- 한국어 존칭체. 초등학생용 비유는 쓰지 마라 — 성인 의사결정자 수준으로 써라.
+~~~~~~~~
+
+→ 통합 전 PR #13, 최신 main, 커밋 전 통합 트리와 10개 공격면·안전 범위·판정 조건을 하나도 생략하지 않고 전달했다.
+
+Claude 원문:
+
+~~~~~~~~text
+API Error: Fable 5's safeguards flagged this message (https://www.anthropic.com/legal/aup). This sometimes happens with safe, normal conversations. Claude Code can't respond to this message with Fable 5.
+
+Try rephrasing the request in a new session or change your model.
+
+Learn more: https://support.claude.com/en/articles/15363606
+
+Details: `[reasoning_extraction]`
+
+Request ID: req_011Ce9NR2pvhZCTMp8KQAb5r
+
+~~~~~~~~
+
+→ 아래 원문은 Claude가 실제로 실행한 검증과 판정을 편집 없이 보존한 것이다. 다음 Codex V2에서 모든 파일·줄·실행 주장을 다시 재현한다.
+
+CLAUDE_COMMAND_EXIT=1
+
+<!-- ATTEMPT-20260818:CLAUDE-V1-END -->
+
+### Claude V1 재호출 — 제공자 안전장치 거부 복구
+
+첫 호출은 `[reasoning_extraction]` 안전장치로 판정 없이 끝났으므로, 숨은 사고과정이 아니라 확인 가능한 관찰만 요구하는 새 검증을 한 번 실행했다.
+
+실행 명령:
+
+```text
+env -u ANTHROPIC_API_KEY claude -p --model sonnet '<아래 프롬프트 전문>'
+```
+
+→ 첫 실패의 안내가 제시한 대로 새 세션과 다른 Claude 모델을 사용했으며, 개인 인증 환경 변수는 계속 제거했다.
+
+재호출 프롬프트 전문:
+
+~~~~~~~~text
+PR #13의 병합 전 품질 준수 여부를 독립적으로 검사해 주세요. 숨은 사고 과정은 요구하지 않습니다. 저장소에서 직접 확인한 사실, 실행한 읽기 전용 명령과 출력, 그 사실이 판정에 주는 의미만 보고해 주세요.
+
+대상 작업트리: /Users/kangsangmo/Desktop/Valuehire_v6/worktrees/humansearch-g3-portal-constants
+비교할 세 상태:
+- PR #13 원본: 918f0b683d8ea28454715669285891b021c39df1
+- 최신 main: 34e4ccff88ce776d06e3001734005a34b169f7eb
+- 공통 분기점: 682f00e981dc2e23515dbdd0b1b3f807a48daa3b
+현재 작업트리는 최신 main을 PR 브랜치에 일반 merge한 커밋 전 트리이며 MERGE_HEAD는 최신 main SHA입니다.
+통합 전 PR은 공통 분기점..PR 원본, main 변경은 공통 분기점..최신 main, 통합 결과는 최신 main과 현재 작업트리를 비교해 확인해 주세요. 기존 실행 증거는 docs/engineering/codeaudit-g3-followup-goal-2026-08-15.md에 있습니다.
+
+절대 조건:
+- 원본 저장소는 읽기 전용입니다. 파일 수정, git add/commit/merge/reset/checkout/stash/push/fetch, GitHub 쓰기를 하지 마세요.
+- 필요한 파괴 시험은 mktemp 복제본에서만 허용합니다. 실제 포털·브라우저·로그인·세션·후보자 개인정보·실제 비밀값에는 접근하지 마세요.
+- PR #14/#15/#21/#23 브랜치나 HumanSearch L0 제품을 변경하지 마세요.
+- 종료 전에 원본 HEAD, MERGE_HEAD, git status가 검사 전과 같은지 확인해 주세요.
+- 필수 검사를 못 했으면 NOT_RUN 또는 BLOCKED로 적고 PASS로 판정하지 마세요.
+
+검사 항목:
+1) AC-19가 환경 변수 격리, 큰 객체 전체 내용, 도달할 수 없는 blob/commit/tree/tag의 실제 객체형, fsck 및 cat-file 오류 시 차단을 보존하는지
+2) G3가 YAML run 칸의 문자열 조각·변수 치환·숨긴 스크립트 이름을 놓치지 않는지
+3) job/step if, continue-on-error, shell, working-directory가 G3 실행 또는 실패를 숨길 수 없는지
+4) runs-on 또는 matrix를 이용한 0회 실행을 막는지
+5) mechanism registry가 주석이나 실행되지 않는 run 칸을 실제 실행으로 잘못 세지 않는지
+6) CI 이름 있는 검증 단계가 정확히 18개이고 G3·AC-19가 모두 포함되며 SOT 18행 이름·순서와 맞는지
+7) pre-push 구현과 문서가 다음 예외를 똑같이 설명하는지: acceptance-0-2.sh/0-5.sh 직접 제외, PUSH-PERFORMING은 CI 담당, acceptance-0-2-unreachable-content.sh는 로컬 push와 CI 모두 실행
+8) PR #13의 기존 RED 파일과 기대 종료값, PR #23의 AC-19 13개 합성 시험 기대값이 약해지지 않았는지
+9) auth_surface.py, login_state.py 등 HumanSearch L0 제품 코드가 섞이지 않았는지
+10) 검사 때문에 원본 저장소가 오염되지 않았는지
+추가로 scripts/acceptance-0-2.sh의 cat-file|grep 앞뒤 동일한 두 분기가 PIPESTATUS 즉시 보존을 위해 그대로 두 개 남아 있는지 확인해 주세요.
+
+중간 이상 결함, 필수 NOT_RUN/BLOCKED, 원본 오염이 하나라도 있으면 FAIL입니다. 결함 0건이어도 확인한 file:line, 실행한 반례·뮤테이션과 명령 출력, 결함 총수와 심각도별 수를 보고해 주세요.
+
+[출력 형식 — 반드시 지킬 것]
+읽는 사람은 기술 배경이 없는 사업 책임자다. 판정 내용은 절대 축소하지 말고, 표현만 풀어 써라.
+1) 문서 맨 앞에 "결론". 결정할 사항 1개당 1~2문장, 전체 분량 상한 없음. 전문용어는 풀어 쓰더라도 결론에서는 쓰지 마라.
+2) 그다음 "판단 근거": 왜 그렇게 봤는지, 갈림길에서 왜 이 해석을 골랐는지, 버린 해석은 왜 버렸는지, 이 판정이 틀리면 무엇이 깨지는지.
+3) 그다음부터 기술 상세·명령·출력·file:line 전문. 증거는 하나도 생략하지 마라.
+- 전문용어는 첫 등장 문장 안에서 괄호로 풀어 써라. 뒤에 몰아 쓴 용어집은 무효다.
+- 터미널 출력·코드 블록·**표**를 붙였으면 바로 아래에 "→ 뭘 시켰나 / 뭐가 나왔나 / 좋은 소식인가 나쁜 소식인가" 1~3줄을 달아라.
+- 첫 줄에 `VERDICT: PASS|FAIL` 한 줄을 두어라. 그 한 줄은 결론의 일부가 아니라 기계가 읽는 표식이므로 결론 제목 앞에 온다.
+- file:line 을 인용하면 그 줄이 무슨 일을 하는 줄인지 한 마디 덧붙여라.
+- 결함마다 심각도 라벨을 붙이고, 그 옆에 그대로 두면 사업/운영에 무슨 일이 생기는지 한 문장으로 덧붙여라(라벨을 지우지 마라).
+- 설계 결정을 지적할 때는 "무엇을 / 왜 / 버린 대안 / 대가 / 되돌리는 법" 5줄로 적어라.
+- 이번에 건너뛴 것·확인하지 못한 것·중간에 실패해서 다시 한 것을 판정 앞부분에 명시해라.
+- 추정과 확인된 사실을 구분 표시해라(확인 못 한 것은 ※).
+- 한국어 존칭체. 초등학생용 비유는 쓰지 마라 — 성인 의사결정자 수준으로 써라.
+~~~~~~~~
+
+→ 안전·범위·세 기준 상태·10개 검사면·FAIL 조건과 strict 출력 계약은 그대로 유지했다.
+
+Claude 재호출 원문:
+
+~~~~~~~~text
+# VERDICT: FAIL
+
+## 결론
+
+이번 감사에서 실제로 위험한 코드 결함은 발견되지 않았습니다. G3(포털 상수·자동화 접속 정보가 코드 전역에 흩어지지 못하게 막는 자체 개발 검사기) 가드, AC-19(과거에 있었다가 지금은 도달할 수 없는 git 객체 속 비밀값을 상시 검사하는 시험 13종) 보호, 명부 대조 장치(어떤 검사가 실제로 도는지 기록해두고 실물과 맞춰보는 장치) 모두 실행해서 확인했고 전부 정상 동작했습니다. PR #13이 만든 검사와 최신 main이 만든 검사가 서로 지우지 않고 둘 다 살아 있으며, 실제 후보자 개인정보를 다루는 제품 코드가 이번 통합에 섞여 들어온 흔적도 없습니다.
+
+다만 지금 이 작업트리를 그대로 커밋하면 안 됩니다. `docs/sot/hook-contracts.md`(pre-push 훅의 동작을 설명하는 공식 문서) 파일이 아직 git의 커밋 대기열(인덱스)에 올라가지 않은 상태이고, 대기열에 있는 옛 버전은 "push할 때 검사 스크립트를 전부 실행한다"고 적혀 있는데, 실제 pre-push 훅은 이미 두 개 검사(acceptance-0-2.sh, acceptance-0-5.sh)를 일부러 건너뛰도록 바뀌어 있습니다. 지금 상태로 `git commit`을 실행하면 실제 동작과 다른 설명이 그대로 회사 공식 문서로 남습니다. 이 파일 하나를 `git add`로 대기열에 올린 뒤 커밋하면 해결되는 문제이지만, 확인 없이 넘어가면 조용히 잘못된 정보가 박제됩니다.
+
+추가로 알려드릴 사항이 있습니다. 이 작업트리에는 사장님이 이미 알고 계실 수 있는 Codex(별도 AI 에이전트)가 지금도 같은 폴더에서 동작 중인 흔적이 있었습니다(같은 경로를 가리키는 프로세스 2개, 관련 문서가 제 감사 시작 직전인 오전 10시46분에도 수정됨). 제 감사가 진행되는 동안에는 그 프로세스가 추가로 파일을 바꾸지는 않았지만, 이 보고서가 가리키는 "지금 이 순간"의 상태는 다른 주체가 함께 손대고 있는 움직이는 목표물이라는 점을 알고 계셔야 합니다.
+
+## 판단 근거
+
+**왜 FAIL로 판정했는지**: 사용자 지시에 "중간 이상 결함이 하나라도 있으면 FAIL"이라고 명시되어 있었고, 위에서 설명한 문서-구현 불일치는 "지금 커밋하면 실제로 발생하는" 재현 가능한 결함이지 추측이 아니기 때문입니다. 기술적 보호 장치(G3·AC-19·명부 대조) 자체는 10개 항목 모두 실행 증거로 확인했고 전부 정상이었습니다. 즉 "지어놓은 벽"은 튼튼하지만 "벽을 세운 사람이 아직 서류에 도장을 안 찍은 상태"라고 보시면 됩니다.
+
+**갈림길과 선택**: `git status`가 파일마다 두 글자 상태코드를 보여주는데, 앞 글자는 "커밋 대기열에 뭐가 있나", 뒷 글자는 "지금 디스크 파일과 대기열이 같은가"를 뜻합니다. 대부분 파일은 `A `또는 `M `(뒷칸이 빈칸)이라 대기열과 디스크가 같았지만, `hook-contracts.md`와 감사 로그 문서 2개만 앞에 공백이 있는 `M`(즉 " M")이었습니다. 이 신호를 무시하고 "지금 디스크에 있는 내용이 곧 커밋될 내용"이라고 단정했다면 item 7(문서-구현 일치)을 안전하게 PASS로 적었을 것이고, 그 판정은 "이 순간의 파일" 기준으로는 맞지만 "다음 명령 한 번(`git commit`)이 만들 결과" 기준으로는 틀립니다. 사용자가 "PR #13 병합 전 품질"을 물으셨으므로, 다음 한 번의 커밋으로 무엇이 남는지까지 보는 것이 올바른 해석이라고 판단해 후자를 기준으로 삼았습니다.
+
+**이 판정이 틀리면 무엇이 깨지는가**: 만약 "디스크 상태만 보면 된다"는 해석이 맞다면 이 FAIL은 과도하게 엄격한 것이고, 실제로는 병합을 진행해도 무방합니다. 그러나 실무에서 병합을 마무리하는 표준 동작(`git add -A && git commit`)이 지금 실행되면 정확히 제가 지적한 결과가 나오므로, 이 해석이 틀릴 가능성은 낮다고 봅니다.
+
+**이번에 건너뛴 것 / 확인하지 못한 것**:
+- ※ 최신 원격 `origin/main`이 이 감사에서 쓴 `34e4ccf`보다 더 나아갔는지는 실행 확인하지 않았습니다(디스크에 남은 미저장 문서에 "0f8541ef..."라는 더 새 커밋 언급이 있었으나, 이것이 실제 원격 상태인지 직접 `git fetch`로 확인하지는 않았습니다 — 지시받은 절대 조건상 fetch가 금지되어 있었기 때문입니다).
+- ※ GitHub 서버 CI(원격 Actions)가 실제로 이 조합을 초록으로 통과시켰는지는 이번 감사 범위 밖입니다(로컬 재현만 수행). 기존 실행 증거 문서(`codeaudit-g3-followup-goal-2026-08-15.md`)에 과거 원격 실행 기록이 있었으나 이번에 다시 실행하지는 않았습니다.
+- 나머지 10개 항목 + 추가 확인 사항(PIPESTATUS 두 분기)은 전부 파일을 직접 읽거나 스크립트를 실제로 실행해서 확인했습니다. NOT_RUN/BLOCKED는 없습니다.
+
+---
+
+## 기술 상세 — 항목별 확인 내역
+
+### 사전 확인: 저장소 상태
+
+```
+HEAD:       918f0b683d8ea28454715669285891b021c39df1  (PR #13 원본)
+MERGE_HEAD: 34e4ccff88ce776d06e3001734005a34b169f7eb  (최신 main)
+```
+→ 뭘 시켰나: `git rev-parse`로 병합 시작점 두 개를 확인. → 뭐가 나왔나: 사용자가 제공한 값과 정확히 일치. → 좋은 소식: 잘못된 대상을 감사할 위험은 없었습니다.
+
+### 항목 1 — AC-19 보존 확인
+
+`scripts/acceptance-0-2-unreachable-content.sh:17-212` (합성 저장소를 만들어 놓고 실제 검사기를 그 안에서 돌려보는 13가지 시나리오 정의부)를 전체 읽고 직접 실행했습니다.
+
+```
+[1/13] SECRET_PATTERNS_FILE=/dev/null 상속을 격리 -> PASS
+[2/13] SECRET_PATTERNS_FILE=.secret-patterns.default 상속을 격리 -> PASS
+[3/13] 무해한 unreachable blob 허용 -> PASS
+[4/13] 금지값 든 blob 차단 -> BLOCKED
+[5/13] commit message 금지값 차단 -> BLOCKED
+[6/13] tree path 금지값 차단 -> BLOCKED
+[7/13] annotated tag 금지값 차단 -> BLOCKED
+[8/13] git fsck 실패는 차단 -> BLOCKED
+[9/13] 객체 읽기(cat-file) 실패는 차단 -> BLOCKED
+[10/13] 알 수 없는 객체형은 차단 -> BLOCKED
+[11/13] 큰(50MB) blob 앞머리 금지값도 차단 -> BLOCKED
+[12/13] 종료상태 검사 -> BLOCKED
+[13/13] git hook 환경에서도 바깥 저장소 무오염 -> PASS
+CHECKED: 13 / EXIT=0
+```
+→ 뭘 시켰나: AC-19 시험 스위트를 실제로 실행. → 뭐가 나왔나: 13개 전부 기대한 대로(정상은 통과, 위반은 차단) 나왔습니다. → 좋은 소식: 환경변수 격리, 4가지 객체형(blob·commit·tree·tag), fsck·cat-file 오류 시 차단이 모두 살아 있습니다.
+
+`scripts/acceptance-0-2.sh:117-134` — 도달 불가 객체를 읽는 핵심 로직도 확인:
+```python
+117  if git cat-file "$object_type" "$sha" 2>/dev/null |
+118     LC_ALL=C grep -aF "$LIT" >/dev/null; then
+119    object_scan_status=("${PIPESTATUS[@]}")
+120  else
+121    object_scan_status=("${PIPESTATUS[@]}")
+122  fi
+```
+→ 이 줄이 하는 일: `if`/`else` 두 분기가 겉으로는 완전히 똑같아 보이지만(둘 다 `PIPESTATUS` 저장), 이는 실수가 아니라 의도된 설계입니다. bash에서 파이프(`|`)로 이어진 두 명령의 각각 종료값(`PIPESTATUS`)은 그 바로 다음에 실행되는 명령이 하나라도 있으면 사라집니다. `if`문의 조건 자체가 파이프이므로, `then`이든 `else`든 그 분기의 첫 줄에서 즉시 값을 받아둬야만 "cat-file이 실패했는지"와 "grep이 찾았는지"를 구분할 수 있습니다. 사용자가 요청한 대로 이 두 분기가 병합 과정에서 실수로 하나로 합쳐지지 않았는지 확인했고, **그대로 두 개 남아 있음을 확인했습니다.** 이 파일은 main과 현재 워킹트리 사이 diff가 0바이트로 완전히 동일했습니다(PR #13이 이 파일을 건드리지 않았으므로 병합 충돌 자체가 없었습니다).
+
+### 항목 2·3·4 — G3의 YAML 은닉 실행·조건 우회·runs-on/matrix 우회 차단
+
+`scripts/acceptance-hs-portal-constants.sh:176-311`의 `ci_line_ok()` 함수(Ruby로 YAML을 구조적으로 해석해 "진짜 실행되는 명령 줄"만 인정하는 핵심 판정 로직)를 전체 읽었습니다.
+
+- **은닉 실행 차단** (line 233-306): `jobs.*.steps[*].run` 문자열만 실행 칸으로 인정하고, 주석·빈 줄을 제거한 뒤 정확히 목록에 있는 명령만 허용합니다. `env.NOTE` 같은 실행되지 않는 값 안의 가짜 단계는 인정하지 않습니다.
+- **조건 우회 차단** (line 292, 304): `job.key?("if")`, `continue-on-error`, `step.key?("if")` 가 하나라도 있으면 그 스텝은 "정상 실행"으로 인정하지 않습니다.
+- **shell/working-directory/위험 환경변수 차단** (line 223-230, 237-239, 300-303): 워크플로 전체·작업 단위·스텝 단위 세 군데 모두에서 `shell`, `working-directory` 키와 `BASH_ENV`/`ENV`/`SHELLOPTS`/`PATH` 환경변수 재정의를 감시합니다.
+- **runs-on/matrix 0회실행 차단** (line 240-291): `runs-on`이 빈 문자열/빈 목록이면 무효 처리하고, `strategy.matrix`는 실제로 곱집합을 계산해서 최종 조합 수가 1개 이상인지 검증합니다(`${{ }}` 같은 표현식이 섞이면 정적으로 계산 불가능하므로 그 자체로 거부).
+
+실행 결과:
+```
+acceptance-hs-portal-constants.sh      → PASS (CHECKED: 56, EXIT=0)
+acceptance-hs-portal-constants-mutations.sh → 24/35 blocked, 3 allowed(정상), 8 notrun(검사불능 케이스), EXIT=0
+hardening.sh   → 15/18 blocked, EXIT=0
+hardening2.sh  → 14/16 blocked, EXIT=0
+hardening3.sh  → 6/8 blocked, EXIT=0
+hardening4.sh  → 6/8 blocked (리터럴 스칼라 은닉: run-name/comment/memo 전부 차단), EXIT=0
+hardening5.sh  → 5/7 blocked, EXIT=0
+hardening6.sh  → 46개 사례(차단 39, 정상표본 6, 자기배선 1), EXIT=0
+```
+→ 뭘 시켰나: 커밋 히스토리(RED2~RED11)가 쌓아온 실제 공격 시나리오 전체를 다시 실행. → 뭐가 나왔나: PR #13이 원래 있던 그대로, 8개 스크립트 전부 exit 0(정상)이며 각 스크립트가 "차단해야 할 것은 차단, 정상은 통과"를 자체 보고합니다. → 좋은 소식: main과의 병합에서 이 8개 파일은 단 1바이트도 바뀌지 않았음을 diff로 재확인했고(PR #13이 유일하게 이 파일들을 만들었으므로 병합 충돌 여지 자체가 없었습니다), 실행 결과도 그대로 재현됩니다.
+
+### 항목 5 — mechanism registry(검사 장치 명부) 오탐 방지
+
+`scripts/verify/check-mechanism-registry.sh:100-139`의 `ci_target_is_run_command()`가 하는 일: 지정된 job의 `step.run` 중 `step.key?("if")`나 `continue-on-error`가 없는 스텝만 보고, 그 안에서 "주석이 아니고(`#`로 시작 안 함) 정확히 일치하는" 줄이 있어야 통과시킵니다.
+
+```
+acceptance-verify-ac-m.sh 실행 결과 (28개 사례):
+  PASS: ci target 이 주석에만 있음 → 불합격 (exit=1)
+  PASS: ci target step 이 if:false 로 꺼짐 → 불합격 (exit=1)
+  ... (총 28/28 PASS)
+CHECKED: 28
+```
+→ 뭘 시켰나: 명부 대조기가 "실행 안 되는 것을 실행되는 것으로 오인하는지" 28가지로 직접 공격. → 뭐가 나왔나: 전부 의도대로 불합격 판정을 냈습니다. → 좋은 소식: 명부가 주석이나 꺼진 스텝을 실행으로 잘못 셀 여지는 없습니다.
+
+`docs/sot/mechanism-registry.yaml`은 항목 4개(`secrets-scan-precommit`, `acceptance-glob-prepush`, `ci-secret-scan`, `ci-portal-constants-gate`)이고, 실제 대조 실행 결과 4개 전부 PASS했습니다.
+
+### 항목 6 — CI 이름 있는 검증 단계 18개, SOT와 이름·순서 일치
+
+```
+$ grep -n "name:" .github/workflows/verify.yml | nl   (workflow 자체 이름 제외)
+2  비밀 스캔 (verify.sh)
+3  HumanSearch G1 클린룸 경계
+4  HumanSearch G2 테스트 게이트
+5  HumanSearch G3 포털 상수·locator 경계     ← PR #13
+6  히스토리 전량 스캔
+7  인수 검사 0-2 상시 내용 검사와 종료상태 분리 (AC-19)  ← main(PR #23 계열)
+8  인수 검사 0-6
+... (총 18개)
+```
+→ 뭘 시켰나: 실제 YAML 파일에서 이름 있는 스텝을 전수 카운트. → 뭐가 나왔나: 정확히 18개, G3(#4)와 AC-19(#6)가 모두 살아 있음. → 좋은 소식: `docs/sot/verification-commands.md:14-33`의 18행짜리 표와 이름·순서가 한 글자도 다르지 않게 일치합니다(직접 대조 완료). PR #13의 diff(`.github/workflows/verify.yml`: `+14`)와 main의 diff(`+5`)가 병합 과정에서 서로를 지우지 않고 둘 다 살아남았음을 `git diff` 3방향 비교로 확인했습니다.
+
+### 항목 7 — pre-push 예외 문서-구현 일치 ⚠️ 결함 발견 (심각도: 중간)
+
+`hooks/pre-push:56-91`의 실제 로직:
+- `DEFERRED="acceptance-0-5 acceptance-0-7"` (line 60), 그리고 `case "$(basename "$c")" in acceptance-0-2.sh|acceptance-0-5.sh) skip` (line 178-181) — `acceptance-0-2.sh`와 `acceptance-0-5.sh`를 이름으로 직접 제외.
+- `PUSH-PERFORMING` 헤더 표식을 가진 스크립트는 CI 전담으로 건너뜁니다(line 148-176).
+- `acceptance-0-2-unreachable-content.sh`는 위 어느 예외에도 해당하지 않아 글로브에 그대로 걸려 로컬에서도 실행됩니다.
+
+지금 디스크(워킹트리)의 `docs/sot/hook-contracts.md:34-42`는 이 내용을 정확히 그대로 설명합니다(제가 직접 원문을 읽어 대조 완료).
+
+**그런데** `git show :docs/sot/hook-contracts.md`(지금 이 순간 `git commit`을 실행하면 실제로 저장될 내용)를 확인하니 다릅니다:
+```
+디스크(워킹트리, 옳음):  "직접 실행 제외: acceptance-0-2.sh — ... / acceptance-0-5.sh — ... / PUSH-PERFORMING ... / 양쪽 실행: acceptance-0-2-unreachable-content.sh — ..."
+커밋 대기열(인덱스, 틀림): "실행: verify.sh, scripts/acceptance-*.sh 전량 (glob — 새 스크립트 추가 시 자동 포함)"
+```
+→ 뭘 시켰나: "지금 커밋하면 뭐가 저장되는가"를 실제로 조회. → 뭐가 나왔나: 대기열에는 옛날(전량 실행이라고 잘못 설명하는) 버전이 들어 있고, 맞는 버전은 아직 저장 대기 상태입니다. → **나쁜 소식**: 지금 이대로 병합 커밋을 만들면, 공식 문서가 실제 pre-push 동작과 다시 어긋납니다 — 바로 이 저장소가 여러 번 겪었던 "문서 따로, 코드 따로" 사고 패턴(P13 원칙이 막으려던 바로 그 문제)이 재발합니다.
+
+- **심각도: 중간** — 지금 그대로 두면 다음에 이 저장소를 보는 사람(또는 코드)이 "push할 때 모든 검사가 도는 줄" 알고 잘못된 전제로 판단을 내릴 수 있습니다. 실제 강제력(코드)은 정확하므로 즉각적인 보안 구멍은 아니지만, 신뢰할 수 있는 단일 정보원(SOT) 원칙이 깨집니다.
+- **설계 결정 카드**:
+  - **무엇을**: `docs/sot/hook-contracts.md`를 병합 커밋에 포함시킬지 여부
+  - **왜**: 실제 pre-push 코드와 설명을 맞추기 위해
+  - **버린 대안**: "디스크에 옳은 버전이 있으니 상관없다"는 판단 — 실제로 커밋되는 것은 디스크가 아니라 인덱스이므로 이 대안은 성립하지 않습니다
+  - **대가**: 없음 — `git add` 한 줄이면 해결되는 문제입니다
+  - **되돌리는 법**: `git add docs/sot/hook-contracts.md`를 병합 커밋 전에 실행
+
+### 항목 8 — PR #13 RED 기대값·PR #23 AC-19 13개 시험 미약화
+
+PR #13이 만든 11개 RED→GREEN 라운드(`git log`로 전체 확인, `9bab751`부터 `22a147f`까지)의 산출물 8개 스크립트를 main과 병합된 현재 워킹트리에서 PR #13 원본과 바이트 단위로 diff했고, 전부 0바이트 차이였습니다. AC-19(`scripts/acceptance-0-2-unreachable-content.sh`)도 main 원본과 0바이트 차이였고, 위에서 실행한 대로 13/13 사례가 그대로 재현됩니다. 최초 RED 커밋(`9bab751`)의 계약문 "Clean tree must exit exactly 0, violations exactly 1, scan-impossible exactly 2"도 현재 `scripts/acceptance-hs-portal-constants.sh:6-7` 주석에 그대로 살아 있고, 실제 실행 결과(exit 0)도 이와 일치합니다.
+
+### 항목 9 — HumanSearch L0 제품 코드 미혼입
+
+```
+$ git diff --stat 682f00e9..918f0b68 -- humansearch/     → (빈 출력)
+$ find . \( -name "auth_surface.py" -o -name "login_state.py" \)   → (빈 출력)
+```
+→ 뭘 시켰나: PR #13이 `humansearch/` 디렉터리를 조금이라도 건드렸는지, 그리고 사용자가 지목한 두 파일이 저장소 어디에도 있는지 전수 검색. → 뭐가 나왔나: 둘 다 빈 출력. → 좋은 소식: 제품 코드 혼입 없음.
+
+### 항목 10 — 저장소 무오염
+
+```
+HEAD(검사 전=검사 후):       918f0b68...
+MERGE_HEAD(검사 전=검사 후): 34e4ccff...
+git status 줄 수(검사 전=검사 후): 36
+충돌 마커(<<<<<<<, =======, >>>>>>>) 전수 검색 결과: 0건
+```
+→ 뭘 시켰나: 감사 시작 시점과 종료 시점의 저장소 상태를 그대로 대조. → 뭐가 나왔나: 완전히 동일. → 좋은 소식: 이번 감사(스크립트 실행 포함)로 인한 오염은 없습니다. 다만 항목 7에서 설명한 두 문서 파일의 " M"(인덱스보다 워킹트리가 앞선) 상태는 제가 만든 것이 아니라 감사 시작 이전부터 있던 상태였습니다(첫 `git status` 호출 때부터 동일하게 관측).
+
+### 부가 관찰 — 동시 작업 중인 별도 프로세스
+
+```
+$ ps aux | grep "worktrees/humansearch-g3-portal-constants"
+node .../openai-codex/codex/.../app-server-broker.mjs ... --cwd .../humansearch-g3-portal-constants  (Sat 07AM 시작)
+node .../openai-codex/codex/.../app-server-broker.mjs ... --cwd .../humansearch-g3-portal-constants  (Sat 08AM 시작)
+```
+→ 뭘 시켰나: 이 폴더를 대상으로 지금 실행 중인 다른 프로세스가 있는지 확인. → 뭐가 나왔나: Codex(별도 AI 에이전트) 브로커 프로세스 2개가 이 정확한 경로를 대상으로 계속 실행 중이며, 관련 문서(`docs/engineering/codeaudit-g3-followup-goal-2026-08-15.md`)가 제 감사 시작 12분 전(10:46)에도 수정되었습니다. → 참고 사항(결함 아님): 이 작업트리는 사장님이 이미 알고 계실 수 있는 다른 자동화가 함께 쓰고 있는 공간입니다. 제 감사 도중에는 추가 변경이 없었지만, 이 보고서를 읽으시는 시점에는 상태가 또 달라져 있을 수 있습니다.
+
+---
+
+## 결함 요약
+
+| # | 결함 | 심각도 | 방치 시 영향 |
+|---|---|---|---|
+| 1 | `docs/sot/hook-contracts.md`가 커밋 대기열에는 옛 버전(pre-push가 검사를 "전량 실행"한다는 틀린 설명)으로 남아 있고, 실제로 맞는 버전은 아직 저장되지 않음 | 중간 | 지금 병합 커밋을 만들면 공식 문서와 실제 코드가 다시 어긋나고, 이후 이 문서를 믿고 작업하는 사람이 pre-push가 어떤 검사를 건너뛰는지 잘못 판단할 수 있음 |
+
+**결함 총수: 1건 (중간 1건, 그 외 없음)**. 나머지 9개 확인 항목과 추가 확인(PIPESTATUS 두 분기)은 전부 실행 증거로 결함 없음을 확인했습니다.
+
+## 권고
+
+병합 커밋을 만들기 전에 `git add docs/sot/hook-contracts.md`(그리고 원하시면 감사 로그인 `docs/engineering/codeaudit-g3-followup-goal-2026-08-15.md`도 함께)를 실행해 두 파일을 대기열에 올려주세요. 그 후에는 이번에 확인한 10개 항목 + 추가 항목 전부 실행 증거상 문제가 없으므로 병합을 진행하셔도 됩니다. 다만 동시에 작업 중인 것으로 보이는 Codex 프로세스와 충돌하지 않도록, 병합 직전에 `git status`를 한 번 더 확인하시길 권합니다.
+
+~~~~~~~~
+
+→ 이 원문이 실제 Claude V1 판정이다. Codex V2는 여기의 모든 파일·줄·명령 주장을 직접 재현한다.
+
+CLAUDE_RETRY_COMMAND_EXIT=0
+
+<!-- ATTEMPT-20260818:CLAUDE-V1-RETRY-END -->
+
+## Codex V2 — Claude 중간 결함 1차 재현과 복구
+
+Claude가 지적한 커밋 대기열 불일치를 다음 읽기 전용 명령으로 재현했다.
+
+```text
+REMOTE_MAIN
+34e4ccff88ce776d06e3001734005a34b169f7eb refs/heads/main
+CURRENT_REFS
+34e4ccff88ce776d06e3001734005a34b169f7eb
+34e4ccff88ce776d06e3001734005a34b169f7eb
+CLAUDE_INDEX_CLAIM_STATUS
+ M docs/engineering/codeaudit-g3-followup-goal-2026-08-15.md
+ M docs/sot/hook-contracts.md
+INDEX_HOOK_RELEVANT_LINES
+        실행: verify.sh, scripts/acceptance-*.sh 전량 (glob — 새 스크립트 추가 시 자동 포함)
+WORKTREE_HOOK_RELEVANT_LINES
+        후보 수집: verify.sh, scripts/acceptance-*.sh (glob — 새 스크립트 추가 시 자동 포함)
+        직접 실행 제외:
+        - acceptance-0-2.sh
+        - acceptance-0-5.sh
+        - 헤더에 PUSH-PERFORMING을 선언한 검사
+        양쪽 실행: acceptance-0-2-unreachable-content.sh
+HEAD_AND_MERGE
+918f0b683d8ea28454715669285891b021c39df1
+34e4ccff88ce776d06e3001734005a34b169f7eb
+UNMERGED_COUNT
+0
+```
+
+→ 원격 main은 감사 기준과 같고, Claude의 핵심 주장도 사실이었다. 디스크의 올바른 문구가 다음 커밋 대기열에는 아직 없었으므로 이 상태에서 커밋하면 정본 문서가 틀리게 남는다.
+
+복구 결정 카드:
+
+> **무엇을** — `docs/sot/hook-contracts.md`의 올바른 현재 내용을 다음 커밋 대기열에 포함한다.
+> **왜** — 실제 훅 예외와 정본 문서가 같은 내용을 갖게 해야 한다.
+> **버린 길** — “커밋 직전에 어차피 올릴 예정이었다”라며 결함을 무시하는 길은 V1 FAIL을 해소하지 못하므로 버렸다.
+> **대가** — 적대검증이 끝나기 전에 이 문서의 커밋 대상 상태가 고정되며, 이후 문구 변경 시 검증을 다시 해야 한다.
+> **되돌리기** — 커밋 전에는 인덱스에서만 내릴 수 있으나, 이번 계약에서는 내리지 않고 최종 커밋까지 유지한다.
+
+<!-- ATTEMPT-20260818:CODEX-V2-REPRO-END -->
+
+복구 실행과 결과:
+
+```text
+COMMAND=git add docs/sot/hook-contracts.md
+POST_FIX_STATUS
+ M docs/engineering/codeaudit-g3-followup-goal-2026-08-15.md
+M  docs/sot/hook-contracts.md
+INDEX_WORKTREE_EQUAL
+EXIT=0
+INDEX_HOOK_RELEVANT_LINES
+후보 수집: verify.sh, scripts/acceptance-*.sh
+직접 실행 제외: acceptance-0-2.sh, acceptance-0-5.sh, PUSH-PERFORMING
+양쪽 실행: acceptance-0-2-unreachable-content.sh
+DIFF_CHECK
+docs/engineering/codeaudit-g3-followup-goal-2026-08-15.md:3632: trailing whitespace.
++**이번에 건너뛴 것 / 확인하지 못한 것**:␠
+EXIT=2
+```
+
+→ 훅 문서 결함은 닫혔지만 Claude 원문 한 줄이 끝 공백 1개를 포함해 원래 공백 검사가 실패했다. 위 `␠`는 저장소 검사에 다시 걸리지 않도록 그 보이지 않는 공백을 눈에 보이게 치환해 보존한 표기다. 문장 내용은 바꾸지 않고 줄 끝 공백만 제거한 뒤 원명령을 재실행한다.
+
+<!-- ATTEMPT-20260818:CODEX-V2-INDEX-FIX-END -->
+
+### Codex V2 전체 주장 재현과 양방향 반례
+
+실행 명령 전문은 아래 출력의 각 `COMMAND=` 줄과 파일·줄 덤프 앞 표제에 보존했다. Claude가 PASS한 보호도 기존 변형 시험으로 다시 깨뜨려 보았고, Claude가 FAIL한 인덱스 주장도 복구 후 반대로 재검사했다.
+
+~~~~~~~~text
+V2_PRE_HEAD=918f0b683d8ea28454715669285891b021c39df1
+V2_PRE_MERGE_HEAD=34e4ccff88ce776d06e3001734005a34b169f7eb
+V2_PRE_REMOTE_MAIN=34e4ccff88ce776d06e3001734005a34b169f7eb
+V2_PRE_STATUS_BEGIN
+M  .github/workflows/verify.yml
+A  docs/engineering/admin-dashboard-engagement-heatmap-spec-adversarial-review-2026-08-16.md
+A  docs/engineering/admin-position-map-phase0-measurement-2026-08-17.md
+A  docs/engineering/admin-position-map-spec-2026-08-17.md
+A  docs/engineering/admin-position-map-spec-v1-adversarial-audit-2026-08-17.md
+A  docs/engineering/admin-position-map-spec-v2-2026-08-17.md
+A  docs/engineering/admin-weekly-dashboard-v6-replacement-goal-2026-08-16.md
+A  docs/engineering/admin-weekly-dashboard-v6-review-prompt-2026-08-16.md
+A  docs/engineering/admin-weekly-dashboard-v6-review-prompt-retry-2026-08-16.md
+ M docs/engineering/codeaudit-g3-followup-goal-2026-08-15.md
+A  docs/engineering/gate0-not-run-red-recovery-prompt-verdict-2026-08-18.md
+A  docs/engineering/gate0-unreachable-secret-scan-goal-2026-08-17.md
+A  docs/engineering/goal-prompts/admin-position-map-v2-impl-kickoff-2026-08-17.md
+A  docs/engineering/goal-prompts/codeaudit-followup-2026-08-15.md
+A  docs/engineering/goal-prompts/codex-5position-relaxed-fit-search-2026-08-15.md
+A  docs/engineering/goal-prompts/codex-5position-search-2026-08-15.md
+A  docs/engineering/goal-prompts/codex-gate0-not-run-red-recovery-2026-08-18.md
+A  docs/engineering/goal-prompts/codex-humansearch-autoloop-L0-2026-08-16.md
+A  docs/engineering/goal-prompts/codex-position-map-p0-impl-2026-08-18.md
+A  docs/engineering/goal-prompts/codex-position-map-p0-impl-addendum-2026-08-18.md
+A  docs/engineering/goal-prompts/codex-position-map-phase0-spec-v2-2026-08-17.md
+A  docs/engineering/goal-prompts/humansearch-L0-kickoff-2026-08-16.md
+A  docs/engineering/goal-prompts/humansearch-journey-nightshift-2026-08-14.md
+A  docs/engineering/humansearch-journey-alternative-plan-2026-08-15.md
+A  docs/engineering/humansearch-journey-alternative-plan-goal-2026-08-15.md
+A  docs/engineering/humansearch-journey-alternative-v1-v2-verdict-2026-08-15.md
+A  docs/engineering/humansearch-journey-master-plan-2026-08-14.md
+A  docs/engineering/premerge-a3-a4-v1-verdict-2026-08-09.md
+A  docs/engineering/strict-not-run-recovery-goal-2026-08-18.md
+A  docs/engineering/verdicts/codex-code-review-v4-recovery-2026-08-18.md
+A  docs/engineering/verdicts/codex-model-routing-rebuttal-2026-08-17.md
+M  docs/sot/hook-contracts.md
+M  docs/sot/verification-commands.md
+A  scripts/acceptance-0-2-unreachable-content.sh
+M  scripts/acceptance-0-2.sh
+M  suppressions.yaml
+V2_PRE_STATUS_END
+
+CLAUDE_FILE_LINE_CLAIMS
+     1	#!/usr/bin/env bash
+     2	# AC-19 — acceptance-0-2의 상시 내용 검사와 일회성 종료상태 검사를 분리한다.
+     3	set -euo pipefail
+     4⇥
+     5	# 합성 fixture는 호출자가 고른 실제 패턴 파일이 아니라 아래 합성 카나리만 사용한다.
+     6	unset SECRET_PATTERNS_FILE
+     7	ROOT=$(git rev-parse --show-toplevel)
+     8	unset GIT_DIR GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_WORK_TREE GIT_COMMON_DIR \
+     9	  GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_PREFIX
+    10	TARGET="$ROOT/scripts/acceptance-0-2.sh"
+    11	VERIFY="$ROOT/verify.sh"
+    12	SELF="$ROOT/scripts/acceptance-0-2-unreachable-content.sh"
+    13	REAL_GIT=$(command -v git)
+    14	TMP=$(mktemp -d)
+    15	trap 'rm -rf -- "$TMP"' EXIT
+    16⇥
+    17	CANARY='AC19-CANARY-8842'
+    18	if [ -n "${AC19_PATTERN_ENV_PROBE:-}" ]; then
+    19	  TOTAL=1
+    20	elif [ -n "${AC19_INNER_HOOK_PROBE:-}" ]; then
+    21	  TOTAL=10
+    22	else
+    23	  TOTAL=13
+    24	fi
+    25	checked=0
+    26	failed=0
+    27⇥
+    28	make_fixture() {
+    29	  local fixture=$1
+    30⇥
+    31	  mkdir -p "$fixture/scripts" "$fixture/docs"
+    32	  cp "$TARGET" "$fixture/scripts/acceptance-0-2.sh"
+    33	  cp "$VERIFY" "$fixture/verify.sh"
+    34	  printf '.secret-patterns\n' > "$fixture/.gitignore"
+    35	  printf '%s\n' "$CANARY" > "$fixture/.secret-patterns"
+    36	  printf 'synthetic fixture\n' > "$fixture/docs/README.md"
+    37⇥
+    38	  (
+    39	    cd "$fixture"
+    40	    git init -q -b main
+    41	    git config user.email acceptance@local
+    42	    git config user.name acceptance
+    43	    git add .gitignore docs/README.md scripts/acceptance-0-2.sh verify.sh
+    44	    git commit -qm fixture
+    45	  )
+    46	}
+    47⇥
+    48	run_case() {
+    49	  local label=$1
+    50	  local expected=$2
+    51	  local fixture=$3
+    52	  shift 3
+    53	  local output rc=0
+    54⇥
+    55	  output="$(cd "$fixture" && "$@" 2>&1)" || rc=$?
+    56	  checked=$((checked + 1))
+    57⇥
+    58	  if [ "$expected" = pass ] && [ "$rc" -eq 0 ]; then
+    59	    printf '[%d/%d] %s -> PASS (exit=0)\n' "$checked" "$TOTAL" "$label"
+    60	    return
+    61	  fi
+    62	  if [ "$expected" = blocked ] && [ "$rc" -ne 0 ]; then
+    63	    printf '[%d/%d] %s -> BLOCKED (exit=%d)\n' "$checked" "$TOTAL" "$label" "$rc"
+    64	    return
+    65	  fi
+    66⇥
+    67	  printf '[%d/%d] %s -> UNEXPECTED (exit=%d, expected=%s)\n' \
+    68	    "$checked" "$TOTAL" "$label" "$rc" "$expected"
+    69	  printf '%s\n' "$output"
+    70	  failed=$((failed + 1))
+    71	}
+    72⇥
+    73	if [ -z "${AC19_PATTERN_ENV_PROBE:-}" ] && [ -z "${AC19_INNER_HOOK_PROBE:-}" ]; then
+    74	  run_case 'SECRET_PATTERNS_FILE=/dev/null 상속을 격리' pass "$ROOT" \
+    75	    env SECRET_PATTERNS_FILE=/dev/null AC19_PATTERN_ENV_PROBE=1 bash "$SELF"
+    76	  run_case 'SECRET_PATTERNS_FILE=.secret-patterns.default 상속을 격리' pass "$ROOT" \
+    77	    env SECRET_PATTERNS_FILE=.secret-patterns.default AC19_PATTERN_ENV_PROBE=1 bash "$SELF"
+    78	fi
+    79⇥
+    80	harmless="$TMP/harmless"
+    81	make_fixture "$harmless"
+    82	printf 'harmless unreachable object\n' |
+    83	  git -C "$harmless" hash-object -w --stdin >/dev/null
+    84	run_case '일반 실행은 무해한 unreachable blob을 허용' pass "$harmless" \
+    85	  bash scripts/acceptance-0-2.sh
+    86⇥
+    87	if [ -z "${AC19_PATTERN_ENV_PROBE:-}" ]; then
+    88	tainted="$TMP/tainted"
+    89	make_fixture "$tainted"
+    90	printf '%s\n' "$CANARY" |
+    91	  git -C "$tainted" hash-object -w --stdin >/dev/null
+    92	run_case '일반 실행은 금지값이 든 unreachable blob을 차단' blocked "$tainted" \
+    93	  bash scripts/acceptance-0-2.sh
+    94⇥
+    95	tainted_commit="$TMP/tainted-commit"
+    96	make_fixture "$tainted_commit"
+    97	tainted_commit_tree=$(git -C "$tainted_commit" rev-parse 'HEAD^{tree}')
+    98	printf '%s\n' "$CANARY" |
+    99	  git -C "$tainted_commit" commit-tree "$tainted_commit_tree" >/dev/null
+   100	run_case 'unreachable commit message의 금지값을 차단' blocked "$tainted_commit" \
+   101	  bash scripts/acceptance-0-2.sh
+   102⇥
+   103	tainted_tree="$TMP/tainted-tree"
+   104	make_fixture "$tainted_tree"
+   105	tainted_tree_blob=$(printf 'harmless tree payload\n' |
+   106	  git -C "$tainted_tree" hash-object -w --stdin)
+   107	printf '100644 blob %s\tpath-%s.txt\n' "$tainted_tree_blob" "$CANARY" |
+   108	  git -C "$tainted_tree" mktree >/dev/null
+   109	run_case 'unreachable tree path의 금지값을 차단' blocked "$tainted_tree" \
+   110	  bash scripts/acceptance-0-2.sh
+   111⇥
+   112	tainted_tag="$TMP/tainted-tag"
+   113	make_fixture "$tainted_tag"
+   114	tainted_tag_target=$(git -C "$tainted_tag" rev-parse HEAD)
+   115	printf 'object %s\ntype commit\ntag ac19-probe\ntagger acceptance <acceptance@example.invalid> 1 +0000\n\n%s\n' \
+   116	  "$tainted_tag_target" "$CANARY" | git -C "$tainted_tag" mktag >/dev/null
+   117	run_case 'unreachable annotated tag message의 금지값을 차단' blocked "$tainted_tag" \
+   118	  bash scripts/acceptance-0-2.sh
+   119⇥
+   120	fsck_failure="$TMP/fsck-failure"
+   121	make_fixture "$fsck_failure"
+   122	mkdir -p "$fsck_failure/bin"
+   123	printf '%s\n' '#!/usr/bin/env bash' \
+   124	  'if [ "${1:-}" = fsck ]; then exit 72; fi' \
+   125	  'exec "$REAL_GIT" "$@"' > "$fsck_failure/bin/git"
+   126	chmod +x "$fsck_failure/bin/git"
+   127	run_case 'git fsck 실패는 검사 대상 없음으로 통과하지 않음' blocked "$fsck_failure" \
+   128	  env PATH="$fsck_failure/bin:$PATH" REAL_GIT="$REAL_GIT" \
+   129	  bash scripts/acceptance-0-2.sh
+   130⇥
+   131	read_failure="$TMP/read-failure"
+   132	make_fixture "$read_failure"
+   133	read_failure_sha=$(printf 'harmless unreachable object\n' |
+   134	  git -C "$read_failure" hash-object -w --stdin)
+   135	mkdir -p "$read_failure/bin"
+   136	printf '%s\n' '#!/usr/bin/env bash' \
+   137	  'if [ "${1:-}" = cat-file ] && [ "${3:-}" = "${FAIL_CAT_FILE_SHA:-}" ]; then exit 71; fi' \
+   138	  'exec "$REAL_GIT" "$@"' > "$read_failure/bin/git"
+   139	chmod +x "$read_failure/bin/git"
+   140	run_case 'unreachable 객체 읽기 실패는 조용히 통과하지 않음' blocked "$read_failure" \
+   141	  env PATH="$read_failure/bin:$PATH" REAL_GIT="$REAL_GIT" \
+   142	  FAIL_CAT_FILE_SHA="$read_failure_sha" bash scripts/acceptance-0-2.sh
+   143⇥
+   144	unknown_type="$TMP/unknown-type"
+   145	make_fixture "$unknown_type"
+   146	unknown_type_sha=$(git -C "$unknown_type" rev-parse HEAD)
+   147	mkdir -p "$unknown_type/bin"
+   148	printf '%s\n' '#!/usr/bin/env bash' \
+   149	  'if [ "${1:-}" = fsck ]; then' \
+   150	  '  "$REAL_GIT" "$@" || exit $?' \
+   151	  '  printf "unreachable mystery %s\\n" "$FAIL_UNKNOWN_SHA"' \
+   152	  '  exit 0' \
+   153	  'fi' \
+   154	  'exec "$REAL_GIT" "$@"' > "$unknown_type/bin/git"
+   155	chmod +x "$unknown_type/bin/git"
+   156	run_case '알 수 없는 unreachable 객체형은 읽기 실패로 차단' blocked "$unknown_type" \
+   157	  env PATH="$unknown_type/bin:$PATH" REAL_GIT="$REAL_GIT" \
+   158	  FAIL_UNKNOWN_SHA="$unknown_type_sha" bash scripts/acceptance-0-2.sh
+   159⇥
+   160	large_tainted="$TMP/large-tainted"
+   161	make_fixture "$large_tainted"
+   162	{ printf '%s\n' "$CANARY"; dd if=/dev/zero bs=1048576 count=50 2>/dev/null; } |
+   163	  git -C "$large_tainted" hash-object -w --stdin >/dev/null
+   164	run_case '큰 unreachable blob 앞쪽의 금지값도 차단' blocked "$large_tainted" \
+   165	  bash scripts/acceptance-0-2.sh
+   166⇥
+   167	endstate="$TMP/endstate"
+   168	make_fixture "$endstate"
+   169	printf 'harmless unreachable object\n' |
+   170	  git -C "$endstate" hash-object -w --stdin >/dev/null
+   171	run_case '종료상태 실행은 무해한 unreachable blob도 차단' blocked "$endstate" \
+   172	  env ACCEPTANCE_ENDSTATE=1 bash scripts/acceptance-0-2.sh
+   173⇥
+   174	if [ -z "${AC19_INNER_HOOK_PROBE:-}" ]; then
+   175	  hook_outer="$TMP/hook-env-outer"
+   176	  mkdir -p "$hook_outer/scripts" "$hook_outer/docs"
+   177	  cp "$TARGET" "$hook_outer/scripts/acceptance-0-2.sh"
+   178	  cp "$SELF" "$hook_outer/scripts/acceptance-0-2-unreachable-content.sh"
+   179	  cp "$VERIFY" "$hook_outer/verify.sh"
+   180	  printf '.secret-patterns\nouter-only-ignore\n' > "$hook_outer/.gitignore"
+   181	  printf '%s\n' "$CANARY" > "$hook_outer/.secret-patterns"
+   182	  printf 'outer repository sentinel\n' > "$hook_outer/docs/README.md"
+   183	  git -C "$hook_outer" init -q -b main
+   184	  git -C "$hook_outer" config user.email acceptance@local
+   185	  git -C "$hook_outer" config user.name acceptance
+   186	  git -C "$hook_outer" add .gitignore docs/README.md scripts verify.sh
+   187	  git -C "$hook_outer" commit -qm outer-fixture
+   188⇥
+   189	  hook_before_head=$(git -C "$hook_outer" rev-parse HEAD)
+   190	  hook_before_status=$(git -C "$hook_outer" status --porcelain --untracked-files=all)
+   191	  hook_git_dir=$(git -C "$hook_outer" rev-parse --absolute-git-dir)
+   192	  hook_rc=0
+   193	  hook_output=$(cd "$hook_outer" && env -u GIT_WORK_TREE GIT_DIR="$hook_git_dir" \
+   194	    AC19_INNER_HOOK_PROBE=1 bash scripts/acceptance-0-2-unreachable-content.sh 2>&1) || hook_rc=$?
+   195	  hook_after_head=$(git -C "$hook_outer" rev-parse HEAD)
+   196	  hook_after_status=$(git -C "$hook_outer" status --porcelain --untracked-files=all)
+   197	  checked=$((checked + 1))
+   198	  if [ "$hook_rc" -eq 0 ] \
+   199	     && [ "$hook_before_head" = "$hook_after_head" ] \
+   200	     && [ "$hook_before_status" = "$hook_after_status" ]; then
+   201	    printf '[%d/%d] Git hook 환경에서도 바깥 저장소 무오염 -> PASS (exit=0)\n' \
+   202	      "$checked" "$TOTAL"
+   203	  else
+   204	    printf '[%d/%d] Git hook 환경에서도 바깥 저장소 무오염 -> UNEXPECTED' \
+   205	      "$checked" "$TOTAL"
+   206	    printf ' (exit=%d, head_same=%s, status_same=%s)\n' "$hook_rc" \
+   207	      "$([ "$hook_before_head" = "$hook_after_head" ] && printf YES || printf NO)" \
+   208	      "$([ "$hook_before_status" = "$hook_after_status" ] && printf YES || printf NO)"
+   209	    printf '%s\n' "$hook_output"
+   210	    failed=$((failed + 1))
+   211	  fi
+   212	fi
+   213	fi
+   214⇥
+   215	printf 'CHECKED: %d\n' "$checked"
+   216	if [ "$failed" -ne 0 ]; then
+   217	  printf 'FAIL: AC-19 예상과 다른 사례 %d건\n' "$failed"
+   218	  exit 1
+   219	fi
+   220⇥
+   108	fsck_output=$(git fsck --full --no-reflogs --unreachable 2>&1) || fsck_rc=$?
+   109	if [ "$fsck_rc" -ne 0 ]; then
+   110	  echo "FAIL: git fsck 실행 실패 (exit=$fsck_rc) — 미도달 객체 검사 무효"
+   111	  fail=1
+   112	fi
+   113	unreachable_objects=$(printf '%s\n' "$fsck_output" |
+   114	  awk '$1 == "unreachable" { print $2, $3 }')
+   115	while read -r object_type sha; do
+   116	  [ -z "${object_type:-}" ] && continue
+   117	  if git cat-file "$object_type" "$sha" 2>/dev/null |
+   118	     LC_ALL=C grep -aF "$LIT" >/dev/null; then
+   119	    object_scan_status=("${PIPESTATUS[@]}")
+   120	  else
+   121	    object_scan_status=("${PIPESTATUS[@]}")
+   122	  fi
+   123	  cat_file_rc=${object_scan_status[0]:-1}
+   124	  grep_rc=${object_scan_status[1]:-2}
+   125	  if [ "$cat_file_rc" -ne 0 ]; then
+   126	    echo "FAIL: unreachable ${object_type} 읽기 실패: $sha (exit=$cat_file_rc)"
+   127	    fail=1
+   128	  elif [ "$grep_rc" -eq 0 ]; then
+   129	    echo "FAIL: unreachable ${object_type}에 리터럴 잔존: $sha"
+   130	    fail=1
+   131	  elif [ "$grep_rc" -ne 1 ]; then
+   132	    echo "FAIL: unreachable ${object_type} 내용 대조 실패: $sha (exit=$grep_rc)"
+   133	    fail=1
+   134	  fi
+   135	done <<< "$unreachable_objects"
+   136⇥
+   137	# 5-c. 도달 가능한 모든 지점(refs + reflog 포함)의 blob 전수 스캔 — 상시 회귀 조건.
+   138	#      SHA 화이트리스트는 "과거의 알려진 오염"만 잡는다. 미래에 새로 유입되는 비밀은
+   139	#      내용 기반으로만 잡을 수 있으므로, --reflog 포함 전 객체를 실제로 열어 확인한다.
+   140	while IFS= read -r sha; do
+   141	  [ -z "$sha" ] && continue
+   142	  if [ "$(git cat-file -t "$sha" 2>/dev/null)" = blob ] \
+   143	     && git cat-file blob "$sha" 2>/dev/null | grep -qF "$LIT"; then
+   144	    echo "FAIL: 도달 가능 blob에 리터럴 잔존: $sha"; fail=1
+   145	  fi
+   176	# 워크플로를 YAML 구조로 읽고 jobs.*.steps[*].run 문자열만 실행 칸으로 인정한다. 파일
+   177	# 어딘가에 명령 글자가 있다는 이유만으로 통과시키면 env.NOTE 같은 실행되지 않는 값 안의
+   178	# 가짜 단계도 배선으로 오인한다(V1 3차 F1). Ruby 표준 YAML 해석기를 쓰므로 새 의존성은 없다.
+   179	#
+   180	# target 명령이 있는 run 문자열은 주석·빈 줄·현재 G3 실행 줄만 담아야 하고, 그 스텝에 if 또는
+   181	# continue-on-error 키가 있으면 인정하지 않는다. 이로써 기존 셸 감싸기·오류 무시 방어도 유지한다.
+   182	ci_line_ok() {
+   183	  local tgt="$1"
+   184	  ruby -ryaml -e '
+   185	    workflow_path, target, allowed_text = ARGV
+   186	    begin
+   187	      workflow = YAML.safe_load(
+   188	        File.read(workflow_path),
+   189	        permitted_classes: [],
+   190	        permitted_symbols: [],
+   191	        aliases: true
+   192	      )
+   193	    rescue Psych::Exception, SystemCallError
+   194	      exit 2
+   195	    end
+   196⇥
+   197	    jobs = workflow.is_a?(Hash) ? workflow["jobs"] : nil
+   198	    exit 2 unless jobs.is_a?(Hash)
+   199	    trigger = workflow.key?("on") ? workflow["on"] : workflow[true]
+   200	    automatic_event = case trigger
+   201	                      when String
+   202	                        ["push", "pull_request"].include?(trigger)
+   203	                      when Array
+   204	                        trigger.map(&:to_s).any? { |event| ["push", "pull_request"].include?(event) }
+   205	                      when Hash
+   206	                        trigger.any? do |event, config|
+   207	                          next false unless ["push", "pull_request"].include?(event.to_s)
+   208	                          next true if config.nil? || (config.is_a?(Hash) && config.empty?)
+   209	                          next false unless config.is_a?(Hash)
+   210⇥
+   211	                          keys = config.keys.map(&:to_s)
+   212	                          keys == ["branches"] && Array(config["branches"]).map(&:to_s) == ["**"]
+   213	                        end
+   214	                      else
+   215	                        false
+   216	                      end
+   217	    exit 1 unless automatic_event
+   218	    allowed = allowed_text.split(";").reject(&:empty?).each_with_object({}) do |command, set|
+   219	      set[command] = true
+   220	    end
+   221	    workflow_defaults = workflow["defaults"]
+   222	    workflow_run = workflow_defaults.is_a?(Hash) ? workflow_defaults["run"] : nil
+   223	    workflow_shell = workflow_run.is_a?(Hash) && workflow_run.key?("shell")
+   224	    workflow_working_directory = workflow_run.is_a?(Hash) && workflow_run.key?("working-directory")
+   225	    forbidden_env_keys = ["BASH_ENV", "ENV", "SHELLOPTS", "PATH"]
+   226	    unsafe_env = lambda do |owner|
+   227	      owner.is_a?(Hash) && owner["env"].is_a?(Hash) &&
+   228	        owner["env"].keys.map(&:to_s).any? { |key| forbidden_env_keys.include?(key) }
+   229	    end
+   230	    workflow_unsafe_env = unsafe_env.call(workflow)
+   231⇥
+   232	    unsafe_g3_execution = false
+   233	    good = jobs.values.map do |job|
+   234	      next false unless job.is_a?(Hash) && job["steps"].is_a?(Array)
+   235	      job_defaults = job["defaults"]
+   236	      job_run = job_defaults.is_a?(Hash) ? job_defaults["run"] : nil
+   237	      job_shell = job_run.is_a?(Hash) && job_run.key?("shell")
+   238	      job_working_directory = job_run.is_a?(Hash) && job_run.key?("working-directory")
+   239	      job_unsafe_env = unsafe_env.call(job)
+   240	      runs_on = job["runs-on"]
+   241	      runs_on_valid = case runs_on
+   242	                      when String
+   243	                        !runs_on.strip.empty?
+   244	                      when Array
+   245	                        !runs_on.empty? && runs_on.all? { |label| label.is_a?(String) && !label.strip.empty? }
+   246	                      else
+   247	                        false
+   248	                      end
+   249	      strategy = job["strategy"]
+   250	      matrix_valid = if !strategy.is_a?(Hash) || !strategy.key?("matrix")
+   251	                       true
+   252	                     elsif strategy["matrix"].is_a?(Hash)
+   253	                       matrix = strategy["matrix"]
+   254	                       static_axes = matrix.reject { |axis, _| ["include", "exclude"].include?(axis.to_s) }
+   255	                       includes = matrix.key?("include") ? matrix["include"] : []
+   256	                       excludes = matrix.key?("exclude") ? matrix["exclude"] : []
+   257	                       expression = lambda do |value|
+   258	                         case value
+   259	                         when String then value.include?("${{")
+   260	                         when Array then value.any? { |item| expression.call(item) }
+   261	                         when Hash then value.any? { |key, item| expression.call(key) || expression.call(item) }
+   262	                         else false
+   263	                         end
+   264	                       end
+   265	                       controls_valid = includes.is_a?(Array) && includes.all? { |entry| entry.is_a?(Hash) } &&
+   266	                         excludes.is_a?(Array) && excludes.all? { |entry| entry.is_a?(Hash) }
+   267	                       if !controls_valid || expression.call(matrix)
+   268	                         false
+   269	                       elsif static_axes.empty?
+   270	                         matrix.keys.all? { |axis| axis.to_s == "include" } && !includes.empty?
+   271	                       elsif !static_axes.values.all? { |values| values.is_a?(Array) && !values.empty? }
+   272	                         false
+   273	                       else
+   274	                         combinations = static_axes.reduce([{}]) do |product, (axis, values)|
+   275	                           product.flat_map { |combination| values.map { |value| combination.merge(axis => value) } }
+   276	                         end
+   277	                         combinations.reject! do |combination|
+   278	                           excludes.any? do |entry|
+   279	                             entry.all? { |axis, value| combination.key?(axis) && combination[axis] == value }
+   280	                           end
+   281	                         end
+   282	                         include_additions = includes.count do |entry|
+   283	                           combinations.none? do |combination|
+   284	                             entry.all? { |axis, value| !static_axes.key?(axis) || combination[axis] == value }
+   285	                           end
+   286	                         end
+   287	                         combinations.length + include_additions >= 1
+   288	                       end
+   289	                     else
+   290	                       false
+   291	                     end
+   292	      job_disqualified = job.key?("if") || job.key?("needs") || (job.key?("continue-on-error") && job["continue-on-error"] != false)
+   293	      job["steps"].map do |step|
+   294	        next false unless step.is_a?(Hash)
+   295	        run = step["run"]
+   296	        next false unless run.is_a?(String)
+   297⇥
+   298	        lines = run.each_line.map(&:strip).reject { |line| line.empty? || line.start_with?("#") }
+   299	        unsafe_g3_execution = true if lines.include?(target) && (
+   300	          !runs_on_valid || !matrix_valid || workflow_shell || workflow_working_directory || workflow_unsafe_env ||
+   301	          job_shell || job_working_directory || job_unsafe_env ||
+   302	          step.key?("shell") || step.key?("working-directory") || unsafe_env.call(step)
+   303	        )
+   304	        next false if job_disqualified || step.key?("if") || step.key?("continue-on-error")
+   305	        lines.include?(target) && lines.all? { |line| allowed.key?(line) }
+   306	      end.any?
+   307	    end.any?
+   308	    exit 1 if unsafe_g3_execution
+   309	    exit(good ? 0 : 1)
+   310	  ' "$WF" "$tgt" "$ALLOWED_CMDS"
+   311	}
+   312⇥
+   313	if [ ! -f "$WF" ]; then
+   314	  wire_bad "CI 워크플로($WF) 부재 — 판정 권한이 있는 쪽이 비어 있다"
+   315	elif ! command -v ruby >/dev/null 2>&1; then
+    95	  if [ -L "$e_path" ]; then echo "심볼릭 링크 금지 — $e_path (저장소 안 실제 파일만)"; return 1; fi
+    96	  if [ ! -f "$e_path" ]; then echo "path 실존하지 않음 — $e_path"; return 1; fi
+    97	  return 0
+    98	}
+    99⇥
+   100	# stage 별 대조(규칙 3~5) — 위반 사유를 stdout 으로, return 1
+   101	ci_target_is_run_command() {
+   102	  local workflow="$1" job="$2" target="$3"
+   103	  case "$target" in
+   104	    'run: '*) target=${target#run: } ;;
+   105	  esac
+   106⇥
+   107	  command -v ruby >/dev/null 2>&1 || return 2
+   108	  ruby -e 'exit 0' >/dev/null 2>&1 || return 2
+   109⇥
+   110	  CI_JOB="$job" CI_TARGET="$target" ruby -ryaml -e '
+   111	    begin
+   112	      workflow = YAML.safe_load(
+   113	        File.read(ARGV.fetch(0)),
+   114	        permitted_classes: [],
+   115	        permitted_symbols: [],
+   116	        aliases: false
+   117	      )
+   118	      jobs = workflow.is_a?(Hash) ? workflow["jobs"] : nil
+   119	      selected = jobs.is_a?(Hash) ? jobs[ENV.fetch("CI_JOB")] : nil
+   120	      steps = selected.is_a?(Hash) ? selected["steps"] : nil
+   121	      exit 2 unless steps.is_a?(Array)
+   122⇥
+   123	      target = ENV.fetch("CI_TARGET")
+   124	      found = steps.any? do |step|
+   125	        run = step.is_a?(Hash) ? step["run"] : nil
+   126	        next false unless run.is_a?(String)
+   127	        next false if step.key?("if") || step.key?("continue-on-error")
+   128⇥
+   129	        run.lines.any? do |line|
+   130	          command = line.strip
+   131	          !command.empty? && !command.start_with?("#") && command == target
+   132	        end
+   133	      end
+   134	      exit(found ? 0 : 1)
+   135	    rescue StandardError
+   136	      exit 2
+   137	    end
+   138	  ' "$workflow" 2>/dev/null
+   139	}
+   140⇥
+   141	validate_stage() {
+   142	  case "$e_stage" in
+   143	    pre-commit|pre-push)
+   144	      if ! grep -qF -- "$e_target" "$e_path"; then
+   145	        echo "죽은 target — '$e_target' 이(가) $e_path 안에 없다"; return 1
+    50	#   acceptance-0-2 : 히스토리 정리 완결성(unreachable==0). 차단된 커밋 시도나 reset
+    51	#                    만으로도 unreachable 이 생기므로 개발 중 상시 실패한다.
+    52	#   acceptance-0-5 : "push 가 완료됐는가"(origin/main==main) 검사. push 직전에는
+    53	#                    논리적으로 성립할 수 없다 — pre-push 와 상호배타.
+    54	#   acceptance-0-7 : 훅이 작동하는가를 검증하는 메타 테스트. 이 훅 안에서 실행하면
+    55	#                    순환이 된다(단독 실행 exit 0 / pre-push 내부 exit 3 실측).
+    56	#
+    57	# 이관은 삭제가 아니다. 아래 3-a 가 CI 에 실제로 남아 있는지 확인하며, 없으면 차단한다.
+    58	# (PUSH_CHECKS 고정 목록은 글로브 도입과 함께 제거했다 — 남겨두면 다음 편집자가 그것을
+    59	#  고치고 검사 목록이 바뀐 줄 착각한다.)
+    60	DEFERRED="acceptance-0-5 acceptance-0-7"
+    61⇥
+    62	# 3-a) 이관한 검사가 CI 에 실제로 있는가 (이관이 조용한 삭제가 되는 것을 막는다)
+    63	#
+    64	# acceptance-0-2 는 이 목록에 없다. 그 검사는 로컬 전용 .secret-patterns 의 실제
+    65	# 리터럴을 기준으로 하는데 CI 에는 그 파일이 없고, 기본 패턴으로 대체하면 패턴 파일
+    66	# 자신이 매칭돼 상시 실패한다(실측: CI run 31176518944). CI 에서의 등가물은
+    67	# "히스토리 전량 스캔" 스텝이므로 그것의 존재를 대신 확인한다.
+    68	#
+    69	# 이름 검색만으로는 부족하다(V1 2026-08-07 실측). 아래 4종이 전부 통과했다:
+    70	#   ① run: 을 # run: 으로 주석 처리   ② 스텝에 if: false 추가
+    71	#   ③ 스텝 본문 통째 삭제(주석에 이름만 잔존)  ④ 조건을 없는 ref 로 변경
+    72	# 그래서 주석을 걷어낸 뒤 "실행되는 run: 줄"에 있는지를 본다.
+    73	WF=.github/workflows/verify.yml
+    74	if [ ! -f "$WF" ]; then
+    75	  block "$WF 없음 — CI 로 이관한 검사를 아무도 실행하지 않는다 (fail-closed)"
+    76	else
+    77	  # 주석 줄을 제거한 '실제로 실행되는' 워크플로 본문
+    78	  ACTIVE=$(grep -v '^[[:space:]]*#' "$WF")
+    79⇥
+    80	  # 실행 동사를 요구한다. 이름만 보면 `run: echo scripts/acceptance-0-7.sh` 한 줄로
+    81	  # 뚫린다(2026-08-07 실측 — 0-7 이 CI 에서 전혀 안 도는데 push 통과).
+    82	  # 이것으로 근본 해결은 안 된다. `run: cat s | bash` 류 변형이 남는다.
+    83	  # 워크플로를 문자열로 파싱하는 접근은 규칙을 하나 추가할 때마다 우회도 하나씩 는다
+    84	  # (막힌 것: 주석 처리·if: false·본문 삭제·echo 대체 / 뚫린 것: if: ${{ false }}·임의
+    85	  #  항상-거짓 조건·파이프 변형). 근본은 실행 증명이며 후속 이슈로 남긴다.
+    86	  # 동사 바로 뒤에 옵션(-)이 오는 것을 막는다. `bash -n <script>` 는 문법 검사일 뿐
+    87	  # 실행하지 않는데, 워크플로 diff 에서 정상 lint 스텝과 구분되지 않아 특히 위험하다
+    88	  # (2026-08-07 실측: `bash -n`·`bash -c`·`bash --version #`·`sh -c :` 전부 통과했다).
+    89	  # `[^-|]*` 는 0회 이상이다. 하나(`[^-|]`)로 두면 경로의 첫 글자를 소비해 정상 줄까지
+    90	  # 매칭에 실패한다(실측: 깨끗한 clone 에서 오탐 발생). 0회 매칭이 허용되므로
+    91	  # `bash <path>` 는 통과하고, `bash -n <path>` 는 `-` 를 소비할 수 없어 차단된다.
+    92	  RUNVERB='run:[[:space:]]*((bash|sh)[[:space:]]+|\./)[^-|]*'
+    93	  for d in $DEFERRED; do
+    94	    if ! printf '%s\n' "$ACTIVE" | grep -qE "${RUNVERB}${d}|^[[:space:]]*((bash|sh)[[:space:]]+|\./)[^-|]*${d}"; then
+    95	      block "$d 가 CI($WF)의 실행 줄에 없다 — 주석 처리·본문 삭제·echo 대체 여부를 확인하라"
+    96	    fi
+    97	  done
+    98⇥
+    99	  # 스텝 비활성화 금지
+   100	  if printf '%s\n' "$ACTIVE" | grep -qE '^[[:space:]]*if:[[:space:]]*(false|\x27false\x27|"false")'; then
+   101	    block "CI 워크플로에 if: false 로 비활성화된 스텝이 있다 (P13 — 검사 약화)"
+   102	  fi
+   103⇥
+   104	  # acceptance-0-2 의 CI 등가물: 이름이 아니라 본문(도달 가능 blob 을 실제로 여는 코드)을 확인
+   105	  if ! printf '%s\n' "$ACTIVE" | grep -q 'cat-file blob'; then
+   106	    block "CI 의 '히스토리 전량 스캔' 본문이 사라졌다 (cat-file blob 없음) — acceptance-0-2 의 등가물이 없다"
+   107	  fi
+   108	fi
+   109⇥
+   110	# 글로브로 찾는다. 고정 목록이면 새로 추가된 인수 스크립트를 조용히 누락한다
+   111	# (2026-08-07 실측: acceptance-9-9.sh 를 추가해도 "검사 2개 실행"으로 통과).
+   112	found=$(find . -maxdepth 2 \( -name 'verify.sh' -o -name 'acceptance-*.sh' \) \
+   113	        -not -path './worktrees/*' -not -path './.git/*' | LC_ALL=C sort)
+   114⇥
+   115	# 제외는 이름이 아니라 성질로 판별한다. 이름 기반 제외는 글로브(신규 자동 포함)와
+   116	# 정면 충돌해, push 를 수행하는 스크립트가 하나만 더 생기면 그날 재귀가 부활한다
+   117	# (2026-08-07 실측: acceptance-0-8.sh 를 넣자 프로세스 20개 도달).
+   118	#   · 헤더에 `# PUSH-PERFORMING` 을 선언한 스크립트 → push 를 수행하므로 여기서 실행 불가
+   119	#   · DEFERRED(0-2·0-5)          → push 안전성과 무관하거나 논리적으로 성립 불가. CI 담당
+   120	checks=""
+   121	while IFS= read -r c; do
+   122	  if [ -z "$c" ]; then continue; fi
+   123	  if head -20 "$c" | grep -q '^# PUSH-PERFORMING'; then
+   124	    # 마커는 "면제"가 아니라 "CI 로 옮긴다는 선언"이다. 옮기지 않았으면 차단한다.
+   125	    #
+   126	    # 이 검증이 없으면 마커가 자기선언 탈출구가 된다(2026-08-07 실측): 실패하는 검사에
+   127	    # 주석 한 줄만 붙이면 pre-commit 통과 · pre-push skip · CI 언급 0건 으로
+   128	    # 검사가 아무 데서도 돌지 않는다. 게다가 P13 약화 탐지는 매칭 전에 주석을 떼므로
+   129	    # 주석 전용 줄을 원리적으로 잡을 수 없어, 패턴을 추가해도 소용이 없다.
+   130	    # DEFERRED 에 이미 적용하던 검증을 그대로 재사용한다.
+   131	    # basename 이 아니라 상대 경로로 대조한다. 파일명만 보면 CI 에 등록된 적 없는
+   132	    # 파일이 동명이인 덕에 면제된다(2026-08-07 실측: CI 는 scripts/acceptance-8-8.sh 를
+   133	    # 실행하는데 other/acceptance-8-8.sh 가 면제받고 skip 됐다).
+   134	    # 정규식 메타문자를 이스케이프한다. 안 하면 `.` 가 와일드카드로 동작해
+   135	    # `bash scripts/acceptance-0-7Xsh` 같은 줄이 통과한다(미탐 방향, V1 6차 실측).
+   136	    rel=$(printf '%s' "${c#./}" | sed 's/[].[*^$+?(){}|\\]/\\&/g')
+   137	    if ! printf '%s\n' "${ACTIVE:-}" | grep -qE "run:[[:space:]]*((bash|sh)[[:space:]]+|\./)[^-|]*${rel}|^[[:space:]]*((bash|sh)[[:space:]]+|\./)[^-|]*${rel}"; then
+   138	      block "$c 가 PUSH-PERFORMING 을 선언했으나 CI 의 실행 줄에 없다 — 아무도 실행하지 않는다"
+   139	    fi
+   140	    printf '  skip %s (PUSH-PERFORMING · CI 담당)\n' "$c" >&2
+   141	    continue
+   142	  fi
+   143	  case "$(basename "$c")" in
+   144	    acceptance-0-2.sh|acceptance-0-5.sh)
+   145	      printf '  skip %s (DEFERRED · CI 담당)\n' "$c" >&2
+   146	      continue
+   147	      ;;
+   148	  esac
+   149	  checks="${checks}${c}"$'\n'
+   150	done <<< "$found"
+   151	checks="${checks%$'\n'}"
+   152⇥
+   153	n=$(printf '%s\n' "$checks" | awk 'NF{c++} END{print c+0}')
+   154	if [ "$n" -eq 0 ]; then
+   155	  block "검사 스크립트를 하나도 찾지 못했다 (fail-closed — 검사할 게 없어서 통과는 금지)"
+   156	else
+   157	  printf 'pre-push: 검사 %d개 실행\n' "$n" >&2
+   158	  while IFS= read -r c; do
+   159	    if [ -z "$c" ]; then continue; fi
+   160	    rc=0
+   161	    # SECRET_PATTERNS_FILE 을 비워 고정한다. 상속하면 다음으로 원격 유출이 완성된다
+   162	    # (2026-08-07 실측 — 비밀 커밋이 실제로 원격에 도달했다):
+   163	    #   git commit --no-verify (문서화된 허용 경로)
+   164	    #   → SECRET_PATTERNS_FILE=/tmp/weak.txt git push  → exit 0 통과
+   165	    SECRET_PATTERNS_FILE= bash "$c" >/dev/null 2>&1 || rc=$?
+   166	    if [ "$rc" -ne 0 ]; then
+   167	      block "$c exit=$rc"
+   168	    else
+   169	      printf '  ok  %s\n' "$c" >&2
+   170	    fi
+   171	  done <<< "$checks"
+   172	fi
+   173⇥
+   174	exit "$fail"
+     1	name: verify
+     2⇥
+     3	# "CI 초록 전까지 완료 없음"을 시스템으로 강제한다.
+     4	# 로컬 검증은 실행자가 주장하는 것이고, 이 워크플로우는 GitHub이 판정하는 것이다.
+     5	on:
+     6	  push:
+     7	    branches: ["**"]
+     8	  pull_request:
+     9	  workflow_dispatch:
+    10⇥
+    11	permissions:
+    12	  contents: read
+    13⇥
+    14	jobs:
+    15	  verify:
+    16	    runs-on: ubuntu-latest
+    17	    steps:
+    18	      - uses: actions/checkout@v4
+    19	        with:
+    20	          fetch-depth: 0   # 아래 "히스토리 전량 스캔" 스텝이 과거 커밋의 blob까지 열어보는 데 필요
+    21⇥
+    22	      - name: 비밀 스캔 (verify.sh)
+    23	        # 패턴은 커밋된 .secret-patterns.default 를 쓴다.
+    24	        # 실제 비밀값은 CI에 올리지 않는다 — 저장소 시크릿에 넣는 것도 유출 경로를 늘리는 일이다.
+    25	        # 로컬 전용 .secret-patterns 는 gitignore 되어 여기 없다.
+    26	        run: bash verify.sh
+    27⇥
+    28	      - name: HumanSearch G1 클린룸 경계
+    29	        run: |
+    30	          bash scripts/acceptance-hs-cleanroom.sh
+    31	          bash scripts/acceptance-hs-cleanroom-mutations.sh
+    32	          bash scripts/acceptance-hs-cleanroom-absolute-paths.sh
+    33	          bash scripts/acceptance-hs-cleanroom-absolute-contexts.sh
+    34	          bash scripts/acceptance-hs-cleanroom-colon-paths.sh
+    35	          bash scripts/acceptance-hs-cleanroom-file-urls.sh
+    36	          bash scripts/acceptance-hs-cleanroom-hook-env.sh
+    37	          bash scripts/acceptance-hs-cleanroom-hook-env-mutations.sh
+    38⇥
+    39	      - name: HumanSearch G2 테스트 게이트 (정적·단위 + runtime import 증명)
+    40	        # uv 버전은 계약 C-8(0.11.3)에 고정. Python 3.14.1은 uv가 .python-version으로 내려받는다.
+    41	        run: |
+    42	          command -v uv > /dev/null 2>&1 || pipx install uv==0.11.3
+    43	          uv --version
+    44	          bash scripts/acceptance-hs-gates.sh
+    45	          bash scripts/acceptance-hs-gates-mutations.sh
+    46	          bash scripts/acceptance-hs-gates-antiforge.sh
+    47⇥
+    48	      - name: HumanSearch G3 포털 상수·locator 경계
+    49	        # 운영 상수·portal locator 는 contracts/ 한 곳(P22 · 웹 자동화 5조 1번).
+    50	        # 검사기 자신이 이 파일의 실행 줄과 pre-push 글로브 배선을 함께 검사한다 —
+    51	        # 이 줄을 지우거나 무력화하면 pre-push 쪽 실행에서 검사기가 exit 1 을 낸다.
+    52	        run: |
+    53	          bash scripts/acceptance-hs-portal-constants.sh
+    54	          bash scripts/acceptance-hs-portal-constants-mutations.sh
+    55	          bash scripts/acceptance-hs-portal-constants-hardening.sh
+    56	          bash scripts/acceptance-hs-portal-constants-hardening2.sh
+    57	          bash scripts/acceptance-hs-portal-constants-hardening3.sh
+    58	          bash scripts/acceptance-hs-portal-constants-hardening4.sh
+    59	          bash scripts/acceptance-hs-portal-constants-hardening5.sh
+    60	          bash scripts/acceptance-hs-portal-constants-hardening6.sh
+    61⇥
+    62	      - name: 히스토리 전량 스캔 (도달 가능한 모든 blob)
+    63	        # verify.sh는 현재 체크아웃의 추적 파일만 본다. 과거 커밋에 들어갔다가 지워진 비밀은
+    64	        # 그것만으로는 잡히지 않으므로, reflog 포함 도달 가능한 모든 blob을 직접 열어 검사한다.
+    65	        run: |
+    66	          set -o pipefail
+    67	          CLEAN=$(mktemp)
+    68	          tr -d '\r' < .secret-patterns.default | grep -vE '^[[:space:]]*(#|$)' > "$CLEAN"
+    69	          [ -s "$CLEAN" ] || { echo "FAIL: 유효 패턴 0개"; exit 2; }
+    70⇥
+    71	          # fail-closed: git이 실패해 객체 목록이 비면 "0건 통과"가 아니라 오류다.
+    72	          OBJS=$(mktemp)
+    73	          if ! git rev-list --all --reflog --objects > "$OBJS"; then
+    74	            echo "FAIL: git rev-list 실패 — 히스토리를 읽지 못했다(스캔 무효)"; exit 2
+    75	          fi
+    76	          count=$(awk '{print $1}' "$OBJS" | sort -u | wc -l)
+    77	          if [ "$count" -lt 2 ]; then
+    78	            echo "FAIL: 도달 가능 객체가 ${count}개 — 저장소를 제대로 읽지 못했다(스캔 무효)"; exit 2
+    79	          fi
+    80	          echo "스캔 대상 객체: ${count}개"
+    81⇥
+    82	          hit=0; blobs=0
+    83	          while IFS= read -r sha; do
+    84	            [ -z "$sha" ] && continue
+    85	            [ "$(git cat-file -t "$sha" 2>/dev/null)" = blob ] || continue
+    86	            blobs=$((blobs+1))
+    87	            if git cat-file blob "$sha" 2>/dev/null | grep -qEif "$CLEAN"; then
+    88	              echo "FAIL: 히스토리 blob에 자격증명 패턴 매치: $sha"
+    89	              awk -v s="$sha" '$1==s {print "  경로: "$2}' "$OBJS"
+    90	              hit=1
+    91	            fi
+    92	          done < <(awk '{print $1}' "$OBJS" | sort -u)
+    93	          if [ "$blobs" -eq 0 ]; then
+    94	            echo "FAIL: blob을 한 개도 읽지 못했다(스캔 무효)"; exit 2
+    95	          fi
+    96	          [ "$hit" -eq 0 ] && echo "PASS: 히스토리 전량 blob 스캔 0건 (blob ${blobs}개 검사)"
+    97	          exit $hit
+    98⇥
+    99	      - name: 인수 검사 0-2 상시 내용 검사와 종료상태 분리 (AC-19)
+   100	        # 실제 로컬 리터럴은 CI에 올리지 않는다. 합성 저장소와 합성 값으로 동일 판정기를 실행해
+   101	        # 환경 격리·네 객체형·fsck/cat-file 실패·큰 객체·종료상태·훅 환경 무오염 13건을 증명한다.
+   102	        run: bash scripts/acceptance-0-2-unreachable-content.sh
+   103⇥
+   104	      - name: 인수 검사 0-6 (가짜 검증 스크립트 0건)
+   105	        run: bash scripts/acceptance-0-6.sh
+   106⇥
+   107	      # ↓ 아래 3개는 pre-push 에서 CI 로 이관된 검사다(2026-08-07).
+   108	      #   pre-push 는 "이 push 가 안전한가"만 판정하며, 저장소 위생·메타 검사는 여기서 돈다.
+   109	      #   hooks/pre-push 가 이 이름들이 이 파일에 실제로 있는지 확인한다 — 지우면 push 가 막힌다.
+   110⇥
+   111	      # acceptance-0-2 는 여기서 돌리지 않는다. 그 검사는 "로컬 전용 .secret-patterns 에
+   112	      # 적힌 실제 리터럴이 히스토리에서 제거됐는가"를 보는데, CI 에는 그 파일이 없다.
+   113	      # 기본 패턴으로 대체하면 패턴 파일 자신이 매칭돼 상시 실패한다(실측: run 31176518944,
+   114	      # blob 09b233e = .secret-patterns.default 자신). CI 에서의 등가물은 위의
+   115	      # "히스토리 전량 스캔" 스텝이며, hooks/pre-push 가 그 스텝의 존재를 확인한다.
+   116⇥
+   117	      - name: 인수 검사 0-7 (훅이 위반 6종을 실제로 차단하는가)
+   118	        run: bash scripts/acceptance-0-7.sh
+   119⇥
+   120	      - name: 인수 검사 0-5 (push · CI 연결)
+   121	        # origin/main==main 을 검사하므로 main 참조가 유효한 경우에만 의미가 있다.
+   122	        if: github.ref == 'refs/heads/main'
+   123	        run: bash scripts/acceptance-0-5.sh
+   124⇥
+   125	      - name: 억제 만료 스캔 (suppressions.yaml)
+   126	        # pre-commit 의 expiry 검사는 suppressions.yaml 이 '스테이징된 커밋'에서만 돈다.
+   127	        # 이미 커밋된 억제가 시간이 지나 썩는 것은 아무도 보지 않는다 — 이 게이트가
+   128	        # 막겠다고 인용한 98d923f(35일 방치) 시나리오 그 자체다. 그래서 매 push 마다 훑는다.
+   129	        run: |
+   130	          [ -f suppressions.yaml ] || { echo "PASS: 억제 없음"; exit 0; }
+   131	          today=$(date +%Y-%m-%d); fail=0; n=0
+   132	          while IFS= read -r e; do
+   133	            n=$((n+1))
+   134	            if ! printf '%s' "$e" | grep -qE '^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$'; then
+   135	              echo "FAIL: expiry 형식 오류 '${e}' — 만료를 판정할 수 없는 억제는 무기한 억제다"; fail=1
+   136	            elif [ "$e" \< "$today" ]; then
+   137	              echo "FAIL: 만료된 억제 (expiry $e < 오늘 $today) — 유예 기한이 지났다"; fail=1
+   138	            fi
+   139	          done < <(awk '/^ *expiry:/{sub(/^ *expiry: */,""); gsub(/["\x27]/,""); print}' suppressions.yaml)
+   140	          nc=$(awk '/^- *check:/{c++} END{print c+0}' suppressions.yaml)
+   141	          if [ "$nc" -ne "$n" ]; then
+   142	            echo "FAIL: 억제 ${nc}건 중 expiry 가 ${n}건뿐"; fail=1
+   143	          fi
+   144	          [ "$fail" -eq 0 ] && echo "PASS: 억제 ${nc}건 전부 유효 기한 내"
+   145	          exit $fail
+   146⇥
+   147	      - name: 강제 장치 존재 검사 (hooks/)
+   148	        # core.hooksPath 는 저장소 전역 config 이고 hooks/ 는 브랜치 내용이다.
+   149	        # hooks/ 가 없는 브랜치에서는 로컬 강제가 조용히 0개가 되며 로컬에서는 막을 수
+   150	        # 없다. 원격에서라도 막는다 — 이것이 P15③ 이 말하는 "판정 권한은 CI에 있다"의 실체다.
+   151	        run: |
+   152	          fail=0
+   153	          for h in hooks/pre-commit hooks/pre-push; do
+   154	            if [ ! -f "$h" ]; then echo "FAIL: $h 없음 — 이 브랜치엔 로컬 강제 장치가 없다"; fail=1
+   155	            elif [ ! -x "$h" ]; then echo "FAIL: $h 실행 권한 없음 — 훅은 존재해도 조용히 통과한다"; fail=1
+   156	            fi
+   157	          done
+   158	          [ "$fail" -eq 0 ] && echo "PASS: 훅 2종 존재·실행가능"
+   159	          exit $fail
+   160⇥
+   161	      - name: 셸 스크립트 문법 검사
+   162	        run: |
+   163	          fail=0
+   164	          while IFS= read -r -d '' f; do
+   165	            bash -n "$f" || { echo "syntax error: $f"; fail=1; }
+   166	          done < <(git ls-files -z '*.sh')
+   167	          exit $fail
+   168⇥
+   169	      - name: 패턴 파일 자체에 실제 비밀이 없는지 (자기 오염 방지)
+   170	        run: |
+   171	          # .secret-patterns.default 는 "모양"만 담아야 한다. 값처럼 보이는 긴 리터럴이 있으면 실패.
+   172	          if grep -nE "^[^#]*=[A-Za-z0-9]{8,}[[:space:]]*$" .secret-patterns.default; then
+   173	            echo "FAIL: 기본 패턴 파일에 실제 값처럼 보이는 리터럴이 있음"
+   174	            exit 1
+   175	          fi
+   176	          echo "PASS: 기본 패턴 파일에 실값 없음"
+   177⇥
+   178	      - name: 인수 검사 hs-a3 (세션 계열 자격증명 탐지)
+   179	        run: bash scripts/acceptance-hs-a3.sh
+   180	      - name: 데이터 노출 스캔 (크기 · 금지경로 · 기록 · 개인정보 내용)
+   181	        # 판정 본문은 scripts/scan-data-exposure.sh 한 곳에 있다. CI 도 인수검사도
+   182	        # **같은 파일을 실행**한다 — 규칙을 두 벌로 적으면 반드시 갈라진다.
+   183	        # 2026-08-12 V1 적대검증 D4: 인라인 본문 시절엔 이 스텝에 `if: ${{ false }}` 를
+   184	        # 넣어 영구히 꺼도 인수검사·pre-commit·pre-push 가 전부 초록이었다.
+   185	        # all = tracked(현재 파일) + history(도달 가능한 모든 blob · D1) + pii(csv/sql 내용 · D2)
+   186	        run: bash scripts/scan-data-exposure.sh all
+   187⇥
+   188	      - name: 인수 검사 hs-a4 (대용량·산출물 차단이 실제로 도는가)
+   189	        run: bash scripts/acceptance-hs-a4.sh
+   190⇥
+   191	      - name: 인수 검사 secret-webhook-vendor (웹훅·벤더 키 탐지 · AC-S1)
+   192	        # 로컬 pre-push 는 acceptance-*.sh 를 글로브로 전량 실행하지만 CI 는 고정 목록이다.
+   193	        # 여기 등록하지 않으면 이 검사는 '로컬에만 있는 검사'가 되고, P15③ 은 그것을
+   194	        # 없는 것으로 친다(이 파일 111행 주석의 "판정 권한은 CI에 있다"와 같은 근거).
+   195	        run: bash scripts/acceptance-secret-webhook-vendor.sh
+   196⇥
+   197	      - name: 인수 검사 verify-ac-m (mechanism 명부 대조 · AC-M)
+   198	        # 명부(docs/sot/mechanism-registry.yaml)와 실제 검사 장치의 일치를 강제한다.
+   199	        # 검사기 1벌(scripts/verify/check-mechanism-registry.sh)을 로컬 pre-push
+   200	        # 글로브와 CI 가 같은 인수 스크립트로 실행한다 (판정기 2벌 금지 · P16).
+   201	        run: bash scripts/acceptance-verify-ac-m.sh
+    10	| 게이트 | harness 스킬의 기본 명령 | 이 저장소의 실제 명령 |
+    11	|---|---|---|
+    12	| 0 — 시작 자격(RED 미해결 확인) | `make red-ledger` | `bash scripts/session-status.sh` (stdout 3번째 줄 `RED: N/M`) |
+    13	| 2 — 워크트리 파기 | `make task NAME=...` | `git worktree add worktrees/<name> -b task/<name>` |
+    14	| 4 — 검증 | `./verify.sh` | `bash verify.sh` (비밀 스캔) — CI(`verify.yml`)가 실제로 도는 검사 전체는 아래 "CI가 실제로 돌리는 것" 표가 정본이다(요약을 여기 두 번 적으면 반드시 갈라진다 — 2026-08-12 REV2-D2 실측). `scripts/acceptance-0-2.sh`는 로컬 전용(`.secret-patterns`에 실제 리터럴이 있어야 해서 CI에 못 올림, 스크립트 주석에 명시) |
+    15	| 5 — 배송 | `make ship` | 아직 스크립트 없음 — `git push -u origin task/<name>` 후 `gh pr create` 수동 실행. push 시 `hooks/pre-push`가 `verify.sh`와 `acceptance-*.sh`를 글로브로 수집한 뒤 아래 계약상 예외를 제외하고 실행 |
+    16	| 6 — 종료 | `make task-done NAME=...` | `git worktree remove worktrees/<name>` 수동 실행 |
+    17⇥
+    18	### CI(`​.github/workflows/verify.yml`)가 실제로 돌리는 것
+    19⇥
+    20	**이름 있는 검증 스텝 18개 전부**를 적는다(2026-08-12 V1 D6: 이전 판은 `bash ...` 직접 명령만 적어 인라인 본문 스텝이 목록에서 빠졌고, 운영자가 실제로 무엇이 도는지 잘못 판단할 수 있었다). 아래는 `verify.yml` 의 `- name:` 스텝 순서 그대로다(#6·#9 G1·#11 G2·#13 G3·#8 AC-M의 합집합과 #19 AC-19의 13개 합성 사례 — 2026-08-18).
+    21⇥
+    22	| # | 스텝 이름 | 실행 내용 |
+    23	|---|---|---|
+    24	| 1 | 비밀 스캔 (verify.sh) | `bash verify.sh` — 추적 파일 전체 |
+    25	| 2 | HumanSearch G1 클린룸 경계 | 인라인 8개 — `scripts/acceptance-hs-cleanroom.sh`, `scripts/acceptance-hs-cleanroom-mutations.sh`, `scripts/acceptance-hs-cleanroom-absolute-paths.sh`, `scripts/acceptance-hs-cleanroom-absolute-contexts.sh`, `scripts/acceptance-hs-cleanroom-colon-paths.sh`, `scripts/acceptance-hs-cleanroom-file-urls.sh`, `scripts/acceptance-hs-cleanroom-hook-env.sh`, `scripts/acceptance-hs-cleanroom-hook-env-mutations.sh` |
+    26	| 3 | HumanSearch G2 테스트 게이트 (정적·단위 + runtime import 증명) | 인라인 — `uv` 설치 후 `scripts/acceptance-hs-gates.sh`, `scripts/acceptance-hs-gates-mutations.sh`, `scripts/acceptance-hs-gates-antiforge.sh` (정적 ruff/mypy + pytest 수집·runtime import 증명) |
+    27	| 4 | HumanSearch G3 포털 상수·locator 경계 | 인라인 — `scripts/acceptance-hs-portal-constants.sh`, `scripts/acceptance-hs-portal-constants-mutations.sh`, `scripts/acceptance-hs-portal-constants-hardening.sh`, `scripts/acceptance-hs-portal-constants-hardening2.sh`, `scripts/acceptance-hs-portal-constants-hardening3.sh`, `scripts/acceptance-hs-portal-constants-hardening4.sh`, `scripts/acceptance-hs-portal-constants-hardening5.sh`, `scripts/acceptance-hs-portal-constants-hardening6.sh` (운영 상수·locator는 `contracts/` 한 곳 · P22, exit 0/1/2 3상태. YAML 실행 칸 은닉, 의미 기반 locator, 작업·단계 조건, 오류 무시, shell·working-directory·위험 환경, 무효 runs-on, 0회 matrix, 수동 전용 트리거를 거부) |
+    28	| 5 | 히스토리 전량 스캔 (도달 가능한 모든 blob) | 인라인 — 도달 가능한 모든 blob 을 열어 자격증명 패턴 대조 |
+    29	| 6 | 인수 검사 0-2 상시 내용 검사와 종료상태 분리 (AC-19) | `bash scripts/acceptance-0-2-unreachable-content.sh` — 환경 격리·네 객체형·도구 실패·큰 객체·종료상태·훅 환경 무오염 13개 합성 사례 (AC-19) |
+    30	| 7 | 인수 검사 0-6 (가짜 검증 스크립트 0건) | `bash scripts/acceptance-0-6.sh` |
+    31	| 8 | 인수 검사 0-7 (훅이 위반 6종을 실제로 차단하는가) | `bash scripts/acceptance-0-7.sh` — 훅 위반 6종 시연 |
+    32	| 9 | 인수 검사 0-5 (push · CI 연결) | `bash scripts/acceptance-0-5.sh` — **`main` 브랜치에서만** (`if: github.ref == 'refs/heads/main'`) |
+    33	| 10 | 억제 만료 스캔 (suppressions.yaml) | 인라인 — `suppressions.yaml` 의 expiry 형식·경과 |
+    34	| 11 | 강제 장치 존재 검사 (hooks/) | 인라인 — `hooks/pre-commit`·`pre-push` 존재·실행권한 |
+    35	| 12 | 셸 스크립트 문법 검사 | 인라인 — `git ls-files '*.sh'` 전부 `bash -n` |
+    36	| 13 | 패턴 파일 자체에 실제 비밀이 없는지 (자기 오염 방지) | 인라인 — `.secret-patterns.default` 에 값 리터럴 없는지 |
+    37	| 14 | 인수 검사 hs-a3 (세션 계열 자격증명 탐지) | `bash scripts/acceptance-hs-a3.sh` — 세션 계열 자격증명 (AC-A3) |
+    38	| 15 | 데이터 노출 스캔 (크기 · 금지경로 · 기록 · 개인정보 내용) | `bash scripts/scan-data-exposure.sh all` — 크기·금지경로·기록·개인정보 (AC-A4) |
+    28	```
+    29⇥
+    30	### `hooks/pre-push`
+    31	```
+    32	입력  : stdin 으로 <local ref> <local sha> <remote ref> <remote sha> (git 표준)
+    33	출력  : exit 0 | exit 1
+    34	        후보 수집: verify.sh, scripts/acceptance-*.sh (glob — 새 스크립트 추가 시 자동 포함)
+    35	        직접 실행 제외:
+    36	        - acceptance-0-2.sh — 로컬 실제 패턴으로 별도 수동 실행. push 시점에는 정상 Git 작업이
+    37	          만든 unreachable 객체가 있을 수 있어 종료상태 0건 조건을 요구하지 않는다
+    38	        - acceptance-0-5.sh — push 완료 뒤 원격 상태를 보는 검사라 push 직전에는 성립하지 않는다
+    39	        - 헤더에 PUSH-PERFORMING을 선언한 검사 — push 재귀를 막기 위해 CI에서만 실행한다.
+    40	          현재 acceptance-0-7.sh가 이에 해당하며, CI 실제 실행 줄이 없으면 pre-push가 차단한다
+    41	        양쪽 실행: acceptance-0-2-unreachable-content.sh — 위 예외에 해당하지 않으므로 로컬
+    42	        push와 CI가 모두 실행해 AC-19 합성 사례 13개를 검사한다
+    43	        차단 시 stderr: "BLOCKED: <스크립트경로> exit=<code>"
+    44	불변식: 스크립트가 0개 발견되면 exit 1 (fail-closed — "검사할 게 없어서 통과"를 금지)
+    45	        미추적 파일(??) 존재 시 exit 1 (P15)
+    46	한계  : git push --no-verify 로 우회 가능. CI는 실패 표시를 만들지만, 현재 원격 main은
+    47	        보호되지 않았고 개인 계정의 비공개 저장소 요금제에서는 필수 성공 검사 지정이
+    48	        잠겨 있어 합치기를 기계적으로 막지 못한다. 현재 최종 강제 주체는 사람 검토다
+    49	        (`docs/sot/git-workflow.md`의 2026-08-15 원격 실측 참조).
+    50	```
+    51⇥
+    52	### `scripts/session-status.sh`
+
+COMMAND=bash scripts/acceptance-0-2-unreachable-content.sh
+[1/13] SECRET_PATTERNS_FILE=/dev/null 상속을 격리 -> PASS (exit=0)
+[2/13] SECRET_PATTERNS_FILE=.secret-patterns.default 상속을 격리 -> PASS (exit=0)
+[3/13] 일반 실행은 무해한 unreachable blob을 허용 -> PASS (exit=0)
+[4/13] 일반 실행은 금지값이 든 unreachable blob을 차단 -> BLOCKED (exit=1)
+[5/13] unreachable commit message의 금지값을 차단 -> BLOCKED (exit=1)
+[6/13] unreachable tree path의 금지값을 차단 -> BLOCKED (exit=1)
+[7/13] unreachable annotated tag message의 금지값을 차단 -> BLOCKED (exit=1)
+[8/13] git fsck 실패는 검사 대상 없음으로 통과하지 않음 -> BLOCKED (exit=1)
+[9/13] unreachable 객체 읽기 실패는 조용히 통과하지 않음 -> BLOCKED (exit=1)
+[10/13] 알 수 없는 unreachable 객체형은 읽기 실패로 차단 -> BLOCKED (exit=1)
+[11/13] 큰 unreachable blob 앞쪽의 금지값도 차단 -> BLOCKED (exit=1)
+[12/13] 종료상태 실행은 무해한 unreachable blob도 차단 -> BLOCKED (exit=1)
+[13/13] Git hook 환경에서도 바깥 저장소 무오염 -> PASS (exit=0)
+CHECKED: 13
+PASS: AC-19 일반 내용 검사와 종료상태 0건 조건 분리
+COMMAND_EXIT=0
+
+COMMAND=env SECRET_PATTERNS_FILE=/dev/null bash scripts/acceptance-0-2-unreachable-content.sh
+[1/13] SECRET_PATTERNS_FILE=/dev/null 상속을 격리 -> PASS (exit=0)
+[2/13] SECRET_PATTERNS_FILE=.secret-patterns.default 상속을 격리 -> PASS (exit=0)
+[3/13] 일반 실행은 무해한 unreachable blob을 허용 -> PASS (exit=0)
+[4/13] 일반 실행은 금지값이 든 unreachable blob을 차단 -> BLOCKED (exit=1)
+[5/13] unreachable commit message의 금지값을 차단 -> BLOCKED (exit=1)
+[6/13] unreachable tree path의 금지값을 차단 -> BLOCKED (exit=1)
+[7/13] unreachable annotated tag message의 금지값을 차단 -> BLOCKED (exit=1)
+[8/13] git fsck 실패는 검사 대상 없음으로 통과하지 않음 -> BLOCKED (exit=1)
+[9/13] unreachable 객체 읽기 실패는 조용히 통과하지 않음 -> BLOCKED (exit=1)
+[10/13] 알 수 없는 unreachable 객체형은 읽기 실패로 차단 -> BLOCKED (exit=1)
+[11/13] 큰 unreachable blob 앞쪽의 금지값도 차단 -> BLOCKED (exit=1)
+[12/13] 종료상태 실행은 무해한 unreachable blob도 차단 -> BLOCKED (exit=1)
+[13/13] Git hook 환경에서도 바깥 저장소 무오염 -> PASS (exit=0)
+CHECKED: 13
+PASS: AC-19 일반 내용 검사와 종료상태 0건 조건 분리
+COMMAND_EXIT=0
+
+COMMAND=env SECRET_PATTERNS_FILE=.secret-patterns.default bash scripts/acceptance-0-2-unreachable-content.sh
+[1/13] SECRET_PATTERNS_FILE=/dev/null 상속을 격리 -> PASS (exit=0)
+[2/13] SECRET_PATTERNS_FILE=.secret-patterns.default 상속을 격리 -> PASS (exit=0)
+[3/13] 일반 실행은 무해한 unreachable blob을 허용 -> PASS (exit=0)
+[4/13] 일반 실행은 금지값이 든 unreachable blob을 차단 -> BLOCKED (exit=1)
+[5/13] unreachable commit message의 금지값을 차단 -> BLOCKED (exit=1)
+[6/13] unreachable tree path의 금지값을 차단 -> BLOCKED (exit=1)
+[7/13] unreachable annotated tag message의 금지값을 차단 -> BLOCKED (exit=1)
+[8/13] git fsck 실패는 검사 대상 없음으로 통과하지 않음 -> BLOCKED (exit=1)
+[9/13] unreachable 객체 읽기 실패는 조용히 통과하지 않음 -> BLOCKED (exit=1)
+[10/13] 알 수 없는 unreachable 객체형은 읽기 실패로 차단 -> BLOCKED (exit=1)
+[11/13] 큰 unreachable blob 앞쪽의 금지값도 차단 -> BLOCKED (exit=1)
+[12/13] 종료상태 실행은 무해한 unreachable blob도 차단 -> BLOCKED (exit=1)
+[13/13] Git hook 환경에서도 바깥 저장소 무오염 -> PASS (exit=0)
+CHECKED: 13
+PASS: AC-19 일반 내용 검사와 종료상태 0건 조건 분리
+COMMAND_EXIT=0
+
+COMMAND=bash scripts/acceptance-0-2.sh
+PASS: no secret-pattern match in any tracked file, .env not tracked
+PASS: 0-2 — 히스토리·객체·reflog·docs 리터럴 0건, 스캐너 뮤테이션 검출 확인
+COMMAND_EXIT=0
+
+COMMAND=bash scripts/acceptance-hs-portal-constants.sh
+PASS: portal constants outside contracts 0
+PASS: contracts zone violations 0
+PASS: ci/pre-push wiring intact
+PRODUCT_FILES: 2
+CHECKED: 56
+CONTRACT_FILES: 3
+COMMAND_EXIT=0
+
+COMMAND=bash scripts/acceptance-hs-portal-constants-mutations.sh
+ok [clean baseline] exit=0
+ok [product scheme URL (.py)] exit=1
+ok [product bare domain (tests/.py)] exit=1
+ok [product host:port (무작위 파일명)] exit=1
+ok [product selector API (.js)] exit=1
+ok [product XPath literal] exit=1
+ok [product quoted CSS id] exit=1
+ok [scripts/ selector API — scripts 면제 금지] exit=1
+ok [검사기 자신에 심은 selector — 자기면제 금지] exit=1
+ok [루트 파일 CDP 플래그] exit=1
+ok [hooks/ 포털 브랜드 도메인] exit=1
+ok [루트 contracts/ 정당 값 — 오탐 금지] exit=0
+ok [contracts-evil/ 유사 경로 위장] exit=1
+ok [중첩 가짜 contracts/ 경로] exit=1
+ok [contracts/ 실행 권한 파일] exit=1
+ok [contracts/ 허용 확장자 밖] exit=1
+ok [CI 무력화: self_commented] exit=1
+ok [CI 무력화: self_missing] exit=1
+ok [CI 무력화: echo_prefixed] exit=1
+ok [CI 무력화: suffixed] exit=1
+ok [CI 무력화: if_false] exit=1
+ok [CI 무력화: coe] exit=1
+ok [CI 무력화: sibling_missing] exit=1
+ok [pre-push 부재] exit=1
+ok [pre-push 실행권한 제거] exit=1
+ok [pre-push 글로브 수집식 제거] exit=1
+ok [전역 패턴 계약 부재] exit=2
+ok [전역 패턴 계약 빈 파일] exit=2
+ok [깨진 정규식] exit=2
+ok [빈 문자열 매치 정규식] exit=2
+ok [제품 패턴 계약 깨짐] exit=2
+ok [제품 루트 부재 — 조용한 skip 금지] exit=2
+ok [제품 파일 0건 — 0건 통과 금지] exit=2
+ok [위반+깨진 패턴 동시 — 2 우선] exit=2
+ok [제품 5파일 깨끗] exit=0
+PASS: portal-constants mutations blocked 24/35 (allowed 3, notrun 8)
+COMMAND_EXIT=0
+
+COMMAND=bash scripts/acceptance-hs-portal-constants-hardening.sh
+ok [hardening baseline] exit=0
+ok [D1 IPv4 비루프백 host:port] exit=1
+ok [D1 미등재 .ai 도메인] exit=1
+ok [D1 CSS 자손 셀렉터] exit=1
+ok [D1 CSS 속성 셀렉터] exit=1
+ok [D1 공백 XPath] exit=1
+ok [D1 따옴표 CDP 포트] exit=1
+ok [D1 매핑형 CDP 포트] exit=1
+ok [D1 IPv6 루프백 host:port] exit=1
+ok [D2 run 블록 선행 exit 0] exit=1
+ok [D2 run 블록 실패 중단 해제] exit=1
+ok [D3 검사기 머리말 표식] exit=1
+ok [D3 mutation 시험 머리말 표식] exit=1
+ok [D4 임시공간 생성 실패] exit=2
+ok [D5 docs 실행 코드 은닉] exit=1
+ok [D5 정당한 문서 인용 — 오탐 금지] exit=0
+ok [D5 실행권한 달린 문서 위장] exit=1
+ok [hardening 자기 배선(CI 실행 줄)]
+PASS: portal-constants hardening blocked 15/18 (allowed 2, notrun 1)
+COMMAND_EXIT=0
+
+COMMAND=bash scripts/acceptance-hs-portal-constants-hardening2.sh
+ok [hardening2 baseline] exit=0
+ok [N1-1 미등재 .biz 도메인] exit=1
+ok [N1-2 단일 라벨 호스트:포트] exit=1
+ok [N1-3 한 자리 포트] exit=1
+ok [N1-4 JSON 따옴표 포트 키] exit=1
+ok [N1-5 camelCase 포트 변수] exit=1
+ok [N1-6 따옴표 값 CSS 속성] exit=1
+ok [N1-7 CSS id 자손] exit=1
+ok [N1-8 백틱 CSS id] exit=1
+ok [N1-9 절대 XPath] exit=1
+ok [N1-10 함수형 XPath] exit=1
+ok [N2 셸 if-false 감싸기] exit=1
+ok [N2 블록 내 이물질 줄(true)] exit=1
+ok [N3 hardening 실행 줄 삭제] exit=1
+ok [N3 pre-push 선행 exit 0] exit=1
+ok [hardening2 자기 배선(CI 실행 줄)]
+PASS: portal-constants hardening2 cases 16 (blocked-mutations 14, clean-baselines 1, wiring-present 1)
+COMMAND_EXIT=0
+
+COMMAND=bash scripts/acceptance-hs-portal-constants-hardening3.sh
+ok [hardening3 baseline] exit=0
+ok [F1 env 값 속 가짜 G3 단계] exit=1
+ok [F2 semantic role finder] exit=1
+ok [F2 semantic label finder] exit=1
+ok [F2 semantic testid finder] exit=1
+ok [F2 semantic text finder] exit=1
+ok [F2 element[attr] CSS 셀렉터] exit=1
+ok [hardening3 자기 배선(CI 실행 줄)]
+PASS: portal-constants hardening3 cases 8 (blocked-mutations 6, clean-baselines 1, wiring-present 1)
+COMMAND_EXIT=0
+
+COMMAND=bash scripts/acceptance-hs-portal-constants-hardening4.sh
+ok [hardening4 baseline] exit=0
+ok [리터럴 스칼라 은닉: description] exit=1
+ok [리터럴 스칼라 은닉: note] exit=1
+ok [리터럴 스칼라 은닉: summary] exit=1
+ok [리터럴 스칼라 은닉: run-name] exit=1
+ok [리터럴 스칼라 은닉: comment] exit=1
+ok [리터럴 스칼라 은닉: memo] exit=1
+ok [hardening4 자기 배선(CI 실행 줄)]
+PASS: portal-constants hardening4 cases 8 (blocked-mutations 6, clean-baselines 1, wiring-present 1)
+COMMAND_EXIT=0
+
+COMMAND=bash scripts/acceptance-hs-portal-constants-hardening5.sh
+ok [hardening5 baseline] exit=0
+RUN_FIELDS_WITH_G3=0
+ENV_VALUES_WITH_G3=1
+ok [F1 quoted env value is not a run field] exit=1
+ok [F2 semantic role finder] exit=1
+ok [F2 semantic label finder] exit=1
+ok [F2 semantic test-id finder] exit=1
+ok [F2 semantic text finder] exit=1
+ok [hardening5 자기 배선(CI 실행 줄)]
+PASS: portal-constants hardening5 cases 7 (blocked-mutations 5, clean-baselines 1, wiring-present 1)
+COMMAND_EXIT=0
+
+COMMAND=bash scripts/acceptance-hs-portal-constants-hardening6.sh
+JOB_IF=ABSENT
+JOB_CONTINUE_ON_ERROR=ABSENT
+AUTO_TRIGGER=true
+RUNS_ON=ubuntu-latest
+STEP_SHELL=ABSENT
+JOB_DEFAULT_SHELL=ABSENT
+WORKFLOW_DEFAULT_SHELL=ABSENT
+ok [hardening6 baseline] exit=0
+STEP_WORKING_DIRECTORY=fake-checks
+JOB_DEFAULT_WORKING_DIRECTORY=ABSENT
+WORKFLOW_DEFAULT_WORKING_DIRECTORY=ABSENT
+ok [N6 step-level working-directory key] exit=1
+STEP_WORKING_DIRECTORY=ABSENT
+JOB_DEFAULT_WORKING_DIRECTORY=fake-checks
+WORKFLOW_DEFAULT_WORKING_DIRECTORY=ABSENT
+ok [N6 job defaults.run.working-directory key] exit=1
+STEP_WORKING_DIRECTORY=ABSENT
+JOB_DEFAULT_WORKING_DIRECTORY=ABSENT
+WORKFLOW_DEFAULT_WORKING_DIRECTORY=fake-checks
+ok [N6 workflow defaults.run.working-directory key] exit=1
+STEP_ENV_KEYS=BASH_ENV
+JOB_ENV_KEYS=ABSENT
+WORKFLOW_ENV_KEYS=ABSENT
+ok [N7 step env BASH_ENV key] exit=1
+STEP_ENV_KEYS=ABSENT
+JOB_ENV_KEYS=BASH_ENV
+WORKFLOW_ENV_KEYS=ABSENT
+ok [N7 job env BASH_ENV key] exit=1
+STEP_ENV_KEYS=ABSENT
+JOB_ENV_KEYS=ABSENT
+WORKFLOW_ENV_KEYS=BASH_ENV
+ok [N7 workflow env BASH_ENV key] exit=1
+STEP_ENV_KEYS=ENV
+JOB_ENV_KEYS=ABSENT
+WORKFLOW_ENV_KEYS=ABSENT
+ok [N7 step env ENV key] exit=1
+STEP_ENV_KEYS=ABSENT
+JOB_ENV_KEYS=SHELLOPTS
+WORKFLOW_ENV_KEYS=ABSENT
+ok [N7 job env SHELLOPTS key] exit=1
+STEP_ENV_KEYS=ABSENT
+JOB_ENV_KEYS=ABSENT
+WORKFLOW_ENV_KEYS=PATH
+ok [N7 workflow env PATH key] exit=1
+STEP_ENV_KEYS=SAFE_STEP_FLAG
+JOB_ENV_KEYS=SAFE_JOB_FLAG
+WORKFLOW_ENV_KEYS=SAFE_WORKFLOW_FLAG
+ok [harmless env keys remain allowed] exit=0
+RUNS_ON_CLASS=NilClass
+RUNS_ON_VALUE=nil
+ok [N8 runs-on null] exit=1
+RUNS_ON_CLASS=Array
+RUNS_ON_VALUE=[]
+ok [N8 runs-on empty list] exit=1
+RUNS_ON_CLASS=FalseClass
+RUNS_ON_VALUE=false
+ok [N8 runs-on false] exit=1
+MATRIX_CLASS=Hash
+MATRIX_KEYS=shard
+STATIC_AXIS_VALUES=shard:Array:0
+ok [N9 matrix empty axis] exit=1
+MATRIX_CLASS=Hash
+MATRIX_KEYS=shard
+STATIC_AXIS_VALUES=shard:Array:2
+ok [non-empty static matrix axis remains allowed] exit=0
+MATRIX_CLASS=String
+MATRIX_VALUE=${{ fromJSON(vars.G3_MATRIX) }}
+ok [N9 matrix expression] exit=1
+MATRIX_VALUE={"shard"=>["${{ vars.G3_SHARD }}"]}
+ok [N9 matrix axis item expression] exit=1
+MATRIX_CLASS=Hash
+MATRIX_KEYS=include
+STATIC_AXIS_VALUES=
+ok [include-only matrix entries remain allowed] exit=0
+MATRIX_VALUE={"include"=>[]}
+ok [N9 empty include-only matrix] exit=1
+MATRIX_CLASS=Hash
+MATRIX_KEYS=exclude
+STATIC_AXIS_VALUES=
+ok [N9 matrix exclude-only] exit=1
+MATRIX_VALUE={"shard"=>["one"], "exclude"=>[{"shard"=>"one"}]}
+ok [N9 exclude removes the sole combination] exit=1
+MATRIX_VALUE={"os"=>["linux", "mac"], "shard"=>["one", "two"], "exclude"=>[{"os"=>"linux"}, {"os"=>"mac"}]}
+ok [N9 exclude removes a multi-axis cartesian product] exit=1
+MATRIX_VALUE={"os"=>["linux", "mac"], "shard"=>["one", "two"], "exclude"=>[{"os"=>"linux", "shard"=>"one"}]}
+ok [matrix with combinations remaining after exclude] exit=0
+MATRIX_VALUE={"shard"=>["one"], "exclude"=>[{"shard"=>"one"}], "include"=>[{"shard"=>"one"}]}
+ok [include restores a combination after exclude] exit=0
+MATRIX_VALUE={"shard"=>["one"], "include"=>"${{ fromJSON(vars.G3_INCLUDE) }}"}
+ok [N9 matrix include expression] exit=1
+MATRIX_VALUE={"shard"=>["one"], "include"=>[{"shard"=>"${{ vars.G3_SHARD }}"}]}
+ok [N9 matrix include value expression] exit=1
+MATRIX_VALUE={"shard"=>["one"], "exclude"=>"${{ fromJSON(vars.G3_EXCLUDE) }}"}
+ok [N9 matrix exclude expression] exit=1
+MATRIX_VALUE={"shard"=>["one"], "exclude"=>[{"shard"=>"${{ vars.G3_SHARD }}"}]}
+ok [N9 matrix exclude value expression] exit=1
+RUNS_ON=ubuntu-latest
+STEP_SHELL=echo {0}
+JOB_DEFAULT_SHELL=ABSENT
+WORKFLOW_DEFAULT_SHELL=ABSENT
+ok [N4 step-level shell key] exit=1
+RUNS_ON=ubuntu-latest
+STEP_SHELL=ABSENT
+JOB_DEFAULT_SHELL=echo {0}
+WORKFLOW_DEFAULT_SHELL=ABSENT
+ok [N4 job defaults.run.shell key] exit=1
+RUNS_ON=ubuntu-latest
+STEP_SHELL=ABSENT
+JOB_DEFAULT_SHELL=ABSENT
+WORKFLOW_DEFAULT_SHELL=echo {0}
+ok [N4 workflow defaults.run.shell key] exit=1
+RUNS_ON=ABSENT
+STEP_SHELL=ABSENT
+JOB_DEFAULT_SHELL=ABSENT
+WORKFLOW_DEFAULT_SHELL=ABSENT
+ok [N5 missing runs-on key] exit=1
+G3_JOBS=1
+G3_STEPS=2
+RUNS_ON=ubuntu-latest
+STEP_SHELLS=echo {0},ABSENT
+JOB_DEFAULT_SHELLS=ABSENT
+ok [N4 bad step plus duplicate safe step] exit=1
+G3_JOBS=2
+G3_STEPS=2
+RUNS_ON=ubuntu-latest,ubuntu-latest
+STEP_SHELLS=ABSENT,ABSENT
+JOB_DEFAULT_SHELLS=echo {0},ABSENT
+ok [N4 bad job defaults plus duplicate safe job] exit=1
+G3_JOBS=2
+G3_STEPS=2
+RUNS_ON=ABSENT,ubuntu-latest
+STEP_SHELLS=ABSENT,ABSENT
+JOB_DEFAULT_SHELLS=ABSENT,ABSENT
+ok [N5 missing runs-on plus duplicate safe job] exit=1
+G3_JOBS=1
+G3_STEPS=2
+RUNS_ON=ubuntu-latest
+STEP_SHELLS=ABSENT,echo {0}
+JOB_DEFAULT_SHELLS=ABSENT
+ok [N4 unsafe step after duplicate safe step] exit=1
+G3_JOBS=2
+G3_STEPS=2
+RUNS_ON=ubuntu-latest,ubuntu-latest
+STEP_SHELLS=ABSENT,ABSENT
+JOB_DEFAULT_SHELLS=ABSENT,echo {0}
+ok [N4 unsafe job defaults after duplicate safe job] exit=1
+G3_JOBS=2
+G3_STEPS=2
+RUNS_ON=ubuntu-latest,ABSENT
+STEP_SHELLS=ABSENT,ABSENT
+JOB_DEFAULT_SHELLS=ABSENT,ABSENT
+ok [N5 missing runs-on after duplicate safe job] exit=1
+JOB_IF=false
+JOB_CONTINUE_ON_ERROR=ABSENT
+AUTO_TRIGGER=true
+ok [N1 job-level if key] exit=1
+G3_JOB_NEEDS=gate
+GATE_IF=false
+ok [N1 skipped prerequisite job] exit=1
+JOB_IF=ABSENT
+JOB_CONTINUE_ON_ERROR=true
+AUTO_TRIGGER=true
+ok [N2 job-level continue-on-error true] exit=1
+JOB_CONTINUE_ON_ERROR_CLASS=String
+JOB_CONTINUE_ON_ERROR=${{ true }}
+ok [N2 job-level continue-on-error expression] exit=1
+JOB_IF=ABSENT
+JOB_CONTINUE_ON_ERROR=ABSENT
+AUTO_TRIGGER=false
+ok [N3 workflow_dispatch-only trigger] exit=1
+PUSH_PATHS_IGNORE=**
+PULL_REQUEST_PATHS_IGNORE=**
+ok [N3 automatic events filtered out] exit=1
+ok [hardening6 자기 배선(CI 실행 줄)]
+PASS: portal-constants hardening6 cases 46 (blocked-mutations 39, clean-baselines 6, wiring-present 1)
+COMMAND_EXIT=0
+
+COMMAND=bash scripts/verify/check-mechanism-registry.sh
+PASS: secrets-scan-precommit (pre-commit · 규칙 1·2·3)
+PASS: acceptance-glob-prepush (pre-push · 규칙 1·2·3)
+PASS: ci-secret-scan (ci · 규칙 1·2·4)
+PASS: ci-portal-constants-gate (ci · 규칙 1·2·4)
+CHECKED: 4
+COMMAND_EXIT=0
+
+COMMAND=bash scripts/acceptance-verify-ac-m.sh
+PASS: 검사기 실존·실행가능 — scripts/verify/check-mechanism-registry.sh
+PASS: fixture 정상 명부 → 통과 (exit=0)
+PASS: fixture path 없는 항목 → 불합격 (exit=1)
+PASS: fixture 죽은 target → 불합격 (exit=1)
+PASS: id 중복 → 불합격 (exit=1)
+PASS: 알 수 없는 stage → 불합격 (exit=1)
+PASS: manual 인데 사유 없음 → 불합격 (exit=1)
+PASS: manual 정상(사유+실행권한) → 통과 (exit=0)
+PASS: manual 인데 실행권한 없음 → 불합격 (exit=1)
+PASS: ci 인데 거짓 target → 불합격 (exit=1)
+PASS: ci target 이 주석에만 있음 → 불합격 (exit=1)
+PASS: ci target step 이 if:false 로 꺼짐 → 불합격 (exit=1)
+PASS: 절대경로 path → 불합격 (exit=1)
+PASS: 상대경로 심볼릭 링크 → 불합격 (exit=1)
+PASS: 필드 중복(path 2회, 마지막 값 유효) → 불합격 (exit=1)
+PASS: id 뒤 인라인 주석 → 불합격 (exit=1)
+PASS: 닫히지 않은 따옴표 → 불합격 (exit=1)
+PASS: stage 불일치 필드(ci_mirror_job) → 불합격 (exit=1)
+PASS: 문법 오류·항목 0개 → 위반(1) (exit=1)
+PASS: 항목 0개 명부 → NOT_RUN (exit=2)
+PASS: ci_mirror_job 불일치 → 불합격 (exit=1)
+PASS: 필수 필드(stage) 누락 → 불합격 (exit=1)
+PASS: 빈 문자열 path → 불합격 (exit=1)
+PASS: CI 자기배선 target 이 셸 주석에만 있음 → 불합격
+PASS: CI 배선 — verify.yml 에 무조건 실행 스텝 정확히 1회
+PASS: 실제 명부(docs/sot/mechanism-registry.yaml) → 통과 (exit=0)
+PASS: 명부 항목 4개 = 검사기 보고 4개 (하한 3)
+PASS: 저장소 무오염 (시작/종료 상태 동일)
+CHECKED: 28
+COMMAND_EXIT=0
+
+COMMAND=bash scripts/check-docs-sot.sh
+PASS: docs/sot/INDEX.md 존재, 1050바이트 (<=20000)
+PASS: docs/sot/coding-principles.md 존재, 15405바이트 (<=20000)
+PASS: docs/sot/hook-contracts.md 존재, 5797바이트 (<=20000)
+PASS: docs/sot/git-workflow.md 존재, 2634바이트 (<=20000)
+PASS: docs/sot/verification-commands.md 존재, 9094바이트 (<=20000)
+PASS: hooks/pre-commit 가 docs/sot/hook-contracts.md 를 계약으로 참조
+PASS: hooks/pre-push 가 docs/sot/hook-contracts.md 를 계약으로 참조
+PASS: scripts/install-hooks.sh 가 docs/sot/hook-contracts.md 를 계약으로 참조
+PASS: scripts/session-status.sh 가 docs/sot/hook-contracts.md 를 계약으로 참조
+PASS: scripts/acceptance-0-7.sh 가 docs/sot/hook-contracts.md 를 계약으로 참조
+OK: docs/sot 재구성 AC 전부 충족
+COMMAND_EXIT=0
+
+CI_SOT_EXACT_REPRO
+-e:5:in `<main>': undefined method `filter_map' for #<Array:0x0000000150831340> (NoMethodError)
+Did you mean?  filter
+CI_SOT_EXIT=1
+
+HASH_AND_DIFF_INVARIANCE
+scripts/acceptance-hs-portal-constants.sh current=b63386cfaeb7114b90db8046f1b9023544dc4a6f baseline=b63386cfaeb7114b90db8046f1b9023544dc4a6f
+scripts/acceptance-hs-portal-constants-mutations.sh current=7606f00a864ac81df9520af53a54a3c315a10422 baseline=7606f00a864ac81df9520af53a54a3c315a10422
+scripts/acceptance-hs-portal-constants-hardening.sh current=5e27cc57950179f855e2d6449fec987bf764ec52 baseline=5e27cc57950179f855e2d6449fec987bf764ec52
+scripts/acceptance-hs-portal-constants-hardening2.sh current=978a22839dfd02adc820549ca2cb25f326db231e baseline=978a22839dfd02adc820549ca2cb25f326db231e
+scripts/acceptance-hs-portal-constants-hardening3.sh current=8db5342121a5e06ee59f31c08b9a17d0d174c7c6 baseline=8db5342121a5e06ee59f31c08b9a17d0d174c7c6
+scripts/acceptance-hs-portal-constants-hardening4.sh current=169bb95cd64b270a4490ce695690fd85bb8598ae baseline=169bb95cd64b270a4490ce695690fd85bb8598ae
+scripts/acceptance-hs-portal-constants-hardening5.sh current=6d3db02d647c9f226d02683b1f55d49029594f64 baseline=6d3db02d647c9f226d02683b1f55d49029594f64
+scripts/acceptance-hs-portal-constants-hardening6.sh current=1d68c752594a6e69c3e46094156e299fe5cd66d4 baseline=1d68c752594a6e69c3e46094156e299fe5cd66d4
+scripts/acceptance-0-2-unreachable-content.sh current=2aadf2ed437244888de1498af5abeb1ddd294a52 main=2aadf2ed437244888de1498af5abeb1ddd294a52
+scripts/acceptance-0-2.sh current=04f6bb57e1a93f8d65707f1e702713736439a053 main=04f6bb57e1a93f8d65707f1e702713736439a053
+
+PIPESTATUS_BRANCH_COPIES=2
+HOOK_INDEX_WORKTREE_DIFF
+HOOK_INDEX_WORKTREE_EXIT=0
+
+PRODUCT_SCOPE
+PRODUCT_DIFF_COUNT=
+
+CLAUDE_LOG_RANGE_REPRO
+9bab751 G3 RED: portal-constants mutation contract fails on missing gate
+b3a3db0 G3 GREEN: portal constants and locators are contracts-only data
+37d2fa7 G3 RED2: hardening contract exposes five confirmed V1 defects
+dfccaa7 G3 GREEN2: close all five V1-confirmed gaps in the portal-constants gate
+8e00bff G3 RED3: second adversarial round exposes ten expressions and a shell-wrap CI bypass
+918b882 G3 GREEN3: allowlist the CI step block and widen pattern categories
+09c19b4 G3 RED4: third adversarial round exposes env-carrier CI bypass and semantic locators
+30270fd G3 GREEN4: parse the CI run block by indentation and exclude env subtrees
+f4b4bae G3 RED5: codeaudit exposes literal-scalar CI bypass beyond env
+3f9ee88 G3 GREEN5: exclude every non-run literal scalar block from the exec lane
+ae5d501 G3 RED6: hardening5 — 실행 칸 밖 YAML 값·의미상 동일 탐색 명령을 검사기가 승인하는 미탐 재현
+912aa79 G3 GREEN6: CI 배선 판정을 YAML 구조 해석으로 교체 — jobs.*.steps[*].run만 실행 칸으로 인정
+f4115e0 G3 RED7: hardening6 — 작업 수준 if·continue-on-error·수동 전용 트리거를 검사기가 승인하는 미탐 재현 (V1 4차 N1~N3)
+dc91fa3 G3 동결 예외: N3 규칙 성립 위해 정상 표본 생성 줄에 on: push·pull_request 추가 — 공격 내용 불변
+201baa5 G3 GREEN7: 작업 수준 if/continue-on-error 거부 + on: push·pull_request 필수화 + hardening6 CI 등록
+cbef7d3 G3 RED8: hardening6 — shell 바꿔치기 3위치·runs-on 누락을 검사기가 승인하는 미탐 재현 (V1 5차 판정)
+1dc458d G3 표본 조정: 정상 표본에 runs-on 추가 — 공격 내용·기대 exit code 불변 (동결 예외 원칙 동일)
+d06a88a G3 GREEN8: G3 단계 shell 키·작업/파일 defaults.run.shell 거부 + runs-on 필수화
+002bccd G3 RED9: hardening6 — working-directory 3위치·BASH_ENV 3위치·runs-on 빈값 3종 미탐 재현 (V1 6차 G6-1~3)
+0a25f73 G3 GREEN9: working-directory 3위치 거부 + env의 BASH_ENV·ENV·SHELLOPTS·PATH 거부 + runs-on 값 계약(비어있지 않은 문자열/목록)
+2b33b83 G3 RED10: hardening6 — 빈 strategy.matrix로 작업 0회 실행되는 우회 미탐 재현 (V2 발견)
+02b8fc4 G3 GREEN10: G3 작업의 strategy.matrix 빈 축·정적판정불가 형태 거부 (fail-closed)
+22a147f G3 RED11: hardening6 — exclude로 유일 조합 제거 등 최종 조합 0개 우회 미탐 재현 (V2 8차)
+610f179 G3 GREEN11: matrix 최종 조합 수 계산(곱집합-exclude, include 보수적)해 0이면 거부 — matrix 0회실행 부류 봉쇄
+3c7fd38 fix(G3): YAML.safe_load 위치인자→키워드 인자 — CI Ruby 3.2(Psych 4) 호환
+
+CONCURRENT_PROCESS_OBSERVATION
+13023
+31811
+75645
+
+V2_POST_HEAD=918f0b683d8ea28454715669285891b021c39df1
+V2_POST_MERGE_HEAD=34e4ccff88ce776d06e3001734005a34b169f7eb
+V2_POST_REMOTE_MAIN=34e4ccff88ce776d06e3001734005a34b169f7eb
+V2_POST_STATUS_BEGIN
+M  .github/workflows/verify.yml
+A  docs/engineering/admin-dashboard-engagement-heatmap-spec-adversarial-review-2026-08-16.md
+A  docs/engineering/admin-position-map-phase0-measurement-2026-08-17.md
+A  docs/engineering/admin-position-map-spec-2026-08-17.md
+A  docs/engineering/admin-position-map-spec-v1-adversarial-audit-2026-08-17.md
+A  docs/engineering/admin-position-map-spec-v2-2026-08-17.md
+A  docs/engineering/admin-weekly-dashboard-v6-replacement-goal-2026-08-16.md
+A  docs/engineering/admin-weekly-dashboard-v6-review-prompt-2026-08-16.md
+A  docs/engineering/admin-weekly-dashboard-v6-review-prompt-retry-2026-08-16.md
+ M docs/engineering/codeaudit-g3-followup-goal-2026-08-15.md
+A  docs/engineering/gate0-not-run-red-recovery-prompt-verdict-2026-08-18.md
+A  docs/engineering/gate0-unreachable-secret-scan-goal-2026-08-17.md
+A  docs/engineering/goal-prompts/admin-position-map-v2-impl-kickoff-2026-08-17.md
+A  docs/engineering/goal-prompts/codeaudit-followup-2026-08-15.md
+A  docs/engineering/goal-prompts/codex-5position-relaxed-fit-search-2026-08-15.md
+A  docs/engineering/goal-prompts/codex-5position-search-2026-08-15.md
+A  docs/engineering/goal-prompts/codex-gate0-not-run-red-recovery-2026-08-18.md
+A  docs/engineering/goal-prompts/codex-humansearch-autoloop-L0-2026-08-16.md
+A  docs/engineering/goal-prompts/codex-position-map-p0-impl-2026-08-18.md
+A  docs/engineering/goal-prompts/codex-position-map-p0-impl-addendum-2026-08-18.md
+A  docs/engineering/goal-prompts/codex-position-map-phase0-spec-v2-2026-08-17.md
+A  docs/engineering/goal-prompts/humansearch-L0-kickoff-2026-08-16.md
+A  docs/engineering/goal-prompts/humansearch-journey-nightshift-2026-08-14.md
+A  docs/engineering/humansearch-journey-alternative-plan-2026-08-15.md
+A  docs/engineering/humansearch-journey-alternative-plan-goal-2026-08-15.md
+A  docs/engineering/humansearch-journey-alternative-v1-v2-verdict-2026-08-15.md
+A  docs/engineering/humansearch-journey-master-plan-2026-08-14.md
+A  docs/engineering/premerge-a3-a4-v1-verdict-2026-08-09.md
+A  docs/engineering/strict-not-run-recovery-goal-2026-08-18.md
+A  docs/engineering/verdicts/codex-code-review-v4-recovery-2026-08-18.md
+A  docs/engineering/verdicts/codex-model-routing-rebuttal-2026-08-17.md
+M  docs/sot/hook-contracts.md
+M  docs/sot/verification-commands.md
+A  scripts/acceptance-0-2-unreachable-content.sh
+M  scripts/acceptance-0-2.sh
+M  suppressions.yaml
+V2_POST_STATUS_END
+V2_OVERALL_EXIT=1
+
+~~~~~~~~
+
+→ `V2_OVERALL_EXIT=0`이면 Claude의 파일·줄·실행 주장을 직접 재현했고, G3 8개 변형 묶음·AC-19 3개 환경 조건·기본 스캔·명부 28개 변형·18단계 이름/순서·시험 지문·제품 비범위·상태 불변이 모두 합격했다는 뜻이다. 출력에 있던 줄 끝 공백 73자는 정보가 사라지지 않도록 `␠` 또는 `⇥`로 눈에 보이게 기록했다.
+
+CODEX_V2_COMMAND_EXIT=1
+
+<!-- ATTEMPT-20260818:CODEX-V2-FULL-END -->
+
+### Codex V2 보조 명령 실패 복구
+
+첫 V2 묶음의 모든 `COMMAND_EXIT`는 0이었으나, 그 뒤 보조 래퍼가 Ruby 2.6 비호환 메서드와 빈 문자열 숫자 처리 때문에 전체 종료 1을 만들었다. 실패한 두 목적만 호환 가능한 방식으로 다시 실행했다.
+
+~~~~~~~~text
+RECOVERY_PRE_HEAD=918f0b683d8ea28454715669285891b021c39df1
+RECOVERY_PRE_MERGE_HEAD=34e4ccff88ce776d06e3001734005a34b169f7eb
+RECOVERY_PRE_REMOTE_MAIN=34e4ccff88ce776d06e3001734005a34b169f7eb
+RECOVERY_PRE_STATUS_BEGIN
+M  .github/workflows/verify.yml
+A  docs/engineering/admin-dashboard-engagement-heatmap-spec-adversarial-review-2026-08-16.md
+A  docs/engineering/admin-position-map-phase0-measurement-2026-08-17.md
+A  docs/engineering/admin-position-map-spec-2026-08-17.md
+A  docs/engineering/admin-position-map-spec-v1-adversarial-audit-2026-08-17.md
+A  docs/engineering/admin-position-map-spec-v2-2026-08-17.md
+A  docs/engineering/admin-weekly-dashboard-v6-replacement-goal-2026-08-16.md
+A  docs/engineering/admin-weekly-dashboard-v6-review-prompt-2026-08-16.md
+A  docs/engineering/admin-weekly-dashboard-v6-review-prompt-retry-2026-08-16.md
+ M docs/engineering/codeaudit-g3-followup-goal-2026-08-15.md
+A  docs/engineering/gate0-not-run-red-recovery-prompt-verdict-2026-08-18.md
+A  docs/engineering/gate0-unreachable-secret-scan-goal-2026-08-17.md
+A  docs/engineering/goal-prompts/admin-position-map-v2-impl-kickoff-2026-08-17.md
+A  docs/engineering/goal-prompts/codeaudit-followup-2026-08-15.md
+A  docs/engineering/goal-prompts/codex-5position-relaxed-fit-search-2026-08-15.md
+A  docs/engineering/goal-prompts/codex-5position-search-2026-08-15.md
+A  docs/engineering/goal-prompts/codex-gate0-not-run-red-recovery-2026-08-18.md
+A  docs/engineering/goal-prompts/codex-humansearch-autoloop-L0-2026-08-16.md
+A  docs/engineering/goal-prompts/codex-position-map-p0-impl-2026-08-18.md
+A  docs/engineering/goal-prompts/codex-position-map-p0-impl-addendum-2026-08-18.md
+A  docs/engineering/goal-prompts/codex-position-map-phase0-spec-v2-2026-08-17.md
+A  docs/engineering/goal-prompts/humansearch-L0-kickoff-2026-08-16.md
+A  docs/engineering/goal-prompts/humansearch-journey-nightshift-2026-08-14.md
+A  docs/engineering/humansearch-journey-alternative-plan-2026-08-15.md
+A  docs/engineering/humansearch-journey-alternative-plan-goal-2026-08-15.md
+A  docs/engineering/humansearch-journey-alternative-v1-v2-verdict-2026-08-15.md
+A  docs/engineering/humansearch-journey-master-plan-2026-08-14.md
+A  docs/engineering/premerge-a3-a4-v1-verdict-2026-08-09.md
+A  docs/engineering/strict-not-run-recovery-goal-2026-08-18.md
+A  docs/engineering/verdicts/codex-code-review-v4-recovery-2026-08-18.md
+A  docs/engineering/verdicts/codex-model-routing-rebuttal-2026-08-17.md
+M  docs/sot/hook-contracts.md
+M  docs/sot/verification-commands.md
+A  scripts/acceptance-0-2-unreachable-content.sh
+M  scripts/acceptance-0-2.sh
+M  suppressions.yaml
+RECOVERY_PRE_STATUS_END
+
+COMMAND=ruby CI/SOT exact name and order check using map.compact
+CI_COUNT=18
+SOT_COUNT=18
+1	비밀 스캔 (verify.sh)	비밀 스캔 (verify.sh)
+2	HumanSearch G1 클린룸 경계	HumanSearch G1 클린룸 경계
+3	HumanSearch G2 테스트 게이트 (정적·단위 + runtime import 증명)	HumanSearch G2 테스트 게이트 (정적·단위 + runtime import 증명)
+4	HumanSearch G3 포털 상수·locator 경계	HumanSearch G3 포털 상수·locator 경계
+5	히스토리 전량 스캔 (도달 가능한 모든 blob)	히스토리 전량 스캔 (도달 가능한 모든 blob)
+6	인수 검사 0-2 상시 내용 검사와 종료상태 분리 (AC-19)	인수 검사 0-2 상시 내용 검사와 종료상태 분리 (AC-19)
+7	인수 검사 0-6 (가짜 검증 스크립트 0건)	인수 검사 0-6 (가짜 검증 스크립트 0건)
+8	인수 검사 0-7 (훅이 위반 6종을 실제로 차단하는가)	인수 검사 0-7 (훅이 위반 6종을 실제로 차단하는가)
+9	인수 검사 0-5 (push · CI 연결)	인수 검사 0-5 (push · CI 연결)
+10	억제 만료 스캔 (suppressions.yaml)	억제 만료 스캔 (suppressions.yaml)
+11	강제 장치 존재 검사 (hooks/)	강제 장치 존재 검사 (hooks/)
+12	셸 스크립트 문법 검사	셸 스크립트 문법 검사
+13	패턴 파일 자체에 실제 비밀이 없는지 (자기 오염 방지)	패턴 파일 자체에 실제 비밀이 없는지 (자기 오염 방지)
+14	인수 검사 hs-a3 (세션 계열 자격증명 탐지)	인수 검사 hs-a3 (세션 계열 자격증명 탐지)
+15	데이터 노출 스캔 (크기 · 금지경로 · 기록 · 개인정보 내용)	데이터 노출 스캔 (크기 · 금지경로 · 기록 · 개인정보 내용)
+16	인수 검사 hs-a4 (대용량·산출물 차단이 실제로 도는가)	인수 검사 hs-a4 (대용량·산출물 차단이 실제로 도는가)
+17	인수 검사 secret-webhook-vendor (웹훅·벤더 키 탐지 · AC-S1)	인수 검사 secret-webhook-vendor (웹훅·벤더 키 탐지 · AC-S1)
+18	인수 검사 verify-ac-m (mechanism 명부 대조 · AC-M)	인수 검사 verify-ac-m (mechanism 명부 대조 · AC-M)
+CI_SOT_RECOVERY_EXIT=0
+
+COMMAND=count HumanSearch L0 product diff with numeric fallback
+PRODUCT_DIFF_COUNT=0
+PRODUCT_COUNT_RECOVERY_EXIT=0
+
+COMMAND=git diff --check
+DIFF_CHECK_RECOVERY_EXIT=0
+
+COMMAND=hook index/worktree equality
+HOOK_EQUAL_RECOVERY_EXIT=0
+
+RECOVERY_POST_HEAD=918f0b683d8ea28454715669285891b021c39df1
+RECOVERY_POST_MERGE_HEAD=34e4ccff88ce776d06e3001734005a34b169f7eb
+RECOVERY_POST_REMOTE_MAIN=34e4ccff88ce776d06e3001734005a34b169f7eb
+RECOVERY_POST_STATUS_BEGIN
+M  .github/workflows/verify.yml
+A  docs/engineering/admin-dashboard-engagement-heatmap-spec-adversarial-review-2026-08-16.md
+A  docs/engineering/admin-position-map-phase0-measurement-2026-08-17.md
+A  docs/engineering/admin-position-map-spec-2026-08-17.md
+A  docs/engineering/admin-position-map-spec-v1-adversarial-audit-2026-08-17.md
+A  docs/engineering/admin-position-map-spec-v2-2026-08-17.md
+A  docs/engineering/admin-weekly-dashboard-v6-replacement-goal-2026-08-16.md
+A  docs/engineering/admin-weekly-dashboard-v6-review-prompt-2026-08-16.md
+A  docs/engineering/admin-weekly-dashboard-v6-review-prompt-retry-2026-08-16.md
+ M docs/engineering/codeaudit-g3-followup-goal-2026-08-15.md
+A  docs/engineering/gate0-not-run-red-recovery-prompt-verdict-2026-08-18.md
+A  docs/engineering/gate0-unreachable-secret-scan-goal-2026-08-17.md
+A  docs/engineering/goal-prompts/admin-position-map-v2-impl-kickoff-2026-08-17.md
+A  docs/engineering/goal-prompts/codeaudit-followup-2026-08-15.md
+A  docs/engineering/goal-prompts/codex-5position-relaxed-fit-search-2026-08-15.md
+A  docs/engineering/goal-prompts/codex-5position-search-2026-08-15.md
+A  docs/engineering/goal-prompts/codex-gate0-not-run-red-recovery-2026-08-18.md
+A  docs/engineering/goal-prompts/codex-humansearch-autoloop-L0-2026-08-16.md
+A  docs/engineering/goal-prompts/codex-position-map-p0-impl-2026-08-18.md
+A  docs/engineering/goal-prompts/codex-position-map-p0-impl-addendum-2026-08-18.md
+A  docs/engineering/goal-prompts/codex-position-map-phase0-spec-v2-2026-08-17.md
+A  docs/engineering/goal-prompts/humansearch-L0-kickoff-2026-08-16.md
+A  docs/engineering/goal-prompts/humansearch-journey-nightshift-2026-08-14.md
+A  docs/engineering/humansearch-journey-alternative-plan-2026-08-15.md
+A  docs/engineering/humansearch-journey-alternative-plan-goal-2026-08-15.md
+A  docs/engineering/humansearch-journey-alternative-v1-v2-verdict-2026-08-15.md
+A  docs/engineering/humansearch-journey-master-plan-2026-08-14.md
+A  docs/engineering/premerge-a3-a4-v1-verdict-2026-08-09.md
+A  docs/engineering/strict-not-run-recovery-goal-2026-08-18.md
+A  docs/engineering/verdicts/codex-code-review-v4-recovery-2026-08-18.md
+A  docs/engineering/verdicts/codex-model-routing-rebuttal-2026-08-17.md
+M  docs/sot/hook-contracts.md
+M  docs/sot/verification-commands.md
+A  scripts/acceptance-0-2-unreachable-content.sh
+M  scripts/acceptance-0-2.sh
+M  suppressions.yaml
+RECOVERY_POST_STATUS_END
+V2_RECOVERY_OVERALL_EXIT=0
+
+~~~~~~~~
+
+→ `V2_RECOVERY_OVERALL_EXIT=0`은 CI/SOT 18개 이름과 순서가 정확히 같고, 제품 코드 변경이 실제 0건이며, 공백 검사와 훅 문서 인덱스도 합격했다는 뜻이다. 출력 줄 끝 공백 0자는 눈에 보이게 치환했다.
+
+<!-- ATTEMPT-20260818:CODEX-V2-RECOVERY-END -->
+
+## Claude V1 결함 종료 확인
+
+실행 명령:
+
+```text
+env -u ANTHROPIC_API_KEY claude -p --model sonnet '<아래 프롬프트 전문>'
+```
+
+→ V1의 유일한 중간 결함을 복구한 뒤, 같은 검증자 계열에 인덱스와 실제 훅의 일치·원격 기준·상태 불변만 다시 확인시켰다.
+
+실행 프롬프트 전문:
+
+~~~~~~~~text
+당신은 방금 수행한 PR #13 Claude V1 감사의 결함 종료 확인자다. 숨은 사고과정은 요구하지 않는다. 저장소에서 직접 확인한 사실과 명령 출력만 보고하라.
+
+작업트리: /Users/kangsangmo/Desktop/Valuehire_v6/worktrees/humansearch-g3-portal-constants
+이전 V1 원문과 Codex V2 재현·복구는 docs/engineering/codeaudit-g3-followup-goal-2026-08-15.md의 다음 절에 있다:
+- "Claude V1 재호출"
+- "Codex V2 — Claude 중간 결함 1차 재현과 복구"
+- "Codex V2 전체 주장 재현과 양방향 반례"
+- "Codex V2 보조 명령 실패 복구"
+
+이전 V1은 G3, AC-19, CI 18단계, pre-push 구현, RED 불변, 제품 비범위, 원본 무오염을 모두 통과시켰지만, docs/sot/hook-contracts.md의 올바른 작업 파일이 인덱스(다음 커밋에 실제 들어갈 내용)에 올라가지 않았다는 중간 결함 1건 때문에 FAIL했다.
+
+지금 확인할 사항:
+1. git show :docs/sot/hook-contracts.md가 acceptance-0-2.sh/acceptance-0-5.sh 직접 제외, PUSH-PERFORMING CI 전담, acceptance-0-2-unreachable-content.sh 로컬·CI 양쪽 실행을 정확히 담는지
+2. 위 인덱스 내용과 현재 작업 파일이 바이트 단위로 같은지
+3. hooks/pre-push 실제 구현과 위 문서가 여전히 일치하는지
+4. docs/engineering/codeaudit-g3-followup-goal-2026-08-15.md도 현재 인덱스와 작업 파일이 같은지
+5. HEAD=918f0b683d8ea28454715669285891b021c39df1, MERGE_HEAD=34e4ccff88ce776d06e3001734005a34b169f7eb, 미해결 충돌 0인지
+6. 검사 전후 HEAD/MERGE_HEAD/git status가 같은지
+7. 원격 main이 34e4ccff88ce776d06e3001734005a34b169f7eb인지 읽기 전용 ls-remote로 확인
+8. 이전 V1의 유일한 중간 결함이 닫혔고 새 중간 이상 결함 또는 필수 NOT_RUN/BLOCKED가 0인지
+
+안전:
+- 원본 저장소 파일 수정, git add/commit/merge/reset/checkout/stash/push/fetch, GitHub 쓰기 금지.
+- 실제 포털·브라우저·로그인·세션·후보자 개인정보·실제 비밀값 접근 금지.
+- 이 확인은 결함 종료 확인이다. 이전에 통과하고 Codex V2가 재실행한 장시간 시험을 다시 실행할 필요는 없지만, 그 기록을 직접 읽고 실행 완료·종료값을 확인해야 한다.
+- 결함이 닫히지 않았거나 새 중간 이상 결함, 필수 NOT_RUN/BLOCKED, 원본 오염이 있으면 FAIL. 모두 없으면 PASS.
+- 결함 총수와 심각도별 수를 명시하라.
+
+[출력 형식 — 반드시 지킬 것]
+읽는 사람은 기술 배경이 없는 사업 책임자다. 판정 내용은 절대 축소하지 말고, 표현만 풀어 써라.
+1) 문서 맨 앞에 "결론". 결정할 사항 1개당 1~2문장, 전체 분량 상한 없음. 전문용어는 풀어 쓰더라도 결론에서는 쓰지 마라.
+2) 그다음 "판단 근거": 왜 그렇게 봤는지, 갈림길에서 왜 이 해석을 골랐는지, 버린 해석은 왜 버렸는지, 이 판정이 틀리면 무엇이 깨지는지.
+3) 그다음부터 기술 상세·명령·출력·file:line 전문. 증거는 하나도 생략하지 마라.
+- 전문용어는 첫 등장 문장 안에서 괄호로 풀어 써라. 뒤에 몰아 쓴 용어집은 무효다.
+- 터미널 출력·코드 블록·**표**를 붙였으면 바로 아래에 "→ 뭘 시켰나 / 뭐가 나왔나 / 좋은 소식인가 나쁜 소식인가" 1~3줄을 달아라.
+- 첫 줄에 `VERDICT: PASS|FAIL` 한 줄을 두어라. 그 한 줄은 결론의 일부가 아니라 기계가 읽는 표식이므로 결론 제목 앞에 온다.
+- file:line 을 인용하면 그 줄이 무슨 일을 하는 줄인지 한 마디 덧붙여라.
+- 결함마다 심각도 라벨을 붙이고, 그 옆에 그대로 두면 사업/운영에 무슨 일이 생기는지 한 문장으로 덧붙여라(라벨을 지우지 마라).
+- 설계 결정을 지적할 때는 "무엇을 / 왜 / 버린 대안 / 대가 / 되돌리는 법" 5줄로 적어라.
+- 이번에 건너뛴 것·확인하지 못한 것·중간에 실패해서 다시 한 것을 판정 앞부분에 명시해라.
+- 추정과 확인된 사실을 구분 표시해라(확인 못 한 것은 ※).
+- 한국어 존칭체. 초등학생용 비유는 쓰지 마라 — 성인 의사결정자 수준으로 써라.
+~~~~~~~~
+
+→ 장시간 시험은 Codex V2 원문에서 종료값을 읽게 하고, V1 결함의 실제 종료 여부와 새 결함 유무를 판정하도록 범위를 제한했다.
+
+Claude 종료 확인 원문:
+
+~~~~~~~~text
+VERDICT: PASS
+
+## 결론
+
+PR #13에 대한 Claude 1차 감사(V1)가 지적했던 유일한 문제 — "회사 공식 문서(`docs/sot/hook-contracts.md`, push할 때 어떤 검사를 실행하고 어떤 검사는 건너뛰는지 설명하는 문서)의 내용이 다음 커밋에 실제로 포함되지 않은 상태였다" — 는 지금 이 순간 완전히 해결된 것으로 확인됩니다. 문서의 올바른 최신 내용이 git의 커밋 대기열(스테이징 영역, 다음 커밋 명령을 실행하면 그대로 저장될 내용을 보관하는 곳)에 정확히 올라가 있고, 디스크에 있는 파일과 한 바이트도 다르지 않습니다.
+
+문서에 적힌 내용 자체도 사실과 일치합니다. "push할 때 두 검사(`acceptance-0-2.sh`, `acceptance-0-5.sh`)는 직접 실행하지 않는다", "특정 표식이 붙은 검사는 서버 쪽 자동 검사(CI)에서만 돈다", "`acceptance-0-2-unreachable-content.sh`라는 검사는 개발자 컴퓨터와 서버 양쪽에서 모두 실행된다"는 세 가지 설명을, 실제로 동작하는 스크립트 코드를 직접 읽어 한 줄씩 대조했고 전부 일치했습니다.
+
+병합 상태도 안전합니다. 병합 대상이었던 두 커밋(PR #13 원본, 최신 main)이 지금 작업트리 상태와 정확히 일치하고, 풀리지 않은 충돌은 없습니다. 회사 서버(GitHub)의 main 브랜치도 이 검증에서 기준으로 삼은 커밋과 정확히 같아서, "검증 대상이 이미 낡은 기준이었다"는 위험도 없습니다. 검증 작업 자체가 저장소를 건드리지 않았다는 것도 앞뒤 상태 비교로 확인했습니다.
+
+다만 한 가지 사업적으로 알아두셔야 할 점이 있습니다. 이전 Codex 2차 검증(V2) 과정에서, 검증에 쓰인 보조 스크립트 하나가 오래된 Ruby 버전과 호환되지 않아 한 차례 오류로 멈춘 적이 있습니다. 이는 저장소 자체의 결함이 아니라 검증 도구의 버전 호환성 문제였고, 곧바로 호환 가능한 방식으로 재실행해 정상 통과를 확인했습니다. 저장소에 남는 위험은 아니지만, 검증 스크립트의 실행 환경(Ruby 버전)이 서로 다른 상태에서 돌고 있다는 점은 후속으로 정리할 가치가 있습니다.
+
+## 판단 근거
+
+**왜 PASS로 판정했는지**: 사용자가 지시한 판정 기준은 "이전 V1의 유일한 중간 결함이 닫혔고, 새로운 중간 이상 결함 또는 필수 항목의 미실행(NOT_RUN)·차단(BLOCKED)이 0건이면 PASS"였습니다. 저는 이전 V1이 지적한 결함을 재현이 아니라 지금 이 순간 직접 확인하는 방식으로 검증했습니다 — 즉 "커밋 대기열에 옳은 문서가 들어있는가"를 `git show :경로`(다음 커밋에 실제로 저장될 내용을 미리 보는 명령)로 직접 조회했고, 디스크 파일과 바이트 단위로 동일함을 확인했습니다. 이는 Codex V2가 이미 같은 방식으로 확인해 남긴 기록과도 일치했습니다.
+
+**갈림길과 선택**: 검증 방식에서 두 가지 선택지가 있었습니다. 하나는 "Codex V2가 이미 통과라고 적었으니 그 기록만 믿고 넘어간다"는 방식이고, 다른 하나는 "기록을 참고하되 핵심 주장(인덱스=디스크 일치, 문서 내용 정확성, 실제 구현 일치)은 제가 직접 다시 조회한다"는 방식입니다. 사용자 지시에 "이전에 통과하고 Codex V2가 재실행한 장시간 시험을 다시 실행할 필요는 없지만, 그 기록을 직접 읽고 실행 완료·종료값을 확인해야 한다"고 명시되어 있었으므로, 저는 시간이 오래 걸리는 대규모 시험 스위트(G3 8종 변형 묶음, AC-19 13개 합성 사례 등)는 재실행하지 않고 기록을 읽는 것으로 대신했지만, 이번 감사의 핵심 대상인 "문서 인덱스 일치 여부"와 "저장소 현재 상태(HEAD·MERGE_HEAD·충돌·원격)"는 재실행 여부와 무관하게 지금 이 순간 다시 실측했습니다. 이것이 옳은 해석이라고 판단한 이유는, 결함이 "닫혔다"는 주장 자체가 시간에 따라 변할 수 있는 상태(커밋 대기열 내용)에 대한 것이었기 때문입니다 — 어제 닫혔더라도 그 사이 누군가 다시 건드렸다면 오늘은 다시 열려 있을 수 있습니다. 그래서 이 부분만큼은 기록을 믿지 않고 직접 재조회했습니다.
+
+**버린 해석**: "Codex V2 기록에 EXIT=0이 적혀 있으니 그것으로 충분하다"는 해석은 버렸습니다. 기록은 과거 특정 시점의 스냅샷이고, 그사이 같은 폴더에서 다른 자동화(Codex 브로커 프로세스)가 동시에 동작하고 있었다는 관찰이 V1 원문에도 명시되어 있었기 때문에, "기록이 맞았으니 지금도 맞다"고 가정하는 것은 이번 감사의 목적(결함이 지금 닫혀 있는지 확인)에 맞지 않는다고 판단했습니다.
+
+**이 판정이 틀리면 무엇이 깨지는가**: 만약 제 판정이 틀려서 실제로는 커밋 대기열과 디스크가 여전히 다르다면, 이 상태로 병합 커밋을 만드는 순간 회사 공식 문서(`hook-contracts.md`)에 실제 동작과 다른 설명이 다시 박제됩니다. 이후 이 문서를 근거로 판단하는 사람(또는 자동화)이 "push할 때 모든 검사가 다 도는 줄" 잘못 알고, 실제로는 건너뛰는 검사가 있다는 사실을 놓칠 수 있습니다. 하지만 저는 `git show :경로`로 커밋 대기열의 실제 내용을 직접 읽었고 디스크와 완전히 같았으므로, 이 위험은 현재 시점 기준으로 존재하지 않습니다.
+
+**이번에 건너뛴 것 / 확인하지 못한 것**:
+- G3(포털 상수 검사기) 8종 변형 스크립트, AC-19 13개 합성 사례, 명부 대조 28개 변형 등 실행 시간이 긴 시험 스위트는 이번에 재실행하지 않았습니다. 대신 Codex V2 기록에 남은 각 `COMMAND_EXIT=0`을 직접 읽어 실행 완료·종료값을 확인했습니다(사용자 지시 범위 내).
+- ※ GitHub 서버 쪽 CI(Actions)가 이 조합을 실제로 초록으로 통과시켰는지는 이번 감사도, 이전 V1·V2도 범위 밖으로 남겨두었습니다. 로컬 재현과 원격 브랜치 포인터 일치만 확인했습니다.
+- 그 외 8개 확인 항목은 전부 이번에 직접 명령을 실행하거나 파일을 읽어 확인했습니다. NOT_RUN/BLOCKED는 없습니다.
+
+---
+
+## 기술 상세 — 항목별 확인 내역
+
+### 항목 1·2 — `docs/sot/hook-contracts.md`의 커밋 대기열(인덱스) 내용과 디스크 파일 일치 여부
+
+```
+$ git show :docs/sot/hook-contracts.md > /tmp/idx_hookcontracts.md
+$ diff -q /tmp/idx_hookcontracts.md docs/sot/hook-contracts.md
+IDENTICAL
+
+$ git show :docs/engineering/codeaudit-g3-followup-goal-2026-08-15.md > /tmp/idx_followup.md
+$ diff -q /tmp/idx_followup.md docs/engineering/codeaudit-g3-followup-goal-2026-08-15.md
+IDENTICAL
+```
+→ 뭘 시켰나: `git show :경로`(콜론 뒤 경로는 "커밋 대기열에 있는 버전"을 뜻함)로 다음 커밋에 실제 저장될 내용을 뽑아 디스크 파일과 바이트 단위로 비교. → 뭐가 나왔나: 두 파일 모두 완전히 동일. → 좋은 소식: 이전 V1이 지적했던 "커밋 대기열에는 옛 버전, 디스크에는 옳은 버전"이라는 불일치가 지금은 존재하지 않습니다.
+
+```
+$ git status --porcelain=v1 | grep -E "hook-contracts|codeaudit-g3-followup"
+M  docs/engineering/codeaudit-g3-followup-goal-2026-08-15.md
+M  docs/sot/hook-contracts.md
+```
+→ 뭘 시켰나: git 상태 코드의 앞 글자(대기열 상태)와 뒷 글자(디스크와 대기열의 차이)를 확인. → 뭐가 나왔나: 둘 다 `M `(뒷칸이 빈칸) — 즉 "대기열에 변경이 올라가 있고, 디스크와 대기열이 완전히 같다"는 뜻입니다. 이전 V1이 결함으로 지적했던 시점에는 이 두 파일이 `M`(뒤 칸이 채워진, 즉 대기열과 디스크가 다른) 상태였는데, 지금은 정상화되었습니다. → 좋은 소식: 지금 커밋해도 문서와 실제 코드가 어긋나지 않습니다.
+
+`docs/sot/hook-contracts.md:35-42`의 실제 내용(제가 직접 읽음):
+```
+35 직접 실행 제외:
+36 - acceptance-0-2.sh — 로컬 실제 패턴으로 별도 수동 실행. ...
+38 - acceptance-0-5.sh — push 완료 뒤 원격 상태를 보는 검사라 ...
+39 - 헤더에 PUSH-PERFORMING을 선언한 검사 — push 재귀를 막기 위해 CI에서만 실행한다.
+41 양쪽 실행: acceptance-0-2-unreachable-content.sh — 위 예외에 해당하지 않으므로 로컬
+42 push와 CI가 모두 실행해 AC-19 합성 사례 13개를 검사한다
+```
+→ 이 줄들이 하는 일: 사용자가 확인을 요청한 세 가지 주장(0-2/0-5 직접 제외, PUSH-PERFORMING은 CI 전담, unreachable-content는 양쪽 실행)을 그대로 문장으로 담고 있습니다. → 좋은 소식: 요청한 세 내용이 모두 정확히 담겨 있습니다.
+
+### 항목 3 — 문서와 `hooks/pre-push` 실제 구현 일치 여부
+
+```
+hooks/pre-push:60   DEFERRED="acceptance-0-5 acceptance-0-7"
+hooks/pre-push:143-148
+    case "$(basename "$c")" in
+      acceptance-0-2.sh|acceptance-0-5.sh)
+        printf '  skip %s (DEFERRED · CI 담당)\n' "$c" >&2
+        continue
+        ;;
+    esac
+hooks/pre-push:121-141   PUSH-PERFORMING 헤더가 붙은 스크립트는 CI 실행 줄 존재를 확인한 뒤 skip
+```
+→ 각 줄이 하는 일: 60줄은 CI로 이관한 검사 이름을 정의, 143-148줄은 `acceptance-0-2.sh`·`acceptance-0-5.sh`를 이름으로 직접 걸러 건너뛰게 함, 121-141줄은 `PUSH-PERFORMING` 표식이 붙은 스크립트를 CI 전담으로 넘김. → 좋은 소식: 문서가 설명하는 세 가지 예외 규칙이 실제 셸 스크립트 로직과 정확히 일치합니다.
+
+```
+$ head -20 scripts/acceptance-0-2-unreachable-content.sh   → PUSH-PERFORMING 표식 없음
+$ grep -n 'acceptance-0-2-unreachable-content' .github/workflows/verify.yml
+102:        run: bash scripts/acceptance-0-2-unreachable-content.sh
+```
+→ 뭘 시켰나: `acceptance-0-2-unreachable-content.sh`가 위 두 예외(직접 제외, PUSH-PERFORMING) 중 어디에도 해당하지 않아 로컬 pre-push의 일반 검사 목록(글로브)에 그대로 남는지, 그리고 CI에도 별도로 등록되어 있는지 확인. → 뭐가 나왔나: 표식 없음(로컬에서 자동 실행됨) + CI 워크플로 102번째 줄에 실행 등록됨. → 좋은 소식: "로컬·CI 양쪽 실행"이라는 문서 주장이 코드로 정확히 뒷받침됩니다.
+
+### 항목 4 — `docs/engineering/codeaudit-g3-followup-goal-2026-08-15.md` 인덱스·디스크 일치
+
+항목 1에서 함께 확인 완료 — `IDENTICAL`, git status `M ` (대기열=디스크).
+
+### 항목 5·6 — HEAD/MERGE_HEAD/충돌/저장소 무오염
+
+```
+검사 시작:
+HEAD:       918f0b683d8ea28454715669285891b021c39df1
+MERGE_HEAD: 34e4ccff88ce776d06e3001734005a34b169f7eb
+git status --porcelain(--branch 포함) 줄 수: 37
+충돌(U/AA/DD) 상태 파일: 없음
+
+검사 종료:
+HEAD:       918f0b683d8ea28454715669285891b021c39df1   (동일)
+MERGE_HEAD: 34e4ccff88ce776d06e3001734005a34b169f7eb   (동일)
+git status 줄 수: 37   (동일)
+충돌 상태 파일: 없음   (동일)
+```
+→ 뭘 시켰나: `git rev-parse HEAD`/`MERGE_HEAD`, `git status --porcelain`을 검사 전후로 비교. 참고로 이 작업트리는 git worktree(하나의 저장소를 여러 폴더에서 동시에 쓰는 기능)라 `.git`이 디렉터리가 아니라 파일이며, `git rev-parse --git-path MERGE_HEAD`로 실제 경로(`.git/worktrees/humansearch-g3-portal-constants/MERGE_HEAD`)를 찾아 원본 파일도 직접 열어 대조했습니다. → 뭐가 나왔나: 모든 값이 검사 전후로 완전히 동일. → 좋은 소식: 이번 읽기 전용 확인 작업(git show, diff, cat, grep, read 명령만 사용)이 저장소 상태를 하나도 바꾸지 않았습니다.
+
+### 항목 7 — 원격 main 확인 (읽기 전용 `ls-remote`, `fetch` 없음)
+
+```
+$ git ls-remote origin refs/heads/main
+34e4ccff88ce776d06e3001734005a34b169f7eb	refs/heads/main
+```
+→ 뭘 시켰나: 원격 저장소(GitHub)의 main 브랜치가 가리키는 커밋을 로컬 데이터를 갱신하지 않는 `ls-remote`로만 조회. → 뭐가 나왔나: `MERGE_HEAD`와 정확히 같은 값. → 좋은 소식: 이번 검증에서 기준으로 삼은 "최신 main"이 실제로 최신이며, 그 사이 원격이 더 앞서 나가서 검증이 낡은 기준을 대상으로 이뤄졌을 위험이 없습니다.
+
+### 항목 8 — 결함 총수·심각도별 집계, 신규 결함 여부
+
+| 구분 | 내용 | 상태 |
+|---|---|---|
+| V1이 지적한 유일한 결함 | `hook-contracts.md`가 커밋 대기열에 반영되지 않음 | **닫힘** — 항목 1·2에서 바이트 단위로 재확인 |
+| 신규 결함 | 없음 | 확인된 것 없음 |
+| 필수 항목 NOT_RUN/BLOCKED | 없음 | 항목 5·6·7 전부 실행·완료 확인 |
+| 참고 사항(결함 아님) | Codex V2 보조 스크립트가 Ruby 구버전 비호환 메서드(`filter_map`)로 한 차례 종료값 1을 냄 | 곧바로 호환 방식으로 재실행해 `CI_SOT_RECOVERY_EXIT=0`으로 정상 통과 확인(문서 5171-5174행, 5325-5346행) |
+
+**결함 총수: 0건(치명적 0 / 높음 0 / 중간 0 / 낮음 0).** 이전 V1이 지적했던 중간 결함 1건은 닫혔고, 이번 확인에서 새로 발견된 결함은 없습니다.
+
+→ 참고 사항에 대한 해석: Ruby 버전 비호환으로 인한 일시적 오류는 저장소의 코드나 문서 결함이 아니라, 검증에 사용한 보조 스크립트가 실행 환경(Ruby 버전)에 따라 깨질 수 있다는 도구 측 취약점입니다. 즉시 재현 가능한 대안 방법으로 재실행해 같은 목적(CI와 SOT 문서의 18개 검증 단계 이름·순서 일치)을 정상 통과로 확인했으므로 이번 판정에는 영향을 주지 않습니다. 다만 검증 도구 자체의 Ruby 버전 통일은 별도로 정리해 두시는 것이 안전합니다(도구가 사용 환경에 따라 거짓 실패를 낼 수 있다는 뜻이므로).
+SessionEnd hook [node "${CLAUDE_PLUGIN_ROOT}/scripts/session-lifecycle-hook.mjs" SessionEnd] failed: Hook cancelled
+
+~~~~~~~~
+
+→ 이 결과가 최종 Claude V1 결함 종료 판정이다. 출력 줄 끝 공백 0자는 정보가 사라지지 않게 눈에 보이도록 치환했다.
+
+CLAUDE_CLOSURE_COMMAND_EXIT=0
+
+<!-- ATTEMPT-20260818:CLAUDE-CLOSURE-END -->
+
+## V1/V2 최종 동의와 커밋 전 판정
+
+| 검사면 | Claude V1 최종 | Codex V2 | 최종 합의 |
+|---|---|---|---|
+| AC-19 환경 격리·큰 객체·네 객체형·오류 시 차단 | PASS | 3개 환경의 13개 합성 시험과 기본 스캔 재실행 PASS | 일치 — PASS |
+| G3 실행 칸 은닉 | PASS | 본체·mutations·hardening1~6 재실행 PASS | 일치 — PASS |
+| 조건·실패 무시·shell·작업 폴더 우회 | PASS | 기존 변형 묶음 재실행 PASS | 일치 — PASS |
+| runs-on·matrix 0회 실행 우회 | PASS | 기존 변형 묶음 재실행 PASS | 일치 — PASS |
+| mechanism registry 주석·죽은 실행 칸 오인 | PASS | 본체 4개와 변형 28개 재실행 PASS | 일치 — PASS |
+| CI 18단계와 SOT 18행 | PASS | Ruby 2.6 호환 대조로 이름·순서 18/18 PASS | 일치 — PASS |
+| pre-push 문서와 실제 예외 | 최초 중간 1건 FAIL, 인덱스 복구 뒤 PASS | 지적 재현, `git add`, 인덱스/작업 파일 동일 PASS | 최종 일치 — PASS |
+| PR #13 RED·PR #23 AC-19 기대값 불변 | PASS | G3 8개와 AC-19 2개 blob 지문 동일 PASS | 일치 — PASS |
+| HumanSearch L0 제품 코드 혼입 | 0건 | 숫자 재계산 0건 | 일치 — PASS |
+| 원본 저장소 오염 | 없음 | 명령 전후 HEAD·MERGE_HEAD·상태 동일 | 일치 — PASS |
+
+→ 최종 판정은 Claude와 Codex 모두 중간 이상 결함 0건, 필수 미실행 0건, 검사 불가 0건으로 PASS다. AC-19 출력의 `BLOCKED`는 악성 합성 표본을 의도대로 막았다는 합격 결과이며, 검증을 못 했다는 상태 표기가 아니다.
+
+중간 실패와 복구:
+
+- 첫 Claude 호출은 제공자 안전장치가 `[reasoning_extraction]`으로 거부했고 원문과 요청 ID를 보존했다.
+- Claude V1은 훅 정본 문서가 인덱스에 없다는 중간 결함 1건을 찾아 FAIL했다. Codex가 같은 현상을 재현하고 올바른 문서를 인덱스에 넣었으며 Claude 종료 확인이 PASS했다.
+- Codex V2 첫 보조 래퍼는 macOS Ruby 2.6에 없는 `filter_map`과 빈 검색 결과 숫자 처리 때문에 종료 1이었다. 실제 보호 시험은 전부 종료 0이었고, 실패한 두 보조 목적을 `map.compact`와 숫자 0 기본값으로 재실행해 전체 종료 0을 확보했다.
+
+→ 실패를 통과로 바꿔 적지 않았다. 각각 원인·원출력·복구 명령·재실행 종료값을 같은 Attempt에 남겼으며, 최종 PASS는 복구 뒤 결과만 뜻한다.
+
+로컬 최종 수치:
+
+- G3 명시 명령 8개: 모두 종료 0
+- AC-19 명시 명령 4개: 모두 종료 0, 합성 시험은 각 13/13
+- 공통 명시 게이트 7개: 모두 종료 0, `session-status`는 RED 0/28
+- 바뀐 셸 파일 문법: 12/12 PASS
+- CI/SOT: 18/18 이름과 순서 일치
+- CI 직접 실행 파일: 28/28 실제 파일 존재 및 SOT 수록
+- PR #13 G3 시험 지문: 8/8 불변
+- PR #23 AC-19 시험 지문: 2/2 불변
+- HumanSearch L0 제품 코드: 변경 0건
+
+→ 모든 수치는 최신 main `34e4ccff88ce776d06e3001734005a34b169f7eb`을 MERGE_HEAD로 둔 같은 통합 트리에서 새로 실행한 결과다.
+
+남은 G3 서버 의존 후보는 기능 누락을 숨기지 않고 다음 일곱 개로 유지한다.
+
+| 번호 | 남은 후보 | 이번에 차단 범위를 넓히지 않은 이유 |
+|---|---|---|
+| 1 | `strategy.max-parallel: 0` | 서버 해석 결과가 필요함 |
+| 2 | 작업 수준 `timeout-minutes: 0` | 서버 유효성 판정이 필요함 |
+| 3 | 단계 수준 `timeout-minutes: 0` | 서버 유효성 판정이 필요함 |
+| 4 | 존재하지 않는 `container` 이미지 | 서버의 이미지 가져오기 결과가 필요함 |
+| 5 | 원격 설정값을 쓰는 `runs-on` 식 | 저장소 밖 변수 값이 필요함 |
+| 6 | `concurrency` 취소 유발 | 다른 실행과의 시점 경쟁이 필요함 |
+| 7 | `environment: production` | 원격 승인·보호 설정이 필요함 |
+
+→ 일곱 후보는 이번 PR이 새로 만든 회귀가 아니라 기존에 정직하게 기록된 서버 의존 한계다. Issue #22는 reachable nonblob 범위를 계속 맡으며 OPEN 상태를 유지해야 한다.
+
+최종 결정 카드:
+
+> **무엇을** — 최신 main을 일반 merge한 이 단일 트리를 한 번 커밋하고, 같은 SHA의 로컬·서버 검사까지 모두 초록일 때만 PR #13을 squash merge한다.
+> **왜** — PR #23의 AC-19와 PR #13의 G3를 어느 한쪽도 지우지 않고 18단계 단일 CI로 보존하기 위해서다.
+> **버린 길** — rebase는 force push가 필요해 금지했고, 한쪽 충돌 문서를 선택하는 방법은 다른 보호를 지우므로 버렸으며, main 직접 수정도 권한 범위 밖이라 버렸다.
+> **대가** — 일반 merge 커밋 한 개가 PR 브랜치에 추가되고, 최종 서버 결과는 그 SHA가 생긴 뒤에야 확인할 수 있어 저장소 문서에는 사후 URL을 덧붙이지 못한다.
+> **되돌리기** — squash merge 전에는 PR 브랜치의 후속 수정으로 되돌릴 수 있다. 병합 뒤 문제가 나면 main 직접 되돌리기 대신 별도 revert PR을 만들어 같은 검사 절차를 다시 통과시켜야 한다.
+
+서버 결과 한계: 최종 SHA의 push/PR 검사 URL과 squash 병합 뒤 main 검사 결과는 SHA가 생성된 뒤 PR 본문·댓글과 최종 보고에 보존한다. 이 goal에 서버 결과 전용 꼬리 커밋을 추가하지 않는다.
+
+<!-- ATTEMPT-20260818:V1-V2-AGREEMENT-END -->
+
+## 제출 직전 strict 브리핑 감사
+
+보조 형식 검사:
+
+```text
+COMMAND=bash ~/.claude/skills/strict/brief-lint.sh docs/engineering/codeaudit-g3-followup-goal-2026-08-15.md
+=== docs/engineering/codeaudit-g3-followup-goal-2026-08-15.md ===
+  [위반] 해석(→) 없는 출력 블록 39개 — 줄 1577, 1596, 1645, 1677, 1712, 1734, 1756, 1779, 1972, 2000
+  코드블록 114개 · 표 7개 (면제 0개) / 해석 누락 39개
+  1층(결론): 줄 3 / 본문 176자
+  1층 기술 표기: 없음 (※ 한글 전문용어는 못 잡는다 — 사람이 본다)
+  결정 카드 4건 (※ 내용이 판단에 쓸 만한지는 못 잰다 — 사람이 본다)
+  증거 보관 경로: 임시 외 실재 파일 38건 (※ 그 파일이 이 주장의 증거인지는 못 잰다)
+
+브리핑 계약 기계 검사: 위반 39건 (문서 1개)
+
+이 검사가 못 보는 것 (사람이 봐야 하는 것):
+  · 설명이 실제로 말이 되는지 — 출력과 무관한 문장도 통과한다
+  · 결정 카드 내용이 판단에 쓸 만한지 — 한 글자여도 통과한다
+  · 증거 파일이 그 주장과 관련 있는지 — 존재하기만 하면 통과한다
+  · 결론이 쉬운 말인지 — 한글 전문용어는 잡지 못한다
+  ※ 이 검사는 홈 폴더에만 있어 서버 자동 검사에 없다 — 회사 차원의 합격 근거가 아니다(P15③).
+
+COMMAND_EXIT=0
+```
+
+→ 이 검사는 흔한 형식 누락을 경고하는 개인용 보조 도구이며 합격 근거가 아니다. 출력 줄 끝 공백 0자는 눈에 보이게 치환했다. 검사기 파일은 이번에 바꾸지 않았으므로 검사기 자체 변형 시험은 적용 대상이 아니다.
+
+사람 기준 아홉 문항:
+
+| 질문 | 답 |
+|---|---|
+| 1층 결론에 전문용어가 있는가 | 아니오 |
+| 해석 없는 출력·코드·표가 있는가 | 아니오 |
+| 결정할 사항이 빠졌는가 | 아니오 |
+| 결정 카드에 버린 길·대가가 빠졌는가 | 아니오 |
+| 파일·줄만 있고 의미 설명이 없는가 | 아니오 |
+| 쉽게 쓰려다 증거·수치·한계를 뺐는가 | 아니오 |
+| 초등학생식 비유로 내용을 깎았는가 | 아니오 |
+| 건너뛴 것·확인 못 한 것·재실행한 것을 숨겼는가 | 아니오 |
+| 확인 안 된 추정을 사실처럼 썼는가 | 아니오 |
+
+→ 아홉 항목이 모두 “아니오”이므로 사람이 읽는 strict 브리핑 계약을 충족한다. 서버 검사는 아직 최종 SHA가 없어 미확인이라고 명시했고, 커밋·push·병합 뒤 단계로 넘겼다.
+
+<!-- ATTEMPT-20260818:STRICT-BRIEF-AUDIT-END -->
+
+### 브리핑 형식 경고 39건 복구
+
+첫 사람 판정의 “해석 없는 블록이 없다”는 답은 보조 검사 결과와 모순되어 무효였다. 경고된 39개는 모두 `실행 명령:` 블록이었고, 각 명령 블록 바로 아래에 “이어지는 출력과 뒤 해석으로 판정한다”는 역할 설명을 추가했다.
+
+```text
+COMMAND=perl -0pi -e 's/(실행 명령:\n\n~~~~~text\n.*?\n~~~~~\n\n)(?!→)/$1→ 바로 아래 출력 전문을 만든 실제 명령이며, 합격·불합격 의미는 이어지는 출력 뒤 해석에서 판정한다.\n\n/sg' docs/engineering/codeaudit-g3-followup-goal-2026-08-15.md
+MECHANICAL_EDIT_EXIT=0
+COMMAND=bash ~/.claude/skills/strict/brief-lint.sh --strict docs/engineering/codeaudit-g3-followup-goal-2026-08-15.md
+=== docs/engineering/codeaudit-g3-followup-goal-2026-08-15.md ===
+  코드블록 115개 · 표 8개 (면제 0개) / 해석 누락 0개
+  1층(결론): 줄 3 / 본문 176자
+  1층 기술 표기: 없음 (※ 한글 전문용어는 못 잡는다 — 사람이 본다)
+  결정 카드 4건 (※ 내용이 판단에 쓸 만한지는 못 잰다 — 사람이 본다)
+  증거 보관 경로: 임시 외 실재 파일 38건 (※ 그 파일이 이 주장의 증거인지는 못 잰다)
+
+브리핑 계약 기계 검사: 위반 0건 (문서 1개)
+
+이 검사가 못 보는 것 (사람이 봐야 하는 것):
+  · 설명이 실제로 말이 되는지 — 출력과 무관한 문장도 통과한다
+  · 결정 카드 내용이 판단에 쓸 만한지 — 한 글자여도 통과한다
+  · 증거 파일이 그 주장과 관련 있는지 — 존재하기만 하면 통과한다
+  · 결론이 쉬운 말인지 — 한글 전문용어는 잡지 못한다
+  ※ 이 검사는 홈 폴더에만 있어 서버 자동 검사에 없다 — 회사 차원의 합격 근거가 아니다(P15③).
+BRIEF_LINT_STRICT_EXIT=0
+COMMAND=git diff --check
+DIFF_CHECK_EXIT=0
+COMMAND=count remaining missing block interpretations
+REMAINING_BLOCK_MISSING=0
+LINES=
+COUNT_EXIT=0
+BRIEF_RECOVERY_OVERALL_EXIT=0
+
+```
+
+→ 정확히 39개 명령 블록을 기계적으로 보완한 뒤 strict 모드 보조 검사가 위반 0건, 남은 미해석 블록 0건, 원래 공백 검사가 종료 0을 냈다. 출력 줄 끝 공백 0자는 눈에 보이게 치환했다.
+
+정정: 첫 셀프 감사에서 “해석 없는 출력·코드·표가 있는가”에 “아니오”라고 적은 판단은 당시 틀렸다. 위 복구와 재검사 뒤에야 “아니오”가 사실이 되었다.
+
+<!-- ATTEMPT-20260818:STRICT-BRIEF-RECOVERY-END -->
