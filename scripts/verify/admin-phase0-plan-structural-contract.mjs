@@ -516,9 +516,13 @@ function validateEvidenceBindings(files, errors) {
 function validateCi(files, contract, errors) {
   const parsed = parseVerifySteps(files.workflow);
   const { steps } = parsed;
+  const activeWorkflowLines = files.workflow.split(/\r?\n/).filter((line) => !/^\s*#/.test(line));
   if (!parsed.verifyFound) errors.push("CI workflow must define jobs.verify");
   if (!parsed.stepsFound) errors.push("CI verify job must contain steps");
   if (parsed.jobIfFound) errors.push("CI verify job must not contain if");
+  if (activeWorkflowLines.some((line) => /(?:^|[\s{,])(?:BASH_ENV|"BASH_ENV"|'BASH_ENV')\s*:/.test(line))) {
+    errors.push("CI workflow must not define BASH_ENV");
+  }
   const stepName = contract.ci?.phase0StepName;
   const run = contract.ci?.run;
   const candidates = steps.filter((step) => step.name === stepName || step.run === run);
