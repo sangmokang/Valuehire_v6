@@ -206,7 +206,41 @@ RED_RC=1
 
 #### 8-2. GREEN 이후 기록 위치
 
-이 절 아래에 GREEN 명령·전체 출력, 변조 시험과 원복 확인을 순서대로 추가합니다.
+```text
+$ bash scripts/acceptance-0-2-unreachable-content.sh
+START=2026-08-18T03:05:23Z
+[1/20] SECRET_PATTERNS_FILE=/dev/null 상속을 격리 -> PASS (exit=0)
+[2/20] SECRET_PATTERNS_FILE=.secret-patterns.default 상속을 격리 -> PASS (exit=0)
+[3/20] 일반 실행은 무해한 unreachable blob을 허용 -> PASS (exit=0)
+[4/20] 일반 실행은 금지값이 든 unreachable blob을 차단 -> BLOCKED (exit=1)
+[5/20] unreachable commit message의 금지값을 차단 -> BLOCKED (exit=1)
+[6/20] unreachable tree path의 금지값을 차단 -> BLOCKED (exit=1)
+[7/20] unreachable annotated tag message의 금지값을 차단 -> BLOCKED (exit=1)
+[8/20] git fsck 실패는 검사 대상 없음으로 통과하지 않음 -> BLOCKED (exit=1)
+[9/20] unreachable 객체 읽기 실패는 조용히 통과하지 않음 -> BLOCKED (exit=1)
+[10/20] 알 수 없는 unreachable 객체형은 읽기 실패로 차단 -> BLOCKED (exit=1)
+[11/20] 큰 unreachable blob 앞쪽의 금지값도 차단 -> BLOCKED (exit=1)
+[12/20] 직접 참조가 가리키는 작은 blob의 금지값을 차단 -> BLOCKED (exit=1)
+[13/20] 직접 참조가 가리키는 50MiB blob 앞쪽의 금지값을 차단 -> BLOCKED (exit=1)
+[14/20] 도달 가능한 blob 읽기 실패를 값 없음으로 통과하지 않음 -> BLOCKED (exit=1)
+[15/20] 서버 본문도 직접 참조의 작은 blob 금지값을 차단 -> BLOCKED (exit=1)
+[16/20] 서버 본문도 직접 참조의 50MiB blob 금지값을 차단 -> BLOCKED (exit=1)
+[17/20] 서버 본문도 blob 읽기 실패를 값 없음으로 통과하지 않음 -> BLOCKED (exit=1)
+[18/20] 종료상태 실행은 무해한 unreachable blob도 차단 -> BLOCKED (exit=1)
+[19/20] 예정 사례 수와 실제 실행 수가 다르면 전체를 차단 -> BLOCKED (exit=1)
+[20/20] Git hook 환경에서도 바깥 저장소 무오염 -> PASS (exit=0)
+CHECKED: 20
+PASS: AC-19 일반 내용 검사와 종료상태 0건 조건 분리
+END=2026-08-18T03:09:36Z
+GREEN_RC=0
+```
+
+→ RED 시험 파일을 바꾸지 않고 기존 보호와 새 여섯 실행 경계, 사례 수 불일치, 훅 환경을 모두 통과했습니다.
+RED에서 가짜 합격했던 로컬·서버 대용량 blob과 읽기 실패 네 항목은 각각 예정한 실패 문구로 차단됐습니다.
+
+#### 8-3. 후속 검증 기록 위치
+
+이 절 아래에 실제 저장소 검사, 변조 시험과 원복 확인을 순서대로 추가합니다.
 
 ### 9. 적대 검증 로그
 
