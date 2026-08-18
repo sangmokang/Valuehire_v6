@@ -298,3 +298,92 @@ FINAL_RC=0
 → 무엇을 시켰나: 실패했던 원명령을 검사기 수정 뒤 그대로 다시 실행했습니다.
 → 무엇이 나왔나: 기존 25개와 새 자기-workflow 사례까지 26개 모두 통과했고 성적은 0이었습니다.
 → 좋은 소식인가: 필수 게이트의 임시 실패는 PASS로 승격됐고, 장치 명부도 실제 별도 workflow를 정직하게 가리킵니다.
+
+## 10. Gate 4 전체 원검증
+
+### 10-1. 현재 작업공간 전체 검사
+
+```text
+$ bash scripts/session-status.sh
+START=2026-08-18T05:44:23Z
+HEAD: 3785b6e (ahead 5 / behind 0)
+ORIGIN: ab851a2
+RED: 0/21 (acceptance-0-7.sh 제외 — CI 담당)
+END=2026-08-18T05:59:32Z
+RC=0
+```
+
+→ 무엇을 시켰나: 새 판정기와 수정한 장치 명부 검사를 포함한 현재 작업공간 인수 검사 21개를 전부 실행했습니다.
+→ 무엇이 나왔나: 실패 0개, 성적 0이었습니다. 서버 전용 `0-7`만 이 명령의 정본 규칙대로 제외됐습니다.
+→ 좋은 소식인가: 현재 코드와 기존 계약은 지역 전체 검사를 통과했습니다. 제외된 항목은 아래에서 별도로 실행했습니다.
+
+```text
+$ bash verify.sh
+PASS: no secret-pattern match in any tracked file, .env not tracked
+VERIFY_RC=0
+```
+
+→ 무엇을 시켰나: 저장소가 정한 최상위 검증 명령을 다시 실행했습니다.
+→ 무엇이 나왔나: 추적 파일의 비밀 패턴과 `.env` 추적은 0건이고 성적은 0이었습니다.
+→ 좋은 소식인가: 현재 변경은 최상위 비밀 검증을 통과했습니다.
+
+### 10-2. pre-push 원명령과 지연 검사
+
+```text
+$ bash hooks/pre-push
+START=2026-08-18T05:59:49Z
+acceptance-0-2.sh: deferred
+acceptance-0-5.sh: deferred
+acceptance-0-7.sh: deferred
+19 checks: ok
+END=2026-08-18T06:32:14Z
+PRE_PUSH_RC=0
+```
+
+→ 무엇을 시켰나: 실제 push 직전에 실행되는 훅 원명령을 변경 없이 실행했습니다.
+→ 무엇이 나왔나: 즉시 검사 19개가 모두 `ok`를 냈고, 긴 서버·이력·샌드박스 검사 3개는 정본대로 지연 표시됐습니다.
+→ 좋은 소식인가: pre-push의 즉시 차단 계약은 모두 통과했습니다. 지연 3개도 아래에서 NOT_RUN 없이 닫았습니다.
+
+```text
+$ SECRET_PATTERNS_FILE= bash scripts/acceptance-0-2.sh
+START=2026-08-18T06:33:08Z
+PASS: no secret-pattern match in any tracked file, .env not tracked
+PASS: 0-2 — 히스토리·객체·reflog·docs 리터럴 0건, 스캐너 뮤테이션 검출 확인
+END=2026-08-18T07:11:20Z
+AC_0_2_RC=0
+```
+
+→ 무엇을 시켰나: 현재 파일만이 아니라 Git 이력·객체·reflog·문서 리터럴과 스캐너 자체 변조 검출을 실행했습니다.
+→ 무엇이 나왔나: 비밀 패턴 0건이고 스캐너 뮤테이션 사례도 정상 검출했습니다.
+→ 좋은 소식인가: 비밀 누출 검사는 단순 현재 파일 검사보다 넓은 범위까지 통과했습니다.
+
+```text
+$ SECRET_PATTERNS_FILE= bash scripts/acceptance-0-5.sh
+START=2026-08-18T07:11:44Z
+PASS: 0-5 완료 — CI 비밀스캔 강제 + push 완료 + 원격 트리 비밀 0건
+END=2026-08-18T07:13:20Z
+AC_0_5_RC=0
+```
+
+→ 무엇을 시켰나: 샌드박스 원격에 실제 push한 뒤 CI 비밀 검사 강제와 원격 트리 0건을 확인했습니다.
+→ 무엇이 나왔나: push가 완료됐고 원격 트리의 비밀 패턴은 0건이었습니다.
+→ 좋은 소식인가: 서버 경로가 비밀 검사를 우회하지 않음을 실제 push로 재현했습니다.
+
+```text
+$ SECRET_PATTERNS_FILE= bash scripts/acceptance-0-7.sh
+START=2026-08-18T07:14:11Z
+[1/6] 검사기 자기 제외 → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+[2/6] 검사 약화(실패 무시) → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+[3/6] 만료일 없는 억제 → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+[4/6] LLM 출력→판정 필드 → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+[5/6] 미커밋 상태로 push → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+[6/6] 가짜 외부효과 모듈 → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+OK: 원본 저장소 무변경 확인 (da39a3ee5e6b4b0d3255bfef95601890afd80709)
+PASS: 위반 6 종이 전부 차단됨 (각 건 훅 OFF 대조 통과)
+END=2026-08-18T07:26:42Z
+AC_0_7_RC=0
+```
+
+→ 무엇을 시켰나: 샌드박스에 규칙 위반 6종을 만들고, 같은 변경이 훅 ON에서만 차단되는지 대조했습니다.
+→ 무엇이 나왔나: 6종 모두 ON에서 성적 1로 차단되고 OFF에서 0으로 지나가 훅이 원인임이 증명됐습니다. 원본 저장소도 변하지 않았습니다.
+→ 좋은 소식인가: 가짜 구현·검사 약화·미커밋 push 우회를 훅이 실제로 차단합니다.
