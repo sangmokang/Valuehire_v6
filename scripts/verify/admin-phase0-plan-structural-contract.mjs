@@ -175,15 +175,18 @@ function parseBlockerDeclarations(text) {
 function parseVerifySteps(workflow) {
   const lines = workflow.split(/\r?\n/);
   const verifyIndex = lines.findIndex((line) => /^  verify:\s*$/.test(line));
-  if (verifyIndex < 0) return { steps: [], verifyFound: false, stepsFound: false };
+  if (verifyIndex < 0) return { steps: [], verifyFound: false, stepsFound: false, jobIfFound: false };
   const nextJobIndex = lines.findIndex(
     (line, index) => index > verifyIndex && /^  [A-Za-z0-9_-]+:\s*$/.test(line),
   );
   const verifyEnd = nextJobIndex < 0 ? lines.length : nextJobIndex;
+  const jobIfFound = lines
+    .slice(verifyIndex + 1, verifyEnd)
+    .some((line) => /^    (?:if|"if"|'if')\s*:/.test(line));
   const stepsIndex = lines.findIndex(
     (line, index) => index > verifyIndex && index < verifyEnd && /^    steps:\s*$/.test(line),
   );
-  if (stepsIndex < 0) return { steps: [], verifyFound: true, stepsFound: false };
+  if (stepsIndex < 0) return { steps: [], verifyFound: true, stepsFound: false, jobIfFound };
 
   const steps = [];
   let step = null;
@@ -201,6 +204,7 @@ function parseVerifySteps(workflow) {
   return {
     verifyFound: true,
     stepsFound: true,
+    jobIfFound,
     steps: steps.map((entry) => {
     const activeLines = entry.lines.filter((line) => !/^\s*#/.test(line));
     const name = activeLines.map((line) => line.match(/^\s*(?:-\s+)?name:\s*(.*)$/)?.[1]).find(Boolean) ?? null;
@@ -514,6 +518,7 @@ function validateCi(files, contract, errors) {
   const { steps } = parsed;
   if (!parsed.verifyFound) errors.push("CI workflow must define jobs.verify");
   if (!parsed.stepsFound) errors.push("CI verify job must contain steps");
+  if (parsed.jobIfFound) errors.push("CI verify job must not contain if");
   const stepName = contract.ci?.phase0StepName;
   const run = contract.ci?.run;
   const candidates = steps.filter((step) => step.name === stepName || step.run === run);
