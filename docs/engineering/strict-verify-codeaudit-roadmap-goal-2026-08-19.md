@@ -20,19 +20,26 @@
 
 2. **PR #13**(`hooks/pre-push` 안내 문구 LOCAL-MANUAL/POST-PUSH 분리 + `acceptance-0-7.sh` 실행기반 회귀시험) — push 완료(`24392fd`), CI 초록 2/2, PR 코멘트 게시 확인. **병합 여부만 사장님 결정 대기.**
 
-### A-3. 실패 수리 중 (완료 아님 — codex(V1)가 2회 연속 FAIL)
+### A-3. 완료 (2026-08-19 새벽 마무리)
 
-3. **`docs/sot/principles.yaml` + `scripts/acceptance-principles-check.sh` 신설**(워크트리 `worktrees/strict-principles-yaml`). 진행 이력:
-   - `03ad76f`(RED)→`804a39c`(GREEN) — codex(V1) **1차 FAIL**: D1(id 집합 미검사)·D2(깨진 따옴표 통과)·D3치명적(회귀검사가 HEAD 대조라 이미 커밋된 하락을 못 잡음)·D4(P11 과장)·D5(P16 과장)·D6(⑪ 사건, SKILL.md 오염).
-   - `c5a6dd0` — D1·D2·D4·D5 수정 + D3을 "origin/main 대조"로 교체 → codex(V1) **2차 FAIL**: D1·D2·D4·D5는 PASS 확인됐으나 **D3이 또 치명적으로 FAIL** — 로컬에 저장된 `origin/main`이 마지막 fetch 시점 사본일 뿐이라, 서버가 이미 앞서 있는데 이 컴퓨터가 안 내려받으면 회귀 검사가 오래된 기준과 비교돼 통째로 생략됨(codex가 임시 원격저장소로 실증).
-   - `ca7c081` — D3 2차 수정: 비교 직전 `git fetch origin main` 강제, 실패 시 fail-closed. **아직 codex 3차 검증 전 — 완료 아님.**
-   - 이 로드맵 문서 자체도 codex(V1) 2차 검증에서 **FAIL**(누락·오래된 수치·순서·원인 단정 문제, 지금 이 개정판이 그 지적 반영본).
+3. **`docs/sot/principles.yaml` + `scripts/acceptance-principles-check.sh` 신설**(워크트리 `worktrees/strict-principles-yaml`, PR #31 오픈·병합 대기). 진행 이력:
+   - `03ad76f`(RED)→`804a39c`(GREEN) — codex(V1) **1차 FAIL**: D1~D6(§②-9·⑪ 참조).
+   - `c5a6dd0` — D1·D2·D4·D5 수정 → codex(V1) **2차 FAIL**: D3만 재차 치명적 FAIL(로컬 `origin/main` 신선도 문제).
+   - `ca7c081` — D3 재수정(비교 직전 `git fetch` 강제) → codex(V1) **3차**: 수정 자체 PASS 확인(코드로 직접 재현), 전체 VERDICT는 판정문 커밋 문제로 FAIL 찍혔으나 이는 정상 V2 후속 절차이지 결함 아님 — Claude(V2, `16468e0`)가 별도 재현으로 **PASS 확정**.
+   - `787c3a5` — AC-GAP-12(안전조치, 아래 A-4) 완료 후 실제로 잠금 보호 상태에서 3차 검증 진행, `guard...check` PASS(위조 0건) 확인.
+   - **결론: AC-P13Y 완료.** PR #31(`https://github.com/sangmokang/Valuehire_v6/pull/31`) 오픈, CI 초록, 병합만 사장님 결정 대기.
+
+### A-4. 완료 — 안전조치(AC-GAP-12)
+
+12. **검증자가 전역 SKILL.md를 쓰지 못하게 하는 실제 장치** — `scripts/guard-global-skill-files.sh`(lock/check/unlock, chmod 444 기반) 신설·뮤테이션 점검 통과(`787c3a5`). D3 3차 검증에서 실전 사용, `check` PASS로 이번엔 오염 0건 확인. `/strict` §5(Claude측·Codex측 양쪽)에 의무 절차로 명문화 완료.
+
+### A-5. 완료 — AC-GAP-1~11 반영 (2026-08-19 새벽)
+
+5. **`/strict` 자체 감사로 찾은 11가지 갭**(②에 전체 목록) — Claude측·Codex측 `SKILL.md` 양쪽에 각자 구조에 맞게 반영 완료. Claude측: 526→545줄. Codex측: 273→287줄(§1 goal문서 목록에 게이트3원칙, §2에 해시체인함정·검증기오염방지, §3-1에 유예금지, §3에 환경차이체크리스트, §4에 gitignore회수+정규식실행확인, §6에 서브에이전트원문대조, §8 도입부에 압축기준, §8-8에 GitHub요금제전제). 구조 무결성 확인(헤더 수 불변), 코덱스측은 §5·§6 역할 스왑 구조 그대로 유지. **codex 검증은 아직 안 받음(문서 규칙 텍스트 추가라 L2로 자체 판단, 다음 실제 사용 시 효과 관찰).**
 
 ### B. 계획은 섰으나 미착수
 
-4. **`/strict` 본문(Claude측 524줄) 압축 계획** — 어느 절을 "본체(항상 로드)"에 남기고 어느 절을 "부록(필요할 때만 읽음)"으로 옮길지 표까지 확정(`docs/engineering/strict-principles-yaml-goal-2026-08-19.md` ⑩). **실제 편집은 아직 안 함**(위험 관리 차원에서 이번 판은 계획까지만 하기로 결정).
-5. **`/strict` 자체 감사로 찾은 11가지 갭** — 실제로 지금 규칙 문서에 없는 것 11개(아래 ②에 전체 목록). 각각 별도 AC로 나눠 구현 필요.
-6. **Codex측 `SKILL.md`(273줄) 동기화** — Claude측과 구조가 다름(§5·§6 검증자 역할이 스왑됨: codex가 구현자일 땐 1차검증=`claude -p`, 2차검증=codex 자신). "동일하게"는 글자 복사가 아니라 **같은 개선을 각자 역할 구조에 맞게** 반영하는 것으로 합의. 아직 착수 전.
+6. **`/strict` 본문(Claude측 545줄) 압축 실행** — 어느 절을 "본체(항상 로드)"에 남기고 어느 절을 "부록(필요할 때만 읽음)"으로 옮길지 표까지 확정(`docs/engineering/strict-principles-yaml-goal-2026-08-19.md` ⑩). **실제 편집은 아직 안 함**(위험 관리 차원에서 이번 판은 계획까지만 하기로 결정 — 갭 반영으로 오히려 더 길어져 우선순위가 올라감).
 7. **`CLAUDE.md`/`docs/sot/INDEX.md` 라우팅표** — 사장님이 제안하신 "항상 읽기(CLAUDE.md+INDEX.md) / 작업별 선택(coding-principles.md 등 5개) / LLM이 안 읽어도 되는 것(훅·CI)" 3단 구조. 논리는 맞다고 리뷰 완료했으나, **"이 매핑표 자체가 항상 읽히는 자리에 없으면 작동 안 한다"는 구멍**을 발견 — `CLAUDE.md` 또는 `INDEX.md` 중 어디에 넣을지 사장님 결정 대기.
 
 ### C. 조사만 하고 판단은 안 내린 것 (참고 자료로 남김)
