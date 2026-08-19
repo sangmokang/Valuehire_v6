@@ -585,3 +585,44 @@ tojqsIAgKGdvYWwg66y47IScIOqysOuhoOqzvCDsnbzsuZgpIHwK
 
 이 변경은 P1을 완성시키지 않는다. 로컬 push의 영구 차단만 제거하고, 새 커밋에 대한
 실제 GitHub Actions 실행은 push 금지로 계속 `BLOCKED`다.
+
+## 10) "원칙에 안 맞는 걸 최대한 고치자" — 사장님 지시 이행 (2026-08-19 후속)
+
+### 사장님 브리핑
+
+**결론:** push 금지가 풀린 뒤 실제 CI를 6차례 돌리며 매번 다른 진짜 환경 차이 버그(macOS/Linux 차이, `bash -e` 실행모드 차이, Ruby 라이브러리 버전 차이)를 고쳤지만, 마지막에 CI가 멈추는 지점은 버그가 아니라 이 PR 자신이 설계해 넣은 "32개 원칙 중 하나라도 안 채워지면 무조건 실패"라는 안전장치였다. 이 사실을 보고드리자 "원칙에 안 맞는 건 뭔지 확인하고, 수정할 수 있는 건 최대한 수정하자"는 지시를 받았다. 32개를 전부 채우는 건 이번에 불가능하다 — 4개(P7·P8·P9·P10)는 아직 존재하지 않는 사업 기능(배포 파이프라인·3사 동시접속 소싱·발송 DB·매일 사업 요약 전송)에 대한 원칙이라 "해당 없음"이고, 나머지 다수는 이 저장소 하나로 끝낼 수 없는 별도의 큰 설계 작업이다. 이번에 실제로 채운 건 P3(조용한 실패 금지)의 절반이다 — 이 저장소에 아직 위반 코드가 0건인 지금 시점에 bare except/catch·`??`·`||[]` 4가지 패턴을 막는 검사기를 새로 만들어 커밋 시점과 서버 검사 양쪽에 심었다. 이 검사기를 만들고 검증하는 과정에서 진짜 버그 2개를 추가로 찾아 고쳤다 — 하나는 이번에 내가 만든 코드에 있었고, 하나는 이번 작업과 무관하게 예전부터 있던 것이다.
+
+**판단 근거:** 32개 중 "지금 당장 고칠 수 있는가"를 기준으로 골랐다. P3는 ⑴ 이 저장소가 아직 작아서(파이썬 5개 파일, JS/TS 0개) 위반이 0건인 깨끗한 상태고 ⑵ SOT에 검사 방법이 정확히 적혀 있고(`docs/sot/coding-principles.md:18`) ⑶ 새 사업 기능을 만들 필요 없이 순수 검사 로직만 추가하면 되는 조건을 모두 만족했다. 다른 원칙들(예: P17 "증거는 만든 자가 쓸 수 없다"는 권한 분리 시스템 전체 설계가 필요, P19 "라이브 스모크"는 저장소 전체 경로 자동분류가 필요)은 이번 세션 하나로 안전하게 끝낼 수 있는 규모가 아니라고 판단해 손대지 않았다. 버린 대안: 4개의 "해당 없음" 원칙을 principles.yaml에서 삭제하는 것도 검토했으나(P1 자신의 "기계 장치 없는 원칙은 삭제한다"는 문구 근거), 원칙 삭제는 SOT의 근본적인 축소이자 사업 범위 판단이라 제가 혼자 결정할 사안이 아니라고 보고 보류했다.
+
+**틀리면 깨지는 것:** 만약 P3 검사기의 정규식이 실제 위반을 놓친다면(예: 여러 줄에 걸친 catch, 문자열 안의 `??`), "검사기가 있으니 안전하다"는 잘못된 안도감만 주고 실제로는 조용한 실패가 계속 스며든다 — 그래서 아래에 codex 적대검증을 별도로 요청했다.
+
+### AC (이번 증분)
+
+- **AC-P3-1**: `docs/sot/coding-principles.md:18`의 4패턴(bare except/catch, `??`, `catch{return null}`, `||[]`)이 py/js/ts 파일 전체에서 검사되고, 위반 시 exit 1을 낸다.
+  검증: `bash scripts/acceptance-silent-failure-lint.sh`
+  counter-AC: 정규식이 문법 변형(공백·여러 줄)에 우회되면 가짜.
+- **AC-P3-2**: 위 검사가 hooks/pre-commit과 CI(.github/workflows/verify.yml) 양쪽에 실제로 배선된다.
+  검증: `bash hooks/pre-commit`(스테이지 후) + `bash scripts/acceptance-principles-check.sh`의 SCHEMA_OK 확인
+  counter-AC: 배선 문구만 있고 실제 호출이 없으면 가짜(§3.5 배선 증명 요구).
+
+### 구현 요약
+
+커밋 `228b384`(P3 린트 신설) + `f7f0a6b`(hooks/pre-commit 과요구 완화 + `scripts/acceptance-hs-a4.sh`의 선행 `bash -e` 잠복 버그 수정). 상세 근거·검증 로그는 각 커밋 메시지에 전문 보존.
+
+발견한 버그 2건:
+1. **이번 작업에서 만든 버그**: `hooks/pre-commit`의 새 §8이 `set -e` 아래서 "위반 없음" 케이스에 `grep '^FAIL:' | head -1`(매치 없음=exit 1)로 파이프 전체를 죽여 **정상 커밋이 원인 불명으로 실패**하는 잠재 결함. 격리 임시 저장소에서 실제 훅을 정상 파일로 돌려보고 발견.
+2. **이번 작업과 무관한 기존 버그**: `scripts/acceptance-hs-a4.sh`가 `HEAD~2` 시점부터 동일하게, `out=$(...)` 를 독립 문장으로 두어 기대한 실패(exit 1)가 `set -e` 아래서 스크립트 전체를 조기 종료시키는 결함을 갖고 있었다. CI에서 이제까지 드러나지 않은 이유는 이 스텝보다 앞선 "P1 원칙 32개 전체 강제 검사"가 설계상 항상 실패해 뒤 스텝이 실행된 적이 없었기 때문이다 — 로컬 pre-push(글롭으로 전량 실행)에서 처음 걸렸다.
+
+### 검증 결과 (로컬, 전부 `bash -e`)
+
+- `acceptance-silent-failure-lint.sh`: CHECKED_FILES=5, PASS, exit=0
+- `acceptance-silent-failure-lint-mutations.sh`: 11/11 PASS(4패턴 주입 각각 + 정상 fixture + 0건 NOT_RUN + 실제 hooks/pre-commit end-to-end 위반/정상 2건 + 원본 무변경)
+- `acceptance-principles-mutations.sh`: 21/21 PASS(회귀 없음, fixture 조립 목록에 신규 파일 2개 반영 후)
+- `acceptance-guard-global-skill-files.sh`: 8/8 PASS(회귀 없음)
+- `acceptance-hs-a4.sh`: 30/30 PASS, exit=0(수정 전: 6번째 PASS 직후 즉사)
+- `acceptance-principles-check.sh`: SCHEMA_OK 32/32, STATUS_COUNTS 완전=1 부분=12 없음=7 해당없음=4 미확인=8(변화 없음), P1_UNMET 31/32(변화 없음)
+- push 후 실제 CI(`runs/32229657428` 등): "P1 원칙 32개 전체 강제 검사" 스텝에서 SCHEMA_OK 32/32 확인 후 설계된 P1_UNMET으로 실패 — 새 오류 없음, 이 스텝 이후 스텝(P3 검사 포함)은 job이 fail-fast라 실행되지 않음(로컬 pre-push만 전량 실행하는 구조라 그쪽에서 이미 검증됨)
+
+### 적대 검증 로그
+
+codex(V1) 적대검증 진행 중 — 결과 도착 시 이 절에 원문 그대로 append 예정.
