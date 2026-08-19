@@ -217,14 +217,96 @@ pc_rc=0
 if [ "$pc_rc" -eq 0 ]; then pc_ok=0; else pc_ok=1; fi
 record "$pc_ok" "필수 파일 첫 도입 add 대조군" "exit=$pc_rc"
 
-# workflow 고정 배선과 같은 존재 검사를 로컬에서 실행한다.
-wiring_ok=0
-if ! grep -qF 'test -f docs/sot/principles.yaml' "$REPO/.github/workflows/verify.yml" || \
-   ! grep -qF 'test -f scripts/acceptance-principles-check.sh' "$REPO/.github/workflows/verify.yml" || \
-   ! grep -qF 'bash scripts/acceptance-principles-check.sh' "$REPO/.github/workflows/verify.yml"; then
-  wiring_ok=1
-fi
-record "$wiring_ok" "CI 고정 파일 목록 + 직접 실행 배선" "workflow literal 확인"
+# workflow 작업 경계와 실행 모드를 YAML 구조로 검사한다. 단순 문자열 검색이면
+# 같은 명령을 주석·다른 job·`|| true` 뒤에 두거나 P1 전체 판정을 verify 안에 다시
+# 넣어도 통과하므로, job ID·표시 이름·명령의 정확한 줄·의존성을 함께 고정한다.
+workflow_contract_rc=0
+ruby -rpsych - "$REPO/.github/workflows/verify.yml" <<'RUBY' || workflow_contract_rc=$?
+workflow_file = ARGV.fetch(0)
+workflow = Psych.safe_load(
+  File.read(workflow_file),
+  permitted_classes: [],
+  permitted_symbols: [],
+  aliases: true
+)
+jobs = workflow.is_a?(Hash) ? workflow["jobs"] : nil
+errors = []
+unless jobs.is_a?(Hash)
+  warn "WORKFLOW_JOBS_MISSING"
+  exit 1
+end
+
+expected_names = {
+  "principles-structure" => "P1 원칙 장부 구조·배선 검증 (필수)",
+  "p1-completion-diagnostic" => "P1 원칙 32개 전체 완료 진단 (비차단)",
+}
+expected_names.each do |job_id, expected_name|
+  job = jobs[job_id]
+  if !job.is_a?(Hash)
+    errors << "JOB_MISSING: #{job_id}"
+  elsif job["name"] != expected_name
+    errors << "JOB_NAME_MISMATCH: #{job_id}"
+  end
+end
+
+run_lines = lambda do |job|
+  next [] unless job.is_a?(Hash) && job["steps"].is_a?(Array)
+  job["steps"].each_with_object([]) do |step, runs|
+    runs << step["run"] if step.is_a?(Hash) && step["run"].is_a?(String)
+  end
+    .flat_map(&:lines)
+    .map(&:strip)
+    .reject(&:empty?)
+end
+
+structure = jobs["principles-structure"]
+diagnostic = jobs["p1-completion-diagnostic"]
+structure_lines = run_lines.call(structure)
+diagnostic_lines = run_lines.call(diagnostic)
+
+required_structure_commands = [
+  "bash scripts/acceptance-principles-mutations.sh",
+  "bash scripts/acceptance-guard-global-skill-files.sh",
+  "bash scripts/acceptance-principles-check.sh --schema-only",
+]
+required_structure_commands.each do |command|
+  errors << "STRUCTURE_COMMAND_MISSING: #{command}" unless structure_lines.include?(command)
+end
+full_command = "bash scripts/acceptance-principles-check.sh"
+errors << "DIAGNOSTIC_FULL_COMMAND_MISSING" unless diagnostic_lines.include?(full_command)
+errors << "DIAGNOSTIC_MODE_WEAKENED" if diagnostic_lines.any? { |line| line.include?("acceptance-principles-check.sh --") }
+errors << "DIAGNOSTIC_FAILURE_HIDDEN" if diagnostic_lines.any? { |line| line.include?("|| true") }
+
+full_command_jobs = jobs.each_with_object([]) do |(job_id, job), matches|
+  matches << job_id if run_lines.call(job).include?(full_command)
+end
+unless full_command_jobs == ["p1-completion-diagnostic"]
+  errors << "FULL_COMMAND_JOB_MISMATCH: #{full_command_jobs.join(',')}"
+end
+
+if diagnostic.is_a?(Hash) && diagnostic["continue-on-error"] != true
+  errors << "DIAGNOSTIC_NOT_NONBLOCKING"
+end
+%w[principles-structure p3 verify].each do |job_id|
+  job = jobs[job_id]
+  next unless job.is_a?(Hash)
+  errors << "REQUIRED_JOB_ALLOWS_FAILURE: #{job_id}" if job["continue-on-error"] == true
+  needs = job["needs"]
+  dependencies = needs.is_a?(Array) ? needs : [needs].compact
+  if dependencies.include?("p1-completion-diagnostic")
+    errors << "REQUIRED_JOB_DEPENDS_ON_DIAGNOSTIC: #{job_id}"
+  end
+end
+
+if errors.empty?
+  puts "WORKFLOW_P1_SPLIT_OK"
+  exit 0
+end
+errors.each { |error| puts error }
+exit 1
+RUBY
+record "$workflow_contract_rc" "CI P1 구조 필수 작업과 전체 완료 진단 작업 분리" \
+  "job 이름·schema-only/full 모드·비차단 진단·필수 작업 독립성"
 
 new_case ci_delete
 rm "$TMP/ci_delete/docs/sot/principles.yaml"
