@@ -39,6 +39,8 @@ overlay_current() {
     docs/sot/principles.yaml \
     scripts/acceptance-principles-check.sh \
     scripts/acceptance-principles-mutations.sh \
+    scripts/acceptance-silent-failure-lint.sh \
+    scripts/acceptance-silent-failure-lint-mutations.sh \
     hooks/pre-commit \
     hooks/pre-push \
     .github/workflows/verify.yml; do
@@ -57,6 +59,7 @@ git -C "$TMP/template" config user.name principles-mutation
 git -C "$TMP/template" config user.email principles-mutation@example.invalid
 git -C "$TMP/template" add docs/sot/principles.yaml \
   scripts/acceptance-principles-check.sh scripts/acceptance-principles-mutations.sh \
+  scripts/acceptance-silent-failure-lint.sh scripts/acceptance-silent-failure-lint-mutations.sh \
   hooks/pre-commit hooks/pre-push .github/workflows/verify.yml
 # --allow-empty: template은 $REPO를 clone한 것이라 overlay_current가 복사하는 파일이
 # 이미 마지막 커밋과 완전히 같을 수 있다(작업트리가 깨끗한 게 정상 상태다). 그럴 때

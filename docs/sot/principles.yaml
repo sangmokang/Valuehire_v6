@@ -29,8 +29,11 @@
     - path: "scripts/scan-data-exposure.sh"
       check: "scripts/acceptance-hs-a4.sh"
       stages: ["acceptance", "ci"]
+    - path: "hooks/pre-commit"
+      check: "scripts/acceptance-silent-failure-lint-mutations.sh"
+      stages: ["pre-commit", "acceptance", "ci"]
   status: "부분"
-  evidence: "grep 결과 다수 acceptance-*.sh에서 NOT_RUN 사용 확인. bare except/catch lint, ?? 기본값류 금지 lint는 미발견."
+  evidence: "grep 결과 다수 acceptance-*.sh에서 NOT_RUN 사용 확인. bare except/catch, catch{return null}, ||[], ?? 4패턴 lint(scripts/acceptance-silent-failure-lint.sh)를 신설해 hooks/pre-commit·CI에 배선했다(2026-08-19, mutation 11/11, 실제 hooks/pre-commit 훅 end-to-end 실행으로 검증). 다만 '모든 핸들러가 status와 함께 DB 기록'하는 장치는 아직 없어 완전은 아니다."
 
 - id: P4
   principle: "가짜 구현 금지"

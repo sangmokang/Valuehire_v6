@@ -34,6 +34,11 @@ jobs:
       - name: P1 원칙 32개 전체 강제 검사
         run: bash scripts/acceptance-principles-check.sh
 
+      - name: P3 조용한 실패 패턴 검사 (bare except/catch, ??, ||[])
+        run: |
+          bash scripts/acceptance-silent-failure-lint.sh
+          bash scripts/acceptance-silent-failure-lint-mutations.sh
+
       - name: 비밀 스캔 (verify.sh)
         # 패턴은 커밋된 .secret-patterns.default 를 쓴다.
         # 실제 비밀값은 CI에 올리지 않는다 — 저장소 시크릿에 넣는 것도 유출 경로를 늘리는 일이다.

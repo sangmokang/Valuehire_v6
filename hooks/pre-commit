@@ -219,4 +219,43 @@ while IFS= read -r f; do
   esac
 done <<< "$staged"
 
+# ── 8) 조용한 실패 패턴 — bare except/catch, ??, ||[] (P3) ───────────────────
+#
+# 판정을 scripts/acceptance-silent-failure-lint.sh 한 곳에 두고, 여기서는 스테이지된
+# 내용(인덱스)을 임시 파일로 떠서 그 판정기를 그대로 부른다(§1 비밀 스캔과 같은 이유 —
+# 작업트리가 아니라 인덱스를 봐야 git add 뒤 작업트리만 덮어쓰는 우회를 막는다).
+LINT_SCRIPT="$REPO/scripts/acceptance-silent-failure-lint.sh"
+if [ ! -x "$LINT_SCRIPT" ]; then
+  block "P3 린트 스크립트 없음 또는 실행 불가 — scripts/acceptance-silent-failure-lint.sh (fail-closed)"
+else
+  lint_targets=""
+  while IFS= read -r f; do
+    case "$f" in
+      *.py|*.js|*.jsx|*.ts|*.tsx) lint_targets="${lint_targets}${lint_targets:+ }$f" ;;
+    esac
+  done <<< "$staged"
+  if [ -n "$lint_targets" ]; then
+    ltmp=$(mktemp -d)
+    lint_files=""
+    for f in $lint_targets; do
+      dest="$ltmp/$f"
+      mkdir -p "$(dirname "$dest")"
+      git show ":$f" > "$dest"
+      lint_files="${lint_files}${lint_files:+ }$dest"
+    done
+    lrc=0
+    lout=$(bash "$LINT_SCRIPT" $lint_files 2>&1) || lrc=$?
+    first_hit=""
+    if [ "$lrc" -eq 1 ]; then
+      first_hit=$(printf '%s' "$lout" | grep '^FAIL:' | head -1 | sed "s#${ltmp}/##") || true
+    fi
+    rm -rf "$ltmp"
+    if [ "$lrc" -eq 1 ]; then
+      block "조용한 실패 패턴 발견 (P3) — 상세: bash scripts/acceptance-silent-failure-lint.sh <파일>. 요약: ${first_hit}"
+    elif [ "$lrc" -ge 2 ]; then
+      block "P3 린트 실행 실패 (exit=$lrc, fail-closed)"
+    fi
+  fi
+fi
+
 exit "$fail"
