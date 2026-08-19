@@ -67,7 +67,11 @@ git -C "$TMP/template" add docs/sot/principles.yaml \
 # CI 실측: GitHub Actions는 run: 스텝을 bash -e로 실행해, 이 한 줄의 exit 1이 21개
 # 시험 전부가 시작되기도 전에 스크립트 전체를 죽였다(로컬은 -e 없이 실행해 안 걸렸다).
 git -C "$TMP/template" commit --quiet --allow-empty "$NO_VERIFY" -m fixture
-git -C "$TMP/template" branch -M main
+# GitHub Actions의 pull_request/push checkout은 HEAD가 브랜치 이름 없이 커밋을 직접
+# 가리키는 detached 상태다. 그 저장소를 로컬 경로로 clone하면 template도 detached가
+# 되므로 `branch -M main`은 "cannot rename ... while not on any"로 실패한다. 새 브랜치를
+# 만들면서 현재 커밋을 붙이는 checkout -B는 로컬 브랜치와 detached HEAD 양쪽에서 같다.
+git -C "$TMP/template" checkout --quiet -B main
 
 git init --quiet --bare "$TMP/with-baseline.git"
 # init.defaultBranch가 실행 환경마다 다르다(로컬 macOS git은 main, GitHub Actions

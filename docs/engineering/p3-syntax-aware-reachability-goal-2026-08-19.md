@@ -4,7 +4,7 @@
 
 여러 줄로 숨긴 위반은 막고 설명문·주석·문자열은 통과시키는 수정이 로컬 시험 35개를 모두 통과했다. 앞선 총괄 검사가 실패해도 서버가 이 검사를 따로 실행하도록 분리했다.
 
-Claude 1차 공격이 처리 코드가 있는 바깥 예외 블록 안의 위반을 전부 놓치는 결함을 찾아 실제 커밋까지 통과시켰다. 같은 반례를 회귀시험으로 고정하고 내부 코드도 끝까지 검사하도록 수정했으며, Claude 수정 후 재공격도 합격했다. 실제 서버 실행은 아직 남았고, 서버에서 이 검사가 실패하거나 건너뛰어지면 다시 고친다. 다른 31개 원칙과 모든 예외 처리 결과의 데이터베이스 기록은 이번에 건드리지 않는다.
+Claude 1차 공격이 처리 코드가 있는 바깥 예외 블록 안의 위반을 전부 놓치는 결함을 찾아 실제 커밋까지 통과시켰다. 같은 반례를 회귀시험으로 고정하고 내부 코드도 끝까지 검사하도록 수정했으며, Claude 수정 후 재공격도 합격했다. 실제 서버의 독립 P3 작업도 35/35로 합격했다. 다만 함께 실행된 원칙 뮤테이션이 서버의 브랜치 이름 없는 checkout을 처리하지 못하는 새 환경 결함을 드러내, 이를 고친 뒤 최종 서버 재실행을 기다린다. 다른 31개 원칙과 모든 예외 처리 결과의 데이터베이스 기록은 이번에 건드리지 않는다.
 
 ## 판단 근거
 
@@ -764,3 +764,48 @@ gh: Upgrade to GitHub Pro or make this repository public to enable this feature.
 ```
 
 → 뭘 시켰나: main 브랜치에서 P3 서버 검사를 병합 전 필수 조건으로 강제할 수 있는지 현재 GitHub 설정을 직접 조회했다. / 뭐가 나왔나: 비공개 저장소의 현재 요금제에서는 브랜치 보호 기능 자체를 사용할 수 없다는 403 응답이었다. / 좋은 소식인가 나쁜 소식인가: 나쁜 소식이다. P3 서버 작업이 실행되고 실패를 표시할 수는 있지만, 저장소 권한자가 그 빨간불을 무시하고 병합하는 권한까지 코드로 없앨 수는 없다. 이 한계는 PR 본문에서 오너 판단 항목으로 남긴다.
+
+## 16. 첫 원격 실행과 서버 전용 환경 결함
+
+원격 run `32237868639`의 두 형제 작업 결과:
+
+```text
+p3     pass  11s
+verify fail   7s
+```
+
+P3 서버 로그의 핵심 원문:
+
+```text
+CHECKED_FILES: 5
+PASS: bare except/catch, catch{return null}, ||[]/||=[], ??/??= 실행 패턴 0건
+PASS: 처리 중인 바깥 catch 안의 네 위반도 모두 BLOCKED — exit=1, catch-null=1/1, bare-catch=1/1, array=1/1, nullish=1/1
+PASS: 실제 hooks/pre-commit 배선(바깥 catch 안 네 위반 → BLOCKED) — exit=1
+CHECKED: 35
+```
+
+→ 뭘 시켰나: P1과 분리한 P3가 실제 Ubuntu 서버에서 먼저 실패한 작업과 무관하게 실행되는지 확인했다. / 뭐가 나왔나: push와 pull_request 두 run 모두 P3가 11초에 합격했고 35개 전체 출력이 남았다. / 좋은 소식인가 나쁜 소식인가: P3 도달성과 이번 결함 수정에는 좋은 소식이다.
+
+그러나 `verify`는 예상한 `P1_UNMET: 31/32`까지 도달하지 못하고 그 앞의 원칙 뮤테이션에서 다음처럼 실패했다.
+
+```text
+fatal: cannot rename the current branch while not on any
+error: src refspec main does not match any
+FAIL: 정상 원칙표 schema-only — exit=127, expected=0, marker=SCHEMA_OK
+bash: scripts/acceptance-principles-check.sh: No such file or directory
+CHECKED: 21
+```
+
+→ 뭘 시켰나: 서버 빨간불을 기존 P1 미충족이라고 가정하지 않고 실패 단계 전체 로그를 열었다. / 뭐가 나왔나: GitHub checkout의 HEAD에는 브랜치 이름이 없는데 시험이 기존 브랜치 이름을 바꾸는 명령을 써서, 격리 원격에 아무 파일도 못 밀고 빈 clone을 만든 것이 근본 원인이었다. / 좋은 소식인가 나쁜 소식인가: 서버와 로컬 차이를 새로 잡은 점은 좋지만, 기존 보고처럼 단순한 P1 불합격은 아니었으므로 즉시 수정 대상이다.
+
+수정은 `git branch -M main`을 현재 커밋에서 새 `main`을 만드는 `git checkout -B main`으로 바꾼 한 곳이다. 실제 로컬 저장소도 의도적으로 detached HEAD로 만든 격리 clone에서 원시험을 다시 실행했다.
+
+```text
+PASS: 정상 원칙표 schema-only — exit=0, expected=0, marker=SCHEMA_OK
+PASS: 정상 표의 P1 전체 미충족 — exit=1, expected=1, marker=P1_UNMET
+PASS: 정상 표의 pre-push 로컬 게이트 — exit=0, expected=0, marker=P1_LOCAL_GATE
+PASS: 원본 worktree 상태 기준선 보존 — before/after 동일
+CHECKED: 21
+```
+
+→ 뭘 시켰나: 브랜치 이름이 없는 서버 checkout과 같은 상태에서 수정된 원칙 뮤테이션 전체를 실행했다. / 뭐가 나왔나: 21개 전부 합격, exit 0이었다. / 좋은 소식인가 나쁜 소식인가: 로컬 격리 재현에는 좋은 소식이며, 원격 최종 확인 전에는 완료로 세지 않는다.
