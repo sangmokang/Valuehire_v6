@@ -33,10 +33,13 @@ record() {
 }
 
 mode_of() {
-  if stat -f '%Lp' "$1" 2>/dev/null; then
+  # GNU(리눅스 CI 러너)를 먼저 시도한다 — guard-global-skill-files.sh의 file_mode()와
+  # 동일한 이유(2026-08-19): BSD -f와 GNU -f는 의미가 전혀 달라서, BSD 순서를 그대로
+  # 쓰면 리눅스에서 -f가 디스크 정보를 권한 값처럼 반환한다.
+  if stat -c '%a' "$1" 2>/dev/null; then
     return 0
   fi
-  stat -c '%a' "$1" 2>/dev/null
+  stat -f '%Lp' "$1" 2>/dev/null
 }
 
 make_guard() {
