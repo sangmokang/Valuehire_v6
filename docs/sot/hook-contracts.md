@@ -31,6 +31,14 @@
 ```
 
 ### `hooks/pre-push`
+
+`acceptance-principles-check.sh`는 pre-push에서 `--pre-push` 모드로 호출한다. 이
+모드는 장부 스키마·mechanism 경로/정적 배선·기준선 회귀만 검사한다. 32개 원칙의
+완전성 판정(`P1_UNMET`)은 CI의 인자 없는 기본(`--full`) 실행이 맡는다. 현황표에
+`해당없음`·`부분`·`없음`·`미확인`을 정직하게 기록하는 것 때문에 관련 없는 로컬
+push가 영구 차단되지 않도록 역할을 분리한 것이다. pre-push 0은 P1 완성을 뜻하지
+않으며, CI full이 실패하면 병합할 수 없다.
+
 ```
 입력  : stdin 으로 <local ref> <local sha> <remote ref> <remote sha> (git 표준)
 출력  : exit 0 | exit 1

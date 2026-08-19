@@ -160,6 +160,7 @@ git -C "$TMP/no_baseline" add docs/sot/principles.yaml
 expect_checker "기준선 없음 명시" "$TMP/no_baseline" --full 1 "BASELINE_NOT_AVAILABLE"
 
 expect_checker "정상 표의 P1 전체 미충족" "$TMP/normal" --full 1 "P1_UNMET"
+expect_checker "정상 표의 pre-push 로컬 게이트" "$TMP/normal" --pre-push 0 "P1_LOCAL_GATE"
 
 # pre-commit 고정 필수 파일: 삭제·rename 차단, 첫 도입 add 허용.
 new_case precommit_delete

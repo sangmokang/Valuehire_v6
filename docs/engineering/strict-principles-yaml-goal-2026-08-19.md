@@ -557,3 +557,31 @@ tojqsIAgKGdvYWwg66y47IScIOqysOuhoOqzvCDsnbzsuZgpIHwK
 깨끗한 `0275da5`에서 세 번째 폐쇄 검증을 같은 guard 절차로 실행했다. Claude는 `VERDICT: PASS`를 반환했고 `git status` 빈 출력, 두 diff check 0, Base64 해시 일치, schema exit 0, 의도된 `P1_UNMET 31/32` exit 1, 실제 서버 실행 BLOCKED, 병합 불가를 재확인했다. guard check와 unlock도 각각 0이었고 시작 SHA-256과 종료 SHA-256은 같았다.
 
 현재 상태: `LOCAL_IMPLEMENTATION_VERIFIED / P1_FAIL / SERVER_BLOCKED / MERGE_NOT_ALLOWED`
+
+## 9) 새 결함 재현과 pre-push/CI 권한 분리
+
+### RED
+
+기존 pre-push는 인자 없이 `acceptance-principles-check.sh`를 실행했다. 현재 현황표는
+`완전 1 / 부분 12 / 없음 7 / 해당없음 4 / 미확인 8`이므로, 로컬 push도 `P1_UNMET:
+31/32`에서 실패했다. P1 미충족 사실은 정확하지만, 아직 해당되지 않는 원칙을
+현황표에 기록하는 동안 모든 unrelated push를 막는 결함이었다.
+
+### 설계 판단
+
+`해당없음`을 P1 전체 판정에서 조용히 제외하지 않는다. `principles.yaml`은 32개
+원칙의 현황표로 남고, CI의 기본 `--full` 실행은 SOT P1대로 미충족 항목이 있으면
+계속 실패한다. 대신 `hooks/pre-push`는 명시적 `--pre-push` 모드로 스키마·mechanism
+경로/정적 배선·기준선 회귀만 검사한다. 이 모드는 P1 완성을 의미하지 않으며,
+완전성 판정 권한은 workflow의 인자 없는 full 실행에 있다. A안/B안 어느 것도
+미구현 원칙을 합격시키는 근거로 사용하지 않았다.
+
+### GREEN 증거
+
+- `scripts/acceptance-principles-check.sh --full`: `P1_UNMET: 31/32`, exit `1`.
+- `scripts/acceptance-principles-check.sh --pre-push`: `P1_LOCAL_GATE: ...`, exit `0`.
+- mutation harness: 정상 표 full 실패와 pre-push 성공을 각각 검증; 전체 `CHECKED: 21`.
+- 실제 pre-push는 이번 변경이 미커밋인 상태에서 P15 청결성 검사로 exit `1`을 냈다. 이는 새 P1 완성 판정이 아니라 작업트리 오염 차단이며, clean fixture에서 pre-push 모드 checker가 0이 되는 것을 harness가 검증한다.
+
+이 변경은 P1을 완성시키지 않는다. 로컬 push의 영구 차단만 제거하고, 새 커밋에 대한
+실제 GitHub Actions 실행은 push 금지로 계속 `BLOCKED`다.

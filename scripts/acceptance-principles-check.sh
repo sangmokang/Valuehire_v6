@@ -3,7 +3,9 @@
 #
 # 종료값: 0=선택한 모드 충족, 1=위반, 2=검사 환경/인자 오류.
 # --schema-only 는 장부 구조와 기록된 장치의 정적 배선만 진단한다.
-# --full(기본)은 회귀와 32개 전체 P1 조건까지 검사하며 CI/pre-push는 이 모드만 쓴다.
+# --pre-push 는 로컬 push 안전성에 필요한 구조·장치·회귀만 검사하고,
+#              아직 구현되지 않은 32개 전체의 완료 판정은 서버 CI에 맡긴다.
+# --full(기본)은 회귀와 32개 전체 P1 조건까지 검사한다.
 set -uo pipefail
 
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY \
@@ -11,7 +13,7 @@ unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY \
 
 MODE=${1:---full}
 case "$MODE" in
-  --schema-only|--full) ;;
+  --schema-only|--pre-push|--full) ;;
   *)
     echo "NOT_RUN: 지원하지 않는 모드 — $MODE"
     exit 2
@@ -382,6 +384,11 @@ RUBY
   fi
 else
   echo "BASELINE_NOT_AVAILABLE: origin/main:$FILE — first introduction; regression is not counted as PASS"
+fi
+
+if [ "$MODE" = "--pre-push" ]; then
+  echo "P1_LOCAL_GATE: schema/mechanism/wiring/regression checks only; full P1 completion is CI-owned"
+  exit "$overall"
 fi
 
 ruby -rpsych - "$FILE" <<'RUBY'

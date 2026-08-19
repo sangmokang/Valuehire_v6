@@ -178,7 +178,15 @@ else
     # (2026-08-07 실측 — 비밀 커밋이 실제로 원격에 도달했다):
     #   git commit --no-verify (문서화된 허용 경로)
     #   → SECRET_PATTERNS_FILE=/tmp/weak.txt git push  → exit 0 통과
-    SECRET_PATTERNS_FILE= bash "$c" >/dev/null 2>&1 || rc=$?
+    # P1의 32개 완성 판정은 서버 CI의 권한이다. 로컬 pre-push는 현재 push의
+    # 구조·경로·배선 무결성만 확인한다. 그렇지 않으면 아직 구현되지 않은
+    # 원칙(특히 해당없음)을 현황표에 정직하게 기록하는 순간 모든 push가
+    # 영구 차단된다. 기본 인자 없는 checker는 CI에서 전체 판정을 계속 수행한다.
+    if [ "${c#./}" = "scripts/acceptance-principles-check.sh" ]; then
+      SECRET_PATTERNS_FILE= bash "$c" --pre-push >/dev/null 2>&1 || rc=$?
+    else
+      SECRET_PATTERNS_FILE= bash "$c" >/dev/null 2>&1 || rc=$?
+    fi
     if [ "$rc" -ne 0 ]; then
       block "$c exit=$rc"
     else
