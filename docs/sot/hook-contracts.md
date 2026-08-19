@@ -1,6 +1,6 @@
 # Valuehire v6 — 로컬 강제 장치(git hook) 계약 (SOT)
 
-최종 갱신: 2026-08-08
+최종 갱신: 2026-08-19
 근거(도입 배경·적대검증·6종 위반 시연): `docs/engineering/hook-enforcement-goal-2026-08-07.md`
 
 ## 현재 규칙 — 입출력 계약
@@ -12,7 +12,9 @@
 출력  : exit 0 (통과) | exit 1 (차단)
         차단 시 stderr: "BLOCKED: <검사이름> — <파일경로> (패턴: <패턴이름>)"
         ※ 매칭된 실제 값은 절대 출력하지 않는다
-검사  : ① 비밀 스캔(verify.sh 위임, VERIFY_SCAN_SOURCE=index) ② 검사기 자기 제외
+검사  : ⓪ 고정 필수 파일(docs/sot/principles.yaml,
+          scripts/acceptance-principles-check.sh)이 인덱스에 있고 검사기가 실행 모드인지 확인
+        ① 비밀 스캔(verify.sh 위임, VERIFY_SCAN_SOURCE=index) ② 검사기 자기 제외
         ③ 검사 약화 패턴 ④ 만료 없는/지난 억제 ⑤ LLM 출력→판정 수치 ⑥ 외부효과 모듈 네트워크 0건
         ⑦ 대용량 파일(1,048,576 바이트 초과) · 산출물 경로(artifacts/·data/·private-reviews/·
           *.db·*.sqlite·*.sqlite3) 차단 — P21. gitignore 가 `git add -f` 로 우회되므로
@@ -24,6 +26,7 @@
           CI 등가물: `.github/workflows/verify.yml` 의 "대용량 파일 · 산출물 경로 스캔"
           (훅은 이번 커밋의 스테이지분만, CI 는 추적 파일 전체를 본다)
 불변식: set -euo pipefail. 검사를 실행하지 못하면 exit 1 (fail-closed)
+        staged 목록을 만들기 전에 ⓪을 실행한다. 삭제만 staged되어 ACMR 목록이 비어도 통과하지 않는다
 제외  : 없음. 자기 자신(hooks/)도 검사 대상이다
 ```
 
@@ -34,6 +37,8 @@
         실행: verify.sh, scripts/acceptance-*.sh 전량 (glob — 새 스크립트 추가 시 자동 포함)
         차단 시 stderr: "BLOCKED: <스크립트경로> exit=<code>"
 불변식: 스크립트가 0개 발견되면 exit 1 (fail-closed — "검사할 게 없어서 통과"를 금지)
+        글로브 실행 전에 principles.yaml과 acceptance-principles-check.sh가 HEAD와 작업트리에
+        모두 존재하고 검사기가 실행 가능한지 고정 목록으로 확인한다
         미추적 파일(??) 존재 시 exit 1 (P15)
 한계  : git push --no-verify 로 우회 가능. CI 가 최종 방어선 (문서에 명시)
 ```

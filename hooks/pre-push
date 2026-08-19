@@ -15,6 +15,22 @@ cd "$REPO"
 fail=0
 block() { printf 'BLOCKED: %s\n' "$1" >&2; fail=1; }
 
+# 글로브는 자기 삭제를 발견할 수 없다. 커밋된 트리와 checkout 양쪽의 고정 파일을 먼저 본다.
+REQUIRED_PRINCIPLES_FILES="docs/sot/principles.yaml scripts/acceptance-principles-check.sh"
+for required in $REQUIRED_PRINCIPLES_FILES; do
+  head_has_required=0
+  if git cat-file -e "HEAD:$required" 2>/dev/null; then
+    head_has_required=1
+  fi
+  if [ "$head_has_required" -ne 1 ] || [ ! -f "$required" ]; then
+    block "P1 필수 파일이 HEAD/작업트리에 없다 — $required (삭제·이름 변경 금지)"
+  fi
+done
+if [ ! -x scripts/acceptance-principles-check.sh ]; then
+  block "P1 검사기가 실행 가능하지 않다 — scripts/acceptance-principles-check.sh"
+fi
+if [ "$fail" -ne 0 ]; then exit 1; fi
+
 # ── 0) 재귀 깊이 가드 ────────────────────────────────────────────────────────
 #
 # push 를 수행하는 검사 스크립트가 pre-push 안에서 돌면 무한 재귀가 된다

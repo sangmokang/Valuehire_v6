@@ -1,189 +1,404 @@
 #!/usr/bin/env bash
-# acceptance-principles-check.sh — docs/sot/principles.yaml 스키마 완전성 + status 회귀(ratchet) 검사 (AC1~AC3)
-set -euo pipefail
-cd "$(git rev-parse --show-toplevel)"
+# acceptance-principles-check.sh — P1 32개 강제 목록의 구조·장치·CI 배선·회귀를 검사한다.
+#
+# 종료값: 0=선택한 모드 충족, 1=위반, 2=검사 환경/인자 오류.
+# --schema-only 는 장부 구조와 기록된 장치의 정적 배선만 진단한다.
+# --full(기본)은 회귀와 32개 전체 P1 조건까지 검사하며 CI/pre-push는 이 모드만 쓴다.
+set -uo pipefail
 
-FILE="docs/sot/principles.yaml"
-REQUIRED_COUNT=32
-REQUIRED_FIELDS=(id principle mechanism_expected mechanism_found status evidence)
-VALID_STATUSES=(완전 부분 없음 해당없음 미확인)
-# codex(V1) D1 반증(2026-08-19): id 개수·중복만 보면 P1을 P999로 바꿔도 통과한다.
-# 32개 항목의 정확한 id 집합을 고정해 대조한다(docs/sot/coding-principles.md §1·§1-B·검증체제 기준).
-EXPECTED_IDS="P1 P2 P3 P4 P5 P6 P7 P8 P9 P10 P11 P12 P13 P14 P15 P16 P17 P18 P19 P20 P21 P22 §1-B-1 §1-B-2 §1-B-3 §1-B-4 §1-B-5 V-1 V-2 V-3 V-4 V-5"
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY \
+      GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_PREFIX GIT_QUARANTINE_PATH
 
-if [ ! -f "$FILE" ]; then
-  echo "FAIL: $FILE 없음"
-  exit 1
-fi
+MODE=${1:---full}
+case "$MODE" in
+  --schema-only|--full) ;;
+  *)
+    echo "NOT_RUN: 지원하지 않는 모드 — $MODE"
+    exit 2
+    ;;
+esac
 
-# 외부 라이브러리(pyyaml) 의존 금지 — docs/sot/mechanism-registry.yaml 파서(scripts/verify/
-# check-mechanism-registry.sh) 관례를 따라 이 파일 전용 최소 파서를 표준 파이썬으로 직접 짠다.
-# 계약: 항목은 `- id: 값`으로 시작, 그 뒤 2칸 들여쓴 `key: 값` 줄이 항목당 정확히 6개(자기 자신 포함).
-# 값은 큰따옴표로 감싸거나 `null` 리터럴만 허용(그 외 형태 = 파싱 실패로 fail-closed).
-result=$(python3 - "$FILE" "$REQUIRED_COUNT" "$EXPECTED_IDS" <<'PYEOF'
-import re, sys
+REPO=$(git rev-parse --show-toplevel 2>/dev/null) || {
+  echo "NOT_RUN: git 저장소가 아니다"
+  exit 2
+}
+cd "$REPO" || {
+  echo "NOT_RUN: 저장소 루트로 이동할 수 없다"
+  exit 2
+}
 
-path, required_count, expected_ids_raw = sys.argv[1], int(sys.argv[2]), sys.argv[3]
-expected_ids = set(expected_ids_raw.split())
-required_fields = ["id", "principle", "mechanism_expected", "mechanism_found", "status", "evidence"]
-valid_statuses = {"완전", "부분", "없음", "해당없음", "미확인"}
+FILE=docs/sot/principles.yaml
+SOURCE=docs/sot/coding-principles.md
+WORKFLOW=.github/workflows/verify.yml
+REQUIRED="$FILE scripts/acceptance-principles-check.sh"
 
-with open(path, encoding="utf-8") as f:
-    lines = f.readlines()
-
-item_start = re.compile(r'^- id:\s*(.+)$')
-field_line = re.compile(r'^  ([a-z_]+):\s*(.*)$')
-
-BARE_OK = re.compile(r'^[A-Za-z0-9._§-]+$')
-# codex(V1) D2 반증(2026-08-19): 예전엔 "첫/끝 글자가 따옴표"만 보고 중간에 깨진 따옴표가
-# 섞인 값도 통과시켰다(독립 YAML 해석기는 이를 문법 오류로 거부함). fullmatch로 중간에
-# 따옴표가 하나도 더 없어야만 유효한 값으로 인정한다(fail-closed).
-QUOTED_OK = re.compile(r'^"[^"]*"$')
-
-def unquote(raw):
-    raw = raw.rstrip("\n").strip()
-    if raw == "null":
-        return None
-    if QUOTED_OK.match(raw):
-        return raw[1:-1]
-    if BARE_OK.match(raw):
-        return raw
-    print(f"FAIL: 값이 계약 밖 형태(온전한 큰따옴표 쌍/null/영숫자._§- 아님): {raw!r}")
-    sys.exit(1)
-
-items = []
-current = None
-for lineno, line in enumerate(lines, 1):
-    if not line.strip() or line.lstrip().startswith("#"):
-        continue
-    m = item_start.match(line)
-    if m:
-        if current is not None:
-            items.append(current)
-        current = {"id": unquote(m.group(1))}
-        continue
-    m = field_line.match(line)
-    if m and current is not None:
-        key, val = m.group(1), m.group(2)
-        if key in current:
-            print(f"FAIL: {lineno}행 — 같은 항목에 필드 '{key}' 중복")
-            sys.exit(1)
-        current[key] = unquote(val)
-        continue
-    print(f"FAIL: {lineno}행 — 계약 밖 형태: {line.rstrip()!r}")
-    sys.exit(1)
-if current is not None:
-    items.append(current)
-
-if len(items) != required_count:
-    print(f"FAIL: 항목 수 {len(items)} != {required_count}")
-    sys.exit(1)
-
-ids_seen = set()
-for item in items:
-    missing = [k for k in required_fields if k not in item]
-    if missing:
-        print(f"FAIL: {item.get('id', '?')} 필드 누락: {missing}")
-        sys.exit(1)
-    if item["status"] not in valid_statuses:
-        print(f"FAIL: {item['id']} status 값 불허: {item['status']}")
-        sys.exit(1)
-    if item["id"] in ids_seen:
-        print(f"FAIL: id 중복: {item['id']}")
-        sys.exit(1)
-    ids_seen.add(item["id"])
-
-missing_ids = expected_ids - ids_seen
-extra_ids = ids_seen - expected_ids
-if missing_ids or extra_ids:
-    print(f"FAIL: id 집합 불일치 — 누락: {sorted(missing_ids)} / 예상 밖: {sorted(extra_ids)}")
-    sys.exit(1)
-
-print("PASS: 스키마 32/32 유효, id 집합 정확히 일치, 중복 0건")
-PYEOF
-) && rc=0 || rc=$?
-echo "$result"
-if [ "$rc" -ne 0 ] || ! echo "$result" | grep -q '^PASS:'; then
-  exit 1
-fi
-
-# AC3 — status 회귀(ratchet): "직전 커밋(HEAD)"이 아니라 "서버에 이미 올라간 origin/main"과
-# 대조한다. codex(V1) D3 반증(2026-08-19, 치명적): HEAD와 대조하면 실제 push 시점엔 이미
-# 모든 변경이 커밋된 상태라 HEAD==작업파일이 되어 회귀를 항상 놓친다. origin/main에 이
-# 파일이 아직 없으면(최초 추가) 회귀 비교를 건너뛴다 — 비교 대상 자체가 없음.
-# HEAD로 조용히 대체하지 않는다 — 그 폴백 자체가 방금 고친 D3 취약점을 그대로 재도입하므로
-# (P13 검사약화 탐지가 이 이유로 실제 커밋을 막아 잡아낸 결함, 2026-08-19). origin/main 참조
-# 자체를 못 찾으면 사람이 볼 수 있게 실패한다(fail-closed) — 조용히 격하하지 않는다.
-# codex(V1) D3 2차 반증(2026-08-19, 치명적): 로컬에 저장된 "origin/main"은 마지막으로 내려받은
-# 시점의 사본일 뿐이다 — 서버는 이미 새 기준으로 앞서 있는데 이 컴퓨터가 그걸 안 내려받았으면,
-# 오래된(파일이 아직 없던) 사본과 비교해 회귀 검사 자체가 통째로 생략된다. 매번 비교 직전
-# 실제로 새로 내려받는다 — `|| true`로 실패를 삼키지 않는다(fail-closed. 기존 관례인
-# acceptance-0-5.sh:85의 `git fetch ... || true`는 이 자리에서 그대로 베끼지 않는다).
-if ! git fetch --quiet origin main; then
-  echo "FAIL: git fetch origin main 실패 — 서버 최신 기준을 확인할 수 없어 안전하게 실패 처리(fail-closed). 네트워크·자격증명을 확인하라"
-  exit 1
-fi
-BASE_REF="origin/main"
-if ! git cat-file -e "$BASE_REF" 2>/dev/null; then
-  echo "FAIL: $BASE_REF 참조를 찾을 수 없음 — 회귀 비교 기준이 없어 안전하게 실패 처리(fail-closed). 'git fetch origin'을 먼저 실행하라"
-  exit 1
-fi
-if git cat-file -e "$BASE_REF:$FILE" 2>/dev/null; then
-  regressed=$(python3 - "$FILE" "$BASE_REF" <<'PYEOF'
-import re, subprocess, sys
-
-path, base_ref = sys.argv[1], sys.argv[2]
-order = {"완전": 4, "부분": 3, "미확인": 2, "해당없음": 2, "없음": 1}
-item_start = re.compile(r'^- id:\s*(.+)$')
-field_line = re.compile(r'^  ([a-z_]+):\s*(.*)$')
-
-def unquote(raw):
-    raw = raw.rstrip("\n").strip()
-    if raw == "null":
-        return None
-    if len(raw) >= 2 and raw[0] == '"' and raw[-1] == '"':
-        return raw[1:-1]
-    return raw  # 회귀검사는 status 값(항상 bare 한글 단어)만 쓰므로 관용적으로 허용
-
-def parse_id_status(text):
-    result = {}
-    current_id = None
-    for line in text.splitlines():
-        m = item_start.match(line)
-        if m:
-            current_id = unquote(m.group(1))
-            continue
-        m = field_line.match(line)
-        if m and current_id is not None and m.group(1) == "status":
-            result[current_id] = unquote(m.group(2))
-    return result
-
-old_raw = subprocess.run(["git", "show", f"{base_ref}:{path}"], capture_output=True, text=True, check=True).stdout
-old = parse_id_status(old_raw)
-
-with open(path, encoding="utf-8") as f:
-    new = parse_id_status(f.read())
-
-bad = []
-for pid, new_status in new.items():
-    old_status = old.get(pid)
-    if old_status is None:
-        continue
-    if order.get(new_status, 0) < order.get(old_status, 0):
-        bad.append(f"{pid}: {old_status} -> {new_status}")
-
-if bad:
-    print("REGRESSED:" + ";".join(bad))
-else:
-    print("NO_REGRESSION")
-PYEOF
-)
-  if echo "$regressed" | grep -q '^REGRESSED:'; then
-    echo "FAIL: status 회귀 발견 — $regressed"
+for required in $REQUIRED; do
+  if [ ! -f "$required" ]; then
+    echo "REQUIRED_FILE_MISSING: $required"
     exit 1
   fi
-  echo "PASS: 회귀 0건 ($regressed)"
+done
+if [ ! -x scripts/acceptance-principles-check.sh ]; then
+  echo "REQUIRED_FILE_NOT_EXECUTABLE: scripts/acceptance-principles-check.sh"
+  exit 1
+fi
+if [ ! -f "$SOURCE" ] || [ ! -f "$WORKFLOW" ]; then
+  echo "NOT_RUN: SOT 또는 workflow를 읽을 수 없다"
+  exit 2
+fi
+if ! command -v ruby >/dev/null 2>&1 || ! ruby -rpsych -e 'exit 0' >/dev/null 2>&1; then
+  echo "NOT_RUN: Ruby Psych YAML 파서가 없다"
+  exit 2
 fi
 
-echo "PASS: principles.yaml 32/32 스키마 유효, 회귀 0건"
-exit 0
+ruby -rpsych -rjson -ropen3 - "$FILE" "$SOURCE" "$WORKFLOW" <<'RUBY'
+file, source_file, workflow_file = ARGV
+errors = []
+
+begin
+  raw = File.read(file)
+  ast = Psych.parse_stream(raw, file)
+rescue Psych::SyntaxError => e
+  puts "YAML_PARSE_ERROR: #{e.problem} (line #{e.line}, column #{e.column})"
+  exit 1
+end
+
+walk = nil
+walk = lambda do |node, path|
+  case node
+  when Psych::Nodes::Mapping
+    seen = {}
+    node.children.each_slice(2).with_index do |(key_node, value_node), index|
+      unless key_node.is_a?(Psych::Nodes::Scalar)
+        errors << "MAPPING_KEY_INVALID: #{path}[#{index}]"
+        next
+      end
+      key = key_node.value
+      if seen.key?(key)
+        errors << "DUPLICATE_KEY: #{path}.#{key}"
+      else
+        seen[key] = true
+      end
+      walk.call(value_node, "#{path}.#{key}")
+    end
+  when Psych::Nodes::Sequence
+    node.children.each_with_index { |child, index| walk.call(child, "#{path}[#{index}]") }
+  else
+    if node.respond_to?(:children) && node.children
+      node.children.each_with_index { |child, index| walk.call(child, "#{path}[#{index}]") }
+    end
+  end
+end
+walk.call(ast, "$")
+
+begin
+  data = Psych.safe_load(raw, permitted_classes: [], permitted_symbols: [], aliases: false)
+rescue Psych::Exception => e
+  errors << "YAML_PARSE_ERROR: #{e.message.lines.first.to_s.strip}"
+  data = nil
+end
+
+unless data.is_a?(Array)
+  errors << "ROOT_TYPE_INVALID: expected sequence"
+  data = []
+end
+
+expected_ids = (1..22).map { |n| "P#{n}" } +
+  (1..5).map { |n| "§1-B-#{n}" } +
+  (1..5).map { |n| "V-#{n}" }
+top_keys = %w[id principle mechanism_expected mechanism_found status evidence]
+mechanism_keys = %w[path check stages]
+statuses = %w[완전 부분 없음 해당없음 미확인]
+active_statuses = %w[완전 부분]
+allowed_stages = %w[pre-commit pre-push session-start acceptance ci]
+
+source_titles = {}
+in_browser = false
+File.foreach(source_file) do |line|
+  if line.start_with?("### §1-B.")
+    in_browser = true
+    next
+  elsif line.start_with?("### 검증 체제")
+    in_browser = false
+  end
+  if (match = line.match(/^\| \*\*((?:P\d+)|(?:V-\d+))\*\* \| \*\*(.+?)\*\*/))
+    source_titles[match[1]] = match[2]
+  elsif in_browser && (match = line.match(/^\| ([1-5]) \| \*\*(.+?)\*\*/))
+    source_titles["§1-B-#{match[1]}"] = match[2]
+  end
+end
+unless source_titles.keys.sort == expected_ids.sort
+  errors << "SOT_ID_SET_MISMATCH: parsed=#{source_titles.keys.sort.join(',')}"
+end
+
+begin
+  workflow = Psych.safe_load(
+    File.read(workflow_file),
+    permitted_classes: [],
+    permitted_symbols: [],
+    aliases: true
+  )
+rescue Psych::Exception => e
+  errors << "WORKFLOW_PARSE_ERROR: #{e.message.lines.first.to_s.strip}"
+  workflow = {}
+end
+
+ci_runs = []
+jobs = workflow.is_a?(Hash) ? workflow["jobs"] : nil
+if jobs.is_a?(Hash)
+  jobs.each_value do |job|
+    next unless job.is_a?(Hash) && job["steps"].is_a?(Array)
+    job["steps"].each do |step|
+      next unless step.is_a?(Hash)
+      condition = step["if"]
+      next if condition == false || condition.to_s.strip == "false"
+      ci_runs << step["run"] if step["run"].is_a?(String)
+    end
+  end
+end
+
+settings_strings = []
+collect_strings = nil
+collect_strings = lambda do |value|
+  case value
+  when Hash
+    value.each_value { |child| collect_strings.call(child) }
+  when Array
+    value.each { |child| collect_strings.call(child) }
+  when String
+    settings_strings << value
+  end
+end
+begin
+  collect_strings.call(JSON.parse(File.read(".claude/settings.json")))
+rescue StandardError => e
+  errors << "SESSION_SETTINGS_INVALID: #{e.class}"
+end
+
+seen_ids = {}
+data.each_with_index do |entry, index|
+  label = "item[#{index}]"
+  unless entry.is_a?(Hash)
+    errors << "ITEM_TYPE_INVALID: #{label}"
+    next
+  end
+
+  unknown = entry.keys - top_keys
+  missing = top_keys - entry.keys
+  errors << "UNKNOWN_FIELD: #{label} #{unknown.join(',')}" unless unknown.empty?
+  errors << "MISSING_FIELD: #{label} #{missing.join(',')}" unless missing.empty?
+  next unless unknown.empty? && missing.empty?
+
+  id = entry["id"]
+  unless id.is_a?(String) && !id.strip.empty?
+    errors << "EMPTY_FIELD: #{label}.id"
+    next
+  end
+  if seen_ids.key?(id)
+    errors << "ID_DUPLICATE: #{id}"
+  else
+    seen_ids[id] = true
+  end
+
+  %w[principle mechanism_expected evidence].each do |key|
+    value = entry[key]
+    errors << "EMPTY_FIELD: #{id}.#{key}" unless value.is_a?(String) && !value.strip.empty?
+  end
+
+  status = entry["status"]
+  errors << "STATUS_INVALID: #{id}=#{status.inspect}" unless statuses.include?(status)
+
+  expected_title = source_titles[id]
+  if expected_title && entry["principle"] != expected_title
+    errors << "PRINCIPLE_MISMATCH: #{id} expected=#{expected_title.inspect} actual=#{entry['principle'].inspect}"
+  end
+
+  mechanisms = entry["mechanism_found"]
+  if active_statuses.include?(status)
+    unless mechanisms.is_a?(Array) && !mechanisms.empty?
+      errors << "MECHANISM_REQUIRED: #{id} status=#{status}"
+      next
+    end
+  elsif !mechanisms.nil?
+    errors << "MECHANISM_MUST_BE_NULL: #{id} status=#{status}"
+    next
+  end
+  next if mechanisms.nil?
+  unless mechanisms.is_a?(Array)
+    errors << "MECHANISM_TYPE_INVALID: #{id}"
+    next
+  end
+
+  mechanisms.each_with_index do |mechanism, mechanism_index|
+    mlabel = "#{id}.mechanism_found[#{mechanism_index}]"
+    unless mechanism.is_a?(Hash)
+      errors << "MECHANISM_ITEM_INVALID: #{mlabel}"
+      next
+    end
+    unknown_mechanism = mechanism.keys - mechanism_keys
+    missing_mechanism = mechanism_keys - mechanism.keys
+    errors << "MECHANISM_UNKNOWN_FIELD: #{mlabel} #{unknown_mechanism.join(',')}" unless unknown_mechanism.empty?
+    errors << "MECHANISM_MISSING_FIELD: #{mlabel} #{missing_mechanism.join(',')}" unless missing_mechanism.empty?
+    next unless unknown_mechanism.empty? && missing_mechanism.empty?
+
+    path = mechanism["path"]
+    check = mechanism["check"]
+    stages = mechanism["stages"]
+    { "path" => path, "check" => check }.each do |kind, value|
+      unless value.is_a?(String) && !value.strip.empty?
+        errors << "MECHANISM_#{kind.upcase}_INVALID: #{mlabel}"
+        next
+      end
+      if value.start_with?("/", "~") || value.split("/").include?("..") ||
+         value.include?("*") || value.match?(/:\d+\z/)
+        errors << "MECHANISM_#{kind.upcase}_INVALID: #{mlabel}=#{value}"
+        next
+      end
+      full_path = File.join(Dir.pwd, value)
+      if File.symlink?(full_path)
+        errors << "MECHANISM_#{kind.upcase}_SYMLINK: #{mlabel}=#{value}"
+      elsif !File.file?(full_path)
+        marker = kind == "path" ? "MECHANISM_PATH_MISSING" : "MECHANISM_CHECK_MISSING"
+        errors << "#{marker}: #{mlabel}=#{value}"
+      else
+        _out, _err, status_result = Open3.capture3("git", "ls-files", "--error-unmatch", "--", value)
+        errors << "MECHANISM_#{kind.upcase}_UNTRACKED: #{mlabel}=#{value}" unless status_result.success?
+      end
+    end
+
+    if path == check
+      errors << "MECHANISM_SELF_EVIDENCE: #{mlabel}=#{path}"
+    end
+    if check.is_a?(String) && File.file?(check) && !File.executable?(check)
+      errors << "MECHANISM_CHECK_NOT_EXECUTABLE: #{mlabel}=#{check}"
+    end
+    if path.is_a?(String) && check.is_a?(String) && File.file?(check) &&
+       !File.read(check).include?(path)
+      errors << "MECHANISM_CHECK_DISCONNECTED: #{mlabel} path=#{path} check=#{check}"
+    end
+
+    unless stages.is_a?(Array) && !stages.empty? && stages.all? { |stage| stage.is_a?(String) }
+      errors << "STAGES_INVALID: #{mlabel}"
+      next
+    end
+    invalid_stages = stages - allowed_stages
+    errors << "STAGE_INVALID: #{mlabel}=#{invalid_stages.join(',')}" unless invalid_stages.empty?
+    errors << "STAGE_DUPLICATE: #{mlabel}" unless stages.uniq.length == stages.length
+
+    stages.each do |stage|
+      case stage
+      when "pre-commit"
+        errors << "WIRING_MISSING: #{mlabel} pre-commit path=#{path}" unless path == "hooks/pre-commit"
+      when "pre-push"
+        prepush_wired = path == "hooks/pre-push" ||
+          (check.is_a?(String) && check.start_with?("scripts/acceptance-") &&
+           File.read("hooks/pre-push").include?("acceptance-*.sh"))
+        errors << "WIRING_MISSING: #{mlabel} pre-push check=#{check.inspect}" unless prepush_wired
+      when "session-start"
+        expected_command = "bash #{path}"
+        unless settings_strings.any? { |value| value.include?(expected_command) }
+          errors << "WIRING_MISSING: #{mlabel} session-start command=#{expected_command}"
+        end
+      when "acceptance"
+        unless check.is_a?(String) && check.start_with?("scripts/acceptance-")
+          errors << "WIRING_MISSING: #{mlabel} acceptance check=#{check.inspect}"
+        end
+      when "ci"
+        escaped = Regexp.escape(check.to_s)
+        command = /(?:^|[[:space:]])(?:bash|sh)[[:space:]]+#{escaped}(?:[[:space:]]|$)/
+        unless ci_runs.any? { |run| run.lines.any? { |line| line.match?(command) } }
+          errors << "WIRING_MISSING: #{mlabel} ci command=bash #{check}"
+        end
+      end
+    end
+  end
+end
+
+actual_ids = data.map { |entry| entry["id"] if entry.is_a?(Hash) }.compact
+unless actual_ids.sort == expected_ids.sort
+  missing_ids = expected_ids - actual_ids
+  extra_ids = actual_ids - expected_ids
+  errors << "ID_SET_MISMATCH: missing=#{missing_ids.join(',')} extra=#{extra_ids.join(',')}"
+end
+
+if errors.empty?
+  counts = statuses.map { |status| "#{status}=#{data.count { |entry| entry['status'] == status }}" }
+  puts "SCHEMA_OK: 32/32 exact fields, SOT titles, mechanism paths, static wiring"
+  puts "STATUS_COUNTS: #{counts.join(' ')}"
+  exit 0
+end
+
+errors.each { |error| puts error }
+puts "SCHEMA_FAIL: #{errors.length} violation(s)"
+exit 1
+RUBY
+schema_rc=$?
+if [ "$schema_rc" -ne 0 ]; then
+  exit 1
+fi
+if [ "$MODE" = "--schema-only" ]; then
+  exit 0
+fi
+
+overall=0
+if ! git fetch --quiet origin main; then
+  echo "BASELINE_FETCH_FAILED: origin/main"
+  overall=1
+elif git cat-file -e "origin/main:$FILE" 2>/dev/null; then
+  baseline=$(mktemp)
+  trap 'rm -f "$baseline"' EXIT
+  if ! git show "origin/main:$FILE" > "$baseline"; then
+    echo "BASELINE_READ_FAILED: origin/main:$FILE"
+    overall=1
+  else
+    ruby -rpsych - "$baseline" "$FILE" <<'RUBY'
+old_file, new_file = ARGV
+begin
+  old_data = Psych.safe_load(File.read(old_file), permitted_classes: [], permitted_symbols: [], aliases: false)
+  new_data = Psych.safe_load(File.read(new_file), permitted_classes: [], permitted_symbols: [], aliases: false)
+rescue Psych::Exception => e
+  puts "BASELINE_PARSE_FAILED: #{e.message.lines.first.to_s.strip}"
+  exit 1
+end
+rank = { "해당없음" => 0, "없음" => 1, "미확인" => 1, "부분" => 2, "완전" => 3 }
+old_status = old_data.to_h { |entry| [entry["id"], entry["status"]] }
+regressions = []
+new_data.each do |entry|
+  id = entry["id"]
+  next unless old_status.key?(id)
+  before = old_status[id]
+  after = entry["status"]
+  regressions << [id, before, after] if rank.fetch(after, -1) < rank.fetch(before, -1)
+end
+if regressions.empty?
+  puts "STATUS_REGRESSION_OK: 0"
+  exit 0
+end
+regressions.each { |id, before, after| puts "STATUS_REGRESSION: #{id} #{before} -> #{after}" }
+exit 1
+RUBY
+    regression_rc=$?
+    [ "$regression_rc" -eq 0 ] || overall=1
+  fi
+else
+  echo "BASELINE_NOT_AVAILABLE: origin/main:$FILE — first introduction; regression is not counted as PASS"
+fi
+
+ruby -rpsych - "$FILE" <<'RUBY'
+data = Psych.safe_load(File.read(ARGV[0]), permitted_classes: [], permitted_symbols: [], aliases: false)
+unmet = data.reject do |entry|
+  entry["status"] == "완전" &&
+    entry["mechanism_found"].is_a?(Array) &&
+    entry["mechanism_found"].any? { |mechanism| mechanism["stages"].include?("ci") }
+end
+if unmet.empty?
+  puts "P1_OK: 32/32 complete with CI-wired mechanisms"
+  exit 0
+end
+puts "P1_UNMET: #{unmet.length}/32 — #{unmet.map { |entry| entry['id'] }.join(',')}"
+exit 1
+RUBY
+p1_rc=$?
+[ "$p1_rc" -eq 0 ] || overall=1
+
+exit "$overall"

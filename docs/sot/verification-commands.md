@@ -1,6 +1,6 @@
 # Valuehire v6 — 이 저장소의 실제 게이트 명령 (SOT)
 
-최종 갱신: 2026-08-17 (전부 실행으로 확인, 가정 없음)
+최종 갱신: 2026-08-19 (PR #31 로컬 배선 기준, 새 서버 실행은 push 전까지 미확인)
 근거: `docs/engineering/docs-sot-restructure-goal-2026-08-08.md`
 
 ## 현재 규칙
@@ -17,29 +17,33 @@
 
 ### CI(`​.github/workflows/verify.yml`)가 실제로 돌리는 것
 
-**워크플로 스텝 17개 전부**를 적는다(2026-08-12 V1 D6: 이전 판은 `bash ...` 직접 명령만 적어 인라인 본문 스텝이 목록에서 빠졌고, 운영자가 실제로 무엇이 도는지 잘못 판단할 수 있었다). 아래는 `verify.yml` 의 `- name:` 스텝 순서 그대로다(#6·#9 G1·#11 G2·#8 AC-M 병합 후 합집합과 #19 AC-19의 13개 합성 사례 — 2026-08-17).
+**워크플로 스텝 21개 전부**를 적는다. 아래는 PR #31 worktree의 `verify.yml` `- name:` 순서다. 1~4번은 로컬 구현이며, push 금지 때문에 GitHub Actions 서버에서의 새 실행은 아직 `BLOCKED`다.
 
 | # | 스텝 이름 | 실행 내용 |
 |---|---|---|
-| 1 | 비밀 스캔 (verify.sh) | `bash verify.sh` — 추적 파일 전체 |
-| 2 | HumanSearch G1 클린룸 경계 | 인라인 8개 — `scripts/acceptance-hs-cleanroom.sh`, `scripts/acceptance-hs-cleanroom-mutations.sh`, `scripts/acceptance-hs-cleanroom-absolute-paths.sh`, `scripts/acceptance-hs-cleanroom-absolute-contexts.sh`, `scripts/acceptance-hs-cleanroom-colon-paths.sh`, `scripts/acceptance-hs-cleanroom-file-urls.sh`, `scripts/acceptance-hs-cleanroom-hook-env.sh`, `scripts/acceptance-hs-cleanroom-hook-env-mutations.sh` |
-| 3 | HumanSearch G2 테스트 게이트 | 인라인 — `uv` 설치 후 `scripts/acceptance-hs-gates.sh`, `scripts/acceptance-hs-gates-mutations.sh`, `scripts/acceptance-hs-gates-antiforge.sh` (정적 ruff/mypy + pytest 수집·runtime import 증명) |
-| 4 | 히스토리 전량 스캔 | 인라인 — 도달 가능한 모든 blob 을 열어 자격증명 패턴 대조 |
-| 5 | 인수 검사 0-2 상시/종료상태 분리 | `bash scripts/acceptance-0-2-unreachable-content.sh` — 환경 격리·네 객체형·도구 실패·큰 객체·종료상태·훅 환경 무오염 13개 합성 사례 (AC-19) |
-| 6 | 인수 검사 0-6 | `bash scripts/acceptance-0-6.sh` |
-| 7 | 인수 검사 0-7 | `bash scripts/acceptance-0-7.sh` — 훅 위반 6종 시연 |
-| 8 | 인수 검사 0-5 | `bash scripts/acceptance-0-5.sh` — **`main` 브랜치에서만** (`if: github.ref == 'refs/heads/main'`) |
-| 9 | 억제 만료 스캔 | 인라인 — `suppressions.yaml` 의 expiry 형식·경과 |
-| 10 | 강제 장치 존재 검사 | 인라인 — `hooks/pre-commit`·`pre-push` 존재·실행권한 |
-| 11 | 셸 스크립트 문법 검사 | 인라인 — `git ls-files '*.sh'` 전부 `bash -n` |
-| 12 | 패턴 파일 자체 실값 검사 | 인라인 — `.secret-patterns.default` 에 값 리터럴 없는지 |
-| 13 | 인수 검사 hs-a3 | `bash scripts/acceptance-hs-a3.sh` — 세션 계열 자격증명 (AC-A3) |
-| 14 | 데이터 노출 스캔 | `bash scripts/scan-data-exposure.sh all` — 크기·금지경로·기록·개인정보 (AC-A4) |
-| 15 | 인수 검사 hs-a4 | `bash scripts/acceptance-hs-a4.sh` — 차단이 실제로 도는가 (AC-A4) |
-| 16 | 인수 검사 secret-webhook-vendor | `bash scripts/acceptance-secret-webhook-vendor.sh` — 웹훅·벤더 키 (AC-S1) |
-| 17 | 인수 검사 verify-ac-m | `bash scripts/acceptance-verify-ac-m.sh` — mechanism 명부 대조 (AC-M) |
+| 1 | P1 원칙 장부 필수 파일 존재 검사 | `principles.yaml`·검사기 존재와 검사기 실행 모드 고정 확인 |
+| 2 | P1 원칙 장부 mutation 검사 | `bash scripts/acceptance-principles-mutations.sh` — 격리 반례와 대조군 |
+| 3 | 전역 strict guard 격리 복구·한계 검사 | `bash scripts/acceptance-guard-global-skill-files.sh` — rollback/recover와 동일 UID 우회 재현 |
+| 4 | P1 원칙 32개 전체 강제 검사 | `bash scripts/acceptance-principles-check.sh` — 미충족 원칙이 있으면 의도적으로 실패 |
+| 5 | 비밀 스캔 (verify.sh) | `bash verify.sh` — 추적 파일 전체 |
+| 6 | HumanSearch G1 클린룸 경계 | 인라인 8개 — `scripts/acceptance-hs-cleanroom.sh`, `scripts/acceptance-hs-cleanroom-mutations.sh`, `scripts/acceptance-hs-cleanroom-absolute-paths.sh`, `scripts/acceptance-hs-cleanroom-absolute-contexts.sh`, `scripts/acceptance-hs-cleanroom-colon-paths.sh`, `scripts/acceptance-hs-cleanroom-file-urls.sh`, `scripts/acceptance-hs-cleanroom-hook-env.sh`, `scripts/acceptance-hs-cleanroom-hook-env-mutations.sh` |
+| 7 | HumanSearch G2 테스트 게이트 | 인라인 — `uv` 설치 후 `scripts/acceptance-hs-gates.sh`, `scripts/acceptance-hs-gates-mutations.sh`, `scripts/acceptance-hs-gates-antiforge.sh` |
+| 8 | 히스토리 전량 스캔 | 인라인 — 도달 가능한 모든 blob을 열어 자격증명 패턴 대조 |
+| 9 | 인수 검사 0-2 상시/종료상태 분리 | `bash scripts/acceptance-0-2-unreachable-content.sh` |
+| 10 | 인수 검사 0-6 | `bash scripts/acceptance-0-6.sh` |
+| 11 | 인수 검사 0-7 | `bash scripts/acceptance-0-7.sh` — 훅 위반 6종 시연 |
+| 12 | 인수 검사 0-5 | `bash scripts/acceptance-0-5.sh` — **`main` 브랜치에서만** |
+| 13 | 억제 만료 스캔 | 인라인 — `suppressions.yaml`의 expiry 형식·경과 |
+| 14 | 강제 장치 존재 검사 | 인라인 — `hooks/pre-commit`·`pre-push` 존재·실행권한 |
+| 15 | 셸 스크립트 문법 검사 | 인라인 — `git ls-files '*.sh'` 전부 `bash -n` |
+| 16 | 패턴 파일 자체 실값 검사 | 인라인 — `.secret-patterns.default`에 값 리터럴 없는지 |
+| 17 | 인수 검사 hs-a3 | `bash scripts/acceptance-hs-a3.sh` |
+| 18 | 데이터 노출 스캔 | `bash scripts/scan-data-exposure.sh all` |
+| 19 | 인수 검사 hs-a4 | `bash scripts/acceptance-hs-a4.sh` |
+| 20 | 인수 검사 secret-webhook-vendor | `bash scripts/acceptance-secret-webhook-vendor.sh` |
+| 21 | 인수 검사 verify-ac-m | `bash scripts/acceptance-verify-ac-m.sh` |
 
-*(1번 앞에 `actions/checkout` 이 있고 `fetch-depth: 0` 이다 — 4번이 과거 blob 을 열려면 필요하다.)*
+*(1번 앞에 `actions/checkout`이 있고 `fetch-depth: 0`이다 — 8번이 과거 blob을 열려면 필요하다.)*
 
 **CI는 고정 목록이고 로컬 `pre-push`는 글로브(이름 규칙 자동 수집)다.** 그래서 새 인수 스크립트를 만들면 로컬에서는 저절로 돌지만 CI에서는 한 줄도 안 돈다 — P15③("로컬에만 있는 검사는 없는 것으로 친다")에 걸린다. **새 `scripts/acceptance-*.sh`를 추가하는 PR은 `verify.yml`과 이 표 양쪽에 자기 줄을 함께 넣어야 한다.**
 

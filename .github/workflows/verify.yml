@@ -19,6 +19,21 @@ jobs:
         with:
           fetch-depth: 0   # 아래 "히스토리 전량 스캔" 스텝이 과거 커밋의 blob까지 열어보는 데 필요
 
+      - name: P1 원칙 장부 필수 파일 존재 검사
+        run: |
+          test -f docs/sot/principles.yaml
+          test -f scripts/acceptance-principles-check.sh
+          test -x scripts/acceptance-principles-check.sh
+
+      - name: P1 원칙 장부 mutation 검사
+        run: bash scripts/acceptance-principles-mutations.sh
+
+      - name: 전역 strict guard 격리 복구·한계 검사
+        run: bash scripts/acceptance-guard-global-skill-files.sh
+
+      - name: P1 원칙 32개 전체 강제 검사
+        run: bash scripts/acceptance-principles-check.sh
+
       - name: 비밀 스캔 (verify.sh)
         # 패턴은 커밋된 .secret-patterns.default 를 쓴다.
         # 실제 비밀값은 CI에 올리지 않는다 — 저장소 시크릿에 넣는 것도 유출 경로를 늘리는 일이다.

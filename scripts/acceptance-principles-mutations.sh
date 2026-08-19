@@ -112,6 +112,15 @@ new_case unknown
 mutate_yaml "$TMP/unknown" 'data[0]["unexpected_field"] = "must fail"'
 expect_checker "unknown field 추가" "$TMP/unknown" --schema-only 1 "UNKNOWN_FIELD"
 
+new_case duplicate_field
+perl -0pi -e 's/(  principle: "[^"]*"\n)/$1  principle: "duplicate"\n/' \
+  "$TMP/duplicate_field/docs/sot/principles.yaml"
+expect_checker "중복 필드" "$TMP/duplicate_field" --schema-only 1 "DUPLICATE_KEY"
+
+new_case empty_principle
+mutate_yaml "$TMP/empty_principle" 'data[0]["principle"] = ""'
+expect_checker "빈 principle" "$TMP/empty_principle" --schema-only 1 "EMPTY_FIELD"
+
 new_case empty_evidence
 mutate_yaml "$TMP/empty_evidence" 'data[0]["evidence"] = ""'
 expect_checker "빈 evidence" "$TMP/empty_evidence" --schema-only 1 "EMPTY_FIELD"
@@ -124,6 +133,10 @@ new_case changed_id
 mutate_yaml "$TMP/changed_id" 'data[0]["id"] = "P99"'
 expect_checker "ID 변경" "$TMP/changed_id" --schema-only 1 "ID_SET_MISMATCH"
 
+new_case bad_status
+mutate_yaml "$TMP/bad_status" 'data[0]["status"] = "거의완전"'
+expect_checker "계약 밖 status" "$TMP/bad_status" --schema-only 1 "STATUS_INVALID"
+
 new_case broken_yaml
 perl -0pi -e 's/principle: "[^"]*"/principle: "broken/' "$TMP/broken_yaml/docs/sot/principles.yaml"
 expect_checker "깨진 따옴표" "$TMP/broken_yaml" --schema-only 1 "YAML_PARSE_ERROR"
@@ -132,12 +145,18 @@ new_case missing_mechanism
 rm "$TMP/missing_mechanism/hooks/pre-commit"
 expect_checker "mechanism 파일 삭제 + status 유지" "$TMP/missing_mechanism" --schema-only 1 "MECHANISM_PATH_MISSING"
 
+new_case disconnected_mechanism
+perl -0pi -e 's#hooks/pre-commit#hooks/pre_commit#g' \
+  "$TMP/disconnected_mechanism/scripts/acceptance-hs-a4.sh"
+expect_checker "verifier에서 mechanism 연결 제거" "$TMP/disconnected_mechanism" --schema-only 1 "MECHANISM_CHECK_DISCONNECTED"
+
 new_case regression
 mutate_yaml "$TMP/regression" 'data.find { |x| x["id"] == "P21" }["status"] = "부분"'
 expect_checker "기준선 존재 + status 하락" "$TMP/regression" --full 1 "STATUS_REGRESSION"
 
 new_case no_baseline "$TMP/no-baseline.git"
 cp "$REPO/docs/sot/principles.yaml" "$TMP/no_baseline/docs/sot/principles.yaml"
+git -C "$TMP/no_baseline" add docs/sot/principles.yaml
 expect_checker "기준선 없음 명시" "$TMP/no_baseline" --full 1 "BASELINE_NOT_AVAILABLE"
 
 expect_checker "정상 표의 P1 전체 미충족" "$TMP/normal" --full 1 "P1_UNMET"
@@ -186,7 +205,7 @@ rm "$TMP/ci_delete/docs/sot/principles.yaml"
 ci_rc=0
 (
   cd "$TMP/ci_delete" || exit 1
-  test -f docs/sot/principles.yaml
+  test -f docs/sot/principles.yaml &&
   test -f scripts/acceptance-principles-check.sh
 ) >/dev/null 2>&1 || ci_rc=$?
 if [ "$ci_rc" -ne 0 ]; then ci_ok=0; else ci_ok=1; fi
