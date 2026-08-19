@@ -114,6 +114,12 @@ expect_checker() {
     ok=1
   fi
   record "$ok" "$desc" "exit=$rc, expected=$want_rc, marker=${pattern:-<none>}"
+  # 실패 원인을 잘라내지 않는다 — record는 요약만 찍어서, 로컬에서 재현되는데 CI에서만
+  # 다르게 실패하는 상황을 진단할 방법이 없었다(2026-08-19 실측). 검사기 원본 출력을
+  # 실패에만 들여쓰기로 첨부한다.
+  if [ "$ok" -ne 0 ]; then
+    printf '%s\n' "$output" | sed 's/^/    | /'
+  fi
 }
 
 # 정상 구조 대조군. 전체 P1 판정과 달리 schema-only는 기록 구조만 판정한다.
