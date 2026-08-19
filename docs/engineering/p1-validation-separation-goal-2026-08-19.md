@@ -137,4 +137,6 @@ PR #31의 새 커밋에서 `principles-structure`, `p3`, `verify`, `p1-completio
 Claude 1차 전체 원문은 `docs/engineering/p1-validation-separation-claude-raw-2026-08-19.txt`,
 실행 명령과 Codex 2차 재현·반박 표는
 `docs/engineering/p1-validation-separation-adversarial-evidence-2026-08-19.md`에 보존했다.
-로컬 1차·2차 검증은 통과했지만 원격 `P1_UNMET` 로그 원문은 아직 없다. push 뒤 이 절과 증거 문서에 원격 실행 ID·job 결과·원문을 추가하기 전에는 AC6을 완료로 판정하지 않는다.
+로컬 1차·2차 검증과 첫 원격 push run `32249461382`, PR run `32249465567`은 통과했다.
+두 원격 진단은 `P1_UNMET: 31/32`, `P1_COMPLETION_RAW_EXIT: 1`,
+`P1_COMPLETION_RESULT: UNMET`을 보존했다. 이 증거를 추가한 최종 문서 커밋의 원격 실행까지 다시 확인하기 전에는 AC6을 완료로 판정하지 않는다.

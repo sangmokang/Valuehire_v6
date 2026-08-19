@@ -198,5 +198,37 @@ P3_GUARD_FILES_UNCHANGED=1
 ## 현재 한계
 
 - `/tmp/p1-codex-reattack.RFmSTT`와 `/tmp/p1-rc-matrix.sMPrlL`은 격리 시험 산출물이며 원본 작업트리에 포함되지 않는다.
-- 원격 Actions 로그와 최종 PR 본문은 아직 검증하지 않았다.
 - branch protection API의 403은 “보호 없음”의 증거가 아니라 실제 설정을 확인하지 못했다는 증거다.
+
+## 첫 원격 실행 증거
+
+동일 HEAD `4c2b63f8321a5c95f7c574b90ad5882d75956012`에 대해 push와 pull request 트리거를 모두 확인했다.
+
+| 트리거 | run ID | 구조 job | 완료 진단 | P3 | verify |
+| --- | ---: | --- | --- | --- | --- |
+| push | `32249461382` | success | success | success | success |
+| pull_request | `32249465567` | success | success | success | success |
+
+→ 두 실행 모두 네 독립 job을 만들고 끝까지 완료했다.
+
+PR run `32249465567`, diagnostic job `96057037178` 원문:
+
+```text
+P1_UNMET: 31/32 — P1,P2,P3,P4,P5,P6,P7,P8,P9,P10,P11,P12,P13,P14,P15,P16,P17,P18,P19,P20,P22,§1-B-1,§1-B-2,§1-B-3,§1-B-4,§1-B-5,V-1,V-2,V-3,V-4,V-5
+P1_COMPLETION_RAW_EXIT: 1
+P1_COMPLETION_RESULT: UNMET
+```
+→ job의 화면상 success는 32개 완료가 아니다. 원래 전체 명령은 종료값 1과 31개 미충족을 그대로 냈고, workflow가 정책상 미충족만 비차단 진단으로 분류했다.
+
+같은 PR run에서 구조 job은 `CHECKED: 21`, P3 job은 `CHECKED: 35`를 기록했다. verify job은 마지막 `인수 검사 verify-ac-m (mechanism 명부 대조 · AC-M)`까지 success로 끝났다. 기존 `인수 검사 0-5 (push · CI 연결)` 단계의 `skipped` 조건은 이번 분리 전부터 존재하던 workflow 조건이며, 나머지 기존 비-P1 17개 단계의 이름·순서는 보존됐다.
+
+branch protection 조회 원문:
+
+```text
+HTTP/2.0 403 Forbidden
+{"message":"Upgrade to GitHub Pro or make this repository public to enable this feature.","status":"403"}
+BRANCH_PROTECTION_API_EXIT=1
+```
+→ 보호 규칙의 실제 활성 여부는 확인하지 못했다. 따라서 위 구조 job을 저장소 정책상 “필수”라고만 부르고 GitHub required check라고 주장하지 않는다.
+
+이 증거를 추가한 후의 새 HEAD는 아직 원격 검증 전이다. 최종 커밋을 push한 뒤 새 run을 다시 확인해야 한다.
