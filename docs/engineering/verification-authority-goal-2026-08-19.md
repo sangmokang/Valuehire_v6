@@ -196,6 +196,7 @@ MUTATION_SURVIVED: 0
 - 첫 전체 mutation은 격리 사본에 `.git`이 없어 7건이 생존: 사본 안에서 `git init`과 baseline commit을 만든 뒤 재실행했습니다.
 - workflow artifact 단계에 `if: always()`를 넣은 첫 판은 pre-commit이 약화 패턴으로 차단: 조건을 제거했습니다.
 - Claude 원문 파일의 마지막 빈 줄 때문에 `git diff --check`가 종료값 2: 원문 내용은 유지하고 끝의 빈 줄만 제거한 뒤 재실행했습니다.
+- 커밋 뒤 첫 실제 `hooks/pre-push`는 새 acceptance가 내부 격리 훅 시험에 `VH_PREPUSH_DEPTH=1`을 상속해 재귀로 오판하면서 종료값 1: 격리 자식 환경에서 훅 깊이 값도 제거하도록 수정했습니다. 같은 선행 16개 검사 재현은 모두 0이었고, 수정 뒤 실제 훅 전체를 다시 실행해 회귀를 확인합니다.
 
 ## 적대 검증 로그
 

@@ -68,7 +68,7 @@ module VerificationAuthority
   module_function
 
   def clean_env
-    GIT_ENV.each_with_object({}) { |key, env| env[key] = nil }
+    (GIT_ENV + ['VH_PREPUSH_DEPTH']).each_with_object({}) { |key, env| env[key] = nil }
   end
 
   def command(command, root)
