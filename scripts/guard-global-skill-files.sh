@@ -21,10 +21,15 @@ STATE_FILE="$STATE_DIR/strict-skill-files.state"
 CHECKED_FILE="$STATE_DIR/strict-skill-files.checked"
 
 file_mode() {
-  if stat -f '%Lp' "$1" 2>/dev/null; then
+  # GNU(Linux, CI 러너)를 먼저 시도한다 — BSD(macOS)의 -f는 "이 형식으로 보여줘"지만
+  # GNU의 -f는 "파일이 아니라 그 파일이 속한 디스크(파일시스템) 정보를 보여줘"라는
+  # 전혀 다른 뜻이다(2026-08-19 CI 실측: macOS 순서 그대로 두니 리눅스에서 -f가
+  # 조용히 성공해 디스크 정보를 권한 값인 것처럼 반환했다). GNU stat은 없는 옵션(-c)을
+  # 주면 안전하게 실패하므로, 먼저 시도해도 macOS에서 다음 분기로 정상적으로 넘어간다.
+  if stat -c '%a' "$1" 2>/dev/null; then
     return 0
   fi
-  stat -c '%a' "$1" 2>/dev/null
+  stat -f '%Lp' "$1" 2>/dev/null
 }
 
 file_hash() {
