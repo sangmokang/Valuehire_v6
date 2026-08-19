@@ -1,0 +1,143 @@
+VERDICT: PASS
+
+# 결론
+
+PR #31 후속 변경(95329e2..ebe9f6f)은 사용자가 지시한 14개 확인 항목 전부를 통과했습니다. principles.yaml의 "32개 중 31개 미충족"이라는 실제 상태는 조금도 숨겨지거나 완화되지 않았고, 그 미충족 판정이 P1 장부 구조 검사·P3 검사·기존 verify 회귀 검사의 실행을 더 이상 가로막지 않도록 GitHub Actions 워크플로가 4개의 독립 작업(job)으로 분리됐습니다. 저는 문서의 자기 주장을 그대로 믿지 않고, 실제 스크립트 실행·격리된 워크플로 변조 재현·GitHub API 실측으로 하나씩 다시 확인했으며, 이 과정에서 검증 대상 저장소 파일이나 git 상태는 전혀 바꾸지 않았습니다.
+
+# 판단 근거
+
+가장 중요한 갈림길은 "workflow YAML에 새 job 4개와 이름이 보인다는 사실을 그대로 배선 완료로 인정할 것인가, 아니면 그 job들이 실제로 서로 독립적이고 각 job의 명령이 진짜로 요구된 모드로 고정돼 있는지 별도로 재현할 것인가"였습니다. 저는 후자를 택했습니다. 이유는 이 정책 변경의 핵심이 "이름만 그럴듯하게 나눠놓고 실제로는 여전히 한 job에 묶여 있거나, 진단 job이 몰래 `--schema-only`로 격하돼 미충족을 숨기는" 종류의 위장이 가장 위험한 실패 모드이기 때문입니다. 그래서 저는 `.github/workflows/verify.yml`을 직접 읽어 4개 job에 `needs`가 전혀 없음을 확인했고(아래 §1), 거기서 멈추지 않고 job 이름·실행 모드·`continue-on-error`를 임의로 변조한 사본을 mktemp 격리 디렉터리에서 만들어 `acceptance-principles-mutations.sh`에 내장된 것과 동일한 Ruby 판정 로직을 독립적으로 재실행했습니다(아래 §3). 세 가지 변조(이름 변경, 모드 약화, `continue-on-error` 삽입) 전부 실제로 잡혔습니다.
+
+두 번째 갈림길은 "진단 job의 rc≥2 처리를 workflow YAML 텍스트 검토만으로 충분하다고 볼 것인가, 실제로 그 bash `case` 문을 rc=0/1/2/127 네 가지로 실행해 봐야 하는가"였습니다. 텍스트만 봐서는 `set +e ... set -e ... case ... exit "$rc"` 조합이 GitHub Actions의 기본 `bash -e` 실행 환경에서 의도대로 동작하는지 확신할 수 없었으므로, 저는 그 스텝의 셸 로직을 그대로 떼어내 네 가지 rc로 직접 실행했습니다(아래 §2). rc=1은 스텝 자체가 exit 0으로 끝나(비차단) 다른 job을 막지 않고, rc=2·127은 스텝이 그 값 그대로 실패해 진단 job이 실패합니다 — 사용자가 요구한 "rc≥2는 성공으로 바꾸거나 숨기면 안 된다"는 조건과 정확히 일치합니다.
+
+세 번째 갈림길은 "branch protection을 문서 주장(§11 '실측이 있을 때만 주장한다')만 읽고 넘어갈 것인가, 제가 직접 `gh api`로 재확인할 것인가"였습니다. 문서 스스로 "확인하지 않았다"고 명시했지만, 검증자가 그 명시를 재확인하지 않으면 "확인 안 했다고 써놓고 사실은 확인했으면서 숨겼을 가능성"을 배제할 수 없습니다. 직접 `gh api repos/sangmokang/Valuehire_v6/branches/main/protection`을 호출한 결과 403(GitHub 요금제 제한)이 나왔고, 이는 이전 세션에서 이미 기록된 한계([[feedback_github_plan_gates_branch_protection]] 메모리)와 일치합니다. 문서의 "확인하지 않았다"는 진술이 실제로 확인 불가능한 상황과 정확히 부합했습니다.
+
+버린 해석은 "principles.yaml 상태가 이번 diff에 20줄 바뀐 것으로 나오니 뭔가 상태가 조작됐을 수 있다"는 의심이었습니다. 이는 `git diff --stat b3361f0..ebe9f6f`에서 나온 것인데, b3361f0에는 이 브랜치의 이전(선행) 조사 커밋 95329e2가 포함되지 않은 상태였기 때문입니다. 사용자가 지시한 정확한 기준점(95329e2 이후)으로 다시 `git diff`를 뜨자 principles.yaml은 완전히 무변화(빈 diff)였습니다. 잘못된 기준점으로 판단했다면 "상태 조작 의심"이라는 오판정을 내렸을 것입니다.
+
+이 PASS 판정이 틀렸다면 무엇이 깨지는가: 만약 제가 놓친 조합 변조(예: job 이름과 모드를 동시에 손대면서 mutation 스크립트 자체도 같은 커밋에서 무력화하는 공격)가 실제로 존재한다면, 서버에서 "필수 검사 초록"을 32개 완료로 오인하는 사고가 재발할 수 있습니다. 다만 이 범주는 `hooks/pre-commit`의 "검사기 자기무력화 동시 변경 방어"(P3 mutation 로그의 "검사기 자체 무력화 공격 → BLOCKED" 항목)로 별도 방어되고 있으며, 이번 검증 범위(제가 재현한 3개 개별 변조)는 전부 잡혔습니다.
+
+# 기술 상세
+
+## 1. workflow job 분리·독립성 (요구사항 1)
+
+`.github/workflows/verify.yml:15-70`에 4개 job이 정의돼 있습니다.
+
+```yaml
+jobs:
+  principles-structure:      # :15  P1 원칙 장부 구조·배선 검증 (필수)
+  p1-completion-diagnostic:  # :38  P1 원칙 32개 전체 완료 진단 (비차단)
+  p3:                        # :70  P3 조용한 실패 문법 판정
+  verify:                    # :81  비밀·HumanSearch·기록·훅 등 기존 회귀
+```
+→ 4개 job 모두 `needs:` 키가 없어(파일에서 grep으로도 재확인) GitHub Actions는 이들을 병렬·독립 실행합니다. `principles-structure`는 `--schema-only`(:36)만, `p1-completion-diagnostic`은 인자 없는 기본 전체 명령(:47)만 실행해 두 의미가 명확히 나뉘어 있습니다.
+
+`p1-completion-diagnostic` job(:38-68)의 핵심:
+```yaml
+run: |
+  set +e
+  bash scripts/acceptance-principles-check.sh
+  rc=$?
+  set -e
+  echo "P1_COMPLETION_RAW_EXIT: $rc"
+  case "$rc" in
+    0) echo "P1_COMPLETION_RESULT: COMPLETE" ;;
+    1) echo "P1_COMPLETION_RESULT: UNMET"; echo "::warning ..." ;;
+    *) echo "P1_COMPLETION_RESULT: NOT_RUN"; exit "$rc" ;;
+  esac
+```
+→ rc=1(미충족)만 비차단 처리하고, rc=0·rc≥2는 각각 성공/그대로 실패로 남습니다. 이 로직을 아래 §2에서 직접 재현했습니다.
+
+## 2. rc별 진단 스텝 재현 (요구사항 2)
+
+동일 `set +e/case/exit` 셸 로직을 4가지 인위적 rc로 직접 실행했습니다.
+```
+--- rc=0 --- P1_COMPLETION_RESULT: COMPLETE, STEP_EXIT=0
+--- rc=1 --- P1_COMPLETION_RESULT: UNMET,    STEP_EXIT=0
+--- rc=2 --- P1_COMPLETION_RESULT: NOT_RUN,  STEP_EXIT=2
+--- rc=127 --- P1_COMPLETION_RESULT: NOT_RUN, STEP_EXIT=127
+```
+→ rc=1만 스텝 자체가 exit 0으로 끝나 job이 계속되고(비차단), rc≥2는 스텝이 원래 값 그대로 실패합니다. "진단 스크립트 실행 오류 rc≥2를 성공으로 바꾸거나 숨기면 안 된다"는 요구사항을 코드가 실제로 만족시킵니다.
+
+## 3. mutation 스크립트의 드리프트 탐지 (요구사항 3)
+
+`scripts/acceptance-principles-mutations.sh:224-320`에 내장된 workflow 정적 배선 검사 로직을 mktemp 격리 사본에 3가지 변조를 가해 재현했습니다.
+
+```
+=== job 이름만 변경 ===        → JOB_NAME_MISMATCH: principles-structure
+=== --schema-only → --full === → STRUCTURE_COMMAND_MISSING: bash scripts/acceptance-principles-check.sh --schema-only
+=== continue-on-error: true 삽입 === → REQUIRED_JOB_ALLOWS_FAILURE: principles-structure
+```
+→ 세 가지 변조 모두 별도 오류 코드로 잡혔습니다. 이 로직 자체를 그대로 실행하는 `bash scripts/acceptance-principles-mutations.sh`(§5)도 21/21 PASS, exit 0으로 통과해 실제 저장소 상태에서는 드리프트가 없음을 함께 확인했습니다.
+
+## 4~11. 지정 스크립트 실측 결과 (요구사항 4~11)
+
+```
+scripts/acceptance-principles-mutations.sh      → CHECKED: 21, FAIL 0건, exit=0
+scripts/acceptance-silent-failure-lint-mutations.sh → CHECKED: 35, FAIL 0건, exit=0
+  (자기무력화 공격 → BLOCKED exit=1 / 무해한 자기개선 → 통과 exit=0 둘 다 확인됨)
+scripts/acceptance-guard-global-skill-files.sh  → CHECKED: 8, FAIL 0건, exit=0
+scripts/acceptance-hs-a4.sh                     → CHECKED: 30, FAIL 0건, exit=0
+scripts/acceptance-principles-check.sh --pre-push → P1_LOCAL_GATE 출력, exit=0
+scripts/acceptance-principles-check.sh (기본)    → P1_UNMET: 31/32, exit=1
+verify.sh                                        → PASS: no secret-pattern match, exit=0
+scripts/session-status.sh                        → HEAD: ebe9f6f, RED: 2/25, exit=0
+```
+→ 10번 요구사항(31/32·종료값 1)이 정확히 재현됐습니다. `STATUS_COUNTS: 완전=1 부분=12 없음=7 해당없음=9 미확인=3`(합계 32)도 함께 출력돼 산술이 맞습니다. session-status.sh의 `RED: 2/25`는 SessionStart 훅이 세션 시작 시 보고한 값과 정확히 일치하며, 그 2건은 이 PR과 무관한 기존 결함(`acceptance-0-2.sh`의 로컬 `.secret-patterns` 부재)과 이 PR이 의도한 `acceptance-principles-check.sh`의 RED(31/32 미충족)입니다.
+
+## 12. principles.yaml 무변경 (요구사항 12)
+
+```
+git diff 95329e2..ebe9f6f -- docs/sot/principles.yaml   → (빈 출력)
+```
+→ 95329e2 이후 principles.yaml은 바이트 단위로 무변화입니다. b3361f0(더 이전 원격 기준)과 비교하면 20줄 차이가 나지만, 그 차이는 95329e2 자체(이 작업 이전의 선행 조사 커밋)에서 이미 발생한 것이며 이번 작업(95329e2..ebe9f6f) 범위에는 포함되지 않습니다.
+
+## 13. 문서의 정직성 (요구사항 13)
+
+`docs/sot/verification-commands.md:20`
+```
+여기서 "필수"는 저장소 문서의 병합 판단 기준이지, GitHub branch protection의
+required check가 실제 활성이라는 뜻이 아니다. 보호 설정은 아래 한계 절의
+원격 실측만 근거로 판단한다.
+```
+→ 같은 문서 79행 "한계" 절에 "`main` 브랜치 GitHub 보호 규칙의 실제 활성화 여부는 확인하지 않았다"고 명시돼 있습니다. 제가 직접 재실측한 결과:
+```
+gh api repos/sangmokang/Valuehire_v6/branches/main/protection
+→ 403 "Upgrade to GitHub Pro or make this repository public to enable this feature."
+```
+→ GitHub 개인 계정 + private repo 요금제 제한으로 실제로 확인이 불가능한 상황이며, 문서의 "확인하지 않았다"는 서술과 정확히 부합합니다. `docs/engineering/strict-principles-yaml-goal-2026-08-19.md:697`도 "branch protection의 required check 여부는 `gh api` 실측이 있을 때만 주장한다"고 병합 조건에 명시했습니다. "CI 초록 = 32개 완료"라는 표현은 세 문서(verification-commands.md, 두 goal 문서) 어디에도 없고, 오히려 반대로 "필수 작업이 초록이어도 32개 원칙 전체 완료를 뜻하지 않는다"(workflow 자체의 `$GITHUB_STEP_SUMMARY` 출력, verify.yml:55)는 문구가 4곳에 반복돼 있습니다.
+
+## 14. git 상태 무손상 (요구사항 14)
+
+```
+검증 시작: On branch task/strict-principles-yaml, nothing to commit, working tree clean
+검증 종료: branch.ab +6 -0 (origin 대비 ahead, porcelain 변경 없음)
+```
+→ 시작·종료 모두 작업트리 변경사항이 0건입니다. "+6 -0"은 로컬 HEAD가 자신의 upstream보다 6커밋 앞서 있다는 뜻으로(이 세션 이전부터 존재하던 push 대기 상태), 제 읽기 전용 검증 행위로 생긴 변화가 아닙니다.
+
+# 용어 설명
+
+- **job(작업)**: GitHub Actions 워크플로 안에서 독립적으로 실행되는 단위. `needs:` 키가 없으면 다른 job의 성공·실패와 무관하게 병렬 실행됩니다.
+- **rc(return code, 종료값)**: 셸 명령이 끝날 때 반환하는 숫자. 0은 성공, 1 이상은 대개 실패를 뜻하며, 이 저장소는 1(위반 발견)과 2 이상(검사 자체를 못 돌림)을 의도적으로 구분합니다.
+- **required check(필수 검사)**: GitHub의 branch protection 설정에서 "이 검사가 초록이어야만 병합 버튼이 활성화된다"고 강제하는 서버 측 규칙. 저장소 문서에서 쓰는 "필수"(정책상 병합 판단 기준)와는 다른 개념이며, 이번 저장소는 GitHub 요금제 제한으로 이 설정의 실제 활성 여부를 API로 조회할 수 없습니다.
+- **mutation(변조) 검사**: 검사기 자신이 제대로 작동하는지 확인하기 위해, 일부러 위반 상태를 격리된 사본에 주입해 "정말로 잡히는지"를 실행으로 증명하는 방식.
+
+# 발견 사항
+
+1. **[INFO, 낮음]** `docs/engineering/p1-validation-separation-goal-2026-08-19.md:135-137`의 "§8 적대 검증 로그" 절이 아직 비어 있고 "구현 후... 추가한다"는 예고문만 있습니다. 사업 영향: 이 자체가 결함은 아니며(문서가 스스로 "오너 검토 대기로 끝낸다"고 명시), 다만 이 절이 채워지기 전까지는 이번 제 검증이 그 절의 "1차 원문" 역할 후보가 될 수 있다는 점을 오너가 알아야 합니다.
+2. **[INFO, 낮음]** 로컬 브랜치가 `origin/task/strict-principles-yaml`보다 6커밋 앞서 있어(push 미완료), goal 문서 §11이 요구하는 "원격 실행 증거"(AC6, 병합 조건 1)는 이번 로컬 검증 범위에서 확인할 수 없습니다. 사업 영향: 로컬에서 통과했다고 해서 실제 GitHub Actions 서버가 같은 4개 job을 정확히 그렇게 실행한다는 보장은 push 이후에만 생깁니다. 이는 사용자가 지시한 14개 항목 범위 밖이므로 PASS 판정에는 영향을 주지 않지만, 병합 여부 판단에는 영향을 줍니다.
+
+이 외에 코드·문서·workflow 배선에서 사용자가 우려한 "은폐", "조기 종료", "정적 배선 미탐지", "rc 오분류", "branch protection 단정" 중 어느 것도 재현되지 않았습니다.
+
+# 5줄 설계 카드
+
+**문제** — P1 32개 원칙 전체 완료 판정(31/32 미충족, 의도된 실패)이 같은 job 안에서 뒤따르는 P3·기존 회귀 검사의 실행 자체를 막고 있었다.
+**목표** — 미충족 사실은 그대로 보존하면서, 구조 검사·P3·기존 회귀는 P1 완료 여부와 무관하게 서버에서 끝까지 실행되게 한다.
+**핵심 제약** — 원칙 상태 조작 금지, 진단 실행 오류(rc≥2)를 성공으로 위장 금지, 기존 P3·회귀 기대값 완화 금지.
+**선택** — workflow를 `principles-structure`(필수, schema-only)·`p1-completion-diagnostic`(비차단, 전체)·`p3`·`verify` 4개 독립 job으로 분리하고, mutation 스크립트로 job 이름·모드·의존성 드리프트를 강제한다.
+**기각** — "전체 명령 삭제"·"상태 상향"·"같은 job 안에서 실패만 무시" 세 대안은 미충족 사실을 숨기거나 job 경계를 다시 섞으므로 기각(goal 문서 §11 "버린 길"과 일치, 제가 재현한 mutation 결과와도 부합).
+
+# 미확인 사항과 재시도
+
+- ※ 이번 6개 로컬 커밋이 실제 GitHub Actions 서버에서 4개 job으로 정확히 실행되는지는 push 이전이라 확인하지 못했습니다(위 발견사항 2). 재시도 방법: 사용자 승인 후 `git push`하고 `gh run list --branch task/strict-principles-yaml` 및 `gh pr checks 31`로 실제 서버 로그를 재조회.
+- ※ branch protection은 GitHub 요금제 제한(403)으로 이번에도 여전히 실측 불가였습니다(문서의 정직한 서술과 일치하므로 재시도 불필요 — 요금제 업그레이드 또는 저장소 공개 전환이 있어야 조회 가능).
+- 재시도가 필요했던 항목은 없습니다. 모든 명령이 첫 실행에서 의도한 출력을 냈습니다.
