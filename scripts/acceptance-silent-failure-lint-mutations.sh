@@ -123,8 +123,17 @@ bash "$LINT" "$TMP/clean.py" >/tmp/.p3out2 2>&1 || rc=$?
 [ "$rc" -eq 0 ] && ok=0 || ok=1
 record "$ok" "정상 fixture 재확인(회귀 없음)" "exit=$rc"
 
-# 9) hooks/pre-commit 실제 배선 — 격리 임시 git 저장소에서 진짜 훅을 실행해 확인한다.
+# 9)+10) hooks/pre-commit 실제 배선 — 격리 임시 git 저장소에서 진짜 훅을 실행해 확인한다.
 # (acceptance-hs-a4.sh와 같은 방식: 판정을 다시 구현하지 않고 실제 hooks/pre-commit을 그대로 돈다.)
+#
+# ⚠️ P3_SKIP_HOOK_SUBTESTS 가드(2026-08-19): hooks/pre-commit §9(자기보호)는 자신이
+# 커밋될 버전으로 **이 스크립트 자체**를 재실행해 검사기가 여전히 위반을 잡는지
+# 확인한다. 그런데 이 스크립트가 실제 hooks/pre-commit을 다시 부르는 이 섹션까지
+# 함께 재실행되면, 그 안에서 또 hooks/pre-commit → §9 → 이 스크립트 → hooks/pre-commit
+# → ... 로 무한 재귀에 빠진다(2026-08-19 실측: 15초 넘게 응답 없음, 강제 종료).
+# hooks/pre-commit §9는 검사기의 "패턴 탐지 능력"만 재확인하면 충분하므로(1~8번),
+# 자기 자신을 재귀 호출하는 이 섹션(9~10번)은 그 컨텍스트에서 건너뛴다.
+if [ -z "${P3_SKIP_HOOK_SUBTESTS:-}" ]; then
 HOOKREPO="$TMP/hookrepo"
 mkdir -p "$HOOKREPO"
 setup_rc=0
@@ -136,7 +145,8 @@ setup_rc=0
   mkdir -p hooks scripts &&
   cp "$REPO/hooks/pre-commit" hooks/pre-commit &&
   cp "$REPO/scripts/acceptance-silent-failure-lint.sh" scripts/acceptance-silent-failure-lint.sh &&
-  chmod +x hooks/pre-commit scripts/acceptance-silent-failure-lint.sh &&
+  cp "$REPO/scripts/acceptance-silent-failure-lint-mutations.sh" scripts/acceptance-silent-failure-lint-mutations.sh &&
+  chmod +x hooks/pre-commit scripts/acceptance-silent-failure-lint.sh scripts/acceptance-silent-failure-lint-mutations.sh &&
   cp "$REPO/verify.sh" verify.sh 2>/dev/null &&
   cp "$REPO/.secret-patterns.default" .secret-patterns.default 2>/dev/null &&
   cp "$REPO/.check-weakening-patterns" .check-weakening-patterns 2>/dev/null &&
@@ -180,6 +190,51 @@ else
 fi
 [ "$rc" -eq 0 ] && ok=0 || ok=1
 record "$ok" "실제 hooks/pre-commit 배선(정상 파일 → 통과)" "exit=$rc"
+
+# 10) 검사기 자체 무력화 공격 — 2026-08-19 codex V1 적대검증이 실제로 뚫었던 경로.
+# 정규식을 절대 안 맞는 문자열로 바꾸면서(예: except → NEVER-EXCEPT) 위반 파일을
+# **같은 커밋**으로 스테이지하면, hooks/pre-commit §8만 있던 시절엔 exit 0으로
+# 통과했다(무력화된 확정본으로 자기 자신을 검사했으므로). §9(자기보호: 뮤테이션
+# 시험을 확정본으로 재실행)가 이걸 막아야 한다.
+HOOK_SELFWEAKEN_LOG="$TMP/hook_selfweaken.log"
+HOOK_BENIGN_LOG="$TMP/hook_benign.log"
+rc=0
+if [ -d "$HOOKREPO/.git" ]; then
+  (
+    cd "$HOOKREPO" &&
+    git reset --quiet >/dev/null 2>&1
+    git checkout -q -- scripts/acceptance-silent-failure-lint.sh 2>/dev/null
+    rm -f scripts/good.py &&
+    perl -pi -e 's/except\[\[:space:\]\]\*:/NEVER-EXCEPT[[:space:]]*:/' scripts/acceptance-silent-failure-lint.sh &&
+    printf 'def f():\n    try:\n        return 1\n    except:\n        return None\n' > scripts/attack.py &&
+    git add scripts/acceptance-silent-failure-lint.sh scripts/attack.py >/dev/null &&
+    bash hooks/pre-commit
+  ) >"$HOOK_SELFWEAKEN_LOG" 2>&1 || rc=$?
+else
+  rc=99
+fi
+if [ "$rc" -eq 1 ] && grep -q "P3 검사기 자체가 같은 커밋에서 무력화됨" "$HOOK_SELFWEAKEN_LOG" 2>/dev/null; then ok=0; else ok=1; fi
+record "$ok" "검사기 자체 무력화 공격(같은 커밋에서 정규식 무력화+위반) → BLOCKED" "exit=$rc"
+
+# 대조군 — 검사기에 무해한 주석만 더한 정상 개선 커밋은 막히면 안 된다(벽 아닌 게이트).
+rc=0
+if [ -d "$HOOKREPO/.git" ]; then
+  (
+    cd "$HOOKREPO" &&
+    git reset --quiet >/dev/null 2>&1
+    git checkout -q -- scripts/acceptance-silent-failure-lint.sh 2>/dev/null
+    rm -f scripts/attack.py &&
+    printf '\n# benign comment\n' >> scripts/acceptance-silent-failure-lint.sh &&
+    printf '\n# benign comment\n' >> scripts/acceptance-silent-failure-lint-mutations.sh &&
+    git add scripts/acceptance-silent-failure-lint.sh scripts/acceptance-silent-failure-lint-mutations.sh >/dev/null &&
+    bash hooks/pre-commit
+  ) >"$HOOK_BENIGN_LOG" 2>&1 || rc=$?
+else
+  rc=99
+fi
+[ "$rc" -eq 0 ] && ok=0 || ok=1
+record "$ok" "검사기 무해한 자기개선 커밋은 통과(벽이 아니라 게이트)" "exit=$rc"
+fi
 
 # 원본 저장소 무변경 확인
 AFTER=$(git -C "$REPO" status --porcelain)

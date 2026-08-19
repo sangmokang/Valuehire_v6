@@ -33,7 +33,7 @@
       check: "scripts/acceptance-silent-failure-lint-mutations.sh"
       stages: ["pre-commit", "acceptance", "ci"]
   status: "부분"
-  evidence: "grep 결과 다수 acceptance-*.sh에서 NOT_RUN 사용 확인. bare except/catch, catch{return null}, ||[], ?? 4패턴 lint(scripts/acceptance-silent-failure-lint.sh)를 신설해 hooks/pre-commit·CI에 배선했다(2026-08-19, mutation 11/11, 실제 hooks/pre-commit 훅 end-to-end 실행으로 검증). 다만 '모든 핸들러가 status와 함께 DB 기록'하는 장치는 아직 없어 완전은 아니다."
+  evidence: "grep 결과 다수 acceptance-*.sh에서 NOT_RUN 사용 확인. bare except/catch, catch{return null}, ||[], ?? 4패턴 lint(scripts/acceptance-silent-failure-lint.sh)를 신설해 hooks/pre-commit·CI에 배선했다(2026-08-19). codex(V1) 적대검증 결과 초판은 FAIL — 줄 단위 정규식이라 여러 줄 catch·주석 내부·문자열 안 텍스트에서 놓치거나 오탐하며, 같은 커밋에서 검사기 정규식과 위반 코드를 함께 스테이지하면 무력화됐다. 자기 무력화 결함은 hooks/pre-commit §9(커밋될 확정본으로 뮤테이션 시험을 재실행)로 막았고 재현 시험 13/13 통과(자기 무력화 공격 BLOCKED + 무해한 자기개선은 통과 둘 다 확인). 다만 정규식의 문법 변형 누락·오탐(여러 줄 catch, 독스트링 오탐 등)은 근본적으로 해결되지 않았다 — 언어별 구문 분석기로 교체해야 완전해지며, 그 작업과 '모든 핸들러가 status와 함께 DB 기록'하는 장치는 이번 범위 밖이라 여전히 부분이다."
 
 - id: P4
   principle: "가짜 구현 금지"

@@ -625,4 +625,42 @@ tojqsIAgKGdvYWwg66y47IScIOqysOuhoOqzvCDsnbzsuZgpIHwK
 
 ### 적대 검증 로그
 
-codex(V1) 적대검증 진행 중 — 결과 도착 시 이 절에 원문 그대로 append 예정.
+**codex(V1) 판정: `VERDICT: FAIL`.** 전문은 `private-reviews/p3-silent-failure-verdict-2026-08-19.md`에 원문 그대로 보존(격리 재현, `/tmp/p3-audit.DIyfQs`에서 공격 파일 작성 후 실제 검사기·훅에 통과시켜 확인).
+
+**핵심 발견 (요구사항 R1~R6 중 R1·R2-b·R2-c 실패, 나머지는 합격):**
+1. **R1 실패 — 정규식이 문법 변형에 우회된다.** 여러 줄 `catch (e) {\n}`, `catch\n(e)\n{\n}`, 주석만 있는 catch, 역슬래시 줄바꿈 `except \` 등 유효한 정상 문법이 6개 중 6개 놓쳤다. 반대로 독스트링·문자열·주석 안의 리터럴 텍스트(`"catch (e) {}"`, `` `... ?? ...` ``)는 3개 잘못 잡았다.
+2. **R2-b/R2-c 실패 — 같은 커밋에서 검사기 자체를 무력화할 수 있었다.** `except` 탐지 정규식을 `NEVER-EXCEPT`로 바꾸면서 bare except 위반 파일을 같은 커밋에 스테이지하면, hooks/pre-commit이 무력화된 확정본으로 자기 자신을 검사해 exit 0(통과)을 냈다. `.github/workflows/verify.yml`에서 P3 검사 스텝은 그보다 앞선 "P1 원칙 32개 전체 강제 검사"가 설계상 항상 실패해 실제로 도달한 적이 없다는 것도 재확인됨 — "서버가 로컬 우회를 보완한다"는 기대는 현재 순서에서 성립하지 않는다.
+3. **R2-a·R3·R4·R5·R6은 합격.** 스테이지된 인덱스 내용을 실제로 검사한다는 주장(작업트리 덮어쓰기 우회 불가), 뮤테이션 시험이 tautology가 아니라는 것(탐지 줄 5개를 하나씩 지우자 매번 FAIL), P3 상태 "부분" 표기의 정직성, `acceptance-hs-a4.sh`의 5곳 `bash -e` 수정이 실제로 유효하고 이번 작업과 무관한 기존 결함이었다는 것(HEAD~2에도 동일 결함 확인), 다른 31개 원칙 상태가 실수로 바뀌지 않았다는 것(STATUS_COUNTS 완전=1/부분=12/없음=7/해당없음=4/미확인=8 그대로) — 전부 codex가 직접 재현해 확인.
+
+**Claude(V2) 재공격 — codex 판정의 격리 재현:**
+
+codex가 제시한 "같은 커밋에서 검사기 무력화" 공격(R2-b/R2-c)을 별도의 격리 임시 git 저장소에서 직접 재현했다. `perl -pi -e` 로 `except` 탐지 정규식을 `NEVER-EXCEPT` 로 바꾸고 bare-except 위반 python 파일을 같은 커밋으로 `git add` 한 뒤 실제 `hooks/pre-commit`(수정 전 버전)을 그대로 실행:
+
+```text
+pre-commit exit=0
+```
+→ 뭘 시켰나: codex가 보고한 정확히 같은 공격을 재현. / 뭐가 나왔나: 위반 코드가 통과했다. / 좋은 소식인가 나쁜 소식인가: codex 판정과 100% 일치 — 실제 결함으로 확인.
+
+**수정(커밋 예정): `hooks/pre-commit` §9 신설.** 검사기 자신(`scripts/acceptance-silent-failure-lint.sh`) 또는 그 뮤테이션 시험이 이번 커밋에 포함되면, **커밋될 확정본**으로 뮤테이션 시험(`scripts/acceptance-silent-failure-lint-mutations.sh`)을 재실행해 알려진 위반 패턴을 여전히 잡아내는지 확인한다. 뮤테이션 시험은 자체 fixture로 위반을 주입하므로 공격자가 무엇을 스테이지했는지와 무관하게 항상 같은 결론을 낸다. 같은 재현 절차로 수정 후 버전을 재시험:
+
+```text
+[1] 공격(weaken+violation 같은 커밋) exit=1 — BLOCKED: P3 검사기 자체가 같은 커밋에서 무력화됨
+[2] 정상 커밋(README만) exit=0
+[3] 검사기 무해한 자기개선(주석만 추가) exit=0
+```
+→ 뭘 시켰나: 공격·정상 커밋·무해한 자기개선 3가지를 수정 후 훅으로 재현. / 뭐가 나왔나: 공격만 막히고 나머지 둘은 정상 통과(벽이 아니라 게이트). / 좋은 소식인가 나쁜 소식인가: 좋은 소식 — 가장 심각했던 결함이 닫혔다.
+
+**부작용 발견 및 수정: 무한 재귀.** §9가 뮤테이션 시험 전체를 재호출하는데, 그 시험 안에 이번에 새로 추가한 "실제 hooks/pre-commit 배선" 테스트(§9~10, HOOKREPO 기반)가 다시 `bash hooks/pre-commit`을 부르면서 `pre-commit → 뮤테이션시험 → pre-commit → ...`로 재귀에 빠졌다(2026-08-19 실측: 15초 이상 무응답, 강제 종료). `P3_SKIP_HOOK_SUBTESTS` 환경변수 가드를 추가해, §9에서 뮤테이션 시험을 재호출할 때는 패턴 탐지 능력만 재확인(1~8번)하고 자기 자신을 재귀 호출하는 구간(9~10번)은 건너뛰도록 고쳤다.
+
+**R1(정규식 우회)은 이번 범위에서 고치지 않는다.** codex의 권고(언어별 구문 분석기로 교체)는 Python은 `ast` 모듈, JS/TS는 별도 파서/린터가 필요한 훨씬 큰 작업이라 이번 증분 세션 하나로 안전하게 끝낼 수 있는 규모가 아니라고 판단했다. `docs/sot/principles.yaml`의 P3 evidence에 이 한계를 정직하게 기록하고 "부분" 상태를 유지한다 — codex가 잡은 과장(R1을 "완전"으로 암시하지 않았는지) 재점검 결과, 원래 커밋 메시지가 "실질적인 안전장치"라고 쓴 것은 R2-b/R2-c 결함을 몰랐던 시점의 과장이었음을 인정하고 이 로그에 정정을 남긴다.
+
+**갈리거나 뒤집힌 판정:** 없음. codex의 6개 요구사항별 판정(R1·R2-a·R2-b·R2-c·R3·R4·R5·R6) 전부를 Claude가 최소 1개 이상 재현해 일치를 확인했다(R2-b/R2-c는 공격 재현, 나머지는 codex 증거 원문과 로컬 재실행 대조). G(구현)·V1(codex)·V2(Claude)가 "R1·R2-b/c는 미해결 잔여 한계, 그 외는 실제 구현"이라는 결론에서 수렴했다.
+
+**최종 검증 (수정 반영 후, 전부 bash -e):**
+- `acceptance-silent-failure-lint-mutations.sh`: 13/13 PASS(자기 무력화 공격 BLOCKED + 무해한 자기개선 통과 2건 추가, 재귀 없음 확인)
+- `acceptance-principles-mutations.sh`: 21/21 PASS(회귀 없음)
+- `acceptance-guard-global-skill-files.sh`: 8/8 PASS(회귀 없음)
+- `acceptance-hs-a4.sh`: 30/30 PASS(회귀 없음)
+- `acceptance-principles-check.sh`: SCHEMA_OK 32/32, STATUS_COUNTS 완전=1 부분=12 없음=7 해당없음=4 미확인=8(변화 없음)
+- 실제 `hooks/pre-commit`으로 이 커밋 자체(hooks/pre-commit + acceptance-silent-failure-lint-mutations.sh 동시 수정)를 스테이지해 exit 0 확인
+- guard-global-skill-files lock/check/unlock 정상 수행, 시작·종료 SHA-256 일치
