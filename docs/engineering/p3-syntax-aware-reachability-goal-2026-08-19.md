@@ -4,7 +4,7 @@
 
 여러 줄로 숨긴 위반은 막고 설명문·주석·문자열은 통과시키는 수정이 로컬 시험 35개를 모두 통과했다. 앞선 총괄 검사가 실패해도 서버가 이 검사를 따로 실행하도록 분리했다.
 
-Claude 1차 공격이 처리 코드가 있는 바깥 예외 블록 안의 위반을 전부 놓치는 결함을 찾아 실제 커밋까지 통과시켰다. 같은 반례를 회귀시험으로 고정하고 내부 코드도 끝까지 검사하도록 수정해 로컬에서는 다시 막았다. 아직 수정 후 재공격과 실제 서버 실행이 남았으며, 둘 중 하나라도 실패하면 다시 고친다. 다른 31개 원칙과 모든 예외 처리 결과의 데이터베이스 기록은 이번에 건드리지 않는다.
+Claude 1차 공격이 처리 코드가 있는 바깥 예외 블록 안의 위반을 전부 놓치는 결함을 찾아 실제 커밋까지 통과시켰다. 같은 반례를 회귀시험으로 고정하고 내부 코드도 끝까지 검사하도록 수정했으며, Claude 수정 후 재공격도 합격했다. 실제 서버 실행은 아직 남았고, 서버에서 이 검사가 실패하거나 건너뛰어지면 다시 고친다. 다른 31개 원칙과 모든 예외 처리 결과의 데이터베이스 기록은 이번에 건드리지 않는다.
 
 ## 판단 근거
 
@@ -603,3 +603,164 @@ CHECKED: 35
 ```
 
 → 뭘 시켰나: Claude가 뚫은 중첩 경로를 직접 검사와 실제 pre-commit 두 곳에서 다시 공격하고, 추가 문법 반례·정상 대조군·자기무력화·작업공간 보존까지 한 명령으로 실행했다. / 뭐가 나왔나: 35개 모두 PASS, 전체 명령 exit 0이며 중첩 네 위반은 각 1건, 실제 훅은 exit 1로 차단했다. / 좋은 소식인가 나쁜 소식인가: 로컬 수정에는 좋은 소식이지만 원격 서버 로그와 전체 저장소 게이트가 남아 있어 아직 최종 완료는 아니다.
+
+## 14. Claude(V3) 수정 후 재공격 원문
+
+실행 프롬프트:
+
+```text
+수정 후 재공격하라. 당신은 Claude V3 독립 검증자다. 저장소는 /Users/kangsangmo/Desktop/Valuehire_v6/worktrees/strict-principles-yaml, HEAD a86d7e0이다. 이전 Claude V1은 scripts/acceptance-silent-failure-lint.sh가 처리 코드가 있는 바깥 catch 뒤 index=end_body로 내부 토큰을 전부 건너뛰어 catch{return null}, 빈 catch, || [], ?? 네 위반과 실제 pre-commit 커밋까지 통과시키는 치명적 결함을 찾았다. Codex는 RED 커밋 79c3ee9와 GREEN a86d7e0으로 해당 이동을 제거했고, ??=/||=[]도 추가했다.\n\n읽기 전용으로 다음을 실제 실행 공격하라:\n1) git show 79c3ee9와 git show a86d7e0을 대조하고, 바깥 handled catch 안의 네 위반을 직접 검사와 격리 actual hooks/pre-commit 양쪽에서 다시 공격하라.\n2) 검사기가 바깥 catch 자체의 bare/catch-return-null 판정도 유지하면서 내부 중첩을 끝까지 찾는지 확인하라.\n3) 35개 mutation 전체를 실행하고 CHECKED 35 및 worktree 보존을 확인하라.\n4) ??=, ||= []; TSX generic; regex/division; CRLF; Unicode; 공백 파일명; template/JSX text vs expression; invalid syntax/0 files 반례를 재공격하라.\n5) staged index, same-commit linter weakening, independent p3 job, docs/SOT 35/35와 P3 부분 상태를 확인하라.\n6) 훅+검사기+시험+workflow를 악의적으로 모두 바꿀 권한 자체는 repo 내부 검사로 없앨 수 없다는 신뢰경계와 이번 AC 결함을 구분하라.\n7) 원본 repo와 ~/.claude ~/.codex를 수정하지 말고 모든 fixture는 mktemp에서만 만들며 시작/종료 status를 대조하라.\n\nPASS는 V1 결함이 직접 검사와 actual hook 모두 차단되고, 새 치명/높음 결함이 없고, 문서가 과장하지 않을 때만 가능하다. 첫 줄 VERDICT: PASS|FAIL. 이어 결론(비기술 사업 책임자용), 판단 근거, 확인 못한 것, 각 명령과 전체 출력, file:line, 심각도, 설계 결정 5줄(무엇/왜/버린 대안/대가/되돌리는 법)을 한국어 존칭체로 적어라. 코드블록마다 바로 아래에 '→ 뭘 시켰나 / 뭐가 나왔나 / 좋은 소식인가 나쁜 소식인가'를 붙여라.
+```
+
+실제 호출은 `env -u ANTHROPIC_API_KEY -u CLAUDE_CODE_SSE_PORT claude -p <위 프롬프트>`였으며 `/private/tmp`에서 시작했다.
+
+판정 원문:
+
+```text
+VERDICT: PASS
+
+## 결론 (비기술 사업 책임자용)
+
+이전에 Claude(V1)가 발견한 치명적 결함 — "처리 코드가 있는 바깥 catch 뒤에서 검사기가 내부 토큰을 통째로 건너뛰어, catch 안에 숨긴 네 가지 금지 패턴(널 반환, 빈 catch, `|| []`, `??`)이 실제 커밋까지 통과하는 문제" — 은 Codex의 수정(커밋 a86d7e0)으로 실제로 막혔습니다. 저는 이 결론을 신뢰하지 않고 직접 격리된 임시 저장소를 만들어 동일한 공격을 실제 git 커밋 훅으로 재현했고, 차단되는 것을 두 눈으로 확인했습니다. 추가로 요청하신 8가지 회피 경로(복합 대입 `??=`/`||=[]`, TSX 제네릭, 정규식/나눗셈 혼동, CRLF, 유니코드, 공백 파일명, 템플릿 리터럴 안 텍스트 vs 실행식, 문법 깨진 파일)도 전부 개별적으로 재공격했으며, 모두 설계된 대로 동작했습니다. 원본 저장소와 사용자 계정 설정(`~/.claude`, `~/.codex`)은 전혀 건드리지 않았습니다.
+
+다만 한 가지는 이번 결함과는 별개의 "신뢰 경계" 문제로 명확히 구분해 알려드립니다: 이 pre-commit 훅은 개발자가 `scripts/install-hooks.sh`를 직접 실행해야 활성화되는 **로컬 자율 장치**이며, 저장소 안의 어떤 검사기도 "커밋 권한을 가진 사람이 훅·검사기·시험·CI를 한꺼번에 악의적으로 바꾸는 것" 자체를 막을 수는 없습니다. 이는 이번에 고친 버그가 아니라 소프트웨어 구조상 원천적인 한계이며, 실질적 방어선은 GitHub 쪽의 "브랜치 보호 규칙(필수 상태 검사)"인데, 그 설정은 로컬 저장소 파일만으로는 확인할 수 없었습니다.
+
+## 판단 근거
+
+1. **원인이 된 코드 변경 자체를 diff로 확인**했습니다. `scripts/acceptance-silent-failure-lint.sh:407` 부근에서 `index = end_body`(바깥 catch 판정 후 본문 전체를 건너뛰던 줄)가 삭제되고, 루프가 `index += 1`로 토큰을 하나씩 계속 순회하도록 바뀌었습니다. 이것이 V1이 지적한 결함의 정확한 원인이자 수정 지점입니다.
+2. **문서 주장(mutation 검사기)만 믿지 않고, 제가 직접 만든 별도 fixture**로 같은 시나리오(처리 코드가 있는 바깥 catch 안에 4개 위반 중첩)를 스캔했고, `catch-return-null=1, bare-catch=1, or-empty-array-fallback=1, nullish-coalescing-fallback=1`이 정확히 한 번씩만 잡혔습니다.
+3. **실제 git 커밋 훅**으로도 같은 공격을 재현했습니다 — 격리된 임시 git 저장소를 만들어 `hooks/pre-commit`을 `.git/hooks/pre-commit`에 실제 설치하고 `git commit`을 실행했고, `BLOCKED: 조용한 실패 패턴 발견 (P3)` 메시지와 함께 커밋이 거부되었습니다(exit 128, 커밋 미생성).
+4. **정상 케이스는 여전히 통과**함을 확인했습니다 — 실제로 처리하는 바깥 catch만 있고 내부에 위반이 없는 파일은 P3 사유 없이 통과했습니다(같은 격리 저장소에서 verify.sh 등 다른 무관 파일 누락으로 인한 차단만 남음).
+5. **35개 mutation 전체 실행 결과 CHECKED: 35, 전부 PASS**를 확인했고, `record` 호출 개수를 직접 세어(들여쓰기 포함 35건) 카운터가 하드코딩이 아니라 실제 집계임을 검증했습니다.
+6. **8개 추가 회피 경로**(??=, ||=[], TSX 제네릭, 정규식/나눗셈, CRLF, 유니코드, 공백 파일명, 템플릿 텍스트 vs 실행식)를 각각 독립 fixture로 직접 재공격 — 모두 기대대로 동작(진짜 위반만 잡고 리터럴/주석/정규식/나눗셈은 무시).
+7. **문법 깨짐·0파일 반례**도 재확인 — Python 문법 오류, 닫히지 않은 TS 블록, 존재하지 않는 파일, git 저장소가 아닌 디렉터리 모두 `NOT_RUN`(exit 2, fail-closed)이었고, 조용히 통과(exit 0)하는 경우는 없었습니다.
+8. **이중 카운팅 여부**도 별도로 검증했습니다 — 4개의 독립된 bare-catch(중첩 2개 포함)를 넣은 파일에서 정확히 4건만 잡혔고, 순회 방식 변경으로 인한 과다 탐지는 없었습니다.
+9. **같은 커밋 내 검사기 무력화 공격**과 **CI 독립 p3 job** 존재도 확인했습니다 — `hooks/pre-commit` §9가 검사기 자신을 확정본으로 재시험해 무력화를 잡고, `.github/workflows/verify.yml`의 `p3` job은 P1 성적과 무관하게 독립 실행되도록 `needs:`가 없습니다.
+10. **docs/sot/principles.yaml의 P3 항목**은 "35/35"라는 구체적 숫자와 "부분(部分)" 상태를 정직하게 명시하고 있으며, DB 기록 장치가 범위 밖이라는 점도 숨기지 않고 적어 과장하지 않았습니다.
+
+## 확인 못한 것
+
+- **GitHub 저장소의 브랜치 보호 규칙(필수 상태 검사) 설정**은 로컬 워크트리 파일만으로는 확인할 수 없습니다. `hooks/pre-commit`은 `scripts/install-hooks.sh`를 실행해야 활성화되는 로컬 자율 장치이므로, 이를 실행하지 않거나 `git commit --no-verify`를 쓰는 개발자에게는 로컬 방어선이 없습니다. 이 경우 유일한 방어선은 CI의 `p3` job인데, 그 job이 머지 전 "필수(required)"로 걸려 있는지는 GitHub 설정이라 이 환경에서 원격 조회 권한 없이는 검증 불가합니다.
+- **원격 GitHub Actions 실행 결과**는 커밋 메시지에도 "Not-tested: 원격 GitHub Actions는 push 후 확인"이라고 스스로 적혀 있듯, 실제 Ubuntu 러너에서 CI가 통과하는지는 로컬에서 확인할 수 없었습니다(로컬은 macOS).
+- **파일별 시각(mtime) 기반의 은밀한 동시 수정 공격**(예: pre-commit 훅과 검사기를 서로 다른 두 커밋으로 나눠 순차 약화)은 이번 재공격 범위에 포함하지 않았습니다 — §9는 "같은 커밋" 무력화만 방어하도록 설계되어 있어, 여러 커밋에 걸친 점진적 약화는 별도 위협 모델입니다(다만 이는 오늘 고친 결함의 범위 밖이며, 별도 검토 과제로 남겨두는 것이 타당합니다).
+
+## 명령·전체 출력 (file:line 포함)
+
+```bash
+git show 79c3ee9   # RED: fixture 추가만, 코드 수정 없음
+git show a86d7e0 -- scripts/acceptance-silent-failure-lint.sh   # GREEN: index=end_body 삭제
+```
+→ 뭘 시켰나: 두 커밋의 실제 diff를 대조 / 뭐가 나왔나: `scripts/acceptance-silent-failure-lint.sh:407`의 `index = end_body` 삭제가 유일한 핵심 수정이고, `??=`/`||=` 토큰 추가가 부수 개선임을 확인 / 좋은 소식인가 나쁜 소식인가: 좋은 소식 — 최소 변경으로 정확히 원인 라인만 고쳤습니다.
+
+```bash
+# 격리 mktemp에서 nested.ts 직접 스캔
+FAIL: nested.ts:5: catch-return-null
+FAIL: nested.ts:8: bare-catch
+FAIL: nested.ts:10: or-empty-array-fallback
+FAIL: nested.ts:11: nullish-coalescing-fallback
+RC=1  (각 마커 1/1)
+```
+→ 뭘 시켰나: 제가 직접 작성한 별도 fixture(V1의 재현과 동일 구조지만 독립 작성)를 스캔 / 뭐가 나왔나: 4건 전부, 정확히 한 번씩 검출 / 좋은 소식: 문서의 mutation 결과와 독립적으로 재현되어 신뢰도가 높습니다.
+
+```bash
+# 격리 mktemp git repo + 실제 .git/hooks/pre-commit + git commit
+BLOCKED: 조용한 실패 패턴 발견 (P3) — ...catch-return-null...
+COMMIT_EXIT=1
+```
+→ 뭘 시켰나: 시뮬레이션이 아니라 진짜 git 커밋 시도 / 뭐가 나왔나: 커밋이 실제로 거부됨(로그에 커밋 안 남음) / 좋은 소식: "직접 검사"뿐 아니라 "실제 훅" 경로도 차단을 확인했습니다.
+
+```bash
+# 같은 저장소에서 clean.ts(정상 handled catch)만 커밋
+BLOCKED: verify.sh 없음 ...
+BLOCKED: .check-weakening-patterns 없음 ...
+COMMIT_EXIT=1   (P3 사유는 없음)
+```
+→ 뭘 시켰나: 위양성(false positive) 여부 확인 / 뭐가 나왔나: P3 관련 차단 문구 없음 — 무관한 파일(verify.sh 등)을 이 임시 저장소에 안 넣어서 생긴 차단일 뿐 / 좋은 소식: 정상 케이스를 P3 위반으로 오판하지 않습니다.
+
+```bash
+bash scripts/acceptance-silent-failure-lint-mutations.sh
+... (35개 항목 전부 PASS) ...
+CHECKED: 35
+```
+→ 뭘 시켰나: 저장소가 자체 주장하는 회귀 시험 35개 전부 실행 / 뭐가 나왔나: 35/35 PASS, 실제 훅·자기무력화 공격·원본 worktree 보존까지 포함 / 좋은 소식: 문서 주장과 실측이 일치.
+
+```bash
+# ??=, ||=[], TSX 제네릭, 정규식/나눗셈 4종 독립 재공격
+nullish_assign.ts:2  nullish-coalescing-fallback  rc=1
+or_assign_array.ts:2 or-empty-array-fallback       rc=1
+generic_arrow.tsx:3   nullish-coalescing-fallback  rc=1 (제네릭 `<T,>` 오탐 없음)
+regex_division.ts:4  or-empty-array-fallback (regex `/a||b/`, 나눗셈은 미검출) rc=1
+```
+→ 뭘 시켰나: 문서가 "BLOCKED"라 주장한 항목을 제 fixture로 재확인 / 뭐가 나왔나: 전부 일치, 오탐 없음 / 좋은 소식.
+
+```bash
+# CRLF, 유니코드, 공백 파일명, 템플릿 텍스트 vs ${} 실행식
+crlf.ts:2 bare-catch rc=1
+unicode_한글.ts:4 catch-return-null rc=1
+"file with spaces.ts":2 bare-catch rc=1
+template_vs_expr.ts:3 nullish-coalescing-fallback (템플릿 리터럴 텍스트 안 `||[]`/`??`는 무시) rc=1
+```
+→ 뭘 시켰나: 인코딩·개행·공백 관련 회피 재공격 / 뭐가 나왔나: 전부 정확 / 좋은 소식.
+
+```bash
+# 문법 깨짐 / 0파일 반례
+invalid.py → NOT_RUN, exit=2
+unclosed.ts → NOT_RUN(닫히지 않은 {), exit=2
+존재하지 않는 파일 → NOT_RUN, exit=2
+git 저장소 아닌 디렉터리에서 인자 없이 실행 → NOT_RUN(git ls-files 실패), exit=2
+```
+→ 뭘 시켰나: fail-closed 원칙(P20) 재공격 / 뭐가 나왔나: 조용히 통과하는 경로 없음, 전부 exit 2 / 좋은 소식.
+
+```bash
+# 이중 카운팅 검증 — 독립 2개 + 중첩 2개 bare-catch
+bare-catch 총 개수(기대값=4): 4
+```
+→ 뭘 시켰나: index 순회 방식 변경이 과다탐지를 유발하는지 확인 / 뭐가 나왔나: 정확히 4건, 과다·과소탐지 없음 / 좋은 소식.
+
+```bash
+# CI 독립 p3 job
+p3: ... uses: actions/checkout@v4 ... lint.sh ... mutations.sh ... (needs: 없음)
+```
+→ 뭘 시켰나: P1 실패와 무관하게 P3가 독립 실행되는지 정적 확인 / 뭐가 나왔나: 확인됨 / 좋은 소식.
+
+```bash
+git config --get core.hooksPath  →  hooks
+grep -l hooksPath ... → scripts/install-hooks.sh
+```
+→ 뭘 시켰나: pre-commit 훅이 강제인지 선택인지 확인 / 뭐가 나왔나: `install-hooks.sh`를 실행해야 활성화되는 **로컬 opt-in** 장치임을 확인 / 나쁜 소식(단, 이번 결함과 무관한 구조적 한계): 개발자가 이 스크립트를 안 돌리거나 `--no-verify`를 쓰면 로컬 방어선이 없고, 유일한 안전망은 GitHub 쪽 브랜치 보호 규칙인데 이는 로컬에서 확인 불가.
+
+```bash
+cd .../strict-principles-yaml && git status --porcelain && git rev-parse HEAD
+(출력 없음) / a86d7e0c2f7782ce32f5135c0d78dd3c81877632
+```
+→ 뭘 시켰나: 원본 저장소 무변경 확인(작업 시작 시점과 종료 시점 대조) / 뭐가 나왔나: 커밋 전과 동일, HEAD 그대로 / 좋은 소식: 지시하신 "원본 repo 수정 금지"를 지켰습니다. 모든 fixture는 `mktemp -d`로 만든 임시 디렉터리에서만 생성했고, 작업 종료 후 삭제했습니다.
+
+## 발견된 결함
+
+없습니다. 재공격한 모든 경로(직접 검사, 실제 훅, 8종 회피 시도, 문법 반례, 이중 카운팅, CI 독립성, 문서 정직성)에서 치명적·높음 등급 결함을 찾지 못했습니다.
+
+## 설계 결정 5줄
+
+- **무엇**: `js_findings()`에서 바깥 catch 판정 후 본문을 건너뛰던 `index = end_body`를 삭제하고 토큰 단위(`index += 1`) 순회로 전환, `??=`/`||=`도 `??`/`||`와 동일 취급하도록 확장.
+- **왜**: Claude(V1)가 처리 코드가 있는 바깥 catch 안에 4개 위반을 숨기면 실제 pre-commit까지 통과하는 것을 실증했고, 복합 대입(`??=`, `||= []`)도 같은 의미의 기본값 우회이기 때문.
+- **버린 대안**: 외부 JS/TS AST 파서(예: Babel) 도입 — macOS/Ubuntu CI 양쪽에서 의존성 없이 동일 실행해야 한다는 기존 제약(P3 코멘트, `scripts/acceptance-silent-failure-lint.sh:11-13`)과 충돌해 기각.
+- **대가**: 자체 lexer 유지 비용이 계속 늘어남(이번에 35개 mutation으로 확장) — 새로운 JS/TS 문법 변형이 나올 때마다 회귀 시험을 추가해야 함.
+- **되돌리는 법**: `git revert a86d7e0`으로 `index = end_body` 재도입 가능하지만, 그 순간 79c3ee9의 RED fixture와 이번에 제가 만든 독립 fixture 양쪽 모두 재발할 것이므로 되돌리려면 mutation 스위트도 함께 되돌려야 함(그렇지 않으면 mutation 자체가 RED로 잡아냄).
+```
+
+→ 뭘 시켰나: V1에서 실패한 정확한 중첩 공격과 Codex가 추가한 복합 대입·TSX·정규식·개행·파일명 반례를 새 임시 저장소에서 재공격하게 했다. / 뭐가 나왔나: `VERDICT: PASS`; 직접 검사 네 마커 1건씩, 실제 커밋 차단, 35/35, 원본 무변경을 독립 확인했다. / 좋은 소식인가 나쁜 소식인가: 코드 결함은 닫혔다는 좋은 소식이다. 브랜치 보호와 원격 CI는 별도 측정 전까지 미확인으로 유지한다.
+
+## 15. 서버 강제력 사전 측정
+
+실행 명령과 전체 출력:
+
+```bash
+gh api repos/sangmokang/Valuehire_v6/branches/main/protection
+```
+
+```text
+gh: Upgrade to GitHub Pro or make this repository public to enable this feature. (HTTP 403)
+{"message":"Upgrade to GitHub Pro or make this repository public to enable this feature.","documentation_url":"https://docs.github.com/rest/branches/branch-protection#get-branch-protection","status":"403"}
+```
+
+→ 뭘 시켰나: main 브랜치에서 P3 서버 검사를 병합 전 필수 조건으로 강제할 수 있는지 현재 GitHub 설정을 직접 조회했다. / 뭐가 나왔나: 비공개 저장소의 현재 요금제에서는 브랜치 보호 기능 자체를 사용할 수 없다는 403 응답이었다. / 좋은 소식인가 나쁜 소식인가: 나쁜 소식이다. P3 서버 작업이 실행되고 실패를 표시할 수는 있지만, 저장소 권한자가 그 빨간불을 무시하고 병합하는 권한까지 코드로 없앨 수는 없다. 이 한계는 PR 본문에서 오너 판단 항목으로 남긴다.
