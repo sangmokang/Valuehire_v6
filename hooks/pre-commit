@@ -225,16 +225,21 @@ done <<< "$staged"
 # 내용(인덱스)을 임시 파일로 떠서 그 판정기를 그대로 부른다(§1 비밀 스캔과 같은 이유 —
 # 작업트리가 아니라 인덱스를 봐야 git add 뒤 작업트리만 덮어쓰는 우회를 막는다).
 LINT_SCRIPT="$REPO/scripts/acceptance-silent-failure-lint.sh"
-if [ ! -x "$LINT_SCRIPT" ]; then
-  block "P3 린트 스크립트 없음 또는 실행 불가 — scripts/acceptance-silent-failure-lint.sh (fail-closed)"
-else
-  lint_targets=""
-  while IFS= read -r f; do
-    case "$f" in
-      *.py|*.js|*.jsx|*.ts|*.tsx) lint_targets="${lint_targets}${lint_targets:+ }$f" ;;
-    esac
-  done <<< "$staged"
-  if [ -n "$lint_targets" ]; then
+lint_targets=""
+while IFS= read -r f; do
+  case "$f" in
+    *.py|*.js|*.jsx|*.ts|*.tsx) lint_targets="${lint_targets}${lint_targets:+ }$f" ;;
+  esac
+done <<< "$staged"
+# py/js 계열을 하나도 안 건드리는 커밋(예: README만 수정)까지 이 검사기의 존재를
+# 요구하면 이 훅을 격리 재현하는 다른 인수 스크립트(예: acceptance-hs-a4.sh)가
+# 전부 이 파일을 알아야 하는 "벽"이 된다 — REQUIRED_PRINCIPLES_FILES 두 개만
+# 그 급의 무조건 보호를 받는다(P1 키스톤). 여기서는 실제로 검사할 대상이 있을
+# 때만 검사기 부재를 fail-closed로 취급한다.
+if [ -n "$lint_targets" ]; then
+  if [ ! -x "$LINT_SCRIPT" ]; then
+    block "P3 린트 스크립트 없음 또는 실행 불가 — scripts/acceptance-silent-failure-lint.sh (fail-closed)"
+  else
     ltmp=$(mktemp -d)
     lint_files=""
     for f in $lint_targets; do

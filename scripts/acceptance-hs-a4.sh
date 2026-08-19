@@ -117,6 +117,11 @@ run_hook_case() {
   [ -f suppressions.yaml ] && cp suppressions.yaml "$tmp/"
   chmod +x "$tmp/hooks/pre-commit" "$tmp/hooks/pre-push"
   # 한 번만 실행하고 종료코드와 출력(BLOCKED 사유)을 함께 받는다.
+  # ⚠️ 여기서 기대하는 결과는 exit 1(BLOCKED)이다. `out=$(...)` 를 독립 문장으로
+  # 두면 set -e 아래서 그 대입 자체가 실패로 잡혀 스크립트 전체가 여기서 죽는다
+  # (2026-08-19 실측: bash -e 로 직접 돌리면 첫 케이스에서 즉사, CI 의 `bash -e {0}`
+  # 는 SHELLOPTS 상속으로 하위 `bash acceptance-hs-a4.sh` 에도 -e 가 전파된다).
+  rc=0
   out=$(
     cd "$tmp" || exit 9
     git config core.hooksPath hooks
@@ -127,8 +132,7 @@ run_hook_case() {
     "$maker" "$path"
     git add -f "$path" >/dev/null 2>&1
     bash hooks/pre-commit 2>&1
-  )
-  rc=$?
+  ) || rc=$?
   rm -rf "$tmp"
   if [ "$rc" -eq 0 ]; then
     bad "pre-commit 통과함 — $desc (차단되어야 한다)"
@@ -172,6 +176,7 @@ if [ -n "$tmp" ] && [ -d "$tmp" ]; then
   cp verify.sh .secret-patterns.default .check-weakening-patterns .gitignore "$tmp/"
   [ -f suppressions.yaml ] && cp suppressions.yaml "$tmp/"
   chmod +x "$tmp/hooks/pre-commit" "$tmp/hooks/pre-push"
+  rc=0
   out=$(
     cd "$tmp" || exit 9
     git config core.hooksPath hooks; git config user.email a@b.c; git config user.name t
@@ -180,8 +185,7 @@ if [ -n "$tmp" ] && [ -d "$tmp" ]; then
     git add -f payload.bin >/dev/null 2>&1
     printf 'x\n' > payload.bin          # 작업트리만 작게 덮어쓴다
     bash hooks/pre-commit 2>&1
-  )
-  rc=$?
+  ) || rc=$?
   rm -rf "$tmp"
   if [ "$rc" -ne 0 ] && printf '%s\n' "$out" | grep -q '1MB 초과 파일'; then
     ok "인덱스 blob 기준 측정 확인 (작업트리 덮어쓰기로 우회 불가)"
@@ -198,6 +202,7 @@ if [ -n "$tmp" ] && [ -d "$tmp" ]; then
   cp verify.sh .secret-patterns.default .check-weakening-patterns .gitignore "$tmp/"
   [ -f suppressions.yaml ] && cp suppressions.yaml "$tmp/"
   chmod +x "$tmp/hooks/pre-commit" "$tmp/hooks/pre-push"
+  rc=0
   out=$(
     cd "$tmp" || exit 9
     git config user.email a@b.c; git config user.name t
@@ -210,8 +215,7 @@ if [ -n "$tmp" ] && [ -d "$tmp" ]; then
     git config core.hooksPath hooks
     git mv notes.txt leak.db >/dev/null 2>&1
     bash hooks/pre-commit 2>&1
-  )
-  rc=$?
+  ) || rc=$?
   rm -rf "$tmp"
   if [ "$rc" -ne 0 ] && printf '%s\n' "$out" | grep -q '산출물·데이터 경로'; then
     ok "rename 도 검사 대상 (git mv 로 우회 불가)"
@@ -247,8 +251,7 @@ rc=0
   printf '# hello\n' > README.md
   git add README.md >/dev/null 2>&1
   bash hooks/pre-commit
-) >/dev/null 2>&1
-rc=$?
+) >/dev/null 2>&1 || rc=$?
 rm -rf "$tmp"
 if [ "$rc" -eq 0 ]; then
   ok "정상 파일은 통과 (차단과 통과가 한 쌍)"
@@ -300,8 +303,7 @@ else
       git config user.email a@b.c; git config user.name t
       "$scenario"
       bash judge.sh "$mode"
-    ) >/dev/null 2>&1
-    rc=$?
+    ) >/dev/null 2>&1 || rc=$?
     rm -rf "$tmp"
     if [ "$rc" -eq "$want" ]; then
       ok "판정기 실행 — $desc (exit=$rc)"
