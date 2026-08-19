@@ -1,5 +1,7 @@
 # PR #31 principles.yaml 재작업 — goal (2026-08-19)
 
+> **후속 정책 갱신:** 오너가 장부의 필수 구조 검사와 32개 전체 완료 진단을 분리하는 정책을 승인했다. 현재 검사 목록·실패 의미·병합 조건은 이 문서 맨 아래 `## 11. P1 구조 검증·전체 완료 진단 분리`가 정본이며, 아래의 과거 `SERVER_BLOCKED`·단일 `verify` 작업 기록은 당시 증거로만 보존한다.
+
 ## 사장님 브리핑
 
 **현재 결론:** PR #31의 로컬 구현은 보강할 수 있지만, push 금지 때문에 새 커밋에서 GitHub Actions가 새 검사를 실제 실행했는지는 이번 작업에서 증명할 수 없다. 최종 판정의 상한은 `로컬 CI-equivalent PASS 또는 PARTIAL / 실제 서버 실행 BLOCKED / 병합 불가`다. PR #32 브랜치는 읽기 전용으로만 감사하며, 이 브랜치에서는 정정 계획만 남긴다.
@@ -664,3 +666,33 @@ pre-commit exit=0
 - `acceptance-principles-check.sh`: SCHEMA_OK 32/32, STATUS_COUNTS 완전=1 부분=12 없음=7 해당없음=4 미확인=8(변화 없음)
 - 실제 `hooks/pre-commit`으로 이 커밋 자체(hooks/pre-commit + acceptance-silent-failure-lint-mutations.sh 동시 수정)를 스테이지해 exit 0 확인
 - guard-global-skill-files lock/check/unlock 정상 수행, 시작·종료 SHA-256 일치
+
+## 11. P1 구조 검증·전체 완료 진단 분리
+
+### 결론
+
+오너 승인에 따라 원칙 장부가 올바른 형식과 연결을 갖췄는지 확인하는 필수 검사와 32개 전체 완료 여부를 알리는 진단을 분리했다. 원칙 상태는 바꾸지 않았고, 인자 없는 기존 전체 명령은 계속 31/32 미충족을 출력한다.
+
+필수 구조 검사, P3, 기존 회귀 검사가 모두 합격해도 32개 원칙 전체 완료를 뜻하지 않는다. 병합 판단에는 세 필수 작업의 합격, 전체 완료 진단 원문 확인, branch protection 실측 결과, 오너의 수동 검토가 함께 필요하다.
+
+### 검사 목록과 실패 의미
+
+- `principles-structure` — `acceptance-principles-mutations.sh`, 전역 skill guard, `acceptance-principles-check.sh --schema-only`를 실행한다. 하나라도 실패하면 장부의 형식·경로·연결이 깨진 필수 실패다.
+- `p1-completion-diagnostic` — 기존 명령 `bash scripts/acceptance-principles-check.sh`를 인자 없이 실행한다. 종료값 1은 `P1_UNMET`과 `P1_COMPLETION_RESULT: UNMET`으로 보존하되 다른 작업을 막지 않는다. 종료값 2 이상은 검사 실행 불가이므로 이 작업도 실패한다.
+- `p3` — 기존 35개 공격·정상 대조군과 실제 훅 자기무력화 방어를 독립 실행한다. P1 진단과 선후 관계가 없다.
+- `verify` — 비밀·HumanSearch·기록·훅·셸·데이터 노출·mechanism 회귀 검사를 기존 순서로 실행한다. P1 진단과 선후 관계가 없다.
+- 현재 직접 실행 집계는 `완전=1 부분=12 없음=7 해당없음=9 미확인=3`이며, 전체 판정은 계속 `P1_UNMET: 31/32`다. 상태값 변경은 이번 작업 범위 밖이다.
+
+### RED → GREEN 증거
+
+- RED: `principles-structure`와 `p1-completion-diagnostic`이 없고 전체 명령이 `verify` 안에 있으면 `JOB_MISSING`, `FULL_COMMAND_JOB_MISMATCH: verify`로 실패했다.
+- 첫 GREEN 시도: job 전체에 `continue-on-error`를 두었더니 P13 약화 방지 훅이 차단했다. 이 설계는 종료값 2 이상까지 숨길 수 있어 폐기했다.
+- 최종 GREEN: 종료값 1만 `UNMET` 진단으로 변환하고 종료값 2 이상은 원래 실패로 남겼다. workflow 구조 시험 21/21과 실제 pre-commit이 합격했다.
+
+### 병합 조건
+
+1. `principles-structure`, `p3`, `verify`의 실제 원격 실행이 모두 합격해야 한다.
+2. `p1-completion-diagnostic` 로그에 현재 미충족 원문과 원명령 종료값이 보존돼야 한다.
+3. 필수 검사 초록을 32개 전체 완료로 표현하지 않는다.
+4. branch protection의 required check 여부는 `gh api` 실측이 있을 때만 주장한다. 보호가 없으면 오너가 diff와 네 작업 결과를 직접 확인해야 한다.
+5. 이 후속 작업은 PR #31을 병합하지 않고 오너 검토 대기로 끝낸다.
