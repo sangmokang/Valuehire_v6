@@ -554,4 +554,6 @@ tojqsIAgKGdvYWwg66y47IScIOqysOuhoOqzvCDsnbzsuZgpIHwK
 
 두 번째 `env -u ANTHROPIC_API_KEY claude -p`는 `VERDICT: FAIL`이었다. 코드 결함이 아니라 첫 원문 자체의 `### 삭제(두 파일 동시): ` 후행 공백을 그대로 넣어 `git diff --check=2`가 된 것이 유일한 실패였다. 두 번째 출력도 같은 예시 끝에 공백을 다시 생성했으므로, 읽기용 원문은 줄 끝 공백만 제거하고 바이트 원문은 SHA-256+Base64로 이 문서에 보존하는 저장 계약으로 바꿨다. Base64 decode와 `/tmp/pr31-claude-adversarial.txt`는 byte-for-byte 동일했고, 수정 직후 `git diff --check=0`을 재현했다.
 
+깨끗한 `0275da5`에서 세 번째 폐쇄 검증을 같은 guard 절차로 실행했다. Claude는 `VERDICT: PASS`를 반환했고 `git status` 빈 출력, 두 diff check 0, Base64 해시 일치, schema exit 0, 의도된 `P1_UNMET 31/32` exit 1, 실제 서버 실행 BLOCKED, 병합 불가를 재확인했다. guard check와 unlock도 각각 0이었고 시작 SHA-256과 종료 SHA-256은 같았다.
+
 현재 상태: `LOCAL_IMPLEMENTATION_VERIFIED / P1_FAIL / SERVER_BLOCKED / MERGE_NOT_ALLOWED`
