@@ -43,6 +43,18 @@ trap 'for d in $TMPDIRS; do [ -n "$d" ] && [ -d "$d" ] && rm -rf "$d"; done' EXI
 ok()  { checked=$((checked + 1)); printf 'PASS: %s\n' "$1"; }
 bad() { checked=$((checked + 1)); printf 'FAIL: %s\n' "$1"; fail=1; }
 
+# pre-commit은 P1 고정 파일이 인덱스에 없는 저장소를 의도적으로 거부한다. 이 A4
+# fixture는 그 파일들을 정상 기준 커밋으로 먼저 넣어야 대용량/PII 차단 사유 자체를
+# 검증할 수 있다. 필수 파일을 빼면 모든 케이스가 P1 누락으로만 막히는 거짓 양성이 된다.
+seed_principles_fixture() {
+  mkdir -p docs/sot scripts
+  cp "$REPO/docs/sot/principles.yaml" docs/sot/principles.yaml
+  cp "$REPO/scripts/acceptance-principles-check.sh" scripts/acceptance-principles-check.sh
+  chmod +x scripts/acceptance-principles-check.sh
+  git add docs/sot/principles.yaml scripts/acceptance-principles-check.sh >/dev/null 2>&1
+  git commit -q -m 'seed required P1 files' >/dev/null 2>&1
+}
+
 # ── 1) .gitignore 가 산출물 경로를 덮는가 ───────────────────────────────────
 # git check-ignore 로 판정한다. .gitignore 본문을 grep 하면 표기 차이(끝 슬래시·와일드카드)
 # 때문에 "적혀는 있는데 실제로는 안 걸리는" 경우를 놓친다.
@@ -110,6 +122,7 @@ run_hook_case() {
     git config core.hooksPath hooks
     git config user.email a@b.c
     git config user.name t
+    seed_principles_fixture
     mkdir -p "$(dirname "$path")"
     "$maker" "$path"
     git add -f "$path" >/dev/null 2>&1
@@ -162,6 +175,7 @@ if [ -n "$tmp" ] && [ -d "$tmp" ]; then
   out=$(
     cd "$tmp" || exit 9
     git config core.hooksPath hooks; git config user.email a@b.c; git config user.name t
+    seed_principles_fixture
     dd if=/dev/zero of=payload.bin bs=1024 count=1200 status=none
     git add -f payload.bin >/dev/null 2>&1
     printf 'x\n' > payload.bin          # 작업트리만 작게 덮어쓴다
@@ -187,6 +201,7 @@ if [ -n "$tmp" ] && [ -d "$tmp" ]; then
   out=$(
     cd "$tmp" || exit 9
     git config user.email a@b.c; git config user.name t
+    seed_principles_fixture
     # 씨앗 커밋은 훅을 붙이기 **전에** 만든다. 훅 우회 옵션을 쓰면 그 리터럴 자체가
     # 검사 약화 패턴이라 이 스크립트가 커밋되지 않는다(2026-08-09 실측 — 훅이 나를 막았다).
     printf 'notes\n' > notes.txt
@@ -228,6 +243,7 @@ rc=0
   git config core.hooksPath hooks
   git config user.email a@b.c
   git config user.name t
+  seed_principles_fixture
   printf '# hello\n' > README.md
   git add README.md >/dev/null 2>&1
   bash hooks/pre-commit
