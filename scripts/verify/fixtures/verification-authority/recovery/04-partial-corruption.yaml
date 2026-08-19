@@ -1,0 +1,5 @@
+id: partial_corruption
+events:
+  - corrupt_state
+expected_status: CORRUPT
+state_present: true

@@ -1,0 +1,5 @@
+id: forced_termination
+events:
+  - forced_termination
+expected_status: FORCED_TERMINATION
+state_present: true

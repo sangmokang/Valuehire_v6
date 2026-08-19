@@ -1,0 +1,6 @@
+id: rollback_state_delete_attempt
+events:
+  - second_target_failure
+  - delete_attempt
+expected_status: DELETE_REFUSED
+state_present: true

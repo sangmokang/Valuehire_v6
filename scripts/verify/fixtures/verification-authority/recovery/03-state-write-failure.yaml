@@ -1,0 +1,5 @@
+id: state_write_failure
+events:
+  - state_write_failure
+expected_status: STATE_WRITE_FAILED
+state_present: true

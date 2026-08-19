@@ -185,3 +185,15 @@ jobs:
         # 검사기 1벌(scripts/verify/check-mechanism-registry.sh)을 로컬 pre-push
         # 글로브와 CI 가 같은 인수 스크립트로 실행한다 (판정기 2벌 금지 · P16).
         run: bash scripts/acceptance-verify-ac-m.sh
+
+      - name: 검증 권한·SHA 귀속 후보 증거 생성
+        # 이 스텝은 후보 증거를 만들 뿐 공식 VERIFIED를 발급하지 않는다. 이 workflow도
+        # PR에서 함께 바뀔 수 있고 현재 외부 branch protection/ruleset은 UNAVAILABLE이다.
+        run: bash scripts/acceptance-verification-authority.sh --output "verification-results/verification-authority-${GITHUB_SHA}.json"
+
+      - name: 검증 권한 후보 증거 보관
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-authority-${{ github.sha }}
+          path: verification-results/verification-authority-${{ github.sha }}.json
+          if-no-files-found: error

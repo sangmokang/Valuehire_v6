@@ -1,0 +1,5 @@
+id: permission_restore_failure
+events:
+  - permission_restore_failure
+expected_status: PERMISSION_RESTORE_FAILED
+state_present: true

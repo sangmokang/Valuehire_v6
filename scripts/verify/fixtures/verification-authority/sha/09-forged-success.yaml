@@ -1,0 +1,14 @@
+expected_state: FAIL
+repository: sangmokang/Valuehire_v6
+workflow_identity: .github/workflows/verify.yml@verify
+required_check: verify
+target_sha: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+check_sha: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+run_identity: llm-report-109
+check_status: completed
+check_conclusion: success
+target_kind: pr_head
+pr_head_sha: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+source: llm_report
+protected_surface_changed: false
+separate_approval: true

@@ -1,0 +1,167 @@
+schema_version: 1
+required_check: verify
+workflow_identity: .github/workflows/verify.yml@verify
+mutation_expected_count: 23
+mutation_catalog:
+  - verifier_early_exit_zero
+  - ci_echo_command
+  - ci_comment_only
+  - ci_dead_code_before_command
+  - artifact_sha_unbound
+  - output_sha_comment_only
+  - required_checker_deleted
+  - required_registry_renamed
+  - mutation_case_deleted
+  - mutation_case_and_expected_count_lowered
+  - counterexample_emptied
+  - verifier_wiring_removed
+  - manifest_and_checker_weakened
+  - authority_implicit_verified_backdoor
+  - mutation_runner_early_success
+  - verified_sha_replaced_with_old_sha
+  - pr_head_sha_changed
+  - required_check_name_changed
+  - workflow_identity_changed
+  - forged_success_fixture
+  - rollback_permission_restore_failure
+  - rollback_state_delete_attempt
+  - normal_control
+protected_surface:
+  - .github/workflows/verify.yml
+  - docs/sot/verification-authority.md
+  - docs/sot/verification-requirements.yaml
+  - docs/sot/verification-protected-surface.yaml
+  - scripts/verify/verification_authority.rb
+  - scripts/verify/verification_authority/mutations.rb
+  - scripts/verify/verification_authority/recovery.rb
+  - scripts/verify/run-verification-authority-mutations.sh
+  - scripts/acceptance-verification-authority.sh
+  - hooks/pre-push
+  - docs/sot/git-workflow.md
+  - docs/sot/verification-commands.md
+unregistered_requirements:
+  - P1
+  - P2
+  - P3
+  - P4
+  - P5
+  - P6
+  - P7
+  - P8
+  - P9
+  - P10
+  - P11
+  - P12
+  - P13
+  - P14
+  - P15
+  - P16
+  - P17
+  - P18
+  - P19
+  - P20
+  - P21
+  - P22
+requirements:
+  - id: VA-001
+    invariant: LLM and implementer reports cannot create VERIFIED; protected-surface changes require policy review.
+    counterexamples:
+      - an LLM report claims COMPLETE and is accepted as merge authority
+      - a protected checker change self-approves without separate policy review
+    verifier: ruby scripts/verify/verification_authority.rb authority-check
+    stage:
+      - local
+      - pre-push
+      - ci
+      - policy
+    authority: external_policy_gate
+    coverage_status: BLOCKED
+  - id: VA-002
+    invariant: Every registered requirement has a closed schema and its verifier command is executed successfully.
+    counterexamples:
+      - invariant or counterexamples are empty
+      - a verifier path exists but its command is not executed
+      - duplicate or unknown fields are accepted
+    verifier: ruby scripts/verify/verification_authority.rb contract-self-test
+    stage:
+      - local
+      - pre-push
+      - ci
+    authority: implementer_candidate
+    coverage_status: COVERED
+  - id: VA-003
+    invariant: Required CI and pre-push paths execute the acceptance entrypoint rather than mention it as text.
+    counterexamples:
+      - the CI step echoes the command
+      - the command remains only in a comment or dead step
+      - pre-push discovers the file but does not execute it
+    verifier: ruby scripts/verify/verification_authority.rb wiring-check
+    stage:
+      - pre-push
+      - ci
+    authority: implementer_candidate
+    coverage_status: COVERED
+  - id: VA-004
+    invariant: The mutation catalog detects verifier, registry, wiring, SHA, recovery, and self-deletion faults with a normal control.
+    counterexamples:
+      - the verifier exits zero before checking anything
+      - a mutation case and its expected count are both lowered
+      - rollback failure deletes its recovery state
+    verifier: bash scripts/verify/run-verification-authority-mutations.sh
+    stage:
+      - local
+      - pre-push
+      - ci
+    authority: implementer_candidate
+    coverage_status: COVERED
+  - id: VA-005
+    invariant: Candidate evidence is bound to repository, workflow identity, required check, target SHA, run identity, and PR or merge-group relation.
+    counterexamples:
+      - a successful check from an old SHA is reused
+      - the required check or workflow identity is changed
+      - an unrelated merge-group SHA is accepted
+    verifier: ruby scripts/verify/verification_authority.rb sha-fixtures
+    stage:
+      - local
+      - pre-push
+      - ci
+      - policy
+    authority: external_policy_gate
+    coverage_status: BLOCKED
+  - id: VA-006
+    invariant: Recovery state remains until all rollback, permission restoration, state writes, and repeated recovery steps succeed.
+    counterexamples:
+      - the second target fails after the first target changed
+      - permission restoration fails and state is deleted
+      - recovery fails again or the state file is corrupted
+    verifier: ruby scripts/verify/verification_authority.rb recovery-fixtures
+    stage:
+      - local
+      - pre-push
+      - ci
+    authority: implementer_candidate
+    coverage_status: COVERED
+  - id: VA-007
+    invariant: Derived status, SHA, workflow identity, unmet items, unregistered count, and mutation survivors are regenerated from execution results.
+    counterexamples:
+      - a hand-edited generated status survives the next run
+      - a report omits its target SHA or mutation survivor count
+    verifier: ruby scripts/verify/verification_authority.rb derived-state-check
+    stage:
+      - local
+      - pre-push
+      - ci
+    authority: implementer_candidate
+    coverage_status: COVERED
+  - id: VA-008
+    invariant: Three-way weakening of every repository-owned protected inventory is reported as a surviving DETECT_ONLY structural limit, never as external enforcement.
+    counterexamples:
+      - checker, manifest, and contract inventories are weakened together and reported as ENFORCED
+      - the structural-limit fixture edits the original repository instead of an isolated copy
+    verifier: ruby scripts/verify/verification_authority.rb structural-limit-check
+    stage:
+      - local
+      - pre-push
+      - ci
+    authority: implementer_candidate
+    coverage_status: COVERED

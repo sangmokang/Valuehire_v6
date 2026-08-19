@@ -1,0 +1,56 @@
+schema_version: 1
+enforcement: DETECT_ONLY
+paths:
+  - path: .github/workflows/verify.yml
+    category: trusted_workflow_candidate
+    required: true
+  - path: docs/sot/verification-authority.md
+    category: state_transition_policy
+    required: true
+  - path: docs/sot/verification-requirements.yaml
+    category: required_checks_and_mutation_catalog
+    required: true
+  - path: docs/sot/verification-protected-surface.yaml
+    category: protected_surface_manifest
+    required: true
+  - path: scripts/verify/verification_authority.rb
+    category: checker_sha_and_mutation_runner
+    required: true
+  - path: scripts/verify/verification_authority/mutations.rb
+    category: mutation_runner_implementation
+    required: true
+  - path: scripts/verify/verification_authority/recovery.rb
+    category: recovery_state_machine
+    required: true
+  - path: scripts/verify/run-verification-authority-mutations.sh
+    category: mutation_entrypoint
+    required: true
+  - path: scripts/acceptance-verification-authority.sh
+    category: acceptance_entrypoint
+    required: true
+  - path: hooks/pre-push
+    category: local_pre_push_wiring
+    required: true
+  - path: docs/sot/git-workflow.md
+    category: merge_policy_declaration
+    required: true
+  - path: docs/sot/verification-commands.md
+    category: required_command_declaration
+    required: true
+external_controls:
+  - control: branch_protection
+    status: UNAVAILABLE
+    evidence: HTTP 403 private repository plan limitation on 2026-08-19
+    authority: GitHub
+  - control: repository_ruleset
+    status: UNAVAILABLE
+    evidence: HTTP 403 private repository plan limitation on 2026-08-19
+    authority: GitHub
+  - control: codeowners
+    status: UNAVAILABLE
+    evidence: .github/CODEOWNERS is absent and no external enforcement was demonstrated
+    authority: GitHub
+  - control: internal_manifest
+    status: DETECT_ONLY
+    evidence: manifest and checker share repository write authority
+    authority: repository_contributors

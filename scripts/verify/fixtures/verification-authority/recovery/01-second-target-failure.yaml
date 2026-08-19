@@ -1,0 +1,5 @@
+id: second_target_failure
+events:
+  - second_target_failure
+expected_status: SECOND_TARGET_FAILED
+state_present: true

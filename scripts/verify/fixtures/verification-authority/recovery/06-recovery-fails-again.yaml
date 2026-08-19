@@ -1,0 +1,5 @@
+id: recovery_fails_again
+events:
+  - recovery_failure_again
+expected_status: RECOVERY_FAILED_AGAIN
+state_present: true

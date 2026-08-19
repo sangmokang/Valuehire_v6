@@ -36,6 +36,8 @@
 불변식: 스크립트가 0개 발견되면 exit 1 (fail-closed — "검사할 게 없어서 통과"를 금지)
         미추적 파일(??) 존재 시 exit 1 (P15)
 한계  : git push --no-verify 로 우회 가능. CI 가 최종 방어선 (문서에 명시)
+        `scripts/acceptance-verification-authority.sh`도 같은 glob으로 실행되며, 자체 wiring
+        fixture가 격리 저장소에서 pre-push가 이 파일을 실제 실행하는지 확인한다.
 ```
 
 ### `scripts/session-status.sh`

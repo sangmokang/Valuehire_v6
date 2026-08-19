@@ -17,7 +17,7 @@
 
 ### CI(`​.github/workflows/verify.yml`)가 실제로 돌리는 것
 
-**워크플로 스텝 17개 전부**를 적는다(2026-08-12 V1 D6: 이전 판은 `bash ...` 직접 명령만 적어 인라인 본문 스텝이 목록에서 빠졌고, 운영자가 실제로 무엇이 도는지 잘못 판단할 수 있었다). 아래는 `verify.yml` 의 `- name:` 스텝 순서 그대로다(#6·#9 G1·#11 G2·#8 AC-M 병합 후 합집합과 #19 AC-19의 13개 합성 사례 — 2026-08-17).
+**워크플로 검사 스텝 19개 전부**를 적는다(2026-08-12 V1 D6: 이전 판은 `bash ...` 직접 명령만 적어 인라인 본문 스텝이 목록에서 빠졌고, 운영자가 실제로 무엇이 도는지 잘못 판단할 수 있었다). 아래는 `verify.yml` 의 검사·증거 스텝 순서 그대로다(#6·#9 G1·#11 G2·#8 AC-M 병합 후 합집합과 #19 AC-19의 13개 합성 사례, 검증 권한 후보 증거 2개 스텝 — 2026-08-19).
 
 | # | 스텝 이름 | 실행 내용 |
 |---|---|---|
@@ -38,10 +38,12 @@
 | 15 | 인수 검사 hs-a4 | `bash scripts/acceptance-hs-a4.sh` — 차단이 실제로 도는가 (AC-A4) |
 | 16 | 인수 검사 secret-webhook-vendor | `bash scripts/acceptance-secret-webhook-vendor.sh` — 웹훅·벤더 키 (AC-S1) |
 | 17 | 인수 검사 verify-ac-m | `bash scripts/acceptance-verify-ac-m.sh` — mechanism 명부 대조 (AC-M) |
+| 18 | 검증 권한·SHA 귀속 후보 증거 생성 | `bash scripts/acceptance-verification-authority.sh --output ...${GITHUB_SHA}.json` — 요구사항 verifier 실제 실행, mutation·SHA·recovery·배선·3중 약화 구조 한계 검사, 대상 SHA 포함 후보 상태 생성 |
+| 19 | 검증 권한 후보 증거 보관 | `actions/upload-artifact@v4` — 18번이 만든 대상 SHA 귀속 JSON을 CI artifact로 보관. 공식 `VERIFIED`가 아니라 검토 후보 증거 |
 
 *(1번 앞에 `actions/checkout` 이 있고 `fetch-depth: 0` 이다 — 4번이 과거 blob 을 열려면 필요하다.)*
 
-**CI는 고정 목록이고 로컬 `pre-push`는 글로브(이름 규칙 자동 수집)다.** 그래서 새 인수 스크립트를 만들면 로컬에서는 저절로 돌지만 CI에서는 한 줄도 안 돈다 — P15③("로컬에만 있는 검사는 없는 것으로 친다")에 걸린다. **새 `scripts/acceptance-*.sh`를 추가하는 PR은 `verify.yml`과 이 표 양쪽에 자기 줄을 함께 넣어야 한다.**
+**CI는 고정 목록이고 로컬 `pre-push`는 글로브(이름 규칙 자동 수집)다.** 그래서 새 인수 스크립트를 만들면 로컬에서는 저절로 돌지만 CI에서는 한 줄도 안 돈다 — P15③("로컬에만 있는 검사는 없는 것으로 친다")에 걸린다. **새 `scripts/acceptance-*.sh`를 추가하는 PR은 `verify.yml`과 이 표 양쪽에 자기 줄을 함께 넣어야 한다.** 검증 권한 checker는 YAML의 실제 `run` 단계와 격리된 pre-push 실행을 모두 확인해 주석·`echo`·경로 문자열만으로는 배선 성공으로 세지 않는다.
 
 ### 데이터 노출 판정기 — `scripts/scan-data-exposure.sh`
 

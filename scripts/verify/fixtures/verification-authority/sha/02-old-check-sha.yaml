@@ -1,0 +1,14 @@
+expected_state: STALE
+repository: sangmokang/Valuehire_v6
+workflow_identity: .github/workflows/verify.yml@verify
+required_check: verify
+target_sha: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+check_sha: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+run_identity: run-102
+check_status: completed
+check_conclusion: success
+target_kind: pr_head
+pr_head_sha: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+source: github_actions_api
+protected_surface_changed: false
+separate_approval: true
