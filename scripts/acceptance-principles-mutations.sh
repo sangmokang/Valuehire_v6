@@ -58,7 +58,12 @@ git -C "$TMP/template" config user.email principles-mutation@example.invalid
 git -C "$TMP/template" add docs/sot/principles.yaml \
   scripts/acceptance-principles-check.sh scripts/acceptance-principles-mutations.sh \
   hooks/pre-commit hooks/pre-push .github/workflows/verify.yml
-git -C "$TMP/template" commit --quiet "$NO_VERIFY" -m fixture
+# --allow-empty: template은 $REPO를 clone한 것이라 overlay_current가 복사하는 파일이
+# 이미 마지막 커밋과 완전히 같을 수 있다(작업트리가 깨끗한 게 정상 상태다). 그럴 때
+# "commit할 게 없다"는 git의 정상 동작(exit 1)을 오류로 착각하면 안 된다. 2026-08-19
+# CI 실측: GitHub Actions는 run: 스텝을 bash -e로 실행해, 이 한 줄의 exit 1이 21개
+# 시험 전부가 시작되기도 전에 스크립트 전체를 죽였다(로컬은 -e 없이 실행해 안 걸렸다).
+git -C "$TMP/template" commit --quiet --allow-empty "$NO_VERIFY" -m fixture
 git -C "$TMP/template" branch -M main
 
 git init --quiet --bare "$TMP/with-baseline.git"
