@@ -59,7 +59,12 @@ errors = []
 
 begin
   raw = File.read(file)
-  ast = Psych.parse_stream(raw, file)
+  # filename은 위치 인자가 아니라 키워드 인자로 넘긴다. Psych 4(Ruby 3.2 CI 러너 기본)는
+  # parse_stream(yaml, filename: nil)만 받고, 예전처럼 2번째 위치 인자를 주면
+  # "wrong number of arguments"로 죽는다 — 이 저장소가 3c7fd38에서 safe_load 자리에
+  # 이미 겪은 것과 같은 종류의 문제다(2026-08-19 CI 실측으로 재발 확인, 로컬 Psych 3.1.0
+  # 에서도 키워드 형태로 정상 동작 확인).
+  ast = Psych.parse_stream(raw, filename: file)
 rescue Psych::SyntaxError => e
   puts "YAML_PARSE_ERROR: #{e.problem} (line #{e.line}, column #{e.column})"
   exit 1
