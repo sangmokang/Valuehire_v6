@@ -161,8 +161,8 @@
   principle: "위험한 동작은 금지하지 않고 능력을 없앤다"
   mechanism_expected: "사후 가드 대신 구조적으로 불가능하게 권한·참조·토큰 회수"
   mechanism_found: null
-  status: "미확인"
-  evidence: "설계 철학에 가까워 grep으로 존재 확인이 어려움. 구체 사례(P8)가 해당없음이라 실증 사례 미발견."
+  status: "해당없음"
+  evidence: "2026-08-19 직접 조사(git ls-files로 전체 py/js/ts 소스 전수 확인, humansearch/src/humansearch/auth_surface.py:1-74, __init__.py:1-19가 유일한 제품 코드): 인증 토큰·과금·삭제·다중 브라우저 세션처럼 '위험한 능력' 자체를 지닌 코드가 아직 없다. 유일한 제품 함수 classify_auth_surface는 부작용 없는 순수 분류 함수이고 _validated()로 잘못된 입력 타입을 예외로 거부하지만, 이건 입력 검증이지 P18이 말하는 '권한·참조·토큰 회수'와는 다른 개념이다. P8(해당없음, 다중 계정 동시접속)과 같은 이유로 실증 대상 자체가 없다."
 
 - id: P19
   principle: "외부 의존 경계는 크기와 무관하게 라이브 스모크가 배송 조건이다"
@@ -215,29 +215,29 @@
   principle: "판정기는 하나다"
   mechanism_expected: "자동로그인 판정과 증거캡처 판정이 같은 함수를 사용"
   mechanism_found: null
-  status: "미확인"
-  evidence: "소스 전체 확인이 필요해 이번 조사 범위에서 미확인으로 남김."
+  status: "해당없음"
+  evidence: "2026-08-19 직접 조사(docs/sot/coding-principles.md:39 — §1-B는 '웹 자동화에만 적용되는 5조'로 범위가 명시됨). humansearch/src/humansearch/auth_surface.py:64 classify_auth_surface 하나만 존재하며 이건 '자동로그인 판정'에 해당하는 순수 분류기다. '증거캡처 판정'에 해당하는 두 번째 판정 함수는 저장소 전체(git ls-files로 py/js/ts 전수 확인)에 하나도 없다 — 두 판정기가 같은 함수를 쓰는지 여부를 판단하려면 비교 대상이 둘 다 있어야 하는데 하나뿐이라 아직 판단 자체가 성립하지 않는다. P7~P10과 같은 이유의 해당없음이며, '미확인'(조사했지만 모른다)이 아니라 '조사했고 아직 대상이 없다'는 판정이다."
 
 - id: "§1-B-3"
   principle: "브라우저 계층은 한 벌이다"
   mechanism_expected: "브라우저 계층을 한 벌로 강제"
   mechanism_found: null
-  status: "미확인"
-  evidence: "동일 사유로 미확인."
+  status: "해당없음"
+  evidence: "2026-08-19 직접 조사: git ls-files 전수 + grep -liE 'playwright|selenium|puppeteer|webdriver|chrome[_-]?devtools'로 실제 브라우저 자동화 코드를 검색했으나 0건(매칭된 6개 파일은 전부 hooks/스크립트 안의 '이런 키워드가 나오면 P4 위반 의심'용 탐지 목록 문자열이지 실제 구현이 아님 — 예: hooks/pre-commit의 NET 변수). 브라우저를 직접 제어하는 코드 자체가 아직 하나도 없어 '한 벌인지 여러 벌인지' 셀 대상이 없다."
 
 - id: "§1-B-4"
   principle: "테스트는 실캡처 스냅샷으로만"
   mechanism_expected: "실캡처 스냅샷 기반으로 판정·배선·동작을 분리 검증"
   mechanism_found: null
-  status: "미확인"
-  evidence: "동일 사유로 미확인."
+  status: "해당없음"
+  evidence: "2026-08-19 직접 조사: humansearch/tests/test_auth_surface.py 전문 확인 — 현재 테스트는 순수 함수 classify_auth_surface에 대한 단위·속성기반(hypothesis) 테스트뿐이고, 화면·DOM을 흉내내는 가짜 브라우저 테스트도 실캡처 스냅샷 테스트도 아직 없다(둘 다 없음 = 이 원칙이 막으려는 나쁜 패턴도, 요구하는 좋은 패턴도 아직 등장하지 않은 상태). 브라우저 시나리오 자체가 없으므로 스냅샷으로 검증할 대상이 없다."
 
 - id: "§1-B-5"
   principle: "개입 감지는 규율이 아니라 구조로"
   mechanism_expected: "드라이버 포트 래퍼가 개입 신호 뒤 호출을 타입상 차단"
   mechanism_found: null
-  status: "미확인"
-  evidence: "동일 사유로 미확인."
+  status: "해당없음"
+  evidence: "2026-08-19 직접 조사: git ls-files 전수 + grep -liE 'class.*Port|class.*Wrapper|class.*Driver'로 드라이버 포트·래퍼 클래스를 검색했으나 실제 구현 0건. 개입(사람의 수동 조작) 감지 대상인 드라이버 호출 자체가 없어 '타입상 차단되는지'를 판단할 대상이 없다."
 
 - id: V-1
   principle: "검증자는 실행 산출물을 제출한다."
