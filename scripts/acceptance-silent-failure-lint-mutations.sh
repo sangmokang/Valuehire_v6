@@ -123,7 +123,143 @@ bash "$LINT" "$TMP/clean.py" >/tmp/.p3out2 2>&1 || rc=$?
 [ "$rc" -eq 0 ] && ok=0 || ok=1
 record "$ok" "정상 fixture 재확인(회귀 없음)" "exit=$rc"
 
-# 9)+10) hooks/pre-commit 실제 배선 — 격리 임시 git 저장소에서 진짜 훅을 실행해 확인한다.
+# 9)~19) codex V1이 실제로 뚫은 문법 변형과 오탐을 회귀 시험으로 고정한다.
+# 한 파일에 모두 섞어 exit=1만 확인하면 첫 위반 하나가 나머지 누락을 가린다.
+# 따라서 서로 다른 문법 변형은 독립 fixture로 실행한다.
+cat > "$TMP/python_inline_except.py" <<'EOF'
+def load():
+    try:
+        return 1
+    except: return None
+EOF
+rc=0
+out=$(bash "$LINT" "$TMP/python_inline_except.py" 2>&1) || rc=$?
+if [ "$rc" -eq 1 ] && printf '%s' "$out" | grep -q "bare-except"; then ok=0; else ok=1; fi
+record "$ok" "Python 한 줄 handler bare except → BLOCKED" "exit=$rc"
+
+cat > "$TMP/python_continued_except.py" <<'EOF'
+def load():
+    try:
+        return 1
+    except \
+    :
+        return None
+EOF
+rc=0
+out=$(bash "$LINT" "$TMP/python_continued_except.py" 2>&1) || rc=$?
+if [ "$rc" -eq 1 ] && printf '%s' "$out" | grep -q "bare-except"; then ok=0; else ok=1; fi
+record "$ok" "Python 줄연결 bare except → BLOCKED" "exit=$rc"
+
+cat > "$TMP/python_docstring.py" <<'EOF'
+def documentation():
+    text = """
+except:
+"""
+    return text
+EOF
+rc=0
+bash "$LINT" "$TMP/python_docstring.py" >"$TMP/python_docstring.log" 2>&1 || rc=$?
+[ "$rc" -eq 0 ] && ok=0 || ok=1
+record "$ok" "Python 독스트링 안 except:는 실행 코드가 아니므로 통과" "exit=$rc"
+
+cat > "$TMP/js_empty_multiline.js" <<'EOF'
+function load() {
+  try { return 1; } catch (e) {
+  }
+}
+EOF
+rc=0
+out=$(bash "$LINT" "$TMP/js_empty_multiline.js" 2>&1) || rc=$?
+if [ "$rc" -eq 1 ] && printf '%s' "$out" | grep -q "bare-catch"; then ok=0; else ok=1; fi
+record "$ok" "JavaScript 여러 줄 빈 catch → BLOCKED" "exit=$rc"
+
+cat > "$TMP/js_empty_comment.js" <<'EOF'
+function load() {
+  try { return 1; } catch /* reason */ (e) { /* deliberately empty */ }
+}
+EOF
+rc=0
+out=$(bash "$LINT" "$TMP/js_empty_comment.js" 2>&1) || rc=$?
+if [ "$rc" -eq 1 ] && printf '%s' "$out" | grep -q "bare-catch"; then ok=0; else ok=1; fi
+record "$ok" "JavaScript 주석만 든 catch → BLOCKED" "exit=$rc"
+
+cat > "$TMP/js_empty_split.js" <<'EOF'
+function load() {
+  try { return 1; }
+  catch
+  (e)
+  {
+  }
+}
+EOF
+rc=0
+out=$(bash "$LINT" "$TMP/js_empty_split.js" 2>&1) || rc=$?
+if [ "$rc" -eq 1 ] && printf '%s' "$out" | grep -q "bare-catch"; then ok=0; else ok=1; fi
+record "$ok" "JavaScript catch·매개변수·블록 줄분리 → BLOCKED" "exit=$rc"
+
+cat > "$TMP/js_null_multiline.ts" <<'EOF'
+function load(): number | null {
+  try { return 1; } catch (e) {
+    return null;
+  }
+}
+EOF
+rc=0
+out=$(bash "$LINT" "$TMP/js_null_multiline.ts" 2>&1) || rc=$?
+if [ "$rc" -eq 1 ] && printf '%s' "$out" | grep -q "catch-return-null"; then ok=0; else ok=1; fi
+record "$ok" "TypeScript 여러 줄 catch return null → BLOCKED" "exit=$rc"
+
+cat > "$TMP/js_null_parenthesized.js" <<'EOF'
+function load() {
+  try { return 1; } catch (e) { return (null); }
+}
+EOF
+rc=0
+out=$(bash "$LINT" "$TMP/js_null_parenthesized.js" 2>&1) || rc=$?
+if [ "$rc" -eq 1 ] && printf '%s' "$out" | grep -q "catch-return-null"; then ok=0; else ok=1; fi
+record "$ok" "JavaScript 괄호로 감싼 catch return null → BLOCKED" "exit=$rc"
+
+cat > "$TMP/js_array_variants.js" <<'EOF'
+function a(value) { return value ||
+  []; }
+function b(value) { return value || [ ]; }
+function c(value) { return value || /* fallback */ []; }
+EOF
+rc=0
+out=$(bash "$LINT" "$TMP/js_array_variants.js" 2>&1) || rc=$?
+hits=$(printf '%s\n' "$out" | grep -c 'or-empty-array-fallback' || true)
+if [ "$rc" -eq 1 ] && [ "$hits" -eq 3 ]; then ok=0; else ok=1; fi
+record "$ok" "JavaScript 줄바꿈·내부공백·주석 || [] 3종 → 모두 BLOCKED" "exit=$rc, hits=$hits/3"
+
+cat > "$TMP/js_literals.js" <<'EOF'
+const stringText = "catch (e) {} and value ?? fallback";
+const templateText = `documentation says value ?? fallback and catch (e) {}`;
+// Example only: config ?? defaultValue || []
+const regexText = /catch \(e\) \{\}|value\?\?/;
+function handled() {
+  try { return 1; } catch (e) { console.error(e); throw e; }
+}
+EOF
+rc=0
+bash "$LINT" "$TMP/js_literals.js" >"$TMP/js_literals.log" 2>&1 || rc=$?
+[ "$rc" -eq 0 ] && ok=0 || ok=1
+record "$ok" "JavaScript 문자열·템플릿·주석·정규식과 실제 처리 catch는 통과" "exit=$rc"
+
+p3_block=$(awk '
+  /^[[:space:]]*- name: P3 조용한 실패 패턴 검사/ { inside=1 }
+  inside && seen && /^[[:space:]]*- name:/ { exit }
+  inside { print; seen=1 }
+' "$REPO/.github/workflows/verify.yml")
+if printf '%s\n' "$p3_block" | grep -Fq 'if: ${{ always() }}' \
+   && printf '%s\n' "$p3_block" | grep -Fq 'bash scripts/acceptance-silent-failure-lint.sh' \
+   && printf '%s\n' "$p3_block" | grep -Fq 'bash scripts/acceptance-silent-failure-lint-mutations.sh'; then
+  ok=0
+else
+  ok=1
+fi
+record "$ok" "CI P3 단계는 앞 단계 실패와 무관하게 본체+회귀시험을 실행" "always+두 명령 정적 배선"
+
+# 20)+21) hooks/pre-commit 실제 배선 — 격리 임시 git 저장소에서 진짜 훅을 실행해 확인한다.
 # (acceptance-hs-a4.sh와 같은 방식: 판정을 다시 구현하지 않고 실제 hooks/pre-commit을 그대로 돈다.)
 #
 # ⚠️ P3_SKIP_HOOK_SUBTESTS 가드(2026-08-19): hooks/pre-commit §9(자기보호)는 자신이
@@ -191,7 +327,7 @@ fi
 [ "$rc" -eq 0 ] && ok=0 || ok=1
 record "$ok" "실제 hooks/pre-commit 배선(정상 파일 → 통과)" "exit=$rc"
 
-# 10) 검사기 자체 무력화 공격 — 2026-08-19 codex V1 적대검증이 실제로 뚫었던 경로.
+# 22) 검사기 자체 무력화 공격 — 2026-08-19 codex V1 적대검증이 실제로 뚫었던 경로.
 # 정규식을 절대 안 맞는 문자열로 바꾸면서(예: except → NEVER-EXCEPT) 위반 파일을
 # **같은 커밋**으로 스테이지하면, hooks/pre-commit §8만 있던 시절엔 exit 0으로
 # 통과했다(무력화된 확정본으로 자기 자신을 검사했으므로). §9(자기보호: 뮤테이션
