@@ -2,9 +2,9 @@
 
 ## 결론
 
-현재 보호 검사는 실제 프로그램 구조가 아니라 줄마다 글자 모양만 찾아서, 여러 줄로 쓴 위반을 놓치고 설명문·주석·문자열을 잘못 막는다. 서버에서도 앞선 총괄 검사가 의도대로 실패하면 이 보호 검사는 실행되지 않는다.
+여러 줄로 숨긴 위반은 막고 설명문·주석·문자열은 통과시키는 수정이 로컬 시험 29개를 모두 통과했다. 앞선 총괄 검사가 실패해도 서버가 이 검사를 따로 실행하도록 분리했다.
 
-이번 작업은 이미 확인된 두 구멍만 닫는다. 실제 프로그램 구조를 읽어 위반과 무해한 글을 구분하고, 앞선 검사의 성적과 관계없이 서버가 이 보호 검사를 실행하게 만든다. 다른 31개 원칙과 모든 예외 처리 결과의 데이터베이스 기록은 건드리지 않는다.
+아직 완료는 아니다. 다른 검증자의 공격과 실제 서버 실행이 남아 있으며, 둘 중 하나라도 실패하면 다시 고친다. 다른 31개 원칙과 모든 예외 처리 결과의 데이터베이스 기록은 이번에 건드리지 않는다.
 
 ## 판단 근거
 
@@ -16,7 +16,7 @@
 
 ## 결정 카드
 
-**무엇을** — Python은 표준 문법 나무로, JavaScript·TypeScript 계열은 문자열·주석과 중첩 블록을 구분하는 토큰 판정으로 바꾼다. 서버 P3 단계에는 앞 단계 실패와 무관하게 실행되는 조건을 둔다.
+**무엇을** — Python은 표준 문법 나무로, JavaScript·TypeScript 계열은 문자열·주석과 중첩 블록을 구분하는 토큰 판정으로 바꾼다. 서버 P3 검사는 P1과 선후 관계가 없는 별도 작업으로 분리한다.
 
 **왜** — 새 외부 꾸러미 없이 현재 macOS와 GitHub Ubuntu 실행기에서 같은 결과를 내면서, 이미 재현된 여러 줄 누락과 문자열·주석 오탐을 직접 닫을 수 있다.
 
@@ -118,6 +118,8 @@
 bash scripts/acceptance-silent-failure-lint-mutations.sh
 ```
 
+→ 뭘 시켰나: 새 구현을 넣기 전에 이전 검증자가 찾은 반례와 서버 실행 조건을 기존 검사기에 적용했다. / 뭐가 나왔나: 아래 원문처럼 절반이 실패했다. / 좋은 소식인가 나쁜 소식인가: 실패를 재현해 시험으로 잠갔다는 점은 좋은 소식이다.
+
 원문 출력:
 
 ```text
@@ -151,3 +153,50 @@ CHECKED: 24
 → 뭘 시켰나: 구현 전 검사기에 이전 적대검증 반례와 서버 실행 조건을 넣었다. / 뭐가 나왔나: 전체 24개 중 12개가 실패했고 명령은 성적 1로 끝났다. / 좋은 소식인가 나쁜 소식인가: 현재 결함 재현에는 좋은 소식이지만 제품 보호 상태에는 나쁜 소식이다. 이 출력이 구현 후 모두 통과해야 한다.
 
 RED 커밋에서는 `hooks/pre-commit`이 검사 시험의 의도된 실패도 “검사기 약화”로 보아 막는다. 따라서 실패 시험을 보존하는 로컬 RED 커밋에만 `git commit --no-verify`를 쓰고 원격에는 보내지 않는다. GREEN 구현 커밋은 실제 훅을 생략하지 않고 통과시켜 이 예외가 배송 우회로 남지 않게 한다.
+
+## 12. GREEN 증거 — 최소 구현 후 로컬 합격
+
+실행 명령:
+
+```bash
+bash scripts/acceptance-silent-failure-lint-mutations.sh
+```
+
+→ 뭘 시켰나: 문법 판정과 서버 독립 작업 배선을 반영한 뒤, 실패·통과 대조군과 실제 커밋 문지기를 전부 다시 실행했다. / 뭐가 나왔나: 아래 29개가 모두 PASS이고 프로그램 성적은 0이었다. / 좋은 소식인가 나쁜 소식인가: 로컬 인수 기준에는 좋은 소식이며, 다른 엔진과 실제 서버 검증 전에는 최종 합격이 아니다.
+
+원문 출력:
+
+```text
+PASS: 정상 Python 파일 — 위반 없음 — exit=0
+PASS: bare except 주입 — exit=1 + bare-except 마커 — exit=1
+PASS: bare/empty catch 주입 — exit=1 + bare-catch 마커 — exit=1
+PASS: catch{return null} 주입 — exit=1 + catch-return-null 마커 — exit=1
+PASS: || [] 주입 — exit=1 + or-empty-array-fallback 마커 — exit=1
+PASS: ?? 주입 — exit=1 + nullish-coalescing-fallback 마커 — exit=1
+PASS: 존재하지 않는 파일 지정 — 0건 스캔은 통과가 아니라 NOT_RUN(exit 2) — exit=2
+PASS: 정상 fixture 재확인(회귀 없음) — exit=0
+PASS: Python 한 줄 handler bare except → BLOCKED — exit=1
+PASS: Python 줄연결 bare except → BLOCKED — exit=1
+PASS: Python 독스트링 안 except:는 실행 코드가 아니므로 통과 — exit=0
+PASS: JavaScript 여러 줄 빈 catch → BLOCKED — exit=1
+PASS: JavaScript 주석만 든 catch → BLOCKED — exit=1
+PASS: JavaScript catch·매개변수·블록 줄분리 → BLOCKED — exit=1
+PASS: TypeScript 여러 줄 catch return null → BLOCKED — exit=1
+PASS: JavaScript 괄호로 감싼 catch return null → BLOCKED — exit=1
+PASS: JavaScript 줄바꿈·내부공백·주석 || [] 3종 → 모두 BLOCKED — exit=1, hits=3/3
+PASS: JavaScript 문자열·템플릿·주석·정규식과 실제 처리 catch는 통과 — exit=0
+PASS: 템플릿 본문은 무시하고 보간식 안 ??만 BLOCKED — exit=1, hits=1/1
+PASS: JSX 본문은 무시하고 중괄호 실행식 안 ??만 BLOCKED — exit=1, nullish=1/1, other=0/0
+PASS: 중첩 블록에서 실제 처리하는 catch는 통과 — exit=0
+PASS: 깨진 Python 문법은 합격이 아니라 NOT_RUN — exit=2
+PASS: 닫히지 않은 TypeScript 블록은 합격이 아니라 NOT_RUN — exit=2
+PASS: CI P3 독립 작업은 P1 성적과 무관하게 본체+회귀시험을 실행 — 독립 job+두 명령 정적 배선
+PASS: 실제 hooks/pre-commit 배선(위반 스테이지 → BLOCKED) — exit=1
+PASS: 실제 hooks/pre-commit 배선(정상 파일 → 통과) — exit=0
+PASS: 검사기 자체 무력화 공격(같은 커밋에서 정규식 무력화+위반) → BLOCKED — exit=1
+PASS: 검사기 무해한 자기개선 커밋은 통과(벽이 아니라 게이트) — exit=0
+PASS: 원본 worktree 상태 기준선 보존 — before/after 동일 여부=0
+CHECKED: 29
+```
+
+→ 뭘 시켰나: 구현 전 12개가 실패했던 같은 원명령을 수정 후 다시 실행했다. / 뭐가 나왔나: 29개 전부 통과했고, 위반 fixture 내부의 exit 1·검사 불가 fixture의 exit 2는 시험이 기대한 차단 성적이다. / 좋은 소식인가 나쁜 소식인가: 원래 검증 명령의 성공 계약을 충족했으므로 좋은 소식이다.

@@ -1,6 +1,6 @@
 # Valuehire v6 — 이 저장소의 실제 게이트 명령 (SOT)
 
-최종 갱신: 2026-08-19 (PR #31 로컬 배선 기준, 새 서버 실행은 push 전까지 미확인)
+최종 갱신: 2026-08-19 (PR #31 P3 문법 판정·독립 작업 배선 기준)
 근거: `docs/engineering/docs-sot-restructure-goal-2026-08-08.md`
 
 ## 현재 규칙
@@ -17,7 +17,7 @@
 
 ### CI(`​.github/workflows/verify.yml`)가 실제로 돌리는 것
 
-**워크플로 스텝은 checkout 1개와 이름 있는 검증 21개, 총 22개다.** 아래는 PR #31 worktree의 `verify.yml` `- name:` 순서다. 1~4번은 로컬 구현이며, push 금지 때문에 GitHub Actions 서버에서의 새 실행은 아직 `BLOCKED`다.
+**워크플로 스텝은 checkout 2개와 이름 있는 검증 22개, 총 24개다.** P3는 `p3` 독립 작업에서 돌고, 나머지는 `verify` 작업에서 아래 순서로 돈다. P3 작업은 P1 작업을 선행 조건으로 두지 않으므로 P1 전체 검사가 실패해도 실행되며, P3 자체 실패는 전체 불합격을 그대로 유지한다.
 
 | # | 스텝 이름 | 실행 내용 |
 |---|---|---|
@@ -25,23 +25,24 @@
 | 2 | P1 원칙 장부 mutation 검사 | `bash scripts/acceptance-principles-mutations.sh` — 격리 반례와 대조군 |
 | 3 | 전역 strict guard 격리 복구·한계 검사 | `bash scripts/acceptance-guard-global-skill-files.sh` — rollback/recover와 동일 UID 우회 재현 |
 | 4 | P1 원칙 32개 전체 강제 검사 | `bash scripts/acceptance-principles-check.sh` — 미충족 원칙이 있으면 의도적으로 실패 |
-| 5 | 비밀 스캔 (verify.sh) | `bash verify.sh` — 추적 파일 전체 |
-| 6 | HumanSearch G1 클린룸 경계 | 인라인 8개 — `scripts/acceptance-hs-cleanroom.sh`, `scripts/acceptance-hs-cleanroom-mutations.sh`, `scripts/acceptance-hs-cleanroom-absolute-paths.sh`, `scripts/acceptance-hs-cleanroom-absolute-contexts.sh`, `scripts/acceptance-hs-cleanroom-colon-paths.sh`, `scripts/acceptance-hs-cleanroom-file-urls.sh`, `scripts/acceptance-hs-cleanroom-hook-env.sh`, `scripts/acceptance-hs-cleanroom-hook-env-mutations.sh` |
-| 7 | HumanSearch G2 테스트 게이트 | 인라인 — `uv` 설치 후 `scripts/acceptance-hs-gates.sh`, `scripts/acceptance-hs-gates-mutations.sh`, `scripts/acceptance-hs-gates-antiforge.sh` |
-| 8 | 히스토리 전량 스캔 | 인라인 — 도달 가능한 모든 blob을 열어 자격증명 패턴 대조 |
-| 9 | 인수 검사 0-2 상시/종료상태 분리 | `bash scripts/acceptance-0-2-unreachable-content.sh` |
-| 10 | 인수 검사 0-6 | `bash scripts/acceptance-0-6.sh` |
-| 11 | 인수 검사 0-7 | `bash scripts/acceptance-0-7.sh` — 훅 위반 6종 시연 |
-| 12 | 인수 검사 0-5 | `bash scripts/acceptance-0-5.sh` — **`main` 브랜치에서만** |
-| 13 | 억제 만료 스캔 | 인라인 — `suppressions.yaml`의 expiry 형식·경과 |
-| 14 | 강제 장치 존재 검사 | 인라인 — `hooks/pre-commit`·`pre-push` 존재·실행권한 |
-| 15 | 셸 스크립트 문법 검사 | 인라인 — `git ls-files '*.sh'` 전부 `bash -n` |
-| 16 | 패턴 파일 자체 실값 검사 | 인라인 — `.secret-patterns.default`에 값 리터럴 없는지 |
-| 17 | 인수 검사 hs-a3 | `bash scripts/acceptance-hs-a3.sh` |
-| 18 | 데이터 노출 스캔 | `bash scripts/scan-data-exposure.sh all` |
-| 19 | 인수 검사 hs-a4 | `bash scripts/acceptance-hs-a4.sh` |
-| 20 | 인수 검사 secret-webhook-vendor | `bash scripts/acceptance-secret-webhook-vendor.sh` |
-| 21 | 인수 검사 verify-ac-m | `bash scripts/acceptance-verify-ac-m.sh` |
+| 5 | P3 조용한 실패 문법 판정 | 별도 `p3` 작업에서 `bash scripts/acceptance-silent-failure-lint.sh` + `bash scripts/acceptance-silent-failure-lint-mutations.sh` — P1과 독립 실행 |
+| 6 | 비밀 스캔 (verify.sh) | `bash verify.sh` — 추적 파일 전체 |
+| 7 | HumanSearch G1 클린룸 경계 | 인라인 8개 — `scripts/acceptance-hs-cleanroom.sh`, `scripts/acceptance-hs-cleanroom-mutations.sh`, `scripts/acceptance-hs-cleanroom-absolute-paths.sh`, `scripts/acceptance-hs-cleanroom-absolute-contexts.sh`, `scripts/acceptance-hs-cleanroom-colon-paths.sh`, `scripts/acceptance-hs-cleanroom-file-urls.sh`, `scripts/acceptance-hs-cleanroom-hook-env.sh`, `scripts/acceptance-hs-cleanroom-hook-env-mutations.sh` |
+| 8 | HumanSearch G2 테스트 게이트 | 인라인 — `uv` 설치 후 `scripts/acceptance-hs-gates.sh`, `scripts/acceptance-hs-gates-mutations.sh`, `scripts/acceptance-hs-gates-antiforge.sh` |
+| 9 | 히스토리 전량 스캔 | 인라인 — 도달 가능한 모든 blob을 열어 자격증명 패턴 대조 |
+| 10 | 인수 검사 0-2 상시/종료상태 분리 | `bash scripts/acceptance-0-2-unreachable-content.sh` |
+| 11 | 인수 검사 0-6 | `bash scripts/acceptance-0-6.sh` |
+| 12 | 인수 검사 0-7 | `bash scripts/acceptance-0-7.sh` — 훅 위반 6종 시연 |
+| 13 | 인수 검사 0-5 | `bash scripts/acceptance-0-5.sh` — **`main` 브랜치에서만** |
+| 14 | 억제 만료 스캔 | 인라인 — `suppressions.yaml`의 expiry 형식·경과 |
+| 15 | 강제 장치 존재 검사 | 인라인 — `hooks/pre-commit`·`pre-push` 존재·실행권한 |
+| 16 | 셸 스크립트 문법 검사 | 인라인 — `git ls-files '*.sh'` 전부 `bash -n` |
+| 17 | 패턴 파일 자체 실값 검사 | 인라인 — `.secret-patterns.default`에 값 리터럴 없는지 |
+| 18 | 인수 검사 hs-a3 | `bash scripts/acceptance-hs-a3.sh` |
+| 19 | 데이터 노출 스캔 | `bash scripts/scan-data-exposure.sh all` |
+| 20 | 인수 검사 hs-a4 | `bash scripts/acceptance-hs-a4.sh` |
+| 21 | 인수 검사 secret-webhook-vendor | `bash scripts/acceptance-secret-webhook-vendor.sh` |
+| 22 | 인수 검사 verify-ac-m | `bash scripts/acceptance-verify-ac-m.sh` |
 
 *(1번 앞에 `actions/checkout`이 있고 `fetch-depth: 0`이다 — 8번이 과거 blob을 열려면 필요하다.)*
 

@@ -44,7 +44,7 @@ def load(path):
         return None
 EOF
 rc=0
-bash "$LINT" "$TMP/clean.py" >/tmp/.p3out 2>&1 || rc=$?
+bash "$LINT" "$TMP/clean.py" >"$TMP/clean-first.log" 2>&1 || rc=$?
 [ "$rc" -eq 0 ] && ok=0 || ok=1
 record "$ok" "정상 Python 파일 — 위반 없음" "exit=$rc"
 
@@ -119,7 +119,7 @@ record "$ok" "존재하지 않는 파일 지정 — 0건 스캔은 통과가 아
 
 # 8) 정상 fixture 재확인 — 다중 파일 동시 검사에서 clean은 섞여도 무해
 rc=0
-bash "$LINT" "$TMP/clean.py" >/tmp/.p3out2 2>&1 || rc=$?
+bash "$LINT" "$TMP/clean.py" >"$TMP/clean-second.log" 2>&1 || rc=$?
 [ "$rc" -eq 0 ] && ok=0 || ok=1
 record "$ok" "정상 fixture 재확인(회귀 없음)" "exit=$rc"
 
@@ -245,19 +245,72 @@ bash "$LINT" "$TMP/js_literals.js" >"$TMP/js_literals.log" 2>&1 || rc=$?
 [ "$rc" -eq 0 ] && ok=0 || ok=1
 record "$ok" "JavaScript 문자열·템플릿·주석·정규식과 실제 처리 catch는 통과" "exit=$rc"
 
-p3_block=$(awk '
-  /^[[:space:]]*- name: P3 조용한 실패 패턴 검사/ { inside=1 }
-  inside && seen && /^[[:space:]]*- name:/ { exit }
-  inside { print; seen=1 }
-' "$REPO/.github/workflows/verify.yml")
-if printf '%s\n' "$p3_block" | grep -Fq 'if: ${{ always() }}' \
-   && printf '%s\n' "$p3_block" | grep -Fq 'bash scripts/acceptance-silent-failure-lint.sh' \
-   && printf '%s\n' "$p3_block" | grep -Fq 'bash scripts/acceptance-silent-failure-lint-mutations.sh'; then
-  ok=0
-else
-  ok=1
+cat > "$TMP/js_template_expression.ts" <<'EOF'
+const message = `literal ?? ${value ?? 3}`;
+EOF
+rc=0
+out=$(bash "$LINT" "$TMP/js_template_expression.ts" 2>&1) || rc=$?
+hits=$(printf '%s\n' "$out" | grep -c 'nullish-coalescing-fallback')
+if [ "$rc" -eq 1 ] && [ "$hits" -eq 1 ]; then ok=0; else ok=1; fi
+record "$ok" "템플릿 본문은 무시하고 보간식 안 ??만 BLOCKED" "exit=$rc, hits=$hits/1"
+
+cat > "$TMP/jsx_text_and_expression.tsx" <<'EOF'
+const view = <div>documentation ?? value || [] catch (e) {} {value ?? 3}</div>;
+EOF
+rc=0
+out=$(bash "$LINT" "$TMP/jsx_text_and_expression.tsx" 2>&1) || rc=$?
+nullish_hits=$(printf '%s\n' "$out" | grep -c 'nullish-coalescing-fallback')
+other_hits=$(printf '%s\n' "$out" | grep -Ec 'bare-catch|catch-return-null|or-empty-array-fallback')
+if [ "$rc" -eq 1 ] && [ "$nullish_hits" -eq 1 ] && [ "$other_hits" -eq 0 ]; then ok=0; else ok=1; fi
+record "$ok" "JSX 본문은 무시하고 중괄호 실행식 안 ??만 BLOCKED" "exit=$rc, nullish=$nullish_hits/1, other=$other_hits/0"
+
+cat > "$TMP/js_nested_handled.ts" <<'EOF'
+function load(value: number) {
+  try { return value; } catch (error) {
+    if (error) { console.error(error); }
+    throw error;
+  }
+}
+EOF
+rc=0
+bash "$LINT" "$TMP/js_nested_handled.ts" >"$TMP/js_nested_handled.log" 2>&1 || rc=$?
+[ "$rc" -eq 0 ] && ok=0 || ok=1
+record "$ok" "중첩 블록에서 실제 처리하는 catch는 통과" "exit=$rc"
+
+cat > "$TMP/invalid.py" <<'EOF'
+def broken(:
+    pass
+EOF
+rc=0
+out=$(bash "$LINT" "$TMP/invalid.py" 2>&1) || rc=$?
+if [ "$rc" -eq 2 ] && printf '%s' "$out" | grep -q 'NOT_RUN'; then ok=0; else ok=1; fi
+record "$ok" "깨진 Python 문법은 합격이 아니라 NOT_RUN" "exit=$rc"
+
+cat > "$TMP/invalid.ts" <<'EOF'
+function broken() {
+  return 1;
+EOF
+rc=0
+out=$(bash "$LINT" "$TMP/invalid.ts" 2>&1) || rc=$?
+if [ "$rc" -eq 2 ] && printf '%s' "$out" | grep -q 'NOT_RUN'; then ok=0; else ok=1; fi
+record "$ok" "닫히지 않은 TypeScript 블록은 합격이 아니라 NOT_RUN" "exit=$rc"
+
+if [ -z "${P3_SKIP_HOOK_SUBTESTS:-}" ]; then
+  p3_job=$(awk '
+    /^  p3:/ { inside=1 }
+    inside && seen && /^  [A-Za-z0-9_-]+:/ { exit }
+    inside { print; seen=1 }
+  ' "$REPO/.github/workflows/verify.yml")
+  if printf '%s\n' "$p3_job" | grep -Fq 'uses: actions/checkout@v4' \
+     && printf '%s\n' "$p3_job" | grep -Fq 'bash scripts/acceptance-silent-failure-lint.sh' \
+     && printf '%s\n' "$p3_job" | grep -Fq 'bash scripts/acceptance-silent-failure-lint-mutations.sh' \
+     && ! printf '%s\n' "$p3_job" | grep -q '^[[:space:]]*needs:'; then
+    ok=0
+  else
+    ok=1
+  fi
+  record "$ok" "CI P3 독립 작업은 P1 성적과 무관하게 본체+회귀시험을 실행" "독립 job+두 명령 정적 배선"
 fi
-record "$ok" "CI P3 단계는 앞 단계 실패와 무관하게 본체+회귀시험을 실행" "always+두 명령 정적 배선"
 
 # 20)+21) hooks/pre-commit 실제 배선 — 격리 임시 git 저장소에서 진짜 훅을 실행해 확인한다.
 # (acceptance-hs-a4.sh와 같은 방식: 판정을 다시 구현하지 않고 실제 hooks/pre-commit을 그대로 돈다.)
@@ -328,7 +381,7 @@ fi
 record "$ok" "실제 hooks/pre-commit 배선(정상 파일 → 통과)" "exit=$rc"
 
 # 22) 검사기 자체 무력화 공격 — 2026-08-19 codex V1 적대검증이 실제로 뚫었던 경로.
-# 정규식을 절대 안 맞는 문자열로 바꾸면서(예: except → NEVER-EXCEPT) 위반 파일을
+# Python AST bare-except 판정을 반대로 바꾸면서 위반 파일을
 # **같은 커밋**으로 스테이지하면, hooks/pre-commit §8만 있던 시절엔 exit 0으로
 # 통과했다(무력화된 확정본으로 자기 자신을 검사했으므로). §9(자기보호: 뮤테이션
 # 시험을 확정본으로 재실행)가 이걸 막아야 한다.
@@ -341,7 +394,7 @@ if [ -d "$HOOKREPO/.git" ]; then
     git reset --quiet >/dev/null 2>&1
     git checkout -q -- scripts/acceptance-silent-failure-lint.sh 2>/dev/null
     rm -f scripts/good.py &&
-    perl -pi -e 's/except\[\[:space:\]\]\*:/NEVER-EXCEPT[[:space:]]*:/' scripts/acceptance-silent-failure-lint.sh &&
+    perl -pi -e 's/node\.type is None/node.type is not None/' scripts/acceptance-silent-failure-lint.sh &&
     printf 'def f():\n    try:\n        return 1\n    except:\n        return None\n' > scripts/attack.py &&
     git add scripts/acceptance-silent-failure-lint.sh scripts/attack.py >/dev/null &&
     bash hooks/pre-commit

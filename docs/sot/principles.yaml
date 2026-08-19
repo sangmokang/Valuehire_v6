@@ -33,7 +33,7 @@
       check: "scripts/acceptance-silent-failure-lint-mutations.sh"
       stages: ["pre-commit", "acceptance", "ci"]
   status: "부분"
-  evidence: "grep 결과 다수 acceptance-*.sh에서 NOT_RUN 사용 확인. bare except/catch, catch{return null}, ||[], ?? 4패턴 lint(scripts/acceptance-silent-failure-lint.sh)를 신설해 hooks/pre-commit·CI에 배선했다(2026-08-19). codex(V1) 적대검증 결과 초판은 FAIL — 줄 단위 정규식이라 여러 줄 catch·주석 내부·문자열 안 텍스트에서 놓치거나 오탐하며, 같은 커밋에서 검사기 정규식과 위반 코드를 함께 스테이지하면 무력화됐다. 자기 무력화 결함은 hooks/pre-commit §9(커밋될 확정본으로 뮤테이션 시험을 재실행)로 막았고 재현 시험 13/13 통과(자기 무력화 공격 BLOCKED + 무해한 자기개선은 통과 둘 다 확인). 다만 정규식의 문법 변형 누락·오탐(여러 줄 catch, 독스트링 오탐 등)은 근본적으로 해결되지 않았다 — 언어별 구문 분석기로 교체해야 완전해지며, 그 작업과 '모든 핸들러가 status와 함께 DB 기록'하는 장치는 이번 범위 밖이라 여전히 부분이다."
+  evidence: "grep 결과 다수 acceptance-*.sh에서 NOT_RUN 사용 확인. bare except/catch, catch{return null}, ||[], ?? 4패턴 lint(scripts/acceptance-silent-failure-lint.sh)를 hooks/pre-commit·CI에 배선했다(2026-08-19). codex(V1)이 초판의 줄 단위 정규식에서 여러 줄 누락·독스트링/문자열/주석 오탐과 같은 커밋 자기무력화를 재현해 FAIL했다. 자기무력화는 hooks/pre-commit §9로 차단했고, R1은 Python 표준 AST + JS/JSX/TS/TSX 토큰 판정으로 교체해 여러 줄·주석 삽입·괄호·배열 공백 변형을 잡으면서 독스트링·문자열·템플릿·정규식·JSX 본문은 통과시켰다. 깨진 문법은 NOT_RUN(exit 2), CI P3는 P1과 선후 관계가 없는 별도 p3 작업으로 실행한다. 회귀 시험 29/29에는 차단/통과 대조군, 실제 훅, 자기무력화 공격, 원본 worktree 무변경이 포함된다. 다만 '모든 핸들러가 status와 함께 DB 기록' 장치는 이번 범위 밖이므로 상태는 부분이다."
 
 - id: P4
   principle: "가짜 구현 금지"

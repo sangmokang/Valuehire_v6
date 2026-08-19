@@ -12,6 +12,17 @@ permissions:
   contents: read
 
 jobs:
+  p3:
+    # P1 전체 검사는 미충족 원칙이 있으면 의도적으로 실패한다. P3를 별도 job으로
+    # 분리해 P1 성적과 무관하게 실행하고, P3가 실패하면 이 job도 그대로 실패시킨다.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: P3 조용한 실패 패턴 검사 (bare except/catch, ??, ||[])
+        run: |
+          bash scripts/acceptance-silent-failure-lint.sh
+          bash scripts/acceptance-silent-failure-lint-mutations.sh
+
   verify:
     runs-on: ubuntu-latest
     steps:
@@ -33,11 +44,6 @@ jobs:
 
       - name: P1 원칙 32개 전체 강제 검사
         run: bash scripts/acceptance-principles-check.sh
-
-      - name: P3 조용한 실패 패턴 검사 (bare except/catch, ??, ||[])
-        run: |
-          bash scripts/acceptance-silent-failure-lint.sh
-          bash scripts/acceptance-silent-failure-lint-mutations.sh
 
       - name: 비밀 스캔 (verify.sh)
         # 패턴은 커밋된 .secret-patterns.default 를 쓴다.
