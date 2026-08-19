@@ -17,7 +17,7 @@
 
 ### CI(`​.github/workflows/verify.yml`)가 실제로 돌리는 것
 
-**워크플로 스텝 21개 전부**를 적는다. 아래는 PR #31 worktree의 `verify.yml` `- name:` 순서다. 1~4번은 로컬 구현이며, push 금지 때문에 GitHub Actions 서버에서의 새 실행은 아직 `BLOCKED`다.
+**워크플로 스텝은 checkout 1개와 이름 있는 검증 21개, 총 22개다.** 아래는 PR #31 worktree의 `verify.yml` `- name:` 순서다. 1~4번은 로컬 구현이며, push 금지 때문에 GitHub Actions 서버에서의 새 실행은 아직 `BLOCKED`다.
 
 | # | 스텝 이름 | 실행 내용 |
 |---|---|---|
