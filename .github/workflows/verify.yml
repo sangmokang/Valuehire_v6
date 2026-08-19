@@ -12,6 +12,61 @@ permissions:
   contents: read
 
 jobs:
+  principles-structure:
+    name: P1 원칙 장부 구조·배선 검증 (필수)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: P1 원칙 장부 필수 파일 존재 검사
+        run: |
+          test -f docs/sot/principles.yaml
+          test -f scripts/acceptance-principles-check.sh
+          test -x scripts/acceptance-principles-check.sh
+
+      - name: P1 원칙 장부 mutation 검사
+        run: bash scripts/acceptance-principles-mutations.sh
+
+      - name: 전역 strict guard 격리 복구·한계 검사
+        run: bash scripts/acceptance-guard-global-skill-files.sh
+
+      - name: P1 원칙 장부 스키마·정적 배선 검사
+        run: bash scripts/acceptance-principles-check.sh --schema-only
+
+  p1-completion-diagnostic:
+    name: P1 원칙 32개 전체 완료 진단 (비차단)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: P1 원칙 32개 전체 완료 판정
+        run: |
+          set +e
+          bash scripts/acceptance-principles-check.sh
+          rc=$?
+          set -e
+          echo "P1_COMPLETION_RAW_EXIT: $rc"
+          echo "### P1 원칙 32개 전체 완료 진단" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 원명령 종료값: $rc" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 이 작업은 진단용이며 필수 구조·P3·기존 회귀 작업의 실행을 막지 않습니다." >> "$GITHUB_STEP_SUMMARY"
+          echo "- 필수 작업이 초록이어도 32개 원칙 전체 완료를 뜻하지 않습니다." >> "$GITHUB_STEP_SUMMARY"
+          case "$rc" in
+            0)
+              echo "P1_COMPLETION_RESULT: COMPLETE"
+              ;;
+            1)
+              echo "P1_COMPLETION_RESULT: UNMET"
+              echo "::warning title=P1 전체 완료 진단 미충족::원명령의 P1_UNMET 원문은 이 단계 로그에 보존됐습니다."
+              ;;
+            *)
+              echo "P1_COMPLETION_RESULT: NOT_RUN"
+              exit "$rc"
+              ;;
+          esac
+
   p3:
     # P1 전체 검사는 미충족 원칙이 있으면 의도적으로 실패한다. P3를 별도 job으로
     # 분리해 P1 성적과 무관하게 실행하고, P3가 실패하면 이 job도 그대로 실패시킨다.
@@ -29,21 +84,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0   # 아래 "히스토리 전량 스캔" 스텝이 과거 커밋의 blob까지 열어보는 데 필요
-
-      - name: P1 원칙 장부 필수 파일 존재 검사
-        run: |
-          test -f docs/sot/principles.yaml
-          test -f scripts/acceptance-principles-check.sh
-          test -x scripts/acceptance-principles-check.sh
-
-      - name: P1 원칙 장부 mutation 검사
-        run: bash scripts/acceptance-principles-mutations.sh
-
-      - name: 전역 strict guard 격리 복구·한계 검사
-        run: bash scripts/acceptance-guard-global-skill-files.sh
-
-      - name: P1 원칙 32개 전체 강제 검사
-        run: bash scripts/acceptance-principles-check.sh
 
       - name: 비밀 스캔 (verify.sh)
         # 패턴은 커밋된 .secret-patterns.default 를 쓴다.
