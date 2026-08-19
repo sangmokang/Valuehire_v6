@@ -284,10 +284,21 @@ unless full_command_jobs == ["p1-completion-diagnostic"]
   errors << "FULL_COMMAND_JOB_MISMATCH: #{full_command_jobs.join(',')}"
 end
 
-if diagnostic.is_a?(Hash) && diagnostic["continue-on-error"] != true
-  errors << "DIAGNOSTIC_NOT_NONBLOCKING"
+if diagnostic.is_a?(Hash) && diagnostic["continue-on-error"] == true
+  errors << "DIAGNOSTIC_ALLOWS_EXECUTION_ERRORS"
 end
-%w[principles-structure p3 verify].each do |job_id|
+required_diagnostic_lines = [
+  "set +e",
+  "rc=$?",
+  "set -e",
+  'echo "P1_COMPLETION_RAW_EXIT: $rc"',
+  'echo "P1_COMPLETION_RESULT: UNMET"',
+  'exit "$rc"',
+]
+required_diagnostic_lines.each do |line|
+  errors << "DIAGNOSTIC_RESULT_BRANCH_MISSING: #{line}" unless diagnostic_lines.include?(line)
+end
+%w[principles-structure p1-completion-diagnostic p3 verify].each do |job_id|
   job = jobs[job_id]
   next unless job.is_a?(Hash)
   errors << "REQUIRED_JOB_ALLOWS_FAILURE: #{job_id}" if job["continue-on-error"] == true
