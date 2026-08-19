@@ -62,6 +62,12 @@ git -C "$TMP/template" commit --quiet "$NO_VERIFY" -m fixture
 git -C "$TMP/template" branch -M main
 
 git init --quiet --bare "$TMP/with-baseline.git"
+# init.defaultBranch가 실행 환경마다 다르다(로컬 macOS git은 main, GitHub Actions
+# 러너는 master가 기본이었다 — 2026-08-19 CI 실측: 로컬 통과·서버 exit=127 재현).
+# bare repo의 symbolic HEAD가 push하지 않은 기본 브랜치(예: master)를 계속 가리키면
+# 그 뒤 clone이 "remote HEAD refers to nonexistent ref"로 조용히 빈 작업트리를 만든다.
+# 환경변수에 기대지 않고 이 저장소들의 HEAD를 명시적으로 고정한다.
+git -C "$TMP/with-baseline.git" symbolic-ref HEAD refs/heads/main
 git -C "$TMP/template" remote set-url origin "$TMP/with-baseline.git"
 git -C "$TMP/template" push --quiet -u origin main
 
@@ -69,6 +75,7 @@ cp -R "$TMP/template" "$TMP/no-baseline-source"
 git -C "$TMP/no-baseline-source" rm --quiet docs/sot/principles.yaml
 git -C "$TMP/no-baseline-source" commit --quiet "$NO_VERIFY" -m no-baseline
 git init --quiet --bare "$TMP/no-baseline.git"
+git -C "$TMP/no-baseline.git" symbolic-ref HEAD refs/heads/main
 git -C "$TMP/no-baseline-source" remote set-url origin "$TMP/no-baseline.git"
 git -C "$TMP/no-baseline-source" push --quiet -u origin main
 
