@@ -277,6 +277,40 @@ bash "$LINT" "$TMP/js_nested_handled.ts" >"$TMP/js_nested_handled.log" 2>&1 || r
 [ "$rc" -eq 0 ] && ok=0 || ok=1
 record "$ok" "중첩 블록에서 실제 처리하는 catch는 통과" "exit=$rc"
 
+cat > "$TMP/js_nested_violations_in_handled_catch.ts" <<'EOF'
+function wrapper(cfg: Config, list: ItemList) {
+  try { setup(); } catch (wrapError) {
+    log(wrapError);
+    function hiddenNull() {
+      try { return risky(); } catch (error) { return null; }
+    }
+    function hiddenEmpty() {
+      try { risky(); } catch (error) {}
+    }
+    const hiddenArray = list.items || [];
+    const hiddenNullish = cfg.retries ?? 3;
+    return { hiddenNull, hiddenEmpty, hiddenArray, hiddenNullish };
+  }
+}
+EOF
+rc=0
+out=$(bash "$LINT" "$TMP/js_nested_violations_in_handled_catch.ts" 2>&1) || rc=$?
+catch_null_hits=$(printf '%s\n' "$out" | grep -c 'catch-return-null' || true)
+bare_catch_hits=$(printf '%s\n' "$out" | grep -c 'bare-catch' || true)
+array_hits=$(printf '%s\n' "$out" | grep -c 'or-empty-array-fallback' || true)
+nullish_hits=$(printf '%s\n' "$out" | grep -c 'nullish-coalescing-fallback' || true)
+if [ "$rc" -eq 1 ] \
+   && [ "$catch_null_hits" -eq 1 ] \
+   && [ "$bare_catch_hits" -eq 1 ] \
+   && [ "$array_hits" -eq 1 ] \
+   && [ "$nullish_hits" -eq 1 ]; then
+  ok=0
+else
+  ok=1
+fi
+record "$ok" "처리 중인 바깥 catch 안의 네 위반도 모두 BLOCKED" \
+  "exit=$rc, catch-null=$catch_null_hits/1, bare-catch=$bare_catch_hits/1, array=$array_hits/1, nullish=$nullish_hits/1"
+
 cat > "$TMP/invalid.py" <<'EOF'
 def broken(:
     pass
