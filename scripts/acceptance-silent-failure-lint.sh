@@ -11,6 +11,7 @@
 # Python은 표준 ast가 실제 except handler를 읽는다. JavaScript/TypeScript 계열은
 # 이 네 규칙에 필요한 토큰만 읽는 의존성 없는 lexer를 쓴다. 문자열·주석·템플릿
 # 리터럴 본문·정규식 본문은 실행 토큰에서 제외하고, 템플릿 ${...} 안의 실행식은 읽는다.
+# ??= 와 ||= []는 각각 ?? 기본값과 || []의 복합 대입형으로 같은 규칙을 적용한다.
 set -uo pipefail
 
 if ! command -v python3 >/dev/null 2>&1; then
@@ -377,9 +378,9 @@ def js_findings(tokens: list[Token]) -> list[tuple[int, str]]:
     index = 0
     while index < len(tokens):
         token = tokens[index]
-        if token.value == "??":
+        if token.value in {"??", "??="}:
             findings.append((token.line, "nullish-coalescing-fallback"))
-        elif token.value == "||":
+        elif token.value in {"||", "||="}:
             cursor = index + 1
             while cursor < len(tokens) and tokens[cursor].value == "(":
                 cursor += 1
@@ -404,7 +405,6 @@ def js_findings(tokens: list[Token]) -> list[tuple[int, str]]:
                     returned = unwrap_parentheses(meaningful[1:])
                     if returned == ["null"]:
                         findings.append((token.line, "catch-return-null"))
-                index = end_body
         index += 1
     return findings
 
@@ -480,7 +480,7 @@ def main() -> int:
     if violations:
         print("FAIL: P3 조용한 실패 패턴 발견 — 명시적 assertX() 관문으로 대체할 것")
         return 1
-    print("PASS: bare except/catch, catch{return null}, ||[], ?? 실행 패턴 0건")
+    print("PASS: bare except/catch, catch{return null}, ||[]/||=[], ??/??= 실행 패턴 0건")
     return 0
 
 

@@ -264,6 +264,48 @@ other_hits=$(printf '%s\n' "$out" | grep -Ec 'bare-catch|catch-return-null|or-em
 if [ "$rc" -eq 1 ] && [ "$nullish_hits" -eq 1 ] && [ "$other_hits" -eq 0 ]; then ok=0; else ok=1; fi
 record "$ok" "JSX 본문은 무시하고 중괄호 실행식 안 ??만 BLOCKED" "exit=$rc, nullish=$nullish_hits/1, other=$other_hits/0"
 
+cat > "$TMP/tsx_generic.tsx" <<'EOF'
+const identity = <T,>(value: T): T => value;
+const retries = config.retries ?? 3;
+EOF
+rc=0
+out=$(bash "$LINT" "$TMP/tsx_generic.tsx" 2>&1) || rc=$?
+nullish_hits=$(printf '%s\n' "$out" | grep -c 'nullish-coalescing-fallback')
+if [ "$rc" -eq 1 ] && [ "$nullish_hits" -eq 1 ]; then ok=0; else ok=1; fi
+record "$ok" "TSX 제네릭 화살표 뒤 실제 ??는 BLOCKED" "exit=$rc, nullish=$nullish_hits/1"
+
+cat > "$TMP/regex-division.js" <<'EOF'
+const pattern = /catch \(e\) \{\}|value\?\?|items \|\| \[\]/;
+const ratio = total / count;
+const items = source.items || [];
+EOF
+rc=0
+out=$(bash "$LINT" "$TMP/regex-division.js" 2>&1) || rc=$?
+array_hits=$(printf '%s\n' "$out" | grep -c 'or-empty-array-fallback')
+other_hits=$(printf '%s\n' "$out" | grep -Ec 'bare-catch|catch-return-null|nullish-coalescing-fallback')
+if [ "$rc" -eq 1 ] && [ "$array_hits" -eq 1 ] && [ "$other_hits" -eq 0 ]; then ok=0; else ok=1; fi
+record "$ok" "정규식·나눗셈은 보존하고 실제 || []만 BLOCKED" "exit=$rc, array=$array_hits/1, other=$other_hits/0"
+
+printf 'const 설명 = "catch (e) {} ??";\r\ntry { risky(); } catch (오류) {\r\n}\r\n' \
+  > "$TMP/공백 포함 파일.js"
+rc=0
+out=$(bash "$LINT" "$TMP/공백 포함 파일.js" 2>&1) || rc=$?
+bare_catch_hits=$(printf '%s\n' "$out" | grep -c 'bare-catch')
+other_hits=$(printf '%s\n' "$out" | grep -Ec 'catch-return-null|or-empty-array-fallback|nullish-coalescing-fallback')
+if [ "$rc" -eq 1 ] && [ "$bare_catch_hits" -eq 1 ] && [ "$other_hits" -eq 0 ]; then ok=0; else ok=1; fi
+record "$ok" "CRLF·유니코드·공백 파일명은 실제 빈 catch만 BLOCKED" "exit=$rc, bare-catch=$bare_catch_hits/1, other=$other_hits/0"
+
+cat > "$TMP/assignment_fallbacks.ts" <<'EOF'
+config.retries ??= 3;
+state.items ||= [];
+EOF
+rc=0
+out=$(bash "$LINT" "$TMP/assignment_fallbacks.ts" 2>&1) || rc=$?
+nullish_hits=$(printf '%s\n' "$out" | grep -c 'nullish-coalescing-fallback')
+array_hits=$(printf '%s\n' "$out" | grep -c 'or-empty-array-fallback')
+if [ "$rc" -eq 1 ] && [ "$nullish_hits" -eq 1 ] && [ "$array_hits" -eq 1 ]; then ok=0; else ok=1; fi
+record "$ok" "??= 기본값·||= [] 복합 대입도 BLOCKED" "exit=$rc, nullish=$nullish_hits/1, array=$array_hits/1"
+
 cat > "$TMP/js_nested_handled.ts" <<'EOF'
 function load(value: number) {
   try { return value; } catch (error) {
@@ -383,6 +425,7 @@ setup_rc=0
 
 HOOK_BAD_LOG="$TMP/hook_bad.log"
 HOOK_GOOD_LOG="$TMP/hook_good.log"
+HOOK_NESTED_LOG="$TMP/hook_nested.log"
 
 rc=0
 if [ -d "$HOOKREPO/.git" ]; then
@@ -413,6 +456,34 @@ else
 fi
 [ "$rc" -eq 0 ] && ok=0 || ok=1
 record "$ok" "실제 hooks/pre-commit 배선(정상 파일 → 통과)" "exit=$rc"
+
+rc=0
+if [ -d "$HOOKREPO/.git" ]; then
+  (
+    cd "$HOOKREPO" &&
+    git reset --quiet >/dev/null 2>&1
+    rm -f scripts/good.py &&
+    cat > scripts/nested-violations.js <<'EOF'
+function wrapper(cfg, list) {
+  try { setup(); } catch (wrapError) {
+    log(wrapError);
+    function hiddenNull() {
+      try { return risky(); } catch (error) { return null; }
+    }
+    function hiddenEmpty() { try { risky(); } catch (error) {} }
+    const hiddenArray = list.items || [];
+    const hiddenNullish = cfg.retries ?? 3;
+  }
+}
+EOF
+    git add scripts/nested-violations.js >/dev/null &&
+    bash hooks/pre-commit
+  ) >"$HOOK_NESTED_LOG" 2>&1 || rc=$?
+else
+  rc=99
+fi
+if [ "$rc" -eq 1 ] && grep -q "조용한 실패 패턴 발견 (P3)" "$HOOK_NESTED_LOG" 2>/dev/null; then ok=0; else ok=1; fi
+record "$ok" "실제 hooks/pre-commit 배선(바깥 catch 안 네 위반 → BLOCKED)" "exit=$rc"
 
 # 22) 검사기 자체 무력화 공격 — 2026-08-19 codex V1 적대검증이 실제로 뚫었던 경로.
 # Python AST bare-except 판정을 반대로 바꾸면서 위반 파일을
