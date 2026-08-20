@@ -20,7 +20,7 @@
 브라우저 프로필과 열린 탭에 넓은 권한을 줄 수 있습니다. 편의가 아니라 이 보안 대가를 먼저 인정하고
 작은 전용 프로필, 정확히 하나인 목표 탭, 짧은 사용권, 즉시 권한 회수를 계약으로 강제합니다.
 
-**무엇을** — 사람인·잡코리아는 채널별 비기본 전용 프로필의 상주 브라우저에 로컬 진단 포트로 접속하고, LinkedIn Recruiter 안의 자동 순회는 별도 허용 근거가 확인될 때까지 금지합니다.
+**무엇을** — 사람인·잡코리아·LinkedIn Recruiter 모두 상주 브라우저에 로컬 진단 포트로 접속합니다. 사람인·잡코리아는 채널별 비기본 전용 프로필을, LinkedIn Recruiter는 사장님의 실제 로그인 프로필을 재사용합니다(이유는 아래 2-1 결정 카드).
 
 **왜** — 정상 상황의 클릭 0회 목표와 기존 로그인 세션 재사용을 함께 만족시키면서, 탭 추측·자격증명 입력·브라우저 생성과 종료를 계약으로 금지할 수 있는 경계이기 때문입니다.
 
@@ -32,7 +32,36 @@
 
 **틀리면 무엇이 깨지는가** — 잘못된 탭이나 계정에 명령이 가거나, 사람이 개입한 뒤에도 자동 명령이
 계속되거나, 프로필 전체의 인증 자료에 접근하는 능력이 제품에 생길 수 있습니다. 이 가운데 하나라도
-막지 못하면 D1과 C1은 시작할 수 없습니다.
+막지 못하면 D1과 C1은 시작할 수 없습니다. LinkedIn의 경우 페이싱(사람 수준 접속 속도) 조건을 지키지
+않으면 2026-07-18에 실제로 있었던 Cloudflare 봇 차단이 재발할 수 있습니다.
+
+### 2-1. LinkedIn Recruiter 자동 순회 — 2026-08-19 정정 결정 카드
+
+**무엇을** — LinkedIn Recruiter 사이트 내부의 프로젝트 확인·필터 순회·후보 목록 넘겨보기 자동화를 허용합니다. 조건: (1) 새 전용 프로필이 아니라 사장님 실제 로그인 프로필을 CDP로 재사용, (2) 카드 클릭 간격 지터·동일 URL 연속 재접속 금지·캡차/2단계 인증 즉시 중단. 메시지 발송 자동화는 여전히 금지입니다.
+
+**왜** — 사장님이 이미 2026-08-14에 확정했고 2026-08-15에 페이싱과 함께 라이브로 실행된 선례가 있었는데, "금지" 문구는 이를 반영하지 않은 별도 미승인 제안서의 문구가 그대로 정본에 옮겨진 것이었습니다(근거는 아래 문단).
+
+**버린 길** — "금지 유지"는 사장님 지시에 반해 버립니다. "속도 제한만 추가"도 기각합니다 — 실제 차단 원인은 속도가 아니라 전용 프로필 사용이었습니다(근거는 아래 문단).
+
+**대가** — LinkedIn만 "실프로필 재사용"이라는 다른 프로필 전략을 쓰게 되어 채널별 전략이 통일되지 않습니다. 페이싱 조건을 D1이 실제로 증명하기 전까지 이 허용은 정책일 뿐 실제 자동화 코드는 여전히 `NOT_RUN`입니다.
+
+**되돌리기** — 다시 막으려면 새 L3 결정과 오너 승인이 필요합니다. 2026-08-15 제안서 자체는 고쳐 쓰지 않고 "제안" 상태 그대로 역사 기록으로 남깁니다.
+
+**근거 상세** — 이 goal의 2026-08-18 초판은 "LinkedIn 자동 순회는 허용 근거 확인 전까지 금지"라고
+적었습니다. 추적해보니 사장님은 이미 2026-08-14에 이를 확정하셨고
+(`docs/engineering/goal-prompts/humansearch-journey-nightshift-2026-08-14.md:8` 결정 ⑥ "RPS는
+프로젝트 생성+필터 세팅 선행 후 필터순회→키워드교체"), 2026-08-15에는 사람 수준 페이싱과 함께 실제
+라이브로 실행된 선례도 있었습니다
+(`docs/engineering/goal-prompts/codex-5position-search-2026-08-15.md:3-33`, "봇 회피: 카드 클릭
+간격 지터, 같은 URL 연속 2회 열지 말 것, 캡차·2FA 감지 즉시 STOP"). "금지" 문구는 이 두 근거를
+반영하지 않고, 같은 2026-08-15에 별도로 작성된 검토용 제안서(문서 자신이 "승인 상태: 오너 승인
+전"이라고 명시,
+`docs/engineering/humansearch-journey-alternative-plan-2026-08-15.md:1-9,301-303`)의 미확정
+제안을 그대로 정본에 옮긴 것이었습니다. 사장님이 2026-08-19에 직접 정정을 지시하셨고, Codex 독립
+검증(V1)도 동일하게 VERDICT: FAIL(사용자 지시 근거 없음, 반대 증거 존재)로 판정했습니다. 실제 차단
+원인은 2026-07-18 실측 정본
+(`docs/engineering/humansearch-v6-founding-spec-2026-08-07.md:214-231`)에 근거합니다 — 속도가
+아니라 "전용 프로필 사용"이었습니다.
 
 ## 3층 — 기술 계약과 증거
 
@@ -140,7 +169,7 @@ v1~v5 코드·경로·설계는 복사·불러오기·실행하지 않습니다.
 | 정상 흐름 사용자 클릭 필요 대 클릭 0회 | 사람인·잡코리아의 준비된 정상 세션은 클릭 0회 | 최초 브라우저 준비·사람 로그인과 인증 예외는 사람 작업이며 자동 재개는 NOT_RUN |
 | raw CDP 금지 후보 대 진단 포트 사용 | 임의 프로토콜 전달·전체 대상 제어 능력은 금지하고, D1이 증명한 최소 접속 어댑터만 허용 | 진단 포트 자체의 넓은 능력은 사라지지 않으므로 capability 부재 시험 필요 |
 | 채널별 전용 프로필 대 기존 사람 세션 | 사람인·잡코리아는 채널별 비기본 전용 프로필에 사람이 직접 로그인한 세션 사용 | 평소 기본 프로필이나 다른 사람 세션에 자동 접속 금지; 세션 충돌은 중단 |
-| 사람인·잡코리아 대 LinkedIn Recruiter | 전자는 D1 이후 준비된 정상 흐름만 허용, LinkedIn 사이트 내부 자동 순회는 허용 근거 전 금지 | LinkedIn은 로컬 준비만 가능하며 사이트 내부 프로젝트·필터·후보 순회는 사람이 수행 |
+| 사람인·잡코리아 대 LinkedIn Recruiter | 셋 다 D1 이후 준비된 정상 흐름을 허용하되 LinkedIn은 실프로필 재사용+페이싱 조건이 추가로 붙음(§2-1) | LinkedIn은 전용 새 프로필을 쓰지 않고, 저장·발송은 계속 사람이 수행 |
 
 → 표가 말하는 것: 다섯 충돌은 하나를 숨기거나 합치지 않고 각각 채택안, 대가, 채널별 한계로 해소합니다.
 
@@ -169,13 +198,13 @@ v1~v5 코드·경로·설계는 복사·불러오기·실행하지 않습니다.
 
 ```json
 {
-  "channel": "saramin | jobkorea",
+  "channel": "saramin | jobkorea | linkedin",
   "lease_id": "opaque-id",
   "fencing_number": "strictly-increasing-integer",
   "expires_at": "timestamp",
   "allowed_origins": ["channel-specific exact origins"],
   "browser_instance_proof": "fresh D1 proof",
-  "profile_instance_proof": "fresh D1 proof",
+  "profile_instance_proof": "fresh D1 proof (linkedin은 사장님 실프로필 증거여야 함)",
   "target_tab_proof": "exactly one fresh matching target"
 }
 ```
@@ -188,8 +217,8 @@ v1~v5 코드·경로·설계는 복사·불러오기·실행하지 않습니다.
 → 좋은가 나쁜가: 하나라도 빠지면 실행하지 않는 것이 합격입니다. 포트 번호와 프로필 경로의 실제
 발견 방식은 D1 실증 전까지 `NOT_RUN`입니다.
 
-LinkedIn Recruiter는 이 입력을 만들거나 브라우저 사용권을 얻을 수 없습니다. 허용 근거 전에는
-사이트 밖 로컬 준비만 가능합니다.
+LinkedIn Recruiter도 D1이 실프로필 재사용·페이싱 조건을 증명한 뒤에는 같은 입력 구조로 사용권을
+얻을 수 있습니다(§2-1). 그 전까지는 사이트 밖 로컬 준비만 가능합니다.
 
 ### 허용 능력과 금지 능력
 
@@ -269,7 +298,7 @@ C1은 로그인 만료, 보안문자, 2단계 인증, 세션 충돌, 사람 입�
 | 사람 입력 감지 즉시 권한 회수·잔여 명령 0 | NOT_RUN | D1 중립 시험 |
 | 인증 복구 뒤 자동 재개 | NOT_RUN | 별도 결정 전 금지 |
 | 사람인·잡코리아 실제 탭 단일 선택 | NOT_RUN | D1/C1 선행 계약 뒤 실증 |
-| LinkedIn Recruiter 자동 순회 허용 | NOT_RUN | 계약·정책·계정 허용 근거와 오너 승인 |
+| LinkedIn Recruiter 자동 순회 — 정책 허용(§2-1)의 실제 코드 구현 | NOT_RUN | D1이 실프로필 재사용·페이싱 조건을 중립 시험으로 증명 |
 | 실제 포털·로그인·후보 검색·화면 캡처 | NOT_RUN | C1 이후 각 별도 단계 |
 
 → 표가 말하는 것: 문서 결정과 실제 동작 증명을 분리하며, 미실행 항목을 D0 완료로 올려 쓰지 않습니다.
@@ -309,7 +338,8 @@ bash ~/.claude/skills/strict/brief-lint.sh docs/engineering/humansearch-d0-brows
 - 미결정과 `NOT_RUN`이 실제 미실증 상태를 숨기지 않는가.
 - Active Tab Bridge를 버린 이유·보안 대가·되돌리기가 충분한가.
 - C1 접속·중단·개인정보 경계가 실제 포털 실행 권한으로 과장되지 않는가.
-- LinkedIn 자동 순회가 허용 근거 전 금지됐는가.
+- LinkedIn 자동 순회 허용(§2-1)이 실제 오너 확정(2026-08-14)·라이브 선례(2026-08-15)에 근거하며,
+  실프로필 재사용·페이싱 조건이 충분한가.
 
 배송은 일반 push와 한국어 PR 생성, 서버 검사 성공 확인까지만 수행합니다. D0 PR의 `main` 병합,
 브라우저 실행, 포털 접속, C1, D1 구현은 금지합니다.
@@ -321,4 +351,46 @@ bash ~/.claude/skills/strict/brief-lint.sh docs/engineering/humansearch-d0-brows
 ## 적대 검증 로그
 
 최종 SOT 초안과 INDEX가 준비된 뒤, 새 지문에서 Claude V1 전체 출력과 Codex V2 재공격 결과를 이
-절에 원문으로 추가합니다. 현재 상태는 `NOT_RUN`입니다.
+절에 원문으로 추가합니다. 문서 전체에 대한 새 V1/V2는 아직 `NOT_RUN`입니다.
+
+### §2-1 LinkedIn 정정에 대한 Codex 독립 리뷰 (2026-08-19)
+
+정정 전 "LinkedIn 자동 순회 금지" 조항이 사장님 지시인지, AI 자체 제안인지를 Codex(`/codex:rescue`,
+격리된 맥락, 제 결론은 알리지 않음)에게 독립적으로 물었습니다.
+
+```
+VERDICT: FAIL
+
+(a) No explicit user instruction prohibiting LinkedIn Recruiter automated traversal was found.
+    The strongest-supported lineage is: AI-reviewed risk proposal → D0 acceptance criterion →
+    categorical proposed-SOT rule. ... the repository contains user-attributed evidence
+    supporting automated RPS traversal with controlled behavior.
+(b) The single Cloudflare incident supports profile/session redesign and cautious pacing, not
+    a universal traversal ban; the founding document itself proposed a different profile
+    strategy as the remedy. ... The evidence therefore supports an interim compliance/risk gate
+    plus owner acknowledgment—not silently replacing the recorded product requirement with an
+    absolute prohibition.
+(c) Yes, controlled traversal is technically compatible with the other safeguards ... The
+    LinkedIn profile clause should use the approved existing single-seat owner profile rather
+    than assuming a fresh automation-only profile, because the latter is the profile type
+    recorded as blocked.
+
+RECOMMENDATION: replace the LinkedIn-wide prohibition with conditional traversal permission:
+one approved single-seat session and exact target, serial execution, measurable human-like
+pacing/jitter and cooldown, no rapid repeat URLs, and immediate stop on human input, login,
+CAPTCHA, 2FA, security checkpoint, or session conflict. Retain the credential, arbitrary-CDP,
+tab creation/closure, storage, and automatic-message-sending prohibitions; preserve the
+August 15 proposal as historical risk analysis rather than rewriting it as an approved decision.
+```
+
+→ 무엇을 시켰나: Codex에게 이 저장소 안에서 "금지 조항의 진짜 근거가 사용자 지시인지 AI 제안인지"와
+"사용자가 요구한 수정(허용+속도제한)이 타당한지"를 독립적으로 판정하게 했습니다.
+
+→ 뭐가 나왔나: FAIL(=금지 조항은 사용자 지시가 아니었다) — 제 자체 분석과 결론이 일치했고, 오히려
+제가 못 찾았던 2026-08-14 사장님 확정 결정 ⑥과 2026-08-15 라이브 실행 선례를 Codex가 추가로 찾아
+근거를 보강했습니다. 프로필 재사용 조건("전용 새 프로필 대신 기존 단일 좌석 프로필")도 동일하게
+권고했습니다.
+
+→ 좋은가 나쁜가: 좋은 소식입니다 — 서로 다른 두 엔진(Claude, Codex)이 독립적으로 같은 결론에
+도달했고, §2-1의 수정 내용이 Codex 권고와 정확히 일치합니다. 이 검증은 §2-1 하나만 겨냥한
+정조준 검증이며, 정정된 문서 전체에 대한 새 V1/V2 전체 재공격은 여전히 `NOT_RUN`입니다.
