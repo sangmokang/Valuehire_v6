@@ -107,9 +107,15 @@ pass=$((pass + 1))
 # --- 실전 배선이 살아 있는가 (라이브 단언) ----------------------------------
 total=$((total + 1))
 missing=""
-for cmd in "bash scripts/acceptance-hs-gates.sh" "bash scripts/acceptance-hs-gates-mutations.sh" \
-  "bash scripts/acceptance-hs-gates-antiforge.sh"; do
-  grep -qE "^[[:space:]]*${cmd}([[:space:]]|$)" "$WF" || missing="${missing} ${cmd}"
+# 2026-08-21 부터 CI 는 scripts/verify/run-acceptance.sh 래퍼를 거쳐 실행한다. 래퍼는
+# 대상을 실제로 실행하므로 라이브 배선으로 인정한다(래퍼가 무력화를 막는다는 증명은
+# scripts/acceptance-semantic-mutations.sh 가 따로 한다). 래퍼 없는 직접 실행도 계속
+# 인정해, 배선 방식이 바뀔 때마다 이 검사가 곧바로 빨간불이 되지 않게 한다.
+for target in scripts/acceptance-hs-gates.sh scripts/acceptance-hs-gates-mutations.sh \
+  scripts/acceptance-hs-gates-antiforge.sh; do
+  if ! grep -qE "^[[:space:]]*bash (scripts/verify/run-acceptance\.sh )?${target//./\\.}([[:space:]]|$)" "$WF"; then
+    missing="${missing} bash ${target}"
+  fi
 done
 if [ -n "$missing" ]; then
   echo "FAIL: CI missing live G2 command(s):${missing}"

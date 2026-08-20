@@ -1,0 +1,33 @@
+verdict: PASS
+g:
+  status: PASS
+  command: "bash scripts/acceptance-principles-check.sh && bash scripts/acceptance-principles-mutations.sh"
+  exit: 0
+  output: "core CHECKED 32, mutation CHECKED 40, registry CHECKED 6, registry fixture CHECKED 31, VERDICT PASS"
+  artifact: "docs/engineering/strict-principles-g-evidence-2026-08-20.md"
+  artifact_hash: "e6974edfb258e39c5dc18ed8631b8f3b08013029b51a01adf274b33a17b18a88"
+  session_id: "codex-root-2026-08-20-strict-principles"
+v1:
+  status: PASS
+  command: "env -u ANTHROPIC_API_KEY claude -p --resume fc479ae5-4368-47d5-91d1-65c0e75fde6e --output-format json --effort high --permission-mode dontAsk --allowedTools Read,Grep,Glob,Bash < docs/engineering/strict-principles-v1-recheck-prompt-2026-08-20.md"
+  exit: 0
+  output: "Claude Sonnet 5 실제 검증 완주; api_error_status=null; 최종 VERDICT PASS; core 32, mutation 40, registry 6, fixture 31"
+  artifact: "docs/engineering/strict-principles-v1-verdict-2026-08-20.md"
+  artifact_hash: "02e27b77fe9806a35a69582df05d69133f86f46d4557b4f1b1d49aa90682344c"
+  session_id: "fc479ae5-4368-47d5-91d1-65c0e75fde6e"
+v2:
+  status: PASS
+  command: "native fresh-context verifier /root/strict_principles_v2_final_r2; direct SOT load and read-only adversarial verification"
+  exit: 0
+  output: "V2_VERDICT PASS; G/V1 claims reproduced; runtime forgery attacks rejected; worktree contamination absent"
+  artifact: "docs/engineering/strict-principles-v2-verdict-2026-08-20.md"
+  artifact_hash: "3e546a156ba2066553a9c46c689ff64aff15e1ce545254f91b603c1a46fe5170"
+  session_id: "/root/strict_principles_v2_final_r2"
+t:
+  status: PASS
+  command: "read goal T contract; run principle checker and verdict fixtures"
+  exit: 0
+  output: "T 입력·출력·오류·경계와 14 counter-AC가 goal 및 executable fixtures에 고정됨"
+  artifact: "docs/engineering/strict-principles-contract-goal-2026-08-20.md"
+  artifact_hash: "eb48fca44301d7e2b5a995e508630816c02d9fe4af215b4483e7bb5e6e590ebd"
+  session_id: "codex-root-2026-08-20-strict-principles"

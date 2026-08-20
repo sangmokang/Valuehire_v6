@@ -22,3 +22,63 @@
   stage: "ci"
   ci_mirror_job: "verify"
   required: true
+- id: "principles-local-check"
+  path: "scripts/acceptance-principles-check.sh"
+  target: "VERDICT: PASS"
+  stage: "manual"
+  manual_reason: "Strict 시작 시 현재 저장소 정본을 직접 읽는 원명령"
+  required: true
+- id: "principles-explicit-prepush"
+  path: "hooks/pre-push"
+  target: "bash scripts/acceptance-principles-check.sh"
+  stage: "pre-push"
+  required: true
+- id: "principles-explicit-ci"
+  path: ".github/workflows/verify.yml"
+  target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-principles-check.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
+- id: "acceptance-runner-ci"
+  path: ".github/workflows/verify.yml"
+  target: "bash scripts/verify/run-acceptance.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
+- id: "acceptance-semantics-ci"
+  path: ".github/workflows/verify.yml"
+  target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-semantic-mutations.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
+- id: "acceptance-runner-gate"
+  path: "scripts/verify/run-acceptance.sh"
+  target: "판정을 한 건도 내놓지 않았다"
+  stage: "manual"
+  manual_reason: "래퍼 자신의 판정 문구. 실행 배선은 acceptance-runner-ci 가 대조한다"
+  required: true
+- id: "ci-step-integrity-ci"
+  path: ".github/workflows/verify.yml"
+  target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-ci-step-integrity.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
+- id: "ci-step-integrity-checker"
+  path: "scripts/verify/check-ci-step-integrity.sh"
+  target: "조건부 스텝은 조건이 거짓이면 실행되지 않고도 초록이다"
+  stage: "manual"
+  manual_reason: "검사기 자신의 판정 문구. 실행 배선은 ci-step-integrity-ci 가 대조한다"
+  required: true
+- id: "verified-sha-ci"
+  path: ".github/workflows/verify.yml"
+  target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-verified-sha.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
+- id: "verified-sha-checker"
+  path: "scripts/verify/check-verified-sha.sh"
+  target: "VERDICT: UNVERIFIED"
+  stage: "manual"
+  manual_reason: "원격 조회가 필요해 CI 안에서 자기 SHA 를 검사하는 것은 뜻이 없다. 머지 전 판정 도구"
+  required: true
+

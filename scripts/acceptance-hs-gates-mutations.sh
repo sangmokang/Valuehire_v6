@@ -24,9 +24,11 @@ for required in "$GATES" "scripts/hs_import_spy.py" "humansearch/pyproject.toml"
   fi
 done
 
-for wired in "bash scripts/acceptance-hs-gates.sh" "bash scripts/acceptance-hs-gates-mutations.sh"; do
-  if ! grep -qE "^[[:space:]]*${wired}([[:space:]]|$)" .github/workflows/verify.yml; then
-    echo "FAIL: CI wiring missing: $wired"
+# CI 는 scripts/verify/run-acceptance.sh 래퍼를 거쳐 실행한다(2026-08-21). 래퍼는
+# 대상을 실제로 실행하므로 배선으로 인정하고, 래퍼 없는 직접 실행도 계속 인정한다.
+for wired in scripts/acceptance-hs-gates.sh scripts/acceptance-hs-gates-mutations.sh; do
+  if ! grep -qE "^[[:space:]]*bash (scripts/verify/run-acceptance\.sh )?${wired//./\\.}([[:space:]]|$)" .github/workflows/verify.yml; then
+    echo "FAIL: CI wiring missing: bash $wired"
     exit 1
   fi
 done
