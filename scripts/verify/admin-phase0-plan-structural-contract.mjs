@@ -214,9 +214,14 @@ function parseVerifySteps(workflow) {
   };
 }
 
-function parseSotCiRowCount(text) {
+function parseSotCiRows(text) {
   const section = text.match(/^### CI\([^\n]*\)[^\n]*\n([\s\S]*?)(?=^### |^## |(?![\s\S]))/m)?.[1] ?? "";
-  return (section.match(/^\|\s*\d+\s*\|/gm) ?? []).length;
+  const rows = [];
+  for (const line of section.split(/\r?\n/)) {
+    const match = line.match(/^\|\s*(\d+)\s*\|([^|]*)\|([^|]*)\|/);
+    if (match) rows.push({ number: Number(match[1]), content: match[3].trim() });
+  }
+  return rows;
 }
 
 function dependencyCycleCount(graph) {
@@ -553,9 +558,16 @@ function validateCi(files, contract, errors) {
   if (namedCount !== contract.ci?.namedStepCount) {
     errors.push(`CI named step count must be ${contract.ci?.namedStepCount}, got ${namedCount}`);
   }
-  const sotCount = parseSotCiRowCount(files.sot);
+  const sotRows = parseSotCiRows(files.sot);
+  const sotCount = sotRows.length;
   if (sotCount !== contract.ci?.namedStepCount) {
     errors.push(`verification SOT CI row count must be ${contract.ci?.namedStepCount}, got ${sotCount}`);
+  }
+  const phase0SotRow = sotRows.find((row) => row.number === contract.ci?.namedStepCount);
+  if (!phase0SotRow || !phase0SotRow.content.includes(contract.ci?.run ?? "")) {
+    errors.push(
+      `verification SOT CI row ${contract.ci?.namedStepCount} must include the run command ${contract.ci?.run}`,
+    );
   }
   if (candidates.length === 0) errors.push("CI Phase 0 plan target count must be greater than 0");
   requireIncludes(errors, files.registry, 'id: "admin-phase0-plan-ci"', "mechanism registry");

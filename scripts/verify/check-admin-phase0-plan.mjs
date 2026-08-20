@@ -463,6 +463,22 @@ const mutations = [
         fs.writeFileSync(file, text);
       },
     },
+    {
+      name: "ci-sot-row-content-forged-count-preserved",
+      // 워크플로 파일은 그대로 두고, verification SOT 표의 17번 행 "실행 내용"만
+      // 가짜 명령으로 바꾼다. 행 개수는 17개로 그대로라 parseSotCiRowCount()만으로는
+      // 잡히지 않는다 — 이 사례는 행 개수가 아니라 행 내용을 검사하는지 확인한다.
+      expected: "verification SOT CI row 17 must include the run command bash scripts/acceptance-admin-phase0-plan.sh",
+      apply(tempRoot) {
+        const file = path.join(tempRoot, relativePaths.sot);
+        const text = replaceOnce(
+          fs.readFileSync(file, "utf8"),
+          "| 17 | 관리자 Phase 0 계획 복구 계약 | `bash scripts/acceptance-admin-phase0-plan.sh` — 요구 누락·비원자 작업·무효 감사 재사용·SOT/CI 미배선 차단 (#18) |",
+          "| 17 | 관리자 Phase 0 계획 복구 계약 | `echo disabled` — 요구 누락·비원자 작업·무효 감사 재사용·SOT/CI 미배선 차단 (#18) |",
+        );
+        fs.writeFileSync(file, text);
+      },
+    },
   ];
 
 // 정상 문서 편집이 검사기의 실패로 오탐되지 않는지 확인하는 사례.
