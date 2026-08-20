@@ -13,7 +13,7 @@
 **LLM은 충돌을 "코드를 새로 지어내서" 해결한다. v4의 자동로그인 6벌이 그 산물이다.**
 
 **worktree는 브랜치 전략이 아니라 작업 공간 격리 메커니즘**이며 trunk-based와 결합된다.
-목표 1개 = worktree 1개 = 브랜치 1개 = PR 1개다. 목표 안에는 서로 같은 결과를 향하는 Work Unit 1~N개가 있을 수 있다.
+Issue 또는 goal 문서 1개 = worktree 1개 = 브랜치 1개 = PR 1개다. PR 하나에는 Work Unit 1~5개만 둘 수 있다.
 
 ### Work Unit — PR보다 작은 증명 경계
 
@@ -38,9 +38,9 @@ P5의 시험 불변 계약이 Work Unit보다 우선한다. 필요한 시험이 
 
 ### 목표·Work Unit·PR 관계
 
-- Issue/요구사항은 사용자가 얻을 결과 하나를 정의한다.
-- worktree·브랜치·PR은 그 목표 하나를 소유한다.
-- PR 안에는 같은 목표를 이루는 Work Unit 1~N개가 순서대로 들어갈 수 있다. 오너가 반드시 볼 판단 항목이 6개 이상이면 목표와 PR을 나눈다.
+- Issue 또는 goal 문서 하나가 PR의 목표와 Work Unit 전체 목록을 정의한다. 목표 문서를 둘 이상 참조해야 하면 PR을 나눈다.
+- worktree·브랜치·PR은 그 Issue 또는 goal 문서 하나를 소유한다.
+- PR 안에는 Work Unit 1~5개만 순서대로 둘 수 있다. 여섯 번째 Work Unit이 필요하면 새 Issue 또는 goal 문서와 PR로 나눈다. 각 Work Unit은 실행 가능한 인수 기준 정확히 하나에 대응하므로 개수는 goal의 Work Unit 장부 행으로 센다.
 - Work Unit마다 새 Agent·새 세션을 띄우는 것은 선택이다. 같은 세션에서도 한 Work Unit만 구현하고 표적 검증을 끝낸 뒤 다음 Work Unit으로 넘어갈 수 있다.
 - 가능한 경우 구현자가 아닌 새 맥락이 반증을 맡는다. 단 외부 모델·유료 서비스·별도 오케스트레이터가 없어도 기본 절차는 중단되지 않는다.
 

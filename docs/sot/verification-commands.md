@@ -35,6 +35,8 @@
 12. CI GREEN 확인 뒤 MERGE
 ```
 
+10번 PR 단계는 `git push`로 브랜치를 원격에 올린 뒤 PR을 만드는 순서다. `git push` 때 pre-push가 결정적 스크립트를 전량 다시 실행하지만, 이는 7번 전체 strict의 실행 장부, 8번 codeaudit의 코드·설계 검토, 9번 전체 적대검증의 Work Unit 결합 공격을 대신하지 않는다. Work Unit 완료 커밋을 중간 백업 목적으로 push할 수는 있어도 PR 전체 PASS를 뜻하지 않는다.
+
 `LOCAL VALIDATE`는 “이번 Work Unit에서 약속한 기능 하나가 실제로 되는가?”만 묻는다. goal에 고정한 해당 AC의 원명령과 기대 종료값·출력을 실제로 실행하며, 다른 Work Unit의 성공으로 대신하지 않는다.
 
 `작은 적대검증`은 “이 약속을 어떻게 속여서 통과시킬 수 있는가?”를 묻는다. 일반 Work Unit은 counter-AC에 정조준한 반증 1~3개를 실제로 실행한다. 예를 들어 검사 실행 배선이면 `echo`, `true`, `|| true`, `if: false`, 조기 `exit 0` 중 해당 주장과 관련된 최소 조합을 시험한다.
@@ -53,11 +55,11 @@
 - 비밀·후보자 데이터 노출 검사
 - 배포·인증·로그인
 
-독립 REVIEW는 구현 결론을 그대로 받아쓰지 않고 같은 AC와 counter-AC를 새 맥락에서 재실행합니다. 다른 Agent나 모델을 쓸 수 있지만 필수 외부 서비스로 고정하지 않습니다. 실행할 수 없으면 `NOT_RUN`이며 고위험 Work Unit을 PASS로 닫지 않습니다.
+독립 REVIEW는 구현 결론을 그대로 받아쓰지 않고 같은 AC와 counter-AC를 새 맥락에서 재실행한다. 다른 Agent나 모델을 쓸 수 있지만 필수 외부 서비스로 고정하지 않는다. 실행할 수 없으면 `NOT_RUN`이며 고위험 Work Unit을 PASS로 닫지 않는다.
 
 ### Work Unit 완료와 PR 완료는 다르다
 
-Work Unit 완료 커밋은 그 주장 하나의 표적 증거가 닫혔다는 뜻입니다. PR 완료는 모든 Work Unit의 결합, 전체 저장소 원칙, 코드 품질, 원격 CI까지 닫혔다는 뜻입니다. Work Unit PASS만으로 PR을 만들거나 병합 완료를 주장하지 않습니다.
+Work Unit 완료 커밋은 그 주장 하나의 표적 증거가 닫혔다는 뜻이다. PR 완료는 모든 Work Unit의 결합, 전체 저장소 원칙, 코드 품질, 원격 CI까지 닫혔다는 뜻이다. Work Unit PASS만으로 PR을 만들거나 병합 완료를 주장하지 않는다.
 
 ### CI(`​.github/workflows/verify.yml`)가 실제로 돌리는 것
 
