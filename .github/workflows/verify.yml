@@ -91,11 +91,31 @@ jobs:
           hit=0; blobs=0
           while IFS= read -r sha; do
             [ -z "$sha" ] && continue
-            [ "$(git cat-file -t "$sha" 2>/dev/null)" = blob ] || continue
+            object_type_rc=0
+            object_type=$(git cat-file -t "$sha" 2>/dev/null) || object_type_rc=$?
+            if [ "$object_type_rc" -ne 0 ]; then
+              echo "FAIL: 히스토리 객체형 읽기 실패: $sha (exit=$object_type_rc)"
+              hit=1
+              continue
+            fi
+            [ "$object_type" = blob ] || continue
             blobs=$((blobs+1))
-            if git cat-file blob "$sha" 2>/dev/null | grep -qEif "$CLEAN"; then
+            if git cat-file blob "$sha" 2>/dev/null | grep -aEif "$CLEAN" >/dev/null; then
+              blob_scan_status=("${PIPESTATUS[@]}")
+            else
+              blob_scan_status=("${PIPESTATUS[@]}")
+            fi
+            cat_file_rc=${blob_scan_status[0]:-1}
+            grep_rc=${blob_scan_status[1]:-2}
+            if [ "$cat_file_rc" -ne 0 ]; then
+              echo "FAIL: 히스토리 blob 읽기 실패: $sha (exit=$cat_file_rc)"
+              hit=1
+            elif [ "$grep_rc" -eq 0 ]; then
               echo "FAIL: 히스토리 blob에 자격증명 패턴 매치: $sha"
               awk -v s="$sha" '$1==s {print "  경로: "$2}' "$OBJS"
+              hit=1
+            elif [ "$grep_rc" -ne 1 ]; then
+              echo "FAIL: 히스토리 blob 내용 대조 실패: $sha (exit=$grep_rc)"
               hit=1
             fi
           done < <(awk '{print $1}' "$OBJS" | sort -u)
@@ -107,7 +127,7 @@ jobs:
 
       - name: 인수 검사 0-2 상시 내용 검사와 종료상태 분리 (AC-19)
         # 실제 로컬 리터럴은 CI에 올리지 않는다. 합성 저장소와 합성 값으로 동일 판정기를 실행해
-        # 환경 격리·네 객체형·fsck/cat-file 실패·큰 객체·종료상태·훅 환경 무오염 13건을 증명한다.
+        # 환경 격리·객체형·도구 실패·도달 여부별 큰 객체·종료상태·훅 환경 무오염 20건을 증명한다.
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-0-2-unreachable-content.sh
 
       - name: 인수 검사 0-6 (가짜 검증 스크립트 0건)

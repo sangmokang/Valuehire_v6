@@ -21,9 +21,9 @@ if [ -n "${AC19_COUNT_MISMATCH_PROBE:-}" ]; then
 elif [ -n "${AC19_PATTERN_ENV_PROBE:-}" ]; then
   TOTAL=1
 elif [ -n "${AC19_INNER_HOOK_PROBE:-}" ]; then
-  TOTAL=16
+  TOTAL=17
 else
-  TOTAL=20
+  TOTAL=21
 fi
 checked=0
 failed=0
@@ -263,6 +263,17 @@ FAIL_REACHABLE_CAT_FILE_SHA="$ci_read_failure_sha" \
 run_case '서버 본문도 blob 읽기 실패를 값 없음으로 통과하지 않음' blocked \
   'FAIL: 히스토리 blob 읽기 실패' "$ci_read_failure" \
   run_ci_history_scan "$ci_read_failure"
+
+# 패턴이 깨져 내용 대조 자체가 성립하지 않아도 값 없음으로 통과하면 안 된다.
+# 실측(2026-08-21): 깨진 정규식은 grep 이 입력을 읽기 전에 끝나므로 파이프의 읽는 쪽이
+# 사라지고, 쓰는 쪽인 cat-file 이 종료값 141(SIGPIPE)로 죽는다. 그래서 이 상황은
+# "내용 대조 실패"가 아니라 "blob 읽기 실패"로 표면화된다. 어느 쪽이든 차단이 계약이다.
+ci_pattern_error="$TMP/ci-pattern-error"
+make_fixture "$ci_pattern_error"
+printf '%s\n' '[' > "$ci_pattern_error/.secret-patterns.default"
+run_case '서버 본문도 대조 불능 패턴을 값 없음으로 통과하지 않음' blocked \
+  'FAIL: 히스토리 blob 읽기 실패' "$ci_pattern_error" \
+  run_ci_history_scan "$ci_pattern_error"
 
 endstate="$TMP/endstate"
 make_fixture "$endstate"
