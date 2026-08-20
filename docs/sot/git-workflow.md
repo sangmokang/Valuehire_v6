@@ -36,6 +36,8 @@ P5의 시험 불변 계약이 Work Unit보다 우선한다. 필요한 시험이 
 
 따라서 Work Unit 하나가 항상 Git 커밋 하나라는 뜻은 아니다. RED 계약 커밋은 시험을 잠그는 공통 기준선이고, 각 Work Unit의 **완료 커밋**은 “이 주장 하나의 구현·표적 검증·작은 적대검증(= 속여서 통과시키는 시도)이 끝났다”는 검토 경계다. 서로 다른 Work Unit 구현을 한 완료 커밋에 섞지 않는다.
 
+독립 검토가 여러 Work Unit에 걸친 결함을 찾으면 하나의 검토 보정 커밋이 영향받은 Work Unit들을 함께 고칠 수 있다. goal 장부는 그 커밋 해시를 영향받은 각 Work Unit의 완료 경계에 기록하며, 이 보정 커밋이 서로 다른 주장을 하나의 Work Unit으로 합치지는 않는다.
+
 ### 목표·Work Unit·PR 관계
 
 - Issue 또는 goal 문서 하나가 PR의 목표와 Work Unit 전체 목록을 정의한다. 목표 문서를 둘 이상 참조해야 하면 PR을 나눈다.
@@ -48,6 +50,7 @@ P5의 시험 불변 계약이 Work Unit보다 우선한다. 필요한 시험이 
 
 - `main` 보호. 직접 push 금지. **오너 본인도 예외 없음**
 - 작업 브랜치 `task/<name>`, 위치 `worktrees/<name>/`, **수명 24~48시간 상한**. 초과 = 목표나 Work Unit 분해가 너무 크다는 신호(v4: 워크트리 77개·미병합 브랜치 113개가 방치된 실측 사례)
+- 24~48시간 수명 상한이 Work Unit 1~5개 상한보다 우선한다. 48시간을 넘길 것으로 예상되면 Work Unit이 5개 미만이어도 새 goal·worktree·브랜치·PR로 일찍 나눈다.
 - PR = 사용자 결과 1개. **squash merge**, 머지 후 브랜치 삭제
 - Work Unit 완료 커밋은 squash 전 검토·원인 격리 경계다. squash 뒤 `main`의 롤백 경계는 PR 전체 커밋이며, 특정 Work Unit만 되돌릴 때는 해당 변경을 역적용하는 새 커밋을 만든다.
 - 릴리스 = `main` 의 어노테이트 태그 `v6.YYYY.MM.DD-N` → CI가 artifact 빌드 → digest 산출 → `releases/<digest>/` 설치
