@@ -103,6 +103,8 @@ work_unit_contracts = [
   ["VERIFY_STEP_12", :line, verification_lines, "12. CI GREEN 확인 뒤 MERGE"],
   ["VERIFY_PRE_PUSH_NOT_SUBSTITUTE", :fragment, verification_text,
    "9번 전체 적대검증의 Work Unit 결합 공격을 대신하지 않는다."],
+  ["VERIFY_NO_FINAL_GATE_EXCEPTION", :fragment, verification_text,
+   "최종 관문을 생략·선택·권장으로 낮추거나 다른 검사로 대체하는 예외 문장은 둘 수 없다."],
   ["VERIFY_GENERAL_WU", :fragment, verification_text,
    "일반 Work Unit은 `IMPLEMENT → 해당 AC 실행 → 반증 1~3개 → 완료 커밋`으로 닫는다."],
   ["VERIFY_HIGH_RISK_CI", :line, verification_lines, "- `.github/workflows/**`"],
@@ -117,12 +119,30 @@ work_unit_contracts = [
    "문서 REVIEW의 PASS만으로 고위험 Work Unit을 닫을 수 없다."],
   ["VERIFY_REVIEW_NOT_RUN", :fragment, verification_text,
    "재실행할 수 없으면 실행 REVIEW는 `NOT_RUN`"],
+  ["VERIFY_NO_PAID_REVIEW_DEFAULT", :fragment, verification_text,
+   "비용이 발생하는 외부 모델은 사용자가 명시적으로 승인했을 때만 선택한다."],
+  ["VERIFY_REVIEW_ENFORCEMENT_LIMIT", :fragment, verification_text,
+   "같은 쓰기 권한 안에서는 독립 검토자 신원을 기계로 보증하지 못하므로"],
   ["VERIFY_WU_NOT_PR", :fragment, verification_text,
    "Work Unit PASS만으로 PR을 만들거나 병합 완료를 주장하지 않는다."]
 ]
 work_unit_contracts.each do |label, mode, haystack, needle|
   found = mode == :line ? haystack.include?(needle) : haystack.include?(needle)
   errors << "WORK_UNIT_CONTRACT_MISSING: #{label}" unless found
+end
+
+forbidden_work_unit_contracts = [
+  ["FINAL_ADVERSARIAL_OPTIONAL",
+   /전체 적대검증[^\n]{0,40}(?:생략할 수 있다|생략 가능|생략해도 된다)/],
+  ["DOCUMENT_REVIEW_CAN_CLOSE",
+   /문서 REVIEW만으로[^\n]{0,40}(?:닫을 수 있다|PASS로 닫는다)/],
+  ["PAID_REVIEW_REQUIRED",
+   /유료[^\n]{0,40}(?:반드시 사용|필수로 사용|필수다)/],
+  ["REVIEW_IDENTITY_OVERCLAIM",
+   /원칙 게이트가 독립 검토자 신원[^\n]{0,40}(?:보증한다|강제한다)/]
+]
+forbidden_work_unit_contracts.each do |label, pattern|
+  errors << "WORK_UNIT_CONTRACT_WEAKENED: #{label}" if verification_text.match?(pattern)
 end
 
 raw = File.read(ledger_file)
