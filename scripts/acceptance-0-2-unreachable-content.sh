@@ -17,6 +17,25 @@ TMP=$(mktemp -d)
 trap 'rm -rf -- "$TMP"' EXIT
 
 CANARY='AC19-CANARY-8842'
+
+# 프로브 환경변수는 사례 수(TOTAL)를 줄인다. 바깥 환경에서 들어오면 "있으면 통과하는
+# 스위치"가 되므로(2026-08-21 V1 지적·재현: AC19_PATTERN_ENV_PROBE=1 → 22건이 1건),
+# 이 스크립트가 스스로 띄운 경우에만 받아들인다. 부모는 자기 TMP 안에 표식 파일을
+# 만들고 그 경로와 값을 함께 넘긴다. 바깥에서 변수만 켜면 표식이 없어 즉시 차단한다.
+PROBE_SET="${AC19_COUNT_MISMATCH_PROBE:-}${AC19_PATTERN_ENV_PROBE:-}${AC19_INNER_HOOK_PROBE:-}"
+if [ -n "$PROBE_SET" ]; then
+  if [ -z "${AC19_PROBE_NONCE_PATH:-}" ] || [ -z "${AC19_PROBE_NONCE:-}" ] \
+     || [ ! -f "$AC19_PROBE_NONCE_PATH" ] \
+     || [ "$(cat "$AC19_PROBE_NONCE_PATH" 2>/dev/null)" != "$AC19_PROBE_NONCE" ]; then
+    echo 'FAIL: AC-19 프로브 변수가 바깥에서 설정됐다 — 사례 수 축소 스위치를 차단한다'
+    exit 2
+  fi
+fi
+AC19_PROBE_NONCE="ac19-$$-$(date +%s)"  # 자격증명이 아니라 자기호출 표식이다
+AC19_PROBE_NONCE_PATH="$TMP/probe-token"
+printf '%s' "$AC19_PROBE_NONCE" > "$AC19_PROBE_NONCE_PATH"
+export AC19_PROBE_NONCE AC19_PROBE_NONCE_PATH
+
 if [ -n "${AC19_COUNT_MISMATCH_PROBE:-}" ]; then
   TOTAL=2
 elif [ -n "${AC19_PATTERN_ENV_PROBE:-}" ]; then
