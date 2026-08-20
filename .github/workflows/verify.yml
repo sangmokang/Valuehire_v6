@@ -189,6 +189,13 @@ jobs:
         # 없는 것으로 친다(이 파일 111행 주석의 "판정 권한은 CI에 있다"와 같은 근거).
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-secret-webhook-vendor.sh
 
+      - name: 인수 검사 ci-step-integrity (스텝을 조용히 끄지 못하는가)
+        # pre-push 는 워크플로를 문자열로 훑어 `if: false` 만 잡는다. `if: ${{ false }}`,
+        # 항상-거짓 조건, `continue-on-error: true` 는 그대로 통과했다(2026-08-12 V1 D4:
+        # 데이터 노출 검사 스텝을 영구히 꺼도 로컬 검사가 전부 초록이었다).
+        # 이 검사는 워크플로를 실제 YAML 로 파싱해 조건부·오류무시 스텝을 구조로 막는다.
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-ci-step-integrity.sh
+
       - name: 인수 검사 semantic-mutations (검사를 껐을 때 반드시 빨개지는가)
         # 2026-08-21: acceptance-hs-a4.sh 본문을 `exit 0` 으로 바꿔도 CI 가 초록이었다.
         # CI 가 종료값만 봤기 때문이다 — 종료값 0 은 "통과했다"와 "아무것도 안 했다"를

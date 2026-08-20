@@ -57,3 +57,15 @@
   stage: "manual"
   manual_reason: "래퍼 자신의 판정 문구. 실행 배선은 acceptance-runner-ci 가 대조한다"
   required: true
+- id: "ci-step-integrity-ci"
+  path: ".github/workflows/verify.yml"
+  target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-ci-step-integrity.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
+- id: "ci-step-integrity-checker"
+  path: "scripts/verify/check-ci-step-integrity.sh"
+  target: "조건부 스텝은 조건이 거짓이면 실행되지 않고도 초록이다"
+  stage: "manual"
+  manual_reason: "검사기 자신의 판정 문구. 실행 배선은 ci-step-integrity-ci 가 대조한다"
+  required: true
