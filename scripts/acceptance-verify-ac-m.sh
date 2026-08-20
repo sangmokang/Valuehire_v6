@@ -5,7 +5,7 @@
 #   정본: docs/engineering/verify-unification-goal-2026-08-10.md:78-81 (AC-M)
 #   출력 : 항목마다 PASS:/FAIL: 전부 출력, 마지막 줄 `CHECKED: <검사 수>`
 #   exit : 0 = PASS | 1 = FAIL | 2 = NOT_RUN
-#   불변식: CHECKED 는 정확히 25 이어야 한다 — 검사가 몇 개 사라져도 초록이면 가짜다
+#   불변식: CHECKED 는 정확히 31 이어야 한다 — 검사가 몇 개 사라져도 초록이면 가짜다
 #           (PR #6 결함 D3 의 교훈: checked==0 만 막으면 3개를 지워도 통과했다 · P20)
 #
 # 쓰기 규칙: 이 검사는 저장소에 어떤 파일도 만들지 않는다. 동적 fixture 는 전부
@@ -24,7 +24,7 @@ SNAP0=$(git status --porcelain)
 CHECKER=scripts/verify/check-mechanism-registry.sh
 FIXDIR=scripts/verify/fixtures/mechanism-registry
 REGISTRY=docs/sot/mechanism-registry.yaml
-EXPECTED_CHECKED=25
+EXPECTED_CHECKED=31
 
 TMP=$(mktemp -d) || { echo "NOT_RUN: mktemp 실패"; echo "CHECKED: 0"; exit 2; }
 trap 'rm -rf "$TMP"' EXIT
@@ -60,6 +60,60 @@ fi
 expect_rc "fixture 정상 명부 → 통과"            "$FIXDIR/normal.yaml"       0
 expect_rc "fixture path 없는 항목 → 불합격"     "$FIXDIR/missing-path.yaml" 1
 expect_rc "fixture 죽은 target → 불합격"        "$FIXDIR/dead-target.yaml"  1
+
+cat > "$TMP/comment-only-target.yaml" <<'EOF'
+- id: "comment-only-target"
+  path: "scripts/verify/fixtures/mechanism-registry/comment-only-hook.sh"
+  target: "-name 'verify.sh' -o -name 'acceptance-*.sh'"
+  stage: "pre-push"
+  required: true
+EOF
+expect_rc "주석에만 있는 target → 불합격" "$TMP/comment-only-target.yaml" 1
+
+cat > "$TMP/echo-only-target.yaml" <<'EOF'
+- id: "echo-only-target"
+  path: "scripts/verify/fixtures/mechanism-registry/echo-only-hook.sh"
+  target: "-name 'verify.sh' -o -name 'acceptance-*.sh'"
+  stage: "pre-push"
+  required: true
+EOF
+expect_rc "echo에만 있는 target → 불합격" "$TMP/echo-only-target.yaml" 1
+
+cat > "$TMP/dead-code-target.yaml" <<'EOF'
+- id: "dead-code-target"
+  path: "scripts/verify/fixtures/mechanism-registry/dead-code-hook.sh"
+  target: "-name 'verify.sh' -o -name 'acceptance-*.sh'"
+  stage: "pre-push"
+  required: true
+EOF
+expect_rc "최상위 exit 뒤 target → 불합격" "$TMP/dead-code-target.yaml" 1
+
+cat > "$TMP/if-false-target.yaml" <<'EOF'
+- id: "if-false-target"
+  path: "scripts/verify/fixtures/mechanism-registry/if-false-hook.sh"
+  target: "-name 'verify.sh' -o -name 'acceptance-*.sh'"
+  stage: "pre-push"
+  required: true
+EOF
+expect_rc "if false 분기 안 target → 불합격" "$TMP/if-false-target.yaml" 1
+
+cat > "$TMP/fingerprint-target.yaml" <<'EOF'
+- id: "fingerprint-target"
+  path: "scripts/verify/fixtures/mechanism-registry/fingerprint-hook.sh"
+  target: "-name 'verify.sh' -o -name 'acceptance-*.sh'"
+  stage: "pre-push"
+  required: true
+EOF
+expect_rc "고정 sandbox 지문에서만 실행되는 target → 불합격" "$TMP/fingerprint-target.yaml" 1
+
+cat > "$TMP/path-fingerprint-target.yaml" <<'EOF'
+- id: "path-fingerprint-target"
+  path: "scripts/verify/fixtures/mechanism-registry/path-fingerprint-hook.sh"
+  target: "-name 'verify.sh' -o -name 'acceptance-*.sh'"
+  stage: "pre-push"
+  required: true
+EOF
+expect_rc "고정 임시경로 접두사에서만 실행되는 target → 불합격" "$TMP/path-fingerprint-target.yaml" 1
 
 # ── 5~10) 동적 fixture — fail-closed 경계 (전부 mktemp 에만 쓴다) ────────────
 # id 중복
