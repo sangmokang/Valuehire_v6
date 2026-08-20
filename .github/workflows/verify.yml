@@ -18,6 +18,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0   # 아래 "히스토리 전량 스캔" 스텝이 과거 커밋의 blob까지 열어보는 데 필요
+          # 이 job 은 읽기만 한다. 기본값(true)은 인증 토큰을 러너의 git 설정에 남겨
+          # 뒤따르는 스크립트가 인증된 git 명령을 쓸 수 있게 만든다 — 여기서는 필요 없다.
+          persist-credentials: false
 
       - name: 비밀 스캔 (verify.sh)
         # 패턴은 커밋된 .secret-patterns.default 를 쓴다.
@@ -48,8 +51,19 @@ jobs:
       - name: HumanSearch G2 테스트 게이트 (정적·단위 + runtime import 증명)
         # uv 버전은 계약 C-8(0.11.3)에 고정. Python 3.14.1은 uv가 .python-version으로 내려받는다.
         run: |
-          command -v uv > /dev/null 2>&1 || pipx install uv==0.11.3
-          uv --version
+          # 설치 여부만 보면 러너에 이미 있는 다른 버전을 그대로 쓴다 — 그건 버전
+          # "출력"이지 "고정"이 아니다. 실제 값을 계약(C-8)과 대조하고 어긋나면 실패시킨다.
+          required=0.11.3
+          actual=$(uv --version 2>/dev/null | awk '{print $2}')
+          if [ "$actual" != "$required" ]; then
+            pipx install --force "uv==$required"
+            actual=$(uv --version 2>/dev/null | awk '{print $2}')
+          fi
+          if [ "$actual" != "$required" ]; then
+            echo "FAIL: uv 버전 불일치 — expected=$required actual=${actual:-없음}"
+            exit 1
+          fi
+          echo "PASS: uv $actual (계약 C-8 고정)"
           bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-gates.sh
           bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-gates-mutations.sh
           bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-gates-antiforge.sh
@@ -154,11 +168,20 @@ jobs:
           exit $fail
 
       - name: 셸 스크립트 문법 검사
+        # `*.sh` 글로브만 보면 hooks/pre-commit·pre-push 가 빠진다(확장자가 없다).
+        # 강제 장치 본인이 문법 검사 밖에 있으면, 훅이 깨진 채로도 이 스텝은 초록이다.
         run: |
           fail=0
+          n=0
           while IFS= read -r -d '' f; do
+            n=$((n+1))
             bash -n "$f" || { echo "syntax error: $f"; fail=1; }
-          done < <(git ls-files -z '*.sh')
+          done < <(git ls-files -z '*.sh' hooks/pre-commit hooks/pre-push)
+          if [ "$n" -lt 2 ]; then
+            echo "FAIL: 문법 검사 대상이 ${n}개 — 대상 0개는 합격이 아니다"
+            exit 1
+          fi
+          echo "PASS: 셸 파일 ${n}개 문법 검사"
           exit $fail
 
       - name: 패턴 파일 자체에 실제 비밀이 없는지 (자기 오염 방지)
