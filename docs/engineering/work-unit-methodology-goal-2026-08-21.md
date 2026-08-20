@@ -79,17 +79,25 @@ Work Unit 안에서 찾는 것은 “이 주장 하나가 참인가?”이고, P
 
 **When** 하나의 목표가 여러 독립 주장을 포함하면, 시스템은 목표를 Work Unit 1~5개로 나누고 각 Work Unit을 하나의 주장과 완료 커밋 경계로 기록해야 합니다.
 
-- 검증 명령: `bash -c 'file=$1; shift; fail=0; for phrase do if rg -qF "$phrase" "$file"; then printf "PRESENT: %s\n" "$phrase"; else printf "MISSING: %s\n" "$phrase"; fail=1; fi; done; exit "$fail"' _ docs/sot/git-workflow.md 'Work Unit' '하나의 주장' '완료 커밋' 'squash'`
-- 기대값: 종료값 0이며 네 개념이 모두 현재 규칙에 설명됩니다.
+- 검증 명령: `bash scripts/acceptance-principles-check.sh`
+- 기대값: 종료값 0, `WORK_UNIT_METHOD: PASS 25/25`. 하나의 주장, 완료 커밋, PR 상한, 브랜치 수명, 검토 보정, squash 경계가 모두 정본 계약으로 직접 검사됩니다.
 - counter-AC: Work Unit을 파일 단위로 정의, 여러 Work Unit을 한 완료 커밋에 혼합, squash 뒤 개별 커밋 revert 가능하다고 기록.
 
 ### AC-2 — 두 층의 검증
 
 **When** Work Unit 구현이 끝나면, 시스템은 해당 AC와 작은 반증을 먼저 실행하고, 모든 Work Unit 뒤에는 strict·codeaudit·전체 적대검증·CI를 별도로 실행해야 합니다.
 
-- 검증 명령: `bash -c 'file=$1; shift; fail=0; for phrase do if rg -qF "$phrase" "$file"; then printf "PRESENT: %s\n" "$phrase"; else printf "MISSING: %s\n" "$phrase"; fail=1; fi; done; exit "$fail"' _ docs/sot/verification-commands.md 'LOCAL VALIDATE' '작은 적대검증' '전체 strict' '전체 codeaudit' '전체 적대검증' 'GitHub verify CI'`
-- 기대값: 종료값 0이며 Work Unit과 PR 전체 검사의 질문·시점이 분리됩니다.
+- 검증 명령: `bash scripts/acceptance-principles-check.sh`
+- 기대값: 종료값 0, `WORK_UNIT_METHOD: PASS 25/25`. Work Unit과 PR 전체 검사의 질문·시점, pre-push 비대체 관계, 고위험 검토 등급이 모두 정본 계약으로 직접 검사됩니다.
 - counter-AC: Work Unit마다 full codeaudit 강제, 최종 통합 검사를 삭제, CI 초록을 로컬 PASS로 대체.
+
+### AC-3 — 방법론 의미 반전 차단
+
+**When** Work Unit 정본의 핵심 문장을 삭제·완화·반전하면, 기존 원칙 mutation 게이트는 해당 사본을 실패시켜야 합니다.
+
+- 검증 명령: `bash scripts/acceptance-principles-mutations.sh`
+- 기대값: 종료값 0, `CHECKED: 49`, `VERDICT: PASS`. 정상 fixture는 통과하고 Work Unit 신규 반례 9개는 모두 기대한 `FAIL`을 관측합니다.
+- counter-AC: `전체 적대검증 생략`, pre-push로 최종 관문 대체, 고위험 경로 삭제, 문서 REVIEW만으로 고위험 WU PASS, WU·브랜치 상한 완화.
 
 ## Work Unit 장부
 
@@ -97,11 +105,11 @@ Work Unit 안에서 찾는 것은 “이 주장 하나가 참인가?”이고, P
 |---|---|---|---|---|---|---|
 | WU-01 | 목표·Work Unit·커밋·PR의 관계가 하나의 주장 단위 검토를 보존합니다. | 계약 RED | L3(SOT) | `4dd2e97`, `87b526a` | FAIL | V1 재검토 전 |
 | WU-02 | Work Unit 표적 검사와 PR 전체 통합 검사가 서로 다른 질문과 시점으로 분리됩니다. | WU-01 | L3(SOT) | `9a3c862`, `87b526a` | FAIL | V1 재검토 전 |
-| WU-03 | Work Unit 계약의 삭제·완화·의미 반전을 기존 원칙 게이트가 실패시킵니다. | WU-01, WU-02 | L3(검증 장치) | RED 이후 구현 예정 | FAIL | 반례 RED 고정 중 |
+| WU-03 | Work Unit 계약의 삭제·완화·의미 반전을 기존 원칙 게이트가 실패시킵니다. | WU-01, WU-02 | L3(검증 장치) | `2c05ab2`(RED), `58043bb`(GREEN) | FAIL | 독립 실행 REVIEW 전 |
 
 ### RED 계약
 
-- 같은 명령으로 AC-1·AC-2의 필수 문구 부재를 먼저 확인합니다.
+- 같은 명령으로 AC-1·AC-2의 필수 문구 부재를 먼저 확인하고, AC-3은 별도 mutation RED 커밋으로 잠급니다.
 - RED는 문법 오류나 파일 누락이 아니라 아직 Work Unit 절차가 정본에 없어서 실패해야 합니다.
 - WU 완료 커밋은 이 AC의 기대값을 바꾸지 않습니다.
 
@@ -137,7 +145,7 @@ AC-2_RED_EXIT=1
 1. Gate 0: 현재 SOT·과거 goal·필수 strict 원칙 직접 로드와 시작 상태를 기록합니다.
 2. Gate 2: 격리 worktree `worktrees/work-unit-methodology`에서 작업합니다.
 3. RED: AC-1·AC-2의 필수 문구 검색이 현재 정본에서 실패함을 확인합니다.
-4. GREEN: WU-01, WU-02를 서로 다른 완료 커밋으로 닫습니다.
+4. GREEN: WU-01, WU-02를 서로 다른 완료 커밋으로 닫고, WU-03은 기존 원칙 게이트 안에서 RED 반례를 통과시킵니다.
 5. R2: 임시 고장 사본에서 “최종 검사를 삭제”, “파일 단위 WU”, “모든 WU full audit”을 주입해 AC 위반임을 확인합니다.
 6. R4: `docs/sot/INDEX.md → git-workflow.md / verification-commands.md` 참조 경로와 실제 사용 명령을 확인합니다.
 7. 통합: `bash scripts/check-docs-sot.sh`, `bash scripts/acceptance-principles-check.sh`, 관련 전체 검증을 실행합니다.
@@ -185,7 +193,7 @@ EXIT=0
 
 ### R2 고장 사본
 
-첫 “최종 적대검증 삭제” 고장 사본은 문구 뒤에 `생략`만 붙여 필수 문자열이 남아 있었기 때문에 탐지 시험 자체가 무효였습니다. 접근을 바꿔 문구를 완전히 제거한 사본으로 재실행했습니다.
+첫 “최종 적대검증 삭제” 고장 사본은 문구 뒤에 `생략`을 붙였고, 당시 문자열 존재 검사에는 필수 문자열이 남아 통과했습니다. 이는 공격이 무효인 것이 아니라 의미 반전을 탐지하지 못한 실제 fail-open 결함입니다. 문구 완전 삭제 재시도만 실패한 것으로는 이 결함이 닫히지 않았고, 후속 WU-03의 정확한 줄 계약과 mutation 회귀시험으로 보정했습니다.
 
 ```text
 PASS: 원본 WU/PR 경계
@@ -202,7 +210,31 @@ PASS: 최종 적대검증 완전 삭제 변조 차단
 CHECKED: 1
 ```
 
-→ 원본은 통과했고 다중 주장, WU 상한 완화, pre-push로 최종 검사를 대체, 일반 WU 과잉검증을 차단했습니다. 첫 삭제 변조는 공격이 불완전해 무효였고, 완전 삭제 재시도는 올바르게 실패했습니다.
+→ 원본과 완전 삭제 반례만으로는 의미 반전 우회를 막지 못했습니다. 이 로그의 `FAIL: 최종 적대검증 삭제 변조가 통과`가 WU-03의 유효한 RED 근거입니다.
+
+### WU-03 RED→GREEN — 정본 의미 반전 차단
+
+RED 커밋 `2c05ab2`에서 기존 mutation fixture에 두 SOT를 넣고 신규 반례 9개를 먼저 추가했습니다. 구현 전 실행은 각 반례가 실제로 `VERDICT: PASS`를 내서 전체 종료값 1이었습니다.
+
+```text
+C2-WORKFLOW-MISSING부터 C2-FINAL-ADVERSARIAL-SKIP까지 신규 9개: expected FAIL, actual PASS
+CHECKED: 49
+VERDICT: FAIL
+```
+
+GREEN 커밋 `58043bb`은 새 CI 줄을 만들지 않고 이미 pre-push·CI에 직접 배선된 `scripts/acceptance-principles-check.sh`가 두 Work Unit SOT를 읽도록 확장했습니다.
+
+```text
+bash scripts/acceptance-principles-check.sh: exit 0
+WORK_UNIT_METHOD: PASS 25/25
+
+bash scripts/acceptance-principles-mutations.sh: exit 0
+신규 9개 반례: 모두 기대한 FAIL 관측
+CHECKED: 49
+VERDICT: PASS
+```
+
+→ 문서 존재만 확인하던 임시 AC를 기존 상시 게이트의 25개 계약과 9개 격리 mutation으로 교체했습니다. 새 acceptance 파일·새 CI 실행 줄·외부 서비스는 추가하지 않았습니다.
 
 ### R4 정본 진입 경로
 
@@ -226,6 +258,16 @@ R4_PROCESS_ENTRYPOINT=PASS
 - 판정 원문: `docs/engineering/work-unit-methodology-v1-verdict-2026-08-21.md`.
 
 V1이 잡은 결함은 C1/M1의 OR 검사, C2의 미갱신 장부·로그, M2의 push/pre-push 위치, M3의 비측정 PR 상한, 문체 혼용, 고위험 목록 이중 정의, 변경 전 줄 기준 미표시입니다. 모두 채택했으며 V1 재검토 전까지 WU 상태는 PASS가 아닙니다.
+
+### V1 실행 재검토 — 비용 제약으로 NOT_RUN
+
+- 표준 `omx ask claude` 실행은 종료값 1과 `Credit balance is too low`를 반환해 저장소 명령을 시작하지 못했습니다.
+- 환경 API 키를 제거한 로그인 경로는 무출력 대기 중 사용자의 “Claude는 돈 쓰면 안 된다” 지시에 따라 즉시 중단했습니다.
+- 이후 Claude 유료 실행은 시도하지 않습니다. 도구 없는 문서 검토를 실행 REVIEW PASS로 승격하지도 않습니다.
+- 실행 프롬프트: `docs/engineering/work-unit-methodology-v1-recheck-prompt-2026-08-21.md`.
+- 판정 기록: `docs/engineering/work-unit-methodology-v1-recheck-verdict-2026-08-21.md`.
+
+→ Claude V1 실행 REVIEW는 `NOT_RUN`입니다. 새 Codex 맥락의 독립 실행 검증은 구현 증거를 보강하지만, 현재 strict 계약에서 Claude V1을 실행한 것으로 대체하지 않습니다. 따라서 전체 strict 최종 판정은 PASS가 아닙니다.
 
 ### 통합 검사 — V1 보정 중간점
 
