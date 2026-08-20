@@ -35,7 +35,25 @@
   required: true
 - id: "principles-explicit-ci"
   path: ".github/workflows/verify.yml"
-  target: "run: bash scripts/acceptance-principles-check.sh"
+  target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-principles-check.sh"
   stage: "ci"
   ci_mirror_job: "verify"
+  required: true
+- id: "acceptance-runner-ci"
+  path: ".github/workflows/verify.yml"
+  target: "bash scripts/verify/run-acceptance.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
+- id: "acceptance-semantics-ci"
+  path: ".github/workflows/verify.yml"
+  target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-semantic-mutations.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
+- id: "acceptance-runner-gate"
+  path: "scripts/verify/run-acceptance.sh"
+  target: "판정을 한 건도 내놓지 않았다"
+  stage: "manual"
+  manual_reason: "래퍼 자신의 판정 문구. 실행 배선은 acceptance-runner-ci 가 대조한다"
   required: true

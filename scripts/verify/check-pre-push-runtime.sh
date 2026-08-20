@@ -43,12 +43,16 @@ PROBE_EXIT=$((40 + 16#$BYTE_HEX % 80))
 PROBE_REL="scripts/acceptance-${NONCE}.sh"
 MARKER="$SANDBOX/.runtime-marker-${NONCE}"
 MARKER_PROOF="executed-${NONCE}"
-mkdir -p "$SANDBOX/hooks" "$SANDBOX/scripts" "$SANDBOX/.github/workflows"
+mkdir -p "$SANDBOX/hooks" "$SANDBOX/scripts/verify" "$SANDBOX/.github/workflows"
 cp "$HOOK" "$SANDBOX/hooks/pre-push"
+# pre-push 는 인수 검사를 실행 래퍼로 돌린다. 샌드박스에 래퍼가 없으면 probe 가
+# "발견·실행됐는가"가 아니라 "래퍼가 없다"로 실패해 검사의 뜻이 달라진다.
+cp scripts/verify/run-acceptance.sh "$SANDBOX/scripts/verify/run-acceptance.sh"
 cp .github/workflows/verify.yml "$SANDBOX/.github/workflows/verify.yml"
 
 cat > "$SANDBOX/scripts/acceptance-principles-check.sh" <<'EOF'
 #!/usr/bin/env bash
+echo "PASS: sandbox stub"
 exit 0
 EOF
 cat > "$SANDBOX/$PROBE_REL" <<EOF
@@ -58,9 +62,11 @@ exit $PROBE_EXIT
 EOF
 cat > "$SANDBOX/verify.sh" <<'EOF'
 #!/usr/bin/env bash
+echo "PASS: sandbox stub"
 exit 0
 EOF
-chmod +x "$SANDBOX/hooks/pre-push" "$SANDBOX/scripts/acceptance-principles-check.sh" \
+chmod +x "$SANDBOX/hooks/pre-push" "$SANDBOX/scripts/verify/run-acceptance.sh" \
+  "$SANDBOX/scripts/acceptance-principles-check.sh" \
   "$SANDBOX/$PROBE_REL" "$SANDBOX/verify.sh"
 
 git -C "$SANDBOX" init -q || exit 2

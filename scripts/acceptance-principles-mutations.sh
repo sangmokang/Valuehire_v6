@@ -26,10 +26,13 @@ cp docs/sot/coding-principles.md "$BASE/docs/sot/"
 cp docs/sot/principles.yaml "$BASE/docs/sot/"
 cp scripts/acceptance-principles-check.sh "$BASE/scripts/"
 cp scripts/verify/check-pre-push-runtime.sh "$BASE/scripts/verify/"
+# pre-push 가 인수 검사를 실행 래퍼로 돌리므로 fixture 에도 래퍼가 있어야 한다.
+cp scripts/verify/run-acceptance.sh "$BASE/scripts/verify/"
 cp hooks/pre-push "$BASE/hooks/"
 cp .github/workflows/verify.yml "$BASE/.github/workflows/"
 chmod +x "$BASE/scripts/acceptance-principles-check.sh"
 chmod +x "$BASE/scripts/verify/check-pre-push-runtime.sh"
+chmod +x "$BASE/scripts/verify/run-acceptance.sh"
 git -C "$BASE" init -q
 
 fail=0
@@ -119,7 +122,7 @@ ruby -rpsych -e 'p=ARGV[0]; d=Psych.safe_load(File.read(p)); d[0]["mechanism_fou
 expect_principles "C6-SELF" "검사기 자기 대상에서 제외" 1 FAIL
 
 new_case c7
-ruby -e 'p=ARGV[0]; s=File.read(p); s=s.lines.reject{|x| x.include?("run: bash scripts/acceptance-principles-check.sh")}.join; File.write(p,s)' "$CASE/.github/workflows/verify.yml"
+ruby -e 'p=ARGV[0]; s=File.read(p); s=s.lines.reject{|x| x.include?("run: bash scripts/verify/run-acceptance.sh scripts/acceptance-principles-check.sh")}.join; File.write(p,s)' "$CASE/.github/workflows/verify.yml"
 expect_principles "C7" "CI 실행 줄 삭제" 1 FAIL
 
 new_case c8
@@ -155,7 +158,7 @@ ruby -e 'p=ARGV[0]; s=File.read(p); old=s[/found=\$\(find .*?LC_ALL=C sort\)/m];
 expect_principles "C9-RUNTIME-PATH-FINGERPRINT" "고정 임시경로 접두사일 때만 정상 글로브 실행" 1 FAIL
 
 new_case c10a
-ruby -e 'p=ARGV[0]; s=File.read(p).sub("run: bash scripts/acceptance-principles-check.sh","run: bash scripts/acceptance-principles-check.sh " + "|" + "| true"); File.write(p,s)' "$CASE/.github/workflows/verify.yml"
+ruby -e 'p=ARGV[0]; s=File.read(p).sub("run: bash scripts/verify/run-acceptance.sh scripts/acceptance-principles-check.sh","run: bash scripts/verify/run-acceptance.sh scripts/acceptance-principles-check.sh " + "|" + "| true"); File.write(p,s)' "$CASE/.github/workflows/verify.yml"
 expect_principles "C10-A" "CI에 실패무시(or-true) 삽입" 1 FAIL
 
 new_case c10b
@@ -167,7 +170,7 @@ ruby -e 'p=ARGV[0]; s=File.read(p).sub("      - name: Strict 원칙 정본·장�
 expect_principles "C10-C" "CI에 if exists 조건 삽입" 1 FAIL
 
 new_case c10d
-ruby -e 'p=ARGV[0]; s=File.read(p).sub("        run: bash scripts/acceptance-principles-check.sh", "        run: |\n          bash scripts/acceptance-principles-check.sh\n          exit 0"); File.write(p,s)' "$CASE/.github/workflows/verify.yml"
+ruby -e 'p=ARGV[0]; s=File.read(p).sub("        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-principles-check.sh", "        run: |\n          bash scripts/verify/run-acceptance.sh scripts/acceptance-principles-check.sh\n          exit 0"); File.write(p,s)' "$CASE/.github/workflows/verify.yml"
 expect_principles "C10-D" "CI 다중 줄 exit 0 우회" 1 FAIL
 
 new_case c10e

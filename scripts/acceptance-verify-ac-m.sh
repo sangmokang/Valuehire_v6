@@ -316,8 +316,12 @@ expect_rc "빈 문자열 path → 불합격" "$TMP/empty-value.yaml" 1
 # CI 스텝을 if 로 끄거나 지워도 로컬 검사가 전부 초록이었다(V1 실측 · P15③).
 checked=$((checked + 1))
 WF=.github/workflows/verify.yml
-run_lines=$(grep -c 'run: bash scripts/acceptance-verify-ac-m.sh' "$WF")
-step_block=$(awk '/- name: 인수 검사 verify-ac-m/,/run: bash scripts\/acceptance-verify-ac-m.sh/' "$WF")
+# 2026-08-21 부터 CI 는 scripts/verify/run-acceptance.sh 래퍼를 거쳐 실행한다.
+# 래퍼는 실제로 대상을 실행하므로 실행 줄로 인정한다(래퍼가 무력화를 막는다는 증명은
+# scripts/acceptance-semantic-mutations.sh 가 별도로 한다). 래퍼 없는 직접 실행도
+# 계속 인정해 배선 방식 변경이 곧바로 빨간불이 되지 않게 한다.
+run_lines=$(grep -cE 'run: bash (scripts/verify/run-acceptance\.sh )?scripts/acceptance-verify-ac-m\.sh' "$WF")
+step_block=$(awk '/- name: 인수 검사 verify-ac-m/,/run: bash .*scripts\/acceptance-verify-ac-m\.sh/' "$WF")
 if [ "$run_lines" -eq 1 ] && [ -n "$step_block" ] && ! printf '%s\n' "$step_block" | grep -qE '^[[:space:]]*(if:|continue-on-error:)'; then
   echo "PASS: CI 배선 — verify.yml 에 무조건 실행 스텝 정확히 1회"
 else

@@ -235,6 +235,9 @@ pre_push_lines = File.readlines(pre_push_file, chomp: true)
 active_pre_push = pre_push_lines.map(&:strip)
   .reject { |line| line.empty? || line.start_with?("#") }
 command = "bash scripts/acceptance-principles-check.sh"
+# CI 는 2026-08-21 부터 실행 래퍼를 거친다. 래퍼는 종료값 0 인데 판정을 한 건도 내지
+# 않은 검사를 불합격시킨다 — 본문을 `exit 0` 으로 바꿔도 초록이던 구멍을 막기 위해서다.
+ci_command = "bash scripts/verify/run-acceptance.sh scripts/acceptance-principles-check.sh"
 command_lines = active_pre_push.select { |line| line == command }
 errors << "PRE_PUSH_EXPLICIT_COMMAND_MISSING: #{command}" unless command_lines.length == 1
 active_pre_push.each do |line|
@@ -279,12 +282,12 @@ if jobs.is_a?(Hash)
     next unless job.is_a?(Hash) && job["steps"].is_a?(Array)
     job["steps"].each_with_index do |step, step_index|
       next unless step.is_a?(Hash) && step["run"].is_a?(String)
-      next unless step["run"].strip == command
+      next unless step["run"].strip == ci_command
       matched_steps << [job_name, job, step_index, step]
     end
   end
 end
-errors << "CI_EXPLICIT_COMMAND_COUNT_INVALID: expected=1 actual=#{matched_steps.length}" unless matched_steps.length == 1
+errors << "CI_EXPLICIT_COMMAND_COUNT_INVALID: expected=1 actual=#{matched_steps.length} (#{ci_command})" unless matched_steps.length == 1
 matched_steps.each do |job_name, job, step_index, step|
   label = "jobs.#{job_name}.steps[#{step_index}]"
   errors << "CI_JOB_CONDITIONAL: #{label}" if job.key?("if")
