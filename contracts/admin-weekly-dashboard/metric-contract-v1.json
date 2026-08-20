@@ -1,0 +1,106 @@
+{
+  "version": "admin-weekly-dashboard-metrics/v1",
+  "external_effects": {
+    "clickup": "DISABLED",
+    "gmail": "DISABLED",
+    "jobkorea": "DISABLED",
+    "linkedin": "DISABLED",
+    "saramin": "DISABLED"
+  },
+  "groups": [
+    {
+      "id": "sourcing",
+      "display_label": "AI / Human Search",
+      "description": "실행, 대상 포지션, 원시 발견, 출처 내부 고유 후보를 분리합니다.",
+      "order": 1
+    },
+    {
+      "id": "mail",
+      "display_label": "추천 · 포지션 메일",
+      "description": "보관 정책과 읽기 연결이 확정되기 전에는 미집계로 둡니다.",
+      "order": 2
+    },
+    {
+      "id": "identity",
+      "display_label": "신원 연결 제한",
+      "description": "출처를 넘는 동일 후보 판정은 별도 신원 연결 계약이 필요합니다.",
+      "order": 3
+    }
+  ],
+  "metrics": [
+    {
+      "id": "recommendation_mail_events",
+      "display_label": "추천 메일",
+      "description": "추천 조건에 맞는 발신 메일 사건 수",
+      "group": "mail",
+      "unit": "건",
+      "source_collection": "mail_events",
+      "event_type": "recommendation_mail",
+      "aggregation": "count"
+    },
+    {
+      "id": "position_mail_events",
+      "display_label": "포지션 메일",
+      "description": "포지션 조건에 맞는 발신 메일 사건 수",
+      "group": "mail",
+      "unit": "건",
+      "source_collection": "mail_events",
+      "event_type": "position_mail",
+      "aggregation": "count"
+    },
+    {
+      "id": "sourcing_runs",
+      "display_label": "실행 수",
+      "description": "주간 실행 고유 수",
+      "group": "sourcing",
+      "unit": "회",
+      "source_collection": "sourcing_runs",
+      "event_type": "sourcing_run",
+      "aggregation": "distinct",
+      "distinct_fields": ["source_system", "source_primary_key"]
+    },
+    {
+      "id": "sourcing_positions",
+      "display_label": "대상 포지션",
+      "description": "후보 발견 원자료에 나타난 포지션 고유 수",
+      "group": "sourcing",
+      "unit": "개",
+      "source_collection": "candidate_discoveries",
+      "event_type": "candidate_discovery",
+      "aggregation": "distinct",
+      "distinct_fields": ["source_system", "position_source_id"]
+    },
+    {
+      "id": "sourcing_raw_discoveries",
+      "display_label": "원시 후보 발견",
+      "description": "후보 발견 원자료 행 수",
+      "group": "sourcing",
+      "unit": "건",
+      "source_collection": "candidate_discoveries",
+      "event_type": "candidate_discovery",
+      "aggregation": "count"
+    },
+    {
+      "id": "sourcing_source_unique_candidates",
+      "display_label": "출처 내부 고유 후보",
+      "description": "출처 내부에서만 확인한 고유 후보 수",
+      "group": "sourcing",
+      "unit": "명",
+      "source_collection": "candidate_discoveries",
+      "event_type": "candidate_discovery",
+      "aggregation": "distinct",
+      "distinct_fields": ["source_system", "candidate_source_key_hmac"]
+    },
+    {
+      "id": "sourcing_global_unique_candidates",
+      "display_label": "전사 고유 후보",
+      "description": "출처 간 신원 연결 계약이 필요한 전사 고유 후보 수",
+      "group": "identity",
+      "unit": "명",
+      "source_collection": "candidate_discoveries",
+      "event_type": "candidate_discovery",
+      "aggregation": "not_run",
+      "not_run_reason": "identity_link_contract_missing"
+    }
+  ]
+}
