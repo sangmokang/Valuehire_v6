@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Strict 원칙 계약의 정상 fixture, 14개 반례, 500/501 경계를 격리 사본에서 실행한다.
+# Strict 원칙·Work Unit 계약의 정상 fixture, 반례, 500/501 경계를 격리 사본에서 실행한다.
 set -uo pipefail
 
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY \
@@ -24,6 +24,8 @@ BASE="$TMP/base"
 mkdir -p "$BASE/docs/sot" "$BASE/scripts/verify" "$BASE/hooks" "$BASE/.github/workflows"
 cp docs/sot/coding-principles.md "$BASE/docs/sot/"
 cp docs/sot/principles.yaml "$BASE/docs/sot/"
+cp docs/sot/git-workflow.md "$BASE/docs/sot/"
+cp docs/sot/verification-commands.md "$BASE/docs/sot/"
 cp scripts/acceptance-principles-check.sh "$BASE/scripts/"
 cp scripts/verify/check-pre-push-runtime.sh "$BASE/scripts/verify/"
 # pre-push 가 인수 검사를 실행 래퍼로 돌리므로 fixture 에도 래퍼가 있어야 한다.
@@ -68,6 +70,42 @@ expect_principles "C1" "principles.yaml 삭제" 1 FAIL
 new_case c2
 rm "$CASE/docs/sot/coding-principles.md"
 expect_principles "C2" "coding-principles.md 삭제" 1 FAIL
+
+new_case c2_workflow_missing
+rm "$CASE/docs/sot/git-workflow.md"
+expect_principles "C2-WORKFLOW-MISSING" "git-workflow.md 삭제" 1 FAIL
+
+new_case c2_verification_missing
+rm "$CASE/docs/sot/verification-commands.md"
+expect_principles "C2-VERIFICATION-MISSING" "verification-commands.md 삭제" 1 FAIL
+
+new_case c2_multiple_claims
+ruby -e 'p=ARGV[0]; s=File.read(p).sub("Work Unit은 하나의 주장만 만들고", "Work Unit은 하나 이상의 주장을 만들고"); File.write(p,s)' "$CASE/docs/sot/git-workflow.md"
+expect_principles "C2-MULTIPLE-CLAIMS" "Work Unit 다중 주장 허용" 1 FAIL
+
+new_case c2_wu_limit
+ruby -e 'p=ARGV[0]; s=File.read(p).sub("Work Unit 1~5개만", "Work Unit 1~9개만"); File.write(p,s)' "$CASE/docs/sot/git-workflow.md"
+expect_principles "C2-WU-LIMIT" "PR의 Work Unit 상한 완화" 1 FAIL
+
+new_case c2_branch_lifetime
+ruby -e 'p=ARGV[0]; s=File.read(p).sub("24~48시간 수명 상한이 Work Unit 1~5개 상한보다 우선한다.", "Work Unit이 5개 이하면 48시간을 넘겨도 된다."); File.write(p,s)' "$CASE/docs/sot/git-workflow.md"
+expect_principles "C2-BRANCH-LIFETIME" "Work Unit 개수로 브랜치 수명 상한 우회" 1 FAIL
+
+new_case c2_pre_push_substitute
+ruby -e 'p=ARGV[0]; s=File.read(p).sub("9번 전체 적대검증의 Work Unit 결합 공격을 대신하지 않는다.", "9번 전체 적대검증의 Work Unit 결합 공격을 대신한다."); File.write(p,s)' "$CASE/docs/sot/verification-commands.md"
+expect_principles "C2-PRE-PUSH-SUBSTITUTE" "pre-push로 최종 관문 대체" 1 FAIL
+
+new_case c2_high_risk_path
+ruby -e 'p=ARGV[0]; s=File.read(p).sub("- `hooks/**`\n", ""); File.write(p,s)' "$CASE/docs/sot/verification-commands.md"
+expect_principles "C2-HIGH-RISK-PATH" "고위험 경로 목록 일부 삭제" 1 FAIL
+
+new_case c2_document_review_pass
+ruby -e 'p=ARGV[0]; s=File.read(p).sub("문서 REVIEW의 PASS만으로 고위험 Work Unit을 닫을 수 없다.", "문서 REVIEW의 PASS만으로 고위험 Work Unit을 닫을 수 있다."); File.write(p,s)' "$CASE/docs/sot/verification-commands.md"
+expect_principles "C2-DOCUMENT-REVIEW-PASS" "비실행 문서 검토로 고위험 Work Unit 닫기" 1 FAIL
+
+new_case c2_final_adversarial_skip
+ruby -e 'p=ARGV[0]; s=File.read(p).sub("9. 전체 적대검증", "9. 전체 적대검증 생략"); File.write(p,s)' "$CASE/docs/sot/verification-commands.md"
+expect_principles "C2-FINAL-ADVERSARIAL-SKIP" "최종 적대검증 의미 반전" 1 FAIL
 
 new_case c3
 printf '[broken\n' >> "$CASE/docs/sot/principles.yaml"

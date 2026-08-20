@@ -42,8 +42,8 @@ Work Unit 안에서 찾는 것은 “이 주장 하나가 참인가?”이고, P
 ## 범위와 위험등급
 
 - 위험등급: **L3** — SOT 두 파일의 개발·검증 흐름을 바꿉니다.
-- 변경 범위: `docs/sot/git-workflow.md`, `docs/sot/verification-commands.md`, 이 goal 문서.
-- 비범위: GitHub Pro 결제, branch protection, CODEOWNERS, 새 Agent 런타임, CI·훅·검사 스크립트 변경, 기존 P0 결함 구현.
+- 변경 범위: `docs/sot/git-workflow.md`, `docs/sot/verification-commands.md`, 기존 `scripts/acceptance-principles-*.sh`, 이 goal 문서.
+- 비범위: GitHub Pro 결제, branch protection, CODEOWNERS, 새 Agent 런타임, 새 CI 실행 줄·새 외부 의존성 추가, 기존 P0 결함 구현.
 - 영향 반경: 이후 모든 코드·제품 작업의 분해, 커밋, 검증 순서. 제품 런타임과 후보자 데이터에는 직접 영향이 없습니다.
 
 ## 입출력·오류·경계 계약
@@ -93,10 +93,11 @@ Work Unit 안에서 찾는 것은 “이 주장 하나가 참인가?”이고, P
 
 ## Work Unit 장부
 
-| ID | 하나의 주장 | 선행 | 위험 | 완료 경계 | 상태 |
-|---|---|---|---|---|---|
-| WU-01 | 목표·Work Unit·커밋·PR의 관계가 하나의 주장 단위 검토를 보존합니다. | 계약 RED | L3(SOT) | `4dd2e97` + V1 보정 커밋 | FAIL — V1 보정 뒤 재검토 전 |
-| WU-02 | Work Unit 표적 검사와 PR 전체 통합 검사가 서로 다른 질문과 시점으로 분리됩니다. | WU-01 | L3(SOT) | `9a3c862` + V1 보정 커밋 | FAIL — V1 보정 뒤 재검토 전 |
+| ID | 하나의 주장 | 선행 | 위험 | 완료 경계 | 상태 | 상태 근거 |
+|---|---|---|---|---|---|---|
+| WU-01 | 목표·Work Unit·커밋·PR의 관계가 하나의 주장 단위 검토를 보존합니다. | 계약 RED | L3(SOT) | `4dd2e97`, `87b526a` | FAIL | V1 재검토 전 |
+| WU-02 | Work Unit 표적 검사와 PR 전체 통합 검사가 서로 다른 질문과 시점으로 분리됩니다. | WU-01 | L3(SOT) | `9a3c862`, `87b526a` | FAIL | V1 재검토 전 |
+| WU-03 | Work Unit 계약의 삭제·완화·의미 반전을 기존 원칙 게이트가 실패시킵니다. | WU-01, WU-02 | L3(검증 장치) | RED 이후 구현 예정 | FAIL | 반례 RED 고정 중 |
 
 ### RED 계약
 
