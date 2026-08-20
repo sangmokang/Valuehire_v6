@@ -103,9 +103,9 @@ Work Unit 안에서 찾는 것은 “이 주장 하나가 참인가?”이고, P
 
 | ID | 하나의 주장 | 선행 | 위험 | 완료 경계 | 상태 | 상태 근거 |
 |---|---|---|---|---|---|---|
-| WU-01 | 목표·Work Unit·커밋·PR의 관계가 하나의 주장 단위 검토를 보존합니다. | 계약 RED | L3(SOT) | `4dd2e97`, `87b526a` | FAIL | V1 재검토 전 |
-| WU-02 | Work Unit 표적 검사와 PR 전체 통합 검사가 서로 다른 질문과 시점으로 분리됩니다. | WU-01 | L3(SOT) | `9a3c862`, `87b526a` | FAIL | V1 재검토 전 |
-| WU-03 | Work Unit 계약의 삭제·완화·의미 반전을 기존 원칙 게이트가 실패시킵니다. | WU-01, WU-02 | L3(검증 장치) | `2c05ab2`, `659e709`(RED), `58043bb`, `8b7a44b`(GREEN) | FAIL | 최종 독립 실행 REVIEW 전 |
+| WU-01 | 목표·Work Unit·커밋·PR의 관계가 하나의 주장 단위 검토를 보존합니다. | 계약 RED | L3(SOT) | `4dd2e97`, `87b526a`, `cbe3d6b` | PASS | Codex 실행 REVIEW·codeaudit 승인 |
+| WU-02 | Work Unit 표적 검사와 PR 전체 통합 검사가 서로 다른 질문과 시점으로 분리됩니다. | WU-01 | L3(SOT) | `9a3c862`, `87b526a`, `cbe3d6b` | PASS | Codex 실행 REVIEW·codeaudit 승인 |
+| WU-03 | Work Unit 계약의 삭제·완화·의미 반전을 기존 원칙 게이트가 실패시킵니다. | WU-01, WU-02 | L3(검증 장치) | `2c05ab2`, `659e709`(RED), `58043bb`, `8b7a44b`(GREEN), `cbe3d6b` | PASS | 28/28·53/53·pre-push 승인 |
 
 ### RED 계약
 
@@ -295,6 +295,43 @@ V1이 잡은 결함은 C1/M1의 OR 검사, C2의 미갱신 장부·로그, M2의
 - 판정 기록: `docs/engineering/work-unit-methodology-v1-recheck-verdict-2026-08-21.md`.
 
 → Claude V1 실행 REVIEW는 `NOT_RUN`입니다. 새 Codex 맥락의 독립 실행 검증은 구현 증거를 보강하지만, 현재 strict 계약에서 Claude V1을 실행한 것으로 대체하지 않습니다. 따라서 전체 strict 최종 판정은 PASS가 아닙니다.
+
+### 비용 없는 독립 실행 REVIEW·codeaudit — PASS
+
+깨끗한 HEAD `cbe3d6b`에서 새 Codex verifier와 codeaudit를 서로 다른 맥락으로 실행했습니다.
+
+```text
+verifier: PASS
+pwd: /Users/kangsangmo/Desktop/Valuehire_v6/worktrees/work-unit-methodology
+branch: task/work-unit-methodology
+HEAD: cbe3d6b
+principles: WORK_UNIT_METHOD 28/28
+mutations: CHECKED 53, VERDICT PASS, SOURCE-TREE 불변
+docs SOT / bash -n / diff check: exit 0
+
+codeaudit: APPROVE
+additive weakening 격리 재현:
+  전체 적대검증은 생략할 수 있다
+  → WORK_UNIT_CONTRACT_WEAKENED: FINAL_ADVERSARIAL_OPTIONAL
+유료 외부 검토 비필수·동일 권한 신원 보증 한계: 수용
+```
+
+첫 verifier 실행은 검증 도중 goal·SOT를 동시에 편집해 `SOURCE-TREE` 불변 검사가 실패했습니다. 파일을 커밋해 안정된 트리로 만든 뒤 같은 verifier가 재실행해 PASS했으므로, 첫 실패는 검사 결함이 아니라 동시 편집 운영 결함으로 분류합니다.
+
+### 전체 pre-push — PASS
+
+깨끗한 HEAD `cbe3d6b`에서 `hooks/pre-push`를 직접 실행했습니다.
+
+```text
+WORK_UNIT_METHOD: PASS 28/28
+pre-push: 검사 21개 실행
+21개 모두 ok
+종료값: 0
+```
+
+로컬에서 논리적으로 실행할 수 없는 세 검사는 기존 계약대로 명시적으로 분리됐습니다: `acceptance-0-2.sh`, `acceptance-0-5.sh`는 CI 담당으로 DEFERRED, `acceptance-0-7.sh`는 push 수행 검사라 CI 담당입니다. 이 분리는 이번 변경에서 새로 만든 skip이 아닙니다.
+
+→ WU-01~03의 로컬 구현·반증·독립 실행 REVIEW·codeaudit는 PASS입니다. 원격 PR·GitHub CI·merge는 실행하지 않았고, Claude V1도 비용 제약으로 `NOT_RUN`이므로 이를 전체 strict 또는 배송 완료 PASS로 확대하지 않습니다.
 
 ### 통합 검사 — V1 보정 중간점
 
