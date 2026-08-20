@@ -80,7 +80,7 @@ Work Unit 안에서 찾는 것은 “이 주장 하나가 참인가?”이고, P
 **When** 하나의 목표가 여러 독립 주장을 포함하면, 시스템은 목표를 Work Unit 1~5개로 나누고 각 Work Unit을 하나의 주장과 완료 커밋 경계로 기록해야 합니다.
 
 - 검증 명령: `bash scripts/acceptance-principles-check.sh`
-- 기대값: 종료값 0, `WORK_UNIT_METHOD: PASS 25/25`. 하나의 주장, 완료 커밋, PR 상한, 브랜치 수명, 검토 보정, squash 경계가 모두 정본 계약으로 직접 검사됩니다.
+- 기대값: 종료값 0, `WORK_UNIT_METHOD: PASS 28/28`. 하나의 주장, 완료 커밋, PR 상한, 브랜치 수명, 검토 보정, squash 경계가 모두 정본 계약으로 직접 검사됩니다.
 - counter-AC: Work Unit을 파일 단위로 정의, 여러 Work Unit을 한 완료 커밋에 혼합, squash 뒤 개별 커밋 revert 가능하다고 기록.
 
 ### AC-2 — 두 층의 검증
@@ -88,7 +88,7 @@ Work Unit 안에서 찾는 것은 “이 주장 하나가 참인가?”이고, P
 **When** Work Unit 구현이 끝나면, 시스템은 해당 AC와 작은 반증을 먼저 실행하고, 모든 Work Unit 뒤에는 strict·codeaudit·전체 적대검증·CI를 별도로 실행해야 합니다.
 
 - 검증 명령: `bash scripts/acceptance-principles-check.sh`
-- 기대값: 종료값 0, `WORK_UNIT_METHOD: PASS 25/25`. Work Unit과 PR 전체 검사의 질문·시점, pre-push 비대체 관계, 고위험 검토 등급이 모두 정본 계약으로 직접 검사됩니다.
+- 기대값: 종료값 0, `WORK_UNIT_METHOD: PASS 28/28`. Work Unit과 PR 전체 검사의 질문·시점, pre-push 비대체 관계, 고위험 검토 등급·비용·신뢰 경계가 모두 정본 계약으로 직접 검사됩니다.
 - counter-AC: Work Unit마다 full codeaudit 강제, 최종 통합 검사를 삭제, CI 초록을 로컬 PASS로 대체.
 
 ### AC-3 — 방법론 의미 반전 차단
@@ -96,7 +96,7 @@ Work Unit 안에서 찾는 것은 “이 주장 하나가 참인가?”이고, P
 **When** Work Unit 정본의 핵심 문장을 삭제·완화·반전하면, 기존 원칙 mutation 게이트는 해당 사본을 실패시켜야 합니다.
 
 - 검증 명령: `bash scripts/acceptance-principles-mutations.sh`
-- 기대값: 종료값 0, `CHECKED: 49`, `VERDICT: PASS`. 정상 fixture는 통과하고 Work Unit 신규 반례 9개는 모두 기대한 `FAIL`을 관측합니다.
+- 기대값: 종료값 0, `CHECKED: 53`, `VERDICT: PASS`. 정상 fixture는 통과하고 Work Unit 신규 반례 13개는 모두 기대한 `FAIL`을 관측합니다.
 - counter-AC: `전체 적대검증 생략`, pre-push로 최종 관문 대체, 고위험 경로 삭제, 문서 REVIEW만으로 고위험 WU PASS, WU·브랜치 상한 완화.
 
 ## Work Unit 장부
@@ -105,7 +105,7 @@ Work Unit 안에서 찾는 것은 “이 주장 하나가 참인가?”이고, P
 |---|---|---|---|---|---|---|
 | WU-01 | 목표·Work Unit·커밋·PR의 관계가 하나의 주장 단위 검토를 보존합니다. | 계약 RED | L3(SOT) | `4dd2e97`, `87b526a` | FAIL | V1 재검토 전 |
 | WU-02 | Work Unit 표적 검사와 PR 전체 통합 검사가 서로 다른 질문과 시점으로 분리됩니다. | WU-01 | L3(SOT) | `9a3c862`, `87b526a` | FAIL | V1 재검토 전 |
-| WU-03 | Work Unit 계약의 삭제·완화·의미 반전을 기존 원칙 게이트가 실패시킵니다. | WU-01, WU-02 | L3(검증 장치) | `2c05ab2`(RED), `58043bb`(GREEN) | FAIL | 독립 실행 REVIEW 전 |
+| WU-03 | Work Unit 계약의 삭제·완화·의미 반전을 기존 원칙 게이트가 실패시킵니다. | WU-01, WU-02 | L3(검증 장치) | `2c05ab2`, `659e709`(RED), `58043bb`, `8b7a44b`(GREEN) | FAIL | 최종 독립 실행 REVIEW 전 |
 
 ### RED 계약
 
@@ -234,7 +234,34 @@ CHECKED: 49
 VERDICT: PASS
 ```
 
-→ 문서 존재만 확인하던 임시 AC를 기존 상시 게이트의 25개 계약과 9개 격리 mutation으로 교체했습니다. 새 acceptance 파일·새 CI 실행 줄·외부 서비스는 추가하지 않았습니다.
+→ 문서 존재만 확인하던 임시 AC를 기존 상시 게이트의 계약과 격리 mutation으로 교체했습니다. 새 acceptance 파일·새 CI 실행 줄·외부 서비스는 추가하지 않았습니다.
+
+### codeaudit 2차 RED→GREEN — 덧붙이기 우회와 검토 신뢰 경계
+
+새 Codex codeaudit는 정상 9번 단계를 보존한 채 `단, 일정이 급하면 전체 적대검증은 생략할 수 있다`를 덧붙이면 당시 25/25 게이트가 합격하는 우회를 재현했습니다. 또한 동일 쓰기 권한에서 독립 검토자 신원을 기계 보증하는 영수증을 만들면 자기발급 문제가 반복된다고 지적했습니다.
+
+RED 커밋 `659e709`은 다음 네 반례를 먼저 추가했고, 구현 전 모두 actual PASS여서 전체 종료값 1을 확인했습니다.
+
+```text
+C2-FINAL-ADVERSARIAL-ADDITIVE: actual PASS
+C2-DOCUMENT-REVIEW-ADDITIVE: actual PASS
+C2-PAID-REVIEW-REQUIRED: actual PASS
+C2-REVIEW-ENFORCEMENT-CLAIM: actual PASS
+CHECKED: 53
+VERDICT: FAIL
+```
+
+GREEN 커밋 `8b7a44b`은 허용형 예외 문장을 거부하고, 비용 없는 새 로컬 맥락을 독립 검토의 기본값으로 고정했습니다. 같은 권한 안에서 검토자 신원을 기계 보증하지 못한다는 한계와 goal 장부·최종 codeaudit의 책임도 함께 기록했습니다.
+
+```text
+bash scripts/acceptance-principles-check.sh: exit 0
+WORK_UNIT_METHOD: PASS 28/28
+bash scripts/acceptance-principles-mutations.sh: exit 0
+CHECKED: 53
+VERDICT: PASS
+```
+
+→ 자기발급 독립성 영수증은 만들지 않았습니다. 원칙 게이트는 정본 정의와 예외 문구를 차단하고, 실제 독립 실행은 새 맥락의 명령·출력과 codeaudit 판정으로 증명합니다.
 
 ### R4 정본 진입 경로
 
