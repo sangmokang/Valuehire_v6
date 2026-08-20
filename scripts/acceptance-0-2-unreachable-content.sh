@@ -12,6 +12,7 @@ VERIFY="$ROOT/verify.sh"
 SELF="$ROOT/scripts/acceptance-0-2-unreachable-content.sh"
 WORKFLOW="$ROOT/.github/workflows/verify.yml"
 REAL_GIT=$(command -v git)
+REAL_GREP=$(command -v grep)
 TMP=$(mktemp -d)
 trap 'rm -rf -- "$TMP"' EXIT
 
@@ -21,9 +22,9 @@ if [ -n "${AC19_COUNT_MISMATCH_PROBE:-}" ]; then
 elif [ -n "${AC19_PATTERN_ENV_PROBE:-}" ]; then
   TOTAL=1
 elif [ -n "${AC19_INNER_HOOK_PROBE:-}" ]; then
-  TOTAL=17
+  TOTAL=18
 else
-  TOTAL=21
+  TOTAL=22
 fi
 checked=0
 failed=0
@@ -265,15 +266,38 @@ run_case '서버 본문도 blob 읽기 실패를 값 없음으로 통과하지 �
   run_ci_history_scan "$ci_read_failure"
 
 # 패턴이 깨져 내용 대조 자체가 성립하지 않아도 값 없음으로 통과하면 안 된다.
-# 실측(2026-08-21): 깨진 정규식은 grep 이 입력을 읽기 전에 끝나므로 파이프의 읽는 쪽이
-# 사라지고, 쓰는 쪽인 cat-file 이 종료값 141(SIGPIPE)로 죽는다. 그래서 이 상황은
-# "내용 대조 실패"가 아니라 "blob 읽기 실패"로 표면화된다. 어느 쪽이든 차단이 계약이다.
+#
+# 표면화되는 사유는 grep 구현에 따라 다르다(2026-08-21 양쪽 실측).
+#   macOS(BSD grep)  : 깨진 정규식이면 입력을 읽기 전에 끝나 파이프의 읽는 쪽이 사라지고,
+#                      쓰는 쪽 cat-file 이 종료값 141 로 죽는다 → "blob 읽기 실패"
+#   리눅스(GNU grep) : 같은 상황에서 cat-file 이 정상 종료하고 grep 만 종료값 2 를 낸다
+#                      → "blob 내용 대조 실패"
+# 계약은 "어느 쪽 사유로든 반드시 차단한다" 이므로 두 사유의 공통 앞부분으로 대조한다.
+# 'FAIL: 히스토리 blob ' 뒤에 공백이 있어 매치 보고("...blob에 자격증명...")와 겹치지 않는다.
 ci_pattern_error="$TMP/ci-pattern-error"
 make_fixture "$ci_pattern_error"
 printf '%s\n' '[' > "$ci_pattern_error/.secret-patterns.default"
 run_case '서버 본문도 대조 불능 패턴을 값 없음으로 통과하지 않음' blocked \
-  'FAIL: 히스토리 blob 읽기 실패' "$ci_pattern_error" \
+  'FAIL: 히스토리 blob ' "$ci_pattern_error" \
   run_ci_history_scan "$ci_pattern_error"
+
+# 위 사례는 grep 구현에 따라 두 사유 중 하나로 갈린다. 내용 대조 실패(종료값 2) 경로를
+# 플랫폼과 무관하게 덮기 위해, 입력을 끝까지 읽은 뒤 2 로 끝나는 grep 대역을 쓴다.
+# 이것이 리눅스(GNU grep)에서 실제로 관측된 조합이다: cat-file 은 0, grep 만 2.
+ci_grep_error="$TMP/ci-grep-error"
+make_fixture "$ci_grep_error"
+ci_grep_error_sha=$(printf '%s\n' "$CANARY" |
+  git -C "$ci_grep_error" hash-object -w --stdin)
+git -C "$ci_grep_error" tag ac19-ci-grep-error "$ci_grep_error_sha"
+mkdir -p "$ci_grep_error/bin"
+printf '%s\n' '#!/usr/bin/env bash' \
+  'for a in "$@"; do case "$a" in -*a*E*i*f*) cat >/dev/null; exit 2;; esac; done' \
+  'exec "$REAL_GREP" "$@"' > "$ci_grep_error/bin/grep"
+chmod +x "$ci_grep_error/bin/grep"
+PATH="$ci_grep_error/bin:$PATH" REAL_GREP="$REAL_GREP" \
+run_case '서버 본문도 내용 대조 실패를 값 없음으로 통과하지 않음' blocked \
+  'FAIL: 히스토리 blob 내용 대조 실패' "$ci_grep_error" \
+  run_ci_history_scan "$ci_grep_error"
 
 endstate="$TMP/endstate"
 make_fixture "$endstate"
