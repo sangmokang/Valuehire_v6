@@ -1,7 +1,8 @@
 # Valuehire v6 — 이 저장소의 실제 게이트 명령 (SOT)
 
-최종 갱신: 2026-08-20 (전부 실행으로 확인, 가정 없음)
-근거: `docs/engineering/docs-sot-restructure-goal-2026-08-08.md`
+최종 갱신: 2026-08-21 (명령은 실행으로 확인, Work Unit 순서는 계약으로 확정)
+근거: `docs/engineering/docs-sot-restructure-goal-2026-08-08.md`,
+`docs/engineering/work-unit-methodology-goal-2026-08-21.md`
 
 ## 현재 규칙
 
@@ -14,6 +15,49 @@
 | 4 — 검증 | `./verify.sh` | `bash verify.sh` (비밀 스캔) — CI(`verify.yml`)가 실제로 도는 검사 전체는 아래 "CI가 실제로 돌리는 것" 표가 정본이다(요약을 여기 두 번 적으면 반드시 갈라진다 — 2026-08-12 REV2-D2 실측). `scripts/acceptance-0-2.sh`는 로컬 전용(`.secret-patterns`에 실제 리터럴이 있어야 해서 CI에 못 올림, 스크립트 주석에 명시) |
 | 5 — 배송 | `make ship` | 아직 스크립트 없음 — `git push -u origin task/<name>` 후 `gh pr create` 수동 실행. push 시 `hooks/pre-push`가 verify.sh + acceptance-*.sh 전량(glob)을 재실행 |
 | 6 — 종료 | `make task-done NAME=...` | `git worktree remove worktrees/<name>` 수동 실행 |
+
+### 개발·검증 순서 — 작은 증명 뒤 전체 통합 검사
+
+기존 `strict → codeaudit → 전체 적대검증`을 없애지 않는다. Work Unit마다 작은 검증 경계를 먼저 닫고, 기존 세 검사를 PR 전체의 최종 관문으로 사용한다.
+
+```text
+1. ISSUE / 요구사항
+2. Work Unit 분해: WU-01, WU-02, ...
+3. 필요한 RED 계약을 먼저 커밋
+4. WU-01: IMPLEMENT → LOCAL VALIDATE → 작은 적대검증 → 완료 커밋
+5. WU-02: IMPLEMENT → LOCAL VALIDATE → 작은 적대검증 → 완료 커밋
+6. WU-N까지 같은 순서로 반복
+7. 전체 strict
+8. 전체 codeaudit
+9. 전체 적대검증
+10. PR
+11. GitHub verify CI
+12. CI GREEN 확인 뒤 MERGE
+```
+
+`LOCAL VALIDATE`는 “이번 Work Unit에서 약속한 기능 하나가 실제로 되는가?”만 묻는다. goal에 고정한 해당 AC의 원명령과 기대 종료값·출력을 실제로 실행하며, 다른 Work Unit의 성공으로 대신하지 않는다.
+
+`작은 적대검증`은 “이 약속을 어떻게 속여서 통과시킬 수 있는가?”를 묻는다. 일반 Work Unit은 counter-AC에 정조준한 반증 1~3개를 실제로 실행한다. 예를 들어 검사 실행 배선이면 `echo`, `true`, `|| true`, `if: false`, 조기 `exit 0` 중 해당 주장과 관련된 최소 조합을 시험한다.
+
+`전체 strict`는 저장소가 기계 원칙과 계약을 지키는지 광범위한 결정적 명령으로 확인한다. `전체 codeaudit`은 구현의 논리·구조·중복·복잡도와 설계 부채를 검토한다. `전체 적대검증`은 각 Work Unit이 따로는 PASS여도 결합·순서·공유 상태·동시 실행에서 뚫리는지 공격한다. 셋은 질문이 다르므로 서로의 PASS를 대신하지 않는다.
+
+### 위험도에 따른 Work Unit 검사 강도
+
+일반 Work Unit은 `IMPLEMENT → 해당 AC 실행 → 반증 1~3개 → 완료 커밋`으로 닫는다. 모든 작은 UI·문서 변경에 full codeaudit나 외부 Agent를 강제하지 않는다.
+
+다음 검증·보안·운영 경계를 건드리는 Work Unit은 `IMPLEMENT → LOCAL VALIDATE → 작은 적대검증 → 독립 REVIEW → 완료 커밋`으로 강화한다.
+
+- `.github/workflows/**`
+- `hooks/**`
+- `scripts/acceptance-*`, `verify*`, `mechanism-registry`
+- 비밀·후보자 데이터 노출 검사
+- 배포·인증·로그인
+
+독립 REVIEW는 구현 결론을 그대로 받아쓰지 않고 같은 AC와 counter-AC를 새 맥락에서 재실행합니다. 다른 Agent나 모델을 쓸 수 있지만 필수 외부 서비스로 고정하지 않습니다. 실행할 수 없으면 `NOT_RUN`이며 고위험 Work Unit을 PASS로 닫지 않습니다.
+
+### Work Unit 완료와 PR 완료는 다르다
+
+Work Unit 완료 커밋은 그 주장 하나의 표적 증거가 닫혔다는 뜻입니다. PR 완료는 모든 Work Unit의 결합, 전체 저장소 원칙, 코드 품질, 원격 CI까지 닫혔다는 뜻입니다. Work Unit PASS만으로 PR을 만들거나 병합 완료를 주장하지 않습니다.
 
 ### CI(`​.github/workflows/verify.yml`)가 실제로 돌리는 것
 
