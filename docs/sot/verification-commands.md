@@ -55,7 +55,12 @@
 - 비밀·후보자 데이터 노출 검사
 - 배포·인증·로그인
 
-독립 REVIEW는 구현 결론을 그대로 받아쓰지 않고 같은 AC와 counter-AC를 새 맥락에서 재실행한다. 다른 Agent나 모델을 쓸 수 있지만 필수 외부 서비스로 고정하지 않는다. 실행할 수 없으면 `NOT_RUN`이며 고위험 Work Unit을 PASS로 닫지 않는다.
+독립 REVIEW는 다음 두 등급을 구분한다.
+
+- **실행 REVIEW**: 구현 결론을 그대로 받아쓰지 않고 같은 AC와 counter-AC를 새 맥락에서 재실행한다. 고위험 Work Unit을 닫으려면 실행 REVIEW가 필요하다.
+- **문서 REVIEW**: diff·문서·전달받은 로그만 읽고 공격한다. 결함을 찾으면 `FAIL`을 만들 수 있지만 실행 증명이 아니므로 `PASS`를 만들 수 없다. 문서 REVIEW의 PASS만으로 고위험 Work Unit을 닫을 수 없다.
+
+다른 Agent나 모델을 쓸 수 있지만 필수 외부 서비스로 고정하지 않는다. 도구 연결 실패 등으로 재실행할 수 없으면 실행 REVIEW는 `NOT_RUN`이며 고위험 Work Unit을 PASS로 닫지 않는다.
 
 ### Work Unit 완료와 PR 완료는 다르다
 

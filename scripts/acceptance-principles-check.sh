@@ -34,8 +34,11 @@ SELF="scripts/acceptance-principles-check.sh"
 PRE_PUSH="hooks/pre-push"
 WORKFLOW=".github/workflows/verify.yml"
 RUNTIME_CHECKER="scripts/verify/check-pre-push-runtime.sh"
+GIT_WORKFLOW_SOT="docs/sot/git-workflow.md"
+VERIFICATION_SOT="docs/sot/verification-commands.md"
 
-for required in "$SOURCE" "$LEDGER" "$SELF" "$PRE_PUSH" "$WORKFLOW" "$RUNTIME_CHECKER"; do
+for required in "$SOURCE" "$LEDGER" "$SELF" "$PRE_PUSH" "$WORKFLOW" "$RUNTIME_CHECKER" \
+  "$GIT_WORKFLOW_SOT" "$VERIFICATION_SOT"; do
   if [ ! -f "$required" ] || [ -L "$required" ]; then
     printf 'VERDICT: FAIL\nREQUIRED_FILE_INVALID: %s\nCHECKED: 0\n' "$required"
     exit 1
@@ -64,9 +67,63 @@ if [ "$runtime_rc" -ne 0 ]; then
   exit 1
 fi
 
-ruby -rpsych - "$LEDGER" "$SOURCE" "$SELF" "$PRE_PUSH" "$WORKFLOW" <<'RUBY'
-ledger_file, source_file, self_file, pre_push_file, workflow_file = ARGV
+ruby -rpsych - "$LEDGER" "$SOURCE" "$SELF" "$PRE_PUSH" "$WORKFLOW" \
+  "$GIT_WORKFLOW_SOT" "$VERIFICATION_SOT" <<'RUBY'
+ledger_file, source_file, self_file, pre_push_file, workflow_file,
+  git_workflow_file, verification_file = ARGV
 errors = []
+
+git_workflow_text = File.read(git_workflow_file)
+verification_text = File.read(verification_file)
+git_workflow_lines = git_workflow_text.lines.map(&:strip)
+verification_lines = verification_text.lines.map(&:strip)
+
+work_unit_contracts = [
+  ["GIT_ONE_GOAL", :line, git_workflow_lines,
+   "Issue 또는 goal 문서 1개 = worktree 1개 = 브랜치 1개 = PR 1개다. PR 하나에는 Work Unit 1~5개만 둘 수 있다."],
+  ["GIT_ONE_CLAIM", :line, git_workflow_lines,
+   "**Work Unit은 하나의 주장만 만들고, 그 주장을 반증하는 시험까지 통과한 뒤 완료 커밋으로 닫는 최소 작업 단위다.** 파일 수나 줄 수가 아니라 실행으로 참·거짓을 가릴 수 있는 불변조건으로 나눈다."],
+  ["GIT_COMMIT_BOUNDARY", :fragment, git_workflow_text,
+   "서로 다른 Work Unit 구현을 한 완료 커밋에 섞지 않는다."],
+  ["GIT_REVIEW_FIX", :line, git_workflow_lines,
+   "독립 검토가 여러 Work Unit에 걸친 결함을 찾으면 하나의 검토 보정 커밋이 영향받은 Work Unit들을 함께 고칠 수 있다. goal 장부는 그 커밋 해시를 영향받은 각 Work Unit의 완료 경계에 기록하며, 이 보정 커밋이 서로 다른 주장을 하나의 Work Unit으로 합치지는 않는다."],
+  ["GIT_WU_LIMIT", :fragment, git_workflow_text,
+   "여섯 번째 Work Unit이 필요하면 새 Issue 또는 goal 문서와 PR로 나눈다."],
+  ["GIT_BRANCH_LIFETIME", :line, git_workflow_lines,
+   "- 24~48시간 수명 상한이 Work Unit 1~5개 상한보다 우선한다. 48시간을 넘길 것으로 예상되면 Work Unit이 5개 미만이어도 새 goal·worktree·브랜치·PR로 일찍 나눈다."],
+  ["GIT_SQUASH_BOUNDARY", :fragment, git_workflow_text,
+   "squash 뒤 `main`의 롤백 경계는 PR 전체 커밋"],
+  ["GIT_EXTERNAL_OPTIONAL", :fragment, git_workflow_text,
+   "외부 모델·유료 서비스·별도 오케스트레이터가 없어도 기본 절차는 중단되지 않는다."],
+  ["VERIFY_STEP_7", :line, verification_lines, "7. 전체 strict"],
+  ["VERIFY_STEP_8", :line, verification_lines, "8. 전체 codeaudit"],
+  ["VERIFY_STEP_9", :line, verification_lines, "9. 전체 적대검증"],
+  ["VERIFY_STEP_10", :line, verification_lines, "10. PR"],
+  ["VERIFY_STEP_11", :line, verification_lines, "11. GitHub verify CI"],
+  ["VERIFY_STEP_12", :line, verification_lines, "12. CI GREEN 확인 뒤 MERGE"],
+  ["VERIFY_PRE_PUSH_NOT_SUBSTITUTE", :fragment, verification_text,
+   "9번 전체 적대검증의 Work Unit 결합 공격을 대신하지 않는다."],
+  ["VERIFY_GENERAL_WU", :fragment, verification_text,
+   "일반 Work Unit은 `IMPLEMENT → 해당 AC 실행 → 반증 1~3개 → 완료 커밋`으로 닫는다."],
+  ["VERIFY_HIGH_RISK_CI", :line, verification_lines, "- `.github/workflows/**`"],
+  ["VERIFY_HIGH_RISK_HOOKS", :line, verification_lines, "- `hooks/**`"],
+  ["VERIFY_HIGH_RISK_ACCEPTANCE", :line, verification_lines,
+   "- `scripts/acceptance-*`, `verify*`, `mechanism-registry`"],
+  ["VERIFY_HIGH_RISK_DATA", :line, verification_lines, "- 비밀·후보자 데이터 노출 검사"],
+  ["VERIFY_HIGH_RISK_RUNTIME", :line, verification_lines, "- 배포·인증·로그인"],
+  ["VERIFY_EXECUTION_REVIEW", :fragment, verification_text,
+   "고위험 Work Unit을 닫으려면 실행 REVIEW가 필요하다."],
+  ["VERIFY_DOCUMENT_REVIEW", :fragment, verification_text,
+   "문서 REVIEW의 PASS만으로 고위험 Work Unit을 닫을 수 없다."],
+  ["VERIFY_REVIEW_NOT_RUN", :fragment, verification_text,
+   "재실행할 수 없으면 실행 REVIEW는 `NOT_RUN`"],
+  ["VERIFY_WU_NOT_PR", :fragment, verification_text,
+   "Work Unit PASS만으로 PR을 만들거나 병합 완료를 주장하지 않는다."]
+]
+work_unit_contracts.each do |label, mode, haystack, needle|
+  found = mode == :line ? haystack.include?(needle) : haystack.include?(needle)
+  errors << "WORK_UNIT_CONTRACT_MISSING: #{label}" unless found
+end
 
 raw = File.read(ledger_file)
 begin
@@ -305,6 +362,7 @@ if errors.empty?
   puts "LEDGER_LOAD: PASS #{ledger_file}"
   puts "MECHANISMS: PASS #{self_targets}/34 strict-contract-bindings"
   puts "WIRING: PASS pre-push=1 ci=1"
+  puts "WORK_UNIT_METHOD: PASS #{work_unit_contracts.length}/#{work_unit_contracts.length}"
   puts "CHECKED: #{data.length}"
   exit 0
 end
