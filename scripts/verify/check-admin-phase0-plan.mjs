@@ -465,6 +465,27 @@ const mutations = [
     },
   ];
 
+// 정상 문서 편집이 검사기의 실패로 오탐되지 않는지 확인하는 사례.
+// mutations와 반대로, apply() 뒤에도 forbidden 사유가 나타나면 안 된다.
+const positiveCases = [
+    {
+      name: "ci-sot-uppercase-z-not-treated-as-section-end",
+      forbidden: "verification SOT CI row count must be",
+      apply(tempRoot) {
+        const file = path.join(tempRoot, relativePaths.sot);
+        const text = fs.readFileSync(file, "utf8");
+        const marker = "| # | 스텝 이름 | 실행 내용 |\n";
+        if (!text.includes(marker)) {
+          throw new Error("ci-sot-uppercase-z-not-treated-as-section-end fixture anchor not found");
+        }
+        fs.writeFileSync(
+          file,
+          replaceOnce(text, marker, `관련 논의는 PR#Z(가칭)에서 이어진다.\n\n${marker}`),
+        );
+      },
+    },
+  ];
+
 function runSelfTest(root) {
   const baseline = validate(root);
   if (baseline.errors.length > 0) return baseline;
@@ -487,6 +508,8 @@ function runSelfTest(root) {
           blockersUnknown: baseline.blockersUnknown,
           mutationsCaught: caught,
           mutationsRequired: mutations.length,
+          positiveChecksPassed: 0,
+          positiveChecksRequired: positiveCases.length,
         };
       }
       caught += 1;
@@ -494,6 +517,35 @@ function runSelfTest(root) {
       fs.rmSync(tempRoot, { recursive: true, force: true });
     }
   }
+
+  let positivePassed = 0;
+  for (const positiveCase of positiveCases) {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "admin-phase0-plan-"));
+    try {
+      copyBundle(root, tempRoot);
+      positiveCase.apply(tempRoot);
+      const result = validate(tempRoot);
+      if (result.errors.some((error) => error.startsWith(positiveCase.forbidden))) {
+        return {
+          errors: [`positive case ${positiveCase.name} incorrectly failed with: ${positiveCase.forbidden}`],
+          phaseRows: baseline.phaseRows,
+          consumers: baseline.consumers,
+          duplicateConsumers: baseline.duplicateConsumers,
+          unknownDependencies: baseline.unknownDependencies,
+          dependencyCycles: baseline.dependencyCycles,
+          blockersUnknown: baseline.blockersUnknown,
+          mutationsCaught: caught,
+          mutationsRequired: mutations.length,
+          positiveChecksPassed: positivePassed,
+          positiveChecksRequired: positiveCases.length,
+        };
+      }
+      positivePassed += 1;
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  }
+
   return {
     errors: [],
     phaseRows: baseline.phaseRows,
@@ -504,6 +556,8 @@ function runSelfTest(root) {
     blockersUnknown: baseline.blockersUnknown,
     mutationsCaught: caught,
     mutationsRequired: mutations.length,
+    positiveChecksPassed: positivePassed,
+    positiveChecksRequired: positiveCases.length,
   };
 }
 
@@ -516,12 +570,12 @@ const result = selfTest ? runSelfTest(root) : validate(root);
 if (result.errors.length > 0) {
   for (const error of result.errors) console.error(`FAIL: ${error}`);
   console.error(
-    `ADMIN_PHASE0_PLAN_CHECK phase0Rows=${result.phaseRows ?? 0} consumers=${result.consumers ?? 0} duplicateConsumers=${result.duplicateConsumers ?? 0} unknownDependencies=${result.unknownDependencies ?? 0} dependencyCycles=${result.dependencyCycles ?? 0} blockersUnknown=${result.blockersUnknown ?? 0} mutationsCaught=${result.mutationsCaught ?? 0} mutationsRequired=${result.mutationsRequired ?? 0} structuralContract=FAIL semanticAuditRequired=true executionPermission=false reason=contract-mismatch`,
+    `ADMIN_PHASE0_PLAN_CHECK phase0Rows=${result.phaseRows ?? 0} consumers=${result.consumers ?? 0} duplicateConsumers=${result.duplicateConsumers ?? 0} unknownDependencies=${result.unknownDependencies ?? 0} dependencyCycles=${result.dependencyCycles ?? 0} blockersUnknown=${result.blockersUnknown ?? 0} mutationsCaught=${result.mutationsCaught ?? 0} mutationsRequired=${result.mutationsRequired ?? 0} positiveChecksPassed=${result.positiveChecksPassed ?? 0} positiveChecksRequired=${result.positiveChecksRequired ?? 0} structuralContract=FAIL semanticAuditRequired=true executionPermission=false reason=contract-mismatch`,
   );
   process.exit(1);
 }
 
 console.log("PASS: Phase 0 structural contract and CI registration match the pinned candidate");
 console.log(
-  `ADMIN_PHASE0_PLAN_CHECK phase0Rows=${result.phaseRows} consumers=${result.consumers} duplicateConsumers=${result.duplicateConsumers} unknownDependencies=${result.unknownDependencies} dependencyCycles=${result.dependencyCycles} blockersUnknown=${result.blockersUnknown} mutationsCaught=${result.mutationsCaught ?? 0} mutationsRequired=${result.mutationsRequired ?? 0} structuralContract=PASS semanticAuditRequired=true executionPermission=false reason=null`,
+  `ADMIN_PHASE0_PLAN_CHECK phase0Rows=${result.phaseRows} consumers=${result.consumers} duplicateConsumers=${result.duplicateConsumers} unknownDependencies=${result.unknownDependencies} dependencyCycles=${result.dependencyCycles} blockersUnknown=${result.blockersUnknown} mutationsCaught=${result.mutationsCaught ?? 0} mutationsRequired=${result.mutationsRequired ?? 0} positiveChecksPassed=${result.positiveChecksPassed ?? 0} positiveChecksRequired=${result.positiveChecksRequired ?? 0} structuralContract=PASS semanticAuditRequired=true executionPermission=false reason=null`,
 );
