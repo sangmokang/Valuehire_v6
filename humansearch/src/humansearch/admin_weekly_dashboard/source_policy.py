@@ -113,7 +113,11 @@ class CalendarResolution:
     def __init__(self, *, state: SourceState, calendar_id: str | None) -> None:
         if not isinstance(state, SourceState):
             raise TypeError("state must be a SourceState")
-        if state.status is MetricStatus.PASS and not calendar_id:
+        if calendar_id is not None and (
+            not isinstance(calendar_id, str) or not calendar_id.strip()
+        ):
+            raise TypeError("calendar_id must be None or a non-empty, non-blank string")
+        if state.status is MetricStatus.PASS and calendar_id is None:
             raise ValueError("a PASS calendar resolution requires a non-empty calendar_id")
         if state.status is not MetricStatus.PASS and calendar_id is not None:
             raise ValueError("a non-PASS calendar resolution must not carry a calendar_id")

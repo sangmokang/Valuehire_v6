@@ -5,6 +5,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -394,6 +395,21 @@ def test_resolve_calendar_alias_rejects_entries_that_are_not_calendar_reference(
 def test_calendar_resolution_rejects_a_pass_without_a_calendar_id() -> None:
     with pytest.raises(ValueError, match="calendar_id"):
         CalendarResolution(state=SourceState(status=MetricStatus.PASS), calendar_id=None)
+
+
+def test_calendar_resolution_rejects_a_blank_calendar_id() -> None:
+    """A whitespace-only calendar_id is not truthy-empty but must still be rejected."""
+
+    with pytest.raises(TypeError, match="calendar_id"):
+        CalendarResolution(state=SourceState(status=MetricStatus.PASS), calendar_id="   ")
+
+
+def test_calendar_resolution_rejects_a_non_string_calendar_id() -> None:
+    with pytest.raises(TypeError, match="calendar_id"):
+        CalendarResolution(
+            state=SourceState(status=MetricStatus.PASS),
+            calendar_id=cast(str, 1),
+        )
 
 
 def test_calendar_resolution_rejects_a_not_run_with_a_calendar_id() -> None:
