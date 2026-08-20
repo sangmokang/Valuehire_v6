@@ -1,0 +1,33 @@
+verdict: FAIL
+g:
+  status: PASS
+  command: "fixture g"
+  exit: 0
+  output: "fixture output g"
+  artifact: "scripts/verify/fixtures/strict-principles/artifact.txt"
+  artifact_hash: "514446d246dd0c105bb4d41610fb8590dfe49bc7fe8b5f55b77683fa45b88454"
+  session_id: "fixture-g"
+v1:
+  status: FAIL
+  command: "fixture v1"
+  exit: 1
+  output: "fixture output v1"
+  artifact: "scripts/verify/fixtures/strict-principles/artifact.txt"
+  artifact_hash: "514446d246dd0c105bb4d41610fb8590dfe49bc7fe8b5f55b77683fa45b88454"
+  session_id: "fixture-v1"
+v2:
+  status: NOT_RUN
+  command: "fixture v2"
+  exit: 1
+  output: "fixture output v2"
+  artifact: "scripts/verify/fixtures/strict-principles/artifact.txt"
+  artifact_hash: "514446d246dd0c105bb4d41610fb8590dfe49bc7fe8b5f55b77683fa45b88454"
+  session_id: "fixture-v2"
+t:
+  status: PASS
+  command: "fixture t"
+  exit: 0
+  output: "fixture output t"
+  artifact: "scripts/verify/fixtures/strict-principles/artifact.txt"
+  artifact_hash: "514446d246dd0c105bb4d41610fb8590dfe49bc7fe8b5f55b77683fa45b88454"
+  session_id: "fixture-t"

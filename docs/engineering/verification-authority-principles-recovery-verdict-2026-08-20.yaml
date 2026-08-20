@@ -1,0 +1,33 @@
+verdict: FAIL
+g:
+  status: PASS
+  command: "local G: principles checker, 34 mutations, registry, AC-M, verification-authority, verify, pre-commit, diff-check"
+  exit: 0
+  output: "local implementation PASS; principles=32 mutations=34 registry=6 ac_m=25 va=32 verify=PASS"
+  artifact: "docs/engineering/verification-authority-principles-recovery-goal-2026-08-20.md"
+  artifact_hash: "6f2ee75cbde2df05877a156232e16b21896e767479530108fcfc77db96c19353"
+  session_id: "local-g-2026-08-20"
+v1:
+  status: NOT_RUN
+  command: "claude --print --permission-mode plan --output-format json --no-session-persistence"
+  exit: 1
+  output: "HTTP 400 Credit balance is too low; input_tokens=0 output_tokens=0"
+  artifact: "docs/engineering/verification-authority-principles-recovery-v1-verdict-2026-08-20.md"
+  artifact_hash: "797d311e9f9513f12b30a778544d6099518fd5f3e3ab5a46942b1a3e25bcef6c"
+  session_id: "667abba6-b851-4bb5-ad86-251a22c24366"
+v2:
+  status: FAIL
+  command: "fresh Codex verifier /root/principles_recovery_v2"
+  exit: 1
+  output: "local implementation PASS; overall Strict FAIL because V1 was NOT_RUN"
+  artifact: "docs/engineering/verification-authority-principles-recovery-v2-verdict-2026-08-20.md"
+  artifact_hash: "ad6ba80e2294f9c037701729a9acc6392b2e571492ecd3542a3ef3a509c930ed"
+  session_id: "/root/principles_recovery_v2"
+t:
+  status: PASS
+  command: "bash scripts/acceptance-principles-check.sh"
+  exit: 0
+  output: "VERDICT PASS; CHECKED 32; pre-push=1 ci=1"
+  artifact: "docs/sot/principles.yaml"
+  artifact_hash: "b7734fae038d9e3d856a6d805861c390a29754450c1c564f2769bd6819657260"
+  session_id: "local-t-2026-08-20"

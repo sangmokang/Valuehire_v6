@@ -1,0 +1,33 @@
+verdict: PASS
+g:
+  status: PASS
+  command: "HEAD+cached snapshot: principles, mutations, registry, AC-M, verification-authority, verify, pre-commit, diff-check, syntax, brief-lint, clean pre-push"
+  exit: 0
+  output: "local candidate PASS; clean snapshot pre-push 21/21; original42 preserved"
+  artifact: "docs/engineering/verification-authority-principles-commit-prep-validation-log-2026-08-20.md"
+  artifact_hash: "d24b4bb92daaa24f432a67cf0938f24e8d86cbc1853a7d77fca2c70cd2e455dd"
+  session_id: "local-g-a9f41f414219941ede66308bcc266ad8c12bded7"
+v1:
+  status: PASS
+  command: "env -u ANTHROPIC_API_KEY claude -p --safe-mode --permission-mode plan --tools '' --max-turns 1 --output-format json"
+  exit: 0
+  output: "V1_VERDICT PASS; original F1/F2/F3 addressed"
+  artifact: "docs/engineering/verification-authority-principles-commit-prep-v1-verdict-2026-08-20.md"
+  artifact_hash: "86508e705b5cd9cb08e88ad73e668331d49f23d5842f5614b0c5022e52c5dae5"
+  session_id: "e68cda18-d5ce-4e23-ac48-911330c39851"
+v2:
+  status: PASS
+  command: "fresh Codex verifier /root/commit_prep_v2"
+  exit: 0
+  output: "V2_VERDICT PASS; exact tree, 21/21, 42+3 split and 34 mutation checks reproduced"
+  artifact: "docs/engineering/verification-authority-principles-commit-prep-v2-verdict-2026-08-20.md"
+  artifact_hash: "b40a198517eb20524d48176c9fd9ef3a1793e905e668487f421dd568c643f193"
+  session_id: "/root/commit_prep_v2"
+t:
+  status: PASS
+  command: "bash scripts/acceptance-principles-check.sh"
+  exit: 0
+  output: "VERDICT PASS; CHECKED 32; pre-push=1 ci=1"
+  artifact: "docs/sot/principles.yaml"
+  artifact_hash: "b7734fae038d9e3d856a6d805861c390a29754450c1c564f2769bd6819657260"
+  session_id: "local-t-2026-08-20"

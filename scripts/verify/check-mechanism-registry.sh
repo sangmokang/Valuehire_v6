@@ -216,6 +216,25 @@ done < "$REGISTRY"
 flush_entry
 [ "$syntax_fail" -eq 1 ] && fail=1
 
+# 현재 정본 명부는 원칙 검사기의 세 실행면을 모두 가져야 한다. 일반 fixture에는
+# 이 저장소 전용 필수 ID를 강제하지 않아 기존 파서 경계 시험을 독립적으로 유지한다.
+if [ "$REGISTRY" = "docs/sot/mechanism-registry.yaml" ]; then
+  for required_id in principles-local-check principles-explicit-prepush principles-explicit-ci; do
+    if ! printf '%s\n' "$seen_ids" | grep -qxF -- "$required_id"; then
+      echo "FAIL: 원칙 검사 장치 누락 — $required_id"
+      fail=1
+    fi
+  done
+  principles_rc=0
+  bash scripts/acceptance-principles-check.sh >/dev/null 2>&1 || principles_rc=$?
+  if [ "$principles_rc" -ne 0 ]; then
+    echo "FAIL: 원칙 검사 원명령 실패 — exit=$principles_rc"
+    fail=1
+  else
+    echo "PASS: 원칙 검사 원명령 실행 (local·pre-push·ci 배선 포함)"
+  fi
+fi
+
 # V1 D6: 문법 오류가 있으면 항목 0개여도 '검사 불능(2)'이 아니라 '위반(1)'이다 —
 # 잘못 쓴 명부는 대응 주체가 다르다(작성자 수정 vs 환경 복구).
 if [ "$checked" -eq 0 ]; then

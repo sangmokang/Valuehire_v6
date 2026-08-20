@@ -22,3 +22,20 @@
   stage: "ci"
   ci_mirror_job: "verify"
   required: true
+- id: "principles-local-check"
+  path: "scripts/acceptance-principles-check.sh"
+  target: "VERDICT: PASS"
+  stage: "manual"
+  manual_reason: "Strict 시작 시 현재 저장소 정본을 직접 읽는 원명령"
+  required: true
+- id: "principles-explicit-prepush"
+  path: "hooks/pre-push"
+  target: "bash scripts/acceptance-principles-check.sh"
+  stage: "pre-push"
+  required: true
+- id: "principles-explicit-ci"
+  path: ".github/workflows/verify.yml"
+  target: "run: bash scripts/acceptance-principles-check.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true

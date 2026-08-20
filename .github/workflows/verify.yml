@@ -25,6 +25,12 @@ jobs:
         # 로컬 전용 .secret-patterns 는 gitignore 되어 여기 없다.
         run: bash verify.sh
 
+      - name: Strict 원칙 정본·장부·배선 검사
+        run: bash scripts/acceptance-principles-check.sh
+
+      - name: Strict 원칙 적대 fixture·500/501 경계
+        run: bash scripts/acceptance-principles-mutations.sh
+
       - name: HumanSearch G1 클린룸 경계
         run: |
           bash scripts/acceptance-hs-cleanroom.sh
