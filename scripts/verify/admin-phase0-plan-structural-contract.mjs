@@ -215,7 +215,7 @@ function parseVerifySteps(workflow) {
 }
 
 function parseSotCiRowCount(text) {
-  const section = text.match(/^### CI\([^\n]*\)[^\n]*\n([\s\S]*?)(?=^### |^## |\Z)/m)?.[1] ?? "";
+  const section = text.match(/^### CI\([^\n]*\)[^\n]*\n([\s\S]*?)(?=^### |^## |(?![\s\S]))/m)?.[1] ?? "";
   return (section.match(/^\|\s*\d+\s*\|/gm) ?? []).length;
 }
 
