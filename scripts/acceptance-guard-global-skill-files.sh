@@ -150,6 +150,56 @@ else
 fi
 record "$recover_ok" "비정상 종료 뒤 recover" "exit=$recover_rc, PASS로 세지 않는 표식"
 
+# ── 복구 실패 주입 (Inv1·Inv2·Inv3·Inv4) ─────────────────────────────────────
+# 기존 "중간 종료 rollback" 케이스는 되돌리기가 성공하는 경로만 본다. 실제로 위험한
+# 것은 되돌리기 자체가 실패했을 때다: 파일1은 잠긴 채 남는데 복구 장부를 지워버리면
+# 다시 되돌릴 방법이 영영 사라진다. chmod 를 2회차부터 실패시켜 그 상황을 만든다.
+make_guard recovery_fail
+mkdir -p "$TMP/recovery_fail/bin"
+cat > "$TMP/recovery_fail/bin/chmod" <<'STUB'
+#!/usr/bin/env bash
+if [ -f "$CHMOD_COUNTER" ]; then n=$(cat "$CHMOD_COUNTER"); else n=0; fi
+n=$((n + 1))
+printf '%s\n' "$n" > "$CHMOD_COUNTER"
+if [ "$n" -ge 2 ]; then
+  printf 'chmod: injected failure (call #%s)\n' "$n" >&2
+  exit 1
+fi
+exec /bin/chmod "$@"
+STUB
+chmod +x "$TMP/recovery_fail/bin/chmod"
+rf_state="$TMP/recovery_fail/state/strict-skill-files.state"
+rf_rc=0
+rf_output=$(CHMOD_COUNTER="$TMP/recovery_fail/counter" \
+  PATH="$TMP/recovery_fail/bin:$PATH" \
+  bash "$TMP/recovery_fail/guard.sh" lock 2>&1) || rf_rc=$?
+
+# Inv1 — 복구가 100% 성공하기 전에는 복구 장부를 지우지 않는다.
+if [ -f "$rf_state" ]; then rf_state_ok=0; else rf_state_ok=1; fi
+record "$rf_state_ok" "Inv1 복구 실패 시 recovery state 보존" \
+  "lock exit=$rf_rc, state=$([ -f "$rf_state" ] && echo 존재 || echo 삭제됨)"
+
+# Inv2 — 복구 실패를 삼키지 않는다.
+if printf '%s\n' "$rf_output" | grep -qF "RECOVERY_FAILED"; then rf_loud_ok=0; else rf_loud_ok=1; fi
+record "$rf_loud_ok" "Inv2 복구 실패를 출력으로 알린다" "RECOVERY_FAILED 표식"
+
+# Inv3 — 부분 적용이면 재복구가 필요한 상태임을 표식으로 남긴다.
+if printf '%s\n' "$rf_output" | grep -qF "RECOVERY_REQUIRED"; then rf_mark_ok=0; else rf_mark_ok=1; fi
+record "$rf_mark_ok" "Inv3 부분 적용은 RECOVERY_REQUIRED 로 남는다" "표식 출력"
+
+# Inv4 — 실패 뒤에도 다시 복구할 수 있다(주입 없이 recover 재실행).
+rf_recover_rc=0
+bash "$TMP/recovery_fail/guard.sh" recover >/dev/null 2>&1 || rf_recover_rc=$?
+rf_m1=$(mode_of "$TMP/recovery_fail/files/claude.md")
+rf_m2=$(mode_of "$TMP/recovery_fail/files/codex.md")
+if [ "$rf_recover_rc" -eq 0 ] && [ "$rf_m1" = 640 ] && [ "$rf_m2" = 600 ]; then
+  rf_again_ok=0
+else
+  rf_again_ok=1
+fi
+record "$rf_again_ok" "Inv4 실패 뒤 recover 재실행 가능" \
+  "recover exit=$rf_recover_rc, modes=$rf_m1/$rf_m2 (기대 640/600)"
+
 make_guard same_uid
 bash "$TMP/same_uid/guard.sh" lock >/dev/null
 chmod 644 "$TMP/same_uid/files/claude.md"

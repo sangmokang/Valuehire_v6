@@ -118,10 +118,16 @@ do_lock() {
   rollback_lock() {
     local rc="${1:-$?}"
     trap - EXIT INT TERM HUP
-    if ! restore_from_state >/dev/null 2>&1; then
-      : # rollback은 원래 실패 종료값을 보존한다. recover가 남은 복구 경로다.
+    # 되돌리기가 완전히 끝나기 전에는 복구 장부를 지우지 않는다. 지워버리면 이미 444로
+    # 바뀐 파일을 되돌릴 근거가 사라져 recover 조차 실패한다(2026-08-21 반례 재현:
+    # chmod 2회차 실패 주입 → 파일1 444 고정 + 장부 삭제 + recover 영구 불가).
+    # restore_from_state 의 RECOVERY_FAILED 출력도 삼키지 않는다 — 조용한 실패 금지(P3).
+    if restore_from_state; then
+      rm -f "$STATE_FILE" "$CHECKED_FILE"
+    else
+      echo "RECOVERY_REQUIRED: 되돌리기 미완 — 복구 장부를 보존한다: $STATE_FILE" >&2
+      echo "RECOVERY_REQUIRED: 원인을 고친 뒤 '$0 recover' 를 실행하라" >&2
     fi
-    rm -f "$STATE_FILE" "$CHECKED_FILE"
     exit "$rc"
   }
   trap 'rollback_lock $?' EXIT
