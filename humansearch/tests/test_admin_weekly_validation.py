@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from pathlib import Path
+from types import SimpleNamespace
 from typing import cast
 from zoneinfo import ZoneInfo
 
@@ -59,6 +60,41 @@ def test_candidate_key_requires_lowercase_hmac_sha256_shape() -> None:
             position_source_id="position-1",
             candidate_source_key_hmac="candidate@example.test",
         )
+
+
+def test_build_weekly_snapshot_rejects_a_duck_typed_source_state() -> None:
+    """A caller must not smuggle a look-alike object past the SourceState contract."""
+
+    contract = load_metric_contract(CONTRACT_PATH)
+    fake_state = SimpleNamespace(status=MetricStatus.FAIL, reason="precondition_missing")
+    states = source_states()
+    states["mail_events"] = cast(SourceState, fake_state)
+
+    with pytest.raises(TypeError, match="SourceState"):
+        build_weekly_snapshot(
+            meeting_date_kst="2026-08-17",
+            events=[],
+            source_states=states,
+            metric_contract=contract,
+        )
+
+
+def test_metric_contract_rejects_a_not_run_reason_outside_its_status_class(
+    tmp_path: Path,
+) -> None:
+    """not_run metrics must use a NOT_RUN-only reason, not a FAIL-only one."""
+
+    source = CONTRACT_PATH.read_text(encoding="utf-8")
+    original = '"not_run_reason": "identity_link_contract_missing"'
+    assert source.count(original) == 1
+    mutated = tmp_path / "mutated-metric-contract.json"
+    mutated.write_text(
+        source.replace(original, '"not_run_reason": "gmail_timeout"'),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="NOT_RUN-only"):
+        load_metric_contract(mutated)
 
 
 def test_private_payload_does_not_create_a_public_hash_oracle() -> None:

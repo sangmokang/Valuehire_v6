@@ -93,6 +93,10 @@ def _metric_result(
             status=MetricStatus.NOT_RUN,
             reason="source_state_missing",
         )
+    elif not isinstance(state, SourceState):
+        raise TypeError(
+            f"source state for {definition.source_collection!r} must be a SourceState"
+        )
     if state.status is not MetricStatus.PASS:
         return MetricResult(
             status=state.status,

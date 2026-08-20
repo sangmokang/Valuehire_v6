@@ -8,11 +8,16 @@ from pathlib import Path
 
 import pytest
 
-from humansearch.admin_weekly_dashboard.contracts import MetricStatus, SourceFailureReason
+from humansearch.admin_weekly_dashboard.contracts import (
+    MetricStatus,
+    SourceFailureReason,
+    SourceState,
+)
 from humansearch.admin_weekly_dashboard.source_policy import (
     FAIL_ONLY_REASONS,
     NOT_RUN_ONLY_REASONS,
     CalendarReference,
+    CalendarResolution,
     CandidateIdentityEvidence,
     CandidateLinkDecision,
     candidate_link_decision,
@@ -191,6 +196,20 @@ def test_collection_verdict_rejects_an_attempt_that_was_not_planned() -> None:
         )
 
 
+@pytest.mark.parametrize("field", ["planned", "attempted", "pagination_exhausted"])
+def test_collection_verdict_rejects_non_boolean_flags(field: str) -> None:
+    """A truthy non-bool (e.g. the string "false") must never be read as True."""
+
+    kwargs: dict[str, object] = {
+        "planned": True,
+        "attempted": True,
+        "pagination_exhausted": True,
+    }
+    kwargs[field] = "false"
+    with pytest.raises(TypeError, match=f"{field} must be a bool"):
+        collection_state(**kwargs)  # type: ignore[arg-type]
+
+
 def test_every_failure_reason_has_an_explicit_collection_status_class() -> None:
     assert NOT_RUN_ONLY_REASONS.isdisjoint(FAIL_ONLY_REASONS)
     assert set(SourceFailureReason) == (
@@ -198,6 +217,25 @@ def test_every_failure_reason_has_an_explicit_collection_status_class() -> None:
         | FAIL_ONLY_REASONS
         | {SourceFailureReason.PERMISSION_DENIED}
     )
+
+
+def test_source_state_rejects_a_fail_status_with_a_not_run_only_reason() -> None:
+    """A caller must not bypass collection_state() by constructing SourceState directly."""
+
+    with pytest.raises(ValueError, match="NOT_RUN-only"):
+        SourceState(status=MetricStatus.FAIL, reason=SourceFailureReason.PRECONDITION_MISSING)
+
+
+def test_source_state_rejects_a_not_run_status_with_a_fail_only_reason() -> None:
+    with pytest.raises(ValueError, match="FAIL-only"):
+        SourceState(status=MetricStatus.NOT_RUN, reason=SourceFailureReason.GMAIL_TIMEOUT)
+
+
+def test_source_state_allows_permission_denied_for_either_incomplete_status() -> None:
+    """permission_denied is deliberately unclassified — it may pair with either status."""
+
+    SourceState(status=MetricStatus.FAIL, reason=SourceFailureReason.PERMISSION_DENIED)
+    SourceState(status=MetricStatus.NOT_RUN, reason=SourceFailureReason.PERMISSION_DENIED)
 
 
 @pytest.mark.parametrize(
@@ -308,4 +346,62 @@ def test_duplicate_calendar_list_entries_are_ambiguous_even_with_the_same_id() -
 
     assert resolution.state.status is MetricStatus.NOT_RUN
     assert resolution.state.reason is SourceFailureReason.CALENDAR_ALIAS_AMBIGUOUS
+
+
+def test_resolve_calendar_alias_rejects_any_alias_other_than_the_contract_owner() -> None:
+    """The v1 contract fixes the target identity; a caller cannot resolve someone else."""
+
+    with pytest.raises(ValueError, match="sangmokang"):
+        resolve_calendar_alias(
+            "other-person",
+            [CalendarReference(calendar_id="cal-1", summary="other-person")],
+        )
+
+
+def test_calendar_reference_rejects_an_empty_calendar_id() -> None:
+    with pytest.raises(ValueError, match="calendar_id"):
+        CalendarReference(calendar_id="", summary="sangmokang")
+
+
+def test_calendar_reference_rejects_an_empty_summary() -> None:
+    with pytest.raises(ValueError, match="summary"):
+        CalendarReference(calendar_id="calendar-1", summary="   ")
+
+
+def test_calendar_id_match_is_literal_not_case_or_space_folded() -> None:
+    """The contract requires an exact id match; casing must not widen it."""
+
+    resolution = resolve_calendar_alias(
+        "sangmokang",
+        [CalendarReference(calendar_id="SangMokang", summary="unrelated")],
+    )
+
+    assert resolution.state.status is MetricStatus.NOT_RUN
     assert resolution.calendar_id is None
+
+
+def test_resolve_calendar_alias_rejects_entries_that_are_not_calendar_reference() -> None:
+    """A duck-typed stand-in must not silently satisfy the CalendarReference contract."""
+
+    class FakeCalendar:
+        calendar_id = "calendar-1"
+        summary = "sangmokang"
+
+    with pytest.raises(TypeError, match="CalendarReference"):
+        resolve_calendar_alias("sangmokang", [FakeCalendar()])  # type: ignore[list-item]
+
+
+def test_calendar_resolution_rejects_a_pass_without_a_calendar_id() -> None:
+    with pytest.raises(ValueError, match="calendar_id"):
+        CalendarResolution(state=SourceState(status=MetricStatus.PASS), calendar_id=None)
+
+
+def test_calendar_resolution_rejects_a_not_run_with_a_calendar_id() -> None:
+    with pytest.raises(ValueError, match="calendar_id"):
+        CalendarResolution(
+            state=SourceState(
+                status=MetricStatus.NOT_RUN,
+                reason=SourceFailureReason.CALENDAR_ALIAS_NOT_FOUND,
+            ),
+            calendar_id="calendar-1",
+        )

@@ -11,7 +11,20 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import cast
 
-from .contracts import MetricStatus, SourceFailureReason, SourceState
+from .contracts import (
+    FAIL_ONLY_REASONS,
+    NOT_RUN_ONLY_REASONS,
+    MetricStatus,
+    SourceFailureReason,
+    SourceState,
+)
+
+# mypy --strict requires re-exported imports to be listed here; tests import the
+# reason-classification sets from this module rather than from .contracts directly.
+__all__ = [
+    "FAIL_ONLY_REASONS",
+    "NOT_RUN_ONLY_REASONS",
+]
 
 SOURCE_POLICY_VERSION = "admin-weekly-dashboard-sources/v1"
 EXPECTED_REFRESH_INTERVAL_MINUTES = 15
@@ -59,31 +72,6 @@ EXPECTED_EXTERNAL_EFFECTS = {
     "gmail": "READ_ONLY_NOT_CONNECTED",
     "supabase_writes": "DISABLED",
 }
-NOT_RUN_ONLY_REASONS = frozenset(
-    {
-        SourceFailureReason.CALENDAR_ALIAS_AMBIGUOUS,
-        SourceFailureReason.CALENDAR_ALIAS_NOT_FOUND,
-        SourceFailureReason.COLLECTION_NOT_SCHEDULED,
-        SourceFailureReason.COLLECTION_OVERLAP,
-        SourceFailureReason.HISTORY_NOT_COLLECTED,
-        SourceFailureReason.IDENTITY_LINK_CONTRACT_MISSING,
-        SourceFailureReason.PRECONDITION_MISSING,
-        SourceFailureReason.RETENTION_POLICY_MISSING,
-        SourceFailureReason.SOURCE_STATE_MISSING,
-    }
-)
-FAIL_ONLY_REASONS = frozenset(
-    {
-        SourceFailureReason.CALENDAR_EVENT_ID_MISSING,
-        SourceFailureReason.COLLECTION_INCOMPLETE,
-        SourceFailureReason.CONTRACT_MISMATCH,
-        SourceFailureReason.GMAIL_TIMEOUT,
-        SourceFailureReason.SOURCE_TIMEOUT,
-        SourceFailureReason.SOURCE_UNAVAILABLE,
-    }
-)
-
-
 class CandidateLinkDecision(str, Enum):
     """A review suggestion is the strongest allowed identity outcome."""
 
@@ -108,13 +96,29 @@ class CalendarReference:
     calendar_id: str
     summary: str
 
+    def __post_init__(self) -> None:
+        if not isinstance(self.calendar_id, str) or not self.calendar_id.strip():
+            raise ValueError("calendar_id must be a non-empty string")
+        if not isinstance(self.summary, str) or not self.summary.strip():
+            raise ValueError("summary must be a non-empty string")
 
-@dataclass(frozen=True)
+
+@dataclass(frozen=True, init=False)
 class CalendarResolution:
     """Resolved runtime calendar ID or a truthful NOT_RUN state."""
 
     state: SourceState
     calendar_id: str | None
+
+    def __init__(self, *, state: SourceState, calendar_id: str | None) -> None:
+        if not isinstance(state, SourceState):
+            raise TypeError("state must be a SourceState")
+        if state.status is MetricStatus.PASS and not calendar_id:
+            raise ValueError("a PASS calendar resolution requires a non-empty calendar_id")
+        if state.status is not MetricStatus.PASS and calendar_id is not None:
+            raise ValueError("a non-PASS calendar resolution must not carry a calendar_id")
+        object.__setattr__(self, "state", state)
+        object.__setattr__(self, "calendar_id", calendar_id)
 
 
 @dataclass(frozen=True)
@@ -319,17 +323,24 @@ def resolve_calendar_alias(
     alias: str,
     calendars: Sequence[CalendarReference],
 ) -> CalendarResolution:
-    """Resolve an alias only when exactly one CalendarList entry matches."""
+    """Resolve an alias only when exactly one CalendarList entry matches.
 
+    The v1 contract fixes the target identity to EXPECTED_CALENDAR_ALIAS, so a
+    different alias is rejected outright rather than silently resolved. The
+    calendar_id comparison is literal (no case/whitespace folding) because the
+    contract requires an exact id match; only the human-readable summary is
+    matched case- and whitespace-insensitively.
+    """
+
+    if alias != EXPECTED_CALENDAR_ALIAS:
+        raise ValueError(f"calendar alias must be exactly {EXPECTED_CALENDAR_ALIAS!r}")
     normalized_alias = _normalize(alias)
-    if normalized_alias is None:
-        raise ValueError("calendar alias must be non-empty")
-    matches = [
-        calendar
-        for calendar in calendars
-        if normalized_alias
-        in {_normalize(calendar.calendar_id), _normalize(calendar.summary)}
-    ]
+    matches = []
+    for calendar in calendars:
+        if not isinstance(calendar, CalendarReference):
+            raise TypeError("calendars must contain only CalendarReference entries")
+        if calendar.calendar_id == alias or _normalize(calendar.summary) == normalized_alias:
+            matches.append(calendar)
     if not matches:
         return CalendarResolution(
             state=SourceState(
@@ -362,6 +373,13 @@ def collection_state(
 ) -> SourceState:
     """Separate deliberate NOT_RUN from attempted-but-incomplete FAIL."""
 
+    for name, value in (
+        ("planned", planned),
+        ("attempted", attempted),
+        ("pagination_exhausted", pagination_exhausted),
+    ):
+        if not isinstance(value, bool):
+            raise TypeError(f"{name} must be a bool")
     if attempted and not planned:
         raise ValueError("unplanned collection cannot be attempted")
     if pagination_exhausted and not attempted:
