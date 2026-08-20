@@ -73,8 +73,8 @@ Work Unit 완료 커밋은 그 주장 하나의 표적 증거가 닫혔다는 �
 | # | 스텝 이름 | 실행 내용 |
 |---|---|---|
 | 1 | 비밀 스캔 (verify.sh) | `bash verify.sh` — 추적 파일 전체 |
-| 2 | Strict 원칙 정본·장부·배선 검사 | `bash scripts/acceptance-principles-check.sh` — 32개 정본 문구·장치·명시적 pre-push/CI 배선 |
-| 3 | Strict 원칙 적대 fixture·500/501 경계 | `bash scripts/acceptance-principles-mutations.sh` — 정상 fixture와 14개 반례·500/501 경계 |
+| 2 | Strict 원칙·Work Unit 정본·장부·배선 검사 | `bash scripts/acceptance-principles-check.sh` — 원칙 32개와 Work Unit 계약 25개, 장치, 명시적 pre-push/CI 배선 |
+| 3 | Strict 원칙·Work Unit 적대 fixture·500/501 경계 | `bash scripts/acceptance-principles-mutations.sh` — 정상 fixture, 원칙 반례, Work Unit 반례 9개, 500/501 경계 |
 | 4 | Strict 전역 스킬 잠금 장치 격리 회귀 | `bash scripts/acceptance-guard-global-skill-files.sh` — lock/check/unlock/recover와 동일 UID 한계 |
 | 5 | HumanSearch G1 클린룸 경계 | 인라인 8개 — `scripts/acceptance-hs-cleanroom.sh`, `scripts/acceptance-hs-cleanroom-mutations.sh`, `scripts/acceptance-hs-cleanroom-absolute-paths.sh`, `scripts/acceptance-hs-cleanroom-absolute-contexts.sh`, `scripts/acceptance-hs-cleanroom-colon-paths.sh`, `scripts/acceptance-hs-cleanroom-file-urls.sh`, `scripts/acceptance-hs-cleanroom-hook-env.sh`, `scripts/acceptance-hs-cleanroom-hook-env-mutations.sh` |
 | 6 | HumanSearch G2 테스트 게이트 | 인라인 — `uv` 설치 후 `scripts/acceptance-hs-gates.sh`, `scripts/acceptance-hs-gates-mutations.sh`, `scripts/acceptance-hs-gates-antiforge.sh` (정적 ruff/mypy + pytest 수집·runtime import 증명) |
