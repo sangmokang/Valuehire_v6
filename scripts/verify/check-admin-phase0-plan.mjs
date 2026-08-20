@@ -466,11 +466,11 @@ const mutations = [
   ];
 
 // 정상 문서 편집이 검사기의 실패로 오탐되지 않는지 확인하는 사례.
-// mutations와 반대로, apply() 뒤에도 forbidden 사유가 나타나면 안 된다.
+// mutations와 반대로, apply() 뒤에도 baseline과 동일하게 오류가 0개여야 한다
+// (특정 사유 하나만 없는지가 아니라 다른 오류로 새로 깨지지 않는지까지 본다).
 const positiveCases = [
     {
       name: "ci-sot-uppercase-z-not-treated-as-section-end",
-      forbidden: "verification SOT CI row count must be",
       apply(tempRoot) {
         const file = path.join(tempRoot, relativePaths.sot);
         const text = fs.readFileSync(file, "utf8");
@@ -525,9 +525,9 @@ function runSelfTest(root) {
       copyBundle(root, tempRoot);
       positiveCase.apply(tempRoot);
       const result = validate(tempRoot);
-      if (result.errors.some((error) => error.startsWith(positiveCase.forbidden))) {
+      if (result.errors.length > 0) {
         return {
-          errors: [`positive case ${positiveCase.name} incorrectly failed with: ${positiveCase.forbidden}`],
+          errors: [`positive case ${positiveCase.name} incorrectly failed with: ${result.errors.join("; ")}`],
           phaseRows: baseline.phaseRows,
           consumers: baseline.consumers,
           duplicateConsumers: baseline.duplicateConsumers,
