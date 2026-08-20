@@ -139,9 +139,32 @@ done <<< "$unreachable_objects"
 #      내용 기반으로만 잡을 수 있으므로, --reflog 포함 전 객체를 실제로 열어 확인한다.
 while IFS= read -r sha; do
   [ -z "$sha" ] && continue
-  if [ "$(git cat-file -t "$sha" 2>/dev/null)" = blob ] \
-     && git cat-file blob "$sha" 2>/dev/null | grep -qF "$LIT"; then
-    echo "FAIL: 도달 가능 blob에 리터럴 잔존: $sha"; fail=1
+  reachable_type_rc=0
+  reachable_type=$(git cat-file -t "$sha" 2>/dev/null) || reachable_type_rc=$?
+  if [ "$reachable_type_rc" -ne 0 ]; then
+    echo "FAIL: 도달 가능 객체형 읽기 실패: $sha (exit=$reachable_type_rc)"
+    fail=1
+    continue
+  fi
+  [ "$reachable_type" = blob ] || continue
+
+  if git cat-file blob "$sha" 2>/dev/null |
+     LC_ALL=C grep -aF "$LIT" >/dev/null; then
+    reachable_scan_status=("${PIPESTATUS[@]}")
+  else
+    reachable_scan_status=("${PIPESTATUS[@]}")
+  fi
+  reachable_cat_file_rc=${reachable_scan_status[0]:-1}
+  reachable_grep_rc=${reachable_scan_status[1]:-2}
+  if [ "$reachable_cat_file_rc" -ne 0 ]; then
+    echo "FAIL: 도달 가능 blob 읽기 실패: $sha (exit=$reachable_cat_file_rc)"
+    fail=1
+  elif [ "$reachable_grep_rc" -eq 0 ]; then
+    echo "FAIL: 도달 가능 blob에 리터럴 잔존: $sha"
+    fail=1
+  elif [ "$reachable_grep_rc" -ne 1 ]; then
+    echo "FAIL: 도달 가능 blob 내용 대조 실패: $sha (exit=$reachable_grep_rc)"
+    fail=1
   fi
 done < <(git rev-list --all --reflog --objects 2>/dev/null | awk '{print $1}' | sort -u)
 
