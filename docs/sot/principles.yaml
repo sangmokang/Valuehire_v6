@@ -322,3 +322,24 @@
       stages: ["strict", "pre-push", "ci"]
   status: "PASS"
   evidence: "Strict 계약 편입 장치의 실존·직접 실행만 PASS다. mechanism_expected에 적힌 제품 장치의 구현 완료를 주장하지 않는다."
+
+- id: "P23"
+  principle: "초록불은 커밋 SHA 에 귀속된다. 브랜치나 PR 에 귀속되지 않는다"
+  mechanism_expected: "로컬 HEAD·원격 HEAD·CI 검사 SHA가 같고 결론이 success이고 작업트리가 깨끗할 때만 VERIFIED (scripts/verify/check-verified-sha.sh · scripts/acceptance-verified-sha.sh)"
+  mechanism_found:
+    - path: "docs/sot/coding-principles.md"
+      check: "scripts/acceptance-principles-check.sh"
+      stages: ["strict", "pre-push", "ci"]
+  status: "PASS"
+  evidence: "Strict 계약 편입 장치의 실존·직접 실행만 PASS다. mechanism_expected에 적힌 제품 장치의 구현 완료를 주장하지 않는다."
+
+- id: "P24"
+  principle: "복구·롤백 계열은 성공 경로가 아니라 불변조건으로 규정한다"
+  mechanism_expected: "Inv1~4를 실패 주입으로 검증 (scripts/acceptance-guard-global-skill-files.sh)"
+  mechanism_found:
+    - path: "docs/sot/coding-principles.md"
+      check: "scripts/acceptance-principles-check.sh"
+      stages: ["strict", "pre-push", "ci"]
+  status: "PASS"
+  evidence: "Strict 계약 편입 장치의 실존·직접 실행만 PASS다. mechanism_expected에 적힌 제품 장치의 구현 완료를 주장하지 않는다."
+

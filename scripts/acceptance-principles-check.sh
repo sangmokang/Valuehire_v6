@@ -110,7 +110,7 @@ unless data.is_a?(Array)
   data = []
 end
 
-expected_ids = (1..22).map { |n| "P#{n}" } +
+expected_ids = (1..24).map { |n| "P#{n}" } +
   (1..5).map { |n| "§1-B-#{n}" } +
   (1..5).map { |n| "V-#{n}" }
 top_keys = %w[id principle mechanism_expected mechanism_found status evidence]
@@ -228,8 +228,8 @@ actual_ids = data.map { |entry| entry["id"] if entry.is_a?(Hash) }.compact
 missing_ids = expected_ids - actual_ids
 extra_ids = actual_ids - expected_ids
 errors << "ID_SET_MISMATCH: missing=#{missing_ids.join(',')} extra=#{extra_ids.join(',')}" unless missing_ids.empty? && extra_ids.empty?
-errors << "TARGET_COUNT_INVALID: expected=32 actual=#{data.length}" unless data.length == 32
-errors << "SELF_TARGET_COUNT_INVALID: expected=32 actual=#{self_targets}" unless self_targets == 32
+errors << "TARGET_COUNT_INVALID: expected=34 actual=#{data.length}" unless data.length == 34
+errors << "SELF_TARGET_COUNT_INVALID: expected=34 actual=#{self_targets}" unless self_targets == 34
 
 pre_push_lines = File.readlines(pre_push_file, chomp: true)
 active_pre_push = pre_push_lines.map(&:strip)
@@ -303,7 +303,7 @@ if errors.empty?
   puts "VERDICT: PASS"
   puts "SOT_LOAD: PASS #{source_file}"
   puts "LEDGER_LOAD: PASS #{ledger_file}"
-  puts "MECHANISMS: PASS #{self_targets}/32 strict-contract-bindings"
+  puts "MECHANISMS: PASS #{self_targets}/34 strict-contract-bindings"
   puts "WIRING: PASS pre-push=1 ci=1"
   puts "CHECKED: #{data.length}"
   exit 0

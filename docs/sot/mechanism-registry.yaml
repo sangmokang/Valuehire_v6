@@ -69,3 +69,16 @@
   stage: "manual"
   manual_reason: "검사기 자신의 판정 문구. 실행 배선은 ci-step-integrity-ci 가 대조한다"
   required: true
+- id: "verified-sha-ci"
+  path: ".github/workflows/verify.yml"
+  target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-verified-sha.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
+- id: "verified-sha-checker"
+  path: "scripts/verify/check-verified-sha.sh"
+  target: "VERDICT: UNVERIFIED"
+  stage: "manual"
+  manual_reason: "원격 조회가 필요해 CI 안에서 자기 SHA 를 검사하는 것은 뜻이 없다. 머지 전 판정 도구"
+  required: true
+

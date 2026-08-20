@@ -212,6 +212,12 @@ jobs:
         # 없는 것으로 친다(이 파일 111행 주석의 "판정 권한은 CI에 있다"와 같은 근거).
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-secret-webhook-vendor.sh
 
+      - name: 인수 검사 verified-sha (초록불이 SHA 에 귀속되는가 · P23)
+        # "CI 통과했습니다"는 어느 커밋에 대해 통과했는지를 말하지 않는다. 원격 HEAD 와
+        # 초록불이 붙은 SHA 와 로컬 HEAD 가 다르면 그 초록불은 지금 머지하려는 코드의
+        # 것이 아니다. 여기서는 판정기의 진리표(9종)와 fail-closed 를 검증한다.
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-verified-sha.sh
+
       - name: 인수 검사 ci-step-integrity (스텝을 조용히 끄지 못하는가)
         # pre-push 는 워크플로를 문자열로 훑어 `if: false` 만 잡는다. `if: ${{ false }}`,
         # 항상-거짓 조건, `continue-on-error: true` 는 그대로 통과했다(2026-08-12 V1 D4:
