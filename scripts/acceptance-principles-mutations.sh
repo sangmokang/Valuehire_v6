@@ -107,6 +107,22 @@ new_case c2_final_adversarial_skip
 ruby -e 'p=ARGV[0]; s=File.read(p).sub("9. 전체 적대검증", "9. 전체 적대검증 생략"); File.write(p,s)' "$CASE/docs/sot/verification-commands.md"
 expect_principles "C2-FINAL-ADVERSARIAL-SKIP" "최종 적대검증 의미 반전" 1 FAIL
 
+new_case c2_final_adversarial_additive
+printf '\n단, 일정이 급하면 전체 적대검증은 생략할 수 있다.\n' >> "$CASE/docs/sot/verification-commands.md"
+expect_principles "C2-FINAL-ADVERSARIAL-ADDITIVE" "정상 문구를 남긴 채 최종 적대검증 예외 추가" 1 FAIL
+
+new_case c2_document_review_additive
+printf '\n급한 고위험 작업은 문서 REVIEW만으로 닫을 수 있다.\n' >> "$CASE/docs/sot/verification-commands.md"
+expect_principles "C2-DOCUMENT-REVIEW-ADDITIVE" "정상 문구를 남긴 채 문서 검토 예외 추가" 1 FAIL
+
+new_case c2_paid_review_required
+printf '\n고위험 REVIEW는 유료 Claude를 반드시 사용한다.\n' >> "$CASE/docs/sot/verification-commands.md"
+expect_principles "C2-PAID-REVIEW-REQUIRED" "유료 외부 검토를 필수 조건으로 추가" 1 FAIL
+
+new_case c2_review_enforcement_claim
+printf '\n원칙 게이트가 독립 검토자 신원까지 기계로 보증한다.\n' >> "$CASE/docs/sot/verification-commands.md"
+expect_principles "C2-REVIEW-ENFORCEMENT-CLAIM" "동일 권한 검토자 신원을 기계 보증한다고 과장" 1 FAIL
+
 new_case c3
 printf '[broken\n' >> "$CASE/docs/sot/principles.yaml"
 expect_principles "C3" "YAML 문법 오류" 1 FAIL
