@@ -8,6 +8,9 @@
   "allowed_origins": [
     "https://hiring.saramin.co.kr"
   ],
+  "loggable_paths": [
+    "/home"
+  ],
   "surface_markers": [
     "[class*=\"BusinessGnb_business-gnb__\"]",
     "[class*=\"AppHeader_header__\"]"

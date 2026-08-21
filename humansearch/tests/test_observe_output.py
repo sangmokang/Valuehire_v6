@@ -21,9 +21,9 @@ def test_human_auth_is_a_person_call_with_exit_two() -> None:
 
 
 def test_output_is_one_privacy_reduced_line() -> None:
-    format_line: Callable[[AuthSurfaceState, str, SurfaceObservation], str] = (
-        _required_api("format_observation_line")
-    )
+    format_line: Callable[
+        [AuthSurfaceState, str, SurfaceObservation, frozenset[str]], str
+    ] = _required_api("format_observation_line")
     observation = SurfaceObservation(
         matched_roles=frozenset({SurfaceRole.HUMAN_AUTH_SURFACE}),
         contract_valid=True,
@@ -33,6 +33,7 @@ def test_output_is_one_privacy_reduced_line() -> None:
         AuthSurfaceState.HUMAN_AUTH,
         "https://portal.invalid/login?account=private#fragment",
         observation,
+        frozenset({"/login"}),
     )
 
     assert line == (

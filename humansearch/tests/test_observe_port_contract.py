@@ -16,6 +16,7 @@ def test_unapproved_diagnostic_port_stops_before_target_read(
         diagnostic_ports=frozenset({9225}),
         targets_path="/json/list",
         allowed_origins=frozenset({"https://portal.invalid"}),
+        loggable_paths=frozenset({"/home"}),
         surface_markers=("main",),
         role_markers={role: ("main",) for role in SurfaceRole},
     )

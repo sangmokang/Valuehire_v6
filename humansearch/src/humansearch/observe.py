@@ -50,6 +50,7 @@ class MarkerContract:
     diagnostic_ports: frozenset[int]
     targets_path: str
     allowed_origins: frozenset[str]
+    loggable_paths: frozenset[str]
     surface_markers: tuple[str, ...]
     role_markers: Mapping[SurfaceRole, tuple[str, ...]]
 
@@ -106,11 +107,14 @@ def exit_code_for_state(state: AuthSurfaceState) -> int:
 
 
 def format_observation_line(
-    state: AuthSurfaceState, tab_url: str, observation: SurfaceObservation
+    state: AuthSurfaceState,
+    tab_url: str,
+    observation: SurfaceObservation,
+    loggable_paths: frozenset[str] = frozenset(),
 ) -> str:
     """Render the complete privacy-reduced CLI output."""
 
-    tab = _privacy_reduced_url(tab_url) if tab_url else "-"
+    tab = _privacy_reduced_url(tab_url, loggable_paths) if tab_url else "-"
     contract_valid = str(observation.contract_valid).lower()
     return (
         f"STATE={state.value} TAB={tab} ROLES={len(observation.matched_roles)} "
@@ -134,7 +138,8 @@ def observe_once(channel: str, port: int) -> tuple[AuthSurfaceState, str, Surfac
         expected_port=port,
     )
     observation = observation_from_marker_payload(payload)
-    return classify_auth_surface(observation), target.url, observation
+    tab_url = _privacy_reduced_url(target.url, contract.loggable_paths)
+    return classify_auth_surface(observation), tab_url, observation
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -149,12 +154,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         state, tab_url, observation = observe_once(args.channel, args.port)
     except (CdpReadError, ObservationError, OSError, ValueError, json.JSONDecodeError):
-        state = AuthSurfaceState.UNKNOWN
         tab_url = ""
         observation = SurfaceObservation(
             matched_roles=frozenset(), contract_valid=False
         )
-    print(format_observation_line(state, tab_url, observation))
+        state = classify_auth_surface(observation)
+    paths = frozenset({urlsplit(tab_url).path}) if tab_url else frozenset()
+    print(format_observation_line(state, tab_url, observation, paths))
     return exit_code_for_state(state)
 
 
@@ -169,6 +175,7 @@ def _load_contract(channel: str) -> MarkerContract:
     ports = raw.get("diagnostic_ports")
     targets_path = raw.get("targets_path")
     origins = raw.get("allowed_origins")
+    loggable_paths = raw.get("loggable_paths")
     surface_markers = raw.get("surface_markers")
     role_markers = raw.get("role_markers")
     if (
@@ -180,6 +187,10 @@ def _load_contract(channel: str) -> MarkerContract:
         raise ObservationError("diagnostic endpoint contract is invalid")
     if not _string_list(origins) or not all(_valid_origin(item) for item in origins):
         raise ObservationError("allowed origin contract is invalid")
+    if not _string_list(loggable_paths) or not all(
+        _valid_targets_path(item) for item in loggable_paths
+    ):
+        raise ObservationError("loggable path contract is invalid")
     if not _string_list(surface_markers) or not isinstance(role_markers, dict):
         raise ObservationError("surface marker contract is invalid")
     expected_roles = {role.value for role in SurfaceRole}
@@ -197,6 +208,7 @@ def _load_contract(channel: str) -> MarkerContract:
         diagnostic_ports=frozenset(ports),
         targets_path=targets_path,
         allowed_origins=frozenset(origins),
+        loggable_paths=frozenset(loggable_paths),
         surface_markers=tuple(surface_markers),
         role_markers=parsed_roles,
     )
@@ -295,9 +307,12 @@ def _string_list(value: object) -> TypeGuard[list[str]]:
     )
 
 
-def _privacy_reduced_url(url: str) -> str:
+def _privacy_reduced_url(
+    url: str, loggable_paths: frozenset[str] = frozenset()
+) -> str:
     parsed = urlsplit(url)
-    return urlunsplit((parsed.scheme, parsed.netloc, parsed.path, "", ""))
+    path = parsed.path if parsed.path in loggable_paths else "/..."
+    return urlunsplit((parsed.scheme, parsed.netloc, path, "", ""))
 
 
 def _port(value: str) -> int:
