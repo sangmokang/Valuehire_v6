@@ -5,11 +5,12 @@ import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from http.client import HTTPConnection, HTTPException
+from ipaddress import ip_address
 from pathlib import Path
 from typing import TypeGuard
 from urllib.parse import urlsplit, urlunsplit
 
-from ._cdp import CdpReadError, evaluate_expression
+from ._cdp import CdpReadError, observe_markers
 from .auth_surface import (
     AuthSurfaceState,
     SurfaceObservation,
@@ -130,10 +131,10 @@ def observe_once(channel: str, port: int) -> tuple[AuthSurfaceState, str, Surfac
         raise ObservationError("diagnostic port is outside channel contract")
     targets = _fetch_targets(contract, port)
     target = select_single_target(targets, contract.allowed_origins)
-    expression = _marker_expression(contract)
-    payload = evaluate_expression(
+    payload = observe_markers(
         target.websocket_url,
-        expression,
+        contract.surface_markers,
+        {role.value: contract.role_markers[role] for role in SurfaceRole},
         expected_host=contract.diagnostic_host,
         expected_port=port,
     )
@@ -153,7 +154,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     try:
         state, tab_url, observation = observe_once(args.channel, args.port)
-    except (CdpReadError, ObservationError, OSError, ValueError, json.JSONDecodeError):
+    except (CdpReadError, ObservationError):
         tab_url = ""
         observation = SurfaceObservation(
             matched_roles=frozenset(), contract_valid=False
@@ -167,7 +168,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 def _load_contract(channel: str) -> MarkerContract:
     try:
         raw = json.loads(_CONTRACT_PATH.read_text(encoding="utf-8"))
-    except OSError as exc:
+    except (OSError, json.JSONDecodeError) as exc:
         raise ObservationError("marker contract is unavailable") from exc
     if not isinstance(raw, dict) or raw.get("channel") != channel:
         raise ObservationError("marker contract channel is invalid")
@@ -180,7 +181,7 @@ def _load_contract(channel: str) -> MarkerContract:
     role_markers = raw.get("role_markers")
     if (
         not isinstance(host, str)
-        or host != "127.0.0.1"
+        or not _is_loopback_address(host)
         or not _valid_ports(ports)
         or not _valid_targets_path(targets_path)
     ):
@@ -230,35 +231,13 @@ def _fetch_targets(contract: MarkerContract, port: int) -> list[object]:
         connection.close()
     if len(body) > 1_048_576:
         raise ObservationError("target list response exceeded the read limit")
-    payload = json.loads(body)
+    try:
+        payload = json.loads(body)
+    except json.JSONDecodeError as exc:
+        raise ObservationError("target list response is invalid") from exc
     if not isinstance(payload, list):
         raise ObservationError("target list response is invalid")
     return payload
-
-
-def _marker_expression(contract: MarkerContract) -> str:
-    marker_data = {
-        "surface_markers": contract.surface_markers,
-        "role_markers": {
-            role.value: contract.role_markers[role] for role in SurfaceRole
-        },
-    }
-    serialized = json.dumps(marker_data, ensure_ascii=False, separators=(",", ":"))
-    return f"""(() => {{
-const markers = {serialized};
-const visible = (selector) => Array.from(document.querySelectorAll(selector))
-  .some((element) => element.getClientRects().length > 0);
-try {{
-  const valid = markers.surface_markers.some(visible);
-  if (!valid) return {{contract_valid:false, matched_roles:[]}};
-  const matched = Object.entries(markers.role_markers)
-    .filter(([, selectors]) => selectors.some(visible))
-    .map(([role]) => role);
-  return {{contract_valid:true, matched_roles:matched}};
-}} catch (_) {{
-  return {{contract_valid:false, matched_roles:[]}};
-}}
-}})()"""
 
 
 def _origin(url: str) -> str:
@@ -291,6 +270,13 @@ def _valid_targets_path(value: object) -> TypeGuard[str]:
         and "#" not in value
         and "//" not in value
     )
+
+
+def _is_loopback_address(value: str) -> bool:
+    try:
+        return ip_address(value).is_loopback
+    except ValueError:
+        return False
 
 
 def _valid_ports(value: object) -> TypeGuard[list[int]]:

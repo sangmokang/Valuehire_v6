@@ -6,6 +6,7 @@ import json
 import os
 import socket
 import struct
+from collections.abc import Mapping, Sequence
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -16,27 +17,33 @@ class CdpReadError(RuntimeError):
     """Raised when the narrow read-only DevTools exchange cannot complete."""
 
 
-def evaluate_expression(
+def observe_markers(
     websocket_url: str,
-    expression: str,
+    surface_markers: Sequence[str],
+    role_markers: Mapping[str, Sequence[str]],
     *,
     expected_host: str,
     expected_port: int,
     timeout: float = 3.0,
 ) -> object:
-    """Evaluate one expression and return only its by-value result."""
+    """Observe only contracted selector visibility and return semantic roles."""
 
-    parsed = urlsplit(websocket_url)
+    try:
+        parsed = urlsplit(websocket_url)
+        parsed_port = parsed.port
+    except ValueError as exc:
+        raise CdpReadError("target websocket is invalid") from exc
     if (
         parsed.scheme != "ws"
         or parsed.hostname != expected_host
-        or parsed.port != expected_port
+        or parsed_port != expected_port
         or parsed.username is not None
         or parsed.password is not None
         or not parsed.path.startswith("/devtools/page/")
     ):
         raise CdpReadError("target websocket is outside the approved local endpoint")
 
+    expression = _marker_expression(surface_markers, role_markers)
     request_path = parsed.path
     if parsed.query:
         request_path = f"{request_path}?{parsed.query}"
@@ -75,6 +82,31 @@ def evaluate_expression(
     except (OSError, TimeoutError, ValueError, json.JSONDecodeError) as exc:
         raise CdpReadError("DevTools read failed") from exc
     raise CdpReadError("DevTools response limit exceeded")
+
+
+def _marker_expression(
+    surface_markers: Sequence[str], role_markers: Mapping[str, Sequence[str]]
+) -> str:
+    marker_data = {
+        "surface_markers": tuple(surface_markers),
+        "role_markers": {role: tuple(markers) for role, markers in role_markers.items()},
+    }
+    serialized = json.dumps(marker_data, ensure_ascii=False, separators=(",", ":"))
+    return f"""(() => {{
+const markers = {serialized};
+const visible = (selector) => Array.from(document.querySelectorAll(selector))
+  .some((element) => element.getClientRects().length > 0);
+try {{
+  const matched = Object.entries(markers.role_markers)
+    .filter(([, selectors]) => selectors.some(visible))
+    .map(([role]) => role);
+  const valid = matched.length > 0 || markers.surface_markers.some(visible);
+  if (!valid) return {{contract_valid:false, matched_roles:[]}};
+  return {{contract_valid:true, matched_roles:matched}};
+}} catch (_) {{
+  return {{contract_valid:false, matched_roles:[]}};
+}}
+}})()"""
 
 
 def _handshake(connection: socket.socket, host: str, port: int, path: str) -> None:
