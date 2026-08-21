@@ -1,3 +1,4 @@
+import hashlib
 import inspect
 import json
 from pathlib import Path
@@ -89,6 +90,7 @@ def test_exactly_one_matching_target_is_returned() -> None:
         [
             {"type": "worker", "url": "https://portal.invalid/background"},
             {
+                "id": "target-one",
                 "type": "page",
                 "url": "https://portal.invalid/home",
                 "webSocketDebuggerUrl": "read-endpoint-one",
@@ -99,19 +101,39 @@ def test_exactly_one_matching_target_is_returned() -> None:
 
     assert target.url == "https://portal.invalid/home"
     assert target.websocket_url == "read-endpoint-one"
+    assert target.target_id_sha256 == hashlib.sha256(b"target-one").hexdigest()
 
 
 def test_observe_once_uses_the_narrow_marker_adapter(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     contract = _contract()
     calls: list[tuple[object, ...]] = []
+    permit_path = tmp_path / "permit.json"
+    permit_path.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "lease_id": "d50e07c2-8ed8-4ed4-9d96-85f19f1704cb",
+                "channel": "saramin",
+                "diagnostic_host": "127.0.0.1",
+                "diagnostic_port": 9225,
+                "allowed_origin": "https://portal.invalid",
+                "target_id_sha256": hashlib.sha256(b"target-one").hexdigest(),
+                "expires_at": "2999-01-01T00:00:00Z",
+            }
+        ),
+        encoding="utf-8",
+    )
+    permit_path.chmod(0o600)
     monkeypatch.setattr(observe, "_load_contract", lambda channel: contract)
     monkeypatch.setattr(
         observe,
         "_fetch_targets",
         lambda loaded, port: [
             {
+                "id": "target-one",
                 "type": "page",
                 "url": "https://portal.invalid/home?ignored=yes",
                 "webSocketDebuggerUrl": "read-endpoint-one",
@@ -128,7 +150,9 @@ def test_observe_once_uses_the_narrow_marker_adapter(
 
     monkeypatch.setattr(observe, "observe_markers", marker_read)
 
-    state, tab_url, observation = observe.observe_once("saramin", 9225)
+    state, tab_url, observation = observe.observe_once(
+        "saramin", 9225, permit_path
+    )
 
     assert state is AuthSurfaceState.AUTHENTICATED
     assert tab_url == "https://portal.invalid/home"

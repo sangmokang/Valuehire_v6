@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from humansearch import observe
@@ -7,7 +9,7 @@ from humansearch.auth_surface import AuthSurfaceState, SurfaceObservation
 def test_read_failure_cannot_emit_unknown_with_an_invalid_contract(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    def failed_read(channel: str, port: int) -> tuple[
+    def failed_read(channel: str, port: int, permit_file: Path | None = None) -> tuple[
         AuthSurfaceState, str, SurfaceObservation
     ]:
         raise observe.ObservationError("read unavailable")
