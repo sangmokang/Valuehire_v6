@@ -1,0 +1,25 @@
+{
+  "channel": "saramin",
+  "diagnostic_host": "127.0.0.1",
+  "targets_path": "/json/list",
+  "allowed_origins": [
+    "https://hiring.saramin.co.kr"
+  ],
+  "surface_markers": [
+    "[class*=\"BusinessGnb_business-gnb__\"]",
+    "[class*=\"AppHeader_header__\"]"
+  ],
+  "role_markers": {
+    "authenticated_surface": [
+      "[class*=\"AfterLoginMenu_logged-menu__\"]",
+      "[class*=\"AfterLoginMenu_company-info__wrapper__\"]"
+    ],
+    "human_auth_surface": [
+      "[class*=\"Gnb_login-menu__\"]"
+    ],
+    "challenge_surface": [
+      "[class*=\"ReCaptchaVerify_wrapper__\"]",
+      "[class*=\"ReCaptchaVerify_widget__\"]"
+    ]
+  }
+}
