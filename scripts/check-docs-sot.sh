@@ -13,7 +13,7 @@ fail=0
 pass() { printf 'PASS: %s\n' "$1"; }
 bad()  { printf 'FAIL: %s\n' "$1" >&2; fail=1; }
 
-# AC-1: docs/sot/ 필수 파일 5개가 존재하고 각각 20,000바이트를 넘지 않는다.
+# AC-1: docs/sot/ 필수 파일 7개가 존재하고 각각 20,000바이트를 넘지 않는다.
 #   (수정 이력: 최초 구현은 wc -l<=300 로 쟀으나, coding-principles.md 처럼 원칙
 #    표의 각 행이 개행 없이 한 줄에 긴 문장을 담는 경우 줄 수가 실제 분량을
 #    반영하지 못함을 실행 중 발견(70줄인데 15,424바이트). 바이트 크기로 교정.)
@@ -22,6 +22,8 @@ REQUIRED_FILES=(
   "docs/sot/coding-principles.md"
   "docs/sot/hook-contracts.md"
   "docs/sot/git-workflow.md"
+  "docs/sot/work-unit-policy.yaml"
+  "docs/sot/work-unit-policy.md"
   "docs/sot/verification-commands.md"
 )
 MAX_BYTES=20000
