@@ -1,6 +1,7 @@
 """Observe one approved Saramin tab and classify its authentication surface."""
 
 import argparse
+import hashlib
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -11,6 +12,7 @@ from typing import TypeGuard
 from urllib.parse import urlsplit, urlunsplit
 
 from ._cdp import CdpReadError, observe_markers
+from ._permit import PermitError, bind_and_consume_permit, load_observation_permit
 from .auth_surface import (
     AuthSurfaceState,
     SurfaceObservation,
@@ -18,12 +20,8 @@ from .auth_surface import (
     classify_auth_surface,
 )
 
-_CONTRACT_PATH = (
-    Path(__file__).resolve().parents[3]
-    / "contracts"
-    / "humansearch"
-    / "saramin-markers.json"
-)
+_REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
+_CONTRACT_PATH = _REPOSITORY_ROOT / "contracts" / "humansearch" / "saramin-markers.json"
 
 
 class ObservationError(RuntimeError):
@@ -40,6 +38,7 @@ class BrowserTarget:
 
     url: str
     websocket_url: str
+    target_id_sha256: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,11 +72,22 @@ def select_single_target(
             f"expected exactly one matching tab, found {len(matching)}"
         )
     selected = matching[0]
+    target_id = selected.get("id")
     url = selected.get("url")
     websocket_url = selected.get("webSocketDebuggerUrl")
-    if not isinstance(url, str) or not isinstance(websocket_url, str):
+    if (
+        not isinstance(target_id, str)
+        or not target_id
+        or not isinstance(url, str)
+        or not isinstance(websocket_url, str)
+    ):
         raise TargetSelectionError("selected tab lacks a read endpoint")
-    return BrowserTarget(url=url, websocket_url=websocket_url)
+    target_proof = hashlib.sha256(target_id.encode("utf-8")).hexdigest()
+    return BrowserTarget(
+        url=url,
+        websocket_url=websocket_url,
+        target_id_sha256=target_proof,
+    )
 
 
 def observation_from_marker_payload(payload: object) -> SurfaceObservation:
@@ -123,18 +133,43 @@ def format_observation_line(
     )
 
 
-def observe_once(channel: str, port: int) -> tuple[AuthSurfaceState, str, SurfaceObservation]:
+def observe_once(
+    channel: str,
+    port: int,
+    permit_file: Path | None = None,
+) -> tuple[AuthSurfaceState, str, SurfaceObservation]:
     """Perform the one allowed target-list read and one DOM marker evaluation."""
 
     contract = _load_contract(channel)
     if port not in contract.diagnostic_ports:
         raise ObservationError("diagnostic port is outside channel contract")
+    try:
+        permit = load_observation_permit(
+            permit_file,
+            repository_root=_REPOSITORY_ROOT,
+            channel=channel,
+            diagnostic_host=contract.diagnostic_host,
+            diagnostic_port=port,
+        )
+    except PermitError as exc:
+        raise ObservationError("observation permit was rejected") from exc
     targets = _fetch_targets(contract, port)
     target = select_single_target(targets, contract.allowed_origins)
+    role_markers = {
+        role.value: contract.role_markers[role] for role in SurfaceRole
+    }
+    try:
+        bind_and_consume_permit(
+            permit,
+            allowed_origin=_origin(target.url),
+            target_id_sha256=target.target_id_sha256,
+        )
+    except PermitError as exc:
+        raise ObservationError("observation permit was rejected") from exc
     payload = observe_markers(
         target.websocket_url,
         contract.surface_markers,
-        {role.value: contract.role_markers[role] for role in SurfaceRole},
+        role_markers,
         expected_host=contract.diagnostic_host,
         expected_port=port,
     )
@@ -149,11 +184,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m humansearch.observe")
     parser.add_argument("--channel", choices=("saramin",), required=True)
     parser.add_argument("--port", type=_port, required=True)
+    parser.add_argument("--permit-file", type=Path)
     parser.add_argument("--once", action="store_true", required=True)
     args = parser.parse_args(argv)
 
     try:
-        state, tab_url, observation = observe_once(args.channel, args.port)
+        state, tab_url, observation = observe_once(
+            args.channel, args.port, args.permit_file
+        )
     except (CdpReadError, ObservationError):
         tab_url = ""
         observation = SurfaceObservation(
