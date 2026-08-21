@@ -126,11 +126,19 @@
 
 ---
 
+## 종료값 계약 (2026-08-22 정정)
+
+`scripts/scan-history-secrets.sh` 의 종료값은 **0 = 정상(위반 0건) · 1 = 위반 발견 · 2 = 검사기 오류 또는 스캔 무효** 다.
+
+초안 WU-1 설명에 `0=위반` 으로 적었으나 AC-1·AC-2 의 문구, 그리고 현재 워크플로 인라인 관례(`exit $hit`, 무효는 `exit 2`)와 어긋났다. 일반 관례로 통일했고 인수 검사도 이 값으로 고정돼 있다.
+
+이 방향을 택한 이유: CI 가 `bash scripts/scan-history-secrets.sh` **한 줄로** 부를 수 있어야 한다. 호출부에서 종료값을 뒤집는 군더더기가 붙으면 그 줄 자체가 새로운 약화 지점이 된다.
+
 ## 작업 분해표 (R1)
 
 | WU | 작업 | AC | 검증 1개 |
 |---|---|---|---|
-| WU-1 | 히스토리 스캔 본문을 `scripts/scan-history-secrets.sh` 로 추출하고 파이프 제거 + 종료값 3분기(0 위반 / 1 정상 / 2 검사기오류) | AC-1, AC-2 | `bash scripts/scan-history-secrets.sh` 가 현재 저장소에서 종료값 0 |
+| WU-1 | 히스토리 스캔 본문을 `scripts/scan-history-secrets.sh` 로 추출하고 파이프 제거 + 종료값 3분기(**0 정상 / 1 위반 / 2 검사기오류·스캔무효**) | AC-1, AC-2 | `bash scripts/scan-history-secrets.sh` 가 현재 저장소에서 종료값 0 |
 | WU-2 | 인수 검사 `scripts/acceptance-history-scan-failclosed.sh` 신설 — 합성 저장소로 차단·통과를 한 쌍으로 | AC-1, AC-2 | `VERDICT: PASS`, `CHECKED` ≥ 8 |
 | WU-3 | CI·명부 배선 — verify.yml 스텝을 스크립트 호출로 교체, 새 인수 검사를 래퍼 경유로 추가, mechanism-registry 등록 | AC-3 | `acceptance-verify-ac-m.sh` 통과 |
 | WU-4 | PR #29 의 `acceptance-0-2*` 개선분(깨끗하게 적용됨) 이식 | AC-1, AC-2 | 해당 인수 검사 통과 |
