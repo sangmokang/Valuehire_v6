@@ -144,7 +144,7 @@ must_catch "쿠키 이름 앵커 — ${K_BC}"    "  \"${K_BC}\": \"${OPAQUE}\""
 must_catch "쿠키 이름 앵커 — ${K_BSC}"   "  \"${K_BSC}\": \"${OPAQUE}\""
 
 # ── ④ 오탐 대조군 — 평범한 코드·문서는 막히면 안 된다 ────────────────────────
-must_not_catch "빌드 경로 값"        "  \"$(printf 'p%s' 'wd')\": \"/Users/runner/work/repo\""
+must_not_catch "빌드 경로 값"        "  \"$(printf 'p%s' 'wd')\": \"/Users/runner/work/repo\""  # selfcontained-ok: 오탐 대조군용 표본 문자열이며 실제 파일 접근이 아니다
 must_not_catch "상태 상수"           "  '$(printf 'P%s' 'W')': 'PENDING_WRITE'"
 must_not_catch "헤더 '이름' 설정"    "  \"sessionIdHeader\": \"x-request-session\""
 must_not_catch "i18n 안내 문구"      "  \"$(printf 'p%s' 'w')\": \"비밀번호를 입력하세요\""

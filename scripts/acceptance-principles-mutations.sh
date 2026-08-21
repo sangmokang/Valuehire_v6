@@ -207,9 +207,16 @@ expect_verdict "C11-ARTIFACT-HASH" "$TMP/artifact-hash-mismatch.yaml" 1 "증거 
 # 서버에는 그 경로가 없어 이 결합은 로컬에만 존재했다 — P15③(로컬 전용 검사는
 # 없는 것으로 친다)에 따라 결합 자체를 없앤다. 이 검사는 자기 자신도 대상에 넣는다(P13④).
 checked=$((checked + 1))
-outside_refs=$(grep -nE '(^|[^A-Za-z0-9_/])/(Users|home)/[A-Za-z0-9._-]+/' \
+# grep 은 일치가 없으면 종료값 1 이다. 그것을 통과 신호로 뭉개지 않으려고
+# if/else 로 나눠 받는다(약화 패턴 금지 — P13).
+if outside_refs=$(grep -nE '(^|[^A-Za-z0-9_/])/(Users|home)/[A-Za-z0-9._-]+/' \
   scripts/acceptance-*.sh scripts/verify/*.sh hooks/pre-commit hooks/pre-push 2>/dev/null |
-  grep -vE '^[^:]+:[0-9]+:[[:space:]]*#' || true)
+  grep -vE '^[^:]+:[0-9]+:[[:space:]]*#' |
+  grep -v 'selfcontained-ok:'); then
+  : # 참조가 남아 있다 — 아래에서 실패로 판정한다
+else
+  outside_refs=""
+fi
 if [ -z "$outside_refs" ]; then
   echo "PASS: C15 검사 스크립트가 저장소 밖 절대경로를 참조하지 않는다"
 else
@@ -219,12 +226,11 @@ fi
 
 SKILL_TMP="$TMP/skills"
 mkdir -p "$SKILL_TMP"
-if [ "${STRICT_SKILL_FIXTURE_MODE:-0}" != "1" ] &&
-   [ -f /Users/kangsangmo/.codex/skills/strict/SKILL.md ] &&
-   [ -f /Users/kangsangmo/.claude/skills/strict/SKILL.md ]; then
-  cp /Users/kangsangmo/.codex/skills/strict/SKILL.md "$SKILL_TMP/codex.md"
-  cp /Users/kangsangmo/.claude/skills/strict/SKILL.md "$SKILL_TMP/claude.md"
-else
+# 표본은 언제나 저장소 안에서 만든다. 예전에는 개인 전역 지침 파일을 정상 표본으로
+# 복사했는데, 그 파일은 다른 저장소가 갈아치울 수 있어 이 저장소의 판정이 외부 상태에
+# 좌우됐다(2026-08-21 실측: v4 가 지침을 교체하자 v6 밀어 올리기 전부 차단).
+# 서버에는 그 경로가 없어 어차피 로컬 전용이었다 — P15③.
+{
   cat > "$SKILL_TMP/common.md" <<'EOF'
 <!-- STRICT_PRINCIPLES_CONTRACT:START -->
 docs/sot/coding-principles.md
@@ -252,7 +258,7 @@ EOF
     printf '%s\n' 'Claude판은 `G=Claude → V1=Codex → V2=Claude`'
     cat "$SKILL_TMP/common.md"
   } > "$SKILL_TMP/claude.md"
-fi
+}
 chmod u+w "$SKILL_TMP/codex.md" "$SKILL_TMP/claude.md"
 cp "$SKILL_TMP/claude.md" "$SKILL_TMP/claude-mismatch.md"
 chmod u+w "$SKILL_TMP/claude-mismatch.md"
