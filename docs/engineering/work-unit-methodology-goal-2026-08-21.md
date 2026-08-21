@@ -69,7 +69,7 @@ Work Unit 안에서 찾는 것은 “이 주장 하나가 참인가?”이고, P
 ### 경계
 
 - 파일 수·줄 수로 Work Unit을 나누지 않습니다.
-- 고위험 경로의 유일한 정본 목록은 `docs/sot/verification-commands.md`의 “위험도에 따른 Work Unit 검사 강도” 절입니다. 이 goal은 목록을 복제하지 않습니다.
+- 고위험 경로의 유일한 기계 정본은 `docs/sot/work-unit-policy.yaml`입니다. 사람용 목록은 여기서 생성한 `docs/sot/work-unit-policy.md`를 사용하며, 이 goal은 목록을 복제하지 않습니다.
 - 일반 Work Unit은 표적 검사와 반증 1~3개로 닫고, 고위험 Work Unit은 독립 검토를 추가합니다.
 - Agent 교체는 선택입니다. 같은 세션에서도 구현 맥락과 검증 질문을 분리할 수 있어야 합니다.
 
