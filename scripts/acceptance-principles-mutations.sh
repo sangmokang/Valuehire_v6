@@ -200,6 +200,23 @@ cp scripts/verify/fixtures/strict-principles/valid-verdict.yaml "$TMP/artifact-h
 ruby -rpsych -e 'p=ARGV[0]; d=Psych.safe_load(File.read(p)); d["g"]["artifact_hash"]="0000000000000000000000000000000000000000000000000000000000000000"; File.write(p,Psych.dump(d))' "$TMP/artifact-hash-mismatch.yaml"
 expect_verdict "C11-ARTIFACT-HASH" "$TMP/artifact-hash-mismatch.yaml" 1 "증거 해시 불일치 차단"
 
+# ── 검사는 저장소 밖 파일에 좌우되지 않아야 한다 ────────────────────────────
+# 2026-08-21 실측: 이 스크립트가 사장님 개인 전역 지침 파일을 "정상 표본"으로 복사해
+# 썼다. 다른 저장소(v4)가 그 파일을 갈아치우자 v6 의 밀어 올리기가 전부 막혔다.
+# 검사 결과가 저장소 밖 상태에 좌우되면 그 검사는 이 저장소의 판정이 아니다.
+# 서버에는 그 경로가 없어 이 결합은 로컬에만 존재했다 — P15③(로컬 전용 검사는
+# 없는 것으로 친다)에 따라 결합 자체를 없앤다. 이 검사는 자기 자신도 대상에 넣는다(P13④).
+checked=$((checked + 1))
+outside_refs=$(grep -nE '(^|[^A-Za-z0-9_/])/(Users|home)/[A-Za-z0-9._-]+/' \
+  scripts/acceptance-*.sh scripts/verify/*.sh hooks/pre-commit hooks/pre-push 2>/dev/null |
+  grep -vE '^[^:]+:[0-9]+:[[:space:]]*#' || true)
+if [ -z "$outside_refs" ]; then
+  echo "PASS: C15 검사 스크립트가 저장소 밖 절대경로를 참조하지 않는다"
+else
+  printf 'FAIL: C15 저장소 밖 절대경로 참조 — 검사 결과가 외부 상태에 좌우된다\n%s\n' "$outside_refs"
+  fail=1
+fi
+
 SKILL_TMP="$TMP/skills"
 mkdir -p "$SKILL_TMP"
 if [ "${STRICT_SKILL_FIXTURE_MODE:-0}" != "1" ] &&
