@@ -79,24 +79,24 @@ Work Unit 안에서 찾는 것은 “이 주장 하나가 참인가?”이고, P
 
 **When** 하나의 목표가 여러 독립 주장을 포함하면, 시스템은 목표를 Work Unit 1~5개로 나누고 각 Work Unit을 하나의 주장과 완료 커밋 경계로 기록해야 합니다.
 
-- 검증 명령: `bash scripts/acceptance-principles-check.sh`
-- 기대값: 종료값 0, `WORK_UNIT_METHOD: PASS 28/28`. 하나의 주장, 완료 커밋, PR 상한, 브랜치 수명, 검토 보정, squash 경계가 모두 정본 계약으로 직접 검사됩니다.
+- 검증 명령: `bash scripts/acceptance-work-unit-policy.sh`
+- 기대값: 종료값 0, `POLICY_CHECKED: 19`, `DOCUMENT_SYNC: PASS`. 하나의 주장, 완료 커밋, PR 상한, 브랜치 수명, 검토 보정, squash 경계가 구조화된 정책으로 직접 검사됩니다.
 - counter-AC: Work Unit을 파일 단위로 정의, 여러 Work Unit을 한 완료 커밋에 혼합, squash 뒤 개별 커밋 revert 가능하다고 기록.
 
 ### AC-2 — 두 층의 검증
 
 **When** Work Unit 구현이 끝나면, 시스템은 해당 AC와 작은 반증을 먼저 실행하고, 모든 Work Unit 뒤에는 strict·codeaudit·전체 적대검증·CI를 별도로 실행해야 합니다.
 
-- 검증 명령: `bash scripts/acceptance-principles-check.sh`
-- 기대값: 종료값 0, `WORK_UNIT_METHOD: PASS 28/28`. Work Unit과 PR 전체 검사의 질문·시점, pre-push 비대체 관계, 고위험 검토 등급·비용·신뢰 경계가 모두 정본 계약으로 직접 검사됩니다.
+- 검증 명령: `bash scripts/acceptance-work-unit-policy.sh`
+- 기대값: 종료값 0, `POLICY_CHECKED: 19`, `DOCUMENT_SYNC: PASS`. Work Unit과 PR 전체 검사의 순서, 고위험 검토 등급·비용·롤백 경계가 구조화된 정책으로 직접 검사됩니다.
 - counter-AC: Work Unit마다 full codeaudit 강제, 최종 통합 검사를 삭제, CI 초록을 로컬 PASS로 대체.
 
-### AC-3 — 방법론 의미 반전 차단
+### AC-3 — 구조화 정책과 생성 문서 변조 차단
 
-**When** Work Unit 정본의 핵심 문장을 삭제·완화·반전하면, 기존 원칙 mutation 게이트는 해당 사본을 실패시켜야 합니다.
+**When** Work Unit 정책의 값·순서·스키마를 바꾸거나 생성 문서에 예외 문장을 덧붙이면, 정책 mutation 게이트는 해당 사본을 실패시켜야 합니다.
 
-- 검증 명령: `bash scripts/acceptance-principles-mutations.sh`
-- 기대값: 종료값 0, `CHECKED: 53`, `VERDICT: PASS`. 정상 fixture는 통과하고 Work Unit 신규 반례 13개는 모두 기대한 `FAIL`을 관측합니다.
+- 검증 명령: `bash scripts/acceptance-work-unit-policy-mutations.sh`
+- 기대값: 종료값 0, `CHECKED: 19`, `VERDICT: PASS`. 정상 정책은 통과하고 값·순서·스키마·생성 문서 반례 17개는 모두 기대한 `FAIL`을 관측하며 원본 저장소는 불변입니다.
 - counter-AC: `전체 적대검증 생략`, pre-push로 최종 관문 대체, 고위험 경로 삭제, 문서 REVIEW만으로 고위험 WU PASS, WU·브랜치 상한 완화.
 
 ## Work Unit 장부
@@ -106,8 +106,24 @@ Work Unit 안에서 찾는 것은 “이 주장 하나가 참인가?”이고, P
 | WU-01 | 목표·Work Unit·커밋·PR의 관계가 하나의 주장 단위 검토를 보존합니다. | 계약 RED | L3(SOT) | `4dd2e97`, `87b526a`, `cbe3d6b` | PASS | Codex 실행 REVIEW·codeaudit 승인 |
 | WU-02 | Work Unit 표적 검사와 PR 전체 통합 검사가 서로 다른 질문과 시점으로 분리됩니다. | WU-01 | L3(SOT) | `9a3c862`, `87b526a`, `cbe3d6b` | PASS | Codex 실행 REVIEW·codeaudit 승인 |
 | WU-03 | Work Unit 계약의 삭제·완화·의미 반전을 기존 원칙 게이트가 실패시킵니다. | WU-01, WU-02 | L3(검증 장치) | `2c05ab2`, `659e709`(RED), `58043bb`, `8b7a44b`(GREEN), `cbe3d6b` | PASS | 28/28·53/53·pre-push 승인 |
-| WU-04 | Work Unit의 기계 계약은 자연어가 아니라 구조화된 정책 한 벌에서 판정됩니다. | WU-03 | L3(SOT·검증 장치) | RED 계약 | FAIL | 정책·생성 문서·판정기 미구현 |
-| WU-05 | 정책값·순서·스키마·생성 문서의 우회가 고장 사본에서 전부 실패합니다. | WU-04 | L3(검증 장치) | RED 계약 | FAIL | 동의어 우회 3건 포함 반례 미구현 |
+| WU-04 | Work Unit의 기계 계약은 자연어가 아니라 구조화된 정책 한 벌에서 판정됩니다. | WU-03 | L3(SOT·검증 장치) | `dc2dad9`(RED), `28155fc`(GREEN) | PASS | 정책 19건·생성 문서 byte-exact 일치 |
+| WU-05 | 정책값·순서·스키마·생성 문서의 우회가 고장 사본에서 전부 실패합니다. | WU-04 | L3(검증 장치) | `dc2dad9`(RED), `28155fc`(GREEN) | PASS | 정상 1건·고장 사본 17건·원본 불변 1건 |
+
+### 구조화 정책 보정 — RED→GREEN
+
+RED 커밋 `dc2dad9`은 구조화 정책·생성 문서·검사기가 없는 상태와 값·순서·스키마·동의어 우회 반례를 먼저 고정했습니다. GREEN 커밋 `28155fc`은 `docs/sot/work-unit-policy.yaml`을 유일한 정책 입력으로 삼고, 사람용 문서를 결정적으로 생성하며, 기존 원칙 검사에서 Work Unit 자연어 문장·금지 정규식을 제거했습니다.
+
+```text
+bash scripts/acceptance-work-unit-policy.sh: CHECKED 5, VERDICT PASS
+ruby scripts/verify/check-work-unit-policy.rb: POLICY_CHECKED 19, DOCUMENT_SYNC PASS
+bash scripts/acceptance-work-unit-policy-mutations.sh: CHECKED 19, VERDICT PASS
+bash scripts/acceptance-semantic-mutations.sh: CHECKED 10, VERDICT PASS
+bash scripts/verify/check-mechanism-registry.sh: CHECKED 16
+bash scripts/acceptance-verify-ac-m.sh: CHECKED 31
+workflow/SOT step names: 25/25, diff 없음
+```
+
+→ 자연어 표현은 생성 출력일 뿐 판정 입력이 아니다. 정책값·키·순서가 달라지거나 생성 문서에 예외 동의어를 덧붙이면 격리 사본 검사가 실패한다.
 
 ### RED 계약
 
