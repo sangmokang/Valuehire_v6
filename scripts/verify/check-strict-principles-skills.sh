@@ -2,8 +2,14 @@
 # 두 Strict 스킬의 공통 원칙 직접 로드 계약과 플랫폼별 엔진 순서를 검증한다.
 set -uo pipefail
 
-CODEX_SKILL=${1:-/Users/kangsangmo/.codex/skills/strict/SKILL.md}
-CLAUDE_SKILL=${2:-/Users/kangsangmo/.claude/skills/strict/SKILL.md}
+# 기본값을 두지 않는다. 예전에는 개인 전역 지침 파일이 기본값이라, 인자 없이 부르면
+# 저장소 밖 상태를 판정하고 그 결과가 배송을 막았다(2026-08-21). 대상은 부르는 쪽이 정한다.
+if [ -z "${1:-}" ] || [ -z "${2:-}" ]; then
+  echo 'FAIL: 검사 대상 두 경로를 인자로 받아야 한다 — 사용법: $0 <codex-skill.md> <claude-skill.md>'
+  exit 2
+fi
+CODEX_SKILL=$1
+CLAUDE_SKILL=$2
 
 for file in "$CODEX_SKILL" "$CLAUDE_SKILL"; do
   if [ ! -f "$file" ] || [ -L "$file" ] || [ ! -s "$file" ]; then
