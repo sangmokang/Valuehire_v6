@@ -168,7 +168,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 def _load_contract(channel: str) -> MarkerContract:
     try:
         raw = json.loads(_CONTRACT_PATH.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
         raise ObservationError("marker contract is unavailable") from exc
     if not isinstance(raw, dict) or raw.get("channel") != channel:
         raise ObservationError("marker contract channel is invalid")
