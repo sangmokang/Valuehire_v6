@@ -73,10 +73,11 @@ legacy_scan() {
     return 2
   fi
 
+  # 종료값 계약은 0=정상(위반 0건) · 1=위반 발견 · 2=스캔 무효.
+  # 현재 워크플로 인라인도 같은 관례(exit $hit, 무효는 exit 2)이므로 그대로 넘긴다.
   (cd "$fixture" && bash -c "$body") || raw_rc=$?
   case "$raw_rc" in
-    0) return 1 ;;
-    1) return 0 ;;
+    0|1|2) return "$raw_rc" ;;
     *) return 2 ;;
   esac
 }
@@ -119,14 +120,14 @@ make_fixture "$large_match"
 { printf '%s\n' "$CANARY"; dd if=/dev/zero bs=1048576 count=20 2>/dev/null; } > "$large_match/large.bin"
 git -C "$large_match" add -f large.bin
 git -C "$large_match" commit -qm large-match
-expect_rc "20MiB 이상 blob 첫 줄 매치 → 위반" 0 "$large_match" run_scanner
+expect_rc "20MiB 이상 blob 첫 줄 매치 → 위반" 1 "$large_match" run_scanner
 
 small_match="$TMP/small-match"
 make_fixture "$small_match"
 printf '%s\n' "$CANARY" > "$small_match/small.txt"
 git -C "$small_match" add small.txt
 git -C "$small_match" commit -qm small-match
-expect_rc "작은 blob 매치 → 위반" 0 "$small_match" run_scanner
+expect_rc "작은 blob 매치 → 위반" 1 "$small_match" run_scanner
 
 broken_regex="$TMP/broken-regex"
 make_fixture "$broken_regex"
@@ -179,7 +180,7 @@ expect_rc "blob 0개 → 스캔 무효" 2 "$zero_blobs" run_scanner
 
 clean="$TMP/clean"
 make_fixture "$clean"
-expect_rc "깨끗한 합성 저장소 → 위반 0건" 1 "$clean" run_scanner
+expect_rc "깨끗한 합성 저장소 → 위반 0건" 0 "$clean" run_scanner
 
 current=$(git status --porcelain)
 if [ "$current" = "$SNAPSHOT" ]; then
