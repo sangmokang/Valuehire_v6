@@ -1,6 +1,9 @@
 {
   "channel": "saramin",
   "diagnostic_host": "127.0.0.1",
+  "diagnostic_ports": [
+    9225
+  ],
   "targets_path": "/json/list",
   "allowed_origins": [
     "https://hiring.saramin.co.kr"

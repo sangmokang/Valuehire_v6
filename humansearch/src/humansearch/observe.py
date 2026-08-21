@@ -47,6 +47,7 @@ class MarkerContract:
 
     channel: str
     diagnostic_host: str
+    diagnostic_ports: frozenset[int]
     targets_path: str
     allowed_origins: frozenset[str]
     surface_markers: tuple[str, ...]
@@ -121,6 +122,8 @@ def observe_once(channel: str, port: int) -> tuple[AuthSurfaceState, str, Surfac
     """Perform the one allowed target-list read and one DOM marker evaluation."""
 
     contract = _load_contract(channel)
+    if port not in contract.diagnostic_ports:
+        raise ObservationError("diagnostic port is outside channel contract")
     targets = _fetch_targets(contract, port)
     target = select_single_target(targets, contract.allowed_origins)
     expression = _marker_expression(contract)
@@ -163,12 +166,16 @@ def _load_contract(channel: str) -> MarkerContract:
     if not isinstance(raw, dict) or raw.get("channel") != channel:
         raise ObservationError("marker contract channel is invalid")
     host = raw.get("diagnostic_host")
+    ports = raw.get("diagnostic_ports")
     targets_path = raw.get("targets_path")
     origins = raw.get("allowed_origins")
     surface_markers = raw.get("surface_markers")
     role_markers = raw.get("role_markers")
-    if not isinstance(host, str) or host != "127.0.0.1" or not _valid_targets_path(
-        targets_path
+    if (
+        not isinstance(host, str)
+        or host != "127.0.0.1"
+        or not _valid_ports(ports)
+        or not _valid_targets_path(targets_path)
     ):
         raise ObservationError("diagnostic endpoint contract is invalid")
     if not _string_list(origins) or not all(_valid_origin(item) for item in origins):
@@ -187,6 +194,7 @@ def _load_contract(channel: str) -> MarkerContract:
     return MarkerContract(
         channel=channel,
         diagnostic_host=host,
+        diagnostic_ports=frozenset(ports),
         targets_path=targets_path,
         allowed_origins=frozenset(origins),
         surface_markers=tuple(surface_markers),
@@ -270,6 +278,12 @@ def _valid_targets_path(value: object) -> TypeGuard[str]:
         and "?" not in value
         and "#" not in value
         and "//" not in value
+    )
+
+
+def _valid_ports(value: object) -> TypeGuard[list[int]]:
+    return isinstance(value, list) and bool(value) and all(
+        type(item) is int and 1 <= item <= 65535 for item in value
     )
 
 
