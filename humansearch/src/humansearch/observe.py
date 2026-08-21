@@ -233,7 +233,7 @@ def _fetch_targets(contract: MarkerContract, port: int) -> list[object]:
         raise ObservationError("target list response exceeded the read limit")
     try:
         payload = json.loads(body)
-    except json.JSONDecodeError as exc:
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
         raise ObservationError("target list response is invalid") from exc
     if not isinstance(payload, list):
         raise ObservationError("target list response is invalid")
