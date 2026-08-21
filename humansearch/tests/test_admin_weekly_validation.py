@@ -62,6 +62,28 @@ def test_candidate_key_requires_lowercase_hmac_sha256_shape() -> None:
         )
 
 
+def test_build_weekly_snapshot_rejects_a_duck_typed_extra_source_state() -> None:
+    """An untracked mapping key must be checked too, not just the ones a metric reads.
+
+    Every source_states entry feeds the input hash before any metric consumes it,
+    so a fake object smuggled in under an unused key must be rejected up front.
+    """
+
+    contract = load_metric_contract(CONTRACT_PATH)
+    states = source_states()
+    states["unused_collection"] = cast(
+        SourceState, SimpleNamespace(status=MetricStatus.NOT_RUN, reason="victim@example.test")
+    )
+
+    with pytest.raises(TypeError, match="SourceState"):
+        build_weekly_snapshot(
+            meeting_date_kst="2026-08-17",
+            events=[],
+            source_states=states,
+            metric_contract=contract,
+        )
+
+
 def test_build_weekly_snapshot_rejects_a_duck_typed_source_state() -> None:
     """A caller must not smuggle a look-alike object past the SourceState contract."""
 

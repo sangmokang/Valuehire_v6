@@ -1,5 +1,6 @@
 """Acceptance tests for pre-live source, retention, and identity decisions."""
 
+import dataclasses
 import json
 import os
 import subprocess
@@ -14,16 +15,19 @@ from humansearch.admin_weekly_dashboard.contracts import (
     SourceFailureReason,
     SourceState,
 )
+from humansearch.admin_weekly_dashboard.source_contract import (
+    CandidateLinkDecision,
+    SupabaseSource,
+    load_source_policy,
+)
 from humansearch.admin_weekly_dashboard.source_policy import (
     FAIL_ONLY_REASONS,
     NOT_RUN_ONLY_REASONS,
     CalendarReference,
     CalendarResolution,
     CandidateIdentityEvidence,
-    CandidateLinkDecision,
     candidate_link_decision,
     collection_state,
-    load_source_policy,
     resolve_calendar_alias,
 )
 from humansearch.admin_weekly_dashboard.source_policy_cli import main as source_policy_main
@@ -155,6 +159,69 @@ def test_source_contract_rejects_unsafe_policy_mutations(
 
     with pytest.raises(ValueError, match=error):
         load_source_policy(mutated)
+
+
+def test_source_policy_rejects_a_direct_replace_that_turns_on_gmail_raw_copies() -> None:
+    """A caller must not bypass load_source_policy() via dataclasses.replace()."""
+
+    policy = load_source_policy(SOURCE_CONTRACT)
+    with pytest.raises(ValueError, match="gmail_raw_permanent_copy"):
+        dataclasses.replace(policy, gmail_raw_permanent_copy=True)
+
+
+def test_source_policy_rejects_a_direct_replace_that_turns_on_auto_merge() -> None:
+    policy = load_source_policy(SOURCE_CONTRACT)
+    with pytest.raises(ValueError, match="candidate_auto_merge"):
+        dataclasses.replace(policy, candidate_auto_merge=True)
+
+
+def test_source_policy_rejects_a_truthy_non_bool_gmail_raw_copy_flag() -> None:
+    """The string "false" is truthy in Python and must not slip past the check."""
+
+    policy = load_source_policy(SOURCE_CONTRACT)
+    with pytest.raises(ValueError, match="gmail_raw_permanent_copy"):
+        dataclasses.replace(policy, gmail_raw_permanent_copy=cast(bool, "false"))
+
+
+def test_source_policy_rejects_an_unapproved_supabase_table_substitution() -> None:
+    policy = load_source_policy(SOURCE_CONTRACT)
+    forged = dict(policy.supabase_tables)
+    forged["gmail_events"] = SupabaseSource(
+        table="public.gmail_messages",
+        select_fields=("body_text", "from_email"),
+        processing="AGGREGATE_READ_ONLY",
+    )
+    with pytest.raises(ValueError, match="approved existing Supabase source"):
+        dataclasses.replace(policy, supabase_tables=forged)
+
+
+def test_source_policy_rejects_a_duck_typed_supabase_table_entry() -> None:
+    class FakeSource:
+        table = "public.pipeline_candidates"
+        select_fields = ("clickup_task_id", "name", "resume_data", "last_synced_at")
+        processing = "TRANSIENT_IDENTITY_REVIEW"
+
+    policy = load_source_policy(SOURCE_CONTRACT)
+    forged = dict(policy.supabase_tables)
+    forged["candidate_cards"] = FakeSource()  # type: ignore[assignment]
+    with pytest.raises(TypeError, match="SupabaseSource"):
+        dataclasses.replace(policy, supabase_tables=forged)
+
+
+def test_supabase_source_rejects_an_unsupported_processing_mode() -> None:
+    with pytest.raises(ValueError, match="processing mode"):
+        SupabaseSource(
+            table="public.gmail_messages",
+            select_fields=("body_text",),
+            processing="RAW_EXPORT",
+        )
+
+
+def test_calendar_reference_rejects_a_padded_calendar_id() -> None:
+    """A leading/trailing-space id must not silently widen the exact-match contract."""
+
+    with pytest.raises(ValueError, match="whitespace"):
+        CalendarReference(calendar_id="  cal-1  ", summary="unrelated")
 
 
 @pytest.mark.parametrize(

@@ -30,6 +30,10 @@ def build_weekly_snapshot(
 ) -> WeeklySnapshot:
     """Build all card values and provenance from one immutable logical input."""
 
+    for source_collection, state in source_states.items():
+        if not isinstance(state, SourceState):
+            raise TypeError(f"source state for {source_collection!r} must be a SourceState")
+
     window = weekly_window(meeting_date_kst)
     input_sha256 = _input_sha256(window, events, source_states, metric_contract.version)
     metrics = {

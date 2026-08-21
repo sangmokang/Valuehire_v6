@@ -16,16 +16,13 @@ from .contracts import (
     load_metric_contract,
 )
 from .snapshot import build_weekly_snapshot
+from .source_contract import CandidateLinkDecision, SourcePolicy, SupabaseSource, load_source_policy
 from .source_policy import (
     CalendarReference,
     CalendarResolution,
     CandidateIdentityEvidence,
-    CandidateLinkDecision,
-    SourcePolicy,
-    SupabaseSource,
     candidate_link_decision,
     collection_state,
-    load_source_policy,
     resolve_calendar_alias,
 )
 from .weekly_window import WeeklyWindow, weekly_window

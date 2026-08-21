@@ -7,7 +7,7 @@ import json
 from collections.abc import Sequence
 from pathlib import Path
 
-from .source_policy import load_source_policy
+from .source_contract import load_source_policy
 
 
 def main(argv: Sequence[str] | None = None) -> int:
