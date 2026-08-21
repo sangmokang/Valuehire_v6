@@ -205,4 +205,52 @@ while IFS= read -r f; do
   esac
 done <<< "$staged"
 
+# ── 8) P3 조용한 실패 — 스테이지된 확정본만 검사한다 ────────────────────────
+# 작업트리를 읽으면 `git add bad.js` 뒤 작업트리만 고쳐 커밋을 우회할 수 있다.
+p3_files=()
+while IFS= read -r -d '' f; do
+  case "$f" in
+    *.py|*.js|*.jsx|*.mjs|*.cjs|*.ts|*.tsx|*.mts|*.cts) p3_files+=("$f") ;;
+  esac
+done < <(git diff --cached --name-only -z --diff-filter=ACMR)
+
+if [ "${#p3_files[@]}" -gt 0 ]; then
+  p3_tmp=$(mktemp -d) || p3_tmp=""
+  if [ -z "$p3_tmp" ]; then
+    block "P3 임시 검사 공간 생성 실패 (fail-closed)"
+  elif ! git cat-file -e ":scripts/acceptance-silent-failure-lint.sh" 2>/dev/null; then
+    block "P3 린터가 인덱스에 없다 — scripts/acceptance-silent-failure-lint.sh"
+  else
+    mkdir -p "$p3_tmp/tree"
+    git show ":scripts/acceptance-silent-failure-lint.sh" > "$p3_tmp/lint.sh"
+    p3_stage_error=0
+    for f in "${p3_files[@]}"; do
+      mkdir -p "$p3_tmp/tree/$(dirname "$f")"
+      if ! git show ":$f" > "$p3_tmp/tree/$f"; then
+        block "P3가 스테이지된 파일을 읽지 못했다 — $f"
+        p3_stage_error=1
+      fi
+    done
+    if [ "$p3_stage_error" -eq 0 ]; then
+      p3_rc=0
+      p3_repo=$PWD
+      if cd "$p3_tmp/tree"; then
+        bash ${p3_tmp}/lint.sh "${p3_files[@]}" > "$p3_tmp/output" 2>&1 || p3_rc=$?
+        cd "$p3_repo" || block "P3 검사 뒤 저장소 루트로 복귀하지 못했다"
+      else
+        p3_rc=2
+      fi
+      if [ "$p3_rc" -eq 1 ]; then
+        first_hit=$(grep '^FAIL:' "$p3_tmp/output" | head -1 | sed 's/ — .*//')
+        block "조용한 실패 패턴 발견 (P3) — ${first_hit:-상세 없음}"
+      elif [ "$p3_rc" -ne 0 ]; then
+        block "P3 린터가 판정을 완료하지 못했다 (exit=$p3_rc, fail-closed)"
+      fi
+    fi
+  fi
+  if [ -n "${p3_tmp:-}" ]; then
+    ruby -rfileutils -e 'FileUtils.remove_entry(ARGV[0]) if File.exist?(ARGV[0])' "$p3_tmp"
+  fi
+fi
+
 exit "$fail"

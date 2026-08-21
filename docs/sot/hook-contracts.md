@@ -1,6 +1,6 @@
 # Valuehire v6 — 로컬 강제 장치(git hook) 계약 (SOT)
 
-최종 갱신: 2026-08-08
+최종 갱신: 2026-08-22
 근거(도입 배경·적대검증·6종 위반 시연): `docs/engineering/hook-enforcement-goal-2026-08-07.md`
 
 ## 현재 규칙 — 입출력 계약
@@ -23,6 +23,9 @@
           앵커가 없으면 src/data/schema.json 같은 정상 소스가 조용히 사라진다(P3).
           CI 등가물: `.github/workflows/verify.yml` 의 "대용량 파일 · 산출물 경로 스캔"
           (훅은 이번 커밋의 스테이지분만, CI 는 추적 파일 전체를 본다)
+        ⑧ P3 조용한 실패 문법. 스테이지된 Python/JavaScript 계열 blob을 같은 커밋의
+          `scripts/acceptance-silent-failure-lint.sh`로 검사한다. 작업트리 사본은 판정에
+          사용하지 않는다. CI는 같은 린터와 mutation 회귀를 전체 추적 파일에 실행한다
 불변식: set -euo pipefail. 검사를 실행하지 못하면 exit 1 (fail-closed)
 제외  : 없음. 자기 자신(hooks/)도 검사 대상이다
 ```
