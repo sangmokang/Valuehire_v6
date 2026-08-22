@@ -188,7 +188,8 @@ expect "다른 lexical scope의 Map capture는 자동 예외 아님" "$TMP/enclo
 
 cat > "$TMP/type-namespace-map.ts" <<'EOF'
 const Cache = new Map();
-const values = rows.map((value: Cache) => Cache.get(value) || []);
+const annotate = (value: Cache) => value;
+const values = Cache.get("items") || [];
 EOF
 expect "타입 이름은 값 Map binding을 가리지 않음" "$TMP/type-namespace-map.ts" 0 "PASS:"
 
