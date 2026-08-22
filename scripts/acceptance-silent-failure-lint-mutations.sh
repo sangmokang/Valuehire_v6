@@ -271,8 +271,8 @@ if [ "$hook_setup" -eq 0 ]; then
     record 1 "pre-commit은 작업트리 미끼 대신 정상 index blob 판정" "exit=$hook_rc output=${hook_output//$'\n'/ | }"
   fi
 
-  printf 'const items = response.items || [];\n' > "$HOOK_REPO/p3-bad.JS"
-  git -C "$HOOK_REPO" add p3-bad.JS
+  printf 'const items = response.items || [];\n' > "$HOOK_REPO/p3-uppercase-bad.JS"
+  git -C "$HOOK_REPO" add p3-uppercase-bad.JS
   hook_rc=0
   hook_output=$(cd "$HOOK_REPO" && bash hooks/pre-commit 2>&1) || hook_rc=$?
   if [ "$hook_rc" -eq 1 ] && printf '%s\n' "$hook_output" | grep -Fq "조용한 실패 패턴 발견 (P3)"; then
