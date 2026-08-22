@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Strict 원칙 계약의 정상 fixture, 14개 반례, 500/501 경계를 격리 사본에서 실행한다.
+# Strict 원칙 계약의 정상 fixture, 반례, 500/501 경계를 격리 사본에서 실행한다.
 set -uo pipefail
 
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY \

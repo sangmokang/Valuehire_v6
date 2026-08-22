@@ -1,0 +1,37 @@
+version: 1
+title: "Work Unit policy"
+work_unit:
+  claims_per_unit: 1
+  max_units_per_pr: 5
+  max_branch_lifetime_hours: 48
+  completion_requires:
+    - local_validation
+    - adversarial_checks_1_to_3
+    - completion_commit
+pull_request:
+  final_gates:
+    - strict
+    - codeaudit
+    - integrated_adversarial
+    - pull_request
+    - github_verify
+    - merge
+  squash_rollback_boundary: pull_request
+review:
+  high_risk:
+    paths:
+      - ".github/workflows/**"
+      - "hooks/**"
+      - "scripts/acceptance-*"
+      - "verify*"
+      - "mechanism-registry"
+      - "비밀·후보자 데이터 노출 검사"
+      - "배포·인증·로그인"
+    execution_review_required: true
+    document_review_can_pass: false
+    paid_external_review_required: false
+enforcement:
+  policy_source: "docs/sot/work-unit-policy.yaml"
+  generated_document: "docs/sot/work-unit-policy.md"
+  checker: "scripts/verify/check-work-unit-policy.rb"
+  renderer: "scripts/verify/render-work-unit-policy.rb"

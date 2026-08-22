@@ -39,6 +39,24 @@
   stage: "ci"
   ci_mirror_job: "verify"
   required: true
+- id: "work-unit-policy-local-check"
+  path: "scripts/acceptance-work-unit-policy.sh"
+  target: "VERDICT: PASS"
+  stage: "manual"
+  manual_reason: "구조화 정책과 생성 문서의 원명령"
+  required: true
+- id: "work-unit-policy-explicit-ci"
+  path: ".github/workflows/verify.yml"
+  target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-work-unit-policy.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
+- id: "work-unit-policy-mutations-ci"
+  path: ".github/workflows/verify.yml"
+  target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-work-unit-policy-mutations.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
 - id: "acceptance-runner-ci"
   path: ".github/workflows/verify.yml"
   target: "bash scripts/verify/run-acceptance.sh"
@@ -81,4 +99,3 @@
   stage: "manual"
   manual_reason: "원격 조회가 필요해 CI 안에서 자기 SHA 를 검사하는 것은 뜻이 없다. 머지 전 판정 도구"
   required: true
-
