@@ -163,6 +163,21 @@ function load() {
 EOF
 expect "Map 이름을 가린 내부 선언은 예외 아님" "$TMP/shadowed-map-local.js" 1 "or-empty-array-fallback"
 
+cat > "$TMP/shadowed-map-arrow.js" <<'EOF'
+const grouped = new Map();
+const values = rows.map(grouped => grouped.get("items") || []);
+EOF
+expect "Map 이름을 가린 화살표 매개변수는 예외 아님" "$TMP/shadowed-map-arrow.js" 1 "or-empty-array-fallback"
+
+cat > "$TMP/shadowed-map-multi-declaration.js" <<'EOF'
+const grouped = new Map();
+function load() {
+  const marker = true, grouped = api;
+  return grouped.get("items") || [];
+}
+EOF
+expect "다중 지역 선언의 Map 이름 가림도 예외 아님" "$TMP/shadowed-map-multi-declaration.js" 1 "or-empty-array-fallback"
+
 cat > "$TMP/enclosing-map.js" <<'EOF'
 function load(keys) {
   const grouped = new Map();
