@@ -184,7 +184,7 @@ function load(keys) {
   return keys.map((key) => grouped.get(key) || []);
 }
 EOF
-expect "둘러싼 유효 범위의 const Map은 예외 유지" "$TMP/enclosing-map.js" 0 "PASS:"
+expect "다른 lexical scope의 Map capture는 자동 예외 아님" "$TMP/enclosing-map.js" 1 "or-empty-array-fallback"
 
 cat > "$TMP/type-namespace-map.ts" <<'EOF'
 const Cache = new Map();
@@ -199,6 +199,33 @@ if (enabled) {
 const values = grouped.get("items") || [];
 EOF
 expect "다른 블록의 Map 이름은 예외로 새지 않음" "$TMP/escaped-block-map.js" 1 "or-empty-array-fallback"
+
+cat > "$TMP/function-shadow-map.js" <<'EOF'
+const grouped = new Map();
+function load() {
+  function grouped() {}
+  return grouped.get("items") || [];
+}
+EOF
+expect "지역 함수 binding은 바깥 Map 예외를 상속하지 않음" "$TMP/function-shadow-map.js" 1 "or-empty-array-fallback"
+
+cat > "$TMP/class-shadow-map.js" <<'EOF'
+const grouped = new Map();
+function load() {
+  class grouped {}
+  return grouped.get("items") || [];
+}
+EOF
+expect "지역 class binding은 바깥 Map 예외를 상속하지 않음" "$TMP/class-shadow-map.js" 1 "or-empty-array-fallback"
+
+cat > "$TMP/destructured-shadow-map.js" <<'EOF'
+const grouped = new Map();
+function load(api) {
+  const { grouped } = api;
+  return grouped.get("items") || [];
+}
+EOF
+expect "구조분해 binding은 바깥 Map 예외를 상속하지 않음" "$TMP/destructured-shadow-map.js" 1 "or-empty-array-fallback"
 
 cat > "$TMP/literals.jsx" <<'EOF'
 const text = "catch (error) {} and value ?? fallback";
