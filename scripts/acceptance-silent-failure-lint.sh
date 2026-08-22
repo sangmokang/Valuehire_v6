@@ -1,44 +1,34 @@
 #!/usr/bin/env bash
 # P3 "조용한 실패 금지"의 문법 판정 절반. 계약:
 #   사용법 : bash scripts/acceptance-silent-failure-lint.sh [파일...]
-#            인자가 없으면 추적 중인 py/js/jsx/ts/tsx 전체를 검사한다.
+#            인자가 없으면 추적 중인 Python/JavaScript 계열 파일을 확장자 대소문자와 무관하게 검사한다.
 #   출력   : 위반마다 FAIL: <file>:<line>: <패턴이름> — <해당 줄> 을 stdout에 출력
 #   종료   : 0 = 위반 없음 | 1 = 위반 발견 | 2 = NOT_RUN(스캔 성립 불가)
 #   불변식 : 검사 대상 0건, 파일 읽기 실패, 문법 토큰화 실패는 통과가 아니다(P20).
 # `const x = new Map(); x.get(k) || []`는 미존재를 빈 컬렉션으로 모델링한 예외다.
 set -uo pipefail
-
 if ! command -v python3 >/dev/null 2>&1; then
   echo "NOT_RUN: python3 없음 — 문법 판정기를 실행할 수 없음"
   exit 2
 fi
-
 python3 - "$@" <<'PY'
 from __future__ import annotations
-
 import ast
 import os
 import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-
 TARGET_SUFFIXES = {".py", ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts"}
-
-
 @dataclass(frozen=True)
 class Token:
     value: str
     line: int
-
-
 class ScanError(Exception):
     def __init__(self, line: int, message: str) -> None:
         super().__init__(message)
         self.line = line
         self.message = message
-
-
 class JSLexer:
     REGEX_PREFIXES = {
         None, "(", "[", "{", ",", ";", ":", "=", "==", "===", "!=", "!==",
@@ -51,9 +41,7 @@ class JSLexer:
         "==", "!=", "<=", ">=", "++", "--", "?.", "**", "<<", ">>", "+=", "-=",
         "*=", "/=", "%=", "&=", "|=", "^=", "...",
     )
-
     JSX_PREFIXES = {None, "=", "(", "[", "{", ",", ":", ";", "return", "=>", "?", "||", "&&"}
-
     def __init__(self, source: str, jsx_enabled: bool = False) -> None:
         self.source = source
         self.length = len(source)
@@ -61,11 +49,9 @@ class JSLexer:
         self.line = 1
         self.tokens: list[Token] = []
         self.jsx_enabled = jsx_enabled
-
     def peek(self, offset: int = 0) -> str:
         pos = self.index + offset
         return self.source[pos] if pos < self.length else ""
-
     def advance(self, count: int = 1) -> None:
         for _ in range(count):
             if self.index >= self.length:
@@ -73,10 +59,8 @@ class JSLexer:
             if self.source[self.index] == "\n":
                 self.line += 1
             self.index += 1
-
     def emit(self, value: str, line: int | None = None) -> None:
         self.tokens.append(Token(value, self.line if line is None else line))
-
     def skip_quoted(self, quote: str) -> None:
         start = self.line
         self.advance()
@@ -96,12 +80,10 @@ class JSLexer:
             else:
                 self.advance()
         raise ScanError(start, "닫히지 않은 문자열")
-
     def skip_line_comment(self) -> None:
         self.advance(2)
         while self.index < self.length and self.peek() not in "\r\n":
             self.advance()
-
     def skip_block_comment(self) -> None:
         start = self.line
         self.advance(2)
@@ -111,7 +93,6 @@ class JSLexer:
                 return
             self.advance()
         raise ScanError(start, "닫히지 않은 블록 주석")
-
     def skip_regex(self) -> None:
         start = self.line
         self.advance()
@@ -137,7 +118,6 @@ class JSLexer:
             else:
                 self.advance()
         raise ScanError(start, "닫히지 않은 정규식 리터럴")
-
     def scan_template(self) -> None:
         start = self.line
         self.advance()
@@ -158,7 +138,6 @@ class JSLexer:
             else:
                 self.advance()
         raise ScanError(start, "닫히지 않은 템플릿 문자열")
-
     def looks_like_jsx_start(self) -> bool:
         if not self.jsx_enabled or self.peek() != "<":
             return False
@@ -177,7 +156,6 @@ class JSLexer:
             if after < self.length and self.source[after] == "(":
                 return False
         return True
-
     def skip_jsx_quoted(self, quote: str) -> None:
         start = self.line
         self.advance()
@@ -191,7 +169,6 @@ class JSLexer:
             else:
                 self.advance()
         raise ScanError(start, "닫히지 않은 JSX 속성 문자열")
-
     def scan_jsx_element(self) -> None:
         start = self.line
         depth = 0
@@ -221,18 +198,15 @@ class JSLexer:
                     self.advance()
             else:
                 raise ScanError(start, "닫히지 않은 JSX 태그")
-
             if closing:
                 depth -= 1
                 if depth < 0:
                     raise ScanError(start, "대응하는 시작이 없는 JSX 닫기 태그")
             elif not self_closing:
                 depth += 1
-
             if depth == 0:
                 self.emit("<literal>", start)
                 return
-
             while self.index < self.length and self.peek() != "<":
                 if self.peek() == "{":
                     self.advance()
@@ -240,7 +214,6 @@ class JSLexer:
                 else:
                     self.advance()
         raise ScanError(start, "닫히지 않은 JSX 요소")
-
     def scan_identifier(self) -> None:
         start = self.index
         line = self.line
@@ -248,14 +221,12 @@ class JSLexer:
         while self.peek().isalnum() or self.peek() in "_$":
             self.advance()
         self.emit(self.source[start:self.index], line)
-
     def scan_number(self) -> None:
         line = self.line
         self.advance()
         while self.peek().isalnum() or self.peek() in "._":
             self.advance()
         self.emit("<literal>", line)
-
     def scan_code(self, stop_at_template_brace: bool = False) -> None:
         brace_depth = 0
         while self.index < self.length:
@@ -311,7 +282,6 @@ class JSLexer:
                 self.advance()
         if stop_at_template_brace:
             raise ScanError(self.line, "닫히지 않은 템플릿 보간식")
-
     def run(self) -> list[Token]:
         self.scan_code()
         stack: list[Token] = []
@@ -326,26 +296,22 @@ class JSLexer:
         if stack:
             raise ScanError(stack[-1].line, f"닫히지 않은 {stack[-1].value}")
         return self.tokens
-
-
 def source_line(lines: list[str], line: int) -> str:
     if 1 <= line <= len(lines):
         return lines[line - 1].strip()
     return ""
-
-
-def matching(tokens: list[Token], start: int, opening: str, closing: str) -> int | None:
+def matching(tokens: list[Token], start: int, opening: str, closing: str, step: int = 1) -> int | None:
     depth = 0
-    for index in range(start, len(tokens)):
+    first, second = (opening, closing) if step > 0 else (closing, opening)
+    for index in range(start, len(tokens) if step > 0 else -1, step):
         value = tokens[index].value
-        if value == opening:
+        if value == first:
             depth += 1
-        elif value == closing:
+        elif value == second:
             depth -= 1
             if depth == 0:
                 return index
     return None
-
 
 def unwrap_parentheses(values: list[str]) -> list[str]:
     current = values
@@ -365,14 +331,115 @@ def unwrap_parentheses(values: list[str]) -> list[str]:
         current = current[1:-1]
     return current
 
-def declared_map_names(tokens: list[Token]) -> set[str]:
-    return {
-        tokens[index - 2].value
-        for index in range(3, len(tokens) - 1)
-        if tokens[index - 3].value == "const" and tokens[index].value == "new" and tokens[index + 1].value == "Map" and tokens[index - 1].value == "="
-    }
+def is_identifier(value: str) -> bool:
+    return bool(value) and (value[0].isalpha() or value[0] in "_$") and all(
+        character.isalnum() or character in "_$" for character in value[1:]
+    )
 
-def is_declared_map_get(tokens: list[Token], operator: int, maps: set[str]) -> bool:
+def names_in_parameters(tokens: list[Token], opening: int, closing: int) -> set[str]:
+    names: set[str] = set()
+    nested = 0
+    expect_name = True
+    for token in tokens[opening + 1:closing]:
+        value = token.value
+        if value in "[{(":
+            nested += 1
+        elif value in "]})":
+            nested -= 1
+        elif nested == 0 and value == ",":
+            expect_name = True
+        elif nested == 0 and value in {":", "="}:
+            expect_name = False
+        elif expect_name and is_identifier(value):
+            names.add(value)
+            expect_name = False
+    return names
+
+def parameter_names(tokens: list[Token], opening_brace: int) -> set[str]:
+    before = opening_brace - 1
+    if before < 0:
+        return set()
+    if tokens[before].value == "=>":
+        before -= 1
+        if before >= 0 and is_identifier(tokens[before].value):
+            return {tokens[before].value}
+    if before < 0 or tokens[before].value != ")":
+        return set()
+    opening = matching(tokens, before, "(", ")", -1)
+    if opening is None:
+        return set()
+    marker = tokens[opening - 1].value if opening else ""
+    preceding = tokens[opening - 2].value if opening >= 2 else ""
+    is_signature = marker in {"catch", "function"} or preceding == "function"
+    is_signature = is_signature or (is_identifier(marker) and marker not in {"if", "for", "while", "switch", "with"})
+    if not is_signature:
+        return set()
+    return names_in_parameters(tokens, opening, before)
+
+def scope_model(tokens: list[Token]) -> tuple[list[int | None], list[dict[str, bool]], list[int]]:
+    parents: list[int | None] = [None]
+    bindings: list[dict[str, bool]] = [{}]
+    token_scopes = [0] * len(tokens)
+    stack = [0]
+    for index, token in enumerate(tokens):
+        if token.value == "{":
+            parents.append(stack[-1])
+            bindings.append({name: False for name in parameter_names(tokens, index)})
+            stack.append(len(parents) - 1)
+        token_scopes[index] = stack[-1]
+        if token.value in {"const", "let", "var"}:
+            cursor, depth, expects_name = index + 1, 0, True
+            while cursor < len(tokens):
+                value = tokens[cursor].value
+                if depth == 0 and value in {";", "}"}:
+                    break
+                if expects_name and depth == 0 and is_identifier(value):
+                    following = [item.value for item in tokens[cursor + 1:cursor + 4]]
+                    bindings[stack[-1]][value] = token.value == "const" and following == ["=", "new", "Map"]
+                    expects_name = False
+                if value in "([{":
+                    depth += 1
+                elif value in ")]}" and depth > 0:
+                    depth -= 1
+                elif value == "," and depth == 0:
+                    expects_name = True
+                cursor += 1
+        if token.value == "}" and len(stack) > 1:
+            stack.pop()
+    return parents, bindings, token_scopes
+
+def arrow_parameter_shadows(tokens: list[Token], operator: int, name: str) -> bool:
+    pairs = {")": "(", "]": "[", "}": "{"}
+    for arrow in range(operator):
+        if tokens[arrow].value != "=>" or arrow == 0:
+            continue
+        previous = tokens[arrow - 1].value
+        shadows = previous == name
+        if previous == ")":
+            opening = matching(tokens, arrow - 1, "(", ")", -1)
+            shadows = opening is not None and name in names_in_parameters(tokens, opening, arrow - 1)
+        if not shadows:
+            continue
+        depths = {"(": 0, "[": 0, "{": 0}
+        contains_operator = True
+        for item in tokens[arrow + 1:operator]:
+            value = item.value
+            if value in depths:
+                depths[value] += 1
+            elif value in pairs:
+                if depths[pairs[value]] == 0:
+                    contains_operator = False
+                    break
+                depths[pairs[value]] -= 1
+            elif value in {",", ";"} and not any(depths.values()):
+                contains_operator = False
+                break
+        if contains_operator:
+            return True
+    return False
+
+def is_declared_map_get(tokens: list[Token], operator: int, parents: list[int | None],
+                        bindings: list[dict[str, bool]], token_scopes: list[int]) -> bool:
     if operator < 5 or tokens[operator - 1].value != ")":
         return False
     depth = 0
@@ -380,12 +447,44 @@ def is_declared_map_get(tokens: list[Token], operator: int, maps: set[str]) -> b
         depth += tokens[cursor].value == ")"
         depth -= tokens[cursor].value == "("
         if depth == 0:
-            return cursor >= 3 and [item.value for item in tokens[cursor - 3:cursor]] == [tokens[cursor - 3].value, ".", "get"] and tokens[cursor - 3].value in maps
+            if cursor < 3 or [item.value for item in tokens[cursor - 2:cursor]] != [".", "get"]:
+                return False
+            name = tokens[cursor - 3].value
+            if arrow_parameter_shadows(tokens, operator, name):
+                return False
+            scope: int | None = token_scopes[operator]
+            while scope is not None:
+                if name in bindings[scope]:
+                    return bindings[scope][name]
+                scope = parents[scope]
+            return False
+    return False
+
+def contains_return_null(body: list[Token]) -> bool:
+    for index, token in enumerate(body):
+        if token.value != "return":
+            continue
+        values: list[str] = []
+        depths = {"(": 0, "[": 0, "{": 0}
+        for item in body[index + 1:]:
+            value = item.value
+            if value == ";" and not any(depths.values()):
+                break
+            if value == "}" and not any(depths.values()):
+                break
+            if value in depths:
+                depths[value] += 1
+            elif value in {")": "(", "]": "[", "}": "{"}:
+                opening = {")": "(", "]": "[", "}": "{"}[value]
+                depths[opening] -= 1
+            values.append(value)
+        if unwrap_parentheses(values) == ["null"]:
+            return True
     return False
 
 def js_findings(tokens: list[Token]) -> list[tuple[int, str]]:
     findings: list[tuple[int, str]] = []
-    maps = declared_map_names(tokens)
+    parents, bindings, token_scopes = scope_model(tokens)
     index = 0
     while index < len(tokens):
         token = tokens[index]
@@ -395,7 +494,7 @@ def js_findings(tokens: list[Token]) -> list[tuple[int, str]]:
             cursor = index + 1
             while cursor < len(tokens) and tokens[cursor].value == "(":
                 cursor += 1
-            if cursor + 1 < len(tokens) and tokens[cursor].value == "[" and tokens[cursor + 1].value == "]" and not is_declared_map_get(tokens, index, maps):
+            if cursor + 1 < len(tokens) and tokens[cursor].value == "[" and tokens[cursor + 1].value == "]" and not is_declared_map_get(tokens, index, parents, bindings, token_scopes):
                 findings.append((token.line, "or-empty-array-fallback"))
         elif token.value == "catch":
             cursor = index + 1
@@ -408,15 +507,12 @@ def js_findings(tokens: list[Token]) -> list[tuple[int, str]]:
                 end_body = matching(tokens, cursor, "{", "}")
                 if end_body is None:
                     raise ScanError(token.line, "닫히지 않은 catch 블록")
-                body = [item.value for item in tokens[cursor + 1:end_body]]
-                meaningful = [value for value in body if value != ";"]
+                body = tokens[cursor + 1:end_body]
+                meaningful = [item.value for item in body if item.value != ";"]
                 if not meaningful:
                     findings.append((token.line, "bare-catch"))
-                elif meaningful[0] == "return":
-                    returned_values = body[1:body.index(";")] if ";" in body else meaningful[1:]
-                    returned = unwrap_parentheses(returned_values)
-                    if returned == ["null"]:
-                        findings.append((token.line, "catch-return-null"))
+                elif contains_return_null(body):
+                    findings.append((token.line, "catch-return-null"))
         index += 1
     return findings
 
@@ -424,7 +520,7 @@ def collect_files(arguments: list[str]) -> list[str]:
     if arguments:
         return arguments
     result = subprocess.run(
-        ["git", "ls-files", "-z", "--", "*.py", "*.js", "*.jsx", "*.mjs", "*.cjs", "*.ts", "*.tsx", "*.mts", "*.cts"],
+        ["git", "ls-files", "-z"],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         check=False,
@@ -480,11 +576,9 @@ def main() -> int:
             print(f"NOT_RUN: {filename}:{error.line}: JavaScript/TypeScript 토큰 판정 실패 — {error.message}")
             invalid += 1
             continue
-
         for line, marker in findings:
             print(f"FAIL: {filename}:{line}: {marker} — {source_line(lines, line)}")
             violations += 1
-
     print(f"CHECKED_FILES: {len(files)}")
     if invalid:
         print(f"NOT_RUN: 문법 판정 실패 파일 {invalid}건(스캔 무효, P20 fail-closed)")
@@ -494,7 +588,5 @@ def main() -> int:
         return 1
     print("PASS: 조용한 실패 패턴 0건 (선언된 Map.get 컬렉션 기본값은 허용)")
     return 0
-
-
 raise SystemExit(main())
 PY

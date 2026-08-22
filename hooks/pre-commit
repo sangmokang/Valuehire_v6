@@ -209,7 +209,8 @@ done <<< "$staged"
 # 작업트리를 읽으면 `git add bad.js` 뒤 작업트리만 고쳐 커밋을 우회할 수 있다.
 p3_files=()
 while IFS= read -r -d '' f; do
-  case "$f" in
+  p3_path=$(printf '%s' "$f" | tr '[:upper:]' '[:lower:]')
+  case "$p3_path" in
     *.py|*.js|*.jsx|*.mjs|*.cjs|*.ts|*.tsx|*.mts|*.cts) p3_files+=("$f") ;;
   esac
 done < <(git diff --cached --name-only -z --diff-filter=ACMR)

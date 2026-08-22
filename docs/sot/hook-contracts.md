@@ -23,7 +23,8 @@
           앵커가 없으면 src/data/schema.json 같은 정상 소스가 조용히 사라진다(P3).
           CI 등가물: `.github/workflows/verify.yml` 의 "대용량 파일 · 산출물 경로 스캔"
           (훅은 이번 커밋의 스테이지분만, CI 는 추적 파일 전체를 본다)
-        ⑧ P3 조용한 실패 문법. 스테이지된 Python/JavaScript 계열 blob을 같은 커밋의
+        ⑧ P3 조용한 실패 문법. 확장자를 소문자로 정규화해 스테이지된 Python/JavaScript
+          계열 blob을 같은 커밋의
           `scripts/acceptance-silent-failure-lint.sh`로 검사한다. 작업트리 사본은 판정에
           사용하지 않는다. CI는 같은 린터와 mutation 회귀를 전체 추적 파일에 실행한다
 불변식: set -euo pipefail. 검사를 실행하지 못하면 exit 1 (fail-closed)
