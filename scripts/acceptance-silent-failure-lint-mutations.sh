@@ -83,6 +83,27 @@ function load() {
 EOF
 expect "return null 뒤 죽은 문장으로 우회 불가" "$TMP/catch-null-unreachable.js" 1 "catch-return-null"
 
+cat > "$TMP/catch-null-after-log.js" <<'EOF'
+function load() {
+  try { return risky(); } catch (error) {
+    console.error(error);
+    return null;
+  }
+}
+EOF
+expect "로그 뒤 catch return null도 차단" "$TMP/catch-null-after-log.js" 1 "catch-return-null"
+
+cat > "$TMP/catch-null-conditional.ts" <<'EOF'
+function load(recoverable: boolean) {
+  try { return risky(); } catch (error) {
+    markFailed(error);
+    if (recoverable) { return null; }
+    throw error;
+  }
+}
+EOF
+expect "조건문 안 catch return null도 차단" "$TMP/catch-null-conditional.ts" 1 "catch-return-null"
+
 cat > "$TMP/or-array.js" <<'EOF'
 const items = response.items || [];
 EOF
@@ -125,6 +146,31 @@ const values = api.get("items") || [];
 EOF
 expect "임의 get 호출의 || []는 예외 아님" "$TMP/unknown-get.js" 1 "or-empty-array-fallback"
 
+cat > "$TMP/shadowed-map-parameter.js" <<'EOF'
+const grouped = new Map();
+function load(grouped) {
+  return grouped.get("items") || [];
+}
+EOF
+expect "Map 이름을 가린 함수 매개변수는 예외 아님" "$TMP/shadowed-map-parameter.js" 1 "or-empty-array-fallback"
+
+cat > "$TMP/shadowed-map-local.js" <<'EOF'
+const grouped = new Map();
+function load() {
+  const grouped = api;
+  return grouped.get("items") || [];
+}
+EOF
+expect "Map 이름을 가린 내부 선언은 예외 아님" "$TMP/shadowed-map-local.js" 1 "or-empty-array-fallback"
+
+cat > "$TMP/enclosing-map.js" <<'EOF'
+function load(keys) {
+  const grouped = new Map();
+  return keys.map((key) => grouped.get(key) || []);
+}
+EOF
+expect "둘러싼 유효 범위의 const Map은 예외 유지" "$TMP/enclosing-map.js" 0 "PASS:"
+
 cat > "$TMP/literals.jsx" <<'EOF'
 const text = "catch (error) {} and value ?? fallback";
 const pattern = /catch \(error\) \{\}|value\?\?/;
@@ -139,6 +185,36 @@ cat > "$TMP/template.ts" <<'EOF'
 const message = `literal ?? ${value ?? 3}`;
 EOF
 expect "템플릿 보간식 안 실행 ?? 차단" "$TMP/template.ts" 1 "nullish-coalescing-fallback"
+
+# 인자 없는 전체 수집은 확장자 대소문자와 무관하게 모든 대상 파일을 찾아야 한다.
+CASE_REPO="$TMP/case-repo"
+git -C "$TMP" init --quiet case-repo
+cat > "$CASE_REPO/bypass.JS" <<'EOF'
+const items = response.items || [];
+EOF
+cat > "$CASE_REPO/bypass.PY" <<'EOF'
+def load():
+    try:
+        return risky()
+    except:
+        return None
+EOF
+cat > "$CASE_REPO/bypass.TSX" <<'EOF'
+const retries = response.retries ?? 3;
+EOF
+git -C "$CASE_REPO" add bypass.JS bypass.PY bypass.TSX
+case_rc=0
+case_output=$(cd "$CASE_REPO" && bash "$LINT" 2>&1) || case_rc=$?
+case_checked=$(printf '%s\n' "$case_output" | sed -n 's/^CHECKED_FILES: //p' | tail -1)
+if [ "$case_rc" -eq 1 ] \
+   && [ "$case_checked" -eq 3 ] 2>/dev/null \
+   && printf '%s\n' "$case_output" | grep -Fq "or-empty-array-fallback" \
+   && printf '%s\n' "$case_output" | grep -Fq "bare-except" \
+   && printf '%s\n' "$case_output" | grep -Fq "nullish-coalescing-fallback"; then
+  record 0 "전체 수집은 대문자 확장자 3종 포함" "exit=1, checked=3"
+else
+  record 1 "전체 수집은 대문자 확장자 3종 포함" "exit=$case_rc checked=${case_checked:-없음} output=${case_output//$'\n'/ | }"
+fi
 
 cat > "$TMP/invalid.py" <<'EOF'
 def broken(:
@@ -185,6 +261,16 @@ if [ "$hook_setup" -eq 0 ]; then
     record 0 "pre-commit은 작업트리 미끼 대신 정상 index blob 판정" "exit=0"
   else
     record 1 "pre-commit은 작업트리 미끼 대신 정상 index blob 판정" "exit=$hook_rc output=${hook_output//$'\n'/ | }"
+  fi
+
+  printf 'const items = response.items || [];\n' > "$HOOK_REPO/p3-bad.JS"
+  git -C "$HOOK_REPO" add p3-bad.JS
+  hook_rc=0
+  hook_output=$(cd "$HOOK_REPO" && bash hooks/pre-commit 2>&1) || hook_rc=$?
+  if [ "$hook_rc" -eq 1 ] && printf '%s\n' "$hook_output" | grep -Fq "조용한 실패 패턴 발견 (P3)"; then
+    record 0 "pre-commit은 대문자 확장자 index blob 차단" "exit=1"
+  else
+    record 1 "pre-commit은 대문자 확장자 index blob 차단" "exit=$hook_rc output=${hook_output//$'\n'/ | }"
   fi
 else
   record 1 "pre-commit fixture 준비" "git clone exit=$hook_setup"
