@@ -171,6 +171,14 @@ function load(keys) {
 EOF
 expect "둘러싼 유효 범위의 const Map은 예외 유지" "$TMP/enclosing-map.js" 0 "PASS:"
 
+cat > "$TMP/escaped-block-map.js" <<'EOF'
+if (enabled) {
+  const grouped = new Map();
+}
+const values = grouped.get("items") || [];
+EOF
+expect "다른 블록의 Map 이름은 예외로 새지 않음" "$TMP/escaped-block-map.js" 1 "or-empty-array-fallback"
+
 cat > "$TMP/literals.jsx" <<'EOF'
 const text = "catch (error) {} and value ?? fallback";
 const pattern = /catch \(error\) \{\}|value\?\?/;
