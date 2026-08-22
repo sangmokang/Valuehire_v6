@@ -186,6 +186,12 @@ function load(keys) {
 EOF
 expect "둘러싼 유효 범위의 const Map은 예외 유지" "$TMP/enclosing-map.js" 0 "PASS:"
 
+cat > "$TMP/type-namespace-map.ts" <<'EOF'
+const Cache = new Map();
+const values = rows.map((value: Cache) => Cache.get(value) || []);
+EOF
+expect "타입 이름은 값 Map binding을 가리지 않음" "$TMP/type-namespace-map.ts" 0 "PASS:"
+
 cat > "$TMP/escaped-block-map.js" <<'EOF'
 if (enabled) {
   const grouped = new Map();
