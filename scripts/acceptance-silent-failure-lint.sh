@@ -376,16 +376,14 @@ def parameter_names(tokens: list[Token], opening_brace: int) -> set[str]:
         return set()
     return names_in_parameters(tokens, opening, before)
 
-def scope_model(tokens: list[Token]) -> tuple[list[int | None], list[dict[str, bool]], list[int]]:
-    parents: list[int | None] = [None]
+def scope_model(tokens: list[Token]) -> tuple[list[dict[str, bool]], list[int]]:
     bindings: list[dict[str, bool]] = [{}]
     token_scopes = [0] * len(tokens)
     stack = [0]
     for index, token in enumerate(tokens):
         if token.value == "{":
-            parents.append(stack[-1])
             bindings.append({name: False for name in parameter_names(tokens, index)})
-            stack.append(len(parents) - 1)
+            stack.append(len(bindings) - 1)
         token_scopes[index] = stack[-1]
         if token.value in {"const", "let", "var"}:
             cursor, depth, expects_name = index + 1, 0, True
@@ -406,19 +404,12 @@ def scope_model(tokens: list[Token]) -> tuple[list[int | None], list[dict[str, b
                 cursor += 1
         if token.value == "}" and len(stack) > 1:
             stack.pop()
-    return parents, bindings, token_scopes
+    return bindings, token_scopes
 
-def arrow_parameter_shadows(tokens: list[Token], operator: int, name: str) -> bool:
+def inside_expression_arrow(tokens: list[Token], operator: int) -> bool:
     pairs = {")": "(", "]": "[", "}": "{"}
     for arrow in range(operator):
-        if tokens[arrow].value != "=>" or arrow == 0:
-            continue
-        previous = tokens[arrow - 1].value
-        shadows = previous == name
-        if previous == ")":
-            opening = matching(tokens, arrow - 1, "(", ")", -1)
-            shadows = opening is not None and name in names_in_parameters(tokens, opening, arrow - 1)
-        if not shadows:
+        if tokens[arrow].value != "=>" or arrow + 1 >= len(tokens) or tokens[arrow + 1].value == "{":
             continue
         depths = {"(": 0, "[": 0, "{": 0}
         contains_operator = True
@@ -438,7 +429,7 @@ def arrow_parameter_shadows(tokens: list[Token], operator: int, name: str) -> bo
             return True
     return False
 
-def is_declared_map_get(tokens: list[Token], operator: int, parents: list[int | None],
+def is_declared_map_get(tokens: list[Token], operator: int,
                         bindings: list[dict[str, bool]], token_scopes: list[int]) -> bool:
     if operator < 5 or tokens[operator - 1].value != ")":
         return False
@@ -450,14 +441,9 @@ def is_declared_map_get(tokens: list[Token], operator: int, parents: list[int | 
             if cursor < 3 or [item.value for item in tokens[cursor - 2:cursor]] != [".", "get"]:
                 return False
             name = tokens[cursor - 3].value
-            if arrow_parameter_shadows(tokens, operator, name):
+            if inside_expression_arrow(tokens, operator):
                 return False
-            scope: int | None = token_scopes[operator]
-            while scope is not None:
-                if name in bindings[scope]:
-                    return bindings[scope][name]
-                scope = parents[scope]
-            return False
+            return bindings[token_scopes[operator]].get(name, False)
     return False
 
 def contains_return_null(body: list[Token]) -> bool:
@@ -484,7 +470,7 @@ def contains_return_null(body: list[Token]) -> bool:
 
 def js_findings(tokens: list[Token]) -> list[tuple[int, str]]:
     findings: list[tuple[int, str]] = []
-    parents, bindings, token_scopes = scope_model(tokens)
+    bindings, token_scopes = scope_model(tokens)
     index = 0
     while index < len(tokens):
         token = tokens[index]
@@ -494,7 +480,7 @@ def js_findings(tokens: list[Token]) -> list[tuple[int, str]]:
             cursor = index + 1
             while cursor < len(tokens) and tokens[cursor].value == "(":
                 cursor += 1
-            if cursor + 1 < len(tokens) and tokens[cursor].value == "[" and tokens[cursor + 1].value == "]" and not is_declared_map_get(tokens, index, parents, bindings, token_scopes):
+            if cursor + 1 < len(tokens) and tokens[cursor].value == "[" and tokens[cursor + 1].value == "]" and not is_declared_map_get(tokens, index, bindings, token_scopes):
                 findings.append((token.line, "or-empty-array-fallback"))
         elif token.value == "catch":
             cursor = index + 1
