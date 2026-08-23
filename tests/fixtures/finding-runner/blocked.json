@@ -1,0 +1,18 @@
+{
+  "findings": [
+    {
+      "id": "F-3",
+      "source": "adversarial",
+      "claim": "실행 환경에 없는 명령으로 재현을 시도한다",
+      "severity": "low",
+      "repro": {
+        "cmd": "valuehire_wu4a_command_that_must_not_exist_9f47a",
+        "cwd": ".",
+        "expect": {
+          "exit_not": 0
+        }
+      },
+      "status": "NOT_TESTED"
+    }
+  ]
+}
