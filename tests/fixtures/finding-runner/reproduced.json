@@ -1,0 +1,18 @@
+{
+  "findings": [
+    {
+      "id": "F-1",
+      "source": "runtime",
+      "claim": "명령이 0이 아닌 종료값으로 결함을 재현한다",
+      "severity": "high",
+      "repro": {
+        "cmd": "node -e \"process.stdout.write('defect reproduced\\n'); process.exit(7)\"",
+        "cwd": ".",
+        "expect": {
+          "exit_not": 0
+        }
+      },
+      "status": "NOT_TESTED"
+    }
+  ]
+}
