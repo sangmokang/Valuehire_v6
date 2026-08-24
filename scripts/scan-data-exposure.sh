@@ -54,6 +54,11 @@ is_forbidden_path() {
   return 1
 }
 
+safe_display_path() {
+  # 제어문자가 줄 구조를 깨거나 로그를 위조하지 않도록 shell-escaped 경로만 출력한다.
+  printf '%q' "$1"
+}
+
 # ── tracked ──────────────────────────────────────────────────────────────────
 scan_tracked() {
   local n=0 inspected=0 bad=0 invalid=0 f sz
@@ -84,6 +89,30 @@ scan_tracked() {
 # ── history (D1) ─────────────────────────────────────────────────────────────
 # rev-list --objects 는 동일 blob에 대표 경로 하나만 붙인다. 경로별 정책을 적용하려면
 # 모든 도달 가능 commit tree를 별도로 열거해야 안전 확장자 alias가 PII 경로를 숨기지 못한다.
+append_commit_tree_pairs() {
+  # append_commit_tree_pairs <commit> <destination>
+  local rev="$1" destination="$2" tree="$TMP_ROOT/history-tree"
+  local record meta type sha raw_path lower kind forbidden display
+  if ! git ls-tree -rz --full-tree "$rev" > "$tree" 2>/dev/null; then
+    echo "NOT_RUN: 도달 가능 commit tree를 완전히 읽지 못했다: $rev"; return 2
+  fi
+  while IFS= read -r -d '' record; do
+    meta=${record%%$'\t'*}; raw_path=${record#*$'\t'}
+    if [ "$meta" = "$record" ] || ! IFS=' ' read -r _ type sha <<< "$meta" \
+       || [ "$type" != blob ] || [ -z "$sha" ]; then
+      echo "NOT_RUN: commit tree의 blob-경로 항목이 불완전하다: $rev"; return 2
+    fi
+    forbidden=0; is_forbidden_path "$raw_path" && forbidden=1
+    lower=$(printf '%s' "$raw_path" | tr '[:upper:]' '[:lower:]'); kind=other
+    case "$lower" in *.csv) kind=csv ;; *.tsv) kind=tsv ;; *.sql) kind=sql ;; esac
+    display=$(safe_display_path "$raw_path") || {
+      echo "NOT_RUN: history 경로를 안전하게 표시하지 못했다: $sha"; return 2;
+    }
+    printf '%s\t%s\t%s\t%s\n' "$sha" "$forbidden" "$kind" "$display" >> "$destination" \
+      || { echo "NOT_RUN: history blob-경로를 기록하지 못했다"; return 2; }
+  done < "$tree"
+}
+
 collect_history_inventory() {
   # collect_history_inventory <object-ids> <blob-path-pairs>
   local ids="$1" pairs="$2" objects="$TMP_ROOT/history-objects"
@@ -98,17 +127,7 @@ collect_history_inventory() {
   : > "$raw" || { echo "NOT_RUN: history 경로 목록을 만들지 못했다"; return 2; }
   while IFS= read -r rev; do
     [ -n "$rev" ] || continue
-    if ! git -c core.quotePath=false ls-tree -r --full-tree "$rev" 2>/dev/null \
-       | awk -F '\t' '
-           index($0, "\t") {
-             meta=substr($0, 1, index($0, "\t")-1)
-             path=substr($0, index($0, "\t")+1)
-             split(meta, field, " ")
-             if (field[2] == "blob") print field[3] "\t" path
-           }
-         ' >> "$raw"; then
-      echo "NOT_RUN: 도달 가능 commit tree를 완전히 읽지 못했다: $rev"; return 2
-    fi
+    append_commit_tree_pairs "$rev" "$raw" || return 2
   done < "$revisions"
   if ! LC_ALL=C sort -u "$raw" > "$pairs"; then
     echo "NOT_RUN: history blob-경로 목록을 정규화하지 못했다"; return 2
@@ -119,8 +138,8 @@ scan_history() {
   local ids="$TMP_ROOT/history-ids" pairs="$TMP_ROOT/history-pairs"
   local info="$TMP_ROOT/history-info" paths="$TMP_ROOT/history-paths"
   local pii_paths="$TMP_ROOT/history-pii-paths" content="$TMP_ROOT/history-blob"
-  local bad=0 invalid=0 blobs=0 inspected=0 line sha info_sha type sz path candidate
-  local pii_rc extra csv_seen tsv_seen sql_seen lf
+  local bad=0 invalid=0 blobs=0 inspected=0 sha info_sha type sz path candidate
+  local pii_rc csv_seen tsv_seen sql_seen forbidden kind
   collect_history_inventory "$ids" "$pairs" || return 2
   if ! git cat-file --batch-check='%(objectname) %(objecttype) %(objectsize)' \
        < "$ids" > "$info" 2>/dev/null; then
@@ -136,18 +155,17 @@ scan_history() {
     [ "$type" = blob ] || continue
     blobs=$((blobs + 1)); path=""; csv_seen=0; tsv_seen=0; sql_seen=0
     : > "$pii_paths"
-    awk -F '\t' -v want="$sha" '$1 == want { print substr($0, index($0, "\t")+1) }' \
+    awk -F '\t' -v want="$sha" '$1 == want { print $2 "\t" $3 "\t" $4 }' \
       "$pairs" > "$paths" || { invalid=1; continue; }
-    while IFS= read -r candidate; do
+    while IFS=$'\t' read -r forbidden kind candidate; do
       [ -n "$path" ] || path="$candidate"
-      if is_forbidden_path "$candidate"; then
+      if [ "$forbidden" -eq 1 ]; then
         echo "FAIL: 기록에 산출물·데이터 경로가 남아 있음: $candidate ($sha)"; bad=1
       fi
-      lf=$(printf '%s' "$candidate" | tr 'A-Z' 'a-z')
-      case "$lf" in
-        *.csv) [ "$csv_seen" -eq 1 ] || { printf '%s\n' "$candidate" >> "$pii_paths"; csv_seen=1; } ;;
-        *.tsv) [ "$tsv_seen" -eq 1 ] || { printf '%s\n' "$candidate" >> "$pii_paths"; tsv_seen=1; } ;;
-        *.sql) [ "$sql_seen" -eq 1 ] || { printf '%s\n' "$candidate" >> "$pii_paths"; sql_seen=1; } ;;
+      case "$kind" in
+        csv) [ "$csv_seen" -eq 1 ] || { printf '%s\t%s\n' "$kind" "$candidate" >> "$pii_paths"; csv_seen=1; } ;;
+        tsv) [ "$tsv_seen" -eq 1 ] || { printf '%s\t%s\n' "$kind" "$candidate" >> "$pii_paths"; tsv_seen=1; } ;;
+        sql) [ "$sql_seen" -eq 1 ] || { printf '%s\t%s\n' "$kind" "$candidate" >> "$pii_paths"; sql_seen=1; } ;;
       esac
     done < "$paths"
     case "$sz" in
@@ -159,14 +177,15 @@ scan_history() {
       if ! git cat-file blob "$sha" > "$content" 2>/dev/null; then
         echo "NOT_RUN: 개인정보 후보 history blob을 읽지 못했다: $sha"; invalid=1; continue
       fi
-      while IFS= read -r candidate; do
-        pii_rc=0; scan_pii_content "$candidate" "$content" "$sha" || pii_rc=$?
+      while IFS=$'\t' read -r kind candidate; do
+        pii_rc=0; scan_pii_content "$candidate" "$content" "$sha" "$kind" || pii_rc=$?
         [ "$pii_rc" -eq 1 ] && bad=1
+        [ "$pii_rc" -eq 2 ] && invalid=1
       done < "$pii_paths"
     fi
     inspected=$((inspected + 1))
   done < "$ids"
-  if IFS= read -r extra <&3; then echo "NOT_RUN: Git 객체 메타데이터가 객체 목록보다 많다"; invalid=1; fi
+  if IFS= read -r _ <&3; then echo "NOT_RUN: Git 객체 메타데이터가 객체 목록보다 많다"; invalid=1; fi
   exec 3<&-; last_checked=$inspected
   if [ "$blobs" -eq 0 ]; then echo "NOT_RUN: blob 을 한 개도 읽지 못했다 (스캔 무효)"; return 2; fi
   if [ "$invalid" -ne 0 ] || [ "$inspected" -ne "$blobs" ]; then return 2; fi
@@ -190,28 +209,35 @@ scan_history() {
 PII_COLUMN_WORDS='name|email|e_mail|mail|phone|mobile|tel|school|univ|university|profile_url|linkedin|resume|birth|이름|이메일|전화|휴대폰|학교|생년|프로필'
 
 pii_word_count() {
-  tr 'A-Z' 'a-z' | grep -oE "$PII_COLUMN_WORDS" | sort -u | awk 'END { print NR + 0 }'
+  tr '[:upper:]' '[:lower:]' | grep -oE "$PII_COLUMN_WORDS" | sort -u | awk 'END { print NR + 0 }'
 }
 
 is_pii_path() {
-  local lf; lf=$(printf '%s' "$1" | tr 'A-Z' 'a-z')
+  local lf; lf=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
   case "$lf" in *.csv|*.tsv|*.sql) return 0 ;; *) return 1 ;; esac
 }
 
 scan_pii_content() {
-  # scan_pii_content <safe-path> <content-file> [history-blob-fingerprint]
+  # scan_pii_content <path> <content-file> [history-blob-fingerprint] [known-format]
   # 현재 파일과 history가 이 한 함수를 공유한다. 실제 값은 어느 출력에도 쓰지 않는다.
-  local path="$1" content="$2" fingerprint="${3:-}" lf header rows hits shape meta
-  lf=$(printf '%s' "$path" | tr 'A-Z' 'a-z')
-  case "$lf" in
-    *.csv|*.tsv)
+  local path="$1" content="$2" fingerprint="${3:-}" format="${4:-}"
+  local lf display header rows hits shape meta
+  if [ -z "$format" ]; then
+    lf=$(printf '%s' "$path" | tr '[:upper:]' '[:lower:]')
+    case "$lf" in *.csv) format=csv ;; *.tsv) format=tsv ;; *.sql) format=sql ;; *) return 0 ;; esac
+    display=$(safe_display_path "$path") || return 2
+  else
+    display="$path"
+  fi
+  case "$format" in
+    csv|tsv)
       header=$(sed -n '1p' "$content")
       hits=$(printf '%s' "$header" | pii_word_count)
       rows=$(awk 'NR > 1 && $0 ~ /[^[:space:],]/ { n++ } END { print n + 0 }' "$content")
       [ "$hits" -ge 2 ] && [ "$rows" -ge 1 ] || return 0
       shape="표 데이터 ${rows}행"
       ;;
-    *.sql)
+    sql)
       hits=$(pii_word_count < "$content")
       if [ "$hits" -lt 2 ] \
          || ! grep -qiE '\b(insert[[:space:]]+into|values[[:space:]]*\(|copy[[:space:]]+.*from)' "$content"; then
@@ -219,11 +245,11 @@ scan_pii_content() {
       fi
       shape="INSERT/VALUES/COPY 적재문"
       ;;
-    *) return 0 ;;
+    *) return 2 ;;
   esac
   if [ -n "$fingerprint" ]; then meta=" · blob $fingerprint"; else meta=""; fi
   printf 'FAIL: 후보자 개인정보 내용: %s%s · 개인정보 컬럼 %s종 · %s\n' \
-    "$path" "$meta" "$hits" "$shape"
+    "$display" "$meta" "$hits" "$shape"
   return 1
 }
 
@@ -239,6 +265,7 @@ scan_pii() {
     pii_rc=0
     scan_pii_content "$f" "$content" || pii_rc=$?
     [ "$pii_rc" -eq 1 ] && bad=1
+    [ "$pii_rc" -eq 2 ] && invalid=1
     inspected=$((inspected + 1))
   done < <(git ls-files -z)
   last_checked=$inspected

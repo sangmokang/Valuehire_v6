@@ -8,14 +8,9 @@
 #   stdout: 항목마다 PASS:/FAIL:/NOT_RUN: 을 전부 출력하고, 마지막 줄에 `CHECKED: <검사 수>`
 #   불변식: 0건 검사는 통과가 아니다 (P20)
 #
-# 왜 이 검사가 필요한가 (2026-08-08 실측):
-#   ① hooks/pre-commit 에 파일 크기 검사가 0건이었다.
-#   ② artifacts/ · *.db · *.sqlite* · data/ · private-reviews/ 가 .gitignore 대상이 아니었다.
 #   구현 계획 §8 은 후보자 개인정보 보호를 이 두 장치 위에 세웠는데 **둘 다 없었다**.
 #   Phase 0 에서 SQLite 가 생기는 순간 구멍이 열린 채로 시작하게 된다.
 #
-# 텍스트 단언이 아니라 실행으로 검사한다 (P16):
-#   임시 저장소를 만들어 훅을 실제로 돌리고 종료코드를 본다. 소스에 문자열이 있는지로
 #   판정하지 않는다 — 문자열은 있는데 동작하지 않는 경우를 잡지 못하기 때문이다.
 set -uo pipefail
 
@@ -346,6 +341,13 @@ else
     printf 'safe\n' > README.md; git add README.md
     git commit -q -m delete-safe-alias
   }
+  sc_history_pii_newline_path() {
+    local filepath; filepath=$(printf 'candidates\t"quoted"\n.csv')
+    printf 'name,email\nFixtureNewline,newline@example.invalid\n' > "$filepath"
+    git add "$filepath"; git commit -q -m pii-newline-path
+    git rm -q "$filepath"; printf 'safe\n' > README.md
+    git add README.md; git commit -q -m delete-newline-path
+  }
   sc_history_ok_csv() {
     printf 'position,count\nAX Sales,20\n' > metrics.csv
     git add metrics.csv; git commit -q -m metrics
@@ -462,6 +464,10 @@ else
     "sc_history_pii_same_blob_alias" 'FixtureAlias|alias@example\.invalid'
   history_pii_case "동일 blob의 안전 확장자 alias가 있어도 all에서 탐지" all \
     "sc_history_pii_same_blob_alias" 'FixtureAlias|alias@example\.invalid'
+  history_pii_case "탭·따옴표·줄바꿈 포함 CSV 경로도 history에서 안전하게 탐지" history \
+    "sc_history_pii_newline_path" 'FixtureNewline|newline@example\.invalid'
+  history_pii_case "탭·따옴표·줄바꿈 포함 CSV 경로도 all에서 안전하게 탐지" all \
+    "sc_history_pii_newline_path" 'FixtureNewline|newline@example\.invalid'
   judge_case "삭제된 정상 지표 CSV history 통과" history "sc_history_ok_csv" 0
   judge_case "삭제된 PII 컬럼 1종 CSV history 통과" history "sc_history_one_pii_word_csv" 0
   judge_case "삭제된 schema-only SQL history 통과" history "sc_history_ok_sql" 0
@@ -469,7 +475,7 @@ fi
 
 # 현재와 history가 같은 이름의 판정 함수 한 개를 정확히 두 번 호출하는지 고정한다.
 pii_definition_count=$(grep -Ec '^scan_pii_content[[:space:]]*\(\)[[:space:]]*\{' "$JUDGE")
-history_pii_call_count=$(grep -Fc 'scan_pii_content "$candidate" "$content" "$sha"' "$JUDGE")
+history_pii_call_count=$(grep -Fc 'scan_pii_content "$candidate" "$content" "$sha" "$kind"' "$JUDGE")
 current_pii_call_count=$(grep -Fc 'scan_pii_content "$f" "$content"' "$JUDGE")
 if [ "$pii_definition_count" -eq 1 ] \
    && [ "$history_pii_call_count" -eq 1 ] \
@@ -581,7 +587,7 @@ else
 fi
 
 # 정확한 사례 수를 고정해 삭제 이력 호출이나 경계 검사가 제거돼도 초록이 되지 않게 한다.
-EXPECTED_CHECKS=46
+EXPECTED_CHECKS=48
 if [ "$checked" -ne "$EXPECTED_CHECKS" ]; then
   printf 'FAIL: 검사 항목 %d개 ≠ 계약값 %d개 (검사가 사라졌거나 무단 추가됐다 · P20)\n' \
     "$checked" "$EXPECTED_CHECKS"

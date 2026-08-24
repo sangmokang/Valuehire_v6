@@ -4,7 +4,7 @@
 
 VERDICT: FAIL
 
-두 원래 결함과 Claude V1이 찾은 acceptance·동일 blob 경로 공백은 닫혔다. 최종 Claude V1은 `b979c5b`에 `PASS`를 반환했다. 새 맥락 Codex V2가 V1의 모든 주장을 재현·반박하기 전에는 완료로 판정하지 않는다.
+두 원래 결함과 Claude V1이 찾은 acceptance·동일 blob alias 공백은 닫혔다. 최종 Claude V1은 `b979c5b`에 `PASS`를 반환했지만, 뒤이은 비표준 Git 경로 공격에서 줄바꿈 포함 CSV가 text 경로 파싱을 우회하는 반례를 재현했다. NUL 경계 보강 뒤 새 V1과 V2가 모두 합격하기 전에는 완료로 판정하지 않는다.
 
 사용자가 결정할 추가 사항은 없다. 승인 범위는 격리 작업공간의 PLAN → BUILD → AUDIT → CHECKPOINT와 Lore 형식 로컬 커밋까지이며, push·PR 생성·병합·배포는 금지한다.
 
@@ -980,6 +980,84 @@ V1 VERDICT: PASS
 V1은 tracked zero-target 제거, data/verify `CHECKED` 위조, history PII 호출 제거, 현재/history 원문 출력, Git 실패 접기, PII 임계값 완화, 함수 한도 완화, verify zero-target 제거를 별도 mirror에서 공격했고 모두 acceptance exit 1 또는 원래 `NOT_RUN` 방어로 반증했다. 독자 fixture의 동일 blob `*.csv`/안전 확장자 alias도 history/all이 모두 exit 1이었다. 합성 원문은 `[가림]` 처리됐다.
 
 전체 안전 판정 기록: `docs/engineering/repository-data-protection-v1-verdict-2026-08-24.md`.
+
+### 2026-08-24 11:44 KST — 비표준 Git 경로 RED→GREEN
+
+V2에 새 경로 열거의 비표준 경계를 공격하도록 전달한 직후 리더도 독립 fixture를 만들었다. 파일명 자체에 줄바꿈이 있고 마지막이 `.csv`인 삭제 이력은 `git ls-tree` 기본 text 출력에서 C-style 인용부호가 붙어 기존 확장자 분류를 우회했다.
+
+```text
+TIMESTAMP_KST: 2026-08-24 11:43 KST
+WORKDIR: /tmp/rdp-newline-case.EiyMcJ
+COMMAND: bash judge.sh history
+PASS: 기록 전량 blob 2개 검사, 크기·경로·개인정보 위반 0건
+CHECKED: 2
+EXIT: 0
+```
+
+fixture 본문은 합성값이며 위 증거에 복사하지 않았다. 이 결과는 삭제된 과거 CSV를 놓치는 AC-3 위반이고, 제어문자가 출력 줄을 가르면 안전한 메타데이터 계약도 깨므로 현재 코드에 맞춰 문서를 낮추지 않고 수용했다. acceptance에 history/all 두 사례를 먼저 추가한 RED는 다음과 같다.
+
+```text
+TIMESTAMP_KST: 2026-08-24 11:44:43 KST
+WORKDIR: /private/tmp/valuehire-rdp-20260824.7e3kk1/worktree
+COMMAND: bash scripts/acceptance-hs-a4.sh
+FAIL: 판정기 실행 — 줄바꿈 포함 CSV 경로도 history에서 안전하게 탐지 (기대 exit=1, 실제 0)
+FAIL: 판정기 실행 — 줄바꿈 포함 CSV 경로도 all에서 안전하게 탐지 (기대 exit=1, 실제 0)
+CHECKED: 48
+EXIT: 1
+```
+
+`git ls-tree -rz`의 NUL 레코드를 Bash에서 직접 읽고, 정책 적용 전에 raw 경로로 금지 경로·확장자를 분류하며, 저장·출력에는 `printf %q`로 shell-escaped 경로만 남기도록 보강했다. history는 형식 종류와 안전 경로를 공용 PII 판정 함수에 넘기고 본문은 여전히 한 번만 읽는다.
+
+```text
+TIMESTAMP_KST: 2026-08-24 11:46:20 KST
+WORKDIR: /private/tmp/valuehire-rdp-20260824.7e3kk1/worktree
+COMMAND: bash scripts/acceptance-hs-a4.sh
+PASS: 과거 PII 차단·원문 비출력 — 줄바꿈 포함 CSV 경로도 history에서 안전하게 탐지 (exit=1)
+PASS: 과거 PII 차단·원문 비출력 — 줄바꿈 포함 CSV 경로도 all에서 안전하게 탐지 (exit=1)
+PASS: 현재/history PII 판정 함수 1개 직접 공유 (정의 1 · 각 호출 1)
+PASS: P11 코드 예산 — 현재 파일≤600·함수≤100, 600/100 통과·601/101 차단
+CHECKED: 48
+EXIT: 0
+FILES: scan-data-exposure.sh=302, data acceptance=599
+
+DIRECT FIXTURE OUTPUT:
+FAIL: 후보자 개인정보 내용: $'candidates\n.csv' · blob 84f0561d12053d38580d73c45401c9463a180cff · 개인정보 컬럼 2종 · 표 데이터 1행
+CHECKED: 2
+EXIT: 1
+OUTPUT_LINES: 2
+```
+
+→ 경로의 실제 줄바꿈은 로그 줄을 늘리지 않고 `\n` 두 글자로 표시된다. 실제 후보자 값은 stdout/stderr와 기록 모두 0건이다. 이 보강 때문에 이전 V1/V2 SHA의 PASS는 최종 코드 판정으로 재사용하지 않는다.
+
+### 2026-08-24 11:47 KST — 새 맥락 Codex V2 1차 FAIL과 G 일치
+
+새 맥락 `verifier` subagent는 독립 clone `/tmp/valuehire-rdp-v2-1c834.3zmbrG`, SHA `1c83438997d9c03554516fc5f26ab8a24286e970`에서 V1의 모든 주장과 counter-AC를 공격했다. 시작/종료 HEAD와 status는 동일·clean이었다.
+
+```text
+VERDICT: FAIL
+normal deleted CSV: history=1, all=1
+newline-path deleted CSV: history=0/PASS/CHECKED:2, all=0/PASS/CHECKED:4
+required original commands: all exit 0
+AC-3: FAIL
+AC-6: FAIL
+```
+
+→ V2는 리더와 독립적으로 같은 줄바꿈 경로 반례를 재현했고 원인도 non-NUL `git ls-tree` text 파싱으로 일치했다. G/V2가 계약 위반에 합의했으므로 당시 V1 PASS를 최종 판정으로 사용하지 않았다. 안전 원문: `docs/engineering/repository-data-protection-v2-round1-verdict-2026-08-24.md`.
+
+V2 권고를 반영해 최종 acceptance 경로는 줄바꿈만이 아니라 탭·따옴표·줄바꿈을 모두 한 파일명에 넣는다.
+
+```text
+TIMESTAMP_KST: 2026-08-24 11:49 KST
+COMMAND: bash scripts/acceptance-hs-a4.sh
+PASS: 과거 PII 차단·원문 비출력 — 탭·따옴표·줄바꿈 포함 CSV 경로도 history에서 안전하게 탐지 (exit=1)
+PASS: 과거 PII 차단·원문 비출력 — 탭·따옴표·줄바꿈 포함 CSV 경로도 all에서 안전하게 탐지 (exit=1)
+CHECKED: 48
+EXIT: 0
+FILES: scan-data-exposure.sh=302, data acceptance=599
+STATIC: shellcheck scanner exit 0; shellcheck severity=error on four changed shell files exit 0
+```
+
+→ NUL-safe 구현, acceptance, SOT가 같은 경계를 말한다. 새 V1과 새 V2가 이 최종 SHA에서 다시 합격해야만 AUDIT를 닫는다.
 
 ## 제출 직전 §8-6b 셀프 감사
 

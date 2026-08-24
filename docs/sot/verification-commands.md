@@ -59,13 +59,13 @@
 
 종료값 `0=PASS / 1=FAIL / 2=NOT_RUN`. 모든 모드는 마지막에 실제 처리 수 `CHECKED: N`을 한 번 출력한다. **검사 대상 0건이나 Git 객체 열거·형식·크기·본문 읽기 실패는 통과가 아니라 `NOT_RUN`이다**(P3·P20).
 
-현재 `pii`와 `history`는 `scan_pii_content` 한 함수를 재사용한다. history는 `git rev-list --objects`가 동일 blob에 대표 경로 하나만 남기는 한계를 피하려고 모든 도달 가능 commit tree의 blob-경로 연결을 별도로 열거한다. 같은 blob이 안전 확장자와 CSV·TSV·SQL 경로를 모두 거쳤어도 관련 확장자를 각각 판정한다. 오탐을 막기 위해 **두 조건을 모두** 만족해야 차단한다 — ① 개인정보 컬럼 낱말 2종 이상 ② 실제 데이터를 담은 형태(CSV·TSV는 데이터 행 1줄 이상, SQL은 `INSERT`/`VALUES`/`COPY`). 그래서 개인정보 컬럼 낱말이 1종뿐인 정상 CSV와 **`CREATE TABLE candidates(name, email)` 같은 스키마 정의는 통과한다** — 정상 자료와 마이그레이션까지 막으면 개발이 멈춘다.
+현재 `pii`와 `history`는 `scan_pii_content` 한 함수를 재사용한다. history는 `git rev-list --objects`가 동일 blob에 대표 경로 하나만 남기는 한계를 피하려고 모든 도달 가능 commit tree의 blob-경로 연결을 별도로 열거한다. `git ls-tree -z`의 NUL 경계를 보존하므로 줄바꿈·탭 같은 제어문자가 든 경로도 레코드를 가르지 않으며, 로그에는 shell-escaped 안전 경로만 출력한다. 같은 blob이 안전 확장자와 CSV·TSV·SQL 경로를 모두 거쳤어도 관련 확장자를 각각 판정한다. 오탐을 막기 위해 **두 조건을 모두** 만족해야 차단한다 — ① 개인정보 컬럼 낱말 2종 이상 ② 실제 데이터를 담은 형태(CSV·TSV는 데이터 행 1줄 이상, SQL은 `INSERT`/`VALUES`/`COPY`). 그래서 개인정보 컬럼 낱말이 1종뿐인 정상 CSV와 **`CREATE TABLE candidates(name, email)` 같은 스키마 정의는 통과한다** — 정상 자료와 마이그레이션까지 막으면 개발이 멈춘다.
 
 과거 개인정보 위반 출력은 안전한 저장소 경로, Git blob 지문, 개인정보 컬럼 종류 수와 데이터 형태만 담는다. 이름·이메일·전화번호와 행/SQL 원문은 stdout·stderr에 출력하지 않는다.
 
 **금지 경로 목록은 `hooks/pre-commit`과 이 판정기 두 곳에 있다**(훅은 '스테이지된 것'만 보므로 별도 코드다). 한쪽만 넓히면 조용히 갈라지므로 `scripts/acceptance-hs-a4.sh`가 두 목록의 동치를 검사한다.
 
-`scripts/acceptance-hs-a4.sh`는 46개 사례를 정확히 요구한다. 빈 tracked/history, Git 기록 열거 실패, 실제 `CHECKED` 2개, 현재와 과거의 개인정보 컬럼 낱말 1종 정상 CSV, 현재/삭제 이력 CSV·TSV·SQL, 동일 blob의 안전 확장자 alias가 있어도 history/all이 삭제 CSV를 탐지하는 사례, 두 경로의 개인정보 원문 비출력, 정상 과거 대조군을 실행한다. 또한 현재/history가 `scan_pii_content` 정의 하나를 각각 직접 호출하는지 고정한다. 같은 파일 판정 함수로 현재 직접 작성 파일의 600줄 이하와 합성 600줄 통과·601줄 차단을 확인하고, 같은 함수 판정기로 현재 함수와 합성 100줄 통과·101줄 차단도 검사한다. 사례 호출을 제거하거나 건수를 위조하면 전체 acceptance가 exit 1이다.
+`scripts/acceptance-hs-a4.sh`는 48개 사례를 정확히 요구한다. 빈 tracked/history, Git 기록 열거 실패, 실제 `CHECKED` 2개, 현재와 과거의 개인정보 컬럼 낱말 1종 정상 CSV, 현재/삭제 이력 CSV·TSV·SQL, 동일 blob의 안전 확장자 alias 및 탭·따옴표·줄바꿈 포함 CSV 경로가 있어도 history/all이 삭제 PII를 안전한 한 줄 메타데이터로 탐지하는 사례, 두 경로의 개인정보 원문 비출력, 정상 과거 대조군을 실행한다. 또한 현재/history가 `scan_pii_content` 정의 하나를 각각 직접 호출하는지 고정한다. 같은 파일 판정 함수로 현재 직접 작성 파일의 600줄 이하와 합성 600줄 통과·601줄 차단을 확인하고, 같은 함수 판정기로 현재 함수와 합성 100줄 통과·101줄 차단도 검사한다. 사례 호출을 제거하거나 건수를 위조하면 전체 acceptance가 exit 1이다.
 
 ### 주요 기능 정본 구조 검사 — `scripts/check-docs-sot.sh`
 

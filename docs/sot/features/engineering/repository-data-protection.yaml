@@ -143,7 +143,7 @@
       },
       {
         "id": "RDP-INV-7",
-        "rule": "History scanning enumerates every reachable commit-tree blob-path association, so a second safe-extension alias for identical blob content cannot hide a CSV, TSV or SQL path.",
+        "rule": "History scanning uses NUL-delimited Git tree records to enumerate every reachable commit-tree blob-path association, so a safe-extension alias or a path containing control characters cannot hide a CSV, TSV or SQL path; displayed paths are safely escaped.",
         "evidence": "scripts/scan-data-exposure.sh"
       }
     ],
@@ -173,7 +173,7 @@
       {
         "id": "RDP-V3",
         "command": "bash scripts/scan-data-exposure.sh history",
-        "expected": "exit 0 after reading at least one reachable blob, enumerating every reachable commit-tree blob-path association, and checking size, forbidden path and CSV/TSV/SQL PII content with the shared decision function"
+        "expected": "exit 0 after reading at least one reachable blob, NUL-safely enumerating every reachable commit-tree blob-path association, safely escaping displayed paths, and checking size, forbidden path and CSV/TSV/SQL PII content with the shared decision function"
       },
       {
         "id": "RDP-V4",
@@ -188,7 +188,7 @@
       {
         "id": "RDP-V6",
         "command": "bash scripts/acceptance-hs-a3.sh && bash scripts/acceptance-hs-a4.sh && bash scripts/acceptance-secret-webhook-vendor.sh",
-        "expected": "exact case counts, tracked/history zero-target, Git enumeration failure, actual CHECKED count, current and deleted-history CSV/TSV/SQL including an identical safe-extension blob alias, current/history one-column and schema-only allowed controls, both-path non-disclosure, one shared PII function, 600/601 file and 100/101 function boundaries all pass; all commands exit 0"
+        "expected": "exact case counts, tracked/history zero-target, Git enumeration failure, actual CHECKED count, current and deleted-history CSV/TSV/SQL including an identical safe-extension blob alias and a control-character-bearing CSV path, current/history one-column and schema-only allowed controls, both-path non-disclosure, one shared PII function, 600/601 file and 100/101 function boundaries all pass; all commands exit 0"
       }
     ],
     "evidence": [
