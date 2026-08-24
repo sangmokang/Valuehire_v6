@@ -304,6 +304,61 @@ else
   }
   sc_history_clean() { printf 'ok\n' > README.md; git add README.md; git commit -q -m one; }
 
+  sc_history_pii_csv() {
+    printf 'name,email\nFixtureAlpha,alpha@example.invalid\n' > candidates.csv
+    git add candidates.csv; git commit -q -m pii
+    git rm -q candidates.csv
+    printf 'safe\n' > README.md; git add README.md; git commit -q -m delete-pii
+  }
+  sc_history_pii_tsv() {
+    printf 'name\tphone\nFixtureBeta\t010-0000-0000\n' > candidates.tsv
+    git add candidates.tsv; git commit -q -m pii
+    git rm -q candidates.tsv
+    printf 'safe\n' > README.md; git add README.md; git commit -q -m delete-pii
+  }
+  sc_history_pii_sql() {
+    printf "INSERT INTO candidates(name,email) VALUES('FixtureGamma','gamma@example.invalid');\n" > seed.sql
+    git add seed.sql; git commit -q -m pii
+    git rm -q seed.sql
+    printf 'safe\n' > README.md; git add README.md; git commit -q -m delete-pii
+  }
+  sc_history_ok_csv() {
+    printf 'position,count\nAX Sales,20\n' > metrics.csv
+    git add metrics.csv; git commit -q -m metrics
+    git rm -q metrics.csv
+    printf 'safe\n' > README.md; git add README.md; git commit -q -m delete-metrics
+  }
+  sc_history_ok_sql() {
+    printf 'CREATE TABLE candidates(name TEXT, email TEXT);\n' > 001_schema.sql
+    git add 001_schema.sql; git commit -q -m schema
+    git rm -q 001_schema.sql
+    printf 'safe\n' > README.md; git add README.md; git commit -q -m delete-schema
+  }
+
+  history_pii_case() {
+    # history_pii_case <설명> <모드> <시나리오함수> <금지 원문 정규식>
+    local desc="$1" mode="$2" scenario="$3" forbidden="$4" tmp rc=0 out
+    tmp=$(mktemp -d) || { bad "임시 저장소 생성 실패 — $desc (fail-closed)"; return; }
+    [ -d "$tmp" ] || { bad "임시 저장소 경로 없음 — $desc (fail-closed)"; return; }
+    cp "$JUDGE" "$tmp/judge.sh"
+    out=$(cd "$tmp" || exit 9
+      git init -q .
+      git config user.email a@b.c; git config user.name t
+      "$scenario"
+      bash judge.sh "$mode" 2>&1
+    ) || rc=$?
+    rm -rf "$tmp"
+    if [ "$rc" -ne 1 ]; then
+      bad "판정기 실행 — $desc (기대 exit=1, 실제 $rc)"
+    elif printf '%s\n' "$out" | grep -qE "$forbidden"; then
+      bad "개인정보 원문이 출력됨 — $desc"
+    elif ! printf '%s\n' "$out" | grep -qE 'blob [0-9a-f]{7,40}.*개인정보 컬럼 [2-9][0-9]*종'; then
+      bad "안전한 history 메타데이터가 부족함 — $desc"
+    else
+      ok "과거 PII 차단·원문 비출력 — $desc (exit=1)"
+    fi
+  }
+
   # D2: 후보자 개인정보 컬럼 조합. 1MB 미만이고 확장자가 허용 목록이라 크기·경로로는 안 잡힌다.
   sc_pii_csv() {
     printf 'name,email,phone,school,profile_url\n홍길동,a@b.c,010-1234-5678,서울대,https://x/1\n' > cand.csv
@@ -329,6 +384,11 @@ else
   judge_case "후보자 컬럼 SQL 을 잡는다 (D2)"                 pii     "sc_pii_sql"       1
   judge_case "정상 지표 CSV 는 통과시킨다 (오탐 대조군)"      pii     "sc_ok_csv"        0
   judge_case "정상 마이그레이션 SQL 은 통과시킨다 (오탐 대조군)" pii  "sc_ok_sql"        0
+  history_pii_case "삭제된 CSV blob" history "sc_history_pii_csv" 'FixtureAlpha|alpha@example\.invalid'
+  history_pii_case "삭제된 TSV blob" history "sc_history_pii_tsv" 'FixtureBeta|010-0000-0000'
+  history_pii_case "삭제된 SQL blob을 all에서도 탐지" all "sc_history_pii_sql" 'FixtureGamma|gamma@example\.invalid'
+  judge_case "삭제된 정상 지표 CSV history 통과" history "sc_history_ok_csv" 0
+  judge_case "삭제된 schema-only SQL history 통과" history "sc_history_ok_sql" 0
 fi
 
 # D4: CI 가 그 판정기를 **실행 줄**에서 부르는가 + 그 스텝이 조건으로 꺼져 있지 않은가.

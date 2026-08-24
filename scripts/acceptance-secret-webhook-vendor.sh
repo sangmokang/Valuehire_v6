@@ -249,6 +249,40 @@ e2e() {
   fi
 }
 
+# P20 계약: 스캐너가 실제로 읽은 추적 blob 수를 보고하고, 0개는 NOT_RUN이어야 한다.
+# 1개/2개 대조를 함께 두어 CHECKED를 상수 1로 위조하는 가짜 구현도 차단한다.
+verify_contract_case() {
+  # verify_contract_case <설명> <추적 파일 수> <기대 상태> <기대 exit>
+  local desc="$1" file_count="$2" want_status="$3" want_rc="$4"
+  local tmp rc=0 out reported i
+  checked=$((checked + 1))
+  tmp=$(mktemp -d) || { printf 'FAIL: 임시 저장소 생성 실패 — %s (fail-closed)\n' "$desc"; fail=1; return; }
+  if [ -z "$tmp" ] || [ ! -d "$tmp" ]; then
+    printf 'FAIL: 임시 저장소 경로가 비었다 — %s (fail-closed)\n' "$desc"; fail=1; return
+  fi
+  git init -q "$tmp"
+  cp verify.sh "$PATTERNS" "$tmp/"
+  i=1
+  while [ "$i" -le "$file_count" ]; do
+    printf 'safe fixture %s\n' "$i" > "$tmp/safe-$i.txt"
+    git -C "$tmp" add "safe-$i.txt"
+    i=$((i + 1))
+  done
+  out=$(cd "$tmp" && SECRET_PATTERNS_FILE= VERIFY_SCAN_SOURCE=index bash verify.sh 2>&1) || rc=$?
+  rm -rf "$tmp"
+  reported=$(printf '%s\n' "$out" | sed -n 's/^CHECKED:[[:space:]]*//p' | tail -1)
+  if [ "$rc" -eq "$want_rc" ] \
+     && printf '%s\n' "$out" | grep -q "^${want_status}:" \
+     && [ "$reported" = "$file_count" ]; then
+    printf 'PASS: verify 계약 — %s (%s, CHECKED: %s, exit=%s)\n' \
+      "$desc" "$want_status" "$reported" "$rc"
+  else
+    printf 'FAIL: verify 계약 — %s (기대 %s/CHECKED:%s/exit:%s, 실제 CHECKED:%s/exit:%s)\n' \
+      "$desc" "$want_status" "$file_count" "$want_rc" "${reported:-없음}" "$rc"
+    fail=1
+  fi
+}
+
 # 여기서도 변수 이름은 중립이어야 한다(위 ② 와 같은 이유 — 이름만으로 잡히면 판별력 0).
 e2e "벤더 키 파일을 verify.sh 가 차단" \
     "cfg.value = \"${SKA}api03-${LONGK}\"" 1
@@ -258,6 +292,9 @@ e2e "대문자 표기 웹훅도 차단(-i 손실 감지)" \
     "u=HTTPS://${DC_U}.COM/API/${WH_U}/${SNOW}/${TOK_U}" 1
 e2e "정상 파일은 verify.sh 가 통과" \
     "{\"position\":\"AX Sales\",\"pages\":20}" 0
+verify_contract_case "빈 Git 인덱스는 합격이 아니다" 0 NOT_RUN 2
+verify_contract_case "안전한 Git 인덱스 blob 한 개" 1 PASS 0
+verify_contract_case "CHECKED 상수 위조 방지용 안전 blob 두 개" 2 PASS 0
 
 # ── 종료 상태 대조 (D4) ──────────────────────────────────────────────────────
 # 2026-08-12 V1 D4: `git status --porcelain` 만 두 시점 비교하면 **무시된 파일**(gitignore)과
@@ -287,7 +324,7 @@ fi
 # (CHECKED: 14 로 통과). bash 버전 차이·편집 실수로 검사가 조용히 사라지는 것이
 # 이 저장소의 실제 사고 유형이다(같은 날 ${VAR^^} 로 3건이 사라졌다).
 # 그래서 기대 개수를 코드에 못박고 **적으면 실패**한다(P20 · P2).
-EXPECTED_CHECKS=32
+EXPECTED_CHECKS=35
 # -lt(하한)가 아니라 -ne(정확값)로 조인다: 하한만 보면 새 검사 3개를 넣고 기존 3개를
 # 지워도 초록이다. V1 판정서의 설계 결정("checked == 기대값 강제")과도 이쪽이 일치한다.
 if [ "$checked" -ne "$EXPECTED_CHECKS" ]; then
