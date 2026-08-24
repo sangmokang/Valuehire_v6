@@ -192,9 +192,9 @@
       "hooks/pre-commit",
       ".github/workflows/verify.yml",
       "suppressions.yaml",
-      "docs/sot/hook-contracts.md"
-      ,"scripts/acceptance-hs-a4.sh"
-      ,"scripts/acceptance-secret-webhook-vendor.sh"
+      "docs/sot/hook-contracts.md",
+      "scripts/acceptance-hs-a4.sh",
+      "scripts/acceptance-secret-webhook-vendor.sh"
     ],
     "change_protocol": {
       "required_updates": [
