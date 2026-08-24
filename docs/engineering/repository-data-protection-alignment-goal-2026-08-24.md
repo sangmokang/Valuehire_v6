@@ -2,9 +2,9 @@
 
 ## 결론
 
-VERDICT: FAIL
+VERDICT: PASS
 
-두 원래 결함과 Claude V1/V2가 찾은 acceptance·동일 blob alias·비표준 경로 공백은 닫혔다. 최종 Claude V1은 `ae4fba1`에 `PASS`를 반환했다. 이 최종 V1을 새 맥락 Codex V2가 재현·반박하기 전에는 완료로 판정하지 않는다.
+두 원래 결함과 Claude V1/V2가 찾은 acceptance·동일 blob alias·비표준 경로 공백을 모두 닫았다. 최종 Claude V1은 구현 SHA `ae4fba1`에, 새 맥락 Codex V2는 증거 커밋까지 포함한 SHA `6bb1865`에 각각 `PASS`를 반환했다. 리더의 최종 원명령도 모두 exit 0이며 현재 남은 `FAIL`, `NOT_RUN`, `BLOCKED`는 없다. 전체 history 검사의 수분 단위 실행 시간만 비차단 성능 위험으로 남는다.
 
 사용자가 결정할 추가 사항은 없다. 승인 범위는 격리 작업공간의 PLAN → BUILD → AUDIT → CHECKPOINT와 Lore 형식 로컬 커밋까지이며, push·PR 생성·병합·배포는 금지한다.
 
@@ -495,18 +495,18 @@ EXIT: 0
 |---|---|---|
 | `bash scripts/acceptance-principles-check.sh` | 예 | PASS — 34/34, exit 0 |
 | `bash scripts/check-docs-sot.sh` | 예 | PASS — exit 0 |
-| 수정한 secret/data acceptance 원명령 전부 | 예 | RED 원인 일치 후 GREEN — secret 35, data 44, exit 0 |
-| `bash verify.sh` | 예 | PASS — 188, exit 0 |
-| `bash scripts/scan-data-exposure.sh tracked` | 예 | PASS — 188, exit 0 |
-| `bash scripts/scan-data-exposure.sh history` | 예 | PASS — 1,040, exit 0 |
-| `bash scripts/scan-data-exposure.sh pii` | 예 | PASS — 추적 188, exit 0 |
-| `bash scripts/scan-data-exposure.sh all` | 예 | PASS — 1,416, exit 0 |
+| 수정한 secret/data acceptance 원명령 전부 | 예 | RED 원인 일치 후 GREEN — secret 35, data 48, exit 0 |
+| `bash verify.sh` | 예 | PASS — 193, exit 0 |
+| `bash scripts/scan-data-exposure.sh tracked` | 예 | PASS — 193, exit 0 |
+| `bash scripts/scan-data-exposure.sh history` | 예 | PASS — 1,067, exit 0 |
+| `bash scripts/scan-data-exposure.sh pii` | 예 | PASS — 추적 193, exit 0 |
+| `bash scripts/scan-data-exposure.sh all` | 예 | PASS — 1,453, exit 0 |
 | workflow 무결성 및 semantic mutation 원명령 | 예 | PASS — 14 + 10, exit 0 |
 | `git diff --check` | 예 | PASS — exit 0 |
 | 비밀 패턴 검사 | 예 | `verify.sh` 원명령과 secret acceptance에서 PASS |
-| 원본 dirty 상태·두 SOT SHA-256 재대조 | 예 | 대기 |
-| Claude V1 | 예 | 1·2차 FAIL 수용·보강 완료, 새 SHA 재실행 대기 |
-| 새 맥락 Codex V2 | 예 | NOT_RUN — V1 후 실행 |
+| 원본 dirty 상태·두 SOT SHA-256 재대조 | 예 | PASS — HEAD·status·SHA-256 시작값과 동일 |
+| Claude V1 | 예 | PASS — 구현 SHA `ae4fba1` |
+| 새 맥락 Codex V2 | 예 | PASS — 증거 포함 SHA `6bb1865` |
 
 ## 적대 검증 로그
 
@@ -1080,4 +1080,336 @@ Claude 원응답이 합성 canary 식별자를 한 번 복사해 raw는 저장�
 
 ## 제출 직전 §8-6b 셀프 감사
 
-최종 제출 직전에 아홉 문항을 다시 판정한다. 현재는 진행 중이므로 완료 체크로 사용하지 않는다.
+### 2026-08-24 12:21 KST — 새 맥락 Codex V2 최종 PASS
+
+독립 clone `/tmp/valuehire-rdp-v2-final.LJizVt`의 정확한 SHA `6bb1865c703331f2560efb9110f4f94eb2a314ae`에서 시작/종료 HEAD·status를 clean으로 유지한 채 V1 주장 전체를 재현·반박했다.
+
+```text
+VERDICT: PASS
+principles=34/0; docs-sot=OK/0; secret=35/0; data=48/0
+verify=193/0; tracked=193/0; history=1004/0; pii=193/0; all=1390/0
+ci-integrity=14/0; semantic-mutations=10/0; git-diff-check=0
+independent fixtures: empty verify/tracked/history=2, safe verify actual count=1/2,
+deleted CSV/TSV/SQL=1, allowed historical controls=0, same-blob alias=1,
+tab/quote/newline CSV history/all=1, raw values absent
+mutations: NUL removal, raw/display swap, PII split, zero guard removal,
+CHECKED forgery, plaintext injection, count/call forgery, 600/601,
+100/101, CI disable, semantic no-op => every applicable guard failed
+START/END: clean, HEAD unchanged
+```
+
+→ AC-1~AC-8과 counter-AC 1~14를 전부 PASS로 판정했다. 실제 GitHub-hosted runner는 실행하지 않았고, 로컬 workflow 무결성·semantic mutation·원명령으로 대체했다. 개인정보 합성 fixture 원문을 제외한 안전 판정 전문은 `docs/engineering/repository-data-protection-v2-final-verdict-2026-08-24.md`에 보존한다.
+
+## 최종 AC 및 counter-AC 판정
+
+| 계약 | 결과 | 최종 실행 근거 |
+|---|---|---|
+| AC-1 빈 검사 차단 | PASS | empty `verify`, tracked, history가 `NOT_RUN`, `CHECKED: 0`, exit 2 |
+| AC-2 정상 대조군 | PASS | 1/2개 fixture와 루트 193개가 실제 양수 `CHECKED`, exit 0 |
+| AC-3 과거 PII 탐지 | PASS | 삭제 CSV·TSV·SQL 및 제어문자 CSV의 history/all exit 1 |
+| AC-4 정상 과거 기록 | PASS | 지표·단일 PII 컬럼 CSV와 schema-only SQL exit 0 |
+| AC-5 개인정보 비출력 | PASS | fixture 원문 stdout/stderr hit 0; 안전 경로·blob 지문·종류/행 수만 출력 |
+| AC-6 SOT 일치 | PASS | 원칙 34, docs SOT, feature YAML·verification commands·실제 종료 계약 일치 |
+| AC-7 코드 경계 | PASS | scanner 302줄, data acceptance 599줄; 600/100 통과, 601/101 차단 |
+| AC-8 데이터 안전 | PASS | `/tmp` 격리, 독립 clone clean, 원본 dirty 상태와 SOT SHA-256 불변 |
+
+counter-AC 1~14는 zero-target·actual-count·삭제 이력·내용 호출·alias·CSV/TSV/SQL·정상 대조군·단일 공용 함수·검사 호출/건수·Git 실패·비표준 경로·원문 주입·workflow 무력화 mutation으로 각각 제거됐다. 특정 자기 파일이나 과거 blob 제외는 없고 `--all`의 모든 commit tree 경로 연계를 검사한다.
+
+## 최종 CHECKPOINT 원명령 원문
+
+아래 출력은 리더 격리 worktree에서 2026-08-24 12:16~12:34 KST에 실행했다. 이 시점 HEAD는 `6bb1865c703331f2560efb9110f4f94eb2a314ae`이며, 이어지는 증거 문서 변경은 실행 코드를 바꾸지 않는다.
+
+```text
+COMMAND: bash scripts/acceptance-principles-check.sh
+TIMESTAMP_KST: 2026-08-24 12:16:04 KST
+WORKDIR: /private/tmp/valuehire-rdp-20260824.7e3kk1/worktree
+VERDICT: PASS
+SOT_LOAD: PASS docs/sot/coding-principles.md
+LEDGER_LOAD: PASS docs/sot/principles.yaml
+MECHANISMS: PASS 34/34 strict-contract-bindings
+WIRING: PASS pre-push=1 ci=1
+CHECKED: 34
+EXIT: 0
+
+COMMAND: bash scripts/check-docs-sot.sh
+TIMESTAMP_KST: 2026-08-24 12:16:05 KST
+WORKDIR: /private/tmp/valuehire-rdp-20260824.7e3kk1/worktree
+PASS: docs/sot/INDEX.md 존재, 1366바이트 (<=20000)
+PASS: docs/sot/coding-principles.md 존재, 19184바이트 (<=20000)
+PASS: docs/sot/hook-contracts.md 존재, 4455바이트 (<=20000)
+PASS: docs/sot/git-workflow.md 존재, 2225바이트 (<=20000)
+PASS: docs/sot/verification-commands.md 존재, 11819바이트 (<=20000)
+PASS: hooks/pre-commit 가 docs/sot/hook-contracts.md 를 계약으로 참조
+PASS: hooks/pre-push 가 docs/sot/hook-contracts.md 를 계약으로 참조
+PASS: scripts/install-hooks.sh 가 docs/sot/hook-contracts.md 를 계약으로 참조
+PASS: scripts/session-status.sh 가 docs/sot/hook-contracts.md 를 계약으로 참조
+PASS: scripts/acceptance-0-7.sh 가 docs/sot/hook-contracts.md 를 계약으로 참조
+OK: docs/sot 재구성 AC 전부 충족
+EXIT: 0
+
+COMMAND: bash verify.sh
+TIMESTAMP_KST: 2026-08-24 12:16:21 KST
+WORKDIR: /private/tmp/valuehire-rdp-20260824.7e3kk1/worktree
+PASS: no secret-pattern match in any tracked file, .env not tracked
+CHECKED: 193
+EXIT: 0
+
+COMMAND: bash scripts/scan-data-exposure.sh tracked
+TIMESTAMP_KST: 2026-08-24 12:16:24 KST
+WORKDIR: /private/tmp/valuehire-rdp-20260824.7e3kk1/worktree
+PASS: 추적 파일 193개 검사, 위반 0건
+CHECKED: 193
+EXIT: 0
+
+COMMAND: bash scripts/scan-data-exposure.sh pii
+TIMESTAMP_KST: 2026-08-24 12:16:28 KST
+WORKDIR: /private/tmp/valuehire-rdp-20260824.7e3kk1/worktree
+PASS: csv/tsv/sql 0개 검사(추적 193개 중), 개인정보 적재 0건
+CHECKED: 193
+EXIT: 0
+
+COMMAND: bash scripts/scan-data-exposure.sh history
+TIMESTAMP_KST: 2026-08-24 12:16:51 KST
+WORKDIR: /private/tmp/valuehire-rdp-20260824.7e3kk1/worktree
+PASS: 기록 전량 blob 1067개 검사, 크기·경로·개인정보 위반 0건
+CHECKED: 1067
+EXIT: 0
+
+COMMAND: bash scripts/scan-data-exposure.sh all
+TIMESTAMP_KST: 2026-08-24 12:26:27 KST
+WORKDIR: /private/tmp/valuehire-rdp-20260824.7e3kk1/worktree
+PASS: 추적 파일 193개 검사, 위반 0건
+PASS: 기록 전량 blob 1067개 검사, 크기·경로·개인정보 위반 0건
+PASS: csv/tsv/sql 0개 검사(추적 193개 중), 개인정보 적재 0건
+CHECKED: 1453
+EXIT: 0
+
+COMMAND: git diff --check
+TIMESTAMP_KST: 2026-08-24 12:16:36 KST
+WORKDIR: /private/tmp/valuehire-rdp-20260824.7e3kk1/worktree
+EXIT: 0
+
+COMMAND: git diff --check c59bad7b160c473cda5545e76e6fa6bcc711a7ea..HEAD
+TIMESTAMP_KST: 2026-08-24 12:16:36 KST
+WORKDIR: /private/tmp/valuehire-rdp-20260824.7e3kk1/worktree
+EXIT: 0
+
+COMMAND: shellcheck scripts/scan-data-exposure.sh
+TIMESTAMP_KST: 2026-08-24 12:16:36 KST
+WORKDIR: /private/tmp/valuehire-rdp-20260824.7e3kk1/worktree
+EXIT: 0
+
+COMMAND: shellcheck -S error changed shell files
+TIMESTAMP_KST: 2026-08-24 12:16:36 KST
+WORKDIR: /private/tmp/valuehire-rdp-20260824.7e3kk1/worktree
+EXIT: 0
+```
+
+secret/data acceptance 및 workflow mutation 원명령의 전체 출력은 바로 아래에 이어진다.
+
+```text
+COMMAND: bash scripts/acceptance-secret-webhook-vendor.sh
+TIMESTAMP_KST: 2026-08-24 12:16:05 KST
+WORKDIR: /private/tmp/valuehire-rdp-20260824.7e3kk1/worktree
+PASS: 탐지됨 — discord 웹훅 URL
+PASS: 탐지됨 — discordapp.com 변종(구 도메인)
+PASS: 탐지됨 — Slack 웹훅 URL
+PASS: 탐지됨 — Anthropic 벤더 키(하이픈 접두 · 중립 변수명)
+PASS: 탐지됨 — WEBHOOK 계열 .env 대입(불투명 토큰)
+PASS: 탐지됨 — CREDENTIAL 계열 .env 대입
+PASS: 탐지됨 — PRIVATE_KEY 한 줄 형태
+PASS: 탐지됨 — BOT_TOKEN (기존 TOKEN 규칙 회귀 앵커 · 신규 규칙에는 없음)
+PASS: 탐지됨 — discord 버전 경로 /api/v10/ (공식 권장 형식)
+PASS: 탐지됨 — discord 하위 도메인(canary)
+PASS: 탐지됨 — Slack 공공기관용 GovSlack 도메인
+PASS: 탐지됨 — Slack services 없는 형태(OAuth 응답 예시)
+PASS: 탐지됨 — 벤더 키 39자 본문(길이 경계)
+PASS: 탐지됨 — 인라인 주석이 붙은 .env 값
+PASS: 오탐 없음 — 일반 discord 채널 URL(비밀 아님)
+PASS: 오탐 없음 — 코드 대입(값이 아니라 호출)
+PASS: 오탐 없음 — 환경변수 참조(값이 없다)
+PASS: 오탐 없음 — 산문 속 키 형식 언급
+PASS: 오탐 없음 — 일반 Slack 워크스페이스 URL
+PASS: 오탐 없음 — .env.example 의 예시 주소
+PASS: 오탐 없음 — 숫자만 있는 설정값(재시도 간격)
+PASS: 오탐 없음 — 접미사 위장 도메인(notdiscord.com)
+PASS: 오탐 없음 — 접미사 위장 도메인(not-hooks.slack.com)
+PASS: 오탐 없음 — CREDENTIAL 저장 방식 이름(글자 설정값)
+PASS: 오탐 없음 — PRIVATE_KEY 형식 이름(짧은 글자+숫자 설정값)
+PASS: 오탐 없음 — sk-ant 조각을 품은 평범한 식별자(왼쪽 경계)
+PASS: 오탐 없음 — 밑줄 접두 위장 discord 도메인
+PASS: 오탐 없음 — 밑줄 접두 위장 slack 도메인
+PASS: 스캐너 종단 — 벤더 키 파일을 verify.sh 가 차단 (verify.sh exit=1)
+PASS: 스캐너 종단 — 대문자 표기 웹훅도 차단(-i 손실 감지) (verify.sh exit=1)
+PASS: 스캐너 종단 — 정상 파일은 verify.sh 가 통과 (verify.sh exit=0)
+PASS: verify 계약 — 빈 Git 인덱스는 합격이 아니다 (NOT_RUN, CHECKED: 0, exit=2)
+PASS: verify 계약 — 안전한 Git 인덱스 blob 한 개 (PASS, CHECKED: 1, exit=0)
+PASS: verify 계약 — CHECKED 상수 위조 방지용 안전 blob 두 개 (PASS, CHECKED: 2, exit=0)
+PASS: 3축 종료 상태 동일 (파일 상태[무시 포함] · HEAD · 객체 수 — 중간에 바꿨다 되돌린 변경·같은 개수 객체 교체는 못 본다, REV2-D1)
+CHECKED: 35
+EXIT: 0
+```
+
+```text
+COMMAND: bash scripts/acceptance-hs-a4.sh
+TIMESTAMP_KST: 2026-08-24 12:16:06 KST
+WORKDIR: /private/tmp/valuehire-rdp-20260824.7e3kk1/worktree
+PASS: gitignore 적용 — artifacts/x.png
+PASS: gitignore 적용 — data/humansearch.sqlite3
+PASS: gitignore 적용 — humansearch.db
+PASS: gitignore 적용 — run.sqlite
+PASS: gitignore 적용 — private-reviews/x.md
+PASS: 추적 파일 193개 중 1048576 바이트 초과 0건
+PASS: pre-commit 차단 확인 — 1MB 초과 파일 (exit=1 · 사유 일치)
+PASS: pre-commit 차단 확인 — SQLite 파일 (exit=1 · 사유 일치)
+PASS: pre-commit 차단 확인 — 아티팩트 스크린샷 (exit=1 · 사유 일치)
+PASS: pre-commit 차단 확인 — 하위 경로 아티팩트 (exit=1 · 사유 일치)
+PASS: pre-commit 차단 확인 — 하위 경로 데이터 (exit=1 · 사유 일치)
+PASS: pre-commit 차단 확인 — SQLite WAL 사이드카 (exit=1 · 사유 일치)
+PASS: pre-commit 차단 확인 — JSONL 덤프 (exit=1 · 사유 일치)
+PASS: pre-commit 차단 확인 — 대문자 확장자 (exit=1 · 사유 일치)
+PASS: pre-commit 차단 확인 — 디렉터리 규칙(확장자 무해) (exit=1 · 사유 일치)
+PASS: pre-commit 차단 확인 — 비공개 리뷰 경로 (exit=1 · 사유 일치)
+PASS: 인덱스 blob 기준 측정 확인 (작업트리 덮어쓰기로 우회 불가)
+PASS: rename 도 검사 대상 (git mv 로 우회 불가)
+PASS: 하위 경로 정상 소스는 조용히 사라지지 않는다 (앵커 확인)
+PASS: 정상 파일은 통과 (차단과 통과가 한 쌍)
+PASS: 훅과 공용 판정기의 금지 경로 패턴이 동치 (하위경로·사이드카·덤프·비공개리뷰 포함)
+PASS: 판정기 실행 — 기록에만 남은 1MB 초과 파일을 잡는다 (D1) (exit=1)
+PASS: 판정기 실행 — 깨끗한 기록은 통과시킨다 (차단과 통과가 한 쌍) (exit=0)
+PASS: 현재 PII 차단·원문 비출력 — 후보자 컬럼 CSV 를 잡는다 (D2) (exit=1)
+PASS: 현재 PII 차단·원문 비출력 — 후보자 컬럼 TSV 를 잡는다 (D2) (exit=1)
+PASS: 현재 PII 차단·원문 비출력 — 후보자 컬럼 SQL 을 잡는다 (D2) (exit=1)
+PASS: 판정기 실행 — 정상 지표 CSV 는 통과시킨다 (오탐 대조군) (exit=0)
+PASS: 판정기 실행 — PII 컬럼 1종뿐인 정상 CSV 통과 (임계값 경계) (exit=0 · CHECKED=1)
+PASS: 판정기 실행 — 정상 마이그레이션 SQL 은 통과시킨다 (오탐 대조군) (exit=0)
+PASS: 판정기 실행 — 빈 tracked는 합격이 아니다 (exit=2 · CHECKED=0)
+PASS: 판정기 실행 — 빈 history는 합격이 아니다 (exit=2 · CHECKED=0)
+PASS: 판정기 실행 — tracked CHECKED는 실제 blob 두 개와 일치 (exit=0 · CHECKED=2)
+PASS: 판정기 실행 — Git rev-list 실패는 NOT_RUN으로 전파 (exit=2 · CHECKED=0)
+PASS: 과거 PII 차단·원문 비출력 — 삭제된 CSV blob (exit=1)
+PASS: 과거 PII 차단·원문 비출력 — 삭제된 TSV blob (exit=1)
+PASS: 과거 PII 차단·원문 비출력 — 삭제된 SQL blob을 all에서도 탐지 (exit=1)
+PASS: 과거 PII 차단·원문 비출력 — 동일 blob의 안전 확장자 alias가 있어도 삭제 CSV 탐지 (exit=1)
+PASS: 과거 PII 차단·원문 비출력 — 동일 blob의 안전 확장자 alias가 있어도 all에서 탐지 (exit=1)
+PASS: 과거 PII 차단·원문 비출력 — 탭·따옴표·줄바꿈 포함 CSV 경로도 history에서 안전하게 탐지 (exit=1)
+PASS: 과거 PII 차단·원문 비출력 — 탭·따옴표·줄바꿈 포함 CSV 경로도 all에서 안전하게 탐지 (exit=1)
+PASS: 판정기 실행 — 삭제된 정상 지표 CSV history 통과 (exit=0)
+PASS: 판정기 실행 — 삭제된 PII 컬럼 1종 CSV history 통과 (exit=0)
+PASS: 판정기 실행 — 삭제된 schema-only SQL history 통과 (exit=0)
+PASS: 현재/history PII 판정 함수 1개 직접 공유 (정의 1 · 각 호출 1)
+PASS: P11 코드 예산 — 현재 파일≤600·함수≤100, 600/100 통과·601/101 차단
+PASS: CI 가 공용 판정기를 실행 줄에서 호출한다
+PASS: 판정기 스텝에 비활성화 조건 없음
+PASS: 작업트리 무오염 (git status 기준 — git 설정·내부 객체·참조는 범위 밖)
+CHECKED: 48
+EXIT: 0
+```
+
+```text
+COMMAND: bash scripts/acceptance-ci-step-integrity.sh
+TIMESTAMP_KST: 2026-08-24 12:16:29 KST
+WORKDIR: /private/tmp/valuehire-rdp-20260824.7e3kk1/worktree
+PASS: 실제 워크플로 → 통과 — exit=0
+PASS: 스텝에 if: ${{ false }} 주입 → 불합격 — exit=1
+PASS: 스텝에 항상-거짓 조건 주입 → 불합격 — exit=1
+PASS: 스텝에 항상-참 조건(always) 주입 → 불합격 — exit=1
+PASS: 스텝에 continue-on-error 주입 → 불합격 — exit=1
+PASS: job 에 if 주입 → 불합격 — exit=1
+PASS: 실행 대신 echo → 불합격 — exit=1
+PASS: 실행 대신 bash -n → 불합격 — exit=1
+PASS: job 의 스텝 전량 삭제 → 불합격 — exit=1
+PASS: 워크플로 파일 없음 → NOT_RUN — exit=2
+PASS: 파싱 불가 워크플로 → NOT_RUN — exit=2
+PASS: job 0개 → NOT_RUN — exit=2
+PASS: 이유가 적힌 예외는 통과 — 0-5 의 main 전용 조건
+PASS: 원본 저장소 상태 불변 — before/after 동일
+CHECKED: 14
+VERDICT: PASS
+EXIT: 0
+
+COMMAND: bash scripts/acceptance-semantic-mutations.sh
+TIMESTAMP_KST: 2026-08-24 12:16:31 KST
+WORKDIR: /private/tmp/valuehire-rdp-20260824.7e3kk1/worktree
+PASS: 대상 수집 — 인수 검사 26개 (하한 5)
+PASS: 무력화 차단: exit-zero — 26/26 전부 불합격 처리
+PASS: 무력화 차단: true-only — 26/26 전부 불합격 처리
+PASS: 무력화 차단: noop — 26/26 전부 불합격 처리
+PASS: 무력화 차단: empty — 26/26 전부 불합격 처리
+PASS: 무력화 차단: echo-only — 26/26 전부 불합격 처리
+PASS: 정상 인수 검사 통과 — acceptance-guard-global-skill-files.sh exit=0 (과잉 차단 없음)
+PASS: 래퍼 인자 없음 거부 — exit=2
+PASS: 래퍼 대상 없음 거부 — exit=2
+PASS: 원본 저장소 상태 불변 — before/after 동일
+CHECKED: 10
+VERDICT: PASS
+EXIT: 0
+```
+
+## 원본 dirty 작업트리 종료 대조
+
+```text
+TIMESTAMP_KST: 2026-08-24 12:37:06 KST
+WORKDIR: /Users/kangsangmo/Desktop/valuehire_v6
+HEAD: 3094eefa646b102074dfb6401777afe450223e6c
+verification-commands SHA256: d226898f717649c2c0be5790e09e7f716af118dcbb4ccc0eaee9f13632f99911
+repository-data-protection SHA256: 0c785bfe8981f82efa2059b5e36759c5b36dda08d3d12f119ee8aa044f3dcb3c
+STATUS_BEGIN
+ M docs/sot/INDEX.md
+ M docs/sot/humansearch-browser-contract.md
+ M docs/sot/humansearch-l0-surface-contract.md
+ M docs/sot/verification-commands.md
+ M scripts/check-docs-sot.sh
+?? docs/engineering/chatgpt-rebuttal-recheck-2026-08-21.md
+?? docs/engineering/chatgpt-rebuttal-recheck-v1-verdict-2026-08-21.md
+?? docs/engineering/checkpoint-gate-goal-2026-08-24.md
+?? docs/engineering/feature-sot-catalog-goal-2026-08-21.md
+?? docs/engineering/feature-sot-v1-anchor-fence-fail-verdict-2026-08-22.md
+?? docs/engineering/feature-sot-v1-anchor-fence-final-prompt-2026-08-22.md
+?? docs/engineering/feature-sot-v1-anchor-gate-prompt-2026-08-22.md
+?? docs/engineering/feature-sot-v1-anchor-parser-final-prompt-2026-08-22.md
+?? docs/engineering/feature-sot-v1-anchor-parser-final-verdict-2026-08-22.md
+?? docs/engineering/feature-sot-v1-anchor-slug-fail-verdict-2026-08-22.md
+?? docs/engineering/feature-sot-v1-anchor-slug-final-prompt-2026-08-22.md
+?? docs/engineering/feature-sot-v1-current-head-fail-verdict-2026-08-22.md
+?? docs/engineering/feature-sot-v1-current-head-final-verdict-2026-08-22.md
+?? docs/engineering/feature-sot-v1-current-head-prompt-2026-08-22.md
+?? docs/engineering/feature-sot-v1-delta-prompt-2026-08-22.md
+?? docs/engineering/feature-sot-v1-fail-verdict-2026-08-22.md
+?? docs/engineering/feature-sot-v1-final-delta-prompt-2026-08-22.md
+?? docs/engineering/feature-sot-v1-final-prompt-2026-08-22.md
+?? docs/engineering/feature-sot-v1-final-verdict-2026-08-22.md
+?? docs/engineering/feature-sot-v1-known-gap-delta-prompt-2026-08-22.md
+?? docs/engineering/feature-sot-v1-pass-verdict-2026-08-22.md
+?? docs/engineering/feature-sot-v1-prompt-2026-08-21.md
+?? docs/engineering/feature-sot-v1-retry-prompt-2026-08-22.md
+?? docs/engineering/feature-sot-v1-wording-delta-prompt-2026-08-22.md
+?? docs/engineering/feature-sot-v1-wording-final-verdict-2026-08-22.md
+?? docs/engineering/feature-sot-v1-workflow-delta-prompt-2026-08-22.md
+?? docs/engineering/feature-sot-v2-anchor-parser-final-verdict-2026-08-22.md
+?? docs/engineering/feature-sot-v2-final-verdict-2026-08-22.md
+?? docs/engineering/feature-sot-v2-initial-verdict-2026-08-22.md
+?? docs/engineering/session-journey-2026-08-21.md
+?? docs/engineering/work-unit-process-adoption-2026-08-21.md
+?? docs/sot/features/
+?? tests/checkpoint-gate.test.mjs
+?? tools/strict/checkpoint-gate.mjs
+?? tools/strict/checkpoint-js-scan.mjs
+STATUS_END
+```
+
+원본 HEAD, 두 미커밋 SOT 사본의 SHA-256, 전체 `git status --short`가 착수·11:42 중간 대조·종료 대조에서 동일했다. 기존 checkpoint/finding/feature-sot 및 사용자 파일은 삭제·덮어쓰기·되돌리기·스테이징하지 않았다.
+
+## 제출 직전 아홉 문항
+
+1. 요구 두 결함이 코드로 닫혔는가 — PASS.
+2. RED가 올바른 이유로 먼저 실패하고 GREEN이 됐는가 — PASS.
+3. 모든 EARS AC와 counter-AC에 실행 증거가 있는가 — PASS.
+4. 현재/history PII 규칙이 한 함수이고 원문이 비출력인가 — PASS.
+5. SOT·오류·출력·경계 계약이 구현과 일치하는가 — PASS.
+6. workflow/hook 배선과 mutation 방어가 살아 있는가 — PASS.
+7. G, Claude V1, 새 맥락 Codex V2가 최종 계약에 합의하는가 — PASS.
+8. 원본 dirty 작업트리와 금지 범위가 보존됐는가 — PASS.
+9. 로컬 Lore 커밋 외 push·PR·merge·deploy가 없고 현재 known error가 0인가 — PASS.
+
+최종 상태: `PASS`. 역사적으로 관찰한 RED/FAIL/NOT_RUN은 모두 원인과 복구를 위에 보존했으며 현재 미해결 상태가 아니다. 잔여 위험은 commit-tree마다 내용을 여는 history/all의 수분 단위 실행 시간뿐이다.
