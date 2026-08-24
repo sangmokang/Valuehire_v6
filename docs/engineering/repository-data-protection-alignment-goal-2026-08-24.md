@@ -4,7 +4,7 @@
 
 VERDICT: FAIL
 
-두 원래 결함의 구현은 닫혔지만 Claude V1 최종 공격이 동일 blob의 여러 과거 경로 중 PII 확장자 경로가 사라지는 새 반례를 찾아 `FAIL`을 반환했다. 이 반례를 RED로 고정하고 구현·정본을 보강했으며 새 V1과 V2가 모두 합격하기 전에는 완료로 판정하지 않는다.
+두 원래 결함과 Claude V1이 찾은 acceptance·동일 blob 경로 공백은 닫혔다. 최종 Claude V1은 `b979c5b`에 `PASS`를 반환했다. 새 맥락 Codex V2가 V1의 모든 주장을 재현·반박하기 전에는 완료로 판정하지 않는다.
 
 사용자가 결정할 추가 사항은 없다. 승인 범위는 격리 작업공간의 PLAN → BUILD → AUDIT → CHECKPOINT와 Lore 형식 로컬 커밋까지이며, push·PR 생성·병합·배포는 금지한다.
 
@@ -954,6 +954,32 @@ FILES: scan-data-exposure.sh=275, data acceptance=593
 ```
 
 → 새 alias 반례의 history와 all이 모두 올바른 이유로 RED에서 GREEN으로 바뀌었다. 정본은 46개 사례와 모든 commit-tree blob-경로 연결 열거를 명시하도록 함께 강화했다.
+
+### 2026-08-24 11:36 KST — Claude V1 최종 PASS
+
+`$ask-claude`의 우선 경로 `omx ask claude`는 구현을 읽기 전에 `Credit balance is too low`로 exit 1이어서 `NOT_RUN`으로 분리했다. 같은 독립 clone에서 환경의 API key만 해제하고 Claude Code 2.1.239 safe-mode를 재실행한 결과 `VERDICT: PASS`를 얻었다.
+
+```text
+TARGET: b979c5be8419af07fb8b4d982cb34badc77bdcfc
+WORKDIR: /private/tmp/valuehire-rdp-v1-b979.TOKH81
+principles=PASS/CHECKED:34/0
+docs-sot=OK/0
+secret-acceptance=PASS/CHECKED:35/0
+data-acceptance=PASS/CHECKED:46/0
+verify=PASS/CHECKED:190/0
+tracked=PASS/CHECKED:190/0
+history=PASS/CHECKED:994/0
+pii=PASS/CHECKED:190/0
+all=PASS/CHECKED:1374/0
+ci-integrity=PASS/CHECKED:14/0
+semantic-mutations=PASS/CHECKED:10/0
+git-diff-check=0
+V1 VERDICT: PASS
+```
+
+V1은 tracked zero-target 제거, data/verify `CHECKED` 위조, history PII 호출 제거, 현재/history 원문 출력, Git 실패 접기, PII 임계값 완화, 함수 한도 완화, verify zero-target 제거를 별도 mirror에서 공격했고 모두 acceptance exit 1 또는 원래 `NOT_RUN` 방어로 반증했다. 독자 fixture의 동일 blob `*.csv`/안전 확장자 alias도 history/all이 모두 exit 1이었다. 합성 원문은 `[가림]` 처리됐다.
+
+전체 안전 판정 기록: `docs/engineering/repository-data-protection-v1-verdict-2026-08-24.md`.
 
 ## 제출 직전 §8-6b 셀프 감사
 
