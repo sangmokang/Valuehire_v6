@@ -4,7 +4,7 @@
 
 VERDICT: FAIL
 
-두 원래 결함과 Claude V1이 찾은 acceptance·동일 blob alias 공백은 닫혔다. 최종 Claude V1은 `b979c5b`에 `PASS`를 반환했지만, 뒤이은 비표준 Git 경로 공격에서 줄바꿈 포함 CSV가 text 경로 파싱을 우회하는 반례를 재현했다. NUL 경계 보강 뒤 새 V1과 V2가 모두 합격하기 전에는 완료로 판정하지 않는다.
+두 원래 결함과 Claude V1/V2가 찾은 acceptance·동일 blob alias·비표준 경로 공백은 닫혔다. 최종 Claude V1은 `ae4fba1`에 `PASS`를 반환했다. 이 최종 V1을 새 맥락 Codex V2가 재현·반박하기 전에는 완료로 판정하지 않는다.
 
 사용자가 결정할 추가 사항은 없다. 승인 범위는 격리 작업공간의 PLAN → BUILD → AUDIT → CHECKPOINT와 Lore 형식 로컬 커밋까지이며, push·PR 생성·병합·배포는 금지한다.
 
@@ -1058,6 +1058,25 @@ STATIC: shellcheck scanner exit 0; shellcheck severity=error on four changed she
 ```
 
 → NUL-safe 구현, acceptance, SOT가 같은 경계를 말한다. 새 V1과 새 V2가 이 최종 SHA에서 다시 합격해야만 AUDIT를 닫는다.
+
+### 2026-08-24 12:00 KST — 최종 Claude V1 PASS
+
+독립 `--no-local` clone `/tmp/valuehire-rdp-v1-final.RI49kD`에서 SHA `ae4fba1ffe905720c1ecc41259d97b5d4449c4d5`를 재공격했다.
+
+```text
+VERDICT: PASS
+principles=34/0; docs-sot=OK/0; secret=35/0; data=48/0
+verify=192/0; tracked=192/0; history=332/0; pii=192/0; all=716/0
+ci-integrity=14/0; semantic-mutations=10/0; git-diff-check=0
+independent fixtures: empty verify=2, safe verify=0, deleted CSV/TSV/SQL=1,
+same-blob safe alias=1, control-character CSV history/all=1
+mutations: NUL removal, escaped-path classification, PII function split,
+data zero guard removal, verify CHECKED forgery, plaintext injection,
+two acceptance calls removal, function limit weakening => all acceptance exit 1
+START/END: clean, HEAD unchanged
+```
+
+Claude 원응답이 합성 canary 식별자를 한 번 복사해 raw는 저장하지 않았다. 실제 후보자 데이터는 없었고, 안전하게 redaction한 전체 판정은 `docs/engineering/repository-data-protection-v1-final-verdict-2026-08-24.md`에 보존했다. 남은 참고 지적은 commit마다 tree를 여는 history가 독립 clone에서 약 73초 걸린다는 성능 비용뿐이며 보안 완료 조건은 깨지 않는다.
 
 ## 제출 직전 §8-6b 셀프 감사
 
