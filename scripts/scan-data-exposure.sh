@@ -34,7 +34,12 @@ esac
 
 git rev-parse --git-dir >/dev/null 2>&1 || { echo "NOT_RUN: git 저장소가 아니다"; exit 2; }
 
+TMP_ROOT=$(mktemp -d) || { echo "NOT_RUN: 임시 검사 공간을 만들지 못했다"; echo "CHECKED: 0"; exit 2; }
+trap 'rm -rf -- "$TMP_ROOT"' EXIT
+
 fail=0
+checked_total=0
+last_checked=0
 
 # 금지 경로 판정 — 훅(hooks/pre-commit)과 **같은 목록**이어야 한다.
 # 목록이 갈라지면 한쪽만 막는 비대칭이 생기고, 그 비대칭이 훅 우회 습관을 만든다.
@@ -51,24 +56,27 @@ is_forbidden_path() {
 
 # ── tracked ──────────────────────────────────────────────────────────────────
 scan_tracked() {
-  local n=0 bad=0 f sz
+  local n=0 inspected=0 bad=0 invalid=0 f sz
   while IFS= read -r -d '' f; do
     n=$((n + 1))
     if is_forbidden_path "$f"; then
-      echo "FAIL: 산출물·데이터 경로가 추적됨: $f (P21 · 후보자 PII)"; bad=1; continue
+      echo "FAIL: 산출물·데이터 경로가 추적됨: $f (P21 · 후보자 PII)"; bad=1
     fi
     sz=$(git cat-file -s ":$f" 2>/dev/null) || sz=""
     case "$sz" in
-      ''|*[!0-9]*) echo "FAIL: blob 크기를 읽지 못함: $f (fail-closed)"; bad=1; continue ;;
+      ''|*[!0-9]*) echo "NOT_RUN: blob 크기를 읽지 못함: $f"; invalid=1; continue ;;
     esac
+    inspected=$((inspected + 1))
     if [ "$sz" -gt "$MAX_BYTES" ]; then
       echo "FAIL: ${MAX_BYTES} 바이트 초과: $f (${sz} 바이트)"; bad=1
     fi
   done < <(git ls-files -z)
+  last_checked=$inspected
   if [ "$n" -eq 0 ]; then
-    echo "FAIL: 추적 파일 0개 — 스캔 무효 (P20 · 대상을 못 찾은 것이지 깨끗한 것이 아니다)"
+    echo "NOT_RUN: 추적 파일 0개 — 스캔 무효 (P20 · 대상을 못 찾은 것이지 깨끗한 것이 아니다)"
     return 2
   fi
+  [ "$invalid" -eq 0 ] || return 2
   [ "$bad" -eq 0 ] && echo "PASS: 추적 파일 ${n}개 검사, 위반 0건"
   return "$bad"
 }
@@ -77,36 +85,63 @@ scan_tracked() {
 # 기존 CI '히스토리 전량 스캔' 스텝이 이미 도달 가능한 blob 을 경로까지 열거한다.
 # 새 순회를 만들지 않고 같은 열거를 재사용한다(P12 · 회수 우선).
 scan_history() {
-  local objs bad=0 blobs=0 sha sz path count
-  objs=$(mktemp) || { echo "FAIL: mktemp 실패 (fail-closed)"; return 2; }
-  # shellcheck disable=SC2064
-  trap "rm -f '$objs'" RETURN
+  local objs="$TMP_ROOT/history-objects" unique="$TMP_ROOT/history-unique"
+  local ids="$TMP_ROOT/history-ids" info="$TMP_ROOT/history-info" content="$TMP_ROOT/history-blob"
+  local bad=0 invalid=0 blobs=0 inspected=0
+  local line sha info_sha type sz path pii_rc extra
   if ! git rev-list --all --reflog --objects > "$objs" 2>/dev/null; then
-    echo "FAIL: git rev-list 실패 — 기록을 읽지 못했다 (스캔 무효)"; return 2
+    echo "NOT_RUN: git rev-list 실패 — 기록을 읽지 못했다 (스캔 무효)"; return 2
   fi
-  count=$(awk '{print $1}' "$objs" | sort -u | wc -l | tr -d ' ')
-  if [ "$count" -lt 2 ]; then
-    echo "FAIL: 도달 가능 객체가 ${count}개 — 저장소를 제대로 읽지 못했다 (스캔 무효)"; return 2
+  if ! awk '!seen[$1]++' "$objs" > "$unique"; then
+    echo "NOT_RUN: 도달 가능 객체 목록을 정규화하지 못했다"; return 2
   fi
-  while IFS= read -r sha; do
+  if ! awk '{ print $1 }' "$unique" > "$ids" \
+     || ! git cat-file --batch-check='%(objectname) %(objecttype) %(objectsize)' \
+       < "$ids" > "$info" 2>/dev/null; then
+    echo "NOT_RUN: 도달 가능 Git 객체 메타데이터 배치 읽기에 실패했다"; return 2
+  fi
+  exec 3< "$info"
+  while IFS= read -r line; do
+    sha=${line%% *}
     [ -z "$sha" ] && continue
-    [ "$(git cat-file -t "$sha" 2>/dev/null)" = blob ] || continue
-    blobs=$((blobs + 1))
-    path=$(awk -v s="$sha" '$1==s {print $2; exit}' "$objs")
-    if [ -n "$path" ] && is_forbidden_path "$path"; then
-      echo "FAIL: 기록에 산출물·데이터 경로가 남아 있음: $path ($sha)"; bad=1; continue
+    if [ "$line" = "$sha" ]; then path=""; else path=${line#* }; fi
+    if ! IFS=' ' read -r info_sha type sz <&3 \
+       || [ "$info_sha" != "$sha" ] \
+       || [ -z "$type" ] \
+       || [ -z "$sz" ]; then
+      echo "NOT_RUN: 도달 가능 Git 객체 메타데이터가 불완전하다: $sha"; invalid=1; continue
     fi
-    sz=$(git cat-file -s "$sha" 2>/dev/null) || sz=""
-    case "$sz" in ''|*[!0-9]*) continue ;; esac
+    [ "$type" = blob ] || continue
+    blobs=$((blobs + 1))
+    if [ -n "$path" ] && is_forbidden_path "$path"; then
+      echo "FAIL: 기록에 산출물·데이터 경로가 남아 있음: $path ($sha)"; bad=1
+    fi
+    case "$sz" in
+      ''|*[!0-9]*) echo "NOT_RUN: 기록 blob 크기를 읽지 못했다: $sha"; invalid=1; continue ;;
+    esac
     if [ "$sz" -gt "$MAX_BYTES" ]; then
       echo "FAIL: 기록에 ${MAX_BYTES} 바이트 초과 blob 이 남아 있음: ${path:-<경로없음>} (${sz} 바이트, $sha)"
       bad=1
+    elif is_pii_path "$path"; then
+      if ! git cat-file blob "$sha" > "$content" 2>/dev/null; then
+        echo "NOT_RUN: 개인정보 후보 history blob을 읽지 못했다: $sha"; invalid=1; continue
+      fi
+      pii_rc=0
+      scan_pii_content "$path" "$content" "$sha" || pii_rc=$?
+      [ "$pii_rc" -eq 1 ] && bad=1
     fi
-  done < <(awk '{print $1}' "$objs" | sort -u)
-  if [ "$blobs" -eq 0 ]; then
-    echo "FAIL: blob 을 한 개도 읽지 못했다 (스캔 무효)"; return 2
+    inspected=$((inspected + 1))
+  done < "$unique"
+  if IFS= read -r extra <&3; then
+    echo "NOT_RUN: Git 객체 메타데이터가 객체 목록보다 많다"; invalid=1
   fi
-  [ "$bad" -eq 0 ] && echo "PASS: 기록 전량 blob ${blobs}개 검사, 크기·경로 위반 0건"
+  exec 3<&-
+  last_checked=$inspected
+  if [ "$blobs" -eq 0 ]; then
+    echo "NOT_RUN: blob 을 한 개도 읽지 못했다 (스캔 무효)"; return 2
+  fi
+  if [ "$invalid" -ne 0 ] || [ "$inspected" -ne "$blobs" ]; then return 2; fi
+  [ "$bad" -eq 0 ] && echo "PASS: 기록 전량 blob ${blobs}개 검사, 크기·경로·개인정보 위반 0건"
   return "$bad"
 }
 
@@ -125,49 +160,76 @@ scan_history() {
 # 검사를 약화시키는 대신 이름을 고친다.
 PII_COLUMN_WORDS='name|email|e_mail|mail|phone|mobile|tel|school|univ|university|profile_url|linkedin|resume|birth|이름|이메일|전화|휴대폰|학교|생년|프로필'
 
-pii_word_count() { printf '%s' "$1" | tr 'A-Z' 'a-z' | grep -oE "$PII_COLUMN_WORDS" | sort -u | wc -l | tr -d ' '; }
+pii_word_count() {
+  tr 'A-Z' 'a-z' | grep -oE "$PII_COLUMN_WORDS" | sort -u | awk 'END { print NR + 0 }'
+}
+
+is_pii_path() {
+  local lf; lf=$(printf '%s' "$1" | tr 'A-Z' 'a-z')
+  case "$lf" in *.csv|*.tsv|*.sql) return 0 ;; *) return 1 ;; esac
+}
+
+scan_pii_content() {
+  # scan_pii_content <safe-path> <content-file> [history-blob-fingerprint]
+  # 현재 파일과 history가 이 한 함수를 공유한다. 실제 값은 어느 출력에도 쓰지 않는다.
+  local path="$1" content="$2" fingerprint="${3:-}" lf header rows hits shape meta
+  lf=$(printf '%s' "$path" | tr 'A-Z' 'a-z')
+  case "$lf" in
+    *.csv|*.tsv)
+      header=$(sed -n '1p' "$content")
+      hits=$(printf '%s' "$header" | pii_word_count)
+      rows=$(awk 'NR > 1 && $0 ~ /[^[:space:],]/ { n++ } END { print n + 0 }' "$content")
+      [ "$hits" -ge 2 ] && [ "$rows" -ge 1 ] || return 0
+      shape="표 데이터 ${rows}행"
+      ;;
+    *.sql)
+      hits=$(pii_word_count < "$content")
+      if [ "$hits" -lt 2 ] \
+         || ! grep -qiE '\b(insert[[:space:]]+into|values[[:space:]]*\(|copy[[:space:]]+.*from)' "$content"; then
+        return 0
+      fi
+      shape="INSERT/VALUES/COPY 적재문"
+      ;;
+    *) return 0 ;;
+  esac
+  if [ -n "$fingerprint" ]; then meta=" · blob $fingerprint"; else meta=""; fi
+  printf 'FAIL: 후보자 개인정보 내용: %s%s · 개인정보 컬럼 %s종 · %s\n' \
+    "$path" "$meta" "$hits" "$shape"
+  return 1
+}
 
 scan_pii() {
-  local n=0 files=0 bad=0 f lf header rows hits body
+  local n=0 inspected=0 files=0 bad=0 invalid=0 f content="$TMP_ROOT/current-blob" pii_rc
   while IFS= read -r -d '' f; do
     n=$((n + 1))
-    lf=$(printf '%s' "$f" | tr 'A-Z' 'a-z')
-    case "$lf" in *.csv|*.tsv) ;; *.sql) ;; *) continue ;; esac
+    if ! is_pii_path "$f"; then inspected=$((inspected + 1)); continue; fi
     files=$((files + 1))
-    case "$lf" in
-      *.csv|*.tsv)
-        header=$(git cat-file blob ":$f" 2>/dev/null | head -1)
-        rows=$(git cat-file blob ":$f" 2>/dev/null | tail -n +2 | grep -cE '[^[:space:],]')
-        hits=$(pii_word_count "$header")
-        if [ "$hits" -ge 2 ] && [ "$rows" -ge 1 ]; then
-          echo "FAIL: 후보자 개인정보로 보이는 표 데이터: $f (개인정보 컬럼 ${hits}종 · 데이터 ${rows}행)"
-          bad=1
-        fi
-        ;;
-      *.sql)
-        body=$(git cat-file blob ":$f" 2>/dev/null)
-        hits=$(pii_word_count "$body")
-        if [ "$hits" -ge 2 ] && printf '%s' "$body" | grep -qiE '\b(insert[[:space:]]+into|values[[:space:]]*\(|copy[[:space:]]+.*from)'; then
-          echo "FAIL: 후보자 개인정보로 보이는 적재문: $f (개인정보 컬럼 ${hits}종 · INSERT/VALUES/COPY 포함)"
-          bad=1
-        fi
-        ;;
-    esac
+    if ! git cat-file blob ":$f" > "$content" 2>/dev/null; then
+      echo "NOT_RUN: 추적 개인정보 후보 blob을 읽지 못했다: $f"; invalid=1; continue
+    fi
+    pii_rc=0
+    scan_pii_content "$f" "$content" || pii_rc=$?
+    [ "$pii_rc" -eq 1 ] && bad=1
+    inspected=$((inspected + 1))
   done < <(git ls-files -z)
+  last_checked=$inspected
   if [ "$n" -eq 0 ]; then
-    echo "FAIL: 추적 파일 0개 — 스캔 무효 (P20)"; return 2
+    echo "NOT_RUN: 추적 파일 0개 — 스캔 무효 (P20)"; return 2
   fi
+  if [ "$invalid" -ne 0 ] || [ "$inspected" -ne "$n" ]; then return 2; fi
   [ "$bad" -eq 0 ] && echo "PASS: csv/tsv/sql ${files}개 검사(추적 ${n}개 중), 개인정보 적재 0건"
   return "$bad"
 }
 
 run() {
   local rc=0
+  last_checked=0
   case "$1" in
     tracked) scan_tracked || rc=$? ;;
     history) scan_history || rc=$? ;;
     pii)     scan_pii     || rc=$? ;;
   esac
+  checked_total=$((checked_total + last_checked))
   # NOT_RUN(2)은 FAIL(1)보다 강하게 전파한다 — 스캔이 성립하지 않은 것을 통과로 접지 않는다.
   if [ "$rc" -eq 2 ]; then fail=2
   elif [ "$rc" -ne 0 ] && [ "$fail" -ne 2 ]; then fail=1
@@ -180,4 +242,5 @@ else
   run "$MODE"
 fi
 
+printf 'CHECKED: %d\n' "$checked_total"
 exit "$fail"

@@ -1,6 +1,6 @@
 # Valuehire v6 — 이 저장소의 실제 게이트 명령 (SOT)
 
-최종 갱신: 2026-08-20 (전부 실행으로 확인, 가정 없음)
+최종 갱신: 2026-08-24 (0건 비밀 스캔 차단·도달 가능한 과거 PII blob 내용 검사; 아래 명령은 실행으로 확인)
 근거: `docs/engineering/docs-sot-restructure-goal-2026-08-08.md`
 
 ## 현재 규칙
@@ -11,7 +11,7 @@
 |---|---|---|
 | 0 — 시작 자격(RED 미해결 확인) | `make red-ledger` | `bash scripts/session-status.sh` (stdout 3번째 줄 `RED: N/M`) |
 | 2 — 워크트리 파기 | `make task NAME=...` | `git worktree add worktrees/<name> -b task/<name>` |
-| 4 — 검증 | `./verify.sh` | `bash verify.sh` (비밀 스캔) — CI(`verify.yml`)가 실제로 도는 검사 전체는 아래 "CI가 실제로 돌리는 것" 표가 정본이다(요약을 여기 두 번 적으면 반드시 갈라진다 — 2026-08-12 REV2-D2 실측). `scripts/acceptance-0-2.sh`는 로컬 전용(`.secret-patterns`에 실제 리터럴이 있어야 해서 CI에 못 올림, 스크립트 주석에 명시) |
+| 4 — 검증 | `./verify.sh` | `bash verify.sh` (비밀 스캔) — 대상 1개 이상을 모두 읽어 위반이 없을 때만 `PASS`, `CHECKED: N`, exit 0이다. 비밀/금지 파일은 `FAIL`, exit 1이고, 유효 패턴 없음·Git 읽기 실패·대상 0개는 `NOT_RUN`, exit 2다. CI(`verify.yml`)가 실제로 도는 검사 전체는 아래 "CI가 실제로 돌리는 것" 표가 정본이다. `scripts/acceptance-0-2.sh`는 로컬 전용(`.secret-patterns`에 실제 리터럴이 있어야 해서 CI에 못 올림, 스크립트 주석에 명시) |
 | 5 — 배송 | `make ship` | 아직 스크립트 없음 — `git push -u origin task/<name>` 후 `gh pr create` 수동 실행. push 시 `hooks/pre-push`가 verify.sh + acceptance-*.sh 전량(glob)을 재실행 |
 | 6 — 종료 | `make task-done NAME=...` | `git worktree remove worktrees/<name>` 수동 실행 |
 
@@ -53,15 +53,39 @@
 | 모드 | 무엇을 보나 |
 |---|---|
 | `tracked` | 지금 추적 중인 파일의 크기(1MB)·금지 경로 |
-| `history` | **도달 가능한 모든 blob**의 크기·금지 경로 — 커밋 후 지운 파일의 과거 본문까지 |
-| `pii` | `*.csv`·`*.tsv`·`*.sql`의 **개인정보 컬럼 조합** — 크기·확장자로는 안 잡히는 것 |
+| `history` | **도달 가능한 모든 blob**의 크기·금지 경로와 `*.csv`·`*.tsv`·`*.sql` 개인정보 내용 — 커밋 후 지운 파일의 과거 본문까지 |
+| `pii` | 현재 추적 `*.csv`·`*.tsv`·`*.sql`의 **개인정보 컬럼 조합** — 크기·확장자로는 안 잡히는 것 |
 | `all` | 셋 다 (CI가 쓰는 모드) |
 
-종료값 `0=PASS / 1=FAIL / 2=NOT_RUN`. **검사 대상 0건은 통과가 아니라 `NOT_RUN`이다**(P20).
+종료값 `0=PASS / 1=FAIL / 2=NOT_RUN`. 모든 모드는 마지막에 실제 처리 수 `CHECKED: N`을 한 번 출력한다. **검사 대상 0건이나 Git 객체 열거·형식·크기·본문 읽기 실패는 통과가 아니라 `NOT_RUN`이다**(P3·P20).
 
-`pii`는 오탐을 막기 위해 **두 조건을 모두** 만족해야 차단한다 — ① 개인정보 컬럼 낱말 2종 이상 ② 실제 데이터를 담은 형태(CSV는 데이터 행 1줄 이상, SQL은 `INSERT`/`VALUES`/`COPY`). 그래서 **`CREATE TABLE candidates(name, email)` 같은 스키마 정의는 통과한다** — 정상 마이그레이션까지 막으면 개발이 멈춘다.
+현재 `pii`와 `history`는 `scan_pii_content` 한 함수를 재사용한다. 오탐을 막기 위해 **두 조건을 모두** 만족해야 차단한다 — ① 개인정보 컬럼 낱말 2종 이상 ② 실제 데이터를 담은 형태(CSV·TSV는 데이터 행 1줄 이상, SQL은 `INSERT`/`VALUES`/`COPY`). 그래서 **`CREATE TABLE candidates(name, email)` 같은 스키마 정의는 통과한다** — 정상 마이그레이션까지 막으면 개발이 멈춘다.
+
+과거 개인정보 위반 출력은 안전한 저장소 경로, Git blob 지문, 개인정보 컬럼 종류 수와 데이터 형태만 담는다. 이름·이메일·전화번호와 행/SQL 원문은 stdout·stderr에 출력하지 않는다.
 
 **금지 경로 목록은 `hooks/pre-commit`과 이 판정기 두 곳에 있다**(훅은 '스테이지된 것'만 보므로 별도 코드다). 한쪽만 넓히면 조용히 갈라지므로 `scripts/acceptance-hs-a4.sh`가 두 목록의 동치를 검사한다.
+
+### 주요 기능 정본 구조 검사 — `scripts/check-docs-sot.sh`
+
+```bash
+bash scripts/check-docs-sot.sh
+```
+
+기존 SOT 필수 파일·훅 계약 참조에 더해 `docs/sot/features/catalog.yaml`과 기능 문서의 구조를
+검사한다. 기능 ID·문서 경로·범주·상태가 1:1로 맞는지, 필수 키·불변조건 ID가 중복되지 않는지,
+호출점·세부 정본·근거 경로와 Markdown 제목 앵커가 현재 저장소에 실제로 존재하는지 확인한다. 외부 URL은 근거 경로로
+허용하지 않는다. 또한 추적 제품 파일, 이름 있는 CI 단계, CI가 언급하는 저장소 검사 명령, 훅,
+HumanSearch 기능 계약을 실제 저장소에서 유도해 기능 문서의 `surface_coverage`와 정확히 대조한다.
+기능 YAML은 Python 표준 `json` 모듈로, GitHub Actions workflow의 단계 이름은 저장소의 기존 CI
+무결성 판정기와 같은 Ruby Psych YAML 파서로 읽는다. 별도 패키지를 추가하지 않는다.
+
+출력은 각 항목의 `PASS:` 또는 `FAIL:`과 마지막 전체 판정이다. 빈 카탈로그, 기능 문서 0개, 필수 키
+누락, 중복 기능 ID, 존재하지 않는 근거 경로·Markdown 앵커, 미귀속 CI 단계·명령은 모두 종료값 1이다. 정상 사본과
+일곱 고장 사본, 실제 새 표면을 동반한 7번째 기능 확장 사본을 2026-08-22에 격리 실행해 의도한
+정상·확장 사본만 종료값 0임을 확인했다.
+
+이 명령은 현재 수동 검사이며 pre-push와 CI에는 연결하지 않았다. 기능 분류 문서의 구조를 검사하지만
+제품 동작의 정답을 대신하지 않으므로, 각 기능 YAML의 `verification` 명령을 함께 실행해야 한다.
 
 ## 시행 지점
 

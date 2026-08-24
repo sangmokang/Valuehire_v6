@@ -21,29 +21,38 @@ else
 fi
 
 if [ ${#SOURCES[@]} -eq 0 ]; then
-  echo "FAIL: no secret patterns file found (.secret-patterns.default / .secret-patterns) (exit 2)"
+  echo "NOT_RUN: no secret patterns file found (.secret-patterns.default / .secret-patterns)"
   echo "      조용한 스킵 금지 — 패턴 없이는 스캔 자체가 무효다."
+  echo "CHECKED: 0"
   exit 2
 fi
 for p in "${SOURCES[@]}"; do
   if [ ! -f "$p" ] || [ ! -r "$p" ] || [ ! -s "$p" ]; then
-    echo "FAIL: secret patterns file missing/not-a-file/unreadable/empty: $p (exit 2)"
+    echo "NOT_RUN: secret patterns file missing/not-a-file/unreadable/empty: $p"
     echo "      로컬: 저장소 루트에 .secret-patterns 배치 / CI: .secret-patterns.default 사용."
+    echo "CHECKED: 0"
     exit 2
   fi
 done
 
-CLEAN=$(mktemp) ERRS=$(mktemp)
-trap 'rm -f "$CLEAN" "$ERRS"' EXIT
+TMP=$(mktemp -d) || { echo "NOT_RUN: temporary scan directory creation failed"; echo "CHECKED: 0"; exit 2; }
+CLEAN="$TMP/patterns"
+FILES="$TMP/files"
+BLOB="$TMP/blob"
+trap 'rm -rf -- "$TMP"' EXIT
 
 # CRLF 제거 + 주석(#)·공백뿐인 줄 제거 → 유효 패턴이 0개면 조용한 no-op 금지
-cat "${SOURCES[@]}" | tr -d '\r' | grep -vE '^[[:space:]]*(#|$)' > "$CLEAN" || true
-if [ ! -s "$CLEAN" ]; then
-  echo "FAIL: no effective secret patterns in: ${SOURCES[*]} (주석/빈 줄뿐, exit 2)"
+if ! awk '{ sub(/\r$/, ""); if ($0 !~ /^[[:space:]]*(#|$)/) print }' \
+  "${SOURCES[@]}" > "$CLEAN"; then
+  echo "NOT_RUN: secret patterns could not be normalized"
+  echo "CHECKED: 0"
   exit 2
 fi
-
-FAIL=0
+if [ ! -s "$CLEAN" ]; then
+  echo "NOT_RUN: no effective secret patterns in: ${SOURCES[*]} (주석/빈 줄뿐)"
+  echo "CHECKED: 0"
+  exit 2
+fi
 
 # 스캔 소스 (V1 2026-08-07 지적 반영):
 #   worktree(기본) — 작업트리 파일 내용을 읽는다. CI·수동 검사용.
@@ -54,43 +63,81 @@ FAIL=0
 #   (실측: 커밋된 blob 에 AKIA… 가 들어갔는데 스캔은 PASS)
 SCAN_SOURCE="${VERIFY_SCAN_SOURCE:-worktree}"
 
-set +e
+case "$SCAN_SOURCE" in
+  worktree|index) ;;
+  *)
+    echo "NOT_RUN: unknown VERIFY_SCAN_SOURCE '$SCAN_SOURCE' (worktree|index)"
+    echo "CHECKED: 0"
+    exit 2
+    ;;
+esac
+
+if ! git ls-files -z > "$FILES" 2>/dev/null; then
+  echo "NOT_RUN: git tracked-file enumeration failed"
+  echo "CHECKED: 0"
+  exit 2
+fi
+
+TARGETS=0
+CHECKED=0
+SCAN_ERROR=0
+ENV_TRACKED=0
+LEAKS=""
 # -i: 자격증명 키워드는 대소문자를 가리지 않는다(`password:` / `PASSWORD=` 둘 다 잡아야 함)
-if [ "$SCAN_SOURCE" = "index" ]; then
-  LEAKS=""
-  while IFS= read -r -d '' f; do
-    rc=0
-    git show ":$f" 2>>"$ERRS" | grep -qEif "$CLEAN" || rc=$?
-    if [ "$rc" -eq 0 ]; then
-      LEAKS="${LEAKS}${f}"$'\n'
-    elif [ "$rc" -gt 1 ]; then
-      printf 'grep 실행 오류(rc=%s): %s\n' "$rc" "$f" >> "$ERRS"
+while IFS= read -r -d '' f; do
+  TARGETS=$((TARGETS + 1))
+  [ "$f" = .env ] && ENV_TRACKED=1
+  rc=0
+  if [ "$SCAN_SOURCE" = index ]; then
+    if ! git show ":$f" > "$BLOB" 2>/dev/null; then
+      printf '  ! unreadable Git index blob: %s\n' "$f"
+      SCAN_ERROR=1
+      continue
     fi
-  done < <(git ls-files -z)
-  LEAKS="${LEAKS%$'\n'}"
-else
-  LEAKS=$(git ls-files -z | xargs -0 grep -lEif "$CLEAN" -- 2>"$ERRS")
+    if grep -qEif "$CLEAN" -- "$BLOB" 2>/dev/null; then rc=0; else rc=$?; fi
+  else
+    if grep -qEif "$CLEAN" -- "$f" 2>/dev/null; then rc=0; else rc=$?; fi
+  fi
+  if [ "$rc" -eq 0 ]; then
+    LEAKS="${LEAKS}${f}"$'\n'
+    CHECKED=$((CHECKED + 1))
+  elif [ "$rc" -eq 1 ]; then
+    CHECKED=$((CHECKED + 1))
+  else
+    printf '  ! unreadable scan target: %s\n' "$f"
+    SCAN_ERROR=1
+  fi
+done < "$FILES"
+
+if [ "$TARGETS" -eq 0 ]; then
+  echo "NOT_RUN: tracked scan target count is zero"
+  echo "CHECKED: 0"
+  exit 2
 fi
-set -e
-if [ -s "$ERRS" ]; then
-  echo "FAIL: scanner error — fail-closed (grep/xargs stderr):"
-  sed 's/^/  ! /' "$ERRS"
-  FAIL=1
+if [ "$SCAN_ERROR" -ne 0 ] || [ "$CHECKED" -ne "$TARGETS" ]; then
+  echo "NOT_RUN: one or more scan targets could not be read"
+  echo "CHECKED: $CHECKED"
+  exit 2
 fi
+
+FAIL=0
+LEAKS="${LEAKS%$'\n'}"
 if [ -n "$LEAKS" ]; then
   echo "FAIL: secret pattern matched in tracked files:"
   printf '%s\n' "$LEAKS" | sed 's/^/  - /'
   FAIL=1
 fi
 
-if git ls-files | grep -qx "\.env$"; then
+if [ "$ENV_TRACKED" -eq 1 ]; then
   echo "FAIL: .env is tracked by git (should stay untracked/gitignored)"
   FAIL=1
 fi
 
 if [ "$FAIL" -eq 0 ]; then
   echo "PASS: no secret-pattern match in any tracked file, .env not tracked"
+  echo "CHECKED: $CHECKED"
   exit 0
 else
+  echo "CHECKED: $CHECKED"
   exit 1
 fi
