@@ -4,7 +4,7 @@
 
 VERDICT: FAIL
 
-두 원래 결함의 구현은 닫혔지만 Claude V1 1·2차 공격이 acceptance 감시 공백을 찾아 `FAIL`을 반환했다. 두 차례 주장을 모두 보강했으며 새 V1과 V2가 모두 합격하기 전에는 완료로 판정하지 않는다.
+두 원래 결함의 구현은 닫혔지만 Claude V1 최종 공격이 동일 blob의 여러 과거 경로 중 PII 확장자 경로가 사라지는 새 반례를 찾아 `FAIL`을 반환했다. 이 반례를 RED로 고정하고 구현·정본을 보강했으며 새 V1과 V2가 모두 합격하기 전에는 완료로 판정하지 않는다.
 
 사용자가 결정할 추가 사항은 없다. 승인 범위는 격리 작업공간의 PLAN → BUILD → AUDIT → CHECKPOINT와 Lore 형식 로컬 커밋까지이며, push·PR 생성·병합·배포는 금지한다.
 
@@ -172,7 +172,7 @@ Exit = 0 PASS | 1 FAIL | 2 NOT_RUN
 - SQL은 개인정보 컬럼 종류 2종 이상과 INSERT/VALUES/COPY 적재 형태가 함께 있을 때 차단한다. CREATE TABLE만 있는 스키마는 통과한다.
 - Git 열거 실패, 객체형/크기/blob 본문 읽기 실패, 검사 blob 0개는 `NOT_RUN`, exit 2다.
 - 출력은 안전한 경로, blob 지문의 축약형 또는 전체 SHA, 컬럼 종류 수, 데이터 형태만 포함한다. 본문·실제 값은 출력하지 않는다.
-- 동일 blob은 내용 판정을 한 번만 수행하되, 금지 경로는 도달 가능한 경로별로 놓치지 않는다.
+- 동일 blob은 실제 검사 수 한 건으로 세고 본문을 한 번 읽되, 도달 가능한 모든 commit-tree 경로에서 금지 경로와 PII 확장자 종류를 놓치지 않고 공용 판정 함수에 적용한다.
 
 ### 공통 경계
 
@@ -900,6 +900,60 @@ FILES: verify.sh=143, scan-data-exposure.sh=246, secret acceptance=337, data acc
 ```
 
 → 정상 사본은 44개 사례를 모두 통과하고 data acceptance 자체도 600줄 hard limit 아래 576줄이다. 다음 V1은 이 새 SHA를 다시 독립 clone에서 공격한다.
+
+### 2026-08-24 11:13 KST — Claude V1 3차 FAIL: 동일 blob 경로 alias
+
+독립 clone `/tmp/valuehire-rdp-v1-pass.FmABgX`에서 Claude Code 2.1.239(Sonnet, safe-mode)가 `757de81e1bb30ae649ced5ef1158e46b10b92e74`를 공격했다. 지정 clone은 시작·종료 모두 clean이고 HEAD가 같았다. 기존 V1 1·2차의 아홉 약화와 추가 mutation을 모두 acceptance exit 1로 반증했지만, 무훼손 코드에서 다음 높은 심각도 반례를 세 번 재현해 최종 `VERDICT: FAIL`을 냈다.
+
+```text
+선행 커밋: candidates.csv = 개인정보 컬럼 2종 + 데이터 행
+후행 커밋: backup.dat = 위 CSV와 완전히 동일한 blob
+각 파일을 후속 커밋에서 삭제
+기존 git rev-list --all --reflog --objects: 동일 blob에 backup.dat 경로만 반환
+기존 history: PASS / CHECKED: 1 / EXIT: 0
+기대 history: FAIL / EXIT: 1
+```
+
+실제 fixture 값은 합성값이지만 저장하지 않는 원칙에 따라 위 증거에는 복사하지 않았다. V1 보고서도 값을 `[합성이름]`, `[합성이메일]`로 가렸고 실제 후보자 데이터는 사용하지 않았다. 이 주장은 counter-AC 14와 AC-3을 직접 깨므로 수용했다.
+
+```text
+TIMESTAMP_KST: 2026-08-24 11:17:58 KST
+WORKDIR: /private/tmp/valuehire-rdp-20260824.7e3kk1/worktree
+COMMAND: bash scripts/acceptance-hs-a4.sh  # alias regression만 추가, 구현 전 RED
+FAIL: 판정기 실행 — 동일 blob의 안전 확장자 alias가 있어도 삭제 CSV 탐지 (기대 exit=1, 실제 0)
+FAIL: 판정기 실행 — 동일 blob의 안전 확장자 alias가 있어도 all에서 탐지 (기대 exit=1, 실제 0)
+CHECKED: 46
+EXIT: 1
+```
+
+보강은 `git rev-list --objects`가 붙인 대표 경로를 정책 판정에 쓰지 않는다. 모든 도달 가능 commit을 `git ls-tree -r --full-tree`로 읽고 고유 blob-경로 연결을 별도 수집한다. blob은 `CHECKED` 한 건으로 세고 본문을 한 번 읽되, 같은 blob이 거친 CSV·TSV·SQL 종류와 금지 경로는 모두 공용 판정 함수에 적용한다. commit tree 하나라도 완전히 읽지 못하면 `NOT_RUN`/2로 닫힌다.
+
+```text
+TIMESTAMP_KST: 2026-08-24 11:20:09 KST
+WORKDIR: /private/tmp/valuehire-rdp-20260824.7e3kk1/worktree
+COMMAND: bash scripts/acceptance-hs-a4.sh
+PASS: 판정기 실행 — 빈 tracked는 합격이 아니다 (exit=2 · CHECKED=0)
+PASS: 판정기 실행 — 빈 history는 합격이 아니다 (exit=2 · CHECKED=0)
+PASS: 판정기 실행 — Git rev-list 실패는 NOT_RUN으로 전파 (exit=2 · CHECKED=0)
+PASS: 과거 PII 차단·원문 비출력 — 삭제된 CSV blob (exit=1)
+PASS: 과거 PII 차단·원문 비출력 — 삭제된 TSV blob (exit=1)
+PASS: 과거 PII 차단·원문 비출력 — 삭제된 SQL blob을 all에서도 탐지 (exit=1)
+PASS: 과거 PII 차단·원문 비출력 — 동일 blob의 안전 확장자 alias가 있어도 삭제 CSV 탐지 (exit=1)
+PASS: 과거 PII 차단·원문 비출력 — 동일 blob의 안전 확장자 alias가 있어도 all에서 탐지 (exit=1)
+PASS: 판정기 실행 — 삭제된 정상 지표 CSV history 통과 (exit=0)
+PASS: 판정기 실행 — 삭제된 PII 컬럼 1종 CSV history 통과 (exit=0)
+PASS: 판정기 실행 — 삭제된 schema-only SQL history 통과 (exit=0)
+PASS: 현재/history PII 판정 함수 1개 직접 공유 (정의 1 · 각 호출 1)
+PASS: P11 코드 예산 — 현재 파일≤600·함수≤100, 600/100 통과·601/101 차단
+PASS: CI 가 공용 판정기를 실행 줄에서 호출한다
+PASS: 판정기 스텝에 비활성화 조건 없음
+PASS: 작업트리 무오염 (git status 기준 — git 설정·내부 객체·참조는 범위 밖)
+CHECKED: 46
+EXIT: 0
+FILES: scan-data-exposure.sh=275, data acceptance=593
+```
+
+→ 새 alias 반례의 history와 all이 모두 올바른 이유로 RED에서 GREEN으로 바뀌었다. 정본은 46개 사례와 모든 commit-tree blob-경로 연결 열거를 명시하도록 함께 강화했다.
 
 ## 제출 직전 §8-6b 셀프 감사
 

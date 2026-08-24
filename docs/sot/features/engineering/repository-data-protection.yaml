@@ -140,6 +140,11 @@
         "id": "RDP-INV-6",
         "rule": "Tracked and historical PII content use one shared decision function, and violation output contains only safe path, blob fingerprint, column-kind count and data-shape metadata.",
         "evidence": "scripts/scan-data-exposure.sh"
+      },
+      {
+        "id": "RDP-INV-7",
+        "rule": "History scanning enumerates every reachable commit-tree blob-path association, so a second safe-extension alias for identical blob content cannot hide a CSV, TSV or SQL path.",
+        "evidence": "scripts/scan-data-exposure.sh"
       }
     ],
     "boundaries": [
@@ -168,7 +173,7 @@
       {
         "id": "RDP-V3",
         "command": "bash scripts/scan-data-exposure.sh history",
-        "expected": "exit 0 after reading at least one reachable blob and checking size, forbidden path and CSV/TSV/SQL PII content with the shared decision function"
+        "expected": "exit 0 after reading at least one reachable blob, enumerating every reachable commit-tree blob-path association, and checking size, forbidden path and CSV/TSV/SQL PII content with the shared decision function"
       },
       {
         "id": "RDP-V4",
@@ -183,7 +188,7 @@
       {
         "id": "RDP-V6",
         "command": "bash scripts/acceptance-hs-a3.sh && bash scripts/acceptance-hs-a4.sh && bash scripts/acceptance-secret-webhook-vendor.sh",
-        "expected": "exact case counts, tracked/history zero-target, Git enumeration failure, actual CHECKED count, current and deleted-history CSV/TSV/SQL, current/history one-column and schema-only allowed controls, both-path non-disclosure, one shared PII function, 600/601 file and 100/101 function boundaries all pass; all commands exit 0"
+        "expected": "exact case counts, tracked/history zero-target, Git enumeration failure, actual CHECKED count, current and deleted-history CSV/TSV/SQL including an identical safe-extension blob alias, current/history one-column and schema-only allowed controls, both-path non-disclosure, one shared PII function, 600/601 file and 100/101 function boundaries all pass; all commands exit 0"
       }
     ],
     "evidence": [

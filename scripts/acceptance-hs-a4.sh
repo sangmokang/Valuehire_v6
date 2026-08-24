@@ -333,6 +333,19 @@ else
     git rm -q seed.sql
     printf 'safe\n' > README.md; git add README.md; git commit -q -m delete-pii
   }
+  sc_history_pii_same_blob_alias() {
+    local d1='2001-01-01T00:00:00Z' d2='2001-01-01T00:01:00Z'
+    printf 'name,email\nFixtureAlias,alias@example.invalid\n' > candidates.csv
+    git add candidates.csv
+    GIT_AUTHOR_DATE="$d1" GIT_COMMITTER_DATE="$d1" git commit -q -m pii-path
+    git rm -q candidates.csv; git commit -q -m delete-pii-path
+    printf 'name,email\nFixtureAlias,alias@example.invalid\n' > backup.dat
+    git add backup.dat
+    GIT_AUTHOR_DATE="$d2" GIT_COMMITTER_DATE="$d2" git commit -q -m safe-alias
+    git rm -q backup.dat
+    printf 'safe\n' > README.md; git add README.md
+    git commit -q -m delete-safe-alias
+  }
   sc_history_ok_csv() {
     printf 'position,count\nAX Sales,20\n' > metrics.csv
     git add metrics.csv; git commit -q -m metrics
@@ -445,6 +458,10 @@ else
   history_pii_case "삭제된 CSV blob" history "sc_history_pii_csv" 'FixtureAlpha|alpha@example\.invalid'
   history_pii_case "삭제된 TSV blob" history "sc_history_pii_tsv" 'FixtureBeta|010-0000-0000'
   history_pii_case "삭제된 SQL blob을 all에서도 탐지" all "sc_history_pii_sql" 'FixtureGamma|gamma@example\.invalid'
+  history_pii_case "동일 blob의 안전 확장자 alias가 있어도 삭제 CSV 탐지" history \
+    "sc_history_pii_same_blob_alias" 'FixtureAlias|alias@example\.invalid'
+  history_pii_case "동일 blob의 안전 확장자 alias가 있어도 all에서 탐지" all \
+    "sc_history_pii_same_blob_alias" 'FixtureAlias|alias@example\.invalid'
   judge_case "삭제된 정상 지표 CSV history 통과" history "sc_history_ok_csv" 0
   judge_case "삭제된 PII 컬럼 1종 CSV history 통과" history "sc_history_one_pii_word_csv" 0
   judge_case "삭제된 schema-only SQL history 통과" history "sc_history_ok_sql" 0
@@ -452,7 +469,7 @@ fi
 
 # 현재와 history가 같은 이름의 판정 함수 한 개를 정확히 두 번 호출하는지 고정한다.
 pii_definition_count=$(grep -Ec '^scan_pii_content[[:space:]]*\(\)[[:space:]]*\{' "$JUDGE")
-history_pii_call_count=$(grep -Fc 'scan_pii_content "$path" "$content" "$sha"' "$JUDGE")
+history_pii_call_count=$(grep -Fc 'scan_pii_content "$candidate" "$content" "$sha"' "$JUDGE")
 current_pii_call_count=$(grep -Fc 'scan_pii_content "$f" "$content"' "$JUDGE")
 if [ "$pii_definition_count" -eq 1 ] \
    && [ "$history_pii_call_count" -eq 1 ] \
@@ -564,7 +581,7 @@ else
 fi
 
 # 정확한 사례 수를 고정해 삭제 이력 호출이나 경계 검사가 제거돼도 초록이 되지 않게 한다.
-EXPECTED_CHECKS=44
+EXPECTED_CHECKS=46
 if [ "$checked" -ne "$EXPECTED_CHECKS" ]; then
   printf 'FAIL: 검사 항목 %d개 ≠ 계약값 %d개 (검사가 사라졌거나 무단 추가됐다 · P20)\n' \
     "$checked" "$EXPECTED_CHECKS"

@@ -82,64 +82,93 @@ scan_tracked() {
 }
 
 # ── history (D1) ─────────────────────────────────────────────────────────────
-# 기존 CI '히스토리 전량 스캔' 스텝이 이미 도달 가능한 blob 을 경로까지 열거한다.
-# 새 순회를 만들지 않고 같은 열거를 재사용한다(P12 · 회수 우선).
-scan_history() {
-  local objs="$TMP_ROOT/history-objects" unique="$TMP_ROOT/history-unique"
-  local ids="$TMP_ROOT/history-ids" info="$TMP_ROOT/history-info" content="$TMP_ROOT/history-blob"
-  local bad=0 invalid=0 blobs=0 inspected=0
-  local line sha info_sha type sz path pii_rc extra
-  if ! git rev-list --all --reflog --objects > "$objs" 2>/dev/null; then
+# rev-list --objects 는 동일 blob에 대표 경로 하나만 붙인다. 경로별 정책을 적용하려면
+# 모든 도달 가능 commit tree를 별도로 열거해야 안전 확장자 alias가 PII 경로를 숨기지 못한다.
+collect_history_inventory() {
+  # collect_history_inventory <object-ids> <blob-path-pairs>
+  local ids="$1" pairs="$2" objects="$TMP_ROOT/history-objects"
+  local revisions="$TMP_ROOT/history-revisions" raw="$TMP_ROOT/history-pairs-raw" rev
+  if ! git rev-list --all --reflog --objects > "$objects" 2>/dev/null \
+     || ! git rev-list --all --reflog > "$revisions" 2>/dev/null; then
     echo "NOT_RUN: git rev-list 실패 — 기록을 읽지 못했다 (스캔 무효)"; return 2
   fi
-  if ! awk '!seen[$1]++' "$objs" > "$unique"; then
+  if ! awk '{ print $1 }' "$objects" | LC_ALL=C sort -u > "$ids"; then
     echo "NOT_RUN: 도달 가능 객체 목록을 정규화하지 못했다"; return 2
   fi
-  if ! awk '{ print $1 }' "$unique" > "$ids" \
-     || ! git cat-file --batch-check='%(objectname) %(objecttype) %(objectsize)' \
+  : > "$raw" || { echo "NOT_RUN: history 경로 목록을 만들지 못했다"; return 2; }
+  while IFS= read -r rev; do
+    [ -n "$rev" ] || continue
+    if ! git -c core.quotePath=false ls-tree -r --full-tree "$rev" 2>/dev/null \
+       | awk -F '\t' '
+           index($0, "\t") {
+             meta=substr($0, 1, index($0, "\t")-1)
+             path=substr($0, index($0, "\t")+1)
+             split(meta, field, " ")
+             if (field[2] == "blob") print field[3] "\t" path
+           }
+         ' >> "$raw"; then
+      echo "NOT_RUN: 도달 가능 commit tree를 완전히 읽지 못했다: $rev"; return 2
+    fi
+  done < "$revisions"
+  if ! LC_ALL=C sort -u "$raw" > "$pairs"; then
+    echo "NOT_RUN: history blob-경로 목록을 정규화하지 못했다"; return 2
+  fi
+}
+
+scan_history() {
+  local ids="$TMP_ROOT/history-ids" pairs="$TMP_ROOT/history-pairs"
+  local info="$TMP_ROOT/history-info" paths="$TMP_ROOT/history-paths"
+  local pii_paths="$TMP_ROOT/history-pii-paths" content="$TMP_ROOT/history-blob"
+  local bad=0 invalid=0 blobs=0 inspected=0 line sha info_sha type sz path candidate
+  local pii_rc extra csv_seen tsv_seen sql_seen lf
+  collect_history_inventory "$ids" "$pairs" || return 2
+  if ! git cat-file --batch-check='%(objectname) %(objecttype) %(objectsize)' \
        < "$ids" > "$info" 2>/dev/null; then
     echo "NOT_RUN: 도달 가능 Git 객체 메타데이터 배치 읽기에 실패했다"; return 2
   fi
   exec 3< "$info"
-  while IFS= read -r line; do
-    sha=${line%% *}
-    [ -z "$sha" ] && continue
-    if [ "$line" = "$sha" ]; then path=""; else path=${line#* }; fi
+  while IFS= read -r sha; do
+    [ -n "$sha" ] || continue
     if ! IFS=' ' read -r info_sha type sz <&3 \
-       || [ "$info_sha" != "$sha" ] \
-       || [ -z "$type" ] \
-       || [ -z "$sz" ]; then
+       || [ "$info_sha" != "$sha" ] || [ -z "$type" ] || [ -z "$sz" ]; then
       echo "NOT_RUN: 도달 가능 Git 객체 메타데이터가 불완전하다: $sha"; invalid=1; continue
     fi
     [ "$type" = blob ] || continue
-    blobs=$((blobs + 1))
-    if [ -n "$path" ] && is_forbidden_path "$path"; then
-      echo "FAIL: 기록에 산출물·데이터 경로가 남아 있음: $path ($sha)"; bad=1
-    fi
+    blobs=$((blobs + 1)); path=""; csv_seen=0; tsv_seen=0; sql_seen=0
+    : > "$pii_paths"
+    awk -F '\t' -v want="$sha" '$1 == want { print substr($0, index($0, "\t")+1) }' \
+      "$pairs" > "$paths" || { invalid=1; continue; }
+    while IFS= read -r candidate; do
+      [ -n "$path" ] || path="$candidate"
+      if is_forbidden_path "$candidate"; then
+        echo "FAIL: 기록에 산출물·데이터 경로가 남아 있음: $candidate ($sha)"; bad=1
+      fi
+      lf=$(printf '%s' "$candidate" | tr 'A-Z' 'a-z')
+      case "$lf" in
+        *.csv) [ "$csv_seen" -eq 1 ] || { printf '%s\n' "$candidate" >> "$pii_paths"; csv_seen=1; } ;;
+        *.tsv) [ "$tsv_seen" -eq 1 ] || { printf '%s\n' "$candidate" >> "$pii_paths"; tsv_seen=1; } ;;
+        *.sql) [ "$sql_seen" -eq 1 ] || { printf '%s\n' "$candidate" >> "$pii_paths"; sql_seen=1; } ;;
+      esac
+    done < "$paths"
     case "$sz" in
       ''|*[!0-9]*) echo "NOT_RUN: 기록 blob 크기를 읽지 못했다: $sha"; invalid=1; continue ;;
     esac
     if [ "$sz" -gt "$MAX_BYTES" ]; then
-      echo "FAIL: 기록에 ${MAX_BYTES} 바이트 초과 blob 이 남아 있음: ${path:-<경로없음>} (${sz} 바이트, $sha)"
-      bad=1
-    elif is_pii_path "$path"; then
+      echo "FAIL: 기록에 ${MAX_BYTES} 바이트 초과 blob 이 남아 있음: ${path:-<경로없음>} (${sz} 바이트, $sha)"; bad=1
+    elif [ -s "$pii_paths" ]; then
       if ! git cat-file blob "$sha" > "$content" 2>/dev/null; then
         echo "NOT_RUN: 개인정보 후보 history blob을 읽지 못했다: $sha"; invalid=1; continue
       fi
-      pii_rc=0
-      scan_pii_content "$path" "$content" "$sha" || pii_rc=$?
-      [ "$pii_rc" -eq 1 ] && bad=1
+      while IFS= read -r candidate; do
+        pii_rc=0; scan_pii_content "$candidate" "$content" "$sha" || pii_rc=$?
+        [ "$pii_rc" -eq 1 ] && bad=1
+      done < "$pii_paths"
     fi
     inspected=$((inspected + 1))
-  done < "$unique"
-  if IFS= read -r extra <&3; then
-    echo "NOT_RUN: Git 객체 메타데이터가 객체 목록보다 많다"; invalid=1
-  fi
-  exec 3<&-
-  last_checked=$inspected
-  if [ "$blobs" -eq 0 ]; then
-    echo "NOT_RUN: blob 을 한 개도 읽지 못했다 (스캔 무효)"; return 2
-  fi
+  done < "$ids"
+  if IFS= read -r extra <&3; then echo "NOT_RUN: Git 객체 메타데이터가 객체 목록보다 많다"; invalid=1; fi
+  exec 3<&-; last_checked=$inspected
+  if [ "$blobs" -eq 0 ]; then echo "NOT_RUN: blob 을 한 개도 읽지 못했다 (스캔 무효)"; return 2; fi
   if [ "$invalid" -ne 0 ] || [ "$inspected" -ne "$blobs" ]; then return 2; fi
   [ "$bad" -eq 0 ] && echo "PASS: 기록 전량 blob ${blobs}개 검사, 크기·경로·개인정보 위반 0건"
   return "$bad"
