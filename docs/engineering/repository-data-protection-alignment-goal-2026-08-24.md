@@ -4,7 +4,7 @@
 
 VERDICT: FAIL
 
-두 원래 결함의 구현은 닫혔지만 Claude V1 1차 공격이 acceptance의 여섯 감시 공백을 찾아 `FAIL`을 반환했다. 공백을 보강했으며 새 V1과 V2가 모두 합격하기 전에는 완료로 판정하지 않는다.
+두 원래 결함의 구현은 닫혔지만 Claude V1 1·2차 공격이 acceptance 감시 공백을 찾아 `FAIL`을 반환했다. 두 차례 주장을 모두 보강했으며 새 V1과 V2가 모두 합격하기 전에는 완료로 판정하지 않는다.
 
 사용자가 결정할 추가 사항은 없다. 승인 범위는 격리 작업공간의 PLAN → BUILD → AUDIT → CHECKPOINT와 Lore 형식 로컬 커밋까지이며, push·PR 생성·병합·배포는 금지한다.
 
@@ -495,7 +495,7 @@ EXIT: 0
 |---|---|---|
 | `bash scripts/acceptance-principles-check.sh` | 예 | PASS — 34/34, exit 0 |
 | `bash scripts/check-docs-sot.sh` | 예 | PASS — exit 0 |
-| 수정한 secret/data acceptance 원명령 전부 | 예 | RED 원인 일치 후 GREEN — secret 35, data 41, exit 0 |
+| 수정한 secret/data acceptance 원명령 전부 | 예 | RED 원인 일치 후 GREEN — secret 35, data 44, exit 0 |
 | `bash verify.sh` | 예 | PASS — 188, exit 0 |
 | `bash scripts/scan-data-exposure.sh tracked` | 예 | PASS — 188, exit 0 |
 | `bash scripts/scan-data-exposure.sh history` | 예 | PASS — 1,040, exit 0 |
@@ -505,7 +505,7 @@ EXIT: 0
 | `git diff --check` | 예 | PASS — exit 0 |
 | 비밀 패턴 검사 | 예 | `verify.sh` 원명령과 secret acceptance에서 PASS |
 | 원본 dirty 상태·두 SOT SHA-256 재대조 | 예 | 대기 |
-| Claude V1 | 예 | 1차 FAIL 수용·보강 완료, 새 SHA 재실행 대기 |
+| Claude V1 | 예 | 1·2차 FAIL 수용·보강 완료, 새 SHA 재실행 대기 |
 | 새 맥락 Codex V2 | 예 | NOT_RUN — V1 후 실행 |
 
 ## 적대 검증 로그
@@ -848,6 +848,58 @@ FILES: verify.sh=143, scan-data-exposure.sh=246, secret acceptance=337, data acc
 ```
 
 → 정상 사본은 새 41개 data 사례와 기존 35개 secret 사례를 모두 통과했고 네 직접 작성 파일은 600줄 이하로 남았다. 전체 정상 출력은 직전 G 원명령 형식과 같은 41개 PASS 줄로 실행 보존됐다.
+
+### 2026-08-24 10:52 KST — Claude V1 2차 FAIL과 추가 보강
+
+독립 clone `/tmp/valuehire-rdp-v1-final.2E1uER`에서 Claude Code 2.1.239가 `62d973efea9288a285356ad04fb65fd9fb83826e`을 재검증했다. 1차 여섯 주장은 모두 고장 사본 exit 1로 뒤집혔지만, `VERDICT: FAIL`과 새 주장 두 개, 낮은 심각도 경계 한 개를 냈다.
+
+| V1 2차 주장 | 재현 | 조치 |
+|---|---|---|
+| 현재 `pii` 호출에서만 본문을 출력하면 history 비출력 시험이 못 잡음 | 예 | 현재 CSV·TSV·SQL 각각 원문 비출력 검사로 교체·추가 |
+| history 전용 판정 복제본을 만들고 임계값을 갈라도 통과 | 예 | 현재/history 1-column parity와 정의 1개·직접 호출 각 1개 구조 계약 추가 |
+| 함수 상한 100을 999로 완화하면 실제 긴 함수가 통과 | 예 | 같은 함수 판정기로 합성 100줄 통과·101줄 차단 추가 |
+
+→ 두 높은 심각도 주장은 `RDP-INV-6`의 단일 판정 함수와 어느 경로에서도 원문 비출력 계약을 직접 깨므로 수용했다. 함수 100/101은 원래 600/601 요구보다 넓지만 직접 작성 함수 hard limit을 실제로 보장한다는 Strict L3 완료 조건과 맞아 함께 닫았다.
+
+V1 2차 원문은 개인정보 원문을 복사하지 말라는 프롬프트를 어기고 합성 fixture의 이름·이메일·전화번호를 판정 본문에 다시 출력했다. 그 값이 담긴 raw 응답은 저장소 파일로 영구 보존하지 않았으며, 실행 신원·SHA·판정·주장·안전한 메타데이터와 재현 결과만 이 goal에 보존했다. 실제 후보자 데이터는 사용되지 않았다.
+
+```text
+TIMESTAMP_KST: 2026-08-24 10:57 KST
+current-only PII plaintext output injected:
+FAIL: 개인정보 원문이 출력됨 — 후보자 컬럼 CSV 를 잡는다 (D2)
+FAIL: 개인정보 원문이 출력됨 — 후보자 컬럼 TSV 를 잡는다 (D2)
+FAIL: 개인정보 원문이 출력됨 — 후보자 컬럼 SQL 을 잡는다 (D2)
+CHECKED: 44
+EXIT: 1
+
+history call redirected through second function:
+FAIL: 현재/history PII 판정이 갈라짐 (정의 1 · history 0 · 현재 1)
+CHECKED: 44
+EXIT: 1
+
+function hard limit weakened 100 -> 999:
+FAIL: P11 코드 예산 또는 600/601 경계 판정 실패
+CHECKED: 44
+EXIT: 1
+```
+
+→ 2차 V1의 세 고장 사본은 모두 보강된 data acceptance에서 exit 1이다. 실패 출력은 fixture 값이 아니라 위반 종류만 남겼다.
+
+```text
+TIMESTAMP_KST: 2026-08-24 10:59 KST
+COMMAND: bash scripts/acceptance-hs-a4.sh
+PASS: 현재 PII 차단·원문 비출력 — 후보자 컬럼 CSV 를 잡는다 (D2) (exit=1)
+PASS: 현재 PII 차단·원문 비출력 — 후보자 컬럼 TSV 를 잡는다 (D2) (exit=1)
+PASS: 현재 PII 차단·원문 비출력 — 후보자 컬럼 SQL 을 잡는다 (D2) (exit=1)
+PASS: 판정기 실행 — 삭제된 PII 컬럼 1종 CSV history 통과 (exit=0)
+PASS: 현재/history PII 판정 함수 1개 직접 공유 (정의 1 · 각 호출 1)
+PASS: P11 코드 예산 — 현재 파일≤600·함수≤100, 600/100 통과·601/101 차단
+CHECKED: 44
+EXIT: 0
+FILES: verify.sh=143, scan-data-exposure.sh=246, secret acceptance=337, data acceptance=576
+```
+
+→ 정상 사본은 44개 사례를 모두 통과하고 data acceptance 자체도 600줄 hard limit 아래 576줄이다. 다음 V1은 이 새 SHA를 다시 독립 clone에서 공격한다.
 
 ## 제출 직전 §8-6b 셀프 감사
 

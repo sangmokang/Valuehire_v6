@@ -65,7 +65,7 @@
 
 **금지 경로 목록은 `hooks/pre-commit`과 이 판정기 두 곳에 있다**(훅은 '스테이지된 것'만 보므로 별도 코드다). 한쪽만 넓히면 조용히 갈라지므로 `scripts/acceptance-hs-a4.sh`가 두 목록의 동치를 검사한다.
 
-`scripts/acceptance-hs-a4.sh`는 41개 사례를 정확히 요구한다. 빈 tracked/history, Git 기록 열거 실패, 실제 `CHECKED` 2개, 개인정보 컬럼 낱말 1종 정상 CSV, 삭제 이력 CSV·TSV·SQL, 개인정보 원문 비출력, 정상 과거 대조군을 실행한다. 또한 같은 파일 판정 함수로 현재 직접 작성 파일의 600줄 이하와 합성 600줄 통과·601줄 차단을 확인하고, 같은 원명령에서 shell 함수 100줄 이하도 검사한다. 사례 호출을 제거하거나 건수를 위조하면 전체 acceptance가 exit 1이다.
+`scripts/acceptance-hs-a4.sh`는 44개 사례를 정확히 요구한다. 빈 tracked/history, Git 기록 열거 실패, 실제 `CHECKED` 2개, 현재와 과거의 개인정보 컬럼 낱말 1종 정상 CSV, 현재/삭제 이력 CSV·TSV·SQL, 두 경로의 개인정보 원문 비출력, 정상 과거 대조군을 실행한다. 또한 현재/history가 `scan_pii_content` 정의 하나를 각각 직접 호출하는지 고정한다. 같은 파일 판정 함수로 현재 직접 작성 파일의 600줄 이하와 합성 600줄 통과·601줄 차단을 확인하고, 같은 함수 판정기로 현재 함수와 합성 100줄 통과·101줄 차단도 검사한다. 사례 호출을 제거하거나 건수를 위조하면 전체 acceptance가 exit 1이다.
 
 ### 주요 기능 정본 구조 검사 — `scripts/check-docs-sot.sh`
 

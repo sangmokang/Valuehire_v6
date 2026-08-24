@@ -339,6 +339,12 @@ else
     git rm -q metrics.csv
     printf 'safe\n' > README.md; git add README.md; git commit -q -m delete-metrics
   }
+  sc_history_one_pii_word_csv() {
+    printf 'name,department\nSynthetic Person,Engineering\n' > employees.csv
+    git add employees.csv; git commit -q -m one-pii-word-normal
+    git rm -q employees.csv
+    printf 'safe\n' > README.md; git add README.md; git commit -q -m delete-normal
+  }
   sc_history_ok_sql() {
     printf 'CREATE TABLE candidates(name TEXT, email TEXT);\n' > 001_schema.sql
     git add 001_schema.sql; git commit -q -m schema
@@ -370,10 +376,38 @@ else
     fi
   }
 
+  pii_non_disclosure_case() {
+    # pii_non_disclosure_case <설명> <시나리오함수> <금지 원문 정규식>
+    local desc="$1" scenario="$2" forbidden="$3" tmp rc=0 out
+    tmp=$(mktemp -d) || { bad "임시 저장소 생성 실패 — $desc (fail-closed)"; return; }
+    [ -d "$tmp" ] || { bad "임시 저장소 경로 없음 — $desc (fail-closed)"; return; }
+    cp "$JUDGE" "$tmp/judge.sh"
+    out=$(cd "$tmp" || exit 9
+      git init -q .
+      git config user.email a@b.c; git config user.name t
+      "$scenario"
+      bash judge.sh pii 2>&1
+    ) || rc=$?
+    rm -rf "$tmp"
+    if [ "$rc" -ne 1 ]; then
+      bad "판정기 실행 — $desc (기대 exit=1, 실제 $rc)"
+    elif printf '%s\n' "$out" | grep -qE "$forbidden"; then
+      bad "개인정보 원문이 출력됨 — $desc"
+    elif ! printf '%s\n' "$out" | grep -qE '개인정보 컬럼 [2-9][0-9]*종'; then
+      bad "안전한 현재 PII 메타데이터가 부족함 — $desc"
+    else
+      ok "현재 PII 차단·원문 비출력 — $desc (exit=1)"
+    fi
+  }
+
   # D2: 후보자 개인정보 컬럼 조합. 1MB 미만이고 확장자가 허용 목록이라 크기·경로로는 안 잡힌다.
   sc_pii_csv() {
     printf 'name,email,phone,school,profile_url\n홍길동,a@b.c,010-1234-5678,서울대,https://x/1\n' > cand.csv
     git add cand.csv; git commit -q -m pii
+  }
+  sc_pii_tsv() {
+    printf 'name\tphone\nSyntheticTsv\t010-0000-0000\n' > cand.tsv
+    git add cand.tsv; git commit -q -m pii
   }
   sc_pii_sql() {
     printf "INSERT INTO candidates(name,email,phone,school) VALUES('홍','a@b.c','010-1','서울대');\n" > seed.sql
@@ -395,8 +429,12 @@ else
 
   judge_case "기록에만 남은 1MB 초과 파일을 잡는다 (D1)"      history "sc_history_big"   1
   judge_case "깨끗한 기록은 통과시킨다 (차단과 통과가 한 쌍)" history "sc_history_clean" 0
-  judge_case "후보자 컬럼 CSV 를 잡는다 (D2)"                 pii     "sc_pii_csv"       1
-  judge_case "후보자 컬럼 SQL 을 잡는다 (D2)"                 pii     "sc_pii_sql"       1
+  pii_non_disclosure_case "후보자 컬럼 CSV 를 잡는다 (D2)" "sc_pii_csv" \
+    '홍길동|a@b\.c|010-1234-5678|서울대|https://x/1'
+  pii_non_disclosure_case "후보자 컬럼 TSV 를 잡는다 (D2)" "sc_pii_tsv" \
+    'SyntheticTsv|010-0000-0000'
+  pii_non_disclosure_case "후보자 컬럼 SQL 을 잡는다 (D2)" "sc_pii_sql" \
+    "홍|a@b\\.c|010-1|서울대"
   judge_case "정상 지표 CSV 는 통과시킨다 (오탐 대조군)"      pii     "sc_ok_csv"        0
   judge_case "PII 컬럼 1종뿐인 정상 CSV 통과 (임계값 경계)"   pii     "sc_one_pii_word_csv" 0 1
   judge_case "정상 마이그레이션 SQL 은 통과시킨다 (오탐 대조군)" pii  "sc_ok_sql"        0
@@ -408,7 +446,20 @@ else
   history_pii_case "삭제된 TSV blob" history "sc_history_pii_tsv" 'FixtureBeta|010-0000-0000'
   history_pii_case "삭제된 SQL blob을 all에서도 탐지" all "sc_history_pii_sql" 'FixtureGamma|gamma@example\.invalid'
   judge_case "삭제된 정상 지표 CSV history 통과" history "sc_history_ok_csv" 0
+  judge_case "삭제된 PII 컬럼 1종 CSV history 통과" history "sc_history_one_pii_word_csv" 0
   judge_case "삭제된 schema-only SQL history 통과" history "sc_history_ok_sql" 0
+fi
+
+# 현재와 history가 같은 이름의 판정 함수 한 개를 정확히 두 번 호출하는지 고정한다.
+pii_definition_count=$(grep -Ec '^scan_pii_content[[:space:]]*\(\)[[:space:]]*\{' "$JUDGE")
+history_pii_call_count=$(grep -Fc 'scan_pii_content "$path" "$content" "$sha"' "$JUDGE")
+current_pii_call_count=$(grep -Fc 'scan_pii_content "$f" "$content"' "$JUDGE")
+if [ "$pii_definition_count" -eq 1 ] \
+   && [ "$history_pii_call_count" -eq 1 ] \
+   && [ "$current_pii_call_count" -eq 1 ]; then
+  ok "현재/history PII 판정 함수 1개 직접 공유 (정의 1 · 각 호출 1)"
+else
+  bad "현재/history PII 판정이 갈라짐 (정의 $pii_definition_count · history $history_pii_call_count · 현재 $current_pii_call_count)"
 fi
 
 # P11 코드 예산을 같은 판정기로 현재 파일과 600/601 경계에 적용한다.
@@ -443,6 +494,8 @@ code_budget_case() {
   tmp=$(mktemp -d) || { bad "P11 경계 fixture 공간 생성 실패"; return; }
   awk 'BEGIN { for (i=1; i<=600; i++) print "safe" }' > "$tmp/600.sh"
   awk 'BEGIN { for (i=1; i<=601; i++) print "unsafe" }' > "$tmp/601.sh"
+  awk 'BEGIN { print "fixture_function() {"; for (i=2; i<100; i++) print ":"; print "}" }' > "$tmp/function-100.sh"
+  awk 'BEGIN { print "fixture_function() {"; for (i=2; i<101; i++) print ":"; print "}" }' > "$tmp/function-101.sh"
   for file in verify.sh scripts/scan-data-exposure.sh \
     scripts/acceptance-secret-webhook-vendor.sh scripts/acceptance-hs-a4.sh; do
     file_within_budget "$file" || budget_ok=0
@@ -450,9 +503,11 @@ code_budget_case() {
   done
   file_within_budget "$tmp/600.sh" || budget_ok=0
   if file_within_budget "$tmp/601.sh"; then budget_ok=0; fi
+  functions_within_budget "$tmp/function-100.sh" || budget_ok=0
+  if functions_within_budget "$tmp/function-101.sh"; then budget_ok=0; fi
   rm -rf "$tmp"
   if [ "$budget_ok" -eq 1 ]; then
-    ok "P11 코드 예산 — 현재 파일≤600·함수≤100, 600 통과·601 차단"
+    ok "P11 코드 예산 — 현재 파일≤600·함수≤100, 600/100 통과·601/101 차단"
   else
     bad "P11 코드 예산 또는 600/601 경계 판정 실패"
   fi
@@ -509,7 +564,7 @@ else
 fi
 
 # 정확한 사례 수를 고정해 삭제 이력 호출이나 경계 검사가 제거돼도 초록이 되지 않게 한다.
-EXPECTED_CHECKS=41
+EXPECTED_CHECKS=44
 if [ "$checked" -ne "$EXPECTED_CHECKS" ]; then
   printf 'FAIL: 검사 항목 %d개 ≠ 계약값 %d개 (검사가 사라졌거나 무단 추가됐다 · P20)\n' \
     "$checked" "$EXPECTED_CHECKS"
