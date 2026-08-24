@@ -4,7 +4,7 @@
 
 VERDICT: FAIL
 
-현재 검사는 파일이 하나도 없어도 합격하며, 커밋 후 삭제된 후보자 개인정보도 놓친다. 두 결함을 코드·시험·정본 문서에서 함께 닫고 모든 독립 검증이 합격하기 전에는 완료로 판정하지 않는다.
+두 원래 결함의 구현은 닫혔지만 Claude V1 1차 공격이 acceptance의 여섯 감시 공백을 찾아 `FAIL`을 반환했다. 공백을 보강했으며 새 V1과 V2가 모두 합격하기 전에는 완료로 판정하지 않는다.
 
 사용자가 결정할 추가 사항은 없다. 승인 범위는 격리 작업공간의 PLAN → BUILD → AUDIT → CHECKPOINT와 Lore 형식 로컬 커밋까지이며, push·PR 생성·병합·배포는 금지한다.
 
@@ -495,7 +495,7 @@ EXIT: 0
 |---|---|---|
 | `bash scripts/acceptance-principles-check.sh` | 예 | PASS — 34/34, exit 0 |
 | `bash scripts/check-docs-sot.sh` | 예 | PASS — exit 0 |
-| 수정한 secret/data acceptance 원명령 전부 | 예 | RED 원인 일치 후 GREEN — 각 35, exit 0 |
+| 수정한 secret/data acceptance 원명령 전부 | 예 | RED 원인 일치 후 GREEN — secret 35, data 41, exit 0 |
 | `bash verify.sh` | 예 | PASS — 188, exit 0 |
 | `bash scripts/scan-data-exposure.sh tracked` | 예 | PASS — 188, exit 0 |
 | `bash scripts/scan-data-exposure.sh history` | 예 | PASS — 1,040, exit 0 |
@@ -505,7 +505,7 @@ EXIT: 0
 | `git diff --check` | 예 | PASS — exit 0 |
 | 비밀 패턴 검사 | 예 | `verify.sh` 원명령과 secret acceptance에서 PASS |
 | 원본 dirty 상태·두 SOT SHA-256 재대조 | 예 | 대기 |
-| Claude V1 | 예 | 대기 — 독립 프롬프트 고정 뒤 실행 |
+| Claude V1 | 예 | 1차 FAIL 수용·보강 완료, 새 SHA 재실행 대기 |
 | 새 맥락 Codex V2 | 예 | NOT_RUN — V1 후 실행 |
 
 ## 적대 검증 로그
@@ -751,6 +751,103 @@ EXIT: 0
 → pre-commit은 인덱스 비밀 검사, CI는 기본 비밀 검사와 data `all`을 호출한다. history 호출부 130행과 tracked PII 호출부 211행이 같은 172행 판정 함수를 사용하므로 현재/과거 규칙은 한 벌이다.
 
 Claude V1과 새 맥락 Codex V2가 위 T 계약과 일치하지 않으면 PASS로 끝내지 않는다.
+
+### 2026-08-24 10:13 KST — Claude V1 1차 FAIL과 수용 범위
+
+Claude Code 2.1.239가 `6246f99d2ef9a24fa8bb95a7dbc54d353d851a80`을 독립 공격해 `VERDICT: FAIL`을 반환했다. 판정 원문 100%는 `docs/engineering/repository-data-protection-v1-round1-verdict-2026-08-24.md`에 보존했다.
+
+| V1 주장 | 재현 | 조치 |
+|---|---|---|
+| data tracked zero-target 분기 제거가 acceptance를 통과 | 예 | 빈 tracked와 빈 history를 각각 `NOT_RUN`/2/`CHECKED: 0`으로 고정 |
+| data `CHECKED` 상수 1 위조가 통과 | 예 | 안전 blob 2개 tracked fixture와 실제 `CHECKED: 2` 대조 추가 |
+| PII 컬럼 하한 2→1 완화가 통과 | 예 | `name` 한 종류만 있는 정상 CSV 경계 대조 추가 |
+| 삭제 이력 PII 호출 3개 제거가 통과 | 예 | data acceptance 정확한 사례 수 41개 고정 |
+| `git rev-list` 실패를 PASS로 접어도 통과 | 예 | 깨진 ref의 Git 열거 실패를 `NOT_RUN`/2/0으로 고정 |
+| 600/601·함수 100줄 판정기가 영구 명령에 없음 | 예 | 기존 data acceptance에 현재 파일·함수와 합성 600/601을 같은 판정 함수로 편입 |
+
+→ V1은 원래 두 결함의 구현 자체는 정상이라고 확인했지만, 그 방어선을 미래 변경에서 약화시켰을 때 잡는 acceptance가 부족하다고 판정했다. 여섯 주장을 모두 실행 재현해 수용했고 문서만 낮추지 않고 검사 장치를 보강했다.
+
+> **무엇을** — data acceptance를 35개에서 정확히 41개로 늘리고 코드 예산 판정도 같은 원명령에 넣었다.
+> **왜** — 현재 코드의 PASS와 그 보호선이 나중에 삭제돼도 실패하는 것은 다른 증명이며, V1은 후자가 비어 있음을 실제 고장 사본으로 보였다.
+> **버린 길** — V1이 원래 목표 밖을 넓혔다고 기각하는 길은 counter-AC의 테스트 호출 제거·Git 실패·CHECKED 위조와 직접 겹쳐 기각했다.
+> **대가** — data acceptance 실행 시간이 늘고 정확한 사례 수를 의도적으로 갱신해야 한다.
+> **되돌리기** — V1 보강 커밋만 되돌리면 원래 GREEN으로 돌아가지만 여섯 감시 공백도 다시 열린다.
+
+### V1 읽기 전용 위반과 데이터 안전 복구
+
+첫 Claude 호출은 도구 옵션 오류로 검증이 시작되지 않았고, 기본 실행과 safe-mode 실행은 각각 15분 동안 최종 응답이 없어 `NOT_RUN`으로 종료했다. 세 번째 safe-mode Sonnet 실행이 판정을 반환했지만, V1은 임시 저장소 `cd` 실패를 놓쳐 격리 task 브랜치에 합성 PII 커밋 두 개를 만들고 `git reset --hard 6246f99`를 실행했다. 원본 dirty 파일은 건드리지 않았으나 task 브랜치와 worktree HEAD reflog 때문에 history 원명령이 의도대로 exit 1이 됐다.
+
+```text
+ACCIDENTAL_ADD_SHA: 5ea883bfff0022951e0c4ec7fd4e70c14e019dfe
+ACCIDENTAL_REMOVE_SHA: a3717d65c2708ad54d817a3823a19ff1130a59f1
+RECOVERY: git reflog expire --expire-unreachable=now --rewrite refs/heads/task/repository-data-protection-20260824
+RECOVERY: git reflog expire --expire-unreachable=now --rewrite HEAD
+HEAD_BEFORE: 6246f99d2ef9a24fa8bb95a7dbc54d353d851a80
+HEAD_AFTER: 6246f99d2ef9a24fa8bb95a7dbc54d353d851a80
+ACCIDENTAL_REFLOG_REFS_AFTER: 0
+OBJECT_RECOVERABLE: 5ea883bfff0022951e0c4ec7fd4e70c14e019dfe yes
+OBJECT_RECOVERABLE: a3717d65c2708ad54d817a3823a19ff1130a59f1 yes
+PASS: 기록 전량 blob 1043개 검사, 크기·경로·개인정보 위반 0건
+CHECKED: 1043
+HISTORY_EXIT: 0
+```
+
+→ 정확히 이번 검증이 만든 도달 불가 reflog 항목만 만료했다. branch HEAD는 전후 동일하고 `git gc`를 하지 않아 두 합성 커밋 객체는 복구 가능하며, history는 다시 안전한 기록 1,043개를 검사해 합격했다. 후속 V1은 실제 작업공간에 쓰지 못하도록 별도 복제본에서만 공격시킨다.
+
+### V1 보강 뒤 고장 사본 재공격
+
+```text
+tracked zero-target guard removed:
+FAIL: 판정기 실행 — 빈 tracked는 합격이 아니다 (기대 exit=2/CHECKED=0, 실제 0/0)
+CHECKED: 41
+EXIT: 1
+
+data CHECKED forged to 1:
+FAIL: 판정기 실행 — tracked CHECKED는 실제 blob 두 개와 일치 (기대 exit=0/CHECKED=2, 실제 0/1)
+CHECKED: 41
+EXIT: 1
+
+PII threshold weakened 2 -> 1:
+FAIL: 판정기 실행 — PII 컬럼 1종뿐인 정상 CSV 통과 (기대 exit=0/CHECKED=1, 실제 1/1)
+CHECKED: 41
+EXIT: 1
+
+three deleted-history calls removed:
+FAIL: 검사 항목 38개 ≠ 계약값 41개 (검사가 사라졌거나 무단 추가됐다 · P20)
+CHECKED: 38
+EXIT: 1
+
+git rev-list failure folded to PASS:
+FAIL: 판정기 실행 — Git rev-list 실패는 NOT_RUN으로 전파 (기대 exit=2/CHECKED=0, 실제 0/0)
+CHECKED: 41
+EXIT: 1
+
+P11 budget call removed:
+FAIL: 검사 항목 40개 ≠ 계약값 41개 (검사가 사라졌거나 무단 추가됐다 · P20)
+CHECKED: 40
+EXIT: 1
+```
+
+→ V1이 뚫은 여섯 고장 사본은 모두 같은 data acceptance 원명령에서 exit 1이 됐다. 원래 네 R2 고장 사본도 다시 실행해 zero-target, verify `CHECKED`, history PII 호출, 개인정보 원문 출력에서 각각 exit 1을 확인했다.
+
+```text
+TIMESTAMP_KST: 2026-08-24 10:38 KST
+COMMAND: bash scripts/acceptance-hs-a4.sh
+PASS: 판정기 실행 — PII 컬럼 1종뿐인 정상 CSV 통과 (임계값 경계) (exit=0 · CHECKED=1)
+PASS: 판정기 실행 — 빈 tracked는 합격이 아니다 (exit=2 · CHECKED=0)
+PASS: 판정기 실행 — 빈 history는 합격이 아니다 (exit=2 · CHECKED=0)
+PASS: 판정기 실행 — tracked CHECKED는 실제 blob 두 개와 일치 (exit=0 · CHECKED=2)
+PASS: 판정기 실행 — Git rev-list 실패는 NOT_RUN으로 전파 (exit=2 · CHECKED=0)
+PASS: P11 코드 예산 — 현재 파일≤600·함수≤100, 600 통과·601 차단
+CHECKED: 41
+EXIT: 0
+COMMAND: bash scripts/acceptance-secret-webhook-vendor.sh
+CHECKED: 35
+EXIT: 0
+FILES: verify.sh=143, scan-data-exposure.sh=246, secret acceptance=337, data acceptance=521
+```
+
+→ 정상 사본은 새 41개 data 사례와 기존 35개 secret 사례를 모두 통과했고 네 직접 작성 파일은 600줄 이하로 남았다. 전체 정상 출력은 직전 G 원명령 형식과 같은 41개 PASS 줄로 실행 보존됐다.
 
 ## 제출 직전 §8-6b 셀프 감사
 

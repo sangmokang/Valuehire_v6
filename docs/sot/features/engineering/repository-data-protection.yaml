@@ -183,7 +183,7 @@
       {
         "id": "RDP-V6",
         "command": "bash scripts/acceptance-hs-a3.sh && bash scripts/acceptance-hs-a4.sh && bash scripts/acceptance-secret-webhook-vendor.sh",
-        "expected": "zero-target, actual CHECKED count, deleted-history CSV/TSV/SQL, non-disclosure, attack fixtures and allowed controls all pass; all commands exit 0"
+        "expected": "exact case counts, tracked/history zero-target, Git enumeration failure, actual CHECKED count, deleted-history CSV/TSV/SQL, one-column and schema-only allowed controls, non-disclosure, 600/601 file boundary and 100-line function budget all pass; all commands exit 0"
       }
     ],
     "evidence": [

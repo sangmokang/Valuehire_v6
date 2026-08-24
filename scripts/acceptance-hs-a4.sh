@@ -274,23 +274,25 @@ if [ ! -f "$JUDGE" ] || [ ! -x "$JUDGE" ]; then
 else
   # 임시 저장소에서 실제 시나리오를 만들고 판정기를 그대로 태운다.
   judge_case() {
-    # judge_case <설명> <모드> <시나리오함수> <기대 exit>
-    local desc="$1" mode="$2" scenario="$3" want="$4" tmp rc=0
+    # judge_case <설명> <모드> <시나리오함수> <기대 exit> [기대 CHECKED]
+    local desc="$1" mode="$2" scenario="$3" want="$4" want_checked="${5:-}"
+    local tmp rc=0 out reported
     tmp=$(mktemp -d) || { bad "임시 저장소 생성 실패 — $desc (fail-closed)"; return; }
     [ -d "$tmp" ] || { bad "임시 저장소 경로 없음 — $desc (fail-closed)"; return; }
     cp "$JUDGE" "$tmp/judge.sh"
-    ( cd "$tmp" || exit 9
+    out=$(cd "$tmp" || exit 9
       git init -q .
       git config user.email a@b.c; git config user.name t
       "$scenario"
-      bash judge.sh "$mode"
-    ) >/dev/null 2>&1
-    rc=$?
+      bash judge.sh "$mode" 2>&1
+    ) || rc=$?
     rm -rf "$tmp"
-    if [ "$rc" -eq "$want" ]; then
-      ok "판정기 실행 — $desc (exit=$rc)"
+    reported=$(printf '%s\n' "$out" | sed -n 's/^CHECKED:[[:space:]]*//p' | tail -1)
+    if [ "$rc" -eq "$want" ] \
+       && { [ -z "$want_checked" ] || [ "$reported" = "$want_checked" ]; }; then
+      ok "판정기 실행 — $desc (exit=$rc${want_checked:+ · CHECKED=$reported})"
     else
-      bad "판정기 실행 — $desc (기대 exit=$want, 실제 $rc)"
+      bad "판정기 실행 — $desc (기대 exit=$want/CHECKED=${want_checked:-무관}, 실제 $rc/${reported:-없음})"
     fi
   }
 
@@ -303,6 +305,15 @@ else
     printf 'ok\n' > README.md; git add README.md; git commit -q -m two
   }
   sc_history_clean() { printf 'ok\n' > README.md; git add README.md; git commit -q -m one; }
+  sc_empty() { :; }
+  sc_two_safe() {
+    printf 'safe one\n' > one.txt; printf 'safe two\n' > two.txt
+    git add one.txt two.txt; git commit -q -m two-safe
+  }
+  sc_broken_history() {
+    mkdir -p .git/refs/heads
+    printf '%040d\n' 0 > .git/refs/heads/broken
+  }
 
   sc_history_pii_csv() {
     printf 'name,email\nFixtureAlpha,alpha@example.invalid\n' > candidates.csv
@@ -373,6 +384,10 @@ else
     printf 'position,count,stage\nAX Sales,20,screening\n' > metrics.csv
     git add metrics.csv; git commit -q -m ok
   }
+  sc_one_pii_word_csv() {
+    printf 'name,department\nSynthetic Person,Engineering\n' > employees.csv
+    git add employees.csv; git commit -q -m one-pii-word-normal
+  }
   sc_ok_sql() {
     printf 'CREATE TABLE positions(id INTEGER PRIMARY KEY, title TEXT NOT NULL);\n' > 001_init.sql
     git add 001_init.sql; git commit -q -m ok
@@ -383,13 +398,67 @@ else
   judge_case "후보자 컬럼 CSV 를 잡는다 (D2)"                 pii     "sc_pii_csv"       1
   judge_case "후보자 컬럼 SQL 을 잡는다 (D2)"                 pii     "sc_pii_sql"       1
   judge_case "정상 지표 CSV 는 통과시킨다 (오탐 대조군)"      pii     "sc_ok_csv"        0
+  judge_case "PII 컬럼 1종뿐인 정상 CSV 통과 (임계값 경계)"   pii     "sc_one_pii_word_csv" 0 1
   judge_case "정상 마이그레이션 SQL 은 통과시킨다 (오탐 대조군)" pii  "sc_ok_sql"        0
+  judge_case "빈 tracked는 합격이 아니다"                    tracked "sc_empty"         2 0
+  judge_case "빈 history는 합격이 아니다"                    history "sc_empty"         2 0
+  judge_case "tracked CHECKED는 실제 blob 두 개와 일치"      tracked "sc_two_safe"      0 2
+  judge_case "Git rev-list 실패는 NOT_RUN으로 전파"           history "sc_broken_history" 2 0
   history_pii_case "삭제된 CSV blob" history "sc_history_pii_csv" 'FixtureAlpha|alpha@example\.invalid'
   history_pii_case "삭제된 TSV blob" history "sc_history_pii_tsv" 'FixtureBeta|010-0000-0000'
   history_pii_case "삭제된 SQL blob을 all에서도 탐지" all "sc_history_pii_sql" 'FixtureGamma|gamma@example\.invalid'
   judge_case "삭제된 정상 지표 CSV history 통과" history "sc_history_ok_csv" 0
   judge_case "삭제된 schema-only SQL history 통과" history "sc_history_ok_sql" 0
 fi
+
+# P11 코드 예산을 같은 판정기로 현재 파일과 600/601 경계에 적용한다.
+file_within_budget() {
+  local lines
+  lines=$(wc -l < "$1" | tr -d ' ')
+  [ "$lines" -le 600 ]
+}
+
+functions_within_budget() {
+  awk '
+    function delta(s, t, opens, closes) {
+      t=s; opens=gsub(/\{/, "", t); t=s; closes=gsub(/\}/, "", t)
+      return opens-closes
+    }
+    /^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*[[:space:]]*\(\)[[:space:]]*\{/ {
+      active=1; start=NR; depth=0
+    }
+    active {
+      depth += delta($0)
+      if (depth == 0) {
+        if (NR-start+1 > 100) bad=1
+        active=0
+      }
+    }
+    END { exit bad || active }
+  ' "$1"
+}
+
+code_budget_case() {
+  local tmp file budget_ok=1
+  tmp=$(mktemp -d) || { bad "P11 경계 fixture 공간 생성 실패"; return; }
+  awk 'BEGIN { for (i=1; i<=600; i++) print "safe" }' > "$tmp/600.sh"
+  awk 'BEGIN { for (i=1; i<=601; i++) print "unsafe" }' > "$tmp/601.sh"
+  for file in verify.sh scripts/scan-data-exposure.sh \
+    scripts/acceptance-secret-webhook-vendor.sh scripts/acceptance-hs-a4.sh; do
+    file_within_budget "$file" || budget_ok=0
+    functions_within_budget "$file" || budget_ok=0
+  done
+  file_within_budget "$tmp/600.sh" || budget_ok=0
+  if file_within_budget "$tmp/601.sh"; then budget_ok=0; fi
+  rm -rf "$tmp"
+  if [ "$budget_ok" -eq 1 ]; then
+    ok "P11 코드 예산 — 현재 파일≤600·함수≤100, 600 통과·601 차단"
+  else
+    bad "P11 코드 예산 또는 600/601 경계 판정 실패"
+  fi
+}
+
+code_budget_case
 
 # D4: CI 가 그 판정기를 **실행 줄**에서 부르는가 + 그 스텝이 조건으로 꺼져 있지 않은가.
 # 문자열 대조가 남지만, 판정 본문은 위에서 실제 실행으로 검증했으므로 여기서는
@@ -437,6 +506,15 @@ if [ "$SNAP0" != "$SNAP1" ]; then
 else
   checked=$((checked + 1))
   echo "PASS: 작업트리 무오염 (git status 기준 — git 설정·내부 객체·참조는 범위 밖)"
+fi
+
+# 정확한 사례 수를 고정해 삭제 이력 호출이나 경계 검사가 제거돼도 초록이 되지 않게 한다.
+EXPECTED_CHECKS=41
+if [ "$checked" -ne "$EXPECTED_CHECKS" ]; then
+  printf 'FAIL: 검사 항목 %d개 ≠ 계약값 %d개 (검사가 사라졌거나 무단 추가됐다 · P20)\n' \
+    "$checked" "$EXPECTED_CHECKS"
+  printf 'CHECKED: %d\n' "$checked"
+  exit 1
 fi
 
 printf 'CHECKED: %d\n' "$checked"
