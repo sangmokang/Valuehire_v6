@@ -103,6 +103,21 @@ run_task_done() {
   if [ -e "$root/worktrees/$name" ]; then RTD_ALIVE=1; else RTD_ALIVE=0; fi
 }
 
+# 검사기를 직접 돌린다.
+#
+# 왜 두 표면을 따로 재는가 (2026-08-26 GREEN 시도에서 실증):
+#   GNU make 는 레시피가 실패하면 레시피의 종료값과 무관하게 **자기 종료값 2** 를 낸다
+#   (`make: *** [task-done] Error 1` → make 자체는 2). 그래서 make 를 통해서는
+#   BLOCK(1) 과 REVIEW(2) 가 구분되지 않는다.
+#   → 3상태 종료값은 scripts/task-done.sh 의 계약이고, make 는 0 vs 비-0 + STATE 문구를
+#     보장한다. 둘 다 재지 않으면 종료값 계약이 아무 데서도 검증되지 않는다.
+run_direct() {
+  local root="$1" name="$2"
+  RTD_OUT=$(cd "$root" && bash scripts/task-done.sh "$name" 2>&1)
+  RTD_RC=$?
+  if [ -e "$root/worktrees/$name" ]; then RTD_ALIVE=1; else RTD_ALIVE=0; fi
+}
+
 # ── 시나리오 3종: 통과 2 + 차단 1 ─────────────────────────────────────────────
 FIX="$TMP/main"
 if ! make_fixture "$FIX"; then
@@ -140,11 +155,18 @@ fi
 # C3 artifact — P12 회수 대상이 남았다. 차단 + 경로 출력.
 if add_wt "$FIX" artifact "artifacts/keep.txt"; then
   run_task_done "$FIX" artifact
-  if [ "$RTD_RC" -eq 1 ] && [ "$RTD_ALIVE" -eq 1 ] \
+  if [ "$RTD_RC" -ne 0 ] && [ "$RTD_ALIVE" -eq 1 ] \
      && printf '%s' "$RTD_OUT" | grep -q 'STATE: BLOCK'; then
-    record 0 "C3 회수 대상이 있으면 폐기가 차단된다" "exit=$RTD_RC 잔존=$RTD_ALIVE STATE=BLOCK"
+    record 0 "C3 회수 대상이 있으면 폐기가 차단된다(make)" "exit=$RTD_RC 잔존=$RTD_ALIVE STATE=BLOCK"
   else
-    record 1 "C3 회수 대상이 있으면 폐기가 차단된다" "exit=$RTD_RC 잔존=$RTD_ALIVE (기대 exit=1 잔존=1 STATE:BLOCK) :: ${RTD_OUT}"
+    record 1 "C3 회수 대상이 있으면 폐기가 차단된다(make)" "exit=$RTD_RC 잔존=$RTD_ALIVE (기대 비-0 잔존=1 STATE:BLOCK) :: ${RTD_OUT}"
+  fi
+  # 종료값 1(BLOCK)은 make 가 2 로 뭉개므로 검사기를 직접 불러서 잰다.
+  run_direct "$FIX" artifact
+  if [ "$RTD_RC" -eq 1 ] && [ "$RTD_ALIVE" -eq 1 ]; then
+    record 0 "C3 검사기 직접 호출은 BLOCK=1 을 낸다" "exit=$RTD_RC"
+  else
+    record 1 "C3 검사기 직접 호출은 BLOCK=1 을 낸다" "exit=$RTD_RC (기대 1) :: ${RTD_OUT}"
   fi
   # 목록 출력은 인수 기준 본문("그 목록을 출력한다")이다. 차단만 하고 침묵하면 불합격.
   if printf '%s' "$RTD_OUT" | grep -q 'artifacts/keep.txt'; then
@@ -171,8 +193,28 @@ if add_wt "$FIX" review ".toolstate/session.json"; then
   else
     record 1 "C4 미분류 무시 파일은 폐기를 막는다(REVIEW)" "exit=$RTD_RC 잔존=$RTD_ALIVE (기대 exit=2 잔존=1 STATE:REVIEW + 경로) :: ${RTD_OUT}"
   fi
+  # BLOCK 과 REVIEW 가 서로 다른 종료값이어야 한다 — 직접 호출로 확인한다.
+  run_direct "$FIX" review
+  if [ "$RTD_RC" -eq 2 ] && [ "$RTD_ALIVE" -eq 1 ]; then
+    record 0 "C4 검사기 직접 호출은 REVIEW=2 를 낸다" "exit=$RTD_RC (BLOCK=1 과 구분됨)"
+  else
+    record 1 "C4 검사기 직접 호출은 REVIEW=2 를 낸다" "exit=$RTD_RC (기대 2) :: ${RTD_OUT}"
+  fi
 else
   record 1 "C4 미분류 무시 파일은 폐기를 막는다(REVIEW)" "워크트리 생성 실패"
+  record 1 "C4 검사기 직접 호출은 REVIEW=2 를 낸다" "워크트리 생성 실패"
+fi
+
+# C5 direct-OK — 검사기 직접 호출도 정상 폐기 경로를 돈다(make 만 되는 게 아니다).
+if add_wt "$FIX" directok; then
+  run_direct "$FIX" directok
+  if [ "$RTD_RC" -eq 0 ] && [ "$RTD_ALIVE" -eq 0 ]; then
+    record 0 "C5 검사기 직접 호출도 clean 을 폐기한다" "exit=$RTD_RC 잔존=$RTD_ALIVE"
+  else
+    record 1 "C5 검사기 직접 호출도 clean 을 폐기한다" "exit=$RTD_RC 잔존=$RTD_ALIVE (기대 exit=0 잔존=0) :: ${RTD_OUT}"
+  fi
+else
+  record 1 "C5 검사기 직접 호출도 clean 을 폐기한다" "워크트리 생성 실패"
 fi
 
 # ── 인자 위반: 전부 삭제 금지 방향으로 거부되어야 한다 ────────────────────────

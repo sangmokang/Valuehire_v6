@@ -142,6 +142,20 @@ task-done:
 얇은 위임만 한다. 로직은 전부 `scripts/task-done.sh` 에 둔다
 (Makefile 은 tab 문법·셸 이스케이프가 까다로워 검사 로직을 담기에 부적합하고, 인수 검사가 직접 호출하기도 어렵다).
 
+**표면이 둘이고 종료값 계약이 다르다** (2026-08-26 GREEN 시도에서 실측 발견):
+
+| 표면 | 종료값 보장 |
+|---|---|
+| `bash scripts/task-done.sh <NAME>` | `0` OK · `1` BLOCK · `2` REVIEW/REFUSED (3상태 정본) |
+| `make task-done NAME=<NAME>` | `0` OK · **비-0** 그 외 |
+
+GNU make 는 레시피가 실패하면 레시피의 종료값과 무관하게 **자기 종료값 2** 를 낸다
+(`make: *** [task-done] Error 1` 이 떠도 `make` 자체는 2). 따라서 make 를 통해서는
+BLOCK(1)과 REVIEW(2)가 구분되지 않는다. `STATE:` 문구가 두 표면 공통의 판정 표식이다.
+
+이 사실을 몰랐다면 "make 로만 재는" 인수 검사가 종료값 계약을 아무 데서도 검증하지 않은 채
+초록이 됐을 것이다. 인수 검사는 두 표면을 모두 잰다(C3·C4 는 make + 직접 호출 쌍, C5 는 직접 호출 OK).
+
 ## 결정성 규율 — 입력 영역 표 (§3 ①)
 
 명시 입력: `NAME`. 암묵 입력: 저장소 HEAD, `.gitignore`, `.git/info/exclude`(**커밋 안 됨 — 머신마다 다름**),
