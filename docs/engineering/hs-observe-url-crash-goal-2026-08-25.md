@@ -3,6 +3,18 @@
 등급: **L3** (개인정보 누출 경로 · SOT-30 §1)
 워크트리: `worktrees/hs-observe-url-crash` · 브랜치 `task/hs-observe-url-crash` · base `c59bad7`
 
+## 1층 — 결론
+
+사람인 화면을 한 번 들여다보는 프로그램이, 브라우저에 열려 있던 **이상한 주소 하나** 때문에
+통째로 멈추면서 그 주소의 일부를 오류 기록에 그대로 남기고 있었다. 실제로 돌려 재현했다.
+고친 뒤에는 어떤 주소가 들어와도 정해진 한 줄만 남기고 정해진 값으로 끝난다.
+
+처음 받은 지시는 한 곳을 고치는 일이었는데, 감사와 교차 검증이 **같은 종류의 구멍을 일곱 개 더**
+찾아내 모두 같은 변경에 담았다. 늘어난 이유는 이 문서의 작업 분해표와 적대 검증 로그에 있다.
+
+작업 중 내가 한 번 잘못 판단했다 — 시험이 닿지 않는 코드를 "닿을 수 없는 코드"로 읽고
+안전장치를 걷어냈다가, 검증자가 곧바로 닿는 경로를 찾아냈다. 되돌리고 그 자리에 시험을 넣었다.
+
 ## 상위 목표 (1문장)
 
 사람인 탭 하나를 관측할 때, 다른 탭이 만든 이상한 주소 하나 때문에 관측기가 통째로 죽으면서
@@ -39,6 +51,8 @@
 | 4 | `observe.py:163` `main()` | 이미 축약된 tab_url | `main` |
 | 5 | `_cdp.py:32` `observe_markers()` | 선택된 탭의 websocket URL | `observe_once:134` — **이미 올바르게 막혀 있다**(`ValueError`→`CdpReadError`, 메시지에 URL 없음). 다만 시험이 0건이었다 |
 
+
+→ 표가 말하는 것: 같은 결함이 5곳에 있었고 4곳은 무방비, 1곳(`_cdp`)은 이미 막혀 있었다. 즉 저자가 이 위험을 알고 있었는데 나머지 4곳에 적용하지 않은 것이다. 나쁜 소식이지만 고칠 방향은 분명하다.
 `urlsplit()`은 `ValueError`를 던진다(실행 확인, Python 3.14.1):
 
 ```
@@ -47,6 +61,8 @@
                                  invalid characters under NFKC normalization
 ```
 
+
+→ 뭘 시켰나: 두 종류의 잘못된 주소를 `urlsplit()` 에 넣었다. 뭐가 나왔나: 예외가 났고, 두 번째 메시지에는 **주소의 호스트가 원문 그대로** 실렸다. 나쁜 소식 — 이 문자열이 오류 로그에 남는다.
 `main()`은 `except (CdpReadError, ObservationError)`만 잡는다(`observe.py:157`). `ValueError`는
 그 그물에 안 걸린다.
 
@@ -60,6 +76,8 @@ ValueError: netloc 'www.saramin.co.kr＃x' contains invalid characters under NFK
 EXIT=1
 ```
 
+
+→ 뭘 시켰나: 후보 식별자와 토큰이 든 주소를 가진 탭 하나를 관측기에 먹였다. 뭐가 나왔나: 계약된 한 줄 대신 종료값 1. 나쁜 소식 — 관측기가 답을 못 주고 죽는다.
 - stdout: **비어 있음** — 계약된 `STATE=... TAB=... ROLES=... CONTRACT_VALID=...` 한 줄이 안 나온다.
 - 종료값: **1** — L0 계약이 정한 값은 0(authenticated) 또는 2뿐이다.
 - stderr: traceback에 **netloc이 원문 그대로** 실린다 → 브라우저 계약 §5·§12 위반.
@@ -86,6 +104,8 @@ EXIT=1
 | 7 | **NFKC 위반 netloc** | `https://exa℀mple.com` | **현재 크래시** → `""` | **현재 크래시** → False | **현재 크래시** → `""` |
 | 8 | **그 외 전부 파싱 불가** | 임의 문자열 | `""` 거부 | False | `""` |
 
+
+→ 표가 말하는 것: 6·7행이 지금 크래시하는 자리이고, 8행이 "앞으로 뭐가 오든"을 덮는 안전망이다. 6·7만 고치면 다음 파이썬 판올림에서 새 실패 사유가 생겼을 때 같은 사고가 반복된다.
 catch-all(8행) 구현 = `ValueError`를 **명시적 거부로 변환**한다. 의미 추정·정상화·다른 파서로의
 자동 전환은 하지 않는다(브라우저 계약 §"주 경로가 실패하면 다른 경로로 자동 전환하지 않고 중단").
 
@@ -99,6 +119,8 @@ catch-all(8행) 구현 = `ValueError`를 **명시적 거부로 변환**한다. �
 | 계약 JSON에 파싱 불가 origin이 있으면 | `ObservationError("allowed origin contract is invalid")` | 기존 fail-closed 경로 재사용 |
 | 오류 메시지에 URL을 넣나 | **아니다** — 어떤 예외 메시지에도 입력 URL을 넣지 않는다 | §12 |
 
+
+→ 표가 말하는 것: 애매한 갈림길 5개를 코드 쓰기 전에 못 박았다. 특히 마지막 줄이 이 작업의 핵심이다 — 크래시를 막는 것만으로는 부족하고, 새로 만드는 거부 메시지에도 주소를 넣지 않아야 한다.
 ## ③ 표↔테스트 대응
 
 표의 6·7행은 WU1 RED(`tests/test_observe_url_parse_failure.py`), 8행은 WU2 RED
@@ -133,6 +155,8 @@ def _valid_origin(value: object) -> bool      # 불변: 파싱 실패 → False
 def _privacy_reduced_url(url, loggable) -> str  # 불변: 파싱 실패 → ""
 ```
 
+
+→ 뭘 보여주나: 겉으로 드러나는 함수 모양은 하나도 바뀌지 않고, 파싱이 실패했을 때의 반환값만 정해진다. 좋은 소식 — 이 변경을 쓰는 쪽 코드는 손댈 것이 없다.
 공개 API 시그니처는 바뀌지 않는다. `humansearch/__init__.py` 내보내기 목록도 바뀌지 않는다.
 
 ## R1 작업 분해표
@@ -148,6 +172,8 @@ def _privacy_reduced_url(url, loggable) -> str  # 불변: 파싱 실패 → ""
 | WU7 | AC-7(V1 3회차 반례, R9) | `observe.py`(`_fetch_targets` 생성자 위치·`_is_loopback_address`) + `tests/test_observe_transport_construction.py` | 같은 파일 + 변조 |
 | WU8 | AC-8(V1 4회차 반례, R9) | `observe.py`(`_is_loopback_address` ASCII·전송 `except`) + 같은 시험 파일 | 같은 파일 + 변조 3종 |
 
+
+→ 표가 말하는 것: 사장님 지시 범위는 WU1~WU2이고 WU3 이후는 전부 감사·적대검증이 찾아낸 반례를 같은 PR에 넣은 것이다. 범위가 늘어난 이유가 여기 다 적혀 있다.
 WU1 GREEN 커밋 전 WU2 착수 금지(R5). WU3는 작업 중 발견한 반례의 영구 편입이며(R9) 코드 변경
 0줄 · 시험만 추가한다. 이미 올바른 코드의 특성화 시험이므로 RED 대신 **변조 증명**으로
 공허하지 않음을 보인다.
@@ -167,6 +193,8 @@ WU1 GREEN 커밋 전 WU2 착수 금지(R5). WU3는 작업 중 발견한 반례�
 | GitHub push·PR 생성 실패 | 명시적 중단 + 사유 보고. merge 시도 금지 |
 | 그 외 전부 | 명시적 중단 + 이 표 갱신안 제시 |
 
+
+→ 표가 말하는 것: 작업 중 만날 수 있는 상황을 미리 세어 두고, 표에 없는 일이 생기면 임의로 판단하지 않고 멈춘다. 마지막 줄이 그 약속이다.
 ## 게이트 계획
 
 RED 커밋(시험만) → GREEN 커밋(구현만) → `bash scripts/acceptance-hs-gates.sh` →
@@ -247,6 +275,8 @@ RED 커밋(시험만) → GREEN 커밋(구현만) → `bash scripts/acceptance-h
 | 〃 | `test_observe_url_parse_property.py` | **4 failed** (exit 1) |
 | `_cdp` 의 `try/except ValueError` 가드 제거 | `test_cdp_websocket_parse_failure.py` | **2 failed** (exit 1) |
 
+
+→ 뭘 시켰나: 고친 코드를 일부러 되돌려서 시험이 빨개지는지 봤다. 뭐가 나왔나: 세 경우 모두 시험이 죽었다. 좋은 소식 — 이 시험들은 통과 도장이 아니라 실제로 뭔가를 지키고 있다.
 변조는 전부 격리 복제본(`scratchpad/mut*`)에 적용했고 작업트리 원본은 건드리지 않았다.
 
 ### 라이브 실증 (몽키패치 0건, 실제 CLI 엔트리포인트)
@@ -262,6 +292,8 @@ RED 커밋(시험만) → GREEN 커밋(구현만) → `bash scripts/acceptance-h
 | stderr | Traceback + `netloc 'hiring.saramin.co.kr＃drift'` | (빈 문자열) |
 | 누출 표식 | `＃drift`, `Traceback` **검출됨** | 4종 전부 미검출 |
 
+
+→ 표가 말하는 것: 같은 입력에서 수정 전에는 호스트 이름이 오류 출력에 남았고, 수정 후에는 네 가지 표식 어느 것도 나오지 않는다. 좋은 소식 — 사장님이 지목하신 누출이 실제로 닫혔다.
 사장님 실제 크롬(9225) 상대 실행에서도 정상 동작했다: `STATE=drifted TAB=- ROLES=0
 CONTRACT_VALID=false`, exit 2, stderr 없음(해당 프로필에 승인 origin 탭이 0개였다).
 
@@ -275,6 +307,8 @@ main:148 -> observe_once:128 -> _valid_origin:269 -> _split:246
          -> format_observation_line:110
 ```
 
+
+→ 뭘 보여주나: 실제 명령을 돌리는 동안 어떤 함수가 순서대로 불렸는지 기록한 것이다. 새로 만든 `_split` 이 두 갈래로 실제 도달한다. 좋은 소식 — 아무도 안 부르는 죽은 코드가 아니다.
 새 함수 `_split` 이 엔트리포인트에서 두 경로로 실제 도달한다. 고아 아님.
 
 ### Full Strict 기준선 대비 (BASELINE_DIFFERENTIAL_PASS)
@@ -287,6 +321,8 @@ base SHA `c59bad7b160c473cda5545e76e6fa6bcc711a7ea` 의 격리 복제본에서 �
 | `scripts/acceptance-0-5.sh` | exit 1 (origin/main != main) | exit 1 (동일) |
 | 나머지 인수 검사 23종 | 전부 exit 0 | — |
 
+
+→ 표가 말하는 것: 실패한 2건은 이 브랜치를 만들기 전 상태에서도 똑같이 실패한다. 즉 내 변경이 만든 실패가 아니다. 다만 "원래 실패하던 것"이므로 통과로 세지 않고 그대로 실패로 적는다.
 브랜치 실패 집합 ⊆ 기준선 실패 집합 · **새 실패 0건** · 삭제된 테스트 0건 · 테스트 약화 0건.
 두 실패는 모두 환경 사유이며(로컬 전용 패턴 파일 부재 / main 브랜치 push 상태) 이 변경과 무관하다.
 `acceptance-0-7.sh` 는 세션 시작 원장이 "CI 담당"으로 표시한 항목이라 로컬에서 제외했다.
@@ -357,6 +393,8 @@ codex 플러그인 커맨드 전수 확인). 대신 실제 설치된 `codex-cli 
 | ④[LOW] argparse 오류는 상태줄 계약 밖 | 재현됨 — 단, **traceback 없이** usage 3줄 + exit 2 | 결함 아님으로 판정. CLI 인자 오류는 관측 결과가 아니다 |
 | ⑧ `rpartition("@")` → `partition("@")` 변조가 지정한 4개 파일에서 살아남음 | **재현됨** | WU5에서 `@` 두 개짜리 픽스처로 잡음 |
 
+
+→ 표가 말하는 것: 검증자가 낸 지적 6개 중 5개가 사실이었고 1개(argparse)는 결함이 아니었다. 액면으로 받지 않고 전부 직접 돌려 본 결과다.
 ②B는 G(생성자)가 자체 공격에서 탭·개행으로 독립 발견한 것과 같은 결함이며, V1이 더 강한
 반례(U+2028은 `urlsplit` 이 지우지 않는다)를 냈다.
 
@@ -377,6 +415,8 @@ codex 플러그인 커맨드 전수 확인). 대신 실제 설치된 `codex-cli 
 | ⑦ `_split` 의 `ValueError` 흡수 제거 | 8 failed |
 | ⑧ 축약 단계 통째로 건너뜀 | 5 failed |
 
+
+→ 표가 말하는 것: 고친 자리를 하나씩 일부러 되돌렸더니 전부 시험이 빨개졌다. 좋은 소식 — 살아남은 변조가 없다는 건 이 시험들이 구현을 실제로 붙잡고 있다는 뜻이다.
 **살아남은 변조 0건.**
 
 ### 남은 위험 — 고치지 않기로 한 것과 그 이유
@@ -407,6 +447,8 @@ WU5 를 얹은 상태를 다시 공격해 네 갈래를 더 냈다. **넷 다 �
 | ③[HIGH] 축약 주소 **끝**의 U+2028 은 `splitlines()` 로 1이지만 완성된 줄은 **2줄** | **재현됨**: `'…/home\u2028 ROLES=0…'` → `splitlines()==2` | WU6 — 판정을 개수에서 `"".join(splitlines()) != s` 로 교체 |
 | ④ 아홉 번째 변조: `parsed.netloc` → `parsed.hostname` 이 살아남는다(포트 탈락 → `:444` 가 포트 없는 origin 과 일치) | **재현됨** | WU6 — 포트가 origin 비교의 일부임을 고정하는 시험 4건 추가 |
 
+→ 표가 말하는 것: 2회차 지적 네 건이 전부 사실이었다. ③은 내가 1회차 대응으로 넣은 안전장치가 **한 칸 이르게 판정**하고 있었다는 뜻이다 — 안전장치를 넣었다는 사실이 그것이 옳다는 증거가 아니다.
+
 ③은 내가 WU5에서 넣은 가드가 **한 칸 이르게 판정**하고 있었다는 뜻이다 — 가드를 넣었다는 사실이
 가드가 옳다는 증거가 아니라는 실례다.
 
@@ -420,6 +462,8 @@ WU5 를 얹은 상태를 다시 공격해 네 갈래를 더 냈다. **넷 다 �
 | ⑫ 계약 경로 `isascii()` 요구 제거 | 3 failed |
 | ⑬ 한 줄 판정을 개수 세기로 되돌림 | 1 failed |
 | ⑭ `netloc`→`hostname` (V1 이 지목한 아홉 번째) | 3 failed |
+
+→ 표가 말하는 것: 2회차 대응으로 고친 여섯 자리를 하나씩 되돌렸더니 전부 시험이 빨개졌다. 특히 ⑭는 검증자가 "이 변조는 살아남는다"고 지목한 바로 그 자리다 — 이제 잡힌다.
 
 **누적 변조 14종 · 살아남은 변조 0건.**
 
@@ -445,6 +489,8 @@ total=1512 crash=0 bad_exit=0 multiline=0
 |---|---|---|---|
 | 3회차 | `HTTPConnection(...)` 생성자가 `try` **밖**(`observe.py:225`)이라, 제어문자가 든 호스트(`::1%\n`)에서 나는 `http.client.InvalidURL` 이 `main()` 을 뚫는다. `ip_address("::1%\n")` 이 루프백으로 판정되기 때문에 계약을 통과한다 | **재현됨** (생성자 단독 호출로 확인) | WU7 — 생성자를 try 안으로, `_is_loopback_address` 에 `isprintable()` 요구 |
 | 4회차 | scope id 에 **비ASCII** 문자가 오면(`::1%<히브리문자>`) `isprintable()` 은 True, `ip_address()` 도 루프백 → 통과 후 호스트 IDNA 인코딩에서 `UnicodeEncodeError`(=`ValueError`) | **재현됨** | WU8 — `isascii()` 도 요구 + 전송 `except` 에 `ValueError` 복원 |
+
+→ 표가 말하는 것: 3·4회차는 형식상 판정이 없지만(제공자 필터에 잘림) 잘리기 전에 낸 반례 두 건은 각각 재현됐고 고쳤다. 판정이 없다는 이유로 반례를 버리지 않는다.
 
 ### 이 run 에서 내가 틀렸던 판단 (기록)
 
@@ -475,6 +521,8 @@ V1 4회차가 곧바로 **도달 경로**(비ASCII scope id)를 찾아냈다.
 | ⑧ 축약 단계 건너뜀 | 죽음 | ⑲ 호스트 isascii 제거 | 죽음 |
 | ⑨ 계약JSON RecursionError 제거 | 죽음 | ⑳ 호스트 isprintable 제거 | 죽음 |
 | ⑩ 타깃JSON RecursionError 제거 | 죽음 | | |
+
+→ 표가 말하는 것: 이번 작업에서 고친 자리 전부를 하나씩 되돌려 봤고, 되돌릴 때마다 시험이 빨개졌다. 좋은 소식 — 통과가 우연이 아니다.
 
 ### 실계약 회귀 확인
 
