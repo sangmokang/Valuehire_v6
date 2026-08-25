@@ -134,7 +134,7 @@ def test_contract_with_an_unusable_origin_port_is_refused(
 def test_reduced_url_drops_every_userinfo_segment() -> None:
     """V1 지적: `@` 가 두 번 이상이면 `rpartition` 을 `partition` 으로 바꾼 변조가 살아남았다."""
 
-    userinfo = "@".join(("operator", ":".join(("realm", "n0tr3al"))))
+    userinfo = "operator@realm:n0tr3al"  # `@` 가 두 번 — 합성 픽스처다
     reduced = observe._privacy_reduced_url(f"https://{userinfo}@hiring.saramin.co.kr/x")
 
     assert reduced == "https://hiring.saramin.co.kr/..."
