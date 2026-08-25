@@ -132,4 +132,3 @@ test("an unsupported code extension fails closed instead of reporting zero funct
     JSON.stringify(result.body),
   );
 });
-

@@ -72,6 +72,8 @@ git show --check HEAD
 - RED: `2026-08-25T21:27:24+09:00`, `node --test tests/checkpoint-function-budget.test.mjs`, exit 1, tests 7, pass 3, fail 4.
 - RED 원문: `/tmp/vhrec-wu3b-red.tMakr9/node-test-red.log`, SHA-256 `00a8fe65f61eb11a09e071ab72cf7903417bfa99fa854dac211188a1ca24e037`.
 - RED 해석: 100줄 정상 경계는 통과했고, 미구현인 101줄 JS/Python/shell 차단과 unsupported 언어 fail-closed 네 동작이 실패했다.
+- 최초 RED commit `33bafa51825ac5fa9e82b2f84430001e6dbf635e`은 `git show --check`가 테스트 EOF 빈 줄을 보고해 canonical RED에서 제외한다. 단언을 바꾸지 않고 빈 줄 1개만 제거한 테스트 SHA-256 `00d957a7b1e1835b0d4a74d6db34fac036255734dea251f5fe795f01b3ad54be`로 재실행한 결과도 tests 7, pass 3, fail 4, exit 1이다.
+- 교정 RED 원문: `/tmp/vhrec-wu3b-red-corrected.ul6jLn/node-test-red-corrected.log`, SHA-256 `2f1b59618e87591fc02a9b6600c66bd9e78db428ccedc0c40382bae5429937ab`.
 - GREEN: `NOT_RUN`
 - G: `NOT_RUN`
 - V1: `NOT_RUN`
