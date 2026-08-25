@@ -294,6 +294,40 @@ else
   record 1 "무력화 저항 시험" "scripts/task-done.sh 가 없어 변이 대상이 없다"
 fi
 
+# ── 명부 target 이 실재하는가 ────────────────────────────────────────────────
+#
+# scripts/verify/check-mechanism-registry.sh 는 stage:pre-push(128행)와 stage:ci(148행)
+# 에서만 target 문자열의 실재를 대조하고 **stage:manual 에서는 대조하지 않는다**(152~159행).
+# 그래서 manual 항목의 target 은 장식이 될 수 있다 — 2026-08-26 실측: task-done.sh 에서
+# target 문자열을 지워도 명부 검사는 PASS 였다.
+#
+# 공유 검사기를 고치면 기존 manual 항목 4개가 함께 깨질 수 있어 이번 범위 밖이다(부채).
+# 대신 task-done-checker 항목의 구멍만 여기서 막는다.
+REG="$REPO/docs/sot/mechanism-registry.yaml"
+CHK="$REPO/scripts/task-done.sh"
+if [ -f "$REG" ] && [ -f "$CHK" ]; then
+  reg_target=$(awk '
+    /^- id: "task-done-checker"/ { inblk = 1; next }
+    inblk && /^- id:/ { exit }
+    inblk && /^  target:/ {
+      line = $0
+      sub(/^  target:[[:space:]]*"/, "", line)
+      sub(/"[[:space:]]*$/, "", line)
+      print line
+      exit
+    }
+  ' "$REG")
+  if [ -z "$reg_target" ]; then
+    record 1 "명부 target 실재" "mechanism-registry.yaml 에서 task-done-checker 의 target 을 읽지 못했다"
+  elif grep -qF -- "$reg_target" "$CHK"; then
+    record 0 "명부 target 실재" "'$reg_target' 가 scripts/task-done.sh 안에 있다"
+  else
+    record 1 "명부 target 실재" "'$reg_target' 가 scripts/task-done.sh 안에 없다 — 명부가 거짓을 말한다"
+  fi
+else
+  record 1 "명부 target 실재" "명부 또는 검사기 파일이 없다"
+fi
+
 # ── 원본 무오염 ───────────────────────────────────────────────────────────────
 if [ "$(git -C "$REPO" status --porcelain)" = "$SNAPSHOT" ]; then
   record 0 "원본 저장소 무오염" "시작·종료 상태 동일"

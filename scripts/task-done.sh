@@ -103,10 +103,11 @@ enumerate() {
 }
 
 classify() {
-  n_block=0; n_review=0
+  n_block=0; n_review=0; n_seen=0
   block_list=""; review_list=""
   local f
   while IFS= read -r -d '' f; do
+    n_seen=$((n_seen + 1))
     if printf '%s' "$f" | grep -qE "$EXCLUDE"; then
       continue
     fi
@@ -120,8 +121,39 @@ classify() {
   done
 }
 
+# 읽은 건수가 실제 레코드 수와 같은가.
+#
+# `while read -d ''` 는 NUL 로 끝나지 않은 마지막 데이터를 **조용히 버린다.**
+# 열거 출력이 NUL 종결이 아니게 되는 순간(예: -z 가 빠지면) 파일 전체가 분류에서
+# 사라지고 0건이 되어 그대로 삭제된다 — 정확히 fail-open 이다.
+# 2026-08-26 실측: task-done.sh 에서 -z 하나를 지웠더니 회수 대상이 있는 워크트리가
+# STATE: OK 로 삭제됐다. 세었다는 사실과 실제 레코드 수를 대조해 그 방향을 막는다.
+verify_count() {
+  local size records last_nul
+  size=$(wc -c < "$SCRATCH" | tr -d ' ')
+
+  # 내용이 있는데 NUL 로 끝나지 않는다 = -z 가 빠졌거나 출력이 잘렸다.
+  # 건수 대조만으로는 이 경우를 못 잡는다: NUL 이 0개면 읽은 것도 0건이라 숫자가 맞는다.
+  if [ "$size" -gt 0 ]; then
+    last_nul=$(tail -c 1 "$SCRATCH" | tr -dc '\0' | wc -c | tr -d ' ')
+    if [ "$last_nul" -ne 1 ]; then
+      state_out REFUSED
+      printf 'REASON: 열거 출력 %s바이트가 NUL 로 끝나지 않는다 — 목록을 신뢰할 수 없다. 지우지 않는다\n' "$size"
+      exit 2
+    fi
+  fi
+
+  records=$(tr -dc '\0' < "$SCRATCH" | wc -c | tr -d ' ')
+  if [ "$n_seen" -ne "$records" ]; then
+    state_out REFUSED
+    printf 'REASON: 열거 %s건 중 %s건만 읽혔다 — 세지 못한 것을 지우지 않는다\n' "$records" "$n_seen"
+    exit 2
+  fi
+}
+
 enumerate || refuse "git ls-files 가 실패했다 — 무엇이 남았는지 모르는 채로 지우지 않는다"
 classify < "$SCRATCH"
+verify_count
 
 # 최대 5줄까지만 보인다. 한 워크트리에 무시 파일이 2,528개인 사례가 실재한다(2026-08-26 실측).
 show() {
@@ -153,6 +185,7 @@ fi
 # 판정과 삭제 사이에 다른 세션이 파일을 만들 수 있다. 창을 좁힐 뿐 없애지는 못한다.
 enumerate || refuse "삭제 직전 재검사에서 git ls-files 가 실패했다"
 classify < "$SCRATCH"
+verify_count
 if [ "$n_block" -gt 0 ] || [ "$n_review" -gt 0 ]; then
   state_out REFUSED
   printf 'REASON: 판정 직후 새 파일이 생겼다 (BLOCK=%s REVIEW=%s) — 다시 실행하십시오\n' \
