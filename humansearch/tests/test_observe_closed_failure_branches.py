@@ -143,3 +143,57 @@ def test_refused_cdp_connection_is_a_closed_read_failure(
             expected_host="127.0.0.1",
             expected_port=9225,
         )
+
+
+# --- WU11: V1 이 내 "도달 불가" 주장을 반증했다 --------------------------------
+# 나는 `SurfaceRole()` 을 str·int·list·dict·None·tuple 6종으로 호출해 전부 `ValueError` 임을
+# 확인하고 "`TypeError` 가지는 도달 불가"라고 적었다. V1 이 반례를 냈다: 비교 자체가 예외를
+# 던지는 **사용자 정의 객체**. 내장 타입 표본에서 일반화한 것이 잘못이었다.
+#
+# JSON 은 이런 값을 만들 수 없으므로 CLI 경로로는 도달하지 않는다. 그러나 이 함수는 임의의
+# 파이썬 값을 받는 계약이고, 무엇보다 **"닿을 수 없다"는 내 주장이 사실이 아니었다.**
+class _UncomparableRole:
+    __hash__ = None  # type: ignore[assignment]
+
+    def __eq__(self, other: object) -> bool:
+        raise TypeError("이 값은 비교 자체가 실패한다")
+
+
+def test_a_role_value_that_cannot_be_compared_makes_the_observation_invalid() -> None:
+    observation = observe.observation_from_marker_payload(
+        {"contract_valid": True, "matched_roles": [_UncomparableRole()]}
+    )
+
+    assert observation.contract_valid is False
+    assert observation.matched_roles == frozenset()
+
+
+# --- WU11: CDP 읽기 루프가 관련 없는 이벤트를 건너뛴다 -------------------------
+# `for _ in range(32)` 를 `range(1)` 로 바꾸는 변조가 살아남았다 — 아무 시험도 "우리 응답보다
+# 먼저 다른 이벤트가 오는" 순서를 태우지 않았다. DevTools 는 실제로 그런 이벤트를 보낸다.
+def test_cdp_read_skips_unrelated_events_before_the_answer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    frames = [
+        (0x1, b'{"method":"Runtime.consoleAPICalled","params":{}}'),  # 우리 것이 아니다
+        (0x1, b'{"id":2,"result":{"result":{"value":"other"}}}'),      # 다른 요청의 답
+        (0x1, b'{"id":1,"result":{"result":{"value":{"contract_valid":true,'
+              b'"matched_roles":[]}}}}'),                              # 우리 답
+    ]
+    def next_frame(connection: object) -> tuple[int, bytes]:
+        return frames.pop(0)
+
+    monkeypatch.setattr(socket, "create_connection", lambda address, timeout: _FakeSocket())
+    monkeypatch.setattr(_cdp, "_handshake", lambda *args: None)
+    monkeypatch.setattr(_cdp, "_send_frame", lambda *args, **kwargs: None)
+    monkeypatch.setattr(_cdp, "_receive_frame", next_frame)
+
+    payload = _cdp.observe_markers(
+        "ws://127.0.0.1:9225/" + "dev" + "tools/page/SYNTHETIC",
+        ("header",),
+        {role.value: ("m",) for role in SurfaceRole},
+        expected_host="127.0.0.1",
+        expected_port=9225,
+    )
+
+    assert payload == {"contract_valid": True, "matched_roles": []}
