@@ -17,7 +17,9 @@ GATES="scripts/acceptance-hs-gates.sh"
 for required in "$GATES" "scripts/hs_import_spy.py" "humansearch/pyproject.toml" \
   "humansearch/uv.lock" "humansearch/.python-version" \
   "humansearch/src/humansearch/__init__.py" "humansearch/tests" \
-  "contracts/admin-weekly-dashboard/metric-contract-v1.json" "apps/admin"; do
+  "contracts/admin-weekly-dashboard/metric-contract-v1.json" "apps/admin" \
+  "contracts/admin-weekly-dashboard/non-loopback-host-samples.json" \
+  "contracts/humansearch/saramin-markers.json"; do
   if [ ! -e "$required" ]; then
     echo "FAIL: required G2 implementation missing: $required"
     exit 1
@@ -43,9 +45,14 @@ trap 'cleanup; trap - EXIT; exit 129' HUP
 # Dashboard tests load their product contract from the repository-level contracts tree.
 # Every isolated project lives one directory below SANDBOX, so this preserves the same
 # relative boundary without letting a mutation case read files from the real worktree.
-mkdir -p "$SANDBOX/contracts/admin-weekly-dashboard"
+# 2026-08-25(G3 hardening7): 시험이 쓰던 주소·바인드 상수를 contracts/ 로 옮겼다.
+# 시험이 계약을 읽게 만들었으면 격리 표본에도 그 계약을 함께 넣어야 한다 —
+# 그러지 않으면 수집 단계에서 깨지고, 그 깨짐이 뮤테이션 판정을 가린다.
+mkdir -p "$SANDBOX/contracts/admin-weekly-dashboard" "$SANDBOX/contracts/humansearch"
 cp contracts/admin-weekly-dashboard/metric-contract-v1.json \
+  contracts/admin-weekly-dashboard/non-loopback-host-samples.json \
   "$SANDBOX/contracts/admin-weekly-dashboard/"
+cp contracts/humansearch/saramin-markers.json "$SANDBOX/contracts/humansearch/"
 mkdir -p "$SANDBOX/apps"
 cp -R apps/admin "$SANDBOX/apps/"
 

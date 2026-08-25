@@ -5,7 +5,7 @@ from humansearch.auth_surface import AuthSurfaceState, SurfaceObservation
 
 # 포털 주소는 코드가 아니라 contracts/ 데이터다 (P22 · G3).
 # 시험이라고 예외를 두면 게이트가 막으려던 값이 제품 코드에 다시 박힌다.
-ORIGIN = sorted(observe._load_contract("saramin").allowed_origins)[0]
+ORIGIN = min(observe._load_contract("saramin").allowed_origins)
 
 
 def test_read_failure_cannot_emit_unknown_with_an_invalid_contract(
