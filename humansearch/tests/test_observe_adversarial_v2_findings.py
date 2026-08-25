@@ -64,12 +64,28 @@ def test_non_ascii_origin_is_not_a_valid_origin() -> None:
     assert observe._valid_origin("https://hiring.saramin.co.kr") is True
 
 
-def test_three_contract_validators_agree_on_ascii() -> None:
-    """세 검증기가 비ASCII 를 같은 방향으로 판정한다 — 한 곳만 다르면 그 틈이 출구가 된다."""
+def test_no_contract_value_can_produce_output_the_terminal_cannot_print() -> None:
+    """계약이 통과시킨 값은 ASCII stdout 으로도 출력할 수 있어야 한다.
 
-    assert observe._valid_origin(_NON_ASCII_ORIGIN) is False
-    assert observe._valid_targets_path("/포털") is False
-    assert observe._is_loopback_address("::1%포털") is False
+    "세 검증기가 모두 `isascii()` 를 쓴다"는 구현 결정이지 계약이 아니다(Codex 지적). 계약인
+    것은 **관측기가 어떤 환경에서도 계약된 한 줄을 낸다**는 것이고, 그것이 성립하려면 계약이
+    통과시킨 origin·경로·호스트가 출력 인코더를 깨지 않아야 한다. 그 성질을 직접 검사한다.
+    """
+
+    for value in (_NON_ASCII_ORIGIN, "https://포털.invalid:443"):
+        if observe._valid_origin(value):
+            observe._privacy_reduced_url(value).encode("ascii")
+    for path in ("/포털", "/한글경로"):
+        if observe._valid_targets_path(path):
+            path.encode("ascii")
+    for host in ("::1%포털", "127.0.0.1%한글"):
+        if observe._is_loopback_address(host):
+            host.encode("ascii")
+
+    # 실제 계약 값은 그대로 통과해야 한다 — 거부 방향으로만 좁힌다.
+    assert observe._valid_origin("https://hiring.saramin.co.kr") is True
+    assert observe._valid_targets_path("/json/list") is True
+    assert observe._is_loopback_address("127.0.0.1") is True
 
 
 def test_contract_with_a_non_ascii_origin_is_refused(

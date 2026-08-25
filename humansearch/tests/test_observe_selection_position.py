@@ -12,6 +12,7 @@ V1 최종 회차가 변조 하나를 냈다: `for candidate in targets:` → `fo
 여기서 검사하는 성질이고, 그 성질이 참이면 어떤 상수 절단도 반례가 된다.
 """
 
+import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
@@ -36,7 +37,10 @@ def _decoy(index: int) -> dict[str, object]:
 
 
 @settings(max_examples=200, deadline=None)
-@given(before=st.integers(min_value=0, max_value=80), after=st.integers(min_value=0, max_value=80))
+@given(
+    before=st.integers(min_value=0, max_value=200),
+    after=st.integers(min_value=0, max_value=80),
+)
 def test_the_approved_tab_is_found_at_any_position(before: int, after: int) -> None:
     targets: list[object] = [_decoy(i) for i in range(before)]
     targets.append(_APPROVED)
@@ -64,9 +68,7 @@ def test_two_approved_tabs_are_refused_however_far_apart(count: int, gap: int) -
         )
         targets.extend(_decoy(1000 + i * gap + j) for j in range(gap))
 
-    try:
+    # 계약이 요구하는 것은 "거부한다"이지 "몇 개라고 세어서 말한다"가 아니다. 내부 계수 문구를
+    # 단언하면 계수가 틀려도 통과하는 변조를 못 잡고, 문구만 바꿔도 시험이 깨진다(Codex 지적).
+    with pytest.raises(observe.TargetSelectionError):
         observe.select_single_target(targets, _ALLOWED)
-    except observe.TargetSelectionError as caught:
-        assert f"found {count}" in str(caught)
-    else:  # pragma: no cover - 통과하면 그 자체가 결함이다
-        raise AssertionError("두 개 이상인데 하나를 골랐다")
