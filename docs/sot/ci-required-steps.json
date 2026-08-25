@@ -1,11 +1,15 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "workflow": ".github/workflows/verify.yml",
+  "workflow_context": {"env":"absent","defaults":"absent"},
+  "protected_jobs": [
+    {"id":"verify","allowed_keys":["runs-on","steps"],"runs_on":"ubuntu-latest"}
+  ],
   "protected_steps": [
-    {"job":"verify","name":"비밀 스캔 (verify.sh)","run_lines":["bash verify.sh"],"if":null,"allow_continue_on_error":false},
-    {"job":"verify","name":"Strict 원칙 정본·장부·배선 검사","run_lines":["bash scripts/verify/run-acceptance.sh scripts/acceptance-principles-check.sh"],"if":null,"allow_continue_on_error":false},
-    {"job":"verify","name":"Strict 원칙 적대 fixture·500/501 경계","run_lines":["bash scripts/verify/run-acceptance.sh scripts/acceptance-principles-mutations.sh"],"if":null,"allow_continue_on_error":false},
-    {"job":"verify","name":"Strict 전역 스킬 잠금 장치 격리 회귀","run_lines":["bash scripts/verify/run-acceptance.sh scripts/acceptance-guard-global-skill-files.sh"],"if":null,"allow_continue_on_error":false},
+    {"job":"verify","name":"비밀 스캔 (verify.sh)","run_lines":["bash verify.sh"],"allowed_keys":["name","run"],"if":null},
+    {"job":"verify","name":"Strict 원칙 정본·장부·배선 검사","run_lines":["bash scripts/verify/run-acceptance.sh scripts/acceptance-principles-check.sh"],"allowed_keys":["name","run"],"if":null},
+    {"job":"verify","name":"Strict 원칙 적대 fixture·500/501 경계","run_lines":["bash scripts/verify/run-acceptance.sh scripts/acceptance-principles-mutations.sh"],"allowed_keys":["name","run"],"if":null},
+    {"job":"verify","name":"Strict 전역 스킬 잠금 장치 격리 회귀","run_lines":["bash scripts/verify/run-acceptance.sh scripts/acceptance-guard-global-skill-files.sh"],"allowed_keys":["name","run"],"if":null},
     {
       "job":"verify","name":"HumanSearch G1 클린룸 경계",
       "run_lines":[
@@ -17,7 +21,7 @@
         "bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-cleanroom-file-urls.sh",
         "bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-cleanroom-hook-env.sh",
         "bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-cleanroom-hook-env-mutations.sh"
-      ],"if":null,"allow_continue_on_error":false
+      ],"allowed_keys":["name","run"],"if":null
     },
     {
       "job":"verify","name":"HumanSearch G2 테스트 게이트 (정적·단위 + runtime import 증명)",
@@ -38,7 +42,7 @@
         "bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-gates.sh",
         "bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-gates-mutations.sh",
         "bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-gates-antiforge.sh"
-      ],"if":null,"allow_continue_on_error":false
+      ],"allowed_keys":["name","run"],"if":null
     },
     {
       "job":"verify","name":"히스토리 전량 스캔 (도달 가능한 모든 blob)",
@@ -75,12 +79,12 @@
         "fi",
         "[ \"$hit\" -eq 0 ] && echo \"PASS: 히스토리 전량 blob 스캔 0건 (blob ${blobs}개 검사)\"",
         "exit $hit"
-      ],"if":null,"allow_continue_on_error":false
+      ],"allowed_keys":["name","run"],"if":null
     },
-    {"job":"verify","name":"인수 검사 0-2 상시 내용 검사와 종료상태 분리 (AC-19)","run_lines":["bash scripts/verify/run-acceptance.sh scripts/acceptance-0-2-unreachable-content.sh"],"if":null,"allow_continue_on_error":false},
-    {"job":"verify","name":"인수 검사 0-6 (가짜 검증 스크립트 0건)","run_lines":["bash scripts/verify/run-acceptance.sh scripts/acceptance-0-6.sh"],"if":null,"allow_continue_on_error":false},
-    {"job":"verify","name":"인수 검사 0-7 (훅이 위반 6종을 실제로 차단하는가)","run_lines":["bash scripts/verify/run-acceptance.sh scripts/acceptance-0-7.sh"],"if":null,"allow_continue_on_error":false},
-    {"job":"verify","name":"인수 검사 0-5 (push · CI 연결)","run_lines":["bash scripts/verify/run-acceptance.sh scripts/acceptance-0-5.sh"],"if":"github.ref == 'refs/heads/main'","allow_continue_on_error":false},
+    {"job":"verify","name":"인수 검사 0-2 상시 내용 검사와 종료상태 분리 (AC-19)","run_lines":["bash scripts/verify/run-acceptance.sh scripts/acceptance-0-2-unreachable-content.sh"],"allowed_keys":["name","run"],"if":null},
+    {"job":"verify","name":"인수 검사 0-6 (가짜 검증 스크립트 0건)","run_lines":["bash scripts/verify/run-acceptance.sh scripts/acceptance-0-6.sh"],"allowed_keys":["name","run"],"if":null},
+    {"job":"verify","name":"인수 검사 0-7 (훅이 위반 6종을 실제로 차단하는가)","run_lines":["bash scripts/verify/run-acceptance.sh scripts/acceptance-0-7.sh"],"allowed_keys":["name","run"],"if":null},
+    {"job":"verify","name":"인수 검사 0-5 (push · CI 연결)","run_lines":["bash scripts/verify/run-acceptance.sh scripts/acceptance-0-5.sh"],"allowed_keys":["name","run","if"],"if":"github.ref == 'refs/heads/main'"},
     {
       "job":"verify","name":"억제 만료 스캔 (suppressions.yaml)",
       "run_lines":[
@@ -100,7 +104,7 @@
         "fi",
         "[ \"$fail\" -eq 0 ] && echo \"PASS: 억제 ${nc}건 전부 유효 기한 내\"",
         "exit $fail"
-      ],"if":null,"allow_continue_on_error":false
+      ],"allowed_keys":["name","run"],"if":null
     },
     {
       "job":"verify","name":"강제 장치 존재 검사 (hooks/)",
@@ -113,7 +117,7 @@
         "done",
         "[ \"$fail\" -eq 0 ] && echo \"PASS: 훅 2종 존재·실행가능\"",
         "exit $fail"
-      ],"if":null,"allow_continue_on_error":false
+      ],"allowed_keys":["name","run"],"if":null
     },
     {
       "job":"verify","name":"셸 스크립트 문법 검사",
@@ -130,7 +134,7 @@
         "fi",
         "echo \"PASS: 셸 파일 ${n}개 문법 검사\"",
         "exit $fail"
-      ],"if":null,"allow_continue_on_error":false
+      ],"allowed_keys":["name","run"],"if":null
     },
     {
       "job":"verify","name":"패턴 파일 자체에 실제 비밀이 없는지 (자기 오염 방지)",
@@ -141,15 +145,15 @@
         "  exit 1",
         "fi",
         "echo \"PASS: 기본 패턴 파일에 실값 없음\""
-      ],"if":null,"allow_continue_on_error":false
+      ],"allowed_keys":["name","run"],"if":null
     },
-    {"job":"verify","name":"인수 검사 hs-a3 (세션 계열 자격증명 탐지)","run_lines":["bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-a3.sh"],"if":null,"allow_continue_on_error":false},
-    {"job":"verify","name":"데이터 노출 스캔 (크기 · 금지경로 · 기록 · 개인정보 내용)","run_lines":["bash scripts/scan-data-exposure.sh all"],"if":null,"allow_continue_on_error":false},
-    {"job":"verify","name":"인수 검사 hs-a4 (대용량·산출물 차단이 실제로 도는가)","run_lines":["bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-a4.sh"],"if":null,"allow_continue_on_error":false},
-    {"job":"verify","name":"인수 검사 secret-webhook-vendor (웹훅·벤더 키 탐지 · AC-S1)","run_lines":["bash scripts/verify/run-acceptance.sh scripts/acceptance-secret-webhook-vendor.sh"],"if":null,"allow_continue_on_error":false},
-    {"job":"verify","name":"인수 검사 verified-sha (초록불이 SHA 에 귀속되는가 · P23)","run_lines":["bash scripts/verify/run-acceptance.sh scripts/acceptance-verified-sha.sh"],"if":null,"allow_continue_on_error":false},
-    {"job":"verify","name":"인수 검사 ci-step-integrity (스텝을 조용히 끄지 못하는가)","run_lines":["bash scripts/verify/run-acceptance.sh scripts/acceptance-ci-step-integrity.sh"],"if":null,"allow_continue_on_error":false},
-    {"job":"verify","name":"인수 검사 semantic-mutations (검사를 껐을 때 반드시 빨개지는가)","run_lines":["bash scripts/verify/run-acceptance.sh scripts/acceptance-semantic-mutations.sh"],"if":null,"allow_continue_on_error":false},
-    {"job":"verify","name":"인수 검사 verify-ac-m (mechanism 명부 대조 · AC-M)","run_lines":["bash scripts/verify/run-acceptance.sh scripts/acceptance-verify-ac-m.sh"],"if":null,"allow_continue_on_error":false}
+    {"job":"verify","name":"인수 검사 hs-a3 (세션 계열 자격증명 탐지)","run_lines":["bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-a3.sh"],"allowed_keys":["name","run"],"if":null},
+    {"job":"verify","name":"데이터 노출 스캔 (크기 · 금지경로 · 기록 · 개인정보 내용)","run_lines":["bash scripts/scan-data-exposure.sh all"],"allowed_keys":["name","run"],"if":null},
+    {"job":"verify","name":"인수 검사 hs-a4 (대용량·산출물 차단이 실제로 도는가)","run_lines":["bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-a4.sh"],"allowed_keys":["name","run"],"if":null},
+    {"job":"verify","name":"인수 검사 secret-webhook-vendor (웹훅·벤더 키 탐지 · AC-S1)","run_lines":["bash scripts/verify/run-acceptance.sh scripts/acceptance-secret-webhook-vendor.sh"],"allowed_keys":["name","run"],"if":null},
+    {"job":"verify","name":"인수 검사 verified-sha (초록불이 SHA 에 귀속되는가 · P23)","run_lines":["bash scripts/verify/run-acceptance.sh scripts/acceptance-verified-sha.sh"],"allowed_keys":["name","run"],"if":null},
+    {"job":"verify","name":"인수 검사 ci-step-integrity (스텝을 조용히 끄지 못하는가)","run_lines":["bash scripts/verify/run-acceptance.sh scripts/acceptance-ci-step-integrity.sh"],"allowed_keys":["name","run"],"if":null},
+    {"job":"verify","name":"인수 검사 semantic-mutations (검사를 껐을 때 반드시 빨개지는가)","run_lines":["bash scripts/verify/run-acceptance.sh scripts/acceptance-semantic-mutations.sh"],"allowed_keys":["name","run"],"if":null},
+    {"job":"verify","name":"인수 검사 verify-ac-m (mechanism 명부 대조 · AC-M)","run_lines":["bash scripts/verify/run-acceptance.sh scripts/acceptance-verify-ac-m.sh"],"allowed_keys":["name","run"],"if":null}
   ]
 }

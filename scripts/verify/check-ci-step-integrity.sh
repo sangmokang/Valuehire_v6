@@ -8,7 +8,7 @@ set -uo pipefail
 
 WORKFLOW="${1:-.github/workflows/verify.yml}"
 CONTRACT="${2:-docs/sot/ci-required-steps.json}"
-EXPECTED_CONTRACT_SHA256="168c9527d393973fce462a795ab399557c1e6c9a848ab57264a9f8f9e507d27a"
+EXPECTED_CONTRACT_SHA256="550bdefbd824dacc066b98241e94991285b329a371200923b595e3e5032b2d3a"
 
 if [ ! -f "$WORKFLOW" ]; then
   echo "NOT_RUN: 워크플로 파일이 없다 — $WORKFLOW"
@@ -30,45 +30,97 @@ def not_run(message)
   exit 2
 end
 
+class DuplicateRejectingHash < Hash
+  def []=(key, value)
+    raise JSON::ParserError, "중복 object key — #{key}" if key?(key)
+    super
+  end
+end
+
+def load_contract(path)
+  JSON.parse(File.read(path), object_class: DuplicateRejectingHash)
+rescue JSON::ParserError => error
+  not_run("CI step 계약 파싱 실패 — #{error.message.lines.first.to_s.strip}")
+end
+
+def validate_contract(contract)
+  root_keys = %w[protected_jobs protected_steps schema_version workflow workflow_context]
+  valid_root = contract.is_a?(Hash) && contract.keys.sort == root_keys &&
+               contract["schema_version"] == 2 &&
+               contract["workflow"] == ".github/workflows/verify.yml" &&
+               contract["workflow_context"].is_a?(Hash) &&
+               contract["workflow_context"].keys.sort == %w[defaults env] &&
+               contract["workflow_context"].values.all? { |value| value == "absent" }
+  not_run("CI step 계약 root/schema가 올바르지 않다") unless valid_root
+
+  job_specs = contract["protected_jobs"]
+  specs = contract["protected_steps"]
+  not_run("보호 job이 0개다 — 0건 대조로 통과할 수 없다") unless job_specs.is_a?(Array) && !job_specs.empty?
+  not_run("보호 대상이 0개다 — 0건 대조로 통과할 수 없다") unless specs.is_a?(Array) && !specs.empty?
+
+  job_ids = {}
+  job_specs.each_with_index do |spec, index|
+    allowed = spec.is_a?(Hash) ? spec["allowed_keys"] : nil
+    valid = spec.is_a?(Hash) && spec.keys.sort == %w[allowed_keys id runs_on] &&
+            spec["id"].is_a?(String) && !spec["id"].empty? &&
+            spec["runs_on"].is_a?(String) && !spec["runs_on"].empty? &&
+            allowed.is_a?(Array) && !allowed.empty? && allowed.all? { |key| key.is_a?(String) } &&
+            allowed.uniq.length == allowed.length && allowed.include?("runs-on") && allowed.include?("steps")
+    not_run("보호 job ##{index + 1}의 schema가 올바르지 않다") unless valid
+    not_run("계약에 보호 job이 중복됐다 — #{spec["id"]}") if job_ids[spec["id"]]
+    job_ids[spec["id"]] = true
+  end
+
+  seen = {}
+  specs.each_with_index do |spec, index|
+    allowed = spec.is_a?(Hash) ? spec["allowed_keys"] : nil
+    valid = spec.is_a?(Hash) && spec.keys.sort == %w[allowed_keys if job name run_lines] &&
+            job_ids[spec["job"]] && spec["name"].is_a?(String) && !spec["name"].empty? &&
+            spec["run_lines"].is_a?(Array) && !spec["run_lines"].empty? &&
+            spec["run_lines"].all? { |line| line.is_a?(String) } &&
+            allowed.is_a?(Array) && allowed.uniq.length == allowed.length &&
+            allowed.all? { |key| key.is_a?(String) } && allowed.include?("name") && allowed.include?("run") &&
+            (spec["if"].nil? ? !allowed.include?("if") : spec["if"].is_a?(String) && allowed.include?("if"))
+    not_run("보호 대상 ##{index + 1}의 schema가 올바르지 않다") unless valid
+    key = [spec["job"], spec["name"]]
+    not_run("계약에 보호 대상이 중복됐다 — #{key.join(" / ")}") if seen[key]
+    seen[key] = true
+  end
+  [job_specs, specs]
+end
+
+def reject_ambiguous_yaml(source)
+  ast = Psych.parse_stream(source)
+  violations = []
+  walk = nil
+  walk = lambda do |node|
+    violations << "alias" if node.is_a?(Psych::Nodes::Alias)
+    violations << "anchor" if node.respond_to?(:anchor) && node.anchor
+    if node.is_a?(Psych::Nodes::Mapping)
+      keys = Array(node.children).each_slice(2).map(&:first)
+      violations << "non-scalar mapping key" unless keys.all? { |key| key.is_a?(Psych::Nodes::Scalar) }
+      scalar_keys = keys.select { |key| key.is_a?(Psych::Nodes::Scalar) }.map(&:value)
+      violations << "merge key <<" if scalar_keys.include?("<<")
+      duplicates = scalar_keys.group_by(&:itself).select { |_key, values| values.length > 1 }.keys
+      violations.concat(duplicates.map { |key| "duplicate mapping key #{key}" })
+    end
+    Array(node.respond_to?(:children) ? node.children : nil).each { |child| walk.call(child) }
+  end
+  walk.call(ast)
+  not_run("워크플로 YAML 모호성 거부 — #{violations.uniq.join(", ")}") unless violations.empty?
+rescue Psych::Exception => error
+  not_run("워크플로 파싱 실패 — #{error.message.lines.first.to_s.strip}")
+end
+
 def normalized_lines(value)
   return nil unless value.is_a?(String)
   lines = value.gsub("\r\n", "\n").split("\n", -1)
-  lines.pop while lines.last == ""
+  lines.pop if lines.last == ""
   lines.map { |line| line.sub(/[ \t]+\z/, "") }
 end
 
-begin
-  contract = JSON.parse(File.read(contract_path))
-rescue JSON::ParserError => e
-  not_run("CI step 계약 파싱 실패 — #{e.message.lines.first.to_s.strip}")
-end
-
-required_root = %w[protected_steps schema_version workflow]
-unless contract.is_a?(Hash) && contract.keys.sort == required_root &&
-       contract["schema_version"] == 1 &&
-       contract["workflow"] == ".github/workflows/verify.yml"
-  not_run("CI step 계약 root/schema가 올바르지 않다")
-end
-
-specs = contract["protected_steps"]
-not_run("보호 대상이 0개다 — 0건 대조로 통과할 수 없다") unless specs.is_a?(Array) && !specs.empty?
-
-spec_keys = %w[allow_continue_on_error if job name run_lines]
-seen = {}
-specs.each_with_index do |spec, index|
-  unless spec.is_a?(Hash) && spec.keys.sort == spec_keys &&
-         spec["job"].is_a?(String) && !spec["job"].empty? &&
-         spec["name"].is_a?(String) && !spec["name"].empty? &&
-         spec["run_lines"].is_a?(Array) && !spec["run_lines"].empty? &&
-         spec["run_lines"].all? { |line| line.is_a?(String) } &&
-         (spec["if"].nil? || spec["if"].is_a?(String)) &&
-         spec["allow_continue_on_error"] == false
-    not_run("보호 대상 ##{index + 1}의 schema가 올바르지 않다")
-  end
-  key = [spec["job"], spec["name"]]
-  not_run("계약에 보호 대상이 중복됐다 — #{key.join(" / ")}") if seen[key]
-  seen[key] = true
-end
+contract = load_contract(contract_path)
+job_specs, specs = validate_contract(contract)
 
 actual_digest = Digest::SHA256.file(contract_path).hexdigest
 if actual_digest != expected_digest
@@ -77,37 +129,40 @@ if actual_digest != expected_digest
   exit 1
 end
 
+workflow_source = File.read(workflow_path)
+reject_ambiguous_yaml(workflow_source)
 begin
-  workflow = Psych.safe_load(File.read(workflow_path), aliases: true, permitted_classes: [Date, Time])
-rescue Psych::Exception => e
-  not_run("워크플로 파싱 실패 — #{e.message.lines.first.to_s.strip}")
+  workflow = Psych.safe_load(workflow_source, aliases: false, permitted_classes: [Date, Time])
+rescue Psych::Exception => error
+  not_run("워크플로 파싱 실패 — #{error.message.lines.first.to_s.strip}")
 end
 
 jobs = workflow.is_a?(Hash) ? workflow["jobs"] : nil
 not_run("jobs를 읽지 못했다 — 검사 대상 0개는 합격이 아니다") unless jobs.is_a?(Hash) && !jobs.empty?
 
 errors = []
-jobs.each do |job_id, job|
-  next unless job.is_a?(Hash)
-  errors << "JOB_CONDITIONAL: jobs.#{job_id}에 if가 있다" if job.key?("if")
-  errors << "JOB_CONTINUE_ON_ERROR: jobs.#{job_id}에 continue-on-error가 있다" if job.key?("continue-on-error")
-  Array(job["steps"]).each_with_index do |step, index|
-    next unless step.is_a?(Hash)
-    name = step["name"]
-    allowed_if = specs.any? { |spec| spec["job"] == job_id && spec["name"] == name && !spec["if"].nil? }
-    errors << "STEP_CONDITIONAL: jobs.#{job_id}.steps[#{index}]에 허용되지 않은 if가 있다" if step.key?("if") && !allowed_if
-    errors << "STEP_CONTINUE_ON_ERROR: jobs.#{job_id}.steps[#{index}]에 continue-on-error가 있다" if step.key?("continue-on-error")
+context = contract["workflow_context"]
+%w[env defaults].each do |key|
+  errors << "WORKFLOW_CONTEXT: root.#{key}는 없어야 한다" if context[key] == "absent" && workflow.key?(key)
+end
+
+job_specs.each do |spec|
+  job_id = spec["id"]
+  job = jobs[job_id]
+  unless job.is_a?(Hash)
+    errors << "JOB_MISSING: #{job_id}"
+    next
   end
+  errors << "JOB_KEYS_MISMATCH: jobs.#{job_id} actual=#{job.keys.sort.inspect} expected=#{spec["allowed_keys"].sort.inspect}" unless job.keys.sort == spec["allowed_keys"].sort
+  errors << "RUNS_ON_MISMATCH: jobs.#{job_id}" unless job["runs-on"] == spec["runs_on"]
+  errors << "JOB_STEPS_INVALID: jobs.#{job_id}" unless job["steps"].is_a?(Array)
 end
 
 specs.each do |spec|
   job_id = spec["job"]
   name = spec["name"]
   job = jobs[job_id]
-  unless job.is_a?(Hash)
-    errors << "JOB_MISSING: #{job_id}"
-    next
-  end
+  next unless job.is_a?(Hash)
   matches = Array(job["steps"]).select { |step| step.is_a?(Hash) && step["name"] == name }
   if matches.length != 1
     errors << "STEP_CARDINALITY: jobs.#{job_id}.#{name} count=#{matches.length} expected=1"
@@ -115,8 +170,8 @@ specs.each do |spec|
   end
 
   step = matches.first
-  actual_lines = normalized_lines(step["run"])
-  errors << "RUN_MISMATCH: jobs.#{job_id}.#{name}" unless actual_lines == spec["run_lines"]
+  errors << "STEP_KEYS_MISMATCH: jobs.#{job_id}.#{name} actual=#{step.keys.sort.inspect} expected=#{spec["allowed_keys"].sort.inspect}" unless step.keys.sort == spec["allowed_keys"].sort
+  errors << "RUN_MISMATCH: jobs.#{job_id}.#{name}" unless normalized_lines(step["run"]) == spec["run_lines"]
   if spec["if"].nil?
     errors << "IF_MISMATCH: jobs.#{job_id}.#{name}은 if가 없어야 한다" if step.key?("if")
   elsif !step.key?("if") || step["if"] != spec["if"]
@@ -124,11 +179,10 @@ specs.each do |spec|
   else
     puts "ALLOWED: #{name} — exact if=#{spec["if"].inspect}"
   end
-  errors << "CONTINUE_ON_ERROR: jobs.#{job_id}.#{name}은 continue-on-error가 없어야 한다" if step.key?("continue-on-error")
 end
 
 if errors.empty?
-  puts "PASS: 보호 CI step의 job·name·run·if·continue-on-error 계약 일치"
+  puts "PASS: workflow context와 보호 CI job·step exact 계약 일치"
   puts "CHECKED: #{specs.length}"
   exit 0
 end

@@ -137,6 +137,17 @@ else
   record 1 "이유가 기록된 0-5 조건부 step" "exit=$rc 또는 ALLOWED 출력 없음"
 fi
 
+p="$TMP/crlf-trailing.yml"; cp "$WF" "$p"
+ruby -e 'p=ARGV[0]; s=File.binread(p); n="        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-a4.sh"; s=s.sub(n,n+"  \t"); File.binwrite(p,s.gsub("\n","\r\n"))' "$p"
+expect_rc "CRLF와 각 줄 끝 공백만 다른 run" "$p" "$CONTRACT" 0
+
+p=$(mutate_run terminal-newline-one "$TARGET" $'        run: |\n          bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-a4.sh')
+expect_rc "YAML 표준 terminal newline 정확히 1개" "$p" "$CONTRACT" 0
+
+checkout_keys=$(ruby -rpsych -rdate -e 'd=Psych.safe_load(File.read(ARGV[0]),aliases:false,permitted_classes:[Date,Time]); puts d["jobs"]["verify"]["steps"].first.keys.sort.join(",")' "$WF")
+if [ "$checkout_keys" = "uses,with" ]; then record 0 "비보호 checkout step의 현재 key 집합" "$checkout_keys"
+else record 1 "비보호 checkout step의 현재 key 집합" "actual=$checkout_keys expected=uses,with"; fi
+
 # 필수 counter-AC 1~3: wrapper·문자열·주석은 명령 실행 증거가 아니다.
 p=$(mutate_run counter-01 "$G2_TARGET" '          echo scripts/verify/run-acceptance.sh scripts/acceptance-hs-gates.sh')
 expect_rc "counter-01 echo 정확 경로" "$p" "$CONTRACT" 1
@@ -210,6 +221,8 @@ printf 'jobs: [broken\n' > "$TMP/broken.yml"
 expect_rc "workflow 파싱 불가" "$TMP/broken.yml" "$CONTRACT" 2
 printf '{broken\n' > "$TMP/broken.json"
 expect_rc "계약 파싱 불가" "$WF" "$TMP/broken.json" 2
+printf '{"schema_version":1,"schema_version":2,"workflow":".github/workflows/verify.yml","workflow_context":{"env":"absent","defaults":"absent"},"protected_jobs":[],"protected_steps":[]}\n' > "$TMP/duplicate-key.json"
+expect_rc "JSON duplicate object key" "$WF" "$TMP/duplicate-key.json" 2
 printf '{"schema_version":1,"workflow":".github/workflows/verify.yml","protected_steps":[]}\n' > "$TMP/zero.json"
 expect_rc "counter-10 보호 대상 0개" "$WF" "$TMP/zero.json" 2
 

@@ -49,15 +49,17 @@
 
 **CI는 고정 목록이고 로컬 `pre-push`는 글로브(이름 규칙 자동 수집)다.** 그래서 새 인수 스크립트를 만들면 로컬에서는 저절로 돌지만 CI에서는 한 줄도 안 돈다 — P15③("로컬에만 있는 검사는 없는 것으로 친다")에 걸린다. **새 `scripts/acceptance-*.sh`를 추가하는 PR은 `verify.yml`과 이 표 양쪽에 자기 줄을 함께 넣어야 한다.**
 
-### CI 보호 step 선언 무결성 — WU0-A
+### CI 보호 job·step 선언 무결성 — WU0-A2
 
-`bash scripts/verify/check-ci-step-integrity.sh`는 Ruby Psych로 workflow를, JSON parser로 `docs/sot/ci-required-steps.json`을 읽는다. 보호 대상마다 job ID와 고유 step name을 찾고, ordered run lines·허용된 exact if·`continue-on-error` 부재를 대조한다. 줄 끝 공백과 CRLF/LF 차이 외에는 shell을 정규화하지 않으므로 `echo`, `printf`, `true`, `:`, `bash -n`, 뒤따르는 `exit 0`은 승인 명령과 다른 문자열로 실패한다.
+`bash scripts/verify/check-ci-step-integrity.sh`는 Ruby Psych의 AST(의미 Hash를 만들기 전의 YAML 구문 트리)를 먼저 검사하고, JSON parser도 중복 object key를 거부한다. workflow 전체의 중복 mapping key와 anchor·alias·`<<` merge key는 exit 2다. 보호 대상마다 job ID·고유 step name·exact 허용 key 집합·ordered run lines·exact if를 계약과 대조하며, 보호 job `verify`는 `runs-on`, `steps`만 허용하고 `runs-on: ubuntu-latest`를 요구한다.
 
-workflow와 계약을 함께 약화해 자기승인하는 변조는 RED에서 고정한 계약 SHA-256 핀이 막는다. 따라서 정당한 CI 명령 변경도 workflow·JSON 계약·검사기 핀을 함께 검토해야 한다. 이 핀은 원격 실행 증거가 아니라 세 파일 drift tripwire다.
+run은 CRLF를 LF로 바꾸고 각 줄 끝 space/tab만 제거한다. YAML block scalar의 표준 terminal newline은 최대 한 개만 제거하므로, 두 번째 이후 terminal blank line·시작/중간 빈 줄·순서·주석·wrapper·shell 문법은 그대로 비교된다.
 
-이 검사가 증명하는 것은 **“현재 파일이 승인된 CI 명령을 정확히 선언한다”**까지다. GitHub 서버가 특정 commit SHA에서 그 명령을 실제 실행해 성공했다는 사실은 `check-verified-sha.sh`와 원격 check 결과를 대조하는 별도 단계가 증명한다.
+workflow root의 `env`와 `defaults`는 없음이 exact 계약이다. root `name`, `on`, `permissions`, `jobs` 전체 내용은 A2가 비교하지 않으며, 안전 명령과 무관한 metadata와 비보호 setup·checkout step의 현재 key 집합은 통과한다. 현재 Ruby 2.6.10/Psych 3.1.0은 따옴표 없는 최상위 `on`을 boolean `true` key로 읽으므로 후속 trigger 검사(WU0-C)는 `workflow["on"]`만 사용하면 안 된다.
 
-의도적으로 비보호 setup step은 허용한다. 따라서 새 비보호 step이 runtime workspace를 바꾸는지, workflow trigger·`defaults`가 실행 자체를 약화하는지는 이 계약의 증명 범위가 아니다. 이 경계를 닫으려면 별도 Work Unit에서 보호 대상을 폐쇄 집합으로 바꾸거나 workflow-level 계약을 추가해야 한다.
+계약 SHA-256 핀은 workflow와 contract만 함께 바꾸고 checker pin을 그대로 둔 **부분 drift**를 잡는 tripwire다. checker pin까지 바꿀 수 있는 작성자에 대한 자기승인 방어 또는 독립 신뢰 기준이 아니다. 그 경계는 branch protection·CODEOWNERS·required review 같은 외부 trust root를 맡는 WU0-D다.
+
+이 검사가 증명하는 것은 **“현재 파일이 승인된 정적 실행 문맥을 정확히 선언한다”**까지다. GitHub의 특정 SHA 실행, trigger, checkout·선행 step·workspace provenance는 WU0-C, 호출 script의 no-op·가짜 PASS/CHECKED는 WU0-B, workflow/job permissions는 WU0-E 범위다. 따라서 WU0-A2가 통과해도 전체 저장소 안전성은 조건부다.
 
 ### 데이터 노출 판정기 — `scripts/scan-data-exposure.sh`
 
