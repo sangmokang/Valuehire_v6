@@ -417,7 +417,7 @@ function isSizeCheckedCode(path) {
   if (/(^|\/)(node_modules|vendor|vendors|dist|build|coverage|fixtures?|migrations?|artifacts?|private-reviews)\//.test(path)) {
     return false;
   }
-  return /\.(?:mjs|cjs|js|jsx|ts|tsx|py|rb|go|rs|java|kt|swift|php|cs|sh|bash|zsh)$/.test(path);
+  return /\.(?:mjs|cjs|js|jsx|ts|tsx|py|rb|go|rs|java|kt|swift|php|cs|sh|bash|zsh|c|h|cpp|cc|hpp|m|vue|svelte|lua|pl|sql|scala)$/.test(path);
 }
 
 function loc(content) {

@@ -1,6 +1,6 @@
 # WU-3b checkpoint 함수 예산 goal — 2026-08-25
 
-VERDICT: COUNTER_RED_PENDING
+VERDICT: LOCAL_GREEN_CHECKPOINT
 
 ## 결론
 
@@ -88,6 +88,11 @@ git show --check HEAD
 - V1-F003 counter RED: `2026-08-25T22:47:09+09:00`, exact HEAD `c0a7a7051dc62b7eb99d5b1ae3f6c976612d096c`, `node --test tests/checkpoint-function-budget.test.mjs`, exit 1, tests 31, pass 7, fail 24.
 - V1-F003 RED 원문: `/tmp/vhrec-wu3b-v1f003-red.SFy8KI/full.log`, SHA-256 `fad0c50c3b8932a2ae7d298a43e18c7942be826abad8580f7fd7dc2a3de34ad0`, session `VHREC-20260825T200157+0900-01a03893`.
 - V1-F003 RED 해석: 기존 7개 함수 경계 검사는 전부 통과했고, 새 12개 확장자 각각의 unsupported fail-closed와 601줄 hard limit 두 단언만 실패했다.
+- V1-F003 GREEN candidate: `2026-08-25T22:55:00+09:00`, exact RED HEAD `3e1fffad1436968219348de64bbfb33a9f949cbf` plus unstaged one-line implementation, function suite 31/31 and original suite 45/45, both exit 0.
+- V1-F003 GREEN 원문: `/tmp/vhrec-wu3b-v1f003-green-target.ndIDlQ/full.log` SHA-256 `bce3da8c74de84ca49cf783aec8499db75d27ebb1bf401ac4d7ce2564a8840e8`; `/tmp/vhrec-wu3b-v1f003-green-regression.3h1PjI/full.log` SHA-256 `75beb429d0fb6c9095146603ddfe5ef108252cb6c22233e5773d37b0c836b9a9`.
+- RED counter-test SHA-256 readback: `d8fe061c53d9238a83f376540eef996ec905ca69f35a0b9544effb1286c0f215`; GREEN 구현 뒤에도 동일하다.
+- pre-commit G: syntax 4개, principles 34/34, `verify.sh`, docs SOT, `git diff --check` 모두 exit 0; 원문 `/tmp/vhrec-wu3b-v1f003-precommit-g.XrbXLt`.
+- size readback: 새 counter-test 177줄, 원본 B test 정확히 600줄, gate 531줄, function scanner 239줄, JS scanner 238줄, lexer 366줄.
 - G: `NOT_RUN`
 - V1: `NOT_RUN`
 - V2: `NOT_RUN`
