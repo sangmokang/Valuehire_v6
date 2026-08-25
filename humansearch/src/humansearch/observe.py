@@ -171,7 +171,9 @@ def main(argv: Sequence[str] | None = None) -> int:
 def _load_contract(channel: str) -> MarkerContract:
     try:
         raw = json.loads(_CONTRACT_PATH.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+    # JSONDecodeError·UnicodeDecodeError 는 둘 다 ValueError 의 하위형이다. 하위형만 열거하면
+    # 4,300 자리를 넘는 정수처럼 맨 ValueError 로 오는 갈래가 그물 밖으로 샌다(V1 지적).
+    except (OSError, ValueError) as exc:
         raise ObservationError("marker contract is unavailable") from exc
     if not isinstance(raw, dict) or raw.get("channel") != channel:
         raise ObservationError("marker contract channel is invalid")
@@ -236,7 +238,7 @@ def _fetch_targets(contract: MarkerContract, port: int) -> list[object]:
         raise ObservationError("target list response exceeded the read limit")
     try:
         payload = json.loads(body)
-    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+    except ValueError as exc:  # JSONDecodeError·UnicodeDecodeError·자릿수 초과를 모두 포함한다
         raise ObservationError("target list response is invalid") from exc
     if not isinstance(payload, list):
         raise ObservationError("target list response is invalid")
@@ -259,6 +261,20 @@ def _split(url: str) -> SplitResult | None:
         return None
 
 
+def _readable_port(parsed: SplitResult) -> bool:
+    """포트를 읽을 수 있는지만 본다 — 값 자체에 정책을 넣지 않는다.
+
+    ``SplitResult.port`` 는 ``urlsplit()`` 이 통과시킨 주소에서도 숫자가 아니거나 범위를
+    벗어난 포트에서 별도로 ``ValueError`` 를 던진다.
+    """
+
+    try:
+        _ = parsed.port
+    except ValueError:
+        return False
+    return True
+
+
 def _origin(url: str) -> str:
     parsed = _split(url)
     if parsed is None or parsed.scheme != "https" or not parsed.netloc:
@@ -270,7 +286,7 @@ def _valid_origin(value: object) -> bool:
     if not isinstance(value, str):
         return False
     parsed = _split(value)
-    if parsed is None:
+    if parsed is None or not _readable_port(parsed):
         return False
     return (
         parsed.scheme == "https"
@@ -324,7 +340,17 @@ def _privacy_reduced_url(
     # netloc 앞부분의 `사용자:암호@` 는 경로에 든 식별자보다 민감하다. `.port` 는 숫자가
     # 아닌 포트에서 따로 ValueError 를 던지므로 읽지 않고, 마지막 `@` 뒤만 남긴다.
     netloc = parsed.netloc.rpartition("@")[2]
-    return urlunsplit((parsed.scheme, netloc, path, "", ""))
+    reduced = urlunsplit((parsed.scheme, netloc, path, "", ""))
+    # 출력은 인코딩 가능한 한 줄이어야 한다. `urlsplit()` 은 U+2028 같은 줄 분리자를 지우지
+    # 않고, 고립 서로게이트는 `print()` 단계에서 `UnicodeEncodeError` 로 죽는다 — 둘 다
+    # `main()` 의 try 블록 밖이다(V1 지적). 안전하게 보여줄 형태가 없으면 아무것도 안 보인다.
+    if len(reduced.splitlines()) > 1:
+        return ""
+    try:
+        reduced.encode("utf-8")
+    except UnicodeEncodeError:
+        return ""
+    return reduced
 
 
 def _port(value: str) -> int:
