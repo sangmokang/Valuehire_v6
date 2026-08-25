@@ -7,6 +7,41 @@
 #  ② fail-open 차단 — -f/-r 검사, CRLF 정규화, 유효 패턴 0개 시 exit 2, grep stderr를 실패로 취급
 set -euo pipefail
 
+canonical_existing_file() {
+  candidate=$1
+  [ -f "$candidate" ] || return 1
+  directory=$(cd "$(dirname "$candidate")" 2>/dev/null && pwd -P) || return 1
+  printf '%s/%s\n' "$directory" "$(basename "$candidate")"
+}
+
+REPO=$(git rev-parse --show-toplevel)
+REPO=$(cd "$REPO" && pwd -P)
+cd "$REPO"
+common=$(git rev-parse --git-common-dir)
+main_root=$(cd "$(dirname "$common")" && pwd -P)
+if [ "$main_root" != "$REPO" ]; then
+  expected_path="$main_root/.secret-patterns"
+  if [ ! -L .secret-patterns ]; then
+    echo "FAIL: linked worktree requires the real main .secret-patterns symlink (exit 2)"
+    exit 2
+  fi
+  link_target=$(readlink .secret-patterns)
+  case "$link_target" in
+    /*) actual_path=$link_target ;;
+    *) actual_path="$REPO/$link_target" ;;
+  esac
+  if ! actual_secret=$(canonical_existing_file "$actual_path"); then
+    actual_secret=""
+  fi
+  if ! expected_secret=$(canonical_existing_file "$expected_path"); then
+    expected_secret=""
+  fi
+  if [ -z "$actual_secret" ] || [ -z "$expected_secret" ] || [ "$actual_secret" != "$expected_secret" ]; then
+    echo "FAIL: linked worktree .secret-patterns does not resolve to the real main secret (exit 2)"
+    exit 2
+  fi
+fi
+
 # 패턴 소스 결정:
 #  - SECRET_PATTERNS_FILE 지정 시 → 그 파일만 사용(테스트·CI 주입용, 기존 계약 유지)
 #  - 미지정 시 → 커밋된 .secret-patterns.default + gitignore된 .secret-patterns 합집합.

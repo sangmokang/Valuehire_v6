@@ -9,6 +9,7 @@ set -euo pipefail
 
 REPO=$(git rev-parse --show-toplevel)
 cd "$REPO"
+REPO=$(pwd -P)
 
 if [ ! -d hooks ]; then
   printf 'BLOCKED: hooks/ 디렉터리가 없다\n' >&2
@@ -27,8 +28,15 @@ chmod +x hooks/* scripts/*.sh
 #
 # 검사를 약화시키는 대신(P13 위반) 환경을 맞춘다. 로컬 전용 패턴은 머신 단위
 # 자산이지 워크트리 단위가 아니므로 공유가 의미상으로도 옳다.
+canonical_existing_file() {
+  candidate=$1
+  [ -f "$candidate" ] || return 1
+  directory=$(cd "$(dirname "$candidate")" 2>/dev/null && pwd -P) || return 1
+  printf '%s/%s\n' "$directory" "$(basename "$candidate")"
+}
+
 common=$(git rev-parse --git-common-dir)
-main_root=$(cd "$(dirname "$common")" && pwd)
+main_root=$(cd "$(dirname "$common")" && pwd -P)
 if [ "$main_root" != "$REPO" ]; then
   expected_secret="$main_root/.secret-patterns"
   if [ ! -f "$expected_secret" ]; then
@@ -36,8 +44,18 @@ if [ "$main_root" != "$REPO" ]; then
     exit 1
   fi
   if [ -L .secret-patterns ]; then
-    actual_secret=$(readlink .secret-patterns)
-    if [ ! -e .secret-patterns ] || [ "$actual_secret" != "$expected_secret" ]; then
+    link_target=$(readlink .secret-patterns)
+    case "$link_target" in
+      /*) actual_path=$link_target ;;
+      *) actual_path="$REPO/$link_target" ;;
+    esac
+    if ! actual_secret=$(canonical_existing_file "$actual_path"); then
+      actual_secret=""
+    fi
+    if ! expected_secret=$(canonical_existing_file "$expected_secret"); then
+      expected_secret=""
+    fi
+    if [ -z "$actual_secret" ] || [ -z "$expected_secret" ] || [ "$actual_secret" != "$expected_secret" ]; then
       printf 'BLOCKED: linked worktree의 .secret-patterns symlink가 잘못됐다\n' >&2
       exit 1
     fi

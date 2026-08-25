@@ -1,6 +1,6 @@
 # Worktree `.secret-patterns` 자동 bootstrap goal — 2026-08-25
 
-VERDICT: COUNTER_RED_PENDING
+VERDICT: LOCAL_GREEN_CHECKPOINT
 
 ## T 계약
 
@@ -81,6 +81,10 @@ git show --check HEAD
 - V1-F002/F004 counter RED: `2026-08-25T23:02:04+09:00`, exact HEAD `6bb8e1e4998b0cc79ee879e8e18b9fb4a66e40ac`, `node --test tests/worktree-secret-bootstrap.test.mjs`, tests 6, pass 4, fail 2, exit 1.
 - counter RED 원문: `/tmp/vhrec-bootstrap-v1f002-f004-red-canonical.ankQYV/full.log`, SHA-256 `bf7ac6707cff33b12ec50a925bbfe11cd8d8eeb0fef7d321a037edb0b0067891`; frozen test SHA-256 `e18025eecd8cd40d1b5aa8c930b9f171443a01fdb64acab62a9a0b3bf1be10ff`.
 - counter RED 해석: 기존 4개 bootstrap 단언은 모두 통과했고, 잔여 linked worktree의 default-only false-green과 의미상 동일한 상대 symlink 수용 두 동작만 실패했다.
+- V1-F002/F004 GREEN candidate: `2026-08-25T23:04:54+09:00`, exact counter-RED HEAD `9499006540b53b472002afeae3c5365dfe7738ca` plus implementation, tests 6, pass 6, fail 0, exit 0.
+- GREEN target 원문: `/tmp/vhrec-bootstrap-v1f002-f004-green-target.wXbBzR/full.log`, SHA-256 `f0235f80e38fbc6a48a00d9fb8faac53a2563605ab5fb710c2194368f91721af`; frozen test SHA-256는 RED와 동일한 `e18025eecd8cd40d1b5aa8c930b9f171443a01fdb64acab62a9a0b3bf1be10ff`.
+- pre-commit G: shell syntax 3개, principles 34/34, `verify.sh`, docs SOT, `git diff --check`, 실제 symlink·대상·`core.hooksPath=hooks` readback 모두 exit 0; 원문 `/tmp/vhrec-bootstrap-v1f002-f004-precommit-g.3cKae9`.
+- 첫 GREEN commit 시도는 새 command substitution의 `|| true`를 P13 검사 약화 패턴으로 탐지해 commit 전 차단됐다. hook을 우회하지 않고 조건식으로 교체한 뒤 bootstrap 6/6, syntax, principles 34/34, verify, docs SOT, diff check를 재실행했다. 재검증 원문 `/tmp/vhrec-bootstrap-v1f002-f004-green-recheck.LoZPgP`.
 - G: `NOT_RUN`
 - V1: `NOT_RUN`
 - V2: `NOT_RUN`

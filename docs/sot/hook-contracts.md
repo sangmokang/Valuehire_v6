@@ -76,9 +76,18 @@
 불변식: 실제 secret 내용은 출력하지 않는다. installer의 symlink readback 계약을 우회하지 않는다
 ```
 
+### `verify.sh`
+```
+입력  : 추적 파일과 패턴 파일. `SECRET_PATTERNS_FILE`은 테스트·CI의 명시적 주입 계약으로 유지
+동작  : linked worktree에서는 스캔 전에 `.secret-patterns`가 실제 main secret과 같은 파일로 해석되는지 확인
+출력  : 정상 스캔은 기존 exit 0/1, linked worktree 환경 불일치는 exit 2
+불변식: linked worktree의 `.secret-patterns.default`는 실제 main secret 연결을 대신할 수 없다.
+        절대·상대 symlink 표기는 달라도 canonical 대상이 같으면 허용하고, secret 내용은 출력하지 않는다.
+```
+
 ## 시행 지점
 
-이 6개 파일 자체가 시행 지점이다. 각 파일 상단 주석의 `# 계약: docs/sot/hook-contracts.md`가 이 문서를 가리킨다 — 파일을 직접 읽으면 항상 최신 계약과 실제 구현이 같은지 대조할 수 있다.
+이 7개 파일 자체가 시행 지점이다. 각 hook·script의 계약 표시는 이 문서를 가리킨다 — 파일을 직접 읽으면 항상 최신 계약과 실제 구현이 같은지 대조할 수 있다.
 
 ## 비범위 / 한계
 
