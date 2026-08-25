@@ -1,5 +1,14 @@
 import assert from "node:assert/strict";
-import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readlinkSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readlinkSync,
+  realpathSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
@@ -44,7 +53,7 @@ test("git worktree add automatically links the real main secret and preserves ho
   git(fixture.main, ["worktree", "add", "-b", "task/linked", fixture.linked]);
   const link = path.join(fixture.linked, ".secret-patterns");
   assert.ok(existsSync(link));
-  assert.equal(readlinkSync(link), path.join(fixture.main, ".secret-patterns"));
+  assert.equal(realpathSync(readlinkSync(link)), realpathSync(path.join(fixture.main, ".secret-patterns")));
   assert.equal(git(fixture.linked, ["config", "--get", "core.hooksPath"]).stdout.trim(), "hooks");
 });
 
