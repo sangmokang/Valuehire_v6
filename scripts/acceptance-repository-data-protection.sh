@@ -155,6 +155,58 @@ sc_copy_identifier_control() {
   commit_file schema.sql seed
 }
 
+sc_csv_substring_control() {
+  printf 'username,mailer\nalpha,beta\n' > harmless.csv
+  commit_file harmless.csv seed
+}
+
+sc_sql_substring_control() {
+  printf "INSERT INTO audit(username,mailer) VALUES ('alpha','beta');\n" > harmless.sql
+  commit_file harmless.sql seed
+}
+
+sc_sql_comment_pii_control() {
+  printf "%s\n%s\n" '-- name email' "INSERT INTO audit(id,status) VALUES (1,'ok');" > harmless.sql
+  commit_file harmless.sql seed
+}
+
+sc_sql_string_pii_control() {
+  printf "INSERT INTO audit(message,status) VALUES ('name email','ok');\n" > harmless.sql
+  commit_file harmless.sql seed
+}
+
+sc_history_sql_string_pii_control() {
+  sc_sql_string_pii_control
+  git rm -q harmless.sql
+  printf 'ok\n' > README.md
+  commit_file README.md delete
+}
+
+sc_staged_sql_string_pii_control() {
+  printf 'ok\n' > README.md
+  commit_file README.md base
+  printf "INSERT INTO audit(message,status) VALUES ('name email','ok');\n" > harmless.sql
+  git add harmless.sql
+}
+
+sc_sql_cross_statement_control() {
+  printf "%s\n%s\n" "INSERT INTO audit(message) SELECT 'ok';" \
+    'CREATE TABLE values(name TEXT, email TEXT);' > harmless.sql
+  commit_file harmless.sql seed
+}
+
+sc_copy_query_export_control() {
+  printf 'COPY (SELECT name,email FROM candidates) TO STDOUT;\n' > export.sql
+  commit_file export.sql seed
+}
+
+sc_history_copy_query_export_control() {
+  sc_copy_query_export_control
+  git rm -q export.sql
+  printf 'ok\n' > README.md
+  commit_file README.md delete
+}
+
 sc_clean() {
   printf 'ok\n' > README.md
   commit_file README.md seed
@@ -419,6 +471,15 @@ run_case "multiline COPY FROM SQL load" pii sc_multiline_copy_sql 1 0 1 0 1
 run_case "deleted history multiline COPY FROM SQL load" history sc_history_multiline_copy_sql 1 0 1 0 2
 run_case "all staged multiline COPY FROM SQL load" all sc_staged_multiline_copy_sql 1 2 1 0 5
 run_case "COPY identifier schema control" pii sc_copy_identifier_control 0 1 0 0 1
+run_case "CSV identifier substring control" pii sc_csv_substring_control 0 1 0 0 1
+run_case "SQL identifier substring control" pii sc_sql_substring_control 0 1 0 0 1
+run_case "SQL comment-only PII words plus unrelated load control" pii sc_sql_comment_pii_control 0 1 0 0 1
+run_case "SQL string-only PII words plus unrelated load control" pii sc_sql_string_pii_control 0 1 0 0 1
+run_case "deleted history SQL string-only PII words control" history sc_history_sql_string_pii_control 0 1 0 0 2
+run_case "all staged SQL string-only PII words control" all sc_staged_sql_string_pii_control 0 3 0 0 5
+run_case "SQL statement-boundary control" pii sc_sql_cross_statement_control 0 1 0 0 1
+run_case "COPY query export control" pii sc_copy_query_export_control 0 1 0 0 1
+run_case "deleted history COPY query export control" history sc_history_copy_query_export_control 0 1 0 0 2
 partial_case "tracked partial ls-files" tracked always 2 0 0 1 0
 partial_case "pii partial ls-files" pii always 2 0 0 1 0
 partial_case "all partial ls-files no false PASS" all always 2 0 0 2 1 sc_staged_multiline_sql
@@ -440,7 +501,7 @@ runner_no_raw_case
 shared_function_case
 ci_wiring_case
 
-EXPECTED_CHECKS=33
+EXPECTED_CHECKS=42
 if [ "$checked" -ne "$EXPECTED_CHECKS" ]; then
   printf 'FAIL: 검사 항목 %d개 ≠ 계약값 %d개\n' "$checked" "$EXPECTED_CHECKS"
   printf 'CHECKED: %d\n' "$checked"

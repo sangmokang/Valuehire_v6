@@ -232,8 +232,8 @@ jobs:
         # 2026-08-21: acceptance-hs-a4.sh 본문을 `exit 0` 으로 바꿔도 CI 가 초록이었다.
         # CI 가 종료값만 봤기 때문이다 — 종료값 0 은 "통과했다"와 "아무것도 안 했다"를
         # 구분하지 못한다. 위 스텝들이 전부 scripts/verify/run-acceptance.sh 를 거치는
-        # 이유이며, 이 검사는 그 래퍼가 무력화 5종(exit 0 · true · no-op · 빈 파일 ·
-        # 출력만)을 인수 검사 전량에 대해 실제로 막는지 격리 사본으로 증명한다.
+        # 이유이며, 이 검사는 그 래퍼가 무력화 6종(exit 0 · true · no-op · 빈 파일 ·
+        # 출력만 · 가짜 PASS 출력)을 인수 검사 전량에 대해 실제로 막는지 격리 사본으로 증명한다.
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-semantic-mutations.sh
 
       - name: 인수 검사 verify-ac-m (mechanism 명부 대조 · AC-M)

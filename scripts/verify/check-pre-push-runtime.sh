@@ -14,7 +14,7 @@ cd "$REPO" || exit 2
 
 HOOK=${1:-hooks/pre-push}
 case "$HOOK" in
-  /*|..*|*/..*|*/../*) echo "FAIL: 안전하지 않은 hook 경로 — $HOOK"; exit 1 ;;
+  /*|..*|*/..*) echo "FAIL: 안전하지 않은 hook 경로 — $HOOK"; exit 1 ;;
 esac
 if [ ! -f "$HOOK" ] || [ -L "$HOOK" ]; then
   echo "FAIL: hook 파일 없음 또는 심볼릭 링크 — $HOOK"
@@ -52,16 +52,19 @@ cp .github/workflows/verify.yml "$SANDBOX/.github/workflows/verify.yml"
 
 cat > "$SANDBOX/scripts/acceptance-principles-check.sh" <<'EOF'
 #!/usr/bin/env bash
+[ -f "$0" ] || exit 1
 echo "PASS: sandbox stub"
 exit 0
 EOF
 cat > "$SANDBOX/$PROBE_REL" <<EOF
 #!/usr/bin/env bash
+[ -d '$(dirname "$MARKER")' ] || exit 2
 printf '%s\n' '$MARKER_PROOF' > '$MARKER'
 exit $PROBE_EXIT
 EOF
 cat > "$SANDBOX/verify.sh" <<'EOF'
 #!/usr/bin/env bash
+[ -f "$0" ] || exit 1
 echo "PASS: sandbox stub"
 exit 0
 EOF

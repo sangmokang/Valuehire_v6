@@ -244,7 +244,24 @@ scan_history() {
 PII_COLUMN_WORDS='name|email|e_mail|mail|phone|mobile|tel|school|univ|university|profile_url|linkedin|resume|birth|이름|이메일|전화|휴대폰|학교|생년|프로필'
 
 pii_word_count() {
-  tr '[:upper:]' '[:lower:]' | grep -oE "$PII_COLUMN_WORDS" | sort -u | awk 'END { print NR + 0 }'
+  awk -v words="$PII_COLUMN_WORDS" '
+    BEGIN {
+      split(words, pii, "|")
+    }
+    {
+      line=tolower($0)
+      for (i in pii) {
+        word=pii[i]
+        if (line ~ "(^|[^[:alnum:]_])" word "([^[:alnum:]_]|$)") {
+          seen[word]=1
+        }
+      }
+    }
+    END {
+      for (word in seen) n++
+      print n + 0
+    }
+  '
 }
 
 sanitize_sql_for_detection() {
@@ -277,13 +294,29 @@ sanitize_sql_for_detection() {
 }
 
 sql_has_load_statement() {
-  local content="$1" sanitized="$TMP_ROOT/sql-sanitized" normalized="$TMP_ROOT/sql-normalized"
-  if ! sanitize_sql_for_detection "$content" > "$sanitized" \
-     || ! tr '\n\r\t' '   ' < "$sanitized" \
-          | sed 's/[[:space:]][[:space:]]*/ /g' > "$normalized"; then
+  local content="$1" normalized="$TMP_ROOT/sql-normalized"
+  if ! tr '\n\r\t' '   ' < "$content" \
+       | sed 's/[[:space:]][[:space:]]*/ /g' > "$normalized"; then
     return 2
   fi
-  grep -qiE '(^|[^[:alnum:]_])insert[[:space:]]+into[[:space:]].*[[:space:]]values([^[:alnum:]_]|$)|(^|[^[:alnum:]_])copy[[:space:]]+[^;]*[[:space:]]from([^[:alnum:]_]|$)' "$normalized"
+  awk '
+    {
+      text = text " " tolower($0)
+    }
+    END {
+      n = split(text, stmt, /;/)
+      for (i = 1; i <= n; i++) {
+        s = stmt[i]
+        if (s ~ /(^|[^[:alnum:]_])insert[[:space:]]+into[[:space:]][^;]*[[:space:]]values([^[:alnum:]_]|$)/) {
+          exit 0
+        }
+        if (s ~ /(^|[^[:alnum:]_])copy[[:space:]]+([^();[:space:]]+|"[^"]+")([[:space:]]*\([^;()]*\))?[[:space:]]+from([^[:alnum:]_]|$)/) {
+          exit 0
+        }
+      }
+      exit 1
+    }
+  ' "$normalized"
 }
 
 is_pii_path() {
@@ -295,7 +328,7 @@ scan_pii_content() {
   # scan_pii_content <path> <content-file> [history-blob-fingerprint] [known-format]
   # 현재 파일과 history가 이 한 함수를 공유한다. 실제 값은 어느 출력에도 쓰지 않는다.
   local path="$1" content="$2" fingerprint="${3:-}" format="${4:-}"
-  local lf path_id header rows hits shape meta sql_rc
+  local lf path_id header rows hits shape meta sql_rc sql_clean
   if [ -z "$format" ]; then
     lf=$(printf '%s' "$path" | tr '[:upper:]' '[:lower:]')
     case "$lf" in *.csv) format=csv ;; *.tsv) format=tsv ;; *.sql) format=sql ;; *) return 0 ;; esac
@@ -312,9 +345,11 @@ scan_pii_content() {
       shape="표 데이터 ${rows}행"
       ;;
     sql)
-      hits=$(pii_word_count < "$content")
+      sql_clean="$TMP_ROOT/sql-detection-copy"
+      sanitize_sql_for_detection "$content" > "$sql_clean" || return 2
+      hits=$(pii_word_count < "$sql_clean")
       [ "$hits" -ge 2 ] || return 0
-      sql_rc=0; sql_has_load_statement "$content" || sql_rc=$?
+      sql_rc=0; sql_has_load_statement "$sql_clean" || sql_rc=$?
       [ "$sql_rc" -eq 2 ] && return 2
       [ "$sql_rc" -eq 0 ] || return 0
       shape="INSERT/VALUES/COPY 적재문"

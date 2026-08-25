@@ -6,7 +6,7 @@
 #   검사의 존재(existence)만 봤고 검사의 의미(semantics)를 보지 않았기 때문이다.
 #
 # 여기서는 차단과 통과를 한 쌍으로 잰다.
-#   차단 — 무력화한 사본 5종은 scripts/verify/run-acceptance.sh 가 전부 불합격시켜야 한다.
+#   차단 — 무력화한 사본 6종은 scripts/verify/run-acceptance.sh 가 전부 불합격시켜야 한다.
 #   통과 — 손대지 않은 실제 인수 검사는 그대로 합격해야 한다(과잉 차단이면 그것도 결함).
 #
 # 원본 저장소를 건드리지 않는다. 사본은 mktemp 아래에서만 만들고 끝나면 상태를 대조한다.
@@ -68,7 +68,7 @@ if [ "$expected_targets" -eq 0 ] || [ "${#targets[@]}" -ne "$expected_targets" ]
 fi
 record 0 "대상 수집" "인수 검사 ${#targets[@]}개 = Git 완전 목록 ${expected_targets}개"
 
-# ── 무력화 5종. 어느 것도 래퍼를 통과해서는 안 된다 ──────────────────────────
+# ── 무력화 6종. 어느 것도 래퍼를 통과해서는 안 된다 ──────────────────────────
 write_mutant() {
   local kind="$1" path="$2"
   case "$kind" in
@@ -77,11 +77,14 @@ write_mutant() {
     noop)       printf '#!/usr/bin/env bash\n: # no-op\n' > "$path" ;;
     empty)      printf '#!/usr/bin/env bash\n' > "$path" ;;
     echo-only)  printf '#!/usr/bin/env bash\necho "검사했습니다"\n' > "$path" ;;
+    fake-pass-output)
+      printf '#!/usr/bin/env bash\necho "PASS: fake"\necho "CHECKED: 1"\necho "VERDICT: PASS"\n' > "$path"
+      ;;
     *)          return 1 ;;
   esac
 }
 
-for kind in exit-zero true-only noop empty echo-only; do
+for kind in exit-zero true-only noop empty echo-only fake-pass-output; do
   blocked=0
   survivors=""
   for t in "${targets[@]}"; do

@@ -11,9 +11,10 @@
 #       1 이상이어야 한다. 둘 중 하나라도 어기면 이 래퍼가 불합격시킨다.
 #
 # 막는 것 / 막지 못하는 것:
-#   막는다   — 본문 삭제, `exit 0`, `true`, `: # no-op`, 검사 함수 제거, 조용한 조기 종료
-#   막지 못함 — `echo "PASS: 검사했습니다"; exit 0` 같은 문구 위조. 그것은 P13 검사 약화
-#              탐지(hooks/pre-commit)와 acceptance-0-6 의 몫이다. 여기서 다 막는다고
+#   막는다   — 본문 삭제, `exit 0`, `true`, `: # no-op`, 검사 함수 제거, 조용한 조기 종료,
+#              `PASS:`/`CHECKED:`/`VERDICT:` 만 출력하는 가짜 검사
+#   막지 못함 — 실제 명령처럼 보이는 임의 로직이 거짓 판정을 출력하는 경우. 그것은 P13 검사 약화
+#              탐지(hooks/pre-commit)와 각 acceptance 의 적대 fixture 몫이다. 여기서 다 막는다고
 #              주장하지 않는다.
 set -uo pipefail
 
@@ -40,6 +41,30 @@ if [ ! -f "$target" ]; then
   exit 2
 fi
 
+if ! awk '
+  function trim(s) {
+    sub(/^[[:space:]]+/, "", s)
+    sub(/[[:space:]]+$/, "", s)
+    return s
+  }
+  function simple_assignment(s) {
+    return s ~ /^[A-Za-z_][A-Za-z0-9_]*=/ && s !~ /\$\(/ && s !~ /`/
+  }
+  {
+    line = trim($0)
+    if (line == "" || line ~ /^#/) next
+    if (line ~ /^set([[:space:]]|$)/) next
+    if (simple_assignment(line)) next
+    if (line ~ /^(echo|printf|true|:|exit)([[:space:];]|$)/) next
+    substantive = 1
+  }
+  END { exit substantive ? 0 : 1 }
+' "$target"; then
+  echo "FAIL(run-acceptance): path $target_id 이 출력·종료 명령만 담고 있다."
+  echo "  PASS 문구와 CHECKED 숫자는 실제 판정 명령을 대신할 수 없다."
+  exit 1
+fi
+
 out=$(mktemp) || {
   echo "FAIL: 임시 출력 파일 생성 실패 — 판정 근거를 모을 수 없다"
   exit 2
@@ -57,7 +82,7 @@ if [ "$rc" -ne 0 ]; then
 fi
 
 # 종료값 0 인데 판정 근거가 없다 — 이것이 exit 0 치환이 통과하던 구멍이다.
-pass_lines=$(grep -c 'PASS' "$out")
+pass_lines=$(grep -c '^PASS:' "$out")
 if [ "$pass_lines" -lt 1 ]; then
   echo "FAIL(run-acceptance): path $target_id 이 종료값 0 이지만 판정을 한 건도 내놓지 않았다."
   echo "  실행됐다는 사실은 검사했다는 증거가 아니다 — 본문이 비었거나 조기 종료했을 수 있다."

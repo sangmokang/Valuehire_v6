@@ -195,7 +195,7 @@
       {
         "id": "RDP-V6",
         "command": "bash scripts/acceptance-hs-a3.sh && bash scripts/acceptance-hs-a4.sh && bash scripts/acceptance-repository-data-protection.sh && bash scripts/acceptance-secret-webhook-vendor.sh",
-        "expected": "exact case counts, complete Git target collection, all-mode aggregation, current and deleted-history multiline INSERT and COPY FROM loads, comment/string/COPY-identifier schema controls, raw-path non-disclosure, deterministic current/deleted-path lookup, one shared PII function, 600/601 file and 100/101 function boundaries all pass; all commands exit 0"
+        "expected": "repository-data-protection reports exactly 42 cases; complete Git target collection, all-mode aggregation, current and deleted-history multiline INSERT and COPY FROM loads, exact PII identifier boundaries, sanitized comment/string controls, SQL statement boundaries, COPY query-export controls, raw-path non-disclosure, deterministic current/deleted-path lookup, one shared PII function, 600/601 file and 100/101 function boundaries all pass; all commands exit 0"
       }
     ],
     "evidence": [

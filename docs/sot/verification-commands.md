@@ -43,7 +43,7 @@
 | 20 | 인수 검사 secret-webhook-vendor | `bash scripts/acceptance-secret-webhook-vendor.sh` — 웹훅·벤더 키 (AC-S1) |
 | 21 | 인수 검사 verified-sha | `bash scripts/acceptance-verified-sha.sh` — 로컬·원격·CI SHA 귀속 진리표 (P23) |
 | 22 | 인수 검사 ci-step-integrity | `bash scripts/acceptance-ci-step-integrity.sh` — 조건부·오류무시·출력 대체 차단 |
-| 23 | 인수 검사 semantic-mutations | `bash scripts/acceptance-semantic-mutations.sh` — 인수 검사 무력화 5종 차단과 정확한 Git 대상 수집 |
+| 23 | 인수 검사 semantic-mutations | `bash scripts/acceptance-semantic-mutations.sh` — 인수 검사 무력화 6종 차단과 정확한 Git 대상 수집 |
 | 24 | 인수 검사 verify-ac-m | `bash scripts/acceptance-verify-ac-m.sh` — mechanism 명부 대조 (AC-M) |
 
 *(1번 앞에 `actions/checkout` 이 있고 `fetch-depth: 0` 이다 — 4번이 과거 blob 을 열려면 필요하다.)*
@@ -63,15 +63,15 @@
 
 종료값 `0=PASS / 1=FAIL / 2=NOT_RUN`. 모든 모드는 마지막에 실제 처리 수 `CHECKED: N`을 한 번 출력한다. **검사 대상 0건이나 Git 객체 열거·형식·크기·본문 읽기 실패는 통과가 아니라 `NOT_RUN`이다**(P3·P20).
 
-현재 `pii`와 `history`는 `scan_pii_content` 한 함수를 재사용한다. history는 모든 도달 가능 commit tree의 blob-경로 연결을 NUL 경계로 열거하므로 제어문자가 든 경로와 안전 확장자 alias도 숨지 못한다. SQL은 판정용 사본에서 `--`·`#`·`/* */` 주석과 작은따옴표 문자열 내용을 제거하고 줄바꿈·탭을 공백으로 정규화한 뒤 `INSERT INTO`·`VALUES (`·`COPY ... FROM`을 판정한다. 개인정보 컬럼 낱말 2종 이상은 기존처럼 원본 파일 전체에서 세며, CSV·TSV는 데이터 행이 있어야 차단한다. 따라서 개인정보 컬럼 1종 CSV, schema-only SQL, 주석·문자열에만 적재 예시가 있는 SQL은 통과한다.
+현재 `pii`와 `history`는 `scan_pii_content` 한 함수를 재사용한다. history는 모든 도달 가능 commit tree의 blob-경로 연결을 NUL 경계로 열거하므로 제어문자가 든 경로와 안전 확장자 alias도 숨지 못한다. SQL은 판정용 사본에서 `--`·`#`·`/* */` 주석과 작은따옴표 문자열 내용을 제거하고 줄바꿈·탭을 공백으로 정규화한 뒤, 같은 사본에서 완전한 개인정보 컬럼 낱말과 단일 세미콜론 경계 안의 `INSERT INTO ... VALUES` 또는 테이블 대상 `COPY ... FROM`을 판정한다. `COPY (SELECT ... FROM ...) TO` 내보내기와 서로 다른 SQL 문장의 키워드는 적재로 합치지 않는다. CSV·TSV도 완전한 컬럼 낱말 2종 이상과 데이터 행이 함께 있어야 차단한다. 따라서 `username,mailer`, 개인정보 낱말이 주석·문자열에만 있는 SQL, schema-only SQL은 통과한다.
 
-`scripts/acceptance-repository-data-protection.sh`는 33개 사례를 정확히 요구한다. 여기에는 현재·삭제 history·all의 여러 줄 `COPY ... FROM` 적재문과 `copy`가 컬럼 식별자로만 존재하는 schema-only 정상 SQL 대조군이 포함된다. bare `copy` 낱말만으로 적재문을 판정하면 이 acceptance가 실패한다.
+`scripts/acceptance-repository-data-protection.sh`는 42개 사례를 정확히 요구한다. 여기에는 현재·삭제 history·all의 여러 줄 `COPY ... FROM` 적재문, `copy` 컬럼 schema-only SQL, 완전한 개인정보 낱말 경계, 주석·문자열 개인정보 대조군, 문장 경계, COPY query export 대조군이 포함된다. 부분 문자열을 개인정보 낱말로 세거나 서로 다른 문장을 합치거나 COPY 내보내기를 적재로 판정하면 이 acceptance가 실패한다.
 
 scanner는 금지경로·크기초과·PII 위반·경로 관련 NOT_RUN에서 원문 경로를 출력하지 않는다. `path <12hex>`는 `printf '%s' "$path" | shasum -a 256` 결과의 앞 12자리인 결정론적 가명이며 비식별화가 아니다. 같은 경로는 current/history에서 같은 지문이다. 운영자는 로컬에서만 `bash scripts/resolve-data-path-fingerprint.sh <12hex>`를 실행해 현재 추적 경로와 삭제된 commit-tree 경로를 역조회한다. 2개 이상이 나오면 도구는 모든 shell-escaped 후보와 `COLLISION`을 출력하고 성공으로 접지 않는다. 이 로컬 출력은 CI·goal·판정서에 복사하지 않는다.
 
 **금지 경로 목록은 `hooks/pre-commit`과 이 판정기 두 곳에 있다**(훅은 '스테이지된 것'만 보므로 별도 코드다). 한쪽만 넓히면 조용히 갈라지므로 `scripts/acceptance-hs-a4.sh`가 두 목록의 동치를 검사한다.
 
-`scripts/acceptance-hs-a4.sh`는 49개 사례를 정확히 요구한다. 기존 48개 회귀에 더해 전용 repository-data-protection acceptance가 CI의 `run-acceptance.sh`와 이 표에 정확히 한 번 연결됐는지 독립 확인한다. 추적 대상은 `git ls-files -z`의 성공한 전체 NUL 목록을 먼저 저장하고 그 실제 수와 처리 수를 정확히 비교한다. 같은 파일 판정 함수로 직접 작성 파일 600줄 이하와 합성 600/601 경계, 함수 100/101 경계를 확인하며 신규 전용 acceptance와 로컬 역조회 도구도 코드 예산 대상이다.
+`scripts/acceptance-hs-a4.sh`는 49개 사례를 정확히 요구한다. 기존 48개 회귀에 더해 전용 repository-data-protection acceptance가 CI의 `run-acceptance.sh`와 이 표에 정확히 한 번 연결됐는지 독립 확인한다. `scripts/acceptance-repository-data-protection.sh`는 42개 사례를 정확히 요구하며, 정상 CSV/SQL 대조군과 부분 Git·SQL·경로 가명·집계 계약을 함께 검증한다. 추적 대상은 `git ls-files -z`의 성공한 전체 NUL 목록을 먼저 저장하고 그 실제 수와 처리 수를 정확히 비교한다. 같은 파일 판정 함수로 직접 작성 파일 600줄 이하와 합성 600/601 경계, 함수 100/101 경계를 확인하며 신규 전용 acceptance와 로컬 역조회 도구도 코드 예산 대상이다.
 
 ### 주요 기능 정본 구조 검사 — `scripts/check-docs-sot.sh`
 
