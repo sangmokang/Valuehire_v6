@@ -137,13 +137,53 @@ done <<< "$unreachable_objects"
 # 5-c. 도달 가능한 모든 지점(refs + reflog 포함)의 blob 전수 스캔 — 상시 회귀 조건.
 #      SHA 화이트리스트는 "과거의 알려진 오염"만 잡는다. 미래에 새로 유입되는 비밀은
 #      내용 기반으로만 잡을 수 있으므로, --reflog 포함 전 객체를 실제로 열어 확인한다.
+reachable_list_rc=0
+reachable_list=$(git rev-list --all --reflog --objects 2>/dev/null) || reachable_list_rc=$?
+reachable_objects=
+reachable_count=0
+if [ "$reachable_list_rc" -ne 0 ]; then
+  echo "FAIL: git rev-list 실패 — 히스토리를 읽지 못했다(스캔 무효) (exit=$reachable_list_rc)"
+  fail=1
+else
+  reachable_objects=$(printf '%s\n' "$reachable_list" | awk '{print $1}' | sort -u)
+  reachable_count=$(printf '%s\n' "$reachable_objects" | awk 'NF{c++} END{print c+0}')
+  if [ "$reachable_count" -lt 2 ]; then
+    echo "FAIL: 도달 가능 객체가 ${reachable_count}개 — 저장소를 제대로 읽지 못했다(스캔 무효)"
+    fail=1
+  fi
+fi
+if [ "$reachable_list_rc" -eq 0 ] && [ "$reachable_count" -ge 2 ]; then
 while IFS= read -r sha; do
   [ -z "$sha" ] && continue
-  if [ "$(git cat-file -t "$sha" 2>/dev/null)" = blob ] \
-     && git cat-file blob "$sha" 2>/dev/null | grep -qF "$LIT"; then
-    echo "FAIL: 도달 가능 blob에 리터럴 잔존: $sha"; fail=1
+  reachable_type_rc=0
+  reachable_type=$(git cat-file -t "$sha" 2>/dev/null) || reachable_type_rc=$?
+  if [ "$reachable_type_rc" -ne 0 ]; then
+    echo "FAIL: 도달 가능 객체형 읽기 실패: $sha (exit=$reachable_type_rc)"
+    fail=1
+    continue
   fi
-done < <(git rev-list --all --reflog --objects 2>/dev/null | awk '{print $1}' | sort -u)
+  [ "$reachable_type" = blob ] || continue
+
+  if git cat-file blob "$sha" 2>/dev/null |
+     LC_ALL=C grep -aF "$LIT" >/dev/null; then
+    reachable_scan_status=("${PIPESTATUS[@]}")
+  else
+    reachable_scan_status=("${PIPESTATUS[@]}")
+  fi
+  reachable_cat_file_rc=${reachable_scan_status[0]:-1}
+  reachable_grep_rc=${reachable_scan_status[1]:-2}
+  if [ "$reachable_cat_file_rc" -ne 0 ]; then
+    echo "FAIL: 도달 가능 blob 읽기 실패: $sha (exit=$reachable_cat_file_rc)"
+    fail=1
+  elif [ "$reachable_grep_rc" -eq 0 ]; then
+    echo "FAIL: 도달 가능 blob에 리터럴 잔존: $sha"
+    fail=1
+  elif [ "$reachable_grep_rc" -ne 1 ]; then
+    echo "FAIL: 도달 가능 blob 내용 대조 실패: $sha (exit=$reachable_grep_rc)"
+    fail=1
+  fi
+done <<< "$reachable_objects"
+fi
 
 # 6~9. 종료상태(end-state) 전용 검사 — 청소 **직후**에만 참인 조건이다.
 #      unreachable 객체 0개·ref 화이트리스트·pseudoref 부재·워크트리 0개는 이후 정상적인
