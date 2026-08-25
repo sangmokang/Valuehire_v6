@@ -60,6 +60,62 @@ mutate_run() {
   printf '%s' "$path"
 }
 
+a2_yaml_evidence() {
+  local workflow="$1" target_name="$2"
+  ruby -rpsych -rdate -e '
+    path, target_name = ARGV
+    source = File.read(path)
+    ast = Psych.parse_stream(source)
+    aliases = anchors = merges = 0
+    duplicates = []
+    walk = nil
+    walk = lambda do |node|
+      aliases += 1 if node.is_a?(Psych::Nodes::Alias)
+      anchors += 1 if node.respond_to?(:anchor) && node.anchor
+      if node.is_a?(Psych::Nodes::Mapping)
+        keys = Array(node.children).each_slice(2).map(&:first)
+        scalar = keys.select { |key| key.is_a?(Psych::Nodes::Scalar) }.map(&:value)
+        scalar.group_by(&:itself).each { |key, values| duplicates << "#{key}=#{values.length}" if values.length > 1 }
+        merges += scalar.count("<<")
+      end
+      Array(node.respond_to?(:children) ? node.children : nil).each { |child| walk.call(child) }
+    end
+    walk.call(ast)
+    puts "AST_DUPLICATE_KEYS=#{duplicates.empty? ? "none" : duplicates.join(",")}"
+    puts "AST_ALIASES=#{aliases} AST_ANCHORS=#{anchors} AST_MERGE_KEYS=#{merges}"
+    begin
+      data = Psych.safe_load(source, aliases: true, permitted_classes: [Date, Time])
+      jobs = data.is_a?(Hash) ? data["jobs"] : nil
+      job = jobs.is_a?(Hash) ? jobs["verify"] : nil
+      steps = job.is_a?(Hash) ? Array(job["steps"]) : []
+      targets = steps.select { |step| step.is_a?(Hash) && step["name"] == target_name }
+      puts "SEMANTIC_ROOT_KEYS=#{data.is_a?(Hash) ? data.keys.map(&:inspect).join(",") : data.class}"
+      puts "SEMANTIC_WORKFLOW_ENV=#{data.is_a?(Hash) && data.key?("env")} DEFAULTS=#{data.is_a?(Hash) && data.key?("defaults")}"
+      puts "SEMANTIC_VERIFY_KEYS=#{job.is_a?(Hash) ? job.keys.map(&:inspect).join(",") : job.class}"
+      puts "SEMANTIC_TARGET_COUNT=#{targets.length} TARGETS=#{targets.map { |step| step.inspect }.join(" | ")}"
+    rescue Psych::Exception => error
+      puts "SEMANTIC_PARSE_ERROR=#{error.class}: #{error.message.lines.first.to_s.strip}"
+    end
+  ' "$workflow" "$target_name"
+}
+
+a2_expect_rc() {
+  local number="$1" desc="$2" workflow="$3" pattern="$4" wanted="$5"
+  local rc=0 output
+  printf '\n===== A2 RED %s: %s =====\n' "$number" "$desc"
+  printf 'SESSION_ID=609BF375-87ED-4ABD-AC85-1B2CF76E1AA1\nHEAD=%s\n' "$(git rev-parse HEAD)"
+  printf 'UTC_START=%s\nKST_START=%s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$(TZ=Asia/Seoul date '+%Y-%m-%dT%H:%M:%S%z')"
+  echo 'MUTATED_SOURCE_BEGIN'
+  grep -nE -- "$pattern" "$workflow" || true
+  echo 'MUTATED_SOURCE_END'
+  a2_yaml_evidence "$workflow" '인수 검사 hs-a4 (대용량·산출물 차단이 실제로 도는가)'
+  output=$(bash "$CHECKER" "$workflow" "$CONTRACT" 2>&1) || rc=$?
+  printf 'CHECKER_OUTPUT_BEGIN\n%s\nCHECKER_OUTPUT_END\nACTUAL_EXIT=%s EXPECTED_EXIT=%s\n' "$output" "$rc" "$wanted"
+  printf 'UTC_END=%s\nKST_END=%s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$(TZ=Asia/Seoul date '+%Y-%m-%dT%H:%M:%S%z')"
+  if [ "$rc" -eq "$wanted" ]; then record 0 "A2-$number $desc" "exit=$rc"
+  else record 1 "A2-$number $desc" "expected exit=$wanted actual=$rc"; fi
+}
+
 TARGET='        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-a4.sh'
 G2_TARGET='          bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-gates.sh'
 
@@ -156,6 +212,91 @@ printf '{broken\n' > "$TMP/broken.json"
 expect_rc "계약 파싱 불가" "$WF" "$TMP/broken.json" 2
 printf '{"schema_version":1,"workflow":".github/workflows/verify.yml","protected_steps":[]}\n' > "$TMP/zero.json"
 expect_rc "counter-10 보호 대상 0개" "$WF" "$TMP/zero.json" 2
+
+if [ "${WU0A2_SKIP_NEW:-0}" != 1 ]; then
+  STEP_NAME='      - name: 인수 검사 hs-a4 (대용량·산출물 차단이 실제로 도는가)'
+  STEP_RUN='        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-a4.sh'
+
+  p=$(mutate_run a2-01 "$STEP_RUN" "$STEP_RUN"$'\n        shell: bash -n {0}')
+  a2_expect_rc 01 '보호 step shell bash -n' "$p" 'name: 인수 검사 hs-a4|run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-a4.sh|shell:' 1
+
+  p=$(mutate_run a2-02 "$STEP_RUN" "$STEP_RUN"$'\n        shell: echo {0}')
+  a2_expect_rc 02 '보호 step shell echo' "$p" 'name: 인수 검사 hs-a4|run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-a4.sh|shell:' 1
+
+  p=$(mutate_run a2-03 "$STEP_RUN" "$STEP_RUN"$'\n        env:\n          BASH_ENV: /tmp/a2-evil')
+  a2_expect_rc 03 '보호 step env.BASH_ENV' "$p" 'name: 인수 검사 hs-a4|run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-a4.sh|env:|BASH_ENV:' 1
+
+  p=$(mutate_run a2-04 "$STEP_RUN" "$STEP_RUN"$'\n        working-directory: scripts')
+  a2_expect_rc 04 '보호 step working-directory' "$p" 'name: 인수 검사 hs-a4|run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-a4.sh|working-directory:' 1
+
+  p=$(mutate_run a2-05 "$STEP_RUN" "$STEP_RUN"$'\n        timeout-minutes: 1')
+  a2_expect_rc 05 '보호 step timeout-minutes' "$p" 'name: 인수 검사 hs-a4|run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-a4.sh|timeout-minutes:' 1
+
+  p=$(mutate_run a2-06 'permissions:' $'defaults:\n  run:\n    shell: bash -n {0}\n\npermissions:')
+  a2_expect_rc 06 'workflow defaults.run.shell' "$p" '^defaults:|^  run:|^    shell:|^permissions:' 1
+
+  p=$(mutate_run a2-07 'permissions:' $'defaults:\n  run:\n    working-directory: scripts\n\npermissions:')
+  a2_expect_rc 07 'workflow defaults.run.working-directory' "$p" '^defaults:|^  run:|^    working-directory:|^permissions:' 1
+
+  p=$(mutate_run a2-08 'permissions:' $'env:\n  BASH_ENV: /tmp/a2-evil\n\npermissions:')
+  a2_expect_rc 08 'workflow env' "$p" '^env:|^  BASH_ENV:|^permissions:' 1
+
+  p=$(mutate_run a2-09 '    steps:' $'    defaults:\n      run:\n        shell: bash -n {0}\n    steps:')
+  a2_expect_rc 09 '보호 job defaults.run.shell' "$p" '^  verify:|^    defaults:|^      run:|^        shell:|^    steps:' 1
+
+  p=$(mutate_run a2-10 '    steps:' $'    defaults:\n      run:\n        working-directory: scripts\n    steps:')
+  a2_expect_rc 10 '보호 job defaults.run.working-directory' "$p" '^  verify:|^    defaults:|^      run:|^        working-directory:|^    steps:' 1
+
+  p=$(mutate_run a2-11 '    steps:' $'    env:\n      BASH_ENV: /tmp/a2-evil\n    steps:')
+  a2_expect_rc 11 '보호 job env' "$p" '^  verify:|^    env:|^      BASH_ENV:|^    steps:' 1
+
+  p=$(mutate_run a2-12 '    runs-on: ubuntu-latest' '    runs-on: macos-latest')
+  a2_expect_rc 12 '보호 job runs-on 변경' "$p" '^  verify:|runs-on:' 1
+
+  p=$(mutate_run a2-13 '    steps:' $'    container: ubuntu:latest\n    steps:')
+  a2_expect_rc 13 '보호 job container' "$p" '^  verify:|^    container:|^    steps:' 1
+
+  p=$(mutate_run a2-14 '    steps:' $'    strategy:\n      matrix:\n        shell: [bash]\n    steps:')
+  a2_expect_rc 14 '보호 job strategy' "$p" '^  verify:|^    strategy:|^      matrix:|^        shell:|^    steps:' 1
+
+  p=$(mutate_run a2-15 '    steps:' $'    environment: production\n    steps:')
+  a2_expect_rc 15 '보호 job environment' "$p" '^  verify:|^    environment:|^    steps:' 1
+
+  p=$(mutate_run a2-16 "$STEP_RUN" $'        run: |+\n          bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-a4.sh\n          \n          ')
+  a2_expect_rc 16 'exact run 뒤 terminal blank line 2개' "$p" 'name: 인수 검사 hs-a4|run: \|\+|bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-a4.sh' 1
+
+  p=$(mutate_run a2-17 "$STEP_RUN" $'        run: echo a2-shadow\n        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-a4.sh')
+  a2_expect_rc 17 'duplicate run 마지막 값 canonical' "$p" 'name: 인수 검사 hs-a4|run: echo a2-shadow|run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-a4.sh' 2
+
+  p=$(mutate_run a2-18 "$STEP_NAME" $'      - name: a2-shadow\n        name: 인수 검사 hs-a4 (대용량·산출물 차단이 실제로 도는가)')
+  a2_expect_rc 18 'duplicate name 마지막 값 canonical' "$p" 'name: a2-shadow|name: 인수 검사 hs-a4|run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-a4.sh' 2
+
+  p=$(mutate_run a2-19 'jobs:' $'jobs:\n  verify:\n    runs-on: a2-shadow\n    steps: []')
+  a2_expect_rc 19 'duplicate 보호 job ID 마지막 값 canonical' "$p" '^jobs:|^  verify:|runs-on: a2-shadow|steps: \[\]' 2
+
+  p="$TMP/a2-20.yml"; cp "$WF" "$p"
+  ruby -e 'p=ARGV[0]; s=File.read(p); s=s.sub("        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-a4.sh", "        <<: *a2_run"); s=s.sub("    steps:\n", "    steps:\n      - &a2_run\n        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-a4.sh\n"); File.write(p,s)' "$p"
+  a2_expect_rc 20 'anchor alias merge로 canonical run 간접 공급' "$p" '&a2_run|\*a2_run|<<:|name: 인수 검사 hs-a4' 2
+
+  p=$(mutate_run a2-21 "        if: github.ref == 'refs/heads/main'" "        if: \${{ github.ref == 'refs/heads/main' }}")
+  a2_expect_rc 21 '허용 if를 expression wrapper로 변경' "$p" 'name: 인수 검사 0-5|if:|run: bash scripts/verify/run-acceptance.sh scripts/acceptance-0-5.sh' 1
+
+  p=$(mutate_run a2-22 '    runs-on: ubuntu-latest' '    runs-on: ${{ matrix.os }}')
+  a2_expect_rc 22 'runs-on 미승인 expression' "$p" '^  verify:|runs-on:' 1
+
+  nested="$TMP/a2-23-repo"
+  git clone -q --no-hardlinks "$REPO" "$nested"
+  ruby -e 'p=ARGV[0]; s=File.read(p); n="        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-a4.sh"; abort("needle missing") unless s.include?(n); File.write(p,s.sub(n,n+"\n        shell: echo {0}"))' "$nested/.github/workflows/verify.yml"
+  printf '\n===== A2 RED 23: 변조 workflow에서 기존 acceptance 거짓 PASS =====\n'
+  printf 'SESSION_ID=609BF375-87ED-4ABD-AC85-1B2CF76E1AA1\nHEAD=%s\n' "$(git rev-parse HEAD)"
+  grep -nE 'name: 인수 검사 hs-a4|run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-a4.sh|shell:' "$nested/.github/workflows/verify.yml"
+  a2_yaml_evidence "$nested/.github/workflows/verify.yml" '인수 검사 hs-a4 (대용량·산출물 차단이 실제로 도는가)'
+  nested_rc=0
+  nested_output=$(cd "$nested" && WU0A2_SKIP_NEW=1 bash scripts/acceptance-ci-step-integrity.sh 2>&1) || nested_rc=$?
+  printf 'ACCEPTANCE_OUTPUT_BEGIN\n%s\nACCEPTANCE_OUTPUT_END\nACTUAL_EXIT=%s EXPECTED_EXIT=1\n' "$nested_output" "$nested_rc"
+  if [ "$nested_rc" -eq 1 ]; then record 0 'A2-23 변조 workflow에서 acceptance 거짓 PASS 차단' "exit=$nested_rc"
+  else record 1 'A2-23 변조 workflow에서 acceptance 거짓 PASS 차단' "expected exit=1 actual=$nested_rc"; fi
+fi
 
 current=$(git status --porcelain)
 if [ "$current" = "$SNAPSHOT" ]; then record 0 "원본 저장소 상태 불변" "before/after 동일"
