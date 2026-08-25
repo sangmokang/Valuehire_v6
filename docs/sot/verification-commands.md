@@ -1,6 +1,6 @@
 # Valuehire v6 — 이 저장소의 실제 게이트 명령 (SOT)
 
-최종 갱신: 2026-08-18 (전부 실행으로 확인, 가정 없음)
+최종 갱신: 2026-08-25 (전부 실행으로 확인, 가정 없음 — main 병합 후 verify.yml 스텝 재계수)
 근거: `docs/engineering/docs-sot-restructure-goal-2026-08-08.md`
 
 ## 현재 규칙
@@ -17,28 +17,35 @@
 
 ### CI(`​.github/workflows/verify.yml`)가 실제로 돌리는 것
 
-**이름 있는 검증 스텝 18개 전부**를 적는다(2026-08-12 V1 D6: 이전 판은 `bash ...` 직접 명령만 적어 인라인 본문 스텝이 목록에서 빠졌고, 운영자가 실제로 무엇이 도는지 잘못 판단할 수 있었다). 아래는 `verify.yml` 의 `- name:` 스텝 순서 그대로다(#6·#9 G1·#11 G2·#13 G3·#8 AC-M의 합집합과 #19 AC-19의 13개 합성 사례 — 2026-08-18).
+**이름 있는 검증 스텝 24개 전부**를 적는다(2026-08-12 V1 D6: 이전 판은 `bash ...` 직접 명령만 적어 인라인 본문 스텝이 목록에서 빠졌고, 운영자가 실제로 무엇이 도는지 잘못 판단할 수 있었다). 아래는 `verify.yml` 의 `- name:` 스텝 순서 그대로다(2026-08-25 실측: `grep -c '^      - name:' .github/workflows/verify.yml` → 24. Strict 원칙 3개 스텝과 G3 포털 상수 스텝이 함께 들어간 병합 후 상태).
 
 | # | 스텝 이름 | 실행 내용 |
 |---|---|---|
 | 1 | 비밀 스캔 (verify.sh) | `bash verify.sh` — 추적 파일 전체 |
-| 2 | HumanSearch G1 클린룸 경계 | 인라인 8개 — `scripts/acceptance-hs-cleanroom.sh`, `scripts/acceptance-hs-cleanroom-mutations.sh`, `scripts/acceptance-hs-cleanroom-absolute-paths.sh`, `scripts/acceptance-hs-cleanroom-absolute-contexts.sh`, `scripts/acceptance-hs-cleanroom-colon-paths.sh`, `scripts/acceptance-hs-cleanroom-file-urls.sh`, `scripts/acceptance-hs-cleanroom-hook-env.sh`, `scripts/acceptance-hs-cleanroom-hook-env-mutations.sh` |
-| 3 | HumanSearch G2 테스트 게이트 (정적·단위 + runtime import 증명) | 인라인 — `uv` 설치 후 `scripts/acceptance-hs-gates.sh`, `scripts/acceptance-hs-gates-mutations.sh`, `scripts/acceptance-hs-gates-antiforge.sh` (정적 ruff/mypy + pytest 수집·runtime import 증명) |
-| 4 | HumanSearch G3 포털 상수·locator 경계 | 인라인 — `scripts/acceptance-hs-portal-constants.sh`, `scripts/acceptance-hs-portal-constants-mutations.sh`, `scripts/acceptance-hs-portal-constants-hardening.sh`, `scripts/acceptance-hs-portal-constants-hardening2.sh`, `scripts/acceptance-hs-portal-constants-hardening3.sh`, `scripts/acceptance-hs-portal-constants-hardening4.sh`, `scripts/acceptance-hs-portal-constants-hardening5.sh`, `scripts/acceptance-hs-portal-constants-hardening6.sh` (운영 상수·locator는 `contracts/` 한 곳 · P22, exit 0/1/2 3상태. YAML 실행 칸 은닉, 의미 기반 locator, 작업·단계 조건, 오류 무시, shell·working-directory·위험 환경, 무효 runs-on, 0회 matrix, 수동 전용 트리거를 거부) |
-| 5 | 히스토리 전량 스캔 (도달 가능한 모든 blob) | 인라인 — 도달 가능한 모든 blob 을 열어 자격증명 패턴 대조 |
-| 6 | 인수 검사 0-2 상시 내용 검사와 종료상태 분리 (AC-19) | `bash scripts/acceptance-0-2-unreachable-content.sh` — 환경 격리·네 객체형·도구 실패·큰 객체·종료상태·훅 환경 무오염 13개 합성 사례 (AC-19) |
-| 7 | 인수 검사 0-6 (가짜 검증 스크립트 0건) | `bash scripts/acceptance-0-6.sh` |
-| 8 | 인수 검사 0-7 (훅이 위반 6종을 실제로 차단하는가) | `bash scripts/acceptance-0-7.sh` — 훅 위반 6종 시연 |
-| 9 | 인수 검사 0-5 (push · CI 연결) | `bash scripts/acceptance-0-5.sh` — **`main` 브랜치에서만** (`if: github.ref == 'refs/heads/main'`) |
-| 10 | 억제 만료 스캔 (suppressions.yaml) | 인라인 — `suppressions.yaml` 의 expiry 형식·경과 |
-| 11 | 강제 장치 존재 검사 (hooks/) | 인라인 — `hooks/pre-commit`·`pre-push` 존재·실행권한 |
-| 12 | 셸 스크립트 문법 검사 | 인라인 — `git ls-files '*.sh'` 전부 `bash -n` |
-| 13 | 패턴 파일 자체에 실제 비밀이 없는지 (자기 오염 방지) | 인라인 — `.secret-patterns.default` 에 값 리터럴 없는지 |
-| 14 | 인수 검사 hs-a3 (세션 계열 자격증명 탐지) | `bash scripts/acceptance-hs-a3.sh` — 세션 계열 자격증명 (AC-A3) |
-| 15 | 데이터 노출 스캔 (크기 · 금지경로 · 기록 · 개인정보 내용) | `bash scripts/scan-data-exposure.sh all` — 크기·금지경로·기록·개인정보 (AC-A4) |
-| 16 | 인수 검사 hs-a4 (대용량·산출물 차단이 실제로 도는가) | `bash scripts/acceptance-hs-a4.sh` — 차단이 실제로 도는가 (AC-A4) |
-| 17 | 인수 검사 secret-webhook-vendor (웹훅·벤더 키 탐지 · AC-S1) | `bash scripts/acceptance-secret-webhook-vendor.sh` — 웹훅·벤더 키 (AC-S1) |
-| 18 | 인수 검사 verify-ac-m (mechanism 명부 대조 · AC-M) | `bash scripts/acceptance-verify-ac-m.sh` — mechanism 명부 대조 (AC-M) |
+| 1 | 비밀 스캔 (verify.sh) | `bash verify.sh` — 추적 파일 전체 |
+| 2 | Strict 원칙 정본·장부·배선 검사 | `bash scripts/acceptance-principles-check.sh` — 32개 정본 문구·장치·명시적 pre-push/CI 배선 |
+| 3 | Strict 원칙 적대 fixture·500/501 경계 | `bash scripts/acceptance-principles-mutations.sh` — 정상 fixture와 14개 반례·500/501 경계 |
+| 4 | Strict 전역 스킬 잠금 장치 격리 회귀 | `bash scripts/acceptance-guard-global-skill-files.sh` — lock/check/unlock/recover와 동일 UID 한계 |
+| 5 | HumanSearch G1 클린룸 경계 | 인라인 8개 — `scripts/acceptance-hs-cleanroom.sh`, `scripts/acceptance-hs-cleanroom-mutations.sh`, `scripts/acceptance-hs-cleanroom-absolute-paths.sh`, `scripts/acceptance-hs-cleanroom-absolute-contexts.sh`, `scripts/acceptance-hs-cleanroom-colon-paths.sh`, `scripts/acceptance-hs-cleanroom-file-urls.sh`, `scripts/acceptance-hs-cleanroom-hook-env.sh`, `scripts/acceptance-hs-cleanroom-hook-env-mutations.sh` |
+| 6 | HumanSearch G2 테스트 게이트 (정적·단위 + runtime import 증명) | 인라인 — `uv` 설치 후 `scripts/acceptance-hs-gates.sh`, `scripts/acceptance-hs-gates-mutations.sh`, `scripts/acceptance-hs-gates-antiforge.sh` (정적 ruff/mypy + pytest 수집·runtime import 증명) |
+| 7 | HumanSearch G3 포털 상수·locator 경계 | 인라인 — `scripts/acceptance-hs-portal-constants.sh`, `scripts/acceptance-hs-portal-constants-mutations.sh`, `scripts/acceptance-hs-portal-constants-hardening.sh` ~ `-hardening7.sh` (운영 상수·locator는 `contracts/` 한 곳 · P22, exit 0/1/2 3상태. YAML 실행 칸 은닉, 의미 기반 locator, 작업·단계 조건, 오류 무시, shell·working-directory·위험 환경, 무효 runs-on, 0회 matrix, 수동 전용 트리거, 태그+순번 셀렉터·홑클래스 셀렉터·TLD 목록 밖 도메인·제품 루트 고정을 거부) |
+| 8 | 히스토리 전량 스캔 (도달 가능한 모든 blob) | 인라인 — 도달 가능한 모든 blob 을 열어 자격증명 패턴 대조 |
+| 9 | 인수 검사 0-2 상시 내용 검사와 종료상태 분리 (AC-19) | `bash scripts/acceptance-0-2-unreachable-content.sh` — 환경 격리·네 객체형·도구 실패·큰 객체·종료상태·훅 환경 무오염 13개 합성 사례 (AC-19) |
+| 10 | 인수 검사 0-6 (가짜 검증 스크립트 0건) | `bash scripts/acceptance-0-6.sh` |
+| 11 | 인수 검사 0-7 (훅이 위반 6종을 실제로 차단하는가) | `bash scripts/acceptance-0-7.sh` — 훅 위반 6종 시연 |
+| 12 | 인수 검사 0-5 (push · CI 연결) | `bash scripts/acceptance-0-5.sh` — **`main` 브랜치에서만** (`if: github.ref == 'refs/heads/main'`) |
+| 13 | 억제 만료 스캔 (suppressions.yaml) | 인라인 — `suppressions.yaml` 의 expiry 형식·경과 |
+| 14 | 강제 장치 존재 검사 (hooks/) | 인라인 — `hooks/pre-commit`·`pre-push` 존재·실행권한 |
+| 15 | 셸 스크립트 문법 검사 | 인라인 — `git ls-files '*.sh'` 전부 `bash -n` |
+| 16 | 패턴 파일 자체에 실제 비밀이 없는지 (자기 오염 방지) | 인라인 — `.secret-patterns.default` 에 값 리터럴 없는지 |
+| 17 | 인수 검사 hs-a3 (세션 계열 자격증명 탐지) | `bash scripts/acceptance-hs-a3.sh` — 세션 계열 자격증명 (AC-A3) |
+| 18 | 데이터 노출 스캔 (크기 · 금지경로 · 기록 · 개인정보 내용) | `bash scripts/scan-data-exposure.sh all` — 크기·금지경로·기록·개인정보 (AC-A4) |
+| 19 | 인수 검사 hs-a4 (대용량·산출물 차단이 실제로 도는가) | `bash scripts/acceptance-hs-a4.sh` — 차단이 실제로 도는가 (AC-A4) |
+| 20 | 인수 검사 secret-webhook-vendor (웹훅·벤더 키 탐지 · AC-S1) | `bash scripts/acceptance-secret-webhook-vendor.sh` — 웹훅·벤더 키 (AC-S1) |
+| 21 | 인수 검사 verified-sha (초록불이 SHA 에 귀속되는가 · P23) | `bash scripts/verify/run-acceptance.sh scripts/acceptance-verified-sha.sh` — 초록불의 SHA 귀속 (P23) |
+| 22 | 인수 검사 ci-step-integrity (스텝을 조용히 끄지 못하는가) | `bash scripts/verify/run-acceptance.sh scripts/acceptance-ci-step-integrity.sh` — 스텝 무력화 차단 |
+| 23 | 인수 검사 semantic-mutations (검사를 껐을 때 반드시 빨개지는가) | `bash scripts/verify/run-acceptance.sh scripts/acceptance-semantic-mutations.sh` — 의미 기반 뮤테이션 |
+| 24 | 인수 검사 verify-ac-m (mechanism 명부 대조 · AC-M) | `bash scripts/verify/run-acceptance.sh scripts/acceptance-verify-ac-m.sh` — mechanism 명부 대조 (AC-M) |
 
 *(1번 앞에 이름 없는 `actions/checkout` 이 있고 `fetch-depth: 0` 이다 — 5번이 과거 blob 을 열려면 필요하다.)*
 
@@ -68,4 +75,4 @@
 ## 비범위 / 한계
 
 - `main` 브랜치 GitHub 보호 규칙의 실제 활성화 여부는 확인하지 않았다(`docs/sot/git-workflow.md` 한계와 동일).
-- 이 표는 2026-08-08 실행 결과의 스냅샷이다. 스크립트가 추가/삭제되면 다시 확인해야 한다.
+- 이 표는 2026-08-20 실행 결과의 스냅샷이다. 스크립트가 추가/삭제되면 다시 확인해야 한다.

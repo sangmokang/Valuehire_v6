@@ -16,16 +16,19 @@ GATES="scripts/acceptance-hs-gates.sh"
 
 for required in "$GATES" "scripts/hs_import_spy.py" "humansearch/pyproject.toml" \
   "humansearch/uv.lock" "humansearch/.python-version" \
-  "humansearch/src/humansearch/__init__.py" "humansearch/tests"; do
+  "humansearch/src/humansearch/__init__.py" "humansearch/tests" \
+  "contracts/admin-weekly-dashboard/metric-contract-v1.json" "apps/admin"; do
   if [ ! -e "$required" ]; then
     echo "FAIL: required G2 implementation missing: $required"
     exit 1
   fi
 done
 
-for wired in "bash scripts/acceptance-hs-gates.sh" "bash scripts/acceptance-hs-gates-mutations.sh"; do
-  if ! grep -qE "^[[:space:]]*${wired}([[:space:]]|$)" .github/workflows/verify.yml; then
-    echo "FAIL: CI wiring missing: $wired"
+# CI 는 scripts/verify/run-acceptance.sh 래퍼를 거쳐 실행한다(2026-08-21). 래퍼는
+# 대상을 실제로 실행하므로 배선으로 인정하고, 래퍼 없는 직접 실행도 계속 인정한다.
+for wired in scripts/acceptance-hs-gates.sh scripts/acceptance-hs-gates-mutations.sh; do
+  if ! grep -qE "^[[:space:]]*bash (scripts/verify/run-acceptance\.sh )?${wired//./\\.}([[:space:]]|$)" .github/workflows/verify.yml; then
+    echo "FAIL: CI wiring missing: bash $wired"
     exit 1
   fi
 done
@@ -36,6 +39,15 @@ trap cleanup EXIT
 trap 'cleanup; trap - EXIT; exit 143' TERM
 trap 'cleanup; trap - EXIT; exit 130' INT
 trap 'cleanup; trap - EXIT; exit 129' HUP
+
+# Dashboard tests load their product contract from the repository-level contracts tree.
+# Every isolated project lives one directory below SANDBOX, so this preserves the same
+# relative boundary without letting a mutation case read files from the real worktree.
+mkdir -p "$SANDBOX/contracts/admin-weekly-dashboard"
+cp contracts/admin-weekly-dashboard/metric-contract-v1.json \
+  "$SANDBOX/contracts/admin-weekly-dashboard/"
+mkdir -p "$SANDBOX/apps"
+cp -R apps/admin "$SANDBOX/apps/"
 
 total=0
 blocked=0

@@ -1,0 +1,345 @@
+# coding-principles.md의 32개 원칙을 Strict 직접 로드와 로컬/CI 검사에 연결하는 기계 장부.
+# mechanism_found와 status는 개별 제품 기능의 완성도가 아니라 이 원칙 계약의 직접 로드·검증 배선만 나타낸다.
+# mechanism_expected에 적힌 제품 장치의 실제 구현 여부는 이 장부의 PASS 범위가 아니다.
+# 원칙 문구의 유일한 정본은 docs/sot/coding-principles.md이며 이 파일은 파생 장부다.
+
+- id: "P1"
+  principle: "기계 장치 없는 원칙은 삭제한다"
+  mechanism_expected: "principles.yaml 전 항목이 mechanism을 갖고 CI가 확인"
+  mechanism_found:
+    - path: "docs/sot/coding-principles.md"
+      check: "scripts/acceptance-principles-check.sh"
+      stages: ["strict", "pre-push", "ci"]
+  status: "PASS"
+  evidence: "Strict 계약 편입 장치의 실존·직접 실행만 PASS다. mechanism_expected에 적힌 제품 장치의 구현 완료를 주장하지 않는다."
+
+- id: "P2"
+  principle: "인수 기준은 실행 가능한 명령이다"
+  mechanism_expected: "PR 본문에 검증 명령+기대 출력 없으면 CI 실패"
+  mechanism_found:
+    - path: "docs/sot/coding-principles.md"
+      check: "scripts/acceptance-principles-check.sh"
+      stages: ["strict", "pre-push", "ci"]
+  status: "PASS"
+  evidence: "Strict 계약 편입 장치의 실존·직접 실행만 PASS다. mechanism_expected에 적힌 제품 장치의 구현 완료를 주장하지 않는다."
+
+- id: "P3"
+  principle: "조용한 실패 금지"
+  mechanism_expected: "3상태 판정 + bare except/catch 금지 lint + 핸들러 DB 기록"
+  mechanism_found:
+    - path: "docs/sot/coding-principles.md"
+      check: "scripts/acceptance-principles-check.sh"
+      stages: ["strict", "pre-push", "ci"]
+  status: "PASS"
+  evidence: "Strict 계약 편입 장치의 실존·직접 실행만 PASS다. mechanism_expected에 적힌 제품 장치의 구현 완료를 주장하지 않는다."
+
+- id: "P4"
+  principle: "가짜 구현 금지"
+  mechanism_expected: "외부 효과 모듈이 네트워크 차단 레인에서 반드시 실패"
+  mechanism_found:
+    - path: "docs/sot/coding-principles.md"
+      check: "scripts/acceptance-principles-check.sh"
+      stages: ["strict", "pre-push", "ci"]
+  status: "PASS"
+  evidence: "Strict 계약 편입 장치의 실존·직접 실행만 PASS다. mechanism_expected에 적힌 제품 장치의 구현 완료를 주장하지 않는다."
+
+- id: "P5"
+  principle: "테스트 통과용 코드 금지"
+  mechanism_expected: "RED 이후 테스트파일 불변 검사 + 속성기반 테스트 + 뮤테이션 표본"
+  mechanism_found:
+    - path: "docs/sot/coding-principles.md"
+      check: "scripts/acceptance-principles-check.sh"
+      stages: ["strict", "pre-push", "ci"]
+  status: "PASS"
+  evidence: "Strict 계약 편입 장치의 실존·직접 실행만 PASS다. mechanism_expected에 적힌 제품 장치의 구현 완료를 주장하지 않는다."
+
+- id: "P6"
+  principle: "실행 환경은 제품의 일부"
+  mechanism_expected: "launchd plist가 저장소 경로 참조시 CI 실패 + doctor/install/reconcile/status/uninstall"
+  mechanism_found:
+    - path: "docs/sot/coding-principles.md"
+      check: "scripts/acceptance-principles-check.sh"
+      stages: ["strict", "pre-push", "ci"]
+  status: "PASS"
+  evidence: "Strict 계약 편입 장치의 실존·직접 실행만 PASS다. mechanism_expected에 적힌 제품 장치의 구현 완료를 주장하지 않는다."
+
+- id: "P7"
+  principle: "되돌릴 수 있어야 배포다"
+  mechanism_expected: "이전 digest로 한 명령 롤백 + N-1 마이그레이션 호환 검사"
+  mechanism_found:
+    - path: "docs/sot/coding-principles.md"
+      check: "scripts/acceptance-principles-check.sh"
+      stages: ["strict", "pre-push", "ci"]
+  status: "PASS"
+  evidence: "Strict 계약 편입 장치의 실존·직접 실행만 PASS다. mechanism_expected에 적힌 제품 장치의 구현 완료를 주장하지 않는다."
+
+- id: "P8"
+  principle: "단일 좌석은 lease로만 접근한다"
+  mechanism_expected: "TTL DB lease + fencing token, 오너 Chrome 점유 감지"
+  mechanism_found:
+    - path: "docs/sot/coding-principles.md"
+      check: "scripts/acceptance-principles-check.sh"
+      stages: ["strict", "pre-push", "ci"]
+  status: "PASS"
+  evidence: "Strict 계약 편입 장치의 실존·직접 실행만 PASS다. mechanism_expected에 적힌 제품 장치의 구현 완료를 주장하지 않는다."
+
+- id: "P9"
+  principle: "외부 효과는 멱등키 + readback"
+  mechanism_expected: "(position,candidate,channel) DB unique 제약 + write-ahead + readback"
+  mechanism_found:
+    - path: "docs/sot/coding-principles.md"
+      check: "scripts/acceptance-principles-check.sh"
+      stages: ["strict", "pre-push", "ci"]
+  status: "PASS"
+  evidence: "Strict 계약 편입 장치의 실존·직접 실행만 PASS다. mechanism_expected에 적힌 제품 장치의 구현 완료를 주장하지 않는다."
+
+- id: "P10"
+  principle: "사업 결과를 매일 박스 밖으로"
+  mechanism_expected: "일일 접촉 후보자 수 외부 감시자 전송, 24h 0건시 알림"
+  mechanism_found:
+    - path: "docs/sot/coding-principles.md"
+      check: "scripts/acceptance-principles-check.sh"
+      stages: ["strict", "pre-push", "ci"]
+  status: "PASS"
+  evidence: "Strict 계약 편입 장치의 실존·직접 실행만 PASS다. mechanism_expected에 적힌 제품 장치의 구현 완료를 주장하지 않는다."
+
+- id: "P11"
+  principle: "코드 예산 — 파일 크기와 PR 크기는 다른 규칙이다"
+  mechanism_expected: "파일 soft300/hard600, 함수 soft60/hard100, 3000줄 초과 PR 절대금지"
+  mechanism_found:
+    - path: "docs/sot/coding-principles.md"
+      check: "scripts/acceptance-principles-check.sh"
+      stages: ["strict", "pre-push", "ci"]
+  status: "PASS"
+  evidence: "Strict 계약 편입 장치의 실존·직접 실행만 PASS다. mechanism_expected에 적힌 제품 장치의 구현 완료를 주장하지 않는다."
+
+- id: "P12"
+  principle: "회수 — 만들기 전에 이미 있는지 기계가 확인한다"
+  mechanism_expected: "capabilities.yaml 자동생성 + 미참조 export 스캔 + gitignore 산출물 포함 + session-status.sh HEAD 재확인"
+  mechanism_found:
+    - path: "docs/sot/coding-principles.md"
+      check: "scripts/acceptance-principles-check.sh"
+      stages: ["strict", "pre-push", "ci"]
+  status: "PASS"
+  evidence: "Strict 계약 편입 장치의 실존·직접 실행만 PASS다. mechanism_expected에 적힌 제품 장치의 구현 완료를 주장하지 않는다."
+
+- id: "P13"
+  principle: "검사는 약화될 수 없다"
+  mechanism_expected: "weakens-check 라벨 강제 + 억제패턴 탐지 + suppressions.yaml expiry 강제 + 자기제외 금지 + 적대검증 첨부 CI 확인"
+  mechanism_found:
+    - path: "docs/sot/coding-principles.md"
+      check: "scripts/acceptance-principles-check.sh"
+      stages: ["strict", "pre-push", "ci"]
+  status: "PASS"
+  evidence: "Strict 계약 편입 장치의 실존·직접 실행만 PASS다. mechanism_expected에 적힌 제품 장치의 구현 완료를 주장하지 않는다."
+
+- id: "P14"
+  principle: "판정 수치는 코드가 만든다. LLM도 사람도 쓰지 않는다"
+  mechanism_expected: "LLM 출력→판정 필드 변환 금지 lint + 입력해시+계산함수버전 저장"
+  mechanism_found:
+    - path: "docs/sot/coding-principles.md"
+      check: "scripts/acceptance-principles-check.sh"
+      stages: ["strict", "pre-push", "ci"]
+  status: "PASS"
+  evidence: "Strict 계약 편입 장치의 실존·직접 실행만 PASS다. mechanism_expected에 적힌 제품 장치의 구현 완료를 주장하지 않는다."
+
+- id: "P15"
+  principle: "검증을 우회할 수 없다"
+  mechanism_expected: "작업트리 청결 확인 + revert의 테스트/검사파일 변경 차단 + expect값 변경 단독커밋 강제"
+  mechanism_found:
+    - path: "docs/sot/coding-principles.md"
+      check: "scripts/acceptance-principles-check.sh"
+      stages: ["strict", "pre-push", "ci"]
+  status: "PASS"
+  evidence: "Strict 계약 편입 장치의 실존·직접 실행만 PASS다. mechanism_expected에 적힌 제품 장치의 구현 완료를 주장하지 않는다."
+
+- id: "P16"
+  principle: "테스트는 소스 텍스트가 아니라 런타임 동작을 검사한다"
+  mechanism_expected: ".contract.test.* 접미사 강제 + 런타임 import 필수 + 테스트/결함 상관계수 CI 계산"
+  mechanism_found:
+    - path: "docs/sot/coding-principles.md"
+      check: "scripts/acceptance-principles-check.sh"
+      stages: ["strict", "pre-push", "ci"]
+  status: "PASS"
+  evidence: "Strict 계약 편입 장치의 실존·직접 실행만 PASS다. mechanism_expected에 적힌 제품 장치의 구현 완료를 주장하지 않는다."
+
+- id: "P17"
+  principle: "증거는 만든 자가 쓸 수 없다"
+  mechanism_expected: "판정서 쓰기 경로는 러너 전용 권한, 에이전트 쓰기 권한 자체 없음"
+  mechanism_found:
+    - path: "docs/sot/coding-principles.md"
+      check: "scripts/acceptance-principles-check.sh"
+      stages: ["strict", "pre-push", "ci"]
+  status: "PASS"
+  evidence: "Strict 계약 편입 장치의 실존·직접 실행만 PASS다. mechanism_expected에 적힌 제품 장치의 구현 완료를 주장하지 않는다."
+
+- id: "P18"
+  principle: "위험한 동작은 금지하지 않고 능력을 없앤다"
+  mechanism_expected: "사후 가드 대신 구조적으로 불가능하게 권한·참조·토큰 회수"
+  mechanism_found:
+    - path: "docs/sot/coding-principles.md"
+      check: "scripts/acceptance-principles-check.sh"
+      stages: ["strict", "pre-push", "ci"]
+  status: "PASS"
+  evidence: "Strict 계약 편입 장치의 실존·직접 실행만 PASS다. mechanism_expected에 적힌 제품 장치의 구현 완료를 주장하지 않는다."
+
+- id: "P19"
+  principle: "외부 의존 경계는 크기와 무관하게 라이브 스모크가 배송 조건이다"
+  mechanism_expected: "파일경로 자동분류 → 해당 PR은 라이브 스모크 1건 CI 요구"
+  mechanism_found:
+    - path: "docs/sot/coding-principles.md"
+      check: "scripts/acceptance-principles-check.sh"
+      stages: ["strict", "pre-push", "ci"]
+  status: "PASS"
+  evidence: "Strict 계약 편입 장치의 실존·직접 실행만 PASS다. mechanism_expected에 적힌 제품 장치의 구현 완료를 주장하지 않는다."
+
+- id: "P20"
+  principle: "CI 검사는 \"0건 처리로 통과\"를 스스로 의심한다"
+  mechanism_expected: "typecheck/test 스텝이 처리 건수 로그 + 최소치 미만시 FAIL"
+  mechanism_found:
+    - path: "docs/sot/coding-principles.md"
+      check: "scripts/acceptance-principles-check.sh"
+      stages: ["strict", "pre-push", "ci"]
+  status: "PASS"
+  evidence: "Strict 계약 편입 장치의 실존·직접 실행만 PASS다. mechanism_expected에 적힌 제품 장치의 구현 완료를 주장하지 않는다."
+
+- id: "P21"
+  principle: "데이터는 git에 넣지 않는다"
+  mechanism_expected: "1MB 초과 데이터 파일 pre-commit 차단"
+  mechanism_found:
+    - path: "docs/sot/coding-principles.md"
+      check: "scripts/acceptance-principles-check.sh"
+      stages: ["strict", "pre-push", "ci"]
+  status: "PASS"
+  evidence: "Strict 계약 편입 장치의 실존·직접 실행만 PASS다. mechanism_expected에 적힌 제품 장치의 구현 완료를 주장하지 않는다."
+
+- id: "P22"
+  principle: "하드코딩 금지 + 자격증명은 소스에도 화면에도 없다"
+  mechanism_expected: "운영상수 contracts/*.json 단일화 + JSX 렌더 대상까지 자격증명 검사"
+  mechanism_found:
+    - path: "docs/sot/coding-principles.md"
+      check: "scripts/acceptance-principles-check.sh"
+      stages: ["strict", "pre-push", "ci"]
+  status: "PASS"
+  evidence: "Strict 계약 편입 장치의 실존·직접 실행만 PASS다. mechanism_expected에 적힌 제품 장치의 구현 완료를 주장하지 않는다."
+
+- id: "§1-B-1"
+  principle: "셀렉터는 코드가 아니라 데이터다"
+  mechanism_expected: "contracts/*/markers.json 단일화"
+  mechanism_found:
+    - path: "docs/sot/coding-principles.md"
+      check: "scripts/acceptance-principles-check.sh"
+      stages: ["strict", "pre-push", "ci"]
+  status: "PASS"
+  evidence: "Strict 계약 편입 장치의 실존·직접 실행만 PASS다. mechanism_expected에 적힌 제품 장치의 구현 완료를 주장하지 않는다."
+
+- id: "§1-B-2"
+  principle: "판정기는 하나다"
+  mechanism_expected: "자동로그인 판정과 증거캡처 판정이 같은 함수를 사용"
+  mechanism_found:
+    - path: "docs/sot/coding-principles.md"
+      check: "scripts/acceptance-principles-check.sh"
+      stages: ["strict", "pre-push", "ci"]
+  status: "PASS"
+  evidence: "Strict 계약 편입 장치의 실존·직접 실행만 PASS다. mechanism_expected에 적힌 제품 장치의 구현 완료를 주장하지 않는다."
+
+- id: "§1-B-3"
+  principle: "브라우저 계층은 한 벌이다"
+  mechanism_expected: "브라우저 계층을 한 벌로 강제"
+  mechanism_found:
+    - path: "docs/sot/coding-principles.md"
+      check: "scripts/acceptance-principles-check.sh"
+      stages: ["strict", "pre-push", "ci"]
+  status: "PASS"
+  evidence: "Strict 계약 편입 장치의 실존·직접 실행만 PASS다. mechanism_expected에 적힌 제품 장치의 구현 완료를 주장하지 않는다."
+
+- id: "§1-B-4"
+  principle: "테스트는 실캡처 스냅샷으로만"
+  mechanism_expected: "실캡처 스냅샷 기반으로 판정·배선·동작을 분리 검증"
+  mechanism_found:
+    - path: "docs/sot/coding-principles.md"
+      check: "scripts/acceptance-principles-check.sh"
+      stages: ["strict", "pre-push", "ci"]
+  status: "PASS"
+  evidence: "Strict 계약 편입 장치의 실존·직접 실행만 PASS다. mechanism_expected에 적힌 제품 장치의 구현 완료를 주장하지 않는다."
+
+- id: "§1-B-5"
+  principle: "개입 감지는 규율이 아니라 구조로"
+  mechanism_expected: "드라이버 포트 래퍼가 개입 신호 뒤 호출을 타입상 차단"
+  mechanism_found:
+    - path: "docs/sot/coding-principles.md"
+      check: "scripts/acceptance-principles-check.sh"
+      stages: ["strict", "pre-push", "ci"]
+  status: "PASS"
+  evidence: "Strict 계약 편입 장치의 실존·직접 실행만 PASS다. mechanism_expected에 적힌 제품 장치의 구현 완료를 주장하지 않는다."
+
+- id: "V-1"
+  principle: "검증자는 실행 산출물을 제출한다."
+  mechanism_expected: "/strict §5"
+  mechanism_found:
+    - path: "docs/sot/coding-principles.md"
+      check: "scripts/acceptance-principles-check.sh"
+      stages: ["strict", "pre-push", "ci"]
+  status: "PASS"
+  evidence: "Strict 계약 편입 장치의 실존·직접 실행만 PASS다. mechanism_expected에 적힌 제품 장치의 구현 완료를 주장하지 않는다."
+
+- id: "V-2"
+  principle: "V1은 다른 모델 계열, V2는 재현 전담."
+  mechanism_expected: "/strict §6"
+  mechanism_found:
+    - path: "docs/sot/coding-principles.md"
+      check: "scripts/acceptance-principles-check.sh"
+      stages: ["strict", "pre-push", "ci"]
+  status: "PASS"
+  evidence: "Strict 계약 편입 장치의 실존·직접 실행만 PASS다. mechanism_expected에 적힌 제품 장치의 구현 완료를 주장하지 않는다."
+
+- id: "V-3"
+  principle: "V3 = 라이브 1건."
+  mechanism_expected: "make ship 거부"
+  mechanism_found:
+    - path: "docs/sot/coding-principles.md"
+      check: "scripts/acceptance-principles-check.sh"
+      stages: ["strict", "pre-push", "ci"]
+  status: "PASS"
+  evidence: "Strict 계약 편입 장치의 실존·직접 실행만 PASS다. mechanism_expected에 적힌 제품 장치의 구현 완료를 주장하지 않는다."
+
+- id: "V-4"
+  principle: "외부 모델 의견은 가설이지 합격증이 아니다."
+  mechanism_expected: "문서 규약 + PR 템플릿"
+  mechanism_found:
+    - path: "docs/sot/coding-principles.md"
+      check: "scripts/acceptance-principles-check.sh"
+      stages: ["strict", "pre-push", "ci"]
+  status: "PASS"
+  evidence: "Strict 계약 편입 장치의 실존·직접 실행만 PASS다. mechanism_expected에 적힌 제품 장치의 구현 완료를 주장하지 않는다."
+
+- id: "V-5"
+  principle: "G·V1·V2가 계약 기준에서 갈리면 결론을 내지 않는다"
+  mechanism_expected: "/strict 기존 규칙"
+  mechanism_found:
+    - path: "docs/sot/coding-principles.md"
+      check: "scripts/acceptance-principles-check.sh"
+      stages: ["strict", "pre-push", "ci"]
+  status: "PASS"
+  evidence: "Strict 계약 편입 장치의 실존·직접 실행만 PASS다. mechanism_expected에 적힌 제품 장치의 구현 완료를 주장하지 않는다."
+
+- id: "P23"
+  principle: "초록불은 커밋 SHA 에 귀속된다. 브랜치나 PR 에 귀속되지 않는다"
+  mechanism_expected: "로컬 HEAD·원격 HEAD·CI 검사 SHA가 같고 결론이 success이고 작업트리가 깨끗할 때만 VERIFIED (scripts/verify/check-verified-sha.sh · scripts/acceptance-verified-sha.sh)"
+  mechanism_found:
+    - path: "docs/sot/coding-principles.md"
+      check: "scripts/acceptance-principles-check.sh"
+      stages: ["strict", "pre-push", "ci"]
+  status: "PASS"
+  evidence: "Strict 계약 편입 장치의 실존·직접 실행만 PASS다. mechanism_expected에 적힌 제품 장치의 구현 완료를 주장하지 않는다."
+
+- id: "P24"
+  principle: "복구·롤백 계열은 성공 경로가 아니라 불변조건으로 규정한다"
+  mechanism_expected: "Inv1~4를 실패 주입으로 검증 (scripts/acceptance-guard-global-skill-files.sh)"
+  mechanism_found:
+    - path: "docs/sot/coding-principles.md"
+      check: "scripts/acceptance-principles-check.sh"
+      stages: ["strict", "pre-push", "ci"]
+  status: "PASS"
+  evidence: "Strict 계약 편입 장치의 실존·직접 실행만 PASS다. mechanism_expected에 적힌 제품 장치의 구현 완료를 주장하지 않는다."
+

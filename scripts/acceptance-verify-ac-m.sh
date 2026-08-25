@@ -5,7 +5,7 @@
 #   정본: docs/engineering/verify-unification-goal-2026-08-10.md:78-81 (AC-M)
 #   출력 : 항목마다 PASS:/FAIL: 전부 출력, 마지막 줄 `CHECKED: <검사 수>`
 #   exit : 0 = PASS | 1 = FAIL | 2 = NOT_RUN
-#   불변식: CHECKED 는 정확히 28 이어야 한다 — 검사가 몇 개 사라져도 초록이면 가짜다
+#   불변식: CHECKED 는 정확히 34 이어야 한다 — 검사가 몇 개 사라져도 초록이면 가짜다
 #           (PR #6 결함 D3 의 교훈: checked==0 만 막으면 3개를 지워도 통과했다 · P20)
 #
 # 쓰기 규칙: 이 검사는 저장소에 어떤 파일도 만들지 않는다. 동적 fixture 는 전부
@@ -24,7 +24,7 @@ SNAP0=$(git status --porcelain)
 CHECKER=scripts/verify/check-mechanism-registry.sh
 FIXDIR=scripts/verify/fixtures/mechanism-registry
 REGISTRY=docs/sot/mechanism-registry.yaml
-EXPECTED_CHECKED=28
+EXPECTED_CHECKED=34
 
 TMP=$(mktemp -d) || { echo "NOT_RUN: mktemp 실패"; echo "CHECKED: 0"; exit 2; }
 trap 'rm -rf "$TMP"' EXIT
@@ -64,7 +64,10 @@ own_ci_wiring_is_unconditional() {
       steps = selected.is_a?(Hash) ? selected["steps"] : nil
       exit 2 unless steps.is_a?(Array)
 
-      target = "bash scripts/acceptance-verify-ac-m.sh"
+      targets = [
+        "bash scripts/acceptance-verify-ac-m.sh",
+        "bash scripts/verify/run-acceptance.sh scripts/acceptance-verify-ac-m.sh"
+      ]
       matches = steps.count do |step|
         next false unless step.is_a?(Hash)
         next false if step.key?("if") || step.key?("continue-on-error")
@@ -73,7 +76,7 @@ own_ci_wiring_is_unconditional() {
 
         run.lines.any? do |line|
           command = line.strip
-          !command.empty? && !command.start_with?("#") && command == target
+          !command.empty? && !command.start_with?("#") && targets.include?(command)
         end
       end
       exit(matches == 1 ? 0 : 1)
@@ -96,6 +99,60 @@ fi
 expect_rc "fixture 정상 명부 → 통과"            "$FIXDIR/normal.yaml"       0
 expect_rc "fixture path 없는 항목 → 불합격"     "$FIXDIR/missing-path.yaml" 1
 expect_rc "fixture 죽은 target → 불합격"        "$FIXDIR/dead-target.yaml"  1
+
+cat > "$TMP/comment-only-target.yaml" <<'EOF'
+- id: "comment-only-target"
+  path: "scripts/verify/fixtures/mechanism-registry/comment-only-hook.sh"
+  target: "-name 'verify.sh' -o -name 'acceptance-*.sh'"
+  stage: "pre-push"
+  required: true
+EOF
+expect_rc "주석에만 있는 target → 불합격" "$TMP/comment-only-target.yaml" 1
+
+cat > "$TMP/echo-only-target.yaml" <<'EOF'
+- id: "echo-only-target"
+  path: "scripts/verify/fixtures/mechanism-registry/echo-only-hook.sh"
+  target: "-name 'verify.sh' -o -name 'acceptance-*.sh'"
+  stage: "pre-push"
+  required: true
+EOF
+expect_rc "echo에만 있는 target → 불합격" "$TMP/echo-only-target.yaml" 1
+
+cat > "$TMP/dead-code-target.yaml" <<'EOF'
+- id: "dead-code-target"
+  path: "scripts/verify/fixtures/mechanism-registry/dead-code-hook.sh"
+  target: "-name 'verify.sh' -o -name 'acceptance-*.sh'"
+  stage: "pre-push"
+  required: true
+EOF
+expect_rc "최상위 exit 뒤 target → 불합격" "$TMP/dead-code-target.yaml" 1
+
+cat > "$TMP/if-false-target.yaml" <<'EOF'
+- id: "if-false-target"
+  path: "scripts/verify/fixtures/mechanism-registry/if-false-hook.sh"
+  target: "-name 'verify.sh' -o -name 'acceptance-*.sh'"
+  stage: "pre-push"
+  required: true
+EOF
+expect_rc "if false 분기 안 target → 불합격" "$TMP/if-false-target.yaml" 1
+
+cat > "$TMP/fingerprint-target.yaml" <<'EOF'
+- id: "fingerprint-target"
+  path: "scripts/verify/fixtures/mechanism-registry/fingerprint-hook.sh"
+  target: "-name 'verify.sh' -o -name 'acceptance-*.sh'"
+  stage: "pre-push"
+  required: true
+EOF
+expect_rc "고정 sandbox 지문에서만 실행되는 target → 불합격" "$TMP/fingerprint-target.yaml" 1
+
+cat > "$TMP/path-fingerprint-target.yaml" <<'EOF'
+- id: "path-fingerprint-target"
+  path: "scripts/verify/fixtures/mechanism-registry/path-fingerprint-hook.sh"
+  target: "-name 'verify.sh' -o -name 'acceptance-*.sh'"
+  stage: "pre-push"
+  required: true
+EOF
+expect_rc "고정 임시경로 접두사에서만 실행되는 target → 불합격" "$TMP/path-fingerprint-target.yaml" 1
 
 # ── 5~10) 동적 fixture — fail-closed 경계 (전부 mktemp 에만 쓴다) ────────────
 # id 중복
@@ -382,6 +439,9 @@ fi
 # CI 스텝을 if 로 끄거나 지워도 로컬 검사가 전부 초록이었다(V1 실측 · P15③).
 checked=$((checked + 1))
 WF=.github/workflows/verify.yml
+# 2026-08-21 부터 CI 는 scripts/verify/run-acceptance.sh 래퍼를 거쳐 실행한다. 판정은
+# 문자열 grep 이 아니라 YAML 구조로 한다(주석 위장·조건부 스텝을 grep 은 못 막는다 —
+# 이 파일의 self-comment fixture 가 그 반례다). 래퍼 없는 직접 실행도 계속 인정한다.
 if own_ci_wiring_is_unconditional "$WF"; then
   echo "PASS: CI 배선 — verify.yml 에 무조건 실행 스텝 정확히 1회"
 else

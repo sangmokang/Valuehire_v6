@@ -18,6 +18,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0   # 아래 "히스토리 전량 스캔" 스텝이 과거 커밋의 blob까지 열어보는 데 필요
+          # 이 job 은 읽기만 한다. 기본값(true)은 인증 토큰을 러너의 git 설정에 남겨
+          # 뒤따르는 스크립트가 인증된 git 명령을 쓸 수 있게 만든다 — 여기서는 필요 없다.
+          persist-credentials: false
 
       - name: 비밀 스캔 (verify.sh)
         # 패턴은 커밋된 .secret-patterns.default 를 쓴다.
@@ -25,25 +28,45 @@ jobs:
         # 로컬 전용 .secret-patterns 는 gitignore 되어 여기 없다.
         run: bash verify.sh
 
+      - name: Strict 원칙 정본·장부·배선 검사
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-principles-check.sh
+
+      - name: Strict 원칙 적대 fixture·500/501 경계
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-principles-mutations.sh
+
+      - name: Strict 전역 스킬 잠금 장치 격리 회귀
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-guard-global-skill-files.sh
+
       - name: HumanSearch G1 클린룸 경계
         run: |
-          bash scripts/acceptance-hs-cleanroom.sh
-          bash scripts/acceptance-hs-cleanroom-mutations.sh
-          bash scripts/acceptance-hs-cleanroom-absolute-paths.sh
-          bash scripts/acceptance-hs-cleanroom-absolute-contexts.sh
-          bash scripts/acceptance-hs-cleanroom-colon-paths.sh
-          bash scripts/acceptance-hs-cleanroom-file-urls.sh
-          bash scripts/acceptance-hs-cleanroom-hook-env.sh
-          bash scripts/acceptance-hs-cleanroom-hook-env-mutations.sh
+          bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-cleanroom.sh
+          bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-cleanroom-mutations.sh
+          bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-cleanroom-absolute-paths.sh
+          bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-cleanroom-absolute-contexts.sh
+          bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-cleanroom-colon-paths.sh
+          bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-cleanroom-file-urls.sh
+          bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-cleanroom-hook-env.sh
+          bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-cleanroom-hook-env-mutations.sh
 
       - name: HumanSearch G2 테스트 게이트 (정적·단위 + runtime import 증명)
         # uv 버전은 계약 C-8(0.11.3)에 고정. Python 3.14.1은 uv가 .python-version으로 내려받는다.
         run: |
-          command -v uv > /dev/null 2>&1 || pipx install uv==0.11.3
-          uv --version
-          bash scripts/acceptance-hs-gates.sh
-          bash scripts/acceptance-hs-gates-mutations.sh
-          bash scripts/acceptance-hs-gates-antiforge.sh
+          # 설치 여부만 보면 러너에 이미 있는 다른 버전을 그대로 쓴다 — 그건 버전
+          # "출력"이지 "고정"이 아니다. 실제 값을 계약(C-8)과 대조하고 어긋나면 실패시킨다.
+          required=0.11.3
+          actual=$(uv --version 2>/dev/null | awk '{print $2}')
+          if [ "$actual" != "$required" ]; then
+            pipx install --force "uv==$required"
+            actual=$(uv --version 2>/dev/null | awk '{print $2}')
+          fi
+          if [ "$actual" != "$required" ]; then
+            echo "FAIL: uv 버전 불일치 — expected=$required actual=${actual:-없음}"
+            exit 1
+          fi
+          echo "PASS: uv $actual (계약 C-8 고정)"
+          bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-gates.sh
+          bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-gates-mutations.sh
+          bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-gates-antiforge.sh
 
       - name: HumanSearch G3 포털 상수·locator 경계
         # 운영 상수·portal locator 는 contracts/ 한 곳(P22 · 웹 자동화 5조 1번).
@@ -99,10 +122,10 @@ jobs:
       - name: 인수 검사 0-2 상시 내용 검사와 종료상태 분리 (AC-19)
         # 실제 로컬 리터럴은 CI에 올리지 않는다. 합성 저장소와 합성 값으로 동일 판정기를 실행해
         # 환경 격리·네 객체형·fsck/cat-file 실패·큰 객체·종료상태·훅 환경 무오염 13건을 증명한다.
-        run: bash scripts/acceptance-0-2-unreachable-content.sh
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-0-2-unreachable-content.sh
 
       - name: 인수 검사 0-6 (가짜 검증 스크립트 0건)
-        run: bash scripts/acceptance-0-6.sh
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-0-6.sh
 
       # ↓ 아래 3개는 pre-push 에서 CI 로 이관된 검사다(2026-08-07).
       #   pre-push 는 "이 push 가 안전한가"만 판정하며, 저장소 위생·메타 검사는 여기서 돈다.
@@ -115,12 +138,12 @@ jobs:
       # "히스토리 전량 스캔" 스텝이며, hooks/pre-push 가 그 스텝의 존재를 확인한다.
 
       - name: 인수 검사 0-7 (훅이 위반 6종을 실제로 차단하는가)
-        run: bash scripts/acceptance-0-7.sh
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-0-7.sh
 
       - name: 인수 검사 0-5 (push · CI 연결)
         # origin/main==main 을 검사하므로 main 참조가 유효한 경우에만 의미가 있다.
         if: github.ref == 'refs/heads/main'
-        run: bash scripts/acceptance-0-5.sh
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-0-5.sh
 
       - name: 억제 만료 스캔 (suppressions.yaml)
         # pre-commit 의 expiry 검사는 suppressions.yaml 이 '스테이징된 커밋'에서만 돈다.
@@ -159,11 +182,20 @@ jobs:
           exit $fail
 
       - name: 셸 스크립트 문법 검사
+        # `*.sh` 글로브만 보면 hooks/pre-commit·pre-push 가 빠진다(확장자가 없다).
+        # 강제 장치 본인이 문법 검사 밖에 있으면, 훅이 깨진 채로도 이 스텝은 초록이다.
         run: |
           fail=0
+          n=0
           while IFS= read -r -d '' f; do
+            n=$((n+1))
             bash -n "$f" || { echo "syntax error: $f"; fail=1; }
-          done < <(git ls-files -z '*.sh')
+          done < <(git ls-files -z '*.sh' hooks/pre-commit hooks/pre-push)
+          if [ "$n" -lt 2 ]; then
+            echo "FAIL: 문법 검사 대상이 ${n}개 — 대상 0개는 합격이 아니다"
+            exit 1
+          fi
+          echo "PASS: 셸 파일 ${n}개 문법 검사"
           exit $fail
 
       - name: 패턴 파일 자체에 실제 비밀이 없는지 (자기 오염 방지)
@@ -176,7 +208,7 @@ jobs:
           echo "PASS: 기본 패턴 파일에 실값 없음"
 
       - name: 인수 검사 hs-a3 (세션 계열 자격증명 탐지)
-        run: bash scripts/acceptance-hs-a3.sh
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-a3.sh
       - name: 데이터 노출 스캔 (크기 · 금지경로 · 기록 · 개인정보 내용)
         # 판정 본문은 scripts/scan-data-exposure.sh 한 곳에 있다. CI 도 인수검사도
         # **같은 파일을 실행**한다 — 규칙을 두 벌로 적으면 반드시 갈라진다.
@@ -186,16 +218,37 @@ jobs:
         run: bash scripts/scan-data-exposure.sh all
 
       - name: 인수 검사 hs-a4 (대용량·산출물 차단이 실제로 도는가)
-        run: bash scripts/acceptance-hs-a4.sh
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-a4.sh
 
       - name: 인수 검사 secret-webhook-vendor (웹훅·벤더 키 탐지 · AC-S1)
         # 로컬 pre-push 는 acceptance-*.sh 를 글로브로 전량 실행하지만 CI 는 고정 목록이다.
         # 여기 등록하지 않으면 이 검사는 '로컬에만 있는 검사'가 되고, P15③ 은 그것을
         # 없는 것으로 친다(이 파일 111행 주석의 "판정 권한은 CI에 있다"와 같은 근거).
-        run: bash scripts/acceptance-secret-webhook-vendor.sh
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-secret-webhook-vendor.sh
+
+      - name: 인수 검사 verified-sha (초록불이 SHA 에 귀속되는가 · P23)
+        # "CI 통과했습니다"는 어느 커밋에 대해 통과했는지를 말하지 않는다. 원격 HEAD 와
+        # 초록불이 붙은 SHA 와 로컬 HEAD 가 다르면 그 초록불은 지금 머지하려는 코드의
+        # 것이 아니다. 여기서는 판정기의 진리표(9종)와 fail-closed 를 검증한다.
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-verified-sha.sh
+
+      - name: 인수 검사 ci-step-integrity (스텝을 조용히 끄지 못하는가)
+        # pre-push 는 워크플로를 문자열로 훑어 `if: false` 만 잡는다. `if: ${{ false }}`,
+        # 항상-거짓 조건, `continue-on-error: true` 는 그대로 통과했다(2026-08-12 V1 D4:
+        # 데이터 노출 검사 스텝을 영구히 꺼도 로컬 검사가 전부 초록이었다).
+        # 이 검사는 워크플로를 실제 YAML 로 파싱해 조건부·오류무시 스텝을 구조로 막는다.
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-ci-step-integrity.sh
+
+      - name: 인수 검사 semantic-mutations (검사를 껐을 때 반드시 빨개지는가)
+        # 2026-08-21: acceptance-hs-a4.sh 본문을 `exit 0` 으로 바꿔도 CI 가 초록이었다.
+        # CI 가 종료값만 봤기 때문이다 — 종료값 0 은 "통과했다"와 "아무것도 안 했다"를
+        # 구분하지 못한다. 위 스텝들이 전부 scripts/verify/run-acceptance.sh 를 거치는
+        # 이유이며, 이 검사는 그 래퍼가 무력화 5종(exit 0 · true · no-op · 빈 파일 ·
+        # 출력만)을 인수 검사 전량에 대해 실제로 막는지 격리 사본으로 증명한다.
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-semantic-mutations.sh
 
       - name: 인수 검사 verify-ac-m (mechanism 명부 대조 · AC-M)
         # 명부(docs/sot/mechanism-registry.yaml)와 실제 검사 장치의 일치를 강제한다.
         # 검사기 1벌(scripts/verify/check-mechanism-registry.sh)을 로컬 pre-push
         # 글로브와 CI 가 같은 인수 스크립트로 실행한다 (판정기 2벌 금지 · P16).
-        run: bash scripts/acceptance-verify-ac-m.sh
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-verify-ac-m.sh

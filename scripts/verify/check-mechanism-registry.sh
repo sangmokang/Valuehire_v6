@@ -97,6 +97,31 @@ validate_schema() {
   return 0
 }
 
+# 주석·echo 같은 죽은 문자열을 실행 배선으로 세지 않는다. 글로브 target 은 실제 find
+# 줄에 있어야 하고, 그 밖의 target 은 공백을 걷어낸 활성 줄의 시작에서 호출돼야 한다.
+active_target_exists() {
+  awk -v target="$1" '
+    /^[[:space:]]*#/ { next }
+    {
+      if ($0 ~ /^exit([[:space:]]|$)/) top_level_exited = 1
+      line = $0
+      sub(/^[[:space:]]+/, "", line)
+      if (target ~ /^-name /) {
+        if (line ~ /^([A-Za-z_][A-Za-z0-9_]*=\$\()?find[[:space:]]/) {
+          collectors += 1
+          if (!top_level_exited && index(line, target) > 0) found = 1
+        }
+      } else if (index(line, target) == 1) {
+        found = 1
+      }
+    }
+    END {
+      if (target ~ /^-name /) exit(found && collectors == 1 ? 0 : 1)
+      exit(found ? 0 : 1)
+    }
+  ' "$2"
+}
+
 # stage 별 대조(규칙 3~5) — 위반 사유를 stdout 으로, return 1
 ci_target_is_run_command() {
   local workflow="$1" job="$2" target="$3"
@@ -141,9 +166,16 @@ ci_target_is_run_command() {
 validate_stage() {
   case "$e_stage" in
     pre-commit|pre-push)
-      if ! grep -qF -- "$e_target" "$e_path"; then
+      if ! active_target_exists "$e_target" "$e_path"; then
         echo "죽은 target — '$e_target' 이(가) $e_path 안에 없다"; return 1
       fi
+      case "$e_target" in
+        -name*)
+          if ! bash scripts/verify/check-pre-push-runtime.sh "$e_path" >/dev/null 2>&1; then
+            echo "실행되지 않는 pre-push target — '$e_target'"; return 1
+          fi
+          ;;
+      esac
       ;;
     ci)
       if [ -z "$e_ci_job" ]; then
@@ -264,6 +296,25 @@ while IFS= read -r raw || [ -n "$raw" ]; do
 done < "$REGISTRY"
 flush_entry
 [ "$syntax_fail" -eq 1 ] && fail=1
+
+# 현재 정본 명부는 원칙 검사기의 세 실행면을 모두 가져야 한다. 일반 fixture에는
+# 이 저장소 전용 필수 ID를 강제하지 않아 기존 파서 경계 시험을 독립적으로 유지한다.
+if [ "$REGISTRY" = "docs/sot/mechanism-registry.yaml" ]; then
+  for required_id in principles-local-check principles-explicit-prepush principles-explicit-ci; do
+    if ! printf '%s\n' "$seen_ids" | grep -qxF -- "$required_id"; then
+      echo "FAIL: 원칙 검사 장치 누락 — $required_id"
+      fail=1
+    fi
+  done
+  principles_rc=0
+  bash scripts/acceptance-principles-check.sh >/dev/null 2>&1 || principles_rc=$?
+  if [ "$principles_rc" -ne 0 ]; then
+    echo "FAIL: 원칙 검사 원명령 실패 — exit=$principles_rc"
+    fail=1
+  else
+    echo "PASS: 원칙 검사 원명령 실행 (local·pre-push·ci 배선 포함)"
+  fi
+fi
 
 # V1 D6: 문법 오류가 있으면 항목 0개여도 '검사 불능(2)'이 아니라 '위반(1)'이다 —
 # 잘못 쓴 명부는 대응 주체가 다르다(작성자 수정 vs 환경 복구).
