@@ -221,8 +221,11 @@ while IFS= read -r -d '' path; do
 done < "$FILES"
 
 # ── 제품 계층 판정 (3단) ─────────────────────────────────────────────────────
-# 1단 비운영 주소 제거: RFC 2606 예약 도메인·루프백은 원리적으로 운영 주소가 될 수 없다.
-#      제거 후에도 금지 패턴이 남으면 그 줄은 여전히 위반이다 — 면제가 아니라 정밀화다.
+# 1단 비운영 주소 중화: RFC 2606 예약 도메인·루프백은 원리적으로 운영 주소가 될 수 없다.
+#      **지우지 않고 중립 자리표시자로 바꾼다** — 지우면 문자열 모양이 깨져 뒤 규칙이
+#      무력화된다(2026-08-25 자체 적대 검증 A3·A4: 예약 도메인을 덧붙이는 것만으로
+#      id·클래스 셀렉터 규칙이 뚫렸고, 병합 직후 판정에서는 차단되던 회귀였다).
+#      중화 후에도 금지 패턴이 남으면 그 줄은 여전히 위반이다 — 면제가 아니라 정밀화다.
 # 2단 금지 패턴: contracts/portal-constants-deny-patterns-product.txt (셀렉터·포트 등).
 # 3단 점 토큰 fail-closed: 따옴표 안이 통째로 `이름.이름` 또는 `.이름` 형태인데 마지막
 #      라벨이 비운영 접미사 계약에 **없으면** 거부한다. 예전 TLD 열거는 모르는 값을
@@ -258,7 +261,8 @@ if [ -s "$PLIST" ]; then
         File.foreach(path) do |line|
           clean = line.dup
           clean = clean.gsub(fullwidth_dots, ".") if clean.match?(fullwidth_dots)
-          addresses.each { |rule| clean = clean.gsub(rule, "") }
+          # 자리표시자는 어떤 금지 패턴·접미사와도 겹치지 않는 한 글자여야 한다.
+          addresses.each { |rule| clean = clean.gsub(rule, "x") }
           stripped << clean
           next if reason
           clean.scan(dotted) do |_quote, token|

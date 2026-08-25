@@ -175,6 +175,18 @@ humansearch pytest                            81 passed in 7.45s
   (`scripts/verify/check-strict-principles-skills.sh:74`)는 strict 스킬 정본 2벌에만 걸리고
   스크립트에는 걸리지 않는다(선례: `-hardening6.sh` 853줄이 병합돼 있다). 쪼개지 않은 이유는
   판정기를 2벌로 나누는 위험이 줄 수 대비 크다고 봤기 때문이다 — 판단이 다르면 되돌릴 수 있다.
+- **따옴표 문자열 안에 섞인 미지 접미사 호스트(2026-08-25 자체 적대 검증 A1)**: 점 토큰
+  fail-closed 판정은 따옴표 안이 **통째로 하나의 토큰**일 때만 본다. 그래서
+  `HOST = "hire-portal.zzunknown portal.invalid"` 처럼 문자열 안에 다른 낱말이 섞이면
+  그 규칙은 놓친다(실측 exit=0).
+  - **적용 범위는 좁다.** 평면 금지 패턴(scheme URL·TLD 목록·host:port·id/클래스/속성
+    셀렉터)은 따옴표에 묶이지 않아 문자열 안에서도 그대로 잡는다. 실측:
+    `HOST = "hiring.jobsite.co.kr portal.invalid"` → exit=1(차단).
+    즉 이 구멍으로 새는 것은 **TLD 목록 밖 접미사를 가진 호스트가 더 긴 문자열 안에 있을 때**뿐이다.
+  - **왜 안 고쳤나**: 문자열 *안*에서 점 토큰을 찾도록 넓히면 제품 코드에서 오탐이
+    23건 발생한다(실측 — f-string 보간 `${week.reason}`·`{parsed.query}`, `README.md` 등).
+    오탐은 결국 억제를 부르고 그게 구멍보다 나쁘다. 보간 문맥 배제까지 구현하면 잡을 수
+    있으나 이 PR 범위를 넘는다. 별도 과제.
 - **값 조립 우회(V1 F1)**: 문자열 연결·여러 줄 조립으로 주소를 만들면 줄 단위 정규식은 못 잡는다.
   `HOST = "hire" + "-" + "portal" + "." + "zzunknown"` 은 통과한다. G3 6라운드 전체가 공유하는
   설계 한계이며, 막으려면 언어별 AST 해석이 필요하다.
@@ -278,6 +290,37 @@ codex 샌드박스가 `/tmp` 생성까지 막아 검사기가 `FAIL: temp worksp
 | F9 | AC-5 는 `0.0.0.0` 허용, 구현은 거부 — 불일치 | 확인됨 | **수정(문서 쪽).** 구현 판단이 옳다. `0.0.0.0` 은 "모든 인터페이스 바인드"라 로컬 전용 서버에서는 막아야 할 값이다. AC-5 를 구현에 맞춰 다시 썼다. |
 | F10 | 시험이 의사클래스 변종 전체·`0.0.0.0`·`::1` 회귀를 고정 안 함 | 확인됨 | **수정.** `hardening7` 에 21개 사례 추가(변종 7종 + F2·F3·F4·F5·F6·F7·F9 반례). 전체 사례 22 → 44. |
 | F11 | AC-6 기대 출력이 `FAIL:` 로 적혀 문서대로는 합격 불가 | 확인됨 — 내 오기 | **수정.** `PASS:` 로 정정. |
+
+### 자체 적대 검증 (V1 판정 흡수 직후, 같은 세션) — 회귀 2건 발견
+
+V1 수정을 끝낸 뒤 내가 직접 같은 코드를 공격했다. **내가 만든 회귀 2건이 나왔다.**
+
+공격 착안: 1단(비운영 주소 중화)이 토큰을 **삭제**하면 남은 문자열의 모양이 바뀐다.
+예약 도메인이나 루프백을 따옴표 안에 덧붙이는 것만으로 **닫는 따옴표가 사라진다**.
+
+| ID | 표본 | 병합 직후(efc6dae) | 수정 직후(db46a8f) | 지금 |
+|---|---|---|---|---|
+| A3 | `SEL = ".login-button portal.invalid"` | exit=1 차단 | **exit=0 통과(회귀)** | exit=1 차단 |
+| A4 | `SEL = "#loginBtn localhost"` | exit=1 차단 | **exit=0 통과(회귀)** | exit=1 차단 |
+| A1 | `HOST = "hire-portal.zzunknown portal.invalid"` | exit=1(다른 이유로 차단) | exit=0 통과 | exit=0 통과 — 잔여 한계로 기재 |
+| A5 | `HOST = "hiring.jobsite.co.kr portal.invalid"` | exit=1 | exit=1 | exit=1 차단 |
+
+A3·A4 는 명백한 회귀였다 — 병합 직후 판정에서는 차단되던 것이 내 수정 뒤 통과했고,
+`#loginBtn`·`.login-button` 은 G3 가 원래부터 잡아야 하는 핵심 대상이다.
+
+**처리**: 1단을 "삭제"에서 "**중립 자리표시자 `x` 로 치환**"으로 바꿨다. 문자열 모양이
+보존되므로 뒤 규칙이 그대로 동작한다. 경계 문자도 소비하지 않도록 lookahead 로 바꿨다.
+
+```
+SEL = "#loginBtn localhost"           → SEL = "#loginBtn x"        → id 규칙 적중
+SEL = ".login-button portal.invalid"  → SEL = ".login-button x"    → 클래스 규칙 적중
+SAFE_HOSTS = {"127.0.0.1", "localhost"} → SAFE_HOSTS = {"x", "x"}  → 여전히 깨끗(오탐 0)
+BASE = "https://portal.invalid/login" → BASE = "x/login"           → 여전히 깨끗
+DIAG = "127.0.0.1:9333"               → 변화 없음                   → 여전히 차단
+```
+
+A3·A4·A4′ 3건을 `hardening7` 에 표본으로 심었다(사례 44 → 47).
+A1 은 오탐 23건 실측 근거를 붙여 잔여 한계로 남겼다(§"알려진 미달·잔여 한계").
 
 ### V1 이후 재검증
 

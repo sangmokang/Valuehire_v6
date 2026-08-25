@@ -87,6 +87,11 @@ F7_PROSE2=$(printf 'MESSAGE = "button label"')
 F9_ANY=$(printf 'BIND = "0.0.0.0"')
 F9_IPV6=$(printf 'DIAG = "[::1]%s"' ':9333')
 F9_V6BARE=$(printf 'SAFE = "[::1]"')
+# ── 2026-08-25 자체 적대 검증(A3·A4): 비운영 주소를 덧붙여 따옴표 모양을 깨뜨리는 마스킹.
+# 중화를 "삭제"로 구현했을 때 닫는 따옴표가 사라져 셀렉터 규칙이 통째로 무력화됐다.
+A3_MASK=$(printf 'SEL = ".login-%s portal.%s"' 'button' 'invalid')
+A4_MASK=$(printf 'SEL = "#loginBtn %s"' 'localhost')
+A4_MASK2=$(printf 'SEL = "#loginBtn input 127.0.0.1"')
 
 G3_NAMES="acceptance-hs-portal-constants acceptance-hs-portal-constants-mutations acceptance-hs-portal-constants-hardening acceptance-hs-portal-constants-hardening2 acceptance-hs-portal-constants-hardening3 acceptance-hs-portal-constants-hardening4 acceptance-hs-portal-constants-hardening5 acceptance-hs-portal-constants-hardening6 acceptance-hs-portal-constants-hardening7"
 
@@ -298,6 +303,14 @@ init_case
 git -C "$CASE_DIR" rm -q -f contracts/portal-constants-nonoperational-addresses.txt > /dev/null
 rm -f "$CASE_DIR/contracts/portal-constants-nonoperational-addresses.txt"
 expect_case "D5 비운영 주소 계약 부재" 2 'portal judgment contract missing'
+
+# ── 자체 적대 검증 A3·A4: 비운영 주소 마스킹으로 셀렉터 규칙을 깨뜨릴 수 없다 ────
+init_case; plant "humansearch/src/humansearch/mask_class_probe.py" "$A3_MASK"
+expect_case "A3 예약 도메인으로 클래스 규칙 마스킹" 1 "$FORBIDDEN_RE"
+init_case; plant "humansearch/tests/mask_id_probe.py" "$A4_MASK"
+expect_case "A4 루프백으로 id 규칙 마스킹" 1 "$FORBIDDEN_RE"
+init_case; plant "humansearch/src/humansearch/mask_id2_probe.py" "$A4_MASK2"
+expect_case "A4 루프백 IP 로 id 규칙 마스킹" 1 "$FORBIDDEN_RE"
 
 # ── 자기 배선 ────────────────────────────────────────────────────────────────
 total=$((total + 1))
