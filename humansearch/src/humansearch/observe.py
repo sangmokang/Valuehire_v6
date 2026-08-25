@@ -8,7 +8,7 @@ from http.client import HTTPConnection, HTTPException
 from ipaddress import ip_address
 from pathlib import Path
 from typing import TypeGuard
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import SplitResult, urlsplit, urlunsplit
 
 from ._cdp import CdpReadError, observe_markers
 from .auth_surface import (
@@ -240,9 +240,25 @@ def _fetch_targets(contract: MarkerContract, port: int) -> list[object]:
     return payload
 
 
+def _split(url: str) -> SplitResult | None:
+    """Parse one address, treating an unparseable one as an explicit non-match.
+
+    ``urlsplit`` raises ``ValueError`` for an unterminated IPv6 literal and for a netloc
+    that changes under NFKC normalization, and that message quotes the netloc verbatim.
+    Letting it escape replaces the contract's single privacy-reduced line with a traceback
+    carrying part of the address, so every caller turns ``None`` into the same refusal it
+    already gives a wrong scheme. Nothing here guesses at, repairs, or normalizes the input.
+    """
+
+    try:
+        return urlsplit(url)
+    except ValueError:
+        return None
+
+
 def _origin(url: str) -> str:
-    parsed = urlsplit(url)
-    if parsed.scheme != "https" or not parsed.netloc:
+    parsed = _split(url)
+    if parsed is None or parsed.scheme != "https" or not parsed.netloc:
         return ""
     return f"{parsed.scheme}://{parsed.netloc}"
 
