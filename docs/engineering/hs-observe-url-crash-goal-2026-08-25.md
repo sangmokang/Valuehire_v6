@@ -142,6 +142,7 @@ def _privacy_reduced_url(url, loggable) -> str  # 불변: 파싱 실패 → ""
 | WU1 | AC-1 | `observe.py`(`_split`,`_origin`) + 신규 시험 | `pytest tests/test_observe_url_parse_failure.py` |
 | WU2 | AC-2 | `observe.py`(`_valid_origin`,`_privacy_reduced_url`) + 신규 속성 시험 | `pytest tests/test_observe_url_parse_property.py` + `acceptance-hs-gates.sh` |
 | WU3 | AC-3(R9로 추가) | 시험만 — `tests/test_cdp_websocket_parse_failure.py` | `pytest tests/test_cdp_websocket_parse_failure.py` + 변조 증명 |
+| WU4 | AC-4(Codeaudit 반례, R9) | `observe.py`(`_privacy_reduced_url`) + `tests/test_observe_userinfo_redaction.py` | `pytest tests/test_observe_userinfo_redaction.py` + 변조 증명 |
 
 WU1 GREEN 커밋 전 WU2 착수 금지(R5). WU3는 작업 중 발견한 반례의 영구 편입이며(R9) 코드 변경
 0줄 · 시험만 추가한다. 이미 올바른 코드의 특성화 시험이므로 RED 대신 **변조 증명**으로
@@ -285,6 +286,47 @@ base SHA `c59bad7b160c473cda5545e76e6fa6bcc711a7ea` 의 격리 복제본에서 �
 브랜치 실패 집합 ⊆ 기준선 실패 집합 · **새 실패 0건** · 삭제된 테스트 0건 · 테스트 약화 0건.
 두 실패는 모두 환경 사유이며(로컬 전용 패턴 파일 부재 / main 브랜치 push 상태) 이 변경과 무관하다.
 `acceptance-0-7.sh` 는 세션 시작 원장이 "CI 담당"으로 표시한 항목이라 로컬에서 제외했다.
+
+### Codeaudit (읽기 전용, 트랙 A·B)
+
+대상 SHA `6eff539` 이전(`3df21fd`). 커버 트랙 A(계약 대조)·B(반례 지목). C(검사기 무력화)는
+Adversarial, D(실제 실행)는 위 라이브 절이 담당한다.
+
+**A 트랙 — 위장 origin 전수 대조(실측).** 승인 origin 만 통과하고 나머지는 전부 `found 0` 으로
+거부됨을 확인했다.
+
+| 입력 | 결과 |
+|---|---|
+| `https://hiring.saramin.co.kr/home` | 선택됨 |
+| netloc 에 `사용자:암호@` 를 붙인 위장 | 거부 (found 0) |
+| 대문자 호스트 `HIRING.SARAMIN.CO.KR` | 거부 |
+| 명시 포트 `:443` | 거부 |
+| 합자 문자 호스트(`ﬀ`) | 거부 |
+| 서브도메인 덧붙임 `…co.kr.evil.com` | 거부 |
+| NFKC 파괴 / IPv6 미종결 | 거부 |
+
+→ exact-origin 문자열 동등 비교라서 정규화 틈이 없다. 전부 fail-closed 방향이다.
+
+**B 트랙 — 유효 반례 1건 발견(→ WU4로 편입).**
+
+- 입력: `_privacy_reduced_url(...)` 에 netloc 앞에 `사용자:암호` 접속 자격이 붙은 https 주소
+- 기대: 접속 자격이 출력에 없어야 한다(브라우저 계약 §12)
+- 당시 실제 동작: 경로는 `/...` 로 가렸지만 **접속 자격이 붙은 netloc 을 통째로 출력**했다
+- 도달성: CLI 경로로는 도달 불가(그런 탭은 허용 origin 과 절대 일치하지 않는다). 그러나
+  `format_observation_line` 은 패키지가 내보내는 공개 함수이고, 이 함수의 직무 자체가
+  개인정보 축약이다
+- 처분: **같은 PR 에 편입 완료**(R9) — `tests/test_observe_userinfo_redaction.py`,
+  구현은 `parsed.netloc.rpartition("@")[2]`. 변조(되돌림) 시 3건 실패로 공허하지 않음을 확인
+
+**A 트랙 — 문서 과장 1건 정정.** `_split` 독스트링이 "모든 호출자가 잘못된 scheme 과 같은
+거부로 바꾼다"고 썼는데, `_privacy_reduced_url` 은 잘못된 scheme 을 거부하지 않는다(실측: `http://h/x` → `'http://h/...'`). "각자의 명시적 거부"로 정정했다.
+
+**잔여 위험(중간) — 실패 원인이 한 표기로 뭉개진다.** `main()` 은 계약 파일 손상·브라우저
+불통·탭 0개·탭 2개를 전부 `STATE=drifted` 로 낸다. 이번 변경으로 "계약 origin 파싱 실패"가
+크래시(시끄러움)에서 `drifted`(조용함)로 옮겨왔다. 다만 크래시도 원인을 알려주지 않았고
+(종료값 1 + netloc 누출), `_load_contract` 는 이미 다른 8종의 계약 오류를 같은 곳으로 보낸다.
+즉 기존 설계와 일관되며 이번 변경이 만든 구멍은 아니다. 원인 구분은 별도 요청이 소유한다 —
+그래서 이 문서의 "배포 후 관측 항목"에 종료값 1 감시를 뒀다.
 
 ### V1 / V2
 
