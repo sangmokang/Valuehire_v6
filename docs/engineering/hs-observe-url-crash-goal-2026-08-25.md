@@ -145,6 +145,8 @@ def _privacy_reduced_url(url, loggable) -> str  # 불변: 파싱 실패 → ""
 | WU4 | AC-4(Codeaudit 반례, R9) | `observe.py`(`_privacy_reduced_url`) + `tests/test_observe_userinfo_redaction.py` | `pytest tests/test_observe_userinfo_redaction.py` + 변조 증명 |
 | WU5 | AC-5(V1 1회차 반례, R9) | `observe.py`(`_load_contract`,`_fetch_targets`,`_valid_origin`,`_privacy_reduced_url`) + `tests/test_observe_adversarial_v1_findings.py` | 같은 파일 + 변조 8종 |
 | WU6 | AC-6(V1 2회차 반례, R9) | `observe.py`(JSON 경계·`_valid_targets_path`·한 줄 가드) + `_cdp.py`(JSON 경계) + `tests/test_observe_adversarial_v1_round2.py` | 같은 파일 + 변조 6종 |
+| WU7 | AC-7(V1 3회차 반례, R9) | `observe.py`(`_fetch_targets` 생성자 위치·`_is_loopback_address`) + `tests/test_observe_transport_construction.py` | 같은 파일 + 변조 |
+| WU8 | AC-8(V1 4회차 반례, R9) | `observe.py`(`_is_loopback_address` ASCII·전송 `except`) + 같은 시험 파일 | 같은 파일 + 변조 3종 |
 
 WU1 GREEN 커밋 전 WU2 착수 금지(R5). WU3는 작업 중 발견한 반례의 영구 편입이며(R9) 코드 변경
 0줄 · 시험만 추가한다. 이미 올바른 코드의 특성화 시험이므로 RED 대신 **변조 증명**으로
@@ -432,6 +434,53 @@ total=1512 crash=0 bad_exit=0 multiline=0
 ```
 
 → 크래시 0건, 계약 밖 종료값(0·2 외) 0건, 여러 줄 출력 0건.
+
+### V1 3·4회차 — 판정 줄 없이 잘렸으나 반례는 유효
+
+3·4회차는 **제공자 측 필터에 최종 요약 단계에서 잘려 `VERDICT` 줄이 없다**(둘 다
+`ERROR: flagged for possible cybersecurity risk`). 형식상 판정은 미완이므로 "V1 PASS"로 세지
+않는다. 다만 잘리기 전 작업 로그에 남은 반례는 각각 독립 재현했고 유효했다.
+
+| 회차 | 반례 | 재현 | 처분 |
+|---|---|---|---|
+| 3회차 | `HTTPConnection(...)` 생성자가 `try` **밖**(`observe.py:225`)이라, 제어문자가 든 호스트(`::1%\n`)에서 나는 `http.client.InvalidURL` 이 `main()` 을 뚫는다. `ip_address("::1%\n")` 이 루프백으로 판정되기 때문에 계약을 통과한다 | **재현됨** (생성자 단독 호출로 확인) | WU7 — 생성자를 try 안으로, `_is_loopback_address` 에 `isprintable()` 요구 |
+| 4회차 | scope id 에 **비ASCII** 문자가 오면(`::1%<히브리문자>`) `isprintable()` 은 True, `ip_address()` 도 루프백 → 통과 후 호스트 IDNA 인코딩에서 `UnicodeEncodeError`(=`ValueError`) | **재현됨** | WU8 — `isascii()` 도 요구 + 전송 `except` 에 `ValueError` 복원 |
+
+### 이 run 에서 내가 틀렸던 판단 (기록)
+
+WU7 직후 변조 시험 ⑯("전송 `except` 에서 `ValueError` 제거")이 **살아남았다**. 나는 이를
+"계약 검증이 이미 그 입력을 막으므로 도달 불가한 추측 방어"로 읽고 `ValueError` 를 걷어냈다.
+V1 4회차가 곧바로 **도달 경로**(비ASCII scope id)를 찾아냈다.
+
+- **무엇이 틀렸나**: "어떤 시험도 이 가지에 닿지 않는다"를 "이 가지에 닿을 수 없다"로 읽었다.
+- **왜 위험한가**: 변조 생존은 *커버리지 부족*의 신호이지 *도달 불가*의 증명이 아니다. 전자의
+  올바른 처방은 시험 추가, 후자는 코드 제거인데 정반대를 골랐다.
+- **어떻게 고쳤나**: 가드를 복원하고 그 가지에 **실제로 닿는 시험**을 함께 넣었다
+  (`test_transport_encoding_failure_is_a_closed_observation_failure`). 이제 변조 ⑱이 죽는다.
+
+### 변조 증명 — 최종 전량 (대조군 56 passed, exit 0)
+
+누적 20종을 최종 코드에 다시 걸었다. ⑮는 대상 문구가 ⑲·⑳으로 대체돼 SKIP 되었고, 나머지
+**19종 전부 죽었다. 살아남은 변조 0건.**
+
+| # | 변조 | # | 변조 |
+|---|---|---|---|
+| ① 계약JSON→JSONDecodeError | 죽음 | ⑪ CDP RecursionError 제거 | 죽음 |
+| ② 타깃JSON→JSONDecodeError | 죽음 | ⑫ 계약경로 isascii 제거 | 죽음 |
+| ③ `_readable_port` 제거 | 죽음 | ⑬ 한 줄 판정→개수세기 | 죽음 |
+| ④ 한 줄 가드 제거 | 죽음 | ⑭ netloc→hostname | 죽음 |
+| ⑤ 인코딩 가드 제거 | 죽음 | ⑯ 생성자를 try 밖으로 | 죽음 |
+| ⑥ rpartition→partition | 죽음 | ⑰ CDP websocket 가드 제거 | 죽음 |
+| ⑦ `_split` 흡수 제거 | 죽음 | ⑱ 전송 except ValueError 제거 | 죽음 |
+| ⑧ 축약 단계 건너뜀 | 죽음 | ⑲ 호스트 isascii 제거 | 죽음 |
+| ⑨ 계약JSON RecursionError 제거 | 죽음 | ⑳ 호스트 isprintable 제거 | 죽음 |
+| ⑩ 타깃JSON RecursionError 제거 | 죽음 | | |
+
+### 실계약 회귀 확인
+
+좁힌 검증이 **실제 운영 계약을 막지 않는지** 확인했다:
+`_load_contract('saramin')` → host `127.0.0.1` · origin `https://hiring.saramin.co.kr` ·
+loggable `/home` 로 정상 로드된다.
 
 ### V2 (2차 적대검증)
 
