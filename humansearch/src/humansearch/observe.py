@@ -249,8 +249,8 @@ def _split(url: str) -> SplitResult | None:
     ``urlsplit`` raises ``ValueError`` for an unterminated IPv6 literal and for a netloc
     that changes under NFKC normalization, and that message quotes the netloc verbatim.
     Letting it escape replaces the contract's single privacy-reduced line with a traceback
-    carrying part of the address, so every caller turns ``None`` into the same refusal it
-    already gives a wrong scheme. Nothing here guesses at, repairs, or normalizes the input.
+    carrying part of the address, so every caller turns ``None`` into its own explicit
+    refusal. Nothing here guesses at, repairs, or normalizes the input.
     """
 
     try:
@@ -321,7 +321,10 @@ def _privacy_reduced_url(
     if parsed is None:
         return ""
     path = parsed.path if parsed.path in loggable_paths else "/..."
-    return urlunsplit((parsed.scheme, parsed.netloc, path, "", ""))
+    # netloc 앞부분의 `사용자:암호@` 는 경로에 든 식별자보다 민감하다. `.port` 는 숫자가
+    # 아닌 포트에서 따로 ValueError 를 던지므로 읽지 않고, 마지막 `@` 뒤만 남긴다.
+    netloc = parsed.netloc.rpartition("@")[2]
+    return urlunsplit((parsed.scheme, netloc, path, "", ""))
 
 
 def _port(value: str) -> int:
