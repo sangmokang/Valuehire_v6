@@ -19,7 +19,12 @@ fi
 
 SNAPSHOT=$(git status --porcelain)
 TMP=$(mktemp -d) || { echo "NOT_RUN: mktemp 실패"; echo "CHECKED: 0"; exit 2; }
-trap 'ruby -rfileutils -e "FileUtils.remove_entry(ARGV[0]) if File.exist?(ARGV[0])" "$TMP"' EXIT
+cleanup() {
+  local rc=$?
+  ruby -rfileutils -e 'FileUtils.remove_entry(ARGV[0]) if File.exist?(ARGV[0])' "$TMP"
+  exit "$rc"
+}
+trap cleanup EXIT
 
 fail=0
 checked=0
@@ -221,8 +226,17 @@ printf 'jobs: [broken\n' > "$TMP/broken.yml"
 expect_rc "workflow 파싱 불가" "$TMP/broken.yml" "$CONTRACT" 2
 printf '{broken\n' > "$TMP/broken.json"
 expect_rc "계약 파싱 불가" "$WF" "$TMP/broken.json" 2
-printf '{"schema_version":1,"schema_version":2,"workflow":".github/workflows/verify.yml","workflow_context":{"env":"absent","defaults":"absent"},"protected_jobs":[],"protected_steps":[]}\n' > "$TMP/duplicate-key.json"
-expect_rc "JSON duplicate object key" "$WF" "$TMP/duplicate-key.json" 2
+cp "$CONTRACT" "$TMP/duplicate-key.json"
+ruby -e 'path = ARGV.fetch(0); source = File.binread(path); source.sub!("{", %q({"workflow":"shadow",)); File.binwrite(path, source)' "$TMP/duplicate-key.json"
+set +e
+duplicate_json_output=$("$CHECKER" "$WF" "$TMP/duplicate-key.json" 2>&1)
+duplicate_json_rc=$?
+set -e
+if [ "$duplicate_json_rc" -eq 2 ] && printf '%s\n' "$duplicate_json_output" | grep -Fq '중복 object key — workflow'; then
+  record 0 "JSON duplicate object key" "실제 정상 계약의 중복 키를 exit=2 fail-closed 거부"
+else
+  record 1 "JSON duplicate object key" "exit=$duplicate_json_rc output=$(printf '%s' "$duplicate_json_output" | tr '\n' ' | ')"
+fi
 printf '{"schema_version":1,"workflow":".github/workflows/verify.yml","protected_steps":[]}\n' > "$TMP/zero.json"
 expect_rc "counter-10 보호 대상 0개" "$WF" "$TMP/zero.json" 2
 

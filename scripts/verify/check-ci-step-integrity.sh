@@ -30,15 +30,103 @@ def not_run(message)
   exit 2
 end
 
-class DuplicateRejectingHash < Hash
-  def []=(key, value)
-    raise JSON::ParserError, "중복 object key — #{key}" if key?(key)
-    super
+class JsonDuplicateKeyScanner
+  def initialize(source)
+    @source = source
+    @index = 0
+  end
+
+  def scan
+    skip_whitespace
+    scan_value
+    skip_whitespace
+    raise JSON::ParserError, "JSON 뒤에 해석되지 않은 입력이 있다" unless @index == @source.length
+  end
+
+  private
+
+  def scan_value
+    skip_whitespace
+    case @source[@index]
+    when "{" then scan_object
+    when "[" then scan_array
+    when "\"" then scan_string
+    else scan_scalar
+    end
+  end
+
+  def scan_object
+    @index += 1
+    skip_whitespace
+    return @index += 1 if @source[@index] == "}"
+
+    seen = {}
+    loop do
+      key = scan_string
+      raise JSON::ParserError, "중복 object key — #{key}" if seen[key]
+      seen[key] = true
+      skip_whitespace
+      expect(":")
+      scan_value
+      skip_whitespace
+      break if consume("}")
+      expect(",")
+      skip_whitespace
+    end
+  end
+
+  def scan_array
+    @index += 1
+    skip_whitespace
+    return @index += 1 if @source[@index] == "]"
+
+    loop do
+      scan_value
+      skip_whitespace
+      break if consume("]")
+      expect(",")
+      skip_whitespace
+    end
+  end
+
+  def scan_string
+    start = @index
+    expect("\"")
+    loop do
+      char = @source[@index]
+      raise JSON::ParserError, "끝나지 않은 JSON string" if char.nil?
+      @index += char == "\\" ? 2 : 1
+      break if char == "\""
+    end
+    JSON.parse(@source[start...@index])
+  end
+
+  def scan_scalar
+    start = @index
+    @index += 1 while @source[@index] && @source[@index] !~ /[\s,}\]]/
+    raise JSON::ParserError, "비어 있는 JSON 값" if start == @index
+  end
+
+  def skip_whitespace
+    @index += 1 while @source[@index] =~ /\s/
+  end
+
+  def consume(token)
+    return false unless @source[@index] == token
+    @index += 1
+    true
+  end
+
+  def expect(token)
+    raise JSON::ParserError, "JSON token #{token.inspect} 누락" unless consume(token)
   end
 end
 
 def load_contract(path)
-  JSON.parse(File.read(path), object_class: DuplicateRejectingHash)
+  source = File.read(path)
+  contract = JSON.parse(source)
+  JsonDuplicateKeyScanner.new(source).scan
+  contract
 rescue JSON::ParserError => error
   not_run("CI step 계약 파싱 실패 — #{error.message.lines.first.to_s.strip}")
 end
