@@ -1,6 +1,6 @@
 # Worktree `.secret-patterns` 자동 bootstrap goal — 2026-08-25
 
-VERDICT: CHECKPOINT_PENDING
+VERDICT: COUNTER_RED_PENDING
 
 ## T 계약
 
@@ -23,7 +23,9 @@ main worktree의 ignored `.secret-patterns`를 symlink하고 `core.hooksPath=hoo
 - AC3: When bootstrap이 끝나면, `core.hooksPath`는 `hooks`여야 한다.
 - AC4: When 실제 main `.secret-patterns`가 없으면, linked worktree checkout hook은 nonzero로 실패해야 한다.
 - AC5: When `.secret-patterns.default`만 있으면, 이를 실제 secret의 fallback으로 연결하지 않아야 한다.
-- AC6: When 변경 범위를 diff하면 이 goal, 테스트, `hooks/post-checkout`, `scripts/install-hooks.sh`, hook SOT의 5파일뿐이어야 한다.
+- AC6: When 변경 범위를 diff하면 이 goal, 테스트, `hooks/post-checkout`, `scripts/install-hooks.sh`, `verify.sh`, hook SOT의 6파일뿐이어야 한다.
+- AC7: When hook 실패 뒤 linked worktree가 등록된 채 남아도, 그곳의 `verify.sh`는 실제 main `.secret-patterns` 연결 없이는 `.secret-patterns.default`만으로 PASS하지 않아야 한다.
+- AC8: When linked worktree의 symlink가 상대 경로로 같은 실제 main secret을 가리키면, 문자열 표현이 다르다는 이유만으로 차단하지 않아야 한다.
 
 ## counter-AC
 
@@ -32,6 +34,8 @@ main worktree의 ignored `.secret-patterns`를 symlink하고 `core.hooksPath=hoo
 - `.secret-patterns.default`를 실제 secret으로 연결해 false-green을 만든다.
 - hook 오류를 출력만 하고 exit 0으로 삼킨다.
 - 수동 실행할 때만 동작하고 `git worktree add`에서는 실행되지 않는다.
+- hook은 nonzero였지만 남은 linked worktree에서 `.secret-patterns.default`만으로 `verify.sh`가 false-green을 낸다.
+- 같은 실제 파일을 가리키는 상대 symlink를 raw `readlink` 문자열 차이만으로 거부한다.
 
 ## 입출력·오류·경계 계약
 
@@ -47,6 +51,7 @@ main worktree의 ignored `.secret-patterns`를 symlink하고 `core.hooksPath=hoo
 - `hooks/post-checkout`
 - `scripts/install-hooks.sh`
 - `docs/sot/hook-contracts.md`
+- `verify.sh`
 
 ## 검증 명령
 
@@ -71,6 +76,11 @@ git show --check HEAD
 - frozen test SHA-256: `6a640d8e5ae3f967b711bb16fee25f825fe0ee71851d6ef4116dab693f0b92ee`.
 - GREEN candidate: `2026-08-25T22:10:01+09:00`, tests 4, pass 4, fail 0, exit 0; shell syntax, principles 34/34, verify, docs SOT, cached diff 모두 exit 0.
 - GREEN 원문: `/tmp/vhrec-bootstrap-precommit.rPCqAF/full.log`, SHA-256 `9b91f939d9eae4b9968245385e2bbf9932fced3f6d27653f070df29ca762a045`.
+- V1 `a9573ec8-ac7b-4274-b93b-37da3bafd5a6` finding `V1-F002`: hook 실패 잔여 linked worktree에서 실제 secret 없이 `.secret-patterns.default`만으로 `verify.sh` exit 0. 로컬 재현 `/tmp/vhrec-bootstrap-v1f002-repro.MRGWGz/full.log`, SHA-256 `18e6e021168e6873983cbdc7f9039ebef2cdfdc485393bc15f554ed6c65d50e7`.
+- V1 finding `V1-F004`: 실제 main secret을 가리키는 상대 symlink가 raw target 문자열 차이로 차단됨. 로컬 재현 `/tmp/vhrec-bootstrap-v1f004-repro.hOJKAD/full.log`, SHA-256 `fabc89613b7ce6fb300450763f7ea7c50f29267d024033053e8756b3c1f5ccc1`.
+- V1-F002/F004 counter RED: `2026-08-25T23:02:04+09:00`, exact HEAD `6bb8e1e4998b0cc79ee879e8e18b9fb4a66e40ac`, `node --test tests/worktree-secret-bootstrap.test.mjs`, tests 6, pass 4, fail 2, exit 1.
+- counter RED 원문: `/tmp/vhrec-bootstrap-v1f002-f004-red-canonical.ankQYV/full.log`, SHA-256 `bf7ac6707cff33b12ec50a925bbfe11cd8d8eeb0fef7d321a037edb0b0067891`; frozen test SHA-256 `e18025eecd8cd40d1b5aa8c930b9f171443a01fdb64acab62a9a0b3bf1be10ff`.
+- counter RED 해석: 기존 4개 bootstrap 단언은 모두 통과했고, 잔여 linked worktree의 default-only false-green과 의미상 동일한 상대 symlink 수용 두 동작만 실패했다.
 - G: `NOT_RUN`
 - V1: `NOT_RUN`
 - V2: `NOT_RUN`
