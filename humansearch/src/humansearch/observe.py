@@ -172,8 +172,9 @@ def _load_contract(channel: str) -> MarkerContract:
     try:
         raw = json.loads(_CONTRACT_PATH.read_text(encoding="utf-8"))
     # JSONDecodeError·UnicodeDecodeError 는 둘 다 ValueError 의 하위형이다. 하위형만 열거하면
-    # 4,300 자리를 넘는 정수처럼 맨 ValueError 로 오는 갈래가 그물 밖으로 샌다(V1 지적).
-    except (OSError, ValueError) as exc:
+    # 4,300 자리를 넘는 정수처럼 맨 ValueError 로 오는 갈래가 샌다. 아주 깊게 중첩된 JSON 은
+    # ValueError 조차 아닌 RecursionError 로 온다(실측: 깊이 300,000 = 600KB) — V1 2회차 지적.
+    except (OSError, ValueError, RecursionError) as exc:
         raise ObservationError("marker contract is unavailable") from exc
     if not isinstance(raw, dict) or raw.get("channel") != channel:
         raise ObservationError("marker contract channel is invalid")
@@ -238,7 +239,9 @@ def _fetch_targets(contract: MarkerContract, port: int) -> list[object]:
         raise ObservationError("target list response exceeded the read limit")
     try:
         payload = json.loads(body)
-    except ValueError as exc:  # JSONDecodeError·UnicodeDecodeError·자릿수 초과를 모두 포함한다
+    # ValueError 는 JSONDecodeError·UnicodeDecodeError·자릿수 초과를 포함하고, 깊은 중첩은
+    # RecursionError 로 따로 온다.
+    except (ValueError, RecursionError) as exc:
         raise ObservationError("target list response is invalid") from exc
     if not isinstance(payload, list):
         raise ObservationError("target list response is invalid")
@@ -300,8 +303,11 @@ def _valid_origin(value: object) -> bool:
 
 
 def _valid_targets_path(value: object) -> TypeGuard[str]:
+    # ASCII 를 요구한다: HTTP 요청 줄은 latin-1 로 인코딩되므로 고립 서로게이트가 든 경로는
+    # 전송 단계에서 UnicodeEncodeError 로 죽고, U+2028 같은 문자는 출력 한 줄 계약을 깬다.
     return (
         isinstance(value, str)
+        and value.isascii()
         and value.startswith("/")
         and "?" not in value
         and "#" not in value
@@ -344,7 +350,10 @@ def _privacy_reduced_url(
     # 출력은 인코딩 가능한 한 줄이어야 한다. `urlsplit()` 은 U+2028 같은 줄 분리자를 지우지
     # 않고, 고립 서로게이트는 `print()` 단계에서 `UnicodeEncodeError` 로 죽는다 — 둘 다
     # `main()` 의 try 블록 밖이다(V1 지적). 안전하게 보여줄 형태가 없으면 아무것도 안 보인다.
-    if len(reduced.splitlines()) > 1:
+    # `splitlines()` 의 개수만 보면 **끝에 붙은** 줄 분리자를 놓친다 — 축약 결과만으로는
+    # 한 줄이지만 뒤에 ` ROLES=...` 가 붙는 순간 두 줄이 된다(V1 2회차 지적). 그래서 개수가
+    # 아니라 "줄바꿈 문자를 하나라도 담고 있는가"로 판정한다.
+    if "".join(reduced.splitlines()) != reduced:
         return ""
     try:
         reduced.encode("utf-8")
