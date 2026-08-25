@@ -564,6 +564,25 @@ V1 4회차가 곧바로 **도달 경로**(비ASCII scope id)를 찾아냈다.
 `_load_contract('saramin')` → host `127.0.0.1` · origin `https://hiring.saramin.co.kr` ·
 loggable `/home` 로 정상 로드된다.
 
+### WU9 이후 — 환경 축 라이브 재실증 (G·V1 공통 사각지대였던 자리)
+
+V2 가 짚은 공통 사각지대(실제 `print()` 인코더를 아무도 통과시키지 않았다)를 실제 CLI·실소켓으로
+직접 관통했다. stdout 인코더를 세 값으로 바꾸고, 계약 origin 에 비ASCII 값을 심은 복제본으로.
+
+```
+정상 계약 · PYTHONIOENCODING=ascii    → exit=2 | STATE=drifted TAB=- ROLES=0 CONTRACT_VALID=false | stderr 0줄
+정상 계약 · PYTHONIOENCODING=latin-1  → exit=2 | 같음 | stderr 0줄
+정상 계약 · PYTHONIOENCODING=utf-8    → exit=2 | 같음 | stderr 0줄
+비ASCII 계약 origin · ascii           → exit=2 | 같음 | stderr 0줄
+비ASCII 계약 origin · utf-8           → exit=2 | 같음 | stderr 0줄
+base(c59bad7) 비ASCII origin · ascii  → exit=1 | stdout 없음 | stderr 26줄
+```
+
+→ 뭘 시켰나: 출력 인코더를 ASCII·latin-1·UTF-8 로 바꿔 가며, 그리고 계약에 비ASCII 주소를 심어
+가며 관측기를 실제로 돌렸다. 뭐가 나왔나: 다섯 조합 모두 계약된 한 줄 + 종료값 2 + stderr 0줄.
+같은 입력에서 수정 전 코드는 종료값 1 에 stderr 26줄이었다. 좋은 소식 — 아무도 안 보던 축이
+실제로 막혔고, 그것이 이 PR 이 만든 회귀가 아니라 원래 열려 있던 구멍이었음도 같이 보인다.
+
 ### V2 (2차 적대검증) — 리셋 컨텍스트의 Claude · `VERDICT: SPLIT`
 
 **축별 판정: 구현·회귀·게이트 축 PASS / V1 명제 축 FAIL / 병합 차단 사유 없음.**
