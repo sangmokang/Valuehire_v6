@@ -298,8 +298,13 @@ def _valid_origin(value: object) -> bool:
     parsed = _split(value)
     if parsed is None or not _readable_port(parsed):
         return False
+    # `_valid_targets_path`·`_is_loopback_address` 와 같은 규칙을 쓴다. 여기만 비ASCII 를
+    # 허용하면 축약 주소가 비ASCII 가 되고, stdout 인코더가 UTF-8 이 아닌 환경에서 `print()`
+    # 가 `UnicodeEncodeError` 로 죽는다 — `main()` 의 try 밖이다(V2 지적). 국제화 도메인은
+    # punycode 로 적으면 되므로 이 요구가 정상 origin 을 막지 않는다.
     return (
-        parsed.scheme == "https"
+        value.isascii()
+        and parsed.scheme == "https"
         and bool(parsed.netloc)
         and not parsed.path
         and not parsed.query
