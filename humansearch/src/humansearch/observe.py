@@ -222,8 +222,11 @@ def _load_contract(channel: str) -> MarkerContract:
 
 
 def _fetch_targets(contract: MarkerContract, port: int) -> list[object]:
-    connection = HTTPConnection(contract.diagnostic_host, port, timeout=3)
+    # 연결 객체 생성도 전송 시도의 일부다. 생성자를 try 밖에 두면 제어문자가 든 호스트에서
+    # 나는 `InvalidURL` 이 이 함수의 그물을 지나쳐 `main()` 까지 올라간다(V1 3회차 지적).
+    connection: HTTPConnection | None = None
     try:
+        connection = HTTPConnection(contract.diagnostic_host, port, timeout=3)
         connection.request(
             "GET", contract.targets_path, headers={"Accept": "application/json"}
         )
@@ -231,10 +234,11 @@ def _fetch_targets(contract: MarkerContract, port: int) -> list[object]:
         if response.status != 200:
             raise ObservationError("target list request was rejected")
         body = response.read(1_048_577)
-    except (OSError, HTTPException) as exc:
+    except (OSError, HTTPException, ValueError) as exc:
         raise ObservationError("target list request failed") from exc
     finally:
-        connection.close()
+        if connection is not None:
+            connection.close()
     if len(body) > 1_048_576:
         raise ObservationError("target list response exceeded the read limit")
     try:
@@ -316,6 +320,11 @@ def _valid_targets_path(value: object) -> TypeGuard[str]:
 
 
 def _is_loopback_address(value: str) -> bool:
+    # 인쇄 불가 문자를 먼저 거른다: `ip_address()` 는 IPv6 scope id 를 받아들이면서 그 안의
+    # 개행·탭을 거르지 않아 `ip_address("::1%\n")` 이 루프백으로 판정된다(실측). 주소 리터럴에
+    # 인쇄 불가 문자가 들어갈 자리는 없다.
+    if not value.isprintable():
+        return False
     try:
         return ip_address(value).is_loopback
     except ValueError:
