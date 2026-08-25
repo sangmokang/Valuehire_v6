@@ -29,9 +29,25 @@ chmod +x hooks/* scripts/*.sh
 # 자산이지 워크트리 단위가 아니므로 공유가 의미상으로도 옳다.
 common=$(git rev-parse --git-common-dir)
 main_root=$(cd "$(dirname "$common")" && pwd)
-if [ "$main_root" != "$REPO" ] && [ -f "$main_root/.secret-patterns" ] && [ ! -e .secret-patterns ]; then
-  ln -s "$main_root/.secret-patterns" .secret-patterns
-  printf '워크트리 보정: .secret-patterns → %s\n' "$main_root/.secret-patterns"
+if [ "$main_root" != "$REPO" ]; then
+  expected_secret="$main_root/.secret-patterns"
+  if [ ! -f "$expected_secret" ]; then
+    printf 'BLOCKED: main worktree의 실제 .secret-patterns가 없다\n' >&2
+    exit 1
+  fi
+  if [ -L .secret-patterns ]; then
+    actual_secret=$(readlink .secret-patterns)
+    if [ ! -e .secret-patterns ] || [ "$actual_secret" != "$expected_secret" ]; then
+      printf 'BLOCKED: linked worktree의 .secret-patterns symlink가 잘못됐다\n' >&2
+      exit 1
+    fi
+  elif [ -e .secret-patterns ]; then
+    printf 'BLOCKED: linked worktree의 .secret-patterns가 symlink가 아니다\n' >&2
+    exit 1
+  else
+    ln -s "$expected_secret" .secret-patterns
+    printf '워크트리 보정: .secret-patterns → %s\n' "$expected_secret"
+  fi
 fi
 
 # readback — 설정이 실제로 됐는가

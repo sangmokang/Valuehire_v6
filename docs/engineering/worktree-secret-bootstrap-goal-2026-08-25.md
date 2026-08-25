@@ -1,6 +1,6 @@
 # Worktree `.secret-patterns` 자동 bootstrap goal — 2026-08-25
 
-VERDICT: RED
+VERDICT: CHECKPOINT_PENDING
 
 ## T 계약
 
@@ -65,7 +65,12 @@ git show --check HEAD
 - RED: `2026-08-25T22:05:14+09:00`, `node --test tests/worktree-secret-bootstrap.test.mjs`, tests 2, pass 0, fail 2, exit 1.
 - RED 원문: `/tmp/vhrec-bootstrap-red.PyuDAw/full.log`, SHA-256 `a8897d7a4c586ecfe5b0bc3d7be575393c6cf384f245124b30a3e5878e2f101f`.
 - RED 해석: 자동 hook이 없어 실제 main secret link가 생성되지 않았고, 실제 secret 부재도 fail-closed하지 않았다.
-- GREEN: `NOT_RUN`
+- macOS `/var` 경로 별칭을 `realpath` 동일성으로 교정한 RED commit: `b5276cfac49ee3c7d7cdb3b6acb52a350efbd9f6`.
+- 잘못된 symlink와 일반 파일 counter-test를 추가한 canonical RED commit: `a3680e1629d459d7a3d67b56df20e5c9892e57da`.
+- canonical RED: tests 4, pass 0, fail 4, exit 1. 원문 `/tmp/vhrec-bootstrap-counter-red.A3zTpJ/full.log`, SHA-256 `027605a909db3aafd96a611b2666526f7c32148531abccd03203ec7d460d56b0`.
+- frozen test SHA-256: `6a640d8e5ae3f967b711bb16fee25f825fe0ee71851d6ef4116dab693f0b92ee`.
+- GREEN candidate: `2026-08-25T22:10:01+09:00`, tests 4, pass 4, fail 0, exit 0; shell syntax, principles 34/34, verify, docs SOT, cached diff 모두 exit 0.
+- GREEN 원문: `/tmp/vhrec-bootstrap-precommit.rPCqAF/full.log`, SHA-256 `9b91f939d9eae4b9968245385e2bbf9932fced3f6d27653f070df29ca762a045`.
 - G: `NOT_RUN`
 - V1: `NOT_RUN`
 - V2: `NOT_RUN`

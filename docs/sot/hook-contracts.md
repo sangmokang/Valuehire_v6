@@ -64,11 +64,21 @@
 동작  : git config core.hooksPath hooks && chmod +x hooks/*
 출력  : exit 0 + 설치된 훅 목록
 불변식: 실행 후 core.hooksPath 를 재조회해 실제로 설정됐는지 확인(readback). 불일치 시 exit 1
+        linked worktree에서는 main worktree의 실제 `.secret-patterns`만 symlink한다.
+        원본 누락·끊어진 링크·다른 대상·일반 파일은 exit 1이며 `.secret-patterns.default`로 대체하지 않는다.
+```
+
+### `hooks/post-checkout`
+```
+입력  : Git 표준 post-checkout 인자 3개. 현재 checkout된 worktree
+동작  : `scripts/install-hooks.sh`를 실행해 hook 경로와 linked worktree 환경을 자동 보정
+출력  : exit 0 | exit 1. installer 누락·실행 실패 시 `BLOCKED`와 함께 fail-closed
+불변식: 실제 secret 내용은 출력하지 않는다. installer의 symlink readback 계약을 우회하지 않는다
 ```
 
 ## 시행 지점
 
-이 5개 파일 자체가 시행 지점이다. 각 파일 상단 주석의 `# 계약: docs/sot/hook-contracts.md`가 이 문서를 가리킨다 — 파일을 직접 읽으면 항상 최신 계약과 실제 구현이 같은지 대조할 수 있다.
+이 6개 파일 자체가 시행 지점이다. 각 파일 상단 주석의 `# 계약: docs/sot/hook-contracts.md`가 이 문서를 가리킨다 — 파일을 직접 읽으면 항상 최신 계약과 실제 구현이 같은지 대조할 수 있다.
 
 ## 비범위 / 한계
 

@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# post-checkout — linked worktree 환경을 저장소 hook 계약에 맞춘다.
+# 계약: docs/sot/hook-contracts.md
+set -euo pipefail
+
+repo=$(git rev-parse --show-toplevel)
+installer="$repo/scripts/install-hooks.sh"
+
+if [ ! -x "$installer" ]; then
+  printf 'BLOCKED: worktree bootstrap installer 실행 불가 — %s\n' "$installer" >&2
+  exit 1
+fi
+
+if ! "$installer" >/dev/null; then
+  printf 'BLOCKED: worktree bootstrap 실패\n' >&2
+  exit 1
+fi
