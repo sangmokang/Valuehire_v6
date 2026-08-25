@@ -75,6 +75,7 @@ CHECKED: 34
 - 첫 AST 진단은 leaf의 `children=nil`을 처리하지 않아 exit `1`; 순회 코드를 바꿔 재실행했다.
 - 재실행: Ruby `2.6.10`, Psych `3.1.0`, exit `0`.
 - 따옴표 없는 최상위 `on`은 `String "on"`이 아니라 `TrueClass true` key로 읽혔고 `workflow["on"]`은 `nil`이었다.
+- 첫 humanreview는 원문이 다른 `on:`과 `true:`가 같은 `TrueClass true` key로 합쳐져도 checker가 exit 0인 결함을 재현했다. RED `2bc76f7`과 GREEN `9791bed`로 Psych 의미 key 중복도 Hash 생성 전에 거부한다.
 - 현재 workflow AST는 alias `0`, anchor `0`, merge key `0`이었다.
 - WU0-A2는 trigger 내용을 비교하지 않는다. WU0-C는 `workflow["on"]`만 사용하지 말고 AST 또는 YAML 1.1 boolean 차이를 명시적으로 처리해야 한다.
 
@@ -175,20 +176,23 @@ mktemp에서 trigger 제거(WU0-C), checkout ref 과거 SHA(WU0-C), 선행 scrip
 - RED fixture `82f0426`: nested acceptance가 과거 HEAD가 아니라 검토 중 checker·contract를 복제하도록 고쳤다.
 - GREEN `08592fd`: workflow/job/step 폐쇄 key 계약, Psych AST ambiguity 거부, run 줄 경계를 구현했다.
 - GREEN parser correction `5ba09ff`: Ruby 2.6 JSON `object_class` 재정의가 중복 key를 관찰하지 않는 거짓 양성을 독립 시험이 발견했다. 정상 계약 복사본에 duplicate `workflow`를 주입하는 시험과 별도 JSON scanner로 고쳤다. acceptance cleanup도 예기치 않은 종료값을 보존한다.
-- 최종 구현 기준 HEAD: `5ba09ff6d794ccaf1e12ccc84a5aaf9c2d6556d1`.
+- 증거 문서 `af48e4f`: A2 증명 범위와 WU0-B/C/D/E 잔여 위험을 분리했다.
+- 추가 RED `2bc76f7`: `on:`+`true:`가 의미 Hash에서 충돌하지만 exit 0인 반례를 독립 commit으로 고정했다.
+- 추가 GREEN `9791bed`: 같은 Psych `ScalarScanner` 의미를 사용해 원문이 다른 mapping key 충돌도 `safe_load` 전에 exit 2로 거부한다.
+- 최종 구현 기준 HEAD: `9791bedc7cdee8ea5dfb77c43b9312acf916c4ff`.
 
-구현 전 d1b1ebe에서 신규 23종 중 exact if wrapper 한 건을 제외한 빠진 동작이 실패했고, 변조 workflow의 기존 acceptance는 거짓 PASS했다. 구현 뒤 같은 인수 명령은 `CHECKED: 53 / VERDICT: PASS`다. 기존 26개 record는 유지됐고 신규 record가 추가됐다.
+구현 전 d1b1ebe에서 신규 23종 중 exact if wrapper 한 건을 제외한 빠진 동작이 실패했고, 변조 workflow의 기존 acceptance는 거짓 PASS했다. 첫 GREEN은 `CHECKED: 53`, 의미 중복 RED 추가 뒤 최종 인수 명령은 `CHECKED: 54 / VERDICT: PASS`다. 기존 26개 record는 유지됐고 신규 record가 추가됐다.
 
 ### G 필수 검증
 
-다음 명령을 HEAD `5ba09ff`에서 직접 실행했다. 전부 exit `0`이다.
+다음 명령을 최종 구현 HEAD `9791bed`에서 다시 직접 실행했다. 전부 exit `0`이다.
 
 ```text
 bash scripts/verify/check-ci-step-integrity.sh
   PASS: workflow context와 보호 CI job·step exact 계약 일치
   CHECKED: 23
 bash scripts/acceptance-ci-step-integrity.sh
-  CHECKED: 53
+  CHECKED: 54
   VERDICT: PASS
 bash scripts/acceptance-semantic-mutations.sh
   CHECKED: 10
@@ -213,9 +217,9 @@ bash verify.sh
 - 변경 shell 2개 `bash -n`: PASS.
 - JSON 정상 exit 0, 실제 정상 계약 duplicate `workflow` exit 2와 `중복 object key` 출력: PASS.
 - YAML 정상 exit 0, duplicate root `name` exit 2, anchor/alias/merge exit 2: PASS.
-- Psych 3.1.0 재확인: `ON_STRING=false ON_TRUE=true TRUE_VALUE_CLASS=Hash`.
-- `git diff --check`: PASS. diff는 +572/-84, 총 656줄로 3,000 이하.
-- 직접 작성 파일 최대 337줄, 함수 최대 45줄. 600/601과 100/101 경계 판정도 기대값과 일치했다.
+- Psych 3.1.0 재확인: `ON_STRING=false ON_TRUE=true TRUE_VALUE_CLASS=Hash`; `on+true`, `on+yes`, `01+1`, `null+~` 의미 중복은 exit 2다.
+- `git diff --check`: PASS. 첫 구현 HEAD `5ba09ff`의 diff는 +572/-84였다.
+- 구현 HEAD의 base diff는 +663/-84, 총 747줄로 3,000 이하이고 직접 작성 파일 최대 339줄, 함수 최대 45줄이다. 600/601과 100/101 경계 판정도 기대값과 일치했다.
 - R2: mktemp clone에서 JSON duplicate 거부 한 줄을 비활성화하자 `acceptance-ci-step-integrity.sh`가 exit 1, `VERDICT: FAIL`로 변했다.
 - R4: `verify.yml:226` → acceptance `CHECKER` 선언 12행·실행 40/117행 → checker → mechanism registry 61~71행의 CI/manual 기록을 직접 대조했고 registry/AC-M 원명령이 통과했다.
 
@@ -238,4 +242,26 @@ bash verify.sh
 
 ### V1 / V2
 
-구현·G가 끝났으므로 다음 단계에서 실제 `env -u ANTHROPIC_API_KEY claude -p` V1의 명령·모델·session·시각·exit·전문·artifact SHA-256을 추가한다. 그 뒤 구현 맥락을 상속하지 않은 Codex V2가 V1의 file:line과 명령을 다시 실행하고 양방향 반박을 추가한다.
+#### Claude V1 — PASS
+
+- 실제 호출: `env -u ANTHROPIC_API_KEY claude -p ... --dangerously-skip-permissions --tools Bash,Read,Grep --output-format json --model sonnet --effort high`.
+- 모델: `claude-sonnet-5`; session ID: `26F1A62C-B43A-498D-A606-258098D832D1`; permission denial `0`; terminal reason `completed`; 두 호출 모두 exit `0`.
+- 시작: UTC `2026-08-25T19:12:57Z`, KST `2026-08-26T04:12:57+0900`; 보완 종료: UTC `2026-08-25T19:32:15Z`, KST `2026-08-26T04:32:16+0900`.
+- 최초 prompt SHA-256: `25e16ffbac671ed96d7d8471af76f95a7c267bd4d3d3bd65bfd2c243a65f447e`; 보완 prompt: `b97b31d92870ec8570b9a86a816329f46e20e18f5d88af755613605c17beea13`.
+- 전체 raw tool call/output transcript: `/Users/kangsangmo/.claude/projects/-Users-kangsangmo-Desktop-Valuehire-v6-worktrees-wu0a2-ci-static-context/26F1A62C-B43A-498D-A606-258098D832D1.jsonl`, 278줄/580,159 bytes, SHA-256 `84a6e519e293206b7c12ed0b1a197f1f9a0f65f04e279d01216acd3e4d1deec5`.
+- 최초 답변은 긴 acceptance 출력을 `...`로 축약했다. 같은 세션 보완에서 “raw transcript에는 전문, 최종 답변은 발췌”라고 정정하고 fake PASS/CHECKED runner exit 0과 no-op checker runner exit 1을 직접 재실행했다.
+- V1은 `on+true` 의미 중복 exit 2, CHECKED 54, 필수 명령, WU0-D triple mutation과 B/C/E 비범위를 직접 실행하고 `VERDICT: PASS`로 A2에 한정했다.
+
+#### 새 맥락 Codex V2 — PASS
+
+- 구현 맥락을 상속하지 않은 새 verifier가 HEAD `9791bed`에서 V1 file:line과 필수 명령을 재실행했다.
+- checker 23, CI acceptance 54, semantic 10, registry 13, AC-M 31, principles 34, docs, verify, bash syntax, diff check가 모두 exit 0이었다.
+- 별도 `on+yes`, `01+1` 의미 중복은 exit 2; fake PASS, trigger/checkout/setup, permissions, triple mutation known-gap은 문서 귀속대로 재현됐다.
+- V1의 최초 텍스트 축약은 보고 형식 결함이지만 raw transcript 보존과 명시적 보완 정정 뒤 실질 T 판정은 일치한다고 보아 `VERDICT: PASS`로 동의했다.
+
+#### 별도 humanreview — APPROVE
+
+- 첫 review의 `on+true` REQUEST_CHANGES를 RED/GREEN으로 보정한 뒤 새 read-only review를 실행했다.
+- 최종 review는 quoted/unquoted, `on+yes`, `null+~`, `01+1`, explicit tag, nested YAML/JSON duplicate를 mktemp에서 공격해 모두 exit 2를 확인했다.
+- blocking finding은 0개다. 유일한 LOW는 이 goal의 HEAD/CHECKED/V1/V2 기록 지연이었고 이 commit에서 정정한다.
+- 판정은 WU0-A2에만 `APPROVE`; GitHub 원격 실행, branch protection, SHIP, merge-ready는 `UNVERIFIED`다.
