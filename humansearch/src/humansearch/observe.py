@@ -66,7 +66,14 @@ def select_single_target(
         if not isinstance(candidate, dict) or candidate.get("type") != "page":
             continue
         url = candidate.get("url")
-        if isinstance(url, str) and _origin(url) in allowed_origins:
+        if not isinstance(url, str):
+            continue
+        # `_origin()` 은 거부를 빈 문자열로 표현한다. 그 값을 허용목록과 그냥 비교하면
+        # 허용목록에 빈 문자열이 섞이는 순간 **거부가 곧 허용이 된다**. 계약 검증이 지금은
+        # 그 상태를 막지만, 거부값을 허용 판정에서 명시적으로 빼는 것이 그 방어에 기대지
+        # 않는 유일한 방법이다(Codex 적대 검증 지적).
+        origin = _origin(url)
+        if origin and origin in allowed_origins:
             matching.append(candidate)
     if len(matching) != 1:
         raise TargetSelectionError(
