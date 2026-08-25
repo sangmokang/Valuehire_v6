@@ -202,10 +202,10 @@ main(argv: Sequence[str] | None = None) -> int
 | 게이트 | 상태 | 계약 |
 |---|---|---|
 | 0 시작 자격 | PASS | 원격·PR·지문·과거 증거·실제 결함 재현. `session-status` 종료값 0. |
-| 1 Goal | IN_PROGRESS | 이 문서와 EARS/counter-AC/입출력·오류·경계 계약을 먼저 커밋. |
-| 2 RED | NOT_RUN | 격리 worktree에서 실제 `main()` 경로 시험을 추가하고 누락 동작 때문에 실패. |
-| 3 GREEN | NOT_RUN | RED 시험 불변 상태에서 `_origin()` 최소 변경. |
-| 3.5 제품 배선 | NOT_RUN | `main→observe_once→select_single_target→_origin` 실행 증명. |
+| 1 Goal | PASS | Goal 선행 커밋 `959889415d50f243d409928df66684e580125492`. |
+| 2 RED | PASS | RED 커밋 `c011fcca111d1a61eacd473ddc082315b04fd812`, 7 failed/11 passed. |
+| 3 GREEN | PASS | RED 시험 SHA-256 불변 상태에서 `_origin()` 최소 변경, 18 passed. |
+| 3.5 제품 배선 | PASS | `main→observe_once→select_single_target→_origin` 실행 시험으로 증명. |
 | 4 전체 검증 | NOT_RUN | 사용자 지정 원명령, 0개·500/501·600/601·코드 보호 뮤테이션. |
 | 5 CHECKPOINT | NOT_RUN | G/V1/V2/T 일치 뒤 로컬 안전 커밋. push·PR은 금지. |
 | 6 병합 뒤 정리 | NOT_RUN | 이번 범위 밖. |
@@ -217,12 +217,12 @@ main(argv: Sequence[str] | None = None) -> int
 
 | 항목 | RED | GREEN | 시험 불변 |
 |---|---|---|---|
-| malformed only 안전 실패 | NOT_RUN | NOT_RUN | RED 커밋 뒤 기대값 변경 금지 |
-| 합성 민감 표식 비노출 | NOT_RUN | NOT_RUN | RED 커밋 뒤 금지 문자열 변경 금지 |
-| 두 순서와 title 무관 선택 | NOT_RUN | NOT_RUN | RED 커밋 뒤 사례 삭제 금지 |
-| 승인 0개/2개 기존 오류 | 기존 직접 시험 PASS, 신규 main 시험 NOT_RUN | NOT_RUN | 기존 시험 약화 금지 |
-| 파싱 밖 ValueError 전파 | NOT_RUN | NOT_RUN | 넓은 catch 금지 |
-| 정적 경로/query/fragment 회귀 | 기존 시험 존재 | NOT_RUN | 기존 기대값 불변 |
+| malformed only 안전 실패 | `ValueError`, RED 실패 | PASS | RED 커밋 뒤 기대값 불변 |
+| 합성 민감 표식 비노출 | `ValueError`, RED 실패 | PASS | RED 커밋 뒤 금지 문자열 불변 |
+| 두 순서와 title 무관 선택 | 네 사례 모두 RED 실패 | 네 사례 PASS | RED 커밋 뒤 사례 불변 |
+| 승인 0개/2개 기존 오류 | 0개 PASS, malformed 포함 2개는 RED 실패 | 둘 다 PASS | 기존 시험 약화 없음 |
+| 파싱 밖 ValueError 전파 | PASS | PASS | 넓은 catch 없음 |
+| 정적 경로/query/fragment 회귀 | 기존 시험 PASS | PASS | 기존 기대값 불변 |
 
 → RED 커밋 뒤에는 시험 파일과 기대값을 바꾸지 않는다. GREEN은 제품 코드 한 경계만 바꿔 같은
 시험을 통과시켜야 한다.
@@ -242,7 +242,8 @@ main(argv: Sequence[str] | None = None) -> int
 | 2026-08-25T19:50:49+0900 | `c59bad7b` | 기준선 26개 이름별 진단 | 0(진단 루프) | 24 PASS, 2 비필수 환경 실패 |
 | 2026-08-25T19:55:51+0900 | `c59bad7b` | 두 원칙 파일 직접 읽기·지문 | 0 | PASS |
 | - | - | `brief-lint.sh` | - | SKIPPED: 저장소에 스크립트 없음, 사람 §8 감사 필수 |
-| - | - | 사용자 지정 targeted pytest | - | NOT_RUN |
+| 2026-08-25T20:07:30+0900 | `95988941` | 사용자 지정 targeted pytest RED | 1 | 7 failed, 11 passed |
+| 2026-08-25T20:14:36+0900 | `c011fcca` + 제품 diff | 사용자 지정 targeted pytest GREEN | 0 | 18 passed |
 | - | - | 전체 pytest/ruff/mypy | - | NOT_RUN |
 | - | - | 세 HumanSearch gate | - | NOT_RUN |
 | - | - | `bash verify.sh`, `git diff --check` | - | NOT_RUN |
@@ -817,6 +818,40 @@ PASS: no secret-pattern match in any tracked file, .env not tracked
   동일하며 제품 구현은 아직 바꾸지 않았다.
 - RED 동결 대상 시험 파일 SHA-256:
   `7f62931a35417d148caf325921b9b6a19834d6d6976d613579a2c186e9fc2115`
+
+### GREEN 최소 변경과 원문
+
+- 시각: `2026-08-25T20:14:36+0900`
+- 기준 HEAD: RED `c011fcca111d1a61eacd473ddc082315b04fd812`
+- 제품 변경: `_origin()`이 자기 `urlsplit(url)` 호출에서 난 `ValueError`만 `""`로 정상화한다.
+- 금지 변경 확인: `main()` 예외 목록, 함수 시그니처, 공개 export, RED 시험 기대값은 불변이다.
+- RED 시험 파일 SHA-256: RED와 같은
+  `7f62931a35417d148caf325921b9b6a19834d6d6976d613579a2c186e9fc2115`.
+
+명령:
+
+```text
+cd humansearch && uv run --no-sync pytest -q tests/test_observe_boundary.py tests/test_observe_adversarial_output.py
+```
+
+종료값 `0`, 전체 출력:
+
+```text
+..................                                                       [100%]
+18 passed in 0.22s
+```
+
+같은 시점 정적 검사:
+
+```text
+$ cd humansearch && uv run --no-sync ruff check src tests
+All checks passed!
+$ cd humansearch && uv run --no-sync mypy src
+Success: no issues found in 9 source files
+```
+
+→ RED에서 동일 호출 경로로 실패하던 일곱 사례가 시험 변경 없이 모두 통과했고, 파싱 경계 밖
+`ValueError` 전파 및 정상 URL 경로 보존도 함께 통과했다.
 
 ## 적대 검증 로그
 

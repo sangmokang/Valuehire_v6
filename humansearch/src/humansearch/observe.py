@@ -241,7 +241,10 @@ def _fetch_targets(contract: MarkerContract, port: int) -> list[object]:
 
 
 def _origin(url: str) -> str:
-    parsed = urlsplit(url)
+    try:
+        parsed = urlsplit(url)
+    except ValueError:
+        return ""
     if parsed.scheme != "https" or not parsed.netloc:
         return ""
     return f"{parsed.scheme}://{parsed.netloc}"
