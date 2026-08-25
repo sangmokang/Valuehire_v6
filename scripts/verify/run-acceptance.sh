@@ -82,7 +82,9 @@ if [ "$rc" -ne 0 ]; then
 fi
 
 # 종료값 0 인데 판정 근거가 없다 — 이것이 exit 0 치환이 통과하던 구멍이다.
-pass_lines=$(grep -c '^PASS:' "$out")
+# 일부 기계 판정기는 개별 PASS 줄 대신 최종 VERDICT 한 줄만 낸다. 두 형식은 정확히
+# 고정하되, 설명문 안의 PASS 부분 문자열은 판정으로 세지 않는다.
+pass_lines=$(grep -Ec '^(PASS:|VERDICT: PASS$)' "$out")
 if [ "$pass_lines" -lt 1 ]; then
   echo "FAIL(run-acceptance): path $target_id 이 종료값 0 이지만 판정을 한 건도 내놓지 않았다."
   echo "  실행됐다는 사실은 검사했다는 증거가 아니다 — 본문이 비었거나 조기 종료했을 수 있다."

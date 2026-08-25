@@ -106,18 +106,28 @@ for kind in exit-zero true-only noop empty echo-only fake-pass-output; do
 done
 
 # ── 통과 쪽: 손대지 않은 실제 인수 검사는 그대로 합격해야 한다 ───────────────
-# 전량 실행은 CI 몫이다(중복 실행 비용). 여기서는 외부 의존이 없는 것 하나로 확인한다.
-sample="scripts/acceptance-guard-global-skill-files.sh"
-if [ -f "$sample" ]; then
+# 전량 실행은 CI 몫이다(중복 실행 비용). 여기서는 개별 PASS 형식과 최종 VERDICT 형식을
+# 하나씩 실행해 래퍼가 정상 출력을 과잉 차단하지 않는지 확인한다.
+samples=(
+  "scripts/acceptance-guard-global-skill-files.sh"
+  "scripts/acceptance-principles-check.sh"
+)
+sample_failures=""
+for sample in "${samples[@]}"; do
+  if [ ! -f "$sample" ]; then
+    sample_failures="$sample_failures missing:$(basename "$sample")"
+    continue
+  fi
   sample_rc=0
   bash "$RUNNER" "$sample" >/dev/null 2>&1 || sample_rc=$?
-  if [ "$sample_rc" -eq 0 ]; then
-    record 0 "정상 인수 검사 통과" "$(basename "$sample") exit=0 (과잉 차단 없음)"
-  else
-    record 1 "정상 인수 검사 통과" "$(basename "$sample") exit=$sample_rc — 래퍼가 정상 검사를 막는다"
+  if [ "$sample_rc" -ne 0 ]; then
+    sample_failures="$sample_failures $(basename "$sample"):exit=$sample_rc"
   fi
+done
+if [ -z "$sample_failures" ]; then
+  record 0 "정상 인수 검사 통과" "PASS/VERDICT 출력 표본 ${#samples[@]}개 exit=0 (과잉 차단 없음)"
 else
-  record 1 "정상 인수 검사 통과" "표본 없음 — $sample"
+  record 1 "정상 인수 검사 통과" "실패:$sample_failures"
 fi
 
 # ── 래퍼 자신의 fail-closed ──────────────────────────────────────────────────

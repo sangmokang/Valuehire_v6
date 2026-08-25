@@ -121,6 +121,7 @@ When `run-acceptance.sh`가 인수 검사를 실행할 때, 시스템은 `PASS:`
 - 공격 mutation harness: 첫 실행에서 세미콜론 분할만 제거한 불충분한 변이가 생산 정규식의 `[^;]*` 이중 방어 때문에 살아남았다. harness를 문장 분할과 정규식 경계를 함께 복귀시키는 실제 회귀로 교정한 뒤 full 재실행은 exit 0, `MUTATIONS_CHECKED: 12`, `VERDICT: PASS`였다.
 - 정적 검증: 변경 shell의 `bash -n`, `shellcheck -S warning`, `git diff --check` 모두 exit 0. 변경 직접 작성 파일은 103~512줄로 600줄 hard limit 안이다.
 - 통합 RED: 강화된 runner가 `check-pre-push-runtime.sh`의 출력 전용 정상 stub 두 개를 거부해 principles가 exit 1, `CHECKED: 0`이었다. 두 stub에 자기 파일 존재 판정을 추가한 뒤 principles를 다시 실행한다.
+- 커밋 후 통합 RED: runner가 판정 줄을 `^PASS:`로만 제한해 `VERDICT: PASS` + `CHECKED: 34` 형식의 정상 principles를 exit 1로 오차단했다. 정확한 `PASS:` 또는 정확한 `VERDICT: PASS`만 허용하고 semantic 정상 표본에 두 출력 형식을 모두 추가한다.
 - 다음 독립 실행 프롬프트: `docs/engineering/repository-data-protection-strict-l3-next-delta-prompt-2026-08-26.md`. 기존 Strict L3 문서의 대체본이 아니라 마지막에 붙이는 추가 델타다.
 
 위 수치는 커밋 전 targeted 증거다. Git index blob을 읽는 scanner의 authoritative 현재/history/all과 전체 로컬 게이트는 최종 로컬 커밋 SHA에서 다시 실행하며, 그 전에는 완료 근거로 승격하지 않는다.
