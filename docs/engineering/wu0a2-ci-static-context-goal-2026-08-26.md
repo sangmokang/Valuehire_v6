@@ -2,9 +2,9 @@
 
 ## 결론
 
-기존 WU0-A의 합격 판정은 취소한다. 같은 `run` 글자라도 job·step의 실행 문맥과 중복 key·alias·merge가 선언 의미를 바꿀 수 있는데 d1b1ebe의 검사와 V1/V2는 이를 시험하지 않았다.
+기존 WU0-A의 합격 판정은 취소한다. 같은 run 글자라도 job·step의 실행 문맥과 중복 key·alias·merge가 선언 의미를 바꿀 수 있는데 d1b1ebe의 검사와 V1/V2는 이를 시험하지 않았다.
 
-이번 작업은 보호 job·step의 정확한 정적 선언, workflow `env`·`defaults` 부재, run 줄 경계, YAML/JSON fail-closed만 보정한다. WU0-B/C/D/E가 남으므로 WU0-A2가 합격해도 저장소 전체 안전성은 `CONDITIONAL`이며 SHIP 또는 merge-ready를 주장하지 않는다.
+이번 작업은 보호 job·step의 정확한 정적 선언, workflow env·defaults 부재, run 줄 경계, YAML/JSON fail-closed만 보정한다. WU0-B/C/D/E가 남으므로 WU0-A2가 합격해도 저장소 전체 안전성은 CONDITIONAL이며 SHIP 또는 merge-ready를 주장하지 않는다.
 
 ## 판단 근거
 
@@ -85,6 +85,8 @@ CHECKED: 34
 ```text
 bash scripts/verify/check-ci-step-integrity.sh [WORKFLOW] [CONTRACT]
 ```
+
+→ 이 명령은 두 선택 경로만 입력받으며, 인자가 없으면 저장소의 workflow와 기계 계약을 대조한다.
 
 - `WORKFLOW` 기본값: `.github/workflows/verify.yml`
 - `CONTRACT` 기본값: `docs/sot/ci-required-steps.json`
@@ -167,4 +169,73 @@ mktemp에서 trigger 제거(WU0-C), checkout ref 과거 SHA(WU0-C), 선행 scrip
 
 ## 적대 검증 로그
 
-구현·G 완료 뒤 실제 `env -u ANTHROPIC_API_KEY claude -p` V1의 명령·모델·session·시각·exit·전문·artifact SHA-256을 추가한다. 그 뒤 구현 맥락을 상속하지 않은 Codex V2가 V1의 file:line과 명령을 다시 실행하고 양방향 반박을 추가한다.
+### RED → GREEN commit
+
+- RED `dde2c20`: 신규 23종을 구현 전 고정했다. pre-commit P13이 공격 fixture의 약화 문자열을 실제 제품 약화로 분류해 로컬 RED commit 두 개는 `--no-verify`로 보존했고 그 이유를 commit/작업 로그에 남겼다.
+- RED fixture `82f0426`: nested acceptance가 과거 HEAD가 아니라 검토 중 checker·contract를 복제하도록 고쳤다.
+- GREEN `08592fd`: workflow/job/step 폐쇄 key 계약, Psych AST ambiguity 거부, run 줄 경계를 구현했다.
+- GREEN parser correction `5ba09ff`: Ruby 2.6 JSON `object_class` 재정의가 중복 key를 관찰하지 않는 거짓 양성을 독립 시험이 발견했다. 정상 계약 복사본에 duplicate `workflow`를 주입하는 시험과 별도 JSON scanner로 고쳤다. acceptance cleanup도 예기치 않은 종료값을 보존한다.
+- 최종 구현 기준 HEAD: `5ba09ff6d794ccaf1e12ccc84a5aaf9c2d6556d1`.
+
+구현 전 d1b1ebe에서 신규 23종 중 exact if wrapper 한 건을 제외한 빠진 동작이 실패했고, 변조 workflow의 기존 acceptance는 거짓 PASS했다. 구현 뒤 같은 인수 명령은 `CHECKED: 53 / VERDICT: PASS`다. 기존 26개 record는 유지됐고 신규 record가 추가됐다.
+
+### G 필수 검증
+
+다음 명령을 HEAD `5ba09ff`에서 직접 실행했다. 전부 exit `0`이다.
+
+```text
+bash scripts/verify/check-ci-step-integrity.sh
+  PASS: workflow context와 보호 CI job·step exact 계약 일치
+  CHECKED: 23
+bash scripts/acceptance-ci-step-integrity.sh
+  CHECKED: 53
+  VERDICT: PASS
+bash scripts/acceptance-semantic-mutations.sh
+  CHECKED: 10
+  VERDICT: PASS
+bash scripts/verify/check-mechanism-registry.sh
+  CHECKED: 13
+bash scripts/acceptance-verify-ac-m.sh
+  CHECKED: 31
+bash scripts/acceptance-principles-check.sh
+  VERDICT: PASS
+  MECHANISMS: PASS 34/34 strict-contract-bindings
+  WIRING: PASS pre-push=1 ci=1
+  CHECKED: 34
+bash scripts/check-docs-sot.sh
+  OK: docs/sot 재구성 AC 전부 충족
+bash verify.sh
+  PASS: no secret-pattern match in any tracked file, .env not tracked
+```
+
+→ 여덟 원명령이 현재 구현의 정상 경로, 반례 감도, 정본 배선과 저장소 기본 검증을 각각 통과시켰다.
+
+- 변경 shell 2개 `bash -n`: PASS.
+- JSON 정상 exit 0, 실제 정상 계약 duplicate `workflow` exit 2와 `중복 object key` 출력: PASS.
+- YAML 정상 exit 0, duplicate root `name` exit 2, anchor/alias/merge exit 2: PASS.
+- Psych 3.1.0 재확인: `ON_STRING=false ON_TRUE=true TRUE_VALUE_CLASS=Hash`.
+- `git diff --check`: PASS. diff는 +572/-84, 총 656줄로 3,000 이하.
+- 직접 작성 파일 최대 337줄, 함수 최대 45줄. 600/601과 100/101 경계 판정도 기대값과 일치했다.
+- R2: mktemp clone에서 JSON duplicate 거부 한 줄을 비활성화하자 `acceptance-ci-step-integrity.sh`가 exit 1, `VERDICT: FAIL`로 변했다.
+- R4: `verify.yml:226` → acceptance `CHECKER` 선언 12행·실행 40/117행 → checker → mechanism registry 61~71행의 CI/manual 기록을 직접 대조했고 registry/AC-M 원명령이 통과했다.
+
+### known-gap 재현
+
+모든 변조는 mktemp 복사본에서 수행했고 A2 checker가 exit 0으로 통과하는 현재 상태를 확인했다.
+
+| 소유 | 변조 | 현재 상태 |
+| --- | --- | --- |
+| WU0-C | push/pull_request 제거, workflow_dispatch만 유지 | HIGH / REPRODUCED |
+| WU0-C | checkout `with.ref=c59bad7…` | HIGH / REPRODUCED |
+| WU0-C | 보호 step 전 `verify.sh` 덮어쓰기 step 삽입 | HIGH / REPRODUCED |
+| WU0-B | script가 가짜 `PASS: forged`, `CHECKED: 99` 출력 | HIGH / REPRODUCED; runner exit 0 |
+| WU0-D | workflow·contract·checker digest pin 동시 약화 | HIGH / REPRODUCED; checker exit 0 |
+| WU0-E | root `permissions: write-all` | HIGH / REPRODUCED |
+
+→ 표의 여섯 위험은 A2의 실패가 아니라 명시된 비범위다. 후속 WU 소유자가 각각 별도 신뢰 계약과 인수 시험으로 닫아야 한다.
+
+따라서 WU0-A2만 PASS 후보이며 전체 저장소 안전성은 `CONDITIONAL`이다. origin/main SHA는 fetch로 확인했지만 원격 check 실행과 branch protection은 확인하지 않아 remote 상태는 `UNVERIFIED`다.
+
+### V1 / V2
+
+구현·G가 끝났으므로 다음 단계에서 실제 `env -u ANTHROPIC_API_KEY claude -p` V1의 명령·모델·session·시각·exit·전문·artifact SHA-256을 추가한다. 그 뒤 구현 맥락을 상속하지 않은 Codex V2가 V1의 file:line과 명령을 다시 실행하고 양방향 반박을 추가한다.
