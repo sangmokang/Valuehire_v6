@@ -234,10 +234,10 @@ def _fetch_targets(contract: MarkerContract, port: int) -> list[object]:
         if response.status != 200:
             raise ObservationError("target list request was rejected")
         body = response.read(1_048_577)
-    # `InvalidURL` 은 `HTTPException` 의 하위형이라 생성자를 try 안에 넣은 것만으로 잡힌다.
-    # `ValueError` 를 여기 더 넣어봤자 계약 검증(`_is_loopback_address`·`_valid_targets_path`)이
-    # 이미 그 입력을 막아 도달하지 않는다 — 변조 시험으로 확인했으므로 추측 방어를 남기지 않는다.
-    except (OSError, HTTPException) as exc:
+    # `InvalidURL` 은 `HTTPException` 의 하위형이고, 호스트 IDNA 인코딩 실패는
+    # `UnicodeEncodeError`(= `ValueError` 하위형)로 온다 — `OSError` 도 `HTTPException` 도
+    # 아니다. 세 갈래를 모두 이 함수의 닫힌 실패로 흡수한다.
+    except (OSError, HTTPException, ValueError) as exc:
         raise ObservationError("target list request failed") from exc
     finally:
         if connection is not None:
@@ -323,10 +323,11 @@ def _valid_targets_path(value: object) -> TypeGuard[str]:
 
 
 def _is_loopback_address(value: str) -> bool:
-    # 인쇄 불가 문자를 먼저 거른다: `ip_address()` 는 IPv6 scope id 를 받아들이면서 그 안의
-    # 개행·탭을 거르지 않아 `ip_address("::1%\n")` 이 루프백으로 판정된다(실측). 주소 리터럴에
-    # 인쇄 불가 문자가 들어갈 자리는 없다.
-    if not value.isprintable():
+    # `ip_address()` 는 IPv6 scope id 를 그대로 받아들이며 그 안의 개행·탭·비ASCII 문자를
+    # 거르지 않는다 — `ip_address("::1%\n")` 도 `ip_address("::1%<히브리문자>")` 도 루프백으로
+    # 판정된다(실측). 전자는 HTTP 요청 줄에서, 후자는 호스트 IDNA 인코딩에서 터진다.
+    # 주소 리터럴은 인쇄 가능한 ASCII 다 — 두 조건이 서로를 대신하지 못한다.
+    if not value.isprintable() or not value.isascii():
         return False
     try:
         return ip_address(value).is_loopback
