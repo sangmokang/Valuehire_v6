@@ -1,16 +1,16 @@
 {
   "slug": "hs-observe-url-crash",
   "base_sha": "c59bad7b160c473cda5545e76e6fa6bcc711a7ea",
-  "head_sha": "20a4b38bac795942c4eefe713c26ef1baad647fa",
+  "head_sha": "fbaf4b369b7d32f558dc4e596b6e028efce3f1e3",
   "goal": "docs/engineering/hs-observe-url-crash-goal-2026-08-25.md",
   "generator": {
     "role": "G",
-    "work_units": 12,
+    "work_units": 16,
     "evidence": [
       {
         "command": "bash scripts/acceptance-hs-gates.sh",
         "exit_code": 0,
-        "artifact": "COLLECTED: 139 (기준선 81)"
+        "artifact": "COLLECTED: 158 (기준선 81)"
       },
       {
         "command": "bash verify.sh",
@@ -28,14 +28,14 @@
         "artifact": "PYTHONIOENCODING=ascii/latin-1/utf-8 세 값 모두 STATE=drifted TAB=- ROLES=0 CONTRACT_VALID=false · exit 2 · stderr 0줄 · 누출 0건"
       },
       {
-        "command": "자체 퍼징 1,512 입력 → main()",
+        "command": "docs/engineering/evidence/hs-observe-url-crash/fuzz_main.py (seed 20260825, 추적 파일)",
         "exit_code": 0,
-        "artifact": "crash=0 bad_exit=0 multiline=0 — 단 in-process 실행이라 실제 print() 인코더는 통과하지 않았다(V2 지적)"
+        "artifact": "seed=20260825 total=1512 crash=0 bad_exit=0 multiline=0"
       },
       {
-        "command": "변조 24종(G 20 + V2 신규 4) 전량",
+        "command": "docs/engineering/evidence/hs-observe-url-crash/mutation_sweep.py (추적 파일)",
         "exit_code": 0,
-        "artifact": "대조군 62 passed exit 0 / 살아남은 변조 0건 — 단 G 가 고른 20종만으로는 V2 의 N2·N7·N21 이 살아남았고 WU9 에서 닫았다. '살아남은 변조 0건'은 언제나 '이 목록에 한해서'다"
+        "artifact": "대조군 118 passed exit 0 · 변조 24종 · 생존 1종('CDP TimeoutError 제거' — OSError 하위형이라 구분 불가). 스크립트가 기대 생존 집합까지 스스로 검사한다"
       },
       {
         "command": "런타임 배선 추적(sys.settrace)",
@@ -258,9 +258,97 @@
   },
   "status": "READY_FOR_PUSH",
   "remaining_open_items": [
-    "format_observation_line 의 TAB 필드에 임의 문자열 심기 — CLI 경로 도달 불가, 오너 결정 필요",
-    "_valid_origin 이 포트 0 을 허용 — 별도 결정",
-    "실패 원인이 STATE=drifted 로 뭉개짐 — base 부터 동일한 설계",
-    "stdout 파이프 조기 종료 시 exit 120 + stderr 2줄 — 입력이 아니라 소비자 조건"
-  ]
+    "실패 원인이 STATE=drifted 로 뭉개짐 — CAUSE 코드 신설은 출력 어휘 결정(오너)",
+    "12 WU 분할 여부 — 나누면 찾은 반례가 병합 전에 닫히지 않는다(오너)",
+    "format_observation_line 의 TAB 필드에 임의 문자열 심기 — CLI 도달 불가(오너)",
+    "_valid_origin 이 포트 0 을 허용 — 별도 결정(오너)",
+    "stdout 파이프 조기 종료 시 exit 120 — 입력이 아니라 소비자 조건(오너)"
+  ],
+  "humanreview": {
+    "tool": "/humanreview (Claude, 읽기 전용)",
+    "status": "REQUEST_CHANGES → 조치 완료",
+    "findings": [
+      {
+        "id": "HR-1",
+        "severity": "높음",
+        "what": "contract_valid 가드가 사라지면 계약이 깨진 화면이 authenticated(exit 0)로 보고된다 — 지키는 시험 0건",
+        "regression": false,
+        "disposition": "WU13 시험 11건 추가"
+      },
+      {
+        "id": "HR-2",
+        "severity": "높음",
+        "what": "역할 중복 검사가 사라지면 중복 주장 화면이 authenticated(exit 0)로 보고된다 — 지키는 시험 0건",
+        "regression": false,
+        "disposition": "WU13"
+      },
+      {
+        "id": "HR-3",
+        "severity": "중간",
+        "what": "읽기 한도(1MiB) 검사에 닿는 시험 0건",
+        "disposition": "WU13"
+      },
+      {
+        "id": "HR-4",
+        "severity": "중간",
+        "what": "주소 자리 타입 검사에 닿는 시험 0건",
+        "disposition": "WU13"
+      },
+      {
+        "id": "HR-5",
+        "severity": "없음",
+        "what": "matching[0]→matching[-1] 은 len==1 보장으로 등가",
+        "disposition": "증명하고 남김"
+      }
+    ],
+    "my_errors_found": [
+      "변조 측정에서 대조군(16 실패)을 빼지 않을 뻔했다 — 이 run 에서 두 번째",
+      "검증 중 사장님 크롬(9225)에 읽기 요청을 보냈다 — 읽기 전용이나 하지 않겠다고 한 것을 어겼다"
+    ],
+    "no_regression": "실제 3사 origin(사람인·잡코리아·링크드인)과 실제 경로를 하나도 막지 않음(실측)"
+  },
+  "codex_rescue": {
+    "tool": "/codex:rescue (읽기 전용)",
+    "status": "REQUEST_CHANGES → 1·5·6번 조치 완료, 3·4번은 오너 결정",
+    "findings": [
+      {
+        "id": "CX-1",
+        "severity": "높음",
+        "what": "_origin 의 거부값 '' 이 허용목록과 충돌 — 허용목록에 빈 문자열이 있으면 파싱 실패 주소가 선택된다",
+        "reachable_via_cli": false,
+        "reachable_via_public_api": true,
+        "disposition": "WU14 수정 + 시험 6건"
+      },
+      {
+        "id": "CX-2",
+        "what": "리뷰 중 HEAD 이동",
+        "disposition": "마지막에 SHA 재고정 + CI 재실행"
+      },
+      {
+        "id": "CX-3",
+        "what": "모든 실패가 drifted 로 뭉개짐 — CAUSE 코드를 남겨라",
+        "disposition": "오너 결정(출력 어휘 신설)"
+      },
+      {
+        "id": "CX-4",
+        "what": "12 WU 중 원 요구는 WU1~2뿐, 0f63ef0 까지로 분할하라",
+        "disposition": "오너 결정"
+      },
+      {
+        "id": "CX-5",
+        "what": "시험 2건이 계약 대신 구현 결정을 단언",
+        "disposition": "WU15 교체"
+      },
+      {
+        "id": "CX-6",
+        "what": "퍼징 seed·변조 명세가 저장소에 없어 재현 불가",
+        "disposition": "WU16 — 추적 파일로 이관"
+      },
+      {
+        "id": "CX-7",
+        "what": "현실적 운영 회귀 없음",
+        "disposition": "내 실측과 일치"
+      }
+    ]
+  }
 }
