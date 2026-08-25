@@ -49,7 +49,7 @@ expect_principles() {
   local rc=0 output=""
   checked=$((checked + 1))
   output=$(cd "$CASE" && bash scripts/acceptance-principles-check.sh 2>&1) || rc=$?
-  if [ "$rc" -eq "$wanted" ] && { [ "$wanted" -eq 127 ] || printf '%s\n' "$output" | grep -q "^VERDICT: $expected_word$"; }; then
+  if [ "$rc" -eq "$wanted" ] && { [ "$wanted" -eq 127 ] || grep -q "^VERDICT: $expected_word$" <<< "$output"; }; then
     printf 'PASS: %s %s — %s (exit=%s)\n' "$id" "$description" "$expected_word" "$rc"
   else
     printf 'FAIL: %s %s — expected %s/exit=%s actual exit=%s\n%s\n' \
