@@ -1,7 +1,7 @@
 {
   "slug": "hs-observe-url-crash",
   "base_sha": "c59bad7b160c473cda5545e76e6fa6bcc711a7ea",
-  "head_sha": "fbaf4b369b7d32f558dc4e596b6e028efce3f1e3",
+  "head_sha": "(이 커밋에서 갱신 — push 후 확정)",
   "goal": "docs/engineering/hs-observe-url-crash-goal-2026-08-25.md",
   "generator": {
     "role": "G",
