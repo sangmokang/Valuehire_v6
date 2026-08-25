@@ -1,0 +1,201 @@
+# HumanSearch 관측기 URL 파싱 크래시 — goal (2026-08-25)
+
+등급: **L3** (개인정보 누출 경로 · SOT-30 §1)
+워크트리: `worktrees/hs-observe-url-crash` · 브랜치 `task/hs-observe-url-crash` · base `c59bad7`
+
+## 상위 목표 (1문장)
+
+사람인 탭 하나를 관측할 때, 다른 탭이 만든 이상한 주소 하나 때문에 관측기가 통째로 죽으면서
+주소 일부를 오류 메시지에 그대로 흘리는 일이 없게 한다 — 성공 신호: 어떤 문자열이 주소 자리에
+들어와도 관측기는 계약된 한 줄만 찍고 계약된 종료값(0 또는 2)으로 끝난다.
+
+## 읽은 SOT
+
+- `docs/sot/humansearch-browser-contract.md` §5 (허용 origin — "경로·query에 계정·후보 식별자가
+  있더라도 로그나 증거에 값을 남기지 않는다"), §7 (목표 탭 계약 — 0개·2개 이상이면 시작 금지),
+  §12 (개인정보 경계 — "Git·로그·PR 본문에 원본 내용·후보 식별자를 남기지 않는다")
+- `docs/sot/humansearch-l0-surface-contract.md` (출력 상태 5개 · `DRIFTED` 는 계약 불일치의 결과)
+- `docs/sot/coding-principles.md` P3(조용한 실패 금지) · P5②(순수 판정 함수 = 속성 기반 시험 필수)
+  · P11①(파일 soft 300 / hard 600) · P16(런타임 동작 검사) · P20(0건 처리 의심) · P22(상수 1곳)
+- `docs/sot/verification-commands.md` (이 저장소의 실제 게이트 명령 — `npm` 스크립트 없음)
+
+## 과거 회수 (R4)
+
+- SOT-30이 요구하는 재발 원장 `docs/sot/31-strict-recurrence-ledger.md`는 **이 저장소에 존재하지
+  않는다**(`ls docs/sot/` 실행 확인). 있는 척하지 않고, 이번 건의 재발 방지는 회귀 테스트로만
+  담보한다.
+- 회수한 자기 지침: "정규식·파서는 눈으로 읽지 말고 돌려라" — 그래서 이 문서의 입력 영역 표는
+  전부 실제 `urlsplit` 실행 결과로 채웠고, 검증도 Hypothesis 속성 시험을 포함한다.
+
+## 현재 상태 (추측 금지 · file:line)
+
+`humansearch/src/humansearch/observe.py` 안에서 `urlsplit()`을 감싸지 않고 부르는 곳이 4군데다.
+
+| # | 위치 | 입력 출처 | 도달 경로 |
+|---|---|---|---|
+| 1 | `observe.py:244` `_origin()` | CDP `/json/list`가 준 **다른 탭의 URL** | `observe_once` → `select_single_target:69` |
+| 2 | `observe.py:299` `_privacy_reduced_url()` | 선택된 탭 URL | `observe_once:142`, 공개 API `format_observation_line:118` |
+| 3 | `observe.py:253` `_valid_origin()` | `contracts/humansearch/saramin-markers.json` | `_load_contract:189` |
+| 4 | `observe.py:163` `main()` | 이미 축약된 tab_url | `main` |
+
+`urlsplit()`은 `ValueError`를 던진다(실행 확인, Python 3.14.1):
+
+```
+'https://[::1'                → ValueError: Invalid IPv6 URL
+'https://www.saramin.co.kr＃x' → ValueError: netloc 'www.saramin.co.kr＃x' contains
+                                 invalid characters under NFKC normalization
+```
+
+`main()`은 `except (CdpReadError, ObservationError)`만 잡는다(`observe.py:157`). `ValueError`는
+그 그물에 안 걸린다.
+
+### 재현 (실행 확인 2026-08-25)
+
+`_fetch_targets`가 `url = "https://www.saramin.co.kr＃x/candidates/HONG-GILDONG?token=SECRET"`인
+page 타깃 1개를 돌려주게 하고 `observe.main(["--channel","saramin","--port","9225","--once"])` 실행:
+
+```
+ValueError: netloc 'www.saramin.co.kr＃x' contains invalid characters under NFKC normalization
+EXIT=1
+```
+
+- stdout: **비어 있음** — 계약된 `STATE=... TAB=... ROLES=... CONTRACT_VALID=...` 한 줄이 안 나온다.
+- 종료값: **1** — L0 계약이 정한 값은 0(authenticated) 또는 2뿐이다.
+- stderr: traceback에 **netloc이 원문 그대로** 실린다 → 브라우저 계약 §5·§12 위반.
+
+## 근본 원인
+
+주소 파싱의 **입력 영역이 정의된 적이 없다**. 코드는 "urlsplit은 문자열을 받으면 결과를 준다"는
+암묵 가정 위에 서 있고, 파싱 자체가 실패할 수 있다는 행이 어느 표에도 없다. 그래서 파싱 실패는
+거부(deny)로 흡수되지 못하고 프로세스 밖으로 새어 나간다.
+
+## ① 입력 영역 표 — 주소 문자열 (SOT-30 §3)
+
+명시 입력: URL 문자열 1개, 허용 origin 집합, loggable 경로 집합.
+암묵 입력: 없음(순수 함수 — 네트워크·파일·시계·난수 없음).
+
+| # | 입력 부류 | 예 | `_origin` | `_valid_origin` | `_privacy_reduced_url` |
+|---|---|---|---|---|---|
+| 1 | 정상 https | `https://portal.invalid/home` | origin 반환 | True | 축약 URL |
+| 2 | 스킴 위반 | `http://h/`, `ws://h`, `file:///x` | `""` 거부 | False | (도달 불가·거부) |
+| 3 | netloc 없음 | `https:///p`, `/rel`, `""` | `""` 거부 | False | 빈 결과 |
+| 4 | netloc에 userinfo(`사용자:암호@호스트`) | (리터럴은 비밀 스캔에 걸리므로 생략) | userinfo까지 포함한 문자열 반환 → 허용목록에 그런 값이 못 들어가므로 거부 | False | netloc 그대로(경로만 가림) |
+| 5 | 경로·query에 식별자 | `…/candidates/X?token=S` | origin 반환 | False | 경로 `/...` 로 가림 |
+| 6 | **IPv6 미종결** | `https://[::1` | **현재 크래시** → `""` | **현재 크래시** → False | **현재 크래시** → `""` |
+| 7 | **NFKC 위반 netloc** | `https://exa℀mple.com` | **현재 크래시** → `""` | **현재 크래시** → False | **현재 크래시** → `""` |
+| 8 | **그 외 전부 파싱 불가** | 임의 문자열 | `""` 거부 | False | `""` |
+
+catch-all(8행) 구현 = `ValueError`를 **명시적 거부로 변환**한다. 의미 추정·정상화·다른 파서로의
+자동 전환은 하지 않는다(브라우저 계약 §"주 경로가 실패하면 다른 경로로 자동 전환하지 않고 중단").
+
+## ② 결정 목록 (확정)
+
+| 결정 | 확정값 | 근거 |
+|---|---|---|
+| 파싱 불가 URL은 목표 탭이 되는가 | **아니다** — 후보에서 제외 | 브라우저 계약 §7 "URL의 부분 일치로 추측하지 않는다" |
+| 파싱 불가 URL이 유일 후보였다면 | 후보 0개 → `TargetSelectionError` → `DRIFTED`, exit 2 | §7 "0개면 시작하지 않는다" |
+| 파싱 불가 URL을 화면에 뭐라고 찍나 | 빈 문자열 → `format_observation_line`이 기존대로 `TAB=-` | 새 어휘를 만들지 않는다. §5 "값을 남기지 않는다" |
+| 계약 JSON에 파싱 불가 origin이 있으면 | `ObservationError("allowed origin contract is invalid")` | 기존 fail-closed 경로 재사용 |
+| 오류 메시지에 URL을 넣나 | **아니다** — 어떤 예외 메시지에도 입력 URL을 넣지 않는다 | §12 |
+
+## ③ 표↔테스트 대응
+
+표의 6·7행은 WU1 RED(`tests/test_observe_url_parse_failure.py`), 8행은 WU2 RED
+(`tests/test_observe_url_parse_property.py`)다. 시험 파일을 WU별로 나누는 이유는 P5①(RED 커밋
+이후 테스트 파일 불변)을 WU 단위로도 지키기 위해서다. 1~5행은 기존 시험이 이미 덮는다(`test_observe_boundary.py`,
+`test_observe_adversarial_output.py`). 8행(catch-all)은 Hypothesis 속성 시험으로 덮는다 —
+**임의 텍스트에 대해 세 함수가 절대 예외를 던지지 않는다**는 성질.
+
+## 인수 기준 (EARS)
+
+**AC-1 (WU1)** — 목표 탭 목록에 파싱 불가 URL을 가진 page 타깃이 있을 때, 관측기는 그 타깃을
+후보에서 제외하고, 예외를 프로세스 밖으로 내보내지 않으며, stdout에 계약된 한 줄만 찍고 종료값
+2로 끝난다. 어떤 출력에도 그 URL의 netloc·경로·query가 나타나지 않는다.
+
+- 검증: `uv run pytest tests/test_observe_url_parse_failure.py -q` (exit 0)
+- counter-AC: 수정 코드를 되돌리면(`_origin`의 예외 처리 제거) 이 시험이 반드시 실패한다.
+
+**AC-2 (WU2)** — 계약 JSON의 `allowed_origins`에 파싱 불가 값이 있을 때 `_load_contract`는
+`ObservationError`로 거부하고, `format_observation_line`에 파싱 불가 URL이 들어와도 예외 없이
+`TAB=-`를 찍는다. 그리고 임의 텍스트 입력에 대해 `_origin`·`_valid_origin`·`_privacy_reduced_url`
+셋 다 예외를 던지지 않는다(Hypothesis 속성).
+
+- 검증: `uv run pytest tests/test_observe_url_parse_property.py -q` · `bash scripts/acceptance-hs-gates.sh` (exit 0, 수집 수 > 81)
+- counter-AC: 속성 시험은 수정 전 코드에서 반드시 실패해야 한다(반례를 Hypothesis가 스스로 찾는다).
+
+## 계약 (SDD — 입출력 모양 먼저)
+
+```python
+def _split(url: str) -> SplitResult | None:   # 신설. 파싱 실패 = None. 예외 없음. URL 미포함.
+def _origin(url: str) -> str                  # 불변: 파싱 실패 → ""
+def _valid_origin(value: object) -> bool      # 불변: 파싱 실패 → False
+def _privacy_reduced_url(url, loggable) -> str  # 불변: 파싱 실패 → ""
+```
+
+공개 API 시그니처는 바뀌지 않는다. `humansearch/__init__.py` 내보내기 목록도 바뀌지 않는다.
+
+## R1 작업 분해표
+
+| WU | AC | 파일 | focused 검증 |
+|---|---|---|---|
+| WU1 | AC-1 | `observe.py`(`_split`,`_origin`) + 신규 시험 | `pytest tests/test_observe_url_parse_failure.py` |
+| WU2 | AC-2 | `observe.py`(`_valid_origin`,`_privacy_reduced_url`) + 신규 속성 시험 | `pytest tests/test_observe_url_parse_property.py` + `acceptance-hs-gates.sh` |
+
+WU1 GREEN 커밋 전 WU2 착수 금지(R5).
+
+## R1 예외 케이스 표 (작업 진행 중 만날 수 있는 상황)
+
+| 상황 | 처리 |
+|---|---|
+| `uv sync` 실패 / 네트워크 없음 | 명시적 중단 + 사유 보고. 시험 건너뛰기 금지 |
+| ruff/mypy가 새 코드에 불합격 | 자동 처리(코드 수정 후 재실행) |
+| 파일이 P11 hard 600줄 초과 | 명시적 중단 + 분할안 제시 |
+| 기존 시험 81건 중 하나라도 깨짐 | 명시적 중단 — 회귀이므로 원인 회수 |
+| 적대검증이 새 반례 발견 | 같은 PR 회귀 시험으로 편입(R9). 불가하면 중단 보고 |
+| GitHub push·PR 생성 실패 | 명시적 중단 + 사유 보고. merge 시도 금지 |
+| 그 외 전부 | 명시적 중단 + 이 표 갱신안 제시 |
+
+## 게이트 계획
+
+RED 커밋(시험만) → GREEN 커밋(구현만) → `bash scripts/acceptance-hs-gates.sh` →
+`bash scripts/acceptance-hs-gates-mutations.sh` → `bash scripts/acceptance-hs-gates-antiforge.sh` →
+`bash verify.sh` → Codeaudit(읽기 전용) → 적대검증 V1/V2 → push → PR → CI. **merge 안 함.**
+
+## 적대검증 정조준
+
+1. `_split`이 `None`을 돌려줄 때 호출부가 그걸 정말 거부로 쓰는가, 아니면 빈 origin `""`이
+   `allowed_origins`에 우연히 들어 있으면 통과해 버리는가? (계약 JSON에 `""`가 못 들어가는지 확인)
+2. 파싱 실패를 삼키면서 **정상 URL의 거부까지 조용해지지** 않는가 (P3 조용한 실패)
+3. 새 예외 메시지에 URL 조각이 들어가지 않는가
+4. Hypothesis 속성이 실제로 6·7행 같은 반례를 만들 수 있는가 — 아니면 통과가 공허한가
+5. 표 밖의 현실 입력이 남아 있는가 (`urlsplit`이 던질 수 있는 다른 `ValueError` 사유)
+
+## 롤백 절차 (L3)
+
+`git revert <GREEN SHA>` 1개로 되돌아간다. 시험 커밋(RED)은 남겨도 무해하지 않다 — 되돌리면
+시험이 빨개지므로 RED·GREEN 두 커밋을 함께 revert한다. 공개 API·계약 JSON·SOT를 바꾸지 않으므로
+데이터 마이그레이션이나 하위 호환 문제는 없다.
+
+## 영향 반경 (L3)
+
+`humansearch/src/humansearch/observe.py` 1개 파일. 호출자는 CLI(`python -m humansearch.observe`)
+뿐이고, 아직 운영 자동화에 배선되지 않았다(브라우저 계약 §"실제 자동화 코드는 여전히 NOT_RUN").
+따라서 라이브 영향은 CLI 1개 명령의 실패 모드에 한정된다.
+
+## 배포 후 관측 항목 (L3)
+
+- 관측기 종료값이 **1로 끝나는 실행이 0건**이어야 한다(0/2만 정상). 1이 관측되면 이 표에 없는
+  예외가 또 새고 있다는 뜻이다.
+- 관측기 stderr가 **비어 있어야** 한다. 한 줄이라도 있으면 즉시 조사.
+
+## 비범위
+
+- CDP 연결·브라우저 기동·포트 발견(D1 소유, `NOT_RUN`)
+- `_cdp.py`의 websocket URL 검증
+- observe.py의 P11 soft 300줄 초과(현재 312줄) 해소 — 이번 변경으로 ~25줄 늘어난다. hard 600은
+  넘지 않는다. 분할은 별도 요청으로 남긴다(이 PR에서 파일을 쪼개면 diff가 결함 수정을 가린다).
+- 재발 원장 파일 신설
+
+## 적대 검증 로그
+
+(후기록)
