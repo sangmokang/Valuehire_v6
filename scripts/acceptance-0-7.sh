@@ -108,17 +108,22 @@ BASE=$(git rev-parse HEAD)
 # 이 문구 시험의 잡음이 되지 않게 샌드박스 안에서만 성공 스텁으로 바꾼다.
 echo "=== pre-push 예외 안내 실실행 ==="
 git config core.hooksPath /dev/null
+# 2026-08-25: 스텁은 판정 한 줄을 내야 한다. main 이 2026-08-21 에 pre-push 를
+# scripts/verify/run-acceptance.sh 래퍼 경유로 바꿨고, 그 래퍼는 "종료값 0 인데 판정
+# 0건"을 불합격시킨다(exit 0 치환이 통과하던 구멍을 막는 장치다). 조용한 스텁을 쓰면
+# 이 문구 시험이 래퍼의 정당한 차단에 걸려 33개 전부 BLOCKED 가 된다 — 이 시험이
+# 보려는 것은 예외 안내 문구이지 래퍼의 판정 강제가 아니다(그건 semantic-mutations 담당).
 for f in scripts/acceptance-*.sh; do
   case "$(basename "$f")" in
     acceptance-0-7.sh)
-      printf '#!/usr/bin/env bash\n# PUSH-PERFORMING\nexit 0\n' > "$f"
+      printf '#!/usr/bin/env bash\n# PUSH-PERFORMING\necho "PASS: fixture stub"\necho "CHECKED: 1"\nexit 0\n' > "$f"
       ;;
     *)
-      printf '#!/usr/bin/env bash\nexit 0\n' > "$f"
+      printf '#!/usr/bin/env bash\necho "PASS: fixture stub"\necho "CHECKED: 1"\nexit 0\n' > "$f"
       ;;
   esac
 done
-printf '#!/usr/bin/env bash\nexit 0\n' > verify.sh
+printf '#!/usr/bin/env bash\necho "PASS: fixture stub"\necho "CHECKED: 1"\nexit 0\n' > verify.sh
 chmod +x verify.sh scripts/acceptance-*.sh
 git add verify.sh scripts/acceptance-*.sh
 git commit -qm "fixture: pre-push skip labels"
