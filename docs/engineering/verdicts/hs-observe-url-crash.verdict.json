@@ -1,7 +1,6 @@
 {
   "slug": "hs-observe-url-crash",
   "base_sha": "c59bad7b160c473cda5545e76e6fa6bcc711a7ea",
-  "head_sha": "(이 커밋에서 갱신 — push 후 확정)",
   "goal": "docs/engineering/hs-observe-url-crash-goal-2026-08-25.md",
   "generator": {
     "role": "G",
@@ -350,5 +349,7 @@
         "disposition": "내 실측과 일치"
       }
     ]
-  }
+  },
+  "code_sha": "96b41c6e1248ff04f3ff3472ec6697d27a3e2c91",
+  "code_sha_note": "이 판정서가 덮는 **코드**의 SHA다. 판정서 자신을 담은 커밋의 SHA 는 커밋 전에 알 수 없으므로 (순환), 코드가 마지막으로 바뀐 커밋을 가리킨다. 이후 커밋은 문서·증거 도구뿐이며 `git diff <code_sha>..HEAD -- humansearch/src/ contracts/` 가 비어 있음으로 확인할 수 있다. 병합 대상 SHA 의 CI 초록불은 `scripts/verify/check-verified-sha.sh <branch>` 로 따로 확인한다"
 }
