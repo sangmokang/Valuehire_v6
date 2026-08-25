@@ -14,6 +14,7 @@ WU5 는 `ValueError` 계열을 막았다. V1 은 같은 계약을 뚫는 네 갈
 
 from collections.abc import Mapping
 from pathlib import Path
+from typing import Self
 
 import pytest
 
@@ -86,7 +87,7 @@ def test_deeply_nested_contract_json_is_a_closed_failure(
 
 
 class _FakeSocket:
-    def __enter__(self) -> "_FakeSocket":
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *exc: object) -> None:
