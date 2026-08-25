@@ -34,6 +34,8 @@ PRODUCT_ROOTS_CONTRACT=contracts/portal-constants-product-roots.txt
 NONOP_ADDRESSES=contracts/portal-constants-nonoperational-addresses.txt
 NONOP_SUFFIXES=contracts/portal-constants-nonoperational-suffixes.txt
 # 제품 코드로 볼 확장자. 루트 발견에만 쓴다(계층 배정은 경로 접두로 한다).
+# 대소문자를 무시해 대조한다 — 2026-08-25 V1(codex) F3 실측: `main.PY`·`main.Js` 가
+# 미등재 제품 폴더 탐지를 피해 전역 계층만 받았다.
 PRODUCT_EXT_RE='\.(py|js|mjs|cjs|ts|tsx|jsx|html|css)$'
 # 검사기 자신의 구역 정의 — 이 접두는 제품 루트 발견 대상이 아니다.
 INFRA_PREFIX_RE='^(contracts|docs|scripts|hooks|\.github)/'
@@ -126,7 +128,7 @@ is_product_path() {
 # grep 의 "일치 없음"(1)은 정상이고 도구 오류(2 이상)는 검사 불능이다. 종료값을 참으로
 # 덮어쓰면 열거 실패가 "미등재 0건"으로 둔갑한다 — 그래서 구분해서 받는다 (P13).
 undeclared_rc=0
-undeclared=$(git ls-files | LC_ALL=C grep -E "$PRODUCT_EXT_RE") || undeclared_rc=$?
+undeclared=$(git ls-files | LC_ALL=C grep -Ei "$PRODUCT_EXT_RE") || undeclared_rc=$?
 if [ "$undeclared_rc" -gt 1 ]; then
   echo "FAIL: product-code enumeration failed (rc=$undeclared_rc)"
   exit 2
@@ -242,8 +244,12 @@ if [ -s "$PLIST" ]; then
     rules.call(suffix_path).each { |raw| suffixes[raw.strip] = true }
     exit 2 if addresses.empty? || suffixes.empty?
 
-    dotted = /(["\x27`])(\.?[a-z0-9][a-z0-9_-]*(?:\.[a-z0-9][a-z0-9_-]*)*)\1/
+    # 2026-08-25 V1(codex) F2 반영. 소문자 ASCII 만 보던 판정을 두 방향으로 넓혔다:
+    #   ① 호스트·CSS 클래스는 대문자를 쓸 수 있다("HIRE-PORTAL.ZZUNKNOWN", ".Login-Button")
+    #   ② 전각 마침표(U+FF0E 등)는 IDNA 정규화에서 보통 마침표가 된다
+    dotted = /(["\x27`])(\.?[A-Za-z0-9][A-Za-z0-9_-]*(?:\.[A-Za-z0-9][A-Za-z0-9_-]*)*)\1/
     ipv4 = /\A[0-9]{1,3}(?:\.[0-9]{1,3}){3}\z/
+    fullwidth_dots = /[\uFF0E\u3002\uFF61\u02D9]/
 
     File.readlines(list_path, chomp: true).reject(&:empty?).each_with_index do |path, index|
       reason = nil
@@ -251,6 +257,7 @@ if [ -s "$PLIST" ]; then
       begin
         File.foreach(path) do |line|
           clean = line.dup
+          clean = clean.gsub(fullwidth_dots, ".") if clean.match?(fullwidth_dots)
           addresses.each { |rule| clean = clean.gsub(rule, "") }
           stripped << clean
           next if reason
@@ -258,10 +265,10 @@ if [ -s "$PLIST" ]; then
             next unless token.include?(".")
             labels = token.split(".", -1)
             last = labels.last.to_s
-            next if suffixes.key?(last)
+            next if suffixes.key?(last.downcase)
             # 버전 문자열(1.2.3)은 주소가 아니다. 4옥텟 IPv4 만 주소로 본다.
             next if labels.all? { |label| label.match?(/\A[0-9]+\z/) } && !token.match?(ipv4)
-            reason = "unknown-suffix:#{last}"
+            reason = "unknown-suffix:#{last.downcase}"
             break
           end
         end

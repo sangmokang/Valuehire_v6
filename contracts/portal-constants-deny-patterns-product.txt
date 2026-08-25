@@ -39,6 +39,17 @@
 # "table tbody tr:nth-child(5) td" 처럼 클래스도 id 도 없이 화면 위치를 지정하는 형태.
 ["'`][^"'`]*:(nth-child|nth-of-type|nth-last-child|nth-last-of-type|first-child|last-child|first-of-type|last-of-type|only-child|only-of-type)[[:space:]]*\(?
 
-# 태그명만으로 이어진 자손·결합자 셀렉터 (같은 D1 의 나머지 절반).
-# 어휘를 알려진 HTML 태그로 한정해 산문 오탐을 막는다 — 목록은 데이터라 코드 수정 없이 늘린다.
-["'`](a|article|aside|body|button|div|footer|form|h[1-6]|header|html|iframe|img|input|label|li|main|nav|ol|option|p|section|select|span|table|tbody|td|textarea|tfoot|th|thead|tr|ul)([[:space:]]*[>~+][[:space:]]*|[[:space:]]+)(a|article|aside|body|button|div|footer|form|h[1-6]|header|html|iframe|img|input|label|li|main|nav|ol|option|p|section|select|span|table|tbody|td|textarea|tfoot|th|thead|tr|ul)([^"'`]*)["'`]
+# 태그명만으로 이어진 셀렉터 (D1 의 나머지 절반).
+# 2026-08-25 V1(codex) F6·F7 반영 — 두 방향 모두 실측으로 확인했다:
+#   F7 오탐: 태그 2개를 공백으로 이은 것만 보면 평범한 영어 문구를 잡는다("a table", "a form").
+#   F6 미탐: 태그 어휘가 좁으면 유효한 셀렉터를 놓친다("dl dd").
+# 그래서 (가) 결합자(> ~ +)가 있거나 (나) 태그가 3개 이상 이어질 때만 잡고, 어휘는 넓혔다.
+# 잔여 한계: 결합자 없는 태그 2개 셀렉터("dl dd")는 여전히 놓친다. 영어 산문 오탐을 만들지
+# 않으면서 그것까지 잡으려면 CSS 문법 해석이 필요하다 — 별도 과제다.
+# 목록은 데이터라 코드 수정 없이 늘린다.
+
+# (가) 결합자가 있는 형태
+["'`](a|abbr|article|aside|audio|b|blockquote|body|button|canvas|caption|code|col|colgroup|datalist|dd|details|dialog|div|dl|dt|em|embed|fieldset|figcaption|figure|footer|form|h[1-6]|header|hr|html|i|iframe|img|input|label|legend|li|main|map|mark|menu|meter|nav|object|ol|optgroup|option|output|p|picture|pre|progress|s|section|select|small|source|span|strong|sub|summary|sup|table|tbody|td|template|textarea|tfoot|th|thead|time|tr|track|u|ul|video)[[:space:]]*[>~+][[:space:]]*(a|abbr|article|aside|audio|b|blockquote|body|button|canvas|caption|code|col|colgroup|datalist|dd|details|dialog|div|dl|dt|em|embed|fieldset|figcaption|figure|footer|form|h[1-6]|header|hr|html|i|iframe|img|input|label|legend|li|main|map|mark|menu|meter|nav|object|ol|optgroup|option|output|p|picture|pre|progress|s|section|select|small|source|span|strong|sub|summary|sup|table|tbody|td|template|textarea|tfoot|th|thead|time|tr|track|u|ul|video)([^"'`]*)["'`]
+
+# (나) 공백으로 3개 이상 이어진 형태
+["'`](a|abbr|article|aside|audio|b|blockquote|body|button|canvas|caption|code|col|colgroup|datalist|dd|details|dialog|div|dl|dt|em|embed|fieldset|figcaption|figure|footer|form|h[1-6]|header|hr|html|i|iframe|img|input|label|legend|li|main|map|mark|menu|meter|nav|object|ol|optgroup|option|output|p|picture|pre|progress|s|section|select|small|source|span|strong|sub|summary|sup|table|tbody|td|template|textarea|tfoot|th|thead|time|tr|track|u|ul|video)[[:space:]]+(a|abbr|article|aside|audio|b|blockquote|body|button|canvas|caption|code|col|colgroup|datalist|dd|details|dialog|div|dl|dt|em|embed|fieldset|figcaption|figure|footer|form|h[1-6]|header|hr|html|i|iframe|img|input|label|legend|li|main|map|mark|menu|meter|nav|object|ol|optgroup|option|output|p|picture|pre|progress|s|section|select|small|source|span|strong|sub|summary|sup|table|tbody|td|template|textarea|tfoot|th|thead|time|tr|track|u|ul|video)[[:space:]]+(a|abbr|article|aside|audio|b|blockquote|body|button|canvas|caption|code|col|colgroup|datalist|dd|details|dialog|div|dl|dt|em|embed|fieldset|figcaption|figure|footer|form|h[1-6]|header|hr|html|i|iframe|img|input|label|legend|li|main|map|mark|menu|meter|nav|object|ol|optgroup|option|output|p|picture|pre|progress|s|section|select|small|source|span|strong|sub|summary|sup|table|tbody|td|template|textarea|tfoot|th|thead|time|tr|track|u|ul|video)([^"'`]*)["'`]

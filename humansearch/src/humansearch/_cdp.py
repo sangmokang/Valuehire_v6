@@ -7,8 +7,26 @@ import os
 import socket
 import struct
 from collections.abc import Mapping, Sequence
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
+
+# 프로토콜 메서드 이름도 코드가 아니라 데이터다 (P22 · G3). 소스에 박아 두면 G3 의
+# 점 토큰 판정이 잡는다 — 게이트에 예외를 파는 대신 값을 contracts/ 로 옮긴다.
+_PROTOCOL_PATH = (
+    Path(__file__).resolve().parents[3] / "contracts" / "humansearch" / "cdp-protocol.json"
+)
+
+
+def _cdp_evaluate_method() -> str:
+    try:
+        raw = json.loads(_PROTOCOL_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise CdpReadError("cdp protocol contract is unavailable") from exc
+    method = raw.get("evaluate_method")
+    if not isinstance(method, str) or not method:
+        raise CdpReadError("cdp protocol contract is malformed")
+    return method
 
 _WEBSOCKET_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
@@ -55,7 +73,7 @@ def observe_markers(
             command = json.dumps(
                 {
                     "id": 1,
-                    "method": "Runtime.evaluate",
+                    "method": _cdp_evaluate_method(),
                     "params": {
                         "expression": expression,
                         "returnByValue": True,

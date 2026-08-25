@@ -65,6 +65,28 @@ D5_RESERVED=$(printf 'BASE = "https%s//portal.%s/login"' ':' 'invalid')
 D5_LOOPBACK=$(printf 'SAFE_HOSTS = {"127.0.0.1", "%s"}' 'localhost')
 D5_LOOPPORT=$(printf 'DIAG = "127.0.0.1%s"' ':9333')
 VERSION_OK=$(printf 'REQUIRES_PYTHON = "3.12"')
+# ── 2026-08-25 V1(codex) 판정 흡수 표본 ──────────────────────────────────────
+V_NTHLAST=$(printf 'CELL = "td:nth-last-%s(2)"' 'child')
+V_NTHLASTTYPE=$(printf 'CELL = "td:nth-last-of-%s(2)"' 'type')
+V_LAST=$(printf 'CELL = "tr:last-%s"' 'child')
+V_FIRSTTYPE=$(printf 'CELL = "tr:first-of-%s"' 'type')
+V_LASTTYPE=$(printf 'CELL = "tr:last-of-%s"' 'type')
+V_ONLY=$(printf 'CELL = "tr:only-%s"' 'child')
+V_ONLYTYPE=$(printf 'CELL = "tr:only-of-%s"' 'type')
+F2_UPPER=$(printf 'HOST = "HIRE-%s.ZZUNKNOWN"' 'PORTAL')
+F2_CLASS=$(printf 'BTN = ".Login-%s"' 'Button')
+F2_FULLWIDTH=$(printf 'HOST = "hire-portal．zzunknown"')
+F3_UPPEREXT='export const NAME = "web";'
+F4_MIXED=$(printf 'ENDPOINTS = "https%s//portal.invalid/,https%s//api.vendor.zzunknown".split(",")' ':' ':')
+F5_TLDEXT=$(printf 'HOST = "hire-%s.zip"' 'portal')
+F5_TLDEXT2=$(printf 'HOST = "hire-%s.%s"' 'portal' 'py')
+F5_SCHEME=$(printf 'BASE = "https%s//hire-portal.zip/login"' ':')
+F6_COMBINATOR=$(printf 'SEL = "dl > %s"' 'dd')
+F7_PROSE=$(printf 'MESSAGE = "a table"')
+F7_PROSE2=$(printf 'MESSAGE = "button label"')
+F9_ANY=$(printf 'BIND = "0.0.0.0"')
+F9_IPV6=$(printf 'DIAG = "[::1]%s"' ':9333')
+F9_V6BARE=$(printf 'SAFE = "[::1]"')
 
 G3_NAMES="acceptance-hs-portal-constants acceptance-hs-portal-constants-mutations acceptance-hs-portal-constants-hardening acceptance-hs-portal-constants-hardening2 acceptance-hs-portal-constants-hardening3 acceptance-hs-portal-constants-hardening4 acceptance-hs-portal-constants-hardening5 acceptance-hs-portal-constants-hardening6 acceptance-hs-portal-constants-hardening7"
 
@@ -177,6 +199,64 @@ init_case; plant "humansearch/src/humansearch/assets_probe.py" "$D2_CLEAN"
 expect_case "D2 파일명·확장자는 오탐 금지" 0 "$CLEAN_RE"
 init_case; plant "humansearch/tests/version_probe.py" "$VERSION_OK"
 expect_case "D2 판 번호 문자열은 오탐 금지" 0 "$CLEAN_RE"
+
+# ── V1 F10: 의사클래스 변종 전체 (CA-1 "변종 전체" 요구) ────────────────────
+init_case; plant "humansearch/src/humansearch/v1.py" "$V_NTHLAST"
+expect_case "V1 nth-last-child" 1 "$FORBIDDEN_RE"
+init_case; plant "humansearch/src/humansearch/v2.py" "$V_NTHLASTTYPE"
+expect_case "V1 nth-last-of-type" 1 "$FORBIDDEN_RE"
+init_case; plant "humansearch/src/humansearch/v3.py" "$V_LAST"
+expect_case "V1 last-child" 1 "$FORBIDDEN_RE"
+init_case; plant "humansearch/src/humansearch/v4.py" "$V_FIRSTTYPE"
+expect_case "V1 first-of-type" 1 "$FORBIDDEN_RE"
+init_case; plant "humansearch/src/humansearch/v5.py" "$V_LASTTYPE"
+expect_case "V1 last-of-type" 1 "$FORBIDDEN_RE"
+init_case; plant "humansearch/src/humansearch/v6.py" "$V_ONLY"
+expect_case "V1 only-child" 1 "$FORBIDDEN_RE"
+init_case; plant "humansearch/src/humansearch/v7.py" "$V_ONLYTYPE"
+expect_case "V1 only-of-type" 1 "$FORBIDDEN_RE"
+
+# ── V1 F2: 대소문자·전각점 ───────────────────────────────────────────────────
+init_case; plant "humansearch/src/humansearch/upper_probe.py" "$F2_UPPER"
+expect_case "V1 F2 대문자 호스트" 1 "$FORBIDDEN_RE"
+init_case; plant "humansearch/tests/upperclass_probe.py" "$F2_CLASS"
+expect_case "V1 F2 대문자 CSS 클래스" 1 "$FORBIDDEN_RE"
+init_case; plant "humansearch/src/humansearch/fullwidth_probe.py" "$F2_FULLWIDTH"
+expect_case "V1 F2 전각 마침표 호스트" 1 "$FORBIDDEN_RE"
+
+# ── V1 F3: 대문자 확장자가 제품 루트 탐지를 피하지 못한다 ────────────────────
+init_case; plant "apps/web/main.PY" "$F3_UPPEREXT"
+expect_case "V1 F3 대문자 확장자 미등재 폴더" 2 'product code outside the product-root contract'
+init_case; plant "apps/web/main.Js" "$F3_UPPEREXT"
+expect_case "V1 F3 혼합 대소문자 확장자" 2 'product code outside the product-root contract'
+
+# ── V1 F4: 예약 URL 제거가 같은 줄의 실제 URL 을 지우지 않는다 ───────────────
+init_case; plant "humansearch/src/humansearch/mixed_probe.py" "$F4_MIXED"
+expect_case "V1 F4 예약 URL 뒤의 실제 URL" 1 "$FORBIDDEN_RE"
+
+# ── V1 F5: 실 TLD 와 겹치는 확장자를 면제하지 않는다 ─────────────────────────
+init_case; plant "humansearch/src/humansearch/zip_probe.py" "$F5_TLDEXT"
+expect_case "V1 F5 .zip 은 파일 확장자이자 실 TLD" 1 "$FORBIDDEN_RE"
+init_case; plant "humansearch/tests/py_probe.py" "$F5_TLDEXT2"
+expect_case "V1 F5 .py 는 파일 확장자이자 실 TLD" 1 "$FORBIDDEN_RE"
+init_case; plant "humansearch/src/humansearch/zipurl_probe.py" "$F5_SCHEME"
+expect_case "V1 F5 scheme 이 붙으면 어느 접미사든 잡힌다" 1 "$FORBIDDEN_RE"
+
+# ── V1 F6·F7: 태그 셀렉터의 두 방향 ─────────────────────────────────────────
+init_case; plant "humansearch/src/humansearch/comb_probe.py" "$F6_COMBINATOR"
+expect_case "V1 F6 결합자가 있으면 어휘 밖 태그도 잡는다" 1 "$FORBIDDEN_RE"
+init_case; plant "humansearch/tests/prose_probe.py" "$F7_PROSE"
+expect_case "V1 F7 평범한 영어 문구는 오탐 금지" 0 "$CLEAN_RE"
+init_case; plant "humansearch/tests/prose2_probe.py" "$F7_PROSE2"
+expect_case "V1 F7 태그 2개 영어 문구도 오탐 금지" 0 "$CLEAN_RE"
+
+# ── V1 F9: 0.0.0.0 과 IPv6 루프백의 경계 ────────────────────────────────────
+init_case; plant "humansearch/src/humansearch/any_probe.py" "$F9_ANY"
+expect_case "V1 F9 0.0.0.0 은 면제 대상이 아니다" 1 "$FORBIDDEN_RE"
+init_case; plant "humansearch/src/humansearch/v6port_probe.py" "$F9_IPV6"
+expect_case "V1 F9 포트 붙은 IPv6 루프백은 위반" 1 "$FORBIDDEN_RE"
+init_case; plant "humansearch/src/humansearch/v6bare_probe.py" "$F9_V6BARE"
+expect_case "V1 F9 포트 없는 IPv6 루프백은 위반 아님" 0 "$CLEAN_RE"
 
 # ── D3 제품 루트 계약 ────────────────────────────────────────────────────────
 init_case; plant "apps/web/main.js" 'export const NAME = "web";'

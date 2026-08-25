@@ -1,0 +1,4 @@
+{
+  "purpose": "Chrome DevTools Protocol 의 배선 상수. 프로토콜 메서드 이름도 코드가 아니라 데이터다 (P22 · G3). 이 값이 소스에 박히면 G3 의 점 토큰 판정이 잡는다 — 정당한 예외를 만드는 대신 값을 여기로 옮긴다.",
+  "evaluate_method": "Runtime.evaluate"
+}
