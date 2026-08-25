@@ -33,10 +33,14 @@ PRODUCT_PATTERNS=contracts/portal-constants-deny-patterns-product.txt
 PRODUCT_ROOTS_CONTRACT=contracts/portal-constants-product-roots.txt
 NONOP_ADDRESSES=contracts/portal-constants-nonoperational-addresses.txt
 NONOP_SUFFIXES=contracts/portal-constants-nonoperational-suffixes.txt
-# 제품 코드로 볼 확장자. 루트 발견에만 쓴다(계층 배정은 경로 접두로 한다).
-# 대소문자를 무시해 대조한다 — 2026-08-25 V1(codex) F3 실측: `main.PY`·`main.Js` 가
-# 미등재 제품 폴더 탐지를 피해 전역 계층만 받았다.
-PRODUCT_EXT_RE='\.(py|js|mjs|cjs|ts|tsx|jsx|html|css)$'
+# 제품 루트 발견의 실패 방향(2026-08-25 자체 적대 검증). 예전에는 "제품 코드 확장자"를
+# 열거했는데, 목록 밖 확장자(.go·.rb·.java·.php·.rs·.kt)는 조용히 빠져나갔다 —
+# D4 에서 고친 고정 TLD 열거와 똑같은 결함이 여기 남아 있었다. 이제 반대로 간다:
+# 인프라 구역 밖 추적 파일은 **비제품 계약에 등재되지 않았다면 제품 코드로 본다.**
+NONPRODUCT_PATHS=contracts/portal-constants-nonproduct-paths.txt
+# 파일 확장자이면서 동시에 실 TLD 인 접미사. 접미사만으로는 파일명과 호스트를 못 가르므로
+# 같은 줄의 주소 문맥으로 판정한다 (2026-08-25 V1 1라운드 F5 · 2라운드 K7).
+AMBIGUOUS_SUFFIXES=contracts/portal-constants-ambiguous-suffixes.txt
 # 검사기 자신의 구역 정의 — 이 접두는 제품 루트 발견 대상이 아니다.
 INFRA_PREFIX_RE='^(contracts|docs|scripts|hooks|\.github)/'
 WF=.github/workflows/verify.yml
@@ -93,7 +97,7 @@ if [ -z "$PRODUCT_ROOTS" ]; then
   echo "FAIL: product root contract has zero effective roots: $PRODUCT_ROOTS_CONTRACT"
   exit 2
 fi
-for required in "$NONOP_ADDRESSES" "$NONOP_SUFFIXES"; do
+for required in "$NONOP_ADDRESSES" "$NONOP_SUFFIXES" "$NONPRODUCT_PATHS" "$AMBIGUOUS_SUFFIXES"; do
   if [ ! -f "$required" ] || [ ! -r "$required" ] || [ ! -s "$required" ]; then
     echo "FAIL: portal judgment contract missing, unreadable, or empty: $required"
     exit 2
@@ -123,22 +127,32 @@ is_product_path() {
   return 1
 }
 
-# 제품 코드 확장자를 가진 추적 파일이 계약 밖에 있으면 검사 불능이다 (D3).
+# 인프라 구역 밖 추적 파일이 비제품 계약에도, 제품 루트 계약에도 없으면 검사 불능이다 (D3).
 # "등재를 잊는 것"이 통과가 아니라 실패가 되게 하는 장치다.
 # grep 의 "일치 없음"(1)은 정상이고 도구 오류(2 이상)는 검사 불능이다. 종료값을 참으로
 # 덮어쓰면 열거 실패가 "미등재 0건"으로 둔갑한다 — 그래서 구분해서 받는다 (P13).
-undeclared_rc=0
-undeclared=$(git ls-files | LC_ALL=C grep -Ei "$PRODUCT_EXT_RE") || undeclared_rc=$?
-if [ "$undeclared_rc" -gt 1 ]; then
-  echo "FAIL: product-code enumeration failed (rc=$undeclared_rc)"
+NPCLEAN=$(mktemp) || { echo "FAIL: temp workspace unavailable"; exit 2; }
+sed -e 's/\r$//' -e '/^[[:space:]]*#/d' -e '/^[[:space:]]*$/d' "$NONPRODUCT_PATHS" > "$NPCLEAN"
+if [ ! -s "$NPCLEAN" ]; then
+  rm -f -- "$NPCLEAN"
+  echo "FAIL: nonproduct path contract has zero effective entries: $NONPRODUCT_PATHS"
   exit 2
 fi
 undeclared_rc=0
-undeclared=$(printf '%s\n' "$undeclared" | LC_ALL=C grep -vE "$INFRA_PREFIX_RE") || undeclared_rc=$?
+undeclared=$(git ls-files | LC_ALL=C grep -vE "$INFRA_PREFIX_RE") || undeclared_rc=$?
 if [ "$undeclared_rc" -gt 1 ]; then
-  echo "FAIL: product-code enumeration failed (rc=$undeclared_rc)"
+  rm -f -- "$NPCLEAN"
+  echo "FAIL: tracked-file enumeration failed (rc=$undeclared_rc)"
   exit 2
 fi
+undeclared_rc=0
+undeclared=$(printf '%s\n' "$undeclared" | LC_ALL=C grep -vEf "$NPCLEAN") || undeclared_rc=$?
+if [ "$undeclared_rc" -gt 1 ]; then
+  rm -f -- "$NPCLEAN"
+  echo "FAIL: nonproduct path contract is unusable (rc=$undeclared_rc)"
+  exit 2
+fi
+rm -f -- "$NPCLEAN"
 undeclared_roots=""
 while IFS= read -r candidate; do
   if [ -z "$candidate" ]; then continue; fi
@@ -238,14 +252,18 @@ if [ -s "$PLIST" ]; then
   # 옮겨 적으면 판정이 두 벌이 되고 반드시 갈라진다(P16).
   product_rc=0
   dotted_hits=$(ruby -e '
-    address_path, suffix_path, list_path, sandbox = ARGV
+    address_path, suffix_path, list_path, sandbox, ambiguous_path = ARGV
     rules = lambda do |path|
       File.readlines(path, chomp: true).reject { |line| line.strip.empty? || line.strip.start_with?("#") }
     end
     addresses = rules.call(address_path).map { |raw| Regexp.new(raw, Regexp::IGNORECASE) }
     suffixes = {}
     rules.call(suffix_path).each { |raw| suffixes[raw.strip] = true }
-    exit 2 if addresses.empty? || suffixes.empty?
+    ambiguous = {}
+    rules.call(ambiguous_path).each { |raw| ambiguous[raw.strip.downcase] = true }
+    exit 2 if addresses.empty? || suffixes.empty? || ambiguous.empty?
+    # 주소 문맥: 이 줄이 호스트를 말하고 있는가. 없으면 같은 접미사를 파일명으로 본다.
+    host_context = /:\/\/|@|\b(host|hostname|domain|url|uri|origin|endpoint|server|portal|site)\b/i
 
     # 2026-08-25 V1(codex) F2 반영. 소문자 ASCII 만 보던 판정을 두 방향으로 넓혔다:
     #   ① 호스트·CSS 클래스는 대문자를 쓸 수 있다("HIRE-PORTAL.ZZUNKNOWN", ".Login-Button")
@@ -270,6 +288,7 @@ if [ -s "$PLIST" ]; then
             labels = token.split(".", -1)
             last = labels.last.to_s
             next if suffixes.key?(last.downcase)
+            next if ambiguous.key?(last.downcase) && !line.match?(host_context)
             # 버전 문자열(1.2.3)은 주소가 아니다. 4옥텟 IPv4 만 주소로 본다.
             next if labels.all? { |label| label.match?(/\A[0-9]+\z/) } && !token.match?(ipv4)
             reason = "unknown-suffix:#{last.downcase}"
@@ -283,7 +302,7 @@ if [ -s "$PLIST" ]; then
       end
       puts "#{index}\t#{reason || "-"}\t#{path}"
     end
-  ' "$NONOP_ADDRESSES" "$NONOP_SUFFIXES" "$PLIST" "$SBOX" 2>> "$ERRS") || product_rc=$?
+  ' "$NONOP_ADDRESSES" "$NONOP_SUFFIXES" "$PLIST" "$SBOX" "$AMBIGUOUS_SUFFIXES" 2>> "$ERRS") || product_rc=$?
   if [ "$product_rc" -ne 0 ]; then
     rm -rf -- "$SBOX"
     echo "FAIL: product-tier evaluator unavailable (rc=$product_rc)"

@@ -447,6 +447,14 @@ init_case() {
     > "$CASE_DIR/contracts/portal-constants-product-roots.txt"
   cp contracts/portal-constants-nonoperational-addresses.txt "$CASE_DIR/contracts/portal-constants-nonoperational-addresses.txt"
   cp contracts/portal-constants-nonoperational-suffixes.txt "$CASE_DIR/contracts/portal-constants-nonoperational-suffixes.txt"
+  cp contracts/portal-constants-nonproduct-paths.txt "$CASE_DIR/contracts/portal-constants-nonproduct-paths.txt"
+  cp contracts/portal-constants-ambiguous-suffixes.txt "$CASE_DIR/contracts/portal-constants-ambiguous-suffixes.txt"
+  # 2026-08-25 동결 예외(hardening7 2라운드): 이 표본은 working-directory 우회를 시연하려고
+  # fake-checks/scripts 와 저장소 최상위에 보조 파일을 만든다. 제품 루트 발견의 실패 방향을
+  # 뒤집은 뒤로는 그것들도 "미등재 제품 코드"로 잡힌다. 표본의 공격 내용·기대 종료코드는
+  # 그대로 두고, 표본 자신의 비제품 계약에 그 보조 경로만 추가한다.
+  printf '^fake-checks/\n^[^/]*$\n' \
+    >> "$CASE_DIR/contracts/portal-constants-nonproduct-paths.txt"
   cp hooks/pre-push "$CASE_DIR/hooks/pre-push"
   chmod +x "$CASE_DIR/hooks/pre-push"
   write_wf "$CASE_DIR" ok

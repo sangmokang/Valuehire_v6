@@ -50,9 +50,9 @@ G3 가 막으려던 바로 그 값이 이미 제품 코드에 들어와 있다. 
 
 | AC | 명령 | 합격 판정 |
 |---|---|---|
-| 1·2·4·5 | `bash scripts/acceptance-hs-portal-constants-hardening7.sh` | exit 0, 마지막 줄 `CHECKED: N` (N ≥ 12) |
+| 1·2·4·5 | `bash scripts/acceptance-hs-portal-constants-hardening7.sh` | exit 0, 마지막 줄 `CHECKED: N` (N 은 정확히 62 — 사례가 줄거나 늘면 스스로 실패한다) |
 | 3 | 위와 동일(제품 루트 누락 fixture 포함) | 누락 fixture 에서 exit 2 |
-| 6 | `bash scripts/acceptance-hs-portal-constants.sh` | `FAIL: portal constants outside contracts 0`, exit 0 |
+| 6 | `bash scripts/acceptance-hs-portal-constants.sh` | `PASS: portal constants outside contracts 0`, exit 0 |
 | 회귀 | `bash scripts/acceptance-hs-portal-constants-hardening{,2,3,4,5,6}.sh`, `-mutations.sh` | 전부 exit 0 |
 | 배선 | `bash scripts/acceptance-verify-ac-m.sh` | exit 0, `CHECKED: 34` |
 
@@ -271,6 +271,89 @@ codex 샌드박스가 `/tmp` 생성까지 막아 검사기가 `FAIL: temp worksp
 - Git 명령은 임시 캐시 생성 경고를 냈지만 결과를 반환했다. 최종 HEAD는 `e819c33da5537d63b4607ea35dcf968db5b5acc7`, 작업트리는 clean이다.
 
 ---
+
+### V1 2라운드 — codex, 2026-08-25 (task-mt8bzjro-giu7jo, read-only, 대상 db46a8f)
+
+1라운드 수정을 흡수한 뒤 같은 방식으로 한 번 더 돌렸다. 판정 원문 그대로다.
+
+---
+
+1) FAIL · 결함 9건
+
+## 2) 항목별 실측 표
+
+`unit`은 `git show db46a8f:<계약>`으로 HEAD 계약을 읽고, 본체 260~271행과 동일한 주소 제거·점 토큰 Ruby 로직 및 `grep -Eiqf`를 표본 문자열에 적용한 명령이다.
+
+| 항목 | 실행한 명령 | 출력(핵심 발췌) | 판정 |
+|---|---|---|---|
+| 기준점 | `git rev-parse HEAD; git branch --show-current; git status --short` | `db46a8f3300...`, `task/humansearch-g3-portal-constants`; 시작 시 status 출력 없음 | 요청 HEAD·브랜치 일치 |
+| 종단 실행 | `bash scripts/acceptance-hs-portal-constants.sh; echo $?`; `bash ...-hardening7.sh; echo $?` | `FAIL: temp workspace unavailable`, `SCANNER_RC=2`; `mktemp: mkdtemp failed...`, `HARDENING7_RC=1` | 환경 차단. 아래 단위 실측으로 대체 |
+| K1 주소 삭제가 다른 위반을 마스킹 | `unit 'SEL = ".login-button portal.invalid"'`; `unit 'SEL = "#loginBtn localhost"'` | 각각 `CLEAN=SEL = ".login-button `, `CLEAN=SEL = "#loginBtn `; `PRODUCT_RC=1 DOTTED=-` | **결함(미탐)**. 주소 규칙이 닫는 따옴표까지 소비하고 본체가 이를 삭제해, 원래 잡던 클래스·ID 셀렉터가 통과한다. `db46a8f:contracts/...addresses.txt:30,34`, `scanner:261` |
+| K2 scheme 주소 규칙의 호스트 끝 경계 부재 | `unit 'URL = "https://api.test.com/path"'`; `unit 'BASE = "https://127.0.0.1:443/login"'` | `CLEAN=URL = ".com/path"`, `ALLOW`; 루프백은 `CLEAN=BASE = ":443/login"`, `ALLOW` | **결함(미탐)**. `.test`가 최종 라벨이 아닌 실제 `.com` 호스트도 예약 주소로 잘라낸다. 포트 붙은 루프백도 AC-5와 달리 통과한다. `addresses.txt:24,27` |
+| K3 F4 축소의 반대쪽 회귀 | `unit 'BASE = "https://portal.invalid/docs/example.com"'` | `CLEAN=BASE = "/docs/example.com"`; `PRODUCT_RC=0`, `BLOCK` | **결함(오탐)**. 예약 호스트 URL은 허용 대상인데, 남은 정상 경로의 dotted 이름 때문에 위반이 된다 |
+| K4 `PRODUCT_EXT_RE` fail-open | `grep -Eiq "$PRODUCT_EXT_RE"`에 `.PY/.vue/.svelte/.astro/.go/.rb/.pyi/.sh/.toml`; 같은 URL을 전역·제품 패턴에 대조 | `.PY rc=0`; 나머지 전부 `rc=1`. `BASE="https://api.vendor.zzunknown"`은 `GLOBAL_RC=1 PRODUCT_RC=0` | **결함(미탐)**. `.vue` 등만 가진 신규 제품 폴더는 미등재 루트 탐지에서 빠지고 제품 규칙도 받지 않는다. 현재 추적 파일 중 `humansearch/pyproject.toml`, `humansearch/uv.lock`도 제품 계층 밖이다. `scanner:39,131` |
+| K5 태그 규칙 혼합 체인 누락 | `unit 'SEL = "main section > article"'` | `PRODUCT_RC=1 DOTTED=- => ALLOW` | **결함(미탐)**. “첫 관계는 자손, 뒤 관계는 결합자”인 유효 셀렉터는 두 신규 규칙 어느 쪽에도 걸리지 않는다. `product-patterns:52,55` |
+| K6 좁힌 태그 규칙의 새 오탐 | `unit 'MESSAGE = "a > b"'`; `unit 'MESSAGE = "a strong output"'` | 둘 다 `PRODUCT_RC=0 => BLOCK` | **결함(오탐)**. 비교 문구와 정상 영어 문구가 각각 결합자 규칙·3태그 규칙에 걸린다 |
+| K7 접미사 5개 제거의 정상 파일명 오탐 | `unit`에 `"conftest.py"`, `"README.md"`, `"deploy.sh"`, `"native.so"`, `"bundle.zip"` 투입 | 각각 `DOTTED=unknown-suffix:py/md/sh/so/zip => BLOCK` | **결함(오탐)**. 실제 TLD 우회는 닫혔지만 정상 파일명도 모두 위반 처리된다 |
+| K8 F11 문서 수정 미완료 | `git show HEAD:docs/...goal... \| nl -ba \| sed -n '46,55p'` | 46행 `PASS: portal constants...`; 55행 `FAIL: portal constants outside contracts 0` | **계약 결함**. AC 본문만 고쳤고 검증 명령 표에는 같은 오기가 남았다 |
+| K9 hardening7 보장 공백 | `awk`로 `init_case/expect_case` 집계; `rg 'CHECKED: 44\|total.*-lt.*44'`; 신규 반례 검색 | `expect_case=43 plus_wiring=1 total=44`; `NO_44_CASE_FLOOR`; `NO_NEW_BOUNDARY_CASES` | **시험 결함**. 현재 44개 구조는 맞지만 44 유지 하한이 없고, K1~K7의 경계 사례를 증명하지 않는다. 문서 하한도 아직 `N ≥ 12` |
+| 기존 수정 핵심 | F2·F4 표본 단위 판정; F3 대문자 경로 grep | F2 대문자·전각점 `BLOCK`; F4 원 표본 `BLOCK`; `main.PY rc=0` | F2·F3 및 F4의 원래 반례는 수정 확인 |
+| 정적 건전성 | `bash -n` 두 스크립트; `git diff --check e819c33..HEAD` | 모두 `RC=0` | 문법·diff 형식은 정상이나 위 논리 결함을 반박하지 못함 |
+
+## 3) 1라운드 수정 검증 결과
+
+| 항목 | 상태 |
+|---|---|
+| F1 문자열 연결·여러 줄 조립 | **미수정 확인**. 단위 판정에서 계속 통과하며 문서화된 설계 한계다. 이번 결함 수에는 재산입하지 않았다 |
+| F2 대문자·전각점 | **수정 확인**. 두 호스트 모두 `unknown-suffix:zzunknown`으로 차단됐다. 다만 `"Version．Alpha"`도 차단되는 오탐 위험이 남는다 |
+| F3 대문자 확장자 | **수정 확인**. `.PY`, `.Js`는 매치한다. 단, K4처럼 열거 밖 확장자는 fail-open이다 |
+| F4 주소 제거 탐욕성 | **원 표본 수정 확인**. 실제 URL이 남아 차단된다. 그러나 K1~K3의 새 단계 상호작용이 생겼다 |
+| F5 실 TLD 5종 제거 | **제거 확인**. `.py/.md/.sh/.so/.zip`은 더 이상 면제되지 않는다. K7 정상 파일명 오탐 발생 |
+| F6 태그 미탐 | **부분 수정 확인**. `"dl > dd"`와 3태그 체인은 잡는다. 문서화된 `"dl dd"`는 계속 미탐이며, K5 혼합 체인도 빠진다 |
+| F7 태그 오탐 | **원 표본 개선 확인**. `"a table"`, `"button label"`은 통과한다. 그러나 K6의 새 오탐이 남는다 |
+| F8 모듈 경로 오탐 | **미수정 확인**. `"package.module"`은 계속 차단된다. 기존 감수 항목으로 재산입하지 않았다 |
+| F9 계약 문구 | **본문 수정 확인**. `0.0.0.0`과 포트 없는/붙은 IPv6 경계가 구현 방향과 맞는다. 다만 scheme+루프백+포트는 K2로 통과한다 |
+| F10 시험 공백 | **수량은 수정 확인**: 43 fixture + 배선 1 = 44. 일반화·유지 하한은 K9처럼 미완료다 |
+| F11 계약 오기 | **부분 실패**. AC-6 본문은 고쳤지만 검증 명령 표 55행은 여전히 `FAIL:`이다 |
+
+## 4) 미확인
+
+- 본체 최종 exit 0/1과 hardening7 44개 종단 결과는 `mktemp` 차단 때문에 실행하지 못했다.
+- K1~K7 표본을 실제 격리 Git 저장소에 심었을 때의 scanner exit는 미확인이다. HEAD 계약과 동일한 Ruby·grep 판정 단계만 직접 실측했다.
+- hardening1~6, mutations, pre-push, CI 전체 회귀는 실행하지 못했다.
+- 조사 시작 시 작업트리는 clean이었으나 도중에 다음 3개 미커밋 변경이 나타났다: `contracts/portal-constants-nonoperational-addresses.txt`, 본체, hardening7. 변경 주체는 출력으로 확정하지 못했다. 되돌리거나 추가 수정하지 않았고, 모든 판정은 `git show db46a8f:<path>`의 불변 HEAD blob 기준이다.
+- 최종 HEAD와 브랜치는 그대로이며 staged 변경·커밋·병합·push는 없다.
+
+## 5) 남은 위험
+
+- 주소 “삭제”는 단순 면제가 아니라 뒤 판정기의 입력 문법을 바꾸므로, 다른 금지 토큰을 마스킹하는 우회가 계속 파생될 수 있다.
+- 제품 루트 fail-closed가 확장자 열거에 의존해 새 언어·프레임워크·설정 형식 추가 시 다시 fail-open 된다.
+- 점 토큰은 호스트, 파일명, 모듈 경로, 대문자 식별자, 전각 구두점을 구분하지 못한다.
+- hardening7은 개별 표본 회귀에는 유효하지만 규칙 범주의 경계·조합과 시험 수 축소를 보장하지 않는다.
+
+---
+
+### V1 2라운드 판정에 대한 처리
+
+9건 중 **2건은 이미 내가 같은 시각 자체 검증으로 찾아 고치던 것**(K1=A3/A4, K4=B)이고,
+**4건은 실제 검사기로 재현돼 고쳤으며**(K2b·K5·K6·K7), **2건은 실제 검사기에서는
+재현되지 않았고**(K2a·K3), 2건은 시험·문서 결함으로 고쳤다(K8·K9).
+
+codex 는 `mktemp` 차단 때문에 검사기를 끝까지 못 돌리고 정규식 단위로만 판정했다.
+그래서 **모든 항목을 격리 저장소에서 실제 검사기로 다시 돌려 확인했다.** 그 결과가 아래다.
+
+| ID | 지적 | 실제 검사기 재현 | 처리 |
+|---|---|---|---|
+| K1 | 주소 삭제가 클래스·id 셀렉터를 마스킹 | **재현**(exit=0) | 이미 수정 — 삭제 대신 자리표시자 치환(GREEN14). 같은 결함을 내 자체 검증(A3·A4)도 찾았다 |
+| K2a | `"https://api.test.com/path"` 미탐 | **재현 안 됨** — exit=1 차단. 중화 뒤 남은 `x.com` 을 평면 TLD 규칙이 잡는다. 단위 판정만 보면 놓친 것처럼 보이나 종단은 막힌다 | 수정 없음(근거 기재) |
+| K2b | `"https://127.0.0.1:443/login"` 미탐 | **재현**(exit=0) — AC-5 는 포트 붙은 루프백을 위반으로 규정하는데 통과했다 | **수정.** scheme 규칙에 호스트 끝 경계(lookahead) 추가 |
+| K3 | 예약 URL 경로의 `example.com` 오탐 | **재현**(exit=1) — 다만 URL 경로 조각이 실제 도메인 이름인 경우로, 잡히는 편이 안전하다고 판단 | 수정 없음(근거 기재) |
+| K4 | `PRODUCT_EXT_RE` fail-open | **재현** — `.go`·`.rb`·`.java`·`.php`·`.rs`·`.kt` 전부 exit=0 통과 | 이미 수정 — 발견 규칙의 실패 방향을 뒤집음(GREEN15). 내 자체 검증(B)도 같은 결함을 찾았다 |
+| K5 | 혼합 체인 `"main section > article"` 미탐 | **재현**(exit=0) | **수정.** 구분자를 공백·결합자 혼합으로 허용(결합자 있으면 2태그, 없으면 3태그) |
+| K6 | `"a > b"`·`"a strong output"` 오탐 | **재현**(둘 다 exit=1) | **수정.** 태그 어휘에서 한 글자 태그(a·b·i·p·s·u) 제거 |
+| K7 | `"conftest.py"`·`"README.md"` 정상 파일명 오탐 | **재현**(둘 다 exit=1) | **수정.** 모호 접미사 계약 신설 — 파일 확장자이자 실 TLD 인 5개는 **같은 줄의 주소 문맥**으로 가른다. `F = "conftest.py"` 통과 / `HOST = "hire-portal.py"` 차단 |
+| K8 | AC-6 오기가 검증 명령 표에 남음 | 확인 | **수정.** 표도 `PASS:` 로 |
+| K9 | hardening7 에 사례 수 하한 없음 | 확인 | **수정.** `EXPECTED_CASES=62` 불변식 추가 — 사례가 줄거나 늘면 스스로 빨개진다(추가 직후 실제로 한 번 빨개져 동작을 확인했다) |
 
 ### V1 판정에 대한 처리
 

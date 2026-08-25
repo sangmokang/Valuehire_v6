@@ -28,6 +28,8 @@ GLOBAL_PATTERNS_SOURCE=${G3_GLOBAL_PATTERNS_SOURCE:-contracts/portal-constants-d
 PRODUCT_PATTERNS_SOURCE=${G3_PRODUCT_PATTERNS_SOURCE:-contracts/portal-constants-deny-patterns-product.txt}
 NONOP_ADDRESSES_SOURCE=${G3_NONOP_ADDRESSES_SOURCE:-contracts/portal-constants-nonoperational-addresses.txt}
 NONOP_SUFFIXES_SOURCE=${G3_NONOP_SUFFIXES_SOURCE:-contracts/portal-constants-nonoperational-suffixes.txt}
+NONPRODUCT_PATHS_SOURCE=${G3_NONPRODUCT_PATHS_SOURCE:-contracts/portal-constants-nonproduct-paths.txt}
+AMBIGUOUS_SUFFIXES_SOURCE=${G3_AMBIGUOUS_SUFFIXES_SOURCE:-contracts/portal-constants-ambiguous-suffixes.txt}
 
 for required in "$SCANNER_SOURCE" "$GLOBAL_PATTERNS_SOURCE" "$PRODUCT_PATTERNS_SOURCE"; do
   if [ ! -f "$required" ]; then
@@ -87,6 +89,16 @@ F7_PROSE2=$(printf 'MESSAGE = "button label"')
 F9_ANY=$(printf 'BIND = "0.0.0.0"')
 F9_IPV6=$(printf 'DIAG = "[::1]%s"' ':9333')
 F9_V6BARE=$(printf 'SAFE = "[::1]"')
+B_FLAG=$(printf 'launch_arg = "--remote-%s=9224"' 'debugging-port')
+# ── V1 2라운드(codex) 반례 ────────────────────────────────────────────────────
+K2_LOOPPORT=$(printf 'BASE = "https%s//127.0.0.1:443/login"' ':')
+K5_MIXED=$(printf 'SEL = "main section %s article"' '>')
+K6_CMP=$(printf 'MESSAGE = "a %s b"' '>')
+K6_PROSE=$(printf 'MESSAGE = "a strong output"')
+K7_FILE=$(printf 'F = "conftest.%s"' 'py')
+K7_DOC=$(printf 'DOC = "README.%s"' 'md')
+K7_HOST=$(printf 'HOST = "hire-portal.%s"' 'py')
+K7_URLCTX=$(printf 'url = "vendor.%s"' 'zip')
 # ── 2026-08-25 자체 적대 검증(A3·A4): 비운영 주소를 덧붙여 따옴표 모양을 깨뜨리는 마스킹.
 # 중화를 "삭제"로 구현했을 때 닫는 따옴표가 사라져 셀렉터 규칙이 통째로 무력화됐다.
 A3_MASK=$(printf 'SEL = ".login-%s portal.%s"' 'button' 'invalid')
@@ -133,6 +145,12 @@ init_case() {
   fi
   if [ -f "$NONOP_SUFFIXES_SOURCE" ]; then
     cp "$NONOP_SUFFIXES_SOURCE" "$CASE_DIR/contracts/portal-constants-nonoperational-suffixes.txt"
+  fi
+  if [ -f "$NONPRODUCT_PATHS_SOURCE" ]; then
+    cp "$NONPRODUCT_PATHS_SOURCE" "$CASE_DIR/contracts/portal-constants-nonproduct-paths.txt"
+  fi
+  if [ -f "$AMBIGUOUS_SUFFIXES_SOURCE" ]; then
+    cp "$AMBIGUOUS_SUFFIXES_SOURCE" "$CASE_DIR/contracts/portal-constants-ambiguous-suffixes.txt"
   fi
   cp hooks/pre-push "$CASE_DIR/hooks/pre-push"
   chmod +x "$CASE_DIR/hooks/pre-push"
@@ -304,6 +322,45 @@ git -C "$CASE_DIR" rm -q -f contracts/portal-constants-nonoperational-addresses.
 rm -f "$CASE_DIR/contracts/portal-constants-nonoperational-addresses.txt"
 expect_case "D5 비운영 주소 계약 부재" 2 'portal judgment contract missing'
 
+# ── V1 2라운드 K2·K5·K6·K7 ─────────────────────────────────────────────────
+init_case; plant "humansearch/src/humansearch/k2_probe.py" "$K2_LOOPPORT"
+expect_case "K2 scheme+루프백+포트는 중화 대상이 아니다" 1 "$FORBIDDEN_RE"
+init_case; plant "humansearch/src/humansearch/k5_probe.py" "$K5_MIXED"
+expect_case "K5 공백·결합자 혼합 태그 체인" 1 "$FORBIDDEN_RE"
+init_case; plant "humansearch/tests/k6a_probe.py" "$K6_CMP"
+expect_case "K6 비교 문구는 오탐 금지" 0 "$CLEAN_RE"
+init_case; plant "humansearch/tests/k6b_probe.py" "$K6_PROSE"
+expect_case "K6 영어 문구는 오탐 금지" 0 "$CLEAN_RE"
+init_case; plant "humansearch/tests/k7a_probe.py" "$K7_FILE"
+expect_case "K7 파일명 .py 는 오탐 금지" 0 "$CLEAN_RE"
+init_case; plant "humansearch/tests/k7b_probe.py" "$K7_DOC"
+expect_case "K7 파일명 .md 는 오탐 금지" 0 "$CLEAN_RE"
+init_case; plant "humansearch/src/humansearch/k7c_probe.py" "$K7_HOST"
+expect_case "K7 주소 문맥의 .py 는 차단" 1 "$FORBIDDEN_RE"
+init_case; plant "humansearch/src/humansearch/k7d_probe.py" "$K7_URLCTX"
+expect_case "K7 주소 문맥의 .zip 은 차단" 1 "$FORBIDDEN_RE"
+init_case
+git -C "$CASE_DIR" rm -q -f contracts/portal-constants-ambiguous-suffixes.txt > /dev/null
+rm -f "$CASE_DIR/contracts/portal-constants-ambiguous-suffixes.txt"
+expect_case "K7 모호 접미사 계약 부재" 2 'portal judgment contract missing'
+
+# ── 자체 적대 검증 B: 제품 루트 발견의 실패 방향 ────────────────────────────
+# 확장자 열거 방식일 때 .go·.rb·.java·.php 는 검사망 밖이었다(실측 exit=0).
+init_case; plant "apps/api/main.go" 'const SEL = ".login-button"'
+expect_case "B 신규 폴더 .go — 검사망을 못 벗어난다" 2 'product code outside the product-root contract'
+init_case; plant "apps/api/main.rb" 'SEL = ".login-button"'
+expect_case "B 신규 폴더 .rb" 2 'product code outside the product-root contract'
+init_case; plant "apps/api/Main.java" 'String sel = ".login-button";'
+expect_case "B 신규 폴더 .java" 2 'product code outside the product-root contract'
+init_case; plant "humansearch/src/humansearch/flag_probe.cfg" "$B_FLAG"
+expect_case "B 등재된 루트 안의 같은 값은 금지 패턴으로 잡힌다" 1 "$FORBIDDEN_RE"
+init_case; plant "notes/plan.md" '# 그냥 문서'
+expect_case "B 문서(.md)는 등재를 요구하지 않는다" 0 "$CLEAN_RE"
+init_case
+git -C "$CASE_DIR" rm -q -f contracts/portal-constants-nonproduct-paths.txt > /dev/null
+rm -f "$CASE_DIR/contracts/portal-constants-nonproduct-paths.txt"
+expect_case "B 비제품 계약 부재" 2 'portal judgment contract missing'
+
 # ── 자체 적대 검증 A3·A4: 비운영 주소 마스킹으로 셀렉터 규칙을 깨뜨릴 수 없다 ────
 init_case; plant "humansearch/src/humansearch/mask_class_probe.py" "$A3_MASK"
 expect_case "A3 예약 도메인으로 클래스 규칙 마스킹" 1 "$FORBIDDEN_RE"
@@ -325,6 +382,15 @@ printf 'ok [%s]\n' "hardening7 자기 배선(CI 실행 줄)"
 SNAP1=$(git status --porcelain)
 if [ "$SNAP0" != "$SNAP1" ]; then
   echo "FAIL: hardening7 시험이 원본 저장소를 변형했다"
+  exit 1
+fi
+
+# 사례 수 하한 (2026-08-25 V1 2라운드 K9). 검사가 몇 개 사라져도 초록이면 가짜다.
+# AC-M 의 CHECKED 불변식과 같은 장치다 — 사례를 지우면 여기서 빨개진다.
+EXPECTED_CASES=62
+if [ "$total" -ne "$EXPECTED_CASES" ]; then
+  echo "FAIL: hardening7 사례 수 $total ≠ 계약값 $EXPECTED_CASES — 사례가 사라졌거나 무단 추가됐다"
+  echo "CHECKED: $total"
   exit 1
 fi
 

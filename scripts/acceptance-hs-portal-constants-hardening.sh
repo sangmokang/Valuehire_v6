@@ -95,6 +95,8 @@ init_case() {
     > "$CASE_DIR/contracts/portal-constants-product-roots.txt"
   cp contracts/portal-constants-nonoperational-addresses.txt "$CASE_DIR/contracts/portal-constants-nonoperational-addresses.txt"
   cp contracts/portal-constants-nonoperational-suffixes.txt "$CASE_DIR/contracts/portal-constants-nonoperational-suffixes.txt"
+  cp contracts/portal-constants-nonproduct-paths.txt "$CASE_DIR/contracts/portal-constants-nonproduct-paths.txt"
+  cp contracts/portal-constants-ambiguous-suffixes.txt "$CASE_DIR/contracts/portal-constants-ambiguous-suffixes.txt"
   cp hooks/pre-push "$CASE_DIR/hooks/pre-push"
   chmod +x "$CASE_DIR/hooks/pre-push"
   write_wf "$CASE_DIR" ok

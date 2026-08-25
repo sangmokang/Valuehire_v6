@@ -113,6 +113,8 @@ init_case() {
     > "$CASE_DIR/contracts/portal-constants-product-roots.txt"
   cp contracts/portal-constants-nonoperational-addresses.txt "$CASE_DIR/contracts/portal-constants-nonoperational-addresses.txt"
   cp contracts/portal-constants-nonoperational-suffixes.txt "$CASE_DIR/contracts/portal-constants-nonoperational-suffixes.txt"
+  cp contracts/portal-constants-nonproduct-paths.txt "$CASE_DIR/contracts/portal-constants-nonproduct-paths.txt"
+  cp contracts/portal-constants-ambiguous-suffixes.txt "$CASE_DIR/contracts/portal-constants-ambiguous-suffixes.txt"
   cp hooks/pre-push "$CASE_DIR/hooks/pre-push"
   chmod +x "$CASE_DIR/hooks/pre-push"
   write_wf "$CASE_DIR" ok
@@ -215,9 +217,15 @@ init_case
 printf '# probe: %s\n' "$SEL_API" >> "$CASE_DIR/scripts/acceptance-hs-portal-constants.sh"
 expect_case "검사기 자신에 심은 selector — 자기면제 금지" 1 "$FORBIDDEN_RE"
 
+# 2026-08-25 동결 예외(hardening7 2라운드): 기대 종료값을 1 → 2 로 바꾼다.
+# 공격 내용·경로는 그대로다. 제품 루트 발견의 실패 방향을 뒤집으면서, 인프라 구역 밖의
+# 미등재 파일은 금지 패턴 판정보다 **먼저** 검사 불능(2)으로 막힌다. 차단이 사라진 게
+# 아니라 더 이른 관문에서 더 강한 이유로 막힌다 — "이 폴더를 등재하지 않았다".
+# 원래 단언("이 값이 금지 패턴에 걸린다")은 hardening7 의 "등재된 루트 안의 같은 값"
+# 사례가 exit 1 로 이어받는다.
 init_case
 plant "note-${RANDOM}.cfg" "$FLAG_P"
-expect_case "루트 파일 CDP 플래그" 1 "$FORBIDDEN_RE"
+expect_case "루트 파일 CDP 플래그(미등재 → 검사 불능)" 2 'product code outside the product-root contract'
 
 init_case
 plant "hooks/deploy_probe" "$BRAND_P"
