@@ -283,7 +283,7 @@ sql_has_load_statement() {
           | sed 's/[[:space:]][[:space:]]*/ /g' > "$normalized"; then
     return 2
   fi
-  grep -qiE '(^|[^[:alnum:]_])insert[[:space:]]+into[[:space:]].*[[:space:]]values([^[:alnum:]_]|$)|(^|[^[:alnum:]_])copy([^[:alnum:]_]|$)' "$normalized"
+  grep -qiE '(^|[^[:alnum:]_])insert[[:space:]]+into[[:space:]].*[[:space:]]values([^[:alnum:]_]|$)|(^|[^[:alnum:]_])copy[[:space:]]+[^;]*[[:space:]]from([^[:alnum:]_]|$)' "$normalized"
 }
 
 is_pii_path() {

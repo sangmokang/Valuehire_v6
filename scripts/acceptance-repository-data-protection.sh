@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2016,SC2329 # scenario names and shim bodies are intentionally evaluated later
 # repository-data-protection follow-up acceptance.
 set -uo pipefail
 
@@ -130,6 +131,30 @@ sc_string_only_sql() {
   commit_file query.sql seed
 }
 
+sc_multiline_copy_sql() {
+  printf "COPY\npeople(name,email)\nFROM\nSTDIN;\nsynthetic\tsynthetic@example.invalid\n\\\\.\n" > load.sql
+  commit_file load.sql seed
+}
+
+sc_history_multiline_copy_sql() {
+  sc_multiline_copy_sql
+  git rm -q load.sql
+  printf 'ok\n' > README.md
+  commit_file README.md delete
+}
+
+sc_staged_multiline_copy_sql() {
+  printf 'ok\n' > README.md
+  commit_file README.md base
+  printf "COPY\npeople(name,email)\nFROM\nSTDIN;\nsynthetic\tsynthetic@example.invalid\n\\\\.\n" > load.sql
+  git add load.sql
+}
+
+sc_copy_identifier_control() {
+  printf 'CREATE TABLE people(copy TEXT, name TEXT, email TEXT);\n' > schema.sql
+  commit_file schema.sql seed
+}
+
 sc_clean() {
   printf 'ok\n' > README.md
   commit_file README.md seed
@@ -257,16 +282,26 @@ ci_wiring_case() {
   local n sot_n
   n=$(grep -Ec 'run:[[:space:]]+bash scripts/verify/run-acceptance.sh scripts/acceptance-repository-data-protection.sh' "$WF")
   sot_n=$(grep -cF '| 19 | 인수 검사 repository-data-protection |' docs/sot/verification-commands.md)
-  [ "$n" -eq 1 ] && pass "verify.yml 신규 acceptance 정확히 1회 호출" || bad "verify.yml 신규 acceptance 호출 수 $n"
-  [ "$sot_n" -eq 1 ] \
-    && pass "verification-commands.md 신규 acceptance 등록" \
-    || bad "verification-commands.md 신규 acceptance 등록 수 $sot_n"
-  grep -q 'repository-data-protection 호출 삭제' scripts/acceptance-ci-step-integrity.sh \
-    && pass "CI 호출 삭제 mutation 방어 등록" \
-    || bad "CI 호출 삭제 mutation 방어 누락"
-  grep -q 'acceptance-repository-data-protection.sh' "$HS_A4" \
-    && pass "hs-a4 코드 예산 대상에 신규 acceptance 포함" \
-    || bad "hs-a4 코드 예산 대상 누락"
+  if [ "$n" -eq 1 ]; then
+    pass "verify.yml 신규 acceptance 정확히 1회 호출"
+  else
+    bad "verify.yml 신규 acceptance 호출 수 $n"
+  fi
+  if [ "$sot_n" -eq 1 ]; then
+    pass "verification-commands.md 신규 acceptance 등록"
+  else
+    bad "verification-commands.md 신규 acceptance 등록 수 $sot_n"
+  fi
+  if grep -q 'repository-data-protection 호출 삭제' scripts/acceptance-ci-step-integrity.sh; then
+    pass "CI 호출 삭제 mutation 방어 등록"
+  else
+    bad "CI 호출 삭제 mutation 방어 누락"
+  fi
+  if grep -q 'acceptance-repository-data-protection.sh' "$HS_A4"; then
+    pass "hs-a4 코드 예산 대상에 신규 acceptance 포함"
+  else
+    bad "hs-a4 코드 예산 대상 누락"
+  fi
 }
 
 partial_acceptance_case() {
@@ -380,6 +415,10 @@ run_case "all staged multiline SQL" all sc_staged_multiline_sql 1 2 1 0 5
 run_case "comment newline SQL load" pii sc_comment_newline_sql 1 0 1 0 1
 run_case "comment-only SQL control" pii sc_comment_only_sql 0 1 0 0 1
 run_case "string-only SQL control" pii sc_string_only_sql 0 1 0 0 1
+run_case "multiline COPY FROM SQL load" pii sc_multiline_copy_sql 1 0 1 0 1
+run_case "deleted history multiline COPY FROM SQL load" history sc_history_multiline_copy_sql 1 0 1 0 2
+run_case "all staged multiline COPY FROM SQL load" all sc_staged_multiline_copy_sql 1 2 1 0 5
+run_case "COPY identifier schema control" pii sc_copy_identifier_control 0 1 0 0 1
 partial_case "tracked partial ls-files" tracked always 2 0 0 1 0
 partial_case "pii partial ls-files" pii always 2 0 0 1 0
 partial_case "all partial ls-files no false PASS" all always 2 0 0 2 1 sc_staged_multiline_sql
@@ -401,7 +440,7 @@ runner_no_raw_case
 shared_function_case
 ci_wiring_case
 
-EXPECTED_CHECKS=29
+EXPECTED_CHECKS=33
 if [ "$checked" -ne "$EXPECTED_CHECKS" ]; then
   printf 'FAIL: 검사 항목 %d개 ≠ 계약값 %d개\n' "$checked" "$EXPECTED_CHECKS"
   printf 'CHECKED: %d\n' "$checked"

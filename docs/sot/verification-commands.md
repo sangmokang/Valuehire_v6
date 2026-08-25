@@ -65,6 +65,8 @@
 
 현재 `pii`와 `history`는 `scan_pii_content` 한 함수를 재사용한다. history는 모든 도달 가능 commit tree의 blob-경로 연결을 NUL 경계로 열거하므로 제어문자가 든 경로와 안전 확장자 alias도 숨지 못한다. SQL은 판정용 사본에서 `--`·`#`·`/* */` 주석과 작은따옴표 문자열 내용을 제거하고 줄바꿈·탭을 공백으로 정규화한 뒤 `INSERT INTO`·`VALUES (`·`COPY ... FROM`을 판정한다. 개인정보 컬럼 낱말 2종 이상은 기존처럼 원본 파일 전체에서 세며, CSV·TSV는 데이터 행이 있어야 차단한다. 따라서 개인정보 컬럼 1종 CSV, schema-only SQL, 주석·문자열에만 적재 예시가 있는 SQL은 통과한다.
 
+`scripts/acceptance-repository-data-protection.sh`는 33개 사례를 정확히 요구한다. 여기에는 현재·삭제 history·all의 여러 줄 `COPY ... FROM` 적재문과 `copy`가 컬럼 식별자로만 존재하는 schema-only 정상 SQL 대조군이 포함된다. bare `copy` 낱말만으로 적재문을 판정하면 이 acceptance가 실패한다.
+
 scanner는 금지경로·크기초과·PII 위반·경로 관련 NOT_RUN에서 원문 경로를 출력하지 않는다. `path <12hex>`는 `printf '%s' "$path" | shasum -a 256` 결과의 앞 12자리인 결정론적 가명이며 비식별화가 아니다. 같은 경로는 current/history에서 같은 지문이다. 운영자는 로컬에서만 `bash scripts/resolve-data-path-fingerprint.sh <12hex>`를 실행해 현재 추적 경로와 삭제된 commit-tree 경로를 역조회한다. 2개 이상이 나오면 도구는 모든 shell-escaped 후보와 `COLLISION`을 출력하고 성공으로 접지 않는다. 이 로컬 출력은 CI·goal·판정서에 복사하지 않는다.
 
 **금지 경로 목록은 `hooks/pre-commit`과 이 판정기 두 곳에 있다**(훅은 '스테이지된 것'만 보므로 별도 코드다). 한쪽만 넓히면 조용히 갈라지므로 `scripts/acceptance-hs-a4.sh`가 두 목록의 동치를 검사한다.

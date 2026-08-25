@@ -65,9 +65,9 @@ When 세 하위 검사 중 하나라도 `NOT_RUN`이면, all은 세 출력을 �
 
 ### AC-3 — SQL 실제 적재와 정상 설명 구분
 
-When `INSERT`, `INTO`, `VALUES`가 서로 다른 줄에 있거나 주석이 토큰 사이에 있으면, 현재 pii·삭제 history·all은 개인정보 적재 SQL을 exit 1로 차단해야 합니다. When INSERT/VALUES가 주석 또는 작은따옴표 문자열 안에만 있으면, 같은 판정 함수는 정상 SQL을 exit 0으로 통과시켜야 합니다.
+When `INSERT`, `INTO`, `VALUES`가 서로 다른 줄에 있거나 주석이 토큰 사이에 있으면, 현재 pii·삭제 history·all은 개인정보 적재 SQL을 exit 1로 차단해야 합니다. When `COPY ... FROM` 적재문이 여러 줄이면 같은 세 모드가 차단해야 합니다. When INSERT/VALUES가 주석 또는 작은따옴표 문자열 안에만 있거나 `copy`가 schema 컬럼 식별자로만 있으면, 같은 판정 함수는 정상 SQL을 exit 0으로 통과시켜야 합니다.
 
-검증 명령: 전용 acceptance의 current/history/all 다중행, comment+newline, comment-only, string-only 사례; 기대: 위반 exit 1, 정상 exit 0, `scan_pii_content` 정의 1개 및 current/history 직접 호출 유지.
+검증 명령: 전용 acceptance의 current/history/all 다중행 INSERT·COPY FROM, comment+newline, comment-only, string-only, COPY-identifier schema 사례; 기대: 33개 사례, 위반 exit 1, 정상 exit 0, `scan_pii_content` 정의 1개 및 current/history 직접 호출 유지.
 
 ### AC-4 — 원문 경로 비출력과 역조회
 
@@ -155,11 +155,11 @@ enumeration failure := exit 2, partial candidates discarded
 |---|---|---|
 | 0 | 기준 SHA, 원본 dirty 지문, 과거 증거, RED 원장 | PASS |
 | 1 | EARS AC, counter-AC, I/O·오류·경계, 영향·롤백·데이터 안전 | PASS |
-| 2 | 격리 worktree에서 새 acceptance RED | 대기 |
-| 3 | 최소 구현으로 RED→GREEN, 테스트 약화 없음 | 대기 |
-| 3.5 | workflow→runner→acceptance→scanner 및 역조회 배선 | 대기 |
-| 4 | 원명령·수치·mutation·전체 all fresh 검증 | 대기 |
-| 5 | Lore 로컬 커밋, clean SHA, V1/V2/humanreview, P23 공개 | 대기 |
+| 2 | 격리 worktree에서 새 acceptance RED | PASS |
+| 3 | 최소 구현으로 RED→GREEN, 테스트 약화 없음 | PASS |
+| 3.5 | workflow→runner→acceptance→scanner 및 역조회 배선 | PASS |
+| 4 | 원명령·수치·mutation·전체 all fresh 검증 | 진행 — COPY 보강 뒤 재실행 필요 |
+| 5 | Lore 로컬 커밋, clean SHA, V1/V2/humanreview, P23 공개 | REQUEST_CHANGES — V1·P23·humanreview 미충족 |
 | 6 | push/PR/merge/배포 | 금지 |
 
 ### 2026-08-25 21:31:23 KST — Strict 원칙 직접 로드
@@ -216,3 +216,51 @@ HARNESS EXIT: 0 (재현 결과 네 건이 계약과 반대임을 수치로 확�
 ```
 
 → 다중행 현재·삭제 history SQL과 부분 Git 목록 실패가 거짓 PASS였고, 주석에만 적재문이 있는 정상 SQL은 거짓 FAIL이었습니다. fixture 원문과 원문 경로는 장부에 복사하지 않았고 임시 저장소는 종료 시 제거했습니다.
+
+### 2026-08-25 23:24:18 KST — COPY 식별자 오탐 RED
+
+```text
+COMMAND: bash scripts/acceptance-repository-data-protection.sh
+PWD: /private/tmp/valuehire-rdp-20260824.7e3kk1/worktree
+HEAD: 3136354d174290f87a88489bcb4ea323af815c47
+PASS: multiline COPY FROM SQL load
+FAIL: COPY identifier schema control — got exit=1 PASS=0 FAIL=1 NOT_RUN=0 CHECKED=1
+CHECKED: 31
+VERDICT: FAIL
+EXIT: 1
+```
+
+→ `copy`가 컬럼 이름으로만 있는 정상 schema SQL을 적재문으로 오인하는 새 반례가 RED로 재현됐습니다. 실제 `COPY ... FROM` 여러 줄 적재문은 기존 코드에서도 차단됐으므로, 누락이 아니라 bare `copy` 오탐이 원인이었습니다.
+
+### 2026-08-25 23:24:49 KST — COPY FROM 계약 GREEN
+
+```text
+COMMAND: bash scripts/acceptance-repository-data-protection.sh
+PWD: /private/tmp/valuehire-rdp-20260824.7e3kk1/worktree
+HEAD: 3136354d174290f87a88489bcb4ea323af815c47 + uncommitted RED/GREEN patch
+PASS: multiline COPY FROM SQL load
+PASS: COPY identifier schema control
+CHECKED: 31
+VERDICT: PASS
+EXIT: 0
+COMMAND: shellcheck scripts/scan-data-exposure.sh scripts/acceptance-repository-data-protection.sh
+EXIT: 0
+COMMAND: bash -n scripts/scan-data-exposure.sh scripts/acceptance-repository-data-protection.sh
+EXIT: 0
+```
+
+→ SQL 판정은 이제 `COPY` 뒤에 실제 `FROM` 절이 있는 경우만 적재문으로 인정합니다. 이어서 current·삭제 history·all의 여러 줄 COPY 사례를 추가해 전용 acceptance 계약값을 33으로 올렸으며, 최종 커밋 SHA에서 전체 게이트를 다시 실행합니다.
+
+### 2026-08-25 23:25:05 KST — canonical Claude V1 복구 시도
+
+```text
+COMMAND: omx ask claude '<final SHA 3136354... read-only adversarial prompt>'
+PWD: /private/tmp/valuehire-rdp-20260824.7e3kk1/worktree
+PROVIDER: claude
+EXIT: 1
+OUTPUT: Credit balance is too low
+ARTIFACT: .omx/artifacts/claude-you-are-claude-v1-an-independent-adversarial-reviewer-work-r-2026-08-25T14-25-05-039Z.md
+STATUS: NOT_RUN
+```
+
+→ 정식 OMX Claude 경로도 검토 본문을 만들기 전에 외부 크레딧에서 종료했습니다. Codex 검증으로 대체하지 않으며, 최종 구현 SHA에서 `ANTHROPIC_API_KEY`를 제거한 인증 경로로 한 번 더 복구 시도합니다.
