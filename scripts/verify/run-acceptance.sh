@@ -17,13 +17,26 @@
 #              주장하지 않는다.
 set -uo pipefail
 
+path_fingerprint() {
+  local digest
+  digest=$(printf '%s' "$1" | shasum -a 256 2>/dev/null) || return 2
+  digest=${digest%%[[:space:]]*}
+  case "$digest" in *[!0-9a-f]*|'') return 2 ;; esac
+  [ "${#digest}" -ge 12 ] || return 2
+  printf '%.12s' "$digest"
+}
+
 target="${1:-}"
 if [ -z "$target" ]; then
-  echo "FAIL: 대상 인수 검사 경로가 없다 — 사용법: $0 <script.sh> [args...]"
+  echo "FAIL: 대상 인수 검사 경로가 없다 — 사용법: run-acceptance <script.sh> [args...]"
   exit 2
 fi
+target_id=$(path_fingerprint "$target") || {
+  echo "FAIL: 대상 인수 검사 path fingerprint를 만들지 못했다"
+  exit 2
+}
 if [ ! -f "$target" ]; then
-  echo "FAIL: 대상 인수 검사가 없다 — $target"
+  echo "FAIL: 대상 인수 검사가 없다 — path $target_id"
   exit 2
 fi
 
@@ -39,14 +52,14 @@ rc=${PIPESTATUS[0]}
 
 if [ "$rc" -ne 0 ]; then
   # 원래 실패는 원래 종료값 그대로 넘긴다. 래퍼가 실패 이유를 바꾸지 않는다.
-  echo "FAIL(run-acceptance): $target 종료값 $rc"
+  echo "FAIL(run-acceptance): path $target_id 종료값 $rc"
   exit "$rc"
 fi
 
 # 종료값 0 인데 판정 근거가 없다 — 이것이 exit 0 치환이 통과하던 구멍이다.
 pass_lines=$(grep -c 'PASS' "$out")
 if [ "$pass_lines" -lt 1 ]; then
-  echo "FAIL(run-acceptance): $target 이 종료값 0 이지만 판정을 한 건도 내놓지 않았다."
+  echo "FAIL(run-acceptance): path $target_id 이 종료값 0 이지만 판정을 한 건도 내놓지 않았다."
   echo "  실행됐다는 사실은 검사했다는 증거가 아니다 — 본문이 비었거나 조기 종료했을 수 있다."
   exit 1
 fi
@@ -55,11 +68,11 @@ fi
 if grep -q 'CHECKED:' "$out"; then
   checked=$(grep 'CHECKED:' "$out" | tail -1 | sed 's/.*CHECKED:[[:space:]]*//' | tr -cd '0-9')
   if [ -z "$checked" ] || [ "$checked" -lt 1 ]; then
-    echo "FAIL(run-acceptance): $target 의 CHECKED 건수가 ${checked:-없음} — 검사 대상 0개는 합격이 아니다."
+    echo "FAIL(run-acceptance): path $target_id 의 CHECKED 건수가 ${checked:-없음} — 검사 대상 0개는 합격이 아니다."
     exit 1
   fi
-  echo "OK(run-acceptance): $target — 판정 ${pass_lines}건, CHECKED ${checked}"
+  echo "OK(run-acceptance): path $target_id — 판정 ${pass_lines}건, CHECKED ${checked}"
   exit 0
 fi
 
-echo "OK(run-acceptance): $target — 판정 ${pass_lines}건"
+echo "OK(run-acceptance): path $target_id — 판정 ${pass_lines}건"

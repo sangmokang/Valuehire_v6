@@ -7,6 +7,15 @@
 #  ② fail-open 차단 — -f/-r 검사, CRLF 정규화, 유효 패턴 0개 시 exit 2, grep stderr를 실패로 취급
 set -euo pipefail
 
+path_fingerprint() {
+  local digest
+  digest=$(printf '%s' "$1" | shasum -a 256 2>/dev/null) || return 2
+  digest=${digest%%[[:space:]]*}
+  case "$digest" in *[!0-9a-f]*|'') return 2 ;; esac
+  [ "${#digest}" -ge 12 ] || return 2
+  printf '%.12s' "$digest"
+}
+
 # 패턴 소스 결정:
 #  - SECRET_PATTERNS_FILE 지정 시 → 그 파일만 사용(테스트·CI 주입용, 기존 계약 유지)
 #  - 미지정 시 → 커밋된 .secret-patterns.default + gitignore된 .secret-patterns 합집합.
@@ -28,7 +37,8 @@ if [ ${#SOURCES[@]} -eq 0 ]; then
 fi
 for p in "${SOURCES[@]}"; do
   if [ ! -f "$p" ] || [ ! -r "$p" ] || [ ! -s "$p" ]; then
-    echo "NOT_RUN: secret patterns file missing/not-a-file/unreadable/empty: $p"
+    pattern_id=$(path_fingerprint "$p") || pattern_id=unavailable
+    echo "NOT_RUN: secret patterns file missing/not-a-file/unreadable/empty: path $pattern_id"
     echo "      로컬: 저장소 루트에 .secret-patterns 배치 / CI: .secret-patterns.default 사용."
     echo "CHECKED: 0"
     exit 2
@@ -49,7 +59,7 @@ if ! awk '{ sub(/\r$/, ""); if ($0 !~ /^[[:space:]]*(#|$)/) print }' \
   exit 2
 fi
 if [ ! -s "$CLEAN" ]; then
-  echo "NOT_RUN: no effective secret patterns in: ${SOURCES[*]} (주석/빈 줄뿐)"
+  echo "NOT_RUN: no effective secret patterns (주석/빈 줄뿐)"
   echo "CHECKED: 0"
   exit 2
 fi
@@ -66,7 +76,7 @@ SCAN_SOURCE="${VERIFY_SCAN_SOURCE:-worktree}"
 case "$SCAN_SOURCE" in
   worktree|index) ;;
   *)
-    echo "NOT_RUN: unknown VERIFY_SCAN_SOURCE '$SCAN_SOURCE' (worktree|index)"
+    echo "NOT_RUN: unknown VERIFY_SCAN_SOURCE (worktree|index)"
     echo "CHECKED: 0"
     exit 2
     ;;
@@ -90,7 +100,8 @@ while IFS= read -r -d '' f; do
   rc=0
   if [ "$SCAN_SOURCE" = index ]; then
     if ! git show ":$f" > "$BLOB" 2>/dev/null; then
-      printf '  ! unreadable Git index blob: %s\n' "$f"
+      path_id=$(path_fingerprint "$f") || path_id=unavailable
+      printf '  ! unreadable Git index blob: path %s\n' "$path_id"
       SCAN_ERROR=1
       continue
     fi
@@ -99,12 +110,14 @@ while IFS= read -r -d '' f; do
     if grep -qEif "$CLEAN" -- "$f" 2>/dev/null; then rc=0; else rc=$?; fi
   fi
   if [ "$rc" -eq 0 ]; then
-    LEAKS="${LEAKS}${f}"$'\n'
+    path_id=$(path_fingerprint "$f") || { SCAN_ERROR=1; continue; }
+    LEAKS="${LEAKS}${path_id}"$'\n'
     CHECKED=$((CHECKED + 1))
   elif [ "$rc" -eq 1 ]; then
     CHECKED=$((CHECKED + 1))
   else
-    printf '  ! unreadable scan target: %s\n' "$f"
+    path_id=$(path_fingerprint "$f") || path_id=unavailable
+    printf '  ! unreadable scan target: path %s\n' "$path_id"
     SCAN_ERROR=1
   fi
 done < "$FILES"
@@ -123,13 +136,14 @@ fi
 FAIL=0
 LEAKS="${LEAKS%$'\n'}"
 if [ -n "$LEAKS" ]; then
-  echo "FAIL: secret pattern matched in tracked files:"
-  printf '%s\n' "$LEAKS" | sed 's/^/  - /'
+  echo "FAIL: secret pattern matched in tracked path fingerprints:"
+  printf '%s\n' "$LEAKS" | sed 's/^/  - path /'
   FAIL=1
 fi
 
 if [ "$ENV_TRACKED" -eq 1 ]; then
-  echo "FAIL: .env is tracked by git (should stay untracked/gitignored)"
+  env_id=$(path_fingerprint .env) || env_id=unavailable
+  echo "FAIL: environment file is tracked by git: path $env_id"
   FAIL=1
 fi
 

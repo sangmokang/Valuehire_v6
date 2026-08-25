@@ -11,6 +11,8 @@ REPO=$(git rev-parse --show-toplevel 2>/dev/null) || {
 cd "$REPO" || exit 2
 SCANNER="$REPO/scripts/scan-data-exposure.sh"
 RESOLVER="$REPO/scripts/resolve-data-path-fingerprint.sh"
+VERIFY="$REPO/verify.sh"
+RUNNER="$REPO/scripts/verify/run-acceptance.sh"
 HS_A4="$REPO/scripts/acceptance-hs-a4.sh"
 SEM="$REPO/scripts/acceptance-semantic-mutations.sh"
 WF="$REPO/.github/workflows/verify.yml"
@@ -298,6 +300,68 @@ hs_raw_path_case() {
   fi
 }
 
+scanner_mode_no_raw_case() {
+  local canary='private/raw-mode-shadow.txt' out rc=0
+  out=$(bash "$SCANNER" "$canary" 2>&1) || rc=$?
+  if [ "$rc" -eq 2 ] && ! printf '%s\n' "$out" | grep -qF "$canary"; then
+    pass "scanner unknown-mode NOT_RUN 원문 입력 제거"
+  else
+    bad "scanner unknown-mode 원문 입력 노출 — exit=$rc"
+  fi
+}
+
+verify_match_no_raw_case() {
+  local tmp out rc=0 canary='private-match-shadow.txt' value='SECRET_CANARY_ALPHA'
+  new_repo || { bad "verify match fixture 생성 실패"; return; }
+  tmp="$NEW_REPO"; cp "$VERIFY" "$tmp/verify.sh"
+  ( cd "$tmp" && printf 'SECRET_CANARY_[A-Z]+\n' > .secret-patterns.default \
+    && printf '%s\n' "$value" > "$canary" && git add . && git commit -q -m verify ) \
+    || { bad "verify match seed 실패"; return; }
+  out=$(cd "$tmp" && bash verify.sh 2>&1) || rc=$?
+  if [ "$rc" -eq 1 ] && ! printf '%s\n' "$out" | grep -qF "$canary" \
+     && ! printf '%s\n' "$out" | grep -qF "$value" \
+     && printf '%s\n' "$out" | grep -qE 'path [0-9a-f]{12}'; then
+    pass "verify secret FAIL 원문 경로·값 제거"
+  else
+    bad "verify secret FAIL 비출력 계약 위반 — exit=$rc"
+  fi
+}
+
+verify_index_not_run_no_raw_case() {
+  local tmp shim real_git out rc=0 canary='private-index-shadow.txt'
+  new_repo || { bad "verify index NOT_RUN fixture 생성 실패"; return; }
+  tmp="$NEW_REPO"; cp "$VERIFY" "$tmp/verify.sh"
+  ( cd "$tmp" && printf 'NEVER_MATCH_THIS\n' > .secret-patterns.default \
+    && printf 'safe\n' > "$canary" && git add . && git commit -q -m verify ) \
+    || { bad "verify index NOT_RUN seed 실패"; return; }
+  shim="$tmp/verify-shim"; mkdir -p "$shim"; real_git=$(command -v git)
+  printf '%s\n' '#!/usr/bin/env bash' "real_git='$real_git'" \
+    'if [ "${1:-}" = show ] && [ "${2:-}" = ":private-index-shadow.txt" ]; then exit 9; fi' \
+    'exec "$real_git" "$@"' > "$shim/git"
+  chmod +x "$shim/git"
+  out=$(cd "$tmp" && PATH="$shim:$PATH" VERIFY_SCAN_SOURCE=index bash verify.sh 2>&1) || rc=$?
+  if [ "$rc" -eq 2 ] && ! printf '%s\n' "$out" | grep -qF "$canary" \
+     && printf '%s\n' "$out" | grep -qE 'unreadable Git index blob: path [0-9a-f]{12}' \
+     && [ "$(printf '%s\n' "$out" | grep -c '^PASS:')" -eq 0 ]; then
+    pass "verify path NOT_RUN 원문 경로 제거"
+  else
+    bad "verify path NOT_RUN 비출력 계약 위반 — exit=$rc"
+  fi
+}
+
+runner_no_raw_case() {
+  local tmp target out rc=0
+  tmp=$(mktemp -d) || { bad "run-acceptance fixture 생성 실패"; return; }
+  tmpdirs="$tmpdirs $tmp"; target="$tmp/private-acceptance-shadow.sh"
+  out=$(bash "$RUNNER" "$target" 2>&1) || rc=$?
+  if [ "$rc" -eq 2 ] && ! printf '%s\n' "$out" | grep -qF "$target" \
+     && printf '%s\n' "$out" | grep -qE 'path [0-9a-f]{12}'; then
+    pass "run-acceptance 오류 원문 대상 경로 제거"
+  else
+    bad "run-acceptance 오류 경로 비출력 계약 위반 — exit=$rc"
+  fi
+}
+
 shared_function_case() {
   local defs hist cur
   defs=$(grep -Ec '^scan_pii_content[[:space:]]*[(][)]' "$SCANNER")
@@ -330,10 +394,14 @@ resolver_case
 partial_acceptance_case "$HS_A4" "acceptance-hs-a4"
 partial_acceptance_case "$SEM" "acceptance-semantic-mutations"
 hs_raw_path_case
+scanner_mode_no_raw_case
+verify_match_no_raw_case
+verify_index_not_run_no_raw_case
+runner_no_raw_case
 shared_function_case
 ci_wiring_case
 
-EXPECTED_CHECKS=25
+EXPECTED_CHECKS=29
 if [ "$checked" -ne "$EXPECTED_CHECKS" ]; then
   printf 'FAIL: 검사 항목 %d개 ≠ 계약값 %d개\n' "$checked" "$EXPECTED_CHECKS"
   printf 'CHECKED: %d\n' "$checked"

@@ -29,7 +29,7 @@ MAX_BYTES=1048576
 
 case "$MODE" in
   tracked|history|pii|all) ;;
-  *) echo "NOT_RUN: 알 수 없는 모드 '$MODE' (tracked|history|pii|all)"; exit 2 ;;
+  *) echo "NOT_RUN: 알 수 없는 모드 (tracked|history|pii|all)"; exit 2 ;;
 esac
 
 git rev-parse --git-dir >/dev/null 2>&1 || { echo "NOT_RUN: git 저장소가 아니다"; exit 2; }
