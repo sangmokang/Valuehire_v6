@@ -171,15 +171,20 @@ def test_a_role_value_that_cannot_be_compared_makes_the_observation_invalid() ->
 # --- WU11: CDP 읽기 루프가 관련 없는 이벤트를 건너뛴다 -------------------------
 # `for _ in range(32)` 를 `range(1)` 로 바꾸는 변조가 살아남았다 — 아무 시험도 "우리 응답보다
 # 먼저 다른 이벤트가 오는" 순서를 태우지 않았다. DevTools 는 실제로 그런 이벤트를 보낸다.
+_ANSWER_FRAME = (
+    b'{"id":1,"result":{"result":{"value":{"contract_valid":true,"matched_roles":[]}}}}'
+)
+
+
 def test_cdp_read_skips_unrelated_events_before_the_answer(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     frames = [
         (0x1, b'{"method":"Runtime.consoleAPICalled","params":{}}'),  # 우리 것이 아니다
         (0x1, b'{"id":2,"result":{"result":{"value":"other"}}}'),      # 다른 요청의 답
-        (0x1, b'{"id":1,"result":{"result":{"value":{"contract_valid":true,'
-              b'"matched_roles":[]}}}}'),                              # 우리 답
+        (0x1, _ANSWER_FRAME),                                          # 우리 답
     ]
+
     def next_frame(connection: object) -> tuple[int, bytes]:
         return frames.pop(0)
 
