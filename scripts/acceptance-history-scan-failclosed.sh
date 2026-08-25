@@ -18,6 +18,7 @@ cd "$ROOT" || {
 
 SCANNER="$ROOT/scripts/scan-history-secrets.sh"
 WORKFLOW="$ROOT/.github/workflows/verify.yml"
+HOOK="$ROOT/hooks/pre-push"
 REAL_GIT=$(command -v git)
 SNAPSHOT=$(git status --porcelain)
 TMP=$(mktemp -d) || {
@@ -32,7 +33,7 @@ esac
 trap 'ruby -rfileutils -e "FileUtils.remove_entry(ARGV[0]) if File.exist?(ARGV[0])" "$TMP"' EXIT
 
 CANARY='VH-HISTORY-SYNTH-CANARY-884211'
-TOTAL=10
+TOTAL=17
 checked=0
 failed=0
 
@@ -60,35 +61,13 @@ make_fixture() {
   git -C "$fixture" commit -qm fixture
 }
 
-legacy_scan() {
-  local fixture="$1" body raw_rc=0
-  body=$(awk '
-    /^      - name: 히스토리 전량 스캔/ { in_step=1; next }
-    in_step && /^      - name:/ { exit }
-    in_step && /^        run: \|/ { in_run=1; next }
-    in_run { sub(/^          /, ""); print }
-  ' "$WORKFLOW")
-  if [ -z "$body" ]; then
-    echo "NOT_RUN: 현재 워크플로의 히스토리 스캔 본문을 찾지 못했다"
-    return 2
-  fi
-
-  # 종료값 계약은 0=정상(위반 0건) · 1=위반 발견 · 2=스캔 무효.
-  # 현재 워크플로 인라인도 같은 관례(exit $hit, 무효는 exit 2)이므로 그대로 넘긴다.
-  (cd "$fixture" && bash -c "$body") || raw_rc=$?
-  case "$raw_rc" in
-    0|1|2) return "$raw_rc" ;;
-    *) return 2 ;;
-  esac
-}
-
 run_scanner() {
   local fixture="$1"
-  if [ -f "$SCANNER" ]; then
-    (cd "$fixture" && bash "$SCANNER")
-  else
-    legacy_scan "$fixture"
+  if [ ! -f "$SCANNER" ]; then
+    echo "NOT_RUN: 히스토리 스캐너 파일이 없다"
+    return 2
   fi
+  (cd "$fixture" && bash "$SCANNER")
 }
 
 run_type_failure() {
@@ -103,6 +82,27 @@ run_blob_failure() {
     run_scanner "$fixture"
 }
 
+run_rev_list_failure() {
+  local fixture="$1"
+  PATH="$fixture/bin:$PATH" REAL_GIT="$REAL_GIT" FAIL_REV_LIST_SHA="$rev_list_failure_sha" \
+    run_scanner "$fixture"
+}
+
+run_rev_list_empty() {
+  local fixture="$1"
+  PATH="$fixture/bin:$PATH" REAL_GIT="$REAL_GIT" run_scanner "$fixture"
+}
+
+run_rev_list_one() {
+  local fixture="$1"
+  PATH="$fixture/bin:$PATH" REAL_GIT="$REAL_GIT" run_scanner "$fixture"
+}
+
+run_cleanup_failure() {
+  local fixture="$1"
+  PATH="$fixture/bin:$PATH" TMPDIR="$fixture/tmp" run_scanner "$fixture"
+}
+
 expect_rc() {
   local label="$1" wanted="$2" fixture="$3"
   shift 3
@@ -112,6 +112,18 @@ expect_rc() {
     record 0 "$label" "exit=$rc"
   else
     record 1 "$label" "expected exit=$wanted actual=$rc / ${output//$'\n'/ | }"
+  fi
+}
+
+expect_rc_marker() {
+  local label="$1" wanted="$2" marker="$3" fixture="$4"
+  shift 4
+  local output rc=0
+  output=$("$@" "$fixture" 2>&1) || rc=$?
+  if [ "$rc" -eq "$wanted" ] && printf '%s\n' "$output" | grep -Fq -- "$marker"; then
+    record 0 "$label" "exit=$rc · marker 확인"
+  else
+    record 1 "$label" "expected exit=$wanted marker=$marker actual=$rc / ${output//$'\n'/ | }"
   fi
 }
 
@@ -167,6 +179,40 @@ git -C "$too_few" init -q -b main
 printf '%s\n' "$CANARY" > "$too_few/.secret-patterns.default"
 expect_rc "도달 객체 2개 미만 → 스캔 무효" 2 "$too_few" run_scanner
 
+rev_list_failure="$TMP/rev-list-failure"
+make_fixture "$rev_list_failure"
+rev_list_failure_sha=$(git -C "$rev_list_failure" rev-parse HEAD)
+mkdir -p "$rev_list_failure/bin"
+printf '%s\n' '#!/usr/bin/env bash' \
+  'if [ "${1:-}" = rev-list ]; then' \
+  '  printf "%s README.md\\n" "$FAIL_REV_LIST_SHA"' \
+  '  printf "synthetic rev-list failure\\n" >&2' \
+  '  exit 73' \
+  'fi' \
+  'exec "$REAL_GIT" "$@"' > "$rev_list_failure/bin/git"
+chmod +x "$rev_list_failure/bin/git"
+expect_rc "객체 목록 부분 출력 후 실패 → 스캔 무효" 2 "$rev_list_failure" \
+  run_rev_list_failure
+
+rev_list_empty="$TMP/rev-list-empty"
+make_fixture "$rev_list_empty"
+mkdir -p "$rev_list_empty/bin"
+printf '%s\n' '#!/usr/bin/env bash' \
+  'if [ "${1:-}" = rev-list ]; then exit 0; fi' \
+  'exec "$REAL_GIT" "$@"' > "$rev_list_empty/bin/git"
+chmod +x "$rev_list_empty/bin/git"
+expect_rc "정상 저장소의 객체 목록이 비어 있음 → 스캔 무효" 2 "$rev_list_empty" \
+  run_rev_list_empty
+
+rev_list_one="$TMP/rev-list-one"
+make_fixture "$rev_list_one"
+mkdir -p "$rev_list_one/bin"
+printf '%s\n' '#!/usr/bin/env bash' \
+  'if [ "${1:-}" = rev-list ]; then exec "$REAL_GIT" rev-parse HEAD; fi' \
+  'exec "$REAL_GIT" "$@"' > "$rev_list_one/bin/git"
+chmod +x "$rev_list_one/bin/git"
+expect_rc "객체 목록이 하나뿐 → 스캔 무효" 2 "$rev_list_one" run_rev_list_one
+
 zero_blobs="$TMP/zero-blobs"
 mkdir -p "$zero_blobs"
 git -C "$zero_blobs" init -q -b main
@@ -181,6 +227,66 @@ expect_rc "blob 0개 → 스캔 무효" 2 "$zero_blobs" run_scanner
 clean="$TMP/clean"
 make_fixture "$clean"
 expect_rc "깨끗한 합성 저장소 → 위반 0건" 0 "$clean" run_scanner
+
+cleanup_failure="$TMP/cleanup-failure"
+make_fixture "$cleanup_failure"
+mkdir -p "$cleanup_failure/bin" "$cleanup_failure/tmp"
+printf '%s\n' '#!/usr/bin/env bash' 'exit 74' > "$cleanup_failure/bin/rm"
+chmod +x "$cleanup_failure/bin/rm"
+expect_rc_marker "시크릿 임시 파일 정리 실패 → 스캔 무효" 2 \
+  "FAIL: 임시 파일 정리 실패" "$cleanup_failure" run_cleanup_failure
+
+history_step=$(awk '
+  /^      - name: 히스토리 전량 스캔/ { in_step=1 }
+  in_step && seen && /^      - name:/ { exit }
+  in_step { print; seen=1 }
+' "$WORKFLOW")
+scanner_calls=$(printf '%s\n' "$history_step" | awk '
+  {
+    line=$0
+    sub(/^[[:space:]]*/, "", line)
+    sub(/[[:space:]]*$/, "", line)
+    if (line == "run: bash scripts/scan-history-secrets.sh") n++
+  }
+  END { print n + 0 }
+')
+inline_calls=$(printf '%s\n' "$history_step" | awk '
+  index($0, "cat-file blob") { n++ }
+  END { print n + 0 }
+')
+if [ "$scanner_calls" -eq 1 ] && [ "$inline_calls" -eq 0 ]; then
+  record 0 "CI가 정본 스캐너 한 벌을 실행" "scanner=1 inline=0"
+else
+  record 1 "CI가 정본 스캐너 한 벌을 실행" \
+    "scanner=$scanner_calls inline=$inline_calls"
+fi
+
+acceptance_calls=$(awk '
+  /^[[:space:]]*#/ { next }
+  {
+    line=$0
+    sub(/^[[:space:]]*/, "", line)
+    sub(/[[:space:]]*$/, "", line)
+    if (line == "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-history-scan-failclosed.sh") n++
+  }
+  END { print n + 0 }
+' "$WORKFLOW")
+if [ "$acceptance_calls" -eq 1 ]; then
+  record 0 "CI가 스캐너 인수 검사를 래퍼로 실행" "call=1"
+else
+  record 1 "CI가 스캐너 인수 검사를 래퍼로 실행" "call=$acceptance_calls"
+fi
+
+hook_guards=$(awk '
+  /^[[:space:]]*#/ { next }
+  index($0, "scripts/scan-history-secrets.sh") { n++ }
+  END { print n + 0 }
+' "$HOOK")
+if [ "$hook_guards" -ge 1 ]; then
+  record 0 "pre-push가 CI 정본 스캐너 배선을 보호" "guard=$hook_guards"
+else
+  record 1 "pre-push가 CI 정본 스캐너 배선을 보호" "guard=0"
+fi
 
 current=$(git status --porcelain)
 if [ "$current" = "$SNAPSHOT" ]; then
