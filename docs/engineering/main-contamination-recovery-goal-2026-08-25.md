@@ -255,16 +255,16 @@ git status --porcelain=v2 --branch --untracked-files=all
 
 ## 결정 카드
 
-> **무엇을** — dirty root를 그대로 rescue branch로 전환하고 main ref만 조건부 갱신한다.  
-> **왜** — 파일과 index를 이동·재작성하지 않아 손실 가능성이 가장 작다.  
-> **버린 길** — stash, restore, reset, clean은 dirty 상태를 재작성하거나 제거하므로 기각한다.  
-> **대가** — rescue branch는 의도적으로 dirty하며 verified라고 부를 수 없다.  
+> **무엇을** — dirty root를 그대로 rescue branch로 전환하고 main ref만 조건부 갱신한다.
+> **왜** — 파일과 index를 이동·재작성하지 않아 손실 가능성이 가장 작다.
+> **버린 길** — stash, restore, reset, clean은 dirty 상태를 재작성하거나 제거하므로 기각한다.
+> **대가** — rescue branch는 의도적으로 dirty하며 verified라고 부를 수 없다.
 > **되돌리기** — rescue branch와 외부 snapshot의 hash를 읽어 같은 상태에서 재개한다.
 
-> **무엇을** — B·C·control을 서로 다른 branch/worktree/commit으로 분리한다.  
-> **왜** — 각 초록불과 소유권을 정확한 SHA에 귀속할 수 있다.  
-> **버린 길** — 한 branch에서 순차 commit은 dirty root와 검증 장부가 섞일 위험이 있어 기각한다.  
-> **대가** — worktree와 검증 횟수가 늘어난다.  
+> **무엇을** — B·C·control을 서로 다른 branch/worktree/commit으로 분리한다.
+> **왜** — 각 초록불과 소유권을 정확한 SHA에 귀속할 수 있다.
+> **버린 길** — 한 branch에서 순차 commit은 dirty root와 검증 장부가 섞일 위험이 있어 기각한다.
+> **대가** — worktree와 검증 횟수가 늘어난다.
 > **되돌리기** — 각 branch를 보존한 채 필요한 lane만 다시 실행한다.
 
 ## 완료 금지 조건
@@ -278,4 +278,3 @@ git status --porcelain=v2 --branch --untracked-files=all
 - AUDIT: NOT_RUN
 - CHECKPOINT: NOT_RUN
 - SHIP: 금지된 비범위
-
