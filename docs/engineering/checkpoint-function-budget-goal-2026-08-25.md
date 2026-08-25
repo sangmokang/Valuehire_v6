@@ -1,6 +1,6 @@
 # WU-3b checkpoint 함수 예산 goal — 2026-08-25
 
-VERDICT: RED
+VERDICT: CHECKPOINT_PENDING
 
 ## 결론
 
@@ -17,7 +17,9 @@ checkpoint-gate의 복구 원본은 P11 파일 hard 600만 판정하고 함수 h
   - `tests/checkpoint-function-budget.test.mjs`
   - `tools/strict/checkpoint-gate.mjs`
   - `tools/strict/checkpoint-function-scan.mjs`
-- 변경 금지: `tests/checkpoint-gate.test.mjs`와 `tools/strict/checkpoint-js-scan.mjs`
+  - `tools/strict/checkpoint-js-scan.mjs`
+  - `tools/strict/checkpoint-js-lexer.mjs`
+- 변경 금지: `tests/checkpoint-gate.test.mjs`
 
 ## T 계약
 
@@ -34,8 +36,9 @@ checkpoint-gate의 복구 원본은 P11 파일 hard 600만 판정하고 함수 h
 - AC3: When shell 함수가 정확히 100 LOC이면 통과하고 101 LOC이면 실패해야 한다.
 - AC4: When 현재 저장소 코드 언어 집합 밖의 직접 작성 코드 확장자가 staged되면 parser 부재를 PASS로 숨기지 말고 fail-closed해야 한다.
 - AC5: When 함수 한도를 판정해도 기존 파일 600/601, scope, secrets, test weakening 판정은 동일하게 유지돼야 한다.
+- AC5a: When 기존 scanner 자체가 새 함수 한도에 걸리면 예외로 숨기지 않고 lexer를 helper 모듈로 분리하며 기존 45개 동작을 유지해야 한다.
 - AC6: When RED 이후 구현을 추가해도 counter-test 파일은 바뀌지 않아야 한다.
-- AC7: When 완료를 판정하면 base 대비 변경은 이 WU 소유 네 파일뿐이어야 한다.
+- AC7: When 완료를 판정하면 base 대비 변경은 이 WU 소유 여섯 파일뿐이어야 한다.
 
 ## counter-AC
 
@@ -74,7 +77,11 @@ git show --check HEAD
 - RED 해석: 100줄 정상 경계는 통과했고, 미구현인 101줄 JS/Python/shell 차단과 unsupported 언어 fail-closed 네 동작이 실패했다.
 - 최초 RED commit `33bafa51825ac5fa9e82b2f84430001e6dbf635e`은 `git show --check`가 테스트 EOF 빈 줄을 보고해 canonical RED에서 제외한다. 단언을 바꾸지 않고 빈 줄 1개만 제거한 테스트 SHA-256 `00d957a7b1e1835b0d4a74d6db34fac036255734dea251f5fe795f01b3ad54be`로 재실행한 결과도 tests 7, pass 3, fail 4, exit 1이다.
 - 교정 RED 원문: `/tmp/vhrec-wu3b-red-corrected.ul6jLn/node-test-red-corrected.log`, SHA-256 `2f1b59618e87591fc02a9b6600c66bd9e78db428ccedc0c40382bae5429937ab`.
-- GREEN: `NOT_RUN`
+- 첫 GREEN 시도는 Python trailing newline을 함수 줄로 더해 `5/7`이었고, dedent 뒤 EOF 계산을 수정해 `7/7`이 됐다. 이어서 기존 45개 중 scanner 소스를 stage하는 1개가 269줄 `tokenizeJavaScript`를 차단해 `44/45`였다. P11 예외 대신 lexer class helper로 분리해 각 method를 hard 100 이하로 만든다.
+- GREEN candidate: function boundary 7/7, original checkpoint regression 45/45, node check 4개 exit 0.
+- GREEN outputs: function tests SHA-256 `273077671aa3140d1989e12a2257a4f72ecb23ad45de0dc01c1454e52c11e298`; original tests SHA-256 `207d915ee48c8291d14dfb39084998bebd8d703b87ea33e31a92f816d092d4c9`.
+- hard function readback: gate max 44, function scanner max 94, JS scanner max 77, JS lexer max 61, counter-test max 16 LOC.
+- adversarial spans: JS regex/string brace 4 LOC, shell quoted brace 3 LOC, Python outer/inner dedent 4/2 LOC, 모두 PASS.
 - G: `NOT_RUN`
 - V1: `NOT_RUN`
 - V2: `NOT_RUN`

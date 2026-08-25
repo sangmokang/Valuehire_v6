@@ -2,6 +2,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { countJavaScriptWeakening } from "./checkpoint-js-scan.mjs";
+import { functionSpans } from "./checkpoint-function-scan.mjs";
 
 const CHECKS = {
   INPUT: "input",
@@ -382,23 +383,34 @@ function checkTestWeakening(base, changes) {
   return violations;
 }
 
-function parseHardLimit() {
-  const fallback = 500;
+function parseBudgetLimits() {
+  const fallback = { file: 500, function: 100 };
   if (!existsSync("docs/sot/coding-principles.md")) return fallback;
   const text = readFileSync("docs/sot/coding-principles.md", "utf8");
   const p11 = text.match(/P11[\s\S]*?(?=\n\| \*\*P\d+|\n### |\n## |$)/);
   if (!p11) return fallback;
   const haystack = p11[0];
-  const patterns = [
+  const filePatterns = [
+    /(?:file|파일)[\s\S]{0,100}?hard\s*(\d+)/i,
     /hard\s+(\d+)\s*(?:LOC|lines?|줄)?/i,
     /hard\s*[:=]\s*(\d+)/i,
     /하드\s*(?:한도|제한)?\s*(\d+)/i,
   ];
-  for (const pattern of patterns) {
-    const match = haystack.match(pattern);
-    if (match) return Number.parseInt(match[1], 10);
-  }
-  return fallback;
+  const functionPatterns = [
+    /(?:function|함수)[\s\S]{0,100}?hard\s*(\d+)/i,
+    /(?:function|함수)[\s\S]{0,100}?하드\s*(?:한도|제한)?\s*(\d+)/i,
+  ];
+  const find = (patterns, defaultValue) => {
+    for (const pattern of patterns) {
+      const match = haystack.match(pattern);
+      if (match) return Number.parseInt(match[1], 10);
+    }
+    return defaultValue;
+  };
+  return {
+    file: find(filePatterns, fallback.file),
+    function: find(functionPatterns, fallback.function),
+  };
 }
 
 function isSizeCheckedCode(path) {
@@ -414,9 +426,9 @@ function loc(content) {
 }
 
 function checkSizeLimit(changes) {
-  let hardLimit;
+  let hardLimits;
   try {
-    hardLimit = parseHardLimit();
+    hardLimits = parseBudgetLimits();
   } catch (error) {
     return [
       {
@@ -429,12 +441,29 @@ function checkSizeLimit(changes) {
   const violations = [];
   for (const change of changes) {
     if (change.status === "D" || !isSizeCheckedCode(change.path)) continue;
-    const lines = loc(readIndex(change.path));
-    if (lines > hardLimit) {
+    const content = readIndex(change.path);
+    const lines = loc(content);
+    if (lines > hardLimits.file) {
       violations.push({
         check: CHECKS.SIZE_LIMIT,
         file: change.path,
-        detail: `file has ${lines} LOC, hard limit is ${hardLimit}`,
+        detail: `file has ${lines} LOC, hard limit is ${hardLimits.file}`,
+      });
+    }
+    try {
+      for (const span of functionSpans(change.path, content)) {
+        if (span.loc <= hardLimits.function) continue;
+        violations.push({
+          check: CHECKS.SIZE_LIMIT,
+          file: change.path,
+          detail: `function ${span.name} has ${span.loc} LOC, hard limit is ${hardLimits.function}`,
+        });
+      }
+    } catch (error) {
+      violations.push({
+        check: CHECKS.SIZE_LIMIT,
+        file: change.path,
+        detail: error.message,
       });
     }
   }
