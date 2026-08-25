@@ -1,0 +1,18 @@
+{
+  "findings": [
+    {
+      "id": "F-2",
+      "source": "contract",
+      "claim": "표준 출력에 보고된 결함 표식이 나타난다",
+      "severity": "medium",
+      "repro": {
+        "cmd": "node -e \"process.stdout.write('healthy output\\n')\"",
+        "cwd": ".",
+        "expect": {
+          "stdout_contains": "reported defect"
+        }
+      },
+      "status": "NOT_TESTED"
+    }
+  ]
+}
