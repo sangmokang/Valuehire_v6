@@ -37,6 +37,30 @@ trap 'chmod -R u+w "$TMP" >/dev/null 2>&1; rm -rf "$TMP"' EXIT
 fail=0
 checked=0
 
+# ── fixture 이름·경로를 실행마다 바꾼다 ──────────────────────────────────────
+#
+# 왜 (2026-08-26 V1 자체 공격에서 실증):
+#   워크트리 이름과 파일 경로를 고정해 두면, 검사를 전혀 하지 않고 그 이름만 보고
+#   정답을 흉내내는 위조본이 통과한다. 실측: 아래 위조본이 16/16 PASS · exit 0.
+#     case "$1" in
+#       clean|cacheonly|directok) echo "STATE: OK"; git worktree remove ...; exit 0 ;;
+#       artifact) echo "STATE: BLOCK"; echo "artifacts/keep.txt"; exit 1 ;;
+#     esac
+#   run-acceptance.sh 는 자기 주석에서 "문구 위조는 막지 못한다"고 자백한다.
+#   그 구멍을 여기서 좁힌다 — 정답을 미리 알 수 없게 만들면 흉내낼 수가 없다.
+RUNID="$$-${RANDOM}-${RANDOM}"
+WT_CLEAN="clean-$RUNID"
+WT_CACHE="cacheonly-$RUNID"
+WT_RECOVER="recover-$RUNID"
+WT_REVIEW="review-$RUNID"
+WT_DIRECT="directok-$RUNID"
+
+# 회수 대상 디렉터리도 P12·P21 이 명시한 넷 중에서 매번 고른다.
+RECOVER_DIRS=(private-reviews artifacts data .harness)
+RECOVER_DIR="${RECOVER_DIRS[$((RANDOM % 4))]}"
+RECOVER_FILE="$RECOVER_DIR/keep-$RUNID.md"
+REVIEW_FILE=".toolstate/session-$RUNID.json"
+
 record() {
   local ok="$1" desc="$2" detail="$3"
   checked=$((checked + 1))
@@ -128,8 +152,8 @@ fi
 
 # C1 clean — 무시 파일이 하나도 없다. 반드시 삭제되어야 한다.
 #   이 케이스가 없으면 구현 부재로 인한 make 실패가 "차단 성공"으로 집계된다.
-if add_wt "$FIX" clean; then
-  run_task_done "$FIX" clean
+if add_wt "$FIX" "$WT_CLEAN"; then
+  run_task_done "$FIX" "$WT_CLEAN"
   if [ "$RTD_RC" -eq 0 ] && [ "$RTD_ALIVE" -eq 0 ]; then
     record 0 "C1 clean 워크트리는 폐기된다" "exit=$RTD_RC 잔존=$RTD_ALIVE"
   else
@@ -141,8 +165,8 @@ fi
 
 # C2 cache-only — 캐시와 재생성 가능한 의존성 환경만 남았다. 역시 삭제되어야 한다.
 #   이 케이스가 빨간 채로 두면 제외 목록이 좁아 정상 워크트리가 영구 폐기 불가가 된다.
-if add_wt "$FIX" cacheonly ".ruff_cache/CACHEDIR.TAG" ".venv/pyvenv.cfg"; then
-  run_task_done "$FIX" cacheonly
+if add_wt "$FIX" "$WT_CACHE" ".ruff_cache/CACHEDIR.TAG" ".venv/pyvenv.cfg"; then
+  run_task_done "$FIX" "$WT_CACHE"
   if [ "$RTD_RC" -eq 0 ] && [ "$RTD_ALIVE" -eq 0 ]; then
     record 0 "C2 캐시·재생성 대상만 있으면 폐기된다" "exit=$RTD_RC 잔존=$RTD_ALIVE"
   else
@@ -153,8 +177,8 @@ else
 fi
 
 # C3 artifact — P12 회수 대상이 남았다. 차단 + 경로 출력.
-if add_wt "$FIX" artifact "artifacts/keep.txt"; then
-  run_task_done "$FIX" artifact
+if add_wt "$FIX" "$WT_RECOVER" "$RECOVER_FILE"; then
+  run_task_done "$FIX" "$WT_RECOVER"
   if [ "$RTD_RC" -ne 0 ] && [ "$RTD_ALIVE" -eq 1 ] \
      && printf '%s' "$RTD_OUT" | grep -q 'STATE: BLOCK'; then
     record 0 "C3 회수 대상이 있으면 폐기가 차단된다(make)" "exit=$RTD_RC 잔존=$RTD_ALIVE STATE=BLOCK"
@@ -162,15 +186,15 @@ if add_wt "$FIX" artifact "artifacts/keep.txt"; then
     record 1 "C3 회수 대상이 있으면 폐기가 차단된다(make)" "exit=$RTD_RC 잔존=$RTD_ALIVE (기대 비-0 잔존=1 STATE:BLOCK) :: ${RTD_OUT}"
   fi
   # 종료값 1(BLOCK)은 make 가 2 로 뭉개므로 검사기를 직접 불러서 잰다.
-  run_direct "$FIX" artifact
+  run_direct "$FIX" "$WT_RECOVER"
   if [ "$RTD_RC" -eq 1 ] && [ "$RTD_ALIVE" -eq 1 ]; then
     record 0 "C3 검사기 직접 호출은 BLOCK=1 을 낸다" "exit=$RTD_RC"
   else
     record 1 "C3 검사기 직접 호출은 BLOCK=1 을 낸다" "exit=$RTD_RC (기대 1) :: ${RTD_OUT}"
   fi
   # 목록 출력은 인수 기준 본문("그 목록을 출력한다")이다. 차단만 하고 침묵하면 불합격.
-  if printf '%s' "$RTD_OUT" | grep -q 'artifacts/keep.txt'; then
-    record 0 "C3 차단 시 남은 경로를 출력한다" "출력에 artifacts/keep.txt 포함"
+  if printf '%s' "$RTD_OUT" | grep -qF "$RECOVER_FILE"; then
+    record 0 "C3 차단 시 남은 경로를 출력한다" "출력에 $RECOVER_FILE 포함"
   else
     record 1 "C3 차단 시 남은 경로를 출력한다" "출력에 경로가 없다 :: ${RTD_OUT}"
   fi
@@ -184,17 +208,17 @@ fi
 # 종료값만 재면 안 된다(2026-08-26 RED 실행에서 실증): `Makefile` 이 없을 때 make 자신이
 # exit 2 를 내므로, 구현이 0줄이어도 "exit 2 면 REVIEW" 라는 단언은 통과해 버린다.
 # 그래서 판정 문구(`STATE: REVIEW`)와 경로 출력까지 함께 요구한다.
-if add_wt "$FIX" review ".toolstate/session.json"; then
-  run_task_done "$FIX" review
+if add_wt "$FIX" "$WT_REVIEW" "$REVIEW_FILE"; then
+  run_task_done "$FIX" "$WT_REVIEW"
   if [ "$RTD_RC" -eq 2 ] && [ "$RTD_ALIVE" -eq 1 ] \
      && printf '%s' "$RTD_OUT" | grep -q 'STATE: REVIEW' \
-     && printf '%s' "$RTD_OUT" | grep -q '.toolstate/session.json'; then
+     && printf '%s' "$RTD_OUT" | grep -qF "$REVIEW_FILE"; then
     record 0 "C4 미분류 무시 파일은 폐기를 막는다(REVIEW)" "exit=$RTD_RC 잔존=$RTD_ALIVE STATE=REVIEW"
   else
     record 1 "C4 미분류 무시 파일은 폐기를 막는다(REVIEW)" "exit=$RTD_RC 잔존=$RTD_ALIVE (기대 exit=2 잔존=1 STATE:REVIEW + 경로) :: ${RTD_OUT}"
   fi
   # BLOCK 과 REVIEW 가 서로 다른 종료값이어야 한다 — 직접 호출로 확인한다.
-  run_direct "$FIX" review
+  run_direct "$FIX" "$WT_REVIEW"
   if [ "$RTD_RC" -eq 2 ] && [ "$RTD_ALIVE" -eq 1 ]; then
     record 0 "C4 검사기 직접 호출은 REVIEW=2 를 낸다" "exit=$RTD_RC (BLOCK=1 과 구분됨)"
   else
@@ -206,8 +230,8 @@ else
 fi
 
 # C5 direct-OK — 검사기 직접 호출도 정상 폐기 경로를 돈다(make 만 되는 게 아니다).
-if add_wt "$FIX" directok; then
-  run_direct "$FIX" directok
+if add_wt "$FIX" "$WT_DIRECT"; then
+  run_direct "$FIX" "$WT_DIRECT"
   if [ "$RTD_RC" -eq 0 ] && [ "$RTD_ALIVE" -eq 0 ]; then
     record 0 "C5 검사기 직접 호출도 clean 을 폐기한다" "exit=$RTD_RC 잔존=$RTD_ALIVE"
   else
