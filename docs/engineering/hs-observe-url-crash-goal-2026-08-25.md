@@ -608,11 +608,44 @@ V1 최종 회차가 변조 하나를 냈다 — *"`_load_contract` 에서 `OSErr
 | 남은 가지 | 왜 시험으로 구분할 수 없나 | 근거 |
 |---|---|---|
 | `_cdp` 의 `TimeoutError` | `OSError` 의 하위형이라 **중복 항목**이다. 어떤 입력도 둘을 가르지 못한다 | `issubclass(TimeoutError, OSError)` → True (실측) |
-| `observation_from_marker_payload` 의 `TypeError` | 파이썬 3.14 열거형은 **어떤 값에도 `ValueError` 만** 낸다 | `SurfaceRole(v)` 를 str·int·list·dict·None·tuple 6종으로 호출 → 전부 `ValueError` (실측) |
+| ~~`observation_from_marker_payload` 의 `TypeError`~~ | ~~파이썬 3.14 열거형은 어떤 값에도 `ValueError` 만 낸다~~ | **이 주장은 틀렸다 — 아래 참조** |
 
-→ 표가 말하는 것: 둘 다 base 부터 있던 코드이고, "시험이 없다"가 아니라 "시험이 있을 수 없다"다.
-이 구분을 흐리지 않으려고 근거를 실행 결과로 붙였다 — 이 작업에서 나는 이미 한 번
-"무검증"을 "도달 불가"로 잘못 읽은 적이 있다.
+→ 표가 말하는 것: `TimeoutError` 는 base 부터 있던 코드이고 "시험이 없다"가 아니라 "시험이 있을
+수 없다"다. `TypeError` 에 대한 두 번째 줄은 **내가 틀렸고 V1 이 반증했다.**
+
+### WU11 — 내가 두 번째로 같은 실수를 했다 (V1 최종 회차)
+
+V1 최종 회차가 위 표의 `TypeError` 줄을 반증했다. 반례:
+
+```python
+class Bad:
+    __hash__ = None
+    def __eq__(self, other): raise TypeError("boom")
+observation_from_marker_payload({"contract_valid": True, "matched_roles": [Bad()]})
+```
+
+→ 뭘 시켰나: 비교 자체가 예외를 던지는 사용자 정의 객체를 역할 값으로 넣었다. 뭐가 나왔나:
+`SurfaceRole(Bad())` 이 `TypeError: boom` 을 낸다(실측). 나쁜 소식 — 내 "도달 불가" 주장이
+사실이 아니었다.
+
+**같은 실수를 이 작업에서 두 번 했다.**
+
+| # | 무엇을 | 어떻게 틀렸나 | 어떻게 드러났나 |
+|---|---|---|---|
+| 1 | 전송 `except` 의 `ValueError` | "어떤 시험도 안 닿는다" → "닿을 수 없다" | V1 4회차가 도달 경로(비ASCII scope id)를 찾음 |
+| 2 | `observation_from_marker_payload` 의 `TypeError` | "내장 타입 6종이 전부 `ValueError`" → "어떤 값도 `TypeError` 를 못 낸다" | V1 최종 회차가 사용자 정의 객체로 반증 |
+
+→ 표가 말하는 것: 둘 다 **표본에서 전체로 건너뛴 것**이다. 1번은 "시험 표본"에서, 2번은
+"타입 표본"에서. 실측을 했다는 사실이 그 실측이 전수였다는 뜻은 아니다. 이 두 줄이 이 run 에서
+내가 배운 것의 전부다.
+
+**V1 이 함께 낸 두 번째 반례**: `_cdp.py:67` 의 `for _ in range(32)` 를 `range(1)` 로 바꿔도
+시험이 다 통과했다. DevTools 는 우리 응답보다 먼저 관련 없는 이벤트를 보내는데, 그 순서를 태우는
+시험이 없었다. 둘 다 `tests/test_observe_closed_failure_branches.py` 에 편입했고 변조 시
+각각 `1 failed` 로 죽는다.
+
+**최종 스윕**: 무검증 가지 **1개**(`_cdp` 의 `TimeoutError`) — V1 본인이 `OSError` 하위형이라
+구분 불가임을 확인했다. base 부터 있던 중복 항목이라 이 PR 에서 건드리지 않는다.
 
 ### V2 (2차 적대검증) — 리셋 컨텍스트의 Claude · `VERDICT: SPLIT`
 
