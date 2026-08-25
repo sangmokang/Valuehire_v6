@@ -5,7 +5,7 @@
 #   정본: docs/engineering/verify-unification-goal-2026-08-10.md:78-81 (AC-M)
 #   출력 : 항목마다 PASS:/FAIL: 전부 출력, 마지막 줄 `CHECKED: <검사 수>`
 #   exit : 0 = PASS | 1 = FAIL | 2 = NOT_RUN
-#   불변식: CHECKED 는 정확히 31 이어야 한다 — 검사가 몇 개 사라져도 초록이면 가짜다
+#   불변식: CHECKED 는 정확히 33 이어야 한다 — 검사가 몇 개 사라져도 초록이면 가짜다
 #           (PR #6 결함 D3 의 교훈: checked==0 만 막으면 3개를 지워도 통과했다 · P20)
 #
 # 쓰기 규칙: 이 검사는 저장소에 어떤 파일도 만들지 않는다. 동적 fixture 는 전부
@@ -24,7 +24,7 @@ SNAP0=$(git status --porcelain)
 CHECKER=scripts/verify/check-mechanism-registry.sh
 FIXDIR=scripts/verify/fixtures/mechanism-registry
 REGISTRY=docs/sot/mechanism-registry.yaml
-EXPECTED_CHECKED=31
+EXPECTED_CHECKED=33
 
 TMP=$(mktemp -d) || { echo "NOT_RUN: mktemp 실패"; echo "CHECKED: 0"; exit 2; }
 trap 'rm -rf "$TMP"' EXIT
@@ -189,6 +189,47 @@ cat > "$TMP/ci-fake-target.yaml" <<'EOF'
   required: true
 EOF
 expect_rc "ci 인데 거짓 target → 불합격" "$TMP/ci-fake-target.yaml" 1
+
+# target 뒤에 실패 무시를 붙인 줄은 정본 명령의 정확한 실행이 아니다.
+# 부분 문자열 매칭이면 실패 후 `exit 0`을 붙인 줄도 통과했던 반례를 고정한다.
+cat > "$TMP/ci-masked-target.yaml" <<'EOF'
+- id: "ci-masked-target"
+  path: "scripts/verify/fixtures/mechanism-registry/ci-masked-workflow.yml"
+  target: "run: bash verify.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
+EOF
+expect_rc "ci target 뒤 실패무시 추가 → 불합격" "$TMP/ci-masked-target.yaml" 1
+
+# 필수 히스토리 ID를 명부와 검사기에서 함께 약화해도 초록이 되는 변조를 막는다.
+# 현재 작업트리를 임시 전체-tree로 복제해 정본 경로와 `./` 동치 경로가
+# 둘 다 동일한 필수-ID 누락을 보고하는지 행동으로 고정한다.
+canonical="$TMP/canonical-registry"
+mkdir -p "$canonical"
+git archive HEAD | tar -x -C "$canonical"
+cp "$CHECKER" "$canonical/$CHECKER"
+cp "$REGISTRY" "$canonical/$REGISTRY"
+cp .github/workflows/verify.yml "$canonical/.github/workflows/verify.yml"
+ruby -e 'p=ARGV[0]; s=File.read(p); blocks=s.split(/(?=^- id:)/); s=blocks.reject{|b| b.include?("history-secret-scan-ci") || b.include?("history-secret-scan-acceptance-ci")}.join; File.write(p,s)' \
+  "$canonical/$REGISTRY"
+canonical_rc=0
+canonical_output=$(cd "$canonical" && bash "$CHECKER" "$REGISTRY" 2>&1) || canonical_rc=$?
+dot_rc=0
+dot_output=$(cd "$canonical" && bash "$CHECKER" "./$REGISTRY" 2>&1) || dot_rc=$?
+checked=$((checked + 1))
+if [ "$canonical_rc" -eq 1 ] && [ "$dot_rc" -eq 1 ] \
+   && grep -qF 'history-secret-scan-ci' <<< "$canonical_output" \
+   && grep -qF 'history-secret-scan-acceptance-ci' <<< "$canonical_output" \
+   && grep -qF 'history-secret-scan-ci' <<< "$dot_output" \
+   && grep -qF 'history-secret-scan-acceptance-ci' <<< "$dot_output"; then
+  echo "PASS: 필수 히스토리 ID 2개 삭제·동치 경로 표기 → 불합격 (exit=1/1)"
+else
+  printf 'FAIL: 필수 히스토리 ID 삭제 또는 동치 경로 우회 미차단 — exit=%s/%s\n' \
+    "$canonical_rc" "$dot_rc"
+  printf '%s\n%s\n' "$canonical_output" "$dot_output"
+  fail=1
+fi
 
 # V1 D4: 저장소 밖 절대경로 — 계약(⑩)은 저장소 루트 기준 상대경로다.
 cat > "$TMP/abs-path.yaml" <<'EOF'

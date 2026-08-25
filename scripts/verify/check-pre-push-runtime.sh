@@ -78,11 +78,35 @@ git -C "$SANDBOX" commit -qm "verify $NONCE" || exit 2
 output=$(cd "$SANDBOX" && bash hooks/pre-push 2>&1)
 rc=$?
 if [ "$rc" -eq 1 ] && [ -f "$MARKER" ] && grep -qxF "$MARKER_PROOF" "$MARKER" && \
-   printf '%s\n' "$output" | grep -qF "BLOCKED: ./$PROBE_REL exit=$PROBE_EXIT"; then
+   grep -qF "BLOCKED: ./$PROBE_REL exit=$PROBE_EXIT" <<< "$output"; then
   echo "PASS: pre-push runtime probe discovered and executed"
+else
+  echo "FAIL: pre-push runtime probe 미실행 또는 실패 전파 누락 — exit=$rc"
+  printf '%s\n' "$output"
+  exit 1
+fi
+
+# 스캐너 호출을 없앴도 훅 소스에 문자열이 남는지가 아니라, 실제 pre-push가
+# 변조된 워크플로를 차단하는지를 증명한다.
+cat > "$SANDBOX/$PROBE_REL" <<'EOF'
+#!/usr/bin/env bash
+echo "PASS: sandbox runtime probe"
+exit 0
+EOF
+rm -f -- "$MARKER"
+ruby -e 'p=ARGV[0]; s=File.read(p); old="run: bash scripts/scan-history-secrets.sh"; abort "scanner line missing" unless s.include?(old); File.write(p, s.sub(old, "run: bash verify.sh"))' \
+  "$SANDBOX/.github/workflows/verify.yml"
+git -C "$SANDBOX" add "$PROBE_REL" .github/workflows/verify.yml || exit 2
+git -C "$SANDBOX" commit -qm "mutate scanner wiring $NONCE" || exit 2
+
+mutated_output=$(cd "$SANDBOX" && bash hooks/pre-push 2>&1)
+mutated_rc=$?
+if [ "$mutated_rc" -eq 1 ] \
+   && grep -qF "CI 의 '히스토리 전량 스캔' 정본 실행이 사라졌다" <<< "$mutated_output"; then
+  echo "PASS: pre-push scanner wiring mutation blocked"
   exit 0
 fi
 
-echo "FAIL: pre-push runtime probe 미실행 또는 실패 전파 누락 — exit=$rc"
-printf '%s\n' "$output"
+echo "FAIL: pre-push scanner wiring mutation 차단 누락 — exit=$mutated_rc"
+printf '%s\n' "$mutated_output"
 exit 1
