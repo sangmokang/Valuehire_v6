@@ -82,3 +82,15 @@
   manual_reason: "원격 조회가 필요해 CI 안에서 자기 SHA 를 검사하는 것은 뜻이 없다. 머지 전 판정 도구"
   required: true
 
+- id: "task-done-gate-ci"
+  path: ".github/workflows/verify.yml"
+  target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-task-done.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
+- id: "task-done-checker"
+  path: "scripts/task-done.sh"
+  target: "ls-files --others --ignored --exclude-standard -z"
+  stage: "manual"
+  manual_reason: "게이트 6 종료 명령. 사람이 워크트리를 접을 때 부른다. 실행 배선은 task-done-gate-ci 가 대조한다"
+  required: true

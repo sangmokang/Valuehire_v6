@@ -238,3 +238,13 @@ jobs:
         # 검사기 1벌(scripts/verify/check-mechanism-registry.sh)을 로컬 pre-push
         # 글로브와 CI 가 같은 인수 스크립트로 실행한다 (판정기 2벌 금지 · P16).
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-verify-ac-m.sh
+
+      - name: 인수 검사 task-done (무시된 산출물이 남으면 워크트리 폐기를 막는가)
+        # git worktree remove 는 추적 파일 수정과 untracked 는 --force 없이 거부하지만
+        # 무시된 파일만 남은 경우 exit 0 으로 조용히 지운다(2026-08-26 격리 저장소 실측).
+        # 이 저장소는 적대검증 판정서(private-reviews/ · .omx/artifacts/)와 데이터(data/)를
+        # 의도적으로 무시 처리해 두므로(P12 · P21) 그 구멍으로 회수 대상이 사라진다.
+        #
+        # 로컬 pre-push 글로브에만 두면 없는 것으로 친다(P15 ③) — 판정 권한은 CI 에 있다.
+        # 인수 검사는 mktemp 아래 격리 저장소에서만 돌고 실 워크트리를 건드리지 않는다.
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-task-done.sh

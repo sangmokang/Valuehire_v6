@@ -5,7 +5,7 @@
 
 ## 현재 규칙
 
-**이 저장소는 make 레포도 npm 레포도 아니다.** `Makefile`·`package.json`이 없고, `make -n red-ledger`는 `No rule to make target` 로 실패한다(2026-08-08 실행 확인). `~/.claude/skills/harness/SKILL.md`가 기본 전제하는 `make task` / `make verify` / `make ship` 은 이 저장소에 아직 없다 — 아래가 대신 쓰는 실제 명령이다.
+**이 저장소는 npm 레포가 아니고, make 도 게이트 6 하나에만 쓴다.** `package.json`이 없다. `Makefile`은 2026-08-26 에 생겼지만 대상이 `task-done` **하나뿐**이다 — `make -n red-ledger`는 여전히 `No rule to make target` 로 실패한다(2026-08-26 실행 확인). `~/.claude/skills/harness/SKILL.md`가 기본 전제하는 `make task` / `make verify` / `make ship` 은 이 저장소에 아직 없다 — 아래가 대신 쓰는 실제 명령이다.
 
 | 게이트 | harness 스킬의 기본 명령 | 이 저장소의 실제 명령 |
 |---|---|---|
@@ -13,11 +13,11 @@
 | 2 — 워크트리 파기 | `make task NAME=...` | `git worktree add worktrees/<name> -b task/<name>` |
 | 4 — 검증 | `./verify.sh` | `bash verify.sh` (비밀 스캔) — CI(`verify.yml`)가 실제로 도는 검사 전체는 아래 "CI가 실제로 돌리는 것" 표가 정본이다(요약을 여기 두 번 적으면 반드시 갈라진다 — 2026-08-12 REV2-D2 실측). `scripts/acceptance-0-2.sh`는 로컬 전용(`.secret-patterns`에 실제 리터럴이 있어야 해서 CI에 못 올림, 스크립트 주석에 명시) |
 | 5 — 배송 | `make ship` | 아직 스크립트 없음 — `git push -u origin task/<name>` 후 `gh pr create` 수동 실행. push 시 `hooks/pre-push`가 verify.sh + acceptance-*.sh 전량(glob)을 재실행 |
-| 6 — 종료 | `make task-done NAME=...` | `git worktree remove worktrees/<name>` 수동 실행 |
+| 6 — 종료 | `make task-done NAME=...` | `make task-done NAME=<name>` (2026-08-26 신설 · `scripts/task-done.sh` 위임). 폐기 전에 워크트리 안의 **무시된 산출물**을 열거해 3상태로 판정한다 — `OK` 만 실제로 지운다. 종료값 3상태(`0` OK / `1` BLOCK / `2` REVIEW·REFUSED)는 스크립트 직접 호출의 계약이고, `make` 는 레시피 실패를 자기 종료값 2 로 뭉개므로 `0` vs 비-0 만 보장한다 — 두 표면 공통 판정 표식은 출력 첫 줄 `STATE:` 다. 맨손 `git worktree remove` 는 무시된 파일만 남은 경우 **경고 없이 exit 0 으로 지운다**(2026-08-26 격리 저장소 실측) |
 
 ### CI(`​.github/workflows/verify.yml`)가 실제로 돌리는 것
 
-**워크플로 스텝 20개 전부**를 적는다(2026-08-12 V1 D6: 이전 판은 `bash ...` 직접 명령만 적어 인라인 본문 스텝이 목록에서 빠졌고, 운영자가 실제로 무엇이 도는지 잘못 판단할 수 있었다). 아래는 `verify.yml` 의 `- name:` 스텝 순서 그대로다(2026-08-20 Strict 원칙 직접 로드 3개 스텝 포함).
+**워크플로 스텝 24개 전부**를 적는다(2026-08-12 V1 D6: 이전 판은 `bash ...` 직접 명령만 적어 인라인 본문 스텝이 목록에서 빠졌고, 운영자가 실제로 무엇이 도는지 잘못 판단할 수 있었다. 2026-08-26: 실제 워크플로가 23개인데 이 표는 20개에서 멈춰 있었다 — verified-sha·ci-step-integrity·semantic-mutations 3개가 누락돼 있던 것을 task-done 추가와 함께 메웠다. 개수는 `grep -cE '^\s+- name:' .github/workflows/verify.yml` 로 확인한다). 아래는 `verify.yml` 의 `- name:` 스텝 순서 그대로다(2026-08-20 Strict 원칙 직접 로드 3개 스텝 포함).
 
 | # | 스텝 이름 | 실행 내용 |
 |---|---|---|
@@ -40,7 +40,11 @@
 | 17 | 데이터 노출 스캔 | `bash scripts/scan-data-exposure.sh all` — 크기·금지경로·기록·개인정보 (AC-A4) |
 | 18 | 인수 검사 hs-a4 | `bash scripts/acceptance-hs-a4.sh` — 차단이 실제로 도는가 (AC-A4) |
 | 19 | 인수 검사 secret-webhook-vendor | `bash scripts/acceptance-secret-webhook-vendor.sh` — 웹훅·벤더 키 (AC-S1) |
-| 20 | 인수 검사 verify-ac-m | `bash scripts/acceptance-verify-ac-m.sh` — mechanism 명부 대조 (AC-M) |
+| 20 | 인수 검사 verified-sha | `bash scripts/acceptance-verified-sha.sh` — 초록불이 SHA 에 귀속되는가 (P23) |
+| 21 | 인수 검사 ci-step-integrity | `bash scripts/acceptance-ci-step-integrity.sh` — 스텝을 조용히 끄지 못하는가 |
+| 22 | 인수 검사 semantic-mutations | `bash scripts/acceptance-semantic-mutations.sh` — 검사를 껐을 때 반드시 빨개지는가 (P13⑥) |
+| 23 | 인수 검사 verify-ac-m | `bash scripts/acceptance-verify-ac-m.sh` — mechanism 명부 대조 (AC-M) |
+| 24 | 인수 검사 task-done | `bash scripts/acceptance-task-done.sh` — 무시된 산출물이 남으면 워크트리 폐기를 막는가 (P12·P21) |
 
 *(1번 앞에 `actions/checkout` 이 있고 `fetch-depth: 0` 이다 — 4번이 과거 blob 을 열려면 필요하다.)*
 
