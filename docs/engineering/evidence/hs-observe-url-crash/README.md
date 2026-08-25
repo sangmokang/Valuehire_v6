@@ -13,12 +13,22 @@ Codex 적대 검증이 지적했다: *"1,512 fuzz 와 24 mutation 은 seed·입�
 ```bash
 cd humansearch
 PYTHONPATH=src uv run --no-sync python ../docs/engineering/evidence/hs-observe-url-crash/fuzz_main.py
-python3 ../docs/engineering/evidence/hs-observe-url-crash/mutation_sweep.py
+cd ..
+python3 docs/engineering/evidence/hs-observe-url-crash/mutation_sweep.py
+```
+
+**읽기 전용 샌드박스에서 돌릴 때**는 작업 폴더를 밖에서 넣는다. 기본값은 `tempfile` 인데,
+그것을 막는 환경이 실제로 있다(이 스크립트를 처음 재현하려던 검토자가 그 이유로 `NOT_RUN`
+이었다).
+
+```bash
+python3 docs/engineering/evidence/hs-observe-url-crash/mutation_sweep.py /쓰기가능한/경로
+HS_MUTATION_WORKDIR=/쓰기가능한/경로 python3 docs/.../mutation_sweep.py
 ```
 
 | 스크립트 | 무엇을 재현하나 | 기대 출력 |
 |---|---|---|
 | `fuzz_main.py` | 적대적 타깃 목록을 `main()` 에 먹이는 퍼징 | `crash=0 bad_exit=0 multiline=0` |
-| `mutation_sweep.py` | `except` 튜플 원소를 하나씩 빼는 전수 변조 | 생존 1건(`_cdp` 의 `TimeoutError`) |
+| `mutation_sweep.py` | `except` 튜플 원소를 하나씩 빼는 전수 변조(24종) | 대조군 118 passed · 생존 1건(`_cdp` 의 `TimeoutError`) |
 
 → 두 스크립트 모두 seed 와 입력 목록이 소스에 박혀 있다. 같은 커밋에서 같은 숫자가 나온다.

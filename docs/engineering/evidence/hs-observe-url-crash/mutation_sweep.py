@@ -1,9 +1,16 @@
 """except 튜플 원소 전수 변조 스윕 — goal 문서의 "무검증 가지" 숫자를 재현한다.
 
 게이트가 아니다. 변조 목록을 소스에 고정해 남이 같은 결과를 얻게 하는 것이 목적이다.
-저장소를 건드리지 않고 임시 복제본에서만 변조한다.
+저장소를 건드리지 않고 복제본에서만 변조한다.
 
-실행: python3 docs/engineering/evidence/hs-observe-url-crash/mutation_sweep.py
+실행:
+    python3 docs/engineering/evidence/hs-observe-url-crash/mutation_sweep.py
+    python3 ... mutation_sweep.py <쓰기 가능한 작업 폴더>      # 샌드박스용
+    HS_MUTATION_WORKDIR=/path python3 ... mutation_sweep.py    # 같은 뜻
+
+작업 폴더를 지정하지 않으면 `tempfile` 이 만든다. **읽기 전용 샌드박스에서는 그것이 막힌다** —
+실제로 이 스크립트를 처음 재현하려던 검토자가 그 이유로 `NOT_RUN` 이 됐다. 재현하라고 만든
+도구가 재현을 못 하면 증거가 아니므로, 작업 폴더를 밖에서 넣을 수 있게 열어 둔다.
 """
 
 import glob
@@ -95,12 +102,29 @@ def _run(root: str, project: str) -> tuple[int, str]:
     return result.returncode, last
 
 
+def _workdir() -> tuple[str, bool]:
+    """(작업 폴더, 다 쓰고 지워야 하는가)를 돌려준다."""
+
+    given = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("HS_MUTATION_WORKDIR")
+    if given:
+        os.makedirs(given, exist_ok=True)
+        return given, False
+    return tempfile.mkdtemp(prefix="hs-mutation-"), True
+
+
 def main() -> int:
     repo = _repo_root()
     project = f"{repo}/humansearch"
     survivors: list[str] = []
-    with tempfile.TemporaryDirectory(prefix="hs-mutation-") as tmp:
-        root = os.path.join(tmp, "root")
+    try:
+        base, disposable = _workdir()
+    except OSError as exc:
+        print(f"NOT_RUN: 작업 폴더를 만들지 못했다 ({exc}). "
+              f"쓰기 가능한 경로를 인자나 HS_MUTATION_WORKDIR 로 넣어라")
+        return 2
+    print(f"작업 폴더: {base}")
+    try:
+        root = os.path.join(base, "root")
 
         def fresh() -> None:
             if os.path.exists(root):
@@ -137,6 +161,10 @@ def main() -> int:
                 print(f"생존  {name} | {last}")
             else:
                 print(f"죽음  {name} | {last}")
+
+    finally:
+        if disposable:
+            shutil.rmtree(base, ignore_errors=True)
 
     print()
     print(f"변조 {len(MUTATIONS)}종 · 생존 {len(survivors)}종: {survivors or '없음'}")
