@@ -120,3 +120,30 @@ def test_an_oversized_target_list_is_refused(monkeypatch: pytest.MonkeyPatch) ->
 
     with pytest.raises(observe.ObservationError, match="exceeded the read limit"):
         observe._fetch_targets(_contract(), 9225)
+
+
+# --- 불변조건 5: 주소 자리는 "문자열로 바꿔 보면" 이 아니라 "문자열인가" 다 ------
+# `isinstance(url, str)` 를 `_origin(str(url))` 로 바꾸는 변조가 살아남았다.
+# JSON 이 만들 수 있는 값(str·int·float·bool·None·list·dict)으로는 둘을 구분할 수 없다 —
+# `str(v)` 가 https 주소 모양이 되지 않기 때문이다. 그러나 `select_single_target` 은 패키지가
+# 내보내는 공개 함수이고, 임의의 파이썬 객체를 받을 수 있다. 문자열로 **보이는** 것과 문자열인
+# 것을 가르는 일이 이 검사의 직무다.
+class _LooksLikeAnApprovedUrl:
+    def __str__(self) -> str:
+        return "https://portal.invalid/home"
+
+
+def test_an_object_that_merely_prints_like_a_url_is_not_a_candidate() -> None:
+    assert str(_LooksLikeAnApprovedUrl()) == "https://portal.invalid/home"
+
+    with pytest.raises(observe.TargetSelectionError, match="found 0"):
+        observe.select_single_target(
+            [
+                {
+                    "type": "page",
+                    "url": _LooksLikeAnApprovedUrl(),
+                    "webSocketDebuggerUrl": "ws",
+                }
+            ],
+            frozenset({"https://portal.invalid"}),
+        )
