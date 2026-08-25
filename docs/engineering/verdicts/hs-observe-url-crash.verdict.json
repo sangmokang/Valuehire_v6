@@ -1,0 +1,131 @@
+{
+  "slug": "hs-observe-url-crash",
+  "base_sha": "c59bad7b160c473cda5545e76e6fa6bcc711a7ea",
+  "head_sha": "d7948ba9d66674c5f5b026fa69789826de5e09bd",
+  "goal": "docs/engineering/hs-observe-url-crash-goal-2026-08-25.md",
+  "generator": {
+    "role": "G",
+    "work_units": 8,
+    "evidence": [
+      {
+        "command": "bash scripts/acceptance-hs-gates.sh",
+        "exit_code": 0,
+        "artifact": "COLLECTED: 120"
+      },
+      {
+        "command": "bash verify.sh",
+        "exit_code": 0,
+        "artifact": "PASS: no secret-pattern match"
+      },
+      {
+        "command": "인수 검사 전량(0-7 제외)",
+        "exit_code": 0,
+        "artifact": "PASS=24 FAIL=2 — 실패 2건은 기준선 c59bad7 에서도 동일(환경 사유)"
+      },
+      {
+        "command": "python -m humansearch.observe --channel saramin --port 9327 --once (실소켓)",
+        "exit_code": 2,
+        "artifact": "STATE=drifted TAB=- ROLES=0 CONTRACT_VALID=false / stderr 빈 문자열"
+      },
+      {
+        "command": "자체 퍼징 1,512 입력 → main()",
+        "exit_code": 0,
+        "artifact": "crash=0 bad_exit=0 multiline=0"
+      },
+      {
+        "command": "변조 20종(유효 19종) 전량",
+        "exit_code": 0,
+        "artifact": "대조군 56 passed exit 0 / 살아남은 변조 0건"
+      },
+      {
+        "command": "런타임 배선 추적(sys.settrace)",
+        "exit_code": 0,
+        "artifact": "main -> observe_once -> _valid_origin -> _split -> select_single_target -> _origin -> _split -> format_observation_line"
+      }
+    ]
+  },
+  "v1": {
+    "tool": "codex exec --sandbox read-only (codex-cli 0.148.0)",
+    "note": "SOT-30 §6 이 지정한 /codex:adversarial-review 는 이 환경에 없다. 실제 설치된 codex CLI 를 fresh·read-only 로 직접 실행했다.",
+    "rounds": [
+      {
+        "round": 1,
+        "head": "-",
+        "status": "INVALID",
+        "reason": "제공자 필터 차단(exit 1), 판정 본문 0줄 — V1 으로 세지 않음"
+      },
+      {
+        "round": 2,
+        "head": "5f8f8c7",
+        "status": "FAIL",
+        "findings": 4,
+        "transcript": "scratchpad/v1_out2.txt",
+        "tokens": 121898
+      },
+      {
+        "round": 3,
+        "head": "abb1ed7",
+        "status": "FAIL",
+        "findings": 4,
+        "transcript": "scratchpad/v1_out3.txt",
+        "tokens": 165846
+      },
+      {
+        "round": 4,
+        "head": "e6d131a",
+        "status": "INCOMPLETE",
+        "reason": "필터에 최종 요약 차단, VERDICT 줄 없음. 작업 로그의 반례 1건은 재현·수정됨",
+        "transcript": "scratchpad/v1_out4.txt",
+        "tokens": 167415
+      },
+      {
+        "round": 5,
+        "head": "4e57ca2",
+        "status": "INCOMPLETE",
+        "reason": "동일. 반례 1건 재현·수정됨",
+        "transcript": "scratchpad/v1_out5.txt",
+        "tokens": 181496
+      },
+      {
+        "round": 6,
+        "head": "4e57ca2",
+        "status": "PASS",
+        "transcript": "scratchpad/v1_out6.txt",
+        "tokens": 109658,
+        "tool_calls": 34,
+        "verdict": "I cannot find any configured contract, target-list response, or tab URL that escapes as an exception unhandled by main()."
+      }
+    ],
+    "findings_reproduced_independently": 10,
+    "findings_accepted": 9,
+    "findings_rejected": 1,
+    "rejected_reason": "argparse 인자 오류는 traceback 없이 usage 3줄 + exit 2 로 끝난다 — 관측 결과가 아니라 CLI 사용 오류다"
+  },
+  "v2": {
+    "status": "PENDING"
+  },
+  "failed_attempts": [
+    {
+      "what": "V1 1회차 프롬프트",
+      "why": "공격 문구가 제공자 필터에 걸려 판정 0줄",
+      "fix": "방어적 견고성 검토 문구로 재작성"
+    },
+    {
+      "what": "WU2 첫 속성 시험(st.text() 만)",
+      "why": "수정 전 코드에서도 통과 — 공허한 시험",
+      "fix": "주소 조립 전략 + @example 로 반례 고정"
+    },
+    {
+      "what": "첫 변조 하네스",
+      "why": "복제본에 contracts/ 가 없어 대조군이 16건 실패하는 잡음",
+      "fix": "mroot/{humansearch,contracts} 배치 + 대상 파일로 좁힘"
+    },
+    {
+      "what": "전송 except 의 ValueError 제거",
+      "why": "변조 생존(커버리지 부족)을 도달 불가로 오독",
+      "fix": "가드 복원 + 그 가지에 닿는 시험 추가(WU8)"
+    }
+  ],
+  "three_way_agree": null,
+  "status": "V2_PENDING"
+}
