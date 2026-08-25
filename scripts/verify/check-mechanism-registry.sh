@@ -27,6 +27,11 @@ if [ ! -f "$REGISTRY" ]; then
   exit 2
 fi
 
+registry_dir=$(dirname "$REGISTRY")
+registry_base=$(basename "$REGISTRY")
+registry_canonical=$(cd "$registry_dir" 2>/dev/null && printf '%s/%s' "$(pwd -P)" "$registry_base")
+sot_canonical=$(cd docs/sot 2>/dev/null && printf '%s/%s' "$(pwd -P)" mechanism-registry.yaml)
+
 fail=0
 checked=0
 syntax_fail=0
@@ -253,7 +258,7 @@ flush_entry
 
 # 현재 정본 명부는 원칙 검사기의 세 실행면을 모두 가져야 한다. 일반 fixture에는
 # 이 저장소 전용 필수 ID를 강제하지 않아 기존 파서 경계 시험을 독립적으로 유지한다.
-if [ "$REGISTRY" = "docs/sot/mechanism-registry.yaml" ]; then
+if [ -n "$registry_canonical" ] && [ "$registry_canonical" = "$sot_canonical" ]; then
   for required_id in principles-local-check principles-explicit-prepush principles-explicit-ci \
     history-secret-scan-ci history-secret-scan-acceptance-ci; do
     if ! printf '%s\n' "$seen_ids" | grep -qxF -- "$required_id"; then

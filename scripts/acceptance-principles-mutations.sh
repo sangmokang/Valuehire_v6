@@ -182,7 +182,7 @@ expect_verdict() {
   local rc=0 output=""
   checked=$((checked + 1))
   output=$(bash scripts/verify/check-strict-verdict-ledger.sh "$fixture" 2>&1) || rc=$?
-  if [ "$rc" -eq "$wanted" ] && printf '%s\n' "$output" | grep -q '^VERDICT: FAIL$'; then
+  if [ "$rc" -eq "$wanted" ] && grep -q '^VERDICT: FAIL$' <<< "$output"; then
     printf 'PASS: %s %s — FAIL (exit=%s)\n' "$id" "$description" "$rc"
   else
     printf 'FAIL: %s %s 미차단 — exit=%s\n%s\n' "$id" "$description" "$rc" "$output"
@@ -266,7 +266,7 @@ ruby -e 'p=ARGV[0]; s=File.read(p).sub("두 플랫폼은 같은 원칙 장부", 
 rc=0
 output=$(bash scripts/verify/check-strict-principles-skills.sh "$SKILL_TMP/codex.md" "$SKILL_TMP/claude-mismatch.md" 2>&1) || rc=$?
 checked=$((checked + 1))
-if [ "$rc" -eq 1 ] && printf '%s\n' "$output" | grep -q '^COMMON_CONTRACT_MISMATCH$'; then
+if [ "$rc" -eq 1 ] && grep -q '^COMMON_CONTRACT_MISMATCH$' <<< "$output"; then
   echo "PASS: C13 Codex/Claude 공통 계약 불일치 — FAIL (exit=1)"
 else
   printf 'FAIL: C13 공통 계약 불일치 미탐 — exit=%s\n%s\n' "$rc" "$output"
@@ -306,7 +306,7 @@ printf '# line 501\n' >> "$SKILL_TMP/codex-501.md"
 rc=0
 output=$(bash scripts/verify/check-strict-principles-skills.sh "$SKILL_TMP/codex-501.md" "$SKILL_TMP/claude-500.md" 2>&1) || rc=$?
 checked=$((checked + 1))
-if [ "$rc" -eq 1 ] && printf '%s\n' "$output" | grep -q '^LINE_LIMIT_EXCEEDED:'; then
+if [ "$rc" -eq 1 ] && grep -q '^LINE_LIMIT_EXCEEDED:' <<< "$output"; then
   echo "PASS: BOUNDARY-501 직접 작성 코드 501줄 — FAIL"
 else
   printf 'FAIL: BOUNDARY-501 expected FAIL exit=1 actual=%s\n%s\n' "$rc" "$output"

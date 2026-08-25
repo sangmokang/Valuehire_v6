@@ -118,7 +118,7 @@
 **Where** CI 와 인수 검사가 히스토리 비밀 스캔을 수행할 때, 시스템은 **동일한 파일** `scripts/scan-history-secrets.sh` 를 실행해야 한다.
 
 - 검증 명령: `bash scripts/verify/run-acceptance.sh scripts/acceptance-verify-ac-m.sh`
-- 기대: `CHECKED: 32` 이상, 명부 항목 수 = 검사기 보고 수
+- 기대: `CHECKED: 33` 정확히, 명부 항목 수 = 검사기 보고 수
 - counter-AC:
   - 워크플로에 스캔 본문이 인라인으로 다시 남아 있으면 **실패**
   - 명부(`docs/sot/mechanism-registry.yaml`)에 스캐너가 등록되지 않았으면 **실패**
