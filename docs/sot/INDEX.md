@@ -6,6 +6,7 @@
 - [hook-contracts.md](hook-contracts.md) — 로컬 git hook 5개(pre-commit·pre-push·session-status·acceptance-0-7·install-hooks)의 입출력 계약
 - [git-workflow.md](git-workflow.md) — trunk-based + worktree + 태그 릴리스 규약
 - [verification-commands.md](verification-commands.md) — 이 저장소의 실제 게이트 명령(make 레포 아님, 실행 확인됨)
+- [ci-required-steps.json](ci-required-steps.json) — CI 보호 step의 job·name·ordered run lines·허용 if 계약
 - [humansearch-l0-surface-contract.md](humansearch-l0-surface-contract.md) — HumanSearch L0 인증 화면 분류의 입력·출력·경계
 - [humansearch-browser-contract.md](humansearch-browser-contract.md) — HumanSearch 상주 브라우저 진단 접속·단일 탭·사용권·사람 개입·채널별 경계
 

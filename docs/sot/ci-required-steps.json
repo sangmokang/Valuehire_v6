@@ -1,0 +1,155 @@
+{
+  "schema_version": 1,
+  "workflow": ".github/workflows/verify.yml",
+  "protected_steps": [
+    {"job":"verify","name":"비밀 스캔 (verify.sh)","run_lines":["bash verify.sh"],"if":null,"allow_continue_on_error":false},
+    {"job":"verify","name":"Strict 원칙 정본·장부·배선 검사","run_lines":["bash scripts/verify/run-acceptance.sh scripts/acceptance-principles-check.sh"],"if":null,"allow_continue_on_error":false},
+    {"job":"verify","name":"Strict 원칙 적대 fixture·500/501 경계","run_lines":["bash scripts/verify/run-acceptance.sh scripts/acceptance-principles-mutations.sh"],"if":null,"allow_continue_on_error":false},
+    {"job":"verify","name":"Strict 전역 스킬 잠금 장치 격리 회귀","run_lines":["bash scripts/verify/run-acceptance.sh scripts/acceptance-guard-global-skill-files.sh"],"if":null,"allow_continue_on_error":false},
+    {
+      "job":"verify","name":"HumanSearch G1 클린룸 경계",
+      "run_lines":[
+        "bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-cleanroom.sh",
+        "bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-cleanroom-mutations.sh",
+        "bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-cleanroom-absolute-paths.sh",
+        "bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-cleanroom-absolute-contexts.sh",
+        "bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-cleanroom-colon-paths.sh",
+        "bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-cleanroom-file-urls.sh",
+        "bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-cleanroom-hook-env.sh",
+        "bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-cleanroom-hook-env-mutations.sh"
+      ],"if":null,"allow_continue_on_error":false
+    },
+    {
+      "job":"verify","name":"HumanSearch G2 테스트 게이트 (정적·단위 + runtime import 증명)",
+      "run_lines":[
+        "# 설치 여부만 보면 러너에 이미 있는 다른 버전을 그대로 쓴다 — 그건 버전",
+        "# \"출력\"이지 \"고정\"이 아니다. 실제 값을 계약(C-8)과 대조하고 어긋나면 실패시킨다.",
+        "required=0.11.3",
+        "actual=$(uv --version 2>/dev/null | awk '{print $2}')",
+        "if [ \"$actual\" != \"$required\" ]; then",
+        "  pipx install --force \"uv==$required\"",
+        "  actual=$(uv --version 2>/dev/null | awk '{print $2}')",
+        "fi",
+        "if [ \"$actual\" != \"$required\" ]; then",
+        "  echo \"FAIL: uv 버전 불일치 — expected=$required actual=${actual:-없음}\"",
+        "  exit 1",
+        "fi",
+        "echo \"PASS: uv $actual (계약 C-8 고정)\"",
+        "bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-gates.sh",
+        "bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-gates-mutations.sh",
+        "bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-gates-antiforge.sh"
+      ],"if":null,"allow_continue_on_error":false
+    },
+    {
+      "job":"verify","name":"히스토리 전량 스캔 (도달 가능한 모든 blob)",
+      "run_lines":[
+        "set -o pipefail",
+        "CLEAN=$(mktemp)",
+        "tr -d '\\r' < .secret-patterns.default | grep -vE '^[[:space:]]*(#|$)' > \"$CLEAN\"",
+        "[ -s \"$CLEAN\" ] || { echo \"FAIL: 유효 패턴 0개\"; exit 2; }",
+        "",
+        "# fail-closed: git이 실패해 객체 목록이 비면 \"0건 통과\"가 아니라 오류다.",
+        "OBJS=$(mktemp)",
+        "if ! git rev-list --all --reflog --objects > \"$OBJS\"; then",
+        "  echo \"FAIL: git rev-list 실패 — 히스토리를 읽지 못했다(스캔 무효)\"; exit 2",
+        "fi",
+        "count=$(awk '{print $1}' \"$OBJS\" | sort -u | wc -l)",
+        "if [ \"$count\" -lt 2 ]; then",
+        "  echo \"FAIL: 도달 가능 객체가 ${count}개 — 저장소를 제대로 읽지 못했다(스캔 무효)\"; exit 2",
+        "fi",
+        "echo \"스캔 대상 객체: ${count}개\"",
+        "",
+        "hit=0; blobs=0",
+        "while IFS= read -r sha; do",
+        "  [ -z \"$sha\" ] && continue",
+        "  [ \"$(git cat-file -t \"$sha\" 2>/dev/null)\" = blob ] || continue",
+        "  blobs=$((blobs+1))",
+        "  if git cat-file blob \"$sha\" 2>/dev/null | grep -qEif \"$CLEAN\"; then",
+        "    echo \"FAIL: 히스토리 blob에 자격증명 패턴 매치: $sha\"",
+        "    awk -v s=\"$sha\" '$1==s {print \"  경로: \"$2}' \"$OBJS\"",
+        "    hit=1",
+        "  fi",
+        "done < <(awk '{print $1}' \"$OBJS\" | sort -u)",
+        "if [ \"$blobs\" -eq 0 ]; then",
+        "  echo \"FAIL: blob을 한 개도 읽지 못했다(스캔 무효)\"; exit 2",
+        "fi",
+        "[ \"$hit\" -eq 0 ] && echo \"PASS: 히스토리 전량 blob 스캔 0건 (blob ${blobs}개 검사)\"",
+        "exit $hit"
+      ],"if":null,"allow_continue_on_error":false
+    },
+    {"job":"verify","name":"인수 검사 0-2 상시 내용 검사와 종료상태 분리 (AC-19)","run_lines":["bash scripts/verify/run-acceptance.sh scripts/acceptance-0-2-unreachable-content.sh"],"if":null,"allow_continue_on_error":false},
+    {"job":"verify","name":"인수 검사 0-6 (가짜 검증 스크립트 0건)","run_lines":["bash scripts/verify/run-acceptance.sh scripts/acceptance-0-6.sh"],"if":null,"allow_continue_on_error":false},
+    {"job":"verify","name":"인수 검사 0-7 (훅이 위반 6종을 실제로 차단하는가)","run_lines":["bash scripts/verify/run-acceptance.sh scripts/acceptance-0-7.sh"],"if":null,"allow_continue_on_error":false},
+    {"job":"verify","name":"인수 검사 0-5 (push · CI 연결)","run_lines":["bash scripts/verify/run-acceptance.sh scripts/acceptance-0-5.sh"],"if":"github.ref == 'refs/heads/main'","allow_continue_on_error":false},
+    {
+      "job":"verify","name":"억제 만료 스캔 (suppressions.yaml)",
+      "run_lines":[
+        "[ -f suppressions.yaml ] || { echo \"PASS: 억제 없음\"; exit 0; }",
+        "today=$(date +%Y-%m-%d); fail=0; n=0",
+        "while IFS= read -r e; do",
+        "  n=$((n+1))",
+        "  if ! printf '%s' \"$e\" | grep -qE '^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$'; then",
+        "    echo \"FAIL: expiry 형식 오류 '${e}' — 만료를 판정할 수 없는 억제는 무기한 억제다\"; fail=1",
+        "  elif [ \"$e\" \\< \"$today\" ]; then",
+        "    echo \"FAIL: 만료된 억제 (expiry $e < 오늘 $today) — 유예 기한이 지났다\"; fail=1",
+        "  fi",
+        "done < <(awk '/^ *expiry:/{sub(/^ *expiry: */,\"\"); gsub(/[\"\\x27]/,\"\"); print}' suppressions.yaml)",
+        "nc=$(awk '/^- *check:/{c++} END{print c+0}' suppressions.yaml)",
+        "if [ \"$nc\" -ne \"$n\" ]; then",
+        "  echo \"FAIL: 억제 ${nc}건 중 expiry 가 ${n}건뿐\"; fail=1",
+        "fi",
+        "[ \"$fail\" -eq 0 ] && echo \"PASS: 억제 ${nc}건 전부 유효 기한 내\"",
+        "exit $fail"
+      ],"if":null,"allow_continue_on_error":false
+    },
+    {
+      "job":"verify","name":"강제 장치 존재 검사 (hooks/)",
+      "run_lines":[
+        "fail=0",
+        "for h in hooks/pre-commit hooks/pre-push; do",
+        "  if [ ! -f \"$h\" ]; then echo \"FAIL: $h 없음 — 이 브랜치엔 로컬 강제 장치가 없다\"; fail=1",
+        "  elif [ ! -x \"$h\" ]; then echo \"FAIL: $h 실행 권한 없음 — 훅은 존재해도 조용히 통과한다\"; fail=1",
+        "  fi",
+        "done",
+        "[ \"$fail\" -eq 0 ] && echo \"PASS: 훅 2종 존재·실행가능\"",
+        "exit $fail"
+      ],"if":null,"allow_continue_on_error":false
+    },
+    {
+      "job":"verify","name":"셸 스크립트 문법 검사",
+      "run_lines":[
+        "fail=0",
+        "n=0",
+        "while IFS= read -r -d '' f; do",
+        "  n=$((n+1))",
+        "  bash -n \"$f\" || { echo \"syntax error: $f\"; fail=1; }",
+        "done < <(git ls-files -z '*.sh' hooks/pre-commit hooks/pre-push)",
+        "if [ \"$n\" -lt 2 ]; then",
+        "  echo \"FAIL: 문법 검사 대상이 ${n}개 — 대상 0개는 합격이 아니다\"",
+        "  exit 1",
+        "fi",
+        "echo \"PASS: 셸 파일 ${n}개 문법 검사\"",
+        "exit $fail"
+      ],"if":null,"allow_continue_on_error":false
+    },
+    {
+      "job":"verify","name":"패턴 파일 자체에 실제 비밀이 없는지 (자기 오염 방지)",
+      "run_lines":[
+        "# .secret-patterns.default 는 \"모양\"만 담아야 한다. 값처럼 보이는 긴 리터럴이 있으면 실패.",
+        "if grep -nE \"^[^#]*=[A-Za-z0-9]{8,}[[:space:]]*$\" .secret-patterns.default; then",
+        "  echo \"FAIL: 기본 패턴 파일에 실제 값처럼 보이는 리터럴이 있음\"",
+        "  exit 1",
+        "fi",
+        "echo \"PASS: 기본 패턴 파일에 실값 없음\""
+      ],"if":null,"allow_continue_on_error":false
+    },
+    {"job":"verify","name":"인수 검사 hs-a3 (세션 계열 자격증명 탐지)","run_lines":["bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-a3.sh"],"if":null,"allow_continue_on_error":false},
+    {"job":"verify","name":"데이터 노출 스캔 (크기 · 금지경로 · 기록 · 개인정보 내용)","run_lines":["bash scripts/scan-data-exposure.sh all"],"if":null,"allow_continue_on_error":false},
+    {"job":"verify","name":"인수 검사 hs-a4 (대용량·산출물 차단이 실제로 도는가)","run_lines":["bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-a4.sh"],"if":null,"allow_continue_on_error":false},
+    {"job":"verify","name":"인수 검사 secret-webhook-vendor (웹훅·벤더 키 탐지 · AC-S1)","run_lines":["bash scripts/verify/run-acceptance.sh scripts/acceptance-secret-webhook-vendor.sh"],"if":null,"allow_continue_on_error":false},
+    {"job":"verify","name":"인수 검사 verified-sha (초록불이 SHA 에 귀속되는가 · P23)","run_lines":["bash scripts/verify/run-acceptance.sh scripts/acceptance-verified-sha.sh"],"if":null,"allow_continue_on_error":false},
+    {"job":"verify","name":"인수 검사 ci-step-integrity (스텝을 조용히 끄지 못하는가)","run_lines":["bash scripts/verify/run-acceptance.sh scripts/acceptance-ci-step-integrity.sh"],"if":null,"allow_continue_on_error":false},
+    {"job":"verify","name":"인수 검사 semantic-mutations (검사를 껐을 때 반드시 빨개지는가)","run_lines":["bash scripts/verify/run-acceptance.sh scripts/acceptance-semantic-mutations.sh"],"if":null,"allow_continue_on_error":false},
+    {"job":"verify","name":"인수 검사 verify-ac-m (mechanism 명부 대조 · AC-M)","run_lines":["bash scripts/verify/run-acceptance.sh scripts/acceptance-verify-ac-m.sh"],"if":null,"allow_continue_on_error":false}
+  ]
+}
