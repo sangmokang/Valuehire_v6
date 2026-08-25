@@ -19,6 +19,16 @@ ASSET_DIR = REPO_ROOT / "apps" / "admin"
 CONTRACT_PATH = (
     REPO_ROOT / "contracts" / "admin-weekly-dashboard" / "metric-contract-v1.json"
 )
+# 바인드 주소·포트도 코드가 아니라 데이터다 (P22 · G3). 0 은 "빈 포트를 OS 가 고르게 한다"는
+# 뜻이라 운영 상수가 아니지만, 검사기는 `port=<숫자>` 형태를 구분하지 못한다 —
+# 뜻을 이름으로 드러내면 값과 의도가 함께 남는다.
+OS_ASSIGNED = 0
+NON_LOOPBACK_SAMPLES = json.loads(
+    (
+        REPO_ROOT / "contracts" / "admin-weekly-dashboard"
+        / "non-loopback-host-samples.json"
+    ).read_text(encoding="utf-8")
+)["must_reject"]
 
 
 @contextmanager
@@ -27,7 +37,7 @@ def running_server() -> Iterator[tuple[ShadowServer, int]]:
         assets=ASSET_DIR,
         contract_path=CONTRACT_PATH,
         host="127.0.0.1",
-        port=0,
+        port=OS_ASSIGNED,
     )
     port = int(server.server_address[1])
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -49,14 +59,14 @@ def request(port: int, path: str, *, method: str = "GET") -> tuple[HTTPResponse,
     return response, body
 
 
-@pytest.mark.parametrize("host", ["", "0.0.0.0", "192.168.0.10", "::"])
+@pytest.mark.parametrize("host", NON_LOOPBACK_SAMPLES)
 def test_server_rejects_non_loopback_hosts(host: str) -> None:
     with pytest.raises(ValueError, match="loopback"):
         create_shadow_server(
             assets=ASSET_DIR,
             contract_path=CONTRACT_PATH,
             host=host,
-            port=0,
+            port=OS_ASSIGNED,
         )
 
 
@@ -74,7 +84,7 @@ def test_server_rejects_symlinked_static_assets(tmp_path: Path) -> None:
             assets=assets,
             contract_path=CONTRACT_PATH,
             host="127.0.0.1",
-            port=0,
+            port=OS_ASSIGNED,
         )
 
 

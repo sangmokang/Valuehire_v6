@@ -46,7 +46,11 @@ trap 'cleanup; trap - EXIT; exit 129' HUP
 # ── 조각 조립 payload ─────────────────────────────────────────────────────────
 SEL_API=$(printf 'document.query%s("#login-form")' 'Selector')
 SEL_PY=$(printf 'driver.find_%s(By.CSS_%s, "#resume-list > li")' 'element' 'SELECTOR')
-URL_P=$(printf 'LOGIN_URL = "https%s//career-portal.example/login"' ':')
+# 2026-08-25 동결 예외(hardening7): 공격의 뜻은 "운영 포털로 가는 scheme URL 이 제품
+# 코드에 박혔다"이다. 원래 표본은 그 자리에 RFC 2606 예약 도메인(.example)을 썼는데,
+# 예약 도메인은 원리적으로 접속이 불가능해 "운영 주소"의 표본이 될 수 없었다.
+# 공격 형태·기대 종료코드는 그대로 두고 호스트만 실제 운영 가능한 것으로 바꾼다.
+URL_P=$(printf 'LOGIN_URL = "https%s//career-portal.net/login"' ':')
 DOM_P=$(printf 'session_host = "cdn.talent-hub.%s"' 'net')
 HP_P=$(printf 'CDP_ADDR = "127.0.0.1%s"' ':9222')
 FLAG_P=$(printf 'launch_arg = "--remote-%s=9224"' 'debugging-port')
@@ -101,6 +105,14 @@ init_case() {
     > "$CASE_DIR/scripts/acceptance-hs-portal-constants-mutations.sh"
   cp "$GPAT" "$CASE_DIR/contracts/portal-constants-deny-patterns.txt"
   cp "$PPAT" "$CASE_DIR/contracts/portal-constants-deny-patterns-product.txt"
+  # 2026-08-25 동결 예외(hardening7): 검사기가 요구하는 계약이 3벌 늘었다. 공격 내용과
+  # 기대 종료코드는 그대로 두고 입력만 맞춘다 — 2026-08-13 runs-on 표본 조정과 같은 처리.
+  # 루트 계약만은 표본 자신의 구조를 적는다. 표본 저장소에는 apps/admin 이 없고,
+  # "등재했는데 실재하지 않는 루트 = exit 2" 규칙이 그 불일치를 정확히 잡기 때문이다.
+  printf 'humansearch/src\nhumansearch/tests\n' \
+    > "$CASE_DIR/contracts/portal-constants-product-roots.txt"
+  cp contracts/portal-constants-nonoperational-addresses.txt "$CASE_DIR/contracts/portal-constants-nonoperational-addresses.txt"
+  cp contracts/portal-constants-nonoperational-suffixes.txt "$CASE_DIR/contracts/portal-constants-nonoperational-suffixes.txt"
   cp hooks/pre-push "$CASE_DIR/hooks/pre-push"
   chmod +x "$CASE_DIR/hooks/pre-push"
   write_wf "$CASE_DIR" ok

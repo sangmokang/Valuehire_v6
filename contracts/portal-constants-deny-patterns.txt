@@ -6,23 +6,28 @@
 # 이 계층에 "모든 URL"을 넣지 않는 이유: uv.lock 의 정당한 패키지 주소, 기존 보안 검사기의
 # 시험용 주소가 오탐된다 — 그 계층은 -product.txt 가 제품 코드에만 건다.
 
-# DOM/드라이버 locator API — 셀렉터는 코드가 아니라 데이터다 (웹 자동화 5조 1번)
-querySelecto[r]
-getElementsB[y]
-getElementByI[d]
-CSS_SELECTO[R]
-find_elemen[t]
-\.locato[r]\(
-wait_for_selecto[r]
+# DOM/드라이버 locator API — 셀렉터는 코드가 아니라 데이터다 (웹 자동화 5조 1번).
+# 2026-08-25 정밀화: 같은 줄에 따옴표 리터럴이 있을 때만 잡는다. `document.getElementById(id)`
+# 처럼 값을 변수로 받는 호출은 "화면 위치가 코드에 박혔다"가 아니다 — 그 값이 어디선가
+# 리터럴로 적히면 아래 셀렉터·XPath 규칙과 제품 계층이 그 리터럴 자체를 잡는다.
+# 잔여 한계: API 호출과 리터럴을 서로 다른 줄로 쪼개면 이 규칙은 놓친다. 그 경우에도
+# 리터럴 쪽이 제품 계층에서 잡히며, hardening7 이 그 분리 형태를 표본으로 고정한다.
+querySelecto[r][^"'`]*["'`]
+getElementsB[y][^"'`]*["'`]
+getElementByI[d][^"'`]*["'`]
+CSS_SELECTO[R][^"'`]*["'`]
+find_elemen[t][^"'`]*["'`]
+\.locato[r]\([^"'`]*["'`]
+wait_for_selecto[r][^"'`]*["'`]
 
 # 의미 기반 화면 찾기 API — Playwright get_by_* 계열 (V1 3차 F2)
-get_by_ro[l]e
-get_by_lab[e]l
-get_by_test_i[d]
-get_by_tex[t]
-get_by_placeholde[r]
-get_by_titl[e]
-get_by_al[t]_text
+get_by_ro[l]e[^"'`]*["'`]
+get_by_lab[e]l[^"'`]*["'`]
+get_by_test_i[d][^"'`]*["'`]
+get_by_tex[t][^"'`]*["'`]
+get_by_placeholde[r][^"'`]*["'`]
+get_by_titl[e][^"'`]*["'`]
+get_by_al[t]_text[^"'`]*["'`]
 
 # XPath 리터럴 (// + 식별자 + [@ 속성 — 공백 변형 포함, V1 결함 D1)
 //[a-z*][a-z0-9]*[[:space:]]*\[[[:space:]]*[@]

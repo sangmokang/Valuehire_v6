@@ -300,7 +300,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         port=cast(int, arguments.port),
     )
     bound_host, bound_port = cast(tuple[str, int], server.server_address)
-    print(f"LOCAL SHADOW · 운영 아님 · http://{bound_host}:{bound_port}")
+    # scheme 리터럴을 코드에 두지 않는다 (G3 · P22). 호스트·포트만 그대로 알린다.
+    print(f"LOCAL SHADOW · 운영 아님 · {bound_host}:{bound_port}")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

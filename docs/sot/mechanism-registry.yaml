@@ -49,7 +49,10 @@
   required: true
 - id: "acceptance-runner-ci"
   path: ".github/workflows/verify.yml"
-  target: "bash scripts/verify/run-acceptance.sh"
+  # 2026-08-25 병합: target 은 접두사가 아니라 실제 run 줄 전체여야 한다. 접두사 대조는
+  # 주석 안의 글자에도 걸렸다(문자열 grep 판정의 한계 — G3 검사기와 같은 교훈).
+  # 다른 항목이 덮지 않는 평범한 인수 검사 한 줄을 골라 "래퍼가 실제로 CI 에서 돈다"를 증명한다.
+  target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-0-6.sh"
   stage: "ci"
   ci_mirror_job: "verify"
   required: true

@@ -132,6 +132,14 @@ init_case() {
   done
   cp "$GLOBAL_PATTERNS_SOURCE" "$CASE_DIR/contracts/portal-constants-deny-patterns.txt"
   cp "$PRODUCT_PATTERNS_SOURCE" "$CASE_DIR/contracts/portal-constants-deny-patterns-product.txt"
+  # 2026-08-25 동결 예외(hardening7): 검사기가 요구하는 계약이 3벌 늘었다. 공격 내용과
+  # 기대 종료코드는 그대로 두고 입력만 맞춘다 — 2026-08-13 runs-on 표본 조정과 같은 처리.
+  # 루트 계약만은 표본 자신의 구조를 적는다. 표본 저장소에는 apps/admin 이 없고,
+  # "등재했는데 실재하지 않는 루트 = exit 2" 규칙이 그 불일치를 정확히 잡기 때문이다.
+  printf 'humansearch/src\nhumansearch/tests\n' \
+    > "$CASE_DIR/contracts/portal-constants-product-roots.txt"
+  cp contracts/portal-constants-nonoperational-addresses.txt "$CASE_DIR/contracts/portal-constants-nonoperational-addresses.txt"
+  cp contracts/portal-constants-nonoperational-suffixes.txt "$CASE_DIR/contracts/portal-constants-nonoperational-suffixes.txt"
   cp hooks/pre-push "$CASE_DIR/hooks/pre-push"
   chmod +x "$CASE_DIR/hooks/pre-push"
   write_wf_ok "$CASE_DIR"

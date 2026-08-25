@@ -28,7 +28,15 @@ cd "$REPO"
 
 GLOBAL_PATTERNS=contracts/portal-constants-deny-patterns.txt
 PRODUCT_PATTERNS=contracts/portal-constants-deny-patterns-product.txt
-PRODUCT_ROOTS="humansearch/src humansearch/tests"
+# 제품 루트는 코드가 아니라 데이터다. 코드에 고정하면 새 제품 폴더가 생겼을 때 검사가
+# 적용되지 않는다(codex V1 D3). 목록 밖 제품 폴더를 발견하면 통과가 아니라 exit 2 다.
+PRODUCT_ROOTS_CONTRACT=contracts/portal-constants-product-roots.txt
+NONOP_ADDRESSES=contracts/portal-constants-nonoperational-addresses.txt
+NONOP_SUFFIXES=contracts/portal-constants-nonoperational-suffixes.txt
+# 제품 코드로 볼 확장자. 루트 발견에만 쓴다(계층 배정은 경로 접두로 한다).
+PRODUCT_EXT_RE='\.(py|js|mjs|cjs|ts|tsx|jsx|html|css)$'
+# 검사기 자신의 구역 정의 — 이 접두는 제품 루트 발견 대상이 아니다.
+INFRA_PREFIX_RE='^(contracts|docs|scripts|hooks|\.github)/'
 WF=.github/workflows/verify.yml
 HOOK=hooks/pre-push
 
@@ -38,7 +46,8 @@ GCLEAN=$(mktemp) || { echo "FAIL: temp workspace unavailable"; exit 2; }
 PCLEAN=$(mktemp) || { echo "FAIL: temp workspace unavailable"; exit 2; }
 FILES=$(mktemp) || { echo "FAIL: temp workspace unavailable"; exit 2; }
 ERRS=$(mktemp) || { echo "FAIL: temp workspace unavailable"; exit 2; }
-cleanup() { rm -f -- "$GCLEAN" "$PCLEAN" "$FILES" "$ERRS"; }
+PLIST=$(mktemp) || { echo "FAIL: temp workspace unavailable"; exit 2; }
+cleanup() { rm -f -- "$GCLEAN" "$PCLEAN" "$FILES" "$ERRS" "$PLIST"; }
 trap cleanup EXIT
 trap 'cleanup; trap - EXIT; exit 143' TERM
 trap 'cleanup; trap - EXIT; exit 130' INT
@@ -72,7 +81,26 @@ load_patterns() {
 load_patterns "$GLOBAL_PATTERNS" "$GCLEAN"
 load_patterns "$PRODUCT_PATTERNS" "$PCLEAN"
 
-# 제품 루트가 없으면 조용한 skip 이 아니라 검사 불능이다 (사전감사 벡터 5).
+# 제품 루트 계약 적재. 부재·빈 파일·유효 항목 0개는 전부 검사 불능이다.
+if [ ! -f "$PRODUCT_ROOTS_CONTRACT" ] || [ ! -r "$PRODUCT_ROOTS_CONTRACT" ] || [ ! -s "$PRODUCT_ROOTS_CONTRACT" ]; then
+  echo "FAIL: product root contract missing, unreadable, or empty: $PRODUCT_ROOTS_CONTRACT"
+  exit 2
+fi
+PRODUCT_ROOTS=$(sed -e 's/\r$//' -e '/^[[:space:]]*#/d' -e '/^[[:space:]]*$/d' "$PRODUCT_ROOTS_CONTRACT")
+if [ -z "$PRODUCT_ROOTS" ]; then
+  echo "FAIL: product root contract has zero effective roots: $PRODUCT_ROOTS_CONTRACT"
+  exit 2
+fi
+for required in "$NONOP_ADDRESSES" "$NONOP_SUFFIXES"; do
+  if [ ! -f "$required" ] || [ ! -r "$required" ] || [ ! -s "$required" ]; then
+    echo "FAIL: portal judgment contract missing, unreadable, or empty: $required"
+    exit 2
+  fi
+done
+
+# 등재한 루트가 실재하지 않으면 조용한 skip 이 아니라 검사 불능이다 (사전감사 벡터 5).
+# 계약이 현실과 어긋난 채로 초록이 되는 것을 금지한다 — 루트를 지웠으면 계약에서도 지워야
+# 하고, 그러면 아래 미등재 발견이 그 폴더를 다시 잡는다. 어느 방향으로도 조용히 빠져나갈 수 없다.
 for root in $PRODUCT_ROOTS; do
   if [ ! -d "$root" ]; then
     echo "FAIL: product root missing: $root"
@@ -82,6 +110,47 @@ done
 
 if ! git ls-files -z > "$FILES"; then
   echo "FAIL: tracked-file enumeration failed"
+  exit 2
+fi
+
+is_product_path() {
+  local candidate="$1" root
+  for root in $PRODUCT_ROOTS; do
+    case "$candidate" in "$root"/*) return 0 ;; esac
+  done
+  return 1
+}
+
+# 제품 코드 확장자를 가진 추적 파일이 계약 밖에 있으면 검사 불능이다 (D3).
+# "등재를 잊는 것"이 통과가 아니라 실패가 되게 하는 장치다.
+# grep 의 "일치 없음"(1)은 정상이고 도구 오류(2 이상)는 검사 불능이다. 종료값을 참으로
+# 덮어쓰면 열거 실패가 "미등재 0건"으로 둔갑한다 — 그래서 구분해서 받는다 (P13).
+undeclared_rc=0
+undeclared=$(git ls-files | LC_ALL=C grep -E "$PRODUCT_EXT_RE") || undeclared_rc=$?
+if [ "$undeclared_rc" -gt 1 ]; then
+  echo "FAIL: product-code enumeration failed (rc=$undeclared_rc)"
+  exit 2
+fi
+undeclared_rc=0
+undeclared=$(printf '%s\n' "$undeclared" | LC_ALL=C grep -vE "$INFRA_PREFIX_RE") || undeclared_rc=$?
+if [ "$undeclared_rc" -gt 1 ]; then
+  echo "FAIL: product-code enumeration failed (rc=$undeclared_rc)"
+  exit 2
+fi
+undeclared_roots=""
+while IFS= read -r candidate; do
+  if [ -z "$candidate" ]; then continue; fi
+  if is_product_path "$candidate"; then continue; fi
+  undeclared_roots="${undeclared_roots}$(dirname "$candidate")
+"
+done <<UNDECLARED
+$undeclared
+UNDECLARED
+undeclared_roots=$(printf '%s' "$undeclared_roots" | LC_ALL=C sort -u | sed '/^$/d')
+if [ -n "$undeclared_roots" ]; then
+  echo "FAIL: product code outside the product-root contract — 등재하지 않으면 검사가 적용되지 않는다"
+  printf '  undeclared-root: %s\n' $undeclared_roots
+  echo "  계약: $PRODUCT_ROOTS_CONTRACT"
   exit 2
 fi
 
@@ -140,17 +209,99 @@ while IFS= read -r -d '' path; do
       ;;
   esac
   checked=$((checked + 1))
-  case "$path" in
-    humansearch/src/*|humansearch/tests/*)
-      product_files=$((product_files + 1))
-      scan_with "$path" "$GCLEAN" global
-      scan_with "$path" "$PCLEAN" product
-      ;;
-    *)
-      scan_with "$path" "$GCLEAN" global
-      ;;
-  esac
+  if is_product_path "$path"; then
+    product_files=$((product_files + 1))
+    scan_with "$path" "$GCLEAN" global
+    printf '%s\n' "$path" >> "$PLIST"
+  else
+    scan_with "$path" "$GCLEAN" global
+  fi
 done < "$FILES"
+
+# ── 제품 계층 판정 (3단) ─────────────────────────────────────────────────────
+# 1단 비운영 주소 제거: RFC 2606 예약 도메인·루프백은 원리적으로 운영 주소가 될 수 없다.
+#      제거 후에도 금지 패턴이 남으면 그 줄은 여전히 위반이다 — 면제가 아니라 정밀화다.
+# 2단 금지 패턴: contracts/portal-constants-deny-patterns-product.txt (셀렉터·포트 등).
+# 3단 점 토큰 fail-closed: 따옴표 안이 통째로 `이름.이름` 또는 `.이름` 형태인데 마지막
+#      라벨이 비운영 접미사 계약에 **없으면** 거부한다. 예전 TLD 열거는 모르는 값을
+#      통과시키는 방향으로 실패했다(codex V2 D4). 이 단계가 그 방향을 뒤집는다.
+# 판정기는 하나다(P16) — 이 검사기 안에서만 판정하고 결과를 여기서 센다.
+if [ -s "$PLIST" ]; then
+  SBOX=$(mktemp -d) || { echo "FAIL: temp workspace unavailable"; exit 2; }
+  # 1·3단은 Ruby 가 맡는다(비운영 주소 제거 · 점 토큰 fail-closed). 2단 금지 패턴은
+  # 계약 파일의 POSIX ERE 를 그대로 해석하는 grep 에 맡긴다 — 표현식을 두 문법으로
+  # 옮겨 적으면 판정이 두 벌이 되고 반드시 갈라진다(P16).
+  product_rc=0
+  dotted_hits=$(ruby -e '
+    address_path, suffix_path, list_path, sandbox = ARGV
+    rules = lambda do |path|
+      File.readlines(path, chomp: true).reject { |line| line.strip.empty? || line.strip.start_with?("#") }
+    end
+    addresses = rules.call(address_path).map { |raw| Regexp.new(raw, Regexp::IGNORECASE) }
+    suffixes = {}
+    rules.call(suffix_path).each { |raw| suffixes[raw.strip] = true }
+    exit 2 if addresses.empty? || suffixes.empty?
+
+    dotted = /(["\x27`])(\.?[a-z0-9][a-z0-9_-]*(?:\.[a-z0-9][a-z0-9_-]*)*)\1/
+    ipv4 = /\A[0-9]{1,3}(?:\.[0-9]{1,3}){3}\z/
+
+    File.readlines(list_path, chomp: true).reject(&:empty?).each_with_index do |path, index|
+      reason = nil
+      stripped = +""
+      begin
+        File.foreach(path) do |line|
+          clean = line.dup
+          addresses.each { |rule| clean = clean.gsub(rule, "") }
+          stripped << clean
+          next if reason
+          clean.scan(dotted) do |_quote, token|
+            next unless token.include?(".")
+            labels = token.split(".", -1)
+            last = labels.last.to_s
+            next if suffixes.key?(last)
+            # 버전 문자열(1.2.3)은 주소가 아니다. 4옥텟 IPv4 만 주소로 본다.
+            next if labels.all? { |label| label.match?(/\A[0-9]+\z/) } && !token.match?(ipv4)
+            reason = "unknown-suffix:#{last}"
+            break
+          end
+        end
+        File.binwrite(File.join(sandbox, index.to_s), stripped)
+      rescue SystemCallError, ArgumentError
+        puts "#{index}\tunreadable\t#{path}"
+        next
+      end
+      puts "#{index}\t#{reason || "-"}\t#{path}"
+    end
+  ' "$NONOP_ADDRESSES" "$NONOP_SUFFIXES" "$PLIST" "$SBOX" 2>> "$ERRS") || product_rc=$?
+  if [ "$product_rc" -ne 0 ]; then
+    rm -rf -- "$SBOX"
+    echo "FAIL: product-tier evaluator unavailable (rc=$product_rc)"
+    exit 2
+  fi
+  while IFS=$(printf '\t') read -r pidx preason ppath; do
+    if [ -z "$ppath" ]; then continue; fi
+    if [ "$preason" = unreadable ]; then
+      errors=$((errors + 1))
+      printf '  unreadable: %q\n' "$ppath"
+      continue
+    fi
+    prc=0
+    LC_ALL=C grep -aEiqf "$PCLEAN" -- "$SBOX/$pidx" 2>> "$ERRS" || prc=$?
+    if [ "$prc" -eq 0 ]; then
+      forbidden=$((forbidden + 1))
+      printf '  forbidden(product/deny-pattern): %q\n' "$ppath"
+    elif [ "$prc" -gt 1 ]; then
+      errors=$((errors + 1))
+      printf '  unreadable: %q\n' "$ppath"
+    elif [ "$preason" != "-" ]; then
+      forbidden=$((forbidden + 1))
+      printf '  forbidden(product/%s): %q\n' "$preason" "$ppath"
+    fi
+  done <<PRODUCT_HITS
+$dotted_hits
+PRODUCT_HITS
+  rm -rf -- "$SBOX"
+fi
 
 # ── 배선 자기 검사 (사전감사 벡터 1·2, V1 결함 D2·D3, V1 2차 결함 N2·N3) ──────
 # CI 는 수동 열거(verify.yml)라 여기 등록되지 않으면 "로컬에만 있는 검사"가 되고,
