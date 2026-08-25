@@ -234,7 +234,10 @@ def _fetch_targets(contract: MarkerContract, port: int) -> list[object]:
         if response.status != 200:
             raise ObservationError("target list request was rejected")
         body = response.read(1_048_577)
-    except (OSError, HTTPException, ValueError) as exc:
+    # `InvalidURL` 은 `HTTPException` 의 하위형이라 생성자를 try 안에 넣은 것만으로 잡힌다.
+    # `ValueError` 를 여기 더 넣어봤자 계약 검증(`_is_loopback_address`·`_valid_targets_path`)이
+    # 이미 그 입력을 막아 도달하지 않는다 — 변조 시험으로 확인했으므로 추측 방어를 남기지 않는다.
+    except (OSError, HTTPException) as exc:
         raise ObservationError("target list request failed") from exc
     finally:
         if connection is not None:
