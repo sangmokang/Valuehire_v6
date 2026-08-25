@@ -72,6 +72,9 @@ expect_rc "실행 대신 echo → 불합격" "$p" 1
 p=$(mutate syntax-only 'p=ARGV[0]; s=File.read(p).sub("        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-a4.sh", "        run: bash -n scripts/acceptance-hs-a4.sh"); File.write(p,s)')
 expect_rc "실행 대신 bash -n → 불합격" "$p" 1
 
+p=$(mutate delete-rdp 'p=ARGV[0]; s=File.read(p).sub(/\n      - name: 인수 검사 repository-data-protection[^\n]*\n        run: bash scripts\/verify\/run-acceptance\.sh scripts\/acceptance-repository-data-protection\.sh\n/, "\n"); File.write(p,s)')
+expect_rc "repository-data-protection 호출 삭제 → 불합격" "$p" 1
+
 p=$(mutate empty-steps 'p=ARGV[0]; require "psych"; d=Psych.safe_load(File.read(p), aliases: true); d["jobs"]["verify"]["steps"]=[]; File.write(p,Psych.dump(d))')
 expect_rc "job 의 스텝 전량 삭제 → 불합격" "$p" 1
 

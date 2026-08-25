@@ -12,8 +12,7 @@
 # 계약: verify 워크플로의 모든 job·step 은 조건 없이 실행되고 실패를 전파해야 한다.
 #       정당한 예외는 이 파일에 이유와 함께 적고, 적히지 않은 예외는 전부 불합격이다.
 #
-# 막지 못하는 것: 스텝 자체를 삭제하는 것. 그것은 mechanism-registry 와 pre-push 의
-#       실행줄 검사가 맡는다. 여기서 다 막는다고 주장하지 않는다.
+# 필수 안전 스텝은 정확한 실행 명령도 한 번 요구해 삭제·중복을 함께 막는다.
 set -uo pipefail
 
 WORKFLOW="${1:-.github/workflows/verify.yml}"
@@ -31,6 +30,9 @@ ALLOWED_STEP_IF = {
   "인수 검사 0-5 (push · CI 연결)" =>
     "origin/main==main 을 보는 검사라 main push 에서만 의미가 있다. PR 실행에서 요구하면 상시 실패한다.",
 }
+REQUIRED_RUN_ONCE = [
+  "bash scripts/verify/run-acceptance.sh scripts/acceptance-repository-data-protection.sh",
+]
 
 begin
   doc = Psych.safe_load(File.read(workflow_path), aliases: true, permitted_classes: [Date, Time])
@@ -42,6 +44,7 @@ end
 
 errors = []
 checked = 0
+run_lines = []
 
 jobs = doc.is_a?(Hash) ? doc["jobs"] : nil
 unless jobs.is_a?(Hash) && !jobs.empty?
@@ -88,6 +91,7 @@ jobs.each do |job_name, job|
       run.each_line do |line|
         stripped = line.strip
         next if stripped.empty? || stripped.start_with?("#")
+        run_lines << stripped
         if stripped =~ /\Aecho\s+(bash|sh)\s+\S+\.sh/
           errors << "STEP_ECHO_ONLY: jobs.#{job_name}.#{label} 의 `#{stripped}` 는 실행이 아니라 출력이다"
         end
@@ -97,6 +101,12 @@ jobs.each do |job_name, job|
       end
     end
   end
+end
+
+REQUIRED_RUN_ONCE.each do |command|
+  checked += 1
+  count = run_lines.count(command)
+  errors << "REQUIRED_RUN_COUNT: `#{command}` 실행 줄이 #{count}개다 — 정확히 1개여야 한다" unless count == 1
 end
 
 if errors.empty?

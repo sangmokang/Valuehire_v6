@@ -39,6 +39,7 @@
         "인수 검사 hs-a3 (세션 계열 자격증명 탐지)",
         "데이터 노출 스캔 (크기 · 금지경로 · 기록 · 개인정보 내용)",
         "인수 검사 hs-a4 (대용량·산출물 차단이 실제로 도는가)",
+        "인수 검사 repository-data-protection (부분 Git·SQL·경로 가명·집계 계약)",
         "인수 검사 secret-webhook-vendor (웹훅·벤더 키 탐지 · AC-S1)"
       ],
       "ci_command_paths": [
@@ -47,6 +48,7 @@
         "scripts/acceptance-hs-a3.sh",
         "scripts/scan-data-exposure.sh",
         "scripts/acceptance-hs-a4.sh",
+        "scripts/acceptance-repository-data-protection.sh",
         "scripts/acceptance-secret-webhook-vendor.sh"
       ],
       "hooks": [
@@ -64,6 +66,11 @@
         "kind": "scanner",
         "path": "scripts/scan-data-exposure.sh",
         "scope": "tracked, history, pii or all"
+      },
+      {
+        "kind": "local_remediation",
+        "path": "scripts/resolve-data-path-fingerprint.sh",
+        "scope": "operator-only current and deleted-history path fingerprint lookup; never CI evidence"
       },
       {
         "kind": "git_hook",
@@ -107,7 +114,7 @@
       },
       {
         "condition": "secret or personal-data pattern matches",
-        "behavior": "report the rule and path without printing the matched value"
+        "behavior": "report the rule and deterministic 12-hex path fingerprint without printing the matched value or raw path"
       }
     ],
     "invariants": [
@@ -138,12 +145,12 @@
       },
       {
         "id": "RDP-INV-6",
-        "rule": "Tracked and historical PII content use one shared decision function, and violation output contains only safe path, blob fingerprint, column-kind count and data-shape metadata.",
+        "rule": "Tracked and historical PII content use one shared decision function, and scanner output replaces every raw path with the same deterministic 12-hex fingerprint contract.",
         "evidence": "scripts/scan-data-exposure.sh"
       },
       {
         "id": "RDP-INV-7",
-        "rule": "History scanning uses NUL-delimited Git tree records to enumerate every reachable commit-tree blob-path association, so a safe-extension alias or a path containing control characters cannot hide a CSV, TSV or SQL path; displayed paths are safely escaped.",
+        "rule": "History scanning uses NUL-delimited Git tree records to enumerate every reachable commit-tree blob-path association; local fingerprint lookup covers current and deleted paths and reports every collision candidate.",
         "evidence": "scripts/scan-data-exposure.sh"
       }
     ],
@@ -187,8 +194,8 @@
       },
       {
         "id": "RDP-V6",
-        "command": "bash scripts/acceptance-hs-a3.sh && bash scripts/acceptance-hs-a4.sh && bash scripts/acceptance-secret-webhook-vendor.sh",
-        "expected": "exact case counts, tracked/history zero-target, Git enumeration failure, actual CHECKED count, current and deleted-history CSV/TSV/SQL including an identical safe-extension blob alias and a control-character-bearing CSV path, current/history one-column and schema-only allowed controls, both-path non-disclosure, one shared PII function, 600/601 file and 100/101 function boundaries all pass; all commands exit 0"
+        "command": "bash scripts/acceptance-hs-a3.sh && bash scripts/acceptance-hs-a4.sh && bash scripts/acceptance-repository-data-protection.sh && bash scripts/acceptance-secret-webhook-vendor.sh",
+        "expected": "exact case counts, complete Git target collection, all-mode aggregation, current and deleted-history multiline SQL, comment/string controls, raw-path non-disclosure, deterministic current/deleted-path lookup, one shared PII function, 600/601 file and 100/101 function boundaries all pass; all commands exit 0"
       }
     ],
     "evidence": [
@@ -199,6 +206,8 @@
       "suppressions.yaml",
       "docs/sot/hook-contracts.md",
       "scripts/acceptance-hs-a4.sh",
+      "scripts/acceptance-repository-data-protection.sh",
+      "scripts/resolve-data-path-fingerprint.sh",
       "scripts/acceptance-secret-webhook-vendor.sh"
     ],
     "change_protocol": {

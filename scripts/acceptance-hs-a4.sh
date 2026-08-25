@@ -7,23 +7,15 @@
 #   출력 : exit 0 = PASS | exit 1 = FAIL | exit 2 = NOT_RUN
 #   stdout: 항목마다 PASS:/FAIL:/NOT_RUN: 을 전부 출력하고, 마지막 줄에 `CHECKED: <검사 수>`
 #   불변식: 0건 검사는 통과가 아니다 (P20)
-#
-#   구현 계획 §8 은 후보자 개인정보 보호를 이 두 장치 위에 세웠는데 **둘 다 없었다**.
-#   Phase 0 에서 SQLite 가 생기는 순간 구멍이 열린 채로 시작하게 된다.
-#
-#   판정하지 않는다 — 문자열은 있는데 동작하지 않는 경우를 잡지 못하기 때문이다.
+# 문자열 존재가 아니라 임시 저장소의 실제 차단·허용 동작을 판정한다.
 set -uo pipefail
 
-# ⚠️ git 훅은 GIT_DIR·GIT_INDEX_FILE 등을 자식 프로세스로 export 한다. 그 상태에서는
-# 임시 저장소로 `cd` 해도 git 명령이 **실제 저장소**에 붙는다 — 2026-08-09 실측:
-# `git push` 중 이 검사가 돌면서 실제 워크트리 인덱스에 테스트 파일 12개가 스테이지되고
-# README.md 가 덮어써졌다(push 는 fail-closed 로 막혀 원격에는 안 갔다).
-# 검증기가 검증 대상을 오염시키면 그 판정은 무효다. 여기서 상속을 끊는다.
+# 훅이 상속한 Git 환경으로 임시 fixture가 원본 저장소에 붙지 않도록 격리한다.
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY \
       GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_PREFIX GIT_QUARANTINE_PATH
 
 REPO=$(git rev-parse --show-toplevel 2>/dev/null) || { echo "NOT_RUN: git 저장소가 아니다"; echo "CHECKED: 0"; exit 2; }
-cd "$REPO"
+cd "$REPO" || exit 2
 
 # 자기 오염 감지 — 이 검사가 끝난 뒤 저장소 상태가 시작과 달라지면 판정 자체가 무효다.
 SNAP0=$(git status --porcelain)
@@ -31,12 +23,22 @@ SNAP0=$(git status --porcelain)
 MAX_BYTES=1048576
 fail=0
 checked=0
-TMPDIRS=""
-# 중단 시 임시 디렉터리를 남기지 않는다.
+TMPDIRS="" d="" # 중단 시 임시 디렉터리를 남기지 않는다.
 trap 'for d in $TMPDIRS; do [ -n "$d" ] && [ -d "$d" ] && rm -rf "$d"; done' EXIT
 
 ok()  { checked=$((checked + 1)); printf 'PASS: %s\n' "$1"; }
 bad() { checked=$((checked + 1)); printf 'FAIL: %s\n' "$1"; fail=1; }
+
+# Git 목록은 임시 파일에 완전히 수집한 뒤에만 사용한다. 부분 출력은 검사 대상이 아니다.
+TARGET_TMP=$(mktemp -d) || { echo "NOT_RUN: 추적 대상 수집 공간 생성 실패"; echo "CHECKED: 0"; exit 2; }
+TMPDIRS="$TMPDIRS $TARGET_TMP"
+TRACKED_TARGETS="$TARGET_TMP/tracked"
+if ! git ls-files -z > "$TRACKED_TARGETS" 2>/dev/null; then
+  echo "NOT_RUN: git ls-files가 완전한 추적 대상을 반환하지 못했다"
+  echo "CHECKED: 0"
+  exit 2
+fi
+expected_seen=$(tr -cd '\000' < "$TRACKED_TARGETS" | wc -c | tr -d ' ')
 
 # ── 1) .gitignore 가 산출물 경로를 덮는가 ───────────────────────────────────
 # git check-ignore 로 판정한다. .gitignore 본문을 grep 하면 표기 차이(끝 슬래시·와일드카드)
@@ -50,23 +52,23 @@ for p in artifacts/x.png data/humansearch.sqlite3 humansearch.db run.sqlite priv
 done
 
 # ── 2) 이미 추적 중인 파일에 위반이 없는가 (CI 가 매번 보는 것과 같은 검사) ──
-#
-# ⚠️ 대상 수(seen)를 반드시 센다(2026-08-12 V1 적대검증 D7). 이전 판은 큰 파일 수(big)만
-# 세고 대상 수를 안 봐서, **추적 파일이 0개인 빈 저장소에서도 "초과 0건"으로 성공**했다.
-# 0건 처리를 통과로 세는 것이 P20 이 금지하는 공허 통과다. 검사 대상이 없으면 그것은
-# "깨끗함"이 아니라 "검사기가 대상을 못 찾음"이며 fail-closed 로 처리한다.
-# (CI 쪽 verify.yml 은 이미 `n -eq 0` 에서 exit 2 로 같은 방어를 한다 — 로컬만 비어 있었다.)
 big=0
 seen=0
+size_invalid=0
 while IFS= read -r -d '' f; do
   seen=$((seen + 1))
-  sz=$(git cat-file -s ":$f" 2>/dev/null) || continue
+  sz=$(git cat-file -s ":$f" 2>/dev/null) || { size_invalid=1; continue; }
   if [ "$sz" -gt "$MAX_BYTES" ]; then
-    printf '  큰 파일: %s (%s 바이트)\n' "$f" "$sz"
+    path_id=$(printf '%s' "$f" | shasum -a 256 2>/dev/null) || { size_invalid=1; continue; }
+    printf '  큰 파일: path %.12s (%s 바이트)\n' "${path_id%%[[:space:]]*}" "$sz"
     big=$((big + 1))
   fi
-done < <(git ls-files -z)
-if [ "$seen" -eq 0 ]; then
+done < "$TRACKED_TARGETS"
+if [ "$seen" -ne "$expected_seen" ]; then
+  bad "추적 대상 처리 수 ${seen}개 ≠ 완전 수집 수 ${expected_seen}개"
+elif [ "$size_invalid" -ne 0 ]; then
+  bad "추적 대상 blob 크기를 전부 읽지 못했다"
+elif [ "$seen" -eq 0 ]; then
   bad "추적 파일 0개 — 스캔 무효 (P20 · 검사 대상을 못 찾은 것이지 깨끗한 것이 아니다)"
 elif [ "$big" -eq 0 ]; then
   ok "추적 파일 ${seen}개 중 ${MAX_BYTES} 바이트 초과 0건"
@@ -235,15 +237,12 @@ else
   bad "정상 파일까지 차단됨 (exit=$rc) — 게이트가 아니라 벽이다"
 fi
 
-# ── 5) 같은 검사가 CI 에도 있는가 (P15③ — 로컬에만 있는 검사는 없는 것으로 친다) ──
+# ── 5) 같은 검사가 CI 에도 있는가 ─────────────────────────────────────────────
 WF=.github/workflows/verify.yml
 if [ ! -f "$WF" ]; then
   bad "$WF 없음 — CI 등가물을 확인할 수 없다"
 else
-  # 판정기가 두 벌이 되면 갈린다(이 저장소가 이미 겪은 사고 — hooks/pre-commit §1 주석).
-  # CI 본문은 이제 공용 판정기(scripts/scan-data-exposure.sh)로 옮겼으므로 CI↔판정기
-  # 대조는 필요 없다 — 같은 파일이다. 남은 갈림길은 **훅 ↔ 판정기** 한 곳뿐이다.
-  # 훅은 '스테이지된 것'만 보므로 별도 코드로 남아 있고, 그래서 목록이 갈라질 수 있다.
+  # 훅과 공용 판정기의 경로 정책, 전용 acceptance의 CI/SOT 단일 배선을 함께 고정한다.
   miss=""
   for pat in '\*/artifacts/\*' '\*/data/\*' '\*\.db-\*' '\*\.jsonl' '\*/private-reviews/\*' '\*\.parquet'; do
     if ! grep -q -- "$pat" scripts/scan-data-exposure.sh; then miss="${miss} ${pat}(판정기)"; fi
@@ -256,12 +255,7 @@ else
   fi
 fi
 
-# ── 6) 공용 데이터 노출 판정기 — 문자열이 아니라 **실행**으로 검증한다 ──────────
-#
-# 왜 공용 스크립트인가(2026-08-12 V1 적대검증 D4): 이전 판은 CI 워크플로 본문에 특정
-# 문자열이 있는지만 봤다. 그래서 크기검사 스텝에 `if: ${{ false }}` 를 넣어 영구히 꺼도
-# 인수검사·pre-commit·pre-push 가 전부 초록이었다(V2 재현). 규칙을 두 벌로 적으면 항상
-# 이렇게 갈라진다 — 판정을 스크립트 하나로 모으고, CI 도 인수검사도 **같은 것을 실행**한다.
+# ── 6) 공용 데이터 노출 판정기를 실제 실행한다 ────────────────────────────────
 JUDGE=scripts/scan-data-exposure.sh
 
 if [ ! -f "$JUDGE" ] || [ ! -x "$JUDGE" ]; then
@@ -475,7 +469,7 @@ fi
 
 # 현재와 history가 같은 이름의 판정 함수 한 개를 정확히 두 번 호출하는지 고정한다.
 pii_definition_count=$(grep -Ec '^scan_pii_content[[:space:]]*\(\)[[:space:]]*\{' "$JUDGE")
-history_pii_call_count=$(grep -Fc 'scan_pii_content "$candidate" "$content" "$sha" "$kind"' "$JUDGE")
+history_pii_call_count=$(grep -Fc 'scan_pii_content "$path_id" "$content" "$sha" "$kind"' "$JUDGE")
 current_pii_call_count=$(grep -Fc 'scan_pii_content "$f" "$content"' "$JUDGE")
 if [ "$pii_definition_count" -eq 1 ] \
    && [ "$history_pii_call_count" -eq 1 ] \
@@ -519,8 +513,8 @@ code_budget_case() {
   awk 'BEGIN { for (i=1; i<=601; i++) print "unsafe" }' > "$tmp/601.sh"
   awk 'BEGIN { print "fixture_function() {"; for (i=2; i<100; i++) print ":"; print "}" }' > "$tmp/function-100.sh"
   awk 'BEGIN { print "fixture_function() {"; for (i=2; i<101; i++) print ":"; print "}" }' > "$tmp/function-101.sh"
-  for file in verify.sh scripts/scan-data-exposure.sh \
-    scripts/acceptance-secret-webhook-vendor.sh scripts/acceptance-hs-a4.sh; do
+  for file in verify.sh scripts/scan-data-exposure.sh scripts/resolve-data-path-fingerprint.sh \
+    scripts/acceptance-secret-webhook-vendor.sh scripts/acceptance-hs-a4.sh scripts/acceptance-repository-data-protection.sh; do
     file_within_budget "$file" || budget_ok=0
     functions_within_budget "$file" || budget_ok=0
   done
@@ -561,6 +555,13 @@ else
   else
     ok "판정기 스텝에 비활성화 조건 없음"
   fi
+  rdp_ci=$(grep -cF 'run: bash scripts/verify/run-acceptance.sh scripts/acceptance-repository-data-protection.sh' "$WF")
+  rdp_sot=$(grep -cF '| 19 | 인수 검사 repository-data-protection |' docs/sot/verification-commands.md)
+  if [ "$rdp_ci" -eq 1 ] && [ "$rdp_sot" -eq 1 ]; then
+    ok "repository-data-protection acceptance가 CI와 검증 SOT에 정확히 한 번 연결됨"
+  else
+    bad "repository-data-protection acceptance 배선 불일치 — CI=${rdp_ci}, SOT=${rdp_sot}"
+  fi
 fi
 
 if [ "$checked" -eq 0 ]; then
@@ -587,7 +588,7 @@ else
 fi
 
 # 정확한 사례 수를 고정해 삭제 이력 호출이나 경계 검사가 제거돼도 초록이 되지 않게 한다.
-EXPECTED_CHECKS=48
+EXPECTED_CHECKS=49
 if [ "$checked" -ne "$EXPECTED_CHECKS" ]; then
   printf 'FAIL: 검사 항목 %d개 ≠ 계약값 %d개 (검사가 사라졌거나 무단 추가됐다 · P20)\n' \
     "$checked" "$EXPECTED_CHECKS"

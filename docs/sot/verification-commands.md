@@ -17,7 +17,7 @@
 
 ### CI(`​.github/workflows/verify.yml`)가 실제로 돌리는 것
 
-**워크플로 스텝 20개 전부**를 적는다(2026-08-12 V1 D6: 이전 판은 `bash ...` 직접 명령만 적어 인라인 본문 스텝이 목록에서 빠졌고, 운영자가 실제로 무엇이 도는지 잘못 판단할 수 있었다). 아래는 `verify.yml` 의 `- name:` 스텝 순서 그대로다(2026-08-20 Strict 원칙 직접 로드 3개 스텝 포함).
+**워크플로의 이름 있는 스텝 24개 전부**를 적는다(2026-08-12 V1 D6: 이전 판은 `bash ...` 직접 명령만 적어 인라인 본문 스텝이 목록에서 빠졌고, 운영자가 실제로 무엇이 도는지 잘못 판단할 수 있었다). 아래는 `verify.yml` 의 `- name:` 스텝 순서 그대로다.
 
 | # | 스텝 이름 | 실행 내용 |
 |---|---|---|
@@ -39,8 +39,12 @@
 | 16 | 인수 검사 hs-a3 | `bash scripts/acceptance-hs-a3.sh` — 세션 계열 자격증명 (AC-A3) |
 | 17 | 데이터 노출 스캔 | `bash scripts/scan-data-exposure.sh all` — 크기·금지경로·기록·개인정보 (AC-A4) |
 | 18 | 인수 검사 hs-a4 | `bash scripts/acceptance-hs-a4.sh` — 차단이 실제로 도는가 (AC-A4) |
-| 19 | 인수 검사 secret-webhook-vendor | `bash scripts/acceptance-secret-webhook-vendor.sh` — 웹훅·벤더 키 (AC-S1) |
-| 20 | 인수 검사 verify-ac-m | `bash scripts/acceptance-verify-ac-m.sh` — mechanism 명부 대조 (AC-M) |
+| 19 | 인수 검사 repository-data-protection | `bash scripts/acceptance-repository-data-protection.sh` — 부분 Git 목록·SQL 주석/문자열·경로 가명·all 집계 계약 |
+| 20 | 인수 검사 secret-webhook-vendor | `bash scripts/acceptance-secret-webhook-vendor.sh` — 웹훅·벤더 키 (AC-S1) |
+| 21 | 인수 검사 verified-sha | `bash scripts/acceptance-verified-sha.sh` — 로컬·원격·CI SHA 귀속 진리표 (P23) |
+| 22 | 인수 검사 ci-step-integrity | `bash scripts/acceptance-ci-step-integrity.sh` — 조건부·오류무시·출력 대체 차단 |
+| 23 | 인수 검사 semantic-mutations | `bash scripts/acceptance-semantic-mutations.sh` — 인수 검사 무력화 5종 차단과 정확한 Git 대상 수집 |
+| 24 | 인수 검사 verify-ac-m | `bash scripts/acceptance-verify-ac-m.sh` — mechanism 명부 대조 (AC-M) |
 
 *(1번 앞에 `actions/checkout` 이 있고 `fetch-depth: 0` 이다 — 4번이 과거 blob 을 열려면 필요하다.)*
 
@@ -59,13 +63,13 @@
 
 종료값 `0=PASS / 1=FAIL / 2=NOT_RUN`. 모든 모드는 마지막에 실제 처리 수 `CHECKED: N`을 한 번 출력한다. **검사 대상 0건이나 Git 객체 열거·형식·크기·본문 읽기 실패는 통과가 아니라 `NOT_RUN`이다**(P3·P20).
 
-현재 `pii`와 `history`는 `scan_pii_content` 한 함수를 재사용한다. history는 `git rev-list --objects`가 동일 blob에 대표 경로 하나만 남기는 한계를 피하려고 모든 도달 가능 commit tree의 blob-경로 연결을 별도로 열거한다. `git ls-tree -z`의 NUL 경계를 보존하므로 줄바꿈·탭 같은 제어문자가 든 경로도 레코드를 가르지 않으며, 로그에는 shell-escaped 안전 경로만 출력한다. 같은 blob이 안전 확장자와 CSV·TSV·SQL 경로를 모두 거쳤어도 관련 확장자를 각각 판정한다. 오탐을 막기 위해 **두 조건을 모두** 만족해야 차단한다 — ① 개인정보 컬럼 낱말 2종 이상 ② 실제 데이터를 담은 형태(CSV·TSV는 데이터 행 1줄 이상, SQL은 `INSERT`/`VALUES`/`COPY`). 그래서 개인정보 컬럼 낱말이 1종뿐인 정상 CSV와 **`CREATE TABLE candidates(name, email)` 같은 스키마 정의는 통과한다** — 정상 자료와 마이그레이션까지 막으면 개발이 멈춘다.
+현재 `pii`와 `history`는 `scan_pii_content` 한 함수를 재사용한다. history는 모든 도달 가능 commit tree의 blob-경로 연결을 NUL 경계로 열거하므로 제어문자가 든 경로와 안전 확장자 alias도 숨지 못한다. SQL은 판정용 사본에서 `--`·`#`·`/* */` 주석과 작은따옴표 문자열 내용을 제거하고 줄바꿈·탭을 공백으로 정규화한 뒤 `INSERT INTO`·`VALUES (`·`COPY ... FROM`을 판정한다. 개인정보 컬럼 낱말 2종 이상은 기존처럼 원본 파일 전체에서 세며, CSV·TSV는 데이터 행이 있어야 차단한다. 따라서 개인정보 컬럼 1종 CSV, schema-only SQL, 주석·문자열에만 적재 예시가 있는 SQL은 통과한다.
 
-과거 개인정보 위반 출력은 안전한 저장소 경로, Git blob 지문, 개인정보 컬럼 종류 수와 데이터 형태만 담는다. 이름·이메일·전화번호와 행/SQL 원문은 stdout·stderr에 출력하지 않는다.
+scanner는 금지경로·크기초과·PII 위반·경로 관련 NOT_RUN에서 원문 경로를 출력하지 않는다. `path <12hex>`는 `printf '%s' "$path" | shasum -a 256` 결과의 앞 12자리인 결정론적 가명이며 비식별화가 아니다. 같은 경로는 current/history에서 같은 지문이다. 운영자는 로컬에서만 `bash scripts/resolve-data-path-fingerprint.sh <12hex>`를 실행해 현재 추적 경로와 삭제된 commit-tree 경로를 역조회한다. 2개 이상이 나오면 도구는 모든 shell-escaped 후보와 `COLLISION`을 출력하고 성공으로 접지 않는다. 이 로컬 출력은 CI·goal·판정서에 복사하지 않는다.
 
 **금지 경로 목록은 `hooks/pre-commit`과 이 판정기 두 곳에 있다**(훅은 '스테이지된 것'만 보므로 별도 코드다). 한쪽만 넓히면 조용히 갈라지므로 `scripts/acceptance-hs-a4.sh`가 두 목록의 동치를 검사한다.
 
-`scripts/acceptance-hs-a4.sh`는 48개 사례를 정확히 요구한다. 빈 tracked/history, Git 기록 열거 실패, 실제 `CHECKED` 2개, 현재와 과거의 개인정보 컬럼 낱말 1종 정상 CSV, 현재/삭제 이력 CSV·TSV·SQL, 동일 blob의 안전 확장자 alias 및 탭·따옴표·줄바꿈 포함 CSV 경로가 있어도 history/all이 삭제 PII를 안전한 한 줄 메타데이터로 탐지하는 사례, 두 경로의 개인정보 원문 비출력, 정상 과거 대조군을 실행한다. 또한 현재/history가 `scan_pii_content` 정의 하나를 각각 직접 호출하는지 고정한다. 같은 파일 판정 함수로 현재 직접 작성 파일의 600줄 이하와 합성 600줄 통과·601줄 차단을 확인하고, 같은 함수 판정기로 현재 함수와 합성 100줄 통과·101줄 차단도 검사한다. 사례 호출을 제거하거나 건수를 위조하면 전체 acceptance가 exit 1이다.
+`scripts/acceptance-hs-a4.sh`는 49개 사례를 정확히 요구한다. 기존 48개 회귀에 더해 전용 repository-data-protection acceptance가 CI의 `run-acceptance.sh`와 이 표에 정확히 한 번 연결됐는지 독립 확인한다. 추적 대상은 `git ls-files -z`의 성공한 전체 NUL 목록을 먼저 저장하고 그 실제 수와 처리 수를 정확히 비교한다. 같은 파일 판정 함수로 직접 작성 파일 600줄 이하와 합성 600/601 경계, 함수 100/101 경계를 확인하며 신규 전용 acceptance와 로컬 역조회 도구도 코드 예산 대상이다.
 
 ### 주요 기능 정본 구조 검사 — `scripts/check-docs-sot.sh`
 
@@ -73,21 +77,13 @@
 bash scripts/check-docs-sot.sh
 ```
 
-기존 SOT 필수 파일·훅 계약 참조에 더해 `docs/sot/features/catalog.yaml`과 기능 문서의 구조를
-검사한다. 기능 ID·문서 경로·범주·상태가 1:1로 맞는지, 필수 키·불변조건 ID가 중복되지 않는지,
-호출점·세부 정본·근거 경로와 Markdown 제목 앵커가 현재 저장소에 실제로 존재하는지 확인한다. 외부 URL은 근거 경로로
-허용하지 않는다. 또한 추적 제품 파일, 이름 있는 CI 단계, CI가 언급하는 저장소 검사 명령, 훅,
-HumanSearch 기능 계약을 실제 저장소에서 유도해 기능 문서의 `surface_coverage`와 정확히 대조한다.
-기능 YAML은 Python 표준 `json` 모듈로, GitHub Actions workflow의 단계 이름은 저장소의 기존 CI
-무결성 판정기와 같은 Ruby Psych YAML 파서로 읽는다. 별도 패키지를 추가하지 않는다.
+현재 71줄 검사기는 필수 SOT 파일 5개의 존재·20,000바이트 상한과 훅 관련 실행 파일 5개의
+`docs/sot/hook-contracts.md` 계약 참조만 검사한다. 각 항목의 `PASS:`/`FAIL:`과 마지막 전체 판정을
+출력하며 하나라도 어긋나면 exit 1이다. 기능 문서 구조나 제품 표면을 검사하지 않는다.
 
-출력은 각 항목의 `PASS:` 또는 `FAIL:`과 마지막 전체 판정이다. 빈 카탈로그, 기능 문서 0개, 필수 키
-누락, 중복 기능 ID, 존재하지 않는 근거 경로·Markdown 앵커, 미귀속 CI 단계·명령은 모두 종료값 1이다. 정상 사본과
-일곱 고장 사본, 실제 새 표면을 동반한 7번째 기능 확장 사본을 2026-08-22에 격리 실행해 의도한
-정상·확장 사본만 종료값 0임을 확인했다.
-
-이 명령은 현재 수동 검사이며 pre-push와 CI에는 연결하지 않았다. 기능 분류 문서의 구조를 검사하지만
-제품 동작의 정답을 대신하지 않으므로, 각 기능 YAML의 `verification` 명령을 함께 실행해야 한다.
+이 명령은 현재 수동 검사이며 pre-push와 CI에는 연결하지 않았다. 따라서 exit 0은 위 10개 정적 항목만
+통과했다는 뜻이고 repository-data-protection 완료나 병합 준비 근거로 사용하지 않는다. 전역 기능 문서·제품
+표면 검증 부재는 별도 `REQUEST_CHANGES`이며, 각 기능 YAML의 `verification` 원명령을 따로 실행해야 한다.
 
 ## 시행 지점
 

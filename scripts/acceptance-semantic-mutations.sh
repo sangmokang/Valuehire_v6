@@ -50,18 +50,23 @@ record() {
   fi
 }
 
-# ── 대상 목록: 검사 대상 0개는 합격이 아니다 ─────────────────────────────────
+# ── 대상 목록: Git의 완전한 NUL 목록과 실제 처리 배열 수를 정확히 대조한다 ──────
+TARGET_LIST="$TMP/acceptance-targets"
+if ! git ls-files -z 'scripts/acceptance-*.sh' > "$TARGET_LIST" 2>/dev/null; then
+  echo "NOT_RUN: git ls-files가 인수 검사 대상의 완전한 목록을 반환하지 못했다"
+  echo "CHECKED: 0"
+  exit 2
+fi
+expected_targets=$(tr -cd '\000' < "$TARGET_LIST" | wc -c | tr -d ' ')
 targets=()
-while IFS= read -r f; do
-  targets+=("$f")
-done < <(git ls-files 'scripts/acceptance-*.sh' | LC_ALL=C sort)
+while IFS= read -r -d '' f; do targets+=("$f"); done < "$TARGET_LIST"
 
-if [ "${#targets[@]}" -lt 5 ]; then
-  echo "FAIL: 인수 검사 대상이 ${#targets[@]}개 — 글로브가 비면 '전부 통과'가 되므로 불합격이다"
+if [ "$expected_targets" -eq 0 ] || [ "${#targets[@]}" -ne "$expected_targets" ]; then
+  echo "FAIL: 인수 검사 처리 수 ${#targets[@]}개 ≠ Git 완전 목록 ${expected_targets}개"
   echo "CHECKED: $checked"
   exit 1
 fi
-record 0 "대상 수집" "인수 검사 ${#targets[@]}개 (하한 5)"
+record 0 "대상 수집" "인수 검사 ${#targets[@]}개 = Git 완전 목록 ${expected_targets}개"
 
 # ── 무력화 5종. 어느 것도 래퍼를 통과해서는 안 된다 ──────────────────────────
 write_mutant() {
