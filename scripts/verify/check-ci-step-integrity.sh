@@ -180,6 +180,7 @@ end
 def reject_ambiguous_yaml(source)
   ast = Psych.parse_stream(source)
   violations = []
+  scanner = Psych::ScalarScanner.new(Psych::ClassLoader::Restricted.new([Date, Time], []))
   walk = nil
   walk = lambda do |node|
     violations << "alias" if node.is_a?(Psych::Nodes::Alias)
@@ -191,6 +192,22 @@ def reject_ambiguous_yaml(source)
       violations << "merge key <<" if scalar_keys.include?("<<")
       duplicates = scalar_keys.group_by(&:itself).select { |_key, values| values.length > 1 }.keys
       violations.concat(duplicates.map { |key| "duplicate mapping key #{key}" })
+
+      semantic_keys = keys.select { |key| key.is_a?(Psych::Nodes::Scalar) }.map do |key|
+        if key.tag && key.tag != "tag:yaml.org,2002:str"
+          violations << "explicit mapping key tag #{key.tag}"
+          ["tagged", key.tag, key.value]
+        elsif key.quoted || key.tag == "tag:yaml.org,2002:str"
+          [String.name, key.value]
+        else
+          value = scanner.tokenize(key.value)
+          [value.class.name, value]
+        end
+      end
+      semantic_duplicates = semantic_keys.group_by(&:itself).select { |_key, values| values.length > 1 }.keys
+      semantic_duplicates.each do |type, value|
+        violations << "duplicate semantic mapping key #{type}:#{value.inspect}"
+      end
     end
     Array(node.respond_to?(:children) ? node.children : nil).each { |child| walk.call(child) }
   end
