@@ -85,9 +85,20 @@ MUTATIONS = [
 ]
 
 
-def _repo_root() -> str:
-    return subprocess.run(["git", "rev-parse", "--show-toplevel"],
-                          capture_output=True, text=True, check=True).stdout.strip()
+def _repo_root() -> str | None:
+    """저장소 뿌리. 못 찾으면 None — 이 스크립트도 예외를 밖으로 내보내지 않는다.
+
+    이 PR 이 고친 결함이 "예외가 그물 밖으로 나가 계약된 출력이 사라진다"인데, 그것을 검사하는
+    도구가 같은 실수를 하고 있었다(저장소 밖에서 실행하면 `CalledProcessError` traceback).
+    검사기도 제품 코드와 같은 규율을 받는다.
+    """
+
+    result = subprocess.run(["git", "rev-parse", "--show-toplevel"],
+                            capture_output=True, text=True)
+    if result.returncode != 0:
+        return None
+    root = result.stdout.strip()
+    return root or None
 
 
 def _run(root: str, project: str) -> tuple[int, str]:
@@ -114,8 +125,15 @@ def _workdir() -> tuple[str, bool]:
 
 def main() -> int:
     repo = _repo_root()
+    if repo is None:
+        print("NOT_RUN: git 저장소 안에서 실행해야 한다 (git rev-parse --show-toplevel 실패)")
+        return 2
     project = f"{repo}/humansearch"
+    if not os.path.isdir(project):
+        print(f"NOT_RUN: {project} 가 없다 — 이 스크립트는 이 저장소 전용이다")
+        return 2
     survivors: list[str] = []
+    skipped: list[str] = []
     try:
         base, disposable = _workdir()
     except OSError as exc:
@@ -146,13 +164,16 @@ def main() -> int:
             with open(target, encoding="utf-8") as handle:
                 source = handle.read()
             if source.count(old) != 1:
-                print(f"SKIP  {name}: 변조 지점 {source.count(old)}회")
+                # 명세가 코드보다 낡으면 변조가 조용히 0건이 된다 — 그것을 통과로 세지 않는다.
+                skipped.append(f"{name}(대상 {source.count(old)}회)")
+                print(f"SKIP  {name}: 변조 지점 {source.count(old)}회 — 명세가 낡았다")
                 continue
             with open(target, "w", encoding="utf-8") as handle:
                 handle.write(source.replace(old, new, 1))
             try:
                 compile(open(target, encoding="utf-8").read(), target, "exec")
             except SyntaxError as exc:
+                skipped.append(f"{name}(문법 깨짐)")
                 print(f"SKIP  {name}: 문법 깨짐 {exc}")
                 continue
             code, last = _run(root, project)
@@ -167,8 +188,13 @@ def main() -> int:
             shutil.rmtree(base, ignore_errors=True)
 
     print()
-    print(f"변조 {len(MUTATIONS)}종 · 생존 {len(survivors)}종: {survivors or '없음'}")
-    print("기대: 생존 1종 = 'CDP TimeoutError 제거' (TimeoutError 는 OSError 하위형이라 구분 불가)")
+    print(f"변조 {len(MUTATIONS)}종 · 실행 {len(MUTATIONS) - len(skipped)}종 · "
+          f"건너뜀 {len(skipped)}종 · 생존 {len(survivors)}종: {survivors or '없음'}")
+    print("기대: 건너뜀 0종 · 생존 1종 = 'CDP TimeoutError 제거'"
+          " (TimeoutError 는 OSError 하위형이라 구분 불가)")
+    if skipped:
+        print(f"FAIL: 명세가 코드보다 낡았다 — {skipped}. 건너뛴 변조는 통과가 아니다(P20)")
+        return 1
     return 0 if survivors == ["CDP TimeoutError 제거"] else 1
 
 
