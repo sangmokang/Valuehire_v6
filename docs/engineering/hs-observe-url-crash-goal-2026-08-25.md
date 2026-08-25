@@ -583,6 +583,37 @@ base(c59bad7) 비ASCII origin · ascii  → exit=1 | stdout 없음 | stderr 26�
 같은 입력에서 수정 전 코드는 종료값 1 에 stderr 26줄이었다. 좋은 소식 — 아무도 안 보던 축이
 실제로 막혔고, 그것이 이 PR 이 만든 회귀가 아니라 원래 열려 있던 구멍이었음도 같이 보인다.
 
+### WU10 — 반응 대신 전수: `except` 원소 전량 스윕
+
+V1 최종 회차가 변조 하나를 냈다 — *"`_load_contract` 에서 `OSError` 를 빼도 시험이 전부
+통과한다"*. 재현됐다(62 passed, exit 0).
+
+여기서 **그 하나만 막는 대신** 방식을 바꿨다. 지금까지 세 번 연속 "검증자가 하나 찾음 → 내가 하나
+막음"을 반복했는데, 그건 검증자의 표본이 다 떨어질 때까지 끝나지 않는다. 그래서 `observe.py` 와
+`_cdp.py` 의 **모든 `except` 튜플에서 원소를 하나씩 빼는 스윕**(16개 변조)을 직접 돌렸다.
+
+| | 스윕 전 | WU10 이후 |
+|---|---|---|
+| 무검증 가지(변조 생존) | **7개** | **2개** |
+
+→ 표가 말하는 것: 검증자가 본 것은 7개 중 1개였다. 반응적으로 대응했으면 나머지 6개는 그대로
+남았을 것이다. 좋은 소식 — 이제 닿을 수 있는 가지는 전부 닿는다.
+
+**닫은 5개** (`tests/test_observe_closed_failure_branches.py`, 9건):
+알 수 없는 역할 이름(`ValueError`) · `main()` 의 `CdpReadError` 흡수 · 계약 파일 부재(`OSError`,
+함수 단위 + `main()` 종단) · 전송 연결 거부(`OSError`) · CDP 연결 거부(`OSError`).
+
+**닫지 못한 2개 — 코드가 아니라 파이썬의 사실 때문이다.**
+
+| 남은 가지 | 왜 시험으로 구분할 수 없나 | 근거 |
+|---|---|---|
+| `_cdp` 의 `TimeoutError` | `OSError` 의 하위형이라 **중복 항목**이다. 어떤 입력도 둘을 가르지 못한다 | `issubclass(TimeoutError, OSError)` → True (실측) |
+| `observation_from_marker_payload` 의 `TypeError` | 파이썬 3.14 열거형은 **어떤 값에도 `ValueError` 만** 낸다 | `SurfaceRole(v)` 를 str·int·list·dict·None·tuple 6종으로 호출 → 전부 `ValueError` (실측) |
+
+→ 표가 말하는 것: 둘 다 base 부터 있던 코드이고, "시험이 없다"가 아니라 "시험이 있을 수 없다"다.
+이 구분을 흐리지 않으려고 근거를 실행 결과로 붙였다 — 이 작업에서 나는 이미 한 번
+"무검증"을 "도달 불가"로 잘못 읽은 적이 있다.
+
 ### V2 (2차 적대검증) — 리셋 컨텍스트의 Claude · `VERDICT: SPLIT`
 
 **축별 판정: 구현·회귀·게이트 축 PASS / V1 명제 축 FAIL / 병합 차단 사유 없음.**
