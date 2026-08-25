@@ -311,6 +311,9 @@ if [ "${WU0A2_SKIP_NEW:-0}" != 1 ]; then
   p=$(mutate_run a2-22 '    runs-on: ubuntu-latest' '    runs-on: ${{ matrix.os }}')
   a2_expect_rc 22 'runs-on 미승인 expression' "$p" '^  verify:|runs-on:' 1
 
+  p=$(mutate_run a2-24 'permissions:' $'true:\n  semantic-shadow: true\n\npermissions:')
+  a2_expect_rc 24 'Psych 의미가 같은 root on/true key 중복' "$p" '^on:|^true:|^  semantic-shadow:|^permissions:' 2
+
   nested="$TMP/a2-23-repo"
   git clone -q --no-hardlinks "$REPO" "$nested"
   cp "$CHECKER" "$nested/scripts/verify/check-ci-step-integrity.sh"
