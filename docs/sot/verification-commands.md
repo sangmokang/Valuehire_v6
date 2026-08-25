@@ -22,30 +22,30 @@
 | # | 스텝 이름 | 실행 내용 |
 |---|---|---|
 | 1 | 비밀 스캔 (verify.sh) | `bash verify.sh` — 추적 파일 전체 |
-| 2 | Strict 원칙 정본·장부·배선 검사 | `bash scripts/acceptance-principles-check.sh` — 32개 정본 문구·장치·명시적 pre-push/CI 배선 |
-| 3 | Strict 원칙 적대 fixture·500/501 경계 | `bash scripts/acceptance-principles-mutations.sh` — 정상 fixture와 14개 반례·500/501 경계 |
-| 4 | Strict 전역 스킬 잠금 장치 격리 회귀 | `bash scripts/acceptance-guard-global-skill-files.sh` — lock/check/unlock/recover와 동일 UID 한계 |
-| 5 | HumanSearch G1 클린룸 경계 | 인라인 8개 — `scripts/acceptance-hs-cleanroom.sh`, `scripts/acceptance-hs-cleanroom-mutations.sh`, `scripts/acceptance-hs-cleanroom-absolute-paths.sh`, `scripts/acceptance-hs-cleanroom-absolute-contexts.sh`, `scripts/acceptance-hs-cleanroom-colon-paths.sh`, `scripts/acceptance-hs-cleanroom-file-urls.sh`, `scripts/acceptance-hs-cleanroom-hook-env.sh`, `scripts/acceptance-hs-cleanroom-hook-env-mutations.sh` |
-| 6 | HumanSearch G2 테스트 게이트 | 인라인 — `uv` 설치 후 `scripts/acceptance-hs-gates.sh`, `scripts/acceptance-hs-gates-mutations.sh`, `scripts/acceptance-hs-gates-antiforge.sh` (정적 ruff/mypy + pytest 수집·runtime import 증명) |
+| 2 | Strict 원칙 정본·장부·배선 검사 | `bash scripts/verify/run-acceptance.sh scripts/acceptance-principles-check.sh` — 34개 정본 문구·장치·명시적 pre-push/CI 배선 |
+| 3 | Strict 원칙 적대 fixture·500/501 경계 | `bash scripts/verify/run-acceptance.sh scripts/acceptance-principles-mutations.sh` — 정상 fixture·반례·500/501 경계 |
+| 4 | Strict 전역 스킬 잠금 장치 격리 회귀 | `bash scripts/verify/run-acceptance.sh scripts/acceptance-guard-global-skill-files.sh` — lock/check/unlock/recover와 동일 UID 한계 |
+| 5 | HumanSearch G1 클린룸 경계 | 인라인 8개를 각각 `bash scripts/verify/run-acceptance.sh <acceptance-script>`로 실행 — 정확한 ordered run lines는 JSON 정본 참고 |
+| 6 | HumanSearch G2 테스트 게이트 | 인라인 — `uv` 고정 후 G2 acceptance 3개를 각각 `bash scripts/verify/run-acceptance.sh <acceptance-script>`로 실행 |
 | 7 | 히스토리 전량 스캔 | 인라인 — 도달 가능한 모든 blob 을 열어 자격증명 패턴 대조 |
-| 8 | 인수 검사 0-2 상시/종료상태 분리 | `bash scripts/acceptance-0-2-unreachable-content.sh` — 환경 격리·네 객체형·도구 실패·큰 객체·종료상태·훅 환경 무오염 13개 합성 사례 (AC-19) |
-| 9 | 인수 검사 0-6 | `bash scripts/acceptance-0-6.sh` |
-| 10 | 인수 검사 0-7 | `bash scripts/acceptance-0-7.sh` — 훅 위반 6종 시연 |
-| 11 | 인수 검사 0-5 | `bash scripts/acceptance-0-5.sh` — **`main` 브랜치에서만** (`if: github.ref == 'refs/heads/main'`) |
+| 8 | 인수 검사 0-2 상시/종료상태 분리 | `bash scripts/verify/run-acceptance.sh scripts/acceptance-0-2-unreachable-content.sh` — 환경 격리·네 객체형·도구 실패·큰 객체·종료상태·훅 환경 무오염 13개 합성 사례 (AC-19) |
+| 9 | 인수 검사 0-6 | `bash scripts/verify/run-acceptance.sh scripts/acceptance-0-6.sh` |
+| 10 | 인수 검사 0-7 | `bash scripts/verify/run-acceptance.sh scripts/acceptance-0-7.sh` — 훅 위반 6종 시연 |
+| 11 | 인수 검사 0-5 | `bash scripts/verify/run-acceptance.sh scripts/acceptance-0-5.sh` — **`main` 브랜치에서만** (`if: github.ref == 'refs/heads/main'`) |
 | 12 | 억제 만료 스캔 | 인라인 — `suppressions.yaml` 의 expiry 형식·경과 |
 | 13 | 강제 장치 존재 검사 | 인라인 — `hooks/pre-commit`·`pre-push` 존재·실행권한 |
 | 14 | 셸 스크립트 문법 검사 | 인라인 — `git ls-files '*.sh'` 전부 `bash -n` |
 | 15 | 패턴 파일 자체 실값 검사 | 인라인 — `.secret-patterns.default` 에 값 리터럴 없는지 |
-| 16 | 인수 검사 hs-a3 | `bash scripts/acceptance-hs-a3.sh` — 세션 계열 자격증명 (AC-A3) |
+| 16 | 인수 검사 hs-a3 | `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-a3.sh` — 세션 계열 자격증명 (AC-A3) |
 | 17 | 데이터 노출 스캔 | `bash scripts/scan-data-exposure.sh all` — 크기·금지경로·기록·개인정보 (AC-A4) |
-| 18 | 인수 검사 hs-a4 | `bash scripts/acceptance-hs-a4.sh` — 차단이 실제로 도는가 (AC-A4) |
-| 19 | 인수 검사 secret-webhook-vendor | `bash scripts/acceptance-secret-webhook-vendor.sh` — 웹훅·벤더 키 (AC-S1) |
+| 18 | 인수 검사 hs-a4 | `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-a4.sh` — 차단이 실제로 도는가 (AC-A4) |
+| 19 | 인수 검사 secret-webhook-vendor | `bash scripts/verify/run-acceptance.sh scripts/acceptance-secret-webhook-vendor.sh` — 웹훅·벤더 키 (AC-S1) |
 | 20 | 인수 검사 verified-sha | `bash scripts/verify/run-acceptance.sh scripts/acceptance-verified-sha.sh` — 초록 결과의 SHA 귀속 판정기 시험 (P23) |
 | 21 | 인수 검사 ci-step-integrity | `bash scripts/verify/run-acceptance.sh scripts/acceptance-ci-step-integrity.sh` — 보호 step의 정확한 선언 계약 |
 | 22 | 인수 검사 semantic-mutations | `bash scripts/verify/run-acceptance.sh scripts/acceptance-semantic-mutations.sh` — 인수 검사 무력화 5종 차단 |
 | 23 | 인수 검사 verify-ac-m | `bash scripts/verify/run-acceptance.sh scripts/acceptance-verify-ac-m.sh` — mechanism 명부 대조 (AC-M) |
 
-*(1번 앞에 `actions/checkout` 이 있고 `fetch-depth: 0` 이다 — 4번이 과거 blob 을 열려면 필요하다.)*
+*(1번 앞에 `actions/checkout` 이 있고 `fetch-depth: 0` 이다 — 7번이 과거 blob 을 열려면 필요하다.)*
 
 **CI는 고정 목록이고 로컬 `pre-push`는 글로브(이름 규칙 자동 수집)다.** 그래서 새 인수 스크립트를 만들면 로컬에서는 저절로 돌지만 CI에서는 한 줄도 안 돈다 — P15③("로컬에만 있는 검사는 없는 것으로 친다")에 걸린다. **새 `scripts/acceptance-*.sh`를 추가하는 PR은 `verify.yml`과 이 표 양쪽에 자기 줄을 함께 넣어야 한다.**
 
@@ -56,6 +56,8 @@
 workflow와 계약을 함께 약화해 자기승인하는 변조는 RED에서 고정한 계약 SHA-256 핀이 막는다. 따라서 정당한 CI 명령 변경도 workflow·JSON 계약·검사기 핀을 함께 검토해야 한다. 이 핀은 원격 실행 증거가 아니라 세 파일 drift tripwire다.
 
 이 검사가 증명하는 것은 **“현재 파일이 승인된 CI 명령을 정확히 선언한다”**까지다. GitHub 서버가 특정 commit SHA에서 그 명령을 실제 실행해 성공했다는 사실은 `check-verified-sha.sh`와 원격 check 결과를 대조하는 별도 단계가 증명한다.
+
+의도적으로 비보호 setup step은 허용한다. 따라서 새 비보호 step이 runtime workspace를 바꾸는지, workflow trigger·`defaults`가 실행 자체를 약화하는지는 이 계약의 증명 범위가 아니다. 이 경계를 닫으려면 별도 Work Unit에서 보호 대상을 폐쇄 집합으로 바꾸거나 workflow-level 계약을 추가해야 한다.
 
 ### 데이터 노출 판정기 — `scripts/scan-data-exposure.sh`
 

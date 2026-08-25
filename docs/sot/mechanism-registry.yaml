@@ -42,7 +42,7 @@
   required: true
 - id: "acceptance-runner-ci"
   path: ".github/workflows/verify.yml"
-  target: "Strict 원칙 정본·장부·배선 검사"
+  target: "HumanSearch G1 클린룸 경계"
   stage: "ci"
   ci_mirror_job: "verify"
   required: true
