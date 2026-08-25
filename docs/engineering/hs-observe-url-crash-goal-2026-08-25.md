@@ -37,6 +37,7 @@
 | 2 | `observe.py:299` `_privacy_reduced_url()` | 선택된 탭 URL | `observe_once:142`, 공개 API `format_observation_line:118` |
 | 3 | `observe.py:253` `_valid_origin()` | `contracts/humansearch/saramin-markers.json` | `_load_contract:189` |
 | 4 | `observe.py:163` `main()` | 이미 축약된 tab_url | `main` |
+| 5 | `_cdp.py:32` `observe_markers()` | 선택된 탭의 websocket URL | `observe_once:134` — **이미 올바르게 막혀 있다**(`ValueError`→`CdpReadError`, 메시지에 URL 없음). 다만 시험이 0건이었다 |
 
 `urlsplit()`은 `ValueError`를 던진다(실행 확인, Python 3.14.1):
 
@@ -140,8 +141,14 @@ def _privacy_reduced_url(url, loggable) -> str  # 불변: 파싱 실패 → ""
 |---|---|---|---|
 | WU1 | AC-1 | `observe.py`(`_split`,`_origin`) + 신규 시험 | `pytest tests/test_observe_url_parse_failure.py` |
 | WU2 | AC-2 | `observe.py`(`_valid_origin`,`_privacy_reduced_url`) + 신규 속성 시험 | `pytest tests/test_observe_url_parse_property.py` + `acceptance-hs-gates.sh` |
+| WU3 | AC-3(R9로 추가) | 시험만 — `tests/test_cdp_websocket_parse_failure.py` | `pytest tests/test_cdp_websocket_parse_failure.py` + 변조 증명 |
 
-WU1 GREEN 커밋 전 WU2 착수 금지(R5).
+WU1 GREEN 커밋 전 WU2 착수 금지(R5). WU3는 작업 중 발견한 반례의 영구 편입이며(R9) 코드 변경
+0줄 · 시험만 추가한다. 이미 올바른 코드의 특성화 시험이므로 RED 대신 **변조 증명**으로
+공허하지 않음을 보인다.
+
+**AC-3** — `_cdp.observe_markers`에 파싱 불가 websocket 주소가 들어오면 `CdpReadError`로
+거부하고 그 메시지에 주소 조각이 없다. counter-AC: 그 가드를 제거하면 시험이 반드시 실패한다.
 
 ## R1 예외 케이스 표 (작업 진행 중 만날 수 있는 상황)
 
@@ -198,4 +205,87 @@ RED 커밋(시험만) → GREEN 커밋(구현만) → `bash scripts/acceptance-h
 
 ## 적대 검증 로그
 
-(후기록)
+### G(생성자) 자기 공격 — goal §"적대검증 정조준" 5개 항목 실행
+
+**정조준 4번이 실제로 터졌다.** WU2의 Hypothesis 속성 시험을 `st.text()` 만으로 쓴 첫 판은
+**수정 전 코드에서도 통과했다**(실측: `2 failed, 2 passed` — 실패한 2건은 속성이 아닌 예시 시험).
+평범한 텍스트 전략은 `https://` 접두사와 NFKC 파괴 문자를 동시에 만들 확률이 사실상 0이라
+결함 영역에 닿지 못한다. 주소 모양을 직접 조립하는 전략(`_ADDRESSES`)과 알려진 반례 2개의
+`@example` 고정으로 교체한 뒤 `4 failed` 로 진짜 RED가 됐다. → **회귀 자산으로 편입됨**(R9).
+
+**정조준 5번(표 밖 입력)에서 5번째 파싱 지점 발견.** `_cdp.py:32` 도 같은 `urlsplit` 을 쓴다.
+그쪽 가드는 이미 올바르지만 **시험이 0건**이었다. → WU3로 편입, 변조 증명까지 완료(R9).
+
+**부수 발견 — `.port` 함정.** `urlsplit()` 이 성공한 뒤에도 `SplitResult.port` 는 숫자가 아닌
+포트에서 별도로 `ValueError` 를 던진다(실측: `.port` 만 그렇고 `.scheme/.netloc/.path/.query/`
+`.fragment/.username/.password` 는 아니다). `observe.py` 는 `.port` 를 읽지 않고 `_cdp.py` 는
+읽으면서 이미 막고 있다. WU3 시험이 이 갈래를 함께 고정한다.
+
+**정조준 1번(빈 origin 통과 가능성) 반증.** `_origin` 이 거부 시 돌려주는 `""` 가
+`allowed_origins` 에 우연히 들어 있으면 파싱 실패가 통과가 된다. 확인: `_load_contract` 는
+`_string_list()` 로 빈 문자열 원소를 거부하고(`bool(item)`), `_valid_origin("")` 도 False다
+(실측). 따라서 `""` 는 허용목록에 들어갈 수 없다.
+
+**정조준 2번(정상 URL의 거부까지 조용해지는가) 반증.** 기존 시험 81건이 그대로 통과하고
+(85→89건), `test_unparseable_target_url_does_not_hide_the_approved_tab` 이 파싱 불가 탭과
+정상 탭이 섞여 있을 때 정상 탭이 선택됨을 고정한다.
+
+**정조준 3번(새 메시지의 URL 조각) 반증.** 새로 만든 예외 메시지는 없다. 기존
+`TargetSelectionError("expected exactly one matching tab, found N")` 로 흡수되며, 시험이
+`＃drift`·`CANDIDATE-9`·`private`·`[::1` 4개 표식의 부재를 단언한다.
+
+### 변조 증명 (L3)
+
+| 변조 | 대상 | 결과 |
+|---|---|---|
+| `_split` 의 `except ValueError: return None` 제거 | `test_observe_url_parse_failure.py` | **4 failed** (exit 1) |
+| 〃 | `test_observe_url_parse_property.py` | **4 failed** (exit 1) |
+| `_cdp` 의 `try/except ValueError` 가드 제거 | `test_cdp_websocket_parse_failure.py` | **2 failed** (exit 1) |
+
+변조는 전부 격리 복제본(`scratchpad/mut*`)에 적용했고 작업트리 원본은 건드리지 않았다.
+
+### 라이브 실증 (몽키패치 0건, 실제 CLI 엔트리포인트)
+
+실제 `python -m humansearch.observe --channel saramin --port <p> --once` 를 진짜 TCP 소켓 상대로
+실행했다. 사장님의 실제 크롬(127.0.0.1:9225, Chrome/151.0.7922.170)에는 읽기 전용 확인만 하고
+건드리지 않았으며, 파싱 불가 입력 실증은 원본을 오염시키지 않는 복제 트리 + 별도 포트에서 했다.
+
+| | 수정 전 (`c59bad7`) | 수정 후 (HEAD) |
+|---|---|---|
+| stdout | (빈 문자열) | `STATE=drifted TAB=- ROLES=0 CONTRACT_VALID=false` |
+| 종료값 | **1** (L0 계약 밖) | **2** (계약 안) |
+| stderr | Traceback + `netloc 'hiring.saramin.co.kr＃drift'` | (빈 문자열) |
+| 누출 표식 | `＃drift`, `Traceback` **검출됨** | 4종 전부 미검출 |
+
+사장님 실제 크롬(9225) 상대 실행에서도 정상 동작했다: `STATE=drifted TAB=- ROLES=0
+CONTRACT_VALID=false`, exit 2, stderr 없음(해당 프로필에 승인 origin 탭이 0개였다).
+
+### 배선 증명 (런타임 추적 — grep 아님)
+
+`sys.settrace` 로 실제 CLI 실행 중 호출을 기록:
+
+```
+main:148 -> observe_once:128 -> _valid_origin:269 -> _split:246
+         -> select_single_target:59 -> _origin:262 -> _split:246
+         -> format_observation_line:110
+```
+
+새 함수 `_split` 이 엔트리포인트에서 두 경로로 실제 도달한다. 고아 아님.
+
+### Full Strict 기준선 대비 (BASELINE_DIFFERENTIAL_PASS)
+
+base SHA `c59bad7b160c473cda5545e76e6fa6bcc711a7ea` 의 격리 복제본에서 같은 명령을 실행해 대조.
+
+| 명령 | 브랜치 | 기준선(c59bad7) |
+|---|---|---|
+| `scripts/acceptance-0-2.sh` | exit 2 (`.secret-patterns` 없음 = NOT_RUN) | exit 2 (동일) |
+| `scripts/acceptance-0-5.sh` | exit 1 (origin/main != main) | exit 1 (동일) |
+| 나머지 인수 검사 23종 | 전부 exit 0 | — |
+
+브랜치 실패 집합 ⊆ 기준선 실패 집합 · **새 실패 0건** · 삭제된 테스트 0건 · 테스트 약화 0건.
+두 실패는 모두 환경 사유이며(로컬 전용 패턴 파일 부재 / main 브랜치 push 상태) 이 변경과 무관하다.
+`acceptance-0-7.sh` 는 세션 시작 원장이 "CI 담당"으로 표시한 항목이라 로컬에서 제외했다.
+
+### V1 / V2
+
+(아래 별도 절에 후기록)
