@@ -55,3 +55,38 @@ def test_main_reports_drift_without_echoing_a_control_character_host(
     assert captured.out == "STATE=drifted TAB=- ROLES=0 CONTRACT_VALID=false\n"
     assert captured.err == ""
     assert "::1" not in captured.out
+
+
+# --- WU8: V1 4회차 반례 -------------------------------------------------------
+# `isprintable()` 만으로는 부족하다. IPv6 scope id 에 **비ASCII** 문자가 오면 인쇄 가능하고
+# `ip_address()` 도 루프백으로 판정하지만, `HTTPConnection` 이 호스트를 IDNA 로 인코딩하며
+# `UnicodeEncodeError`(= `ValueError` 하위형, `OSError`·`HTTPException` 아님)를 던진다.
+#
+# 이 시험이 없어서 앞선 변조 시험이 전송 `except` 의 `ValueError` 를 "도달 불가"로 잘못 읽었고,
+# 그 판단으로 가드를 걷어냈다가 V1 이 도달 경로를 찾아냈다 — 미검증을 도달 불가로 읽지 않는다.
+_NON_ASCII_SCOPE_HOST = "::1%" + "א"
+
+
+def test_non_ascii_scope_id_is_not_a_loopback_host() -> None:
+    assert _NON_ASCII_SCOPE_HOST.isprintable() is True  # 인쇄 가능성만으로는 못 거른다
+    assert observe._is_loopback_address(_NON_ASCII_SCOPE_HOST) is False
+
+
+def test_transport_encoding_failure_is_a_closed_observation_failure() -> None:
+    with pytest.raises(observe.ObservationError, match="target list request"):
+        observe._fetch_targets(_contract(_NON_ASCII_SCOPE_HOST), 9225)
+
+
+def test_main_reports_drift_for_a_non_ascii_scope_host(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(
+        observe, "_load_contract", lambda channel: _contract(_NON_ASCII_SCOPE_HOST)
+    )
+
+    exit_code = observe.main(["--channel", "saramin", "--port", "9225", "--once"])
+
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert captured.out == "STATE=drifted TAB=- ROLES=0 CONTRACT_VALID=false\n"
+    assert captured.err == ""
