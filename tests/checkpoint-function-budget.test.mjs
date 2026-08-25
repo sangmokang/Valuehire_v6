@@ -72,6 +72,30 @@ function expectFunctionLimit(result, path, actual = 101, limit = 100) {
   );
 }
 
+function expectUnsupported(result, path) {
+  assert.equal(result.status, 1, result.stderr);
+  assert.ok(
+    result.body.violations.some(
+      (item) => item.check === "size-limit" && item.file === path && /unsupported/i.test(item.detail),
+    ),
+    JSON.stringify(result.body),
+  );
+}
+
+function expectFileLimit(result, path, actual = 601, limit = 600) {
+  assert.equal(result.status, 1, result.stderr);
+  assert.ok(
+    result.body.violations.some(
+      (item) =>
+        item.check === "size-limit" &&
+        item.file === path &&
+        item.detail.includes(`${actual}`) &&
+        item.detail.includes(`${limit}`),
+    ),
+    JSON.stringify(result.body),
+  );
+}
+
 function javascriptFunction(lines) {
   return [
     "function target() {",
@@ -132,3 +156,22 @@ test("an unsupported code extension fails closed instead of reporting zero funct
     JSON.stringify(result.body),
   );
 });
+
+const previouslyUnclassifiedCode = [
+  "c", "h", "cpp", "cc", "hpp", "m", "vue", "svelte", "lua", "pl", "sql", "scala",
+];
+
+for (const extension of previouslyUnclassifiedCode) {
+  test(`.${extension} source fails closed when no function parser exists`, () => {
+    const { cwd, base } = makeRepo();
+    const path = `src/app.${extension}`;
+    expectUnsupported(runGate(cwd, base, path, "source line\n"), path);
+  });
+
+  test(`.${extension} source cannot bypass the 600-line file limit`, () => {
+    const { cwd, base } = makeRepo();
+    const path = `src/app.${extension}`;
+    const content = Array.from({ length: 601 }, (_, index) => `source line ${index}`).join("\n") + "\n";
+    expectFileLimit(runGate(cwd, base, path, content), path);
+  });
+}

@@ -1,6 +1,6 @@
 # WU-3b checkpoint 함수 예산 goal — 2026-08-25
 
-VERDICT: CHECKPOINT_PENDING
+VERDICT: COUNTER_RED_PENDING
 
 ## 결론
 
@@ -39,6 +39,7 @@ checkpoint-gate의 복구 원본은 P11 파일 hard 600만 판정하고 함수 h
 - AC5a: When 기존 scanner 자체가 새 함수 한도에 걸리면 예외로 숨기지 않고 lexer를 helper 모듈로 분리하며 기존 45개 동작을 유지해야 한다.
 - AC6: When RED 이후 구현을 추가해도 counter-test 파일은 바뀌지 않아야 한다.
 - AC7: When 완료를 판정하면 base 대비 변경은 이 WU 소유 여섯 파일뿐이어야 한다.
+- AC8: When `.c`, `.h`, `.cpp`, `.cc`, `.hpp`, `.m`, `.vue`, `.svelte`, `.lua`, `.pl`, `.sql`, `.scala`가 staged되면 파일·함수 예산을 모두 우회하지 않아야 한다.
 
 ## counter-AC
 
@@ -47,6 +48,7 @@ checkpoint-gate의 복구 원본은 P11 파일 hard 600만 판정하고 함수 h
 - JS 문자열·정규식·주석 안의 중괄호를 함수 종료로 센다.
 - shell 인용문 안의 중괄호를 함수 종료로 센다.
 - 지원하지 않는 `.go` 변경을 함수 0개로 오인해 PASS한다.
+- 알려진 비-JS/Python/shell 코드 확장자를 size 검사 대상에서 제외해 601줄 파일도 PASS한다.
 - 테스트를 구현 뒤에 바꾸거나 기존 600줄 테스트를 축약한다.
 
 ## 오류·롤백 계약
@@ -82,6 +84,10 @@ git show --check HEAD
 - GREEN outputs: function tests SHA-256 `273077671aa3140d1989e12a2257a4f72ecb23ad45de0dc01c1454e52c11e298`; original tests SHA-256 `207d915ee48c8291d14dfb39084998bebd8d703b87ea33e31a92f816d092d4c9`.
 - hard function readback: gate max 44, function scanner max 94, JS scanner max 77, JS lexer max 61, counter-test max 16 LOC.
 - adversarial spans: JS regex/string brace 4 LOC, shell quoted brace 3 LOC, Python outer/inner dedent 4/2 LOC, 모두 PASS.
+- V1 `a9573ec8-ac7b-4274-b93b-37da3bafd5a6` finding `V1-F003`: 12개 코드 확장자가 1200줄 파일과 101줄 함수를 모두 exit 0으로 통과함. counter-test RED를 구현 전에 추가한다.
+- V1-F003 counter RED: `2026-08-25T22:47:09+09:00`, exact HEAD `c0a7a7051dc62b7eb99d5b1ae3f6c976612d096c`, `node --test tests/checkpoint-function-budget.test.mjs`, exit 1, tests 31, pass 7, fail 24.
+- V1-F003 RED 원문: `/tmp/vhrec-wu3b-v1f003-red.SFy8KI/full.log`, SHA-256 `fad0c50c3b8932a2ae7d298a43e18c7942be826abad8580f7fd7dc2a3de34ad0`, session `VHREC-20260825T200157+0900-01a03893`.
+- V1-F003 RED 해석: 기존 7개 함수 경계 검사는 전부 통과했고, 새 12개 확장자 각각의 unsupported fail-closed와 601줄 hard limit 두 단언만 실패했다.
 - G: `NOT_RUN`
 - V1: `NOT_RUN`
 - V2: `NOT_RUN`
