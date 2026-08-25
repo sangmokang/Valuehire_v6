@@ -143,6 +143,7 @@ def _privacy_reduced_url(url, loggable) -> str  # 불변: 파싱 실패 → ""
 | WU2 | AC-2 | `observe.py`(`_valid_origin`,`_privacy_reduced_url`) + 신규 속성 시험 | `pytest tests/test_observe_url_parse_property.py` + `acceptance-hs-gates.sh` |
 | WU3 | AC-3(R9로 추가) | 시험만 — `tests/test_cdp_websocket_parse_failure.py` | `pytest tests/test_cdp_websocket_parse_failure.py` + 변조 증명 |
 | WU4 | AC-4(Codeaudit 반례, R9) | `observe.py`(`_privacy_reduced_url`) + `tests/test_observe_userinfo_redaction.py` | `pytest tests/test_observe_userinfo_redaction.py` + 변조 증명 |
+| WU5 | AC-5(V1 적대검증 반례, R9) | `observe.py`(`_load_contract`,`_fetch_targets`,`_valid_origin`,`_privacy_reduced_url`) + `tests/test_observe_adversarial_v1_findings.py` | 같은 파일 + 변조 8종 |
 
 WU1 GREEN 커밋 전 WU2 착수 금지(R5). WU3는 작업 중 발견한 반례의 영구 편입이며(R9) 코드 변경
 0줄 · 시험만 추가한다. 이미 올바른 코드의 특성화 시험이므로 RED 대신 **변조 증명**으로
@@ -328,6 +329,68 @@ Adversarial, D(실제 실행)는 위 라이브 절이 담당한다.
 즉 기존 설계와 일관되며 이번 변경이 만든 구멍은 아니다. 원인 구분은 별도 요청이 소유한다 —
 그래서 이 문서의 "배포 후 관측 항목"에 종료값 1 감시를 뒀다.
 
-### V1 / V2
+### V1 (1차 적대검증) — `codex exec --sandbox read-only`, fresh 세션
 
-(아래 별도 절에 후기록)
+**도구 정정 (실행하지 않은 것을 실행했다고 하지 않는다).** SOT-30 §6이 지정한
+`/codex:adversarial-review --fresh` 는 **이 환경에 존재하지 않는다**(`~/.claude/skills/` 목록과
+codex 플러그인 커맨드 전수 확인). 대신 실제 설치된 `codex-cli 0.148.0` 을 fresh·read-only
+샌드박스로 직접 실행했다. 산출물(diff·AC·테스트)만 전달하고 구현 추론 과정은 전달하지 않았다.
+
+**1차 시도는 무효.** 첫 프롬프트는 제공자 측 필터에 걸려
+`ERROR: This content was flagged for possible cybersecurity risk`, exit 1, 판정 본문 0줄로
+끝났다. "Done만/빈 결과는 무효" 규칙에 따라 V1으로 세지 않고, 방어적 견고성 검토 문구로
+1회 재작성해 재실행했다.
+
+**2차 시도 판정: `VERDICT: FAIL` · Merge recommendation: REQUEST_CHANGES** (transcript:
+`scratchpad/v1_out2.txt`, 121,898 tokens, HEAD `5f8f8c7` 기준). 네 건 중 세 건을 **독립
+재현**했다 — 액면으로 받지 않았다.
+
+| V1 지적 | 재현 결과 | 처분 |
+|---|---|---|
+| ①[HIGH] `json.loads` 가 4,300자리 초과 정수에서 `JSONDecodeError` 가 아닌 맨 `ValueError` 를 던져 두 JSON 경계를 샌다 | **재현됨** — `ValueError: Exceeds the limit (4300 digits)` | WU5에서 `except ValueError` 로 수정 |
+| ②A[HIGH] 고립 서로게이트(`\ud800`)가 `print()` 에서 `UnicodeEncodeError` 로 죽는다(try 밖) | **재현됨** | WU5에서 축약 단계가 인코딩 불가를 빈 문자열로 흡수 |
+| ②B[HIGH] U+2028 이 netloc 에 살아남아 출력이 `splitlines()` 기준 **2줄** | **재현됨** — `"\n" in line = False` 인데 `splitlines()==2` | WU5에서 한 줄 계약 가드 추가 |
+| ③[HIGH] `_valid_origin` 이 `.port` 를 검증하지 않아 `:notaport`·`:99999` 를 통과 | **재현됨** | WU5에서 `_readable_port` 추가 |
+| ④[LOW] argparse 오류는 상태줄 계약 밖 | 재현됨 — 단, **traceback 없이** usage 3줄 + exit 2 | 결함 아님으로 판정. CLI 인자 오류는 관측 결과가 아니다 |
+| ⑧ `rpartition("@")` → `partition("@")` 변조가 지정한 4개 파일에서 살아남음 | **재현됨** | WU5에서 `@` 두 개짜리 픽스처로 잡음 |
+
+②B는 G(생성자)가 자체 공격에서 탭·개행으로 독립 발견한 것과 같은 결함이며, V1이 더 강한
+반례(U+2028은 `urlsplit` 이 지우지 않는다)를 냈다.
+
+### 변조 증명 — 최종 (대조군 포함)
+
+첫 시도의 하네스는 복제본에 `contracts/` 가 없어 대조군이 16건 실패하는 잡음 하네스였다.
+경로를 바로잡고(`mroot/{humansearch,contracts}`) 대상 시험 9개 파일로 좁혀 다시 쟀다.
+
+| 변조 | 결과 |
+|---|---|
+| (대조군) 무변조 | **34 passed, exit 0** |
+| ① 계약 JSON `ValueError`→`JSONDecodeError` | 1 failed |
+| ② 타깃 JSON `ValueError`→`JSONDecodeError` | 2 failed |
+| ③ `_readable_port` 검증 제거 | 4 failed |
+| ④ 한 줄 계약 가드 제거 | 1 failed |
+| ⑤ 인코딩 가드 제거 | 1 failed |
+| ⑥ `rpartition`→`partition` | 7 failed |
+| ⑦ `_split` 의 `ValueError` 흡수 제거 | 8 failed |
+| ⑧ 축약 단계 통째로 건너뜀 | 5 failed |
+
+**살아남은 변조 0건.**
+
+### 남은 위험 — 고치지 않기로 한 것과 그 이유
+
+**`format_observation_line` 의 TAB 필드에 임의 문자열을 심을 수 있다.** 승인 origin 뒤에
+공백과 함께 `STATE=authenticated` 를 붙인 주소를 넣으면 출력 한 줄 안에 그 문자열이 들어간다
+(실측 5건 중 3건 성공). 다만 그런 netloc 은 허용 origin 과 절대 일치하지 않아 **CLI 경로로는
+도달할 수 없다**(선택 단계에서 `found 0`). 고치려면 "netloc 이 어떤 모양이어야 하는가"라는
+확정되지 않은 결정을 코드에 넣어야 하므로(SOT-30 §3② 위반) 이번 PR에서는 고치지 않고 기록만
+한다. 오너 결정이 필요한 항목이다.
+
+**`_valid_origin` 이 포트 `0` 을 허용한다.** `.port` 가 0 을 정상 반환하므로 "읽을 수 있는가"
+규칙으로는 통과한다. "포트 0 은 실주소가 아니다"는 별도 결정이라 넣지 않았다.
+
+**실패 원인이 `STATE=drifted` 한 표기로 뭉개진다.** V1의 지적 (e)와 Codeaudit의 잔여 위험이
+같은 것을 가리킨다. 기존 설계와 일관되며 이번 변경이 만든 구멍은 아니다.
+
+### V2 (2차 적대검증)
+
+(후기록)
