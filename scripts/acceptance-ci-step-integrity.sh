@@ -286,6 +286,8 @@ if [ "${WU0A2_SKIP_NEW:-0}" != 1 ]; then
 
   nested="$TMP/a2-23-repo"
   git clone -q --no-hardlinks "$REPO" "$nested"
+  cp "$CHECKER" "$nested/scripts/verify/check-ci-step-integrity.sh"
+  cp "$CONTRACT" "$nested/docs/sot/ci-required-steps.json"
   ruby -e 'p=ARGV[0]; s=File.read(p); n="        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-a4.sh"; abort("needle missing") unless s.include?(n); File.write(p,s.sub(n,n+"\n        shell: echo {0}"))' "$nested/.github/workflows/verify.yml"
   printf '\n===== A2 RED 23: 변조 workflow에서 기존 acceptance 거짓 PASS =====\n'
   printf 'SESSION_ID=609BF375-87ED-4ABD-AC85-1B2CF76E1AA1\nHEAD=%s\n' "$(git rev-parse HEAD)"
