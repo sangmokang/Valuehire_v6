@@ -5,7 +5,7 @@
 #   정본: docs/engineering/verify-unification-goal-2026-08-10.md:78-81 (AC-M)
 #   출력 : 항목마다 PASS:/FAIL: 전부 출력, 마지막 줄 `CHECKED: <검사 수>`
 #   exit : 0 = PASS | 1 = FAIL | 2 = NOT_RUN
-#   불변식: CHECKED 는 정확히 31 이어야 한다 — 검사가 몇 개 사라져도 초록이면 가짜다
+#   불변식: CHECKED 는 정확히 34 이어야 한다 — 검사가 몇 개 사라져도 초록이면 가짜다
 #           (PR #6 결함 D3 의 교훈: checked==0 만 막으면 3개를 지워도 통과했다 · P20)
 #
 # 쓰기 규칙: 이 검사는 저장소에 어떤 파일도 만들지 않는다. 동적 fixture 는 전부
@@ -24,7 +24,7 @@ SNAP0=$(git status --porcelain)
 CHECKER=scripts/verify/check-mechanism-registry.sh
 FIXDIR=scripts/verify/fixtures/mechanism-registry
 REGISTRY=docs/sot/mechanism-registry.yaml
-EXPECTED_CHECKED=31
+EXPECTED_CHECKED=34
 
 TMP=$(mktemp -d) || { echo "NOT_RUN: mktemp 실패"; echo "CHECKED: 0"; exit 2; }
 trap 'rm -rf "$TMP"' EXIT
@@ -45,6 +45,45 @@ expect_rc() {
     printf 'FAIL: %s (기대 exit=%s, 실제 %s)\n' "$desc" "$want" "$rc"
     fail=1
   fi
+}
+
+# 이 인수 검사 자신의 CI 배선을 확인한다. 두 번째 인수의 워크플로를 받는 이유는
+# 주석만 남은 가짜 배선을 임시 fixture 로 재현해 이 검사 자체도 시험하기 위해서다.
+own_ci_wiring_is_unconditional() {
+  local wf="$1"
+  ruby -ryaml -e '
+    begin
+      workflow = YAML.safe_load(
+        File.read(ARGV.fetch(0)),
+        permitted_classes: [],
+        permitted_symbols: [],
+        aliases: false
+      )
+      jobs = workflow.is_a?(Hash) ? workflow["jobs"] : nil
+      selected = jobs.is_a?(Hash) ? jobs["verify"] : nil
+      steps = selected.is_a?(Hash) ? selected["steps"] : nil
+      exit 2 unless steps.is_a?(Array)
+
+      targets = [
+        "bash scripts/acceptance-verify-ac-m.sh",
+        "bash scripts/verify/run-acceptance.sh scripts/acceptance-verify-ac-m.sh"
+      ]
+      matches = steps.count do |step|
+        next false unless step.is_a?(Hash)
+        next false if step.key?("if") || step.key?("continue-on-error")
+        run = step["run"]
+        next false unless run.is_a?(String)
+
+        run.lines.any? do |line|
+          command = line.strip
+          !command.empty? && !command.start_with?("#") && targets.include?(command)
+        end
+      end
+      exit(matches == 1 ? 0 : 1)
+    rescue StandardError
+      exit 2
+    end
+  ' "$wf" 2>/dev/null
 }
 
 # ── 1) 검사기 실존 + 실행권한 ────────────────────────────────────────────────
@@ -190,6 +229,68 @@ cat > "$TMP/ci-fake-target.yaml" <<'EOF'
 EOF
 expect_rc "ci 인데 거짓 target → 불합격" "$TMP/ci-fake-target.yaml" 1
 
+# codeaudit(2026-08-15) 후속 A2: ci target 문자열이 실제 run 명령에는 없고 주석에만
+# 있어도 파일 전체 grep은 통과했다. 명부는 "실제로 실행되는 장치"의 명부이므로,
+# 작업의 run 값 안에 있는 정확한 명령줄만 근거로 인정해야 한다.
+mkdir -p "$TMP/comment-only/.github/workflows"
+cat > "$TMP/comment-only/.github/workflows/verify.yml" <<'EOF'
+name: verify
+on: push
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 목표 명령을 주석에만 둔 가짜 배선
+        # bash scripts/acceptance-hs-portal-constants.sh
+        run: echo clean
+EOF
+cat > "$TMP/comment-only/registry.yaml" <<'EOF'
+- id: "ci-comment-only-target"
+  path: ".github/workflows/verify.yml"
+  target: "bash scripts/acceptance-hs-portal-constants.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
+EOF
+comment_only_rc=$(cd "$TMP/comment-only" && bash "$REPO/$CHECKER" registry.yaml >/dev/null 2>&1; echo $?)
+checked=$((checked + 1))
+if [ "$comment_only_rc" -eq 1 ]; then
+  echo "PASS: ci target 이 주석에만 있음 → 불합격 (exit=1)"
+else
+  echo "FAIL: ci target 이 주석에만 있음 → 불합격 (기대 exit=1, 실제 $comment_only_rc)"
+  fail=1
+fi
+
+# codeaudit 2026-08-15 D4: 명령은 run 안에 있지만 step 자체가 if:false 로 꺼진 경우.
+mkdir -p "$TMP/if-false/.github/workflows"
+cat > "$TMP/if-false/.github/workflows/verify.yml" <<'EOF'
+name: verify
+on: push
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 꺼진 목표 명령
+        if: false
+        run: bash scripts/acceptance-hs-portal-constants.sh
+EOF
+cat > "$TMP/if-false/registry.yaml" <<'EOF'
+- id: "ci-if-false-target"
+  path: ".github/workflows/verify.yml"
+  target: "bash scripts/acceptance-hs-portal-constants.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
+EOF
+if_false_rc=$(cd "$TMP/if-false" && bash "$REPO/$CHECKER" registry.yaml >/dev/null 2>&1; echo $?)
+checked=$((checked + 1))
+if [ "$if_false_rc" -eq 1 ]; then
+  echo "PASS: ci target step 이 if:false 로 꺼짐 → 불합격 (exit=1)"
+else
+  echo "FAIL: ci target step 이 if:false 로 꺼짐 → 불합격 (기대 exit=1, 실제 $if_false_rc)"
+  fail=1
+fi
+
 # V1 D4: 저장소 밖 절대경로 — 계약(⑩)은 저장소 루트 기준 상대경로다.
 cat > "$TMP/abs-path.yaml" <<'EOF'
 - id: "abs-path"
@@ -311,21 +412,40 @@ cat > "$TMP/empty-value.yaml" <<'EOF'
 EOF
 expect_rc "빈 문자열 path → 불합격" "$TMP/empty-value.yaml" 1
 
+# ── codeaudit 2026-08-15 D1: 주석만 남은 자기배선 반례 ───────────────────────
+mkdir -p "$TMP/self-comment/.github/workflows"
+cat > "$TMP/self-comment/.github/workflows/verify.yml" <<'EOF'
+name: verify
+on: push
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 인수 검사 verify-ac-m
+        run: |
+          # run: bash scripts/acceptance-verify-ac-m.sh
+          echo skipped
+EOF
+checked=$((checked + 1))
+if own_ci_wiring_is_unconditional "$TMP/self-comment/.github/workflows/verify.yml"; then
+  echo "FAIL: CI 자기배선 target 이 셸 주석에만 있는데 합격했다"
+  fail=1
+else
+  echo "PASS: CI 자기배선 target 이 셸 주석에만 있음 → 불합격"
+fi
+
 # ── V1 D3: CI 배선 자기검사 ──────────────────────────────────────────────────
 # 이 인수 검사의 실행 줄이 서버 자동검사(verify.yml)에 조건 없이 정확히 1회 있는가.
 # CI 스텝을 if 로 끄거나 지워도 로컬 검사가 전부 초록이었다(V1 실측 · P15③).
 checked=$((checked + 1))
 WF=.github/workflows/verify.yml
-# 2026-08-21 부터 CI 는 scripts/verify/run-acceptance.sh 래퍼를 거쳐 실행한다.
-# 래퍼는 실제로 대상을 실행하므로 실행 줄로 인정한다(래퍼가 무력화를 막는다는 증명은
-# scripts/acceptance-semantic-mutations.sh 가 별도로 한다). 래퍼 없는 직접 실행도
-# 계속 인정해 배선 방식 변경이 곧바로 빨간불이 되지 않게 한다.
-run_lines=$(grep -cE 'run: bash (scripts/verify/run-acceptance\.sh )?scripts/acceptance-verify-ac-m\.sh' "$WF")
-step_block=$(awk '/- name: 인수 검사 verify-ac-m/,/run: bash .*scripts\/acceptance-verify-ac-m\.sh/' "$WF")
-if [ "$run_lines" -eq 1 ] && [ -n "$step_block" ] && ! printf '%s\n' "$step_block" | grep -qE '^[[:space:]]*(if:|continue-on-error:)'; then
+# 2026-08-21 부터 CI 는 scripts/verify/run-acceptance.sh 래퍼를 거쳐 실행한다. 판정은
+# 문자열 grep 이 아니라 YAML 구조로 한다(주석 위장·조건부 스텝을 grep 은 못 막는다 —
+# 이 파일의 self-comment fixture 가 그 반례다). 래퍼 없는 직접 실행도 계속 인정한다.
+if own_ci_wiring_is_unconditional "$WF"; then
   echo "PASS: CI 배선 — verify.yml 에 무조건 실행 스텝 정확히 1회"
 else
-  printf 'FAIL: CI 배선 — 실행 줄 %s회 또는 조건부/오류무시 스텝 (로컬에만 있는 검사는 없는 것으로 친다 · P15③)\n' "$run_lines"
+  echo 'FAIL: CI 배선 — 정확한 비주석 실행 줄 1회가 아니거나 조건부/오류무시 스텝 (로컬에만 있는 검사는 없는 것으로 친다 · P15③)'
   fail=1
 fi
 

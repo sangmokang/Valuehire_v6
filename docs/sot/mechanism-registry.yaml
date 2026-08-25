@@ -3,7 +3,9 @@
 # 계약: docs/engineering/verify-ac-m-goal-2026-08-12.md §⑩ (파서가 받는 유일한 형태)
 # 대조: scripts/verify/check-mechanism-registry.sh 가 pre-push 글로브와 CI 에서
 #       이 명부의 모든 항목을 실제 파일·문구와 대조한다. 명부가 실제와 어긋나면 빨간불.
-# 규칙: target 은 함수명이 아니라 path 파일 안에 문자 그대로 존재하는 명령 문자열이다.
+# 규칙: target 은 함수명이 아니라 실제 실행되는 정확한 명령 문자열이다. stage:ci 는
+#       ci_mirror_job 아래 조건부 실행·오류 무시가 없는 step.run 의 비주석 명령줄과
+#       대조한다(파일 전체 검색 금지).
 #       stage: manual 은 AC-20(memory-recall-check.sh) 착수 시에만 추가하고
 #       manual_reason 필수 (verify-unification-goal-2026-08-10.md AC-M counter-AC).
 - id: "secrets-scan-precommit"
@@ -18,7 +20,13 @@
   required: true
 - id: "ci-secret-scan"
   path: ".github/workflows/verify.yml"
-  target: "run: bash verify.sh"
+  target: "bash verify.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
+- id: "ci-portal-constants-gate"
+  path: ".github/workflows/verify.yml"
+  target: "bash scripts/acceptance-hs-portal-constants.sh"
   stage: "ci"
   ci_mirror_job: "verify"
   required: true
@@ -41,7 +49,10 @@
   required: true
 - id: "acceptance-runner-ci"
   path: ".github/workflows/verify.yml"
-  target: "bash scripts/verify/run-acceptance.sh"
+  # 2026-08-25 병합: target 은 접두사가 아니라 실제 run 줄 전체여야 한다. 접두사 대조는
+  # 주석 안의 글자에도 걸렸다(문자열 grep 판정의 한계 — G3 검사기와 같은 교훈).
+  # 다른 항목이 덮지 않는 평범한 인수 검사 한 줄을 골라 "래퍼가 실제로 CI 에서 돈다"를 증명한다.
+  target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-0-6.sh"
   stage: "ci"
   ci_mirror_job: "verify"
   required: true

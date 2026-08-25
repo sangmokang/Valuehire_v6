@@ -48,3 +48,8 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+
+# G3 hardening6 은 fixture 를 저장소 안(.g3-hardening6.XXXXXX)에 만든다. 추적 대상이
+# 아닌데 git status 에 나타나면, 같은 시각에 도는 다른 인수 검사의 "저장소 무변형"
+# 자기검사가 거짓 실패한다(2026-08-25 실측 — 간헐 실패 2건의 원인).
+.g3-hardening6.*

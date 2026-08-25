@@ -1,6 +1,6 @@
 # Valuehire v6 — 로컬 강제 장치(git hook) 계약 (SOT)
 
-최종 갱신: 2026-08-08
+최종 갱신: 2026-08-18
 근거(도입 배경·적대검증·6종 위반 시연): `docs/engineering/hook-enforcement-goal-2026-08-07.md`
 
 ## 현재 규칙 — 입출력 계약
@@ -31,11 +31,22 @@
 ```
 입력  : stdin 으로 <local ref> <local sha> <remote ref> <remote sha> (git 표준)
 출력  : exit 0 | exit 1
-        실행: verify.sh, scripts/acceptance-*.sh 전량 (glob — 새 스크립트 추가 시 자동 포함)
+        후보 수집: verify.sh, scripts/acceptance-*.sh (glob — 새 스크립트 추가 시 자동 포함)
+        직접 실행 제외:
+        - acceptance-0-2.sh — 로컬 실제 패턴으로 별도 수동 실행. push 시점에는 정상 Git 작업이
+          만든 unreachable 객체가 있을 수 있어 종료상태 0건 조건을 요구하지 않는다
+        - acceptance-0-5.sh — push 완료 뒤 원격 상태를 보는 검사라 push 직전에는 성립하지 않는다
+        - 헤더에 PUSH-PERFORMING을 선언한 검사 — push 재귀를 막기 위해 CI에서만 실행한다.
+          현재 acceptance-0-7.sh가 이에 해당하며, CI 실제 실행 줄이 없으면 pre-push가 차단한다
+        양쪽 실행: acceptance-0-2-unreachable-content.sh — 위 예외에 해당하지 않으므로 로컬
+        push와 CI가 모두 실행해 AC-19 합성 사례 13개를 검사한다
         차단 시 stderr: "BLOCKED: <스크립트경로> exit=<code>"
 불변식: 스크립트가 0개 발견되면 exit 1 (fail-closed — "검사할 게 없어서 통과"를 금지)
         미추적 파일(??) 존재 시 exit 1 (P15)
-한계  : git push --no-verify 로 우회 가능. CI 가 최종 방어선 (문서에 명시)
+한계  : git push --no-verify 로 우회 가능. CI는 실패 표시를 만들지만, 현재 원격 main은
+        보호되지 않았고 개인 계정의 비공개 저장소 요금제에서는 필수 성공 검사 지정이
+        잠겨 있어 합치기를 기계적으로 막지 못한다. 현재 최종 강제 주체는 사람 검토다
+        (`docs/sot/git-workflow.md`의 2026-08-15 원격 실측 참조).
 ```
 
 ### `scripts/session-status.sh`
@@ -73,4 +84,4 @@
 ## 비범위 / 한계
 
 - 6종 위반 시연의 실제 실행 결과·적대검증 판정(V1 조건부 REJECT→승인까지 5차 판정)은 `docs/engineering/hook-enforcement-goal-2026-08-07.md` 실행 결과·적대 검증 로그 절에 있다. 이 문서는 재현하지 않는다.
-- `git push --no-verify` 우회는 구조적으로 탐지 불가(2026-08-07 확정) — CI가 최종 방어선이라는 전제가 깨지면 이 문서 전체가 무효하다.
+- `git push --no-verify` 우회는 구조적으로 탐지 불가(2026-08-07 확정)다. 현재 CI는 필수 합치기 조건이 아니므로 로컬 우회 뒤에도 실패 표시만 남기며, 사람 검토가 합치기 차단을 맡는다. GitHub Pro로 올리거나 저장소를 공개한 뒤 `verify` 성공을 필수 상태 검사로 지정해야 원격 기계 강제가 생긴다.

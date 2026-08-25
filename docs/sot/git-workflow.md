@@ -25,9 +25,14 @@
 ## 시행 지점
 
 - 워크트리 생성: `git worktree add worktrees/<name> -b task/<name>` (이 저장소엔 아직 `make task`가 없다 — `docs/sot/verification-commands.md` 참고)
-- `main` 보호(직접 push 금지)는 아직 GitHub 브랜치 보호 규칙으로 기계 강제되어 있는지 실행으로 재확인 필요 — 이 문서 갱신 시점 기준 미확인.
+- main 직접 push 금지는 현재 사람 규율이다. 2026-08-15 원격 조회에서 main은 `protected=false`였고,
+  브랜치 보호·저장소 규칙 조회는 모두 현재 개인 계정의 비공개 저장소 요금제에서 403으로 거부됐다.
+  따라서 CI는 실패 표시를 만들지만 합치기 자체를 기계적으로 거부하지 못한다. 로컬 pre-push도
+  `git push --no-verify`로 우회할 수 있다. 강제하려면 GitHub Pro로 올리거나 저장소를 공개한 뒤
+  `verify` 성공을 필수 상태 검사로 지정해야 한다.
 
 ## 비범위 / 한계
 
 - CI가 각 원칙(P1~P22)을 어떻게 강제하는지의 전체 매핑표는 여기 옮기지 않았다 — 원본 goal 문서 §4 "CI가 강제할 것"에 있다.
-- `main` 브랜치 보호 규칙의 실제 GitHub 설정 여부는 이 문서 작성 시점에 실행 확인하지 않았다(범위 밖) — 필요 시 `gh api repos/:owner/:repo/branches/main/protection`로 확인한다.
+- 위 원격 상태는 2026-08-15에 `gh api repos/sangmokang/Valuehire_v6/branches/main`과 보호·저장소
+  규칙 조회로 확인했다. 계정 요금제나 저장소 공개 범위가 바뀌면 같은 명령으로 다시 확인해야 한다.

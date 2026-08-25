@@ -68,6 +68,21 @@ jobs:
           bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-gates-mutations.sh
           bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-gates-antiforge.sh
 
+      - name: HumanSearch G3 포털 상수·locator 경계
+        # 운영 상수·portal locator 는 contracts/ 한 곳(P22 · 웹 자동화 5조 1번).
+        # 검사기 자신이 이 파일의 실행 줄과 pre-push 글로브 배선을 함께 검사한다 —
+        # 이 줄을 지우거나 무력화하면 pre-push 쪽 실행에서 검사기가 exit 1 을 낸다.
+        run: |
+          bash scripts/acceptance-hs-portal-constants.sh
+          bash scripts/acceptance-hs-portal-constants-mutations.sh
+          bash scripts/acceptance-hs-portal-constants-hardening.sh
+          bash scripts/acceptance-hs-portal-constants-hardening2.sh
+          bash scripts/acceptance-hs-portal-constants-hardening3.sh
+          bash scripts/acceptance-hs-portal-constants-hardening4.sh
+          bash scripts/acceptance-hs-portal-constants-hardening5.sh
+          bash scripts/acceptance-hs-portal-constants-hardening6.sh
+          bash scripts/acceptance-hs-portal-constants-hardening7.sh
+
       - name: 히스토리 전량 스캔 (도달 가능한 모든 blob)
         # verify.sh는 현재 체크아웃의 추적 파일만 본다. 과거 커밋에 들어갔다가 지워진 비밀은
         # 그것만으로는 잡히지 않으므로, reflog 포함 도달 가능한 모든 blob을 직접 열어 검사한다.
