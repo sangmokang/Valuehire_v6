@@ -214,4 +214,46 @@
 
 ## 적대 검증 로그
 
-(V1·V2 판정 원문을 여기에 그대로 append 한다. 명령·시각·전체 출력·종료값·세션 식별자를 보존한다.)
+원문은 OMX가 자동 생성한 로컬 artifact에 100% 보존하고, 이 장부는 경로·바이트 수·SHA-256으로
+원문과 판정을 결합한다. 약화 카나리를 포함한 원문을 추적 문서에 재복사하면
+pre-commit 카나리가 의도대로 차단하므로, 해시된 artifact가 이 작업의 원문 증거다.
+
+### Claude V1-0 — 배선 전 후보
+
+- 판정: `HUMANREVIEW_VERDICT: REQUEST_CHANGES`
+- 스킬 고정: `humanreview` SHA-256
+  `a18f19f86794da142781e72da2e165d058881c76b69a21fc9df4640ba822a955`
+- 핵심: 스캐너·인수 검사가 CI에 미배선, 인라인 구 판정기와 거짓 초록, WU-4·pre-push·명부·SOT 누락.
+- 원문: `/Users/kangsangmo/Desktop/Valuehire_v6/.omx/artifacts/claude-claude-v1-pr-29-git-pr-pr-29-origin-main-users-kangsangmo-de-2026-08-25T12-26-11-806Z.md`
+- 크기/해시: `27060 bytes` /
+  `f23acd629bba6f5379d0e463da44eb2fa43bcbfe68ec4349b904d4cad354ff44`
+
+### Claude V1-1 — `d0b6c8b`
+
+- 판정: `HUMANREVIEW_VERDICT: REQUEST_CHANGES`
+- 핵심: 기존 7건은 해소. `GIT_DIR` 상속이 다른 저장소를 스캔하게 만드는 거짓 초록과
+  히스토리 명부 ID 자기축소를 신규 재현.
+- 원문: `.omx/artifacts/claude-claude-final-adversarial-review-request-pr-29-replacement-yo-2026-08-25T13-28-20-474Z.md`
+- 크기/해시: `22529 bytes` /
+  `eb9c730f2aabc317d665469bd06e0ab14ad707075b1479b2fffff3bf316804f2`
+
+### Claude V1-2 — `afcea04`
+
+- 판정: `HUMANREVIEW_VERDICT: REQUEST_CHANGES`
+- 핵심: `GIT_DIR`·pre-push 동작은 해소. CI 명령 마스킹 fixture가 수정 전도 빨개져 판별력이
+  없었고, 검사기+명부 필수 ID 동시 약화와 `./docs/...` 동치 경로가 살아남음.
+- 원문: `.omx/artifacts/claude-claude-v1-re-review-exact-fixed-sha-read-only-re-review-in-u-2026-08-25T14-01-43-258Z.md`
+- 크기/해시: `22095 bytes` /
+  `14b9b99644153fb4e121ca406d02f75cb73f46123a3c10dab84bb673af97fd63`
+
+### Claude V1-3 — `fe0db76`
+
+- 판정: `HUMANREVIEW_VERDICT: APPROVE`
+- 관측: 구/신 명령 마스킹 `exit 0/1`, 필수 ID 동시 약화 RED, 정본·`./`·`..`·절대경로
+  모두 누락 ID 2건을 지목. F1·F4 회귀를 포함한 추가 mutation 9개 생존 0개.
+- GREEN: AC-M 33, history 18, AC-19 23, CI integrity 14, semantic 10,
+  principles 34/41, `verify.sh`, 쉘 문법, YAML, merge-tree 전부 PASS.
+- 잔여: 원격 GitHub Actions·GNU grep `UNVERIFIED`; Low 비차단 2건.
+- 원문: `.omx/artifacts/claude-claude-v1-final-re-review-3-mutation-adequacy-read-only-huma-2026-08-25T14-34-22-784Z.md`
+- 크기/해시: `15436 bytes` /
+  `fd2143e7b15ef3942fc2927f98d6d80e4a956e2c9411ba01adfd929207c25ae9`
