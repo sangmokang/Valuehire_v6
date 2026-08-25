@@ -22,6 +22,18 @@
   stage: "ci"
   ci_mirror_job: "verify"
   required: true
+- id: "history-secret-scan-ci"
+  path: ".github/workflows/verify.yml"
+  target: "run: bash scripts/scan-history-secrets.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
+- id: "history-secret-scan-acceptance-ci"
+  path: ".github/workflows/verify.yml"
+  target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-history-scan-failclosed.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
 - id: "principles-local-check"
   path: "scripts/acceptance-principles-check.sh"
   target: "VERDICT: PASS"
@@ -81,4 +93,3 @@
   stage: "manual"
   manual_reason: "원격 조회가 필요해 CI 안에서 자기 SHA 를 검사하는 것은 뜻이 없다. 머지 전 판정 도구"
   required: true
-

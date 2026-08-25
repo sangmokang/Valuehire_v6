@@ -70,40 +70,11 @@ jobs:
 
       - name: 히스토리 전량 스캔 (도달 가능한 모든 blob)
         # verify.sh는 현재 체크아웃의 추적 파일만 본다. 과거 커밋에 들어갔다가 지워진 비밀은
-        # 그것만으로는 잡히지 않으므로, reflog 포함 도달 가능한 모든 blob을 직접 열어 검사한다.
-        run: |
-          set -o pipefail
-          CLEAN=$(mktemp)
-          tr -d '\r' < .secret-patterns.default | grep -vE '^[[:space:]]*(#|$)' > "$CLEAN"
-          [ -s "$CLEAN" ] || { echo "FAIL: 유효 패턴 0개"; exit 2; }
+        # 그것만으로는 잡히지 않으므로, CI와 인수 검사가 같은 fail-closed 판정기를 실행한다.
+        run: bash scripts/scan-history-secrets.sh
 
-          # fail-closed: git이 실패해 객체 목록이 비면 "0건 통과"가 아니라 오류다.
-          OBJS=$(mktemp)
-          if ! git rev-list --all --reflog --objects > "$OBJS"; then
-            echo "FAIL: git rev-list 실패 — 히스토리를 읽지 못했다(스캔 무효)"; exit 2
-          fi
-          count=$(awk '{print $1}' "$OBJS" | sort -u | wc -l)
-          if [ "$count" -lt 2 ]; then
-            echo "FAIL: 도달 가능 객체가 ${count}개 — 저장소를 제대로 읽지 못했다(스캔 무효)"; exit 2
-          fi
-          echo "스캔 대상 객체: ${count}개"
-
-          hit=0; blobs=0
-          while IFS= read -r sha; do
-            [ -z "$sha" ] && continue
-            [ "$(git cat-file -t "$sha" 2>/dev/null)" = blob ] || continue
-            blobs=$((blobs+1))
-            if git cat-file blob "$sha" 2>/dev/null | grep -qEif "$CLEAN"; then
-              echo "FAIL: 히스토리 blob에 자격증명 패턴 매치: $sha"
-              awk -v s="$sha" '$1==s {print "  경로: "$2}' "$OBJS"
-              hit=1
-            fi
-          done < <(awk '{print $1}' "$OBJS" | sort -u)
-          if [ "$blobs" -eq 0 ]; then
-            echo "FAIL: blob을 한 개도 읽지 못했다(스캔 무효)"; exit 2
-          fi
-          [ "$hit" -eq 0 ] && echo "PASS: 히스토리 전량 blob 스캔 0건 (blob ${blobs}개 검사)"
-          exit $hit
+      - name: 인수 검사 history-scan-failclosed (대형 blob·오류·배선)
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-history-scan-failclosed.sh
 
       - name: 인수 검사 0-2 상시 내용 검사와 종료상태 분리 (AC-19)
         # 실제 로컬 리터럴은 CI에 올리지 않는다. 합성 저장소와 합성 값으로 동일 판정기를 실행해

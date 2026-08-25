@@ -279,7 +279,7 @@ fi
 
 hook_guards=$(awk '
   /^[[:space:]]*#/ { next }
-  index($0, "scripts/scan-history-secrets.sh") { n++ }
+  index($0, "scripts/scan-history-secrets\\.sh") { n++ }
   END { print n + 0 }
 ' "$HOOK")
 if [ "$hook_guards" -ge 1 ]; then

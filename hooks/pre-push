@@ -111,9 +111,12 @@ else
     block "CI 워크플로에 if: false 로 비활성화된 스텝이 있다 (P13 — 검사 약화)"
   fi
 
-  # acceptance-0-2 의 CI 등가물: 이름이 아니라 본문(도달 가능 blob 을 실제로 여는 코드)을 확인
-  if ! printf '%s\n' "$ACTIVE" | grep -q 'cat-file blob'; then
-    block "CI 의 '히스토리 전량 스캔' 본문이 사라졌다 (cat-file blob 없음) — acceptance-0-2 의 등가물이 없다"
+  # acceptance-0-2 의 CI 등가물: 인라인 구현 문자열이 아니라 한 벌인 정본 스캐너의
+  # 무조건 실행 줄을 확인한다. 옵션·파이프·echo가 끼면 실행 증거로 인정하지 않는다.
+  if ! grep -qE \
+    '^[[:space:]]*run:[[:space:]]+bash[[:space:]]+scripts/scan-history-secrets\.sh[[:space:]]*$' \
+    <<< "$ACTIVE"; then
+    block "CI 의 '히스토리 전량 스캔' 정본 실행이 사라졌다 (scan-history-secrets.sh 없음) — acceptance-0-2 의 등가물이 없다"
   fi
 fi
 

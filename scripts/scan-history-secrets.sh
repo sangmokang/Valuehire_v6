@@ -10,11 +10,13 @@ SHAS=
 BLOB=
 
 cleanup() {
-  [ -n "$BLOB" ] && rm -f -- "$BLOB"
-  [ -n "$SHAS" ] && rm -f -- "$SHAS"
-  [ -n "$OBJS" ] && rm -f -- "$OBJS"
-  [ -n "$CLEAN" ] && rm -f -- "$CLEAN"
-  [ -n "$TMP_DIR" ] && rmdir -- "$TMP_DIR" 2>/dev/null
+  local cleanup_failed=0
+  if [ -n "$BLOB" ] && ! rm -f -- "$BLOB"; then cleanup_failed=1; fi
+  if [ -n "$SHAS" ] && ! rm -f -- "$SHAS"; then cleanup_failed=1; fi
+  if [ -n "$OBJS" ] && ! rm -f -- "$OBJS"; then cleanup_failed=1; fi
+  if [ -n "$CLEAN" ] && ! rm -f -- "$CLEAN"; then cleanup_failed=1; fi
+  if [ -n "$TMP_DIR" ] && ! rmdir -- "$TMP_DIR" 2>/dev/null; then cleanup_failed=1; fi
+  return "$cleanup_failed"
 }
 
 TMP_DIR=$(mktemp -d)
@@ -129,6 +131,9 @@ if [ "$hit" -eq 0 ]; then
   echo "PASS: 히스토리 전량 blob 스캔 0건 (blob ${blobs}개 검사)"
 fi
 result=$hit
-cleanup
+if ! cleanup; then
+  echo "FAIL: 임시 파일 정리 실패 — 민감 내용이 남았을 수 있다(스캔 무효)"
+  result=2
+fi
 trap - EXIT HUP INT TERM
 exit "$result"
