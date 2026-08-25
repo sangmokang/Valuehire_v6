@@ -22,7 +22,6 @@
 | # | 스텝 이름 | 실행 내용 |
 |---|---|---|
 | 1 | 비밀 스캔 (verify.sh) | `bash verify.sh` — 추적 파일 전체 |
-| 1 | 비밀 스캔 (verify.sh) | `bash verify.sh` — 추적 파일 전체 |
 | 2 | Strict 원칙 정본·장부·배선 검사 | `bash scripts/acceptance-principles-check.sh` — 32개 정본 문구·장치·명시적 pre-push/CI 배선 |
 | 3 | Strict 원칙 적대 fixture·500/501 경계 | `bash scripts/acceptance-principles-mutations.sh` — 정상 fixture와 14개 반례·500/501 경계 |
 | 4 | Strict 전역 스킬 잠금 장치 격리 회귀 | `bash scripts/acceptance-guard-global-skill-files.sh` — lock/check/unlock/recover와 동일 UID 한계 |
@@ -47,7 +46,7 @@
 | 23 | 인수 검사 semantic-mutations (검사를 껐을 때 반드시 빨개지는가) | `bash scripts/verify/run-acceptance.sh scripts/acceptance-semantic-mutations.sh` — 의미 기반 뮤테이션 |
 | 24 | 인수 검사 verify-ac-m (mechanism 명부 대조 · AC-M) | `bash scripts/verify/run-acceptance.sh scripts/acceptance-verify-ac-m.sh` — mechanism 명부 대조 (AC-M) |
 
-*(1번 앞에 이름 없는 `actions/checkout` 이 있고 `fetch-depth: 0` 이다 — 5번이 과거 blob 을 열려면 필요하다.)*
+*(1번 앞에 이름 없는 `actions/checkout` 이 있고 `fetch-depth: 0` 이다 — 8번(히스토리 전량 스캔)이 과거 blob 을 열려면 필요하다.)*
 
 **CI는 고정 목록이고 로컬 `pre-push`는 글로브(이름 규칙 자동 수집)로 후보를 찾은 뒤 계약상 예외를 적용한다.** `acceptance-0-2.sh`와 `acceptance-0-5.sh`는 직접 실행하지 않고, 헤더에 `PUSH-PERFORMING`을 선언한 push 수행 검사는 재귀를 막기 위해 건너뛰되 CI 실제 실행 줄이 없으면 push 자체를 차단한다. `scripts/acceptance-0-2-unreachable-content.sh`는 어느 예외에도 해당하지 않아 로컬 push와 CI 양쪽에서 실행된다. 따라서 새 인수 스크립트를 만들면 로컬 후보에는 저절로 들어오지만 CI에는 자동 등록되지 않는다 — P15③("로컬에만 있는 검사는 없는 것으로 친다")에 걸린다. **새 `scripts/acceptance-*.sh`를 추가하는 PR은 `verify.yml`과 이 표 양쪽에 자기 줄을 함께 넣어야 한다.**
 
