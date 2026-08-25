@@ -158,7 +158,7 @@ enumeration failure := exit 2, partial candidates discarded
 | 2 | 격리 worktree에서 새 acceptance RED | PASS |
 | 3 | 최소 구현으로 RED→GREEN, 테스트 약화 없음 | PASS |
 | 3.5 | workflow→runner→acceptance→scanner 및 역조회 배선 | PASS |
-| 4 | 원명령·수치·mutation·전체 all fresh 검증 | 진행 — COPY 보강 뒤 재실행 필요 |
+| 4 | 원명령·수치·mutation·전체 all fresh 검증 | PASS — 구현 SHA `8945496…`, 추적 원출력 장부 보존 |
 | 5 | Lore 로컬 커밋, clean SHA, V1/V2/humanreview, P23 공개 | REQUEST_CHANGES — V1·P23·humanreview 미충족 |
 | 6 | push/PR/merge/배포 | 금지 |
 
@@ -264,3 +264,40 @@ STATUS: NOT_RUN
 ```
 
 → 정식 OMX Claude 경로도 검토 본문을 만들기 전에 외부 크레딧에서 종료했습니다. Codex 검증으로 대체하지 않으며, 최종 구현 SHA에서 `ANTHROPIC_API_KEY`를 제거한 인증 경로로 한 번 더 복구 시도합니다.
+
+### 2026-08-25 23:44~23:49 KST — 구현 SHA 전체 검증
+
+전체 stdout/stderr와 명령별 시각·PWD·HEAD·exit·CHECKED는 `docs/engineering/repository-data-protection-followup-verification-log-2026-08-25.md`에 줄이지 않고 보존했습니다.
+
+```text
+IMPLEMENTATION_SHA: 8945496f957a62d8d17a8bceafc3616fc5e38d22
+principles: exit=0 CHECKED=34
+principles-mutations: exit=0 CHECKED=41
+hs-a3: exit=0 CHECKED=25
+secret: exit=0 CHECKED=35
+hs-a4: exit=0 CHECKED=49
+repository-data-protection: exit=0 CHECKED=33
+verify: exit=0 CHECKED=198
+tracked: exit=0 CHECKED=198
+history: exit=0 CHECKED=1319
+pii: exit=0 CHECKED=198
+all: exit=0 PASS=3 CHECKED=1715
+ci-step-integrity: exit=0 CHECKED=27
+ci-step-integrity-acceptance: exit=0 CHECKED=15
+semantic-mutations: exit=0 CHECKED=10
+mechanism-registry: exit=0 CHECKED=31
+attack-mutations: exit=0 CHECKED=8
+shellcheck-scanner-and-acceptance: exit=0
+shellcheck-warning-changed-files: exit=0
+bash-n-changed-files: exit=0
+git-diff-check: exit=0
+P23: exit=2 NOT_RUN
+CLAUDE_V1: NOT_RUN
+ISOLATED_STATUS: clean
+```
+
+→ 로컬 구현과 검증 체계는 PASS지만 외부 필수 게이트는 닫히지 않았습니다. `check-docs-sot.sh`의 10항목 PASS는 catalog·surface coverage 또는 본 기능 완료 근거에서 제외했습니다.
+
+### 원본 worktree 증거 로그 위치 복구
+
+검증 로그 생성 도중 기본 실행 디렉터리 때문에 새 추적 후보 문서 한 개가 원본 worktree에 잠시 생성됐습니다. 즉시 같은 `apply_patch`에서 원본 파일을 삭제하고 격리 worktree에 추가했으며, 기존 원본 파일은 수정하지 않았습니다. 복구 직후 원본은 작업 직전과 같은 dirty 43건, status 지문 `64c1b6218c9079bfb0447b6fb1625a1a8a44db394ca56b92b23f5367cc38894b`로 돌아왔습니다. 시작 기준 41건·`804384...`와의 외부 드리프트는 여전히 보존 AC 실패입니다.
