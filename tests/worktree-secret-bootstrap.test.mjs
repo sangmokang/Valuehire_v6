@@ -7,6 +7,7 @@ import {
   mkdtempSync,
   readlinkSync,
   realpathSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -66,4 +67,20 @@ test("missing real secret fails closed and never links the default file", () => 
   assert.notEqual(result.status, 0);
   const link = path.join(fixture.linked, ".secret-patterns");
   assert.equal(existsSync(link), false);
+});
+
+test("a linked worktree with a wrong secret symlink fails closed", () => {
+  const fixture = createFixture({ realSecret: true });
+  git(fixture.main, ["worktree", "add", "--no-checkout", "-b", "task/wrong-link", fixture.linked]);
+  symlinkSync(path.join(fixture.main, "missing-secret"), path.join(fixture.linked, ".secret-patterns"));
+  const result = spawnSync("git", ["checkout", "-f"], { cwd: fixture.linked, encoding: "utf8" });
+  assert.notEqual(result.status, 0);
+});
+
+test("a linked worktree with a regular secret file fails closed", () => {
+  const fixture = createFixture({ realSecret: true });
+  git(fixture.main, ["worktree", "add", "--no-checkout", "-b", "task/regular-file", fixture.linked]);
+  writeFileSync(path.join(fixture.linked, ".secret-patterns"), "WORKTREE_LOCAL\n");
+  const result = spawnSync("git", ["checkout", "-f"], { cwd: fixture.linked, encoding: "utf8" });
+  assert.notEqual(result.status, 0);
 });
