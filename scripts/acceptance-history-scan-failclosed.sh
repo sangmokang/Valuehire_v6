@@ -33,7 +33,7 @@ esac
 trap 'ruby -rfileutils -e "FileUtils.remove_entry(ARGV[0]) if File.exist?(ARGV[0])" "$TMP"' EXIT
 
 CANARY='VH-HISTORY-SYNTH-CANARY-884211'
-TOTAL=17
+TOTAL=18
 checked=0
 failed=0
 
@@ -103,6 +103,11 @@ run_cleanup_failure() {
   PATH="$fixture/bin:$PATH" TMPDIR="$fixture/tmp" run_scanner "$fixture"
 }
 
+run_git_dir_injection() {
+  local fixture="$1"
+  GIT_DIR="$git_dir_clean/.git" run_scanner "$fixture"
+}
+
 expect_rc() {
   local label="$1" wanted="$2" fixture="$3"
   shift 3
@@ -120,7 +125,7 @@ expect_rc_marker() {
   shift 4
   local output rc=0
   output=$("$@" "$fixture" 2>&1) || rc=$?
-  if [ "$rc" -eq "$wanted" ] && printf '%s\n' "$output" | grep -Fq -- "$marker"; then
+  if [ "$rc" -eq "$wanted" ] && grep -Fq -- "$marker" <<< "$output"; then
     record 0 "$label" "exit=$rc · marker 확인"
   else
     record 1 "$label" "expected exit=$wanted marker=$marker actual=$rc / ${output//$'\n'/ | }"
@@ -236,6 +241,17 @@ chmod +x "$cleanup_failure/bin/rm"
 expect_rc_marker "시크릿 임시 파일 정리 실패 → 스캔 무효" 2 \
   "FAIL: 임시 파일 정리 실패" "$cleanup_failure" run_cleanup_failure
 
+git_dir_tainted="$TMP/git-dir-tainted"
+make_fixture "$git_dir_tainted"
+printf '%s\n' "$CANARY" > "$git_dir_tainted/leak.txt"
+git -C "$git_dir_tainted" add leak.txt
+git -C "$git_dir_tainted" commit -qm git-dir-tainted
+git_dir_clean="$TMP/git-dir-clean"
+make_fixture "$git_dir_clean"
+expect_rc_marker "상속 GIT_DIR가 다른 저장소를 가리켜도 현재 히스토리 위반 탐지" 1 \
+  "FAIL: 히스토리 blob에 자격증명 패턴 매치" "$git_dir_tainted" \
+  run_git_dir_injection
+
 history_step=$(awk '
   /^      - name: 히스토리 전량 스캔/ { in_step=1 }
   in_step && seen && /^      - name:/ { exit }
@@ -277,15 +293,14 @@ else
   record 1 "CI가 스캐너 인수 검사를 래퍼로 실행" "call=$acceptance_calls"
 fi
 
-hook_guards=$(awk '
-  /^[[:space:]]*#/ { next }
-  index($0, "scripts/scan-history-secrets\\.sh") { n++ }
-  END { print n + 0 }
-' "$HOOK")
-if [ "$hook_guards" -ge 1 ]; then
-  record 0 "pre-push가 CI 정본 스캐너 배선을 보호" "guard=$hook_guards"
+hook_output=$(bash scripts/verify/check-pre-push-runtime.sh hooks/pre-push 2>&1)
+hook_rc=$?
+if [ "$hook_rc" -eq 0 ] \
+   && grep -Fq "scanner wiring mutation blocked" <<< "$hook_output"; then
+  record 0 "pre-push가 CI 정본 스캐너 배선을 행동으로 보호" "mutation blocked"
 else
-  record 1 "pre-push가 CI 정본 스캐너 배선을 보호" "guard=0"
+  record 1 "pre-push가 CI 정본 스캐너 배선을 행동으로 보호" \
+    "exit=$hook_rc / ${hook_output//$'\n'/ | }"
 fi
 
 current=$(git status --porcelain)

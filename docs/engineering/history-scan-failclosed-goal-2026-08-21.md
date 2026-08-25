@@ -118,7 +118,7 @@
 **Where** CI 와 인수 검사가 히스토리 비밀 스캔을 수행할 때, 시스템은 **동일한 파일** `scripts/scan-history-secrets.sh` 를 실행해야 한다.
 
 - 검증 명령: `bash scripts/verify/run-acceptance.sh scripts/acceptance-verify-ac-m.sh`
-- 기대: `CHECKED: 31` 이상, 명부 항목 수 = 검사기 보고 수
+- 기대: `CHECKED: 32` 이상, 명부 항목 수 = 검사기 보고 수
 - counter-AC:
   - 워크플로에 스캔 본문이 인라인으로 다시 남아 있으면 **실패**
   - 명부(`docs/sot/mechanism-registry.yaml`)에 스캐너가 등록되지 않았으면 **실패**
@@ -161,6 +161,7 @@
 | 매우 큰 blob (수십 MB) | **자동 처리** — 임시 파일로 받아 전량 검사. 크기로 건너뛰지 않는다 |
 | 바이너리 blob | **자동 처리** — `grep -a` 로 텍스트 취급 |
 | 임시 파일 생성 실패 | **명시적 중단** — 종료값 2 |
+| `GIT_DIR`등이 다른 저장소를 가리킴 | **자동 격리** — 상속 재지정을 제거하고 현재 체크아웃을 스캔 |
 | 스캔 시간이 CI 한도를 넘음 | **명시적 중단** — 사장님께 보고 후 `git cat-file --batch` 최적화를 별도 WU 로 |
 | pre-commit 이 약화 패턴으로 커밋 차단 | **자동 처리** — 문자열 조립으로 회피하고 그 사실을 커밋 메시지에 남긴다. suppressions 등록 금지 |
 | 원본 저장소가 오염됨 | **명시적 중단** — 즉시 복구하고 보고 |

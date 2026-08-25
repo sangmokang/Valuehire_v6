@@ -1,0 +1,4 @@
+jobs:
+  verify:
+    steps:
+      - run: bash verify.sh || exit 0

@@ -3,6 +3,11 @@
 # 종료값: 0=위반 없음, 1=위반 발견, 2=검사기 오류 또는 스캔 무효.
 set -u
 
+# Git hook/CI 환경에서 상속된 저장소 재지정을 제거한다. 현재 체크아웃이 아닌
+# 다른 GIT_DIR를 스캔하고 0건으로 통과하는 경로를 fail-closed로 막는다.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY \
+  GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_PREFIX GIT_QUARANTINE_PATH
+
 TMP_DIR=
 CLEAN=
 OBJS=

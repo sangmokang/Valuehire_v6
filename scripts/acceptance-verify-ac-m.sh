@@ -5,7 +5,7 @@
 #   정본: docs/engineering/verify-unification-goal-2026-08-10.md:78-81 (AC-M)
 #   출력 : 항목마다 PASS:/FAIL: 전부 출력, 마지막 줄 `CHECKED: <검사 수>`
 #   exit : 0 = PASS | 1 = FAIL | 2 = NOT_RUN
-#   불변식: CHECKED 는 정확히 31 이어야 한다 — 검사가 몇 개 사라져도 초록이면 가짜다
+#   불변식: CHECKED 는 정확히 32 이어야 한다 — 검사가 몇 개 사라져도 초록이면 가짜다
 #           (PR #6 결함 D3 의 교훈: checked==0 만 막으면 3개를 지워도 통과했다 · P20)
 #
 # 쓰기 규칙: 이 검사는 저장소에 어떤 파일도 만들지 않는다. 동적 fixture 는 전부
@@ -24,7 +24,7 @@ SNAP0=$(git status --porcelain)
 CHECKER=scripts/verify/check-mechanism-registry.sh
 FIXDIR=scripts/verify/fixtures/mechanism-registry
 REGISTRY=docs/sot/mechanism-registry.yaml
-EXPECTED_CHECKED=31
+EXPECTED_CHECKED=32
 
 TMP=$(mktemp -d) || { echo "NOT_RUN: mktemp 실패"; echo "CHECKED: 0"; exit 2; }
 trap 'rm -rf "$TMP"' EXIT
@@ -189,6 +189,18 @@ cat > "$TMP/ci-fake-target.yaml" <<'EOF'
   required: true
 EOF
 expect_rc "ci 인데 거짓 target → 불합격" "$TMP/ci-fake-target.yaml" 1
+
+# target 뒤에 실패 무시를 붙인 줄은 정본 명령의 정확한 실행이 아니다.
+# 부분 문자열 매칭이면 실패 후 `exit 0`을 붙인 줄도 통과했던 반례를 고정한다.
+cat > "$TMP/ci-masked-target.yaml" <<'EOF'
+- id: "ci-masked-target"
+  path: "scripts/verify/fixtures/mechanism-registry/ci-masked-workflow.yml"
+  target: "run: bash verify.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
+EOF
+expect_rc "ci target 뒤 실패무시 추가 → 불합격" "$TMP/ci-masked-target.yaml" 1
 
 # V1 D4: 저장소 밖 절대경로 — 계약(⑩)은 저장소 루트 기준 상대경로다.
 cat > "$TMP/abs-path.yaml" <<'EOF'

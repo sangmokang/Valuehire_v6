@@ -28,7 +28,7 @@
 | 5 | HumanSearch G1 클린룸 경계 | 인라인 8개 — `scripts/acceptance-hs-cleanroom.sh`, `scripts/acceptance-hs-cleanroom-mutations.sh`, `scripts/acceptance-hs-cleanroom-absolute-paths.sh`, `scripts/acceptance-hs-cleanroom-absolute-contexts.sh`, `scripts/acceptance-hs-cleanroom-colon-paths.sh`, `scripts/acceptance-hs-cleanroom-file-urls.sh`, `scripts/acceptance-hs-cleanroom-hook-env.sh`, `scripts/acceptance-hs-cleanroom-hook-env-mutations.sh` |
 | 6 | HumanSearch G2 테스트 게이트 | 인라인 — `uv` 설치 후 `scripts/acceptance-hs-gates.sh`, `scripts/acceptance-hs-gates-mutations.sh`, `scripts/acceptance-hs-gates-antiforge.sh` (정적 ruff/mypy + pytest 수집·runtime import 증명) |
 | 7 | 히스토리 전량 스캔 | `bash scripts/scan-history-secrets.sh` — 도달 가능한 모든 blob을 한 벌인 fail-closed 판정기로 대조 |
-| 8 | 인수 검사 history-scan-failclosed | `bash scripts/verify/run-acceptance.sh scripts/acceptance-history-scan-failclosed.sh` — 대형 blob·오류·0/1/부분 목록·정리 실패·CI/pre-push 배선 17건 |
+| 8 | 인수 검사 history-scan-failclosed | `bash scripts/verify/run-acceptance.sh scripts/acceptance-history-scan-failclosed.sh` — 대형 blob·오류·0/1/부분 목록·정리 실패·Git 환경 격리·CI/pre-push 배선 18건 |
 | 9 | 인수 검사 0-2 상시/종료상태 분리 | `bash scripts/verify/run-acceptance.sh scripts/acceptance-0-2-unreachable-content.sh` — 환경 격리·네 객체형·도구 실패·큰 객체·종료상태·훅 환경 무오염·목록 실패 23개 합성 사례 (AC-19) |
 | 10 | 인수 검사 0-6 | `bash scripts/verify/run-acceptance.sh scripts/acceptance-0-6.sh` |
 | 11 | 인수 검사 0-7 | `bash scripts/verify/run-acceptance.sh scripts/acceptance-0-7.sh` — 훅 위반 6종 시연 |
