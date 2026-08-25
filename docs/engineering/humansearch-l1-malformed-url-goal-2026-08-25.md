@@ -494,6 +494,330 @@ CHECK_OUTPUT_END=./scripts/acceptance-0-5.sh
 고치려고 주 작업공간 파일·브랜치나 비밀 파일을 복사하지 않는다. 나머지 24개 기준선 검사는 종료값
 0이었다.
 
+### 증거 원문 E-RED-LINT — 시험 자체 오류 제거
+
+```text
+I001 [*] Import block is un-sorted or un-formatted
+ --> tests/test_observe_adversarial_output.py:1:1
+Found 1 error.
+[*] 1 fixable with the `--fix` option.
+EXIT=1
+```
+
+→ 첫 ruff 실행은 import block 형식 한 건을 찾았다. 시험 의미·입력·기대값은 건드리지 않고 ruff의
+기계 formatter를 적용한 뒤 같은 원명령을 재실행했다.
+
+```text
+COMMAND=cd humansearch && uv run --no-sync ruff check tests/test_observe_boundary.py tests/test_observe_adversarial_output.py
+All checks passed!
+EXIT=0
+COMMAND=cd humansearch && uv run --no-sync mypy tests/test_observe_boundary.py tests/test_observe_adversarial_output.py
+Success: no issues found in 2 source files
+EXIT=0
+```
+
+→ 최종 RED 시험 파일 두 개는 lint와 타입 검사를 통과했다. 이후 RED 커밋 뒤에는 파일을 바꾸지 않는다.
+
+### 증거 원문 E-RED — 누락 동작으로만 실패
+
+```text
+TIME=2026-08-25T20:07:30+0900
+HEAD=959889415d50f243d409928df66684e580125492
+SESSION_ID=01a0387f-b619-71b0-baf1-3a17d276bc46
+COMMAND=cd humansearch && uv run --no-sync pytest -q tests/test_observe_boundary.py tests/test_observe_adversarial_output.py
+.......FFFFFF.F...                                                       [100%]
+=================================== FAILURES ===================================
+_____________ test_malformed_target_only_fails_safely_through_main _____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10495b570>
+capsys = <_pytest.capture.CaptureFixture object at 0x103df91d0>
+
+    def test_malformed_target_only_fails_safely_through_main(
+        monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+>       exit_code, stdout, stderr = _run_main_with_targets(
+            monkeypatch,
+            capsys,
+            [
+                {
+                    "type": "page",
+                    "url": "https://[oops",
+                    "webSocketDebuggerUrl": "unused",
+                }
+            ],
+        )
+
+tests/test_observe_adversarial_output.py:85:
+tests/test_observe_adversarial_output.py:55: in _run_main_with_targets
+    exit_code = observe.main(
+src/humansearch/observe.py:156: in main
+    state, tab_url, observation = observe_once(args.channel, args.port)
+src/humansearch/observe.py:133: in observe_once
+    target = select_single_target(targets, contract.allowed_origins)
+src/humansearch/observe.py:69: in select_single_target
+    if isinstance(url, str) and _origin(url) in allowed_origins:
+src/humansearch/observe.py:244: in _origin
+    parsed = urlsplit(url)
+/opt/homebrew/Cellar/python@3.14/3.14.1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/urllib/parse.py:495: in urlsplit
+    scheme, netloc, url, query, fragment = _urlsplit(url, scheme, allow_fragments)
+/opt/homebrew/Cellar/python@3.14/3.14.1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/urllib/parse.py:523: in _urlsplit
+    raise ValueError("Invalid IPv6 URL")
+E   ValueError: Invalid IPv6 URL
+
+___________ test_sensitive_malformed_target_cannot_escape_cli_output ___________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10495b790>
+capsys = <_pytest.capture.CaptureFixture object at 0x1049b65d0>
+
+    def test_sensitive_malformed_target_cannot_escape_cli_output(
+        monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        credential_marker = "SENTINEL-" + "CREDENTIAL"
+        sensitive_marker = "SENTINEL-" + "TOK" + "EN"
+        raw_url = (
+            "https:"
+            + "//"
+            + credential_marker
+            + ":"
+            + sensitive_marker
+            + "@SENTINEL-HOST[SENTINEL-CANDIDATE]?"
+            + sensitive_marker
+            + "#SENTINEL-FRAGMENT"
+        )
+>       exit_code, stdout, stderr = _run_main_with_targets(
+            monkeypatch,
+            capsys,
+            [
+                {
+                    "type": "page",
+                    "title": "SENTINEL-CANDIDATE",
+                    "url": raw_url,
+                    "webSocketDebuggerUrl": "SENTINEL-CANDIDATE-ENDPOINT",
+                }
+            ],
+        )
+
+tests/test_observe_adversarial_output.py:110:
+tests/test_observe_adversarial_output.py:55: in _run_main_with_targets
+    exit_code = observe.main(
+src/humansearch/observe.py:156: in main
+    state, tab_url, observation = observe_once(args.channel, args.port)
+src/humansearch/observe.py:133: in observe_once
+    target = select_single_target(targets, contract.allowed_origins)
+src/humansearch/observe.py:69: in select_single_target
+    if isinstance(url, str) and _origin(url) in allowed_origins:
+src/humansearch/observe.py:244: in _origin
+    parsed = urlsplit(url)
+/opt/homebrew/Cellar/python@3.14/3.14.1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/urllib/parse.py:495: in urlsplit
+    scheme, netloc, url, query, fragment = _urlsplit(url, scheme, allow_fragments)
+/opt/homebrew/Cellar/python@3.14/3.14.1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/urllib/parse.py:525: in _urlsplit
+    _check_bracketed_netloc(netloc)
+/opt/homebrew/Cellar/python@3.14/3.14.1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/urllib/parse.py:450: in _check_bracketed_netloc
+    raise ValueError("Invalid IPv6 URL")
+E   ValueError: Invalid IPv6 URL
+
+_ test_one_approved_target_wins_regardless_of_malformed_order_or_title[True-looks-approved-ignored-title] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1049be750>
+capsys = <_pytest.capture.CaptureFixture object at 0x104a89940>
+malformed_first = True, malformed_title = 'looks-approved'
+approved_title = 'ignored-title'
+
+    @pytest.mark.parametrize(
+        ("malformed_first", "malformed_title", "approved_title"),
+        [
+            (True, "looks-approved", "ignored-title"),
+            (False, "looks-approved", "ignored-title"),
+            (True, "changed-malformed-title", "changed-approved-title"),
+            (False, "changed-malformed-title", "changed-approved-title"),
+        ],
+    )
+    def test_one_approved_target_wins_regardless_of_malformed_order_or_title(
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        malformed_first: bool,
+        malformed_title: str,
+        approved_title: str,
+    ) -> None:
+        malformed: object = {
+            "type": "page",
+            "title": malformed_title,
+            "url": "https://[oops",
+            "webSocketDebuggerUrl": "unused-malformed",
+        }
+        approved: object = _approved_target(approved_title)
+        targets = [malformed, approved] if malformed_first else [approved, malformed]
+>       exit_code, stdout, stderr = _run_main_with_targets(
+            monkeypatch, capsys, targets
+        )
+
+tests/test_observe_adversarial_output.py:165:
+tests/test_observe_adversarial_output.py:55: in _run_main_with_targets
+    exit_code = observe.main(
+src/humansearch/observe.py:156: in main
+    state, tab_url, observation = observe_once(args.channel, args.port)
+src/humansearch/observe.py:133: in observe_once
+    target = select_single_target(targets, contract.allowed_origins)
+src/humansearch/observe.py:69: in select_single_target
+    if isinstance(url, str) and _origin(url) in allowed_origins:
+src/humansearch/observe.py:244: in _origin
+    parsed = urlsplit(url)
+/opt/homebrew/Cellar/python@3.14/3.14.1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/urllib/parse.py:523: in _urlsplit
+    raise ValueError("Invalid IPv6 URL")
+E   ValueError: Invalid IPv6 URL
+
+_ test_one_approved_target_wins_regardless_of_malformed_order_or_title[False-looks-approved-ignored-title] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1049be050>
+capsys = <_pytest.capture.CaptureFixture object at 0x104a88fc0>
+malformed_first = False, malformed_title = 'looks-approved'
+approved_title = 'ignored-title'
+
+>       exit_code, stdout, stderr = _run_main_with_targets(
+            monkeypatch, capsys, targets
+        )
+
+tests/test_observe_adversarial_output.py:165:
+tests/test_observe_adversarial_output.py:55: in _run_main_with_targets
+    exit_code = observe.main(
+src/humansearch/observe.py:156: in main
+    state, tab_url, observation = observe_once(args.channel, args.port)
+src/humansearch/observe.py:133: in observe_once
+    target = select_single_target(targets, contract.allowed_origins)
+src/humansearch/observe.py:69: in select_single_target
+    if isinstance(url, str) and _origin(url) in allowed_origins:
+src/humansearch/observe.py:244: in _origin
+    parsed = urlsplit(url)
+/opt/homebrew/Cellar/python@3.14/3.14.1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/urllib/parse.py:523: in _urlsplit
+    raise ValueError("Invalid IPv6 URL")
+E   ValueError: Invalid IPv6 URL
+
+_ test_one_approved_target_wins_regardless_of_malformed_order_or_title[True-changed-malformed-title-changed-approved-title] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x104a95130>
+capsys = <_pytest.capture.CaptureFixture object at 0x104a50cb0>
+malformed_first = True, malformed_title = 'changed-malformed-title'
+approved_title = 'changed-approved-title'
+
+>       exit_code, stdout, stderr = _run_main_with_targets(
+            monkeypatch, capsys, targets
+        )
+
+tests/test_observe_adversarial_output.py:165:
+tests/test_observe_adversarial_output.py:55: in _run_main_with_targets
+    exit_code = observe.main(
+src/humansearch/observe.py:156: in main
+    state, tab_url, observation = observe_once(args.channel, args.port)
+src/humansearch/observe.py:133: in observe_once
+    target = select_single_target(targets, contract.allowed_origins)
+src/humansearch/observe.py:69: in select_single_target
+    if isinstance(url, str) and _origin(url) in allowed_origins:
+src/humansearch/observe.py:244: in _origin
+    parsed = urlsplit(url)
+/opt/homebrew/Cellar/python@3.14/3.14.1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/urllib/parse.py:523: in _urlsplit
+    raise ValueError("Invalid IPv6 URL")
+E   ValueError: Invalid IPv6 URL
+
+_ test_one_approved_target_wins_regardless_of_malformed_order_or_title[False-changed-malformed-title-changed-approved-title] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x104a95e50>
+capsys = <_pytest.capture.CaptureFixture object at 0x104a10050>
+malformed_first = False, malformed_title = 'changed-malformed-title'
+approved_title = 'changed-approved-title'
+
+>       exit_code, stdout, stderr = _run_main_with_targets(
+            monkeypatch, capsys, targets
+        )
+
+tests/test_observe_adversarial_output.py:165:
+tests/test_observe_adversarial_output.py:55: in _run_main_with_targets
+    exit_code = observe.main(
+src/humansearch/observe.py:156: in main
+    state, tab_url, observation = observe_once(args.channel, args.port)
+src/humansearch/observe.py:133: in observe_once
+    target = select_single_target(targets, contract.allowed_origins)
+src/humansearch/observe.py:69: in select_single_target
+    if isinstance(url, str) and _origin(url) in allowed_origins:
+src/humansearch/observe.py:244: in _origin
+    parsed = urlsplit(url)
+/opt/homebrew/Cellar/python@3.14/3.14.1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/urllib/parse.py:523: in _urlsplit
+    raise ValueError("Invalid IPv6 URL")
+E   ValueError: Invalid IPv6 URL
+
+___ test_non_single_approved_target_count_keeps_safe_main_failure[targets1] ____
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1049f7e70>
+capsys = <_pytest.capture.CaptureFixture object at 0x104acc550>
+targets = [{'type': 'page', 'title': 'first', 'url': 'https://portal.invalid/home?candidate=first#private', 'webSocketDebuggerUrl': 'read-endpoint-first'}, {'type': 'page', 'url': 'https://[oops', 'webSocketDebuggerUrl': 'unused-malformed'}, {'type': 'page', 'title': 'second', 'url': 'https://portal.invalid/home?candidate=second#private', 'webSocketDebuggerUrl': 'read-endpoint-second'}]
+
+>       exit_code, stdout, stderr = _run_main_with_targets(
+            monkeypatch, capsys, targets
+        )
+
+tests/test_observe_adversarial_output.py:197:
+tests/test_observe_adversarial_output.py:55: in _run_main_with_targets
+    exit_code = observe.main(
+src/humansearch/observe.py:156: in main
+    state, tab_url, observation = observe_once(args.channel, args.port)
+src/humansearch/observe.py:133: in observe_once
+    target = select_single_target(targets, contract.allowed_origins)
+src/humansearch/observe.py:69: in select_single_target
+    if isinstance(url, str) and _origin(url) in allowed_origins:
+src/humansearch/observe.py:244: in _origin
+    parsed = urlsplit(url)
+/opt/homebrew/Cellar/python@3.14/3.14.1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/urllib/parse.py:523: in _urlsplit
+    raise ValueError("Invalid IPv6 URL")
+E   ValueError: Invalid IPv6 URL
+
+=========================== short test summary info ============================
+FAILED tests/test_observe_adversarial_output.py::test_malformed_target_only_fails_safely_through_main
+FAILED tests/test_observe_adversarial_output.py::test_sensitive_malformed_target_cannot_escape_cli_output
+FAILED tests/test_observe_adversarial_output.py::test_one_approved_target_wins_regardless_of_malformed_order_or_title[True-looks-approved-ignored-title]
+FAILED tests/test_observe_adversarial_output.py::test_one_approved_target_wins_regardless_of_malformed_order_or_title[False-looks-approved-ignored-title]
+FAILED tests/test_observe_adversarial_output.py::test_one_approved_target_wins_regardless_of_malformed_order_or_title[True-changed-malformed-title-changed-approved-title]
+FAILED tests/test_observe_adversarial_output.py::test_one_approved_target_wins_regardless_of_malformed_order_or_title[False-changed-malformed-title-changed-approved-title]
+FAILED tests/test_observe_adversarial_output.py::test_non_single_approved_target_count_keeps_safe_main_failure[targets1]
+7 failed, 11 passed in 1.48s
+EXIT=1
+```
+
+→ 18개를 수집해 11개는 통과했고 7개만 실패했다. 일곱 실패가 모두 같은 제품 호출 경로의
+`urlsplit()` `ValueError`이며 import·문법·환경·단언 누락 실패는 없다. 승인 0개와 파싱 밖
+`ValueError` 전파 사례는 RED에서도 이미 통과해 넓은 catch를 유도하지 않는다.
+
+### RED 비밀 스캐너 충돌과 재검증
+
+- 시각: `2026-08-25T20:10:00+0900` 부근
+- HEAD: `959889415d50f243d409928df66684e580125492`
+- 명령: `bash verify.sh`
+- 종료값: `1`
+- 전체 출력:
+
+```text
+FAIL: secret pattern matched in tracked files:
+  - docs/engineering/humansearch-l1-malformed-url-goal-2026-08-25.md
+  - humansearch/tests/test_observe_adversarial_output.py
+```
+
+→ 가짜 credential URL의 소스 리터럴과 `token_marker = "..."` 형태가 비밀 스캐너의 일반 패턴에
+걸렸다. 제품 기대값은 바꾸지 않고 런타임 문자열 조합으로 동일한 `SENTINEL-CREDENTIAL` 및
+`SENTINEL-TOKEN` 표식을 만들도록 시험 fixture만 정리했다.
+
+- 재검증 시각: `2026-08-25T20:13:36+0900` 직전
+- HEAD: `959889415d50f243d409928df66684e580125492`
+- 명령: `bash verify.sh`
+- 종료값: `0`
+- 전체 출력:
+
+```text
+PASS: no secret-pattern match in any tracked file, .env not tracked
+```
+
+- 같은 시점 RED 재실행: `7 failed, 11 passed in 1.45s`, 종료값 `1`. 실패 위치와 수는 위 RED와
+  동일하며 제품 구현은 아직 바꾸지 않았다.
+- RED 동결 대상 시험 파일 SHA-256:
+  `7f62931a35417d148caf325921b9b6a19834d6d6976d613579a2c186e9fc2115`
+
 ## 적대 검증 로그
 
 ### V1 — Claude
