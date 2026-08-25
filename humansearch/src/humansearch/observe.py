@@ -115,10 +115,12 @@ def format_observation_line(
 ) -> str:
     """Render the complete privacy-reduced CLI output."""
 
-    tab = _privacy_reduced_url(tab_url, loggable_paths) if tab_url else "-"
+    # 축약이 빈 문자열이면 = 보여줄 안전한 주소가 없다는 뜻이다(파싱 불가). 탭이 아예
+    # 없을 때와 같은 표기를 쓴다 — 실패마다 새 어휘를 만들지 않는다.
+    tab = _privacy_reduced_url(tab_url, loggable_paths) if tab_url else ""
     contract_valid = str(observation.contract_valid).lower()
     return (
-        f"STATE={state.value} TAB={tab} ROLES={len(observation.matched_roles)} "
+        f"STATE={state.value} TAB={tab or '-'} ROLES={len(observation.matched_roles)} "
         f"CONTRACT_VALID={contract_valid}"
     )
 
@@ -160,7 +162,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             matched_roles=frozenset(), contract_valid=False
         )
         state = classify_auth_surface(observation)
-    paths = frozenset({urlsplit(tab_url).path}) if tab_url else frozenset()
+    reduced = _split(tab_url) if tab_url else None
+    paths = frozenset({reduced.path}) if reduced is not None else frozenset()
     print(format_observation_line(state, tab_url, observation, paths))
     return exit_code_for_state(state)
 
@@ -266,7 +269,9 @@ def _origin(url: str) -> str:
 def _valid_origin(value: object) -> bool:
     if not isinstance(value, str):
         return False
-    parsed = urlsplit(value)
+    parsed = _split(value)
+    if parsed is None:
+        return False
     return (
         parsed.scheme == "https"
         and bool(parsed.netloc)
@@ -312,7 +317,9 @@ def _string_list(value: object) -> TypeGuard[list[str]]:
 def _privacy_reduced_url(
     url: str, loggable_paths: frozenset[str] = frozenset()
 ) -> str:
-    parsed = urlsplit(url)
+    parsed = _split(url)
+    if parsed is None:
+        return ""
     path = parsed.path if parsed.path in loggable_paths else "/..."
     return urlunsplit((parsed.scheme, parsed.netloc, path, "", ""))
 
