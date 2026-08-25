@@ -12,6 +12,7 @@ WU5 는 `ValueError` 계열을 막았다. V1 은 같은 계약을 뚫는 네 갈
    `https://portal.invalid:444` 가 포트 없는 승인 origin 과 같아진다. 이를 잡는 시험이 없었다.
 """
 
+import socket
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Self
@@ -100,9 +101,8 @@ class _FakeSocket:
 def test_deeply_nested_cdp_json_is_a_closed_read_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(
-        _cdp.socket, "create_connection", lambda address, timeout: _FakeSocket()
-    )
+    # `_cdp` 가 `import socket` 로 같은 모듈 객체를 쓰므로 여기 패치가 그대로 걸린다.
+    monkeypatch.setattr(socket, "create_connection", lambda address, timeout: _FakeSocket())
     monkeypatch.setattr(_cdp, "_handshake", lambda *args: None)
     monkeypatch.setattr(_cdp, "_send_frame", lambda *args, **kwargs: None)
     monkeypatch.setattr(_cdp, "_receive_frame", lambda connection: (0x1, _DEEP_JSON))
