@@ -1,16 +1,16 @@
 {
   "slug": "hs-observe-url-crash",
   "base_sha": "c59bad7b160c473cda5545e76e6fa6bcc711a7ea",
-  "head_sha": "d7948ba9d66674c5f5b026fa69789826de5e09bd",
+  "head_sha": "380e82ebf7441fd75117f025e47b9c4f9951a85b",
   "goal": "docs/engineering/hs-observe-url-crash-goal-2026-08-25.md",
   "generator": {
     "role": "G",
-    "work_units": 8,
+    "work_units": 9,
     "evidence": [
       {
         "command": "bash scripts/acceptance-hs-gates.sh",
         "exit_code": 0,
-        "artifact": "COLLECTED: 120"
+        "artifact": "COLLECTED: 126"
       },
       {
         "command": "bash verify.sh",
@@ -18,9 +18,9 @@
         "artifact": "PASS: no secret-pattern match"
       },
       {
-        "command": "인수 검사 전량(0-7 제외)",
+        "command": "인수 검사 25종(0-7 제외) — verify.sh 는 별도로 센다",
         "exit_code": 0,
-        "artifact": "PASS=24 FAIL=2 — 실패 2건은 기준선 c59bad7 에서도 동일(환경 사유)"
+        "artifact": "PASS=23 FAIL=2 (verify.sh 포함 시 PASS=24 FAIL=2). 실패 2건은 기준선 c59bad7 에서도 동일(환경 사유). 초판에 라벨과 숫자를 섞어 적었던 것을 V2 지적으로 정정"
       },
       {
         "command": "python -m humansearch.observe --channel saramin --port 9327 --once (실소켓)",
@@ -30,12 +30,12 @@
       {
         "command": "자체 퍼징 1,512 입력 → main()",
         "exit_code": 0,
-        "artifact": "crash=0 bad_exit=0 multiline=0"
+        "artifact": "crash=0 bad_exit=0 multiline=0 — 단 in-process 실행이라 실제 print() 인코더는 통과하지 않았다(V2 지적)"
       },
       {
-        "command": "변조 20종(유효 19종) 전량",
+        "command": "변조 24종(G 20 + V2 신규 4) 전량",
         "exit_code": 0,
-        "artifact": "대조군 56 passed exit 0 / 살아남은 변조 0건"
+        "artifact": "대조군 62 passed exit 0 / 살아남은 변조 0건 — 단 G 가 고른 20종만으로는 V2 의 N2·N7·N21 이 살아남았고 WU9 에서 닫았다. '살아남은 변조 0건'은 언제나 '이 목록에 한해서'다"
       },
       {
         "command": "런타임 배선 추적(sys.settrace)",
@@ -88,21 +88,68 @@
       },
       {
         "round": 6,
-        "head": "4e57ca2",
+        "head": "d7948ba",
         "status": "PASS",
         "transcript": "scratchpad/v1_out6.txt",
         "tokens": 109658,
         "tool_calls": 34,
-        "verdict": "I cannot find any configured contract, target-list response, or tab URL that escapes as an exception unhandled by main()."
+        "verdict": "I cannot find any configured contract, target-list response, or tab URL that escapes as an exception unhandled by main().",
+        "head_note": "verdict.json 초판은 4e57ca2 로 적었으나 리뷰 중 HEAD 가 진행했다(transcript 4659행). 실제 판정 대상은 d7948ba",
+        "scope": "질문 1축(예외가 main() 을 뚫는가)에 한정. UTF-8 stdout · ASCII 계약 origin 환경에서만 검증됨. 종료값 계약·stderr 공백·한 줄 계약·누출은 이 PASS 의 범위 밖"
       }
     ],
     "findings_reproduced_independently": 10,
     "findings_accepted": 9,
     "findings_rejected": 1,
-    "rejected_reason": "argparse 인자 오류는 traceback 없이 usage 3줄 + exit 2 로 끝난다 — 관측 결과가 아니라 CLI 사용 오류다"
+    "rejected_reason": "argparse 인자 오류는 traceback 없이 usage 3줄 + exit 2 로 끝난다 — 관측 결과가 아니라 CLI 사용 오류다",
+    "independence_limit": "3회차 이후 프롬프트에 직전 지적의 수정 내용을 요약해 넣었다. 2회차만 완전한 블라인드다. 후반 PASS 의 무게는 전반 FAIL 보다 가볍다"
   },
   "v2": {
-    "status": "PENDING"
+    "tool": "reset-context Claude subagent (opus)",
+    "status": "SPLIT",
+    "axes": {
+      "구현·회귀·게이트": "PASS",
+      "V1 명제": "FAIL",
+      "병합 차단 사유": "없음"
+    },
+    "reproduced": "generator.evidence 7항목 중 6 재현 · 1 불일치(인수 검사 라벨/숫자) · 변조 20종 개별 재실행 NOT_RUN",
+    "findings": [
+      {
+        "id": "V2-1",
+        "what": "_valid_origin 에만 isascii() 가 없어 비ASCII 계약 origin + 비UTF-8 stdout 에서 print() 가 UnicodeEncodeError 로 죽는다",
+        "regression": false,
+        "pii_leak": false,
+        "base_same": true,
+        "disposition": "WU9 에서 수정 + 시험 3건"
+      },
+      {
+        "id": "V2-2",
+        "what": "변조 N2(전송 그물)·N21(CDP 그물)·N7(main 성공 경로)이 살아남았다",
+        "disposition": "WU9 에서 시험 3건 추가 — 넷 다(N22 포함) 죽는 것 확인"
+      },
+      {
+        "id": "V2-3",
+        "what": "문서 사실 오류 2건 — 인수 검사 PASS=24(→23) · observe.py '+~25줄'(→+79)",
+        "disposition": "goal·verdict.json 정정"
+      },
+      {
+        "id": "V2-4",
+        "what": "V1 후반 회차는 완전한 블라인드가 아니었다(프롬프트가 수정 내용을 알려줌)",
+        "disposition": "goal §독립성 한계로 명시. 코드 변경 없음"
+      },
+      {
+        "id": "V2-5",
+        "what": "G 의 퍼징이 in-process 라 실제 print() 인코더를 통과하지 않았다 — G·V1 공통 사각지대",
+        "disposition": "기록. WU9 의 계약 검증으로 정상 경로에서는 성립하지 않는다"
+      }
+    ],
+    "no_violation_confirmed": [
+      "SOT diff 누락 없음",
+      "P3 위반 없음",
+      "P16 형식 충족",
+      "P22 위반 없음",
+      "좁힌 검증이 정상 운영 입력을 막는 사례 반례 0건(성공 경로 실소켓 관통 확인)"
+    ]
   },
   "failed_attempts": [
     {
@@ -126,6 +173,24 @@
       "fix": "가드 복원 + 그 가지에 닿는 시험 추가(WU8)"
     }
   ],
-  "three_way_agree": null,
-  "status": "V2_PENDING"
+  "three_way_agree": {
+    "합의": [
+      "결함 실재",
+      "수정이 결함을 닫음",
+      "정상 입력을 막지 않음",
+      "병합 차단 사유 없음"
+    ],
+    "갈렸다가 해소": [
+      "main() 을 뚫는 입력이 남았는가 → V2 가 찾고 WU9 로 닫음",
+      "살아남은 변조 → V2 가 3종 찾고 WU9 로 닫음"
+    ],
+    "남은 갈림": "없음"
+  },
+  "status": "READY_FOR_PUSH",
+  "remaining_open_items": [
+    "format_observation_line 의 TAB 필드에 임의 문자열 심기 — CLI 경로 도달 불가, 오너 결정 필요",
+    "_valid_origin 이 포트 0 을 허용 — 별도 결정",
+    "실패 원인이 STATE=drifted 로 뭉개짐 — base 부터 동일한 설계",
+    "stdout 파이프 조기 종료 시 exit 120 + stderr 2줄 — 입력이 아니라 소비자 조건"
+  ]
 }
