@@ -20,6 +20,7 @@ set -uo pipefail
 
 REGISTRY=${1:-docs/sot/mechanism-registry.yaml}
 WORKFLOW_FILE=${WORKFLOW_FILE:-.github/workflows/verify.yml}
+CI_CONTRACT_FILE=${CI_CONTRACT_FILE:-docs/sot/ci-required-steps.json}
 
 if [ ! -f "$REGISTRY" ]; then
   echo "NOT_RUN: 명부 없음 — $REGISTRY"
@@ -121,6 +122,18 @@ active_target_exists() {
   ' "$2"
 }
 
+# CI 항목은 워크플로 문자열을 찾지 않는다. 기계 정본에서 job+step name을 정확히 1개
+# 찾고, 별도 구조 검사기가 그 step의 전체 run/if/continue-on-error 계약을 대조한다.
+ci_contract_target_exists() {
+  ruby -rjson -e '
+    contract = JSON.parse(File.read(ARGV[0]))
+    specs = contract["protected_steps"]
+    exit 1 unless specs.is_a?(Array)
+    matches = specs.select { |spec| spec["job"] == ARGV[1] && spec["name"] == ARGV[2] }
+    exit(matches.length == 1 ? 0 : 1)
+  ' "$CI_CONTRACT_FILE" "$e_ci_job" "$e_target" >/dev/null 2>&1
+}
+
 # stage 별 대조(규칙 3~5) — 위반 사유를 stdout 으로, return 1
 validate_stage() {
   case "$e_stage" in
@@ -143,10 +156,14 @@ validate_stage() {
       if ! printf '%s\n' "$ci_jobs" | grep -qxF -- "$e_ci_job"; then
         echo "ci_mirror_job '$e_ci_job' 이(가) $WORKFLOW_FILE 의 jobs: 키에 없다"; return 1
       fi
-      # V1 D1: 작업 이름만 보면 존재하지 않는 명령을 '실행 중'이라 적어도 통과한다.
-      # ci 도 target 문자열이 그 워크플로 파일에 실재해야 한다(정본의 target 계약).
-      if ! active_target_exists "$e_target" "$e_path"; then
-        echo "죽은 ci target — '$e_target' 이(가) $e_path 안에 없다"; return 1
+      if [ "$e_path" != "$WORKFLOW_FILE" ]; then
+        echo "ci path 불일치 — '$e_path' (expected $WORKFLOW_FILE)"; return 1
+      fi
+      if ! ci_contract_target_exists; then
+        echo "CI 계약 target 불일치 — jobs.$e_ci_job 의 '$e_target' 보호 step이 정확히 1개가 아니다"; return 1
+      fi
+      if ! bash scripts/verify/check-ci-step-integrity.sh "$WORKFLOW_FILE" "$CI_CONTRACT_FILE" >/dev/null 2>&1; then
+        echo "CI 정확 명령 계약 위반 — $WORKFLOW_FILE"; return 1
       fi
       ;;
     manual)

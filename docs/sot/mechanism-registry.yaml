@@ -3,7 +3,8 @@
 # 계약: docs/engineering/verify-ac-m-goal-2026-08-12.md §⑩ (파서가 받는 유일한 형태)
 # 대조: scripts/verify/check-mechanism-registry.sh 가 pre-push 글로브와 CI 에서
 #       이 명부의 모든 항목을 실제 파일·문구와 대조한다. 명부가 실제와 어긋나면 빨간불.
-# 규칙: target 은 함수명이 아니라 path 파일 안에 문자 그대로 존재하는 명령 문자열이다.
+# 규칙: pre-commit/pre-push target 은 path 안의 활성 명령 문자열이다. ci target 은
+#       ci-required-steps.json 안의 정확한 보호 step name이며 run은 그 JSON 계약이 맡는다.
 #       stage: manual 은 AC-20(memory-recall-check.sh) 착수 시에만 추가하고
 #       manual_reason 필수 (verify-unification-goal-2026-08-10.md AC-M counter-AC).
 - id: "secrets-scan-precommit"
@@ -18,7 +19,7 @@
   required: true
 - id: "ci-secret-scan"
   path: ".github/workflows/verify.yml"
-  target: "run: bash verify.sh"
+  target: "비밀 스캔 (verify.sh)"
   stage: "ci"
   ci_mirror_job: "verify"
   required: true
@@ -35,19 +36,19 @@
   required: true
 - id: "principles-explicit-ci"
   path: ".github/workflows/verify.yml"
-  target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-principles-check.sh"
+  target: "Strict 원칙 정본·장부·배선 검사"
   stage: "ci"
   ci_mirror_job: "verify"
   required: true
 - id: "acceptance-runner-ci"
   path: ".github/workflows/verify.yml"
-  target: "bash scripts/verify/run-acceptance.sh"
+  target: "Strict 원칙 정본·장부·배선 검사"
   stage: "ci"
   ci_mirror_job: "verify"
   required: true
 - id: "acceptance-semantics-ci"
   path: ".github/workflows/verify.yml"
-  target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-semantic-mutations.sh"
+  target: "인수 검사 semantic-mutations (검사를 껐을 때 반드시 빨개지는가)"
   stage: "ci"
   ci_mirror_job: "verify"
   required: true
@@ -59,19 +60,19 @@
   required: true
 - id: "ci-step-integrity-ci"
   path: ".github/workflows/verify.yml"
-  target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-ci-step-integrity.sh"
+  target: "인수 검사 ci-step-integrity (스텝을 조용히 끄지 못하는가)"
   stage: "ci"
   ci_mirror_job: "verify"
   required: true
 - id: "ci-step-integrity-checker"
   path: "scripts/verify/check-ci-step-integrity.sh"
-  target: "조건부 스텝은 조건이 거짓이면 실행되지 않고도 초록이다"
+  target: "RUN_MISMATCH"
   stage: "manual"
   manual_reason: "검사기 자신의 판정 문구. 실행 배선은 ci-step-integrity-ci 가 대조한다"
   required: true
 - id: "verified-sha-ci"
   path: ".github/workflows/verify.yml"
-  target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-verified-sha.sh"
+  target: "인수 검사 verified-sha (초록불이 SHA 에 귀속되는가 · P23)"
   stage: "ci"
   ci_mirror_job: "verify"
   required: true
@@ -81,4 +82,3 @@
   stage: "manual"
   manual_reason: "원격 조회가 필요해 CI 안에서 자기 SHA 를 검사하는 것은 뜻이 없다. 머지 전 판정 도구"
   required: true
-

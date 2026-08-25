@@ -23,6 +23,7 @@ REQUIRED_FILES=(
   "docs/sot/hook-contracts.md"
   "docs/sot/git-workflow.md"
   "docs/sot/verification-commands.md"
+  "docs/sot/ci-required-steps.json"
 )
 MAX_BYTES=20000
 for f in "${REQUIRED_FILES[@]}"; do

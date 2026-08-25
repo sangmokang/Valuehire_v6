@@ -1,6 +1,6 @@
 # Valuehire v6 — 이 저장소의 실제 게이트 명령 (SOT)
 
-최종 갱신: 2026-08-20 (전부 실행으로 확인, 가정 없음)
+최종 갱신: 2026-08-25 (WU0-A 로컬 실행으로 확인, 원격 실행 귀속은 별도)
 근거: `docs/engineering/docs-sot-restructure-goal-2026-08-08.md`
 
 ## 현재 규칙
@@ -17,7 +17,7 @@
 
 ### CI(`​.github/workflows/verify.yml`)가 실제로 돌리는 것
 
-**워크플로 스텝 20개 전부**를 적는다(2026-08-12 V1 D6: 이전 판은 `bash ...` 직접 명령만 적어 인라인 본문 스텝이 목록에서 빠졌고, 운영자가 실제로 무엇이 도는지 잘못 판단할 수 있었다). 아래는 `verify.yml` 의 `- name:` 스텝 순서 그대로다(2026-08-20 Strict 원칙 직접 로드 3개 스텝 포함).
+**워크플로 실행 step 23개 전부**를 적는다(2026-08-12 V1 D6: 이전 판은 `bash ...` 직접 명령만 적어 인라인 본문 스텝이 목록에서 빠졌고, 운영자가 실제로 무엇이 도는지 잘못 판단할 수 있었다). 아래는 `verify.yml` 의 `- name:` 실행 step 순서 그대로다. 정확한 job·name·ordered run lines·허용 if 계약은 `docs/sot/ci-required-steps.json`이 정본이다.
 
 | # | 스텝 이름 | 실행 내용 |
 |---|---|---|
@@ -40,11 +40,22 @@
 | 17 | 데이터 노출 스캔 | `bash scripts/scan-data-exposure.sh all` — 크기·금지경로·기록·개인정보 (AC-A4) |
 | 18 | 인수 검사 hs-a4 | `bash scripts/acceptance-hs-a4.sh` — 차단이 실제로 도는가 (AC-A4) |
 | 19 | 인수 검사 secret-webhook-vendor | `bash scripts/acceptance-secret-webhook-vendor.sh` — 웹훅·벤더 키 (AC-S1) |
-| 20 | 인수 검사 verify-ac-m | `bash scripts/acceptance-verify-ac-m.sh` — mechanism 명부 대조 (AC-M) |
+| 20 | 인수 검사 verified-sha | `bash scripts/verify/run-acceptance.sh scripts/acceptance-verified-sha.sh` — 초록 결과의 SHA 귀속 판정기 시험 (P23) |
+| 21 | 인수 검사 ci-step-integrity | `bash scripts/verify/run-acceptance.sh scripts/acceptance-ci-step-integrity.sh` — 보호 step의 정확한 선언 계약 |
+| 22 | 인수 검사 semantic-mutations | `bash scripts/verify/run-acceptance.sh scripts/acceptance-semantic-mutations.sh` — 인수 검사 무력화 5종 차단 |
+| 23 | 인수 검사 verify-ac-m | `bash scripts/verify/run-acceptance.sh scripts/acceptance-verify-ac-m.sh` — mechanism 명부 대조 (AC-M) |
 
 *(1번 앞에 `actions/checkout` 이 있고 `fetch-depth: 0` 이다 — 4번이 과거 blob 을 열려면 필요하다.)*
 
 **CI는 고정 목록이고 로컬 `pre-push`는 글로브(이름 규칙 자동 수집)다.** 그래서 새 인수 스크립트를 만들면 로컬에서는 저절로 돌지만 CI에서는 한 줄도 안 돈다 — P15③("로컬에만 있는 검사는 없는 것으로 친다")에 걸린다. **새 `scripts/acceptance-*.sh`를 추가하는 PR은 `verify.yml`과 이 표 양쪽에 자기 줄을 함께 넣어야 한다.**
+
+### CI 보호 step 선언 무결성 — WU0-A
+
+`bash scripts/verify/check-ci-step-integrity.sh`는 Ruby Psych로 workflow를, JSON parser로 `docs/sot/ci-required-steps.json`을 읽는다. 보호 대상마다 job ID와 고유 step name을 찾고, ordered run lines·허용된 exact if·`continue-on-error` 부재를 대조한다. 줄 끝 공백과 CRLF/LF 차이 외에는 shell을 정규화하지 않으므로 `echo`, `printf`, `true`, `:`, `bash -n`, 뒤따르는 `exit 0`은 승인 명령과 다른 문자열로 실패한다.
+
+workflow와 계약을 함께 약화해 자기승인하는 변조는 RED에서 고정한 계약 SHA-256 핀이 막는다. 따라서 정당한 CI 명령 변경도 workflow·JSON 계약·검사기 핀을 함께 검토해야 한다. 이 핀은 원격 실행 증거가 아니라 세 파일 drift tripwire다.
+
+이 검사가 증명하는 것은 **“현재 파일이 승인된 CI 명령을 정확히 선언한다”**까지다. GitHub 서버가 특정 commit SHA에서 그 명령을 실제 실행해 성공했다는 사실은 `check-verified-sha.sh`와 원격 check 결과를 대조하는 별도 단계가 증명한다.
 
 ### 데이터 노출 판정기 — `scripts/scan-data-exposure.sh`
 
@@ -70,4 +81,4 @@
 ## 비범위 / 한계
 
 - `main` 브랜치 GitHub 보호 규칙의 실제 활성화 여부는 확인하지 않았다(`docs/sot/git-workflow.md` 한계와 동일).
-- 이 표는 2026-08-20 실행 결과의 스냅샷이다. 스크립트가 추가/삭제되면 다시 확인해야 한다.
+- 이 표는 2026-08-25 WU0-A 기준의 선언 스냅샷이다. 원격 GitHub 실행 여부는 확인하지 않았으며 스크립트가 추가/삭제되면 다시 확인해야 한다.

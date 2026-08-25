@@ -312,20 +312,20 @@ EOF
 expect_rc "빈 문자열 path → 불합격" "$TMP/empty-value.yaml" 1
 
 # ── V1 D3: CI 배선 자기검사 ──────────────────────────────────────────────────
-# 이 인수 검사의 실행 줄이 서버 자동검사(verify.yml)에 조건 없이 정확히 1회 있는가.
-# CI 스텝을 if 로 끄거나 지워도 로컬 검사가 전부 초록이었다(V1 실측 · P15③).
+# 문자열/prefix 검색은 경로를 출력만 해도 통과한다. 구조 검사기와 기계 정본이 이
+# 인수 검사의 job·고유 step·전체 run·조건을 정확히 승인하는지 같은 판정면을 호출한다.
 checked=$((checked + 1))
 WF=.github/workflows/verify.yml
-# 2026-08-21 부터 CI 는 scripts/verify/run-acceptance.sh 래퍼를 거쳐 실행한다.
-# 래퍼는 실제로 대상을 실행하므로 실행 줄로 인정한다(래퍼가 무력화를 막는다는 증명은
-# scripts/acceptance-semantic-mutations.sh 가 별도로 한다). 래퍼 없는 직접 실행도
-# 계속 인정해 배선 방식 변경이 곧바로 빨간불이 되지 않게 한다.
-run_lines=$(grep -cE 'run: bash (scripts/verify/run-acceptance\.sh )?scripts/acceptance-verify-ac-m\.sh' "$WF")
-step_block=$(awk '/- name: 인수 검사 verify-ac-m/,/run: bash .*scripts\/acceptance-verify-ac-m\.sh/' "$WF")
-if [ "$run_lines" -eq 1 ] && [ -n "$step_block" ] && ! printf '%s\n' "$step_block" | grep -qE '^[[:space:]]*(if:|continue-on-error:)'; then
-  echo "PASS: CI 배선 — verify.yml 에 무조건 실행 스텝 정확히 1회"
+CI_CONTRACT=docs/sot/ci-required-steps.json
+ci_rc=0
+ci_output=$(bash scripts/verify/check-ci-step-integrity.sh "$WF" "$CI_CONTRACT" 2>&1) || ci_rc=$?
+ci_checked=$(printf '%s\n' "$ci_output" | sed -n 's/^CHECKED: //p' | tail -1)
+target_rc=0
+target_count=$(ruby -rjson -e 'd=JSON.parse(File.read(ARGV[0])); puts d.fetch("protected_steps").count { |s| s["job"] == "verify" && s["name"] == "인수 검사 verify-ac-m (mechanism 명부 대조 · AC-M)" }' "$CI_CONTRACT" 2>/dev/null) || target_rc=$?
+if [ "$ci_rc" -eq 0 ] && [ "$target_rc" -eq 0 ] && [ "${ci_checked:-0}" -ge 1 ] 2>/dev/null && [ "${target_count:-0}" -eq 1 ]; then
+  echo "PASS: CI 배선 — 구조화 계약에 verify-ac-m 보호 step 정확히 1개"
 else
-  printf 'FAIL: CI 배선 — 실행 줄 %s회 또는 조건부/오류무시 스텝 (로컬에만 있는 검사는 없는 것으로 친다 · P15③)\n' "$run_lines"
+  printf 'FAIL: CI 배선 — exact checker exit=%s CHECKED=%s target-count=%s\n' "$ci_rc" "${ci_checked:-없음}" "$target_count"
   fail=1
 fi
 
