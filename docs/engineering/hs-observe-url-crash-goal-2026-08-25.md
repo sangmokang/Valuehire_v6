@@ -143,7 +143,8 @@ def _privacy_reduced_url(url, loggable) -> str  # 불변: 파싱 실패 → ""
 | WU2 | AC-2 | `observe.py`(`_valid_origin`,`_privacy_reduced_url`) + 신규 속성 시험 | `pytest tests/test_observe_url_parse_property.py` + `acceptance-hs-gates.sh` |
 | WU3 | AC-3(R9로 추가) | 시험만 — `tests/test_cdp_websocket_parse_failure.py` | `pytest tests/test_cdp_websocket_parse_failure.py` + 변조 증명 |
 | WU4 | AC-4(Codeaudit 반례, R9) | `observe.py`(`_privacy_reduced_url`) + `tests/test_observe_userinfo_redaction.py` | `pytest tests/test_observe_userinfo_redaction.py` + 변조 증명 |
-| WU5 | AC-5(V1 적대검증 반례, R9) | `observe.py`(`_load_contract`,`_fetch_targets`,`_valid_origin`,`_privacy_reduced_url`) + `tests/test_observe_adversarial_v1_findings.py` | 같은 파일 + 변조 8종 |
+| WU5 | AC-5(V1 1회차 반례, R9) | `observe.py`(`_load_contract`,`_fetch_targets`,`_valid_origin`,`_privacy_reduced_url`) + `tests/test_observe_adversarial_v1_findings.py` | 같은 파일 + 변조 8종 |
+| WU6 | AC-6(V1 2회차 반례, R9) | `observe.py`(JSON 경계·`_valid_targets_path`·한 줄 가드) + `_cdp.py`(JSON 경계) + `tests/test_observe_adversarial_v1_round2.py` | 같은 파일 + 변조 6종 |
 
 WU1 GREEN 커밋 전 WU2 착수 금지(R5). WU3는 작업 중 발견한 반례의 영구 편입이며(R9) 코드 변경
 0줄 · 시험만 추가한다. 이미 올바른 코드의 특성화 시험이므로 RED 대신 **변조 증명**으로
@@ -390,6 +391,47 @@ codex 플러그인 커맨드 전수 확인). 대신 실제 설치된 `codex-cli 
 
 **실패 원인이 `STATE=drifted` 한 표기로 뭉개진다.** V1의 지적 (e)와 Codeaudit의 잔여 위험이
 같은 것을 가리킨다. 기존 설계와 일관되며 이번 변경이 만든 구멍은 아니다.
+
+### V1 2회차 — `VERDICT: FAIL` (HEAD `abb1ed7`, transcript `scratchpad/v1_out3.txt`)
+
+WU5 를 얹은 상태를 다시 공격해 네 갈래를 더 냈다. **넷 다 독립 재현했다** — 특히 ①은 내 첫
+재현 시도(깊이 2,000)에서 실패했고, 깊이를 300,000 까지 올려서야 재현됐다. V1 말을 못 믿어서가
+아니라 못 믿는 게 규칙이라 판 것이고, 결과적으로 V1 이 옳았다.
+
+| V1 지적 | 재현 | 처분 |
+|---|---|---|
+| ①[HIGH] 깊게 중첩된 JSON 은 `RecursionError` — `ValueError` 가 **아니다** | **재현됨**: 깊이 300,000 = 600KB(1MiB 한계 안) | WU6 — `observe.py` 두 경계 + `_cdp.py` 한 경계에 `RecursionError` 추가 |
+| ②[HIGH] `_valid_targets_path` 가 고립 서로게이트 경로를 허용 → HTTP 요청 인코딩(latin-1)에서 `UnicodeEncodeError` | **재현됨** | WU6 — 계약 경로에 `isascii()` 요구 |
+| ③[HIGH] 축약 주소 **끝**의 U+2028 은 `splitlines()` 로 1이지만 완성된 줄은 **2줄** | **재현됨**: `'…/home\u2028 ROLES=0…'` → `splitlines()==2` | WU6 — 판정을 개수에서 `"".join(splitlines()) != s` 로 교체 |
+| ④ 아홉 번째 변조: `parsed.netloc` → `parsed.hostname` 이 살아남는다(포트 탈락 → `:444` 가 포트 없는 origin 과 일치) | **재현됨** | WU6 — 포트가 origin 비교의 일부임을 고정하는 시험 4건 추가 |
+
+③은 내가 WU5에서 넣은 가드가 **한 칸 이르게 판정**하고 있었다는 뜻이다 — 가드를 넣었다는 사실이
+가드가 옳다는 증거가 아니라는 실례다.
+
+### 변조 증명 — WU6 추가분 (대조군 47 passed, exit 0)
+
+| 변조 | 결과 |
+|---|---|
+| ⑨ 계약 JSON `RecursionError` 제거 | 1 failed |
+| ⑩ 타깃 JSON `RecursionError` 제거 | 1 failed |
+| ⑪ CDP JSON `RecursionError` 제거 | 1 failed |
+| ⑫ 계약 경로 `isascii()` 요구 제거 | 3 failed |
+| ⑬ 한 줄 판정을 개수 세기로 되돌림 | 1 failed |
+| ⑭ `netloc`→`hostname` (V1 이 지목한 아홉 번째) | 3 failed |
+
+**누적 변조 14종 · 살아남은 변조 0건.**
+
+### G 자체 퍼징 (1,512 입력)
+
+실제 `main()` 에 적대적 타깃 목록 1,512개를 먹였다 — 제어문자·유니코드 줄분리자·고립
+서로게이트·전각문자·합자·널바이트를 섞은 무작위 주소 1,500개 + 깊이 300,000 JSON·자릿수 초과
+정수·비UTF8·빈 목록 등 12개.
+
+```
+total=1512 crash=0 bad_exit=0 multiline=0
+```
+
+→ 크래시 0건, 계약 밖 종료값(0·2 외) 0건, 여러 줄 출력 0건.
 
 ### V2 (2차 적대검증)
 
