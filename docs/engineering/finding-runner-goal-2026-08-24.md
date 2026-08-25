@@ -1,12 +1,12 @@
 # WU-4a Finding 재현 러너 — goal (2026-08-24)
 
-VERDICT: RED
+VERDICT: CHECKPOINT_PENDING
 
 ## 1층 결론
 
-2026-08-25 복구 Work Unit은 검증된 base `c59bad7b160c473cda5545e76e6fa6bcc711a7ea`에서 테스트와 fixture를 먼저 복원했고, 구현 파일이 없는 상태의 원명령이 요구 동작 부재로 실패하는 RED를 확인했습니다. 이 문서 아래의 2026-08-24 PASS·V1·V2 기록은 원본 보존용 역사 자료이며 현재 branch나 새 SHA의 PASS 증거가 아닙니다.
+2026-08-25 복구 Work Unit은 검증된 base `c59bad7b160c473cda5545e76e6fa6bcc711a7ea`에서 RED commit을 보존한 뒤 원본 구현을 복원했습니다. 구현 전 원명령은 요구 동작 부재로 실패했고, 구현 후 pre-commit 원명령은 8/8 통과했습니다. 이 문서 아래의 2026-08-24 PASS·V1·V2 기록은 원본 보존용 역사 자료이며 현재 branch나 새 SHA의 PASS 증거가 아닙니다.
 
-현재 Work Unit의 GREEN, mutation, G, Claude V1, 새 맥락 Codex V2, T는 모두 `NOT_RUN`입니다. 구현과 독립 검증을 마치기 전에는 완료나 PASS로 승격하지 않습니다.
+현재 Work Unit의 pre-commit GREEN만 실행됐습니다. 최종 commit SHA의 mutation, G, Claude V1, 새 맥락 Codex V2, T는 모두 `NOT_RUN`이며, 이를 마치기 전에는 완료나 PASS로 승격하지 않습니다.
 
 ### 2026-08-25 복구 신원과 RED 증거
 
@@ -21,6 +21,16 @@ VERDICT: RED
 - 첫 RED raw output: `/tmp/vhrec-c-red.hMnnMq/node-test-red.log`, SHA-256 `736a78c2a4d9f7f6c5d92700eb10f0fec7fe27ef4ad05a6b1535c30a8977d45f`
 - 정책 counter-test 포함 최종 RED: `2026-08-25T20:27:23+09:00`, exit `1`, tests `8`, pass `0`, fail `8`
 - 최종 RED raw output: `/tmp/vhrec-c-red-policy.OQnFkz/node-test-red.log`, SHA-256 `618c7c08fbba3488e9ed1b816210764cbc2e366e6bb17d3d3d02b77116888e22`
+- RED commit: `6ddb22db81d4360296e9b138181c0aa01a699289`
+- clean RED commit 재현: `2026-08-25T20:28:36+09:00`, exit `1`, tests `8`, pass `0`, fail `8`
+- clean RED raw output: `/tmp/vhrec-c-red-commit.jEoqDj/node-test-red-commit.log`, SHA-256 `32d0126a92748ad4e9af536624b1f13b24fcdfbe09bf5b29f5a5c99798dee335`
+- 구현 복원 SHA-256: 원본·worktree 모두 `2b770269a041b1e17378cbc9b6fa4325e64bee22969c2553087813188e48ab67`
+- pre-commit GREEN: `2026-08-25T20:29:09+09:00`, node check exit `0`; 원명령 exit `0`, tests `8`, pass `8`, fail `0`
+- pre-commit GREEN raw output: `/tmp/vhrec-c-green-precommit.298I5D/node-test.log`, SHA-256 `f20635cb6b6c3e7bbb751b26c8223f2bd036845bc4b520263af9c5a3f8ffeef4`
+- 실행 제거 R2 mutant: `2026-08-25T20:31:49+09:00`, exit `1`, tests `8`, pass `4`, fail `4`; 원본 구현 hash 전후 동일
+- R2 raw output: `/tmp/vhrec-c-mutation-rerun.jFFmnI/node-test-mutation.log`, SHA-256 `d92729b18bc64932b46ea7fbd9cb825e0087c54c214daa54fd860bf3d4cc1e72`
+- pre-commit 저장소 게이트: `2026-08-25T20:33:38+09:00`~`20:34:03+09:00`, node check/test, 원칙 `34/34`, `verify.sh`, docs SOT, diff check, 600/601·100/101 경계 모두 exit `0`
+- 저장소 게이트 raw evidence: `/tmp/vhrec-c-gates-precommit.KiBHbg/`; node test SHA-256 `fe350d1124afcce31c0a961b4db4e1d973bb91f670a3a731d9a22cea40b36c94`, verify SHA-256 `757c22ef0b961070b50f38c22529cd03a350af7bf292f80a9b83345db1165900`
 
 ### BLOCKED와 NOT_TESTED 정책
 
@@ -28,6 +38,8 @@ VERDICT: RED
 - finding의 `BLOCKED`와 `NOT_TESTED`는 runner-level exit `1`을 직접 만들지 않는다. 해당 상태를 `NOT_REPRODUCIBLE`로 세탁해서도 안 된다.
 - 상위 Strict 필수 검증에서 `BLOCKED` 또는 `NOT_RUN`이 남으면 완료 불가다. runner-level merge-block과 Strict 전체 완료 판정을 혼동하지 않는다.
 - 테스트는 high `BLOCKED` 한 건과 선택되지 않은 high `NOT_TESTED` 한 건을 동시에 보존하고, 요약 수치와 `병합 차단: 아니오`를 함께 고정한다.
+
+> 역사 경계: 이 지점 이후의 2026-08-24 실행 결과·세션·PASS 표현은 보호 ref 원문을 보존한 무효 증거다. 2026-08-25 branch나 이후 commit의 초록불로 재사용하지 않는다.
 
 ## 2층 판단 근거
 
