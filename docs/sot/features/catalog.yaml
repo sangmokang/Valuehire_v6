@@ -1,0 +1,132 @@
+{
+  "schema_version": "valuehire.feature-catalog/v1",
+  "updated_at": "2026-08-22",
+  "authority": {
+    "owns": [
+      "major_feature_selection",
+      "feature_category",
+      "feature_manifest_path",
+      "maturity_vocabulary",
+      "availability_vocabulary"
+    ],
+    "does_not_own": [
+      "feature_internal_business_rules",
+      "historical_decision_logs",
+      "runtime_evidence_after_updated_at"
+    ]
+  },
+  "categories": [
+    {
+      "id": "product_experience",
+      "label": "제품 경험",
+      "definition": "사람이 직접 실행하거나 읽는 제품 화면·API·순수 제품 로직"
+    },
+    {
+      "id": "automation_boundary",
+      "label": "자동화 경계",
+      "definition": "채용 포털 자동화가 허용되는 입력·상태·권한과 아직 구현되지 않은 경계"
+    },
+    {
+      "id": "engineering_assurance",
+      "label": "저장소 보증",
+      "definition": "데이터 보호, 검증, 변경 전달을 저장소 수준에서 강제하는 기능"
+    }
+  ],
+  "status_vocabulary": {
+    "maturity": {
+      "implemented": "현재 HEAD에 실행 코드 또는 저장소 강제 장치가 존재함",
+      "contract_only": "정책과 경계만 정본화됐고 현재 HEAD에 실행 구현이 없음"
+    },
+    "availability": {
+      "local_runtime": "로컬 명령으로 실행 가능하나 운영 배포가 아님",
+      "library_only": "호출 가능한 함수는 있으나 비시험 제품 소비자와 배포 진입점이 없음",
+      "repository_control": "커밋, push, CI 또는 수동 게이트에서 저장소를 판정함",
+      "not_connected": "실행 코드 또는 제품 호출 경로가 없음"
+    }
+  },
+  "features": [
+    {
+      "id": "admin-weekly-dashboard",
+      "name": "관리자 주간 대시보드",
+      "category": "product_experience",
+      "document": "docs/sot/features/product/admin-weekly-dashboard.yaml",
+      "maturity": "implemented",
+      "availability": "local_runtime"
+    },
+    {
+      "id": "humansearch-auth-surface",
+      "name": "HumanSearch 인증 화면 분류",
+      "category": "automation_boundary",
+      "document": "docs/sot/features/automation/humansearch-auth-surface.yaml",
+      "maturity": "implemented",
+      "availability": "local_runtime"
+    },
+    {
+      "id": "humansearch-browser-access",
+      "name": "HumanSearch 사람인 인증 화면 일회 관측",
+      "category": "automation_boundary",
+      "document": "docs/sot/features/automation/humansearch-browser-access.yaml",
+      "maturity": "implemented",
+      "availability": "local_runtime"
+    },
+    {
+      "id": "repository-data-protection",
+      "name": "저장소 비밀·개인정보 보호",
+      "category": "engineering_assurance",
+      "document": "docs/sot/features/engineering/repository-data-protection.yaml",
+      "maturity": "implemented",
+      "availability": "repository_control"
+    },
+    {
+      "id": "verification-evidence-system",
+      "name": "검증·증거 판정 체계",
+      "category": "engineering_assurance",
+      "document": "docs/sot/features/engineering/verification-evidence-system.yaml",
+      "maturity": "implemented",
+      "availability": "repository_control"
+    },
+    {
+      "id": "change-delivery-guardrails",
+      "name": "변경 전달·Git 보호 장치",
+      "category": "engineering_assurance",
+      "document": "docs/sot/features/engineering/change-delivery-guardrails.yaml",
+      "maturity": "implemented",
+      "availability": "repository_control"
+    }
+  ],
+  "coverage": {
+    "product_roots": [
+      "apps/admin",
+      "contracts/admin-weekly-dashboard",
+      "contracts/humansearch",
+      "humansearch/src/humansearch"
+    ],
+    "control_roots": [
+      "hooks",
+      "scripts",
+      ".github/workflows/verify.yml",
+      "verify.sh"
+    ],
+    "derivation": {
+      "tracked_product_files": "git ls-files under product_roots; every file must be assigned exactly once by feature.surface_coverage",
+      "ci_steps": "every named step in .github/workflows/verify.yml; every step must be assigned exactly once by an engineering feature",
+      "ci_command_paths": "every repository shell command path named in .github/workflows/verify.yml; every path must be assigned exactly once by an engineering feature",
+      "hooks": "every file directly under hooks; every hook must be assigned exactly once by an engineering feature",
+      "contract_surfaces": "every docs/sot/humansearch-*-contract.md file; every contract must be assigned exactly once"
+    },
+    "excluded": [
+      "docs/engineering history as standalone features",
+      "humansearch/tests as standalone features",
+      "worktrees and non-HEAD branches",
+      "ignored candidate and browser evidence",
+      "cache and generated files"
+    ]
+  },
+  "known_gaps": [
+    "No product feature in this catalog is documented as production-deployed.",
+    "HumanSearch browser access is limited to one-shot read-only Saramin authentication-surface observation; search, input, retry, browser lifecycle and other channels remain unimplemented.",
+    "HumanSearch target selection does not currently normalize ValueError from a malformed target URL; that path can emit a traceback exposing URL fragments and exit 1 instead of the handled one-line exit 2 result.",
+    "Feature SOT structure validation is manual and is not wired to pre-push or CI.",
+    "Remote main branch protection is declared by SOT but was not reverified as part of this catalog."
+  ]
+}

@@ -1,0 +1,236 @@
+{
+  "schema_version": "valuehire.feature-sot/v1",
+  "feature": {
+    "id": "verification-evidence-system",
+    "name": "검증·증거 판정 체계",
+    "category": "engineering_assurance",
+    "maturity": "implemented",
+    "availability": "repository_control",
+    "purpose": "검사가 존재한다는 사실이 아니라 실제 판정 수, 무력화 저항, 장치 배선과 검사한 커밋 지문을 근거로 변경 상태를 판정한다.",
+    "authority": {
+      "owns": [
+        "feature_status",
+        "verification_control_map",
+        "feature_level_invariants"
+      ],
+      "delegates": [
+        {
+          "scope": "P1 through P24 and V-1 through V-5 principles",
+          "document": "docs/sot/coding-principles.md"
+        },
+        {
+          "scope": "machine-readable principle ledger",
+          "document": "docs/sot/principles.yaml"
+        },
+        {
+          "scope": "mechanism inventory",
+          "document": "docs/sot/mechanism-registry.yaml"
+        },
+        {
+          "scope": "current command inventory and CI steps",
+          "document": "docs/sot/verification-commands.md"
+        }
+      ]
+    },
+    "surface_coverage": {
+      "tracked_product_files": [],
+      "ci_steps": [
+        "Strict 원칙 정본·장부·배선 검사",
+        "P3 조용한 실패 문법·오탐 회귀",
+        "Strict 원칙 적대 fixture·500/501 경계",
+        "Strict 전역 스킬 잠금 장치 격리 회귀",
+        "HumanSearch G2 테스트 게이트 (정적·단위 + runtime import 증명)",
+        "인수 검사 0-6 (가짜 검증 스크립트 0건)",
+        "셸 스크립트 문법 검사",
+        "인수 검사 verified-sha (초록불이 SHA 에 귀속되는가 · P23)",
+        "인수 검사 ci-step-integrity (스텝을 조용히 끄지 못하는가)",
+        "인수 검사 semantic-mutations (검사를 껐을 때 반드시 빨개지는가)",
+        "인수 검사 verify-ac-m (mechanism 명부 대조 · AC-M)"
+      ],
+      "ci_command_paths": [
+        "scripts/acceptance-silent-failure-lint-mutations.sh",
+        "scripts/acceptance-silent-failure-lint.sh",
+        "scripts/acceptance-0-6.sh",
+        "scripts/acceptance-ci-step-integrity.sh",
+        "scripts/acceptance-guard-global-skill-files.sh",
+        "scripts/acceptance-hs-gates-antiforge.sh",
+        "scripts/acceptance-hs-gates-mutations.sh",
+        "scripts/acceptance-hs-gates.sh",
+        "scripts/acceptance-principles-check.sh",
+        "scripts/acceptance-principles-mutations.sh",
+        "scripts/acceptance-semantic-mutations.sh",
+        "scripts/acceptance-verified-sha.sh",
+        "scripts/acceptance-verify-ac-m.sh",
+        "scripts/verify/check-mechanism-registry.sh",
+        "scripts/verify/run-acceptance.sh"
+      ],
+      "hooks": [],
+      "contract_surfaces": []
+    },
+    "entrypoints": [
+      {
+        "kind": "ci",
+        "path": ".github/workflows/verify.yml",
+        "job": "verify"
+      },
+      {
+        "kind": "acceptance_runner",
+        "path": "scripts/verify/run-acceptance.sh"
+      },
+      {
+        "kind": "principle_gate",
+        "path": "scripts/acceptance-principles-check.sh"
+      },
+      {
+        "kind": "semantic_attack",
+        "path": "scripts/acceptance-semantic-mutations.sh"
+      },
+      {
+        "kind": "ci_integrity_attack",
+        "path": "scripts/acceptance-ci-step-integrity.sh"
+      },
+      {
+        "kind": "commit_attribution",
+        "path": "scripts/verify/check-verified-sha.sh"
+      },
+      {
+        "kind": "mechanism_registry_check",
+        "path": "scripts/verify/check-mechanism-registry.sh"
+      },
+      {
+        "kind": "global_strict_skill_lock",
+        "path": "scripts/guard-global-skill-files.sh"
+      },
+      {
+        "kind": "global_strict_skill_contract_check",
+        "path": "scripts/verify/check-strict-principles-skills.sh"
+      },
+      {
+        "kind": "global_strict_skill_lock_acceptance",
+        "path": "scripts/acceptance-guard-global-skill-files.sh"
+      }
+    ],
+    "inputs": [
+      {
+        "name": "current_repository_state",
+        "type": "source, tests, scripts, SOT, workflow and Git SHA state"
+      },
+      {
+        "name": "acceptance_output",
+        "type": "full command output with explicit verdict and checked count"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "gate_result",
+        "type": "PASS, FAIL or NOT_RUN with checked counts and command exit"
+      },
+      {
+        "name": "sha_attribution",
+        "type": "VERIFIED, UNVERIFIED or NOT_RUN for one exact commit"
+      }
+    ],
+    "errors": [
+      {
+        "condition": "command exits zero without a valid verdict or checks zero targets",
+        "behavior": "treat as failure, not success"
+      },
+      {
+        "condition": "CI step is disabled, reduced to output-only, or ignores errors",
+        "behavior": "integrity acceptance must fail"
+      },
+      {
+        "condition": "local, remote and checked SHA differ or cannot be read",
+        "behavior": "return UNVERIFIED or NOT_RUN"
+      }
+    ],
+    "invariants": [
+      {
+        "id": "VES-INV-1",
+        "rule": "PASS requires the original command's complete success contract; substitutes and prose are not PASS.",
+        "evidence": "docs/sot/coding-principles.md"
+      },
+      {
+        "id": "VES-INV-2",
+        "rule": "Acceptance scripts must emit a verdict and a non-zero checked count, and critical checks must fail under semantic mutation.",
+        "evidence": "scripts/verify/run-acceptance.sh"
+      },
+      {
+        "id": "VES-INV-3",
+        "rule": "Local pre-push and CI are separate enforcement points; the CI step cannot be silently disabled.",
+        "evidence": "scripts/verify/check-ci-step-integrity.sh"
+      },
+      {
+        "id": "VES-INV-4",
+        "rule": "A green result belongs only to the exact local, remote and checked commit SHA when all three match and the tree is clean.",
+        "evidence": "scripts/verify/check-verified-sha.sh"
+      },
+      {
+        "id": "VES-INV-5",
+        "rule": "The mechanism registry must match real command text and declared execution stages.",
+        "evidence": "docs/sot/mechanism-registry.yaml"
+      },
+      {
+        "id": "VES-INV-6",
+        "rule": "Global Strict skill verification uses lock, check and unlock transitions and its isolated regression gate must stay wired to CI.",
+        "evidence": "scripts/guard-global-skill-files.sh"
+      }
+    ],
+    "boundaries": [
+      "A local PASS does not prove the remote CI state for an unpushed commit.",
+      "The mechanism registry documents and checks wiring; it does not prove every product mechanism promised by each principle is implemented.",
+      "Human or external-model review is a hypothesis until local file and command evidence reproduces it.",
+      "Production deployment and merge remain owner-controlled actions."
+    ],
+    "non_goals": [
+      "automatic merge",
+      "production deployment",
+      "claiming feature completeness from test presence alone",
+      "replacing domain-specific product tests"
+    ],
+    "verification": [
+      {
+        "id": "VES-V1",
+        "command": "bash scripts/acceptance-principles-check.sh",
+        "expected": "VERDICT PASS, SOT and ledger PASS, mechanisms and both wiring stages non-zero"
+      },
+      {
+        "id": "VES-V2",
+        "command": "bash scripts/acceptance-semantic-mutations.sh && bash scripts/acceptance-ci-step-integrity.sh",
+        "expected": "all disabling mutations are rejected and allowed controls pass"
+      },
+      {
+        "id": "VES-V3",
+        "command": "bash scripts/acceptance-verified-sha.sh && bash scripts/acceptance-verify-ac-m.sh",
+        "expected": "SHA truth table and mechanism registry acceptance both exit 0"
+      }
+    ],
+    "evidence": [
+      ".github/workflows/verify.yml",
+      "scripts/verify/run-acceptance.sh",
+      "scripts/acceptance-semantic-mutations.sh",
+      "scripts/acceptance-ci-step-integrity.sh",
+      "scripts/acceptance-verified-sha.sh",
+      "scripts/acceptance-verify-ac-m.sh",
+      "scripts/guard-global-skill-files.sh",
+      "scripts/verify/check-strict-principles-skills.sh",
+      "scripts/acceptance-guard-global-skill-files.sh",
+      "docs/sot/principles.yaml",
+      "docs/sot/mechanism-registry.yaml"
+    ],
+    "change_protocol": {
+      "required_updates": [
+        "checker and its attack/control acceptance pair",
+        "pre-push and CI wiring when enforcement changes",
+        "mechanism registry and verification command SOT",
+        "affected principle and this feature document"
+      ],
+      "requires_owner_approval": [
+        "weakening a required gate",
+        "skipping a security or personal-data check",
+        "merge or deployment"
+      ],
+      "rollback": "Restore checker, acceptance attacks, wiring and registry as one unit; preserve failed evidence until the restored gate passes on the same target SHA."
+    }
+  }
+}
