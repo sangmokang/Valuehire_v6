@@ -6,7 +6,7 @@ require "json"
 require "pathname"
 
 CONTRACT_PATH = "docs/sot/acceptance-integrity-contract.json"
-EXPECTED_CONTRACT_SHA256 = "91acd80b3ce5299b4e5fa40daa852b2c76ff651576053fa52a2aaa51319b6d69"
+EXPECTED_CONTRACT_SHA256 = "4cf55eb4834d946ee310e995d5b82bd23a5fd3ca9dac15bb634286d6a555d2c3"
 EXPECTED_COUNT = 27
 
 def verdict(kind, message, code)

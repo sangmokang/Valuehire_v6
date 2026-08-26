@@ -25,7 +25,7 @@
     {"path": "scripts/acceptance-principles-check.sh", "sha256": "f931d1e8ff0e2d1c142c00cc6d2219c22dc878a93fb83a46a7c87e2cfc249ec6"},
     {"path": "scripts/acceptance-principles-mutations.sh", "sha256": "27f5e5b56789e261c3bf89ceedf58b221d7b8d6ad3e51fd68c6f2c05845065d7"},
     {"path": "scripts/acceptance-secret-webhook-vendor.sh", "sha256": "b39c10515a2ba3632c7fb8906af83776ef7ab478b45029287fd5c437b26fce58"},
-    {"path": "scripts/acceptance-semantic-mutations.sh", "sha256": "b9ad6063019002ba33c9e69f9c940ded4935211070dd5280141697552f06de0f"},
+    {"path": "scripts/acceptance-semantic-mutations.sh", "sha256": "a76bbb28c01aab239ac3458bc3602922f0748fbf5963b42a177a0adba0ed1002"},
     {"path": "scripts/acceptance-verified-sha.sh", "sha256": "06b69d18ae655909abad0ed3e59fc51202292ad256e5c8ed491cc2ed56b8de6c"},
     {"path": "scripts/acceptance-verify-ac-m.sh", "sha256": "046006a8de10a7718f015f7e57b0c660a2b240e86ca1a833474ad853c4a2dacb"},
     {"path": "verify.sh", "sha256": "08e7468f98b832c7d02e6139daa64e47adecfae48bbef4ecc39970a28b8c7adb"}

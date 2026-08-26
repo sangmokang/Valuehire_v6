@@ -88,12 +88,12 @@ write_mutant() {
 for kind in exit-zero true-only noop empty echo-only; do
   blocked=0
   survivors=""
+  sandbox="$TMP/repo-${kind}"
+  if ! git clone -q --no-hardlinks "$REPO" "$sandbox"; then
+    record 1 "무력화 차단: $kind" "sandbox clone 실패"
+    continue
+  fi
   for t in "${targets[@]}"; do
-    sandbox="$TMP/repo-${kind}-$(basename "$t" .sh)"
-    git clone -q --no-hardlinks "$REPO" "$sandbox" || {
-      record 1 "무력화 차단: $kind" "sandbox clone 실패: $t"
-      continue
-    }
     mutant="$sandbox/$t"
     write_mutant "$kind" "$mutant" || continue
     rc=0
@@ -103,6 +103,10 @@ for kind in exit-zero true-only noop empty echo-only; do
     else
       survivors="$survivors $(basename "$t")"
     fi
+    git -C "$sandbox" restore --source=HEAD -- "$t" || {
+      record 1 "무력화 차단: $kind" "target restore 실패: $t"
+      break
+    }
   done
   if [ "$blocked" -eq "${#targets[@]}" ]; then
     record 0 "무력화 차단: $kind" "${blocked}/${#targets[@]} 전부 불합격 처리"
