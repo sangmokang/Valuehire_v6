@@ -67,6 +67,9 @@ required_steps:
   - id: "history-scan"
     job: "verify"
     must_run_contains: ["git cat-file blob"]
+  - id: "pytest-baseline"
+    job: "verify"
+    must_run_contains: ["bash scripts/verify/run-acceptance.sh scripts/acceptance-pytest-baseline.sh"]
   - id: "history-scan-failclosed"
     job: "verify"
     must_run_contains: ["bash scripts/verify/run-acceptance.sh scripts/acceptance-history-scan-failclosed.sh"]
@@ -151,6 +154,7 @@ acceptance_scripts:
     - "scripts/acceptance-hs-gates.sh"
     - "scripts/acceptance-principles-check.sh"
     - "scripts/acceptance-principles-mutations.sh"
+    - "scripts/acceptance-pytest-baseline.sh"
     - "scripts/acceptance-secret-webhook-vendor.sh"
     - "scripts/acceptance-semantic-mutations.sh"
     - "scripts/acceptance-silent-failure-lint-mutations.sh"
@@ -163,3 +167,17 @@ acceptance_scripts:
         로컬 전용 .secret-patterns 의 실제 리터럴을 기준으로 하는데 CI 에는 그 파일이 없다.
         기본 패턴으로 대체하면 패턴 파일 자신이 매칭돼 상시 실패한다(실측: CI run 31176518944).
         CI 에서의 등가물은 history-scan 스텝이며 이 명부가 그 스텝을 필수로 요구한다.
+
+# 제품 시험의 승인 기준선. acceptance-hs-gates.sh 는 `collected < 1` 만 보므로 시험을
+# 1개만 남기고 나머지를 지워도 통과한다 — "0건이 아니다"는 "줄지 않았다"가 아니다.
+# 줄어든 것을 알려면 줄기 전 값이 승인된 채로 있어야 한다. 낮추려면 이 diff 와 사유가
+# 함께 남는다.
+# 대조기: scripts/verify/check-pytest-baseline.sh
+pytest_baseline:
+  files: 28
+  cases: 211
+  approved_on: "2026-08-27"
+  reason: >-
+    origin/main(3276712) 위로 리베이스한 직후 실측값이다.
+    측정 명령: cd humansearch && uv run --frozen pytest --collect-only -q
+    출력: 211 tests collected · 시험 파일 28개(humansearch/tests/test_*.py).

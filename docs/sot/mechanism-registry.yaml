@@ -110,3 +110,9 @@
   stage: "ci"
   ci_mirror_job: "verify"
   required: true
+- id: "pytest-baseline-ci"
+  path: ".github/workflows/verify.yml"
+  target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-pytest-baseline.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true

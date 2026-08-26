@@ -119,6 +119,14 @@ jobs:
           [ "$hit" -eq 0 ] && echo "PASS: 히스토리 전량 blob 스캔 0건 (blob ${blobs}개 검사)"
           exit $hit
 
+      - name: 인수 검사 pytest-baseline (제품 시험이 줄지 않았는가 · AC9)
+        id: pytest-baseline
+        # 위 hs-gates 는 `collected < 1` 만 본다. 시험을 1개만 남기고 나머지를 지워도
+        # 그 게이트는 초록이다 — "0건이 아니다"는 "줄지 않았다"가 아니다.
+        # 이 스텝은 승인 기준선(명부의 pytest_baseline)과 실측을 대조한다.
+        # uv 는 바로 위 hs-gates 스텝에서 계약 버전으로 고정해 두었다.
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-pytest-baseline.sh
+
       - name: 인수 검사 history-scan-failclosed (스캐너 3상태 계약)
         id: history-scan-failclosed
         # 위 history-scan 스텝의 본문을 파일로 뺀 scripts/scan-history-secrets.sh 가
