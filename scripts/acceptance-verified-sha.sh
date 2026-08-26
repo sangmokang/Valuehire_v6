@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # acceptance-verified-sha.sh — 초록불이 SHA 에 귀속되는지 판정기를 진리표로 검증한다.
 #
-# 차단 — 세 SHA 중 하나라도 다르거나, CI 결론이 success 가 아니거나, 작업트리가
-#        더럽거나, 값 하나라도 없으면 UNVERIFIED 여야 한다.
-# 통과 — 전부 일치하고 success 이고 clean 일 때만 VERIFIED.
+# 차단 — 세 SHA 중 하나라도 다르거나, 모든 CI 실행이 completed/success가 아니거나,
+#        작업트리가 더럽거나, 값 하나라도 없으면 UNVERIFIED 여야 한다.
+# 통과 — 전부 일치하고 모든 실행이 completed/success이고 clean 일 때만 VERIFIED.
 # fail-closed — 인자 개수가 틀리면 NOT_RUN(2).
 set -uo pipefail
 
@@ -63,6 +63,21 @@ expect_runs() {
   fi
 }
 
+expect_runs_not_run() {
+  local desc="$1"
+  shift
+  local out rc=0
+  out=$(bash "$CHECKER" --evaluate-runs "$A" "$A" clean "$@" 2>&1) || rc=$?
+  checked=$((checked + 1))
+  if [ "$rc" -eq 2 ] && printf '%s\n' "$out" | grep -q '^NOT_RUN: '; then
+    printf 'PASS: %s — NOT_RUN (exit=2)\n' "$desc"
+  else
+    printf 'FAIL: %s — expected NOT_RUN/exit=2 actual exit=%s\n%s\n' \
+      "$desc" "$rc" "$out"
+    fail=1
+  fi
+}
+
 expect_runs "verify 2개 모두 완료·성공 → 검증됨" 0 VERIFIED \
   completed:success completed:success
 expect_runs "성공 1개·진행 중 1개 → 미검증" 1 UNVERIFIED \
@@ -70,6 +85,119 @@ expect_runs "성공 1개·진행 중 1개 → 미검증" 1 UNVERIFIED \
 expect_runs "성공 1개·실패 1개 → 미검증" 1 UNVERIFIED \
   completed:success completed:failure
 expect_runs "verify 실행 0개 → 미검증" 1 UNVERIFIED
+expect_runs "진행 중 뒤 성공 → 미검증" 1 UNVERIFIED \
+  in_progress:none completed:success
+expect_runs_not_run "진행 중 뒤 오형식도 끝까지 검사" \
+  in_progress:none malformed
+expect_runs_not_run "실패 뒤 알 수 없는 상태도 끝까지 검사" \
+  completed:failure unknown:success
+expect_runs_not_run "구분자 둘인 레코드 → 조회 불능" \
+  completed:success:extra
+expect_runs_not_run "빈 status 필드 → 조회 불능" \
+  :success
+expect_runs_not_run "빈 conclusion 필드 → 조회 불능" \
+  completed:
+expect_runs_not_run "정상 뒤 구분자 둘인 레코드도 끝까지 검사" \
+  completed:success completed:success:extra
+
+# 실제 조회부도 통과시킨다. 순수 판정부만 시험하면 Bash 3.2의 빈 배열 확장이나
+# `gh api --paginate` 누락처럼 API→배열→판정부 연결에서 생기는 회귀를 놓친다.
+expect_lookup() {
+  local desc="$1" mode="$2" wanted_rc="$3" wanted_word="$4"
+  local out rc=0
+  out=$(CHECKER="$CHECKER" MOCK_SHA="$A" MOCK_RUN_MODE="$mode" bash -c '
+    git() {
+      case "$*" in
+        "rev-parse --abbrev-ref HEAD")
+          printf "%s\n" task/mock
+          if [ "$MOCK_RUN_MODE" = branch_fail ]; then return 91; fi
+          return 0
+          ;;
+        "rev-parse HEAD")
+          printf "%s\n" "$MOCK_SHA"
+          if [ "$MOCK_RUN_MODE" = local_sha_fail ]; then return 92; fi
+          return 0
+          ;;
+        "ls-remote origin refs/heads/task/mock")
+          printf "%s\t%s\n" "$MOCK_SHA" refs/heads/task/mock
+          if [ "$MOCK_RUN_MODE" = remote_sha_fail ]; then return 93; fi
+          return 0
+          ;;
+        "status --porcelain")
+          [ "$MOCK_RUN_MODE" = status_fail ] && return 98
+          [ "$MOCK_RUN_MODE" = dirty ] && printf "%s\n" " M scripts/mock-dirty.sh"
+          :
+          ;;
+        *) return 97 ;;
+      esac
+    }
+    gh() {
+      [ "$1" = api ] && [ "$2" = --paginate ] \
+        && [ "$3" = "repos/{owner}/{repo}/commits/$MOCK_SHA/check-runs" ] \
+        && [ "$4" = --jq ] || return 96
+      case "$MOCK_RUN_MODE" in
+        zero) : ;;
+        status_fail) printf "%s\n" completed:success ;;
+        dirty|filter_fail|branch_fail|local_sha_fail|remote_sha_fail)
+          printf "%s\n" completed:success
+          ;;
+        gh_fail)
+          printf "%s\n" completed:success
+          return 93
+          ;;
+        many|many_bad)
+          i=1
+          while [ "$i" -le 35 ]; do
+            printf "%s\n" completed:success
+            i=$((i + 1))
+          done
+          [ "$MOCK_RUN_MODE" = many_bad ] && printf "%s\n" malformed
+          return 0
+          ;;
+        blank)
+          printf "%s\n\n%s\n" completed:success completed:success
+          ;;
+        *) return 95 ;;
+      esac
+    }
+    awk() {
+      if [ "$MOCK_RUN_MODE" = filter_fail ] \
+        && [ "$1" = "{ printf \"R%s\\n\", \$0 }" ]; then
+        return 94
+      fi
+      command awk "$@"
+    }
+    export -f git gh awk
+    if [ "$MOCK_RUN_MODE" = branch_fail ]; then
+      bash "$CHECKER"
+    else
+      bash "$CHECKER" task/mock
+    fi
+  ' 2>&1) || rc=$?
+  checked=$((checked + 1))
+  if [ "$rc" -eq "$wanted_rc" ] && printf '%s\n' "$out" | grep -q "^VERDICT: $wanted_word$"; then
+    printf 'PASS: %s — %s (exit=%s)\n' "$desc" "$wanted_word" "$rc"
+  elif [ "$rc" -eq "$wanted_rc" ] && [ "$wanted_word" = NOT_RUN ] \
+    && printf '%s\n' "$out" | grep -q '^NOT_RUN: '; then
+    printf 'PASS: %s — NOT_RUN (exit=%s)\n' "$desc" "$rc"
+  else
+    printf 'FAIL: %s — expected %s/exit=%s actual exit=%s\n%s\n' \
+      "$desc" "$wanted_word" "$wanted_rc" "$rc" "$out"
+    fail=1
+  fi
+}
+
+expect_lookup "실제 조회 0건 → Bash 3.2에서도 미검증" zero 1 UNVERIFIED
+expect_lookup "페이지 크기 초과 35건 전부 성공 → 검증됨" many 0 VERIFIED
+expect_lookup "35건 뒤 오형식도 끝까지 검사 → 조회 불능" many_bad 2 NOT_RUN
+expect_lookup "성공 레코드 사이 빈 줄도 손실 없이 검사 → 조회 불능" blank 2 NOT_RUN
+expect_lookup "작업트리 상태 조회 실패 → 조회 불능" status_fail 2 NOT_RUN
+expect_lookup "작업트리 변경 출력 → 미검증" dirty 1 UNVERIFIED
+expect_lookup "조회가 일부 출력 뒤 실패 → 조회 불능" gh_fail 2 NOT_RUN
+expect_lookup "레코드 필터 실패 → 조회 불능" filter_fail 2 NOT_RUN
+expect_lookup "현재 브랜치 조회가 출력 뒤 실패 → 조회 불능" branch_fail 2 NOT_RUN
+expect_lookup "로컬 SHA 조회가 출력 뒤 실패 → 조회 불능" local_sha_fail 2 NOT_RUN
+expect_lookup "원격 SHA 조회가 출력 뒤 실패 → 조회 불능" remote_sha_fail 2 NOT_RUN
 
 checked=$((checked + 1))
 bad_runs_rc=0

@@ -9,7 +9,7 @@
 #
 # 계약: 아래가 전부 참일 때만 VERIFIED 다.
 #   로컬 HEAD == 원격 브랜치 HEAD == CI 가 실제로 검사한 SHA
-#   그 SHA 에 대한 verify 결론이 success
+#   그 SHA 에 대한 모든 verify 실행이 completed/success
 #   작업트리에 커밋되지 않은 변경이 없다
 # 하나라도 어긋나면 UNVERIFIED 이고, 조회 자체를 못 하면 NOT_RUN 이다(모르면 통과 아님).
 #
@@ -66,6 +66,10 @@ evaluate_runs() {
 
   for record in "$@"; do
     case "$record" in
+      *:*:*)
+        echo "NOT_RUN: check-run 레코드 구분자 초과 — $record"
+        exit 2
+        ;;
       *:*) ;;
       *)
         echo "NOT_RUN: check-run 레코드 형식 오류 — $record"
@@ -85,6 +89,13 @@ evaluate_runs() {
         exit 2
         ;;
     esac
+  done
+
+  # 모든 레코드의 구조를 먼저 검증한다. 집계 중 일찍 멈추면 뒤쪽의 오형식이나
+  # 알 수 없는 상태를 UNVERIFIED 로 낮춰 조회 자체가 깨진 사실을 숨기게 된다.
+  for record in "$@"; do
+    status=${record%%:*}
+    conclusion=${record#*:}
     if [ "$status" != "completed" ]; then
       aggregate="pending"
       break
@@ -123,19 +134,38 @@ if [ "${1:-}" = "--evaluate-runs" ]; then
 fi
 
 # ── 실제 조회부 ──────────────────────────────────────────────────────────────
-branch="${1:-$(git rev-parse --abbrev-ref HEAD 2>/dev/null)}"
+if [ "$#" -gt 0 ]; then
+  branch="$1"
+else
+  branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+  branch_rc=$?
+  if [ "$branch_rc" -ne 0 ]; then
+    echo "NOT_RUN: 현재 브랜치 조회 실패 (git rev-parse exit=$branch_rc) — 부분 출력을 증거로 쓰지 않는다"
+    exit 2
+  fi
+fi
 if [ -z "$branch" ] || [ "$branch" = "HEAD" ]; then
   echo "NOT_RUN: 브랜치를 확정하지 못했다 (detached HEAD?)"
   exit 2
 fi
 
 local_sha=$(git rev-parse HEAD 2>/dev/null)
+local_sha_rc=$?
+if [ "$local_sha_rc" -ne 0 ]; then
+  echo "NOT_RUN: 로컬 HEAD 조회 실패 (git rev-parse exit=$local_sha_rc) — 부분 출력을 증거로 쓰지 않는다"
+  exit 2
+fi
 if [ -z "$local_sha" ]; then
   echo "NOT_RUN: 로컬 HEAD 를 읽지 못했다"
   exit 2
 fi
 
 remote_sha=$(git ls-remote origin "refs/heads/$branch" 2>/dev/null | awk '{print $1}' | head -1)
+remote_sha_rc=$?
+if [ "$remote_sha_rc" -ne 0 ]; then
+  echo "NOT_RUN: 원격 HEAD 조회 실패 (git ls-remote exit=$remote_sha_rc) — 부분 출력을 증거로 쓰지 않는다"
+  exit 2
+fi
 if [ -z "$remote_sha" ]; then
   echo "NOT_RUN: 원격에 $branch 가 없다 — 아직 push 되지 않았다면 검증된 SHA 자체가 없다"
   exit 2
@@ -148,23 +178,59 @@ fi
 
 # 원격 HEAD SHA 에 붙은 check-run 만 본다. 브랜치나 PR 로 조회하면 옛 커밋의 초록불을
 # 지금 코드의 것으로 착각하게 된다 — 이 스크립트가 존재하는 이유가 바로 그것이다.
-runs=$(gh api --paginate "repos/{owner}/{repo}/commits/$remote_sha/check-runs" \
-        --jq '.check_runs[] | select(.name=="verify") | "\(.status):\(.conclusion // "none")"' 2>/dev/null)
-rc=$?
-if [ "$rc" -ne 0 ]; then
-  echo "NOT_RUN: check-runs 조회 실패 (gh exit=$rc) — 모르는 것을 통과로 세지 않는다"
+encoded_runs=$(
+  gh api --paginate "repos/{owner}/{repo}/commits/$remote_sha/check-runs" \
+    --jq '.check_runs[] | select(.name=="verify") | "\(.status):\(.conclusion // "none")"' 2>/dev/null |
+    awk '{ printf "R%s\n", $0 }'
+  pipeline_status=("${PIPESTATUS[@]}")
+  printf 'X%s:%s\n' "${pipeline_status[0]}" "${pipeline_status[1]}"
+)
+
+records=()
+gh_rc=2
+filter_rc=2
+trailer_count=0
+while IFS= read -r encoded; do
+  case "$encoded" in
+    R*) records+=("${encoded#R}") ;;
+    X*:*)
+      trailer_count=$((trailer_count + 1))
+      gh_rc=${encoded#X}
+      filter_rc=${gh_rc#*:}
+      gh_rc=${gh_rc%%:*}
+      case "$gh_rc:$filter_rc" in
+        *[!0-9:]*|*:*:*) trailer_count=2 ;;
+      esac
+      ;;
+    *) trailer_count=2 ;;
+  esac
+done <<< "$encoded_runs"
+
+if [ "$trailer_count" -ne 1 ]; then
+  echo "NOT_RUN: check-runs 내부 전달 형식 오류 — 모르는 것을 통과로 세지 않는다"
+  exit 2
+fi
+if [ "$gh_rc" -ne 0 ] || [ "$filter_rc" -ne 0 ]; then
+  echo "NOT_RUN: check-runs 조회 실패 (gh exit=$gh_rc, filter exit=$filter_rc) — 모르는 것을 통과로 세지 않는다"
   exit 2
 fi
 
-if [ -z "$(git status --porcelain)" ]; then
+status_output=$(git status --porcelain 2>/dev/null)
+status_rc=$?
+if [ "$status_rc" -ne 0 ]; then
+  echo "NOT_RUN: 작업트리 상태 조회 실패 (git status exit=$status_rc) — 모르는 것을 clean으로 세지 않는다"
+  exit 2
+fi
+if [ -z "$status_output" ]; then
   worktree="clean"
 else
   worktree="dirty"
 fi
 
-records=()
-while IFS= read -r record; do
-  [ -n "$record" ] && records+=("$record")
-done <<< "$runs"
-
-evaluate_runs "$local_sha" "$remote_sha" "$worktree" "${records[@]}"
+# Bash 3.2는 `set -u`에서 빈 배열의 "${records[@]}" 확장을 unbound variable로
+# 종료한다. 조회 결과 0건도 정상적인 UNVERIFIED 입력이므로 빈 배열은 명시적으로 분기한다.
+if [ "${#records[@]}" -eq 0 ]; then
+  evaluate_runs "$local_sha" "$remote_sha" "$worktree"
+else
+  evaluate_runs "$local_sha" "$remote_sha" "$worktree" "${records[@]}"
+fi
