@@ -95,8 +95,8 @@ function makeRepo(mutate = () => {}, paths = {}) {
   const base = git(cwd, "rev-parse", "HEAD");
   const red1 = commit(cwd, "red one", "WU-1", "RED", paths.red1);
   const green1 = commit(cwd, "green one", "WU-1", "GREEN", paths.green1);
-  const red2 = commit(cwd, "red two", "WU-2", "RED");
-  const green2 = commit(cwd, "green two", "WU-2", "GREEN");
+  const red2 = commit(cwd, "red two", "WU-2", "RED", paths.red2);
+  const green2 = commit(cwd, "green two", "WU-2", "GREEN", paths.green2);
   const output1 = "PASS WU-1 complete\n";
   const output2 = "PASS WU-2 complete\n";
   const issue = readFileSync(join(cwd, "docs/engineering/issue.md"));
@@ -233,6 +233,14 @@ test("a GREEN commit that rewrites its RED test is rejected", () => expectFailur
   makeRepo(() => {}, { red1: "tests/wu-1.test.mjs", green1: "tests/wu-1.test.mjs" }),
   "GREEN commit modifies RED test",
 ));
+test("a later GREEN commit cannot rewrite an earlier WU RED test", () => expectFailure(
+  makeRepo(() => {}, { red1: "tests/wu-1.test.mjs", green2: "tests/wu-1.test.mjs" }),
+  "later non-RED commit modifies protected RED test",
+));
+test("a later recorded RED commit may extend a protected test", () => {
+  const result = runValidator(makeRepo(() => {}, { red1: "tests/wu-1.test.mjs", red2: "tests/wu-1.test.mjs" }));
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+});
 test("a stale branch is rejected", () => expectFailure(makeRepo(({ ledger }) => { ledger.branch = "task/stale"; }), "branch"));
 test("a stale worktree is rejected", () => expectFailure(makeRepo(({ ledger }) => { ledger.worktree = "/tmp/stale"; }), "worktree"));
 test("zero evidence is rejected", () => expectFailure(makeRepo(({ ledger }) => {
