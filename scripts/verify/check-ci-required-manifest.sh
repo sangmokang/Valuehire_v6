@@ -231,46 +231,82 @@ def executable_lines(run, top_level = true)
   return [] unless run.is_a?(String)
   out = []
   heredoc_end = nil
-  fn_depth = nil
+  in_function = false
   depth = 0
   dead = false
+  pending = nil
+  brace_stack = []
 
   run.each_line do |raw|
     line = raw.rstrip
+
     if heredoc_end
       heredoc_end = nil if line.strip == heredoc_end
       next
     end
+
+    # 백슬래시로 이은 줄은 한 명령이다. 뒷줄만 떼어 보면 앞줄의 조건에 매달린 것을
+    # 놓친다 — `false && \` 다음 줄이 그렇다 (2026-08-27 V2 H1).
+    if pending
+      line = pending + " " + line.strip
+      pending = nil
+    end
+    if line =~ /\\\z/
+      pending = line.sub(/\\\z/, "").rstrip
+      next
+    end
+
     stripped = line.strip
     next if stripped.empty?
     next if stripped.start_with?("#")
 
-    # heredoc 시작 — 마커가 숫자로만 이뤄질 수도 있다(V2 G1-5).
+    # heredoc 시작 — 마커가 숫자로만 이뤄질 수도 있다.
     if (m = stripped.match(/<<-?\s*[\x27"]?([A-Za-z0-9_]+)[\x27"]?/))
       heredoc_end = m[1]
     end
 
     # 함수 본문은 호출되기 전에는 실행되지 않는다.
-    if fn_depth
-      fn_depth = nil if stripped == "}"
+    if in_function
+      in_function = false if stripped == "}"
       next
     end
     if stripped =~ /\A[A-Za-z_][A-Za-z0-9_]*\s*\(\s*\)\s*\{?\s*\z/ ||
        stripped =~ /\Afunction\s+[A-Za-z_][A-Za-z0-9_]*/
-      fn_depth = 1
+      in_function = true
       next
     end
 
+    # 블록 깊이는 **셸 키워드로만** 센다. 중괄호를 세면 awk·sed 의 정상 인자(필드를 뽑는
+    # 스크립트가 중괄호로 감싸여 있다)를 블록으로 오인해 정상 워크플로를 빨갛게 만든다.
+    # 예외로 **줄 끝의 `{`** 와 **줄 전체가 `}`** 인 것만 그룹으로 본다 — `false && {` 처럼
+    # 조건에 매달린 그룹을 놓치면 그 안의 `exit` 을 전역 종료로 오인한다 (V2 H2).
+    openers = stripped.scan(/(?:\A|[;&|]\s*)(?:if|for|while|until|case)(?=\s)/).size
     closers = stripped.scan(/(?:\A|[;&|]\s*)(?:fi|done|esac)(?=\z|[;&\s])/).size
-    depth -= closers
+
+    # 중괄호 그룹은 **조건에 매달린 것만** 깊이로 센다. 줄 전체가 `{` 인 무조건 그룹은
+    # 그대로 실행되므로 세면 정상 코드를 막는다(실측: 그렇게 만들었다가 되돌렸다).
+    # `false && {` 처럼 조건이 붙은 그룹만 안쪽을 조건부로 본다.
+    if stripped =~ /\{\z/
+      conditional = !(stripped =~ /[&|]{2}/).nil?
+      brace_stack.push(conditional)
+      openers += 1 if conditional
+    elsif stripped == "}"
+      closers += 1 if brace_stack.pop
+    end
+
+    # 이 줄 자신이 속한 깊이는 닫기를 반영한 값이다. 열기는 **다음 줄부터** 적용한다.
+    # 순서를 뒤집으면 한 줄에서 열고 닫는 블록 뒤가 블록 안으로 보인다 (V2 H3).
+    line_depth = depth - closers
+    line_depth = 0 if line_depth < 0
+
+    out << stripped if (!top_level || line_depth.zero?) && !dead
+
+    depth += openers - closers
     depth = 0 if depth < 0
 
-    out << stripped if (!top_level || depth.zero?) && !dead
-
-    openers = stripped.scan(/(?:\A|[;&|]\s*)(?:if|for|while|until|case)(?=\s)/).size
-    depth += openers
-
-    dead = true if depth.zero? && stripped =~ /\Aexit(\s|\z)/
+    # 조건이나 그룹 안의 `exit` 은 전역 종료가 아니다. 최상위에서 단독으로 선 것만 본다.
+    dead = true if depth.zero? && line_depth.zero? &&
+                   stripped =~ /\Aexit(\s|\z)/ && stripped !~ /[&|]/
   end
   out
 end
