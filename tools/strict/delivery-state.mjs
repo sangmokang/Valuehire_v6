@@ -6,7 +6,10 @@ const VERSION = "valuehire.delivery-state/v1";
 const OID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
 const SHA256 = /^[0-9a-f]{64}$/;
 const LOCAL_STATES = new Set(["PASS", "FAIL", "NOT_RUN", "BLOCKED"]);
-const REMOTE_STATES = new Set(["NOT_RUN", "BLOCKED", "OPEN", "GREEN", "FAIL", "MERGED"]);
+const PR_STATES = new Set(["NOT_RUN", "BLOCKED", "OPEN"]);
+const CI_STATES = new Set(["NOT_RUN", "BLOCKED", "GREEN", "FAIL"]);
+const MERGE_STATES = new Set(["NOT_RUN", "BLOCKED", "MERGED"]);
+const POST_MERGE_STATES = new Set(["NOT_RUN", "BLOCKED", "GREEN", "FAIL"]);
 
 function parseArgs(argv) {
   const args = { runId: null, stateCommit: null, stateBlob: null, candidate: null, json: false };
@@ -100,7 +103,7 @@ function validateProof(violations, field, proof, stateCommit, targetSha, usedPat
   if (!output.toString("utf8").includes(targetSha)) add(violations, field, `${field} output does not name its target SHA`);
 }
 
-function validState(violations, field, value, allowed = REMOTE_STATES) {
+function validState(violations, field, value, allowed) {
   if (!value || typeof value !== "object" || !allowed.has(value.state)) {
     add(violations, field, `${field} state is missing or unknown`);
     return false;
@@ -122,23 +125,25 @@ function validateState(args, state) {
     if (!LOCAL_STATES.has(state.local?.[key])) add(violations, `local.${key}`, `local ${key} state is missing or unknown`);
   }
 
-  const prValid = validState(violations, "pr", state.pr);
-  const ciValid = validState(violations, "ci", state.ci);
-  const mergeValid = validState(violations, "merge", state.merge);
-  const deployValid = validState(violations, "deploy", state.deploy);
-  const liveValid = validState(violations, "live_verify", state.live_verify);
+  const prValid = validState(violations, "pr", state.pr, PR_STATES);
+  const ciValid = validState(violations, "ci", state.ci, CI_STATES);
+  const mergeValid = validState(violations, "merge", state.merge, MERGE_STATES);
+  const deployValid = validState(violations, "deploy", state.deploy, POST_MERGE_STATES);
+  const liveValid = validState(violations, "live_verify", state.live_verify, POST_MERGE_STATES);
   if (prValid && state.pr.state === "OPEN") {
     if (!Number.isInteger(state.pr.number) || state.pr.number < 1 || !/^https:\/\/github\.com\//.test(state.pr.url ?? "")) {
       add(violations, "pr", "OPEN PR requires a GitHub number and URL");
     }
     if (state.pr.head_sha !== args.candidate) add(violations, "pr", "PR head does not match candidate");
   }
-  if (ciValid && state.ci.state === "GREEN") {
+  if (ciValid && ["GREEN", "FAIL"].includes(state.ci.state)) {
     if (state.pr?.state !== "OPEN") add(violations, "ci", "CI GREEN requires a real OPEN PR");
     if (state.ci.head_sha !== args.candidate || state.pr?.head_sha !== args.candidate) add(violations, "ci", "CI or PR head does not match candidate");
     if (!Array.isArray(state.ci.checks) || state.ci.checks.length === 0) add(violations, "ci", "CI GREEN has zero checks");
-    else if (state.ci.checks.some((check) => !check?.name || check.conclusion !== "SUCCESS")) {
+    else if (state.ci.state === "GREEN" && state.ci.checks.some((check) => !check?.name || check.conclusion !== "SUCCESS")) {
       add(violations, "ci", "CI GREEN contains a missing or non-successful check");
+    } else if (state.ci.state === "FAIL" && state.ci.checks.every((check) => check?.name && check.conclusion === "SUCCESS")) {
+      add(violations, "ci", "CI FAIL has no failing check");
     }
     validateProof(violations, "ci", state.ci, args.stateCommit, args.candidate, usedPaths);
   }
@@ -151,6 +156,12 @@ function validateState(args, state) {
     if (!OID.test(state.merge.merge_sha ?? "")) add(violations, "merge", "merge SHA must be a full Git object ID");
     else validateProof(violations, "merge", state.merge, args.stateCommit, state.merge.merge_sha, usedPaths);
   }
+  if (!merged && deployValid && !["NOT_RUN", "BLOCKED"].includes(state.deploy.state)) {
+    add(violations, "deploy", `deploy state ${state.deploy.state} is not allowed before merge`);
+  }
+  if (state.deploy?.state !== "GREEN" && liveValid && !["NOT_RUN", "BLOCKED"].includes(state.live_verify.state)) {
+    add(violations, "live_verify", `live verify state ${state.live_verify.state} is not allowed before deploy GREEN`);
+  }
   for (const [field, value] of [["checkpoint readiness", state.checkpoint_readiness], ["overall T", state.overall_t]]) {
     if (!new Set(["NOT_RUN", "PASS", "FAIL", "BLOCKED"]).has(value)) add(violations, field, `${field} state is missing or unknown`);
     if (!merged && value !== "NOT_RUN") add(violations, field, `${field} cannot be promoted before merge`);
@@ -158,12 +169,12 @@ function validateState(args, state) {
       add(violations, field, `${field} PASS requires local PASS and CI GREEN`);
     }
   }
-  if (deployValid && state.deploy.state === "GREEN") {
+  if (deployValid && ["GREEN", "FAIL"].includes(state.deploy.state)) {
     if (!merged) add(violations, "deploy", "deploy evidence is allowed only after merge");
     if (state.deploy.merge_sha !== state.merge?.merge_sha) add(violations, "deploy", "deploy merge SHA does not match merge evidence");
     if (OID.test(state.merge?.merge_sha ?? "")) validateProof(violations, "deploy", state.deploy, args.stateCommit, state.merge.merge_sha, usedPaths);
   }
-  if (liveValid && state.live_verify.state === "GREEN") {
+  if (liveValid && ["GREEN", "FAIL"].includes(state.live_verify.state)) {
     if (state.deploy?.state !== "GREEN") add(violations, "live_verify", "live verify evidence is allowed only after deploy GREEN");
     if (state.live_verify.merge_sha !== state.merge?.merge_sha) add(violations, "live_verify", "live verify merge SHA does not match merge evidence");
     if (OID.test(state.merge?.merge_sha ?? "")) validateProof(violations, "live_verify", state.live_verify, args.stateCommit, state.merge.merge_sha, usedPaths);

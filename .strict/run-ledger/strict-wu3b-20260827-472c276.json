@@ -236,6 +236,58 @@
           "output_ref": "/tmp/valuehire-strict-wu3b-evidence/wu3b5/staged-gate.json"
         }
       ]
+    },
+    {
+      "id": "WU-3b-5a",
+      "status": "open",
+      "scope": [
+        ".strict/run-ledger/strict-wu3b-20260827-472c276.json",
+        "tools/strict/delivery-state.mjs",
+        "tests/delivery-wiring.test.mjs",
+        "scripts/acceptance-checkpoint-delivery.sh",
+        "docs/sot/verification-commands.md"
+      ],
+      "red_commit": "f2df1613438d9421fd36068f7f6a6e1534be44c8",
+      "implementation_commit": null,
+      "validation": [
+        {
+          "command": "node --test tests/delivery-wiring.test.mjs",
+          "started_at": "2026-08-26T19:04:45Z",
+          "finished_at": "2026-08-26T19:04:48Z",
+          "exit": 0,
+          "checked": 6,
+          "output_sha256": "db8a8b28c96995ef5fd439c555b4b208b428b1a516884e4efa3d770fd23d8da6",
+          "output_ref": "/tmp/valuehire-strict-wu3b-evidence/wu3b5a/delivery-wiring.tap"
+        },
+        {
+          "command": "PR enum mutation + node --test --test-name-pattern=pr rejects the cross-stage state",
+          "started_at": "2026-08-26T19:05:12Z",
+          "finished_at": "2026-08-26T19:05:13Z",
+          "exit": 1,
+          "expected_exit": 1,
+          "checked": 1,
+          "output_sha256": "e938655ff326cc12211e81e803a45976c14249efb6d68da07449a605cac1e5f7",
+          "output_ref": "/tmp/valuehire-strict-wu3b-evidence/wu3b5a/pr-state-mutation.tap"
+        },
+        {
+          "command": "bash scripts/verify/run-acceptance.sh scripts/acceptance-checkpoint-delivery.sh",
+          "started_at": "2026-08-26T19:05:26Z",
+          "finished_at": "2026-08-26T19:05:48Z",
+          "exit": 0,
+          "checked": 76,
+          "output_sha256": "309bd9c51af1c088f139c771d8098b9433d7b295adf29fc935ef9f2a4de188da",
+          "output_ref": "/tmp/valuehire-strict-wu3b-evidence/wu3b5a/checkpoint-delivery-acceptance.log"
+        },
+        {
+          "command": "node tools/strict/checkpoint-gate.mjs --base f2df1613438d9421fd36068f7f6a6e1534be44c8 --json --run-id strict-wu3b-20260827-472c276 --wu-id WU-3b-5a",
+          "started_at": "2026-08-26T19:06:38Z",
+          "finished_at": "2026-08-26T19:06:48Z",
+          "exit": 0,
+          "checked": 4,
+          "output_sha256": "e4b15b1a7bd891e43aabe6b5df41a78097670e63e8cacda701b837d5cdbd7a95",
+          "output_ref": "/tmp/valuehire-strict-wu3b-evidence/wu3b5a/staged-gate.json"
+        }
+      ]
     }
   ],
   "updated_at": "2026-08-27T02:50:00+09:00"
