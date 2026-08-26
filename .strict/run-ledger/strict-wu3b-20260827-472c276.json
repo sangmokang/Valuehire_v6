@@ -606,9 +606,29 @@
         "tools/strict/checkpoint-gate.mjs",
         "tools/strict/delivery-state.mjs"
       ],
-      "red_commit": null,
+      "red_commit": "f0c04b73b679f039938e9db40f62a8b24fa3bd5a",
       "implementation_commit": null,
-      "validation": []
+      "validation": [
+        {
+          "command": "node --test tests/adversarial-evidence.test.mjs tests/checkpoint-ledger-trust.test.mjs tests/delivery-state.test.mjs",
+          "started_at": "2026-08-26T20:29:00Z",
+          "finished_at": "2026-08-26T20:29:07Z",
+          "exit": 0,
+          "checked": 37,
+          "output_sha256": "7f96fcab6047cc7fff2b4022f73d6f9239b44dbd535ff001a00f5d1a5308872b",
+          "output_ref": ".strict/evidence/wu3b7/green.tap"
+        },
+        {
+          "command": "five black-box fail-closed fixtures in validator test suites",
+          "started_at": "2026-08-26T20:29:00Z",
+          "finished_at": "2026-08-26T20:29:07Z",
+          "exit": 1,
+          "expected_exit": 1,
+          "checked": 5,
+          "output_sha256": "4eebd48f3a9adf29a7a52c1623e97281ece79dfe0fdc6a4c0bb0fa2fa7be363f",
+          "output_ref": ".strict/evidence/wu3b7/red.tap"
+        }
+      ]
     }
   ],
   "updated_at": "2026-08-27T05:00:00+09:00"

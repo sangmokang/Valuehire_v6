@@ -84,7 +84,7 @@ function validateProof(violations, field, proof, stateCommit, targetSha, usedPat
   if (proof.output_complete !== true) add(violations, field, `${field} output_complete must be true`);
   if (!safePath(proof.output_path)) {
     add(violations, field, `${field} output path is unsafe or empty`);
-    return;
+    return null;
   }
   if (usedPaths.has(proof.output_path)) add(violations, field, `${field} must use separate evidence output`);
   usedPaths.add(proof.output_path);
@@ -92,7 +92,7 @@ function validateProof(violations, field, proof, stateCommit, targetSha, usedPat
   try { output = gitBuffer(["show", `${stateCommit}:${proof.output_path}`]); }
   catch (error) {
     add(violations, field, `${field} output is missing: ${error.message}`);
-    return;
+    return null;
   }
   if (output.length === 0) add(violations, field, `${field} output is empty`);
   if (!SHA256.test(proof.output_sha256 ?? "") || sha256(output) !== proof.output_sha256) {
@@ -101,6 +101,39 @@ function validateProof(violations, field, proof, stateCommit, targetSha, usedPat
   if (output.length !== proof.output_bytes) add(violations, field, `${field} output byte count mismatch`);
   if (lines(output) !== proof.output_lines || proof.output_lines < 1) add(violations, field, `${field} output line count mismatch`);
   if (!output.toString("utf8").includes(targetSha)) add(violations, field, `${field} output does not name its target SHA`);
+  return output;
+}
+
+function validateCiSource(violations, state, output) {
+  if (state.ci.source_kind !== "github-pr-status-check-rollup") {
+    add(violations, "ci", "CI evidence must come from a GitHub PR statusCheckRollup source");
+  }
+  const command = state.ci.source_command ?? "";
+  const commandMatch = command.match(/^gh pr view (\d+) --json ([A-Za-z,]+)$/);
+  const required = ["title", "body", "url", "statusCheckRollup", "headRefOid"];
+  const fields = new Set(commandMatch?.[2].split(",") ?? []);
+  if (!commandMatch || Number(commandMatch[1]) !== state.pr?.number || required.some((field) => !fields.has(field))) {
+    add(violations, "ci", "CI source command must query the recorded GitHub PR statusCheckRollup and headRefOid");
+  }
+  let raw;
+  try { raw = JSON.parse(output?.toString("utf8") ?? ""); }
+  catch {
+    add(violations, "ci", "CI evidence is not complete gh pr view JSON");
+    return;
+  }
+  if (raw.url !== state.pr?.url || raw.headRefOid !== state.candidate_sha) {
+    add(violations, "ci", "CI GitHub JSON does not match the recorded PR URL and candidate");
+  }
+  if (!Array.isArray(raw.statusCheckRollup) || raw.statusCheckRollup.length === 0) {
+    add(violations, "ci", "CI GitHub JSON has zero status checks");
+    return;
+  }
+  for (const check of state.ci.checks ?? []) {
+    const match = raw.statusCheckRollup.find((item) => item?.name === check.name);
+    if (!match || (match.conclusion ?? match.state) !== check.conclusion) {
+      add(violations, "ci", `CI check ${check.name} is not reproduced by GitHub statusCheckRollup`);
+    }
+  }
 }
 
 function validState(violations, field, value, allowed) {
@@ -145,7 +178,8 @@ function validateState(args, state) {
     } else if (state.ci.state === "FAIL" && state.ci.checks.every((check) => check?.name && check.conclusion === "SUCCESS")) {
       add(violations, "ci", "CI FAIL has no failing check");
     }
-    validateProof(violations, "ci", state.ci, args.stateCommit, args.candidate, usedPaths);
+    const ciOutput = validateProof(violations, "ci", state.ci, args.stateCommit, args.candidate, usedPaths);
+    validateCiSource(violations, state, ciOutput);
   }
 
   const merged = mergeValid && state.merge.state === "MERGED";
@@ -154,7 +188,15 @@ function validateState(args, state) {
     if (state.pr?.state !== "OPEN" || state.merge.pr_number !== state.pr.number) add(violations, "merge", "merge does not match the recorded PR");
     if (state.merge.actor !== "USER") add(violations, "merge", "merge actor must be USER");
     if (!OID.test(state.merge.merge_sha ?? "")) add(violations, "merge", "merge SHA must be a full Git object ID");
-    else validateProof(violations, "merge", state.merge, args.stateCommit, state.merge.merge_sha, usedPaths);
+    else {
+      const mergeExists = git(["cat-file", "-e", `${state.merge.merge_sha}^{commit}`], { allowFailure: true }).status === 0;
+      if (!mergeExists) add(violations, "merge", "merge object does not exist as a Git commit");
+      else {
+        if (!isAncestor(args.candidate, state.merge.merge_sha)) add(violations, "merge", "merge commit is not descended from the candidate");
+        if (!isAncestor(state.merge.merge_sha, args.stateCommit)) add(violations, "merge", "state evidence commit is not descended from the merge commit");
+      }
+      validateProof(violations, "merge", state.merge, args.stateCommit, state.merge.merge_sha, usedPaths);
+    }
   }
   if (!merged && deployValid && !["NOT_RUN", "BLOCKED"].includes(state.deploy.state)) {
     add(violations, "deploy", `deploy state ${state.deploy.state} is not allowed before merge`);

@@ -129,7 +129,11 @@ function validateReviewer(violations, id, reviewer, manifest, evidenceCommit, us
   if (lines(output) !== reviewer.output_lines || reviewer.output_lines < 1) add(violations, field, `${id} raw output line count mismatch`);
   const text = output.toString("utf8");
   if (!text.includes(manifest.candidate_sha)) add(violations, field, `${id} raw output does not name the candidate`);
-  if (!/^FINAL: PASS$/m.test(text)) add(violations, field, `${id} raw output has no final PASS marker`);
+  const nonempty = text.split(/\r?\n/).filter((line) => line.trim().length > 0);
+  const markers = nonempty.filter((line) => /^FINAL: (?:PASS|FAIL)$/.test(line));
+  if (markers.length !== 1 || markers[0] !== "FINAL: PASS" || nonempty.at(-1) !== "FINAL: PASS") {
+    add(violations, field, `${id} raw output final PASS marker is not unique and authoritative`);
+  }
 }
 
 function validateManifest(args, manifest) {

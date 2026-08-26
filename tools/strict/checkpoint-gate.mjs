@@ -146,10 +146,9 @@ function matchesAny(path, scopes) {
 
 function checkScope(changes, fallbackScopes, authority) {
   const violations = [];
-  if (authority.runId && changes.length === 0) {
+  if (changes.length === 0) {
     return [{ check: CHECKS.SCOPE, file: "", detail: "zero staged targets are not checkpoint evidence" }];
   }
-  if (changes.length === 0) return violations;
   let scopes;
   try {
     if (authority.runId) {
