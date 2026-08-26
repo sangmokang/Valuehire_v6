@@ -854,7 +854,64 @@
           "output_ref": ".strict/evidence/wu3b11/mutation.tap"
         }
       ]
+    },
+    {
+      "id": "WU-3b-12",
+      "status": "green",
+      "scope": [
+        ".strict/run-ledger/strict-wu3b-20260827-472c276.json",
+        "contracts/strict-trace-ledger.schema.json",
+        "docs/engineering/valuehire-delivery-chain-goal-2026-08-27.md",
+        "tests/trace-ledger.test.mjs",
+        "tools/strict/trace-ledger.mjs"
+      ],
+      "red_commit": "40635a7066b16784594b0f5a18d385d47dfb16d2",
+      "implementation_commit": "3bf8440ce6fa2ca812b1c707577f1c327333e1b7",
+      "validation": []
+    },
+    {
+      "id": "WU-3b-13",
+      "status": "green",
+      "scope": [
+        ".strict/run-ledger/strict-wu3b-20260827-472c276.json",
+        "tests/trace-ledger.test.mjs",
+        "tools/strict/trace-ledger.mjs"
+      ],
+      "red_commit": "95c7e70c79d8c1b9d4e301fc41ba6770b9b1c73d",
+      "implementation_commit": "1a6f28f9f85633a1e33bdfb136b39b8fed6276a8",
+      "validation": []
+    },
+    {
+      "id": "WU-3b-14",
+      "status": "open",
+      "scope": [
+        ".strict/run-ledger/strict-wu3b-20260827-472c276.json",
+        "docs/engineering/valuehire-delivery-chain-issue-2026-08-27.md",
+        "scripts/acceptance-checkpoint-delivery.sh",
+        "tests/trusted-checkpoint-gate.test.mjs",
+        "tools/strict/checkpoint-gate.mjs",
+        "tools/strict/checkpoint-js-scan.mjs",
+        "tools/strict/checkpoint-policy.mjs",
+        "tools/strict/checkpoint-secrets.mjs",
+        "tools/strict/index-checkpoint-gate.mjs"
+      ],
+      "red_commit": null,
+      "implementation_commit": null,
+      "validation": []
+    },
+    {
+      "id": "WU-3b-15",
+      "status": "planned",
+      "scope": [
+        ".strict/run-ledger/strict-wu3b-20260827-472c276.json",
+        "docs/engineering/valuehire-delivery-chain-issue-2026-08-27.md",
+        "tests/adversarial-evidence.test.mjs",
+        "tools/strict/adversarial-evidence.mjs"
+      ],
+      "red_commit": null,
+      "implementation_commit": null,
+      "validation": []
     }
   ],
-  "updated_at": "2026-08-27T05:00:00+09:00"
+  "updated_at": "2026-08-27T07:20:00+09:00"
 }

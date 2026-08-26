@@ -69,6 +69,10 @@ GitHub Issue 생성은 외부 쓰기이므로 승인 전에는 실행하지 않�
 | WU-3b-9 | RED/GREEN 절차 위조 차단 | trace validator, 과거 무효 WU 표기, 회귀 테스트 |
 | WU-3b-10 | Codeaudit 현재상태 문서 보정 | goal 결론, 구현 전/후 상태 분리, 회귀 테스트 |
 | WU-3b-11 | Codeaudit WU 이력 정직성 보정 | WU-3b-2c 무효 표기, 성공 trace 제외, 회귀 테스트 |
+| WU-3b-12 | V1 evidence ref·시간 경계 보정 | clone 가능한 trace, 승인 명령·Git 시간 상하한, PR branch 증거 제거 |
+| WU-3b-13 | 교차 WU RED 보호 | 후속 GREEN·장부 밖 커밋의 과거 RED 테스트 재작성 차단 |
+| WU-3b-14 | index 고정 checkpoint 실행 | gate와 policy/secret/JS scan을 index bundle로 실행, unstaged stub 차단 |
+| WU-3b-15 | V1 envelope 절차 보정 | 무효 무-trailer 커밋 보존, 오류 봉투·들여쓴 판정 차단, 유효 RED/GREEN 재실행 |
 
 ## 데이터 안전 조건
 

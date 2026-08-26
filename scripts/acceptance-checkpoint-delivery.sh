@@ -20,6 +20,7 @@ if ! node --test \
   tests/v1-regression-wiring.test.mjs \
   tests/goal-current-state.test.mjs \
   tests/pr-draft.test.mjs \
+  tests/trusted-checkpoint-gate.test.mjs \
   tests/trusted-secret-runner.test.mjs >"$output" 2>&1; then
   cat "$output"
   echo "FAIL: checkpoint delivery regression"
@@ -41,6 +42,7 @@ for target in \
   tools/strict/checkpoint-js-scan.mjs \
   tools/strict/checkpoint-policy.mjs \
   tools/strict/checkpoint-secrets.mjs \
+  tools/strict/index-checkpoint-gate.mjs \
   tools/strict/trusted-secret-scan.mjs \
   tools/strict/trace-ledger.mjs \
   tools/strict/adversarial-evidence.mjs \
