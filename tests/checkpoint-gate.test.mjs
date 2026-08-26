@@ -130,7 +130,7 @@ test("scope: active wus ledger rejects a staged file outside its declared scope"
 });
 test("scope: --scope fallback accepts a matching staged file when run ledger is absent", () => {
   const { cwd, base } = makeRepo();
-  expectPass(runGate(cwd, base));
+  expectViolation(runGate(cwd, base), "scope");
   write(cwd, "src/app.mjs", "export const value = 2;\n");
   git(cwd, "add", "src/app.mjs");
   expectPass(runGate(cwd, base, "--scope", "src/**"));

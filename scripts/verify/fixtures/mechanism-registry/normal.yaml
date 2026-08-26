@@ -2,12 +2,12 @@
 # path·target 은 실제 저장소에 존재하는 것을 쓴다 (2026-08-12 grep -n 실측).
 - id: "secrets-scan-precommit"
   path: "hooks/pre-commit"
-  target: "SECRET_PATTERNS_FILE= VERIFY_SCAN_SOURCE=index bash verify.sh"
+  target: "node tools/strict/trusted-secret-scan.mjs"
   stage: "pre-commit"
   required: true
 - id: "ci-secret-scan"
   path: ".github/workflows/verify.yml"
-  target: "run: bash verify.sh"
+  target: "run: node tools/strict/trusted-secret-scan.mjs"
   stage: "ci"
   ci_mirror_job: "verify"
   required: true

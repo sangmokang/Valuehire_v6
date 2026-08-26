@@ -21,13 +21,15 @@ esac
 trap 'rm -rf "$TMP"' EXIT HUP INT TERM
 
 BASE="$TMP/base"
-mkdir -p "$BASE/docs/sot" "$BASE/scripts/verify" "$BASE/hooks" "$BASE/.github/workflows"
+mkdir -p "$BASE/docs/sot" "$BASE/scripts/verify" "$BASE/hooks" "$BASE/.github/workflows" "$BASE/tools/strict"
 cp docs/sot/coding-principles.md "$BASE/docs/sot/"
 cp docs/sot/principles.yaml "$BASE/docs/sot/"
 cp scripts/acceptance-principles-check.sh "$BASE/scripts/"
 cp scripts/verify/check-pre-push-runtime.sh "$BASE/scripts/verify/"
 # pre-push 가 인수 검사를 실행 래퍼로 돌리므로 fixture 에도 래퍼가 있어야 한다.
 cp scripts/verify/run-acceptance.sh "$BASE/scripts/verify/"
+cp tools/strict/trusted-secret-scan.mjs "$BASE/tools/strict/"
+cp tools/strict/checkpoint-secrets.mjs "$BASE/tools/strict/"
 cp hooks/pre-push "$BASE/hooks/"
 cp .github/workflows/verify.yml "$BASE/.github/workflows/"
 chmod +x "$BASE/scripts/acceptance-principles-check.sh"

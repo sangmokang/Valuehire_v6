@@ -53,26 +53,20 @@ scan_added() {
 
 clean_patterns() { sed -e 's/[[:space:]]*#.*//' -e '/^[[:space:]]*$/d' "$1"; }
 
-# ── 1) 비밀 패턴 — verify.sh 에 위임한다 (원칙 A: 하나의 정책 = 하나의 판정 함수)
-#
-# 여기서 자체 스캔을 구현하면 판정기가 2벌이 되고, 실제로 갈렸다(2026-08-07 실측):
-#   verify.sh          : .default + .secret-patterns 합집합 / tr -d '\r' 정규화 / grep -i
-#   자체 구현(폐기)    : 둘 중 하나만 / 정규화 없음 / -i 없음  → 같은 저장소에서 다른 판정
-# VERIFY_SCAN_SOURCE=index 로 부른다. 기본(worktree) 모드는 목록만 인덱스에서 읽고
-# 내용은 작업트리에서 읽으므로 다음으로 우회된다(V1 2026-08-07 실측):
-#   git add <비밀> → 작업트리만 깨끗하게 덮어씀 → git commit → 통과, 커밋에는 비밀이 들어감
-if [ ! -f verify.sh ]; then
-  block "verify.sh 없음 — 비밀 스캔 불가 (fail-closed)"
-else
-  # SECRET_PATTERNS_FILE 을 비워 고정한다. 상속하면 호출자가
-  #   SECRET_PATTERNS_FILE=/tmp/weak.txt git commit
-  # 로 "유효하지만 아무것도 안 잡는" 패턴 파일을 주입해 스캔을 무력화할 수 있다
-  # (2026-08-07 실측: AKIA…·ghp_… 가 그대로 커밋됨). 빈 값이면 verify.sh 가
-  # .secret-patterns.default + .secret-patterns 합집합이라는 기본 경로를 탄다.
+# ── 1) 비밀 패턴 — index와 같은 trusted runner 한 벌만 실행한다 ─────────────
+TRUSTED_SECRET_FILES=(tools/strict/trusted-secret-scan.mjs tools/strict/checkpoint-secrets.mjs)
+for trusted_file in "${TRUSTED_SECRET_FILES[@]}"; do
+  if ! git cat-file -e ":$trusted_file" 2>/dev/null; then
+    block "$trusted_file index blob 없음 — 비밀 스캔 불가 (fail-closed)"
+  elif ! git diff --quiet -- "$trusted_file"; then
+    block "$trusted_file 작업 폴더 bytes가 index와 다름 — 실행 거부 (fail-closed)"
+  fi
+done
+if [ "$fail" -eq 0 ]; then
   vrc=0
-  SECRET_PATTERNS_FILE= VERIFY_SCAN_SOURCE=index bash verify.sh >/dev/null 2>&1 || vrc=$?
+  node tools/strict/trusted-secret-scan.mjs >/dev/null 2>&1 || vrc=$?
   if [ "$vrc" -ne 0 ]; then
-    block "비밀 스캔 실패 (verify.sh --index exit=$vrc). 상세: VERIFY_SCAN_SOURCE=index bash verify.sh"
+    block "index 고정 비밀 스캔 실패 (trusted runner exit=$vrc)"
   fi
 fi
 

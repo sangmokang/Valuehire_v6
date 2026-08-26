@@ -43,6 +43,16 @@ trap 'for d in $TMPDIRS; do [ -n "$d" ] && [ -d "$d" ] && rm -rf "$d"; done' EXI
 ok()  { checked=$((checked + 1)); printf 'PASS: %s\n' "$1"; }
 bad() { checked=$((checked + 1)); printf 'FAIL: %s\n' "$1"; fail=1; }
 
+install_hook_fixture() {
+  local target="$1"
+  mkdir -p "$target/hooks" "$target/tools/strict"
+  cp hooks/pre-commit hooks/pre-push "$target/hooks/"
+  cp verify.sh .secret-patterns.default .check-weakening-patterns .gitignore "$target/"
+  cp tools/strict/trusted-secret-scan.mjs tools/strict/checkpoint-secrets.mjs "$target/tools/strict/"
+  [ -f suppressions.yaml ] && cp suppressions.yaml "$target/"
+  chmod +x "$target/hooks/pre-commit" "$target/hooks/pre-push"
+}
+
 # ── 1) .gitignore 가 산출물 경로를 덮는가 ───────────────────────────────────
 # git check-ignore 로 판정한다. .gitignore 본문을 grep 하면 표기 차이(끝 슬래시·와일드카드)
 # 때문에 "적혀는 있는데 실제로는 안 걸리는" 경우를 놓친다.
@@ -96,20 +106,16 @@ run_hook_case() {
     return
   fi
   git init -q "$tmp"
-  mkdir -p "$tmp/hooks" "$tmp/scripts"
-  cp hooks/pre-commit hooks/pre-push "$tmp/hooks/"
-  cp verify.sh "$tmp/"
-  cp .secret-patterns.default "$tmp/"
-  cp .check-weakening-patterns "$tmp/"
-  cp .gitignore "$tmp/"
-  [ -f suppressions.yaml ] && cp suppressions.yaml "$tmp/"
-  chmod +x "$tmp/hooks/pre-commit" "$tmp/hooks/pre-push"
+  install_hook_fixture "$tmp"
   # 한 번만 실행하고 종료코드와 출력(BLOCKED 사유)을 함께 받는다.
   out=$(
     cd "$tmp" || exit 9
-    git config core.hooksPath hooks
     git config user.email a@b.c
     git config user.name t
+    git add -f verify.sh .secret-patterns.default .check-weakening-patterns .gitignore tools/strict >/dev/null 2>&1
+    [ ! -f suppressions.yaml ] || git add -f suppressions.yaml >/dev/null 2>&1
+    git commit -q -m fixture-seed >/dev/null 2>&1
+    git config core.hooksPath hooks
     mkdir -p "$(dirname "$path")"
     "$maker" "$path"
     git add -f "$path" >/dev/null 2>&1
@@ -154,14 +160,15 @@ run_hook_case "비공개 리뷰 경로"       "private-reviews/r.md"       make_
 tmp=$(mktemp -d) || bad "임시 저장소 생성 실패 (인덱스 측정 검사)"
 if [ -n "$tmp" ] && [ -d "$tmp" ]; then
   TMPDIRS="$TMPDIRS $tmp"
-  git init -q "$tmp"; mkdir -p "$tmp/hooks"
-  cp hooks/pre-commit hooks/pre-push "$tmp/hooks/"
-  cp verify.sh .secret-patterns.default .check-weakening-patterns .gitignore "$tmp/"
-  [ -f suppressions.yaml ] && cp suppressions.yaml "$tmp/"
-  chmod +x "$tmp/hooks/pre-commit" "$tmp/hooks/pre-push"
+  git init -q "$tmp"
+  install_hook_fixture "$tmp"
   out=$(
     cd "$tmp" || exit 9
-    git config core.hooksPath hooks; git config user.email a@b.c; git config user.name t
+    git config user.email a@b.c; git config user.name t
+    git add -f verify.sh .secret-patterns.default .check-weakening-patterns .gitignore tools/strict >/dev/null 2>&1
+    [ ! -f suppressions.yaml ] || git add -f suppressions.yaml >/dev/null 2>&1
+    git commit -q -m fixture-seed >/dev/null 2>&1
+    git config core.hooksPath hooks
     dd if=/dev/zero of=payload.bin bs=1024 count=1200 status=none
     git add -f payload.bin >/dev/null 2>&1
     printf 'x\n' > payload.bin          # 작업트리만 작게 덮어쓴다
@@ -179,18 +186,16 @@ fi
 # ── 3-c) rename 이 검사 대상에 포함되는가 ────────────────────────────────────
 tmp=$(mktemp -d) || bad "임시 저장소 생성 실패 (rename 검사)"
 if [ -n "$tmp" ] && [ -d "$tmp" ]; then
-  git init -q "$tmp"; mkdir -p "$tmp/hooks"
-  cp hooks/pre-commit hooks/pre-push "$tmp/hooks/"
-  cp verify.sh .secret-patterns.default .check-weakening-patterns .gitignore "$tmp/"
-  [ -f suppressions.yaml ] && cp suppressions.yaml "$tmp/"
-  chmod +x "$tmp/hooks/pre-commit" "$tmp/hooks/pre-push"
+  git init -q "$tmp"
+  install_hook_fixture "$tmp"
   out=$(
     cd "$tmp" || exit 9
     git config user.email a@b.c; git config user.name t
     # 씨앗 커밋은 훅을 붙이기 **전에** 만든다. 훅 우회 옵션을 쓰면 그 리터럴 자체가
     # 검사 약화 패턴이라 이 스크립트가 커밋되지 않는다(2026-08-09 실측 — 훅이 나를 막았다).
     printf 'notes\n' > notes.txt
-    git add notes.txt >/dev/null 2>&1
+    git add -f notes.txt verify.sh .secret-patterns.default .check-weakening-patterns .gitignore tools/strict >/dev/null 2>&1
+    [ ! -f suppressions.yaml ] || git add -f suppressions.yaml >/dev/null 2>&1
     git commit -q -m seed >/dev/null 2>&1
     git config core.hooksPath hooks
     git mv notes.txt leak.db >/dev/null 2>&1
@@ -217,17 +222,16 @@ fi
 # ── 4) 대조군: 정상 파일은 통과해야 한다 (차단이 전부 막는 것이면 게이트가 아니다) ──
 tmp=$(mktemp -d)
 git init -q "$tmp"
-mkdir -p "$tmp/hooks"
-cp hooks/pre-commit hooks/pre-push "$tmp/hooks/"
-cp verify.sh .secret-patterns.default .check-weakening-patterns .gitignore "$tmp/"
-[ -f suppressions.yaml ] && cp suppressions.yaml "$tmp/"
-chmod +x "$tmp/hooks/pre-commit" "$tmp/hooks/pre-push"
+install_hook_fixture "$tmp"
 rc=0
 (
   cd "$tmp" || exit 9
-  git config core.hooksPath hooks
   git config user.email a@b.c
   git config user.name t
+  git add -f verify.sh .secret-patterns.default .check-weakening-patterns .gitignore tools/strict >/dev/null 2>&1
+  [ ! -f suppressions.yaml ] || git add -f suppressions.yaml >/dev/null 2>&1
+  git commit -q -m fixture-seed >/dev/null 2>&1
+  git config core.hooksPath hooks
   printf '# hello\n' > README.md
   git add README.md >/dev/null 2>&1
   bash hooks/pre-commit

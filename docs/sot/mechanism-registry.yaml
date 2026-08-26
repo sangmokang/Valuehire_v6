@@ -8,7 +8,7 @@
 #       manual_reason 필수 (verify-unification-goal-2026-08-10.md AC-M counter-AC).
 - id: "secrets-scan-precommit"
   path: "hooks/pre-commit"
-  target: "SECRET_PATTERNS_FILE= VERIFY_SCAN_SOURCE=index bash verify.sh"
+  target: "node tools/strict/trusted-secret-scan.mjs"
   stage: "pre-commit"
   required: true
 - id: "acceptance-glob-prepush"

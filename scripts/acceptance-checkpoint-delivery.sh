@@ -9,6 +9,7 @@ output=$(mktemp)
 trap 'rm -f "$output"' EXIT
 
 if ! node --test \
+  tests/checkpoint-gate.test.mjs \
   tests/checkpoint-gate-mutation.test.mjs \
   tests/checkpoint-ledger-trust.test.mjs \
   tests/checkpoint-secret-trust.test.mjs \
