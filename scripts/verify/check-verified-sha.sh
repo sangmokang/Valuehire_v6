@@ -53,6 +53,51 @@ evaluate() {
   return 1
 }
 
+evaluate_runs() {
+  local local_sha="$1" remote_sha="$2" worktree="$3"
+  shift 3
+  local record status conclusion aggregate="success"
+
+  printf 'CI_RUN_COUNT: %d\n' "$#"
+  if [ "$#" -eq 0 ]; then
+    evaluate "$local_sha" "$remote_sha" none none "$worktree"
+    return $?
+  fi
+
+  for record in "$@"; do
+    case "$record" in
+      *:*) ;;
+      *)
+        echo "NOT_RUN: check-run 레코드 형식 오류 — $record"
+        exit 2
+        ;;
+    esac
+    status=${record%%:*}
+    conclusion=${record#*:}
+    if [ -z "$status" ] || [ -z "$conclusion" ]; then
+      echo "NOT_RUN: check-run 레코드 값 누락 — $record"
+      exit 2
+    fi
+    case "$status" in
+      completed|queued|in_progress|waiting|requested|pending) ;;
+      *)
+        echo "NOT_RUN: 알 수 없는 check-run 상태 — $status"
+        exit 2
+        ;;
+    esac
+    if [ "$status" != "completed" ]; then
+      aggregate="pending"
+      break
+    fi
+    if [ "$conclusion" != "success" ]; then
+      aggregate="$conclusion"
+      break
+    fi
+  done
+
+  evaluate "$local_sha" "$remote_sha" "$remote_sha" "$aggregate" "$worktree"
+}
+
 if [ "${1:-}" = "--evaluate" ]; then
   shift
   if [ "$#" -ne 5 ]; then
@@ -60,6 +105,20 @@ if [ "${1:-}" = "--evaluate" ]; then
     exit 2
   fi
   evaluate "$@"
+  exit $?
+fi
+
+if [ "${1:-}" = "--evaluate-runs" ]; then
+  shift
+  if [ "$#" -lt 3 ]; then
+    echo "FAIL: --evaluate-runs 는 최소 인자 3개가 필요하다 (local remote worktree [status:conclusion...])"
+    exit 2
+  fi
+  local_sha="$1"
+  remote_sha="$2"
+  worktree="$3"
+  shift 3
+  evaluate_runs "$local_sha" "$remote_sha" "$worktree" "$@"
   exit $?
 fi
 
@@ -89,20 +148,12 @@ fi
 
 # 원격 HEAD SHA 에 붙은 check-run 만 본다. 브랜치나 PR 로 조회하면 옛 커밋의 초록불을
 # 지금 코드의 것으로 착각하게 된다 — 이 스크립트가 존재하는 이유가 바로 그것이다.
-runs=$(gh api "repos/{owner}/{repo}/commits/$remote_sha/check-runs" \
-        --jq '.check_runs[] | select(.name=="verify") | "\(.conclusion)"' 2>/dev/null)
+runs=$(gh api --paginate "repos/{owner}/{repo}/commits/$remote_sha/check-runs" \
+        --jq '.check_runs[] | select(.name=="verify") | "\(.status):\(.conclusion // "none")"' 2>/dev/null)
 rc=$?
 if [ "$rc" -ne 0 ]; then
   echo "NOT_RUN: check-runs 조회 실패 (gh exit=$rc) — 모르는 것을 통과로 세지 않는다"
   exit 2
-fi
-
-if [ -z "$runs" ]; then
-  conclusion="none"
-  ci_sha="none"
-else
-  conclusion=$(printf '%s\n' "$runs" | head -1)
-  ci_sha="$remote_sha"
 fi
 
 if [ -z "$(git status --porcelain)" ]; then
@@ -111,4 +162,9 @@ else
   worktree="dirty"
 fi
 
-evaluate "$local_sha" "$remote_sha" "$ci_sha" "$conclusion" "$worktree"
+records=()
+while IFS= read -r record; do
+  [ -n "$record" ] && records+=("$record")
+done <<< "$runs"
+
+evaluate_runs "$local_sha" "$remote_sha" "$worktree" "${records[@]}"

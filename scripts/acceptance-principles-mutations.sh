@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Strict 원칙 계약의 정상 fixture, 14개 반례, SOT hard/hard+1 경계를 격리 사본에서 실행한다.
+# Strict 원칙 계약의 정상 fixture, 실패 반례, SOT hard/hard+1 경계를 격리 사본에서 실행한다.
 set -uo pipefail
 
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY \
@@ -357,6 +357,58 @@ if [ "$rc" -eq 2 ] && grep -q '^VERDICT: NOT_RUN$' <<< "$output" && grep -q '^SO
   echo "PASS: C17 P11 hard LOC 중복 선언 — NOT_RUN (exit=2)"
 else
   printf 'FAIL: C17 P11 hard LOC 중복 선언 미차단 — exit=%s\n%s\n' "$rc" "$output"
+  fail=1
+fi
+
+new_case c18_sot_unreadable
+chmod 000 "$CASE/docs/sot/coding-principles.md"
+rc=0
+output=$(cd "$CASE" && bash scripts/verify/check-strict-principles-skills.sh "$SKILL_TMP/codex-limit.md" "$SKILL_TMP/claude-limit.md" 2>&1) || rc=$?
+chmod 600 "$CASE/docs/sot/coding-principles.md"
+checked=$((checked + 1))
+if [ "$rc" -eq 2 ] && grep -q '^VERDICT: NOT_RUN$' <<< "$output" && grep -q '^SOT_FILE_UNREADABLE:' <<< "$output"; then
+  echo "PASS: C18 정본 파일 읽기 불가 — NOT_RUN (exit=2)"
+else
+  printf 'FAIL: C18 정본 파일 읽기 불가 미차단 — exit=%s\n%s\n' "$rc" "$output"
+  fail=1
+fi
+
+new_case c19_sot_invalid_encoding
+ruby -e 'p=ARGV[0]; s=File.binread(p); s=s.sub("**P11**".b, "**P11**\xFF".b); File.binwrite(p,s)' \
+  "$CASE/docs/sot/coding-principles.md"
+rc=0
+output=$(cd "$CASE" && bash scripts/verify/check-strict-principles-skills.sh "$SKILL_TMP/codex-limit.md" "$SKILL_TMP/claude-limit.md" 2>&1) || rc=$?
+checked=$((checked + 1))
+if [ "$rc" -eq 2 ] && grep -q '^VERDICT: NOT_RUN$' <<< "$output" && grep -q '^SOT_ENCODING_INVALID:' <<< "$output"; then
+  echo "PASS: C19 정본 UTF-8 손상 — NOT_RUN (exit=2)"
+else
+  printf 'FAIL: C19 정본 UTF-8 손상 미차단 — exit=%s\n%s\n' "$rc" "$output"
+  fail=1
+fi
+
+cp "$SKILL_TMP/codex-limit.md" "$SKILL_TMP/codex-unreadable.md"
+chmod 000 "$SKILL_TMP/codex-unreadable.md"
+rc=0
+output=$(bash scripts/verify/check-strict-principles-skills.sh "$SKILL_TMP/codex-unreadable.md" "$SKILL_TMP/claude-limit.md" 2>&1) || rc=$?
+chmod 600 "$SKILL_TMP/codex-unreadable.md"
+checked=$((checked + 1))
+if [ "$rc" -eq 1 ] && grep -q '^VERDICT: FAIL$' <<< "$output" && grep -q '^SKILL_FILE_INVALID:' <<< "$output"; then
+  echo "PASS: C20 스킬 파일 읽기 불가 — FAIL (exit=1)"
+else
+  printf 'FAIL: C20 스킬 파일 읽기 불가 미차단 — exit=%s\n%s\n' "$rc" "$output"
+  fail=1
+fi
+
+cp "$SKILL_TMP/codex-limit.md" "$SKILL_TMP/codex-invalid-encoding.md"
+ruby -e 'p=ARGV[0]; s=File.binread(p); s=s.sub("STRICT_PRINCIPLES_CONTRACT:START".b, "STRICT_PRINCIPLES_CONTRACT:START\xFF".b); File.binwrite(p,s)' \
+  "$SKILL_TMP/codex-invalid-encoding.md"
+rc=0
+output=$(bash scripts/verify/check-strict-principles-skills.sh "$SKILL_TMP/codex-invalid-encoding.md" "$SKILL_TMP/claude-limit.md" 2>&1) || rc=$?
+checked=$((checked + 1))
+if [ "$rc" -eq 1 ] && grep -q '^VERDICT: FAIL$' <<< "$output" && grep -q '^SKILL_ENCODING_INVALID:' <<< "$output"; then
+  echo "PASS: C21 스킬 UTF-8 손상 — FAIL (exit=1)"
+else
+  printf 'FAIL: C21 스킬 UTF-8 손상 미차단 — exit=%s\n%s\n' "$rc" "$output"
   fail=1
 fi
 

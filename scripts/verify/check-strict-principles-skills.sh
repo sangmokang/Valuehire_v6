@@ -12,7 +12,7 @@ CODEX_SKILL=$1
 CLAUDE_SKILL=$2
 
 for file in "$CODEX_SKILL" "$CLAUDE_SKILL"; do
-  if [ ! -f "$file" ] || [ -L "$file" ] || [ ! -s "$file" ]; then
+  if [ ! -f "$file" ] || [ -L "$file" ] || [ ! -s "$file" ] || [ ! -r "$file" ]; then
     printf 'VERDICT: FAIL\nSKILL_FILE_INVALID: %s\nCHECKED: 0\n' "$file"
     exit 1
   fi
@@ -43,7 +43,30 @@ unless File.file?(sot_path) && !File.zero?(sot_path)
   exit 2
 end
 
-sot = File.read(sot_path)
+unless File.readable?(sot_path)
+  puts "VERDICT: NOT_RUN"
+  puts "SOT_FILE_UNREADABLE: #{sot_path}"
+  puts "CHECKED: 0"
+  exit 2
+end
+
+begin
+  sot = File.binread(sot_path)
+rescue SystemCallError, IOError => e
+  puts "VERDICT: NOT_RUN"
+  puts "SOT_FILE_UNREADABLE: #{sot_path} #{e.class}"
+  puts "CHECKED: 0"
+  exit 2
+end
+
+sot.force_encoding("UTF-8")
+unless sot.valid_encoding?
+  puts "VERDICT: NOT_RUN"
+  puts "SOT_ENCODING_INVALID: #{sot_path}"
+  puts "CHECKED: 0"
+  exit 2
+end
+
 p11_lines = sot.lines.select { |line| line.include?("**P11**") }
 file_clause = p11_lines.length == 1 ? p11_lines.first.split("②", 2).first : ""
 line_limit_matches = file_clause.scan(/\bhard\s+(\d+)\s+LOC\b/i).flatten.map(&:to_i)
@@ -57,8 +80,31 @@ line_limit = line_limit_matches.fetch(0)
 start_marker = "<!-- STRICT_PRINCIPLES_CONTRACT:START -->"
 end_marker = "<!-- STRICT_PRINCIPLES_CONTRACT:END -->"
 
-extract = lambda do |path|
-  text = File.read(path)
+skill_texts = {}
+[codex_file, claude_file].each do |path|
+  begin
+    text = File.binread(path)
+  rescue SystemCallError, IOError => e
+    errors << "SKILL_FILE_UNREADABLE: #{path} #{e.class}"
+    next
+  end
+  text.force_encoding("UTF-8")
+  unless text.valid_encoding?
+    errors << "SKILL_ENCODING_INVALID: #{path}"
+    next
+  end
+  skill_texts[path] = text
+end
+
+unless errors.empty?
+  puts "VERDICT: FAIL"
+  errors.each { |error| puts error }
+  puts "CHECKED: 2"
+  puts "FAILURES: #{errors.length}"
+  exit 1
+end
+
+extract = lambda do |path, text|
   starts = text.scan(Regexp.new(Regexp.escape(start_marker))).length
   ends = text.scan(Regexp.new(Regexp.escape(end_marker))).length
   if starts != 1 || ends != 1
@@ -68,10 +114,10 @@ extract = lambda do |path|
   text[/#{Regexp.escape(start_marker)}.*?#{Regexp.escape(end_marker)}/m].to_s
 end
 
-codex = File.read(codex_file)
-claude = File.read(claude_file)
-codex_block = extract.call(codex_file)
-claude_block = extract.call(claude_file)
+codex = skill_texts.fetch(codex_file)
+claude = skill_texts.fetch(claude_file)
+codex_block = extract.call(codex_file, codex)
+claude_block = extract.call(claude_file, claude)
 errors << "COMMON_CONTRACT_MISMATCH" unless codex_block == claude_block
 
 required = [

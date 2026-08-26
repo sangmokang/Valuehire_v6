@@ -48,6 +48,49 @@ expect "CI 실행 자체가 없음 → 미검증"          1 UNVERIFIED "$A" "$A
 expect "작업트리 dirty → 미검증"              1 UNVERIFIED "$A" "$A" "$A" success dirty
 expect "빈 값 섞임 → 미검증"                  1 UNVERIFIED ""    "$A" "$A" success clean
 
+expect_runs() {
+  local desc="$1" wanted_rc="$2" wanted_word="$3"
+  shift 3
+  local out rc=0
+  out=$(bash "$CHECKER" --evaluate-runs "$A" "$A" clean "$@" 2>&1) || rc=$?
+  checked=$((checked + 1))
+  if [ "$rc" -eq "$wanted_rc" ] && printf '%s\n' "$out" | grep -q "^VERDICT: $wanted_word$"; then
+    printf 'PASS: %s — %s (exit=%s)\n' "$desc" "$wanted_word" "$rc"
+  else
+    printf 'FAIL: %s — expected %s/exit=%s actual exit=%s\n%s\n' \
+      "$desc" "$wanted_word" "$wanted_rc" "$rc" "$out"
+    fail=1
+  fi
+}
+
+expect_runs "verify 2개 모두 완료·성공 → 검증됨" 0 VERIFIED \
+  completed:success completed:success
+expect_runs "성공 1개·진행 중 1개 → 미검증" 1 UNVERIFIED \
+  completed:success in_progress:none
+expect_runs "성공 1개·실패 1개 → 미검증" 1 UNVERIFIED \
+  completed:success completed:failure
+expect_runs "verify 실행 0개 → 미검증" 1 UNVERIFIED
+
+checked=$((checked + 1))
+bad_runs_rc=0
+bash "$CHECKER" --evaluate-runs "$A" "$A" clean malformed >/dev/null 2>&1 || bad_runs_rc=$?
+if [ "$bad_runs_rc" -eq 2 ]; then
+  echo "PASS: 잘못된 check-run 레코드 → NOT_RUN (exit=2)"
+else
+  echo "FAIL: 잘못된 check-run 레코드 → exit=$bad_runs_rc (기대 2)"
+  fail=1
+fi
+
+checked=$((checked + 1))
+unknown_status_rc=0
+bash "$CHECKER" --evaluate-runs "$A" "$A" clean unknown:success >/dev/null 2>&1 || unknown_status_rc=$?
+if [ "$unknown_status_rc" -eq 2 ]; then
+  echo "PASS: 알 수 없는 check-run 상태 → NOT_RUN (exit=2)"
+else
+  echo "FAIL: 알 수 없는 check-run 상태 → exit=$unknown_status_rc (기대 2)"
+  fail=1
+fi
+
 # 미검증 사유가 실제로 출력되는가 — 이유 없는 판정은 다음 사람이 고칠 수 없다.
 checked=$((checked + 1))
 # 판정기는 UNVERIFIED 일 때 종료값 1 이다. 파이프로 넘기면 pipefail 이 그 1 을

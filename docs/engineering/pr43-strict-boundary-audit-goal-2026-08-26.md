@@ -177,3 +177,12 @@ V1은 Claude가 정본 추출 실패, 600/601, 검사기·시험 동시 약화, 
 | Codex V2 새 맥락 | `.omx/artifacts/codex-pr43-boundary-v2-2026-08-26.md` | `b4efa6ef0042d38a0935dcf7ba0423ffe8b3c98411bc95d7cd123f1ea71e424e` | APPROVE — V1 핵심 근거 독립 재현 | REQUEST_CHANGES — 로컬 HEAD와 원격 PR head 불일치 |
 
 G는 구현·변이·정본 개수 수정과 로컬 검증을 PASS했다. V1과 V2도 로컬 코드 결함 수정은 승인했지만, 새 로컬 변경의 원격 Actions는 실행되지 않았다. 다음 Strict SHIP 프롬프트는 force-push 없이 기존 PR #43 브랜치를 갱신하고 정확한 새 SHA의 Actions와 Claude/Codex 원격 재검증을 수행해야 한다.
+
+## 후속 humanreview 보정 (2026-08-26)
+
+이 문서의 위 검증 장부는 boundary 600/601 수정 시점의 기록이다. 후속 `$humanreview`에서 추가 결함 두 가지를 발견해 별도 goal `docs/engineering/pr43-final-report-humanreview-goal-2026-08-26.md`로 보강했다.
+
+- 원칙 mutation은 읽기 불가·UTF-8 손상 반례까지 확장돼 `CHECKED: 48`, `VERDICT: PASS`로 재실행됐다.
+- verified-sha 판정기는 같은 SHA의 `verify` check-run 전량이 completed/success일 때만 VERIFIED가 되도록 보강됐고, `CHECKED: 18`, `VERDICT: PASS`로 재실행됐다.
+- 히스토리 원명령 재실행 결과는 `PASS: 히스토리 전량 blob 스캔 0건 (blob 1380개 검사)`다.
+- Claude V1은 후속 호출 두 번 모두 `No messages returned`로 `NOT_RUN`이며, 원격 PR #43은 아직 이전 SHA `b93b98b7454d833f067adc2cbe31073e1e2bd9d3`를 가리킨다.
