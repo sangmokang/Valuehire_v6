@@ -73,6 +73,7 @@ GitHub Issue 생성은 외부 쓰기이므로 승인 전에는 실행하지 않�
 | WU-3b-13 | 교차 WU RED 보호 | 후속 GREEN·장부 밖 커밋의 과거 RED 테스트 재작성 차단 |
 | WU-3b-14 | index 고정 checkpoint 실행 | gate와 policy/secret/JS scan을 index bundle로 실행, unstaged stub 차단 |
 | WU-3b-15 | V1 envelope 절차 보정 | 무효 무-trailer 커밋 보존, 오류 봉투·들여쓴 판정 차단, 유효 RED/GREEN 재실행 |
+| WU-3b-16 | V1/V2 trace fail-open 보정 | 종료값 0·완결 출력·전체 commit 분류·후속 RED 비약화·index runner SOT |
 
 ## 데이터 안전 조건
 

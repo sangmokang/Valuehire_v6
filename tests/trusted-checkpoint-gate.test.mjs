@@ -128,3 +128,9 @@ test("index runner executes approved modules despite every unstaged sibling stub
   const body = JSON.parse(result.stdout);
   assert.ok(body.violations.some((item) => item.check === "scope" && item.file === "outside.txt"));
 });
+
+test("verification SOT requires the canonical index runner invocation", () => {
+  const sot = readFileSync(join(ROOT, "docs/sot/verification-commands.md"), "utf8");
+  assert.match(sot, /git show :tools\/strict\/index-checkpoint-gate\.mjs \| node --input-type=module -/);
+  assert.match(sot, /작업 폴더.*직접 실행.*판정 근거.*아니/s);
+});

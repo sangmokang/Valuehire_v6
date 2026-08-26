@@ -56,8 +56,8 @@ function sealRecord(record) {
   return { ...unsigned, record_sha256: sha256(canonical(unsigned)) };
 }
 
-function commit(cwd, subject, wu, phase, path = "src/value.mjs") {
-  write(cwd, path, `export const value = ${JSON.stringify(subject)};\n`);
+function commit(cwd, subject, wu, phase, path = "src/value.mjs", content = null) {
+  write(cwd, path, content ?? `export const value = ${JSON.stringify(subject)};\n`);
   git(cwd, "add", path);
   git(cwd, "commit", "-qm", subject, "-m", `WU: ${wu}\nPhase: ${phase}`);
   return git(cwd, "rev-parse", "HEAD");
@@ -93,12 +93,17 @@ function makeRepo(mutate = () => {}, paths = {}) {
   git(cwd, "add", "-A");
   git(cwd, "commit", "-qm", "baseline");
   const base = git(cwd, "rev-parse", "HEAD");
-  const red1 = commit(cwd, "red one", "WU-1", "RED", paths.red1);
+  const red1 = commit(cwd, "red one", "WU-1", "RED", paths.red1, paths.red1Content);
   const green1 = commit(cwd, "green one", "WU-1", "GREEN", paths.green1);
-  const red2 = commit(cwd, "red two", "WU-2", "RED", paths.red2);
+  if (paths.uncontracted) {
+    write(cwd, "src/uncontracted.mjs", "export const uncontracted = true;\n");
+    git(cwd, "add", "src/uncontracted.mjs");
+    git(cwd, "commit", "-qm", "uncontracted change");
+  }
+  const red2 = commit(cwd, "red two", "WU-2", "RED", paths.red2, paths.red2Content);
   const green2 = commit(cwd, "green two", "WU-2", "GREEN", paths.green2);
-  const output1 = "PASS WU-1 complete\n";
-  const output2 = "PASS WU-2 complete\n";
+  const output1 = paths.output1 ?? "TAP version 13\n1..1\n# tests 1\n# pass 1\n# fail 0\n# duration_ms 1\n";
+  const output2 = paths.output2 ?? "TAP version 13\n1..1\n# tests 1\n# pass 1\n# fail 0\n# duration_ms 1\n";
   const issue = readFileSync(join(cwd, "docs/engineering/issue.md"));
   const evidence1 = evidence("evidence/wu-1.tap", output1, commitTime(cwd, green1), commitTime(cwd, green1));
   const evidence2 = evidence("evidence/wu-2.tap", output2, commitTime(cwd, green2), commitTime(cwd, green2));
@@ -238,9 +243,39 @@ test("a later GREEN commit cannot rewrite an earlier WU RED test", () => expectF
   "later non-RED commit modifies protected RED test",
 ));
 test("a later recorded RED commit may extend a protected test", () => {
-  const result = runValidator(makeRepo(() => {}, { red1: "tests/wu-1.test.mjs", red2: "tests/wu-1.test.mjs" }));
+  const result = runValidator(makeRepo(() => {}, {
+    red1: "tests/wu-1.test.mjs",
+    red2: "tests/wu-1.test.mjs",
+    red1Content: "assert.equal(1, 1);\n",
+    red2Content: "assert.equal(1, 1);\nassert.equal(2, 2);\n",
+  }));
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
 });
+test("a later recorded RED commit cannot weaken an earlier protected test", () => expectFailure(
+  makeRepo(() => {}, {
+    red1: "tests/wu-1.test.mjs",
+    red2: "tests/wu-1.test.mjs",
+    red1Content: "assert.equal(1, 1);\nassert.equal(2, 2);\n",
+    red2Content: "assert.equal(1, 1);\n",
+  }),
+  "recorded RED weakens",
+));
+test("GREEN evidence cannot self-authorize a nonzero expected exit", () => expectFailure(makeRepo(({ ledger }) => {
+  for (let index = 0; index < ledger.records.length; index += 1) {
+    ledger.records[index].evidence[0].exit = 1;
+    ledger.records[index].evidence[0].expected_exit = 1;
+    ledger.records[index] = sealRecord(ledger.records[index]);
+    if (index + 1 < ledger.records.length) ledger.records[index + 1].previous_record_sha256 = ledger.records[index].record_sha256;
+  }
+}), "exit must be zero"));
+test("self-consistent truncated node test output is rejected", () => expectFailure(
+  makeRepo(() => {}, { output1: "TAP version 13\nok 1 - partial\n" }),
+  "completion summary",
+));
+test("an unclassified commit between base and candidate is rejected", () => expectFailure(
+  makeRepo(() => {}, { uncontracted: true }),
+  "unclassified commit",
+));
 test("a stale branch is rejected", () => expectFailure(makeRepo(({ ledger }) => { ledger.branch = "task/stale"; }), "branch"));
 test("a stale worktree is rejected", () => expectFailure(makeRepo(({ ledger }) => { ledger.worktree = "/tmp/stale"; }), "worktree"));
 test("zero evidence is rejected", () => expectFailure(makeRepo(({ ledger }) => {
