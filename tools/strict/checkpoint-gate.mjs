@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import { existsSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { countJavaScriptWeakening } from "./checkpoint-js-scan.mjs";
 
@@ -197,56 +196,18 @@ function parseScannerFiles(output, stagedFiles) {
 
 function checkSecrets(changes, authority) {
   const stagedFiles = new Set(changes.filter((change) => change.status !== "D").map((change) => change.path));
-  if (authority.runId) {
-    const result = runTrustedSecretScan({
-      readIndex,
-      localPatternSha256: authority.secretPatternSha256,
-    });
-    if (result.status === 0) return [];
-    const output = `${result.stdout}\n${result.stderr}`;
-    const files = parseScannerFiles(output, stagedFiles);
-    return (files.length > 0 ? files : [""]).map((file) => ({
-      check: CHECKS.LEAKS,
-      file,
-      detail: `trusted repository secret scanner failed with exit ${result.status}`,
-    }));
-  }
-  if (existsSync("verify.sh")) {
-    const result = spawnSync("bash", ["verify.sh"], {
-      encoding: "utf8",
-      env: { ...process.env, SECRET_PATTERNS_FILE: "", VERIFY_SCAN_SOURCE: "index" },
-      maxBuffer: 16 * 1024 * 1024,
-    });
-    if (result.status === 0) return [];
-    const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
-    const files = parseScannerFiles(output, stagedFiles);
-    return (files.length > 0 ? files : [""]).map((file) => ({
-      check: CHECKS.LEAKS,
-      file,
-      detail: `repository secret scanner failed with exit ${result.status}`,
-    }));
-  }
-
-  const patterns = [
-    /\bAKIA[0-9A-Z]{16}\b/,
-    /\bASIA[0-9A-Z]{16}\b/,
-    /\bghp_[A-Za-z0-9_]{20,}\b/,
-    /\b(?:password|passwd|secret|token|api[_-]?key)\b\s*[:=]\s*["']?[^"'\s]{8,}/i,
-    /-----BEGIN (?:RSA |EC |OPENSSH |)PRIVATE KEY-----/,
-  ];
-  const violations = [];
-  for (const change of changes) {
-    if (change.status === "D") continue;
-    const content = readIndex(change.path);
-    if (patterns.some((pattern) => pattern.test(content))) {
-      violations.push({
-        check: CHECKS.LEAKS,
-        file: change.path,
-        detail: "conservative secret pattern matched staged content",
-      });
-    }
-  }
-  return violations;
+  const result = runTrustedSecretScan({
+    readIndex,
+    localPatternSha256: authority.secretPatternSha256,
+  });
+  if (result.status === 0) return [];
+  const output = `${result.stdout}\n${result.stderr}`;
+  const files = parseScannerFiles(output, stagedFiles);
+  return (files.length > 0 ? files : [""]).map((file) => ({
+    check: CHECKS.LEAKS,
+    file,
+    detail: `trusted repository secret scanner failed with exit ${result.status}`,
+  }));
 }
 
 function normalizeExtension(path) {
@@ -452,7 +413,7 @@ async function main() {
       violations.push({ check: CHECKS.INPUT, file: "", detail: "--base is required" });
     } else {
       git(["rev-parse", "--verify", `${args.base}^{commit}`]);
-      if (args.runId) await loadSecurePolicy();
+      await loadSecurePolicy();
     }
   } catch (error) {
     violations.push({ check: CHECKS.INPUT, file: "", detail: error.message });

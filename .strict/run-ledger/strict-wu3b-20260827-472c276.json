@@ -392,7 +392,59 @@
           "output_ref": "/tmp/valuehire-strict-wu3b-evidence/wu3b1a/staged-gate.json"
         }
       ]
+    },
+    {
+      "id": "WU-3b-2a",
+      "status": "open",
+      "scope": [
+        ".strict/run-ledger/strict-wu3b-20260827-472c276.json",
+        "docs/engineering/valuehire-delivery-chain-issue-2026-08-27.md",
+        "docs/engineering/valuehire-delivery-chain-goal-2026-08-27.md",
+        "tests/checkpoint-gate.test.mjs",
+        "tools/strict/checkpoint-gate.mjs"
+      ],
+      "red_commit": "ebb3535782f33aa905ddbef956f2a6ef2dec35c8",
+      "implementation_commit": null,
+      "validation": [
+        {
+          "command": "node --test --test-name-pattern=no-run-id-path tests/checkpoint-gate.test.mjs",
+          "started_at": "2026-08-26T19:23:08Z",
+          "finished_at": "2026-08-26T19:23:09Z",
+          "exit": 0,
+          "checked": 1,
+          "output_sha256": "55a310985a7dd348fe63a6d80c995b4cf6f5cecb5a76b4ba2415f7da39648802",
+          "output_ref": "/tmp/valuehire-strict-wu3b-evidence/wu3b2a/final-targeted.tap"
+        },
+        {
+          "command": "no-run secret bypass mutation + node --test --test-name-pattern=no-run-id-path",
+          "started_at": "2026-08-26T19:23:23Z",
+          "finished_at": "2026-08-26T19:23:23Z",
+          "exit": 1,
+          "expected_exit": 1,
+          "checked": 1,
+          "output_sha256": "c42188692190d9014992e9ce74df849d08d7907defc54a320ba1771e21ba757a",
+          "output_ref": "/tmp/valuehire-strict-wu3b-evidence/wu3b2a/no-run-secret-mutation.tap"
+        },
+        {
+          "command": "node --test tests/checkpoint-secret-trust.test.mjs",
+          "started_at": "2026-08-26T19:23:35Z",
+          "finished_at": "2026-08-26T19:23:39Z",
+          "exit": 0,
+          "checked": 9,
+          "output_sha256": "c14c612f5460b7b93573a3b79e5643dacc444b1d794b6329d14f1fe940909f76",
+          "output_ref": "/tmp/valuehire-strict-wu3b-evidence/wu3b2a/secret-trust.tap"
+        },
+        {
+          "command": "node tools/strict/checkpoint-gate.mjs --base ebb3535782f33aa905ddbef956f2a6ef2dec35c8 --json --run-id strict-wu3b-20260827-472c276 --wu-id WU-3b-2a",
+          "started_at": "2026-08-26T19:24:22Z",
+          "finished_at": "2026-08-26T19:24:29Z",
+          "exit": 0,
+          "checked": 4,
+          "output_sha256": "e4b15b1a7bd891e43aabe6b5df41a78097670e63e8cacda701b837d5cdbd7a95",
+          "output_ref": "/tmp/valuehire-strict-wu3b-evidence/wu3b2a/staged-gate.json"
+        }
+      ]
     }
   ],
-  "updated_at": "2026-08-27T04:20:44+09:00"
+  "updated_at": "2026-08-27T04:24:29+09:00"
 }

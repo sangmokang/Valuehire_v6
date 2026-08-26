@@ -56,6 +56,7 @@ GitHub Issue 생성은 외부 쓰기이므로 승인 전에는 실행하지 않�
 | WU-3b-1 | run-ledger 단일 권한 출처 | checkpoint gate, ledger policy, 회귀 테스트 |
 | WU-3b-1a | legacy worktree ledger 자동 선택 제거 | checkpoint fallback, 기존 scope 회귀 테스트 |
 | WU-3b-2 | secret-pattern 신뢰 경계 | trusted secret runner, `verify.sh`, 회귀 테스트 |
+| WU-3b-2a | legacy secret 검사 경로 제거 | checkpoint fallback, index scanner, 회귀 테스트 |
 | WU-3b-3 | Issue→commit→evidence 추적 장부 | trace validator, schema, 회귀 테스트 |
 | WU-3b-4 | 최신 SHA V1/V2 준비·보존 | adversarial evidence 계약과 회귀 테스트 |
 | WU-3b-5 | PR/CI/merge/deploy/live 상태 | delivery state, acceptance, hook/CI/SOT 배선 |
