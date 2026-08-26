@@ -1,0 +1,194 @@
+{
+  "schema_version": "valuehire.feature-sot/v1",
+  "feature": {
+    "id": "admin-weekly-dashboard",
+    "name": "관리자 주간 대시보드",
+    "category": "product_experience",
+    "maturity": "implemented",
+    "availability": "local_runtime",
+    "purpose": "개인정보와 외부 쓰기 없이 합성 주간 지표, 수집 상태, 입력 지문을 로컬 화면에서 검토한다.",
+    "authority": {
+      "owns": [
+        "feature_status",
+        "runtime_boundary",
+        "public_routes",
+        "feature_level_invariants",
+        "verification_commands"
+      ],
+      "delegates": [
+        {
+          "scope": "metric ids, groups, units, aggregation and external-effect flags",
+          "document": "contracts/admin-weekly-dashboard/metric-contract-v1.json"
+        },
+        {
+          "scope": "repository-wide coding and verification principles",
+          "document": "docs/sot/coding-principles.md"
+        }
+      ],
+      "historical_context_only": [
+        "docs/engineering/admin-weekly-dashboard-phase-b-foundation-goal-2026-08-17.md",
+        "docs/engineering/admin-weekly-dashboard-phase-c-shadow-ui-goal-2026-08-17.md"
+      ]
+    },
+    "surface_coverage": {
+      "tracked_product_files": [
+        "apps/admin/app.js",
+        "apps/admin/index.html",
+        "apps/admin/styles.css",
+        "contracts/admin-weekly-dashboard/metric-contract-v1.json",
+        "humansearch/src/humansearch/admin_weekly_dashboard/__init__.py",
+        "humansearch/src/humansearch/admin_weekly_dashboard/contracts.py",
+        "humansearch/src/humansearch/admin_weekly_dashboard/shadow_server.py",
+        "humansearch/src/humansearch/admin_weekly_dashboard/snapshot.py",
+        "humansearch/src/humansearch/admin_weekly_dashboard/weekly_window.py"
+      ],
+      "ci_steps": [],
+      "ci_command_paths": [],
+      "hooks": [],
+      "contract_surfaces": []
+    },
+    "entrypoints": [
+      {
+        "kind": "cli",
+        "path": "humansearch/src/humansearch/admin_weekly_dashboard/shadow_server.py",
+        "symbol": "main",
+        "command": "PYTHONPATH=humansearch/src python3 -m humansearch.admin_weekly_dashboard.shadow_server --assets apps/admin --contract contracts/admin-weekly-dashboard/metric-contract-v1.json --host 127.0.0.1 --port 8765"
+      },
+      {
+        "kind": "http",
+        "path": "humansearch/src/humansearch/admin_weekly_dashboard/shadow_server.py",
+        "routes": ["/", "/styles.css", "/app.js", "/api/dashboard", "/healthz"]
+      },
+      {
+        "kind": "browser_client",
+        "path": "apps/admin/app.js",
+        "symbol": "loadDashboard",
+        "consumes": "/api/dashboard"
+      }
+    ],
+    "inputs": [
+      {
+        "name": "meeting_date_kst",
+        "type": "ISO date string",
+        "constraints": ["valid calendar date", "interpreted in Asia/Seoul"]
+      },
+      {
+        "name": "metric_contract",
+        "type": "validated JSON contract",
+        "source": "contracts/admin-weekly-dashboard/metric-contract-v1.json"
+      },
+      {
+        "name": "events_and_source_states",
+        "type": "in-memory MetricEvent and SourceState collections",
+        "runtime_note": "The shipped shadow server supplies deterministic synthetic data; no live adapter is connected."
+      }
+    ],
+    "outputs": [
+      {
+        "name": "weekly_snapshot",
+        "type": "PII-free JSON-safe payload",
+        "fields": ["window", "metrics", "external_effects", "input_sha256", "snapshot_sha256"]
+      },
+      {
+        "name": "dashboard_view",
+        "type": "static HTML/CSS/JS rendered from one API payload",
+        "shows": ["12-week collection state", "metric groups", "PASS/FAIL/NOT_RUN", "provenance"]
+      }
+    ],
+    "errors": [
+      {
+        "condition": "metric contract or event input is invalid",
+        "behavior": "fail before opening the server or building a misleading snapshot"
+      },
+      {
+        "condition": "source FAIL or NOT_RUN",
+        "behavior": "value is null and an allowlisted reason is retained; never coerced to zero"
+      },
+      {
+        "condition": "unknown route or unsupported method",
+        "behavior": "404 route_not_found or 405 method_not_allowed with safe headers"
+      }
+    ],
+    "invariants": [
+      {
+        "id": "AWD-INV-1",
+        "rule": "The reporting window is the Sunday 00:00 KST inclusive to the following Sunday 00:00 KST exclusive before the meeting week.",
+        "evidence": "humansearch/src/humansearch/admin_weekly_dashboard/weekly_window.py"
+      },
+      {
+        "id": "AWD-INV-2",
+        "rule": "Runs, positions, raw discoveries, source-local unique candidates and mail events remain separate metrics.",
+        "evidence": "contracts/admin-weekly-dashboard/metric-contract-v1.json"
+      },
+      {
+        "id": "AWD-INV-3",
+        "rule": "Every metric carries status, value or null, safe reason, contract version, source row count and input hash.",
+        "evidence": "humansearch/src/humansearch/admin_weekly_dashboard/contracts.py"
+      },
+      {
+        "id": "AWD-INV-4",
+        "rule": "Private event payload never crosses the API boundary and never changes the public hashes.",
+        "evidence": "humansearch/tests/test_admin_weekly_boundaries.py"
+      },
+      {
+        "id": "AWD-INV-5",
+        "rule": "The server binds only to loopback, serves an exact route allowlist and disables all declared external effects.",
+        "evidence": "humansearch/src/humansearch/admin_weekly_dashboard/shadow_server.py"
+      },
+      {
+        "id": "AWD-INV-6",
+        "rule": "The local shadow contains one synthetic collected week and eleven explicit NOT_RUN history gaps; it does not invent history.",
+        "evidence": "humansearch/src/humansearch/admin_weekly_dashboard/shadow_server.py"
+      }
+    ],
+    "boundaries": [
+      "Local shadow only; the banner must say it is not production.",
+      "No administrator authentication or internet exposure.",
+      "No database, Gmail, ClickUp, calendar or recruitment-portal adapter is connected.",
+      "No snapshot persistence and no production history backfill.",
+      "All external effects in the metric contract must remain DISABLED for this runtime."
+    ],
+    "non_goals": [
+      "production deployment",
+      "live account reads",
+      "candidate identity resolution across sources",
+      "sending mail or writing to external services",
+      "creating historical numbers from estimates"
+    ],
+    "verification": [
+      {
+        "id": "AWD-V1",
+        "command": "cd humansearch && uv run --no-sync pytest -q tests/test_admin_weekly_window.py tests/test_admin_weekly_snapshot.py tests/test_admin_weekly_boundaries.py tests/test_admin_weekly_validation.py tests/test_admin_shadow_contract.py tests/test_admin_shadow_server.py",
+        "expected": "exit 0 and collected tests greater than zero"
+      },
+      {
+        "id": "AWD-V2",
+        "command": "cd humansearch && uv run --no-sync ruff check src tests && uv run --no-sync mypy src tests",
+        "expected": "both commands exit 0"
+      }
+    ],
+    "evidence": [
+      "apps/admin/index.html",
+      "apps/admin/app.js",
+      "apps/admin/styles.css",
+      "humansearch/src/humansearch/admin_weekly_dashboard",
+      "humansearch/tests/test_admin_shadow_server.py",
+      "humansearch/tests/test_admin_shadow_contract.py",
+      "docs/engineering/admin-weekly-dashboard-phase-c-shadow-ui-goal-2026-08-17.md"
+    ],
+    "change_protocol": {
+      "required_updates": [
+        "this feature document",
+        "contracts/admin-weekly-dashboard/metric-contract-v1.json when metric semantics change",
+        "runtime tests for changed behavior"
+      ],
+      "requires_owner_approval": [
+        "production exposure",
+        "live account reads",
+        "external writes",
+        "personal-data boundary expansion"
+      ],
+      "rollback": "Revert the feature change and its contract/test/SOT updates together; no persisted product data is owned by the current shadow runtime."
+    }
+  }
+}

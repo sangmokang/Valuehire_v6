@@ -2,7 +2,9 @@
 
 이 디렉토리는 "다음 세션이 이 문서 없이도 이 저장소가 왜 이런 규칙으로 도는지 알아야 하는" 것만 담는다. 세션/사건 기록은 `docs/engineering/`(날짜 필수, 불변)에 남긴다. 분류 기준과 파일 크기 예산은 `docs/engineering/docs-sot-restructure-goal-2026-08-08.md` 참고.
 
-- [coding-principles.md](coding-principles.md) — P1~P22 확정 원칙 표 + 웹 자동화 5조 + 검증 체제(V-1~V-5)
+- [features/INDEX.md](features/INDEX.md) — 현재 주요 기능의 분류·구현 상태·경계·검증 명령 단일 진입점
+- [features/catalog.yaml](features/catalog.yaml) — 현재 주요 기능의 범주와 상태를 기계가 읽는 카탈로그
+- [coding-principles.md](coding-principles.md) — P1~P24 확정 원칙 표 + 웹 자동화 5조 + 검증 체제(V-1~V-5)
 - [hook-contracts.md](hook-contracts.md) — 로컬 git hook 5개(pre-commit·pre-push·session-status·acceptance-0-7·install-hooks)의 입출력 계약
 - [git-workflow.md](git-workflow.md) — trunk-based + worktree + 태그 릴리스 규약
 - [verification-commands.md](verification-commands.md) — 이 저장소의 실제 게이트 명령(make 레포 아님, 실행 확인됨)
@@ -10,3 +12,6 @@
 - [humansearch-browser-contract.md](humansearch-browser-contract.md) — HumanSearch 상주 브라우저 진단 접속·단일 탭·사용권·사람 개입·채널별 경계
 
 새 SOT 파일을 추가하는 유일한 트리거: 스크립트/훅/CI/다음 세션이 이 문서를 **답으로 참조**해야 하는가? 아니면 `docs/engineering/`에 남긴다.
+
+현재 기능을 찾을 때는 `features/catalog.yaml`에서 기능 ID와 상태를 고른 뒤 해당 기능 문서를 읽는다.
+기능 문서는 세부 정본을 복제하지 않고 `authority.delegates`로 소유 경로를 지정한다.
