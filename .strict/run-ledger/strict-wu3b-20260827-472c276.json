@@ -12,9 +12,42 @@
       "id": "WU-3b-1",
       "status": "open",
       "scope": [
+        ".strict/run-ledger/strict-wu3b-20260827-472c276.json",
         "tools/strict/checkpoint-gate.mjs",
         "tools/strict/checkpoint-policy.mjs",
         "tests/checkpoint-ledger-trust.test.mjs"
+      ],
+      "red_commit": "2ef1f62814284cf20ee5b5270626e972e4460af4",
+      "implementation_commit": null,
+      "validation": [
+        {
+          "command": "node --test tests/checkpoint-ledger-trust.test.mjs",
+          "started_at": "2026-08-26T18:21:57Z",
+          "finished_at": "2026-08-26T18:22:11Z",
+          "exit": 0,
+          "checked": 8,
+          "output_sha256": "13ee8c521913314d38ec5802a2ceaad8880d96c45cf7f1afe467480f99b34d9e",
+          "output_ref": "/tmp/valuehire-strict-wu3b-evidence/wu3b1/ledger-trust.tap"
+        },
+        {
+          "command": "worktree-read mutation + node --test --test-name-pattern=unstaged broad decoy",
+          "started_at": "2026-08-26T18:22:40Z",
+          "finished_at": "2026-08-26T18:22:41Z",
+          "exit": 1,
+          "expected_exit": 1,
+          "checked": 1,
+          "output_sha256": "82512dbf011dec1693615d169d6da8a97b917ac7d3333debc4c6024f00ea9a5f",
+          "output_ref": "/tmp/valuehire-strict-wu3b-evidence/wu3b1/ledger-worktree-mutation.tap"
+        },
+        {
+          "command": "node tools/strict/checkpoint-gate.mjs --base 2ef1f62814284cf20ee5b5270626e972e4460af4 --json --run-id strict-wu3b-20260827-472c276 --wu-id WU-3b-1",
+          "started_at": "2026-08-26T18:24:19Z",
+          "finished_at": "2026-08-26T18:24:46Z",
+          "exit": 0,
+          "checked": 3,
+          "output_sha256": "e4b15b1a7bd891e43aabe6b5df41a78097670e63e8cacda701b837d5cdbd7a95",
+          "output_ref": "/tmp/valuehire-strict-wu3b-evidence/wu3b1/staged-gate.json"
+        }
       ]
     },
     {

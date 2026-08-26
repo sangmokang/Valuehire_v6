@@ -2,6 +2,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { countJavaScriptWeakening } from "./checkpoint-js-scan.mjs";
+import { secureLedgerScopes } from "./checkpoint-policy.mjs";
 
 const CHECKS = {
   INPUT: "input",
@@ -12,7 +13,7 @@ const CHECKS = {
 };
 
 function parseArgs(argv) {
-  const args = { base: null, json: false, scopes: [] };
+  const args = { base: null, json: false, scopes: [], runId: null, wuId: null };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--json") {
@@ -26,6 +27,16 @@ function parseArgs(argv) {
       const scope = argv[index + 1];
       if (!scope || scope.startsWith("--")) throw new Error("--scope requires a value");
       args.scopes.push(scope);
+      index += 1;
+    } else if (arg === "--run-id") {
+      const value = argv[index + 1];
+      if (!value || value.startsWith("--")) throw new Error("--run-id requires a value");
+      args.runId = value;
+      index += 1;
+    } else if (arg === "--wu-id") {
+      const value = argv[index + 1];
+      if (!value || value.startsWith("--")) throw new Error("--wu-id requires a value");
+      args.wuId = value;
       index += 1;
     } else {
       throw new Error(`unknown argument: ${arg}`);
@@ -193,14 +204,26 @@ function extractLedgerScopes() {
   return entry ? { found: true, scopes: scopesFromWu(entry) } : { found: false, scopes: [] };
 }
 
-function checkScope(changes, fallbackScopes) {
+function checkScope(changes, fallbackScopes, authority) {
   const violations = [];
+  if (authority.runId && changes.length === 0) {
+    return [{ check: CHECKS.SCOPE, file: "", detail: "zero staged targets are not checkpoint evidence" }];
+  }
   if (changes.length === 0) return violations;
   let scopes;
   try {
-    const ledger = extractLedgerScopes();
-    scopes = ledger.found ? ledger.scopes : fallbackScopes;
-    if (!ledger.found && scopes.length === 0) {
+    if (authority.runId) {
+      scopes = secureLedgerScopes({
+        runId: authority.runId,
+        wuId: authority.wuId,
+        cliScopes: fallbackScopes,
+        readIndex,
+      }).scopes;
+    } else {
+      const ledger = extractLedgerScopes();
+      scopes = ledger.found ? ledger.scopes : fallbackScopes;
+    }
+    if (scopes.length === 0) {
       return [
         {
           check: CHECKS.SCOPE,
@@ -482,7 +505,7 @@ function main() {
     }
   } catch (error) {
     violations.push({ check: CHECKS.INPUT, file: "", detail: error.message });
-    args ??= { json: process.argv.includes("--json"), scopes: [] };
+    args ??= { json: process.argv.includes("--json"), scopes: [], runId: null, wuId: null };
   }
 
   if (violations.length === 0) {
@@ -494,7 +517,7 @@ function main() {
     }
     if (violations.length === 0) {
       violations.push(
-        ...runCheck(CHECKS.SCOPE, ".strict/run-ledger", () => checkScope(changes, args.scopes)),
+        ...runCheck(CHECKS.SCOPE, ".strict/run-ledger", () => checkScope(changes, args.scopes, args)),
         ...runCheck(CHECKS.LEAKS, "", () => checkSecrets(changes)),
         ...runCheck(CHECKS.TEST_WEAKENING, "", () => checkTestWeakening(args.base, changes)),
         ...runCheck(CHECKS.SIZE_LIMIT, "docs/sot/coding-principles.md", () => checkSizeLimit(changes)),
