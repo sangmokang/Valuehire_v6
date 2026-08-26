@@ -1,0 +1,382 @@
+{
+  "slug": "hs-observe-url-crash",
+  "base_sha": "c59bad7b160c473cda5545e76e6fa6bcc711a7ea",
+  "goal": "docs/engineering/hs-observe-url-crash-goal-2026-08-25.md",
+  "generator": {
+    "role": "G",
+    "work_units": 16,
+    "evidence": [
+      {
+        "command": "bash scripts/acceptance-hs-gates.sh",
+        "exit_code": 0,
+        "artifact": "COLLECTED: 158 (기준선 81)"
+      },
+      {
+        "command": "bash verify.sh",
+        "exit_code": 0,
+        "artifact": "PASS: no secret-pattern match"
+      },
+      {
+        "command": "인수 검사 25종(0-7 제외) — verify.sh 는 별도로 센다",
+        "exit_code": 0,
+        "artifact": "PASS=23 FAIL=2 (verify.sh 포함 시 PASS=24 FAIL=2). 실패 2건은 기준선 c59bad7 에서도 동일(환경 사유). 초판에 라벨과 숫자를 섞어 적었던 것을 V2 지적으로 정정"
+      },
+      {
+        "command": "python -m humansearch.observe --channel saramin --port 9327 --once (실소켓)",
+        "exit_code": 2,
+        "artifact": "PYTHONIOENCODING=ascii/latin-1/utf-8 세 값 모두 STATE=drifted TAB=- ROLES=0 CONTRACT_VALID=false · exit 2 · stderr 0줄 · 누출 0건"
+      },
+      {
+        "command": "docs/engineering/evidence/hs-observe-url-crash/fuzz_main.py (seed 20260825, 추적 파일)",
+        "exit_code": 0,
+        "artifact": "seed=20260825 total=1512 crash=0 bad_exit=0 multiline=0"
+      },
+      {
+        "command": "docs/engineering/evidence/hs-observe-url-crash/mutation_sweep.py (추적 파일)",
+        "exit_code": 0,
+        "artifact": "대조군 118 passed exit 0 · 변조 24종 · 생존 1종('CDP TimeoutError 제거' — OSError 하위형이라 구분 불가). 스크립트가 기대 생존 집합까지 스스로 검사한다"
+      },
+      {
+        "command": "런타임 배선 추적(sys.settrace)",
+        "exit_code": 0,
+        "artifact": "main -> observe_once -> _valid_origin -> _split -> select_single_target -> _origin -> _split -> format_observation_line"
+      },
+      {
+        "command": "except 튜플 원소 전수 스윕 (16 변조)",
+        "exit_code": 0,
+        "artifact": "무검증 가지 7 → 1. 남은 1개(_cdp 의 TimeoutError)는 OSError 하위형이라 구분 불가 — V1 이 확인"
+      },
+      {
+        "command": "targets 절단 변조 4종 (32/64/100/160)",
+        "exit_code": 0,
+        "artifact": "전부 죽음 — 상수가 아니라 위치 무관 성질을 고정했기 때문"
+      }
+    ],
+    "my_errors": [
+      {
+        "what": "전송 except 의 ValueError 를 '도달 불가'로 읽고 제거",
+        "why": "'어떤 시험도 안 닿는다'를 '닿을 수 없다'로 읽음",
+        "found_by": "V1 4회차",
+        "fixed_in": "WU8"
+      },
+      {
+        "what": "observation_from_marker_payload 의 TypeError 를 '도달 불가'로 선언",
+        "why": "내장 타입 6종 표본에서 전체로 일반화",
+        "found_by": "V1 최종 회차",
+        "fixed_in": "WU11"
+      },
+      {
+        "what": "문서에 인수 검사 PASS=24 로 기재",
+        "why": "verify.sh 를 인수 검사에 섞어 세고 라벨은 인수 검사로만 적음",
+        "found_by": "V2",
+        "fixed_in": "문서 정정"
+      },
+      {
+        "what": "문서에 observe.py 가 ~25줄 는다고 기재",
+        "why": "착수 시점 추정을 완료 시점에 다시 재지 않음(실측 +79)",
+        "found_by": "V2",
+        "fixed_in": "문서 정정"
+      }
+    ]
+  },
+  "v1": {
+    "tool": "codex exec --sandbox read-only (codex-cli 0.148.0)",
+    "note": "SOT-30 §6 이 지정한 /codex:adversarial-review 는 이 환경에 없다. 실제 설치된 codex CLI 를 fresh·read-only 로 직접 실행했다.",
+    "rounds": [
+      {
+        "round": 1,
+        "head": "-",
+        "status": "INVALID",
+        "reason": "제공자 필터 차단(exit 1), 판정 본문 0줄 — V1 으로 세지 않음"
+      },
+      {
+        "round": 2,
+        "head": "5f8f8c7",
+        "status": "FAIL",
+        "findings": 4,
+        "transcript": "scratchpad/v1_out2.txt",
+        "tokens": 121898
+      },
+      {
+        "round": 3,
+        "head": "abb1ed7",
+        "status": "FAIL",
+        "findings": 4,
+        "transcript": "scratchpad/v1_out3.txt",
+        "tokens": 165846
+      },
+      {
+        "round": 4,
+        "head": "e6d131a",
+        "status": "INCOMPLETE",
+        "reason": "필터에 최종 요약 차단, VERDICT 줄 없음. 작업 로그의 반례 1건은 재현·수정됨",
+        "transcript": "scratchpad/v1_out4.txt",
+        "tokens": 167415
+      },
+      {
+        "round": 5,
+        "head": "4e57ca2",
+        "status": "INCOMPLETE",
+        "reason": "동일. 반례 1건 재현·수정됨",
+        "transcript": "scratchpad/v1_out5.txt",
+        "tokens": 181496
+      },
+      {
+        "round": 6,
+        "head": "d7948ba",
+        "status": "PASS",
+        "transcript": "scratchpad/v1_out6.txt",
+        "tokens": 109658,
+        "tool_calls": 34,
+        "verdict": "I cannot find any configured contract, target-list response, or tab URL that escapes as an exception unhandled by main().",
+        "head_note": "verdict.json 초판은 4e57ca2 로 적었으나 리뷰 중 HEAD 가 진행했다(transcript 4659행). 실제 판정 대상은 d7948ba",
+        "scope": "질문 1축(예외가 main() 을 뚫는가)에 한정. UTF-8 stdout · ASCII 계약 origin 환경에서만 검증됨. 종료값 계약·stderr 공백·한 줄 계약·누출은 이 PASS 의 범위 밖"
+      },
+      {
+        "round": 7,
+        "head": "13ac888",
+        "status": "FAIL",
+        "findings": 1,
+        "what": "_load_contract 의 OSError 가지 무검증",
+        "disposition": "전수 스윕으로 확장 → WU10 에서 5개 닫음",
+        "transcript": "scratchpad/v1_out7.txt"
+      },
+      {
+        "round": 8,
+        "head": "175b45a",
+        "status": "FAIL",
+        "findings": 2,
+        "what": "내 '도달 불가' 주장 반증(사용자 정의 객체) + CDP 이벤트 순서 무검증",
+        "disposition": "WU11",
+        "transcript": "scratchpad/v1_out8.txt"
+      },
+      {
+        "round": 9,
+        "head": "175b45a",
+        "status": "FAIL",
+        "findings": 1,
+        "what": "targets[:32] 절단 변조 생존",
+        "disposition": "WU12 — 상수 대신 위치 무관 성질 고정",
+        "transcript": "scratchpad/v1_out9.txt"
+      }
+    ],
+    "findings_reproduced_independently": 10,
+    "findings_accepted": 9,
+    "findings_rejected": 1,
+    "rejected_reason": "argparse 인자 오류는 traceback 없이 usage 3줄 + exit 2 로 끝난다 — 관측 결과가 아니라 CLI 사용 오류다",
+    "independence_limit": "3회차 이후 프롬프트에 직전 지적의 수정 내용을 요약해 넣었다. 2회차만 완전한 블라인드다. 후반 PASS 의 무게는 전반 FAIL 보다 가볍다",
+    "loop_stopped_because": "9회차 발견이 '임의 상수 절단'이라는 원리적으로 무한한 변조군으로 옮겨 갔다. 실제 크래시는 5회차에서 말랐고(6회차 PASS), 이후는 시험 공백이었다. 계속 돌리면 계속 나오지만 코드를 더 옳게 만들지 않는다 — 멈추고 오너 결정으로 올린다"
+  },
+  "v2": {
+    "tool": "reset-context Claude subagent (opus)",
+    "status": "SPLIT",
+    "axes": {
+      "구현·회귀·게이트": "PASS",
+      "V1 명제": "FAIL",
+      "병합 차단 사유": "없음"
+    },
+    "reproduced": "generator.evidence 7항목 중 6 재현 · 1 불일치(인수 검사 라벨/숫자) · 변조 20종 개별 재실행 NOT_RUN",
+    "findings": [
+      {
+        "id": "V2-1",
+        "what": "_valid_origin 에만 isascii() 가 없어 비ASCII 계약 origin + 비UTF-8 stdout 에서 print() 가 UnicodeEncodeError 로 죽는다",
+        "regression": false,
+        "pii_leak": false,
+        "base_same": true,
+        "disposition": "WU9 에서 수정 + 시험 3건"
+      },
+      {
+        "id": "V2-2",
+        "what": "변조 N2(전송 그물)·N21(CDP 그물)·N7(main 성공 경로)이 살아남았다",
+        "disposition": "WU9 에서 시험 3건 추가 — 넷 다(N22 포함) 죽는 것 확인"
+      },
+      {
+        "id": "V2-3",
+        "what": "문서 사실 오류 2건 — 인수 검사 PASS=24(→23) · observe.py '+~25줄'(→+79)",
+        "disposition": "goal·verdict.json 정정"
+      },
+      {
+        "id": "V2-4",
+        "what": "V1 후반 회차는 완전한 블라인드가 아니었다(프롬프트가 수정 내용을 알려줌)",
+        "disposition": "goal §독립성 한계로 명시. 코드 변경 없음"
+      },
+      {
+        "id": "V2-5",
+        "what": "G 의 퍼징이 in-process 라 실제 print() 인코더를 통과하지 않았다 — G·V1 공통 사각지대",
+        "disposition": "기록. WU9 의 계약 검증으로 정상 경로에서는 성립하지 않는다"
+      },
+      {
+        "id": "V2-6",
+        "what": "내가 고른 20종 변조만으로는 3종이 살아남았다 — 변조 목록은 고르는 사람에 종속된다",
+        "disposition": "WU9 + 이후 전수 스윕으로 방식 자체를 바꿈"
+      }
+    ],
+    "no_violation_confirmed": [
+      "SOT diff 누락 없음",
+      "P3 위반 없음",
+      "P16 형식 충족",
+      "P22 위반 없음",
+      "좁힌 검증이 정상 운영 입력을 막는 사례 반례 0건(성공 경로 실소켓 관통 확인)"
+    ]
+  },
+  "failed_attempts": [
+    {
+      "what": "V1 1회차 프롬프트",
+      "why": "공격 문구가 제공자 필터에 걸려 판정 0줄",
+      "fix": "방어적 견고성 검토 문구로 재작성"
+    },
+    {
+      "what": "WU2 첫 속성 시험(st.text() 만)",
+      "why": "수정 전 코드에서도 통과 — 공허한 시험",
+      "fix": "주소 조립 전략 + @example 로 반례 고정"
+    },
+    {
+      "what": "첫 변조 하네스",
+      "why": "복제본에 contracts/ 가 없어 대조군이 16건 실패하는 잡음",
+      "fix": "mroot/{humansearch,contracts} 배치 + 대상 파일로 좁힘"
+    },
+    {
+      "what": "전송 except 의 ValueError 제거",
+      "why": "변조 생존(커버리지 부족)을 도달 불가로 오독",
+      "fix": "가드 복원 + 그 가지에 닿는 시험 추가(WU8)"
+    }
+  ],
+  "three_way_agree": {
+    "합의": [
+      "결함 실재",
+      "수정이 결함을 닫음",
+      "정상 입력을 막지 않음",
+      "병합 차단 사유 없음"
+    ],
+    "갈렸다가 해소": [
+      "main() 을 뚫는 입력이 남았는가 → V2 가 찾고 WU9 로 닫음",
+      "살아남은 변조 → V2 가 3종 찾고 WU9 로 닫음",
+      "V1 이 낸 반례 4회차분(무검증 except·도달불가 반증·이벤트 순서·절단) 전부 회귀 자산으로 편입"
+    ],
+    "남은 갈림": "없음"
+  },
+  "status": "READY_FOR_PUSH",
+  "remaining_open_items": [
+    "실패 원인이 STATE=drifted 로 뭉개짐 — CAUSE 코드 신설은 출력 어휘 결정(오너)",
+    "12 WU 분할 여부 — 나누면 찾은 반례가 병합 전에 닫히지 않는다(오너)",
+    "format_observation_line 의 TAB 필드에 임의 문자열 심기 — CLI 도달 불가(오너)",
+    "_valid_origin 이 포트 0 을 허용 — 별도 결정(오너)",
+    "stdout 파이프 조기 종료 시 exit 120 — 입력이 아니라 소비자 조건(오너)"
+  ],
+  "humanreview": {
+    "tool": "/humanreview (Claude, 읽기 전용)",
+    "status": "REQUEST_CHANGES → 조치 완료",
+    "findings": [
+      {
+        "id": "HR-1",
+        "severity": "높음",
+        "what": "contract_valid 가드가 사라지면 계약이 깨진 화면이 authenticated(exit 0)로 보고된다 — 지키는 시험 0건",
+        "regression": false,
+        "disposition": "WU13 시험 11건 추가"
+      },
+      {
+        "id": "HR-2",
+        "severity": "높음",
+        "what": "역할 중복 검사가 사라지면 중복 주장 화면이 authenticated(exit 0)로 보고된다 — 지키는 시험 0건",
+        "regression": false,
+        "disposition": "WU13"
+      },
+      {
+        "id": "HR-3",
+        "severity": "중간",
+        "what": "읽기 한도(1MiB) 검사에 닿는 시험 0건",
+        "disposition": "WU13"
+      },
+      {
+        "id": "HR-4",
+        "severity": "중간",
+        "what": "주소 자리 타입 검사에 닿는 시험 0건",
+        "disposition": "WU13"
+      },
+      {
+        "id": "HR-5",
+        "severity": "없음",
+        "what": "matching[0]→matching[-1] 은 len==1 보장으로 등가",
+        "disposition": "증명하고 남김"
+      }
+    ],
+    "my_errors_found": [
+      "변조 측정에서 대조군(16 실패)을 빼지 않을 뻔했다 — 이 run 에서 두 번째",
+      "검증 중 사장님 크롬(9225)에 읽기 요청을 보냈다 — 읽기 전용이나 하지 않겠다고 한 것을 어겼다"
+    ],
+    "no_regression": "실제 3사 origin(사람인·잡코리아·링크드인)과 실제 경로를 하나도 막지 않음(실측)"
+  },
+  "codex_rescue": {
+    "tool": "/codex:rescue (읽기 전용)",
+    "status": "REQUEST_CHANGES → 1·5·6번 조치 완료, 3·4번은 오너 결정",
+    "findings": [
+      {
+        "id": "CX-1",
+        "severity": "높음",
+        "what": "_origin 의 거부값 '' 이 허용목록과 충돌 — 허용목록에 빈 문자열이 있으면 파싱 실패 주소가 선택된다",
+        "reachable_via_cli": false,
+        "reachable_via_public_api": true,
+        "disposition": "WU14 수정 + 시험 6건"
+      },
+      {
+        "id": "CX-2",
+        "what": "리뷰 중 HEAD 이동",
+        "disposition": "마지막에 SHA 재고정 + CI 재실행"
+      },
+      {
+        "id": "CX-3",
+        "what": "모든 실패가 drifted 로 뭉개짐 — CAUSE 코드를 남겨라",
+        "disposition": "오너 결정(출력 어휘 신설)"
+      },
+      {
+        "id": "CX-4",
+        "what": "12 WU 중 원 요구는 WU1~2뿐, 0f63ef0 까지로 분할하라",
+        "disposition": "오너 결정"
+      },
+      {
+        "id": "CX-5",
+        "what": "시험 2건이 계약 대신 구현 결정을 단언",
+        "disposition": "WU15 교체"
+      },
+      {
+        "id": "CX-6",
+        "what": "퍼징 seed·변조 명세가 저장소에 없어 재현 불가",
+        "disposition": "WU16 — 추적 파일로 이관"
+      },
+      {
+        "id": "CX-7",
+        "what": "현실적 운영 회귀 없음",
+        "disposition": "내 실측과 일치"
+      }
+    ]
+  },
+  "code_sha": "96b41c6e1248ff04f3ff3472ec6697d27a3e2c91",
+  "code_sha_note": "이 판정서가 덮는 **코드**의 SHA다. 판정서 자신을 담은 커밋의 SHA 는 커밋 전에 알 수 없으므로 (순환), 코드가 마지막으로 바뀐 커밋을 가리킨다. 이후 커밋은 문서·증거 도구뿐이며 `git diff <code_sha>..HEAD -- humansearch/src/ contracts/` 가 비어 있음으로 확인할 수 있다. 병합 대상 SHA 의 CI 초록불은 `scripts/verify/check-verified-sha.sh <branch>` 로 따로 확인한다",
+  "codex_rescue_recheck": {
+    "tool": "/codex:rescue (2회차 — 1회차 판정 자체를 재검증)",
+    "status": "REQUEST_CHANGES",
+    "reviewed_sha": "67bc638",
+    "confirmed": [
+      "거부값 충돌은 a79a952 에서 실제 재현되고 현재 수정으로 해소됨(observe.py:75)",
+      "원 요구(크래시·traceback 누출)는 a79a952 에서 이미 닫혔음 — base 는 netloc 노출, a79 는 미포함",
+      "속성 시험이 '잘못된 이유로' 변조를 죽이던 것(found N 문구 단언)도 현재 해소",
+      "fuzz 숫자 정확히 재현: total=1512 crash=0 bad_exit=0 multiline=0",
+      "TimeoutError <: OSError 확인 — 등가 생존 1종 근거 성립",
+      "현실적 운영 회귀 없음(실계약 정상 로드)"
+    ],
+    "self_corrections": [
+      "1회차의 '최고 심각도 운영 누출' 해석은 과했다 — CLI 계약 로더가 빈 origin 을 거부하므로 운영 도달성은 없고 공개 API 결함이다",
+      "'확정 P3 위반'도 과했다 — CAUSE 코드는 새 출력 계약이며 오너 결정 사항이다"
+    ],
+    "open": [
+      "SHA 재고정 — 67bc638 의 CI SUCCESS 확인 필요 (check-verified-sha.sh → VERIFIED 로 충족)",
+      "변조 스윕이 읽기 전용 샌드박스에서 NOT_RUN — 임시 복제를 못 만들어서",
+      "범위 분할 권고 — 원 요구 PR 은 0f63ef0 까지, WU3 이후는 별도 PR (오너 결정)"
+    ],
+    "disposition": {
+      "SHA 재고정": "충족 — LOCAL=REMOTE=CI_VERIFIED=67bc638, CI success, worktree clean",
+      "샌드박스 NOT_RUN": "mutation_sweep.py 에 작업 폴더 주입(인자/HS_MUTATION_WORKDIR) 추가. 세 경로 모두 동일 결과 실측",
+      "범위 분할": "오너 결정 — 자르면 두 검증이 찾은 반례(거부값 충돌·인증 보고 무방비)가 병합 전에 닫히지 않는다"
+    }
+  }
+}

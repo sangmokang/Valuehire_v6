@@ -8,7 +8,7 @@ from http.client import HTTPConnection, HTTPException
 from ipaddress import ip_address
 from pathlib import Path
 from typing import TypeGuard
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import SplitResult, urlsplit, urlunsplit
 
 from ._cdp import CdpReadError, observe_markers
 from .auth_surface import (
@@ -66,7 +66,14 @@ def select_single_target(
         if not isinstance(candidate, dict) or candidate.get("type") != "page":
             continue
         url = candidate.get("url")
-        if isinstance(url, str) and _origin(url) in allowed_origins:
+        if not isinstance(url, str):
+            continue
+        # `_origin()` 은 거부를 빈 문자열로 표현한다. 그 값을 허용목록과 그냥 비교하면
+        # 허용목록에 빈 문자열이 섞이는 순간 **거부가 곧 허용이 된다**. 계약 검증이 지금은
+        # 그 상태를 막지만, 거부값을 허용 판정에서 명시적으로 빼는 것이 그 방어에 기대지
+        # 않는 유일한 방법이다(Codex 적대 검증 지적).
+        origin = _origin(url)
+        if origin and origin in allowed_origins:
             matching.append(candidate)
     if len(matching) != 1:
         raise TargetSelectionError(
@@ -115,10 +122,12 @@ def format_observation_line(
 ) -> str:
     """Render the complete privacy-reduced CLI output."""
 
-    tab = _privacy_reduced_url(tab_url, loggable_paths) if tab_url else "-"
+    # 축약이 빈 문자열이면 = 보여줄 안전한 주소가 없다는 뜻이다(파싱 불가). 탭이 아예
+    # 없을 때와 같은 표기를 쓴다 — 실패마다 새 어휘를 만들지 않는다.
+    tab = _privacy_reduced_url(tab_url, loggable_paths) if tab_url else ""
     contract_valid = str(observation.contract_valid).lower()
     return (
-        f"STATE={state.value} TAB={tab} ROLES={len(observation.matched_roles)} "
+        f"STATE={state.value} TAB={tab or '-'} ROLES={len(observation.matched_roles)} "
         f"CONTRACT_VALID={contract_valid}"
     )
 
@@ -160,7 +169,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             matched_roles=frozenset(), contract_valid=False
         )
         state = classify_auth_surface(observation)
-    paths = frozenset({urlsplit(tab_url).path}) if tab_url else frozenset()
+    reduced = _split(tab_url) if tab_url else None
+    paths = frozenset({reduced.path}) if reduced is not None else frozenset()
     print(format_observation_line(state, tab_url, observation, paths))
     return exit_code_for_state(state)
 
@@ -168,7 +178,10 @@ def main(argv: Sequence[str] | None = None) -> int:
 def _load_contract(channel: str) -> MarkerContract:
     try:
         raw = json.loads(_CONTRACT_PATH.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+    # JSONDecodeError·UnicodeDecodeError 는 둘 다 ValueError 의 하위형이다. 하위형만 열거하면
+    # 4,300 자리를 넘는 정수처럼 맨 ValueError 로 오는 갈래가 샌다. 아주 깊게 중첩된 JSON 은
+    # ValueError 조차 아닌 RecursionError 로 온다(실측: 깊이 300,000 = 600KB) — V1 2회차 지적.
+    except (OSError, ValueError, RecursionError) as exc:
         raise ObservationError("marker contract is unavailable") from exc
     if not isinstance(raw, dict) or raw.get("channel") != channel:
         raise ObservationError("marker contract channel is invalid")
@@ -216,8 +229,11 @@ def _load_contract(channel: str) -> MarkerContract:
 
 
 def _fetch_targets(contract: MarkerContract, port: int) -> list[object]:
-    connection = HTTPConnection(contract.diagnostic_host, port, timeout=3)
+    # 연결 객체 생성도 전송 시도의 일부다. 생성자를 try 밖에 두면 제어문자가 든 호스트에서
+    # 나는 `InvalidURL` 이 이 함수의 그물을 지나쳐 `main()` 까지 올라간다(V1 3회차 지적).
+    connection: HTTPConnection | None = None
     try:
+        connection = HTTPConnection(contract.diagnostic_host, port, timeout=3)
         connection.request(
             "GET", contract.targets_path, headers={"Accept": "application/json"}
         )
@@ -225,24 +241,60 @@ def _fetch_targets(contract: MarkerContract, port: int) -> list[object]:
         if response.status != 200:
             raise ObservationError("target list request was rejected")
         body = response.read(1_048_577)
-    except (OSError, HTTPException) as exc:
+    # `InvalidURL` 은 `HTTPException` 의 하위형이고, 호스트 IDNA 인코딩 실패는
+    # `UnicodeEncodeError`(= `ValueError` 하위형)로 온다 — `OSError` 도 `HTTPException` 도
+    # 아니다. 세 갈래를 모두 이 함수의 닫힌 실패로 흡수한다.
+    except (OSError, HTTPException, ValueError) as exc:
         raise ObservationError("target list request failed") from exc
     finally:
-        connection.close()
+        if connection is not None:
+            connection.close()
     if len(body) > 1_048_576:
         raise ObservationError("target list response exceeded the read limit")
     try:
         payload = json.loads(body)
-    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+    # ValueError 는 JSONDecodeError·UnicodeDecodeError·자릿수 초과를 포함하고, 깊은 중첩은
+    # RecursionError 로 따로 온다.
+    except (ValueError, RecursionError) as exc:
         raise ObservationError("target list response is invalid") from exc
     if not isinstance(payload, list):
         raise ObservationError("target list response is invalid")
     return payload
 
 
+def _split(url: str) -> SplitResult | None:
+    """Parse one address, treating an unparseable one as an explicit non-match.
+
+    ``urlsplit`` raises ``ValueError`` for an unterminated IPv6 literal and for a netloc
+    that changes under NFKC normalization, and that message quotes the netloc verbatim.
+    Letting it escape replaces the contract's single privacy-reduced line with a traceback
+    carrying part of the address, so every caller turns ``None`` into its own explicit
+    refusal. Nothing here guesses at, repairs, or normalizes the input.
+    """
+
+    try:
+        return urlsplit(url)
+    except ValueError:
+        return None
+
+
+def _readable_port(parsed: SplitResult) -> bool:
+    """포트를 읽을 수 있는지만 본다 — 값 자체에 정책을 넣지 않는다.
+
+    ``SplitResult.port`` 는 ``urlsplit()`` 이 통과시킨 주소에서도 숫자가 아니거나 범위를
+    벗어난 포트에서 별도로 ``ValueError`` 를 던진다.
+    """
+
+    try:
+        _ = parsed.port
+    except ValueError:
+        return False
+    return True
+
+
 def _origin(url: str) -> str:
-    parsed = urlsplit(url)
-    if parsed.scheme != "https" or not parsed.netloc:
+    parsed = _split(url)
+    if parsed is None or parsed.scheme != "https" or not parsed.netloc:
         return ""
     return f"{parsed.scheme}://{parsed.netloc}"
 
@@ -250,9 +302,16 @@ def _origin(url: str) -> str:
 def _valid_origin(value: object) -> bool:
     if not isinstance(value, str):
         return False
-    parsed = urlsplit(value)
+    parsed = _split(value)
+    if parsed is None or not _readable_port(parsed):
+        return False
+    # `_valid_targets_path`·`_is_loopback_address` 와 같은 규칙을 쓴다. 여기만 비ASCII 를
+    # 허용하면 축약 주소가 비ASCII 가 되고, stdout 인코더가 UTF-8 이 아닌 환경에서 `print()`
+    # 가 `UnicodeEncodeError` 로 죽는다 — `main()` 의 try 밖이다(V2 지적). 국제화 도메인은
+    # punycode 로 적으면 되므로 이 요구가 정상 origin 을 막지 않는다.
     return (
-        parsed.scheme == "https"
+        value.isascii()
+        and parsed.scheme == "https"
         and bool(parsed.netloc)
         and not parsed.path
         and not parsed.query
@@ -263,8 +322,11 @@ def _valid_origin(value: object) -> bool:
 
 
 def _valid_targets_path(value: object) -> TypeGuard[str]:
+    # ASCII 를 요구한다: HTTP 요청 줄은 latin-1 로 인코딩되므로 고립 서로게이트가 든 경로는
+    # 전송 단계에서 UnicodeEncodeError 로 죽고, U+2028 같은 문자는 출력 한 줄 계약을 깬다.
     return (
         isinstance(value, str)
+        and value.isascii()
         and value.startswith("/")
         and "?" not in value
         and "#" not in value
@@ -273,6 +335,12 @@ def _valid_targets_path(value: object) -> TypeGuard[str]:
 
 
 def _is_loopback_address(value: str) -> bool:
+    # `ip_address()` 는 IPv6 scope id 를 그대로 받아들이며 그 안의 개행·탭·비ASCII 문자를
+    # 거르지 않는다 — `ip_address("::1%\n")` 도 `ip_address("::1%<히브리문자>")` 도 루프백으로
+    # 판정된다(실측). 전자는 HTTP 요청 줄에서, 후자는 호스트 IDNA 인코딩에서 터진다.
+    # 주소 리터럴은 인쇄 가능한 ASCII 다 — 두 조건이 서로를 대신하지 못한다.
+    if not value.isprintable() or not value.isascii():
+        return False
     try:
         return ip_address(value).is_loopback
     except ValueError:
@@ -296,9 +364,27 @@ def _string_list(value: object) -> TypeGuard[list[str]]:
 def _privacy_reduced_url(
     url: str, loggable_paths: frozenset[str] = frozenset()
 ) -> str:
-    parsed = urlsplit(url)
+    parsed = _split(url)
+    if parsed is None:
+        return ""
     path = parsed.path if parsed.path in loggable_paths else "/..."
-    return urlunsplit((parsed.scheme, parsed.netloc, path, "", ""))
+    # netloc 앞부분의 `사용자:암호@` 는 경로에 든 식별자보다 민감하다. `.port` 는 숫자가
+    # 아닌 포트에서 따로 ValueError 를 던지므로 읽지 않고, 마지막 `@` 뒤만 남긴다.
+    netloc = parsed.netloc.rpartition("@")[2]
+    reduced = urlunsplit((parsed.scheme, netloc, path, "", ""))
+    # 출력은 인코딩 가능한 한 줄이어야 한다. `urlsplit()` 은 U+2028 같은 줄 분리자를 지우지
+    # 않고, 고립 서로게이트는 `print()` 단계에서 `UnicodeEncodeError` 로 죽는다 — 둘 다
+    # `main()` 의 try 블록 밖이다(V1 지적). 안전하게 보여줄 형태가 없으면 아무것도 안 보인다.
+    # `splitlines()` 의 개수만 보면 **끝에 붙은** 줄 분리자를 놓친다 — 축약 결과만으로는
+    # 한 줄이지만 뒤에 ` ROLES=...` 가 붙는 순간 두 줄이 된다(V1 2회차 지적). 그래서 개수가
+    # 아니라 "줄바꿈 문자를 하나라도 담고 있는가"로 판정한다.
+    if "".join(reduced.splitlines()) != reduced:
+        return ""
+    try:
+        reduced.encode("utf-8")
+    except UnicodeEncodeError:
+        return ""
+    return reduced
 
 
 def _port(value: str) -> int:

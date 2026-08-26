@@ -79,7 +79,8 @@ def observe_markers(
                 if "error" in message:
                     raise CdpReadError("DevTools rejected the read expression")
                 return _result_value(message)
-    except (OSError, TimeoutError, ValueError, json.JSONDecodeError) as exc:
+    # 아주 깊게 중첩된 JSON 은 ValueError 가 아니라 RecursionError 로 온다(V1 2회차 지적).
+    except (OSError, TimeoutError, ValueError, RecursionError) as exc:
         raise CdpReadError("DevTools read failed") from exc
     raise CdpReadError("DevTools response limit exceeded")
 
