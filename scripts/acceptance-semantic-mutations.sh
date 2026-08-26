@@ -72,11 +72,17 @@ write_mutant() {
     noop)       printf '#!/usr/bin/env bash\n: # no-op\n' > "$path" ;;
     empty)      printf '#!/usr/bin/env bash\n' > "$path" ;;
     echo-only)  printf '#!/usr/bin/env bash\necho "검사했습니다"\n' > "$path" ;;
+    # ↓ 2026-08-27 추가. 위 5종은 막혔지만 아래 3종은 그대로 통과했다.
+    #   래퍼가 판정 낱말을 부분 문자열로 세고(PASSWORD 안의 PASS), 아무 일도 하지 않은
+    #   채 합격 문구만 찍는 것을 구분하지 못했기 때문이다.
+    verdict-only)   printf '#!/usr/bin/env bash\necho "VERDICT: PASS"\n' > "$path" ;;
+    password-word)  printf '#!/usr/bin/env bash\necho "PASSWORD 검사 없음"\n' > "$path" ;;
+    fake-checked)   printf '#!/usr/bin/env bash\necho "PASS: 전부 통과"\necho "CHECKED: 42"\necho "VERDICT: PASS"\n' > "$path" ;;
     *)          return 1 ;;
   esac
 }
 
-for kind in exit-zero true-only noop empty echo-only; do
+for kind in exit-zero true-only noop empty echo-only verdict-only password-word fake-checked; do
   blocked=0
   survivors=""
   for t in "${targets[@]}"; do
