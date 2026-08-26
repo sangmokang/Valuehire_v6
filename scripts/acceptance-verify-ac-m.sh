@@ -153,15 +153,42 @@ expect_rc "manual 인데 사유 없음 → 불합격" "$TMP/manual-no-reason.yam
 
 # manual + 사유 + 실행권한 path → 통과 (규칙 5 의 정상 경로)
 # ⚠️ path 는 저장소 안 상대경로여야 한다 — 절대경로는 계약 위반으로 거부된다(V1 D4).
+# target 은 그 파일 안에 문자 그대로 있어야 한다. 이전 fixture 는 파일 경로 자신을
+# target 으로 적었는데 그 문자열은 파일 안에 없었다 — manual stage 가 target 을 아예
+# 대조하지 않아서 통과하던 것이다(2026-08-27 실측).
 cat > "$TMP/manual-ok.yaml" <<'EOF'
 - id: "manual-ok"
   path: "scripts/session-status.sh"
-  target: "scripts/session-status.sh"
+  target: "RED: UNKNOWN"
   stage: "manual"
   manual_reason: "goal 작성 시점에 사람이 실행하는 검사 (fixture)"
   required: true
 EOF
-expect_rc "manual 정상(사유+실행권한) → 통과" "$TMP/manual-ok.yaml" 0
+expect_rc "manual 정상(사유+실행권한+살아있는 target) → 통과" "$TMP/manual-ok.yaml" 0
+
+# 2026-08-27 발견: manual stage 는 target 을 한 번도 대조하지 않았다. 그래서 명부에
+# 아무 문구나 적어도 통과했다 — 장부가 실제 장치와 갈라져도 아무도 모른다 (AC8).
+cat > "$TMP/manual-dead-target.yaml" <<'EOF'
+- id: "manual-dead-target"
+  path: "scripts/session-status.sh"
+  target: "VH-THIS-STRING-IS-NOWHERE-IN-THAT-FILE"
+  stage: "manual"
+  manual_reason: "죽은 manual target 반례 (fixture)"
+  required: true
+EOF
+expect_rc "manual 인데 죽은 target → 불합격" "$TMP/manual-dead-target.yaml" 1
+
+# 주석에만 있는 문구를 target 으로 적는 것도 배선이 아니다. ci·pre-push 는 이미
+# 주석을 걷어내고 본다 — manual 만 예외일 이유가 없다.
+cat > "$TMP/manual-comment-target.yaml" <<'EOF'
+- id: "manual-comment-target"
+  path: "scripts/session-status.sh"
+  target: "세션 시작 시 저장소의 현재 상태를 보고한다"
+  stage: "manual"
+  manual_reason: "주석에만 있는 target 반례 (fixture)"
+  required: true
+EOF
+expect_rc "manual 인데 주석에만 있는 target → 불합격" "$TMP/manual-comment-target.yaml" 1
 
 # ── V1 적대검증(2026-08-12, FAIL 9건)이 뚫은 경계 — 반례를 고정한다 ─────────
 # V1 D2: 존재하지만 실행권한이 없는 manual path — 규칙 5의 유일한 판별 반례.
