@@ -67,6 +67,9 @@ required_steps:
   - id: "history-scan"
     job: "verify"
     must_run_contains: ["git cat-file blob"]
+  - id: "admin-app-runtime"
+    job: "verify"
+    must_run_contains: ["bash scripts/verify/run-acceptance.sh scripts/acceptance-admin-app-runtime.sh"]
   - id: "pytest-baseline"
     job: "verify"
     must_run_contains: ["bash scripts/verify/run-acceptance.sh scripts/acceptance-pytest-baseline.sh"]
@@ -132,6 +135,7 @@ required_steps:
 acceptance_scripts:
   required:
     - "scripts/acceptance-0-2-unreachable-content.sh"
+    - "scripts/acceptance-admin-app-runtime.sh"
     - "scripts/acceptance-0-5.sh"
     - "scripts/acceptance-0-6.sh"
     - "scripts/acceptance-0-7.sh"

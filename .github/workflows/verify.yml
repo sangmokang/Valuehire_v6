@@ -119,6 +119,14 @@ jobs:
           [ "$hit" -eq 0 ] && echo "PASS: 히스토리 전량 blob 스캔 0건 (blob ${blobs}개 검사)"
           exit $hit
 
+      - name: 인수 검사 admin-app-runtime (관리자 화면이 실제로 도는가 · AC10)
+        id: admin-app-runtime
+        # test_admin_shadow_server.py 는 app.js 를 빈 문자열로 써 놓고 MIME 만 본다.
+        # API 경로를 바꾸거나 화면 그리는 코드를 지워도 어떤 시험도 빨개지지 않았다.
+        # 이 검사는 node 최소 DOM 위에서 app.js 를 실제로 실행해 화면 결과를 단언한다.
+        # node 는 ubuntu-latest 러너에 이미 있다 — 새 의존성을 들이지 않는다.
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-admin-app-runtime.sh
+
       - name: 인수 검사 pytest-baseline (제품 시험이 줄지 않았는가 · AC9)
         id: pytest-baseline
         # 위 hs-gates 는 `collected < 1` 만 본다. 시험을 1개만 남기고 나머지를 지워도
