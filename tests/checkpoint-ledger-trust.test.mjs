@@ -81,6 +81,14 @@ function runGate(cwd, base, ...extra) {
   return { ...result, body };
 }
 
+function runLegacyGate(cwd, base) {
+  const result = spawnSync(process.execPath, [GATE, "--base", base, "--json", "--scope", "src/**"], {
+    cwd,
+    encoding: "utf8",
+  });
+  return { ...result, body: JSON.parse(result.stdout) };
+}
+
 function expectViolation(result, detail) {
   assert.equal(result.status, 1, result.stderr);
   assert.equal(result.body.pass, false);
@@ -160,4 +168,9 @@ test("secure scope rejects a ledger whose embedded run id differs from the reque
 test("secure scope rejects zero staged targets", () => {
   const { cwd, base } = makeRepo();
   expectViolation(runGate(cwd, base), "zero staged targets");
+});
+
+test("explicit legacy scope also rejects zero staged targets", () => {
+  const { cwd, base } = makeRepo();
+  expectViolation(runLegacyGate(cwd, base), "zero staged targets");
 });

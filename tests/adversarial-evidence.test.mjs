@@ -142,6 +142,12 @@ test("a missing required attack is rejected", () => expectFailure(makeRepo(({ ma
 test("Claude V1 FAIL forbids a PASS logic verdict", () => expectFailure(makeRepo(({ manifest }) => {
   manifest.reviewers.V1.verdict = "FAIL";
 }), "verdict"));
+test("a later raw FAIL marker overrides an earlier PASS marker", () => expectFailure(makeRepo(({ manifest, outputs }) => {
+  outputs.V1 = `candidate=${manifest.candidate_sha}\nFINAL: PASS\nFINAL: FAIL\n`;
+  manifest.reviewers.V1.output_sha256 = sha256(outputs.V1);
+  manifest.reviewers.V1.output_bytes = Buffer.byteLength(outputs.V1);
+  manifest.reviewers.V1.output_lines = outputs.V1.split("\n").length - 1;
+}), "final PASS"));
 test("G V1 V2 disagreement is rejected", () => expectFailure(makeRepo(({ manifest }) => {
   manifest.reviewers.V2.verdict = "FAIL";
   manifest.disagreements = ["V1 says PASS, V2 says FAIL"];

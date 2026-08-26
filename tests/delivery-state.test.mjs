@@ -69,21 +69,23 @@ function localOnly(candidate) {
   };
 }
 
-function merged(state, outputs) {
+function merged(state, outputs, mergeSha) {
   const candidate = state.candidate_sha;
   state.pr = { state: "OPEN", number: 17, url: "https://github.com/example/valuehire/pull/17", head_sha: candidate };
   state.ci = {
     state: "GREEN",
     head_sha: candidate,
     checks: [{ name: "verify", conclusion: "SUCCESS" }],
+    source_kind: "github-pr-status-check-rollup",
+    source_command: "gh pr view 17 --json title,body,url,statusCheckRollup,headRefOid",
     ...proof("evidence/ci.txt", outputs.ci, candidate),
   };
   state.merge = {
     state: "MERGED",
     actor: "USER",
     pr_number: 17,
-    merge_sha: "a".repeat(40),
-    ...proof("evidence/merge.txt", outputs.merge, "a".repeat(40)),
+    merge_sha: mergeSha,
+    ...proof("evidence/merge.txt", outputs.merge, mergeSha),
   };
   state.checkpoint_readiness = "PASS";
   state.overall_t = "PASS";
@@ -97,14 +99,20 @@ function makeRepo(mutate = () => {}) {
   git(cwd, "add", "-A");
   git(cwd, "commit", "-qm", "candidate");
   const candidate = git(cwd, "rev-parse", "HEAD");
+  const candidateTree = git(cwd, "rev-parse", `${candidate}^{tree}`);
+  const unrelated = git(cwd, "commit-tree", candidateTree, "-m", "unrelated merge object");
+  write(cwd, "src/value.mjs", "export const value = 2;\n");
+  git(cwd, "add", "src/value.mjs");
+  git(cwd, "commit", "-qm", "user merge result");
+  const mergeSha = git(cwd, "rev-parse", "HEAD");
   const outputs = {
-    ci: `candidate=${candidate}\nCI GREEN\n`,
-    merge: `merge=${"a".repeat(40)}\nUSER MERGED\n`,
-    deploy: `merge=${"a".repeat(40)}\nDEPLOY GREEN\n`,
-    live: `merge=${"a".repeat(40)}\nLIVE GREEN\n`,
+    ci: `${JSON.stringify({ title: "fixture", url: "https://github.com/example/valuehire/pull/17", headRefOid: candidate, statusCheckRollup: [{ name: "verify", conclusion: "SUCCESS" }] })}\n`,
+    merge: `merge=${mergeSha}\nUSER MERGED\n`,
+    deploy: `merge=${mergeSha}\nDEPLOY GREEN\n`,
+    live: `merge=${mergeSha}\nLIVE GREEN\n`,
   };
   const state = localOnly(candidate);
-  mutate({ state, outputs, candidate, merged: () => merged(state, outputs) });
+  mutate({ state, outputs, candidate, mergeSha, unrelated, merged: () => merged(state, outputs, mergeSha) });
   for (const [name, output] of Object.entries(outputs)) write(cwd, `evidence/${name}.txt`, output);
   write(cwd, STATE_PATH, `${JSON.stringify(state, null, 2)}\n`);
   git(cwd, "add", "-A");
@@ -158,9 +166,25 @@ test("CI for a stale hash is rejected", () => expectFailure(makeRepo(({ state, o
   state.pr = { state: "OPEN", number: 17, url: "https://github.com/example/valuehire/pull/17", head_sha: candidate };
   state.ci = { state: "GREEN", head_sha: "0".repeat(40), checks: [{ name: "verify", conclusion: "SUCCESS" }], ...proof("evidence/ci.txt", outputs.ci, candidate) };
 }), "candidate"));
+test("CI evidence must come from a GitHub PR statusCheckRollup command", () => expectFailure(makeRepo(({ state, merged: markMerged }) => {
+  markMerged();
+  state.ci.source_kind = "local-test-output";
+  state.ci.source_command = "node --test";
+}), "GitHub"));
 test("merge without CI GREEN is rejected", () => expectFailure(makeRepo(({ state, outputs }) => {
   state.merge = { state: "MERGED", actor: "USER", pr_number: 17, merge_sha: "a".repeat(40), ...proof("evidence/merge.txt", outputs.merge, "a".repeat(40)) };
 }), "CI GREEN"));
+test("a nonexistent merge object cannot promote readiness", () => expectFailure(makeRepo(({ state, outputs, merged: markMerged }) => {
+  markMerged();
+  const missing = "f".repeat(40);
+  outputs.merge = `merge=${missing}\nUSER MERGED\n`;
+  state.merge = { ...state.merge, merge_sha: missing, ...proof("evidence/merge.txt", outputs.merge, missing) };
+}), "object"));
+test("a merge object unrelated to the candidate cannot promote readiness", () => expectFailure(makeRepo(({ state, outputs, unrelated, merged: markMerged }) => {
+  markMerged();
+  outputs.merge = `merge=${unrelated}\nUSER MERGED\n`;
+  state.merge = { ...state.merge, merge_sha: unrelated, ...proof("evidence/merge.txt", outputs.merge, unrelated) };
+}), "descended"));
 test("deploy before merge is rejected", () => expectFailure(makeRepo(({ state, outputs }) => {
   state.deploy = { state: "GREEN", merge_sha: "a".repeat(40), ...proof("evidence/deploy.txt", outputs.deploy, "a".repeat(40)) };
 }), "after merge"));
