@@ -103,7 +103,7 @@ function isTestPath(path) {
   return /(^|\/)(?:tests?|__tests__)(\/|$)/.test(path) || /\.(?:test|spec)\.[^/]+$/.test(path);
 }
 
-function validateRedTestImmutability(violations, record, field) {
+function validateRedTestImmutability(violations, record, field, candidate, recordedRedCommits) {
   if (!OID.test(record.red_commit ?? "") || !OID.test(record.implementation_commit ?? "")) return;
   const redTests = new Set(changedPaths(record.red_commit).filter(isTestPath));
   if (redTests.size === 0) return;
@@ -111,6 +111,13 @@ function validateRedTestImmutability(violations, record, field) {
   for (const commit of range ? range.split("\n") : []) {
     for (const path of changedPaths(commit)) {
       if (redTests.has(path)) add(violations, field, `GREEN commit modifies RED test: ${path}`);
+    }
+  }
+  const later = gitText(["rev-list", "--reverse", `${record.implementation_commit}..${candidate}`]);
+  for (const commit of later ? later.split("\n") : []) {
+    if (recordedRedCommits.has(commit)) continue;
+    for (const path of changedPaths(commit)) {
+      if (redTests.has(path)) add(violations, field, `later non-RED commit modifies protected RED test: ${path}`);
     }
   }
 }
@@ -255,6 +262,7 @@ function validateLedger(args, ledger, ledgerCommit) {
   }
   const usedWus = new Set();
   const usedPaths = new Set();
+  const recordedRedCommits = new Set(ledger.records.map((record) => record?.red_commit).filter((commit) => OID.test(commit ?? "")));
   const ledgerCommitTime = commitTime(ledgerCommit);
   let previous = null;
   let clock = issueTime ?? Number.NEGATIVE_INFINITY;
@@ -281,7 +289,7 @@ function validateLedger(args, ledger, ledgerCommit) {
         !isAncestor(record.red_commit, record.implementation_commit)) {
       add(violations, field, "RED commit is not an ancestor of GREEN commit");
     }
-    validateRedTestImmutability(violations, record, field);
+    validateRedTestImmutability(violations, record, field, args.candidate, recordedRedCommits);
     clock = validateEvidence(
       violations,
       ledger,
