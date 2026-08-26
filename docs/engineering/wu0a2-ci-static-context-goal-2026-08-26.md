@@ -175,11 +175,15 @@ mktemp에서 trigger 제거(WU0-C), checkout ref 과거 SHA(WU0-C), 선행 scrip
 - RED `dde2c20`: 신규 23종을 구현 전 고정했다. pre-commit P13이 공격 fixture의 약화 문자열을 실제 제품 약화로 분류해 로컬 RED commit 두 개는 `--no-verify`로 보존했고 그 이유를 commit/작업 로그에 남겼다.
 - RED fixture `82f0426`: nested acceptance가 과거 HEAD가 아니라 검토 중 checker·contract를 복제하도록 고쳤다.
 - GREEN `08592fd`: workflow/job/step 폐쇄 key 계약, Psych AST ambiguity 거부, run 줄 경계를 구현했다.
-- GREEN parser correction `5ba09ff`: Ruby 2.6 JSON `object_class` 재정의가 중복 key를 관찰하지 않는 거짓 양성을 독립 시험이 발견했다. 정상 계약 복사본에 duplicate `workflow`를 주입하는 시험과 별도 JSON scanner로 고쳤다. acceptance cleanup도 예기치 않은 종료값을 보존한다.
+- GREEN parser correction `5ba09ff`: 기존 duplicate-key acceptance는 빈 `protected_jobs`/`protected_steps`가 섞인 비현실 fixture여서 exit 2가 중복 key 거부 때문인지 schema·zero-target 거부 때문인지 분리하지 못했다. Ruby 2.6 JSON `object_class`의 `[]=` 재정의 자체는 중복 key를 관찰할 수 있음이 같은 Ruby 2.6.10과 `5ba09ff^` checker 재실행으로 확인됐다. 이 commit의 실제 가치는 JSON 원문을 별도로 순회하는 명시적 scanner, 실제 정상 계약 복사본에 duplicate `workflow`만 주입하는 현실 fixture, `중복 object key — workflow` 오류 메시지 검증, trap cleanup의 원래 종료값 보존이다.
 - 증거 문서 `af48e4f`: A2 증명 범위와 WU0-B/C/D/E 잔여 위험을 분리했다.
 - 추가 RED `2bc76f7`: `on:`+`true:`가 의미 Hash에서 충돌하지만 exit 0인 반례를 독립 commit으로 고정했다.
 - 추가 GREEN `9791bed`: 같은 Psych `ScalarScanner` 의미를 사용해 원문이 다른 mapping key 충돌도 `safe_load` 전에 exit 2로 거부한다.
 - 최종 구현 기준 HEAD: `9791bedc7cdee8ea5dfb77c43b9312acf916c4ff`.
+
+### WU0-A3 follow-up
+
+checker의 추가 CLI 인자 거부, symlink 입력 거부, repo 밖 workflow/contract 경로 identity 검증은 WU0-A2나 WU0-B에 섞지 않고 WU0-A3 후속 작업으로 남긴다. 현재 checker는 첫 두 인자만 읽고 나머지를 무시하며 `-f` 존재 검사만 사용하므로, 이 입력 경계는 WU0-A2의 정적 CI 문맥·파서 모호성 보정 범위를 넘는다.
 
 구현 전 d1b1ebe에서 신규 23종 중 exact if wrapper 한 건을 제외한 빠진 동작이 실패했고, 변조 workflow의 기존 acceptance는 거짓 PASS했다. 첫 GREEN은 `CHECKED: 53`, 의미 중복 RED 추가 뒤 최종 인수 명령은 `CHECKED: 54 / VERDICT: PASS`다. 기존 26개 record는 유지됐고 신규 record가 추가됐다.
 
