@@ -246,6 +246,15 @@ test("secrets: existing repository scanner allows a clean staged blob", () => {
   git(cwd, "add", "src/app.mjs");
   expectPass(runGate(cwd, base, "--scope", "src/**"));
 });
+test("secrets: no-run-id path ignores unstaged scanner and pattern weakening", () => {
+  const { cwd, base } = makeRepo();
+  const canary = ["CHECKPOINT", "CANARY", "ABCDEFGHIJKL"].join("_");
+  write(cwd, "src/app.mjs", `export const credential = ${JSON.stringify(canary)};\n`);
+  git(cwd, "add", "src/app.mjs");
+  write(cwd, ".secret-patterns.default", "WEAK_PATTERN_THAT_WILL_NOT_MATCH\n");
+  write(cwd, "verify.sh", "#!/usr/bin/env bash\nexit 0\n");
+  expectViolation(runGate(cwd, base, "--scope", "src/**"), "secrets", "src/app.mjs");
+});
 test("secrets: checkpoint sources pass real scanner patterns without fake weakening markers", () => {
   const { cwd, base } = makeRepo();
   copyFileSync(join(ROOT, ".secret-patterns.default"), join(cwd, ".secret-patterns.default"));
