@@ -127,7 +127,7 @@ WU-3b-2b 뒤 full strict에서 기존 격리 fixture가 새 policy/secret 모듈
 
 ## 적대 검증 로그
 
-최신 candidate SHA가 확정된 뒤 V1 원문·session ID·명령·전체 출력 SHA와 V2 재현 표를 작업 branch 밖의 pinned evidence commit에 보존한다. 후보 SHA를 바꾸는 문서 후기록으로 순환시키지 않는다.
+최신 candidate SHA가 확정된 뒤 V1 원문·session ID·명령·전체 출력 SHA와 V2 재현 표를 작업 branch 밖의 전용 `refs/strict-evidence/<run-id>` 후손 commit에 보존한다. PR branch HEAD는 마지막 유효 WU 구현 commit인 candidate와 정확히 같아야 하며, evidence commit을 PR head로 push하지 않는다. 추적 장부의 worktree는 clone 가능한 `${WORKTREE}` placeholder로 기록하고 validator가 실행 시 현재 repository root에 결합한다. 후보 SHA를 바꾸는 문서 후기록으로 순환시키지 않는다.
 
 ## 시작 장부
 

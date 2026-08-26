@@ -90,6 +90,10 @@ function commitTrailers(commit) {
   return gitText(["show", "-s", "--format=%B", commit]);
 }
 
+function commitTime(commit) {
+  return time(gitText(["show", "-s", "--format=%cI", commit]));
+}
+
 function changedPaths(commit) {
   const output = gitText(["diff-tree", "--no-commit-id", "--name-only", "-r", commit]);
   return output ? output.split("\n") : [];
@@ -134,7 +138,19 @@ function validateCommit(violations, commit, field, wuId, phase, candidate) {
   }
 }
 
-function validateEvidence(violations, ledger, ledgerCommit, record, issueTime, clock, usedPaths) {
+function validateEvidence(violations, ledger, ledgerCommit, ledgerCommitTime, record, issueTime, clock, usedPaths) {
+  const expected = Array.isArray(record.expected_commands) ? record.expected_commands : [];
+  if (expected.length === 0 || expected.some((command) => typeof command !== "string" || command.trim() === "")) {
+    add(violations, `records[${record.sequence}].expected_commands`, "expected_commands must contain at least one non-empty command");
+  }
+  if (new Set(expected).size !== expected.length) {
+    add(violations, `records[${record.sequence}].expected_commands`, "expected_commands must be unique");
+  }
+  const seenCommands = new Set();
+  const implementationTime = OID.test(record.implementation_commit ?? "") &&
+    git(["cat-file", "-e", `${record.implementation_commit}^{commit}`], { allowFailure: true }).status === 0
+    ? commitTime(record.implementation_commit)
+    : null;
   if (!Array.isArray(record.evidence) || record.evidence.length === 0) {
     add(violations, `records[${record.sequence}].evidence`, "evidence must contain at least one result");
     return clock;
@@ -146,6 +162,10 @@ function validateEvidence(violations, ledger, ledgerCommit, record, issueTime, c
       continue;
     }
     if (typeof evidence.command !== "string" || evidence.command.trim() === "") add(violations, field, "command is empty");
+    else {
+      seenCommands.add(evidence.command);
+      if (!expected.includes(evidence.command)) add(violations, field, "command is not approved for WU");
+    }
     if (evidence.cwd !== ledger.worktree && evidence.cwd !== "${WORKTREE}") add(violations, field, "evidence cwd does not match worktree");
     if (!evidence.environment || typeof evidence.environment !== "object" || Array.isArray(evidence.environment)) {
       add(violations, field, "environment must be recorded");
@@ -154,6 +174,12 @@ function validateEvidence(violations, ledger, ledgerCommit, record, issueTime, c
     const finished = time(evidence.finished_at);
     if (started === null || finished === null || started < issueTime || finished < started || started < clock) {
       add(violations, field, "timestamp order is invalid or predates the issue contract");
+    }
+    if (started !== null && implementationTime !== null && started < implementationTime) {
+      add(violations, field, "timestamp predates implementation commit");
+    }
+    if (finished !== null && ledgerCommitTime !== null && finished > ledgerCommitTime) {
+      add(violations, field, "timestamp is after ledger commit");
     }
     if (finished !== null) clock = Math.max(clock, finished);
     if (!Number.isInteger(evidence.exit) || !Number.isInteger(evidence.expected_exit)) add(violations, field, "exit values must be integers");
@@ -178,6 +204,9 @@ function validateEvidence(violations, ledger, ledgerCommit, record, issueTime, c
     if (output.length !== evidence.output_bytes) add(violations, field, "output byte count mismatch");
     if (lines(output) !== evidence.output_lines || evidence.output_lines < 1) add(violations, field, "output line count mismatch");
   }
+  for (const command of expected) {
+    if (!seenCommands.has(command)) add(violations, `records[${record.sequence}].expected_commands`, `approved command has no evidence: ${command}`);
+  }
   return clock;
 }
 
@@ -199,9 +228,11 @@ function validateLedger(args, ledger, ledgerCommit) {
   const currentBranch = gitText(["symbolic-ref", "--short", "HEAD"]);
   if (ledger.branch !== currentBranch) add(violations, "branch", `branch is stale; current branch is ${currentBranch}`);
   const currentWorktree = realpathSync(gitText(["rev-parse", "--show-toplevel"]));
-  let ledgerWorktree = null;
-  try { ledgerWorktree = realpathSync(ledger.worktree); } catch {}
-  if (ledgerWorktree !== currentWorktree) add(violations, "worktree", "worktree is stale or does not resolve to the current root");
+  if (ledger.worktree !== "${WORKTREE}") {
+    let ledgerWorktree = null;
+    try { ledgerWorktree = realpathSync(ledger.worktree); } catch {}
+    if (ledgerWorktree !== currentWorktree) add(violations, "worktree", "worktree is stale or does not resolve to the current root");
+  }
 
   let issueTime = null;
   if (ledger.issue && typeof ledger.issue === "object") {
@@ -224,6 +255,7 @@ function validateLedger(args, ledger, ledgerCommit) {
   }
   const usedWus = new Set();
   const usedPaths = new Set();
+  const ledgerCommitTime = commitTime(ledgerCommit);
   let previous = null;
   let clock = issueTime ?? Number.NEGATIVE_INFINITY;
   for (const [index, record] of ledger.records.entries()) {
@@ -250,7 +282,16 @@ function validateLedger(args, ledger, ledgerCommit) {
       add(violations, field, "RED commit is not an ancestor of GREEN commit");
     }
     validateRedTestImmutability(violations, record, field);
-    clock = validateEvidence(violations, ledger, ledgerCommit, record, issueTime ?? Number.NEGATIVE_INFINITY, clock, usedPaths);
+    clock = validateEvidence(
+      violations,
+      ledger,
+      ledgerCommit,
+      ledgerCommitTime,
+      record,
+      issueTime ?? Number.NEGATIVE_INFINITY,
+      clock,
+      usedPaths,
+    );
     previous = record.record_sha256;
   }
   if (ledger.records.at(-1)?.implementation_commit !== args.candidate) {

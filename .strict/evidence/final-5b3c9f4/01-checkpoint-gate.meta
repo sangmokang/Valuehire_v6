@@ -1,7 +1,0 @@
-command=node --test tests/checkpoint-gate.test.mjs
-started_at=2026-08-26T21:03:24Z
-finished_at=2026-08-26T21:04:06Z
-cwd=/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/wu3b-delivery-chain-20260827
-env.CI=<unset>
-env.NODE_ENV=<unset>
-exit=0
