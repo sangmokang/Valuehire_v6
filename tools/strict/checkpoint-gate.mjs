@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { countJavaScriptWeakening } from "./checkpoint-js-scan.mjs";
 
@@ -10,9 +10,10 @@ const CHECKS = {
   TEST_WEAKENING: "test-weakening",
   SIZE_LIMIT: "size-limit",
 };
+const RUN_ID_PATTERN = /^r-\d{13}-\d{4}$/;
 
 function parseArgs(argv) {
-  const args = { base: null, json: false, scopes: [] };
+  const args = { base: null, runId: null, json: false, scopes: [] };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--json") {
@@ -21,6 +22,11 @@ function parseArgs(argv) {
       const value = argv[index + 1];
       if (!value || value.startsWith("--")) throw new Error("--base requires a value");
       args.base = value;
+      index += 1;
+    } else if (arg === "--run-id") {
+      const value = argv[index + 1];
+      if (!value || value.startsWith("--")) throw new Error("--run-id requires a value");
+      args.runId = value;
       index += 1;
     } else if (arg === "--scope") {
       const scope = argv[index + 1];
@@ -121,15 +127,6 @@ function flattenStrings(value) {
   return [];
 }
 
-function readRunLedgers() {
-  const directory = ".strict/run-ledger";
-  if (!existsSync(directory)) return [];
-  return readdirSync(directory)
-    .filter((name) => name.endsWith(".json"))
-    .sort()
-    .map((name) => `${directory}/${name}`);
-}
-
 function scopesFromWu(entry) {
   const scopes = [
     ...flattenStrings(entry.scope),
@@ -148,70 +145,49 @@ function isScopeBearingWu(entry) {
   return entry && typeof entry === "object" && scopesFromWu(entry).length > 0;
 }
 
-function selectLedgerWu(file, parsed) {
+function extractLedgerScopes(file, parsed) {
   const entries = Array.isArray(parsed?.wus) ? parsed.wus : [];
-  const openEntries = entries.filter((entry) => ["open", "red"].includes(wuStatus(entry)));
-  const scopedOpenEntries = openEntries.filter(isScopeBearingWu);
-  if (scopedOpenEntries.length === 1) return scopedOpenEntries[0];
-  if (scopedOpenEntries.length > 1) {
-    throw new Error(`${file}: ambiguous scope-bearing open/red WU entries: ${scopedOpenEntries.length}`);
+  const scopedEntries = entries.filter(
+    (entry) => ["open", "red", "green"].includes(wuStatus(entry)) && isScopeBearingWu(entry),
+  );
+  if (scopedEntries.length > 1) {
+    throw new Error(`${file}: ambiguous scope-bearing open/red/green WU entries: ${scopedEntries.length}`);
   }
-  if (openEntries.length > 0) return null;
-
-  const scoped = entries.filter(isScopeBearingWu);
-  const lastGreen = scoped.findLast((entry) => wuStatus(entry) === "green");
-  return lastGreen ?? null;
+  return scopedEntries.length === 1
+    ? { found: true, scopes: scopesFromWu(scopedEntries[0]) }
+    : { found: false, scopes: [] };
 }
 
-function parseUpdatedAt(file, parsed) {
-  const timestamp = Date.parse(String(parsed?.updated_at ?? ""));
-  if (!Number.isFinite(timestamp)) throw new Error(`${file}: invalid updated_at`);
-  return timestamp;
+function loadRunLedger(runId) {
+  if (!RUN_ID_PATTERN.test(runId)) {
+    throw new Error("--run-id must match ^r-\\d{13}-\\d{4}$");
+  }
+  const file = `.strict/run-ledger/${runId}.json`;
+  let stat;
+  try {
+    stat = lstatSync(file);
+  } catch (error) {
+    if (error?.code === "ENOENT") throw new Error(`${file}: run ledger not found`);
+    throw error;
+  }
+  if (stat.isSymbolicLink() || !stat.isFile()) {
+    throw new Error(`${file}: run ledger must be a regular file`);
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(readFileSync(file, "utf8"));
+  } catch (error) {
+    throw new Error(`${file}: invalid JSON (${error.message})`);
+  }
+  if (parsed?.run_id !== runId) {
+    throw new Error(`${file}: run_id does not match --run-id`);
+  }
+  return { file, parsed };
 }
 
-function extractLedgerScopes() {
-  const files = readRunLedgers();
-  if (files.length === 0) return { found: false, scopes: [] };
-
-  const ledgers = [];
-  for (const file of files) {
-    let parsed;
-    try {
-      parsed = JSON.parse(readFileSync(file, "utf8"));
-    } catch (error) {
-      throw new Error(`${file}: invalid JSON (${error.message})`);
-    }
-    ledgers.push({ file, timestamp: parseUpdatedAt(file, parsed), parsed });
-  }
-
-  const latest = Math.max(...ledgers.map((ledger) => ledger.timestamp));
-  const latestLedgers = ledgers.filter((ledger) => ledger.timestamp === latest);
-  if (latestLedgers.length > 1) {
-    throw new Error(`ambiguous latest run ledgers: ${latestLedgers.length}`);
-  }
-  const entry = selectLedgerWu(latestLedgers[0].file, latestLedgers[0].parsed);
-  return entry ? { found: true, scopes: scopesFromWu(entry) } : { found: false, scopes: [] };
-}
-
-function checkScope(changes, fallbackScopes) {
+function checkScope(changes, scopes) {
   const violations = [];
   if (changes.length === 0) return violations;
-  let scopes;
-  try {
-    const ledger = extractLedgerScopes();
-    scopes = ledger.found ? ledger.scopes : fallbackScopes;
-    if (!ledger.found && scopes.length === 0) {
-      return [
-        {
-          check: CHECKS.SCOPE,
-          file: "",
-          detail: "run ledger scope not found and --scope was not provided",
-        },
-      ];
-    }
-  } catch (error) {
-    return [{ check: CHECKS.SCOPE, file: ".strict/run-ledger", detail: error.message }];
-  }
   for (const file of stagedPathsForPolicy(changes)) {
     if (!matchesAny(file, scopes)) {
       violations.push({
@@ -463,6 +439,8 @@ function emit(result, json) {
 
 function main() {
   let args;
+  let ledger;
+  let scopes;
   const violations = [];
   try {
     args = parseArgs(process.argv.slice(2));
@@ -472,9 +450,39 @@ function main() {
     } else {
       git(["rev-parse", "--verify", `${args.base}^{commit}`]);
     }
+    if (!args.runId) {
+      violations.push({ check: CHECKS.INPUT, file: "", detail: "--run-id is required" });
+    } else if (violations.length === 0) {
+      ledger = loadRunLedger(args.runId);
+    }
   } catch (error) {
     violations.push({ check: CHECKS.INPUT, file: "", detail: error.message });
-    args ??= { json: process.argv.includes("--json"), scopes: [] };
+    args ??= { json: process.argv.includes("--json"), runId: null, scopes: [] };
+  }
+
+  if (violations.length === 0) {
+    try {
+      const declared = extractLedgerScopes(ledger.file, ledger.parsed);
+      if (declared.found && args.scopes.length > 0) {
+        violations.push({
+          check: CHECKS.INPUT,
+          file: ledger.file,
+          detail: "ledger scope and --scope cannot be used together",
+        });
+      } else if (declared.found) {
+        scopes = declared.scopes;
+      } else if (args.scopes.length > 0) {
+        scopes = args.scopes;
+      } else {
+        violations.push({
+          check: CHECKS.SCOPE,
+          file: ledger.file,
+          detail: "run ledger scope not found and --scope was not provided",
+        });
+      }
+    } catch (error) {
+      violations.push({ check: CHECKS.SCOPE, file: ledger.file, detail: error.message });
+    }
   }
 
   if (violations.length === 0) {
@@ -486,7 +494,7 @@ function main() {
     }
     if (violations.length === 0) {
       violations.push(
-        ...runCheck(CHECKS.SCOPE, ".strict/run-ledger", () => checkScope(changes, args.scopes)),
+        ...runCheck(CHECKS.SCOPE, ledger.file, () => checkScope(changes, scopes)),
         ...runCheck(CHECKS.LEAKS, "", () => checkSecrets(changes)),
         ...runCheck(CHECKS.TEST_WEAKENING, "", () => checkTestWeakening(args.base, changes)),
         ...runCheck(CHECKS.SIZE_LIMIT, "docs/sot/coding-principles.md", () => checkSizeLimit(changes)),
