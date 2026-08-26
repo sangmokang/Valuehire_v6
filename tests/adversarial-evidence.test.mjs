@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -131,6 +131,28 @@ test("G, Claude V1, and fresh-context Codex V2 evidence binds to one candidate a
   const result = runValidator(makeRepo());
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   assert.deepEqual(result.body, { pass: true, violations: [] });
+});
+
+test("Claude JSON envelope result text is validated as the authoritative raw output", () => {
+  const result = runValidator(makeRepo(({ manifest, outputs }) => {
+    const resultText = `candidate=${manifest.candidate_sha}\nFINAL: PASS\n`;
+    outputs.V1 = `${JSON.stringify({
+      type: "result",
+      session_id: "v1-session-1",
+      result: resultText,
+    })}\n`;
+    manifest.reviewers.V1.output_sha256 = sha256(outputs.V1);
+    manifest.reviewers.V1.output_bytes = Buffer.byteLength(outputs.V1);
+    manifest.reviewers.V1.output_lines = outputs.V1.split("\n").length - 1;
+  }));
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.deepEqual(result.body, { pass: true, violations: [] });
+});
+
+test("delivery acceptance runs the V1 wiring and goal current-state regressions", () => {
+  const body = readFileSync(join(ROOT, "scripts/acceptance-checkpoint-delivery.sh"), "utf8");
+  assert.match(body, /tests\/v1-regression-wiring\.test\.mjs/);
+  assert.match(body, /tests\/goal-current-state\.test\.mjs/);
 });
 
 test("a stale reviewer candidate is rejected", () => expectFailure(makeRepo(({ manifest }) => {
