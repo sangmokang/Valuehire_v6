@@ -56,9 +56,9 @@ function sealRecord(record) {
   return { ...unsigned, record_sha256: sha256(canonical(unsigned)) };
 }
 
-function commit(cwd, subject, wu, phase) {
-  write(cwd, "src/value.mjs", `export const value = ${JSON.stringify(subject)};\n`);
-  git(cwd, "add", "src/value.mjs");
+function commit(cwd, subject, wu, phase, path = "src/value.mjs") {
+  write(cwd, path, `export const value = ${JSON.stringify(subject)};\n`);
+  git(cwd, "add", path);
   git(cwd, "commit", "-qm", subject, "-m", `WU: ${wu}\nPhase: ${phase}`);
   return git(cwd, "rev-parse", "HEAD");
 }
@@ -80,7 +80,7 @@ function evidence(path, output, startedAt, finishedAt) {
   };
 }
 
-function makeRepo(mutate = () => {}) {
+function makeRepo(mutate = () => {}, paths = {}) {
   const cwd = mkdtempSync(join(tmpdir(), "trace-ledger-"));
   cleanups.push(cwd);
   git(cwd, "init", "-q", "-b", "task/trace-fixture");
@@ -89,8 +89,8 @@ function makeRepo(mutate = () => {}) {
   git(cwd, "add", "-A");
   git(cwd, "commit", "-qm", "baseline");
   const base = git(cwd, "rev-parse", "HEAD");
-  const red1 = commit(cwd, "red one", "WU-1", "RED");
-  const green1 = commit(cwd, "green one", "WU-1", "GREEN");
+  const red1 = commit(cwd, "red one", "WU-1", "RED", paths.red1);
+  const green1 = commit(cwd, "green one", "WU-1", "GREEN", paths.green1);
   const red2 = commit(cwd, "red two", "WU-2", "RED");
   const green2 = commit(cwd, "green two", "WU-2", "GREEN");
   const output1 = "PASS WU-1 complete\n";
@@ -203,6 +203,10 @@ test("a WU implementation commit mismatch is rejected", () => expectFailure(make
   ledger.records[0].implementation_commit = commits.green2;
   ledger.records[0] = sealRecord(ledger.records[0]);
 }), "trailer"));
+test("a GREEN commit that rewrites its RED test is rejected", () => expectFailure(
+  makeRepo(() => {}, { red1: "tests/wu-1.test.mjs", green1: "tests/wu-1.test.mjs" }),
+  "GREEN commit modifies RED test",
+));
 test("a stale branch is rejected", () => expectFailure(makeRepo(({ ledger }) => { ledger.branch = "task/stale"; }), "branch"));
 test("a stale worktree is rejected", () => expectFailure(makeRepo(({ ledger }) => { ledger.worktree = "/tmp/stale"; }), "worktree"));
 test("zero evidence is rejected", () => expectFailure(makeRepo(({ ledger }) => {
