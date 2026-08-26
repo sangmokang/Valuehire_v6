@@ -60,8 +60,10 @@ only_output=$(awk '
       # 반대로 파이프·stderr 리다이렉트·빈 명령 치환은 부수 효과가 아니다.
       # 2026-08-27 V1 F7 실측: `echo "PASS: ok" | cat` · `>&2` · `$(:)` 한 글자로
       # 위조본이 전부 되살아났다. 하한이 파이프 문자 하나였던 셈이다.
-      if (line ~ /[0-9]?>>?[[:space:]]*[^&[:space:]]/) next     # 파일로 쓴다
-      if (line ~ /\$\([[:space:]]*[^:)[:space:]]/) next         # 실제 명령을 부르는 치환(빈 :() 제외)
+      # /dev/null 로 버리는 것은 파일을 쓰는 것이 아니고, `$(true)`·`$(:)` 는 아무 일도
+      # 하지 않는다. 2026-08-27 V2 G5 실측으로 이 둘을 예외에서 뺐다.
+      if (line ~ /[0-9]?>>?[[:space:]]*[^&[:space:]]/ && line !~ /\/dev\/null/) next
+      if (line ~ /\$\([[:space:]]*[^:)[:space:]]/ && line !~ /\$\([[:space:]]*(true|false|:)[[:space:]]*\)/) next
       if (line ~ /`[^`]+`/) next                                # 백틱 명령 치환
       output += 1
     }

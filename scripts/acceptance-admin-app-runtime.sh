@@ -51,7 +51,7 @@ case "$TMP" in
 esac
 trap 'ruby -rfileutils -e "FileUtils.remove_entry(ARGV[0]) if File.exist?(ARGV[0])" "$TMP"' EXIT
 
-TOTAL=21
+TOTAL=24
 checked=0
 failed=0
 
@@ -189,6 +189,19 @@ expect "브라우저에 없는 node 전역 참조 → 불합격" 1 "$p" "$HTML"
 # 반대 방향 — 표준 DOM 메서드를 쓰는 **정상 코드**를 빨갛게 만들면 그것도 결함이다.
 p=$(break_app standard-appendchild 'p=ARGV[0]; s=File.read(p).sub("      item.append(button);", "      item.appendChild(button);"); File.write(p,s)')
 expect "표준 appendChild 로 바꾼 정상 코드 → 통과(오차단 없음)" 0 "$p" "$HTML"
+
+# ── V2 G3·G6 (높음): HTML 정규식이 주석·홑따옴표·경로를 제대로 보지 않았다 ──
+# 2026-08-27 V2 실측: 태그를 주석 처리하거나, 서버가 제공하지 않는 경로로 바꾸거나,
+# 홑따옴표 속성을 쓰면 판정이 어긋났다. 앞의 둘은 미탐, 마지막은 정상 화면 오차단이다.
+p=$(break_html commented-script 'p=ARGV[0]; s=File.read(p).sub(%q{<script src="/app.js" defer></script>}, %q{<!-- <script src="/app.js" defer></script> -->}); File.write(p,s)')
+expect "스크립트 태그를 주석 처리 → 불합격" 1 "$APP" "$p"
+
+p=$(break_html wrong-path-same-name 'p=ARGV[0]; s=File.read(p).sub(%q{src="/app.js"}, %q{src="/wrong/place/app.js"}); File.write(p,s)')
+expect "이름은 같고 경로가 다른 곳을 가리킴 → 불합격" 1 "$APP" "$p"
+
+# 반대 방향 — 홑따옴표는 HTML 에서 정상이다. 이것을 막으면 오차단이다.
+p=$(break_html single-quoted-src 'p=ARGV[0]; q=39.chr; s=File.read(p).sub(%q{<script src="/app.js" defer>}, "<script src=#{q}/app.js#{q} defer>"); File.write(p,s)')
+expect "홑따옴표 속성을 쓴 정상 화면 → 통과(오차단 없음)" 0 "$APP" "$p"
 
 # ── fail-closed ─────────────────────────────────────────────────────────────
 expect "app.js 없음 → 실행 불가" 2 "$TMP/does-not-exist.js" "$HTML"

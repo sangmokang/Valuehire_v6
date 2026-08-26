@@ -81,6 +81,18 @@ checked = 0
 # ── 실행 조건 ────────────────────────────────────────────────────────────────
 # Psych 는 YAML 1.1 규칙으로 `on:` 을 boolean true 키로 읽는다. "on" 문자열이 아니다.
 # 이 함정을 모르면 트리거 검사가 조용히 0건이 된다(2026-08-27 실측).
+# YAML 1.1 은 on/off/yes/no 를 boolean 으로 읽는다. Psych 도 그래서 `on:` 이 `true` 키가
+# 된다. 문제는 여기서 끝나지 않는다 — 원문에 `on:` 과 `true:` 가 **둘 다** 있으면 Psych 가
+# 한 노드로 합쳐 버리고, 검사기는 GitHub 이 트리거로 보는 쪽이 아닌 것을 읽게 된다
+# (2026-08-27 V2 G4 실측: 원문 on 에 pull_request 가 없는데도 통과했다).
+# 그래서 원문 텍스트에서 최상위 boolean 별칭 키를 먼저 거른다.
+raw_workflow = File.read(workflow_path)
+alias_keys = raw_workflow.scan(/^(true|false|on|off|yes|no)\s*:/).flatten
+if alias_keys.uniq.size > 1
+  errors << "TRIGGER_KEY_COLLISION: 최상위에 #{alias_keys.uniq.join(", ")} 키가 함께 있다 — " \
+            "YAML 1.1 은 이들을 같은 boolean 키로 합치므로, 검사기와 GitHub 이 서로 다른 " \
+            "노드를 트리거로 읽을 수 있다"
+end
 triggers = wf.key?(true) ? wf[true] : wf["on"]
 required_triggers = manifest["required_triggers"] || []
 if required_triggers.empty?
@@ -136,7 +148,7 @@ def check_shell(node, label, errors)
   return unless node.is_a?(Hash)
   if node.key?("shell")
     errors << "SHELL_OVERRIDE: #{label} 이 shell 을 직접 지정한다 (#{node["shell"].inspect}) — " \
-              "기본 셸의 -e 가 사라져 다줄 run 의 중간 실패가 무시된다"
+              "명시한 셸이 -e 를 켜는지 검사기는 알 수 없다. 기본 셸만 -e 가 보장된다"
   end
   d = node["defaults"]
   return unless d.is_a?(Hash)
@@ -144,7 +156,7 @@ def check_shell(node, label, errors)
   return unless r.is_a?(Hash)
   if r.key?("shell")
     errors << "SHELL_OVERRIDE: #{label}.defaults.run 이 shell 을 지정한다 (#{r["shell"].inspect}) — " \
-              "스텝을 하나도 건드리지 않고 워크플로 전체의 실패 전파를 끌 수 있다"
+              "스텝을 하나도 건드리지 않고 워크플로 전체의 실패 전파 보장을 바꿀 수 있다"
   end
 end
 
@@ -194,18 +206,35 @@ SWALLOW = [
   [/;\s*true\s*$/,             "세미콜론 뒤 무조건 성공"],
   [/;\s*:\s*$/,                "세미콜론 뒤 무조건 성공(:)"],
   [/[|][|]\s*exit\s+0\s*$/,    "오류를 성공 종료로 바꾸는 꼬리"],
-  [/\Aset\s+\+e\b/,            "오류 전파를 끄는 설정 (set +e)"],
-  [/\Aset\s+\+o\s+errexit\b/, "오류 전파를 끄는 설정 (set +o errexit)"],
-  [/\Aset\s+-e\s*\+/,          "오류 전파를 끄는 설정 (set -e+…)"],
-  [/\Atrap\s+.*\bERR\b/,       "ERR 트랩으로 실패를 가로챈다"],
+  # `command`/`builtin`/`eval` 을 앞에 붙여 같은 일을 할 수 있다(2026-08-27 V2 G1-4).
+  [/\A(?:command\s+|builtin\s+|eval\s+)?set\s+\+e\b/,            "오류 전파를 끄는 설정 (set +e)"],
+  [/\A(?:command\s+|builtin\s+|eval\s+)?set\s+\+o\s+errexit\b/, "오류 전파를 끄는 설정 (set +o errexit)"],
+  [/\A(?:command\s+|builtin\s+|eval\s+)?set\s+-e\s*\+/,          "오류 전파를 끄는 설정 (set -e+…)"],
+  [/\A(?:command\s+|builtin\s+|eval\s+)?trap\s+.*\bERR\b/,       "ERR 트랩으로 실패를 가로챈다"],
 ]
 
 # 실제로 실행되는 줄만 남긴다. 주석·빈 줄을 걷어내고, heredoc 본문은 데이터이지
 # 명령이 아니므로 통째로 건너뛴다(heredoc 안에 명령을 적어 위장하는 것을 막는다).
-def executable_lines(run)
+# 실제로 **실행에 닿는** 줄만 남긴다.
+#
+# 2026-08-27 V2 실측: "그 줄에 혼자 있는가"만 보면, 명령을 단독 줄로 두면서도 그 줄에
+# 닿지 못하게 만드는 다섯 형태가 전부 통과했다 — 앞에 `exit 0` 두기, `if false` 분기,
+# 호출되지 않는 함수 본문, `command set +e`, 숫자 heredoc 마커.
+#
+# top_level 이 참이면 **조건 없이 무조건 실행되는 줄**만 돌려준다(필수 명령용).
+# 거짓이면 주석·heredoc·죽은 코드만 걷어낸다(인라인 본문 조각용 — 그 자리는 셸 로직
+# 안에 있는 것이 정상이라 깊이를 요구할 수 없다).
+#
+# 블록 깊이는 **셸 키워드로만** 센다. 중괄호를 세면 awk·sed 의 정상 인자(필드를 뽑는
+# 스크립트가 중괄호로 감싸여 있다)를 블록으로 오인해 정상 워크플로를 빨갛게 만든다(실측).
+def executable_lines(run, top_level = true)
   return [] unless run.is_a?(String)
   out = []
   heredoc_end = nil
+  fn_depth = nil
+  depth = 0
+  dead = false
+
   run.each_line do |raw|
     line = raw.rstrip
     if heredoc_end
@@ -215,12 +244,42 @@ def executable_lines(run)
     stripped = line.strip
     next if stripped.empty?
     next if stripped.start_with?("#")
-    if (m = stripped.match(/<<-?\s*[\x27"]?([A-Za-z_][A-Za-z0-9_]*)[\x27"]?/))
+
+    # heredoc 시작 — 마커가 숫자로만 이뤄질 수도 있다(V2 G1-5).
+    if (m = stripped.match(/<<-?\s*[\x27"]?([A-Za-z0-9_]+)[\x27"]?/))
       heredoc_end = m[1]
     end
-    out << stripped
+
+    # 함수 본문은 호출되기 전에는 실행되지 않는다.
+    if fn_depth
+      fn_depth = nil if stripped == "}"
+      next
+    end
+    if stripped =~ /\A[A-Za-z_][A-Za-z0-9_]*\s*\(\s*\)\s*\{?\s*\z/ ||
+       stripped =~ /\Afunction\s+[A-Za-z_][A-Za-z0-9_]*/
+      fn_depth = 1
+      next
+    end
+
+    closers = stripped.scan(/(?:\A|[;&|]\s*)(?:fi|done|esac)(?=\z|[;&\s])/).size
+    depth -= closers
+    depth = 0 if depth < 0
+
+    out << stripped if (!top_level || depth.zero?) && !dead
+
+    openers = stripped.scan(/(?:\A|[;&|]\s*)(?:if|for|while|until|case)(?=\s)/).size
+    depth += openers
+
+    dead = true if depth.zero? && stripped =~ /\Aexit(\s|\z)/
   end
   out
+end
+
+# 출력·no-op 명령으로 시작하는 줄은 "그 명령을 실행한다"가 아니다.
+# must_run_contains(인라인 본문 조각)에도 이 기준을 적용한다 — 2026-08-27 V2 G2 실측:
+# 본문을 조각 인용 echo 한 줄로 바꿔도 "조각이 있다"로 셌다.
+def echoish?(line)
+  line =~ /\A(echo|printf|:|true|cat\b[^|]*<<)/
 end
 
 def scan_swallow(run, label, errors, swallow)
@@ -319,13 +378,18 @@ required_steps.each do |rs|
   # must_run_contains — 인라인 본문 스텝용. 단독 줄을 요구할 수 없는 자리에만 쓴다.
   # 주석은 걷어내고 본다. 주석에만 남은 명령은 실행되지 않는다.
   unless contains.empty?
-    body = executable_lines(run).join("\n")
+    body_lines = executable_lines(run, false)
     contains.each do |frag|
-      if body.include?(frag.to_s)
+      hits = body_lines.select { |l| l.include?(frag.to_s) }
+      real = hits.reject { |l| echoish?(l) }
+      if !real.empty?
         passes << "STEP #{sid} ~ `#{frag}`"
+      elsif !hits.empty?
+        errors << "STEP_FRAGMENT_ECHOED: #{label} 에서 `#{frag}` 가 출력 명령 안에만 있다 " \
+                  "(`#{hits.first}`) — 문자열을 찍는 것은 실행이 아니다"
       else
         errors << "STEP_FRAGMENT_MISSING: #{label} 의 실행되는 줄에 `#{frag}` 가 없다 — " \
-                  "주석 처리되었거나 사라졌다"
+                  "주석 처리되었거나 도달하지 못하는 자리로 옮겨졌다"
       end
     end
   end

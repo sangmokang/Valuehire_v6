@@ -84,12 +84,15 @@ write_mutant() {
     stderr-only)    printf '#!/usr/bin/env bash\necho "PASS: ok" >&2\necho "PASS: ok"\n' > "$path" ;;
     subst-only)     printf '#!/usr/bin/env bash\necho "PASS: $(:)"\n' > "$path" ;;
     verdict-pipe)   printf '#!/usr/bin/env bash\necho "VERDICT: PASS" | cat\n' > "$path" ;;
+    # ↓ 2026-08-27 V2 G5. 무의미한 명령 치환과 /dev/null 리다이렉트도 "일을 함"으로 셌다.
+    true-subst)     printf '#!/usr/bin/env bash\necho "PASS: $(true)"\necho "PASS: ok"\n' > "$path" ;;
+    devnull-pad)    printf '#!/usr/bin/env bash\nprintf "padding" > /dev/null\necho "PASS: ok"\n' > "$path" ;;
     *)          return 1 ;;
   esac
 }
 
 for kind in exit-zero true-only noop empty echo-only verdict-only password-word fake-checked \
-           pipe-only stderr-only subst-only verdict-pipe; do
+           pipe-only stderr-only subst-only verdict-pipe true-subst devnull-pad; do
   blocked=0
   survivors=""
   for t in "${targets[@]}"; do

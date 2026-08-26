@@ -23,13 +23,16 @@ import { readFileSync, existsSync } from "node:fs";
 import { argv, exit } from "node:process";
 
 function parseArgs(list) {
-  const out = { app: "apps/admin/app.js", html: "apps/admin/index.html" };
+  const out = { app: "apps/admin/app.js", html: "apps/admin/index.html", expectSrc: null };
   for (let i = 0; i < list.length; i += 1) {
     if (list[i] === "--app" && list[i + 1]) {
       out.app = list[i + 1];
       i += 1;
     } else if (list[i] === "--html" && list[i + 1]) {
       out.html = list[i + 1];
+      i += 1;
+    } else if (list[i] === "--expect-src" && list[i + 1]) {
+      out.expectSrc = list[i + 1];
       i += 1;
     }
   }
@@ -150,15 +153,28 @@ class Node {
 // 경로를 틀리게 하거나 type 을 바꿔도 시험이 초록이다 — 브라우저에서는 app.js 가 한 줄도
 // 실행되지 않는데 말이다 (2026-08-27 V1 F6).
 function scriptSourcesFromHtml(html) {
+  // 주석 안의 태그는 브라우저가 읽지 않는다. 먼저 걷어낸다.
+  // 속성은 큰따옴표·작은따옴표 둘 다 쓸 수 있다 — 한쪽만 읽으면 정상 화면을 빨갛게
+  // 만들고(작은따옴표), 반대로 위장을 놓친다 (2026-08-27 V2 G3·G6 실측).
+  const live = html.replace(/<!--[\s\S]*?-->/g, "");
   const found = [];
   const re = /<script\b([^>]*)>/gi;
-  let m = re.exec(html);
+  let m = re.exec(live);
   while (m !== null) {
     const attrs = m[1];
-    const src = attrs.match(/\ssrc="([^"]+)"/i);
-    const type = attrs.match(/\stype="([^"]+)"/i);
-    found.push({ src: src ? src[1] : null, type: type ? type[1].toLowerCase() : null });
-    m = re.exec(html);
+    const src = attrs.match(/\ssrc\s*=\s*("([^"]*)"|'([^']*)')/i);
+    const type = attrs.match(/\stype\s*=\s*("([^"]*)"|'([^']*)')/i);
+    const pick = (mm) => {
+      if (!mm) return null;
+      if (mm[2] !== undefined) return mm[2];
+      return mm[3];
+    };
+    const typeValue = pick(type);
+    found.push({
+      src: pick(src),
+      type: typeValue === null ? null : typeValue.toLowerCase(),
+    });
+    m = re.exec(live);
   }
   return found;
 }
@@ -343,9 +359,11 @@ async function main() {
 
   // ⓪ 화면이 이 스크립트를 실제로 불러오는가
   const scripts = scriptSourcesFromHtml(html);
-  const appName = args.app.split("/").pop();
-  const loader = scripts.find((t) => t.src !== null && t.src.split("/").pop() === appName);
-  say(loader !== undefined, "화면이 관리자 스크립트를 불러온다", `<script src> ${scripts.length}개 중 ${appName} 참조=${loader !== undefined}`);
+  // basename 만 맞추면 `/wrong/place/app.js` 처럼 서버가 제공하지 않는 경로도 통과한다.
+  // 서버 라우트는 `/app.js` 하나뿐이므로 **경로 전체**를 맞춘다 (2026-08-27 V2 G3).
+  const expected = args.expectSrc === null ? `/${args.app.split("/").pop()}` : args.expectSrc;
+  const loader = scripts.find((t) => t.src === expected);
+  say(loader !== undefined, "화면이 관리자 스크립트를 불러온다", `<script src> ${scripts.length}개 중 ${expected} 참조=${loader !== undefined} (실제: ${scripts.map((t) => String(t.src)).join(", ") || "없음"})`);
   const loaderType = loader ? loader.type : null;
   const executableType = loaderType === null || loaderType === "module" || loaderType === "text/javascript";
   say(executableType, "그 스크립트가 실행되는 type 이다", `type=${String(loaderType)}`);
