@@ -38,7 +38,13 @@ function write(cwd, path, content) {
 
 function installBundle(cwd, bundle) {
   mkdirSync(join(cwd, "tools/strict"), { recursive: true });
-  for (const path of ["verify.sh", "tools/strict/checkpoint-gate.mjs", "tools/strict/checkpoint-js-scan.mjs"]) {
+  for (const path of [
+    "verify.sh",
+    "tools/strict/checkpoint-gate.mjs",
+    "tools/strict/checkpoint-js-scan.mjs",
+    "tools/strict/checkpoint-policy.mjs",
+    "tools/strict/checkpoint-secrets.mjs",
+  ]) {
     copyFileSync(join(bundle, path), join(cwd, path));
   }
 }
@@ -128,6 +134,8 @@ function makeBundle(mutation) {
   copyFileSync(join(ROOT, "verify.sh"), join(bundle, "verify.sh"));
   copyFileSync(join(ROOT, "tools/strict/checkpoint-gate.mjs"), join(bundle, "tools/strict/checkpoint-gate.mjs"));
   copyFileSync(join(ROOT, "tools/strict/checkpoint-js-scan.mjs"), join(bundle, "tools/strict/checkpoint-js-scan.mjs"));
+  copyFileSync(join(ROOT, "tools/strict/checkpoint-policy.mjs"), join(bundle, "tools/strict/checkpoint-policy.mjs"));
+  copyFileSync(join(ROOT, "tools/strict/checkpoint-secrets.mjs"), join(bundle, "tools/strict/checkpoint-secrets.mjs"));
   if (mutation === "verify-exit-zero") write(bundle, "verify.sh", "#!/usr/bin/env bash\nexit 0\n");
   if (mutation === "scanner-always-zero") {
     write(bundle, "tools/strict/checkpoint-js-scan.mjs", "export function countJavaScriptWeakening() { return { skip: 0, only: 0, todo: 0, assertions: 0 }; }\n");

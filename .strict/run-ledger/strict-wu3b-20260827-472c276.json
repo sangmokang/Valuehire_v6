@@ -444,7 +444,67 @@
           "output_ref": "/tmp/valuehire-strict-wu3b-evidence/wu3b2a/staged-gate.json"
         }
       ]
+    },
+    {
+      "id": "WU-3b-2b",
+      "status": "open",
+      "scope": [
+        ".github/workflows/verify.yml",
+        ".strict/run-ledger/strict-wu3b-20260827-472c276.json",
+        "docs/engineering/valuehire-delivery-chain-issue-2026-08-27.md",
+        "docs/engineering/valuehire-delivery-chain-goal-2026-08-27.md",
+        "docs/sot/hook-contracts.md",
+        "docs/sot/mechanism-registry.yaml",
+        "docs/sot/verification-commands.md",
+        "hooks/pre-push",
+        "scripts/acceptance-checkpoint-delivery.sh",
+        "scripts/verify/check-pre-push-runtime.sh",
+        "tests/checkpoint-gate-mutation.test.mjs",
+        "tests/trusted-secret-runner.test.mjs",
+        "tools/strict/trusted-secret-scan.mjs"
+      ],
+      "red_commit": "118d0c379760b0131bc583c07bd84424c86124f4",
+      "implementation_commit": null,
+      "validation": [
+        {
+          "command": "node --test tests/trusted-secret-runner.test.mjs",
+          "started_at": "2026-08-26T19:27:52Z",
+          "finished_at": "2026-08-26T19:27:53Z",
+          "exit": 0,
+          "checked": 3,
+          "output_sha256": "bb4bd14d89aa21264eb40e0fe99110457de1b5156d7a7bda610885e41c5ffc0d",
+          "output_ref": "/tmp/valuehire-strict-wu3b-evidence/wu3b2b/green.tap"
+        },
+        {
+          "command": "trusted runner worktree-read mutation + node --test tests/trusted-secret-runner.test.mjs",
+          "started_at": "2026-08-26T19:28:09Z",
+          "finished_at": "2026-08-26T19:28:09Z",
+          "exit": 1,
+          "expected_exit": 1,
+          "checked": 1,
+          "output_sha256": "3773924fbc5156971159f79a2ad9f73012e6f9f5c4b3411e9fee5296987901ab",
+          "output_ref": "/tmp/valuehire-strict-wu3b-evidence/wu3b2b/worktree-read-mutation.tap"
+        },
+        {
+          "command": "bash scripts/verify/run-acceptance.sh scripts/acceptance-checkpoint-delivery.sh",
+          "started_at": "2026-08-26T19:29:30Z",
+          "finished_at": "2026-08-26T19:29:48Z",
+          "exit": 0,
+          "checked": 82,
+          "output_sha256": "fd8f5299f87318ec6ebd14305e1301452d343c0b5cfc7f4ce6f701793ffbaf86",
+          "output_ref": "/tmp/valuehire-strict-wu3b-evidence/wu3b2b/acceptance-final.log"
+        },
+        {
+          "command": "node tools/strict/checkpoint-gate.mjs --base 118d0c379760b0131bc583c07bd84424c86124f4 --json --run-id strict-wu3b-20260827-472c276 --wu-id WU-3b-2b",
+          "started_at": "2026-08-26T19:31:34Z",
+          "finished_at": "2026-08-26T19:31:42Z",
+          "exit": 0,
+          "checked": 12,
+          "output_sha256": "e4b15b1a7bd891e43aabe6b5df41a78097670e63e8cacda701b837d5cdbd7a95",
+          "output_ref": "/tmp/valuehire-strict-wu3b-evidence/wu3b2b/staged-gate.json"
+        }
+      ]
     }
   ],
-  "updated_at": "2026-08-27T04:24:29+09:00"
+  "updated_at": "2026-08-27T04:31:42+09:00"
 }

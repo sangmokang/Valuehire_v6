@@ -21,9 +21,14 @@
   target: "STRICT_DELIVERY_CHECK=scripts/acceptance-checkpoint-delivery.sh"
   stage: "pre-push"
   required: true
+- id: "trusted-secret-scan-prepush"
+  path: "hooks/pre-push"
+  target: "node tools/strict/trusted-secret-scan.mjs"
+  stage: "pre-push"
+  required: true
 - id: "ci-secret-scan"
   path: ".github/workflows/verify.yml"
-  target: "run: bash verify.sh"
+  target: "run: node tools/strict/trusted-secret-scan.mjs"
   stage: "ci"
   ci_mirror_job: "verify"
   required: true

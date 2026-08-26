@@ -46,6 +46,11 @@ fi
 # 우회를 막는 독립 증거다.
 bash scripts/acceptance-principles-check.sh
 
+# 비밀 판정은 작업 폴더의 verify.sh나 pattern을 직접 권한으로 쓰지 않는다. index의
+# verify.sh/.secret-patterns.default와, 명시적 SHA가 일치하는 선택적 로컬 pattern만 쓴다.
+# 로컬 pattern이 있으면 STRICT_SECRET_PATTERN_SHA256 승인값이 없거나 다를 때 fail-closed한다.
+node tools/strict/trusted-secret-scan.mjs
+
 # ── 2) push 안전성 검사 ──────────────────────────────────────────────────────
 #
 # pre-push 가 판정하는 것은 "이 push 가 안전한가"이지 "저장소가 이상적 상태인가"가

@@ -11,7 +11,7 @@
 |---|---|---|
 | 0 — 시작 자격(RED 미해결 확인) | `make red-ledger` | `bash scripts/session-status.sh` (stdout 3번째 줄 `RED: N/M`) |
 | 2 — 워크트리 파기 | `make task NAME=...` | `git worktree add worktrees/<name> -b task/<name>` |
-| 4 — 검증 | `./verify.sh` | `bash verify.sh` (비밀 스캔) — CI(`verify.yml`)가 실제로 도는 검사 전체는 아래 "CI가 실제로 돌리는 것" 표가 정본이다(요약을 여기 두 번 적으면 반드시 갈라진다 — 2026-08-12 REV2-D2 실측). `scripts/acceptance-0-2.sh`는 로컬 전용(`.secret-patterns`에 실제 리터럴이 있어야 해서 CI에 못 올림, 스크립트 주석에 명시) |
+| 4 — 검증 | `./verify.sh` | `node tools/strict/trusted-secret-scan.mjs` (index 고정 비밀 스캔) — CI(`verify.yml`)가 실제로 도는 검사 전체는 아래 "CI가 실제로 돌리는 것" 표가 정본이다(요약을 여기 두 번 적으면 반드시 갈라진다 — 2026-08-12 REV2-D2 실측). `scripts/acceptance-0-2.sh`는 로컬 전용(`.secret-patterns`에 실제 리터럴이 있어야 해서 CI에 못 올림, 스크립트 주석에 명시) |
 | 5 — 배송 | `make ship` | 아직 스크립트 없음 — `git push -u origin task/<name>` 후 `gh pr create` 수동 실행. push 시 `hooks/pre-push`가 verify.sh + acceptance-*.sh 전량(glob)을 재실행 |
 | 6 — 종료 | `make task-done NAME=...` | `git worktree remove worktrees/<name>` 수동 실행 |
 
@@ -21,7 +21,7 @@
 
 | # | 스텝 이름 | 실행 내용 |
 |---|---|---|
-| 1 | 비밀 스캔 (verify.sh) | `bash verify.sh` — 추적 파일 전체 |
+| 1 | 비밀 스캔 (verify.sh) | `node tools/strict/trusted-secret-scan.mjs` — index의 scanner/default pattern과 승인 SHA가 일치하는 선택적 로컬 pattern으로 추적 파일 전체 검사 |
 | 2 | Strict 원칙 정본·장부·배선 검사 | `bash scripts/acceptance-principles-check.sh` — 32개 정본 문구·장치·명시적 pre-push/CI 배선 |
 | 3 | Strict 원칙 적대 fixture·500/501 경계 | `bash scripts/acceptance-principles-mutations.sh` — 정상 fixture와 14개 반례·500/501 경계 |
 | 4 | Strict 전달 사슬 신뢰 경계와 상태 모델 | `bash scripts/acceptance-checkpoint-delivery.sh` — scope/secret/trace/V1·V2/state 정상·고장 fixture와 mutation |

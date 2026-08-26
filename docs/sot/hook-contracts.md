@@ -31,11 +31,13 @@
 ```
 입력  : stdin 으로 <local ref> <local sha> <remote ref> <remote sha> (git 표준)
 출력  : exit 0 | exit 1
-        실행: verify.sh, scripts/acceptance-*.sh 전량 (glob — 새 스크립트 추가 시 자동 포함)
+        실행: index 고정 `tools/strict/trusted-secret-scan.mjs`를 먼저 실행한 뒤,
+              verify.sh, scripts/acceptance-*.sh 전량 (glob — 새 스크립트 추가 시 자동 포함)
         차단 시 stderr: "BLOCKED: <스크립트경로> exit=<code>"
 불변식: 스크립트가 0개 발견되면 exit 1 (fail-closed — "검사할 게 없어서 통과"를 금지)
         미추적 파일(??) 존재 시 exit 1 (P15)
         scripts/acceptance-checkpoint-delivery.sh가 CI 실행 줄에 없으면 exit 1
+        선택적 .secret-patterns가 있으면 STRICT_SECRET_PATTERN_SHA256 승인값이 없거나 다를 때 exit 1
         로컬 합격은 실제 PR·GitHub CI·사용자 merge 증거를 대신하지 않음
 한계  : git push --no-verify 로 우회 가능. CI 가 최종 방어선 (문서에 명시)
 ```

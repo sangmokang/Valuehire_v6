@@ -16,7 +16,8 @@ if ! node --test \
   tests/adversarial-evidence.test.mjs \
   tests/delivery-state.test.mjs \
   tests/delivery-wiring.test.mjs \
-  tests/pr-draft.test.mjs >"$output" 2>&1; then
+  tests/pr-draft.test.mjs \
+  tests/trusted-secret-runner.test.mjs >"$output" 2>&1; then
   cat "$output"
   echo "FAIL: checkpoint delivery regression"
   exit 1
@@ -37,6 +38,7 @@ for target in \
   tools/strict/checkpoint-js-scan.mjs \
   tools/strict/checkpoint-policy.mjs \
   tools/strict/checkpoint-secrets.mjs \
+  tools/strict/trusted-secret-scan.mjs \
   tools/strict/trace-ledger.mjs \
   tools/strict/adversarial-evidence.mjs \
   tools/strict/delivery-state.mjs; do

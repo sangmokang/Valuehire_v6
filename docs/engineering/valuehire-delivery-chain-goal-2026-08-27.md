@@ -83,6 +83,8 @@ Codeaudit에서 secure `--run-id` 경로 밖의 legacy fallback이 작업 폴더
 
 같은 감사에서 no-run-id secret 경로가 작업 폴더 `verify.sh`와 pattern을 직접 실행하는 우회도 재현했다. WU-3b-2a는 호출 모드와 무관하게 index의 `verify.sh`와 `.secret-patterns.default`, 승인 SHA가 일치하는 선택적 로컬 pattern만 사용한다.
 
+실제 pre-push와 CI도 하위 `verify.sh`를 작업 폴더에서 직접 호출하고 있었으므로 WU-3b-2b에서 `tools/strict/trusted-secret-scan.mjs`를 공통 진입점으로 추가했다. pre-push는 clean-tree 확인 뒤 이 runner를 직접 실행하고, CI checkout은 event commit의 index blob만 scanner/default pattern 권한으로 사용한다.
+
 ## 설계 결정
 
 > **무엇을** — scope ledger는 명시적 run/WU ID와 index blob으로 고정한다.
