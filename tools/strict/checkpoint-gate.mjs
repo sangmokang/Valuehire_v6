@@ -11,6 +11,9 @@ const CHECKS = {
   SIZE_LIMIT: "size-limit",
 };
 const RUN_ID_PATTERN = /^r-\d{13}-\d{4}$/;
+const SCOPE_FIELDS = ["scope", "scopes", "files", "paths"];
+
+class InputError extends Error {}
 
 function parseArgs(argv) {
   const args = { base: null, runId: null, json: false, scopes: [] };
@@ -19,11 +22,13 @@ function parseArgs(argv) {
     if (arg === "--json") {
       args.json = true;
     } else if (arg === "--base") {
+      if (args.base !== null) throw new Error("--base may only be provided once");
       const value = argv[index + 1];
       if (!value || value.startsWith("--")) throw new Error("--base requires a value");
       args.base = value;
       index += 1;
     } else if (arg === "--run-id") {
+      if (args.runId !== null) throw new Error("--run-id may only be provided once");
       const value = argv[index + 1];
       if (!value || value.startsWith("--")) throw new Error("--run-id requires a value");
       args.runId = value;
@@ -121,19 +126,27 @@ function matchesAny(path, scopes) {
   return scopes.some((scope) => globToRegex(scope).test(path));
 }
 
-function flattenStrings(value) {
-  if (typeof value === "string") return [value];
-  if (Array.isArray(value)) return value.flatMap(flattenStrings);
-  return [];
+function validateScopeValue(field, value) {
+  if (typeof value === "string" && value.trim().length > 0) return [value];
+  if (
+    Array.isArray(value) &&
+    value.length > 0 &&
+    value.every((item) => typeof item === "string" && item.trim().length > 0)
+  ) {
+    return value;
+  }
+  throw new InputError(
+    `${field} must be a non-empty string or a non-empty one-dimensional array of non-empty strings`,
+  );
 }
 
 function scopesFromWu(entry) {
-  const scopes = [
-    ...flattenStrings(entry.scope),
-    ...flattenStrings(entry.scopes),
-    ...flattenStrings(entry.files),
-    ...flattenStrings(entry.paths),
-  ];
+  const scopes = [];
+  for (const field of SCOPE_FIELDS) {
+    if (Object.prototype.hasOwnProperty.call(entry, field)) {
+      scopes.push(...validateScopeValue(field, entry[field]));
+    }
+  }
   return scopes;
 }
 
@@ -141,20 +154,17 @@ function wuStatus(entry) {
   return String(entry?.status ?? "").toLowerCase();
 }
 
-function isScopeBearingWu(entry) {
-  return entry && typeof entry === "object" && scopesFromWu(entry).length > 0;
-}
-
 function extractLedgerScopes(file, parsed) {
   const entries = Array.isArray(parsed?.wus) ? parsed.wus : [];
-  const scopedEntries = entries.filter(
-    (entry) => ["open", "red", "green"].includes(wuStatus(entry)) && isScopeBearingWu(entry),
-  );
+  const scopedEntries = entries
+    .filter((entry) => entry && typeof entry === "object")
+    .map((entry) => ({ entry, scopes: scopesFromWu(entry) }))
+    .filter(({ entry, scopes }) => ["open", "red", "green"].includes(wuStatus(entry)) && scopes.length > 0);
   if (scopedEntries.length > 1) {
     throw new Error(`${file}: ambiguous scope-bearing open/red/green WU entries: ${scopedEntries.length}`);
   }
   return scopedEntries.length === 1
-    ? { found: true, scopes: scopesFromWu(scopedEntries[0]) }
+    ? { found: true, scopes: scopedEntries[0].scopes }
     : { found: false, scopes: [] };
 }
 
@@ -253,32 +263,35 @@ function checkSecrets(changes) {
 }
 
 function isTestFile(path) {
+  const normalizedPath = path.toLowerCase();
   return (
-    /(^|\/)(tests?|__tests__)\/.*\.(?:[cm]?[jt]sx?|py|sh|bash|zsh)$/.test(path) ||
-    /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(path) ||
-    /(^|\/)test_[^/]+\.py$/.test(path) ||
-    /(^|\/)[^/]+_test\.py$/.test(path) ||
-    /^scripts\/acceptance-[^/]+\.sh$/.test(path)
+    /(^|\/)(tests?|__tests__)\/.*\.(?:[cm]?[jt]sx?|py|sh|bash|zsh)$/.test(normalizedPath) ||
+    /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(normalizedPath) ||
+    /(^|\/)test_[^/]+\.py$/.test(normalizedPath) ||
+    /(^|\/)[^/]+_test\.py$/.test(normalizedPath) ||
+    /^scripts\/acceptance-[^/]+\.sh$/.test(normalizedPath)
   );
 }
 
 function stripLineComments(content, path) {
+  const normalizedPath = path.toLowerCase();
   return content
     .split(/\r?\n/)
     .map((line) => {
-      if (/\.(?:py|sh|bash|zsh)$/.test(path)) return line.replace(/(^|\s)#.*$/, "");
+      if (/\.(?:py|sh|bash|zsh)$/.test(normalizedPath)) return line.replace(/(^|\s)#.*$/, "");
       return line.replace(/(^|\s)\/\/.*$/, "");
     })
     .join("\n");
 }
 
 function countWeakeningMarkersForFile(path, content) {
-  const isJavaScript = /\.[cm]?[jt]sx?$/.test(path);
+  const normalizedPath = path.toLowerCase();
+  const isJavaScript = /\.[cm]?[jt]sx?$/.test(normalizedPath);
   const stripped = isJavaScript ? content : stripLineComments(content, path);
   const counts = isJavaScript
     ? countJavaScriptWeakening(stripped)
     : { skip: 0, only: 0, todo: 0, assertions: 0 };
-  if (/\.py$/.test(path)) {
+  if (/\.py$/.test(normalizedPath)) {
     counts.skip +=
       (stripped.match(/@(?:pytest\.mark\.)?skip(?:if)?\b/g) ?? []).length +
       (stripped.match(/\bpytest\.skip\s*\(/g) ?? []).length +
@@ -287,7 +300,7 @@ function countWeakeningMarkersForFile(path, content) {
       (stripped.match(/^\s*assert\b/gm) ?? []).length +
       (stripped.match(/\bself\.assert[A-Za-z_]*\s*\(/g) ?? []).length;
   }
-  if (/\.(?:sh|bash|zsh)$/.test(path)) {
+  if (/\.(?:sh|bash|zsh)$/.test(normalizedPath)) {
     counts.assertions +=
       (stripped.match(/^\s*(?:test|\[\[?)(?:\s|$)/gm) ?? []).length +
       (stripped.match(/\bgrep\s+(?:-[A-Za-z]*q[A-Za-z]*|-[A-Za-z]+\s+-q|-q)\b/g) ?? []).length +
@@ -296,12 +309,34 @@ function countWeakeningMarkersForFile(path, content) {
   return counts;
 }
 
+function countMatches(content, pattern) {
+  return (content.match(pattern) ?? []).length;
+}
+
+function assertionStrength(path, content) {
+  if (!/\.[cm]?[jt]sx?$/.test(path.toLowerCase())) {
+    return { exact: 0, broad: 0, anchored: 0, disjunctions: 0 };
+  }
+  return {
+    exact:
+      countMatches(content, /\bassert\.(?:equal|strictEqual|deepEqual|deepStrictEqual)\s*\(/g) +
+      countMatches(content, /\bexpect\s*\([^\n)]*\)\s*\.(?:toBe|toEqual|toStrictEqual)\s*\(/g),
+    broad:
+      countMatches(content, /\bassert\.(?:ok|notEqual|notStrictEqual)\s*\(/g) +
+      countMatches(content, /\bexpect\s*\([^\n)]*\)\s*\.(?:toBeTruthy|toBeDefined|toContain)\s*\(/g),
+    anchored: countMatches(content, /\bassert\.match\s*\([^\n,]+,\s*\/\^[^\n/]*\$\/[a-z]*\s*\)/gi),
+    disjunctions: countMatches(content, /\b(?:assert|expect)(?:\.|\s*\()[^\n;]*\|\|[^\n;]*/g),
+  };
+}
+
 function compareTestStrength(base, basePath, currentPath, currentContent) {
+  const beforeContent = basePath ? readBase(base, basePath) : "";
   const before = basePath
-    ? countWeakeningMarkersForFile(basePath, readBase(base, basePath))
+    ? countWeakeningMarkersForFile(basePath, beforeContent)
     : countJavaScriptWeakening("");
   const after = countWeakeningMarkersForFile(currentPath, currentContent);
   const details = [];
+  if (currentContent.trim().length === 0) details.push("test file is empty");
   for (const marker of ["skip", "only", "todo"]) {
     if (after[marker] > before[marker]) {
       details.push(`${marker} increased ${before[marker]} -> ${after[marker]}`);
@@ -309,6 +344,22 @@ function compareTestStrength(base, basePath, currentPath, currentContent) {
   }
   if (after.assertions < before.assertions) {
     details.push(`assertions decreased ${before.assertions} -> ${after.assertions}`);
+  }
+  if (before.assertions > 0 && after.assertions === before.assertions) {
+    const beforeStrength = assertionStrength(basePath, beforeContent);
+    const afterStrength = assertionStrength(currentPath, currentContent);
+    if (afterStrength.exact < beforeStrength.exact) {
+      details.push(`exact assertions decreased ${beforeStrength.exact} -> ${afterStrength.exact}`);
+    }
+    if (afterStrength.broad > beforeStrength.broad) {
+      details.push(`broad assertions increased ${beforeStrength.broad} -> ${afterStrength.broad}`);
+    }
+    if (afterStrength.anchored < beforeStrength.anchored) {
+      details.push(`anchored matches decreased ${beforeStrength.anchored} -> ${afterStrength.anchored}`);
+    }
+    if (afterStrength.disjunctions > beforeStrength.disjunctions) {
+      details.push(`assertion disjunctions increased ${beforeStrength.disjunctions} -> ${afterStrength.disjunctions}`);
+    }
   }
   return details;
 }
@@ -378,10 +429,11 @@ function parseHardLimit() {
 }
 
 function isSizeCheckedCode(path) {
-  if (/(^|\/)(node_modules|vendor|vendors|dist|build|coverage|fixtures?|migrations?|artifacts?|private-reviews)\//.test(path)) {
+  const normalizedPath = path.toLowerCase();
+  if (/(^|\/)(node_modules|vendor|vendors|dist|build|coverage|fixtures?|migrations?|artifacts?|private-reviews)\//.test(normalizedPath)) {
     return false;
   }
-  return /\.(?:mjs|cjs|js|jsx|ts|tsx|py|rb|go|rs|java|kt|swift|php|cs|sh|bash|zsh)$/.test(path);
+  return /\.(?:mjs|cjs|js|jsx|ts|tsx|py|rb|go|rs|java|kt|swift|php|cs|sh|bash|zsh)$/.test(normalizedPath);
 }
 
 function loc(content) {
@@ -481,7 +533,11 @@ function main() {
         });
       }
     } catch (error) {
-      violations.push({ check: CHECKS.SCOPE, file: ledger.file, detail: error.message });
+      violations.push({
+        check: error instanceof InputError ? CHECKS.INPUT : CHECKS.SCOPE,
+        file: ledger.file,
+        detail: error.message,
+      });
     }
   }
 
