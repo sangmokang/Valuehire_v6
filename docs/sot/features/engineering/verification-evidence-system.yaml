@@ -36,6 +36,7 @@
       "tracked_product_files": [],
       "ci_steps": [
         "Strict 원칙 정본·장부·배선 검사",
+        "P3 조용한 실패 문법·오탐 회귀",
         "Strict 원칙 적대 fixture·500/501 경계",
         "Strict 전역 스킬 잠금 장치 격리 회귀",
         "HumanSearch G2 테스트 게이트 (정적·단위 + runtime import 증명)",
@@ -47,6 +48,8 @@
         "인수 검사 verify-ac-m (mechanism 명부 대조 · AC-M)"
       ],
       "ci_command_paths": [
+        "scripts/acceptance-silent-failure-lint-mutations.sh",
+        "scripts/acceptance-silent-failure-lint.sh",
         "scripts/acceptance-0-6.sh",
         "scripts/acceptance-ci-step-integrity.sh",
         "scripts/acceptance-guard-global-skill-files.sh",
