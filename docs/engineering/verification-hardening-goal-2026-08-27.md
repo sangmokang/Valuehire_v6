@@ -341,3 +341,216 @@ V1 이 낸 9건을 보고서로 끝내지 않았다. 7건은 같은 PR 에서 **
 **설계상 배운 것**: "명령 문자열이 run 에 있는가"는 앞뒤에 무엇이 붙어도 참이므로 원리적으로
 뚫린다. 판정을 **"그 명령이 그 줄에서 단독으로 실행되는가"**로 바꾸자 V1 이 찾은 우회 13개가
 한꺼번에 닫혔다. 문자열 규칙을 하나씩 늘리는 방향이 아니라 **구조를 바꾸는 방향**이 맞았다.
+
+
+### V2 (Codex · 새 맥락 · 격리 clone `2571603`) — 2026-08-27
+
+실행: `codex exec --dangerously-bypass-approvals-and-sandbox`
+1차 시도는 Codex 의 사이버 정책이 프롬프트를 차단해 **실행 불가(NOT_RUN)** 였다. 표현을
+중립적인 코드 리뷰 어투로 바꾸고 확인 사례를 표로 옮겨 재실행했다(재현 범위는 같다).
+
+V1 이 지적한 F1~F7 과 F6′ 오탐은 **전부 수정 확인**되었으나, 같은 종류의 다른 형태를
+새로 찾아 **DISPUTE(REQUEST_CHANGES)** 를 냈다.
+
+```
+V2 VERDICT: DISPUTE
+
+지정된 F1~F7 재현 입력은 모두 고쳐졌습니다. 그러나 같은 공격군에서 새로운 fail-open 우회 4종, 정상 HTML·안전한 명시 셸 오탐, F9 코드 주석 누락이 실행으로 확인됐습니다.
+
+## 1. 항목별 확인 표
+
+공통 절차:
+
+```bash
+T=$(mktemp -d)
+cp .github/workflows/verify.yml "$T/w.yml"
+ruby scripts/verify/wf-mutate.rb "$T/w.yml" <변이>
+WORKFLOW_FILE="$T/w.yml" \
+  bash scripts/verify/check-ci-required-manifest.sh \
+  docs/sot/ci-required-manifest.yaml
+```
+
+| 항목 | 돌린 변이/명령 | 실제 종료값·핵심 출력 | 판정 |
+|---|---|---|---|
+| F1 | `append-run '; echo after'`, `'\| cat'`, `'&'`; `prepend-run 'set +e'`, `'set +o errexit'`, `"trap 'true' ERR"` | 전부 `rc=1`; `STEP_COMMAND_NOT_STANDALONE` 또는 `RUN_SWALLOWS_ERROR`; `CHECKED: 105` | 검출됨(수정 확인) |
+| F2 | `workflow-shell bash`; `job-shell verify bash`; `step-shell hs-a4 bash` | 전부 `rc=1`; `SHELL_OVERRIDE`; `CHECKED: 105` | 검출됨(수정 확인) |
+| F3 | `wrap-run 'echo "CMD"'`, `printf`, `: CMD`, `# CMD`, 표준 `EOF` heredoc | 전부 `rc=1`; `STEP_COMMAND_NOT_STANDALONE`; `CHECKED: 105/106` | 검출됨(수정 확인) |
+| F4 | `trigger-filter push branches never-such-branch`, `paths-ignore '**'`, `tags never-such-tag` | 전부 `rc=1`; `TRIGGER_NARROWED` 또는 `TRIGGER_FILTERED`; `CHECKED: 105` | 검출됨(수정 확인) |
+| F5 | 임시 문서에 31번째 `verify-ac-m` 중복 행 추가, 20·22번째 id 순서 교환, 이름 위조 | `rc=1`; `DOC_DUPLICATE_ROW`, `DOC_COUNT_MISMATCH`, 두 `DOC_ORDER_MISMATCH`, 두 `DOC_NAME_MISMATCH`; `CHECKED: 94` | 검출됨(수정 확인) |
+| F6 | script 태그 삭제, `/wrong.js`, `type="text/template"` | 각각 `rc=1`; `app.js 참조=false` 또는 `type=text/template`; `CHECKED: 25` | 검출됨(수정 확인) |
+| F6′ | `item.append(button)` → `item.appendChild(button)` | `rc=0`; `버튼 12개`, 클릭 반응 PASS, `CHECKED: 25` | 정상 통과(오탐 수정 확인) |
+| F7 | 요청한 4개 한 줄 스크립트 각각 `run-acceptance.sh` 실행 | 전부 `rc=1`; `출력·종료 명령만으로 이뤄져 있다` | 검출됨(수정 확인) |
+| F8 | `rg -n '한계\(V1 F8\|죽은.*대입' scripts/verify/check-mechanism-registry.sh` | “문자열이 코드 안에 있는가만 본다”, “죽은 대입으로도 통과”, “실행 경로는 보지 않는다” 출력 | 인정 정확히 명시 |
+| F9 | `rg -n -i 'F9\|개수만\|더미\|semantic' scripts/verify/check-pytest-baseline.sh` | 출력 없음. 인정은 코드가 아니라 목표 문서 232행에만 존재 | 코드 주석 인정 누락 |
+
+F8 주석은 [check-mechanism-registry.sh](/private/tmp/claude-501/-Users-kangsangmo-Desktop-Valuehire-v6--claude-worktrees-history-scan-failclosed/4010d7e2-1ee0-4d2e-9c75-f35b56c84e51/scratchpad/v2-clone/scripts/verify/check-mechanism-registry.sh:167)에 정확히 있습니다. F9는 [check-pytest-baseline.sh](/private/tmp/claude-501/-Users-kangsangmo-Desktop-Valuehire-v6--claude-worktrees-history-scan-failclosed/4010d7e2-1ee0-4d2e-9c75-f35b56c84e51/scratchpad/v2-clone/scripts/verify/check-pytest-baseline.sh:18)에 수집 불가 한계만 있고, “개수만 보므로 더미 교체를 못 잡는다”는 인정은 [목표 문서](/private/tmp/claude-501/-Users-kangsangmo-Desktop-Valuehire-v6--claude-worktrees-history-scan-failclosed/4010d7e2-1ee0-4d2e-9c75-f35b56c84e51/scratchpad/v2-clone/docs/engineering/verification-hardening-goal-2026-08-27.md:232)에만 있습니다.
+
+## 2. 새로 찾은 미탐 사례
+
+### 치명: 필수 명령이 단독 줄이어도 실행되지 않을 수 있음
+
+`hs-a4`의 필수 명령을 다음처럼 감싼 사본을 검사했습니다.
+
+```bash
+wrap-run $'exit 0\nCMD'
+wrap-run $'if false; then\n  CMD\nfi'
+wrap-run $'never_called() {\n  CMD\n}'
+wrap-run $'command set +e\nCMD\ntrue'
+wrap-run $'cat <<\'123\'\nCMD\n123'
+```
+
+실제 출력:
+
+```text
+set_plus_e_swallow checker_rc=0 PASS: 필수 구조 105건이 명부와 양방향으로 일치 CHECKED: 105
+dead_function checker_rc=0 PASS: 필수 구조 105건이 명부와 양방향으로 일치 CHECKED: 105
+numeric_heredoc checker_rc=0 PASS: 필수 구조 105건이 명부와 양방향으로 일치 CHECKED: 105
+false_if checker_rc=0 PASS: 필수 구조 105건이 명부와 양방향으로 일치 CHECKED: 105
+```
+
+별도 `bash -e` 실행에서도 네 경우 모두 필수 실패가 실행되지 않거나 삼켜진 뒤 `rc=0`임을 확인했습니다.
+
+원인은 [SWALLOW 패턴](/private/tmp/claude-501/-Users-kangsangmo-Desktop-Valuehire-v6--claude-worktrees-history-scan-failclosed/4010d7e2-1ee0-4d2e-9c75-f35b56c84e51/scratchpad/v2-clone/scripts/verify/check-ci-required-manifest.sh:191)이 제한된 줄 시작 형태만 보고, [단독 줄 검사](/private/tmp/claude-501/-Users-kangsangmo-Desktop-Valuehire-v6--claude-worktrees-history-scan-failclosed/4010d7e2-1ee0-4d2e-9c75-f35b56c84e51/scratchpad/v2-clone/scripts/verify/check-ci-required-manifest.sh:304)가 셸 제어 흐름을 해석하지 않기 때문입니다.
+
+### 높음: `must_run_contains` 다섯 곳은 F3형 echo 위장을 그대로 허용
+
+각 step의 전체 `run`을 `echo "<fragment>"` 한 줄로 바꿨습니다.
+
+```text
+history-scan rc=0 PASS: STEP history-scan ~ `git cat-file blob`
+suppressions-expiry rc=0 PASS: STEP suppressions-expiry ~ `suppressions.yaml`
+hooks-present rc=0 PASS: STEP hooks-present ~ `hooks/pre-commit hooks/pre-push`
+shell-syntax rc=0 PASS: STEP shell-syntax ~ `bash -n`
+pattern-file-selfcheck rc=0 PASS: STEP pattern-file-selfcheck ~ `.secret-patterns.default`
+```
+
+모두 최종 `PASS: 필수 구조 105건… / CHECKED: 105`였습니다. [must_run_contains 구현](/private/tmp/claude-501/-Users-kangsangmo-Desktop-Valuehire-v6--claude-worktrees-history-scan-failclosed/4010d7e2-1ee0-4d2e-9c75-f35b56c84e51/scratchpad/v2-clone/scripts/verify/check-ci-required-manifest.sh:319)은 주석만 제거한 뒤 부분 문자열을 셉니다.
+
+따라서 두 필드가 같은 명부 항목에서 충돌하지는 않지만, “필수 명령은 실행돼야 한다”는 정책에는 의미상 큰 예외 통로가 남습니다.
+
+### 높음: HTML 정규식 검사 우회
+
+다음 HTML 사본이 전부 `rc=0 / CHECKED: 25`였습니다.
+
+```html
+<!-- <script src="/app.js" defer></script> -->
+<script src="/wrong/place/app.js" defer></script>
+<script src="/app.js" type='text/template' defer></script>
+```
+
+`/wrong/place/app.js`는 실제 서버가 제공하지 않습니다. 서버 라우트는 [`/app.js` 하나뿐](/private/tmp/claude-501/-Users-kangsangmo-Desktop-Valuehire-v6--claude-worktrees-history-scan-failclosed/4010d7e2-1ee0-4d2e-9c75-f35b56c84e51/scratchpad/v2-clone/humansearch/src/humansearch/admin_weekly_dashboard/shadow_server.py:191)입니다.
+
+원인은 [HTML 정규식](/private/tmp/claude-501/-Users-kangsangmo-Desktop-Valuehire-v6--claude-worktrees-history-scan-failclosed/4010d7e2-1ee0-4d2e-9c75-f35b56c84e51/scratchpad/v2-clone/scripts/verify/admin-app-runtime.mjs:152)이 주석을 제거하지 않고 속성의 큰따옴표만 읽으며, [경로 전체가 아니라 basename만 비교](/private/tmp/claude-501/-Users-kangsangmo-Desktop-Valuehire-v6--claude-worktrees-history-scan-failclosed/4010d7e2-1ee0-4d2e-9c75-f35b56c84e51/scratchpad/v2-clone/scripts/verify/admin-app-runtime.mjs:347)하기 때문입니다.
+
+### 보통: F7의 한 글자 변형은 막았지만 출력 위조 하한은 여전히 낮음
+
+```bash
+echo "PASS: $(true)"
+```
+
+```text
+rc=0
+PASS:
+OK(run-acceptance): ... — 판정 1건
+```
+
+또한:
+
+```bash
+printf "padding" > /dev/null
+echo "PASS: ok"
+```
+
+도 `rc=0`입니다. [정적 판정](/private/tmp/claude-501/-Users-kangsangmo-Desktop-Valuehire-v6--claude-worktrees-history-scan-failclosed/4010d7e2-1ee0-4d2e-9c75-f35b56c84e51/scratchpad/v2-clone/scripts/verify/run-acceptance.sh:55)이 임의 명령 치환과 파일 리다이렉트를 곧바로 “일을 함”으로 분류합니다.
+
+## 3. 오탐·규칙 충돌·고아 검사
+
+정상 저장소 실행:
+
+| 명령 | 결과 |
+|---|---|
+| `check-ci-required-manifest.sh` | `rc=0`, `CHECKED: 105` |
+| `check-docs-workflow-sync.sh` | `rc=0`, `CHECKED: 91` |
+| `check-ci-step-integrity.sh` | `rc=0`, `CHECKED: 32` |
+| `check-mechanism-registry.sh` | `rc=0`, `CHECKED: 22` |
+| `admin-app-runtime.mjs` | `rc=0`, `CHECKED: 25` |
+
+추가 오탐은 두 가지입니다.
+
+- 정상 HTML인 `<script src='/app.js' defer></script>`는 `rc=1`, `app.js 참조=false`였습니다.
+- `shell: bash --noprofile --norc -eo pipefail {0}`도 `SHELL_OVERRIDE / rc=1`입니다. 같은 셸을 직접 실행한 `false; echo unreachable`은 `rc=1`로 실패 전파가 정상입니다. “모든 명시 셸 금지”가 정책이면 의도된 차단이지만, 검사기의 “명시하면 `-e`가 사라진다”는 진단은 이 경우 사실이 아닙니다.
+
+고아 검사는 전부 fail-closed였습니다.
+
+| 임시 clone에서 삭제 | 실패한 인수 검사 |
+|---|---|
+| `check-ci-required-manifest.sh` | `acceptance-ci-required-manifest.sh rc=2`, `acceptance-ci-workflow-hardening.sh rc=2` |
+| `check-docs-workflow-sync.sh` | `acceptance-docs-workflow-sync.sh rc=2` |
+| `check-pytest-baseline.sh` | `acceptance-pytest-baseline.sh rc=2` |
+| `admin-app-runtime.mjs` | `acceptance-admin-app-runtime.sh rc=2` |
+| `wf-mutate.rb` | `acceptance-ci-workflow-hardening.sh rc=2` |
+
+고아 검사기는 없습니다.
+
+## 4. 공통 가정 점검
+
+로컬 Psych 실행:
+
+```text
+Psych=3.1.0
+true(TrueClass)=>"a"
+false(FalseClass)=>"b"
+```
+
+즉 `on`, `yes`는 `true`, `off`는 `false` 키로 합쳐집니다. YAML 1.1이 `on/off/yes/no`를 boolean으로 정의한다는 점과 일치합니다. [YAML 1.1 boolean 명세](https://yaml.org/type/bool.html)
+
+현재 코드는 `wf.key?(true) ? wf[true] : wf["on"]`으로 정상 `on:`은 보완했습니다. 하지만 다음 사본은 문제가 됩니다.
+
+```yaml
+on:
+  push:
+    branches: ["**"]
+true:
+  push:
+  pull_request:
+```
+
+Psych 출력:
+
+```text
+PARSED_KEYS=[["name", String], ["true", TrueClass], ["permissions", String], ["jobs", String]]
+TRIGGER_VALUE={"push"=>nil, "pull_request"=>nil}
+```
+
+검사기 출력:
+
+```text
+rc=0
+PASS: TRIGGER push
+PASS: TRIGGER pull_request
+PASS: 필수 구조 105건이 명부와 양방향으로 일치
+```
+
+GitHub 문서상 워크플로 트리거는 `on` 키가 정의하며, 위 원문의 `on`에는 `pull_request`가 없습니다. 따라서 검사기는 GitHub가 트리거로 보는 노드가 아니라 Psych에서 충돌한 `true` 노드를 검증합니다. [GitHub Actions workflow syntax](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax)
+
+한편 YAML anchor/alias는 2025년 이후 GitHub Actions가 공식 지원하며, 검사기도 `aliases: true`를 사용하므로 단순 anchor/alias는 현재 공통 가정 문제가 아닙니다. [GitHub 공식 anchor 문서](https://docs.github.com/en/actions/reference/workflows-and-actions/reusing-workflow-configurations)
+
+원격 GitHub에 변이 워크플로를 push하지 않았으므로 해당 충돌 사본에 대한 GitHub 서버 파서의 실제 오류 문구는 미확인입니다. 다만 로컬 검사기가 원문의 `on`이 아닌 다른 노드를 검사하며 초록을 내는 사실은 실행으로 확정됐습니다.
+
+## 5. 판정 근거
+
+- 요청된 과거 미탐 F1~F7과 F6′은 모두 의도대로 수정됐습니다.
+- 그러나 필수 명령의 도달 가능성·실행 여부를 보지 않아 동일 공격군의 더 단순한 우회가 `rc=0`입니다.
+- `must_run_contains` 다섯 곳은 `echo` 위장만으로 전부 통과합니다.
+- HTML 로더 검사는 주석·홑따옴표·실제 라우트 전체 경로를 처리하지 못합니다.
+- Psych의 `on` 보정은 `true:` 키 충돌에서 다른 노드를 검증합니다.
+- 정상 홑따옴표 HTML과 안전한 명시 셸을 오차단합니다.
+- F9의 인정은 요청한 코드 주석에 없습니다.
+- 리뷰 전후 HEAD는 `2571603aa1837e62ea1da2f56663d93cefc74030`, `git status --short`는 빈 출력, `git diff --exit-code`는 `0`입니다. 저장소 파일·커밋·원격은 변경하지 않았습니다.
+
+병합 전 판정은 `REQUEST_CHANGES`입니다.
+
+V2_EXIT=0
+V2_DONE
+
+```

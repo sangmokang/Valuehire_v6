@@ -51,7 +51,7 @@ case "$TMP" in
 esac
 trap 'ruby -rfileutils -e "FileUtils.remove_entry(ARGV[0]) if File.exist?(ARGV[0])" "$TMP"' EXIT
 
-TOTAL=24
+TOTAL=35
 checked=0
 failed=0
 
@@ -131,6 +131,38 @@ attack "F3-4 명령 자체를 주석 처리" 1 wrap-run '# CMD'
 attack "F4-1 도달 불가 branches 필터" 1 trigger-filter push branches never-such-branch
 attack "F4-2 모든 경로 무시 필터"     1 trigger-filter push paths-ignore '**'
 attack "F4-3 도달 불가 태그 필터"     1 trigger-filter push tags never-such-tag
+
+# ── V2 G1 (치명): 단독 줄이어도 그 줄이 실행되지 않을 수 있다 ──────────────
+# 2026-08-27 V2 실측: 명령을 단독 줄로 두면서도 도달하지 못하게 만드는 다섯 형태가
+# 전부 통과했다. "그 줄에 혼자 있는가"만 보고 "그 줄에 닿는가"를 보지 않았기 때문이다.
+attack "G1-1 앞에 exit 0 을 두어 죽은 코드로"     1 wrap-run 'exit 0
+CMD'
+attack "G1-2 거짓 분기 안으로 옮김"                1 wrap-run 'if false; then
+  CMD
+fi'
+attack "G1-3 호출되지 않는 함수 안으로 옮김"       1 wrap-run 'never_called() {
+  CMD
+}'
+attack "G1-4 command 접두로 set +e 우회"           1 wrap-run 'command set +e
+CMD
+true'
+attack "G1-5 숫자 heredoc 마커로 위장"             1 wrap-run 'cat <<'"'"'123'"'"'
+CMD
+123'
+
+# ── V2 G2 (높음): must_run_contains 자리는 여전히 echo 위장을 허용했다 ─────
+# 인라인 본문 스텝 다섯 곳은 조각 대조라, 본문을 조각을 인용한 echo 한 줄로 바꿔도
+# "조각이 있다"로 셌다.
+attack "G2-1 history-scan 본문을 echo 한 줄로"        1 contains-echo history-scan "git cat-file blob"
+attack "G2-2 suppressions-expiry 본문을 echo 한 줄로" 1 contains-echo suppressions-expiry "suppressions.yaml"
+attack "G2-3 hooks-present 본문을 echo 한 줄로"       1 contains-echo hooks-present "hooks/pre-commit hooks/pre-push"
+attack "G2-4 shell-syntax 본문을 echo 한 줄로"        1 contains-echo shell-syntax "bash -n"
+attack "G2-5 pattern-file-selfcheck 본문을 echo 로"   1 contains-echo pattern-file-selfcheck ".secret-patterns.default"
+
+# ── V2 G4 (높음): YAML 1.1 에서 on 과 true 가 같은 키로 합쳐진다 ───────────
+# 원문의 `on:` 은 그대로 두고 최상위 `true:` 블록을 덧붙이면, 검사기는 GitHub 이
+# 트리거로 보는 노드가 아니라 합쳐진 다른 노드를 읽고 초록을 낸다.
+attack "G4-1 최상위 true: 키를 덧붙여 트리거를 흐림" 1 true-key
 
 # ── 원본 불변 ───────────────────────────────────────────────────────────────
 current=$(git status --porcelain)
