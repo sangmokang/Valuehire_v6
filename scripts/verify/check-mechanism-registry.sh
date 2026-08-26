@@ -156,6 +156,16 @@ validate_stage() {
       if [ ! -x "$e_path" ]; then
         echo "manual path 가 실행권한 없음 — $e_path"; return 1
       fi
+      # 2026-08-27 발견: manual 만 target 을 한 번도 대조하지 않았다. 그래서 명부에 아무
+      # 문구나 적어도 통과했고, 장부가 실제 장치와 갈라져도 아무도 몰랐다(정상 fixture
+      # 자신의 target 이 그 파일 안에 없었던 것이 증거다).
+      #
+      # manual 은 "실행 배선"이 아니라 "그 장치가 무엇을 판정하는가"를 가리키므로, ci·
+      # pre-push 처럼 줄 시작을 요구하지 않는다. 다만 주석은 걷어낸다 — 주석에만 있는
+      # 문구는 코드가 아니고, 그 기준은 다른 stage 와 같아야 한다.
+      if ! grep -v '^[[:space:]]*#' "$e_path" | grep -qF -- "$e_target"; then
+        echo "죽은 manual target — '$e_target' 이(가) $e_path 의 주석 아닌 줄에 없다"; return 1
+      fi
       ;;
     *)
       echo "알 수 없는 stage — $e_stage"; return 1

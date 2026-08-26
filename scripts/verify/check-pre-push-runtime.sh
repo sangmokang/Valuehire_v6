@@ -50,9 +50,14 @@ cp "$HOOK" "$SANDBOX/hooks/pre-push"
 cp scripts/verify/run-acceptance.sh "$SANDBOX/scripts/verify/run-acceptance.sh"
 cp .github/workflows/verify.yml "$SANDBOX/.github/workflows/verify.yml"
 
+# 스텁도 실제로 무언가를 해야 한다. 실행 래퍼가 "출력만 하는 본문"을 거부하기
+# 때문이다(2026-08-27). 그 계약은 옳으므로 스텁을 계약에 맞춘다 — 계약을 스텁에
+# 맞춰 낮추면 그 순간 위조본이 다시 통과한다.
 cat > "$SANDBOX/scripts/acceptance-principles-check.sh" <<'EOF'
 #!/usr/bin/env bash
-echo "PASS: sandbox stub"
+commits=$(git rev-list --count HEAD 2>/dev/null)
+[ -n "$commits" ] || exit 2
+echo "PASS: sandbox stub (commits=$commits)"
 exit 0
 EOF
 cat > "$SANDBOX/$PROBE_REL" <<EOF
@@ -62,7 +67,9 @@ exit $PROBE_EXIT
 EOF
 cat > "$SANDBOX/verify.sh" <<'EOF'
 #!/usr/bin/env bash
-echo "PASS: sandbox stub"
+tracked=$(git ls-files | wc -l | tr -d ' ')
+[ -n "$tracked" ] || exit 2
+echo "PASS: sandbox stub (tracked=$tracked)"
 exit 0
 EOF
 chmod +x "$SANDBOX/hooks/pre-push" "$SANDBOX/scripts/verify/run-acceptance.sh" \
