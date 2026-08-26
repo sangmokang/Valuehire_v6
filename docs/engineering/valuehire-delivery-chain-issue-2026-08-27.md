@@ -68,6 +68,7 @@ GitHub Issue 생성은 외부 쓰기이므로 승인 전에는 실행하지 않�
 | WU-3b-8 | V1 기존 게이트 회귀 보정 | fixture, cleanroom, core gate CI 배선, pre-commit secret authority |
 | WU-3b-9 | RED/GREEN 절차 위조 차단 | trace validator, 과거 무효 WU 표기, 회귀 테스트 |
 | WU-3b-10 | Codeaudit 현재상태 문서 보정 | goal 결론, 구현 전/후 상태 분리, 회귀 테스트 |
+| WU-3b-11 | Codeaudit WU 이력 정직성 보정 | WU-3b-2c 무효 표기, 성공 trace 제외, 회귀 테스트 |
 
 ## 데이터 안전 조건
 

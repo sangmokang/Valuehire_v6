@@ -6,9 +6,17 @@ import test from "node:test";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const goal = readFileSync(join(ROOT, "docs/engineering/valuehire-delivery-chain-goal-2026-08-27.md"), "utf8");
+const ledger = JSON.parse(readFileSync(join(ROOT, ".strict/run-ledger/strict-wu3b-20260827-472c276.json"), "utf8"));
 
 test("goal separates the repaired local boundary from unrun remote delivery", () => {
   assert.match(goal, /현재 후보는 로컬 검사 경계를 닫았지만.*원격 PR.*CI.*merge.*미실행/s);
   assert.match(goal, /## 변경 전 판단 근거/);
   assert.doesNotMatch(goal, /현재 후보는.*검사 입력을 작업 폴더에서 바꿀 수 있고.*장부가 없/s);
+});
+
+test("goal and run ledger invalidate every known RED-test rewrite", () => {
+  assert.match(goal, /WU-3b-2c.*WU-3b-6a.*invalidated/s);
+  for (const id of ["WU-3b-2c", "WU-3b-6a"]) {
+    assert.equal(ledger.wus.find((wu) => wu.id === id)?.status, "invalidated");
+  }
 });
