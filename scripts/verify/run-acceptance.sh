@@ -53,13 +53,16 @@ only_output=$(awk '
     if (line ~ /^#/) next
     total += 1
     if (line ~ /^(echo|printf|exit([[:space:]]|$)|true$|:$|:[[:space:]]*#)/) {
-      # 출력 명령처럼 보여도 리다이렉트·파이프·명령 치환이 붙어 있으면 부수 효과가 있다.
-      # `printf ... > marker` 는 파일을 쓰고, `echo "$(git ...)"` 는 다른 명령을 돌린다.
-      # 이것을 "출력뿐"으로 세면 정상 검사를 오차단한다(2026-08-27 실측: pre-push
-      # 런타임 증명의 probe 가 이 규칙에 걸려 검사 전체가 빨개졌다).
-      if (line ~ /[|>]/) next
-      if (line ~ /\$\(/) next
-      if (index(line, "`") > 0) next
+      # 출력 명령처럼 보여도 **파일을 쓰면** 부수 효과가 있다. `printf ... > marker` 가
+      # 그렇고, pre-push 런타임 증명의 probe 가 실제로 그 형태다 — 이것까지 "출력뿐"으로
+      # 세면 정상 검사를 오차단한다.
+      #
+      # 반대로 파이프·stderr 리다이렉트·빈 명령 치환은 부수 효과가 아니다.
+      # 2026-08-27 V1 F7 실측: `echo "PASS: ok" | cat` · `>&2` · `$(:)` 한 글자로
+      # 위조본이 전부 되살아났다. 하한이 파이프 문자 하나였던 셈이다.
+      if (line ~ /[0-9]?>>?[[:space:]]*[^&[:space:]]/) next     # 파일로 쓴다
+      if (line ~ /\$\([[:space:]]*[^:)[:space:]]/) next         # 실제 명령을 부르는 치환(빈 :() 제외)
+      if (line ~ /`[^`]+`/) next                                # 백틱 명령 치환
       output += 1
     }
   }

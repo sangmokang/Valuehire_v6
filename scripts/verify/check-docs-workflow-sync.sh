@@ -109,25 +109,39 @@ end
   errors << "DOC_MISSING_STEP: 워크플로의 `#{id}` 가 문서에 없다 — 운영자가 모르는 검사가 돈다"
 end
 
-if doc_ids.size == wf_ids.size && (doc_ids - wf_ids).empty? && (wf_ids - doc_ids).empty?
-  doc_ids.each_with_index do |id, i|
-    checked += 1
-    if id == wf_ids[i]
-      passes << "STEP #{i + 1} #{id}"
-    else
-      errors << "DOC_ORDER_MISMATCH: #{i + 1}번째가 문서는 `#{id}`, 워크플로는 `#{wf_ids[i]}` — 순서가 다르다"
-    end
+# 같은 단계를 두 번 적으면 그것만으로 표가 사실과 다르다. 번호만 이어붙이면 순번
+# 검사(①)도 차집합(②)도 통과하므로, 중복 자체를 따로 본다 (2026-08-27 V1 F5).
+# Ruby 2.6 호환 — Enumerable#tally 는 2.7 부터라 group_by 로 센다.
+duplicated = doc_ids.group_by { |x| x }.select { |_, v| v.size > 1 }.keys
+duplicated.each do |id|
+  checked += 1
+  errors << "DOC_DUPLICATE_ROW: 문서가 `#{id}` 를 #{doc_ids.count(id)}번 적었다 — " \
+            "같은 단계가 여러 번 도는 것처럼 읽힌다"
+end
+
+if doc_ids.size != wf_ids.size
+  checked += 1
+  errors << "DOC_COUNT_MISMATCH: 문서 #{doc_ids.size}행 vs 워크플로 #{wf_ids.size}개 — 행 수가 다르다"
+end
+
+# 순서·이름 대조는 **어떤 경우에도 건너뛰지 않는다**. 예전에는 개수가 어긋나면 이
+# 블록 전체를 생략했고, 그래서 중복 1행을 넣으면 순서 뒤바꿈과 이름 위조가 함께
+# 통과하면서 "순서까지 일치" 라는 거짓 문장까지 출력됐다 (2026-08-27 V1 F5).
+compare_n = [doc_ids.size, wf_ids.size].min
+(0...compare_n).each do |i|
+  checked += 1
+  if doc_ids[i] == wf_ids[i]
+    passes << "STEP #{i + 1} #{doc_ids[i]}"
+  else
+    errors << "DOC_ORDER_MISMATCH: #{i + 1}번째가 문서는 `#{doc_ids[i]}`, 워크플로는 `#{wf_ids[i]}` — 순서가 다르다"
   end
 
-  # ── ③ 표시 이름까지 맞는가 (사람이 읽는 열의 신뢰도) ──────────────────────
-  documented.each_with_index do |row, i|
-    checked += 1
-    if row[:name] == actual[i][:name]
-      passes << "NAME #{row[:id]}"
-    else
-      errors << "DOC_NAME_MISMATCH: `#{row[:id]}` 의 이름이 문서는 #{row[:name].inspect}, " \
-                "워크플로는 #{actual[i][:name].inspect}"
-    end
+  checked += 1
+  if documented[i][:name] == actual[i][:name]
+    passes << "NAME #{documented[i][:id]}"
+  else
+    errors << "DOC_NAME_MISMATCH: #{i + 1}번째 이름이 문서는 #{documented[i][:name].inspect}, " \
+              "워크플로는 #{actual[i][:name].inspect}"
   end
 end
 

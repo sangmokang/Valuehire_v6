@@ -45,7 +45,7 @@ case "$TMP" in
 esac
 trap 'ruby -rfileutils -e "FileUtils.remove_entry(ARGV[0]) if File.exist?(ARGV[0])" "$TMP"' EXIT
 
-TOTAL=12
+TOTAL=14
 checked=0
 failed=0
 
@@ -174,6 +174,36 @@ lines.reject! { |l| l =~ /^\|\s*\d+\s*\|\s*`[a-z0-9-]+`/ }
 File.write(path, lines.join)
 ')
 expect "문서에서 단계 표 전체 삭제 → 스캔 무효" 2 "$p" "$WF"
+
+# ── V1 F5 (높음): 행 중복이면 순서·이름 대조 블록이 통째로 생략됐다 ────────
+# 2026-08-27 실측: 중복 1행 + 순서 뒤바꿈 + 이름 위조를 함께 넣으면 exit 0 이고
+# "30행이 29개와 순서까지 일치" 라는 **거짓 문장**을 출력했다. 개수가 어긋나면 이후
+# 대조를 건너뛰도록 짜여 있었기 때문이다. 건너뛴 것을 통과로 세면 안 된다.
+p=$(mutate_doc row-duplicated '
+path = ARGV[0]
+lines = File.readlines(path)
+idx = lines.index { |l| l =~ /^\|\s*\d+\s*\|\s*`verify-ac-m`/ }
+raise "대상 행 없음" if idx.nil?
+num = lines[idx][/^\|\s*(\d+)/, 1].to_i
+lines.insert(idx + 1, lines[idx].sub(/^\|\s*\d+/, "| #{num + 1}"))
+File.write(path, lines.join)
+')
+expect "문서에 같은 단계를 번호만 바꿔 한 줄 더 적음 → 불합격" 1 "$p" "$WF"
+
+p=$(mutate_doc dup-and-swap '
+path = ARGV[0]
+lines = File.readlines(path)
+d = lines.index { |l| l =~ /^\|\s*\d+\s*\|\s*`verify-ac-m`/ }
+raise "대상 행 없음" if d.nil?
+dnum = lines[d][/^\|\s*(\d+)/, 1].to_i
+lines.insert(d + 1, lines[d].sub(/^\|\s*\d+/, "| #{dnum + 1}"))
+i = lines.index { |l| l =~ /^\|\s*\d+\s*\|\s*`hs-a3`/ }
+j = lines.index { |l| l =~ /^\|\s*\d+\s*\|\s*`hs-a4`/ }
+raise "교체 대상 없음" if i.nil? || j.nil?
+lines[i], lines[j] = lines[j], lines[i]
+File.write(path, lines.join)
+')
+expect "번호를 이어붙인 중복 + 순서뒤바꿈 동시 → 불합격" 1 "$p" "$WF"
 
 # ── 차단 쪽: 워크플로만 바꾸고 문서를 두면 ──────────────────────────────────
 p=$(mutate_wf step-added '

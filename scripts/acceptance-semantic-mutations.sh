@@ -78,11 +78,18 @@ write_mutant() {
     verdict-only)   printf '#!/usr/bin/env bash\necho "VERDICT: PASS"\n' > "$path" ;;
     password-word)  printf '#!/usr/bin/env bash\necho "PASSWORD 검사 없음"\n' > "$path" ;;
     fake-checked)   printf '#!/usr/bin/env bash\necho "PASS: 전부 통과"\necho "CHECKED: 42"\necho "VERDICT: PASS"\n' > "$path" ;;
+    # ↓ 2026-08-27 V1 F7. 위 3종은 막혔지만 파이프·리다이렉트 문자 하나만 붙이면
+    #   본문 정적 판정이 "일을 한다"로 세어 전부 다시 통과했다. 하한이 한 글자였다.
+    pipe-only)      printf '#!/usr/bin/env bash\necho "PASS: ok" | cat\n' > "$path" ;;
+    stderr-only)    printf '#!/usr/bin/env bash\necho "PASS: ok" >&2\necho "PASS: ok"\n' > "$path" ;;
+    subst-only)     printf '#!/usr/bin/env bash\necho "PASS: $(:)"\n' > "$path" ;;
+    verdict-pipe)   printf '#!/usr/bin/env bash\necho "VERDICT: PASS" | cat\n' > "$path" ;;
     *)          return 1 ;;
   esac
 }
 
-for kind in exit-zero true-only noop empty echo-only verdict-only password-word fake-checked; do
+for kind in exit-zero true-only noop empty echo-only verdict-only password-word fake-checked \
+           pipe-only stderr-only subst-only verdict-pipe; do
   blocked=0
   survivors=""
   for t in "${targets[@]}"; do

@@ -73,6 +73,36 @@ class Node {
     for (const node of nodes) this.children.push(node);
   }
 
+  // 브라우저에는 있는데 이 최소 DOM 에는 없던 메서드들. 없으면 **정상 코드가 빨개진다**
+  // (2026-08-27 V1 F6: append 를 표준 appendChild 로 바꾸자 "버튼 0개" 로 오차단됐다).
+  // 최소 DOM 이 브라우저보다 좁으면 그 차이가 그대로 거짓 판정이 된다.
+  appendChild(node) {
+    this.children.push(node);
+    return node;
+  }
+
+  insertBefore(node, ref) {
+    const at = this.children.indexOf(ref);
+    if (at < 0) this.children.push(node);
+    else this.children.splice(at, 0, node);
+    return node;
+  }
+
+  removeChild(node) {
+    const at = this.children.indexOf(node);
+    if (at >= 0) this.children.splice(at, 1);
+    return node;
+  }
+
+  get firstChild() {
+    if (this.children.length === 0) return null;
+    return this.children[0];
+  }
+
+  get childNodes() {
+    return this.children;
+  }
+
   replaceChildren(...nodes) {
     this.children = [];
     this.ownText = "";
@@ -116,6 +146,23 @@ class Node {
 
 // index.html 의 id 를 그대로 쓴다. app.js 가 없는 id 를 참조하면 여기서 null 이 되어
 // 실행이 터진다 — 화면 쪽에서 id 를 지우는 것도 이 harness 가 잡는다.
+// 화면이 이 스크립트를 실제로 불러오는가. 여기를 보지 않으면 `<script src>` 를 지우거나
+// 경로를 틀리게 하거나 type 을 바꿔도 시험이 초록이다 — 브라우저에서는 app.js 가 한 줄도
+// 실행되지 않는데 말이다 (2026-08-27 V1 F6).
+function scriptSourcesFromHtml(html) {
+  const found = [];
+  const re = /<script\b([^>]*)>/gi;
+  let m = re.exec(html);
+  while (m !== null) {
+    const attrs = m[1];
+    const src = attrs.match(/\ssrc="([^"]+)"/i);
+    const type = attrs.match(/\stype="([^"]+)"/i);
+    found.push({ src: src ? src[1] : null, type: type ? type[1].toLowerCase() : null });
+    m = re.exec(html);
+  }
+  return found;
+}
+
 function idsFromHtml(html) {
   const found = [];
   const re = /\sid="([^"]+)"/g;
@@ -221,13 +268,23 @@ async function runApp(source, ids, responder) {
     return responder(url, options);
   };
 
+  // 브라우저에 없는 node 전역을 가린다. 가리지 않으면 `process.version` 같은 참조가
+  // 여기서는 통과하고 브라우저에서만 ReferenceError 로 죽는다 (2026-08-27 V1 F6).
   const factory = new Function(
     "document",
     "fetch",
     "console",
+    "process",
+    "require",
+    "module",
+    "global",
+    "Buffer",
+    "__dirname",
+    "__filename",
     `"use strict";\n${source}\n`,
   );
-  factory(documentStub, fetchStub, console);
+  factory(documentStub, fetchStub, console,
+    undefined, undefined, undefined, undefined, undefined, undefined, undefined);
 
   // app.js 는 loadDashboard() 의 Promise 를 밖으로 넘기지 않는다. 화면이 결론을 낼
   // 때까지(load-state 에 판정이 찍힐 때까지) 마이크로태스크를 흘려보내며 기다린다.
@@ -283,6 +340,15 @@ async function main() {
     if (!node) return "";
     return node.textContent;
   };
+
+  // ⓪ 화면이 이 스크립트를 실제로 불러오는가
+  const scripts = scriptSourcesFromHtml(html);
+  const appName = args.app.split("/").pop();
+  const loader = scripts.find((t) => t.src !== null && t.src.split("/").pop() === appName);
+  say(loader !== undefined, "화면이 관리자 스크립트를 불러온다", `<script src> ${scripts.length}개 중 ${appName} 참조=${loader !== undefined}`);
+  const loaderType = loader ? loader.type : null;
+  const executableType = loaderType === null || loaderType === "module" || loaderType === "text/javascript";
+  say(executableType, "그 스크립트가 실행되는 type 이다", `type=${String(loaderType)}`);
 
   // ① API 호출
   say(calls.length === 1, "API 를 정확히 한 번 부른다", `호출 ${calls.length}회`);

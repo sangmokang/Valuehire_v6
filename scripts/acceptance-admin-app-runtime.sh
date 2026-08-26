@@ -51,7 +51,7 @@ case "$TMP" in
 esac
 trap 'ruby -rfileutils -e "FileUtils.remove_entry(ARGV[0]) if File.exist?(ARGV[0])" "$TMP"' EXIT
 
-TOTAL=16
+TOTAL=21
 checked=0
 failed=0
 
@@ -93,7 +93,8 @@ break_app() {
   local name="$1"
   local code="$2"
   local path
-  path="$TMP/app-$name.js"
+  mkdir -p "$TMP/$name" || return 1
+  path="$TMP/$name/$(basename "$APP")"
   cp "$APP" "$path" || return 1
   ruby -e "$code" "$path" || return 1
   # 주입이 실제로 파일을 바꿨는지 확인한다. 안 바뀌었다면 그것은 "막았다"가 아니라
@@ -108,7 +109,8 @@ break_html() {
   local name="$1"
   local code="$2"
   local path
-  path="$TMP/index-$name.html"
+  mkdir -p "$TMP/$name" || return 1
+  path="$TMP/$name/$(basename "$HTML")"
   cp "$HTML" "$path" || return 1
   ruby -e "$code" "$path" || return 1
   if cmp -s "$HTML" "$path"; then
@@ -166,6 +168,27 @@ expect "불러오기 실패를 PASS 로 말함 → 불합격" 1 "$p" "$HTML"
 # 빠진다. 그래서 판정은 "실행 불가(2)"가 아니라 "불합격(1)"이다 — 어느 쪽이든 빨개진다.
 p=$(break_html no-provenance-id 'p=ARGV[0]; s=File.read(p).sub("<dl id=\"provenance\"></dl>", "<dl></dl>"); File.write(p,s)')
 expect "화면에서 판정 근거 자리를 지움 → 불합격" 1 "$APP" "$p"
+
+# ── V1 F6 (높음): 화면이 스크립트를 불러오는지 보지 않았다 ─────────────────
+# 2026-08-27 실측: <script src> 를 지우거나 경로를 틀리게 하거나 type 을 바꿔도 시험이
+# 초록이었다. 브라우저에서는 app.js 가 한 줄도 실행되지 않는데도 그랬다.
+p=$(break_html no-script-tag 'p=ARGV[0]; s=File.read(p).sub(%q{<script src="/app.js" defer></script>}, ""); File.write(p,s)')
+expect "화면에서 스크립트 태그 제거 → 불합격" 1 "$APP" "$p"
+
+p=$(break_html wrong-script-src 'p=ARGV[0]; s=File.read(p).sub(%q{src="/app.js"}, %q{src="/wrong.js"}); File.write(p,s)')
+expect "화면의 스크립트 경로 오기 → 불합격" 1 "$APP" "$p"
+
+p=$(break_html template-script-type 'p=ARGV[0]; s=File.read(p).sub(%q{<script src="/app.js" defer>}, %q{<script src="/app.js" type="text/template" defer>}); File.write(p,s)')
+expect "스크립트를 실행되지 않는 type 으로 → 불합격" 1 "$APP" "$p"
+
+# 브라우저에 없는 node 전역을 참조하면 브라우저에서만 죽는다. 하네스가 그것을 통과시키면
+# "여기서는 되는데 화면은 하얗다"가 된다.
+p=$(break_app node-global 'p=ARGV[0]; s=File.read(p).sub("  async function loadDashboard() {", "  async function loadDashboard() {\n    void process.version;"); File.write(p,s)')
+expect "브라우저에 없는 node 전역 참조 → 불합격" 1 "$p" "$HTML"
+
+# 반대 방향 — 표준 DOM 메서드를 쓰는 **정상 코드**를 빨갛게 만들면 그것도 결함이다.
+p=$(break_app standard-appendchild 'p=ARGV[0]; s=File.read(p).sub("      item.append(button);", "      item.appendChild(button);"); File.write(p,s)')
+expect "표준 appendChild 로 바꾼 정상 코드 → 통과(오차단 없음)" 0 "$p" "$HTML"
 
 # ── fail-closed ─────────────────────────────────────────────────────────────
 expect "app.js 없음 → 실행 불가" 2 "$TMP/does-not-exist.js" "$HTML"
