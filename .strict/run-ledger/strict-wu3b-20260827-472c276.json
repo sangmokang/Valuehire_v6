@@ -340,7 +340,59 @@
           "output_ref": "/tmp/valuehire-strict-wu3b-evidence/wu3b6/staged-gate.json"
         }
       ]
+    },
+    {
+      "id": "WU-3b-1a",
+      "status": "open",
+      "scope": [
+        ".strict/run-ledger/strict-wu3b-20260827-472c276.json",
+        "docs/engineering/valuehire-delivery-chain-issue-2026-08-27.md",
+        "docs/engineering/valuehire-delivery-chain-goal-2026-08-27.md",
+        "tests/checkpoint-gate.test.mjs",
+        "tools/strict/checkpoint-gate.mjs"
+      ],
+      "red_commit": "96a24792ee79fabb54bb6347c1bcbca9fd0a875f",
+      "implementation_commit": null,
+      "validation": [
+        {
+          "command": "broad fallback mutation + node --test --test-name-pattern=never auto-selects tests/checkpoint-gate.test.mjs",
+          "started_at": "2026-08-26T19:18:28Z",
+          "finished_at": "2026-08-26T19:18:28Z",
+          "exit": 1,
+          "expected_exit": 1,
+          "checked": 1,
+          "output_sha256": "9f6e0a2fa8e7d20481cb42db32b2741132b0cd273731a637136317b9c5f5f900",
+          "output_ref": "/tmp/valuehire-strict-wu3b-evidence/wu3b1a/broad-scope-mutation.tap"
+        },
+        {
+          "command": "node --test --test-name-pattern=active-wus|never-auto-selects|index-SOT tests/checkpoint-gate.test.mjs",
+          "started_at": "2026-08-26T19:19:39Z",
+          "finished_at": "2026-08-26T19:19:40Z",
+          "exit": 0,
+          "checked": 3,
+          "output_sha256": "7af53d9661b1770fac7be58f57d84e6c9d1d1e7d838f2f497a8b654f262e40c5",
+          "output_ref": "/tmp/valuehire-strict-wu3b-evidence/wu3b1a/final-targeted.tap"
+        },
+        {
+          "command": "node --test tests/checkpoint-ledger-trust.test.mjs",
+          "started_at": "2026-08-26T19:19:47Z",
+          "finished_at": "2026-08-26T19:19:50Z",
+          "exit": 0,
+          "checked": 8,
+          "output_sha256": "bd5972556695dc83078a9465f3179ff1993636e965a08296c95b589943601391",
+          "output_ref": "/tmp/valuehire-strict-wu3b-evidence/wu3b1a/ledger-trust.tap"
+        },
+        {
+          "command": "node tools/strict/checkpoint-gate.mjs --base 96a24792ee79fabb54bb6347c1bcbca9fd0a875f --json --run-id strict-wu3b-20260827-472c276 --wu-id WU-3b-1a",
+          "started_at": "2026-08-26T19:20:37Z",
+          "finished_at": "2026-08-26T19:20:44Z",
+          "exit": 0,
+          "checked": 4,
+          "output_sha256": "e4b15b1a7bd891e43aabe6b5df41a78097670e63e8cacda701b837d5cdbd7a95",
+          "output_ref": "/tmp/valuehire-strict-wu3b-evidence/wu3b1a/staged-gate.json"
+        }
+      ]
     }
   ],
-  "updated_at": "2026-08-27T04:20:00+09:00"
+  "updated_at": "2026-08-27T04:20:44+09:00"
 }

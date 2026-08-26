@@ -79,6 +79,8 @@ git diff --check
 
 WU-3b-6은 PR 본문과 변경 요약을 로컬에서 준비하되, `origin/main`과 후보 기반의 분기 상태 및 사용자 승인 경계를 문서와 테스트로 고정한다. base가 정리되지 않은 동안 PR 생성 명령은 `BLOCKED`다.
 
+Codeaudit에서 secure `--run-id` 경로 밖의 legacy fallback이 작업 폴더 ledger를 계속 자동 선택하는 결함을 재현했다. WU-3b-1a는 이 fallback을 삭제해 `--run-id`가 없으면 명시적 `--scope`만 사용하고, 둘 다 없으면 staged 파일별 scope 위반으로 닫는다.
+
 ## 설계 결정
 
 > **무엇을** — scope ledger는 명시적 run/WU ID와 index blob으로 고정한다.
