@@ -265,7 +265,7 @@ test("secrets: checkpoint sources pass real scanner patterns without fake weaken
   git(cwd, "add", "tools/strict/checkpoint-gate.mjs", "tools/strict/checkpoint-js-scan.mjs", "tests/checkpoint-gate.test.mjs");
   expectPass(runGate(cwd, base, "--scope", "tools/strict/**", "--scope", "tests/**"));
 });
-test("secrets: conservative fallback rejects a credential when verify.sh is absent", () => {
+test("secrets: missing indexed scanner fails closed and attributes the staged target", () => {
   const { cwd, base } = makeRepo({ scanner: false });
   const canary = ["AKIA", "0123456789ABCDEF"].join("");
   write(cwd, "src/app.mjs", `export const credential = ${JSON.stringify(canary)};\n`);
