@@ -37,6 +37,11 @@ jobs:
       - name: Strict 전역 스킬 잠금 장치 격리 회귀
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-guard-global-skill-files.sh
 
+      - name: P3 조용한 실패 문법·오탐 회귀
+        run: |
+          bash scripts/verify/run-acceptance.sh scripts/acceptance-silent-failure-lint.sh
+          bash scripts/verify/run-acceptance.sh scripts/acceptance-silent-failure-lint-mutations.sh
+
       - name: HumanSearch G1 클린룸 경계
         run: |
           bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-cleanroom.sh

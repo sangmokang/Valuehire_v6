@@ -89,9 +89,11 @@
     const root = byId("metric-groups");
     const metadataByGroup = new Map();
     dashboard.metric_catalog.forEach((metric) => {
-      const groupMetrics = metadataByGroup.get(metric.group) || [];
-      groupMetrics.push(metric);
-      metadataByGroup.set(metric.group, groupMetrics);
+      if (metadataByGroup.has(metric.group)) {
+        metadataByGroup.get(metric.group).push(metric);
+      } else {
+        metadataByGroup.set(metric.group, [metric]);
+      }
     });
     root.replaceChildren();
     dashboard.metric_groups.forEach((group) => {
@@ -102,11 +104,13 @@
       title.id = `group-${group.id}`;
       heading.append(title, element("p", "", group.description));
       const grid = element("div", "metric-grid");
-      (metadataByGroup.get(group.id) || []).forEach((metadata) => {
-        const result = snapshot.metrics[metadata.id];
-        if (!result) throw new Error("metric_result_missing");
-        grid.append(renderMetricCard(metadata, result));
-      });
+      if (metadataByGroup.has(group.id)) {
+        metadataByGroup.get(group.id).forEach((metadata) => {
+          const result = snapshot.metrics[metadata.id];
+          if (!result) throw new Error("metric_result_missing");
+          grid.append(renderMetricCard(metadata, result));
+        });
+      }
       section.append(heading, grid);
       root.append(section);
     });

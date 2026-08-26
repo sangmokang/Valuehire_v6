@@ -39,6 +39,23 @@
   stage: "ci"
   ci_mirror_job: "verify"
   required: true
+- id: "p3-lint-precommit"
+  path: "hooks/pre-commit"
+  target: "bash ${p3_tmp}/lint.sh"
+  stage: "pre-commit"
+  required: true
+- id: "p3-lint-ci"
+  path: ".github/workflows/verify.yml"
+  target: "bash scripts/verify/run-acceptance.sh scripts/acceptance-silent-failure-lint.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
+- id: "p3-lint-mutations-ci"
+  path: ".github/workflows/verify.yml"
+  target: "bash scripts/verify/run-acceptance.sh scripts/acceptance-silent-failure-lint-mutations.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
 - id: "acceptance-runner-ci"
   path: ".github/workflows/verify.yml"
   target: "bash scripts/verify/run-acceptance.sh"
@@ -81,4 +98,3 @@
   stage: "manual"
   manual_reason: "원격 조회가 필요해 CI 안에서 자기 SHA 를 검사하는 것은 뜻이 없다. 머지 전 판정 도구"
   required: true
-
