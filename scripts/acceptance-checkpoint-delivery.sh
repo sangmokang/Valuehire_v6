@@ -13,6 +13,7 @@ if ! node --test \
   tests/checkpoint-gate-mutation.test.mjs \
   tests/checkpoint-ledger-trust.test.mjs \
   tests/checkpoint-secret-trust.test.mjs \
+  tests/concurrent-validation.test.mjs \
   tests/trace-ledger.test.mjs \
   tests/adversarial-evidence.test.mjs \
   tests/delivery-state.test.mjs \
