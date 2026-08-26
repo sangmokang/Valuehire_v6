@@ -65,6 +65,7 @@ GitHub Issue 생성은 외부 쓰기이므로 승인 전에는 실행하지 않�
 | WU-3b-6 | 원격 쓰기 전 PR 준비 경계 | PR 초안, base 분기 경고, 승인 전 명령 상태 |
 | WU-3b-6a | V1 증거 정확성 보정 | WU-3b-6 RED scope, 시점 고정 분기 수치 제거 |
 | WU-3b-7 | V1 validator fail-closed 보정 | 최종 마커, merge ancestry, CI 출처, 대상 0개 |
+| WU-3b-8 | V1 기존 게이트 회귀 보정 | fixture, cleanroom, core gate CI 배선, pre-commit secret authority |
 
 ## 데이터 안전 조건
 

@@ -629,6 +629,25 @@
           "output_ref": ".strict/evidence/wu3b7/red.tap"
         }
       ]
+    },
+    {
+      "id": "WU-3b-8",
+      "status": "open",
+      "scope": [
+        ".strict/run-ledger/strict-wu3b-20260827-472c276.json",
+        "docs/engineering/valuehire-delivery-chain-goal-2026-08-27.md",
+        "docs/engineering/valuehire-delivery-chain-issue-2026-08-27.md",
+        "docs/sot/hook-contracts.md",
+        "docs/sot/mechanism-registry.yaml",
+        "hooks/pre-commit",
+        "scripts/acceptance-checkpoint-delivery.sh",
+        "scripts/acceptance-principles-mutations.sh",
+        "scripts/verify/fixtures/mechanism-registry/normal.yaml",
+        "tests/v1-regression-wiring.test.mjs"
+      ],
+      "red_commit": null,
+      "implementation_commit": null,
+      "validation": []
     }
   ],
   "updated_at": "2026-08-27T05:00:00+09:00"
