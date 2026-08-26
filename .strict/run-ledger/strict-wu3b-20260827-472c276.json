@@ -10,7 +10,7 @@
   "wus": [
     {
       "id": "WU-3b-1",
-      "status": "open",
+      "status": "green",
       "scope": [
         ".strict/run-ledger/strict-wu3b-20260827-472c276.json",
         "tools/strict/checkpoint-gate.mjs",
@@ -18,7 +18,7 @@
         "tests/checkpoint-ledger-trust.test.mjs"
       ],
       "red_commit": "2ef1f62814284cf20ee5b5270626e972e4460af4",
-      "implementation_commit": null,
+      "implementation_commit": "8949d27d638bda0581274c9a9a560044cf07327f",
       "validation": [
         {
           "command": "node --test tests/checkpoint-ledger-trust.test.mjs",
@@ -52,7 +52,7 @@
     },
     {
       "id": "WU-3b-2",
-      "status": "open",
+      "status": "green",
       "scope": [
         ".strict/run-ledger/strict-wu3b-20260827-472c276.json",
         "verify.sh",
@@ -61,7 +61,7 @@
         "tests/checkpoint-secret-trust.test.mjs"
       ],
       "red_commit": "bb21ec788706ca0691f776bd436bc6804a3bcd33",
-      "implementation_commit": null,
+      "implementation_commit": "050fff1f60040a64b69b3afa45b84e38d1fe8d80",
       "validation": [
         {
           "command": "node --test tests/checkpoint-secret-trust.test.mjs",
@@ -95,7 +95,7 @@
     },
     {
       "id": "WU-3b-3",
-      "status": "open",
+      "status": "green",
       "scope": [
         ".strict/run-ledger/strict-wu3b-20260827-472c276.json",
         "contracts/strict-trace-ledger.schema.json",
@@ -103,7 +103,7 @@
         "tests/trace-ledger.test.mjs"
       ],
       "red_commit": "f90da8dcb7a3de29301b3df2a60f8b0653d9403e",
-      "implementation_commit": null,
+      "implementation_commit": "828acbbd8b99f258c05479deacad48f5cec8540a",
       "validation": [
         {
           "command": "node --test tests/trace-ledger.test.mjs",
@@ -137,7 +137,7 @@
     },
     {
       "id": "WU-3b-4",
-      "status": "open",
+      "status": "green",
       "scope": [
         ".strict/run-ledger/strict-wu3b-20260827-472c276.json",
         "tools/strict/adversarial-evidence.mjs",
@@ -147,7 +147,7 @@
         "docs/engineering/valuehire-delivery-chain-issue-2026-08-27.md"
       ],
       "red_commit": "2d12782f31782c99f0feda38904c8aae9813666d",
-      "implementation_commit": null,
+      "implementation_commit": "05dafb067f3ed164bbed3bec75aad5c93e760da4",
       "validation": [
         {
           "command": "node --test tests/adversarial-evidence.test.mjs",
@@ -181,7 +181,7 @@
     },
     {
       "id": "WU-3b-5",
-      "status": "open",
+      "status": "green",
       "scope": [
         ".strict/run-ledger/strict-wu3b-20260827-472c276.json",
         "tools/strict/delivery-state.mjs",
@@ -196,7 +196,7 @@
         "docs/sot/features/engineering/verification-evidence-system.yaml"
       ],
       "red_commit": "3840283dc7fff001eefc58a31a3c37e366b4eb96",
-      "implementation_commit": null,
+      "implementation_commit": "95691cfee7a0255ca1a172744b4a9a59bbb70b11",
       "validation": [
         {
           "command": "node --test tests/delivery-state.test.mjs",
@@ -239,7 +239,7 @@
     },
     {
       "id": "WU-3b-5a",
-      "status": "open",
+      "status": "green",
       "scope": [
         ".strict/run-ledger/strict-wu3b-20260827-472c276.json",
         "tools/strict/delivery-state.mjs",
@@ -248,7 +248,7 @@
         "docs/sot/verification-commands.md"
       ],
       "red_commit": "f2df1613438d9421fd36068f7f6a6e1534be44c8",
-      "implementation_commit": null,
+      "implementation_commit": "624504b175321e3e46f53ed49bb1d40cd60329b9",
       "validation": [
         {
           "command": "node --test tests/delivery-wiring.test.mjs",
@@ -291,7 +291,7 @@
     },
     {
       "id": "WU-3b-6",
-      "status": "open",
+      "status": "green",
       "scope": [
         ".strict/run-ledger/strict-wu3b-20260827-472c276.json",
         "docs/engineering/valuehire-delivery-chain-pr-draft-2026-08-27.md",
@@ -301,7 +301,7 @@
         "tests/pr-draft.test.mjs"
       ],
       "red_commit": "27b77e5b74587c516f2b2d0557b49a19afdce6ce",
-      "implementation_commit": null,
+      "implementation_commit": "91836b95a92d130a797ec4def954f1ec6f142f97",
       "validation": [
         {
           "command": "node --test tests/pr-draft.test.mjs",
@@ -344,7 +344,7 @@
     },
     {
       "id": "WU-3b-1a",
-      "status": "open",
+      "status": "green",
       "scope": [
         ".strict/run-ledger/strict-wu3b-20260827-472c276.json",
         "docs/engineering/valuehire-delivery-chain-issue-2026-08-27.md",
@@ -353,7 +353,7 @@
         "tools/strict/checkpoint-gate.mjs"
       ],
       "red_commit": "96a24792ee79fabb54bb6347c1bcbca9fd0a875f",
-      "implementation_commit": null,
+      "implementation_commit": "35d8c6543d602835f7414206bf62d4b4005d142f",
       "validation": [
         {
           "command": "broad fallback mutation + node --test --test-name-pattern=never auto-selects tests/checkpoint-gate.test.mjs",
@@ -396,7 +396,7 @@
     },
     {
       "id": "WU-3b-2a",
-      "status": "open",
+      "status": "green",
       "scope": [
         ".strict/run-ledger/strict-wu3b-20260827-472c276.json",
         "docs/engineering/valuehire-delivery-chain-issue-2026-08-27.md",
@@ -405,7 +405,7 @@
         "tools/strict/checkpoint-gate.mjs"
       ],
       "red_commit": "ebb3535782f33aa905ddbef956f2a6ef2dec35c8",
-      "implementation_commit": null,
+      "implementation_commit": "e542b96390cfecf2b84f302b8fa057d46552a783",
       "validation": [
         {
           "command": "node --test --test-name-pattern=no-run-id-path tests/checkpoint-gate.test.mjs",
@@ -448,7 +448,7 @@
     },
     {
       "id": "WU-3b-2b",
-      "status": "open",
+      "status": "green",
       "scope": [
         ".github/workflows/verify.yml",
         ".strict/run-ledger/strict-wu3b-20260827-472c276.json",
@@ -465,7 +465,7 @@
         "tools/strict/trusted-secret-scan.mjs"
       ],
       "red_commit": "118d0c379760b0131bc583c07bd84424c86124f4",
-      "implementation_commit": null,
+      "implementation_commit": "d7e12c7eb58bf58d774eb081603d24bd6e45f370",
       "validation": [
         {
           "command": "node --test tests/trusted-secret-runner.test.mjs",
@@ -517,7 +517,7 @@
         "tools/strict/checkpoint-gate.mjs"
       ],
       "red_commit": "61b85e96904c473792574d288048ef0eb696c435",
-      "implementation_commit": null,
+      "implementation_commit": "69896747d43232d4a3936f9988565adb777467b3",
       "validation": [
         {
           "command": "node --test --test-name-pattern=checkpoint-sources|missing-indexed-scanner|never-auto-selects tests/checkpoint-gate.test.mjs",
@@ -569,7 +569,7 @@
         "tests/pr-draft.test.mjs"
       ],
       "red_commit": "edd54fe34e731a8f42ca16301a4a60ce7e973867",
-      "implementation_commit": null,
+      "implementation_commit": "6fb966a8eff5130dedf953a7cc1e7d28247befaf",
       "validation": [
         {
           "command": "node --test tests/pr-draft.test.mjs",
@@ -594,7 +594,7 @@
     },
     {
       "id": "WU-3b-7",
-      "status": "open",
+      "status": "green",
       "scope": [
         ".strict/run-ledger/strict-wu3b-20260827-472c276.json",
         "docs/engineering/valuehire-delivery-chain-goal-2026-08-27.md",
@@ -607,7 +607,7 @@
         "tools/strict/delivery-state.mjs"
       ],
       "red_commit": "f0c04b73b679f039938e9db40f62a8b24fa3bd5a",
-      "implementation_commit": null,
+      "implementation_commit": "e58166d0a9403d2d0de112f1e8aa3e9f55c83700",
       "validation": [
         {
           "command": "node --test tests/adversarial-evidence.test.mjs tests/checkpoint-ledger-trust.test.mjs tests/delivery-state.test.mjs",
@@ -632,7 +632,7 @@
     },
     {
       "id": "WU-3b-8",
-      "status": "open",
+      "status": "green",
       "scope": [
         ".strict/run-ledger/strict-wu3b-20260827-472c276.json",
         "docs/engineering/valuehire-delivery-chain-goal-2026-08-27.md",
@@ -648,7 +648,7 @@
         "tests/v1-regression-wiring.test.mjs"
       ],
       "red_commit": "8ef485d6399cadffe0df15cf4947f859ff05f74c",
-      "implementation_commit": null,
+      "implementation_commit": "96255dc1549a50d45060d343b3b66d01dfcbf060",
       "validation": [
         {
           "command": "node --test tests/v1-regression-wiring.test.mjs",
@@ -724,7 +724,7 @@
     },
     {
       "id": "WU-3b-9",
-      "status": "open",
+      "status": "green",
       "scope": [
         ".strict/run-ledger/strict-wu3b-20260827-472c276.json",
         "docs/engineering/valuehire-delivery-chain-goal-2026-08-27.md",
@@ -733,7 +733,7 @@
         "tools/strict/trace-ledger.mjs"
       ],
       "red_commit": "45f04c1d947b5b03262872ede3aab15a4781d398",
-      "implementation_commit": null,
+      "implementation_commit": "edc5145cf60ba41a1c293a2f062511e12507fad0",
       "validation": [
         {
           "command": "node --test tests/trace-ledger.test.mjs",
@@ -769,7 +769,7 @@
     },
     {
       "id": "WU-3b-10",
-      "status": "open",
+      "status": "green",
       "scope": [
         ".strict/run-ledger/strict-wu3b-20260827-472c276.json",
         "docs/engineering/valuehire-delivery-chain-goal-2026-08-27.md",
@@ -777,7 +777,7 @@
         "tests/goal-current-state.test.mjs"
       ],
       "red_commit": "7708d63c3106c5a7a89bb4d8245c234d7e1ef67f",
-      "implementation_commit": null,
+      "implementation_commit": "41a6f163dcb2ec394fa53c60070f19640cf2104a",
       "validation": [
         {
           "command": "node --test tests/goal-current-state.test.mjs",
@@ -813,7 +813,7 @@
     },
     {
       "id": "WU-3b-11",
-      "status": "open",
+      "status": "green",
       "scope": [
         ".strict/run-ledger/strict-wu3b-20260827-472c276.json",
         "docs/engineering/valuehire-delivery-chain-goal-2026-08-27.md",
@@ -821,7 +821,7 @@
         "tests/goal-current-state.test.mjs"
       ],
       "red_commit": "235dcab0526322c38a351c3f1e2e2e17ca90646a",
-      "implementation_commit": null,
+      "implementation_commit": "5b3c9f4fb3798a23616078e39335f3258a644389",
       "validation": [
         {
           "command": "node --test tests/goal-current-state.test.mjs",
@@ -901,7 +901,7 @@
     },
     {
       "id": "WU-3b-15",
-      "status": "green-pending-evidence",
+      "status": "green",
       "scope": [
         ".strict/run-ledger/strict-wu3b-20260827-472c276.json",
         "docs/engineering/valuehire-delivery-chain-issue-2026-08-27.md",
@@ -909,12 +909,12 @@
         "tools/strict/adversarial-evidence.mjs"
       ],
       "red_commit": "d699838dac66710d246f185d9bb9e0ed0962da5a",
-      "implementation_commit": null,
+      "implementation_commit": "581fee500f94f943cbf186d542374b54b31b0dfd",
       "validation": []
     },
     {
       "id": "WU-3b-16",
-      "status": "open",
+      "status": "green-pending-evidence",
       "scope": [
         ".strict/run-ledger/strict-wu3b-20260827-472c276.json",
         "contracts/strict-trace-ledger.schema.json",
@@ -925,7 +925,7 @@
         "tests/trusted-checkpoint-gate.test.mjs",
         "tools/strict/trace-ledger.mjs"
       ],
-      "red_commit": null,
+      "red_commit": "aa12c589a7918aeb4077850ab14b5beed3497388",
       "implementation_commit": null,
       "validation": []
     }

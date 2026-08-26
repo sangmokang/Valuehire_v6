@@ -52,6 +52,14 @@
 
 ### Strict 전달 상태 판정
 
+WU의 staged checkpoint는 작업 폴더 runner를 직접 실행하지 않는다. 다음 index blob 호출만 판정 근거다.
+
+```bash
+git show :tools/strict/index-checkpoint-gate.mjs | node --input-type=module - --base <commit> --json --run-id <run-id> --wu-id <wu-id>
+```
+
+`node tools/strict/index-checkpoint-gate.mjs ...`처럼 작업 폴더 파일을 직접 실행한 결과는 checkpoint 판정 근거가 아니다. staged 대상 0개는 PASS 증거가 아니며 종료값 1이어야 한다.
+
 ```bash
 bash scripts/verify/run-acceptance.sh scripts/acceptance-checkpoint-delivery.sh
 ```

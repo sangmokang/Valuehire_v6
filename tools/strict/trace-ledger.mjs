@@ -2,6 +2,7 @@
 import { createHash } from "node:crypto";
 import { realpathSync } from "node:fs";
 import { spawnSync } from "node:child_process";
+import { countJavaScriptWeakening } from "./checkpoint-js-scan.mjs";
 
 const LEDGER_VERSION = "valuehire.strict-trace/v1";
 const OID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
@@ -99,6 +100,26 @@ function changedPaths(commit) {
   return output ? output.split("\n") : [];
 }
 
+function commitFile(commit, path) {
+  const result = git(["show", `${commit}:${path}`], { allowFailure: true });
+  return result.status === 0 ? result.stdout : "";
+}
+
+function recordedRedWeakens(commit, path) {
+  const before = commitFile(`${commit}^`, path);
+  const after = commitFile(commit, path);
+  if (/\.(?:[cm]?[jt]sx?)$/i.test(path)) {
+    const oldCounts = countJavaScriptWeakening(before);
+    const newCounts = countJavaScriptWeakening(after);
+    return newCounts.assertions < oldCounts.assertions ||
+      newCounts.skip > oldCounts.skip || newCounts.only > oldCounts.only || newCounts.todo > oldCounts.todo;
+  }
+  const summary = gitText(["diff", "--numstat", `${commit}^`, commit, "--", path]).split("\t");
+  const additions = Number(summary[0]);
+  const deletions = Number(summary[1]);
+  return !Number.isFinite(additions) || !Number.isFinite(deletions) || additions <= deletions;
+}
+
 function isTestPath(path) {
   return /(^|\/)(?:tests?|__tests__)(\/|$)/.test(path) || /\.(?:test|spec)\.[^/]+$/.test(path);
 }
@@ -115,15 +136,38 @@ function validateRedTestImmutability(violations, record, field, candidate, recor
   }
   const later = gitText(["rev-list", "--reverse", `${record.implementation_commit}..${candidate}`]);
   for (const commit of later ? later.split("\n") : []) {
-    if (recordedRedCommits.has(commit)) continue;
     for (const path of changedPaths(commit)) {
-      if (redTests.has(path)) add(violations, field, `later non-RED commit modifies protected RED test: ${path}`);
+      if (!redTests.has(path)) continue;
+      if (recordedRedCommits.has(commit)) {
+        if (recordedRedWeakens(commit, path)) add(violations, field, `later recorded RED weakens protected RED test: ${path}`);
+      } else add(violations, field, `later non-RED commit modifies protected RED test: ${path}`);
     }
   }
 }
 
 function add(violations, field, detail) {
   violations.push({ field, detail });
+}
+
+function outputCompletionError(command, output) {
+  const text = output.toString("utf8");
+  const nonempty = text.split(/\r?\n/).filter((line) => line.trim().length > 0);
+  if (command.startsWith("node --test ")) {
+    const tests = Number(text.match(/^# tests (\d+)$/m)?.[1]);
+    const passed = Number(text.match(/^# pass (\d+)$/m)?.[1]);
+    const failed = Number(text.match(/^# fail (\d+)$/m)?.[1]);
+    if (!Number.isInteger(tests) || tests < 1 || passed !== tests || failed !== 0 ||
+        !/^# duration_ms /.test(nonempty.at(-1) ?? "")) return "node test completion summary is missing or partial";
+    return null;
+  }
+  if (command.startsWith("bash scripts/acceptance-")) {
+    const checked = Number((nonempty.at(-1) ?? "").match(/^CHECKED: (\d+)$/)?.[1]);
+    if (!/^PASS:/m.test(text) || !Number.isInteger(checked) || checked < 1) {
+      return "acceptance completion summary is missing or partial";
+    }
+    return null;
+  }
+  return "command has no supported completion contract";
 }
 
 function validateCommit(violations, commit, field, wuId, phase, candidate) {
@@ -190,7 +234,7 @@ function validateEvidence(violations, ledger, ledgerCommit, ledgerCommitTime, re
     }
     if (finished !== null) clock = Math.max(clock, finished);
     if (!Number.isInteger(evidence.exit) || !Number.isInteger(evidence.expected_exit)) add(violations, field, "exit values must be integers");
-    if (evidence.exit !== evidence.expected_exit) add(violations, field, "exit does not match expected_exit");
+    if (evidence.exit !== 0 || evidence.expected_exit !== 0) add(violations, field, "GREEN evidence exit must be zero");
     if (evidence.output_complete !== true) add(violations, field, "output_complete must be true");
     if (!safePath(evidence.output_path)) {
       add(violations, field, "output_path is unsafe or empty");
@@ -210,6 +254,8 @@ function validateEvidence(violations, ledger, ledgerCommit, ledgerCommitTime, re
     }
     if (output.length !== evidence.output_bytes) add(violations, field, "output byte count mismatch");
     if (lines(output) !== evidence.output_lines || evidence.output_lines < 1) add(violations, field, "output line count mismatch");
+    const completionError = typeof evidence.command === "string" ? outputCompletionError(evidence.command, output) : null;
+    if (completionError) add(violations, field, completionError);
   }
   for (const command of expected) {
     if (!seenCommands.has(command)) add(violations, `records[${record.sequence}].expected_commands`, `approved command has no evidence: ${command}`);
@@ -305,6 +351,31 @@ function validateLedger(args, ledger, ledgerCommit) {
   if (ledger.records.at(-1)?.implementation_commit !== args.candidate) {
     add(violations, "candidate_commit", "last WU implementation commit does not equal candidate");
   }
+  const classified = new Set();
+  for (const record of ledger.records) {
+    if (OID.test(record?.red_commit ?? "")) classified.add(record.red_commit);
+    if (OID.test(record?.implementation_commit ?? "")) classified.add(record.implementation_commit);
+  }
+  const excludedCommits = ledger.excluded_commits === undefined ? [] : ledger.excluded_commits;
+  if (!Array.isArray(excludedCommits)) add(violations, "excluded_commits", "excluded_commits must be an array");
+  else for (const [index, excluded] of excludedCommits.entries()) {
+    const field = `excluded_commits[${index}]`;
+    if (!excluded || typeof excluded !== "object" || !OID.test(excluded.commit ?? "")) {
+      add(violations, field, "excluded commit must use a full Git object ID");
+      continue;
+    }
+    if (classified.has(excluded.commit)) add(violations, field, "commit is classified more than once");
+    classified.add(excluded.commit);
+    if (!["administrative", "invalidated"].includes(excluded.status)) add(violations, field, "excluded status is invalid");
+    if (typeof excluded.reason !== "string" || excluded.reason.trim() === "") add(violations, field, "excluded reason is missing");
+    const actualPaths = changedPaths(excluded.commit).sort();
+    const declaredPaths = Array.isArray(excluded.paths) ? [...excluded.paths].sort() : [];
+    if (JSON.stringify(actualPaths) !== JSON.stringify(declaredPaths)) add(violations, field, "excluded changed paths do not match Git");
+  }
+  const historyText = gitText(["rev-list", "--reverse", `${ledger.base_commit}..${args.candidate}`]);
+  const history = historyText ? historyText.split("\n") : [];
+  for (const commit of history) if (!classified.has(commit)) add(violations, "history", `unclassified commit: ${commit}`);
+  for (const commit of classified) if (!history.includes(commit)) add(violations, "history", `classified commit is outside base..candidate: ${commit}`);
   return violations;
 }
 

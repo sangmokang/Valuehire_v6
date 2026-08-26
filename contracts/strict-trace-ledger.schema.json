@@ -12,7 +12,8 @@
     "candidate_commit",
     "branch",
     "worktree",
-    "records"
+    "records",
+    "excluded_commits"
   ],
   "properties": {
     "schema_version": { "const": "valuehire.strict-trace/v1" },
@@ -36,6 +37,10 @@
       "type": "array",
       "minItems": 1,
       "items": { "$ref": "#/$defs/record" }
+    },
+    "excluded_commits": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/excludedCommit" }
     }
   },
   "$defs": {
@@ -56,13 +61,24 @@
         "environment": { "type": "object" },
         "started_at": { "$ref": "#/$defs/timestamp" },
         "finished_at": { "$ref": "#/$defs/timestamp" },
-        "exit": { "type": "integer" },
-        "expected_exit": { "type": "integer" },
+        "exit": { "const": 0 },
+        "expected_exit": { "const": 0 },
         "output_path": { "type": "string", "minLength": 1 },
         "output_sha256": { "$ref": "#/$defs/sha256" },
         "output_bytes": { "type": "integer", "minimum": 1 },
         "output_lines": { "type": "integer", "minimum": 1 },
         "output_complete": { "const": true }
+      }
+    },
+    "excludedCommit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit", "status", "reason", "paths"],
+      "properties": {
+        "commit": { "$ref": "#/$defs/gitOid" },
+        "status": { "enum": ["administrative", "invalidated"] },
+        "reason": { "type": "string", "minLength": 1 },
+        "paths": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
       }
     },
     "record": {
