@@ -17,7 +17,9 @@ cd "$REPO"
 GATES="scripts/acceptance-hs-gates.sh"
 WF=".github/workflows/verify.yml"
 for required in "$GATES" "$WF" "humansearch/pyproject.toml" "humansearch/uv.lock" \
-  "humansearch/.python-version" "humansearch/src/humansearch/__init__.py" "humansearch/tests"; do
+  "humansearch/.python-version" "humansearch/src/humansearch/__init__.py" "humansearch/tests" \
+  "contracts/admin-weekly-dashboard/metric-contract-v1.json" \
+  "contracts/admin-weekly-dashboard/source-contract-v1.json" "apps/admin"; do
   [ -e "$required" ] || { echo "FAIL: required for antiforge missing: $required"; exit 2; }
 done
 
@@ -30,6 +32,16 @@ trap 'cleanup; trap - EXIT; exit 129' HUP
 
 pass=0
 total=0
+
+# Dashboard tests resolve contracts/assets from the parent of each isolated project.
+# Copy every repository-level fixture so antiforge verdicts cannot pass for FileNotFound.
+mkdir -p "$SANDBOX/contracts/admin-weekly-dashboard"
+cp contracts/admin-weekly-dashboard/metric-contract-v1.json \
+  "$SANDBOX/contracts/admin-weekly-dashboard/"
+cp contracts/admin-weekly-dashboard/source-contract-v1.json \
+  "$SANDBOX/contracts/admin-weekly-dashboard/"
+mkdir -p "$SANDBOX/apps"
+cp -R apps/admin "$SANDBOX/apps/"
 
 # --- 결함1: atexit 증거 위조가 무력화되는가 --------------------------------
 total=$((total + 1))

@@ -11,30 +11,24 @@ from enum import Enum
 from pathlib import Path
 from typing import TypedDict, cast
 
+from .status_codes import (
+    FAIL_ONLY_REASONS,
+    NOT_RUN_ONLY_REASONS,
+    MetricStatus,
+    SourceFailureReason,
+)
+from .status_codes import reject_reason_status_mismatch as _reject_reason_status_mismatch
 from .weekly_window import WeeklyWindow, WeeklyWindowPayload
 
-
-class MetricStatus(str, Enum):
-    """Three-state source and metric verdict; missing work is never PASS."""
-
-    PASS = "PASS"
-    FAIL = "FAIL"
-    NOT_RUN = "NOT_RUN"
-
-
-class SourceFailureReason(str, Enum):
-    """PII-safe reason codes allowed to cross the dashboard API boundary."""
-
-    CALENDAR_EVENT_ID_MISSING = "calendar_event_id_missing"
-    CONTRACT_MISMATCH = "contract_mismatch"
-    GMAIL_TIMEOUT = "gmail_timeout"
-    HISTORY_NOT_COLLECTED = "history_not_collected"
-    IDENTITY_LINK_CONTRACT_MISSING = "identity_link_contract_missing"
-    PERMISSION_DENIED = "permission_denied"
-    RETENTION_POLICY_MISSING = "retention_policy_missing"
-    SOURCE_STATE_MISSING = "source_state_missing"
-    SOURCE_TIMEOUT = "source_timeout"
-    SOURCE_UNAVAILABLE = "source_unavailable"
+# mypy --strict requires imports re-exported to other modules to be listed here;
+# MetricStatus/SourceFailureReason/the reason-classification sets now live in
+# .status_codes but source_policy.py and snapshot.py still import them from this module.
+__all__ = [
+    "FAIL_ONLY_REASONS",
+    "NOT_RUN_ONLY_REASONS",
+    "MetricStatus",
+    "SourceFailureReason",
+]
 
 
 class Aggregation(str, Enum):
@@ -65,6 +59,8 @@ class SourceState:
             raise ValueError("PASS source state cannot have a failure reason")
         if status is not MetricStatus.PASS and normalized_reason is None:
             raise ValueError("FAIL and NOT_RUN source states require a reason")
+        if normalized_reason is not None:
+            _reject_reason_status_mismatch(status, normalized_reason)
         object.__setattr__(self, "status", status)
         object.__setattr__(self, "reason", normalized_reason)
 
@@ -197,7 +193,7 @@ class MetricContract:
         return [metric.to_catalog_payload() for metric in self.metrics]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, init=False)
 class MetricResult:
     """One display value and the minimum provenance needed to reproduce it."""
 
@@ -208,6 +204,39 @@ class MetricResult:
     source_collection: str
     source_row_count: int
     input_sha256: str
+
+    def __init__(
+        self,
+        *,
+        status: MetricStatus,
+        value: int | None,
+        reason: SourceFailureReason | str | None,
+        metric_contract_version: str,
+        source_collection: str,
+        source_row_count: int,
+        input_sha256: str,
+    ) -> None:
+        if not isinstance(status, MetricStatus):
+            raise TypeError("status must be a MetricStatus")
+        normalized_reason = _source_failure_reason(reason)
+        if status is MetricStatus.PASS:
+            if normalized_reason is not None:
+                raise ValueError("PASS metric result cannot have a failure reason")
+            if value is None:
+                raise ValueError("PASS metric result requires a value")
+        else:
+            if normalized_reason is None:
+                raise ValueError("FAIL and NOT_RUN metric results require a reason")
+            if value is not None:
+                raise ValueError("FAIL and NOT_RUN metric results cannot have a value")
+            _reject_reason_status_mismatch(status, normalized_reason)
+        object.__setattr__(self, "status", status)
+        object.__setattr__(self, "value", value)
+        object.__setattr__(self, "reason", normalized_reason)
+        object.__setattr__(self, "metric_contract_version", metric_contract_version)
+        object.__setattr__(self, "source_collection", source_collection)
+        object.__setattr__(self, "source_row_count", source_row_count)
+        object.__setattr__(self, "input_sha256", input_sha256)
 
     def to_payload(self) -> MetricPayload:
         """Return this result in its JSON-safe API shape."""
@@ -348,6 +377,8 @@ def _metric_definition(raw: object) -> MetricDefinition:
         raise ValueError("not_run aggregation requires not_run_reason")
     if aggregation is not Aggregation.NOT_RUN and not_run_reason is not None:
         raise ValueError("only not_run aggregation may define not_run_reason")
+    if not_run_reason is not None and not_run_reason in FAIL_ONLY_REASONS:
+        raise ValueError(f"not_run_reason must be a NOT_RUN-only reason, not {not_run_reason.value}")
 
     return MetricDefinition(
         metric_id=_required_string(data, "id"),

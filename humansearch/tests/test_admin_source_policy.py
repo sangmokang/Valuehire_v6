@@ -1,0 +1,490 @@
+"""Acceptance tests for pre-live source, retention, and identity decisions."""
+
+import dataclasses
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+from typing import cast
+
+import pytest
+
+from humansearch.admin_weekly_dashboard.contracts import (
+    MetricStatus,
+    SourceFailureReason,
+    SourceState,
+)
+from humansearch.admin_weekly_dashboard.source_contract import (
+    CandidateLinkDecision,
+    SupabaseSource,
+    load_source_policy,
+)
+from humansearch.admin_weekly_dashboard.source_policy import (
+    FAIL_ONLY_REASONS,
+    NOT_RUN_ONLY_REASONS,
+    CalendarReference,
+    CalendarResolution,
+    CandidateIdentityEvidence,
+    candidate_link_decision,
+    collection_state,
+    resolve_calendar_alias,
+)
+from humansearch.admin_weekly_dashboard.source_policy_cli import main as source_policy_main
+
+SOURCE_CONTRACT = (
+    Path(__file__).parents[2]
+    / "contracts"
+    / "admin-weekly-dashboard"
+    / "source-contract-v1.json"
+)
+PROJECT_ROOT = Path(__file__).parents[1]
+
+
+def test_source_contract_reuses_existing_supabase_tables_without_raw_gmail_fields() -> None:
+    policy = load_source_policy(SOURCE_CONTRACT)
+
+    assert policy.version == "admin-weekly-dashboard-sources/v1"
+    assert policy.refresh_interval_minutes == 15
+    assert policy.calendar_alias == "sangmokang"
+    assert policy.gmail_raw_permanent_copy is False
+    assert policy.weekly_aggregate_retention == "INDEFINITE"
+    assert policy.deletion_request_required is True
+    assert policy.candidate_identity_fields == ("name", "school", "company")
+    assert policy.candidate_auto_merge is False
+    assert policy.candidate_all_exact is CandidateLinkDecision.REVIEW_REQUIRED
+    assert policy.external_effects == {
+        "calendar": "READ_ONLY_NOT_CONNECTED",
+        "clickup": "READ_ONLY_NOT_CONNECTED",
+        "gmail": "READ_ONLY_NOT_CONNECTED",
+        "supabase_writes": "DISABLED",
+    }
+
+    expected_tables = {
+        "candidate_cards": "public.pipeline_candidates",
+        "gmail_cursor": "public.gmail_sync_state",
+        "gmail_events": "public.gmail_derived_events",
+        "gmail_runs": "public.gmail_ingestion_runs",
+        "position_cards": "public.pipeline_position_cards",
+        "sourcing_results": "public.sourcing_results",
+        "sourcing_runs": "public.sourcing_runs",
+    }
+    assert {
+        source_name: source.table for source_name, source in policy.supabase_tables.items()
+    } == expected_tables
+
+    gmail_fields = set(policy.supabase_tables["gmail_events"].select_fields)
+    assert gmail_fields == {"id", "event_type", "status", "occurred_at", "classifier_version"}
+    assert gmail_fields.isdisjoint(
+        {"body_text", "classified_payload", "from_email", "source_member_email", "subject"}
+    )
+
+
+def test_source_policy_cli_is_a_pii_free_production_readback(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert source_policy_main(["--contract", str(SOURCE_CONTRACT)]) == 0
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["readiness"] == {"status": "NOT_RUN", "reason": "precondition_missing"}
+    assert payload["refresh"] == {
+        "interval_minutes": 15,
+        "overlap_reason": "collection_overlap",
+        "overlap_result": "NOT_RUN",
+    }
+    assert payload["retention"]["gmail_raw_permanent_copy"] is False
+    assert payload["candidate_identity"]["auto_merge"] is False
+    serialized = json.dumps(payload, ensure_ascii=False, sort_keys=True)
+    for forbidden in ("body_text", "classified_payload", "from_email", "source_member_email"):
+        assert forbidden not in serialized
+
+
+def test_source_policy_cli_runs_through_the_real_module_entrypoint() -> None:
+    env = os.environ.copy()
+    env["PYTHONPATH"] = "src"
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "humansearch.admin_weekly_dashboard.source_policy_cli",
+            "--contract",
+            str(SOURCE_CONTRACT),
+        ],
+        cwd=PROJECT_ROOT,
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["readiness"] == {"status": "NOT_RUN", "reason": "precondition_missing"}
+
+
+@pytest.mark.parametrize(
+    ("original", "replacement", "error"),
+    [
+        ('"gmail_raw_permanent_copy": "FORBIDDEN"', '"gmail_raw_permanent_copy": "ALLOWED"', "permanent Gmail"),
+        ('"auto_merge": false', '"auto_merge": true', "never auto-merge"),
+        ('"interval_minutes": 15', '"interval_minutes": 30', "must be 15 minutes"),
+        (
+            '"admin-weekly-dashboard-sources/v1"',
+            '"admin-weekly-dashboard-sources/v999"',
+            "version must be",
+        ),
+        ('"requested_alias": "sangmokang"', '"requested_alias": "other"', "must be sangmokang"),
+        (
+            '"public.gmail_derived_events"',
+            '"public.gmail_messages"',
+            "approved existing Supabase source",
+        ),
+        (
+            '"supabase_writes": "DISABLED"',
+            '"supabase_writes": "ENABLED"',
+            "external effects must remain",
+        ),
+    ],
+)
+def test_source_contract_rejects_unsafe_policy_mutations(
+    tmp_path: Path,
+    original: str,
+    replacement: str,
+    error: str,
+) -> None:
+    source = SOURCE_CONTRACT.read_text(encoding="utf-8")
+    assert source.count(original) == 1
+    mutated = tmp_path / "mutated-source-contract.json"
+    mutated.write_text(source.replace(original, replacement), encoding="utf-8")
+
+    with pytest.raises(ValueError, match=error):
+        load_source_policy(mutated)
+
+
+def test_source_policy_rejects_a_direct_replace_that_turns_on_gmail_raw_copies() -> None:
+    """A caller must not bypass load_source_policy() via dataclasses.replace()."""
+
+    policy = load_source_policy(SOURCE_CONTRACT)
+    with pytest.raises(ValueError, match="gmail_raw_permanent_copy"):
+        dataclasses.replace(policy, gmail_raw_permanent_copy=True)
+
+
+def test_source_policy_rejects_a_direct_replace_that_turns_on_auto_merge() -> None:
+    policy = load_source_policy(SOURCE_CONTRACT)
+    with pytest.raises(ValueError, match="candidate_auto_merge"):
+        dataclasses.replace(policy, candidate_auto_merge=True)
+
+
+def test_source_policy_rejects_a_truthy_non_bool_gmail_raw_copy_flag() -> None:
+    """The string "false" is truthy in Python and must not slip past the check."""
+
+    policy = load_source_policy(SOURCE_CONTRACT)
+    with pytest.raises(ValueError, match="gmail_raw_permanent_copy"):
+        dataclasses.replace(policy, gmail_raw_permanent_copy=cast(bool, "false"))
+
+
+def test_source_policy_rejects_an_unapproved_supabase_table_substitution() -> None:
+    policy = load_source_policy(SOURCE_CONTRACT)
+    forged = dict(policy.supabase_tables)
+    forged["gmail_events"] = SupabaseSource(
+        table="public.gmail_messages",
+        select_fields=("body_text", "from_email"),
+        processing="AGGREGATE_READ_ONLY",
+    )
+    with pytest.raises(ValueError, match="approved existing Supabase source"):
+        dataclasses.replace(policy, supabase_tables=forged)
+
+
+def test_source_policy_rejects_a_duck_typed_supabase_table_entry() -> None:
+    class FakeSource:
+        table = "public.pipeline_candidates"
+        select_fields = ("clickup_task_id", "name", "resume_data", "last_synced_at")
+        processing = "TRANSIENT_IDENTITY_REVIEW"
+
+    policy = load_source_policy(SOURCE_CONTRACT)
+    forged = dict(policy.supabase_tables)
+    forged["candidate_cards"] = FakeSource()  # type: ignore[assignment]
+    with pytest.raises(TypeError, match="SupabaseSource"):
+        dataclasses.replace(policy, supabase_tables=forged)
+
+
+def test_supabase_source_rejects_an_unsupported_processing_mode() -> None:
+    with pytest.raises(ValueError, match="processing mode"):
+        SupabaseSource(
+            table="public.gmail_messages",
+            select_fields=("body_text",),
+            processing="RAW_EXPORT",
+        )
+
+
+def test_calendar_reference_rejects_a_padded_calendar_id() -> None:
+    """A leading/trailing-space id must not silently widen the exact-match contract."""
+
+    with pytest.raises(ValueError, match="whitespace"):
+        CalendarReference(calendar_id="  cal-1  ", summary="unrelated")
+
+
+@pytest.mark.parametrize(
+    ("planned", "attempted", "exhausted", "reason", "expected_status"),
+    [
+        (False, False, False, "collection_not_scheduled", MetricStatus.NOT_RUN),
+        (True, False, False, "precondition_missing", MetricStatus.NOT_RUN),
+        (True, True, False, "collection_incomplete", MetricStatus.FAIL),
+        (True, True, True, None, MetricStatus.PASS),
+    ],
+)
+def test_collection_verdict_requires_a_complete_attempt_for_pass(
+    planned: bool,
+    attempted: bool,
+    exhausted: bool,
+    reason: str | None,
+    expected_status: MetricStatus,
+) -> None:
+    state = collection_state(
+        planned=planned,
+        attempted=attempted,
+        pagination_exhausted=exhausted,
+        reason=reason,
+    )
+
+    assert state.status is expected_status
+    if expected_status is MetricStatus.PASS:
+        assert state.reason is None
+    else:
+        assert state.reason is SourceFailureReason(reason)
+
+
+def test_collection_verdict_rejects_an_attempt_that_was_not_planned() -> None:
+    with pytest.raises(ValueError, match="unplanned collection cannot be attempted"):
+        collection_state(
+            planned=False,
+            attempted=True,
+            pagination_exhausted=False,
+            reason="collection_incomplete",
+        )
+
+
+@pytest.mark.parametrize("field", ["planned", "attempted", "pagination_exhausted"])
+def test_collection_verdict_rejects_non_boolean_flags(field: str) -> None:
+    """A truthy non-bool (e.g. the string "false") must never be read as True."""
+
+    kwargs: dict[str, object] = {
+        "planned": True,
+        "attempted": True,
+        "pagination_exhausted": True,
+    }
+    kwargs[field] = "false"
+    with pytest.raises(TypeError, match=f"{field} must be a bool"):
+        collection_state(**kwargs)  # type: ignore[arg-type]
+
+
+def test_every_failure_reason_has_an_explicit_collection_status_class() -> None:
+    assert NOT_RUN_ONLY_REASONS.isdisjoint(FAIL_ONLY_REASONS)
+    assert set(SourceFailureReason) == (
+        NOT_RUN_ONLY_REASONS
+        | FAIL_ONLY_REASONS
+        | {SourceFailureReason.PERMISSION_DENIED}
+    )
+
+
+def test_source_state_rejects_a_fail_status_with_a_not_run_only_reason() -> None:
+    """A caller must not bypass collection_state() by constructing SourceState directly."""
+
+    with pytest.raises(ValueError, match="NOT_RUN-only"):
+        SourceState(status=MetricStatus.FAIL, reason=SourceFailureReason.PRECONDITION_MISSING)
+
+
+def test_source_state_rejects_a_not_run_status_with_a_fail_only_reason() -> None:
+    with pytest.raises(ValueError, match="FAIL-only"):
+        SourceState(status=MetricStatus.NOT_RUN, reason=SourceFailureReason.GMAIL_TIMEOUT)
+
+
+def test_source_state_allows_permission_denied_for_either_incomplete_status() -> None:
+    """permission_denied is deliberately unclassified — it may pair with either status."""
+
+    SourceState(status=MetricStatus.FAIL, reason=SourceFailureReason.PERMISSION_DENIED)
+    SourceState(status=MetricStatus.NOT_RUN, reason=SourceFailureReason.PERMISSION_DENIED)
+
+
+@pytest.mark.parametrize(
+    ("planned", "attempted", "reason", "error"),
+    [
+        (True, True, "precondition_missing", "NOT_RUN-only"),
+        (True, False, "collection_incomplete", "FAIL-only"),
+        (True, False, "collection_not_scheduled", "planned collection"),
+        (False, False, "precondition_missing", "unplanned collection"),
+    ],
+)
+def test_collection_verdict_rejects_reasons_that_contradict_attempt_state(
+    planned: bool,
+    attempted: bool,
+    reason: str,
+    error: str,
+) -> None:
+    with pytest.raises(ValueError, match=error):
+        collection_state(
+            planned=planned,
+            attempted=attempted,
+            pagination_exhausted=False,
+            reason=reason,
+        )
+
+
+def test_candidate_all_exact_creates_review_suggestion_but_never_auto_merge() -> None:
+    left = CandidateIdentityEvidence(name=" 김 민수 ", school="서울 대학교", company="Acme")
+    right = CandidateIdentityEvidence(name="김 민수", school="서울   대학교", company="acme")
+
+    assert candidate_link_decision(left, right) is CandidateLinkDecision.REVIEW_REQUIRED
+    assert "AUTO_MERGE" not in {decision.value for decision in CandidateLinkDecision}
+
+
+@pytest.mark.parametrize(
+    ("left", "right", "expected"),
+    [
+        (
+            CandidateIdentityEvidence(name="김민수", school="서울대", company=None),
+            CandidateIdentityEvidence(name="김민수", school="서울대", company="Acme"),
+            CandidateLinkDecision.INSUFFICIENT_EVIDENCE,
+        ),
+        (
+            CandidateIdentityEvidence(name="김민수", school="서울대", company="Acme"),
+            CandidateIdentityEvidence(name="김민수", school="연세대", company="Acme"),
+            CandidateLinkDecision.NO_MATCH,
+        ),
+        (
+            CandidateIdentityEvidence(name="김민수", school="서울대", company="Acme"),
+            CandidateIdentityEvidence(name="이민수", school="서울대", company="Acme"),
+            CandidateLinkDecision.NO_MATCH,
+        ),
+    ],
+)
+def test_candidate_link_requires_all_three_exact_fields(
+    left: CandidateIdentityEvidence,
+    right: CandidateIdentityEvidence,
+    expected: CandidateLinkDecision,
+) -> None:
+    assert candidate_link_decision(left, right) is expected
+
+
+def test_calendar_alias_resolves_only_one_exact_id_or_summary_match() -> None:
+    resolution = resolve_calendar_alias(
+        "sangmokang",
+        [
+            CalendarReference(calendar_id="primary@example.test", summary="업무"),
+            CalendarReference(calendar_id="calendar-2", summary="sangmokang"),
+        ],
+    )
+
+    assert resolution.state.status is MetricStatus.PASS
+    assert resolution.calendar_id == "calendar-2"
+
+
+@pytest.mark.parametrize(
+    ("calendars", "reason"),
+    [
+        ([], SourceFailureReason.CALENDAR_ALIAS_NOT_FOUND),
+        (
+            [
+                CalendarReference(calendar_id="calendar-1", summary="sangmokang"),
+                CalendarReference(calendar_id="calendar-2", summary="sangmokang"),
+            ],
+            SourceFailureReason.CALENDAR_ALIAS_AMBIGUOUS,
+        ),
+    ],
+)
+def test_calendar_alias_missing_or_ambiguous_is_not_run(
+    calendars: list[CalendarReference],
+    reason: SourceFailureReason,
+) -> None:
+    resolution = resolve_calendar_alias("sangmokang", calendars)
+
+    assert resolution.state.status is MetricStatus.NOT_RUN
+    assert resolution.state.reason is reason
+    assert resolution.calendar_id is None
+
+
+def test_duplicate_calendar_list_entries_are_ambiguous_even_with_the_same_id() -> None:
+    resolution = resolve_calendar_alias(
+        "sangmokang",
+        [
+            CalendarReference(calendar_id="calendar-1", summary="sangmokang"),
+            CalendarReference(calendar_id="calendar-1", summary="sangmokang"),
+        ],
+    )
+
+    assert resolution.state.status is MetricStatus.NOT_RUN
+    assert resolution.state.reason is SourceFailureReason.CALENDAR_ALIAS_AMBIGUOUS
+
+
+def test_resolve_calendar_alias_rejects_any_alias_other_than_the_contract_owner() -> None:
+    """The v1 contract fixes the target identity; a caller cannot resolve someone else."""
+
+    with pytest.raises(ValueError, match="sangmokang"):
+        resolve_calendar_alias(
+            "other-person",
+            [CalendarReference(calendar_id="cal-1", summary="other-person")],
+        )
+
+
+def test_calendar_reference_rejects_an_empty_calendar_id() -> None:
+    with pytest.raises(ValueError, match="calendar_id"):
+        CalendarReference(calendar_id="", summary="sangmokang")
+
+
+def test_calendar_reference_rejects_an_empty_summary() -> None:
+    with pytest.raises(ValueError, match="summary"):
+        CalendarReference(calendar_id="calendar-1", summary="   ")
+
+
+def test_calendar_id_match_is_literal_not_case_or_space_folded() -> None:
+    """The contract requires an exact id match; casing must not widen it."""
+
+    resolution = resolve_calendar_alias(
+        "sangmokang",
+        [CalendarReference(calendar_id="SangMokang", summary="unrelated")],
+    )
+
+    assert resolution.state.status is MetricStatus.NOT_RUN
+    assert resolution.calendar_id is None
+
+
+def test_resolve_calendar_alias_rejects_entries_that_are_not_calendar_reference() -> None:
+    """A duck-typed stand-in must not silently satisfy the CalendarReference contract."""
+
+    class FakeCalendar:
+        calendar_id = "calendar-1"
+        summary = "sangmokang"
+
+    with pytest.raises(TypeError, match="CalendarReference"):
+        resolve_calendar_alias("sangmokang", [FakeCalendar()])  # type: ignore[list-item]
+
+
+def test_calendar_resolution_rejects_a_pass_without_a_calendar_id() -> None:
+    with pytest.raises(ValueError, match="calendar_id"):
+        CalendarResolution(state=SourceState(status=MetricStatus.PASS), calendar_id=None)
+
+
+def test_calendar_resolution_rejects_a_blank_calendar_id() -> None:
+    """A whitespace-only calendar_id is not truthy-empty but must still be rejected."""
+
+    with pytest.raises(TypeError, match="calendar_id"):
+        CalendarResolution(state=SourceState(status=MetricStatus.PASS), calendar_id="   ")
+
+
+def test_calendar_resolution_rejects_a_non_string_calendar_id() -> None:
+    with pytest.raises(TypeError, match="calendar_id"):
+        CalendarResolution(
+            state=SourceState(status=MetricStatus.PASS),
+            calendar_id=cast(str, 1),
+        )
+
+
+def test_calendar_resolution_rejects_a_not_run_with_a_calendar_id() -> None:
+    with pytest.raises(ValueError, match="calendar_id"):
+        CalendarResolution(
+            state=SourceState(
+                status=MetricStatus.NOT_RUN,
+                reason=SourceFailureReason.CALENDAR_ALIAS_NOT_FOUND,
+            ),
+            calendar_id="calendar-1",
+        )
