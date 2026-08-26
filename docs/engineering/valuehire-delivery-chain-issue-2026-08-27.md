@@ -58,6 +58,7 @@ GitHub Issue 생성은 외부 쓰기이므로 승인 전에는 실행하지 않�
 | WU-3b-3 | Issue→commit→evidence 추적 장부 | trace validator, schema, 회귀 테스트 |
 | WU-3b-4 | 최신 SHA V1/V2 준비·보존 | adversarial evidence 계약과 회귀 테스트 |
 | WU-3b-5 | PR/CI/merge/deploy/live 상태 | delivery state, acceptance, hook/CI/SOT 배선 |
+| WU-3b-6 | 원격 쓰기 전 PR 준비 경계 | PR 초안, base 분기 경고, 승인 전 명령 상태 |
 
 ## 데이터 안전 조건
 

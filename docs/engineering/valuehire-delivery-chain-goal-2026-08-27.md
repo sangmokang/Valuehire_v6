@@ -77,6 +77,8 @@ git diff --check
 
 추가 acceptance와 새 테스트는 WU-3b-5에서 pre-push glob과 CI 고정 목록에 함께 연결한다. 실행 대상 0개와 무출력은 실패다.
 
+WU-3b-6은 PR 본문과 변경 요약을 로컬에서 준비하되, `origin/main`과 후보 기반의 분기 상태 및 사용자 승인 경계를 문서와 테스트로 고정한다. base가 정리되지 않은 동안 PR 생성 명령은 `BLOCKED`다.
+
 ## 설계 결정
 
 > **무엇을** — scope ledger는 명시적 run/WU ID와 index blob으로 고정한다.

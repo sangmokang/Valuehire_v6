@@ -15,7 +15,8 @@ if ! node --test \
   tests/trace-ledger.test.mjs \
   tests/adversarial-evidence.test.mjs \
   tests/delivery-state.test.mjs \
-  tests/delivery-wiring.test.mjs >"$output" 2>&1; then
+  tests/delivery-wiring.test.mjs \
+  tests/pr-draft.test.mjs >"$output" 2>&1; then
   cat "$output"
   echo "FAIL: checkpoint delivery regression"
   exit 1
