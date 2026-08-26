@@ -26,11 +26,28 @@ fi
 ruby -rpsych -rdate -e '
 workflow_path = ARGV[0]
 
-# 이름으로 지정한 예외. 이유 없이 늘리지 않는다.
+# 예외는 **안정된 step id** 로 지정한다. 이유 없이 늘리지 않는다.
+#
+# 2026-08-27 이전에는 이 키가 표시 이름(step["name"])이었다. 그래서 허용된 이름을 다른
+# 스텝에 복사하는 것만으로 예외 권한이 그대로 따라갔다(실측: hs-a4 스텝의 name 을
+# "인수 검사 0-5 (push · CI 연결)" 로 바꾸고 항상-거짓 조건을 붙여도 exit 0). 이름은
+# 사람을 위한 표시이고 복사가 자유롭다 — 권한을 거기 걸면 안 된다.
 ALLOWED_STEP_IF = {
-  "인수 검사 0-5 (push · CI 연결)" =>
+  "acceptance-0-5" =>
     "origin/main==main 을 보는 검사라 main push 에서만 의미가 있다. PR 실행에서 요구하면 상시 실패한다.",
 }
+
+# 명령 앞부분은 그대로 두고 뒤에만 붙여 실패를 삼키는 형태. "그 명령이 있는가" 식
+# 검사로는 원리적으로 잡히지 않는다. 문자 클래스로 쓴 것은 이 소스 자체가 P13 약화
+# 탐지 패턴에 걸리지 않게 하기 위해서다(저장소 선례와 같은 이유).
+SWALLOW_TAILS = [
+  [/[|][|]\s*true\s*\z/,     "오류를 무시하는 꼬리"],
+  [/[|][|]\s*:\s*\z/,        "오류를 무시하는 꼬리(:)"],
+  [/;\s*true\s*\z/,          "세미콜론 뒤 무조건 성공"],
+  [/;\s*:\s*\z/,             "세미콜론 뒤 무조건 성공(:)"],
+  [/[|][|]\s*exit\s+0\s*\z/, "오류를 성공 종료로 바꾸는 꼬리"],
+  [/\Aset\s+\+e\z/,          "오류 전파를 끄는 설정"],
+]
 
 begin
   doc = Psych.safe_load(File.read(workflow_path), aliases: true, permitted_classes: [Date, Time])
@@ -68,9 +85,10 @@ jobs.each do |job_name, job|
     label = step["name"] || step["uses"] || "steps[#{i}]"
 
     if step.key?("if")
-      reason = ALLOWED_STEP_IF[step["name"]]
+      # 판정 기준은 step id 다. 표시 이름은 복사·위조가 자유로우므로 권한을 걸지 않는다.
+      reason = step["id"] ? ALLOWED_STEP_IF[step["id"].to_s] : nil
       if reason
-        puts "ALLOWED: #{label} — if 허용 (#{reason})"
+        puts "ALLOWED: #{step["id"]} — if 허용 (#{reason})"
       else
         errors << "STEP_CONDITIONAL: jobs.#{job_name}.#{label} 에 if 가 있다 (#{step["if"].inspect}) — " \
                   "조건부 스텝은 조건이 거짓이면 실행되지 않고도 초록이다"
@@ -93,6 +111,13 @@ jobs.each do |job_name, job|
         end
         if stripped =~ /\A(bash|sh)\s+-n\s+\S+\.sh/
           errors << "STEP_SYNTAX_ONLY: jobs.#{job_name}.#{label} 의 `#{stripped}` 는 문법 검사일 뿐 실행이 아니다"
+        end
+        # 명령 앞부분은 그대로 두고 뒤에만 붙이는 우회. 실패가 전파되지 않으면 검사가 아니다.
+        SWALLOW_TAILS.each do |re, why|
+          if stripped =~ re
+            errors << "STEP_SWALLOWS_ERROR: jobs.#{job_name}.#{label} 의 `#{stripped}` — #{why}. " \
+                      "명령이 그대로 있어도 실패가 전파되지 않으면 그 스텝은 항상 초록이다"
+          end
         end
       end
     end
