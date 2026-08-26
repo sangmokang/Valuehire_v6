@@ -180,7 +180,7 @@ test("scope: the latest scope-less run ledger overrides an older scoped run ledg
   git(cwd, "add", "src/app.mjs");
   expectPass(runGate(cwd, base, "--scope", "src/**"));
 });
-test("scope: checkpoint uses the latest green WU declaration in one run ledger", () => {
+test("scope: checkpoint never auto-selects a worktree ledger without --run-id", () => {
   const { cwd, base } = makeRepo();
   write(
     cwd,
@@ -195,7 +195,7 @@ test("scope: checkpoint uses the latest green WU declaration in one run ledger",
   );
   write(cwd, "src/app.mjs", "export const value = 2;\n");
   git(cwd, "add", "src/app.mjs");
-  expectPass(runGate(cwd, base));
+  expectViolation(runGate(cwd, base), "scope");
 });
 test("scope: missing run ledger and missing --scope fails closed", () => {
   const { cwd, base } = makeRepo();
