@@ -6,6 +6,7 @@ import test from "node:test";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const DRAFT = join(ROOT, "docs/engineering/valuehire-delivery-chain-pr-draft-2026-08-27.md");
+const RUN_LEDGER = join(ROOT, ".strict/run-ledger/strict-wu3b-20260827-472c276.json");
 
 test("PR draft preserves the approval and remote-evidence boundary", () => {
   const body = readFileSync(DRAFT, "utf8");
@@ -22,8 +23,16 @@ test("PR draft preserves the approval and remote-evidence boundary", () => {
 test("PR draft exposes the divergent base instead of presenting a runnable create command", () => {
   const body = readFileSync(DRAFT, "utf8");
   assert.match(body, /origin\/main.*6.*뒤/);
-  assert.match(body, /origin\/main.*18.*앞/);
+  assert.match(body, /git rev-list --left-right --count origin\/main\.\.HEAD/);
+  assert.doesNotMatch(body, /origin\/main.*\d+커밋 앞이다/);
   assert.match(body, /PR 생성 명령: `BLOCKED`/);
   assert.match(body, /git push -u origin task\/wu3b-delivery-chain-20260827/);
   assert.match(body, /gh pr create --base main --head task\/wu3b-delivery-chain-20260827/);
+});
+
+test("WU-3b-6 scope covers the RED test that defines its PR boundary", () => {
+  const ledger = JSON.parse(readFileSync(RUN_LEDGER, "utf8"));
+  const wu = ledger.wus.find(({ id }) => id === "WU-3b-6");
+  assert.ok(wu, "WU-3b-6 must exist");
+  assert.ok(wu.scope.includes("tests/pr-draft.test.mjs"));
 });

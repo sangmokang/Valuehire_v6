@@ -79,6 +79,8 @@ git diff --check
 
 WU-3b-6은 PR 본문과 변경 요약을 로컬에서 준비하되, `origin/main`과 후보 기반의 분기 상태 및 사용자 승인 경계를 문서와 테스트로 고정한다. base가 정리되지 않은 동안 PR 생성 명령은 `BLOCKED`다.
 
+Claude V1이 WU-3b-6 RED 테스트의 scope 누락과 고정 ahead 수치의 즉시 노후화를 반증했다. WU-3b-6a는 원래 RED 테스트를 보호 scope에 넣고, 분기 수치는 문서에 고정하지 않은 채 승인 직전 원명령으로 다시 측정하도록 계약한다.
+
 Codeaudit에서 secure `--run-id` 경로 밖의 legacy fallback이 작업 폴더 ledger를 계속 자동 선택하는 결함을 재현했다. WU-3b-1a는 이 fallback을 삭제해 `--run-id`가 없으면 명시적 `--scope`만 사용하고, 둘 다 없으면 staged 파일별 scope 위반으로 닫는다.
 
 같은 감사에서 no-run-id secret 경로가 작업 폴더 `verify.sh`와 pattern을 직접 실행하는 우회도 재현했다. WU-3b-2a는 호출 모드와 무관하게 index의 `verify.sh`와 `.secret-patterns.default`, 승인 SHA가 일치하는 선택적 로컬 pattern만 사용한다.
