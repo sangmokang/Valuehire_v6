@@ -1,12 +1,12 @@
 # WU-3a checkpoint 판정기 goal — 2026-08-24
 
-VERDICT: CHECKPOINT_PENDING
+VERDICT: APPROVE — LOCAL CHECKPOINT
 
 ## 2026-08-26 명시적 run 선택 계약
 
-현재 B 판정기는 검사 대상을 명시하지 않고 모든 run 장부의 `updated_at`을 비교한다. 따라서 더 최신인 무관 run 하나가 추가되면 같은 호출의 범위 판정이 달라질 수 있다. 이번 L3 변경은 필수 `--run-id`가 가리키는 정규 파일 하나만 읽고, 범위 출처를 그 장부 또는 `--scope` 중 정확히 하나로 제한한다. A의 `id/ac/status/commit` WU 스키마와 C 구현은 바꾸지 않는다.
+변경 전 B 판정기는 검사 대상을 명시하지 않고 모든 run 장부의 `updated_at`을 비교했다. 따라서 더 최신인 무관 run 하나가 추가되면 같은 호출의 범위 판정이 달라질 수 있었다. 이번 L3 변경은 필수 `--run-id`가 가리키는 정규 파일 하나만 읽고, 범위 출처를 그 장부 또는 `--scope` 중 정확히 하나로 제한한다. A의 `id/ac/status/commit` WU 스키마와 C 구현은 바꾸지 않는다.
 
-### 현재 상태와 근본 원인
+### 변경 전 상태와 근본 원인
 
 - `tools/strict/checkpoint-gate.mjs:13-31`의 인자 판독에는 `--run-id`가 없다.
 - `tools/strict/checkpoint-gate.mjs:124-187`은 `.strict/run-ledger/*.json` 전체를 읽고 `updated_at` 최대값을 선택한다.
@@ -292,6 +292,97 @@ e93da3cf4a4623c8b1da0f8adafd3f7d166b7133a351c9fb286042c73da07ca9  tools/strict/c
 
 goal을 포함한 네 파일의 최종 commit hash readback과 G/V1/V2 원문은 자기참조로 commit SHA를 바꾸지 않도록 외부 복구 evidence manifest와 control worktree에 귀속한다.
 
-## 현재 T 판정
+## 2026-08-25 복구 시점 T 판정 — 과거 이력
 
 `RED_CONFIRMED`, `PRECOMMIT_GREEN`; exact GREEN commit의 G, V1, V2, T는 `NOT_RUN`이다. P11 함수 hard 100의 100/101 경계는 별도 Work Unit 전까지 `BLOCKED`이며 이 복구 commit을 전체 T PASS로 보고하지 않는다. 과거 `3094eef`·45/45·검증자 문구는 모두 제거했으며 자동 훅 배선·장부 갱신은 WU-3b 범위다.
+
+## 2026-08-26 명시적 run 선택 최종 증거
+
+이 절은 위 2026-08-25 복구 이력의 `NOT_RUN` 상태를 대체한다. 검증 대상 제품 commit은 `01c020bc19c0c84a72c0643232b1ce4949da0332`, 고정 RED commit은 `178635780eeb4fdf89d987356d30b830d40404d8`, 기준은 `72c3d8ebc052b3ec4241c1c21422fdc6151c5ef7`이다. RED 이후 GREEN에서 테스트는 변경하지 않았다.
+
+### G — 원명령과 회귀
+
+```text
+2026-08-26T17:57:47+09:00
+HEAD=01c020bc19c0c84a72c0643232b1ce4949da0332
+GATE_SHA256=cc6786d128963be17094999070d066e83955b714f55b382edff9e1ccab39a1f2
+TEST_SHA256=2aa6fe212e2fdc07d5200b9f2a2076e48cf818019ab347a4771682f16665ade0
+
+node --check tools/strict/checkpoint-gate.mjs
+EXIT=0
+
+node --test tests/checkpoint-gate.test.mjs
+EXIT=0 tests=49 pass=49 fail=0 skipped=0 todo=0
+OUTPUT_SHA256=57655ba7283deadfb763f73ef567c1607ddf0d7bd0aa484b59f87fc69f055329
+
+bash scripts/acceptance-principles-check.sh
+EXIT=0 VERDICT=PASS SOT_LOAD=PASS LEDGER_LOAD=PASS MECHANISMS=34/34 WIRING=pre-push:1,ci:1
+OUTPUT_SHA256=31153ab17a665560a3a4e8a5f2a45bd58275e1d6f1e1d27a21fee40d74197dc2
+```
+
+RED 재현은 같은 600줄 테스트 SHA로 `tests=49 pass=7 fail=42 skipped=0`, exit 1이었다. 제품 파일에는 `readdirSync`, `readRunLedgers`, `parseUpdatedAt`, `updated_at` 비교가 0건이며, 유효한 `--run-id` 없이 PASS하는 시험 경로도 0건이다.
+
+A와 C는 수정하지 않은 별도 worktree에서 다시 실행했다.
+
+```text
+A_HEAD=f075216b3e35c8ea2eb717f7b667b85f3a7ed6ff
+A_COMMAND=node --test tests/strict/ledger*.test.mjs
+A_RESULT=exit 0 tests=12 pass=12 fail=0 skipped=0
+A_OUTPUT_SHA256=22194f35ea35eb30db6b7043382eb564944a9a85229e31e056ce3392f7e97fe1
+A_WORKTREE=clean
+
+C_HEAD=a32e6ac9c31e5c73fa08674e25591d297e997dc7
+C_COMMAND=node --test tests/finding-runner.test.mjs
+C_RESULT=exit 0 tests=8 pass=8 fail=0 skipped=0
+C_OUTPUT_SHA256=52f52479cbcd79291118921585fb84f86411486e124a2410d3a7257f9c033c19
+C_WORKTREE=clean
+```
+
+### 적대 변이와 경계
+
+임시 복제본에만 변이를 적용했고 대상·원본 worktree에는 쓰지 않았다.
+
+| 공격 | 기대 | 결과 |
+| --- | --- | --- |
+| 내부 `run_id` 불일치 검사를 제거한 제품 변이 | 원 시험 RED | exit 1, fail 1, output `e34bd1ff...` |
+| `test.skip` 삽입 | 0건·skip 감시가 RED | exit 1, fail 1, skipped 1, output `9f352caa...` |
+| 제품의 조기 `process.exit(0)` | 원 시험 RED | exit 1, fail 49, output `a3e4b315...` |
+| 항상 PASS하는 no-op 제품 | 원 시험 RED | exit 1, fail 42, output `13d294dc...` |
+| 스테이지된 빈 테스트 | B gate가 약화 탐지 | exit 1, `assertions decreased 12 -> 0` |
+| 스테이지된 skip 변이 | B gate가 약화 탐지 | exit 1, `skip increased 0 -> 36` |
+| 직접 작성 코드 600줄 | 정상 경계 | exit 0, `pass:true` |
+| 직접 작성 코드 601줄 | 경계+1 | exit 1, `file has 601 LOC, hard limit is 600` |
+
+빈 파일에 `node --test`만 실행하면 Node 자체는 `tests=1 pass=1`, exit 0을 반환했다. 따라서 exit code만 보는 검증은 가짜 초록이며, 이 WU의 완료 계약은 `tests=49`, `fail=0`, `skipped=0` 확인 또는 실제 B gate의 test-weakening 검사까지 포함한다.
+
+### V1 — Claude 독립 공격
+
+```text
+SESSION=da1cb102-f4d7-4983-bfa0-2d13894e6b15
+MODEL=claude-sonnet-5
+TARGET=01c020bc19c0c84a72c0643232b1ce4949da0332
+EXIT=0
+VERDICT=PASS
+RAW_LOG=/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/checkpoint-v1-r4.XXXXXX.fEBp6WgC2i
+RAW_OUTPUT_SHA256=fbd17345385506175d6a0bfb900f68c6ae71be0943773956f46a29cceff9f1a9
+```
+
+V1은 원명령 49/49·skip 0을 재현하고 임시 저장소에서 더 최신 무관 run 추가 전후 결과 불변, symlink·빈 파일·내부 ID 불일치·ledger 범위와 `--scope` 충돌·경로 탈출 거부를 직접 확인했다. 하드링크는 정규 파일이며 내용 검증을 그대로 받으므로 계약 위반으로 보지 않았다. `lstatSync`와 `readFileSync` 사이 경쟁은 300회 공격에서 재현되지 않았으나 원자적 open은 아니므로 이론적 창은 남은 위험으로 기록한다.
+
+### V2 — Codex 새 컨텍스트 반박 검증
+
+```text
+AGENT=/root/checkpoint_v2_adversarial
+TARGET=01c020bc19c0c84a72c0643232b1ce4949da0332
+VERDICT=PASS
+```
+
+V2는 V1 결론을 그대로 채택하지 않고 RED 7/42, GREEN 49/49, run-id 누락, 최신 무관 장부, 범위 출처 충돌, current WU 정확히 하나, 빈·잘못된·불일치·symlink·directory 장부, 입력 위반 뒤 검사 미실행, 600/601 경계를 재현했다. V1이 실행하지 않은 no-op·exit-0·빈 테스트·skip 변이도 별도로 실행해 모두 검증 계약이 탐지함을 확인했다. 허용 세 파일 외 diff, A/C 변경, RED 이후 테스트 변경은 0건이었다.
+
+### T — 최종 판정과 잔여 위험
+
+**APPROVE — LOCAL CHECKPOINT.** AC-1~AC-4와 counter-AC가 G·V1·V2에서 닫혔다. 범위의 권위자는 지정 장부의 정확히 한 current WU 또는 장부에 선언이 없을 때의 명시적 `--scope` 중 하나뿐이다. 원본 dirty worktree의 상태 경로 목록은 착수 시점과 동일하고, 대상 worktree는 최종 증거 commit 전까지 clean이었다.
+
+- 남은 비차단 위험: `lstatSync` 뒤 파일을 읽는 순간 사이에는 이론적 TOCTOU 경쟁 창이 있다. 동일 저장소 쓰기 권한자를 비신뢰 공격자로 보는 계약 확장은 별도 보안 WU에서 원자적 open/fstat로 다룬다.
+- 자동 호출부가 새 `--run-id`를 공급하는지 확인하는 배선 변경은 명시적 비범위다. 현재 B는 수동 CLI다.
+- 원격 CI, push, PR, merge, main 변경은 사용자 금지에 따라 모두 `NOT_RUN`이다.
