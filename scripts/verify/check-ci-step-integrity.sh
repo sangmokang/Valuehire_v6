@@ -8,7 +8,7 @@ set -uo pipefail
 
 WORKFLOW="${1:-.github/workflows/verify.yml}"
 CONTRACT="${2:-docs/sot/ci-required-steps.json}"
-EXPECTED_CONTRACT_SHA256="550bdefbd824dacc066b98241e94991285b329a371200923b595e3e5032b2d3a"
+EXPECTED_CONTRACT_SHA256="43d8ee9f83c157e5b56bc974d6e75d8f7ac9252e9e5b141581be682826877241"
 
 if [ ! -f "$WORKFLOW" ]; then
   echo "NOT_RUN: 워크플로 파일이 없다 — $WORKFLOW"

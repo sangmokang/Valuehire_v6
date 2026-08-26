@@ -174,7 +174,8 @@ else
     #   → SECRET_PATTERNS_FILE=/tmp/weak.txt git push  → exit 0 통과
     # 래퍼를 거친다. 종료값 0 인데 판정을 한 건도 내지 않은 검사(본문이 `exit 0` 으로
     # 바뀐 경우 등)를 로컬에서도 CI 와 같은 기준으로 불합격시키기 위해서다.
-    SECRET_PATTERNS_FILE= bash scripts/verify/run-acceptance.sh "$c" >/dev/null 2>&1 || rc=$?
+    rel="${c#./}"
+    SECRET_PATTERNS_FILE= bash scripts/verify/run-acceptance.sh "$rel" >/dev/null 2>&1 || rc=$?
     if [ "$rc" -ne 0 ]; then
       block "$c exit=$rc"
     else

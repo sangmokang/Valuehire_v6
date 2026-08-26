@@ -52,11 +52,23 @@
   stage: "ci"
   ci_mirror_job: "verify"
   required: true
+- id: "acceptance-output-integrity-ci"
+  path: ".github/workflows/verify.yml"
+  target: "인수 검사 output-integrity (출력 위조와 no-op이 성공할 수 없는가)"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
 - id: "acceptance-runner-gate"
   path: "scripts/verify/run-acceptance.sh"
-  target: "판정을 한 건도 내놓지 않았다"
+  target: "ruby scripts/verify/check-acceptance-integrity.rb"
   stage: "manual"
-  manual_reason: "래퍼 자신의 판정 문구. 실행 배선은 acceptance-runner-ci 가 대조한다"
+  manual_reason: "래퍼가 실행 전 content contract validator를 호출하는 활성 명령. CI 배선은 acceptance-runner-ci가 대조한다"
+  required: true
+- id: "acceptance-integrity-validator"
+  path: "scripts/verify/check-acceptance-integrity.rb"
+  target: "contract digest mismatch"
+  stage: "manual"
+  manual_reason: "고정 계약 SHA와 target identity/content를 실행 전에 fail-closed 대조하는 WU0-B trust root"
   required: true
 - id: "ci-step-integrity-ci"
   path: ".github/workflows/verify.yml"

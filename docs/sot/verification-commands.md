@@ -17,7 +17,7 @@
 
 ### CI(`​.github/workflows/verify.yml`)가 실제로 돌리는 것
 
-**워크플로 실행 step 23개 전부**를 적는다(2026-08-12 V1 D6: 이전 판은 `bash ...` 직접 명령만 적어 인라인 본문 스텝이 목록에서 빠졌고, 운영자가 실제로 무엇이 도는지 잘못 판단할 수 있었다). 아래는 `verify.yml` 의 `- name:` 실행 step 순서 그대로다. 정확한 job·name·ordered run lines·허용 if 계약은 `docs/sot/ci-required-steps.json`이 정본이다.
+**워크플로 실행 step 24개 전부**를 적는다(2026-08-12 V1 D6: 이전 판은 `bash ...` 직접 명령만 적어 인라인 본문 스텝이 목록에서 빠졌고, 운영자가 실제로 무엇이 도는지 잘못 판단할 수 있었다). 아래는 `verify.yml` 의 `- name:` 실행 step 순서 그대로다. 정확한 job·name·ordered run lines·허용 if 계약은 `docs/sot/ci-required-steps.json`이 정본이다.
 
 | # | 스텝 이름 | 실행 내용 |
 |---|---|---|
@@ -42,8 +42,9 @@
 | 19 | 인수 검사 secret-webhook-vendor | `bash scripts/verify/run-acceptance.sh scripts/acceptance-secret-webhook-vendor.sh` — 웹훅·벤더 키 (AC-S1) |
 | 20 | 인수 검사 verified-sha | `bash scripts/verify/run-acceptance.sh scripts/acceptance-verified-sha.sh` — 초록 결과의 SHA 귀속 판정기 시험 (P23) |
 | 21 | 인수 검사 ci-step-integrity | `bash scripts/verify/run-acceptance.sh scripts/acceptance-ci-step-integrity.sh` — 보호 step의 정확한 선언 계약 |
-| 22 | 인수 검사 semantic-mutations | `bash scripts/verify/run-acceptance.sh scripts/acceptance-semantic-mutations.sh` — 인수 검사 무력화 5종 차단 |
-| 23 | 인수 검사 verify-ac-m | `bash scripts/verify/run-acceptance.sh scripts/acceptance-verify-ac-m.sh` — mechanism 명부 대조 (AC-M) |
+| 22 | 인수 검사 output-integrity | `bash scripts/verify/run-acceptance.sh scripts/acceptance-output-integrity.sh` — 보호 script의 고정된 identity/content와 출력 위조 차단 |
+| 23 | 인수 검사 semantic-mutations | `bash scripts/verify/run-acceptance.sh scripts/acceptance-semantic-mutations.sh` — 인수 검사 무력화 5종 차단 |
+| 24 | 인수 검사 verify-ac-m | `bash scripts/verify/run-acceptance.sh scripts/acceptance-verify-ac-m.sh` — mechanism 명부 대조 (AC-M) |
 
 *(1번 앞에 `actions/checkout` 이 있고 `fetch-depth: 0` 이다 — 7번이 과거 blob 을 열려면 필요하다.)*
 

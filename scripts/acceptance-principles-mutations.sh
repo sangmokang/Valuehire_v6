@@ -28,11 +28,13 @@ cp scripts/acceptance-principles-check.sh "$BASE/scripts/"
 cp scripts/verify/check-pre-push-runtime.sh "$BASE/scripts/verify/"
 # pre-push 가 인수 검사를 실행 래퍼로 돌리므로 fixture 에도 래퍼가 있어야 한다.
 cp scripts/verify/run-acceptance.sh "$BASE/scripts/verify/"
+cp scripts/verify/check-acceptance-integrity.rb "$BASE/scripts/verify/"
 cp hooks/pre-push "$BASE/hooks/"
 cp .github/workflows/verify.yml "$BASE/.github/workflows/"
 chmod +x "$BASE/scripts/acceptance-principles-check.sh"
 chmod +x "$BASE/scripts/verify/check-pre-push-runtime.sh"
 chmod +x "$BASE/scripts/verify/run-acceptance.sh"
+chmod +x "$BASE/scripts/verify/check-acceptance-integrity.rb"
 git -C "$BASE" init -q
 
 fail=0

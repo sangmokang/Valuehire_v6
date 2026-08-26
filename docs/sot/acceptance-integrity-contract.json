@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "algorithm": "sha256",
+  "inventory": [
+    {"path": "scripts/acceptance-0-2-unreachable-content.sh", "sha256": "5aa9a3406e5fc3bde18d820be527a8b5642a2c28f60fd612c64c39655013c0d9"},
+    {"path": "scripts/acceptance-0-5.sh", "sha256": "cd37471103f48098611bb50c2daefe5633898ef3edf6bdf261f663e634ab3841"},
+    {"path": "scripts/acceptance-0-6.sh", "sha256": "9ba1f4fa3fb617baeda87d72f802b7d484a250a88c9776f6ef3653238410cd2b"},
+    {"path": "scripts/acceptance-0-7.sh", "sha256": "61d60afea728dbd3d57e2dc7f5d752853bfa03c40e5675f77cb05caf54f8726d"},
+    {"path": "scripts/acceptance-ci-step-integrity.sh", "sha256": "bcbab981492f29b617ff42be2dba3b88bbc417e2906d0e862dce2b52f5c878c2"},
+    {"path": "scripts/acceptance-guard-global-skill-files.sh", "sha256": "76cda3281f4af5379350e34f61434182b4850d90c483f1d5649dbe4cd1e3ff16"},
+    {"path": "scripts/acceptance-hs-a3.sh", "sha256": "b260ffc43d09c8d738269d284d8a1be9bd71d1d5bc3d723163a6b0c7bfa0d97d"},
+    {"path": "scripts/acceptance-hs-a4.sh", "sha256": "fe4bae740384f7cb1f96761cc19563f9fc535398494d86b6996ce863e7d99581"},
+    {"path": "scripts/acceptance-hs-cleanroom-absolute-contexts.sh", "sha256": "261ce74e7e04cb4ef94b355d50e2d73c2f21af85961bf01b6fb6651ae03d2b32"},
+    {"path": "scripts/acceptance-hs-cleanroom-absolute-paths.sh", "sha256": "335981193a36df925ef2289d6de2fc68cfbae56b3cabb36f8e8e9cb4fa7aa496"},
+    {"path": "scripts/acceptance-hs-cleanroom-colon-paths.sh", "sha256": "0132e7f9dcb0503ae2b4c0cbbf7a8bcc6b3dc401f5a3df05f7235b594f9ffbad"},
+    {"path": "scripts/acceptance-hs-cleanroom-file-urls.sh", "sha256": "f3c12157394e56d883bee0468e7687831baba23db9876b46bc131084ca92ad3f"},
+    {"path": "scripts/acceptance-hs-cleanroom-hook-env-mutations.sh", "sha256": "0fd58917930b3897c579158de5c9c859e5533ccaf018b1426015c43134217fb0"},
+    {"path": "scripts/acceptance-hs-cleanroom-hook-env.sh", "sha256": "98a639bf383add73df66ba319174b8cb9b0dafdf7287118675b8bd223e048567"},
+    {"path": "scripts/acceptance-hs-cleanroom-mutations.sh", "sha256": "28f25e863dfb64b16a4debc556704d5bfab5e8e74181805cc7e37841131fcfb4"},
+    {"path": "scripts/acceptance-hs-cleanroom.sh", "sha256": "cde91875f8225b20fd3c19bb1ab8f573988ac589f926a71ef03f55399891e821"},
+    {"path": "scripts/acceptance-hs-gates-antiforge.sh", "sha256": "5351b491bc2767ce95e1e98480bbf6e804d84a85f2f51702078389f37e273319"},
+    {"path": "scripts/acceptance-hs-gates-mutations.sh", "sha256": "9f1f7d9078326724541d429e15376afc2ae52eff36e17f2e049a2444bd3eea38"},
+    {"path": "scripts/acceptance-hs-gates.sh", "sha256": "6167f62d39654a49789fffcb220373acf2d799b23c537f81d8b96fa7cda5c17b"},
+    {"path": "scripts/acceptance-output-integrity.sh", "sha256": "857eb0d9530ca955ac431181ae8981136b73ef3ef1676c4bc63587521606492c"},
+    {"path": "scripts/acceptance-principles-check.sh", "sha256": "f931d1e8ff0e2d1c142c00cc6d2219c22dc878a93fb83a46a7c87e2cfc249ec6"},
+    {"path": "scripts/acceptance-principles-mutations.sh", "sha256": "27f5e5b56789e261c3bf89ceedf58b221d7b8d6ad3e51fd68c6f2c05845065d7"},
+    {"path": "scripts/acceptance-secret-webhook-vendor.sh", "sha256": "b39c10515a2ba3632c7fb8906af83776ef7ab478b45029287fd5c437b26fce58"},
+    {"path": "scripts/acceptance-semantic-mutations.sh", "sha256": "b9ad6063019002ba33c9e69f9c940ded4935211070dd5280141697552f06de0f"},
+    {"path": "scripts/acceptance-verified-sha.sh", "sha256": "06b69d18ae655909abad0ed3e59fc51202292ad256e5c8ed491cc2ed56b8de6c"},
+    {"path": "scripts/acceptance-verify-ac-m.sh", "sha256": "046006a8de10a7718f015f7e57b0c660a2b240e86ca1a833474ad853c4a2dacb"},
+    {"path": "verify.sh", "sha256": "08e7468f98b832c7d02e6139daa64e47adecfae48bbef4ecc39970a28b8c7adb"}
+  ]
+}

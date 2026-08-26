@@ -225,6 +225,11 @@ jobs:
         # 이 검사는 워크플로를 실제 YAML 로 파싱해 조건부·오류무시 스텝을 구조로 막는다.
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-ci-step-integrity.sh
 
+      - name: 인수 검사 output-integrity (출력 위조와 no-op이 성공할 수 없는가)
+        # PASS/CHECKED/VERDICT 문자열은 표시 자료일 뿐 승인 권한이 아니다. 고정된
+        # content contract와 불일치하는 보호 script는 실행 전에 거부되어야 한다.
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-output-integrity.sh
+
       - name: 인수 검사 semantic-mutations (검사를 껐을 때 반드시 빨개지는가)
         # 2026-08-21: acceptance-hs-a4.sh 본문을 `exit 0` 으로 바꿔도 CI 가 초록이었다.
         # CI 가 종료값만 봤기 때문이다 — 종료값 0 은 "통과했다"와 "아무것도 안 했다"를

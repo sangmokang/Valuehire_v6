@@ -6,7 +6,7 @@
 #   검사의 존재(existence)만 봤고 검사의 의미(semantics)를 보지 않았기 때문이다.
 #
 # 여기서는 차단과 통과를 한 쌍으로 잰다.
-#   차단 — 무력화한 사본 5종은 scripts/verify/run-acceptance.sh 가 전부 불합격시켜야 한다.
+#   차단 — 무력화한 추적 파일 5종은 scripts/verify/run-acceptance.sh 가 전부 불합격시켜야 한다.
 #   통과 — 손대지 않은 실제 인수 검사는 그대로 합격해야 한다(과잉 차단이면 그것도 결함).
 #
 # 원본 저장소를 건드리지 않는다. 사본은 mktemp 아래에서만 만들고 끝나면 상태를 대조한다.
@@ -22,8 +22,14 @@ REPO=$(git rev-parse --show-toplevel 2>/dev/null) || {
 }
 cd "$REPO" || exit 2
 RUNNER="$REPO/scripts/verify/run-acceptance.sh"
+CONTRACT="$REPO/docs/sot/acceptance-integrity-contract.json"
 if [ ! -f "$RUNNER" ]; then
   echo "FAIL: 래퍼 판정기가 없다 — $RUNNER (fail-closed)"
+  echo "CHECKED: 0"
+  exit 2
+fi
+if [ ! -f "$CONTRACT" ]; then
+  echo "NOT_RUN: integrity contract가 없다 — $CONTRACT"
   echo "CHECKED: 0"
   exit 2
 fi
@@ -54,14 +60,17 @@ record() {
 targets=()
 while IFS= read -r f; do
   targets+=("$f")
-done < <(git ls-files 'scripts/acceptance-*.sh' | LC_ALL=C sort)
+done < <(ruby -rjson -e '
+  contract = JSON.parse(File.read("docs/sot/acceptance-integrity-contract.json"))
+  puts contract.fetch("inventory").map { |entry| entry.fetch("path") }.grep(%r{\Ascripts/acceptance-.*\.sh\z}).sort
+')
 
-if [ "${#targets[@]}" -lt 5 ]; then
-  echo "FAIL: 인수 검사 대상이 ${#targets[@]}개 — 글로브가 비면 '전부 통과'가 되므로 불합격이다"
+if [ "${#targets[@]}" -ne 26 ]; then
+  echo "FAIL: 인수 검사 대상이 ${#targets[@]}개 — 승인 inventory 감소/증가는 불합격이다"
   echo "CHECKED: $checked"
   exit 1
 fi
-record 0 "대상 수집" "인수 검사 ${#targets[@]}개 (하한 5)"
+record 0 "대상 수집" "승인 인수 검사 ${#targets[@]}개"
 
 # ── 무력화 5종. 어느 것도 래퍼를 통과해서는 안 된다 ──────────────────────────
 write_mutant() {
@@ -70,7 +79,7 @@ write_mutant() {
     exit-zero)  printf '#!/usr/bin/env bash\nexit 0\n' > "$path" ;;
     true-only)  printf '#!/usr/bin/env bash\ntrue\n' > "$path" ;;
     noop)       printf '#!/usr/bin/env bash\n: # no-op\n' > "$path" ;;
-    empty)      printf '#!/usr/bin/env bash\n' > "$path" ;;
+    empty)      : > "$path" ;;
     echo-only)  printf '#!/usr/bin/env bash\necho "검사했습니다"\n' > "$path" ;;
     *)          return 1 ;;
   esac
@@ -80,11 +89,16 @@ for kind in exit-zero true-only noop empty echo-only; do
   blocked=0
   survivors=""
   for t in "${targets[@]}"; do
-    mutant="$TMP/$(basename "$t")"
+    sandbox="$TMP/repo-${kind}-$(basename "$t" .sh)"
+    git clone -q --no-hardlinks "$REPO" "$sandbox" || {
+      record 1 "무력화 차단: $kind" "sandbox clone 실패: $t"
+      continue
+    }
+    mutant="$sandbox/$t"
     write_mutant "$kind" "$mutant" || continue
     rc=0
-    bash "$RUNNER" "$mutant" >/dev/null 2>&1 || rc=$?
-    if [ "$rc" -ne 0 ]; then
+    (cd "$sandbox" && bash scripts/verify/run-acceptance.sh "$t") >/dev/null 2>&1 || rc=$?
+    if [ "$rc" -eq 1 ]; then
       blocked=$((blocked + 1))
     else
       survivors="$survivors $(basename "$t")"

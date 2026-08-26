@@ -43,11 +43,12 @@ PROBE_EXIT=$((40 + 16#$BYTE_HEX % 80))
 PROBE_REL="scripts/acceptance-${NONCE}.sh"
 MARKER="$SANDBOX/.runtime-marker-${NONCE}"
 MARKER_PROOF="executed-${NONCE}"
-mkdir -p "$SANDBOX/hooks" "$SANDBOX/scripts/verify" "$SANDBOX/.github/workflows"
+mkdir -p "$SANDBOX/hooks" "$SANDBOX/scripts/verify" "$SANDBOX/docs/sot" "$SANDBOX/.github/workflows"
 cp "$HOOK" "$SANDBOX/hooks/pre-push"
 # pre-push 는 인수 검사를 실행 래퍼로 돌린다. 샌드박스에 래퍼가 없으면 probe 가
 # "발견·실행됐는가"가 아니라 "래퍼가 없다"로 실패해 검사의 뜻이 달라진다.
 cp scripts/verify/run-acceptance.sh "$SANDBOX/scripts/verify/run-acceptance.sh"
+cp scripts/verify/check-acceptance-integrity.rb "$SANDBOX/scripts/verify/check-acceptance-integrity.rb"
 cp .github/workflows/verify.yml "$SANDBOX/.github/workflows/verify.yml"
 
 cat > "$SANDBOX/scripts/acceptance-principles-check.sh" <<'EOF'
@@ -66,8 +67,26 @@ echo "PASS: sandbox stub"
 exit 0
 EOF
 chmod +x "$SANDBOX/hooks/pre-push" "$SANDBOX/scripts/verify/run-acceptance.sh" \
+  "$SANDBOX/scripts/verify/check-acceptance-integrity.rb" \
   "$SANDBOX/scripts/acceptance-principles-check.sh" \
   "$SANDBOX/$PROBE_REL" "$SANDBOX/verify.sh"
+
+ruby -rdigest -rjson -e '
+root = ARGV.fetch(0)
+paths = ARGV[1..-1].sort
+inventory = paths.map do |path|
+  {"path" => path, "sha256" => Digest::SHA256.file(File.join(root, path)).hexdigest}
+end
+contract = {"schema_version" => 1, "algorithm" => "sha256", "inventory" => inventory}
+contract_path = File.join(root, "docs/sot/acceptance-integrity-contract.json")
+File.write(contract_path, JSON.pretty_generate(contract) + "\n")
+digest = Digest::SHA256.file(contract_path).hexdigest
+validator_path = File.join(root, "scripts/verify/check-acceptance-integrity.rb")
+validator = File.read(validator_path)
+validator = validator.sub(/EXPECTED_CONTRACT_SHA256 = "[0-9a-fA-F_]+"/, "EXPECTED_CONTRACT_SHA256 = #{digest.inspect}")
+validator = validator.sub(/EXPECTED_COUNT = \d+/, "EXPECTED_COUNT = #{paths.length}")
+File.write(validator_path, validator)
+' "$SANDBOX" scripts/acceptance-principles-check.sh "$PROBE_REL" verify.sh
 
 git -C "$SANDBOX" init -q || exit 2
 git -C "$SANDBOX" config user.name "Runtime $NONCE"
