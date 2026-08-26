@@ -124,7 +124,7 @@ function isTestPath(path) {
   return /(^|\/)(?:tests?|__tests__)(\/|$)/.test(path) || /\.(?:test|spec)\.[^/]+$/.test(path);
 }
 
-function validateRedTestImmutability(violations, record, field, candidate, recordedRedCommits) {
+function validateRedTestImmutability(violations, record, field, candidate, recordedRedCommits, invalidatedCommits) {
   if (!OID.test(record.red_commit ?? "") || !OID.test(record.implementation_commit ?? "")) return;
   const redTests = new Set(changedPaths(record.red_commit).filter(isTestPath));
   if (redTests.size === 0) return;
@@ -140,6 +140,8 @@ function validateRedTestImmutability(violations, record, field, candidate, recor
       if (!redTests.has(path)) continue;
       if (recordedRedCommits.has(commit)) {
         if (recordedRedWeakens(commit, path)) add(violations, field, `later recorded RED weakens protected RED test: ${path}`);
+      } else if (invalidatedCommits.has(commit)) {
+        if (recordedRedWeakens(commit, path)) add(violations, field, `later invalidated commit weakens protected RED test: ${path}`);
       } else add(violations, field, `later non-RED commit modifies protected RED test: ${path}`);
     }
   }
@@ -309,6 +311,11 @@ function validateLedger(args, ledger, ledgerCommit) {
   const usedWus = new Set();
   const usedPaths = new Set();
   const recordedRedCommits = new Set(ledger.records.map((record) => record?.red_commit).filter((commit) => OID.test(commit ?? "")));
+  const invalidatedCommits = new Set(
+    (Array.isArray(ledger.excluded_commits) ? ledger.excluded_commits : [])
+      .filter((excluded) => excluded?.status === "invalidated" && OID.test(excluded?.commit ?? ""))
+      .map((excluded) => excluded.commit),
+  );
   const ledgerCommitTime = commitTime(ledgerCommit);
   let previous = null;
   let clock = issueTime ?? Number.NEGATIVE_INFINITY;
@@ -335,7 +342,7 @@ function validateLedger(args, ledger, ledgerCommit) {
         !isAncestor(record.red_commit, record.implementation_commit)) {
       add(violations, field, "RED commit is not an ancestor of GREEN commit");
     }
-    validateRedTestImmutability(violations, record, field, args.candidate, recordedRedCommits);
+    validateRedTestImmutability(violations, record, field, args.candidate, recordedRedCommits, invalidatedCommits);
     clock = validateEvidence(
       violations,
       ledger,

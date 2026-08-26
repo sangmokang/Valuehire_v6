@@ -914,7 +914,7 @@
     },
     {
       "id": "WU-3b-16",
-      "status": "green-pending-evidence",
+      "status": "green",
       "scope": [
         ".strict/run-ledger/strict-wu3b-20260827-472c276.json",
         "contracts/strict-trace-ledger.schema.json",
@@ -926,9 +926,23 @@
         "tools/strict/trace-ledger.mjs"
       ],
       "red_commit": "aa12c589a7918aeb4077850ab14b5beed3497388",
+      "implementation_commit": "e5c2198b8e4bbe139de37ace44563f91a2b4db3b",
+      "validation": []
+    },
+    {
+      "id": "WU-3b-17",
+      "status": "green-pending-evidence",
+      "scope": [
+        ".strict/run-ledger/strict-wu3b-20260827-472c276.json",
+        "docs/engineering/valuehire-delivery-chain-goal-2026-08-27.md",
+        "docs/engineering/valuehire-delivery-chain-issue-2026-08-27.md",
+        "tests/trace-ledger.test.mjs",
+        "tools/strict/trace-ledger.mjs"
+      ],
+      "red_commit": "444028301f7e6b8bcffdfd986ab6c94c64409a5a",
       "implementation_commit": null,
       "validation": []
     }
   ],
-  "updated_at": "2026-08-27T08:05:00+09:00"
+  "updated_at": "2026-08-27T09:00:00+09:00"
 }
