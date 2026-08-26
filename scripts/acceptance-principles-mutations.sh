@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Strict 원칙 계약의 정상 fixture, 14개 반례, 500/501 경계를 격리 사본에서 실행한다.
+# Strict 원칙 계약의 정상 fixture, 14개 반례, SOT hard/hard+1 경계를 격리 사본에서 실행한다.
 set -uo pipefail
 
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY \
@@ -25,12 +25,14 @@ mkdir -p "$BASE/docs/sot" "$BASE/scripts/verify" "$BASE/hooks" "$BASE/.github/wo
 cp docs/sot/coding-principles.md "$BASE/docs/sot/"
 cp docs/sot/principles.yaml "$BASE/docs/sot/"
 cp scripts/acceptance-principles-check.sh "$BASE/scripts/"
+cp scripts/verify/check-strict-principles-skills.sh "$BASE/scripts/verify/"
 cp scripts/verify/check-pre-push-runtime.sh "$BASE/scripts/verify/"
 # pre-push 가 인수 검사를 실행 래퍼로 돌리므로 fixture 에도 래퍼가 있어야 한다.
 cp scripts/verify/run-acceptance.sh "$BASE/scripts/verify/"
 cp hooks/pre-push "$BASE/hooks/"
 cp .github/workflows/verify.yml "$BASE/.github/workflows/"
 chmod +x "$BASE/scripts/acceptance-principles-check.sh"
+chmod +x "$BASE/scripts/verify/check-strict-principles-skills.sh"
 chmod +x "$BASE/scripts/verify/check-pre-push-runtime.sh"
 chmod +x "$BASE/scripts/verify/run-acceptance.sh"
 git -C "$BASE" init -q
@@ -38,6 +40,13 @@ git -C "$BASE" init -q
 fail=0
 checked=0
 CASE=""
+
+line_limit=$(ruby -e 's=File.read("docs/sot/coding-principles.md"); p11=s.lines.select { |line| line.include?("**P11**") }; clause=p11.length == 1 ? p11.first.split("②", 2).first : ""; matches=clause.scan(/\bhard\s+(\d+)\s+LOC\b/i).flatten.map(&:to_i); abort("SOT_LIMIT_PARSE_FAILED") unless matches.length == 1; puts matches.fetch(0)' 2>/dev/null) || {
+  echo "VERDICT: NOT_RUN"
+  echo "REASON: SOT_LIMIT_PARSE_FAILED"
+  exit 2
+}
+over_limit=$((line_limit + 1))
 
 new_case() {
   CASE="$TMP/$1"
@@ -281,35 +290,73 @@ mkdir -p "$CASE/.omx"
 printf '{"truncated":' > "$CASE/.omx/project-memory.json"
 expect_principles "C14-B" "메모리 파일 잘림, 현재 SOT 직접 로드" 0 PASS
 
-cp "$SKILL_TMP/codex.md" "$SKILL_TMP/codex-500.md"
-cp "$SKILL_TMP/claude.md" "$SKILL_TMP/claude-500.md"
-chmod u+w "$SKILL_TMP/codex-500.md" "$SKILL_TMP/claude-500.md"
-for file in "$SKILL_TMP/codex-500.md" "$SKILL_TMP/claude-500.md"; do
+cp "$SKILL_TMP/codex.md" "$SKILL_TMP/codex-limit.md"
+cp "$SKILL_TMP/claude.md" "$SKILL_TMP/claude-limit.md"
+chmod u+w "$SKILL_TMP/codex-limit.md" "$SKILL_TMP/claude-limit.md"
+for file in "$SKILL_TMP/codex-limit.md" "$SKILL_TMP/claude-limit.md"; do
   lines=$(wc -l < "$file" | tr -d ' ')
-  while [ "$lines" -lt 500 ]; do
+  while [ "$lines" -lt "$line_limit" ]; do
     printf '# boundary padding\n' >> "$file"
     lines=$((lines + 1))
   done
 done
 rc=0
-output=$(bash scripts/verify/check-strict-principles-skills.sh "$SKILL_TMP/codex-500.md" "$SKILL_TMP/claude-500.md" 2>&1) || rc=$?
+output=$(bash scripts/verify/check-strict-principles-skills.sh "$SKILL_TMP/codex-limit.md" "$SKILL_TMP/claude-limit.md" 2>&1) || rc=$?
 checked=$((checked + 1))
 if [ "$rc" -eq 0 ]; then
-  echo "PASS: BOUNDARY-500 직접 작성 코드 500줄 — PASS"
+  printf 'PASS: BOUNDARY-%s 직접 작성 코드 hard 한도 — PASS\n' "$line_limit"
 else
-  printf 'FAIL: BOUNDARY-500 expected PASS exit=0 actual=%s\n%s\n' "$rc" "$output"
+  printf 'FAIL: BOUNDARY-%s expected PASS exit=0 actual=%s\n%s\n' "$line_limit" "$rc" "$output"
   fail=1
 fi
 
-cp "$SKILL_TMP/codex-500.md" "$SKILL_TMP/codex-501.md"
-printf '# line 501\n' >> "$SKILL_TMP/codex-501.md"
+cp "$SKILL_TMP/codex-limit.md" "$SKILL_TMP/codex-over-limit.md"
+printf '# line %s\n' "$over_limit" >> "$SKILL_TMP/codex-over-limit.md"
 rc=0
-output=$(bash scripts/verify/check-strict-principles-skills.sh "$SKILL_TMP/codex-501.md" "$SKILL_TMP/claude-500.md" 2>&1) || rc=$?
+output=$(bash scripts/verify/check-strict-principles-skills.sh "$SKILL_TMP/codex-over-limit.md" "$SKILL_TMP/claude-limit.md" 2>&1) || rc=$?
 checked=$((checked + 1))
 if [ "$rc" -eq 1 ] && grep -q '^LINE_LIMIT_EXCEEDED:' <<< "$output"; then
-  echo "PASS: BOUNDARY-501 직접 작성 코드 501줄 — FAIL"
+  printf 'PASS: BOUNDARY-%s 직접 작성 코드 hard 한도 초과 — FAIL\n' "$over_limit"
 else
-  printf 'FAIL: BOUNDARY-501 expected FAIL exit=1 actual=%s\n%s\n' "$rc" "$output"
+  printf 'FAIL: BOUNDARY-%s expected FAIL exit=1 actual=%s\n%s\n' "$over_limit" "$rc" "$output"
+  fail=1
+fi
+
+new_case c16_limit_missing
+ruby -e 'p=ARGV[0]; s=File.read(p).sub(/hard\s+[0-9]+\s+LOC/i, "hard LOC"); File.write(p,s)' \
+  "$CASE/docs/sot/coding-principles.md"
+rc=0
+output=$(cd "$CASE" && bash scripts/verify/check-strict-principles-skills.sh "$SKILL_TMP/codex-limit.md" "$SKILL_TMP/claude-limit.md" 2>&1) || rc=$?
+checked=$((checked + 1))
+if [ "$rc" -eq 2 ] && grep -q '^VERDICT: NOT_RUN$' <<< "$output" && grep -q '^SOT_LIMIT_PARSE_FAILED:' <<< "$output"; then
+  echo "PASS: C16 P11 hard LOC 파싱 불가 — NOT_RUN (exit=2)"
+else
+  printf 'FAIL: C16 P11 hard LOC 파싱 불가 미차단 — exit=%s\n%s\n' "$rc" "$output"
+  fail=1
+fi
+
+new_case c16_sot_missing
+rm "$CASE/docs/sot/coding-principles.md"
+rc=0
+output=$(cd "$CASE" && bash scripts/verify/check-strict-principles-skills.sh "$SKILL_TMP/codex-limit.md" "$SKILL_TMP/claude-limit.md" 2>&1) || rc=$?
+checked=$((checked + 1))
+if [ "$rc" -eq 2 ] && grep -q '^VERDICT: NOT_RUN$' <<< "$output" && grep -q '^SOT_FILE_MISSING:' <<< "$output"; then
+  echo "PASS: C16-SOT-MISSING 정본 파일 누락 — NOT_RUN (exit=2)"
+else
+  printf 'FAIL: C16-SOT-MISSING 정본 파일 누락 미차단 — exit=%s\n%s\n' "$rc" "$output"
+  fail=1
+fi
+
+new_case c17_limit_duplicate
+ruby -e 'p=ARGV[0]; s=File.read(p).sub(/hard\s+([0-9]+)\s+LOC/i, "hard \\1 LOC / hard \\1 LOC"); File.write(p,s)' \
+  "$CASE/docs/sot/coding-principles.md"
+rc=0
+output=$(cd "$CASE" && bash scripts/verify/check-strict-principles-skills.sh "$SKILL_TMP/codex-limit.md" "$SKILL_TMP/claude-limit.md" 2>&1) || rc=$?
+checked=$((checked + 1))
+if [ "$rc" -eq 2 ] && grep -q '^VERDICT: NOT_RUN$' <<< "$output" && grep -q '^SOT_LIMIT_PARSE_FAILED:' <<< "$output"; then
+  echo "PASS: C17 P11 hard LOC 중복 선언 — NOT_RUN (exit=2)"
+else
+  printf 'FAIL: C17 P11 hard LOC 중복 선언 미차단 — exit=%s\n%s\n' "$rc" "$output"
   fail=1
 fi
 

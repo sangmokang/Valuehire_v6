@@ -23,9 +23,37 @@ if ! command -v ruby >/dev/null 2>&1; then
   exit 2
 fi
 
-ruby - "$CODEX_SKILL" "$CLAUDE_SKILL" <<'RUBY'
-codex_file, claude_file = ARGV
+SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P) || {
+  printf 'VERDICT: NOT_RUN\nREASON: script directory unavailable\nCHECKED: 0\n'
+  exit 2
+}
+REPO=$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P) || {
+  printf 'VERDICT: NOT_RUN\nREASON: repository root unavailable\nCHECKED: 0\n'
+  exit 2
+}
+SOT_PATH="$REPO/docs/sot/coding-principles.md"
+
+ruby - "$SOT_PATH" "$CODEX_SKILL" "$CLAUDE_SKILL" <<'RUBY'
+sot_path, codex_file, claude_file = ARGV
 errors = []
+unless File.file?(sot_path) && !File.zero?(sot_path)
+  puts "VERDICT: NOT_RUN"
+  puts "SOT_FILE_MISSING: #{sot_path}"
+  puts "CHECKED: 0"
+  exit 2
+end
+
+sot = File.read(sot_path)
+p11_lines = sot.lines.select { |line| line.include?("**P11**") }
+file_clause = p11_lines.length == 1 ? p11_lines.first.split("②", 2).first : ""
+line_limit_matches = file_clause.scan(/\bhard\s+(\d+)\s+LOC\b/i).flatten.map(&:to_i)
+unless line_limit_matches.length == 1
+  puts "VERDICT: NOT_RUN"
+  puts "SOT_LIMIT_PARSE_FAILED: #{sot_path}"
+  puts "CHECKED: 0"
+  exit 2
+end
+line_limit = line_limit_matches.fetch(0)
 start_marker = "<!-- STRICT_PRINCIPLES_CONTRACT:START -->"
 end_marker = "<!-- STRICT_PRINCIPLES_CONTRACT:END -->"
 
@@ -71,13 +99,14 @@ errors << "CLAUDE_ENGINE_ORDER_INVALID" unless claude.include?(claude_order)
 
 { codex_file => codex, claude_file => claude }.each do |path, text|
   lines = text.lines.length
-  errors << "LINE_LIMIT_EXCEEDED: #{path}=#{lines}" if lines > 500
+  errors << "LINE_LIMIT_EXCEEDED: #{path}=#{lines} hard=#{line_limit}" if lines > line_limit
 end
 
 if errors.empty?
   puts "VERDICT: PASS"
   puts "COMMON_CONTRACT: PASS byte-identical"
   puts "ENGINE_ORDER: PASS Codex/Claude platform-only difference"
+  puts "LINE_LIMIT: hard=#{line_limit}"
   puts "LINES: codex=#{codex.lines.length} claude=#{claude.lines.length}"
   puts "CHECKED: 2"
   exit 0
