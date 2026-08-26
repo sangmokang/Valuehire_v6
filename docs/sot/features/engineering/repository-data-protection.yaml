@@ -1,0 +1,192 @@
+{
+  "schema_version": "valuehire.feature-sot/v1",
+  "feature": {
+    "id": "repository-data-protection",
+    "name": "저장소 비밀·개인정보 보호",
+    "category": "engineering_assurance",
+    "maturity": "implemented",
+    "availability": "repository_control",
+    "purpose": "비밀, 세션 자격증명, 후보자 개인정보, 대용량 데이터와 금지 산출물 경로가 Git 현재 상태와 도달 가능한 기록에 들어가지 못하게 판정한다.",
+    "authority": {
+      "owns": [
+        "feature_status",
+        "control_entrypoints",
+        "feature_level_boundary"
+      ],
+      "delegates": [
+        {
+          "scope": "P3, P15, P21 and P22 repository principles",
+          "document": "docs/sot/coding-principles.md"
+        },
+        {
+          "scope": "pre-commit and pre-push input/output contracts",
+          "document": "docs/sot/hook-contracts.md"
+        },
+        {
+          "scope": "actual local and CI commands",
+          "document": "docs/sot/verification-commands.md"
+        }
+      ]
+    },
+    "surface_coverage": {
+      "tracked_product_files": [],
+      "ci_steps": [
+        "비밀 스캔 (verify.sh)",
+        "히스토리 전량 스캔 (도달 가능한 모든 blob)",
+        "인수 검사 0-2 상시 내용 검사와 종료상태 분리 (AC-19)",
+        "억제 만료 스캔 (suppressions.yaml)",
+        "패턴 파일 자체에 실제 비밀이 없는지 (자기 오염 방지)",
+        "인수 검사 hs-a3 (세션 계열 자격증명 탐지)",
+        "데이터 노출 스캔 (크기 · 금지경로 · 기록 · 개인정보 내용)",
+        "인수 검사 hs-a4 (대용량·산출물 차단이 실제로 도는가)",
+        "인수 검사 secret-webhook-vendor (웹훅·벤더 키 탐지 · AC-S1)"
+      ],
+      "ci_command_paths": [
+        "verify.sh",
+        "scripts/acceptance-0-2-unreachable-content.sh",
+        "scripts/acceptance-hs-a3.sh",
+        "scripts/scan-data-exposure.sh",
+        "scripts/acceptance-hs-a4.sh",
+        "scripts/acceptance-secret-webhook-vendor.sh"
+      ],
+      "hooks": [
+        "hooks/pre-commit"
+      ],
+      "contract_surfaces": []
+    },
+    "entrypoints": [
+      {
+        "kind": "scanner",
+        "path": "verify.sh",
+        "scope": "tracked files or staged index selected by VERIFY_SCAN_SOURCE"
+      },
+      {
+        "kind": "scanner",
+        "path": "scripts/scan-data-exposure.sh",
+        "scope": "tracked, history, pii or all"
+      },
+      {
+        "kind": "git_hook",
+        "path": "hooks/pre-commit",
+        "scope": "staged files"
+      },
+      {
+        "kind": "ci",
+        "path": ".github/workflows/verify.yml",
+        "scope": "tracked tree and reachable Git history"
+      },
+      {
+        "kind": "ci_suppression_expiry",
+        "path": ".github/workflows/verify.yml",
+        "anchor": "억제 만료 스캔 (suppressions.yaml)",
+        "contract": "suppressions.yaml"
+      }
+    ],
+    "inputs": [
+      {
+        "name": "repository_content",
+        "type": "tracked files, staged blobs and reachable Git objects"
+      },
+      {
+        "name": "secret_patterns",
+        "type": "repository-safe defaults plus optional ignored local patterns",
+        "boundary": "matched secret values must never be printed"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "verdict",
+        "type": "process exit and explicit PASS/FAIL/NOT_RUN lines",
+        "values": ["0 PASS", "1 FAIL", "2 NOT_RUN where supported"]
+      }
+    ],
+    "errors": [
+      {
+        "condition": "scanner prerequisites, pattern set or scan target are missing",
+        "behavior": "fail closed or return NOT_RUN; never silently pass"
+      },
+      {
+        "condition": "secret or personal-data pattern matches",
+        "behavior": "report the rule and path without printing the matched value"
+      }
+    ],
+    "invariants": [
+      {
+        "id": "RDP-INV-1",
+        "rule": "The scanner does not exempt itself and a zero-target scan is not success.",
+        "evidence": "verify.sh"
+      },
+      {
+        "id": "RDP-INV-2",
+        "rule": "Files over 1 MiB, database/artifact paths and qualifying PII tables are blocked by the canonical data-exposure decision path.",
+        "evidence": "scripts/scan-data-exposure.sh"
+      },
+      {
+        "id": "RDP-INV-3",
+        "rule": "Pre-commit checks staged blobs while CI checks the tracked tree and reachable history; neither substitutes for the other.",
+        "evidence": "docs/sot/hook-contracts.md"
+      },
+      {
+        "id": "RDP-INV-4",
+        "rule": "Secret values and candidate data are not valid repository evidence artifacts.",
+        "evidence": "docs/sot/coding-principles.md"
+      },
+      {
+        "id": "RDP-INV-5",
+        "rule": "Every declared suppression has a valid non-expired date and is rechecked on every CI push.",
+        "evidence": ".github/workflows/verify.yml"
+      }
+    ],
+    "boundaries": [
+      "The scanner reduces repository leakage risk but is not a credential vault or data-retention system.",
+      "Ignored local files are outside Git unless force-added; pre-commit still checks staged forbidden paths.",
+      "A passing local hook is not final authority because hooks can be bypassed.",
+      "No scanner result authorizes using candidate data or external credentials."
+    ],
+    "non_goals": [
+      "storing candidate datasets",
+      "managing production secrets",
+      "proving remote branch protection",
+      "authorizing external API access"
+    ],
+    "verification": [
+      {
+        "id": "RDP-V1",
+        "command": "bash verify.sh",
+        "expected": "exit 0 and explicit scan result"
+      },
+      {
+        "id": "RDP-V2",
+        "command": "bash scripts/scan-data-exposure.sh all",
+        "expected": "exit 0 with non-zero checked targets"
+      },
+      {
+        "id": "RDP-V3",
+        "command": "bash scripts/acceptance-hs-a3.sh && bash scripts/acceptance-hs-a4.sh && bash scripts/acceptance-secret-webhook-vendor.sh",
+        "expected": "all attack fixtures are blocked and all commands exit 0"
+      }
+    ],
+    "evidence": [
+      "verify.sh",
+      "scripts/scan-data-exposure.sh",
+      "hooks/pre-commit",
+      ".github/workflows/verify.yml",
+      "suppressions.yaml",
+      "docs/sot/hook-contracts.md"
+    ],
+    "change_protocol": {
+      "required_updates": [
+        "canonical scanner or hook",
+        "matching acceptance attack and allowed control",
+        "CI mirror when a local enforcement path changes",
+        "affected coding principle and feature document"
+      ],
+      "requires_owner_approval": [
+        "weakening a secret or personal-data boundary",
+        "adding repository data exceptions",
+        "handling real candidate or credential material"
+      ],
+      "rollback": "Restore the last known scanner and hook versions together; do not delete evidence of a detected leak before credentials and history are safely remediated."
+    }
+  }
+}

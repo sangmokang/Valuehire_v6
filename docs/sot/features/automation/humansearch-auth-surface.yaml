@@ -1,0 +1,140 @@
+{
+  "schema_version": "valuehire.feature-sot/v1",
+  "feature": {
+    "id": "humansearch-auth-surface",
+    "name": "HumanSearch 인증 화면 분류",
+    "category": "automation_boundary",
+    "maturity": "implemented",
+    "availability": "local_runtime",
+    "purpose": "검증된 화면 관측 하나를 외부 효과 없이 인증 관련 다섯 상태 중 하나로 분류한다.",
+    "authority": {
+      "owns": [
+        "feature_status",
+        "runtime_wiring_status",
+        "feature_manifest"
+      ],
+      "delegates": [
+        {
+          "scope": "input types, exact role/state values, complete decision table, invalid input behavior and public API",
+          "document": "docs/sot/humansearch-l0-surface-contract.md"
+        }
+      ],
+      "historical_context_only": [
+        "docs/engineering/humansearch-l0-auth-surface-goal-2026-08-18.md"
+      ]
+    },
+    "surface_coverage": {
+      "tracked_product_files": [
+        "humansearch/src/humansearch/__init__.py",
+        "humansearch/src/humansearch/auth_surface.py"
+      ],
+      "ci_steps": [],
+      "ci_command_paths": [],
+      "hooks": [],
+      "contract_surfaces": [
+        "docs/sot/humansearch-l0-surface-contract.md"
+      ]
+    },
+    "entrypoints": [
+      {
+        "kind": "python_public_api",
+        "path": "humansearch/src/humansearch/__init__.py",
+        "symbol": "classify_auth_surface"
+      },
+      {
+        "kind": "implementation",
+        "path": "humansearch/src/humansearch/auth_surface.py",
+        "symbol": "classify_auth_surface"
+      }
+    ],
+    "inputs": [
+      {
+        "name": "observation",
+        "type": "SurfaceObservation",
+        "fields": ["matched_roles: frozenset[SurfaceRole]", "contract_valid: bool"],
+        "normative_contract": "docs/sot/humansearch-l0-surface-contract.md#입력"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "state",
+        "type": "AuthSurfaceState",
+        "allowed_values": ["unknown", "human_auth", "authenticated", "challenge", "drifted"],
+        "normative_contract": "docs/sot/humansearch-l0-surface-contract.md#출력"
+      }
+    ],
+    "errors": [
+      {
+        "condition": "runtime input violates exact SurfaceObservation, bool, frozenset or SurfaceRole types",
+        "behavior": "raise InvalidObservation"
+      }
+    ],
+    "invariants": [
+      {
+        "id": "HAS-INV-1",
+        "rule": "The complete 16 normal observations are decided only by the normative decision table.",
+        "evidence": "docs/sot/humansearch-l0-surface-contract.md#완전-결정표"
+      },
+      {
+        "id": "HAS-INV-2",
+        "rule": "Invalid structure or mutually exclusive multiple roles becomes DRIFTED, never authenticated.",
+        "evidence": "humansearch/src/humansearch/auth_surface.py"
+      },
+      {
+        "id": "HAS-INV-3",
+        "rule": "Classification is pure and deterministic and performs no browser, network, file, clock or environment access.",
+        "evidence": "docs/sot/humansearch-l0-surface-contract.md#공개-기능"
+      },
+      {
+        "id": "HAS-INV-4",
+        "rule": "AUTHENTICATED is a surface classification, not permission to start a search or an end-to-end run.",
+        "evidence": "docs/sot/humansearch-l0-surface-contract.md#출력"
+      }
+    ],
+    "boundaries": [
+      "No portal selectors, URLs, DOM, browser session, credential or candidate data are inputs.",
+      "No waiting, retry, seat lease, stop behavior or workflow transition is owned.",
+      "The one-shot Saramin observer is the only current non-test runtime consumer; it does not turn AUTHENTICATED into search permission.",
+      "The project has no package build or deployment entrypoint for this classifier."
+    ],
+    "non_goals": [
+      "logging in",
+      "browser connection",
+      "candidate search",
+      "automatic resume after authentication",
+      "deciding whether a full run may start"
+    ],
+    "verification": [
+      {
+        "id": "HAS-V1",
+        "command": "cd humansearch && uv run --no-sync pytest -q tests/test_auth_surface.py tests/test_package_boundary.py",
+        "expected": "exit 0 with all normal combinations, invalid inputs, properties and package wiring tested"
+      },
+      {
+        "id": "HAS-V2",
+        "command": "rg -n --glob '!humansearch/tests/**' --glob '!docs/**' 'classify_auth_surface' humansearch",
+        "expected": "implementation, package export and the narrow one-shot observer consumer only"
+      }
+    ],
+    "evidence": [
+      "humansearch/src/humansearch/auth_surface.py",
+      "humansearch/src/humansearch/__init__.py",
+      "humansearch/src/humansearch/observe.py",
+      "humansearch/tests/test_auth_surface.py",
+      "docs/sot/humansearch-l0-surface-contract.md"
+    ],
+    "change_protocol": {
+      "required_updates": [
+        "docs/sot/humansearch-l0-surface-contract.md",
+        "this feature document when status or wiring changes",
+        "complete decision-table and invalid-input tests"
+      ],
+      "requires_owner_approval": [
+        "adding browser or credential access",
+        "treating AUTHENTICATED as run permission",
+        "expanding into live candidate search"
+      ],
+      "rollback": "Revert the classifier implementation, package export, tests and affected SOT in the same change."
+    }
+  }
+}

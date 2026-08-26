@@ -1,0 +1,209 @@
+{
+  "schema_version": "valuehire.feature-sot/v1",
+  "feature": {
+    "id": "change-delivery-guardrails",
+    "name": "변경 전달·Git 보호 장치",
+    "category": "engineering_assurance",
+    "maturity": "implemented",
+    "availability": "repository_control",
+    "purpose": "짧은 작업 브랜치와 격리 작업공간을 사용하고, 커밋과 push 전에 저장소 계약을 검사하며, 자동 병합과 운영 전달을 막는다.",
+    "authority": {
+      "owns": [
+        "feature_status",
+        "control_entrypoints",
+        "feature_level_boundaries"
+      ],
+      "delegates": [
+        {
+          "scope": "branch, worktree, PR, merge and release policy",
+          "document": "docs/sot/git-workflow.md"
+        },
+        {
+          "scope": "hook input, output and fail-closed contracts",
+          "document": "docs/sot/hook-contracts.md"
+        },
+        {
+          "scope": "actual task, verify, ship and cleanup commands",
+          "document": "docs/sot/verification-commands.md"
+        },
+        {
+          "scope": "forbidden legacy repository names and worktree path combinations",
+          "document": "contracts/cleanroom-deny-patterns.txt"
+        }
+      ]
+    },
+    "surface_coverage": {
+      "tracked_product_files": [],
+      "ci_steps": [
+        "HumanSearch G1 클린룸 경계",
+        "인수 검사 0-7 (훅이 위반 6종을 실제로 차단하는가)",
+        "인수 검사 0-5 (push · CI 연결)",
+        "강제 장치 존재 검사 (hooks/)"
+      ],
+      "ci_command_paths": [
+        "scripts/acceptance-0-5.sh",
+        "scripts/acceptance-0-7.sh",
+        "scripts/acceptance-hs-cleanroom-absolute-contexts.sh",
+        "scripts/acceptance-hs-cleanroom-absolute-paths.sh",
+        "scripts/acceptance-hs-cleanroom-colon-paths.sh",
+        "scripts/acceptance-hs-cleanroom-file-urls.sh",
+        "scripts/acceptance-hs-cleanroom-hook-env-mutations.sh",
+        "scripts/acceptance-hs-cleanroom-hook-env.sh",
+        "scripts/acceptance-hs-cleanroom-mutations.sh",
+        "scripts/acceptance-hs-cleanroom.sh"
+      ],
+      "hooks": [
+        "hooks/pre-push"
+      ],
+      "contract_surfaces": []
+    },
+    "entrypoints": [
+      {
+        "kind": "hook_install",
+        "path": "scripts/install-hooks.sh",
+        "effect": "sets core.hooksPath to hooks and reads it back"
+      },
+      {
+        "kind": "pre_commit",
+        "path": "hooks/pre-commit",
+        "scope": "staged files and staged blobs"
+      },
+      {
+        "kind": "pre_push",
+        "path": "hooks/pre-push",
+        "scope": "clean worktree, verification and acceptance commands"
+      },
+      {
+        "kind": "session_recovery",
+        "path": "scripts/session-status.sh",
+        "scope": "HEAD, origin relationship and unresolved acceptance failures"
+      },
+      {
+        "kind": "cleanroom_boundary",
+        "path": "scripts/acceptance-hs-cleanroom.sh",
+        "contract": "contracts/cleanroom-deny-patterns.txt",
+        "ci_anchor": "HumanSearch G1 클린룸 경계"
+      }
+    ],
+    "inputs": [
+      {
+        "name": "staged_or_pushed_change",
+        "type": "Git index, working tree and local/remote ref state"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "hook_decision",
+        "type": "exit 0 allow or exit 1 block with a reason that does not reveal secrets"
+      },
+      {
+        "name": "session_status",
+        "type": "HEAD, ORIGIN and RED summary"
+      }
+    ],
+    "errors": [
+      {
+        "condition": "required checker is missing, cannot run, finds zero targets or the tree is dirty before push",
+        "behavior": "block rather than continue"
+      },
+      {
+        "condition": "local hook is bypassed with git's commit-time verification opt-out flag",
+        "behavior": "CI remains the final authority; local execution cannot prove bypass did not occur"
+      }
+    ],
+    "invariants": [
+      {
+        "id": "CDG-INV-1",
+        "rule": "One task uses one short-lived task branch, one worktree and one acceptance boundary.",
+        "evidence": "docs/sot/git-workflow.md"
+      },
+      {
+        "id": "CDG-INV-2",
+        "rule": "Main is not pushed directly and merge is never automatic under the repository policy.",
+        "evidence": "docs/sot/git-workflow.md"
+      },
+      {
+        "id": "CDG-INV-3",
+        "rule": "Pre-commit checks staged content and pre-push rejects untracked or uncommitted changes before running delivery checks.",
+        "evidence": "docs/sot/hook-contracts.md"
+      },
+      {
+        "id": "CDG-INV-4",
+        "rule": "Hook installation is verified by reading back core.hooksPath.",
+        "evidence": "scripts/install-hooks.sh"
+      },
+      {
+        "id": "CDG-INV-5",
+        "rule": "Remote main protection is a declared requirement but is not claimed verified by this feature manifest.",
+        "evidence": "docs/sot/git-workflow.md#시행-지점"
+      },
+      {
+        "id": "CDG-INV-6",
+        "rule": "Tracked content must not contain forbidden legacy repository names or worktree path combinations, and the eight cleanroom variants stay wired to CI.",
+        "evidence": "contracts/cleanroom-deny-patterns.txt"
+      }
+    ],
+    "boundaries": [
+      "Hooks are local first-line controls and are bypassable; CI must mirror required protection.",
+      "The repository does not currently provide make task, make verify or make ship.",
+      "Push, PR creation, merge, release and deployment are not automatic actions.",
+      "Remote branch-protection configuration requires a separate live query."
+    ],
+    "non_goals": [
+      "automatic merge",
+      "automatic deployment",
+      "proving GitHub branch protection without a live query",
+      "replacing product-specific verification"
+    ],
+    "verification": [
+      {
+        "id": "CDG-V1",
+        "command": "bash scripts/install-hooks.sh",
+        "expected": "exit 0 and core.hooksPath readback equals hooks"
+      },
+      {
+        "id": "CDG-V2",
+        "command": "bash scripts/acceptance-0-7.sh",
+        "expected": "all isolated hook-violation cases are blocked"
+      },
+      {
+        "id": "CDG-V3",
+        "command": "bash scripts/session-status.sh",
+        "expected": "three complete lines for HEAD, ORIGIN and RED; any unknown makes the command fail"
+      }
+    ],
+    "evidence": [
+      "docs/sot/git-workflow.md",
+      "docs/sot/hook-contracts.md",
+      "hooks/pre-commit",
+      "hooks/pre-push",
+      "scripts/install-hooks.sh",
+      "scripts/session-status.sh",
+      "scripts/acceptance-hs-cleanroom.sh",
+      "scripts/acceptance-hs-cleanroom-mutations.sh",
+      "scripts/acceptance-hs-cleanroom-absolute-paths.sh",
+      "scripts/acceptance-hs-cleanroom-absolute-contexts.sh",
+      "scripts/acceptance-hs-cleanroom-colon-paths.sh",
+      "scripts/acceptance-hs-cleanroom-file-urls.sh",
+      "scripts/acceptance-hs-cleanroom-hook-env.sh",
+      "scripts/acceptance-hs-cleanroom-hook-env-mutations.sh",
+      "contracts/cleanroom-deny-patterns.txt"
+    ],
+    "change_protocol": {
+      "required_updates": [
+        "affected hook or delivery script",
+        "hook and Git SOT",
+        "isolated acceptance proof",
+        "CI mirror when enforcement changes",
+        "this feature document"
+      ],
+      "requires_owner_approval": [
+        "merge",
+        "release",
+        "production push or deployment",
+        "weakening main or hook policy"
+      ],
+      "rollback": "Restore hook scripts, installation, CI mirror and SOT together; verify core.hooksPath and rerun isolated hook acceptance before delivery."
+    }
+  }
+}

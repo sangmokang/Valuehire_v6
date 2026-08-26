@@ -1,0 +1,212 @@
+{
+  "schema_version": "valuehire.feature-sot/v1",
+  "feature": {
+    "id": "humansearch-browser-access",
+    "name": "HumanSearch 사람인 인증 화면 일회 관측",
+    "category": "automation_boundary",
+    "maturity": "implemented",
+    "availability": "local_runtime",
+    "purpose": "사람이 준비한 사람인 브라우저의 승인된 로컬 진단 포트에서 정확히 한 탭의 계약 표지만 한 번 읽어 인증 화면 상태를 개인정보 없이 분류한다.",
+    "authority": {
+      "owns": [
+        "feature_status",
+        "current_HEAD_implementation_scope",
+        "feature_manifest"
+      ],
+      "delegates": [
+        {
+          "scope": "profile strategy, diagnostic access, target selection, human intervention, credential and channel rules",
+          "document": "docs/sot/humansearch-browser-contract.md"
+        },
+        {
+          "scope": "authentication surface roles, states and classification table",
+          "document": "docs/sot/humansearch-l0-surface-contract.md"
+        },
+        {
+          "scope": "Saramin loopback endpoint, exact origins, loggable paths and DOM marker selectors",
+          "document": "contracts/humansearch/saramin-markers.json"
+        }
+      ]
+    },
+    "surface_coverage": {
+      "tracked_product_files": [
+        "contracts/humansearch/saramin-markers.json",
+        "humansearch/src/humansearch/_cdp.py",
+        "humansearch/src/humansearch/observe.py"
+      ],
+      "ci_steps": [],
+      "ci_command_paths": [],
+      "hooks": [],
+      "contract_surfaces": [
+        "docs/sot/humansearch-browser-contract.md"
+      ]
+    },
+    "entrypoints": [
+      {
+        "kind": "python_module_cli",
+        "path": "humansearch/src/humansearch/observe.py",
+        "symbol": "main",
+        "invocation": "cd humansearch && uv run --no-sync python -m humansearch.observe --channel saramin --port 9225 --once"
+      },
+      {
+        "kind": "python_api",
+        "path": "humansearch/src/humansearch/observe.py",
+        "symbol": "observe_once"
+      },
+      {
+        "kind": "narrow_transport",
+        "path": "humansearch/src/humansearch/_cdp.py",
+        "symbol": "observe_markers"
+      }
+    ],
+    "inputs": [
+      {
+        "name": "channel",
+        "type": "literal",
+        "allowed_values": ["saramin"]
+      },
+      {
+        "name": "diagnostic_port",
+        "type": "integer",
+        "constraint": "must be listed for the channel in contracts/humansearch/saramin-markers.json"
+      },
+      {
+        "name": "browser_surface",
+        "type": "existing browser target and visible contracted selectors",
+        "constraint": "loopback endpoint, exact allowed origin and exactly one matching page target"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "stdout",
+        "type": "single privacy-reduced line",
+        "format": "STATE=<state> TAB=<origin-and-allowed-path-or-dash> ROLES=<count> CONTRACT_VALID=<true|false>"
+      },
+      {
+        "name": "handled_exit_code",
+        "type": "integer",
+        "allowed_values": [0, 2],
+        "constraint": "0 only for AUTHENTICATED; every handled classified or observation-failure state returns 2"
+      },
+      {
+        "name": "known_unhandled_exit",
+        "type": "integer",
+        "observed_value": 1,
+        "constraint": "a malformed target URL that makes urllib.parse.urlsplit raise ValueError currently escapes before normalization; see boundaries and errors"
+      }
+    ],
+    "errors": [
+      {
+        "condition": "contract, loopback endpoint, approved port, target list, exact target count, WebSocket or marker payload is invalid",
+        "behavior": "normalize to a DRIFTED one-line result and exit 2 without traceback, except for the separately documented malformed-target-URL defect"
+      },
+      {
+        "condition": "a target item contains a URL for which urllib.parse.urlsplit raises ValueError, such as an invalid IPv6 URL",
+        "behavior": "known current defect: ValueError can escape, print a traceback that may expose malformed URL fragments and exit 1; this is not an accepted safe behavior and must be fixed before treating all observation failures as normalized"
+      },
+      {
+        "condition": "CLI arguments are syntactically invalid",
+        "behavior": "argparse rejects the invocation with its standard exit 2 contract"
+      }
+    ],
+    "invariants": [
+      {
+        "id": "HBA-INV-1",
+        "rule": "The observer reads only the Saramin channel, a numeric loopback host, a contract-listed port and exactly one page at an exact allowed origin.",
+        "evidence": "humansearch/src/humansearch/observe.py"
+      },
+      {
+        "id": "HBA-INV-2",
+        "rule": "Zero or multiple matching targets stop without selecting by order, title, recency or partial URL.",
+        "evidence": "humansearch/tests/test_observe.py"
+      },
+      {
+        "id": "HBA-INV-3",
+        "rule": "The transport exposes contracted marker observation only; it has no arbitrary expression or arbitrary CDP method input.",
+        "evidence": "humansearch/tests/test_observe_boundary.py"
+      },
+      {
+        "id": "HBA-INV-4",
+        "rule": "Handled output retains no query, fragment, credential, candidate identifier or unapproved path and fits one line; malformed target URL parsing is a documented open violation.",
+        "evidence": "humansearch/tests/test_observe_adversarial_output.py"
+      },
+      {
+        "id": "HBA-INV-5",
+        "rule": "Only a uniquely authenticated valid surface returns success; handled login, challenge, unknown, drift and transport failure require human action through exit 2.",
+        "evidence": "humansearch/src/humansearch/observe.py"
+      },
+      {
+        "id": "HBA-INV-6",
+        "rule": "Observation never grants search, input, navigation, retry, browser lifecycle, credential, storage, screenshot or message-sending capability.",
+        "evidence": "docs/sot/humansearch-browser-contract.md#10-자격증명과-명령-능력-경계"
+      }
+    ],
+    "boundaries": [
+      "Local one-shot read only; no daemon, scheduler, retry loop, automatic resume or production deployment.",
+      "Saramin only; JobKorea and LinkedIn Recruiter have no implemented observer in current HEAD.",
+      "No browser launch, shutdown, profile discovery, tab creation, navigation, activation or closure.",
+      "No login, credential, cookie, token, storage, raw DOM, screenshot, candidate search, save, registration or message access.",
+      "The tracked marker contract is configuration authority, not proof that a local browser or authenticated session currently exists.",
+      "Known defect: malformed target URL parsing can bypass the one-line privacy-reduced failure path, expose URL fragments in a traceback and exit 1."
+    ],
+    "non_goals": [
+      "operating a full browser automation workflow",
+      "discovering or opening a diagnostic port",
+      "logging in or resolving challenges",
+      "searching or persisting candidates",
+      "capturing personal data",
+      "sending messages or writing to an external service"
+    ],
+    "verification": [
+      {
+        "id": "HBA-V1",
+        "command": "cd humansearch && uv run --no-sync pytest -q tests/test_observe.py tests/test_observe_adversarial_output.py tests/test_observe_boundary.py tests/test_observe_contract_failure.py tests/test_observe_output.py tests/test_observe_port_contract.py tests/test_observe_transport_failure.py",
+        "expected": "exit 0 for target-count, contract, port, transport, marker, privacy output and capability-boundary tests"
+      },
+      {
+        "id": "HBA-V1-GAP",
+        "command": "cd humansearch && uv run --no-sync python -c 'from humansearch.observe import select_single_target; select_single_target([{\"type\":\"page\",\"url\":\"https://[oops\"}], frozenset({\"https://hiring.saramin.co.kr\"}))'",
+        "expected": "known current failure: uncaught ValueError and exit 1; after the product fix this expectation and the known-gap statements must be removed together"
+      },
+      {
+        "id": "HBA-V2",
+        "command": "cd humansearch && uv run --no-sync ruff check src tests && uv run --no-sync mypy src",
+        "expected": "exit 0 with lint and strict typing clean"
+      },
+      {
+        "id": "HBA-V3",
+        "command": "bash scripts/acceptance-hs-gates.sh",
+        "expected": "exit 0 with the repository HumanSearch product gate"
+      }
+    ],
+    "evidence": [
+      "contracts/humansearch/saramin-markers.json",
+      "humansearch/src/humansearch/_cdp.py",
+      "humansearch/src/humansearch/observe.py",
+      "humansearch/tests/test_observe.py",
+      "humansearch/tests/test_observe_adversarial_output.py",
+      "humansearch/tests/test_observe_boundary.py",
+      "humansearch/tests/test_observe_contract_failure.py",
+      "humansearch/tests/test_observe_output.py",
+      "humansearch/tests/test_observe_port_contract.py",
+      "humansearch/tests/test_observe_transport_failure.py",
+      "docs/sot/humansearch-browser-contract.md"
+    ],
+    "change_protocol": {
+      "required_updates": [
+        "contracts/humansearch/saramin-markers.json for any endpoint, origin, path or selector change",
+        "docs/sot/humansearch-browser-contract.md for any capability or channel change",
+        "this feature document when implementation, availability or connectivity changes",
+        "boundary and adversarial tests before any capability expansion"
+      ],
+      "requires_owner_approval": [
+        "live portal access beyond the current one-shot read contract",
+        "credential, profile, browser lifecycle or arbitrary CDP capability expansion",
+        "another portal channel",
+        "search, persistence, message sending or any external write",
+        "automatic retry or resume after human authentication"
+      ],
+      "rollback": "Revert the observer, narrow CDP transport, marker contract, exports, tests and both affected SOT documents together; do not leave a callable wider transport behind. The malformed-target-URL gap may be removed only with a regression test and code fix in the same change."
+    }
+  }
+}
