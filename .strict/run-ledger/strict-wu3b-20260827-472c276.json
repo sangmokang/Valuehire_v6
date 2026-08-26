@@ -560,7 +560,7 @@
     },
     {
       "id": "WU-3b-6a",
-      "status": "open",
+      "status": "invalidated",
       "scope": [
         ".strict/run-ledger/strict-wu3b-20260827-472c276.json",
         "docs/engineering/valuehire-delivery-chain-goal-2026-08-27.md",
@@ -732,9 +732,40 @@
         "tests/trace-ledger.test.mjs",
         "tools/strict/trace-ledger.mjs"
       ],
-      "red_commit": null,
+      "red_commit": "45f04c1d947b5b03262872ede3aab15a4781d398",
       "implementation_commit": null,
-      "validation": []
+      "validation": [
+        {
+          "command": "node --test tests/trace-ledger.test.mjs",
+          "started_at": "2026-08-26T20:44:00Z",
+          "finished_at": "2026-08-26T20:44:17Z",
+          "exit": 1,
+          "expected_exit": 1,
+          "checked": 17,
+          "output_sha256": "8601de95647ccad1a84cb43b84aa97e61a9f6a09f3be94a237cf6b1b65367d61",
+          "output_ref": ".strict/evidence/wu3b9/red.tap"
+        },
+        {
+          "command": "node --test tests/trace-ledger.test.mjs",
+          "started_at": "2026-08-26T20:46:00Z",
+          "finished_at": "2026-08-26T20:46:16Z",
+          "exit": 0,
+          "expected_exit": 0,
+          "checked": 17,
+          "output_sha256": "d60728ce1128cbe2d6d73122804c02f1bb45c87e936f84b04812c42251d93990",
+          "output_ref": ".strict/evidence/wu3b9/green.tap"
+        },
+        {
+          "command": "remove validateRedTestImmutability call + node --test tests/trace-ledger.test.mjs",
+          "started_at": "2026-08-26T20:47:00Z",
+          "finished_at": "2026-08-26T20:47:15Z",
+          "exit": 1,
+          "expected_exit": 1,
+          "checked": 17,
+          "output_sha256": "8fd5086ec9717ce70894f98035532faad25852831f2df6e1918b7f96a7833543",
+          "output_ref": ".strict/evidence/wu3b9/mutation.tap"
+        }
+      ]
     }
   ],
   "updated_at": "2026-08-27T05:00:00+09:00"

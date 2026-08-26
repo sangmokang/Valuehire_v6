@@ -90,6 +90,27 @@ function commitTrailers(commit) {
   return gitText(["show", "-s", "--format=%B", commit]);
 }
 
+function changedPaths(commit) {
+  const output = gitText(["diff-tree", "--no-commit-id", "--name-only", "-r", commit]);
+  return output ? output.split("\n") : [];
+}
+
+function isTestPath(path) {
+  return /(^|\/)(?:tests?|__tests__)(\/|$)/.test(path) || /\.(?:test|spec)\.[^/]+$/.test(path);
+}
+
+function validateRedTestImmutability(violations, record, field) {
+  if (!OID.test(record.red_commit ?? "") || !OID.test(record.implementation_commit ?? "")) return;
+  const redTests = new Set(changedPaths(record.red_commit).filter(isTestPath));
+  if (redTests.size === 0) return;
+  const range = gitText(["rev-list", "--reverse", `${record.red_commit}..${record.implementation_commit}`]);
+  for (const commit of range ? range.split("\n") : []) {
+    for (const path of changedPaths(commit)) {
+      if (redTests.has(path)) add(violations, field, `GREEN commit modifies RED test: ${path}`);
+    }
+  }
+}
+
 function add(violations, field, detail) {
   violations.push({ field, detail });
 }
@@ -228,6 +249,7 @@ function validateLedger(args, ledger, ledgerCommit) {
         !isAncestor(record.red_commit, record.implementation_commit)) {
       add(violations, field, "RED commit is not an ancestor of GREEN commit");
     }
+    validateRedTestImmutability(violations, record, field);
     clock = validateEvidence(violations, ledger, ledgerCommit, record, issueTime ?? Number.NEGATIVE_INFINITY, clock, usedPaths);
     previous = record.record_sha256;
   }
