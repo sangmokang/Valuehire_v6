@@ -167,7 +167,79 @@ pytest_baseline:
 
 ## 적대 검증 로그
 
-(후기록 — V1/V2 판정 본문을 여기에 append 한다)
+### V1 (Claude CLI · fresh · 격리 clone `2a0f0da`) — 2026-08-27
+
+실행: `claude -p <v1-prompt> --dangerously-skip-permissions` (clone 안에서 read-only 지시)
+1차 시도는 `ANTHROPIC_API_KEY` 잔액 부족으로 실행 불가(NOT_RUN). 키를 걷어내고 재실행해 판정을 받았다.
+
+```
+V1_RETRY_CLONE=/private/tmp/claude-501/-Users-kangsangmo-Desktop-Valuehire-v6--claude-worktrees-history-scan-failclosed/4010d7e2-1ee0-4d2e-9c75-f35b56c84e51/scratchpad/v1-clone
+V1_RETRY_HEAD=2a0f0da4deee5ecfa0789ace2bdacfa8fa9a7ca6
+V1 VERDICT: FAIL
+
+## 1. 반증 시도 내역
+
+모든 파괴적 실험은 `mktemp -d` 아래 `git clone` 사본에서 수행했고, 원 작업트리는 읽기만 했습니다(종료 후 사본 삭제). 대조군: 원 작업트리에서 5개 검사기 직접 실행 → 전부 exit 0 (`CHECKED: 100 / 31 / 88 / 2 / 21`), 사본 원문에서 워크플로 대상 인수 검사 5종(verify-ac-m·ci-step-integrity·ci-required-manifest·docs-workflow-sync·0-7) 전부 OK.
+
+### 뚫린 것
+
+| # | 공격 | 결과 |
+|---|---|---|
+| 1 | hs-a4 run 을 `… \|\| true; echo done` / `\|\| true  # keep going` / `\|\| :; echo done` / `\|\| echo warn` / `\|\| /bin/true` / `\|\| exit 0 # done` / `&& echo ok` + 다음 줄 / `if …; then …; else …; fi` / `… &` + `echo` / `… \| cat` / `… 2>&1 \| tee` / `set -u +e` / `set +e # relax` / `set +e; …` / `set +o errexit` / `trap 'exit 0' ERR` | manifest=0 · integrity=0 **전부 통과**. 같은 본문을 `bash -e`(GitHub 기본 셸)로 실행해 실패 스크립트를 넣으니 **step-exit=0**(대조군 `bash x.sh` 만 있을 때는 1). |
+| 2 | 스텝에 `shell: bash {0}` 추가 후 hs-cleanroom(8줄) 끝에 `echo all-done` | 4종 CI 인수 검사 전부 OK. `bash`(-e 없음) 실증 exit=0. |
+| 2′ | 워크플로 최상위 `defaults: run: shell: bash {0}` (스텝은 한 줄도 안 건드림) | manifest=0 · integrity=0. 다줄 스텝(silent-failure-lint 2줄·hs-cleanroom 8줄·hs-gates 3줄)에서 마지막 줄 외 실패 전부 무시. |
+| 3 | hs-a3 run 을 `echo "bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-a3.sh"` (인용 echo) / secret-webhook-vendor 를 `printf '%s\n' "bash …"` / `: bash …` / heredoc `cat <<'X'` / `CMD='bash …'; echo "$CMD"` | verify-ac-m·ci-step-integrity·ci-required-manifest 전부 rc=0. `bash -e` 실증 exit=0. (hs-a4 에서만 빨개진 것은 `acceptance-ci-step-integrity.sh:69` 의 하드코딩 주입 문자열이 사라진 부수 효과 — 다른 스텝엔 무관.) |
+| 3′ | data-exposure-scan 의 run 을 `# bash scripts/scan-data-exposure.sh all` + `echo "PASS: skipped"` | 3종 전부 rc=0. (`secret-scan` 만은 mechanism-registry 의 `run: bash verify.sh` 항목 덕에 verify-ac-m 이 잡음.) |
+| 4 | `on:` 에 push/pull_request 를 **남기고** `branches: ["never-such-branch"]` 또는 `paths-ignore: ["**"]` | manifest=0 · integrity=0. 워크플로는 영원히 실행되지 않음. |
+| 5 | `docs/sot/verification-commands.md` 표에 `\| 30 \| \`verify-ac-m\` \|` 중복 1행 추가 + 5·6행 id 맞바꿈 + 3행 이름 위조 | exit 0, 출력 `PASS: 문서 단계 30행이 워크플로 스텝 29개와 순서까지 일치` (거짓 문장). |
+| 6 | `apps/admin/index.html` 에서 `<script src="/app.js" defer>` 제거 / `src="/wrong.js"` / `type="text/template"` | 하네스 exit 0. 브라우저에서는 app.js 가 실행조차 안 됨. |
+| 6′ | app.js 에 `process.version` 참조 추가 (브라우저 ReferenceError) / 클릭 시 고정 문구 / 히트맵 순서 뒤집기 / aria-label 제거 / 감사 항목 삭제 | 전부 exit 0. |
+| 6″ | app.js `item.append(button)` → `item.appendChild(button)` (브라우저 정상) | **exit 1, `버튼 0개`** — 정상 코드 오차단. |
+| 7 | run-acceptance 대상 본문을 `echo "PASS: ok" \| cat` / `echo "PASS: ok" >&2` / `echo "PASS: $(:)"` / `echo "VERDICT: PASS" \| cat` / `echo "PASS: ok"` + `builtin true` / `x=1` / `FAIL:` 뒤 `PASS:` / `CHECKED: 0 \| cat` 뒤 `CHECKED: 5` | 전부 `OK(run-acceptance) … 판정 1건`. |
+| 8 | run-acceptance.sh 의 `판정을 한 건도 내놓지 않았다` 실제 출력을 없애고 `_doc="…"` 문자열만 남김 | mechanism-registry `acceptance-runner-gate` PASS. |
+| 9 | humansearch/tests 전부 `git rm` 후 `parametrize(range(8))` 더미 28파일 | pytest-baseline PASS (224 ≥ 211). |
+
+### 막힌 것
+
+AC1 기준선 · `on:` 키/트리거 삭제 · 필수 스텝 삭제/스텝 단위 주석/비활성 job 이동 · `|| true` **줄 끝** · `; true` · `if: false` · `${{ false }}` · anchor `*never` · continue-on-error(step/job) · 필수 명령 제거 · 미등록/미실행/사유 없는 제외/없는 job · AC5 이름 복사+항상-거짓 조건(STEP_CONDITIONAL 양쪽) · id 중복/키릴 lookalike/대문자/앵커 공유(STEP_DUPLICATE_ID·STEP_MISSING) · job 키 중복(Psych 후승으로 `if` 잡힘) · hs-a4 명령을 0-5 스텝으로 이관(STEP_COMMAND_MISSING) · 새 검사기 5종 각각 삭제 시 해당 인수 검사 exit 2(fail-closed) · 인수검사+스텝+명부 항목 동시 삭제는 verify-ac-m 이 잡음 · `bash -n "…" && echo "bash …"`(SYNTAX_ONLY) · `! cmd || true` · `exit $?` · `X: PASS` + `:` · 미추적 acceptance(`git archive` 에 0건 → CI 도달 불가) · `PYTEST_PROJECT` 는 `acceptance-pytest-baseline.sh:73` 이 값을 덮어써 workflow `env:` 로 우회 불가(가짜 프로젝트는 NOT_RUN=2) · 문서 1행 삭제/이름 위조/낡은 표 중복(단독) 차단.
+
+## 2. 발견 결함
+
+**F1 [치명] 오류 삼킴 탐지가 "줄 끝 꼬리" 6종뿐 — AC4 위반**
+`scripts/verify/check-ci-required-manifest.sh:142`, `scripts/verify/check-ci-step-integrity.sh:43`. 표 #1 의 16개 변형이 모두 두 검사기를 통과하고 `bash -e` 에서 exit 0. `|| true; echo done` 처럼 AC4 가 명시한 "`|| true` 계열" 자체가 뚫린다. 재현: 사본 워크플로의 hs-a4 `run:` 뒤에 ` || true; echo done` 추가 → `bash scripts/verify/check-ci-required-manifest.sh; echo $?` → 0.
+
+**F2 [치명] `shell:` / `defaults.run.shell` 을 아무도 보지 않음**
+두 검사기 모두 `if`·`continue-on-error`·`run` 만 본다. `defaults: run: shell: bash {0}` 한 블록으로 다줄 스텝 13개 호출 중 10개의 실패가 무시된다(GitHub 는 커스텀 `shell` 에 `-e` 를 붙이지 않음). 재현: `perl -0pi -e 's{^permissions:}{defaults:\n  run:\n    shell: bash {0}\npermissions:}m' .github/workflows/verify.yml` 후 두 검사기 exit 0.
+
+**F3 [높음] 필수 명령 대조가 주석 포함 substring — AC3 "주석 처리" 부분 위반, STEP_ECHO_ONLY 무력**
+`check-ci-required-manifest.sh:221` `run.include?(cmd)` 는 주석 줄을 걷어내지 않고, `:277` 실행 추출은 `scripts/acceptance-*.sh` 문자열만 본다. `check-ci-step-integrity.sh:109` 는 `echo bash` 만 잡아 `echo "bash …"`·`printf`·`:`·heredoc·변수 대입이 통과. 명령 자체를 `#` 로 주석 처리해도 manifest 는 통과하며, mechanism-registry 에 target 이 없는 스텝(hs-a3·hs-a4·hs-cleanroom·hs-gates·guard-global-skill-files·principles-mutations·0-2/0-6/0-7·data-exposure-scan·history-scan·secret-webhook-vendor)은 어떤 CI 검사도 잡지 못한다.
+
+**F4 [높음] AC2 는 키 존재만 봄 — `branches`/`paths-ignore` 필터로 워크플로를 영구 비활성화**
+`check-ci-required-manifest.sh:95-97`. `push: branches: ["never-such-branch"]` 로 `present.include?("push")` 가 참. 실행 조건이 사라지는 대표 공격을 반쯤만 막았다.
+
+**F5 [높음] AC11 — 문서 행 1개 중복이면 순서·이름 대조 전체가 건너뛰어지고 거짓 PASS 문장 출력**
+`check-docs-workflow-sync.sh:112` `doc_ids.size == wf_ids.size && …` 조건이 거짓이면 ②③ 블록이 통째로 생략되지만 오류로 남지 않는다. 중복+순서 뒤바꿈+이름 위조가 exit 0 이고 "30행이 29개와 순서까지 일치" 를 찍는다.
+
+**F6 [높음] AC10 — index.html 이 app.js 를 로드하는지 시험하지 않음**
+`admin-app-runtime.mjs:119` 는 HTML 에서 `id=` 만 뽑고 `<script src>` 는 보지 않는다. 스크립트 태그 제거·경로 오기·`type=text/template` 모두 통과. 반대로 `appendChild`(표준 DOM) 는 `class Node`(`:46`) 에 없어 정상 코드를 빨갛게 만든다(`버튼 0개`). node 전역(`process`) 참조도 통과한다 — "최소 DOM 이 브라우저와 다르게 동작" 하는 양방향 사례.
+
+**F7 [보통] AC6 실용 하한이 한 글자**
+`run-acceptance.sh:60` 의 `[|>]` 예외로 `echo "PASS: ok" | cat` / `>&2` 한 줄이 "has-work". 문서가 "의미 없는 명령 섞기"를 한계로 적어두었지만, 실제 하한은 파이프 문자 하나이고 AC6 의 `VERDICT: PASS` 위조도 `| cat` 만 붙이면 통과한다. 별도로 `FAIL:` 줄이 있어도 `PASS:` 1건이면 통과.
+
+**F8 [낮음] mechanism manual target 이 실행 여부와 무관한 grep -F**
+`check-mechanism-registry.sh:166`. 죽은 문자열 대입 `_doc="…"` 으로 통과. "manual 항목도 target 을 대조한다"(2a0f0da) 는 문자열 존재만 대조한다.
+
+**F9 [낮음] pytest 기준선은 개수만** — 실제 시험 전량을 더미로 갈아치워도 통과. AC9 문언("줄면") 안이라 설계 한계로 분류하되, `hs-gates` 의 `collected<1` 을 보완한다는 취지에는 못 미친다.
+
+## 3. 판정 근거
+
+AC4(오류 무시 꼬리)·AC2(실행 조건)·AC11(문서 구조 일치)·AC10(화면 실행 시험)이 각각 **한 줄짜리 변형**으로 뚫렸고, 모두 사본에서 실제 명령으로 재현하고 `bash -e` 로 삼킴을 실증했다. F1·F2·F3 은 구현자가 스스로 약하다고 본 지점(#1)이 예상보다 훨씬 넓게 열려 있음을 보여주며, "명령 앞부분이 그대로여도 실패가 전파되지 않으면 검사가 아니다" 라는 검사기 자신의 계약을 지키지 못한다. AC1·AC3(삭제/스텝 주석/이동)·AC5·AC7·AC8·#3·#5·#6·#7 은 막혔지만, 위 치명·높음 결함이 CI 최종 방어선을 무력화하므로 FAIL 이다.
+
+V1_EXIT=0
+V1_DONE
+
+```
+
 
 ---
 
