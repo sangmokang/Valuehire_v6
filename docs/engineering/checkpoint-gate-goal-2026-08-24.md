@@ -1,6 +1,76 @@
 # WU-3a checkpoint 판정기 goal — 2026-08-24
 
-VERDICT: APPROVE — LOCAL CHECKPOINT
+VERDICT: REQUEST_CHANGES — INDEPENDENT DEFENSE OUT OF SCOPE
+
+## 2026-08-27 fail-open 재감사 계약
+
+현재 HEAD `a8f1fe399ca79e2df22b6df17f75ab50e45991a4`의 B 판정기는 대문자·혼합 대소문자 확장자를 코드/테스트로 분류하지 않고, 장부 범위 값을 재귀 평탄화하며, 단일값 CLI 인자를 마지막 값으로 덮어쓰고, 단언 개수만 같으면 기대 조건 완화를 놓친다. 이 L3 작업은 허용된 세 파일 안에서 그 네 원인을 RED→GREEN으로 닫는다.
+
+제품 판정기와 해당 테스트를 함께 빈 파일 또는 항상 성공하는 no-op으로 바꾸는 공격은, 두 파일 바깥의 독립 실행 주체가 없으면 스스로 탐지할 수 없다. goal 문서는 실행 주체가 아니고 훅·CI 수정은 금지되어 있으므로 이 항목은 현재 범위에서 닫을 수 없다. 후속 WU는 checkpoint gate와 테스트의 해시·실행 건수·필수 반증을 별도 훅과 CI에서 검사해야 하며, 그 WU 전에는 로컬 `APPROVE`를 금지한다.
+
+### EARS 인수 기준과 counter-AC
+
+1. **AC-27-1** — When 파일 경로 확장자의 대소문자가 달라질 때, 시스템은 같은 소문자 확장자와 동일하게 빈 테스트와 601 LOC 코드를 거부하고 정확히 600 LOC 코드를 통과시켜야 한다.
+2. **AC-27-2** — When current WU의 `scope`/`scopes`/`files`/`paths` 필드가 존재할 때, 시스템은 비어 있지 않은 문자열 또는 비어 있지 않은 문자열만 가진 1차원 배열만 허용하고 나머지는 `input` 위반과 종료값 1로 거부해야 한다.
+3. **AC-27-3** — When 잘못된 장부 범위와 `--scope`가 함께 주어질 때, 시스템은 CLI 범위로 대체하지 않고 장부 입력 위반을 반환해야 한다.
+4. **AC-27-4** — When `--base` 또는 `--run-id`가 두 번 이상 주어질 때, 시스템은 마지막 값을 선택하지 않고 `input` 위반과 종료값 1을 반환해야 한다. While `--scope`가 반복될 때는 기존처럼 모두 보존해야 한다.
+5. **AC-27-5** — When 단언 개수는 같지만 exact equality·anchored match가 부정 비교·부분 match로 넓어질 때, 시스템은 `test-weakening` 위반으로 거부해야 한다.
+6. **데이터 안전 AC** — While 입력을 검증하고 Git 인덱스 blob을 검사할 때, 시스템은 장부·인덱스·ref·작업 파일을 쓰거나 비밀 원문을 출력하지 않아야 한다.
+
+counter-AC는 특정 fixture 경로/문자열만 막는 분기, 중첩 배열 재귀 평탄화, 숫자·객체·null·혼합·빈 범위를 범위 없음으로 바꾼 fallback, 중복 단일값의 마지막 값 선택, assertion 수만 유지한 의미 완화, 소문자만 검사하는 확장자 정규식이다. 합법적인 기존 소문자 파일, A 장부 + 반복 `--scope`, 기존 run 선택과 JSON 출력이 깨져도 실패다.
+
+### 입출력·오류·경계 계약
+
+- `--base`와 `--run-id`는 각각 정확히 한 번, `--scope`는 한 번 이상 반복 입력할 수 있다.
+- 범위 필드의 값 `S`는 `(typeof S === "string" && S.trim().length > 0) || (Array.isArray(S) && S.length > 0 && S.every(x => typeof x === "string" && x.trim().length > 0))`일 때만 유효하다. 배열 안 배열과 빈 배열은 무효다.
+- 무효 장부 범위는 `check: "input"`, 성공 종료값 0이 아닌 종료값 1을 내고 다른 범위 출처로 대체하지 않는다.
+- 확장자 분류에만 경로를 소문자로 정규화한다. 실제 파일 경로, 범위 glob, JSON의 `file` 값은 원문 대소문자를 보존한다.
+- 성공 JSON `{pass:true,violations:[]}`과 실패 JSON `{pass:false,violations:[...]}`, run_id 지정 파일 한 개, ledger/CLI 범위 출처 정확히 하나라는 기존 계약을 보존한다.
+
+### 영향 반경·롤백·비범위
+
+- 영향 반경은 수동 B CLI의 입력 자격, 테스트 약화, P11 파일 경계 판정이다. 장부와 Git 데이터는 읽기 전용이다.
+- 롤백은 새 GREEN commit을 로컬에서 revert하는 한 명령이다. 스키마·데이터 마이그레이션은 없다.
+- `tools/strict/ledger.mjs`, A WU 스키마, A/C worktree, 훅, CI, main, 원격, push, PR, merge는 비범위다.
+
+### 결정 카드
+
+> **무엇을** — 경로 분류 전에 확장자만 소문자로 정규화하고, 범위 필드를 재귀 평탄화하지 않는 단일 validator로 검증하며, 단일값 CLI 중복과 대표적 기대 조건 완화를 fail-closed한다.
+> **왜** — 현재 네 우회는 모두 입력을 느슨하게 해석하거나 검사 강도를 수량 하나로 축약한 데서 생겼다.
+> **버린 길** — fixture 이름 하드코딩, 잘못된 범위를 없음으로 간주한 fallback, 모든 assertion 변경 차단은 각각 일반화 실패·조용한 실패·정상 강화 오탐을 남겨 기각했다.
+> **대가** — 기존에 중복 단일값 인자나 잘못된 범위를 암묵적으로 허용한 호출은 이제 명시적 입력 오류가 된다. 의미 약화 탐지는 정한 partial order 밖의 모든 논리 변환을 완전 판정하지 못한다.
+> **되돌리기** — GREEN commit을 revert하면 이전 CLI로 복구되며 장부나 제품 데이터 복구는 필요하지 않다.
+
+### 2026-08-27 Strict 직접 로드 장부
+
+```text
+2026-08-27T02:09:51+09:00
+SESSION=01a03f0b-061b-71a1-be8b-aa3f62839554
+HEAD=a8f1fe399ca79e2df22b6df17f75ab50e45991a4
+COMMAND=bash scripts/acceptance-principles-check.sh
+EXIT=0
+VERDICT: PASS
+SOT_LOAD: PASS docs/sot/coding-principles.md
+LEDGER_LOAD: PASS docs/sot/principles.yaml
+MECHANISMS: PASS 34/34 strict-contract-bindings
+WIRING: PASS pre-push=1 ci=1
+CHECKED: 34
+```
+→ 현재 checkout에서 두 정본을 순서대로 직접 읽고 원명령을 실행했다. 34개 계약과 pre-push/CI 배선은 확인됐지만, 이 결과는 checkpoint gate 자체의 동시 무력화 저항을 증명하지 않는다.
+
+### 2026-08-27 RED 원장
+
+```text
+2026-08-27T02:22:47+09:00
+HEAD=a8f1fe399ca79e2df22b6df17f75ab50e45991a4
+TEST_LINES=600
+COMMAND=node --test tests/checkpoint-gate.test.mjs
+EXIT=1
+tests=67 pass=49 fail=18 skipped=0 todo=0
+OUTPUT_SHA256=bc6b24913a41d6bbdadfa3aed88fcaaed42f4f487a684af9c5c7f6f912b5eef2
+RAW_LOG=/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/checkpoint-red.XXXXXX.myTYtdgezg
+```
+→ 기존 49건은 모두 통과했고 새 계약 18건만 실패했다. 실패 원문은 대문자 빈 테스트와 601줄 코드의 성공, 잘못된 범위의 성공 또는 `scope` 오분류, 중복 인자의 성공, 기대 조건 완화의 성공을 각각 보여 주므로 문법/import 실패가 아니라 빠진 동작의 RED다.
 
 ## 2026-08-26 명시적 run 선택 계약
 

@@ -5,15 +5,11 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const GATE = join(ROOT, "tools/strict/checkpoint-gate.mjs");
 const RUN_ID = "r-1787525327788-6723";
 const cleanups = [];
-test.after(() => {
-  for (const directory of cleanups) rmSync(directory, { recursive: true, force: true });
-});
-
+test.after(() => { for (const directory of cleanups) rmSync(directory, { recursive: true, force: true }); });
 function git(cwd, ...args) {
   return execFileSync("git", args, {
     cwd,
@@ -28,13 +24,10 @@ function git(cwd, ...args) {
     },
   }).trim();
 }
-
 function write(cwd, path, content) {
   const target = join(cwd, path);
-  mkdirSync(dirname(target), { recursive: true });
-  writeFileSync(target, content);
+  mkdirSync(dirname(target), { recursive: true }); writeFileSync(target, content);
 }
-
 function writeLedger(cwd, { runId = RUN_ID, ledgerRunId = runId, scopes, wus, updatedAt } = {}) {
   const wu = { id: "WU-3a", ac: "checkpoint gate", status: "red", commit: null };
   if (scopes?.length > 0) wu.scope = scopes;
@@ -102,12 +95,9 @@ function runGate(cwd, base, ...extra) {
   assert.ok(Array.isArray(body.violations));
   return { ...result, body };
 }
-
 function runRawGate(cwd, ...args) {
-  const result = spawnSync(process.execPath, [GATE, ...args], { cwd, encoding: "utf8" });
-  return { ...result, body: JSON.parse(result.stdout) };
+  const result = spawnSync(process.execPath, [GATE, ...args], { cwd, encoding: "utf8" }); return { ...result, body: JSON.parse(result.stdout) };
 }
-
 function runRawGateWithEnv(cwd, env, ...args) {
   const result = spawnSync(process.execPath, [GATE, ...args], {
     cwd,
@@ -116,7 +106,6 @@ function runRawGateWithEnv(cwd, env, ...args) {
   });
   return { ...result, body: JSON.parse(result.stdout) };
 }
-
 function expectViolation(result, check, file) {
   assert.equal(result.status, 1, result.stderr);
   assert.equal(result.body.pass, false);
@@ -127,11 +116,53 @@ function expectViolation(result, check, file) {
     JSON.stringify(result.body, null, 2),
   );
 }
-
 function expectPass(result) {
   assert.equal(result.status, 0, result.stderr);
   assert.deepEqual(result.body, { pass: true, violations: [] });
 }
+function currentWu(field, value) { return [{ id: "WU-3a", ac: "checkpoint gate", status: "red", [field]: value }]; }
+for (const file of ["tests/unit.test.JS", "humansearch/tests/test_gate.PY", "tests/unit.test.TSX"]) {
+  test(`test weakening: empty mixed-case test ${file} is rejected`, () => {
+    const { cwd, base } = makeRepo(); write(cwd, file, ""); git(cwd, "add", file);
+    expectViolation(runGate(cwd, base, "--scope", "**"), "test-weakening", file); });
+}
+for (const extension of ["JS", "PY", "TSX"]) {
+  test(`size limit: mixed-case .${extension} enforces the 600/601 boundary`, () => {
+    const { cwd, base } = makeRepo(); const file = `src/boundary.${extension}`;
+    write(cwd, file, `${"line\n".repeat(600)}`); git(cwd, "add", file);
+    expectPass(runGate(cwd, base, "--scope", "src/**"));
+    write(cwd, file, `${"line\n".repeat(601)}`); git(cwd, "add", file);
+    expectViolation(runGate(cwd, base, "--scope", "src/**"), "size-limit", file); });
+}
+for (const [name, field, value] of [
+  ["nested array", "scope", [["src/**"]]], ["number", "scopes", 7],
+  ["object", "files", { glob: "src/**" }], ["null", "paths", null],
+  ["mixed elements", "scope", ["src/**", 7]], ["empty string", "scopes", ""], ["empty array", "files", []],
+]) {
+  test(`scope: ${name} declaration is rejected as input`, () => {
+    const { cwd, base } = makeRepo({ ledger: false }); writeLedger(cwd, { wus: currentWu(field, value) });
+    expectViolation(runGate(cwd, base), "input"); });
+}
+test("scope: invalid ledger declaration never falls back to --scope", () => {
+  const { cwd, base } = makeRepo({ ledger: false }); writeLedger(cwd, { wus: currentWu("scope", 7) });
+  expectViolation(runGate(cwd, base, "--scope", "src/**"), "input"); });
+for (const [name, buildArgs, prepare] of [
+  ["duplicate --run-id", (base) => ["--base", base, "--run-id", RUN_ID, "--run-id", RUN_ID, "--json", "--scope", "src/**"]],
+  ["different duplicate --run-id", (base) => ["--base", base, "--run-id", RUN_ID, "--run-id", "r-1787525327999-9999", "--json", "--scope", "src/**"], (cwd) => writeLedger(cwd, { runId: "r-1787525327999-9999" })],
+  ["duplicate --base", (base) => ["--base", base, "--base", base, "--run-id", RUN_ID, "--json", "--scope", "src/**"]],
+]) {
+  test(`CLI rejects ${name} instead of selecting the last value`, () => {
+    const { cwd, base } = makeRepo(); prepare?.(cwd);
+    expectViolation(runRawGate(cwd, ...buildArgs(base)), "input"); });
+}
+test("test weakening: equally many assertions with broader expectations are rejected", () => {
+  const { cwd } = makeRepo(); write(cwd, "tests/unit.test.mjs", 'import assert from "node:assert/strict";\nassert.equal({ status: 1 }.status, 1);\nassert.match("input violation", /^input violation$/);\n');
+  git(cwd, "add", "tests/unit.test.mjs"); git(cwd, "commit", "-qm", "add strict expectations");
+  const base = git(cwd, "rev-parse", "HEAD");
+  write(cwd, "tests/unit.test.mjs", 'import assert from "node:assert/strict";\nassert.notEqual({ status: 1 }.status, 0);\nassert.match("input violation", /input/);\n');
+  git(cwd, "add", "tests/unit.test.mjs");
+  expectViolation(runGate(cwd, base, "--scope", "tests/**"), "test-weakening", "tests/unit.test.mjs");
+});
 test("scope: explicit run id selects its older ledger instead of a newer conflicting run", () => {
   const { cwd, base } = makeRepo({ ledgerScopes: ["src/**"] });
   writeLedger(cwd, {
@@ -171,7 +202,6 @@ test("scope: ledger declaration and --scope together are rejected as input", () 
   const { cwd, base } = makeRepo({ ledgerScopes: ["src/**"] });
   expectViolation(runGate(cwd, base, "--scope", "src/**"), "input");
 });
-
 test("scope: two scope-bearing current wus fail closed", () => {
   const { cwd, base } = makeRepo({
     ledger: false,
@@ -184,7 +214,6 @@ test("scope: two scope-bearing current wus fail closed", () => {
   });
   expectViolation(runGate(cwd, base), "scope");
 });
-
 test("CLI rejects missing, malformed, and nonexistent run ids as input", () => {
   const { cwd, base } = makeRepo();
   expectViolation(runRawGate(cwd, "--base", base, "--json", "--scope", "src/**"), "input");
@@ -194,7 +223,6 @@ test("CLI rejects missing, malformed, and nonexistent run ids as input", () => {
     "input",
   );
 });
-
 for (const [name, content] of [
   ["empty", ""],
   ["invalid JSON", "{"],
@@ -205,20 +233,17 @@ for (const [name, content] of [
     expectViolation(runGate(cwd, base, "--scope", "src/**"), "input");
   });
 }
-
 test("CLI rejects a designated ledger whose internal run_id differs", () => {
   const { cwd, base } = makeRepo({ ledger: false });
   writeLedger(cwd, { ledgerRunId: "r-1787525327999-9999" });
   expectViolation(runGate(cwd, base, "--scope", "src/**"), "input");
 });
-
 test("CLI rejects a symbolic-link run ledger", () => {
   const { cwd, base } = makeRepo({ ledger: false });
   writeLedger(cwd, { runId: "r-1787525327999-9999", ledgerRunId: RUN_ID });
   symlinkSync("r-1787525327999-9999.json", join(cwd, `.strict/run-ledger/${RUN_ID}.json`));
   expectViolation(runGate(cwd, base, "--scope", "src/**"), "input");
 });
-
 test("checks remain independent when the size SOT cannot be read", () => {
   const { cwd, base } = makeRepo({ ledgerScopes: ["src/**"] });
   write(cwd, "docs/unrelated.md", "outside\n");
@@ -229,13 +254,11 @@ test("checks remain independent when the size SOT cannot be read", () => {
   expectViolation(result, "scope", "docs/unrelated.md");
   expectViolation(result, "size-limit", "docs/sot/coding-principles.md");
 });
-
 test("CLI emits JSON input violation when --base has no value before --json", () => {
   const { cwd } = makeRepo();
   const result = runRawGate(cwd, "--base", "--json");
   expectViolation(result, "input");
 });
-
 test("CLI emits JSON when the git index cannot be read", () => {
   const { cwd, base } = makeRepo();
   write(cwd, "corrupt-index", "not a git index\n");
@@ -252,7 +275,6 @@ test("CLI emits JSON when the git index cannot be read", () => {
   );
   expectViolation(result, "input");
 });
-
 test("secrets: delegates staged content to the existing repository scanner", () => {
   const { cwd, base } = makeRepo();
   const canary = ["CHECKPOINT", "CANARY", "ABCDEFGHIJKL"].join("_");
@@ -261,14 +283,12 @@ test("secrets: delegates staged content to the existing repository scanner", () 
   mkdirSync(join(cwd, "nested"));
   expectViolation(runGate(join(cwd, "nested"), base, "--scope", "src/**"), "secrets", "src/app.mjs");
 });
-
 test("secrets: existing repository scanner allows a clean staged blob", () => {
   const { cwd, base } = makeRepo();
   write(cwd, "src/app.mjs", 'export const message = "safe";\n');
   git(cwd, "add", "src/app.mjs");
   expectPass(runGate(cwd, base, "--scope", "src/**"));
 });
-
 test("secrets: checkpoint sources pass real scanner patterns without fake weakening markers", () => {
   const { cwd, base } = makeRepo();
   copyFileSync(join(ROOT, ".secret-patterns.default"), join(cwd, ".secret-patterns.default"));
@@ -279,7 +299,6 @@ test("secrets: checkpoint sources pass real scanner patterns without fake weaken
   git(cwd, "add", "tools/strict/checkpoint-gate.mjs", "tools/strict/checkpoint-js-scan.mjs", "tests/checkpoint-gate.test.mjs");
   expectPass(runGate(cwd, base, "--scope", "tools/strict/**", "--scope", "tests/**"));
 });
-
 test("secrets: conservative fallback rejects a credential when verify.sh is absent", () => {
   const { cwd, base } = makeRepo({ scanner: false });
   const canary = ["AKIA", "0123456789ABCDEF"].join("");
@@ -287,7 +306,6 @@ test("secrets: conservative fallback rejects a credential when verify.sh is abse
   git(cwd, "add", "src/app.mjs");
   expectViolation(runGate(cwd, base, "--scope", "src/**"), "secrets", "src/app.mjs");
 });
-
 for (const modifier of ["skip", "only", "todo"]) {
   test(`test weakening: ${modifier} increase is rejected`, () => {
     const { cwd, base } = makeRepo();
@@ -313,7 +331,6 @@ for (const modifier of ["skip", "only", "todo"]) {
     );
   });
 }
-
 for (const fixture of [
   {
     name: "node:test skip boolean option",
@@ -361,7 +378,6 @@ for (const fixture of [
     );
   });
 }
-
 test("test weakening: assertion decrease after a quote regex is rejected", () => {
   const { cwd } = makeRepo();
   write(
@@ -382,7 +398,6 @@ test("test weakening: assertion decrease after a quote regex is rejected", () =>
     "tests/unit.test.mjs",
   );
 });
-
 for (const fixture of [
   ["commenting out", "// assert.ok(true);"],
   ["block-commenting", "/* assert.ok(true); */"],
@@ -403,7 +418,6 @@ for (const fixture of [
     expectViolation(runGate(cwd, base, "--scope", "tests/**"), "test-weakening", "tests/unit.test.mjs");
   });
 }
-
 test("test weakening: a newly added skipped test is rejected against a zero baseline", () => {
   const { cwd, base } = makeRepo();
   write(
@@ -418,7 +432,6 @@ test("test weakening: a newly added skipped test is rejected against a zero base
     "tests/new.test.mjs",
   );
 });
-
 test("counter-AC: deleting a Python test file must never exit zero", () => {
   const { cwd, base: initialBase } = makeRepo();
   write(cwd, "humansearch/tests/test_gate.py", "def test_gate():\n    assert True\n");
@@ -433,7 +446,6 @@ test("counter-AC: deleting a Python test file must never exit zero", () => {
     "humansearch/tests/test_gate.py",
   );
 });
-
 test("test weakening: Python assertion decrease is rejected", () => {
   const { cwd } = makeRepo();
   write(
@@ -452,7 +464,6 @@ test("test weakening: Python assertion decrease is rejected", () => {
     "humansearch/tests/test_gate.py",
   );
 });
-
 test("test weakening: Python skip increase is rejected", () => {
   const { cwd } = makeRepo();
   write(cwd, "humansearch/tests/test_gate.py", "def test_gate():\n    assert True\n");
@@ -471,7 +482,6 @@ test("test weakening: Python skip increase is rejected", () => {
     "humansearch/tests/test_gate.py",
   );
 });
-
 test("counter-AC: deleting a shell acceptance test must never exit zero", () => {
   const { cwd, base: initialBase } = makeRepo();
   write(cwd, "scripts/acceptance-fixture.sh", "#!/usr/bin/env bash\nexit 0\n");
@@ -486,7 +496,6 @@ test("counter-AC: deleting a shell acceptance test must never exit zero", () => 
     "scripts/acceptance-fixture.sh",
   );
 });
-
 test("test weakening: replacing shell assertions with exit zero is rejected", () => {
   const { cwd } = makeRepo();
   write(
@@ -505,7 +514,6 @@ test("test weakening: replacing shell assertions with exit zero is rejected", ()
     "scripts/acceptance-fixture.sh",
   );
 });
-
 test("counter-AC: deleting a test file must never exit zero", () => {
   const { cwd, base } = makeRepo();
   git(cwd, "rm", "-q", "tests/unit.test.mjs");
@@ -515,7 +523,6 @@ test("counter-AC: deleting a test file must never exit zero", () => {
     "tests/unit.test.mjs",
   );
 });
-
 test("counter-AC: moving a test outside recognized test paths must never exit zero", () => {
   const { cwd, base } = makeRepo();
   mkdirSync(join(cwd, "src"), { recursive: true });
@@ -526,7 +533,6 @@ test("counter-AC: moving a test outside recognized test paths must never exit ze
     "tests/unit.test.mjs",
   );
 });
-
 test("test weakening: clean test and an unrelated skip property pass", () => {
   const { cwd, base } = makeRepo();
   write(
@@ -540,21 +546,18 @@ test("test weakening: clean test and an unrelated skip property pass", () => {
     git(cwd, "add", "tests/unit.test.mjs");
   expectPass(runGate(cwd, base, "--scope", "tests/**"));
 });
-
 test("size limit: a code file one line above the parsed SOT hard limit is rejected", () => {
   const { cwd, base } = makeRepo({ hardLimit: 3 });
   write(cwd, "src/app.mjs", "one\ntwo\nthree\nfour\n");
   git(cwd, "add", "src/app.mjs");
   expectViolation(runGate(cwd, base, "--scope", "src/**"), "size-limit", "src/app.mjs");
 });
-
 test("size limit: a code file exactly at the parsed SOT hard limit passes", () => {
   const { cwd, base } = makeRepo({ hardLimit: 3 });
   write(cwd, "src/app.mjs", "one\ntwo\nthree\n");
   git(cwd, "add", "src/app.mjs");
   expectPass(runGate(cwd, base, "--scope", "src/**"));
 });
-
 test("size limit: directly authored test code is not exempt from the hard limit", () => {
   const { cwd, base } = makeRepo({ hardLimit: 3 });
   write(cwd, "tests/oversized.test.mjs", "one\ntwo\nthree\nfour\n");
@@ -565,7 +568,6 @@ test("size limit: directly authored test code is not exempt from the hard limit"
     "tests/oversized.test.mjs",
   );
 });
-
 test("size limit: missing SOT falls back to 500 lines", () => {
   const { cwd, base } = makeRepo({ sot: false });
   write(cwd, "src/app.mjs", `${Array.from({ length: 501 }, (_, index) => `line${index}`).join("\n")}\n`);
@@ -574,7 +576,6 @@ test("size limit: missing SOT falls back to 500 lines", () => {
   expectViolation(result, "size-limit", "src/app.mjs");
   assert.match(result.body.violations.find((item) => item.check === "size-limit").detail, /500/);
 });
-
 test("size limit: missing P11 ignores unrelated hard numbers and falls back to 500", () => {
   const { cwd } = makeRepo();
   write(cwd, "docs/sot/coding-principles.md", "| P10 | unrelated | hard 9999 LOC |\n");
@@ -591,7 +592,6 @@ test("size limit: missing P11 ignores unrelated hard numbers and falls back to 5
   expectViolation(result, "size-limit", "src/app.mjs");
   assert.match(result.body.violations.find((item) => item.check === "size-limit").detail, /500/);
 });
-
 test("size limit: missing SOT allows exactly the 500-line fallback boundary", () => {
   const { cwd, base } = makeRepo({ sot: false });
   write(cwd, "src/app.mjs", `${Array.from({ length: 500 }, (_, index) => `line${index}`).join("\n")}\n`);
