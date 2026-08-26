@@ -196,10 +196,19 @@ function parseScannerFiles(output, stagedFiles) {
 
 function checkSecrets(changes, authority) {
   const stagedFiles = new Set(changes.filter((change) => change.status !== "D").map((change) => change.path));
-  const result = runTrustedSecretScan({
-    readIndex,
-    localPatternSha256: authority.secretPatternSha256,
-  });
+  let result;
+  try {
+    result = runTrustedSecretScan({
+      readIndex,
+      localPatternSha256: authority.secretPatternSha256,
+    });
+  } catch (error) {
+    return ([...stagedFiles].length > 0 ? [...stagedFiles] : [""]).map((file) => ({
+      check: CHECKS.LEAKS,
+      file,
+      detail: error.message,
+    }));
+  }
   if (result.status === 0) return [];
   const output = `${result.stdout}\n${result.stderr}`;
   const files = parseScannerFiles(output, stagedFiles);

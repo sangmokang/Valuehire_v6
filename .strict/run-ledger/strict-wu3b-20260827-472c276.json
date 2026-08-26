@@ -504,7 +504,59 @@
           "output_ref": "/tmp/valuehire-strict-wu3b-evidence/wu3b2b/staged-gate.json"
         }
       ]
+    },
+    {
+      "id": "WU-3b-2c",
+      "status": "open",
+      "scope": [
+        ".strict/run-ledger/strict-wu3b-20260827-472c276.json",
+        "docs/engineering/valuehire-delivery-chain-issue-2026-08-27.md",
+        "docs/engineering/valuehire-delivery-chain-goal-2026-08-27.md",
+        "tests/checkpoint-gate.test.mjs",
+        "tools/strict/checkpoint-gate.mjs"
+      ],
+      "red_commit": "61b85e96904c473792574d288048ef0eb696c435",
+      "implementation_commit": null,
+      "validation": [
+        {
+          "command": "node --test --test-name-pattern=checkpoint-sources|missing-indexed-scanner|never-auto-selects tests/checkpoint-gate.test.mjs",
+          "started_at": "2026-08-26T19:36:00Z",
+          "finished_at": "2026-08-26T19:36:02Z",
+          "exit": 0,
+          "checked": 3,
+          "output_sha256": "3a40b291f1050c318550d9a85ede09189815a8731916d5971a8600c09a5a9356",
+          "output_ref": "/tmp/valuehire-strict-wu3b-evidence/wu3b2c/green-final.tap"
+        },
+        {
+          "command": "empty attribution mutation + node --test --test-name-pattern=missing-indexed-scanner",
+          "started_at": "2026-08-26T19:36:15Z",
+          "finished_at": "2026-08-26T19:36:15Z",
+          "exit": 1,
+          "expected_exit": 1,
+          "checked": 1,
+          "output_sha256": "72b3df4410ae9d19bd88b87596e753bd372c9132bb1fc81a1a9e3bf479a3f4f6",
+          "output_ref": "/tmp/valuehire-strict-wu3b-evidence/wu3b2c/empty-attribution-mutation.tap"
+        },
+        {
+          "command": "node --test tests/checkpoint-gate.test.mjs",
+          "started_at": "2026-08-26T19:36:27Z",
+          "finished_at": "2026-08-26T19:36:58Z",
+          "exit": 0,
+          "checked": 67,
+          "output_sha256": "fce862a972529d8f639a61041025b7e0abbfbdcbfd008968453e69590b3462b9",
+          "output_ref": "/tmp/valuehire-strict-wu3b-evidence/wu3b2c/full-gate.tap"
+        },
+        {
+          "command": "node tools/strict/checkpoint-gate.mjs --base 61b85e96904c473792574d288048ef0eb696c435 --json --run-id strict-wu3b-20260827-472c276 --wu-id WU-3b-2c",
+          "started_at": "2026-08-26T19:37:41Z",
+          "finished_at": "2026-08-26T19:37:50Z",
+          "exit": 0,
+          "checked": 5,
+          "output_sha256": "e4b15b1a7bd891e43aabe6b5df41a78097670e63e8cacda701b837d5cdbd7a95",
+          "output_ref": "/tmp/valuehire-strict-wu3b-evidence/wu3b2c/staged-gate.json"
+        }
+      ]
     }
   ],
-  "updated_at": "2026-08-27T04:31:42+09:00"
+  "updated_at": "2026-08-27T04:37:50+09:00"
 }

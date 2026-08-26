@@ -85,6 +85,8 @@ Codeaudit에서 secure `--run-id` 경로 밖의 legacy fallback이 작업 폴더
 
 실제 pre-push와 CI도 하위 `verify.sh`를 작업 폴더에서 직접 호출하고 있었으므로 WU-3b-2b에서 `tools/strict/trusted-secret-scan.mjs`를 공통 진입점으로 추가했다. pre-push는 clean-tree 확인 뒤 이 runner를 직접 실행하고, CI checkout은 event commit의 index blob만 scanner/default pattern 권한으로 사용한다.
 
+WU-3b-2b 뒤 full strict에서 기존 격리 fixture가 새 policy/secret 모듈을 복사하지 않아 2건 실패했다. WU-3b-2c는 protected bundle을 실제 의존 집합과 맞추고, scanner 준비 실패를 빈 경로가 아니라 staged 대상에 귀속하며, 직접 작성 gate 테스트 정본을 hard 600 LOC에 맞췄다.
+
 ## 설계 결정
 
 > **무엇을** — scope ledger는 명시적 run/WU ID와 index blob으로 고정한다.

@@ -119,7 +119,7 @@ function expectViolation(result, check, file) {
   );
 }
 function expectPass(result) {
-  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.status, 0, `${result.stderr}\n${JSON.stringify(result.body, null, 2)}`);
   assert.deepEqual(result.body, { pass: true, violations: [] });
 }
 test("scope: active wus ledger rejects a staged file outside its declared scope", () => {
@@ -181,18 +181,7 @@ test("scope: the latest scope-less run ledger overrides an older scoped run ledg
   expectPass(runGate(cwd, base, "--scope", "src/**"));
 });
 test("scope: checkpoint never auto-selects a worktree ledger without --run-id", () => {
-  const { cwd, base } = makeRepo();
-  write(
-    cwd,
-    ".strict/run-ledger/r-1787525327788-6723.json",
-    `${JSON.stringify({
-      updated_at: "2026-08-24T00:00:00.000Z",
-      wus: [
-        { id: "WU-old", status: "green", scope: ["docs/**"] },
-        { id: "WU-3a", status: "green", scope: ["src/**"] },
-      ],
-    })}\n`,
-  );
+  const { cwd, base } = makeRepo({ ledgerScopes: ["src/**"] });
   write(cwd, "src/app.mjs", "export const value = 2;\n");
   git(cwd, "add", "src/app.mjs");
   expectViolation(runGate(cwd, base), "scope");
@@ -261,8 +250,10 @@ test("secrets: checkpoint sources pass real scanner patterns without fake weaken
   mkdirSync(join(cwd, "tools/strict"), { recursive: true });
   copyFileSync(GATE, join(cwd, "tools/strict/checkpoint-gate.mjs"));
   copyFileSync(join(ROOT, "tools/strict/checkpoint-js-scan.mjs"), join(cwd, "tools/strict/checkpoint-js-scan.mjs"));
+  copyFileSync(join(ROOT, "tools/strict/checkpoint-policy.mjs"), join(cwd, "tools/strict/checkpoint-policy.mjs"));
+  copyFileSync(join(ROOT, "tools/strict/checkpoint-secrets.mjs"), join(cwd, "tools/strict/checkpoint-secrets.mjs"));
   copyFileSync(join(ROOT, "tests/checkpoint-gate.test.mjs"), join(cwd, "tests/checkpoint-gate.test.mjs"));
-  git(cwd, "add", "tools/strict/checkpoint-gate.mjs", "tools/strict/checkpoint-js-scan.mjs", "tests/checkpoint-gate.test.mjs");
+  git(cwd, "add", "tools/strict/checkpoint-gate.mjs", "tools/strict/checkpoint-js-scan.mjs", "tools/strict/checkpoint-policy.mjs", "tools/strict/checkpoint-secrets.mjs", "tests/checkpoint-gate.test.mjs");
   expectPass(runGate(cwd, base, "--scope", "tools/strict/**", "--scope", "tests/**"));
 });
 test("secrets: missing indexed scanner fails closed and attributes the staged target", () => {
