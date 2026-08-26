@@ -895,7 +895,7 @@
         "tools/strict/checkpoint-secrets.mjs",
         "tools/strict/index-checkpoint-gate.mjs"
       ],
-      "red_commit": null,
+      "red_commit": "0e02ba25556a41125a33c216059600392a28c18c",
       "implementation_commit": null,
       "validation": []
     },

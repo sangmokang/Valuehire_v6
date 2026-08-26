@@ -1,13 +1,44 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
-import { countJavaScriptWeakening } from "./checkpoint-js-scan.mjs";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 let secureLedgerScopes;
 let runTrustedSecretScan;
+let countJavaScriptWeakening;
 
 async function loadSecurePolicy() {
+  ({ countJavaScriptWeakening } = await import("./checkpoint-js-scan.mjs"));
   ({ secureLedgerScopes } = await import("./checkpoint-policy.mjs"));
   ({ runTrustedSecretScan } = await import("./checkpoint-secrets.mjs"));
+}
+
+function requireIndexRuntime() {
+  const runtimeRoot = dirname(fileURLToPath(import.meta.url));
+  const runtimeRepository = dirname(dirname(runtimeRoot));
+  for (const path of [
+    "tools/strict/checkpoint-gate.mjs",
+    "tools/strict/checkpoint-js-scan.mjs",
+    "tools/strict/checkpoint-policy.mjs",
+    "tools/strict/checkpoint-secrets.mjs",
+  ]) {
+    const indexed = spawnSync("git", ["-C", runtimeRepository, "show", `:${path}`], {
+      encoding: null,
+      env: process.env,
+    });
+    if (indexed.status !== 0) throw new Error(`trusted runtime file is missing from the Git index: ${path}`);
+    const runtimePath = join(runtimeRoot, path.split("/").at(-1));
+    let runtime;
+    try {
+      runtime = readFileSync(runtimePath);
+    } catch {
+      throw new Error(`trusted runtime file is missing from the loaded bundle: ${path}`);
+    }
+    if (!runtime.equals(indexed.stdout)) {
+      throw new Error(`loaded runtime bytes differ from the Git index: ${path}`);
+    }
+  }
 }
 
 const CHECKS = {
@@ -417,6 +448,7 @@ async function main() {
   try {
     args = parseArgs(process.argv.slice(2));
     process.chdir(git(["rev-parse", "--show-toplevel"]).trim());
+    requireIndexRuntime();
     if (!args.base) {
       violations.push({ check: CHECKS.INPUT, file: "", detail: "--base is required" });
     } else {
