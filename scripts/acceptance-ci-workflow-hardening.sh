@@ -51,7 +51,7 @@ case "$TMP" in
 esac
 trap 'ruby -rfileutils -e "FileUtils.remove_entry(ARGV[0]) if File.exist?(ARGV[0])" "$TMP"' EXIT
 
-TOTAL=35
+TOTAL=38
 checked=0
 failed=0
 
@@ -163,6 +163,26 @@ attack "G2-5 pattern-file-selfcheck 본문을 echo 로"   1 contains-echo patter
 # 원문의 `on:` 은 그대로 두고 최상위 `true:` 블록을 덧붙이면, 검사기는 GitHub 이
 # 트리거로 보는 노드가 아니라 합쳐진 다른 노드를 읽고 초록을 낸다.
 attack "G4-1 최상위 true: 키를 덧붙여 트리거를 흐림" 1 true-key
+
+# ── V2 3차 H1~H3: 줄 연속과 블록 경계를 제대로 못 봤다 ─────────────────────
+# 2026-08-27 V2 실측 3건. 하나는 미탐, 둘은 정상 구성을 막는 오탐이다.
+#
+# H1 미탐 — 백슬래시로 줄을 이으면 뒷줄이 앞줄의 조건에 매달린다. 그런데 별개 줄로 봐서
+#          "단독 줄에 있다"로 셌다.
+attack "H1 백슬래시 줄 연속으로 조건에 매닮 → 불합격" 1 wrap-run 'false && \
+CMD'
+
+# H2 오탐 — 조건부 중괄호 그룹 안의 exit 을 전역 종료로 오인해, 그 뒤의 정상 명령을
+#          죽은 코드로 잘못 판정했다. 그룹은 조건이 거짓이면 아예 실행되지 않는다.
+attack "H2 조건부 그룹 안 exit 뒤의 정상 명령 → 통과(오차단 없음)" 0 wrap-run 'false && {
+  exit 0
+}
+CMD'
+
+# H3 오탐 — 한 줄에서 열고 닫는 블록(`if …; then …; fi`)은 깊이를 되돌려야 하는데,
+#          닫기를 먼저 세고 열기를 나중에 세는 순서 탓에 다음 줄이 블록 안으로 보였다.
+attack "H3 한 줄 완결 블록 뒤의 정상 명령 → 통과(오차단 없음)" 0 wrap-run 'if true; then :; fi
+CMD'
 
 # ── 원본 불변 ───────────────────────────────────────────────────────────────
 current=$(git status --porcelain)
