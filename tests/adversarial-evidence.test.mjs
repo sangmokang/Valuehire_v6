@@ -170,6 +170,23 @@ test("a later raw FAIL marker overrides an earlier PASS marker", () => expectFai
   manifest.reviewers.V1.output_bytes = Buffer.byteLength(outputs.V1);
   manifest.reviewers.V1.output_lines = outputs.V1.split("\n").length - 1;
 }), "final PASS"));
+test("an indented FAIL marker cannot hide before a final PASS", () => expectFailure(makeRepo(({ manifest, outputs }) => {
+  outputs.V1 = `candidate=${manifest.candidate_sha}\n  FINAL: FAIL\nFINAL: PASS\n`;
+  manifest.reviewers.V1.output_sha256 = sha256(outputs.V1);
+  manifest.reviewers.V1.output_bytes = Buffer.byteLength(outputs.V1);
+  manifest.reviewers.V1.output_lines = outputs.V1.split("\n").length - 1;
+}), "final PASS"));
+test("a Claude error envelope cannot authorize its embedded PASS text", () => expectFailure(makeRepo(({ manifest, outputs }) => {
+  outputs.V1 = `${JSON.stringify({
+    type: "result",
+    is_error: true,
+    session_id: "v1-session-1",
+    result: `candidate=${manifest.candidate_sha}\nFINAL: PASS\n`,
+  })}\n`;
+  manifest.reviewers.V1.output_sha256 = sha256(outputs.V1);
+  manifest.reviewers.V1.output_bytes = Buffer.byteLength(outputs.V1);
+  manifest.reviewers.V1.output_lines = outputs.V1.split("\n").length - 1;
+}), "envelope"));
 test("G V1 V2 disagreement is rejected", () => expectFailure(makeRepo(({ manifest }) => {
   manifest.reviewers.V2.verdict = "FAIL";
   manifest.disagreements = ["V1 says PASS, V2 says FAIL"];
