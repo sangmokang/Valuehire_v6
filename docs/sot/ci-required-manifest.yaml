@@ -125,6 +125,9 @@ required_steps:
   - id: "semantic-mutations"
     job: "verify"
     must_run_contains: ["bash scripts/verify/run-acceptance.sh scripts/acceptance-semantic-mutations.sh"]
+  - id: "docs-workflow-sync"
+    job: "verify"
+    must_run_contains: ["bash scripts/verify/run-acceptance.sh scripts/acceptance-docs-workflow-sync.sh"]
   - id: "verify-ac-m"
     job: "verify"
     must_run_contains: ["bash scripts/verify/run-acceptance.sh scripts/acceptance-verify-ac-m.sh"]
@@ -141,6 +144,7 @@ acceptance_scripts:
     - "scripts/acceptance-0-7.sh"
     - "scripts/acceptance-ci-required-manifest.sh"
     - "scripts/acceptance-ci-step-integrity.sh"
+    - "scripts/acceptance-docs-workflow-sync.sh"
     - "scripts/acceptance-guard-global-skill-files.sh"
     - "scripts/acceptance-history-scan-failclosed.sh"
     - "scripts/acceptance-hs-a3.sh"

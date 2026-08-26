@@ -294,6 +294,13 @@ jobs:
         # 출력만)을 인수 검사 전량에 대해 실제로 막는지 격리 사본으로 증명한다.
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-semantic-mutations.sh
 
+      - name: 인수 검사 docs-workflow-sync (검증 지침이 실제 워크플로와 맞는가 · AC11)
+        id: docs-workflow-sync
+        # docs/sot/verification-commands.md 는 운영자가 "서버에서 무엇이 도는가"를
+        # 판단하는 문서인데 스텝 수를 손으로 적어 두고 아무도 확인하지 않았다.
+        # 이 검사는 문서 표의 step id 순서·이름·개수를 워크플로와 구조로 대조한다.
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-docs-workflow-sync.sh
+
       - name: 인수 검사 verify-ac-m (mechanism 명부 대조 · AC-M)
         id: verify-ac-m
         # 명부(docs/sot/mechanism-registry.yaml)와 실제 검사 장치의 일치를 강제한다.
