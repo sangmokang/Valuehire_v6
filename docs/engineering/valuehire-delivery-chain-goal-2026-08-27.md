@@ -95,6 +95,8 @@ Codeaudit에서 secure `--run-id` 경로 밖의 legacy fallback이 작업 폴더
 
 WU-3b-2b 뒤 full strict에서 기존 격리 fixture가 새 policy/secret 모듈을 복사하지 않아 2건 실패했다. WU-3b-2c는 protected bundle을 실제 의존 집합과 맞추고, scanner 준비 실패를 빈 경로가 아니라 staged 대상에 귀속하며, 직접 작성 gate 테스트 정본을 hard 600 LOC에 맞췄다.
 
+최신 전체-history trace에서 이미 `invalidated`로 분류한 커밋이 보호 테스트를 건드렸다는 이유만으로 다시 미분류 변경처럼 차단됐다. WU-3b-17은 제외 이력을 면제하지 않고 변경 전후 assertion·skip·only·todo를 비교해 강화·중립만 허용하며, 약화는 명시적인 실패로 유지한다.
+
 ## 설계 결정
 
 > **무엇을** — scope ledger는 명시적 run/WU ID와 index blob으로 고정한다.

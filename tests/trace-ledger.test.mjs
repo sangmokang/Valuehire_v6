@@ -95,10 +95,13 @@ function makeRepo(mutate = () => {}, paths = {}) {
   const base = git(cwd, "rev-parse", "HEAD");
   const red1 = commit(cwd, "red one", "WU-1", "RED", paths.red1, paths.red1Content);
   const green1 = commit(cwd, "green one", "WU-1", "GREEN", paths.green1);
+  let uncontracted = null;
   if (paths.uncontracted) {
-    write(cwd, "src/uncontracted.mjs", "export const uncontracted = true;\n");
-    git(cwd, "add", "src/uncontracted.mjs");
+    const path = paths.uncontractedPath ?? "src/uncontracted.mjs";
+    write(cwd, path, paths.uncontractedContent ?? "export const uncontracted = true;\n");
+    git(cwd, "add", path);
     git(cwd, "commit", "-qm", "uncontracted change");
+    uncontracted = git(cwd, "rev-parse", "HEAD");
   }
   const red2 = commit(cwd, "red two", "WU-2", "RED", paths.red2, paths.red2Content);
   const green2 = commit(cwd, "green two", "WU-2", "GREEN", paths.green2);
@@ -140,7 +143,7 @@ function makeRepo(mutate = () => {}, paths = {}) {
     worktree: "${WORKTREE}",
     records: [first, second],
   };
-  mutate({ cwd, ledger, output1, output2, commits: { red1, green1, red2, green2 } });
+  mutate({ cwd, ledger, output1, output2, commits: { red1, green1, red2, green2, uncontracted } });
   write(cwd, "evidence/wu-1.tap", output1);
   write(cwd, "evidence/wu-2.tap", output2);
   write(cwd, LEDGER_PATH, `${JSON.stringify(ledger, null, 2)}\n`);
@@ -275,6 +278,41 @@ test("self-consistent truncated node test output is rejected", () => expectFailu
 test("an unclassified commit between base and candidate is rejected", () => expectFailure(
   makeRepo(() => {}, { uncontracted: true }),
   "unclassified commit",
+));
+test("an explicitly invalidated commit may extend a protected RED test", () => {
+  const fixture = makeRepo(({ ledger, commits }) => {
+    ledger.excluded_commits = [{
+      commit: commits.uncontracted,
+      status: "invalidated",
+      reason: "uncontracted test extension",
+      paths: ["tests/wu-1.test.mjs"],
+    }];
+  }, {
+    red1: "tests/wu-1.test.mjs",
+    red1Content: "assert.equal(1, 1);\n",
+    uncontracted: true,
+    uncontractedPath: "tests/wu-1.test.mjs",
+    uncontractedContent: "assert.equal(1, 1);\nassert.equal(2, 2);\n",
+  });
+  const result = runValidator(fixture);
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+});
+test("an explicitly invalidated commit cannot weaken a protected RED test", () => expectFailure(
+  makeRepo(({ ledger, commits }) => {
+    ledger.excluded_commits = [{
+      commit: commits.uncontracted,
+      status: "invalidated",
+      reason: "uncontracted test weakening",
+      paths: ["tests/wu-1.test.mjs"],
+    }];
+  }, {
+    red1: "tests/wu-1.test.mjs",
+    red1Content: "assert.equal(1, 1);\nassert.equal(2, 2);\n",
+    uncontracted: true,
+    uncontractedPath: "tests/wu-1.test.mjs",
+    uncontractedContent: "assert.equal(1, 1);\n",
+  }),
+  "invalidated commit weakens",
 ));
 test("a stale branch is rejected", () => expectFailure(makeRepo(({ ledger }) => { ledger.branch = "task/stale"; }), "branch"));
 test("a stale worktree is rejected", () => expectFailure(makeRepo(({ ledger }) => { ledger.worktree = "/tmp/stale"; }), "worktree"));
