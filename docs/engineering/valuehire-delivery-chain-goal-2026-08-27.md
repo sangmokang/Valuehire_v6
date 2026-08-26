@@ -85,7 +85,7 @@ Claude V1이 WU-3b-6 RED 테스트의 scope 누락과 고정 ahead 수치의 즉
 
 같은 V1은 clean clone pre-push에서 기존 acceptance 3개가 실패하고 core checkpoint 67개가 CI 사슬에 없으며 pre-commit이 작업 폴더 scanner를 직접 실행하는 회귀를 재현했다. WU-3b-8은 이 다섯 경로를 하나의 wiring RED 테스트로 잠그고 GREEN에서는 테스트를 수정하지 않는다.
 
-WU-3b-6a는 GREEN에서 자신의 RED 테스트를 수정해 실행 절차를 위반했다. 이 이력은 성공으로 세지 않고 `invalidated`로 보존한다. WU-3b-9는 RED에서 바뀐 테스트 경로를 같은 WU의 GREEN이 다시 바꾸면 pinned trace 검증을 exit 1로 거부하게 한다.
+WU-3b-2c와 WU-3b-6a는 GREEN에서 자신의 RED 테스트를 수정해 실행 절차를 위반했다. 두 이력은 성공으로 세지 않고 `invalidated`로 보존한다. WU-3b-9는 RED에서 바뀐 테스트 경로를 같은 WU의 GREEN이 다시 바꾸면 pinned trace 검증을 exit 1로 거부하게 한다.
 
 Codeaudit에서 secure `--run-id` 경로 밖의 legacy fallback이 작업 폴더 ledger를 계속 자동 선택하는 결함을 재현했다. WU-3b-1a는 이 fallback을 삭제해 `--run-id`가 없으면 명시적 `--scope`만 사용하고, 둘 다 없으면 staged 파일별 scope 위반으로 닫는다.
 

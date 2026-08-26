@@ -508,7 +508,7 @@
     },
     {
       "id": "WU-3b-2c",
-      "status": "open",
+      "status": "invalidated",
       "scope": [
         ".strict/run-ledger/strict-wu3b-20260827-472c276.json",
         "docs/engineering/valuehire-delivery-chain-issue-2026-08-27.md",
@@ -820,9 +820,40 @@
         "docs/engineering/valuehire-delivery-chain-issue-2026-08-27.md",
         "tests/goal-current-state.test.mjs"
       ],
-      "red_commit": null,
+      "red_commit": "235dcab0526322c38a351c3f1e2e2e17ca90646a",
       "implementation_commit": null,
-      "validation": []
+      "validation": [
+        {
+          "command": "node --test tests/goal-current-state.test.mjs",
+          "started_at": "2026-08-26T21:18:00Z",
+          "finished_at": "2026-08-26T21:18:01Z",
+          "exit": 1,
+          "expected_exit": 1,
+          "checked": 2,
+          "output_sha256": "0512d3a9687916d0490e7c32b546262720e4521c4d47ea796a93dd931b38d312",
+          "output_ref": ".strict/evidence/wu3b11/red.tap"
+        },
+        {
+          "command": "node --test tests/goal-current-state.test.mjs",
+          "started_at": "2026-08-26T21:20:00Z",
+          "finished_at": "2026-08-26T21:20:01Z",
+          "exit": 0,
+          "expected_exit": 0,
+          "checked": 2,
+          "output_sha256": "1efe6aafe300529abe46ba5026e79c241b8584e9108214b53f987c657202b1c8",
+          "output_ref": ".strict/evidence/wu3b11/green.tap"
+        },
+        {
+          "command": "restore WU-3b-2c status=open + node --test tests/goal-current-state.test.mjs",
+          "started_at": "2026-08-26T21:21:00Z",
+          "finished_at": "2026-08-26T21:21:01Z",
+          "exit": 1,
+          "expected_exit": 1,
+          "checked": 2,
+          "output_sha256": "408ee5ed61faab9560fb50e465dd63ccebbac9e06ae2942a0ccea8775b765d65",
+          "output_ref": ".strict/evidence/wu3b11/mutation.tap"
+        }
+      ]
     }
   ],
   "updated_at": "2026-08-27T05:00:00+09:00"
