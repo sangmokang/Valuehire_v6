@@ -12,6 +12,7 @@
 - 파생 장부인 `docs/sot/principles.yaml`도 `hard600`을 기록한다.
 - `scripts/verify/check-strict-principles-skills.sh`는 500을 하드코딩해 501줄을 거부한다.
 - `scripts/acceptance-principles-mutations.sh`와 `docs/sot/verification-commands.md`는 500/501을 올바른 경계로 설명해 거짓 정상 상태를 만든다.
+- 정본 설명과 장부 머리말·검증 명령 문서는 실제 34개 원칙을 32개라고 기록해 실행 결과 `34/34`와 갈린다.
 - 이 불일치는 PR #43에서 처음 생기지 않았지만, PR #43이 해당 변이 시험을 수정하고 전체 원칙 검증 보존을 주장하므로 현재 후보의 병합 판정을 막는다.
 
 ## 모드와 범위
@@ -24,6 +25,8 @@
 - 대상:
   - `scripts/verify/check-strict-principles-skills.sh`
   - `scripts/acceptance-principles-mutations.sh`
+  - `docs/sot/coding-principles.md`
+  - `docs/sot/principles.yaml`
   - `docs/sot/verification-commands.md`
 - 비범위:
   - 히스토리 스캐너 동작 확대
@@ -107,6 +110,14 @@ When 로컬 수정으로 HEAD가 PR #43 원격 head와 달라지면, 시스템�
 - 기대: push 전에는 원격 검증을 새 SHA의 PASS로 주장하지 않는다.
 - counter-AC: 옛 `b93b98b...` Actions 초록을 새 로컬 커밋에 귀속하는 상태.
 
+### AC-5 원칙 개수 일치
+
+When 정본·파생 장부·검증 문서가 현재 원칙 개수를 설명하면, 시스템은 실행 결과와 같은 34개를 기록해야 한다.
+
+- 검증: `rg -n "32개|34개" docs/sot/coding-principles.md docs/sot/principles.yaml docs/sot/verification-commands.md`와 `bash scripts/acceptance-principles-check.sh`.
+- 기대: 현재 개수 설명은 34개이고 원칙 검사는 `MECHANISMS: PASS 34/34`, `CHECKED: 34`를 출력한다.
+- counter-AC: 기계 검사는 34개를 처리하면서 문서는 32개라고 남아 있는 상태.
+
 ## Harness 게이트와 적대검증
 
 - Gate 0: SOT 직접 로드, 원칙 검사, 현재 HEAD·main·원격 후보 고정.
@@ -146,7 +157,7 @@ V1은 Claude가 정본 추출 실패, 600/601, 검사기·시험 동시 약화, 
 
 | 시각 | 세션 | HEAD | 명령 | 종료값 | 상태 | 핵심 출력 |
 |---|---|---|---|---:|---|---|
-| 2026-08-26T09:36:14+09:00 | strict-pr43-reaudit-20260826 | b93b98b7454d833f067adc2cbe31073e1e2bd9d3+local | `bash scripts/verify/run-acceptance.sh scripts/acceptance-principles-mutations.sh` | 0 | PASS | `BOUNDARY-600 ... PASS`, `BOUNDARY-601 ... FAIL`, `C16 ... NOT_RUN`, `CHECKED: 43` |
+| 2026-08-26T09:36:14+09:00 | strict-pr43-reaudit-20260826 | b93b98b7454d833f067adc2cbe31073e1e2bd9d3+local | `bash scripts/verify/run-acceptance.sh scripts/acceptance-principles-mutations.sh` | 0 | PASS | `BOUNDARY-600 ... PASS`, `BOUNDARY-601 ... FAIL`, P11 파싱 누락·SOT 누락·중복 hard 모두 `NOT_RUN`, `CHECKED: 44` |
 | 2026-08-26T09:36:14+09:00 | strict-pr43-reaudit-20260826 | b93b98b7454d833f067adc2cbe31073e1e2bd9d3+local | `bash scripts/acceptance-ci-step-integrity.sh` | 0 | PASS | `CHECKED: 14` |
 | 2026-08-26T09:36:14+09:00 | strict-pr43-reaudit-20260826 | b93b98b7454d833f067adc2cbe31073e1e2bd9d3+local | `bash scripts/verify/run-acceptance.sh scripts/acceptance-history-scan-failclosed.sh` | 0 | PASS | `CHECKED: 18` |
 | 2026-08-26T09:36:14+09:00 | strict-pr43-reaudit-20260826 | b93b98b7454d833f067adc2cbe31073e1e2bd9d3+local | `bash scripts/verify/run-acceptance.sh scripts/acceptance-0-2-unreachable-content.sh` | 0 | PASS | `CHECKED: 23` |
@@ -154,7 +165,15 @@ V1은 Claude가 정본 추출 실패, 600/601, 검사기·시험 동시 약화, 
 | 2026-08-26T09:36:14+09:00 | strict-pr43-reaudit-20260826 | b93b98b7454d833f067adc2cbe31073e1e2bd9d3+local | `bash scripts/verify/run-acceptance.sh scripts/acceptance-principles-check.sh` | 0 | PASS | `CHECKED: 34` |
 | 2026-08-26T09:36:14+09:00 | strict-pr43-reaudit-20260826 | b93b98b7454d833f067adc2cbe31073e1e2bd9d3+local | `bash scripts/acceptance-semantic-mutations.sh` | 0 | PASS | `CHECKED: 10` |
 | 2026-08-26T09:36:14+09:00 | strict-pr43-reaudit-20260826 | b93b98b7454d833f067adc2cbe31073e1e2bd9d3+local | `bash verify.sh` | 0 | PASS | `PASS: no secret-pattern match in any tracked file, .env not tracked` |
-| 2026-08-26T09:36:14+09:00 | strict-pr43-reaudit-20260826 | b93b98b7454d833f067adc2cbe31073e1e2bd9d3+local | `bash scripts/scan-history-secrets.sh` | 0 | PASS | `PASS: 히스토리 전량 blob 스캔 0건 (blob 1364개 검사)` |
+| 2026-08-26T09:36:14+09:00 | strict-pr43-reaudit-20260826 | b93b98b7454d833f067adc2cbe31073e1e2bd9d3+local | `bash scripts/scan-history-secrets.sh` | 0 | PASS | `PASS: 히스토리 전량 blob 스캔 0건 (최종 독립 재검증 blob 1369개)` |
 | 2026-08-26T09:36:14+09:00 | strict-pr43-reaudit-20260826 | b93b98b7454d833f067adc2cbe31073e1e2bd9d3+local | `shellcheck -S warning scripts/verify/check-strict-principles-skills.sh scripts/acceptance-principles-mutations.sh` | 0 | PASS | warning 이상 0건 |
 
-V1·V2와 원격 Actions는 아직 새 로컬 변경에 대해 실행하지 않았다. 다음 Strict SHIP 프롬프트에서 새 커밋 SHA를 push하고 그 SHA에 귀속된 원격 검사와 Claude/Codex 적대검증을 다시 실행한다.
+### V1/V2 독립 판정
+
+| 검토 | 산출물 | SHA256 | 로컬 코드 | 원격 SHIP |
+|---|---|---|---|---|
+| Claude V1 최초 호출 | `.omx/artifacts/claude-claude-v1-push-users-kangsangmo-desktop-valuehire-v6-worktre-2026-08-26T00-45-48-071Z.md` | `e8a81281382762eef6dfac1035fc04aeeaf9c4bbdf8f720161ad270ac8b3a297` | INVALID — 명령을 실행하지 않고 허가를 요청했으며 요구 판정 형식을 지키지 않음 | NOT_RUN |
+| Claude V1 고유 재시도 | `.omx/artifacts/claude-pr43-boundary-v1-retry-2026-08-26.md` | `06dc0992fdd0badfc1e4d694b3f918055c851bb7b0d96638c8ea3f8d15a6bf34` | APPROVE — 34/44/14/10/18과 blob 1369 재현 | NOT_RUN — 첫 줄 형식 위반, `all contracts` 과장, 저장소에 없는 `make ship` 권고 |
+| Codex V2 새 맥락 | `.omx/artifacts/codex-pr43-boundary-v2-2026-08-26.md` | `b4efa6ef0042d38a0935dcf7ba0423ffe8b3c98411bc95d7cd123f1ea71e424e` | APPROVE — V1 핵심 근거 독립 재현 | REQUEST_CHANGES — 로컬 HEAD와 원격 PR head 불일치 |
+
+G는 구현·변이·정본 개수 수정과 로컬 검증을 PASS했다. V1과 V2도 로컬 코드 결함 수정은 승인했지만, 새 로컬 변경의 원격 Actions는 실행되지 않았다. 다음 Strict SHIP 프롬프트는 force-push 없이 기존 PR #43 브랜치를 갱신하고 정확한 새 SHA의 Actions와 Claude/Codex 원격 재검증을 수행해야 한다.

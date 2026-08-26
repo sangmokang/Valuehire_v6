@@ -1,6 +1,6 @@
 # Valuehire v6 — 코딩 원칙 (SOT)
 
-최종 갱신: 2026-08-21
+최종 갱신: 2026-08-26
 근거(전체 논증·적대검증): `docs/engineering/v6-coding-principles-goal-2026-08-06.md` §0~§0-E, §8
 
 ## 현재 규칙
@@ -63,7 +63,7 @@
 ## 시행 지점
 
 - Strict는 시작할 때 이 파일과 `docs/sot/principles.yaml`을 현재 저장소에서 직접 읽고 `bash scripts/acceptance-principles-check.sh`를 실행한다. 메모리·과거 대화·이전 보고서는 보조 정보이며 두 파일의 직접 로드를 대신하지 않는다.
-- `docs/sot/principles.yaml`은 이 문서의 32개 원칙 문구와 Strict·pre-push·CI 검증 배선을 기계가 읽도록 옮긴 파생 장부다. 원칙 문구가 갈리면 이 문서가 맞고 검사기는 불일치를 실패시킨다.
+- `docs/sot/principles.yaml`은 이 문서의 34개 원칙 문구와 Strict·pre-push·CI 검증 배선을 기계가 읽도록 옮긴 파생 장부다. 원칙 문구가 갈리면 이 문서가 맞고 검사기는 불일치를 실패시킨다.
 - 각 원칙의 "기계 장치" 열이 실제 강제 지점이다. 이미 CI에 있는 것도 있고(예: 비밀 스캔 → P4·P22, `verify.sh` + `.github/workflows/verify.yml`), 아직 표에만 있고 CI에 없는 것도 있다 — "정본화됐다"가 "이미 강제된다"를 뜻하지 않는다.
 - 오너 원본 27개 번호 ↔ v6 P번호 대응표는 원본 goal 문서 §2에 있다.
 - 실제 강제 여부는 항상 실행으로 재확인한다(가정 금지) — `docs/sot/verification-commands.md` 참고.

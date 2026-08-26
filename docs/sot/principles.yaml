@@ -1,4 +1,4 @@
-# coding-principles.md의 32개 원칙을 Strict 직접 로드와 로컬/CI 검사에 연결하는 기계 장부.
+# coding-principles.md의 34개 원칙을 Strict 직접 로드와 로컬/CI 검사에 연결하는 기계 장부.
 # mechanism_found와 status는 개별 제품 기능의 완성도가 아니라 이 원칙 계약의 직접 로드·검증 배선만 나타낸다.
 # mechanism_expected에 적힌 제품 장치의 실제 구현 여부는 이 장부의 PASS 범위가 아니다.
 # 원칙 문구의 유일한 정본은 docs/sot/coding-principles.md이며 이 파일은 파생 장부다.
@@ -342,4 +342,3 @@
       stages: ["strict", "pre-push", "ci"]
   status: "PASS"
   evidence: "Strict 계약 편입 장치의 실존·직접 실행만 PASS다. mechanism_expected에 적힌 제품 장치의 구현 완료를 주장하지 않는다."
-
