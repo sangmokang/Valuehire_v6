@@ -77,6 +77,16 @@ function lines(buffer) {
   return text.endsWith("\n") ? text.split("\n").length - 1 : text.split("\n").length;
 }
 
+function authoritativeOutputText(rawText) {
+  const trimmed = rawText.trim();
+  if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) return rawText;
+  try {
+    const envelope = JSON.parse(trimmed);
+    if (envelope && typeof envelope === "object" && typeof envelope.result === "string") return envelope.result;
+  } catch {}
+  return rawText;
+}
+
 function safePath(path) {
   return typeof path === "string" && path.length > 0 && !path.startsWith("/") && !path.split("/").includes("..");
 }
@@ -127,7 +137,7 @@ function validateReviewer(violations, id, reviewer, manifest, evidenceCommit, us
   }
   if (output.length !== reviewer.output_bytes) add(violations, field, `${id} raw output byte count mismatch`);
   if (lines(output) !== reviewer.output_lines || reviewer.output_lines < 1) add(violations, field, `${id} raw output line count mismatch`);
-  const text = output.toString("utf8");
+  const text = authoritativeOutputText(output.toString("utf8"));
   if (!text.includes(manifest.candidate_sha)) add(violations, field, `${id} raw output does not name the candidate`);
   const nonempty = text.split(/\r?\n/).filter((line) => line.trim().length > 0);
   const markers = nonempty.filter((line) => /^FINAL: (?:PASS|FAIL)$/.test(line));

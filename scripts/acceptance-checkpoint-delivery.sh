@@ -17,6 +17,8 @@ if ! node --test \
   tests/adversarial-evidence.test.mjs \
   tests/delivery-state.test.mjs \
   tests/delivery-wiring.test.mjs \
+  tests/v1-regression-wiring.test.mjs \
+  tests/goal-current-state.test.mjs \
   tests/pr-draft.test.mjs \
   tests/trusted-secret-runner.test.mjs >"$output" 2>&1; then
   cat "$output"
