@@ -1,0 +1,65 @@
+{
+  "schema_version": "valuehire.strict-run/v2",
+  "run_id": "strict-wu3b-20260827-472c276",
+  "issue_id": "LOCAL-VH-WU3B-20260827",
+  "task": "ValueHire v6 strict delivery chain",
+  "state": "BUILD",
+  "base_sha": "472c276f8c18584719319f1665c73bed61257c1a",
+  "branch": "task/wu3b-delivery-chain-20260827",
+  "worktree": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/wu3b-delivery-chain-20260827",
+  "wus": [
+    {
+      "id": "WU-3b-1",
+      "status": "open",
+      "scope": [
+        "tools/strict/checkpoint-gate.mjs",
+        "tools/strict/checkpoint-policy.mjs",
+        "tests/checkpoint-ledger-trust.test.mjs"
+      ]
+    },
+    {
+      "id": "WU-3b-2",
+      "status": "open",
+      "scope": [
+        "verify.sh",
+        "tools/strict/checkpoint-secrets.mjs",
+        "tests/checkpoint-secret-trust.test.mjs"
+      ]
+    },
+    {
+      "id": "WU-3b-3",
+      "status": "open",
+      "scope": [
+        "contracts/strict-trace-ledger.schema.json",
+        "tools/strict/trace-ledger.mjs",
+        "tests/trace-ledger.test.mjs"
+      ]
+    },
+    {
+      "id": "WU-3b-4",
+      "status": "open",
+      "scope": [
+        "tools/strict/trace-ledger.mjs",
+        "tests/adversarial-evidence.test.mjs",
+        "docs/engineering/valuehire-delivery-chain-goal-2026-08-27.md"
+      ]
+    },
+    {
+      "id": "WU-3b-5",
+      "status": "open",
+      "scope": [
+        "tools/strict/delivery-state.mjs",
+        "tests/delivery-state.test.mjs",
+        "scripts/acceptance-checkpoint-delivery.sh",
+        ".github/workflows/verify.yml",
+        "hooks/pre-push",
+        "docs/sot/verification-commands.md",
+        "docs/sot/hook-contracts.md",
+        "docs/sot/mechanism-registry.yaml",
+        "docs/sot/features/engineering/change-delivery-guardrails.yaml",
+        "docs/sot/features/engineering/verification-evidence-system.yaml"
+      ]
+    }
+  ],
+  "updated_at": "2026-08-27T02:50:00+09:00"
+}
