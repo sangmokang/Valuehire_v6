@@ -17,7 +17,7 @@
 
 ### CI(`​.github/workflows/verify.yml`)가 실제로 돌리는 것
 
-**워크플로 스텝 29개 전부**를 적는다. 판정 기준은 표시 이름이 아니라 **안정된 step id** 다 — 이름은 복사·위조가 자유롭다(2026-08-27 실측). 이 표와 `verify.yml` 의 일치는 `scripts/verify/check-docs-workflow-sync.sh` 가 구조로 대조하며, 손으로 적은 숫자도 함께 검사한다.
+**워크플로 스텝 30개 전부**를 적는다. 판정 기준은 표시 이름이 아니라 **안정된 step id** 다 — 이름은 복사·위조가 자유롭다(2026-08-27 실측). 이 표와 `verify.yml` 의 일치는 `scripts/verify/check-docs-workflow-sync.sh` 가 구조로 대조하며, 손으로 적은 숫자도 함께 검사한다.
 
 | # | step id | 스텝 이름 | 실행 내용 |
 |---|---|---|---|
@@ -47,9 +47,10 @@
 | 24 | `verified-sha` | 인수 검사 verified-sha (초록불이 SHA 에 귀속되는가 · P23) | `scripts/acceptance-verified-sha.sh` — 현재 SHA 귀속 진리표 (P23) |
 | 25 | `ci-step-integrity` | 인수 검사 ci-step-integrity (스텝을 조용히 끄지 못하는가) | `scripts/acceptance-ci-step-integrity.sh` — 조건부·오류무시·echo 대체·표시 이름 위조 차단 |
 | 26 | `ci-required-manifest` | 인수 검사 ci-required-manifest (필수 구조가 명부와 양방향으로 맞는가) | `scripts/acceptance-ci-required-manifest.sh` — 필수 트리거·job·step·명령을 명부와 양방향 대조 (AC1~AC8) |
-| 27 | `semantic-mutations` | 인수 검사 semantic-mutations (검사를 껐을 때 반드시 빨개지는가) | `scripts/acceptance-semantic-mutations.sh` — 인수 검사 무력화 5종 전량 차단 |
-| 28 | `docs-workflow-sync` | 인수 검사 docs-workflow-sync (검증 지침이 실제 워크플로와 맞는가 · AC11) | `scripts/acceptance-docs-workflow-sync.sh` — 이 표의 step id 순서·이름·개수를 워크플로와 구조로 대조 (AC11) |
-| 29 | `verify-ac-m` | 인수 검사 verify-ac-m (mechanism 명부 대조 · AC-M) | `scripts/acceptance-verify-ac-m.sh` — mechanism 명부 대조 (AC-M) |
+| 27 | `ci-workflow-hardening` | 인수 검사 ci-workflow-hardening (V1 이 뚫은 무력화 20종 회귀) | `scripts/acceptance-ci-workflow-hardening.sh` — V1 적대검증이 뚫은 무력화 20종(오류 삼킴 위치·shell 교체·실행 위장·트리거 필터) 회귀 |
+| 28 | `semantic-mutations` | 인수 검사 semantic-mutations (검사를 껐을 때 반드시 빨개지는가) | `scripts/acceptance-semantic-mutations.sh` — 인수 검사 무력화 5종 전량 차단 |
+| 29 | `docs-workflow-sync` | 인수 검사 docs-workflow-sync (검증 지침이 실제 워크플로와 맞는가 · AC11) | `scripts/acceptance-docs-workflow-sync.sh` — 이 표의 step id 순서·이름·개수를 워크플로와 구조로 대조 (AC11) |
+| 30 | `verify-ac-m` | 인수 검사 verify-ac-m (mechanism 명부 대조 · AC-M) | `scripts/acceptance-verify-ac-m.sh` — mechanism 명부 대조 (AC-M) |
 
 *(1번 앞에 `actions/checkout`(step id `checkout`)이 있고 `fetch-depth: 0` 이다 — 8번이 과거 blob 을 열려면 필요하다. 표에는 `- name:` 이 붙은 스텝만 적는다.)*
 

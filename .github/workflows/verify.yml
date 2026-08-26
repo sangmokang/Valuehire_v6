@@ -285,6 +285,14 @@ jobs:
         # 판정 기준은 표시 이름이 아니라 안정된 step id 다.
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-ci-required-manifest.sh
 
+      - name: 인수 검사 ci-workflow-hardening (V1 이 뚫은 무력화 20종 회귀)
+        id: ci-workflow-hardening
+        # 2026-08-27 V1 적대검증이 실제로 뚫은 것들이다: 오류 삼킴 꼬리를 줄 중간에 두기,
+        # shell 을 바꿔 기본 셸의 -e 를 떼어내기, echo/printf/: 로 실행을 위장하기,
+        # 트리거를 남기고 필터로 도달 불가하게 만들기. 반례를 보고서로 끝내지 않고
+        # 회귀 시험으로 편입한다.
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-ci-workflow-hardening.sh
+
       - name: 인수 검사 semantic-mutations (검사를 껐을 때 반드시 빨개지는가)
         id: semantic-mutations
         # 2026-08-21: acceptance-hs-a4.sh 본문을 `exit 0` 으로 바꿔도 CI 가 초록이었다.

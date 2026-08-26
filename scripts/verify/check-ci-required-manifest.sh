@@ -92,18 +92,65 @@ present = case triggers
           when String then [triggers]
           else []
           end
+# 키가 있다고 실행되는 것이 아니다. 2026-08-27 V1 실측: push 를 남기고
+# `branches: ["never-such-branch"]` 나 `paths-ignore: ["**"]` 를 걸면 워크플로가
+# 영원히 실행되지 않는데도 통과했다. 필터까지 봐야 "실행 조건이 살아 있다"고 말할 수 있다.
+BLOCKING_FILTERS = %w[branches-ignore paths paths-ignore tags tags-ignore].freeze
 required_triggers.each do |t|
   checked += 1
-  if present.include?(t.to_s)
-    passes << "TRIGGER #{t}"
-  else
-    errors << "TRIGGER_MISSING: `on:` 에 #{t} 가 없다 (현재: #{present.empty? ? "없음" : present.join(", ")}) — " \
+  name = t.to_s
+  unless present.include?(name)
+    errors << "TRIGGER_MISSING: `on:` 에 #{name} 가 없다 (현재: #{present.empty? ? "없음" : present.join(", ")}) — " \
               "실행 조건이 사라지면 검사는 시작조차 하지 않는다"
+    next
   end
+  cfg = triggers.is_a?(Hash) ? triggers[name] : nil
+  if cfg.is_a?(Hash)
+    bad = cfg.keys.map(&:to_s) & BLOCKING_FILTERS
+    unless bad.empty?
+      errors << "TRIGGER_FILTERED: `on.#{name}` 에 #{bad.join(", ")} 필터가 있다 — " \
+                "트리거를 남겨두고 필터로 도달 불가하게 만들면 검사는 영원히 돌지 않는다"
+      next
+    end
+    if cfg.key?("branches")
+      list = Array(cfg["branches"]).map(&:to_s)
+      unless list.include?("**")
+        errors << "TRIGGER_NARROWED: `on.#{name}.branches` 가 #{list.inspect} — " \
+                  "모든 브랜치(`**`)를 덮지 않으면 이 워크플로는 일부 push 에서 돌지 않는다"
+        next
+      end
+    end
+  end
+  passes << "TRIGGER #{name}"
 end
 
 jobs = wf["jobs"]
 bail("FAIL: jobs 를 읽지 못했다 — 검사 대상 0개는 합격이 아니다", 2) unless jobs.is_a?(Hash) && !jobs.empty?
+
+# ── 셸 교체 금지 (2026-08-27 V1 F2 · 치명) ──────────────────────────────────
+# GitHub 의 기본 bash 셸은 `bash -e` 로 돈다. `shell:` 을 직접 지정하면 `-e` 가 붙지
+# 않으므로, 다줄 run 에서 **마지막 줄 외의 실패가 전부 무시된다**. 스텝을 하나도
+# 건드리지 않고 최상위 `defaults` 한 블록만 넣어도 워크플로 전체가 그렇게 된다.
+# 실측: 다줄 스텝 13개 중 10개의 중간 실패가 조용히 사라졌다.
+def check_shell(node, label, errors)
+  return unless node.is_a?(Hash)
+  if node.key?("shell")
+    errors << "SHELL_OVERRIDE: #{label} 이 shell 을 직접 지정한다 (#{node["shell"].inspect}) — " \
+              "기본 셸의 -e 가 사라져 다줄 run 의 중간 실패가 무시된다"
+  end
+  d = node["defaults"]
+  return unless d.is_a?(Hash)
+  r = d["run"]
+  return unless r.is_a?(Hash)
+  if r.key?("shell")
+    errors << "SHELL_OVERRIDE: #{label}.defaults.run 이 shell 을 지정한다 (#{r["shell"].inspect}) — " \
+              "스텝을 하나도 건드리지 않고 워크플로 전체의 실패 전파를 끌 수 있다"
+  end
+end
+
+checked += 1
+check_shell(wf, "workflow", errors)
+jobs.each { |jn, job| checked += 1; check_shell(job, "jobs.#{jn}", errors) }
 
 # ── 필수 job ─────────────────────────────────────────────────────────────────
 (manifest["required_jobs"] || []).each do |rj|
@@ -139,14 +186,42 @@ end
 
 # 실행처럼 보이지만 실패를 삼키는 꼬리. 문자 클래스로 쓴 것은 이 소스 자체가 P13 약화
 # 탐지 패턴에 걸리지 않게 하기 위해서다(저장소 선례와 같은 이유).
+# 전체 run 에 적용하는 금지 형태. 여기 있는 것은 "정상 코드에는 나올 이유가 없는" 것만
+# 둔다 — 필수 명령 줄에 꼬리를 붙이는 공격은 아래 "단독 줄" 규칙이 막는다.
 SWALLOW = [
   [/[|][|]\s*true\s*$/,        "오류를 무시하는 꼬리"],
   [/[|][|]\s*:\s*$/,           "오류를 무시하는 꼬리(:)"],
   [/;\s*true\s*$/,             "세미콜론 뒤 무조건 성공"],
   [/;\s*:\s*$/,                "세미콜론 뒤 무조건 성공(:)"],
   [/[|][|]\s*exit\s+0\s*$/,    "오류를 성공 종료로 바꾸는 꼬리"],
-  [/^\s*set\s+\+e\s*$/,        "오류 전파를 끄는 설정"],
+  [/\Aset\s+\+e\b/,            "오류 전파를 끄는 설정 (set +e)"],
+  [/\Aset\s+\+o\s+errexit\b/, "오류 전파를 끄는 설정 (set +o errexit)"],
+  [/\Aset\s+-e\s*\+/,          "오류 전파를 끄는 설정 (set -e+…)"],
+  [/\Atrap\s+.*\bERR\b/,       "ERR 트랩으로 실패를 가로챈다"],
 ]
+
+# 실제로 실행되는 줄만 남긴다. 주석·빈 줄을 걷어내고, heredoc 본문은 데이터이지
+# 명령이 아니므로 통째로 건너뛴다(heredoc 안에 명령을 적어 위장하는 것을 막는다).
+def executable_lines(run)
+  return [] unless run.is_a?(String)
+  out = []
+  heredoc_end = nil
+  run.each_line do |raw|
+    line = raw.rstrip
+    if heredoc_end
+      heredoc_end = nil if line.strip == heredoc_end
+      next
+    end
+    stripped = line.strip
+    next if stripped.empty?
+    next if stripped.start_with?("#")
+    if (m = stripped.match(/<<-?\s*[\x27"]?([A-Za-z_][A-Za-z0-9_]*)[\x27"]?/))
+      heredoc_end = m[1]
+    end
+    out << stripped
+  end
+  out
+end
 
 def scan_swallow(run, label, errors, swallow)
   return unless run.is_a?(String)
@@ -211,21 +286,50 @@ required_steps.each do |rs|
   end
 
   run = step["run"]
-  wants = rs["must_run_contains"] || []
-  unless wants.empty?
-    unless run.is_a?(String)
-      errors << "STEP_NO_RUN: #{label} 에 run 이 없다 — 명부는 이 스텝이 명령을 돌리기를 요구한다"
-      next
-    end
-    wants.each do |cmd|
-      if run.include?(cmd.to_s)
-        passes << "STEP #{sid} — `#{cmd}`"
+  commands = rs["must_run_commands"] || []
+  contains = rs["must_run_contains"] || []
+
+  if (!commands.empty? || !contains.empty?) && !run.is_a?(String)
+    errors << "STEP_NO_RUN: #{label} 에 run 이 없다 — 명부는 이 스텝이 명령을 돌리기를 요구한다"
+    next
+  end
+
+  # must_run_commands — 그 명령이 **그 줄에서 단독으로** 실행돼야 한다.
+  #
+  # 2026-08-27 V1 실측: 부분 문자열 대조는 아래를 전부 "명령이 있다"로 셌다.
+  #   `bash x.sh || true; echo done` · `bash x.sh | cat` · `bash x.sh &`
+  #   `echo "bash x.sh"` · `printf '%s\n' "bash x.sh"` · `: bash x.sh` · `# bash x.sh`
+  # 앞뒤에 무엇이 붙어도 문자열은 그대로 있기 때문이다. 그래서 "포함"이 아니라
+  # "그 줄 전체가 이 명령"을 요구한다. 꼬리를 붙이는 순간 단독이 아니게 되어 걸린다.
+  unless commands.empty?
+    lines = executable_lines(run)
+    commands.each do |cmd|
+      target = cmd.to_s.strip
+      if lines.include?(target)
+        passes << "STEP #{sid} — `#{target}`"
       else
-        errors << "STEP_COMMAND_MISSING: #{label} 의 run 에 `#{cmd}` 가 없다 — " \
-                  "명부가 요구하는 명령이 실행되지 않는다"
+        near = lines.find { |l| l.include?(target) }
+        detail = near ? " (비슷한 줄: `#{near}`)" : ""
+        errors << "STEP_COMMAND_NOT_STANDALONE: #{label} 의 run 에 `#{target}` 가 " \
+                  "단독 줄로 없다#{detail} — 앞뒤에 무엇이든 붙으면 실패가 전파되지 않을 수 있다"
       end
     end
   end
+
+  # must_run_contains — 인라인 본문 스텝용. 단독 줄을 요구할 수 없는 자리에만 쓴다.
+  # 주석은 걷어내고 본다. 주석에만 남은 명령은 실행되지 않는다.
+  unless contains.empty?
+    body = executable_lines(run).join("\n")
+    contains.each do |frag|
+      if body.include?(frag.to_s)
+        passes << "STEP #{sid} ~ `#{frag}`"
+      else
+        errors << "STEP_FRAGMENT_MISSING: #{label} 의 실행되는 줄에 `#{frag}` 가 없다 — " \
+                  "주석 처리되었거나 사라졌다"
+      end
+    end
+  end
+
   scan_swallow(run, label, errors, SWALLOW)
 end
 
@@ -234,7 +338,10 @@ jobs.each do |jname, job|
   next unless job.is_a?(Hash)
   (job["steps"] || []).each_with_index do |st, i|
     next unless st.is_a?(Hash)
-    scan_swallow(st["run"], "jobs.#{jname}.steps[#{i}](id=#{st["id"].inspect})", errors, SWALLOW)
+    slabel = "jobs.#{jname}.steps[#{i}](id=#{st["id"].inspect})"
+    scan_swallow(st["run"], slabel, errors, SWALLOW)
+    # 스텝 하나만 shell 을 바꿔도 그 스텝의 다줄 run 은 -e 없이 돈다.
+    check_shell(st, slabel, errors)
   end
 end
 
