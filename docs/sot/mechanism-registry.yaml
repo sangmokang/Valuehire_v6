@@ -16,6 +16,11 @@
   target: "-name 'verify.sh' -o -name 'acceptance-*.sh'"
   stage: "pre-push"
   required: true
+- id: "checkpoint-delivery-prepush"
+  path: "hooks/pre-push"
+  target: "STRICT_DELIVERY_CHECK=scripts/acceptance-checkpoint-delivery.sh"
+  stage: "pre-push"
+  required: true
 - id: "ci-secret-scan"
   path: ".github/workflows/verify.yml"
   target: "run: bash verify.sh"
@@ -36,6 +41,12 @@
 - id: "principles-explicit-ci"
   path: ".github/workflows/verify.yml"
   target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-principles-check.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
+- id: "checkpoint-delivery-ci"
+  path: ".github/workflows/verify.yml"
+  target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-checkpoint-delivery.sh"
   stage: "ci"
   ci_mirror_job: "verify"
   required: true
@@ -81,4 +92,3 @@
   stage: "manual"
   manual_reason: "원격 조회가 필요해 CI 안에서 자기 SHA 를 검사하는 것은 뜻이 없다. 머지 전 판정 도구"
   required: true
-

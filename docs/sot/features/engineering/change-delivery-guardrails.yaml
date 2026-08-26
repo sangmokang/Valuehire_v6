@@ -79,6 +79,11 @@
         "scope": "HEAD, origin relationship and unresolved acceptance failures"
       },
       {
+        "kind": "delivery_state_boundary",
+        "path": "tools/strict/delivery-state.mjs",
+        "scope": "PR, GitHub CI, user merge, deploy and live verification states"
+      },
+      {
         "kind": "cleanroom_boundary",
         "path": "scripts/acceptance-hs-cleanroom.sh",
         "contract": "contracts/cleanroom-deny-patterns.txt",
@@ -141,6 +146,11 @@
         "id": "CDG-INV-6",
         "rule": "Tracked content must not contain forbidden legacy repository names or worktree path combinations, and the eight cleanroom variants stay wired to CI.",
         "evidence": "contracts/cleanroom-deny-patterns.txt"
+      },
+      {
+        "id": "CDG-INV-7",
+        "rule": "Checkpoint readiness and overall T cannot be promoted before user merge, and deploy/live evidence belongs only to post-merge stages.",
+        "evidence": "tools/strict/delivery-state.mjs"
       }
     ],
     "boundaries": [
@@ -187,7 +197,8 @@
       "scripts/acceptance-hs-cleanroom-file-urls.sh",
       "scripts/acceptance-hs-cleanroom-hook-env.sh",
       "scripts/acceptance-hs-cleanroom-hook-env-mutations.sh",
-      "contracts/cleanroom-deny-patterns.txt"
+      "contracts/cleanroom-deny-patterns.txt",
+      "tools/strict/delivery-state.mjs"
     ],
     "change_protocol": {
       "required_updates": [

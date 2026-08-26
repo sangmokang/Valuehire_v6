@@ -1,6 +1,6 @@
 # Valuehire v6 — 로컬 강제 장치(git hook) 계약 (SOT)
 
-최종 갱신: 2026-08-08
+최종 갱신: 2026-08-27
 근거(도입 배경·적대검증·6종 위반 시연): `docs/engineering/hook-enforcement-goal-2026-08-07.md`
 
 ## 현재 규칙 — 입출력 계약
@@ -35,6 +35,8 @@
         차단 시 stderr: "BLOCKED: <스크립트경로> exit=<code>"
 불변식: 스크립트가 0개 발견되면 exit 1 (fail-closed — "검사할 게 없어서 통과"를 금지)
         미추적 파일(??) 존재 시 exit 1 (P15)
+        scripts/acceptance-checkpoint-delivery.sh가 CI 실행 줄에 없으면 exit 1
+        로컬 합격은 실제 PR·GitHub CI·사용자 merge 증거를 대신하지 않음
 한계  : git push --no-verify 로 우회 가능. CI 가 최종 방어선 (문서에 명시)
 ```
 

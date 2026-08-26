@@ -63,6 +63,7 @@ bash scripts/acceptance-principles-check.sh
 # (PUSH_CHECKS 고정 목록은 글로브 도입과 함께 제거했다 — 남겨두면 다음 편집자가 그것을
 #  고치고 검사 목록이 바뀐 줄 착각한다.)
 DEFERRED="acceptance-0-5 acceptance-0-7"
+STRICT_DELIVERY_CHECK=scripts/acceptance-checkpoint-delivery.sh
 
 # 3-a) 이관한 검사가 CI 에 실제로 있는가 (이관이 조용한 삭제가 되는 것을 막는다)
 #
@@ -81,6 +82,10 @@ if [ ! -f "$WF" ]; then
 else
   # 주석 줄을 제거한 '실제로 실행되는' 워크플로 본문
   ACTIVE=$(grep -v '^[[:space:]]*#' "$WF")
+
+  if ! printf '%s\n' "$ACTIVE" | grep -qF "run: bash scripts/verify/run-acceptance.sh $STRICT_DELIVERY_CHECK"; then
+    block "$STRICT_DELIVERY_CHECK 가 CI($WF)의 실행 줄에 없다 — 로컬 GREEN을 원격 GREEN으로 대체할 수 없다"
+  fi
 
   # 실행 동사를 요구한다. 이름만 보면 `run: echo scripts/acceptance-0-7.sh` 한 줄로
   # 뚫린다(2026-08-07 실측 — 0-7 이 CI 에서 전혀 안 도는데 push 통과).

@@ -37,6 +37,7 @@
       "ci_steps": [
         "Strict 원칙 정본·장부·배선 검사",
         "Strict 원칙 적대 fixture·500/501 경계",
+        "Strict 전달 사슬 신뢰 경계와 상태 모델",
         "Strict 전역 스킬 잠금 장치 격리 회귀",
         "HumanSearch G2 테스트 게이트 (정적·단위 + runtime import 증명)",
         "인수 검사 0-6 (가짜 검증 스크립트 0건)",
@@ -49,6 +50,7 @@
       "ci_command_paths": [
         "scripts/acceptance-0-6.sh",
         "scripts/acceptance-ci-step-integrity.sh",
+        "scripts/acceptance-checkpoint-delivery.sh",
         "scripts/acceptance-guard-global-skill-files.sh",
         "scripts/acceptance-hs-gates-antiforge.sh",
         "scripts/acceptance-hs-gates-mutations.sh",
@@ -77,6 +79,15 @@
       {
         "kind": "principle_gate",
         "path": "scripts/acceptance-principles-check.sh"
+      },
+      {
+        "kind": "delivery_evidence_gate",
+        "path": "scripts/acceptance-checkpoint-delivery.sh",
+        "validators": [
+          "tools/strict/trace-ledger.mjs",
+          "tools/strict/adversarial-evidence.mjs",
+          "tools/strict/delivery-state.mjs"
+        ]
       },
       {
         "kind": "semantic_attack",
@@ -171,6 +182,11 @@
         "id": "VES-INV-6",
         "rule": "Global Strict skill verification uses lock, check and unlock transitions and its isolated regression gate must stay wired to CI.",
         "evidence": "scripts/guard-global-skill-files.sh"
+      },
+      {
+        "id": "VES-INV-7",
+        "rule": "Local validation, GitHub CI, user merge, deploy and live verification are distinct pinned states; pre-merge readiness and overall T remain NOT_RUN.",
+        "evidence": "tools/strict/delivery-state.mjs"
       }
     ],
     "boundaries": [
@@ -207,13 +223,17 @@
       "scripts/verify/run-acceptance.sh",
       "scripts/acceptance-semantic-mutations.sh",
       "scripts/acceptance-ci-step-integrity.sh",
+      "scripts/acceptance-checkpoint-delivery.sh",
       "scripts/acceptance-verified-sha.sh",
       "scripts/acceptance-verify-ac-m.sh",
       "scripts/guard-global-skill-files.sh",
       "scripts/verify/check-strict-principles-skills.sh",
       "scripts/acceptance-guard-global-skill-files.sh",
       "docs/sot/principles.yaml",
-      "docs/sot/mechanism-registry.yaml"
+      "docs/sot/mechanism-registry.yaml",
+      "tools/strict/trace-ledger.mjs",
+      "tools/strict/adversarial-evidence.mjs",
+      "tools/strict/delivery-state.mjs"
     ],
     "change_protocol": {
       "required_updates": [
