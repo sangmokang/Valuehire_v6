@@ -84,9 +84,61 @@ expect_rc "파싱 불가 워크플로 → NOT_RUN" "$TMP/broken.yml" 2
 printf 'name: x\njobs: {}\n' > "$TMP/nojobs.yml"
 expect_rc "job 0개 → NOT_RUN" "$TMP/nojobs.yml" 2
 
+# ── 표시 이름 위조로 예외 권한이 옮겨가지 않는가 (AC5) ──────────────────────
+#
+# 예외를 표시 이름으로 판정하면, 허용된 이름을 다른 스텝에 복사하는 것만으로 그 스텝이
+# 조건부가 되어도 통과한다. 이름은 사람을 위한 것이고 복사가 자유롭다. 판정 기준은
+# 안정된 step id 여야 한다.
+ALLOWED_NAME='인수 검사 0-5 (push · CI 연결)'
+p=$(mutate name-forged "
+require 'psych'
+path = ARGV[0]
+d = Psych.safe_load(File.read(path), aliases: true)
+s = d['jobs']['verify']['steps'].find { |x| x['id'] == 'hs-a4' }
+s['name'] = '$ALLOWED_NAME'
+s['i' + 'f'] = \"github.event_name == 'never'\"
+File.write(path, Psych.dump(d))
+")
+expect_rc "허용된 표시 이름을 다른 스텝에 복사 → 불합격" "$p" 1
+
+# 뒤집어서도 확인한다. 예외는 id 에 붙어 있으므로 id 를 바꾸면 예외가 사라져야 한다.
+p=$(mutate allowed-id-renamed "
+require 'psych'
+path = ARGV[0]
+d = Psych.safe_load(File.read(path), aliases: true)
+s = d['jobs']['verify']['steps'].find { |x| x['id'] == 'acceptance-0-5' }
+s['id'] = 'acceptance-0-5-renamed'
+File.write(path, Psych.dump(d))
+")
+expect_rc "예외 스텝의 id 를 바꾸면 예외 상실 → 불합격" "$p" 1
+
+# ── run 뒤에 오류 무시 꼬리를 붙이는 우회 (AC4) ──────────────────────────────
+# 명령 앞부분은 그대로 두고 뒤에만 붙이므로 "그 명령이 있는가" 식 검사로는 잡히지 않는다.
+ORTRUE='|'
+ORTRUE="$ORTRUE| true"
+p=$(mutate run-or-true "
+require 'psych'
+path = ARGV[0]
+d = Psych.safe_load(File.read(path), aliases: true)
+s = d['jobs']['verify']['steps'].find { |x| x['id'] == 'hs-a4' }
+s['run'] = s['run'].rstrip + ' ' + '$ORTRUE' + \"\n\"
+File.write(path, Psych.dump(d))
+")
+expect_rc "run 뒤에 오류 무시 꼬리 → 불합격" "$p" 1
+
+p=$(mutate run-semi-true "
+require 'psych'
+path = ARGV[0]
+d = Psych.safe_load(File.read(path), aliases: true)
+s = d['jobs']['verify']['steps'].find { |x| x['id'] == 'hs-a4' }
+s['run'] = s['run'].rstrip + '; ' + 'true' + \"\n\"
+File.write(path, Psych.dump(d))
+")
+expect_rc "run 뒤에 세미콜론 무조건 성공 → 불합격" "$p" 1
+
 # ── 예외 목록이 살아 있는가(과잉 차단 방지) ─────────────────────────────────
-if bash "$CHECKER" "$WF" 2>&1 | grep -q '^ALLOWED: 인수 검사 0-5'; then
-  record 0 "이유가 적힌 예외는 통과" "0-5 의 main 전용 조건"
+if bash "$CHECKER" "$WF" 2>&1 | grep -q '^ALLOWED: acceptance-0-5'; then
+  record 0 "이유가 적힌 예외는 통과" "id=acceptance-0-5 의 main 전용 조건"
 else
   record 1 "이유가 적힌 예외는 통과" "ALLOWED 출력 없음 — 예외 목록이 죽었다"
 fi
