@@ -162,11 +162,15 @@ ruby -e 'p=ARGV[0]; s=File.read(p).sub("run: bash scripts/verify/run-acceptance.
 expect_principles "C10-A" "CI에 실패무시(or-true) 삽입" 1 FAIL
 
 new_case c10b
-ruby -e 'p=ARGV[0]; s=File.read(p).sub("      - name: Strict 원칙 정본·장부·배선 검사\n        run:", "      - name: Strict 원칙 정본·장부·배선 검사\n        continue-on-error:" + " true" + "\n        run:"); File.write(p,s)' "$CASE/.github/workflows/verify.yml"
+# 주입 지점은 표시 이름이 아니라 **안정된 step id** 로 잡는다. 이름 바로 뒤에 무엇이
+# 오는지를 가정하면, 워크플로에 줄 하나만 추가돼도 주입이 조용히 빗나가 "공격하지 않은
+# 채 통과"가 된다(2026-08-27 실측: id: 줄을 넣자 C10-B·C10-C 가 그렇게 됐다).
+# 주입이 실패하면 raise 로 즉시 드러낸다 — 조용히 넘어가면 시험이 성립하지 않는다.
+ruby -e 'p=ARGV[0]; s=File.read(p); anchor="        id: principles-check\n        run:"; raise "anchor missing" unless s.include?(anchor); s2=s.sub(anchor, "        id: principles-check\n        continue-on-error:" + " true" + "\n        run:"); raise "injection failed" if s2==s; File.write(p,s2)' "$CASE/.github/workflows/verify.yml"
 expect_principles "C10-B" "CI에 continue-on-error 삽입" 1 FAIL
 
 new_case c10c
-ruby -e 'p=ARGV[0]; s=File.read(p).sub("      - name: Strict 원칙 정본·장부·배선 검사\n        run:", "      - name: Strict 원칙 정본·장부·배선 검사\n        if: exists(\"docs/sot/principles.yaml\")\n        run:"); File.write(p,s)' "$CASE/.github/workflows/verify.yml"
+ruby -e 'p=ARGV[0]; s=File.read(p); anchor="        id: principles-check\n        run:"; raise "anchor missing" unless s.include?(anchor); s2=s.sub(anchor, "        id: principles-check\n        if: exists(\"docs/sot/principles.yaml\")\n        run:"); raise "injection failed" if s2==s; File.write(p,s2)' "$CASE/.github/workflows/verify.yml"
 expect_principles "C10-C" "CI에 if exists 조건 삽입" 1 FAIL
 
 new_case c10d
