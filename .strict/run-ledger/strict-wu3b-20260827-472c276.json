@@ -54,9 +54,43 @@
       "id": "WU-3b-2",
       "status": "open",
       "scope": [
+        ".strict/run-ledger/strict-wu3b-20260827-472c276.json",
         "verify.sh",
+        "tools/strict/checkpoint-gate.mjs",
         "tools/strict/checkpoint-secrets.mjs",
         "tests/checkpoint-secret-trust.test.mjs"
+      ],
+      "red_commit": "bb21ec788706ca0691f776bd436bc6804a3bcd33",
+      "implementation_commit": null,
+      "validation": [
+        {
+          "command": "node --test tests/checkpoint-secret-trust.test.mjs",
+          "started_at": "2026-08-26T18:28:56Z",
+          "finished_at": "2026-08-26T18:29:11Z",
+          "exit": 0,
+          "checked": 9,
+          "output_sha256": "3c7950ad9d30148edfb47dbe1ee93a8d9289821874f1a7f5cb1c760f3e77e4b5",
+          "output_ref": "/tmp/valuehire-strict-wu3b-evidence/wu3b2/secret-trust.tap"
+        },
+        {
+          "command": "worktree-read secret-policy mutation + node --test --test-name-pattern=unstaged decoys",
+          "started_at": "2026-08-26T18:32:31Z",
+          "finished_at": "2026-08-26T18:32:33Z",
+          "exit": 1,
+          "expected_exit": 1,
+          "checked": 2,
+          "output_sha256": "866e6406c3a260a0af887ac93d471ae493c24372ee9977879f20ff7d779d898c",
+          "output_ref": "/tmp/valuehire-strict-wu3b-evidence/wu3b2/secret-worktree-mutation.tap"
+        },
+        {
+          "command": "node tools/strict/checkpoint-gate.mjs --base bb21ec788706ca0691f776bd436bc6804a3bcd33 --json --run-id strict-wu3b-20260827-472c276 --wu-id WU-3b-2",
+          "started_at": "2026-08-26T18:34:43Z",
+          "finished_at": "2026-08-26T18:35:25Z",
+          "exit": 0,
+          "checked": 3,
+          "output_sha256": "e4b15b1a7bd891e43aabe6b5df41a78097670e63e8cacda701b837d5cdbd7a95",
+          "output_ref": "/tmp/valuehire-strict-wu3b-evidence/wu3b2/staged-gate.json"
+        }
       ]
     },
     {

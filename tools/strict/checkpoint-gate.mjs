@@ -2,7 +2,14 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { countJavaScriptWeakening } from "./checkpoint-js-scan.mjs";
-import { secureLedgerScopes } from "./checkpoint-policy.mjs";
+
+let secureLedgerScopes;
+let runTrustedSecretScan;
+
+async function loadSecurePolicy() {
+  ({ secureLedgerScopes } = await import("./checkpoint-policy.mjs"));
+  ({ runTrustedSecretScan } = await import("./checkpoint-secrets.mjs"));
+}
 
 const CHECKS = {
   INPUT: "input",
@@ -13,7 +20,14 @@ const CHECKS = {
 };
 
 function parseArgs(argv) {
-  const args = { base: null, json: false, scopes: [], runId: null, wuId: null };
+  const args = {
+    base: null,
+    json: false,
+    scopes: [],
+    runId: null,
+    wuId: null,
+    secretPatternSha256: null,
+  };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--json") {
@@ -37,6 +51,11 @@ function parseArgs(argv) {
       const value = argv[index + 1];
       if (!value || value.startsWith("--")) throw new Error("--wu-id requires a value");
       args.wuId = value;
+      index += 1;
+    } else if (arg === "--secret-pattern-sha256") {
+      const value = argv[index + 1];
+      if (!value || value.startsWith("--")) throw new Error("--secret-pattern-sha256 requires a value");
+      args.secretPatternSha256 = value;
       index += 1;
     } else {
       throw new Error(`unknown argument: ${arg}`);
@@ -259,8 +278,22 @@ function parseScannerFiles(output, stagedFiles) {
   return [...files].filter((file) => stagedFiles.has(file));
 }
 
-function checkSecrets(changes) {
+function checkSecrets(changes, authority) {
   const stagedFiles = new Set(changes.filter((change) => change.status !== "D").map((change) => change.path));
+  if (authority.runId) {
+    const result = runTrustedSecretScan({
+      readIndex,
+      localPatternSha256: authority.secretPatternSha256,
+    });
+    if (result.status === 0) return [];
+    const output = `${result.stdout}\n${result.stderr}`;
+    const files = parseScannerFiles(output, stagedFiles);
+    return (files.length > 0 ? files : [""]).map((file) => ({
+      check: CHECKS.LEAKS,
+      file,
+      detail: `trusted repository secret scanner failed with exit ${result.status}`,
+    }));
+  }
   if (existsSync("verify.sh")) {
     const result = spawnSync("bash", ["verify.sh"], {
       encoding: "utf8",
@@ -492,7 +525,7 @@ function emit(result, json) {
   }
 }
 
-function main() {
+async function main() {
   let args;
   const violations = [];
   try {
@@ -502,10 +535,17 @@ function main() {
       violations.push({ check: CHECKS.INPUT, file: "", detail: "--base is required" });
     } else {
       git(["rev-parse", "--verify", `${args.base}^{commit}`]);
+      if (args.runId) await loadSecurePolicy();
     }
   } catch (error) {
     violations.push({ check: CHECKS.INPUT, file: "", detail: error.message });
-    args ??= { json: process.argv.includes("--json"), scopes: [], runId: null, wuId: null };
+    args ??= {
+      json: process.argv.includes("--json"),
+      scopes: [],
+      runId: null,
+      wuId: null,
+      secretPatternSha256: null,
+    };
   }
 
   if (violations.length === 0) {
@@ -518,7 +558,7 @@ function main() {
     if (violations.length === 0) {
       violations.push(
         ...runCheck(CHECKS.SCOPE, ".strict/run-ledger", () => checkScope(changes, args.scopes, args)),
-        ...runCheck(CHECKS.LEAKS, "", () => checkSecrets(changes)),
+        ...runCheck(CHECKS.LEAKS, "", () => checkSecrets(changes, args)),
         ...runCheck(CHECKS.TEST_WEAKENING, "", () => checkTestWeakening(args.base, changes)),
         ...runCheck(CHECKS.SIZE_LIMIT, "docs/sot/coding-principles.md", () => checkSizeLimit(changes)),
       );
@@ -530,4 +570,4 @@ function main() {
   process.exit(result.pass ? 0 : 1);
 }
 
-main();
+await main();
