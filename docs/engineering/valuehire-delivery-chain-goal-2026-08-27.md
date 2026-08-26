@@ -2,14 +2,14 @@
 
 ## 결론
 
-현재 후보는 아직 전달할 수 없다. 검사 입력을 작업 폴더에서 바꿀 수 있고, 변경과 검증·원격 결과를 같은 대상으로 묶는 장부가 없기 때문이다.
+현재 후보는 로컬 검사 경계를 닫았지만 원격 PR, GitHub CI, 사용자 merge가 미실행이라 아직 전달 흐름 전체를 마치지 못했다.
 
-이번 로컬 작업은 이 두 허점을 닫고 검증 가능한 커밋까지 만든다. 실제 원격 전달, 병합, 배포는 승인 전 실행하지 않으며 미실행 상태를 합격으로 바꾸지 않는다.
+이번 로컬 작업은 두 허점을 닫고 검증 가능한 커밋까지 만들었다. 실제 원격 전달, 병합, 배포는 승인 전 실행하지 않으며 미실행 상태를 합격으로 바꾸지 않는다.
 
-## 판단 근거
+## 변경 전 판단 근거
 
-- `tools/strict/checkpoint-gate.mjs`는 `.strict/run-ledger/*.json`을 작업 폴더에서 전부 읽고 `updated_at`이 가장 큰 파일을 자동 선택한다.
-- `verify.sh`는 기본 실행에서 작업 폴더의 `.secret-patterns.default`와 `.secret-patterns`를 합친다.
+- 변경 전 `tools/strict/checkpoint-gate.mjs`는 `.strict/run-ledger/*.json`을 작업 폴더에서 전부 읽고 `updated_at`이 가장 큰 파일을 자동 선택했다.
+- 변경 전 `verify.sh`는 기본 실행에서 작업 폴더의 `.secret-patterns.default`와 `.secret-patterns`를 합쳤다.
 - 과거 WU-3a V1/V2 증거의 대상 tree는 현재 HEAD `472c276f8c18584719319f1665c73bed61257c1a`가 아니므로 현재 후보 합격증이 아니다.
 - `docs/sot/coding-principles.md` P11 hard limit은 직접 작성 코드 파일 600 LOC다. 새 코드 파일과 수정 후 기존 파일 모두 이를 넘지 않는다.
 - 저장소에는 `AGENTS.md`와 `CLAUDE.md`가 없었다. 사용자 메시지로 제공된 AGENTS 계약은 적용하되 저장소 직접 로드는 `NOT_RUN`으로 기록한다.
