@@ -1,0 +1,7 @@
+command=bash hooks/pre-push
+started_at=2026-08-26T21:04:07Z
+finished_at=2026-08-26T21:07:36Z
+cwd=/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/tmp.XSxwm5odIQ/repo
+env.CI=<unset>
+env.NODE_ENV=<unset>
+exit=0

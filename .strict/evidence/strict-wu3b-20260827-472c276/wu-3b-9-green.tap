@@ -1,0 +1,112 @@
+TAP version 13
+# Subtest: a pinned trace ledger connects issue, branch, worktree, WU commits, and full evidence
+ok 1 - a pinned trace ledger connects issue, branch, worktree, WU commits, and full evidence
+  ---
+  duration_ms: 872.920584
+  type: 'test'
+  ...
+# Subtest: worktree ledger deletion cannot forge the pinned result
+ok 2 - worktree ledger deletion cannot forge the pinned result
+  ---
+  duration_ms: 932.582667
+  type: 'test'
+  ...
+# Subtest: worktree ledger copy decoy cannot forge the pinned result
+ok 3 - worktree ledger copy decoy cannot forge the pinned result
+  ---
+  duration_ms: 891.08
+  type: 'test'
+  ...
+# Subtest: worktree ledger reorder cannot forge the pinned result
+ok 4 - worktree ledger reorder cannot forge the pinned result
+  ---
+  duration_ms: 721.553791
+  type: 'test'
+  ...
+# Subtest: worktree ledger past timestamp cannot forge the pinned result
+ok 5 - worktree ledger past timestamp cannot forge the pinned result
+  ---
+  duration_ms: 757.657083
+  type: 'test'
+  ...
+# Subtest: a substituted ledger blob is rejected
+ok 6 - a substituted ledger blob is rejected
+  ---
+  duration_ms: 788.751292
+  type: 'test'
+  ...
+# Subtest: record deletion is rejected
+ok 7 - record deletion is rejected
+  ---
+  duration_ms: 716.710083
+  type: 'test'
+  ...
+# Subtest: record duplication is rejected
+ok 8 - record duplication is rejected
+  ---
+  duration_ms: 1130.6285
+  type: 'test'
+  ...
+# Subtest: record reordering is rejected
+ok 9 - record reordering is rejected
+  ---
+  duration_ms: 1141.908916
+  type: 'test'
+  ...
+# Subtest: a timestamp before the issue contract is rejected
+ok 10 - a timestamp before the issue contract is rejected
+  ---
+  duration_ms: 776.0985
+  type: 'test'
+  ...
+# Subtest: a WU ID that disagrees with commit trailers is rejected
+ok 11 - a WU ID that disagrees with commit trailers is rejected
+  ---
+  duration_ms: 815.974667
+  type: 'test'
+  ...
+# Subtest: a WU implementation commit mismatch is rejected
+ok 12 - a WU implementation commit mismatch is rejected
+  ---
+  duration_ms: 874.247667
+  type: 'test'
+  ...
+# Subtest: a GREEN commit that rewrites its RED test is rejected
+ok 13 - a GREEN commit that rewrites its RED test is rejected
+  ---
+  duration_ms: 1048.947917
+  type: 'test'
+  ...
+# Subtest: a stale branch is rejected
+ok 14 - a stale branch is rejected
+  ---
+  duration_ms: 1112.285542
+  type: 'test'
+  ...
+# Subtest: a stale worktree is rejected
+ok 15 - a stale worktree is rejected
+  ---
+  duration_ms: 762.381625
+  type: 'test'
+  ...
+# Subtest: zero evidence is rejected
+ok 16 - zero evidence is rejected
+  ---
+  duration_ms: 784.099167
+  type: 'test'
+  ...
+# Subtest: partial output is rejected
+ok 17 - partial output is rejected
+  ---
+  duration_ms: 816.867
+  type: 'test'
+  ...
+1..17
+# tests 17
+# suites 0
+# pass 17
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 15202.927542

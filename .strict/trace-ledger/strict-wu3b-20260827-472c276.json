@@ -1,0 +1,436 @@
+{
+  "schema_version": "valuehire.strict-trace/v1",
+  "run_id": "strict-wu3b-20260827-472c276",
+  "issue": {
+    "id": "LOCAL-VH-WU3B-20260827",
+    "contract_path": "docs/engineering/valuehire-delivery-chain-issue-2026-08-27.md",
+    "contract_sha256": "01f5210c4bf997f7dbe455c1c6f8795dd1ef7ae674d6fdfdd999e50c336e8cfe",
+    "opened_at": "2026-08-26T17:45:29Z"
+  },
+  "base_commit": "472c276f8c18584719319f1665c73bed61257c1a",
+  "candidate_commit": "5b3c9f4fb3798a23616078e39335f3258a644389",
+  "branch": "task/wu3b-delivery-chain-20260827",
+  "worktree": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/wu3b-delivery-chain-20260827",
+  "records": [
+    {
+      "sequence": 1,
+      "wu_id": "WU-3b-1",
+      "red_commit": "2ef1f62814284cf20ee5b5270626e972e4460af4",
+      "implementation_commit": "8949d27d638bda0581274c9a9a560044cf07327f",
+      "previous_record_sha256": null,
+      "evidence": [
+        {
+          "command": "node tools/strict/checkpoint-gate.mjs --base 2ef1f62814284cf20ee5b5270626e972e4460af4 --json --run-id strict-wu3b-20260827-472c276 --wu-id WU-3b-1",
+          "cwd": "${WORKTREE}",
+          "environment": {
+            "CI": "false",
+            "NODE_ENV": "test",
+            "authority": "git-index"
+          },
+          "started_at": "2026-08-26T18:24:19Z",
+          "finished_at": "2026-08-26T18:24:46Z",
+          "exit": 0,
+          "expected_exit": 0,
+          "output_path": ".strict/evidence/strict-wu3b-20260827-472c276/wu-3b-1-green.json",
+          "output_sha256": "e4b15b1a7bd891e43aabe6b5df41a78097670e63e8cacda701b837d5cdbd7a95",
+          "output_bytes": 30,
+          "output_lines": 1,
+          "output_complete": true
+        }
+      ],
+      "record_sha256": "acbcfb5ff5da06734c0966d0af6a9fbae07546919a93492428dd103e34d07b58"
+    },
+    {
+      "sequence": 2,
+      "wu_id": "WU-3b-2",
+      "red_commit": "bb21ec788706ca0691f776bd436bc6804a3bcd33",
+      "implementation_commit": "050fff1f60040a64b69b3afa45b84e38d1fe8d80",
+      "previous_record_sha256": "acbcfb5ff5da06734c0966d0af6a9fbae07546919a93492428dd103e34d07b58",
+      "evidence": [
+        {
+          "command": "node tools/strict/checkpoint-gate.mjs --base bb21ec788706ca0691f776bd436bc6804a3bcd33 --json --run-id strict-wu3b-20260827-472c276 --wu-id WU-3b-2",
+          "cwd": "${WORKTREE}",
+          "environment": {
+            "CI": "false",
+            "NODE_ENV": "test",
+            "authority": "git-index"
+          },
+          "started_at": "2026-08-26T18:34:43Z",
+          "finished_at": "2026-08-26T18:35:25Z",
+          "exit": 0,
+          "expected_exit": 0,
+          "output_path": ".strict/evidence/strict-wu3b-20260827-472c276/wu-3b-2-green.json",
+          "output_sha256": "e4b15b1a7bd891e43aabe6b5df41a78097670e63e8cacda701b837d5cdbd7a95",
+          "output_bytes": 30,
+          "output_lines": 1,
+          "output_complete": true
+        }
+      ],
+      "record_sha256": "216f99328766ffc8ecc34a3f5224eecf758127caf5fd77a048784383b25919b7"
+    },
+    {
+      "sequence": 3,
+      "wu_id": "WU-3b-3",
+      "red_commit": "f90da8dcb7a3de29301b3df2a60f8b0653d9403e",
+      "implementation_commit": "828acbbd8b99f258c05479deacad48f5cec8540a",
+      "previous_record_sha256": "216f99328766ffc8ecc34a3f5224eecf758127caf5fd77a048784383b25919b7",
+      "evidence": [
+        {
+          "command": "node tools/strict/checkpoint-gate.mjs --base f90da8dcb7a3de29301b3df2a60f8b0653d9403e --json --run-id strict-wu3b-20260827-472c276 --wu-id WU-3b-3",
+          "cwd": "${WORKTREE}",
+          "environment": {
+            "CI": "false",
+            "NODE_ENV": "test",
+            "authority": "git-index"
+          },
+          "started_at": "2026-08-26T18:44:28Z",
+          "finished_at": "2026-08-26T18:44:39Z",
+          "exit": 0,
+          "expected_exit": 0,
+          "output_path": ".strict/evidence/strict-wu3b-20260827-472c276/wu-3b-3-green.json",
+          "output_sha256": "e4b15b1a7bd891e43aabe6b5df41a78097670e63e8cacda701b837d5cdbd7a95",
+          "output_bytes": 30,
+          "output_lines": 1,
+          "output_complete": true
+        }
+      ],
+      "record_sha256": "9d4bfc172929c546e796e0e7222715532b0c8eb9989691cf530ea6300f475634"
+    },
+    {
+      "sequence": 4,
+      "wu_id": "WU-3b-4",
+      "red_commit": "2d12782f31782c99f0feda38904c8aae9813666d",
+      "implementation_commit": "05dafb067f3ed164bbed3bec75aad5c93e760da4",
+      "previous_record_sha256": "9d4bfc172929c546e796e0e7222715532b0c8eb9989691cf530ea6300f475634",
+      "evidence": [
+        {
+          "command": "node tools/strict/checkpoint-gate.mjs --base 2d12782f31782c99f0feda38904c8aae9813666d --json --run-id strict-wu3b-20260827-472c276 --wu-id WU-3b-4",
+          "cwd": "${WORKTREE}",
+          "environment": {
+            "CI": "false",
+            "NODE_ENV": "test",
+            "authority": "git-index"
+          },
+          "started_at": "2026-08-26T18:49:58Z",
+          "finished_at": "2026-08-26T18:50:09Z",
+          "exit": 0,
+          "expected_exit": 0,
+          "output_path": ".strict/evidence/strict-wu3b-20260827-472c276/wu-3b-4-green.json",
+          "output_sha256": "e4b15b1a7bd891e43aabe6b5df41a78097670e63e8cacda701b837d5cdbd7a95",
+          "output_bytes": 30,
+          "output_lines": 1,
+          "output_complete": true
+        }
+      ],
+      "record_sha256": "9f3d66500e131a200be2a5b810fc49fe35808c00b3d0c89a959c0b62adbc6f42"
+    },
+    {
+      "sequence": 5,
+      "wu_id": "WU-3b-5",
+      "red_commit": "3840283dc7fff001eefc58a31a3c37e366b4eb96",
+      "implementation_commit": "95691cfee7a0255ca1a172744b4a9a59bbb70b11",
+      "previous_record_sha256": "9f3d66500e131a200be2a5b810fc49fe35808c00b3d0c89a959c0b62adbc6f42",
+      "evidence": [
+        {
+          "command": "node tools/strict/checkpoint-gate.mjs --base 3840283dc7fff001eefc58a31a3c37e366b4eb96 --json --run-id strict-wu3b-20260827-472c276 --wu-id WU-3b-5",
+          "cwd": "${WORKTREE}",
+          "environment": {
+            "CI": "false",
+            "NODE_ENV": "test",
+            "authority": "git-index"
+          },
+          "started_at": "2026-08-26T18:58:59Z",
+          "finished_at": "2026-08-26T18:59:08Z",
+          "exit": 0,
+          "expected_exit": 0,
+          "output_path": ".strict/evidence/strict-wu3b-20260827-472c276/wu-3b-5-green.json",
+          "output_sha256": "e4b15b1a7bd891e43aabe6b5df41a78097670e63e8cacda701b837d5cdbd7a95",
+          "output_bytes": 30,
+          "output_lines": 1,
+          "output_complete": true
+        }
+      ],
+      "record_sha256": "a22494cd1dc2e51a67d453c1fe5dc12fe5cb5cf99bc92b13e644d9d5ecf8b25d"
+    },
+    {
+      "sequence": 6,
+      "wu_id": "WU-3b-5a",
+      "red_commit": "f2df1613438d9421fd36068f7f6a6e1534be44c8",
+      "implementation_commit": "624504b175321e3e46f53ed49bb1d40cd60329b9",
+      "previous_record_sha256": "a22494cd1dc2e51a67d453c1fe5dc12fe5cb5cf99bc92b13e644d9d5ecf8b25d",
+      "evidence": [
+        {
+          "command": "node tools/strict/checkpoint-gate.mjs --base f2df1613438d9421fd36068f7f6a6e1534be44c8 --json --run-id strict-wu3b-20260827-472c276 --wu-id WU-3b-5a",
+          "cwd": "${WORKTREE}",
+          "environment": {
+            "CI": "false",
+            "NODE_ENV": "test",
+            "authority": "git-index"
+          },
+          "started_at": "2026-08-26T19:06:38Z",
+          "finished_at": "2026-08-26T19:06:48Z",
+          "exit": 0,
+          "expected_exit": 0,
+          "output_path": ".strict/evidence/strict-wu3b-20260827-472c276/wu-3b-5a-green.json",
+          "output_sha256": "e4b15b1a7bd891e43aabe6b5df41a78097670e63e8cacda701b837d5cdbd7a95",
+          "output_bytes": 30,
+          "output_lines": 1,
+          "output_complete": true
+        }
+      ],
+      "record_sha256": "7a203997247a7cba5bcf3d574cc54c667f9106ca69b4ba9672c31d5c7468b1eb"
+    },
+    {
+      "sequence": 7,
+      "wu_id": "WU-3b-6",
+      "red_commit": "27b77e5b74587c516f2b2d0557b49a19afdce6ce",
+      "implementation_commit": "91836b95a92d130a797ec4def954f1ec6f142f97",
+      "previous_record_sha256": "7a203997247a7cba5bcf3d574cc54c667f9106ca69b4ba9672c31d5c7468b1eb",
+      "evidence": [
+        {
+          "command": "node tools/strict/checkpoint-gate.mjs --base 27b77e5b74587c516f2b2d0557b49a19afdce6ce --json --run-id strict-wu3b-20260827-472c276 --wu-id WU-3b-6",
+          "cwd": "${WORKTREE}",
+          "environment": {
+            "CI": "false",
+            "NODE_ENV": "test",
+            "authority": "git-index"
+          },
+          "started_at": "2026-08-26T19:13:24Z",
+          "finished_at": "2026-08-26T19:13:33Z",
+          "exit": 0,
+          "expected_exit": 0,
+          "output_path": ".strict/evidence/strict-wu3b-20260827-472c276/wu-3b-6-green.json",
+          "output_sha256": "e4b15b1a7bd891e43aabe6b5df41a78097670e63e8cacda701b837d5cdbd7a95",
+          "output_bytes": 30,
+          "output_lines": 1,
+          "output_complete": true
+        }
+      ],
+      "record_sha256": "71e873a2b7485f80ce0dd7bcd61f3e0f44d18318a992d7c89a883309256e6d2c"
+    },
+    {
+      "sequence": 8,
+      "wu_id": "WU-3b-1a",
+      "red_commit": "96a24792ee79fabb54bb6347c1bcbca9fd0a875f",
+      "implementation_commit": "35d8c6543d602835f7414206bf62d4b4005d142f",
+      "previous_record_sha256": "71e873a2b7485f80ce0dd7bcd61f3e0f44d18318a992d7c89a883309256e6d2c",
+      "evidence": [
+        {
+          "command": "node tools/strict/checkpoint-gate.mjs --base 96a24792ee79fabb54bb6347c1bcbca9fd0a875f --json --run-id strict-wu3b-20260827-472c276 --wu-id WU-3b-1a",
+          "cwd": "${WORKTREE}",
+          "environment": {
+            "CI": "false",
+            "NODE_ENV": "test",
+            "authority": "git-index"
+          },
+          "started_at": "2026-08-26T19:20:37Z",
+          "finished_at": "2026-08-26T19:20:44Z",
+          "exit": 0,
+          "expected_exit": 0,
+          "output_path": ".strict/evidence/strict-wu3b-20260827-472c276/wu-3b-1a-green.json",
+          "output_sha256": "e4b15b1a7bd891e43aabe6b5df41a78097670e63e8cacda701b837d5cdbd7a95",
+          "output_bytes": 30,
+          "output_lines": 1,
+          "output_complete": true
+        }
+      ],
+      "record_sha256": "ada7b6965ef7d9c1db7b56bdfa9eeff6348e246e9772eb985e765f5ad7783a5a"
+    },
+    {
+      "sequence": 9,
+      "wu_id": "WU-3b-2a",
+      "red_commit": "ebb3535782f33aa905ddbef956f2a6ef2dec35c8",
+      "implementation_commit": "e542b96390cfecf2b84f302b8fa057d46552a783",
+      "previous_record_sha256": "ada7b6965ef7d9c1db7b56bdfa9eeff6348e246e9772eb985e765f5ad7783a5a",
+      "evidence": [
+        {
+          "command": "node tools/strict/checkpoint-gate.mjs --base ebb3535782f33aa905ddbef956f2a6ef2dec35c8 --json --run-id strict-wu3b-20260827-472c276 --wu-id WU-3b-2a",
+          "cwd": "${WORKTREE}",
+          "environment": {
+            "CI": "false",
+            "NODE_ENV": "test",
+            "authority": "git-index"
+          },
+          "started_at": "2026-08-26T19:24:22Z",
+          "finished_at": "2026-08-26T19:24:29Z",
+          "exit": 0,
+          "expected_exit": 0,
+          "output_path": ".strict/evidence/strict-wu3b-20260827-472c276/wu-3b-2a-green.json",
+          "output_sha256": "e4b15b1a7bd891e43aabe6b5df41a78097670e63e8cacda701b837d5cdbd7a95",
+          "output_bytes": 30,
+          "output_lines": 1,
+          "output_complete": true
+        }
+      ],
+      "record_sha256": "f77570966035e0e772daf86d8c3a6a761851607f3c2da6ec5f483d481f3b4e08"
+    },
+    {
+      "sequence": 10,
+      "wu_id": "WU-3b-2b",
+      "red_commit": "118d0c379760b0131bc583c07bd84424c86124f4",
+      "implementation_commit": "d7e12c7eb58bf58d774eb081603d24bd6e45f370",
+      "previous_record_sha256": "f77570966035e0e772daf86d8c3a6a761851607f3c2da6ec5f483d481f3b4e08",
+      "evidence": [
+        {
+          "command": "node tools/strict/checkpoint-gate.mjs --base 118d0c379760b0131bc583c07bd84424c86124f4 --json --run-id strict-wu3b-20260827-472c276 --wu-id WU-3b-2b",
+          "cwd": "${WORKTREE}",
+          "environment": {
+            "CI": "false",
+            "NODE_ENV": "test",
+            "authority": "git-index"
+          },
+          "started_at": "2026-08-26T19:31:34Z",
+          "finished_at": "2026-08-26T19:31:42Z",
+          "exit": 0,
+          "expected_exit": 0,
+          "output_path": ".strict/evidence/strict-wu3b-20260827-472c276/wu-3b-2b-green.json",
+          "output_sha256": "e4b15b1a7bd891e43aabe6b5df41a78097670e63e8cacda701b837d5cdbd7a95",
+          "output_bytes": 30,
+          "output_lines": 1,
+          "output_complete": true
+        }
+      ],
+      "record_sha256": "72d407113419a51d51adebe5118277cf7b0795f7aeeaf34746f6acb757cce25e"
+    },
+    {
+      "sequence": 11,
+      "wu_id": "WU-3b-7",
+      "red_commit": "f0c04b73b679f039938e9db40f62a8b24fa3bd5a",
+      "implementation_commit": "e58166d0a9403d2d0de112f1e8aa3e9f55c83700",
+      "previous_record_sha256": "72d407113419a51d51adebe5118277cf7b0795f7aeeaf34746f6acb757cce25e",
+      "evidence": [
+        {
+          "command": "node --test tests/adversarial-evidence.test.mjs tests/checkpoint-ledger-trust.test.mjs tests/delivery-state.test.mjs",
+          "cwd": "${WORKTREE}",
+          "environment": {
+            "CI": "false",
+            "NODE_ENV": "test",
+            "authority": "git-index"
+          },
+          "started_at": "2026-08-26T20:29:00Z",
+          "finished_at": "2026-08-26T20:29:07Z",
+          "exit": 0,
+          "expected_exit": 0,
+          "output_path": ".strict/evidence/strict-wu3b-20260827-472c276/wu-3b-7-green.tap",
+          "output_sha256": "7f96fcab6047cc7fff2b4022f73d6f9239b44dbd535ff001a00f5d1a5308872b",
+          "output_bytes": 6346,
+          "output_lines": 232,
+          "output_complete": true
+        }
+      ],
+      "record_sha256": "f5bf473fb14eeabdb2dba9f9aa5b3f6b8f43191888cbf7198a25b47ddcba937e"
+    },
+    {
+      "sequence": 12,
+      "wu_id": "WU-3b-8",
+      "red_commit": "8ef485d6399cadffe0df15cf4947f859ff05f74c",
+      "implementation_commit": "96255dc1549a50d45060d343b3b66d01dfcbf060",
+      "previous_record_sha256": "f5bf473fb14eeabdb2dba9f9aa5b3f6b8f43191888cbf7198a25b47ddcba937e",
+      "evidence": [
+        {
+          "command": "bash scripts/acceptance-verify-ac-m.sh",
+          "cwd": "${WORKTREE}",
+          "environment": {
+            "CI": "false",
+            "NODE_ENV": "test",
+            "authority": "git-index"
+          },
+          "started_at": "2026-08-26T20:39:00Z",
+          "finished_at": "2026-08-26T20:39:48Z",
+          "exit": 0,
+          "expected_exit": 0,
+          "output_path": ".strict/evidence/strict-wu3b-20260827-472c276/wu-3b-8-green.raw",
+          "output_sha256": "6a7bc5202a06fe6cfc29f5c488c71aefb47f7e7805d07ddf4967e1e29219089e",
+          "output_bytes": 1847,
+          "output_lines": 32,
+          "output_complete": true
+        }
+      ],
+      "record_sha256": "88f5e6d08f2e3db4be72f549839c6d8de3006bdb1e00ce5b00def41715781a40"
+    },
+    {
+      "sequence": 13,
+      "wu_id": "WU-3b-9",
+      "red_commit": "45f04c1d947b5b03262872ede3aab15a4781d398",
+      "implementation_commit": "edc5145cf60ba41a1c293a2f062511e12507fad0",
+      "previous_record_sha256": "88f5e6d08f2e3db4be72f549839c6d8de3006bdb1e00ce5b00def41715781a40",
+      "evidence": [
+        {
+          "command": "node --test tests/trace-ledger.test.mjs",
+          "cwd": "${WORKTREE}",
+          "environment": {
+            "CI": "false",
+            "NODE_ENV": "test",
+            "authority": "git-index"
+          },
+          "started_at": "2026-08-26T20:46:00Z",
+          "finished_at": "2026-08-26T20:46:16Z",
+          "exit": 0,
+          "expected_exit": 0,
+          "output_path": ".strict/evidence/strict-wu3b-20260827-472c276/wu-3b-9-green.tap",
+          "output_sha256": "d60728ce1128cbe2d6d73122804c02f1bb45c87e936f84b04812c42251d93990",
+          "output_bytes": 2854,
+          "output_lines": 112,
+          "output_complete": true
+        }
+      ],
+      "record_sha256": "0446441d3ec2161dbd121834e2eeab984d43a749ae64cca449a10e0ef0b4f520"
+    },
+    {
+      "sequence": 14,
+      "wu_id": "WU-3b-10",
+      "red_commit": "7708d63c3106c5a7a89bb4d8245c234d7e1ef67f",
+      "implementation_commit": "41a6f163dcb2ec394fa53c60070f19640cf2104a",
+      "previous_record_sha256": "0446441d3ec2161dbd121834e2eeab984d43a749ae64cca449a10e0ef0b4f520",
+      "evidence": [
+        {
+          "command": "node --test tests/goal-current-state.test.mjs",
+          "cwd": "${WORKTREE}",
+          "environment": {
+            "CI": "false",
+            "NODE_ENV": "test",
+            "authority": "git-index"
+          },
+          "started_at": "2026-08-26T21:07:00Z",
+          "finished_at": "2026-08-26T21:07:01Z",
+          "exit": 0,
+          "expected_exit": 0,
+          "output_path": ".strict/evidence/strict-wu3b-20260827-472c276/wu-3b-10-green.tap",
+          "output_sha256": "0e524553f2041f3fd87f5b696f8c1e1b05d0499297ce1c56626b5574818f2b84",
+          "output_bytes": 328,
+          "output_lines": 16,
+          "output_complete": true
+        }
+      ],
+      "record_sha256": "20b8d19e65d1c6893d0b4e26a806ce3e458040fc4d8956fe18a51373b5a16be1"
+    },
+    {
+      "sequence": 15,
+      "wu_id": "WU-3b-11",
+      "red_commit": "235dcab0526322c38a351c3f1e2e2e17ca90646a",
+      "implementation_commit": "5b3c9f4fb3798a23616078e39335f3258a644389",
+      "previous_record_sha256": "20b8d19e65d1c6893d0b4e26a806ce3e458040fc4d8956fe18a51373b5a16be1",
+      "evidence": [
+        {
+          "command": "node --test tests/goal-current-state.test.mjs",
+          "cwd": "${WORKTREE}",
+          "environment": {
+            "CI": "false",
+            "NODE_ENV": "test",
+            "authority": "git-index"
+          },
+          "started_at": "2026-08-26T21:20:00Z",
+          "finished_at": "2026-08-26T21:20:01Z",
+          "exit": 0,
+          "expected_exit": 0,
+          "output_path": ".strict/evidence/strict-wu3b-20260827-472c276/wu-3b-11-green.tap",
+          "output_sha256": "1efe6aafe300529abe46ba5026e79c241b8584e9108214b53f987c657202b1c8",
+          "output_bytes": 512,
+          "output_lines": 22,
+          "output_complete": true
+        }
+      ],
+      "record_sha256": "576e2e914bec66e36e6de32b9151c60db21b7365794cfeeea48c5b55d8d6daa3"
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+VERDICT: PASS
+SOT_LOAD: PASS docs/sot/coding-principles.md
+LEDGER_LOAD: PASS docs/sot/principles.yaml
+MECHANISMS: PASS 34/34 strict-contract-bindings
+WIRING: PASS pre-push=1 ci=1
+CHECKED: 34
+PASS: trusted secret scan
+  skip ./scripts/acceptance-0-2.sh (DEFERRED · CI 담당)
+  skip ./scripts/acceptance-0-5.sh (DEFERRED · CI 담당)
+  skip ./scripts/acceptance-0-7.sh (PUSH-PERFORMING · CI 담당)
+pre-push: 검사 25개 실행
+  ok  ./scripts/acceptance-0-2-unreachable-content.sh
+  ok  ./scripts/acceptance-0-6.sh
+  ok  ./scripts/acceptance-checkpoint-delivery.sh
+  ok  ./scripts/acceptance-ci-step-integrity.sh
+  ok  ./scripts/acceptance-guard-global-skill-files.sh
+  ok  ./scripts/acceptance-hs-a3.sh
+  ok  ./scripts/acceptance-hs-a4.sh
+  ok  ./scripts/acceptance-hs-cleanroom-absolute-contexts.sh
+  ok  ./scripts/acceptance-hs-cleanroom-absolute-paths.sh
+  ok  ./scripts/acceptance-hs-cleanroom-colon-paths.sh
+  ok  ./scripts/acceptance-hs-cleanroom-file-urls.sh
+  ok  ./scripts/acceptance-hs-cleanroom-hook-env-mutations.sh
+  ok  ./scripts/acceptance-hs-cleanroom-hook-env.sh
+  ok  ./scripts/acceptance-hs-cleanroom-mutations.sh
+  ok  ./scripts/acceptance-hs-cleanroom.sh
+  ok  ./scripts/acceptance-hs-gates-antiforge.sh
+  ok  ./scripts/acceptance-hs-gates-mutations.sh
+  ok  ./scripts/acceptance-hs-gates.sh
+  ok  ./scripts/acceptance-principles-check.sh
+  ok  ./scripts/acceptance-principles-mutations.sh
+  ok  ./scripts/acceptance-secret-webhook-vendor.sh
+  ok  ./scripts/acceptance-semantic-mutations.sh
+  ok  ./scripts/acceptance-verified-sha.sh
+  ok  ./scripts/acceptance-verify-ac-m.sh
+  ok  ./verify.sh

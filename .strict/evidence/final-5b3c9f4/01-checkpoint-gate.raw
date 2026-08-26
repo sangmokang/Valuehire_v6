@@ -1,0 +1,412 @@
+TAP version 13
+# Subtest: scope: active wus ledger rejects a staged file outside its declared scope
+ok 1 - scope: active wus ledger rejects a staged file outside its declared scope
+  ---
+  duration_ms: 1541.513084
+  type: 'test'
+  ...
+# Subtest: scope: --scope fallback accepts a matching staged file when run ledger is absent
+ok 2 - scope: --scope fallback accepts a matching staged file when run ledger is absent
+  ---
+  duration_ms: 1953.917584
+  type: 'test'
+  ...
+# Subtest: scope: current A ledger without file declarations falls back to --scope
+ok 3 - scope: current A ledger without file declarations falls back to --scope
+  ---
+  duration_ms: 2265.374958
+  type: 'test'
+  ...
+# Subtest: scope: a scope-less current open WU overrides an older green WU scope
+ok 4 - scope: a scope-less current open WU overrides an older green WU scope
+  ---
+  duration_ms: 679.135291
+  type: 'test'
+  ...
+# Subtest: scope: the latest scope-less run ledger overrides an older scoped run ledger
+ok 5 - scope: the latest scope-less run ledger overrides an older scoped run ledger
+  ---
+  duration_ms: 888.132041
+  type: 'test'
+  ...
+# Subtest: scope: checkpoint never auto-selects a worktree ledger without --run-id
+ok 6 - scope: checkpoint never auto-selects a worktree ledger without --run-id
+  ---
+  duration_ms: 1221.869125
+  type: 'test'
+  ...
+# Subtest: scope: missing run ledger and missing --scope fails closed
+ok 7 - scope: missing run ledger and missing --scope fails closed
+  ---
+  duration_ms: 1388.446417
+  type: 'test'
+  ...
+# Subtest: size limit reads the index SOT when the worktree path cannot be read
+ok 8 - size limit reads the index SOT when the worktree path cannot be read
+  ---
+  duration_ms: 1065.452542
+  type: 'test'
+  ...
+# Subtest: CLI emits JSON input violation when --base has no value before --json
+ok 9 - CLI emits JSON input violation when --base has no value before --json
+  ---
+  duration_ms: 140.394917
+  type: 'test'
+  ...
+# Subtest: CLI emits JSON when the git index cannot be read
+ok 10 - CLI emits JSON when the git index cannot be read
+  ---
+  duration_ms: 205.821833
+  type: 'test'
+  ...
+# Subtest: secrets: delegates staged content to the existing repository scanner
+ok 11 - secrets: delegates staged content to the existing repository scanner
+  ---
+  duration_ms: 657.890709
+  type: 'test'
+  ...
+# Subtest: secrets: existing repository scanner allows a clean staged blob
+ok 12 - secrets: existing repository scanner allows a clean staged blob
+  ---
+  duration_ms: 541.932042
+  type: 'test'
+  ...
+# Subtest: secrets: no-run-id path ignores unstaged scanner and pattern weakening
+ok 13 - secrets: no-run-id path ignores unstaged scanner and pattern weakening
+  ---
+  duration_ms: 493.511708
+  type: 'test'
+  ...
+# Subtest: secrets: checkpoint sources pass real scanner patterns without fake weakening markers
+ok 14 - secrets: checkpoint sources pass real scanner patterns without fake weakening markers
+  ---
+  duration_ms: 770.242625
+  type: 'test'
+  ...
+# Subtest: secrets: missing indexed scanner fails closed and attributes the staged target
+ok 15 - secrets: missing indexed scanner fails closed and attributes the staged target
+  ---
+  duration_ms: 314.710125
+  type: 'test'
+  ...
+# Subtest: test weakening: skip increase is rejected
+ok 16 - test weakening: skip increase is rejected
+  ---
+  duration_ms: 1016.36575
+  type: 'test'
+  ...
+# Subtest: test weakening: only increase is rejected
+ok 17 - test weakening: only increase is rejected
+  ---
+  duration_ms: 565.720084
+  type: 'test'
+  ...
+# Subtest: test weakening: todo increase is rejected
+ok 18 - test weakening: todo increase is rejected
+  ---
+  duration_ms: 394.75375
+  type: 'test'
+  ...
+# Subtest: test weakening: node:test skip boolean option is rejected
+ok 19 - test weakening: node:test skip boolean option is rejected
+  ---
+  duration_ms: 409.086625
+  type: 'test'
+  ...
+# Subtest: test weakening: node:test numeric skip option is rejected
+ok 20 - test weakening: node:test numeric skip option is rejected
+  ---
+  duration_ms: 411.096542
+  type: 'test'
+  ...
+# Subtest: test weakening: node:test only option is rejected
+ok 21 - test weakening: node:test only option is rejected
+  ---
+  duration_ms: 418.250875
+  type: 'test'
+  ...
+# Subtest: test weakening: node:test todo option is rejected
+ok 22 - test weakening: node:test todo option is rejected
+  ---
+  duration_ms: 452.201167
+  type: 'test'
+  ...
+# Subtest: test weakening: destructured skip alias inside template interpolation is rejected
+ok 23 - test weakening: destructured skip alias inside template interpolation is rejected
+  ---
+  duration_ms: 490.831792
+  type: 'test'
+  ...
+# Subtest: test weakening: static string concatenation key is rejected
+ok 24 - test weakening: static string concatenation key is rejected
+  ---
+  duration_ms: 449.805167
+  type: 'test'
+  ...
+# Subtest: test weakening: static template key skip after division is rejected
+ok 25 - test weakening: static template key skip after division is rejected
+  ---
+  duration_ms: 594.193625
+  type: 'test'
+  ...
+# Subtest: test weakening: assertion decrease after a quote regex is rejected
+ok 26 - test weakening: assertion decrease after a quote regex is rejected
+  ---
+  duration_ms: 738.601083
+  type: 'test'
+  ...
+# Subtest: test weakening: commenting out an assertion is rejected
+ok 27 - test weakening: commenting out an assertion is rejected
+  ---
+  duration_ms: 671.389541
+  type: 'test'
+  ...
+# Subtest: test weakening: block-commenting an assertion is rejected
+ok 28 - test weakening: block-commenting an assertion is rejected
+  ---
+  duration_ms: 391.567125
+  type: 'test'
+  ...
+# Subtest: test weakening: replacing with a string literal an assertion is rejected
+ok 29 - test weakening: replacing with a string literal an assertion is rejected
+  ---
+  duration_ms: 385.111125
+  type: 'test'
+  ...
+# Subtest: test weakening: destructuring with no-op methods an assertion is rejected
+ok 30 - test weakening: destructuring with no-op methods an assertion is rejected
+  ---
+  duration_ms: 418.984375
+  type: 'test'
+  ...
+# Subtest: test weakening: array-destructuring a no-op assertion an assertion is rejected
+ok 31 - test weakening: array-destructuring a no-op assertion an assertion is rejected
+  ---
+  duration_ms: 399.321416
+  type: 'test'
+  ...
+# Subtest: test weakening: shadowing with a function parameter an assertion is rejected
+ok 32 - test weakening: shadowing with a function parameter an assertion is rejected
+  ---
+  duration_ms: 489.12925
+  type: 'test'
+  ...
+# Subtest: test weakening: shadowing with an arrow parameter an assertion is rejected
+ok 33 - test weakening: shadowing with an arrow parameter an assertion is rejected
+  ---
+  duration_ms: 425.390292
+  type: 'test'
+  ...
+# Subtest: test weakening: shadowing with a method parameter an assertion is rejected
+ok 34 - test weakening: shadowing with a method parameter an assertion is rejected
+  ---
+  duration_ms: 582.753292
+  type: 'test'
+  ...
+# Subtest: test weakening: shadowing with a catch parameter an assertion is rejected
+ok 35 - test weakening: shadowing with a catch parameter an assertion is rejected
+  ---
+  duration_ms: 672.878667
+  type: 'test'
+  ...
+# Subtest: test weakening: overwriting methods with Object.assign an assertion is rejected
+ok 36 - test weakening: overwriting methods with Object.assign an assertion is rejected
+  ---
+  duration_ms: 552.414
+  type: 'test'
+  ...
+# Subtest: test weakening: overwriting methods with Reflect.set an assertion is rejected
+ok 37 - test weakening: overwriting methods with Reflect.set an assertion is rejected
+  ---
+  duration_ms: 527.943625
+  type: 'test'
+  ...
+# Subtest: test weakening: shadowing with an object rest binding an assertion is rejected
+ok 38 - test weakening: shadowing with an object rest binding an assertion is rejected
+  ---
+  duration_ms: 380.909834
+  type: 'test'
+  ...
+# Subtest: test weakening: shadowing with an array rest binding an assertion is rejected
+ok 39 - test weakening: shadowing with an array rest binding an assertion is rejected
+  ---
+  duration_ms: 382.803875
+  type: 'test'
+  ...
+# Subtest: test weakening: shadowing with a rest parameter binding an assertion is rejected
+ok 40 - test weakening: shadowing with a rest parameter binding an assertion is rejected
+  ---
+  duration_ms: 634.796167
+  type: 'test'
+  ...
+# Subtest: test weakening: overwriting a global assertion binding an assertion is rejected
+ok 41 - test weakening: overwriting a global assertion binding an assertion is rejected
+  ---
+  duration_ms: 464.754958
+  type: 'test'
+  ...
+# Subtest: test weakening: overwriting a computed global assertion binding an assertion is rejected
+ok 42 - test weakening: overwriting a computed global assertion binding an assertion is rejected
+  ---
+  duration_ms: 462.908167
+  type: 'test'
+  ...
+# Subtest: test weakening: a local no-op assertion import is rejected
+ok 43 - test weakening: a local no-op assertion import is rejected
+  ---
+  duration_ms: 439.726166
+  type: 'test'
+  ...
+# Subtest: test weakening: trusted assertion default alias passes
+ok 44 - test weakening: trusted assertion default alias passes
+  ---
+  duration_ms: 436.913041
+  type: 'test'
+  ...
+# Subtest: test weakening: trusted assertion namespace alias passes
+ok 45 - test weakening: trusted assertion namespace alias passes
+  ---
+  duration_ms: 492.400875
+  type: 'test'
+  ...
+# Subtest: test weakening: trusted assertion named imports passes
+ok 46 - test weakening: trusted assertion named imports passes
+  ---
+  duration_ms: 565.919292
+  type: 'test'
+  ...
+# Subtest: test weakening: trusted assertion require alias passes
+ok 47 - test weakening: trusted assertion require alias passes
+  ---
+  duration_ms: 809.83675
+  type: 'test'
+  ...
+# Subtest: test weakening: trusted assertion destructured require passes
+ok 48 - test weakening: trusted assertion destructured require passes
+  ---
+  duration_ms: 389.153
+  type: 'test'
+  ...
+# Subtest: test weakening: a newly added skipped test is rejected against a zero baseline
+ok 49 - test weakening: a newly added skipped test is rejected against a zero baseline
+  ---
+  duration_ms: 392.650083
+  type: 'test'
+  ...
+# Subtest: counter-AC: deleting a Python test file must never exit zero
+ok 50 - counter-AC: deleting a Python test file must never exit zero
+  ---
+  duration_ms: 397.322333
+  type: 'test'
+  ...
+# Subtest: test weakening: Python assertion decrease is rejected
+ok 51 - test weakening: Python assertion decrease is rejected
+  ---
+  duration_ms: 451.4415
+  type: 'test'
+  ...
+# Subtest: test weakening: Python skip increase is rejected
+ok 52 - test weakening: Python skip increase is rejected
+  ---
+  duration_ms: 518.188209
+  type: 'test'
+  ...
+# Subtest: counter-AC: deleting a shell acceptance test must never exit zero
+ok 53 - counter-AC: deleting a shell acceptance test must never exit zero
+  ---
+  duration_ms: 424.226583
+  type: 'test'
+  ...
+# Subtest: test weakening: replacing shell assertions with exit zero is rejected
+ok 54 - test weakening: replacing shell assertions with exit zero is rejected
+  ---
+  duration_ms: 485.058959
+  type: 'test'
+  ...
+# Subtest: counter-AC: deleting a test file must never exit zero
+ok 55 - counter-AC: deleting a test file must never exit zero
+  ---
+  duration_ms: 432.940167
+  type: 'test'
+  ...
+# Subtest: counter-AC: moving a test outside recognized test paths must never exit zero
+ok 56 - counter-AC: moving a test outside recognized test paths must never exit zero
+  ---
+  duration_ms: 528.207667
+  type: 'test'
+  ...
+# Subtest: test weakening: clean test and an unrelated skip property pass
+ok 57 - test weakening: clean test and an unrelated skip property pass
+  ---
+  duration_ms: 653.02325
+  type: 'test'
+  ...
+# Subtest: size limit: a code file one line above the parsed SOT hard limit is rejected
+ok 58 - size limit: a code file one line above the parsed SOT hard limit is rejected
+  ---
+  duration_ms: 414.732833
+  type: 'test'
+  ...
+# Subtest: size limit: a code file exactly at the parsed SOT hard limit passes
+ok 59 - size limit: a code file exactly at the parsed SOT hard limit passes
+  ---
+  duration_ms: 335.583375
+  type: 'test'
+  ...
+# Subtest: size limit: directly authored test code is not exempt from the hard limit
+ok 60 - size limit: directly authored test code is not exempt from the hard limit
+  ---
+  duration_ms: 366.250417
+  type: 'test'
+  ...
+# Subtest: size limit: missing SOT falls back to 500 lines
+ok 61 - size limit: missing SOT falls back to 500 lines
+  ---
+  duration_ms: 331.824208
+  type: 'test'
+  ...
+# Subtest: size limit: missing P11 ignores unrelated hard numbers and falls back to 500
+ok 62 - size limit: missing P11 ignores unrelated hard numbers and falls back to 500
+  ---
+  duration_ms: 398.45575
+  type: 'test'
+  ...
+# Subtest: size limit: missing SOT allows exactly the 500-line fallback boundary
+ok 63 - size limit: missing SOT allows exactly the 500-line fallback boundary
+  ---
+  duration_ms: 352.930292
+  type: 'test'
+  ...
+# Subtest: size limit: uppercase .JS uses the P11 boundary
+ok 64 - size limit: uppercase .JS uses the P11 boundary
+  ---
+  duration_ms: 697.517083
+  type: 'test'
+  ...
+# Subtest: size limit: uppercase .TSX uses the P11 boundary
+ok 65 - size limit: uppercase .TSX uses the P11 boundary
+  ---
+  duration_ms: 767.465667
+  type: 'test'
+  ...
+# Subtest: test weakening: uppercase .JS assertion decrease is rejected
+ok 66 - test weakening: uppercase .JS assertion decrease is rejected
+  ---
+  duration_ms: 1067.686416
+  type: 'test'
+  ...
+# Subtest: test weakening: uppercase .TSX assertion decrease is rejected
+ok 67 - test weakening: uppercase .TSX assertion decrease is rejected
+  ---
+  duration_ms: 898.744791
+  type: 'test'
+  ...
+1..67
+# tests 67
+# suites 0
+# pass 67
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 41601.922083
