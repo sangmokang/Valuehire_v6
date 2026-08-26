@@ -22,9 +22,9 @@ test("PR draft preserves the approval and remote-evidence boundary", () => {
 
 test("PR draft exposes the divergent base instead of presenting a runnable create command", () => {
   const body = readFileSync(DRAFT, "utf8");
-  assert.match(body, /origin\/main.*6.*뒤/);
-  assert.match(body, /git rev-list --left-right --count origin\/main\.\.HEAD/);
-  assert.doesNotMatch(body, /origin\/main.*\d+커밋 앞이다/);
+  assert.match(body, /git rev-list --left-right --count origin\/main\.\.\.HEAD/);
+  assert.match(body, /정확한 좌우 커밋 수는 아직 `NOT_RUN`/);
+  assert.doesNotMatch(body, /origin\/main.*\d+커밋 (?:뒤|앞)/);
   assert.match(body, /PR 생성 명령: `BLOCKED`/);
   assert.match(body, /git push -u origin task\/wu3b-delivery-chain-20260827/);
   assert.match(body, /gh pr create --base main --head task\/wu3b-delivery-chain-20260827/);

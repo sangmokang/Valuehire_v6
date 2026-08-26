@@ -14,7 +14,7 @@ push, PR 생성·수정, merge, deploy는 사용자 승인 전 실행 금지다.
 
 ## Base 사전 조건
 
-2026-08-27 로컬 refs 기준으로 이 브랜치는 `origin/main`보다 6커밋 뒤이고 18커밋 앞이다. 기반인 `rescue/main-mixed-20260825T200952`의 5커밋도 `origin/main`에 없다. 따라서 base 이력을 먼저 정리하거나 승인된 PR 대상을 확정하기 전에는 아래 원격 명령을 실행하지 않는다.
+분기 커밋 수는 후보 커밋이 생길 때마다 달라지므로 이 초안에 고정하지 않는다. 기반인 `rescue/main-mixed-20260825T200952`의 커밋들이 로컬 `origin/main`에 없는 분기 상태는 확인했지만, 원격 최신 상태와 정확한 좌우 커밋 수는 아직 `NOT_RUN`이다. 승인된 PR 대상을 확정하기 전에는 아래 원격 명령을 실행하지 않는다.
 
 - PR 생성 명령: `BLOCKED`
 - 예상 base 후보: `main`
@@ -24,6 +24,8 @@ push, PR 생성·수정, merge, deploy는 사용자 승인 전 실행 금지다.
 승인과 base 확정 뒤 준비된 명령:
 
 ```bash
+git fetch origin main
+git rev-list --left-right --count origin/main...HEAD
 git push -u origin task/wu3b-delivery-chain-20260827
 gh pr create --base main --head task/wu3b-delivery-chain-20260827 --title "검증 결과를 변경 후보와 끝까지 묶는다" --body-file docs/engineering/valuehire-delivery-chain-pr-draft-2026-08-27.md
 gh pr view <실제-PR-번호> --json title,body,url,statusCheckRollup

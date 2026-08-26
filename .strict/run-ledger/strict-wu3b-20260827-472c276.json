@@ -297,7 +297,8 @@
         "docs/engineering/valuehire-delivery-chain-pr-draft-2026-08-27.md",
         "docs/engineering/valuehire-delivery-chain-issue-2026-08-27.md",
         "docs/engineering/valuehire-delivery-chain-goal-2026-08-27.md",
-        "scripts/acceptance-checkpoint-delivery.sh"
+        "scripts/acceptance-checkpoint-delivery.sh",
+        "tests/pr-draft.test.mjs"
       ],
       "red_commit": "27b77e5b74587c516f2b2d0557b49a19afdce6ce",
       "implementation_commit": null,
@@ -567,9 +568,29 @@
         "docs/engineering/valuehire-delivery-chain-pr-draft-2026-08-27.md",
         "tests/pr-draft.test.mjs"
       ],
-      "red_commit": null,
+      "red_commit": "edd54fe34e731a8f42ca16301a4a60ce7e973867",
       "implementation_commit": null,
-      "validation": []
+      "validation": [
+        {
+          "command": "node --test tests/pr-draft.test.mjs",
+          "started_at": "2026-08-26T19:56:00Z",
+          "finished_at": "2026-08-26T19:56:01Z",
+          "exit": 0,
+          "checked": 3,
+          "output_sha256": "083e0185e96c6ab772d1ebc9bec09d294a800066383e16553d94d002fcb7f603",
+          "output_ref": "/tmp/valuehire-strict-wu3b-evidence/wu3b6a/green.tap"
+        },
+        {
+          "command": "fixed branch-count mutation + node --test tests/pr-draft.test.mjs",
+          "started_at": "2026-08-26T19:58:00Z",
+          "finished_at": "2026-08-26T19:58:01Z",
+          "exit": 1,
+          "expected_exit": 1,
+          "checked": 1,
+          "output_sha256": "5481ec0c90249ef36bc084831d394f73de20871f139635741163e18fa795a9b8",
+          "output_ref": "/tmp/valuehire-strict-wu3b-evidence/wu3b6a/mutation.tap"
+        }
+      ]
     }
   ],
   "updated_at": "2026-08-27T05:00:00+09:00"
