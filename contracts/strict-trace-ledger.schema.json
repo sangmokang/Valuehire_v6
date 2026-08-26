@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://valuehire.local/contracts/strict-trace-ledger.schema.json",
+  "title": "ValueHire strict trace ledger",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "issue",
+    "base_commit",
+    "candidate_commit",
+    "branch",
+    "worktree",
+    "records"
+  ],
+  "properties": {
+    "schema_version": { "const": "valuehire.strict-trace/v1" },
+    "run_id": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
+    "issue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "contract_path", "contract_sha256", "opened_at"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "contract_path": { "type": "string", "minLength": 1 },
+        "contract_sha256": { "$ref": "#/$defs/sha256" },
+        "opened_at": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "base_commit": { "$ref": "#/$defs/gitOid" },
+    "candidate_commit": { "$ref": "#/$defs/gitOid" },
+    "branch": { "type": "string", "minLength": 1 },
+    "worktree": { "type": "string", "minLength": 1 },
+    "records": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/record" }
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "gitOid": { "type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command", "cwd", "environment", "started_at", "finished_at", "exit",
+        "expected_exit", "output_path", "output_sha256", "output_bytes",
+        "output_lines", "output_complete"
+      ],
+      "properties": {
+        "command": { "type": "string", "minLength": 1 },
+        "cwd": { "type": "string", "minLength": 1 },
+        "environment": { "type": "object" },
+        "started_at": { "$ref": "#/$defs/timestamp" },
+        "finished_at": { "$ref": "#/$defs/timestamp" },
+        "exit": { "type": "integer" },
+        "expected_exit": { "type": "integer" },
+        "output_path": { "type": "string", "minLength": 1 },
+        "output_sha256": { "$ref": "#/$defs/sha256" },
+        "output_bytes": { "type": "integer", "minimum": 1 },
+        "output_lines": { "type": "integer", "minimum": 1 },
+        "output_complete": { "const": true }
+      }
+    },
+    "record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sequence", "wu_id", "red_commit", "implementation_commit",
+        "previous_record_sha256", "evidence", "record_sha256"
+      ],
+      "properties": {
+        "sequence": { "type": "integer", "minimum": 1 },
+        "wu_id": { "type": "string", "minLength": 1 },
+        "red_commit": { "$ref": "#/$defs/gitOid" },
+        "implementation_commit": { "$ref": "#/$defs/gitOid" },
+        "previous_record_sha256": {
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/sha256" }]
+        },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/evidence" }
+        },
+        "record_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    }
+  }
+}

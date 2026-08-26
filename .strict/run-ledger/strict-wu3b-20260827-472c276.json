@@ -97,9 +97,42 @@
       "id": "WU-3b-3",
       "status": "open",
       "scope": [
+        ".strict/run-ledger/strict-wu3b-20260827-472c276.json",
         "contracts/strict-trace-ledger.schema.json",
         "tools/strict/trace-ledger.mjs",
         "tests/trace-ledger.test.mjs"
+      ],
+      "red_commit": "f90da8dcb7a3de29301b3df2a60f8b0653d9403e",
+      "implementation_commit": null,
+      "validation": [
+        {
+          "command": "node --test tests/trace-ledger.test.mjs",
+          "started_at": "2026-08-26T18:42:23Z",
+          "finished_at": "2026-08-26T18:42:49Z",
+          "exit": 0,
+          "checked": 16,
+          "output_sha256": "58a52845f7cbbdb89d78136a73d83d6003e38dc5d04733945d847f95b9ef1209",
+          "output_ref": "/tmp/valuehire-strict-wu3b-evidence/wu3b3/trace-ledger.tap"
+        },
+        {
+          "command": "worktree-read trace-ledger mutation + node --test --test-name-pattern=worktree ledger",
+          "started_at": "2026-08-26T18:43:15Z",
+          "finished_at": "2026-08-26T18:43:24Z",
+          "exit": 1,
+          "expected_exit": 1,
+          "checked": 4,
+          "output_sha256": "bf1452dfb18595bed6673120d37dd606af79aa6101997d72e1600bb7f280d63b",
+          "output_ref": "/tmp/valuehire-strict-wu3b-evidence/wu3b3/worktree-read-mutation.tap"
+        },
+        {
+          "command": "node tools/strict/checkpoint-gate.mjs --base f90da8dcb7a3de29301b3df2a60f8b0653d9403e --json --run-id strict-wu3b-20260827-472c276 --wu-id WU-3b-3",
+          "started_at": "2026-08-26T18:44:28Z",
+          "finished_at": "2026-08-26T18:44:39Z",
+          "exit": 0,
+          "checked": 3,
+          "output_sha256": "e4b15b1a7bd891e43aabe6b5df41a78097670e63e8cacda701b837d5cdbd7a95",
+          "output_ref": "/tmp/valuehire-strict-wu3b-evidence/wu3b3/staged-gate.json"
+        }
       ]
     },
     {
