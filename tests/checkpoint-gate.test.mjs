@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,8 +8,8 @@ import test from "node:test";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const GATE = join(ROOT, "tools/strict/checkpoint-gate.mjs");
+const RUN_ID = "r-1787525327788-6723";
 const cleanups = [];
-
 test.after(() => {
   for (const directory of cleanups) rmSync(directory, { recursive: true, force: true });
 });
@@ -35,7 +35,26 @@ function write(cwd, path, content) {
   writeFileSync(target, content);
 }
 
-function makeRepo({ hardLimit = 600, ledgerScopes, scanner = true, sot = true } = {}) {
+function writeLedger(cwd, { runId = RUN_ID, ledgerRunId = runId, scopes, wus, updatedAt } = {}) {
+  const wu = { id: "WU-3a", ac: "checkpoint gate", status: "red", commit: null };
+  if (scopes?.length > 0) wu.scope = scopes;
+  write(
+    cwd,
+    `.strict/run-ledger/${runId}.json`,
+    `${JSON.stringify({
+      run_id: ledgerRunId,
+      task: "checkpoint fixture",
+      state: "BUILD",
+      contract_sha256: "0".repeat(64),
+      approvals: [],
+      wus: wus ?? [wu],
+      findings_ref: null,
+      next_action: "run checkpoint",
+      updated_at: updatedAt ?? "2026-08-24T00:00:00.000Z",
+    })}\n`,
+  );
+}
+function makeRepo({ hardLimit = 600, ledger = true, ledgerScopes, scanner = true, sot = true } = {}) {
   const cwd = mkdtempSync(join(tmpdir(), "checkpoint-gate-"));
   cleanups.push(cwd);
   git(cwd, "init", "-q");
@@ -50,25 +69,7 @@ function makeRepo({ hardLimit = 600, ledgerScopes, scanner = true, sot = true } 
     copyFileSync(join(ROOT, "verify.sh"), join(cwd, "verify.sh"));
     write(cwd, ".secret-patterns.default", "CHECKPOINT_CANARY_[A-Z0-9]{12}\n");
   }
-  if (ledgerScopes !== undefined) {
-    const wu = { id: "WU-3a", ac: "checkpoint gate", status: "red", commit: null };
-    if (ledgerScopes.length > 0) wu.scope = ledgerScopes;
-    write(
-      cwd,
-      ".strict/run-ledger/r-1787525327788-6723.json",
-      `${JSON.stringify({
-        run_id: "r-1787525327788-6723",
-        task: "checkpoint fixture",
-        state: "BUILD",
-        contract_sha256: "0".repeat(64),
-        approvals: [],
-        wus: [wu],
-        findings_ref: null,
-        next_action: "run checkpoint",
-        updated_at: "2026-08-24T00:00:00.000Z",
-      })}\n`,
-    );
-  }
+  if (ledger) writeLedger(cwd, { scopes: ledgerScopes });
   write(cwd, "src/app.mjs", "export const value = 1;\n");
   write(
     cwd,
@@ -84,9 +85,8 @@ function makeRepo({ hardLimit = 600, ledgerScopes, scanner = true, sot = true } 
   git(cwd, "commit", "-qm", "baseline");
   return { cwd, base: git(cwd, "rev-parse", "HEAD") };
 }
-
 function runGate(cwd, base, ...extra) {
-  const result = spawnSync(process.execPath, [GATE, "--base", base, "--json", ...extra], {
+  const result = spawnSync(process.execPath, [GATE, "--base", base, "--run-id", RUN_ID, "--json", ...extra], {
     cwd,
     encoding: "utf8",
   });
@@ -132,93 +132,91 @@ function expectPass(result) {
   assert.equal(result.status, 0, result.stderr);
   assert.deepEqual(result.body, { pass: true, violations: [] });
 }
-
-test("scope: active wus ledger rejects a staged file outside its declared scope", () => {
+test("scope: explicit run id selects its older ledger instead of a newer conflicting run", () => {
   const { cwd, base } = makeRepo({ ledgerScopes: ["src/**"] });
+  writeLedger(cwd, {
+    runId: "r-1787525327999-9999",
+    scopes: ["docs/**"],
+    updatedAt: "2026-08-25T00:00:00.000Z",
+  });
   write(cwd, "docs/unrelated.md", "unrelated\n");
   git(cwd, "add", "docs/unrelated.md");
   expectViolation(runGate(cwd, base), "scope", "docs/unrelated.md");
 });
-
-test("scope: --scope fallback accepts a matching staged file when run ledger is absent", () => {
-  const { cwd, base } = makeRepo();
-  expectPass(runGate(cwd, base));
+test("scope: adding a newer unrelated run does not change the designated run result", () => {
+  const { cwd, base } = makeRepo({ ledgerScopes: ["src/**"] });
   write(cwd, "src/app.mjs", "export const value = 2;\n");
   git(cwd, "add", "src/app.mjs");
-  expectPass(runGate(cwd, base, "--scope", "src/**"));
+  expectPass(runGate(cwd, base));
+  writeLedger(cwd, {
+    runId: "r-1787525327999-9999",
+    scopes: ["docs/**"],
+    updatedAt: "2026-08-25T00:00:00.000Z",
+  });
+  expectPass(runGate(cwd, base));
 });
-
 test("scope: current A ledger without file declarations falls back to --scope", () => {
-  const { cwd, base } = makeRepo({ ledgerScopes: [] });
+  const { cwd, base } = makeRepo();
   write(cwd, "src/app.mjs", "export const value = 2;\n");
   git(cwd, "add", "src/app.mjs");
   expectPass(runGate(cwd, base, "--scope", "src/**"));
 });
-
-test("scope: a scope-less current open WU overrides an older green WU scope", () => {
-  const { cwd, base } = makeRepo();
-  write(
-    cwd,
-    ".strict/run-ledger/r-1787525327788-6723.json",
-    `${JSON.stringify({
-      updated_at: "2026-08-24T00:00:00.000Z",
-      wus: [
-        { id: "WU-old", status: "green", scope: ["docs/**"] },
-        { id: "WU-current", status: "open" },
-      ],
-    })}\n`,
-  );
-  write(cwd, "src/app.mjs", "export const value = 2;\n");
-  git(cwd, "add", "src/app.mjs");
-  expectPass(runGate(cwd, base, "--scope", "src/**"));
-});
-
-test("scope: the latest scope-less run ledger overrides an older scoped run ledger", () => {
-  const { cwd, base } = makeRepo();
-  write(
-    cwd,
-    ".strict/run-ledger/r-old.json",
-    `${JSON.stringify({
-      updated_at: "2026-08-23T00:00:00.000Z",
-      wus: [{ id: "WU-old", status: "green", scope: ["docs/**"] }],
-    })}\n`,
-  );
-  write(
-    cwd,
-    ".strict/run-ledger/r-current.json",
-    `${JSON.stringify({
-      updated_at: "2026-08-24T00:00:00.000Z",
-      wus: [{ id: "WU-current", status: "red" }],
-    })}\n`,
-  );
-  write(cwd, "src/app.mjs", "export const value = 2;\n");
-  git(cwd, "add", "src/app.mjs");
-  expectPass(runGate(cwd, base, "--scope", "src/**"));
-});
-
-test("scope: checkpoint uses the latest green WU declaration in one run ledger", () => {
-  const { cwd, base } = makeRepo();
-  write(
-    cwd,
-    ".strict/run-ledger/r-1787525327788-6723.json",
-    `${JSON.stringify({
-      updated_at: "2026-08-24T00:00:00.000Z",
-      wus: [
-        { id: "WU-old", status: "green", scope: ["docs/**"] },
-        { id: "WU-3a", status: "green", scope: ["src/**"] },
-      ],
-    })}\n`,
-  );
-  write(cwd, "src/app.mjs", "export const value = 2;\n");
-  git(cwd, "add", "src/app.mjs");
-  expectPass(runGate(cwd, base));
-});
-
-test("scope: missing run ledger and missing --scope fails closed", () => {
+test("scope: current A ledger without file declarations requires --scope", () => {
   const { cwd, base } = makeRepo();
   write(cwd, "src/app.mjs", "export const value = 2;\n");
   git(cwd, "add", "src/app.mjs");
   expectViolation(runGate(cwd, base), "scope");
+});
+test("scope: ledger declaration and --scope together are rejected as input", () => {
+  const { cwd, base } = makeRepo({ ledgerScopes: ["src/**"] });
+  expectViolation(runGate(cwd, base, "--scope", "src/**"), "input");
+});
+
+test("scope: two scope-bearing current wus fail closed", () => {
+  const { cwd, base } = makeRepo({
+    ledger: false,
+  });
+  writeLedger(cwd, {
+    wus: [
+      { id: "WU-red", status: "red", scope: ["src/**"] },
+      { id: "WU-green", status: "green", paths: ["docs/**"] },
+    ],
+  });
+  expectViolation(runGate(cwd, base), "scope");
+});
+
+test("CLI rejects missing, malformed, and nonexistent run ids as input", () => {
+  const { cwd, base } = makeRepo();
+  expectViolation(runRawGate(cwd, "--base", base, "--json", "--scope", "src/**"), "input");
+  expectViolation(runRawGate(cwd, "--base", base, "--run-id", "r-bad", "--json"), "input");
+  expectViolation(
+    runRawGate(cwd, "--base", base, "--run-id", "r-1787525327000-0000", "--json"),
+    "input",
+  );
+});
+
+for (const [name, content] of [
+  ["empty", ""],
+  ["invalid JSON", "{"],
+]) {
+  test(`CLI rejects ${name} designated run ledger as input`, () => {
+    const { cwd, base } = makeRepo({ ledger: false });
+    write(cwd, `.strict/run-ledger/${RUN_ID}.json`, content);
+    expectViolation(runGate(cwd, base, "--scope", "src/**"), "input");
+  });
+}
+
+test("CLI rejects a designated ledger whose internal run_id differs", () => {
+  const { cwd, base } = makeRepo({ ledger: false });
+  writeLedger(cwd, { ledgerRunId: "r-1787525327999-9999" });
+  expectViolation(runGate(cwd, base, "--scope", "src/**"), "input");
+});
+
+test("CLI rejects a symbolic-link run ledger", () => {
+  const { cwd, base } = makeRepo({ ledger: false });
+  writeLedger(cwd, { runId: "r-1787525327999-9999", ledgerRunId: RUN_ID });
+  symlinkSync("r-1787525327999-9999.json", join(cwd, `.strict/run-ledger/${RUN_ID}.json`));
+  expectViolation(runGate(cwd, base, "--scope", "src/**"), "input");
 });
 
 test("checks remain independent when the size SOT cannot be read", () => {
@@ -246,6 +244,8 @@ test("CLI emits JSON when the git index cannot be read", () => {
     { GIT_INDEX_FILE: join(cwd, "corrupt-index") },
     "--base",
     base,
+    "--run-id",
+    RUN_ID,
     "--json",
     "--scope",
     "src/**",
