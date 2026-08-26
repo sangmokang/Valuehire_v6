@@ -79,12 +79,15 @@ function lines(buffer) {
 
 function authoritativeOutputText(rawText) {
   const trimmed = rawText.trim();
-  if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) return rawText;
+  if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) return { text: rawText, envelopeError: null };
   try {
     const envelope = JSON.parse(trimmed);
-    if (envelope && typeof envelope === "object" && typeof envelope.result === "string") return envelope.result;
+    if (envelope && typeof envelope === "object" && typeof envelope.result === "string") {
+      if (envelope.is_error === true) return { text: envelope.result, envelopeError: "reviewer envelope reports is_error=true" };
+      return { text: envelope.result, envelopeError: null };
+    }
   } catch {}
-  return rawText;
+  return { text: rawText, envelopeError: null };
 }
 
 function safePath(path) {
@@ -137,10 +140,12 @@ function validateReviewer(violations, id, reviewer, manifest, evidenceCommit, us
   }
   if (output.length !== reviewer.output_bytes) add(violations, field, `${id} raw output byte count mismatch`);
   if (lines(output) !== reviewer.output_lines || reviewer.output_lines < 1) add(violations, field, `${id} raw output line count mismatch`);
-  const text = authoritativeOutputText(output.toString("utf8"));
+  const authoritative = authoritativeOutputText(output.toString("utf8"));
+  if (authoritative.envelopeError) add(violations, field, `${id} ${authoritative.envelopeError}`);
+  const text = authoritative.text;
   if (!text.includes(manifest.candidate_sha)) add(violations, field, `${id} raw output does not name the candidate`);
   const nonempty = text.split(/\r?\n/).filter((line) => line.trim().length > 0);
-  const markers = nonempty.filter((line) => /^FINAL: (?:PASS|FAIL)$/.test(line));
+  const markers = nonempty.map((line) => line.trim()).filter((line) => /^FINAL: (?:PASS|FAIL)$/.test(line));
   if (markers.length !== 1 || markers[0] !== "FINAL: PASS" || nonempty.at(-1) !== "FINAL: PASS") {
     add(violations, field, `${id} raw output final PASS marker is not unique and authoritative`);
   }
