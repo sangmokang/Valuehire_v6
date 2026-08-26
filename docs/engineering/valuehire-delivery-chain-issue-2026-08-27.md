@@ -29,6 +29,20 @@ GitHub Issue 생성은 외부 쓰기이므로 승인 전에는 실행하지 않�
 - merge 전 readiness 또는 overall T를 PASS로 기록한다.
 - merge 전 deploy/live verify를 PASS로 기록한다.
 
+## WU-3b 보호 집합
+
+- `verify.sh`
+- `tools/strict/checkpoint-js-scan.mjs`
+- `tools/strict/checkpoint-gate.mjs`
+- `tests/checkpoint-gate-mutation.test.mjs` mutation validator
+- `docs/sot/coding-principles.md`의 P11 정본
+- `.strict/run-ledger/<run-id>.json`
+- `.secret-patterns.default`
+- 선택적 `.secret-patterns`
+- `scripts/verify/run-acceptance.sh`, `hooks/pre-push`, `.github/workflows/verify.yml`의 관련 runner·실행 설정
+
+이 집합의 작업폴더 사본은 승인 근거가 아니다. 실행 시점의 Git index blob, 명시적으로 승인한 full commit/blob SHA, 또는 읽기 전용 배포 산출물 중 하나로 정확히 고정하며 누락·불일치·무출력은 종료값 1이다.
+
 ## 입출력·오류·경계 계약
 
 입력은 명시적 run ID, WU ID, 기준 commit, 승인 authority SHA, Git index, 선택적 로컬 pattern SHA, 추적 장부 commit SHA와 blob SHA다. 출력은 구조화된 단일 JSON 판정과 종료값 `0=PASS`, `1=FAIL`이다. 입력 누락, 해석 실패, 대상 0개, 무출력, hash 불일치, 모호한 선택은 모두 종료값 1이다. 비밀 원문은 출력하거나 장부에 저장하지 않는다.

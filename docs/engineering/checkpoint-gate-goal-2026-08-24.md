@@ -113,6 +113,7 @@ counter-AC: gate 단독 PASS를 mutation 저항 증거로 사용하거나, mutat
 ### trusted-tooling precondition과 WU-3b 인수 기준
 
 - WU-3a precondition: 실행되는 `verify.sh`, `checkpoint-js-scan.mjs`, `checkpoint-gate.mjs`, mutation validator와 이들이 읽는 P11 정본·기본/로컬 비밀 패턴의 내용이 독립 기준점이 승인한 해시와 일치해야 한다.
+- WU-3b 보호 집합은 `verify.sh`, `tools/strict/checkpoint-js-scan.mjs`, `tools/strict/checkpoint-gate.mjs`, `tests/checkpoint-gate-mutation.test.mjs`, `docs/sot/coding-principles.md`의 P11 정본, `.strict/run-ledger/<run-id>.json`, `.secret-patterns.default`, 선택적 `.secret-patterns`, `scripts/verify/run-acceptance.sh`, `hooks/pre-push`, `.github/workflows/verify.yml`의 관련 실행 설정이다.
 - WU-3b는 변경 대상과 다른 신뢰 영역에서 후보 해시를 고정하고, 그 해시의 mutation validator를 gate보다 먼저 실행하며, 정상 0·고장 5종 각 1·검사 대상 0개 아님을 확인한 뒤에만 gate 결과를 checkpoint 입력으로 받아야 한다.
 - WU-3b는 도구뿐 아니라 P11 정본과 `.secret-patterns.default`·`.secret-patterns` 정책 입력도 worktree 파일 그대로 신뢰하지 않고 승인 SHA/index blob 또는 읽기 전용 배포 산출물에서 실행해야 하며, 이 전체 보호 집합의 HEAD/index/worktree 불일치·해시 불일치·runner 무출력은 fail-closed해야 한다.
 - 이번 작업은 훅·CI·정본 배선 변경이 금지되어 이 precondition을 실제 checkpoint 경로에 연결하지 않는다. 그러므로 WU-3b 실행 전 readiness는 `NOT_RUN`이다.

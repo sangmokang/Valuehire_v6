@@ -139,9 +139,44 @@
       "id": "WU-3b-4",
       "status": "open",
       "scope": [
-        "tools/strict/trace-ledger.mjs",
+        ".strict/run-ledger/strict-wu3b-20260827-472c276.json",
+        "tools/strict/adversarial-evidence.mjs",
         "tests/adversarial-evidence.test.mjs",
-        "docs/engineering/valuehire-delivery-chain-goal-2026-08-27.md"
+        "docs/engineering/checkpoint-gate-goal-2026-08-24.md",
+        "docs/engineering/valuehire-delivery-chain-goal-2026-08-27.md",
+        "docs/engineering/valuehire-delivery-chain-issue-2026-08-27.md"
+      ],
+      "red_commit": "2d12782f31782c99f0feda38904c8aae9813666d",
+      "implementation_commit": null,
+      "validation": [
+        {
+          "command": "node --test tests/adversarial-evidence.test.mjs",
+          "started_at": "2026-08-26T18:48:48Z",
+          "finished_at": "2026-08-26T18:48:55Z",
+          "exit": 0,
+          "checked": 12,
+          "output_sha256": "4550591ddbe32d23b46475b36ccd8883c79c99d7849b2f3fc885205085e98954",
+          "output_ref": "/tmp/valuehire-strict-wu3b-evidence/wu3b4/adversarial-evidence.tap"
+        },
+        {
+          "command": "stale-candidate no-op mutation + node --test --test-name-pattern=stale reviewer candidate",
+          "started_at": "2026-08-26T18:49:16Z",
+          "finished_at": "2026-08-26T18:49:16Z",
+          "exit": 1,
+          "expected_exit": 1,
+          "checked": 1,
+          "output_sha256": "b359bd01bf7e5083ddcc59e55919073f2dc3aa9c6a4a00f4d885524ac0166b44",
+          "output_ref": "/tmp/valuehire-strict-wu3b-evidence/wu3b4/stale-candidate-mutation.tap"
+        },
+        {
+          "command": "node tools/strict/checkpoint-gate.mjs --base 2d12782f31782c99f0feda38904c8aae9813666d --json --run-id strict-wu3b-20260827-472c276 --wu-id WU-3b-4",
+          "started_at": "2026-08-26T18:49:58Z",
+          "finished_at": "2026-08-26T18:50:09Z",
+          "exit": 0,
+          "checked": 5,
+          "output_sha256": "e4b15b1a7bd891e43aabe6b5df41a78097670e63e8cacda701b837d5cdbd7a95",
+          "output_ref": "/tmp/valuehire-strict-wu3b-evidence/wu3b4/staged-gate.json"
+        }
       ]
     },
     {

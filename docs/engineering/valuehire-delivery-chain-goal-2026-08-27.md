@@ -38,12 +38,12 @@ T는 Issue의 AC-1~AC-8, counter-AC, 저장소 P1~P24와 V-1~V-5, 이 문서의 
 - `verify.sh`
 - `tools/strict/checkpoint-js-scan.mjs`
 - `tools/strict/checkpoint-gate.mjs`
-- checkpoint mutation validator와 runner
+- `tests/checkpoint-gate-mutation.test.mjs` checkpoint mutation validator
 - `docs/sot/coding-principles.md` P11 정본
 - `.strict/run-ledger/<run-id>.json`
 - `.secret-patterns.default`
 - 선택적 `.secret-patterns`
-- 관련 acceptance runner, hook, CI 실행 설정
+- `scripts/verify/run-acceptance.sh`, `hooks/pre-push`, `.github/workflows/verify.yml`의 관련 runner와 실행 설정
 
 보호 집합은 명시적 full commit SHA 또는 Git index blob에서 읽는다. 로컬 `.secret-patterns`가 존재하면 한 번 읽은 bytes의 승인 SHA-256이 일치해야 하며 원문은 보존하지 않는다.
 
