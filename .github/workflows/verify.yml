@@ -16,6 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        id: checkout
         with:
           fetch-depth: 0   # 아래 "히스토리 전량 스캔" 스텝이 과거 커밋의 blob까지 열어보는 데 필요
           # 이 job 은 읽기만 한다. 기본값(true)은 인증 토큰을 러너의 git 설정에 남겨
@@ -23,26 +24,32 @@ jobs:
           persist-credentials: false
 
       - name: 비밀 스캔 (verify.sh)
+        id: secret-scan
         # 패턴은 커밋된 .secret-patterns.default 를 쓴다.
         # 실제 비밀값은 CI에 올리지 않는다 — 저장소 시크릿에 넣는 것도 유출 경로를 늘리는 일이다.
         # 로컬 전용 .secret-patterns 는 gitignore 되어 여기 없다.
         run: bash verify.sh
 
       - name: Strict 원칙 정본·장부·배선 검사
+        id: principles-check
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-principles-check.sh
 
       - name: Strict 원칙 적대 fixture·500/501 경계
+        id: principles-mutations
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-principles-mutations.sh
 
       - name: Strict 전역 스킬 잠금 장치 격리 회귀
+        id: guard-global-skill-files
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-guard-global-skill-files.sh
 
       - name: P3 조용한 실패 문법·오탐 회귀
+        id: silent-failure-lint
         run: |
           bash scripts/verify/run-acceptance.sh scripts/acceptance-silent-failure-lint.sh
           bash scripts/verify/run-acceptance.sh scripts/acceptance-silent-failure-lint-mutations.sh
 
       - name: HumanSearch G1 클린룸 경계
+        id: hs-cleanroom
         run: |
           bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-cleanroom.sh
           bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-cleanroom-mutations.sh
@@ -54,6 +61,7 @@ jobs:
           bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-cleanroom-hook-env-mutations.sh
 
       - name: HumanSearch G2 테스트 게이트 (정적·단위 + runtime import 증명)
+        id: hs-gates
         # uv 버전은 계약 C-8(0.11.3)에 고정. Python 3.14.1은 uv가 .python-version으로 내려받는다.
         run: |
           # 설치 여부만 보면 러너에 이미 있는 다른 버전을 그대로 쓴다 — 그건 버전
@@ -74,6 +82,7 @@ jobs:
           bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-gates-antiforge.sh
 
       - name: 히스토리 전량 스캔 (도달 가능한 모든 blob)
+        id: history-scan
         # verify.sh는 현재 체크아웃의 추적 파일만 본다. 과거 커밋에 들어갔다가 지워진 비밀은
         # 그것만으로는 잡히지 않으므로, reflog 포함 도달 가능한 모든 blob을 직접 열어 검사한다.
         run: |
@@ -110,12 +119,21 @@ jobs:
           [ "$hit" -eq 0 ] && echo "PASS: 히스토리 전량 blob 스캔 0건 (blob ${blobs}개 검사)"
           exit $hit
 
+      - name: 인수 검사 history-scan-failclosed (스캐너 3상태 계약)
+        id: history-scan-failclosed
+        # 위 history-scan 스텝의 본문을 파일로 뺀 scripts/scan-history-secrets.sh 가
+        # 0=위반없음 / 1=위반 / 2=스캔무효 를 실제로 지키는지 합성 저장소 10종으로 잰다.
+        # 이 검사가 pre-push 글로브에만 있고 CI 에 없으면 P15③ 에 걸린다 — 그래서 여기 둔다.
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-history-scan-failclosed.sh
+
       - name: 인수 검사 0-2 상시 내용 검사와 종료상태 분리 (AC-19)
+        id: acceptance-0-2-unreachable
         # 실제 로컬 리터럴은 CI에 올리지 않는다. 합성 저장소와 합성 값으로 동일 판정기를 실행해
         # 환경 격리·네 객체형·fsck/cat-file 실패·큰 객체·종료상태·훅 환경 무오염 13건을 증명한다.
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-0-2-unreachable-content.sh
 
       - name: 인수 검사 0-6 (가짜 검증 스크립트 0건)
+        id: acceptance-0-6
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-0-6.sh
 
       # ↓ 아래 3개는 pre-push 에서 CI 로 이관된 검사다(2026-08-07).
@@ -129,14 +147,17 @@ jobs:
       # "히스토리 전량 스캔" 스텝이며, hooks/pre-push 가 그 스텝의 존재를 확인한다.
 
       - name: 인수 검사 0-7 (훅이 위반 6종을 실제로 차단하는가)
+        id: acceptance-0-7
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-0-7.sh
 
       - name: 인수 검사 0-5 (push · CI 연결)
+        id: acceptance-0-5
         # origin/main==main 을 검사하므로 main 참조가 유효한 경우에만 의미가 있다.
         if: github.ref == 'refs/heads/main'
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-0-5.sh
 
       - name: 억제 만료 스캔 (suppressions.yaml)
+        id: suppressions-expiry
         # pre-commit 의 expiry 검사는 suppressions.yaml 이 '스테이징된 커밋'에서만 돈다.
         # 이미 커밋된 억제가 시간이 지나 썩는 것은 아무도 보지 않는다 — 이 게이트가
         # 막겠다고 인용한 98d923f(35일 방치) 시나리오 그 자체다. 그래서 매 push 마다 훑는다.
@@ -159,6 +180,7 @@ jobs:
           exit $fail
 
       - name: 강제 장치 존재 검사 (hooks/)
+        id: hooks-present
         # core.hooksPath 는 저장소 전역 config 이고 hooks/ 는 브랜치 내용이다.
         # hooks/ 가 없는 브랜치에서는 로컬 강제가 조용히 0개가 되며 로컬에서는 막을 수
         # 없다. 원격에서라도 막는다 — 이것이 P15③ 이 말하는 "판정 권한은 CI에 있다"의 실체다.
@@ -173,6 +195,7 @@ jobs:
           exit $fail
 
       - name: 셸 스크립트 문법 검사
+        id: shell-syntax
         # `*.sh` 글로브만 보면 hooks/pre-commit·pre-push 가 빠진다(확장자가 없다).
         # 강제 장치 본인이 문법 검사 밖에 있으면, 훅이 깨진 채로도 이 스텝은 초록이다.
         run: |
@@ -190,6 +213,7 @@ jobs:
           exit $fail
 
       - name: 패턴 파일 자체에 실제 비밀이 없는지 (자기 오염 방지)
+        id: pattern-file-selfcheck
         run: |
           # .secret-patterns.default 는 "모양"만 담아야 한다. 값처럼 보이는 긴 리터럴이 있으면 실패.
           if grep -nE "^[^#]*=[A-Za-z0-9]{8,}[[:space:]]*$" .secret-patterns.default; then
@@ -199,8 +223,10 @@ jobs:
           echo "PASS: 기본 패턴 파일에 실값 없음"
 
       - name: 인수 검사 hs-a3 (세션 계열 자격증명 탐지)
+        id: hs-a3
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-a3.sh
       - name: 데이터 노출 스캔 (크기 · 금지경로 · 기록 · 개인정보 내용)
+        id: data-exposure-scan
         # 판정 본문은 scripts/scan-data-exposure.sh 한 곳에 있다. CI 도 인수검사도
         # **같은 파일을 실행**한다 — 규칙을 두 벌로 적으면 반드시 갈라진다.
         # 2026-08-12 V1 적대검증 D4: 인라인 본문 시절엔 이 스텝에 `if: ${{ false }}` 를
@@ -209,28 +235,42 @@ jobs:
         run: bash scripts/scan-data-exposure.sh all
 
       - name: 인수 검사 hs-a4 (대용량·산출물 차단이 실제로 도는가)
+        id: hs-a4
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-a4.sh
 
       - name: 인수 검사 secret-webhook-vendor (웹훅·벤더 키 탐지 · AC-S1)
+        id: secret-webhook-vendor
         # 로컬 pre-push 는 acceptance-*.sh 를 글로브로 전량 실행하지만 CI 는 고정 목록이다.
         # 여기 등록하지 않으면 이 검사는 '로컬에만 있는 검사'가 되고, P15③ 은 그것을
         # 없는 것으로 친다(이 파일 111행 주석의 "판정 권한은 CI에 있다"와 같은 근거).
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-secret-webhook-vendor.sh
 
       - name: 인수 검사 verified-sha (초록불이 SHA 에 귀속되는가 · P23)
+        id: verified-sha
         # "CI 통과했습니다"는 어느 커밋에 대해 통과했는지를 말하지 않는다. 원격 HEAD 와
         # 초록불이 붙은 SHA 와 로컬 HEAD 가 다르면 그 초록불은 지금 머지하려는 코드의
         # 것이 아니다. 여기서는 판정기의 진리표(9종)와 fail-closed 를 검증한다.
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-verified-sha.sh
 
       - name: 인수 검사 ci-step-integrity (스텝을 조용히 끄지 못하는가)
+        id: ci-step-integrity
         # pre-push 는 워크플로를 문자열로 훑어 `if: false` 만 잡는다. `if: ${{ false }}`,
         # 항상-거짓 조건, `continue-on-error: true` 는 그대로 통과했다(2026-08-12 V1 D4:
         # 데이터 노출 검사 스텝을 영구히 꺼도 로컬 검사가 전부 초록이었다).
         # 이 검사는 워크플로를 실제 YAML 로 파싱해 조건부·오류무시 스텝을 구조로 막는다.
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-ci-step-integrity.sh
 
+      - name: 인수 검사 ci-required-manifest (필수 구조가 명부와 양방향으로 맞는가)
+        id: ci-required-manifest
+        # ci-step-integrity 는 "스텝을 조용히 끄는 것"을 막지만 스텝을 **삭제**하는 것과
+        # `on:` 트리거를 없애 검사가 아예 시작되지 않게 하는 것은 막지 못한다(자기 주석 명시).
+        # 이 검사는 docs/sot/ci-required-manifest.yaml 과 워크플로를 양방향 대조해
+        # 필수 트리거·job·step·명령의 삭제와, 명부에 없는 인수 검사의 몰래 추가를 함께 막는다.
+        # 판정 기준은 표시 이름이 아니라 안정된 step id 다.
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-ci-required-manifest.sh
+
       - name: 인수 검사 semantic-mutations (검사를 껐을 때 반드시 빨개지는가)
+        id: semantic-mutations
         # 2026-08-21: acceptance-hs-a4.sh 본문을 `exit 0` 으로 바꿔도 CI 가 초록이었다.
         # CI 가 종료값만 봤기 때문이다 — 종료값 0 은 "통과했다"와 "아무것도 안 했다"를
         # 구분하지 못한다. 위 스텝들이 전부 scripts/verify/run-acceptance.sh 를 거치는
@@ -239,6 +279,7 @@ jobs:
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-semantic-mutations.sh
 
       - name: 인수 검사 verify-ac-m (mechanism 명부 대조 · AC-M)
+        id: verify-ac-m
         # 명부(docs/sot/mechanism-registry.yaml)와 실제 검사 장치의 일치를 강제한다.
         # 검사기 1벌(scripts/verify/check-mechanism-registry.sh)을 로컬 pre-push
         # 글로브와 CI 가 같은 인수 스크립트로 실행한다 (판정기 2벌 금지 · P16).

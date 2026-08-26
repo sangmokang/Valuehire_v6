@@ -52,7 +52,7 @@ case "$TMP" in
 esac
 trap 'ruby -rfileutils -e "FileUtils.remove_entry(ARGV[0]) if File.exist?(ARGV[0])" "$TMP"' EXIT
 
-TOTAL=22
+TOTAL=25
 checked=0
 failed=0
 
@@ -68,27 +68,56 @@ record() {
 }
 
 # expect <설명> <기대 종료값> <명부> <워크플로>
+#
+# 주입에 실패해 경로가 비면 검사기는 명부의 기본 워크플로(=진짜 파일)를 보게 되고,
+# 그 결과 "공격이 막혔다"가 아니라 "공격을 아예 하지 않았다"가 통과로 기록된다.
+# 그래서 빈 경로·없는 경로는 여기서 먼저 불합격시킨다 (fail-closed).
 expect() {
-  local label="$1" wanted="$2" manifest="$3" workflow="$4" rc=0 out=""
+  local label="$1"
+  local wanted="$2"
+  local manifest="$3"
+  local workflow="$4"
+  local rc=0
+  local out=""
+  if [ -z "$manifest" ] || [ -z "$workflow" ]; then
+    record 1 "$label" "주입 실패 — 사본 경로가 비었다(공격이 실행되지 않았다)"
+    return
+  fi
+  case "$label" in
+    *"없음"*) ;;
+    *)
+      if [ ! -f "$manifest" ] || [ ! -f "$workflow" ]; then
+        record 1 "$label" "주입 실패 — 사본 파일이 없다(공격이 실행되지 않았다)"
+        return
+      fi
+      ;;
+  esac
   out=$(WORKFLOW_FILE="$workflow" bash "$CHECKER" "$manifest" 2>&1) || rc=$?
   if [ "$rc" -eq "$wanted" ]; then
     record 0 "$label" "exit=$rc"
   else
-    record 1 "$label" "expected exit=$wanted actual=$rc / ${out//$'\n'/ | }"
+    record 1 "$label" "expected exit=$wanted actual=$rc / $(printf '%s' "$out" | grep -c '^FAIL:')건 FAIL / $(printf '%s' "$out" | grep '^FAIL:' | head -2 | tr '\n' ' ')"
   fi
 }
 
 # 워크플로 사본에 ruby 로 주입한다. 반환값은 사본 경로.
+# `local a=$1 b=$TMP/$a` 처럼 한 줄에 묶으면 bash 3.2 에서 뒤 항목이 앞 항목을 못 본다.
 mutate_wf() {
-  local name="$1" code="$2" path="$TMP/wf-$name.yml"
-  cp "$WF" "$path"
+  local name="$1"
+  local code="$2"
+  local path
+  path="$TMP/wf-$name.yml"
+  cp "$WF" "$path" || return 1
   ruby -e "$code" "$path" || return 1
   printf '%s' "$path"
 }
 
 mutate_manifest() {
-  local name="$1" code="$2" path="$TMP/mf-$name.yaml"
-  cp "$MANIFEST" "$path"
+  local name="$1"
+  local code="$2"
+  local path
+  path="$TMP/mf-$name.yaml"
+  cp "$MANIFEST" "$path" || return 1
   ruby -e "$code" "$path" || return 1
   printf '%s' "$path"
 }
@@ -306,11 +335,32 @@ expect "실재하지 않는 job 을 명부가 요구 → 불합격" 1 "$p" "$WF"
 # ── fail-closed: 읽지 못하는 상황을 통과로 세지 않는다 ───────────────────────
 expect "명부 없음 → 스캔 무효" 2 "$TMP/no-such-manifest.yaml" "$WF"
 
+# 빈 명부는 "대조할 것이 없어서 통과"가 아니라, 워크플로가 돌리는 검사 전량이 미등록인
+# 상태다. 그래서 무효(2)가 아니라 위반(1)로 나와야 한다 — 명부를 비우는 것이 가장 값싼
+# 무력화이므로, 그것이 조용한 통과가 되지 않는다는 사실 자체를 사례로 못박는다.
 printf 'workflow: ".github/workflows/verify.yml"\n' > "$TMP/empty-manifest.yaml"
-expect "대조 항목 0개 명부 → 스캔 무효" 2 "$TMP/empty-manifest.yaml" "$WF"
+expect "명부를 통째로 비움 → 불합격" 1 "$TMP/empty-manifest.yaml" "$WF"
 
 printf 'required_steps: [broken\n' > "$TMP/broken-manifest.yaml"
 expect "파싱 불가 명부 → 스캔 무효" 2 "$TMP/broken-manifest.yaml" "$WF"
+
+# counter-AC "checker 가 파일 0개를 읽고 합격하는 경우": 인수 검사가 하나도 없는 저장소
+# 에서 돌리면 통과가 아니라 무효여야 한다 (P20).
+empty_repo="$TMP/empty-repo"
+mkdir -p "$empty_repo"
+git -C "$empty_repo" init -q -b main
+git -C "$empty_repo" config user.email acceptance@example.invalid
+git -C "$empty_repo" config user.name acceptance
+printf 'placeholder\n' > "$empty_repo/README.md"
+git -C "$empty_repo" add README.md
+git -C "$empty_repo" commit -qm empty
+empty_rc=0
+( cd "$empty_repo" && WORKFLOW_FILE="$WF" bash "$CHECKER" "$MANIFEST" >/dev/null 2>&1 ) || empty_rc=$?
+if [ "$empty_rc" -eq 2 ]; then
+  record 0 "인수 검사 0개인 저장소 → 스캔 무효" "exit=$empty_rc"
+else
+  record 1 "인수 검사 0개인 저장소 → 스캔 무효" "expected exit=2 actual=$empty_rc — 0건 대조로 통과는 금지한다"
+fi
 
 # ── 원본 불변 ────────────────────────────────────────────────────────────────
 current=$(git status --porcelain)

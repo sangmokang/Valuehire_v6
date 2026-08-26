@@ -1,0 +1,165 @@
+# ci-required-manifest.yaml — 서버 자동검사가 반드시 갖춰야 할 최소 구조 (SOT)
+#
+# 왜 명부인가: verify.yml 을 이 파일에서 **생성하지 않는다**. 생성기는 그 자체가 새 단일
+# 실패점이 되고, matrix·secrets·복합 run 블록처럼 명부 스키마로 표현하기 어려운 요소가
+# 있으며, 워크플로를 사람이 읽고 고칠 수 없게 만든다(2026-08-27 Codex 반려 결정 카드).
+# 대신 **필수 실행 조건과 필수 스텝만** 여기 적고 워크플로와 양방향으로 대조한다.
+#
+# 판정 기준은 표시 이름이 아니라 **안정된 job id · step id** 다. 이름은 사람을 위한 것이고
+# 복사·위조가 자유롭다(2026-08-27 실측: 예외 목록이 이름 문자열로 판정하고 있었다).
+#
+# 대조기: scripts/verify/check-ci-required-manifest.sh (YAML 구조 파싱 · grep 추정 금지)
+# 인수검사: scripts/acceptance-ci-required-manifest.sh
+#
+# 한계(주장하지 않는 것): 같은 커밋에서 이 명부와 대조기를 함께 약화하는 공격은 저장소
+# 내부 장치로 막을 수 없다. 그것은 외부 required check 와 승인 규칙의 몫이다.
+
+workflow: ".github/workflows/verify.yml"
+
+# 이것이 없으면 검사가 아예 시작되지 않는다. workflow_dispatch 만 남기는 것이 대표 공격이다.
+required_triggers:
+  - "push"
+  - "pull_request"
+
+required_jobs:
+  - id: "verify"
+
+# must_run_contains: 그 스텝의 run 본문에 문자 그대로 있어야 하는 명령.
+# allow_if: 조건부 실행을 허용하는 유일한 통로. 사유 없이 늘리지 않는다.
+required_steps:
+  - id: "checkout"
+    job: "verify"
+    uses_contains: "actions/checkout"
+  - id: "secret-scan"
+    job: "verify"
+    must_run_contains: ["bash verify.sh"]
+  - id: "principles-check"
+    job: "verify"
+    must_run_contains: ["bash scripts/verify/run-acceptance.sh scripts/acceptance-principles-check.sh"]
+  - id: "principles-mutations"
+    job: "verify"
+    must_run_contains: ["bash scripts/verify/run-acceptance.sh scripts/acceptance-principles-mutations.sh"]
+  - id: "guard-global-skill-files"
+    job: "verify"
+    must_run_contains: ["bash scripts/verify/run-acceptance.sh scripts/acceptance-guard-global-skill-files.sh"]
+  - id: "silent-failure-lint"
+    job: "verify"
+    must_run_contains:
+      - "bash scripts/verify/run-acceptance.sh scripts/acceptance-silent-failure-lint.sh"
+      - "bash scripts/verify/run-acceptance.sh scripts/acceptance-silent-failure-lint-mutations.sh"
+  - id: "hs-cleanroom"
+    job: "verify"
+    must_run_contains:
+      - "bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-cleanroom.sh"
+      - "bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-cleanroom-mutations.sh"
+      - "bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-cleanroom-absolute-paths.sh"
+      - "bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-cleanroom-absolute-contexts.sh"
+      - "bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-cleanroom-colon-paths.sh"
+      - "bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-cleanroom-file-urls.sh"
+      - "bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-cleanroom-hook-env.sh"
+      - "bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-cleanroom-hook-env-mutations.sh"
+  - id: "hs-gates"
+    job: "verify"
+    must_run_contains:
+      - "bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-gates.sh"
+      - "bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-gates-mutations.sh"
+      - "bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-gates-antiforge.sh"
+  - id: "history-scan"
+    job: "verify"
+    must_run_contains: ["git cat-file blob"]
+  - id: "history-scan-failclosed"
+    job: "verify"
+    must_run_contains: ["bash scripts/verify/run-acceptance.sh scripts/acceptance-history-scan-failclosed.sh"]
+  - id: "acceptance-0-2-unreachable"
+    job: "verify"
+    must_run_contains: ["bash scripts/verify/run-acceptance.sh scripts/acceptance-0-2-unreachable-content.sh"]
+  - id: "acceptance-0-6"
+    job: "verify"
+    must_run_contains: ["bash scripts/verify/run-acceptance.sh scripts/acceptance-0-6.sh"]
+  - id: "acceptance-0-7"
+    job: "verify"
+    must_run_contains: ["bash scripts/verify/run-acceptance.sh scripts/acceptance-0-7.sh"]
+  - id: "acceptance-0-5"
+    job: "verify"
+    must_run_contains: ["bash scripts/verify/run-acceptance.sh scripts/acceptance-0-5.sh"]
+    allow_if: "origin/main==main 을 보는 검사라 main push 에서만 의미가 있다. PR 실행에서 요구하면 상시 실패한다."
+  - id: "suppressions-expiry"
+    job: "verify"
+    must_run_contains: ["suppressions.yaml"]
+  - id: "hooks-present"
+    job: "verify"
+    must_run_contains: ["hooks/pre-commit hooks/pre-push"]
+  - id: "shell-syntax"
+    job: "verify"
+    must_run_contains: ["bash -n"]
+  - id: "pattern-file-selfcheck"
+    job: "verify"
+    must_run_contains: [".secret-patterns.default"]
+  - id: "hs-a3"
+    job: "verify"
+    must_run_contains: ["bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-a3.sh"]
+  - id: "data-exposure-scan"
+    job: "verify"
+    must_run_contains: ["bash scripts/scan-data-exposure.sh all"]
+  - id: "hs-a4"
+    job: "verify"
+    must_run_contains: ["bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-a4.sh"]
+  - id: "secret-webhook-vendor"
+    job: "verify"
+    must_run_contains: ["bash scripts/verify/run-acceptance.sh scripts/acceptance-secret-webhook-vendor.sh"]
+  - id: "verified-sha"
+    job: "verify"
+    must_run_contains: ["bash scripts/verify/run-acceptance.sh scripts/acceptance-verified-sha.sh"]
+  - id: "ci-step-integrity"
+    job: "verify"
+    must_run_contains: ["bash scripts/verify/run-acceptance.sh scripts/acceptance-ci-step-integrity.sh"]
+  - id: "ci-required-manifest"
+    job: "verify"
+    must_run_contains: ["bash scripts/verify/run-acceptance.sh scripts/acceptance-ci-required-manifest.sh"]
+  - id: "semantic-mutations"
+    job: "verify"
+    must_run_contains: ["bash scripts/verify/run-acceptance.sh scripts/acceptance-semantic-mutations.sh"]
+  - id: "verify-ac-m"
+    job: "verify"
+    must_run_contains: ["bash scripts/verify/run-acceptance.sh scripts/acceptance-verify-ac-m.sh"]
+
+# 저장소의 모든 scripts/acceptance-*.sh 는 required 또는 excluded 중 정확히 한 곳에 있어야
+# 한다. 어디에도 없으면 불합격이다 — 새 인수 검사가 pre-push 글로브에만 잡히고 CI 에서는
+# 한 줄도 돌지 않는 상태(P15③ "로컬에만 있는 검사는 없는 것으로 친다")를 막는다.
+acceptance_scripts:
+  required:
+    - "scripts/acceptance-0-2-unreachable-content.sh"
+    - "scripts/acceptance-0-5.sh"
+    - "scripts/acceptance-0-6.sh"
+    - "scripts/acceptance-0-7.sh"
+    - "scripts/acceptance-ci-required-manifest.sh"
+    - "scripts/acceptance-ci-step-integrity.sh"
+    - "scripts/acceptance-guard-global-skill-files.sh"
+    - "scripts/acceptance-history-scan-failclosed.sh"
+    - "scripts/acceptance-hs-a3.sh"
+    - "scripts/acceptance-hs-a4.sh"
+    - "scripts/acceptance-hs-cleanroom-absolute-contexts.sh"
+    - "scripts/acceptance-hs-cleanroom-absolute-paths.sh"
+    - "scripts/acceptance-hs-cleanroom-colon-paths.sh"
+    - "scripts/acceptance-hs-cleanroom-file-urls.sh"
+    - "scripts/acceptance-hs-cleanroom-hook-env-mutations.sh"
+    - "scripts/acceptance-hs-cleanroom-hook-env.sh"
+    - "scripts/acceptance-hs-cleanroom-mutations.sh"
+    - "scripts/acceptance-hs-cleanroom.sh"
+    - "scripts/acceptance-hs-gates-antiforge.sh"
+    - "scripts/acceptance-hs-gates-mutations.sh"
+    - "scripts/acceptance-hs-gates.sh"
+    - "scripts/acceptance-principles-check.sh"
+    - "scripts/acceptance-principles-mutations.sh"
+    - "scripts/acceptance-secret-webhook-vendor.sh"
+    - "scripts/acceptance-semantic-mutations.sh"
+    - "scripts/acceptance-silent-failure-lint-mutations.sh"
+    - "scripts/acceptance-silent-failure-lint.sh"
+    - "scripts/acceptance-verified-sha.sh"
+    - "scripts/acceptance-verify-ac-m.sh"
+  excluded:
+    - path: "scripts/acceptance-0-2.sh"
+      reason: >-
+        로컬 전용 .secret-patterns 의 실제 리터럴을 기준으로 하는데 CI 에는 그 파일이 없다.
+        기본 패턴으로 대체하면 패턴 파일 자신이 매칭돼 상시 실패한다(실측: CI run 31176518944).
+        CI 에서의 등가물은 history-scan 스텝이며 이 명부가 그 스텝을 필수로 요구한다.
