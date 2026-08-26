@@ -63,6 +63,10 @@ function commit(cwd, subject, wu, phase, path = "src/value.mjs") {
   return git(cwd, "rev-parse", "HEAD");
 }
 
+function commitTime(cwd, oid) {
+  return git(cwd, "show", "-s", "--format=%cI", oid);
+}
+
 function evidence(path, output, startedAt, finishedAt) {
   return {
     command: `node --test ${path}.test.mjs`,
@@ -96,13 +100,16 @@ function makeRepo(mutate = () => {}, paths = {}) {
   const output1 = "PASS WU-1 complete\n";
   const output2 = "PASS WU-2 complete\n";
   const issue = readFileSync(join(cwd, "docs/engineering/issue.md"));
+  const evidence1 = evidence("evidence/wu-1.tap", output1, commitTime(cwd, green1), commitTime(cwd, green1));
+  const evidence2 = evidence("evidence/wu-2.tap", output2, commitTime(cwd, green2), commitTime(cwd, green2));
   const first = sealRecord({
     sequence: 1,
     wu_id: "WU-1",
     red_commit: red1,
     implementation_commit: green1,
     previous_record_sha256: null,
-    evidence: [evidence("evidence/wu-1.tap", output1, "2026-08-27T01:00:00Z", "2026-08-27T01:01:00Z")],
+    expected_commands: [evidence1.command],
+    evidence: [evidence1],
   });
   const second = sealRecord({
     sequence: 2,
@@ -110,7 +117,8 @@ function makeRepo(mutate = () => {}, paths = {}) {
     red_commit: red2,
     implementation_commit: green2,
     previous_record_sha256: first.record_sha256,
-    evidence: [evidence("evidence/wu-2.tap", output2, "2026-08-27T01:02:00Z", "2026-08-27T01:03:00Z")],
+    expected_commands: [evidence2.command],
+    evidence: [evidence2],
   });
   const ledger = {
     schema_version: "valuehire.strict-trace/v1",
@@ -119,12 +127,12 @@ function makeRepo(mutate = () => {}, paths = {}) {
       id: "LOCAL-TRACE-1",
       contract_path: "docs/engineering/issue.md",
       contract_sha256: sha256(issue),
-      opened_at: "2026-08-27T00:00:00Z",
+      opened_at: "2000-01-01T00:00:00Z",
     },
     base_commit: base,
     candidate_commit: green2,
     branch: "task/trace-fixture",
-    worktree: cwd,
+    worktree: "${WORKTREE}",
     records: [first, second],
   };
   mutate({ cwd, ledger, output1, output2, commits: { red1, green1, red2, green2 } });
@@ -192,9 +200,27 @@ test("record deletion is rejected", () => expectFailure(makeRepo(({ ledger }) =>
 test("record duplication is rejected", () => expectFailure(makeRepo(({ ledger }) => ledger.records.push(ledger.records[0])), "sequence"));
 test("record reordering is rejected", () => expectFailure(makeRepo(({ ledger }) => ledger.records.reverse()), "sequence"));
 test("a timestamp before the issue contract is rejected", () => expectFailure(makeRepo(({ ledger }) => {
-  ledger.records[0].evidence[0].started_at = "2020-01-01T00:00:00Z";
+  ledger.records[0].evidence[0].started_at = "1999-01-01T00:00:00Z";
   ledger.records[0] = sealRecord(ledger.records[0]);
 }), "timestamp"));
+test("an evidence timestamp after the ledger commit is rejected", () => expectFailure(makeRepo(({ ledger }) => {
+  ledger.records[0].evidence[0].started_at = "2030-01-01T00:00:00Z";
+  ledger.records[0].evidence[0].finished_at = "2030-01-01T00:00:01Z";
+  ledger.records[0] = sealRecord(ledger.records[0]);
+}), "after ledger commit"));
+test("an evidence timestamp before the implementation commit is rejected", () => expectFailure(makeRepo(({ ledger }) => {
+  ledger.records[0].evidence[0].started_at = "2001-01-01T00:00:00Z";
+  ledger.records[0].evidence[0].finished_at = "2001-01-01T00:00:01Z";
+  ledger.records[0] = sealRecord(ledger.records[0]);
+}), "predates implementation commit"));
+test("an unrelated evidence command is rejected", () => expectFailure(makeRepo(({ ledger }) => {
+  ledger.records[0].evidence[0].command = "true";
+  ledger.records[0] = sealRecord(ledger.records[0]);
+}), "command is not approved"));
+test("a WU missing expected commands is rejected", () => expectFailure(makeRepo(({ ledger }) => {
+  delete ledger.records[0].expected_commands;
+  ledger.records[0] = sealRecord(ledger.records[0]);
+}), "expected_commands"));
 test("a WU ID that disagrees with commit trailers is rejected", () => expectFailure(makeRepo(({ ledger }) => {
   ledger.records[0].wu_id = "WU-X";
   ledger.records[0] = sealRecord(ledger.records[0]);
