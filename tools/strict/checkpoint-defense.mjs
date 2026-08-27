@@ -115,9 +115,12 @@ function parseTap(output) {
 }
 
 function runCheckpointTests(tree, contract) {
+  const env = { ...process.env };
+  delete env.NODE_TEST_CONTEXT;
   const result = spawnSync(process.execPath, ["--test", "tests/checkpoint-gate.test.mjs"], {
     cwd: tree,
     encoding: "utf8",
+    env,
     timeout: 120_000,
     maxBuffer: 32 * 1024 * 1024,
   });
