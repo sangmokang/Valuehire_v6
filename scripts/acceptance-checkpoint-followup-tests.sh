@@ -14,6 +14,7 @@ node --test --test-concurrency=1 \
   tests/checkpoint-test-strength.test.mjs \
   tests/checkpoint-test-strength-ignored-source.test.mjs \
   tests/checkpoint-test-strength-parser-context.test.mjs \
+  tests/checkpoint-test-strength-return-asi.test.mjs \
   tests/checkpoint-test-strength-control-flow.test.mjs \
   tests/checkpoint-test-strength-static-analysis.test.mjs \
   tests/checkpoint-test-strength-structural-context.test.mjs \
@@ -33,10 +34,10 @@ cat "$OUT"
 field() { awk -v key="$1" '$1=="#" && $2==key { value=$3 } END { print value }' "$OUT"; }
 tests=$(field tests); passed=$(field pass); failed=$(field fail)
 cancelled=$(field cancelled); skipped=$(field skipped); todo=$(field todo)
-if [ "$rc" -eq 0 ] && [ "$tests" = 82 ] && [ "$passed" = 82 ] && \
+if [ "$rc" -eq 0 ] && [ "$tests" = 83 ] && [ "$passed" = 83 ] && \
    [ "$failed" = 0 ] && [ "$cancelled" = 0 ] && [ "$skipped" = 0 ] && [ "$todo" = 0 ]; then
-  echo "PASS: checkpoint 후속 회귀 82/82, fail·cancelled·skipped·todo 0"
-  echo "CHECKED: 82"
+  echo "PASS: checkpoint 후속 회귀 83/83, fail·cancelled·skipped·todo 0"
+  echo "CHECKED: 83"
   echo "VERDICT: PASS"
   exit 0
 fi

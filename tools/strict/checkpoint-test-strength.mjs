@@ -105,7 +105,7 @@ function hasDisabledContext(visible, position) {
       blocks.pop();
     }
   }
-  const afterReturn = blocks.some(({ start }) => /\breturn\b[^;]*;/s.test(visible.slice(start, position)));
+  const afterReturn = blocks.some(({ start }) => /\breturn\b(?:[^\r\n;]*;|[^\r\n]*\r?\n)/.test(visible.slice(start, position)));
   const regionStart = blocks.at(-1)?.start ?? Math.max(0, visible.lastIndexOf("}", position - 1) + 1);
   const terminated = /\b(?:process|Deno|Bun)\s*\.\s*exit\s*\([^)]*\)\s*;/s.test(visible.slice(regionStart, position));
   return blocks.some(({ disabled }) => disabled) || afterReturn || terminated || expressionDisabled(visible, position);

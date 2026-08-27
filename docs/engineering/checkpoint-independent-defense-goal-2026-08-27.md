@@ -135,7 +135,7 @@ bash scripts/acceptance-checkpoint-defense.sh [<candidate-commit>]
 {
   "pass": true,
   "candidate": "40-hex commit",
-  "checked": 79,
+  "checked": 80,
   "tests": {"tests": 67, "pass": 67, "fail": 0, "skipped": 0, "todo": 0, "cancelled": 0},
   "direct": {"normal": true, "blocked": true},
   "violations": []
@@ -300,6 +300,6 @@ PASS
 
 → 다음 V1이 재현한 정규식과 나눗셈 경계 오판도 같은 절차로 닫았습니다. `5bf0e8c`에서 단언 위장 세 종류, 정상 나눗셈 오차단, 함수 101줄 우회가 모두 RED였고 시험 blob을 바꾸지 않은 `c5ea2d6`에서 집중 회귀 12/12와 후속 집계 66/66이 GREEN이 됐습니다. 공통 lexer도 독립 계약 지문에 포함해 임의 교체를 막았습니다.
 
-→ `ba7e6f8` 대상 V1은 test 콜백 첫 문장 `try`, 익명 `function ()` 콜백, 후보 contract 동시 갱신 세 결함을 `REQUEST_CHANGES`로 재현했습니다. `aa9c7ba`에서 parser 8건과 승인 기준 2건이 정확히 0/10 RED였고, 시험 blob을 바꾸지 않은 `de8e16a`와 `7ae7bd7`에서 실행 문맥을 고친 뒤 checker와 contract를 선행 승인 commit에서 읽도록 분리했습니다. 이후 `b9c7a3b` 대상 V1이 미호출 arrow callback 네 형태, 순회되지 않은 generator, Python `return` 뒤 단언을 재현했고 `15da447`에서 정확히 0/6 RED로 봉인했습니다. RED blob을 바꾸지 않은 `6fac83f`에서 6/6 GREEN이 됐고, 전체 후속 집계는 82/82입니다. 후보가 checker·보호 시험 또는 67개 무의미 시험과 자기 지문을 함께 바꿔도 승인 계약과 달라 실패합니다.
+→ `ba7e6f8` 대상 V1은 test 콜백 첫 문장 `try`, 익명 `function ()` 콜백, 후보 contract 동시 갱신 세 결함을 `REQUEST_CHANGES`로 재현했습니다. `aa9c7ba`에서 parser 8건과 승인 기준 2건이 정확히 0/10 RED였고, 시험 blob을 바꾸지 않은 `de8e16a`와 `7ae7bd7`에서 실행 문맥을 고친 뒤 checker와 contract를 선행 승인 commit에서 읽도록 분리했습니다. 이후 `b9c7a3b` 대상 V1이 미호출 arrow callback 네 형태, 순회되지 않은 generator, Python `return` 뒤 단언을 재현했고 `15da447`에서 정확히 0/6 RED로 봉인했습니다. RED blob을 바꾸지 않은 `6fac83f`에서 6/6 GREEN이 됐습니다. 독립 verifier가 찾은 JavaScript ASI `return` 줄바꿈 우회도 `00da6e2`에서 0/1 RED로 봉인한 뒤 같은 종료 문맥 규칙으로 1/1 GREEN이 됐고, 전체 후속 집계는 83/83입니다. 후보가 checker·보호 시험 또는 67개 무의미 시험과 자기 지문을 함께 바꿔도 승인 계약과 달라 실패합니다.
 
 → 최종 V1과 V2는 이 G/T 판정과 같은 후보 HEAD에서 새로 실행해 원문과 요약을 별도 보존합니다. 직전 후보의 V1 결과는 재사용하지 않습니다. push·PR·merge·원격 CI는 사용자 금지에 따라 `NOT_RUN`이며 로컬 PASS로 바꾸지 않습니다.
