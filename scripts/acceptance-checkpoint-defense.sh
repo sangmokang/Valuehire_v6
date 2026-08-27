@@ -2,6 +2,11 @@
 # acceptance-checkpoint-defense.sh — candidate checkpoint gate/test/defense blobs are still meaningful.
 set -uo pipefail
 
+if [ "$#" -gt 1 ]; then
+  echo "FAIL: candidate commit은 최대 한 개만 허용한다"
+  echo "CHECKED: 0"
+  exit 2
+fi
 candidate="${1:-HEAD}"
 contract="contracts/checkpoint-defense.json"
 if [ ! -f "$contract" ]; then

@@ -133,11 +133,12 @@ bash scripts/acceptance-checkpoint-defense.sh [<candidate-commit>]
 
 ```json
 {
-  "verdict": "PASS|FAIL|NOT_RUN",
+  "pass": true,
   "candidate": "40-hex commit",
-  "fingerprints": {"checked": 2, "mismatches": 0},
-  "tests": {"expected": 67, "minimum": 67, "tests": 67, "pass": 67, "fail": 0, "skipped": 0, "todo": 0, "cancelled": 0},
-  "fixtures": {"normal": "PASS", "blocked": "PASS"}
+  "checked": 77,
+  "tests": {"tests": 67, "pass": 67, "fail": 0, "skipped": 0, "todo": 0, "cancelled": 0},
+  "direct": {"normal": true, "blocked": true},
+  "violations": []
 }
 ```
 
@@ -187,7 +188,7 @@ bash scripts/acceptance-checkpoint-defense.sh [<candidate-commit>]
 1. Gate 0~1: 정본·과거 goal·훅·CI·현재 검사·기준 수치와 이 계약을 고정합니다.
 2. Gate 2: 기존 600줄 시험은 건드리지 않고 새 책임별 시험을 추가해 빠진 동작 때문에 실패하는 RED를 실행하고 Lore 형식 commit으로 보존합니다.
 3. Gate 3: RED 시험의 기대값을 바꾸지 않고 최소 구현으로 GREEN을 만듭니다. 함수 경계도 같은 RED에서 100/101로 고정합니다.
-4. Gate 3.5: pre-push 글로브와 명시적 호출, 공통 acceptance wrapper, CI step, 장치 명부의 실제 호출 흐름을 실행으로 증명합니다.
+4. Gate 3.5: pre-push 글로브의 runtime probe, 공통 acceptance wrapper, CI step, 장치 명부의 실제 호출 흐름을 실행으로 증명합니다.
 5. Gate 4: 정상 검증과 원본 밖 임시 복제본의 공격 전량을 새 HEAD에서 실행합니다.
 6. AUDIT: Claude V1 원문 JSON을 보존하고 새 Codex V2가 모든 근거를 다시 실행한 뒤 codeaudit 혼합 감사와 humanreview 병합 전 판정을 수행합니다.
 7. CHECKPOINT: 로컬 Lore commit까지만 보존합니다. push·PR·merge·원격 CI는 `NOT_RUN`입니다.
