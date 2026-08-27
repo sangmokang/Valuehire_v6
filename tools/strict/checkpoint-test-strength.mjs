@@ -35,17 +35,68 @@ function maskIgnoredJavaScript(source) {
   return visible.join("");
 }
 
+function staticPrimitive(text) {
+  const token = text.trim().replace(/^\((.*)\)$/s, "$1").trim();
+  if (["false", "null", "undefined", "NaN"].includes(token)) return { known: true, value: false };
+  if (token === "true") return { known: true, value: true };
+  if (/^-?(?:\d+(?:\.\d+)?|\.\d+)(?:e[+-]?\d+)?n?$/i.test(token)) {
+    return { known: true, value: Number(token.replace(/n$/i, "")) };
+  }
+  const comparison = token.match(/^(.+?)\s*(===|!==|==|!=|<=|>=|<|>)\s*(.+)$/);
+  if (!comparison) return { known: false, value: null };
+  const left = staticPrimitive(comparison[1]);
+  const right = staticPrimitive(comparison[3]);
+  if (!left.known || !right.known) return { known: false, value: null };
+  const operations = {
+    "===": (a, b) => a === b,
+    "!==": (a, b) => a !== b,
+    "==": (a, b) => a == b,
+    "!=": (a, b) => a != b,
+    "<=": (a, b) => a <= b,
+    ">=": (a, b) => a >= b,
+    "<": (a, b) => a < b,
+    ">": (a, b) => a > b,
+  };
+  return { known: true, value: operations[comparison[2]](left.value, right.value) };
+}
+
+function staticallyFalsy(text) {
+  const result = staticPrimitive(text);
+  return result.known && !result.value;
+}
+
+function namedFunctionDisabled(prefix, visible) {
+  const declaration = prefix.match(/\bfunction\s+([A-Za-z_$][\w$]*)\s*\([^)]*\)\s*$/);
+  const arrow = prefix.match(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>\s*$/);
+  const name = declaration?.[1] ?? arrow?.[1];
+  if (!name) return false;
+  const calls = [...visible.matchAll(new RegExp(`\\b${name}\\s*\\(`, "g"))].length;
+  return declaration ? calls <= 1 : calls === 0;
+}
+
+function blockDisabled(prefix, visible) {
+  if (/\btry\s*$/.test(prefix)) return true;
+  const condition = prefix.match(/\bif\s*\(([^()]*)\)\s*$/)?.[1];
+  return (condition !== undefined && staticallyFalsy(condition)) || namedFunctionDisabled(prefix, visible);
+}
+
+function shortCircuited(visible, position) {
+  const statement = visible.slice(Math.max(0, visible.lastIndexOf(";", position - 1) + 1), position);
+  const operand = statement.match(/(?:^|[({])\s*([^;&|()]+?)\s*&&\s*$/)?.[1];
+  return operand !== undefined && staticallyFalsy(operand);
+}
+
 function hasDisabledContext(visible, position) {
   const disabled = [];
   for (let index = 0; index < position; index += 1) {
     if (visible[index] === "{") {
       const prefix = visible.slice(Math.max(0, index - 120), index).trimEnd();
-      disabled.push(/(?:\btry|\bif\s*\(\s*(?:false|0|null|undefined)\s*\))\s*$/.test(prefix));
+      disabled.push(blockDisabled(prefix, visible));
     } else if (visible[index] === "}") {
       disabled.pop();
     }
   }
-  return disabled.includes(true);
+  return disabled.includes(true) || shortCircuited(visible, position);
 }
 
 function jsCalls(source, name) {
