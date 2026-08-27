@@ -35,11 +35,25 @@ function maskIgnoredJavaScript(source) {
   return visible.join("");
 }
 
+function hasDisabledContext(visible, position) {
+  const disabled = [];
+  for (let index = 0; index < position; index += 1) {
+    if (visible[index] === "{") {
+      const prefix = visible.slice(Math.max(0, index - 120), index).trimEnd();
+      disabled.push(/(?:\btry|\bif\s*\(\s*(?:false|0|null|undefined)\s*\))\s*$/.test(prefix));
+    } else if (visible[index] === "}") {
+      disabled.pop();
+    }
+  }
+  return disabled.includes(true);
+}
+
 function jsCalls(source, name) {
   const calls = [];
   const visible = maskIgnoredJavaScript(source);
   const pattern = new RegExp(`\\bassert\\.${name}\\s*\\(`, "g");
   for (const match of visible.matchAll(pattern)) {
+    if (hasDisabledContext(visible, match.index)) continue;
     const start = match.index + match[0].length;
     let depth = 1;
     for (let index = start; index < visible.length; index += 1) {
@@ -114,15 +128,16 @@ function normalizeExpression(text) {
 }
 
 function regexToken(text) {
-  const match = text.trim().match(/^\/((?:\\.|[^/])*)\/[a-z]*$/i);
-  return match ? match[1] : null;
+  const match = text.trim().match(/^\/((?:\\.|[^/])*)\/([a-z]*)$/i);
+  return match ? { body: match[1], flags: match[2].toLowerCase() } : null;
 }
 
-function anchoredRegexBody(token) {
-  if (token === null || !token.startsWith("^") || !token.endsWith("$")) return null;
-  const body = token.slice(1, -1);
+function anchoredRegex(token) {
+  if (token === null || !token.body.startsWith("^") || !token.body.endsWith("$")) return null;
+  const body = token.body.slice(1, -1);
   if (body === ".*" || body === "[\\s\\S]*") return null;
-  return body;
+  const weakFlags = [...token.flags].filter((flag) => "ims".includes(flag)).sort().join("");
+  return { body, weakFlags };
 }
 
 function jsStrongAtoms(source) {
@@ -138,8 +153,10 @@ function jsStrongAtoms(source) {
   }
   for (const call of jsCalls(source, "match")) {
     const args = splitArguments(call);
-    const body = anchoredRegexBody(regexToken(args[1] ?? ""));
-    if (args.length >= 2 && body) atoms.push(`js:anchored:${normalizeExpression(args[0])}:${body}`);
+    const regex = anchoredRegex(regexToken(args[1] ?? ""));
+    if (args.length >= 2 && regex) {
+      atoms.push(`js:anchored:${normalizeExpression(args[0])}:${regex.body}\u001f${regex.weakFlags}`);
+    }
   }
   return atoms;
 }
@@ -164,19 +181,22 @@ function strongAtoms(path, source) {
   return [];
 }
 
-function multiset(values) {
-  const counts = new Map();
-  for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1);
-  return counts;
+function preservesAtom(before, after) {
+  if (!before.startsWith("js:anchored:") || !after.startsWith("js:anchored:")) return before === after;
+  const [beforeKey, beforeFlags = ""] = before.split("\u001f");
+  const [afterKey, afterFlags = ""] = after.split("\u001f");
+  return beforeKey === afterKey && [...afterFlags].every((flag) => beforeFlags.includes(flag));
 }
 
 export function strengthDetails(basePath, beforeContent, currentPath, currentContent) {
-  const before = multiset(strongAtoms(basePath ?? currentPath, beforeContent));
-  const after = multiset(strongAtoms(currentPath, currentContent));
+  const before = strongAtoms(basePath ?? currentPath, beforeContent);
+  const after = strongAtoms(currentPath, currentContent);
+  const used = new Set();
   const details = [];
-  for (const [atom, count] of before) {
-    const actual = after.get(atom) ?? 0;
-    if (actual < count) details.push(`strong assertion weakened: ${atom} ${count} -> ${actual}`);
+  for (const atom of before) {
+    const match = after.findIndex((candidate, index) => !used.has(index) && preservesAtom(atom, candidate));
+    if (match === -1) details.push(`strong assertion weakened: ${atom.replace("\u001f", " flags=")}`);
+    else used.add(match);
   }
   return details;
 }
