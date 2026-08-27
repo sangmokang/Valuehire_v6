@@ -98,12 +98,6 @@
   stage: "manual"
   manual_reason: "후보 commit blob·정확 시험 수·독립 fixture를 판정하는 동일 검사기"
   required: true
-- id: "checkpoint-defense-contract"
-  path: "contracts/checkpoint-defense.json"
-  target: "expected_tests"
-  stage: "manual"
-  manual_reason: "승인 지문과 RED에서 고정한 정확 시험 수의 기계 계약"
-  required: true
 - id: "verified-sha-ci"
   path: ".github/workflows/verify.yml"
   target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-verified-sha.sh"

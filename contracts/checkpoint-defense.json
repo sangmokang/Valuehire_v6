@@ -1,22 +1,15 @@
 {
-  "schema_version": 1,
+  "version": 1,
   "expected_tests": 67,
   "minimum_tests": 67,
-  "files": [
-    {
-      "path": "tools/strict/checkpoint-gate.mjs",
-      "role": "checkpoint-gate",
-      "sha256": "36d795af77c1daf09cf496ae15289dac9d238329c9ad2208c4427072c7e18002"
-    },
-    {
-      "path": "tests/checkpoint-gate.test.mjs",
-      "role": "checkpoint-tests",
-      "sha256": "ac7fe60a8ba99b6ca7d748dbde38d9c1601083ed000bc6a21c56db660785c47e"
-    },
-    {
-      "path": "tools/strict/checkpoint-defense.mjs",
-      "role": "independent-checker",
-      "sha256": "3380d4a6a2c14497b76b701831177809a20ccaffc17e50942b57d47242c70356"
-    }
-  ]
+  "fingerprints": {
+    "tools/strict/checkpoint-gate.mjs": "36d795af77c1daf09cf496ae15289dac9d238329c9ad2208c4427072c7e18002",
+    "tests/checkpoint-gate.test.mjs": "ac7fe60a8ba99b6ca7d748dbde38d9c1601083ed000bc6a21c56db660785c47e",
+    "tools/strict/checkpoint-defense.mjs": "a8a5da2bf8f0cf428046c45feab60e902fe67123c5f78dfcbb8df9aafb33f02c",
+    "tools/strict/checkpoint-js-scan.mjs": "01c0f9603f67c292464c6c8d814b4d9d6f9fb9820c58aa3842d19c07c02c4c43",
+    "tools/strict/checkpoint-test-strength.mjs": "d37f9639849ee5ce2a24fe58d78c0eeb87e4ec371a761bdc16d3e9cb2176eb9b",
+    "tools/strict/checkpoint-function-scan.mjs": "333c38a0dfd8f8abfb1f362c5eab8441a61df99ff6147d238fc391e13be4c731",
+    "verify.sh": "08e7468f98b832c7d02e6139daa64e47adecfae48bbef4ecc39970a28b8c7adb",
+    ".secret-patterns.default": "b1676e869e09252f9f3b33026ec6972b06cdbf0a02a153d33fe349ac03b92145"
+  }
 }

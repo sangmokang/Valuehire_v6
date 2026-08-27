@@ -8,7 +8,7 @@ import { spawnSync } from "node:child_process";
 
 const DEFAULT_CONTRACT = "contracts/checkpoint-defense.json";
 const FIXED_TEST_COUNT = 67;
-const PATHS = [
+const REQUIRED_PATHS = [
   "tools/strict/checkpoint-gate.mjs",
   "tests/checkpoint-gate.test.mjs",
   "tools/strict/checkpoint-defense.mjs",
@@ -57,15 +57,19 @@ function jsonResult(pass, fields) {
 
 async function loadContract(path) {
   const contract = JSON.parse(await readFile(path, "utf8"));
+  if (contract.version !== 1 || !contract.fingerprints || typeof contract.fingerprints !== "object") {
+    throw new Error("checkpoint defense contract version/fingerprints are invalid");
+  }
   if (contract.expected_tests !== FIXED_TEST_COUNT || contract.minimum_tests !== FIXED_TEST_COUNT) {
     throw new Error(`checkpoint defense contract must pin ${FIXED_TEST_COUNT} tests`);
   }
+  if (Object.keys(contract.fingerprints).length < 6) throw new Error("checkpoint defense contract fingerprints fewer than 6 files");
+  for (const pathName of REQUIRED_PATHS) {
+    if (!/^[a-f0-9]{64}$/.test(contract.fingerprints[pathName] ?? "")) {
+      throw new Error(`checkpoint defense contract fingerprint missing: ${pathName}`);
+    }
+  }
   return contract;
-}
-
-function expectedHash(contract, path) {
-  if (contract.fingerprints?.[path]) return contract.fingerprints[path];
-  return contract.files?.find((file) => file.path === path)?.sha256;
 }
 
 function candidateBlob(candidate, path) {
@@ -75,13 +79,12 @@ function candidateBlob(candidate, path) {
 function verifyFingerprints(candidate, contract) {
   const violations = [];
   let checked = 0;
-  for (const path of PATHS) {
+  for (const [path, expected] of Object.entries(contract.fingerprints)) {
     checked += 1;
     try {
       const actual = sha256(candidateBlob(candidate, path));
-      const expected = expectedHash(contract, path);
-      if (!expected || actual !== expected) {
-        violations.push({ check: "fingerprint", file: path, detail: `${actual} != ${expected ?? "<missing>"}` });
+      if (actual !== expected) {
+        violations.push({ check: "fingerprint", file: path, detail: `${actual} != ${expected}` });
       }
     } catch (error) {
       violations.push({ check: "fingerprint", file: path, detail: error.message });
@@ -141,7 +144,8 @@ function fixtureRepo() {
   writeFileSync(join(cwd, "docs/sot/coding-principles.md"), "| P11 | budget | hard 600 LOC, function hard 100 LOC |\n");
   writeFileSync(join(cwd, ".secret-patterns.default"), "CHECKPOINT_CANARY_[A-Z0-9]{12}\n");
   writeFileSync(join(cwd, "verify.sh"), "#!/usr/bin/env bash\nexit 0\n");
-  writeFileSync(join(cwd, "README.md"), "baseline\n");
+  mkdirSync(join(cwd, "tests"), { recursive: true });
+  writeFileSync(join(cwd, "tests/value.test.mjs"), 'import assert from "node:assert/strict";\nassert.equal(status, 1);\n');
   writeFileSync(join(cwd, `.strict/run-ledger/${RUN_ID}.json`), `${JSON.stringify({
     run_id: RUN_ID,
     task: "checkpoint defense fixture",
@@ -168,13 +172,12 @@ function runGate(tree, cwd, base) {
 
 function runDirectFixtures(tree) {
   const normal = fixtureRepo();
-  mkdirSync(join(normal.cwd, "tests"), { recursive: true });
-  writeFileSync(join(normal.cwd, "tests/normal.test.mjs"), "import assert from 'node:assert/strict';\nassert.equal(1, 1);\n");
-  git(["add", "tests/normal.test.mjs"], { cwd: normal.cwd });
+  writeFileSync(join(normal.cwd, "tests/value.test.mjs"), 'import assert from "node:assert/strict";\nassert.equal(status, 1);\nassert.ok(true);\n');
+  git(["add", "tests/value.test.mjs"], { cwd: normal.cwd });
   const normalResult = runGate(tree, normal.cwd, normal.base);
   const blocked = fixtureRepo();
-  writeFileSync(join(blocked.cwd, "outside.mjs"), "export const outside = 1;\n");
-  git(["add", "outside.mjs"], { cwd: blocked.cwd });
+  writeFileSync(join(blocked.cwd, "tests/value.test.mjs"), "");
+  git(["add", "tests/value.test.mjs"], { cwd: blocked.cwd });
   const blockedResult = runGate(tree, blocked.cwd, blocked.base);
   rmSync(normal.cwd, { recursive: true, force: true });
   rmSync(blocked.cwd, { recursive: true, force: true });
@@ -194,8 +197,14 @@ async function main() {
     const violations = [...fingerprint.violations, ...checkpoint.violations];
     if (!direct.normal) violations.push({ check: "direct-fixture", file: "tools/strict/checkpoint-gate.mjs", detail: "normal fixture failed" });
     if (!direct.blocked) violations.push({ check: "direct-fixture", file: "tools/strict/checkpoint-gate.mjs", detail: "blocked fixture passed" });
-    const result = jsonResult(violations.length === 0, { candidate, checked: fingerprint.checked, tests: checkpoint.tests, direct, violations });
-    process.stdout.write(args.json ? `${JSON.stringify(result)}\n` : `${result.pass ? "PASS" : "FAIL"} checkpoint defense\n`);
+    const checked = fingerprint.checked + (checkpoint.tests.tests ?? 0) + 2;
+    const result = jsonResult(violations.length === 0, { candidate, checked, tests: checkpoint.tests, direct, violations });
+    if (args.json) process.stdout.write(`${JSON.stringify(result)}\n`);
+    else {
+      for (const violation of violations) process.stdout.write(`FAIL: ${violation.check} ${violation.file} — ${violation.detail}\n`);
+      if (result.pass) process.stdout.write(`PASS: checkpoint defense candidate=${candidate} tests=${checkpoint.tests.tests}\n`);
+      process.stdout.write(`CHECKED: ${checked}\nVERDICT: ${result.pass ? "PASS" : "FAIL"}\n`);
+    }
     process.exit(result.pass ? 0 : 1);
   } catch (error) {
     const result = jsonResult(false, { candidate: null, checked: 0, tests: null, direct: null, violations: [{ check: "input", file: "", detail: error.message }] });
