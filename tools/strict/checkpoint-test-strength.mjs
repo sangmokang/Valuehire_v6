@@ -50,9 +50,25 @@ function blockDisabled(prefix, visible) {
   return control.test(prefix) || namedFunctionDisabled(prefix, visible);
 }
 
+function arrowExpressionDisabled(statement, visible, position) {
+  const assigned = statement.match(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>\s*$/s);
+  if (assigned) {
+    const calls = [...visible.matchAll(new RegExp(`\\b${assigned[1]}\\s*\\(`, "g"))].length;
+    return calls === 0;
+  }
+  const testCallback = /\b(?:test|it|specify)\s*\((?:[^;]*,\s*)?(?:async\s*)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>\s*$/s;
+  if (testCallback.test(statement)) return false;
+  if (/\[\s*\]\s*\.\s*(?:forEach|map|filter|some|every|find)\s*\([^;]*=>\s*$/s.test(statement)) return true;
+  if (/\b(?:setTimeout|setInterval)\s*\([^;]*=>\s*$/s.test(statement)) return true;
+  if (!/^\s*\(+\s*(?:async\s*)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>\s*$/s.test(statement)) return false;
+  const tail = visible.slice(position).match(/^assert\.[A-Za-z_$][\w$]*\s*\((?:[^()]|\([^()]*\))*\)([\s\S]{0,16})/)?.[1] ?? "";
+  return !/^\s*\)\s*\(/.test(tail);
+}
+
 function expressionDisabled(visible, position) {
   const statement = visible.slice(Math.max(0, visible.lastIndexOf(";", position - 1) + 1), position);
-  return /&&|\|\||\?/.test(statement);
+  const bracelessControl = /(?:^|[;}])\s*(?:(?:if|while|for|with)\s*\([^;{}]*\)|else)\s*$/s;
+  return /&&|\|\||\?/.test(statement) || bracelessControl.test(statement) || arrowExpressionDisabled(statement, visible, position);
 }
 
 function hasDisabledContext(visible, position) {
