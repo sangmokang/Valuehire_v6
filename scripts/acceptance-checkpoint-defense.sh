@@ -10,10 +10,21 @@ fi
 candidate="${1:-HEAD}"
 contract="contracts/checkpoint-defense.json"
 checker="tools/strict/checkpoint-defense.mjs"
+trusted="de8e16ad26d7016484388ed1560472f5e38cb380"
 resolved=$(git rev-parse --verify "${candidate}^{commit}") || {
   echo "FAIL: candidate commit 해석 실패 — $candidate"
   echo "CHECKED: 0"
   exit 2
+}
+git rev-parse --verify "${trusted}^{commit}" >/dev/null 2>&1 || {
+  echo "NOT_RUN: 승인 commit 해석 실패 — $trusted"
+  echo "CHECKED: 0"
+  exit 2
+}
+git merge-base --is-ancestor "$trusted" "$resolved" || {
+  echo "FAIL: 승인 commit이 후보 이력의 조상이 아니다 — $trusted"
+  echo "CHECKED: 1"
+  exit 1
 }
 
 tempdir=$(mktemp -d) || {
@@ -30,16 +41,31 @@ cleanup() {
 }
 trap cleanup EXIT
 
-git show "${resolved}:${checker}" > "$checker_copy" || {
-  echo "FAIL: candidate checker blob 없음 — $checker"
+git show "${trusted}:${checker}" > "$checker_copy" || {
+  echo "FAIL: approved checker blob 없음 — $checker"
   echo "CHECKED: 1"
   exit 1
 }
-git show "${resolved}:${contract}" > "$contract_copy" || {
-  echo "FAIL: candidate contract blob 없음 — $contract"
+git show "${trusted}:${contract}" > "$contract_copy" || {
+  echo "FAIL: approved contract blob 없음 — $contract"
   echo "CHECKED: 1"
   exit 1
 }
+trusted_contract_blob=$(git rev-parse --verify "${trusted}:${contract}") || exit 2
+candidate_contract_blob=$(git rev-parse --verify "${resolved}:${contract}") || exit 1
+index_contract_blob=$(git rev-parse --verify ":${contract}" 2>/dev/null) || exit 1
+if [ "$candidate_contract_blob" != "$trusted_contract_blob" ] || [ "$index_contract_blob" != "$trusted_contract_blob" ]; then
+  echo "FAIL: candidate/index contract differs from approved contract"
+  echo "CHECKED: 1"
+  exit 1
+fi
+worktree_contract=$(shasum -a 256 "$contract" 2>/dev/null | awk '{print $1}')
+approved_contract=$(shasum -a 256 "$contract_copy" | awk '{print $1}')
+if [ -z "$worktree_contract" ] || [ "$worktree_contract" != "$approved_contract" ]; then
+  echo "FAIL: worktree contract differs from approved contract"
+  echo "CHECKED: 1"
+  exit 1
+fi
 expected=$(node -e '
 const fs=require("fs");
 const contract=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));
