@@ -36,13 +36,14 @@ function maskIgnoredJavaScript(source) {
 }
 
 function namedFunctionDisabled(prefix, visible) {
-  const declaration = prefix.match(/\bfunction\s+([A-Za-z_$][\w$]*)\s*\([^)]*\)\s*$/);
+  const declaration = prefix.match(/\bfunction\s*(\*)?\s+([A-Za-z_$][\w$]*)\s*\([^)]*\)\s*$/);
   const arrow = prefix.match(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s+)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>\s*$/);
   const expression = prefix.match(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*function(?:\s+[A-Za-z_$][\w$]*)?\s*\([^)]*\)\s*$/);
   const method = prefix.match(/\b(?:static\s+)?(?:async\s+)?([A-Za-z_$][\w$]*)\s*\([^)]*\)\s*$/);
   const methodName = method?.[1] === "function" ? undefined : method?.[1];
-  const name = declaration?.[1] ?? arrow?.[1] ?? expression?.[1] ?? methodName;
+  const name = declaration?.[2] ?? arrow?.[1] ?? expression?.[1] ?? methodName;
   if (!name) return false;
+  if (declaration?.[1]) return true;
   const calls = [...visible.matchAll(new RegExp(`\\b${name}\\s*\\(`, "g"))].length;
   return declaration || method ? calls <= 1 : calls === 0;
 }
@@ -51,18 +52,25 @@ function runnerCallback(prefix) {
   return /\b(?:test|it|specify|describe|suite|context)\s*\([^;]*,\s*(?:async\s*)?function(?:\s+[A-Za-z_$][\w$]*)?\s*\([^)]*\)\s*$/s.test(prefix);
 }
 
+function runnerArrowCallback(prefix) {
+  return /\b(?:test|it|specify|describe|suite|context)\s*\([^;]*,\s*(?:async\s*)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>\s*$/s.test(prefix);
+}
+
 function anonymousFunctionDisabled(prefix) {
-  const anonymous = /\bfunction\s*\([^)]*\)\s*$/.test(prefix);
+  const anonymous = /\bfunction\s*\*?\s*\([^)]*\)\s*$/.test(prefix);
   return anonymous && !runnerCallback(prefix);
 }
 
 function blockDisabled(prefix, visible) {
-  if (runnerCallback(prefix)) return false;
+  if (runnerCallback(prefix) || runnerArrowCallback(prefix)) return false;
   const control = /(?:^|[;{}])\s*(?:if|else|while|for|switch|try|catch|finally|do|with)\b[^{}]*$/s;
   const deferred = /\b(?:setTimeout|setInterval|queueMicrotask)\s*\([^{};]*=>\s*$/s;
   const promise = /\.(?:then|catch|finally)\s*\([^{};]*=>\s*$/s;
+  const namedArrow = /\b(?:const|let|var)\s+[A-Za-z_$][\w$]*\s*=\s*(?:async\s+)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>\s*$/s;
+  if (namedArrow.test(prefix)) return namedFunctionDisabled(prefix, visible);
+  const callbackArrow = /(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>\s*$/.test(prefix);
   return control.test(prefix) || deferred.test(prefix) || promise.test(prefix)
-    || namedFunctionDisabled(prefix, visible) || anonymousFunctionDisabled(prefix);
+    || callbackArrow || namedFunctionDisabled(prefix, visible) || anonymousFunctionDisabled(prefix);
 }
 
 function arrowExpressionDisabled(statement, visible, position) {
@@ -75,9 +83,10 @@ function arrowExpressionDisabled(statement, visible, position) {
   if (testCallback.test(statement)) return false;
   if (/\[\s*\]\s*\.\s*(?:forEach|map|filter|some|every|find)\s*\([^;]*=>\s*$/s.test(statement)) return true;
   if (/\b(?:setTimeout|setInterval)\s*\([^;]*=>\s*$/s.test(statement)) return true;
-  if (!/^\s*\(+\s*(?:async\s*)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>\s*$/s.test(statement)) return false;
+  const immediate = /^\s*\(+\s*(?:async\s*)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>\s*$/s.test(statement);
   const tail = visible.slice(position).match(/^assert\.[A-Za-z_$][\w$]*\s*\((?:[^()]|\([^()]*\))*\)([\s\S]{0,16})/)?.[1] ?? "";
-  return !/^\s*\)\s*\(/.test(tail);
+  if (immediate && /^\s*\)\s*\(/.test(tail)) return false;
+  return /=>\s*$/.test(statement);
 }
 
 function expressionDisabled(visible, position) {
@@ -248,7 +257,7 @@ function pythonDisabledContext(lines, position) {
     const code = lines[index].replace(/#.*/, "").trim();
     const indent = indentation(lines[index]);
     if (code && indent < targetIndent) break;
-    if (indent === targetIndent && /^(?:sys\.exit|os\._exit|exit|quit)\s*\(|^raise\s+SystemExit\b/.test(code)) return true;
+    if (indent === targetIndent && /^(?:return\b|(?:sys\.exit|os\._exit|exit|quit)\s*\(|raise\s+SystemExit\b)/.test(code)) return true;
   }
   return false;
 }
