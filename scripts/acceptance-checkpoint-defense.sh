@@ -52,6 +52,29 @@ if [ -z "$expected" ] || [ -z "$actual" ] || [ "$actual" != "$expected" ]; then
   echo "CHECKED: 1"
   exit 1
 fi
+protected_paths=$(node -e '
+const fs=require("fs");
+const contract=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));
+for (const path of Object.keys(contract.fingerprints || {})) console.log(path);
+' "$contract_copy")
+while IFS= read -r protected; do
+  [ -n "$protected" ] || continue
+  candidate_blob=$(git rev-parse --verify "${resolved}:${protected}") || {
+    echo "FAIL: candidate protected blob 없음 — $protected"
+    echo "CHECKED: 1"
+    exit 1
+  }
+  if ! index_blob=$(git rev-parse --verify ":${protected}" 2>/dev/null); then
+    echo "FAIL: index protected blob 없음 — $protected"
+    echo "CHECKED: 1"
+    exit 1
+  fi
+  if [ "$candidate_blob" != "$index_blob" ]; then
+    echo "FAIL: staged protected blob differs from candidate — $protected"
+    echo "CHECKED: 1"
+    exit 1
+  fi
+done <<< "$protected_paths"
 worktree_actual=$(shasum -a 256 "$checker" 2>/dev/null | awk '{print $1}')
 if [ -z "$worktree_actual" ] || [ "$worktree_actual" != "$actual" ]; then
   echo "FAIL: worktree checker differs from candidate blob"
