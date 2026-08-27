@@ -35,6 +35,33 @@ function maskIgnoredJavaScript(source) {
   return visible.join("");
 }
 
+function controlBlockDisabled(prefix) {
+  const control = /(?:^|[;{}])\s*(?:if|else|while|for|switch|try|catch|finally|do|with)\b[^{}]*$/s;
+  const deferred = /\b(?:setTimeout|setInterval|queueMicrotask)\s*\([^{};]*=>\s*$/s;
+  const promise = /\.(?:then|catch|finally)\s*\([^{};]*=>\s*$/s;
+  const callbackArrow = /(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>\s*$/.test(prefix);
+  return control.test(prefix) || deferred.test(prefix) || promise.test(prefix) || callbackArrow;
+}
+
+function callDisabledContext(visible, position) {
+  const blocks = [];
+  for (let index = 0; index < position; index += 1) {
+    if (visible[index] === "{") {
+      const prefix = visible.slice(Math.max(0, index - 120), index).trimEnd();
+      const runner = runnerCallback(prefix) || runnerArrowCallback(prefix);
+      blocks.push(!runner && controlBlockDisabled(prefix));
+    } else if (visible[index] === "}") {
+      blocks.pop();
+    }
+  }
+  return blocks.some(Boolean) || expressionDisabled(visible, position);
+}
+
+function liveNamedCalls(visible, name) {
+  const pattern = new RegExp(`\\b${name}\\s*\\(`, "g");
+  return [...visible.matchAll(pattern)].filter((match) => !callDisabledContext(visible, match.index)).length;
+}
+
 function namedFunctionDisabled(prefix, visible) {
   const declaration = prefix.match(/\bfunction\s*(\*)?\s+([A-Za-z_$][\w$]*)\s*\([^)]*\)\s*$/);
   const arrow = prefix.match(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s+)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>\s*$/);
@@ -44,7 +71,7 @@ function namedFunctionDisabled(prefix, visible) {
   const name = declaration?.[2] ?? arrow?.[1] ?? expression?.[1] ?? methodName;
   if (!name) return false;
   if (declaration?.[1]) return true;
-  const calls = [...visible.matchAll(new RegExp(`\\b${name}\\s*\\(`, "g"))].length;
+  const calls = liveNamedCalls(visible, name);
   return declaration || method ? calls <= 1 : calls === 0;
 }
 
@@ -63,14 +90,9 @@ function anonymousFunctionDisabled(prefix) {
 
 function blockDisabled(prefix, visible) {
   if (runnerCallback(prefix) || runnerArrowCallback(prefix)) return false;
-  const control = /(?:^|[;{}])\s*(?:if|else|while|for|switch|try|catch|finally|do|with)\b[^{}]*$/s;
-  const deferred = /\b(?:setTimeout|setInterval|queueMicrotask)\s*\([^{};]*=>\s*$/s;
-  const promise = /\.(?:then|catch|finally)\s*\([^{};]*=>\s*$/s;
   const namedArrow = /\b(?:const|let|var)\s+[A-Za-z_$][\w$]*\s*=\s*(?:async\s+)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>\s*$/s;
   if (namedArrow.test(prefix)) return namedFunctionDisabled(prefix, visible);
-  const callbackArrow = /(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>\s*$/.test(prefix);
-  return control.test(prefix) || deferred.test(prefix) || promise.test(prefix)
-    || callbackArrow || namedFunctionDisabled(prefix, visible) || anonymousFunctionDisabled(prefix);
+  return controlBlockDisabled(prefix) || namedFunctionDisabled(prefix, visible) || anonymousFunctionDisabled(prefix);
 }
 
 function arrowExpressionDisabled(statement, visible, position) {
@@ -107,8 +129,12 @@ function hasDisabledContext(visible, position) {
   }
   const afterReturn = blocks.some(({ start }) => /\breturn\b(?:[^\r\n;]*;|[^\r\n]*\r?\n)/.test(visible.slice(start, position)));
   const regionStart = blocks.at(-1)?.start ?? Math.max(0, visible.lastIndexOf("}", position - 1) + 1);
-  const terminated = /\b(?:process|Deno|Bun)\s*\.\s*exit\s*\([^)]*\)\s*;/s.test(visible.slice(regionStart, position));
-  return blocks.some(({ disabled }) => disabled) || afterReturn || terminated || expressionDisabled(visible, position);
+  const region = visible.slice(regionStart, position);
+  const terminated = /\b(?:process|Deno|Bun)\s*\.\s*exit\s*\([^)]*\)\s*(?:;|\r?\n)/s.test(region);
+  const afterBreak = /\bbreak(?:\s+[A-Za-z_$][\w$]*)?\s*(?:;|\r?\n)/s.test(region);
+  const neverSettles = /\bawait\s+new\s+Promise\s*\(\s*(?:(?:async\s*)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>\s*\{\s*\}|function\s*\([^)]*\)\s*\{\s*\})\s*\)\s*(?:;|\r?\n)/s.test(region);
+  return blocks.some(({ disabled }) => disabled) || afterReturn || terminated || afterBreak
+    || neverSettles || expressionDisabled(visible, position);
 }
 
 function jsCalls(source, name) {
@@ -238,10 +264,33 @@ function pythonStrongAtoms(source) {
   return atoms;
 }
 
+function pythonControlDisabled(lines, position) {
+  const indentation = (line) => line.match(/^[ \t]*/)[0].replace(/\t/g, "        ").length;
+  let ceiling = indentation(lines[position]);
+  for (let index = position - 1; index >= 0 && ceiling > 0; index -= 1) {
+    const code = lines[index].replace(/#.*/, "").trim();
+    const indent = indentation(lines[index]);
+    if (!code || indent >= ceiling || !code.endsWith(":")) continue;
+    if (/^(?:if|elif|else|while|for|try|except|finally|with|match|case)\b/.test(code)) return true;
+    ceiling = indent;
+  }
+  return false;
+}
+
+function pythonLiveCalls(lines, name) {
+  const pattern = new RegExp(`\\b${name}\\s*\\(`, "g");
+  let calls = 0;
+  for (const [index, line] of lines.entries()) {
+    const code = line.replace(/#.*/, "");
+    if (pythonControlDisabled(lines, index)) continue;
+    calls += [...code.matchAll(pattern)].length;
+  }
+  return calls;
+}
+
 function pythonDisabledContext(lines, position) {
   const indentation = (line) => line.match(/^[ \t]*/)[0].replace(/\t/g, "        ").length;
   let ceiling = indentation(lines[position]);
-  const source = lines.join("\n");
   for (let index = position - 1; index >= 0 && ceiling > 0; index -= 1) {
     const code = lines[index].replace(/#.*/, "").trim();
     const indent = indentation(lines[index]);
@@ -249,7 +298,7 @@ function pythonDisabledContext(lines, position) {
     if (/^(?:if|elif|else|while|for|try|except|finally|with|match|case)\b/.test(code)) return true;
     const definition = code.match(/^(?:async\s+)?def\s+([A-Za-z_]\w*)\s*\(/);
     if (definition && !/^test(?:_|$)/.test(definition[1])
-      && [...source.matchAll(new RegExp(`\\b${definition[1]}\\s*\\(`, "g"))].length <= 1) return true;
+      && pythonLiveCalls(lines, definition[1]) <= 1) return true;
     ceiling = indent;
   }
   const targetIndent = indentation(lines[position]);
