@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 원본 밖 임시 복제본에서 checkpoint 독립 방어 공격 9개를 실제 실행한다.
+# 원본 밖 임시 복제본에서 8개 공격군을 실행한다. candidate/worktree 미끼는 후속 19개 회귀가 맡는다.
 set -uo pipefail
 
 REPO=$(git rev-parse --show-toplevel 2>/dev/null) || {
@@ -16,10 +16,10 @@ cat "$OUT"
 field() { awk -v key="$1" '$1=="#" && $2==key { value=$3 } END { print value }' "$OUT"; }
 tests=$(field tests); passed=$(field pass); failed=$(field fail)
 cancelled=$(field cancelled); skipped=$(field skipped); todo=$(field todo)
-if [ "$rc" -eq 0 ] && [ "$tests" = 9 ] && [ "$passed" = 9 ] && \
+if [ "$rc" -eq 0 ] && [ "$tests" = 8 ] && [ "$passed" = 8 ] && \
    [ "$failed" = 0 ] && [ "$cancelled" = 0 ] && [ "$skipped" = 0 ] && [ "$todo" = 0 ]; then
-  echo "PASS: checkpoint 독립 방어 공격 9/9 차단"
-  echo "CHECKED: 9"
+  echo "PASS: checkpoint 독립 방어 공격군 8/8 차단 (candidate/worktree 미끼는 followup 회귀에서 별도 검사)"
+  echo "CHECKED: 8"
   echo "VERDICT: PASS"
   exit 0
 fi
