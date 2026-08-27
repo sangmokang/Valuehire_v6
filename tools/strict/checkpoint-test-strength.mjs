@@ -37,7 +37,7 @@ function maskIgnoredJavaScript(source) {
 
 function namedFunctionDisabled(prefix, visible) {
   const declaration = prefix.match(/\bfunction\s+([A-Za-z_$][\w$]*)\s*\([^)]*\)\s*$/);
-  const arrow = prefix.match(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>\s*$/);
+  const arrow = prefix.match(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s+)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>\s*$/);
   const expression = prefix.match(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*function(?:\s+[A-Za-z_$][\w$]*)?\s*\([^)]*\)\s*$/);
   const method = prefix.match(/\b(?:static\s+)?(?:async\s+)?([A-Za-z_$][\w$]*)\s*\([^)]*\)\s*$/);
   const name = declaration?.[1] ?? arrow?.[1] ?? expression?.[1] ?? method?.[1];
@@ -54,7 +54,10 @@ function anonymousFunctionDisabled(prefix) {
 
 function blockDisabled(prefix, visible) {
   const control = /(?:^|[;}])\s*(?:if|else|while|for|switch|try|catch|finally|do|with)\b[^{}]*$/s;
-  return control.test(prefix) || namedFunctionDisabled(prefix, visible) || anonymousFunctionDisabled(prefix);
+  const deferred = /\b(?:setTimeout|setInterval|queueMicrotask)\s*\([^{};]*=>\s*$/s;
+  const promise = /\.(?:then|catch|finally)\s*\([^{};]*=>\s*$/s;
+  return control.test(prefix) || deferred.test(prefix) || promise.test(prefix)
+    || namedFunctionDisabled(prefix, visible) || anonymousFunctionDisabled(prefix);
 }
 
 function arrowExpressionDisabled(statement, visible, position) {
@@ -231,7 +234,8 @@ function pythonDisabledContext(lines, position) {
     if (!code || indent >= ceiling || !code.endsWith(":")) continue;
     if (/^(?:if|elif|else|while|for|try|except|finally|with|match|case)\b/.test(code)) return true;
     const definition = code.match(/^(?:async\s+)?def\s+([A-Za-z_]\w*)\s*\(/);
-    if (definition && [...source.matchAll(new RegExp(`\\b${definition[1]}\\s*\\(`, "g"))].length <= 1) return true;
+    if (definition && !/^test(?:_|$)/.test(definition[1])
+      && [...source.matchAll(new RegExp(`\\b${definition[1]}\\s*\\(`, "g"))].length <= 1) return true;
     ceiling = indent;
   }
   const targetIndent = indentation(lines[position]);
