@@ -43,7 +43,10 @@ function git(args, options = {}) {
     input: options.input,
     maxBuffer: 32 * 1024 * 1024,
   });
-  if (result.status !== 0) throw new Error((result.stderr || result.stdout || "git failed").trim());
+  if (result.status !== 0) {
+    const detail = result.stderr || result.stdout || "git failed";
+    throw new Error((Buffer.isBuffer(detail) ? detail.toString() : String(detail)).trim());
+  }
   return result.stdout;
 }
 
@@ -174,21 +177,27 @@ function runGate(tree, cwd, base) {
 }
 
 function runDirectFixtures(tree) {
-  const normal = fixtureRepo();
-  writeFileSync(join(normal.cwd, "tests/value.test.mjs"), 'import assert from "node:assert/strict";\nassert.equal(status, 1);\nassert.ok(true);\n');
-  git(["add", "tests/value.test.mjs"], { cwd: normal.cwd });
-  const normalResult = runGate(tree, normal.cwd, normal.base);
-  const blocked = fixtureRepo();
-  writeFileSync(join(blocked.cwd, "tests/value.test.mjs"), "");
-  git(["add", "tests/value.test.mjs"], { cwd: blocked.cwd });
-  const blockedResult = runGate(tree, blocked.cwd, blocked.base);
-  rmSync(normal.cwd, { recursive: true, force: true });
-  rmSync(blocked.cwd, { recursive: true, force: true });
-  return { normal: normalResult.status === 0, blocked: blockedResult.status !== 0 };
+  let normal = null;
+  let blocked = null;
+  try {
+    normal = fixtureRepo();
+    writeFileSync(join(normal.cwd, "tests/value.test.mjs"), 'import assert from "node:assert/strict";\nassert.equal(status, 1);\nassert.ok(true);\n');
+    git(["add", "tests/value.test.mjs"], { cwd: normal.cwd });
+    const normalResult = runGate(tree, normal.cwd, normal.base);
+    blocked = fixtureRepo();
+    writeFileSync(join(blocked.cwd, "tests/value.test.mjs"), "");
+    git(["add", "tests/value.test.mjs"], { cwd: blocked.cwd });
+    const blockedResult = runGate(tree, blocked.cwd, blocked.base);
+    return { normal: normalResult.status === 0, blocked: blockedResult.status !== 0 };
+  } finally {
+    if (normal) rmSync(normal.cwd, { recursive: true, force: true });
+    if (blocked) rmSync(blocked.cwd, { recursive: true, force: true });
+  }
 }
 
 async function main() {
   let tree = null;
+  let exitCode = 2;
   try {
     const args = parseArgs(process.argv.slice(2));
     const candidate = git(["rev-parse", "--verify", `${args.candidate}^{commit}`]).trim();
@@ -208,14 +217,15 @@ async function main() {
       if (result.pass) process.stdout.write(`PASS: checkpoint defense candidate=${candidate} tests=${checkpoint.tests.tests}\n`);
       process.stdout.write(`CHECKED: ${checked}\nVERDICT: ${result.pass ? "PASS" : "FAIL"}\n`);
     }
-    process.exit(result.pass ? 0 : 1);
+    exitCode = result.pass ? 0 : 1;
   } catch (error) {
     const result = jsonResult(false, { candidate: null, checked: 0, tests: null, direct: null, violations: [{ check: "input", file: "", detail: error.message }] });
     process.stdout.write(`${JSON.stringify(result)}\n`);
-    process.exit(2);
+    exitCode = 2;
   } finally {
     if (tree) rmSync(tree, { recursive: true, force: true });
   }
+  process.exit(exitCode);
 }
 
 main();

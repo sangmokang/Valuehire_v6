@@ -1,11 +1,56 @@
-function stripStrings(text) {
-  return text.replace(/(["'`])(?:\\.|(?!\1)[\s\S])*\1/g, "\"\"");
+function maskIgnoredJavaScript(source) {
+  const visible = [...source];
+  let state = "code";
+  let escaped = false;
+  let inClass = false;
+  let previous = "";
+  const mask = (index) => {
+    if (visible[index] !== "\n" && visible[index] !== "\r") visible[index] = " ";
+  };
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index];
+    const next = source[index + 1];
+    if (state === "code") {
+      if (char === "/" && next === "/") state = "line-comment";
+      else if (char === "/" && next === "*") state = "block-comment";
+      else if (char === "\"" || char === "'" || char === "`") state = char;
+      else if (char === "/" && (!previous || /[({[=,:;!&|?+\-*%^~<>]/.test(previous))) state = "regex";
+      else if (!/\s/.test(char)) previous = char;
+      if (state !== "code") mask(index);
+      continue;
+    }
+    mask(index);
+    if (state === "line-comment" && (char === "\n" || char === "\r")) state = "code";
+    else if (state === "block-comment" && char === "*" && next === "/") {
+      mask(++index);
+      state = "code";
+    } else if (escaped) escaped = false;
+    else if (char === "\\") escaped = true;
+    else if (state === "regex") {
+      if (char === "[") inClass = true;
+      else if (char === "]") inClass = false;
+      else if (char === "/" && !inClass) state = "code";
+    } else if (char === state) state = "code";
+  }
+  return visible.join("");
 }
 
 function jsCalls(source, name) {
   const calls = [];
-  const pattern = new RegExp(`\\bassert\\.${name}\\s*\\(([^\\n;]+)\\)`, "g");
-  for (const match of source.matchAll(pattern)) calls.push(match[1]);
+  const visible = maskIgnoredJavaScript(source);
+  const pattern = new RegExp(`\\bassert\\.${name}\\s*\\(`, "g");
+  for (const match of visible.matchAll(pattern)) {
+    const start = match.index + match[0].length;
+    let depth = 1;
+    for (let index = start; index < visible.length; index += 1) {
+      if (visible[index] === "(") depth += 1;
+      else if (visible[index] === ")") depth -= 1;
+      if (depth === 0) {
+        calls.push(source.slice(start, index));
+        break;
+      }
+    }
+  }
   return calls;
 }
 
