@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 원본 밖 임시 복제본에서 8개 공격군을 실행한다. candidate/worktree 미끼는 후속 28개 회귀가 맡는다.
+# 원본 밖 임시 복제본에서 8개 공격군을 실행한다. candidate/worktree 미끼는 후속 33개 회귀가 맡는다.
 set -uo pipefail
 
 REPO=$(git rev-parse --show-toplevel 2>/dev/null) || {

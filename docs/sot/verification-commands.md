@@ -44,7 +44,7 @@
 | 21 | 인수 검사 ci-step-integrity | `bash scripts/acceptance-ci-step-integrity.sh` — 조건부·오류무시·출력 전용 스텝 차단 |
 | 22 | 인수 검사 semantic-mutations | `bash scripts/acceptance-semantic-mutations.sh` — 인수 검사 무력화 변이 차단 |
 | 23 | 인수 검사 checkpoint-defense | `bash scripts/acceptance-checkpoint-defense.sh` — 후보 commit blob 지문·정확히 67개 시험·독립 정상/차단 fixture |
-| 24 | 인수 검사 checkpoint-followup | `bash scripts/acceptance-checkpoint-followup-tests.sh` — 단언 강도·ignored source·control-flow·함수 100/101·독립 검사·임시 정리 28개 회귀 |
+| 24 | 인수 검사 checkpoint-followup | `bash scripts/acceptance-checkpoint-followup-tests.sh` — 단언 강도·정적 실행문맥·candidate checker 미끼·함수 100/101·독립 검사·임시 정리 33개 회귀 |
 | 25 | 인수 검사 checkpoint-defense-mutations | `bash scripts/acceptance-checkpoint-defense-mutations.sh` — 격리 복제본의 독립 방어 공격군 8개 회귀; candidate/worktree 미끼는 24번 회귀에서 별도 검사 |
 | 26 | 인수 검사 verify-ac-m | `bash scripts/acceptance-verify-ac-m.sh` — mechanism 명부 대조 (AC-M) |
 

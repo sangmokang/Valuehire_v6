@@ -167,6 +167,7 @@ bash scripts/acceptance-checkpoint-defense.sh [<candidate-commit>]
 9. staged/working tree와 candidate commit blob이 다른 미끼
 10. 강한 단언을 약화하고 무의미한 단언을 추가한 다섯 RED
 11. 강한 단언을 정적 거짓 분기·삼키는 try 블록으로 감싸거나 anchored 정규식에 약화 플래그를 추가하는 후속 RED
+12. checker 작업트리 미끼, 정적으로 거짓인 비교·단락 평가·미호출 함수로 실행을 끄는 후속 RED
 
 정상 반례는 승인 blob, 정확히 67개 전부 성공, 직접 정상 fixture, exact·anchored 보존 뒤 독립 단언 추가, broad에서 exact 강화, JavaScript·Python·shell 신규 시험, 파일 600줄과 함수 100줄입니다.
 
@@ -276,17 +277,17 @@ push, PR, merge, 원격 CI, 배포, 외부 서비스 호출, 원본 7파일 수�
 
 ## G 판정과 적대 검증 로그
 
-PASS
+REQUEST_CHANGES
 
-- 원문 판정: `PASS`
-- 요약 판정: `PASS`
-- 결함 수: `0`
-- 심각도: `없음`
-- 제목: `차단 결함 없음`
-- 원인: `적용할 결함 없음`
-- 사업 영향: `제품·시험·독립 검사기·CI 중 어느 한 방어선을 무력화해도 로컬 배송 경로가 실패로 닫힙니다.`
+- 원문 판정: `REQUEST_CHANGES`
+- 요약 판정: `REQUEST_CHANGES`
+- 결함 수: `4`
+- 심각도: `높음 2건, 중간 2건`
+- 제목: `candidate checker 미끼와 일반 정적 실행 우회`
+- 원인: `래퍼가 작업트리 checker를 실행했고 단언 문맥 판정이 일부 고정 문자열에 머물렀습니다.`
+- 사업 영향: `로컬 배송 경로 또는 checkpoint가 실제 후보 blob과 다른 판정기·실행되지 않는 단언을 신뢰할 수 있습니다.`
 
-→ G는 T의 로컬 계약 전체를 같은 `PASS`로 판정합니다. 독립 checker는 후보 blob 8개와 checkpoint 67개, 직접 fixture 2개를 합쳐 `CHECKED: 77`을 보고했고 시험 상태는 `tests=67`, `pass=67`, `fail=0`, `cancelled=0`, `skipped=0`, `todo=0`이었습니다. 후속 회귀는 28/28, 공격군은 8/8, A 장부는 12/12, C finding-runner는 8/8이었습니다. 원칙 34/34, semantic mutation 10개 군, CI-step integrity 14개, AC-M 31개와 실제 pre-push 27개도 같은 최종 HEAD에서 확인했습니다.
+→ G의 최종 판정은 candidate checker 미끼와 일반 정적 실행 우회 RED가 GREEN이 될 때까지 `REQUEST_CHANGES`입니다. 직전 V1의 `PASS`는 이 네 재현 결함을 잔여 위험으로 분류했으므로 최종 V1으로 재사용하지 않습니다.
 
 → 직전 후보의 V1이 잔여 위험으로 분류한 정적 거짓 분기·삼키는 try 블록·정규식 약화 플래그 우회는 L3 차단 결함으로 승격했고, 새 RED 3건이 빠진 동작 때문에 실패한 뒤 기대값을 바꾸지 않은 GREEN 4/4로 닫았습니다. 원격 작업은 계속 `NOT_RUN`입니다.
 
