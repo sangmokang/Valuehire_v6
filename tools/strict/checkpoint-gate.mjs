@@ -2,6 +2,8 @@
 import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { countJavaScriptWeakening } from "./checkpoint-js-scan.mjs";
+import { scanFunctions } from "./checkpoint-function-scan.mjs";
+import { strengthDetails } from "./checkpoint-test-strength.mjs";
 
 const CHECKS = {
   INPUT: "input",
@@ -309,26 +311,6 @@ function countWeakeningMarkersForFile(path, content) {
   return counts;
 }
 
-function countMatches(content, pattern) {
-  return (content.match(pattern) ?? []).length;
-}
-
-function assertionStrength(path, content) {
-  if (!/\.[cm]?[jt]sx?$/.test(path.toLowerCase())) {
-    return { exact: 0, broad: 0, anchored: 0, disjunctions: 0 };
-  }
-  return {
-    exact:
-      countMatches(content, /\bassert\.(?:equal|strictEqual|deepEqual|deepStrictEqual)\s*\(/g) +
-      countMatches(content, /\bexpect\s*\([^\n)]*\)\s*\.(?:toBe|toEqual|toStrictEqual)\s*\(/g),
-    broad:
-      countMatches(content, /\bassert\.(?:ok|notEqual|notStrictEqual)\s*\(/g) +
-      countMatches(content, /\bexpect\s*\([^\n)]*\)\s*\.(?:toBeTruthy|toBeDefined|toContain)\s*\(/g),
-    anchored: countMatches(content, /\bassert\.match\s*\([^\n,]+,\s*\/\^[^\n/]*\$\/[a-z]*\s*\)/gi),
-    disjunctions: countMatches(content, /\b(?:assert|expect)(?:\.|\s*\()[^\n;]*\|\|[^\n;]*/g),
-  };
-}
-
 function compareTestStrength(base, basePath, currentPath, currentContent) {
   const beforeContent = basePath ? readBase(base, basePath) : "";
   const before = basePath
@@ -345,21 +327,8 @@ function compareTestStrength(base, basePath, currentPath, currentContent) {
   if (after.assertions < before.assertions) {
     details.push(`assertions decreased ${before.assertions} -> ${after.assertions}`);
   }
-  if (before.assertions > 0 && after.assertions === before.assertions) {
-    const beforeStrength = assertionStrength(basePath, beforeContent);
-    const afterStrength = assertionStrength(currentPath, currentContent);
-    if (afterStrength.exact < beforeStrength.exact) {
-      details.push(`exact assertions decreased ${beforeStrength.exact} -> ${afterStrength.exact}`);
-    }
-    if (afterStrength.broad > beforeStrength.broad) {
-      details.push(`broad assertions increased ${beforeStrength.broad} -> ${afterStrength.broad}`);
-    }
-    if (afterStrength.anchored < beforeStrength.anchored) {
-      details.push(`anchored matches decreased ${beforeStrength.anchored} -> ${afterStrength.anchored}`);
-    }
-    if (afterStrength.disjunctions > beforeStrength.disjunctions) {
-      details.push(`assertion disjunctions increased ${beforeStrength.disjunctions} -> ${afterStrength.disjunctions}`);
-    }
+  if (before.assertions > 0) {
+    details.push(...strengthDetails(basePath, beforeContent, currentPath, currentContent));
   }
   return details;
 }
@@ -428,6 +397,15 @@ function parseHardLimit() {
   return fallback;
 }
 
+function parseFunctionHardLimit() {
+  if (!existsSync("docs/sot/coding-principles.md")) return 100;
+  const text = readFileSync("docs/sot/coding-principles.md", "utf8");
+  const p11 = text.match(/P11[\s\S]*?(?=\n\| \*\*P\d+|\n### |\n## |$)/);
+  if (!p11) return 100;
+  const match = p11[0].match(/function\s+hard\s+(\d+)\s*(?:LOC|lines?|줄)?/i);
+  return match ? Number.parseInt(match[1], 10) : 100;
+}
+
 function isSizeCheckedCode(path) {
   const normalizedPath = path.toLowerCase();
   if (/(^|\/)(node_modules|vendor|vendors|dist|build|coverage|fixtures?|migrations?|artifacts?|private-reviews)\//.test(normalizedPath)) {
@@ -443,8 +421,10 @@ function loc(content) {
 
 function checkSizeLimit(changes) {
   let hardLimit;
+  let functionHardLimit;
   try {
     hardLimit = parseHardLimit();
+    functionHardLimit = parseFunctionHardLimit();
   } catch (error) {
     return [
       {
@@ -464,6 +444,15 @@ function checkSizeLimit(changes) {
         file: change.path,
         detail: `file has ${lines} LOC, hard limit is ${hardLimit}`,
       });
+    }
+    for (const span of scanFunctions(change.path, readIndex(change.path))) {
+      if (span.loc > functionHardLimit) {
+        violations.push({
+          check: CHECKS.SIZE_LIMIT,
+          file: change.path,
+          detail: `function has ${span.loc} LOC, hard limit is ${functionHardLimit} (line ${span.start})`,
+        });
+      }
     }
   }
   return violations;

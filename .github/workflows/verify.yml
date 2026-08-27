@@ -233,6 +233,17 @@ jobs:
         # 출력만)을 인수 검사 전량에 대해 실제로 막는지 격리 사본으로 증명한다.
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-semantic-mutations.sh
 
+      # candidate commit blob의 승인 지문과 정확히 67개인 원 시험, 별도 정상·차단 fixture를
+      # 한 검사기로 재현한다. pre-push도 acceptance 글로브를 통해 같은 스크립트를 실행한다.
+      - name: 인수 검사 checkpoint-defense (gate·시험 동시 무력화 차단)
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-checkpoint-defense.sh
+
+      - name: 인수 검사 checkpoint-followup (단언 강도·함수 경계·독립 검사 회귀)
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-checkpoint-followup-tests.sh
+
+      - name: 인수 검사 checkpoint-defense-mutations (독립 방어선 실제 공격)
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-checkpoint-defense-mutations.sh
+
       - name: 인수 검사 verify-ac-m (mechanism 명부 대조 · AC-M)
         # 명부(docs/sot/mechanism-registry.yaml)와 실제 검사 장치의 일치를 강제한다.
         # 검사기 1벌(scripts/verify/check-mechanism-registry.sh)을 로컬 pre-push
