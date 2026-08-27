@@ -13,6 +13,7 @@ rc=0
 node --test --test-concurrency=1 \
   tests/checkpoint-test-strength.test.mjs \
   tests/checkpoint-test-strength-ignored-source.test.mjs \
+  tests/checkpoint-test-strength-parser-context.test.mjs \
   tests/checkpoint-test-strength-control-flow.test.mjs \
   tests/checkpoint-test-strength-static-analysis.test.mjs \
   tests/checkpoint-test-strength-structural-context.test.mjs \
@@ -22,6 +23,7 @@ node --test --test-concurrency=1 \
   tests/checkpoint-js-lexical-boundaries.test.mjs \
   tests/checkpoint-function-budget-followup.test.mjs \
   tests/checkpoint-defense.test.mjs \
+  tests/checkpoint-defense-trust-root.test.mjs \
   tests/checkpoint-defense-staged-bait.test.mjs \
   tests/checkpoint-defense-checker-bait.test.mjs \
   tests/checkpoint-defense-cleanup.test.mjs > "$OUT" 2>&1 || rc=$?
