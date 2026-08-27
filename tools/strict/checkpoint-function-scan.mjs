@@ -1,4 +1,5 @@
 import { extname } from "node:path";
+import { startsJavaScriptRegex } from "./checkpoint-js-lex.mjs";
 
 const JS_EXTENSIONS = new Set([".js", ".mjs", ".cjs", ".jsx", ".ts", ".tsx"]);
 const SHELL_EXTENSIONS = new Set([".sh", ".bash", ".zsh"]);
@@ -10,11 +11,9 @@ function maskBraceLanguage(source, language) {
   let state = "code";
   let quote = "";
   let inClass = false;
-  let previous = "";
   const mask = (position) => {
     if (output[position] !== "\n" && output[position] !== "\r") output[position] = " ";
   };
-  const startsRegex = () => language === "javascript" && (previous === "" || /[([{=:;,!?&|+*%^~<>-]/.test(previous));
   while (index < source.length) {
     const char = source[index];
     const next = source[index + 1] ?? "";
@@ -53,7 +52,6 @@ function maskBraceLanguage(source, language) {
         index += 1;
         while (/[A-Za-z]/.test(source[index] ?? "")) mask(index++);
         state = "code";
-        previous = "/";
       } else index += 1;
     } else if (language === "javascript" && char === "/" && next === "/") {
       mask(index);
@@ -76,12 +74,11 @@ function maskBraceLanguage(source, language) {
       quote = char;
       mask(index++);
       state = "template";
-    } else if (char === "/" && startsRegex()) {
+    } else if (char === "/" && language === "javascript" && startsJavaScriptRegex(source, index)) {
       mask(index++);
       inClass = false;
       state = "regex";
     } else {
-      if (!/\s/.test(char)) previous = char;
       index += 1;
     }
   }

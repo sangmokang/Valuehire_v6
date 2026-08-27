@@ -1,9 +1,10 @@
+import { startsJavaScriptRegex } from "./checkpoint-js-lex.mjs";
+
 function maskIgnoredJavaScript(source) {
   const visible = [...source];
   let state = "code";
   let escaped = false;
   let inClass = false;
-  let previous = "";
   const mask = (index) => {
     if (visible[index] !== "\n" && visible[index] !== "\r") visible[index] = " ";
   };
@@ -14,8 +15,7 @@ function maskIgnoredJavaScript(source) {
       if (char === "/" && next === "/") state = "line-comment";
       else if (char === "/" && next === "*") state = "block-comment";
       else if (char === "\"" || char === "'" || char === "`") state = char;
-      else if (char === "/" && (!previous || /[({[=,:;!&|?+\-*%^~<>]/.test(previous))) state = "regex";
-      else if (!/\s/.test(char)) previous = char;
+      else if (char === "/" && startsJavaScriptRegex(source, index)) state = "regex";
       if (state !== "code") mask(index);
       continue;
     }
