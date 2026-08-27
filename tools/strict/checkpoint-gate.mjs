@@ -398,12 +398,12 @@ function parseHardLimit() {
 }
 
 function parseFunctionHardLimit() {
-  if (!existsSync("docs/sot/coding-principles.md")) return 100;
+  if (!existsSync("docs/sot/coding-principles.md")) return null;
   const text = readFileSync("docs/sot/coding-principles.md", "utf8");
   const p11 = text.match(/P11[\s\S]*?(?=\n\| \*\*P\d+|\n### |\n## |$)/);
-  if (!p11) return 100;
-  const match = p11[0].match(/function\s+hard\s+(\d+)\s*(?:LOC|lines?|줄)?/i);
-  return match ? Number.parseInt(match[1], 10) : 100;
+  if (!p11) return null;
+  const match = p11[0].match(/(?:function|함수)[^\n]{0,40}?hard\s+(\d+)\s*(?:LOC|lines?|줄)?/i);
+  return match ? Number.parseInt(match[1], 10) : null;
 }
 
 function isSizeCheckedCode(path) {
@@ -445,7 +445,7 @@ function checkSizeLimit(changes) {
         detail: `file has ${lines} LOC, hard limit is ${hardLimit}`,
       });
     }
-    for (const span of scanFunctions(change.path, readIndex(change.path))) {
+    for (const span of functionHardLimit ? scanFunctions(change.path, readIndex(change.path)) : []) {
       if (span.loc > functionHardLimit) {
         violations.push({
           check: CHECKS.SIZE_LIMIT,

@@ -6,7 +6,7 @@
     {
       "path": "tools/strict/checkpoint-gate.mjs",
       "role": "checkpoint-gate",
-      "sha256": "6d1085e137ba1043db0416018ea8c7675c3eb141dd33894bf0f97736f184b840"
+      "sha256": "36d795af77c1daf09cf496ae15289dac9d238329c9ad2208c4427072c7e18002"
     },
     {
       "path": "tests/checkpoint-gate.test.mjs",

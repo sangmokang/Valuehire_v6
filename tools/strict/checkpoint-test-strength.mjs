@@ -85,7 +85,10 @@ function jsStrongAtoms(source) {
   for (const name of ["equal", "strictEqual", "deepEqual", "deepStrictEqual"]) {
     for (const call of jsCalls(source, name)) {
       const args = splitArguments(call);
-      if (args.length >= 2) atoms.push(`js:exact:${normalizeExpression(args[0])}:${normalizeExpression(args[1])}`);
+      if (args.length < 2) continue;
+      const subject = normalizeExpression(args[0]);
+      const expected = normalizeExpression(args[1]);
+      if (subject !== expected) atoms.push(`js:exact:${subject}:${expected}`);
     }
   }
   for (const call of jsCalls(source, "match")) {
@@ -101,7 +104,10 @@ function pythonStrongAtoms(source) {
   for (const line of source.split(/\r?\n/)) {
     const stripped = line.replace(/#.*/, "").trim();
     const match = stripped.match(/^assert\s+(.+?)\s*==\s*(.+?)(?:\s*,.*)?$/);
-    if (match) atoms.push(`py:exact:${normalizeExpression(match[1])}:${normalizeExpression(match[2])}`);
+    if (!match) continue;
+    const subject = normalizeExpression(match[1]);
+    const expected = normalizeExpression(match[2]);
+    if (subject !== expected) atoms.push(`py:exact:${subject}:${expected}`);
   }
   return atoms;
 }
