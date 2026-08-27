@@ -7,7 +7,7 @@
     "tests/checkpoint-gate.test.mjs": "ac7fe60a8ba99b6ca7d748dbde38d9c1601083ed000bc6a21c56db660785c47e",
     "tools/strict/checkpoint-defense.mjs": "d23796a56426f629310c314380e16c661a1218bb2d4e22ce355c5da3f885c28c",
     "tools/strict/checkpoint-js-scan.mjs": "01c0f9603f67c292464c6c8d814b4d9d6f9fb9820c58aa3842d19c07c02c4c43",
-    "tools/strict/checkpoint-test-strength.mjs": "861f4b472abf4beadd1a8dc86bc61edd342fc09c23d97fa42d9e4dc3941e19aa",
+    "tools/strict/checkpoint-test-strength.mjs": "1def0e6874afff2bc93e69f1bd78bc5f6a8cc0ade40c82ca8a716814d9217f36",
     "tools/strict/checkpoint-function-scan.mjs": "fac61e7f4abe81d6d7d649d6635fe48035a768de4e19a790d93535ef50fb5db5",
     "tools/strict/checkpoint-js-lex.mjs": "10b8baacb7d2c705d8e9db8ecb60a127ff0640291c1a66bd710f8503c127a148",
     "verify.sh": "08e7468f98b832c7d02e6139daa64e47adecfae48bbef4ecc39970a28b8c7adb",

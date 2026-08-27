@@ -40,20 +40,25 @@ function namedFunctionDisabled(prefix, visible) {
   const arrow = prefix.match(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s+)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>\s*$/);
   const expression = prefix.match(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*function(?:\s+[A-Za-z_$][\w$]*)?\s*\([^)]*\)\s*$/);
   const method = prefix.match(/\b(?:static\s+)?(?:async\s+)?([A-Za-z_$][\w$]*)\s*\([^)]*\)\s*$/);
-  const name = declaration?.[1] ?? arrow?.[1] ?? expression?.[1] ?? method?.[1];
+  const methodName = method?.[1] === "function" ? undefined : method?.[1];
+  const name = declaration?.[1] ?? arrow?.[1] ?? expression?.[1] ?? methodName;
   if (!name) return false;
   const calls = [...visible.matchAll(new RegExp(`\\b${name}\\s*\\(`, "g"))].length;
   return declaration || method ? calls <= 1 : calls === 0;
 }
 
+function runnerCallback(prefix) {
+  return /\b(?:test|it|specify|describe|suite|context)\s*\([^;]*,\s*(?:async\s*)?function(?:\s+[A-Za-z_$][\w$]*)?\s*\([^)]*\)\s*$/s.test(prefix);
+}
+
 function anonymousFunctionDisabled(prefix) {
   const anonymous = /\bfunction\s*\([^)]*\)\s*$/.test(prefix);
-  const testCallback = /\b(?:test|it|specify)\s*\([^;]*,\s*(?:async\s*)?function\s*\([^)]*\)\s*$/s.test(prefix);
-  return anonymous && !testCallback;
+  return anonymous && !runnerCallback(prefix);
 }
 
 function blockDisabled(prefix, visible) {
-  const control = /(?:^|[;}])\s*(?:if|else|while|for|switch|try|catch|finally|do|with)\b[^{}]*$/s;
+  if (runnerCallback(prefix)) return false;
+  const control = /(?:^|[;{}])\s*(?:if|else|while|for|switch|try|catch|finally|do|with)\b[^{}]*$/s;
   const deferred = /\b(?:setTimeout|setInterval|queueMicrotask)\s*\([^{};]*=>\s*$/s;
   const promise = /\.(?:then|catch|finally)\s*\([^{};]*=>\s*$/s;
   return control.test(prefix) || deferred.test(prefix) || promise.test(prefix)
