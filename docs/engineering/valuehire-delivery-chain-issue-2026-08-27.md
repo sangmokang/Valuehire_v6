@@ -76,6 +76,7 @@ GitHub Issue 생성은 외부 쓰기이므로 승인 전에는 실행하지 않�
 | WU-3b-16 | V1/V2 trace fail-open 보정 | 종료값 0·완결 출력·전체 commit 분류·후속 RED 비약화·index runner SOT |
 | WU-3b-17 | 무효 이력의 RED 보호 판정 | 명시적 invalidated commit의 테스트 강화 허용·약화 차단 |
 | WU-3b-18 | 동시 strict 재실행 안정성 | pipefail 조기종료 판정 제거·병렬 mutation 재실행 |
+| WU-3b-19 | WU-3b-8 절차 복구 | 과거 GREEN 테스트 수정 이력 무효화·현재 보호 상태 재채택 |
 
 ## 데이터 안전 조건
 

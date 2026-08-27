@@ -99,6 +99,8 @@ WU-3b-2b 뒤 full strict에서 기존 격리 fixture가 새 policy/secret 모듈
 
 최신 후보의 full strict와 trust suite를 동시에 재실행하자 `acceptance-principles-mutations.sh`의 캡처 출력 판정이 `printf | grep -q` 조기 종료와 `pipefail`의 결합으로 `Broken pipe`를 내며 정상 FAIL fixture를 오판했다. WU-3b-18은 이 결함을 병렬 2회 재실행으로 고정하고 출력 판정을 producer 파이프 종료값과 분리한다.
 
+전체-history trace는 WU-3b-8 GREEN이 앞선 WU의 `tests/checkpoint-gate.test.mjs`를 수정한 절차 위반도 재현했다. WU-3b-8 이력은 기능이 현재 통과한다는 이유로 성공 처리하지 않고 `invalidated`로 보존하며, WU-3b-19가 최신 후보의 동일 보호 기능을 변경 없는 재검증으로 다시 채택한다.
+
 ## 설계 결정
 
 > **무엇을** — scope ledger는 명시적 run/WU ID와 index blob으로 고정한다.
