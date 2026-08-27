@@ -39,15 +39,22 @@ function namedFunctionDisabled(prefix, visible) {
   const declaration = prefix.match(/\bfunction\s+([A-Za-z_$][\w$]*)\s*\([^)]*\)\s*$/);
   const arrow = prefix.match(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>\s*$/);
   const expression = prefix.match(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*function(?:\s+[A-Za-z_$][\w$]*)?\s*\([^)]*\)\s*$/);
-  const name = declaration?.[1] ?? arrow?.[1] ?? expression?.[1];
+  const method = prefix.match(/\b(?:static\s+)?(?:async\s+)?([A-Za-z_$][\w$]*)\s*\([^)]*\)\s*$/);
+  const name = declaration?.[1] ?? arrow?.[1] ?? expression?.[1] ?? method?.[1];
   if (!name) return false;
   const calls = [...visible.matchAll(new RegExp(`\\b${name}\\s*\\(`, "g"))].length;
-  return declaration ? calls <= 1 : calls === 0;
+  return declaration || method ? calls <= 1 : calls === 0;
+}
+
+function anonymousFunctionDisabled(prefix) {
+  const anonymous = /\bfunction\s*\([^)]*\)\s*$/.test(prefix);
+  const testCallback = /\b(?:test|it|specify)\s*\([^;]*,\s*(?:async\s*)?function\s*\([^)]*\)\s*$/s.test(prefix);
+  return anonymous && !testCallback;
 }
 
 function blockDisabled(prefix, visible) {
   const control = /(?:^|[;}])\s*(?:if|else|while|for|switch|try|catch|finally|do|with)\b[^{}]*$/s;
-  return control.test(prefix) || namedFunctionDisabled(prefix, visible);
+  return control.test(prefix) || namedFunctionDisabled(prefix, visible) || anonymousFunctionDisabled(prefix);
 }
 
 function arrowExpressionDisabled(statement, visible, position) {
@@ -82,7 +89,9 @@ function hasDisabledContext(visible, position) {
     }
   }
   const afterReturn = blocks.some(({ start }) => /\breturn\b[^;]*;/s.test(visible.slice(start, position)));
-  return blocks.some(({ disabled }) => disabled) || afterReturn || expressionDisabled(visible, position);
+  const regionStart = blocks.at(-1)?.start ?? Math.max(0, visible.lastIndexOf("}", position - 1) + 1);
+  const terminated = /\b(?:process|Deno|Bun)\s*\.\s*exit\s*\([^)]*\)\s*;/s.test(visible.slice(regionStart, position));
+  return blocks.some(({ disabled }) => disabled) || afterReturn || terminated || expressionDisabled(visible, position);
 }
 
 function jsCalls(source, name) {
@@ -204,7 +213,7 @@ function pythonStrongAtoms(source) {
   for (const [index, line] of lines.entries()) {
     const stripped = line.replace(/#.*/, "").trim();
     const match = stripped.match(/^assert\s+(.+?)\s*==\s*(.+?)(?:\s*,.*)?$/);
-    if (!match || pythonConditionalAncestor(lines, index)) continue;
+    if (!match || pythonDisabledContext(lines, index)) continue;
     const subject = normalizeExpression(match[1]);
     const expected = normalizeExpression(match[2]);
     if (subject !== expected) atoms.push(`py:exact:${subject}:${expected}`);
@@ -212,15 +221,25 @@ function pythonStrongAtoms(source) {
   return atoms;
 }
 
-function pythonConditionalAncestor(lines, position) {
+function pythonDisabledContext(lines, position) {
   const indentation = (line) => line.match(/^[ \t]*/)[0].replace(/\t/g, "        ").length;
   let ceiling = indentation(lines[position]);
+  const source = lines.join("\n");
   for (let index = position - 1; index >= 0 && ceiling > 0; index -= 1) {
     const code = lines[index].replace(/#.*/, "").trim();
     const indent = indentation(lines[index]);
     if (!code || indent >= ceiling || !code.endsWith(":")) continue;
     if (/^(?:if|elif|else|while|for|try|except|finally|with|match|case)\b/.test(code)) return true;
+    const definition = code.match(/^(?:async\s+)?def\s+([A-Za-z_]\w*)\s*\(/);
+    if (definition && [...source.matchAll(new RegExp(`\\b${definition[1]}\\s*\\(`, "g"))].length <= 1) return true;
     ceiling = indent;
+  }
+  const targetIndent = indentation(lines[position]);
+  for (let index = position - 1; index >= 0; index -= 1) {
+    const code = lines[index].replace(/#.*/, "").trim();
+    const indent = indentation(lines[index]);
+    if (code && indent < targetIndent) break;
+    if (indent === targetIndent && /^(?:sys\.exit|os\._exit|exit|quit)\s*\(|^raise\s+SystemExit\b/.test(code)) return true;
   }
   return false;
 }
