@@ -2,6 +2,10 @@
 
 VERDICT: REQUEST_CHANGES — INDEPENDENT DEFENSE OUT OF SCOPE
 
+## 결론
+
+이 기록은 당시 범위의 시험은 통과했지만 제품 판정기와 시험을 함께 끄는 공격을 막지 못했으므로 전체 계약은 변경 요청 상태입니다. 아래 과거 원문 판정은 삭제하거나 순화하지 않고, 후속 독립 방어선이 닫아야 할 근거로 그대로 보존합니다.
+
 ## 2026-08-27 fail-open 재감사 계약
 
 현재 HEAD `a8f1fe399ca79e2df22b6df17f75ab50e45991a4`의 B 판정기는 대문자·혼합 대소문자 확장자를 코드/테스트로 분류하지 않고, 장부 범위 값을 재귀 평탄화하며, 단일값 CLI 인자를 마지막 값으로 덮어쓰고, 단언 개수만 같으면 기대 조건 완화를 놓친다. 이 L3 작업은 허용된 세 파일 안에서 그 네 원인을 RED→GREEN으로 닫는다.
@@ -360,6 +364,8 @@ e93da3cf4a4623c8b1da0f8adafd3f7d166b7133a351c9fb286042c73da07ca9  tools/strict/c
 72b9d42b521c04d242740d33683bbb11f2a2c2e10f302c10dec1d4652c589267  tests/checkpoint-gate.test.mjs
 ```
 
+→ 세 해시는 당시 복원된 제품·스캐너·시험의 exact bytes를 가리키며 후속 WU의 새 증거로 재사용하지 않는다.
+
 goal을 포함한 네 파일의 최종 commit hash readback과 G/V1/V2 원문은 자기참조로 commit SHA를 바꾸지 않도록 외부 복구 evidence manifest와 control worktree에 귀속한다.
 
 ## 2026-08-25 복구 시점 T 판정 — 과거 이력
@@ -390,6 +396,8 @@ EXIT=0 VERDICT=PASS SOT_LOAD=PASS LEDGER_LOAD=PASS MECHANISMS=34/34 WIRING=pre-p
 OUTPUT_SHA256=31153ab17a665560a3a4e8a5f2a45bd58275e1d6f1e1d27a21fee40d74197dc2
 ```
 
+→ 이 묶음은 당시 제품 commit에서 gate 문법, 49개 시험, 원칙 검사를 함께 통과했다는 과거 실행 기록이다.
+
 RED 재현은 같은 600줄 테스트 SHA로 `tests=49 pass=7 fail=42 skipped=0`, exit 1이었다. 제품 파일에는 `readdirSync`, `readRunLedgers`, `parseUpdatedAt`, `updated_at` 비교가 0건이며, 유효한 `--run-id` 없이 PASS하는 시험 경로도 0건이다.
 
 A와 C는 수정하지 않은 별도 worktree에서 다시 실행했다.
@@ -408,6 +416,8 @@ C_OUTPUT_SHA256=52f52479cbcd79291118921585fb84f86411486e124a2410d3a7257f9c033c19
 C_WORKTREE=clean
 ```
 
+→ A와 C의 별도 worktree 회귀는 각각 12개와 8개가 통과했고, 해당 작업공간은 실행 뒤 깨끗했다.
+
 ### 적대 변이와 경계
 
 임시 복제본에만 변이를 적용했고 대상·원본 worktree에는 쓰지 않았다.
@@ -423,6 +433,8 @@ C_WORKTREE=clean
 | 직접 작성 코드 600줄 | 정상 경계 | exit 0, `pass:true` |
 | 직접 작성 코드 601줄 | 경계+1 | exit 1, `file has 601 LOC, hard limit is 600` |
 
+→ 표의 모든 공격은 당시 기대한 차단 또는 경계 결과를 냈지만, 제품과 시험의 동시 무력화는 이 범위에서 검증하지 않았다.
+
 빈 파일에 `node --test`만 실행하면 Node 자체는 `tests=1 pass=1`, exit 0을 반환했다. 따라서 exit code만 보는 검증은 가짜 초록이며, 이 WU의 완료 계약은 `tests=49`, `fail=0`, `skipped=0` 확인 또는 실제 B gate의 test-weakening 검사까지 포함한다.
 
 ### V1 — Claude 독립 공격
@@ -437,6 +449,8 @@ RAW_LOG=/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/checkpoint-v1-r4.XXXXXX
 RAW_OUTPUT_SHA256=fbd17345385506175d6a0bfb900f68c6ae71be0943773956f46a29cceff9f1a9
 ```
 
+→ 이 원문은 당시 V1 포장 문서의 주장이고 임시 경로 원본은 현재 독립 확인되지 않았으므로 후속 검증 증거로 승계하지 않는다.
+
 V1은 원명령 49/49·skip 0을 재현하고 임시 저장소에서 더 최신 무관 run 추가 전후 결과 불변, symlink·빈 파일·내부 ID 불일치·ledger 범위와 `--scope` 충돌·경로 탈출 거부를 직접 확인했다. 하드링크는 정규 파일이며 내용 검증을 그대로 받으므로 계약 위반으로 보지 않았다. `lstatSync`와 `readFileSync` 사이 경쟁은 300회 공격에서 재현되지 않았으나 원자적 open은 아니므로 이론적 창은 남은 위험으로 기록한다.
 
 ### V2 — Codex 새 컨텍스트 반박 검증
@@ -446,6 +460,8 @@ AGENT=/root/checkpoint_v2_adversarial
 TARGET=01c020bc19c0c84a72c0643232b1ce4949da0332
 VERDICT=PASS
 ```
+
+→ 이 짧은 원문은 당시 V2 요약일 뿐 세부 명령·세션·전체 출력이 없으므로 후속 V2가 새 HEAD에서 다시 실행해야 한다.
 
 V2는 V1 결론을 그대로 채택하지 않고 RED 7/42, GREEN 49/49, run-id 누락, 최신 무관 장부, 범위 출처 충돌, current WU 정확히 하나, 빈·잘못된·불일치·symlink·directory 장부, 입력 위반 뒤 검사 미실행, 600/601 경계를 재현했다. V1이 실행하지 않은 no-op·exit-0·빈 테스트·skip 변이도 별도로 실행해 모두 검증 계약이 탐지함을 확인했다. 허용 세 파일 외 diff, A/C 변경, RED 이후 테스트 변경은 0건이었다.
 
