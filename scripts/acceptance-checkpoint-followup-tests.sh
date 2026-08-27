@@ -32,10 +32,10 @@ cat "$OUT"
 field() { awk -v key="$1" '$1=="#" && $2==key { value=$3 } END { print value }' "$OUT"; }
 tests=$(field tests); passed=$(field pass); failed=$(field fail)
 cancelled=$(field cancelled); skipped=$(field skipped); todo=$(field todo)
-if [ "$rc" -eq 0 ] && [ "$tests" = 66 ] && [ "$passed" = 66 ] && \
+if [ "$rc" -eq 0 ] && [ "$tests" = 76 ] && [ "$passed" = 76 ] && \
    [ "$failed" = 0 ] && [ "$cancelled" = 0 ] && [ "$skipped" = 0 ] && [ "$todo" = 0 ]; then
-  echo "PASS: checkpoint 후속 회귀 66/66, fail·cancelled·skipped·todo 0"
-  echo "CHECKED: 66"
+  echo "PASS: checkpoint 후속 회귀 76/76, fail·cancelled·skipped·todo 0"
+  echo "CHECKED: 76"
   echo "VERDICT: PASS"
   exit 0
 fi
