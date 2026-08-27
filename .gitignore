@@ -43,6 +43,7 @@ worktrees/
 
 # Python (G2 게이트가 humansearch/ 에서 만드는 로컬 산출물 — 커밋 금지)
 .venv/
+.venv
 __pycache__/
 *.pyc
 .pytest_cache/
