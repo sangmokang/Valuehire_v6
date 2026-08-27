@@ -35,68 +35,38 @@ function maskIgnoredJavaScript(source) {
   return visible.join("");
 }
 
-function staticPrimitive(text) {
-  const token = text.trim().replace(/^\((.*)\)$/s, "$1").trim();
-  if (["false", "null", "undefined", "NaN"].includes(token)) return { known: true, value: false };
-  if (token === "true") return { known: true, value: true };
-  if (/^-?(?:\d+(?:\.\d+)?|\.\d+)(?:e[+-]?\d+)?n?$/i.test(token)) {
-    return { known: true, value: Number(token.replace(/n$/i, "")) };
-  }
-  const comparison = token.match(/^(.+?)\s*(===|!==|==|!=|<=|>=|<|>)\s*(.+)$/);
-  if (!comparison) return { known: false, value: null };
-  const left = staticPrimitive(comparison[1]);
-  const right = staticPrimitive(comparison[3]);
-  if (!left.known || !right.known) return { known: false, value: null };
-  const operations = {
-    "===": (a, b) => a === b,
-    "!==": (a, b) => a !== b,
-    "==": (a, b) => a == b,
-    "!=": (a, b) => a != b,
-    "<=": (a, b) => a <= b,
-    ">=": (a, b) => a >= b,
-    "<": (a, b) => a < b,
-    ">": (a, b) => a > b,
-  };
-  return { known: true, value: operations[comparison[2]](left.value, right.value) };
-}
-
-function staticallyFalsy(text) {
-  const result = staticPrimitive(text);
-  return result.known && !result.value;
-}
-
 function namedFunctionDisabled(prefix, visible) {
   const declaration = prefix.match(/\bfunction\s+([A-Za-z_$][\w$]*)\s*\([^)]*\)\s*$/);
   const arrow = prefix.match(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>\s*$/);
-  const name = declaration?.[1] ?? arrow?.[1];
+  const expression = prefix.match(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*function(?:\s+[A-Za-z_$][\w$]*)?\s*\([^)]*\)\s*$/);
+  const name = declaration?.[1] ?? arrow?.[1] ?? expression?.[1];
   if (!name) return false;
   const calls = [...visible.matchAll(new RegExp(`\\b${name}\\s*\\(`, "g"))].length;
   return declaration ? calls <= 1 : calls === 0;
 }
 
 function blockDisabled(prefix, visible) {
-  if (/\btry\s*$/.test(prefix)) return true;
-  const condition = prefix.match(/\bif\s*\(([^()]*)\)\s*$/)?.[1];
-  return (condition !== undefined && staticallyFalsy(condition)) || namedFunctionDisabled(prefix, visible);
+  const control = /(?:^|[;}])\s*(?:if|else|while|for|switch|try|catch|finally|do|with)\b[^{}]*$/s;
+  return control.test(prefix) || namedFunctionDisabled(prefix, visible);
 }
 
-function shortCircuited(visible, position) {
+function expressionDisabled(visible, position) {
   const statement = visible.slice(Math.max(0, visible.lastIndexOf(";", position - 1) + 1), position);
-  const operand = statement.match(/(?:^|[({])\s*([^;&|()]+?)\s*&&\s*$/)?.[1];
-  return operand !== undefined && staticallyFalsy(operand);
+  return /&&|\|\||\?/.test(statement);
 }
 
 function hasDisabledContext(visible, position) {
-  const disabled = [];
+  const blocks = [];
   for (let index = 0; index < position; index += 1) {
     if (visible[index] === "{") {
       const prefix = visible.slice(Math.max(0, index - 120), index).trimEnd();
-      disabled.push(blockDisabled(prefix, visible));
+      blocks.push({ disabled: blockDisabled(prefix, visible), start: index + 1 });
     } else if (visible[index] === "}") {
-      disabled.pop();
+      blocks.pop();
     }
   }
-  return disabled.includes(true) || shortCircuited(visible, position);
+  const afterReturn = blocks.some(({ start }) => /\breturn\b[^;]*;/s.test(visible.slice(start, position)));
+  return blocks.some(({ disabled }) => disabled) || afterReturn || expressionDisabled(visible, position);
 }
 
 function jsCalls(source, name) {
@@ -214,15 +184,29 @@ function jsStrongAtoms(source) {
 
 function pythonStrongAtoms(source) {
   const atoms = [];
-  for (const line of source.split(/\r?\n/)) {
+  const lines = source.split(/\r?\n/);
+  for (const [index, line] of lines.entries()) {
     const stripped = line.replace(/#.*/, "").trim();
     const match = stripped.match(/^assert\s+(.+?)\s*==\s*(.+?)(?:\s*,.*)?$/);
-    if (!match) continue;
+    if (!match || pythonConditionalAncestor(lines, index)) continue;
     const subject = normalizeExpression(match[1]);
     const expected = normalizeExpression(match[2]);
     if (subject !== expected) atoms.push(`py:exact:${subject}:${expected}`);
   }
   return atoms;
+}
+
+function pythonConditionalAncestor(lines, position) {
+  const indentation = (line) => line.match(/^[ \t]*/)[0].replace(/\t/g, "        ").length;
+  let ceiling = indentation(lines[position]);
+  for (let index = position - 1; index >= 0 && ceiling > 0; index -= 1) {
+    const code = lines[index].replace(/#.*/, "").trim();
+    const indent = indentation(lines[index]);
+    if (!code || indent >= ceiling || !code.endsWith(":")) continue;
+    if (/^(?:if|elif|else|while|for|try|except|finally|with|match|case)\b/.test(code)) return true;
+    ceiling = indent;
+  }
+  return false;
 }
 
 function strongAtoms(path, source) {
