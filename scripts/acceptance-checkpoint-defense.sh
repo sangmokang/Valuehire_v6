@@ -10,7 +10,7 @@ fi
 candidate="${1:-HEAD}"
 contract="contracts/checkpoint-defense.json"
 checker="tools/strict/checkpoint-defense.mjs"
-trusted="506264e6e29176f4ce236fb85d9fb64318bb6981"
+trusted="de151001c9338fec5c097d3e024d7946967f0e90"
 resolved=$(git rev-parse --verify "${candidate}^{commit}") || {
   echo "FAIL: candidate commit 해석 실패 — $candidate"
   echo "CHECKED: 0"
