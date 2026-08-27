@@ -52,6 +52,12 @@ if [ -z "$expected" ] || [ -z "$actual" ] || [ "$actual" != "$expected" ]; then
   echo "CHECKED: 1"
   exit 1
 fi
+worktree_actual=$(shasum -a 256 "$checker" 2>/dev/null | awk '{print $1}')
+if [ -z "$worktree_actual" ] || [ "$worktree_actual" != "$actual" ]; then
+  echo "FAIL: worktree checker differs from candidate blob"
+  echo "CHECKED: 1"
+  exit 1
+fi
 
 rc=0
 node "$checker_copy" --candidate "$resolved" --contract "$contract_copy" --json > "$out" 2>&1 || rc=$?
