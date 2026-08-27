@@ -12,17 +12,19 @@ trap 'rm -f "$OUT"' EXIT
 rc=0
 node --test --test-concurrency=1 \
   tests/checkpoint-test-strength.test.mjs \
+  tests/checkpoint-test-strength-ignored-source.test.mjs \
   tests/checkpoint-function-budget-followup.test.mjs \
-  tests/checkpoint-defense.test.mjs > "$OUT" 2>&1 || rc=$?
+  tests/checkpoint-defense.test.mjs \
+  tests/checkpoint-defense-cleanup.test.mjs > "$OUT" 2>&1 || rc=$?
 cat "$OUT"
 
 field() { awk -v key="$1" '$1=="#" && $2==key { value=$3 } END { print value }' "$OUT"; }
 tests=$(field tests); passed=$(field pass); failed=$(field fail)
 cancelled=$(field cancelled); skipped=$(field skipped); todo=$(field todo)
-if [ "$rc" -eq 0 ] && [ "$tests" = 19 ] && [ "$passed" = 19 ] && \
+if [ "$rc" -eq 0 ] && [ "$tests" = 24 ] && [ "$passed" = 24 ] && \
    [ "$failed" = 0 ] && [ "$cancelled" = 0 ] && [ "$skipped" = 0 ] && [ "$todo" = 0 ]; then
-  echo "PASS: checkpoint 후속 회귀 19/19, fail·cancelled·skipped·todo 0"
-  echo "CHECKED: 19"
+  echo "PASS: checkpoint 후속 회귀 24/24, fail·cancelled·skipped·todo 0"
+  echo "CHECKED: 24"
   echo "VERDICT: PASS"
   exit 0
 fi
