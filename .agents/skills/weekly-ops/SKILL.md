@@ -69,6 +69,7 @@ At minimum inspect:
 - Notion parent/schema read and page write/readback separately;
 - all approved career pages;
 - Saramin, JobKorea, and LinkedIn Recruiter sent-history readback;
+- immutable consultant roster and channel-account/seat ownership mapping;
 - admin deploy and deployed-page readback;
 - Claude CLI and a fresh Codex verifier.
 
@@ -109,14 +110,26 @@ Sourcing outreach rules:
   the verified sent count is zero;
 - record one access result per channel with an allowed blocker reason; a visible login page, tutorial,
   cached result, or denied automation permission is not a successful read;
+- record the exact opaque provider actor/account refs covered by each readback and derive explicit
+  consultant/channel coverage gaps from the roster;
 - do not restart, log in, solve a challenge, or change the user's browser session without exact authority;
 - count only provider-readback `SENT` rows with stable request/message ID and sent time;
 - require that receipt reference to resolve inside the same immutable outreach source snapshot;
+- require an opaque provider actor/account reference that resolves to exactly one consultant in the
+  authoritative roster for that channel; LinkedIn actor and seat references must agree;
+- dedupe on `(channel, provider_receipt_ref)` across snapshot re-imports so relabeled local rows cannot inflate
+  sends or focus share;
 - never count an open candidate tab, search result, clicked profile, draft, pending attempt, or local log as sent;
+- never attribute activity from an internal position-share email, CC recipient, shared-mailbox address,
+  display-name similarity, or assignment alone;
 - attribute each event to an approved consultant roster identity and one canonical position;
 - store only a server-HMAC candidate key in the evidence bundle;
 - aggregate verified sent count, HMAC-unique candidate count, active days, position focus share, and
   channel mix in code;
+- disclose unread consultant accounts/channels as coverage gaps and do not compare them as zero against
+  fully observed consultants;
+- keep out-of-window sends in `excluded_rows`; they cannot satisfy the zero-result proof for the closed
+  weekly window;
 - treat verified sent as grass `YELLOW` eligibility. Preserve the existing
   `GREEN → BLUE → YELLOW → ORANGE → TRANSPARENT` precedence and fail closed on missing sources.
 - keep generic Gmail email outside this sourcing metric; it belongs to customer-intent classification.

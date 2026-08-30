@@ -134,7 +134,21 @@ diagnostic = contract["outreach_diagnostic_contract"]
 assert diagnostic["require_all_channels_for_portal_events"] is True
 assert diagnostic["require_all_channels_when_capabilities_pass"] is True
 assert diagnostic["diagnostic_and_event_snapshot_must_match"] is True
+assert "covered_provider_actor_refs" in diagnostic["required_fields"]
+roster = contract["consultant_roster_contract"]
+assert roster["required_when_outreach_capabilities_pass_or_events_exist"] is True
+assert roster["provider_actor_unique_per_channel"] is True
+assert roster["event_provider_actor_must_match_roster"] is True
+assert roster["linkedin_actor_must_equal_seat"] is True
+assert roster["provider_receipt_dedupe_key"] == ["channel", "provider_receipt_ref"]
+assert roster["coverage_gap_comparison_status"] == "NOT_COMPARABLE"
+assert roster["unread_account_metric"] == "NOT_RUN"
+assert roster["required_output_collections"] == [
+    "channel_coverage", "consultant_focus", "excluded_rows"
+]
+assert roster["zero_result_scope"] == "accepted_sent_inside_closed_weekly_window"
 assert contract["score_points"] == gate.DIFFICULTY_POINTS
+assert contract["consultant_focus_version"] == gate.CONSULTANT_FOCUS_VERSION
 assert contract["dedupe_rule_version"] == "weekly-dedupe-v1"
 assert contract["zero_result_contract"]["rule_version"] == "weekly-zero-result-v1"
 assert contract["zero_result_contract"]["collections"] == ["positions", "outreach_events"]
@@ -143,11 +157,14 @@ assert publication["data_and_publication_verdicts_separate"] is True
 assert publication["publication_report_outside_content_hash"] is True
 assert publication["canonical_brief_warns_not_publication_complete"] is True
 assert publication["publication_report_names_contract_errors"] is True
-for required in ("stable thread/message identity", "screenshots", "AUTOMATION_DENIED"):
+for required in (
+    "stable thread/message identity", "screenshots", "AUTOMATION_DENIED",
+    "provider_actor_ref", "internal position-share email", "NOT_RUN coverage gap",
+):
     assert required in skill + prompt
 PY
 then
-  pass_check "outreach browser readback contract is machine-checked"
+  pass_check "outreach browser and consultant-roster contracts are machine-checked"
 else
   fail_check "outreach browser readback contract drifted"
 fi
@@ -328,10 +345,52 @@ fi
 
 case_dir=$(prepare_mutation outreach-surface-bypass)
 if mutate_exact "$case_dir/.agents/skills/weekly-ops/scripts/activity_gate.py" \
-  'if not diagnostic_allows_event(diagnostic, event):' 'if False:'; then
+  'if event["status"] == "SENT" and not diagnostic_allows_event(' \
+  'if False and not diagnostic_allows_event('; then
   expect_mutation_red "outreach surface verification bypass" "$case_dir"
 else
   fail_check "outreach surface mutation was not applied exactly once"
+fi
+
+case_dir=$(prepare_mutation outreach-roster-bypass)
+if mutate_exact "$case_dir/.agents/skills/weekly-ops/scripts/activity_gate.py" \
+  'if not consultant_matches_roster(event, consultant_roster):' 'if False:'; then
+  expect_mutation_red "outreach consultant roster bypass" "$case_dir"
+else
+  fail_check "outreach roster mutation was not applied exactly once"
+fi
+
+case_dir=$(prepare_mutation outreach-receipt-dedupe-bypass)
+if mutate_exact "$case_dir/.agents/skills/weekly-ops/scripts/activity_gate.py" \
+  'if receipt_key in seen_receipts:' 'if False:'; then
+  expect_mutation_red "outreach provider receipt dedupe bypass" "$case_dir"
+else
+  fail_check "outreach receipt dedupe mutation was not applied exactly once"
+fi
+
+case_dir=$(prepare_mutation outreach-window-zero-bypass)
+if mutate_exact "$case_dir/.agents/skills/weekly-ops/scripts/weekly_gate.py" \
+  'if outreach_complete and not consultant_focus:' 'if False:'; then
+  expect_mutation_red "out-of-window outreach cannot bypass zero proof" "$case_dir"
+else
+  fail_check "outreach window-zero mutation was not applied exactly once"
+fi
+
+case_dir=$(prepare_mutation outreach-coverage-output-removal)
+if mutate_exact "$case_dir/.agents/skills/weekly-ops/scripts/weekly_gate.py" \
+  '"channel_coverage": channel_coverage,' '"channel_coverage_removed": channel_coverage,'; then
+  expect_mutation_red "outreach coverage output removal" "$case_dir"
+else
+  fail_check "outreach coverage-output mutation was not applied exactly once"
+fi
+
+case_dir=$(prepare_mutation outreach-comparison-bypass)
+if mutate_exact "$case_dir/.agents/skills/weekly-ops/scripts/activity_gate.py" \
+  'status = "NOT_COMPARABLE" if coverage_blockers else "COMPARABLE"' \
+  'status = "COMPARABLE"'; then
+  expect_mutation_red "partial outreach coverage cannot be ranked" "$case_dir"
+else
+  fail_check "outreach comparison mutation was not applied exactly once"
 fi
 
 case_dir=$(prepare_mutation zero-result-bypass)

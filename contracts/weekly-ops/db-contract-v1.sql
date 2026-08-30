@@ -121,11 +121,47 @@ create table priority_scores (
   primary key (run_id, position_id, formula_version)
 );
 
+create table consultants (
+  consultant_id text primary key,
+  consultant_display text not null,
+  roster_version text not null,
+  active boolean not null default true
+);
+
+create table consultant_provider_accounts (
+  consultant_id text not null references consultants(consultant_id),
+  channel text not null check (channel in ('saramin', 'jobkorea', 'linkedin_rps')),
+  provider_actor_ref text not null,
+  primary key (channel, provider_actor_ref),
+  unique (consultant_id, channel, provider_actor_ref)
+);
+
+create table outreach_channel_coverage (
+  run_id text not null references weekly_runs(run_id),
+  source_snapshot_id text not null references source_snapshots(snapshot_id),
+  consultant_id text not null,
+  channel text not null,
+  provider_actor_ref text not null,
+  access_state text not null check (
+    access_state in (
+      'AUTHENTICATED', 'AUTH_REQUIRED', 'TUTORIAL_OR_DEMO', 'AUTOMATION_DENIED',
+      'CHALLENGE', 'MISSING_PROFILE', 'STALE_PAGE'
+    )
+  ),
+  coverage_status text not null check (coverage_status in ('COVERED', 'NOT_RUN')),
+  blocker_reason text,
+  foreign key (consultant_id, channel, provider_actor_ref)
+    references consultant_provider_accounts(consultant_id, channel, provider_actor_ref),
+  primary key (run_id, channel, provider_actor_ref)
+);
+
 create table proposal_send_attempts (
   send_attempt_id text primary key,
   run_id text not null references weekly_runs(run_id),
+  source_snapshot_id text not null references source_snapshots(snapshot_id),
   consultant_id text not null,
   channel text not null check (channel in ('saramin', 'jobkorea', 'linkedin_rps')),
+  provider_actor_ref text not null,
   candidate_key_hmac text not null,
   position_id text not null references canonical_positions(position_id),
   status text not null check (status in ('PENDING', 'SENT', 'FAILED')),
@@ -136,6 +172,8 @@ create table proposal_send_attempts (
   sent_at timestamptz,
   finalized_at timestamptz,
   evidence_uri text not null,
+  foreign key (consultant_id, channel, provider_actor_ref)
+    references consultant_provider_accounts(consultant_id, channel, provider_actor_ref),
   check (
     (status = 'PENDING' and sent_at is null and finalized_at is null)
     or (
@@ -146,6 +184,10 @@ create table proposal_send_attempts (
   ),
   unique (channel, candidate_key_hmac, position_id, provider_request_key)
 );
+
+create unique index proposal_send_receipt_once
+  on proposal_send_attempts(channel, provider_receipt_ref)
+  where provider_receipt_ref is not null;
 
 create table consultant_position_focus (
   run_id text not null references weekly_runs(run_id),

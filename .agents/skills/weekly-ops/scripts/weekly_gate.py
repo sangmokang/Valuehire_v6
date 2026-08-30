@@ -18,7 +18,10 @@ if str(SCRIPT_DIRECTORY) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIRECTORY))
 
 from activity_gate import (
+    apply_coverage_comparability,
+    build_channel_coverage,
     validate_career_summaries,
+    validate_consultant_roster,
     validate_outreach_channel_diagnostics,
     validate_outreach_events,
 )
@@ -37,6 +40,7 @@ from contract_gate import (
 
 SCHEMA_VERSION = "weekly-ops-input-v1"
 SCORE_VERSION = "weekly-priority-v1"
+CONSULTANT_FOCUS_VERSION = "consultant-focus-v2"
 ORIGINS = {
     "SCRAPED_STAGING",
     "CLIENT_REQUESTED",
@@ -307,9 +311,12 @@ def stable_projection(
         "zero_result_assertions": bundle.get("zero_result_assertions", []),
         "publication_target_contracts": target_contracts,
         "score_version": SCORE_VERSION,
+        "consultant_focus_version": CONSULTANT_FOCUS_VERSION,
     }
     if "outreach_channel_diagnostics" in bundle:
         projection["outreach_channel_diagnostics"] = bundle.get("outreach_channel_diagnostics")
+    if "consultant_roster" in bundle:
+        projection["consultant_roster"] = bundle.get("consultant_roster")
     return projection
 
 
@@ -336,19 +343,15 @@ def capability_requirements(capabilities: Any) -> tuple[bool, bool, bool]:
 
 
 def required_zero_collections(
-    bundle: dict[str, Any],
     positions: list[dict[str, Any]],
+    consultant_focus: list[dict[str, Any]],
     outreach_complete: bool,
     core_position_complete: bool,
 ) -> set[str]:
     required: set[str] = set()
     if core_position_complete and not positions:
         required.add("positions")
-    sent_events = [
-        item for item in bundle.get("outreach_events", [])
-        if isinstance(item, dict) and item.get("status") == "SENT"
-    ]
-    if outreach_complete and not sent_events:
+    if outreach_complete and not consultant_focus:
         required.add("outreach_events")
     return required
 
@@ -366,6 +369,8 @@ def assemble_result(
     bundle: dict[str, Any],
     positions: list[dict[str, Any]],
     consultant_focus: list[dict[str, Any]],
+    channel_coverage: list[dict[str, Any]],
+    excluded_rows: list[dict[str, str]],
     career_summaries: list[dict[str, Any]],
     errors: list[str],
     source_blockers: list[str],
@@ -407,9 +412,12 @@ def assemble_result(
         "input_hash": input_hash,
         "content_hash": content_hash,
         "score_version": SCORE_VERSION,
+        "consultant_focus_version": CONSULTANT_FOCUS_VERSION,
         "positions": positions,
         "customer_priority_ids": customer_priority_ids(positions),
         "consultant_focus": consultant_focus,
+        "channel_coverage": channel_coverage,
+        "excluded_rows": excluded_rows,
         "career_page_summaries": career_summaries,
         "brief_markdown": brief,
         "publication_report_markdown": publication_report,
@@ -449,16 +457,27 @@ def evaluate(bundle: dict[str, Any]) -> dict[str, Any]:
         require_complete=career_complete,
     )
     position_lookup = {position["canonical_id"]: position for position in positions}
+    consultant_roster = validate_consultant_roster(
+        bundle.get("consultant_roster"),
+        bundle.get("outreach_events"),
+        errors,
+        require_roster=outreach_complete,
+    )
     outreach_diagnostics = validate_outreach_channel_diagnostics(
         bundle.get("outreach_channel_diagnostics"),
         bundle.get("outreach_events"),
+        consultant_roster,
         source_snapshot_ids,
         errors,
         require_all_channels=outreach_complete,
     )
-    consultant_focus = validate_outreach_events(
+    channel_coverage, coverage_blockers = build_channel_coverage(
+        outreach_diagnostics, consultant_roster
+    )
+    consultant_focus, excluded_rows = validate_outreach_events(
         bundle.get("outreach_events"),
         outreach_diagnostics,
+        consultant_roster,
         position_lookup,
         run,
         source_snapshot_ids,
@@ -466,15 +485,16 @@ def evaluate(bundle: dict[str, Any]) -> dict[str, Any]:
         parse_datetime,
         errors,
     )
+    consultant_focus = apply_coverage_comparability(consultant_focus, coverage_blockers)
     zero_result_assertions = validate_zero_result_assertions(
         bundle.get("zero_result_assertions"),
         required_zero_collections(
-            bundle, positions, outreach_complete, core_position_complete
+            positions, consultant_focus, outreach_complete, core_position_complete
         ),
         snapshot_evidence_refs,
         errors,
     )
-    source_blockers.extend(snapshot_blockers + career_blockers)
+    source_blockers.extend(snapshot_blockers + career_blockers + coverage_blockers)
     projection = stable_projection(bundle, positions, career_summaries, dedupe_decisions)
     projection["zero_result_assertions"] = zero_result_assertions
     input_hash = digest(projection)
@@ -494,7 +514,8 @@ def evaluate(bundle: dict[str, Any]) -> dict[str, Any]:
         else ""
     )
     return assemble_result(
-        bundle, positions, consultant_focus, career_summaries, errors,
+        bundle, positions, consultant_focus, channel_coverage, excluded_rows,
+        career_summaries, errors,
         source_blockers, data_status, snapshot_id, input_hash, brief,
     )
 
