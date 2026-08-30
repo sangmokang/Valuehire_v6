@@ -107,6 +107,7 @@ class WeeklyGateAdversarialTest(unittest.TestCase):
 
         self.assertEqual(result["verdict"], "BLOCKED")
         self.assertIn("PUBLICATION_TARGET_INVALID", result["errors"])
+        self.assertIn("PUBLICATION_TARGET_INVALID", result["publication_report_markdown"])
 
     def test_score_properties_hold_across_all_difficulty_labels(self):
         point_maps = self.gate.DIFFICULTY_POINTS
@@ -170,6 +171,40 @@ class WeeklyGateAdversarialTest(unittest.TestCase):
         self.assertIn(html.escape(result["brief_markdown"]), rendered)
         self.assertIn(result["report_snapshot_id"], rendered)
         self.assertIn(result["content_hash"], rendered)
+
+    def test_data_pass_does_not_hide_unverified_publication_targets(self):
+        result = self.gate.evaluate(valid_bundle())
+
+        self.assertEqual(result["data_verdict"], "PASS")
+        self.assertEqual(result["publication_verdict"], "PARTIAL")
+        self.assertEqual(result["verdict"], "PARTIAL")
+        self.assertIn("데이터 판정은 발행 완료 판정이 아니다", result["brief_markdown"])
+        for target in ("database", "clickup", "notion", "admin_web", "email"):
+            self.assertIn(f"{target}:NOT_RUN", result["publication_report_markdown"])
+
+    def test_html_shows_publication_report_outside_hashed_canonical_brief(self):
+        renderer_path = (
+            Path(__file__).resolve().parents[2]
+            / ".agents/skills/weekly-ops/scripts/brief_renderer.py"
+        )
+        spec = importlib.util.spec_from_file_location("brief_renderer", renderer_path)
+        renderer = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(renderer)
+        result = self.gate.evaluate(valid_bundle())
+
+        rendered = renderer.render_html(
+            result["brief_markdown"],
+            result["report_snapshot_id"],
+            result["content_hash"],
+            result["publication_report_markdown"],
+        )
+
+        self.assertIn(html.escape(result["publication_report_markdown"]), rendered)
+        self.assertIn("content hash 외부의 전달 통제 메타데이터", rendered)
+        self.assertEqual(
+            self.gate.hashlib.sha256(result["brief_markdown"].encode("utf-8")).hexdigest(),
+            result["content_hash"],
+        )
 
 
 if __name__ == "__main__":

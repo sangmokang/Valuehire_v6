@@ -22,7 +22,7 @@ from activity_gate import (
     validate_outreach_channel_diagnostics,
     validate_outreach_events,
 )
-from brief_renderer import render_brief, render_html
+from brief_renderer import render_brief, render_html, render_publication_report
 from contract_gate import (
     REQUIRED_PUBLICATION_TARGETS,
     capability_blockers,
@@ -354,6 +354,63 @@ def customer_priority_ids(positions: list[dict[str, Any]]) -> list[str]:
     ]
 
 
+def assemble_result(
+    bundle: dict[str, Any],
+    positions: list[dict[str, Any]],
+    consultant_focus: list[dict[str, Any]],
+    career_summaries: list[dict[str, Any]],
+    errors: list[str],
+    source_blockers: list[str],
+    data_status: str,
+    snapshot_id: str,
+    input_hash: str,
+    brief: str,
+) -> dict[str, Any]:
+    content_hash = hashlib.sha256(brief.encode("utf-8")).hexdigest()
+    error_count_before_publication = len(errors)
+    publication_blockers = publication_state(
+        bundle.get("publication_targets"), snapshot_id, content_hash, errors
+    )
+    publication_errors = sorted(set(errors[error_count_before_publication:]))
+    publication_verdict = (
+        "BLOCKED" if len(errors) > error_count_before_publication
+        else "PARTIAL" if publication_blockers
+        else "PASS"
+    )
+    verdict = (
+        "BLOCKED" if errors
+        else "PARTIAL" if source_blockers or publication_blockers
+        else "PASS"
+    )
+    publication_report = render_publication_report(
+        publication_verdict,
+        sorted(set(publication_blockers)),
+        publication_errors,
+        snapshot_id,
+        content_hash,
+    )
+    return {
+        "schema_version": "weekly-ops-publication-v1",
+        "verdict": verdict,
+        "data_verdict": data_status,
+        "publication_verdict": publication_verdict,
+        "publication_errors": publication_errors,
+        "report_snapshot_id": snapshot_id,
+        "input_hash": input_hash,
+        "content_hash": content_hash,
+        "score_version": SCORE_VERSION,
+        "positions": positions,
+        "customer_priority_ids": customer_priority_ids(positions),
+        "consultant_focus": consultant_focus,
+        "career_page_summaries": career_summaries,
+        "brief_markdown": brief,
+        "publication_report_markdown": publication_report,
+        "receipts": publication_receipts(bundle.get("publication_targets")),
+        "errors": sorted(set(errors)),
+        "blockers": sorted(set(source_blockers + publication_blockers)),
+    }
+
+
 def evaluate(bundle: dict[str, Any]) -> dict[str, Any]:
     errors: list[str] = []
     if bundle.get("schema_version") != SCHEMA_VERSION:
@@ -425,32 +482,10 @@ def evaluate(bundle: dict[str, Any]) -> dict[str, Any]:
         if run
         else ""
     )
-    content_hash = hashlib.sha256(brief.encode("utf-8")).hexdigest()
-    publication_blockers = publication_state(
-        bundle.get("publication_targets"), snapshot_id, content_hash, errors
+    return assemble_result(
+        bundle, positions, consultant_focus, career_summaries, errors,
+        source_blockers, data_status, snapshot_id, input_hash, brief,
     )
-    if errors:
-        verdict = "BLOCKED"
-    elif source_blockers or publication_blockers:
-        verdict = "PARTIAL"
-    else:
-        verdict = "PASS"
-    return {
-        "schema_version": "weekly-ops-publication-v1",
-        "verdict": verdict,
-        "report_snapshot_id": snapshot_id,
-        "input_hash": input_hash,
-        "content_hash": content_hash,
-        "score_version": SCORE_VERSION,
-        "positions": positions,
-        "customer_priority_ids": customer_priority_ids(positions),
-        "consultant_focus": consultant_focus,
-        "career_page_summaries": career_summaries,
-        "brief_markdown": brief,
-        "receipts": publication_receipts(bundle.get("publication_targets")),
-        "errors": sorted(set(errors)),
-        "blockers": sorted(set(source_blockers + publication_blockers)),
-    }
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -474,7 +509,8 @@ def main(argv: list[str] | None = None) -> int:
         output = result["brief_markdown"]
     elif args.format == "html":
         output = render_html(
-            result["brief_markdown"], result["report_snapshot_id"], result["content_hash"]
+            result["brief_markdown"], result["report_snapshot_id"], result["content_hash"],
+            result["publication_report_markdown"],
         )
     else:
         output = canonical_json(result)

@@ -213,6 +213,10 @@
     "require_write_ahead": true,
     "require_idempotency_key": true,
     "require_readback": true,
+    "data_and_publication_verdicts_separate": true,
+    "publication_report_outside_content_hash": true,
+    "canonical_brief_warns_not_publication_complete": true,
+    "publication_report_names_contract_errors": true,
     "receipt_required_fields": [
       "write_ahead_intent_id",
       "idempotency_key",

@@ -233,10 +233,14 @@ provider readback이 있는 `SENT` 행만 consultant×canonical position에 연�
 {
   "schema_version": "weekly-ops-publication-v1",
   "verdict": "PASS|PARTIAL|BLOCKED|NOT_RUN",
+  "data_verdict": "PASS|PARTIAL|BLOCKED",
+  "publication_verdict": "PASS|PARTIAL|BLOCKED",
+  "publication_errors": [],
   "report_snapshot_id": "sha256-based id",
   "content_hash": "sha256",
   "score_version": "weekly-priority-v1",
   "brief_markdown": "derived CEO briefing",
+  "publication_report_markdown": "delivery-control metadata outside content hash",
   "receipts": [],
   "blockers": []
 }
@@ -292,13 +296,21 @@ fixture와 git에 금지한다.
 
 - 직접 작성 코드 파일 soft 300줄, hard 600줄.
 - 직접 작성 함수 soft 60줄, hard 100줄.
-- 예상 변경 총량 1,400줄 이하. 3,000줄을 넘기면 작업을 재분할한다.
+- 예상 변경 총량은 최초 1,400줄이었으나 계약·적대 fixture 보강으로 초과했다. 단일 PR은
+  3,000 변경줄 이하여야 하며 초과 시 선행 브랜치를 base로 한 stacked review로 분할한다.
 - 새 dependency는 추가하지 않는다. Python 표준 라이브러리만 사용한다.
 
-변경 총량 임계값은 실제로 발동했다. 기준 커밋 대비 누적 `+3894/-18`이므로 실행기를
-`weekly_gate`, `contract_gate`, `activity_gate`, `brief_renderer` 네 모듈로, 시험을 fixture와
-기본·적대 시험 세 모듈로 분할했고, 변경을 `b61fec9`, `d0d1cf5`, `f4be8d2` 세 결정 커밋으로
-나눴다. 모든 직접 작성 파일은 hard 600줄, 함수는 hard 100줄 이하다.
+변경 총량 임계값은 실제로 발동했다. 현재 브랜치를 `main`에 직접 PR하면 3,000줄을 넘으므로
+금지한다. 실제 로컬 review stack은 다음과 같이 만들었다.
+
+1. `task/weekly-ops-foundation`: `c59bad7..b61fec9` — 기반 계약과 실행기.
+2. `task/weekly-ops-outreach`: `b61fec9..d0d1cf5` — Aside 발송 증거 경계. base는 foundation.
+3. `task/weekly-ops-skill`: `d0d1cf5..HEAD` — 적대검증 보강. base는 outreach.
+
+각 인접 diff는 fresh V2 직전에 `git diff --numstat`으로 3,000 변경줄 이하를 다시 확인한다.
+push·PR은 비범위이므로 원격 PR을 만들었다고 주장하지 않는다. 실행기는 `weekly_gate`,
+`contract_gate`, `activity_gate`, `brief_renderer` 네 모듈로, 시험은 fixture와 기본·적대 시험
+세 모듈로 분리했다. 모든 직접 작성 파일은 hard 600줄, 함수는 hard 100줄 이하다.
 
 ## 적대검증 정조준
 
@@ -362,11 +374,12 @@ fixture와 git에 금지한다.
 - Claude V1 보강 RED: 정본과 다른 수기 HTML/hash, 622줄 테스트의 검사 누락, 점수표 문서
   드리프트, 버전·계보 없는 dedupe, 증명 없는 빈 배열 PASS, generic email 채널 위장,
   비문자 발행 target의 예외를 실제 재현했다. 수정 전 42개 중 9 failure·3 error였다.
-- GREEN 조건: 같은 명령이 현재 42개 시험을 실제 실행하고 모두 통과한다.
+- GREEN 조건: 같은 명령이 현재 44개 시험을 실제 실행하고 모두 통과한다.
 - mutation 조건: `bash scripts/acceptance-weekly-ops-skill.sh --full`이 검사 32개와 함께
   scraped cap, capability fail-open, readback bypass, 필수 target 제거, 값 PII 우회,
   position lineage, source status, outreach receipt lineage, outreach surface, zero-result receipt,
-  dedupe version, career-company completeness, email relabel 우회까지 13개 변이를 모두 죽인다.
+  dedupe version, career-company completeness, email relabel, 데이터 판정의 발행 성공 위장까지
+  14개 변이를 모두 죽인다.
 
 ## 적대 검증 로그
 
@@ -399,6 +412,34 @@ fixture와 git에 금지한다.
   `fc079b3ae15d685cee1d841cb5c4c4ef39906e187368a0e16d7acfdee837e043`.
 - strongest unresolved interpretation: brief의 데이터 판정과 publication bundle의 발행 판정을
   분리한 설계가 단독 HTML 독자에게 충분한지 Codex V2가 독립 판단해야 한다.
+
+### Codex V2 — 발행 경계·PR 경계 FAIL
+
+- reviewed commit: `1c1ef82d0c8e9755229da6fd7c01e50848c60c9f`.
+- verdict: `FAIL`; 42개 시험, acceptance 32/13, principles 34/34, 비밀 검사와 frozen hash는
+  통과했다.
+- counterexample 1: 데이터가 PASS이고 발행 대상 5개가 `NOT_RUN`일 때 전체는 `PARTIAL`인데
+  정본 브리핑이 데이터 PASS만 말해 단독 HTML 독자가 발행 성공으로 오해할 수 있었다.
+- counterexample 2: `c59bad7..1c1ef82` 누적 diff는 3,000 변경줄을 넘는데 실제 stacked branch
+  base가 없었다.
+- drift: `docs/sot/verification-commands.md`가 26개 시험·mutation 8종으로 과거 수치를 말했다.
+
+### V2 교정 후보 — fresh 재검증 대기
+
+- RED 2건을 추가해 `data_verdict`와 `publication_verdict` 분리, 미발행 대상 5개가 담긴
+  `publication_report_markdown`, HTML의 가시적 발행 상태를 강제했다.
+- 정본 Markdown은 “데이터 판정은 발행 완료 판정이 아니다”를 항상 명시하며, 상태 부록은
+  hash 순환을 막기 위해 content hash 외부의 동일-snapshot 전달 통제 메타데이터로 둔다.
+- 고정 번들: `PARTIAL`, `data_verdict=PARTIAL`, `publication_verdict=PARTIAL`,
+  `report_snapshot_id=rpt_6edf944357dc9db4306a04ef`,
+  `input_hash=6edf944357dc9db4306a04ef4bc76a42f392ec958ba45f1cbc52d0c12b5250c2`,
+  `content_hash=9d8768a763d243dad7907f305a9987e6703417046dd662d0b692681a01b48d70`.
+- local GREEN: unit 44/44, acceptance CHECKED 33와 mutation 14/14, principles 34/34,
+  `verify.sh` PASS, 공식 `quick_validate.py`로 canonical/Codex/Claude 3개 모두 PASS.
+- 실제 branch ref: foundation=`b61fec9`, outreach=`d0d1cf5`, hardening=current; 인접 변경줄은
+  각각 2,889, 395, 1,478로 모두 3,000 이하이다. current의 PR base는 반드시 outreach다.
+- stop condition: 이 후보 커밋을 fresh Claude V1과 fresh Codex V2가 모두 PASS하기 전까지
+  외부 발행은 금지한다.
 
 ## 비범위
 
