@@ -35,7 +35,8 @@ publication_mode: <dry_run|write>
 - SCRAPED_STAGING is not a customer request.
 - Only provider-readback SENT events count as consultant outreach or grass YELLOW evidence.
 - LLM output is an enum proposal, never the score or operating state.
-- Missing/stale/error is NOT_RUN/PARTIAL, never zero.
+- Missing/stale/error is NOT_RUN/PARTIAL, never zero. A true zero needs a source-bound
+  `weekly-zero-result-v1` provider receipt.
 - External writes require intent, idempotency, schema readback, and post-write readback.
 - Required capability and publication target names are fixed sets; omission cannot bypass a gate.
 - Every business fact resolves through an immutable source snapshot and opaque evidence reference.
@@ -63,7 +64,8 @@ remaining risks and exact blockers
 
 ## Sourcing outreach channel contract
 
-Emit exactly one channel diagnostic before extracting rows:
+Emit exactly one diagnostic for each channel whenever all three outreach capabilities are `PASS`,
+before extracting rows and even when the resulting verified-send count is zero:
 
 ```text
 channel: <jobkorea|saramin|linkedin_rps>

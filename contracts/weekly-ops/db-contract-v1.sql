@@ -99,6 +99,16 @@ create table dedupe_decisions (
   unique (run_id, duplicate_snapshot_id)
 );
 
+create table zero_result_assertions (
+  run_id text not null references weekly_runs(run_id),
+  collection_name text not null check (collection_name in ('positions', 'outreach_events')),
+  source_snapshot_id text not null references source_snapshots(snapshot_id),
+  provider_receipt_ref text not null,
+  observed_count integer not null check (observed_count = 0),
+  rule_version text not null,
+  primary key (run_id, collection_name)
+);
+
 create table priority_scores (
   run_id text not null references weekly_runs(run_id),
   position_id text not null references canonical_positions(position_id),
@@ -115,7 +125,7 @@ create table proposal_send_attempts (
   send_attempt_id text primary key,
   run_id text not null references weekly_runs(run_id),
   consultant_id text not null,
-  channel text not null check (channel in ('saramin', 'jobkorea', 'linkedin_rps', 'email')),
+  channel text not null check (channel in ('saramin', 'jobkorea', 'linkedin_rps')),
   candidate_key_hmac text not null,
   position_id text not null references canonical_positions(position_id),
   status text not null check (status in ('PENDING', 'SENT', 'FAILED')),
