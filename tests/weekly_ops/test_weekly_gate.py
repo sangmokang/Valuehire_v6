@@ -92,7 +92,7 @@ class WeeklyGateTest(unittest.TestCase):
 
     def test_post_cutoff_event_is_rendered_as_late_alert(self):
         bundle = valid_bundle()
-        bundle["positions"][0]["event_at"] = "2026-08-30T09:00:00+09:00"
+        bundle["positions"][0]["event_at"] = "2026-08-31T09:00:00+09:00"
 
         result = self.gate.evaluate(bundle)
 
@@ -445,7 +445,11 @@ class WeeklyGateTest(unittest.TestCase):
 
     def test_non_pass_source_snapshot_cannot_become_full_pass(self):
         bundle = valid_bundle()
-        bundle["source_snapshots"][0]["status"] = "FAIL"
+        gmail_snapshot = next(
+            item for item in bundle["source_snapshots"]
+            if item["snapshot_id"] == "snap-gmail-fixture"
+        )
+        gmail_snapshot["status"] = "FAIL"
         first = self.gate.evaluate(bundle)
         mark_all_targets_verified(bundle, first)
 

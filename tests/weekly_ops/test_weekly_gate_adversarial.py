@@ -12,6 +12,87 @@ class WeeklyGateAdversarialTest(unittest.TestCase):
     def setUpClass(cls):
         cls.gate = load_gate()
 
+    def test_db_operating_snapshot_is_rendered_and_bound_to_identity(self):
+        bundle = valid_bundle()
+        first = self.gate.evaluate(bundle)
+
+        self.assertEqual(first["operating_snapshot"]["closed_week"]["new_positions"], 14)
+        self.assertIn("## 핵심 운영지표", first["brief_markdown"])
+        self.assertIn("26W35 신규 포지션 14개 / 신규 고객사 9개", first["brief_markdown"])
+        self.assertIn("현재 funnel은 별도 시점 snapshot", first["brief_markdown"])
+
+        bundle["operating_snapshot"]["closed_week"]["new_positions"] = 15
+        second = self.gate.evaluate(bundle)
+        self.assertNotEqual(second["report_snapshot_id"], first["report_snapshot_id"])
+
+    def test_db_read_pass_requires_verified_operating_snapshot(self):
+        bundle = valid_bundle()
+        del bundle["operating_snapshot"]
+
+        result = self.gate.evaluate(bundle)
+
+        self.assertEqual(result["verdict"], "BLOCKED")
+        self.assertIn("OPERATING_SNAPSHOT_MISSING", result["errors"])
+
+    def test_operating_snapshot_must_match_closed_week_boundaries(self):
+        bundle = valid_bundle()
+        bundle["operating_snapshot"]["closed_week"]["week_start"] = "2026-08-23"
+
+        result = self.gate.evaluate(bundle)
+
+        self.assertEqual(result["verdict"], "BLOCKED")
+        self.assertIn("OPERATING_SNAPSHOT_INVALID", result["errors"])
+
+    def test_operating_snapshot_rejects_future_freshness(self):
+        bundle = valid_bundle()
+        bundle["operating_snapshot"]["current"]["position_last_synced_at"] = (
+            "2026-08-31T12:00:00+09:00"
+        )
+
+        result = self.gate.evaluate(bundle)
+
+        self.assertEqual(result["verdict"], "BLOCKED")
+        self.assertIn("OPERATING_SNAPSHOT_INVALID", result["errors"])
+
+    def test_weekly_window_must_be_monday_to_monday(self):
+        bundle = valid_bundle()
+        bundle["run"]["window_start"] = "2026-08-19T00:00:00+09:00"
+        bundle["run"]["window_end_exclusive"] = "2026-08-26T00:00:00+09:00"
+        bundle["operating_snapshot"]["closed_week"]["week_start"] = "2026-08-19"
+        bundle["operating_snapshot"]["closed_week"]["week_end"] = "2026-08-26"
+
+        result = self.gate.evaluate(bundle)
+
+        self.assertEqual(result["verdict"], "BLOCKED")
+        self.assertIn("RUN_WINDOW_INVALID", result["errors"])
+
+    def test_db_snapshot_requires_exact_rpc_source(self):
+        bundle = valid_bundle()
+        bundle["source_snapshots"][0]["source_uri_ref"] = "protected:manual-db-export"
+
+        result = self.gate.evaluate(bundle)
+
+        self.assertEqual(result["verdict"], "BLOCKED")
+        self.assertIn("OPERATING_SNAPSHOT_INVALID", result["errors"])
+
+    def test_source_snapshot_rejects_fetch_after_meeting(self):
+        bundle = valid_bundle()
+        bundle["source_snapshots"][0]["fetched_at"] = "2026-08-31T12:30:00+09:00"
+
+        result = self.gate.evaluate(bundle)
+
+        self.assertEqual(result["verdict"], "BLOCKED")
+        self.assertIn("SOURCE_SNAPSHOT_INVALID", result["errors"])
+
+    def test_operating_metric_sections_reject_unknown_keys(self):
+        bundle = valid_bundle()
+        bundle["operating_snapshot"]["current"]["funnel"]["weekly_proposals"] = 130
+
+        result = self.gate.evaluate(bundle)
+
+        self.assertEqual(result["verdict"], "BLOCKED")
+        self.assertIn("OPERATING_SNAPSHOT_INVALID", result["errors"])
+
     def test_empty_positions_need_a_source_bound_zero_result_assertion(self):
         bundle = valid_bundle()
         bundle["positions"] = []

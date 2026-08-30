@@ -49,6 +49,17 @@ DB separately retains the raw-source hash. Missing lineage is `BLOCKED`.
 Any valid non-`PASS` source snapshot remains an explicit source blocker; enum-valid failure cannot be
 silently converted into a full `PASS`.
 
+## DB operating snapshot
+
+When `db_read=PASS`, the bundle must include one `operating_snapshot` backed by a `PASS` database
+source snapshot and exact provenance `sql_rpc:weekly_brief_snapshot`. The RPC's closed week must equal
+the run's seven-day Monday 00:00-to-Monday 00:00 Asia/Seoul half-open window. Its source URI must be
+exactly `rpc:weekly_brief_snapshot:{meeting_date}`. Closed-week SQL counts, current funnel state, and
+targets remain separate exact-key fields; unknown metrics are invalid so the current funnel cannot be
+silently mixed with weekly performance. Generated and source freshness timestamps after the meeting
+cutoff are invalid. Non-negative numeric validation, source linkage, and the complete operating
+snapshot are bound into `report_snapshot_id`.
+
 ## Priority formula
 
 `weekly-priority-v1` is implemented by `scripts/weekly_gate.py`.

@@ -63,6 +63,7 @@ def validate_source_snapshots(
     snapshots: Any,
     parse_datetime: Callable[[str], datetime],
     errors: list[str],
+    meeting_cutoff: datetime | None = None,
 ) -> tuple[set[str], set[str], dict[str, set[str]], list[str]]:
     if not isinstance(snapshots, list) or not snapshots:
         errors.append("SOURCE_SNAPSHOTS_MISSING")
@@ -102,7 +103,9 @@ def validate_source_snapshots(
             and all(isinstance(ref, str) and bool(ref) for ref in refs)
         )
         try:
-            parse_datetime(snapshot["fetched_at"])
+            fetched_at = parse_datetime(snapshot["fetched_at"])
+            if meeting_cutoff is not None and fetched_at > meeting_cutoff:
+                valid = False
         except (TypeError, ValueError):
             valid = False
         if not valid:

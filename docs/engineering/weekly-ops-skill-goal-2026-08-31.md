@@ -11,7 +11,7 @@
 이번 작업은 두 산출물을 만든다.
 
 1. 오늘 11시 회의를 위한 **근거 기반 CEO 브리핑**을 만든다. 공식 주간 창은
-   2026-08-23 00:00 이상, 2026-08-30 00:00 미만(KST)이며, 그 뒤 회의 전까지의
+   2026-08-24 00:00 이상, 2026-08-31 00:00 미만(KST)이며, 그 뒤 회의 전까지의
    사건은 `마감 후 경보`로 분리한다.
 2. 같은 일을 반복할 **Claude·Codex 공용 `weekly-ops` Skill**을 만든다. DB를 정본으로
    삼고 ClickUp·Notion·웹·이메일은 한 `report_snapshot_id`에서 파생한 읽기 모델로만
@@ -21,7 +21,9 @@
    집계해 지난주 몰입도와 잔디밭 `YELLOW` 근거를 만든다.
 
 현재 확인된 실데이터 경계는 명확하다. 연결된 Gmail 계정은 읽기 가능하고 2026-08-23
-이후 후보 메시지 292건을 페이지 끝까지 읽었다. 반면 이 세션에는 ClickUp과 Notion
+이후 후보 메시지 292건을 페이지 끝까지 읽었다. Supabase의
+`weekly_brief_snapshot(2026-08-31)`은 26W35를 `[2026-08-24, 2026-08-31)`로 반환했다.
+반면 이 세션에는 ClickUp과 Notion
 쓰기 커넥터가 없고, `admin.valuehire.cc`의 배포 저장소·인증 경로도 이 저장소에 없다.
 따라서 이 범위에서 ClickUp·Notion·운영 웹을 성공으로 가장하지 않는다. Skill은 해당
 능력이 없으면 `NOT_RUN`, 필수 출처가 하나라도 검증되지 않으면 전체 발행을 `PARTIAL`
@@ -219,12 +221,13 @@ provider readback이 있는 `SENT` 행만 consultant×canonical position에 연�
   "schema_version": "weekly-ops-input-v1",
   "run": {
     "meeting_at": "2026-08-31T11:00:00+09:00",
-    "window_start": "2026-08-23T00:00:00+09:00",
-    "window_end_exclusive": "2026-08-30T00:00:00+09:00",
+    "window_start": "2026-08-24T00:00:00+09:00",
+    "window_end_exclusive": "2026-08-31T00:00:00+09:00",
     "late_alert_end": "2026-08-31T11:00:00+09:00"
   },
   "capabilities": [],
   "source_snapshots": [],
+  "operating_snapshot": {},
   "dedupe_decisions": [],
   "positions": [],
   "zero_result_assertions": [],
@@ -382,14 +385,15 @@ push·PR은 비범위이므로 원격 PR을 만들었다고 주장하지 않는�
 - Claude V1 보강 RED: 정본과 다른 수기 HTML/hash, 622줄 테스트의 검사 누락, 점수표 문서
   드리프트, 버전·계보 없는 dedupe, 증명 없는 빈 배열 PASS, generic email 채널 위장,
   비문자 발행 target의 예외를 실제 재현했다. 수정 전 42개 중 9 failure·3 error였다.
-- GREEN 조건: 같은 명령이 현재 54개 시험을 실제 실행하고 모두 통과한다.
-- mutation 조건: `bash scripts/acceptance-weekly-ops-skill.sh --full`이 검사 38개와 함께
+- GREEN 조건: 같은 명령이 현재 62개 시험을 실제 실행하고 모두 통과한다.
+- mutation 조건: `bash scripts/acceptance-weekly-ops-skill.sh --full`이 검사 45개와 함께
   scraped cap, capability fail-open, readback bypass, 필수 target 제거, 값 PII 우회,
   position lineage, source status, outreach receipt lineage, outreach surface, consultant roster,
   outreach receipt dedupe, out-of-window zero 우회, coverage 출력 제거, partial coverage 순위 우회,
   zero-result receipt,
   dedupe version, career-company completeness, email relabel, 데이터 판정의 발행 성공 위장까지
-  19개 변이를 모두 죽인다.
+  DB 운영 snapshot 누락, 주간 경계 위조, RPC lineage 위조, cutoff 이후 source, funnel
+  extra-key 우회를 더한 25개 변이를 모두 죽인다.
 
 ## 적대 검증 로그
 
@@ -434,23 +438,39 @@ push·PR은 비범위이므로 원격 PR을 만들었다고 주장하지 않는�
   base가 없었다.
 - drift: `docs/sot/verification-commands.md`가 26개 시험·mutation 8종으로 과거 수치를 말했다.
 
-### Aside 확장 후 최신 재검증
+### Aside 확장·DB 정본 연동 후 최신 재검증
 
 - RED 2건을 추가해 `data_verdict`와 `publication_verdict` 분리, 미발행 대상 5개가 담긴
   `publication_report_markdown`, HTML의 가시적 발행 상태를 강제했다.
 - 정본 Markdown은 “데이터 판정은 발행 완료 판정이 아니다”를 항상 명시하며, 상태 부록은
   hash 순환을 막기 위해 content hash 외부의 동일-snapshot 전달 통제 메타데이터로 둔다.
+- production SQL RPC `weekly_brief_snapshot(2026-08-31)`의 provenance와 정확한
+  `[2026-08-24, 2026-08-31)` 경계를 DB source snapshot에 묶었다. current funnel은
+  폐쇄 주간 실적으로 재해석하거나 목표 대비 순위화하지 않는다.
 - 고정 번들: `PARTIAL`, `data_verdict=PARTIAL`, `publication_verdict=PARTIAL`,
-  `report_snapshot_id=rpt_64f0c8c1209b0b1d704906fa`,
-  `input_hash=64f0c8c1209b0b1d704906fa38636cae8bf894ece3add57c8e7ca3c87c3b60d1`,
-  `content_hash=9a52a555dedcf13cc19a1c7da8abf53a0beaaaf5a6c4381dce6132485cc7f347`.
-- local GREEN: unit 54/54, acceptance CHECKED 38와 mutation 19/19, principles 34/34,
+  `report_snapshot_id=rpt_6b0bfab9f7bbed136f50bf9e`,
+  `input_hash=6b0bfab9f7bbed136f50bf9ed4568c1bb9909ce596d96a04d2a50cd2cc54c577`,
+  `content_hash=1e05cbc13a304605bcb676fef2ad7271ba32eff0ef35607dfa2bbcb8761a7f94`.
+- DB publication receipt: `public.weekly_meetings` object
+  `8b8055e3-0807-5c89-9459-a5174fb49cf2`를 같은 snapshot/content hash로
+  `READBACK_VERIFIED`했다. 첫 시도의 과거 snapshot row는 삭제하지 않고 `SUPERSEDED`로
+  감사 이력을 보존했다.
+- local GREEN: unit 62/62, acceptance CHECKED 45와 mutation 25/25, principles 34/34,
   `verify.sh` PASS, 공식 `quick_validate.py`로 canonical/Codex/Claude 3개 모두 PASS.
 - 실제 branch ref: foundation=`b61fec9`, outreach=`d0d1cf5`, hardening=current. 현재
-  outreach 대비 누적 변경은 2,307줄로 3,000 이하이며 PR base는 반드시 outreach다.
-- fresh Codex V2: `PASS`. partial multi-account 반례는 전원 `NOT_COMPARABLE`과
+  outreach 대비 누적 변경은 2,835줄로 3,000 이하이며 PR base는 반드시 outreach다.
+- 이전 Aside fresh Codex V2: `PASS`. partial multi-account 반례는 전원 `NOT_COMPARABLE`과
   “계정 coverage 불일치로 컨설턴트 간 순위 산정 안 함”으로 닫혔고, out-of-window SENT,
   중복 provider receipt, 미인증 actor coverage 공격도 모두 차단됐다.
+- DB 연동 fresh Codex V2 수정 전: `FAIL`. 임의 수요일 7일 창, 수기 DB export URI,
+  회의 뒤 `fetched_at`, current funnel extra key가 PASS하는 네 반례를 재현했다. 현재 구현은
+  월요일 00:00/7일/+09:00, exact RPC URI, meeting cutoff, exact metric key set을 강제하고
+  네 반례를 단위·mutation 시험으로 고정했다.
+- DB 연동 fresh Codex V2 수정 후: `PASS`. 네 반례는 각각 `RUN_WINDOW_INVALID`,
+  `OPERATING_SNAPSHOT_INVALID`, `SOURCE_SNAPSHOT_INVALID`, `OPERATING_SNAPSHOT_INVALID`로
+  차단됐고, frozen JSON·Markdown·HTML은 fresh gate 출력과 동일하다. V2는 외부 DB에
+  접근하지 않았으며, 통합자가 별도로 실제 DB row의 snapshot/content hash와
+  `READBACK_VERIFIED` 상태를 재조회했다.
 - fresh Claude V1: `NOT_RUN`. `omx ask claude`는 Claude CLI 2.1.251을 호출했으나
   `Credit balance is too low`로 exit 1이었다. 이를 PASS나 독립 검증으로 대체하지 않는다.
 - stop condition: 현재 diff를 fresh Claude V1과 fresh Codex V2가 모두 PASS하고 같은

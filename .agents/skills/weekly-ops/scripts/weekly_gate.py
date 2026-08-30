@@ -35,6 +35,7 @@ from contract_gate import (
     validate_source_snapshots,
     validate_zero_result_assertions,
 )
+from operating_gate import validate_operating_snapshot
 
 
 SCHEMA_VERSION = "weekly-ops-input-v1"
@@ -183,7 +184,16 @@ def validate_run(run: Any, errors: list[str]) -> dict[str, datetime] | None:
     except (TypeError, ValueError):
         errors.append("RUN_DATETIME_INVALID")
         return None
-    if not (
+    window_is_week = (
+        parsed["window_start"].weekday() == 0
+        and parsed["window_end_exclusive"].weekday() == 0
+        and parsed["window_start"].time() == datetime.min.time()
+        and parsed["window_end_exclusive"].time() == datetime.min.time()
+        and parsed["window_end_exclusive"] - parsed["window_start"] == timedelta(days=7)
+        and parsed["window_end_exclusive"].date() == parsed["meeting_at"].date()
+        and all(value.utcoffset() == timedelta(hours=9) for value in parsed.values())
+    )
+    if not window_is_week or not (
         parsed["window_start"] < parsed["window_end_exclusive"]
         <= parsed["meeting_at"]
         <= parsed["late_alert_end"]
@@ -281,6 +291,7 @@ def stable_projection(
     positions: list[dict[str, Any]],
     career_summaries: list[dict[str, Any]],
     dedupe_decisions: list[dict[str, Any]],
+    operating_snapshot: dict[str, Any],
 ) -> dict[str, Any]:
     target_contracts = [
         {
@@ -299,6 +310,7 @@ def stable_projection(
         "dedupe_decisions": dedupe_decisions,
         "positions": positions,
         "career_page_summaries": career_summaries,
+        "operating_snapshot": operating_snapshot,
         "outreach_events": bundle.get("outreach_events", []),
         "zero_result_assertions": bundle.get("zero_result_assertions", []),
         "publication_target_contracts": target_contracts,
@@ -334,6 +346,15 @@ def capability_requirements(capabilities: Any) -> tuple[bool, bool, bool]:
     return career_complete, outreach_complete, core_position_complete
 
 
+def capability_passed(capabilities: Any, name: str) -> bool:
+    return any(
+        isinstance(item, dict)
+        and item.get("name") == name
+        and item.get("status") == "PASS"
+        for item in capabilities
+    ) if isinstance(capabilities, list) else False
+
+
 def required_zero_collections(
     positions: list[dict[str, Any]],
     consultant_focus: list[dict[str, Any]],
@@ -364,6 +385,7 @@ def assemble_result(
     channel_coverage: list[dict[str, Any]],
     excluded_rows: list[dict[str, str]],
     career_summaries: list[dict[str, Any]],
+    operating_snapshot: dict[str, Any],
     errors: list[str],
     source_blockers: list[str],
     data_status: str,
@@ -411,6 +433,7 @@ def assemble_result(
         "channel_coverage": channel_coverage,
         "excluded_rows": excluded_rows,
         "career_page_summaries": career_summaries,
+        "operating_snapshot": operating_snapshot,
         "brief_markdown": brief,
         "publication_report_markdown": publication_report,
         "receipts": publication_receipts(bundle.get("publication_targets")),
@@ -427,23 +450,30 @@ def evaluate(bundle: dict[str, Any]) -> dict[str, Any]:
         errors.append("FORBIDDEN_SENSITIVE_FIELD")
     run = validate_run(bundle.get("run"), errors)
     source_blockers = capability_blockers(bundle.get("capabilities"), errors)
-    source_snapshot_ids, evidence_refs, snapshot_evidence_refs, snapshot_blockers = validate_source_snapshots(
-        bundle.get("source_snapshots"), parse_datetime, errors
+    cutoff = run["meeting_at"] if run else None
+    source_snapshot_ids, evidence_refs, snapshot_evidence_refs, snapshot_blockers = (
+        validate_source_snapshots(bundle.get("source_snapshots"), parse_datetime, errors, cutoff)
     )
     positions = validate_positions(bundle.get("positions"), run, evidence_refs, errors)
     canonical_ids = {position["canonical_id"] for position in positions}
     dedupe_decisions = validate_dedupe_decisions(
         bundle.get("dedupe_decisions"), canonical_ids, evidence_refs, errors
     )
-    career_complete, outreach_complete, core_position_complete = capability_requirements(
-        bundle.get("capabilities")
-    )
+    career_complete, outreach_complete, core_position_complete = capability_requirements(bundle.get("capabilities"))
     career_summaries, career_blockers = validate_career_summaries(
         bundle.get("career_page_summaries"),
         source_snapshot_ids,
         parse_datetime,
         errors,
         require_complete=career_complete,
+    )
+    operating_snapshot = validate_operating_snapshot(
+        bundle.get("operating_snapshot"),
+        run,
+        bundle.get("source_snapshots"),
+        parse_datetime,
+        errors,
+        require_snapshot=capability_passed(bundle.get("capabilities"), "db_read"),
     )
     position_lookup = {position["canonical_id"]: position for position in positions}
     consultant_roster = validate_consultant_roster(
@@ -484,7 +514,7 @@ def evaluate(bundle: dict[str, Any]) -> dict[str, Any]:
         errors,
     )
     source_blockers.extend(snapshot_blockers + career_blockers + coverage_blockers)
-    projection = stable_projection(bundle, positions, career_summaries, dedupe_decisions)
+    projection = stable_projection(bundle, positions, career_summaries, dedupe_decisions, operating_snapshot)
     projection["zero_result_assertions"] = zero_result_assertions
     input_hash = digest(projection)
     snapshot_id = f"rpt_{input_hash[:24]}"
@@ -495,6 +525,7 @@ def evaluate(bundle: dict[str, Any]) -> dict[str, Any]:
             positions,
             career_summaries,
             consultant_focus,
+            operating_snapshot,
             snapshot_id,
             data_status,
             sorted(set(source_blockers)),
@@ -504,7 +535,7 @@ def evaluate(bundle: dict[str, Any]) -> dict[str, Any]:
     )
     return assemble_result(
         bundle, positions, consultant_focus, channel_coverage, excluded_rows,
-        career_summaries, errors,
+        career_summaries, operating_snapshot, errors,
         source_blockers, data_status, snapshot_id, input_hash, brief,
     )
 
