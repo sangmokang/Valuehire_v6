@@ -121,6 +121,7 @@
       "source_snapshot_id"
     ],
     "require_all_channels_for_portal_events": true,
+    "require_all_channels_when_capabilities_pass": true,
     "blocker_reason_required_when_unreadable": true,
     "diagnostic_and_event_snapshot_must_match": true
   },
@@ -183,6 +184,19 @@
     "NONE"
   ],
   "score_version": "weekly-priority-v1",
+  "score_points": {
+    "scarcity": {"LOW": 0, "MEDIUM": 20, "HIGH": 35},
+    "seniority": {"LOW": 0, "MEDIUM": 15, "HIGH": 25},
+    "constraints": {"LOW": 0, "MEDIUM": 15, "HIGH": 25},
+    "funnel_friction": {"LOW": 0, "MEDIUM": 8, "HIGH": 15}
+  },
+  "dedupe_rule_version": "weekly-dedupe-v1",
+  "zero_result_contract": {
+    "rule_version": "weekly-zero-result-v1",
+    "collections": ["positions", "outreach_events"],
+    "receipt_must_resolve_in_source_snapshot": true,
+    "required_when_responsible_capabilities_pass": true
+  },
   "consultant_focus_version": "consultant-focus-v1",
   "publication": {
     "default_mode": "dry_run",

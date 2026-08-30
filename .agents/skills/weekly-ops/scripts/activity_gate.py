@@ -8,9 +8,16 @@ from typing import Any, Callable
 
 
 CAREER_STATUSES = {"PASS", "PARTIAL", "FAIL", "NOT_RUN", "STALE"}
-OUTREACH_CHANNELS = {"saramin", "jobkorea", "linkedin_rps", "email"}
 OUTREACH_STATUSES = {"PENDING", "SENT", "FAILED"}
 PORTAL_CHANNELS = {"saramin", "jobkorea", "linkedin_rps"}
+OUTREACH_CHANNELS = PORTAL_CHANNELS
+EXPECTED_CAREER_COMPANIES = {
+    "SpoonLabs",
+    "Codeit",
+    "GC Company",
+    "Wrtn Technologies",
+    "FastView",
+}
 OUTREACH_ACCESS_STATES = {
     "AUTHENTICATED",
     "AUTH_REQUIRED",
@@ -33,8 +40,11 @@ def validate_career_summaries(
     source_snapshot_ids: set[str],
     parse_datetime: Callable[[str], datetime],
     errors: list[str],
+    require_complete: bool = False,
 ) -> tuple[list[dict[str, Any]], list[str]]:
     if summaries is None:
+        if require_complete:
+            errors.append("CAREER_REQUIRED_COMPANY_MISSING")
         return [], []
     if not isinstance(summaries, list):
         errors.append("CAREER_SUMMARIES_INVALID")
@@ -80,6 +90,8 @@ def validate_career_summaries(
         validated.append(dict(item))
         if status != "PASS":
             blockers.append(f"career:{company}:{status}")
+    if require_complete and EXPECTED_CAREER_COMPANIES - seen:
+        errors.append("CAREER_REQUIRED_COMPANY_MISSING")
     return validated, sorted(blockers)
 
 
@@ -169,6 +181,7 @@ def validate_outreach_channel_diagnostics(
     events: Any,
     source_snapshot_ids: set[str],
     errors: list[str],
+    require_all_channels: bool = False,
 ) -> dict[str, dict[str, Any]]:
     portal_events = (
         [
@@ -179,7 +192,7 @@ def validate_outreach_channel_diagnostics(
         if isinstance(events, list)
         else []
     )
-    if not portal_events:
+    if not portal_events and not require_all_channels:
         return {}
     if not isinstance(diagnostics, list):
         errors.append("OUTREACH_DIAGNOSTICS_MISSING")

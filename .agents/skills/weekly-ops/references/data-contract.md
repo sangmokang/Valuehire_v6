@@ -12,6 +12,7 @@ weekly_run
   -> source_snapshots
   -> canonical_positions <- position_source_links -> customer_intents/career_observations
   -> dedupe_decisions
+  -> zero_result_assertions
   -> priority_scores
   -> proposal_send_attempts -> consultant_position_focus -> grass YELLOW evidence
   -> report_snapshot
@@ -53,7 +54,8 @@ silently converted into a full `PASS`.
 
 - urgency = intent + recency + explicit deadline + late-stage signal + explicit client priority,
   capped at 100;
-- difficulty = scarcity + seniority + special constraints + funnel friction, capped at 100;
+- difficulty = scarcity (`0/20/35`) + seniority (`0/15/25`) + special constraints
+  (`0/15/25`) + funnel friction (`0/8/15`), capped at 100;
 - priority = `round(0.7 * urgency + 0.3 * difficulty)`;
 - scraped-only priority is capped at 20 and excluded from customer actions.
 - closed positions are excluded from customer actions and rendered under operating changes.
@@ -61,11 +63,18 @@ silently converted into a full `PASS`.
 Every input enum needs an opaque evidence reference. The DB can resolve that reference to protected
 source metadata; reviewers and published views cannot resolve it to raw PII.
 
+When the capabilities responsible for `positions` or three-channel `outreach_events` are all `PASS`
+but the observed result is zero, the bundle must carry one `weekly-zero-result-v1` assertion. Its
+provider receipt must resolve inside the named source snapshot and `observed_count` must be the integer
+zero. An empty array without that receipt is `BLOCKED`, not a business conclusion of zero.
+
 ## Dedupe contract
 
 Normalize comparison keys with Unicode NFKC, case folding, whitespace collapse, and explicit alias
 tables. Exact keys may link automatically. Fuzzy candidates go to manual review. The decision records
-rule version, inputs, canonical ID, reason, actor, and timestamp.
+rule version, inputs, canonical ID, reason, actor, and timestamp. The redacted gate requires
+`rule_version=weekly-dedupe-v1`, a kept canonical ID that exists in the same bundle, and removed source
+references that resolve to the same bundle's source snapshots.
 
 Never mutate or delete source snapshots to make counts look clean.
 
@@ -92,11 +101,14 @@ A local string or an ID found only in another snapshot is not provider readback.
 An authenticated screen is only a capability precondition. Screenshots, OCR, open tabs, cached routes,
 and aggregate portal totals remain non-ledger evidence unless each counted event has the required
 provider identity, sent time, consultant identity, and canonical-position join.
-Before any portal event is accepted, the hashed input must contain exactly one diagnostic for each of
-JobKorea, Saramin, and LinkedIn RPS. Each diagnostic records access state, allowlisted surface kind,
+When all three outreach capabilities are `PASS`, and before any portal event is accepted, the hashed
+input must contain exactly one diagnostic for each of JobKorea, Saramin, and LinkedIn RPS. Each
+diagnostic records access state, allowlisted surface kind,
 protected surface reference, stable-receipt availability, and its source snapshot. A non-authenticated
 or receipt-unavailable diagnostic also requires a blocker reason. A counted event must share that
 diagnostic's source snapshot; LinkedIn additionally requires provider seat and project references.
+Generic email is not an outreach channel for this metric; Gmail customer mail is classified separately
+as customer intent.
 
 ## Publication receipt
 

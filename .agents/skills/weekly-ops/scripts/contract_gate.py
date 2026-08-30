@@ -30,6 +30,9 @@ RECEIPT_FIELDS = {
     "content_hash",
 }
 SOURCE_STATUSES = {"PASS", "PARTIAL", "FAIL", "NOT_RUN", "STALE"}
+DEDUPE_RULE_VERSION = "weekly-dedupe-v1"
+ZERO_RESULT_RULE_VERSION = "weekly-zero-result-v1"
+ZERO_RESULT_COLLECTIONS = {"positions", "outreach_events"}
 ALLOWED_EMAIL_TARGETS = {"sangmokang@valueconnect.kr"}
 EMAIL_PATTERN = re.compile(r"(?<![\w.+-])[\w.+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?![\w.-])")
 PHONE_PATTERN = re.compile(
@@ -48,6 +51,7 @@ def find_sensitive_values(value: Any) -> bool:
             if not (
                 key == "target_id"
                 and value.get("name") == "email"
+                and isinstance(nested, str)
                 and nested in ALLOWED_EMAIL_TARGETS
             )
         )
@@ -137,13 +141,24 @@ def validate_source_snapshots(
     return snapshot_ids, evidence_refs, snapshot_evidence_refs, sorted(blockers)
 
 
-def validate_dedupe_decisions(decisions: Any, errors: list[str]) -> list[dict[str, Any]]:
+def validate_dedupe_decisions(
+    decisions: Any,
+    canonical_ids: set[str],
+    valid_evidence_refs: set[str],
+    errors: list[str],
+) -> list[dict[str, Any]]:
     if not isinstance(decisions, list):
         errors.append("DEDUPE_DECISIONS_MISSING")
         return []
     validated: list[dict[str, Any]] = []
     seen: set[str] = set()
-    required = {"decision_id", "kept_canonical_id", "removed_source_refs", "reason"}
+    required = {
+        "decision_id",
+        "kept_canonical_id",
+        "removed_source_refs",
+        "reason",
+        "rule_version",
+    }
     for decision in decisions:
         if not isinstance(decision, dict) or not required.issubset(decision):
             errors.append("DEDUPE_DECISION_INVALID")
@@ -154,12 +169,13 @@ def validate_dedupe_decisions(decisions: Any, errors: list[str]) -> list[dict[st
             and bool(decision_id)
             and decision_id not in seen
             and isinstance(decision["kept_canonical_id"], str)
-            and bool(decision["kept_canonical_id"])
+            and decision["kept_canonical_id"] in canonical_ids
             and isinstance(decision["removed_source_refs"], list)
             and bool(decision["removed_source_refs"])
-            and all(isinstance(ref, str) and bool(ref) for ref in decision["removed_source_refs"])
+            and all(ref in valid_evidence_refs for ref in decision["removed_source_refs"])
             and isinstance(decision["reason"], str)
             and bool(decision["reason"])
+            and decision["rule_version"] == DEDUPE_RULE_VERSION
         )
         if not valid:
             errors.append("DEDUPE_DECISION_INVALID")
@@ -167,6 +183,66 @@ def validate_dedupe_decisions(decisions: Any, errors: list[str]) -> list[dict[st
         seen.add(decision_id)
         validated.append(dict(decision))
     return validated
+
+
+def validate_zero_result_assertions(
+    assertions: Any,
+    required_collections: set[str],
+    snapshot_evidence_refs: dict[str, set[str]],
+    errors: list[str],
+) -> list[dict[str, Any]]:
+    if not isinstance(assertions, list):
+        if required_collections:
+            errors.append("ZERO_RESULT_UNPROVEN")
+        return []
+    validated: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    required = {
+        "collection",
+        "rule_version",
+        "source_snapshot_id",
+        "provider_receipt_ref",
+        "observed_count",
+    }
+    for assertion in assertions:
+        if not isinstance(assertion, dict) or not required.issubset(assertion):
+            errors.append("ZERO_RESULT_ASSERTION_INVALID")
+            continue
+        collection = assertion["collection"]
+        snapshot_id = assertion["source_snapshot_id"]
+        receipt_ref = assertion["provider_receipt_ref"]
+        valid = (
+            collection in ZERO_RESULT_COLLECTIONS
+            and collection not in seen
+            and assertion["rule_version"] == ZERO_RESULT_RULE_VERSION
+            and isinstance(snapshot_id, str)
+            and isinstance(receipt_ref, str)
+            and receipt_ref in snapshot_evidence_refs.get(snapshot_id, set())
+            and type(assertion["observed_count"]) is int
+            and assertion["observed_count"] == 0
+        )
+        if not valid:
+            errors.append("ZERO_RESULT_ASSERTION_INVALID")
+            continue
+        seen.add(collection)
+        validated.append(dict(assertion))
+    if required_collections - seen:
+        errors.append("ZERO_RESULT_UNPROVEN")
+    return validated
+
+
+def publication_receipts(targets: Any) -> list[dict[str, Any]]:
+    if not isinstance(targets, list):
+        return []
+    receipts: list[dict[str, Any]] = []
+    for target in targets:
+        if not isinstance(target, dict) or not isinstance(target.get("name"), str):
+            continue
+        receipt = {"name": target["name"], "status": target.get("status", "NOT_RUN")}
+        if target.get("status") == "READBACK_VERIFIED":
+            receipt.update({field: target.get(field) for field in sorted(RECEIPT_FIELDS)})
+        receipts.append(receipt)
+    return sorted(receipts, key=lambda item: item["name"])
 
 
 def publication_state(
@@ -178,7 +254,13 @@ def publication_state(
     blockers: list[str] = []
     seen: set[str] = set()
     for target in targets:
-        if not isinstance(target, dict) or not target.get("name") or not target.get("target_id"):
+        if (
+            not isinstance(target, dict)
+            or not isinstance(target.get("name"), str)
+            or not target["name"]
+            or not isinstance(target.get("target_id"), str)
+            or not target["target_id"]
+        ):
             errors.append("PUBLICATION_TARGET_INVALID")
             continue
         name = target["name"]

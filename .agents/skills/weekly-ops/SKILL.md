@@ -72,7 +72,8 @@ At minimum inspect:
 - admin deploy and deployed-page readback;
 - Claude CLI and a fresh Codex verifier.
 
-Never translate a connector error into an empty list.
+Never translate a connector error into an empty list. When responsible capabilities are all `PASS`,
+an empty positions or verified-sent result requires a source-bound `weekly-zero-result-v1` receipt.
 
 ## Phase 2 — ingest evidence safely
 
@@ -94,6 +95,7 @@ Gmail rules:
 Career-page rules:
 
 - fetch only approved official URLs at the configured cadence and rate;
+- when `career_pages_read=PASS`, require one current summary for all five configured companies;
 - record selector/parser failure as `FAIL`, not zero openings;
 - compare stable job URL first, then normalized company/title/location;
 - keep every career-only observation in `SCRAPED_STAGING`;
@@ -103,6 +105,8 @@ Career-page rules:
 Sourcing outreach rules:
 
 - inspect the provider sent-history surface through Aside or the approved channel browser profile;
+- require all three channel diagnostics whenever all three outreach capabilities are `PASS`, even when
+  the verified sent count is zero;
 - record one access result per channel with an allowed blocker reason; a visible login page, tutorial,
   cached result, or denied automation permission is not a successful read;
 - do not restart, log in, solve a challenge, or change the user's browser session without exact authority;
@@ -115,6 +119,7 @@ Sourcing outreach rules:
   channel mix in code;
 - treat verified sent as grass `YELLOW` eligibility. Preserve the existing
   `GREEN → BLUE → YELLOW → ORANGE → TRANSPARENT` precedence and fail closed on missing sources.
+- keep generic Gmail email outside this sourcing metric; it belongs to customer-intent classification.
 
 Provider surfaces are channel-specific:
 
@@ -132,8 +137,9 @@ Use exact normalized keys, never a single fuzzy-similarity threshold:
 - customer intent key: `(mailbox, message_id, intent_type, target_list_id)` in the protected DB;
 - publication key: `(report_snapshot_id, target_name, target_id)`.
 
-Preserve all raw source snapshots. Create a versioned `dedupe_decision` and point duplicates to one
-canonical position. Route ambiguous similarities to manual review.
+Preserve all raw source snapshots. Create a `weekly-dedupe-v1` decision whose kept canonical ID and
+removed source references resolve inside the same evidence bundle. Route ambiguous similarities to
+manual review.
 
 Allowed origins are `SCRAPED_STAGING`, `CLIENT_REQUESTED`, `CLIENT_SHARED`, and
 `INTERNAL_CREATED`. A scraped item cannot claim `REQUESTED`, `POSITION_SHARED`,

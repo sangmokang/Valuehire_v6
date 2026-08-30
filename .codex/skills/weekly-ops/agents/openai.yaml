@@ -1,0 +1,4 @@
+interface:
+  display_name: "Weekly Ops"
+  short_description: "DB 정본 Weekly 브리핑·동기화·적대검증"
+  default_prompt: "Use $weekly-ops to build one DB-backed Weekly CEO briefing, keep scraped jobs separate from customer requests, compute deterministic priority, adversarially verify it with Claude and Codex, and publish only with readback receipts."

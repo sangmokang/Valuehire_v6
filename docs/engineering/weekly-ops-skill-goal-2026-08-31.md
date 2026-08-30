@@ -158,7 +158,7 @@ priority를 별도 계산하고 formula version과 증거 라벨을 기록해야
   `<=14d=5`) + deadline(`<=7d=25`, `<=14d=15`) + late-stage(`10`) + 고객이
   명시한 우선순위(`TOP=50`, `HIGH=25`, `NORMAL/NONE=0`), 최대 100.
 - difficulty: scarcity(`0/20/35`) + seniority(`0/15/25`) + special constraints
-  (`0/15/25`) + funnel friction(`0/15`), 최대 100.
+  (`0/15/25`) + funnel friction(`0/8/15`), 최대 100.
 - priority: `round(0.7 * urgency + 0.3 * difficulty)`.
 - `SCRAPED_STAGING` only는 priority 최대 20이며 고객 우선순위 목록에서 제외한다.
 - `CLOSED` 포지션은 점수 보존 후 고객 액션이 아닌 운영 변경으로 분리한다.
@@ -219,6 +219,8 @@ provider readback이 있는 `SENT` 행만 consultant×canonical position에 연�
   "source_snapshots": [],
   "dedupe_decisions": [],
   "positions": [],
+  "zero_result_assertions": [],
+  "outreach_channel_diagnostics": [],
   "outreach_events": [],
   "career_page_summaries": [],
   "publication_targets": []
@@ -330,8 +332,11 @@ fixture와 git에 금지한다.
 
 ### 플랫폼 배포 구조
 
-- Codex는 공식 프로젝트 정본 위치 `.agents/skills/weekly-ops`를 직접 사용한다.
-- Claude는 `.claude/skills/weekly-ops/SKILL.md` 어댑터가 정본 전체 로드를 강제한다.
+- 엔진 중립 정본은 `.agents/skills/weekly-ops` 한 곳이다.
+- Codex는 프로젝트 발견 위치 `.codex/skills/weekly-ops/SKILL.md` 어댑터가 정본 전체 로드를
+  강제하며, UI 메타데이터도 같은 Codex 어댑터 폴더에 둔다.
+- Claude는 `.claude/skills/weekly-ops/SKILL.md` 어댑터가 같은 정본 전체 로드를 강제한다.
+- 두 어댑터는 정본을 복사하지 않으며, 정본 누락·불일치 시 `NOT_RUN`으로 멈춘다.
 - 디렉터리 symlink는 저장소 비밀 스캐너가 fail-closed로 거부하므로 사용하지 않는다.
 
 ### RED 장부
@@ -349,10 +354,31 @@ fixture와 git에 금지한다.
   2개 반례를 추가했다.
 - V2 재검증 RED: non-PASS source snapshot이 blocker가 되지 않는 경우와 source snapshot에
   연결되지 않은 임의 provider receipt가 잔디밭 YELLOW로 승격되는 2개 반례를 재현했다.
-- GREEN 조건: 같은 명령이 현재 26개 시험을 실제 실행하고 모두 통과한다.
-- mutation 조건: `bash scripts/acceptance-weekly-ops-skill.sh --full`이 검사 21개와 함께
+- Claude V1 보강 RED: 정본과 다른 수기 HTML/hash, 622줄 테스트의 검사 누락, 점수표 문서
+  드리프트, 버전·계보 없는 dedupe, 증명 없는 빈 배열 PASS, generic email 채널 위장,
+  비문자 발행 target의 예외를 실제 재현했다. 수정 전 42개 중 9 failure·3 error였다.
+- GREEN 조건: 같은 명령이 현재 42개 시험을 실제 실행하고 모두 통과한다.
+- mutation 조건: `bash scripts/acceptance-weekly-ops-skill.sh --full`이 검사 32개와 함께
   scraped cap, capability fail-open, readback bypass, 필수 target 제거, 값 PII 우회,
-  position lineage, source status, outreach receipt lineage 우회 변이를 모두 죽인다.
+  position lineage, source status, outreach receipt lineage, outreach surface, zero-result receipt,
+  dedupe version, career-company completeness, email relabel 우회까지 13개 변이를 모두 죽인다.
+
+## 적대 검증 로그
+
+### Claude V1 — 수정 전 FAIL
+
+- command: `claude 2.1.251 --safe-mode --no-chrome --no-session-persistence --restricted
+  --permission-mode dontAsk --tools Read,Grep,Glob,Bash --model opus --effort high -p <V1 prompt>`
+- session: unified exec `77322`, 2026-08-31 03:54~04:07 KST, exit 0.
+- verdict: `FAIL`; Claude 내부 Bash 권한이 거부되어 실행 증거는 LIMIT로 분리했고, 정적
+  반례는 로컬 RED 테스트로 독립 재현했다.
+- artifact: `.omx/artifacts/claude-weekly-ops-v1-2026-08-31T0407+0900.md`, SHA-256
+  `eb49a7155258a96f36c4a3462f967fe0e41098206018490352c6baeec1f7f012`.
+- post-fix frozen bundle: `PARTIAL`, `report_snapshot_id=rpt_6edf944357dc9db4306a04ef`,
+  `input_hash=6edf944357dc9db4306a04ef4bc76a42f392ec958ba45f1cbc52d0c12b5250c2`,
+  `content_hash=015837095be47ddca6b2d22a4a190fecab0d41960a9b7bdbf15c86d8fa066e45`.
+- next: 같은 고정 번들·현재 diff로 fresh Claude V1을 다시 실행한 뒤, fresh Codex V2가
+  각 주장을 독립 재현한다. 두 판정이 끝나기 전 운영 발행은 금지한다.
 
 ## 비범위
 
