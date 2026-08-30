@@ -179,9 +179,11 @@ MUST_NOT
 
 OUTPUT
 - channel_coverage[]: channel, access_state, surface_kind, covered_consultants, NOT_RUN blockers
-- consultant_focus[]: consultant_id, canonical_position_id, company, title,
-  verified_sent_count, unique_candidate_count, active_days, focus_share, channel_mix,
-  grass_evidence, evidence_refs, comparison_status
+- consultant_focus[]: consultant_id, consultant_display, consultant-level verified_sent_count,
+  unique_candidate_count, active_days, channel_mix, comparison_status, positions[]
+- consultant_focus[].positions[]: position_id, company, title, position-level verified_sent_count,
+  unique_candidate_count, active_days, focus_share, channels, channel_mix, grass_evidence,
+  evidence_refs
 - excluded_rows[]: reason enum과 opaque evidence_ref만
 - verdict: PASS|PARTIAL|BLOCKED|NOT_RUN
 
@@ -190,3 +192,7 @@ STOP
   집계하지 않고 BLOCKED/PARTIAL로 끝낸다.
 - 모든 계정 coverage가 같지 않으면 컨설턴트 간 순위 문장을 만들지 않는다.
 ```
+
+`consultant_focus` is deliberately grouped by consultant. `positions[]` is the canonical
+consultant-by-position ledger; a DB writer may only flatten it mechanically as
+`consultant_id + positions[].position_id`. It must not re-scrape, re-join, re-score, or infer rows.

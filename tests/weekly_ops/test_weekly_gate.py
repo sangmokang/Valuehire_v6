@@ -170,11 +170,41 @@ class WeeklyGateTest(unittest.TestCase):
         result = self.gate.evaluate(bundle)
 
         focus = result["consultant_focus"][0]
+        self.assertEqual(
+            set(focus),
+            {
+                "consultant_id",
+                "consultant_display",
+                "verified_sent_count",
+                "unique_candidate_count",
+                "active_days",
+                "channel_mix",
+                "comparison_status",
+                "positions",
+            },
+        )
         self.assertEqual(focus["verified_sent_count"], 2)
         self.assertEqual(focus["unique_candidate_count"], 2)
         self.assertEqual(focus["active_days"], 2)
         self.assertEqual(focus["comparison_status"], "COMPARABLE")
         self.assertEqual(focus["positions"][0]["focus_share"], 1.0)
+        self.assertEqual(
+            set(focus["positions"][0]),
+            {
+                "position_id",
+                "company",
+                "title",
+                "verified_sent_count",
+                "unique_candidate_count",
+                "active_days",
+                "channels",
+                "channel_mix",
+                "evidence_refs",
+                "focus_share",
+                "grass_evidence",
+            },
+        )
+        self.assertEqual(focus["positions"][0]["position_id"], "pos-codeit-backend")
         self.assertEqual(focus["positions"][0]["channel_mix"], {"jobkorea": 1, "linkedin_rps": 1})
         self.assertEqual(
             focus["positions"][0]["evidence_refs"],

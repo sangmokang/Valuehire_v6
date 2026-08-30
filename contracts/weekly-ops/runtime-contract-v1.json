@@ -162,6 +162,35 @@
     "coverage_gap_comparison_status": "NOT_COMPARABLE",
     "zero_result_scope": "accepted_sent_inside_closed_weekly_window"
   },
+  "consultant_focus_output_schema": {
+    "shape": "consultant_summary_with_nested_positions",
+    "top_level_required_fields": [
+      "consultant_id",
+      "consultant_display",
+      "verified_sent_count",
+      "unique_candidate_count",
+      "active_days",
+      "channel_mix",
+      "comparison_status",
+      "positions"
+    ],
+    "position_required_fields": [
+      "position_id",
+      "company",
+      "title",
+      "verified_sent_count",
+      "unique_candidate_count",
+      "active_days",
+      "channels",
+      "channel_mix",
+      "evidence_refs",
+      "focus_share",
+      "grass_evidence"
+    ],
+    "db_projection": "flatten_parent_consultant_id_plus_nested_position_id_without_recompute",
+    "grass_projection_source": "consultant_focus.positions",
+    "forbid_rejoin_or_recompute": true
+  },
   "career_sources": [
     {
       "company": "SpoonLabs",

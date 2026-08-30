@@ -106,6 +106,17 @@ readback. Compute per consultant and canonical position:
 - channel mix.
 
 The current aggregation contract is `consultant-focus-v2`; its version is part of snapshot identity.
+Its exact output shape is one consultant summary per `consultant_focus[]` item with these required
+fields: `consultant_id`, `consultant_display`, `verified_sent_count`, `unique_candidate_count`,
+`active_days`, `channel_mix`, `comparison_status`, and `positions`. Each `positions[]` item is one
+canonical consultant-by-position ledger row with `position_id`, `company`, `title`,
+`verified_sent_count`, `unique_candidate_count`, `active_days`, `channels`, `channel_mix`,
+`evidence_refs`, `focus_share`, and `grass_evidence`.
+
+The DB projection to `consultant_position_focus` is a mechanical flatten only: copy the parent
+`consultant_id`, copy `positions[].position_id` to the DB `position_id`, and copy the position-level
+counts, share, mix, and grass evidence. It may not rejoin by title, recompute focus, or create rows
+from the consultant-level totals.
 
 The row is eligible for grass `YELLOW`. It does not override `GREEN` or `BLUE`, and missing channel
 readback makes the affected metric `NOT_RUN`, never zero. Open tabs, searches, drafts, and pending or

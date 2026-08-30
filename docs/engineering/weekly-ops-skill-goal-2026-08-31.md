@@ -508,6 +508,20 @@ push·PR은 비범위이므로 원격 PR을 만들었다고 주장하지 않는�
 - 판정: canonical data/publication verdict는 계속 `PARTIAL`; 외부 발행 gate는 `CLOSED`다.
   ClickUp·Notion·admin·email write와 포털 수치를 성공으로 보고하지 않는다.
 
+### Fresh Codex V2 출력 계약 FAIL과 교정
+
+- V2는 `7fc2fbcca554886cef1188c9b05b0903cdd5afd5`에서 기계 프롬프트의 flat
+  `consultant_focus[]`와 실제 consultant summary→`positions[]` shape가 다른 schema drift를
+  재현해 `FAIL`했다. grass/DB writer가 검증 행을 누락할 수 있는 결함이다.
+- `consultant-focus-v2`를 summary + nested positions로 고정했다. runtime contract에 top-level
+  8개·position-level 11개 필드를 열거하고, DB에는 parent `consultant_id` + nested
+  `position_id`를 재계산 없이 펼치는 것만 허용한다. title 재조인·재스크레이프는 금지한다.
+- exact key unit test와 schema/projection acceptance, key-rename mutation을 추가했다. local은
+  unit `62/62`, Weekly `46/46`·mutation `26/26`, principles `34/34`, secret/PII/diff,
+  canonical/Codex/Claude Skill Creator validation이 PASS했다. 실패 기록은
+  `.omx/artifacts/weekly-ops-2026-08-31/codex-v2-output-shape-fail.md`에 보존하며 fresh V2
+  PASS 전에는 닫지 않는다.
+
 ## 비범위
 
 - 운영 Supabase migration 적용.

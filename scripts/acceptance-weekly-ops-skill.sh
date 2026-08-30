@@ -148,6 +148,23 @@ assert roster["required_output_collections"] == [
     "channel_coverage", "consultant_focus", "excluded_rows"
 ]
 assert roster["zero_result_scope"] == "accepted_sent_inside_closed_weekly_window"
+focus_schema = contract["consultant_focus_output_schema"]
+assert focus_schema["shape"] == "consultant_summary_with_nested_positions"
+assert focus_schema["top_level_required_fields"] == [
+    "consultant_id", "consultant_display", "verified_sent_count", "unique_candidate_count",
+    "active_days", "channel_mix", "comparison_status", "positions",
+]
+assert focus_schema["position_required_fields"] == [
+    "position_id", "company", "title", "verified_sent_count", "unique_candidate_count",
+    "active_days", "channels", "channel_mix", "evidence_refs", "focus_share", "grass_evidence",
+]
+assert focus_schema["db_projection"] == (
+    "flatten_parent_consultant_id_plus_nested_position_id_without_recompute"
+)
+assert focus_schema["grass_projection_source"] == "consultant_focus.positions"
+assert focus_schema["forbid_rejoin_or_recompute"] is True
+assert "consultant_focus[].positions[]: position_id" in prompt
+assert "consultant_id + positions[].position_id" in prompt
 assert contract["score_points"] == gate.DIFFICULTY_POINTS
 assert contract["consultant_focus_version"] == gate.CONSULTANT_FOCUS_VERSION
 assert contract["dedupe_rule_version"] == "weekly-dedupe-v1"
@@ -403,6 +420,14 @@ if mutate_exact "$case_dir/.agents/skills/weekly-ops/scripts/activity_gate.py" \
   expect_mutation_red "partial outreach coverage cannot be ranked" "$case_dir"
 else
   fail_check "outreach comparison mutation was not applied exactly once"
+fi
+
+case_dir=$(prepare_mutation outreach-position-shape-drift)
+if mutate_exact "$case_dir/.agents/skills/weekly-ops/scripts/activity_gate.py" \
+  '"position_id": position_id,' '"canonical_position_id": position_id,'; then
+  expect_mutation_red "consultant focus nested position schema drift" "$case_dir"
+else
+  fail_check "consultant focus position-schema mutation was not applied exactly once"
 fi
 
 case_dir=$(prepare_mutation zero-result-bypass)
