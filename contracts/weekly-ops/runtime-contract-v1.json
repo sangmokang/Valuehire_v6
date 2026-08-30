@@ -1,0 +1,183 @@
+{
+  "contract_version": "weekly-ops-runtime-v1",
+  "timezone": "Asia/Seoul",
+  "cadence": {
+    "career_pages": "daily 07:30 Asia/Seoul",
+    "weekly_draft": "Monday 08:30 Asia/Seoul",
+    "publication_deadline": "Monday 10:00 Asia/Seoul"
+  },
+  "weekly_window": {
+    "start": "previous ISO-week Monday minus 8 days at 00:00",
+    "end_exclusive": "current ISO-week Monday minus 1 day at 00:00",
+    "post_cutoff_section": "마감 후 경보"
+  },
+  "gmail": {
+    "mailbox": "sangmokang@valueconnect.kr",
+    "internal_domain": "valueconnect.kr",
+    "message_mode": "individual_message",
+    "exclude": [
+      "quoted_history",
+      "signature",
+      "attachments",
+      "automated_platform_mail",
+      "candidate_resume",
+      "internal_outbound_recommendation"
+    ]
+  },
+  "clickup": {
+    "position_list_id": "901814621569",
+    "staging_status": "scraped",
+    "job_statuses": [
+      "backend/fullstack/cto",
+      "ai/ml/data",
+      "po/pm/기획",
+      "frontend",
+      "designer",
+      "sales/bd",
+      "marketing",
+      "devops/sre/security/qa",
+      "hr/finance/strategy/etc",
+      "c-level",
+      "app",
+      "etc"
+    ],
+    "terminal_statuses": [
+      "closedpositions",
+      "complete"
+    ],
+    "unclassified_behavior": "keep_in_scraped_staging"
+  },
+  "required_read_capabilities": [
+    "db_read",
+    "gmail_read",
+    "clickup_read",
+    "notion_read",
+    "career_pages_read",
+    "jobkorea_outreach_read",
+    "saramin_outreach_read",
+    "linkedin_outreach_read"
+  ],
+  "source_snapshot_contract": {
+    "required_fields": [
+      "snapshot_id",
+      "source_system",
+      "source_uri_ref",
+      "fetched_at",
+      "status",
+      "content_hash",
+      "evidence_refs"
+    ],
+    "status_values": ["PASS", "PARTIAL", "FAIL", "NOT_RUN", "STALE"],
+    "content_hash": "lowercase_sha256",
+    "position_evidence_must_resolve": true,
+    "non_pass_status_is_blocker": true,
+    "outreach_receipt_must_resolve_in_same_snapshot": true
+  },
+  "outreach_sources": [
+    {
+      "channel": "jobkorea",
+      "browser": "Aside_or_approved_channel_profile",
+      "required_surface": "sent_history",
+      "receipt": "provider_request_or_message_id"
+    },
+    {
+      "channel": "saramin",
+      "browser": "Aside_or_approved_channel_profile",
+      "required_surface": "sent_history",
+      "receipt": "provider_request_or_message_id"
+    },
+    {
+      "channel": "linkedin_rps",
+      "browser": "Aside_real_login_profile",
+      "required_surface": "sent_inmail_or_message_history",
+      "receipt": "provider_message_id"
+    }
+  ],
+  "career_sources": [
+    {
+      "company": "SpoonLabs",
+      "official_url": "https://career.spoonlabs.com/ko/recruiting",
+      "adapter": "greeting_openings",
+      "talent_pool_behavior": "exclude_from_active_requisition"
+    },
+    {
+      "company": "Codeit",
+      "official_url": "https://careers.codeit.com/recruit",
+      "adapter": "roundhr_browser_network",
+      "title_mapping_required": true,
+      "ids_without_titles_status": "PARTIAL"
+    },
+    {
+      "company": "GC Company",
+      "official_url": "https://gccompany.career.greetinghr.com/ko/apply",
+      "adapter": "greeting_openings",
+      "talent_pool_behavior": "exclude_from_active_requisition"
+    },
+    {
+      "company": "Wrtn Technologies",
+      "official_url": "https://wrtn.career.greetinghr.com/ko/career",
+      "adapter": "greeting_openings"
+    },
+    {
+      "company": "FastView",
+      "official_url": "https://fastview.ninehire.site/recruit",
+      "adapter": "ninehire_same_domain_api",
+      "talent_pool_behavior": "exclude_from_active_requisition"
+    }
+  ],
+  "origins": [
+    "SCRAPED_STAGING",
+    "CLIENT_REQUESTED",
+    "CLIENT_SHARED",
+    "INTERNAL_CREATED"
+  ],
+  "intents": [
+    "REQUESTED",
+    "POSITION_SHARED",
+    "REQUIREMENT_CHANGED",
+    "PIPELINE_FEEDBACK",
+    "REFERENCE_ONLY",
+    "NONE"
+  ],
+  "lifecycles": [
+    "ACTIVE",
+    "PIPELINE",
+    "CLOSING",
+    "CLOSED"
+  ],
+  "client_priorities": [
+    "TOP",
+    "HIGH",
+    "NORMAL",
+    "NONE"
+  ],
+  "score_version": "weekly-priority-v1",
+  "consultant_focus_version": "consultant-focus-v1",
+  "publication": {
+    "default_mode": "dry_run",
+    "required_targets": [
+      "database",
+      "clickup",
+      "notion",
+      "admin_web",
+      "email"
+    ],
+    "email_recipient_allowlist": [
+      "sangmokang@valueconnect.kr"
+    ],
+    "require_write_ahead": true,
+    "require_idempotency_key": true,
+    "require_readback": true,
+    "receipt_required_fields": [
+      "write_ahead_intent_id",
+      "idempotency_key",
+      "schema_readback_ref",
+      "external_object_id",
+      "receipt_id",
+      "receipt_persisted_ref",
+      "report_snapshot_id",
+      "content_hash"
+    ],
+    "single_snapshot": true
+  }
+}
