@@ -2,7 +2,7 @@
 
 > 현재 모드: Strict L3 / Codex
 > 회의 시각: 2026-08-31 11:00 Asia/Seoul
-> 기준 HEAD: `c59bad7b160c473cda5545e76e6fa6bcc711a7ea`
+> 기준 HEAD: `793f094168c0d12ac0bd3a4429239eef5eca31be`
 > 작업 브랜치: `task/weekly-ops-skill`
 > Goal thread: `01a05363-a982-7293-8e95-5f0cf679e19d`
 
@@ -475,6 +475,38 @@ push·PR은 비범위이므로 원격 PR을 만들었다고 주장하지 않는�
   `Credit balance is too low`로 exit 1이었다. 이를 PASS나 독립 검증으로 대체하지 않는다.
 - stop condition: 현재 diff를 fresh Claude V1과 fresh Codex V2가 모두 PASS하고 같은
   snapshot의 외부 readback 영수증이 모이기 전까지 외부 발행은 금지한다.
+
+### 06:20 KST 연속 실행·외부 경계 재확인
+
+- reviewed commit: `793f094168c0d12ac0bd3a4429239eef5eca31be`.
+- SOT gate: `2026-08-31T06:07:04+09:00`에 `bash scripts/acceptance-principles-check.sh`를
+  다시 실행해 `VERDICT: PASS`, strict contract binding `34/34`, pre-push/CI wiring `1/1`을
+  확인했다. 저장소 안에는 별도 `AGENTS.md`·`CLAUDE.md`가 없으며 세션의 상위 AGENTS 계약을
+  유지한다.
+- Gmail late alert: 연결 계정은 `sangmokang@valueconnect.kr`이며
+  `after:2026/08/31 before:2026/09/01 -in:spam -in:trash` 결과는 0건, 다음 페이지 없음이다.
+  이는 마감 뒤 새 메일이 없다는 확인일 뿐, 다른 출처 실패를 0으로 바꾸지 않는다.
+- DB readback: `public.weekly_meetings`의
+  `8b8055e3-0807-5c89-9459-a5174fb49cf2`가
+  `report_snapshot_id=rpt_6b0bfab9f7bbed136f50bf9e`,
+  `content_hash=1e05cbc13a304605bcb676fef2ad7271ba32eff0ef35607dfa2bbcb8761a7f94`,
+  `READBACK_VERIFIED`로 다시 일치했다. 따라서 운영 DB가 계약뿐이라는 과거 진단은
+  폐기하며, 비범위는 운영 migration 적용으로 한정한다.
+- ClickUp: list `901814621569`의 DB mirror 마지막 성공은
+  `2026-06-05T16:23:39.722+00:00`로 `STALE`; live schema/write connector는 없다.
+- Notion: `weekly_meetings` mirror에서 과거 페이지 ID와 URL은 확인되지만 현재 parent/schema와
+  쓰기/readback connector는 없다. 과거 페이지를 새 발행 대상으로 추정하지 않는다.
+- Aside: 활성 CDP에는 잡코리아 로그인·검색·이력서 화면만 있고 발송함이 아니다. 사람인과
+  LinkedIn Recruiter의 인증된 발송 이력 surface도 없다. 따라서 세 채널 모두 `NOT_RUN`이며,
+  컨설턴트별 발송 수·몰입도·잔디밭 YELLOW를 생성하지 않는다.
+- Sites: `.openai/hosting.json`이 없고 보이는 유일한 Sites 프로젝트는 본 작업과 무관하며
+  live/preview URL도 없다. `admin.valuehire.cc`로 가장하거나 덮어쓰지 않는다.
+- Claude V1 재시도: `omx ask claude` session `45904`는 5분 이상 stdout/stderr 없이 실행되어
+  bounded interrupt 후 exit 130이었다. 결과는 `NOT_RUN`이며 Codex V2로 대체하지 않는다.
+- readback ledger:
+  `.omx/artifacts/weekly-ops-2026-08-31/connectivity-readback-2026-08-31T0620+0900.json`.
+- 판정: canonical data/publication verdict는 계속 `PARTIAL`; 외부 발행 gate는 `CLOSED`다.
+  ClickUp·Notion·admin·email write와 포털 수치를 성공으로 보고하지 않는다.
 
 ## 비범위
 
