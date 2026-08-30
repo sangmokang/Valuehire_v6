@@ -101,6 +101,56 @@ def valid_bundle():
     }
 
 
+def valid_outreach_diagnostics():
+    return [
+        {
+            "channel": "jobkorea",
+            "access_state": "AUTHENTICATED",
+            "surface_kind": "position_offer_history",
+            "surface_ref": "protected:jobkorea-position-offer-history",
+            "stable_receipt_available": True,
+            "source_snapshot_id": "snap-outreach-fixture",
+        },
+        {
+            "channel": "saramin",
+            "access_state": "AUTHENTICATED",
+            "surface_kind": "detailed_usage_history",
+            "surface_ref": "protected:saramin-detailed-usage-history",
+            "stable_receipt_available": True,
+            "source_snapshot_id": "snap-outreach-fixture",
+        },
+        {
+            "channel": "linkedin_rps",
+            "access_state": "AUTHENTICATED",
+            "surface_kind": "inmail_audit_report",
+            "surface_ref": "protected:linkedin-inmail-audit-report",
+            "stable_receipt_available": True,
+            "source_snapshot_id": "snap-outreach-fixture",
+        },
+    ]
+
+
+def valid_outreach_event(channel="jobkorea"):
+    event = {
+        "event_id": f"outreach-{channel}",
+        "consultant_id": "consultant-a",
+        "consultant_display": "Consultant A",
+        "position_id": "pos-codeit-backend",
+        "channel": channel,
+        "status": "SENT",
+        "sent_at": "2026-08-24T09:00:00+09:00",
+        "candidate_key_hmac": "hmac:candidate-1",
+        "provider_receipt_ref": "sha256:receipt-1",
+        "source_snapshot_id": "snap-outreach-fixture",
+    }
+    if channel == "linkedin_rps":
+        event.update(
+            provider_seat_ref="provider-seat:consultant-a",
+            provider_project_ref="provider-project:codeit-backend",
+        )
+    return event
+
+
 def mark_all_targets_verified(bundle, result):
     for target in bundle["publication_targets"]:
         target.update(
@@ -238,6 +288,7 @@ class WeeklyGateTest(unittest.TestCase):
 
     def test_verified_outreach_builds_consultant_position_focus(self):
         bundle = valid_bundle()
+        bundle["outreach_channel_diagnostics"] = valid_outreach_diagnostics()
         bundle["outreach_events"] = [
             {
                 "event_id": "outreach-1",
@@ -262,6 +313,8 @@ class WeeklyGateTest(unittest.TestCase):
                 "candidate_key_hmac": "hmac:candidate-2",
                 "provider_receipt_ref": "sha256:receipt-2",
                 "source_snapshot_id": "snap-outreach-fixture",
+                "provider_seat_ref": "provider-seat:consultant-a",
+                "provider_project_ref": "provider-project:codeit-backend",
             },
         ]
 
@@ -277,6 +330,7 @@ class WeeklyGateTest(unittest.TestCase):
 
     def test_sent_outreach_without_provider_readback_is_blocked(self):
         bundle = valid_bundle()
+        bundle["outreach_channel_diagnostics"] = valid_outreach_diagnostics()
         bundle["outreach_events"] = [
             {
                 "event_id": "outreach-no-receipt",
@@ -295,6 +349,94 @@ class WeeklyGateTest(unittest.TestCase):
 
         self.assertEqual(result["verdict"], "BLOCKED")
         self.assertIn("OUTREACH_SENT_WITHOUT_READBACK", result["errors"])
+
+    def test_portal_outreach_without_channel_diagnostics_is_blocked(self):
+        bundle = valid_bundle()
+        bundle["outreach_events"] = [valid_outreach_event()]
+
+        result = self.gate.evaluate(bundle)
+
+        self.assertEqual(result["verdict"], "BLOCKED")
+        self.assertIn("OUTREACH_DIAGNOSTICS_MISSING", result["errors"])
+        self.assertIn("OUTREACH_SURFACE_UNVERIFIED", result["errors"])
+        self.assertEqual(result["consultant_focus"], [])
+
+    def test_browser_visible_or_unreadable_surfaces_cannot_create_sent_rows(self):
+        cases = (
+            ("access_state", "AUTH_REQUIRED"),
+            ("access_state", "TUTORIAL_OR_DEMO"),
+            ("access_state", "AUTOMATION_DENIED"),
+            ("surface_kind", "screenshot"),
+            ("surface_kind", "ocr"),
+            ("surface_kind", "open_tab"),
+            ("stable_receipt_available", False),
+        )
+        for field, value in cases:
+            with self.subTest(field=field, value=value):
+                bundle = valid_bundle()
+                bundle["outreach_channel_diagnostics"] = valid_outreach_diagnostics()
+                diagnostic = bundle["outreach_channel_diagnostics"][0]
+                diagnostic[field] = value
+                diagnostic["blocker_reason"] = "provider history is not readable"
+                bundle["outreach_events"] = [valid_outreach_event()]
+
+                result = self.gate.evaluate(bundle)
+
+                self.assertEqual(result["verdict"], "BLOCKED")
+                self.assertIn("OUTREACH_SURFACE_UNVERIFIED", result["errors"])
+                self.assertEqual(result["consultant_focus"], [])
+
+    def test_linkedin_sent_event_requires_seat_and_project_dimensions(self):
+        for missing_field in ("provider_seat_ref", "provider_project_ref"):
+            with self.subTest(missing_field=missing_field):
+                bundle = valid_bundle()
+                bundle["outreach_channel_diagnostics"] = valid_outreach_diagnostics()
+                event = valid_outreach_event("linkedin_rps")
+                del event[missing_field]
+                bundle["outreach_events"] = [event]
+
+                result = self.gate.evaluate(bundle)
+
+                self.assertEqual(result["verdict"], "BLOCKED")
+                self.assertIn("LINKEDIN_OUTREACH_DIMENSIONS_MISSING", result["errors"])
+                self.assertEqual(result["consultant_focus"], [])
+
+    def test_channel_diagnostic_must_share_the_event_source_snapshot(self):
+        bundle = valid_bundle()
+        bundle["source_snapshots"].append(
+            {
+                "snapshot_id": "snap-outreach-other",
+                "source_system": "sourcing_outreach",
+                "source_uri_ref": "protected:other-outreach-surface",
+                "fetched_at": "2026-08-30T00:06:00+09:00",
+                "status": "PASS",
+                "content_hash": "d" * 64,
+                "evidence_refs": ["sha256:receipt-other"],
+            }
+        )
+        bundle["outreach_channel_diagnostics"] = valid_outreach_diagnostics()
+        bundle["outreach_channel_diagnostics"][0]["source_snapshot_id"] = "snap-outreach-other"
+        bundle["outreach_events"] = [valid_outreach_event()]
+
+        result = self.gate.evaluate(bundle)
+
+        self.assertEqual(result["verdict"], "BLOCKED")
+        self.assertIn("OUTREACH_SURFACE_UNVERIFIED", result["errors"])
+        self.assertEqual(result["consultant_focus"], [])
+
+    def test_channel_diagnostics_are_bound_into_snapshot_identity(self):
+        bundle = valid_bundle()
+        bundle["outreach_channel_diagnostics"] = valid_outreach_diagnostics()
+        bundle["outreach_events"] = [valid_outreach_event()]
+        first = self.gate.evaluate(bundle)
+
+        bundle["outreach_channel_diagnostics"][0]["surface_ref"] = (
+            "protected:jobkorea-position-offer-history-v2"
+        )
+        second = self.gate.evaluate(bundle)
+
+        self.assertNotEqual(first["input_hash"], second["input_hash"])
+        self.assertNotEqual(first["report_snapshot_id"], second["report_snapshot_id"])
 
     def test_missing_outreach_sources_are_not_rendered_as_zero_activity(self):
         bundle = valid_bundle()
@@ -411,6 +553,7 @@ class WeeklyGateTest(unittest.TestCase):
 
     def test_outreach_event_must_resolve_to_source_snapshot(self):
         bundle = valid_bundle()
+        bundle["outreach_channel_diagnostics"] = valid_outreach_diagnostics()
         bundle["outreach_events"] = [
             {
                 "event_id": "outreach-unresolved-source",
@@ -433,6 +576,7 @@ class WeeklyGateTest(unittest.TestCase):
 
     def test_outreach_receipt_must_resolve_inside_its_source_snapshot(self):
         bundle = valid_bundle()
+        bundle["outreach_channel_diagnostics"] = valid_outreach_diagnostics()
         bundle["outreach_events"] = [
             {
                 "event_id": "outreach-unresolved-receipt",

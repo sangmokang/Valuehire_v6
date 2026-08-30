@@ -61,6 +61,34 @@ Claude V1 / Codex V2 verdicts
 remaining risks and exact blockers
 ```
 
+## Sourcing outreach channel contract
+
+Emit exactly one channel diagnostic before extracting rows:
+
+```text
+channel: <jobkorea|saramin|linkedin_rps>
+access_state: <AUTHENTICATED|AUTH_REQUIRED|TUTORIAL_OR_DEMO|AUTOMATION_DENIED|CHALLENGE|MISSING_PROFILE|STALE_PAGE>
+surface_kind: <provider-specific allowlisted enum>
+surface_ref: <protected route/export reference>
+stable_receipt_available: <true|false>
+source_snapshot_id: <redacted extraction snapshot>
+blocker_reason: <required unless stable receipt extraction succeeded>
+```
+
+- Only `AUTHENTICATED` may continue, and it still does not imply that any message was sent.
+- JobKorea must read authenticated position-offer history. An integrated-login redirect, cached
+  talent-search page, resume tab, or `offerIdx` link does not prove a send.
+- Saramin must read enterprise home → talent pool → candidate management → usage history →
+  detailed usage history. Login/signup, tutorial, and demo rows are not production evidence.
+- LinkedIn Recruiter should prefer an InMail Audit Report or equivalent export that preserves seat,
+  exact sent time, project, and stable thread/message identity. Inbox screenshots/OCR, visible
+  conversation dates, and aggregate totals may corroborate activity but cannot create per-position
+  `SENT` rows.
+- If browser automation is disabled or OS accessibility permission denies extraction, record
+  `AUTOMATION_DENIED`; do not infer counts from the visible page.
+- Every accepted row must map approved consultant identity → canonical position and retain only an
+  opaque provider receipt plus server-HMAC candidate key in the review bundle.
+
 ## Questions that must be answered once per environment
 
 - What exact Notion parent/database receives the report?

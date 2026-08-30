@@ -79,6 +79,47 @@ else
   fail_check "runtime contract JSON invalid"
 fi
 
+if python3 - "$CONTRACT" "$CANONICAL/SKILL.md" "$CANONICAL/references/prompt-contract.md" <<'PY'
+import json
+from pathlib import Path
+import sys
+
+contract = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+skill = Path(sys.argv[2]).read_text(encoding="utf-8")
+prompt = Path(sys.argv[3]).read_text(encoding="utf-8")
+expected_states = {
+    "AUTHENTICATED",
+    "AUTH_REQUIRED",
+    "TUTORIAL_OR_DEMO",
+    "AUTOMATION_DENIED",
+    "CHALLENGE",
+    "MISSING_PROFILE",
+    "STALE_PAGE",
+}
+sources = {item["channel"]: item for item in contract["outreach_sources"]}
+assert set(contract["outreach_access_states"]) == expected_states
+assert set(sources) == {"jobkorea", "saramin", "linkedin_rps"}
+assert "integrated_login" in sources["jobkorea"]["invalid_surfaces"]
+assert "tutorial" in sources["saramin"]["invalid_surfaces"]
+assert sources["linkedin_rps"]["preferred_surface"] == "inmail_audit_report_or_equivalent_export"
+assert sources["jobkorea"]["accepted_surface_kind"] == "position_offer_history"
+assert sources["saramin"]["accepted_surface_kind"] == "detailed_usage_history"
+assert set(sources["linkedin_rps"]["accepted_surface_kind"]) == {
+    "inmail_audit_report", "recruiter_inbox_thread"
+}
+assert all("open_tab" in source["invalid_surfaces"] for source in sources.values())
+diagnostic = contract["outreach_diagnostic_contract"]
+assert diagnostic["require_all_channels_for_portal_events"] is True
+assert diagnostic["diagnostic_and_event_snapshot_must_match"] is True
+for required in ("stable thread/message identity", "screenshots", "AUTOMATION_DENIED"):
+    assert required in skill + prompt
+PY
+then
+  pass_check "outreach browser readback contract is machine-checked"
+else
+  fail_check "outreach browser readback contract drifted"
+fi
+
 if python3 -m py_compile "$GATE" "$ACTIVITY" "$CONTRACT_GATE"; then
   pass_check "weekly gates compile"
 else
@@ -214,6 +255,14 @@ if mutate_exact "$case_dir/.agents/skills/weekly-ops/scripts/activity_gate.py" \
   expect_mutation_red "outreach receipt lineage bypass" "$case_dir"
 else
   fail_check "outreach receipt mutation was not applied exactly once"
+fi
+
+case_dir=$(prepare_mutation outreach-surface-bypass)
+if mutate_exact "$case_dir/.agents/skills/weekly-ops/scripts/activity_gate.py" \
+  'if not diagnostic_allows_event(diagnostic, event):' 'if False:'; then
+  expect_mutation_red "outreach surface verification bypass" "$case_dir"
+else
+  fail_check "outreach surface mutation was not applied exactly once"
 fi
 
 printf 'CHECKED: %s\n' "$checked"

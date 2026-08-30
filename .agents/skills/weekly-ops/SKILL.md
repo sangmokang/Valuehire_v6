@@ -103,6 +103,8 @@ Career-page rules:
 Sourcing outreach rules:
 
 - inspect the provider sent-history surface through Aside or the approved channel browser profile;
+- record one access result per channel with an allowed blocker reason; a visible login page, tutorial,
+  cached result, or denied automation permission is not a successful read;
 - do not restart, log in, solve a challenge, or change the user's browser session without exact authority;
 - count only provider-readback `SENT` rows with stable request/message ID and sent time;
 - require that receipt reference to resolve inside the same immutable outreach source snapshot;
@@ -113,6 +115,14 @@ Sourcing outreach rules:
   channel mix in code;
 - treat verified sent as grass `YELLOW` eligibility. Preserve the existing
   `GREEN → BLUE → YELLOW → ORANGE → TRANSPARENT` precedence and fail closed on missing sources.
+
+Provider surfaces are channel-specific:
+
+- JobKorea requires the authenticated position-offer history, not an open talent-search or resume tab;
+- Saramin requires the enterprise talent-pool detailed usage history, not its tutorial/demo screen;
+- LinkedIn Recruiter prefers the InMail audit/report export when it preserves seat, time, project, and
+  stable thread/message identity. Inbox screenshots, visible conversation dates, or aggregate totals
+  without a canonical-position join are supporting evidence only and cannot create `SENT` rows.
 
 ## Phase 3 — normalize and deduplicate
 
