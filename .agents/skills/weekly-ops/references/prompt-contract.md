@@ -50,6 +50,7 @@ publication_mode: <dry_run|write>
 
 ```text
 VERDICT
+separate data_verdict and publication_verdict
 report_snapshot_id and content_hash
 data cutoff and source capability table
 CEO brief
@@ -58,6 +59,7 @@ consultant-by-position focus: verified sends, unique HMAC candidates, active day
 scraped staging changes, explicitly marked non-client
 dedupe decisions and manual-review queue counts
 publication receipts
+publication report naming every unverified or failed target; this is outside the canonical brief hash
 Claude V1 / Codex V2 verdicts
 remaining risks and exact blockers
 ```

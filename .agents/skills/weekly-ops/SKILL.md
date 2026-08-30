@@ -155,6 +155,10 @@ python3 .agents/skills/weekly-ops/scripts/weekly_gate.py <redacted-evidence.json
 
 The command exits `0` only for `PASS`, `1` for `PARTIAL/BLOCKED`, and `2` for `NOT_RUN`.
 Use its scores, ordering, snapshot ID, content hash, and Markdown verbatim as the publication base.
+The canonical Markdown must state that its data verdict is not a publication-completion verdict.
+Render exact failed or unverified targets in `publication_report_markdown` as delivery-control metadata
+outside the canonical content hash; never let that status block silently disappear from HTML or a failure
+report.
 Do not manually adjust a score. To change weights, version the contract and tests first.
 
 ## Phase 5 — adversarial verification
@@ -204,6 +208,7 @@ If full publication cannot run, still return a useful result with:
 - what was not read or written;
 - the exact missing connector, target ID, schema, or authority;
 - the locally verified brief and snapshot hash, if available;
+- separate `data_verdict`, `publication_verdict`, and an exact `publication_report_markdown` target list;
 - the smallest safe next action.
 
 Never describe `NOT_RUN` sources as zero and never claim ClickUp, Notion, web, or email was updated

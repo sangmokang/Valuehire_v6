@@ -138,6 +138,11 @@ assert contract["score_points"] == gate.DIFFICULTY_POINTS
 assert contract["dedupe_rule_version"] == "weekly-dedupe-v1"
 assert contract["zero_result_contract"]["rule_version"] == "weekly-zero-result-v1"
 assert contract["zero_result_contract"]["collections"] == ["positions", "outreach_events"]
+publication = contract["publication"]
+assert publication["data_and_publication_verdicts_separate"] is True
+assert publication["publication_report_outside_content_hash"] is True
+assert publication["canonical_brief_warns_not_publication_complete"] is True
+assert publication["publication_report_names_contract_errors"] is True
 for required in ("stable thread/message identity", "screenshots", "AUTOMATION_DENIED"):
     assert required in skill + prompt
 PY
@@ -360,6 +365,15 @@ if mutate_exact "$case_dir/.agents/skills/weekly-ops/scripts/activity_gate.py" \
   expect_mutation_red "portal outreach relabelled as email" "$case_dir"
 else
   fail_check "outreach email mutation was not applied exactly once"
+fi
+
+case_dir=$(prepare_mutation publication-warning-removal)
+if mutate_exact "$case_dir/.agents/skills/weekly-ops/scripts/brief_renderer.py" \
+  '데이터 판정은 발행 완료 판정이 아니다.' \
+  '데이터 판정과 발행 완료 판정은 같다.'; then
+  expect_mutation_red "data verdict relabelled as publication success" "$case_dir"
+else
+  fail_check "publication warning mutation was not applied exactly once"
 fi
 
 printf 'CHECKED: %s\n' "$checked"
