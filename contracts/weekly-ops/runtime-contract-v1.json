@@ -118,12 +118,33 @@
       "surface_kind",
       "surface_ref",
       "stable_receipt_available",
+      "covered_provider_actor_refs",
       "source_snapshot_id"
     ],
     "require_all_channels_for_portal_events": true,
     "require_all_channels_when_capabilities_pass": true,
     "blocker_reason_required_when_unreadable": true,
     "diagnostic_and_event_snapshot_must_match": true
+  },
+  "consultant_roster_contract": {
+    "required_when_outreach_capabilities_pass_or_events_exist": true,
+    "required_fields": ["consultant_id", "consultant_display", "provider_accounts"],
+    "provider_accounts_are_opaque": true,
+    "provider_actor_unique_per_channel": true,
+    "event_provider_actor_must_match_roster": true,
+    "linkedin_actor_must_equal_seat": true,
+    "forbidden_identity_inference": [
+      "internal_position_share_email",
+      "cc_recipient",
+      "shared_mailbox_owner",
+      "display_name_similarity",
+      "assignment_without_provider_readback"
+    ],
+    "provider_receipt_dedupe_key": ["channel", "provider_receipt_ref"],
+    "unread_account_metric": "NOT_RUN",
+    "required_output_collections": ["channel_coverage", "consultant_focus", "excluded_rows"],
+    "coverage_gap_comparison_status": "NOT_COMPARABLE",
+    "zero_result_scope": "accepted_sent_inside_closed_weekly_window"
   },
   "career_sources": [
     {
@@ -197,7 +218,7 @@
     "receipt_must_resolve_in_source_snapshot": true,
     "required_when_responsible_capabilities_pass": true
   },
-  "consultant_focus_version": "consultant-focus-v1",
+  "consultant_focus_version": "consultant-focus-v2",
   "publication": {
     "default_mode": "dry_run",
     "required_targets": [

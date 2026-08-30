@@ -21,6 +21,7 @@ clickup: <list IDs, allowed statuses, schema fingerprint>
 notion: <parent/database ID, template version>
 career_pages: <approved company + official URL + cadence>
 sourcing_outreach: <Aside/channel profiles, sent-history surfaces, consultant roster, readback IDs>
+consultant_roster: <immutable consultant ID/display + channel-specific opaque provider actor refs>
 database: <connection name, schema version, lock key>
 admin: <deploy target, visibility, readback URL>
 recipients: <allowlisted addresses>
@@ -34,6 +35,11 @@ publication_mode: <dry_run|write>
 - Preserve raw evidence. Dedupe by canonical links and tombstones, not deletion.
 - SCRAPED_STAGING is not a customer request.
 - Only provider-readback SENT events count as consultant outreach or grass YELLOW evidence.
+- Attribute a send only when its provider actor/seat resolves to exactly one consultant in the supplied
+  roster. Internal handoff mail, CC recipients, shared-mailbox ownership, and model name guesses do not
+  establish who performed the outreach.
+- One `(channel, provider_receipt_ref)` is one send across snapshot re-imports. A different local event ID
+  cannot make the same provider receipt count twice.
 - LLM output is an enum proposal, never the score or operating state.
 - Missing/stale/error is NOT_RUN/PARTIAL, never zero. A true zero needs a source-bound
   `weekly-zero-result-v1` provider receipt.
@@ -56,6 +62,8 @@ data cutoff and source capability table
 CEO brief
 canonical customer-priority positions with three separate scores
 consultant-by-position focus: verified sends, unique HMAC candidates, active days, focus share
+consultant coverage: verified provider accounts and explicit NOT_RUN accounts; never render an
+unread consultant as zero activity
 scraped staging changes, explicitly marked non-client
 dedupe decisions and manual-review queue counts
 publication receipts
@@ -75,6 +83,7 @@ access_state: <AUTHENTICATED|AUTH_REQUIRED|TUTORIAL_OR_DEMO|AUTOMATION_DENIED|CH
 surface_kind: <provider-specific allowlisted enum>
 surface_ref: <protected route/export reference>
 stable_receipt_available: <true|false>
+covered_provider_actor_refs: <opaque account/seat refs actually covered by this readback>
 source_snapshot_id: <redacted extraction snapshot>
 blocker_reason: <required unless stable receipt extraction succeeded>
 ```
@@ -92,6 +101,17 @@ blocker_reason: <required unless stable receipt extraction succeeded>
   `AUTOMATION_DENIED`; do not infer counts from the visible page.
 - Every accepted row must map approved consultant identity → canonical position and retain only an
   opaque provider receipt plus server-HMAC candidate key in the review bundle.
+- The accepted row's opaque `provider_actor_ref` must belong to the consultant's roster entry for that
+  channel. LinkedIn's actor must also equal the readback seat reference.
+- Compute focus only from `sent_at` inside the closed weekly window. Keep post-cutoff sends in a
+  separate late-alert input and never backfill them into the prior-week share.
+- Position-share emails between ValueConnect consultants show allocation or intent, not completed
+  outreach. Gmail and Aside history may corroborate one another, but only the portal receipt creates a
+  grass event.
+- If one consultant account or one channel history is unreadable, report that coverage gap beside the
+  affected consultant/channel. Do not rank that consultant against fully observed peers.
+- A SENT row outside the closed weekly window is an excluded row, not proof that the in-window result
+  is non-empty. If the accepted in-window set is empty, require the source-bound zero-result receipt.
 
 ## Questions that must be answered once per environment
 
@@ -100,8 +120,66 @@ blocker_reason: <required unless stable receipt extraction succeeded>
 - What ClickUp custom fields, if any, distinguish origin from workflow status?
 - What customer-domain/sender allowlist is authoritative?
 - What consultant roster and account/alias mapping is authoritative for each sourcing portal?
+- Which shared or transferred portal accounts could make account owner differ from the human sender,
+  and what provider field proves the acting seat?
 - Where is each portal's sent-history surface and stable provider receipt ID?
 - What retention period and access policy apply to protected email evidence?
 - Who may manually override category, intent, and score evidence labels?
 - What freshness SLA and publication deadline apply before the meeting?
 - What robots/ToS/rate policy governs each career page?
+
+## Aside 컨설턴트 몰입도 기계 프롬프트
+
+Claude와 Codex 모두 아래 블록을 그대로 실행 계약으로 사용한다. 산문 해석으로 조건을
+완화하지 않는다.
+
+```text
+GOAL
+지난주 닫힌 주간 구간에 잡코리아·사람인·LinkedIn Recruiter에서 실제 발송된 제안을
+provider receipt 기준으로 복원하고, consultant×canonical_position 몰입도와 잔디밭
+YELLOW 자격 근거를 만든다.
+
+INPUT
+- window_start, window_end_exclusive: Asia/Seoul timezone-aware timestamp
+- Aside 또는 승인된 채널 프로필의 sent-history surface
+- immutable consultant_roster:
+  consultant_id, consultant_display, channel별 opaque provider_actor_ref 목록
+- canonical_position 목록과 alias/merge history
+- source_snapshot_id와 snapshot 내부 provider_receipt_ref 집합
+
+MUST
+1. 채널마다 access_state/surface_kind/source_snapshot_id/blocker_reason 진단을 먼저 기록한다.
+2. AUTHENTICATED + allowlisted sent-history + stable provider receipt가 모두 있어야 행을 읽는다.
+3. sent_at이 [window_start, window_end_exclusive) 안인 SENT 행만 집계한다.
+4. provider_actor_ref가 해당 채널 roster의 정확히 한 consultant에게 매핑되어야 한다.
+5. LinkedIn은 provider_actor_ref == provider_seat_ref이고 project_ref가 있어야 한다.
+6. provider receipt는 (channel, provider_receipt_ref)로 snapshot 재수집을 넘어 한 번만 센다.
+7. position은 exact provider project/JD key 또는 versioned canonical alias로만 연결한다.
+8. 컨설턴트별 verified sends, HMAC-unique candidates, active days, position focus share,
+   channel mix를 pure code로 계산한다.
+9. 잔디밭에는 같은 canonical position ledger의 YELLOW_ELIGIBLE만 투영하고
+   GREEN > BLUE > YELLOW > ORANGE > TRANSPARENT 우선순위를 유지한다.
+10. 읽지 못한 계정/채널은 NOT_RUN coverage gap으로 남기고 0건·저성과로 해석하지 않는다.
+
+MUST_NOT
+- 로그인·보안문자·2FA를 우회하거나 사용자 세션을 임의 재시작하지 않는다.
+- 열린 후보 탭, 검색·열람 기록, 초안, pending/failed, screenshot/OCR, aggregate total을
+  SENT로 바꾸지 않는다.
+- Gmail 내부 포지션 공유, CC 수신, 공용메일함 주소, ClickUp 배정, 이름 유사도로
+  실제 발송자를 추론하지 않는다.
+- 동일 receipt를 event_id만 바꾸어 중복 집계하지 않는다.
+- 후보 이름·메일·전화·이력서·원문 메시지를 보고서나 review bundle에 남기지 않는다.
+
+OUTPUT
+- channel_coverage[]: channel, access_state, surface_kind, covered_consultants, NOT_RUN blockers
+- consultant_focus[]: consultant_id, canonical_position_id, company, title,
+  verified_sent_count, unique_candidate_count, active_days, focus_share, channel_mix,
+  grass_evidence, evidence_refs, comparison_status
+- excluded_rows[]: reason enum과 opaque evidence_ref만
+- verdict: PASS|PARTIAL|BLOCKED|NOT_RUN
+
+STOP
+- roster identity, provider receipt, canonical position join 중 하나라도 모호하면 해당 행을
+  집계하지 않고 BLOCKED/PARTIAL로 끝낸다.
+- 모든 계정 coverage가 같지 않으면 컨설턴트 간 순위 문장을 만들지 않는다.
+```

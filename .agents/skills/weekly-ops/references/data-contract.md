@@ -14,7 +14,8 @@ weekly_run
   -> dedupe_decisions
   -> zero_result_assertions
   -> priority_scores
-  -> proposal_send_attempts -> consultant_position_focus -> grass YELLOW evidence
+  -> consultants -> consultant_provider_accounts -> proposal_send_attempts
+  -> consultant_position_focus -> grass YELLOW evidence
   -> report_snapshot
   -> publication_intents
   -> publication_receipts
@@ -93,9 +94,17 @@ readback. Compute per consultant and canonical position:
 - focus share = position verified sends / consultant total verified sends;
 - channel mix.
 
+The current aggregation contract is `consultant-focus-v2`; its version is part of snapshot identity.
+
 The row is eligible for grass `YELLOW`. It does not override `GREEN` or `BLUE`, and missing channel
 readback makes the affected metric `NOT_RUN`, never zero. Open tabs, searches, drafts, and pending or
 failed attempts are not activity.
+Each counted row must carry an opaque provider actor/account reference that maps to exactly one active
+consultant for that channel. An internal assignment email, copied recipient, shared mailbox, or display
+name is not identity evidence. LinkedIn's provider actor and seat references must agree.
+The tuple `(channel, provider_receipt_ref)` is unique for aggregation across snapshot re-imports. Duplicate
+local event IDs, forwarded copies, and re-imports of the same receipt block the focus projection rather
+than increasing the count.
 The provider receipt reference must resolve inside the same outreach source snapshot as the send event.
 A local string or an ID found only in another snapshot is not provider readback.
 An authenticated screen is only a capability precondition. Screenshots, OCR, open tabs, cached routes,
@@ -104,11 +113,17 @@ provider identity, sent time, consultant identity, and canonical-position join.
 When all three outreach capabilities are `PASS`, and before any portal event is accepted, the hashed
 input must contain exactly one diagnostic for each of JobKorea, Saramin, and LinkedIn RPS. Each
 diagnostic records access state, allowlisted surface kind,
-protected surface reference, stable-receipt availability, and its source snapshot. A non-authenticated
+protected surface reference, stable-receipt availability, covered provider actor refs, and its source
+snapshot. A non-authenticated
 or receipt-unavailable diagnostic also requires a blocker reason. A counted event must share that
 diagnostic's source snapshot; LinkedIn additionally requires provider seat and project references.
 Generic email is not an outreach channel for this metric; Gmail customer mail is classified separately
 as customer intent.
+The publication result always contains `channel_coverage`, `consultant_focus`, and `excluded_rows`.
+Out-of-window sends appear only in `excluded_rows` and do not suppress the in-window
+`weekly-zero-result-v1` requirement.
+Any coverage gap sets consultant focus `comparison_status=NOT_COMPARABLE`; observed counts may remain
+visible, but the renderer must not rank consultants against one another.
 
 ## Publication receipt
 

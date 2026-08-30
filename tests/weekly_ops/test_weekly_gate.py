@@ -137,6 +137,7 @@ class WeeklyGateTest(unittest.TestCase):
                 "status": "SENT",
                 "sent_at": "2026-08-24T09:00:00+09:00",
                 "candidate_key_hmac": "hmac:candidate-1",
+                "provider_actor_ref": "provider-account:consultant-a-jobkorea",
                 "provider_receipt_ref": "sha256:receipt-1",
                 "source_snapshot_id": "snap-outreach-fixture",
             },
@@ -149,6 +150,7 @@ class WeeklyGateTest(unittest.TestCase):
                 "status": "SENT",
                 "sent_at": "2026-08-25T09:00:00+09:00",
                 "candidate_key_hmac": "hmac:candidate-2",
+                "provider_actor_ref": "provider-seat:consultant-a",
                 "provider_receipt_ref": "sha256:receipt-2",
                 "source_snapshot_id": "snap-outreach-fixture",
                 "provider_seat_ref": "provider-seat:consultant-a",
@@ -162,9 +164,60 @@ class WeeklyGateTest(unittest.TestCase):
         self.assertEqual(focus["verified_sent_count"], 2)
         self.assertEqual(focus["unique_candidate_count"], 2)
         self.assertEqual(focus["active_days"], 2)
+        self.assertEqual(focus["comparison_status"], "COMPARABLE")
         self.assertEqual(focus["positions"][0]["focus_share"], 1.0)
+        self.assertEqual(focus["positions"][0]["channel_mix"], {"jobkorea": 1, "linkedin_rps": 1})
+        self.assertEqual(
+            focus["positions"][0]["evidence_refs"],
+            ["sha256:receipt-1", "sha256:receipt-2"],
+        )
         self.assertEqual(focus["positions"][0]["grass_evidence"], "YELLOW_ELIGIBLE")
+        self.assertEqual(len(result["channel_coverage"]), 3)
+        self.assertEqual(result["excluded_rows"], [])
         self.assertIn("컨설턴트별 몰입", result["brief_markdown"])
+
+    def test_out_of_window_sent_event_does_not_replace_zero_result_proof(self):
+        bundle = valid_bundle()
+        event = valid_outreach_event()
+        event["sent_at"] = bundle["run"]["window_end_exclusive"]
+        bundle["outreach_events"] = [event]
+        bundle["zero_result_assertions"] = []
+
+        result = self.gate.evaluate(bundle)
+
+        self.assertEqual(result["verdict"], "BLOCKED")
+        self.assertIn("ZERO_RESULT_UNPROVEN", result["errors"])
+        self.assertEqual(result["consultant_focus"], [])
+        self.assertEqual(result["excluded_rows"][0]["reason"], "OUTSIDE_WEEKLY_WINDOW")
+
+    def test_unread_consultant_account_is_coverage_gap_not_zero(self):
+        bundle = valid_bundle()
+        bundle["outreach_channel_diagnostics"][0]["covered_provider_actor_refs"] = []
+
+        result = self.gate.evaluate(bundle)
+
+        self.assertEqual(result["data_verdict"], "PARTIAL")
+        self.assertIn("outreach:jobkorea:consultant-a:NOT_RUN", result["blockers"])
+        jobkorea = next(item for item in result["channel_coverage"] if item["channel"] == "jobkorea")
+        self.assertEqual(jobkorea["covered_consultants"], [])
+        self.assertEqual(jobkorea["not_run_consultants"], ["consultant-a"])
+
+    def test_pending_and_failed_attempts_are_excluded_without_fake_sent_time(self):
+        bundle = valid_bundle()
+        pending = valid_outreach_event()
+        pending.update(event_id="pending-1", status="PENDING", sent_at=None)
+        failed = valid_outreach_event()
+        failed.update(event_id="failed-1", status="FAILED", sent_at=None)
+        bundle["outreach_events"] = [pending, failed]
+
+        result = self.gate.evaluate(bundle)
+
+        self.assertNotIn("OUTREACH_EVENT_INVALID", result["errors"])
+        self.assertEqual(result["consultant_focus"], [])
+        self.assertEqual(
+            [item["reason"] for item in result["excluded_rows"]],
+            ["STATUS_NOT_SENT", "STATUS_NOT_SENT"],
+        )
 
     def test_sent_outreach_without_provider_readback_is_blocked(self):
         bundle = valid_bundle()
@@ -179,6 +232,7 @@ class WeeklyGateTest(unittest.TestCase):
                 "status": "SENT",
                 "sent_at": "2026-08-24T09:00:00+09:00",
                 "candidate_key_hmac": "hmac:candidate-1",
+                "provider_actor_ref": "provider-account:consultant-a-saramin",
                 "source_snapshot_id": "snap-outreach-fixture",
             }
         ]
@@ -187,6 +241,44 @@ class WeeklyGateTest(unittest.TestCase):
 
         self.assertEqual(result["verdict"], "BLOCKED")
         self.assertIn("OUTREACH_SENT_WITHOUT_READBACK", result["errors"])
+
+    def test_outreach_requires_roster_bound_provider_actor(self):
+        cases = (
+            ("missing_roster", None, "provider-account:consultant-a-jobkorea"),
+            ("invented_consultant", "consultant-b", "provider-account:consultant-a-jobkorea"),
+            ("wrong_provider_actor", "consultant-a", "provider-account:consultant-b-jobkorea"),
+        )
+        for name, consultant_id, actor_ref in cases:
+            with self.subTest(name=name):
+                bundle = valid_bundle()
+                event = valid_outreach_event()
+                event["provider_actor_ref"] = actor_ref
+                if consultant_id is not None:
+                    event["consultant_id"] = consultant_id
+                if name == "missing_roster":
+                    del bundle["consultant_roster"]
+                bundle["outreach_events"] = [event]
+
+                result = self.gate.evaluate(bundle)
+
+                self.assertEqual(result["verdict"], "BLOCKED")
+                self.assertTrue(
+                    {"CONSULTANT_ROSTER_INVALID", "OUTREACH_CONSULTANT_UNMAPPED"}
+                    & set(result["errors"])
+                )
+                self.assertEqual(result["consultant_focus"], [])
+
+    def test_duplicate_provider_receipt_cannot_inflate_focus(self):
+        bundle = valid_bundle()
+        first = valid_outreach_event()
+        second = {**first, "event_id": "outreach-duplicate-id"}
+        bundle["outreach_events"] = [first, second]
+
+        result = self.gate.evaluate(bundle)
+
+        self.assertEqual(result["verdict"], "BLOCKED")
+        self.assertIn("OUTREACH_RECEIPT_DUPLICATE", result["errors"])
+        self.assertEqual(result["consultant_focus"], [])
 
     def test_portal_outreach_without_channel_diagnostics_is_blocked(self):
         bundle = valid_bundle()
@@ -209,6 +301,7 @@ class WeeklyGateTest(unittest.TestCase):
             ("surface_kind", "ocr"),
             ("surface_kind", "open_tab"),
             ("stable_receipt_available", False),
+            ("covered_provider_actor_refs", []),
         )
         for field, value in cases:
             with self.subTest(field=field, value=value):
@@ -403,6 +496,7 @@ class WeeklyGateTest(unittest.TestCase):
                 "status": "SENT",
                 "sent_at": "2026-08-24T09:00:00+09:00",
                 "candidate_key_hmac": "hmac:candidate-1",
+                "provider_actor_ref": "provider-account:consultant-a-jobkorea",
                 "provider_receipt_ref": "sha256:receipt-1",
                 "source_snapshot_id": "snap-unknown",
             }
@@ -426,6 +520,7 @@ class WeeklyGateTest(unittest.TestCase):
                 "status": "SENT",
                 "sent_at": "2026-08-24T09:00:00+09:00",
                 "candidate_key_hmac": "hmac:candidate-1",
+                "provider_actor_ref": "provider-account:consultant-a-jobkorea",
                 "provider_receipt_ref": "local:draft-or-open-tab-not-source-evidence",
                 "source_snapshot_id": "snap-outreach-fixture",
             }

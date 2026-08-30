@@ -39,6 +39,98 @@ class WeeklyGateAdversarialTest(unittest.TestCase):
         self.assertEqual(result["verdict"], "BLOCKED")
         self.assertIn("OUTREACH_DIAGNOSTICS_MISSING", result["errors"])
 
+    def test_passed_outreach_capabilities_require_consultant_roster_even_at_zero(self):
+        bundle = valid_bundle()
+        del bundle["consultant_roster"]
+
+        result = self.gate.evaluate(bundle)
+
+        self.assertEqual(result["verdict"], "BLOCKED")
+        self.assertIn("CONSULTANT_ROSTER_INVALID", result["errors"])
+
+    def test_provider_actor_cannot_belong_to_two_consultants(self):
+        bundle = valid_bundle()
+        shared_actor = bundle["consultant_roster"][0]["provider_accounts"]["jobkorea"][0]
+        bundle["consultant_roster"].append(
+            {
+                "consultant_id": "consultant-b",
+                "consultant_display": "Consultant B",
+                "provider_accounts": {
+                    "jobkorea": [shared_actor],
+                    "saramin": ["provider-account:consultant-b-saramin"],
+                    "linkedin_rps": ["provider-seat:consultant-b"],
+                },
+            }
+        )
+
+        result = self.gate.evaluate(bundle)
+
+        self.assertEqual(result["verdict"], "BLOCKED")
+        self.assertIn("CONSULTANT_ROSTER_INVALID", result["errors"])
+
+    def test_consultant_may_have_no_account_on_an_unused_channel(self):
+        bundle = valid_bundle()
+        bundle["consultant_roster"][0]["provider_accounts"]["linkedin_rps"] = []
+        bundle["outreach_channel_diagnostics"][2]["covered_provider_actor_refs"] = []
+
+        result = self.gate.evaluate(bundle)
+
+        self.assertNotIn("CONSULTANT_ROSTER_INVALID", result["errors"])
+        linkedin = next(
+            item for item in result["channel_coverage"] if item["channel"] == "linkedin_rps"
+        )
+        self.assertEqual(linkedin["expected_account_count"], 0)
+        self.assertEqual(linkedin["not_run_consultants"], [])
+
+    def test_partial_coverage_forbids_peer_ranking(self):
+        bundle = valid_bundle()
+        bundle["consultant_roster"][0]["provider_accounts"]["jobkorea"].append("actor-a-2")
+        bundle["consultant_roster"].append(
+            {
+                "consultant_id": "consultant-b",
+                "consultant_display": "Consultant B",
+                "provider_accounts": {
+                    "jobkorea": ["actor-b-j"],
+                    "saramin": ["actor-b-s"],
+                    "linkedin_rps": ["actor-b-l"],
+                },
+            }
+        )
+        for diagnostic, actor in zip(
+            bundle["outreach_channel_diagnostics"], ("actor-b-j", "actor-b-s", "actor-b-l")
+        ):
+            diagnostic["covered_provider_actor_refs"].append(actor)
+        bundle["source_snapshots"][2]["evidence_refs"].append("sha256:receipt-3")
+        event_a = valid_outreach_event()
+        event_b = {
+            **event_a,
+            "event_id": "outreach-b-1",
+            "consultant_id": "consultant-b",
+            "consultant_display": "Consultant B",
+            "provider_actor_ref": "actor-b-j",
+            "provider_receipt_ref": "sha256:receipt-2",
+            "candidate_key_hmac": "hmac:candidate-b-1",
+        }
+        bundle["outreach_events"] = [
+            event_a,
+            event_b,
+            {
+                **event_b,
+                "event_id": "outreach-b-2",
+                "provider_receipt_ref": "sha256:receipt-3",
+                "candidate_key_hmac": "hmac:candidate-b-2",
+            },
+        ]
+
+        result = self.gate.evaluate(bundle)
+
+        self.assertEqual(
+            [item["consultant_display"] for item in result["consultant_focus"]],
+            ["Consultant A", "Consultant B"],
+        )
+        self.assertTrue(all(item["comparison_status"] == "NOT_COMPARABLE" for item in result["consultant_focus"]))
+        self.assertIn("컨설턴트 간 순위 산정 안 함", result["brief_markdown"])
+
     def test_passed_career_capability_cannot_omit_daily_company_set(self):
         bundle = valid_bundle()
         bundle["career_page_summaries"] = []
@@ -97,6 +189,18 @@ class WeeklyGateAdversarialTest(unittest.TestCase):
 
         self.assertEqual(result["verdict"], "BLOCKED")
         self.assertIn("OUTREACH_EVENT_INVALID", result["errors"])
+        self.assertEqual(result["consultant_focus"], [])
+
+    def test_internal_handoff_cannot_be_counted_as_consultant_focus(self):
+        bundle = valid_bundle()
+        event = valid_outreach_event()
+        event["provider_actor_ref"] = "gmail:internal-position-share"
+        bundle["outreach_events"] = [event]
+
+        result = self.gate.evaluate(bundle)
+
+        self.assertEqual(result["verdict"], "BLOCKED")
+        self.assertIn("OUTREACH_CONSULTANT_UNMAPPED", result["errors"])
         self.assertEqual(result["consultant_focus"], [])
 
     def test_non_string_publication_target_fails_closed_without_exception(self):

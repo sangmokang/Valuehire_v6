@@ -117,6 +117,7 @@ def valid_bundle():
             }
             for company, official_url in CAREER_FIXTURES
         ],
+        "consultant_roster": valid_consultant_roster(),
         "outreach_channel_diagnostics": valid_outreach_diagnostics(),
         "outreach_events": [],
         "zero_result_assertions": [
@@ -140,6 +141,20 @@ def valid_bundle():
     }
 
 
+def valid_consultant_roster():
+    return [
+        {
+            "consultant_id": "consultant-a",
+            "consultant_display": "Consultant A",
+            "provider_accounts": {
+                "jobkorea": ["provider-account:consultant-a-jobkorea"],
+                "saramin": ["provider-account:consultant-a-saramin"],
+                "linkedin_rps": ["provider-seat:consultant-a"],
+            },
+        }
+    ]
+
+
 def valid_outreach_diagnostics():
     return [
         {
@@ -148,6 +163,7 @@ def valid_outreach_diagnostics():
             "surface_kind": "position_offer_history",
             "surface_ref": "protected:jobkorea-position-offer-history",
             "stable_receipt_available": True,
+            "covered_provider_actor_refs": ["provider-account:consultant-a-jobkorea"],
             "source_snapshot_id": "snap-outreach-fixture",
         },
         {
@@ -156,6 +172,7 @@ def valid_outreach_diagnostics():
             "surface_kind": "detailed_usage_history",
             "surface_ref": "protected:saramin-detailed-usage-history",
             "stable_receipt_available": True,
+            "covered_provider_actor_refs": ["provider-account:consultant-a-saramin"],
             "source_snapshot_id": "snap-outreach-fixture",
         },
         {
@@ -164,6 +181,7 @@ def valid_outreach_diagnostics():
             "surface_kind": "inmail_audit_report",
             "surface_ref": "protected:linkedin-inmail-audit-report",
             "stable_receipt_available": True,
+            "covered_provider_actor_refs": ["provider-seat:consultant-a"],
             "source_snapshot_id": "snap-outreach-fixture",
         },
     ]
@@ -179,11 +197,13 @@ def valid_outreach_event(channel="jobkorea"):
         "status": "SENT",
         "sent_at": "2026-08-24T09:00:00+09:00",
         "candidate_key_hmac": "hmac:candidate-1",
+        "provider_actor_ref": f"provider-account:consultant-a-{channel}",
         "provider_receipt_ref": "sha256:receipt-1",
         "source_snapshot_id": "snap-outreach-fixture",
     }
     if channel == "linkedin_rps":
         event.update(
+            provider_actor_ref="provider-seat:consultant-a",
             provider_seat_ref="provider-seat:consultant-a",
             provider_project_ref="provider-project:codeit-backend",
         )

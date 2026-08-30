@@ -199,8 +199,16 @@ provider readback이 있는 `SENT` 행만 consultant×canonical position에 연�
 검증 발송 수·HMAC 고유 후보 수·활동일·포지션별 집중 비중을 계산해야 한다. 해당 행은
 잔디밭 `YELLOW` 자격 근거이며 GREEN/BLUE가 있으면 색 우선순위를 덮지 않는다.
 
+각 행은 채널별 provider actor/seat가 승인된 consultant roster의 정확히 한 명에게 귀속되고,
+`(channel, provider_receipt_ref)` 중복은 snapshot 재수집을 넘어 전체 몰입도 투영을 차단해야 한다.
+내부 포지션 공유 메일·참조 수신자·공용 메일함·이름 유사도는 실제 제안 수행자 증거가 아니다.
+읽지 못한 계정은 0건으로 비교하지 않고 컨설턴트/채널별 `NOT_RUN` coverage gap으로 남긴다.
+게이트 출력은 `channel_coverage`, `consultant_focus`, `excluded_rows`를 항상 포함하며, 주간
+구간 밖 SENT는 제외 행으로만 남고 주간 내 0건 영수증 요구를 대신하지 못한다.
+
 - counter-AC: 열린 후보 탭, 검색 결과, 초안, 클릭 횟수를 발송으로 세거나, 이름이 비슷한
-  포지션을 수기 추측으로 연결한다.
+  포지션을 수기 추측으로 연결한다. 같은 provider receipt를 event ID만 바꿔 두 번 세거나,
+  내부 공유 메일 수신자를 실제 발송 컨설턴트로 간주한다.
 
 ## 입출력·오류·경계 계약
 
@@ -374,12 +382,14 @@ push·PR은 비범위이므로 원격 PR을 만들었다고 주장하지 않는�
 - Claude V1 보강 RED: 정본과 다른 수기 HTML/hash, 622줄 테스트의 검사 누락, 점수표 문서
   드리프트, 버전·계보 없는 dedupe, 증명 없는 빈 배열 PASS, generic email 채널 위장,
   비문자 발행 target의 예외를 실제 재현했다. 수정 전 42개 중 9 failure·3 error였다.
-- GREEN 조건: 같은 명령이 현재 44개 시험을 실제 실행하고 모두 통과한다.
-- mutation 조건: `bash scripts/acceptance-weekly-ops-skill.sh --full`이 검사 33개와 함께
+- GREEN 조건: 같은 명령이 현재 54개 시험을 실제 실행하고 모두 통과한다.
+- mutation 조건: `bash scripts/acceptance-weekly-ops-skill.sh --full`이 검사 38개와 함께
   scraped cap, capability fail-open, readback bypass, 필수 target 제거, 값 PII 우회,
-  position lineage, source status, outreach receipt lineage, outreach surface, zero-result receipt,
+  position lineage, source status, outreach receipt lineage, outreach surface, consultant roster,
+  outreach receipt dedupe, out-of-window zero 우회, coverage 출력 제거, partial coverage 순위 우회,
+  zero-result receipt,
   dedupe version, career-company completeness, email relabel, 데이터 판정의 발행 성공 위장까지
-  14개 변이를 모두 죽인다.
+  19개 변이를 모두 죽인다.
 
 ## 적대 검증 로그
 
@@ -424,22 +434,27 @@ push·PR은 비범위이므로 원격 PR을 만들었다고 주장하지 않는�
   base가 없었다.
 - drift: `docs/sot/verification-commands.md`가 26개 시험·mutation 8종으로 과거 수치를 말했다.
 
-### V2 교정 후보 — fresh 재검증 대기
+### Aside 확장 후 최신 재검증
 
 - RED 2건을 추가해 `data_verdict`와 `publication_verdict` 분리, 미발행 대상 5개가 담긴
   `publication_report_markdown`, HTML의 가시적 발행 상태를 강제했다.
 - 정본 Markdown은 “데이터 판정은 발행 완료 판정이 아니다”를 항상 명시하며, 상태 부록은
   hash 순환을 막기 위해 content hash 외부의 동일-snapshot 전달 통제 메타데이터로 둔다.
 - 고정 번들: `PARTIAL`, `data_verdict=PARTIAL`, `publication_verdict=PARTIAL`,
-  `report_snapshot_id=rpt_6edf944357dc9db4306a04ef`,
-  `input_hash=6edf944357dc9db4306a04ef4bc76a42f392ec958ba45f1cbc52d0c12b5250c2`,
-  `content_hash=9d8768a763d243dad7907f305a9987e6703417046dd662d0b692681a01b48d70`.
-- local GREEN: unit 44/44, acceptance CHECKED 33와 mutation 14/14, principles 34/34,
+  `report_snapshot_id=rpt_64f0c8c1209b0b1d704906fa`,
+  `input_hash=64f0c8c1209b0b1d704906fa38636cae8bf894ece3add57c8e7ca3c87c3b60d1`,
+  `content_hash=9a52a555dedcf13cc19a1c7da8abf53a0beaaaf5a6c4381dce6132485cc7f347`.
+- local GREEN: unit 54/54, acceptance CHECKED 38와 mutation 19/19, principles 34/34,
   `verify.sh` PASS, 공식 `quick_validate.py`로 canonical/Codex/Claude 3개 모두 PASS.
-- 실제 branch ref: foundation=`b61fec9`, outreach=`d0d1cf5`, hardening=current; 인접 변경줄은
-  각각 2,889, 395, 1,478로 모두 3,000 이하이다. current의 PR base는 반드시 outreach다.
-- stop condition: 이 후보 커밋을 fresh Claude V1과 fresh Codex V2가 모두 PASS하기 전까지
-  외부 발행은 금지한다.
+- 실제 branch ref: foundation=`b61fec9`, outreach=`d0d1cf5`, hardening=current. 현재
+  outreach 대비 누적 변경은 2,307줄로 3,000 이하이며 PR base는 반드시 outreach다.
+- fresh Codex V2: `PASS`. partial multi-account 반례는 전원 `NOT_COMPARABLE`과
+  “계정 coverage 불일치로 컨설턴트 간 순위 산정 안 함”으로 닫혔고, out-of-window SENT,
+  중복 provider receipt, 미인증 actor coverage 공격도 모두 차단됐다.
+- fresh Claude V1: `NOT_RUN`. `omx ask claude`는 Claude CLI 2.1.251을 호출했으나
+  `Credit balance is too low`로 exit 1이었다. 이를 PASS나 독립 검증으로 대체하지 않는다.
+- stop condition: 현재 diff를 fresh Claude V1과 fresh Codex V2가 모두 PASS하고 같은
+  snapshot의 외부 readback 영수증이 모이기 전까지 외부 발행은 금지한다.
 
 ## 비범위
 
