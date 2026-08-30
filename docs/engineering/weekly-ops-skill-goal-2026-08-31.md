@@ -295,6 +295,11 @@ fixture와 git에 금지한다.
 - 예상 변경 총량 1,400줄 이하. 3,000줄을 넘기면 작업을 재분할한다.
 - 새 dependency는 추가하지 않는다. Python 표준 라이브러리만 사용한다.
 
+변경 총량 임계값은 실제로 발동했다. 기준 커밋 대비 누적 `+3894/-18`이므로 실행기를
+`weekly_gate`, `contract_gate`, `activity_gate`, `brief_renderer` 네 모듈로, 시험을 fixture와
+기본·적대 시험 세 모듈로 분할했고, 변경을 `b61fec9`, `d0d1cf5`, `f4be8d2` 세 결정 커밋으로
+나눴다. 모든 직접 작성 파일은 hard 600줄, 함수는 hard 100줄 이하다.
+
 ## 적대검증 정조준
 
 - required connector 하나가 실패했는데 PASS인 가짜 발행
@@ -379,6 +384,21 @@ fixture와 git에 금지한다.
   `content_hash=015837095be47ddca6b2d22a4a190fecab0d41960a9b7bdbf15c86d8fa066e45`.
 - next: 같은 고정 번들·현재 diff로 fresh Claude V1을 다시 실행한 뒤, fresh Codex V2가
   각 주장을 독립 재현한다. 두 판정이 끝나기 전 운영 발행은 금지한다.
+
+### Claude V1 — 수정 후 PASS
+
+- command: safe/no-persistence Claude Opus high, read-only built-ins와 허용된 로컬 검증
+  명령만 사용; session `51905`, 2026-08-31 04:24~04:30 KST, exit 0.
+- reviewed commit: `f4be8d21a23d017809e5f38029be02ca55f04477`.
+- verdict: `PASS`; 42개 시험, frozen Markdown hash, HTML canonical copy, adapter 동일성,
+  600/100 한도, 점수표 일치를 독립 재현했다.
+- Claude 내부 권한 LIMIT: acceptance 32/13, principles 34/34, gate CLI는 실행 거부됐다.
+  통합자는 같은 커밋에서 세 명령을 별도로 exit 0으로 재실행했지만, 이 결과를 Claude의
+  독립 실행으로 가장하지 않는다.
+- artifact: `.omx/artifacts/claude-weekly-ops-v1-2026-08-31T0430+0900.md`, SHA-256
+  `fc079b3ae15d685cee1d841cb5c4c4ef39906e187368a0e16d7acfdee837e043`.
+- strongest unresolved interpretation: brief의 데이터 판정과 publication bundle의 발행 판정을
+  분리한 설계가 단독 HTML 독자에게 충분한지 Codex V2가 독립 판단해야 한다.
 
 ## 비범위
 
