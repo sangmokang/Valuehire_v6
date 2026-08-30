@@ -19,7 +19,10 @@ def render_position(position: dict[str, Any]) -> str:
 def render_blocker(blocker: str) -> str:
     labels = {
         "clickup_read:STALE": "ClickUp 스키마는 과거 판독값만 있어 쓰기를 중단했다.",
-        "notion_read:NOT_RUN": "Notion 대상 DB와 parent를 확인하지 못해 쓰기를 중단했다.",
+        "notion_read:NOT_RUN": (
+            "Notion page ID는 DB mirror에서 찾았지만 current parent/schema readback이 없어 "
+            "쓰기를 중단했다."
+        ),
         "jobkorea_outreach_read:NOT_RUN": "잡코리아 발송함을 재조회하지 못했다.",
         "saramin_outreach_read:NOT_RUN": "사람인 발송함을 재조회하지 못했다.",
         "linkedin_outreach_read:NOT_RUN": "LinkedIn Recruiter 발송함을 재조회하지 못했다.",
@@ -32,11 +35,35 @@ def render_blocker(blocker: str) -> str:
     return labels.get(blocker, blocker)
 
 
+def render_operating_snapshot(snapshot: dict[str, Any]) -> list[str]:
+    closed = snapshot["closed_week"]
+    current = snapshot["current"]
+    funnel = current["funnel"]
+    targets = snapshot["targets"]
+    return [
+        f"- {closed['week_label']} 신규 포지션 {closed['new_positions']}개 / "
+        f"신규 고객사 {closed['new_position_companies']}개",
+        f"- 주간 실행: AI 검색 {closed['ai_search_runs']}회, 포지션 커버리지 "
+        f"{closed['position_coverage']}개, 추천 인원 {closed['recommended_people']}명, "
+        f"추천 이벤트 {closed['recommendation_events']}건",
+        f"- 현재 snapshot: 오픈 포지션 {current['open_positions']}개, "
+        f"AI 소싱 {funnel['ai_sourcing']}명, 제안 {funnel['proposal']}건, "
+        f"추천 {funnel['recommended']}명, 인터뷰 {funnel['interviewing']}명, "
+        f"최종합격 {funnel['final_pass']}명, 입사 {funnel['joined']}명",
+        f"- 기준 목표: 주간 제안 {targets['weekly_proposals']}건, "
+        f"주간 추천 {targets['weekly_recommendations']}명, "
+        f"주간 매출 ₩{targets['weekly_revenue']:,}",
+        f"- 데이터 기준: SQL 주간 집계 [{closed['week_start']}, {closed['week_end']}), "
+        "현재 funnel은 별도 시점 snapshot으로 비교 산정하지 않음",
+    ]
+
+
 def render_brief(
     bundle: dict[str, Any],
     positions: list[dict[str, Any]],
     career_summaries: list[dict[str, Any]],
     consultant_focus: list[dict[str, Any]],
+    operating_snapshot: dict[str, Any],
     snapshot_id: str,
     data_status: str,
     source_blockers: list[str],
@@ -74,8 +101,11 @@ def render_brief(
         "우선순위는 증거 라벨을 버전 고정 수식으로 계산했다.",
         "데이터 판정은 발행 완료 판정이 아니다. 동일 snapshot과 content hash에 연결된 "
         "DB·ClickUp·Notion·admin web·email readback 영수증을 모두 확인해야 발행 완료다.",
-        "", "## 이번 주 고객 액션", "",
     ]
+    if operating_snapshot:
+        lines.extend(["", "## 핵심 운영지표", ""])
+        lines.extend(render_operating_snapshot(operating_snapshot))
+    lines.extend(["", "## 이번 주 고객 액션", ""])
     lines.extend(render_position(item) for item in weekly)
     if not weekly:
         lines.append("- 검증된 고객 액션 없음.")

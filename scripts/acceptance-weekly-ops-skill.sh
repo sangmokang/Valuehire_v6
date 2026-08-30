@@ -25,6 +25,7 @@ GATE=$CANONICAL/scripts/weekly_gate.py
 ACTIVITY=$CANONICAL/scripts/activity_gate.py
 CONTRACT_GATE=$CANONICAL/scripts/contract_gate.py
 RENDERER=$CANONICAL/scripts/brief_renderer.py
+OPERATING=$CANONICAL/scripts/operating_gate.py
 TESTS=tests/weekly_ops
 CONTRACT=contracts/weekly-ops/runtime-contract-v1.json
 checked=0
@@ -42,7 +43,7 @@ fail_check() {
 }
 
 for required in \
-  "$CANONICAL/SKILL.md" "$GATE" "$ACTIVITY" "$CONTRACT_GATE" "$RENDERER" \
+  "$CANONICAL/SKILL.md" "$GATE" "$ACTIVITY" "$CONTRACT_GATE" "$RENDERER" "$OPERATING" \
   "$TESTS/fixtures.py" "$TESTS/test_weekly_gate.py" \
   "$TESTS/test_weekly_gate_adversarial.py" "$CONTRACT" contracts/weekly-ops/db-contract-v1.sql; do
   if [ -f "$required" ] && [ -s "$required" ] && [ ! -L "$required" ]; then
@@ -152,6 +153,17 @@ assert contract["consultant_focus_version"] == gate.CONSULTANT_FOCUS_VERSION
 assert contract["dedupe_rule_version"] == "weekly-dedupe-v1"
 assert contract["zero_result_contract"]["rule_version"] == "weekly-zero-result-v1"
 assert contract["zero_result_contract"]["collections"] == ["positions", "outreach_events"]
+operating = contract["operating_snapshot_contract"]
+assert operating["required_when_db_read_pass"] is True
+assert operating["closed_week_must_equal_run_window"] is True
+assert operating["current_funnel_is_not_weekly_performance"] is True
+assert operating["source_uri_pattern"] == "rpc:weekly_brief_snapshot:{meeting_date}"
+assert operating["run_timezone"] == "Asia/Seoul"
+assert operating["run_window_requires_monday_midnight_and_seven_days"] is True
+assert operating["source_fetched_at_not_after_meeting"] is True
+assert operating["exact_key_sets"] is True
+assert contract["weekly_window"]["start"] == "previous ISO-week Monday at 00:00"
+assert contract["weekly_window"]["end_exclusive"] == "current ISO-week Monday at 00:00"
 publication = contract["publication"]
 assert publication["data_and_publication_verdicts_separate"] is True
 assert publication["publication_report_outside_content_hash"] is True
@@ -169,7 +181,7 @@ else
   fail_check "outreach browser readback contract drifted"
 fi
 
-if python3 -m py_compile "$GATE" "$ACTIVITY" "$CONTRACT_GATE" "$RENDERER" "$TESTS"/*.py; then
+if python3 -m py_compile "$GATE" "$ACTIVITY" "$CONTRACT_GATE" "$RENDERER" "$OPERATING" "$TESTS"/*.py; then
   pass_check "weekly gates compile"
 else
   fail_check "weekly gates do not compile"
@@ -433,6 +445,58 @@ if mutate_exact "$case_dir/.agents/skills/weekly-ops/scripts/brief_renderer.py" 
   expect_mutation_red "data verdict relabelled as publication success" "$case_dir"
 else
   fail_check "publication warning mutation was not applied exactly once"
+fi
+
+case_dir=$(prepare_mutation operating-snapshot-omission)
+if mutate_exact "$case_dir/.agents/skills/weekly-ops/scripts/weekly_gate.py" \
+  'require_snapshot=capability_passed(bundle.get("capabilities"), "db_read"),' \
+  'require_snapshot=False,'; then
+  expect_mutation_red "db PASS operating snapshot omission" "$case_dir"
+else
+  fail_check "operating snapshot omission mutation was not applied exactly once"
+fi
+
+case_dir=$(prepare_mutation operating-window-bypass)
+if mutate_exact "$case_dir/.agents/skills/weekly-ops/scripts/operating_gate.py" \
+  'and week_start == run["window_start"].date()' 'and True'; then
+  expect_mutation_red "DB closed-week window mismatch" "$case_dir"
+else
+  fail_check "operating window mutation was not applied exactly once"
+fi
+
+case_dir=$(prepare_mutation weekly-run-window-bypass)
+if mutate_exact "$case_dir/.agents/skills/weekly-ops/scripts/weekly_gate.py" \
+  'if not window_is_week or not (' 'if False and not ('; then
+  expect_mutation_red "Monday-to-Monday run window bypass" "$case_dir"
+else
+  fail_check "weekly run-window mutation was not applied exactly once"
+fi
+
+case_dir=$(prepare_mutation operating-rpc-lineage-bypass)
+if mutate_exact "$case_dir/.agents/skills/weekly-ops/scripts/operating_gate.py" \
+  'and snapshot.get("source_uri_ref") == f"rpc:weekly_brief_snapshot:{meeting_date}"' \
+  'and True'; then
+  expect_mutation_red "DB RPC source lineage bypass" "$case_dir"
+else
+  fail_check "DB RPC lineage mutation was not applied exactly once"
+fi
+
+case_dir=$(prepare_mutation source-cutoff-bypass)
+if mutate_exact "$case_dir/.agents/skills/weekly-ops/scripts/contract_gate.py" \
+  'if meeting_cutoff is not None and fetched_at > meeting_cutoff:' \
+  'if False:'; then
+  expect_mutation_red "source snapshot meeting cutoff bypass" "$case_dir"
+else
+  fail_check "source cutoff mutation was not applied exactly once"
+fi
+
+case_dir=$(prepare_mutation operating-extra-funnel-key-bypass)
+if mutate_exact "$case_dir/.agents/skills/weekly-ops/scripts/operating_gate.py" \
+  'and set(funnel) == FUNNEL_METRICS' \
+  'and FUNNEL_METRICS.issubset(funnel)'; then
+  expect_mutation_red "operating funnel extra-key bypass" "$case_dir"
+else
+  fail_check "operating funnel key-set mutation was not applied exactly once"
 fi
 
 printf 'CHECKED: %s\n' "$checked"

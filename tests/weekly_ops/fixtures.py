@@ -23,6 +23,15 @@ def load_gate():
 def valid_source_snapshots():
     return [
         {
+            "snapshot_id": "snap-db-weekly-fixture",
+            "source_system": "database",
+            "source_uri_ref": "rpc:weekly_brief_snapshot:2026-08-31",
+            "fetched_at": "2026-08-31T05:35:00+09:00",
+            "status": "PASS",
+            "content_hash": "d" * 64,
+            "evidence_refs": ["sha256:db-weekly-fixture"],
+        },
+        {
             "snapshot_id": "snap-gmail-fixture",
             "source_system": "gmail",
             "source_uri_ref": "protected:gmail-fixture",
@@ -93,8 +102,8 @@ def valid_bundle():
         "schema_version": "weekly-ops-input-v1",
         "run": {
             "meeting_at": "2026-08-31T11:00:00+09:00",
-            "window_start": "2026-08-23T00:00:00+09:00",
-            "window_end_exclusive": "2026-08-30T00:00:00+09:00",
+            "window_start": "2026-08-24T00:00:00+09:00",
+            "window_end_exclusive": "2026-08-31T00:00:00+09:00",
             "late_alert_end": "2026-08-31T11:00:00+09:00",
         },
         "capabilities": [
@@ -102,6 +111,7 @@ def valid_bundle():
             for name in capability_names
         ],
         "source_snapshots": valid_source_snapshots(),
+        "operating_snapshot": valid_operating_snapshot(),
         "dedupe_decisions": [],
         "positions": [valid_position()],
         "career_page_summaries": [
@@ -138,6 +148,55 @@ def valid_bundle():
             }
             for name in ("database", "clickup", "notion", "admin_web", "email")
         ],
+    }
+
+
+def valid_operating_snapshot():
+    return {
+        "source_snapshot_id": "snap-db-weekly-fixture",
+        "meeting_date": "2026-08-31",
+        "generated_at": "2026-08-31T05:35:00+09:00",
+        "timezone": "Asia/Seoul",
+        "provenance": "sql_rpc:weekly_brief_snapshot",
+        "count_semantics": (
+            "[week_start, week_end) exact SQL counts; current snapshots are explicitly separate"
+        ),
+        "closed_week": {
+            "week_start": "2026-08-24",
+            "week_end": "2026-08-31",
+            "week_label": "26W35",
+            "new_positions": 14,
+            "new_position_companies": 9,
+            "ai_search_runs": 0,
+            "position_coverage": 0,
+            "recommended_people": 0,
+            "admin_ai_search_rows": 141,
+            "recommendation_events": 0,
+        },
+        "current": {
+            "open_positions": 131,
+            "position_last_synced_at": "2026-08-31T02:05:57+09:00",
+            "candidate_last_synced_at": "2026-08-28T17:08:35+09:00",
+            "funnel": {
+                "ai_sourcing": 6115,
+                "proposal": 0,
+                "recommended": 1,
+                "interviewing": 15,
+                "final_pass": 4,
+                "joined": 11,
+            },
+        },
+        "targets": {
+            "weekly_proposals": 130,
+            "weekly_recommendations": 20,
+            "weekly_revenue": 6222222,
+            "annual_recommendations": 1040,
+            "annual_revenue": 323555556,
+            "average_fee": 14000000,
+            "proposal_acceptance_rate": 0.15,
+            "recommend_to_final_rate": 0.06,
+            "recommend_to_join_rate": 0.0222,
+        },
     }
 
 

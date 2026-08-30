@@ -7,8 +7,8 @@
     "publication_deadline": "Monday 10:00 Asia/Seoul"
   },
   "weekly_window": {
-    "start": "previous ISO-week Monday minus 8 days at 00:00",
-    "end_exclusive": "current ISO-week Monday minus 1 day at 00:00",
+    "start": "previous ISO-week Monday at 00:00",
+    "end_exclusive": "current ISO-week Monday at 00:00",
     "post_cutoff_section": "마감 후 경보"
   },
   "gmail": {
@@ -72,6 +72,22 @@
     "position_evidence_must_resolve": true,
     "non_pass_status_is_blocker": true,
     "outreach_receipt_must_resolve_in_same_snapshot": true
+  },
+  "operating_snapshot_contract": {
+    "required_when_db_read_pass": true,
+    "source_system": "database",
+    "source_uri_pattern": "rpc:weekly_brief_snapshot:{meeting_date}",
+    "provenance": "sql_rpc:weekly_brief_snapshot",
+    "count_semantics": "[week_start, week_end) exact SQL counts; current snapshots are explicitly separate",
+    "closed_week_must_equal_run_window": true,
+    "run_timezone": "Asia/Seoul",
+    "run_window_requires_monday_midnight_and_seven_days": true,
+    "future_freshness_forbidden": true,
+    "source_fetched_at_not_after_meeting": true,
+    "exact_key_sets": true,
+    "required_output": "operating_snapshot",
+    "required_sections": ["closed_week", "current", "targets"],
+    "current_funnel_is_not_weekly_performance": true
   },
   "outreach_sources": [
     {
