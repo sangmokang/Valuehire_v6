@@ -375,7 +375,7 @@ push·PR은 비범위이므로 원격 PR을 만들었다고 주장하지 않는�
   드리프트, 버전·계보 없는 dedupe, 증명 없는 빈 배열 PASS, generic email 채널 위장,
   비문자 발행 target의 예외를 실제 재현했다. 수정 전 42개 중 9 failure·3 error였다.
 - GREEN 조건: 같은 명령이 현재 44개 시험을 실제 실행하고 모두 통과한다.
-- mutation 조건: `bash scripts/acceptance-weekly-ops-skill.sh --full`이 검사 32개와 함께
+- mutation 조건: `bash scripts/acceptance-weekly-ops-skill.sh --full`이 검사 33개와 함께
   scraped cap, capability fail-open, readback bypass, 필수 target 제거, 값 PII 우회,
   position lineage, source status, outreach receipt lineage, outreach surface, zero-result receipt,
   dedupe version, career-company completeness, email relabel, 데이터 판정의 발행 성공 위장까지
