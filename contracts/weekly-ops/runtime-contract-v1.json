@@ -78,21 +78,52 @@
       "channel": "jobkorea",
       "browser": "Aside_or_approved_channel_profile",
       "required_surface": "sent_history",
-      "receipt": "provider_request_or_message_id"
+      "accepted_surface_kind": "position_offer_history",
+      "receipt": "provider_request_or_message_id",
+      "invalid_surfaces": ["integrated_login", "talent_search", "resume_tab", "cached_offer_link", "screenshot", "ocr", "open_tab"]
     },
     {
       "channel": "saramin",
       "browser": "Aside_or_approved_channel_profile",
       "required_surface": "sent_history",
-      "receipt": "provider_request_or_message_id"
+      "accepted_surface_kind": "detailed_usage_history",
+      "receipt": "provider_request_or_message_id",
+      "navigation": "enterprise_home > talent_pool > candidate_management > usage_history > detail",
+      "invalid_surfaces": ["login", "tutorial", "demo_rows", "screenshot", "ocr", "open_tab"]
     },
     {
       "channel": "linkedin_rps",
       "browser": "Aside_real_login_profile",
       "required_surface": "sent_inmail_or_message_history",
-      "receipt": "provider_message_id"
+      "accepted_surface_kind": ["inmail_audit_report", "recruiter_inbox_thread"],
+      "receipt": "provider_message_or_thread_id",
+      "preferred_surface": "inmail_audit_report_or_equivalent_export",
+      "required_dimensions": ["consultant_seat", "sent_at", "project", "provider_identity"],
+      "invalid_surfaces": ["screenshot", "ocr", "open_tab", "visible_conversation_date", "aggregate_total_only"]
     }
   ],
+  "outreach_access_states": [
+    "AUTHENTICATED",
+    "AUTH_REQUIRED",
+    "TUTORIAL_OR_DEMO",
+    "AUTOMATION_DENIED",
+    "CHALLENGE",
+    "MISSING_PROFILE",
+    "STALE_PAGE"
+  ],
+  "outreach_diagnostic_contract": {
+    "required_fields": [
+      "channel",
+      "access_state",
+      "surface_kind",
+      "surface_ref",
+      "stable_receipt_available",
+      "source_snapshot_id"
+    ],
+    "require_all_channels_for_portal_events": true,
+    "blocker_reason_required_when_unreadable": true,
+    "diagnostic_and_event_snapshot_must_match": true
+  },
   "career_sources": [
     {
       "company": "SpoonLabs",

@@ -21,6 +21,7 @@ from activity_gate import (
     render_career_summaries,
     render_consultant_focus,
     validate_career_summaries,
+    validate_outreach_channel_diagnostics,
     validate_outreach_events,
 )
 from contract_gate import (
@@ -285,7 +286,7 @@ def stable_projection(
         for target in bundle.get("publication_targets", [])
         if isinstance(target, dict)
     ]
-    return {
+    projection = {
         "schema_version": bundle.get("schema_version"),
         "run": bundle.get("run"),
         "capabilities": bundle.get("capabilities"),
@@ -297,6 +298,9 @@ def stable_projection(
         "publication_target_contracts": target_contracts,
         "score_version": SCORE_VERSION,
     }
+    if "outreach_channel_diagnostics" in bundle:
+        projection["outreach_channel_diagnostics"] = bundle.get("outreach_channel_diagnostics")
+    return projection
 
 
 def render_position(position: dict[str, Any]) -> str:
@@ -421,8 +425,15 @@ def evaluate(bundle: dict[str, Any]) -> dict[str, Any]:
         bundle.get("career_page_summaries"), source_snapshot_ids, parse_datetime, errors
     )
     position_lookup = {position["canonical_id"]: position for position in positions}
+    outreach_diagnostics = validate_outreach_channel_diagnostics(
+        bundle.get("outreach_channel_diagnostics"),
+        bundle.get("outreach_events"),
+        source_snapshot_ids,
+        errors,
+    )
     consultant_focus = validate_outreach_events(
         bundle.get("outreach_events"),
+        outreach_diagnostics,
         position_lookup,
         run,
         source_snapshot_ids,

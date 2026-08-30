@@ -10,6 +10,22 @@ from typing import Any, Callable
 CAREER_STATUSES = {"PASS", "PARTIAL", "FAIL", "NOT_RUN", "STALE"}
 OUTREACH_CHANNELS = {"saramin", "jobkorea", "linkedin_rps", "email"}
 OUTREACH_STATUSES = {"PENDING", "SENT", "FAILED"}
+PORTAL_CHANNELS = {"saramin", "jobkorea", "linkedin_rps"}
+OUTREACH_ACCESS_STATES = {
+    "AUTHENTICATED",
+    "AUTH_REQUIRED",
+    "TUTORIAL_OR_DEMO",
+    "AUTOMATION_DENIED",
+    "CHALLENGE",
+    "MISSING_PROFILE",
+    "STALE_PAGE",
+}
+ALLOWED_OUTREACH_SURFACES = {
+    "jobkorea": {"position_offer_history"},
+    "saramin": {"detailed_usage_history"},
+    "linkedin_rps": {"inmail_audit_report", "recruiter_inbox_thread"},
+}
+LINKEDIN_EVENT_FIELDS = {"provider_seat_ref", "provider_project_ref"}
 
 
 def validate_career_summaries(
@@ -69,6 +85,7 @@ def validate_career_summaries(
 
 def validate_outreach_events(
     events: Any,
+    diagnostics: dict[str, dict[str, Any]],
     position_lookup: dict[str, dict[str, Any]],
     run: dict[str, datetime] | None,
     source_snapshot_ids: set[str],
@@ -123,6 +140,17 @@ def validate_outreach_events(
         if event["status"] == "SENT" and not event.get("provider_receipt_ref"):
             errors.append("OUTREACH_SENT_WITHOUT_READBACK")
             continue
+        if event["status"] == "SENT" and event["channel"] in PORTAL_CHANNELS:
+            diagnostic = diagnostics.get(event["channel"])
+            if not diagnostic_allows_event(diagnostic, event):
+                errors.append("OUTREACH_SURFACE_UNVERIFIED")
+                continue
+            if event["channel"] == "linkedin_rps" and any(
+                not isinstance(event.get(field), str) or not event[field]
+                for field in LINKEDIN_EVENT_FIELDS
+            ):
+                errors.append("LINKEDIN_OUTREACH_DIMENSIONS_MISSING")
+                continue
         if event["status"] == "SENT" and event["provider_receipt_ref"] not in snapshot_evidence_refs.get(
             event["source_snapshot_id"], set()
         ):
@@ -134,6 +162,82 @@ def validate_outreach_events(
             continue
         accepted.append({**event, "_sent_at": sent_at})
     return aggregate_consultant_focus(accepted, position_lookup)
+
+
+def validate_outreach_channel_diagnostics(
+    diagnostics: Any,
+    events: Any,
+    source_snapshot_ids: set[str],
+    errors: list[str],
+) -> dict[str, dict[str, Any]]:
+    portal_events = (
+        [
+            event
+            for event in events
+            if isinstance(event, dict) and event.get("channel") in PORTAL_CHANNELS
+        ]
+        if isinstance(events, list)
+        else []
+    )
+    if not portal_events:
+        return {}
+    if not isinstance(diagnostics, list):
+        errors.append("OUTREACH_DIAGNOSTICS_MISSING")
+        return {}
+    validated: dict[str, dict[str, Any]] = {}
+    required = {
+        "channel",
+        "access_state",
+        "surface_kind",
+        "surface_ref",
+        "stable_receipt_available",
+        "source_snapshot_id",
+    }
+    for item in diagnostics:
+        if not isinstance(item, dict) or not required.issubset(item):
+            errors.append("OUTREACH_DIAGNOSTIC_INVALID")
+            continue
+        channel = item["channel"]
+        if (
+            channel not in PORTAL_CHANNELS
+            or channel in validated
+            or item["access_state"] not in OUTREACH_ACCESS_STATES
+            or not isinstance(item["surface_kind"], str)
+            or not item["surface_kind"]
+            or not isinstance(item["surface_ref"], str)
+            or not item["surface_ref"]
+            or not isinstance(item["stable_receipt_available"], bool)
+            or item["source_snapshot_id"] not in source_snapshot_ids
+            or (
+                (
+                    item["access_state"] != "AUTHENTICATED"
+                    or item["stable_receipt_available"] is not True
+                )
+                and (
+                    not isinstance(item.get("blocker_reason"), str)
+                    or not item["blocker_reason"].strip()
+                )
+            )
+        ):
+            errors.append("OUTREACH_DIAGNOSTIC_INVALID")
+            continue
+        validated[channel] = dict(item)
+    if set(validated) != PORTAL_CHANNELS:
+        errors.append("OUTREACH_DIAGNOSTICS_MISSING")
+    return validated
+
+
+def diagnostic_allows_event(
+    diagnostic: dict[str, Any] | None, event: dict[str, Any]
+) -> bool:
+    if not diagnostic:
+        return False
+    return (
+        diagnostic["access_state"] == "AUTHENTICATED"
+        and diagnostic["stable_receipt_available"] is True
+        and diagnostic["surface_kind"] in ALLOWED_OUTREACH_SURFACES[event["channel"]]
+        and diagnostic["source_snapshot_id"] == event["source_snapshot_id"]
+    )
 
 
 def aggregate_consultant_focus(

@@ -31,6 +31,8 @@ weekly_run
   `REFERENCE_ONLY`, `NONE`
 - publication: `INTENT_RECORDED`, `WRITE_STARTED`, `UNKNOWN_OUTCOME`,
   `READBACK_VERIFIED`, `FAILED`
+- outreach access: `AUTHENTICATED`, `AUTH_REQUIRED`, `TUTORIAL_OR_DEMO`,
+  `AUTOMATION_DENIED`, `CHALLENGE`, `MISSING_PROFILE`, `STALE_PAGE`
 
 `UNKNOWN_OUTCOME` must reconcile by reading the target before retrying.
 
@@ -87,6 +89,14 @@ readback makes the affected metric `NOT_RUN`, never zero. Open tabs, searches, d
 failed attempts are not activity.
 The provider receipt reference must resolve inside the same outreach source snapshot as the send event.
 A local string or an ID found only in another snapshot is not provider readback.
+An authenticated screen is only a capability precondition. Screenshots, OCR, open tabs, cached routes,
+and aggregate portal totals remain non-ledger evidence unless each counted event has the required
+provider identity, sent time, consultant identity, and canonical-position join.
+Before any portal event is accepted, the hashed input must contain exactly one diagnostic for each of
+JobKorea, Saramin, and LinkedIn RPS. Each diagnostic records access state, allowlisted surface kind,
+protected surface reference, stable-receipt availability, and its source snapshot. A non-authenticated
+or receipt-unavailable diagnostic also requires a blocker reason. A counted event must share that
+diagnostic's source snapshot; LinkedIn additionally requires provider seat and project references.
 
 ## Publication receipt
 
