@@ -1,0 +1,203 @@
+{
+  "contract_version": "notion-weekly-golden-v1",
+  "template": {
+    "title_pattern": "FY{yy}W{iso_week}-1",
+    "view": "private_executive_dashboard",
+    "section_order": [
+      "four_week_kpis",
+      "recent_client_positions",
+      "market_accessibility",
+      "position_changes",
+      "candidate_sourcing",
+      "new_tasks",
+      "pipeline_movements",
+      "active_pipeline",
+      "pre_interview_pipeline",
+      "data_coverage"
+    ],
+    "detail_sections_collapsed": [
+      "new_tasks",
+      "pipeline_movements",
+      "active_pipeline",
+      "pre_interview_pipeline"
+    ]
+  },
+  "authority": {
+    "recent_client_positions_order": "observed_at_desc",
+    "managerial_directives_forbidden": true,
+    "llm_may_not_choose_work": true,
+    "priority_name": "sourcing_coverage_priority",
+    "priority_is_formula_output_not_management_decision": true
+  },
+  "four_week_series": {
+    "length": 4,
+    "contiguous_iso_weeks": true,
+    "timezone": "Asia/Seoul",
+    "missing_value": null,
+    "missing_display": "—",
+    "missing_is_never_zero": true,
+    "trend_requires_verified_points": 3
+  },
+  "metrics": {
+    "live_client_position_count": {
+      "kind": "week_end_snapshot",
+      "unit": "canonical_position",
+      "allowed_origins": ["CLIENT_REQUESTED", "CLIENT_SHARED"],
+      "allowed_lifecycles": ["ACTIVE", "PIPELINE", "CLOSING"],
+      "excluded_origins": ["SCRAPED_STAGING"],
+      "excluded_statuses": ["closedpositions", "complete"],
+      "headcount_is_separate": true
+    },
+    "new_task_count": {
+      "kind": "weekly_flow",
+      "unit": "canonical_candidate_position",
+      "dedupe_key": ["candidate_key_hmac", "position_id"],
+      "external_task_id_is_lineage_not_identity": true,
+      "reactivation_is_separate_metric": true
+    },
+    "active_pipeline_count": {
+      "kind": "week_end_snapshot",
+      "unit": "canonical_candidate_position",
+      "latest_state_only": true,
+      "stages": [
+        "RECOMMENDATION_PENDING",
+        "CLIENT_REVIEW",
+        "ASSIGNMENT",
+        "INTERVIEW_1",
+        "INTERVIEW_2",
+        "FINAL_INTERVIEW",
+        "OFFER",
+        "FINAL_ACCEPTED"
+      ]
+    },
+    "interview_pipeline_count": {
+      "kind": "week_end_snapshot",
+      "unit": "canonical_candidate_position",
+      "latest_state_only": true,
+      "stages": [
+        "ASSIGNMENT",
+        "INTERVIEW_1",
+        "INTERVIEW_2",
+        "FINAL_INTERVIEW",
+        "OFFER",
+        "FINAL_ACCEPTED"
+      ]
+    },
+    "channel_outreach": {
+      "kind": "weekly_flow",
+      "channels": ["saramin", "jobkorea", "linkedin_rps"],
+      "unit": "provider_verified_send",
+      "dedupe_key": ["channel", "provider_receipt_ref"],
+      "status_fields": ["sent", "pending", "accepted", "rejected"],
+      "unsupported_status_value": null
+    }
+  },
+  "recent_client_positions": {
+    "window": "closed_week",
+    "allowed_origins": ["CLIENT_REQUESTED", "CLIENT_SHARED"],
+    "required_fields": [
+      "position_id",
+      "company",
+      "title",
+      "requested_headcount",
+      "observed_at",
+      "intent_type",
+      "source_snapshot_id",
+      "evidence_refs"
+    ],
+    "no_priority_or_action_language": true
+  },
+  "market_accessibility": {
+    "source": "linkedin_recruiter_saved_search",
+    "required_fields": [
+      "position_id",
+      "search_url_ref",
+      "query",
+      "geography",
+      "job_titles",
+      "skills",
+      "seniority_or_years",
+      "languages",
+      "result_count_lower_bound",
+      "count_is_exact",
+      "qualified_sample_size",
+      "qualified_sample_matches",
+      "captured_at",
+      "source_snapshot_id"
+    ],
+    "minimum_qualified_sample_size": 20,
+    "pool_points": [
+      {"max": 0, "points": 0},
+      {"max": 9, "points": 15},
+      {"max": 24, "points": 30},
+      {"max": 49, "points": 45},
+      {"max": 99, "points": 60},
+      {"max": 249, "points": 75},
+      {"max": null, "points": 90}
+    ],
+    "precision_adjustments": [
+      {"max_rate_exclusive": 0.2, "points": -20},
+      {"max_rate_exclusive": 0.4, "points": -10},
+      {"max_rate_exclusive": 0.6, "points": 0},
+      {"max_rate_exclusive": 0.8, "points": 5},
+      {"max_rate_exclusive": null, "points": 10}
+    ],
+    "score_bounds": [0, 100],
+    "bands": {"EASY": [70, 100], "MEDIUM": [40, 69], "HARD": [0, 39]},
+    "missing_or_partial_result": "UNRANKED"
+  },
+  "sourcing_coverage_priority": {
+    "eligible_lifecycles": ["ACTIVE"],
+    "recency_points": [
+      {"max_age_days": 2, "points": 40},
+      {"max_age_days": 7, "points": 30},
+      {"max_age_days": 14, "points": 15},
+      {"max_age_days": null, "points": 0}
+    ],
+    "pipeline_gap_points": [
+      {"active_candidates": 0, "points": 30},
+      {"active_candidates": 1, "points": 20},
+      {"active_candidates": 2, "points": 10},
+      {"active_candidates": 3, "points": 0}
+    ],
+    "scarcity_points": {"HARD": 30, "MEDIUM": 15, "EASY": 0},
+    "score_formula": "recency_points + pipeline_gap_points + scarcity_points",
+    "bands": {"A": [70, 100], "B": [40, 69], "C": [0, 39]},
+    "explain_components": true,
+    "unverified_market_result": "UNRANKED"
+  },
+  "pipeline": {
+    "dedupe_key": ["candidate_key_hmac", "position_id"],
+    "latest_event_at_cutoff_wins": true,
+    "closed_stages": ["JOINED", "REJECTED", "WITHDRAWN", "CLOSED"],
+    "movement_count_is_distinct_transition": true
+  },
+  "privacy": {
+    "canonical_snapshot_uses_candidate_key_hmac": true,
+    "candidate_display_name_allowed_only_in_user_authorized_private_notion": true,
+    "resolve_display_name_at_write_time": true,
+    "forbidden_targets_for_candidate_display_name": ["git", "email", "admin_web", "review_bundle"],
+    "private_page_access_readback_required": true
+  },
+  "hooks": [
+    "preflight_sources",
+    "freeze_four_week_cutoffs",
+    "capture_source_snapshots",
+    "normalize_positions_and_tasks",
+    "dedupe_candidate_position_records",
+    "compute_weekly_metrics",
+    "compute_market_accessibility",
+    "compute_sourcing_coverage_priority",
+    "render_golden_sample",
+    "record_write_ahead_intent",
+    "publish_private_notion",
+    "readback_verify"
+  ],
+  "fail_closed": {
+    "unknown_is_not_zero": true,
+    "missing_linkedin_search_is_unranked": true,
+    "missing_four_week_history_is_visible": true,
+    "duplicate_or_ambiguous_identity_blocks_affected_count": true,
+    "publication_without_readback_is_partial": true
+  }
+}

@@ -204,12 +204,89 @@ create table consultant_position_focus (
   primary key (run_id, consultant_id, position_id, formula_version)
 );
 
+create table candidate_position_tasks (
+  candidate_task_id text primary key,
+  candidate_key_hmac text not null,
+  position_id text not null references canonical_positions(position_id),
+  source_snapshot_id text not null references source_snapshots(snapshot_id),
+  external_task_id text not null,
+  first_created_at timestamptz not null,
+  current_stage text not null check (
+    current_stage in (
+      'RECOMMENDATION_PENDING', 'CLIENT_REVIEW', 'ASSIGNMENT', 'INTERVIEW_1',
+      'INTERVIEW_2', 'FINAL_INTERVIEW', 'OFFER', 'FINAL_ACCEPTED', 'JOINED',
+      'REJECTED', 'WITHDRAWN', 'CLOSED'
+    )
+  ),
+  current_stage_at timestamptz not null,
+  unique (candidate_key_hmac, position_id)
+);
+
+create table candidate_pipeline_events (
+  pipeline_event_id text primary key,
+  candidate_task_id text not null references candidate_position_tasks(candidate_task_id),
+  source_snapshot_id text not null references source_snapshots(snapshot_id),
+  event_type text not null check (
+    event_type in ('CREATED', 'REACTIVATED', 'STAGE_CHANGED', 'CLOSED')
+  ),
+  from_stage text,
+  to_stage text not null,
+  event_at timestamptz not null,
+  evidence_ref text not null,
+  unique (candidate_task_id, event_type, to_stage, event_at)
+);
+
+create table weekly_metric_snapshots (
+  metric_snapshot_id text primary key,
+  run_id text not null references weekly_runs(run_id),
+  metric_name text not null check (
+    metric_name in (
+      'live_client_position_count', 'new_task_count', 'reactivated_task_count',
+      'active_pipeline_count', 'interview_pipeline_count', 'channel_outreach'
+    )
+  ),
+  dimension_key text not null,
+  value integer check (value is null or value >= 0),
+  status text not null check (status in ('VERIFIED', 'PARTIAL', 'NOT_RUN')),
+  as_of timestamptz not null,
+  source_snapshot_id text references source_snapshots(snapshot_id),
+  evidence_refs jsonb not null,
+  input_hash text not null,
+  contract_version text not null,
+  check (status <> 'VERIFIED' or (value is not null and source_snapshot_id is not null)),
+  check (status <> 'NOT_RUN' or value is null),
+  unique (run_id, metric_name, dimension_key, contract_version)
+);
+
+create table linkedin_market_search_snapshots (
+  market_search_snapshot_id text primary key,
+  run_id text not null references weekly_runs(run_id),
+  position_id text not null references canonical_positions(position_id),
+  source_snapshot_id text not null references source_snapshots(snapshot_id),
+  protected_search_url_ref text not null,
+  query_text text not null,
+  filter_set jsonb not null,
+  result_count_lower_bound integer not null check (result_count_lower_bound >= 0),
+  count_is_exact boolean not null,
+  qualified_sample_size integer not null check (qualified_sample_size >= 0),
+  qualified_sample_matches integer not null check (
+    qualified_sample_matches >= 0 and qualified_sample_matches <= qualified_sample_size
+  ),
+  accessibility_score integer check (accessibility_score between 0 and 100),
+  accessibility_band text check (accessibility_band in ('EASY', 'MEDIUM', 'HARD')),
+  captured_at timestamptz not null,
+  formula_version text not null,
+  input_hash text not null,
+  unique (run_id, position_id, formula_version)
+);
+
 create table report_snapshots (
   report_snapshot_id text primary key,
   run_id text not null references weekly_runs(run_id),
   status text not null check (status in ('PARTIAL', 'BLOCKED', 'READY', 'PUBLISHED')),
   content_hash text not null,
   score_version text not null,
+  template_version text not null,
   evidence_bundle_hash text not null,
   brief_markdown text not null,
   created_at timestamptz not null,

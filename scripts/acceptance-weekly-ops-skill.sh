@@ -28,6 +28,8 @@ RENDERER=$CANONICAL/scripts/brief_renderer.py
 OPERATING=$CANONICAL/scripts/operating_gate.py
 TESTS=tests/weekly_ops
 CONTRACT=contracts/weekly-ops/runtime-contract-v1.json
+GOLDEN_CONTRACT=contracts/weekly-ops/notion-golden-sample-v1.json
+GOLDEN_SPEC=$CANONICAL/references/notion-golden-sample.md
 checked=0
 fail=0
 
@@ -50,6 +52,14 @@ for required in \
     pass_check "required file $required"
   else
     fail_check "required file invalid $required"
+  fi
+done
+
+for required in "$GOLDEN_CONTRACT" "$GOLDEN_SPEC"; do
+  if [ -f "$required" ] && [ -s "$required" ] && [ ! -L "$required" ]; then
+    pass_check "required Golden Sample file $required"
+  else
+    fail_check "required Golden Sample file invalid $required"
   fi
 done
 
@@ -95,6 +105,55 @@ if python3 -m json.tool "$CONTRACT" >/dev/null 2>&1; then
   pass_check "runtime contract parses as JSON"
 else
   fail_check "runtime contract JSON invalid"
+fi
+
+if python3 -m json.tool "$GOLDEN_CONTRACT" >/dev/null 2>&1; then
+  pass_check "Notion Golden Sample contract parses as JSON"
+else
+  fail_check "Notion Golden Sample contract JSON invalid"
+fi
+
+if python3 - "$GOLDEN_CONTRACT" "$GOLDEN_SPEC" contracts/weekly-ops/db-contract-v1.sql <<'PY'
+import json
+from pathlib import Path
+import sys
+
+contract = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+spec = Path(sys.argv[2]).read_text(encoding="utf-8")
+db = Path(sys.argv[3]).read_text(encoding="utf-8")
+assert contract["contract_version"] == "notion-weekly-golden-v1"
+assert contract["authority"]["managerial_directives_forbidden"] is True
+assert contract["authority"]["llm_may_not_choose_work"] is True
+assert contract["four_week_series"]["length"] == 4
+assert contract["four_week_series"]["missing_is_never_zero"] is True
+assert contract["four_week_series"]["trend_requires_verified_points"] == 3
+metrics = contract["metrics"]
+assert metrics["live_client_position_count"]["excluded_origins"] == ["SCRAPED_STAGING"]
+assert metrics["new_task_count"]["dedupe_key"] == ["candidate_key_hmac", "position_id"]
+assert metrics["new_task_count"]["reactivation_is_separate_metric"] is True
+assert metrics["channel_outreach"]["channels"] == ["saramin", "jobkorea", "linkedin_rps"]
+assert contract["market_accessibility"]["minimum_qualified_sample_size"] == 20
+assert contract["market_accessibility"]["missing_or_partial_result"] == "UNRANKED"
+assert contract["sourcing_coverage_priority"]["score_formula"] == (
+    "recency_points + pipeline_gap_points + scarcity_points"
+)
+assert contract["privacy"]["candidate_display_name_allowed_only_in_user_authorized_private_notion"] is True
+assert contract["fail_closed"]["unknown_is_not_zero"] is True
+for phrase in (
+    "최근 인입 포지션", "시장 접근성", "후보자 소싱", "지난주 신규 Task",
+    "활성 Pipeline", "NOTION_WEEKLY_GOLDEN_SAMPLE_V1", "즉시 실행",
+):
+    assert phrase in spec
+for table in (
+    "candidate_position_tasks", "candidate_pipeline_events", "weekly_metric_snapshots",
+    "linkedin_market_search_snapshots",
+):
+    assert f"create table {table}" in db
+PY
+then
+  pass_check "Notion Golden Sample prompt, metric, DB, and fail-closed contracts are machine-checked"
+else
+  fail_check "Notion Golden Sample contract drifted"
 fi
 
 if python3 - "$CONTRACT" "$CANONICAL/SKILL.md" "$CANONICAL/references/prompt-contract.md" "$GATE" <<'PY'

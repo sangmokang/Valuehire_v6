@@ -34,6 +34,10 @@ Read these files before acting:
 4. `references/adversarial-review.md`
 5. repository `contracts/weekly-ops/runtime-contract-v1.json`
 
+When the request creates or standardizes a Notion weekly dashboard or Golden Sample, also read
+`references/notion-golden-sample.md` and repository
+`contracts/weekly-ops/notion-golden-sample-v1.json` before inspecting business data.
+
 If a referenced file or target contract is absent, return `NOT_RUN`; do not improvise an operating ID.
 
 ## Phase 0 — fix the run contract
@@ -102,7 +106,10 @@ Gmail rules:
   internal outbound recommendations from `CLIENT_REQUESTED`;
 - retain message/thread identifiers only in the protected DB; pass opaque evidence hashes to the
   review bundle;
-- never place raw body, personal address, or candidate name in git, Notion, admin, or the CEO brief.
+- never place raw body, personal address, or candidate name in git, email, admin, or the public CEO
+  brief. A candidate display name may be resolved only at write time for an explicitly authorized
+  private Notion pipeline detail, following `notion-weekly-golden-v1`; it remains absent from the
+  canonical redacted snapshot and review bundle.
 
 Career-page rules:
 
@@ -185,6 +192,11 @@ outside the canonical content hash; never let that status block silently disappe
 report.
 Do not manually adjust a score. To change weights, version the contract and tests first.
 
+For a Notion Golden Sample, do not reuse the general urgency score as a management instruction.
+Recent client intake is a chronological list. Market accessibility and sourcing coverage priority use
+only the formula and evidence requirements in `notion-golden-sample-v1.json`. Missing LinkedIn filters
+or its reviewed sample makes that position `UNRANKED`, not low priority.
+
 ## Phase 5 — adversarial verification
 
 Follow `references/adversarial-review.md` exactly.
@@ -217,9 +229,11 @@ placed only in an allowed job category after a deterministic or human-confirmed 
 The grass map must consume the same canonical position and verified outreach ledger. It must not
 re-scrape browser history or recompute consultant focus in the frontend.
 
-Notion and admin views must render the CEO brief, not raw source rows. Email sends the same content to
-the allowlisted recipient and includes the snapshot ID. An HTTP/API success without readback is not a
-receipt.
+Notion and admin views must render the CEO brief, not raw source rows. An explicitly authorized private
+Notion Golden Sample may additionally resolve candidate display names into collapsed pipeline-detail
+sections; those names must not enter Git, email, admin, logs, or reviewer artifacts. Email sends the
+same PII-free canonical content to the allowlisted recipient and includes the snapshot ID. An HTTP/API
+success without readback is not a receipt.
 An external readback without write-ahead intent, schema reference, external object ID, or a
 DB-persisted receipt reference is also not `READBACK_VERIFIED`.
 

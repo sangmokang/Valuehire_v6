@@ -79,6 +79,15 @@ Claude V1 / Codex V2 verdicts
 remaining risks and exact blockers
 ```
 
+## Notion Golden Sample mode
+
+When the request standardizes a weekly Notion dashboard, asks for four-week trends, or names a
+`FY..W..-1` Golden Sample, read `notion-golden-sample.md` and use
+`contracts/weekly-ops/notion-golden-sample-v1.json`. In that mode, recent client intake is never a
+management priority list, LinkedIn market accessibility requires frozen filters plus a reviewed
+sample, and new Task, reactivation, movement, active pipeline, and interview pipeline counts remain
+separate metrics.
+
 ## Sourcing outreach channel contract
 
 Emit exactly one diagnostic for each channel whenever all three outreach capabilities are `PASS`,
