@@ -204,6 +204,8 @@ T는 이 문서, `docs/sot/invoice.md`, `contracts/invoice/invoice-v1.json`의 �
 | 2026-09-01 | vision 독립 검증 | 최종 재생성 PNG 2건 직접 검사 | PASS | A4 1페이지, 한글, 금액·계좌, 표 정렬, DRAFT, 잘림·겹침 이상 없음; 재생성 뒤 재검사에서도 변화 없음 |
 | 2026-09-01T11:41:09+09:00 | Codex G | 최종 예시 PDF 재생성 | PASS | 001 SHA `e877600979c15f1e6508b4cd49f303fa134149e6361463a3bf848940770ed50c`, 002 SHA `bb5a4b991a7a6be15af649449fc67cf1069f0d780120981682dd901a4c358079`; 각 1페이지, `CHECKED: 3` |
 | 2026-09-01T11:41:09+09:00 | Codex G | V1 산출물 보존 | PASS | `.omx/artifacts/claude-invoice-v1-20260901.md`, SHA `b648efce965485658d34adab631a7c8d0ed4f39155fc9552a729296347f22d9a` |
+| 2026-09-01 | Codex G | 커밋 `60218c4` pre-push | PASS | 로컬 적용 대상 27개 전량 `ok`; push·PR은 실행하지 않음 |
+| 2026-09-01 | fresh Codex V2 | 커밋 `60218c4bb278447422453d0cab7a569573f87b65` 독립 재현 | PASS | `REVIEW_READY`; 공식 스킬 검사 2건, 인수검사 12 tests, PDF 서명·EOF·1페이지·metadata SHA, 추적 234개 노출 0 확인. Gmail은 실행하지 않았고 최종 단계는 `BLOCKED` |
 
 ## 적대 검증 로그
 
@@ -219,3 +221,5 @@ T는 이 문서, `docs/sot/invoice.md`, `contracts/invoice/invoice-v1.json`의 �
 
 - 첫 실행 `FAIL`: 제품 반례가 아니라 AC-5에 적힌 기본 `python3`가 PyYAML을 찾지 못한 환경 문제와 신규 파일 미커밋 상태를 병합 blocker로 판정했다. 동일 공식 검증기는 위의 시스템 Python 명령으로 두 스킬 모두 `Skill is valid!`를 반환했다.
 - 조치: AC-5 명령을 실제 통과한 인터프리터로 고정하고, 모든 신규 파일을 로컬 검수 브랜치에 Lore 체크포인트로 커밋한 뒤 같은 fresh V2를 재실행한다.
+- 최종 실행 `PASS`: 커밋 `60218c4bb278447422453d0cab7a569573f87b65`의 검수 단계 목표에 필수 반례가 남지 않았음을 fresh context에서 확인했다. 두 PDF의 기록 SHA와 metadata가 일치하고, Codex/Claude 스킬이 공식 검사와 바이트 동등 검사를 통과했다.
+- 권한 경계: V2는 파일 수정·PDF 재생성·Gmail 호출을 하지 않았다. 세금 정책 `UNCONFIRMED`, `send_enabled=false`, 사용자 최종 승인 부재 때문에 최종 발행·메일은 계속 `BLOCKED`다.
