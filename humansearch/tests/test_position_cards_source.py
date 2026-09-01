@@ -14,6 +14,7 @@ import pytest
 
 from humansearch.admin_weekly_dashboard.contracts import MetricStatus, SourceFailureReason
 from humansearch.admin_weekly_dashboard.position_cards_source import (
+    HttpGet,
     PositionCardRow,
     PositionCardsResult,
     fetch_position_cards,
@@ -33,7 +34,7 @@ def _fixture_api_key() -> str:
     return "not-a-real-supabase-service-role-key"
 
 
-def _ok_get(body: object, *, status: int = 200) -> object:
+def _ok_get(body: object, *, status: int = 200) -> HttpGet:
     encoded = json.dumps(body).encode("utf-8")
     expected_key = _fixture_api_key()
 
