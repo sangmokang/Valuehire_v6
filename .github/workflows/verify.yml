@@ -243,3 +243,8 @@ jobs:
         # 검사기 1벌(scripts/verify/check-mechanism-registry.sh)을 로컬 pre-push
         # 글로브와 CI 가 같은 인수 스크립트로 실행한다 (판정기 2벌 금지 · P16).
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-verify-ac-m.sh
+
+      - name: 인수 검사 invoice (채용 수수료 계산·계약·플랫폼 동등성)
+        # 인보이스 PDF는 검수 승인 전 발송할 수 없다. CI에서는 개인정보 없는 fixture로
+        # 계산·기한·입력 거부·계약 변조와 Codex/Claude 스킬 동등성을 검증한다.
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-invoice.sh
