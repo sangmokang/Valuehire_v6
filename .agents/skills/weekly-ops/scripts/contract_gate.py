@@ -42,8 +42,9 @@ PHONE_PATTERN = re.compile(
     r"0\d{1,2}[- .]?\d{3,4}[- .]?\d{4})(?![A-Za-z0-9])"
 )
 RRN_PATTERN = re.compile(
-    r"(?<!\d)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])[- ]?[1-4]\d{6}(?!\d)"
+    r"(?<!\d)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])[-. ]?[1-4]\d{6}(?!\d)"
 )
+DASH_VARIANTS = str.maketrans({dash: "-" for dash in "‐‑‒–—―−﹘﹣"})
 PROFILE_URL_PATTERN = re.compile(
     r"(?i)(?<![a-z0-9.-])(?:[a-z0-9-]+\.)*(?:linkedin\.com|lnkd\.in|github\.com)/\S+"
 )
@@ -59,7 +60,7 @@ EMBEDDED_KEY_PATTERN = re.compile(
 
 def find_sensitive_text(value: str) -> bool:
     """NFKC 정규화 뒤 문자열 하나를 검사한다. 렌더링된 최종 산출물 재검사에도 쓰인다."""
-    normalized = unicodedata.normalize("NFKC", value)
+    normalized = unicodedata.normalize("NFKC", value).translate(DASH_VARIANTS)
     if (
         RRN_PATTERN.search(normalized)
         or PROFILE_URL_PATTERN.search(normalized)
