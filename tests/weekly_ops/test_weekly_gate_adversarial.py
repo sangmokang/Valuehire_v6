@@ -25,6 +25,32 @@ class WeeklyGateAdversarialTest(unittest.TestCase):
         second = self.gate.evaluate(bundle)
         self.assertNotEqual(second["report_snapshot_id"], first["report_snapshot_id"])
 
+    def test_client_requested_origin_rejects_none_intent(self):
+        bundle = valid_bundle()
+        bundle["positions"][0]["intent"] = "NONE"
+
+        result = self.gate.evaluate(bundle)
+
+        self.assertEqual(result["data_verdict"], "BLOCKED")
+        self.assertIn("POSITION_ORIGIN_INTENT_MISMATCH", result["errors"])
+
+    def test_client_shared_origin_rejects_requested_intent(self):
+        bundle = valid_bundle()
+        bundle["positions"][0]["origin"] = "CLIENT_SHARED"
+
+        result = self.gate.evaluate(bundle)
+
+        self.assertEqual(result["data_verdict"], "BLOCKED")
+        self.assertIn("POSITION_ORIGIN_INTENT_MISMATCH", result["errors"])
+
+    def test_existing_client_position_accepts_requirement_change(self):
+        bundle = valid_bundle()
+        bundle["positions"][0]["intent"] = "REQUIREMENT_CHANGED"
+
+        result = self.gate.evaluate(bundle)
+
+        self.assertNotIn("POSITION_ORIGIN_INTENT_MISMATCH", result["errors"])
+
     def test_db_read_pass_requires_verified_operating_snapshot(self):
         bundle = valid_bundle()
         del bundle["operating_snapshot"]
@@ -114,6 +140,16 @@ class WeeklyGateAdversarialTest(unittest.TestCase):
     def test_passed_outreach_capabilities_require_all_channel_diagnostics_even_at_zero(self):
         bundle = valid_bundle()
         del bundle["outreach_channel_diagnostics"]
+
+        result = self.gate.evaluate(bundle)
+
+        self.assertEqual(result["verdict"], "BLOCKED")
+        self.assertIn("OUTREACH_DIAGNOSTICS_MISSING", result["errors"])
+
+    def test_nonpass_outreach_capability_still_requires_one_diagnostic_per_channel(self):
+        bundle = valid_bundle()
+        bundle["capabilities"][5]["status"] = "NOT_RUN"
+        bundle["outreach_channel_diagnostics"] = bundle["outreach_channel_diagnostics"][1:]
 
         result = self.gate.evaluate(bundle)
 
@@ -294,6 +330,17 @@ class WeeklyGateAdversarialTest(unittest.TestCase):
         self.assertIn("PUBLICATION_TARGET_INVALID", result["errors"])
         self.assertIn("PUBLICATION_TARGET_INVALID", result["publication_report_markdown"])
 
+    def test_unknown_sixth_publication_target_fails_closed(self):
+        bundle = valid_bundle()
+        bundle["publication_targets"].append(
+            {"name": "unknown", "target_id": "unexpected", "status": "NOT_RUN"}
+        )
+
+        result = self.gate.evaluate(bundle)
+
+        self.assertEqual(result["verdict"], "BLOCKED")
+        self.assertIn("PUBLICATION_TARGET_INVALID", result["errors"])
+
     def test_score_properties_hold_across_all_difficulty_labels(self):
         point_maps = self.gate.DIFFICULTY_POINTS
         prior = None
@@ -335,6 +382,110 @@ class WeeklyGateAdversarialTest(unittest.TestCase):
         self.assertEqual(len(result["receipts"]), 5)
         self.assertTrue(all(item["status"] == "READBACK_VERIFIED" for item in result["receipts"]))
         self.assertTrue(all(item["content_hash"] == result["content_hash"] for item in result["receipts"]))
+        expected_targets = {item["name"]: item["target_id"] for item in bundle["publication_targets"]}
+        self.assertEqual(
+            {item["target_name"]: item["target_id"] for item in result["receipts"]},
+            expected_targets,
+        )
+
+    def test_candidate_display_name_aliases_are_forbidden(self):
+        for field in (
+            "candidate_display_name",
+            "candidateDisplayName",
+            "candidate-display-name",
+            "Candidate Display Name",
+            "candidate_full_name",
+            "applicant_name",
+            "applicantName",
+            "applicant-display-name",
+        ):
+            with self.subTest(field=field):
+                bundle = valid_bundle()
+                bundle["positions"][0][field] = "synthetic-person"
+                result = self.gate.evaluate(bundle)
+                self.assertEqual(result["data_verdict"], "BLOCKED")
+                self.assertIn("FORBIDDEN_SENSITIVE_FIELD", result["errors"])
+
+    def test_unlisted_pii_candidate_keys_fail_closed_via_allowlist(self):
+        for field in (
+            "email", "phone", "ssn", "jumin", "kakao_id", "resume_url",
+            "profile_url", "linkedin_url", "name_ko",
+            "이름", "연락처", "전화번호", "주소", "생년월일",
+        ):
+            with self.subTest(field=field):
+                bundle = valid_bundle()
+                bundle["positions"][0][field] = "synthetic-value"
+                result = self.gate.evaluate(bundle)
+                self.assertEqual(result["data_verdict"], "BLOCKED")
+                self.assertIn("FORBIDDEN_UNKNOWN_FIELD", result["errors"])
+
+    def test_novel_unlisted_keys_fail_closed_in_every_object(self):
+        def with_outreach_extra(bundle):
+            event = valid_outreach_event()
+            event["totally_new_key"] = "x"
+            bundle["outreach_events"] = [event]
+
+        mutators = {
+            "top_level": lambda bundle: bundle.update({"totally_new_key": "x"}),
+            "run": lambda bundle: bundle["run"].update({"totally_new_key": "x"}),
+            "capability": lambda bundle: bundle["capabilities"][0].update({"totally_new_key": "x"}),
+            "source_snapshot": lambda bundle: bundle["source_snapshots"][0].update({"totally_new_key": "x"}),
+            "career_summary": lambda bundle: bundle["career_page_summaries"][0].update({"totally_new_key": "x"}),
+            "consultant_roster": lambda bundle: bundle["consultant_roster"][0].update({"totally_new_key": "x"}),
+            "outreach_event": with_outreach_extra,
+            "zero_result_assertion": lambda bundle: bundle["zero_result_assertions"][0].update({"totally_new_key": "x"}),
+            "publication_target": lambda bundle: bundle["publication_targets"][0].update({"totally_new_key": "x"}),
+            "operating_snapshot": lambda bundle: bundle["operating_snapshot"].update({"totally_new_key": "x"}),
+        }
+        for name, mutate in mutators.items():
+            with self.subTest(object=name):
+                bundle = valid_bundle()
+                mutate(bundle)
+                result = self.gate.evaluate(bundle)
+                self.assertEqual(result["data_verdict"], "BLOCKED")
+                self.assertIn("FORBIDDEN_UNKNOWN_FIELD", result["errors"])
+
+    def test_structures_hidden_under_scalar_slots_fail_closed(self):
+        bundle = valid_bundle()
+        bundle["positions"][0]["evidence_refs"] = [
+            "sha256:codeit-request", {"연락처": "synthetic-value"},
+        ]
+        result = self.gate.evaluate(bundle)
+        self.assertEqual(result["data_verdict"], "BLOCKED")
+        self.assertIn("FORBIDDEN_UNKNOWN_FIELD", result["errors"])
+
+    def test_allowlisted_bundle_has_zero_unknown_field_false_positives(self):
+        bundle = valid_bundle()
+        bundle["source_snapshots"][3]["evidence_refs"].append("sha256:receipt-li")
+        linkedin_event = valid_outreach_event("linkedin_rps")
+        linkedin_event["provider_receipt_ref"] = "sha256:receipt-li"
+        bundle["outreach_events"] = [valid_outreach_event(), linkedin_event]
+        bundle["outreach_channel_diagnostics"][0]["blocker_reason"] = "정기 점검 안내"
+        bundle["dedupe_decisions"] = [
+            {
+                "decision_id": "dedupe-ok",
+                "kept_canonical_id": "pos-codeit-backend",
+                "removed_source_refs": ["sha256:codeit-request"],
+                "reason": "exact provider identifier",
+                "rule_version": "weekly-dedupe-v1",
+            }
+        ]
+        first = self.gate.evaluate(bundle)
+        mark_all_targets_verified(bundle, first)
+
+        result = self.gate.evaluate(bundle)
+
+        self.assertEqual(result["errors"], [])
+        self.assertEqual(result["verdict"], "PASS")
+
+    def test_legitimate_key_names_are_not_classified_as_pii(self):
+        legitimate = (
+            "position_id", "hiring_cycle_id", "candidate_key_hmac", "list_url",
+            "official_url", "operator_url", "notion_parent_url", "search_url_ref",
+            "metric_name", "risk_name", "target_name", "display_name_similarity",
+        )
+        payload = [{key: "synthetic"} for key in legitimate]
+        self.assertEqual(self.gate.find_forbidden_fields(payload), [])
 
     def test_html_view_is_derived_from_the_canonical_brief_and_single_hash(self):
         renderer_path = (
