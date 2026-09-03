@@ -1061,3 +1061,21 @@ checkpoint 근거가 아니다.
 - 보정 후 fresh GREEN: 단위 139 tests OK, sot_gate `CHECKED: 89` exit 0, acceptance
   `CHECKED: 64` exit 0(mutation 31종 생존 0), verify.sh PASS.
 
+### 2026-09-04 fresh Codex V2 2차 결과와 보정
+
+- V2 2차 artifact: `.omx/artifacts/codex-v2-pii-3layer-round2-20260904.md`
+  (검토 대상 HEAD `12cfcd45759d3a8af1ec7c256f1f42e517b71ea9`) — verdict `FAIL`.
+  1차 반례 7종은 전부 닫힌 것으로 독립 재현·확인됐다.
+- 채택·보정(R9 회귀 편입): allowlist 이메일 substring 마스킹이
+  `sangmokang@valueconnect.kr.evil.com` 을 통과시키던 우회(경계 lookaround re.sub로 교체),
+  공백 든 따옴표 이메일, 한글 IDN 이메일(유니코드 이메일 패턴), 괄호 지역번호
+  `(02) 123-4567`, 주민번호 성별 자리 1-8 확장·공백-하이픈 구분, main 최종 문자열 검사의
+  격리 반례(render_html 주입 e2e 테스트) + 전용 acceptance mutation
+  (stdout-rescan-bypass) 신설.
+- 기각(의도된 과차단 유지): `+1 234 567 890건` 4그룹 증감 표기 — 실제 국제전화와
+  구조적으로 동일해 구분 불가. 진짜 전화 뒤에 한글 조사가 오는 경우를 예외로 두면
+  우회 구멍이 되므로 차단 유지(콤마 표기 시 통과). 날짜코드+7자리 수 병기 유사 사례도
+  같은 방향의 잔여 과차단으로 수용.
+- 보정 후 fresh GREEN: 단위 142 tests OK, sot_gate `CHECKED: 89` exit 0, acceptance
+  `CHECKED: 65` exit 0(mutation 32종 생존 0), verify.sh PASS, clean.
+
