@@ -210,6 +210,45 @@ OLD_CAUGHT_AND_NEW_MISSED_COUNT=4
 신규 줄 **단독**으로 추적 파일 전수 스캔: rc=1(매치 0건), stderr 0바이트, 합성 카나리로
 패턴 생존 확인. 즉 "0건"이 "패턴이 죽었다"의 결과가 아님을 같은 실행에서 증명했다.
 
+### Full Strict · 억제 제거로 열린 CI 스텝 재검 (2026-09-03)
+
+**로컬 전량 원장** — 워크트리에서 `verify.sh` + `acceptance-*.sh` 28개:
+```
+FULL_STRICT: TOTAL=28 RED=0
+```
+(`acceptance-0-7.sh` 는 원장 제외 대상이라 따로 실행 — exit 0, 위반 7종 차단 + 통과쌍 1건)
+
+착수 시 `RED: 1/28` 이 나왔는데 원인은 이번 변경이 아니라 **새 워크트리에 gitignore 된
+로컬 `.secret-patterns` 가 없다**는 환경 문제였다(`acceptance-0-2.sh` 가 그 파일을 요구).
+메인 트리에서 심볼릭 링크한 뒤 0/28. 워크트리 생성 직후 로컬 env 파일을 잇는 규칙에
+`.secret-patterns` 도 포함된다는 사실을 여기 남긴다.
+
+**CI 16~26번(억제 만료로 그동안 skipped 였던 11개) 재현** — GitHub 체크아웃과 같은 객체
+집합을 만들기 위해 `git clone --no-local --single-branch` 로 뜬 사본에서 실행:
+
+| CI # | 스텝 | 결과 |
+|---|---|---|
+| 16 | 강제 장치 존재 검사 | EXIT=0 |
+| 17 | 셸 스크립트 문법 검사 (50개) | EXIT=0 |
+| 18 | 패턴 파일 자체 실값 | EXIT=0 |
+| 19 | hs-a3 (CHECKED 25) | EXIT=0 |
+| 20 | 데이터 노출 스캔 (추적 226 · blob 365) | EXIT=0 |
+| 21 | hs-a4 (CHECKED 30) | EXIT=0 |
+| 22 | secret-webhook-vendor (CHECKED 41) | EXIT=0 |
+| 23 | verified-sha (CHECKED 12) | EXIT=0 |
+| 24 | ci-step-integrity (CHECKED 14) | EXIT=0 |
+| 25 | semantic-mutations (CHECKED 10) | EXIT=0 |
+| 26 | verify-ac-m (CHECKED 31) | EXIT=0 |
+
+**새로 빨개진 것 0건.** 중간에 20번이 로컬에서 한 번 FAIL 로 보였는데
+(`docs/decisions/finding-events.jsonl`, blob d8148f1), 추적하니 **origin/main 에서 도달
+불가능한 객체**였고 기준 커밋 b724093 에서도 같은 FAIL 이 재현됐다. 로컬 `git clone` 이
+객체 저장소를 하드링크로 공유해 다른 워크트리의 폐기 객체까지 끌고 온 허상이며,
+전송 프로토콜을 강제한 `--no-local` 사본에서는 위 표대로 PASS 다. 이번 변경과 무관하다.
+
+**히스토리 전량 스캔(CI 8번)** — 신규 패턴을 도달 가능한 모든 blob 에 적용:
+`PASS: 히스토리 전량 blob 스캔 0건 (blob 2136개 검사)`, 객체 6184개.
+
 ### V1 (외부 적대검증) · V2 (리셋 재검증)
 
 (후기록 — 판정 본문을 그대로 append 한다)
