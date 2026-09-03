@@ -51,6 +51,12 @@
   stage: "ci"
   ci_mirror_job: "verify"
   required: true
+- id: "weekly-ops-sot-ci"
+  path: ".github/workflows/verify.yml"
+  target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-weekly-ops-skill.sh --full"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
 - id: "acceptance-runner-gate"
   path: "scripts/verify/run-acceptance.sh"
   target: "판정을 한 건도 내놓지 않았다"
@@ -81,4 +87,3 @@
   stage: "manual"
   manual_reason: "원격 조회가 필요해 CI 안에서 자기 SHA 를 검사하는 것은 뜻이 없다. 머지 전 판정 도구"
   required: true
-
