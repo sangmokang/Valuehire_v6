@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import re
+import unicodedata
 from datetime import datetime
 from typing import Any, Callable
 
@@ -32,25 +34,64 @@ RECEIPT_FIELDS = {
 SOURCE_STATUSES = {"PASS", "PARTIAL", "FAIL", "NOT_RUN", "STALE"}
 DEDUPE_RULE_VERSION = "weekly-dedupe-v1"
 ZERO_RESULT_RULE_VERSION = "weekly-zero-result-v1"
-ZERO_RESULT_COLLECTIONS = {"positions", "outreach_events"}
+ZERO_RESULT_COLLECTIONS = {"positions", "position_state", "outreach_events", "pipeline_events", "pipeline_state"}
 ALLOWED_EMAIL_TARGETS = {"sangmokang@valueconnect.kr"}
 EMAIL_PATTERN = re.compile(r"(?<![\w.+-])[\w.+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?![\w.-])")
 PHONE_PATTERN = re.compile(
     r"(?<![A-Za-z0-9])(?:(?:\+?82[- .]?)?0?1[016789][- .]?\d{3,4}[- .]?\d{4}|"
     r"0\d{1,2}[- .]?\d{3,4}[- .]?\d{4})(?![A-Za-z0-9])"
 )
+RRN_PATTERN = re.compile(
+    r"(?<!\d)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])[- ]?[1-4]\d{6}(?!\d)"
+)
+PROFILE_URL_PATTERN = re.compile(
+    r"(?i)(?<![a-z0-9.-])(?:[a-z0-9-]+\.)*(?:linkedin\.com|lnkd\.in|github\.com)/\S+"
+)
+INTL_PHONE_PATTERN = re.compile(
+    r"(?<![\w+])\+[1-9]\d{0,2}[- .]?\d{2,4}[- .]?\d{3,4}[- .]?\d{0,4}(?![\d])"
+)
+EMBEDDED_KEY_PATTERN = re.compile(
+    r"""(?i)["'](?:name|full_name|email|phone|mobile|address|birth|birthdate|"""
+    r"""candidate_name|candidate_display_name|candidate_full_name|candidate_email|"""
+    r"""applicant_name|applicant_display_name|applicant_full_name)["']\s*[:=]"""
+)
+
+
+def find_sensitive_text(value: str) -> bool:
+    """NFKC 정규화 뒤 문자열 하나를 검사한다. 렌더링된 최종 산출물 재검사에도 쓰인다."""
+    normalized = unicodedata.normalize("NFKC", value)
+    if (
+        RRN_PATTERN.search(normalized)
+        or PROFILE_URL_PATTERN.search(normalized)
+        or INTL_PHONE_PATTERN.search(normalized)
+        or EMBEDDED_KEY_PATTERN.search(normalized)
+    ):
+        return True
+    value = normalized
+    return bool(EMAIL_PATTERN.search(value) or PHONE_PATTERN.search(value))
+
+
+def _string_value_is_sensitive(value: str) -> bool:
+    stripped = value.strip()
+    if stripped.startswith("{"):
+        try:
+            if isinstance(json.loads(stripped), dict):
+                return True
+        except ValueError:
+            pass
+    return find_sensitive_text(value)
 
 
 def find_sensitive_values(value: Any) -> bool:
     if isinstance(value, str):
-        return bool(EMAIL_PATTERN.search(value) or PHONE_PATTERN.search(value))
+        return _string_value_is_sensitive(value)
     if isinstance(value, dict):
         return any(
-            find_sensitive_values(nested)
+            find_sensitive_values(key) or find_sensitive_values(nested)
             for key, nested in value.items()
             if not (
                 key == "target_id"
-                and value.get("name") == "email"
+                and (value.get("name") == "email" or value.get("target_name") == "email")
                 and isinstance(nested, str)
                 and nested in ALLOWED_EMAIL_TARGETS
             )
@@ -239,13 +280,21 @@ def publication_receipts(targets: Any) -> list[dict[str, Any]]:
         return []
     receipts: list[dict[str, Any]] = []
     for target in targets:
-        if not isinstance(target, dict) or not isinstance(target.get("name"), str):
+        if (
+            not isinstance(target, dict)
+            or not isinstance(target.get("name"), str)
+            or target["name"] not in REQUIRED_PUBLICATION_TARGETS
+        ):
             continue
-        receipt = {"name": target["name"], "status": target.get("status", "NOT_RUN")}
+        receipt = {
+            "target_name": target["name"],
+            "target_id": target.get("target_id"),
+            "status": target.get("status", "NOT_RUN"),
+        }
         if target.get("status") == "READBACK_VERIFIED":
             receipt.update({field: target.get(field) for field in sorted(RECEIPT_FIELDS)})
         receipts.append(receipt)
-    return sorted(receipts, key=lambda item: item["name"])
+    return sorted(receipts, key=lambda item: item["target_name"])
 
 
 def publication_state(
@@ -267,7 +316,7 @@ def publication_state(
             errors.append("PUBLICATION_TARGET_INVALID")
             continue
         name = target["name"]
-        if not isinstance(name, str) or name in seen:
+        if name not in REQUIRED_PUBLICATION_TARGETS or name in seen:
             errors.append("PUBLICATION_TARGET_INVALID")
             continue
         seen.add(name)
