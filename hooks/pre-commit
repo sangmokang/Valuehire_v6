@@ -108,7 +108,15 @@ else
   else
     while IFS= read -r f; do
       case "$f" in
-        *.sh|*.yml|*.yaml|hooks/*)
+        # .secret-patterns.default 를 뺀 채로는 검사기를 한 줄도 안 고치고
+        # **검사 기준**만 손대는 경로가 열려 있었다 (2026-09-03 실측: 이 저장소의
+        # 비밀 정책 전체가 그 파일 한 장에 있다). 규칙을 정하는 파일이 규칙 약화
+        # 감시 밖에 있으면 감시의 의미가 없다. 시연: scripts/acceptance-0-7.sh 7번.
+        #
+        # .check-weakening-patterns 는 일부러 넣지 않는다 — 그 파일 자체가 약화
+        # 리터럴 목록이라 새 약화 패턴을 추가하는 정당한 작업이 자기 매칭으로
+        # 영구 차단된다(넣었다가 되돌린 이유를 남긴다).
+        *.sh|*.yml|*.yaml|hooks/*|.secret-patterns.default)
           if scan_added "검사약화" "$f" -Ef "$wf"; then
             block "검사 약화 패턴 추가 — $f (P13). 정당하면 suppressions.yaml 에 expiry 와 함께 등록하라"
           fi
