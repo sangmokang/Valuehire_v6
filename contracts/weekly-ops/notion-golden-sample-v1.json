@@ -1,5 +1,10 @@
 {
   "contract_version": "notion-weekly-golden-v1",
+  "runtime_status": {
+    "state": "CONTRACT_ONLY_NOT_EXECUTABLE",
+    "publication_allowed": false,
+    "replacement_required": "notion-weekly-golden-v2"
+  },
   "template": {
     "title_pattern": "FY{yy}W{iso_week}-1",
     "view": "private_executive_dashboard",
@@ -10,6 +15,7 @@
       "position_changes",
       "candidate_sourcing",
       "new_tasks",
+      "reactivated_tasks",
       "pipeline_movements",
       "active_pipeline",
       "pre_interview_pipeline",
@@ -17,17 +23,70 @@
     ],
     "detail_sections_collapsed": [
       "new_tasks",
+      "reactivated_tasks",
       "pipeline_movements",
       "active_pipeline",
-      "pre_interview_pipeline"
+      "pre_interview_pipeline",
+      "data_coverage"
     ]
   },
   "authority": {
     "recent_client_positions_order": "observed_at_desc",
     "managerial_directives_forbidden": true,
     "llm_may_not_choose_work": true,
-    "priority_name": "sourcing_coverage_priority",
-    "priority_is_formula_output_not_management_decision": true
+    "risk_name": "sourcing_coverage_risk",
+    "risk_is_formula_output_not_management_decision": true,
+    "legacy_priority_score_fields_forbidden": true
+  },
+  "section_schemas": {
+    "four_week_kpis": {
+      "shape": "metric_by_week_matrix",
+      "row_required_fields": ["metric_name", "week_label", "metric_iso_week", "window_start", "window_end_exclusive", "value", "status", "as_of", "source_snapshot_id", "evidence_refs"]
+    },
+    "recent_client_positions": {
+      "shape": "ordered_position_rows",
+      "row_required_fields": ["position_id", "company", "title", "requested_headcount", "observed_at", "intent_type", "source_snapshot_id", "evidence_refs"]
+    },
+    "market_accessibility": {
+      "shape": "position_market_rows",
+      "row_required_fields": ["position_id", "market_status", "accessibility_score", "accessibility_band", "coverage_risk_score", "coverage_risk_band", "market_formula_version", "coverage_risk_formula_version", "source_snapshot_id", "evidence_refs"],
+      "nullable_fields": ["coverage_risk_score"],
+      "ineligible_coverage_risk_band": "UNRANKED"
+    },
+    "position_changes": {
+      "shape": "position_change_rows",
+      "row_required_fields": ["position_id", "company", "title", "change_type", "changed_at", "source_snapshot_id", "evidence_refs"]
+    },
+    "candidate_sourcing": {
+      "shape": "channel_and_consultant_collections",
+      "required_collections": ["channel_coverage", "consultant_focus", "excluded_rows"]
+    },
+    "new_tasks": {
+      "shape": "candidate_task_rows",
+      "row_required_fields": ["candidate_key_hmac", "position_id", "company", "title", "hiring_cycle_id", "event_at", "current_stage", "source_snapshot_id", "evidence_refs"]
+    },
+    "reactivated_tasks": {
+      "shape": "candidate_task_rows",
+      "row_required_fields": ["candidate_key_hmac", "position_id", "company", "title", "hiring_cycle_id", "event_at", "current_stage", "source_snapshot_id", "evidence_refs"]
+    },
+    "pipeline_movements": {
+      "shape": "pipeline_event_rows",
+      "row_required_fields": ["candidate_key_hmac", "position_id", "company", "title", "hiring_cycle_id", "from_stage", "to_stage", "event_type", "event_at", "source_snapshot_id", "evidence_refs"]
+    },
+    "active_pipeline": {
+      "shape": "current_candidate_task_rows",
+      "row_required_fields": ["candidate_key_hmac", "position_id", "company", "title", "hiring_cycle_id", "current_stage", "current_stage_at", "source_snapshot_id", "evidence_refs"]
+    },
+    "pre_interview_pipeline": {
+      "shape": "current_candidate_task_rows",
+      "row_required_fields": ["candidate_key_hmac", "position_id", "company", "title", "hiring_cycle_id", "current_stage", "current_stage_at", "source_snapshot_id", "evidence_refs"]
+    },
+    "data_coverage": {
+      "shape": "coverage_and_alert_collections",
+      "required_collections": ["requirement_status", "post_cutoff_alerts"],
+      "requirement_row_required_fields": ["requirement", "status", "as_of", "source_snapshot_id", "evidence_refs", "blocker_reason"],
+      "alert_row_required_fields": ["event_type", "occurred_at", "cutoff_at", "source_snapshot_id", "evidence_refs"]
+    }
   },
   "four_week_series": {
     "length": 4,
@@ -44,16 +103,23 @@
       "unit": "canonical_position",
       "allowed_origins": ["CLIENT_REQUESTED", "CLIENT_SHARED"],
       "allowed_lifecycles": ["ACTIVE", "PIPELINE", "CLOSING"],
-      "excluded_origins": ["SCRAPED_STAGING"],
+      "excluded_origins": ["SCRAPED_STAGING", "INTERNAL_CREATED"],
       "excluded_statuses": ["closedpositions", "complete"],
       "headcount_is_separate": true
     },
     "new_task_count": {
       "kind": "weekly_flow",
       "unit": "canonical_candidate_position",
-      "dedupe_key": ["candidate_key_hmac", "position_id"],
+      "dedupe_key": ["candidate_key_hmac", "position_id", "hiring_cycle_id"],
       "external_task_id_is_lineage_not_identity": true,
       "reactivation_is_separate_metric": true
+    },
+    "reactivated_task_count": {
+      "kind": "weekly_flow",
+      "unit": "canonical_candidate_position",
+      "dedupe_key": ["candidate_key_hmac", "position_id", "hiring_cycle_id"],
+      "requires_prior_closed_same_cycle": true,
+      "new_task_is_false": true
     },
     "active_pipeline_count": {
       "kind": "week_end_snapshot",
@@ -83,6 +149,15 @@
         "FINAL_ACCEPTED"
       ]
     },
+    "pre_interview_pipeline_count": {
+      "kind": "week_end_snapshot",
+      "unit": "canonical_candidate_position",
+      "latest_state_only": true,
+      "stages": [
+        "RECOMMENDATION_PENDING",
+        "CLIENT_REVIEW"
+      ]
+    },
     "channel_outreach": {
       "kind": "weekly_flow",
       "channels": ["saramin", "jobkorea", "linkedin_rps"],
@@ -95,6 +170,7 @@
   "recent_client_positions": {
     "window": "closed_week",
     "allowed_origins": ["CLIENT_REQUESTED", "CLIENT_SHARED"],
+    "excluded_origins": ["SCRAPED_STAGING", "INTERNAL_CREATED"],
     "required_fields": [
       "position_id",
       "company",
@@ -109,6 +185,10 @@
   },
   "market_accessibility": {
     "source": "linkedin_recruiter_saved_search",
+    "source_system": "linkedin_rps",
+    "filter_dimensions_require_nonempty_string_arrays": true,
+    "ordered_result_snapshot_hash_equals_source_raw_hash": true,
+    "formula_version": "market-accessibility-v2",
     "required_fields": [
       "position_id",
       "search_url_ref",
@@ -118,36 +198,61 @@
       "skills",
       "seniority_or_years",
       "languages",
+      "sort_order",
+      "ordered_result_snapshot_hash",
+      "must_have_predicates",
+      "sample_evaluations",
       "result_count_lower_bound",
       "count_is_exact",
-      "qualified_sample_size",
+      "provider_result_receipt_ref",
+      "evaluated_sample_size",
       "qualified_sample_matches",
       "captured_at",
       "source_snapshot_id"
     ],
-    "minimum_qualified_sample_size": 20,
+    "evaluated_sample_size": 20,
+    "sample_selection": "ordered_first_20_hmac_unique",
+    "underfilled_unique_sample": "UNRANKED",
+    "sample_evaluation_schema": {
+      "exact_fields": ["candidate_key_hmac", "rank", "predicate_results"],
+      "candidate_key_hmac_min_length": 32,
+      "rank_sequence": [1, 20],
+      "predicate_keys_equal_must_have_predicates": true,
+      "predicate_values": ["TRUE", "FALSE", "UNKNOWN"],
+      "qualified_count_recomputed_from_predicates": true
+    },
     "pool_points": [
       {"max": 0, "points": 0},
-      {"max": 9, "points": 15},
-      {"max": 24, "points": 30},
-      {"max": 49, "points": 45},
-      {"max": 99, "points": 60},
-      {"max": 249, "points": 75},
-      {"max": null, "points": 90}
+      {"max": 9, "points": 10},
+      {"max": 24, "points": 20},
+      {"max": 49, "points": 30},
+      {"max": 99, "points": 40},
+      {"max": null, "points": 50}
     ],
-    "precision_adjustments": [
-      {"max_rate_exclusive": 0.2, "points": -20},
-      {"max_rate_exclusive": 0.4, "points": -10},
-      {"max_rate_exclusive": 0.6, "points": 0},
-      {"max_rate_exclusive": 0.8, "points": 5},
-      {"max_rate_exclusive": null, "points": 10}
+    "precision_points": [
+      {"max_rate_exclusive": 0.2, "points": 0},
+      {"max_rate_exclusive": 0.4, "points": 15},
+      {"max_rate_exclusive": 0.6, "points": 30},
+      {"max_rate_exclusive": 0.8, "points": 40},
+      {"max_rate_exclusive": null, "points": 50}
     ],
+    "pool_points_input": "result_count_lower_bound",
+    "result_count_source": "immutable_pass_bound_provider_receipt",
+    "precision_rate_formula": "qualified_sample_matches / evaluated_sample_size",
+    "precision_points_input": "precision_rate",
+    "score_formula": "(pool_points * precision_points * 100) // 2500",
+    "zero_qualified_override": {"score": 0, "band": "HARD"},
     "score_bounds": [0, 100],
     "bands": {"EASY": [70, 100], "MEDIUM": [40, 69], "HARD": [0, 39]},
     "missing_or_partial_result": "UNRANKED"
   },
-  "sourcing_coverage_priority": {
+  "sourcing_coverage_risk": {
+    "formula_version": "sourcing-coverage-risk-v1",
+    "position_age_source": "latest_pass_customer_intent_before_cutoff",
+    "active_candidate_source": "latest_pass_pipeline_event_per_task_at_cutoff",
+    "inputs_recomputed_by_db": true,
     "eligible_lifecycles": ["ACTIVE"],
+    "ineligible_lifecycle_result": {"score": null, "band": "UNRANKED", "reason": "INELIGIBLE_LIFECYCLE"},
     "recency_points": [
       {"max_age_days": 2, "points": 40},
       {"max_age_days": 7, "points": 30},
@@ -158,7 +263,7 @@
       {"active_candidates": 0, "points": 30},
       {"active_candidates": 1, "points": 20},
       {"active_candidates": 2, "points": 10},
-      {"active_candidates": 3, "points": 0}
+      {"active_candidates_min": 3, "points": 0}
     ],
     "scarcity_points": {"HARD": 30, "MEDIUM": 15, "EASY": 0},
     "score_formula": "recency_points + pipeline_gap_points + scarcity_points",
@@ -167,7 +272,7 @@
     "unverified_market_result": "UNRANKED"
   },
   "pipeline": {
-    "dedupe_key": ["candidate_key_hmac", "position_id"],
+    "dedupe_key": ["candidate_key_hmac", "position_id", "hiring_cycle_id"],
     "latest_event_at_cutoff_wins": true,
     "closed_stages": ["JOINED", "REJECTED", "WITHDRAWN", "CLOSED"],
     "movement_count_is_distinct_transition": true
@@ -176,7 +281,10 @@
     "canonical_snapshot_uses_candidate_key_hmac": true,
     "candidate_display_name_allowed_only_in_user_authorized_private_notion": true,
     "resolve_display_name_at_write_time": true,
-    "forbidden_targets_for_candidate_display_name": ["git", "email", "admin_web", "review_bundle"],
+    "forbidden_targets_for_candidate_display_name": [
+      "canonical_input", "git", "email", "admin_web", "logs", "hashes", "receipts", "exceptions",
+      "review_bundle"
+    ],
     "private_page_access_readback_required": true
   },
   "hooks": [
@@ -187,7 +295,7 @@
     "dedupe_candidate_position_records",
     "compute_weekly_metrics",
     "compute_market_accessibility",
-    "compute_sourcing_coverage_priority",
+    "compute_sourcing_coverage_risk",
     "render_golden_sample",
     "record_write_ahead_intent",
     "publish_private_notion",
