@@ -500,9 +500,15 @@ while IFS= read -r rule; do
   j=1
   while [ "$j" -le "$CORPUS_N" ]; do
     eval "line=\$CORPUS_$j"
+    # 세 조건을 모두 봐야 한다. 현행이 **이미** 놓치는 표본을 빼지 않으면, 어떤 규칙을
+    # 빼도 그 표본이 계속 미탐이라 **모든 규칙이 판별력 있음으로 잘못 계수된다**
+    # (2026-09-03 자체 뮤테이션에서 실측: 규칙 하나를 지우자 UNCOVERED 가 [17] -> [] 로
+    # 줄어 오히려 더 안전해 보였다). 회귀 검사가 먼저 빨개져 결과는 같지만, 게이트가
+    # 거짓 신호를 내는 것 자체가 결함이다.
+    c=0; printf '%s\n' "$line" | grep -qEif "$CLEAN"    || c=$?
     o=0; printf '%s\n' "$line" | grep -qEif "$OLDCLEAN" || o=$?
-    m=0; printf '%s\n' "$line" | grep -qEif "$MINUS"   || m=$?
-    if [ "$o" -eq 0 ] && [ "$m" -eq 1 ]; then discriminating=1; break; fi
+    m=0; printf '%s\n' "$line" | grep -qEif "$MINUS"    || m=$?
+    if [ "$c" -eq 0 ] && [ "$o" -eq 0 ] && [ "$m" -eq 1 ]; then discriminating=1; break; fi
     j=$((j + 1))
   done
   rm -f "$MINUS"
