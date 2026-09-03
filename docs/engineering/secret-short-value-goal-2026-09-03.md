@@ -154,4 +154,62 @@
 
 ## 적대 검증 로그
 
-(후기록 — V1/V2 판정 본문을 그대로 append 한다)
+### AUDIT — 뮤테이션 (저장소 밖 격리 사본, 2026-09-03)
+
+사본: 워크트리를 `git clone` 한 3벌. 저장소 안에서는 아무것도 바꾸지 않았다.
+
+**기준(뮤테이션 없음)** — `bash scripts/acceptance-secret-webhook-vendor.sh` exit 0
+```
+OLD_CAUGHT_AND_NEW_MISSED_COUNT=0
+CHECKED: 41
+```
+
+**(a) 신규 줄 삭제** — 패턴 파일 114 → 113줄(삭제 1줄, 기존 12자 줄은 잔존 확인). exit 1
+```
+FAIL: 스캐너 종단 — 짧은 값 — CREDENTIAL (접미 없음) (기대 exit=1, 실제 0)
+FAIL: 스캐너 종단 — 짧은 값 — WEBHOOK_URL (열거된 접미) (기대 exit=1, 실제 0)
+FAIL: 스캐너 종단 — 짧은 값 — PRIVATE_KEY (접미 없음) (기대 exit=1, 실제 0)
+OLD_CAUGHT_AND_NEW_MISSED_COUNT=0
+```
+판별 표본 3건이 정확히 RED 다. `CREDENTIAL_TOKEN` 은 **RED 가 되지 않았다** — 기존 TOKEN
+규칙이 덮기 때문이며, 그래서 §⑤ 에서 검출력 증거로 세지 않았다(변조 생존 ≠ 도달 불가).
+
+**(b) 기존 12자 줄을 신규 줄로 교체** — 12자 줄만 삭제(후보 1건 확인), 신규 줄 잔존. exit 1
+```
+FAIL: 통과됨(놓침) — WEBHOOK 계열 .env 대입(불투명 토큰)
+FAIL: 회귀 — 기준선은 잡던 것을 지금은 놓친다 (코퍼스 1)
+FAIL: 회귀 — 기준선은 잡던 것을 지금은 놓친다 (코퍼스 2)
+FAIL: 회귀 — 기준선은 잡던 것을 지금은 놓친다 (코퍼스 3)
+FAIL: 회귀 — 기준선은 잡던 것을 지금은 놓친다 (코퍼스 4)
+OLD_CAUGHT_AND_NEW_MISSED_COUNT=4
+```
+장문·열거 밖 접미 회귀가 잡힌다(§⑤ CA-2 충족). 동결 fixture 를 기준선으로 잡은 설계가
+여기서 값을 한다 — '현재 파일 − 신규 줄'을 기준선으로 삼았다면 이 뮤테이션도 0이 나온다.
+
+**(c) 훅 case 에서 `.secret-patterns.default` 제거** — `hooks/pre-commit` 한 줄 되돌림. exit 1
+```
+[7/7] 비밀 패턴 파일 약화 → 사유 불일치 ← 차단은 됐지만 겨냥한 게이트가 아니다
+      (기대 사유: 검사 약화 패턴 추가 — .secret-patterns.default)
+```
+사유 대조가 없으면 이 뮤테이션은 **생존한다** — verify.sh 가 대신 막아 종료값이 1이기
+때문이다. 실제로 WU3 RED 실행에서 그 장면을 그대로 관측했다.
+
+### 정규식 실측 (저장소 밖, `/usr/bin/grep` 절대경로 · rc 3갈래)
+
+대조군 `PASSWORD=abc123xy` → old=CAUGHT / new=CAUGHT (판정기 생존 확인) 이후:
+
+| 입력 | old | new |
+|---|---|---|
+| `CREDENTIAL=abc123xy` | MISSED | CAUGHT |
+| `WEBHOOK_URL=abc123xy` | MISSED | CAUGHT |
+| `PRIVATE_KEY=abc123xy` | MISSED | CAUGHT |
+| `CREDENTIAL_TOKEN=abc123xy` | CAUGHT | CAUGHT |
+| `CREDENTIAL_PROVIDER=keychain` | MISSED | MISSED |
+| `PRIVATE_KEY_FORMAT=PKCS12` | MISSED | MISSED |
+
+신규 줄 **단독**으로 추적 파일 전수 스캔: rc=1(매치 0건), stderr 0바이트, 합성 카나리로
+패턴 생존 확인. 즉 "0건"이 "패턴이 죽었다"의 결과가 아님을 같은 실행에서 증명했다.
+
+### V1 (외부 적대검증) · V2 (리셋 재검증)
+
+(후기록 — 판정 본문을 그대로 append 한다)
