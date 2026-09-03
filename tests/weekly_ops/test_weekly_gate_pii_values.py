@@ -103,5 +103,50 @@ class WeeklyGatePiiValueTest(unittest.TestCase):
         self.assertEqual(result["data_verdict"], "PASS")
 
 
+class WeeklyGateFinalOutputRescanTest(unittest.TestCase):
+    """WU-3: renderer 이후 최종 산출물 독립 재검사 — 마지막 방어선."""
+
+    def evaluate_with_injected_brief(self, injected_line):
+        gate = load_gate()
+        original = gate.render_brief
+        gate.render_brief = (
+            lambda *args, **kwargs: original(*args, **kwargs) + "\n" + injected_line
+        )
+        result = gate.evaluate(valid_bundle())
+        return gate, result
+
+    def test_renderer_injected_email_is_blocked_and_payload_is_stripped(self):
+        gate, result = self.evaluate_with_injected_brief(
+            "- 문의: synthetic.person@example.com"
+        )
+        self.assertEqual(result["verdict"], "BLOCKED")
+        self.assertIn("FORBIDDEN_SENSITIVE_OUTPUT", result["errors"])
+        self.assertEqual(result["brief_markdown"], "")
+        self.assertEqual(result["positions"], [])
+        self.assertNotIn("synthetic.person@example.com", gate.canonical_json(result))
+
+    def test_renderer_injected_phone_is_blocked(self):
+        gate, result = self.evaluate_with_injected_brief("- 연락처: 010-1234-5678")
+        self.assertEqual(result["verdict"], "BLOCKED")
+        self.assertIn("FORBIDDEN_SENSITIVE_OUTPUT", result["errors"])
+        self.assertNotIn("010-1234-5678", gate.canonical_json(result))
+
+    def test_injected_forbidden_or_unknown_output_keys_are_violations(self):
+        gate = load_gate()
+        clean = gate.evaluate(valid_bundle())
+        self.assertEqual(gate.final_output_violations(clean), [])
+        with_forbidden = dict(clean, candidate_name="synthetic-name")
+        self.assertTrue(gate.final_output_violations(with_forbidden))
+        with_unknown = dict(clean, kakao_id="synthetic-value")
+        self.assertTrue(gate.final_output_violations(with_unknown))
+
+    def test_clean_bundle_keeps_full_payload_after_rescan(self):
+        gate = load_gate()
+        result = gate.evaluate(valid_bundle())
+        self.assertEqual(result["data_verdict"], "PASS")
+        self.assertNotEqual(result["brief_markdown"], "")
+        self.assertNotIn("FORBIDDEN_SENSITIVE_OUTPUT", result["errors"])
+
+
 if __name__ == "__main__":
     unittest.main()
