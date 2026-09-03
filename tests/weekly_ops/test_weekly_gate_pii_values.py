@@ -50,6 +50,18 @@ class WeeklyGatePiiValueTest(unittest.TestCase):
             with self.subTest(value=value):
                 self.assert_action_value_blocked(value)
 
+    def test_unicode_dash_and_dot_separator_variants_are_blocked(self):
+        # 2026-09-04 codeaudit B-트랙 발견 반례 (R9): NFKC가 정규화하지 않는 대시 변형
+        for value in (
+            "010–1234–5678",   # en dash
+            "010—1234—5678",   # em dash
+            "010−1234−5678",   # minus sign
+            "900101–1234567",       # en dash 주민번호
+            "900101.1234567",            # 점 구분 주민번호
+        ):
+            with self.subTest(value=value):
+                self.assert_action_value_blocked(value)
+
     def test_international_phone_numbers_are_blocked(self):
         for value in (
             "+1 415 555 2671",
