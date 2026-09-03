@@ -328,7 +328,9 @@ class WeeklyGateAdversarialTest(unittest.TestCase):
 
         self.assertEqual(result["verdict"], "BLOCKED")
         self.assertIn("PUBLICATION_TARGET_INVALID", result["errors"])
-        self.assertIn("PUBLICATION_TARGET_INVALID", result["publication_report_markdown"])
+        self.assertIn("FORBIDDEN_SENSITIVE_OUTPUT", result["errors"])
+        self.assertEqual(result["publication_report_markdown"], "")
+        self.assertEqual(result["receipts"], [])
 
     def test_unknown_sixth_publication_target_fails_closed(self):
         bundle = valid_bundle()

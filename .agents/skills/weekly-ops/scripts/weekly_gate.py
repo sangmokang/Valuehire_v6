@@ -29,6 +29,7 @@ from brief_renderer import render_brief, render_html, render_publication_report
 from contract_gate import (
     REQUIRED_PUBLICATION_TARGETS,
     capability_blockers,
+    find_sensitive_text,
     find_sensitive_values,
     publication_receipts,
     publication_state,
@@ -37,7 +38,12 @@ from contract_gate import (
     validate_zero_result_assertions,
 )
 from operating_gate import validate_operating_snapshot
-from schema_gate import find_forbidden_fields, find_unknown_fields
+from schema_gate import (
+    final_output_violations,
+    find_forbidden_fields,
+    find_unknown_fields,
+    sanitized_blocked_result,
+)
 
 
 SCHEMA_VERSION = "weekly-ops-input-v1"
@@ -432,7 +438,8 @@ def assemble_result(
     }
 
 
-def evaluate(bundle: dict[str, Any]) -> dict[str, Any]:
+def input_boundary_errors(bundle: dict[str, Any]) -> list[str]:
+    """WU-1 허용목록·금지 키·민감 값의 입력 경계 검사(fail-closed)."""
     errors: list[str] = []
     if bundle.get("schema_version") != SCHEMA_VERSION:
         errors.append("SCHEMA_VERSION_INVALID")
@@ -440,9 +447,14 @@ def evaluate(bundle: dict[str, Any]) -> dict[str, Any]:
         errors.append("FORBIDDEN_SENSITIVE_FIELD")
     if find_unknown_fields(bundle):
         errors.append("FORBIDDEN_UNKNOWN_FIELD")
-    sensitive_values_found = find_sensitive_values(bundle)
-    if sensitive_values_found:
+    if find_sensitive_values(bundle):
         errors.append("FORBIDDEN_SENSITIVE_VALUE")
+    return errors
+
+
+def evaluate(bundle: dict[str, Any]) -> dict[str, Any]:
+    errors: list[str] = input_boundary_errors(bundle)
+    sensitive_values_found = "FORBIDDEN_SENSITIVE_VALUE" in errors
     run = validate_run(bundle.get("run"), errors)
     source_blockers = capability_blockers(bundle.get("capabilities"), errors)
     cutoff = run["meeting_at"] if run else None
@@ -528,11 +540,14 @@ def evaluate(bundle: dict[str, Any]) -> dict[str, Any]:
         if run and not sensitive_values_found
         else ""
     )
-    return assemble_result(
+    result = assemble_result(
         bundle, positions, consultant_focus, channel_coverage, excluded_rows,
         career_summaries, operating_snapshot, errors,
         source_blockers, data_status, snapshot_id, input_hash, brief,
     )
+    if final_output_violations(result):
+        return sanitized_blocked_result(result)
+    return result
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -561,6 +576,9 @@ def main(argv: list[str] | None = None) -> int:
         )
     else:
         output = canonical_json(result)
+    if find_sensitive_text(output):
+        print(json.dumps({"verdict": "BLOCKED", "reason": "FORBIDDEN_SENSITIVE_OUTPUT"}))
+        return 1
     sys.stdout.write(output)
     if not output.endswith("\n"):
         sys.stdout.write("\n")

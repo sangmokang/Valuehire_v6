@@ -422,7 +422,7 @@ else
 fi
 case_dir=$(prepare_mutation lineage-bypass)
 if mutate_exact "$case_dir/.agents/skills/weekly-ops/scripts/weekly_gate.py" \
-  'if any(ref not in valid_evidence_refs for ref in position["evidence_refs"]):' \
+  'if any(not isinstance(ref, str) or ref not in valid_evidence_refs for ref in position["evidence_refs"]):' \
   'if False:'; then
   expect_mutation_red "position evidence lineage bypass" "$case_dir"
 else
@@ -594,6 +594,28 @@ if mutate_exact "$case_dir/.agents/skills/weekly-ops/scripts/sot_gate.py" \
   expect_mutation_red "Weekly SOT checker fail-open" "$case_dir"
 else
   fail_check "Weekly SOT checker mutation was not applied exactly once"
+fi
+case_dir=$(prepare_mutation renderer-pii-injection)
+if mutate_exact "$case_dir/.agents/skills/weekly-ops/scripts/brief_renderer.py" \
+  'lines.extend(["", f"`report_snapshot_id: {snapshot_id}`", ""])' \
+  'lines.extend(["", "- 문의: synthetic.person@example.com", f"`report_snapshot_id: {snapshot_id}`", ""])'; then
+  expect_mutation_red "renderer synthetic PII injection" "$case_dir"
+else
+  fail_check "renderer PII injection mutation was not applied exactly once"
+fi
+case_dir=$(prepare_mutation final-output-rescan-bypass)
+if mutate_exact "$case_dir/.agents/skills/weekly-ops/scripts/weekly_gate.py" \
+  'if final_output_violations(result):' 'if False:'; then
+  expect_mutation_red "final output rescan bypass" "$case_dir"
+else
+  fail_check "final output rescan mutation was not applied exactly once"
+fi
+case_dir=$(prepare_mutation input-allowlist-fail-open)
+if mutate_exact "$case_dir/.agents/skills/weekly-ops/scripts/schema_gate.py" \
+  'return sorted(set(found))' 'return []'; then
+  expect_mutation_red "input key allowlist fail-open" "$case_dir"
+else
+  fail_check "input allowlist mutation was not applied exactly once"
 fi
 printf 'CHECKED: %s\n' "$checked"
 exit "$fail"

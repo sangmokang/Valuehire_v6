@@ -163,3 +163,77 @@ def find_unknown_fields(value: Any, schema: Any = None) -> list[str]:
     found: list[str] = []
     _walk_schema(value, INPUT_SCHEMA if schema is None else schema, "$", found)
     return sorted(set(found))
+
+
+_SCORE = {"urgency": None, "difficulty": None, "priority": None, "version": None}
+_POSITION_OUT = dict(_POSITION, score=_SCORE, period=None)
+_CHANNEL_MIX = {"jobkorea": None, "saramin": None, "linkedin_rps": None}
+_FOCUS_POSITION = {
+    "position_id": None, "company": None, "title": None, "verified_sent_count": None,
+    "unique_candidate_count": None, "active_days": None, "channels": ("list", None),
+    "channel_mix": _CHANNEL_MIX, "evidence_refs": ("list", None), "focus_share": None,
+    "grass_evidence": None,
+}
+_FOCUS = {
+    "consultant_id": None, "consultant_display": None, "verified_sent_count": None,
+    "unique_candidate_count": None, "active_days": None, "channel_mix": _CHANNEL_MIX,
+    "comparison_status": None, "positions": ("list", _FOCUS_POSITION),
+}
+_COVERAGE = {
+    "channel": None, "access_state": None, "surface_kind": None,
+    "covered_consultants": ("list", None), "not_run_consultants": ("list", None),
+    "covered_account_count": None, "expected_account_count": None,
+    "not_run_blockers": ("list", None),
+}
+_RECEIPT = {
+    "target_name": None, "target_id": None, "status": None,
+    "write_ahead_intent_id": None, "idempotency_key": None, "schema_readback_ref": None,
+    "external_object_id": None, "receipt_id": None, "receipt_persisted_ref": None,
+    "report_snapshot_id": None, "content_hash": None,
+}
+OUTPUT_SCHEMA = {
+    "schema_version": None, "verdict": None, "data_verdict": None,
+    "publication_verdict": None, "publication_errors": ("list", None),
+    "report_snapshot_id": None, "input_hash": None, "content_hash": None,
+    "score_version": None, "consultant_focus_version": None,
+    "positions": ("list", _POSITION_OUT), "customer_priority_ids": ("list", None),
+    "consultant_focus": ("list", _FOCUS), "channel_coverage": ("list", _COVERAGE),
+    "excluded_rows": ("list", {"reason": None, "evidence_ref": None}),
+    "career_page_summaries": ("list", _CAREER_SUMMARY),
+    "operating_snapshot": _OPERATING_SNAPSHOT, "brief_markdown": None,
+    "publication_report_markdown": None, "receipts": ("list", _RECEIPT),
+    "errors": ("list", None), "blockers": ("list", None),
+}
+
+
+def final_output_violations(result: Any) -> list[str]:
+    """content hash/readback 직전 최종 산출물을 WU-1(허용목록)·WU-2(값) 검사기로 재검사."""
+    from contract_gate import find_sensitive_values
+
+    found = find_unknown_fields(result, OUTPUT_SCHEMA)
+    found.extend(find_forbidden_fields(result))
+    if find_sensitive_values(result):
+        found.append("$.sensitive_value")
+    return found
+
+
+def sanitized_blocked_result(result: dict[str, Any]) -> dict[str, Any]:
+    """재검사 실패 시 발행 차단: 입력 유래 payload를 전부 비운 BLOCKED 결과로 대체."""
+    errors = sorted(set(list(result.get("errors", [])) + ["FORBIDDEN_SENSITIVE_OUTPUT"]))
+    return {
+        "schema_version": result.get("schema_version"),
+        "verdict": "BLOCKED",
+        "data_verdict": "BLOCKED",
+        "publication_verdict": "BLOCKED",
+        "publication_errors": [],
+        "report_snapshot_id": result.get("report_snapshot_id"),
+        "input_hash": result.get("input_hash"),
+        "content_hash": "",
+        "score_version": result.get("score_version"),
+        "consultant_focus_version": result.get("consultant_focus_version"),
+        "positions": [], "customer_priority_ids": [], "consultant_focus": [],
+        "channel_coverage": [], "excluded_rows": [], "career_page_summaries": [],
+        "operating_snapshot": {}, "brief_markdown": "",
+        "publication_report_markdown": "", "receipts": [],
+        "errors": errors, "blockers": [],
+    }

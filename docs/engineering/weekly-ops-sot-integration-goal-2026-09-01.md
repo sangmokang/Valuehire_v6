@@ -1018,6 +1018,15 @@ checkpoint 근거가 아니다.
   종료. `test_structures_hidden_under_scalar_slots_fail_closed`가 회귀로 고정하며, 보정은
   ref 타입 가드 + 스키마의 미지 구조 거부 두 겹이다.
 
+### WU-3 구현 중 결정 (2026-09-04)
+
+- 오염된 publication target(`target_id`가 dict)은 이전에는 receipts로 그대로 에코됐다.
+  최종 재검사 도입 후에는 산출물 전체가 소거된 BLOCKED 결과로 대체된다 — 기존 테스트
+  `test_non_string_publication_target_fails_closed_without_exception`의 기대를 "오류 코드
+  유지 + publication_report/receipts 소거"로 갱신했다(검증 강화, 약화 아님).
+- 최종 재검사 실패 시 stdout 산출물도 `find_sensitive_text`로 한 번 더 검사해 markdown/
+  html/json 어느 형식으로도 PII가 프로세스 밖으로 나가지 않는다.
+
 ### 결정 카드 — 자유문 action 필드의 실명 잔여 위험 (사용자 결정 대기)
 
 1. 문제: `positions[].action` 자유문에 임의 한국어 실명이 들어오면 패턴으로 차단 불가.
