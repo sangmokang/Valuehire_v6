@@ -65,8 +65,11 @@
   expiry: 2026-09-30
   issue: >-
     2026-09-03 실측으로 오탐 2건을 확인했다(인용형 규칙을 3키워드로 확장해 추적 파일
-    전수 스캔: humansearch-v6-founding-spec:515 의 "credential_source":"macos_keychain"
-    JSON 필드, acceptance-secret-webhook-vendor.sh:128 의 Slack 카나리 줄). 둘 다 비밀이
-    아니다. 닫는 순서: ① verify.sh 에 줄 단위 허용 목록(경로:줄번호 또는 인라인 마커)을
+    전수 스캔): humansearch-v6-founding-spec 515행의 credential_source 필드(값은 자격증명
+    자체가 아니라 저장 위치 이름이다), acceptance-secret-webhook-vendor.sh 128행의 Slack
+    카나리 줄. 둘 다 비밀이 아니다. ⚠️ 이 항목의 본문에 그 JSON 한 조각을 리터럴로 옮겨
+    적었더니 이 파일 자신이 3번째 오탐이 됐다(2026-09-03 codeaudit 이 잡았다) — 억제를
+    설명하는 글이 억제 대상을 늘리는 자기오염이라 형태를 끊어 다시 적는다.
+    닫는 순서: ① verify.sh 에 줄 단위 허용 목록(경로:줄번호 또는 인라인 마커)을
     먼저 만들고 ② 그 위에서 인용 형식 규칙을 켠다. ①이 없으면 오탐 1건이 곧 전 브랜치
     작업 중단이므로 순서를 바꾸지 않는다.
