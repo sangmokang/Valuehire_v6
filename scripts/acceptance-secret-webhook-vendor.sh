@@ -295,12 +295,29 @@ e2e "오탐 방지 — ${K_PK}_FORMAT (열거 밖 접미)"   "${K_PK}_FORMAT=PKC
 # 줄 수 없어 항상 0이 나오는 동어반복이 된다. 동결 사본이어야 "기존 12자 줄을 신규 줄로
 # 교체" 같은 실제 회귀가 여기서 빨간불이 된다(goal §⑤ CA-2).
 BASELINE=scripts/verify/fixtures/secret-patterns/baseline-2026-09-03.default
+# 기준선 무결성은 **해시로 못박는다** (2026-09-03 V1 적대검증 D3).
+#   V1 반례: fixture 를 `.` 한 줄로 바꿔도 코퍼스 전건이 '기준선 탐지'로 남아
+#   old_caught 하한을 통과하고 회귀 0이 나온다. 즉 기준선 자체가 공격면이었다.
+#   이 상수를 바꾸는 것은 곧 "탐지 기준선을 의도적으로 옮긴다"는 선언이며,
+#   그때는 suppressions.yaml 에 근거를 남기는 것이 계약이다.
+BASELINE_SHA256=24fa49aa45af2253f1f508b49d988086bf511dd7c13d6b5b5be1a38265e04000
 OLDCLEAN=$(mktemp) || { echo "FAIL: mktemp 실패 — 회귀 대조 불가"; echo "CHECKED: ${checked}"; exit 2; }
 trap 'rm -f "$CLEAN" "$OLDCLEAN"' EXIT
+checked=$((checked + 1))
 if [ ! -f "$BASELINE" ] || [ ! -s "$BASELINE" ]; then
   echo "FAIL: 회귀 기준선이 없다/비었다 — $BASELINE (fail-closed)"
   fail=1
 else
+  got=$(shasum -a 256 "$BASELINE" 2>/dev/null | awk '{print $1}')
+  if [ -z "$got" ]; then
+    echo "FAIL: 기준선 해시를 계산하지 못했다 (shasum 부재 · fail-closed)"
+    fail=1
+  elif [ "$got" != "$BASELINE_SHA256" ]; then
+    printf 'FAIL: 기준선이 변조됐다 — 기대 %s / 실제 %s\n' "$BASELINE_SHA256" "$got"
+    fail=1
+  else
+    printf 'PASS: 회귀 기준선 무결 (sha256 %s…)\n' "$(printf '%s' "$got" | cut -c1-12)"
+  fi
   tr -d '\r' < "$BASELINE" | grep -vE '^[[:space:]]*(#|$)' > "$OLDCLEAN"
 fi
 
@@ -317,11 +334,47 @@ CORPUS_9="https://${SLK}/${SVC}/T01ABCDEFGH/B01ABCDEFGH/${TOK}"
 CORPUS_10="  cfg.value = \"${SKA}api03-${LONGK}\""
 CORPUS_11="${K_CR}=abcdef123456 # local placeholder"
 CORPUS_12="${K_PW}=${SHORTV}"
+# 2026-09-03 V1 적대검증 D3·D4 반영 — 코퍼스가 키워드 계열만 덮어서, 코퍼스 밖 규칙
+# (AWS·GitHub·JWT·쿠키…)을 완화하거나 지워도 회귀 0이 나왔다. V1 이 든 반례가
+# 정확히 `AKIA[0-9A-Z]{16}` -> `{99}` 였다. 규칙 계열마다 표본을 하나씩 박아 둔다.
+# 카나리는 전부 조립한다 — 리터럴로 두면 이 파일 자신이 스캔에 걸린다(위 60행과 같은 이유).
+AWSP=$(printf 'AK%s' 'IA')
+GHP=$(printf 'gh%s_' 'p')
+AIZ=$(printf 'AI%s' 'za')
+XOX=$(printf 'xo%s-' 'xb')
+SKG=$(printf 'sk%s' '-')
+JWTP=$(printf 'ey%s' 'J')
+LIAT=$(printf 'li%sat' '_')
+AQ=$(printf 'AQ%s' 'ED')
+PEM=$(printf -- '-----BE%s RSA PRIVATE KEY-----' 'GIN')
+CORPUS_13="${AWSP}IOSFODNN7EXAMPLE"
+CORPUS_14="${GHP}0123456789abcdefghijklmnopqrstuvwxyz01"
+CORPUS_15="${AIZ}SyD0123456789abcdefghijklmnopqrstuvw"
+CORPUS_16="${XOX}0123456789-abcdefghij"
+CORPUS_17="${SKG}0123456789abcdefghijklmno"
+CORPUS_18="${JWTP}hbGciOiJIUzI1NiJ9.${JWTP}zdWIiOiIxIn0.c2ln"
+CORPUS_19="  {\"name\": \"${LIAT}\", \"domain\": \".example.com\"}"
+CORPUS_20="${AQ}AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+CORPUS_21="$PEM"
+# ⚠️ 이 둘은 조립하지 않으면 **이 파일 자신이** 스캔에 걸린다(2026-09-03 실측:
+# verify.sh 가 이 스크립트를 매치해 exit 1). 자격증명 URL 과 Authorization 헤더는
+# 카나리 문자열이 곧 완성된 매치라 변수로 끊어야 한다.
+URLC=$(printf 'user:hunter2%s@' 'pass')
+AUTHH=$(printf 'Authoriza%s' 'tion')
+BEAR=$(printf 'Bear%s' 'er')
+CORPUS_22="  fetch('https://${URLC}internal.example.com/x')"
+CORPUS_23="  ${AUTHH}: ${BEAR} abcdefghijklmnop.qrst"
+# ⚠️ 실제 응답 헤더 형식이어야 한다. `headers['Set-Cookie'] = '...'` 같은 코드 대입은
+# 규칙 (8)의 `SET-COOKIE[[:space:]]*:` 를 만족하지 않아 첫 판에서 이 표본만 미탐이었다
+# (2026-09-03 실측: 코퍼스 23/24). 규칙이 아니라 표본이 틀렸던 경우다.
+SETC=$(printf 'Set-Coo%s' 'kie')
+CORPUS_24="${SETC}: sid=abc123def456; Path=/"
+CORPUS_N=24
 
 old_caught=0
 regressed=0
 i=1
-while [ "$i" -le 12 ]; do
+while [ "$i" -le "$CORPUS_N" ]; do
   eval "line=\$CORPUS_$i"
   o=0; printf '%s\n' "$line" | grep -qEif "$OLDCLEAN" || o=$?
   n=0; printf '%s\n' "$line" | grep -qEif "$CLEAN"    || n=$?
@@ -340,11 +393,50 @@ done
 
 # 대조군: 기준선이 코퍼스를 하나도 못 잡으면 위 "회귀 0건"은 판정기가 죽은 결과일 뿐이다.
 checked=$((checked + 1))
-if [ "$old_caught" -lt 12 ]; then
-  printf 'FAIL: 기준선이 코퍼스 12건 중 %d건만 탐지 — 기준선이 죽었다면 회귀 0건은 증거가 아니다\n' "$old_caught"
+if [ "$old_caught" -ne "$CORPUS_N" ]; then
+  printf 'FAIL: 기준선이 코퍼스 %d건 중 %d건만 탐지 — 기준선이 죽었다면 회귀 0건은 증거가 아니다\n' \
+    "$CORPUS_N" "$old_caught"
   fail=1
 else
-  printf 'PASS: 회귀 기준선 살아있음 — 코퍼스 12/12 탐지 (%s)\n' "$BASELINE"
+  printf 'PASS: 회귀 기준선 살아있음 — 코퍼스 %d/%d 탐지 (%s)\n' "$old_caught" "$CORPUS_N" "$BASELINE"
+fi
+
+# ── ⑥-c 설정 센티널 오탐 코퍼스 (2026-09-03 V1 적대검증 D2 반례의 영구 편입) ──
+#
+# V1 이 `WEBHOOK_VALUE=disabled` 로 뚫었고, 실측해 보니 범위가 더 넓었다 —
+# 이름 열거와 길이만으로 가르면 `disabled`·`keychain`·`changeme` 같은 평범한 설정
+# 센티널이 전부 비밀로 잡힌다. 비밀 스캔에는 줄 단위 억제 경로가 없어 이 한 줄이 곧
+# 전 브랜치 작업 중단이므로, 값에 숫자를 요구하는 것으로 닫고 그 반례를 여기 박아 둔다.
+FP_1="${K_WH}_VALUE=disabled"
+FP_2="${K_WH}_URL=disabled"
+FP_3="${K_WH}_ENDPOINT=disabled"
+FP_4="${K_CR}=disabled"
+FP_5="${K_CR}=keychain"
+FP_6="${K_WH}_URL=changeme"
+FP_7="${K_CR}=placeholder"
+FP_8="${K_PK}=default"
+FP_N=8
+
+fp_hit=0
+i=1
+while [ "$i" -le "$FP_N" ]; do
+  eval "line=\$FP_$i"
+  rc=0; printf '%s\n' "$line" | grep -qEif "$CLEAN" || rc=$?
+  if [ "$rc" -gt 1 ]; then
+    printf 'FAIL: 센티널 대조 실행 오류 (grep exit=%s) — FP %d\n' "$rc" "$i"; fail=1
+  elif [ "$rc" -eq 0 ]; then
+    printf 'FAIL: 오탐 — 평범한 설정 센티널이 비밀로 잡힌다 (FP %d)\n' "$i"
+    fp_hit=$((fp_hit + 1))
+  fi
+  i=$((i + 1))
+done
+
+checked=$((checked + 1))
+if [ "$fp_hit" -ne 0 ]; then
+  printf 'FAIL: 설정 센티널 오탐 %d건 (계약값 0) — 오탐 1건이 곧 전 브랜치 작업 중단이다\n' "$fp_hit"
+  fail=1
+else
+  printf 'PASS: 설정 센티널 %d종 오탐 0건 (2026-09-03 V1 반례 회귀)\n' "$FP_N"
 fi
 
 checked=$((checked + 1))
@@ -385,7 +477,10 @@ fi
 # 이 저장소의 실제 사고 유형이다(같은 날 ${VAR^^} 로 3건이 사라졌다).
 # 그래서 기대 개수를 코드에 못박고 **적으면 실패**한다(P20 · P2).
 # 2026-09-03 AC-SECRET-SHORT-1 로 9건 추가(32 -> 41): 대조군 1 + 격리 e2e 6 + 회귀 2.
-EXPECTED_CHECKS=41
+# 같은 날 V1 적대검증 반례 편입으로 2건 추가(41 -> 43): 기준선 해시 대조 1 + 센티널 오탐 1.
+# ⚠️ AC 6벡터의 표본과 기대값은 RED 커밋(ae84381) 이후 한 글자도 바뀌지 않았다.
+# 늘어난 것은 전부 적대검증이 찾아낸 반례를 **더한** 것이지 기준을 낮춘 것이 아니다.
+EXPECTED_CHECKS=43
 # -lt(하한)가 아니라 -ne(정확값)로 조인다: 하한만 보면 새 검사 3개를 넣고 기존 3개를
 # 지워도 초록이다. V1 판정서의 설계 결정("checked == 기대값 강제")과도 이쪽이 일치한다.
 if [ "$checked" -ne "$EXPECTED_CHECKS" ]; then
