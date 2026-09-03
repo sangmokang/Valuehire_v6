@@ -44,9 +44,10 @@ if [ -n "${VH_PREPUSH_DEPTH:-}" ]; then
   exit 1
 fi
 
-TOTAL=6
+TOTAL=7
 fail=0
 step=0
+allow_checked=0
 
 REPO_ROOT=$(git rev-parse --show-toplevel) || { echo "FAIL: git 저장소가 아님"; exit 1; }
 
@@ -100,9 +101,17 @@ reset_tree() {
   git clean -qfd
 }
 
-# demo <이름> <셋업코드> <행위코드>
+# demo <이름> <셋업코드> <행위코드> [기대사유]
+#
+# [기대사유] (2026-09-03 추가): 훅 ON 출력에 이 문구가 있어야 BLOCKED 로 센다.
+# 왜 필요한가 — pre-commit 은 검사 8종을 끝까지 순차 실행하고 **어느 하나만 걸려도**
+# 종료값이 1이다. 종료값만 보면 "겨냥한 게이트가 막았다"와 "다른 게이트가 먼저
+# 막았다"가 구분되지 않는다(위 15-17행 사고와 같은 유형). 특히 `.secret-patterns.default`
+# 를 겨냥한 시연은 §1 비밀 스캔이 함께 반응한다 — 심는 약화 리터럴이 곧 스캔 패턴이
+# 되어 저장소 문서를 매칭하기 때문이다(2026-09-03 실측: 약화 패턴 9종 전부 그렇다).
+# 사유 대조가 없으면 훅을 한 줄도 고치지 않아도 이 시연이 초록으로 난다.
 demo() {
-  local name="$1" setup="$2" action="$3"
+  local name="$1" setup="$2" action="$3" want="${4:-}"
   step=$((step + 1))
   local sON sOFF aON aOFF
 
@@ -127,10 +136,20 @@ demo() {
       "$step" "$TOTAL" "$name" "$sON" "$sOFF"
     sed 's/^/         /' "$outdir/setup.on.$step" | head -3
     fail=1
+  elif [ "$aON" -ne 0 ] && [ "$aOFF" -eq 0 ] && [ -n "$want" ] \
+       && ! grep -qF "$want" "$outdir/act.on.$step"; then
+    printf '[%d/%d] %s → 사유 불일치 ← 차단은 됐지만 겨냥한 게이트가 아니다 (기대 사유: %s)\n' \
+      "$step" "$TOTAL" "$name" "$want"
+    awk '/BLOCKED/{print "         실제: " $0}' "$outdir/act.on.$step" | head -3
+    fail=1
   elif [ "$aON" -ne 0 ] && [ "$aOFF" -eq 0 ]; then
     printf '[%d/%d] %s → BLOCKED (훅ON=%d · 훅OFF=%d) ✓ 훅이 원인\n' \
       "$step" "$TOTAL" "$name" "$aON" "$aOFF"
-    awk '/BLOCKED/{print "         " $0; exit}' "$outdir/act.on.$step"
+    if [ -n "$want" ]; then
+      awk -v w="$want" 'index($0,w){print "         " $0; exit}' "$outdir/act.on.$step"
+    else
+      awk '/BLOCKED/{print "         " $0; exit}' "$outdir/act.on.$step"
+    fi
   elif [ "$aON" -ne 0 ] && [ "$aOFF" -ne 0 ]; then
     printf '[%d/%d] %s → 위양성 ← 훅 없이도 실패한다 (훅ON=%d · 훅OFF=%d)\n' \
       "$step" "$TOTAL" "$name" "$aON" "$aOFF"
@@ -139,6 +158,36 @@ demo() {
   else
     printf '[%d/%d] %s → PASSED ← 결함, 차단되지 않음 (훅ON=%d · 훅OFF=%d)\n' \
       "$step" "$TOTAL" "$name" "$aON" "$aOFF"
+    fail=1
+  fi
+}
+
+# demo_allow <이름> <셋업코드> <행위코드>
+#   차단 시연의 **짝**. 같은 파일에 대한 정상 변경이 훅 ON 에서 그대로 통과해야 한다.
+#   차단만 시험하면 "전부 막는 훅"도 만점을 받는다 — 그런 훅은 우회 습관을 만든다.
+demo_allow() {
+  local name="$1" setup="$2" action="$3"
+  local s a
+  allow_checked=$((allow_checked + 1))
+  reset_tree; git config core.hooksPath hooks
+  set +e
+  ( eval "$setup" )  >"$outdir/setup.allow.$allow_checked" 2>&1; s=$?
+  ( eval "$action" ) >"$outdir/act.allow.$allow_checked"   2>&1; a=$?
+  set -e
+  reset_tree; git config core.hooksPath hooks
+
+  if [ "$s" -ne 0 ]; then
+    printf '[통과쌍 %d] %s → SETUP FAILED (%d) ← 정상 변경을 만들지 못했다. 시연 무효\n' \
+      "$allow_checked" "$name" "$s"
+    sed 's/^/         /' "$outdir/setup.allow.$allow_checked" | head -3
+    fail=1
+  elif [ "$a" -eq 0 ]; then
+    printf '[통과쌍 %d] %s → PASSED ✓ 훅 ON 에서도 정상 변경은 막지 않는다\n' \
+      "$allow_checked" "$name"
+  else
+    printf '[통과쌍 %d] %s → 오탐 ← 정상 변경이 막혔다 (훅ON=%d). 오탐 1건이 곧 우회 습관이다\n' \
+      "$allow_checked" "$name" "$a"
+    sed 's/^/         /' "$outdir/act.allow.$allow_checked" | head -5
     fail=1
   fi
 }
@@ -191,6 +240,30 @@ demo "가짜 외부효과 모듈" \
    test -s src/portal-login.js' \
   'git add src/portal-login.js && git commit -m "feat: portal login"'
 
+# 7. 비밀 스캔 규칙 파일(.secret-patterns.default)을 약화 (2026-09-03 추가)
+#
+#    이 저장소의 비밀 정책 **전체**가 이 파일 한 장에 있는데, P13 §3 검사 약화 감시는
+#    `*.sh|*.yml|*.yaml|hooks/*` 만 봐서 이 파일이 범위 밖이었다. 규칙을 정하는 파일이
+#    규칙 약화 감시 밖에 있으면, 검사기를 고칠 필요도 없이 검사 기준만 손대면 된다.
+#
+#    심는 문자열은 조립해서 만든다(시연 2와 같은 이유 — 리터럴로 두면 이 스크립트 자신이
+#    .check-weakening-patterns 에 걸려 커밋할 수 없다).
+#    사유 대조가 필수인 이유는 demo() 주석 참조 — §1 비밀 스캔이 함께 반응하므로
+#    종료값만 보면 훅을 고치지 않아도 초록이 난다.
+demo "비밀 패턴 파일 약화" \
+  'w=$(printf "%s%s" "skip" ":")
+   printf "\n%s\n" "$w" >> .secret-patterns.default
+   grep -qx "$w" .secret-patterns.default' \
+  'git add .secret-patterns.default && git commit -m "weaken: secret patterns"' \
+  "검사 약화 패턴 추가 — .secret-patterns.default"
+
+# 7의 짝 — 같은 파일에 대한 **정상** 규칙 추가는 통과해야 한다.
+# 이 저장소 어디에도 없는 벤더 키 모양을 하나 더한다(2026-09-03 실측: 추적 파일 매치 0건).
+demo_allow "비밀 패턴 파일 정상 추가" \
+  'printf "\n%s\n" "zzk-[A-Za-z0-9]{32,}" >> .secret-patterns.default
+   grep -qF "zzk-" .secret-patterns.default' \
+  'git add .secret-patterns.default && git commit -m "feat: add vendor key shape"'
+
 # --- 원본 오염 검사 -----------------------------------------------------------
 echo
 ORIG_AFTER=$(orig_state)
@@ -202,8 +275,13 @@ else
 fi
 
 echo
+if [ "$allow_checked" -lt 1 ]; then
+  echo "FAIL: 통과쌍 시연이 0건 — 차단만 시험하면 '전부 막는 훅'도 만점을 받는다"
+  fail=1
+fi
+
 if [ "$fail" -eq 0 ]; then
-  echo "PASS: 위반 $TOTAL 종이 전부 차단됨 (각 건 훅 OFF 대조 통과)"
+  echo "PASS: 위반 $TOTAL 종이 전부 차단됨 (각 건 훅 OFF 대조 통과) + 정상 변경 통과쌍 ${allow_checked}건"
   exit 0
 fi
 echo "RESULT: 차단되지 않았거나 시연이 무효인 항목이 있다. exit 1"
