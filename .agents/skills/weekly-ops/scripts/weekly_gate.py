@@ -37,6 +37,7 @@ from contract_gate import (
     validate_zero_result_assertions,
 )
 from operating_gate import validate_operating_snapshot
+from schema_gate import find_forbidden_fields, find_unknown_fields
 
 
 SCHEMA_VERSION = "weekly-ops-input-v1"
@@ -55,6 +56,12 @@ INTENT_SCORES = {
     "PIPELINE_FEEDBACK": 15,
     "REFERENCE_ONLY": 0,
     "NONE": 0,
+}
+ORIGIN_INTENTS = {
+    "SCRAPED_STAGING": frozenset({"REFERENCE_ONLY", "NONE"}),
+    "CLIENT_REQUESTED": frozenset({"REQUESTED", "REQUIREMENT_CHANGED", "PIPELINE_FEEDBACK"}),
+    "CLIENT_SHARED": frozenset({"POSITION_SHARED", "REQUIREMENT_CHANGED", "PIPELINE_FEEDBACK"}),
+    "INTERNAL_CREATED": frozenset({"REFERENCE_ONLY", "NONE"}),
 }
 CLIENT_PRIORITY_POINTS = {
     "TOP": 50,
@@ -84,20 +91,6 @@ DIFFICULTY_POINTS = {
     "constraints": {"LOW": 0, "MEDIUM": 15, "HIGH": 25},
     "funnel_friction": {"LOW": 0, "MEDIUM": 8, "HIGH": 15},
 }
-FORBIDDEN_KEYS = {
-    "raw_body",
-    "body_html",
-    "body_text",
-    "candidate_name",
-    "candidate_email",
-    "sender_address",
-    "recipient_address",
-    "access_token",
-    "api_key",
-    "credential",
-}
-
-
 def canonical_json(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
@@ -116,19 +109,6 @@ def parse_datetime(value: str) -> datetime:
 def normalized_key(value: str) -> str:
     normalized = unicodedata.normalize("NFKC", value).casefold()
     return re.sub(r"\s+", " ", normalized).strip()
-
-
-def find_forbidden_fields(value: Any) -> list[str]:
-    found: list[str] = []
-    if isinstance(value, dict):
-        for key, nested in value.items():
-            if key.casefold() in FORBIDDEN_KEYS:
-                found.append(key)
-            found.extend(find_forbidden_fields(nested))
-    elif isinstance(value, list):
-        for nested in value:
-            found.extend(find_forbidden_fields(nested))
-    return found
 
 
 def recency_points(event_at: datetime, meeting_at: datetime) -> int:
@@ -252,6 +232,13 @@ def validate_positions(
         if position["origin"] not in ORIGINS or position["intent"] not in INTENT_SCORES:
             errors.append("POSITION_ENUM_INVALID")
             continue
+        if position["intent"] not in ORIGIN_INTENTS[position["origin"]]:
+            errors.append(
+                "SCRAPED_CUSTOMER_INTENT_CONFLICT"
+                if position["origin"] == "SCRAPED_STAGING"
+                else "POSITION_ORIGIN_INTENT_MISMATCH"
+            )
+            continue
         if position.get("client_priority", "NONE") not in CLIENT_PRIORITY_POINTS:
             errors.append("POSITION_ENUM_INVALID")
             continue
@@ -264,14 +251,9 @@ def validate_positions(
         if not isinstance(position["evidence_refs"], list) or not position["evidence_refs"]:
             errors.append("POSITION_EVIDENCE_MISSING")
             continue
-        if any(ref not in valid_evidence_refs for ref in position["evidence_refs"]):
+        if any(not isinstance(ref, str) or ref not in valid_evidence_refs for ref in position["evidence_refs"]):
             errors.append("POSITION_EVIDENCE_UNRESOLVED")
             continue
-        if position["origin"] == "SCRAPED_STAGING" and position["intent"] not in {
-            "NONE",
-            "REFERENCE_ONLY",
-        }:
-            errors.append("SCRAPED_CUSTOMER_INTENT_CONFLICT")
         key = (normalized_key(position["company"]), normalized_key(position["title"]))
         prior_id = canonical_keys.get(key)
         if prior_id is not None and prior_id != position["canonical_id"]:
@@ -456,6 +438,8 @@ def evaluate(bundle: dict[str, Any]) -> dict[str, Any]:
         errors.append("SCHEMA_VERSION_INVALID")
     if find_forbidden_fields(bundle):
         errors.append("FORBIDDEN_SENSITIVE_FIELD")
+    if find_unknown_fields(bundle):
+        errors.append("FORBIDDEN_UNKNOWN_FIELD")
     sensitive_values_found = find_sensitive_values(bundle)
     if sensitive_values_found:
         errors.append("FORBIDDEN_SENSITIVE_VALUE")
@@ -499,7 +483,7 @@ def evaluate(bundle: dict[str, Any]) -> dict[str, Any]:
         consultant_roster,
         source_snapshot_ids,
         errors,
-        require_all_channels=outreach_complete,
+        require_all_channels=True,
     )
     channel_coverage, coverage_blockers = build_channel_coverage(
         outreach_diagnostics, consultant_roster
