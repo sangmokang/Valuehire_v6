@@ -1036,3 +1036,28 @@ checkpoint 근거가 아니다.
    운영 리뷰에서 육안 확인.
 4. 영향: A는 renderer·계약·기존 테스트 문구 변경 필요, B는 변경 0.
 5. 결정 전까지 필드는 그대로 유지한다(임의 제거 금지) — 기본 동작은 B와 동일.
+
+### 2026-09-04 fresh Codex V2 1차 결과와 보정
+
+- V2 artifact: `.omx/artifacts/codex-v2-pii-3layer-20260904.md` (검토 대상 HEAD
+  `d822c145e399ab2d78832cb21dcffda055533014`, branch diff
+  `2ed74eb5c324014e107e03f9091173c388083d4b173da4d561d958e7e1e5fa57`) — verdict `FAIL`.
+- 1차 실행은 cyber 정책 필터로 빈 출력(무효 처리), 컴플라이언스 리뷰 표현으로 재실행해
+  판정 본문을 확보했다. Codex 샌드박스에서 임시 디렉터리 필요 테스트 1건은
+  sandbox-limited로 분리 보고됐다.
+- 채택·보정(같은 PR 회귀 편입, R9): 따옴표 로컬파트 이메일, 슬래시 구분 전화·주민번호,
+  괄호 국제전화, 포트 붙은 github URL, 중간 삽입 camelCase/한국어 키 문자열화 JSON,
+  `+1 234 567건` 증감 표기 오탐(국제전화 패턴 3그룹 강제), allowlist 이메일이 main JSON
+  출력 재검사에서 오차단되던 결함(정확 값 마스킹 후 검사), tuple/set 컨테이너의 스키마
+  걷기 통과, main 종단(e2e) 테스트 부재.
+- 기각(의도된 과차단 — 발행 게이트에서 과차단은 안전 방향): github 저장소 URL·
+  linkedin company URL 차단 유지(`/company/` 예외는 경로 조작으로 우회 가능),
+  `설정 예시: {"name": …}` 문자열 차단 유지, 유사날짜 사업 ID(990231-…) 차단 유지.
+- V2의 "정당 키 12종 표본은 denylist 비매칭만 증명" 지적에 대한 해석 확정:
+  hiring_cycle_id 등 9종은 DB/Golden 계층 키로 v1 입력 허용목록에 의도적으로 없다.
+  "오탐 0건"은 PII 분류기·값 검사 수준의 계약이며, 스키마 밖 거부는 오탐이 아니라
+  fail-closed 계약 이행이다. v1 입력·출력에 실재하는 position_id·candidate_key_hmac·
+  official_url·target_name은 수용 테스트로 증명한다.
+- 보정 후 fresh GREEN: 단위 139 tests OK, sot_gate `CHECKED: 89` exit 0, acceptance
+  `CHECKED: 64` exit 0(mutation 31종 생존 0), verify.sh PASS.
+
