@@ -136,17 +136,17 @@ def find_forbidden_fields(value: Any) -> list[str]:
 
 def _walk_schema(value: Any, node: Any, path: str, found: list[str]) -> None:
     if node is None:
-        if isinstance(value, (dict, list)):
+        if isinstance(value, (dict, list, tuple, set, frozenset)):
             found.append(path)
         return
     if isinstance(node, tuple):
-        if isinstance(value, dict):
+        if isinstance(value, (dict, tuple, set, frozenset)):
             found.append(path)
         elif isinstance(value, list):
             for index, item in enumerate(value):
                 _walk_schema(item, node[1], f"{path}[{index}]", found)
         return
-    if isinstance(value, list):
+    if isinstance(value, (list, tuple, set, frozenset)):
         found.append(path)
         return
     if not isinstance(value, dict):

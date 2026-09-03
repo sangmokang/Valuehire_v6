@@ -37,25 +37,39 @@ ZERO_RESULT_RULE_VERSION = "weekly-zero-result-v1"
 ZERO_RESULT_COLLECTIONS = {"positions", "position_state", "outreach_events", "pipeline_events", "pipeline_state"}
 ALLOWED_EMAIL_TARGETS = {"sangmokang@valueconnect.kr"}
 EMAIL_PATTERN = re.compile(r"(?<![\w.+-])[\w.+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?![\w.-])")
+QUOTED_EMAIL_PATTERN = re.compile(r'"[^"@\s]{1,64}"@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?![\w.-])')
 PHONE_PATTERN = re.compile(
-    r"(?<![A-Za-z0-9])(?:(?:\+?82[- .]?)?0?1[016789][- .]?\d{3,4}[- .]?\d{4}|"
-    r"0\d{1,2}[- .]?\d{3,4}[- .]?\d{4})(?![A-Za-z0-9])"
+    r"(?<![A-Za-z0-9])(?:(?:\+?82[- ./]?)?0?1[016789][- ./]?\d{3,4}[- ./]?\d{4}|"
+    r"0\d{1,2}[- ./]?\d{3,4}[- ./]?\d{4})(?![A-Za-z0-9])"
 )
 RRN_PATTERN = re.compile(
-    r"(?<!\d)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])[-. ]?[1-4]\d{6}(?!\d)"
+    r"(?<!\d)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])[-. /]?[1-4]\d{6}(?!\d)"
 )
 DASH_VARIANTS = str.maketrans({dash: "-" for dash in "‐‑‒–—―−﹘﹣"})
 PROFILE_URL_PATTERN = re.compile(
-    r"(?i)(?<![a-z0-9.-])(?:[a-z0-9-]+\.)*(?:linkedin\.com|lnkd\.in|github\.com)/\S+"
+    r"(?i)(?<![a-z0-9.-])(?:[a-z0-9-]+\.)*(?:linkedin\.com|lnkd\.in|github\.com)"
+    r"(?::\d+)?/\S+"
 )
 INTL_PHONE_PATTERN = re.compile(
-    r"(?<![\w+])\+[1-9]\d{0,2}[- .]?\d{2,4}[- .]?\d{3,4}[- .]?\d{0,4}(?![\d])"
+    r"(?<![\w+])\+[1-9]\d{0,2}[- ./]?\(?\d{2,4}\)?[- ./]?\d{3,4}[- ./]?\d{3,4}(?!\d)"
 )
-EMBEDDED_KEY_PATTERN = re.compile(
-    r"""(?i)["'](?:name|full_name|email|phone|mobile|address|birth|birthdate|"""
-    r"""candidate_name|candidate_display_name|candidate_full_name|candidate_email|"""
-    r"""applicant_name|applicant_display_name|applicant_full_name)["']\s*[:=]"""
-)
+QUOTED_KEY_PATTERN = re.compile(r"""["']([\w \-]{1,64})["']\s*[:=]""")
+EMBEDDED_KEY_TOKENS = frozenset({
+    "name", "fullname", "email", "phone", "mobile", "address", "birth", "birthdate",
+    "candidatename", "candidatedisplayname", "candidatefullname", "candidateemail",
+    "applicantname", "applicantdisplayname", "applicantfullname",
+    "이름", "성명", "연락처", "전화번호", "휴대폰", "주소", "생년월일", "이메일",
+})
+
+
+def _embedded_key_hit(text: str) -> bool:
+    """따옴표+콜론 경계의 키 토큰을 정규화해 대조한다 — substring 매칭이 아니다."""
+    for match in QUOTED_KEY_PATTERN.finditer(text):
+        token = match.group(1).strip()
+        ascii_token = re.sub(r"[^a-z0-9]", "", token.casefold())
+        if ascii_token in EMBEDDED_KEY_TOKENS or token in EMBEDDED_KEY_TOKENS:
+            return True
+    return False
 
 
 def find_sensitive_text(value: str) -> bool:
@@ -65,7 +79,8 @@ def find_sensitive_text(value: str) -> bool:
         RRN_PATTERN.search(normalized)
         or PROFILE_URL_PATTERN.search(normalized)
         or INTL_PHONE_PATTERN.search(normalized)
-        or EMBEDDED_KEY_PATTERN.search(normalized)
+        or QUOTED_EMAIL_PATTERN.search(normalized)
+        or _embedded_key_hit(normalized)
     ):
         return True
     value = normalized

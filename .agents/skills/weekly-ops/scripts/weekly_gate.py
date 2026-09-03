@@ -27,6 +27,7 @@ from activity_gate import (
 )
 from brief_renderer import render_brief, render_html, render_publication_report
 from contract_gate import (
+    ALLOWED_EMAIL_TARGETS,
     REQUIRED_PUBLICATION_TARGETS,
     capability_blockers,
     find_sensitive_text,
@@ -576,7 +577,10 @@ def main(argv: list[str] | None = None) -> int:
         )
     else:
         output = canonical_json(result)
-    if find_sensitive_text(output):
+    scan_text = output
+    for allowed in sorted(ALLOWED_EMAIL_TARGETS):
+        scan_text = scan_text.replace(allowed, "")
+    if find_sensitive_text(scan_text):
         print(json.dumps({"verdict": "BLOCKED", "reason": "FORBIDDEN_SENSITIVE_OUTPUT"}))
         return 1
     sys.stdout.write(output)
