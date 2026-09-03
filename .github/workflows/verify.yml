@@ -38,7 +38,7 @@ jobs:
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-guard-global-skill-files.sh
 
       - name: Weekly Ops 공용 Skill·fail-closed mutation 게이트
-        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-weekly-ops-skill.sh
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-weekly-ops-skill.sh --full
 
       - name: HumanSearch G1 클린룸 경계
         run: |
