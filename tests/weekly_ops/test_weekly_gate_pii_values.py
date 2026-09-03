@@ -4,9 +4,14 @@ find_sensitive_values가 놓쳤던 값 계열: 프로필 URL, 전각 ＠ 이메�
 주민등록번호, 비한국 전화, 문자열화 JSON 내 금지 키. 정당 값 오탐 0건도 함께 고정한다.
 """
 
+import contextlib
+import io
+import json
+import tempfile
 import unittest
+from pathlib import Path
 
-from fixtures import load_gate, valid_bundle
+from fixtures import load_gate, mark_all_targets_verified, valid_bundle
 
 
 class WeeklyGatePiiValueTest(unittest.TestCase):
@@ -79,6 +84,27 @@ class WeeklyGatePiiValueTest(unittest.TestCase):
             with self.subTest(value=value):
                 self.assert_action_value_blocked(value)
 
+    def test_codex_v2_false_negative_formats_are_blocked(self):
+        # 2026-09-04 fresh Codex V2 FAIL 반례의 영구 회귀 (R9)
+        for value in (
+            '"synthetic.person"@example.com',
+            "010/1234/5678",
+            "+1 (415) 555-2671",
+            "900101/1234567",
+            "https://github.com:443/synthetic-person",
+            '비고: {"candidateName":"synthetic-person"}',
+            '비고: {"이름":"synthetic-name"}',
+        ):
+            with self.subTest(value=value):
+                self.assert_action_value_blocked(value)
+
+    def test_business_delta_notation_is_not_an_intl_phone(self):
+        bundle = valid_bundle()
+        bundle["positions"][0]["action"] = "전주 대비 +1 234 567건 증가"
+        result = self.gate.evaluate(bundle)
+        self.assertNotIn("FORBIDDEN_SENSITIVE_VALUE", result["errors"])
+        self.assertEqual(result["data_verdict"], "PASS")
+
     def test_candidate_alias_style_keys_stay_blocked_by_allowlist(self):
         for field in ("candidate_alias", "candidateDisplayNameV2"):
             with self.subTest(field=field):
@@ -113,6 +139,44 @@ class WeeklyGatePiiValueTest(unittest.TestCase):
         result = self.gate.evaluate(bundle)
         self.assertNotIn("FORBIDDEN_SENSITIVE_VALUE", result["errors"])
         self.assertEqual(result["data_verdict"], "PASS")
+
+
+class WeeklyGateMainEndToEndTest(unittest.TestCase):
+    """Codex V2 지적: evaluate만 검증하고 main 종단 경로는 무검증이던 공백을 닫는다."""
+
+    def run_main(self, bundle, fmt):
+        gate = load_gate()
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "bundle.json"
+            path.write_text(json.dumps(bundle, ensure_ascii=False), encoding="utf-8")
+            buffer = io.StringIO()
+            with contextlib.redirect_stdout(buffer):
+                code = gate.main([str(path), "--format", fmt])
+        return code, buffer.getvalue()
+
+    def test_allowlisted_email_target_publishes_in_every_format(self):
+        gate = load_gate()
+        bundle = valid_bundle()
+        email_target = next(
+            target for target in bundle["publication_targets"] if target["name"] == "email"
+        )
+        email_target["target_id"] = "sangmokang@valueconnect.kr"
+        first = gate.evaluate(bundle)
+        mark_all_targets_verified(bundle, first)
+        for fmt in ("json", "markdown", "html"):
+            with self.subTest(fmt=fmt):
+                code, output = self.run_main(bundle, fmt)
+                self.assertEqual(code, 0)
+                self.assertNotIn("FORBIDDEN_SENSITIVE_OUTPUT", output)
+
+    def test_pii_action_never_reaches_stdout_in_any_format(self):
+        bundle = valid_bundle()
+        bundle["positions"][0]["action"] = "연락 010/1234/5678 부탁"
+        for fmt in ("json", "markdown", "html"):
+            with self.subTest(fmt=fmt):
+                code, output = self.run_main(bundle, fmt)
+                self.assertEqual(code, 1)
+                self.assertNotIn("010/1234/5678", output)
 
 
 class WeeklyGateFinalOutputRescanTest(unittest.TestCase):

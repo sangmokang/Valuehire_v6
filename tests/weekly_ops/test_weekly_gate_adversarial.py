@@ -456,6 +456,15 @@ class WeeklyGateAdversarialTest(unittest.TestCase):
         self.assertEqual(result["data_verdict"], "BLOCKED")
         self.assertIn("FORBIDDEN_UNKNOWN_FIELD", result["errors"])
 
+    def test_python_only_container_types_fail_closed(self):
+        # 2026-09-04 Codex V2 지적: tuple/set은 list가 아니라 스키마 걷기를 통과했다
+        self.assertTrue(
+            self.gate.find_unknown_fields({"positions": ({"totally_new_key": "x"},)})
+        )
+        self.assertTrue(
+            self.gate.find_unknown_fields({"positions": [{"evidence_refs": {"sha256:x"}}]})
+        )
+
     def test_allowlisted_bundle_has_zero_unknown_field_false_positives(self):
         bundle = valid_bundle()
         bundle["source_snapshots"][3]["evidence_refs"].append("sha256:receipt-li")
