@@ -98,6 +98,18 @@ class WeeklyGatePiiValueTest(unittest.TestCase):
             with self.subTest(value=value):
                 self.assert_action_value_blocked(value)
 
+    def test_codex_v2_round2_false_negative_formats_are_blocked(self):
+        # 2026-09-04 fresh Codex V2 2차 FAIL 반례의 영구 회귀 (R9)
+        for value in (
+            '"John Doe"@example.com',
+            "홍길동@예시.한국",
+            "(02) 123-4567",
+            "900101-5234567",
+            "900101 - 1234567",
+        ):
+            with self.subTest(value=value):
+                self.assert_action_value_blocked(value)
+
     def test_business_delta_notation_is_not_an_intl_phone(self):
         bundle = valid_bundle()
         bundle["positions"][0]["action"] = "전주 대비 +1 234 567건 증가"
@@ -168,6 +180,35 @@ class WeeklyGateMainEndToEndTest(unittest.TestCase):
                 code, output = self.run_main(bundle, fmt)
                 self.assertEqual(code, 0)
                 self.assertNotIn("FORBIDDEN_SENSITIVE_OUTPUT", output)
+
+    def run_main_with_html_injection(self, injected):
+        gate = load_gate()
+        original = gate.render_html
+        gate.render_html = lambda *args, **kwargs: original(*args, **kwargs) + injected
+        bundle = valid_bundle()
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "bundle.json"
+            path.write_text(json.dumps(bundle, ensure_ascii=False), encoding="utf-8")
+            buffer = io.StringIO()
+            with contextlib.redirect_stdout(buffer):
+                code = gate.main([str(path), "--format", "html"])
+        return code, buffer.getvalue()
+
+    def test_post_render_injection_is_blocked_by_main_rescan(self):
+        # main의 최종 문자열 검사만 무력화해도 죽는 격리 반례 (V2 2차: 공허 테스트 지적)
+        code, output = self.run_main_with_html_injection(
+            "<p>synthetic.person@example.com</p>"
+        )
+        self.assertEqual(code, 1)
+        self.assertNotIn("synthetic.person@example.com", output)
+
+    def test_allowlist_prefix_injection_cannot_slip_past_masking(self):
+        # V2 2차 반례: substring 마스킹이 sangmokang@valueconnect.kr.evil.com 을 통과시킴
+        code, output = self.run_main_with_html_injection(
+            "<p>sangmokang@valueconnect.kr.evil.com</p>"
+        )
+        self.assertEqual(code, 1)
+        self.assertNotIn("evil.com", output)
 
     def test_pii_action_never_reaches_stdout_in_any_format(self):
         bundle = valid_bundle()
