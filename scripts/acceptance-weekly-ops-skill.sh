@@ -610,6 +610,13 @@ if mutate_exact "$case_dir/.agents/skills/weekly-ops/scripts/weekly_gate.py" \
 else
   fail_check "final output rescan mutation was not applied exactly once"
 fi
+case_dir=$(prepare_mutation stdout-rescan-bypass)
+if mutate_exact "$case_dir/.agents/skills/weekly-ops/scripts/weekly_gate.py" \
+  'if find_sensitive_text(scan_text):' 'if False:'; then
+  expect_mutation_red "stdout final text rescan bypass" "$case_dir"
+else
+  fail_check "stdout rescan mutation was not applied exactly once"
+fi
 case_dir=$(prepare_mutation input-allowlist-fail-open)
 if mutate_exact "$case_dir/.agents/skills/weekly-ops/scripts/schema_gate.py" \
   'return sorted(set(found))' 'return []'; then

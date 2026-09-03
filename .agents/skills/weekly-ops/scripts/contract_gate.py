@@ -37,13 +37,14 @@ ZERO_RESULT_RULE_VERSION = "weekly-zero-result-v1"
 ZERO_RESULT_COLLECTIONS = {"positions", "position_state", "outreach_events", "pipeline_events", "pipeline_state"}
 ALLOWED_EMAIL_TARGETS = {"sangmokang@valueconnect.kr"}
 EMAIL_PATTERN = re.compile(r"(?<![\w.+-])[\w.+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?![\w.-])")
-QUOTED_EMAIL_PATTERN = re.compile(r'"[^"@\s]{1,64}"@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?![\w.-])')
+QUOTED_EMAIL_PATTERN = re.compile(r'"[^"@]{1,64}"@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?![\w.-])')
+UNICODE_EMAIL_PATTERN = re.compile(r"(?<![\w.+-])[\w.+-]+@[\w.-]+\.\w{2,}(?![\w.-])")
 PHONE_PATTERN = re.compile(
-    r"(?<![A-Za-z0-9])(?:(?:\+?82[- ./]?)?0?1[016789][- ./]?\d{3,4}[- ./]?\d{4}|"
-    r"0\d{1,2}[- ./]?\d{3,4}[- ./]?\d{4})(?![A-Za-z0-9])"
+    r"(?<![A-Za-z0-9])(?:(?:\+?82[- ./]?)?\(?0?1[016789]\)?[- ./]?\d{3,4}[- ./]?\d{4}|"
+    r"\(?0\d{1,2}\)?[- ./]?\d{3,4}[- ./]?\d{4})(?![A-Za-z0-9])"
 )
 RRN_PATTERN = re.compile(
-    r"(?<!\d)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])[-. /]?[1-4]\d{6}(?!\d)"
+    r"(?<!\d)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\s?[-./]?\s?[1-8]\d{6}(?!\d)"
 )
 DASH_VARIANTS = str.maketrans({dash: "-" for dash in "‐‑‒–—―−﹘﹣"})
 PROFILE_URL_PATTERN = re.compile(
@@ -80,6 +81,7 @@ def find_sensitive_text(value: str) -> bool:
         or PROFILE_URL_PATTERN.search(normalized)
         or INTL_PHONE_PATTERN.search(normalized)
         or QUOTED_EMAIL_PATTERN.search(normalized)
+        or UNICODE_EMAIL_PATTERN.search(normalized)
         or _embedded_key_hit(normalized)
     ):
         return True

@@ -579,7 +579,9 @@ def main(argv: list[str] | None = None) -> int:
         output = canonical_json(result)
     scan_text = output
     for allowed in sorted(ALLOWED_EMAIL_TARGETS):
-        scan_text = scan_text.replace(allowed, "")
+        scan_text = re.sub(
+            rf"(?<![\w.+-]){re.escape(allowed)}(?![\w.-])", "", scan_text
+        )
     if find_sensitive_text(scan_text):
         print(json.dumps({"verdict": "BLOCKED", "reason": "FORBIDDEN_SENSITIVE_OUTPUT"}))
         return 1
