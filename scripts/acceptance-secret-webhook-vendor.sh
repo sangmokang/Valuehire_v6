@@ -81,6 +81,11 @@ K_WH_C=$(printf 'W%s' "$(printf '%s' "${K_WH#W}" | tr 'A-Z' 'a-z')")  # Webhook
 DC_U=$(printf '%s' "$DC" | tr 'a-z' 'A-Z')        # DISCORD
 WH_U=$(printf '%s' "$WH" | tr 'a-z' 'A-Z')        # WEBHOOKS
 TOK_U=$(printf '%s' "$TOK" | tr 'a-z' 'A-Z')      # 대문자 표기 토큰
+# AC-SECRET-SHORT-1 용 조각 (2026-09-03). 리터럴로 두지 않는 이유는 위 60행과 같다.
+K_TK=$(printf 'TOK%s' 'EN')                       # TOKEN
+K_PW=$(printf 'PASSW%s' 'ORD')                    # PASSWORD (대조군 전용)
+SHORTV=abc123xy                                   # 8자 — 6자 하한과 12자 하한 사이
+LONGV=$(printf 'abcdef%s' '123456789')            # 15자 — 12자 하한을 넘는 값
 
 must_catch() {
   local desc="$1" line="$2" rc=0
@@ -259,6 +264,98 @@ e2e "대문자 표기 웹훅도 차단(-i 손실 감지)" \
 e2e "정상 파일은 verify.sh 가 통과" \
     "{\"position\":\"AX Sales\",\"pages\":20}" 0
 
+# ── ⑥ AC-SECRET-SHORT-1 — 환경변수 형식의 6~11자 구간 (2026-09-03) ───────────
+#
+# 계약: docs/engineering/secret-short-value-goal-2026-09-03.md §⑤
+#   기존 12자 규칙(.secret-patterns.default 마지막 줄)은 그대로 두고, 허용-접미를
+#   **열거한** 6자 하한 규칙을 한 줄 더한다. 접미사가 열거 밖이면 판정하지 않는다 —
+#   `_PROVIDER`·`_FORMAT` 은 비밀이 아니라 비밀의 메타데이터를 담는 이름이기 때문이다.
+#
+# ⚠️ 대조군 먼저. MISSED 판정은 "규칙이 배제했다"와 "판정기가 죽었다"를 구분하지 못한다.
+# 아래 대조군이 CAUGHT 가 아니면 뒤따르는 MISSED 3건은 증거가 아니다(goal §⑤ CA-3).
+must_catch "대조군(자가검증) — ${K_PW} 짧은 값은 기존 규칙이 이미 잡는다" \
+  "${K_PW}=${SHORTV}"
+
+# 6벡터는 정규식 단위가 아니라 **verify.sh 전체 스캐너**에 격리 파일로 넣는다.
+# 정규식이 맞아도 스캐너가 그 줄을 안 쓰면 아무 의미가 없다(⑤ 와 같은 이유).
+e2e "짧은 값 — ${K_CR} (접미 없음)"          "${K_CR}=${SHORTV}"            1
+e2e "짧은 값 — ${K_WH}_URL (열거된 접미)"    "${K_WH}_URL=${SHORTV}"        1
+e2e "짧은 값 — ${K_PK} (접미 없음)"          "${K_PK}=${SHORTV}"            1
+# ⚠️ 이 한 건은 **기존 (2) 규칙의 TOKEN** 이 이미 덮는다. 신규 줄을 지워도 초록이므로
+# 신규 규칙의 검출력 증거로 세지 않는다(goal §⑤ 판별력 열 ❌ · 회귀 앵커 전용).
+e2e "회귀 앵커 — ${K_CR}_${K_TK} (기존 ${K_TK} 규칙 소관)" \
+                                             "${K_CR}_${K_TK}=${SHORTV}"    1
+e2e "오탐 방지 — ${K_CR}_PROVIDER (열거 밖 접미)" "${K_CR}_PROVIDER=keychain" 0
+e2e "오탐 방지 — ${K_PK}_FORMAT (열거 밖 접미)"   "${K_PK}_FORMAT=PKCS12"     0
+
+# ── ⑥-b old∖new 회귀 — 2026-09-03 기준선이 잡던 것을 지금도 잡는가 ───────────
+#
+# 기준선은 **동결 사본**이다(scripts/verify/fixtures/secret-patterns/). '현재 파일에서
+# 신규 줄을 뺀 것'을 기준선으로 삼으면, 줄을 더하기만 한 변경에서는 검출력이 구조적으로
+# 줄 수 없어 항상 0이 나오는 동어반복이 된다. 동결 사본이어야 "기존 12자 줄을 신규 줄로
+# 교체" 같은 실제 회귀가 여기서 빨간불이 된다(goal §⑤ CA-2).
+BASELINE=scripts/verify/fixtures/secret-patterns/baseline-2026-09-03.default
+OLDCLEAN=$(mktemp) || { echo "FAIL: mktemp 실패 — 회귀 대조 불가"; echo "CHECKED: ${checked}"; exit 2; }
+trap 'rm -f "$CLEAN" "$OLDCLEAN"' EXIT
+if [ ! -f "$BASELINE" ] || [ ! -s "$BASELINE" ]; then
+  echo "FAIL: 회귀 기준선이 없다/비었다 — $BASELINE (fail-closed)"
+  fail=1
+else
+  tr -d '\r' < "$BASELINE" | grep -vE '^[[:space:]]*(#|$)' > "$OLDCLEAN"
+fi
+
+# 회귀 코퍼스 — 2026-09-03 기준선이 CAUGHT 하던 표본. 값은 전부 더미이며 파일에 쓰지 않는다.
+CORPUS_1="${K_CR}_PROVIDER=${LONGV}"
+CORPUS_2="${K_PK}_FORMAT=${LONGV}"
+CORPUS_3="${K_WH}_RETRY_LABEL=${LONGV}"
+CORPUS_4="${K_WH}_SIGNING_VALUE=${TOK}"
+CORPUS_5="export SERVICE_${K_CR}=${TOK}"
+CORPUS_6="${K_PK}=MIIEvQIBADANBgkqhkiG9w0BAQEFAASC"
+CORPUS_7="${K_BT}=${TOK}"
+CORPUS_8="https://${DC}.com/api/${WH}/${SNOW}/${TOK}"
+CORPUS_9="https://${SLK}/${SVC}/T01ABCDEFGH/B01ABCDEFGH/${TOK}"
+CORPUS_10="  cfg.value = \"${SKA}api03-${LONGK}\""
+CORPUS_11="${K_CR}=abcdef123456 # local placeholder"
+CORPUS_12="${K_PW}=${SHORTV}"
+
+old_caught=0
+regressed=0
+i=1
+while [ "$i" -le 12 ]; do
+  eval "line=\$CORPUS_$i"
+  o=0; printf '%s\n' "$line" | grep -qEif "$OLDCLEAN" || o=$?
+  n=0; printf '%s\n' "$line" | grep -qEif "$CLEAN"    || n=$?
+  if [ "$o" -gt 1 ] || [ "$n" -gt 1 ]; then
+    printf 'FAIL: 회귀 대조 실행 오류 (기준선 exit=%s · 현행 exit=%s) — 코퍼스 %d\n' "$o" "$n" "$i"
+    fail=1
+  else
+    [ "$o" -eq 0 ] && old_caught=$((old_caught + 1))
+    if [ "$o" -eq 0 ] && [ "$n" -ne 0 ]; then
+      printf 'FAIL: 회귀 — 기준선은 잡던 것을 지금은 놓친다 (코퍼스 %d)\n' "$i"
+      regressed=$((regressed + 1))
+    fi
+  fi
+  i=$((i + 1))
+done
+
+# 대조군: 기준선이 코퍼스를 하나도 못 잡으면 위 "회귀 0건"은 판정기가 죽은 결과일 뿐이다.
+checked=$((checked + 1))
+if [ "$old_caught" -lt 12 ]; then
+  printf 'FAIL: 기준선이 코퍼스 12건 중 %d건만 탐지 — 기준선이 죽었다면 회귀 0건은 증거가 아니다\n' "$old_caught"
+  fail=1
+else
+  printf 'PASS: 회귀 기준선 살아있음 — 코퍼스 12/12 탐지 (%s)\n' "$BASELINE"
+fi
+
+checked=$((checked + 1))
+printf 'OLD_CAUGHT_AND_NEW_MISSED_COUNT=%d\n' "$regressed"
+if [ "$regressed" -ne 0 ]; then
+  printf 'FAIL: 변경 전 CAUGHT → 변경 후 MISSED 가 %d건 (계약값 0)\n' "$regressed"
+  fail=1
+else
+  printf 'PASS: 변경 전 CAUGHT 였다가 변경 후 MISSED 가 된 항목 0건\n'
+fi
+
 # ── 종료 상태 대조 (D4) ──────────────────────────────────────────────────────
 # 2026-08-12 V1 D4: `git status --porcelain` 만 두 시점 비교하면 **무시된 파일**(gitignore)과
 # **잠깐 생겼다 지운 변경**을 못 본다. 검사기가 로컬 산출물이나 비밀 파일을 남겨도 "무오염"이
@@ -287,7 +384,8 @@ fi
 # (CHECKED: 14 로 통과). bash 버전 차이·편집 실수로 검사가 조용히 사라지는 것이
 # 이 저장소의 실제 사고 유형이다(같은 날 ${VAR^^} 로 3건이 사라졌다).
 # 그래서 기대 개수를 코드에 못박고 **적으면 실패**한다(P20 · P2).
-EXPECTED_CHECKS=32
+# 2026-09-03 AC-SECRET-SHORT-1 로 9건 추가(32 -> 41): 대조군 1 + 격리 e2e 6 + 회귀 2.
+EXPECTED_CHECKS=41
 # -lt(하한)가 아니라 -ne(정확값)로 조인다: 하한만 보면 새 검사 3개를 넣고 기존 3개를
 # 지워도 초록이다. V1 판정서의 설계 결정("checked == 기대값 강제")과도 이쪽이 일치한다.
 if [ "$checked" -ne "$EXPECTED_CHECKS" ]; then

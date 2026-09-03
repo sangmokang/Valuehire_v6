@@ -1,0 +1,109 @@
+# 동결 기준선 — 2026-09-03 (커밋 b724093) 시점의 .secret-patterns.default 사본.
+# 용도: old∖new 회귀 대조 하나뿐이다. 이 파일은 스캔 규칙으로 쓰이지 않는다.
+#
+# 왜 '현재 파일 − 신규 줄'이 아니라 동결 사본인가: 규칙을 더하기만 하면 검출력은
+# 구조적으로 줄 수 없어 그 대조는 항상 0이 나오는 동어반복이다. 기준선을 고정해야
+# '기존 줄을 신규 줄로 교체' 같은 실제 회귀가 빨간불이 된다.
+#
+# 갱신 규칙: 이 파일을 고치는 것은 곧 '탐지 범위를 의도적으로 줄인다'는 선언이다.
+# 근거를 suppressions.yaml 에 남기지 않고 고치지 않는다.
+
+# 기본 비밀 스캔 패턴 (ERE, 한 줄당 1개) — 이 파일은 git에 커밋되며 CI가 사용한다.
+# ⚠️ 실제 비밀값을 여기에 절대 적지 않는다. 여기 있는 것은 "모양"이지 "값"이 아니다.
+# 프로젝트 고유의 알려진 리터럴은 gitignore된 로컬 .secret-patterns 에 둔다.
+
+# 자격증명 대입문 (스캔은 대소문자 무시로 수행된다 — verify.sh가 grep -i 사용).
+# 오탐을 막기 위해 두 형태로 나눈다. `token = getToken()` 같은 코드 대입은 잡지 않는다.
+#
+# (1) 따옴표로 감싼 값: password: "..." / Api_Key = '...' / JSON "access_token": "..." — 값 6자 이상
+[A-Za-z0-9_]*(PASSWORD|PASSWD|SECRET|TOKEN|APIKEY|API_KEY|ACCESS_KEY)[A-Za-z0-9_]*['\"]?[[:space:]]*[:=][[:space:]]*['\"][A-Za-z0-9][^'\"]{5,}['\"]
+# (2) .env 형태 — 줄 전체가 KEY=값 인 경우만. 앞뒤 앵커로 코드 문장을 배제한다.
+^[[:space:]]*(export[[:space:]]+)?[A-Za-z0-9_]*(PASSWORD|PASSWD|SECRET|TOKEN|APIKEY|API_KEY|ACCESS_KEY)[A-Za-z0-9_]*=[A-Za-z0-9][^[:space:]'\"#$<>{}()]{5,}[[:space:]]*$
+
+# 클라우드/서비스 키 형식
+AKIA[0-9A-Z]{16}
+ASIA[0-9A-Z]{16}
+gh[pousr]_[A-Za-z0-9]{36,}
+sk-[A-Za-z0-9]{20,}
+xox[baprs]-[A-Za-z0-9-]{10,}
+AIza[0-9A-Za-z_-]{35}
+
+# 개인키 블록
+-----BEGIN[[:space:]]+(RSA|DSA|EC|OPENSSH|PGP)?[[:space:]]*PRIVATE[[:space:]]+KEY
+
+# 자격증명이 박힌 URL (user:pass@host)
+[a-zA-Z][a-zA-Z0-9+.-]*://[^/[:space:]:@]+:[^/[:space:]@]+@
+
+# 세션 계열 자격증명 (2026-08-08 추가 · 2026-08-09 개정 — AC-A3)
+#
+# 개정 이유(실측): 초판은 "키: 값" 한 줄 형태만 잡았다. 그런데 CDP Network.getAllCookies 와
+# Playwright storageState 가 실제로 뱉는 형식은 **쿠키 이름이 값 자리에 온다** —
+# name 필드에 쿠키 이름이, value 필드에 실제 값이 들어간다. 그래서 전부 놓쳤다.
+# (예시를 리터럴로 적으면 아래 (5) 가 이 주석을 자기매칭한다 — 실제로 한 번 걸렸다.)
+# v6 는 CDP 경유가 전제이므로
+# 그것이 실제 산출 형식이다. 동시에 pw/pwd·SESSION_ID 키 매칭이 평범한 코드를 막았다
+# (빌드 경로 "pwd":"/Users/…" · 상태 상수 'PW':'PENDING_WRITE' · 헤더 이름 설정 · i18n 문구).
+# **진짜는 놓치고 더미는 막는 비대칭**은 훅 우회 습관을 만든다. 그래서 키 이름 매칭을
+# 줄이고 값 '자리'와 값 '모양'을 추가한다 — 키 이름은 바꿀 수 있어도 값은 못 바꾼다.
+#
+# 의도적으로 뺀 것(구멍이지만 오탐보다 낫다고 판단, 근거를 남긴다):
+#   · pw / pwd 짧은 키 — 오탐 4종 중 3종이 여기서 났고 비밀 스캔에는 억제 경로가 없다.
+#     자격증명은 Keychain 단일 출처이므로 파일에 남을 경로가 애초에 정책상 없다(창립 스펙 §3-6).
+#   · SESSION_ID / SESSIONID 키 — "sessionIdHeader" 같은 설정 '이름'과 구분이 안 된다.
+#     실제 세션 값은 아래 (6) 값 모양으로 잡는다.
+#
+# (3) 세션 쿠키 키 = 따옴표 값
+[A-Za-z0-9_-]*(LI_AT|LI_RM|LIDC|JSESSIONID|PHPSESSID|BCOOKIE|BSCOOKIE)[A-Za-z0-9_-]*['\"]?[[:space:]]*[:=][[:space:]]*['\"][A-Za-z0-9][^'\"]{5,}['\"]
+# (4) 세션 쿠키 키 = 무따옴표 (YAML · .env · 헤더 문자열)
+(LI_AT|LI_RM|LIDC|JSESSIONID|PHPSESSID|BCOOKIE|BSCOOKIE)[[:space:]]*[:=][[:space:]]*[A-Za-z0-9_:+/-]{12,}
+# (5) 값 '자리'에 쿠키 이름이 오는 직렬화 (CDP getAllCookies · Playwright storageState)
+['\"]name['\"][[:space:]]*:[[:space:]]*['\"](LI_AT|LI_RM|LIDC|JSESSIONID|PHPSESSID|BCOOKIE|BSCOOKIE)['\"]
+# (6) 값 '모양' — 키 이름을 바꿔도 값 형태는 못 바꾼다
+AQED[A-Za-z0-9_-]{30,}
+AJAX:[0-9]{16,}
+# (7) CDP 디버거 WebSocket URL — 붙는 즉시 프로필 전체 쿠키를 뽑을 수 있는 무인증 채널
+WS://[^/[:space:]]*/DEVTOOLS/
+# (8) Set-Cookie 응답 헤더 / cookies.txt 형태
+SET-COOKIE[[:space:]]*:[[:space:]]*[A-Za-z0-9_-]+=[A-Za-z0-9]{6,}
+# (9) Cookie 요청 헤더 / 필드 (Cookie2 같은 변종 포함)
+['\"]?COOKIE[0-9]?['\"]?[[:space:]]*[:=][[:space:]]*['\"][A-Za-z0-9_-]+=[A-Za-z0-9][^'\"]{5,}['\"]
+# (9b) Cookie 요청 헤더 — 따옴표 없는 값. devtools 의 "Copy as cURL" 이 이 형태로 뱉는다.
+# (8)Set-Cookie 는 따옴표를 요구하지 않는데 (9)만 요구해 비대칭이었다(2026-08-09 재검증).
+COOKIE[0-9]?[[:space:]]*:[[:space:]]*[A-Za-z0-9_-]+=[A-Za-z0-9][^;'\"[:space:]]{5,}
+# (10) JWT 토큰 형태
+EYJ[A-Za-z0-9_-]{8,}\.EYJ[A-Za-z0-9_-]{8,}\.
+# (11) Authorization 헤더 (Bearer / Basic + 값)
+AUTHORIZATION['\"]?[[:space:]]*[:=][[:space:]]*['\"]?(BEARER|BASIC)[[:space:]]+[A-Za-z0-9._~+/=-]{10,}
+
+# ── 웹훅 URL · 벤더 키 (AC-S1) ────────────────────────────────────────────────
+# 비밀이 URL '경로'에 실려 키워드(PASSWORD/TOKEN…)가 없다. 위 규칙들로는 구조적으로 못 잡는다.
+#
+# 2026-08-12 V1 적대검증 D1·D2·D5 반영:
+#  · 도메인 앞을 (^|[^A-Za-z0-9-]) 로 앵커한다 — canary./ptb. 같은 하위 도메인은 통과시키고
+#    notdiscord.com · not-hooks.slack.com 같은 접미사 위장은 막는다(둘 다 실측 확인).
+#  · Discord 공식 문서가 /api/v{n}/ 버전 경로를 권장한다 → (v[0-9]+/)? 를 넣는다. v10 이 새고 있었다.
+#  · Slack 공공기관용 GovSlack 은 slack-gov.com 이고, OAuth 응답 예시는 /services 없는 형태도 있다.
+#  · sk-ant- 본문 하한을 40 -> 24 로 내린다. 39자가 통과했고 Anthropic 은 전체 길이를 공개하지 않는다.
+#  · BOT_TOKEN 은 뺐다 — 위 (1)(2) 의 TOKEN 이 이미 덮는 죽은 중복이고, 서로의 삭제를 가린다.
+# codeaudit(2026-08-12) D4·D5 반영 — 왼쪽 경계에 밑줄(_)을 추가하고 sk-ant 에도 경계를 둔다.
+#  · D4: 경계 [^A-Za-z0-9-] 가 밑줄을 통과시켜 my_discord.com·team_hooks.slack.com 위장 도메인이
+#    비밀로 오인됐다. 밑줄은 식별자 문자이므로 경계에서 제외한다([^A-Za-z0-9_-]).
+#  · D5: sk-ant 에 왼쪽 경계가 없어 평범한 식별자 안의 'sk-ant-' 조각(mask-ant-…)을 잡았다.
+#    실제 벤더 키는 값이라 항상 비영숫자로 구분되므로 경계 추가는 탐지 손실을 만들지 않는다.
+(^|[^A-Za-z0-9_-])discord(app)?\.com/api/(v[0-9]+/)?webhooks/[0-9]{15,}/[A-Za-z0-9_-]{20,}
+(^|[^A-Za-z0-9_-])hooks\.slack(-gov)?\.com/(services/)?T[A-Za-z0-9]+/B[A-Za-z0-9]+/[A-Za-z0-9]{20,}
+(^|[^A-Za-z0-9])sk-ant-[A-Za-z0-9_-]{24,}
+
+# 자격증명 대입문 키워드 확장 — WEBHOOK/CREDENTIAL/PRIVATE_KEY (.env 형태)
+#
+# 값이 URL 인 경우는 **의도적으로 제외**한다(D2). 값 문자 집합에 : 와 / 가 없다.
+#  왜: WEBHOOK_URL=https://example.com/... 같은 .env.example·문서 한 줄과, 실제 운영 웹훅 주소는
+#      모양이 완전히 같다. 비밀 스캔에는 억제 경로가 없어 오탐 1건이 곧 작업 중단이므로,
+#      URL 값 판정은 위 벤더 규칙(discord/slack)에 맡기고 여기서는 불투명 토큰만 본다.
+#  대가: 위 3사 밖 벤더의 웹훅 URL 이 .env 에 들어가면 놓친다. 벤더가 늘면 위에 규칙을 추가한다.
+# 값에 글자가 최소 1개 있어야 한다 — WEBHOOK_RETRY_INTERVAL_MS=300000 같은 설정 숫자를 막지 않는다.
+# 끝의 인라인 주석(# ...)을 허용한다 — CREDENTIAL=abcdef123456 # placeholder 가 새고 있었다.
+# 값 하한은 12자다(글자 1개 + 11자) — 2026-08-12 V2 재검증: 5자 하한으로는 keychain(8자)·
+# PKCS12(6자) 같은 저장 방식·형식 이름이 오탐됐다. 대가: 12자 미만의 실제 비밀은 이 규칙이
+# 못 본다(짧은 비밀은 위 (1)(2) 키워드·벤더 규칙이 각자의 범위에서 담당).
+^[[:space:]]*(export[[:space:]]+)?[A-Za-z0-9_]*(WEBHOOK|CREDENTIAL|PRIVATE_KEY)[A-Za-z0-9_]*=['"]?[A-Za-z0-9._-]*[A-Za-z][A-Za-z0-9._-]{11,}['"]?([[:space:]]*#[^#]*)?[[:space:]]*$
