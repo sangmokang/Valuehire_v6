@@ -369,7 +369,27 @@ CORPUS_23="  ${AUTHH}: ${BEAR} abcdefghijklmnop.qrst"
 # (2026-09-03 실측: 코퍼스 23/24). 규칙이 아니라 표본이 틀렸던 경우다.
 SETC=$(printf 'Set-Coo%s' 'kie')
 CORPUS_24="${SETC}: sid=abc123def456; Path=/"
-CORPUS_N=24
+# 2026-09-03 V2 적대검증 F4 — 기준선 25개 규칙을 하나씩 지우는 전수 스윕에서 9개가
+# 통째로 삭제돼도 초록이었다. 그중 가장 아픈 것이 1번(가장 넓은 인용형 자격증명 규칙)이다.
+# "규칙 계열마다 표본을 박았다"는 주장이 실측으로 거짓이었으므로 빈 자리를 채운다.
+# 카나리는 전부 조립한다 — 리터럴로 두면 이 파일 자신이 그 규칙에 걸린다.
+KQ=$(printf 'api_%s' 'key')                       # api_key (인용형 전용)
+ASP=$(printf 'AS%s' 'IA')                         # ASIA (AWS 임시 자격증명)
+AJ=$(printf 'AJA%s:' 'X')                         # AJAX:
+# ⚠️ 이 줄의 주석에 그 엔드포인트 모양을 예시로 적으면 주석이 규칙 #16 에 걸린다
+# (2026-09-03 실측: verify.sh 가 이 파일을 매치). 그래서 말로만 적는다.
+WSD=$(printf 'ws://127.0.0.1:9222/devto%s/' 'ols') # CDP 디버거 웹소켓 엔드포인트 모양
+CKQ=$(printf 'coo%s' 'kie')                       # cookie (인용형 전용)
+CKP=$(printf 'Coo%s' 'kie')                       # Cookie (평문 전용)
+CORPUS_25="  cfg = { \"${KQ}\": \"abc123xyz789\" }"
+CORPUS_26="${ASP}IOSFODNN7EXAMPLE"
+CORPUS_27="  cfg = { \"${LIAT}\": \"AbCdEfGhIjKl\" }"
+CORPUS_28="${LIAT}=AbCdEfGhIjKlMn"
+CORPUS_29="  csrf = ${AJ}1234567890123456"
+CORPUS_30="  target = ${WSD}browser/abcdef"
+CORPUS_31="  h = { \"${CKQ}\": \"sid=abc123def\" }"
+CORPUS_32="${CKP}: sid=abc123def456"
+CORPUS_N=32
 
 old_caught=0
 regressed=0
@@ -415,7 +435,21 @@ FP_5="${K_CR}=keychain"
 FP_6="${K_WH}_URL=changeme"
 FP_7="${K_CR}=placeholder"
 FP_8="${K_PK}=default"
-FP_N=8
+# 2026-09-03 V2 적대검증 ② — 위 8종을 "값에 숫자 요구"로 막았더니 이번엔 **숫자를 품은**
+# 평범한 설정값이 통째로 들어왔다. 값 문자집합에서 . - _ 를 빼서 닫았고 반례를 박아 둔다.
+# ⚠️ 아래는 전부 **이 규칙이 새로 만든** 오탐만 골랐다. `api-v2.example.com` 같은 12자
+# 이상 호스트명은 origin/main 의 12자 규칙이 이미 잡는 기존 동작이라 여기 넣지 않는다
+# (넣으면 이 PR 과 무관한 이유로 빨개져서, 다음 사람이 원인을 오귀속한다).
+FP_9="${K_WH}_URL=192.168.0.10"
+FP_10="${K_WH}_URL=1.2.3.4"
+FP_11="${K_WH}_URL=2026-09-03"
+FP_12="${K_CR}_URL=2026-09-03T00"
+FP_13="${K_CR}_URL=v2.1.0-rc1"
+FP_14="${K_WH}_URL=n8n-prod-01"
+FP_15="${K_WH}=stage-2"
+FP_16="${K_CR}=SHA-256"
+FP_17="${K_PK}=id_rsa.pub"
+FP_N=17
 
 fp_hit=0
 i=1
@@ -437,6 +471,54 @@ if [ "$fp_hit" -ne 0 ]; then
   fail=1
 else
   printf 'PASS: 설정 센티널 %d종 오탐 0건 (2026-09-03 V1 반례 회귀)\n' "$FP_N"
+fi
+
+# ── ⑥-d 규칙별 판별력 스윕 (2026-09-03 V2 적대검증 F4 반례의 영구 편입) ────────
+#
+# "코퍼스를 넓혀 규칙 계열마다 표본을 박았다"는 주장은 실측으로 거짓이었다 — 기준선
+# 25개 규칙을 하나씩 지워 보니 9개가 통째로 삭제돼도 전 게이트가 초록이었다.
+# 표본이 "잡히는가"만 보고 "그 규칙만 잡는가"를 안 본 것이며, 이 저장소가 이미 아는
+# 죽은 중복 함정(2026-08-12 D5)을 코퍼스에는 적용하지 않은 것이다.
+#
+# 그래서 주장 대신 **검사**를 둔다: 기준선의 각 규칙을 현행 집합에서 하나만 빼고,
+# 기준선이 잡던 코퍼스 표본 중 하나라도 놓치게 되는지 본다. 안 놓치면 그 규칙은
+# 판별 표본이 없다는 뜻이다. 판별 표본 없는 규칙의 **집합**을 정확값으로 못박는다 —
+# 늘어나면(새 규칙에 표본을 안 붙임) 빨간불, 줄어들면(덮었음) 이 상수를 갱신하라는 빨간불.
+#
+# 지금 비어 있는 유일한 규칙: #17 `SET-COOKIE…` — #19 평문 COOKIE 규칙이 값 문자집합
+# 상 상위집합이라 Set-Cookie 입력 전체에서 #17 을 덮는다(#17 ⊆ #19). 판별 입력이
+# 원리적으로 존재하지 않는 죽은 중복이며, 이 PR 이 만든 것이 아니라 기존 규칙 문제다.
+UNCOVERED_EXPECTED="17"
+uncovered=""
+ridx=0
+while IFS= read -r rule; do
+  [ -z "$rule" ] && continue
+  ridx=$((ridx + 1))
+  MINUS=$(mktemp) || { echo "FAIL: mktemp 실패 — 판별력 스윕 불가"; fail=1; break; }
+  grep -Fvx -e "$rule" "$CLEAN" > "$MINUS"
+  discriminating=0
+  j=1
+  while [ "$j" -le "$CORPUS_N" ]; do
+    eval "line=\$CORPUS_$j"
+    o=0; printf '%s\n' "$line" | grep -qEif "$OLDCLEAN" || o=$?
+    m=0; printf '%s\n' "$line" | grep -qEif "$MINUS"   || m=$?
+    if [ "$o" -eq 0 ] && [ "$m" -eq 1 ]; then discriminating=1; break; fi
+    j=$((j + 1))
+  done
+  rm -f "$MINUS"
+  [ "$discriminating" -eq 0 ] && uncovered="${uncovered}${uncovered:+ }${ridx}"
+done < "$OLDCLEAN"
+
+checked=$((checked + 1))
+printf 'UNCOVERED_BASELINE_RULES=%s\n' "${uncovered:-(없음)}"
+if [ "$uncovered" != "$UNCOVERED_EXPECTED" ]; then
+  printf 'FAIL: 판별 표본 없는 기준선 규칙 집합이 계약과 다르다 — 기대 [%s] / 실제 [%s]\n' \
+    "$UNCOVERED_EXPECTED" "${uncovered:-}"
+  printf '      규칙을 늘렸다면 판별 표본을 함께 넣고, 덮었다면 이 상수를 줄여라.\n'
+  fail=1
+else
+  printf 'PASS: 기준선 %d개 규칙 중 판별 표본 없는 것이 계약값 [%s] 과 일치\n' \
+    "$ridx" "$UNCOVERED_EXPECTED"
 fi
 
 checked=$((checked + 1))
@@ -480,7 +562,7 @@ fi
 # 같은 날 V1 적대검증 반례 편입으로 2건 추가(41 -> 43): 기준선 해시 대조 1 + 센티널 오탐 1.
 # ⚠️ AC 6벡터의 표본과 기대값은 RED 커밋(ae84381) 이후 한 글자도 바뀌지 않았다.
 # 늘어난 것은 전부 적대검증이 찾아낸 반례를 **더한** 것이지 기준을 낮춘 것이 아니다.
-EXPECTED_CHECKS=43
+EXPECTED_CHECKS=44
 # -lt(하한)가 아니라 -ne(정확값)로 조인다: 하한만 보면 새 검사 3개를 넣고 기존 3개를
 # 지워도 초록이다. V1 판정서의 설계 결정("checked == 기대값 강제")과도 이쪽이 일치한다.
 if [ "$checked" -ne "$EXPECTED_CHECKS" ]; then
