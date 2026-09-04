@@ -41,9 +41,8 @@ required_files=(
   docs/sot/invoice.md
   docs/sot/invoice-storage.md
   supabase/migrations/20260901090000_invoice_fee_agreements_and_storage.sql
-  supabase/migrations/20260901100000_invoice_fee_agreement_immutability.sql
-  supabase/migrations/20260901103000_invoice_fee_agreement_idempotent_upsert.sql
   supabase/migrations/20260902090000_invoice_runtime_integrity.sql
+  supabase/migrations/20260905090000_invoice_owner_policy_and_fee_trigger.sql
   tools/invoice/generate_invoice.py
   tools/invoice/generate_deduction.py
   tools/invoice/storage_common.py

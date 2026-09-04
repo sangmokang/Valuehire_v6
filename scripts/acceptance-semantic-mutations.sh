@@ -162,10 +162,9 @@ fi
 ci_mutant="$TMP/verify-invoice-step-disabled.yml"
 if ruby -e '
   source = File.read(ARGV[0])
-  needle = "        run: python3 scripts/verify/check-invoice-gate.py\n"
+  needle = "          python3 scripts/verify/check-invoice-gate.py\n"
   abort "needle missing" unless source.include?(needle)
-  File.write(ARGV[1], source.sub(needle,
-    "        run: |\n          exit 0\n          python3 scripts/verify/check-invoice-gate.py\n"))
+  File.write(ARGV[1], source.sub(needle, "          exit 0\n" + needle))
 ' .github/workflows/verify.yml "$ci_mutant"; then
   ci_rc=0
   python3 scripts/verify/check-invoice-gate.py --workflow "$ci_mutant" \

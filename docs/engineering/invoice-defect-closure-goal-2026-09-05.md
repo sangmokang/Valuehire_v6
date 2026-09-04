@@ -190,6 +190,14 @@ fee_agreement_id, supply_amount)` — 프롬프트의 "tenant·고객사·입사
   저장이 어긋난 것. 즉시 확인 대상.
 - `PLACEMENT_DUPLICATE` 오류 → 같은 성사 건을 두 번 청구하려 한 것.
 
+## 남은 부채
+
+| 부채 | 내용 | 기한·완화 |
+|---|---|---|
+| DEBT-1 | 운영의 `reject_overlapping_fee_agreements()` 실제 본문과 owner RLS 정책의 현재 `cmd` 를 확인하지 못했다. 읽기 전용 PostgREST 로는 함수 소스도 `pg_policies` 도 못 읽는다. | 완화: `20260905090000` 이 두 경우 모두에서 올바른 끝 상태로 수렴시킨다(`create or replace` + `drop policy if exists`). 운영 적용 시 `select cmd from pg_policies` 로 확인할 것. |
+| DEBT-2 | `20260902090000` 과 `20260905090000` 은 아직 운영에 적용되지 않았다. 이 PR 은 마이그레이션 적용을 포함하지 않는다(운영 쓰기 금지). | 적용은 별도 승인 작업. 적용 전까지 배송 상태는 `LOCAL_ONLY` 다. |
+| DEBT-3 | `contracts/invoice/storage-v1.json` 의 `supabase.source_repository` 가 로컬 절대경로(`/Users/...`)다. 이번 결함 목록 밖이라 손대지 않았다. | 다음 invoice 작업에서 정리. |
+
 ## 적대 검증 로그
 
 (후기록)

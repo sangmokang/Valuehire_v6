@@ -111,13 +111,13 @@
   ci_mirror_job: "verify"
   required: true
 - id: "invoice-independent-unit-ci"
-  path: ".github/workflows/verify.yml"
+  path: "scripts/acceptance-invoice.sh"
   target: "python3 -m unittest discover -s tools/invoice/tests -v"
   stage: "ci"
   ci_mirror_job: "verify"
   required: true
 - id: "invoice-postgres-runtime-ci"
-  path: ".github/workflows/verify.yml"
+  path: "scripts/acceptance-invoice.sh"
   target: "bash tools/invoice/tests/test_postgres_integrity.sh"
   stage: "ci"
   ci_mirror_job: "verify"

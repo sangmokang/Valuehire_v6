@@ -54,9 +54,8 @@ psql_cmd=("$pg_bin/psql" -X -v ON_ERROR_STOP=1 -h "$pg_socket" -p "$pg_port" -d 
 "${psql_cmd[@]}" -f "$repo/tools/invoice/tests/postgres_fixture.sql" >/dev/null
 for migration in \
   20260901090000_invoice_fee_agreements_and_storage.sql \
-  20260901100000_invoice_fee_agreement_immutability.sql \
-  20260901103000_invoice_fee_agreement_idempotent_upsert.sql \
-  20260902090000_invoice_runtime_integrity.sql; do
+  20260902090000_invoice_runtime_integrity.sql \
+  20260905090000_invoice_owner_policy_and_fee_trigger.sql; do
   "${psql_cmd[@]}" -f "$repo/supabase/migrations/$migration" >/dev/null
 done
 
@@ -119,12 +118,37 @@ active_contracts=$("${psql_cmd[@]}" -Atc \
   "select jsonb_build_object('version',version,'sha256',sha256,'config',config)
    from invoice_business_contract_versions where active" \
   | python3 "$repo/tools/invoice/tests/assert_contract_snapshot.py"
-owner_policy=$("${psql_cmd[@]}" -Atc \
-  "select cmd from pg_policies
-   where tablename='invoice_delivery_receipts'
-     and policyname='invoice_delivery_receipts_owner'")
-[ "$owner_policy" = "SELECT" ] || {
-  echo "FAIL: owner delivery policy is not read-only: $owner_policy"
+# 로그인 사용자(authenticated)는 원장을 읽기만 할 수 있어야 한다. 쓰기는
+# service_role 로만 간다. 20260905090000 이 이 축소를 forward-only 로 가져온다.
+owner_policies=$("${psql_cmd[@]}" -Atc \
+  "select tablename || ':' || cmd from pg_policies
+   where policyname in (
+     'recruitment_fee_agreements_owner',
+     'invoice_settlement_details_owner',
+     'invoice_delivery_receipts_owner'
+   ) order by tablename")
+expected_owner_policies=$'invoice_delivery_receipts:SELECT\ninvoice_settlement_details:SELECT\nrecruitment_fee_agreements:SELECT'
+[ "$owner_policies" = "$expected_owner_policies" ] || {
+  echo "FAIL: authenticated owner policies are not read-only: $owner_policies"
+  exit 1
+}
+
+# 정책 이름만 보고 끝내지 않는다 — 실제로 쓰기를 시도해 막히는지 확인한다.
+"${psql_cmd[@]}" -c "grant select, insert, update, delete
+  on recruitment_fee_agreements to authenticated;" >/dev/null
+set +e
+"${psql_cmd[@]}" -c "set role authenticated;
+  insert into recruitment_fee_agreements (
+    agreement_ref, client_key, client_name, position_key, position_name,
+    fee_rate, effective_from, source_reference
+  ) values (
+    'AUTH-DIRECT', 'auth client', 'Auth Client', 'auth role', 'Auth Role',
+    0.99, '2026-01-01', 'must be rejected by RLS'
+  );" >"$pg_tmp/owner-write.log" 2>&1
+owner_write_rc=$?
+set -e
+[ "$owner_write_rc" -ne 0 ] || {
+  echo "FAIL: an authenticated session wrote a fee agreement directly"
   exit 1
 }
 

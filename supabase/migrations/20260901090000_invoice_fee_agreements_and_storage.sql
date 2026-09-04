@@ -141,8 +141,9 @@ create policy recruitment_fee_agreements_service_role
 drop policy if exists recruitment_fee_agreements_owner
   on recruitment_fee_agreements;
 create policy recruitment_fee_agreements_owner
-  on recruitment_fee_agreements for select to authenticated
-  using ((auth.jwt() ->> 'email') = 'sangmokang@valueconnect.kr');
+  on recruitment_fee_agreements for all to authenticated
+  using ((auth.jwt() ->> 'email') = 'sangmokang@valueconnect.kr')
+  with check ((auth.jwt() ->> 'email') = 'sangmokang@valueconnect.kr');
 
 drop policy if exists invoice_settlement_details_service_role
   on invoice_settlement_details;
@@ -152,8 +153,9 @@ create policy invoice_settlement_details_service_role
 drop policy if exists invoice_settlement_details_owner
   on invoice_settlement_details;
 create policy invoice_settlement_details_owner
-  on invoice_settlement_details for select to authenticated
-  using ((auth.jwt() ->> 'email') = 'sangmokang@valueconnect.kr');
+  on invoice_settlement_details for all to authenticated
+  using ((auth.jwt() ->> 'email') = 'sangmokang@valueconnect.kr')
+  with check ((auth.jwt() ->> 'email') = 'sangmokang@valueconnect.kr');
 
 create or replace function store_invoice_placement_set(p_payload jsonb)
 returns jsonb
