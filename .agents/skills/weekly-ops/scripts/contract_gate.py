@@ -38,9 +38,11 @@ ZERO_RESULT_COLLECTIONS = {"positions", "position_state", "outreach_events", "pi
 ALLOWED_EMAIL_TARGETS = {"sangmokang@valueconnect.kr"}
 EMAIL_PATTERN = re.compile(r"(?<![\w.+-])[\w.+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?![\w.-])")
 QUOTED_EMAIL_PATTERN = re.compile(r'"[^"@]{1,64}"@[\w.-]+\.[\w-]{2,}(?![\w.-])')
-UNICODE_EMAIL_PATTERN = re.compile(r"(?<![\w.+-])[\w.+-]+@[\w.-]+\.[\w-]{2,}(?![\w.-])")
+UNICODE_EMAIL_PATTERN = re.compile(
+    r"(?<![\w.+!#$%&'*/=?^`{|}~-])[\w.+!#$%&'*/=?^`{|}~-]{1,64}@[\w.-]+\.[\w-]{2,}(?![\w.-])"
+)
 DOMAIN_LITERAL_EMAIL_PATTERN = re.compile(
-    r"""["']?[\w.+ -]{1,64}["']?@\[[0-9A-Fa-f:.]{2,45}\]"""
+    r"""["']?[\w.+! -]{1,64}["']?@\[(?:IPv6:)?[0-9A-Za-z:.]{2,45}\]"""
 )
 PHONE_PATTERN = re.compile(
     r"(?<![A-Za-z0-9])"
@@ -57,7 +59,8 @@ PROFILE_URL_PATTERN = re.compile(
     r"\.?(?::\d+)?/\S+"
 )
 INTL_PHONE_PATTERN = re.compile(
-    r"(?<![\w+])\+[1-9]\d{0,2}[- ./]?\(?\d{2,4}\)?[- ./]?\d{3,4}[- ./]?\d{3,4}(?!\d)"
+    r"(?<![\w+])\+[1-9]\d{0,2}"
+    r"(?:(?:[- ./]?\(?\d{2,4}\)?){3}|(?:[- .]\(?\d{1,4}\)?){4,6})(?!\d)"
 )
 QUOTED_KEY_PATTERN = re.compile(r"""["']([\w \-]{1,64})["']\s*[:=]""")
 EMBEDDED_KEY_TOKENS = frozenset({
