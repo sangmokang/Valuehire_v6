@@ -105,7 +105,7 @@ class InvoiceLedgerTest(InvoiceLedgerCase):
             "select payload from invoice_sync_outbox"
         ).fetchone()[0])
         response = self.remote_confirmation("upsert_fee_agreement", payload)
-        with mock.patch.object(ledger, "_remote_request", return_value=response):
+        with self.patched_remote( return_value=response):
             sent, failed = ledger.sync_pending(self.connection, 20)
         self.assertEqual((sent, failed), (1, 0))
         row = self.connection.execute(
@@ -117,8 +117,7 @@ class InvoiceLedgerTest(InvoiceLedgerCase):
             agreement_ref="TEST-CLIENT-EE-2026", position="전장 엔지니어"
         )
         ledger.register_agreement(self.connection, second)
-        with mock.patch.object(
-            ledger, "_remote_request", side_effect=ledger.StorageError("network down")
+        with self.patched_remote( side_effect=ledger.StorageError("network down")
         ):
             sent, failed = ledger.sync_pending(self.connection, 20)
         self.assertEqual((sent, failed), (0, 1))
@@ -144,7 +143,7 @@ class InvoiceLedgerTest(InvoiceLedgerCase):
                     position=f"Position {index}",
                 )
                 ledger.register_agreement(self.connection, agreement)
-                with mock.patch.object(ledger, "_remote_request", return_value=response):
+                with self.patched_remote( return_value=response):
                     sent, failed = ledger.sync_pending(self.connection, 1)
                 self.assertEqual((sent, failed), (0, 1))
                 row = self.connection.execute(
@@ -273,9 +272,7 @@ class InvoiceLedgerTest(InvoiceLedgerCase):
                 "update invoice_sync_outbox set status='sent' "
                 "where operation<>'record_invoice_delivery'"
             )
-        with mock.patch.object(
-            ledger,
-            "_remote_request",
+        with self.patched_remote(
             return_value=self.remote_confirmation("record_invoice_delivery", receipt_payload),
         ):
             ledger.sync_pending(self.connection, 20)
@@ -302,7 +299,7 @@ class InvoiceLedgerTest(InvoiceLedgerCase):
             operations.append(operation)
             return self.remote_confirmation(operation, payload)
 
-        with mock.patch.object(ledger, "_remote_request", side_effect=confirm):
+        with self.patched_remote( side_effect=confirm):
             self.assertEqual(ledger.sync_pending(self.connection, 20), (2, 0))
         self.assertEqual(
             operations, ["upsert_fee_agreement", "store_invoice_placement_set"]
@@ -322,7 +319,7 @@ class InvoiceLedgerTest(InvoiceLedgerCase):
             operations.append(operation)
             raise ledger.StorageError("network down")
 
-        with mock.patch.object(ledger, "_remote_request", side_effect=fail_first):
+        with self.patched_remote( side_effect=fail_first):
             self.assertEqual(ledger.sync_pending(self.connection, 20), (0, 1))
         self.assertEqual(operations, ["upsert_fee_agreement"])
         self.assertEqual(self.connection.execute(
@@ -358,7 +355,7 @@ class InvoiceLedgerTest(InvoiceLedgerCase):
         def confirm(operation: str, payload: dict[str, object]) -> object:
             operations.append(operation)
             return self.remote_confirmation(operation, payload)
-        with mock.patch.object(ledger, "_remote_request", side_effect=confirm):
+        with self.patched_remote( side_effect=confirm):
             self.assertEqual(ledger.sync_pending(self.connection, 20), (1, 0))
         self.assertEqual(operations, ["upsert_fee_agreement"])
         self.assertEqual(self.connection.execute(
@@ -377,7 +374,7 @@ class InvoiceLedgerTest(InvoiceLedgerCase):
         def confirm(operation: str, payload: dict[str, object]) -> object:
             operations.append(operation)
             return self.remote_confirmation(operation, payload)
-        with mock.patch.object(ledger, "_remote_request", side_effect=confirm):
+        with self.patched_remote( side_effect=confirm):
             self.assertEqual(ledger.sync_pending(self.connection, 20), (1, 0))
         self.assertEqual(operations, ["store_invoice_placement_set"])
 

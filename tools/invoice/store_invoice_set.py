@@ -432,9 +432,11 @@ def _confirmed_remote_result(
     operation: str, payload: dict[str, Any], response: Any
 ) -> dict[str, Any]:
     try:
-        return storage_remote.validate_remote_response(operation, payload, response)
+        confirmed = storage_remote.validate_remote_response(operation, payload, response)
+        storage_remote.confirm_stored_rows(operation, payload, confirmed)
     except storage_remote.RemoteError as error:
         raise StorageError(str(error)) from error
+    return confirmed
 
 
 def sync_pending(connection: sqlite3.Connection, limit: int) -> tuple[int, int]:

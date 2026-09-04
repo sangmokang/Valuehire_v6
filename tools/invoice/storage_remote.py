@@ -169,6 +169,91 @@ def remote_request(operation: str, payload: dict[str, Any]) -> Any:
     raise RemoteError(f"unsupported outbox operation: {operation}")
 
 
+# 한 작업이 실제로 어느 행을 남겼어야 하는지: (계약상 테이블 이름, 응답의 id 필드,
+# 다시 읽을 컬럼, 그 컬럼을 payload 의 어느 값과 대조할지).
+READBACK_PLAN: dict[str, tuple[str, str, tuple[str, ...]]] = {
+    "upsert_fee_agreement": (
+        "fee_agreements", "id",
+        ("id", "tenant_id", "agreement_ref", "client_key", "position_key",
+         "fee_rate", "status"),
+    ),
+    "store_invoice_placement_set": (
+        "invoices", "invoice_id",
+        ("id", "tenant_id", "document_number", "placement_set_id", "payload_sha256"),
+    ),
+    "record_invoice_delivery": (
+        "delivery_receipts", "delivery_receipt_id",
+        ("id", "tenant_id", "document_number", "gmail_message_id",
+         "attachment_sha256", "payload_sha256"),
+    ),
+}
+
+
+def readback_rows(table: str, row_id: str, columns: tuple[str, ...]) -> Any:
+    """Read the row back from Supabase with an independent request."""
+    query = urllib.parse.urlencode(
+        [("id", f"eq.{row_id}"), ("select", ",".join(columns))]
+    )
+    return _request("GET", f"{table}?{query}")
+
+
+def _readback_expectation(
+    operation: str, payload: dict[str, Any], confirmed: dict[str, Any]
+) -> dict[str, Any]:
+    if operation == "upsert_fee_agreement":
+        return {key: payload.get(key) for key in (
+            "tenant_id", "agreement_ref", "client_key", "position_key",
+            "fee_rate", "status",
+        )}
+    if operation == "store_invoice_placement_set":
+        return {
+            "tenant_id": payload.get("tenant_id"),
+            "document_number": (payload.get("invoice") or {}).get("invoice_number"),
+            "placement_set_id": confirmed.get("placement_set_id"),
+            "payload_sha256": payload.get("payload_sha256"),
+        }
+    return {key: payload.get(key) for key in (
+        "tenant_id", "document_number", "gmail_message_id",
+        "attachment_sha256", "payload_sha256",
+    )}
+
+
+def confirm_stored_rows(
+    operation: str, payload: dict[str, Any], confirmed: dict[str, Any]
+) -> dict[str, Any]:
+    """Prove the write landed by reading it back, not by trusting the response.
+
+    A 2xx whose body mirrors the request is not evidence that a row exists.
+    """
+    plan = READBACK_PLAN.get(operation)
+    if plan is None:
+        raise RemoteError(f"unsupported outbox operation: {operation}")
+    table_key, id_field, columns = plan
+    table = load_storage_contract()["supabase"]["tables"][table_key]
+    row_id = _uuid_text(confirmed.get(id_field), f"{id_field} for read-back")
+    rows = readback_rows(table, row_id, columns)
+    if not isinstance(rows, list):
+        raise RemoteError("REMOTE_READBACK_INVALID: read-back is not a row list")
+    if not rows:
+        raise RemoteError("REMOTE_READBACK_MISSING: the stored row cannot be read back")
+    if len(rows) != 1:
+        raise RemoteError("REMOTE_READBACK_AMBIGUOUS: read-back matched several rows")
+    row = rows[0]
+    if not isinstance(row, dict) or set(row) != set(columns):
+        raise RemoteError("REMOTE_READBACK_INVALID: read-back row shape is wrong")
+    if row.get("id") != row_id:
+        raise RemoteError("REMOTE_READBACK_MISMATCH: read-back returned another row")
+    expected = _readback_expectation(operation, payload, confirmed)
+    for field, value in expected.items():
+        same = (
+            _same_decimal(row.get(field), value)
+            if field == "fee_rate" else row.get(field) == value
+        )
+        if not same:
+            raise RemoteError(f"REMOTE_READBACK_MISMATCH: {field} differs in storage")
+    return row
+
+
 def _uuid_text(value: Any, label: str) -> str:
     if not isinstance(value, str):
         raise RemoteError(f"REMOTE_CONFIRMATION_ERROR: {label} is missing")

@@ -1,6 +1,7 @@
 """Shared fixtures for the Invoice ledger test suites."""
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import os
@@ -143,6 +144,47 @@ class InvoiceLedgerCase(unittest.TestCase):
             }
         value.update(overrides)
         return value
+
+    @contextlib.contextmanager
+    def patched_remote(self, **kwargs):
+        """Patch the Supabase write and let the independent read-back mirror it.
+
+        The read-back is a separate request in production, so tests must stub it
+        separately too — a confirmed response alone no longer means success.
+        """
+        write = mock.MagicMock(**kwargs)
+        stored: dict[str, object] = {}
+
+        def perform(operation: str, payload: dict[str, object]):
+            response = write(operation, payload)
+            stored.clear()
+            if isinstance(response, dict):
+                stored.update(response)
+            elif isinstance(response, list) and response and isinstance(response[0], dict):
+                stored.update(response[0])
+            return response
+
+        def rows(table: str, row_id: str, columns: tuple[str, ...]):
+            return [
+                {name: (row_id if name == "id" else stored.get(name)) for name in columns}
+            ]
+
+        with mock.patch.object(ledger, "_remote_request", side_effect=perform), \
+                mock.patch.object(
+                    ledger.storage_remote, "readback_rows", side_effect=rows
+                ):
+            yield
+
+    @staticmethod
+    def readback_of(confirmed: dict[str, object]):
+        """Mimic Supabase returning the very row the write claims to have stored."""
+
+        def rows(table: str, row_id: str, columns: tuple[str, ...]):
+            return [
+                {name: (row_id if name == "id" else confirmed[name]) for name in columns}
+            ]
+
+        return rows
 
     def _write_document_files(
         self, invoice: dict[str, object] | None = None,

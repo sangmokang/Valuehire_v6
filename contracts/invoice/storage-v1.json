@@ -17,7 +17,8 @@
       "invoices": "revenue_invoices",
       "payouts": "commission_payouts",
       "billing_statements": "client_billing_statements",
-      "settlement_details": "invoice_settlement_details"
+      "settlement_details": "invoice_settlement_details",
+      "delivery_receipts": "invoice_delivery_receipts"
     },
     "rpcs": {
       "store_document_set": "store_invoice_placement_set",
