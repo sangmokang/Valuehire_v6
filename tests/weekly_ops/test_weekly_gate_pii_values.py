@@ -145,6 +145,16 @@ class WeeklyGatePiiValueTest(unittest.TestCase):
                 self.assertEqual(result["verdict"], "BLOCKED")
                 self.assertIn("EMAIL_TARGET_NOT_ALLOWLISTED", result["errors"])
 
+    def test_codex_v2_round5_false_negative_formats_are_blocked(self):
+        # 2026-09-04 fresh Codex V2 5차 FAIL 반례의 영구 회귀 (R9)
+        for value in (
+            "user@[IPv6:2001:db8::1]",
+            "user!@example.com",
+            "+33 1 42 68 53 00",
+        ):
+            with self.subTest(value=value):
+                self.assert_action_value_blocked(value)
+
     def test_business_delta_notation_is_not_an_intl_phone(self):
         bundle = valid_bundle()
         bundle["positions"][0]["action"] = "전주 대비 +1 234 567건 증가"
