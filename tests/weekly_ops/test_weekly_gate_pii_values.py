@@ -121,6 +121,30 @@ class WeeklyGatePiiValueTest(unittest.TestCase):
             with self.subTest(value=value):
                 self.assert_action_value_blocked(value)
 
+    def test_codex_v2_round4_false_negative_formats_are_blocked(self):
+        # 2026-09-04 fresh Codex V2 4차 FAIL 반례의 영구 회귀 (R9)
+        for value in (
+            "user@[192.0.2.1]",
+            "(02)   123 - 4567",
+            "https://www.linkedin.com./in/synthetic-person",
+        ):
+            with self.subTest(value=value):
+                self.assert_action_value_blocked(value)
+
+    def test_email_publication_target_enforces_recipient_allowlist(self):
+        # V2 4차 반례: publication_state가 수신자 allowlist를 구조적으로 강제하지 않았다
+        for target_id in ("user@[192.0.2.1]", "ops-mailing-list"):
+            with self.subTest(target_id=target_id):
+                bundle = valid_bundle()
+                email_target = next(
+                    target for target in bundle["publication_targets"]
+                    if target["name"] == "email"
+                )
+                email_target["target_id"] = target_id
+                result = self.gate.evaluate(bundle)
+                self.assertEqual(result["verdict"], "BLOCKED")
+                self.assertIn("EMAIL_TARGET_NOT_ALLOWLISTED", result["errors"])
+
     def test_business_delta_notation_is_not_an_intl_phone(self):
         bundle = valid_bundle()
         bundle["positions"][0]["action"] = "전주 대비 +1 234 567건 증가"
