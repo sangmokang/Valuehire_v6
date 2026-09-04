@@ -1220,6 +1220,8 @@ checkpoint 근거가 아니다.
   전용 검사 `test_weekly_code_budget.py`를 먼저 추가해 628줄로 실패시킨 뒤, 빈 줄 정리와
   기존 표현 결합만으로 shell을 599줄로 줄이고 tracked required-file 목록에 새 검사를
   연결했다. RED 커밋 `750663a`, GREEN 커밋 `3dab69d`.
+- P13 자기포함을 직접 만족하도록 acceptance의 Python 예산 검사 앞에도 `$0` 600줄 상한을
+  연결했다. 독립 회귀 검사와 직접 self-check를 함께 유지한다. 강화 커밋 `c74d693`.
 - fresh 단위시험: 152 tests, exit 0, `OK`.
 - fresh Weekly full acceptance: `CHECKED: 66`, exit 0. 필수 파일·Golden 계약·SOT 연결·
   코드 예산·단위시험·32개 mutation이 모두 통과했다.
