@@ -1147,3 +1147,14 @@ checkpoint 근거가 아니다.
 - 보정 후 fresh GREEN: 단위 149 tests OK, sot_gate `CHECKED: 89` exit 0, acceptance
   `CHECKED: 65` exit 0(mutation 32종 생존 0), verify.sh PASS, clean.
 
+### 2026-09-04 fresh Codex V2 8차 결과와 보정
+
+- V2 8차 artifact: `.omx/artifacts/codex-v2-pii-3layer-round8-20260904.md`
+  (검토 대상 HEAD `313ef0f79d983db56884769e9615f342d54faf78`) — verdict `FAIL`.
+  4~7차 반례 15/15 값·2/2 수신자 차단 재현 확인.
+- 채택·보정(R9 회귀 편입): 문장 마침표가 붙은 이메일(`…@example.com.` — 종결 경계를
+  단어문자/도메인 연속만 배제하도록 수정), 괄호 국가번호(`(+33) …`)와 `00` 국제 접두
+  전화, `contactName` 등 contact 계열 구조화 키 토큰.
+- 보정 후 fresh GREEN: 단위 150 tests OK, sot_gate `CHECKED: 89` exit 0, acceptance
+  `CHECKED: 65` exit 0(mutation 32종 생존 0), verify.sh PASS, clean.
+
