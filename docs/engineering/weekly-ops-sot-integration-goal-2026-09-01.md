@@ -1109,3 +1109,15 @@ checkpoint 근거가 아니다.
 - 보정 후 fresh GREEN: 단위 146 tests OK, sot_gate `CHECKED: 89` exit 0, acceptance
   `CHECKED: 65` exit 0(mutation 32종 생존 0), verify.sh PASS, clean.
 
+### 2026-09-04 fresh Codex V2 5차 결과와 보정
+
+- V2 5차 artifact: `.omx/artifacts/codex-v2-pii-3layer-round5-20260904.md`
+  (검토 대상 HEAD `1617beca0119fe6ec0398a0d79ea467651d67115`) — verdict `FAIL`.
+  4차 반례 3/3 차단·allowlist 강제 2/2 재현·정당 fixture 통과 확인.
+- 채택·보정(R9 회귀 편입): IPv6 도메인 리터럴 이메일(`user@[IPv6:2001:db8::1]`),
+  RFC atext 특수문자 로컬파트(`user!@example.com`), 가변 그룹 국제전화
+  (`+33 1 42 68 53 00` — 1~4자리 그룹 4~6개 대안 추가, 기존 3그룹 규칙과 병행,
+  `+1 234 567건` 오탐 가드 테스트는 그대로 GREEN).
+- 보정 후 fresh GREEN: 단위 147 tests OK, sot_gate `CHECKED: 89` exit 0, acceptance
+  `CHECKED: 65` exit 0(mutation 32종 생존 0), verify.sh PASS, clean.
+
