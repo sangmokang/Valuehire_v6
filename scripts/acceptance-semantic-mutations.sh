@@ -97,6 +97,75 @@ for kind in exit-zero true-only noop empty echo-only; do
   fi
 done
 
+# 출력 문구까지 위조한 no-op은 일반 래퍼만으로 구분할 수 없다. 줄 허용 수용시험은
+# verify.sh의 허용 소비를 제거한 격리본에서 반드시 RED가 되는지 별도 판정한다.
+semantic_repo="$TMP/secret-allowlist-semantic"
+semantic_output="$TMP/secret-allowlist-semantic.output"
+semantic_setup=0
+mkdir -p "$semantic_repo"
+if ! git archive HEAD | tar -x -C "$semantic_repo"; then
+  semantic_setup=1
+elif ! cp "$REPO/verify.sh" "$semantic_repo/verify.sh"; then
+  semantic_setup=1
+elif ! cp "$REPO/scripts/acceptance-secret-allowlist.sh" \
+          "$semantic_repo/scripts/acceptance-secret-allowlist.sh"; then
+  semantic_setup=1
+elif ! (
+  cd "$semantic_repo" || exit 2
+  git init -q
+  git config user.email acceptance@local
+  git config user.name acceptance
+  git add -A
+  git commit -qm fixture
+); then
+  semantic_setup=1
+elif ! ruby -e '
+  path = ARGV.fetch(0)
+  source = File.binread(path)
+  needle = %q{if [ "$used" -lt "$available" ]; then}
+  abort "mutation target count != 1" unless source.scan(needle).length == 1
+  File.binwrite(path, source.sub(needle, "if false; then"))
+' "$semantic_repo/verify.sh"; then
+  semantic_setup=1
+fi
+
+probe_secret_allowlist_semantics() {
+  local target="$1" rc=0
+  cp "$target" "$semantic_repo/scripts/acceptance-secret-allowlist.sh" || return 2
+  (
+    cd "$semantic_repo" || exit 2
+    bash scripts/verify/run-acceptance.sh scripts/acceptance-secret-allowlist.sh
+  ) > "$semantic_output" 2>&1 || rc=$?
+  [ "$rc" -ne 0 ] &&
+    /usr/bin/grep -qF '등재된 정확한 한 줄' "$semantic_output" &&
+    /usr/bin/grep -qF -- '-> FAIL' "$semantic_output"
+}
+
+if [ "$semantic_setup" -ne 0 ]; then
+  record 1 "줄 허용 수용시험 의미 변이" "격리 저장소 또는 허용 소비 제거 변이를 만들지 못함"
+  record 1 "PASS 출력 전용 위조 차단" "의미 판정기를 준비하지 못함"
+elif probe_secret_allowlist_semantics "$REPO/scripts/acceptance-secret-allowlist.sh"; then
+  record 0 "줄 허용 수용시험 의미 변이" "허용 소비 제거 시 정확 허용 사례가 RED"
+
+  spoofed="$TMP/spoofed-secret-allowlist.sh"
+  printf '%s\n' \
+    '#!/usr/bin/env bash' \
+    'echo "ALLOWED_LINES_COUNT=1"' \
+    'echo "MODE_MISMATCH_COUNT=0"' \
+    'echo "UNEXPECTED_MISSED_COUNT=0"' \
+    'echo "CHECKED: 41"' \
+    'echo "PASS: 줄 내용 허용 목록과 두 스캔 모드가 AC-ALLOWLIST-1을 만족한다"' \
+    'exit 0' > "$spoofed"
+  if probe_secret_allowlist_semantics "$spoofed"; then
+    record 1 "PASS 출력 전용 위조 차단" "구현을 실행하지 않은 위조가 의미 변이를 통과함"
+  else
+    record 0 "PASS 출력 전용 위조 차단" "그럴듯한 PASS/CHECKED 출력만으로는 의미 변이를 통과하지 못함"
+  fi
+else
+  record 1 "줄 허용 수용시험 의미 변이" "허용 소비 제거 뒤에도 정확 허용 사례가 RED가 아님"
+  record 1 "PASS 출력 전용 위조 차단" "기준 수용시험의 변이 민감도가 먼저 성립하지 않음"
+fi
+
 # ── 통과 쪽: 손대지 않은 실제 인수 검사는 그대로 합격해야 한다 ───────────────
 # 전량 실행은 CI 몫이다(중복 실행 비용). 여기서는 외부 의존이 없는 것 하나로 확인한다.
 sample="scripts/acceptance-guard-global-skill-files.sh"
