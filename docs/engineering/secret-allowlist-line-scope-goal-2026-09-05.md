@@ -1090,6 +1090,38 @@ CI 무결성, 의미 변이, 명부, 셸 문법, 억제 만료를 실제 워크�
 HEAD에서 단독 재실행해 `CHECKED=44`, `UNCOVERED_BASELINE_RULES=17`,
 `OLD_CAUGHT_AND_NEW_MISSED_COUNT=0`, exit 0을 확인했고 병렬 결과는 기능 증거에서 폐기했습니다.
 
+### 10-14. 최종 V2가 찾은 의미 판정 결속 오류와 RED→GREEN
+
+최종 V1은 `d850cc0`을 PASS로 판정했지만, V2는 의미 변이의 출력 판정식이 정확 허용 문구와 `FAIL`을
+서로 다른 줄에서 찾아도 합격시키는 MEDIUM 1을 재현해 FAIL로 뒤집었습니다. 정상일 때는 합격 문구를
+출력하고 허용 소비 제거 변이에서는 정확 허용을 계속 PASS로 출력한 채 무관한 사례만 FAIL로 만든
+조건부 위조가 기존 판정식을 통과했습니다.
+
+```text
+V2_VERDICT=FAIL
+V2_MEDIUM=1
+ORACLE_FALSE_ACCEPT=1
+
+RED_COMMIT=1d95d7c
+CHECKED=13
+CONDITIONAL_PASS_UNRELATED_FAIL=FAIL
+SUITE_EXIT=1
+
+GREEN_COMMIT=22cbc34
+CHECKED=13
+CONDITIONAL_PASS_UNRELATED_FAIL=PASS_BLOCKED
+SUITE_EXIT=0
+```
+
+→ 무엇을 시켰나: V2 반례를 기존 검사 변경 없이 추가해 먼저 RED로 보존하고, 그 뒤 의미 판정이
+exit 1과 worktree/index 각각의 완전한 `정확 허용 ... -> FAIL` 결과 줄을 모두 요구하게 했습니다.
+→ 뭐가 나왔나: 서로 무관한 PASS와 FAIL을 합치던 반례만 RED였고, 결과 줄 결속 뒤 진짜 허용 소비 제거는
+계속 잡으면서 고정 7줄 위조와 조건부 위조가 모두 차단됐습니다.
+→ 좋은 소식인가 나쁜 소식인가: V1 PASS를 그대로 믿었으면 검사기 우회가 남았으므로 발견 당시에는
+나쁜 소식이었습니다. V2의 반박을 추가 전용 RED와 최소 GREEN으로 닫았으므로 현재 결과는 좋은 소식입니다.
+일반 러너가 모든 임의 출력 위조를 판별한다고 주장하지 않고 이 수용시험의 지정 의미 변이에만 보장을
+한정합니다.
+
 ### 11. 제출 직전 사람 감사
 
 | 질문 | 판정 | 근거 |
