@@ -1236,3 +1236,30 @@ checkpoint 근거가 아니다.
 - Golden v2 실행 엔진과 외부 Notion/Gmail/ClickUp/admin-web 게시 상태는 여전히
   `NOT_RUN`이다. 현재 검증은 Weekly SOT/계약/게이트 구현의 일관성을 증명하며,
   Golden Sample 게시 완료를 의미하지 않는다.
+
+### 2026-09-05 humanreview/codeaudit 추가 공격 — NANP 국가번호·슬래시·내선
+
+- 직전 답변의 "compact NANP 형식은 모두 닫혔다"는 표현은 검증 범위를 넘는 과장이었다.
+  보장 문구는 앞으로 **회귀시험에 명시된 NANP 문법**으로 한정하며, 모든 국가·모든 전화번호
+  표기를 포괄한다고 주장하지 않는다.
+- 10차 RED: `14155552671`, `1(415)5552671`이 입력 게이트와 JSON/Markdown/HTML 최종
+  출력 재검사를 통과했다. RED 커밋 `1522be1`; optional unprefixed country code `1`을
+  NANP 문법에 포함한 GREEN 커밋 `cfee50b`.
+- 11차 RED: `415/555/2671`, `(415)/555/2671`, `1/415/555/2671`,
+  `4155552671x123`, `14155552671x123`이 동일하게 발행 가능한 상태임을 확인했다.
+  RED 커밋 `6f5766b`; `/` 구분자와 `x`, `#`, `ext`, `내선` suffix를 포함한 GREEN
+  커밋 `97eba8d`.
+- GREEN 검증은 9~11차 개인정보 반례, JSON/Markdown/HTML stdout, 정상 업무 증감
+  `+1 234 567건`, 승인 URL·날짜·업무 수치의 오탐 대조를 함께 실행했다.
+- 검사기 자기방어 변조: 임시 clone에서 acceptance shell을 599줄에서 604줄로 늘리자
+  직접 self-check가 exit 1로 차단했다. 직접 조건을 의도적으로 약화한 별도 clone에서도
+  `test_weekly_code_budget.py`가 `604 not less than or equal to 600`으로 실패했다.
+  저장소 공통 semantic mutation은 `exit 0`, `true`, no-op, 빈 파일, 출력 전용 5종을
+  인수 검사 27개에 적용해 27/27 모두 차단했다(`CHECKED: 10`, exit 0).
+- fresh current-HEAD 회귀: Weekly 단위시험 154개 `OK`, full acceptance `CHECKED: 66`,
+  exit 0. 이 결과는 로컬 결정론 게이트의 회귀 방어 증거이며 외부 발행 증거가 아니다.
+- 엔진 간 스킬 상태: `humanreview`는 Codex/Claude SHA-256가 동일하다. `codeaudit`은
+  서로 다른 revision이므로 Claude 수동 검증 프롬프트에 이번 감사 계약과 출력 형식을
+  직접 포함한다. 스킬 이름만 호출한 결과를 교차검증 합의로 간주하지 않는다.
+- 병합 판정은 계속 `REQUEST_CHANGES`: 단일 diff가 P11의 3,000줄 절대 상한을 넘으며,
+  Golden v2 callable publisher와 실제 Notion/Gmail/ClickUp/admin-web readback은 없다.
