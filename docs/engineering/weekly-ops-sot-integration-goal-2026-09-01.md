@@ -1121,3 +1121,14 @@ checkpoint 근거가 아니다.
 - 보정 후 fresh GREEN: 단위 147 tests OK, sot_gate `CHECKED: 89` exit 0, acceptance
   `CHECKED: 65` exit 0(mutation 32종 생존 0), verify.sh PASS, clean.
 
+### 2026-09-04 fresh Codex V2 6차 결과와 보정
+
+- V2 6차 artifact: `.omx/artifacts/codex-v2-pii-3layer-round6-20260904.md`
+  (검토 대상 HEAD `4f5146e6088697565d8defbcda5873776336c8f7`) — verdict `FAIL`.
+  4·5차 반례 6/6 차단·allowlist 강제 2/2 재현 확인.
+- 채택·보정(R9 회귀 편입): 따옴표 로컬파트 안의 `@`(`"john@doe"@example.com` —
+  qcontent 허용), 한 자리 지역번호 국제전화(`+82 2 1234 5678`, `+81 3 1234 5678` —
+  1~2자리 지역 그룹 + 3~4자리 그룹 2개 대안). `+1 234 567건` 오탐 가드 GREEN 유지.
+- 보정 후 fresh GREEN: 단위 148 tests OK, sot_gate `CHECKED: 89` exit 0, acceptance
+  `CHECKED: 65` exit 0(mutation 32종 생존 0), verify.sh PASS, clean.
+
