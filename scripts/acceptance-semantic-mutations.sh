@@ -259,6 +259,22 @@ else
   record 1 "조건부 정확 FAIL 위조 차단" "직접 의미 변이 실패로 신뢰 경계를 세우지 못함"
 fi
 
+# P13 시연 자체를 한 줄 PASS 출력기로 바꾸는 단일 파일 위조도 차단해야 한다.
+# 일반 래퍼의 종료값/PASS 표식만 믿으면 훅 fixture를 한 번도 실행하지 않은 사본이 통과한다.
+p13_output_spoof="$TMP/acceptance-0-7.sh"
+printf '%s\n' \
+  '#!/usr/bin/env bash' \
+  '# PUSH-PERFORMING' \
+  'printf "%s\n" "PASS: 위반 8 종이 전부 차단됨 (각 건 훅 OFF·정확 사유 대조 통과) + 정상 변경 통과쌍 2건"' \
+  'exit 0' > "$p13_output_spoof"
+p13_output_spoof_rc=0
+bash "$RUNNER" "$p13_output_spoof" >/dev/null 2>&1 || p13_output_spoof_rc=$?
+if [ "$p13_output_spoof_rc" -ne 0 ]; then
+  record 0 "P13 PASS 출력 전용 위조 차단" "fixture를 실행하지 않은 acceptance-0-7 사본 exit=$p13_output_spoof_rc"
+else
+  record 1 "P13 PASS 출력 전용 위조 차단" "fixture를 실행하지 않은 acceptance-0-7 사본이 래퍼를 통과함"
+fi
+
 # ── 통과 쪽: 손대지 않은 실제 인수 검사는 그대로 합격해야 한다 ───────────────
 # 전량 실행은 CI 몫이다(중복 실행 비용). 여기서는 외부 의존이 없는 것 하나로 확인한다.
 sample="scripts/acceptance-guard-global-skill-files.sh"
