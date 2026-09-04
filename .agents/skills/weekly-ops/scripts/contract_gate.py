@@ -53,6 +53,9 @@ PHONE_PATTERN = re.compile(
     r"\(?0\d{1,2}\)?\s?[-./]?\s?\d{3,4}\s?[-./]?\s?\d{4})"
     r"(?:\s?(?:[xX#]|ext\.?|내선)\s?\d{1,5})?(?![A-Za-z0-9])"
 )
+NANP_PHONE_PATTERN = re.compile(
+    r"(?<![A-Za-z0-9])\(?[2-9]\d{2}\)?[-. ][2-9]\d{2}[-. ]\d{4}(?![A-Za-z0-9])"
+)
 RRN_PATTERN = re.compile(
     r"(?<!\d)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\s?[-./]?\s?[1-8]\d{6}(?!\d)"
 )
@@ -115,6 +118,7 @@ def find_sensitive_text(value: str) -> bool:
         RRN_PATTERN.search(normalized)
         or PROFILE_URL_PATTERN.search(normalized)
         or INTL_PHONE_PATTERN.search(normalized)
+        or NANP_PHONE_PATTERN.search(normalized)
         or QUOTED_EMAIL_PATTERN.search(normalized)
         or UNICODE_EMAIL_PATTERN.search(normalized)
         or DOMAIN_LITERAL_EMAIL_PATTERN.search(normalized)
