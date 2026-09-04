@@ -55,9 +55,27 @@ RRN_PATTERN = re.compile(
 )
 DASH_VARIANTS = str.maketrans({dash: "-" for dash in "‐‑‒–—―−﹘﹣"})
 PROFILE_URL_PATTERN = re.compile(
-    r"(?i)(?<![a-z0-9.-])(?:[a-z0-9-]+\.)*(?:linkedin\.com|lnkd\.in|github\.com)"
+    r"(?i)(?<![a-z0-9.-])(?:[a-z0-9-]+\.)*"
+    r"(?:linkedin\.com|lnkd\.in|github\.com|gitlab\.com|bitbucket\.org|behance\.net|"
+    r"dribbble\.com|velog\.io|notefolio\.net|instagram\.com|facebook\.com|"
+    r"x\.com|twitter\.com|rocketpunch\.com)"
     r"\.?(?::\d+)?/\S+"
 )
+APPROVED_URL_HOSTS = {
+    "careers.codeit.com", "www.spoonlabs.com", "career.gccompany.co.kr",
+    "wrtn.career.greetinghr.com", "fastview.career.greetinghr.com",
+    "www.jobkorea.co.kr", "billing.saramin.co.kr", "app.clickup.com", "app.notion.com",
+}
+GENERIC_URL_PATTERN = re.compile(r"(?i)\bhttps?://([^\s/\"'<>]+)")
+
+
+def _unapproved_url_hit(text: str) -> bool:
+    """http(s) URL은 승인 호스트 allowlist 밖이면 전부 차단한다(fail-closed)."""
+    for match in GENERIC_URL_PATTERN.finditer(text):
+        host = match.group(1).split("@")[-1].split(":")[0].strip(".").casefold()
+        if host not in APPROVED_URL_HOSTS:
+            return True
+    return False
 INTL_PHONE_PATTERN = re.compile(
     r"(?<![\w+])\+[1-9]\d{0,2}"
     r"(?:(?:[- ./]?\(?\d{2,4}\)?){3}"
@@ -69,7 +87,9 @@ EMBEDDED_KEY_TOKENS = frozenset({
     "name", "fullname", "email", "phone", "mobile", "address", "birth", "birthdate",
     "candidatename", "candidatedisplayname", "candidatefullname", "candidateemail",
     "applicantname", "applicantdisplayname", "applicantfullname",
-    "이름", "성명", "연락처", "전화번호", "휴대폰", "주소", "생년월일", "이메일",
+    "firstname", "lastname", "givenname", "familyname", "middlename",
+    "surname", "nickname",
+    "이름", "성", "성명", "연락처", "전화번호", "휴대폰", "주소", "생년월일", "이메일",
 })
 
 
@@ -94,6 +114,7 @@ def find_sensitive_text(value: str) -> bool:
         or QUOTED_EMAIL_PATTERN.search(normalized)
         or UNICODE_EMAIL_PATTERN.search(normalized)
         or DOMAIN_LITERAL_EMAIL_PATTERN.search(normalized)
+        or _unapproved_url_hit(normalized)
         or _embedded_key_hit(normalized)
     ):
         return True
