@@ -39,6 +39,9 @@ ALLOWED_EMAIL_TARGETS = {"sangmokang@valueconnect.kr"}
 EMAIL_PATTERN = re.compile(r"(?<![\w.+-])[\w.+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?![\w.-])")
 QUOTED_EMAIL_PATTERN = re.compile(r'"[^"@]{1,64}"@[\w.-]+\.[\w-]{2,}(?![\w.-])')
 UNICODE_EMAIL_PATTERN = re.compile(r"(?<![\w.+-])[\w.+-]+@[\w.-]+\.[\w-]{2,}(?![\w.-])")
+DOMAIN_LITERAL_EMAIL_PATTERN = re.compile(
+    r"""["']?[\w.+ -]{1,64}["']?@\[[0-9A-Fa-f:.]{2,45}\]"""
+)
 PHONE_PATTERN = re.compile(
     r"(?<![A-Za-z0-9])"
     r"(?:(?:\+?82\s?[-./]?\s?)?\(?0?1[016789]\)?\s?[-./]?\s?\d{3,4}\s?[-./]?\s?\d{4}|"
@@ -51,7 +54,7 @@ RRN_PATTERN = re.compile(
 DASH_VARIANTS = str.maketrans({dash: "-" for dash in "‐‑‒–—―−﹘﹣"})
 PROFILE_URL_PATTERN = re.compile(
     r"(?i)(?<![a-z0-9.-])(?:[a-z0-9-]+\.)*(?:linkedin\.com|lnkd\.in|github\.com)"
-    r"(?::\d+)?/\S+"
+    r"\.?(?::\d+)?/\S+"
 )
 INTL_PHONE_PATTERN = re.compile(
     r"(?<![\w+])\+[1-9]\d{0,2}[- ./]?\(?\d{2,4}\)?[- ./]?\d{3,4}[- ./]?\d{3,4}(?!\d)"
@@ -78,12 +81,14 @@ def _embedded_key_hit(text: str) -> bool:
 def find_sensitive_text(value: str) -> bool:
     """NFKC 정규화 뒤 문자열 하나를 검사한다. 렌더링된 최종 산출물 재검사에도 쓰인다."""
     normalized = unicodedata.normalize("NFKC", value).translate(DASH_VARIANTS)
+    normalized = re.sub(r"\s+", " ", normalized)
     if (
         RRN_PATTERN.search(normalized)
         or PROFILE_URL_PATTERN.search(normalized)
         or INTL_PHONE_PATTERN.search(normalized)
         or QUOTED_EMAIL_PATTERN.search(normalized)
         or UNICODE_EMAIL_PATTERN.search(normalized)
+        or DOMAIN_LITERAL_EMAIL_PATTERN.search(normalized)
         or _embedded_key_hit(normalized)
     ):
         return True
@@ -340,6 +345,9 @@ def publication_state(
             errors.append("PUBLICATION_TARGET_INVALID")
             continue
         seen.add(name)
+        if name == "email" and target["target_id"] not in ALLOWED_EMAIL_TARGETS:
+            errors.append("EMAIL_TARGET_NOT_ALLOWLISTED")
+            continue
         if target.get("status") == "READBACK_VERIFIED":
             if any(not isinstance(target.get(field), str) or not target[field] for field in RECEIPT_FIELDS):
                 errors.append("PUBLICATION_RECEIPT_CONTRACT_INVALID")

@@ -142,7 +142,9 @@ def valid_bundle():
         "publication_targets": [
             {
                 "name": name,
-                "target_id": f"{name}-fixture",
+                "target_id": (
+                    "sangmokang@valueconnect.kr" if name == "email" else f"{name}-fixture"
+                ),
                 "required": True,
                 "status": "NOT_RUN",
             }
