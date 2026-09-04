@@ -93,6 +93,9 @@ if [ "$SCAN_SOURCE" = index ]; then
     echo "FAIL: secret allowlist missing/unreadable in index: $ALLOWLIST_SOURCE (exit 2)"
     exit 2
   fi
+elif [ -L "$ALLOWLIST_SOURCE" ]; then
+  echo "FAIL: secret allowlist must not be a worktree symbolic link: $ALLOWLIST_SOURCE (exit 2)"
+  exit 2
 elif [ ! -f "$ALLOWLIST_SOURCE" ] || [ ! -r "$ALLOWLIST_SOURCE" ] || [ ! -s "$ALLOWLIST_SOURCE" ]; then
   echo "FAIL: secret allowlist missing/not-a-file/unreadable/empty: $ALLOWLIST_SOURCE (exit 2)"
   exit 2
