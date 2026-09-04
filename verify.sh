@@ -229,7 +229,7 @@ write_tracked_content() {
   if [ "$SCAN_SOURCE" = index ]; then
     git show ":$path"
   elif [ -L "$path" ]; then
-    readlink "./$path"
+    readlink -n "./$path"
   elif [ -f "$path" ]; then
     cat -- "$path"
   else
