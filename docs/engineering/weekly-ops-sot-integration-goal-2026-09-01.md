@@ -1203,3 +1203,34 @@ checkpoint 근거가 아니다.
 - 코드 변경 없음(읽기 전용 감사) — HEAD·diff hash는 8a6516d 라운드와 동일하게
   유지된다.
 
+### 2026-09-05 humanreview/codeaudit 재개 — 이전 위험 수용 폐기 및 검사기 자기포함
+
+- 최신 사용자 지시는 `$humanreview $codeaudit`로 문제를 검증한 뒤 **문제를 해결**하라는
+  것이다. 따라서 바로 위 절의 compact NANP 형식 위험 수용은 현재 실행 범위에서는
+  폐기한다. 개인정보 발행 차단은 strict 불변조건이므로 유예 가능한 운영 부채로
+  남기지 않는다.
+- RED: `(415)555-2671`, `4155552671`을 기존 round9 회귀 검사에 추가하자 같은 두 값이
+  모두 `PASS`로 재현됐다. 잘못된 작업 디렉터리에서 최초 실행한 import 실패는 기능
+  증거에서 제외하고, `tests/weekly_ops`에서 다시 실행해 2 failures를 확인했다.
+- GREEN: `NANP_PHONE_PATTERN`의 괄호 뒤·숫자 그룹 사이 구분자를 선택으로 바꾸고,
+  영숫자 경계는 유지했다. round9 privacy, 정당 값 오탐, 업무 증감 표기 회귀가 함께
+  통과했다. RED 커밋 `3d3f045`, GREEN 커밋 `1a39d95`.
+- 추가 공격 감사에서 `scripts/acceptance-weekly-ops-skill.sh`가 628줄이면서도 기존
+  600줄 파일 상한 검사의 대상에서 자기 자신을 제외한다는 false-PASS를 발견했다.
+  전용 검사 `test_weekly_code_budget.py`를 먼저 추가해 628줄로 실패시킨 뒤, 빈 줄 정리와
+  기존 표현 결합만으로 shell을 599줄로 줄이고 tracked required-file 목록에 새 검사를
+  연결했다. RED 커밋 `750663a`, GREEN 커밋 `3dab69d`.
+- fresh 단위시험: 152 tests, exit 0, `OK`.
+- fresh Weekly full acceptance: `CHECKED: 66`, exit 0. 필수 파일·Golden 계약·SOT 연결·
+  코드 예산·단위시험·32개 mutation이 모두 통과했다.
+- fresh 임시 PostgreSQL 진실표: 운영 DB와 분리한 임시 클러스터에서 DDL을 처음부터
+  적용해 `CHECKED: 49`, exit 0. 임시 클러스터는 종료·삭제했다.
+- fresh 보조 게이트: principles `CHECKED: 34`, Weekly SOT `CHECKED: 89`, secret scan
+  PASS, `git diff --check` PASS.
+- 남은 병합 차단: upstream `251c341..3dab69d`의 tracked diff는 6,038 insertions +
+  321 deletions = 6,359줄이다. `coding-principles.md` P11의 PR 3,000줄 절대 상한을
+  초과하므로 현재 브랜치를 단일 PR로 병합할 수 없다. 사용자 승인 없는 히스토리
+  재작성·push·PR 생성은 수행하지 않는다.
+- Golden v2 실행 엔진과 외부 Notion/Gmail/ClickUp/admin-web 게시 상태는 여전히
+  `NOT_RUN`이다. 현재 검증은 Weekly SOT/계약/게이트 구현의 일관성을 증명하며,
+  Golden Sample 게시 완료를 의미하지 않는다.
