@@ -229,7 +229,8 @@ ALLOWED_MATCHES=0
 UNALLOWED_MATCHES=0
 
 scan_tracked_file() {
-  local path="$1" content=$TMP/content matches=$TMP/matches rc=0 line consume_rc
+  local path="$1" content=$TMP/content matches=$TMP/matches matches_no_nul=$TMP/matches.no-nul
+  local rc=0 line consume_rc
   if ! write_tracked_content "$path" > "$content" 2>>"$ERRS"; then
     printf 'tracked content read error: %q\n' "$path" >> "$ERRS"
     return
@@ -238,6 +239,19 @@ scan_tracked_file() {
   if [ "$rc" -eq 1 ]; then return; fi
   if [ "$rc" -gt 1 ]; then
     printf 'grep execution error(rc=%s): %q\n' "$rc" "$path" >> "$ERRS"
+    return
+  fi
+  if ! LC_ALL=C tr -d '\000' < "$matches" > "$matches_no_nul" 2>>"$ERRS"; then
+    printf 'NUL-byte validation error: %q\n' "$path" >> "$ERRS"
+    return
+  fi
+  if ! cmp -s "$matches" "$matches_no_nul"; then
+    if [ "$UNALLOWED_MATCHES" -eq 0 ]; then
+      echo "FAIL: secret pattern matched in tracked files:"
+    fi
+    printf '  - %q\n' "$path"
+    UNALLOWED_MATCHES=$((UNALLOWED_MATCHES + 1))
+    FAIL=1
     return
   fi
   while IFS= read -r line || [ -n "$line" ]; do
