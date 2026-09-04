@@ -88,13 +88,26 @@ case "$allowlist_mode" in
   100644|100755) ;;
   *) echo "FAIL: secret allowlist must be a regular tracked file: $ALLOWLIST_SOURCE (exit 2)"; exit 2 ;;
 esac
+
+worktree_path_has_no_symlink() {
+  local remaining="$1" current= component
+  while [ -n "$remaining" ]; do
+    case "$remaining" in
+      */*) component=${remaining%%/*}; remaining=${remaining#*/} ;;
+      *) component=$remaining; remaining= ;;
+    esac
+    current=${current:+$current/}$component
+    [ ! -L "$current" ] || return 1
+  done
+}
+
 if [ "$SCAN_SOURCE" = index ]; then
   if ! git show ":$ALLOWLIST_SOURCE" > "$ALLOWLIST_RAW" 2>/dev/null; then
     echo "FAIL: secret allowlist missing/unreadable in index: $ALLOWLIST_SOURCE (exit 2)"
     exit 2
   fi
-elif [ -L "$ALLOWLIST_SOURCE" ]; then
-  echo "FAIL: secret allowlist must not be a worktree symbolic link: $ALLOWLIST_SOURCE (exit 2)"
+elif ! worktree_path_has_no_symlink "$ALLOWLIST_SOURCE"; then
+  echo "FAIL: secret allowlist path must not contain a worktree symbolic link: $ALLOWLIST_SOURCE (exit 2)"
   exit 2
 elif [ ! -f "$ALLOWLIST_SOURCE" ] || [ ! -r "$ALLOWLIST_SOURCE" ] || [ ! -s "$ALLOWLIST_SOURCE" ]; then
   echo "FAIL: secret allowlist missing/not-a-file/unreadable/empty: $ALLOWLIST_SOURCE (exit 2)"
