@@ -19,7 +19,7 @@ cd "$REPO" || {
 
 VERIFY=$REPO/verify.sh
 PATTERNS=$REPO/.secret-patterns.default
-EXPECTED_CHECKS=31
+EXPECTED_CHECKS=33
 SNAP0=$(git status --porcelain)
 
 if [ ! -x /usr/bin/grep ] || [ ! -f "$VERIFY" ] || [ ! -s "$PATTERNS" ]; then
@@ -221,6 +221,37 @@ make_nul_mutation_repo() {
   )
 }
 
+make_symlink_trailing_newline_repo() {
+  local custom_patterns readlink_shim
+  CASE_REPO=$TMP/symlink-trailing-newline
+  mkdir -p "$CASE_REPO"
+  git init -q "$CASE_REPO"
+  cp "$VERIFY" "$CASE_REPO/verify.sh"
+  custom_patterns=$CASE_REPO/.patterns.empty-line
+  cp "$CLEAN" "$custom_patterns"
+  printf '\n%s\n' '^$' >> "$custom_patterns"
+  if ! printf '%s\n' "$CANARY" | /usr/bin/grep -qEif "$custom_patterns"; then
+    return 2
+  fi
+  mkdir "$CASE_REPO/shims"
+  readlink_shim=$CASE_REPO/shims/readlink
+  printf '%s\n' \
+    '#!/bin/sh' \
+    'if [ "${1:-}" = -n ]; then exec /usr/bin/readlink "$@"; fi' \
+    '/usr/bin/readlink "$@"' \
+    "printf '\\n'" > "$readlink_shim"
+  chmod +x "$readlink_shim"
+  ln -s "$SAFE"$'\n' "$CASE_REPO/link.txt"
+  write_allowlist "$CASE_REPO" link.txt "$(hash_line "$SAFE")" valid || return 2
+  (
+    cd "$CASE_REPO" || exit 2
+    git config user.email acceptance@local
+    git config user.name acceptance
+    git add .secret-allowlist.yaml link.txt
+    git commit -qm fixture
+  )
+}
+
 checked=0
 fail=0
 unexpected_missed=0
@@ -230,10 +261,13 @@ LAST_RC=0
 run_mode() {
   local desc="$1" repo="$2" mode="$3" want="$4" forbid_scanner_error="$5"
   local allowlist_source="${6:-.secret-allowlist.yaml}"
+  local patterns_source="${7:-.secret-patterns.default}"
+  local path_prefix="${8:-}"
   local out=$TMP/output.$checked rc=0 bad_reason=0
   (
     cd "$repo" || exit 2
-    SECRET_PATTERNS_FILE=.secret-patterns.default \
+    PATH="${path_prefix:+$path_prefix:}$PATH" \
+      SECRET_PATTERNS_FILE="$patterns_source" \
       SECRET_ALLOWLIST_FILE="$allowlist_source" \
       VERIFY_SCAN_SOURCE="$mode" bash verify.sh
   ) > "$out" 2>&1
@@ -259,10 +293,14 @@ run_mode() {
 
 run_pair() {
   local desc="$1" repo="$2" want="$3" forbid_scanner_error="${4:-0}"
-  local allowlist_source="${5:-.secret-allowlist.yaml}" worktree_rc index_rc
-  run_mode "$desc" "$repo" worktree "$want" "$forbid_scanner_error" "$allowlist_source"
+  local allowlist_source="${5:-.secret-allowlist.yaml}"
+  local patterns_source="${6:-.secret-patterns.default}"
+  local path_prefix="${7:-}" worktree_rc index_rc
+  run_mode "$desc" "$repo" worktree "$want" "$forbid_scanner_error" \
+    "$allowlist_source" "$patterns_source" "$path_prefix"
   worktree_rc=$LAST_RC
-  run_mode "$desc" "$repo" index "$want" "$forbid_scanner_error" "$allowlist_source"
+  run_mode "$desc" "$repo" index "$want" "$forbid_scanner_error" \
+    "$allowlist_source" "$patterns_source" "$path_prefix"
   index_rc=$LAST_RC
   if [ "$worktree_rc" -ne "$index_rc" ]; then
     printf 'MODE_MISMATCH: %s worktree=%d index=%d\n' "$desc" "$worktree_rc" "$index_rc"
@@ -331,6 +369,11 @@ run_pair "추적 심볼릭 링크의 바깥 내용은 비범위" "$CASE_REPO" 0 
 
 make_symlink_repo symlink-blob "$CANARY" "$SAFE" || exit 2
 run_pair "추적 심볼릭 링크의 저장 문자열은 탐지" "$CASE_REPO" 1 1
+
+# 32~33: 링크 대상 끝 개행과 readlink 표시용 개행을 구분해 두 모드가 같은 blob 바이트를 읽어야 한다.
+make_symlink_trailing_newline_repo || exit 2
+run_pair "끝 개행이 있는 링크 대상의 저장 바이트 동일성" \
+  "$CASE_REPO" 0 1 .secret-allowlist.yaml .patterns.empty-line "$CASE_REPO/shims"
 
 SNAP1=$(git status --porcelain)
 if [ "$SNAP0" != "$SNAP1" ]; then
