@@ -19,7 +19,7 @@ cd "$REPO" || {
 
 VERIFY=$REPO/verify.sh
 PATTERNS=$REPO/.secret-patterns.default
-EXPECTED_CHECKS=30
+EXPECTED_CHECKS=31
 SNAP0=$(git status --porcelain)
 
 if [ ! -x /usr/bin/grep ] || [ ! -f "$VERIFY" ] || [ ! -s "$PATTERNS" ]; then
@@ -183,6 +183,27 @@ make_allowlist_source_symlink_repo() {
   ln -s "$outside" "$CASE_REPO/.secret-allowlist.yaml"
 }
 
+make_allowlist_parent_symlink_repo() {
+  local outside=$TMP/allowlist-parent.external
+  CASE_REPO=$TMP/allowlist-parent-symlink
+  mkdir -p "$CASE_REPO/policy"
+  git init -q "$CASE_REPO"
+  cp "$VERIFY" "$CASE_REPO/verify.sh"
+  cp "$PATTERNS" "$CASE_REPO/.secret-patterns.default"
+  printf '%s' "$CANARY" > "$CASE_REPO/payload.txt"
+  write_allowlist "$CASE_REPO" payload.txt "$(hash_line "$CANARY")" valid || return 2
+  mv "$CASE_REPO/.secret-allowlist.yaml" "$CASE_REPO/policy/allowlist.yaml"
+  (
+    cd "$CASE_REPO" || exit 2
+    git config user.email acceptance@local
+    git config user.name acceptance
+    git add -A
+    git commit -qm fixture
+  )
+  mv "$CASE_REPO/policy" "$outside"
+  ln -s "$outside" "$CASE_REPO/policy"
+}
+
 make_nul_mutation_repo() {
   CASE_REPO=$TMP/nul-mutation
   mkdir -p "$CASE_REPO"
@@ -295,11 +316,16 @@ run_mode "worktree 허용 목록 외부 심볼릭 링크 거부" "$CASE_REPO" wo
 ) || exit 2
 run_mode "index 허용 목록 심볼릭 링크 거부" "$CASE_REPO" index 2 0
 
-# 25~26: 허용한 텍스트 뒤에 NUL 한 바이트가 추가되면 셸 변수 축약으로 같은 줄처럼 보이면 안 된다.
+# 25: 대체 허용 목록 경로의 상위 디렉터리도 외부 심볼릭 링크로 정책을 주입할 수 없다.
+make_allowlist_parent_symlink_repo || exit 2
+run_mode "worktree 허용 목록 상위 외부 심볼릭 링크 거부" \
+  "$CASE_REPO" worktree 2 0 'policy/allowlist.yaml'
+
+# 26~27: 허용한 텍스트 뒤에 NUL 한 바이트가 추가되면 셸 변수 축약으로 같은 줄처럼 보이면 안 된다.
 make_nul_mutation_repo || exit 2
 run_pair "등재된 줄 끝 NUL 한 바이트 추가" "$CASE_REPO" 1 1
 
-# 27~30: worktree가 링크를 따라가고 index가 링크 문자열을 읽던 기존 갈림을 함께 회귀 고정한다.
+# 28~31: worktree가 링크를 따라가고 index가 링크 문자열을 읽던 기존 갈림을 함께 회귀 고정한다.
 make_symlink_repo symlink-follow ../outside.txt "$CANARY" || exit 2
 run_pair "추적 심볼릭 링크의 바깥 내용은 비범위" "$CASE_REPO" 0 1
 
