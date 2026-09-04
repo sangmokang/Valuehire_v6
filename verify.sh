@@ -102,6 +102,14 @@ worktree_path_has_no_symlink() {
   done
 }
 
+worktree_parent_has_no_symlink() {
+  local path="$1"
+  case "$path" in
+    */*) worktree_path_has_no_symlink "${path%/*}" ;;
+    *) return 0 ;;
+  esac
+}
+
 if [ "$SCAN_SOURCE" = index ]; then
   if ! git show ":./$ALLOWLIST_SOURCE" > "$ALLOWLIST_RAW" 2>/dev/null; then
     echo "FAIL: secret allowlist missing/unreadable in index: $ALLOWLIST_SOURCE (exit 2)"
@@ -238,6 +246,11 @@ consume_allowance() {
 
 write_tracked_content() {
   local path="$1"
+  # index 모드라도 같은 경로 안전성 판정을 먼저 거친다. 한 모드만 검사하면 상위
+  # 디렉터리 링크가 worktree를 저장소 밖 미끼로 보내 두 모드의 종료값이 갈린다.
+  if ! worktree_parent_has_no_symlink "$path"; then
+    return 2
+  fi
   if [ "$SCAN_SOURCE" = index ]; then
     git show ":./$path"
   elif [ -L "$path" ]; then
