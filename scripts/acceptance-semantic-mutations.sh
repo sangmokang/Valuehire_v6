@@ -98,17 +98,14 @@ for kind in exit-zero true-only noop empty echo-only; do
 done
 
 # 출력 문구까지 위조한 no-op은 일반 래퍼만으로 구분할 수 없다. 줄 허용 수용시험은
-# verify.sh의 허용 소비를 제거한 격리본에서 반드시 RED가 되는지 별도 판정한다.
+# 승인된 정확한 Git blob인지 먼저 고정하고, 허용 소비를 제거한 verify.sh의 종료값을
+# 이 검사 소유의 격리 fixture에서 직접 관찰한다. 검사 대상의 자체 출력은 증거로 쓰지 않는다.
 semantic_repo="$TMP/secret-allowlist-semantic"
-semantic_output="$TMP/secret-allowlist-semantic.output"
 semantic_setup=0
 mkdir -p "$semantic_repo"
 if ! git archive HEAD | tar -x -C "$semantic_repo"; then
   semantic_setup=1
 elif ! cp "$REPO/verify.sh" "$semantic_repo/verify.sh"; then
-  semantic_setup=1
-elif ! cp "$REPO/scripts/acceptance-secret-allowlist.sh" \
-          "$semantic_repo/scripts/acceptance-secret-allowlist.sh"; then
   semantic_setup=1
 elif ! (
   cd "$semantic_repo" || exit 2
@@ -129,27 +126,75 @@ elif ! ruby -e '
   semantic_setup=1
 fi
 
-probe_secret_allowlist_semantics() {
-  local target="$1" rc=0
-  cp "$target" "$semantic_repo/scripts/acceptance-secret-allowlist.sh" || return 2
+APPROVED_SECRET_ALLOWLIST_ACCEPTANCE_BLOB=$(printf '%s%s' \
+  'ba20f15e65bca5c6bd0c' '5c20cbc282ad40711434')
+
+acceptance_blob_is_approved() {
+  local target="$1" actual
+  actual=$(git hash-object -- "$target" 2>/dev/null) || return 2
+  [ "$actual" = "$APPROVED_SECRET_ALLOWLIST_ACCEPTANCE_BLOB" ]
+}
+
+observe_mutated_verify_directly() {
+  local direct_repo="$TMP/secret-allowlist-direct" clean key value canary hash
+  mkdir -p "$direct_repo" || return 2
+  git init -q "$direct_repo" || return 2
+  cp "$semantic_repo/verify.sh" "$direct_repo/verify.sh" || return 2
+  cp "$semantic_repo/.secret-patterns.default" "$direct_repo/.secret-patterns.default" || return 2
+
+  clean="$direct_repo/patterns.clean"
+  tr -d '\r' < "$direct_repo/.secret-patterns.default" |
+    /usr/bin/grep -vE '^[[:space:]]*(#|$)' > "$clean" || return 2
+  key=$(printf '%s%s' 'PASS' 'WORD')
+  value=$(printf '%s%s' 'abc1' '23xy')
+  canary=$(printf '%s=%s' "$key" "$value")
+  if ! printf '%s\n' "$canary" | /usr/bin/grep -qEif "$clean"; then
+    return 2
+  fi
+  hash=$(printf '%s' "$canary" | git hash-object --stdin) || return 2
+  printf '%s\n' "$canary" > "$direct_repo/payload.txt"
+  printf '%s\n' \
+    '- path: "payload.txt"' \
+    '  line_hash: "'"$hash"'"' \
+    '  reason: "semantic mutation fixture"' \
+    '  owner: "acceptance"' \
+    '  expiry: "2099-12-31"' > "$direct_repo/.secret-allowlist.yaml"
+  rm -f "$clean"
   (
-    cd "$semantic_repo" || exit 2
-    bash scripts/verify/run-acceptance.sh scripts/acceptance-secret-allowlist.sh
-  ) > "$semantic_output" 2>&1 || rc=$?
-  [ "$rc" -eq 1 ] &&
-    /usr/bin/grep -qE '^\[[0-9]+/[0-9]+\] 등재된 정확한 한 줄 \(worktree\) -> FAIL \(expected=0 actual=1 scanner_error=0\)$' \
-      "$semantic_output" &&
-    /usr/bin/grep -qE '^\[[0-9]+/[0-9]+\] 등재된 정확한 한 줄 \(index\) -> FAIL \(expected=0 actual=1 scanner_error=0\)$' \
-      "$semantic_output"
+    cd "$direct_repo" || exit 2
+    git config user.email acceptance@local
+    git config user.name acceptance
+    git add -A
+    git commit -qm fixture
+  ) || return 2
+
+  DIRECT_WORKTREE_RC=0
+  (
+    cd "$direct_repo" || exit 2
+    VERIFY_SCAN_SOURCE=worktree bash verify.sh
+  ) > "$TMP/direct-worktree.output" 2>&1 || DIRECT_WORKTREE_RC=$?
+  DIRECT_INDEX_RC=0
+  (
+    cd "$direct_repo" || exit 2
+    VERIFY_SCAN_SOURCE=index bash verify.sh
+  ) > "$TMP/direct-index.output" 2>&1 || DIRECT_INDEX_RC=$?
+  [ "$DIRECT_WORKTREE_RC" -eq 1 ] && [ "$DIRECT_INDEX_RC" -eq 1 ]
 }
 
 if [ "$semantic_setup" -ne 0 ]; then
-  record 1 "줄 허용 수용시험 의미 변이" "격리 저장소 또는 허용 소비 제거 변이를 만들지 못함"
+  record 1 "줄 허용 직접 의미 변이" "격리 저장소 또는 허용 소비 제거 변이를 만들지 못함"
+  record 1 "줄 허용 수용시험 blob 고정" "의미 판정기를 준비하지 못함"
   record 1 "PASS 출력 전용 위조 차단" "의미 판정기를 준비하지 못함"
   record 1 "조건부 PASS·무관 FAIL 위조 차단" "의미 판정기를 준비하지 못함"
   record 1 "조건부 정확 FAIL 위조 차단" "의미 판정기를 준비하지 못함"
-elif probe_secret_allowlist_semantics "$REPO/scripts/acceptance-secret-allowlist.sh"; then
-  record 0 "줄 허용 수용시험 의미 변이" "허용 소비 제거 시 정확 허용 사례가 RED"
+elif observe_mutated_verify_directly; then
+  record 0 "줄 허용 직접 의미 변이" "허용 소비 제거 뒤 verify.sh가 worktree=$DIRECT_WORKTREE_RC index=$DIRECT_INDEX_RC"
+
+  if acceptance_blob_is_approved "$REPO/scripts/acceptance-secret-allowlist.sh"; then
+    record 0 "줄 허용 수용시험 blob 고정" "검토된 Git blob과 일치"
+  else
+    record 1 "줄 허용 수용시험 blob 고정" "검토된 Git blob과 불일치"
+  fi
 
   spoofed="$TMP/spoofed-secret-allowlist.sh"
   printf '%s\n' \
@@ -160,10 +205,10 @@ elif probe_secret_allowlist_semantics "$REPO/scripts/acceptance-secret-allowlist
     'echo "CHECKED: 41"' \
     'echo "PASS: 줄 내용 허용 목록과 두 스캔 모드가 AC-ALLOWLIST-1을 만족한다"' \
     'exit 0' > "$spoofed"
-  if probe_secret_allowlist_semantics "$spoofed"; then
+  if acceptance_blob_is_approved "$spoofed"; then
     record 1 "PASS 출력 전용 위조 차단" "구현을 실행하지 않은 위조가 의미 변이를 통과함"
   else
-    record 0 "PASS 출력 전용 위조 차단" "그럴듯한 PASS/CHECKED 출력만으로는 의미 변이를 통과하지 못함"
+    record 0 "PASS 출력 전용 위조 차단" "그럴듯한 PASS/CHECKED 출력의 미승인 blob을 거부함"
   fi
 
   conditional_spoof="$TMP/conditional-spoofed-secret-allowlist.sh"
@@ -181,10 +226,10 @@ elif probe_secret_allowlist_semantics "$REPO/scripts/acceptance-secret-allowlist
     'echo "CHECKED: 41"' \
     'echo "PASS: 줄 내용 허용 목록과 두 스캔 모드가 AC-ALLOWLIST-1을 만족한다"' \
     'exit 0' > "$conditional_spoof"
-  if probe_secret_allowlist_semantics "$conditional_spoof"; then
+  if acceptance_blob_is_approved "$conditional_spoof"; then
     record 1 "조건부 PASS·무관 FAIL 위조 차단" "정확 허용 PASS와 무관 FAIL을 같은 RED로 오인함"
   else
-    record 0 "조건부 PASS·무관 FAIL 위조 차단" "실패 사유가 정확 허용 결과 줄에 결속됨"
+    record 0 "조건부 PASS·무관 FAIL 위조 차단" "조건부 출력 위조의 미승인 blob을 거부함"
   fi
 
   exact_conditional_spoof="$TMP/exact-conditional-spoofed-secret-allowlist.sh"
@@ -201,16 +246,17 @@ elif probe_secret_allowlist_semantics "$REPO/scripts/acceptance-secret-allowlist
     'echo "CHECKED: 41"' \
     'echo "PASS: 줄 내용 허용 목록과 두 스캔 모드가 AC-ALLOWLIST-1을 만족한다"' \
     'exit 0' > "$exact_conditional_spoof"
-  if probe_secret_allowlist_semantics "$exact_conditional_spoof"; then
+  if acceptance_blob_is_approved "$exact_conditional_spoof"; then
     record 1 "조건부 정확 FAIL 위조 차단" "구현을 실행하지 않고 정확 FAIL 두 줄만 위조해 의미 변이를 통과함"
   else
     record 0 "조건부 정확 FAIL 위조 차단" "정확 FAIL 문구만 재현한 미승인 수용시험은 거부됨"
   fi
 else
-  record 1 "줄 허용 수용시험 의미 변이" "허용 소비 제거 뒤에도 정확 허용 사례가 RED가 아님"
-  record 1 "PASS 출력 전용 위조 차단" "기준 수용시험의 변이 민감도가 먼저 성립하지 않음"
-  record 1 "조건부 PASS·무관 FAIL 위조 차단" "기준 수용시험의 변이 민감도가 먼저 성립하지 않음"
-  record 1 "조건부 정확 FAIL 위조 차단" "기준 수용시험의 변이 민감도가 먼저 성립하지 않음"
+  record 1 "줄 허용 직접 의미 변이" "허용 소비 제거 뒤 직접 fixture 종료값이 worktree=${DIRECT_WORKTREE_RC:-NOT_RUN} index=${DIRECT_INDEX_RC:-NOT_RUN}"
+  record 1 "줄 허용 수용시험 blob 고정" "직접 의미 변이 실패로 신뢰 경계를 세우지 못함"
+  record 1 "PASS 출력 전용 위조 차단" "직접 의미 변이 실패로 신뢰 경계를 세우지 못함"
+  record 1 "조건부 PASS·무관 FAIL 위조 차단" "직접 의미 변이 실패로 신뢰 경계를 세우지 못함"
+  record 1 "조건부 정확 FAIL 위조 차단" "직접 의미 변이 실패로 신뢰 경계를 세우지 못함"
 fi
 
 # ── 통과 쪽: 손대지 않은 실제 인수 검사는 그대로 합격해야 한다 ───────────────
