@@ -19,7 +19,7 @@ cd "$REPO" || {
 
 VERIFY=$REPO/verify.sh
 PATTERNS=$REPO/.secret-patterns.default
-EXPECTED_CHECKS=37
+EXPECTED_CHECKS=39
 SNAP0=$(git status --porcelain)
 
 if [ ! -x /usr/bin/grep ] || [ ! -f "$VERIFY" ] || [ ! -s "$PATTERNS" ]; then
@@ -212,6 +212,24 @@ make_nul_mutation_repo() {
   cp "$PATTERNS" "$CASE_REPO/.secret-patterns.default"
   printf '%s\0\n' "$CANARY" > "$CASE_REPO/payload.bin"
   write_allowlist "$CASE_REPO" payload.bin "$(hash_line "$CANARY")" valid || return 2
+  (
+    cd "$CASE_REPO" || exit 2
+    git config user.email acceptance@local
+    git config user.name acceptance
+    git add -A
+    git commit -qm fixture
+  )
+}
+
+make_nul_allowlist_repo() {
+  CASE_REPO=$TMP/nul-allowlist
+  mkdir -p "$CASE_REPO"
+  git init -q "$CASE_REPO"
+  cp "$VERIFY" "$CASE_REPO/verify.sh"
+  cp "$PATTERNS" "$CASE_REPO/.secret-patterns.default"
+  printf '%s' "$CANARY" > "$CASE_REPO/payload.txt"
+  write_allowlist "$CASE_REPO" payload.txt "$(hash_line "$CANARY")" valid || return 2
+  printf '\0%s\n' '  unknown: "blocked"' >> "$CASE_REPO/.secret-allowlist.yaml"
   (
     cd "$CASE_REPO" || exit 2
     git config user.email acceptance@local
@@ -419,6 +437,10 @@ run_pair "stage 문법형 추적 파일명의 리터럴 blob" "$CASE_REPO" 1 1
 # 36~37: 대체 허용 목록 이름도 stage 문법으로 재해석하지 않고 그 리터럴 정책을 검증해야 한다.
 make_colon_allowlist_repo || exit 2
 run_pair "stage 문법형 허용 목록 경로의 리터럴 정책" "$CASE_REPO" 2 0 '0:policy.yaml'
+
+# 38~39: 정책 파일의 NUL 뒤 문법도 파서에서 사라지지 않고 두 모드 모두 fail-closed여야 한다.
+make_nul_allowlist_repo || exit 2
+run_pair "허용 목록 NUL 뒤 문법 위반" "$CASE_REPO" 2 1
 
 SNAP1=$(git status --porcelain)
 if [ "$SNAP0" != "$SNAP1" ]; then
