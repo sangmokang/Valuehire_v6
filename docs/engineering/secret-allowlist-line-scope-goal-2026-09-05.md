@@ -773,10 +773,10 @@ RED 본문은 저장소 밖
 → 좋은 소식인가 나쁜 소식인가: V2 FAIL 자체는 나쁜 소식이었지만 기존 초록을 최종으로 오인하지
 않고 실제 우회를 재현·수정했으므로 적대검증이 제 역할을 했습니다.
 
-#### 10-10. 최종 코드 SHA `8474758` 실행 증거
+#### 10-10. 이전 최종 후보 코드 SHA `8474758` 실행 증거
 
-최종 코드 SHA `847475831ca4045b7ec09233eccd7f3d8025facb`에서 원명령은 다음 계약으로
-통과했습니다.
+당시 최종 후보 코드 SHA `847475831ca4045b7ec09233eccd7f3d8025facb`에서 원명령은 다음 계약으로
+통과했습니다. 이후 §10-12의 정책 원문 NUL 반례가 이 후보를 대체했습니다.
 
 ```text
 ALLOWED_LINES_COUNT=1
@@ -881,6 +881,124 @@ goal 자체를 갱신하면 HEAD가 바뀌므로 이 문서 커밋 뒤 V1→V2�
 읽기 전용으로 실행합니다. 그 최종 본문은 자기 자신을 이 문서에 다시 기록하는 순환을 피하기 위해
 사용자 지시대로 저장소 밖 scratch에 보존하고 제출 보고서에서 경로와 판정을 제시합니다.
 
+#### 10-12. V2 정책 원문 NUL 반례와 최종 코드 후보 `b169a23`
+
+`97c630a`를 읽은 최종 후보 V2는 macOS `awk`가 정책 파일의 NUL 뒤 바이트를 보지 못해, 유효 항목 뒤에
+숨긴 알 수 없는 문법이 파서에서 사라지고 exit 0으로 통과하는 fail-open을 찾았습니다. V2 본문은
+`/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/tmp.IhUV0vGgTN/final4-v2-codex-verdict.txt`에
+보존했습니다.
+
+기존 37개 표본과 기대값은 바꾸지 않고 두 모드의 같은 NUL 정책 반례만 추가했습니다. RED 커밋
+`ceec040aa5a2e7556118b98ee4b38a5774bec3f5`에서 새 38·39번만 기대 exit 2 대신 exit 0이었고,
+원명령은 exit 1이었습니다. `추가만·기준 안 낮춤`은 이 RED 커밋 메시지에도 남겼습니다. RED 로그는
+`/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/tmp.IhUV0vGgTN/policy-nul-valid-red.log`입니다.
+
+```text
+[38/39] 허용 목록 NUL 뒤 문법 위반 (worktree) -> FAIL (expected=2 actual=0 scanner_error=0)
+[39/39] 허용 목록 NUL 뒤 문법 위반 (index) -> FAIL (expected=2 actual=0 scanner_error=0)
+MODE_MISMATCH_COUNT=0
+UNEXPECTED_MISSED_COUNT=0
+CHECKED: 39
+RED_EXIT=1
+```
+
+→ 해석: 기존 기능이 아니라 정책 원문 바이트 검증의 부재 때문에 두 모드가 똑같이 잘못 통과했습니다.
+
+GREEN 커밋 `b169a23259f60526f5932e5ee7554ecedcd26199`은 YAML subset 파서 전에 원문에서 NUL을
+제거한 임시 사본과 원문을 비교합니다. 한 바이트라도 다르면 내용을 출력하지 않고 exit 2로 닫습니다.
+탐지 정규식과 허용 목록 표본은 바꾸지 않았습니다.
+
+```text
+ALLOWED_LINES_COUNT=1
+MODE_MISMATCH_COUNT=0
+UNEXPECTED_MISSED_COUNT=0
+CHECKED: 39
+PASS: 줄 내용 허용 목록과 두 스캔 모드가 AC-ALLOWLIST-1을 만족한다
+
+actual worktree: ALLOWED_LINES_COUNT=2, ALLOWED_MATCHES_CONSUMED=0, exit 0
+actual index:    ALLOWED_LINES_COUNT=2, ALLOWED_MATCHES_CONSUMED=0, exit 0
+```
+
+→ 해석: 새 NUL 반례까지 포함한 39개 기대 종료값이 모두 맞고, 실제 저장소의 두 모드도 추적 파일 매치
+0·스캐너 오류 0으로 통과했습니다. GREEN 로그는 저장소 밖
+`/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/tmp.IhUV0vGgTN/policy-nul-green.log`에 있습니다.
+
+같은 코드 SHA를 네 번 `git clone --no-local --single-branch`한 저장소 밖
+`/tmp/secret-allowlist-mutations.rdRyVo`에서 필수 네 뮤테이션을 다시 실행했습니다. 패치 파일의 과거
+blob 표시는 증거에서 제외하고 각 복제본의 실제 `git diff`와 실행 로그만 대조했습니다.
+
+```text
+MUTATION_A_RC=1  # 허용 조회 제거: 정확 허용 4건 RED
+MUTATION_B_RC=1  # 파일명 면제: UNEXPECTED_MISSED_COUNT=10
+MUTATION_C_RC=1  # expiry 검사 제거: 만료 사례 2건 RED
+MUTATION_D_RC=1  # index 한쪽만 허용 제거: MODE_MISMATCH_COUNT=2
+```
+
+→ 해석: 줄 내용·단일 소비·expiry·공통 모드 경로가 각각 시험 판정에 실제로 필요합니다. 운영 GREEN의
+`UNEXPECTED_MISSED_COUNT`는 0이고, B의 10은 고의로 파일 전체를 면제한 잘못된 사본에서만 생겼습니다.
+
+통합 계약은 저장소 밖 `/tmp/secret-allowlist-final.mfpSJA` 로그에서 모두 통과했습니다.
+
+```text
+acceptance-0-7.sh: 위반 8/8 차단, 정확 사유 일치, 정상 변경 2/2 통과
+acceptance-secret-webhook-vendor.sh: CHECKED 44, UNCOVERED_BASELINE_RULES=17,
+  OLD_CAUGHT_AND_NEW_MISSED_COUNT=0
+acceptance-verify-ac-m.sh: CHECKED 32, 명부 18/18, 허용 목록 target 되돌림 RED
+acceptance-0-2-unreachable-content.sh: CHECKED 13
+acceptance-principles-check.sh: CHECKED 34, MECHANISMS 34/34
+```
+
+→ 해석: 새 원문 검증이 P13·명부·기존 탐지 기준선과 원칙 배선을 약화하지 않았습니다.
+
+같은 SHA의 no-local CI 대응 15단계도 모두 통과했습니다. 로그는
+`/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/tmp.u3O3dp4Q9A/ci-logs/`에 있습니다.
+
+```text
+CI_REPRO_HEAD=b169a23259f60526f5932e5ee7554ecedcd26199
+CI_REPRO_CHECKED=15
+CI_REPRO_FAIL=0
+```
+
+→ 해석: 원본과 객체 저장소를 공유하지 않는 복제본에서 새 39건 수용시험을 포함한 CI 경로가 모두
+통과했습니다.
+
+인용형 후보 규칙은 저장소 밖에서만 다시 조립했습니다. 현재 규칙의 기본 대조군과 후보 규칙의 인용형
+대조군을 각각 `/usr/bin/grep`으로 먼저 CAUGHT 확인한 뒤 index blob을 측정했습니다.
+
+```text
+BASE_POSITIVE_CONTROL=CAUGHT
+CANDIDATE_POSITIVE_CONTROL=CAUGHT
+TRACKED_FILES_SCANNED=230
+MATCH_PATH=docs/engineering/humansearch-v6-founding-spec-2026-08-07.md MATCH_LINES=1
+MATCH_PATH=scripts/acceptance-secret-webhook-vendor.sh MATCH_LINES=1
+QUOTED_RULE_CURRENT_MATCHES=2
+SCANNER_ERRORS=0
+ALLOWLIST_ENTRIES_VERIFIED=2  # 각 현재 원문에서 HASH_MATCHES=1
+```
+
+→ 해석: 후보를 지금 켜면 오탐은 정확히 두 건입니다. 후보는 저장소 규칙에 넣지 않았고 형식 구멍
+본체와 `secret-format-gap`은 그대로 남습니다.
+
+```text
+PATTERN_RULE_DIFF_LINES=0
+PATTERN_BASE_BLOB=5541a33a6b96ba0e16d8680dfe4154779968ecab
+PATTERN_HEAD_BLOB=5541a33a6b96ba0e16d8680dfe4154779968ecab
+SHELL_SYNTAX=PASS
+SHELLCHECK_TARGETS=PASS
+FILE_LIMIT=PASS max=581 hard=600
+FUNCTION_LIMIT=PASS max=51 hard=100
+DIFF_LIMIT=PASS changed_lines=1899 hard=3000
+```
+
+→ 무엇을 시켰나: 마지막 독립 V2 반례를 기대값 추가 RED로 고정하고 최소 원문 바이트 검증 뒤 기능,
+변이, 통합, no-local CI, 규칙 비변경과 크기 경계를 새 코드 SHA에서 다시 실행했습니다.
+→ 뭐가 나왔나: 39/39, 네 변이 RED, CI 15/15, 기존 44·17·0, 규칙 변경 0줄이 유지됐습니다.
+→ 좋은 소식인가 나쁜 소식인가: 정책 파일 자체의 숨은 문법도 fail-closed로 닫혔으므로 좋은 소식입니다.
+다만 이 작업은 예외 경로만 만들었으며 인용형·camelCase·docker-compose 탐지 규칙은 추가하지 않았습니다.
+
+이 문서 커밋으로 HEAD가 한 번 더 바뀝니다. 최종 문서 SHA의 no-local CI와 V1→V2·codeaudit 본문은
+자기 참조 순환을 만들지 않도록 다시 저장소 밖에 보존하고 제출 보고서에 정확한 SHA와 경로를 씁니다.
+
 ### 11. 제출 직전 사람 감사
 
 | 질문 | 판정 | 근거 |
@@ -890,7 +1008,7 @@ goal 자체를 갱신하면 HEAD가 바뀌므로 이 문서 커밋 뒤 V1→V2�
 | 결론에 결정할 사항이 빠졌나? | 아니오 | 로컬 완료, 형식 규칙 비범위, 원격 작업 금지를 명시했습니다. |
 | 결정에 버린 길·대가가 빠졌나? | 아니오 | 결정 카드에 파일 면제·줄번호·원문 저장 기각과 지문 갱신 비용을 기록했습니다. |
 | `file:line`의 역할 설명이 빠졌나? | 아니오 | 위치를 쓴 곳마다 오탐 줄·기존 파일명 출력·suppression 역할을 함께 적었습니다. |
-| 쉽게 쓰며 증거·수치·한계를 뺐나? | 아니오 | 37개, 44·17·0, 15개 CI, 다섯 적대 경계와 비범위를 수치로 남겼습니다. |
+| 쉽게 쓰며 증거·수치·한계를 뺐나? | 아니오 | 39개, 44·17·0, 15개 CI, 여섯 적대 경계와 비범위를 수치로 남겼습니다. |
 | 초등학생 비유로 내용을 깎았나? | 아니오 | 비유 없이 계약과 실행 결과를 그대로 설명했습니다. |
 | 건너뜀·미확인·실패 후 재시도가 앞부분에서 빠졌나? | 아니오 | 레거시 0-2 중단, V1 HUP 재시도, 원격 CI 미실행을 명시했습니다. |
 | 추정을 확인된 사실처럼 썼나? | 아니오 | 실행 증거, 코드 기반 판단, 원격 미확인을 분리했습니다. |
