@@ -499,7 +499,8 @@ PARENT_SYMLINK_RED_EXIT=1
 → 좋은 소식인가 나쁜 소식인가: 기본 루트 경로에는 없던 낮은 위험이지만 명시 계약 위반은 나쁜
 소식이며, 모든 경로 구성요소의 링크를 거부한 `999f46f` 뒤 31개가 GREEN이 된 것은 좋은 소식입니다.
 
-최종 기능 HEAD `999f46f`에서 원명령의 전체 결론은 다음과 같습니다.
+당시 중간 기능 HEAD `999f46f`에서 원명령의 전체 결론은 다음과 같습니다. 아래 §10-9~§10-11의
+37건 최종 코드 증거가 이 31건 중간 기록을 대체합니다.
 
 ```text
 [1/31] 양성 대조군 탐지 (worktree) -> PASS (exit=1)
@@ -542,7 +543,7 @@ PASS: 줄 내용 허용 목록과 두 스캔 모드가 AC-ALLOWLIST-1을 만족�
 
 → 무엇을 시켰나: 최초 22개, 자기 target 2개, 경로 별칭 2개, 허용 목록 소스 링크 2개,
 상위 링크 1개, NUL 경계 2개를 한 원명령에서 실행했습니다.
-→ 뭐가 나왔나: 31개 모두 기대 종료값과 일치했고 두 모드 불일치와 예상 밖 누락이 0이었습니다.
+→ 뭐가 나왔나: 당시 31개 모두 기대 종료값과 일치했고 두 모드 불일치와 예상 밖 누락이 0이었습니다.
 → 좋은 소식인가 나쁜 소식인가: AC-ALLOWLIST-1과 독립 검토에서 새로 드러난 두 BLOCK 및 한 LOW를 함께 닫았으므로
 좋은 소식입니다.
 
@@ -578,7 +579,7 @@ SCANNER_ERRORS=0
 - `acceptance-verify-ac-m.sh`: 새 target 되돌림이 죽은 target으로 실패했고, 실제 명부 18건이
   일치했으며 `CHECKED: 32`, exit 0.
 
-최종 로컬 재실행에서도 다음 계약값이 유지됐습니다.
+당시 로컬 재실행에서도 다음 계약값이 유지됐습니다.
 
 ```text
 acceptance-0-7.sh: BLOCKED 8/8, 정확 사유 일치 8/8, 정상 통과쌍 2/2, exit 0
@@ -692,7 +693,7 @@ DIFF_LIMIT=PASS changed_lines=1626 hard=3000
 → 뭐가 나왔나: 추적 파일 매치와 스캐너 오류는 0, 허용 항목은 2개지만 소비는 0, 규칙 변경은 0줄,
 두 지문은 각각 정확히 한 줄과 일치했습니다. 코드 파일·함수·전체 diff도 hard 한도 이내였습니다.
 → 좋은 소식인가 나쁜 소식인가: 탐지 규칙을 늘리지 않고 예외 경로만 추가했다는 범위와 안전 경계가
-일치하므로 좋은 소식입니다. goal 증거 문서 추가 뒤 diff 수치는 최종 재계산합니다.
+일치하므로 좋은 소식입니다. 아래 최신 기록에서 최종 코드 SHA 기준 수치를 다시 계산합니다.
 
 #### 10-8. 독립 판정 이력과 재시도
 
@@ -730,6 +731,156 @@ V1의 유일한 구현 잔여 위험은 대체 중첩 경로의 상위 디렉터
 문서 계약보다 약한 상태를 남기지 않고 `e5fa5af` RED와 `999f46f` GREEN으로 닫았습니다. 이 마지막
 코드 변경 뒤의 V1·V2·codeaudit를 다시 실행해 최종 본문 경로와 판정 대조를 이어서 기록합니다.
 
+#### 10-9. 후속 독립 검증에서 찾은 두 경계와 누적 RED→GREEN
+
+코드 HEAD `e1f81949518b1ca64d1a00922e4575127dc9d3dc`에서 사용자 지정 `codex exec` 명령을
+`< /dev/null`과 읽기 전용 sandbox로 실행했습니다. V1과 codeaudit는 PASS였고, V2는 V1 본문을
+먼저 읽은 뒤 Git stage 문법형 파일명 우회를 BLOCK으로 찾아 FAIL했습니다.
+
+- V1 PASS: `/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/tmp.IhUV0vGgTN/final3-v1-codex-verdict.txt`
+- codeaudit PASS: `/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/tmp.IhUV0vGgTN/final3-codeaudit-verdict.txt`
+- V2 FAIL: `/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/tmp.IhUV0vGgTN/final3-v2-codex-verdict.txt`
+
+V1과 codeaudit는 `3da4a63` RED에서 GNU `readlink`가 표시용 개행을 붙일 때 worktree/index가
+갈리는 반례와 `e1f8194`의 `readlink -n` GREEN을 확인했습니다. V2는 그 다음으로 `git show
+":$path"`가 `0:` 접두 파일명을 리터럴 파일이 아니라 stage-0 경로 표현으로 재해석하는 우회를
+찾았습니다. 같은 문제가 index의 대체 허용 목록 경로에도 있었습니다.
+
+기존 33개 기대값을 바꾸지 않고 다음 네 항목만 추가한 `d96f9e2`가 RED였습니다.
+
+```text
+[34/37] stage 문법형 추적 파일명의 리터럴 blob (worktree) -> PASS (exit=1)
+[35/37] stage 문법형 추적 파일명의 리터럴 blob (index) -> FAIL (expected=1 actual=0)
+[36/37] stage 문법형 허용 목록 경로의 리터럴 정책 (worktree) -> PASS (exit=2)
+[37/37] stage 문법형 허용 목록 경로의 리터럴 정책 (index) -> FAIL (expected=2 actual=0)
+MODE_MISMATCH_COUNT=2
+UNEXPECTED_MISSED_COUNT=1
+CHECKED: 37
+```
+
+→ 해석: 새 네 사례만 실패했고, 특히 두 index 판정이 각각 탐지 누락과 정책 우회로 갈렸습니다.
+
+RED 본문은 저장소 밖
+`/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/tmp.IhUV0vGgTN/colon-stage-valid-red.log`에
+있습니다. `177aff1`은 두 index 읽기를 `:./<리터럴 경로>`로 바꿨고 37/37을 GREEN으로 만들었습니다.
+`8474758`은 동작을 바꾸지 않고 빈 지역변수 초기화를 명시해 대상 두 스크립트의 ShellCheck를
+의도적 fixture 경고 제외 조건에서 통과시켰습니다.
+
+→ 무엇을 시켰나: 서로 다른 독립 검증기가 이전 PASS를 공격하고, 찾은 반례는 기대값을 낮추지 않은
+추가 RED 뒤 최소 GREEN으로 닫게 했습니다.
+→ 뭐가 나왔나: GNU 표시 개행과 Git stage 문법형 경로라는 두 추가 갈림을 찾았고, 최종 코드에서는
+두 경계 모두 worktree/index 동일 판정으로 고정됐습니다.
+→ 좋은 소식인가 나쁜 소식인가: V2 FAIL 자체는 나쁜 소식이었지만 기존 초록을 최종으로 오인하지
+않고 실제 우회를 재현·수정했으므로 적대검증이 제 역할을 했습니다.
+
+#### 10-10. 최종 코드 SHA `8474758` 실행 증거
+
+최종 코드 SHA `847475831ca4045b7ec09233eccd7f3d8025facb`에서 원명령은 다음 계약으로
+통과했습니다.
+
+```text
+ALLOWED_LINES_COUNT=1
+MODE_MISMATCH_COUNT=0
+UNEXPECTED_MISSED_COUNT=0
+CHECKED: 37
+PASS: 줄 내용 허용 목록과 두 스캔 모드가 AC-ALLOWLIST-1을 만족한다
+```
+
+→ 해석: 37개 기대 종료값이 모두 맞고 두 모드 차이와 예상 밖 탐지 누락이 0입니다.
+
+실제 저장소의 worktree/index 종단은 각각 `ALLOWED_LINES_COUNT=2`,
+`ALLOWED_MATCHES_CONSUMED=0`, 추적 파일 매치 0, 스캐너 오류 0, exit 0이었습니다. 네 필수
+뮤테이션은 저장소 밖 no-local 복제본
+`/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/tmp.zpfu8IvMcR`에서 모두 suite exit 1이었습니다.
+
+```text
+MUTATION_A_RC=1  # 허용 조회 제거: 정확 허용 RED
+MUTATION_B_RC=1  # 파일명 면제: UNEXPECTED_MISSED_COUNT=10
+MUTATION_C_RC=1  # expiry 제거: 만료 사례 RED
+MUTATION_D_RC=1  # index 한쪽만 허용 제거: MODE_MISMATCH_COUNT=2
+```
+
+→ 해석: 네 잘못된 구현이 모두 시험 묶음을 깨뜨려 각 방어가 실제 판정에 필요함을 증명합니다.
+
+같은 SHA를 `git clone --no-local --single-branch`한 복제본의 CI 대응 15단계도 모두
+통과했습니다. 로그는
+`/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/tmp.WBMYdlp1gy/ci-logs/`에 있습니다.
+
+```text
+CI_REPRO_HEAD=847475831ca4045b7ec09233eccd7f3d8025facb
+CI_REPRO_CHECKED=15
+CI_REPRO_FAIL=0
+```
+
+→ 해석: 객체를 공유하지 않은 복제본에서 변경 영향권의 서버 자동 검사 15개가 모두 통과했습니다.
+
+통합 계약도 같은 SHA에서 다시 확인했습니다.
+
+```text
+acceptance-0-7.sh: 위반 8/8 차단, 정확 사유 일치, 정상 변경 2/2 통과
+acceptance-secret-webhook-vendor.sh: CHECKED 44, UNCOVERED_BASELINE_RULES=17,
+  OLD_CAUGHT_AND_NEW_MISSED_COUNT=0
+acceptance-verify-ac-m.sh: CHECKED 32, 명부 18/18, 허용 목록 target 되돌림 RED
+acceptance-0-2-unreachable-content.sh: CHECKED 13
+acceptance-principles-check.sh: CHECKED 34, MECHANISMS 34/34
+```
+
+→ 해석: 새 억제 경로가 훅·명부·기존 비밀 규칙과 원칙 장치를 약화하지 않았습니다.
+
+인용형 후보 규칙은 저장소 밖 파일에서만 측정했고 저장소 패턴에는 넣지 않았습니다. 조립한 기본
+대조군을 정제된 현재 규칙에 `/usr/bin/grep`으로 먼저 대어 CAUGHT를 확인한 뒤, 인용형 후보 자체의
+조립 대조군도 CAUGHT를 확인했습니다.
+
+```text
+TRACKED_FILES_SCANNED=230
+MATCH_PATH=docs/engineering/humansearch-v6-founding-spec-2026-08-07.md MATCH_LINES=1
+MATCH_PATH=scripts/acceptance-secret-webhook-vendor.sh MATCH_LINES=1
+QUOTED_RULE_CURRENT_MATCHES=2
+SCANNER_ERRORS=0
+ALLOWLIST_ENTRIES_VERIFIED=2  # 두 항목 모두 현재 원문에서 HASH_MATCHES=1
+```
+
+→ 해석: 향후 인용형 규칙을 켜면 현재 정확히 두 오탐이 생기며, 두 허용 지문이 그 원문에 각각 한 번만 묶입니다.
+
+```text
+PATTERN_RULE_DIFF_LINES=0
+PATTERN_BASE_BLOB=5541a33a6b96ba0e16d8680dfe4154779968ecab
+PATTERN_HEAD_BLOB=5541a33a6b96ba0e16d8680dfe4154779968ecab
+SHELL_SYNTAX=PASS
+SHELLCHECK_TARGETS=PASS  # 간접 trap 함수와 생성할 shim 문자열의 의도적 경고만 제외
+FILE_LIMIT=PASS max=581 hard=600
+FUNCTION_LIMIT=PASS max=51 hard=100
+DIFF_LIMIT=PASS changed_lines=1714 hard=3000
+```
+
+→ 무엇을 시켰나: 최종 코드 SHA에서 기능·뮤테이션·통합·no-local CI·규칙 비변경·크기 경계를
+처음부터 다시 실행했습니다.
+→ 뭐가 나왔나: 필수 수치와 기존 44·17·0이 모두 유지됐고, 탐지 규칙 변경과 예상 밖 누락은 0입니다.
+→ 좋은 소식인가 나쁜 소식인가: V2가 찾은 BLOCK을 닫은 뒤 전체 계약이 다시 초록이므로 좋은
+소식입니다. 형식 탐지 규칙 본체는 여전히 비범위이고 `secret-format-gap`도 유지됩니다.
+
+#### 10-11. 실패한 증거 설정과 폐기 기준
+
+성공 출력만 골라 쓰지 않도록 다음 실패·오설정도 기록합니다.
+
+1. GNU 개행 반례의 첫 fixture는 기존 패턴 파일 끝 개행을 가정해 임시 정규식이 앞 패턴과 붙었고,
+   `/usr/bin/grep` 문법 오류 exit 2로 끝났습니다. 기능 RED가 아니므로 폐기했습니다.
+2. 다음 fixture는 임시 패턴 경로를 `run_pair`가 전달하지 않아 패턴 파일 없음 exit 2였습니다.
+   역시 기능 RED가 아니므로 폐기했습니다.
+3. 첫 `readlink` shim은 개행 대신 글자 두 개를 출력해 잘못 GREEN이었습니다. shim 바이트를 고친 뒤
+   worktree=1/index=0의 유효 RED만 `symlink-newline-valid-red.log`로 채택했습니다.
+4. 인용형 실측의 첫 시도는 무인용 필수 대조군을 인용형 전용 후보 규칙에 잘못 대어 실패했습니다.
+   두 번째는 주석을 제거하지 않은 기본 패턴을 직접 사용해 정규식 문법 오류가 났습니다.
+5. 세 번째 인용형 실측은 zsh 특수 변수명 `path`를 루프 변수로 써 PATH를 훼손했고 스캐너 오류
+   230건이어서 0매치 결과를 폐기했습니다. `/bin/bash`와 `file_path`로 고친 결과만 §10-10에 썼습니다.
+6. 이전 SHA `5d733d7`을 읽던 V2는 코드가 더 바뀐 뒤 최종 증거가 될 수 없어 중단했습니다.
+7. 최종 정적 경계 묶음의 첫 명령은 case 문 구문 오타로 exit 2였습니다. 명령만 고쳐 같은 코드
+   SHA에서 다시 실행한 PASS만 채택했습니다.
+
+goal 자체를 갱신하면 HEAD가 바뀌므로 이 문서 커밋 뒤 V1→V2와 codeaudit를 최종 문서 SHA에서 다시
+읽기 전용으로 실행합니다. 그 최종 본문은 자기 자신을 이 문서에 다시 기록하는 순환을 피하기 위해
+사용자 지시대로 저장소 밖 scratch에 보존하고 제출 보고서에서 경로와 판정을 제시합니다.
+
 ### 11. 제출 직전 사람 감사
 
 | 질문 | 판정 | 근거 |
@@ -739,7 +890,7 @@ V1의 유일한 구현 잔여 위험은 대체 중첩 경로의 상위 디렉터
 | 결론에 결정할 사항이 빠졌나? | 아니오 | 로컬 완료, 형식 규칙 비범위, 원격 작업 금지를 명시했습니다. |
 | 결정에 버린 길·대가가 빠졌나? | 아니오 | 결정 카드에 파일 면제·줄번호·원문 저장 기각과 지문 갱신 비용을 기록했습니다. |
 | `file:line`의 역할 설명이 빠졌나? | 아니오 | 위치를 쓴 곳마다 오탐 줄·기존 파일명 출력·suppression 역할을 함께 적었습니다. |
-| 쉽게 쓰며 증거·수치·한계를 뺐나? | 아니오 | 31개, 44·17·0, 15개 CI, 두 BLOCK과 한 LOW, 비범위를 수치로 남겼습니다. |
+| 쉽게 쓰며 증거·수치·한계를 뺐나? | 아니오 | 37개, 44·17·0, 15개 CI, 다섯 적대 경계와 비범위를 수치로 남겼습니다. |
 | 초등학생 비유로 내용을 깎았나? | 아니오 | 비유 없이 계약과 실행 결과를 그대로 설명했습니다. |
 | 건너뜀·미확인·실패 후 재시도가 앞부분에서 빠졌나? | 아니오 | 레거시 0-2 중단, V1 HUP 재시도, 원격 CI 미실행을 명시했습니다. |
 | 추정을 확인된 사실처럼 썼나? | 아니오 | 실행 증거, 코드 기반 판단, 원격 미확인을 분리했습니다. |
