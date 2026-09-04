@@ -144,6 +144,7 @@ probe_secret_allowlist_semantics() {
 if [ "$semantic_setup" -ne 0 ]; then
   record 1 "줄 허용 수용시험 의미 변이" "격리 저장소 또는 허용 소비 제거 변이를 만들지 못함"
   record 1 "PASS 출력 전용 위조 차단" "의미 판정기를 준비하지 못함"
+  record 1 "조건부 PASS·무관 FAIL 위조 차단" "의미 판정기를 준비하지 못함"
 elif probe_secret_allowlist_semantics "$REPO/scripts/acceptance-secret-allowlist.sh"; then
   record 0 "줄 허용 수용시험 의미 변이" "허용 소비 제거 시 정확 허용 사례가 RED"
 
@@ -161,9 +162,31 @@ elif probe_secret_allowlist_semantics "$REPO/scripts/acceptance-secret-allowlist
   else
     record 0 "PASS 출력 전용 위조 차단" "그럴듯한 PASS/CHECKED 출력만으로는 의미 변이를 통과하지 못함"
   fi
+
+  conditional_spoof="$TMP/conditional-spoofed-secret-allowlist.sh"
+  printf '%s\n' \
+    '#!/usr/bin/env bash' \
+    'if /usr/bin/grep -qF "if false; then" verify.sh; then' \
+    '  echo "[3/41] 등재된 정확한 한 줄 (worktree) -> PASS (exit=0)"' \
+    '  echo "[4/41] 등재된 정확한 한 줄 (index) -> PASS (exit=0)"' \
+    '  echo "[5/41] 관련 없는 다른 검사 -> FAIL (expected=1 actual=0 scanner_error=0)"' \
+    '  exit 1' \
+    'fi' \
+    'echo "ALLOWED_LINES_COUNT=1"' \
+    'echo "MODE_MISMATCH_COUNT=0"' \
+    'echo "UNEXPECTED_MISSED_COUNT=0"' \
+    'echo "CHECKED: 41"' \
+    'echo "PASS: 줄 내용 허용 목록과 두 스캔 모드가 AC-ALLOWLIST-1을 만족한다"' \
+    'exit 0' > "$conditional_spoof"
+  if probe_secret_allowlist_semantics "$conditional_spoof"; then
+    record 1 "조건부 PASS·무관 FAIL 위조 차단" "정확 허용 PASS와 무관 FAIL을 같은 RED로 오인함"
+  else
+    record 0 "조건부 PASS·무관 FAIL 위조 차단" "실패 사유가 정확 허용 결과 줄에 결속됨"
+  fi
 else
   record 1 "줄 허용 수용시험 의미 변이" "허용 소비 제거 뒤에도 정확 허용 사례가 RED가 아님"
   record 1 "PASS 출력 전용 위조 차단" "기준 수용시험의 변이 민감도가 먼저 성립하지 않음"
+  record 1 "조건부 PASS·무관 FAIL 위조 차단" "기준 수용시험의 변이 민감도가 먼저 성립하지 않음"
 fi
 
 # ── 통과 쪽: 손대지 않은 실제 인수 검사는 그대로 합격해야 한다 ───────────────
