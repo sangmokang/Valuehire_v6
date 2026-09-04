@@ -201,6 +201,14 @@ class WeeklyGatePiiValueTest(unittest.TestCase):
             with self.subTest(value=value):
                 self.assert_action_value_blocked(value)
 
+    def test_codex_v2_round10_unprefixed_country_code_nanp_is_blocked(self):
+        for value in (
+            "후보자 전화: 14155552671",
+            "후보자 전화: 1(415)5552671",
+        ):
+            with self.subTest(value=value):
+                self.assert_action_value_blocked(value)
+
     def test_business_delta_notation_is_not_an_intl_phone(self):
         bundle = valid_bundle()
         bundle["positions"][0]["action"] = "전주 대비 +1 234 567건 증가"
@@ -311,13 +319,14 @@ class WeeklyGateMainEndToEndTest(unittest.TestCase):
         self.assertNotIn("sangmokang@valueconnect.kr", output)
 
     def test_pii_action_never_reaches_stdout_in_any_format(self):
-        bundle = valid_bundle()
-        bundle["positions"][0]["action"] = "연락 010/1234/5678 부탁"
-        for fmt in ("json", "markdown", "html"):
-            with self.subTest(fmt=fmt):
-                code, output = self.run_main(bundle, fmt)
-                self.assertEqual(code, 1)
-                self.assertNotIn("010/1234/5678", output)
+        for phone in ("010/1234/5678", "14155552671", "1(415)5552671"):
+            bundle = valid_bundle()
+            bundle["positions"][0]["action"] = f"연락 {phone} 부탁"
+            for fmt in ("json", "markdown", "html"):
+                with self.subTest(phone=phone, fmt=fmt):
+                    code, output = self.run_main(bundle, fmt)
+                    self.assertEqual(code, 1)
+                    self.assertNotIn(phone, output)
 
 
 class WeeklyGateFinalOutputRescanTest(unittest.TestCase):
