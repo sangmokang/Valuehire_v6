@@ -36,6 +36,7 @@ required_files=(
   tools/invoice/store_invoice_set.py
   tools/invoice/tests/test_generate_invoice.py
   tools/invoice/tests/test_generate_deduction.py
+  tools/invoice/tests/invoice_ledger_case.py
   tools/invoice/tests/test_store_invoice_set.py
   tools/invoice/tests/assert_contract_snapshot.py
   tools/invoice/tests/postgres_fixture.sql
@@ -94,7 +95,7 @@ if python3 -m py_compile \
   tools/invoice/storage_agreements.py tools/invoice/storage_remote.py \
   tools/invoice/store_invoice_set.py scripts/verify/check-invoice-gate.py \
   tools/invoice/tests/test_generate_invoice.py tools/invoice/tests/test_generate_deduction.py \
-  tools/invoice/tests/test_store_invoice_set.py \
+  tools/invoice/tests/invoice_ledger_case.py tools/invoice/tests/test_store_invoice_set.py \
   tools/invoice/tests/assert_contract_snapshot.py; then
   record_pass "Invoice Python 문법 검사"
 else
@@ -122,6 +123,7 @@ files = (
     Path("tools/invoice/storage_remote.py"),
     Path("tools/invoice/tests/test_generate_invoice.py"),
     Path("tools/invoice/tests/test_generate_deduction.py"),
+    Path("tools/invoice/tests/invoice_ledger_case.py"),
     Path("tools/invoice/tests/test_store_invoice_set.py"),
     Path("tools/invoice/tests/assert_contract_snapshot.py"),
     Path("scripts/verify/check-invoice-gate.py"),
