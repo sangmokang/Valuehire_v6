@@ -136,9 +136,11 @@ probe_secret_allowlist_semantics() {
     cd "$semantic_repo" || exit 2
     bash scripts/verify/run-acceptance.sh scripts/acceptance-secret-allowlist.sh
   ) > "$semantic_output" 2>&1 || rc=$?
-  [ "$rc" -ne 0 ] &&
-    /usr/bin/grep -qF '등재된 정확한 한 줄' "$semantic_output" &&
-    /usr/bin/grep -qF -- '-> FAIL' "$semantic_output"
+  [ "$rc" -eq 1 ] &&
+    /usr/bin/grep -qE '^\[[0-9]+/[0-9]+\] 등재된 정확한 한 줄 \(worktree\) -> FAIL \(expected=0 actual=1 scanner_error=0\)$' \
+      "$semantic_output" &&
+    /usr/bin/grep -qE '^\[[0-9]+/[0-9]+\] 등재된 정확한 한 줄 \(index\) -> FAIL \(expected=0 actual=1 scanner_error=0\)$' \
+      "$semantic_output"
 }
 
 if [ "$semantic_setup" -ne 0 ]; then
