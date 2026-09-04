@@ -247,7 +247,7 @@ if python3 -m py_compile "$CANONICAL"/scripts/*.py "$TESTS"/*.py; then
 else
   fail_check "weekly gates do not compile"
 fi
-if python3 - "$CANONICAL/scripts" "$TESTS" <<'PY'
+if [ "$(wc -l < "$0")" -le 600 ] && python3 - "$CANONICAL/scripts" "$TESTS" <<'PY'
 import ast
 from pathlib import Path
 import sys
