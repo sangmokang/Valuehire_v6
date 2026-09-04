@@ -1095,3 +1095,17 @@ checkpoint 근거가 아니다.
 - 보정 후 fresh GREEN: 단위 144 tests OK, sot_gate `CHECKED: 89` exit 0, acceptance
   `CHECKED: 65` exit 0(mutation 32종 생존 0), verify.sh PASS, clean.
 
+### 2026-09-04 fresh Codex V2 4차 결과와 보정
+
+- V2 4차 artifact: `.omx/artifacts/codex-v2-pii-3layer-round4-20260904.md`
+  (검토 대상 HEAD `cc193d5c82912282c6db9eb250eae124dd25d3ab`) — verdict `FAIL`.
+  3차 반례는 5/5 차단으로 독립 재현·확인.
+- 채택·보정(R9 회귀 편입): 이메일 발행 대상의 수신자 allowlist가 구조적으로 강제되지
+  않던 결함 — `publication_state`가 name=email이면 target_id의
+  `ALLOWED_EMAIL_TARGETS` 정확 일치를 요구하고 위반 시 `EMAIL_TARGET_NOT_ALLOWLISTED`
+  (fixtures의 email target_id도 허용 주소로 교체). 도메인-리터럴 이메일
+  (`user@[192.0.2.1]`) 패턴, 검사 전 공백 연쇄 정규화(다중 공백 구분 전화),
+  FQDN 끝점 프로필 URL(`linkedin.com./in/...`).
+- 보정 후 fresh GREEN: 단위 146 tests OK, sot_gate `CHECKED: 89` exit 0, acceptance
+  `CHECKED: 65` exit 0(mutation 32종 생존 0), verify.sh PASS, clean.
+
