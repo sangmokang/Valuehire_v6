@@ -476,51 +476,74 @@ NUL_BYTE_RED_EXIT=1
 → 좋은 소식인가 나쁜 소식인가: 보안 계약 위반은 나쁜 소식이며, 매치 결과에 NUL이 있으면 지문 판정
 전에 경로를 exit 1로 차단한 뒤 30개가 전부 GREEN이 된 것은 좋은 소식입니다.
 
-최종 기능 HEAD `4822440`과 suppression 설명 보정 HEAD `f84a4ac`에서 원명령의 전체 결론은 다음과
-같습니다.
+#### 10-2d. 최종 V1 반례 추가 RED/GREEN — 대체 경로 상위 링크
+
+최종 V1은 `dd9d032`의 구현을 PASS로 판정하면서도, 환경변수로 선택한 중첩 허용 목록의 상위
+디렉터리가 외부 심볼릭 링크일 때 마지막 파일의 `-L` 검사만으로는 외부 정책을 구분하지 못한다는
+LOW 잔여 위험을 남겼습니다. 이는 목표 문서의 외부 정책 주입 금지 계약과 충돌하므로 기존 30개를
+바꾸지 않고 worktree 반례 한 개만 더해 `EXPECTED_CHECKS=31`로 올렸습니다. 커밋 `e5fa5af`는
+`추가만·기준 안 낮춤`을 명시합니다.
 
 ```text
-[1/30] 양성 대조군 탐지 (worktree) -> PASS (exit=1)
-[2/30] 양성 대조군 탐지 (index) -> PASS (exit=1)
-[3/30] 등재된 정확한 한 줄 (worktree) -> PASS (exit=0)
-[4/30] 등재된 정확한 한 줄 (index) -> PASS (exit=0)
-[5/30] 같은 파일의 같은 값 두 번째 줄 (worktree) -> PASS (exit=1)
-[6/30] 같은 파일의 같은 값 두 번째 줄 (index) -> PASS (exit=1)
-[7/30] 등재된 줄 한 글자 변경 (worktree) -> PASS (exit=1)
-[8/30] 등재된 줄 한 글자 변경 (index) -> PASS (exit=1)
-[9/30] 등재된 줄의 줄번호 이동 (worktree) -> PASS (exit=0)
-[10/30] 등재된 줄의 줄번호 이동 (index) -> PASS (exit=0)
-[11/30] expiry 누락 (worktree) -> PASS (exit=2)
-[12/30] expiry 누락 (index) -> PASS (exit=2)
-[13/30] expiry 만료 (worktree) -> PASS (exit=2)
-[14/30] expiry 만료 (index) -> PASS (exit=2)
-[15/30] 허용 목록 파일 없음 (worktree) -> PASS (exit=2)
-[16/30] 허용 목록 파일 없음 (index) -> PASS (exit=2)
-[17/30] 허용 목록 문법 위반 (worktree) -> PASS (exit=2)
-[18/30] 허용 목록 문법 위반 (index) -> PASS (exit=2)
-[19/30] 허용 목록 자기 파일 target 거부 (worktree) -> PASS (exit=2)
-[20/30] 허용 목록 자기 파일 target 거부 (index) -> PASS (exit=2)
-[21/30] 허용 목록 자기 파일 경로 별칭 거부 (worktree) -> PASS (exit=2)
-[22/30] 허용 목록 자기 파일 경로 별칭 거부 (index) -> PASS (exit=2)
-[23/30] worktree 허용 목록 외부 심볼릭 링크 거부 (worktree) -> PASS (exit=2)
-[24/30] index 허용 목록 심볼릭 링크 거부 (index) -> PASS (exit=2)
-[25/30] 등재된 줄 끝 NUL 한 바이트 추가 (worktree) -> PASS (exit=1)
-[26/30] 등재된 줄 끝 NUL 한 바이트 추가 (index) -> PASS (exit=1)
-[27/30] 추적 심볼릭 링크의 바깥 내용은 비범위 (worktree) -> PASS (exit=0)
-[28/30] 추적 심볼릭 링크의 바깥 내용은 비범위 (index) -> PASS (exit=0)
-[29/30] 추적 심볼릭 링크의 저장 문자열은 탐지 (worktree) -> PASS (exit=1)
-[30/30] 추적 심볼릭 링크의 저장 문자열은 탐지 (index) -> PASS (exit=1)
+[25/31] worktree 허용 목록 상위 외부 심볼릭 링크 거부 (worktree) -> FAIL (expected=2 actual=0 scanner_error=0)
 ALLOWED_LINES_COUNT=1
 MODE_MISMATCH_COUNT=0
 UNEXPECTED_MISSED_COUNT=0
-CHECKED: 30
+CHECKED: 31
+PARENT_SYMLINK_RED_EXIT=1
+```
+
+→ 무엇을 시켰나: 추적된 중첩 허용 목록을 커밋한 뒤 상위 디렉터리만 저장소 밖 경로를 가리키는
+링크로 교체해 worktree 모드를 실행했습니다.
+→ 뭐가 나왔나: 외부 정책을 읽어 exit 0으로 통과했으므로 기대 exit 2와 달라 RED였습니다.
+→ 좋은 소식인가 나쁜 소식인가: 기본 루트 경로에는 없던 낮은 위험이지만 명시 계약 위반은 나쁜
+소식이며, 모든 경로 구성요소의 링크를 거부한 `999f46f` 뒤 31개가 GREEN이 된 것은 좋은 소식입니다.
+
+최종 기능 HEAD `999f46f`에서 원명령의 전체 결론은 다음과 같습니다.
+
+```text
+[1/31] 양성 대조군 탐지 (worktree) -> PASS (exit=1)
+[2/31] 양성 대조군 탐지 (index) -> PASS (exit=1)
+[3/31] 등재된 정확한 한 줄 (worktree) -> PASS (exit=0)
+[4/31] 등재된 정확한 한 줄 (index) -> PASS (exit=0)
+[5/31] 같은 파일의 같은 값 두 번째 줄 (worktree) -> PASS (exit=1)
+[6/31] 같은 파일의 같은 값 두 번째 줄 (index) -> PASS (exit=1)
+[7/31] 등재된 줄 한 글자 변경 (worktree) -> PASS (exit=1)
+[8/31] 등재된 줄 한 글자 변경 (index) -> PASS (exit=1)
+[9/31] 등재된 줄의 줄번호 이동 (worktree) -> PASS (exit=0)
+[10/31] 등재된 줄의 줄번호 이동 (index) -> PASS (exit=0)
+[11/31] expiry 누락 (worktree) -> PASS (exit=2)
+[12/31] expiry 누락 (index) -> PASS (exit=2)
+[13/31] expiry 만료 (worktree) -> PASS (exit=2)
+[14/31] expiry 만료 (index) -> PASS (exit=2)
+[15/31] 허용 목록 파일 없음 (worktree) -> PASS (exit=2)
+[16/31] 허용 목록 파일 없음 (index) -> PASS (exit=2)
+[17/31] 허용 목록 문법 위반 (worktree) -> PASS (exit=2)
+[18/31] 허용 목록 문법 위반 (index) -> PASS (exit=2)
+[19/31] 허용 목록 자기 파일 target 거부 (worktree) -> PASS (exit=2)
+[20/31] 허용 목록 자기 파일 target 거부 (index) -> PASS (exit=2)
+[21/31] 허용 목록 자기 파일 경로 별칭 거부 (worktree) -> PASS (exit=2)
+[22/31] 허용 목록 자기 파일 경로 별칭 거부 (index) -> PASS (exit=2)
+[23/31] worktree 허용 목록 외부 심볼릭 링크 거부 (worktree) -> PASS (exit=2)
+[24/31] index 허용 목록 심볼릭 링크 거부 (index) -> PASS (exit=2)
+[25/31] worktree 허용 목록 상위 외부 심볼릭 링크 거부 (worktree) -> PASS (exit=2)
+[26/31] 등재된 줄 끝 NUL 한 바이트 추가 (worktree) -> PASS (exit=1)
+[27/31] 등재된 줄 끝 NUL 한 바이트 추가 (index) -> PASS (exit=1)
+[28/31] 추적 심볼릭 링크의 바깥 내용은 비범위 (worktree) -> PASS (exit=0)
+[29/31] 추적 심볼릭 링크의 바깥 내용은 비범위 (index) -> PASS (exit=0)
+[30/31] 추적 심볼릭 링크의 저장 문자열은 탐지 (worktree) -> PASS (exit=1)
+[31/31] 추적 심볼릭 링크의 저장 문자열은 탐지 (index) -> PASS (exit=1)
+ALLOWED_LINES_COUNT=1
+MODE_MISMATCH_COUNT=0
+UNEXPECTED_MISSED_COUNT=0
+CHECKED: 31
 PASS: 줄 내용 허용 목록과 두 스캔 모드가 AC-ALLOWLIST-1을 만족한다
 ```
 
 → 무엇을 시켰나: 최초 22개, 자기 target 2개, 경로 별칭 2개, 허용 목록 소스 링크 2개,
-NUL 경계 2개를 한 원명령에서 실행했습니다.
-→ 뭐가 나왔나: 30개 모두 기대 종료값과 일치했고 두 모드 불일치와 예상 밖 누락이 0이었습니다.
-→ 좋은 소식인가 나쁜 소식인가: AC-ALLOWLIST-1과 독립 검토에서 새로 드러난 두 BLOCK을 함께 닫았으므로
+상위 링크 1개, NUL 경계 2개를 한 원명령에서 실행했습니다.
+→ 뭐가 나왔나: 31개 모두 기대 종료값과 일치했고 두 모드 불일치와 예상 밖 누락이 0이었습니다.
+→ 좋은 소식인가 나쁜 소식인가: AC-ALLOWLIST-1과 독립 검토에서 새로 드러난 두 BLOCK 및 한 LOW를 함께 닫았으므로
 좋은 소식입니다.
 
 #### 10-3. 실제 항목·규칙 비변경·현재 오탐 실측
@@ -661,7 +684,7 @@ ALLOWLIST_ENTRY webhook-vendor hash_matches=1
 SHELL_SYNTAX=PASS
 FILE_LIMIT=PASS max=581 hard=600
 FUNCTION_LIMIT=PASS max=51 hard=100
-DIFF_LIMIT=PASS changed_lines=1555 hard=3000
+DIFF_LIMIT=PASS changed_lines=1626 hard=3000
 ```
 
 → 무엇을 시켰나: 실제 저장소 양 모드 종단, 규칙 blob, 두 운영 지문, 셸 문법, P11 코드 경계를
@@ -695,8 +718,17 @@ DIFF_LIMIT=PASS changed_lines=1555 hard=3000
 → 뭐가 나왔나: 세 판정 모두 당시에는 FAIL이었고, 겹치는 두 BLOCK은 추가 RED와 GREEN 커밋으로
 재현·수정됐습니다. 증거 미기록 지적은 §10-5~§10-7에 채웠습니다.
 → 좋은 소식인가 나쁜 소식인가: 첫 판정 실패 자체는 나쁜 소식이지만 결함을 숨기지 않고 시험과 코드로
-닫았으므로 유효한 적대검증이었습니다. 최신 HEAD에 대한 V1·V2·codeaudit 재판정은 바로 아래에
-최종 본문 경로와 함께 추가합니다.
+닫았으므로 유효한 적대검증이었습니다.
+
+증거 커밋 `dd9d032`에서 다시 실행한 V1과 codeaudit는 모두 PASS였고 BLOCK/HIGH를 CLEAR로
+판정했습니다. 본문은 다음 저장소 밖 파일에 있습니다.
+
+- V1 PASS: `/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/tmp.IhUV0vGgTN/final-v1-codex-verdict.txt`
+- codeaudit PASS: `/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/tmp.IhUV0vGgTN/final-codeaudit-verdict.txt`
+
+V1의 유일한 구현 잔여 위험은 대체 중첩 경로의 상위 디렉터리 링크였습니다. PASS 안의 LOW였지만
+문서 계약보다 약한 상태를 남기지 않고 `e5fa5af` RED와 `999f46f` GREEN으로 닫았습니다. 이 마지막
+코드 변경 뒤의 V1·V2·codeaudit를 다시 실행해 최종 본문 경로와 판정 대조를 이어서 기록합니다.
 
 ### 11. 제출 직전 사람 감사
 
@@ -707,7 +739,7 @@ DIFF_LIMIT=PASS changed_lines=1555 hard=3000
 | 결론에 결정할 사항이 빠졌나? | 아니오 | 로컬 완료, 형식 규칙 비범위, 원격 작업 금지를 명시했습니다. |
 | 결정에 버린 길·대가가 빠졌나? | 아니오 | 결정 카드에 파일 면제·줄번호·원문 저장 기각과 지문 갱신 비용을 기록했습니다. |
 | `file:line`의 역할 설명이 빠졌나? | 아니오 | 위치를 쓴 곳마다 오탐 줄·기존 파일명 출력·suppression 역할을 함께 적었습니다. |
-| 쉽게 쓰며 증거·수치·한계를 뺐나? | 아니오 | 30개, 44·17·0, 15개 CI, 두 BLOCK, 비범위를 수치로 남겼습니다. |
+| 쉽게 쓰며 증거·수치·한계를 뺐나? | 아니오 | 31개, 44·17·0, 15개 CI, 두 BLOCK과 한 LOW, 비범위를 수치로 남겼습니다. |
 | 초등학생 비유로 내용을 깎았나? | 아니오 | 비유 없이 계약과 실행 결과를 그대로 설명했습니다. |
 | 건너뜀·미확인·실패 후 재시도가 앞부분에서 빠졌나? | 아니오 | 레거시 0-2 중단, V1 HUP 재시도, 원격 CI 미실행을 명시했습니다. |
 | 추정을 확인된 사실처럼 썼나? | 아니오 | 실행 증거, 코드 기반 판단, 원격 미확인을 분리했습니다. |
