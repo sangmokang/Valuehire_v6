@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import urllib.error
+from unittest.mock import patch
 
 import pytest
 
@@ -161,15 +162,51 @@ def test_fetch_position_cards_wrapped_urlerror_connection_refused_is_source_unav
     assert result.rows == ()
 
 
-def test_fetch_position_cards_permission_denied_status_is_fail() -> None:
+@pytest.mark.parametrize("status", [401, 403])
+def test_fetch_position_cards_permission_denied_status_is_fail(status: int) -> None:
     result = fetch_position_cards(
         base_url="https://example.supabase.co",
         api_key=_fixture_api_key(),
-        http_get=_ok_get({"message": "invalid api key"}, status=401),
+        http_get=_ok_get({"message": "invalid api key"}, status=status),
     )
 
     assert result.state.status is MetricStatus.FAIL
     assert result.state.reason is SourceFailureReason.PERMISSION_DENIED
+    assert result.rows == ()
+
+
+def test_default_http_get_adapter_classifies_a_real_urlopen_timeout() -> None:
+    """codex adversarial finding: prior timeout tests never exercised the real
+
+    ``_urllib_get`` adapter (they all inject ``http_get`` directly) — this
+    mocks only ``urllib.request.urlopen`` so the default adapter itself runs.
+    """
+
+    with patch(
+        "humansearch.admin_weekly_dashboard.position_cards_source.urllib.request.urlopen"
+    ) as mock_urlopen:
+        mock_urlopen.side_effect = urllib.error.URLError(TimeoutError("timed out"))
+        result = fetch_position_cards(
+            base_url="https://example.supabase.co",
+            api_key=_fixture_api_key(),
+        )
+
+    assert result.state.status is MetricStatus.FAIL
+    assert result.state.reason is SourceFailureReason.SOURCE_TIMEOUT
+    assert result.rows == ()
+
+
+def test_fetch_position_cards_408_is_source_timeout() -> None:
+    """codex adversarial finding: HTTP 408 is a timeout, not a schema mismatch."""
+
+    result = fetch_position_cards(
+        base_url="https://example.supabase.co",
+        api_key=_fixture_api_key(),
+        http_get=_ok_get({"message": "request timeout"}, status=408),
+    )
+
+    assert result.state.status is MetricStatus.FAIL
+    assert result.state.reason is SourceFailureReason.SOURCE_TIMEOUT
     assert result.rows == ()
 
 
