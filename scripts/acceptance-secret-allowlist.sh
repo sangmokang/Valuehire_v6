@@ -19,7 +19,7 @@ cd "$REPO" || {
 
 VERIFY=$REPO/verify.sh
 PATTERNS=$REPO/.secret-patterns.default
-EXPECTED_CHECKS=24
+EXPECTED_CHECKS=26
 SNAP0=$(git status --porcelain)
 
 if [ ! -x /usr/bin/grep ] || [ ! -f "$VERIFY" ] || [ ! -s "$PATTERNS" ]; then
@@ -171,11 +171,12 @@ LAST_RC=0
 
 run_mode() {
   local desc="$1" repo="$2" mode="$3" want="$4" forbid_scanner_error="$5"
+  local allowlist_source="${6:-.secret-allowlist.yaml}"
   local out=$TMP/output.$checked rc=0 bad_reason=0
   (
     cd "$repo" || exit 2
     SECRET_PATTERNS_FILE=.secret-patterns.default \
-      SECRET_ALLOWLIST_FILE=.secret-allowlist.yaml \
+      SECRET_ALLOWLIST_FILE="$allowlist_source" \
       VERIFY_SCAN_SOURCE="$mode" bash verify.sh
   ) > "$out" 2>&1
   rc=$?
@@ -200,10 +201,10 @@ run_mode() {
 
 run_pair() {
   local desc="$1" repo="$2" want="$3" forbid_scanner_error="${4:-0}"
-  local worktree_rc index_rc
-  run_mode "$desc" "$repo" worktree "$want" "$forbid_scanner_error"
+  local allowlist_source="${5:-.secret-allowlist.yaml}" worktree_rc index_rc
+  run_mode "$desc" "$repo" worktree "$want" "$forbid_scanner_error" "$allowlist_source"
   worktree_rc=$LAST_RC
-  run_mode "$desc" "$repo" index "$want" "$forbid_scanner_error"
+  run_mode "$desc" "$repo" index "$want" "$forbid_scanner_error" "$allowlist_source"
   index_rc=$LAST_RC
   if [ "$worktree_rc" -ne "$index_rc" ]; then
     printf 'MODE_MISMATCH: %s worktree=%d index=%d\n' "$desc" "$worktree_rc" "$index_rc"
@@ -245,7 +246,10 @@ run_pair "허용 목록 문법 위반" "$CASE_REPO" 2
 make_self_target_repo || exit 2
 run_pair "허용 목록 자기 파일 target 거부" "$CASE_REPO" 2
 
-# 21~24: worktree가 링크를 따라가고 index가 링크 문자열을 읽던 기존 갈림을 함께 회귀 고정한다.
+# 21~22: 같은 허용 목록을 `./` 별칭으로 선택해도 자기 target 거부를 우회할 수 없다.
+run_pair "허용 목록 자기 파일 경로 별칭 거부" "$CASE_REPO" 2 0 './.secret-allowlist.yaml'
+
+# 23~26: worktree가 링크를 따라가고 index가 링크 문자열을 읽던 기존 갈림을 함께 회귀 고정한다.
 make_symlink_repo symlink-follow ../outside.txt "$CANARY" || exit 2
 run_pair "추적 심볼릭 링크의 바깥 내용은 비범위" "$CASE_REPO" 0 1
 
