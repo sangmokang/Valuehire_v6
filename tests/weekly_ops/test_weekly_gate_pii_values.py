@@ -209,6 +209,17 @@ class WeeklyGatePiiValueTest(unittest.TestCase):
             with self.subTest(value=value):
                 self.assert_action_value_blocked(value)
 
+    def test_codex_v2_round11_nanp_slashes_and_extensions_are_blocked(self):
+        for value in (
+            "후보자 전화: 415/555/2671",
+            "후보자 전화: (415)/555/2671",
+            "후보자 전화: 1/415/555/2671",
+            "후보자 전화: 4155552671x123",
+            "후보자 전화: 14155552671x123",
+        ):
+            with self.subTest(value=value):
+                self.assert_action_value_blocked(value)
+
     def test_business_delta_notation_is_not_an_intl_phone(self):
         bundle = valid_bundle()
         bundle["positions"][0]["action"] = "전주 대비 +1 234 567건 증가"
@@ -319,7 +330,13 @@ class WeeklyGateMainEndToEndTest(unittest.TestCase):
         self.assertNotIn("sangmokang@valueconnect.kr", output)
 
     def test_pii_action_never_reaches_stdout_in_any_format(self):
-        for phone in ("010/1234/5678", "14155552671", "1(415)5552671"):
+        for phone in (
+            "010/1234/5678",
+            "14155552671",
+            "1(415)5552671",
+            "415/555/2671",
+            "14155552671x123",
+        ):
             bundle = valid_bundle()
             bundle["positions"][0]["action"] = f"연락 {phone} 부탁"
             for fmt in ("json", "markdown", "html"):
