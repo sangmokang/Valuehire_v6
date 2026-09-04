@@ -7,8 +7,9 @@ Base SHA: 8bb31ed912869275b17579b8b2d8042f47098cea (unmerged task/secret-short-v
 기준 상태의 비밀 검사는 파일 하나에서 한 줄만 오탐이어도 파일 전체를 실패시켰고, 안전하게 한 줄만
 제외할 방법이 없었습니다. 현재 변경은 정확한 파일 경로와 정확한 줄 내용에 허용 횟수 한 번을 묶어
 이 문제를 해결합니다. 추가 감사에서 상위 폴더가 저장소 밖을 가리킬 때 두 검사 결과가 갈리던 문제와,
-검사를 안 하고 합격 문구만 출력해도 통과하던 문제까지 닫았습니다. 탐지 규칙은 늘리지 않았으며 형식
-구멍 자체를 닫았다고 판정하지 않습니다.
+P13 전용 인수 스크립트 하나를 검사 없이 합격 문구만 출력하도록 바꿔도 통과하던 문제까지 닫았습니다.
+다른 인수 스크립트의 출력 위조나 같은 권한자의 검사기·고정값 동시 변경까지 막았다는 뜻은 아닙니다.
+탐지 규칙은 늘리지 않았으며 형식 구멍 자체를 닫았다고 판정하지 않습니다.
 
 작업은 지정된 격리 작업공간과 브랜치에서만 수행하고 로컬 안전 커밋까지 보존합니다. 원격 전송,
 변경 요청 생성, 합치기는 하지 않습니다. 배포와 제품 데이터 변경이 없는 내부 보안 검사 작업이므로
@@ -1204,11 +1205,12 @@ P13_SUBSTRING_MUTATION: expected full row embedded behind a false reason,
 함께 바꾸는 동일 권한자 공모는 여전히 저장소 밖 보호 장치가 맡을 구조적 잔여이며, 이 보강이 그
 신뢰경계까지 해결했다고 주장하지 않습니다.
 
-같은 감사에서 A–D 외부 변이의 provenance도 최종 코드 blob에 다시 결속했습니다.
-`/tmp/secret-allowlist-final2-mutations.oT8yNG/manifest.txt`에는 실행 명령, source/mutant blob,
-diff·log SHA-256이 있고 A 정확 허용 실패 4건, B `UNEXPECTED_MISSED_COUNT=14`, C 만료 실패 2건,
-D `MODE_MISMATCH_COUNT=2`, 네 suite 모두 exit 1입니다. 이 산출물은 로컬 가변 로그이므로 원격 서명
-증거로 격상하지 않습니다.
+같은 감사에서 A–D 외부 변이의 provenance도 감사 대상 코드 SHA `876da7fdc7e9a889f693df7f4620ec37fbe11aad`에
+다시 결속했습니다. `/tmp/secret-allowlist-final3-mutations.EbMBUX/manifest.txt`에는 실행 명령,
+source/mutant blob, diff·log SHA-256이 있고 A 정확 허용 실패 4건,
+B `UNEXPECTED_MISSED_COUNT=14`, C 만료 실패 2건, D `MODE_MISMATCH_COUNT=2`, 네 suite 모두 exit 1입니다.
+이 문단을 고친 후 생기는 문서 전용 후속 커밋은 검사기와 표본 blob을 바꾸지 않습니다. 이 산출물은
+로컬 가변 로그이므로 원격 서명 증거로 격상하지 않습니다.
 
 ### 11. 제출 직전 사람 감사
 
