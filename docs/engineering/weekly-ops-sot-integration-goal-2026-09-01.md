@@ -1132,3 +1132,18 @@ checkpoint 근거가 아니다.
 - 보정 후 fresh GREEN: 단위 148 tests OK, sot_gate `CHECKED: 89` exit 0, acceptance
   `CHECKED: 65` exit 0(mutation 32종 생존 0), verify.sh PASS, clean.
 
+### 2026-09-04 fresh Codex V2 7차 결과와 보정
+
+- V2 7차 artifact: `.omx/artifacts/codex-v2-pii-3layer-round7-20260904.md`
+  (검토 대상 HEAD `15d04ed7a74044e50b20f472c5ea44332ea876a0`) — verdict `FAIL`.
+  4~6차 반례 11건 차단 재현 확인.
+- 채택·보정(R9 회귀 편입): 구조화 이름 JSON(`{"firstName":…,"lastName":…}` —
+  임베디드 키 토큰에 first/last/given/family/middle/sur/nick name·성 추가),
+  프로필 URL 정책을 호스트 열거에서 **승인 호스트 allowlist(fail-closed)**로 반전 —
+  http(s) URL은 승인 9개 호스트 밖이면 전부 차단(behance·gitlab 포함 미지 호스트 일괄).
+  스킴 없는 표기는 확장된 프로필 호스트 목록이 2차 방어.
+- 결정: 신규 정당 호스트는 `APPROVED_URL_HOSTS` 갱신이 필요(키 allowlist와 같은
+  의도된 마찰). 스킴 없는 미지 호스트 표기(`example.com/x`)는 잔여 위험으로 기록.
+- 보정 후 fresh GREEN: 단위 149 tests OK, sot_gate `CHECKED: 89` exit 0, acceptance
+  `CHECKED: 65` exit 0(mutation 32종 생존 0), verify.sh PASS, clean.
+
