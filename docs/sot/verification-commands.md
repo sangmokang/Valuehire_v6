@@ -44,7 +44,7 @@
 | 21 | 인수 검사 secret-allowlist | `bash scripts/verify/run-acceptance.sh scripts/acceptance-secret-allowlist.sh` — 줄 내용 지문 억제·worktree/index 동일성 (AC-ALLOWLIST-1) |
 | 22 | 인수 검사 verified-sha | `bash scripts/verify/run-acceptance.sh scripts/acceptance-verified-sha.sh` — 현재 SHA 귀속 진리표(P23) |
 | 23 | 인수 검사 ci-step-integrity | `bash scripts/verify/run-acceptance.sh scripts/acceptance-ci-step-integrity.sh` — 조건부·오류무시·echo 대체 차단 |
-| 24 | 인수 검사 semantic-mutations | `bash scripts/verify/run-acceptance.sh scripts/acceptance-semantic-mutations.sh` — 인수 검사 무력화 5종 전량 차단 |
+| 24 | 인수 검사 semantic-mutations | `bash scripts/verify/run-acceptance.sh scripts/acceptance-semantic-mutations.sh` — 인수 검사 무력화 5종과 P13 PASS 출력 단일 파일 위조 차단 |
 | 25 | 인수 검사 verify-ac-m | `bash scripts/verify/run-acceptance.sh scripts/acceptance-verify-ac-m.sh` — mechanism 명부 대조 (AC-M) |
 
 *(1번 앞에 `actions/checkout` 이 있고 `fetch-depth: 0` 이다 — 8번이 과거 blob 을 열려면 필요하다.)*

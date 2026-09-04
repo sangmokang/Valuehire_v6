@@ -12,9 +12,9 @@
 #
 # 막는 것 / 막지 못하는 것:
 #   막는다   — 본문 삭제, `exit 0`, `true`, `: # no-op`, 검사 함수 제거, 조용한 조기 종료
-#   막지 못함 — `echo "PASS: 검사했습니다"; exit 0` 같은 문구 위조. 그것은 P13 검사 약화
-#              탐지(hooks/pre-commit)와 acceptance-0-6 의 몫이다. 여기서 다 막는다고
-#              주장하지 않는다.
+#   막지 못함 — 일반 인수 검사의 `echo "PASS: 검사했습니다"; exit 0` 같은 문구 위조.
+#              다만 P13 훅 시연은 단일 파일 위조가 실제로 재현돼 검토된 blob을 별도로
+#              고정한다. 모든 임의 스크립트의 의미를 판별한다고 주장하지 않는다.
 set -uo pipefail
 
 target="${1:-}"
@@ -25,6 +25,20 @@ fi
 if [ ! -f "$target" ]; then
   echo "FAIL: 대상 인수 검사가 없다 — $target"
   exit 2
+fi
+
+# P13 훅 시연은 generic PASS 표식만으로 의미를 증명할 수 없다. workflow가 호출하는
+# 정확한 파일명은 검토된 blob에 결속해, 한 파일을 출력 전용 사본으로 바꾸는 우회를 닫는다.
+if [ "${target##*/}" = acceptance-0-7.sh ]; then
+  expected=$(printf '%s%s' '27fb3ec375340315dcf7' '7a4780c116941b3d15ff')
+  actual=$(git hash-object -- "$target" 2>/dev/null) || {
+    echo "FAIL(run-acceptance): $target 의 blob 지문을 계산하지 못했다."
+    exit 2
+  }
+  if [ "$actual" != "$expected" ]; then
+    echo "FAIL(run-acceptance): $target 이 검토된 P13 시연 blob과 다르다."
+    exit 1
+  fi
 fi
 
 out=$(mktemp) || {

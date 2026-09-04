@@ -1179,6 +1179,37 @@ SUITE_EXIT=0
 분리할 수 없고, 원격 보호 장치도 현재 비범위이므로 사람 V1/V2 검토와 이후 P13 약화 탐지 작업에
 남는 구조적 위험으로 공개합니다.
 
+### 10-17. 최종 V2의 P13 단일 파일 위조·부분 일치 반례
+
+최종 V2는 허용 목록 본체와 별개로 P13 증거 경로의 두 반례를 재현했습니다. 첫째,
+`acceptance-0-7.sh` 한 파일을 최종 PASS 한 줄만 출력하는 사본으로 바꾸면 일반
+`run-acceptance.sh`와 기존 semantic 검사가 모두 통과했습니다. 둘째, 기대 식별 문구 앞에 다른
+사유를 붙여도 `grep -qF` 부분 일치가 이를 정확 사유로 셌습니다. 이는 전 검사기 동시 공모가 아니라
+단일 파일·단일 출력 우회이므로 인스코프 결함으로 판정했습니다.
+
+출력 전용 위조를 `acceptance-semantic-mutations.sh`에 추가만 한 RED 커밋 `59c691f`에서는 기존
+15개 판정이 모두 PASS이고 새 P13 위조 한 건만 FAIL, `CHECKED: 16`, suite exit 1이었습니다. 이후
+일반 래퍼가 `acceptance-0-7.sh`라는 정확한 파일명을 검토된 blob에 결속하도록 하고, 여덟 기대값을
+각각 전체 `BLOCKED:` 행으로 바꿔 `/usr/bin/grep -xcF` 결과가 정확히 1일 때만 인정했습니다.
+
+```text
+SEMANTIC_GREEN: CHECKED=16, P13 output-only spoof blocked, exit 0
+P13_GREEN: blocked=8/8, hook-off controls=8/8, exact full reason rows=8/8,
+           normal pass pairs=2/2, exit 0
+P13_SUBSTRING_MUTATION: expected full row embedded behind a false reason,
+                        exact matches=0, suite exit 1
+```
+
+→ 해석: 한 파일 PASS 출력 위조와 기대 토큰 끼워 넣기는 이제 자동 RED입니다. blob 상수와 래퍼까지
+함께 바꾸는 동일 권한자 공모는 여전히 저장소 밖 보호 장치가 맡을 구조적 잔여이며, 이 보강이 그
+신뢰경계까지 해결했다고 주장하지 않습니다.
+
+같은 감사에서 A–D 외부 변이의 provenance도 최종 코드 blob에 다시 결속했습니다.
+`/tmp/secret-allowlist-final2-mutations.oT8yNG/manifest.txt`에는 실행 명령, source/mutant blob,
+diff·log SHA-256이 있고 A 정확 허용 실패 4건, B `UNEXPECTED_MISSED_COUNT=14`, C 만료 실패 2건,
+D `MODE_MISMATCH_COUNT=2`, 네 suite 모두 exit 1입니다. 이 산출물은 로컬 가변 로그이므로 원격 서명
+증거로 격상하지 않습니다.
+
 ### 11. 제출 직전 사람 감사
 
 | 질문 | 판정 | 근거 |

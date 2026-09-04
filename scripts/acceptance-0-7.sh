@@ -114,7 +114,7 @@ reset_tree() {
 demo() {
   local name="$1" setup="$2" action="$3" want="${4:-}"
   step=$((step + 1))
-  local sON sOFF aON aOFF
+  local sON sOFF aON aOFF reason_matches=0 reason_rc=0
   if [ -n "$want" ]; then
     reason_checked=$((reason_checked + 1))
   fi
@@ -135,22 +135,33 @@ demo() {
 
   reset_tree; git config core.hooksPath hooks
 
+  if [ "$aON" -ne 0 ] && [ "$aOFF" -eq 0 ] && [ -n "$want" ]; then
+    set +e
+    reason_matches=$(/usr/bin/grep -xcF -- "$want" "$outdir/act.on.$step")
+    reason_rc=$?
+    set -e
+    if [ "$reason_rc" -gt 1 ]; then
+      reason_matches=0
+    fi
+  fi
+
   if [ "$sON" -ne 0 ] || [ "$sOFF" -ne 0 ]; then
     printf '[%d/%d] %s → SETUP FAILED (on=%d off=%d) ← 위반을 만들지 못했다. 시연 무효\n' \
       "$step" "$TOTAL" "$name" "$sON" "$sOFF"
     sed 's/^/         /' "$outdir/setup.on.$step" | head -3
     fail=1
   elif [ "$aON" -ne 0 ] && [ "$aOFF" -eq 0 ] && [ -n "$want" ] \
-       && ! grep -qF "$want" "$outdir/act.on.$step"; then
-    printf '[%d/%d] %s → 사유 불일치 ← 차단은 됐지만 겨냥한 게이트가 아니다 (기대 사유: %s)\n' \
-      "$step" "$TOTAL" "$name" "$want"
+       && [ "$reason_matches" -ne 1 ]; then
+    printf '[%d/%d] %s → 사유 불일치 ← 정확한 차단 행이 1회가 아니다 (기대 횟수=1 실제=%d)\n' \
+      "$step" "$TOTAL" "$name" "$reason_matches"
+    printf '         기대: %s\n' "$want"
     awk '/BLOCKED/{print "         실제: " $0}' "$outdir/act.on.$step" | head -3
     fail=1
   elif [ "$aON" -ne 0 ] && [ "$aOFF" -eq 0 ]; then
     printf '[%d/%d] %s → BLOCKED (훅ON=%d · 훅OFF=%d) ✓ 훅이 원인\n' \
       "$step" "$TOTAL" "$name" "$aON" "$aOFF"
     if [ -n "$want" ]; then
-      awk -v w="$want" 'index($0,w){print "         " $0; exit}' "$outdir/act.on.$step"
+      awk -v w="$want" '$0 == w {print "         " $0; exit}' "$outdir/act.on.$step"
     else
       awk '/BLOCKED/{print "         " $0; exit}' "$outdir/act.on.$step"
     fi
@@ -206,7 +217,7 @@ demo "검사기 자기 제외" \
   'printf "\nkeep=\$(git ls-files | grep -v acceptance-0-6.sh)\n" >> scripts/acceptance-0-6.sh
    grep -q "grep -v acceptance-0-6.sh" scripts/acceptance-0-6.sh' \
   'git add scripts/acceptance-0-6.sh && git commit -m "weaken: self-exempt"' \
-  "검사기 자기 제외 — scripts/acceptance-0-6.sh"
+  "BLOCKED: 검사기 자기 제외 — scripts/acceptance-0-6.sh 가 자기 자신을 검사 대상에서 뺀다 (P13)"
 
 # 2. 검사를 skip / 실패 무시로 완화 (48143a7 · 129f61d 재현)
 #
@@ -218,14 +229,14 @@ demo "검사 약화(실패 무시)" \
    printf "\nbash verify.sh %s\n" "$w" >> scripts/acceptance-0-2.sh
    grep -qF "$w" scripts/acceptance-0-2.sh' \
   'git add scripts/acceptance-0-2.sh && git commit -m "weaken: swallow failure"' \
-  "검사 약화 패턴 추가 — scripts/acceptance-0-2.sh"
+  "BLOCKED: 검사 약화 패턴 추가 — scripts/acceptance-0-2.sh (P13). 정당하면 suppressions.yaml 에 expiry 와 함께 등록하라"
 
 # 3. 만료일 없는 억제 (98d923f — 35일 방치 재현)
 demo "만료일 없는 억제" \
   'printf -- "- check: hard_exclude_freelancer\n  reason: later\n  owner: someone\n" > suppressions.yaml
    test -s suppressions.yaml' \
   'git add suppressions.yaml && git commit -m "suppress: no expiry"' \
-  "suppressions.yaml 억제 항목 1건 중 expiry 가 0건뿐"
+  "BLOCKED: suppressions.yaml 억제 항목 1건 중 expiry 가 0건뿐 — 만료일 없는 억제는 영구화된다 (P13)"
 
 # 4. LLM 출력 숫자를 판정 필드에 기록 (v4 QA-094 재현)
 demo "LLM 출력→판정 필드" \
@@ -233,14 +244,14 @@ demo "LLM 출력→판정 필드" \
    printf "const r = await llm.chat(p);\nscore = parseFloat(r.text);\ndb.insert({ fit_score: score });\n" > src/scoring.js
    test -s src/scoring.js' \
   'git add src/scoring.js && git commit -m "feat: scoring"' \
-  "LLM 출력을 판정 수치로 변환 — src/scoring.js"
+  "BLOCKED: LLM 출력을 판정 수치로 변환 — src/scoring.js. 판정 수치는 순수 함수가 만든다 (P14)"
 
 # 5. 커밋 안 된 변경을 둔 채 push (78f3631 ② 재현)
 demo "미커밋 상태로 push" \
   'echo dirty > uncommitted.txt
    test -s uncommitted.txt' \
   'git push --dry-run sandbox HEAD:refs/heads/probe-0-7' \
-  "작업트리가 깨끗하지 않다"
+  "BLOCKED: 작업트리가 깨끗하지 않다 — 미커밋/미추적 변경이 있는 상태의 push (P15)"
 
 # 6. 외부 효과 코드에 네트워크 호출이 0건 (§0 E5 gptreview.js 재현)
 demo "가짜 외부효과 모듈" \
@@ -248,7 +259,7 @@ demo "가짜 외부효과 모듈" \
    printf "async function fetchProfile() {\n  console.log(\"fetching...\");\n  return { ok: true };\n}\n" > src/portal-login.js
    test -s src/portal-login.js' \
   'git add src/portal-login.js && git commit -m "feat: portal login"' \
-  "외부 효과를 표방하는데 네트워크 호출이 0건 — src/portal-login.js"
+  "BLOCKED: 외부 효과를 표방하는데 네트워크 호출이 0건 — src/portal-login.js. 시뮬레이션 의심 (P4)"
 
 # 7. 비밀 스캔 규칙 파일(.secret-patterns.default)을 약화 (2026-09-03 추가)
 #
@@ -265,7 +276,7 @@ demo "비밀 패턴 파일 약화" \
    printf "\n%s\n" "$w" >> .secret-patterns.default
    grep -qx "$w" .secret-patterns.default' \
   'git add .secret-patterns.default && git commit -m "weaken: secret patterns"' \
-  "검사 약화 패턴 추가 — .secret-patterns.default"
+  "BLOCKED: 검사 약화 패턴 추가 — .secret-patterns.default (P13). 정당하면 suppressions.yaml 에 expiry 와 함께 등록하라"
 
 # 7의 짝 — 같은 파일에 대한 **정상** 규칙 추가는 통과해야 한다.
 # 이 저장소 어디에도 없는 벤더 키 모양을 하나 더한다(2026-09-03 실측: 추적 파일 매치 0건).
@@ -281,7 +292,7 @@ demo "비밀 줄 허용 목록 약화" \
    printf "\n%s\n" "$w" >> .secret-allowlist.yaml
    /usr/bin/grep -qx "$w" .secret-allowlist.yaml' \
   'git add .secret-allowlist.yaml && git commit -m "weaken: secret allowlist"' \
-  "검사 약화 패턴 추가 — .secret-allowlist.yaml"
+  "BLOCKED: 검사 약화 패턴 추가 — .secret-allowlist.yaml (P13). 정당하면 suppressions.yaml 에 expiry 와 함께 등록하라"
 
 # 8의 짝 — 필수 필드를 갖춘 정확 경로·내용 지문 항목 추가는 훅 ON에서도 통과해야 한다.
 demo_allow "비밀 줄 허용 목록 정상 추가" \
