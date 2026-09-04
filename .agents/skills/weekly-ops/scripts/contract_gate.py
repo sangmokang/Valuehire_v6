@@ -36,10 +36,13 @@ DEDUPE_RULE_VERSION = "weekly-dedupe-v1"
 ZERO_RESULT_RULE_VERSION = "weekly-zero-result-v1"
 ZERO_RESULT_COLLECTIONS = {"positions", "position_state", "outreach_events", "pipeline_events", "pipeline_state"}
 ALLOWED_EMAIL_TARGETS = {"sangmokang@valueconnect.kr"}
-EMAIL_PATTERN = re.compile(r"(?<![\w.+-])[\w.+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?![\w.-])")
-QUOTED_EMAIL_PATTERN = re.compile(r'"[^"]{1,64}"@[\w.-]+\.[\w-]{2,}(?![\w.-])')
+EMAIL_PATTERN = re.compile(
+    r"(?<![\w.+-])[\w.+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?![\w-])(?!\.[\w-])"
+)
+QUOTED_EMAIL_PATTERN = re.compile(r'"[^"]{1,64}"@[\w.-]+\.[\w-]{2,}(?![\w-])(?!\.[\w-])')
 UNICODE_EMAIL_PATTERN = re.compile(
-    r"(?<![\w.+!#$%&'*/=?^`{|}~-])[\w.+!#$%&'*/=?^`{|}~-]{1,64}@[\w.-]+\.[\w-]{2,}(?![\w.-])"
+    r"(?<![\w.+!#$%&'*/=?^`{|}~-])[\w.+!#$%&'*/=?^`{|}~-]{1,64}"
+    r"@[\w.-]+\.[\w-]{2,}(?![\w-])(?!\.[\w-])"
 )
 DOMAIN_LITERAL_EMAIL_PATTERN = re.compile(
     r"""["']?[\w.+! -]{1,64}["']?@\[(?:IPv6:)?[0-9A-Za-z:.]{2,45}\]"""
@@ -77,7 +80,7 @@ def _unapproved_url_hit(text: str) -> bool:
             return True
     return False
 INTL_PHONE_PATTERN = re.compile(
-    r"(?<![\w+])\+[1-9]\d{0,2}"
+    r"(?<![\w+])(?:\(?\+[1-9]\d{0,2}\)?|(?<!\d)00[- .]?[1-9]\d{0,2})"
     r"(?:(?:[- ./]?\(?\d{2,4}\)?){3}"
     r"|(?:[- .]\(?\d{1,2}\)?)(?:[- .]\(?\d{3,4}\)?){2}"
     r"|(?:[- .]\(?\d{1,4}\)?){4,6})(?!\d)"
@@ -88,7 +91,8 @@ EMBEDDED_KEY_TOKENS = frozenset({
     "candidatename", "candidatedisplayname", "candidatefullname", "candidateemail",
     "applicantname", "applicantdisplayname", "applicantfullname",
     "firstname", "lastname", "givenname", "familyname", "middlename",
-    "surname", "nickname",
+    "surname", "nickname", "contact", "contactname", "contactinfo",
+    "telephone", "tel", "휴대전화",
     "이름", "성", "성명", "연락처", "전화번호", "휴대폰", "주소", "생년월일", "이메일",
 })
 
