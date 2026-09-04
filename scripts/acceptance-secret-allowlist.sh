@@ -19,7 +19,7 @@ cd "$REPO" || {
 
 VERIFY=$REPO/verify.sh
 PATTERNS=$REPO/.secret-patterns.default
-EXPECTED_CHECKS=26
+EXPECTED_CHECKS=28
 SNAP0=$(git status --porcelain)
 
 if [ ! -x /usr/bin/grep ] || [ ! -f "$VERIFY" ] || [ ! -s "$PATTERNS" ]; then
@@ -163,6 +163,26 @@ make_self_target_repo() {
   )
 }
 
+make_allowlist_source_symlink_repo() {
+  local outside=$TMP/allowlist-policy.external
+  CASE_REPO=$TMP/allowlist-source-symlink
+  mkdir -p "$CASE_REPO"
+  git init -q "$CASE_REPO"
+  cp "$VERIFY" "$CASE_REPO/verify.sh"
+  cp "$PATTERNS" "$CASE_REPO/.secret-patterns.default"
+  printf '%s' "$CANARY" > "$CASE_REPO/payload.txt"
+  write_allowlist "$CASE_REPO" payload.txt "$(hash_line "$CANARY")" valid || return 2
+  (
+    cd "$CASE_REPO" || exit 2
+    git config user.email acceptance@local
+    git config user.name acceptance
+    git add -A
+    git commit -qm fixture
+  )
+  mv "$CASE_REPO/.secret-allowlist.yaml" "$outside"
+  ln -s "$outside" "$CASE_REPO/.secret-allowlist.yaml"
+}
+
 checked=0
 fail=0
 unexpected_missed=0
@@ -249,7 +269,16 @@ run_pair "허용 목록 자기 파일 target 거부" "$CASE_REPO" 2
 # 21~22: 같은 허용 목록을 `./` 별칭으로 선택해도 자기 target 거부를 우회할 수 없다.
 run_pair "허용 목록 자기 파일 경로 별칭 거부" "$CASE_REPO" 2 0 './.secret-allowlist.yaml'
 
-# 23~26: worktree가 링크를 따라가고 index가 링크 문자열을 읽던 기존 갈림을 함께 회귀 고정한다.
+# 23~24: 각 스캔 소스의 허용 목록 자체가 심볼릭 링크이면 저장소 밖 정책을 읽지 않고 닫혀야 한다.
+make_allowlist_source_symlink_repo || exit 2
+run_mode "worktree 허용 목록 외부 심볼릭 링크 거부" "$CASE_REPO" worktree 2 0
+(
+  cd "$CASE_REPO" || exit 2
+  git add .secret-allowlist.yaml
+) || exit 2
+run_mode "index 허용 목록 심볼릭 링크 거부" "$CASE_REPO" index 2 0
+
+# 25~28: worktree가 링크를 따라가고 index가 링크 문자열을 읽던 기존 갈림을 함께 회귀 고정한다.
 make_symlink_repo symlink-follow ../outside.txt "$CANARY" || exit 2
 run_pair "추적 심볼릭 링크의 바깥 내용은 비범위" "$CASE_REPO" 0 1
 
