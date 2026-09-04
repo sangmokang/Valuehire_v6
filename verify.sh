@@ -90,7 +90,7 @@ case "$allowlist_mode" in
 esac
 
 worktree_path_has_no_symlink() {
-  local remaining="$1" current= component
+  local remaining="$1" current="" component
   while [ -n "$remaining" ]; do
     case "$remaining" in
       */*) component=${remaining%%/*}; remaining=${remaining#*/} ;;
