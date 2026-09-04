@@ -110,6 +110,17 @@ class WeeklyGatePiiValueTest(unittest.TestCase):
             with self.subTest(value=value):
                 self.assert_action_value_blocked(value)
 
+    def test_codex_v2_round3_false_negative_formats_are_blocked(self):
+        # 2026-09-04 fresh Codex V2 3차 FAIL 반례의 영구 회귀 (R9)
+        for value in (
+            '"홍 길동"@예시.한국',
+            "user@example.xn--3e0b707e",
+            "(02) 123 - 4567",
+            "010-1234-5678x123",
+        ):
+            with self.subTest(value=value):
+                self.assert_action_value_blocked(value)
+
     def test_business_delta_notation_is_not_an_intl_phone(self):
         bundle = valid_bundle()
         bundle["positions"][0]["action"] = "전주 대비 +1 234 567건 증가"
@@ -209,6 +220,15 @@ class WeeklyGateMainEndToEndTest(unittest.TestCase):
         )
         self.assertEqual(code, 1)
         self.assertNotIn("evil.com", output)
+
+    def test_allowlist_email_injected_into_html_is_still_blocked(self):
+        # V2 3차 반례: allowlist 이메일의 정당한 자리는 JSON target_id뿐 —
+        # 렌더링된 HTML에 등장하면 마스킹 없이 차단돼야 한다
+        code, output = self.run_main_with_html_injection(
+            "<p>sangmokang@valueconnect.kr</p>"
+        )
+        self.assertEqual(code, 1)
+        self.assertNotIn("sangmokang@valueconnect.kr", output)
 
     def test_pii_action_never_reaches_stdout_in_any_format(self):
         bundle = valid_bundle()
