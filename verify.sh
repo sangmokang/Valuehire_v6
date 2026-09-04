@@ -102,7 +102,7 @@ worktree_path_has_no_symlink() {
 }
 
 if [ "$SCAN_SOURCE" = index ]; then
-  if ! git show ":$ALLOWLIST_SOURCE" > "$ALLOWLIST_RAW" 2>/dev/null; then
+  if ! git show ":./$ALLOWLIST_SOURCE" > "$ALLOWLIST_RAW" 2>/dev/null; then
     echo "FAIL: secret allowlist missing/unreadable in index: $ALLOWLIST_SOURCE (exit 2)"
     exit 2
   fi
@@ -227,7 +227,7 @@ consume_allowance() {
 write_tracked_content() {
   local path="$1"
   if [ "$SCAN_SOURCE" = index ]; then
-    git show ":$path"
+    git show ":./$path"
   elif [ -L "$path" ]; then
     readlink -n "./$path"
   elif [ -f "$path" ]; then
