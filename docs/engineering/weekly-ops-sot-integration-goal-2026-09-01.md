@@ -973,7 +973,7 @@ checkpoint 근거가 아니다.
 | operating_snapshot | 기존 `operating_gate` 정확 키 집합과 동일(source_snapshot_id, meeting_date, generated_at, timezone, provenance, count_semantics, closed_week{10}, current{4, funnel 6}, targets{9}) |
 | **그 외 전부** | **FORBIDDEN_UNKNOWN_FIELD 명시적 거부(fail-closed catch-all)** |
 
-스칼라 자리(허용 키의 값)에 dict/list가 오는 것도 미지 구조로 거부한다. 필수 여부·타입
+→ 해석: 스칼라 자리(허용 키의 값)에 dict/list가 오는 것도 미지 구조로 거부한다. 필수 여부·타입
 검증은 기존 validator가 담당하고, 이 표는 "허용되지 않은 키·구조의 존재"만 차단한다.
 
 ### 결정 목록 (WU-1·2·3, 결정성 규율 ②)
