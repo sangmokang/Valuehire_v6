@@ -17,16 +17,11 @@ cd "$REPO" || {
   exit 2
 }
 CANONICAL=.agents/skills/weekly-ops
-GATE=$CANONICAL/scripts/weekly_gate.py
-ACTIVITY=$CANONICAL/scripts/activity_gate.py
-CONTRACT_GATE=$CANONICAL/scripts/contract_gate.py
-RENDERER=$CANONICAL/scripts/brief_renderer.py
-OPERATING=$CANONICAL/scripts/operating_gate.py
-TESTS=tests/weekly_ops
-CONTRACT=contracts/weekly-ops/runtime-contract-v1.json
-GOLDEN_CONTRACT=contracts/weekly-ops/notion-golden-sample-v1.json
-DB_CONTRACT=contracts/weekly-ops/db-contract-v1.sql
-GOLDEN_SPEC=$CANONICAL/references/notion-golden-sample.md
+GATE=$CANONICAL/scripts/weekly_gate.py; ACTIVITY=$CANONICAL/scripts/activity_gate.py
+CONTRACT_GATE=$CANONICAL/scripts/contract_gate.py; RENDERER=$CANONICAL/scripts/brief_renderer.py
+OPERATING=$CANONICAL/scripts/operating_gate.py; TESTS=tests/weekly_ops
+CONTRACT=contracts/weekly-ops/runtime-contract-v1.json; GOLDEN_CONTRACT=contracts/weekly-ops/notion-golden-sample-v1.json
+DB_CONTRACT=contracts/weekly-ops/db-contract-v1.sql; GOLDEN_SPEC=$CANONICAL/references/notion-golden-sample.md
 checked=0
 fail=0
 pass_check() {
@@ -41,7 +36,7 @@ fail_check() {
 for required in \
   "$CANONICAL/SKILL.md" "$GATE" "$ACTIVITY" "$CONTRACT_GATE" "$RENDERER" "$OPERATING" \
   "$TESTS/fixtures.py" "$TESTS/test_weekly_gate.py" \
-  "$TESTS/test_weekly_gate_adversarial.py" "$TESTS/test_weekly_sot_contract.py" "$TESTS/test_weekly_db_lineage_contract.py" \
+  "$TESTS/test_weekly_gate_adversarial.py" "$TESTS/test_weekly_sot_contract.py" "$TESTS/test_weekly_db_lineage_contract.py" "$TESTS/test_weekly_code_budget.py" \
   "$CANONICAL/scripts/sot_gate.py" "$CANONICAL/scripts/schema_gate.py" "$CANONICAL/references/data-contract.md" "$CANONICAL/references/adversarial-review.md" docs/sot/weekly-ops-contract.md "$CONTRACT" contracts/weekly-ops/db-contract-v1.sql; do
   if [ -f "$required" ] && [ -s "$required" ] && [ ! -L "$required" ] && git ls-files --error-unmatch "$required" >/dev/null 2>&1; then
     pass_check "required file $required"
@@ -57,13 +52,11 @@ for required in "$GOLDEN_CONTRACT" "$GOLDEN_SPEC"; do
     fail_check "required Golden Sample file invalid $required"
   fi
 done
-
 if [ -f "$CANONICAL/SKILL.md" ] && [ ! -L "$CANONICAL/SKILL.md" ]; then
   pass_check "engine-neutral canonical skill is present under .agents/skills"
 else
   fail_check "engine-neutral canonical skill is not a regular file"
 fi
-
 CODEX_ADAPTER=.codex/skills/weekly-ops/SKILL.md
 CODEX_UI=.codex/skills/weekly-ops/agents/openai.yaml
 CANONICAL_UI=$CANONICAL/agents/openai.yaml
@@ -78,7 +71,6 @@ if [ -f "$CODEX_ADAPTER" ] && [ ! -L "$CODEX_ADAPTER" ] && \
 else
   fail_check "Codex project adapter is missing, drifting, or contains copied assets"
 fi
-
 CLAUDE_ADAPTER=.claude/skills/weekly-ops/SKILL.md
 if [ -f "$CLAUDE_ADAPTER" ] && [ ! -L "$CLAUDE_ADAPTER" ] && \
    grep -q '`\.agents/skills/weekly-ops/SKILL.md`' "$CLAUDE_ADAPTER" && \
@@ -87,7 +79,6 @@ if [ -f "$CLAUDE_ADAPTER" ] && [ ! -L "$CLAUDE_ADAPTER" ] && \
 else
   fail_check "Claude adapter is missing, drifting, or contains copied assets"
 fi
-
 frontmatter=$(sed -n '1,/^---$/p' "$CANONICAL/SKILL.md" 2>/dev/null)
 if printf '%s\n' "$frontmatter" | grep -q '^name: weekly-ops$' && \
    printf '%s\n' "$frontmatter" | grep -q '^description: .[^[:space:]]'; then
@@ -95,24 +86,20 @@ if printf '%s\n' "$frontmatter" | grep -q '^name: weekly-ops$' && \
 else
   fail_check "skill frontmatter invalid"
 fi
-
 if python3 -m json.tool "$CONTRACT" >/dev/null 2>&1; then
   pass_check "runtime contract parses as JSON"
 else
   fail_check "runtime contract JSON invalid"
 fi
-
 if python3 -m json.tool "$GOLDEN_CONTRACT" >/dev/null 2>&1; then
   pass_check "Notion Golden Sample contract parses as JSON"
 else
   fail_check "Notion Golden Sample contract JSON invalid"
 fi
-
 if python3 - "$GOLDEN_CONTRACT" "$GOLDEN_SPEC" contracts/weekly-ops/db-contract-v1.sql <<'PY'
 import json
 from pathlib import Path
 import sys
-
 contract = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
 spec = Path(sys.argv[2]).read_text(encoding="utf-8")
 db = Path(sys.argv[3]).read_text(encoding="utf-8")
@@ -155,13 +142,11 @@ then
 else
   fail_check "Notion Golden Sample contract drifted"
 fi
-
 if python3 - "$CONTRACT" "$CANONICAL/SKILL.md" "$CANONICAL/references/prompt-contract.md" "$GATE" <<'PY'
 import importlib.util
 import json
 from pathlib import Path
 import sys
-
 contract = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
 skill = Path(sys.argv[2]).read_text(encoding="utf-8")
 prompt = Path(sys.argv[3]).read_text(encoding="utf-8")
@@ -257,26 +242,19 @@ then
 else
   fail_check "outreach browser readback contract drifted"
 fi
-
 if python3 -m py_compile "$CANONICAL"/scripts/*.py "$TESTS"/*.py; then
   pass_check "weekly gates compile"
 else
   fail_check "weekly gates do not compile"
 fi
-
 if python3 - "$CANONICAL/scripts" "$TESTS" <<'PY'
 import ast
 from pathlib import Path
 import sys
-
 FILE_HARD_LIMIT = 600
 FUNCTION_HARD_LIMIT = 100
-
-
 def file_within_budget(text):
     return len(text.splitlines()) <= FILE_HARD_LIMIT
-
-
 assert file_within_budget("line\n" * 600) is True
 assert file_within_budget("line\n" * 601) is False
 paths = sorted(
@@ -300,7 +278,6 @@ then
 else
   fail_check "weekly code or hard-limit boundary contract failed"
 fi
-
 unit_output=$(mktemp) || {
   printf 'NOT_RUN: unit output tempfile unavailable\nCHECKED: %s\n' "$checked"
   exit 2
@@ -321,7 +298,6 @@ cleanup() {
   fi
 }
 trap cleanup EXIT
-
 if python3 -m unittest discover -s "$TESTS" -v >"$unit_output" 2>&1 && \
    grep -qE '^Ran ([1-9][0-9]*) tests' "$unit_output" && grep -q '^OK$' "$unit_output"; then
   pass_check "weekly unit contracts execute and pass"
@@ -329,7 +305,6 @@ else
   fail_check "weekly unit contracts failed or collected zero tests"
   sed -n '1,160p' "$unit_output"
 fi
-
 MUTATION_BASE="$TEMP_ROOT/baseline"
 baseline_output="$TEMP_ROOT/baseline.out"
 mkdir -p "$MUTATION_BASE/.agents/skills" "$MUTATION_BASE/tests" "$MUTATION_BASE/docs/sot" "$MUTATION_BASE/contracts/weekly-ops" "$MUTATION_BASE/.github/workflows" "$MUTATION_BASE/scripts"
@@ -538,7 +513,6 @@ if mutate_exact "$case_dir/.agents/skills/weekly-ops/scripts/brief_renderer.py" 
 else
   fail_check "publication warning mutation was not applied exactly once"
 fi
-
 case_dir=$(prepare_mutation operating-snapshot-omission)
 if mutate_exact "$case_dir/.agents/skills/weekly-ops/scripts/weekly_gate.py" \
   'require_snapshot=capability_passed(bundle.get("capabilities"), "db_read"),' \
@@ -547,7 +521,6 @@ if mutate_exact "$case_dir/.agents/skills/weekly-ops/scripts/weekly_gate.py" \
 else
   fail_check "operating snapshot omission mutation was not applied exactly once"
 fi
-
 case_dir=$(prepare_mutation operating-window-bypass)
 if mutate_exact "$case_dir/.agents/skills/weekly-ops/scripts/operating_gate.py" \
   'and week_start == run["window_start"].date()' 'and True'; then
@@ -555,7 +528,6 @@ if mutate_exact "$case_dir/.agents/skills/weekly-ops/scripts/operating_gate.py" 
 else
   fail_check "operating window mutation was not applied exactly once"
 fi
-
 case_dir=$(prepare_mutation weekly-run-window-bypass)
 if mutate_exact "$case_dir/.agents/skills/weekly-ops/scripts/weekly_gate.py" \
   'if not window_is_week or not (' 'if False and not ('; then
@@ -587,7 +559,6 @@ if mutate_exact "$case_dir/.agents/skills/weekly-ops/scripts/operating_gate.py" 
 else
   fail_check "operating funnel key-set mutation was not applied exactly once"
 fi
-
 case_dir=$(prepare_mutation weekly-sot-fail-open)
 if mutate_exact "$case_dir/.agents/skills/weekly-ops/scripts/sot_gate.py" \
   'return sorted(set(errors + audit_bundle(files)))' 'return []'; then
