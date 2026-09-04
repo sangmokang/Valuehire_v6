@@ -54,7 +54,7 @@ PHONE_PATTERN = re.compile(
     r"(?:\s?(?:[xX#]|ext\.?|내선)\s?\d{1,5})?(?![A-Za-z0-9])"
 )
 NANP_PHONE_PATTERN = re.compile(
-    r"(?<![A-Za-z0-9])(?:\([2-9]\d{2}\)[-. ]?|[2-9]\d{2}[-. ]?)"
+    r"(?<![A-Za-z0-9])(?:1[-. ]?)?(?:\([2-9]\d{2}\)[-. ]?|[2-9]\d{2}[-. ]?)"
     r"[2-9]\d{2}[-. ]?\d{4}(?![A-Za-z0-9])"
 )
 RRN_PATTERN = re.compile(
