@@ -37,11 +37,13 @@ ZERO_RESULT_RULE_VERSION = "weekly-zero-result-v1"
 ZERO_RESULT_COLLECTIONS = {"positions", "position_state", "outreach_events", "pipeline_events", "pipeline_state"}
 ALLOWED_EMAIL_TARGETS = {"sangmokang@valueconnect.kr"}
 EMAIL_PATTERN = re.compile(r"(?<![\w.+-])[\w.+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?![\w.-])")
-QUOTED_EMAIL_PATTERN = re.compile(r'"[^"@]{1,64}"@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?![\w.-])')
-UNICODE_EMAIL_PATTERN = re.compile(r"(?<![\w.+-])[\w.+-]+@[\w.-]+\.\w{2,}(?![\w.-])")
+QUOTED_EMAIL_PATTERN = re.compile(r'"[^"@]{1,64}"@[\w.-]+\.[\w-]{2,}(?![\w.-])')
+UNICODE_EMAIL_PATTERN = re.compile(r"(?<![\w.+-])[\w.+-]+@[\w.-]+\.[\w-]{2,}(?![\w.-])")
 PHONE_PATTERN = re.compile(
-    r"(?<![A-Za-z0-9])(?:(?:\+?82[- ./]?)?\(?0?1[016789]\)?[- ./]?\d{3,4}[- ./]?\d{4}|"
-    r"\(?0\d{1,2}\)?[- ./]?\d{3,4}[- ./]?\d{4})(?![A-Za-z0-9])"
+    r"(?<![A-Za-z0-9])"
+    r"(?:(?:\+?82\s?[-./]?\s?)?\(?0?1[016789]\)?\s?[-./]?\s?\d{3,4}\s?[-./]?\s?\d{4}|"
+    r"\(?0\d{1,2}\)?\s?[-./]?\s?\d{3,4}\s?[-./]?\s?\d{4})"
+    r"(?:\s?(?:[xX#]|ext\.?|내선)\s?\d{1,5})?(?![A-Za-z0-9])"
 )
 RRN_PATTERN = re.compile(
     r"(?<!\d)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\s?[-./]?\s?[1-8]\d{6}(?!\d)"
