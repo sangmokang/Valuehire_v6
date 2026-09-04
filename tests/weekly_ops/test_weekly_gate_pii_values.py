@@ -193,8 +193,10 @@ class WeeklyGatePiiValueTest(unittest.TestCase):
         # 국가번호 없는 NANP(북미) 국내 전화번호 형식
         for value in (
             "후보자 전화: (415) 555-2671",
+            "후보자 전화: (415)555-2671",
             "후보자 전화: 415-555-2671",
             "후보자 전화: 415.555.2671",
+            "후보자 전화: 4155552671",
         ):
             with self.subTest(value=value):
                 self.assert_action_value_blocked(value)
