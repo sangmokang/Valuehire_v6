@@ -165,6 +165,18 @@ class WeeklyGatePiiValueTest(unittest.TestCase):
             with self.subTest(value=value):
                 self.assert_action_value_blocked(value)
 
+    def test_codex_v2_round7_false_negative_formats_are_blocked(self):
+        # 2026-09-04 fresh Codex V2 7차 FAIL 반례의 영구 회귀 (R9)
+        # + URL 정책을 승인 호스트 allowlist(fail-closed)로 반전
+        for value in (
+            '후보 데이터: {"firstName":"John","lastName":"Doe"}',
+            "https://www.behance.net/synthetic-designer",
+            "https://gitlab.com/synthetic-person",
+            "https://unknown-portfolio.example/synthetic-person",
+        ):
+            with self.subTest(value=value):
+                self.assert_action_value_blocked(value)
+
     def test_business_delta_notation_is_not_an_intl_phone(self):
         bundle = valid_bundle()
         bundle["positions"][0]["action"] = "전주 대비 +1 234 567건 증가"
