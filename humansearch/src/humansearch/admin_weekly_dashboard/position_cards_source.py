@@ -120,6 +120,8 @@ def fetch_position_cards(
 
     if status_code == 401 or status_code == 403:
         return _fail(SourceFailureReason.PERMISSION_DENIED)
+    if 500 <= status_code <= 599:
+        return _fail(SourceFailureReason.SOURCE_UNAVAILABLE)
     if status_code != 200:
         return _fail(SourceFailureReason.CONTRACT_MISMATCH)
 

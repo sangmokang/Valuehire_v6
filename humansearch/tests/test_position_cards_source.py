@@ -136,6 +136,20 @@ def test_fetch_position_cards_http_error_status_is_fail() -> None:
     assert result.rows == ()
 
 
+def test_fetch_position_cards_5xx_is_source_unavailable() -> None:
+    """A 5xx is the server's fault, not a select_fields/schema problem — codeaudit finding."""
+
+    result = fetch_position_cards(
+        base_url="https://example.supabase.co",
+        api_key=_fixture_api_key(),
+        http_get=_ok_get({"message": "internal error"}, status=503),
+    )
+
+    assert result.state.status is MetricStatus.FAIL
+    assert result.state.reason is SourceFailureReason.SOURCE_UNAVAILABLE
+    assert result.rows == ()
+
+
 def test_fetch_position_cards_non_list_payload_is_fail() -> None:
     result = fetch_position_cards(
         base_url="https://example.supabase.co",
