@@ -92,7 +92,7 @@ base64·하이픈 키·docker-compose 시퀀스 형식이 탐지되지 않으며
 bash scripts/verify/run-acceptance.sh scripts/acceptance-secret-allowlist.sh
 ```
 
-기대 출력은 `CHECKED: 22`, 합성 표본의 `ALLOWED_LINES_COUNT=1`, `UNEXPECTED_MISSED_COUNT=0`, 마지막 `PASS:`
+최초 RED 기대 출력은 `CHECKED: 22`, 합성 표본의 `ALLOWED_LINES_COUNT=1`, `UNEXPECTED_MISSED_COUNT=0`, 마지막 `PASS:`
 한 줄과 종료값 0입니다. RED 커밋에서는 같은 명령이 문법 오류가 아니라 허용 목록 미지원과 두 모드
 심볼릭 링크 판정 차이 때문에 종료값 1이어야 합니다.
 
@@ -102,6 +102,7 @@ bash scripts/verify/run-acceptance.sh scripts/acceptance-secret-allowlist.sh
 - 줄번호를 저장해 한 줄 위에 무해한 내용을 넣었을 때 4번이 실패하는 경우
 - 같은 경로·내용의 허용 항목 하나가 무제한 매치를 숨겨 2번이 통과하는 경우
 - 허용 원문을 목록에 저장해 허용 목록 자신을 검사 대상에서 빼는 경우
+- 허용 목록의 `reason` 줄에 탐지값을 넣고 자기 파일의 그 줄 지문으로 스스로 억제하는 경우
 - 허용 목록 파싱 실패, 항목 0개, 필수 필드 누락, 잘못된 날짜, 만료를 값 없음처럼 통과시키는 경우
 - 작업공간과 커밋 직전 모드가 서로 다른 허용 판정 함수를 쓰는 경우
 - 작업공간 모드가 추적 심볼릭 링크를 따라 저장되지 않는 바깥 내용을 검사하는 경우
@@ -359,6 +360,37 @@ EXIT_CODE=0
 잘못된 억제는 exit 2로 닫혔고 모드 불일치는 0이었습니다.
 → 좋은 소식인가 나쁜 소식인가: AC-ALLOWLIST-1의 핵심인 파일 전체 면제 금지와 모드 동일성을
 실행으로 만족했으므로 좋은 소식입니다.
+
+#### 10-2a. 독립 검토 반례 추가 RED — 허용 목록 자기 억제
+
+독립 구조 검토가 `0e98de3`에서 허용 목록이 자기 파일의 탐지 줄을 자기 지문으로 소비할 수 있는
+반례를 재현했습니다. 기존 22개 기대값·표본은 한 줄도 바꾸지 않고, 런타임 조립 탐지값을
+`reason`에 둔 자기 target 거부 시험만 두 모드에 추가했습니다. 따라서 `EXPECTED_CHECKS`는
+22에서 24로 늘었으며 이는 추가만·기준 안 낮춤입니다.
+
+시각 `2026-09-05T00:49:46+09:00`부터 `00:49:51+09:00`, HEAD `0e98de3`의 구현에 추가 시험을
+실행한 결과입니다.
+
+```text
+[19/24] 허용 목록 자기 파일 target 거부 (worktree) -> FAIL (expected=2 actual=0 scanner_error=0)
+       ALLOWED_LINES_COUNT=1
+       ALLOWED_MATCHES_CONSUMED=1
+[20/24] 허용 목록 자기 파일 target 거부 (index) -> FAIL (expected=2 actual=0 scanner_error=0)
+       ALLOWED_LINES_COUNT=1
+       ALLOWED_MATCHES_CONSUMED=1
+MODE_MISMATCH_COUNT=0
+UNEXPECTED_MISSED_COUNT=0
+CHECKED: 24
+FAIL: AC-ALLOWLIST-1을 만족하지 못했다
+ADVERSARIAL_RED_EXIT=1
+```
+
+→ 무엇을 시켰나: 목록 자신을 target으로 삼아 목록 안의 탐지 줄을 소비하려는 반례를 양 모드에
+추가했습니다.
+→ 뭐가 나왔나: 두 모드 모두 자기 매치 한 건을 소비해 exit 0으로 통과했고, 시험 전체는 기대 exit 2와
+달라 RED가 됐습니다.
+→ 좋은 소식인가 나쁜 소식인가: 구현에는 자기제외 구멍이 있어 나쁜 소식이지만, 독립 검토가 이를
+커밋 전에 재현 가능한 RED로 고정한 것은 좋은 소식입니다.
 
 #### 10-3. 실제 항목·규칙 비변경·현재 오탐 실측
 

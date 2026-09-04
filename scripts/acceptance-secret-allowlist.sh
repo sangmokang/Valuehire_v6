@@ -19,7 +19,7 @@ cd "$REPO" || {
 
 VERIFY=$REPO/verify.sh
 PATTERNS=$REPO/.secret-patterns.default
-EXPECTED_CHECKS=22
+EXPECTED_CHECKS=24
 SNAP0=$(git status --porcelain)
 
 if [ ! -x /usr/bin/grep ] || [ ! -f "$VERIFY" ] || [ ! -s "$PATTERNS" ]; then
@@ -52,6 +52,7 @@ VALUE=$(printf '%s%s' 'abc1' '23xy')
 CANARY=$(printf '%s=%s' "$KEY" "$VALUE")
 MUTATED=$(printf '%sz' "${CANARY%?}")
 SAFE=$(printf '%s%s' 'ordinary-' 'configuration')
+SELF_MATCH=$(printf '%s%s' 'AKIA' '0123456789ABCDEF')
 
 # 어떤 MISSED도 허용 증거로 세기 전에 현재 패턴이 양성 대조군을 실제로 잡는지 확인한다.
 if ! printf '%s\n' "$CANARY" | /usr/bin/grep -qEif "$CLEAN"; then
@@ -129,6 +130,30 @@ make_symlink_repo() {
   printf '%s\n' "$outside_content" > "$TMP/$name/outside.txt"
   ln -s "$link_target" "$CASE_REPO/link.txt"
   write_allowlist "$CASE_REPO" link.txt "$(hash_line "$SAFE")" valid || return 2
+  (
+    cd "$CASE_REPO" || exit 2
+    git config user.email acceptance@local
+    git config user.name acceptance
+    git add -A
+    git commit -qm fixture
+  )
+}
+
+make_self_target_repo() {
+  local reason_line hash
+  CASE_REPO=$TMP/self-target
+  mkdir -p "$CASE_REPO"
+  git init -q "$CASE_REPO"
+  cp "$VERIFY" "$CASE_REPO/verify.sh"
+  cp "$PATTERNS" "$CASE_REPO/.secret-patterns.default"
+  reason_line=$(printf '  reason: "%s"' "$SELF_MATCH")
+  hash=$(hash_line "$reason_line")
+  printf '%s\n' \
+    '- path: ".secret-allowlist.yaml"' \
+    '  line_hash: "'"$hash"'"' \
+    "$reason_line" \
+    '  owner: "acceptance"' \
+    '  expiry: "2099-12-31"' > "$CASE_REPO/.secret-allowlist.yaml"
   (
     cd "$CASE_REPO" || exit 2
     git config user.email acceptance@local
@@ -216,7 +241,11 @@ run_pair "허용 목록 파일 없음" "$CASE_REPO" 2
 make_regular_repo syntax "$CANARY" "$(hash_line "$CANARY")" syntax || exit 2
 run_pair "허용 목록 문법 위반" "$CASE_REPO" 2
 
-# 19~22: worktree가 링크를 따라가고 index가 링크 문자열을 읽던 기존 갈림을 함께 회귀 고정한다.
+# 19~20: 허용 목록이 자기 파일의 매치 줄을 지문으로 숨기는 자기제외 경로를 거부한다.
+make_self_target_repo || exit 2
+run_pair "허용 목록 자기 파일 target 거부" "$CASE_REPO" 2
+
+# 21~24: worktree가 링크를 따라가고 index가 링크 문자열을 읽던 기존 갈림을 함께 회귀 고정한다.
 make_symlink_repo symlink-follow ../outside.txt "$CANARY" || exit 2
 run_pair "추적 심볼릭 링크의 바깥 내용은 비범위" "$CASE_REPO" 0 1
 
