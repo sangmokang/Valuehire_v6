@@ -75,7 +75,7 @@ esac
 # 줄 허용 목록은 원문 대신 정확한 파일 경로와 줄 내용의 Git blob 지문을 저장한다.
 # 같은 경로·지문 항목 하나는 매치 한 번만 소비한다. 파일 전체·디렉터리·글로브 면제는 없다.
 ALLOWLIST_SOURCE="${SECRET_ALLOWLIST_FILE:-.secret-allowlist.yaml}"
-if printf '%s' "$ALLOWLIST_SOURCE" | /usr/bin/grep -qE '(^/|(^|/)\.\.(/|$)|[*?\[])'; then
+if printf '%s' "$ALLOWLIST_SOURCE" | /usr/bin/grep -qE '(^/|//|/$|(^|/)\.{1,2}(/|$)|[*?\[])'; then
   echo "FAIL: secret allowlist path must be a literal repository-relative path (exit 2)"
   exit 2
 fi
@@ -176,7 +176,7 @@ while IFS=$'\t' read -r path hash expiry; do
     echo "FAIL: secret allowlist cannot suppress its own file in entry $ALLOW_TOTAL (exit 2)"
     exit 2
   fi
-  if printf '%s' "$path" | /usr/bin/grep -qE '(^/|(^|/)\.\.(/|$)|[*?\[])'; then
+  if printf '%s' "$path" | /usr/bin/grep -qE '(^/|//|/$|(^|/)\.{1,2}(/|$)|[*?\[])'; then
     echo "FAIL: invalid literal path in secret allowlist entry $ALLOW_TOTAL (exit 2)"
     exit 2
   fi
