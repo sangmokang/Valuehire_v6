@@ -47,6 +47,7 @@ CLEAN=$TMP/patterns.clean
 ERRS=$TMP/scanner.errors
 FILES=$TMP/tracked-files
 ALLOWLIST_RAW=$TMP/allowlist.raw
+ALLOWLIST_NO_NUL=$TMP/allowlist.no-nul
 ALLOWLIST_ROWS=$TMP/allowlist.rows
 ALLOWLIST_USED=$TMP/allowlist.used
 : > "$ERRS"
@@ -114,6 +115,17 @@ elif [ ! -f "$ALLOWLIST_SOURCE" ] || [ ! -r "$ALLOWLIST_SOURCE" ] || [ ! -s "$AL
   exit 2
 else
   cat -- "$ALLOWLIST_SOURCE" > "$ALLOWLIST_RAW"
+fi
+
+# awk 구현에 따라 NUL 뒤 바이트가 보이지 않을 수 있으므로, 문법 파싱 전에 원문
+# 바이트를 검증한다. NUL을 제거한 사본과 다르면 정책 전체를 해석 불능으로 닫는다.
+if ! LC_ALL=C tr -d '\000' < "$ALLOWLIST_RAW" > "$ALLOWLIST_NO_NUL" 2>> "$ERRS"; then
+  echo "FAIL: secret allowlist NUL-byte validation error: $ALLOWLIST_SOURCE (exit 2)"
+  exit 2
+fi
+if ! cmp -s "$ALLOWLIST_RAW" "$ALLOWLIST_NO_NUL"; then
+  echo "FAIL: secret allowlist contains a NUL byte: $ALLOWLIST_SOURCE (exit 2)"
+  exit 2
 fi
 
 # YAML 전체가 아니라 아래 고정된 단일행 subset만 허용한다. 모르는 문법을 조용히
