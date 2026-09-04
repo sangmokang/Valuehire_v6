@@ -1079,3 +1079,19 @@ checkpoint 근거가 아니다.
 - 보정 후 fresh GREEN: 단위 142 tests OK, sot_gate `CHECKED: 89` exit 0, acceptance
   `CHECKED: 65` exit 0(mutation 32종 생존 0), verify.sh PASS, clean.
 
+### 2026-09-04 fresh Codex V2 3차 결과와 보정
+
+- V2 3차 artifact: `.omx/artifacts/codex-v2-pii-3layer-round3-20260904.md`
+  (검토 대상 HEAD `150606762772a3deb336a6f837a5756feb4ffa60`) — verdict `FAIL`.
+  2차 반례는 5/5 값·2/2 주입 전부 닫힘으로 독립 재현·확인, 정당 fixture 18/18 통과 확인.
+- 채택·보정(R9 회귀 편입): 따옴표+IDN 이메일(`"홍 길동"@예시.한국`), punycode TLD
+  이메일, 공백-하이픈 지역번호 `(02) 123 - 4567`, 내선 확장 전화 `010-1234-5678x123`,
+  그리고 allowlist 이메일 마스킹의 문맥 무시(HTML 주입도 마스킹) 결함 — 마스킹을
+  json 형식(구조적 target_id 예외의 직렬화 표면)에만 제한. HTML/Markdown에 allowlist
+  이메일이 등장하면 이제 차단된다.
+- 잔여 위험 기록 확장: 전화 패턴이 16진수 해시 안의 8자리 이상 연속 숫자와 우연히
+  일치할 확률(해시당 수 % 수준, 원 코드 시절부터 존재)은 RRN-in-hex와 같은 계열의
+  수용 위험으로 두고, 운영 관측 항목(BLOCKED 오탐 모니터링)으로 승격 대상.
+- 보정 후 fresh GREEN: 단위 144 tests OK, sot_gate `CHECKED: 89` exit 0, acceptance
+  `CHECKED: 65` exit 0(mutation 32종 생존 0), verify.sh PASS, clean.
+
