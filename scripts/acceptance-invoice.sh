@@ -6,6 +6,7 @@ REPO=$(git rev-parse --show-toplevel)
 cd "$REPO" || exit 2
 
 fail=0
+blocked=0
 checked=0
 record_pass() {
   checked=$((checked + 1))
@@ -16,6 +17,22 @@ record_fail() {
   fail=1
   printf 'FAIL: %s\n' "$1" >&2
 }
+# 환경·도구 부재는 검사 실패가 아니다. 그러나 초록도 아니다 — 종료값 3 으로 남긴다.
+record_blocked() {
+  checked=$((checked + 1))
+  blocked=1
+  printf 'BLOCKED: %s\n' "$1" >&2
+}
+
+# 바이트코드 캐시를 작업트리 밖에 둔다. 읽기 전용·제한 환경에서 권한 오류로 실패하던
+# py_compile 이 그 자체로 FAIL 로 집계되던 문제를 없앤다.
+cache_dir=$(mktemp -d) || {
+  echo "BLOCKED: 임시 캐시 경로를 만들 수 없다"
+  echo "VERDICT: BLOCKED"
+  echo "CHECKED: 0"
+  exit 4
+}
+export PYTHONPYCACHEPREFIX="$cache_dir"
 
 required_files=(
   contracts/invoice/invoice-v1.json
@@ -64,7 +81,7 @@ test_log=$(mktemp) || {
   echo "FAIL: 테스트 출력 임시 파일을 만들 수 없다"
   exit 2
 }
-trap 'rm -f "$test_log"' EXIT
+trap 'rm -f "$test_log"; rm -rf "$cache_dir"' EXIT
 python3 -m unittest discover -s tools/invoice/tests -v >"$test_log" 2>&1
 test_rc=$?
 cat "$test_log"
@@ -79,12 +96,14 @@ bash tools/invoice/tests/test_postgres_integrity.sh
 postgres_rc=$?
 if [ "$postgres_rc" -eq 0 ]; then
   record_pass "PostgreSQL 마이그레이션·동시성·저장 RPC·전달 영수증 실증"
+elif [ "$postgres_rc" -eq 4 ]; then
+  record_blocked "PostgreSQL 서버 바이너리가 없어 런타임 무결성 검사를 실행하지 못했다"
 else
-  record_fail "PostgreSQL 런타임 무결성 검사 실패"
+  record_fail "PostgreSQL 런타임 무결성 검사 실패 (exit $postgres_rc)"
 fi
 
 gate_rc=0
-python3 scripts/verify/check-invoice-gate.py || gate_rc=$?
+python3 scripts/verify/check-invoice-gate.py --wiring-only || gate_rc=$?
 if [ "$gate_rc" -eq 0 ]; then
   record_pass "Invoice 단위·PostgreSQL 검사의 독립 CI 배선"
 else
@@ -165,7 +184,7 @@ else
 fi
 
 if ! command -v rg >/dev/null 2>&1; then
-  record_fail "미완성 표식 검사기 rg를 실행할 수 없음"
+  record_blocked "미완성 표식 검사기 rg가 설치되어 있지 않다"
 else
   rg -n 'TODO|FIXME|NotImplementedError' \
     contracts/invoice docs/sot/invoice.md docs/sot/invoice-storage.md \
@@ -185,6 +204,11 @@ if [ "$fail" -ne 0 ]; then
   echo "VERDICT: FAIL"
   echo "CHECKED: $checked"
   exit 1
+fi
+if [ "$blocked" -ne 0 ]; then
+  echo "VERDICT: BLOCKED"
+  echo "CHECKED: $checked"
+  exit 4
 fi
 
 echo "VERDICT: PASS"

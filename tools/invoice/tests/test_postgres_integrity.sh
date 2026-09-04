@@ -2,7 +2,37 @@
 set -euo pipefail
 
 repo=$(git rev-parse --show-toplevel)
-pg_bin=$(pg_config --bindir)
+
+# 환경 부재(BLOCKED, 종료값 4)와 시험 실패(FAIL)를 구분한다. psql 은 스크립트
+# 오류에 종료값 3 을 쓰므로 BLOCKED 에는 3 을 쓰지 않는다.
+# CI 러너는 PostgreSQL 서버 바이너리를 PATH 가 아니라 /usr/lib/postgresql/<ver>/bin
+# 에 두므로 pg_config 만으로는 initdb 를 찾지 못한다.
+resolve_pg_bin() {
+  local dir candidate
+  if [ -n "${PG_BINDIR:-}" ] && [ -x "$PG_BINDIR/initdb" ]; then
+    printf '%s' "$PG_BINDIR"; return 0
+  fi
+  if command -v pg_config >/dev/null 2>&1; then
+    if dir=$(pg_config --bindir 2>/dev/null); then
+      if [ -n "$dir" ] && [ -x "$dir/initdb" ]; then printf '%s' "$dir"; return 0; fi
+    fi
+  fi
+  for candidate in $(ls -d /usr/lib/postgresql/*/bin 2>/dev/null | sort -Vr); do
+    if [ -x "$candidate/initdb" ]; then printf '%s' "$candidate"; return 0; fi
+  done
+  return 1
+}
+pg_bin=$(resolve_pg_bin) || {
+  echo "BLOCKED: PostgreSQL 서버 바이너리(initdb)를 찾을 수 없다 — 환경 부재이지 시험 실패가 아니다"
+  echo "  PG_BINDIR 로 경로를 주거나 postgresql 서버 패키지를 설치하라"
+  exit 4
+}
+for tool in pg_ctl createdb psql; do
+  [ -x "$pg_bin/$tool" ] || {
+    echo "BLOCKED: $pg_bin/$tool 이 없다 — PostgreSQL 설치가 불완전하다"
+    exit 4
+  }
+done
 pg_tmp=$(mktemp -d "${TMPDIR:-/tmp}/invoice-pg.XXXXXX")
 pg_data="$pg_tmp/data"
 pg_socket="$pg_tmp/socket"

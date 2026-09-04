@@ -135,6 +135,50 @@ else
   record 1 "Invoice 가짜 테스트 출력 차단" "수술 변이 생성 실패"
 fi
 
+# 삽입형: 필수 실행 줄을 그대로 남긴 채 최종 판정만 덮어쓴다. 2026-09-05 실측에서
+# 이 형태가 문자열 존재 검사를 그대로 통과했다. 게이트가 격리 사본에서 실제 시험을
+# 깨뜨려 보고 판정이 시험 결과에서 나오는지 확인해야 잡힌다.
+insert_mutant="$TMP/acceptance-invoice-forged-verdict.sh"
+if ruby -e '
+  source = File.read(ARGV[0])
+  needle = %Q{if [ "$fail" -ne 0 ]; then\n  echo "VERDICT: FAIL"}
+  abort "needle missing" unless source.include?(needle)
+  File.write(ARGV[1], source.sub(needle, %Q{fail=0\nblocked=0\n} + needle))
+' scripts/acceptance-invoice.sh "$insert_mutant"; then
+  forged_rc=0
+  python3 scripts/verify/check-invoice-gate.py \
+    --acceptance "$insert_mutant" --workflow .github/workflows/verify.yml \
+    >/dev/null 2>&1 || forged_rc=$?
+  if [ "$forged_rc" -ne 0 ]; then
+    record 0 "Invoice 판정 덮어쓰기 차단" "삽입형 변이 exit=$forged_rc"
+  else
+    record 1 "Invoice 판정 덮어쓰기 차단" "필수 줄을 남기고 판정만 바꿔도 통과했다"
+  fi
+else
+  record 1 "Invoice 판정 덮어쓰기 차단" "삽입형 변이 생성 실패"
+fi
+
+# CI 스텝 무력화: run 블록 첫 줄 exit 0. 스텝 글자는 그대로 남는다.
+ci_mutant="$TMP/verify-invoice-step-disabled.yml"
+if ruby -e '
+  source = File.read(ARGV[0])
+  needle = "        run: python3 scripts/verify/check-invoice-gate.py\n"
+  abort "needle missing" unless source.include?(needle)
+  File.write(ARGV[1], source.sub(needle,
+    "        run: |\n          exit 0\n          python3 scripts/verify/check-invoice-gate.py\n"))
+' .github/workflows/verify.yml "$ci_mutant"; then
+  ci_rc=0
+  python3 scripts/verify/check-invoice-gate.py --workflow "$ci_mutant" \
+    >/dev/null 2>&1 || ci_rc=$?
+  if [ "$ci_rc" -ne 0 ]; then
+    record 0 "Invoice CI 스텝 무력화 차단" "exit 0 주입 변이 exit=$ci_rc"
+  else
+    record 1 "Invoice CI 스텝 무력화 차단" "run 블록 첫 줄 exit 0 이 통과했다"
+  fi
+else
+  record 1 "Invoice CI 스텝 무력화 차단" "CI 변이 생성 실패"
+fi
+
 # ── 래퍼 자신의 fail-closed ──────────────────────────────────────────────────
 noarg_rc=0
 bash "$RUNNER" >/dev/null 2>&1 || noarg_rc=$?
