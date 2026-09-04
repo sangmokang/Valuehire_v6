@@ -1122,6 +1122,43 @@ exit 1과 worktree/index 각각의 완전한 `정확 허용 ... -> FAIL` 결과 
 일반 러너가 모든 임의 출력 위조를 판별한다고 주장하지 않고 이 수용시험의 지정 의미 변이에만 보장을
 한정합니다.
 
+### 10-15. 최종 V1 재감사가 찾은 정확 FAIL 위조와 독립 관찰 경계
+
+`09a92de`를 읽은 최종 V1은 10-14의 완전한 결과 줄 결속도 검사 대상 스크립트가 그 두 줄을 그대로
+출력하면 우회된다고 반박했습니다. 정상 소스에서는 합격 카운터를 출력하고 허용 소비 제거 변이만
+발견하면 worktree/index의 정확한 실패 두 줄을 출력하는 스크립트는 `verify.sh`를 한 번도 실행하지
+않았지만 당시 의미 판정기를 통과했습니다. 판정 본문은 저장소 밖
+`/tmp/secret-allowlist-audit.w2pFXX/postv2-v1-body.txt`에 보존했습니다.
+
+```text
+V1_VERDICT=FAIL
+V1_MEDIUM=1
+EXACT_CONDITIONAL_ORACLE_FALSE_ACCEPT=1
+
+RED_COMMIT=4cb4b07
+CHECKED=14
+CONDITIONAL_EXACT_FAIL_FORGE=FAIL
+SUITE_EXIT=1
+
+GREEN_COMMIT=739a601
+DIRECT_MUTATED_VERIFY_WORKTREE_RC=1
+DIRECT_MUTATED_VERIFY_INDEX_RC=1
+APPROVED_ACCEPTANCE_BLOB_MATCH=PASS
+THREE_OUTPUT_FORGERIES=BLOCKED
+CHECKED=15
+SUITE_EXIT=0
+```
+
+→ 무엇을 시켰나: 정확한 실패 두 줄까지 위조하는 반례를 표본 변경 없이 추가해 RED로 보존한 뒤,
+검사 대상의 자체 출력과 종료값을 의미 증거에서 제거했습니다. 독립 판정기가 소유한 격리 fixture에서
+변이된 `verify.sh`를 두 모드로 직접 실행하고, 수용시험 파일은 검토된 Git blob과 같아야만 인정합니다.
+→ 뭐가 나왔나: 변이된 실제 판정기는 두 모드 모두 exit 1이었고, 고정 출력·무관 실패·정확 실패의
+세 위조 파일은 모두 승인 blob 불일치로 거부됐습니다.
+→ 좋은 소식인가 나쁜 소식인가: 10-14의 정규식 강화만으로는 부족했다는 점은 나쁜 소식이었지만,
+현재는 대상 스크립트의 말이 아니라 직접 실행 종료값을 증거로 삼으므로 같은 단일 파일 위조는 닫혔습니다.
+수용시험과 독립 판정기를 같은 변경에서 함께 악의적으로 고치는 공모까지 암호학적으로 막는 장치는
+아니며, 의도적 수용시험 변경 시 blob 고정값도 별도 검토해야 합니다.
+
 ### 11. 제출 직전 사람 감사
 
 | 질문 | 판정 | 근거 |
