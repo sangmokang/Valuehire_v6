@@ -1,4 +1,4 @@
 interface:
   display_name: "Invoice"
-  short_description: "채용 수수료 청구서 PDF를 계산·검수·발송합니다"
-  default_prompt: "Use $invoice to create a review-ready recruitment fee invoice PDF."
+  short_description: "계약별 채용 청구서·정산 PDF를 저장·검수합니다"
+  default_prompt: "Use $invoice to resolve the customer-position fee agreement, create and persist a review-ready recruitment invoice or settlement PDF."

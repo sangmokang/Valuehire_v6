@@ -104,3 +104,21 @@
   stage: "ci"
   ci_mirror_job: "verify"
   required: true
+- id: "invoice-independent-runtime-ci"
+  path: ".github/workflows/verify.yml"
+  target: "python3 scripts/verify/check-invoice-gate.py"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
+- id: "invoice-independent-unit-ci"
+  path: ".github/workflows/verify.yml"
+  target: "python3 -m unittest discover -s tools/invoice/tests -v"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
+- id: "invoice-postgres-runtime-ci"
+  path: ".github/workflows/verify.yml"
+  target: "bash tools/invoice/tests/test_postgres_integrity.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true

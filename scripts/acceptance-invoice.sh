@@ -19,9 +19,29 @@ record_fail() {
 
 required_files=(
   contracts/invoice/invoice-v1.json
+  contracts/invoice/deduction-v1.json
+  contracts/invoice/storage-v1.json
   docs/sot/invoice.md
+  docs/sot/invoice-storage.md
+  supabase/migrations/20260901090000_invoice_fee_agreements_and_storage.sql
+  supabase/migrations/20260901100000_invoice_fee_agreement_immutability.sql
+  supabase/migrations/20260901103000_invoice_fee_agreement_idempotent_upsert.sql
+  supabase/migrations/20260902090000_invoice_runtime_integrity.sql
   tools/invoice/generate_invoice.py
+  tools/invoice/generate_deduction.py
+  tools/invoice/storage_common.py
+  tools/invoice/storage_schema.py
+  tools/invoice/storage_agreements.py
+  tools/invoice/storage_remote.py
+  tools/invoice/store_invoice_set.py
   tools/invoice/tests/test_generate_invoice.py
+  tools/invoice/tests/test_generate_deduction.py
+  tools/invoice/tests/test_store_invoice_set.py
+  tools/invoice/tests/assert_contract_snapshot.py
+  tools/invoice/tests/postgres_fixture.sql
+  tools/invoice/tests/postgres_runtime_assertions.sql
+  tools/invoice/tests/test_postgres_integrity.sh
+  scripts/verify/check-invoice-gate.py
   .codex/skills/invoice/SKILL.md
   .codex/skills/invoice/agents/openai.yaml
   .claude/skills/invoice/SKILL.md
@@ -51,7 +71,31 @@ else
   record_fail "Invoice 회귀 테스트 실패 또는 테스트 0건"
 fi
 
-if python3 -m py_compile tools/invoice/generate_invoice.py tools/invoice/tests/test_generate_invoice.py; then
+postgres_rc=0
+bash tools/invoice/tests/test_postgres_integrity.sh
+postgres_rc=$?
+if [ "$postgres_rc" -eq 0 ]; then
+  record_pass "PostgreSQL 마이그레이션·동시성·저장 RPC·전달 영수증 실증"
+else
+  record_fail "PostgreSQL 런타임 무결성 검사 실패"
+fi
+
+gate_rc=0
+python3 scripts/verify/check-invoice-gate.py || gate_rc=$?
+if [ "$gate_rc" -eq 0 ]; then
+  record_pass "Invoice 단위·PostgreSQL 검사의 독립 CI 배선"
+else
+  record_fail "Invoice 테스트 게이트 배선 누락 또는 위조 가능"
+fi
+
+if python3 -m py_compile \
+  tools/invoice/generate_invoice.py tools/invoice/generate_deduction.py \
+  tools/invoice/storage_common.py tools/invoice/storage_schema.py \
+  tools/invoice/storage_agreements.py tools/invoice/storage_remote.py \
+  tools/invoice/store_invoice_set.py scripts/verify/check-invoice-gate.py \
+  tools/invoice/tests/test_generate_invoice.py tools/invoice/tests/test_generate_deduction.py \
+  tools/invoice/tests/test_store_invoice_set.py \
+  tools/invoice/tests/assert_contract_snapshot.py; then
   record_pass "Invoice Python 문법 검사"
 else
   record_fail "Invoice Python 문법 검사 실패"
@@ -70,7 +114,17 @@ from pathlib import Path
 
 files = (
     Path("tools/invoice/generate_invoice.py"),
+    Path("tools/invoice/generate_deduction.py"),
+    Path("tools/invoice/store_invoice_set.py"),
+    Path("tools/invoice/storage_common.py"),
+    Path("tools/invoice/storage_schema.py"),
+    Path("tools/invoice/storage_agreements.py"),
+    Path("tools/invoice/storage_remote.py"),
     Path("tools/invoice/tests/test_generate_invoice.py"),
+    Path("tools/invoice/tests/test_generate_deduction.py"),
+    Path("tools/invoice/tests/test_store_invoice_set.py"),
+    Path("tools/invoice/tests/assert_contract_snapshot.py"),
+    Path("scripts/verify/check-invoice-gate.py"),
     Path(".codex/skills/invoice/SKILL.md"),
     Path(".claude/skills/invoice/SKILL.md"),
 )
@@ -81,7 +135,7 @@ for path in files:
     if lines > 600:
         violations.append(f"{path}: {lines} lines")
 
-for path in files[:2]:
+for path in (item for item in files if item.suffix == ".py"):
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     for node in ast.walk(tree):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -107,7 +161,9 @@ if ! command -v rg >/dev/null 2>&1; then
   record_fail "미완성 표식 검사기 rg를 실행할 수 없음"
 else
   rg -n 'TODO|FIXME|NotImplementedError' \
-    contracts/invoice docs/sot/invoice.md tools/invoice .codex/skills/invoice .claude/skills/invoice
+    contracts/invoice docs/sot/invoice.md docs/sot/invoice-storage.md \
+    supabase/migrations \
+    tools/invoice .codex/skills/invoice .claude/skills/invoice
   marker_rc=$?
   if [ "$marker_rc" -eq 0 ]; then
     record_fail "Invoice 범위에 미완성 표식 존재"

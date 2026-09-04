@@ -1,26 +1,33 @@
 {
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "issuer": {
     "company_name": "밸류커넥트 주식회사"
   },
   "billing": {
     "currency": "KRW",
-    "default_fee_rate": "0.20",
+    "fee_policy": {
+      "source": "CUSTOMER_POSITION_AGREEMENT",
+      "input_unit": "PERCENT",
+      "allow_default": false,
+      "require_agreement_reference": true,
+      "minimum_exclusive": "0",
+      "maximum_inclusive": "100"
+    },
     "rounding": "HALF_UP_TO_WON",
-    "tax_policy": "UNCONFIRMED",
+    "tax_policy": "NOT_APPLICABLE",
     "tax_rate": null,
-    "final_total_policy": "BLOCK_UNTIL_CONFIRMED"
+    "final_total_policy": "FINALIZED"
   },
   "payment": {
     "due_offset_days": 14,
     "due_day_basis": "CALENDAR_DAYS",
     "bank_name": "하나은행",
     "account_number_display": "588-910030-71604",
-    "account_holder": null
+    "account_holder": "밸류커넥트 주식회사"
   },
   "delivery": {
     "default_recipient": "sangmokang@valueconnect.kr",
-    "send_enabled": false,
+    "send_enabled": true,
     "require_final_confirmation": true,
     "require_attachment_sha256": true,
     "automatic_retry": false
@@ -30,6 +37,6 @@
     "max_pages": 1,
     "draft_watermark": "DRAFT · 검수용",
     "draft_total_label": "총 청구 금액*",
-    "draft_total_note": "* 검수용 금액이며 부가가치세 처리 기준 확정 전입니다."
+    "draft_total_note": "* 검수용 금액이며 부가가치세 비대상 기준입니다."
   }
 }

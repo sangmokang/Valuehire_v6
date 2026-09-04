@@ -4,6 +4,7 @@ import importlib.util
 import json
 import tempfile
 import unittest
+import sys
 from datetime import date
 from pathlib import Path
 from unittest import mock
@@ -11,6 +12,7 @@ from unittest import mock
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 MODULE_PATH = REPO_ROOT / "tools" / "invoice" / "generate_invoice.py"
+sys.path.insert(0, str(MODULE_PATH.parent))
 CONTRACT_PATH = REPO_ROOT / "contracts" / "invoice" / "invoice-v1.json"
 SPEC = importlib.util.spec_from_file_location("invoice_generator", MODULE_PATH)
 assert SPEC and SPEC.loader
@@ -32,6 +34,8 @@ class InvoiceGeneratorTest(unittest.TestCase):
             "start_date": "2026-09-01",
             "position": "테스트 엔지니어",
             "annual_salary_krw": 60_000_000,
+            "fee_percent": "20",
+            "fee_agreement_ref": "TEST-CLIENT-POSITION-2026",
             "draft": True,
         }
         base.update(overrides)
@@ -60,6 +64,26 @@ class InvoiceGeneratorTest(unittest.TestCase):
         manwon_result = invoice_generator.calculate_invoice(validated, self.contract)
         self.assertEqual(manwon_result.source.annual_salary_krw, 60_000_000)
         self.assertEqual(manwon_result.requested_fee_krw, 12_000_000)
+
+    def test_uses_each_customer_position_fee_without_a_default(self) -> None:
+        self.assertEqual(self.calculate(fee_percent="15").requested_fee_krw, 9_000_000)
+        self.assertEqual(self.calculate(fee_percent="20").requested_fee_krw, 12_000_000)
+        self.assertEqual(self.calculate(fee_percent="25").requested_fee_krw, 15_000_000)
+
+        missing = self.payload()
+        missing.pop("fee_percent")
+        with self.assertRaisesRegex(invoice_generator.InputError, "missing field"):
+            invoice_generator.validate_input(missing, self.contract)
+        missing_ref = self.payload()
+        missing_ref.pop("fee_agreement_ref")
+        with self.assertRaisesRegex(invoice_generator.InputError, "missing field"):
+            invoice_generator.validate_input(missing_ref, self.contract)
+
+        for invalid in (20, "NaN", "Infinity", "0", "100.1"):
+            with self.subTest(invalid=invalid), self.assertRaises(invoice_generator.InputError):
+                invoice_generator.validate_input(
+                    self.payload(fee_percent=invalid), self.contract
+                )
 
     def test_due_date_crosses_month_and_leap_day(self) -> None:
         month_end = self.calculate(start_date="2026-01-25")
@@ -104,9 +128,12 @@ class InvoiceGeneratorTest(unittest.TestCase):
                 with self.assertRaises(invoice_generator.InputError):
                     invoice_generator.validate_input(self.payload(**payload), self.contract)
 
-    def test_rejects_final_document_while_tax_is_unconfirmed(self) -> None:
-        with self.assertRaisesRegex(invoice_generator.ContractError, "tax policy"):
-            invoice_generator.validate_input(self.payload(draft=False), self.contract)
+    def test_allows_final_document_when_tax_is_not_applicable(self) -> None:
+        validated = invoice_generator.validate_input(self.payload(draft=False), self.contract)
+        result = invoice_generator.calculate_invoice(validated, self.contract)
+        self.assertFalse(result.source.draft)
+        self.assertIsNone(result.tax_amount_krw)
+        self.assertEqual(result.total_amount_krw, 12_000_000)
 
     def test_html_contains_required_business_fields_and_escapes_input(self) -> None:
         validated = invoice_generator.validate_input(
@@ -136,6 +163,8 @@ class InvoiceGeneratorTest(unittest.TestCase):
             "2026.09.15",
             "하나은행",
             "588-910030-71604",
+            "예금주",
+            "밸류커넥트 주식회사",
             "DRAFT · 검수용",
             "메일 발송 안 됨",
         ):
@@ -175,10 +204,33 @@ class InvoiceGeneratorTest(unittest.TestCase):
                 self.assertTrue(all(path.stat().st_size > 0 for path in (pdf, html_path, metadata_path)))
                 metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
                 self.assertEqual(metadata["pdf_sha256"], digest)
+                self.assertEqual(metadata["fee_authority"], "UNVERIFIED_DRAFT")
+                self.assertEqual(metadata["fee_percent"], "20")
+                self.assertEqual(
+                    metadata["fee_agreement_ref"], "TEST-CLIENT-POSITION-2026"
+                )
                 with self.assertRaisesRegex(invoice_generator.InputError, "already exists"):
                     invoice_generator.generate_files(
                         input_path, output_path, CONTRACT_PATH, None, False
                     )
+
+    def test_final_file_generation_fails_closed_without_remote_fee_proof(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            input_path = root / "input.json"
+            output_path = root / "invoice.pdf"
+            input_path.write_text(
+                json.dumps(self.payload(draft=False), ensure_ascii=False), encoding="utf-8"
+            )
+            with mock.patch.object(invoice_generator, "ARTIFACT_ROOT", root), mock.patch.object(
+                invoice_generator.storage_remote,
+                "verify_fee_authority",
+                side_effect=invoice_generator.storage_remote.RemoteError("network unavailable"),
+            ), self.assertRaisesRegex(invoice_generator.ContractError, "was not proven"):
+                invoice_generator.generate_files(
+                    input_path, output_path, CONTRACT_PATH, None, False
+                )
+            self.assertFalse(output_path.exists())
 
     def test_rejects_artifact_path_escape(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -189,18 +241,29 @@ class InvoiceGeneratorTest(unittest.TestCase):
 
     def test_contract_business_constants_are_locked(self) -> None:
         self.assertEqual(self.contract["issuer"]["company_name"], "밸류커넥트 주식회사")
-        self.assertEqual(self.contract["billing"]["default_fee_rate"], "0.20")
+        self.assertNotIn("default_fee_rate", self.contract["billing"])
         self.assertEqual(
-            self.contract["billing"]["final_total_policy"], "BLOCK_UNTIL_CONFIRMED"
+            self.contract["billing"]["fee_policy"],
+            {
+                "source": "CUSTOMER_POSITION_AGREEMENT",
+                "input_unit": "PERCENT",
+                "allow_default": False,
+                "require_agreement_reference": True,
+                "minimum_exclusive": "0",
+                "maximum_inclusive": "100",
+            },
         )
+        self.assertEqual(self.contract["billing"]["tax_policy"], "NOT_APPLICABLE")
+        self.assertEqual(self.contract["billing"]["final_total_policy"], "FINALIZED")
         self.assertEqual(self.contract["payment"]["due_offset_days"], 14)
         self.assertEqual(self.contract["payment"]["bank_name"], "하나은행")
         self.assertEqual(self.contract["payment"]["account_number_display"], "588-910030-71604")
+        self.assertEqual(self.contract["payment"]["account_holder"], "밸류커넥트 주식회사")
         self.assertEqual(
             self.contract["delivery"],
             {
                 "default_recipient": "sangmokang@valueconnect.kr",
-                "send_enabled": False,
+                "send_enabled": True,
                 "require_final_confirmation": True,
                 "require_attachment_sha256": True,
                 "automatic_retry": False,
@@ -210,17 +273,22 @@ class InvoiceGeneratorTest(unittest.TestCase):
     def test_contract_loader_rejects_invalid_fields(self) -> None:
         source = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
         mutations = (
-            ("billing", "default_fee_rate", "not-a-decimal"),
+            ("fee_policy", "allow_default", True),
+            ("fee_policy", "source", "DEFAULT"),
             ("billing", "final_total_policy", "ALLOW"),
             ("payment", "due_offset_days", True),
             ("payment", "bank_name", ""),
+            ("payment", "account_holder", None),
             ("delivery", "default_recipient", "not-an-email"),
             ("delivery", "send_enabled", "false"),
         )
         for section, key, value in mutations:
             with self.subTest(key=key), tempfile.TemporaryDirectory() as temp_dir:
                 mutated = json.loads(json.dumps(source, ensure_ascii=False))
-                mutated[section][key] = value
+                if section == "fee_policy":
+                    mutated["billing"]["fee_policy"][key] = value
+                else:
+                    mutated[section][key] = value
                 path = Path(temp_dir) / "contract.json"
                 path.write_text(json.dumps(mutated, ensure_ascii=False), encoding="utf-8")
                 with mock.patch.object(invoice_generator, "DEFAULT_CONTRACT", path):

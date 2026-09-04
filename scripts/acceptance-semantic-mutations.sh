@@ -112,6 +112,29 @@ else
   record 1 "정상 인수 검사 통과" "표본 없음 — $sample"
 fi
 
+# Invoice acceptance가 실제 unittest를 실행하지 않고 "Ran 1 test / OK"만
+# 출력해도 기존 stdout 판정은 속는다. 전용 배선 판정기가 그 수술 변이를 거부해야 한다.
+invoice_mutant="$TMP/acceptance-invoice-fake-tests.sh"
+if ruby -e '
+  source = File.read(ARGV[0])
+  needle = %q{python3 -m unittest discover -s tools/invoice/tests -v >"$test_log" 2>&1}
+  replacement = %q{printf "Ran 1 test in 0.001s\\n\\nOK\\n" >"$test_log"}
+  abort "needle missing" unless source.include?(needle)
+  File.write(ARGV[1], source.sub(needle, replacement))
+' scripts/acceptance-invoice.sh "$invoice_mutant"; then
+  invoice_gate_rc=0
+  python3 scripts/verify/check-invoice-gate.py \
+    --acceptance "$invoice_mutant" --workflow .github/workflows/verify.yml \
+    >/dev/null 2>&1 || invoice_gate_rc=$?
+  if [ "$invoice_gate_rc" -ne 0 ]; then
+    record 0 "Invoice 가짜 테스트 출력 차단" "수술 변이 exit=$invoice_gate_rc"
+  else
+    record 1 "Invoice 가짜 테스트 출력 차단" "실제 unittest 제거 후에도 배선 판정 통과"
+  fi
+else
+  record 1 "Invoice 가짜 테스트 출력 차단" "수술 변이 생성 실패"
+fi
+
 # ── 래퍼 자신의 fail-closed ──────────────────────────────────────────────────
 noarg_rc=0
 bash "$RUNNER" >/dev/null 2>&1 || noarg_rc=$?

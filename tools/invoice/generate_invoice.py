@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """Generate one-page ValueConnect recruitment fee invoice PDFs."""
-
 from __future__ import annotations
-
 import argparse
 import hashlib
 import html
@@ -19,9 +17,11 @@ from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 from typing import Any, NamedTuple
-
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
+MODULE_DIR = Path(__file__).resolve().parent
+if str(MODULE_DIR) not in sys.path:
+    sys.path.insert(0, str(MODULE_DIR))
+import storage_remote
 DEFAULT_CONTRACT = REPO_ROOT / "contracts" / "invoice" / "invoice-v1.json"
 ARTIFACT_ROOT = REPO_ROOT / "artifacts" / "invoices"
 ALLOWED_INPUT_FIELDS = frozenset(
@@ -34,6 +34,8 @@ ALLOWED_INPUT_FIELDS = frozenset(
         "position",
         "annual_salary_krw",
         "annual_salary_manwon",
+        "fee_percent",
+        "fee_agreement_ref",
         "draft",
     }
 )
@@ -43,20 +45,17 @@ STRING_FIELDS = (
     "company_name",
     "candidate_name",
     "position",
+    "fee_agreement_ref",
 )
 TAX_POLICIES = frozenset({"UNCONFIRMED", "EXCLUSIVE", "INCLUSIVE", "NOT_APPLICABLE"})
 class InvoiceError(Exception):
     """Base error for invoice generation."""
-
 class InputError(InvoiceError):
     """Raised when invoice input violates the contract."""
-
 class ContractError(InvoiceError):
     """Raised when the machine-readable contract is invalid."""
-
 class RenderError(InvoiceError):
     """Raised when PDF rendering cannot complete."""
-
 class InvoiceInput(NamedTuple):
     invoice_number: str
     issue_date: date
@@ -65,6 +64,8 @@ class InvoiceInput(NamedTuple):
     start_date: date
     position: str
     annual_salary_krw: int
+    fee_percent: Decimal
+    fee_agreement_ref: str
     draft: bool
 class InvoiceResult(NamedTuple):
     source: InvoiceInput
@@ -72,22 +73,18 @@ class InvoiceResult(NamedTuple):
     tax_amount_krw: int | None
     total_amount_krw: int
     due_date: date
-
 def _require_dict(value: Any, label: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ContractError(f"{label} must be an object")
     return value
-
 def _require_text(value: Any, label: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ContractError(f"{label} must be a non-empty string")
     return value.strip()
-
 def _require_bool(value: Any, label: str) -> bool:
     if not isinstance(value, bool):
         raise ContractError(f"{label} must be boolean")
     return value
-
 def _parse_decimal(value: Any, label: str, allow_zero: bool = False) -> Decimal:
     if not isinstance(value, str):
         raise ContractError(f"{label} must be a decimal string")
@@ -96,11 +93,9 @@ def _parse_decimal(value: Any, label: str, allow_zero: bool = False) -> Decimal:
     except InvalidOperation as error:
         raise ContractError(f"{label} is not a decimal") from error
     lower_bound = Decimal("0") if allow_zero else Decimal("0.0000001")
-    if parsed < lower_bound or parsed > Decimal("1"):
+    if not parsed.is_finite() or parsed < lower_bound or parsed > Decimal("1"):
         raise ContractError(f"{label} must be between {lower_bound} and 1")
     return parsed
-
-
 def load_contract(path: str | Path) -> dict[str, Any]:
     contract_path = Path(path).expanduser().resolve()
     if contract_path != DEFAULT_CONTRACT.resolve():
@@ -110,16 +105,24 @@ def load_contract(path: str | Path) -> dict[str, Any]:
     except (OSError, json.JSONDecodeError) as error:
         raise ContractError(f"cannot read contract: {error}") from error
     contract = _require_dict(raw, "contract")
-    if contract.get("schema_version") != "1.0":
-        raise ContractError("schema_version must be 1.0")
-
+    if contract.get("schema_version") != "1.1":
+        raise ContractError("schema_version must be 1.1")
     issuer = _require_dict(contract.get("issuer"), "issuer")
     _require_text(issuer.get("company_name"), "issuer.company_name")
-
     billing = _require_dict(contract.get("billing"), "billing")
     if billing.get("currency") != "KRW":
         raise ContractError("billing.currency must be KRW")
-    _parse_decimal(billing.get("default_fee_rate"), "billing.default_fee_rate")
+    fee_policy = _require_dict(billing.get("fee_policy"), "billing.fee_policy")
+    if fee_policy.get("source") != "CUSTOMER_POSITION_AGREEMENT":
+        raise ContractError("billing.fee_policy.source is unsupported")
+    if fee_policy.get("input_unit") != "PERCENT":
+        raise ContractError("billing.fee_policy.input_unit must be PERCENT")
+    if fee_policy.get("allow_default") is not False:
+        raise ContractError("billing.fee_policy.allow_default must be false")
+    if fee_policy.get("require_agreement_reference") is not True:
+        raise ContractError("billing fee agreement reference must be required")
+    if fee_policy.get("minimum_exclusive") != "0" or fee_policy.get("maximum_inclusive") != "100":
+        raise ContractError("billing fee percentage bounds are unsupported")
     if billing.get("rounding") != "HALF_UP_TO_WON":
         raise ContractError("billing.rounding must be HALF_UP_TO_WON")
     tax_policy = billing.get("tax_policy")
@@ -130,9 +133,9 @@ def load_contract(path: str | Path) -> dict[str, Any]:
         _parse_decimal(tax_rate, "billing.tax_rate", allow_zero=True)
     elif tax_rate is not None:
         raise ContractError("billing.tax_rate must be null unless tax is EXCLUSIVE")
-    if billing.get("final_total_policy") != "BLOCK_UNTIL_CONFIRMED":
-        raise ContractError("billing.final_total_policy must block until confirmed")
-
+    expected_total_policy = "BLOCK_UNTIL_CONFIRMED" if tax_policy == "UNCONFIRMED" else "FINALIZED"
+    if billing.get("final_total_policy") != expected_total_policy:
+        raise ContractError("billing.final_total_policy conflicts with billing.tax_policy")
     payment = _require_dict(contract.get("payment"), "payment")
     offset = payment.get("due_offset_days")
     if isinstance(offset, bool) or not isinstance(offset, int) or not 0 <= offset <= 365:
@@ -143,9 +146,7 @@ def load_contract(path: str | Path) -> dict[str, Any]:
     account = _require_text(payment.get("account_number_display"), "payment.account_number_display")
     if not re.fullmatch(r"[0-9 -]{8,32}", account):
         raise ContractError("payment.account_number_display has an invalid format")
-    if payment.get("account_holder") is not None:
-        _require_text(payment.get("account_holder"), "payment.account_holder")
-
+    _require_text(payment.get("account_holder"), "payment.account_holder")
     delivery = _require_dict(contract.get("delivery"), "delivery")
     recipient = _require_text(delivery.get("default_recipient"), "delivery.default_recipient")
     if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", recipient):
@@ -157,14 +158,12 @@ def load_contract(path: str | Path) -> dict[str, Any]:
         "automatic_retry",
     ):
         _require_bool(delivery.get(key), f"delivery.{key}")
-
     document = _require_dict(contract.get("document"), "document")
     if document.get("page_size") != "A4" or document.get("max_pages") != 1:
         raise ContractError("document must be one A4 page")
     for key in ("draft_watermark", "draft_total_label", "draft_total_note"):
         _require_text(document.get(key), f"document.{key}")
     return contract
-
 def _input_text(payload: dict[str, Any], key: str) -> str:
     value = payload.get(key)
     if not isinstance(value, str):
@@ -175,8 +174,6 @@ def _input_text(payload: dict[str, Any], key: str) -> str:
     if any(ord(character) < 32 for character in cleaned):
         raise InputError(f"{key} must not contain control characters")
     return cleaned
-
-
 def _input_date(payload: dict[str, Any], key: str) -> date:
     value = payload.get(key)
     if not isinstance(value, str):
@@ -185,7 +182,17 @@ def _input_date(payload: dict[str, Any], key: str) -> date:
         return date.fromisoformat(value)
     except ValueError as error:
         raise InputError(f"{key} must be a valid YYYY-MM-DD date") from error
-
+def _input_percent(payload: dict[str, Any], key: str) -> Decimal:
+    value = payload.get(key)
+    if not isinstance(value, str):
+        raise InputError(f"{key} must be a decimal string")
+    try:
+        parsed = Decimal(value)
+    except InvalidOperation as error:
+        raise InputError(f"{key} must be a decimal percentage") from error
+    if not parsed.is_finite() or parsed <= 0 or parsed > 100:
+        raise InputError(f"{key} must be greater than 0 and at most 100")
+    return parsed
 def validate_input(payload: Any, contract: dict[str, Any]) -> InvoiceInput:
     if not isinstance(payload, dict):
         raise InputError("input must be a JSON object")
@@ -198,7 +205,6 @@ def validate_input(payload: Any, contract: dict[str, Any]) -> InvoiceInput:
     salary_fields = {"annual_salary_krw", "annual_salary_manwon"} & set(payload)
     if len(salary_fields) != 1:
         raise InputError("provide exactly one of annual_salary_krw or annual_salary_manwon")
-
     strings = {key: _input_text(payload, key) for key in STRING_FIELDS}
     salary_key = salary_fields.pop()
     annual_salary_input = payload.get(salary_key)
@@ -220,7 +226,6 @@ def validate_input(payload: Any, contract: dict[str, Any]) -> InvoiceInput:
         raise InputError("draft must be boolean")
     if not draft and contract["billing"]["tax_policy"] == "UNCONFIRMED":
         raise ContractError("tax policy must be confirmed before a final document")
-
     return InvoiceInput(
         invoice_number=strings["invoice_number"],
         issue_date=_input_date(payload, "issue_date"),
@@ -229,17 +234,15 @@ def validate_input(payload: Any, contract: dict[str, Any]) -> InvoiceInput:
         start_date=_input_date(payload, "start_date"),
         position=strings["position"],
         annual_salary_krw=annual_salary,
+        fee_percent=_input_percent(payload, "fee_percent"),
+        fee_agreement_ref=strings["fee_agreement_ref"],
         draft=draft,
     )
-
-
 def _won(value: Decimal) -> int:
     return int(value.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
-
-
 def calculate_invoice(invoice_input: InvoiceInput, contract: dict[str, Any]) -> InvoiceResult:
     billing = contract["billing"]
-    fee_rate = Decimal(billing["default_fee_rate"])
+    fee_rate = invoice_input.fee_percent / Decimal("100")
     requested_fee = _won(Decimal(invoice_input.annual_salary_krw) * fee_rate)
     tax_policy = billing["tax_policy"]
     tax_amount: int | None = None
@@ -249,16 +252,12 @@ def calculate_invoice(invoice_input: InvoiceInput, contract: dict[str, Any]) -> 
         total += tax_amount
     due_date = invoice_input.start_date + timedelta(days=contract["payment"]["due_offset_days"])
     return InvoiceResult(invoice_input, requested_fee, tax_amount, total, due_date)
-
 def _format_date(value: date) -> str:
     return value.strftime("%Y.%m.%d")
-
 def _format_krw(value: int) -> str:
     return f"{value:,}원"
-
 def _escape_text(value: str) -> str:
     return html.escape(value).replace("{", "&#123;").replace("}", "&#125;")
-
 def _render_context(invoice: InvoiceResult, contract: dict[str, Any]) -> dict[str, str]:
     source = invoice.source
     issuer = _escape_text(contract["issuer"]["company_name"])
@@ -275,6 +274,7 @@ def _render_context(invoice: InvoiceResult, contract: dict[str, Any]) -> dict[st
           <div class="amount-row secondary"><span>부가가치세</span><strong>{_format_krw(invoice.tax_amount_krw)}</strong></div>"""
     return {
         "account": _escape_text(payment["account_number_display"]),
+        "account_holder": _escape_text(payment["account_holder"]),
         "annual_salary": _format_krw(source.annual_salary_krw),
         "bank": _escape_text(payment["bank_name"]),
         "candidate_name": safe["candidate_name"],
@@ -294,8 +294,6 @@ def _render_context(invoice: InvoiceResult, contract: dict[str, Any]) -> dict[st
         "total_amount": _format_krw(invoice.total_amount_krw),
         "total_label": total_label,
     }
-
-
 _HTML_TEMPLATE = """<!doctype html>
 <html lang="ko">
 <head>
@@ -313,7 +311,7 @@ _HTML_TEMPLATE = """<!doctype html>
     .details {{ border-top: 2px solid #183f5e; }} .detail-row {{ display: grid; grid-template-columns: 36mm 1fr; min-height: 14mm; align-items: center; border-bottom: 1px solid #dfe5e9; }} .detail-row span {{ color: #6e7d87; font-size: 9.5pt; font-weight: 700; }} .detail-row strong {{ color: #172b39; font-size: 11pt; font-weight: 650; }}
     .amounts {{ margin-top: 9mm; margin-left: auto; width: 105mm; }} .amount-row {{ display: flex; justify-content: space-between; align-items: center; padding: 4mm 0; color: #50636f; font-size: 10pt; }} .amount-row strong {{ color: #182d3c; font-size: 12pt; }} .amount-row.secondary {{ border-top: 1px solid #e0e5e9; }}
     .amount-row.total {{ margin-top: 1mm; padding: 5mm; background: #123b5d; color: #fff; border-radius: 2mm; }} .amount-row.total strong {{ color: #fff; font-size: 17pt; }} .tax-note {{ margin: 2.5mm 0 0; color: #8a5c34; font-size: 8.5pt; line-height: 1.5; text-align: right; }}
-    .payment {{ margin-top: 10mm; padding: 6mm; border: 1px solid #c9d4dc; border-left: 4px solid #2c678d; border-radius: 2mm; background: #f7f9fa; }} .payment-title {{ margin: 0 0 5mm; color: #214b67; font-size: 10pt; font-weight: 800; letter-spacing: .08em; }} .payment-grid {{ display: grid; grid-template-columns: 1.3fr .8fr 1.2fr; gap: 5mm; }}
+    .payment {{ margin-top: 10mm; padding: 6mm; border: 1px solid #c9d4dc; border-left: 4px solid #2c678d; border-radius: 2mm; background: #f7f9fa; }} .payment-title {{ margin: 0 0 5mm; color: #214b67; font-size: 10pt; font-weight: 800; letter-spacing: .08em; }} .payment-grid {{ display: grid; grid-template-columns: 1.2fr .6fr 1fr 1.2fr; gap: 4mm; }}
     .payment .value {{ font-size: 10.5pt; }} .due-emphasis {{ color: #143f5e !important; font-size: 12pt !important; }} footer {{ position: absolute; left: 18mm; right: 18mm; bottom: 13mm; display: flex; justify-content: space-between; align-items: flex-end; border-top: 1px solid #d8dfe4; padding-top: 4mm; color: #71808a; font-size: 8.5pt; }} .notice {{ color: #8d3732; font-weight: 700; }}
   </style>
 </head>
@@ -337,7 +335,6 @@ _HTML_TEMPLATE = """<!doctype html>
       <div class="meta-item"><span class="label">발행일</span><span class="value">{_format_date(source.issue_date)}</span></div>
       <div class="meta-item"><span class="label">INVOICE NO.</span><span class="value">{safe['invoice_number']}</span></div>
     </section>
-
     <p class="section-title">PLACEMENT DETAILS</p>
     <section class="details">
       <div class="detail-row"><span>입사자명</span><strong>{safe['candidate_name']}</strong></div>
@@ -345,7 +342,6 @@ _HTML_TEMPLATE = """<!doctype html>
       <div class="detail-row"><span>직책</span><strong>{safe['position']}</strong></div>
       <div class="detail-row"><span>결정 연봉</span><strong>{_format_krw(source.annual_salary_krw)}</strong></div>
     </section>
-
     <section class="amounts">
       <div class="amount-row"><span>요청 수수료</span><strong>{_format_krw(invoice.requested_fee_krw)}</strong></div>{tax_row}
       <div class="amount-row total"><span>{total_label}</span><strong>{_format_krw(invoice.total_amount_krw)}</strong></div>
@@ -358,6 +354,7 @@ _HTML_TEMPLATE = """<!doctype html>
         <div><span class="label">계약서에 따른 입금 Due Date</span><span class="value due-emphasis">{_format_date(invoice.due_date)}</span></div>
         <div><span class="label">은행</span><span class="value">{html.escape(payment['bank_name'])}</span></div>
         <div><span class="label">계좌번호</span><span class="value">{html.escape(payment['account_number_display'])}</span></div>
+        <div><span class="label">예금주</span><span class="value">{html.escape(payment['account_holder'])}</span></div>
       </div>
     </section>
 
@@ -369,7 +366,6 @@ _HTML_TEMPLATE = """<!doctype html>
 </body>
 </html>
 """
-
 
 def render_html(invoice: InvoiceResult, contract: dict[str, Any]) -> str:
     rendered = _HTML_TEMPLATE.replace("{{", "{").replace("}}", "}")
@@ -392,6 +388,7 @@ def render_html(invoice: InvoiceResult, contract: dict[str, Any]) -> str:
         "{_format_date(invoice.due_date)}": context["due_date"],
         "{html.escape(payment['bank_name'])}": context["bank"],
         "{html.escape(payment['account_number_display'])}": context["account"],
+        "{html.escape(payment['account_holder'])}": context["account_holder"],
         "{payment['due_offset_days']}": context["due_offset"],
         "{draft_notice}": context["draft_notice"],
     }
@@ -402,7 +399,6 @@ def render_html(invoice: InvoiceResult, contract: dict[str, Any]) -> str:
     if re.search(r"\{(?:safe|_format|html\.escape|payment|f'|tax_|total_|draft_)", rendered):
         raise ContractError("invoice template contains unresolved tokens")
     return rendered
-
 
 def find_chrome(explicit_path: str | None = None) -> str:
     requested = explicit_path or os.environ.get("INVOICE_CHROME_BIN")
@@ -424,7 +420,6 @@ def find_chrome(explicit_path: str | None = None) -> str:
             return str(Path(resolved).resolve())
     raise RenderError("Chrome executable is required for PDF rendering")
 
-
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -432,14 +427,12 @@ def _sha256(path: Path) -> str:
             digest.update(chunk)
     return digest.hexdigest()
 
-
 def _ensure_artifact_path(path: Path, label: str) -> Path:
     resolved = path.expanduser().resolve()
     root = ARTIFACT_ROOT.resolve()
     if not resolved.is_relative_to(root):
         raise InputError(f"{label} must be inside {ARTIFACT_ROOT}")
     return resolved
-
 
 def _render_pdf(chrome: str, html_path: Path, pdf_path: Path, profile_path: Path) -> None:
     command = [
@@ -497,13 +490,9 @@ def _render_pdf(chrome: str, html_path: Path, pdf_path: Path, profile_path: Path
     if page_count != 1:
         raise RenderError(f"rendered PDF must contain exactly one page, found {page_count}")
 
-
 def generate_files(
-    input_path: Path,
-    output_path: Path,
-    contract_path: Path,
-    chrome_path: str | None,
-    overwrite: bool,
+    input_path: Path, output_path: Path, contract_path: Path,
+    chrome_path: str | None, overwrite: bool,
 ) -> tuple[InvoiceResult, Path, Path, Path, str]:
     input_file = _ensure_artifact_path(input_path, "input")
     output_file = _ensure_artifact_path(output_path, "output")
@@ -515,9 +504,18 @@ def generate_files(
         payload = json.loads(input_file.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
         raise InputError(f"cannot read input JSON: {error}") from error
-
     contract = load_contract(contract_path)
     invoice_input = validate_input(payload, contract)
+    fee_authority = None
+    if not invoice_input.draft:
+        try:
+            fee_authority = storage_remote.verify_fee_authority(
+                invoice_input.company_name, invoice_input.position,
+                invoice_input.start_date, invoice_input.fee_percent,
+                invoice_input.fee_agreement_ref,
+            )
+        except storage_remote.RemoteError as error:
+            raise ContractError(f"final fee authority was not proven: {error}") from error
     result = calculate_invoice(invoice_input, contract)
     html_text = render_html(result, contract)
     html_output = output_file.with_suffix(".html")
@@ -526,7 +524,6 @@ def generate_files(
     existing = [str(path) for path in targets if path.exists()]
     if existing and not overwrite:
         raise InputError(f"output already exists; use --overwrite: {', '.join(existing)}")
-
     output_file.parent.mkdir(parents=True, exist_ok=True)
     chrome = find_chrome(chrome_path)
     with tempfile.TemporaryDirectory(prefix="invoice-", dir=output_file.parent) as temp_dir:
@@ -540,11 +537,15 @@ def generate_files(
         metadata = {
             "contract_version": contract["schema_version"],
             "invoice_number": result.source.invoice_number,
+            "fee_percent": format(result.source.fee_percent.normalize(), "f"),
+            "fee_agreement_ref": result.source.fee_agreement_ref,
             "requested_fee_krw": result.requested_fee_krw,
             "tax_amount_krw": result.tax_amount_krw,
             "total_amount_krw": result.total_amount_krw,
             "due_date": result.due_date.isoformat(),
             "draft": result.source.draft,
+            "fee_authority": "SUPABASE" if fee_authority else "UNVERIFIED_DRAFT",
+            "fee_agreement_id": fee_authority["id"] if fee_authority else None,
             "input_sha256": _sha256(input_file),
             "pdf_sha256": pdf_digest,
         }
@@ -558,7 +559,6 @@ def generate_files(
         raise RenderError("one or more invoice outputs are missing or empty")
     return result, output_file, html_output, metadata_output, pdf_digest
 
-
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", required=True, type=Path, help="Input JSON in artifacts/invoices")
@@ -567,7 +567,6 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--chrome", help="Explicit Chrome executable")
     parser.add_argument("--overwrite", action="store_true")
     return parser
-
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
@@ -583,17 +582,19 @@ def main(argv: list[str] | None = None) -> int:
         print(f"RENDER_ERROR: {error}", file=sys.stderr)
         return 3
     checked = sum(path.stat().st_size > 0 for path in (pdf, html_file, metadata))
-    print("VERDICT: PASS")
+    print("RENDER_VERDICT: PASS")
+    business = "UNVERIFIED_DRAFT" if result.source.draft else "FEE_AUTHORITY_VERIFIED"
+    print(f"BUSINESS_STATUS: {business}")
     print(f"PDF: {pdf}")
     print(f"HTML: {html_file}")
     print(f"METADATA: {metadata}")
     print(f"REQUESTED_FEE_KRW: {result.requested_fee_krw}")
+    print(f"FEE_PERCENT: {format(result.source.fee_percent.normalize(), 'f')}")
+    print(f"FEE_AGREEMENT_REF: {result.source.fee_agreement_ref}")
     print(f"TOTAL_AMOUNT_KRW: {result.total_amount_krw}")
     print(f"DUE_DATE: {result.due_date.isoformat()}")
     print(f"PDF_SHA256: {digest}")
     print(f"CHECKED: {checked}")
     return 0
-
-
 if __name__ == "__main__":
     raise SystemExit(main())

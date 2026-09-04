@@ -248,3 +248,9 @@ jobs:
         # 인보이스 PDF는 검수 승인 전 발송할 수 없다. CI에서는 개인정보 없는 fixture로
         # 계산·기한·입력 거부·계약 변조와 Codex/Claude 스킬 동등성을 검증한다.
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-invoice.sh
+
+      - name: Invoice 독립 런타임 게이트 (위조 출력 우회 방지)
+        run: |
+          python3 scripts/verify/check-invoice-gate.py
+          python3 -m unittest discover -s tools/invoice/tests -v
+          bash tools/invoice/tests/test_postgres_integrity.sh
