@@ -104,6 +104,27 @@ def load_storage_contract() -> dict[str, Any]:
     return contract
 
 
+PLACEMENT_KEY_COLUMNS = (
+    "tenant_id", "client_name", "candidate_name", "start_date",
+    "position_name", "fee_agreement_id", "supply_amount",
+)
+
+
+def reject_duplicate_placement(connection: Any, values: tuple[Any, ...]) -> None:
+    """Refuse a second invoice for a placement that is already billed.
+
+    The document number is chosen by a person, so it cannot be the business key.
+    Two invoices for the same tenant, client, candidate, start date, position,
+    fee agreement, and amount are the same placement whatever they are numbered.
+    """
+    where = " and ".join(f"{column}=?" for column in PLACEMENT_KEY_COLUMNS)
+    row = connection.execute(
+        f"select document_number from revenue_invoices where {where}", values
+    ).fetchone()
+    if row is not None:
+        raise StorageError(f"PLACEMENT_DUPLICATE: already billed as {row[0]}")
+
+
 def tenant_id() -> str:
     return load_storage_contract()["tenant_id"]
 

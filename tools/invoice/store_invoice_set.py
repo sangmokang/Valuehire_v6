@@ -24,6 +24,7 @@ from storage_common import (
     iso_date as _iso_date,
     load_json as _load_json,
     load_storage_contract,
+    reject_duplicate_placement,
     seal_payload,
     tenant_id,
 )
@@ -209,6 +210,11 @@ def store_document_set(
         if existing["payload_sha256"] == payload["payload_sha256"]:
             return "idempotent"
         raise StorageError("IDEMPOTENCY_CONFLICT")
+    reject_duplicate_placement(connection, (
+        tenant_id(), source.company_name, source.candidate_name,
+        source.start_date.isoformat(), source.position, agreement["id"],
+        invoice.requested_fee_krw,
+    ))
     invoice_id, placement_id = str(uuid.uuid4()), str(uuid.uuid4())
     with connection:
         connection.execute(

@@ -63,6 +63,24 @@ begin
       raise;
     end if;
   end;
+
+  -- 같은 성사 건을 번호만 바꿔 다시 청구하면 거부해야 한다 (업무키 멱등).
+  begin
+    payload_base := jsonb_set(
+      payload_base, '{invoice,invoice_number}', to_jsonb('VC-PG-TEST-002'::text)
+    );
+    payload := payload_base || jsonb_build_object(
+      'payload_canonical', payload_base::text,
+      'payload_sha256',
+        encode(digest(convert_to(payload_base::text, 'UTF8'), 'sha256'), 'hex')
+    );
+    perform store_invoice_placement_set(payload);
+    raise exception 'a renumbered duplicate placement was accepted';
+  exception when others then
+    if sqlerrm <> 'PLACEMENT_DUPLICATE' then
+      raise;
+    end if;
+  end;
 end;
 $$;
 

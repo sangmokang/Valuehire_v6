@@ -84,6 +84,12 @@ alter table revenue_invoices
   add column if not exists contract_version text,
   add column if not exists contract_sha256 text;
 
+create unique index if not exists revenue_invoices_placement_uniq
+  on revenue_invoices
+  (tenant_id, client_name, candidate_name, start_date, position_name,
+   fee_agreement_id, supply_amount)
+  where fee_agreement_id is not null;
+
 alter table client_billing_statements
   add column if not exists contract_version text,
   add column if not exists contract_sha256 text,
@@ -248,6 +254,19 @@ begin
       );
     end if;
     raise exception 'IDEMPOTENCY_CONFLICT';
+  end if;
+
+  if exists (
+    select 1 from revenue_invoices
+    where tenant_id = tenant
+      and client_name = invoice_data ->> 'company_name'
+      and candidate_name = invoice_data ->> 'candidate_name'
+      and start_date = start_on
+      and position_name = invoice_data ->> 'position'
+      and fee_agreement_id = agreement.id
+      and supply_amount = invoice_amount
+  ) then
+    raise exception 'PLACEMENT_DUPLICATE';
   end if;
 
   if settlement_data is not null and jsonb_typeof(settlement_data) <> 'null' then

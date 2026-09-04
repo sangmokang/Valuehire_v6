@@ -45,7 +45,7 @@ PostgreSQL의 부분 제외 제약은 같은 tenant·고객사·포지션에서 
 
 인보이스와 정산서가 함께 있으면 인보이스 번호, 고객사, 입사자, 입사일, 포지션, 연봉, 수수료율, 수수료 계약 참조, 청구 금액이 모두 같아야 한다. 회사 배분, 참여자 배분 합계, 원천징수, 납부 기한, 입금 정보는 `invoice_business_contract_versions`의 버전과 SHA-256에 고정된 불변 JSON 계약 스냅샷을 DB 함수가 다시 검증한다. 새 코드는 현재 JSON과 같은 스냅샷만 생성하고, 이미 큐에 들어간 문서·전달 증빙은 이후 활성 버전이 바뀌어도 원래 스냅샷으로 재시도한다. 존재하지 않거나 SHA-256이 다른 스냅샷은 저장하지 않는다.
 
-`document_number`와 `settlement_number`는 각각 멱등 키다. 같은 번호와 같은 `payload_sha256` 재시도는 기존 성공을 반환하고, 같은 번호에 다른 payload는 `IDEMPOTENCY_CONFLICT`로 실패한다.
+멱등 키는 두 층이다. **업무키**는 `tenant_id`, 고객사, 입사자, 입사일, 포지션, 수수료 계약, 청구 금액이며 같은 성사 건을 문서 번호만 바꿔 다시 청구하면 `PLACEMENT_DUPLICATE`로 실패한다. 문서 번호는 사람이 정하는 값이므로 그 자체로는 업무키가 될 수 없다. **문서키**인 `document_number`와 `settlement_number`는 재시도 식별자다 — 같은 번호와 같은 `payload_sha256` 재시도는 기존 성공을 반환하고, 같은 번호에 다른 payload는 `IDEMPOTENCY_CONFLICT`로 실패한다. 업무키는 SQLite `revenue_invoices_placement_uniq` 와 PostgreSQL 같은 이름의 부분 unique index 양쪽에서 DB 제약으로 강제하며, 저장 RPC 도 저장 전에 같은 조건을 직접 확인한다.
 
 ## SQLite 미러와 동기화
 

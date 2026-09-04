@@ -97,6 +97,15 @@
       "fee_percent",
       "fee_agreement_ref",
       "invoice_amount_krw"
+    ],
+    "placement_business_key": [
+      "tenant_id",
+      "client_name",
+      "candidate_name",
+      "start_date",
+      "position_name",
+      "fee_agreement_id",
+      "supply_amount"
     ]
   }
 }

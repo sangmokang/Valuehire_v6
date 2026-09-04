@@ -43,6 +43,10 @@ create table if not exists revenue_invoices (
   status text not null, unique (tenant_id, document_number),
   foreign key (fee_agreement_id) references recruitment_fee_agreements(id)
 );
+create unique index if not exists revenue_invoices_placement_uniq
+  on revenue_invoices
+  (tenant_id, client_name, candidate_name, start_date, position_name,
+   fee_agreement_id, supply_amount);
 create table if not exists client_billing_statements (
   id text primary key, tenant_id text not null, statement_no text not null,
   linked_invoice_id text not null, placement_set_id text not null,
