@@ -9,6 +9,7 @@ collapsed into the same "PASS + empty list" outcome.
 from __future__ import annotations
 
 import json
+import urllib.error
 
 import pytest
 
@@ -121,6 +122,106 @@ def test_fetch_position_cards_timeout_is_fail_not_pass_with_empty_rows() -> None
 
     assert result.state.status is MetricStatus.FAIL
     assert result.state.reason is SourceFailureReason.SOURCE_TIMEOUT
+    assert result.rows == ()
+
+
+def test_fetch_position_cards_wrapped_urlerror_timeout_is_source_timeout() -> None:
+    """codex adversarial finding: real urlopen wraps a timeout as URLError(reason=
+
+    TimeoutError(...)), never a bare TimeoutError — the bare-exception test above
+    never exercises the real network path. This reproduces the actual shape.
+    """
+
+    def _wrapped_timeout_get(url: str, timeout: float, api_key: str) -> tuple[int, bytes]:
+        raise urllib.error.URLError(TimeoutError("timed out"))
+
+    result = fetch_position_cards(
+        base_url="https://example.supabase.co",
+        api_key=_fixture_api_key(),
+        http_get=_wrapped_timeout_get,
+    )
+
+    assert result.state.status is MetricStatus.FAIL
+    assert result.state.reason is SourceFailureReason.SOURCE_TIMEOUT
+    assert result.rows == ()
+
+
+def test_fetch_position_cards_wrapped_urlerror_connection_refused_is_source_unavailable() -> None:
+    def _wrapped_refused_get(url: str, timeout: float, api_key: str) -> tuple[int, bytes]:
+        raise urllib.error.URLError(ConnectionRefusedError("connection refused"))
+
+    result = fetch_position_cards(
+        base_url="https://example.supabase.co",
+        api_key=_fixture_api_key(),
+        http_get=_wrapped_refused_get,
+    )
+
+    assert result.state.status is MetricStatus.FAIL
+    assert result.state.reason is SourceFailureReason.SOURCE_UNAVAILABLE
+    assert result.rows == ()
+
+
+def test_fetch_position_cards_permission_denied_status_is_fail() -> None:
+    result = fetch_position_cards(
+        base_url="https://example.supabase.co",
+        api_key=_fixture_api_key(),
+        http_get=_ok_get({"message": "invalid api key"}, status=401),
+    )
+
+    assert result.state.status is MetricStatus.FAIL
+    assert result.state.reason is SourceFailureReason.PERMISSION_DENIED
+    assert result.rows == ()
+
+
+def test_fetch_position_cards_rate_limited_status_is_source_unavailable() -> None:
+    result = fetch_position_cards(
+        base_url="https://example.supabase.co",
+        api_key=_fixture_api_key(),
+        http_get=_ok_get({"message": "rate limited"}, status=429),
+    )
+
+    assert result.state.status is MetricStatus.FAIL
+    assert result.state.reason is SourceFailureReason.SOURCE_UNAVAILABLE
+    assert result.rows == ()
+
+
+def test_fetch_position_cards_null_field_value_is_fail() -> None:
+    row_with_null = dict(VALID_ROW, last_updated_at=None)
+
+    result = fetch_position_cards(
+        base_url="https://example.supabase.co",
+        api_key=_fixture_api_key(),
+        http_get=_ok_get([row_with_null]),
+    )
+
+    assert result.state.status is MetricStatus.FAIL
+    assert result.state.reason is SourceFailureReason.CONTRACT_MISMATCH
+    assert result.rows == ()
+
+
+def test_fetch_position_cards_empty_string_field_is_fail() -> None:
+    row_with_blank = dict(VALID_ROW, company_name="")
+
+    result = fetch_position_cards(
+        base_url="https://example.supabase.co",
+        api_key=_fixture_api_key(),
+        http_get=_ok_get([row_with_blank]),
+    )
+
+    assert result.state.status is MetricStatus.FAIL
+    assert result.state.reason is SourceFailureReason.CONTRACT_MISMATCH
+    assert result.rows == ()
+
+
+def test_fetch_position_cards_non_dict_list_item_is_fail() -> None:
+    result = fetch_position_cards(
+        base_url="https://example.supabase.co",
+        api_key=_fixture_api_key(),
+        http_get=_ok_get([1, 2, 3]),
+    )
+
+    assert result.state.status is MetricStatus.FAIL
+    assert result.state.reason is SourceFailureReason.CONTRACT_MISMATCH
     assert result.rows == ()
 
 

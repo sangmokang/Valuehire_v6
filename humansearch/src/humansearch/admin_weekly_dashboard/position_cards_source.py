@@ -115,12 +115,19 @@ def fetch_position_cards(
         status_code, body = getter(url, timeout, api_key)
     except TimeoutError:
         return _fail(SourceFailureReason.SOURCE_TIMEOUT)
-    except (OSError, urllib.error.URLError):
+    except urllib.error.URLError as error:
+        # urlopen wraps a real socket timeout as URLError(reason=TimeoutError(...)),
+        # never as a bare TimeoutError — the bare-exception branch above only ever
+        # fires for an injected test double, not the real network path.
+        if isinstance(error.reason, TimeoutError):
+            return _fail(SourceFailureReason.SOURCE_TIMEOUT)
+        return _fail(SourceFailureReason.SOURCE_UNAVAILABLE)
+    except OSError:
         return _fail(SourceFailureReason.SOURCE_UNAVAILABLE)
 
     if status_code == 401 or status_code == 403:
         return _fail(SourceFailureReason.PERMISSION_DENIED)
-    if 500 <= status_code <= 599:
+    if status_code == 429 or 500 <= status_code <= 599:
         return _fail(SourceFailureReason.SOURCE_UNAVAILABLE)
     if status_code != 200:
         return _fail(SourceFailureReason.CONTRACT_MISMATCH)
