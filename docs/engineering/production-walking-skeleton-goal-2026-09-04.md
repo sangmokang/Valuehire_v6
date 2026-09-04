@@ -151,6 +151,7 @@ Preview는 `VALUEHIRE_ENV=preview`, `VALUEHIRE_TENANT_ID=E2E-TEST-*`를 강제�
 - Preview smoke가 읽은 SHA와 `git rev-parse HEAD`가 일치해야 한다.
 - Production 승격 직전 Vercel deployment SHA와 현재 commit SHA가 일치해야 한다.
 - migration history와 저장소 digest가 다르면 배포/승격을 실패시킨다.
+- Production 승격 전 `npm run verify:production-schema-readonly`는 Management API의 `/database/query/read-only`로 Production catalog를 조회하고, Preview에서 확보한 `VALUEHIRE_PREVIEW_REMOTE_SCHEMA_FINGERPRINT`와 동일한 schema/권한/RLS/trigger/function 계약을 증명해야 한다. Production ref 또는 Preview fingerprint가 없으면 네트워크 전에 실패한다.
 - Preview smoke는 `vercel rollback --help`의 구문과 직전 건강한 Preview deployment ID를 읽기 전용으로 확인한다. 직전 Preview는 alias 복구·재배포를 위한 recovery reference일 뿐 Production rollback 후보로 부르지 않는다.
 - Production 승격 계약의 rollback 검증은 `npm run verify:production-rollback-readonly`가 현재 READY Production deployment를 확인하고, Vercel의 `target=production&state=READY&rollbackCandidate=true` 목록에서 더 오래된 eligible Production deployment ID를 특정해야 PASS다. 이 명령은 조회와 `vercel rollback --help`만 수행하며 rollback 자체를 실행하지 않는다. eligible 후보가 없으면 `READY_TO_PROMOTE`는 false다. 실제 `vercel rollback` 실행은 장애 대응 또는 명시 승인 때만 수행한다.
 
@@ -222,6 +223,7 @@ Preview는 `VALUEHIRE_ENV=preview`, `VALUEHIRE_TENANT_ID=E2E-TEST-*`를 강제�
 ### 승격과 Production
 
 - **AC-R1** When `READY_TO_PROMOTE` is evaluated, Preview smoke, commit/deploy SHA, env contract, migration digest, rollback CLI syntax, eligible prior Production rollback candidate, and PII scans shall all PASS.
+- **AC-R1a** When Production schema readiness is evaluated, the read-only catalog contract and fingerprint shall match the Preview contract; missing target, credential, or fingerprint shall fail before any network request.
 - **AC-R2** When Production is checked, health shall report the expected SHA/schema/environment without secrets or PII.
 - **AC-R3** When an unauthenticated Production client calls an admin API/page, access shall be blocked.
 - **AC-R4** When the authorized owner loads the core list in Production verification, the check shall be read-only and shall not mutate rows or auth users.
@@ -254,7 +256,7 @@ Preview는 `VALUEHIRE_ENV=preview`, `VALUEHIRE_TENANT_ID=E2E-TEST-*`를 강제�
 | G2 Preview smoke | `node scripts/smoke-preview-admin.mjs` with Preview env | **FAIL을 먼저 보존** | PASS |
 | G3 mutation | auth 우회, 빈 목록 은폐, status CHECK 제거, cleanup 제거 mutation | FAIL | FAIL |
 | G4 코드 | targeted unit/integration tests, lint/type/static gates | 일부 RED | PASS |
-| G5 DB drift | read-only migration list/schema digest compare | current remote 재사용 FAIL | isolated Preview/Production contract PASS |
+| G5 DB drift | read-only migration list/schema digest compare + `npm run verify:production-schema-readonly` | current remote 재사용 FAIL | isolated Preview/Production contract PASS |
 | G6 보안 | secret/PII scan + bundle scan + outbound allowlist | PASS | PASS |
 | G7 V1/V2 | Claude 1차 + fresh Codex 2차 적대검증 | NOT_RUN | 모두 PASS |
 | G8 전체 | `bash scripts/session-status.sh`, `bash verify.sh`, CI-equivalent | baseline 기록 | PASS |

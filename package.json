@@ -12,6 +12,7 @@
     "test:production-admin": "node --test tests/production-admin/*.test.mjs",
     "smoke:preview-admin": "node scripts/smoke-preview-admin.mjs",
     "smoke:production-readonly": "node scripts/smoke-production-readonly.mjs",
+    "verify:production-schema-readonly": "node scripts/verify-production-schema-readonly.mjs",
     "verify:production-rollback-readonly": "node scripts/verify-production-rollback.mjs",
     "mutate:production-admin": "node scripts/mutate-production-admin-behavior.mjs",
     "verify:production-admin": "node --test tests/production-admin/*.test.mjs && node scripts/check-preview-smoke-contract.mjs && node scripts/verify-production-admin-static.mjs",

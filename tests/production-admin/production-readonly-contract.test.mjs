@@ -83,3 +83,13 @@ test("production smoke rejects missing schema and credential inputs before netwo
   assert.match(missingCookie.stderr, /missing_PRODUCTION_READONLY_COOKIE/);
   assert.doesNotMatch(missingCookie.stderr, /health_failed/);
 });
+
+test("production schema verifier fails closed before network without its target and Preview fingerprint", () => {
+  const result = spawnSync(process.execPath, ["scripts/verify-production-schema-readonly.mjs"], {
+    cwd: process.cwd(),
+    encoding: "utf8",
+    env: { PATH: process.env.PATH, PRODUCTION_SUPABASE_REF: "", VALUEHIRE_PREVIEW_REMOTE_SCHEMA_FINGERPRINT: "" },
+  });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /PRODUCTION_SUPABASE_REF_MISSING_OR_INVALID/);
+});

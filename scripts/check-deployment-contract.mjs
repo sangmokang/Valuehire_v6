@@ -35,6 +35,7 @@ export function checkDeploymentContract({ env = process.env, requireCurrentEnv =
   const previewDeploy = readText("scripts/deploy-preview.sh");
   const staticVerifier = readText("scripts/verify-production-admin-static.mjs");
   const productionSmoke = readText("scripts/smoke-production-readonly.mjs");
+  const productionSchemaVerifier = readText("scripts/verify-production-schema-readonly.mjs");
   const productionReadonlyContract = readText("scripts/production-readonly-contract.mjs");
   const productionRollback = readText("scripts/verify-production-rollback.mjs");
   const previewSmoke = readText("scripts/smoke-preview-admin.mjs");
@@ -49,6 +50,7 @@ export function checkDeploymentContract({ env = process.env, requireCurrentEnv =
   addIfMissing(errors, "package_missing_production_audit_script", pkg.scripts?.["audit:production"] === "npm audit --omit=dev --audit-level=high");
   addIfMissing(errors, "package_lock_invalid", lock.lockfileVersion === 3 && lock.packages?.[""]?.name === pkg.name);
   addIfMissing(errors, "package_missing_production_readonly_smoke", pkg.scripts?.["smoke:production-readonly"]);
+  addIfMissing(errors, "package_missing_production_schema_verifier", pkg.scripts?.["verify:production-schema-readonly"] === "node scripts/verify-production-schema-readonly.mjs");
   addIfMissing(errors, "package_missing_production_rollback_verifier", pkg.scripts?.["verify:production-rollback-readonly"] === "node scripts/verify-production-rollback.mjs");
   addIfMissing(errors, "vercel_output_directory_missing", vercel.includes('"outputDirectory": "apps/production-admin"'));
   addIfMissing(errors, "vercel_admin_rewrite_missing", vercel.includes('"source": "/admin"') && vercel.includes('"destination": "/index.html"'));
@@ -88,6 +90,7 @@ export function checkDeploymentContract({ env = process.env, requireCurrentEnv =
   addIfMissing(errors, "production_rollback_verifier_must_be_readonly_and_fail_closed", productionRollback.includes('["rollback", "--help"]') && productionRollback.includes("/v13/deployments/${id}") && productionRollback.includes("/v7/deployments?projectId=") && productionRollback.includes("target=production&state=READY&rollbackCandidate=true") && productionRollback.includes("isRollbackCandidate") && productionRollback.includes("deployment.target === \"production\"") && productionRollback.includes("deploymentProjectId(currentDeployment) === EXPECTED_VERCEL_PROJECT_ID") && productionRollback.includes("PRODUCTION_BASE_URL or PRODUCTION_DEPLOYMENT_ID is required") && productionRollback.includes("PRODUCTION_ROLLBACK_CANDIDATE_MISSING") && productionRollback.includes("ROLLBACK_CLI_SYNTAX: PASS") && productionRollback.includes("WRITES_ATTEMPTED: 0") && !/rollback\", \[(?!\"--help\")/.test(productionRollback));
   addIfMissing(errors, "production_smoke_must_require_sha", productionSmoke.includes("missing_VALUEHIRE_DEPLOY_SHA") && !productionSmoke.includes("expectedSha &&"));
   addIfMissing(errors, "production_smoke_must_require_schema_digest", productionSmoke.includes("missing_VALUEHIRE_SCHEMA_DIGEST") && !productionSmoke.includes("VALUEHIRE_SCHEMA_DIGEST ||"));
+  addIfMissing(errors, "production_schema_verifier_must_be_readonly_and_match_preview", productionSchemaVerifier.includes("database/query/read-only") && productionSchemaVerifier.includes("verifyRemoteContract") && productionSchemaVerifier.includes("VALUEHIRE_PREVIEW_REMOTE_SCHEMA_FINGERPRINT") && productionSchemaVerifier.includes("PRODUCTION_SCHEMA_FINGERPRINT_MISMATCH") && productionSchemaVerifier.includes("writes_attempted=0") && !productionSchemaVerifier.includes("/api/admin/") && !productionSchemaVerifier.includes("vercel rollback"));
   addIfMissing(errors, "production_smoke_must_require_readonly_cookie", productionReadonlyContract.includes("missing_PRODUCTION_READONLY_COOKIE"));
   addIfMissing(errors, "production_smoke_must_check_15m_cookie_and_token_expiry", productionSmoke.includes("validateReadonlyCredential") && productionSmoke.includes("PRODUCTION_READONLY_COOKIE_EXPIRES_AT") && productionReadonlyContract.includes("production_readonly_cookie_ttl_exceeds_15_minutes") && productionReadonlyContract.includes("production_readonly_access_token_expired") && productionReadonlyContract.includes("production_readonly_access_token_ttl_exceeds_60_minutes"));
   addIfMissing(errors, "acceptance_missing_preview_smoke_contract", acceptance.includes("check-preview-smoke-contract.mjs"));

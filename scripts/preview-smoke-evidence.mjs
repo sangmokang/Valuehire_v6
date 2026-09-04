@@ -114,7 +114,7 @@ const EXPECTED_CONSTRAINTS = new Map([
   ["admin_positions_title_check", ["c", /length\(btrim\(title\)\).*160/]],
 ]);
 
-const REMOTE_SCHEMA_QUERY = `
+export const REMOTE_SCHEMA_QUERY = `
 select json_build_object(
   'tables', (select coalesce(json_agg(row_to_json(t) order by t.relname), '[]'::json) from (
     select c.relname, c.relrowsecurity, c.relforcerowsecurity
@@ -361,7 +361,7 @@ export function verifyReviewEventServiceRoleGrants(grants, assert) {
   );
 }
 
-function verifyRemoteContract(contract, assert) {
+export function verifyRemoteContract(contract, assert) {
   const expectedTables = TABLES.map((relname) => ({
     relname,
     relrowsecurity: true,
