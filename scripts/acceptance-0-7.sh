@@ -48,6 +48,7 @@ TOTAL=8
 fail=0
 step=0
 allow_checked=0
+reason_checked=0
 
 REPO_ROOT=$(git rev-parse --show-toplevel) || { echo "FAIL: git 저장소가 아님"; exit 1; }
 
@@ -114,6 +115,9 @@ demo() {
   local name="$1" setup="$2" action="$3" want="${4:-}"
   step=$((step + 1))
   local sON sOFF aON aOFF
+  if [ -n "$want" ]; then
+    reason_checked=$((reason_checked + 1))
+  fi
 
   # 훅 ON
   reset_tree; git config core.hooksPath hooks
@@ -201,7 +205,8 @@ demo_allow() {
 demo "검사기 자기 제외" \
   'printf "\nkeep=\$(git ls-files | grep -v acceptance-0-6.sh)\n" >> scripts/acceptance-0-6.sh
    grep -q "grep -v acceptance-0-6.sh" scripts/acceptance-0-6.sh' \
-  'git add scripts/acceptance-0-6.sh && git commit -m "weaken: self-exempt"'
+  'git add scripts/acceptance-0-6.sh && git commit -m "weaken: self-exempt"' \
+  "검사기 자기 제외 — scripts/acceptance-0-6.sh"
 
 # 2. 검사를 skip / 실패 무시로 완화 (48143a7 · 129f61d 재현)
 #
@@ -212,33 +217,38 @@ demo "검사 약화(실패 무시)" \
   'w=$(printf "%s%s" "||" " true")
    printf "\nbash verify.sh %s\n" "$w" >> scripts/acceptance-0-2.sh
    grep -qF "$w" scripts/acceptance-0-2.sh' \
-  'git add scripts/acceptance-0-2.sh && git commit -m "weaken: swallow failure"'
+  'git add scripts/acceptance-0-2.sh && git commit -m "weaken: swallow failure"' \
+  "검사 약화 패턴 추가 — scripts/acceptance-0-2.sh"
 
 # 3. 만료일 없는 억제 (98d923f — 35일 방치 재현)
 demo "만료일 없는 억제" \
   'printf -- "- check: hard_exclude_freelancer\n  reason: later\n  owner: someone\n" > suppressions.yaml
    test -s suppressions.yaml' \
-  'git add suppressions.yaml && git commit -m "suppress: no expiry"'
+  'git add suppressions.yaml && git commit -m "suppress: no expiry"' \
+  "suppressions.yaml 억제 항목 1건 중 expiry 가 0건뿐"
 
 # 4. LLM 출력 숫자를 판정 필드에 기록 (v4 QA-094 재현)
 demo "LLM 출력→판정 필드" \
   'mkdir -p src
    printf "const r = await llm.chat(p);\nscore = parseFloat(r.text);\ndb.insert({ fit_score: score });\n" > src/scoring.js
    test -s src/scoring.js' \
-  'git add src/scoring.js && git commit -m "feat: scoring"'
+  'git add src/scoring.js && git commit -m "feat: scoring"' \
+  "LLM 출력을 판정 수치로 변환 — src/scoring.js"
 
 # 5. 커밋 안 된 변경을 둔 채 push (78f3631 ② 재현)
 demo "미커밋 상태로 push" \
   'echo dirty > uncommitted.txt
    test -s uncommitted.txt' \
-  'git push --dry-run sandbox HEAD:refs/heads/probe-0-7'
+  'git push --dry-run sandbox HEAD:refs/heads/probe-0-7' \
+  "작업트리가 깨끗하지 않다"
 
 # 6. 외부 효과 코드에 네트워크 호출이 0건 (§0 E5 gptreview.js 재현)
 demo "가짜 외부효과 모듈" \
   'mkdir -p src
    printf "async function fetchProfile() {\n  console.log(\"fetching...\");\n  return { ok: true };\n}\n" > src/portal-login.js
    test -s src/portal-login.js' \
-  'git add src/portal-login.js && git commit -m "feat: portal login"'
+  'git add src/portal-login.js && git commit -m "feat: portal login"' \
+  "외부 효과를 표방하는데 네트워크 호출이 0건 — src/portal-login.js"
 
 # 7. 비밀 스캔 규칙 파일(.secret-patterns.default)을 약화 (2026-09-03 추가)
 #
@@ -301,8 +311,13 @@ if [ "$allow_checked" -lt 2 ]; then
   fail=1
 fi
 
+if [ "$reason_checked" -ne "$TOTAL" ]; then
+  echo "FAIL: 정확 사유 대조가 ${reason_checked}/${TOTAL}건 — 다른 게이트의 우연한 차단을 합격으로 셀 수 있다"
+  fail=1
+fi
+
 if [ "$fail" -eq 0 ]; then
-  echo "PASS: 위반 $TOTAL 종이 전부 차단됨 (각 건 훅 OFF 대조 통과) + 정상 변경 통과쌍 ${allow_checked}건"
+  echo "PASS: 위반 $TOTAL 종이 전부 차단됨 (각 건 훅 OFF·정확 사유 대조 통과) + 정상 변경 통과쌍 ${allow_checked}건"
   exit 0
 fi
 echo "RESULT: 차단되지 않았거나 시연이 무효인 항목이 있다. exit 1"
