@@ -172,6 +172,10 @@ today=$(date +%Y-%m-%d)
 ALLOW_TOTAL=0
 while IFS=$'\t' read -r path hash expiry; do
   ALLOW_TOTAL=$((ALLOW_TOTAL + 1))
+  if [ "$path" = "$ALLOWLIST_SOURCE" ]; then
+    echo "FAIL: secret allowlist cannot suppress its own file in entry $ALLOW_TOTAL (exit 2)"
+    exit 2
+  fi
   if printf '%s' "$path" | /usr/bin/grep -qE '(^/|(^|/)\.\.(/|$)|[*?\[])'; then
     echo "FAIL: invalid literal path in secret allowlist entry $ALLOW_TOTAL (exit 2)"
     exit 2
