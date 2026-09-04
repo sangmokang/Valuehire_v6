@@ -41,7 +41,7 @@
 | 18 | 데이터 노출 스캔 | `bash scripts/scan-data-exposure.sh all` — 크기·금지경로·기록·개인정보 (AC-A4) |
 | 19 | 인수 검사 hs-a4 | `bash scripts/acceptance-hs-a4.sh` — 차단이 실제로 도는가 (AC-A4) |
 | 20 | 인수 검사 secret-webhook-vendor | `bash scripts/acceptance-secret-webhook-vendor.sh` — 웹훅·벤더 키 (AC-S1) |
-| 21 | 인수 검사 secret-allowlist | `bash scripts/acceptance-secret-allowlist.sh` — 줄 내용 지문 억제·worktree/index 동일성 (AC-ALLOWLIST-1) |
+| 21 | 인수 검사 secret-allowlist | `bash scripts/verify/run-acceptance.sh scripts/acceptance-secret-allowlist.sh` — 줄 내용 지문 억제·worktree/index 동일성 (AC-ALLOWLIST-1) |
 | 22 | 인수 검사 verified-sha | `bash scripts/acceptance-verified-sha.sh` — 현재 SHA 귀속 진리표(P23) |
 | 23 | 인수 검사 ci-step-integrity | `bash scripts/acceptance-ci-step-integrity.sh` — 조건부·오류무시·echo 대체 차단 |
 | 24 | 인수 검사 semantic-mutations | `bash scripts/acceptance-semantic-mutations.sh` — 인수 검사 무력화 5종 전량 차단 |
