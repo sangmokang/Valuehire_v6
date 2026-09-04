@@ -585,7 +585,7 @@ SCANNER_ERRORS=0
 당시 로컬 재실행에서도 다음 계약값이 유지됐습니다.
 
 ```text
-acceptance-0-7.sh: BLOCKED 8/8, 정확 사유 일치 8/8, 정상 통과쌍 2/2, exit 0
+acceptance-0-7.sh: BLOCKED 8/8, 출력 사유 육안 일치 8/8(당시 자동 대조 2/8), 정상 통과쌍 2/2, exit 0
 acceptance-0-2-unreachable-content.sh: CHECKED 13, exit 0
 acceptance-principles-check.sh: CHECKED 34, MECHANISMS 34/34, exit 0
 acceptance-secret-webhook-vendor.sh: CHECKED 44, UNCOVERED_BASELINE_RULES=17,
@@ -820,7 +820,7 @@ CI_REPRO_FAIL=0
 통합 계약도 같은 SHA에서 다시 확인했습니다.
 
 ```text
-acceptance-0-7.sh: 위반 8/8 차단, 정확 사유 일치, 정상 변경 2/2 통과
+acceptance-0-7.sh: 위반 8/8 차단, 출력 사유 육안 일치(당시 자동 대조 2/8), 정상 변경 2/2 통과
 acceptance-secret-webhook-vendor.sh: CHECKED 44, UNCOVERED_BASELINE_RULES=17,
   OLD_CAUGHT_AND_NEW_MISSED_COUNT=0
 acceptance-verify-ac-m.sh: CHECKED 32, 명부 18/18, 허용 목록 target 되돌림 RED
@@ -943,7 +943,7 @@ MUTATION_D_RC=1  # index 한쪽만 허용 제거: MODE_MISMATCH_COUNT=2
 통합 계약은 저장소 밖 `/tmp/secret-allowlist-final.mfpSJA` 로그에서 모두 통과했습니다.
 
 ```text
-acceptance-0-7.sh: 위반 8/8 차단, 정확 사유 일치, 정상 변경 2/2 통과
+acceptance-0-7.sh: 위반 8/8 차단, 출력 사유 육안 일치(당시 자동 대조 2/8), 정상 변경 2/2 통과
 acceptance-secret-webhook-vendor.sh: CHECKED 44, UNCOVERED_BASELINE_RULES=17,
   OLD_CAUGHT_AND_NEW_MISSED_COUNT=0
 acceptance-verify-ac-m.sh: CHECKED 32, 명부 18/18, 허용 목록 target 되돌림 RED
