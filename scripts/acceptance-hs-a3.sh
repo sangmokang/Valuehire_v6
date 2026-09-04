@@ -166,11 +166,11 @@ e2e() {
     printf 'FAIL: 임시 저장소 경로가 비었다 — %s (fail-closed)\n' "$desc"; fail=1; return
   fi
   git init -q "$tmp"
-  cp verify.sh "$PATTERNS" "$tmp/"
+  cp verify.sh "$PATTERNS" .secret-allowlist.yaml "$tmp/"
   (
     cd "$tmp" || exit 9
     printf '%s\n' "$content" > payload.json
-    git add payload.json >/dev/null 2>&1
+    git add .secret-allowlist.yaml payload.json >/dev/null 2>&1
     SECRET_PATTERNS_FILE= VERIFY_SCAN_SOURCE=index bash verify.sh
   ) >/dev/null 2>&1
   rc=$?

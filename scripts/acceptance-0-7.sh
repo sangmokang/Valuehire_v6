@@ -7,7 +7,7 @@
 # 0-7 인수 스크립트 — 로컬 강제 장치(git hook)가 실제로 위반을 차단하는가.
 #
 # 계약: docs/sot/hook-contracts.md
-#   출력  : exit 0 (7종 전부 BLOCKED + 통과쌍 1건 이상) | exit 1 (하나라도 통과·위양성·셋업 실패)
+#   출력  : exit 0 (8종 전부 BLOCKED + 통과쌍 2건 이상) | exit 1 (하나라도 통과·위양성·셋업 실패)
 #   불변식: 모든 시연은 mktemp -d 안의 clone 에서 수행한다. 원본 저장소를 건드리지 않는다.
 #          검사를 실행하지 못한 경우도 실패로 판정한다(fail-closed).
 #
@@ -44,7 +44,7 @@ if [ -n "${VH_PREPUSH_DEPTH:-}" ]; then
   exit 1
 fi
 
-TOTAL=7
+TOTAL=8
 fail=0
 step=0
 allow_checked=0
@@ -264,6 +264,27 @@ demo_allow "비밀 패턴 파일 정상 추가" \
    grep -qF "zzk-" .secret-patterns.default' \
   'git add .secret-patterns.default && git commit -m "feat: add vendor key shape"'
 
+# 8. 줄 허용 목록도 억제 정책이므로 검사 약화 감시 밖으로 빠지면 안 된다.
+#    verify.sh의 문법 차단과 P13 §3을 구분하려고 demo()의 사유 대조를 반드시 사용한다.
+demo "비밀 줄 허용 목록 약화" \
+  'w=$(printf "%s%s" "skip" ":")
+   printf "\n%s\n" "$w" >> .secret-allowlist.yaml
+   /usr/bin/grep -qx "$w" .secret-allowlist.yaml' \
+  'git add .secret-allowlist.yaml && git commit -m "weaken: secret allowlist"' \
+  "검사 약화 패턴 추가 — .secret-allowlist.yaml"
+
+# 8의 짝 — 필수 필드를 갖춘 정확 경로·내용 지문 항목 추가는 훅 ON에서도 통과해야 한다.
+demo_allow "비밀 줄 허용 목록 정상 추가" \
+  'z=0000000000000000000000000000000000000000
+   printf "%s\n" \
+     "- path: \"verify.sh\"" \
+     "  line_hash: \"$z\"" \
+     "  reason: \"reviewed synthetic allowance\"" \
+     "  owner: \"acceptance\"" \
+     "  expiry: \"2099-12-31\"" >> .secret-allowlist.yaml
+   /usr/bin/grep -qF "$z" .secret-allowlist.yaml' \
+  'git add .secret-allowlist.yaml && git commit -m "chore: add reviewed line allowance"'
+
 # --- 원본 오염 검사 -----------------------------------------------------------
 echo
 ORIG_AFTER=$(orig_state)
@@ -275,8 +296,8 @@ else
 fi
 
 echo
-if [ "$allow_checked" -lt 1 ]; then
-  echo "FAIL: 통과쌍 시연이 0건 — 차단만 시험하면 '전부 막는 훅'도 만점을 받는다"
+if [ "$allow_checked" -lt 2 ]; then
+  echo "FAIL: 통과쌍 시연이 ${allow_checked}건 — 규칙 파일·허용 목록 정상 변경 2건을 모두 증명해야 한다"
   fail=1
 fi
 

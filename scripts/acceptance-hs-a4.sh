@@ -99,6 +99,7 @@ run_hook_case() {
   mkdir -p "$tmp/hooks" "$tmp/scripts"
   cp hooks/pre-commit hooks/pre-push "$tmp/hooks/"
   cp verify.sh "$tmp/"
+  cp .secret-allowlist.yaml "$tmp/"
   cp .secret-patterns.default "$tmp/"
   cp .check-weakening-patterns "$tmp/"
   cp .gitignore "$tmp/"
@@ -112,7 +113,7 @@ run_hook_case() {
     git config user.name t
     mkdir -p "$(dirname "$path")"
     "$maker" "$path"
-    git add -f "$path" >/dev/null 2>&1
+    git add -f .secret-allowlist.yaml "$path" >/dev/null 2>&1
     bash hooks/pre-commit 2>&1
   )
   rc=$?
@@ -156,14 +157,14 @@ if [ -n "$tmp" ] && [ -d "$tmp" ]; then
   TMPDIRS="$TMPDIRS $tmp"
   git init -q "$tmp"; mkdir -p "$tmp/hooks"
   cp hooks/pre-commit hooks/pre-push "$tmp/hooks/"
-  cp verify.sh .secret-patterns.default .check-weakening-patterns .gitignore "$tmp/"
+  cp verify.sh .secret-patterns.default .secret-allowlist.yaml .check-weakening-patterns .gitignore "$tmp/"
   [ -f suppressions.yaml ] && cp suppressions.yaml "$tmp/"
   chmod +x "$tmp/hooks/pre-commit" "$tmp/hooks/pre-push"
   out=$(
     cd "$tmp" || exit 9
     git config core.hooksPath hooks; git config user.email a@b.c; git config user.name t
     dd if=/dev/zero of=payload.bin bs=1024 count=1200 status=none
-    git add -f payload.bin >/dev/null 2>&1
+    git add -f .secret-allowlist.yaml payload.bin >/dev/null 2>&1
     printf 'x\n' > payload.bin          # 작업트리만 작게 덮어쓴다
     bash hooks/pre-commit 2>&1
   )
@@ -181,7 +182,7 @@ tmp=$(mktemp -d) || bad "임시 저장소 생성 실패 (rename 검사)"
 if [ -n "$tmp" ] && [ -d "$tmp" ]; then
   git init -q "$tmp"; mkdir -p "$tmp/hooks"
   cp hooks/pre-commit hooks/pre-push "$tmp/hooks/"
-  cp verify.sh .secret-patterns.default .check-weakening-patterns .gitignore "$tmp/"
+  cp verify.sh .secret-patterns.default .secret-allowlist.yaml .check-weakening-patterns .gitignore "$tmp/"
   [ -f suppressions.yaml ] && cp suppressions.yaml "$tmp/"
   chmod +x "$tmp/hooks/pre-commit" "$tmp/hooks/pre-push"
   out=$(
@@ -190,7 +191,7 @@ if [ -n "$tmp" ] && [ -d "$tmp" ]; then
     # 씨앗 커밋은 훅을 붙이기 **전에** 만든다. 훅 우회 옵션을 쓰면 그 리터럴 자체가
     # 검사 약화 패턴이라 이 스크립트가 커밋되지 않는다(2026-08-09 실측 — 훅이 나를 막았다).
     printf 'notes\n' > notes.txt
-    git add notes.txt >/dev/null 2>&1
+    git add .secret-allowlist.yaml notes.txt >/dev/null 2>&1
     git commit -q -m seed >/dev/null 2>&1
     git config core.hooksPath hooks
     git mv notes.txt leak.db >/dev/null 2>&1
@@ -219,7 +220,7 @@ tmp=$(mktemp -d)
 git init -q "$tmp"
 mkdir -p "$tmp/hooks"
 cp hooks/pre-commit hooks/pre-push "$tmp/hooks/"
-cp verify.sh .secret-patterns.default .check-weakening-patterns .gitignore "$tmp/"
+cp verify.sh .secret-patterns.default .secret-allowlist.yaml .check-weakening-patterns .gitignore "$tmp/"
 [ -f suppressions.yaml ] && cp suppressions.yaml "$tmp/"
 chmod +x "$tmp/hooks/pre-commit" "$tmp/hooks/pre-push"
 rc=0
@@ -229,7 +230,7 @@ rc=0
   git config user.email a@b.c
   git config user.name t
   printf '# hello\n' > README.md
-  git add README.md >/dev/null 2>&1
+  git add .secret-allowlist.yaml README.md >/dev/null 2>&1
   bash hooks/pre-commit
 ) >/dev/null 2>&1
 rc=$?

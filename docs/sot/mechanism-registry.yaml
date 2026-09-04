@@ -8,7 +8,7 @@
 #       manual_reason 필수 (verify-unification-goal-2026-08-10.md AC-M counter-AC).
 - id: "secrets-scan-precommit"
   path: "hooks/pre-commit"
-  target: "SECRET_PATTERNS_FILE= VERIFY_SCAN_SOURCE=index bash verify.sh"
+  target: "SECRET_PATTERNS_FILE= SECRET_ALLOWLIST_FILE= VERIFY_SCAN_SOURCE=index bash verify.sh"
   stage: "pre-commit"
   required: true
 - id: "acceptance-glob-prepush"
@@ -19,6 +19,12 @@
 - id: "ci-secret-scan"
   path: ".github/workflows/verify.yml"
   target: "run: bash verify.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
+- id: "secret-allowlist-line-scope-ci"
+  path: ".github/workflows/verify.yml"
+  target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-secret-allowlist.sh"
   stage: "ci"
   ci_mirror_job: "verify"
   required: true
@@ -102,6 +108,6 @@
 # 이 항목이 없으면 case 한 줄을 조용히 되돌려도 아무도 모른다(그 상태가 직전까지의 현실이었다).
 - id: "p13-weakening-scope-secret-patterns"
   path: "hooks/pre-commit"
-  target: "*.sh|*.yml|*.yaml|hooks/*|.secret-patterns.default)"
+  target: "*.sh|*.yml|*.yaml|hooks/*|.secret-patterns.default|.secret-allowlist.yaml)"
   stage: "pre-commit"
   required: true

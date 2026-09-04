@@ -2,7 +2,7 @@
 # path·target 은 실제 저장소에 존재하는 것을 쓴다 (2026-08-12 grep -n 실측).
 - id: "secrets-scan-precommit"
   path: "hooks/pre-commit"
-  target: "SECRET_PATTERNS_FILE= VERIFY_SCAN_SOURCE=index bash verify.sh"
+  target: "SECRET_PATTERNS_FILE= SECRET_ALLOWLIST_FILE= VERIFY_SCAN_SOURCE=index bash verify.sh"
   stage: "pre-commit"
   required: true
 - id: "ci-secret-scan"

@@ -45,9 +45,10 @@ CANARY="ACCEPTANCE-MUTATION-CANARY-42"
   cd "$sandbox"
   git init -q .
   cp "$OLDPWD/verify.sh" .
+  cp "$OLDPWD/.secret-allowlist.yaml" .
   printf '%s\n' "$CANARY" > .secret-patterns
   printf '.secret-patterns\n' > .gitignore
-  git add verify.sh .gitignore
+  git add verify.sh .gitignore .secret-allowlist.yaml
   git -c user.email=a@a -c user.name=a commit -qm init
   printf '%s\n' "$CANARY" > planted.txt
   git add planted.txt

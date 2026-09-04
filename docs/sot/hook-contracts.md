@@ -1,7 +1,7 @@
 # Valuehire v6 — 로컬 강제 장치(git hook) 계약 (SOT)
 
-최종 갱신: 2026-08-22
-근거(도입 배경·적대검증·6종 위반 시연): `docs/engineering/hook-enforcement-goal-2026-08-07.md`
+최종 갱신: 2026-09-05
+근거(도입 배경·적대검증·8종 위반 시연): `docs/engineering/hook-enforcement-goal-2026-08-07.md`, `docs/engineering/secret-allowlist-line-scope-goal-2026-09-05.md`
 
 ## 현재 규칙 — 입출력 계약
 
@@ -14,10 +14,10 @@
         ※ 매칭된 실제 값은 절대 출력하지 않는다
 검사  : ① 비밀 스캔(verify.sh 위임, VERIFY_SCAN_SOURCE=index) ② 검사기 자기 제외
         ③ 검사 약화 패턴 ④ 만료 없는/지난 억제 ⑤ LLM 출력→판정 수치 ⑥ 외부효과 모듈 네트워크 0건
-        ※ ③ 의 대상: `*.sh` · `*.yml` · `*.yaml` · `hooks/*` · `.secret-patterns.default`.
-          마지막 항목은 2026-09-03 추가 — 이 저장소의 비밀 정책 전체가 그 파일 한 장에
+        ※ ③ 의 대상: `*.sh` · `*.yml` · `*.yaml` · `hooks/*` · `.secret-patterns.default` ·
+          `.secret-allowlist.yaml`. 비밀 정책 전체와 줄 단위 억제 정책을 정하는 두 파일이
           있는데 감시 밖이라, 검사기를 한 줄도 고치지 않고 검사 기준만 손대는 경로가
-          열려 있었다. `.check-weakening-patterns` 는 일부러 제외한다(그 파일 자체가
+          열리지 않게 한다. `.check-weakening-patterns` 는 일부러 제외한다(그 파일 자체가
           약화 리터럴 목록이라 새 패턴 추가가 자기 매칭으로 영구 차단된다).
           탐지 범위는 `.check-weakening-patterns` 의 리터럴이 **추가**되는 경우뿐이다 —
           규칙을 더 느슨하게 고치거나 줄을 삭제하는 약화는 미탐(후자는 억제
@@ -64,8 +64,8 @@
 ### `scripts/acceptance-0-7.sh`
 ```
 입력  : 없음
-출력  : exit 0 (7종 전부 BLOCKED + 통과쌍 1건 이상 통과) | exit 1 (하나라도 어긋남)
-        각 차단 시연: "[N/7] <위반이름> → BLOCKED (exit=<code>)" 또는 "→ PASSED ← 결함"
+출력  : exit 0 (8종 전부 BLOCKED + 통과쌍 2건 이상 통과) | exit 1 (하나라도 어긋남)
+        각 차단 시연: "[N/8] <위반이름> → BLOCKED (exit=<code>)" 또는 "→ PASSED ← 결함"
         각 통과 시연: "[통과쌍 N] <이름> → PASSED" 또는 "→ 오탐"
 불변식: 모든 시연은 mktemp -d 안의 clone 에서 수행.
         종료 시 원본 저장소의 git status 가 시연 전과 동일함을 확인하고, 다르면 exit 1
@@ -73,7 +73,7 @@
         기대 사유 대조는 종료 코드 판정에 **덧붙이는** 조건으로만 쓴다 —
         pre-commit 은 검사 8종을 끝까지 돌리고 어느 하나만 걸려도 종료값이 1이라,
         종료값만으로는 겨냥한 게이트가 막았는지 알 수 없기 때문이다(2026-09-03).
-        차단만 시험하지 않는다 — 같은 대상의 정상 변경이 통과하는 짝이 1건 이상
+        차단만 시험하지 않는다 — 비밀 규칙·줄 허용 목록의 정상 변경 통과쌍 2건 이상이
         없으면 exit 1 (전부 막는 훅도 만점을 받는 것을 막는다).
 ```
 
@@ -91,5 +91,5 @@
 
 ## 비범위 / 한계
 
-- 6종 위반 시연의 실제 실행 결과·적대검증 판정(V1 조건부 REJECT→승인까지 5차 판정)은 `docs/engineering/hook-enforcement-goal-2026-08-07.md` 실행 결과·적대 검증 로그 절에 있다. 이 문서는 재현하지 않는다.
+- 기존 위반 시연의 실제 실행 결과·적대검증 판정(V1 조건부 REJECT→승인까지 5차 판정)은 `docs/engineering/hook-enforcement-goal-2026-08-07.md` 실행 결과·적대 검증 로그 절에 있다. 줄 허용 목록 감시 시연은 2026-09-05 goal 문서에 기록한다.
 - `git push --no-verify` 우회는 구조적으로 탐지 불가(2026-08-07 확정) — CI가 최종 방어선이라는 전제가 깨지면 이 문서 전체가 무효하다.

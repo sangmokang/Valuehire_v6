@@ -31,6 +31,7 @@ make_fixture() {
   mkdir -p "$fixture/scripts" "$fixture/docs"
   cp "$TARGET" "$fixture/scripts/acceptance-0-2.sh"
   cp "$VERIFY" "$fixture/verify.sh"
+  cp "$ROOT/.secret-allowlist.yaml" "$fixture/.secret-allowlist.yaml"
   printf '.secret-patterns\n' > "$fixture/.gitignore"
   printf '%s\n' "$CANARY" > "$fixture/.secret-patterns"
   printf 'synthetic fixture\n' > "$fixture/docs/README.md"
@@ -40,7 +41,7 @@ make_fixture() {
     git init -q -b main
     git config user.email acceptance@local
     git config user.name acceptance
-    git add .gitignore docs/README.md scripts/acceptance-0-2.sh verify.sh
+    git add .gitignore .secret-allowlist.yaml docs/README.md scripts/acceptance-0-2.sh verify.sh
     git commit -qm fixture
   )
 }
@@ -177,13 +178,14 @@ if [ -z "${AC19_INNER_HOOK_PROBE:-}" ]; then
   cp "$TARGET" "$hook_outer/scripts/acceptance-0-2.sh"
   cp "$SELF" "$hook_outer/scripts/acceptance-0-2-unreachable-content.sh"
   cp "$VERIFY" "$hook_outer/verify.sh"
+  cp "$ROOT/.secret-allowlist.yaml" "$hook_outer/.secret-allowlist.yaml"
   printf '.secret-patterns\nouter-only-ignore\n' > "$hook_outer/.gitignore"
   printf '%s\n' "$CANARY" > "$hook_outer/.secret-patterns"
   printf 'outer repository sentinel\n' > "$hook_outer/docs/README.md"
   git -C "$hook_outer" init -q -b main
   git -C "$hook_outer" config user.email acceptance@local
   git -C "$hook_outer" config user.name acceptance
-  git -C "$hook_outer" add .gitignore docs/README.md scripts verify.sh
+  git -C "$hook_outer" add .gitignore .secret-allowlist.yaml docs/README.md scripts verify.sh
   git -C "$hook_outer" commit -qm outer-fixture
 
   hook_before_head=$(git -C "$hook_outer" rev-parse HEAD)

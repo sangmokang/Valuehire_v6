@@ -125,7 +125,11 @@ entry :=
     expiry: "<YYYY-MM-DD>"
 ```
 
-- `path`는 추적 파일의 저장소 상대 경로이며 절대경로, `..`, 빈 값, 디렉터리, 글로브 문자를 거부합니다.
+- `path`는 정확한 저장소 상대 경로 문자열이며 절대경로, `..`, 빈 값, 글로브 문자를 거부합니다.
+  대상 파일이 현재 없으면 항목은 어떤 매치에도 적용되지 않는 비활성 상태로 남고, expiry 의무는
+  그대로 적용됩니다. 이 성질로 부분 fixture에서도 운영 목록 원본을 복사해 같은 파서를 검증합니다.
+- 허용 목록 파일 자체는 추적된 일반 파일이어야 하며, worktree 모드는 작업공간 사본을, index 모드는
+  스테이지된 blob을 읽습니다. 외부·미추적 목록을 환경변수로 주입해 검사를 우회할 수 없습니다.
 - 값은 큰따옴표 한 쌍 안의 단일 행이며 큰따옴표·역슬래시·개행을 값에 허용하지 않습니다.
 - 필드 순서와 들여쓰기는 위 계약 그대로입니다. 알 수 없는 줄·필드, 중복 필드, 항목 0개는 문법 오류입니다.
 - `line_hash`는 줄 끝 개행을 제외한 정확한 바이트를 `git hash-object --stdin`에 넣은 값입니다.
@@ -312,9 +316,85 @@ RED_EXIT_CODE=1
 → 뭐가 나왔나: 22회가 모두 실행됐고, 허용이 필요한 항목은 기존 판정 그대로 실패했으며 모드 갈림도 1건 재현됐습니다.
 → 좋은 소식인가 나쁜 소식인가: 구현 전 RED가 문법 문제가 아니라 요구한 동작 부재로 실패했으므로 시험 자격은 좋은 소식입니다.
 
-GREEN, 종단 검사, 뮤테이션, V1, V2, codeaudit의 명령·시각·종료값·전체 출력·SHA·세션 식별자를
-이 절에 이어서 추가합니다. 필수 검사가 하나라도 `FAIL`, `NOT_RUN`, `BLOCKED`이면 최종 PASS로
-승격하지 않습니다.
+#### 10-2. GREEN — 단일 줄 소비와 모드 동일성
+
+시각 `2026-09-05T00:36:53+09:00`부터 `00:37:04+09:00`, HEAD `1b0439d` 위의 스테이지된
+GREEN 후보에서 RED와 같은 원명령을 다시 실행했고 종료값은 0이었습니다. RED 커밋
+`1b0439d` 이후 `scripts/acceptance-secret-allowlist.sh`의 기대값과 표본은 바꾸지 않았습니다.
+
+```text
+[1/22] 양성 대조군 탐지 (worktree) -> PASS (exit=1)
+[2/22] 양성 대조군 탐지 (index) -> PASS (exit=1)
+[3/22] 등재된 정확한 한 줄 (worktree) -> PASS (exit=0)
+[4/22] 등재된 정확한 한 줄 (index) -> PASS (exit=0)
+[5/22] 같은 파일의 같은 값 두 번째 줄 (worktree) -> PASS (exit=1)
+[6/22] 같은 파일의 같은 값 두 번째 줄 (index) -> PASS (exit=1)
+[7/22] 등재된 줄 한 글자 변경 (worktree) -> PASS (exit=1)
+[8/22] 등재된 줄 한 글자 변경 (index) -> PASS (exit=1)
+[9/22] 등재된 줄의 줄번호 이동 (worktree) -> PASS (exit=0)
+[10/22] 등재된 줄의 줄번호 이동 (index) -> PASS (exit=0)
+[11/22] expiry 누락 (worktree) -> PASS (exit=2)
+[12/22] expiry 누락 (index) -> PASS (exit=2)
+[13/22] expiry 만료 (worktree) -> PASS (exit=2)
+[14/22] expiry 만료 (index) -> PASS (exit=2)
+[15/22] 허용 목록 파일 없음 (worktree) -> PASS (exit=2)
+[16/22] 허용 목록 파일 없음 (index) -> PASS (exit=2)
+[17/22] 허용 목록 문법 위반 (worktree) -> PASS (exit=2)
+[18/22] 허용 목록 문법 위반 (index) -> PASS (exit=2)
+[19/22] 추적 심볼릭 링크의 바깥 내용은 비범위 (worktree) -> PASS (exit=0)
+[20/22] 추적 심볼릭 링크의 바깥 내용은 비범위 (index) -> PASS (exit=0)
+[21/22] 추적 심볼릭 링크의 저장 문자열은 탐지 (worktree) -> PASS (exit=1)
+[22/22] 추적 심볼릭 링크의 저장 문자열은 탐지 (index) -> PASS (exit=1)
+ALLOWED_LINES_COUNT=1
+MODE_MISMATCH_COUNT=0
+UNEXPECTED_MISSED_COUNT=0
+CHECKED: 22
+PASS: 줄 내용 허용 목록과 두 스캔 모드가 AC-ALLOWLIST-1을 만족한다
+OK(run-acceptance): scripts/acceptance-secret-allowlist.sh — 판정 23건, CHECKED 22
+EXIT_CODE=0
+```
+
+→ 무엇을 시켰나: RED에서 고정한 6항목×2모드와 심볼릭 링크 회귀를 구현 후 같은 래퍼로 실행했습니다.
+→ 뭐가 나왔나: 허용 항목 하나가 한 매치만 소비했고, 내용 변경은 잡고 줄 이동은 허용했으며,
+잘못된 억제는 exit 2로 닫혔고 모드 불일치는 0이었습니다.
+→ 좋은 소식인가 나쁜 소식인가: AC-ALLOWLIST-1의 핵심인 파일 전체 면제 금지와 모드 동일성을
+실행으로 만족했으므로 좋은 소식입니다.
+
+#### 10-3. 실제 항목·규칙 비변경·현재 오탐 실측
+
+- `.secret-allowlist.yaml`에 요청된 두 경로의 현재 정확한 줄 지문을 등재했고, 각 지문을 원문에서
+  다시 계산한 결과 모두 일치했습니다. 원문 값은 로그에 출력하지 않았습니다.
+- `.secret-patterns.default`의 HEAD blob과 작업공간 blob은 모두
+  `5541a33a6b96ba0e16d8680dfe4154779968ecab`로 같아 탐지 규칙 변경은 0줄입니다.
+- 저장소 밖 임시 규칙에서 먼저 조립한 양성 대조군이 `/usr/bin/grep`에 CAUGHT됨을 확인한 뒤,
+  인용형 규칙의 키워드 집합만 세 이름으로 확장해 index blob 229개를 측정했습니다.
+
+```text
+POSITIVE_CONTROL=CAUGHT
+MATCH_PATH=docs/engineering/humansearch-v6-founding-spec-2026-08-07.md MATCH_LINES=1
+MATCH_PATH=scripts/acceptance-secret-webhook-vendor.sh MATCH_LINES=1
+QUOTED_RULE_CURRENT_MATCHES=2
+SCANNER_ERRORS=0
+```
+
+이 결과는 규칙을 켰다는 뜻이 아닙니다. 이번 작업은 두 오탐을 정확한 줄 내용에 묶는 예외 경로만
+만들었고, 인용형·camelCase·docker-compose 형식 구멍 본체는 `secret-format-gap`에 그대로 남습니다.
+
+#### 10-4. 영향 회귀 중간 증거
+
+- 실제 저장소 종단: worktree/index 각각 `ALLOWED_LINES_COUNT=2`, `ALLOWED_MATCHES_CONSUMED=0`,
+  추적 파일 매치 0, 스캐너 오류 0, exit 0.
+- `acceptance-0-2-unreachable-content.sh`: `CHECKED: 13`, exit 0.
+- `acceptance-hs-a3.sh`: `CHECKED: 25`, exit 0.
+- `acceptance-hs-a4.sh`: `CHECKED: 30`, exit 0.
+- `acceptance-secret-webhook-vendor.sh`: `CHECKED: 44`, `UNCOVERED_BASELINE_RULES=17`,
+  `OLD_CAUGHT_AND_NEW_MISSED_COUNT=0`, exit 0.
+- `acceptance-verify-ac-m.sh`: 새 target 되돌림이 죽은 target으로 실패했고, 실제 명부 18건이
+  일치했으며 `CHECKED: 32`, exit 0.
+
+GREEN 커밋, P13 8종 시연, 파일·함수 경계, 외부 사본 뮤테이션, no-local CI 재현, V1, V2,
+codeaudit의 명령·시각·종료값·본문·SHA·세션 식별자는 이 절에 이어서 추가합니다. 필수 검사가
+하나라도 `FAIL`, `NOT_RUN`, `BLOCKED`이면 최종 PASS로 승격하지 않습니다.
 
 ### 11. 제출 직전 사람 감사
 

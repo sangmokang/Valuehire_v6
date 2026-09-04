@@ -70,7 +70,7 @@ else
   # (2026-08-07 실측: AKIA…·ghp_… 가 그대로 커밋됨). 빈 값이면 verify.sh 가
   # .secret-patterns.default + .secret-patterns 합집합이라는 기본 경로를 탄다.
   vrc=0
-  SECRET_PATTERNS_FILE= VERIFY_SCAN_SOURCE=index bash verify.sh >/dev/null 2>&1 || vrc=$?
+  SECRET_PATTERNS_FILE= SECRET_ALLOWLIST_FILE= VERIFY_SCAN_SOURCE=index bash verify.sh >/dev/null 2>&1 || vrc=$?
   if [ "$vrc" -ne 0 ]; then
     block "비밀 스캔 실패 (verify.sh --index exit=$vrc). 상세: VERIFY_SCAN_SOURCE=index bash verify.sh"
   fi
@@ -109,7 +109,7 @@ else
         # .check-weakening-patterns 는 일부러 넣지 않는다 — 그 파일 자체가 약화
         # 리터럴 목록이라 새 약화 패턴을 추가하는 정당한 작업이 자기 매칭으로
         # 영구 차단된다(넣었다가 되돌린 이유를 남긴다).
-        *.sh|*.yml|*.yaml|hooks/*|.secret-patterns.default)
+        *.sh|*.yml|*.yaml|hooks/*|.secret-patterns.default|.secret-allowlist.yaml)
           if scan_added "검사약화" "$f" -Ef "$wf"; then
             block "검사 약화 패턴 추가 — $f (P13). 정당하면 suppressions.yaml 에 expiry 와 함께 등록하라"
           fi
@@ -121,12 +121,17 @@ else
 fi
 
 # ── 4) 만료일 없는 억제 (P13 ③ · 98d923f 35일 방치 재현 방지) ─────────────────
-if printf '%s\n' "$staged" | grep -qx 'suppressions.yaml'; then
-  sup=$(git show ":suppressions.yaml")
-  n_check=$(printf '%s\n' "$sup" | awk '/^- *check:/{c++} END{print c+0}')
+for sup_file in suppressions.yaml .secret-allowlist.yaml; do
+  if ! printf '%s\n' "$staged" | /usr/bin/grep -qx "$sup_file"; then continue; fi
+  sup=$(git show ":$sup_file")
+  if [ "$sup_file" = suppressions.yaml ]; then
+    n_items=$(printf '%s\n' "$sup" | awk '/^- *check:/{c++} END{print c+0}')
+  else
+    n_items=$(printf '%s\n' "$sup" | awk '/^- *path:/{c++} END{print c+0}')
+  fi
   n_exp=$(printf '%s\n' "$sup" | awk '/^ *expiry:/{c++} END{print c+0}')
-  if [ "$n_check" -ne "$n_exp" ]; then
-    block "억제 항목 ${n_check}건 중 expiry 가 ${n_exp}건뿐 — 만료일 없는 억제는 영구화된다 (P13)"
+  if [ "$n_items" -ne "$n_exp" ]; then
+    block "$sup_file 억제 항목 ${n_items}건 중 expiry 가 ${n_exp}건뿐 — 만료일 없는 억제는 영구화된다 (P13)"
   fi
   # 개수만 맞추면 expiry: 1999-01-01 도 통과한다. 날짜 자체를 본다.
   # 값 정제를 하지 않는다 — gsub 로 숫자만 남기면 'never' 가 빈 문자열이 되어
@@ -134,13 +139,13 @@ if printf '%s\n' "$staged" | grep -qx 'suppressions.yaml'; then
   # (빈 값 / '99-01-01' / 'never' / '9999-99-99' 가 전부 통과하던 것을 막는다)
   today=$(date +%Y-%m-%d)
   while IFS= read -r e; do
-    if ! printf '%s' "$e" | grep -qE '^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$'; then
-      block "expiry 형식이 YYYY-MM-DD 가 아니다: '${e}' — 만료를 판정할 수 없는 억제는 무기한 억제다 (P13)"
+    if ! printf '%s' "$e" | /usr/bin/grep -qE '^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$'; then
+      block "$sup_file expiry 형식이 YYYY-MM-DD 가 아니다: '${e}' — 만료를 판정할 수 없는 억제는 무기한 억제다 (P13)"
     elif [ "$e" \< "$today" ]; then
-      block "만료된 억제가 남아 있다 (expiry: $e < 오늘 $today) — 유예는 기한이 지나면 해제되어야 한다 (P13)"
+      block "$sup_file 에 만료된 억제가 남아 있다 (expiry: $e < 오늘 $today) — 유예는 기한이 지나면 해제되어야 한다 (P13)"
     fi
   done <<< "$(printf '%s\n' "$sup" | awk '/^ *expiry:/{sub(/^ *expiry: */,""); gsub(/["\x27]/,""); print}')"
-fi
+done
 
 # ── 5) LLM 출력 숫자를 판정 필드에 (P14 · v4 QA-094 재현 방지) ────────────────
 while IFS= read -r f; do
