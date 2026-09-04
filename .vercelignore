@@ -1,0 +1,15 @@
+/*
+!api
+!api/**
+!apps
+apps/*
+!apps/production-admin
+!apps/production-admin/**
+apps/production-admin/package.json
+!server
+server/*
+!server/admin
+!server/admin/**
+!package.json
+!package-lock.json
+!vercel.json

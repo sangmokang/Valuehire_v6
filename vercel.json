@@ -1,0 +1,22 @@
+{
+  "version": 2,
+  "outputDirectory": "apps/production-admin",
+  "rewrites": [
+    { "source": "/admin", "destination": "/index.html" },
+    { "source": "/admin/ui.js", "destination": "/ui.js" },
+    { "source": "/admin/styles.css", "destination": "/styles.css" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "no-referrer" },
+        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" },
+        { "key": "Strict-Transport-Security", "value": "max-age=31536000; includeSubDomains" },
+        { "key": "Cache-Control", "value": "no-store" },
+        { "key": "Content-Security-Policy", "value": "default-src 'self'; connect-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'" }
+      ]
+    }
+  ]
+}

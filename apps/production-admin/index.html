@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <title>ValueHire Admin</title>
+    <link rel="stylesheet" href="/admin/styles.css">
+    <script type="module" src="/admin/ui.js"></script>
+  </head>
+  <body>
+    <main class="shell" id="app">
+      <section class="login-panel" aria-labelledby="login-title">
+        <p class="eyebrow">ValueHire v6</p>
+        <h1 id="login-title">관리자 검토</h1>
+        <form id="login-form" class="login-form">
+          <label>
+            이메일
+            <input id="email" name="email" type="email" autocomplete="username" required>
+          </label>
+          <label>
+            비밀번호
+            <input id="password" name="password" type="password" autocomplete="current-password" required>
+          </label>
+          <button type="submit">로그인</button>
+          <p id="login-error" class="error" role="alert" aria-live="assertive"></p>
+        </form>
+      </section>
+
+      <section id="candidate-region" class="workspace" aria-labelledby="workspace-title" hidden>
+        <header class="workspace-header">
+          <div>
+            <p class="eyebrow">한 포지션 · 한 후보자</p>
+            <h2 id="workspace-title">검토 상태</h2>
+          </div>
+          <button id="logout-button" type="button" class="secondary">로그아웃</button>
+        </header>
+        <div id="candidate-list" class="candidate-list" aria-live="polite"></div>
+      </section>
+
+      <p id="status-message" class="status" role="status" aria-live="polite"></p>
+    </main>
+  </body>
+</html>

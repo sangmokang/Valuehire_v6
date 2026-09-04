@@ -1,0 +1,20 @@
+{
+  "private": true,
+  "name": "valuehire-v6",
+  "version": "0.0.0",
+  "type": "commonjs",
+  "engines": {
+    "node": "24.x"
+  },
+  "scripts": {
+    "audit:production": "npm audit --omit=dev --audit-level=high",
+    "deploy:preview": "bash scripts/deploy-preview.sh",
+    "test:production-admin": "node --test tests/production-admin/*.test.mjs",
+    "smoke:preview-admin": "node scripts/smoke-preview-admin.mjs",
+    "smoke:production-readonly": "node scripts/smoke-production-readonly.mjs",
+    "verify:production-rollback-readonly": "node scripts/verify-production-rollback.mjs",
+    "mutate:production-admin": "node scripts/mutate-production-admin-behavior.mjs",
+    "verify:production-admin": "node --test tests/production-admin/*.test.mjs && node scripts/check-preview-smoke-contract.mjs && node scripts/verify-production-admin-static.mjs",
+    "acceptance:production-walking-skeleton": "bash scripts/acceptance-production-walking-skeleton.sh"
+  }
+}
