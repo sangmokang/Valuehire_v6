@@ -19,7 +19,7 @@ cd "$REPO" || {
 
 VERIFY=$REPO/verify.sh
 PATTERNS=$REPO/.secret-patterns.default
-EXPECTED_CHECKS=33
+EXPECTED_CHECKS=37
 SNAP0=$(git status --porcelain)
 
 if [ ! -x /usr/bin/grep ] || [ ! -f "$VERIFY" ] || [ ! -s "$PATTERNS" ]; then
@@ -252,6 +252,43 @@ make_symlink_trailing_newline_repo() {
   )
 }
 
+make_colon_path_repo() {
+  CASE_REPO=$TMP/colon-path
+  mkdir -p "$CASE_REPO"
+  git init -q "$CASE_REPO"
+  cp "$VERIFY" "$CASE_REPO/verify.sh"
+  cp "$PATTERNS" "$CASE_REPO/.secret-patterns.default"
+  printf '%s\n' "$SAFE" > "$CASE_REPO/payload.txt"
+  printf '%s\n' "$CANARY" > "$CASE_REPO/0:payload.txt"
+  write_allowlist "$CASE_REPO" '0:payload.txt' "$(hash_line "$SAFE")" valid || return 2
+  (
+    cd "$CASE_REPO" || exit 2
+    git config user.email acceptance@local
+    git config user.name acceptance
+    git add -A
+    git commit -qm fixture
+  )
+}
+
+make_colon_allowlist_repo() {
+  CASE_REPO=$TMP/colon-allowlist
+  mkdir -p "$CASE_REPO"
+  git init -q "$CASE_REPO"
+  cp "$VERIFY" "$CASE_REPO/verify.sh"
+  cp "$PATTERNS" "$CASE_REPO/.secret-patterns.default"
+  printf '%s\n' "$CANARY" > "$CASE_REPO/payload.txt"
+  write_allowlist "$CASE_REPO" payload.txt "$(hash_line "$CANARY")" valid || return 2
+  mv "$CASE_REPO/.secret-allowlist.yaml" "$CASE_REPO/policy.yaml"
+  printf '%s\n' malformed > "$CASE_REPO/0:policy.yaml"
+  (
+    cd "$CASE_REPO" || exit 2
+    git config user.email acceptance@local
+    git config user.name acceptance
+    git add -A
+    git commit -qm fixture
+  )
+}
+
 checked=0
 fail=0
 unexpected_missed=0
@@ -374,6 +411,14 @@ run_pair "추적 심볼릭 링크의 저장 문자열은 탐지" "$CASE_REPO" 1 
 make_symlink_trailing_newline_repo || exit 2
 run_pair "끝 개행이 있는 링크 대상의 저장 바이트 동일성" \
   "$CASE_REPO" 0 1 .secret-allowlist.yaml .patterns.empty-line "$CASE_REPO/shims"
+
+# 34~35: Git stage 문법처럼 보이는 추적 파일명도 두 모드가 같은 리터럴 경로의 blob을 읽어야 한다.
+make_colon_path_repo || exit 2
+run_pair "stage 문법형 추적 파일명의 리터럴 blob" "$CASE_REPO" 1 1
+
+# 36~37: 대체 허용 목록 이름도 stage 문법으로 재해석하지 않고 그 리터럴 정책을 검증해야 한다.
+make_colon_allowlist_repo || exit 2
+run_pair "stage 문법형 허용 목록 경로의 리터럴 정책" "$CASE_REPO" 2 0 '0:policy.yaml'
 
 SNAP1=$(git status --porcelain)
 if [ "$SNAP0" != "$SNAP1" ]; then
