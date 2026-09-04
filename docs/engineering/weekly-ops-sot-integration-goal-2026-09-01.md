@@ -1158,3 +1158,27 @@ checkpoint 근거가 아니다.
 - 보정 후 fresh GREEN: 단위 150 tests OK, sot_gate `CHECKED: 89` exit 0, acceptance
   `CHECKED: 65` exit 0(mutation 32종 생존 0), verify.sh PASS, clean.
 
+### 2026-09-04 fresh Codex V2 9차 결과와 보정
+
+- V2 9차 artifact: `.omx/artifacts/codex-v2-pii-3layer-round9-20260904.md` (검토 대상 HEAD
+  `9f99627367df22975f344d2dd89283cecf81f5c5`, diff hash
+  `cedeb788327b023b62c35253d6c53cbe62304ba83bf598ebaccaa33b070dd7d5`) — verdict `FAIL`.
+  1~8차 반례 표본(라운드당 대표 1건 이상, 총 15건)은 전부 독립 재현으로 CLOSED 유지 확인.
+- 신규 반례: 국가번호(+/00) 없는 북미식(NANP) 국내 전화번호 형식
+  `(415) 555-2671` / `415-555-2671` / `415.555.2671`이 `contract_gate.py`의
+  `PHONE_PATTERN`(한국식 전용)과 `INTL_PHONE_PATTERN`(+/00 요구)을 모두 통과해
+  입력 게이트와 최종 렌더링 재검사 양쪽에서 JSON/Markdown/HTML로 그대로 발행됐다
+  (`weekly_gate.py` main 종단 재현, exit 0, 값 포함 확인).
+  file:line — `contract_gate.py:52`(한국 전용), `contract_gate.py:83`(국가번호 필수).
+- 채택·보정(R9 회귀 편입): `NANP_PHONE_PATTERN`(`\(?[2-9]\d{2}\)?[-. ][2-9]\d{2}[-. ]\d{4}`,
+  경계 lookaround 포함)을 `find_sensitive_text` 판정에 추가.
+  `test_codex_v2_round9_false_negative_formats_are_blocked` 3종 회귀 추가, RED 확인 뒤
+  최소 구현으로 GREEN 전환. 기존 정당 값(날짜·업무 수치·해시 등)과 자릿수 경계가
+  겹치지 않음을 `test_legitimate_values_have_zero_false_positives`,
+  `test_business_delta_notation_is_not_an_intl_phone` 재통과로 확인.
+- RED 커밋 `3634a10`, GREEN 커밋 `5bf1896`(fresh HEAD
+  `5bf18966d5a6b9fe53e0827e0d77a14d86784a5c`).
+- 보정 후 fresh GREEN: 단위 151 tests OK, sot_gate `CHECKED: 89` exit 0, acceptance
+  `CHECKED: 65` exit 0(mutation 32종 생존 0), verify.sh PASS, clean. 새 tracked diff hash
+  `3e7a608956472b9681279308f4e805ce382f33809640f3b2318bff2b6a87a112`.
+
