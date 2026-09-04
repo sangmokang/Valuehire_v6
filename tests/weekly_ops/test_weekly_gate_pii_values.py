@@ -177,6 +177,17 @@ class WeeklyGatePiiValueTest(unittest.TestCase):
             with self.subTest(value=value):
                 self.assert_action_value_blocked(value)
 
+    def test_codex_v2_round8_false_negative_formats_are_blocked(self):
+        # 2026-09-04 fresh Codex V2 8차 FAIL 반례의 영구 회귀 (R9)
+        for value in (
+            "후보자 연락처 john.doe@example.com.",
+            '후보 데이터: {"contactName":"John Doe"}',
+            "후보자 전화: (+33) 1 42 68 53 00",
+            "후보자 전화: 00 33 1 42 68 53 00",
+        ):
+            with self.subTest(value=value):
+                self.assert_action_value_blocked(value)
+
     def test_business_delta_notation_is_not_an_intl_phone(self):
         bundle = valid_bundle()
         bundle["positions"][0]["action"] = "전주 대비 +1 234 567건 증가"
