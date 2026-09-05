@@ -19,7 +19,7 @@ cd "$REPO" || {
 
 VERIFY=$REPO/verify.sh
 PATTERNS=$REPO/.secret-patterns.default
-EXPECTED_CHECKS=61
+EXPECTED_CHECKS=63
 SNAP0=$(git status --porcelain)
 HEAD0=$(git rev-parse HEAD)
 
@@ -58,6 +58,22 @@ SELF_MATCH=$(printf '%s%s' 'AKIA' '0123456789ABCDEF')
 # 어떤 MISSED도 허용 증거로 세기 전에 현재 패턴이 양성 대조군을 실제로 잡는지 확인한다.
 if ! printf '%s\n' "$CANARY" | /usr/bin/grep -qEif "$CLEAN"; then
   echo "NOT_RUN: 양성 대조군을 /usr/bin/grep이 잡지 못했다"
+  echo "CHECKED: 0"
+  exit 2
+fi
+
+# 복합 대조군: 서로 다른 두 규칙(단축 키워드·따옴표 자격증명)에 동시에 걸리는 한 줄.
+DUAL=$(printf 'DEPLOY_CREDENTIAL=key4chain # %s="%s"' "$KEY" "$VALUE")
+UNIQ_PATTERNS=$TMP/patterns.uniq
+awk '!seen[$0]++' "$CLEAN" > "$UNIQ_PATTERNS"
+dual_rules=0
+while IFS= read -r pat; do
+  if printf '%s\n' "$DUAL" | /usr/bin/grep -aqEi -e "$pat"; then
+    dual_rules=$((dual_rules + 1))
+  fi
+done < "$UNIQ_PATTERNS"
+if [ "$dual_rules" -lt 2 ]; then
+  echo "NOT_RUN: 복합 대조군이 서로 다른 두 규칙에 걸리지 않는다 (matched=$dual_rules)"
   echo "CHECKED: 0"
   exit 2
 fi
@@ -547,6 +563,12 @@ run_pair "존재하지 않는 expiry 달" "$CASE_REPO" 2
 
 make_regular_repo invalid-day "$CANARY" "$(hash_line "$CANARY")" invalid-day || exit 2
 run_pair "존재하지 않는 expiry 날짜" "$CASE_REPO" 2
+
+# 62~63: 서로 다른 두 규칙에 동시에 걸리는 복합 줄은 허용 등재로도 통과될 수 없다.
+# 무해해 보이는 매치 뒤에 같은 줄로 실린 다른 규칙의 비밀까지 함께 삼켜지는 것을 막는다.
+make_regular_repo composite "$DUAL" "$(hash_line "$DUAL")" valid || exit 2
+run_pair "복합(다중 규칙) 줄의 허용 거부" "$CASE_REPO" 1
+
 
 SNAP1=$(git status --porcelain)
 HEAD1=$(git rev-parse HEAD)
