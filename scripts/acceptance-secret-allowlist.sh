@@ -19,7 +19,7 @@ cd "$REPO" || {
 
 VERIFY=$REPO/verify.sh
 PATTERNS=$REPO/.secret-patterns.default
-EXPECTED_CHECKS=63
+EXPECTED_CHECKS=65
 SNAP0=$(git status --porcelain)
 HEAD0=$(git rev-parse HEAD)
 
@@ -569,6 +569,13 @@ run_pair "존재하지 않는 expiry 날짜" "$CASE_REPO" 2
 make_regular_repo composite "$DUAL" "$(hash_line "$DUAL")" valid || exit 2
 run_pair "복합(다중 규칙) 줄의 허용 거부" "$CASE_REPO" 1
 
+
+
+# 64~65: 소문자 변형 복합 줄도 같은 판정이어야 한다 — 규칙 수 계산에서 -i 를 빼는 변조가
+# 소문자 자격증명 밀수를 되살리는 것을 실측으로 확인했고(-i 제거 변조판 rc=0), 여기 고정한다.
+DUAL_LOWER=$(printf 'DEPLOY_CREDENTIAL=key4chain # %s="%s"' "$(printf '%s' "$KEY" | tr 'A-Z' 'a-z')" "$VALUE")
+make_regular_repo composite-lower "$DUAL_LOWER" "$(hash_line "$DUAL_LOWER")" valid || exit 2
+run_pair "소문자 복합 줄의 허용 거부" "$CASE_REPO" 1
 
 SNAP1=$(git status --porcelain)
 HEAD1=$(git rev-parse HEAD)

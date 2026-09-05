@@ -70,7 +70,7 @@ count_matching_rules() {
   local line="$1" pat n=0 rc
   while IFS= read -r pat; do
     rc=0
-    printf '%s\n' "$line" | /usr/bin/grep -aqEi -e "$pat" || rc=$?
+    printf '%s\n' "$line" | LC_ALL=C /usr/bin/grep -aqEi -e "$pat" || rc=$?
     if [ "$rc" -eq 0 ]; then
       n=$((n + 1))
       if [ "$n" -ge 2 ]; then break; fi
