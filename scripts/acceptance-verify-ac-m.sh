@@ -5,7 +5,7 @@
 #   정본: docs/engineering/verify-unification-goal-2026-08-10.md:78-81 (AC-M)
 #   출력 : 항목마다 PASS:/FAIL: 전부 출력, 마지막 줄 `CHECKED: <검사 수>`
 #   exit : 0 = PASS | 1 = FAIL | 2 = NOT_RUN
-#   불변식: CHECKED 는 정확히 33 이어야 한다 — 검사가 몇 개 사라져도 초록이면 가짜다
+#   불변식: CHECKED 는 정확히 34 이어야 한다 — 검사가 몇 개 사라져도 초록이면 가짜다
 #           (PR #6 결함 D3 의 교훈: checked==0 만 막으면 3개를 지워도 통과했다 · P20)
 #
 # 쓰기 규칙: 이 검사는 저장소에 어떤 파일도 만들지 않는다. 동적 fixture 는 전부
@@ -24,7 +24,7 @@ SNAP0=$(git status --porcelain)
 CHECKER=scripts/verify/check-mechanism-registry.sh
 FIXDIR=scripts/verify/fixtures/mechanism-registry
 REGISTRY=docs/sot/mechanism-registry.yaml
-EXPECTED_CHECKED=33
+EXPECTED_CHECKED=34
 
 TMP=$(mktemp -d) || { echo "NOT_RUN: mktemp 실패"; echo "CHECKED: 0"; exit 2; }
 trap 'rm -rf "$TMP"' EXIT
@@ -367,6 +367,40 @@ else
     echo "PASS: P13 PASS-only alias + 인라인 주석 재배선 → 죽은 target 불합격 (exit=1)"
   else
     printf 'FAIL: P13 PASS-only alias + 인라인 주석 재배선 (기대 exit=1, 실제 %s)\n' "$p13_rewire_rc"
+    fail=1
+  fi
+fi
+
+# 정본과 같은 파일도 `./` 경로 별칭으로 넘기면 필수-ID 검사가 빠져서는 안 된다.
+# clean workflow를 유지한 별도 no-local 사본에서 P13 ID만 제거해 이 경계를 고정한다.
+p13_path_repo="$TMP/p13-path-repo"
+checked=$((checked + 1))
+p13_path_setup=0
+git clone --no-local --no-checkout "$REPO" "$p13_path_repo" >/dev/null 2>&1 || p13_path_setup=1
+if [ "$p13_path_setup" -eq 0 ]; then
+  git -C "$p13_path_repo" checkout --detach "$(git rev-parse HEAD)" >/dev/null 2>&1 || p13_path_setup=1
+fi
+if [ "$p13_path_setup" -eq 0 ]; then
+  awk '
+    BEGIN { drop=0 }
+    /^- id: "p13-hook-acceptance-ci"$/ { drop=1; next }
+    drop && /^  required: true$/ { drop=0; next }
+    !drop { print }
+  ' "$p13_path_repo/docs/sot/mechanism-registry.yaml" > "$TMP/p13-path-registry.yaml" || p13_path_setup=1
+  mv "$TMP/p13-path-registry.yaml" "$p13_path_repo/docs/sot/mechanism-registry.yaml" || p13_path_setup=1
+fi
+if [ "$p13_path_setup" -ne 0 ] || \
+   /usr/bin/grep -qF 'p13-hook-acceptance-ci' "$p13_path_repo/docs/sot/mechanism-registry.yaml"; then
+  echo "FAIL: P13 명부 경로 별칭 fixture 설정 실패"
+  fail=1
+else
+  p13_path_rc=0
+  (cd "$p13_path_repo" && bash scripts/verify/check-mechanism-registry.sh ./docs/sot/mechanism-registry.yaml) \
+    >/dev/null 2>&1 || p13_path_rc=$?
+  if [ "$p13_path_rc" -eq 1 ]; then
+    echo "PASS: P13 필수 ID 삭제 + 정본 ./ 경로 별칭 → 불합격 (exit=1)"
+  else
+    printf 'FAIL: P13 필수 ID 삭제 + 정본 ./ 경로 별칭 (기대 exit=1, 실제 %s)\n' "$p13_path_rc"
     fail=1
   fi
 fi
