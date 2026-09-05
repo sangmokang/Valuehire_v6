@@ -19,7 +19,7 @@ cd "$REPO" || {
 
 VERIFY=$REPO/verify.sh
 PATTERNS=$REPO/.secret-patterns.default
-EXPECTED_CHECKS=57
+EXPECTED_CHECKS=59
 SNAP0=$(git status --porcelain)
 
 if [ ! -x /usr/bin/grep ] || [ ! -f "$VERIFY" ] || [ ! -s "$PATTERNS" ]; then
@@ -354,6 +354,7 @@ make_empty_final_line_repo() {
   : > "$CASE_REPO/.secret-allowlist.yaml"
   blank_hash=$(hash_line '')
   blank_count=$(/usr/bin/grep -c '^$' "$CASE_REPO/verify.sh")
+  EMPTY_ALLOWED_COUNT=$((blank_count + 1))
   for ((i=0; i<blank_count; i++)); do
     append_allowlist_entry "$CASE_REPO" verify.sh "$blank_hash"
   done
@@ -378,7 +379,8 @@ run_mode() {
   local allowlist_source="${6:-.secret-allowlist.yaml}"
   local patterns_source="${7:-.secret-patterns.default}"
   local path_prefix="${8:-}"
-  local out=$TMP/output.$checked rc=0 bad_reason=0
+  local required_line="${9:-}"
+  local out=$TMP/output.$checked rc=0 bad_reason=0 missing_required=0
   (
     cd "$repo" || exit 2
     PATH="${path_prefix:+$path_prefix:}$PATH" \
@@ -393,11 +395,14 @@ run_mode() {
     1) /usr/bin/grep -qF 'scanner error' "$out" && bad_reason=1 ;;
     2) /usr/bin/grep -qF 'scanner error' "$out" || bad_reason=1 ;;
   esac
-  if [ "$rc" -eq "$want" ] && [ "$bad_reason" -eq 0 ]; then
+  if [ -n "$required_line" ] && ! /usr/bin/grep -qxF "$required_line" "$out"; then
+    missing_required=1
+  fi
+  if [ "$rc" -eq "$want" ] && [ "$bad_reason" -eq 0 ] && [ "$missing_required" -eq 0 ]; then
     printf '[%d/%d] %s (%s) -> PASS (exit=%d)\n' "$checked" "$EXPECTED_CHECKS" "$desc" "$mode" "$rc"
   else
-    printf '[%d/%d] %s (%s) -> FAIL (expected=%d actual=%d scanner_error=%d)\n' \
-      "$checked" "$EXPECTED_CHECKS" "$desc" "$mode" "$want" "$rc" "$bad_reason"
+    printf '[%d/%d] %s (%s) -> FAIL (expected=%d actual=%d scanner_error=%d required_output=%d)\n' \
+      "$checked" "$EXPECTED_CHECKS" "$desc" "$mode" "$want" "$rc" "$bad_reason" "$missing_required"
     sed 's/^/       /' "$out"
     fail=1
   fi
@@ -411,12 +416,12 @@ run_pair() {
   local desc="$1" repo="$2" want="$3" forbid_scanner_error="${4:-0}"
   local allowlist_source="${5:-.secret-allowlist.yaml}"
   local patterns_source="${6:-.secret-patterns.default}"
-  local path_prefix="${7:-}" worktree_rc index_rc
+  local path_prefix="${7:-}" required_line="${8:-}" worktree_rc index_rc
   run_mode "$desc" "$repo" worktree "$want" "$forbid_scanner_error" \
-    "$allowlist_source" "$patterns_source" "$path_prefix"
+    "$allowlist_source" "$patterns_source" "$path_prefix" "$required_line"
   worktree_rc=$LAST_RC
   run_mode "$desc" "$repo" index "$want" "$forbid_scanner_error" \
-    "$allowlist_source" "$patterns_source" "$path_prefix"
+    "$allowlist_source" "$patterns_source" "$path_prefix" "$required_line"
   index_rc=$LAST_RC
   if [ "$worktree_rc" -ne "$index_rc" ]; then
     printf 'MODE_MISMATCH: %s worktree=%d index=%d\n' "$desc" "$worktree_rc" "$index_rc"
@@ -507,7 +512,7 @@ run_pair "stage 문법형 허용 목록 경로의 리터럴 정책" "$CASE_REPO"
 make_nul_allowlist_repo || exit 2
 run_pair "허용 목록 NUL 뒤 문법 위반" "$CASE_REPO" 2 1
 
-# 42~57: goal에 고정한 바이트·경로·읽기 실패·정규식 오류·달력 경계를 두 모드에서 적대 검증한다.
+# 42~59: goal에 고정한 바이트·경로·읽기 실패·정규식 오류·달력 경계를 두 모드에서 적대 검증한다.
 make_regular_repo crlf "$(printf '%s\r\n%s' "$CANARY" "$SAFE")" \
   "$(hash_line "$CANARY"$'\r')" valid || exit 2
 run_pair "CRLF 매치 줄의 정확한 바이트 지문" "$CASE_REPO" 0 1
@@ -515,6 +520,8 @@ run_pair "CRLF 매치 줄의 정확한 바이트 지문" "$CASE_REPO" 0 1
 make_empty_final_line_repo || exit 2
 run_pair "빈 마지막 줄의 정확한 소비" "$CASE_REPO" 0 1 \
   .secret-allowlist.yaml "$TMP/empty-final.patterns"
+run_pair "빈 마지막 줄이 실제로 소비됐다는 출력 증거" "$CASE_REPO" 0 1 \
+  .secret-allowlist.yaml "$TMP/empty-final.patterns" '' "ALLOWED_MATCHES_CONSUMED=$EMPTY_ALLOWED_COUNT"
 
 make_special_name_repo || exit 2
 run_pair "공백·개행·선행하이픈 추적 파일명" "$CASE_REPO" 1 1
