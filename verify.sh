@@ -60,6 +60,27 @@ if [ ! -s "$CLEAN" ]; then
   exit 2
 fi
 
+# 복합 줄 차단: 한 줄이 서로 다른 패턴 규칙 2개 이상에 걸리면 허용 목록으로도 통과할 수
+# 없다. 무해한 매치(예: 저장 방식 이름) 뒤에 같은 줄로 실린 다른 규칙의 진짜 비밀까지
+# 항목 하나가 함께 삼키는 것을 막는다. 중복 패턴 줄은 하나의 규칙으로 센다.
+UNIQ_RULES=$TMP/patterns.uniq
+awk '!seen[$0]++' "$CLEAN" > "$UNIQ_RULES"
+
+count_matching_rules() {
+  local line="$1" pat n=0 rc
+  while IFS= read -r pat; do
+    rc=0
+    printf '%s\n' "$line" | /usr/bin/grep -aqEi -e "$pat" || rc=$?
+    if [ "$rc" -eq 0 ]; then
+      n=$((n + 1))
+      if [ "$n" -ge 2 ]; then break; fi
+    elif [ "$rc" -gt 1 ]; then
+      return 2
+    fi
+  done < "$UNIQ_RULES"
+  printf '%d' "$n"
+}
+
 # 스캔 소스 (V1 2026-08-07 지적 반영):
 #   worktree(기본) — 작업트리 파일 내용을 읽는다. CI·수동 검사용.
 #   index          — 인덱스(스테이지)에 등록된 blob 내용을 읽는다. pre-commit 용.
@@ -293,6 +314,21 @@ scan_tracked_file() {
     return
   fi
   while IFS= read -r line || [ -n "$line" ]; do
+    rules_rc=0
+    rules=$(count_matching_rules "$line") || rules_rc=$?
+    if [ "$rules_rc" -ne 0 ]; then
+      printf 'allowlist rule-count error: %q\n' "$path" >> "$ERRS"
+      continue
+    fi
+    if [ "$rules" -ge 2 ]; then
+      if [ "$UNALLOWED_MATCHES" -eq 0 ]; then
+        echo "FAIL: secret pattern matched in tracked files:"
+      fi
+      printf '  - %q (composite: %d rules)\n' "$path" "$rules"
+      UNALLOWED_MATCHES=$((UNALLOWED_MATCHES + 1))
+      FAIL=1
+      continue
+    fi
     consume_rc=0
     consume_allowance "$path" "$line" || consume_rc=$?
     if [ "$consume_rc" -eq 0 ]; then
