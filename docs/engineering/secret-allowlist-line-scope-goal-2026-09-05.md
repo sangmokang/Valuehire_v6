@@ -1221,9 +1221,10 @@ workflow만 바꾸는 우회이므로 인스코프 결함으로 판정했습니�
 
 RED 커밋 `10bf5ec`은 기존 32개 판정을 유지하고 이 별칭 재배선 한 건만 추가했습니다. 새 판정은
 기대 exit 1 대신 실제 exit 0이어서 `CHECKED: 33`, suite exit 1이었습니다. 표본과 기대값은 이후
-바꾸지 않았습니다. GREEN은 mechanism 명부에 P13의 전체 workflow 명령을 exact target으로 추가하고,
+바꾸지 않았습니다. GREEN은 mechanism 명부에 P13의 workflow 명령을 활성 행 시작 target으로 추가하고,
 정본 검사기가 그 필수 ID의 삭제도 거부하도록 했습니다. 따라서 별칭 실행 줄 뒤 주석에 원래 명령을
-끼워 넣어도 target은 활성 줄 시작에 없으므로 죽은 target exit 1입니다.
+끼워 넣어도 target은 활성 줄 시작에 없으므로 죽은 target exit 1입니다. 이 대조는 명령 suffix·`shell`
+등 실행 의미 전체를 증명하지 않으며, 그 범위는 기존 `ci-transfer-guarantee` 억제에 남습니다.
 
 ```text
 P13_ALIAS_RED: existing=32 PASS, new expected=1 actual=0, CHECKED=33, suite exit 1
@@ -1235,6 +1236,27 @@ P13_ALIAS_GREEN: alias + inline-comment decoy = dead target exit 1,
 재배선하는 우회도 자동 RED입니다. 명부·검사기·workflow를 같은 권한자가 함께 바꾸는 공격은 여전히
 외부 독립 승인과 exact-SHA 원격 CI가 맡을 구조적 잔여이며, 다음 `p13-deletion-blindspot`은 추가 줄이
 아니라 필수 target과 검사 스텝을 삭제하는 경로를 별도로 닫아야 합니다.
+
+### 10-19. 정본 명부 경로 별칭의 필수-ID 우회와 RED→GREEN
+
+후속 codeaudit은 필수-ID 검사가 인자 문자열이 `docs/sot/mechanism-registry.yaml`과 완전히 같을 때만
+실행돼, 같은 파일을 `./docs/sot/mechanism-registry.yaml`로 넘기면 P13 ID 삭제 사본이 exit 0이 되는
+반례를 제시했습니다. 추가 전용 RED 커밋 `4d2380b`은 기존 33개를 그대로 통과시키고 이 한 건만
+기대 exit 1·실제 exit 0으로 실패시켜 `CHECKED: 34`, suite exit 1을 고정했습니다.
+
+GREEN은 경로 문자열 대신 Bash의 동일 파일 판정 `-ef`를 사용합니다. 따라서 `./`·절대경로·링크처럼
+표기가 달라도 canonical registry와 같은 파일이면 저장소 필수 ID를 검사하고, 독립 fixture 사본에는
+저장소 전용 ID를 강요하지 않습니다.
+
+```text
+P13_PATH_RED: existing=33 PASS, new expected=1 actual=0, CHECKED=34, suite exit 1
+P13_PATH_GREEN: same-file alias with missing required ID = exit 1,
+                 canonical registry entries=19, CHECKED=34, suite exit 0
+```
+
+→ 해석: 검사 호출자가 정본 파일을 다른 정상 경로 표기로 쓴 것만으로 필수 P13 ID 검사를 끌 수 없습니다.
+검사기·명부·workflow를 함께 바꾸는 동일 권한자 공격과 CI 명령의 실제 실행 의미 증명은 여전히 각각
+외부 승인과 `ci-transfer-guarantee` 후속의 책임입니다.
 
 ### 11. 제출 직전 사람 감사
 

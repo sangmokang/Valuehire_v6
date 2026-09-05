@@ -249,9 +249,10 @@ flush_entry
 [ "$syntax_fail" -eq 1 ] && fail=1
 
 # 현재 정본 명부는 원칙 검사기의 세 실행면과 P13 인수 검사의 정확한 CI target을
-# 모두 가져야 한다. 일반 fixture에는 이 저장소 전용 필수 ID를 강제하지 않아 기존
-# 파서 경계 시험을 독립적으로 유지한다.
-if [ "$REGISTRY" = "docs/sot/mechanism-registry.yaml" ]; then
+# 모두 가져야 한다. 경로 문자열이 아니라 동일 파일인지(-ef)로 판별해 `./`·절대경로
+# 같은 별칭이 필수-ID 검사를 건너뛰지 못하게 한다. 별도 fixture 사본에는 이 저장소
+# 전용 ID를 강제하지 않아 기존 파서 경계 시험을 독립적으로 유지한다.
+if [ "$REGISTRY" -ef "docs/sot/mechanism-registry.yaml" ]; then
   for required_id in principles-local-check principles-explicit-prepush principles-explicit-ci p13-hook-acceptance-ci; do
     if ! printf '%s\n' "$seen_ids" | grep -qxF -- "$required_id"; then
       echo "FAIL: 저장소 필수 검사 장치 누락 — $required_id"
