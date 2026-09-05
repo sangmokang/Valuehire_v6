@@ -19,7 +19,7 @@ cd "$REPO" || {
 
 VERIFY=$REPO/verify.sh
 PATTERNS=$REPO/.secret-patterns.default
-EXPECTED_CHECKS=41
+EXPECTED_CHECKS=57
 SNAP0=$(git status --porcelain)
 
 if [ ! -x /usr/bin/grep ] || [ ! -f "$VERIFY" ] || [ ! -s "$PATTERNS" ]; then
@@ -65,30 +65,21 @@ hash_line() { printf '%s' "$1" | git hash-object --stdin; }
 
 write_allowlist() {
   local repo="$1" path="$2" hash="$3" kind="$4"
+  local expiry=2099-12-31
   case "$kind" in
-    valid)
-      printf '%s\n' \
-        '- path: "'"$path"'"' \
-        '  line_hash: "'"$hash"'"' \
-        '  reason: "synthetic acceptance exception"' \
-        '  owner: "acceptance"' \
-        '  expiry: "2099-12-31"' > "$repo/.secret-allowlist.yaml"
-      ;;
+    valid) ;;
     no-expiry)
       printf '%s\n' \
         '- path: "'"$path"'"' \
         '  line_hash: "'"$hash"'"' \
         '  reason: "synthetic acceptance exception"' \
         '  owner: "acceptance"' > "$repo/.secret-allowlist.yaml"
+      return
       ;;
-    expired)
-      printf '%s\n' \
-        '- path: "'"$path"'"' \
-        '  line_hash: "'"$hash"'"' \
-        '  reason: "synthetic acceptance exception"' \
-        '  owner: "acceptance"' \
-        '  expiry: "2000-01-01"' > "$repo/.secret-allowlist.yaml"
-      ;;
+    expired) expiry=2000-01-01 ;;
+    today) expiry=$(date +%Y-%m-%d) ;;
+    invalid-month) expiry=2099-13-01 ;;
+    invalid-day) expiry=2099-02-30 ;;
     syntax)
       printf '%s\n' \
         '- path: "'"$path"'"' \
@@ -96,10 +87,27 @@ write_allowlist() {
         '  reason: "synthetic acceptance exception"' \
         '  owner: "acceptance"' \
         '  expiry: 2099-12-31' > "$repo/.secret-allowlist.yaml"
+      return
       ;;
-    missing) ;;
+    missing) return ;;
     *) return 2 ;;
   esac
+  printf '%s\n' \
+    '- path: "'"$path"'"' \
+    '  line_hash: "'"$hash"'"' \
+    '  reason: "synthetic acceptance exception"' \
+    '  owner: "acceptance"' \
+    '  expiry: "'"$expiry"'"' > "$repo/.secret-allowlist.yaml"
+}
+
+append_allowlist_entry() {
+  local repo="$1" path="$2" hash="$3"
+  printf '%s\n' \
+    '- path: "'"$path"'"' \
+    '  line_hash: "'"$hash"'"' \
+    '  reason: "synthetic acceptance exception"' \
+    '  owner: "acceptance"' \
+    '  expiry: "2099-12-31"' >> "$repo/.secret-allowlist.yaml"
 }
 
 make_regular_repo() {
@@ -328,6 +336,37 @@ make_colon_allowlist_repo() {
   )
 }
 
+make_special_name_repo() {
+  local path=$'-odd name\npart.txt'
+  make_regular_repo special-name "$SAFE" "$(hash_line "$SAFE")" valid || return 2
+  printf '%s' "$CANARY" > "$CASE_REPO/$path"
+  (cd "$CASE_REPO" && git add -A && git commit -qm special-name)
+}
+
+make_empty_final_line_repo() {
+  local blank_hash blank_count i patterns=$TMP/empty-final.patterns
+  CASE_REPO=$TMP/empty-final
+  mkdir -p "$CASE_REPO"
+  git init -q "$CASE_REPO"
+  cp "$VERIFY" "$CASE_REPO/verify.sh"
+  printf '%s\n' '^$' > "$patterns"
+  printf '\n' > "$CASE_REPO/payload.txt"
+  : > "$CASE_REPO/.secret-allowlist.yaml"
+  blank_hash=$(hash_line '')
+  blank_count=$(/usr/bin/grep -c '^$' "$CASE_REPO/verify.sh")
+  for ((i=0; i<blank_count; i++)); do
+    append_allowlist_entry "$CASE_REPO" verify.sh "$blank_hash"
+  done
+  append_allowlist_entry "$CASE_REPO" payload.txt "$blank_hash"
+  (
+    cd "$CASE_REPO" || exit 2
+    git config user.email acceptance@local
+    git config user.name acceptance
+    git add -A
+    git commit -qm fixture
+  )
+}
+
 checked=0
 fail=0
 unexpected_missed=0
@@ -335,7 +374,7 @@ mode_mismatch=0
 LAST_RC=0
 
 run_mode() {
-  local desc="$1" repo="$2" mode="$3" want="$4" forbid_scanner_error="$5"
+  local desc="$1" repo="$2" mode="$3" want="$4" scanner_error_policy="$5"
   local allowlist_source="${6:-.secret-allowlist.yaml}"
   local patterns_source="${7:-.secret-patterns.default}"
   local path_prefix="${8:-}"
@@ -350,9 +389,10 @@ run_mode() {
   rc=$?
   checked=$((checked + 1))
 
-  if [ "$forbid_scanner_error" -eq 1 ] && /usr/bin/grep -qF 'scanner error' "$out"; then
-    bad_reason=1
-  fi
+  case "$scanner_error_policy" in
+    1) /usr/bin/grep -qF 'scanner error' "$out" && bad_reason=1 ;;
+    2) /usr/bin/grep -qF 'scanner error' "$out" || bad_reason=1 ;;
+  esac
   if [ "$rc" -eq "$want" ] && [ "$bad_reason" -eq 0 ]; then
     printf '[%d/%d] %s (%s) -> PASS (exit=%d)\n' "$checked" "$EXPECTED_CHECKS" "$desc" "$mode" "$rc"
   else
@@ -466,6 +506,37 @@ run_pair "stage 문법형 허용 목록 경로의 리터럴 정책" "$CASE_REPO"
 # 40~41: 정책 파일의 NUL 뒤 문법도 파서에서 사라지지 않고 두 모드 모두 fail-closed여야 한다.
 make_nul_allowlist_repo || exit 2
 run_pair "허용 목록 NUL 뒤 문법 위반" "$CASE_REPO" 2 1
+
+# 42~57: goal에 고정한 바이트·경로·읽기 실패·정규식 오류·달력 경계를 두 모드에서 적대 검증한다.
+make_regular_repo crlf "$(printf '%s\r\n%s' "$CANARY" "$SAFE")" \
+  "$(hash_line "$CANARY"$'\r')" valid || exit 2
+run_pair "CRLF 매치 줄의 정확한 바이트 지문" "$CASE_REPO" 0 1
+
+make_empty_final_line_repo || exit 2
+run_pair "빈 마지막 줄의 정확한 소비" "$CASE_REPO" 0 1 \
+  .secret-allowlist.yaml "$TMP/empty-final.patterns"
+
+make_special_name_repo || exit 2
+run_pair "공백·개행·선행하이픈 추적 파일명" "$CASE_REPO" 1 1
+
+make_regular_repo tracked-deletion "$CANARY" "$(hash_line "$SAFE")" valid || exit 2
+rm "$CASE_REPO/payload.txt"
+run_pair "추적 파일 worktree 삭제의 fail-closed" "$CASE_REPO" 1
+
+make_regular_repo invalid-pattern "$SAFE" "$(hash_line "$SAFE")" valid || exit 2
+printf '%s\n' '[' > "$CASE_REPO/.patterns.invalid"
+(cd "$CASE_REPO" && git add .patterns.invalid && git commit -qm invalid-pattern) || exit 2
+run_pair "잘못된 grep 패턴의 scanner error" "$CASE_REPO" 1 2 \
+  .secret-allowlist.yaml .patterns.invalid
+
+make_regular_repo expiry-today "$CANARY" "$(hash_line "$CANARY")" today || exit 2
+run_pair "오늘과 같은 expiry는 유효" "$CASE_REPO" 0
+
+make_regular_repo invalid-month "$CANARY" "$(hash_line "$CANARY")" invalid-month || exit 2
+run_pair "존재하지 않는 expiry 달" "$CASE_REPO" 2
+
+make_regular_repo invalid-day "$CANARY" "$(hash_line "$CANARY")" invalid-day || exit 2
+run_pair "존재하지 않는 expiry 날짜" "$CASE_REPO" 2
 
 SNAP1=$(git status --porcelain)
 if [ "$SNAP0" != "$SNAP1" ]; then
