@@ -19,8 +19,9 @@ cd "$REPO" || {
 
 VERIFY=$REPO/verify.sh
 PATTERNS=$REPO/.secret-patterns.default
-EXPECTED_CHECKS=59
+EXPECTED_CHECKS=61
 SNAP0=$(git status --porcelain)
+HEAD0=$(git rev-parse HEAD)
 
 if [ ! -x /usr/bin/grep ] || [ ! -f "$VERIFY" ] || [ ! -s "$PATTERNS" ]; then
   echo "NOT_RUN: /usr/bin/grep, verify.sh, 기본 패턴 중 하나를 읽을 수 없다"
@@ -512,10 +513,12 @@ run_pair "stage 문법형 허용 목록 경로의 리터럴 정책" "$CASE_REPO"
 make_nul_allowlist_repo || exit 2
 run_pair "허용 목록 NUL 뒤 문법 위반" "$CASE_REPO" 2 1
 
-# 42~59: goal에 고정한 바이트·경로·읽기 실패·정규식 오류·달력 경계를 두 모드에서 적대 검증한다.
+# 42~61: goal에 고정한 바이트·경로·읽기 실패·정규식 오류·달력 경계를 두 모드에서 적대 검증한다.
 make_regular_repo crlf "$(printf '%s\r\n%s' "$CANARY" "$SAFE")" \
   "$(hash_line "$CANARY"$'\r')" valid || exit 2
 run_pair "CRLF 매치 줄의 정확한 바이트 지문" "$CASE_REPO" 0 1
+run_pair "CRLF 매치 줄이 실제로 소비됐다는 출력 증거" "$CASE_REPO" 0 1 \
+  .secret-allowlist.yaml .secret-patterns.default '' 'ALLOWED_MATCHES_CONSUMED=1'
 
 make_empty_final_line_repo || exit 2
 run_pair "빈 마지막 줄의 정확한 소비" "$CASE_REPO" 0 1 \
@@ -546,8 +549,13 @@ make_regular_repo invalid-day "$CANARY" "$(hash_line "$CANARY")" invalid-day || 
 run_pair "존재하지 않는 expiry 날짜" "$CASE_REPO" 2
 
 SNAP1=$(git status --porcelain)
+HEAD1=$(git rev-parse HEAD)
 if [ "$SNAP0" != "$SNAP1" ]; then
   echo "FAIL: 인수 검사가 원본 저장소 상태를 바꿨다"
+  fail=1
+fi
+if [ "$HEAD0" != "$HEAD1" ]; then
+  echo "FAIL: 인수 검사가 원본 저장소 HEAD를 바꿨다"
   fail=1
 fi
 if [ "$checked" -ne "$EXPECTED_CHECKS" ]; then
