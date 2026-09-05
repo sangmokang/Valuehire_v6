@@ -198,7 +198,7 @@ fee_agreement_id, supply_amount)` — 프롬프트의 "tenant·고객사·입사
 | DEBT-2 | `20260902090000` 과 `20260905090000` 은 아직 운영에 적용되지 않았다. 이 PR 은 마이그레이션 적용을 포함하지 않는다(운영 쓰기 금지). | 적용은 별도 승인 작업. 적용 전까지 배송 상태는 `LOCAL_ONLY` 다. |
 | DEBT-5 | 저장 재조회는 `revenue_invoices` 한 행만 다시 읽는다. 문서 세트 RPC 가 함께 쓰는 `client_billing_statements`·`invoice_settlement_details` 는 따로 읽지 않는다. | 의도된 결정: plpgsql 함수는 한 트랜잭션이라 일부만 남는 상태가 생기지 않고, 파생 행의 값은 `postgres_runtime_assertions.sql` 이 본다. 재조회가 막는 것은 "응답은 왔는데 행이 없거나 다른 성사 건이 저장된" 경우다. |
 | DEBT-4 | 명령 추적은 스텝의 `if:` 를 무시하고 run 블록을 실행하므로, 등록된 명령을 부르면서 조건으로 꺼 둔 스텝은 이 게이트에서 깨끗하게 통과한다. 2026-09-05 실측: `if: ${{ false }}` 주입 시 이 게이트 rc=0, `check-ci-step-integrity.sh` rc=1. | 완화: 두 검사가 CI 에서 함께 돈다. 한쪽만 남기지 말 것. |
-| DEBT-3 | `contracts/invoice/storage-v1.json` 의 `supabase.source_repository` 가 로컬 절대경로(`/Users/...`)다. 이번 결함 목록 밖이라 손대지 않았다. | 다음 invoice 작업에서 정리. |
+| DEBT-3 (해소) | `contracts/invoice/storage-v1.json` 의 `supabase.source_repository` 로컬 절대경로. 코드·시험·문서 어디에서도 읽지 않는 죽은 필드였고, `acceptance-hs-cleanroom.sh` 의 금지 참조 검사가 push 를 막았다. | 2026-09-05 제거함. |
 
 ## 적대 검증 로그
 
