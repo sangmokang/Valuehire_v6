@@ -28,6 +28,12 @@
   stage: "ci"
   ci_mirror_job: "verify"
   required: true
+- id: "p13-hook-acceptance-ci"
+  path: ".github/workflows/verify.yml"
+  target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-0-7.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
 - id: "principles-local-check"
   path: "scripts/acceptance-principles-check.sh"
   target: "VERDICT: PASS"

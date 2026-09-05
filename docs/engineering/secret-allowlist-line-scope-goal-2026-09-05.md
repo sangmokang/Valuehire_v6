@@ -1212,6 +1212,30 @@ B `UNEXPECTED_MISSED_COUNT=14`, C 만료 실패 2건, D `MODE_MISMATCH_COUNT=2`,
 이 문단을 고친 후 생기는 문서 전용 후속 커밋은 검사기와 표본 blob을 바꾸지 않습니다. 이 산출물은
 로컬 가변 로그이므로 원격 서명 증거로 격상하지 않습니다.
 
+### 10-18. 사후 V2의 P13 별칭 재배선 반례와 RED→GREEN
+
+사후 V2는 workflow가 `acceptance-0-7.sh` 대신 PASS만 출력하는 `p13-alias.sh`를 실행하고,
+인라인 주석에 원래 경로를 남기면 pre-push의 문자열 검색과 기존 mechanism 명부가 모두 통과하는
+2파일 반례를 재현했습니다. 이는 runner·고정값·검사기 전부를 함께 바꾸는 공모가 아니라 실행 파일과
+workflow만 바꾸는 우회이므로 인스코프 결함으로 판정했습니다.
+
+RED 커밋 `10bf5ec`은 기존 32개 판정을 유지하고 이 별칭 재배선 한 건만 추가했습니다. 새 판정은
+기대 exit 1 대신 실제 exit 0이어서 `CHECKED: 33`, suite exit 1이었습니다. 표본과 기대값은 이후
+바꾸지 않았습니다. GREEN은 mechanism 명부에 P13의 전체 workflow 명령을 exact target으로 추가하고,
+정본 검사기가 그 필수 ID의 삭제도 거부하도록 했습니다. 따라서 별칭 실행 줄 뒤 주석에 원래 명령을
+끼워 넣어도 target은 활성 줄 시작에 없으므로 죽은 target exit 1입니다.
+
+```text
+P13_ALIAS_RED: existing=32 PASS, new expected=1 actual=0, CHECKED=33, suite exit 1
+P13_ALIAS_GREEN: alias + inline-comment decoy = dead target exit 1,
+                 actual registry entries=19, CHECKED=33, suite exit 0
+```
+
+→ 해석: 현재 workflow의 `acceptance-0-7.sh` 한 파일 교체뿐 아니라 PASS-only 별칭으로 실행 대상을
+재배선하는 우회도 자동 RED입니다. 명부·검사기·workflow를 같은 권한자가 함께 바꾸는 공격은 여전히
+외부 독립 승인과 exact-SHA 원격 CI가 맡을 구조적 잔여이며, 다음 `p13-deletion-blindspot`은 추가 줄이
+아니라 필수 target과 검사 스텝을 삭제하는 경로를 별도로 닫아야 합니다.
+
 ### 11. 제출 직전 사람 감사
 
 | 질문 | 판정 | 근거 |

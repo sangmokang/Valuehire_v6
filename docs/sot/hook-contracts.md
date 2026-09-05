@@ -76,6 +76,9 @@
         기대 사유는 식별 토큰의 부분 일치가 아니라 전체 `BLOCKED:` 행이 정확히 1회
         출력돼야 한다. `run-acceptance.sh`는 이 시연 파일을 검토된 Git blob에 결속해
         fixture를 실행하지 않는 PASS 출력 전용 단일 파일 교체를 거부한다.
+        CI 실행 명령 자체도 mechanism 명부의 `p13-hook-acceptance-ci` exact target에
+        결속한다. PASS-only 별칭을 실행하면서 인라인 주석에 원래 경로를 남기는 재배선은
+        `acceptance-verify-ac-m.sh`에서 죽은 target으로 실패해야 한다.
         차단만 시험하지 않는다 — 비밀 규칙·줄 허용 목록의 정상 변경 통과쌍 2건 이상이
         없으면 exit 1 (전부 막는 훅도 만점을 받는 것을 막는다).
 ```
