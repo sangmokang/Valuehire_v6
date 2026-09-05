@@ -196,6 +196,7 @@ fee_agreement_id, supply_amount)` — 프롬프트의 "tenant·고객사·입사
 |---|---|---|
 | DEBT-1 | 운영의 `reject_overlapping_fee_agreements()` 실제 본문과 owner RLS 정책의 현재 `cmd` 를 확인하지 못했다. 읽기 전용 PostgREST 로는 함수 소스도 `pg_policies` 도 못 읽는다. | 완화: `20260905090000` 이 두 경우 모두에서 올바른 끝 상태로 수렴시킨다(`create or replace` + `drop policy if exists`). 운영 적용 시 `select cmd from pg_policies` 로 확인할 것. |
 | DEBT-2 | `20260902090000` 과 `20260905090000` 은 아직 운영에 적용되지 않았다. 이 PR 은 마이그레이션 적용을 포함하지 않는다(운영 쓰기 금지). | 적용은 별도 승인 작업. 적용 전까지 배송 상태는 `LOCAL_ONLY` 다. |
+| DEBT-4 | 명령 추적은 스텝의 `if:` 를 무시하고 run 블록을 실행하므로, 등록된 명령을 부르면서 조건으로 꺼 둔 스텝은 이 게이트에서 깨끗하게 통과한다. 2026-09-05 실측: `if: ${{ false }}` 주입 시 이 게이트 rc=0, `check-ci-step-integrity.sh` rc=1. | 완화: 두 검사가 CI 에서 함께 돈다. 한쪽만 남기지 말 것. |
 | DEBT-3 | `contracts/invoice/storage-v1.json` 의 `supabase.source_repository` 가 로컬 절대경로(`/Users/...`)다. 이번 결함 목록 밖이라 손대지 않았다. | 다음 invoice 작업에서 정리. |
 
 ## 적대 검증 로그

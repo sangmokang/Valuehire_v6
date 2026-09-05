@@ -22,6 +22,16 @@ So this gate observes behaviour instead:
      acceptance script is run there. A harness that still reports PASS is a
      fake harness.
 
+What this does not catch
+------------------------
+The command trace executes a step's `run` block regardless of its `if:`, so a step
+that is registered, calls the right commands, and is switched off with a condition
+still traces clean here. That shape is caught by
+`scripts/verify/check-ci-step-integrity.sh`, which parses the workflow and rejects
+any conditional or failure-ignoring step (measured on 2026-09-05: injecting
+`if: ${{ false }}` leaves this gate at exit 0 and takes that checker to exit 1).
+Nor does this gate defend anything outside Invoice.
+
 Scope is Invoice only. Exit 0 PASS, 1 FAIL, 4 BLOCKED (environment, not defect; psql uses 3).
 """
 from __future__ import annotations
