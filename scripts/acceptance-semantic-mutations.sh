@@ -127,7 +127,7 @@ elif ! ruby -e '
 fi
 
 APPROVED_SECRET_ALLOWLIST_ACCEPTANCE_BLOB=$(printf '%s%s' \
-  'f0281198a290e0141cb5' '14b6eab688afd4f1f6e1')
+  '293587d0c8e875e1211a' '228828f5f821ad26edeb')
 
 acceptance_blob_is_approved() {
   local target="$1" actual
@@ -202,7 +202,7 @@ elif observe_mutated_verify_directly; then
     'echo "ALLOWED_LINES_COUNT=1"' \
     'echo "MODE_MISMATCH_COUNT=0"' \
     'echo "UNEXPECTED_MISSED_COUNT=0"' \
-    'echo "CHECKED: 59"' \
+    'echo "CHECKED: 61"' \
     'echo "PASS: 줄 내용 허용 목록과 두 스캔 모드가 AC-ALLOWLIST-1을 만족한다"' \
     'exit 0' > "$spoofed"
   if acceptance_blob_is_approved "$spoofed"; then
@@ -215,15 +215,15 @@ elif observe_mutated_verify_directly; then
   printf '%s\n' \
     '#!/usr/bin/env bash' \
     'if /usr/bin/grep -qF "if false; then" verify.sh; then' \
-    '  echo "[3/59] 등재된 정확한 한 줄 (worktree) -> PASS (exit=0)"' \
-    '  echo "[4/59] 등재된 정확한 한 줄 (index) -> PASS (exit=0)"' \
-    '  echo "[5/59] 관련 없는 다른 검사 -> FAIL (expected=1 actual=0 scanner_error=0 required_output=0)"' \
+    '  echo "[3/61] 등재된 정확한 한 줄 (worktree) -> PASS (exit=0)"' \
+    '  echo "[4/61] 등재된 정확한 한 줄 (index) -> PASS (exit=0)"' \
+    '  echo "[5/61] 관련 없는 다른 검사 -> FAIL (expected=1 actual=0 scanner_error=0 required_output=0)"' \
     '  exit 1' \
     'fi' \
     'echo "ALLOWED_LINES_COUNT=1"' \
     'echo "MODE_MISMATCH_COUNT=0"' \
     'echo "UNEXPECTED_MISSED_COUNT=0"' \
-    'echo "CHECKED: 59"' \
+    'echo "CHECKED: 61"' \
     'echo "PASS: 줄 내용 허용 목록과 두 스캔 모드가 AC-ALLOWLIST-1을 만족한다"' \
     'exit 0' > "$conditional_spoof"
   if acceptance_blob_is_approved "$conditional_spoof"; then
@@ -236,14 +236,14 @@ elif observe_mutated_verify_directly; then
   printf '%s\n' \
     '#!/usr/bin/env bash' \
     'if /usr/bin/grep -qF "if false; then" verify.sh; then' \
-    '  echo "[3/59] 등재된 정확한 한 줄 (worktree) -> FAIL (expected=0 actual=1 scanner_error=0 required_output=0)"' \
-    '  echo "[4/59] 등재된 정확한 한 줄 (index) -> FAIL (expected=0 actual=1 scanner_error=0 required_output=0)"' \
+    '  echo "[3/61] 등재된 정확한 한 줄 (worktree) -> FAIL (expected=0 actual=1 scanner_error=0 required_output=0)"' \
+    '  echo "[4/61] 등재된 정확한 한 줄 (index) -> FAIL (expected=0 actual=1 scanner_error=0 required_output=0)"' \
     '  exit 1' \
     'fi' \
     'echo "ALLOWED_LINES_COUNT=1"' \
     'echo "MODE_MISMATCH_COUNT=0"' \
     'echo "UNEXPECTED_MISSED_COUNT=0"' \
-    'echo "CHECKED: 59"' \
+    'echo "CHECKED: 61"' \
     'echo "PASS: 줄 내용 허용 목록과 두 스캔 모드가 AC-ALLOWLIST-1을 만족한다"' \
     'exit 0' > "$exact_conditional_spoof"
   if acceptance_blob_is_approved "$exact_conditional_spoof"; then
