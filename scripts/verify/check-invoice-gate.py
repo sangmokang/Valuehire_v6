@@ -57,7 +57,9 @@ REQUIRED_INVOCATIONS = (
     ("bash", "scripts/verify/run-acceptance.sh", "scripts/acceptance-invoice.sh"),
     ("python3", "scripts/verify/check-invoice-gate.py"),
 )
-ARG_SEPARATOR = "\x1f"
+# 인자에는 NUL 이 들어갈 수 없다(execve 가 막는다). 그래서 인자는 NUL 로 잇고 기록은
+# NUL 두 개로 끊는다. 개행이나 다른 구분자를 쓰면 인자 안에 그 문자를 넣어 기록을
+# 위조할 수 있다(2026-09-05 실측: 개행 + 0x1f 로 가짜 호출 한 줄을 만들어 냈다).
 STUBBED_COMMANDS = ("python3", "python", "bash", "sh", "make", "npm", "node", "env")
 COPY_PATHS = (
     "contracts/invoice",
@@ -139,7 +141,7 @@ def traced_invocations(script: str) -> list[tuple[str, ...]]:
             stub = bin_dir / name
             stub.write_text(
                 "#!/bin/sh\n"
-                f'{{ printf "%s\\037" "{name}" "$@"; printf "\\n"; }} >> "{trace}"\n'
+                f'{{ printf "%s\\000" "{name}" "$@"; printf "\\000"; }} >> "{trace}"\n'
                 "exit 0\n"
             )
             stub.chmod(0o755)
@@ -154,10 +156,11 @@ def traced_invocations(script: str) -> list[tuple[str, ...]]:
         )
         if not trace.exists():
             return []
+        data = trace.read_bytes().decode("utf-8", errors="replace")
         return [
-            tuple(field for field in line.split("\x1f") if field)
-            for line in trace.read_text(encoding="utf-8").splitlines()
-            if line
+            tuple(record.split("\0"))
+            for record in data.split("\0\0")
+            if record
         ]
 
 

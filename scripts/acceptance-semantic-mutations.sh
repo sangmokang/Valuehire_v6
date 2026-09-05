@@ -200,6 +200,28 @@ else
   record 1 "Invoice 게이트 약한 모드 치환 차단" "약한 모드 변이 생성 실패"
 fi
 
+# 추적 기록 위조: 인자 안에 구분자와 개행을 넣어 가짜 호출 한 건을 만들어 낸다.
+# 2026-09-05 V1 2회차 가설 — 개행 구분 기록에서는 실제로 성립했다.
+forge_rc=0
+python3 - <<'FORGE' >/dev/null 2>&1 || forge_rc=$?
+import importlib.util
+spec = importlib.util.spec_from_file_location("gate", "scripts/verify/check-invoice-gate.py")
+gate = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(gate)
+script = (
+    "bash $'x\\npython3\\x1fscripts/verify/check-invoice-gate.py\\n' --wiring-only\n"
+    "bash scripts/verify/run-acceptance.sh scripts/acceptance-invoice.sh\n"
+)
+called = gate.traced_invocations(script)
+missing = [item for item in gate.REQUIRED_INVOCATIONS if item not in called]
+raise SystemExit(0 if missing else 1)
+FORGE
+if [ "$forge_rc" -eq 0 ]; then
+  record 0 "Invoice 추적 기록 위조 차단" "인자 속 구분자·개행으로 가짜 호출을 만들지 못한다"
+else
+  record 1 "Invoice 추적 기록 위조 차단" "인자에 구분자를 넣어 호출 기록을 위조했다"
+fi
+
 # ── 래퍼 자신의 fail-closed ──────────────────────────────────────────────────
 noarg_rc=0
 bash "$RUNNER" >/dev/null 2>&1 || noarg_rc=$?

@@ -196,9 +196,60 @@ fee_agreement_id, supply_amount)` — 프롬프트의 "tenant·고객사·입사
 |---|---|---|
 | DEBT-1 | 운영의 `reject_overlapping_fee_agreements()` 실제 본문과 owner RLS 정책의 현재 `cmd` 를 확인하지 못했다. 읽기 전용 PostgREST 로는 함수 소스도 `pg_policies` 도 못 읽는다. | 완화: `20260905090000` 이 두 경우 모두에서 올바른 끝 상태로 수렴시킨다(`create or replace` + `drop policy if exists`). 운영 적용 시 `select cmd from pg_policies` 로 확인할 것. |
 | DEBT-2 | `20260902090000` 과 `20260905090000` 은 아직 운영에 적용되지 않았다. 이 PR 은 마이그레이션 적용을 포함하지 않는다(운영 쓰기 금지). | 적용은 별도 승인 작업. 적용 전까지 배송 상태는 `LOCAL_ONLY` 다. |
+| DEBT-5 | 저장 재조회는 `revenue_invoices` 한 행만 다시 읽는다. 문서 세트 RPC 가 함께 쓰는 `client_billing_statements`·`invoice_settlement_details` 는 따로 읽지 않는다. | 의도된 결정: plpgsql 함수는 한 트랜잭션이라 일부만 남는 상태가 생기지 않고, 파생 행의 값은 `postgres_runtime_assertions.sql` 이 본다. 재조회가 막는 것은 "응답은 왔는데 행이 없거나 다른 성사 건이 저장된" 경우다. |
 | DEBT-4 | 명령 추적은 스텝의 `if:` 를 무시하고 run 블록을 실행하므로, 등록된 명령을 부르면서 조건으로 꺼 둔 스텝은 이 게이트에서 깨끗하게 통과한다. 2026-09-05 실측: `if: ${{ false }}` 주입 시 이 게이트 rc=0, `check-ci-step-integrity.sh` rc=1. | 완화: 두 검사가 CI 에서 함께 돈다. 한쪽만 남기지 말 것. |
 | DEBT-3 | `contracts/invoice/storage-v1.json` 의 `supabase.source_repository` 가 로컬 절대경로(`/Users/...`)다. 이번 결함 목록 밖이라 손대지 않았다. | 다음 invoice 작업에서 정리. |
 
 ## 적대 검증 로그
 
-(후기록)
+### G (구현자 자체 변이, 2026-09-05)
+
+| 변이 | 결과 |
+|---|---|
+| D-A 파이썬 가드 + SQLite index 제거 | `FAILED (failures=2)` |
+| D-A 파이썬 가드만 제거(DB index 유지) | `FAILED (errors=1)` |
+| D-A PostgreSQL 검사 + index 제거 | pg 시험 `ERROR: a renumbered duplicate placement was accepted` |
+| D-B 재조회 무력화 | `FAILED (failures=12, errors=1)` |
+| D-C 치환형(가짜 unittest 출력) | 게이트 `exit=1` |
+| D-C 삽입형(판정 직전 `fail=0`) | 게이트 `exit=1` |
+| D-C 삽입형(record_fail → record_pass) | 게이트 `exit=1` |
+| D-C CI run 첫 줄 `exit 0` | 게이트 `exit=1` |
+| D-C CI 스텝 삭제(echo 로 치환) | 게이트 `exit=1` |
+| D-D 가드 제거 + storage-v1.json SHA 드리프트 | `FAILED (failures=2)` |
+| D-D 가드만 제거 | `FAILED (failures=1)` |
+| D-E 출력 숫자 상수화 | `FAILED (failures=1)` |
+| D-F owner 정책 축소 제거 | pg 시험 `FAIL: authenticated owner policies are not read-only` |
+
+### Codeaudit (독립 서브에이전트, 읽기 전용)
+
+`VERDICT: PASS` — 9개 항목 전부. 실측(unittest 53건 OK, pg 시험 exit 0, acceptance
+VERDICT: PASS, 게이트 전체 모드 PASS) 포함. 유일한 유보: "20260901090000 이 운영에
+적용됐다"는 사실은 저장소 정적 감사로 재현 불가(별도 읽기 조회 근거는 이 문서 위 표).
+
+### V1 1회차 (codex, 읽기 전용) — `VERDICT: FAIL`
+
+샌드박스가 파일 쓰기를 막아 판정문은 작업 로그에서 회수했다. 유효 반례 2건:
+
+1. **명령 추적이 부분문자열이었다.** `python3 scripts/verify/check-invoice-gate.py --wiring-only`
+   처럼 인자를 하나 붙여 약한 모드로 갈아치워도 "호출했다"로 인정됐다.
+   실측 재현: 그 워크플로 사본에 대해 게이트 `rc=0`, `check-ci-step-integrity.sh` 도 `rc=0`.
+   → argv 전체 일치로 고침. 회귀: acceptance-semantic-mutations "약한 모드 치환 차단".
+2. **재조회가 문서 번호와 hash 만 봤다.** 고객사·입사자·입사일·포지션·계약·금액이
+   뒤바뀐 채 저장된 행도 성공으로 셌다. 실측 재현으로 확인.
+   → 업무키 전체를 재조회해 대조하도록 고침. 회귀: `PlacementReadbackColumnsTest`.
+
+### V1 2회차 (codex) — 판정 없음 (NOT_RUN)
+
+`Codex error: This content was flagged for possible cybersecurity risk.` 로 턴이 실패했다.
+과거와 같은 차단 패턴이다(재발 원장 참고). 판정문 없이 남긴 두 **가설**을 구현자가 직접 검증했다:
+
+1. **추적 기록 정규화가 느슨한가** — 사실이었다. 개행 구분 기록에서 인자 안에 개행과
+   `0x1f` 를 넣어 가짜 호출 한 건을 만들어 냈다(실측: 누락 0건 → 우회 성립).
+   → 인자에 들어갈 수 없는 NUL 로 인자를 잇고 NUL 두 개로 기록을 끊도록 고침.
+   회귀: acceptance-semantic-mutations "추적 기록 위조 차단".
+2. **재조회가 revenue_invoices 만 본다** — 사실이나 의도된 결정이다. DEBT-5 참조.
+
+### V2 (리셋 컨텍스트 재검증) — 미실행
+
+L3 는 V2 를 요구한다. 이번 실행에서는 수행하지 못했다. 남은 부채이며, 병합 전에
+별도 세션에서 이 goal 문서와 커밋 범위만 읽고 V1 판정 자체를 재공격해야 한다.

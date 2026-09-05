@@ -238,6 +238,11 @@ def confirm_stored_rows(
 
     A 2xx whose body mirrors the request is not evidence that a row exists.
     """
+    # 문서 세트 RPC 는 revenue_invoices 외에 client_billing_statements 와
+    # invoice_settlement_details 에도 쓴다. 그 행들을 따로 읽지 않는 것은 의도된
+    # 결정이다 — plpgsql 함수는 한 트랜잭션이라 일부만 남는 상태가 생기지 않고,
+    # 파생 행의 값이 맞는지는 tools/invoice/tests/postgres_runtime_assertions.sql 이
+    # 본다. 여기서 막는 것은 "응답은 왔는데 행이 없거나 다른 성사 건이 저장된" 경우다.
     plan = READBACK_PLAN.get(operation)
     if plan is None:
         raise RemoteError(f"unsupported outbox operation: {operation}")
