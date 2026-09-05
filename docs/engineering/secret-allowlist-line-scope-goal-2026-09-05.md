@@ -1327,3 +1327,23 @@ exit 0을 확인했습니다. 처음부터 성공한 것처럼 숨기지 않습�
 이 보강은 탐지 정규식을 한 줄도 추가하지 않았습니다. `.secret-patterns.default`의 base/current blob은
 계속 `5541a33a6b96ba0e16d8680dfe4154779968ecab`로 같습니다. 따라서 형식 구멍 본체를
 닫았다는 주장은 여전히 금지하며, 다음 작업은 별도 `p13-deletion-blindspot`입니다.
+
+### 10-21. 보강 뒤 로컬 종단 재검증과 잘못 호출한 검사
+
+보강 커밋 뒤 직렬 재검증에서 secret-allowlist 57, semantic 16, mechanism 명부 19,
+mechanism 적대 fixture 34, strict 원칙 34, P13 위반 8종·정상 통과쌍 2건이 모두 exit 0이었습니다.
+`verify.sh`도 worktree/index 각각 exit 0, `ALLOWED_LINES_COUNT=2`,
+`ALLOWED_MATCHES_CONSUMED=0`이었고 webhook 계약은 44·17·0을 유지했습니다. 로그 묶음은
+`/tmp/secret-allowlist-final-local.OPOuhE/`에 있으며 `results.tsv` SHA-256은
+`9d0893dbd4753dc8fa587774877ddf076cb9863a388fb8d28477a1833b761862`입니다.
+
+처음에는 존재하지 않는 `scripts/acceptance-suppression-expiry.sh`를 전용 인수 검사로 잘못 가정해
+exit 2를 만들었습니다. 실제 만료 스캔은 workflow의 인라인 블록이므로 이 실패를 제품 실패로 세지
+않았습니다. 첫 인라인 재시도도 zsh가 Bash의 문자열 비교식을 해석하지 못해 오류를 출력했으므로
+증거에서 제외했습니다. 같은 블록을 명시적으로 Bash에서 다시 실행한 결과
+`EXPIRY_INLINE_TOTAL=6`, `EXPIRY_INLINE_RC=0`이었습니다.
+
+→ 무엇을 시켰나: 변경된 허용 목록뿐 아니라 연결된 명부·P13·원칙·기존 webhook과 실제 만료
+배선을 직렬로 다시 실행했습니다. → 뭐가 나왔나: 실재하는 최종 게이트는 모두 GREEN이고, 실패한
+한 호출과 첫 재시도는 감사자의 명령 선택 오류였습니다. → 좋은 소식인가 나쁜 소식인가: 제품에는
+좋은 소식이지만, 명령표의 `인라인` 표기를 전용 파일로 오독하지 말아야 한다는 감사 교훈입니다.
