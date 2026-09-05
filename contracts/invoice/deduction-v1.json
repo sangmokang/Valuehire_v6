@@ -1,0 +1,33 @@
+{
+  "schema_version": "1.1",
+  "currency": "KRW",
+  "issuer_name": "밸류커넥트 주식회사",
+  "company_share_percent": "25",
+  "withholding_percent": "3.3",
+  "allocation_total_percent": "100",
+  "rps_bearers": [
+    "account_manager",
+    "coworker",
+    "company",
+    "pro_rata"
+  ],
+  "rps_statuses": [
+    "pending",
+    "none",
+    "deferred",
+    "deducted"
+  ],
+  "document": {
+    "page_size": "A4",
+    "max_pages": 1,
+    "draft_watermark": "DRAFT · 검수용",
+    "title_ko": "계산서 발행 정산 내역",
+    "status_en": {
+      "pending": "RPS STATUS PENDING",
+      "none": "NO RPS DEDUCTION",
+      "deferred": "RPS NOT DEDUCTED THIS TERM",
+      "deducted": "RPS DEDUCTED"
+    },
+    "zero_rps_status": "이번 Term에서 미공제, 추후 공제 예정"
+  }
+}
