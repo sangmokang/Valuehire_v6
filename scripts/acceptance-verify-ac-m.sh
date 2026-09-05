@@ -5,7 +5,7 @@
 #   정본: docs/engineering/verify-unification-goal-2026-08-10.md:78-81 (AC-M)
 #   출력 : 항목마다 PASS:/FAIL: 전부 출력, 마지막 줄 `CHECKED: <검사 수>`
 #   exit : 0 = PASS | 1 = FAIL | 2 = NOT_RUN
-#   불변식: CHECKED 는 정확히 32 이어야 한다 — 검사가 몇 개 사라져도 초록이면 가짜다
+#   불변식: CHECKED 는 정확히 33 이어야 한다 — 검사가 몇 개 사라져도 초록이면 가짜다
 #           (PR #6 결함 D3 의 교훈: checked==0 만 막으면 3개를 지워도 통과했다 · P20)
 #
 # 쓰기 규칙: 이 검사는 저장소에 어떤 파일도 만들지 않는다. 동적 fixture 는 전부
@@ -24,7 +24,7 @@ SNAP0=$(git status --porcelain)
 CHECKER=scripts/verify/check-mechanism-registry.sh
 FIXDIR=scripts/verify/fixtures/mechanism-registry
 REGISTRY=docs/sot/mechanism-registry.yaml
-EXPECTED_CHECKED=32
+EXPECTED_CHECKED=33
 
 TMP=$(mktemp -d) || { echo "NOT_RUN: mktemp 실패"; echo "CHECKED: 0"; exit 2; }
 trap 'rm -rf "$TMP"' EXIT
@@ -335,6 +335,41 @@ sed \
   's#run: bash scripts/verify/run-acceptance.sh scripts/acceptance-secret-allowlist.sh#run: bash scripts/acceptance-secret-allowlist.sh#' \
   "$REGISTRY" > "$TMP/dead-secret-allowlist-target.yaml"
 expect_rc "허용 목록 CI target 되돌림 → 죽은 target 불합격" "$TMP/dead-secret-allowlist-target.yaml" 1
+
+# P13 시연 파일을 PASS-only 별칭으로 바꾸고, 인라인 주석에 원래 경로를 남기면
+# pre-push의 문자열 검색은 속을 수 있다. 실제 workflow를 바꾸는 대신 exact HEAD의
+# no-local 사본만 변조하고, mechanism 명부가 정확한 실행 target 소실을 잡는지 본다.
+p13_rewire_repo="$TMP/p13-rewire-repo"
+checked=$((checked + 1))
+p13_setup=0
+git clone --no-local --no-checkout "$REPO" "$p13_rewire_repo" >/dev/null 2>&1 || p13_setup=1
+if [ "$p13_setup" -eq 0 ]; then
+  git -C "$p13_rewire_repo" checkout --detach "$(git rev-parse HEAD)" >/dev/null 2>&1 || p13_setup=1
+fi
+if [ "$p13_setup" -eq 0 ]; then
+  sed \
+    's|run: bash scripts/verify/run-acceptance.sh scripts/acceptance-0-7.sh|run: bash scripts/verify/run-acceptance.sh scripts/p13-alias.sh # scripts/acceptance-0-7.sh|' \
+    "$p13_rewire_repo/.github/workflows/verify.yml" > "$TMP/p13-workflow.yml" || p13_setup=1
+  mv "$TMP/p13-workflow.yml" "$p13_rewire_repo/.github/workflows/verify.yml" || p13_setup=1
+  printf '%s\n' '#!/usr/bin/env bash' 'echo "PASS: P13 alias spoof"' > "$p13_rewire_repo/scripts/p13-alias.sh" || p13_setup=1
+  chmod +x "$p13_rewire_repo/scripts/p13-alias.sh" || p13_setup=1
+fi
+if [ "$p13_setup" -ne 0 ] || \
+   ! /usr/bin/grep -qxF '        run: bash scripts/verify/run-acceptance.sh scripts/p13-alias.sh # scripts/acceptance-0-7.sh' \
+      "$p13_rewire_repo/.github/workflows/verify.yml"; then
+  echo "FAIL: P13 alias 재배선 fixture 설정 실패"
+  fail=1
+else
+  p13_rewire_rc=0
+  (cd "$p13_rewire_repo" && bash scripts/verify/check-mechanism-registry.sh docs/sot/mechanism-registry.yaml) \
+    >/dev/null 2>&1 || p13_rewire_rc=$?
+  if [ "$p13_rewire_rc" -eq 1 ]; then
+    echo "PASS: P13 PASS-only alias + 인라인 주석 재배선 → 죽은 target 불합격 (exit=1)"
+  else
+    printf 'FAIL: P13 PASS-only alias + 인라인 주석 재배선 (기대 exit=1, 실제 %s)\n' "$p13_rewire_rc"
+    fail=1
+  fi
+fi
 
 # ── 13) 실제 명부가 검사기를 통과하는가 ──────────────────────────────────────
 expect_rc "실제 명부(docs/sot/mechanism-registry.yaml) → 통과" "$REGISTRY" 0
