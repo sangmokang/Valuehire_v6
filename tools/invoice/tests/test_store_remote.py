@@ -100,5 +100,73 @@ class RemoteReadbackTest(InvoiceLedgerCase):
             self.assertIn(table_key, tables)
 
 
+class PlacementReadbackColumnsTest(InvoiceLedgerCase):
+    """V1 반례(2026-09-05): 문서 번호와 hash 만 다시 읽으면, 고객사·입사자·입사일·
+    포지션·계약·금액이 뒤바뀐 채 저장된 행도 성공으로 센다."""
+
+    PAYLOAD = {
+        "tenant_id": "valueconnect",
+        "payload_sha256": "a" * 64,
+        "invoice": {
+            "invoice_number": "VC-READBACK-001",
+            "company_name": "가상회사",
+            "candidate_name": "홍길동",
+            "start_date": "2026-09-01",
+            "position": "AI Engineer",
+            "invoice_amount_krw": 12_000_000,
+        },
+    }
+    CONFIRMED = {
+        "invoice_id": "00000000-0000-4000-8000-000000000001",
+        "placement_set_id": "00000000-0000-4000-8000-000000000002",
+        "fee_agreement_id": "00000000-0000-4000-8000-000000000003",
+    }
+
+    def _stored_row(self, **overrides: object) -> dict[str, object]:
+        row = {
+            "id": self.CONFIRMED["invoice_id"],
+            "tenant_id": self.PAYLOAD["tenant_id"],
+            "document_number": self.PAYLOAD["invoice"]["invoice_number"],
+            "placement_set_id": self.CONFIRMED["placement_set_id"],
+            "fee_agreement_id": self.CONFIRMED["fee_agreement_id"],
+            "payload_sha256": self.PAYLOAD["payload_sha256"],
+            **self.ledger_columns(self.PAYLOAD),
+        }
+        row.update(overrides)
+        return row
+
+    def _confirm(self, **overrides: object):
+        row = self._stored_row(**overrides)
+
+        def rows(table: str, row_id: str, columns: tuple[str, ...]):
+            return [{name: row[name] for name in columns}]
+
+        with mock.patch.object(ledger.storage_remote, "readback_rows", side_effect=rows):
+            return ledger.storage_remote.confirm_stored_rows(
+                "store_invoice_placement_set", self.PAYLOAD, self.CONFIRMED
+            )
+
+    def test_an_intact_placement_row_is_accepted(self) -> None:
+        self.assertEqual(
+            self._confirm()["document_number"], "VC-READBACK-001"
+        )
+
+    def test_a_row_stored_against_another_placement_is_refused(self) -> None:
+        tampered = {
+            "client_name": "엉뚱한회사",
+            "candidate_name": "다른사람",
+            "start_date": "2027-01-01",
+            "position_name": "Backend Engineer",
+            "supply_amount": 999,
+            "fee_agreement_id": "00000000-0000-4000-8000-0000000000ff",
+        }
+        for field, value in tampered.items():
+            with self.subTest(field=field):
+                with self.assertRaisesRegex(
+                    ledger.storage_remote.RemoteError, "REMOTE_READBACK_MISMATCH"
+                ):
+                    self._confirm(**{field: value})
+
+
 if __name__ == "__main__":
     unittest.main()

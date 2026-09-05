@@ -162,6 +162,7 @@ class InvoiceLedgerCase(unittest.TestCase):
                 stored.update(response)
             elif isinstance(response, list) and response and isinstance(response[0], dict):
                 stored.update(response[0])
+            stored.update(self.ledger_columns(payload))
             return response
 
         def rows(table: str, row_id: str, columns: tuple[str, ...]):
@@ -174,6 +175,20 @@ class InvoiceLedgerCase(unittest.TestCase):
                     ledger.storage_remote, "readback_rows", side_effect=rows
                 ):
             yield
+
+    @staticmethod
+    def ledger_columns(payload: dict[str, object]) -> dict[str, object]:
+        """Ledger column names for the invoice fields the read-back now compares."""
+        invoice = payload.get("invoice")
+        if not isinstance(invoice, dict):
+            return {}
+        return {
+            "client_name": invoice.get("company_name"),
+            "candidate_name": invoice.get("candidate_name"),
+            "start_date": invoice.get("start_date"),
+            "position_name": invoice.get("position"),
+            "supply_amount": invoice.get("invoice_amount_krw"),
+        }
 
     @staticmethod
     def readback_of(confirmed: dict[str, object]):

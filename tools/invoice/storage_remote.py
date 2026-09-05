@@ -174,17 +174,20 @@ def remote_request(operation: str, payload: dict[str, Any]) -> Any:
 READBACK_PLAN: dict[str, tuple[str, str, tuple[str, ...]]] = {
     "upsert_fee_agreement": (
         "fee_agreements", "id",
-        ("id", "tenant_id", "agreement_ref", "client_key", "position_key",
-         "fee_rate", "status"),
+        ("id", "tenant_id", "agreement_ref", "client_key", "client_name",
+         "position_key", "position_name", "fee_rate", "effective_from",
+         "effective_to", "status"),
     ),
     "store_invoice_placement_set": (
         "invoices", "invoice_id",
-        ("id", "tenant_id", "document_number", "placement_set_id", "payload_sha256"),
+        ("id", "tenant_id", "document_number", "placement_set_id", "payload_sha256",
+         "client_name", "candidate_name", "start_date", "position_name",
+         "supply_amount", "fee_agreement_id"),
     ),
     "record_invoice_delivery": (
         "delivery_receipts", "delivery_receipt_id",
-        ("id", "tenant_id", "document_number", "gmail_message_id",
-         "attachment_sha256", "payload_sha256"),
+        ("id", "tenant_id", "document_number", "recipient", "subject",
+         "gmail_message_id", "attachment_sha256", "payload_sha256"),
     ),
 }
 
@@ -202,19 +205,29 @@ def _readback_expectation(
 ) -> dict[str, Any]:
     if operation == "upsert_fee_agreement":
         return {key: payload.get(key) for key in (
-            "tenant_id", "agreement_ref", "client_key", "position_key",
-            "fee_rate", "status",
+            "tenant_id", "agreement_ref", "client_key", "client_name",
+            "position_key", "position_name", "fee_rate", "effective_from",
+            "effective_to", "status",
         )}
     if operation == "store_invoice_placement_set":
+        # 문서 번호와 hash 만 보면 고객사·입사자·입사일·포지션·계약·금액이 뒤바뀐 채
+        # 저장된 행도 성공으로 센다. 업무키 전체를 다시 읽어 대조한다.
+        invoice = payload.get("invoice") or {}
         return {
             "tenant_id": payload.get("tenant_id"),
-            "document_number": (payload.get("invoice") or {}).get("invoice_number"),
+            "document_number": invoice.get("invoice_number"),
             "placement_set_id": confirmed.get("placement_set_id"),
+            "fee_agreement_id": confirmed.get("fee_agreement_id"),
             "payload_sha256": payload.get("payload_sha256"),
+            "client_name": invoice.get("company_name"),
+            "candidate_name": invoice.get("candidate_name"),
+            "start_date": invoice.get("start_date"),
+            "position_name": invoice.get("position"),
+            "supply_amount": invoice.get("invoice_amount_krw"),
         }
     return {key: payload.get(key) for key in (
-        "tenant_id", "document_number", "gmail_message_id",
-        "attachment_sha256", "payload_sha256",
+        "tenant_id", "document_number", "recipient", "subject",
+        "gmail_message_id", "attachment_sha256", "payload_sha256",
     )}
 
 
@@ -247,7 +260,7 @@ def confirm_stored_rows(
     for field, value in expected.items():
         same = (
             _same_decimal(row.get(field), value)
-            if field == "fee_rate" else row.get(field) == value
+            if field in {"fee_rate", "supply_amount"} else row.get(field) == value
         )
         if not same:
             raise RemoteError(f"REMOTE_READBACK_MISMATCH: {field} differs in storage")

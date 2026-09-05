@@ -178,6 +178,28 @@ else
   record 1 "Invoice CI 스텝 무력화 차단" "CI 변이 생성 실패"
 fi
 
+# 약한 모드로 갈아치우기: 명령 이름은 그대로 두고 --wiring-only 를 붙인다.
+# 2026-09-05 V1 반례 — 부분문자열 추적은 이 형태를 호출로 인정했다.
+weak_mutant="$TMP/verify-invoice-step-weakened.yml"
+if ruby -e '
+  source = File.read(ARGV[0])
+  needle = "          python3 scripts/verify/check-invoice-gate.py\n"
+  abort "needle missing" unless source.include?(needle)
+  File.write(ARGV[1], source.sub(needle,
+    "          python3 scripts/verify/check-invoice-gate.py --wiring-only\n"))
+' .github/workflows/verify.yml "$weak_mutant"; then
+  weak_rc=0
+  python3 scripts/verify/check-invoice-gate.py --workflow "$weak_mutant" \
+    >/dev/null 2>&1 || weak_rc=$?
+  if [ "$weak_rc" -ne 0 ]; then
+    record 0 "Invoice 게이트 약한 모드 치환 차단" "--wiring-only 주입 변이 exit=$weak_rc"
+  else
+    record 1 "Invoice 게이트 약한 모드 치환 차단" "인자만 붙여 약한 모드로 바꿔도 통과했다"
+  fi
+else
+  record 1 "Invoice 게이트 약한 모드 치환 차단" "약한 모드 변이 생성 실패"
+fi
+
 # ── 래퍼 자신의 fail-closed ──────────────────────────────────────────────────
 noarg_rc=0
 bash "$RUNNER" >/dev/null 2>&1 || noarg_rc=$?

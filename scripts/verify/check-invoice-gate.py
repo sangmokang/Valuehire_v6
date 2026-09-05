@@ -50,10 +50,14 @@ REQUIRED_ACCEPTANCE_LINES = {
     "bash tools/invoice/tests/test_postgres_integrity.sh",
 }
 # 워크플로에서 "글자가 있는가"가 아니라 "실제로 불렸는가"를 볼 명령.
+# argv 전체를 그대로 맞춘다. 부분문자열로 보면
+# `python3 scripts/verify/check-invoice-gate.py --wiring-only` 처럼 인자를 하나 붙여
+# 약한 모드로 갈아치우는 우회가 통과한다(2026-09-05 V1 반례).
 REQUIRED_INVOCATIONS = (
-    "bash scripts/verify/run-acceptance.sh scripts/acceptance-invoice.sh",
-    "python3 scripts/verify/check-invoice-gate.py",
+    ("bash", "scripts/verify/run-acceptance.sh", "scripts/acceptance-invoice.sh"),
+    ("python3", "scripts/verify/check-invoice-gate.py"),
 )
+ARG_SEPARATOR = "\x1f"
 STUBBED_COMMANDS = ("python3", "python", "bash", "sh", "make", "npm", "node", "env")
 COPY_PATHS = (
     "contracts/invoice",
@@ -124,7 +128,7 @@ def invoice_run_blocks(document: dict) -> list[str]:
     return blocks
 
 
-def traced_invocations(script: str) -> list[str]:
+def traced_invocations(script: str) -> list[tuple[str, ...]]:
     """Run a workflow `run` block with recording stubs and report what it called."""
     with tempfile.TemporaryDirectory() as temp:
         root = Path(temp)
@@ -134,7 +138,9 @@ def traced_invocations(script: str) -> list[str]:
         for name in STUBBED_COMMANDS:
             stub = bin_dir / name
             stub.write_text(
-                f'#!/bin/sh\nprintf "{name} %s\\n" "$*" >> "{trace}"\nexit 0\n'
+                "#!/bin/sh\n"
+                f'{{ printf "%s\\037" "{name}" "$@"; printf "\\n"; }} >> "{trace}"\n'
+                "exit 0\n"
             )
             stub.chmod(0o755)
         work = root / "work"
@@ -146,7 +152,13 @@ def traced_invocations(script: str) -> list[str]:
             env={"PATH": str(bin_dir), "HOME": str(root)},
             capture_output=True, timeout=120,
         )
-        return trace.read_text(encoding="utf-8").splitlines() if trace.exists() else []
+        if not trace.exists():
+            return []
+        return [
+            tuple(field for field in line.split("\x1f") if field)
+            for line in trace.read_text(encoding="utf-8").splitlines()
+            if line
+        ]
 
 
 def check_workflow_execution(workflow: Path) -> list[str]:
@@ -164,10 +176,10 @@ def check_workflow_execution(workflow: Path) -> list[str]:
             return [f"Invoice 스텝을 추적 실행하지 못했다: {error}"]
     problems = []
     for wanted in REQUIRED_INVOCATIONS:
-        if not any(wanted in line for line in called):
+        if wanted not in called:
             problems.append(
-                f"워크플로 Invoice 스텝이 `{wanted}` 를 실제로 호출하지 않는다 "
-                f"(추적된 호출: {called or '없음'})"
+                f"워크플로 Invoice 스텝이 `{' '.join(wanted)}` 를 그대로 호출하지 않는다 "
+                f"(추적된 호출: {[' '.join(item) for item in called] or '없음'})"
             )
     return problems
 
