@@ -343,3 +343,22 @@
   status: "PASS"
   evidence: "Strict 계약 편입 장치의 실존·직접 실행만 PASS다. mechanism_expected에 적힌 제품 장치의 구현 완료를 주장하지 않는다."
 
+- id: "P25"
+  principle: "제품 기능은 검증 가능한 배포 경로를 첫 작업 단위로 닫는다"
+  mechanism_expected: "구현 전 production smoke RED + Strict 첫 WU 최소 운영 골격 + 배송 상태 분리 + 운영 URL·SHA·인증·환경·DB readback·롤백·업무 1건 증거"
+  mechanism_found:
+    - path: "docs/sot/coding-principles.md"
+      check: "scripts/acceptance-principles-check.sh"
+      stages: ["strict", "pre-push", "ci"]
+  status: "PASS"
+  evidence: "Strict 계약 편입과 배송 상태 과장 금지만 PASS다. 공급자별 실제 운영 검증기는 첫 제품 골격 작업에서 추가하며, 그 전에는 PRODUCTION_REACHABLE 이상을 주장하지 않는다."
+
+- id: "P26"
+  principle: "DB 스키마와 지표 정의는 저장소의 단일 정본에서만 바꾼다"
+  mechanism_expected: "migration-only + schema drift 검사 + DB 제약 + DB 생성 타입 + 지표 단일 authority + 부팅 환경검증 + 운영 오류 관측"
+  mechanism_found:
+    - path: "docs/sot/coding-principles.md"
+      check: "scripts/acceptance-principles-check.sh"
+      stages: ["strict", "pre-push", "ci"]
+  status: "PASS"
+  evidence: "Strict 계약 편입만 PASS다. 실제 공급자별 migration/drift/관측 장치는 첫 DB 연결 WU에서 추가하며, 그 전에는 구현됐다고 주장하지 않는다."

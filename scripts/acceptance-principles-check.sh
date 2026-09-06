@@ -110,7 +110,7 @@ unless data.is_a?(Array)
   data = []
 end
 
-expected_ids = (1..24).map { |n| "P#{n}" } +
+expected_ids = (1..26).map { |n| "P#{n}" } +
   (1..5).map { |n| "§1-B-#{n}" } +
   (1..5).map { |n| "V-#{n}" }
 top_keys = %w[id principle mechanism_expected mechanism_found status evidence]
@@ -119,6 +119,7 @@ required_stages = %w[strict pre-push ci]
 allowed_statuses = %w[PASS FAIL NOT_RUN]
 
 source_titles = {}
+source_lines = {}
 in_browser = false
 File.foreach(source_file) do |line|
   if line.start_with?("### §1-B.")
@@ -129,8 +130,31 @@ File.foreach(source_file) do |line|
   end
   if (match = line.match(/^\| \*\*((?:P\d+)|(?:V-\d+))\*\* \| \*\*(.+?)\*\*/))
     source_titles[match[1]] = match[2]
+    source_lines[match[1]] = line
   elsif in_browser && (match = line.match(/^\| ([1-5]) \| \*\*(.+?)\*\*/))
     source_titles["§1-B-#{match[1]}"] = match[2]
+  end
+end
+required_fragments = {
+  "P25" => [
+    "PREVIEW_VERIFIED",
+    "PRODUCTION_REACHABLE",
+    "PRODUCTION_VERIFIED",
+    "BUSINESS_USED",
+    "실제 데이터 조회",
+    "새 세션 재조회",
+  ],
+  "P26" => [
+    "마이그레이션",
+    "NOT NULL / UNIQUE / FOREIGN KEY / CHECK",
+    "단일 계산 authority",
+    "필수 환경변수",
+  ],
+}
+required_fragments.each do |id, fragments|
+  line = source_lines.fetch(id, "")
+  fragments.each do |fragment|
+    errors << "REQUIRED_CLAUSE_MISSING: #{id}=#{fragment}" unless line.include?(fragment)
   end
 end
 if source_titles.keys.sort != expected_ids.sort
@@ -228,8 +252,8 @@ actual_ids = data.map { |entry| entry["id"] if entry.is_a?(Hash) }.compact
 missing_ids = expected_ids - actual_ids
 extra_ids = actual_ids - expected_ids
 errors << "ID_SET_MISMATCH: missing=#{missing_ids.join(',')} extra=#{extra_ids.join(',')}" unless missing_ids.empty? && extra_ids.empty?
-errors << "TARGET_COUNT_INVALID: expected=34 actual=#{data.length}" unless data.length == 34
-errors << "SELF_TARGET_COUNT_INVALID: expected=34 actual=#{self_targets}" unless self_targets == 34
+errors << "TARGET_COUNT_INVALID: expected=36 actual=#{data.length}" unless data.length == 36
+errors << "SELF_TARGET_COUNT_INVALID: expected=36 actual=#{self_targets}" unless self_targets == 36
 
 pre_push_lines = File.readlines(pre_push_file, chomp: true)
 active_pre_push = pre_push_lines.map(&:strip)
@@ -303,7 +327,7 @@ if errors.empty?
   puts "VERDICT: PASS"
   puts "SOT_LOAD: PASS #{source_file}"
   puts "LEDGER_LOAD: PASS #{ledger_file}"
-  puts "MECHANISMS: PASS #{self_targets}/34 strict-contract-bindings"
+  puts "MECHANISMS: PASS #{self_targets}/36 strict-contract-bindings"
   puts "WIRING: PASS pre-push=1 ci=1"
   puts "CHECKED: #{data.length}"
   exit 0
