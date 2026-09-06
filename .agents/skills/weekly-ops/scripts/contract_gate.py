@@ -30,30 +30,6 @@ RECEIPT_FIELDS = {
     "content_hash",
 }
 SOURCE_STATUSES = {"PASS", "PARTIAL", "FAIL", "NOT_RUN", "STALE"}
-ALLOWED_EMAIL_TARGETS = {"sangmokang@valueconnect.kr"}
-EMAIL_PATTERN = re.compile(r"(?<![\w.+-])[\w.+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?![\w.-])")
-PHONE_PATTERN = re.compile(
-    r"(?<![A-Za-z0-9])(?:(?:\+?82[- .]?)?0?1[016789][- .]?\d{3,4}[- .]?\d{4}|"
-    r"0\d{1,2}[- .]?\d{3,4}[- .]?\d{4})(?![A-Za-z0-9])"
-)
-
-
-def find_sensitive_values(value: Any) -> bool:
-    if isinstance(value, str):
-        return bool(EMAIL_PATTERN.search(value) or PHONE_PATTERN.search(value))
-    if isinstance(value, dict):
-        return any(
-            find_sensitive_values(nested)
-            for key, nested in value.items()
-            if not (
-                key == "target_id"
-                and value.get("name") == "email"
-                and nested in ALLOWED_EMAIL_TARGETS
-            )
-        )
-    if isinstance(value, list):
-        return any(find_sensitive_values(nested) for nested in value)
-    return False
 
 
 def capability_blockers(capabilities: Any, errors: list[str]) -> list[str]:

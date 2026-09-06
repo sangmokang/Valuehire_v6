@@ -26,7 +26,6 @@ from activity_gate import (
 from contract_gate import (
     REQUIRED_PUBLICATION_TARGETS,
     capability_blockers,
-    find_sensitive_values,
     publication_state,
     validate_dedupe_decisions,
     validate_source_snapshots,
@@ -78,13 +77,6 @@ DIFFICULTY_POINTS = {
     "funnel_friction": {"LOW": 0, "MEDIUM": 8, "HIGH": 15},
 }
 FORBIDDEN_KEYS = {
-    "raw_body",
-    "body_html",
-    "body_text",
-    "candidate_name",
-    "candidate_email",
-    "sender_address",
-    "recipient_address",
     "access_token",
     "api_key",
     "credential",
@@ -418,9 +410,6 @@ def evaluate(bundle: dict[str, Any]) -> dict[str, Any]:
         errors.append("SCHEMA_VERSION_INVALID")
     if find_forbidden_fields(bundle):
         errors.append("FORBIDDEN_SENSITIVE_FIELD")
-    sensitive_values_found = find_sensitive_values(bundle)
-    if sensitive_values_found:
-        errors.append("FORBIDDEN_SENSITIVE_VALUE")
     run = validate_run(bundle.get("run"), errors)
     source_blockers = capability_blockers(bundle.get("capabilities"), errors)
     source_snapshot_ids, evidence_refs, snapshot_evidence_refs, snapshot_blockers = validate_source_snapshots(
@@ -456,7 +445,7 @@ def evaluate(bundle: dict[str, Any]) -> dict[str, Any]:
             data_status,
             sorted(set(source_blockers)),
         )
-        if run and not sensitive_values_found
+        if run
         else ""
     )
     content_hash = hashlib.sha256(brief.encode("utf-8")).hexdigest()

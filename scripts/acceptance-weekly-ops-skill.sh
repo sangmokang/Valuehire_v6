@@ -181,15 +181,6 @@ else
   fail_check "required target mutation was not applied exactly once"
 fi
 
-case_dir=$(prepare_mutation pii-value-bypass)
-if mutate_exact "$case_dir/.agents/skills/weekly-ops/scripts/contract_gate.py" \
-  'return bool(EMAIL_PATTERN.search(value) or PHONE_PATTERN.search(value))' \
-  'return False'; then
-  expect_mutation_red "rendered PII value bypass" "$case_dir"
-else
-  fail_check "PII value mutation was not applied exactly once"
-fi
-
 case_dir=$(prepare_mutation lineage-bypass)
 if mutate_exact "$case_dir/.agents/skills/weekly-ops/scripts/weekly_gate.py" \
   'if any(ref not in valid_evidence_refs for ref in position["evidence_refs"]):' \

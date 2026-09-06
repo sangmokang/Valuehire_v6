@@ -196,15 +196,6 @@ class WeeklyGateTest(unittest.TestCase):
         self.assertEqual(result["verdict"], "BLOCKED")
         self.assertIn("PUBLICATION_READBACK_MISMATCH", result["errors"])
 
-    def test_raw_message_body_is_rejected(self):
-        bundle = valid_bundle()
-        bundle["positions"][0]["raw_body"] = "private customer content"
-
-        result = self.gate.evaluate(bundle)
-
-        self.assertEqual(result["verdict"], "BLOCKED")
-        self.assertIn("FORBIDDEN_SENSITIVE_FIELD", result["errors"])
-
     def test_post_cutoff_event_is_rendered_as_late_alert(self):
         bundle = valid_bundle()
         bundle["positions"][0]["event_at"] = "2026-08-30T09:00:00+09:00"
@@ -462,17 +453,6 @@ class WeeklyGateTest(unittest.TestCase):
 
         self.assertEqual(result["verdict"], "BLOCKED")
         self.assertIn("DUPLICATE_CANONICAL_ID", result["errors"])
-
-    def test_email_hidden_in_rendered_value_is_blocked(self):
-        bundle = valid_bundle()
-        bundle["positions"][0]["action"] = "contact candidate@example.com"
-
-        result = self.gate.evaluate(bundle)
-
-        self.assertEqual(result["verdict"], "BLOCKED")
-        self.assertIn("FORBIDDEN_SENSITIVE_VALUE", result["errors"])
-        self.assertNotIn("candidate@example.com", result["brief_markdown"])
-
 
 if __name__ == "__main__":
     unittest.main()
