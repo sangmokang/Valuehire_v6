@@ -80,6 +80,16 @@ but the observed result is zero, the bundle must carry one `weekly-zero-result-v
 provider receipt must resolve inside the named source snapshot and `observed_count` must be the integer
 zero. An empty array without that receipt is `BLOCKED`, not a business conclusion of zero.
 
+Golden KPI receipts separate state from flow: `position_state` proves live-position zero,
+`pipeline_state` proves active/interview/pre-interview zero, `pipeline_events` proves new/reactivated
+flow zero, and `outreach_events` proves verified-send zero. Every VERIFIED KPI, including non-zero,
+must equal the DB-derived count from immutable position-state, candidate-task/pipeline-event, or SENT
+receipt ledgers at the target window and meeting cutoff. `week_label` is the report slot and
+`metric_iso_week` is the ISO week of the closed data window.
+
+LinkedIn `result_count_lower_bound` and `count_is_exact` must resolve from an immutable provider result
+receipt bound to the same PASS source snapshot and ordered-result hash; the market row cannot override it.
+
 ## Dedupe contract
 
 Normalize comparison keys with Unicode NFKC, case folding, whitespace collapse, and explicit alias
@@ -127,6 +137,9 @@ name is not identity evidence. LinkedIn's provider actor and seat references mus
 The tuple `(channel, provider_receipt_ref)` is unique for aggregation across snapshot re-imports. Duplicate
 local event IDs, forwarded copies, and re-imports of the same receipt block the focus projection rather
 than increasing the count.
+For a reconciliation run, the same global receipt is not reinserted. Focus is rederived from all immutable
+PASS-backed sends inside the target run's window whose source was fetched by that run's meeting cutoff;
+filtering those sends to the target `run_id` is forbidden because it would undercount previously observed facts.
 The provider receipt reference must resolve inside the same outreach source snapshot as the send event.
 A local string or an ID found only in another snapshot is not provider readback.
 An authenticated screen is only a capability precondition. Screenshots, OCR, open tabs, cached routes,

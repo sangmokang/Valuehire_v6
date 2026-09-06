@@ -28,15 +28,21 @@ Do not call a draft complete merely because prose was generated.
 
 Read these files before acting:
 
-1. `references/prompt-contract.md`
-2. `references/data-contract.md`
-3. `references/briefing-style.md`
-4. `references/adversarial-review.md`
-5. repository `contracts/weekly-ops/runtime-contract-v1.json`
+1. repository `docs/sot/weekly-ops-contract.md`
+2. `references/prompt-contract.md`
+3. `references/data-contract.md`
+4. `references/briefing-style.md`
+5. `references/adversarial-review.md`
+6. repository `contracts/weekly-ops/runtime-contract-v1.json`
 
 When the request creates or standardizes a Notion weekly dashboard or Golden Sample, also read
 `references/notion-golden-sample.md` and repository
-`contracts/weekly-ops/notion-golden-sample-v1.json` before inspecting business data.
+`contracts/weekly-ops/notion-golden-sample-v1.json` before inspecting business data. That v1 Golden
+contract is legacy and non-executable. Unless a v2 machine contract, callable registry, CLI, and runtime
+acceptance all exist, return `NOT_RUN`; do not route a Golden request through the general v1 renderer.
+For this gate, “exist” means the exact six tracked paths and wrapped acceptance predicate named under
+`docs/sot/weekly-ops-contract.md` `## 현재 구현 상태`; bind their declared hashes into run evidence.
+A caller assertion or unverified alternate path never satisfies the Golden v2 gate.
 
 If a referenced file or target contract is absent, return `NOT_RUN`; do not improvise an operating ID.
 
@@ -107,8 +113,9 @@ Gmail rules:
 - retain message/thread identifiers only in the protected DB; pass opaque evidence hashes to the
   review bundle;
 - never place raw body, personal address, or candidate name in git, email, admin, or the public CEO
-  brief. A candidate display name may be resolved only at write time for an explicitly authorized
-  private Notion pipeline detail, following `notion-weekly-golden-v1`; it remains absent from the
+  brief. A candidate display name may be resolved only at write time under an executable v2 target
+  contract for an explicitly authorized private Notion pipeline detail. The legacy
+  `notion-weekly-golden-v1` contract never authorizes that resolver; names remain absent from the
   canonical redacted snapshot and review bundle.
 
 Career-page rules:
@@ -124,8 +131,9 @@ Career-page rules:
 Sourcing outreach rules:
 
 - inspect the provider sent-history surface through Aside or the approved channel browser profile;
-- require all three channel diagnostics whenever all three outreach capabilities are `PASS`, even when
-  the verified sent count is zero;
+- emit exactly one diagnostic for each fixed channel on every run before extracting rows. A non-`PASS`
+  capability emits its access blocker and `NOT_RUN`; when all three capabilities are `PASS`, all three
+  diagnostics are still required even when the verified sent count is zero;
 - record one access result per channel with an allowed blocker reason; a visible login page, tutorial,
   cached result, or denied automation permission is not a successful read;
 - record the exact opaque provider actor/account refs covered by each readback and derive explicit
@@ -137,6 +145,8 @@ Sourcing outreach rules:
   authoritative roster for that channel; LinkedIn actor and seat references must agree;
 - dedupe on `(channel, provider_receipt_ref)` across snapshot re-imports so relabeled local rows cannot inflate
   sends or focus share;
+- on reconciliation runs, reuse the immutable global receipt fact and aggregate every PASS-backed send inside
+  the target run window and meeting cutoff; never restrict focus derivation to `send.run_id = current_run_id`;
 - never count an open candidate tab, search result, clicked profile, draft, pending attempt, or local log as sent;
 - never attribute activity from an internal position-share email, CC recipient, shared-mailbox address,
   display-name similarity, or assignment alone;
@@ -193,9 +203,9 @@ report.
 Do not manually adjust a score. To change weights, version the contract and tests first.
 
 For a Notion Golden Sample, do not reuse the general urgency score as a management instruction.
-Recent client intake is a chronological list. Market accessibility and sourcing coverage priority use
-only the formula and evidence requirements in `notion-golden-sample-v1.json`. Missing LinkedIn filters
-or its reviewed sample makes that position `UNRANKED`, not low priority.
+Recent client intake is a chronological list. Market accessibility and sourcing coverage risk must follow
+the versioned target contract required by `docs/sot/weekly-ops-contract.md`; v1 is not that runtime.
+Missing LinkedIn filters or its reviewed sample makes that position `UNRANKED`, not low priority.
 
 ## Phase 5 — adversarial verification
 
@@ -229,9 +239,11 @@ placed only in an allowed job category after a deterministic or human-confirmed 
 The grass map must consume the same canonical position and verified outreach ledger. It must not
 re-scrape browser history or recompute consultant focus in the frontend.
 
-Notion and admin views must render the CEO brief, not raw source rows. An explicitly authorized private
-Notion Golden Sample may additionally resolve candidate display names into collapsed pipeline-detail
-sections; those names must not enter Git, email, admin, logs, or reviewer artifacts. Email sends the
+Notion and admin views must render the CEO brief, not raw source rows. Only after an executable v2 Golden
+contract and all exact SOT-named v2 artifacts pass the wrapped acceptance predicate may an explicitly
+authorized private Notion Golden Sample resolve candidate display names into collapsed pipeline-detail
+sections; a caller assertion cannot enable it and the legacy v1 contract remains `NOT_RUN`. Those names
+must not enter Git, email, admin, logs, or reviewer artifacts. Email sends the
 same PII-free canonical content to the allowlisted recipient and includes the snapshot ID. An HTTP/API
 success without readback is not a receipt.
 An external readback without write-ahead intent, schema reference, external object ID, or a
@@ -247,7 +259,8 @@ If full publication cannot run, still return a useful result with:
 - the exact missing connector, target ID, schema, or authority;
 - the locally verified brief and snapshot hash, if available;
 - separate `data_verdict`, `publication_verdict`, and an exact `publication_report_markdown` target list;
-- the smallest safe next action.
+- the smallest safe operator recovery action as delivery-control metadata; never place it in the CEO
+  brief or present it as a management recommendation.
 
 Never describe `NOT_RUN` sources as zero and never claim ClickUp, Notion, web, or email was updated
 without a readback receipt.
