@@ -182,10 +182,13 @@ else
   record_fail "P11 파일·함수 크기 상한 위반"
 fi
 
-if ! command -v rg >/dev/null 2>&1; then
-  record_blocked "미완성 표식 검사기 rg가 설치되어 있지 않다"
+# rg 는 GitHub 러너에 없다(2026-09-06 CI 실측: VERDICT: BLOCKED). 어디에나 있는 grep 을
+# 절대경로로 부른다 — PATH 의 grep 이 ugrep 등으로 가려져 조용히 다르게 동작한 적이 있다.
+marker_grep=/usr/bin/grep
+if [ ! -x "$marker_grep" ]; then
+  record_blocked "미완성 표식 검사기 $marker_grep 가 없다"
 else
-  rg -n 'TODO|FIXME|NotImplementedError' \
+  "$marker_grep" -rnE --exclude-dir=__pycache__ 'TODO|FIXME|NotImplementedError' \
     contracts/invoice docs/sot/invoice.md docs/sot/invoice-storage.md \
     supabase/migrations \
     tools/invoice .codex/skills/invoice .claude/skills/invoice
