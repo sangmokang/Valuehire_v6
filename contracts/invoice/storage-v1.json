@@ -1,0 +1,111 @@
+{
+  "schema_version": "1.2",
+  "tenant_id": "valueconnect",
+  "business_contract": {
+    "version": "invoice-business-2026-09-02.1",
+    "sha256": "1728e9ae0dca3d619f0b6e65f0b8a3842b95b99752770176d27dccc0fe34094e"
+  },
+  "authority": {
+    "operational_source": "SUPABASE",
+    "local_mirror": "SQLITE",
+    "local_pending_is_remote_success": false
+  },
+  "supabase": {
+    "tables": {
+      "fee_agreements": "recruitment_fee_agreements",
+      "invoices": "revenue_invoices",
+      "payouts": "commission_payouts",
+      "billing_statements": "client_billing_statements",
+      "settlement_details": "invoice_settlement_details",
+      "delivery_receipts": "invoice_delivery_receipts"
+    },
+    "rpcs": {
+      "store_document_set": "store_invoice_placement_set",
+      "record_delivery": "record_invoice_delivery"
+    },
+    "remote_success": {
+      "upsert_fee_agreement": [
+        "id",
+        "tenant_id",
+        "agreement_ref",
+        "client_key",
+        "client_name",
+        "position_key",
+        "position_name",
+        "fee_rate",
+        "effective_from",
+        "effective_to",
+        "source_reference",
+        "status"
+      ],
+      "store_invoice_placement_set": [
+        "status",
+        "invoice_id",
+        "placement_set_id",
+        "fee_agreement_id",
+        "tenant_id",
+        "document_number",
+        "fee_agreement_ref",
+        "invoice_pdf_sha256",
+        "settlement_number",
+        "settlement_pdf_sha256",
+        "contract_version",
+        "contract_sha256",
+        "payload_sha256"
+      ],
+      "record_invoice_delivery": [
+        "status",
+        "statement_id",
+        "delivery_receipt_id",
+        "tenant_id",
+        "document_number",
+        "recipient",
+        "subject",
+        "gmail_message_id",
+        "sent_at",
+        "attachment_sha256",
+        "contract_version",
+        "contract_sha256",
+        "payload_sha256"
+      ]
+    }
+  },
+  "sqlite": {
+    "default_path": "data/invoice-ledger.sqlite3",
+    "outbox_table": "invoice_sync_outbox",
+    "offline_final_documents_allowed": false,
+    "outbox_priority": {
+      "upsert_fee_agreement": 10,
+      "store_invoice_placement_set": 20,
+      "record_invoice_delivery": 30
+    }
+  },
+  "matching": {
+    "fee_key_fields": [
+      "client_key",
+      "position_key",
+      "effective_from",
+      "effective_to"
+    ],
+    "document_pair_fields": [
+      "invoice_number",
+      "company_name",
+      "candidate_name",
+      "start_date",
+      "position",
+      "annual_salary_krw",
+      "fee_percent",
+      "fee_agreement_ref",
+      "invoice_amount_krw"
+    ],
+    "placement_business_key": [
+      "tenant_id",
+      "client_name",
+      "candidate_name",
+      "start_date",
+      "position_name",
+      "fee_agreement_id",
+      "supply_amount"
+    ]
+  }
+}

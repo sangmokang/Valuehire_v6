@@ -1,0 +1,10 @@
+# 데이터 노출 스캔 검토 기준선 — <sha256>\t<경로>\t<사유>
+#
+# 개인정보 스캔은 컬럼 이름 조합을 본다. 저장 프로시저와 스키마는 정상적으로
+# client_name·candidate_name 을 담으므로 규칙만으로는 구분되지 않는다. 아래는
+# 전수 확인 결과 후보자 개인정보가 없음을 기록한 것이다. 파일이 바뀌면 해시가
+# 어긋나 다시 차단되고 재검토가 필요하다(경로 예외도, 기한 유예도 아니다).
+# 확인일 2026-09-06. 확인 내역은 docs/engineering/invoice-defect-closure-goal-2026-09-05.md
+560382e2ac10e964e547cb7d067f734efe350b3ac748fa6d17063cc1ecbf72bd	supabase/migrations/20260901090000_invoice_fee_agreements_and_storage.sql	스키마 정의와 트리거 함수. 걸린 낱말은 컬럼 이름(client_name·position_name)과 RLS 정책의 소유자 본인 이메일뿐. 후보자 데이터 없음
+cf612c4a0d055ac487d5af16e66957c7f27fe4f2be71b41608b6471ee835c958	supabase/migrations/20260902090000_invoice_runtime_integrity.sql	스키마와 저장 RPC. 걸린 낱말은 컬럼 이름과 발행사 자기 정보(밸류커넥트·하나은행), RLS 정책의 소유자 본인 이메일. 후보자 데이터 없음
+e8200f392749adccee41893fd222412b5c87331ddc7a6213953336ac26d0276b	tools/invoice/tests/postgres_runtime_assertions.sql	시험 픽스처. 값은 자리표시자(가상회사·홍길동)와 gmail-pg-test-001. 실제 후보자 아님

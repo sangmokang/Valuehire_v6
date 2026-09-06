@@ -1,0 +1,406 @@
+"""Supabase transport and operation-specific response validation."""
+from __future__ import annotations
+
+import json
+import os
+import urllib.error
+import urllib.parse
+import urllib.request
+import uuid
+from datetime import date, datetime
+from decimal import Decimal, InvalidOperation
+from typing import Any
+
+from storage_common import load_storage_contract, normalize, tenant_id
+
+
+class RemoteError(Exception):
+    """Raised when Supabase cannot prove the requested operation succeeded."""
+
+
+def _canonical(value: Any) -> str:
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def _credentials() -> tuple[str, str]:
+    url = (
+        os.environ.get("SUPABASE_URL")
+        or os.environ.get("NEXT_PUBLIC_SUPABASE_URL")
+        or ""
+    ).rstrip("/")
+    key = (
+        os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+        or os.environ.get("SUPABASE_SECRET_KEY")
+        or ""
+    )
+    if not url or not key:
+        raise RemoteError("Supabase URL and service-role key are required")
+    return url, key
+
+
+def _request(
+    method: str,
+    path: str,
+    *,
+    payload: dict[str, Any] | None = None,
+    prefer: str | None = None,
+) -> Any:
+    url, key = _credentials()
+    headers = {"apikey": key, "Authorization": f"Bearer {key}"}
+    data = None
+    if payload is not None:
+        data = _canonical(payload).encode()
+        headers["Content-Type"] = "application/json"
+    if prefer:
+        headers["Prefer"] = prefer
+    request = urllib.request.Request(
+        f"{url}/rest/v1/{path}", data=data, method=method, headers=headers
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            raw = response.read()
+    except urllib.error.HTTPError as error:
+        detail = error.read().decode(errors="replace")[:500]
+        raise RemoteError(f"Supabase HTTP {error.code}: {detail}") from error
+    except urllib.error.URLError as error:
+        raise RemoteError(f"Supabase network error: {error.reason}") from error
+    try:
+        return json.loads(raw) if raw else None
+    except json.JSONDecodeError as error:
+        raise RemoteError("Supabase returned invalid JSON") from error
+
+
+def query_fee_agreements(
+    tenant_id: str, client_key: str, position_key: str, on_date: str
+) -> Any:
+    query = urllib.parse.urlencode(
+        [
+            ("tenant_id", f"eq.{tenant_id}"),
+            ("client_key", f"eq.{client_key}"),
+            ("position_key", f"eq.{position_key}"),
+            ("status", "eq.active"),
+            ("effective_from", f"lte.{on_date}"),
+            ("or", f"(effective_to.is.null,effective_to.gte.{on_date})"),
+            (
+                "select",
+                "id,tenant_id,agreement_ref,client_key,client_name,position_key,"
+                "position_name,fee_rate,effective_from,effective_to,source_reference,status",
+            ),
+        ]
+    )
+    table = load_storage_contract()["supabase"]["tables"]["fee_agreements"]
+    return _request("GET", f"{table}?{query}")
+
+
+def verify_fee_authority(
+    company: str,
+    position: str,
+    on_date: date,
+    fee_percent: Decimal,
+    agreement_ref: str,
+) -> dict[str, Any]:
+    matches = query_fee_agreements(
+        tenant_id(), normalize(company), normalize(position), on_date.isoformat()
+    )
+    if not isinstance(matches, list):
+        raise RemoteError("FEE_AGREEMENT_REMOTE_INVALID")
+    if not matches:
+        raise RemoteError("FEE_AGREEMENT_NOT_FOUND")
+    if len(matches) != 1:
+        raise RemoteError("FEE_AGREEMENT_CONFLICT")
+    row = matches[0]
+    required = {
+        "id", "tenant_id", "agreement_ref", "client_key", "client_name",
+        "position_key", "position_name", "fee_rate", "effective_from",
+        "effective_to", "source_reference", "status",
+    }
+    if not isinstance(row, dict) or set(row) != required:
+        raise RemoteError("FEE_AGREEMENT_REMOTE_INVALID")
+    _uuid_text(row.get("id"), "agreement id")
+    try:
+        rate = Decimal(str(row.get("fee_rate")))
+        effective_from = date.fromisoformat(str(row.get("effective_from")))
+        effective_to = (
+            None if row.get("effective_to") is None
+            else date.fromisoformat(str(row["effective_to"]))
+        )
+    except (InvalidOperation, ValueError) as error:
+        raise RemoteError("FEE_AGREEMENT_REMOTE_INVALID") from error
+    if (
+        row.get("tenant_id") != tenant_id()
+        or row.get("agreement_ref") != agreement_ref
+        or row.get("client_key") != normalize(company)
+        or row.get("position_key") != normalize(position)
+        or normalize(str(row.get("client_name", ""))) != normalize(company)
+        or normalize(str(row.get("position_name", ""))) != normalize(position)
+        or row.get("status") != "active"
+        or rate != fee_percent / 100
+        or effective_from > on_date
+        or (effective_to is not None and effective_to < on_date)
+    ):
+        raise RemoteError("FEE_AGREEMENT_MISMATCH")
+    return row
+
+
+def remote_request(operation: str, payload: dict[str, Any]) -> Any:
+    storage = load_storage_contract()["supabase"]
+    if operation == "store_invoice_placement_set":
+        return _request(
+            "POST",
+            f"rpc/{storage['rpcs']['store_document_set']}",
+            payload={"p_payload": payload},
+            prefer="return=representation",
+        )
+    if operation == "upsert_fee_agreement":
+        table = storage["tables"]["fee_agreements"]
+        return _request(
+            "POST",
+            f"{table}?on_conflict=tenant_id,agreement_ref",
+            payload=payload,
+            prefer="resolution=merge-duplicates,return=representation",
+        )
+    if operation == "record_invoice_delivery":
+        return _request(
+            "POST",
+            f"rpc/{storage['rpcs']['record_delivery']}",
+            payload={"p_payload": payload},
+            prefer="return=representation",
+        )
+    raise RemoteError(f"unsupported outbox operation: {operation}")
+
+
+# 한 작업이 실제로 어느 행을 남겼어야 하는지: (계약상 테이블 이름, 응답의 id 필드,
+# 다시 읽을 컬럼, 그 컬럼을 payload 의 어느 값과 대조할지).
+READBACK_PLAN: dict[str, tuple[str, str, tuple[str, ...]]] = {
+    "upsert_fee_agreement": (
+        "fee_agreements", "id",
+        ("id", "tenant_id", "agreement_ref", "client_key", "client_name",
+         "position_key", "position_name", "fee_rate", "effective_from",
+         "effective_to", "status"),
+    ),
+    "store_invoice_placement_set": (
+        "invoices", "invoice_id",
+        ("id", "tenant_id", "document_number", "placement_set_id", "payload_sha256",
+         "client_name", "candidate_name", "start_date", "position_name",
+         "supply_amount", "fee_agreement_id"),
+    ),
+    "record_invoice_delivery": (
+        "delivery_receipts", "delivery_receipt_id",
+        ("id", "tenant_id", "document_number", "recipient", "subject",
+         "gmail_message_id", "attachment_sha256", "payload_sha256"),
+    ),
+}
+
+
+def readback_rows(table: str, row_id: str, columns: tuple[str, ...]) -> Any:
+    """Read the row back from Supabase with an independent request."""
+    query = urllib.parse.urlencode(
+        [("id", f"eq.{row_id}"), ("select", ",".join(columns))]
+    )
+    return _request("GET", f"{table}?{query}")
+
+
+def _readback_expectation(
+    operation: str, payload: dict[str, Any], confirmed: dict[str, Any]
+) -> dict[str, Any]:
+    if operation == "upsert_fee_agreement":
+        return {key: payload.get(key) for key in (
+            "tenant_id", "agreement_ref", "client_key", "client_name",
+            "position_key", "position_name", "fee_rate", "effective_from",
+            "effective_to", "status",
+        )}
+    if operation == "store_invoice_placement_set":
+        # 문서 번호와 hash 만 보면 고객사·입사자·입사일·포지션·계약·금액이 뒤바뀐 채
+        # 저장된 행도 성공으로 센다. 업무키 전체를 다시 읽어 대조한다.
+        invoice = payload.get("invoice") or {}
+        return {
+            "tenant_id": payload.get("tenant_id"),
+            "document_number": invoice.get("invoice_number"),
+            "placement_set_id": confirmed.get("placement_set_id"),
+            "fee_agreement_id": confirmed.get("fee_agreement_id"),
+            "payload_sha256": payload.get("payload_sha256"),
+            "client_name": invoice.get("company_name"),
+            "candidate_name": invoice.get("candidate_name"),
+            "start_date": invoice.get("start_date"),
+            "position_name": invoice.get("position"),
+            "supply_amount": invoice.get("invoice_amount_krw"),
+        }
+    return {key: payload.get(key) for key in (
+        "tenant_id", "document_number", "recipient", "subject",
+        "gmail_message_id", "attachment_sha256", "payload_sha256",
+    )}
+
+
+def _read_single(
+    table: str, row_id: str, columns: tuple[str, ...]
+) -> dict[str, Any]:
+    rows = readback_rows(table, row_id, columns)
+    if not isinstance(rows, list):
+        raise RemoteError("REMOTE_READBACK_INVALID: read-back is not a row list")
+    if not rows:
+        raise RemoteError("REMOTE_READBACK_MISSING: the stored row cannot be read back")
+    if len(rows) != 1:
+        raise RemoteError("REMOTE_READBACK_AMBIGUOUS: read-back matched several rows")
+    row = rows[0]
+    if not isinstance(row, dict) or set(row) != set(columns):
+        raise RemoteError("REMOTE_READBACK_INVALID: read-back row shape is wrong")
+    if row.get("id") != row_id:
+        raise RemoteError("REMOTE_READBACK_MISMATCH: read-back returned another row")
+    return row
+
+
+def _confirm_fee_agreement(agreement_id: Any, payload: dict[str, Any]) -> None:
+    """Resolve the stored fee agreement and compare it with the payload's reference.
+
+    Comparing the stored fee_agreement_id with the id the write itself reported is
+    a self-reference: a write that filed the invoice under another client's
+    agreement and echoed that same id back would pass. The payload's authority is
+    the business reference (fee_agreement_ref), so read the agreement row.
+    """
+    table = load_storage_contract()["supabase"]["tables"]["fee_agreements"]
+    row = _read_single(
+        table,
+        _uuid_text(agreement_id, "stored fee agreement id"),
+        ("id", "tenant_id", "agreement_ref"),
+    )
+    invoice = payload.get("invoice") or {}
+    if (
+        row.get("tenant_id") != payload.get("tenant_id")
+        or row.get("agreement_ref") != invoice.get("fee_agreement_ref")
+    ):
+        raise RemoteError(
+            "REMOTE_READBACK_MISMATCH: the stored invoice points at another fee agreement"
+        )
+
+
+def confirm_stored_rows(
+    operation: str, payload: dict[str, Any], confirmed: dict[str, Any]
+) -> dict[str, Any]:
+    """Prove the write landed by reading it back, not by trusting the response.
+
+    A 2xx whose body mirrors the request is not evidence that a row exists.
+    """
+    # 문서 세트 RPC 는 revenue_invoices 외에 client_billing_statements 와
+    # invoice_settlement_details 에도 쓴다. 그 행들을 따로 읽지 않는 것은 의도된
+    # 결정이다 — plpgsql 함수는 한 트랜잭션이라 일부만 남는 상태가 생기지 않고,
+    # 파생 행의 값이 맞는지는 tools/invoice/tests/postgres_runtime_assertions.sql 이
+    # 본다. 여기서 막는 것은 "응답은 왔는데 행이 없거나 다른 성사 건이 저장된" 경우다.
+    plan = READBACK_PLAN.get(operation)
+    if plan is None:
+        raise RemoteError(f"unsupported outbox operation: {operation}")
+    table_key, id_field, columns = plan
+    table = load_storage_contract()["supabase"]["tables"][table_key]
+    row_id = _uuid_text(confirmed.get(id_field), f"{id_field} for read-back")
+    row = _read_single(table, row_id, columns)
+    expected = _readback_expectation(operation, payload, confirmed)
+    for field, value in expected.items():
+        same = (
+            _same_decimal(row.get(field), value)
+            if field in {"fee_rate", "supply_amount"} else row.get(field) == value
+        )
+        if not same:
+            raise RemoteError(f"REMOTE_READBACK_MISMATCH: {field} differs in storage")
+    if operation == "store_invoice_placement_set":
+        _confirm_fee_agreement(row.get("fee_agreement_id"), payload)
+    return row
+
+
+def _uuid_text(value: Any, label: str) -> str:
+    if not isinstance(value, str):
+        raise RemoteError(f"REMOTE_CONFIRMATION_ERROR: {label} is missing")
+    try:
+        uuid.UUID(value)
+    except ValueError as error:
+        raise RemoteError(f"REMOTE_CONFIRMATION_ERROR: {label} is invalid") from error
+    return value
+
+
+def _same_decimal(left: Any, right: Any) -> bool:
+    try:
+        return Decimal(str(left)) == Decimal(str(right))
+    except InvalidOperation:
+        return False
+
+
+def _same_instant(left: Any, right: Any) -> bool:
+    try:
+        return datetime.fromisoformat(str(left).replace("Z", "+00:00")) == datetime.fromisoformat(
+            str(right).replace("Z", "+00:00")
+        )
+    except ValueError:
+        return False
+
+
+def validate_remote_response(
+    operation: str, payload: dict[str, Any], response: Any
+) -> dict[str, Any]:
+    required = set(
+        load_storage_contract()["supabase"]["remote_success"].get(operation, [])
+    )
+    if not required:
+        raise RemoteError(f"unsupported outbox operation: {operation}")
+    if operation == "upsert_fee_agreement":
+        if isinstance(response, list) and len(response) == 1:
+            result = response[0]
+        elif isinstance(response, dict):
+            result = response
+        else:
+            raise RemoteError("REMOTE_CONFIRMATION_ERROR: agreement response is empty")
+        if not isinstance(result, dict):
+            raise RemoteError("REMOTE_CONFIRMATION_ERROR: agreement response is invalid")
+        if not required.issubset(result):
+            raise RemoteError("REMOTE_CONFIRMATION_ERROR: agreement fields are missing")
+        _uuid_text(result.get("id"), "agreement id")
+        exact_fields = required - {"id", "fee_rate"}
+        if any(result.get(field) != payload.get(field) for field in exact_fields) or not (
+            _same_decimal(result.get("fee_rate"), payload.get("fee_rate"))
+        ):
+            raise RemoteError("REMOTE_CONFIRMATION_ERROR: agreement identity mismatch")
+        return result
+    if operation == "store_invoice_placement_set":
+        if not isinstance(response, dict) or response.get("status") not in {
+            "stored",
+            "idempotent",
+        }:
+            raise RemoteError("REMOTE_CONFIRMATION_ERROR: invoice response is invalid")
+        if not required.issubset(response):
+            raise RemoteError("REMOTE_CONFIRMATION_ERROR: invoice fields are missing")
+        for field in ("invoice_id", "placement_set_id", "fee_agreement_id"):
+            _uuid_text(response.get(field), field)
+        invoice = payload.get("invoice") or {}
+        settlement = payload.get("settlement")
+        expected = {
+            "tenant_id": payload.get("tenant_id"),
+            "document_number": invoice.get("invoice_number"),
+            "fee_agreement_ref": invoice.get("fee_agreement_ref"),
+            "invoice_pdf_sha256": invoice.get("pdf_sha256"),
+            "settlement_number": settlement.get("settlement_number") if settlement else None,
+            "settlement_pdf_sha256": settlement.get("pdf_sha256") if settlement else None,
+            "contract_version": payload.get("contract_version"),
+            "contract_sha256": payload.get("contract_sha256"),
+            "payload_sha256": payload.get("payload_sha256"),
+        }
+        if any(response.get(field) != value for field, value in expected.items()):
+            raise RemoteError("REMOTE_CONFIRMATION_ERROR: invoice identity mismatch")
+        return response
+    if operation == "record_invoice_delivery":
+        if not isinstance(response, dict) or response.get("status") not in {
+            "stored",
+            "idempotent",
+        }:
+            raise RemoteError("REMOTE_CONFIRMATION_ERROR: delivery response is invalid")
+        if not required.issubset(response):
+            raise RemoteError("REMOTE_CONFIRMATION_ERROR: delivery fields are missing")
+        for field in ("statement_id", "delivery_receipt_id"):
+            _uuid_text(response.get(field), field)
+        exact_fields = {
+            "tenant_id", "document_number", "recipient", "subject",
+            "gmail_message_id", "attachment_sha256", "contract_version",
+            "contract_sha256", "payload_sha256",
+        }
+        if any(response.get(field) != payload.get(field) for field in exact_fields) or not (
+            _same_instant(response.get("sent_at"), payload.get("sent_at"))
+        ):
+            raise RemoteError("REMOTE_CONFIRMATION_ERROR: delivery identity mismatch")
+        return response
+    raise RemoteError(f"unsupported outbox operation: {operation}")
