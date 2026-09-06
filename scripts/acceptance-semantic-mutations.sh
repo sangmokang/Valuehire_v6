@@ -127,7 +127,7 @@ elif ! ruby -e '
 fi
 
 APPROVED_SECRET_ALLOWLIST_ACCEPTANCE_BLOB=$(printf '%s%s' \
-  '293587d0c8e875e1211a' '228828f5f821ad26edeb')
+  '4a8decbd038b2b865714' 'bc7f4173ec2e66a4d6d6')
 
 acceptance_blob_is_approved() {
   local target="$1" actual
