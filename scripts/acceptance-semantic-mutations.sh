@@ -222,6 +222,35 @@ else
   record 1 "Invoice 추적 기록 위조 차단" "인자에 구분자를 넣어 호출 기록을 위조했다"
 fi
 
+# 생산 호출 형태. CI 는 게이트를 **인자 없이** 부른다. 위 변이들은 전부
+# --acceptance/--workflow 인자를 주기 때문에, 인자 없는 경로만 조기 통과시키는
+# 한 줄 변이(`if not sys.argv[1:]: return 0`)가 전부 살아남았다(2026-09-06 실측:
+# 그 변이로 변이 검사 15건과 인수 검사가 모두 VERDICT: PASS 였다).
+# 그래서 위조된 인수 검사를 심은 격리 사본 안에서 게이트를 인자 없이 실행한다.
+prod_copy="$TMP/prod-shape"
+prod_ready=0
+if [ -f "$insert_mutant" ]; then
+  prod_ready=1
+  while IFS= read -r rel; do
+    mkdir -p "$prod_copy/$(dirname "$rel")"
+    cp -R "$REPO/$rel" "$prod_copy/$(dirname "$rel")/" || prod_ready=0
+  done < <(python3 scripts/verify/check-invoice-gate.py --print-copy-paths)
+fi
+if [ "$prod_ready" -eq 1 ]; then
+  cp "$insert_mutant" "$prod_copy/scripts/acceptance-invoice.sh"
+  git init -q "$prod_copy"
+  prod_rc=0
+  ( cd "$prod_copy" && python3 scripts/verify/check-invoice-gate.py ) >/dev/null 2>&1 \
+    || prod_rc=$?
+  if [ "$prod_rc" -ne 0 ]; then
+    record 0 "Invoice 게이트 생산 호출 형태" "인자 없는 호출도 위조를 잡는다 exit=$prod_rc"
+  else
+    record 1 "Invoice 게이트 생산 호출 형태" "인자 없는 호출이 위조를 통과시켰다 — CI 가 쓰는 형태다"
+  fi
+else
+  record 1 "Invoice 게이트 생산 호출 형태" "격리 사본 준비 실패"
+fi
+
 # ── 래퍼 자신의 fail-closed ──────────────────────────────────────────────────
 noarg_rc=0
 bash "$RUNNER" >/dev/null 2>&1 || noarg_rc=$?

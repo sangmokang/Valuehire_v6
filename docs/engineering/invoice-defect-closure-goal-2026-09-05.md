@@ -249,6 +249,19 @@ VERDICT: PASS, 게이트 전체 모드 PASS) 포함. 유일한 유보: "20260901
    회귀: acceptance-semantic-mutations "추적 기록 위조 차단".
 2. **재조회가 revenue_invoices 만 본다** — 사실이나 의도된 결정이다. DEBT-5 참조.
 
+### V1 3회차 (codex rescue, 2026-09-05) — `REWRITE` · 유효 반례 3건
+
+세 건 모두 구현자가 직접 재현한 뒤 고쳤다.
+
+| 반례 | 재현 | 수정 | 회귀 편입 |
+|---|---|---|---|
+| ① 게이트가 호출 여부만 보고 **종료값 전파**를 안 본다. `cmd &` · `cmd \| cat` · `cmd \|\| true` 전부 게이트 rc=0 | 실측 3형태 rc=0 | 같은 run 블록을 **실패하는 스텁**으로 한 번 더 돌려 종료값이 0 이면 불합격 | 게이트 자체 (3형태 전부 rc=1) |
+| ② 변이 시험이 전부 인자를 주는 형태였다. CI 는 **인자 없이** 부른다 — `if not sys.argv[1:]: return 0` 한 줄로 게이트를 껐는데 변이 검사 15건과 인수 검사가 **전부 PASS** | 실측 재현 | 위조 인수 검사를 심은 격리 사본에서 게이트를 **인자 없이** 실행 | acceptance-semantic-mutations "생산 호출 형태" (변이 시 VERDICT: FAIL) |
+| ③ 저장된 `fee_agreement_id` 를 **응답이 보고한 같은 id** 와 비교(자기참조). 엉뚱한 계약에 붙여 저장하고 그 id 를 돌려주면 통과 | 실측 재현 | 계약 행을 실제로 읽어 `agreement_ref` 를 payload 와 대조 | `test_a_stored_invoice_filed_under_another_agreement_is_refused` 외 1건 |
+
+부수 발견: 추적 스텁의 PATH 가 스텁 디렉터리 하나뿐이라 `cmd | cat` 이 127 로 끝나
+"실패를 삼킨다"를 놓쳤다. PATH 에 `/usr/bin:/bin` 을 더해 해소했다(실측 확인).
+
 ### V2 (리셋 컨텍스트 재검증) — 미실행
 
 L3 는 V2 를 요구한다. 이번 실행에서는 수행하지 못했다. 남은 부채이며, 병합 전에

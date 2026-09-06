@@ -231,6 +231,48 @@ def _readback_expectation(
     )}
 
 
+def _read_single(
+    table: str, row_id: str, columns: tuple[str, ...]
+) -> dict[str, Any]:
+    rows = readback_rows(table, row_id, columns)
+    if not isinstance(rows, list):
+        raise RemoteError("REMOTE_READBACK_INVALID: read-back is not a row list")
+    if not rows:
+        raise RemoteError("REMOTE_READBACK_MISSING: the stored row cannot be read back")
+    if len(rows) != 1:
+        raise RemoteError("REMOTE_READBACK_AMBIGUOUS: read-back matched several rows")
+    row = rows[0]
+    if not isinstance(row, dict) or set(row) != set(columns):
+        raise RemoteError("REMOTE_READBACK_INVALID: read-back row shape is wrong")
+    if row.get("id") != row_id:
+        raise RemoteError("REMOTE_READBACK_MISMATCH: read-back returned another row")
+    return row
+
+
+def _confirm_fee_agreement(agreement_id: Any, payload: dict[str, Any]) -> None:
+    """Resolve the stored fee agreement and compare it with the payload's reference.
+
+    Comparing the stored fee_agreement_id with the id the write itself reported is
+    a self-reference: a write that filed the invoice under another client's
+    agreement and echoed that same id back would pass. The payload's authority is
+    the business reference (fee_agreement_ref), so read the agreement row.
+    """
+    table = load_storage_contract()["supabase"]["tables"]["fee_agreements"]
+    row = _read_single(
+        table,
+        _uuid_text(agreement_id, "stored fee agreement id"),
+        ("id", "tenant_id", "agreement_ref"),
+    )
+    invoice = payload.get("invoice") or {}
+    if (
+        row.get("tenant_id") != payload.get("tenant_id")
+        or row.get("agreement_ref") != invoice.get("fee_agreement_ref")
+    ):
+        raise RemoteError(
+            "REMOTE_READBACK_MISMATCH: the stored invoice points at another fee agreement"
+        )
+
+
 def confirm_stored_rows(
     operation: str, payload: dict[str, Any], confirmed: dict[str, Any]
 ) -> dict[str, Any]:
@@ -249,18 +291,7 @@ def confirm_stored_rows(
     table_key, id_field, columns = plan
     table = load_storage_contract()["supabase"]["tables"][table_key]
     row_id = _uuid_text(confirmed.get(id_field), f"{id_field} for read-back")
-    rows = readback_rows(table, row_id, columns)
-    if not isinstance(rows, list):
-        raise RemoteError("REMOTE_READBACK_INVALID: read-back is not a row list")
-    if not rows:
-        raise RemoteError("REMOTE_READBACK_MISSING: the stored row cannot be read back")
-    if len(rows) != 1:
-        raise RemoteError("REMOTE_READBACK_AMBIGUOUS: read-back matched several rows")
-    row = rows[0]
-    if not isinstance(row, dict) or set(row) != set(columns):
-        raise RemoteError("REMOTE_READBACK_INVALID: read-back row shape is wrong")
-    if row.get("id") != row_id:
-        raise RemoteError("REMOTE_READBACK_MISMATCH: read-back returned another row")
+    row = _read_single(table, row_id, columns)
     expected = _readback_expectation(operation, payload, confirmed)
     for field, value in expected.items():
         same = (
@@ -269,6 +300,8 @@ def confirm_stored_rows(
         )
         if not same:
             raise RemoteError(f"REMOTE_READBACK_MISMATCH: {field} differs in storage")
+    if operation == "store_invoice_placement_set":
+        _confirm_fee_agreement(row.get("fee_agreement_id"), payload)
     return row
 
 

@@ -130,7 +130,9 @@ def invoice_run_blocks(document: dict) -> list[str]:
     return blocks
 
 
-def traced_invocations(script: str) -> list[tuple[str, ...]]:
+def traced_invocations(
+    script: str, stub_exit: int = 0
+) -> tuple[list[tuple[str, ...]], int]:
     """Run a workflow `run` block with recording stubs and report what it called."""
     with tempfile.TemporaryDirectory() as temp:
         root = Path(temp)
@@ -142,26 +144,27 @@ def traced_invocations(script: str) -> list[tuple[str, ...]]:
             stub.write_text(
                 "#!/bin/sh\n"
                 f'{{ printf "%s\\000" "{name}" "$@"; printf "\\000"; }} >> "{trace}"\n'
-                "exit 0\n"
+                f"exit {stub_exit}\n"
             )
             stub.chmod(0o755)
         work = root / "work"
         work.mkdir()
         step = root / "step.sh"
         step.write_text(script)
-        subprocess.run(
+        result = subprocess.run(
             ["/bin/bash", "-e", str(step)], cwd=work,
-            env={"PATH": str(bin_dir), "HOME": str(root)},
+            env={"PATH": f"{bin_dir}:/usr/bin:/bin", "HOME": str(root)},
             capture_output=True, timeout=120,
         )
-        if not trace.exists():
-            return []
-        data = trace.read_bytes().decode("utf-8", errors="replace")
-        return [
-            tuple(record.split("\0"))
-            for record in data.split("\0\0")
-            if record
-        ]
+        calls: list[tuple[str, ...]] = []
+        if trace.exists():
+            data = trace.read_bytes().decode("utf-8", errors="replace")
+            calls = [
+                tuple(record.split("\0"))
+                for record in data.split("\0\0")
+                if record
+            ]
+        return calls, result.returncode
 
 
 def check_workflow_execution(workflow: Path) -> list[str]:
@@ -171,13 +174,24 @@ def check_workflow_execution(workflow: Path) -> list[str]:
         return [f"워크플로를 읽지 못했다 (fail-closed): {error}"]
     if not blocks:
         return ["워크플로에 Invoice 스텝이 하나도 없다 — 스텝 삭제도 우회다"]
-    called = []
+    called: list[tuple[str, ...]] = []
+    swallowed: list[str] = []
     for block in blocks:
         try:
-            called.extend(traced_invocations(block))
+            calls, _ = traced_invocations(block, stub_exit=0)
+            called.extend(calls)
+            # 호출됐다는 사실은 "그 실패가 CI 를 빨갛게 만든다"를 뜻하지 않는다.
+            # 같은 블록을 실패하는 스텁으로 한 번 더 돌려 종료값이 올라오는지 본다.
+            # 백그라운드(&) · 파이프(| cat) · `|| true` 는 여기서 0 이 되어 걸린다.
+            _, failure_rc = traced_invocations(block, stub_exit=1)
         except (OSError, subprocess.SubprocessError) as error:
             return [f"Invoice 스텝을 추적 실행하지 못했다: {error}"]
-    problems = []
+        if failure_rc == 0:
+            swallowed.append(" ".join(block.split())[:120])
+    problems = [
+        f"워크플로 Invoice 스텝이 명령 실패를 삼킨다 (스텝이 종료값 0 으로 끝난다): {block}"
+        for block in swallowed
+    ]
     for wanted in REQUIRED_INVOCATIONS:
         if wanted not in called:
             problems.append(
@@ -262,7 +276,14 @@ def main() -> int:
         help="배선 문자열만 확인한다. 인수 검사가 자기를 부를 때 재귀를 끊는 용도이며 "
              "이것만으로는 위조를 막지 못한다.",
     )
+    parser.add_argument(
+        "--print-copy-paths", action="store_true",
+        help="격리 사본에 필요한 경로를 한 줄에 하나씩 출력한다(변이 검사가 읽는다).",
+    )
     args = parser.parse_args()
+    if args.print_copy_paths:
+        print("\n".join(COPY_PATHS))
+        return 0
 
     problems: list[str] = []
     try:

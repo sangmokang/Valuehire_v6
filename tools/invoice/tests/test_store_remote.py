@@ -114,6 +114,7 @@ class PlacementReadbackColumnsTest(InvoiceLedgerCase):
             "start_date": "2026-09-01",
             "position": "AI Engineer",
             "invoice_amount_krw": 12_000_000,
+            "fee_agreement_ref": "TEST-CLIENT-AI-2026",
         },
     }
     CONFIRMED = {
@@ -135,11 +136,22 @@ class PlacementReadbackColumnsTest(InvoiceLedgerCase):
         row.update(overrides)
         return row
 
-    def _confirm(self, **overrides: object):
+    def _agreement_row(self, **overrides: object) -> dict[str, object]:
+        row = {
+            "id": self.CONFIRMED["fee_agreement_id"],
+            "tenant_id": self.PAYLOAD["tenant_id"],
+            "agreement_ref": self.PAYLOAD["invoice"]["fee_agreement_ref"],
+        }
+        row.update(overrides)
+        return row
+
+    def _confirm(self, agreement: dict[str, object] | None = None, **overrides: object):
         row = self._stored_row(**overrides)
+        agreement_row = agreement or self._agreement_row()
 
         def rows(table: str, row_id: str, columns: tuple[str, ...]):
-            return [{name: row[name] for name in columns}]
+            source = agreement_row if "agreement_ref" in columns else row
+            return [{name: (row_id if name == "id" else source[name]) for name in columns}]
 
         with mock.patch.object(ledger.storage_remote, "readback_rows", side_effect=rows):
             return ledger.storage_remote.confirm_stored_rows(
@@ -166,6 +178,35 @@ class PlacementReadbackColumnsTest(InvoiceLedgerCase):
                     ledger.storage_remote.RemoteError, "REMOTE_READBACK_MISMATCH"
                 ):
                     self._confirm(**{field: value})
+
+
+    def test_a_stored_invoice_filed_under_another_agreement_is_refused(self) -> None:
+        """V1 지적(2026-09-06): 저장된 fee_agreement_id 를 응답이 보고한 같은 id 와
+        비교하는 것은 자기참조다. 엉뚱한 계약에 붙여 저장하고 그 id 를 그대로
+        돌려주면 통과한다. 계약 행을 실제로 읽어 업무 참조로 대조해야 한다."""
+        with self.assertRaisesRegex(
+            ledger.storage_remote.RemoteError, "another fee agreement"
+        ):
+            self._confirm(agreement=self._agreement_row(agreement_ref="OTHER-CLIENT-2026"))
+        with self.assertRaisesRegex(
+            ledger.storage_remote.RemoteError, "another fee agreement"
+        ):
+            self._confirm(agreement=self._agreement_row(tenant_id="someone-else"))
+
+    def test_an_unreadable_fee_agreement_is_refused(self) -> None:
+        def rows(table: str, row_id: str, columns: tuple[str, ...]):
+            if "agreement_ref" in columns:
+                return []
+            row = self._stored_row()
+            return [{name: (row_id if name == "id" else row[name]) for name in columns}]
+
+        with mock.patch.object(ledger.storage_remote, "readback_rows", side_effect=rows):
+            with self.assertRaisesRegex(
+                ledger.storage_remote.RemoteError, "REMOTE_READBACK_MISSING"
+            ):
+                ledger.storage_remote.confirm_stored_rows(
+                    "store_invoice_placement_set", self.PAYLOAD, self.CONFIRMED
+                )
 
 
 if __name__ == "__main__":

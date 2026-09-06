@@ -183,6 +183,7 @@ class InvoiceLedgerCase(unittest.TestCase):
         if not isinstance(invoice, dict):
             return {}
         return {
+            "agreement_ref": invoice.get("fee_agreement_ref"),
             "client_name": invoice.get("company_name"),
             "candidate_name": invoice.get("candidate_name"),
             "start_date": invoice.get("start_date"),
