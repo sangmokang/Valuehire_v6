@@ -125,6 +125,50 @@ scan_history() {
 # 검사를 약화시키는 대신 이름을 고친다.
 PII_COLUMN_WORDS='name|email|e_mail|mail|phone|mobile|tel|school|univ|university|profile_url|linkedin|resume|birth|이름|이메일|전화|휴대폰|학교|생년|프로필'
 
+# 검토 기준선. "이 파일을 사람이 전수 확인했고 후보자 개인정보가 없다"를 **내용 해시**와
+# 함께 적는다. 경로 예외나 기한 유예가 아니다 — 파일이 한 글자라도 바뀌면 해시가 어긋나
+# 다시 차단된다. 규칙 자체는 어디서도 약해지지 않는다.
+#
+# 왜 필요한가: 이 규칙은 컬럼 이름 조합을 본다. 그런데 저장 프로시저는 정상적으로
+# `insert into ... (client_name, candidate_name ...) values (...)` 를 담는다. 값이 진짜
+# 사람 이름인지 자리표시자인지는 정규식으로 판별할 수 없다. 규칙을 좁히면 미탐이 늘고
+# 그대로 두면 정상 마이그레이션이 영구히 막힌다. 그래서 판별을 사람에게 넘기되,
+# 그 판단에 유효기간 대신 **내용 고정**을 건다.
+REVIEWED_FILE=.data-exposure-reviewed
+
+blob_sha() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    git cat-file blob ":$1" 2>/dev/null | sha256sum | cut -d' ' -f1
+  else
+    git cat-file blob ":$1" 2>/dev/null | shasum -a 256 | cut -d' ' -f1
+  fi
+}
+
+reviewed_reason() {
+  [ -f "$REVIEWED_FILE" ] || return 1
+  awk -F'\t' -v p="$1" -v s="$2" \
+    '$1==s && $2==p {print $3; found=1} END{exit found?0:1}' "$REVIEWED_FILE"
+}
+
+# 원장이 썩는 것을 막는다 — 지워진 파일이나 바뀐 내용을 가리키는 항목은 그 자체가 불합격.
+check_reviewed_ledger() {
+  local bad=0 sha path reason
+  [ -f "$REVIEWED_FILE" ] || return 0
+  while IFS=$'\t' read -r sha path reason; do
+    case "$sha" in ''|'#'*) continue ;; esac
+    if [ -z "${path:-}" ] || [ -z "${reason:-}" ]; then
+      echo "FAIL: 검토 기준선 형식 오류 — sha·경로·사유 세 칸이 필요하다: $sha"; bad=1; continue
+    fi
+    if ! git ls-files --error-unmatch "$path" >/dev/null 2>&1; then
+      echo "FAIL: 검토 기준선의 죽은 항목 — 추적되지 않는 경로: $path"; bad=1; continue
+    fi
+    if [ "$(blob_sha "$path")" != "$sha" ]; then
+      echo "FAIL: 검토 기준선이 낡았다 — $path 내용이 검토 이후 바뀌었다(재검토 필요)"; bad=1
+    fi
+  done < "$REVIEWED_FILE"
+  return "$bad"
+}
+
 pii_word_count() { printf '%s' "$1" | tr 'A-Z' 'a-z' | grep -oE "$PII_COLUMN_WORDS" | sort -u | wc -l | tr -d ' '; }
 
 scan_pii() {
@@ -140,16 +184,24 @@ scan_pii() {
         rows=$(git cat-file blob ":$f" 2>/dev/null | tail -n +2 | grep -cE '[^[:space:],]')
         hits=$(pii_word_count "$header")
         if [ "$hits" -ge 2 ] && [ "$rows" -ge 1 ]; then
-          echo "FAIL: 후보자 개인정보로 보이는 표 데이터: $f (개인정보 컬럼 ${hits}종 · 데이터 ${rows}행)"
-          bad=1
+          if reason=$(reviewed_reason "$f" "$(blob_sha "$f")"); then
+            echo "REVIEWED: $f — $reason"
+          else
+            echo "FAIL: 후보자 개인정보로 보이는 표 데이터: $f (개인정보 컬럼 ${hits}종 · 데이터 ${rows}행)"
+            bad=1
+          fi
         fi
         ;;
       *.sql)
         body=$(git cat-file blob ":$f" 2>/dev/null)
         hits=$(pii_word_count "$body")
         if [ "$hits" -ge 2 ] && printf '%s' "$body" | grep -qiE '\b(insert[[:space:]]+into|values[[:space:]]*\(|copy[[:space:]]+.*from)'; then
-          echo "FAIL: 후보자 개인정보로 보이는 적재문: $f (개인정보 컬럼 ${hits}종 · INSERT/VALUES/COPY 포함)"
-          bad=1
+          if reason=$(reviewed_reason "$f" "$(blob_sha "$f")"); then
+            echo "REVIEWED: $f — $reason"
+          else
+            echo "FAIL: 후보자 개인정보로 보이는 적재문: $f (개인정보 컬럼 ${hits}종 · INSERT/VALUES/COPY 포함)"
+            bad=1
+          fi
         fi
         ;;
     esac
@@ -157,6 +209,7 @@ scan_pii() {
   if [ "$n" -eq 0 ]; then
     echo "FAIL: 추적 파일 0개 — 스캔 무효 (P20)"; return 2
   fi
+  check_reviewed_ledger || bad=1
   [ "$bad" -eq 0 ] && echo "PASS: csv/tsv/sql ${files}개 검사(추적 ${n}개 중), 개인정보 적재 0건"
   return "$bad"
 }
