@@ -1,24 +1,28 @@
 # CEO briefing style
 
-Write as an operating brief for a CEO, not as an analyst transcript.
+This style governs the future Notion Golden projection. It does not alter the general Weekly v1
+renderer or its existing Markdown contract. Write Golden output as an operating brief for a CEO,
+not as an analyst transcript.
 
 ## Order
 
-1. 결론 — what changed and where management attention is needed.
-2. 이번 주 고객 액션 — ordered by deterministic priority.
+1. 결론 — only the material, evidenced changes.
+2. 최근 고객 인입 — chronological facts, never an LLM priority list.
 3. 마감 후 경보 — events after the closed metric window.
-4. 컨설턴트별 몰입 — verified sent count, active days, and largest position focus share.
+4. 컨설턴트별 몰입 — verified sent count, active days, largest position focus share, and inline
+   `comparison_status`; unequal coverage forbids peer-ranking language in this section.
 5. 채용 페이지 관측 — explicitly non-client staging signals.
-6. 운영 위험 — missing source, stale data, manual review, or failed publication.
+6. 데이터 커버리지 — missing source, stale data, manual review, or failed publication.
 
 ## Voice
 
 - Use short declarative Korean sentences.
-- Name the company, position, decision, timing, and next action.
+- Name the company, position, observed decision, and timing.
 - Put numbers next to the fact they measure.
 - Distinguish fact, inference, and unavailable evidence.
 - Prefer “확인되지 않았다” to invented certainty.
 - Omit greetings, process narration, generic recommendations, and LLM self-reference.
+- Do not issue management priorities or action directives.
 
 ## Banned filler
 
@@ -32,7 +36,6 @@ Write as an operating brief for a CEO, not as an analyst transcript.
 
 ```text
 결론
-신규 의뢰는 세 고객사에 집중됐다. Codeit 백엔드와 SpoonLabs AI Creative Director는
-요청 시점과 직무 희소도를 함께 고려할 때 이번 주 선행 소싱 대상이다. FastView Product
-BD는 레퍼런스 체크 이후 오퍼 단계로, 신규 발굴보다 일정·리스크 관리가 우선이다.
+신규 의뢰 3건이 확인됐다. Codeit 백엔드와 SpoonLabs AI Creative Director는 8월 31일에
+공유됐다. FastView Product BD는 레퍼런스 체크 완료 상태이며 고객 결정일은 확인되지 않았다.
 ```

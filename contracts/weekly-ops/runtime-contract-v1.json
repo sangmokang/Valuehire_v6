@@ -26,6 +26,7 @@
   },
   "clickup": {
     "position_list_id": "901814621569",
+    "list_url": "https://app.clickup.com/9018789656/v/li/901814621569",
     "staging_status": "scraped",
     "job_statuses": [
       "backend/fullstack/cto",
@@ -92,14 +93,17 @@
   "outreach_sources": [
     {
       "channel": "jobkorea",
+      "operator_url": "https://www.jobkorea.co.kr/corp/person/position",
       "browser": "Aside_or_approved_channel_profile",
       "required_surface": "sent_history",
       "accepted_surface_kind": "position_offer_history",
+      "navigation": "operator_url > sent_history > position_offer_history",
       "receipt": "provider_request_or_message_id",
       "invalid_surfaces": ["integrated_login", "talent_search", "resume_tab", "cached_offer_link", "screenshot", "ocr", "open_tab"]
     },
     {
       "channel": "saramin",
+      "operator_url": "https://billing.saramin.co.kr/manage/7791926?svcAypdTgtNos=31463970",
       "browser": "Aside_or_approved_channel_profile",
       "required_surface": "sent_history",
       "accepted_surface_kind": "detailed_usage_history",
@@ -110,6 +114,8 @@
     {
       "channel": "linkedin_rps",
       "browser": "Aside_real_login_profile",
+      "navigation_boundary": "existing_authenticated_aside_tab_only",
+      "operator_url_policy": "capture_and_verify_current_authenticated_surface_before_read",
       "required_surface": "sent_inmail_or_message_history",
       "accepted_surface_kind": ["inmail_audit_report", "recruiter_inbox_thread"],
       "receipt": "provider_message_or_thread_id",
@@ -138,7 +144,7 @@
       "source_snapshot_id"
     ],
     "require_all_channels_for_portal_events": true,
-    "require_all_channels_when_capabilities_pass": true,
+    "require_all_channels_on_every_run": true,
     "blocker_reason_required_when_unreadable": true,
     "diagnostic_and_event_snapshot_must_match": true
   },
@@ -161,6 +167,13 @@
     "required_output_collections": ["channel_coverage", "consultant_focus", "excluded_rows"],
     "coverage_gap_comparison_status": "NOT_COMPARABLE",
     "zero_result_scope": "accepted_sent_inside_closed_weekly_window"
+  },
+  "golden_projection_policy": {
+    "legacy_priority_score_excluded": true,
+    "excluded_runtime_fields": ["client_priorities", "score_version", "score_points"],
+    "client_priority_is_observed_customer_evidence_only": true,
+    "required_output_collection_section": "candidate_sourcing",
+    "post_cutoff_projection_section": "data_coverage"
   },
   "consultant_focus_output_schema": {
     "shape": "consultant_summary_with_nested_positions",
@@ -202,11 +215,16 @@
       "company": "Codeit",
       "official_url": "https://careers.codeit.com/recruit",
       "adapter": "roundhr_browser_network",
+      "allowed_request_hosts": [],
+      "cross_domain_requires_versioned_allowlist": true,
+      "empty_allowlist_behavior": "NOT_RUN",
       "title_mapping_required": true,
-      "ids_without_titles_status": "PARTIAL"
+      "ids_without_titles_status": "PARTIAL",
+      "talent_pool_behavior": "exclude_from_active_requisition"
     },
     {
-      "company": "GC Company",
+      "company": "여기어때",
+      "legal_operator": "GC Company",
       "official_url": "https://gccompany.career.greetinghr.com/ko/apply",
       "adapter": "greeting_openings",
       "talent_pool_behavior": "exclude_from_active_requisition"
@@ -214,7 +232,8 @@
     {
       "company": "Wrtn Technologies",
       "official_url": "https://wrtn.career.greetinghr.com/ko/career",
-      "adapter": "greeting_openings"
+      "adapter": "greeting_openings",
+      "talent_pool_behavior": "exclude_from_active_requisition"
     },
     {
       "company": "FastView",
@@ -237,6 +256,14 @@
     "REFERENCE_ONLY",
     "NONE"
   ],
+  "intent_origin_mapping": {
+    "REQUESTED": "CLIENT_REQUESTED",
+    "POSITION_SHARED": "CLIENT_SHARED",
+    "REQUIREMENT_CHANGED": "EXISTING_CLIENT_POSITION_ONLY_NO_PROMOTION",
+    "PIPELINE_FEEDBACK": "EXISTING_CLIENT_POSITION_ONLY_NO_PROMOTION",
+    "REFERENCE_ONLY": "NO_PROMOTION",
+    "NONE": "NO_PROMOTION"
+  },
   "lifecycles": [
     "ACTIVE",
     "PIPELINE",
@@ -259,13 +286,14 @@
   "dedupe_rule_version": "weekly-dedupe-v1",
   "zero_result_contract": {
     "rule_version": "weekly-zero-result-v1",
-    "collections": ["positions", "outreach_events"],
+    "collections": ["positions", "position_state", "outreach_events", "pipeline_events", "pipeline_state"],
     "receipt_must_resolve_in_source_snapshot": true,
     "required_when_responsible_capabilities_pass": true
   },
   "consultant_focus_version": "consultant-focus-v2",
   "publication": {
     "default_mode": "dry_run",
+    "notion_parent_url": "https://app.notion.com/p/valueconnect/1975f52f80964fb1996eed3b0226e633?v=c5aa2180f3b24feda8408f20547aed54",
     "required_targets": [
       "database",
       "clickup",
@@ -285,6 +313,8 @@
     "publication_report_names_contract_errors": true,
     "receipt_required_fields": [
       "write_ahead_intent_id",
+      "target_name",
+      "target_id",
       "idempotency_key",
       "schema_readback_ref",
       "external_object_id",

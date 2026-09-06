@@ -23,6 +23,9 @@ class WeeklyGateTest(unittest.TestCase):
         self.assertEqual(score["difficulty"], 90)
         self.assertEqual(score["priority"], 80)
         self.assertEqual(score["version"], "weekly-priority-v1")
+        self.assertIn("## 이번 주 고객 액션", result["brief_markdown"])
+        self.assertIn("후보군 확장과 1차 추천 일정 확정", result["brief_markdown"])
+        self.assertIn("(우선순위 80, 시급성 75, 난이도 90)", result["brief_markdown"])
 
     def test_scraped_only_position_is_capped_and_not_in_customer_actions(self):
         bundle = valid_bundle()
@@ -593,7 +596,5 @@ class WeeklyGateTest(unittest.TestCase):
         self.assertEqual(result["verdict"], "BLOCKED")
         self.assertIn("FORBIDDEN_SENSITIVE_VALUE", result["errors"])
         self.assertNotIn("candidate@example.com", result["brief_markdown"])
-
-
 if __name__ == "__main__":
     unittest.main()

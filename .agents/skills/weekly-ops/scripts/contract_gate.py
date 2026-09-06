@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import re
+import unicodedata
 from datetime import datetime
 from typing import Any, Callable
 
@@ -32,25 +34,125 @@ RECEIPT_FIELDS = {
 SOURCE_STATUSES = {"PASS", "PARTIAL", "FAIL", "NOT_RUN", "STALE"}
 DEDUPE_RULE_VERSION = "weekly-dedupe-v1"
 ZERO_RESULT_RULE_VERSION = "weekly-zero-result-v1"
-ZERO_RESULT_COLLECTIONS = {"positions", "outreach_events"}
+ZERO_RESULT_COLLECTIONS = {"positions", "position_state", "outreach_events", "pipeline_events", "pipeline_state"}
 ALLOWED_EMAIL_TARGETS = {"sangmokang@valueconnect.kr"}
-EMAIL_PATTERN = re.compile(r"(?<![\w.+-])[\w.+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?![\w.-])")
-PHONE_PATTERN = re.compile(
-    r"(?<![A-Za-z0-9])(?:(?:\+?82[- .]?)?0?1[016789][- .]?\d{3,4}[- .]?\d{4}|"
-    r"0\d{1,2}[- .]?\d{3,4}[- .]?\d{4})(?![A-Za-z0-9])"
+EMAIL_PATTERN = re.compile(
+    r"(?<![\w.+-])[\w.+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?![\w-])(?!\.[\w-])"
 )
+QUOTED_EMAIL_PATTERN = re.compile(r'"[^"]{1,64}"@[\w.-]+\.[\w-]{2,}(?![\w-])(?!\.[\w-])')
+UNICODE_EMAIL_PATTERN = re.compile(
+    r"(?<![\w.+!#$%&'*/=?^`{|}~-])[\w.+!#$%&'*/=?^`{|}~-]{1,64}"
+    r"@[\w.-]+\.[\w-]{2,}(?![\w-])(?!\.[\w-])"
+)
+DOMAIN_LITERAL_EMAIL_PATTERN = re.compile(
+    r"""["']?[\w.+! -]{1,64}["']?@\[(?:IPv6:)?[0-9A-Za-z:.]{2,45}\]"""
+)
+PHONE_PATTERN = re.compile(
+    r"(?<![A-Za-z0-9])"
+    r"(?:(?:\+?82\s?[-./]?\s?)?\(?0?1[016789]\)?\s?[-./]?\s?\d{3,4}\s?[-./]?\s?\d{4}|"
+    r"\(?0\d{1,2}\)?\s?[-./]?\s?\d{3,4}\s?[-./]?\s?\d{4})"
+    r"(?:\s?(?:[xX#]|ext\.?|내선)\s?\d{1,5})?(?![A-Za-z0-9])"
+)
+NANP_PHONE_PATTERN = re.compile(
+    r"(?<![A-Za-z0-9])(?:1[-./ ]?)?(?:\([2-9]\d{2}\)[-./ ]?|[2-9]\d{2}[-./ ]?)"
+    r"[2-9]\d{2}[-./ ]?\d{4}"
+    r"(?:\s?(?:[xX#]|ext\.?|내선)\s?\d{1,5})?(?![A-Za-z0-9])"
+)
+RRN_PATTERN = re.compile(
+    r"(?<!\d)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\s?[-./]?\s?[1-8]\d{6}(?!\d)"
+)
+DASH_VARIANTS = str.maketrans({dash: "-" for dash in "‐‑‒–—―−﹘﹣"})
+PROFILE_URL_PATTERN = re.compile(
+    r"(?i)(?<![a-z0-9.-])(?:[a-z0-9-]+\.)*"
+    r"(?:linkedin\.com|lnkd\.in|github\.com|gitlab\.com|bitbucket\.org|behance\.net|"
+    r"dribbble\.com|velog\.io|notefolio\.net|instagram\.com|facebook\.com|"
+    r"x\.com|twitter\.com|rocketpunch\.com)"
+    r"\.?(?::\d+)?/\S+"
+)
+APPROVED_URL_HOSTS = {
+    "careers.codeit.com", "www.spoonlabs.com", "career.gccompany.co.kr",
+    "wrtn.career.greetinghr.com", "fastview.career.greetinghr.com",
+    "www.jobkorea.co.kr", "billing.saramin.co.kr", "app.clickup.com", "app.notion.com",
+}
+GENERIC_URL_PATTERN = re.compile(r"(?i)\bhttps?://([^\s/\"'<>]+)")
+
+
+def _unapproved_url_hit(text: str) -> bool:
+    """http(s) URL은 승인 호스트 allowlist 밖이면 전부 차단한다(fail-closed)."""
+    for match in GENERIC_URL_PATTERN.finditer(text):
+        host = match.group(1).split("@")[-1].split(":")[0].strip(".").casefold()
+        if host not in APPROVED_URL_HOSTS:
+            return True
+    return False
+INTL_PHONE_PATTERN = re.compile(
+    r"(?<![\w+])(?:\(?\+[1-9]\d{0,2}\)?|(?<!\d)00[- .]?[1-9]\d{0,2})"
+    r"(?:(?:[- ./]?\(?\d{2,4}\)?){3}"
+    r"|(?:[- .]\(?\d{1,2}\)?)(?:[- .]\(?\d{3,4}\)?){2}"
+    r"|(?:[- .]\(?\d{1,4}\)?){4,6})(?!\d)"
+)
+QUOTED_KEY_PATTERN = re.compile(r"""["']([\w \-]{1,64})["']\s*[:=]""")
+EMBEDDED_KEY_TOKENS = frozenset({
+    "name", "fullname", "email", "phone", "mobile", "address", "birth", "birthdate",
+    "candidatename", "candidatedisplayname", "candidatefullname", "candidateemail",
+    "applicantname", "applicantdisplayname", "applicantfullname",
+    "firstname", "lastname", "givenname", "familyname", "middlename",
+    "surname", "nickname", "contact", "contactname", "contactinfo",
+    "telephone", "tel", "휴대전화",
+    "이름", "성", "성명", "연락처", "전화번호", "휴대폰", "주소", "생년월일", "이메일",
+})
+
+
+def _embedded_key_hit(text: str) -> bool:
+    """따옴표+콜론 경계의 키 토큰을 정규화해 대조한다 — substring 매칭이 아니다."""
+    for match in QUOTED_KEY_PATTERN.finditer(text):
+        token = match.group(1).strip()
+        ascii_token = re.sub(r"[^a-z0-9]", "", token.casefold())
+        if ascii_token in EMBEDDED_KEY_TOKENS or token in EMBEDDED_KEY_TOKENS:
+            return True
+    return False
+
+
+def find_sensitive_text(value: str) -> bool:
+    """NFKC 정규화 뒤 문자열 하나를 검사한다. 렌더링된 최종 산출물 재검사에도 쓰인다."""
+    normalized = unicodedata.normalize("NFKC", value).translate(DASH_VARIANTS)
+    normalized = re.sub(r"\s+", " ", normalized)
+    if (
+        RRN_PATTERN.search(normalized)
+        or PROFILE_URL_PATTERN.search(normalized)
+        or INTL_PHONE_PATTERN.search(normalized)
+        or NANP_PHONE_PATTERN.search(normalized)
+        or QUOTED_EMAIL_PATTERN.search(normalized)
+        or UNICODE_EMAIL_PATTERN.search(normalized)
+        or DOMAIN_LITERAL_EMAIL_PATTERN.search(normalized)
+        or _unapproved_url_hit(normalized)
+        or _embedded_key_hit(normalized)
+    ):
+        return True
+    value = normalized
+    return bool(EMAIL_PATTERN.search(value) or PHONE_PATTERN.search(value))
+
+
+def _string_value_is_sensitive(value: str) -> bool:
+    stripped = value.strip()
+    if stripped.startswith("{"):
+        try:
+            if isinstance(json.loads(stripped), dict):
+                return True
+        except ValueError:
+            pass
+    return find_sensitive_text(value)
 
 
 def find_sensitive_values(value: Any) -> bool:
     if isinstance(value, str):
-        return bool(EMAIL_PATTERN.search(value) or PHONE_PATTERN.search(value))
+        return _string_value_is_sensitive(value)
     if isinstance(value, dict):
         return any(
-            find_sensitive_values(nested)
+            find_sensitive_values(key) or find_sensitive_values(nested)
             for key, nested in value.items()
             if not (
                 key == "target_id"
-                and value.get("name") == "email"
+                and (value.get("name") == "email" or value.get("target_name") == "email")
                 and isinstance(nested, str)
                 and nested in ALLOWED_EMAIL_TARGETS
             )
@@ -239,13 +341,21 @@ def publication_receipts(targets: Any) -> list[dict[str, Any]]:
         return []
     receipts: list[dict[str, Any]] = []
     for target in targets:
-        if not isinstance(target, dict) or not isinstance(target.get("name"), str):
+        if (
+            not isinstance(target, dict)
+            or not isinstance(target.get("name"), str)
+            or target["name"] not in REQUIRED_PUBLICATION_TARGETS
+        ):
             continue
-        receipt = {"name": target["name"], "status": target.get("status", "NOT_RUN")}
+        receipt = {
+            "target_name": target["name"],
+            "target_id": target.get("target_id"),
+            "status": target.get("status", "NOT_RUN"),
+        }
         if target.get("status") == "READBACK_VERIFIED":
             receipt.update({field: target.get(field) for field in sorted(RECEIPT_FIELDS)})
         receipts.append(receipt)
-    return sorted(receipts, key=lambda item: item["name"])
+    return sorted(receipts, key=lambda item: item["target_name"])
 
 
 def publication_state(
@@ -267,10 +377,13 @@ def publication_state(
             errors.append("PUBLICATION_TARGET_INVALID")
             continue
         name = target["name"]
-        if not isinstance(name, str) or name in seen:
+        if name not in REQUIRED_PUBLICATION_TARGETS or name in seen:
             errors.append("PUBLICATION_TARGET_INVALID")
             continue
         seen.add(name)
+        if name == "email" and target["target_id"] not in ALLOWED_EMAIL_TARGETS:
+            errors.append("EMAIL_TARGET_NOT_ALLOWLISTED")
+            continue
         if target.get("status") == "READBACK_VERIFIED":
             if any(not isinstance(target.get(field), str) or not target[field] for field in RECEIPT_FIELDS):
                 errors.append("PUBLICATION_RECEIPT_CONTRACT_INVALID")
