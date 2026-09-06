@@ -82,8 +82,16 @@ new_case c3_empty_source
 expect_principles "C3-EMPTY-SOT" "coding-principles.md 빈 파일" 1 FAIL
 
 new_case c4
-ruby -rpsych -e 'p=ARGV[0]; d=Psych.safe_load(File.read(p)); d.reject!{|x| x["id"]=="P22"}; File.write(p,Psych.dump(d))' "$CASE/docs/sot/principles.yaml"
+ruby -rpsych -e 'p=ARGV[0]; d=Psych.safe_load(File.read(p)); d.reject!{|x| x["id"]=="P26"}; File.write(p,Psych.dump(d))' "$CASE/docs/sot/principles.yaml"
 expect_principles "C4" "원칙 ID 하나 삭제" 1 FAIL
+
+new_case c4_production_clause
+ruby -e 'p=ARGV[0]; s=File.read(p); s.gsub!("BUSINESS_USED", "BUSINESS_DONE"); File.write(p,s)' "$CASE/docs/sot/coding-principles.md"
+expect_principles "C4-PRODUCTION-CLAUSE" "P25 배송 상태 계약 삭제" 1 FAIL
+
+new_case c4_schema_clause
+ruby -e 'p=ARGV[0]; s=File.read(p); s.sub!("NOT NULL / UNIQUE / FOREIGN KEY / CHECK", "앱에서 검사"); File.write(p,s)' "$CASE/docs/sot/coding-principles.md"
+expect_principles "C4-SCHEMA-CLAUSE" "P26 DB 제약 계약 삭제" 1 FAIL
 
 new_case c5
 ruby -rpsych -e 'p=ARGV[0]; d=Psych.safe_load(File.read(p)); d << d[0].dup; File.write(p,Psych.dump(d))' "$CASE/docs/sot/principles.yaml"
