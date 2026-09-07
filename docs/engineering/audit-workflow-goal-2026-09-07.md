@@ -62,4 +62,22 @@
 
 ## 적대 검증 로그
 
-(구현·검증 완료 후 기록)
+### 배선 증명 (CI 라이브 로그, 2026-09-07)
+
+PR #68 push 이벤트 CI 실행(run 34074547386)의 "억제 만료 스캔 (suppressions.yaml)" 스텝 실제 stdout: `##[group]Run bash scripts/check-suppression-expiry.sh` → `PASS: 억제 3건 전부 유효 기한 내`. 인라인 로직이 아니라 새 스크립트가 실제로 CI에서 호출·실행됨을 확인.
+
+### V1 (fresh 서브에이전트, `humanreview` 스킬 기반, 2026-09-07)
+
+**최초 판정: REQUEST_CHANGES.** 전문은 `docs/engineering/audit-workflow-v1-verdict-2026-09-07.md`.
+
+확인된 것: AC-1(추출 전/후 로직 동일, 경계값 6종), counter-AC(현재 저장소에 대고 실행 시 `verify.yml`의 `@v4`를 정확히 잡음), PR #68 head SHA 일치·push/pull_request 두 이벤트 CI 성공, verify.yml diff에 검사 약화 은닉 없음.
+
+**M-1 (유효 반례, 채택)**: `check-action-sha-drift.sh`가 **주석 처리되어 실행되지 않는** `# uses: actions/checkout@v4` 같은 줄도 실제 참조로 오판(당시 저장소에 이 패턴이 없어 즉시 오탐은 아니었으나 잠재 결함). → 매칭 전에 각 줄을 trim해 `#`로 시작하면 건너뛰도록 수정, fixture로 재확인(PASS).
+
+**M-2 (유효 반례, 채택)**: 같은 스크립트가 유효한 **대문자 40자 SHA**를 가변 참조로 오판(`[0-9a-f]`가 소문자만 허용, git SHA는 대소문자 무관). → `[0-9a-fA-F]`로 수정, fixture로 재확인(PASS).
+
+**M-3 (유효 반례, 채택)**: goal 문서가 "`acceptance-ci-step-integrity.sh`가 다중 워크플로를 지원하는지 먼저 실측"하라고 지시했는데 실측 기록이 비어 있었다. 실측 결과 그 스크립트가 `verify.yml`에 하드코딩되어 있어 **`audit.yml`은 구조 무결성 검사(무력화 저항)의 보호를 전혀 못 받는 상태**였다 — 누군가 `audit.yml`에 `continue-on-error: true`를 몰래 넣어도 이 저장소 어떤 자동 검사도 못 잡는 회귀 방어선 공백. → `scripts/acceptance-ci-step-integrity.sh`를 `run_battery()` 함수로 일반화해 `verify.yml`·`audit.yml` 양쪽에 동일한 무력화 8종 배터리를 돌리도록 확장(검사기 1벌 `scripts/verify/check-ci-step-integrity.sh`는 이미 워크플로 경로를 인자로 받아 그대로 재사용). 로컬 재실행: `CHECKED: 23`(기존 14 → 23), `VERDICT: PASS`.
+
+**R9(발견 반례 영구 편입)**: M-1·M-2는 스크립트 수정 자체가 회귀 방어(같은 반례를 fixture로 재확인해 PASS 전환 확인 완료). M-3는 CI에 이미 등록된 기존 인수 검사(`acceptance-ci-step-integrity.sh`, `verify.yml` 22번 스텝)의 커버리지를 넓히는 것으로 편입했다 — 새 스크립트를 만들지 않고 기존 검사기를 일반화해 "검사기 1벌" 원칙을 유지했다.
+
+**정정 후 상태**: 위 3건 모두 이 PR 안에서 코드로 반영·재검증 완료. `.github/workflows/audit.yml`/`verify.yml`의 트리거·나머지 스텝은 이번 정정에서 변경 없음.
