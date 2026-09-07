@@ -27,8 +27,12 @@
 ## 인수 기준 (EARS)
 
 - **AC-1**: `verify.yml:18`의 `uses:` 값이 `actions/checkout@<40자 SHA> # v7.0.1` 형태여야 한다.
-  검증 명령: `/usr/bin/grep -E "uses: actions/checkout@[0-9a-f]{40}" .github/workflows/verify.yml` → 매치 1건.
+  검증 명령(초안): `/usr/bin/grep -E "uses: actions/checkout@[0-9a-f]{40}" .github/workflows/verify.yml` → 매치 1건.
+  **검증 명령(V1 반례 반영 후 authoritative)**: 초안 패턴은 행 시작·SHA 뒤 경계·버전 주석·유일성을 강제하지 않아 41자 SHA·주석 처리된 줄·중복 checkout 행을 모두 거짓 통과시킨다(아래 "적대 검증 로그" M-1). 대신 아래 두 명령을 함께 쓴다.
+  1. `/usr/bin/grep -cE '^[[:space:]]*-[[:space:]]+uses:[[:space:]]+actions/checkout@[0-9a-f]{40}[[:space:]]+# v7\.0\.1[[:space:]]*$' .github/workflows/verify.yml` → `1`
+  2. `git grep -n -I -i -E 'actions/checkout@' -- '*.yml' '*.yaml'` → 저장소 전체 workflow YAML 중 `.github/workflows/verify.yml:18` 단 한 줄만 출력
 - **AC-2**: 이 변경 뒤 CI(verify job)가 checkout 스텝을 포함해 처음부터 끝까지 성공해야 한다(로컬 재현 불가 — PR을 올려 실제 GitHub Actions 러너로 확인).
+  검증 명령: `gh api repos/sangmokang/Valuehire_v6/commits/<head-sha>/check-runs --jq '.check_runs[] | "\(.name) \(.status) \(.conclusion)"'` — `push`·`pull_request` 두 이벤트 모두 `completed success`여야 한다(이벤트 종류를 구분해서 봐야 하는 이유는 "적대 검증 로그" 참고).
 - **counter-AC**: SHA 대신 `@v4`나 `@v7`(태그) 같은 가변 참조로 되돌리면 AC-1 검증 명령이 매치 0건으로 실패해야 한다.
 
 ## 계약 (입출력 모양)
@@ -56,8 +60,22 @@
 
 - 이슈 #64의 다른 항목(ubuntu-24.04 고정, timeout-minutes/concurrency, push+pull_request 중복 트리거 제거, awk `'` 이식성, 자기오염 정규식, shellcheck/zizmor 도입, 브랜치 보호 API — GitHub Pro 업그레이드 없이는 막혀 있음)은 각각 별도 WU.
 - `.github/dependabot.yml`(github-actions 생태계, cooldown) 신설 — 별도 WU.
+- `scripts/acceptance-*.sh` 신설로 "서드파티 액션은 항상 SHA 고정"을 상시 CI 회귀로 강제 — 별도 WU(V1 M-1 반례 후속, 위 "적대 검증 로그" 참고).
 - 이번 PR은 checkout 버전+SHA 고정 1개 AC만.
 
 ## 적대 검증 로그
 
-(구현·검증 완료 후 기록)
+### Codeaudit (읽기 전용, 2026-09-07)
+
+PASS. 실제 diff(1 insertion/1 deletion)가 goal 문서 주장과 일치, AC-1/counter-AC를 fresh 재실행으로 확인, weakens-check 라벨 기계장치 부재를 재확인. 상세는 세션 기록 참고.
+
+### V1 (`codex:rescue` → `humanreview`, fresh read-only, 2026-09-07)
+
+**최초 판정: REQUEST_CHANGES.** 전문은 `docs/engineering/checkout-v7-sha-pin-v1-verdict-2026-09-07.md`.
+
+- **M-1 (유효 반례, 채택)**: goal 문서 초안의 AC-1 grep 패턴 `uses: actions/checkout@[0-9a-f]{40}`은 (a) 정확한 SHA 뒤에 문자 추가, (b) checkout 행을 주석 처리, (c) 두 번째 checkout 행 추가 — 세 우회 모두 종료값 0(거짓 통과)이었다. → 위 "인수 기준" 절의 AC-1을 행 전체 anchor + exact-count 패턴 + 저장소 전체 유일성 검사로 교체해 반영했다. 교체 후 패턴으로 재실행: `anchored-match-count=1`, `git grep`도 `verify.yml:18` 단 한 줄만 출력 — M-1 반례가 더 이상 통하지 않음을 확인.
+- **E-1 (V1 환경 한계, 코드 결함 아님)**: V1이 실행된 서브에이전트 샌드박스에서 `gh api`/`git ls-remote`가 네트워크 차단(`error connecting to api.github.com`, `Could not resolve host`)으로 전량 실패해 AC-2를 fresh 재현하지 못하고 NOT_RUN으로 판정했다. 이 세션(부모 세션)은 `gh` 인증·네트워크가 정상 동작하며, PR #67 생성 직후 및 이 정정 시점 두 차례 모두 `gh api .../commits/569ab89.../check-runs`로 `push`·`pull_request` 두 이벤트의 `verify` job이 각각 `completed success`임을 fresh 확인했다(로컬 HEAD=원격 PR HEAD=`569ab8988e2c3e41be7c7b9789c537b9a008602e` 일치, `mergeStateStatus=CLEAN`). CI 초록불이 이벤트 종류를 구분하지 않고 아무거나 하나만 보고 판단하는 실수를 피하기 위해 두 이벤트 모두 조회했다 — 결과: 둘 다 success. **AC-2 결론: PASS (부모 세션 fresh 증거로 종결, E-1은 V1 실행 환경 제약이었을 뿐 실제 결함이 아님).**
+- 그 외 항목(SHA 정확성, node24, fetch-depth/persist-credentials 입력 호환성, 검사 약화 은닉 없음, counter-AC 2종)은 V1에서 전부 PASS로 확인됨.
+- R9(발견 반례 영구 편입): M-1은 이 goal 문서(같은 PR)의 AC-1 검증 명령 자체를 교체하는 것으로 편입했다. 이 변경은 CI에 등록된 상시 회귀 스크립트가 아니라 1회성 수동 검증 문서이므로 `scripts/acceptance-*.sh` 신설은 하지 않았다(신설 시 `verify.yml`+`docs/sot/verification-commands.md` 양쪽 등록이 필요해 이번 PR의 명시적 비범위인 "checkout 버전+SHA 고정 1개 AC만"을 넘어선다) — 별도 WU 후보로 남긴다.
+
+**정정 후 재판정**: 위 M-1 반영(문서만 수정, `.github/workflows/verify.yml`은 최초 커밋에서 변경 없음)과 E-1 종결로 두 차단 사유가 모두 닫혔다. L2 등급 요구(V1까지)를 충족.
