@@ -140,23 +140,9 @@ jobs:
         # pre-commit 의 expiry 검사는 suppressions.yaml 이 '스테이징된 커밋'에서만 돈다.
         # 이미 커밋된 억제가 시간이 지나 썩는 것은 아무도 보지 않는다 — 이 게이트가
         # 막겠다고 인용한 98d923f(35일 방치) 시나리오 그 자체다. 그래서 매 push 마다 훑는다.
-        run: |
-          [ -f suppressions.yaml ] || { echo "PASS: 억제 없음"; exit 0; }
-          today=$(date +%Y-%m-%d); fail=0; n=0
-          while IFS= read -r e; do
-            n=$((n+1))
-            if ! printf '%s' "$e" | grep -qE '^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$'; then
-              echo "FAIL: expiry 형식 오류 '${e}' — 만료를 판정할 수 없는 억제는 무기한 억제다"; fail=1
-            elif [ "$e" \< "$today" ]; then
-              echo "FAIL: 만료된 억제 (expiry $e < 오늘 $today) — 유예 기한이 지났다"; fail=1
-            fi
-          done < <(awk '/^ *expiry:/{sub(/^ *expiry: */,""); gsub(/["\x27]/,""); print}' suppressions.yaml)
-          nc=$(awk '/^- *check:/{c++} END{print c+0}' suppressions.yaml)
-          if [ "$nc" -ne "$n" ]; then
-            echo "FAIL: 억제 ${nc}건 중 expiry 가 ${n}건뿐"; fail=1
-          fi
-          [ "$fail" -eq 0 ] && echo "PASS: 억제 ${nc}건 전부 유효 기한 내"
-          exit $fail
+        # 같은 판정 로직을 audit.yml(매일 새벽, push/PR 없이도 돔)도 부른다 —
+        # 로직을 두 곳에 따로 적으면 반드시 갈라지므로 scripts/ 로 뺐다.
+        run: bash scripts/check-suppression-expiry.sh
 
       - name: 강제 장치 존재 검사 (hooks/)
         # core.hooksPath 는 저장소 전역 config 이고 hooks/ 는 브랜치 내용이다.
