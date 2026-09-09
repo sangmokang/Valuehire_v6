@@ -41,7 +41,7 @@ if [ "$fail" -eq 0 ]; then
   output=$(ruby "$CHECKER" "$POLICY" "$DOCUMENT" 2>&1) || rc=$?
   checked=$((checked + 1))
   if [ "$rc" -eq 0 ] && printf '%s\n' "$output" | grep -q '^VERDICT: PASS$' && \
-     printf '%s\n' "$output" | grep -q '^POLICY_CHECKED: 19$' && \
+     printf '%s\n' "$output" | grep -q '^POLICY_CHECKED: 22$' && \
      printf '%s\n' "$output" | grep -q '^DOCUMENT_SYNC: PASS$'; then
     echo "PASS: structured policy and generated document"
   else

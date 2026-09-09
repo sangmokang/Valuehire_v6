@@ -33,7 +33,7 @@ T는 작성자와 독립 검증자가 공유하는 채점 기준입니다. 정�
 - 입력: UTF-8 YAML 단일 문서, 정확한 필수 키, 정수 version/claims/max units/hours, 문자열·불리언·순서 있는 목록. 객체 키 순서는 의미가 없으며 목록 순서는 의미가 있습니다. 5.0과 문자열 5는 정수 계약 위반입니다.
 - YAML 중복 키·알 수 없는 키·빈 문서·여러 문서·별칭·잘못된 자료형을 실패시킵니다.
 - 정책·생성 문서·검사 모듈은 일반 비어 있지 않은 파일이어야 합니다. 심볼릭 링크·누락·빈 파일·읽기 실패는 성공하지 않습니다.
-- checker 성공: exit 0, VERDICT PASS, POLICY_CHECKED 19, DOCUMENT_SYNC PASS. 실패: exit 1, VERDICT FAIL, 원인과 처리 수. 잘못된 CLI 인수 또는 런타임 부재는 NOT_RUN/exit 2.
+- checker 성공: exit 0, VERDICT PASS, POLICY_CHECKED 22, DOCUMENT_SYNC PASS. 6개 객체 구조와 16개 정책값 단언을 실제 실행해 센다. 종전 19는 실행 계수가 아닌 상수였다. 실패: exit 1, VERDICT FAIL, 원인과 실제 처리 수. 잘못된 CLI 인수 또는 런타임 부재는 NOT_RUN/exit 2.
 - acceptance 성공: exit 0, VERDICT PASS, CHECKED 양수. 내부 checker 세부 출력과 외부 acceptance 공개 출력을 문서에서 구분합니다.
 - renderer는 검증된 입력만 출력하고 잘못된 입력에서는 생성 문서를 덮어쓰지 않습니다. 같은 입력을 두 번 생성해도 바이트가 같아야 합니다.
 - 처리 개수는 실행한 단언으로부터 계산합니다. 출력만 꾸민 checker는 독립적인 고장 입력 시험으로 탐지합니다. 모든 검사기·시험을 함께 수정할 수 있는 같은 사용자 권한의 변조까지 방지한다고 주장하지 않습니다.
@@ -48,7 +48,7 @@ T는 작성자와 독립 검증자가 공유하는 채점 기준입니다. 정�
    명령: ruby scripts/verify/check-work-unit-policy.rb; bash scripts/acceptance-work-unit-policy.sh.
    기대: 위 공개 출력 계약 및 exit 0. 반례: 목표 문서에 내부 출력이 공개 출력처럼 적혀 있음.
 2. If 정책 자료형·값·구조·문서가 위반되면 검사기는 exit 1과 해당 원인으로 실패해야 합니다.
-   명령: bash scripts/acceptance-work-unit-policy-mutations.sh.
+   명령: ruby scripts/verify/work-unit-policy-contract-test.rb; bash scripts/acceptance-work-unit-policy-mutations.sh.
    기대: 정상 대조군과 고장 사본 전부 기대 결과, CHECKED 양수, VERDICT PASS. 반례: 실수/여러 문서/위조 성공 checker/문서 동시 변조.
 3. When 객체 키 순서·주석·공백만 달라지면 정책 의미와 생성 문서는 같아야 합니다.
    명령: 동일 mutation 검사 및 renderer 두 번 실행 비교.
