@@ -41,10 +41,21 @@ trap 'rm -rf "$TMP"' EXIT
 : > "$TMP/miss"   || die "작업 파일을 열 수 없다 ($TMP/miss)"
 
 # CI 실행 면제 — 이름이 아니라 이유와 함께 적는다. 이유 없이 늘리지 않는다.
+: > "$TMP/exempt" || die "작업 파일을 열 수 없다 ($TMP/exempt)"
+
 #   scripts/acceptance-0-2.sh : 로컬 전용 .secret-patterns 의 실제 리터럴을 기준으로 하는데
 #     CI 에는 그 파일이 없고, 기본 패턴으로 대체하면 패턴 파일 자신이 매칭돼 상시 실패한다
 #     (실측: CI run 31176518944). CI 에서의 등가물은 히스토리 전량 스캔 스텝이다.
-EXEMPT="scripts/acceptance-0-2.sh"
+echo "scripts/acceptance-0-2.sh" >> "$TMP/exempt" || die "면제 목록 기록 실패"
+
+#   scripts/acceptance-0-5.sh : 워크플로에서 `if: github.ref == 'refs/heads/main'` 이 붙어
+#     main 참조에서만 돈다. origin/main==main 을 보는 검사라 PR 실행에서 요구하면 상시
+#     실패한다(check-ci-step-integrity.sh 의 ALLOWED_STEP_IF 에 같은 이유로 등록돼 있다).
+#     면제를 **그 조건에 정확히 묶는다** — main 참조에서는 면제하지 않으므로, 그때 이 검사가
+#     빠지면 여전히 빨개진다. 이름만 보고 항상 빼면 면제가 구멍이 된다.
+if [ "${GITHUB_REF:-}" != "refs/heads/main" ]; then
+  echo "scripts/acceptance-0-5.sh" >> "$TMP/exempt" || die "면제 목록 기록 실패"
+fi
 
 if [ -n "${ACCEPTANCE_EXPECT_LIST:-}" ]; then
   [ -f "$ACCEPTANCE_EXPECT_LIST" ] || die "기대 목록 파일이 없다 — $ACCEPTANCE_EXPECT_LIST"
@@ -58,7 +69,7 @@ else
   if [ ! -s "$TMP/found" ]; then
     die "인수 스크립트가 0개 — 검사 대상 0개는 합격이 아니다"
   fi
-  grep -vxF "$EXEMPT" "$TMP/found" > "$TMP/expect"
+  grep -vxF -f "$TMP/exempt" "$TMP/found" > "$TMP/expect"
   grc=$?
   [ "$grc" -gt 1 ] && die "면제 목록 적용 실행 오류 (grep exit=$grc)"
 fi
