@@ -268,3 +268,10 @@ jobs:
         # 두 번 돌리는 중복이 아니다.
         run: |
           python3 scripts/verify/check-invoice-gate.py
+
+      - name: 인수 검사 hs-kickoff (HumanSearch 착수 정리 · WU-0A)
+        # HumanSearch 착수 정리가 실제로 끝났는가 — 미병합 6건 처분표(결론·근거), 정본의
+        # CI 스텝 수가 이 파일의 실제 스텝 수와 같은가, 2026-08-17 레쥬메 설계서가 "v4 전제
+        # 역사 기록" 머리말과 함께 보존됐는가, 착수 프롬프트·이 배선·Codex 판정 문서가
+        # 있는가를 12건으로 센다. 로컬 pre-push 글로브에만 두면 P15③ 이 없는 검사로 친다.
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff.sh

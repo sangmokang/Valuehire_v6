@@ -1,6 +1,6 @@
 # Valuehire v6 — 이 저장소의 실제 게이트 명령 (SOT)
 
-최종 갱신: 2026-09-02 (Invoice 독립 단위·PostgreSQL 런타임 게이트 추가)
+최종 갱신: 2026-09-09 (스텝 수 26→28 실측 정정 — PostgreSQL 준비·Invoice 자가시험 스텝 누락 복구, hs-kickoff 추가)
 근거: `docs/engineering/docs-sot-restructure-goal-2026-08-08.md`
 
 ## 현재 규칙
@@ -17,7 +17,7 @@
 
 ### CI(`​.github/workflows/verify.yml`)가 실제로 돌리는 것
 
-**워크플로 스텝 26개 전부**를 적는다(2026-08-12 V1 D6: 이전 판은 `bash ...` 직접 명령만 적어 인라인 본문 스텝이 목록에서 빠졌고, 운영자가 실제로 무엇이 도는지 잘못 판단할 수 있었다). 아래는 `verify.yml` 의 `- name:` 스텝 순서 그대로다.
+**워크플로 스텝 28개 전부**를 적는다(2026-08-12 V1 D6: 이전 판은 `bash ...` 직접 명령만 적어 인라인 본문 스텝이 목록에서 빠졌고, 운영자가 실제로 무엇이 도는지 잘못 판단할 수 있었다). 아래는 `verify.yml` 의 `- name:` 스텝 순서 그대로다.
 
 | # | 스텝 이름 | 실행 내용 |
 |---|---|---|
@@ -45,8 +45,10 @@
 | 22 | 인수 검사 ci-step-integrity | `bash scripts/acceptance-ci-step-integrity.sh` — 조건부·오류무시·echo 대체 차단 |
 | 23 | 인수 검사 semantic-mutations | `bash scripts/acceptance-semantic-mutations.sh` — 인수 검사 무력화 5종 전량 차단 |
 | 24 | 인수 검사 verify-ac-m | `bash scripts/acceptance-verify-ac-m.sh` — mechanism 명부 대조 (AC-M) |
-| 25 | 인수 검사 invoice | `bash scripts/acceptance-invoice.sh` — 채용 수수료 계산·기한·계약 변조·Codex/Claude 스킬 동등성 |
-| 26 | Invoice 독립 런타임 게이트 | 게이트 배선 검사 + Python 단위시험 직접 실행 + 임시 PostgreSQL에서 마이그레이션·수수료 동시성·저장/전달 RPC 검증 |
+| 25 | PostgreSQL 서버 준비 (Invoice 런타임 검사용) | 인라인 — Invoice 실증용 임시 PostgreSQL 설치·기동 |
+| 26 | 인수 검사 invoice | `bash scripts/verify/run-acceptance.sh scripts/acceptance-invoice.sh` — 채용 수수료 계산·기한·계약 변조·Codex/Claude 스킬 동등성 + 임시 PostgreSQL 마이그레이션·동시성·저장/전달 RPC |
+| 27 | Invoice 게이트 자가시험 (위조 출력·스텝 무력화 차단) | 인라인 — 위조 출력·스텝 무력화가 반드시 빨개지는지 |
+| 28 | 인수 검사 hs-kickoff (HumanSearch 착수 정리 · WU-0A) | `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff.sh` — 미병합 6건 처분표·CI 스텝 수 일치·설계서 역사 보존·착수 프롬프트·배선·Codex 판정 문서 12건 |
 
 *(1번 앞에 `actions/checkout` 이 있고 `fetch-depth: 0` 이다 — 8번이 과거 blob 을 열려면 필요하다.)*
 
