@@ -58,6 +58,15 @@ if [ "${GITHUB_REF:-}" != "refs/heads/main" ]; then
 fi
 
 if [ -n "${ACCEPTANCE_EXPECT_LIST:-}" ]; then
+  # 이 입구는 **시연 전용**이다. CI 러너에서는 거부한다.
+  # 거부하지 않으면 워크플로 env 에 한 줄(ACCEPTANCE_EXPECT_LIST: ...)만 넣어 기대 목록을
+  # 한 개로 줄일 수 있고, 그 한 줄은 P13 약화 패턴 어디에도 걸리지 않는다
+  # (2026-09-09 humanreview 실측). 마커를 위조하는 것보다 훨씬 싼 우회였다.
+  # GITHUB_ACTIONS 는 러너가 설정한다. 워크플로에서 그것까지 덮어쓰는 편집은 diff 에
+  # 뚜렷이 남고, 그 형태는 이 검사가 아니라 P13 추가 탐지가 맡는다.
+  if [ -n "${GITHUB_ACTIONS:-}" ]; then
+    die "ACCEPTANCE_EXPECT_LIST 는 시연 전용이다 — CI 에서 기대 목록을 좁힐 수 없다"
+  fi
   [ -f "$ACCEPTANCE_EXPECT_LIST" ] || die "기대 목록 파일이 없다 — $ACCEPTANCE_EXPECT_LIST"
   sed 's#^\./##' "$ACCEPTANCE_EXPECT_LIST" | grep -v '^[[:space:]]*$' | LC_ALL=C sort -u > "$TMP/expect" \
     || die "기대 목록을 읽지 못했다"
