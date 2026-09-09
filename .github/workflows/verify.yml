@@ -14,6 +14,12 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    env:
+      # 실행 증명 마커의 수집 위치. scripts/verify/run-acceptance.sh 가 대상의 판정을
+      # 확인한 뒤에만 여기에 <경로>\t<sha256> 을 append 하고, 마지막 스텝이 기대 목록
+      # 전량과 대조한다. 이 값을 지우면 마커가 하나도 안 생겨 마지막 스텝이 빨개진다
+      # (억제 ci-transfer-guarantee 해제분 · fail-closed).
+      ACCEPTANCE_MARKER_DIR: ${{ github.workspace }}/.acceptance-markers
     steps:
       - uses: actions/checkout@v4
         with:
@@ -26,7 +32,9 @@ jobs:
         # 패턴은 커밋된 .secret-patterns.default 를 쓴다.
         # 실제 비밀값은 CI에 올리지 않는다 — 저장소 시크릿에 넣는 것도 유출 경로를 늘리는 일이다.
         # 로컬 전용 .secret-patterns 는 gitignore 되어 여기 없다.
-        run: bash verify.sh
+        # 래퍼를 거친다. 직접 부르면 실행 증명 마커가 남지 않아, 이 저장소의 최우선
+        # 방어선인 비밀 스캔만 실행 증명 밖에 남는다(2026-09-09 감사에서 잡힌 공백).
+        run: bash scripts/verify/run-acceptance.sh verify.sh
 
       - name: Strict 원칙 정본·장부·배선 검사
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-principles-check.sh
@@ -241,6 +249,10 @@ jobs:
         # total 은 find 로 이미 얻었으므로 fail-closed 를 통과하고 `RED: 0/N` + exit 0 이
         # 나온다 — 게이트 0(시작 자격) 판정이 거짓 초록이 된다.
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-gate0-loop-proof.sh
+      - name: 인수 검사 ci-execution-proof (실행하지 않은 검사가 통과하지 못하는가)
+        # 억제 ci-transfer-guarantee 해제분. 아래 마지막 스텝(실행 증명 검수)이 정말로
+        # 우회 8종을 잡는지를 격리 사본에 변조를 주입해 확인한다.
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-ci-execution-proof.sh
 
       - name: 인수 검사 semantic-mutations (검사를 껐을 때 반드시 빨개지는가)
         # 2026-08-21: acceptance-hs-a4.sh 본문을 `exit 0` 으로 바꿔도 CI 가 초록이었다.
@@ -280,3 +292,17 @@ jobs:
         # 두 번 돌리는 중복이 아니다.
         run: |
           python3 scripts/verify/check-invoice-gate.py
+
+      - name: 실행 증명 검수 (인수 스크립트가 실제로 돌았는가)
+        # 이 워크플로가 판정하는 마지막 것. 위 스텝들이 scripts/verify/run-acceptance.sh 를
+        # 거쳐 실제로 실행됐는지를, 그 래퍼가 남긴 마커로 대조한다.
+        #
+        # 왜 필요한가: hooks/pre-push 의 CI 이관 보증은 워크플로를 문자열로 파싱해서,
+        # 규칙을 하나 막을 때마다 우회가 하나씩 늘었다 — `# run:` 주석 처리 · `echo` 대체 ·
+        # `bash /dev/null <path>` · `bash "" <path>` · `sh /dev/null <path>` ·
+        # `bash ; echo <path>` · 본문 삭제 · `if: ${{ false }}`. 전부 스크립트를 한 줄도
+        # 실행하지 않는다. 실행 흔적으로 판정하면 그 전부가 한꺼번에 닫힌다.
+        #
+        # 이 스텝은 반드시 마지막이어야 한다. 앞 스텝들의 마커를 세기 때문이다.
+        # 조건을 붙이거나 continue-on-error 를 달면 acceptance-ci-step-integrity 가 막는다.
+        run: bash scripts/verify/check-acceptance-markers.sh

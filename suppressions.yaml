@@ -7,23 +7,6 @@
 # 넘겼고, 기한이 없어 프리랜서·전문대 하드제외 우회가 35일간 살아 있었다(§0-C 사례 B).
 # 유예는 해결이 아니며, 기한 없는 유예는 해결이 영원히 오지 않는다.
 
-- check: ci-transfer-guarantee
-  reason: >-
-    pre-push 의 "이관한 검사가 CI 에 실제로 있는가" 보증이 워크플로를 문자열로 파싱한다.
-    막을 때마다 새 우회가 나왔다 — 주석 처리 / if: false / 스텝 본문 삭제 / echo 대체 /
-    bash -n / bash -c / sh -c : 까지 막았으나, V1 6차에서 다시 4종이 통과했다:
-    `bash ; echo <path>` · `bash /dev/null <path>` · `bash "" <path>` · `sh /dev/null <path>`.
-    넷 다 스크립트를 한 줄도 실행하지 않는다. `if: ${{ false }}` 같은 임의 항상-거짓 조건과
-    파이프 변형도 남아 있다. 문자열 규칙을 하나 추가할 때마다 우회도 하나씩 늘어난다.
-    현재 이 보증은 방어 심도이지 1차 방어선이 아니며, 비밀 게이트 3중(pre-commit --index /
-    pre-push 고정 / CI 히스토리 blob 스캔)은 이 우회에 영향받지 않는다.
-  owner: sangmokang
-  expiry: 2026-09-15
-  issue: >-
-    파싱을 정교화하는 방향은 수익이 체감한다. 실행 증명으로 바꾼다 — CI 가 각 인수 스크립트
-    완료 시 마커(job summary·아티팩트·check-run)를 남기고 pre-push 가 최근 성공 run 에서
-    조회한다. 워크플로를 어떻게 편집하든 실행하지 않으면 통과할 수 없으므로, 위 우회 전부와
-    항상-거짓 조건이 한꺼번에 닫힌다.
 
 - check: gate-scope-gaps
   reason: >-
