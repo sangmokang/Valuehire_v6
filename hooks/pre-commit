@@ -112,6 +112,28 @@ else
   rm -f "$wf"
 fi
 
+# ── 3-b) 검사 실행 줄 삭제 (P13 · 억제 p13-deletion-blindspot 해제) ───────────
+# 위 3) 은 scan_added 라서 **추가된 줄**만 본다. 검사 줄을 지우는 약화는 원리적으로
+# 보이지 않았다. 범위를 .github/workflows/* 로 한정하면 오탐이 거의 없다는 데 V1 과
+# 합의했고, 그 범위부터 도입한다. 판정은 별도 검사기에 위임한다 — 훅 안에 규칙을
+# 인라인하면 그 규칙을 격리 사본으로 공격하는 인수 검사를 쓸 수 없다.
+DEL_CHECKER=scripts/verify/check-workflow-deletion.sh
+if [ ! -x "$DEL_CHECKER" ]; then
+  block "$DEL_CHECKER 없음 또는 실행 권한 없음 — 삭제 약화 탐지 불가 (fail-closed)"
+else
+  dout=$(mktemp) || block "임시 파일 생성 실패 — 삭제 약화 판정 근거를 모을 수 없다 (fail-closed)"
+  if [ -n "${dout:-}" ] && [ -f "$dout" ]; then
+    drc=0
+    bash "$DEL_CHECKER" >"$dout" 2>&1 || drc=$?
+    if [ "$drc" -ne 0 ]; then
+      # 검사기 출력을 그대로 보인다. 사유(경로·스크립트)는 그 안에 있다.
+      cat "$dout" >&2
+      block "검사 실행 줄 삭제 (check-workflow-deletion exit=$drc)"
+    fi
+    rm -f "$dout"
+  fi
+fi
+
 # ── 4) 만료일 없는 억제 (P13 ③ · 98d923f 35일 방치 재현 방지) ─────────────────
 if printf '%s\n' "$staged" | grep -qx 'suppressions.yaml'; then
   sup=$(git show ":suppressions.yaml")
