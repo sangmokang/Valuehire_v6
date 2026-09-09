@@ -1,0 +1,21 @@
+{
+ "label": "new8-pytest",
+ "command": [
+  "uv",
+  "run",
+  "--no-sync",
+  "pytest",
+  "-q",
+  "tests/test_hs_0001.py",
+  "tests/test_hs_0001_main_compat.py",
+  "-p",
+  "no:cacheprovider"
+ ],
+ "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910/humansearch",
+ "started": "2026-09-09T21:02:35.975842+00:00",
+ "ended": "2026-09-09T21:02:41.984626+00:00",
+ "exit_code": 0,
+ "stdout": "........                                                                 [100%]\n8 passed in 5.68s\n",
+ "stderr": "",
+ "head": "16e5d649dbd257e6d01318c1a8fb0fbe8e731596"
+}

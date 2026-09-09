@@ -70,8 +70,8 @@ else
 
   CELLS=$(disposition_cells)
   for t in "${targets[@]}"; do
-    rows=$(printf '%s\n' "$CELLS" | awk -F'\t' -v t="$t" 'NF && index($1, t) > 0' | /usr/bin/grep -c .)
-    row=$(printf '%s\n' "$CELLS" | awk -F'\t' -v t="$t" 'NF && index($1, t) > 0' | head -1)
+    rows=$(printf '%s\n' "$CELLS" | awk -F'\t' -v t="$t" 'NF && $1 ~ ("(^|[^[:alnum:]_./-])" t "($|[^[:alnum:]_./-])")' | /usr/bin/grep -c .)
+    row=$(printf '%s\n' "$CELLS" | awk -F'\t' -v t="$t" 'NF && $1 ~ ("(^|[^[:alnum:]_./-])" t "($|[^[:alnum:]_./-])")' | head -1)
     ev=$(printf '%s' "$row" | cut -f3 | sed 's/^근거=//')
     # 대상 열에 여러 대상을 몰아 적고 나머지 행을 지우면 여섯 판정이 모두 통과한다(Codex V2 5회차).
     others=0
@@ -211,7 +211,7 @@ fi
 
 # 12 Codex V2 판정 문서
 verdict=$(ls $VERDICT_GLOB 2>/dev/null | head -1)
-if [ -n "$verdict" ] && [ -s "$verdict" ] && head -1 "$verdict" | /usr/bin/grep -qE '^VERDICT: (PASS|FAIL)'; then
+if [ -n "$verdict" ] && [ -s "$verdict" ] && head -1 "$verdict" | /usr/bin/grep -qE '^VERDICT: (PASS|FAIL)$'; then
   pass "판정 문서 $verdict ($(head -1 "$verdict"))"
 else
   failc "판정 문서 없음/빈 파일/첫 줄 VERDICT 아님 ($VERDICT_GLOB)"

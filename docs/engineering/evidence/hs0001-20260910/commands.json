@@ -1,0 +1,755 @@
+[
+  {
+    "id": "bootstrap-hooks",
+    "command": [
+      "bash",
+      "scripts/install-hooks.sh"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+    "started": "2026-09-09T20:24:58.088801+00:00",
+    "elapsed": 0.13369100005365908,
+    "exit_code": 0,
+    "session": "hs-next-20260910",
+    "commit": "06110d9355ae352da58e4ee7e4e2551962cda7d4",
+    "output_file": "bootstrap-hooks.log",
+    "output": "워크트리 보정: .secret-patterns → /Users/kangsangmo/Desktop/Valuehire_v6/.secret-patterns\ncore.hooksPath = hooks\n설치된 훅:\n  hooks/pre-commit\n  hooks/pre-push\n"
+  },
+  {
+    "id": "briefing-recheck",
+    "command": [
+      "bash",
+      "/Users/kangsangmo/.claude/skills/strict/brief-lint.sh",
+      "docs/engineering/humansearch-hs0001-goal-2026-09-10.md",
+      "docs/engineering/evidence/hs0001-20260910/README.md"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+    "started": "2026-09-09T20:16:54.509271+00:00",
+    "elapsed": 0.05241649993695319,
+    "exit_code": 0,
+    "session": "hs-next-20260910",
+    "commit": "06110d9355ae352da58e4ee7e4e2551962cda7d4",
+    "output_file": "briefing-recheck.log",
+    "output": "=== docs/engineering/humansearch-hs0001-goal-2026-09-10.md ===\n  코드블록 0개 · 표 0개 (면제 0개) / 해석 누락 0개\n  1층(결론): 줄 3 / 본문 82자\n  1층 기술 표기: 없음 (※ 한글 전문용어는 못 잡는다 — 사람이 본다)\n  결정 카드 1건 (※ 내용이 판단에 쓸 만한지는 못 잰다 — 사람이 본다)\n  증거 보관 경로: 임시 외 실재 파일 4건 (※ 그 파일이 이 주장의 증거인지는 못 잰다)\n=== docs/engineering/evidence/hs0001-20260910/README.md ===\n  코드블록 0개 · 표 0개 (면제 0개) / 해석 누락 0개\n  1층(결론): 줄 3 / 본문 52자\n  1층 기술 표기: 없음 (※ 한글 전문용어는 못 잡는다 — 사람이 본다)\n  결정 카드: 없음\n  증거 보관 경로: 임시 외 실재 파일 0건 (※ 그 파일이 이 주장의 증거인지는 못 잰다)\n\n브리핑 계약 기계 검사: 위반 0건 (문서 2개)\n\n이 검사가 못 보는 것 (사람이 봐야 하는 것):\n  · 설명이 실제로 말이 되는지 — 출력과 무관한 문장도 통과한다\n  · 결정 카드 내용이 판단에 쓸 만한지 — 한 글자여도 통과한다\n  · 증거 파일이 그 주장과 관련 있는지 — 존재하기만 하면 통과한다\n  · 결론이 쉬운 말인지 — 한글 전문용어는 잡지 못한다\n  ※ 이 검사는 홈 폴더에만 있어 서버 자동 검사에 없다 — 회사 차원의 합격 근거가 아니다(P15③).\n"
+  },
+  {
+    "id": "briefing",
+    "command": [
+      "bash",
+      "/Users/kangsangmo/.claude/skills/strict/brief-lint.sh",
+      "docs/engineering/humansearch-hs0001-goal-2026-09-10.md",
+      "docs/engineering/evidence/hs0001-20260910/README.md"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+    "started": "2026-09-09T20:16:34.162330+00:00",
+    "elapsed": 0.04316695895977318,
+    "exit_code": 0,
+    "session": "hs-next-20260910",
+    "commit": "06110d9355ae352da58e4ee7e4e2551962cda7d4",
+    "output_file": "briefing.log",
+    "output": "=== docs/engineering/humansearch-hs0001-goal-2026-09-10.md ===\n  코드블록 0개 · 표 0개 (면제 0개) / 해석 누락 0개\n  1층(결론): 줄 3 / 본문 82자\n  1층 기술 표기: 없음 (※ 한글 전문용어는 못 잡는다 — 사람이 본다)\n  결정 카드 1건 (※ 내용이 판단에 쓸 만한지는 못 잰다 — 사람이 본다)\n  증거 보관 경로: 임시 외 실재 파일 4건 (※ 그 파일이 이 주장의 증거인지는 못 잰다)\n=== docs/engineering/evidence/hs0001-20260910/README.md ===\n  코드블록 0개 · 표 0개 (면제 0개) / 해석 누락 0개\n  [위반] 1층(결론) 제목이 문서 앞부분에 없다 (VERDICT 한 줄은 결론이 아니다 — §8-1)\n  결정 카드: 없음\n  증거 보관 경로: 임시 외 실재 파일 0건 (※ 그 파일이 이 주장의 증거인지는 못 잰다)\n\n브리핑 계약 기계 검사: 위반 1건 (문서 2개)\n\n이 검사가 못 보는 것 (사람이 봐야 하는 것):\n  · 설명이 실제로 말이 되는지 — 출력과 무관한 문장도 통과한다\n  · 결정 카드 내용이 판단에 쓸 만한지 — 한 글자여도 통과한다\n  · 증거 파일이 그 주장과 관련 있는지 — 존재하기만 하면 통과한다\n  · 결론이 쉬운 말인지 — 한글 전문용어는 잡지 못한다\n  ※ 이 검사는 홈 폴더에만 있어 서버 자동 검사에 없다 — 회사 차원의 합격 근거가 아니다(P15③).\n"
+  },
+  {
+    "id": "gate0-recheck",
+    "command": [
+      "bash",
+      "scripts/session-status.sh"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+    "started": "2026-09-09T20:27:03.292027+00:00",
+    "elapsed": 729.3855900410563,
+    "exit_code": 0,
+    "session": "hs-next-20260910",
+    "commit": "e2404d3732dfe6167907ebd5a1d76a7aa02ea26b",
+    "output_file": "gate0-recheck.log",
+    "output": "HEAD: 06110d9 (ahead 1 / behind 10)\nORIGIN: 4379b2f\nRED: 2/31 (acceptance-0-7.sh 제외 — CI 담당)\n"
+  },
+  {
+    "id": "gate0-recovery",
+    "command": [
+      "bash",
+      "-c",
+      "bash scripts/acceptance-0-2.sh; bash scripts/acceptance-0-5.sh"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+    "started": "2026-09-09T20:25:08.910334+00:00",
+    "elapsed": 425.1185930839274,
+    "exit_code": 0,
+    "session": "hs-next-20260910",
+    "commit": "06110d9355ae352da58e4ee7e4e2551962cda7d4",
+    "output_file": "gate0-recovery.log",
+    "output": "PASS: no secret-pattern match in any tracked file, .env not tracked\nPASS: 0-2 — 히스토리·객체·reflog·docs 리터럴 0건, 스캐너 뮤테이션 검출 확인\nPASS: 0-5 완료 — CI 비밀스캔 강제 + push 완료 + 원격 트리 비밀 0건\n"
+  },
+  {
+    "id": "gate0",
+    "command": [
+      "bash",
+      "scripts/session-status.sh"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+    "started": "2026-09-09T20:13:49.357745+00:00",
+    "elapsed": 431.0126785831526,
+    "exit_code": 0,
+    "session": "hs-next-20260910",
+    "commit": "06110d9355ae352da58e4ee7e4e2551962cda7d4",
+    "output_file": "gate0.log",
+    "output": "HEAD: 06110d9 (ahead 1 / behind 2)\nORIGIN: 3de3633\nRED: 2/31 (acceptance-0-7.sh 제외 — CI 담당)\n"
+  },
+  {
+    "id": "hs0001-all-new-green",
+    "command": [
+      "uv",
+      "run",
+      "--no-sync",
+      "pytest",
+      "-q",
+      "tests/test_hs_0001.py",
+      "tests/test_hs_0001_main_compat.py"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910/humansearch",
+    "started": "2026-09-09T20:45:21.033592+00:00",
+    "elapsed": 9.439884999999776,
+    "exit_code": 0,
+    "session": "hs-next-20260910",
+    "commit": "16e5d649dbd257e6d01318c1a8fb0fbe8e731596",
+    "output_file": "hs0001-all-new-green.log",
+    "output": "........                                                                 [100%]\n8 passed in 7.51s\n"
+  },
+  {
+    "id": "hs0001-budget",
+    "command": [
+      "python3",
+      "-c",
+      "import ast,pathlib,tempfile; paths=[pathlib.Path(p) for p in (\"scripts/acceptance-hs-kickoff.sh\",\"scripts/acceptance-hs-kickoff-mutations.sh\",\"scripts/verify/list-workflow-steps.py\")]; check=lambda ps: bool(ps) and all(len(p.read_text().splitlines())<=600 for p in ps); print(\"FILES\", [(str(p),len(p.read_text().splitlines())) for p in paths]); assert check(paths); t=tempfile.TemporaryDirectory(); p=pathlib.Path(t.name)/\"boundary.py\"; p.write_text(\"# boundary\\n\"*600); assert check([p]); print(\"PASS hard600\"); p.write_text(\"# boundary\\n\"*601); assert not check([p]); print(\"PASS hard601 rejected\"); assert not check([]); print(\"PASS zero rejected\"); tree=ast.parse(paths[2].read_text()); print(\"FUNCTIONS\", [(n.name,n.end_lineno-n.lineno+1) for n in ast.walk(tree) if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef))]); print(\"CHECKED: 6\")"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+    "started": "2026-09-09T20:07:43.942571+00:00",
+    "elapsed": 0.0811229171231389,
+    "exit_code": 0,
+    "session": "hs-next-20260910",
+    "commit": "06110d9355ae352da58e4ee7e4e2551962cda7d4",
+    "output_file": "hs0001-budget.log",
+    "output": "FILES [('scripts/acceptance-hs-kickoff.sh', 225), ('scripts/acceptance-hs-kickoff-mutations.sh', 593), ('scripts/verify/list-workflow-steps.py', 153)]\nPASS hard600\nPASS hard601 rejected\nPASS zero rejected\nFUNCTIONS [('fail', 3), ('main', 116)]\nCHECKED: 6\n"
+  },
+  {
+    "id": "hs0001-compat-red-commit",
+    "command": [
+      "git",
+      "commit",
+      "-F",
+      "artifacts/hs-next-20260910/compat-red-commit.txt"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+    "started": "2026-09-09T20:44:30.873043+00:00",
+    "elapsed": 5.338314332999289,
+    "exit_code": 0,
+    "session": "hs-next-20260910",
+    "commit": "16e5d649dbd257e6d01318c1a8fb0fbe8e731596",
+    "output_file": "hs0001-compat-red-commit.log",
+    "output": "[task/hs-0001-20260910 16e5d64] 정상 CI 시간 제한을 착수 검사에서 과잉 차단하지 않도록 회귀를 고정한다\n 1 file changed, 55 insertions(+)\n create mode 100644 humansearch/tests/test_hs_0001_main_compat.py\n"
+  },
+  {
+    "id": "hs0001-final-budget-boundaries",
+    "command": [
+      "python3",
+      "artifacts/hs-next-20260910/budget-check.py",
+      "--boundaries"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+    "started": "2026-09-09T20:47:34.887663+00:00",
+    "elapsed": 0.0403588330373168,
+    "exit_code": 0,
+    "session": "hs-next-20260910",
+    "commit": "16e5d649dbd257e6d01318c1a8fb0fbe8e731596",
+    "output_file": "hs0001-final-budget-boundaries.log",
+    "output": "PASS: /var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/tmpqpft06z4/boundary.txt: 600 lines / hard600\nFAIL: /var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/tmpqpft06z4/boundary.txt: 601 lines / hard600\nFAIL: 검사 대상 0개\nPASS: same validator hard600 accepted / hard601 rejected / zero rejected\n"
+  },
+  {
+    "id": "hs0001-final-budget-real",
+    "command": [
+      "python3",
+      "artifacts/hs-next-20260910/budget-check.py",
+      "artifacts/hs-next-20260910/final-candidate-files.json"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+    "started": "2026-09-09T20:47:34.794481+00:00",
+    "elapsed": 0.04385454207658768,
+    "exit_code": 0,
+    "session": "hs-next-20260910",
+    "commit": "16e5d649dbd257e6d01318c1a8fb0fbe8e731596",
+    "output_file": "hs0001-final-budget-real.log",
+    "output": "PASS: scripts/acceptance-hs-kickoff.sh: 225 lines / hard600\nPASS: scripts/acceptance-hs-kickoff-mutations.sh: 593 lines / hard600\nPASS: scripts/verify/list-workflow-steps.py: 167 lines / hard600\nPASS: fail: 3 / hard100\nPASS: main: 44 / hard100\nPASS: list_steps: 83 / hard100\nPASS: scripts/acceptance-hs-gates-mutations.sh: 138 lines / hard600\nPASS: scripts/acceptance-hs-gates-antiforge.sh: 145 lines / hard600\nPASS: humansearch/tests/test_hs_0001.py: 177 lines / hard600\nPASS: clean_env: 6 / hard100\nPASS: copy_fixture: 21 / hard100\nPASS: run_acceptance: 10 / hard100\nPASS: replace_once: 4 / hard100\nPASS: insert_before: 2 / hard100\nPASS: mutate_step_shell: 3 / hard100\nPASS: mutate_default_shell: 2 / hard100\nPASS: mutate_step_bash_env: 9 / hard100\nPASS: mutate_top_bash_env: 4 / hard100\nPASS: mutate_pr_131: 6 / hard100\nPASS: mutate_verdict_passed: 2 / hard100\nPASS: fail_lines: 3 / hard100\nPASS: assert_rejected: 5 / hard100\nPASS: test_clean_hs_kickoff_fixture_passes: 8 / hard100\nPASS: test_hs_kickoff_rejects_false_passes_in_workflow_contract: 9 / hard100\nPASS: humansearch/tests/test_hs_0001_main_compat.py: 55 lines / hard600\nPASS: add_latest_main_ci_controls: 4 / hard100\nPASS: test_hs_kickoff_accepts_latest_main_ci_concurrency_and_job_timeout: 11 / hard100\nPASS: .github/workflows/verify.yml: 287 lines / hard600\n"
+  },
+  {
+    "id": "hs0001-final-budget",
+    "command": [
+      "python3",
+      "-c",
+      "import ast,pathlib,tempfile; paths=[pathlib.Path(p) for p in (\"scripts/acceptance-hs-kickoff.sh\",\"scripts/acceptance-hs-kickoff-mutations.sh\",\"scripts/verify/list-workflow-steps.py\")]; check=lambda ps: bool(ps) and all(len(p.read_text().splitlines())<=600 for p in ps); print(\"FILES\", [(str(p),len(p.read_text().splitlines())) for p in paths]); assert check(paths); t=tempfile.TemporaryDirectory(); p=pathlib.Path(t.name)/\"boundary.py\"; p.write_text(\"# boundary\\n\"*600); assert check([p]); print(\"PASS hard600\"); p.write_text(\"# boundary\\n\"*601); assert not check([p]); print(\"PASS hard601 rejected\"); assert not check([]); print(\"PASS zero rejected\"); tree=ast.parse(paths[2].read_text()); funcs=[(n.name,n.end_lineno-n.lineno+1) for n in ast.walk(tree) if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef))]; print(\"FUNCTIONS\",funcs); assert funcs and all(n<=100 for _,n in funcs); print(\"PASS function hard100; CHECKED: 7\")"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+    "started": "2026-09-09T20:11:23.877032+00:00",
+    "elapsed": 0.15809458401054144,
+    "exit_code": 0,
+    "session": "hs-next-20260910",
+    "commit": "06110d9355ae352da58e4ee7e4e2551962cda7d4",
+    "output_file": "hs0001-final-budget.log",
+    "output": "FILES [('scripts/acceptance-hs-kickoff.sh', 225), ('scripts/acceptance-hs-kickoff-mutations.sh', 593), ('scripts/verify/list-workflow-steps.py', 158)]\nPASS hard600\nPASS hard601 rejected\nPASS zero rejected\nFUNCTIONS [('fail', 3), ('main', 38), ('list_steps', 81)]\nPASS function hard100; CHECKED: 7\n"
+  },
+  {
+    "id": "hs0001-final-static",
+    "command": [
+      "bash",
+      "-c",
+      "bash -n scripts/acceptance-hs-kickoff.sh scripts/acceptance-hs-kickoff-mutations.sh scripts/acceptance-hs-gates-mutations.sh scripts/acceptance-hs-gates-antiforge.sh && python3 -m py_compile scripts/verify/list-workflow-steps.py && bash scripts/acceptance-principles-check.sh && bash scripts/verify/check-ci-step-integrity.sh && bash verify.sh"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+    "started": "2026-09-09T20:45:55.711755+00:00",
+    "elapsed": 3.5664096251130104,
+    "exit_code": 0,
+    "session": "hs-next-20260910",
+    "commit": "16e5d649dbd257e6d01318c1a8fb0fbe8e731596",
+    "output_file": "hs0001-final-static.log",
+    "output": "VERDICT: PASS\nSOT_LOAD: PASS docs/sot/coding-principles.md\nLEDGER_LOAD: PASS docs/sot/principles.yaml\nMECHANISMS: PASS 34/34 strict-contract-bindings\nWIRING: PASS pre-push=1 ci=1\nCHECKED: 34\nALLOWED: 인수 검사 0-5 (push · CI 연결) — if 허용 (origin/main==main 을 보는 검사라 main push 에서만 의미가 있다. PR 실행에서 요구하면 상시 실패한다.)\nPASS: 조건부·오류무시 스텝 없음 (job·step 31개 검사)\nCHECKED: 31\nPASS: no secret-pattern match in any tracked file, .env not tracked\n"
+  },
+  {
+    "id": "hs0001-g2-fixture-green",
+    "command": [
+      "bash",
+      "scripts/acceptance-hs-gates-mutations.sh"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+    "started": "2026-09-09T20:43:40.237191+00:00",
+    "elapsed": 85.11591179086827,
+    "exit_code": 1,
+    "session": "hs-next-20260910",
+    "commit": "16e5d649dbd257e6d01318c1a8fb0fbe8e731596",
+    "output_file": "hs0001-g2-fixture-green.log",
+    "output": "FAIL: clean baseline rejected\nE         PASS: 처분 PR #15 → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nE         PASS: 처분 task/hs-d1-permit → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nE         PASS: 처분 task/hs-l1-malformed-url-fix → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nE         PASS: 처분 task/hs-observe-url-crash → 결론=폐기 (근거 경로 2 건·커밋 0 건)\nE         FAIL: 워크플로를 정규 형식으로 읽지 못했다 — 형식 위반: 잡 수준 키 'timeout-minutes' (22행). runs-on 과 steps 만 쓴다 — 조건·기본 셸·전략으로 스텝 전체를 끌 수 있다\nE         PASS: 역사 기록 보존 resume-evidence-supabase-archive-goal-2026-08-17.md\nE         PASS: 역사 기록 보존 resume-evidence-supabase-implementation-prompt-2026-08-17.md\nE         PASS: 착수 프롬프트 커밋됨 docs/engineering/goal-prompts/humansearch-journey-kickoff-2026-09-07.md\nE         FAIL: CI 배선 불량 — 워크플로를 정규 형식으로 읽지 못했다\nE         PASS: 판정 문서 docs/engineering/humansearch-kickoff-ledger-verdict-0000-00-00.md (VERDICT: PASS)\nE         CHECKED: 12\nE         FAIL(run-acceptance): scripts/acceptance-hs-kickoff.sh 종료값 1\nE         \nE       assert 1 == 0\nE        +  where 1 = Result(returncode=1, stdout=\"PASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\\nPASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\\...0000-00-00.md (VERDICT: PASS)\\nCHECKED: 12\\nFAIL(run-acceptance): scripts/acceptance-hs-kickoff.sh 종료값 1\\n\", stderr='').returncode\n\ntests/test_hs_0001_main_compat.py:53: AssertionError\n=========================== short test summary info ============================\nFAILED tests/test_hs_0001_main_compat.py::test_hs_kickoff_accepts_latest_main_ci_concurrency_and_job_timeout\n1 failed, 218 passed in 15.04s\nFAIL: pytest exit 1\n"
+  },
+  {
+    "id": "hs0001-g2-fixture-red",
+    "command": [
+      "bash",
+      "scripts/acceptance-hs-gates-mutations.sh"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+    "started": "2026-09-09T20:42:03.640791+00:00",
+    "elapsed": 28.449503374984488,
+    "exit_code": 1,
+    "session": "hs-next-20260910",
+    "commit": "e2404d3732dfe6167907ebd5a1d76a7aa02ea26b",
+    "output_file": "hs0001-g2-fixture-red.log",
+    "output": "FAIL: mutation failed for the wrong reason: planted strict type error (exit=1)\n                if _WINDOWS and i == 0:\n                    file_size = st.st_size\n    \n        if not follow_symlinks and _islink(src):\n            os.symlink(os.readlink(src), dst)\n        else:\n>           with open(src, 'rb') as fsrc:\n                 ^^^^^^^^^^^^^^^\nE           FileNotFoundError: [Errno 2] No such file or directory: '/private/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/tmp.6j3BPD3qTJ/.github/workflows/verify.yml'\n\n/opt/homebrew/Cellar/python@3.14/3.14.1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/shutil.py:313: FileNotFoundError\n=========================== short test summary info ============================\nFAILED tests/test_hs_0001.py::test_clean_hs_kickoff_fixture_passes - FileNotF...\nFAILED tests/test_hs_0001.py::test_hs_kickoff_rejects_false_passes_in_workflow_contract[step shell no-op is rejected]\nFAILED tests/test_hs_0001.py::test_hs_kickoff_rejects_false_passes_in_workflow_contract[top defaults run shell is rejected]\nFAILED tests/test_hs_0001.py::test_hs_kickoff_rejects_false_passes_in_workflow_contract[step BASH_ENV is rejected]\nFAILED tests/test_hs_0001.py::test_hs_kickoff_rejects_false_passes_in_workflow_contract[top BASH_ENV is rejected]\nFAILED tests/test_hs_0001.py::test_hs_kickoff_rejects_false_passes_in_workflow_contract[PR 131 does not satisfy PR 13]\nFAILED tests/test_hs_0001.py::test_hs_kickoff_rejects_false_passes_in_workflow_contract[VERDICT PASSED suffix is rejected]\n7 failed, 211 passed in 9.63s\nFAIL: pytest exit 1\n"
+  },
+  {
+    "id": "hs0001-green",
+    "command": [
+      "bash",
+      "scripts/verify/run-acceptance.sh",
+      "scripts/acceptance-hs-kickoff.sh"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+    "started": "2026-09-09T20:15:36.574738+00:00",
+    "elapsed": 0.5856877500191331,
+    "exit_code": 0,
+    "session": "hs-next-20260910",
+    "commit": "06110d9355ae352da58e4ee7e4e2551962cda7d4",
+    "output_file": "hs0001-green.log",
+    "output": "PASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 1 건)\nPASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 1 건)\nPASS: 처분 PR #15 → 결론=폐기 (근거 경로 1 건·커밋 1 건)\nPASS: 처분 task/hs-d1-permit → 결론=재작성 (근거 경로 1 건·커밋 2 건)\nPASS: 처분 task/hs-l1-malformed-url-fix → 결론=폐기 (근거 경로 1 건·커밋 1 건)\nPASS: 처분 task/hs-observe-url-crash → 결론=폐기 (근거 경로 2 건·커밋 0 건)\nPASS: CI 스텝 수·이름·순서 정본=30 실제=30 표 행=30 빈 이름 0 번호 1..30 이름 1:1\nPASS: 역사 기록 보존 resume-evidence-supabase-archive-goal-2026-08-17.md\nPASS: 역사 기록 보존 resume-evidence-supabase-implementation-prompt-2026-08-17.md\nPASS: 착수 프롬프트 커밋됨 docs/engineering/goal-prompts/humansearch-journey-kickoff-2026-09-07.md\nPASS: CI 배선 2건 — 이름과 명령이 같은 스텝에서 일치하고 조건·오류무시 없음\nPASS: 판정 문서 docs/engineering/humansearch-kickoff-ledger-verdict-2026-09-10.md (VERDICT: PASS)\nCHECKED: 12\nOK(run-acceptance): scripts/acceptance-hs-kickoff.sh — 판정 12건, CHECKED 12\n"
+  },
+  {
+    "id": "hs0001-kickoff-regression",
+    "command": [
+      "bash",
+      "-c",
+      "bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff.sh && bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff-mutations.sh"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+    "started": "2026-09-09T20:43:41.584663+00:00",
+    "elapsed": 47.772686917101964,
+    "exit_code": 0,
+    "session": "hs-next-20260910",
+    "commit": "e2404d3732dfe6167907ebd5a1d76a7aa02ea26b",
+    "output_file": "hs0001-kickoff-regression.log",
+    "output": "PASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 1 건)\nPASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 1 건)\nPASS: 처분 PR #15 → 결론=폐기 (근거 경로 1 건·커밋 1 건)\nPASS: 처분 task/hs-d1-permit → 결론=재작성 (근거 경로 1 건·커밋 2 건)\nPASS: 처분 task/hs-l1-malformed-url-fix → 결론=폐기 (근거 경로 1 건·커밋 1 건)\nPASS: 처분 task/hs-observe-url-crash → 결론=폐기 (근거 경로 2 건·커밋 0 건)\nPASS: CI 스텝 수·이름·순서 정본=30 실제=30 표 행=30 빈 이름 0 번호 1..30 이름 1:1\nPASS: 역사 기록 보존 resume-evidence-supabase-archive-goal-2026-08-17.md\nPASS: 역사 기록 보존 resume-evidence-supabase-implementation-prompt-2026-08-17.md\nPASS: 착수 프롬프트 커밋됨 docs/engineering/goal-prompts/humansearch-journey-kickoff-2026-09-07.md\nPASS: CI 배선 2건 — 이름과 명령이 같은 스텝에서 일치하고 조건·오류무시 없음\nPASS: 판정 문서 docs/engineering/humansearch-kickoff-ledger-verdict-2026-09-10.md (VERDICT: FAIL)\nCHECKED: 12\nOK(run-acceptance): scripts/acceptance-hs-kickoff.sh — 판정 12건, CHECKED 12\nPASS: 양성 대조군 — 손대지 않은 사본은 통과 (exit 0)\nPASS: 음성1 CI 실행 줄 주석 위장 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성2 CI 스텝 continue-on-error — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성3 정본 표에 이름이 빈 행 — 기대한 사유로 차단됨 (exit 1, 'CI 스텝 불일치')\nPASS: 음성4 처분표 대상 중복 — 기대한 사유로 차단됨 (exit 1, '처분이 둘 이상')\nPASS: 음성5 근거 자리표시자 — 기대한 사유로 차단됨 (exit 1, 'PR #13 행의 근거가 자리표시자')\nPASS: 음성6 판정 문서 첫 줄 위조 — 기대한 사유로 차단됨 (exit 1, '판정 문서 없음')\nPASS: 음성7 env 미끼로 실행 줄 위장 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성8 정본 표 행 번호 중복 — 기대한 사유로 차단됨 (exit 1, 'CI 스텝 불일치')\nPASS: 음성9 진짜 처분 행을 코드 블록 안으로 숨김 — 기대한 사유로 차단됨 (exit 1, '행 없음')\nPASS: 양성2 코드 블록 안 가짜 처분 행 — 판정이 흔들리지 않음 (exit 0)\nPASS: 음성10 뜻 없는 영숫자 근거 — 기대한 사유로 차단됨 (exit 1, 'PR #13 행의 근거가 자리표시자')\nPASS: 음성11 run 키 중복 뒤쪽 덮어쓰기 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성12 따옴표 조건 키로 스텝 끄기 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성13 따옴표 오류무시 키 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성14 코드 스팬으로 감싼 뜻 없는 근거 — 기대한 사유로 차단됨 (exit 1, 'PR #13 행의 근거에 이 저장소에서 확인할 수 있는 경로가 없다')\nPASS: 음성15 3칸 들여쓴 코드 펜스로 진짜 행 숨김 — 기대한 사유로 차단됨 (exit 1, '행 없음')\nPASS: 음성27 정규 형식을 벗어난 들여쓰기 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 양성4 스텝에 timeout-minutes 삽입 — 판정이 흔들리지 않음 (exit 0)\nPASS: 음성16 스텝 삭제 후 여러 줄 문자열 안에 은닉 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성17 콜론 앞 공백 조건 키 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성18 콜론 앞 공백 run 키로 덮어쓰기 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성19 물결표 펜스로 진짜 행 숨김 — 기대한 사유로 차단됨 (exit 1, '행 없음')\nPASS: 양성5 run 값을 따옴표로 감싸기 — 판정이 흔들리지 않음 (exit 0)\nPASS: 양성6 run 줄 뒤 주석 — 판정이 흔들리지 않음 (exit 0)\nPASS: 양성7 한 줄짜리 블록 스칼라 run — 판정이 흔들리지 않음 (exit 0)\nPASS: 음성20 대상 6개를 한 행에 몰아 적기 — 기대한 사유로 차단됨 (exit 1, '대상 칸에 다른 대상')\nPASS: 음성21 실재하지 않는 근거 경로 — 기대한 사유로 차단됨 (exit 1, 'PR #13 행의 근거에 실재하지 않는 것이 있다')\nPASS: 음성22 명령만 다른 스텝으로 이동 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성23 탭 문자 주입 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성24 문서 구분자로 문서 둘 만들기 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성25 유니코드 이스케이프 조건 키 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성26 병합 키로 조건 끌어오기 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성28 잡 수준 조건으로 스텝 전체 끄기 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성29 잡 수준 기본 셸 바꾸기 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성30 값 위치 앵커·별칭 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성31 근거 토큰 끝 마침표 — 기대한 사유로 차단됨 (exit 1, 'PR #13 행의 근거에 실재하지 않는 것이 있다')\nCHECKED: 37\nOK(run-acceptance): scripts/acceptance-hs-kickoff-mutations.sh — 판정 37건, CHECKED 37\n"
+  },
+  {
+    "id": "hs0001-mutations-after",
+    "command": [
+      "bash",
+      "scripts/verify/run-acceptance.sh",
+      "scripts/acceptance-hs-kickoff-mutations.sh"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+    "started": "2026-09-09T20:10:13.313373+00:00",
+    "elapsed": 66.28395383316092,
+    "exit_code": 0,
+    "session": "hs-next-20260910",
+    "commit": "06110d9355ae352da58e4ee7e4e2551962cda7d4",
+    "output_file": "hs0001-mutations-after.log",
+    "output": "PASS: 양성 대조군 — 손대지 않은 사본은 통과 (exit 0)\nPASS: 음성1 CI 실행 줄 주석 위장 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성2 CI 스텝 continue-on-error — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성3 정본 표에 이름이 빈 행 — 기대한 사유로 차단됨 (exit 1, 'CI 스텝 불일치')\nPASS: 음성4 처분표 대상 중복 — 기대한 사유로 차단됨 (exit 1, '처분이 둘 이상')\nPASS: 음성5 근거 자리표시자 — 기대한 사유로 차단됨 (exit 1, 'PR #13 행의 근거가 자리표시자')\nPASS: 음성6 판정 문서 첫 줄 위조 — 기대한 사유로 차단됨 (exit 1, '판정 문서 없음')\nPASS: 음성7 env 미끼로 실행 줄 위장 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성8 정본 표 행 번호 중복 — 기대한 사유로 차단됨 (exit 1, 'CI 스텝 불일치')\nPASS: 음성9 진짜 처분 행을 코드 블록 안으로 숨김 — 기대한 사유로 차단됨 (exit 1, '행 없음')\nPASS: 양성2 코드 블록 안 가짜 처분 행 — 판정이 흔들리지 않음 (exit 0)\nPASS: 음성10 뜻 없는 영숫자 근거 — 기대한 사유로 차단됨 (exit 1, 'PR #13 행의 근거가 자리표시자')\nPASS: 음성11 run 키 중복 뒤쪽 덮어쓰기 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성12 따옴표 조건 키로 스텝 끄기 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성13 따옴표 오류무시 키 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성14 코드 스팬으로 감싼 뜻 없는 근거 — 기대한 사유로 차단됨 (exit 1, 'PR #13 행의 근거에 이 저장소에서 확인할 수 있는 경로가 없다')\nPASS: 음성15 3칸 들여쓴 코드 펜스로 진짜 행 숨김 — 기대한 사유로 차단됨 (exit 1, '행 없음')\nPASS: 음성27 정규 형식을 벗어난 들여쓰기 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 양성4 스텝에 timeout-minutes 삽입 — 판정이 흔들리지 않음 (exit 0)\nPASS: 음성16 스텝 삭제 후 여러 줄 문자열 안에 은닉 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성17 콜론 앞 공백 조건 키 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성18 콜론 앞 공백 run 키로 덮어쓰기 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성19 물결표 펜스로 진짜 행 숨김 — 기대한 사유로 차단됨 (exit 1, '행 없음')\nPASS: 양성5 run 값을 따옴표로 감싸기 — 판정이 흔들리지 않음 (exit 0)\nPASS: 양성6 run 줄 뒤 주석 — 판정이 흔들리지 않음 (exit 0)\nPASS: 양성7 한 줄짜리 블록 스칼라 run — 판정이 흔들리지 않음 (exit 0)\nPASS: 음성20 대상 6개를 한 행에 몰아 적기 — 기대한 사유로 차단됨 (exit 1, '대상 칸에 다른 대상')\nPASS: 음성21 실재하지 않는 근거 경로 — 기대한 사유로 차단됨 (exit 1, 'PR #13 행의 근거에 실재하지 않는 것이 있다')\nPASS: 음성22 명령만 다른 스텝으로 이동 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성23 탭 문자 주입 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성24 문서 구분자로 문서 둘 만들기 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성25 유니코드 이스케이프 조건 키 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성26 병합 키로 조건 끌어오기 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성28 잡 수준 조건으로 스텝 전체 끄기 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성29 잡 수준 기본 셸 바꾸기 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성30 값 위치 앵커·별칭 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성31 근거 토큰 끝 마침표 — 기대한 사유로 차단됨 (exit 1, 'PR #13 행의 근거에 실재하지 않는 것이 있다')\nCHECKED: 37\nOK(run-acceptance): scripts/acceptance-hs-kickoff-mutations.sh — 판정 37건, CHECKED 37\n"
+  },
+  {
+    "id": "hs0001-mutations",
+    "command": [
+      "bash",
+      "scripts/verify/run-acceptance.sh",
+      "scripts/acceptance-hs-kickoff-mutations.sh"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+    "started": "2026-09-09T20:06:25.238549+00:00",
+    "elapsed": 66.31945262500085,
+    "exit_code": 0,
+    "session": "hs-next-20260910",
+    "commit": "06110d9355ae352da58e4ee7e4e2551962cda7d4",
+    "output_file": "hs0001-mutations.log",
+    "output": "PASS: 양성 대조군 — 손대지 않은 사본은 통과 (exit 0)\nPASS: 음성1 CI 실행 줄 주석 위장 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성2 CI 스텝 continue-on-error — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성3 정본 표에 이름이 빈 행 — 기대한 사유로 차단됨 (exit 1, 'CI 스텝 불일치')\nPASS: 음성4 처분표 대상 중복 — 기대한 사유로 차단됨 (exit 1, '처분이 둘 이상')\nPASS: 음성5 근거 자리표시자 — 기대한 사유로 차단됨 (exit 1, 'PR #13 행의 근거가 자리표시자')\nPASS: 음성6 판정 문서 첫 줄 위조 — 기대한 사유로 차단됨 (exit 1, '판정 문서 없음')\nPASS: 음성7 env 미끼로 실행 줄 위장 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성8 정본 표 행 번호 중복 — 기대한 사유로 차단됨 (exit 1, 'CI 스텝 불일치')\nPASS: 음성9 진짜 처분 행을 코드 블록 안으로 숨김 — 기대한 사유로 차단됨 (exit 1, '행 없음')\nPASS: 양성2 코드 블록 안 가짜 처분 행 — 판정이 흔들리지 않음 (exit 0)\nPASS: 음성10 뜻 없는 영숫자 근거 — 기대한 사유로 차단됨 (exit 1, 'PR #13 행의 근거가 자리표시자')\nPASS: 음성11 run 키 중복 뒤쪽 덮어쓰기 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성12 따옴표 조건 키로 스텝 끄기 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성13 따옴표 오류무시 키 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성14 코드 스팬으로 감싼 뜻 없는 근거 — 기대한 사유로 차단됨 (exit 1, 'PR #13 행의 근거에 이 저장소에서 확인할 수 있는 경로가 없다')\nPASS: 음성15 3칸 들여쓴 코드 펜스로 진짜 행 숨김 — 기대한 사유로 차단됨 (exit 1, '행 없음')\nPASS: 음성27 정규 형식을 벗어난 들여쓰기 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 양성4 스텝에 timeout-minutes 삽입 — 판정이 흔들리지 않음 (exit 0)\nPASS: 음성16 스텝 삭제 후 여러 줄 문자열 안에 은닉 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성17 콜론 앞 공백 조건 키 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성18 콜론 앞 공백 run 키로 덮어쓰기 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성19 물결표 펜스로 진짜 행 숨김 — 기대한 사유로 차단됨 (exit 1, '행 없음')\nPASS: 양성5 run 값을 따옴표로 감싸기 — 판정이 흔들리지 않음 (exit 0)\nPASS: 양성6 run 줄 뒤 주석 — 판정이 흔들리지 않음 (exit 0)\nPASS: 양성7 한 줄짜리 블록 스칼라 run — 판정이 흔들리지 않음 (exit 0)\nPASS: 음성20 대상 6개를 한 행에 몰아 적기 — 기대한 사유로 차단됨 (exit 1, '대상 칸에 다른 대상')\nPASS: 음성21 실재하지 않는 근거 경로 — 기대한 사유로 차단됨 (exit 1, 'PR #13 행의 근거에 실재하지 않는 것이 있다')\nPASS: 음성22 명령만 다른 스텝으로 이동 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성23 탭 문자 주입 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성24 문서 구분자로 문서 둘 만들기 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성25 유니코드 이스케이프 조건 키 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성26 병합 키로 조건 끌어오기 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성28 잡 수준 조건으로 스텝 전체 끄기 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성29 잡 수준 기본 셸 바꾸기 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성30 값 위치 앵커·별칭 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성31 근거 토큰 끝 마침표 — 기대한 사유로 차단됨 (exit 1, 'PR #13 행의 근거에 실재하지 않는 것이 있다')\nCHECKED: 37\nOK(run-acceptance): scripts/acceptance-hs-kickoff-mutations.sh — 판정 37건, CHECKED 37\n"
+  },
+  {
+    "id": "hs0001-new-green",
+    "command": [
+      "uv",
+      "run",
+      "--no-sync",
+      "pytest",
+      "-q",
+      "tests/test_hs_0001.py"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910/humansearch",
+    "started": "2026-09-09T20:39:12.312081+00:00",
+    "elapsed": 6.298822375014424,
+    "exit_code": 0,
+    "session": "hs-next-20260910",
+    "commit": "e2404d3732dfe6167907ebd5a1d76a7aa02ea26b",
+    "output_file": "hs0001-new-green.log",
+    "output": ".......                                                                  [100%]\n7 passed in 5.93s\n"
+  },
+  {
+    "id": "hs0001-new-red-recheck",
+    "command": [
+      "uv",
+      "run",
+      "--no-sync",
+      "pytest",
+      "-q",
+      "tests/test_hs_0001.py"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910/humansearch",
+    "started": "2026-09-09T20:36:09.355421+00:00",
+    "elapsed": 7.318073166999966,
+    "exit_code": 1,
+    "session": "hs-next-20260910",
+    "commit": "c6a94c713486c62b9effb1cef8adc2f137114e9f",
+    "output_file": "hs0001-new-red-recheck.log",
+    "output": ".FFFFFF                                                                  [100%]\n=================================== FAILURES ===================================\n_ test_hs_kickoff_rejects_false_passes_in_workflow_contract[step shell no-op is rejected] _\n\ntmp_path = PosixPath('/private/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/pytest-of-kangsangmo/pytest-4003/test_hs_kickoff_rejects_false_0')\nmutation = Mutation(name='step shell no-op is rejected', expected_fail='CI 배선 불량 — 본 검사=약화', edit=<function mutate_step_shell at 0x1052bcca0>)\n\n    @pytest.mark.parametrize(\"mutation\", MUTATIONS, ids=lambda mutation: mutation.name)\n    def test_hs_kickoff_rejects_false_passes_in_workflow_contract(\n        tmp_path: Path, mutation: Mutation\n    ) -> None:\n        repo = copy_fixture(tmp_path)\n    \n        mutation.edit(repo)\n        result = run_acceptance(repo)\n    \n>       assert_rejected(result, mutation.expected_fail)\n\ntests/test_hs_0001.py:177: \n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \n\nresult = Result(returncode=0, stdout='PASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\\nPASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\\... (VERDICT: PASS)\\nCHECKED: 12\\nOK(run-acceptance): scripts/acceptance-hs-kickoff.sh — 판정 12건, CHECKED 12\\n', stderr='')\nexpected_fail = 'CI 배선 불량 — 본 검사=약화'\n\n    def assert_rejected(result: Result, expected_fail: str) -> None:\n        combined = result.stdout + result.stderr\n>       assert result.returncode != 0, combined\nE       AssertionError: PASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nE         PASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nE         PASS: 처분 PR #15 → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nE         PASS: 처분 task/hs-d1-permit → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nE         PASS: 처분 task/hs-l1-malformed-url-fix → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nE         PASS: 처분 task/hs-observe-url-crash → 결론=폐기 (근거 경로 2 건·커밋 0 건)\nE         PASS: CI 스텝 수·이름·순서 정본=30 실제=30 표 행=30 빈 이름 0 번호 1..30 이름 1:1\nE         PASS: 역사 기록 보존 resume-evidence-supabase-archive-goal-2026-08-17.md\nE         PASS: 역사 기록 보존 resume-evidence-supabase-implementation-prompt-2026-08-17.md\nE         PASS: 착수 프롬프트 커밋됨 docs/engineering/goal-prompts/humansearch-journey-kickoff-2026-09-07.md\nE         PASS: CI 배선 2건 — 이름과 명령이 같은 스텝에서 일치하고 조건·오류무시 없음\nE         PASS: 판정 문서 docs/engineering/humansearch-kickoff-ledger-verdict-0000-00-00.md (VERDICT: PASS)\nE         CHECKED: 12\nE         OK(run-acceptance): scripts/acceptance-hs-kickoff.sh — 판정 12건, CHECKED 12\nE         \nE       assert 0 != 0\nE        +  where 0 = Result(returncode=0, stdout='PASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\\nPASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\\... (VERDICT: PASS)\\nCHECKED: 12\\nOK(run-acceptance): scripts/acceptance-hs-kickoff.sh — 판정 12건, CHECKED 12\\n', stderr='').returncode\n\ntests/test_hs_0001.py:153: AssertionError\n_ test_hs_kickoff_rejects_false_passes_in_workflow_contract[top defaults run shell is rejected] _\n\ntmp_path = PosixPath('/private/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/pytest-of-kangsangmo/pytest-4003/test_hs_kickoff_rejects_false_1')\nmutation = Mutation(name='top defaults run shell is rejected', expected_fail='워크플로를 정규 형식으로 읽지 못했다', edit=<function mutate_default_shell at 0x1052bce00>)\n\n    @pytest.mark.parametrize(\"mutation\", MUTATIONS, ids=lambda mutation: mutation.name)\n    def test_hs_kickoff_rejects_false_passes_in_workflow_contract(\n        tmp_path: Path, mutation: Mutation\n    ) -> None:\n        repo = copy_fixture(tmp_path)\n    \n        mutation.edit(repo)\n        result = run_acceptance(repo)\n    \n>       assert_rejected(result, mutation.expected_fail)\n\ntests/test_hs_0001.py:177: \n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \n\nresult = Result(returncode=0, stdout='PASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\\nPASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\\... (VERDICT: PASS)\\nCHECKED: 12\\nOK(run-acceptance): scripts/acceptance-hs-kickoff.sh — 판정 12건, CHECKED 12\\n', stderr='')\nexpected_fail = '워크플로를 정규 형식으로 읽지 못했다'\n\n    def assert_rejected(result: Result, expected_fail: str) -> None:\n        combined = result.stdout + result.stderr\n>       assert result.returncode != 0, combined\nE       AssertionError: PASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nE         PASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nE         PASS: 처분 PR #15 → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nE         PASS: 처분 task/hs-d1-permit → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nE         PASS: 처분 task/hs-l1-malformed-url-fix → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nE         PASS: 처분 task/hs-observe-url-crash → 결론=폐기 (근거 경로 2 건·커밋 0 건)\nE         PASS: CI 스텝 수·이름·순서 정본=30 실제=30 표 행=30 빈 이름 0 번호 1..30 이름 1:1\nE         PASS: 역사 기록 보존 resume-evidence-supabase-archive-goal-2026-08-17.md\nE         PASS: 역사 기록 보존 resume-evidence-supabase-implementation-prompt-2026-08-17.md\nE         PASS: 착수 프롬프트 커밋됨 docs/engineering/goal-prompts/humansearch-journey-kickoff-2026-09-07.md\nE         PASS: CI 배선 2건 — 이름과 명령이 같은 스텝에서 일치하고 조건·오류무시 없음\nE         PASS: 판정 문서 docs/engineering/humansearch-kickoff-ledger-verdict-0000-00-00.md (VERDICT: PASS)\nE         CHECKED: 12\nE         OK(run-acceptance): scripts/acceptance-hs-kickoff.sh — 판정 12건, CHECKED 12\nE         \nE       assert 0 != 0\nE        +  where 0 = Result(returncode=0, stdout='PASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\\nPASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\\... (VERDICT: PASS)\\nCHECKED: 12\\nOK(run-acceptance): scripts/acceptance-hs-kickoff.sh — 판정 12건, CHECKED 12\\n', stderr='').returncode\n\ntests/test_hs_0001.py:153: AssertionError\n_ test_hs_kickoff_rejects_false_passes_in_workflow_contract[step BASH_ENV is rejected] _\n\ntmp_path = PosixPath('/private/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/pytest-of-kangsangmo/pytest-4003/test_hs_kickoff_rejects_false_2')\nmutation = Mutation(name='step BASH_ENV is rejected', expected_fail='CI 배선 불량 — 본 검사=약화', edit=<function mutate_step_bash_env at 0x1052bcf60>)\n\n    @pytest.mark.parametrize(\"mutation\", MUTATIONS, ids=lambda mutation: mutation.name)\n    def test_hs_kickoff_rejects_false_passes_in_workflow_contract(\n        tmp_path: Path, mutation: Mutation\n    ) -> None:\n        repo = copy_fixture(tmp_path)\n    \n        mutation.edit(repo)\n        result = run_acceptance(repo)\n    \n>       assert_rejected(result, mutation.expected_fail)\n\ntests/test_hs_0001.py:177: \n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \n\nresult = Result(returncode=0, stdout='PASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\\nPASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\\... (VERDICT: PASS)\\nCHECKED: 12\\nOK(run-acceptance): scripts/acceptance-hs-kickoff.sh — 판정 12건, CHECKED 12\\n', stderr='')\nexpected_fail = 'CI 배선 불량 — 본 검사=약화'\n\n    def assert_rejected(result: Result, expected_fail: str) -> None:\n        combined = result.stdout + result.stderr\n>       assert result.returncode != 0, combined\nE       AssertionError: PASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nE         PASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nE         PASS: 처분 PR #15 → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nE         PASS: 처분 task/hs-d1-permit → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nE         PASS: 처분 task/hs-l1-malformed-url-fix → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nE         PASS: 처분 task/hs-observe-url-crash → 결론=폐기 (근거 경로 2 건·커밋 0 건)\nE         PASS: CI 스텝 수·이름·순서 정본=30 실제=30 표 행=30 빈 이름 0 번호 1..30 이름 1:1\nE         PASS: 역사 기록 보존 resume-evidence-supabase-archive-goal-2026-08-17.md\nE         PASS: 역사 기록 보존 resume-evidence-supabase-implementation-prompt-2026-08-17.md\nE         PASS: 착수 프롬프트 커밋됨 docs/engineering/goal-prompts/humansearch-journey-kickoff-2026-09-07.md\nE         PASS: CI 배선 2건 — 이름과 명령이 같은 스텝에서 일치하고 조건·오류무시 없음\nE         PASS: 판정 문서 docs/engineering/humansearch-kickoff-ledger-verdict-0000-00-00.md (VERDICT: PASS)\nE         CHECKED: 12\nE         OK(run-acceptance): scripts/acceptance-hs-kickoff.sh — 판정 12건, CHECKED 12\nE         \nE       assert 0 != 0\nE        +  where 0 = Result(returncode=0, stdout='PASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\\nPASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\\... (VERDICT: PASS)\\nCHECKED: 12\\nOK(run-acceptance): scripts/acceptance-hs-kickoff.sh — 판정 12건, CHECKED 12\\n', stderr='').returncode\n\ntests/test_hs_0001.py:153: AssertionError\n_ test_hs_kickoff_rejects_false_passes_in_workflow_contract[top BASH_ENV is rejected] _\n\ntmp_path = PosixPath('/private/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/pytest-of-kangsangmo/pytest-4003/test_hs_kickoff_rejects_false_3')\nmutation = Mutation(name='top BASH_ENV is rejected', expected_fail='워크플로를 정규 형식으로 읽지 못했다', edit=<function mutate_top_bash_env at 0x1052bd0c0>)\n\n    @pytest.mark.parametrize(\"mutation\", MUTATIONS, ids=lambda mutation: mutation.name)\n    def test_hs_kickoff_rejects_false_passes_in_workflow_contract(\n        tmp_path: Path, mutation: Mutation\n    ) -> None:\n        repo = copy_fixture(tmp_path)\n    \n        mutation.edit(repo)\n        result = run_acceptance(repo)\n    \n>       assert_rejected(result, mutation.expected_fail)\n\ntests/test_hs_0001.py:177: \n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \n\nresult = Result(returncode=0, stdout='PASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\\nPASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\\... (VERDICT: PASS)\\nCHECKED: 12\\nOK(run-acceptance): scripts/acceptance-hs-kickoff.sh — 판정 12건, CHECKED 12\\n', stderr='')\nexpected_fail = '워크플로를 정규 형식으로 읽지 못했다'\n\n    def assert_rejected(result: Result, expected_fail: str) -> None:\n        combined = result.stdout + result.stderr\n>       assert result.returncode != 0, combined\nE       AssertionError: PASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nE         PASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nE         PASS: 처분 PR #15 → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nE         PASS: 처분 task/hs-d1-permit → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nE         PASS: 처분 task/hs-l1-malformed-url-fix → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nE         PASS: 처분 task/hs-observe-url-crash → 결론=폐기 (근거 경로 2 건·커밋 0 건)\nE         PASS: CI 스텝 수·이름·순서 정본=30 실제=30 표 행=30 빈 이름 0 번호 1..30 이름 1:1\nE         PASS: 역사 기록 보존 resume-evidence-supabase-archive-goal-2026-08-17.md\nE         PASS: 역사 기록 보존 resume-evidence-supabase-implementation-prompt-2026-08-17.md\nE         PASS: 착수 프롬프트 커밋됨 docs/engineering/goal-prompts/humansearch-journey-kickoff-2026-09-07.md\nE         PASS: CI 배선 2건 — 이름과 명령이 같은 스텝에서 일치하고 조건·오류무시 없음\nE         PASS: 판정 문서 docs/engineering/humansearch-kickoff-ledger-verdict-0000-00-00.md (VERDICT: PASS)\nE         CHECKED: 12\nE         OK(run-acceptance): scripts/acceptance-hs-kickoff.sh — 판정 12건, CHECKED 12\nE         \nE       assert 0 != 0\nE        +  where 0 = Result(returncode=0, stdout='PASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\\nPASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\\... (VERDICT: PASS)\\nCHECKED: 12\\nOK(run-acceptance): scripts/acceptance-hs-kickoff.sh — 판정 12건, CHECKED 12\\n', stderr='').returncode\n\ntests/test_hs_0001.py:153: AssertionError\n_ test_hs_kickoff_rejects_false_passes_in_workflow_contract[PR 131 does not satisfy PR 13] _\n\ntmp_path = PosixPath('/private/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/pytest-of-kangsangmo/pytest-4003/test_hs_kickoff_rejects_false_4')\nmutation = Mutation(name='PR 131 does not satisfy PR 13', expected_fail='처분표에 PR #13 행 없음', edit=<function mutate_pr_131 at 0x1052bd220>)\n\n    @pytest.mark.parametrize(\"mutation\", MUTATIONS, ids=lambda mutation: mutation.name)\n    def test_hs_kickoff_rejects_false_passes_in_workflow_contract(\n        tmp_path: Path, mutation: Mutation\n    ) -> None:\n        repo = copy_fixture(tmp_path)\n    \n        mutation.edit(repo)\n        result = run_acceptance(repo)\n    \n>       assert_rejected(result, mutation.expected_fail)\n\ntests/test_hs_0001.py:177: \n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \n\nresult = Result(returncode=0, stdout='PASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\\nPASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\\... (VERDICT: PASS)\\nCHECKED: 12\\nOK(run-acceptance): scripts/acceptance-hs-kickoff.sh — 판정 12건, CHECKED 12\\n', stderr='')\nexpected_fail = '처분표에 PR #13 행 없음'\n\n    def assert_rejected(result: Result, expected_fail: str) -> None:\n        combined = result.stdout + result.stderr\n>       assert result.returncode != 0, combined\nE       AssertionError: PASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nE         PASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nE         PASS: 처분 PR #15 → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nE         PASS: 처분 task/hs-d1-permit → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nE         PASS: 처분 task/hs-l1-malformed-url-fix → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nE         PASS: 처분 task/hs-observe-url-crash → 결론=폐기 (근거 경로 2 건·커밋 0 건)\nE         PASS: CI 스텝 수·이름·순서 정본=30 실제=30 표 행=30 빈 이름 0 번호 1..30 이름 1:1\nE         PASS: 역사 기록 보존 resume-evidence-supabase-archive-goal-2026-08-17.md\nE         PASS: 역사 기록 보존 resume-evidence-supabase-implementation-prompt-2026-08-17.md\nE         PASS: 착수 프롬프트 커밋됨 docs/engineering/goal-prompts/humansearch-journey-kickoff-2026-09-07.md\nE         PASS: CI 배선 2건 — 이름과 명령이 같은 스텝에서 일치하고 조건·오류무시 없음\nE         PASS: 판정 문서 docs/engineering/humansearch-kickoff-ledger-verdict-0000-00-00.md (VERDICT: PASS)\nE         CHECKED: 12\nE         OK(run-acceptance): scripts/acceptance-hs-kickoff.sh — 판정 12건, CHECKED 12\nE         \nE       assert 0 != 0\nE        +  where 0 = Result(returncode=0, stdout='PASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\\nPASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\\... (VERDICT: PASS)\\nCHECKED: 12\\nOK(run-acceptance): scripts/acceptance-hs-kickoff.sh — 판정 12건, CHECKED 12\\n', stderr='').returncode\n\ntests/test_hs_0001.py:153: AssertionError\n_ test_hs_kickoff_rejects_false_passes_in_workflow_contract[VERDICT PASSED suffix is rejected] _\n\ntmp_path = PosixPath('/private/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/pytest-of-kangsangmo/pytest-4003/test_hs_kickoff_rejects_false_5')\nmutation = Mutation(name='VERDICT PASSED suffix is rejected', expected_fail='판정 문서 없음/빈 파일/첫 줄 VERDICT 아님', edit=<function mutate_verdict_passed at 0x1052bd380>)\n\n    @pytest.mark.parametrize(\"mutation\", MUTATIONS, ids=lambda mutation: mutation.name)\n    def test_hs_kickoff_rejects_false_passes_in_workflow_contract(\n        tmp_path: Path, mutation: Mutation\n    ) -> None:\n        repo = copy_fixture(tmp_path)\n    \n        mutation.edit(repo)\n        result = run_acceptance(repo)\n    \n>       assert_rejected(result, mutation.expected_fail)\n\ntests/test_hs_0001.py:177: \n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \n\nresult = Result(returncode=0, stdout='PASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\\nPASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\\...VERDICT: PASSED)\\nCHECKED: 12\\nOK(run-acceptance): scripts/acceptance-hs-kickoff.sh — 판정 12건, CHECKED 12\\n', stderr='')\nexpected_fail = '판정 문서 없음/빈 파일/첫 줄 VERDICT 아님'\n\n    def assert_rejected(result: Result, expected_fail: str) -> None:\n        combined = result.stdout + result.stderr\n>       assert result.returncode != 0, combined\nE       AssertionError: PASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nE         PASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nE         PASS: 처분 PR #15 → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nE         PASS: 처분 task/hs-d1-permit → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nE         PASS: 처분 task/hs-l1-malformed-url-fix → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nE         PASS: 처분 task/hs-observe-url-crash → 결론=폐기 (근거 경로 2 건·커밋 0 건)\nE         PASS: CI 스텝 수·이름·순서 정본=30 실제=30 표 행=30 빈 이름 0 번호 1..30 이름 1:1\nE         PASS: 역사 기록 보존 resume-evidence-supabase-archive-goal-2026-08-17.md\nE         PASS: 역사 기록 보존 resume-evidence-supabase-implementation-prompt-2026-08-17.md\nE         PASS: 착수 프롬프트 커밋됨 docs/engineering/goal-prompts/humansearch-journey-kickoff-2026-09-07.md\nE         PASS: CI 배선 2건 — 이름과 명령이 같은 스텝에서 일치하고 조건·오류무시 없음\nE         PASS: 판정 문서 docs/engineering/humansearch-kickoff-ledger-verdict-0000-00-00.md (VERDICT: PASSED)\nE         CHECKED: 12\nE         OK(run-acceptance): scripts/acceptance-hs-kickoff.sh — 판정 12건, CHECKED 12\nE         \nE       assert 0 != 0\nE        +  where 0 = Result(returncode=0, stdout='PASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\\nPASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\\...VERDICT: PASSED)\\nCHECKED: 12\\nOK(run-acceptance): scripts/acceptance-hs-kickoff.sh — 판정 12건, CHECKED 12\\n', stderr='').returncode\n\ntests/test_hs_0001.py:153: AssertionError\n=========================== short test summary info ============================\nFAILED tests/test_hs_0001.py::test_hs_kickoff_rejects_false_passes_in_workflow_contract[step shell no-op is rejected]\nFAILED tests/test_hs_0001.py::test_hs_kickoff_rejects_false_passes_in_workflow_contract[top defaults run shell is rejected]\nFAILED tests/test_hs_0001.py::test_hs_kickoff_rejects_false_passes_in_workflow_contract[step BASH_ENV is rejected]\nFAILED tests/test_hs_0001.py::test_hs_kickoff_rejects_false_passes_in_workflow_contract[top BASH_ENV is rejected]\nFAILED tests/test_hs_0001.py::test_hs_kickoff_rejects_false_passes_in_workflow_contract[PR 131 does not satisfy PR 13]\nFAILED tests/test_hs_0001.py::test_hs_kickoff_rejects_false_passes_in_workflow_contract[VERDICT PASSED suffix is rejected]\n6 failed, 1 passed in 7.01s\n"
+  },
+  {
+    "id": "hs0001-new-red",
+    "command": [
+      "uv",
+      "run",
+      "--no-sync",
+      "pytest",
+      "-q",
+      "tests/test_hs_0001.py"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910/humansearch",
+    "started": "2026-09-09T20:35:48.431231+00:00",
+    "elapsed": 0.6873957079369575,
+    "exit_code": 4,
+    "session": "hs-next-20260910",
+    "commit": "c6a94c713486c62b9effb1cef8adc2f137114e9f",
+    "output_file": "hs0001-new-red.log",
+    "output": "ERROR: file or directory not found: tests/test_hs_0001.py\n\n\nno tests ran in 0.18s\n"
+  },
+  {
+    "id": "hs0001-red-commit",
+    "command": [
+      "git",
+      "commit",
+      "-F",
+      "artifacts/hs-next-20260910/red-commit.txt"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+    "started": "2026-09-09T20:36:47.885520+00:00",
+    "elapsed": 5.402954500168562,
+    "exit_code": 0,
+    "session": "hs-next-20260910",
+    "commit": "e2404d3732dfe6167907ebd5a1d76a7aa02ea26b",
+    "output_file": "hs0001-red-commit.log",
+    "output": "[task/hs-0001-20260910 e2404d3] 착수 관문이 실행 우회와 잘못된 대상을 합격시키는 회귀를 고정한다\n 1 file changed, 177 insertions(+)\n create mode 100644 humansearch/tests/test_hs_0001.py\n"
+  },
+  {
+    "id": "hs0001-red",
+    "command": [
+      "bash",
+      "scripts/verify/run-acceptance.sh",
+      "scripts/acceptance-hs-kickoff.sh"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+    "started": "2026-09-09T20:05:57.025914+00:00",
+    "elapsed": 1.029317625099793,
+    "exit_code": 1,
+    "session": "hs-next-20260910",
+    "commit": "06110d9355ae352da58e4ee7e4e2551962cda7d4",
+    "output_file": "hs0001-red.log",
+    "output": "PASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 1 건)\nPASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 1 건)\nPASS: 처분 PR #15 → 결론=폐기 (근거 경로 1 건·커밋 1 건)\nPASS: 처분 task/hs-d1-permit → 결론=재작성 (근거 경로 1 건·커밋 2 건)\nPASS: 처분 task/hs-l1-malformed-url-fix → 결론=폐기 (근거 경로 1 건·커밋 1 건)\nPASS: 처분 task/hs-observe-url-crash → 결론=폐기 (근거 경로 2 건·커밋 0 건)\nPASS: CI 스텝 수·이름·순서 정본=30 실제=30 표 행=30 빈 이름 0 번호 1..30 이름 1:1\nPASS: 역사 기록 보존 resume-evidence-supabase-archive-goal-2026-08-17.md\nPASS: 역사 기록 보존 resume-evidence-supabase-implementation-prompt-2026-08-17.md\nPASS: 착수 프롬프트 커밋됨 docs/engineering/goal-prompts/humansearch-journey-kickoff-2026-09-07.md\nPASS: CI 배선 2건 — 이름과 명령이 같은 스텝에서 일치하고 조건·오류무시 없음\nFAIL: 판정 문서 없음/빈 파일/첫 줄 VERDICT 아님 (docs/engineering/humansearch-kickoff-ledger-verdict-*.md)\nCHECKED: 12\nFAIL(run-acceptance): scripts/acceptance-hs-kickoff.sh 종료값 1\n"
+  },
+  {
+    "id": "hs0001-static-after",
+    "command": [
+      "bash",
+      "-c",
+      "bash -n scripts/acceptance-hs-kickoff.sh scripts/acceptance-hs-kickoff-mutations.sh && python3 -m py_compile scripts/verify/list-workflow-steps.py && bash scripts/acceptance-principles-check.sh && bash scripts/verify/check-ci-step-integrity.sh && bash verify.sh"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+    "started": "2026-09-09T20:11:24.204337+00:00",
+    "elapsed": 4.22389154182747,
+    "exit_code": 0,
+    "session": "hs-next-20260910",
+    "commit": "06110d9355ae352da58e4ee7e4e2551962cda7d4",
+    "output_file": "hs0001-static-after.log",
+    "output": "VERDICT: PASS\nSOT_LOAD: PASS docs/sot/coding-principles.md\nLEDGER_LOAD: PASS docs/sot/principles.yaml\nMECHANISMS: PASS 34/34 strict-contract-bindings\nWIRING: PASS pre-push=1 ci=1\nCHECKED: 34\nALLOWED: 인수 검사 0-5 (push · CI 연결) — if 허용 (origin/main==main 을 보는 검사라 main push 에서만 의미가 있다. PR 실행에서 요구하면 상시 실패한다.)\nPASS: 조건부·오류무시 스텝 없음 (job·step 31개 검사)\nCHECKED: 31\nPASS: no secret-pattern match in any tracked file, .env not tracked\n"
+  },
+  {
+    "id": "hs0001-static",
+    "command": [
+      "bash",
+      "-c",
+      "bash -n scripts/acceptance-hs-kickoff.sh scripts/acceptance-hs-kickoff-mutations.sh && python3 -m py_compile scripts/verify/list-workflow-steps.py && bash scripts/acceptance-principles-check.sh && bash scripts/verify/check-ci-step-integrity.sh && bash verify.sh"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+    "started": "2026-09-09T20:07:08.595155+00:00",
+    "elapsed": 5.096131625119597,
+    "exit_code": 0,
+    "session": "hs-next-20260910",
+    "commit": "06110d9355ae352da58e4ee7e4e2551962cda7d4",
+    "output_file": "hs0001-static.log",
+    "output": "VERDICT: PASS\nSOT_LOAD: PASS docs/sot/coding-principles.md\nLEDGER_LOAD: PASS docs/sot/principles.yaml\nMECHANISMS: PASS 34/34 strict-contract-bindings\nWIRING: PASS pre-push=1 ci=1\nCHECKED: 34\nALLOWED: 인수 검사 0-5 (push · CI 연결) — if 허용 (origin/main==main 을 보는 검사라 main push 에서만 의미가 있다. PR 실행에서 요구하면 상시 실패한다.)\nPASS: 조건부·오류무시 스텝 없음 (job·step 31개 검사)\nCHECKED: 31\nPASS: no secret-pattern match in any tracked file, .env not tracked\n"
+  },
+  {
+    "id": "humansearch-regression",
+    "command": [
+      "bash",
+      "-c",
+      "uv run --no-sync ruff check src tests && uv run --no-sync mypy src tests && uv run --no-sync pytest -q"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910/humansearch",
+    "started": "2026-09-09T20:09:21.469475+00:00",
+    "elapsed": 25.280818540835753,
+    "exit_code": 0,
+    "session": "hs-next-20260910",
+    "commit": "06110d9355ae352da58e4ee7e4e2551962cda7d4",
+    "output_file": "humansearch-regression.log",
+    "output": "All checks passed!\nSuccess: no issues found in 41 source files\n........................................................................ [ 34%]\n........................................................................ [ 68%]\n...................................................................      [100%]\n211 passed in 15.27s\n"
+  },
+  {
+    "id": "principles-mutations",
+    "command": [
+      "bash",
+      "scripts/acceptance-principles-mutations.sh"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+    "started": "2026-09-09T20:09:14.890521+00:00",
+    "elapsed": 36.01604745793156,
+    "exit_code": 0,
+    "session": "hs-next-20260910",
+    "commit": "06110d9355ae352da58e4ee7e4e2551962cda7d4",
+    "output_file": "principles-mutations.log",
+    "output": "PASS: FIXTURE-NORMAL 정상 fixture — PASS (exit=0)\nPASS: C1 principles.yaml 삭제 — FAIL (exit=1)\nPASS: C2 coding-principles.md 삭제 — FAIL (exit=1)\nPASS: C3 YAML 문법 오류 — FAIL (exit=1)\nPASS: C3-EMPTY-LEDGER principles.yaml 빈 파일 — FAIL (exit=1)\nPASS: C3-EMPTY-SOT coding-principles.md 빈 파일 — FAIL (exit=1)\nPASS: C4 원칙 ID 하나 삭제 — FAIL (exit=1)\nPASS: C5 중복 ID 추가 — FAIL (exit=1)\nPASS: C5-UNKNOWN 알 수 없는 ID — FAIL (exit=1)\nPASS: C5-PRINCIPLE 정본과 원칙 문구 불일치 — FAIL (exit=1)\nPASS: C5-EMPTY-EXPECTED 빈 mechanism_expected — FAIL (exit=1)\nPASS: C5-EMPTY-FOUND 빈 mechanism_found — FAIL (exit=1)\nPASS: C6 mechanism 경로 미존재 — FAIL (exit=1)\nPASS: C6-CHECK mechanism 검사기 미존재 — FAIL (exit=1)\nPASS: C6-STAGES 잘못된 stages 구조 — FAIL (exit=1)\nPASS: C6-SELF 검사기 자기 대상에서 제외 — FAIL (exit=1)\nPASS: C7 CI 실행 줄 삭제 — FAIL (exit=1)\nPASS: C8 검사기 파일 삭제 — FAIL (exit=127)\nPASS: C9 검사 대상 0개가 되도록 글로브 변경 — FAIL (exit=1)\nPASS: C9-COMMENT-DECOY 죽은 주석으로 깨진 pre-push 글로브 위장 — FAIL (exit=1)\nPASS: C9-ECHO-DECOY echo 문자열로 깨진 pre-push 글로브 위장 — FAIL (exit=1)\nPASS: C9-DEAD-CODE 최상위 exit 뒤 죽은 find 줄로 글로브 위장 — FAIL (exit=1)\nPASS: C9-IF-FALSE if false 분기의 죽은 find 줄로 글로브 위장 — FAIL (exit=1)\nPASS: C9-RUNTIME-FINGERPRINT 고정 sandbox 지문일 때만 정상 글로브 실행 — FAIL (exit=1)\nPASS: C9-RUNTIME-PATH-FINGERPRINT 고정 임시경로 접두사일 때만 정상 글로브 실행 — FAIL (exit=1)\nPASS: C10-A CI에 실패무시(or-true) 삽입 — FAIL (exit=1)\nPASS: C10-B CI에 continue-on-error 삽입 — FAIL (exit=1)\nPASS: C10-C CI에 if exists 조건 삽입 — FAIL (exit=1)\nPASS: C10-D CI 다중 줄 exit 0 우회 — FAIL (exit=1)\nPASS: C10-E pre-push에 실패무시(or-true) 삽입 — FAIL (exit=1)\nPASS: C11 거짓 최종 판정 차단 — FAIL (exit=1)\nPASS: C12 거짓 최종 판정 차단 — FAIL (exit=1)\nPASS: C11-ARTIFACT-MISSING 증거 파일 누락 차단 — FAIL (exit=1)\nPASS: C11-ARTIFACT-HASH 증거 해시 불일치 차단 — FAIL (exit=1)\nPASS: C15 검사 스크립트가 저장소 밖 절대경로를 참조하지 않는다\nPASS: C13 Codex/Claude 공통 계약 불일치 — FAIL (exit=1)\nPASS: C14-A 메모리 파일 없음, 현재 SOT 직접 로드 — PASS (exit=0)\nPASS: C14-B 메모리 파일 잘림, 현재 SOT 직접 로드 — PASS (exit=0)\nPASS: BOUNDARY-500 직접 작성 코드 500줄 — PASS\nPASS: BOUNDARY-501 직접 작성 코드 501줄 — FAIL\nPASS: SOURCE-TREE 원본 저장소 상태 불변\nCHECKED: 41\nVERDICT: PASS\n"
+  },
+  {
+    "id": "recover-wu-baseline",
+    "command": [
+      "bash",
+      "-c",
+      "git restore --worktree -- scripts/verify/list-workflow-steps.py && git merge --abort && git switch -c task/hs-0001-20260910 c6a94c713486c62b9effb1cef8adc2f137114e9f"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+    "started": "2026-09-09T20:35:18.564533+00:00",
+    "elapsed": 0.11990775004960597,
+    "exit_code": 0,
+    "session": "hs-next-20260910",
+    "commit": "c6a94c713486c62b9effb1cef8adc2f137114e9f",
+    "output_file": "recover-wu-baseline.log",
+    "output": "Switched to a new branch 'task/hs-0001-20260910'\n"
+  },
+  {
+    "id": "v1-cli",
+    "command": [
+      "env",
+      "-u",
+      "ANTHROPIC_API_KEY",
+      "claude",
+      "-p",
+      "--safe-mode",
+      "--permission-mode",
+      "dontAsk",
+      "--tools",
+      "Bash,Read,Glob,Grep",
+      "--allowedTools",
+      "Bash,Read,Glob,Grep",
+      "--output-format",
+      "stream-json",
+      "--verbose",
+      "--session-id",
+      "b901fdcb-d2b2-4c2c-b57f-45acbacd5ca0"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+    "started": "2026-09-09T20:11:01.548744+00:00",
+    "elapsed": 1197.573634875007,
+    "exit_code": 0,
+    "session": "hs-next-20260910",
+    "commit": "06110d9355ae352da58e4ee7e4e2551962cda7d4",
+    "output_file": "v1-cli.log",
+    "output_reference": "v1-cli-public.jsonl",
+    "output_sha256": "496ee53b58fdfd7f86db8e5f4428144e3f96cd688a8f389ae151b72f4cb5dd82",
+    "original_output_reference": ".claude/private-reviews/hs0001-20260910/v1-cli-original.jsonl",
+    "redaction_provenance": "v1-cli-public-provenance.json",
+    "original_output_sha256": "635e6d669cd142b0b180cb20629c382e98815d054889bae7b9bb7aa41a78c6f5"
+  },
+  {
+    "id": "hs0001-final-g2",
+    "command": [
+      "bash",
+      "-c",
+      "bash scripts/acceptance-hs-gates.sh && bash scripts/acceptance-hs-gates-mutations.sh && bash scripts/acceptance-hs-gates-antiforge.sh"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+    "started": "2026-09-09T20:46:32.288287+00:00",
+    "elapsed": 126.95524654188193,
+    "exit_code": 0,
+    "session": "hs-next-20260910",
+    "commit": "16e5d649dbd257e6d01318c1a8fb0fbe8e731596",
+    "output_file": "hs0001-final-g2.log",
+    "output": "PASS: ruff clean in 43 python files\nPASS: mypy strict clean in 43 source files\nPASS: pytest collected 219 and passed\nPASS: runtime import proof /Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910/humansearch/src/humansearch/__init__.py\nCOLLECTED: 219\nPASS: gates mutations blocked 6/6\nPASS: gates antiforge 3/3 (evidence forgery + CI disable blocked)\n"
+  },
+  {
+    "id": "hs0001-brief-final",
+    "command": [
+      "bash",
+      "/Users/kangsangmo/.claude/skills/strict/brief-lint.sh",
+      "docs/engineering/humansearch-hs0001-goal-2026-09-10.md",
+      "docs/engineering/evidence/hs0001-20260910/README.md"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+    "started": "2026-09-09T20:51:40.923143+00:00",
+    "elapsed": 0.03452237509191036,
+    "exit_code": 0,
+    "session": "hs-next-20260910",
+    "commit": "16e5d649dbd257e6d01318c1a8fb0fbe8e731596",
+    "output_file": "hs0001-brief-final.log",
+    "output": "=== docs/engineering/humansearch-hs0001-goal-2026-09-10.md ===\n  코드블록 0개 · 표 0개 (면제 0개) / 해석 누락 0개\n  1층(결론): 줄 3 / 본문 82자\n  1층 기술 표기: 없음 (※ 한글 전문용어는 못 잡는다 — 사람이 본다)\n  결정 카드 2건 (※ 내용이 판단에 쓸 만한지는 못 잰다 — 사람이 본다)\n  증거 보관 경로: 임시 외 실재 파일 4건 (※ 그 파일이 이 주장의 증거인지는 못 잰다)\n=== docs/engineering/evidence/hs0001-20260910/README.md ===\n  코드블록 0개 · 표 0개 (면제 0개) / 해석 누락 0개\n  1층(결론): 줄 3 / 본문 52자\n  1층 기술 표기: 없음 (※ 한글 전문용어는 못 잡는다 — 사람이 본다)\n  결정 카드: 없음\n  증거 보관 경로: 임시 외 실재 파일 0건 (※ 그 파일이 이 주장의 증거인지는 못 잰다)\n\n브리핑 계약 기계 검사: 위반 0건 (문서 2개)\n\n이 검사가 못 보는 것 (사람이 봐야 하는 것):\n  · 설명이 실제로 말이 되는지 — 출력과 무관한 문장도 통과한다\n  · 결정 카드 내용이 판단에 쓸 만한지 — 한 글자여도 통과한다\n  · 증거 파일이 그 주장과 관련 있는지 — 존재하기만 하면 통과한다\n  · 결론이 쉬운 말인지 — 한글 전문용어는 잡지 못한다\n  ※ 이 검사는 홈 폴더에만 있어 서버 자동 검사에 없다 — 회사 차원의 합격 근거가 아니다(P15③).\n"
+  },
+  {
+    "id": "hs0001-evidence-recovery",
+    "command": [
+      "bash",
+      "-c",
+      "git diff --cached --check && bash verify.sh && VERIFY_SCAN_SOURCE=index bash verify.sh"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+    "started": "2026-09-09T20:56:16.988939+00:00",
+    "elapsed": 12.848118624882773,
+    "exit_code": 0,
+    "session": "hs-next-20260910",
+    "commit": "16e5d649dbd257e6d01318c1a8fb0fbe8e731596",
+    "output_file": "hs0001-evidence-recovery.log",
+    "output": "PASS: no secret-pattern match in any tracked file, .env not tracked\nPASS: no secret-pattern match in any tracked file, .env not tracked\n"
+  },
+  {
+    "id": "hs0001-final-session-status",
+    "command": [
+      "bash",
+      "scripts/session-status.sh"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+    "started": "2026-09-09T20:49:30.472158+00:00",
+    "elapsed": 558.6366005830932,
+    "exit_code": 0,
+    "session": "hs-next-20260910",
+    "commit": "16e5d649dbd257e6d01318c1a8fb0fbe8e731596",
+    "output_file": "hs0001-final-session-status.log",
+    "output": "HEAD: 16e5d64 (ahead 21 / behind 10)\nORIGIN: 4379b2f\nRED: 2/31 (acceptance-0-7.sh 제외 — CI 담당)\n"
+  },
+  {
+    "id": "hs0001-staged-secret-recheck",
+    "command": [
+      "env",
+      "VERIFY_SCAN_SOURCE=index",
+      "bash",
+      "verify.sh"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+    "started": "2026-09-09T20:55:18.702527+00:00",
+    "elapsed": 9.175071500008926,
+    "exit_code": 0,
+    "session": "hs-next-20260910",
+    "commit": "16e5d649dbd257e6d01318c1a8fb0fbe8e731596",
+    "output_file": "hs0001-staged-secret-recheck.log",
+    "output": "PASS: no secret-pattern match in any tracked file, .env not tracked\n"
+  },
+  {
+    "id": "hs0001-staged-secret-scan",
+    "command": [
+      "env",
+      "VERIFY_SCAN_SOURCE=index",
+      "bash",
+      "verify.sh"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+    "started": "2026-09-09T20:52:21.843236+00:00",
+    "elapsed": 8.52724629198201,
+    "exit_code": 1,
+    "session": "hs-next-20260910",
+    "commit": "16e5d649dbd257e6d01318c1a8fb0fbe8e731596",
+    "output_file": "hs0001-staged-secret-scan.log",
+    "output": "FAIL: scanner error — fail-closed (grep/xargs stderr):\n  ! grep 실행 오류(rc=141): docs/engineering/evidence/hs0001-20260910/v1-cli.log\n"
+  },
+  {
+    "id": "hs0001-final-v1-evidence-check",
+    "command": [
+      "bash",
+      "-c",
+      "git diff --cached --check && bash verify.sh && VERIFY_SCAN_SOURCE=index bash verify.sh"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+    "started": "2026-09-09T21:18:26.939501+00:00",
+    "elapsed": 0.037800833117216825,
+    "exit_code": 2,
+    "session": "hs-next-20260910",
+    "commit": "16e5d649dbd257e6d01318c1a8fb0fbe8e731596",
+    "output_file": "hs0001-final-v1-evidence-check.log",
+    "output": "docs/engineering/evidence/hs0001-20260910/v1-final-mutants.py:76: trailing whitespace.\n+    root = base / name; \n"
+  },
+  {
+    "id": "hs0001-final-v1-evidence-recheck",
+    "command": [
+      "bash",
+      "-c",
+      "git diff --cached --check && bash verify.sh && VERIFY_SCAN_SOURCE=index bash verify.sh"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+    "started": "2026-09-09T21:18:41.678302+00:00",
+    "elapsed": 4.523378708167002,
+    "exit_code": 1,
+    "session": "hs-next-20260910",
+    "commit": "16e5d649dbd257e6d01318c1a8fb0fbe8e731596",
+    "output_file": "hs0001-final-v1-evidence-recheck.log",
+    "output": "FAIL: secret pattern matched in tracked files:\n  - docs/engineering/evidence/hs0001-20260910/codeaudit-final-recheck.json\n"
+  },
+  {
+    "id": "hs0001-final-v1-evidence-recheck2",
+    "command": [
+      "bash",
+      "-c",
+      "git diff --cached --check && bash verify.sh && VERIFY_SCAN_SOURCE=index bash verify.sh"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+    "started": "2026-09-09T21:21:10.289855+00:00",
+    "elapsed": 14.851850375067443,
+    "exit_code": 0,
+    "session": "hs-next-20260910",
+    "commit": "16e5d649dbd257e6d01318c1a8fb0fbe8e731596",
+    "output_file": "hs0001-final-v1-evidence-recheck2.log",
+    "output": "PASS: no secret-pattern match in any tracked file, .env not tracked\nPASS: no secret-pattern match in any tracked file, .env not tracked\n"
+  },
+  {
+    "id": "v1-final-cli",
+    "command": [
+      "env",
+      "-u",
+      "ANTHROPIC_API_KEY",
+      "claude",
+      "-p",
+      "--safe-mode",
+      "--permission-mode",
+      "dontAsk",
+      "--tools",
+      "Bash,Read,Glob,Grep",
+      "--allowedTools",
+      "Bash,Read,Glob,Grep",
+      "--output-format",
+      "stream-json",
+      "--verbose",
+      "--session-id",
+      "122a5412-d386-42f5-87fa-83135bb909b5"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+    "started": "2026-09-09T21:00:12.247607+00:00",
+    "elapsed": 914.6152806249447,
+    "exit_code": 0,
+    "session": "hs-next-20260910",
+    "commit": "16e5d649dbd257e6d01318c1a8fb0fbe8e731596",
+    "output_file": "v1-final-cli.log",
+    "output_reference": "v1-final-cli-public.jsonl",
+    "provenance": "v1-final-cli-public-provenance.json"
+  },
+  {
+    "id": "hs0001-checkpoint",
+    "command": [
+      "bash",
+      "-c",
+      "git diff --cached --check && bash verify.sh && VERIFY_SCAN_SOURCE=index bash verify.sh && bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff.sh"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+    "started": "2026-09-09T21:28:32.167266+00:00",
+    "elapsed": 4.934456875082105,
+    "exit_code": 1,
+    "session": "hs-next-20260910",
+    "commit": "16e5d649dbd257e6d01318c1a8fb0fbe8e731596",
+    "output_file": "hs0001-checkpoint.log",
+    "output": "FAIL: secret pattern matched in tracked files:\n  - docs/engineering/evidence/hs0001-20260910/status-red-diagnosis.json\n"
+  },
+  {
+    "id": "hs0001-checkpoint-recheck",
+    "command": [
+      "bash",
+      "-c",
+      "git diff --cached --check && bash verify.sh && VERIFY_SCAN_SOURCE=index bash verify.sh && bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff.sh"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+    "started": "2026-09-09T21:29:29.710416+00:00",
+    "elapsed": 16.55790445790626,
+    "exit_code": 0,
+    "session": "hs-next-20260910",
+    "commit": "16e5d649dbd257e6d01318c1a8fb0fbe8e731596",
+    "output_file": "hs0001-checkpoint-recheck.log",
+    "output": "PASS: no secret-pattern match in any tracked file, .env not tracked\nPASS: no secret-pattern match in any tracked file, .env not tracked\nPASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 1 건)\nPASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 1 건)\nPASS: 처분 PR #15 → 결론=폐기 (근거 경로 1 건·커밋 1 건)\nPASS: 처분 task/hs-d1-permit → 결론=재작성 (근거 경로 1 건·커밋 2 건)\nPASS: 처분 task/hs-l1-malformed-url-fix → 결론=폐기 (근거 경로 1 건·커밋 1 건)\nPASS: 처분 task/hs-observe-url-crash → 결론=폐기 (근거 경로 2 건·커밋 0 건)\nPASS: CI 스텝 수·이름·순서 정본=30 실제=30 표 행=30 빈 이름 0 번호 1..30 이름 1:1\nPASS: 역사 기록 보존 resume-evidence-supabase-archive-goal-2026-08-17.md\nPASS: 역사 기록 보존 resume-evidence-supabase-implementation-prompt-2026-08-17.md\nPASS: 착수 프롬프트 커밋됨 docs/engineering/goal-prompts/humansearch-journey-kickoff-2026-09-07.md\nPASS: CI 배선 2건 — 이름과 명령이 같은 스텝에서 일치하고 조건·오류무시 없음\nPASS: 판정 문서 docs/engineering/humansearch-kickoff-ledger-verdict-2026-09-10.md (VERDICT: PASS)\nCHECKED: 12\nOK(run-acceptance): scripts/acceptance-hs-kickoff.sh — 판정 12건, CHECKED 12\n"
+  },
+  {
+    "id": "hs0001-brief-checkpoint",
+    "command": [
+      "bash",
+      "/Users/kangsangmo/.claude/skills/strict/brief-lint.sh",
+      "docs/engineering/humansearch-hs0001-goal-2026-09-10.md",
+      "docs/engineering/evidence/hs0001-20260910/README.md",
+      "docs/engineering/humansearch-workflow-env-debt-2026-09-10.md"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+    "started": "2026-09-09T21:30:19.121053+00:00",
+    "elapsed": 0.04440100002102554,
+    "exit_code": 0,
+    "session": "hs-next-20260910",
+    "commit": "16e5d649dbd257e6d01318c1a8fb0fbe8e731596",
+    "output_file": "hs0001-brief-checkpoint.log",
+    "output": "=== docs/engineering/humansearch-hs0001-goal-2026-09-10.md ===\n  코드블록 0개 · 표 0개 (면제 0개) / 해석 누락 0개\n  1층(결론): 줄 3 / 본문 82자\n  1층 기술 표기: 없음 (※ 한글 전문용어는 못 잡는다 — 사람이 본다)\n  결정 카드 2건 (※ 내용이 판단에 쓸 만한지는 못 잰다 — 사람이 본다)\n  증거 보관 경로: 임시 외 실재 파일 4건 (※ 그 파일이 이 주장의 증거인지는 못 잰다)\n=== docs/engineering/evidence/hs0001-20260910/README.md ===\n  코드블록 0개 · 표 0개 (면제 0개) / 해석 누락 0개\n  1층(결론): 줄 3 / 본문 52자\n  1층 기술 표기: 없음 (※ 한글 전문용어는 못 잡는다 — 사람이 본다)\n  결정 카드: 없음\n  증거 보관 경로: 임시 외 실재 파일 1건 (※ 그 파일이 이 주장의 증거인지는 못 잰다)\n=== docs/engineering/humansearch-workflow-env-debt-2026-09-10.md ===\n  코드블록 0개 · 표 0개 (면제 0개) / 해석 누락 0개\n  1층(결론): 줄 3 / 본문 82자\n  1층 기술 표기: 없음 (※ 한글 전문용어는 못 잡는다 — 사람이 본다)\n  결정 카드 1건 (※ 내용이 판단에 쓸 만한지는 못 잰다 — 사람이 본다)\n  증거 보관 경로: 임시 외 실재 파일 0건 (※ 그 파일이 이 주장의 증거인지는 못 잰다)\n\n브리핑 계약 기계 검사: 위반 0건 (문서 3개)\n\n이 검사가 못 보는 것 (사람이 봐야 하는 것):\n  · 설명이 실제로 말이 되는지 — 출력과 무관한 문장도 통과한다\n  · 결정 카드 내용이 판단에 쓸 만한지 — 한 글자여도 통과한다\n  · 증거 파일이 그 주장과 관련 있는지 — 존재하기만 하면 통과한다\n  · 결론이 쉬운 말인지 — 한글 전문용어는 잡지 못한다\n  ※ 이 검사는 홈 폴더에만 있어 서버 자동 검사에 없다 — 회사 차원의 합격 근거가 아니다(P15③).\n"
+  },
+  {
+    "id": "hs0001-green-commit",
+    "command": [
+      "git",
+      "commit",
+      "-F",
+      "artifacts/hs-next-20260910/green-commit-message.txt"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+    "started": "2026-09-09T21:33:55.092075+00:00",
+    "elapsed": 9.607570125022903,
+    "exit_code": 1,
+    "session": "hs-next-20260910",
+    "commit": "16e5d649dbd257e6d01318c1a8fb0fbe8e731596",
+    "output_file": "hs0001-green-commit.log",
+    "output": "BLOCKED: 산출물·데이터 경로는 커밋하지 않는다 — docs/engineering/evidence/hs0001-20260910/v1-cli-public.jsonl (P21 · 후보자 PII)\nBLOCKED: 산출물·데이터 경로는 커밋하지 않는다 — docs/engineering/evidence/hs0001-20260910/v1-final-cli-public.jsonl (P21 · 후보자 PII)\n"
+  }
+]

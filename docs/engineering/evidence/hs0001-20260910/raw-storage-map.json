@@ -1,0 +1,13 @@
+{
+  "v1-evidence.log": "v1-evidence.log.json",
+  "v2-evidence.log": "v2-evidence.log.json",
+  "v2-f1-f4-evidence.log": "v2-f1-f4-evidence.log.json",
+  "v1-experiments.sh": "v1-experiments.sh.json",
+  "v1-verdict.md": "v1-verdict.md.json",
+  "codeaudit-reconsideration.md": "codeaudit-reconsideration.md.json",
+  "v1-final-mutants.py": "v1-final-mutants.py.json",
+  "codeaudit-final-recheck.json": "codeaudit-final-recheck.raw.json",
+  "status-red-diagnosis.json": "status-red-diagnosis.raw.json",
+  "v1-cli-public.jsonl": "v1-cli-public.json",
+  "v1-final-cli-public.jsonl": "v1-final-cli-public.json"
+}

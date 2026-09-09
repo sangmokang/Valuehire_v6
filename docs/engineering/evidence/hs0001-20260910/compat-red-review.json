@@ -1,0 +1,382 @@
+{
+  "created_at_utc": "2026-09-09T20:48:42.971049Z",
+  "purpose": "Preserve compat RED independent-review evidence and distinguish it from a later fresh rerun after parser/product changed.",
+  "verdict": "PRIOR_RED_EVIDENCE_PRESERVED__CURRENT_RERUN_IS_GREEN",
+  "prior_red_review": {
+    "source": "Raw tool output captured in the immediately preceding independent review turn before product/parser changed. This section preserves that output rather than using the later GREEN rerun as RED evidence.",
+    "head": "e2404d3732dfe6167907ebd5a1d76a7aa02ea26b",
+    "branch": "task/hs-0001-20260910",
+    "fingerprints_at_prior_red_review": {
+      "artifacts/hs-next-20260910/compat-draft.py": {
+        "lines": 55,
+        "bytes": 1521,
+        "sha256": "0662357ecb0570bee47983b71afb968644ff22a5de7cd74a0ad550cf41a63070"
+      },
+      "artifacts/hs-next-20260910/compat-draft-evidence.json": {
+        "lines": 91,
+        "bytes": 7506,
+        "sha256": "9403dda01c3b466b4c27fcee0e9839c7d8ada130ea2907bf959f5b97f32ac7ee"
+      },
+      "scripts/acceptance-hs-kickoff.sh": {
+        "lines": 225,
+        "bytes": 12383,
+        "sha256": "58262dbce5b40aead6d57da29f03bbf7860d05d1c0923b1a764f514d1eb2740b"
+      },
+      "scripts/verify/list-workflow-steps.py": {
+        "lines": 165,
+        "bytes": 7505,
+        "sha256": "a02cd98cc6afcc7a32ebeffc4ce942a5fa68c5bbd5d7ce389b99c56ae04a3263"
+      }
+    },
+    "commands": [
+      {
+        "command": [
+          "humansearch/.venv/bin/ruff",
+          "check",
+          "artifacts/hs-next-20260910/compat-draft.py"
+        ],
+        "started_at_utc": "2026-09-09T20:43:15.108905Z",
+        "ended_at_utc": "2026-09-09T20:43:15.158561Z",
+        "returncode": 0,
+        "stdout": "All checks passed!\n",
+        "stderr": ""
+      },
+      {
+        "command": [
+          "humansearch/.venv/bin/mypy",
+          "--strict",
+          "--python-executable",
+          "humansearch/.venv/bin/python",
+          "artifacts/hs-next-20260910/compat-draft.py"
+        ],
+        "started_at_utc": "2026-09-09T20:43:15.158936Z",
+        "ended_at_utc": "2026-09-09T20:43:15.408079Z",
+        "returncode": 0,
+        "stdout": "Success: no issues found in 1 source file\n",
+        "stderr": ""
+      },
+      {
+        "command": [
+          "humansearch/.venv/bin/pytest",
+          "--collect-only",
+          "-q",
+          "artifacts/hs-next-20260910/compat-draft.py"
+        ],
+        "started_at_utc": "2026-09-09T20:43:15.408263Z",
+        "ended_at_utc": "2026-09-09T20:43:15.821756Z",
+        "returncode": 0,
+        "stdout": "artifacts/hs-next-20260910/compat-draft.py::test_hs_kickoff_accepts_latest_main_ci_concurrency_and_job_timeout\n\n1 test collected in 0.13s\n",
+        "stderr": ""
+      },
+      {
+        "command": [
+          "humansearch/.venv/bin/pytest",
+          "artifacts/hs-next-20260910/compat-draft.py",
+          "-q",
+          "--tb=short"
+        ],
+        "started_at_utc": "2026-09-09T20:43:15.822044Z",
+        "ended_at_utc": "2026-09-09T20:43:20.357226Z",
+        "returncode": 1,
+        "stdout": "F                                                                        [100%]\n=================================== FAILURES ===================================\n______ test_hs_kickoff_accepts_latest_main_ci_concurrency_and_job_timeout ______\nartifacts/hs-next-20260910/compat-draft.py:53: in test_hs_kickoff_accepts_latest_main_ci_concurrency_and_job_timeout\n    assert result.returncode == 0, result.stdout + result.stderr\nE   AssertionError: PASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nE     PASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nE     PASS: 처분 PR #15 → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nE     PASS: 처분 task/hs-d1-permit → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nE     PASS: 처분 task/hs-l1-malformed-url-fix → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nE     PASS: 처분 task/hs-observe-url-crash → 결론=폐기 (근거 경로 2 건·커밋 0 건)\nE     FAIL: 워크플로를 정규 형식으로 읽지 못했다 — 형식 위반: 잡 수준 키 'timeout-minutes' (22행). runs-on 과 steps 만 쓴다 — 조건·기본 셸·전략으로 스텝 전체를 끌 수 있다\nE     PASS: 역사 기록 보존 resume-evidence-supabase-archive-goal-2026-08-17.md\nE     PASS: 역사 기록 보존 resume-evidence-supabase-implementation-prompt-2026-08-17.md\nE     PASS: 착수 프롬프트 커밋됨 docs/engineering/goal-prompts/humansearch-journey-kickoff-2026-09-07.md\nE     FAIL: CI 배선 불량 — 워크플로를 정규 형식으로 읽지 못했다\nE     PASS: 판정 문서 docs/engineering/humansearch-kickoff-ledger-verdict-0000-00-00.md (VERDICT: PASS)\nE     CHECKED: 12\nE     FAIL(run-acceptance): scripts/acceptance-hs-kickoff.sh 종료값 1\nE     \nE   assert 1 == 0\nE    +  where 1 = Result(returncode=1, stdout=\"PASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\\...0000-00-00.md (VERDICT: PASS)\nCHECKED: 12\nFAIL(run-acceptance): scripts/acceptance-hs-kickoff.sh 종료값 1\n\", stderr='').returncode\n=========================== short test summary info ============================\nFAILED artifacts/hs-next-20260910/compat-draft.py::test_hs_kickoff_accepts_latest_main_ci_concurrency_and_job_timeout\n1 failed in 4.32s\n",
+        "stderr": ""
+      },
+      {
+        "command": [
+          "humansearch/.venv/bin/pytest",
+          "humansearch/tests/test_hs_0001.py",
+          "-q",
+          "--tb=short"
+        ],
+        "started_at_utc": "2026-09-09T20:43:20.357467Z",
+        "ended_at_utc": "2026-09-09T20:43:25.482272Z",
+        "returncode": 0,
+        "stdout": ".......                                                                  [100%]\n7 passed in 4.89s\n",
+        "stderr": ""
+      },
+      {
+        "command": [
+          "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910/humansearch/.venv/bin/pytest",
+          "--collect-only",
+          "-q",
+          "humansearch/tests/test_hs_0001_main_compat.py"
+        ],
+        "started_at_utc": "2026-09-09T20:43:27.123572Z",
+        "ended_at_utc": "2026-09-09T20:43:27.453480Z",
+        "returncode": 0,
+        "stdout": "tests/test_hs_0001_main_compat.py::test_hs_kickoff_accepts_latest_main_ci_concurrency_and_job_timeout\n\n1 test collected in 0.11s\n",
+        "stderr": "",
+        "note": {
+          "temp_target": "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0001-compat-review-ejbrcp03/repo/humansearch/tests/test_hs_0001_main_compat.py"
+        }
+      },
+      {
+        "command": [
+          "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910/humansearch/.venv/bin/pytest",
+          "humansearch/tests/test_hs_0001_main_compat.py",
+          "-q",
+          "--tb=short"
+        ],
+        "started_at_utc": "2026-09-09T20:43:27.453697Z",
+        "ended_at_utc": "2026-09-09T20:43:28.395139Z",
+        "returncode": 1,
+        "stdout": "F                                                                        [100%]\n=================================== FAILURES ===================================\n______ test_hs_kickoff_accepts_latest_main_ci_concurrency_and_job_timeout ______\nhumansearch/tests/test_hs_0001_main_compat.py:53: in test_hs_kickoff_accepts_latest_main_ci_concurrency_and_job_timeout\n    assert result.returncode == 0, result.stdout + result.stderr\nE   AssertionError: PASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nE     PASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nE     PASS: 처분 PR #15 → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nE     PASS: 처분 task/hs-d1-permit → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nE     PASS: 처분 task/hs-l1-malformed-url-fix → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nE     PASS: 처분 task/hs-observe-url-crash → 결론=폐기 (근거 경로 2 건·커밋 0 건)\nE     FAIL: 워크플로를 정규 형식으로 읽지 못했다 — 형식 위반: 잡 수준 키 'timeout-minutes' (22행). runs-on 과 steps 만 쓴다 — 조건·기본 셸·전략으로 스텝 전체를 끌 수 있다\nE     PASS: 역사 기록 보존 resume-evidence-supabase-archive-goal-2026-08-17.md\nE     PASS: 역사 기록 보존 resume-evidence-supabase-implementation-prompt-2026-08-17.md\nE     PASS: 착수 프롬프트 커밋됨 docs/engineering/goal-prompts/humansearch-journey-kickoff-2026-09-07.md\nE     FAIL: CI 배선 불량 — 워크플로를 정규 형식으로 읽지 못했다\nE     PASS: 판정 문서 docs/engineering/humansearch-kickoff-ledger-verdict-0000-00-00.md (VERDICT: PASS)\nE     CHECKED: 12\nE     FAIL(run-acceptance): scripts/acceptance-hs-kickoff.sh 종료값 1\nE     \nE   assert 1 == 0\nE    +  where 1 = Result(returncode=1, stdout=\"PASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\\...0000-00-00.md (VERDICT: PASS)\nCHECKED: 12\nFAIL(run-acceptance): scripts/acceptance-hs-kickoff.sh 종료값 1\n\", stderr='').returncode\n=========================== short test summary info ============================\nFAILED humansearch/tests/test_hs_0001_main_compat.py::test_hs_kickoff_accepts_latest_main_ci_concurrency_and_job_timeout\n1 failed in 0.74s\n",
+        "stderr": "",
+        "note": {
+          "temp_target": "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0001-compat-review-ejbrcp03/repo/humansearch/tests/test_hs_0001_main_compat.py"
+        }
+      }
+    ],
+    "prior_verdict": "PASS_FOR_TESTS_ONLY_RED_COMMIT_EVIDENCE_AT_THAT_WORKTREE_STATE"
+  },
+  "current_fresh_rerun_after_workspace_changed": {
+    "created_at_utc": "2026-09-09T20:46:45.805861Z",
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+    "head": "16e5d649dbd257e6d01318c1a8fb0fbe8e731596",
+    "branch": "task/hs-0001-20260910",
+    "status_before": {
+      "returncode": 0,
+      "stdout": "## task/hs-0001-20260910\nM  docs/sot/verification-commands.md\nM  scripts/acceptance-hs-gates-antiforge.sh\nM  scripts/acceptance-hs-gates-mutations.sh\nM  scripts/acceptance-hs-kickoff.sh\nM  scripts/verify/list-workflow-steps.py\n?? docs/engineering/evidence/hs0001-20260910/\n?? docs/engineering/goal-prompts/humansearch-next-execution-2026-09-10.md\n?? docs/engineering/humansearch-hs0001-goal-2026-09-10.md\n?? docs/engineering/humansearch-kickoff-ledger-verdict-2026-09-10.md\n?? docs/engineering/humansearch-next-issues-wu-2026-09-10.md\n",
+      "stderr": ""
+    },
+    "status_after": {
+      "returncode": 0,
+      "stdout": "## task/hs-0001-20260910\nM  docs/sot/verification-commands.md\nM  scripts/acceptance-hs-gates-antiforge.sh\nM  scripts/acceptance-hs-gates-mutations.sh\nM  scripts/acceptance-hs-kickoff.sh\nM  scripts/verify/list-workflow-steps.py\n?? docs/engineering/evidence/hs0001-20260910/\n?? docs/engineering/goal-prompts/humansearch-next-execution-2026-09-10.md\n?? docs/engineering/humansearch-hs0001-goal-2026-09-10.md\n?? docs/engineering/humansearch-kickoff-ledger-verdict-2026-09-10.md\n?? docs/engineering/humansearch-next-issues-wu-2026-09-10.md\n",
+      "stderr": ""
+    },
+    "fingerprints_before": {
+      "artifacts/hs-next-20260910/compat-draft.py": {
+        "path": "artifacts/hs-next-20260910/compat-draft.py",
+        "exists": true,
+        "lines": 55,
+        "bytes": 1521,
+        "sha256": "0662357ecb0570bee47983b71afb968644ff22a5de7cd74a0ad550cf41a63070"
+      },
+      "artifacts/hs-next-20260910/compat-draft-evidence.json": {
+        "path": "artifacts/hs-next-20260910/compat-draft-evidence.json",
+        "exists": true,
+        "lines": 91,
+        "bytes": 7506,
+        "sha256": "9403dda01c3b466b4c27fcee0e9839c7d8ada130ea2907bf959f5b97f32ac7ee"
+      },
+      "scripts/acceptance-hs-kickoff.sh": {
+        "path": "scripts/acceptance-hs-kickoff.sh",
+        "exists": true,
+        "lines": 225,
+        "bytes": 12383,
+        "sha256": "58262dbce5b40aead6d57da29f03bbf7860d05d1c0923b1a764f514d1eb2740b"
+      },
+      "scripts/verify/list-workflow-steps.py": {
+        "path": "scripts/verify/list-workflow-steps.py",
+        "exists": true,
+        "lines": 167,
+        "bytes": 7764,
+        "sha256": "5bf585f31b1ae2fa6915e82606bf8b0b2a1cd3a317d890bfcd6bdc6d541bd28f"
+      },
+      "humansearch/tests/test_hs_0001.py": {
+        "path": "humansearch/tests/test_hs_0001.py",
+        "exists": true,
+        "lines": 177,
+        "bytes": 6202,
+        "sha256": "5e84ee466466147ca377b08928bfd04593184e519dc54677a6dd8fe1c31278bf"
+      }
+    },
+    "fingerprints_after": {
+      "artifacts/hs-next-20260910/compat-draft.py": {
+        "path": "artifacts/hs-next-20260910/compat-draft.py",
+        "exists": true,
+        "lines": 55,
+        "bytes": 1521,
+        "sha256": "0662357ecb0570bee47983b71afb968644ff22a5de7cd74a0ad550cf41a63070"
+      },
+      "artifacts/hs-next-20260910/compat-draft-evidence.json": {
+        "path": "artifacts/hs-next-20260910/compat-draft-evidence.json",
+        "exists": true,
+        "lines": 91,
+        "bytes": 7506,
+        "sha256": "9403dda01c3b466b4c27fcee0e9839c7d8ada130ea2907bf959f5b97f32ac7ee"
+      },
+      "scripts/acceptance-hs-kickoff.sh": {
+        "path": "scripts/acceptance-hs-kickoff.sh",
+        "exists": true,
+        "lines": 225,
+        "bytes": 12383,
+        "sha256": "58262dbce5b40aead6d57da29f03bbf7860d05d1c0923b1a764f514d1eb2740b"
+      },
+      "scripts/verify/list-workflow-steps.py": {
+        "path": "scripts/verify/list-workflow-steps.py",
+        "exists": true,
+        "lines": 167,
+        "bytes": 7764,
+        "sha256": "5bf585f31b1ae2fa6915e82606bf8b0b2a1cd3a317d890bfcd6bdc6d541bd28f"
+      },
+      "humansearch/tests/test_hs_0001.py": {
+        "path": "humansearch/tests/test_hs_0001.py",
+        "exists": true,
+        "lines": 177,
+        "bytes": 6202,
+        "sha256": "5e84ee466466147ca377b08928bfd04593184e519dc54677a6dd8fe1c31278bf"
+      }
+    },
+    "changed_fingerprints": {},
+    "commands": [
+      {
+        "command": [
+          "humansearch/.venv/bin/ruff",
+          "check",
+          "artifacts/hs-next-20260910/compat-draft.py"
+        ],
+        "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+        "started_at_utc": "2026-09-09T20:46:45.863060Z",
+        "ended_at_utc": "2026-09-09T20:46:45.897941Z",
+        "returncode": 0,
+        "stdout": "All checks passed!\n",
+        "stderr": ""
+      },
+      {
+        "command": [
+          "humansearch/.venv/bin/mypy",
+          "--strict",
+          "--python-executable",
+          "humansearch/.venv/bin/python",
+          "artifacts/hs-next-20260910/compat-draft.py"
+        ],
+        "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+        "started_at_utc": "2026-09-09T20:46:45.898069Z",
+        "ended_at_utc": "2026-09-09T20:46:46.127816Z",
+        "returncode": 0,
+        "stdout": "Success: no issues found in 1 source file\n",
+        "stderr": ""
+      },
+      {
+        "command": [
+          "humansearch/.venv/bin/pytest",
+          "--collect-only",
+          "-q",
+          "artifacts/hs-next-20260910/compat-draft.py"
+        ],
+        "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+        "started_at_utc": "2026-09-09T20:46:46.127992Z",
+        "ended_at_utc": "2026-09-09T20:46:46.531980Z",
+        "returncode": 0,
+        "stdout": "artifacts/hs-next-20260910/compat-draft.py::test_hs_kickoff_accepts_latest_main_ci_concurrency_and_job_timeout\n\n1 test collected in 0.13s\n",
+        "stderr": ""
+      },
+      {
+        "command": [
+          "humansearch/.venv/bin/pytest",
+          "artifacts/hs-next-20260910/compat-draft.py",
+          "-q",
+          "--tb=short"
+        ],
+        "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+        "started_at_utc": "2026-09-09T20:46:46.533111Z",
+        "ended_at_utc": "2026-09-09T20:46:47.675793Z",
+        "returncode": 0,
+        "stdout": ".                                                                        [100%]\n1 passed in 0.91s\n",
+        "stderr": ""
+      },
+      {
+        "command": [
+          "humansearch/.venv/bin/pytest",
+          "humansearch/tests/test_hs_0001.py",
+          "-q",
+          "--tb=short"
+        ],
+        "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+        "started_at_utc": "2026-09-09T20:46:47.676094Z",
+        "ended_at_utc": "2026-09-09T20:46:52.845414Z",
+        "returncode": 0,
+        "stdout": ".......                                                                  [100%]\n7 passed in 4.96s\n",
+        "stderr": ""
+      },
+      {
+        "command": [
+          "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910/humansearch/.venv/bin/pytest",
+          "--collect-only",
+          "-q",
+          "humansearch/tests/test_hs_0001_main_compat.py"
+        ],
+        "cwd": "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0001-compat-red-review-jduuq9xk/repo",
+        "started_at_utc": "2026-09-09T20:46:53.866049Z",
+        "ended_at_utc": "2026-09-09T20:46:54.233699Z",
+        "returncode": 0,
+        "stdout": "tests/test_hs_0001_main_compat.py::test_hs_kickoff_accepts_latest_main_ci_concurrency_and_job_timeout\n\n1 test collected in 0.11s\n",
+        "stderr": "",
+        "note": {
+          "temp_repo": "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0001-compat-red-review-jduuq9xk/repo",
+          "copied_to": "humansearch/tests/test_hs_0001_main_compat.py",
+          "copied_sha256": "0662357ecb0570bee47983b71afb968644ff22a5de7cd74a0ad550cf41a63070"
+        }
+      },
+      {
+        "command": [
+          "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910/humansearch/.venv/bin/pytest",
+          "humansearch/tests/test_hs_0001_main_compat.py",
+          "-q",
+          "--tb=short"
+        ],
+        "cwd": "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0001-compat-red-review-jduuq9xk/repo",
+        "started_at_utc": "2026-09-09T20:46:54.233866Z",
+        "ended_at_utc": "2026-09-09T20:46:58.175782Z",
+        "returncode": 0,
+        "stdout": ".                                                                        [100%]\n1 passed in 3.71s\n",
+        "stderr": "",
+        "note": {
+          "temp_repo": "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0001-compat-red-review-jduuq9xk/repo",
+          "copied_to": "humansearch/tests/test_hs_0001_main_compat.py",
+          "copied_sha256": "0662357ecb0570bee47983b71afb968644ff22a5de7cd74a0ad550cf41a63070"
+        }
+      }
+    ],
+    "verdict": {
+      "verdict": "PASS_FOR_TESTS_ONLY_RED_COMMIT_EVIDENCE",
+      "claim_checked": "compat-draft.py locks a positive compatibility case: latest main PR70 top-level concurrency plus job-level timeout-minutes: 30 should be accepted, but current parser rejects job timeout exactly, producing RED.",
+      "result": "The draft is syntactically/type/collection valid; current behavior fails only because run_acceptance returns 1 after list-workflow-steps rejects job-level timeout-minutes. Existing base regression remains 7 PASS. Copying bytes to humansearch/tests/test_hs_0001_main_compat.py in a temp repo still imports and collects, then fails for the same behavior RED.",
+      "not_a_verdict_on_product_fix": true
+    },
+    "key_observations": [
+      "compat-draft.py line 53 asserts result.returncode == 0 for the latest-main concurrency + job timeout fixture.",
+      "Fresh pytest failure contains FAIL: 워크플로를 정규 형식으로 읽지 못했다 — 형식 위반: 잡 수준 키 'timeout-minutes' (22행).",
+      "Fresh pytest failure contains CHECKED: 12 and FAIL(run-acceptance), so this is acceptance behavior RED, not collection/import/syntax failure.",
+      "Temp-copy placement under humansearch/tests/test_hs_0001_main_compat.py collected successfully and failed for the same timeout-minutes rejection."
+    ]
+  },
+  "current_fingerprints_now": {
+    "artifacts/hs-next-20260910/compat-draft.py": {
+      "path": "artifacts/hs-next-20260910/compat-draft.py",
+      "lines": 55,
+      "bytes": 1521,
+      "sha256": "0662357ecb0570bee47983b71afb968644ff22a5de7cd74a0ad550cf41a63070"
+    },
+    "artifacts/hs-next-20260910/compat-draft-evidence.json": {
+      "path": "artifacts/hs-next-20260910/compat-draft-evidence.json",
+      "lines": 91,
+      "bytes": 7506,
+      "sha256": "9403dda01c3b466b4c27fcee0e9839c7d8ada130ea2907bf959f5b97f32ac7ee"
+    },
+    "scripts/acceptance-hs-kickoff.sh": {
+      "path": "scripts/acceptance-hs-kickoff.sh",
+      "lines": 225,
+      "bytes": 12383,
+      "sha256": "58262dbce5b40aead6d57da29f03bbf7860d05d1c0923b1a764f514d1eb2740b"
+    },
+    "scripts/verify/list-workflow-steps.py": {
+      "path": "scripts/verify/list-workflow-steps.py",
+      "lines": 167,
+      "bytes": 7764,
+      "sha256": "5bf585f31b1ae2fa6915e82606bf8b0b2a1cd3a317d890bfcd6bdc6d541bd28f"
+    },
+    "humansearch/tests/test_hs_0001.py": {
+      "path": "humansearch/tests/test_hs_0001.py",
+      "lines": 177,
+      "bytes": 6202,
+      "sha256": "5e84ee466466147ca377b08928bfd04593184e519dc54677a6dd8fe1c31278bf"
+    }
+  },
+  "interpretation": [
+    "The original independent review approved compat-draft.py as RED evidence at list-workflow-steps.py sha a02cd98c... because pytest failed on exact job-level timeout-minutes rejection.",
+    "During preservation, a fresh rerun observed list-workflow-steps.py sha 5bf585f... and compat tests passed, so the current rerun is not RED evidence.",
+    "The draft artifact sha stayed 0662357..., and the evidence draft sha stayed 9403dda..., so the preserved RED/now-GREEN difference is explained by product/parser workspace changes, not by compat-draft.py changing."
+  ]
+}

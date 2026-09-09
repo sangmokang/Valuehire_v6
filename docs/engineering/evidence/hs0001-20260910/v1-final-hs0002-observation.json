@@ -1,0 +1,14 @@
+{
+ "label": "hs0002-observation",
+ "command": [
+  "bash",
+  "artifacts/hs-next-20260910/v1-final-hs0002-observation.sh"
+ ],
+ "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+ "started": "2026-09-09T21:10:55.171982+00:00",
+ "ended": "2026-09-09T21:10:55.244151+00:00",
+ "exit_code": 0,
+ "stdout": "--- mutated reader on the untouched candidate verify.yml:\nrc=2\n--- test expectation for 'top defaults run shell is rejected': substring '워크플로를 정규 형식으로 읽지 못했다' (present above regardless of which top key tripped)\n",
+ "stderr": "형식 위반: 최상위 키 'name' (1행). 실행 환경 변경은 허용하지 않는다\n",
+ "head": "16e5d649dbd257e6d01318c1a8fb0fbe8e731596"
+}

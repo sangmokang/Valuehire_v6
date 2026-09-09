@@ -1,0 +1,15 @@
+{
+ "label": "static-bash-n",
+ "command": [
+  "bash",
+  "-c",
+  "for f in scripts/acceptance-hs-kickoff.sh scripts/acceptance-hs-kickoff-mutations.sh scripts/acceptance-hs-gates-mutations.sh scripts/acceptance-hs-gates-antiforge.sh; do bash -n \"$f\" && echo \"OK bash -n $f\"; done; python3 -m py_compile scripts/verify/list-workflow-steps.py && echo \"OK py_compile\""
+ ],
+ "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+ "started": "2026-09-09T21:02:55.452995+00:00",
+ "ended": "2026-09-09T21:02:55.517140+00:00",
+ "exit_code": 0,
+ "stdout": "OK bash -n scripts/acceptance-hs-kickoff.sh\nOK bash -n scripts/acceptance-hs-kickoff-mutations.sh\nOK bash -n scripts/acceptance-hs-gates-mutations.sh\nOK bash -n scripts/acceptance-hs-gates-antiforge.sh\nOK py_compile\n",
+ "stderr": "",
+ "head": "16e5d649dbd257e6d01318c1a8fb0fbe8e731596"
+}

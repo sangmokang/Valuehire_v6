@@ -1,0 +1,10 @@
+{
+  "reviewer": "Codex native fresh-context /root/hs0001_v2_final",
+  "scope": "same-UID local review, not OS/P17 receipt",
+  "source": "v2-final-recheck-verdict.md",
+  "sha256": "49bdab20f725adfa0db61f1757b96ed7cbc879def40adcd63f62fff5c48da96b",
+  "current_verdict_file": "docs/engineering/humansearch-kickoff-ledger-verdict-2026-09-10.md",
+  "authoring": "reviewer authored; root copied exact bytes",
+  "previous_fail_preserved": "v2-verdict-formatted.md",
+  "candidate_fingerprints": "final-candidate-files.json"
+}

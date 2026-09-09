@@ -1,0 +1,14 @@
+{
+ "label": "budget-independent-ast",
+ "command": [
+  "python3",
+  "artifacts/hs-next-20260910/v1-final-ast-measure.py"
+ ],
+ "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+ "started": "2026-09-09T21:03:15.975323+00:00",
+ "ended": "2026-09-09T21:03:16.064315+00:00",
+ "exit_code": 0,
+ "stdout": "scripts/acceptance-hs-kickoff.sh: 225 lines -> OK\nscripts/acceptance-hs-kickoff-mutations.sh: 593 lines -> OK (soft300 exceeded)\nscripts/verify/list-workflow-steps.py: 167 lines -> OK\n   def fail: 3 lines -> OK\n   def main: 44 lines -> OK\n   def list_steps: 83 lines -> OK (soft60 exceeded)\nscripts/acceptance-hs-gates-mutations.sh: 138 lines -> OK\nscripts/acceptance-hs-gates-antiforge.sh: 145 lines -> OK\nhumansearch/tests/test_hs_0001.py: 177 lines -> OK\n   def clean_env: 6 lines -> OK\n   def copy_fixture: 21 lines -> OK\n   def run_acceptance: 10 lines -> OK\n   def replace_once: 4 lines -> OK\n   def insert_before: 2 lines -> OK\n   def mutate_step_shell: 3 lines -> OK\n   def mutate_default_shell: 2 lines -> OK\n   def mutate_step_bash_env: 9 lines -> OK\n   def mutate_top_bash_env: 4 lines -> OK\n   def mutate_pr_131: 6 lines -> OK\n   def mutate_verdict_passed: 2 lines -> OK\n   def fail_lines: 3 lines -> OK\n   def assert_rejected: 5 lines -> OK\n   def test_clean_hs_kickoff_fixture_passes: 8 lines -> OK\n   def test_hs_kickoff_rejects_false_passes_in_workflow_contract: 9 lines -> OK\nhumansearch/tests/test_hs_0001_main_compat.py: 55 lines -> OK\n   def add_latest_main_ci_controls: 4 lines -> OK\n   def test_hs_kickoff_accepts_latest_main_ci_concurrency_and_job_timeout: 11 lines -> OK\ndocs/sot/verification-commands.md: 90 lines -> OK\n.github/workflows/verify.yml: 287 lines -> OK\nINDEX blob functions: [('fail', 3), ('main', 44), ('list_steps', 83)]\nHEAD blob functions: [('fail', 3), ('main', 116)]\n",
+ "stderr": "",
+ "head": "16e5d649dbd257e6d01318c1a8fb0fbe8e731596"
+}

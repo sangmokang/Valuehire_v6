@@ -1,0 +1,15 @@
+{
+ "label": "g2-boundary-with",
+ "command": [
+  "bash",
+  "artifacts/hs-next-20260910/v1-final-g2-boundary.sh",
+  "with"
+ ],
+ "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+ "started": "2026-09-09T21:09:34.695658+00:00",
+ "ended": "2026-09-09T21:09:57.181410+00:00",
+ "exit_code": 0,
+ "stdout": "SANDBOX=/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/v1final-g2-with.AKpEUqofxj MODE=with\nROOT seen by test = /var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/v1final-g2-with.AKpEUqofxj\n/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/v1final-g2-with.AKpEUqofxj/.github/workflows/verify.yml\nPASS: ruff clean in 43 python files\nPASS: mypy strict clean in 43 source files\nPASS: pytest collected 219 and passed\nPASS: runtime import proof /var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/v1final-g2-with.AKpEUqofxj/case-1/src/humansearch/__init__.py\nCOLLECTED: 219\nGATES_RC=0\n",
+ "stderr": "",
+ "head": "16e5d649dbd257e6d01318c1a8fb0fbe8e731596"
+}

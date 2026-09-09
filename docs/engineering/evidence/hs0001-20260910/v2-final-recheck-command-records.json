@@ -1,0 +1,44 @@
+{
+  "created": "2026-09-09T21:24:44.005110+00:00",
+  "records": [
+    {
+      "label": "probes13",
+      "command": [
+        "python3",
+        "artifacts/hs-next-20260910/v2-final-recheck-probes.py"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+      "started": "2026-09-09T21:24:34.338492+00:00",
+      "ended": "2026-09-09T21:24:43.722886+00:00",
+      "exit_code": 0,
+      "stdout": "p01_earlier_step_writes_BASH_ENV_to_GITHUB_ENV: acceptance rc=0 ci-integrity rc=0 :: PASS: 판정 문서 docs/engineering/humansearch-kickoff-ledger-verdict-0000-00-00.md (VERDICT: PASS)\np02_shell_key_on_dash_line: acceptance rc=1 ci-integrity rc=0 :: FAIL: CI 배선 불량 — 본 검사=약화 자기 변이=OK | PASS: 판정 문서 docs/engineering/humansearch-kickoff-ledger-verdict-0000-00-00.md (VERDICT: PASS)\np03_quoted_on_key_legit_yaml: acceptance rc=1 ci-integrity rc=0 :: FAIL: 워크플로를 정규 형식으로 읽지 못했다 — 형식 위반: 최상위 키 '\"on\"' (5행). 실행 환경 변경은 허용하지 않는다 | FAIL: CI 배선 불량 — 워크플로를 정규 형식으로 읽지 못했다 | PASS: 판정 문서 docs/engineering/humansearch-kickoff-ledger-verdict-0000-00-00.md (VERDICT: PASS)\np04_two_verdict_files_fail_and_pass: acceptance rc=0 ci-integrity rc=0 :: PASS: 판정 문서 docs/engineering/humansearch-kickoff-ledger-verdict-0000-00-00.md (VERDICT: PASS)\np05_job_level_env_BASH_ENV: acceptance rc=1 ci-integrity rc=0 :: FAIL: 워크플로를 정규 형식으로 읽지 못했다 — 형식 위반: 잡 수준 키 'env' (17행). runs-on·steps·정수 시간 제한만 쓴다 — 조건·기본 셸·전략으로 스텝 전체를 끌 수 있다 | FAIL: CI 배선 불량 — 워크플로를 정규 형식으로 읽지 못했다 | PASS: 판정 문서 docs/engineering/humansearch-kickoff-ledger-verdict-0000-00-00.md (VERDICT: PASS)\np06_top_defaults_after_comment: acceptance rc=1 ci-integrity rc=0 :: FAIL: 워크플로를 정규 형식으로 읽지 못했다 — 형식 위반: 최상위 키 'defaults' (15행). 실행 환경 변경은 허용하지 않는다 | FAIL: CI 배선 불량 — 워크플로를 정규 형식으로 읽지 못했다 | PASS: 판정 문서 docs/engineering/humansearch-kickoff-ledger-verdict-0000-00-00.md (VERDICT: PASS)\np07_step_working_directory: acceptance rc=1 ci-integrity rc=0 :: FAIL: CI 배선 불량 — 본 검사=약화 자기 변이=OK | PASS: 판정 문서 docs/engineering/humansearch-kickoff-ledger-verdict-0000-00-00.md (VERDICT: PASS)\np08_job_timeout_expression: acceptance rc=1 ci-integrity rc=0 :: FAIL: 워크플로를 정규 형식으로 읽지 못했다 — 형식 위반: 잡 시간 제한은 양의 정수여야 한다 (17행) | FAIL: CI 배선 불량 — 워크플로를 정규 형식으로 읽지 못했다 | PASS: 판정 문서 docs/engineering/humansearch-kickoff-ledger-verdict-0000-00-00.md (VERDICT: PASS)\np09_job_container: acceptance rc=1 ci-integrity rc=0 :: FAIL: 워크플로를 정규 형식으로 읽지 못했다 — 형식 위반: 잡 수준 키 'container' (17행). runs-on·steps·정수 시간 제한만 쓴다 — 조건·기본 셸·전략으로 스텝 전체를 끌 수 있다 | FAIL: CI 배선 불량 — 워크플로를 정규 형식으로 읽지 못했다 | PASS: 판정 문서 docs/engineering/humansearch-kickoff-ledger-verdict-0000-00-00.md (VERDICT: PASS)\np10_runs_on_windows: acceptance rc=0 ci-integrity rc=0 :: PASS: 판정 문서 docs/engineering/humansearch-kickoff-ledger-verdict-0000-00-00.md (VERDICT: PASS)\np11_step_timeout_zero: acceptance rc=0 ci-integrity rc=0 :: PASS: 판정 문서 docs/engineering/humansearch-kickoff-ledger-verdict-0000-00-00.md (VERDICT: PASS)\np12_if_false_regression: acceptance rc=1 ci-integrity rc=1 :: FAIL: CI 배선 불량 — 본 검사=약화 자기 변이=OK | PASS: 판정 문서 docs/engineering/humansearch-kickoff-ledger-verdict-0000-00-00.md (VERDICT: PASS)\np13_earlier_step_hijacks_bash_via_GITHUB_PATH: acceptance rc=0 ci-integrity rc=0 :: PASS: 판정 문서 docs/engineering/humansearch-kickoff-ledger-verdict-0000-00-00.md (VERDICT: PASS)\norig unchanged: True\n",
+      "stderr": ""
+    },
+    {
+      "label": "semantic-local",
+      "command": [
+        "bash",
+        "artifacts/hs-next-20260910/v2-final-recheck-semantic-local.sh"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+      "started": "2026-09-09T21:24:43.722928+00:00",
+      "ended": "2026-09-09T21:24:43.941635+00:00",
+      "exit_code": 0,
+      "stdout": "--- control: bash -e step-script.sh\nACCEPTANCE RAN\nCHECKED: 12\nstep-exit=0\n--- p01 emulation: BASH_ENV=bait bash -e step-script.sh\nstep-exit=0\n--- p13 emulation: PATH=fakebin:PATH /bin/bash -e run-body.sh (run body invokes 'bash ...')\nstep-exit=0\n--- which bash under hijacked PATH: /bin/bash\n",
+      "stderr": ""
+    },
+    {
+      "label": "hs0002-observation",
+      "command": [
+        "bash",
+        "artifacts/hs-next-20260910/v2-final-recheck-hs0002-observation.sh"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+      "started": "2026-09-09T21:24:43.941674+00:00",
+      "ended": "2026-09-09T21:24:44.005021+00:00",
+      "exit_code": 0,
+      "stdout": "--- mutated reader on the untouched candidate verify.yml:\nrc=2\n--- test expectation for 'top defaults run shell is rejected': substring '워크플로를 정규 형식으로 읽지 못했다' (present above regardless of which top key tripped)\n",
+      "stderr": "형식 위반: 최상위 키 'name' (1행). 실행 환경 변경은 허용하지 않는다\n"
+    }
+  ]
+}

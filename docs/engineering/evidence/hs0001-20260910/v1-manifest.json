@@ -1,0 +1,11 @@
+{
+  "v1-cli.log": "635e6d669cd142b0b180cb20629c382e98815d054889bae7b9bb7aa41a78c6f5",
+  "v1-cli.json": "466a5373ddaa648e7fb5c7ca500dfcd590979f20b177ed383eddfeaebbae6ec2",
+  "v1-verdict.md": "e894ba0a942c0a5f2161801fbc39e570d0cddca5ba6e4b7c25dd1060bbba5eeb",
+  "v1-evidence.log": "3aeefde77b4d3c02cc408690664ebec16fada4d41e252e62ecb153b094581e0f",
+  "v1-experiments.sh": "769cd9c6e6b0359ad1dffb38b9117fb8a04fac548a9540c7ef2fe741452bd264",
+  "v1-prompt.txt": "d19c1b01915ca0ff57e923635a48830c8877b47a1b4c84563fdda136036bf458",
+  "v1-session.txt": "432731e744527aebbf08d662c21cc00a26e210fadc26231301199e8462de66dc",
+  "regression-draft-evidence.json": "a7a66b5e7c8a9479a133739566041ab74064ebaebde8f28fc2ab8408bad7db9b",
+  "regression-draft-evidence-rev2.json": "d39b6755f9be187960077f4a90b7ac8b5e050862943f1f8d26ee67284fd257f5"
+}

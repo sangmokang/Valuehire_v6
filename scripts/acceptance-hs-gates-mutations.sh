@@ -52,6 +52,13 @@ cp contracts/admin-weekly-dashboard/source-contract-v1.json \
 mkdir -p "$SANDBOX/apps"
 cp -R apps/admin "$SANDBOX/apps/"
 
+# HS-00.01은 저장소의 검사·문서를 실제 입력으로 읽는다. 격리 프로젝트의
+# 부모에도 같은 경계를 복사해 파일 누락이 의도한 실패를 가리지 않게 한다.
+for fixture_dir in .github docs scripts humansearch/src; do
+  mkdir -p "$SANDBOX/$fixture_dir"
+  cp -R "$fixture_dir/." "$SANDBOX/$fixture_dir/"
+done
+
 total=0
 blocked=0
 CASE_DIR=""

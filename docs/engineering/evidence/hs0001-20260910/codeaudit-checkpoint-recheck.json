@@ -1,0 +1,211 @@
+{
+  "created_utc": "2026-09-09T21:33:49.887814+00:00",
+  "verdict": "PASS",
+  "scope": "recheck only: current staged fast gates, raw wrapper preservation, source9 fixed, V2 staged evidence; no product retest expansion",
+  "commands": [
+    {
+      "command": "git diff --cached --check",
+      "started_utc": "2026-09-09T21:33:33.768047+00:00",
+      "ended_utc": "2026-09-09T21:33:33.831440+00:00",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "",
+      "full_output": "",
+      "full_output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "bash verify.sh",
+      "started_utc": "2026-09-09T21:33:33.831540+00:00",
+      "ended_utc": "2026-09-09T21:33:38.699424+00:00",
+      "exit_code": 0,
+      "stdout": "PASS: no secret-pattern match in any tracked file, .env not tracked\n",
+      "stderr": "",
+      "full_output": "PASS: no secret-pattern match in any tracked file, .env not tracked\n",
+      "full_output_sha256": "757c22ef0b961070b50f38c22529cd03a350af7bf292f80a9b83345db1165900"
+    },
+    {
+      "command": "VERIFY_SCAN_SOURCE=index bash verify.sh",
+      "started_utc": "2026-09-09T21:33:38.699470+00:00",
+      "ended_utc": "2026-09-09T21:33:49.736675+00:00",
+      "exit_code": 0,
+      "stdout": "PASS: no secret-pattern match in any tracked file, .env not tracked\n",
+      "stderr": "",
+      "full_output": "PASS: no secret-pattern match in any tracked file, .env not tracked\n",
+      "full_output_sha256": "757c22ef0b961070b50f38c22529cd03a350af7bf292f80a9b83345db1165900"
+    }
+  ],
+  "facts": {
+    "diff_cached_check_rc": 0,
+    "verify_worktree_rc": 0,
+    "verify_index_rc": 0,
+    "status_red_diagnosis_plain_exists": false,
+    "status_red_diagnosis_raw_exists": true,
+    "status_red_diagnosis_raw_sha256": "88957893dce289a024e30a7e6bc580a2b0f1df4342a9aca0c2cc4e3d35708e94",
+    "raw_storage_map_entries": 9,
+    "raw_storage_all_match": true,
+    "raw_storage_map_sha256": "8b9ecdca07ca4a8cd1789980f5314a79f84cb81c0f54e6189b3f06b21a2541ec",
+    "source9_all_match": true,
+    "v2_recheck_staged_md_exists": true,
+    "v2_recheck_staged_md_sha256": "49bdab20f725adfa0db61f1757b96ed7cbc879def40adcd63f62fff5c48da96b",
+    "v2_recheck_staged_first_line": "VERDICT: PASS",
+    "root_checkpoint_recheck_json_sha256": "26efa14891d9202e8a53d3fcdf156b22957b355738b0f9e4d6735c9076e5fe6d",
+    "root_checkpoint_recheck_log_sha256": "1c29a6ebba039ba1fef1d6916e066b599dbcb991e83f4d6b747461456eebbab0",
+    "root_checkpoint_recheck_exit_code": null,
+    "root_checkpoint_recheck_command": [
+      "bash",
+      "-c",
+      "git diff --cached --check && bash verify.sh && VERIFY_SCAN_SOURCE=index bash verify.sh && bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff.sh"
+    ]
+  },
+  "source9": [
+    {
+      "path": "scripts/acceptance-hs-kickoff.sh",
+      "expected_sha256": "58262dbce5b40aead6d57da29f03bbf7860d05d1c0923b1a764f514d1eb2740b",
+      "worktree_matches": true,
+      "index_matches": true
+    },
+    {
+      "path": "scripts/acceptance-hs-kickoff-mutations.sh",
+      "expected_sha256": "4569309a6e2a5614e43d7442d80bf9808d221995081c2097cf813e6ac0c9181e",
+      "worktree_matches": true,
+      "index_matches": true
+    },
+    {
+      "path": "scripts/verify/list-workflow-steps.py",
+      "expected_sha256": "5bf585f31b1ae2fa6915e82606bf8b0b2a1cd3a317d890bfcd6bdc6d541bd28f",
+      "worktree_matches": true,
+      "index_matches": true
+    },
+    {
+      "path": "scripts/acceptance-hs-gates-mutations.sh",
+      "expected_sha256": "d166d802d77c4a99532a72cc5ded838ba6f2126fb3cf7acd8fc226173a6481bf",
+      "worktree_matches": true,
+      "index_matches": true
+    },
+    {
+      "path": "scripts/acceptance-hs-gates-antiforge.sh",
+      "expected_sha256": "de04ebbb8ba07f6cb0acdcb2ab3a6fb377be7e37c44cb1deacd56f59982dc947",
+      "worktree_matches": true,
+      "index_matches": true
+    },
+    {
+      "path": "humansearch/tests/test_hs_0001.py",
+      "expected_sha256": "5e84ee466466147ca377b08928bfd04593184e519dc54677a6dd8fe1c31278bf",
+      "worktree_matches": true,
+      "index_matches": true
+    },
+    {
+      "path": "humansearch/tests/test_hs_0001_main_compat.py",
+      "expected_sha256": "0662357ecb0570bee47983b71afb968644ff22a5de7cd74a0ad550cf41a63070",
+      "worktree_matches": true,
+      "index_matches": true
+    },
+    {
+      "path": "docs/sot/verification-commands.md",
+      "expected_sha256": "cd3af0bed3b8b0415630cd73b2f19e3f3bb7c0fc823dabd16ebddf76b999fe47",
+      "worktree_matches": true,
+      "index_matches": true
+    },
+    {
+      "path": ".github/workflows/verify.yml",
+      "expected_sha256": "175d44e93b0eca518cdd74dd54b971e49b020e66bfd6b3935930ae20fac7ecc5",
+      "worktree_matches": true,
+      "index_matches": true
+    }
+  ],
+  "raw_storage_entries": [
+    {
+      "original_path": "v1-evidence.log",
+      "stored_path": "v1-evidence.log.json",
+      "sha_matches_text": true,
+      "stored_sha256": "3aeefde77b4d3c02cc408690664ebec16fada4d41e252e62ecb153b094581e0f",
+      "computed_text_sha256": "3aeefde77b4d3c02cc408690664ebec16fada4d41e252e62ecb153b094581e0f",
+      "text_bytes": 66333
+    },
+    {
+      "original_path": "v2-evidence.log",
+      "stored_path": "v2-evidence.log.json",
+      "sha_matches_text": true,
+      "stored_sha256": "c5a2545be136b49ca78cb12fd1b702f5a85cd698fb6ec39aa771621c8bb63f34",
+      "computed_text_sha256": "c5a2545be136b49ca78cb12fd1b702f5a85cd698fb6ec39aa771621c8bb63f34",
+      "text_bytes": 80034
+    },
+    {
+      "original_path": "v2-f1-f4-evidence.log",
+      "stored_path": "v2-f1-f4-evidence.log.json",
+      "sha_matches_text": true,
+      "stored_sha256": "cd331ab4d0d108150d6f8372763b6bcbeb0f9013b70545c87da24119bda67f1b",
+      "computed_text_sha256": "cd331ab4d0d108150d6f8372763b6bcbeb0f9013b70545c87da24119bda67f1b",
+      "text_bytes": 25025
+    },
+    {
+      "original_path": "v1-experiments.sh",
+      "stored_path": "v1-experiments.sh.json",
+      "sha_matches_text": true,
+      "stored_sha256": "769cd9c6e6b0359ad1dffb38b9117fb8a04fac548a9540c7ef2fe741452bd264",
+      "computed_text_sha256": "769cd9c6e6b0359ad1dffb38b9117fb8a04fac548a9540c7ef2fe741452bd264",
+      "text_bytes": 14433
+    },
+    {
+      "original_path": "v1-verdict.md",
+      "stored_path": "v1-verdict.md.json",
+      "sha_matches_text": true,
+      "stored_sha256": "e894ba0a942c0a5f2161801fbc39e570d0cddca5ba6e4b7c25dd1060bbba5eeb",
+      "computed_text_sha256": "e894ba0a942c0a5f2161801fbc39e570d0cddca5ba6e4b7c25dd1060bbba5eeb",
+      "text_bytes": 19434
+    },
+    {
+      "original_path": "codeaudit-reconsideration.md",
+      "stored_path": "codeaudit-reconsideration.md.json",
+      "sha_matches_text": true,
+      "stored_sha256": "e7f4e6de92fd5b96fddc6bf5bc4202d493ca82dcc79cb58d402bd633295c0f11",
+      "computed_text_sha256": "e7f4e6de92fd5b96fddc6bf5bc4202d493ca82dcc79cb58d402bd633295c0f11",
+      "text_bytes": 12387
+    },
+    {
+      "original_path": "v1-final-mutants.py",
+      "stored_path": "v1-final-mutants.py.json",
+      "sha_matches_text": true,
+      "stored_sha256": "d2548c4020d1cb4f77c12e55080091fc11d76283760a6931f4173f366e89e8bc",
+      "computed_text_sha256": "d2548c4020d1cb4f77c12e55080091fc11d76283760a6931f4173f366e89e8bc",
+      "text_bytes": 7128
+    },
+    {
+      "original_path": "codeaudit-final-recheck.json",
+      "stored_path": "codeaudit-final-recheck.raw.json",
+      "sha_matches_text": true,
+      "stored_sha256": "63b6dd52f3f5633afe2cf6ea4b6570bf3ff1d34d93bbcd1e81b9a12fdbdb2498",
+      "computed_text_sha256": "63b6dd52f3f5633afe2cf6ea4b6570bf3ff1d34d93bbcd1e81b9a12fdbdb2498",
+      "text_bytes": 2718
+    },
+    {
+      "original_path": "status-red-diagnosis.json",
+      "stored_path": "status-red-diagnosis.raw.json",
+      "sha_matches_text": true,
+      "stored_sha256": "3fd31286e2b7e6c25529bcd7f53eebf805d11d38f0464f9b21637b470486846d",
+      "computed_text_sha256": "3fd31286e2b7e6c25529bcd7f53eebf805d11d38f0464f9b21637b470486846d",
+      "text_bytes": 102983
+    }
+  ],
+  "v2_recheck": {
+    "md_path": "docs/engineering/evidence/hs0001-20260910/v2-final-recheck-verdict.md",
+    "md_sha256": "49bdab20f725adfa0db61f1757b96ed7cbc879def40adcd63f62fff5c48da96b",
+    "json_sha256": "d0d34d75906424b6c1f7b9e42d1f14ae1f3d651135fa137fe2a2f9dc0fc176cb"
+  },
+  "inferences": {
+    "authentication_summary": "The prior scanner hit is resolved by lossless raw JSON text preservation; this recheck does not assert an actual credential existed.",
+    "approval_boundary": "PASS is limited to this checkpoint evidence state. It does not add product tests, remote CI, merge, or live product proof."
+  },
+  "not_repeated": [
+    "product pytest suites",
+    "G2 family",
+    "remote GitHub Actions",
+    "portal/live product checks",
+    "OS-separated receipt"
+  ],
+  "self_artifacts": {
+    "markdown_path": "artifacts/hs-next-20260910/codeaudit-checkpoint-recheck.md",
+    "markdown_sha256": "5d3cf9d03b4bd35094d99a96eb07b2860fca47f3ad951154a26f1e82006a8d09",
+    "json_path": "artifacts/hs-next-20260910/codeaudit-checkpoint-recheck.json"
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "authored_report_sha256": "15cc44fe64e8a4742433d219851a04be37013f2a9bfb1c70e9ec583fac3bd9ba",
+  "cli_result_sha256": "2de8fcfef3922ad4f054608dbec62ed0f204f6d577deb1576826470bc7c17c24",
+  "note": "Authored report restored byte-exact from original CLI Bash heredoc tool records 590 and 602; verified against Claude-authored manifest. CLI final result independently preserved; it is a second Claude-authored text, not the same bytes as file report."
+}

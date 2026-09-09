@@ -1,0 +1,87 @@
+{
+  "original_path": ".claude/private-reviews/hs0001-20260910/v1-final-cli-original.jsonl",
+  "original_sha256": "f5722038a91441ab4170eec50da6ca84ab93ef1dd1b43938ec4f3f0c4b732d75",
+  "original_bytes": 834326,
+  "original_mode": "0600",
+  "public_sha256": "2073f9ab209f75f159289b418d45e36b6ad8a4b3642009f0495bc0c888e16712",
+  "record_count": 605,
+  "omitted_fields": [
+    {
+      "record": 5,
+      "sha256": "46ecd4fb16f1ffbb4614d649c72b26ce250f346d1089e7f03eb947d83f19498f"
+    },
+    {
+      "record": 24,
+      "sha256": "ba6fde3eef9afecd2b5b9e01d82f736f37f09a2a7a08847e6606cbf69560212c"
+    },
+    {
+      "record": 38,
+      "sha256": "809de3488b63b9f05ea57f8edd06c2d83c7633153dd0fd307873ec46d7afe206"
+    },
+    {
+      "record": 104,
+      "sha256": "b549ac2d45b76e867e6277cd6a9800053f948a70e22a9857facfc0421d74e0c1"
+    },
+    {
+      "record": 127,
+      "sha256": "27c3f7e6d2ea518cdd5b4f3fb4bdc222311d4285ef26a94925e0a22ed84a7cfb"
+    },
+    {
+      "record": 140,
+      "sha256": "abeaa456bbf6eabf6499cc119d48cba46e9a0e14786a41cdbe691ce89217f9d2"
+    },
+    {
+      "record": 159,
+      "sha256": "ecb635d67c6fac7d7fbc8a73c2b89c3359b81376e64b03ca475ca6ec70ae7a0a"
+    },
+    {
+      "record": 181,
+      "sha256": "25660f26e49cdf519f9de78d13434c09f222c49a6ce7a9823cffb5f9e3894585"
+    },
+    {
+      "record": 210,
+      "sha256": "53815da1b81326ad952c7b0b89fae0a76c589c48127caad4ce26e79c28018a6a"
+    },
+    {
+      "record": 312,
+      "sha256": "6e95ed2b80fa860a366c6fe3bf881ee746dbbbcc952b16e47a488f7b19e123a8"
+    },
+    {
+      "record": 346,
+      "sha256": "ddcbab0ef46552ce3885c8aef318b9561cad45e134e6051217894a15c4be3260"
+    },
+    {
+      "record": 383,
+      "sha256": "beac009f93bbd20519187b46e113642657f3251ca1293d3867279a2629bf7d56"
+    },
+    {
+      "record": 465,
+      "sha256": "8cfd849ed74be60c27d2f21c134e5a0a6148f231314fb75df083d601038b0450"
+    },
+    {
+      "record": 499,
+      "sha256": "2f371f229577b9a837f0bcc589512e4bfaca3ed4ba36ceba5f5b7484dcbb1c5b"
+    },
+    {
+      "record": 521,
+      "sha256": "470540a3dbdb44ce139e7e4df3ba971b4c9c871ce51134c003586b23eba9099d"
+    },
+    {
+      "record": 550,
+      "sha256": "c7409428fcdde2844fa3bb6163aecc20cc066ebc83372986aebbf14fcc673788"
+    },
+    {
+      "record": 588,
+      "sha256": "978f2d2cfe07a399bd7b3cd202d852d64e5c94ab4bcd8c11f8d661c4a962a5a0"
+    },
+    {
+      "record": 594,
+      "sha256": "a84ff0a632e20c63817c998425b931541776228d1c2aa6a361011c30faf065b2"
+    },
+    {
+      "record": 601,
+      "sha256": "41cad0bc7014472d7cfcc9d8f30b435c2b04bd803d78a3d254e7ca2066936d26"
+    }
+  ],
+  "reason": "Opaque thinking signature metadata only; all command outputs and verdict text retained."
+}

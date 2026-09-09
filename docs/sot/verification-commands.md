@@ -28,7 +28,7 @@
 | 5 | Strict 전역 스킬 잠금 장치 격리 회귀 | `bash scripts/acceptance-guard-global-skill-files.sh` — lock/check/unlock/recover와 동일 UID 한계 |
 | 6 | P3 조용한 실패 문법·오탐 회귀 | `scripts/acceptance-silent-failure-lint.sh` + mutation 34건 — 대소문자 확장자 전체 소스와 스테이지 blob 판정 |
 | 7 | HumanSearch G1 클린룸 경계 | 인라인 8개 — `scripts/acceptance-hs-cleanroom.sh`, `scripts/acceptance-hs-cleanroom-mutations.sh`, `scripts/acceptance-hs-cleanroom-absolute-paths.sh`, `scripts/acceptance-hs-cleanroom-absolute-contexts.sh`, `scripts/acceptance-hs-cleanroom-colon-paths.sh`, `scripts/acceptance-hs-cleanroom-file-urls.sh`, `scripts/acceptance-hs-cleanroom-hook-env.sh`, `scripts/acceptance-hs-cleanroom-hook-env-mutations.sh` |
-| 8 | HumanSearch G2 테스트 게이트 (정적·단위 + runtime import 증명) | 인라인 — `uv` 설치 후 `scripts/acceptance-hs-gates.sh`, `scripts/acceptance-hs-gates-mutations.sh`, `scripts/acceptance-hs-gates-antiforge.sh` (정적 ruff/mypy + pytest 수집·runtime import 증명) |
+| 8 | HumanSearch G2 테스트 게이트 (정적·단위 + runtime import 증명) | 인라인 — `uv` 설치 후 `scripts/acceptance-hs-gates.sh`, `scripts/acceptance-hs-gates-mutations.sh`, `scripts/acceptance-hs-gates-antiforge.sh` (정적 ruff/mypy + pytest 수집·runtime import 증명). HS-00.01 새 회귀 `tests/test_hs_0001.py`도 같은 pytest 전체 수집으로 실행한다 |
 | 9 | 히스토리 전량 스캔 (도달 가능한 모든 blob) | 인라인 — 도달 가능한 모든 blob 을 열어 자격증명 패턴 대조 |
 | 10 | 인수 검사 0-2 상시 내용 검사와 종료상태 분리 (AC-19) | `bash scripts/acceptance-0-2-unreachable-content.sh` — 환경 격리·네 객체형·도구 실패·큰 객체·종료상태·훅 환경 무오염 13개 합성 사례 (AC-19) |
 | 11 | 인수 검사 0-6 (가짜 검증 스크립트 0건) | `bash scripts/acceptance-0-6.sh` |
@@ -81,3 +81,10 @@
 
 - `main` 브랜치 GitHub 보호 규칙의 실제 활성화 여부는 확인하지 않았다(`docs/sot/git-workflow.md` 한계와 동일).
 - 이 표는 2026-08-22 실행 결과의 스냅샷이다. 스크립트가 추가/삭제되면 다시 확인해야 한다.
+
+## HS-00.01 실행 환경·대상 일치 회귀
+
+정조준 명령은 humansearch에서 `uv run --no-sync pytest -q tests/test_hs_0001.py`다. 이 시험과 `tests/test_hs_0001_main_compat.py`는 기존 G2 게이트의 `pytest tests`에도 수집된다. 별도 acceptance 프레임워크나 CI 단계는 추가하지 않는다.
+보호하는 hs-kickoff 두 run 단계의 키는 name/run/id/timeout-minutes만 허용하며, shell/env/working-directory를 포함한 나머지 키는 약화로 판정한다. 다른 단계의 uses/with/env는 해당 보호 단계로 오인하지 않는다. 최상위 defaults/env 등 실행 환경 변경은 거부한다. 잡 수준 시간 제한은 양의 정수로 허용한다. concurrency/trigger 내용 검증은 HS-00.04의 별도 부채다.
+처분 대상은 토큰 경계를 지켜 PR #131을 PR #13으로 세지 않는다. 판정 첫 줄은 정확히 `VERDICT: PASS` 또는 `VERDICT: FAIL`이어야 한다. 이 형식 검사는 판정의 의미·권한·최신 지문을 승인하지 않는다. 실제 Codeaudit·Claude V1·Codex V2 원문과 커밋 지문을 별도로 대조한다.
+영향은 착수 문서·검사 입력 형식과 G2 회귀 수집이다. 기존 37종 변이 기대값은 바꾸지 않는다. 근거·기존 판정 대체·롤백은 `docs/engineering/humansearch-hs0001-goal-2026-09-10.md`, 승인은 이번 사용자 실행 요청과 각 독립 검토 원문에 기록한다. 이 개정은 로컬 후보이며 원격 CI/병합 승인을 뜻하지 않는다.

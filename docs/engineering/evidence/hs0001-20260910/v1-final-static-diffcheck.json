@@ -1,0 +1,16 @@
+{
+ "label": "static-diffcheck",
+ "command": [
+  "git",
+  "diff",
+  "--cached",
+  "--check"
+ ],
+ "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+ "started": "2026-09-09T21:02:42.756656+00:00",
+ "ended": "2026-09-09T21:02:42.789530+00:00",
+ "exit_code": 0,
+ "stdout": "",
+ "stderr": "",
+ "head": "16e5d649dbd257e6d01318c1a8fb0fbe8e731596"
+}

@@ -1,0 +1,71 @@
+{
+ "when": "2026-09-09T21:13:45.815755+00:00",
+ "head": "16e5d649dbd257e6d01318c1a8fb0fbe8e731596",
+ "files": {
+  "scripts/acceptance-hs-kickoff.sh": {
+   "declared": "58262dbce5b40aead6d57da29f03bbf7860d05d1c0923b1a764f514d1eb2740b",
+   "worktree": "58262dbce5b40aead6d57da29f03bbf7860d05d1c0923b1a764f514d1eb2740b",
+   "index": "58262dbce5b40aead6d57da29f03bbf7860d05d1c0923b1a764f514d1eb2740b",
+   "match": true,
+   "same_as_before": true
+  },
+  "scripts/acceptance-hs-kickoff-mutations.sh": {
+   "declared": "4569309a6e2a5614e43d7442d80bf9808d221995081c2097cf813e6ac0c9181e",
+   "worktree": "4569309a6e2a5614e43d7442d80bf9808d221995081c2097cf813e6ac0c9181e",
+   "index": "4569309a6e2a5614e43d7442d80bf9808d221995081c2097cf813e6ac0c9181e",
+   "match": true,
+   "same_as_before": true
+  },
+  "scripts/verify/list-workflow-steps.py": {
+   "declared": "5bf585f31b1ae2fa6915e82606bf8b0b2a1cd3a317d890bfcd6bdc6d541bd28f",
+   "worktree": "5bf585f31b1ae2fa6915e82606bf8b0b2a1cd3a317d890bfcd6bdc6d541bd28f",
+   "index": "5bf585f31b1ae2fa6915e82606bf8b0b2a1cd3a317d890bfcd6bdc6d541bd28f",
+   "match": true,
+   "same_as_before": true
+  },
+  "scripts/acceptance-hs-gates-mutations.sh": {
+   "declared": "d166d802d77c4a99532a72cc5ded838ba6f2126fb3cf7acd8fc226173a6481bf",
+   "worktree": "d166d802d77c4a99532a72cc5ded838ba6f2126fb3cf7acd8fc226173a6481bf",
+   "index": "d166d802d77c4a99532a72cc5ded838ba6f2126fb3cf7acd8fc226173a6481bf",
+   "match": true,
+   "same_as_before": true
+  },
+  "scripts/acceptance-hs-gates-antiforge.sh": {
+   "declared": "de04ebbb8ba07f6cb0acdcb2ab3a6fb377be7e37c44cb1deacd56f59982dc947",
+   "worktree": "de04ebbb8ba07f6cb0acdcb2ab3a6fb377be7e37c44cb1deacd56f59982dc947",
+   "index": "de04ebbb8ba07f6cb0acdcb2ab3a6fb377be7e37c44cb1deacd56f59982dc947",
+   "match": true,
+   "same_as_before": true
+  },
+  "humansearch/tests/test_hs_0001.py": {
+   "declared": "5e84ee466466147ca377b08928bfd04593184e519dc54677a6dd8fe1c31278bf",
+   "worktree": "5e84ee466466147ca377b08928bfd04593184e519dc54677a6dd8fe1c31278bf",
+   "index": "5e84ee466466147ca377b08928bfd04593184e519dc54677a6dd8fe1c31278bf",
+   "match": true,
+   "same_as_before": true
+  },
+  "humansearch/tests/test_hs_0001_main_compat.py": {
+   "declared": "0662357ecb0570bee47983b71afb968644ff22a5de7cd74a0ad550cf41a63070",
+   "worktree": "0662357ecb0570bee47983b71afb968644ff22a5de7cd74a0ad550cf41a63070",
+   "index": "0662357ecb0570bee47983b71afb968644ff22a5de7cd74a0ad550cf41a63070",
+   "match": true,
+   "same_as_before": true
+  },
+  "docs/sot/verification-commands.md": {
+   "declared": "cd3af0bed3b8b0415630cd73b2f19e3f3bb7c0fc823dabd16ebddf76b999fe47",
+   "worktree": "cd3af0bed3b8b0415630cd73b2f19e3f3bb7c0fc823dabd16ebddf76b999fe47",
+   "index": "cd3af0bed3b8b0415630cd73b2f19e3f3bb7c0fc823dabd16ebddf76b999fe47",
+   "match": true,
+   "same_as_before": true
+  },
+  ".github/workflows/verify.yml": {
+   "declared": "175d44e93b0eca518cdd74dd54b971e49b020e66bfd6b3935930ae20fac7ecc5",
+   "worktree": "175d44e93b0eca518cdd74dd54b971e49b020e66bfd6b3935930ae20fac7ecc5",
+   "index": "175d44e93b0eca518cdd74dd54b971e49b020e66bfd6b3935930ae20fac7ecc5",
+   "match": true,
+   "same_as_before": true
+  }
+ },
+ "git_status": "A  docs/engineering/evidence/hs0001-20260910/README.md\nA  docs/engineering/evidence/hs0001-20260910/actions-official-sources.md\nA  docs/engineering/evidence/hs0001-20260910/budget-check.py\nA  docs/engineering/evidence/hs0001-20260910/candidate-files.json\nA  docs/engineering/evidence/hs0001-20260910/codeaudit-commands.json\nA  docs/engineering/evidence/hs0001-20260910/codeaudit-initial-verdict.md\nA  docs/engineering/evidence/hs0001-20260910/codeaudit-reconsideration.md.json\nAM docs/engineering/evidence/hs0001-20260910/commands.json\nA  docs/engineering/evidence/hs0001-20260910/compat-draft-evidence.json\nA  docs/engineering/evidence/hs0001-20260910/compat-red-review.json\nA  docs/engineering/evidence/hs0001-20260910/compat-red-review.md\nA  docs/engineering/evidence/hs0001-20260910/final-candidate-files.json\nA  docs/engineering/evidence/hs0001-20260910/new-red-review.json\nA  docs/engineering/evidence/hs0001-20260910/new-red-review.md\nA  docs/engineering/evidence/hs0001-20260910/raw-storage-map.json\nA  docs/engineering/evidence/hs0001-20260910/red-review.json\nA  docs/engineering/evidence/hs0001-20260910/regression-draft-evidence-rev2.json\nA  docs/engineering/evidence/hs0001-20260910/regression-draft-evidence.json\nA  docs/engineering/evidence/hs0001-20260910/v1-cli-public-provenance.json\nA  docs/engineering/evidence/hs0001-20260910/v1-cli-public.jsonl\nA  docs/engineering/evidence/hs0001-20260910/v1-cli.json\nA  docs/engineering/evidence/hs0001-20260910/v1-evidence.log.json\nA  docs/engineering/evidence/hs0001-20260910/v1-experiments.sh.json\nA  docs/engineering/evidence/hs0001-20260910/v1-manifest.json\nA  docs/engineering/evidence/hs0001-20260910/v1-prompt.txt\nA  docs/engineering/evidence/hs0001-20260910/v1-session.txt\nA  docs/engineering/evidence/hs0001-20260910/v1-verdict.md.json\nA  docs/engineering/evidence/hs0001-20260910/v2-evidence.log.json\nA  docs/engineering/evidence/hs0001-20260910/v2-f1-f4-evidence.log.json\nA  docs/engineering/evidence/hs0001-20260910/v2-f1-f4.sh\nA  docs/engineering/evidence/hs0001-20260910/v2-reproduction.sh\nA  docs/engineering/evidence/hs0001-20260910/v2-verdict-formatted.md\nA  docs/engineering/evidence/hs0001-20260910/v2-verdict.md\nA  docs/engineering/goal-prompts/humansearch-next-execution-2026-09-10.md\nAM docs/engineering/humansearch-hs0001-goal-2026-09-10.md\nA  docs/engineering/humansearch-kickoff-ledger-verdict-2026-09-10.md\nA  docs/engineering/humansearch-next-issues-wu-2026-09-10.md\nM  docs/sot/verification-commands.md\nM  scripts/acceptance-hs-gates-antiforge.sh\nM  scripts/acceptance-hs-gates-mutations.sh\nM  scripts/acceptance-hs-kickoff.sh\nM  scripts/verify/list-workflow-steps.py\n?? docs/engineering/evidence/hs0001-20260910/codeaudit-final-recheck.json\n?? docs/engineering/evidence/hs0001-20260910/codeaudit-final-recheck.md\n?? docs/engineering/evidence/hs0001-20260910/codeaudit-final.json\n?? docs/engineering/evidence/hs0001-20260910/codeaudit-final.md\n",
+ "git_status_same_as_before": false
+}

@@ -1,0 +1,15 @@
+{
+  "base": "06110d9355ae352da58e4ee7e4e2551962cda7d4",
+  "recovered": "c6a94c713486c62b9effb1cef8adc2f137114e9f",
+  "files": {
+    ".github/workflows/verify.yml": "175d44e93b0eca518cdd74dd54b971e49b020e66bfd6b3935930ae20fac7ecc5",
+    "docs/engineering/goal-prompts/humansearch-journey-kickoff-2026-09-07.md": "d6eea41458089ec18d721e597247aee05087c7c1f1692a413b33c5f140e69dce",
+    "docs/engineering/history/resume-evidence-supabase-archive-goal-2026-08-17.md": "2e3ee353f4a342b87400056871b0abbf73d1a75ab17b1c678bfb469e183b946b",
+    "docs/engineering/history/resume-evidence-supabase-implementation-prompt-2026-08-17.md": "496ee0d14e77d884deed554944a1affd401b0daac02d08ada919628104e50012",
+    "docs/engineering/humansearch-branch-disposition-2026-09-07.md": "973d760992323165895841708a01b6a8ef7ee709e69f1df359c4cdb670ba6872",
+    "docs/sot/verification-commands.md": "23a4505acb215d6e9b5295cd5ca58c2c6770a595dc698191ad4ba0a461574d6b",
+    "scripts/acceptance-hs-kickoff-mutations.sh": "4569309a6e2a5614e43d7442d80bf9808d221995081c2097cf813e6ac0c9181e",
+    "scripts/acceptance-hs-kickoff.sh": "705ceb9f82fdd899673e04d31c68fb73a38372a0f324674f6e5533b5120d147b",
+    "scripts/verify/list-workflow-steps.py": "c8630fc4cce7071ee12365becbf9852aedfeff3dae79b9be22392d212f0b4505"
+  }
+}

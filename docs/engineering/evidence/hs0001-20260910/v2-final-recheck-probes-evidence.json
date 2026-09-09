@@ -1,0 +1,290 @@
+{
+ "started": "2026-09-09T21:24:34.387490+00:00",
+ "base": "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/v2final-probe-9tr09tip",
+ "orig_sha_before": {
+  "scripts/acceptance-hs-kickoff.sh": "58262dbce5b40aead6d57da29f03bbf7860d05d1c0923b1a764f514d1eb2740b",
+  "scripts/verify/list-workflow-steps.py": "5bf585f31b1ae2fa6915e82606bf8b0b2a1cd3a317d890bfcd6bdc6d541bd28f",
+  ".github/workflows/verify.yml": "175d44e93b0eca518cdd74dd54b971e49b020e66bfd6b3935930ae20fac7ecc5"
+ },
+ "probes": [
+  {
+   "name": "p01_earlier_step_writes_BASH_ENV_to_GITHUB_ENV",
+   "note": "expect: is it caught?",
+   "mutation_diff": "--- a/.github/workflows/verify.yml\n+++ b/.github/workflows/verify.yml\n@@ -27,7 +27,7 @@\n         # 패턴은 커밋된 .secret-patterns.default 를 쓴다.\n         # 실제 비밀값은 CI에 올리지 않는다 — 저장소 시크릿에 넣는 것도 유출 경로를 늘리는 일이다.\n         # 로컬 전용 .secret-patterns 는 gitignore 되어 여기 없다.\n-        run: bash verify.sh\n+        run: bash verify.sh && echo \"BASH_ENV=$GITHUB_WORKSPACE/scripts/v1-bait-env.sh\" >> \"$GITHUB_ENV\"\n \n       - name: Strict 원칙 정본·장부·배선 검사\n         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-principles-check.sh\n",
+   "acceptance_cmd": [
+    "bash",
+    "scripts/verify/run-acceptance.sh",
+    "scripts/acceptance-hs-kickoff.sh"
+   ],
+   "acceptance_rc": 0,
+   "acceptance_stdout": "PASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 PR #15 → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 task/hs-d1-permit → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 task/hs-l1-malformed-url-fix → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 task/hs-observe-url-crash → 결론=폐기 (근거 경로 2 건·커밋 0 건)\nPASS: CI 스텝 수·이름·순서 정본=30 실제=30 표 행=30 빈 이름 0 번호 1..30 이름 1:1\nPASS: 역사 기록 보존 resume-evidence-supabase-archive-goal-2026-08-17.md\nPASS: 역사 기록 보존 resume-evidence-supabase-implementation-prompt-2026-08-17.md\nPASS: 착수 프롬프트 커밋됨 docs/engineering/goal-prompts/humansearch-journey-kickoff-2026-09-07.md\nPASS: CI 배선 2건 — 이름과 명령이 같은 스텝에서 일치하고 조건·오류무시 없음\nPASS: 판정 문서 docs/engineering/humansearch-kickoff-ledger-verdict-0000-00-00.md (VERDICT: PASS)\nCHECKED: 12\nOK(run-acceptance): scripts/acceptance-hs-kickoff.sh — 판정 12건, CHECKED 12\n",
+   "acceptance_stderr": "",
+   "ci_integrity_cmd": [
+    "bash",
+    "scripts/verify/check-ci-step-integrity.sh",
+    ".github/workflows/verify.yml"
+   ],
+   "ci_integrity_rc": 0,
+   "ci_integrity_stdout": "ALLOWED: 인수 검사 0-5 (push · CI 연결) — if 허용 (origin/main==main 을 보는 검사라 main push 에서만 의미가 있다. PR 실행에서 요구하면 상시 실패한다.)\nPASS: 조건부·오류무시 스텝 없음 (job·step 31개 검사)\nCHECKED: 31\n",
+   "ci_integrity_stderr": ""
+  },
+  {
+   "name": "p02_shell_key_on_dash_line",
+   "note": "expect rejected 약화",
+   "mutation_diff": "--- a/.github/workflows/verify.yml\n+++ b/.github/workflows/verify.yml\n@@ -270,7 +270,8 @@\n         run: |\n           python3 scripts/verify/check-invoice-gate.py\n \n-      - name: 인수 검사 hs-kickoff (HumanSearch 착수 정리 · WU-0A)\n+      - shell: cat\n+        name: 인수 검사 hs-kickoff (HumanSearch 착수 정리 · WU-0A)\n         # HumanSearch 착수 정리가 실제로 끝났는가 — 미병합 6건 처분표(결론·근거), 정본의\n         # CI 스텝 수가 이 파일의 실제 스텝 수와 같은가, 2026-08-17 레쥬메 설계서가 \"v4 전제\n         # 역사 기록\" 머리말과 함께 보존됐는가, 착수 프롬프트·이 배선·Codex 판정 문서가\n",
+   "acceptance_cmd": [
+    "bash",
+    "scripts/verify/run-acceptance.sh",
+    "scripts/acceptance-hs-kickoff.sh"
+   ],
+   "acceptance_rc": 1,
+   "acceptance_stdout": "PASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 PR #15 → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 task/hs-d1-permit → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 task/hs-l1-malformed-url-fix → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 task/hs-observe-url-crash → 결론=폐기 (근거 경로 2 건·커밋 0 건)\nPASS: CI 스텝 수·이름·순서 정본=30 실제=30 표 행=30 빈 이름 0 번호 1..30 이름 1:1\nPASS: 역사 기록 보존 resume-evidence-supabase-archive-goal-2026-08-17.md\nPASS: 역사 기록 보존 resume-evidence-supabase-implementation-prompt-2026-08-17.md\nPASS: 착수 프롬프트 커밋됨 docs/engineering/goal-prompts/humansearch-journey-kickoff-2026-09-07.md\nFAIL: CI 배선 불량 — 본 검사=약화 자기 변이=OK\nPASS: 판정 문서 docs/engineering/humansearch-kickoff-ledger-verdict-0000-00-00.md (VERDICT: PASS)\nCHECKED: 12\nFAIL(run-acceptance): scripts/acceptance-hs-kickoff.sh 종료값 1\n",
+   "acceptance_stderr": "",
+   "ci_integrity_cmd": [
+    "bash",
+    "scripts/verify/check-ci-step-integrity.sh",
+    ".github/workflows/verify.yml"
+   ],
+   "ci_integrity_rc": 0,
+   "ci_integrity_stdout": "ALLOWED: 인수 검사 0-5 (push · CI 연결) — if 허용 (origin/main==main 을 보는 검사라 main push 에서만 의미가 있다. PR 실행에서 요구하면 상시 실패한다.)\nPASS: 조건부·오류무시 스텝 없음 (job·step 31개 검사)\nCHECKED: 31\n",
+   "ci_integrity_stderr": ""
+  },
+  {
+   "name": "p03_quoted_on_key_legit_yaml",
+   "note": "over-block check",
+   "mutation_diff": "--- a/.github/workflows/verify.yml\n+++ b/.github/workflows/verify.yml\n@@ -2,7 +2,7 @@\n \n # \"CI 초록 전까지 완료 없음\"을 시스템으로 강제한다.\n # 로컬 검증은 실행자가 주장하는 것이고, 이 워크플로우는 GitHub이 판정하는 것이다.\n-on:\n+\"on\":\n   push:\n     branches: [\"**\"]\n   pull_request:\n",
+   "acceptance_cmd": [
+    "bash",
+    "scripts/verify/run-acceptance.sh",
+    "scripts/acceptance-hs-kickoff.sh"
+   ],
+   "acceptance_rc": 1,
+   "acceptance_stdout": "PASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 PR #15 → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 task/hs-d1-permit → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 task/hs-l1-malformed-url-fix → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 task/hs-observe-url-crash → 결론=폐기 (근거 경로 2 건·커밋 0 건)\nFAIL: 워크플로를 정규 형식으로 읽지 못했다 — 형식 위반: 최상위 키 '\"on\"' (5행). 실행 환경 변경은 허용하지 않는다\nPASS: 역사 기록 보존 resume-evidence-supabase-archive-goal-2026-08-17.md\nPASS: 역사 기록 보존 resume-evidence-supabase-implementation-prompt-2026-08-17.md\nPASS: 착수 프롬프트 커밋됨 docs/engineering/goal-prompts/humansearch-journey-kickoff-2026-09-07.md\nFAIL: CI 배선 불량 — 워크플로를 정규 형식으로 읽지 못했다\nPASS: 판정 문서 docs/engineering/humansearch-kickoff-ledger-verdict-0000-00-00.md (VERDICT: PASS)\nCHECKED: 12\nFAIL(run-acceptance): scripts/acceptance-hs-kickoff.sh 종료값 1\n",
+   "acceptance_stderr": "",
+   "ci_integrity_cmd": [
+    "bash",
+    "scripts/verify/check-ci-step-integrity.sh",
+    ".github/workflows/verify.yml"
+   ],
+   "ci_integrity_rc": 0,
+   "ci_integrity_stdout": "ALLOWED: 인수 검사 0-5 (push · CI 연결) — if 허용 (origin/main==main 을 보는 검사라 main push 에서만 의미가 있다. PR 실행에서 요구하면 상시 실패한다.)\nPASS: 조건부·오류무시 스텝 없음 (job·step 31개 검사)\nCHECKED: 31\n",
+   "ci_integrity_stderr": ""
+  },
+  {
+   "name": "p04_two_verdict_files_fail_and_pass",
+   "note": "which file is reported",
+   "mutation_diff": "",
+   "acceptance_cmd": [
+    "bash",
+    "scripts/verify/run-acceptance.sh",
+    "scripts/acceptance-hs-kickoff.sh"
+   ],
+   "acceptance_rc": 0,
+   "acceptance_stdout": "PASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 PR #15 → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 task/hs-d1-permit → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 task/hs-l1-malformed-url-fix → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 task/hs-observe-url-crash → 결론=폐기 (근거 경로 2 건·커밋 0 건)\nPASS: CI 스텝 수·이름·순서 정본=30 실제=30 표 행=30 빈 이름 0 번호 1..30 이름 1:1\nPASS: 역사 기록 보존 resume-evidence-supabase-archive-goal-2026-08-17.md\nPASS: 역사 기록 보존 resume-evidence-supabase-implementation-prompt-2026-08-17.md\nPASS: 착수 프롬프트 커밋됨 docs/engineering/goal-prompts/humansearch-journey-kickoff-2026-09-07.md\nPASS: CI 배선 2건 — 이름과 명령이 같은 스텝에서 일치하고 조건·오류무시 없음\nPASS: 판정 문서 docs/engineering/humansearch-kickoff-ledger-verdict-0000-00-00.md (VERDICT: PASS)\nCHECKED: 12\nOK(run-acceptance): scripts/acceptance-hs-kickoff.sh — 판정 12건, CHECKED 12\n",
+   "acceptance_stderr": "",
+   "ci_integrity_cmd": [
+    "bash",
+    "scripts/verify/check-ci-step-integrity.sh",
+    ".github/workflows/verify.yml"
+   ],
+   "ci_integrity_rc": 0,
+   "ci_integrity_stdout": "ALLOWED: 인수 검사 0-5 (push · CI 연결) — if 허용 (origin/main==main 을 보는 검사라 main push 에서만 의미가 있다. PR 실행에서 요구하면 상시 실패한다.)\nPASS: 조건부·오류무시 스텝 없음 (job·step 31개 검사)\nCHECKED: 31\n",
+   "ci_integrity_stderr": ""
+  },
+  {
+   "name": "p05_job_level_env_BASH_ENV",
+   "note": "expect rejected job-level key",
+   "mutation_diff": "--- a/.github/workflows/verify.yml\n+++ b/.github/workflows/verify.yml\n@@ -14,6 +14,8 @@\n jobs:\n   verify:\n     runs-on: ubuntu-latest\n+    env:\n+      BASH_ENV: scripts/v1-bait-env.sh\n     steps:\n       - name: 저장소 가져오기 (히스토리 전체)\n         uses: actions/checkout@v4\n",
+   "acceptance_cmd": [
+    "bash",
+    "scripts/verify/run-acceptance.sh",
+    "scripts/acceptance-hs-kickoff.sh"
+   ],
+   "acceptance_rc": 1,
+   "acceptance_stdout": "PASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 PR #15 → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 task/hs-d1-permit → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 task/hs-l1-malformed-url-fix → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 task/hs-observe-url-crash → 결론=폐기 (근거 경로 2 건·커밋 0 건)\nFAIL: 워크플로를 정규 형식으로 읽지 못했다 — 형식 위반: 잡 수준 키 'env' (17행). runs-on·steps·정수 시간 제한만 쓴다 — 조건·기본 셸·전략으로 스텝 전체를 끌 수 있다\nPASS: 역사 기록 보존 resume-evidence-supabase-archive-goal-2026-08-17.md\nPASS: 역사 기록 보존 resume-evidence-supabase-implementation-prompt-2026-08-17.md\nPASS: 착수 프롬프트 커밋됨 docs/engineering/goal-prompts/humansearch-journey-kickoff-2026-09-07.md\nFAIL: CI 배선 불량 — 워크플로를 정규 형식으로 읽지 못했다\nPASS: 판정 문서 docs/engineering/humansearch-kickoff-ledger-verdict-0000-00-00.md (VERDICT: PASS)\nCHECKED: 12\nFAIL(run-acceptance): scripts/acceptance-hs-kickoff.sh 종료값 1\n",
+   "acceptance_stderr": "",
+   "ci_integrity_cmd": [
+    "bash",
+    "scripts/verify/check-ci-step-integrity.sh",
+    ".github/workflows/verify.yml"
+   ],
+   "ci_integrity_rc": 0,
+   "ci_integrity_stdout": "ALLOWED: 인수 검사 0-5 (push · CI 연결) — if 허용 (origin/main==main 을 보는 검사라 main push 에서만 의미가 있다. PR 실행에서 요구하면 상시 실패한다.)\nPASS: 조건부·오류무시 스텝 없음 (job·step 31개 검사)\nCHECKED: 31\n",
+   "ci_integrity_stderr": ""
+  },
+  {
+   "name": "p06_top_defaults_after_comment",
+   "note": "expect rejected top key",
+   "mutation_diff": "--- a/.github/workflows/verify.yml\n+++ b/.github/workflows/verify.yml\n@@ -10,6 +10,11 @@\n \n permissions:\n   contents: read\n+\n+# harmless comment\n+defaults:\n+  run:\n+    shell: cat\n \n jobs:\n   verify:\n",
+   "acceptance_cmd": [
+    "bash",
+    "scripts/verify/run-acceptance.sh",
+    "scripts/acceptance-hs-kickoff.sh"
+   ],
+   "acceptance_rc": 1,
+   "acceptance_stdout": "PASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 PR #15 → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 task/hs-d1-permit → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 task/hs-l1-malformed-url-fix → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 task/hs-observe-url-crash → 결론=폐기 (근거 경로 2 건·커밋 0 건)\nFAIL: 워크플로를 정규 형식으로 읽지 못했다 — 형식 위반: 최상위 키 'defaults' (15행). 실행 환경 변경은 허용하지 않는다\nPASS: 역사 기록 보존 resume-evidence-supabase-archive-goal-2026-08-17.md\nPASS: 역사 기록 보존 resume-evidence-supabase-implementation-prompt-2026-08-17.md\nPASS: 착수 프롬프트 커밋됨 docs/engineering/goal-prompts/humansearch-journey-kickoff-2026-09-07.md\nFAIL: CI 배선 불량 — 워크플로를 정규 형식으로 읽지 못했다\nPASS: 판정 문서 docs/engineering/humansearch-kickoff-ledger-verdict-0000-00-00.md (VERDICT: PASS)\nCHECKED: 12\nFAIL(run-acceptance): scripts/acceptance-hs-kickoff.sh 종료값 1\n",
+   "acceptance_stderr": "",
+   "ci_integrity_cmd": [
+    "bash",
+    "scripts/verify/check-ci-step-integrity.sh",
+    ".github/workflows/verify.yml"
+   ],
+   "ci_integrity_rc": 0,
+   "ci_integrity_stdout": "ALLOWED: 인수 검사 0-5 (push · CI 연결) — if 허용 (origin/main==main 을 보는 검사라 main push 에서만 의미가 있다. PR 실행에서 요구하면 상시 실패한다.)\nPASS: 조건부·오류무시 스텝 없음 (job·step 31개 검사)\nCHECKED: 31\n",
+   "ci_integrity_stderr": ""
+  },
+  {
+   "name": "p07_step_working_directory",
+   "note": "expect rejected 약화",
+   "mutation_diff": "--- a/.github/workflows/verify.yml\n+++ b/.github/workflows/verify.yml\n@@ -275,6 +275,7 @@\n         # CI 스텝 수가 이 파일의 실제 스텝 수와 같은가, 2026-08-17 레쥬메 설계서가 \"v4 전제\n         # 역사 기록\" 머리말과 함께 보존됐는가, 착수 프롬프트·이 배선·Codex 판정 문서가\n         # 있는가를 12건으로 센다. 로컬 pre-push 글로브에만 두면 P15③ 이 없는 검사로 친다.\n+        working-directory: /tmp\n         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff.sh\n \n       - name: 인수 검사 hs-kickoff-mutations (WU-0A 검사를 속일 수 있는가)\n",
+   "acceptance_cmd": [
+    "bash",
+    "scripts/verify/run-acceptance.sh",
+    "scripts/acceptance-hs-kickoff.sh"
+   ],
+   "acceptance_rc": 1,
+   "acceptance_stdout": "PASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 PR #15 → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 task/hs-d1-permit → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 task/hs-l1-malformed-url-fix → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 task/hs-observe-url-crash → 결론=폐기 (근거 경로 2 건·커밋 0 건)\nPASS: CI 스텝 수·이름·순서 정본=30 실제=30 표 행=30 빈 이름 0 번호 1..30 이름 1:1\nPASS: 역사 기록 보존 resume-evidence-supabase-archive-goal-2026-08-17.md\nPASS: 역사 기록 보존 resume-evidence-supabase-implementation-prompt-2026-08-17.md\nPASS: 착수 프롬프트 커밋됨 docs/engineering/goal-prompts/humansearch-journey-kickoff-2026-09-07.md\nFAIL: CI 배선 불량 — 본 검사=약화 자기 변이=OK\nPASS: 판정 문서 docs/engineering/humansearch-kickoff-ledger-verdict-0000-00-00.md (VERDICT: PASS)\nCHECKED: 12\nFAIL(run-acceptance): scripts/acceptance-hs-kickoff.sh 종료값 1\n",
+   "acceptance_stderr": "",
+   "ci_integrity_cmd": [
+    "bash",
+    "scripts/verify/check-ci-step-integrity.sh",
+    ".github/workflows/verify.yml"
+   ],
+   "ci_integrity_rc": 0,
+   "ci_integrity_stdout": "ALLOWED: 인수 검사 0-5 (push · CI 연결) — if 허용 (origin/main==main 을 보는 검사라 main push 에서만 의미가 있다. PR 실행에서 요구하면 상시 실패한다.)\nPASS: 조건부·오류무시 스텝 없음 (job·step 31개 검사)\nCHECKED: 31\n",
+   "ci_integrity_stderr": ""
+  },
+  {
+   "name": "p08_job_timeout_expression",
+   "note": "expect rejected non-integer",
+   "mutation_diff": "--- a/.github/workflows/verify.yml\n+++ b/.github/workflows/verify.yml\n@@ -14,6 +14,7 @@\n jobs:\n   verify:\n     runs-on: ubuntu-latest\n+    timeout-minutes: ${{ 30 }}\n     steps:\n       - name: 저장소 가져오기 (히스토리 전체)\n         uses: actions/checkout@v4\n",
+   "acceptance_cmd": [
+    "bash",
+    "scripts/verify/run-acceptance.sh",
+    "scripts/acceptance-hs-kickoff.sh"
+   ],
+   "acceptance_rc": 1,
+   "acceptance_stdout": "PASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 PR #15 → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 task/hs-d1-permit → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 task/hs-l1-malformed-url-fix → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 task/hs-observe-url-crash → 결론=폐기 (근거 경로 2 건·커밋 0 건)\nFAIL: 워크플로를 정규 형식으로 읽지 못했다 — 형식 위반: 잡 시간 제한은 양의 정수여야 한다 (17행)\nPASS: 역사 기록 보존 resume-evidence-supabase-archive-goal-2026-08-17.md\nPASS: 역사 기록 보존 resume-evidence-supabase-implementation-prompt-2026-08-17.md\nPASS: 착수 프롬프트 커밋됨 docs/engineering/goal-prompts/humansearch-journey-kickoff-2026-09-07.md\nFAIL: CI 배선 불량 — 워크플로를 정규 형식으로 읽지 못했다\nPASS: 판정 문서 docs/engineering/humansearch-kickoff-ledger-verdict-0000-00-00.md (VERDICT: PASS)\nCHECKED: 12\nFAIL(run-acceptance): scripts/acceptance-hs-kickoff.sh 종료값 1\n",
+   "acceptance_stderr": "",
+   "ci_integrity_cmd": [
+    "bash",
+    "scripts/verify/check-ci-step-integrity.sh",
+    ".github/workflows/verify.yml"
+   ],
+   "ci_integrity_rc": 0,
+   "ci_integrity_stdout": "ALLOWED: 인수 검사 0-5 (push · CI 연결) — if 허용 (origin/main==main 을 보는 검사라 main push 에서만 의미가 있다. PR 실행에서 요구하면 상시 실패한다.)\nPASS: 조건부·오류무시 스텝 없음 (job·step 31개 검사)\nCHECKED: 31\n",
+   "ci_integrity_stderr": ""
+  },
+  {
+   "name": "p09_job_container",
+   "note": "expect rejected job-level key",
+   "mutation_diff": "--- a/.github/workflows/verify.yml\n+++ b/.github/workflows/verify.yml\n@@ -14,6 +14,7 @@\n jobs:\n   verify:\n     runs-on: ubuntu-latest\n+    container: ubuntu:24.04\n     steps:\n       - name: 저장소 가져오기 (히스토리 전체)\n         uses: actions/checkout@v4\n",
+   "acceptance_cmd": [
+    "bash",
+    "scripts/verify/run-acceptance.sh",
+    "scripts/acceptance-hs-kickoff.sh"
+   ],
+   "acceptance_rc": 1,
+   "acceptance_stdout": "PASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 PR #15 → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 task/hs-d1-permit → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 task/hs-l1-malformed-url-fix → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 task/hs-observe-url-crash → 결론=폐기 (근거 경로 2 건·커밋 0 건)\nFAIL: 워크플로를 정규 형식으로 읽지 못했다 — 형식 위반: 잡 수준 키 'container' (17행). runs-on·steps·정수 시간 제한만 쓴다 — 조건·기본 셸·전략으로 스텝 전체를 끌 수 있다\nPASS: 역사 기록 보존 resume-evidence-supabase-archive-goal-2026-08-17.md\nPASS: 역사 기록 보존 resume-evidence-supabase-implementation-prompt-2026-08-17.md\nPASS: 착수 프롬프트 커밋됨 docs/engineering/goal-prompts/humansearch-journey-kickoff-2026-09-07.md\nFAIL: CI 배선 불량 — 워크플로를 정규 형식으로 읽지 못했다\nPASS: 판정 문서 docs/engineering/humansearch-kickoff-ledger-verdict-0000-00-00.md (VERDICT: PASS)\nCHECKED: 12\nFAIL(run-acceptance): scripts/acceptance-hs-kickoff.sh 종료값 1\n",
+   "acceptance_stderr": "",
+   "ci_integrity_cmd": [
+    "bash",
+    "scripts/verify/check-ci-step-integrity.sh",
+    ".github/workflows/verify.yml"
+   ],
+   "ci_integrity_rc": 0,
+   "ci_integrity_stdout": "ALLOWED: 인수 검사 0-5 (push · CI 연결) — if 허용 (origin/main==main 을 보는 검사라 main push 에서만 의미가 있다. PR 실행에서 요구하면 상시 실패한다.)\nPASS: 조건부·오류무시 스텝 없음 (job·step 31개 검사)\nCHECKED: 31\n",
+   "ci_integrity_stderr": ""
+  },
+  {
+   "name": "p10_runs_on_windows",
+   "note": "environment change via runs-on value",
+   "mutation_diff": "--- a/.github/workflows/verify.yml\n+++ b/.github/workflows/verify.yml\n@@ -13,7 +13,7 @@\n \n jobs:\n   verify:\n-    runs-on: ubuntu-latest\n+    runs-on: windows-latest\n     steps:\n       - name: 저장소 가져오기 (히스토리 전체)\n         uses: actions/checkout@v4\n",
+   "acceptance_cmd": [
+    "bash",
+    "scripts/verify/run-acceptance.sh",
+    "scripts/acceptance-hs-kickoff.sh"
+   ],
+   "acceptance_rc": 0,
+   "acceptance_stdout": "PASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 PR #15 → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 task/hs-d1-permit → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 task/hs-l1-malformed-url-fix → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 task/hs-observe-url-crash → 결론=폐기 (근거 경로 2 건·커밋 0 건)\nPASS: CI 스텝 수·이름·순서 정본=30 실제=30 표 행=30 빈 이름 0 번호 1..30 이름 1:1\nPASS: 역사 기록 보존 resume-evidence-supabase-archive-goal-2026-08-17.md\nPASS: 역사 기록 보존 resume-evidence-supabase-implementation-prompt-2026-08-17.md\nPASS: 착수 프롬프트 커밋됨 docs/engineering/goal-prompts/humansearch-journey-kickoff-2026-09-07.md\nPASS: CI 배선 2건 — 이름과 명령이 같은 스텝에서 일치하고 조건·오류무시 없음\nPASS: 판정 문서 docs/engineering/humansearch-kickoff-ledger-verdict-0000-00-00.md (VERDICT: PASS)\nCHECKED: 12\nOK(run-acceptance): scripts/acceptance-hs-kickoff.sh — 판정 12건, CHECKED 12\n",
+   "acceptance_stderr": "",
+   "ci_integrity_cmd": [
+    "bash",
+    "scripts/verify/check-ci-step-integrity.sh",
+    ".github/workflows/verify.yml"
+   ],
+   "ci_integrity_rc": 0,
+   "ci_integrity_stdout": "ALLOWED: 인수 검사 0-5 (push · CI 연결) — if 허용 (origin/main==main 을 보는 검사라 main push 에서만 의미가 있다. PR 실행에서 요구하면 상시 실패한다.)\nPASS: 조건부·오류무시 스텝 없음 (job·step 31개 검사)\nCHECKED: 31\n",
+   "ci_integrity_stderr": ""
+  },
+  {
+   "name": "p11_step_timeout_zero",
+   "note": "invalid step timeout value",
+   "mutation_diff": "--- a/.github/workflows/verify.yml\n+++ b/.github/workflows/verify.yml\n@@ -275,6 +275,7 @@\n         # CI 스텝 수가 이 파일의 실제 스텝 수와 같은가, 2026-08-17 레쥬메 설계서가 \"v4 전제\n         # 역사 기록\" 머리말과 함께 보존됐는가, 착수 프롬프트·이 배선·Codex 판정 문서가\n         # 있는가를 12건으로 센다. 로컬 pre-push 글로브에만 두면 P15③ 이 없는 검사로 친다.\n+        timeout-minutes: 0\n         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff.sh\n \n       - name: 인수 검사 hs-kickoff-mutations (WU-0A 검사를 속일 수 있는가)\n",
+   "acceptance_cmd": [
+    "bash",
+    "scripts/verify/run-acceptance.sh",
+    "scripts/acceptance-hs-kickoff.sh"
+   ],
+   "acceptance_rc": 0,
+   "acceptance_stdout": "PASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 PR #15 → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 task/hs-d1-permit → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 task/hs-l1-malformed-url-fix → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 task/hs-observe-url-crash → 결론=폐기 (근거 경로 2 건·커밋 0 건)\nPASS: CI 스텝 수·이름·순서 정본=30 실제=30 표 행=30 빈 이름 0 번호 1..30 이름 1:1\nPASS: 역사 기록 보존 resume-evidence-supabase-archive-goal-2026-08-17.md\nPASS: 역사 기록 보존 resume-evidence-supabase-implementation-prompt-2026-08-17.md\nPASS: 착수 프롬프트 커밋됨 docs/engineering/goal-prompts/humansearch-journey-kickoff-2026-09-07.md\nPASS: CI 배선 2건 — 이름과 명령이 같은 스텝에서 일치하고 조건·오류무시 없음\nPASS: 판정 문서 docs/engineering/humansearch-kickoff-ledger-verdict-0000-00-00.md (VERDICT: PASS)\nCHECKED: 12\nOK(run-acceptance): scripts/acceptance-hs-kickoff.sh — 판정 12건, CHECKED 12\n",
+   "acceptance_stderr": "",
+   "ci_integrity_cmd": [
+    "bash",
+    "scripts/verify/check-ci-step-integrity.sh",
+    ".github/workflows/verify.yml"
+   ],
+   "ci_integrity_rc": 0,
+   "ci_integrity_stdout": "ALLOWED: 인수 검사 0-5 (push · CI 연결) — if 허용 (origin/main==main 을 보는 검사라 main push 에서만 의미가 있다. PR 실행에서 요구하면 상시 실패한다.)\nPASS: 조건부·오류무시 스텝 없음 (job·step 31개 검사)\nCHECKED: 31\n",
+   "ci_integrity_stderr": ""
+  },
+  {
+   "name": "p12_if_false_regression",
+   "note": "expect rejected 약화 (existing)",
+   "mutation_diff": "--- a/.github/workflows/verify.yml\n+++ b/.github/workflows/verify.yml\n@@ -271,6 +271,7 @@\n           python3 scripts/verify/check-invoice-gate.py\n \n       - name: 인수 검사 hs-kickoff (HumanSearch 착수 정리 · WU-0A)\n+        if: false\n         # HumanSearch 착수 정리가 실제로 끝났는가 — 미병합 6건 처분표(결론·근거), 정본의\n         # CI 스텝 수가 이 파일의 실제 스텝 수와 같은가, 2026-08-17 레쥬메 설계서가 \"v4 전제\n         # 역사 기록\" 머리말과 함께 보존됐는가, 착수 프롬프트·이 배선·Codex 판정 문서가\n",
+   "acceptance_cmd": [
+    "bash",
+    "scripts/verify/run-acceptance.sh",
+    "scripts/acceptance-hs-kickoff.sh"
+   ],
+   "acceptance_rc": 1,
+   "acceptance_stdout": "PASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 PR #15 → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 task/hs-d1-permit → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 task/hs-l1-malformed-url-fix → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 task/hs-observe-url-crash → 결론=폐기 (근거 경로 2 건·커밋 0 건)\nPASS: CI 스텝 수·이름·순서 정본=30 실제=30 표 행=30 빈 이름 0 번호 1..30 이름 1:1\nPASS: 역사 기록 보존 resume-evidence-supabase-archive-goal-2026-08-17.md\nPASS: 역사 기록 보존 resume-evidence-supabase-implementation-prompt-2026-08-17.md\nPASS: 착수 프롬프트 커밋됨 docs/engineering/goal-prompts/humansearch-journey-kickoff-2026-09-07.md\nFAIL: CI 배선 불량 — 본 검사=약화 자기 변이=OK\nPASS: 판정 문서 docs/engineering/humansearch-kickoff-ledger-verdict-0000-00-00.md (VERDICT: PASS)\nCHECKED: 12\nFAIL(run-acceptance): scripts/acceptance-hs-kickoff.sh 종료값 1\n",
+   "acceptance_stderr": "",
+   "ci_integrity_cmd": [
+    "bash",
+    "scripts/verify/check-ci-step-integrity.sh",
+    ".github/workflows/verify.yml"
+   ],
+   "ci_integrity_rc": 1,
+   "ci_integrity_stdout": "ALLOWED: 인수 검사 0-5 (push · CI 연결) — if 허용 (origin/main==main 을 보는 검사라 main push 에서만 의미가 있다. PR 실행에서 요구하면 상시 실패한다.)\nFAIL: STEP_CONDITIONAL: jobs.verify.인수 검사 hs-kickoff (HumanSearch 착수 정리 · WU-0A) 에 if 가 있다 (false) — 조건부 스텝은 조건이 거짓이면 실행되지 않고도 초록이다\nCHECKED: 31\n",
+   "ci_integrity_stderr": ""
+  },
+  {
+   "name": "p13_earlier_step_hijacks_bash_via_GITHUB_PATH",
+   "note": "expect: is it caught?",
+   "mutation_diff": "--- a/.github/workflows/verify.yml\n+++ b/.github/workflows/verify.yml\n@@ -27,7 +27,7 @@\n         # 패턴은 커밋된 .secret-patterns.default 를 쓴다.\n         # 실제 비밀값은 CI에 올리지 않는다 — 저장소 시크릿에 넣는 것도 유출 경로를 늘리는 일이다.\n         # 로컬 전용 .secret-patterns 는 gitignore 되어 여기 없다.\n-        run: bash verify.sh\n+        run: bash verify.sh && mkdir -p /tmp/fakebin && printf \"#!/bin/sh\\nexit 0\\n\" > /tmp/fakebin/bash && chmod +x /tmp/fakebin/bash && echo /tmp/fakebin >> \"$GITHUB_PATH\"\n \n       - name: Strict 원칙 정본·장부·배선 검사\n         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-principles-check.sh\n",
+   "acceptance_cmd": [
+    "bash",
+    "scripts/verify/run-acceptance.sh",
+    "scripts/acceptance-hs-kickoff.sh"
+   ],
+   "acceptance_rc": 0,
+   "acceptance_stdout": "PASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 PR #15 → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 task/hs-d1-permit → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 task/hs-l1-malformed-url-fix → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nPASS: 처분 task/hs-observe-url-crash → 결론=폐기 (근거 경로 2 건·커밋 0 건)\nPASS: CI 스텝 수·이름·순서 정본=30 실제=30 표 행=30 빈 이름 0 번호 1..30 이름 1:1\nPASS: 역사 기록 보존 resume-evidence-supabase-archive-goal-2026-08-17.md\nPASS: 역사 기록 보존 resume-evidence-supabase-implementation-prompt-2026-08-17.md\nPASS: 착수 프롬프트 커밋됨 docs/engineering/goal-prompts/humansearch-journey-kickoff-2026-09-07.md\nPASS: CI 배선 2건 — 이름과 명령이 같은 스텝에서 일치하고 조건·오류무시 없음\nPASS: 판정 문서 docs/engineering/humansearch-kickoff-ledger-verdict-0000-00-00.md (VERDICT: PASS)\nCHECKED: 12\nOK(run-acceptance): scripts/acceptance-hs-kickoff.sh — 판정 12건, CHECKED 12\n",
+   "acceptance_stderr": "",
+   "ci_integrity_cmd": [
+    "bash",
+    "scripts/verify/check-ci-step-integrity.sh",
+    ".github/workflows/verify.yml"
+   ],
+   "ci_integrity_rc": 0,
+   "ci_integrity_stdout": "ALLOWED: 인수 검사 0-5 (push · CI 연결) — if 허용 (origin/main==main 을 보는 검사라 main push 에서만 의미가 있다. PR 실행에서 요구하면 상시 실패한다.)\nPASS: 조건부·오류무시 스텝 없음 (job·step 31개 검사)\nCHECKED: 31\n",
+   "ci_integrity_stderr": ""
+  }
+ ],
+ "orig_sha_after": {
+  "scripts/acceptance-hs-kickoff.sh": "58262dbce5b40aead6d57da29f03bbf7860d05d1c0923b1a764f514d1eb2740b",
+  "scripts/verify/list-workflow-steps.py": "5bf585f31b1ae2fa6915e82606bf8b0b2a1cd3a317d890bfcd6bdc6d541bd28f",
+  ".github/workflows/verify.yml": "175d44e93b0eca518cdd74dd54b971e49b020e66bfd6b3935930ae20fac7ecc5"
+ },
+ "ended": "2026-09-09T21:24:43.608655+00:00"
+}

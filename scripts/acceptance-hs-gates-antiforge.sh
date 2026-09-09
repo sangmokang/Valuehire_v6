@@ -43,6 +43,13 @@ cp contracts/admin-weekly-dashboard/source-contract-v1.json \
 mkdir -p "$SANDBOX/apps"
 cp -R apps/admin "$SANDBOX/apps/"
 
+# HS-00.01 회귀가 읽는 저장소 입력도 사본 안에 둔다. 원본을 가리키는
+# 심볼릭 링크나 누락 파일 실패를 위조 차단 성공으로 세지 않는다.
+for fixture_dir in .github docs scripts humansearch/src; do
+  mkdir -p "$SANDBOX/$fixture_dir"
+  cp -R "$fixture_dir/." "$SANDBOX/$fixture_dir/"
+done
+
 # --- 결함1: atexit 증거 위조가 무력화되는가 --------------------------------
 total=$((total + 1))
 FORGE="$SANDBOX/forge"

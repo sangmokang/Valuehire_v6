@@ -1,0 +1,14 @@
+{
+ "label": "semantic-local",
+ "command": [
+  "bash",
+  "artifacts/hs-next-20260910/v1-final-semantic-local.sh"
+ ],
+ "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+ "started": "2026-09-09T21:10:44.793952+00:00",
+ "ended": "2026-09-09T21:10:45.013752+00:00",
+ "exit_code": 0,
+ "stdout": "--- control: bash -e step-script.sh\nACCEPTANCE RAN\nCHECKED: 12\nstep-exit=0\n--- p01 emulation: BASH_ENV=bait bash -e step-script.sh\nstep-exit=0\n--- p13 emulation: PATH=fakebin:PATH /bin/bash -e run-body.sh (run body invokes 'bash ...')\nstep-exit=0\n--- which bash under hijacked PATH: /bin/bash\n",
+ "stderr": "",
+ "head": "16e5d649dbd257e6d01318c1a8fb0fbe8e731596"
+}

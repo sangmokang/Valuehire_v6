@@ -1,0 +1,16 @@
+당신은 새 독립 Claude V1 검증자입니다. 생성자 대화는 제공하지 않습니다. 사용자 요청은 HS-00.01을 각 테스트·Codeaudit·실제 적대검증 뒤 로컬 커밋하는 것입니다. 같은 UID 로컬검토이며 OS독립/라이브 완료를 승인하는 과제가 아닙니다.
+T는 docs/engineering/humansearch-hs0001-goal-2026-09-10.md, 사용자prompt docs/engineering/goal-prompts/humansearch-next-execution-2026-09-10.md입니다. 범위와 지문은 artifacts/hs-next-20260910/final-candidate-files.json의9파일, git diff --cached, tests/test_hs_0001.py 및 test_hs_0001_main_compat.py입니다. HEAD16e5d64의tests-onlyRED와e2404d3 기대값이보존되는지 확인하십시오. 정본은 docs/sot/coding-principles.md와verification-commands.md. 이전 V1/V2 원문은 docs/engineering/evidence/hs0001-20260910/v1-verdict.md.json와v2-verdict-formatted.md(옛 후보FAIL)입니다. 새후보의실제판정을독립적으로내리세요. 최신Codeaudit는 artifacts/hs-next-20260910/codeaudit-final-recheck.md/json, 실행기록 hs0001-final-g2.json/log 및budget-check.py/budget기록입니다.
+관련8신규회귀와기존37변이및G2호출경로가대상입니다. 정해진문서형식검사와실제WU승인은다릅니다. 문서가FAIL원문을보존해도형식은PASS일수있지만이를제품완료로바꾸면안됩니다. 판정파일은독립검토가작성하는출력이고raw는그대로보존됩니다. HS00.02 기대사유부분문자열,03동형문자,04trigger/concurrency의미는별도WU입니다. 현재HS00.01의실행환경차단·대상일치·기존정상설정AC에해당하는지구분하세요.
+원본제품/시험/정본 수정 금지. 원본지문전후확인. 변이는 tempfile.mkdtemp 사본에서만 Git환경변수와BASH_ENV/ENV제거. 새단독임시경로만쓰기; /tmp고정파일사용금지. 외부포털/운영DB/remote쓰기금지. 소유출력 artifacts/hs-next-20260910/v1-final-* 실험스크립트/원문/판정만. 전역스킬편집금지.
+직접 정상대조군과관련반례를실행하고 항상허용/항상거부/핵심효과생략 고장사본을새pytest회귀가잡는지확인하세요. 기존37은정상대조1회면충분하며각변이마다전체suite반복은필수아닙니다. G2사본의fixture연결을실제명령으로확인하되원문있는실행을필요없이반복하지말고변경된경계에집중하세요. 파일hard600,함수hard100을실측하고 같은validator의600/601/0경계를직접재현하세요. shell/default/env실행의공식근거는 evidence/hs0001-20260910/actions-official-sources.md입니다. 새로운높음차단을찾으면최소반례/원인/수정조건만제시하고원본수정시제품은만들지마세요.
+명령·시각·종료값·전체출력·targetSHA256·mutationdiff를파일에보존하고stdout에판정출력. 증거파일은 후행공백도유지하는JSON text필드로저장하면원문보존과diff검사를함께만족합니다. 불투명한CLI thinking.signature 메타데이터는코드/명령출력이아니며공개사본에서제외되고권한600원본과sha를별도보존합니다. 파이프마지막grep값을원명령성공으로오독금지. 완전한증거파일경로를본문에서참조하면원문을답변에중복붙일필요없습니다. 처음부터고정된scope를넘는권한격리·live검사를새필수항목으로추가하지마세요.
+[출력 형식 — 반드시 지킬 것]
+첫 줄은 VERDICT: PASS|FAIL.
+그다음 결론 → 판단 근거 → 기술 상세와 증거 원문 순서로 쓴다.
+결론에는 전문용어를 쓰지 않는다. 판단 근거에는 선택·버린 해석·틀리면 깨지는 것을 쓴다.
+전문용어는 첫 등장 문장 안에서 풀고, 출력·코드·표 바로 아래에는 → 해석을 붙인다.
+file:line에는 줄의 역할을 붙인다. 결함마다 심각도, 원문 제목, 원인, 사업 영향을 쓴다.
+설계 지적은 무엇을/왜/버린 길/대가/되돌리기 다섯 줄로 쓴다.
+건너뜀·미확인·실패 후 재시도와 추정을 판정 앞부분에 밝힌다.
+증거를 생략하지 말고 무엇을 어떻게 깨려다 실패했는지 반증 기록을 남긴다.
+한국어 존칭체로 쓰되 내용을 축소하거나 초등학생 비유를 쓰지 않는다.

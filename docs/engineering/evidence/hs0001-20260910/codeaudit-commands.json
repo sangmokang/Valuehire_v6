@@ -1,0 +1,259 @@
+{
+  "purpose": "HS-00.01 codeaudit 보강: 보고서에서 생략한 명령과 전체 stdout/stderr 원문 보존",
+  "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+  "generated_at": "2026-09-09T20:18:54.640Z",
+  "commands": [
+    {
+      "id": "head",
+      "command": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+      "started": "2026-09-09T20:15:49.444Z",
+      "ended": "2026-09-09T20:15:49.566Z",
+      "exit_code": 0,
+      "signal": null,
+      "stdout": "06110d9355ae352da58e4ee7e4e2551962cda7d4\n",
+      "stderr": ""
+    },
+    {
+      "id": "staged_diff_sha256",
+      "command": [
+        "sh",
+        "-c",
+        "git diff --cached | shasum -a 256"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+      "started": "2026-09-09T20:15:49.566Z",
+      "ended": "2026-09-09T20:15:49.618Z",
+      "exit_code": 0,
+      "signal": null,
+      "stdout": "99fb71401ba6338ca727b53bb1ab318d91f25939865d9518c96f315d0b0ec51c  -\n",
+      "stderr": ""
+    },
+    {
+      "id": "worktree_helper_diff_sha256",
+      "command": [
+        "sh",
+        "-c",
+        "git diff -- scripts/verify/list-workflow-steps.py | shasum -a 256"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+      "started": "2026-09-09T20:15:49.618Z",
+      "ended": "2026-09-09T20:15:49.640Z",
+      "exit_code": 0,
+      "signal": null,
+      "stdout": "069f23a4902cb8d210b7f13e117e03e73e921943309ea0d134e0ba4a8a588666  -\n",
+      "stderr": ""
+    },
+    {
+      "id": "function_length_ast",
+      "command": [
+        "python3",
+        "-c",
+        "import ast, pathlib\nfor p in ['scripts/verify/list-workflow-steps.py']:\n    tree=ast.parse(pathlib.Path(p).read_text())\n    for n in ast.walk(tree):\n        if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef)):\n            print(f'{p}:{n.lineno}-{n.end_lineno} {n.name} {n.end_lineno-n.lineno+1}')"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+      "started": "2026-09-09T20:15:49.640Z",
+      "ended": "2026-09-09T20:15:49.674Z",
+      "exit_code": 0,
+      "signal": null,
+      "stdout": "scripts/verify/list-workflow-steps.py:29-31 fail 3\nscripts/verify/list-workflow-steps.py:34-71 main 38\nscripts/verify/list-workflow-steps.py:74-154 list_steps 81\n",
+      "stderr": ""
+    },
+    {
+      "id": "bash_n_kickoff",
+      "command": [
+        "bash",
+        "-n",
+        "scripts/acceptance-hs-kickoff.sh"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+      "started": "2026-09-09T20:15:49.675Z",
+      "ended": "2026-09-09T20:15:49.685Z",
+      "exit_code": 0,
+      "signal": null,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "bash_n_kickoff_mutations",
+      "command": [
+        "bash",
+        "-n",
+        "scripts/acceptance-hs-kickoff-mutations.sh"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+      "started": "2026-09-09T20:15:49.685Z",
+      "ended": "2026-09-09T20:15:49.693Z",
+      "exit_code": 0,
+      "signal": null,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "py_compile_workflow_steps",
+      "command": [
+        "python3",
+        "-m",
+        "py_compile",
+        "scripts/verify/list-workflow-steps.py"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+      "started": "2026-09-09T20:15:49.693Z",
+      "ended": "2026-09-09T20:15:49.748Z",
+      "exit_code": 0,
+      "signal": null,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "hs_kickoff_mutations_full",
+      "command": [
+        "bash",
+        "scripts/verify/run-acceptance.sh",
+        "scripts/acceptance-hs-kickoff-mutations.sh"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+      "started": "2026-09-09T20:15:49.748Z",
+      "ended": "2026-09-09T20:16:42.939Z",
+      "exit_code": 0,
+      "signal": null,
+      "stdout": "PASS: 양성 대조군 — 손대지 않은 사본은 통과 (exit 0)\nPASS: 음성1 CI 실행 줄 주석 위장 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성2 CI 스텝 continue-on-error — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성3 정본 표에 이름이 빈 행 — 기대한 사유로 차단됨 (exit 1, 'CI 스텝 불일치')\nPASS: 음성4 처분표 대상 중복 — 기대한 사유로 차단됨 (exit 1, '처분이 둘 이상')\nPASS: 음성5 근거 자리표시자 — 기대한 사유로 차단됨 (exit 1, 'PR #13 행의 근거가 자리표시자')\nPASS: 음성6 판정 문서 첫 줄 위조 — 기대한 사유로 차단됨 (exit 1, '판정 문서 없음')\nPASS: 음성7 env 미끼로 실행 줄 위장 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성8 정본 표 행 번호 중복 — 기대한 사유로 차단됨 (exit 1, 'CI 스텝 불일치')\nPASS: 음성9 진짜 처분 행을 코드 블록 안으로 숨김 — 기대한 사유로 차단됨 (exit 1, '행 없음')\nPASS: 양성2 코드 블록 안 가짜 처분 행 — 판정이 흔들리지 않음 (exit 0)\nPASS: 음성10 뜻 없는 영숫자 근거 — 기대한 사유로 차단됨 (exit 1, 'PR #13 행의 근거가 자리표시자')\nPASS: 음성11 run 키 중복 뒤쪽 덮어쓰기 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성12 따옴표 조건 키로 스텝 끄기 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성13 따옴표 오류무시 키 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성14 코드 스팬으로 감싼 뜻 없는 근거 — 기대한 사유로 차단됨 (exit 1, 'PR #13 행의 근거에 이 저장소에서 확인할 수 있는 경로가 없다')\nPASS: 음성15 3칸 들여쓴 코드 펜스로 진짜 행 숨김 — 기대한 사유로 차단됨 (exit 1, '행 없음')\nPASS: 음성27 정규 형식을 벗어난 들여쓰기 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 양성4 스텝에 timeout-minutes 삽입 — 판정이 흔들리지 않음 (exit 0)\nPASS: 음성16 스텝 삭제 후 여러 줄 문자열 안에 은닉 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성17 콜론 앞 공백 조건 키 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성18 콜론 앞 공백 run 키로 덮어쓰기 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성19 물결표 펜스로 진짜 행 숨김 — 기대한 사유로 차단됨 (exit 1, '행 없음')\nPASS: 양성5 run 값을 따옴표로 감싸기 — 판정이 흔들리지 않음 (exit 0)\nPASS: 양성6 run 줄 뒤 주석 — 판정이 흔들리지 않음 (exit 0)\nPASS: 양성7 한 줄짜리 블록 스칼라 run — 판정이 흔들리지 않음 (exit 0)\nPASS: 음성20 대상 6개를 한 행에 몰아 적기 — 기대한 사유로 차단됨 (exit 1, '대상 칸에 다른 대상')\nPASS: 음성21 실재하지 않는 근거 경로 — 기대한 사유로 차단됨 (exit 1, 'PR #13 행의 근거에 실재하지 않는 것이 있다')\nPASS: 음성22 명령만 다른 스텝으로 이동 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성23 탭 문자 주입 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성24 문서 구분자로 문서 둘 만들기 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성25 유니코드 이스케이프 조건 키 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성26 병합 키로 조건 끌어오기 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성28 잡 수준 조건으로 스텝 전체 끄기 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성29 잡 수준 기본 셸 바꾸기 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성30 값 위치 앵커·별칭 — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nPASS: 음성31 근거 토큰 끝 마침표 — 기대한 사유로 차단됨 (exit 1, 'PR #13 행의 근거에 실재하지 않는 것이 있다')\nCHECKED: 37\nOK(run-acceptance): scripts/acceptance-hs-kickoff-mutations.sh — 판정 37건, CHECKED 37\n",
+      "stderr": ""
+    },
+    {
+      "id": "hs_kickoff_after_report_full",
+      "command": [
+        "bash",
+        "scripts/verify/run-acceptance.sh",
+        "scripts/acceptance-hs-kickoff.sh"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+      "started": "2026-09-09T20:16:42.940Z",
+      "ended": "2026-09-09T20:16:43.657Z",
+      "exit_code": 0,
+      "signal": null,
+      "stdout": "PASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 1 건)\nPASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 1 건)\nPASS: 처분 PR #15 → 결론=폐기 (근거 경로 1 건·커밋 1 건)\nPASS: 처분 task/hs-d1-permit → 결론=재작성 (근거 경로 1 건·커밋 2 건)\nPASS: 처분 task/hs-l1-malformed-url-fix → 결론=폐기 (근거 경로 1 건·커밋 1 건)\nPASS: 처분 task/hs-observe-url-crash → 결론=폐기 (근거 경로 2 건·커밋 0 건)\nPASS: CI 스텝 수·이름·순서 정본=30 실제=30 표 행=30 빈 이름 0 번호 1..30 이름 1:1\nPASS: 역사 기록 보존 resume-evidence-supabase-archive-goal-2026-08-17.md\nPASS: 역사 기록 보존 resume-evidence-supabase-implementation-prompt-2026-08-17.md\nPASS: 착수 프롬프트 커밋됨 docs/engineering/goal-prompts/humansearch-journey-kickoff-2026-09-07.md\nPASS: CI 배선 2건 — 이름과 명령이 같은 스텝에서 일치하고 조건·오류무시 없음\nPASS: 판정 문서 docs/engineering/humansearch-kickoff-ledger-verdict-2026-09-10.md (VERDICT: PASS)\nCHECKED: 12\nOK(run-acceptance): scripts/acceptance-hs-kickoff.sh — 판정 12건, CHECKED 12\n",
+      "stderr": ""
+    },
+    {
+      "id": "brief_lint_full",
+      "command": [
+        "sh",
+        "-c",
+        "[ -x /Users/kangsangmo/.claude/skills/strict/brief-lint.sh ] && /Users/kangsangmo/.claude/skills/strict/brief-lint.sh docs/engineering/humansearch-kickoff-ledger-verdict-2026-09-10.md || /Users/kangsangmo/.codex/skills/strict/brief-lint.sh docs/engineering/humansearch-kickoff-ledger-verdict-2026-09-10.md"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+      "started": "2026-09-09T20:16:43.657Z",
+      "ended": "2026-09-09T20:16:43.702Z",
+      "exit_code": 0,
+      "signal": null,
+      "stdout": "=== docs/engineering/humansearch-kickoff-ledger-verdict-2026-09-10.md ===\n  코드블록 7개 · 표 1개 (면제 0개) / 해석 누락 0개\n  1층(결론): 줄 5 / 본문 199자\n  1층 기술 표기: 없음 (※ 한글 전문용어는 못 잡는다 — 사람이 본다)\n  결정 카드: 없음\n  증거 보관 경로: 임시 외 실재 파일 4건 (※ 그 파일이 이 주장의 증거인지는 못 잰다)\n\n브리핑 계약 기계 검사: 위반 0건 (문서 1개)\n\n이 검사가 못 보는 것 (사람이 봐야 하는 것):\n  · 설명이 실제로 말이 되는지 — 출력과 무관한 문장도 통과한다\n  · 결정 카드 내용이 판단에 쓸 만한지 — 한 글자여도 통과한다\n  · 증거 파일이 그 주장과 관련 있는지 — 존재하기만 하면 통과한다\n  · 결론이 쉬운 말인지 — 한글 전문용어는 잡지 못한다\n  ※ 이 검사는 홈 폴더에만 있어 서버 자동 검사에 없다 — 회사 차원의 합격 근거가 아니다(P15③).\n",
+      "stderr": ""
+    },
+    {
+      "id": "git_diff_check",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+      "started": "2026-09-09T20:16:43.702Z",
+      "ended": "2026-09-09T20:16:43.719Z",
+      "exit_code": 0,
+      "signal": null,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "report_line_refs",
+      "command": [
+        "sh",
+        "-c",
+        "nl -ba docs/engineering/humansearch-kickoff-ledger-verdict-2026-09-10.md | sed -n '1,170p'"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+      "started": "2026-09-09T20:16:43.719Z",
+      "ended": "2026-09-09T20:16:43.726Z",
+      "exit_code": 0,
+      "signal": null,
+      "stdout": "     1\tVERDICT: PASS\n     2\t\n     3\t# HS-00.01 독립 감사 판정 — 2026-09-10\n     4\t\n     5\t## 결론\n     6\t\n     7\t빠진 착수 확인서는 이제 실제 검토 내용으로 채워졌다. 다만 이것은 내부 문서와 검사만 통과했다는 뜻이고, 후보 검색 기능이나 온라인 전달이 끝났다는 뜻은 아니다.\n     8\t\n     9\t검사 장치 자체는 단순히 첫 줄만 보는 가짜 합격으로 보이지 않는다. 본 검사는 빠진 확인서 하나 때문에 실패하는 상태를 재현했고, 고장 주입 검사도 기대한 이유로 실패하는지 확인했다.\n    10\t\n    11\t중간에 함수 길이 제한을 넘는 문제가 있었지만, 현재 작업트리에서는 작은 함수 둘로 나뉘었고 같은 검사를 다시 통과했다.\n    12\t\n    13\t## 판단 근거\n    14\t\n    15\t- `docs/engineering/humansearch-next-issues-wu-2026-09-10.md:123`은 HS-00.01을 \"현재 착수 판정을 실제 검토 결과로 채운다\"로 정의하고, 기존 11/12 실패 재확인, 독립 검토 출력 보존, 기존 검사 12/12, FAIL 판정을 PASS로 변환 금지를 요구한다.\n    16\t- `docs/engineering/humansearch-hs0001-goal-2026-09-10.md:25`는 `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff.sh`가 종료값 0과 `CHECKED: 12`를 내야 한다고 쓴다.\n    17\t- `scripts/acceptance-hs-kickoff.sh:218`은 `docs/engineering/humansearch-kickoff-ledger-verdict-*.md` 파일이 있고 첫 줄이 `VERDICT: PASS` 또는 `VERDICT: FAIL`인지 검사한다. 이 검사는 검토자의 판정값을 제품 PASS로 바꾸지 않고, 원문 존재와 형식만 본다.\n    18\t- `scripts/acceptance-hs-kickoff-mutations.sh:1`은 본 검사를 속이는 정상·음성 대조군 37건을 임시 worktree에서 실행한다. 출력은 종료값뿐 아니라 기대 실패 사유를 함께 요구한다.\n    19\t- `.github/workflows/verify.yml:273`과 `.github/workflows/verify.yml:280`은 본 검사와 변이 검사를 CI 스텝에 연결한다.\n    20\t- `docs/sot/verification-commands.md:17`은 CI 스텝 30개 전체를 정본 표로 적고, `docs/sot/verification-commands.md:80`과 `docs/sot/verification-commands.md:81`은 hs-kickoff와 hs-kickoff-mutations를 해당 명령으로 기록한다.\n    21\t\n    22\t버린 해석은 두 가지다. 첫째, 11/12 RED를 검사기 결함으로 보는 해석은 버렸다. 본 검사 출력에서 실패한 항목은 판정 문서 누락 하나뿐이고, 변이 검사가 대상·사유 대조를 통과했기 때문이다. 둘째, 첫 줄 `VERDICT: PASS`만 추가하면 충분하다는 해석도 버렸다. WU 문서는 `docs/engineering/humansearch-next-issues-wu-2026-09-10.md:70`에서 사용자 요구부터 시험까지 대조하라고 요구하고, `docs/engineering/humansearch-next-issues-wu-2026-09-10.md:71`에서 판정 파일 존재나 문구만으로 통과시키지 말라고 못박는다.\n    23\t\n    24\t## 요구사항 대조표\n    25\t\n    26\t| ID | 요구 | 판정 | 근거 | 공백 | 심각도 |\n    27\t|---|---|---|---|---|---|\n    28\t| R1 | 기존 11/12 실패가 판정 문서 누락인지 재확인 | 구현 확인 | `artifacts/hs-next-20260910/hs0001-red.log:12`와 재실행 출력 모두 판정 문서 누락만 FAIL | 없음 | 낮음 |\n    29\t| R2 | 독립 검토 원문을 보존 | 구현 확인 | 이 파일 첫 줄과 본문, 작성 후 본 검사 재실행 | OS 권한 분리 아님 | 낮음 |\n    30\t| R3 | FAIL 판정을 제품 PASS로 둔갑 금지 | 구현 확인 | `scripts/acceptance-hs-kickoff.sh:218`은 PASS/FAIL 둘 다 원문으로 허용하고, WU 승인과 제품 완료를 분리 | 제품 기능 검증 없음 | 중간 |\n    31\t| R4 | 본 검사 12건과 변이 37건으로 검사 자체 검증 | 구현 확인 | 본 검사 재실행 12/12, 변이 검사 재실행 37/37 | 원격 CI는 NOT_RUN | 중간 |\n    32\t| R5 | 네트워크·포털·DB·제품 코드 변경 금지 | 구현 확인 | 변경 범위는 문서·검사·CI 파일, 실행 명령은 로컬 shell과 임시 worktree | 외부 서비스는 확인하지 않음 | 중간 |\n    33\t| R6 | 파일 600줄, 함수 100줄 예산 확인 | 구현 확인 | 현재 작업트리 helper는 `main` 38줄, `list_steps` 81줄, 최대 파일은 593줄 | staged index 원본은 `main` 116줄이었고 수정본 stage 여부는 별도 커밋자가 확인 필요 | 높음 |\n    34\t| R7 | HS00.02~04 부채와 HS00.01 AC 무력화 결함 구분 | 구현 확인 | `docs/engineering/humansearch-next-issues-wu-2026-09-10.md:124`부터 126은 별도 WU, 128부터 130은 현재 AC 무력화일 때만 01 차단이라고 설명 | 02~04 자체 구현은 이번 범위 밖 | 중간 |\n    35\t\n    36\t→ 이 표는 이번 요구를 일곱 개로 나눠 확인한 결과다. 좋은 소식이다. 현재 PASS는 R1부터 R7까지의 로컬 문서·검사 범위에만 걸린다.\n    37\t\n    38\t## 증거 원문\n    39\t\n    40\t```text\n    41\tcommand: git rev-parse HEAD\n    42\ttime: 2026-09-09T20:08:24Z\n    43\texit: 0\n    44\toutput: 06110d9355ae352da58e4ee7e4e2551962cda7d4\n    45\t```\n    46\t\n    47\t→ 현재 감사 기준 커밋을 확인했다. 좋은 소식이다. 과거 SHA 결과를 현재 판정으로 재사용하지 않기 위한 기준점이다.\n    48\t\n    49\t```text\n    50\tcommand: git diff --cached | shasum -a 256\n    51\ttime: 2026-09-09T20:10:30Z\n    52\texit: 0\n    53\toutput: 99fb71401ba6338ca727b53bb1ab318d91f25939865d9518c96f315d0b0ec51c  -\n    54\t```\n    55\t\n    56\t→ staged 9파일의 후보 diff 지문이다. 이후 작업트리 helper 수정은 별도 지문으로 분리했다.\n    57\t\n    58\t```text\n    59\tcommand: git diff -- scripts/verify/list-workflow-steps.py | shasum -a 256\n    60\ttime: 2026-09-09T20:10:30Z\n    61\texit: 0\n    62\toutput: 069f23a4902cb8d210b7f13e117e03e73e921943309ea0d134e0ba4a8a588666  -\n    63\t```\n    64\t\n    65\t→ staged 원본 뒤에 적용된 작업트리 helper 분리 지문이다. 좋은 소식이다. 함수 예산 위반 수정은 staged 지문과 분리되어 추적된다.\n    66\t\n    67\t```text\n    68\tcommand: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff.sh\n    69\ttime: 2026-09-09T20:08:32Z\n    70\texit: 1\n    71\toutput:\n    72\tPASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 1 건)\n    73\tPASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 1 건)\n    74\tPASS: 처분 PR #15 → 결론=폐기 (근거 경로 1 건·커밋 1 건)\n    75\tPASS: 처분 task/hs-d1-permit → 결론=재작성 (근거 경로 1 건·커밋 2 건)\n    76\tPASS: 처분 task/hs-l1-malformed-url-fix → 결론=폐기 (근거 경로 1 건·커밋 1 건)\n    77\tPASS: 처분 task/hs-observe-url-crash → 결론=폐기 (근거 경로 2 건·커밋 0 건)\n    78\tPASS: CI 스텝 수·이름·순서 정본=30 실제=30 표 행=30 빈 이름 0 번호 1..30 이름 1:1\n    79\tPASS: 역사 기록 보존 resume-evidence-supabase-archive-goal-2026-08-17.md\n    80\tPASS: 역사 기록 보존 resume-evidence-supabase-implementation-prompt-2026-08-17.md\n    81\tPASS: 착수 프롬프트 커밋됨 docs/engineering/goal-prompts/humansearch-journey-kickoff-2026-09-07.md\n    82\tPASS: CI 배선 2건 — 이름과 명령이 같은 스텝에서 일치하고 조건·오류무시 없음\n    83\tFAIL: 판정 문서 없음/빈 파일/첫 줄 VERDICT 아님 (docs/engineering/humansearch-kickoff-ledger-verdict-*.md)\n    84\tCHECKED: 12\n    85\tFAIL(run-acceptance): scripts/acceptance-hs-kickoff.sh 종료값 1\n    86\t```\n    87\t\n    88\t→ 보고서 작성 전 RED를 재현했다. 좋은 소식이다. 11/12 실패 원인이 독립 판정 문서 누락임을 보여준다.\n    89\t\n    90\t```text\n    91\tcommand: python3 - <<'PY' ... ast FunctionDef length check ... PY\n    92\ttime: 2026-09-09T20:10:30Z\n    93\texit: 0\n    94\toutput:\n    95\tscripts/verify/list-workflow-steps.py:29-31 fail 3\n    96\tscripts/verify/list-workflow-steps.py:34-71 main 38\n    97\tscripts/verify/list-workflow-steps.py:74-154 list_steps 81\n    98\t```\n    99\t\n   100\t→ 현재 작업트리 helper 수정본의 함수 예산을 검사했다. 좋은 소식이다. 중간에 발견된 `main()` 116줄 결함은 현재 수정본에서 해소됐다.\n   101\t\n   102\t```text\n   103\tcommand: bash -n scripts/acceptance-hs-kickoff.sh\n   104\tcommand: bash -n scripts/acceptance-hs-kickoff-mutations.sh\n   105\tcommand: python3 -m py_compile scripts/verify/list-workflow-steps.py\n   106\ttime: 2026-09-09T20:10:38Z\n   107\texit: 0\n   108\toutput: no output\n   109\t```\n   110\t\n   111\t→ 셸 문법과 Python 컴파일 검사를 했다. 좋은 소식이다. 이 환경에는 별도 lsp_diagnostics 도구가 노출되지 않아 Python 파일은 `py_compile`로 대체 확인했다.\n   112\t\n   113\t```text\n   114\tcommand: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff-mutations.sh\n   115\ttime: 2026-09-09T20:10:38Z\n   116\texit: 0\n   117\toutput:\n   118\tCHECKED: 37\n   119\tOK(run-acceptance): scripts/acceptance-hs-kickoff-mutations.sh — 판정 37건, CHECKED 37\n   120\tEXIT:0\n   121\t```\n   122\t\n   123\t→ helper 분리 뒤 변이 검사를 다시 돌렸다. 좋은 소식이다. 정상·음성 대조군 37건이 유지됐다.\n   124\t\n   125\t## 결함 기록\n   126\t\n   127\t[높음] 수정 전 함수 예산 위반은 실제 결함이었다. `scripts/verify/list-workflow-steps.py:34`의 `main()`이 staged 원본에서 116줄이었다. 이 상태로 커밋하면 P11 함수 hard 100줄 제한을 어기고, 검증 장치 변경 WU의 자체 기준을 약화시킨다. 수정은 단계 목록 파싱 본문을 `list_steps(lines, start)`로 빼고, 함수 길이와 변이 검사를 다시 확인하는 것이다. 현재 작업트리에서는 이 수정이 적용되어 `main()` 38줄, `list_steps()` 81줄이다.\n   128\t\n   129\t[낮음] `docs/engineering/humansearch-hs0001-goal-2026-09-10.md:45`부터 49는 검토 전 상태(`Codeaudit NOT_RUN`, `상태 PLAN`)를 담고 있다. 이 문서는 계획·진행 장부로 읽으면 문제가 아니지만, 최종 커밋 설명으로 쓰면 상태가 낡아 보인다. 고치려면 별도 편집 권한이 있을 때 최종 검토 완료 상태와 이 판정 파일 경로를 덧붙이면 된다.\n   130\t\n   131\t## 확인하지 않은 것\n   132\t\n   133\t- 원격 GitHub Actions 실행은 하지 않았다.\n   134\t- GitHub Issue #69 상태, PR 생성, push, merge는 하지 않았다.\n   135\t- 사람인·잡코리아·LinkedIn 포털, Supabase, SQLite 실제 저장 경로는 실행하지 않았다.\n   136\t- 같은 사용자 권한의 독립 맥락 검토이며, OS 권한 분리 감사가 아니다.\n   137\t- HS00.02, HS00.03, HS00.04의 별도 부채는 이번 PASS 범위가 아니다.\n   138\t\n   139\t## 보고서 작성 후 재검사 기록\n   140\t\n   141\t이 문서를 저장한 뒤 본 검사와 strict brief lint를 다시 실행했다. 아래 값은 초안 작성 직후 1차 실행 결과다.\n   142\t\n   143\t- post-write hs-kickoff: 2026-09-09T20:13:26Z, exit 0, `CHECKED: 12`, `OK(run-acceptance): scripts/acceptance-hs-kickoff.sh — 판정 12건, CHECKED 12`\n   144\t- brief-lint 1차: 2026-09-09T20:13:26Z, exit 0, 위반 3건. 결론 문단의 기술 표기와 표 해석 누락을 이 문서에서 수정했다.\n   145\t- post-fix hs-kickoff: 2026-09-09T20:13:59Z, exit 0, `CHECKED: 12`, `OK(run-acceptance): scripts/acceptance-hs-kickoff.sh — 판정 12건, CHECKED 12`\n   146\t- brief-lint 2차: 2026-09-09T20:13:59Z, exit 0, 위반 0건. 이 숫자는 형식만 증명하며 저장소 자동 검사나 회사 차원의 합격 근거가 아니다.\n",
+      "stderr": ""
+    },
+    {
+      "id": "function_length_ast_heredoc_full",
+      "command": "python3 - <<'PY'\nimport ast, pathlib\nfor p in ['scripts/verify/list-workflow-steps.py']:\n    tree=ast.parse(pathlib.Path(p).read_text())\n    for n in ast.walk(tree):\n        if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef)):\n            print(f'{p}:{n.lineno}-{n.end_lineno} {n.name} {n.end_lineno-n.lineno+1}')\nPY",
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+      "started": "2026-09-09T20:18:00.546Z",
+      "ended": "2026-09-09T20:18:01.325Z",
+      "exit_code": 0,
+      "signal": null,
+      "stdout": "scripts/verify/list-workflow-steps.py:29-31 fail 3\nscripts/verify/list-workflow-steps.py:34-71 main 38\nscripts/verify/list-workflow-steps.py:74-154 list_steps 81\n",
+      "stderr": ""
+    },
+    {
+      "id": "final_hs_kickoff_after_correction_full",
+      "command": [
+        "bash",
+        "scripts/verify/run-acceptance.sh",
+        "scripts/acceptance-hs-kickoff.sh"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+      "started": "2026-09-09T20:18:53.409Z",
+      "ended": "2026-09-09T20:18:54.436Z",
+      "exit_code": 0,
+      "signal": null,
+      "stdout": "PASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 1 건)\nPASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 1 건)\nPASS: 처분 PR #15 → 결론=폐기 (근거 경로 1 건·커밋 1 건)\nPASS: 처분 task/hs-d1-permit → 결론=재작성 (근거 경로 1 건·커밋 2 건)\nPASS: 처분 task/hs-l1-malformed-url-fix → 결론=폐기 (근거 경로 1 건·커밋 1 건)\nPASS: 처분 task/hs-observe-url-crash → 결론=폐기 (근거 경로 2 건·커밋 0 건)\nPASS: CI 스텝 수·이름·순서 정본=30 실제=30 표 행=30 빈 이름 0 번호 1..30 이름 1:1\nPASS: 역사 기록 보존 resume-evidence-supabase-archive-goal-2026-08-17.md\nPASS: 역사 기록 보존 resume-evidence-supabase-implementation-prompt-2026-08-17.md\nPASS: 착수 프롬프트 커밋됨 docs/engineering/goal-prompts/humansearch-journey-kickoff-2026-09-07.md\nPASS: CI 배선 2건 — 이름과 명령이 같은 스텝에서 일치하고 조건·오류무시 없음\nPASS: 판정 문서 docs/engineering/humansearch-kickoff-ledger-verdict-2026-09-10.md (VERDICT: PASS)\nCHECKED: 12\nOK(run-acceptance): scripts/acceptance-hs-kickoff.sh — 판정 12건, CHECKED 12\n",
+      "stderr": ""
+    },
+    {
+      "id": "final_brief_lint_after_correction_full",
+      "command": [
+        "sh",
+        "-c",
+        "[ -x /Users/kangsangmo/.claude/skills/strict/brief-lint.sh ] && /Users/kangsangmo/.claude/skills/strict/brief-lint.sh docs/engineering/humansearch-kickoff-ledger-verdict-2026-09-10.md || /Users/kangsangmo/.codex/skills/strict/brief-lint.sh docs/engineering/humansearch-kickoff-ledger-verdict-2026-09-10.md"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+      "started": "2026-09-09T20:18:54.437Z",
+      "ended": "2026-09-09T20:18:54.500Z",
+      "exit_code": 0,
+      "signal": null,
+      "stdout": "=== docs/engineering/humansearch-kickoff-ledger-verdict-2026-09-10.md ===\n  코드블록 7개 · 표 1개 (면제 0개) / 해석 누락 0개\n  1층(결론): 줄 5 / 본문 213자\n  1층 기술 표기: 없음 (※ 한글 전문용어는 못 잡는다 — 사람이 본다)\n  결정 카드: 없음\n  증거 보관 경로: 임시 외 실재 파일 4건 (※ 그 파일이 이 주장의 증거인지는 못 잰다)\n\n브리핑 계약 기계 검사: 위반 0건 (문서 1개)\n\n이 검사가 못 보는 것 (사람이 봐야 하는 것):\n  · 설명이 실제로 말이 되는지 — 출력과 무관한 문장도 통과한다\n  · 결정 카드 내용이 판단에 쓸 만한지 — 한 글자여도 통과한다\n  · 증거 파일이 그 주장과 관련 있는지 — 존재하기만 하면 통과한다\n  · 결론이 쉬운 말인지 — 한글 전문용어는 잡지 못한다\n  ※ 이 검사는 홈 폴더에만 있어 서버 자동 검사에 없다 — 회사 차원의 합격 근거가 아니다(P15③).\n",
+      "stderr": ""
+    },
+    {
+      "id": "final_report_line_refs_after_correction",
+      "command": [
+        "sh",
+        "-c",
+        "nl -ba docs/engineering/humansearch-kickoff-ledger-verdict-2026-09-10.md | sed -n '1,170p'"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+      "started": "2026-09-09T20:18:54.500Z",
+      "ended": "2026-09-09T20:18:54.555Z",
+      "exit_code": 0,
+      "signal": null,
+      "stdout": "     1\tVERDICT: PASS\n     2\t\n     3\t# HS-00.01 독립 감사 판정 — 2026-09-10\n     4\t\n     5\t## 결론\n     6\t\n     7\t빠진 착수 확인서는 이제 실제 검토 내용으로 채워졌다. 다만 이것은 내부 문서와 검사만 통과했다는 뜻이고, 후보 검색 기능이나 온라인 전달이 끝났다는 뜻은 아니다.\n     8\t\n     9\t본 검사 12항목 중 판정 문서 항목은 첫 줄 형식만 확인한다. 검토 내용의 의미는 이 독립 감사 본문이 담당하며, 고장 주입 검사는 배선·표·근거 형식·위장 실행 같은 검사 장치가 기대한 이유로 실패하는지만 확인했다.\n    10\t\n    11\t중간에 함수 길이 제한을 넘는 문제가 있었지만, 현재 작업트리에서는 작은 함수 둘로 나뉘었고 같은 검사를 다시 통과했다.\n    12\t\n    13\t## 판단 근거\n    14\t\n    15\t- `docs/engineering/humansearch-next-issues-wu-2026-09-10.md:123`은 HS-00.01을 \"현재 착수 판정을 실제 검토 결과로 채운다\"로 정의하고, 기존 11/12 실패 재확인, 독립 검토 출력 보존, 기존 검사 12/12, FAIL 판정을 PASS로 변환 금지를 요구한다.\n    16\t- `docs/engineering/humansearch-hs0001-goal-2026-09-10.md:25`는 `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff.sh`가 종료값 0과 `CHECKED: 12`를 내야 한다고 쓴다.\n    17\t- `scripts/acceptance-hs-kickoff.sh:214`는 `docs/engineering/humansearch-kickoff-ledger-verdict-*.md` 파일이 있고 첫 줄이 `VERDICT: PASS` 또는 `VERDICT: FAIL`인지 검사한다. 이 검사는 검토자의 판정값을 제품 PASS로 바꾸지 않고, 원문 존재와 형식만 본다.\n    18\t- `scripts/acceptance-hs-kickoff-mutations.sh:1`은 본 검사를 속이는 정상·음성 대조군 37건을 임시 worktree에서 실행한다. 출력은 종료값뿐 아니라 기대 실패 사유를 함께 요구하지만, 독립 검토 본문의 의미 적합성을 자동 판정하지는 않는다.\n    19\t- `.github/workflows/verify.yml:273`과 `.github/workflows/verify.yml:280`은 본 검사와 변이 검사를 CI 스텝에 연결한다.\n    20\t- `docs/sot/verification-commands.md:17`은 CI 스텝 30개 전체를 정본 표로 적고, `docs/sot/verification-commands.md:80`과 `docs/sot/verification-commands.md:81`은 hs-kickoff와 hs-kickoff-mutations를 해당 명령으로 기록한다.\n    21\t\n    22\t버린 해석은 두 가지다. 첫째, 11/12 RED를 검사기 결함으로 보는 해석은 버렸다. 본 검사 출력에서 실패한 항목은 판정 문서 누락 하나뿐이고, 변이 검사가 배선·표·근거 형식 위장을 기대 사유로 차단했기 때문이다. 둘째, 첫 줄 `VERDICT: PASS`만 추가하면 충분하다는 해석도 버렸다. WU 문서는 `docs/engineering/humansearch-next-issues-wu-2026-09-10.md:70`에서 사용자 요구부터 시험까지 대조하라고 요구하고, `docs/engineering/humansearch-next-issues-wu-2026-09-10.md:71`에서 판정 파일 존재나 문구만으로 통과시키지 말라고 못박는다.\n    23\t\n    24\t## 요구사항 대조표\n    25\t\n    26\t| ID | 요구 | 판정 | 근거 | 공백 | 심각도 |\n    27\t|---|---|---|---|---|---|\n    28\t| R1 | 기존 11/12 실패가 판정 문서 누락인지 재확인 | 구현 확인 | `artifacts/hs-next-20260910/hs0001-red.log:12`와 재실행 출력 모두 판정 문서 누락만 FAIL | 없음 | 낮음 |\n    29\t| R2 | 독립 검토 원문을 보존 | 구현 확인 | 이 파일 첫 줄과 본문, 작성 후 본 검사 재실행 | OS 권한 분리 아님 | 낮음 |\n    30\t| R3 | FAIL 판정을 제품 PASS로 둔갑 금지 | 구현 확인 | `scripts/acceptance-hs-kickoff.sh:214`는 PASS/FAIL 둘 다 원문으로 허용하고, WU 승인과 제품 완료를 분리 | 제품 기능 검증 없음 | 중간 |\n    31\t| R4 | 본 검사 12건과 변이 37건으로 배선·형식 위장 방어 확인 | 구현 확인 | 본 검사 재실행 12/12, 변이 검사 재실행 37/37 | 독립 검토 의미 자동 판정과 원격 CI는 NOT_RUN | 중간 |\n    32\t| R5 | 네트워크·포털·DB·제품 코드 변경 금지 | 구현 확인 | 변경 범위는 문서·검사·CI 파일, 실행 명령은 로컬 shell과 임시 worktree | 외부 서비스는 확인하지 않음 | 중간 |\n    33\t| R6 | 파일 600줄, 함수 100줄 예산 확인 | 구현 확인 | 현재 작업트리 helper는 `main` 38줄, `list_steps` 81줄, 최대 파일은 593줄 | staged index 원본은 `main` 116줄이었고 수정본 stage 여부는 별도 커밋자가 확인 필요 | 높음 |\n    34\t| R7 | HS00.02~04 부채와 HS00.01 AC 무력화 결함 구분 | 구현 확인 | `docs/engineering/humansearch-next-issues-wu-2026-09-10.md:124`부터 126은 별도 WU, 128부터 130은 현재 AC 무력화일 때만 01 차단이라고 설명 | 02~04 자체 구현은 이번 범위 밖 | 중간 |\n    35\t\n    36\t→ 이 표는 이번 요구를 일곱 개로 나눠 확인한 결과다. 좋은 소식이다. 현재 PASS는 R1부터 R7까지의 로컬 문서·검사 범위에만 걸린다.\n    37\t\n    38\t## 증거 요약과 원문 보관\n    39\t\n    40\t전체 명령, 시작·종료 시각, 종료값, 표준출력, 표준오류 원문은 `artifacts/hs-next-20260910/codeaudit-commands.json`에 보존했다. 아래 코드블록은 감사 중간 이력과 핵심 줄 요약이며, 생략 없는 원문은 JSON의 `commands[]` 항목을 본다.\n    41\t\n    42\t```text\n    43\tcommand: git rev-parse HEAD\n    44\ttime: 2026-09-09T20:08:24Z\n    45\texit: 0\n    46\toutput: 06110d9355ae352da58e4ee7e4e2551962cda7d4\n    47\t```\n    48\t\n    49\t→ 현재 감사 기준 커밋을 확인했다. 좋은 소식이다. 과거 SHA 결과를 현재 판정으로 재사용하지 않기 위한 기준점이다.\n    50\t\n    51\t```text\n    52\tcommand: git diff --cached | shasum -a 256\n    53\ttime: 2026-09-09T20:10:30Z\n    54\texit: 0\n    55\toutput: 99fb71401ba6338ca727b53bb1ab318d91f25939865d9518c96f315d0b0ec51c  -\n    56\t```\n    57\t\n    58\t→ staged 9파일의 후보 diff 지문이다. 이후 작업트리 helper 수정은 별도 지문으로 분리했다.\n    59\t\n    60\t```text\n    61\tcommand: git diff -- scripts/verify/list-workflow-steps.py | shasum -a 256\n    62\ttime: 2026-09-09T20:10:30Z\n    63\texit: 0\n    64\toutput: 069f23a4902cb8d210b7f13e117e03e73e921943309ea0d134e0ba4a8a588666  -\n    65\t```\n    66\t\n    67\t→ staged 원본 뒤에 적용된 작업트리 helper 분리 지문이다. 좋은 소식이다. 함수 예산 위반 수정은 staged 지문과 분리되어 추적된다.\n    68\t\n    69\t```text\n    70\tcommand: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff.sh\n    71\ttime: 2026-09-09T20:08:32Z\n    72\texit: 1\n    73\toutput:\n    74\tPASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 1 건)\n    75\tPASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 1 건)\n    76\tPASS: 처분 PR #15 → 결론=폐기 (근거 경로 1 건·커밋 1 건)\n    77\tPASS: 처분 task/hs-d1-permit → 결론=재작성 (근거 경로 1 건·커밋 2 건)\n    78\tPASS: 처분 task/hs-l1-malformed-url-fix → 결론=폐기 (근거 경로 1 건·커밋 1 건)\n    79\tPASS: 처분 task/hs-observe-url-crash → 결론=폐기 (근거 경로 2 건·커밋 0 건)\n    80\tPASS: CI 스텝 수·이름·순서 정본=30 실제=30 표 행=30 빈 이름 0 번호 1..30 이름 1:1\n    81\tPASS: 역사 기록 보존 resume-evidence-supabase-archive-goal-2026-08-17.md\n    82\tPASS: 역사 기록 보존 resume-evidence-supabase-implementation-prompt-2026-08-17.md\n    83\tPASS: 착수 프롬프트 커밋됨 docs/engineering/goal-prompts/humansearch-journey-kickoff-2026-09-07.md\n    84\tPASS: CI 배선 2건 — 이름과 명령이 같은 스텝에서 일치하고 조건·오류무시 없음\n    85\tFAIL: 판정 문서 없음/빈 파일/첫 줄 VERDICT 아님 (docs/engineering/humansearch-kickoff-ledger-verdict-*.md)\n    86\tCHECKED: 12\n    87\tFAIL(run-acceptance): scripts/acceptance-hs-kickoff.sh 종료값 1\n    88\t```\n    89\t\n    90\t→ 보고서 작성 전 RED를 재현했다. 좋은 소식이다. 11/12 실패 원인이 독립 판정 문서 누락임을 보여준다.\n    91\t\n    92\t```text\n    93\tcommand id: function_length_ast_heredoc_full\n    94\traw log: artifacts/hs-next-20260910/codeaudit-commands.json\n    95\ttime: 2026-09-09T20:18:00.546Z\n    96\texit: 0\n    97\toutput:\n    98\tscripts/verify/list-workflow-steps.py:29-31 fail 3\n    99\tscripts/verify/list-workflow-steps.py:34-71 main 38\n   100\tscripts/verify/list-workflow-steps.py:74-154 list_steps 81\n   101\t```\n   102\t\n   103\t→ 현재 작업트리 helper 수정본의 함수 예산을 검사했다. 좋은 소식이다. 중간에 발견된 `main()` 116줄 결함은 현재 수정본에서 해소됐다.\n   104\t\n   105\t```text\n   106\tcommand: bash -n scripts/acceptance-hs-kickoff.sh\n   107\tcommand: bash -n scripts/acceptance-hs-kickoff-mutations.sh\n   108\tcommand: python3 -m py_compile scripts/verify/list-workflow-steps.py\n   109\ttime: 2026-09-09T20:10:38Z\n   110\texit: 0\n   111\toutput: no output\n   112\t```\n   113\t\n   114\t→ 셸 문법과 Python 컴파일 검사를 했다. 좋은 소식이다. 이 환경에는 별도 lsp_diagnostics 도구가 노출되지 않아 Python 파일은 `py_compile`로 대체 확인했다.\n   115\t\n   116\t```text\n   117\tcommand id: hs_kickoff_mutations_full\n   118\traw log: artifacts/hs-next-20260910/codeaudit-commands.json\n   119\ttime: 2026-09-09T20:15:49.748Z\n   120\texit: 0\n   121\toutput:\n   122\tCHECKED: 37\n   123\tOK(run-acceptance): scripts/acceptance-hs-kickoff-mutations.sh — 판정 37건, CHECKED 37\n   124\t```\n   125\t\n   126\t→ helper 분리 뒤 변이 검사를 다시 돌렸다. 좋은 소식이다. 정상·음성 대조군 37건이 유지됐다. 위 블록은 끝부분 요약이고, 전체 37개 PASS 줄은 원문 JSON에 보존했다.\n   127\t\n   128\t## 결함 기록\n   129\t\n   130\t[높음] 수정 전 함수 예산 위반은 실제 결함이었다. `scripts/verify/list-workflow-steps.py:34`의 `main()`이 staged 원본에서 116줄이었다. 이 상태로 커밋하면 P11 함수 hard 100줄 제한을 어기고, 검증 장치 변경 WU의 자체 기준을 약화시킨다. 수정은 단계 목록 파싱 본문을 `list_steps(lines, start)`로 빼고, 함수 길이와 변이 검사를 다시 확인하는 것이다. 현재 작업트리에서는 이 수정이 적용되어 `main()` 38줄, `list_steps()` 81줄이다.\n   131\t\n   132\t[낮음] `docs/engineering/humansearch-hs0001-goal-2026-09-10.md:45`부터 49는 검토 전 상태(`Codeaudit NOT_RUN`, `상태 PLAN`)를 담고 있다. 이 문서는 계획·진행 장부로 읽으면 문제가 아니지만, 최종 커밋 설명으로 쓰면 상태가 낡아 보인다. 고치려면 별도 편집 권한이 있을 때 최종 검토 완료 상태와 이 판정 파일 경로를 덧붙이면 된다.\n   133\t\n   134\t## 확인하지 않은 것\n   135\t\n   136\t- 원격 GitHub Actions 실행은 하지 않았다.\n   137\t- GitHub Issue #69 상태, PR 생성, push, merge는 하지 않았다.\n   138\t- 사람인·잡코리아·LinkedIn 포털, Supabase, SQLite 실제 저장 경로는 실행하지 않았다.\n   139\t- 같은 사용자 권한의 독립 맥락 검토이며, OS 권한 분리 감사가 아니다.\n   140\t- HS00.02, HS00.03, HS00.04의 별도 부채는 이번 PASS 범위가 아니다.\n   141\t\n   142\t## 보고서 작성 후 재검사 기록\n   143\t\n   144\t이 문서를 저장한 뒤 본 검사와 strict brief lint를 다시 실행했다. 아래 값은 초안 작성 직후 1차 실행 결과다.\n   145\t\n   146\t- post-write hs-kickoff: 2026-09-09T20:13:26Z, exit 0, `CHECKED: 12`, `OK(run-acceptance): scripts/acceptance-hs-kickoff.sh — 판정 12건, CHECKED 12`\n   147\t- brief-lint 1차: 2026-09-09T20:13:26Z, exit 0, 위반 3건. 결론 문단의 기술 표기와 표 해석 누락을 이 문서에서 수정했다.\n   148\t- post-fix hs-kickoff: 2026-09-09T20:13:59Z, exit 0, `CHECKED: 12`, `OK(run-acceptance): scripts/acceptance-hs-kickoff.sh — 판정 12건, CHECKED 12`\n   149\t- brief-lint 2차: 2026-09-09T20:13:59Z, exit 0, 위반 0건. 이 숫자는 형식만 증명하며 저장소 자동 검사나 회사 차원의 합격 근거가 아니다.\n",
+      "stderr": ""
+    },
+    {
+      "id": "final_overclaim_grep_after_correction",
+      "command": [
+        "sh",
+        "-c",
+        "rg -n '가짜 합격|자동 의미검증|fixture로 의미|:218|\\.\\.\\. ast FunctionDef|PENDING' docs/engineering/humansearch-kickoff-ledger-verdict-2026-09-10.md || true"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+      "started": "2026-09-09T20:18:54.556Z",
+      "ended": "2026-09-09T20:18:54.640Z",
+      "exit_code": 0,
+      "signal": null,
+      "stdout": "",
+      "stderr": ""
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "original_path": ".claude/private-reviews/hs0001-20260910/v1-cli-original.jsonl",
+  "original_sha256": "635e6d669cd142b0b180cb20629c382e98815d054889bae7b9bb7aa41a78c6f5",
+  "original_bytes": 855713,
+  "public_file": "v1-cli-public.jsonl",
+  "omitted_field": "assistant content[type=thinking].signature",
+  "omitted_count": 11,
+  "omitted_sha256": [
+    "766c75ac8eba77e51b03d1dd991b261c797a89d9493735cfa07eae80b9302b68",
+    "cea5e3c29920f071537750cf92e2c8b5d53a9e909ab7ea86af3355aa53fcee4c",
+    "0314bdb47c9eb9dbe337d9051816b99d4ceea5fb205b4e93f677c2b5f943cb45",
+    "1e196f4ea6f4b0f9e132236a794db63a33bd7b633be365282f5b8d9e8805e6b1",
+    "24e7583a44b6b5f2edef940ed71172ac56d76e3af261d00f35d3fb7c173c3942",
+    "0b6ecb9f03088d3440101ae475fdf0c6396e0635ed4d55a18b084ed09c7b7eb8",
+    "5d3d7da498528520128dcb78ddbf95cdb768677b0073b1cfaa0c0e4de41bbad6",
+    "4297a09b151b003916c490dc2e98656bc9ff1530565350bad11cec36ab482d3e",
+    "bc1dad6c08470a9883a7574fbb35e7614adbbf79b2a27c829209ee3a89f5a911",
+    "cca7ebe398f2073643907b7f5637e93cefb6bdee4cbe1b6f3a138b05100b6be6",
+    "20f04fb59f97b0782101926d3b2c8f8098a45aa06f7e33cecf44b6bf5f36bd20"
+  ],
+  "reason": "Opaque Claude signature accidentally matches a vendor key shape; command outputs and verdict text are retained unchanged."
+}

@@ -1,0 +1,14 @@
+{
+  "head": "16e5d649dbd257e6d01318c1a8fb0fbe8e731596",
+  "files": {
+    "scripts/acceptance-hs-kickoff.sh": "58262dbce5b40aead6d57da29f03bbf7860d05d1c0923b1a764f514d1eb2740b",
+    "scripts/acceptance-hs-kickoff-mutations.sh": "4569309a6e2a5614e43d7442d80bf9808d221995081c2097cf813e6ac0c9181e",
+    "scripts/verify/list-workflow-steps.py": "5bf585f31b1ae2fa6915e82606bf8b0b2a1cd3a317d890bfcd6bdc6d541bd28f",
+    "scripts/acceptance-hs-gates-mutations.sh": "d166d802d77c4a99532a72cc5ded838ba6f2126fb3cf7acd8fc226173a6481bf",
+    "scripts/acceptance-hs-gates-antiforge.sh": "de04ebbb8ba07f6cb0acdcb2ab3a6fb377be7e37c44cb1deacd56f59982dc947",
+    "humansearch/tests/test_hs_0001.py": "5e84ee466466147ca377b08928bfd04593184e519dc54677a6dd8fe1c31278bf",
+    "humansearch/tests/test_hs_0001_main_compat.py": "0662357ecb0570bee47983b71afb968644ff22a5de7cd74a0ad550cf41a63070",
+    "docs/sot/verification-commands.md": "cd3af0bed3b8b0415630cd73b2f19e3f3bb7c0fc823dabd16ebddf76b999fe47",
+    ".github/workflows/verify.yml": "175d44e93b0eca518cdd74dd54b971e49b020e66bfd6b3935930ae20fac7ecc5"
+  }
+}

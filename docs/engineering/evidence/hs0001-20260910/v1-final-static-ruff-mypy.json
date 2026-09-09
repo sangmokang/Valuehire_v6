@@ -1,0 +1,15 @@
+{
+ "label": "static-ruff-mypy",
+ "command": [
+  "bash",
+  "-c",
+  "uv run --no-sync ruff check src tests && uv run --no-sync mypy src tests"
+ ],
+ "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910/humansearch",
+ "started": "2026-09-09T21:02:55.567626+00:00",
+ "ended": "2026-09-09T21:02:55.936213+00:00",
+ "exit_code": 0,
+ "stdout": "All checks passed!\nSuccess: no issues found in 43 source files\n",
+ "stderr": "",
+ "head": "16e5d649dbd257e6d01318c1a8fb0fbe8e731596"
+}

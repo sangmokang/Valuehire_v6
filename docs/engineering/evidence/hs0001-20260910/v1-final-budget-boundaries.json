@@ -1,0 +1,15 @@
+{
+ "label": "budget-boundaries",
+ "command": [
+  "python3",
+  "artifacts/hs-next-20260910/budget-check.py",
+  "--boundaries"
+ ],
+ "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+ "started": "2026-09-09T21:02:56.016959+00:00",
+ "ended": "2026-09-09T21:02:56.060322+00:00",
+ "exit_code": 0,
+ "stdout": "PASS: /var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/tmpjz64b3o8/boundary.txt: 600 lines / hard600\nFAIL: /var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/tmpjz64b3o8/boundary.txt: 601 lines / hard600\nFAIL: 검사 대상 0개\nPASS: same validator hard600 accepted / hard601 rejected / zero rejected\n",
+ "stderr": "",
+ "head": "16e5d649dbd257e6d01318c1a8fb0fbe8e731596"
+}

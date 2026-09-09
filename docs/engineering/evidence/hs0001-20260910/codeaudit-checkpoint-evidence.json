@@ -1,0 +1,276 @@
+{
+  "created_utc": "2026-09-09T21:32:05.653247+00:00",
+  "verdict": "PASS",
+  "scope": "read-only checkpoint evidence audit; no product test rerun",
+  "facts": {
+    "source9_all_match_worktree_and_index": true,
+    "v1_public_provenance_ok": true,
+    "raw_storage_all_match": true,
+    "diff_cached_check_rc": 0,
+    "verify_worktree_rc": 0,
+    "verify_index_rc": 0,
+    "status_red_raw_wrapped": true,
+    "v1_final_first_line": "VERDICT: PASS",
+    "v1_final_sha256": "15cc44fe64e8a4742433d219851a04be37013f2a9bfb1c70e9ec583fac3bd9ba",
+    "v2_recheck_first_line": "VERDICT: PASS",
+    "v2_recheck_sha256": "49bdab20f725adfa0db61f1757b96ed7cbc879def40adcd63f62fff5c48da96b",
+    "debt_status": "OPEN"
+  },
+  "commands": [
+    {
+      "command": "git diff --cached --check",
+      "started_utc": "2026-09-09T21:31:48.664268+00:00",
+      "ended_utc": "2026-09-09T21:31:48.735879+00:00",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "",
+      "full_output": "",
+      "full_output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "bash verify.sh",
+      "started_utc": "2026-09-09T21:31:48.735940+00:00",
+      "ended_utc": "2026-09-09T21:31:53.660416+00:00",
+      "exit_code": 0,
+      "stdout": "PASS: no secret-pattern match in any tracked file, .env not tracked\n",
+      "stderr": "",
+      "full_output": "PASS: no secret-pattern match in any tracked file, .env not tracked\n",
+      "full_output_sha256": "757c22ef0b961070b50f38c22529cd03a350af7bf292f80a9b83345db1165900"
+    },
+    {
+      "command": "VERIFY_SCAN_SOURCE=index bash verify.sh",
+      "started_utc": "2026-09-09T21:31:53.660490+00:00",
+      "ended_utc": "2026-09-09T21:32:05.447898+00:00",
+      "exit_code": 0,
+      "stdout": "PASS: no secret-pattern match in any tracked file, .env not tracked\n",
+      "stderr": "",
+      "full_output": "PASS: no secret-pattern match in any tracked file, .env not tracked\n",
+      "full_output_sha256": "757c22ef0b961070b50f38c22529cd03a350af7bf292f80a9b83345db1165900"
+    }
+  ],
+  "source9": {
+    "manifest_sha256": "6262de511d1e83d428463bfbbac8b967eebce93f13bd603fff754b30914c7324",
+    "head": "16e5d649dbd257e6d01318c1a8fb0fbe8e731596",
+    "entries": [
+      {
+        "path": "scripts/acceptance-hs-kickoff.sh",
+        "expected_sha256": "58262dbce5b40aead6d57da29f03bbf7860d05d1c0923b1a764f514d1eb2740b",
+        "worktree_sha256": "58262dbce5b40aead6d57da29f03bbf7860d05d1c0923b1a764f514d1eb2740b",
+        "index_sha256": "58262dbce5b40aead6d57da29f03bbf7860d05d1c0923b1a764f514d1eb2740b",
+        "worktree_matches": true,
+        "index_matches": true
+      },
+      {
+        "path": "scripts/acceptance-hs-kickoff-mutations.sh",
+        "expected_sha256": "4569309a6e2a5614e43d7442d80bf9808d221995081c2097cf813e6ac0c9181e",
+        "worktree_sha256": "4569309a6e2a5614e43d7442d80bf9808d221995081c2097cf813e6ac0c9181e",
+        "index_sha256": "4569309a6e2a5614e43d7442d80bf9808d221995081c2097cf813e6ac0c9181e",
+        "worktree_matches": true,
+        "index_matches": true
+      },
+      {
+        "path": "scripts/verify/list-workflow-steps.py",
+        "expected_sha256": "5bf585f31b1ae2fa6915e82606bf8b0b2a1cd3a317d890bfcd6bdc6d541bd28f",
+        "worktree_sha256": "5bf585f31b1ae2fa6915e82606bf8b0b2a1cd3a317d890bfcd6bdc6d541bd28f",
+        "index_sha256": "5bf585f31b1ae2fa6915e82606bf8b0b2a1cd3a317d890bfcd6bdc6d541bd28f",
+        "worktree_matches": true,
+        "index_matches": true
+      },
+      {
+        "path": "scripts/acceptance-hs-gates-mutations.sh",
+        "expected_sha256": "d166d802d77c4a99532a72cc5ded838ba6f2126fb3cf7acd8fc226173a6481bf",
+        "worktree_sha256": "d166d802d77c4a99532a72cc5ded838ba6f2126fb3cf7acd8fc226173a6481bf",
+        "index_sha256": "d166d802d77c4a99532a72cc5ded838ba6f2126fb3cf7acd8fc226173a6481bf",
+        "worktree_matches": true,
+        "index_matches": true
+      },
+      {
+        "path": "scripts/acceptance-hs-gates-antiforge.sh",
+        "expected_sha256": "de04ebbb8ba07f6cb0acdcb2ab3a6fb377be7e37c44cb1deacd56f59982dc947",
+        "worktree_sha256": "de04ebbb8ba07f6cb0acdcb2ab3a6fb377be7e37c44cb1deacd56f59982dc947",
+        "index_sha256": "de04ebbb8ba07f6cb0acdcb2ab3a6fb377be7e37c44cb1deacd56f59982dc947",
+        "worktree_matches": true,
+        "index_matches": true
+      },
+      {
+        "path": "humansearch/tests/test_hs_0001.py",
+        "expected_sha256": "5e84ee466466147ca377b08928bfd04593184e519dc54677a6dd8fe1c31278bf",
+        "worktree_sha256": "5e84ee466466147ca377b08928bfd04593184e519dc54677a6dd8fe1c31278bf",
+        "index_sha256": "5e84ee466466147ca377b08928bfd04593184e519dc54677a6dd8fe1c31278bf",
+        "worktree_matches": true,
+        "index_matches": true
+      },
+      {
+        "path": "humansearch/tests/test_hs_0001_main_compat.py",
+        "expected_sha256": "0662357ecb0570bee47983b71afb968644ff22a5de7cd74a0ad550cf41a63070",
+        "worktree_sha256": "0662357ecb0570bee47983b71afb968644ff22a5de7cd74a0ad550cf41a63070",
+        "index_sha256": "0662357ecb0570bee47983b71afb968644ff22a5de7cd74a0ad550cf41a63070",
+        "worktree_matches": true,
+        "index_matches": true
+      },
+      {
+        "path": "docs/sot/verification-commands.md",
+        "expected_sha256": "cd3af0bed3b8b0415630cd73b2f19e3f3bb7c0fc823dabd16ebddf76b999fe47",
+        "worktree_sha256": "cd3af0bed3b8b0415630cd73b2f19e3f3bb7c0fc823dabd16ebddf76b999fe47",
+        "index_sha256": "cd3af0bed3b8b0415630cd73b2f19e3f3bb7c0fc823dabd16ebddf76b999fe47",
+        "worktree_matches": true,
+        "index_matches": true
+      },
+      {
+        "path": ".github/workflows/verify.yml",
+        "expected_sha256": "175d44e93b0eca518cdd74dd54b971e49b020e66bfd6b3935930ae20fac7ecc5",
+        "worktree_sha256": "175d44e93b0eca518cdd74dd54b971e49b020e66bfd6b3935930ae20fac7ecc5",
+        "index_sha256": "175d44e93b0eca518cdd74dd54b971e49b020e66bfd6b3935930ae20fac7ecc5",
+        "worktree_matches": true,
+        "index_matches": true
+      }
+    ]
+  },
+  "v1_public_provenance": {
+    "original_mode": "0o600",
+    "original_bytes": 834326,
+    "original_sha256": "f5722038a91441ab4170eec50da6ca84ab93ef1dd1b43938ec4f3f0c4b732d75",
+    "expected_original_sha256": "f5722038a91441ab4170eec50da6ca84ab93ef1dd1b43938ec4f3f0c4b732d75",
+    "public_sha256": "2073f9ab209f75f159289b418d45e36b6ad8a4b3642009f0495bc0c888e16712",
+    "expected_public_sha256": "2073f9ab209f75f159289b418d45e36b6ad8a4b3642009f0495bc0c888e16712",
+    "public_records": 605,
+    "expected_records": 605,
+    "omitted_fields": 19,
+    "bad_json": 0,
+    "signature_key_count": 0,
+    "signature_sha256_field_count": 19
+  },
+  "raw_storage_map": {
+    "map_sha256": "8b9ecdca07ca4a8cd1789980f5314a79f84cb81c0f54e6189b3f06b21a2541ec",
+    "entries": [
+      {
+        "original_path": "v1-evidence.log",
+        "stored_path": "v1-evidence.log.json",
+        "stored_sha256": "3aeefde77b4d3c02cc408690664ebec16fada4d41e252e62ecb153b094581e0f",
+        "computed_text_sha256": "3aeefde77b4d3c02cc408690664ebec16fada4d41e252e62ecb153b094581e0f",
+        "sha_matches_text": true,
+        "text_bytes": 66333
+      },
+      {
+        "original_path": "v2-evidence.log",
+        "stored_path": "v2-evidence.log.json",
+        "stored_sha256": "c5a2545be136b49ca78cb12fd1b702f5a85cd698fb6ec39aa771621c8bb63f34",
+        "computed_text_sha256": "c5a2545be136b49ca78cb12fd1b702f5a85cd698fb6ec39aa771621c8bb63f34",
+        "sha_matches_text": true,
+        "text_bytes": 80034
+      },
+      {
+        "original_path": "v2-f1-f4-evidence.log",
+        "stored_path": "v2-f1-f4-evidence.log.json",
+        "stored_sha256": "cd331ab4d0d108150d6f8372763b6bcbeb0f9013b70545c87da24119bda67f1b",
+        "computed_text_sha256": "cd331ab4d0d108150d6f8372763b6bcbeb0f9013b70545c87da24119bda67f1b",
+        "sha_matches_text": true,
+        "text_bytes": 25025
+      },
+      {
+        "original_path": "v1-experiments.sh",
+        "stored_path": "v1-experiments.sh.json",
+        "stored_sha256": "769cd9c6e6b0359ad1dffb38b9117fb8a04fac548a9540c7ef2fe741452bd264",
+        "computed_text_sha256": "769cd9c6e6b0359ad1dffb38b9117fb8a04fac548a9540c7ef2fe741452bd264",
+        "sha_matches_text": true,
+        "text_bytes": 14433
+      },
+      {
+        "original_path": "v1-verdict.md",
+        "stored_path": "v1-verdict.md.json",
+        "stored_sha256": "e894ba0a942c0a5f2161801fbc39e570d0cddca5ba6e4b7c25dd1060bbba5eeb",
+        "computed_text_sha256": "e894ba0a942c0a5f2161801fbc39e570d0cddca5ba6e4b7c25dd1060bbba5eeb",
+        "sha_matches_text": true,
+        "text_bytes": 19434
+      },
+      {
+        "original_path": "codeaudit-reconsideration.md",
+        "stored_path": "codeaudit-reconsideration.md.json",
+        "stored_sha256": "e7f4e6de92fd5b96fddc6bf5bc4202d493ca82dcc79cb58d402bd633295c0f11",
+        "computed_text_sha256": "e7f4e6de92fd5b96fddc6bf5bc4202d493ca82dcc79cb58d402bd633295c0f11",
+        "sha_matches_text": true,
+        "text_bytes": 12387
+      },
+      {
+        "original_path": "v1-final-mutants.py",
+        "stored_path": "v1-final-mutants.py.json",
+        "stored_sha256": "d2548c4020d1cb4f77c12e55080091fc11d76283760a6931f4173f366e89e8bc",
+        "computed_text_sha256": "d2548c4020d1cb4f77c12e55080091fc11d76283760a6931f4173f366e89e8bc",
+        "sha_matches_text": true,
+        "text_bytes": 7128
+      },
+      {
+        "original_path": "codeaudit-final-recheck.json",
+        "stored_path": "codeaudit-final-recheck.raw.json",
+        "stored_sha256": "63b6dd52f3f5633afe2cf6ea4b6570bf3ff1d34d93bbcd1e81b9a12fdbdb2498",
+        "computed_text_sha256": "63b6dd52f3f5633afe2cf6ea4b6570bf3ff1d34d93bbcd1e81b9a12fdbdb2498",
+        "sha_matches_text": true,
+        "text_bytes": 2718
+      },
+      {
+        "original_path": "status-red-diagnosis.json",
+        "stored_path": "status-red-diagnosis.raw.json",
+        "stored_sha256": "3fd31286e2b7e6c25529bcd7f53eebf805d11d38f0464f9b21637b470486846d",
+        "computed_text_sha256": "3fd31286e2b7e6c25529bcd7f53eebf805d11d38f0464f9b21637b470486846d",
+        "sha_matches_text": true,
+        "text_bytes": 102983
+      }
+    ]
+  },
+  "status_red_diagnosis_preservation": {
+    "mapped": true,
+    "raw_exists": true,
+    "raw_sha256": "88957893dce289a024e30a7e6bc580a2b0f1df4342a9aca0c2cc4e3d35708e94",
+    "original_plain_exists": false
+  },
+  "v2_recheck": {
+    "md_exists": true,
+    "md_sha256": "49bdab20f725adfa0db61f1757b96ed7cbc879def40adcd63f62fff5c48da96b",
+    "json_exists": true,
+    "json_sha256": "d0d34d75906424b6c1f7b9e42d1f14ae1f3d651135fa137fe2a2f9dc0fc176cb"
+  },
+  "root_checkpoint_recheck": {
+    "json_exists": true,
+    "json_sha256": "26efa14891d9202e8a53d3fcdf156b22957b355738b0f9e4d6735c9076e5fe6d",
+    "log_exists": true,
+    "log_sha256": "1c29a6ebba039ba1fef1d6916e066b599dbcb991e83f4d6b747461456eebbab0",
+    "json": {
+      "command": [
+        "bash",
+        "-c",
+        "git diff --cached --check && bash verify.sh && VERIFY_SCAN_SOURCE=index bash verify.sh && bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff.sh"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+      "started": "2026-09-09T21:29:29.710416+00:00",
+      "elapsed": 16.55790445790626,
+      "exit_code": 0,
+      "session": "hs-next-20260910",
+      "commit": "16e5d649dbd257e6d01318c1a8fb0fbe8e731596",
+      "output_file": "hs0001-checkpoint-recheck.log"
+    }
+  },
+  "debt": {
+    "path": "docs/engineering/humansearch-workflow-env-debt-2026-09-10.md",
+    "exists": true,
+    "sha256": "b9e5fe99121bf89cdd5012615972235799d56b8a34eb4813f5f16a9df7d7fddb",
+    "status": "OPEN"
+  },
+  "inferences": {
+    "authentication_summary": "The earlier scanner hit on status-red-diagnosis was wrapper/content-shape related and is now scanner-safe through raw JSON text preservation. This audit does not assert any actual credential was present.",
+    "approval_boundary": "PASS applies only to evidence preservation, staged fast gates, source9 fingerprint stability, and debt transparency. It does not claim product live behavior, remote CI, merge, or OS-separated receipt."
+  },
+  "not_repeated": [
+    "product pytest suites",
+    "G2 family",
+    "remote GitHub Actions",
+    "portal/live product checks",
+    "OS-account-separated receipt"
+  ],
+  "self_artifacts": {
+    "markdown_path": "artifacts/hs-next-20260910/codeaudit-checkpoint-evidence.md",
+    "markdown_sha256": "6448fa689a4ef48459a88825a2dc2880b3cd15b06416a211dc37fcc96024fd8b",
+    "json_path": "artifacts/hs-next-20260910/codeaudit-checkpoint-evidence.json",
+    "json_sha256": "d06db73b7b90d77da3eecc68cde6c1f3c0cf06ad3bd040e7b54a6d537eb1d285",
+    "json_actual_sha256_after_write": "a78302877e3fcdbd35bd69fc12aff597a4e193a2a85a549963b45c5702ae27bf"
+  }
+}

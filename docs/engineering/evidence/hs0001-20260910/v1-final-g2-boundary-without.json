@@ -1,0 +1,15 @@
+{
+ "label": "g2-boundary-without",
+ "command": [
+  "bash",
+  "artifacts/hs-next-20260910/v1-final-g2-boundary.sh",
+  "without"
+ ],
+ "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+ "started": "2026-09-09T21:09:59.290743+00:00",
+ "ended": "2026-09-09T21:10:15.187473+00:00",
+ "exit_code": 0,
+ "stdout": "SANDBOX=/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/v1final-g2-without.55WeLM5GUI MODE=without\nROOT seen by test = /var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/v1final-g2-without.55WeLM5GUI\nls: /var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/v1final-g2-without.55WeLM5GUI/.github/workflows/verify.yml: No such file or directory\n                    file_size = st.st_size\n    \n        if not follow_symlinks and _islink(src):\n            os.symlink(os.readlink(src), dst)\n        else:\n>           with open(src, 'rb') as fsrc:\n                 ^^^^^^^^^^^^^^^\nE           FileNotFoundError: [Errno 2] No such file or directory: '/private/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/v1final-g2-without.55WeLM5GUI/.github/workflows/verify.yml'\n\n/opt/homebrew/Cellar/python@3.14/3.14.1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/shutil.py:313: FileNotFoundError\n=========================== short test summary info ============================\nFAILED tests/test_hs_0001.py::test_clean_hs_kickoff_fixture_passes - FileNotF...\nFAILED tests/test_hs_0001.py::test_hs_kickoff_rejects_false_passes_in_workflow_contract[step shell no-op is rejected]\nFAILED tests/test_hs_0001.py::test_hs_kickoff_rejects_false_passes_in_workflow_contract[top defaults run shell is rejected]\nFAILED tests/test_hs_0001.py::test_hs_kickoff_rejects_false_passes_in_workflow_contract[step BASH_ENV is rejected]\nFAILED tests/test_hs_0001.py::test_hs_kickoff_rejects_false_passes_in_workflow_contract[top BASH_ENV is rejected]\nFAILED tests/test_hs_0001.py::test_hs_kickoff_rejects_false_passes_in_workflow_contract[PR 131 does not satisfy PR 13]\nFAILED tests/test_hs_0001.py::test_hs_kickoff_rejects_false_passes_in_workflow_contract[VERDICT PASSED suffix is rejected]\nFAILED tests/test_hs_0001_main_compat.py::test_hs_kickoff_accepts_latest_main_ci_concurrency_and_job_timeout\n8 failed, 211 passed in 13.47s\nFAIL: pytest exit 1\nGATES_RC=1\n",
+ "stderr": "",
+ "head": "16e5d649dbd257e6d01318c1a8fb0fbe8e731596"
+}

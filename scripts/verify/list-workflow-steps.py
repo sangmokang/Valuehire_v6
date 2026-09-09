@@ -23,7 +23,8 @@ import sys, re
 STEP_DASH = "      - "
 KEY_INDENT = 8
 KEY_RE = re.compile(r"^[a-z][a-z0-9-]*: ?")
-WEAK_KEYS = ("if", "continue-on-error")
+TOP_KEYS = ("name", "on", "permissions", "jobs", "concurrency")
+RUN_KEYS = ("name", "run", "id", "timeout-minutes")
 
 
 def fail(msg: str) -> int:
@@ -41,6 +42,10 @@ def main(path: str) -> int:
     for i, l in enumerate(lines, 1):
         if l.rstrip() == "---" or l.rstrip() == "...":
             return fail("문서 구분자 (%d행). 이 파일은 문서 하나여야 한다" % i)
+        if l and not l[0].isspace() and not l.startswith("#"):
+            key = l.split(":", 1)[0]
+            if key not in TOP_KEYS:
+                return fail("최상위 키 '%s' (%d행). 실행 환경 변경은 허용하지 않는다" % (key, i))
 
     jobs = [i for i, l in enumerate(lines) if l.startswith("jobs:")]
     if len(jobs) != 1:
@@ -50,7 +55,7 @@ def main(path: str) -> int:
     if len(job_names) != 1:
         return fail("jobs 아래 잡이 %d개. 하나여야 한다" % len(job_names))
     # 잡 수준 설정으로 스텝 전체를 끄거나 다른 셸로 돌릴 수 있다(Codex V2 6회차).
-    # 잡 수준에는 runs-on 과 steps 만 허용한다.
+    # 잡 수준에는 실행 위치·단계와 정수 시간 제한만 허용한다.
     job_end = next((i for i, l in enumerate(lines[job_names[0] + 1:], job_names[0] + 1)
                     if l.strip() and not l.startswith("    ")), len(lines))
     for i in range(job_names[0] + 1, job_end):
@@ -60,16 +65,23 @@ def main(path: str) -> int:
         if len(l) - len(l.lstrip(" ")) != 4:
             continue
         key = l.strip().split(":", 1)[0]
-        if key not in ("runs-on", "steps"):
-            return fail("잡 수준 키 '%s' (%d행). runs-on 과 steps 만 쓴다 — "
+        if key == "timeout-minutes" and not re.fullmatch(r"[1-9][0-9]*", l.split(":", 1)[1].strip()):
+            return fail("잡 시간 제한은 양의 정수여야 한다 (%d행)" % (i + 1))
+        if key not in ("runs-on", "steps", "timeout-minutes"):
+            return fail("잡 수준 키 '%s' (%d행). runs-on·steps·정수 시간 제한만 쓴다 — "
                         "조건·기본 셸·전략으로 스텝 전체를 끌 수 있다" % (key, i + 1))
 
     steps_at = [i for i, l in enumerate(lines) if l.rstrip() == "    steps:"]
     if len(steps_at) != 1:
         return fail("steps: 가 %d개" % len(steps_at))
 
+    return list_steps(lines, steps_at[0] + 1)
+
+
+def list_steps(lines, start):
+    """검증된 헤더 뒤 단계 목록을 읽고 동일한 출력 계약으로 내보낸다."""
     steps, cur, seen_keys = [], None, set()
-    i = steps_at[0] + 1
+    i = start
     while i < len(lines):
         raw = lines[i]
         if not raw.strip() or raw.lstrip().startswith("#"):
@@ -137,7 +149,9 @@ def main(path: str) -> int:
         elif key == "run":
             cur["run_count"] += 1
             cur["run"] = val
-        elif key in WEAK_KEYS:
+        elif key not in RUN_KEYS:
+            # 보호하는 run 스텝은 허용 목록만 쓴다. 다른 스텝의 uses/with/env는
+            # 열거 결과에 남지만 호출자가 보호 스텝만 골라 판정한다.
             cur["weak"].append(key)
 
     if not steps:

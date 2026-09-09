@@ -1,0 +1,91 @@
+{
+  "purpose": "positive compatibility RED draft for latest main workflow concurrency plus job timeout-minutes",
+  "commands": [
+    {
+      "command": [
+        "git",
+        "diff",
+        "3de3633..4379b2f",
+        "--",
+        ".github/workflows/verify.yml"
+      ],
+      "started_at_utc": "2026-09-09T20:39:40.221993Z",
+      "ended_at_utc": "2026-09-09T20:39:40.411996Z",
+      "returncode": 0,
+      "stdout": "diff --git a/.github/workflows/verify.yml b/.github/workflows/verify.yml\nindex 70846e4..fc6845a 100644\n--- a/.github/workflows/verify.yml\n+++ b/.github/workflows/verify.yml\n@@ -11,9 +11,26 @@ on:\n permissions:\n   contents: read\n \n+concurrency:\n+  # 같은 ref 에서 새 push 가 오면 앞선 실행은 의미가 없다 — 러너를 비운다.\n+  #\n+  # push 와 pull_request 가 서로를 취소하지 않도록 이벤트도 그룹 키에 포함한다.\n+  # P23 판정기는 같은 SHA 의 verify 실행 전부를 집계하므로, 한 이벤트의 성공이\n+  # 다른 이벤트의 취소를 가리지 않는다.\n+  #\n+  # 단 main 은 취소하지 않는다: 초록불 증거가 커밋 SHA 에 귀속되므로(P23),\n+  # main 실행을 중도 취소하면 그 SHA 에 대한 판정이 영구히 비게 된다.\n+  group: verify-${{ github.event_name }}-${{ github.ref }}\n+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}\n+\n jobs:\n   verify:\n     runs-on: ubuntu-latest\n+    # 기본 상한은 360분(6시간)이다. 매달린 스텝이 그만큼 러너를 점유하는 것을 막는다.\n+    # 값 근거는 정상 시간이 아니라 '허용되는 최악'이다 — Invoice 게이트 내부 카나리아\n+    # (check-invoice-gate.py CANARY_TIMEOUT=900) 가 900초를 다 쓰고 나머지 게이트가\n+    # 실측 최댓값(최근 성공 15회 3.2~4.8분)을 써도 약 20분이다. 30분은 그 위 여유다.\n+    timeout-minutes: 30\n     steps:\n       - uses: actions/checkout@v4\n         with:\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "humansearch/.venv/bin/ruff",
+        "check",
+        "artifacts/hs-next-20260910/compat-draft.py"
+      ],
+      "started_at_utc": "2026-09-09T20:39:40.412017Z",
+      "ended_at_utc": "2026-09-09T20:39:40.822486Z",
+      "returncode": 0,
+      "stdout": "All checks passed!\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "humansearch/.venv/bin/mypy",
+        "--strict",
+        "--python-executable",
+        "humansearch/.venv/bin/python",
+        "artifacts/hs-next-20260910/compat-draft.py"
+      ],
+      "started_at_utc": "2026-09-09T20:39:40.822510Z",
+      "ended_at_utc": "2026-09-09T20:39:41.579544Z",
+      "returncode": 0,
+      "stdout": "Success: no issues found in 1 source file\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "humansearch/.venv/bin/pytest",
+        "artifacts/hs-next-20260910/compat-draft.py",
+        "-q"
+      ],
+      "started_at_utc": "2026-09-09T20:39:41.579608Z",
+      "ended_at_utc": "2026-09-09T20:39:42.796021Z",
+      "returncode": 1,
+      "stdout": "F                                                                        [100%]\n=================================== FAILURES ===================================\n______ test_hs_kickoff_accepts_latest_main_ci_concurrency_and_job_timeout ______\n\ntmp_path = PosixPath('/private/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/pytest-of-kangsangmo/pytest-4008/test_hs_kickoff_accepts_latest0')\n\n    def test_hs_kickoff_accepts_latest_main_ci_concurrency_and_job_timeout(\n        tmp_path: Path,\n    ) -> None:\n        repo = copy_fixture(tmp_path)\n    \n        add_latest_main_ci_controls(repo)\n        result = run_acceptance(repo)\n    \n>       assert result.returncode == 0, result.stdout + result.stderr\nE       AssertionError: PASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nE         PASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nE         PASS: 처분 PR #15 → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nE         PASS: 처분 task/hs-d1-permit → 결론=재작성 (근거 경로 1 건·커밋 0 건)\nE         PASS: 처분 task/hs-l1-malformed-url-fix → 결론=폐기 (근거 경로 1 건·커밋 0 건)\nE         PASS: 처분 task/hs-observe-url-crash → 결론=폐기 (근거 경로 2 건·커밋 0 건)\nE         FAIL: 워크플로를 정규 형식으로 읽지 못했다 — 형식 위반: 잡 수준 키 'timeout-minutes' (22행). runs-on 과 steps 만 쓴다 — 조건·기본 셸·전략으로 스텝 전체를 끌 수 있다\nE         PASS: 역사 기록 보존 resume-evidence-supabase-archive-goal-2026-08-17.md\nE         PASS: 역사 기록 보존 resume-evidence-supabase-implementation-prompt-2026-08-17.md\nE         PASS: 착수 프롬프트 커밋됨 docs/engineering/goal-prompts/humansearch-journey-kickoff-2026-09-07.md\nE         FAIL: CI 배선 불량 — 워크플로를 정규 형식으로 읽지 못했다\nE         PASS: 판정 문서 docs/engineering/humansearch-kickoff-ledger-verdict-0000-00-00.md (VERDICT: PASS)\nE         CHECKED: 12\nE         FAIL(run-acceptance): scripts/acceptance-hs-kickoff.sh 종료값 1\nE         \nE       assert 1 == 0\nE        +  where 1 = Result(returncode=1, stdout=\"PASS: 처분 PR #13 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\\nPASS: 처분 PR #54 → 결론=재작성 (근거 경로 1 건·커밋 0 건)\\...0000-00-00.md (VERDICT: PASS)\\nCHECKED: 12\\nFAIL(run-acceptance): scripts/acceptance-hs-kickoff.sh 종료값 1\\n\", stderr='').returncode\n\nartifacts/hs-next-20260910/compat-draft.py:53: AssertionError\n=========================== short test summary info ============================\nFAILED artifacts/hs-next-20260910/compat-draft.py::test_hs_kickoff_accepts_latest_main_ci_concurrency_and_job_timeout\n1 failed in 0.96s\n",
+      "stderr": ""
+    }
+  ],
+  "fingerprints": {
+    "compat_draft_sha256": "0662357ecb0570bee47983b71afb968644ff22a5de7cd74a0ad550cf41a63070",
+    "test_hs_0001_sha256": "5e84ee466466147ca377b08928bfd04593184e519dc54677a6dd8fe1c31278bf",
+    "acceptance_hs_kickoff_sha256": "58262dbce5b40aead6d57da29f03bbf7860d05d1c0923b1a764f514d1eb2740b",
+    "list_workflow_steps_sha256": "a02cd98cc6afcc7a32ebeffc4ce942a5fa68c5bbd5d7ce389b99c56ae04a3263"
+  },
+  "environment": {
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910",
+    "python": "3.14.1",
+    "platform": "macOS-15.7.3-arm64-arm-64bit-Mach-O",
+    "venv_pytest": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-next-implementation-prompt-20260910/humansearch/.venv/bin/pytest"
+  },
+  "checks": {
+    "line_count": {
+      "cmd": [
+        "wc",
+        "-l",
+        "artifacts/hs-next-20260910/compat-draft.py"
+      ],
+      "returncode": 0,
+      "stdout": "      55 artifacts/hs-next-20260910/compat-draft.py\n",
+      "stderr": ""
+    },
+    "git_status_short": {
+      "cmd": [
+        "git",
+        "status",
+        "--short"
+      ],
+      "returncode": 0,
+      "stdout": " M scripts/acceptance-hs-kickoff.sh\n M scripts/verify/list-workflow-steps.py\n?? docs/engineering/evidence/hs0001-20260910/\n?? docs/engineering/goal-prompts/humansearch-next-execution-2026-09-10.md\n?? docs/engineering/humansearch-hs0001-goal-2026-09-10.md\n?? docs/engineering/humansearch-kickoff-ledger-verdict-2026-09-10.md\n?? docs/engineering/humansearch-next-issues-wu-2026-09-10.md\n",
+      "stderr": ""
+    }
+  }
+}
