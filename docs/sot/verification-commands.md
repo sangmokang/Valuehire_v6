@@ -50,7 +50,7 @@
 | 27 | 인수 검사 invoice (채용 수수료 계산·계약·플랫폼 동등성) | `bash scripts/verify/run-acceptance.sh scripts/acceptance-invoice.sh` — 채용 수수료 계산·기한·계약 변조·Codex/Claude 스킬 동등성 + 임시 PostgreSQL 마이그레이션·동시성·저장/전달 RPC |
 | 28 | Invoice 게이트 자가시험 (위조 출력·스텝 무력화 차단) | 인라인 — 위조 출력·스텝 무력화가 반드시 빨개지는지 |
 | 29 | 인수 검사 hs-kickoff (HumanSearch 착수 정리 · WU-0A) | `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff.sh` — 미병합 6건 처분표·CI 스텝 수 일치·설계서 역사 보존·착수 프롬프트·배선·Codex 판정 문서 12건 |
-| 30 | 인수 검사 hs-kickoff-mutations (WU-0A 검사를 속일 수 있는가) | `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff-mutations.sh` — 양성 7 + 음성 19 = 26건. 음성은 종료값뿐 아니라 **기대한 실패 사유**까지 확인한다(주석·env·여러 줄 문자열 미끼, run 키 중복, 콜론 앞 공백 키, 따옴표 키, 빈 이름 표 행, 표 번호 중복, 처분 대상 중복, 근거 자리표시자·영숫자·코드 스팬 위장, 코드 펜스 3종 은닉, 판정 문서 위조). 양성은 무해한 변형(따옴표 값·후행 주석·블록 스칼라·들여쓰기 이동·timeout-minutes·코드 블록 안 가짜 행)에서 과잉 차단이 없음을 확인한다 |
+| 30 | 인수 검사 hs-kickoff-mutations (WU-0A 검사를 속일 수 있는가) | `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff-mutations.sh` — 양성 6 + 음성 27 = 33건. 음성은 종료값뿐 아니라 **기대한 실패 사유**까지 확인한다(주석·env·여러 줄 문자열 미끼, run 키 중복, 콜론 앞 공백 키, 따옴표 키, 빈 이름 표 행, 표 번호 중복, 처분 대상 중복, 근거 자리표시자·영숫자·코드 스팬 위장, 코드 펜스 3종 은닉, 판정 문서 위조). 양성은 무해한 변형(따옴표 값·후행 주석·블록 스칼라·timeout-minutes·코드 블록 안 가짜 행·원본)에서 과잉 차단이 없음을 확인한다. 시험대는 원본 저장소의 진짜 워크트리라 근거의 커밋·경로 실존까지 검사된다 |
 
 *(1번 앞에 `actions/checkout` 이 있고 `fetch-depth: 0` 이다 — 8번이 과거 blob 을 열려면 필요하다.)*
 

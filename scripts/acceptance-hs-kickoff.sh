@@ -45,24 +45,41 @@ targets=(
 if [ ! -f "$DISPOSITION" ]; then
   for t in "${targets[@]}"; do failc "처분표 없음 — $t 판정 불가 ($DISPOSITION)"; done
 else
-  # 코드 블록 안의 표 흉내는 처분이 아니다(Codex V2 2회차 지적). 펜스 안쪽을 버린다.
-  disposition_rows() {
-    awk -v t="$1" '
+  # 표를 열로 나눠 읽는다. 대상 문자열이 행의 어느 열에 있든 세면, 한 행에 대상 6개를
+  # 몰아 적고 나머지를 지워도 여섯 판정이 모두 통과한다(Codex V2 5회차 지적).
+  # 코드 펜스(백틱·물결표, 0~3칸 들여쓰기) 안쪽은 표가 아니다.
+  # 출력: <대상열>\t<결론열>\t<근거열>
+  disposition_cells() {
+    awk '
       {
         line = $0
         sub(/^[ ]+/, "", line)
         indent = length($0) - length(line)
       }
-      # 마크다운은 3칸까지 들여쓴 코드 펜스도 펜스로 읽는다(Codex V2 3회차 지적).
       indent <= 3 && (substr(line, 1, 3) == "```" || substr(line, 1, 3) == "~~~") { fence = !fence; next }
       fence { next }
-      substr(line, 1, 1) == "|" { if (index($0, t) > 0) print }
+      substr(line, 1, 1) == "|" {
+        n = split(line, c, "|")
+        if (n != 7) next                      # | # | 대상 | 결론 | 근거 | 다음 행동 |
+        for (k = 1; k <= n; k++) { gsub(/^[ \t]+|[ \t]+$/, "", c[k]) }
+        if (c[3] == "" || c[4] == "") next
+        print c[3] "\t" c[4] "\t" c[5]
+      }
     ' "$DISPOSITION"
   }
+
+  CELLS=$(disposition_cells)
   for t in "${targets[@]}"; do
-    rows=$(disposition_rows "$t" | /usr/bin/grep -c '^|')
-    row=$(disposition_rows "$t" | head -1)
-    ev=$(printf '%s' "$row" | /usr/bin/grep -oE '근거=[^|]*' | head -1 | sed 's/^근거=//')
+    rows=$(printf '%s\n' "$CELLS" | awk -F'\t' -v t="$t" 'NF && index($1, t) > 0' | /usr/bin/grep -c .)
+    row=$(printf '%s\n' "$CELLS" | awk -F'\t' -v t="$t" 'NF && index($1, t) > 0' | head -1)
+    ev=$(printf '%s' "$row" | cut -f3 | sed 's/^근거=//')
+    # 대상 열에 여러 대상을 몰아 적고 나머지 행을 지우면 여섯 판정이 모두 통과한다(Codex V2 5회차).
+    others=0
+    for u in "${targets[@]}"; do
+      [ "$u" = "$t" ] && continue
+      case "$t" in *"$u"*) continue;; esac
+      if printf '%s' "$row" | cut -f1 | /usr/bin/grep -qF -- "$u"; then others=$((others+1)); fi
+    done
     ev_alnum=$(printf '%s' "$ev" | tr -cd 'A-Za-z0-9' | wc -c | tr -d ' ')
     ev_solid=$(printf '%s' "$ev" | tr -d '[:space:]' | wc -c | tr -d ' ')
     # 근거는 "실행한 명령·경로·커밋"이어야 한다. 뜻 없는 영숫자(abcdefgh)를 막으려면
@@ -70,32 +87,60 @@ else
     ev_ticks=$(printf '%s' "$ev" | tr -cd '`' | wc -c | tr -d ' ')
     # 코드 스팬으로 감싸기만 하면 `abcdefgh` 도 통과한다(Codex V2 3회차 지적).
     # 근거의 형태 자체를 요구한다 — PR 번호(#12), 커밋(16진 7자 이상), 경로(a/b), 줄번호(:12).
-    ev_shape=0
-    if printf '%s' "$ev" | /usr/bin/grep -qE '(#[0-9]+|[0-9a-f]{7,}|[A-Za-z0-9_.-]+/[A-Za-z0-9_./-]+|:[0-9]+)'; then
-      ev_shape=1
-    fi
+    # 형태만 맞으면 `aaaa/bbbb.md:12` 같은 가짜도 통과한다(Codex V2 5회차 지적).
+    # 근거에 적힌 커밋과 저장소 경로가 **실제로 있는지** 확인한다. 하나 이상 실증돼야 한다.
+    ev_real=0
+    ev_bad=""
+    for tok in $(printf '%s' "$ev" | tr '`,;()[]' ' ' | tr ' ' '\n' \
+                 | /usr/bin/grep -E '^[0-9a-f]{7,40}$' | /usr/bin/grep -E '[a-f]' | sort -u); do
+      if git cat-file -e "${tok}^{commit}" 2>/dev/null; then ev_real=$((ev_real+1)); else ev_bad="$ev_bad $tok"; fi
+    done
+    for tok in $(printf '%s' "$ev" | tr '`,;()[]' ' ' | tr ' ' '\n' | sed 's/:[0-9]*$//' \
+                 | /usr/bin/grep -E '^[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)+\.(md|py|sh|yml|yaml|ts|tsx|json)$' | sort -u); do
+      if [ -e "$tok" ]; then
+        ev_real=$((ev_real+1))
+      elif [ "${t#task/}" != "$t" ] && git cat-file -e "$t:$tok" 2>/dev/null; then
+        ev_real=$((ev_real+1))          # 대상이 브랜치면 그 브랜치에서 확인한다
+      else
+        ev_bad="$ev_bad $tok"
+      fi
+    done
     if [ "$rows" -eq 0 ]; then
       failc "처분표에 $t 행 없음"
+    elif [ "$others" -gt 0 ]; then
+      failc "$t 행의 대상 칸에 다른 대상 ${others}개가 함께 적혀 있다 — 대상마다 자기 행이 있어야 한다"
     elif [ "$rows" -ne 1 ]; then
       failc "$t 행이 ${rows}개 — 같은 대상에 처분이 둘 이상이면 결론이 무엇인지 정해지지 않는다"
-    elif ! printf '%s' "$row" | /usr/bin/grep -qE '결론=(병합요청|재작성|폐기)'; then
+    elif ! printf '%s' "$row" | cut -f2 | /usr/bin/grep -qE '^결론=(병합요청|재작성|폐기)$'; then
       failc "$t 행에 결론=(병합요청|재작성|폐기) 없음"
-    elif [ "$ev_alnum" -lt 4 ] || [ "$ev_solid" -lt 8 ] || [ "$ev_ticks" -lt 2 ] || [ "$ev_shape" -eq 0 ]; then
-      failc "$t 행의 근거가 자리표시자 — 영숫자 ${ev_alnum}자(4 미만)·공백 제외 ${ev_solid}바이트(8 미만)·코드 스팬 표시 ${ev_ticks}개(2 미만)·PR/커밋/경로/줄번호 형태 ${ev_shape}(0=없음) 중 하나"
+    elif [ "$ev_alnum" -lt 4 ] || [ "$ev_solid" -lt 8 ] || [ "$ev_ticks" -lt 2 ]; then
+      failc "$t 행의 근거가 자리표시자 — 영숫자 ${ev_alnum}자(4 미만)·공백 제외 ${ev_solid}바이트(8 미만)·코드 스팬 표시 ${ev_ticks}개(2 미만) 중 하나"
+    elif [ -n "$ev_bad" ]; then
+      failc "$t 행의 근거에 실재하지 않는 것이 있다 —$ev_bad"
+    elif [ "$ev_real" -eq 0 ]; then
+      failc "$t 행의 근거에 실증 가능한 커밋·경로가 없다 (실존 확인 0건)"
     else
-      pass "처분 $t → $(printf '%s' "$row" | /usr/bin/grep -oE '결론=(병합요청|재작성|폐기)' | head -1)"
+      pass "처분 $t → $(printf '%s' "$row" | cut -f2) (근거 실증 $ev_real 건)"
     fi
   done
 fi
 
-# 7 CI 스텝 수
-if [ -f "$VERIFY_YML" ] && [ -f "$VC_DOC" ]; then
-  # `- name:` 을 문자열로 세면 이름 없는 스텝(uses 만 있는 checkout)이 통째로 빠지고,
-  # 여러 줄 문자열 안의 가짜 머리글이 스텝으로 세어진다. YAML 로 읽는다.
+# 워크플로를 한 번만 읽는다. 읽지 못하면 항목 7·11 이 각각 실패를 세어 CHECKED 가 흔들린다.
+STEPS=""
+STEPS_ERR=""
+if [ -f "$VERIFY_YML" ]; then
   STEPS=$(python3 scripts/verify/list-workflow-steps.py "$VERIFY_YML" 2>&1) || {
-    failc "워크플로 스텝을 읽지 못했다 — $STEPS"
+    STEPS_ERR="$STEPS"
     STEPS=""
   }
+fi
+
+# 7 CI 스텝 수·이름·순서
+if [ -n "$STEPS_ERR" ]; then
+  failc "워크플로를 정규 형식으로 읽지 못했다 — $STEPS_ERR"
+elif [ -f "$VERIFY_YML" ] && [ -f "$VC_DOC" ]; then
+  # `- name:` 을 문자열로 세면 이름 없는 스텝(uses 만 있는 checkout)이 통째로 빠지고,
+  # 여러 줄 문자열 안의 가짜 머리글이 스텝으로 세어진다. YAML 로 읽는다.
   actual=$(printf '%s' "$STEPS" | /usr/bin/grep -c . )
   documented=$(/usr/bin/grep -oE '워크플로 스텝 [0-9]+개' "$VC_DOC" | head -1 | tr -cd '0-9')
   # 수만 같아서는 안 된다 — 정본은 "이름·순서 그대로"를 주장하므로 이름을 1:1 대조한다(Codex V2 지적).
@@ -134,32 +179,34 @@ else
   failc "착수 프롬프트 없음 $PROMPT"
 fi
 
-# 11 CI 배선(자기 자신 + 자기 변이) — 주석이 아닌 실행 줄이어야 하고, 조건·오류무시가 없어야 한다.
-# 문자열 grep 만으로는 실행 줄을 주석으로 위장하고 다른 명령으로 바꿔치기해도 통과한다(Codex V2 지적).
-# 그래서 스텝 블록을 잘라 그 안의 run: 줄과 약화 지시를 함께 본다.
-# 11 CI 배선(자기 자신 + 자기 변이) — 실행되는 명령이 정말 이 검사여야 한다.
-# 문자열로 훑으면 주석·env 값·여러 줄 문자열 안의 미끼, 콜론 앞 공백으로 쓴 두 번째 키를
-# 모두 놓친다(Codex V2 1~4회차). YAML 로 읽어 스텝의 실제 run 값과 약화 키를 본다.
+# 11 CI 배선 — 기대한 **이름의 스텝**이 기대한 명령을 돌려야 한다.
+# 명령만 보면 이름이 다른 스텝으로 명령을 옮겨도 통과한다(Codex V2 5회차 지적).
 WANT_PREFIX="bash scripts/verify/run-acceptance.sh scripts/"
 wiring_verdict() {
-  printf '%s\n' "$STEPS" | awk -F'\t' -v want="$WANT_PREFIX$1" '
-    NF && $3 == want {
-      if ($4 + 0 > 1) { print "DUP"; found = 1; exit }
-      if ($5 != "")   { print "WEAK"; found = 1; exit }
-      print "OK"; found = 1; exit
+  printf '%s\n' "$STEPS" | awk -F'\t' -v want="$WANT_PREFIX$1" -v nm="$2" '
+    NF && index($2, nm) > 0 { hits++; run = $3; cnt = $4 + 0; weak = $5 }
+    END {
+      if (hits == 0) { print "없음"; exit }
+      if (hits > 1)  { print "이름중복"; exit }
+      if (run != want) { print "명령다름"; exit }
+      if (cnt > 1) { print "키중복"; exit }
+      if (weak != "") { print "약화"; exit }
+      print "OK"
     }
   '
 }
-if [ -n "$STEPS" ]; then
-  w_self=$(wiring_verdict 'acceptance-hs-kickoff.sh')
-  w_mut=$(wiring_verdict 'acceptance-hs-kickoff-mutations.sh')
+if [ -n "$STEPS_ERR" ]; then
+  failc "CI 배선 불량 — 워크플로를 정규 형식으로 읽지 못했다"
+elif [ -n "$STEPS" ]; then
+  w_self=$(wiring_verdict 'acceptance-hs-kickoff.sh' 'hs-kickoff (')
+  w_mut=$(wiring_verdict 'acceptance-hs-kickoff-mutations.sh' 'hs-kickoff-mutations')
   if [ "$w_self" = "OK" ] && [ "$w_mut" = "OK" ]; then
-    pass "CI 배선 2건 — 본 검사·자기 변이 검사가 스텝의 실제 실행 명령이고 조건·오류무시 없음"
+    pass "CI 배선 2건 — 이름과 명령이 같은 스텝에서 일치하고 조건·오류무시 없음"
   else
-    failc "CI 배선 불량 — 본 검사=${w_self:-없음} 자기 변이=${w_mut:-없음} (미끼·중복 키·조건·오류무시·누락)"
+    failc "CI 배선 불량 — 본 검사=$w_self 자기 변이=$w_mut"
   fi
 else
-  failc "CI 배선 불량 — 워크플로 스텝을 읽지 못했다"
+  failc "CI 배선 불량 — 워크플로 스텝이 비었다"
 fi
 
 # 12 Codex V2 판정 문서

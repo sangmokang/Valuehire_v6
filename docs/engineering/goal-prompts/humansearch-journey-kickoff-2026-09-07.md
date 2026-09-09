@@ -124,7 +124,7 @@ WU-0A 사실·브랜치 처분·정본 표 갱신
 4. 판정 `PASS:/FAIL:/CHECKED:` 규약, 최소치 미만 = exit 1(P20). 자기 변이 3종 + 공통 5종.
 5. 새 `scripts/acceptance-*.sh` 는 `verify.yml` + `docs/sot/verification-commands.md` 같은 PR. `bash verify.sh` 출력 숫자 PR 본문에.
 6. 정본·계약 파일을 건드리면 §2-10 의 7요소. 라벨 `weakens-check` 없는 정본 diff 는 머지 불가.
-7. 적대 검증: Claude V1 → Codex V2 재현. 판정 파일 `.claude/private-reviews/<wu>-verdict-<date>.md` 첫 줄 `VERDICT:`. **단, CI 인수 검사가 판정 파일을 세는 WU(0A 등)는 저장소 안 `docs/engineering/` 에 둔다** — `.claude/private-reviews/` 는 `.gitignore:24` 로 무시되어 CI 러너에 존재하지 않는다(2026-09-09 정정). **codex 샌드박스는 파일 쓰기·`mktemp`·네트워크·`uv` 캐시를 막는다** — 판정은 `node /Users/kangsangmo/.claude/plugins/cache/openai-codex/codex/1.0.2/scripts/codex-companion.mjs result <job>` 로 회수해 Claude 가 파일로 저장하고, 시험 실행은 Claude 가, codex 는 읽기·대조·독립 재관측.
+7. 적대 검증: Claude V1 → Codex V2 재현. 판정 파일 `.claude/private-reviews/<wu>-verdict-<date>.md` 첫 줄 `VERDICT:`. **단, CI 인수 검사가 판정 파일을 세는 WU(0A 등)는 저장소 안 `docs/engineering/` 에 둔다** — `.claude/private-reviews/` 는 `.gitignore:24` 로 무시되어 CI 러너에 존재하지 않는다(2026-09-09 정정). **codex 샌드박스의 `mktemp`·파일 쓰기 차단은 실행 시점에 따라 다르다** — 2026-09-09 5회차에서는 둘 다 성공했다. 막히면 그때 미확인으로 적는다. **codex 샌드박스는 파일 쓰기·`mktemp`·네트워크·`uv` 캐시를 막는다** — 판정은 `node /Users/kangsangmo/.claude/plugins/cache/openai-codex/codex/1.0.2/scripts/codex-companion.mjs result <job>` 로 회수해 Claude 가 파일로 저장하고, 시험 실행은 Claude 가, codex 는 읽기·대조·독립 재관측.
 8. PII: URL 경로 축약, 이름·연락처 암호화, 캡처 원본 git 밖(P21). 브리핑 3층, 용어 즉시 풀이, 결정 5줄 카드. 완료 선언은 CI 초록 + `check-verified-sha.sh` VERIFIED 뒤에만.
 
 ## §5. 절대 안전선
@@ -148,7 +148,7 @@ WU-0A 사실·브랜치 처분·정본 표 갱신
 
 ## §7. 첫 작업(WU-0A) 종료 조건 — 끝나면 곧바로 WU-0B
 
-- 워크트리 `hs-kickoff-ledger` 에 ① 이 프롬프트 ② 처분표(6건 결론+근거) ③ `verification-commands.md` CI 스텝 30 갱신(실측) ④ `scripts/acceptance-hs-kickoff.sh` + `verify.yml` 배선 ⑤ 08-17 설계서 2건 `docs/engineering/history/` 보존 — 커밋 + PR 열림. `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff.sh` → `CHECKED: 12`, exit 0. 자기 변이 `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff-mutations.sh` → `CHECKED: 26`(양성 7 + 음성 19), exit 0. `bash verify.sh` 숫자 PR 본문에.
+- 워크트리 `hs-kickoff-ledger` 에 ① 이 프롬프트 ② 처분표(6건 결론+근거) ③ `verification-commands.md` CI 스텝 30 갱신(실측) ④ `scripts/acceptance-hs-kickoff.sh` + `verify.yml` 배선 ⑤ 08-17 설계서 2건 `docs/engineering/history/` 보존 — 커밋 + PR 열림. `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff.sh` → `CHECKED: 12`, exit 0. 자기 변이 `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff-mutations.sh` → `CHECKED: 33`(양성 6 + 음성 27), exit 0. `bash verify.sh` 숫자 PR 본문에.
 - Codex V2 판정을 `result` 로 회수해 파일 저장(크기 > 0, 첫 줄 `VERDICT:`).
 - 사장님께 남는 것은 **카드 2(봇 계정 만들기) 하나**와 카드 3 의 병합 버튼. 나머지는 기본값. merge 0. 막히면 원인 기록 후 다음 항목, 2회 막히면 질문으로.
 

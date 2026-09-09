@@ -4,7 +4,7 @@
 # 왜 있나: 인수 검사는 "통과"만 보여줘서는 안 된다. 일부러 깨뜨린 사본에서 반드시
 # 빨개져야 그 검사가 실제로 무언가를 보고 있다는 증거가 된다(Codex V2 2026-09-09 지적).
 #
-# 무엇을 검사하나(CHECKED 33 = 양성 7 + 음성 26):
+# 무엇을 검사하나(CHECKED 33 = 양성 6 + 음성 27):
 #   양성  원본 그대로의 사본 → acceptance-hs-kickoff.sh exit 0.
 #   음성1 CI 실행 줄을 주석으로 위장하고 다른 명령으로 바꾼다 → exit != 0.
 #   음성2 CI 스텝에 오류무시 지시(continue-on-error 를 true 로)를 붙인다 → exit != 0.
@@ -21,7 +21,8 @@
 #   음성13 오류무시 키를 따옴표로 감싼다 → exit != 0.
 #   음성14 근거를 코드 스팬으로 감싼 뜻 없는 영숫자로 바꾼다 → exit != 0.
 #   음성15 3칸 들여쓴 코드 펜스로 진짜 처분 행을 감싼다 → exit != 0.
-#   양성3 워크플로 전체 들여쓰기를 옮긴다(의미 동등) → exit 0.
+#   음성27 워크플로 들여쓰기를 정규 형식 밖으로 옮긴다 → exit != 0.
+#        (의미는 같지만 검사 가능한 형식을 벗어나므로 통과시키지 않는다 — fail-closed)
 #   양성4 스텝에 timeout-minutes 를 끼운다(정상 설정) → exit 0.
 #   음성16 스텝을 지우고 앞 스텝의 여러 줄 문자열 안에 머리글·실행 줄을 숨긴다 → exit != 0.
 #   음성17 조건 키를 콜론 앞 공백으로 쓴다(if : false) → exit != 0.
@@ -63,6 +64,20 @@ fi
 TMP="$(mktemp -d)" || { echo "FAIL: 임시 디렉터리 생성 실패"; echo "CHECKED: 0"; exit 1; }
 trap 'rm -rf "$TMP"' EXIT
 
+# 시험대는 원본 저장소의 진짜 워크트리다. 파일만 복사한 빈 저장소에서는 근거의
+# 커밋·경로 실존 검사가 성립하지 않아, 음성이 "우연히 다른 이유로" 빨개진다(Codex V2 5회차).
+WT="$TMP/wt"
+if ! git worktree add --detach --quiet "$WT" HEAD; then
+  echo "FAIL: 시험대 워크트리를 만들지 못했다"
+  echo "CHECKED: 0"
+  exit 1
+fi
+trap 'git worktree remove --force "$WT" >/dev/null 2>&1; rm -rf "$TMP"' EXIT
+
+VERDICT_FIXTURE="docs/engineering/humansearch-kickoff-ledger-verdict-0000-00-00.md"
+
+# 워크트리는 HEAD 를 담는다. 검사가 읽는 파일은 **지금 작업트리**의 것으로 덮어써야
+# 커밋 전 변경도 시험된다.
 FILES=(
   ".github/workflows/verify.yml"
   "docs/sot/verification-commands.md"
@@ -73,26 +88,25 @@ FILES=(
   "scripts/verify/list-workflow-steps.py"
 )
 
-# 사본 하나를 새로 만든다. 판정 문서는 이 시험대 안에서만 쓰는 합성본이다.
+# 원본 상태로 되돌리고, 판정 문서(아직 커밋 전이라 없다)를 시험대 전용 합성본으로 채운다.
 make_fixture() {
   local dst="$1"
-  rm -rf "$dst"
-  mkdir -p "$dst"
+  [ "$dst" = "$WT" ] || return 1
+  git -C "$WT" checkout --force --quiet -- . || return 1
+  git -C "$WT" clean -qfd || return 1
   local f
   for f in "${FILES[@]}"; do
     [ -f "$f" ] || return 1
-    mkdir -p "$dst/$(dirname "$f")"
-    cp "$f" "$dst/$f"
+    mkdir -p "$WT/$(dirname "$f")"
+    cp "$f" "$WT/$f"
   done
-  local verdict
-  verdict=$(ls docs/engineering/humansearch-kickoff-ledger-verdict-*.md 2>/dev/null | head -1)
-  if [ -n "$verdict" ]; then
-    cp "$verdict" "$dst/$verdict"
+  local real
+  real=$(ls docs/engineering/humansearch-kickoff-ledger-verdict-*.md 2>/dev/null | head -1)
+  if [ -n "$real" ]; then
+    cp "$real" "$WT/$real"
   else
-    printf 'VERDICT: PASS\n\n시험대 전용 합성 판정 문서.\n' \
-      > "$dst/docs/engineering/humansearch-kickoff-ledger-verdict-0000-00-00.md"
+    printf 'VERDICT: PASS\n\n시험대 전용 합성 판정 문서.\n' > "$WT/$VERDICT_FIXTURE"
   fi
-  git -C "$dst" init -q >"$TMP/init.log" 2>&1 || return 1
   return 0
 }
 
@@ -103,7 +117,7 @@ run_target() {
 }
 
 # ── 양성 대조군 ────────────────────────────────────────────────────────────
-FIX="$TMP/base"
+FIX="$WT"
 if ! make_fixture "$FIX"; then
   echo "FAIL: 시험대 구성 실패 — 원본 파일이 없다"
   echo "CHECKED: 0"
@@ -119,12 +133,20 @@ fi
 # ── 음성 대조군 ────────────────────────────────────────────────────────────
 tree_hash() {
   # 내용만 세면 권한 변경·심볼릭 링크 대상 변경을 "안 바뀜"으로 읽는다(Codex V2 5회차 지적).
+  # 검사가 읽는 파일만 본다 — 워크트리 전체를 해시하면 느리고 무관한 변화에 흔들린다.
   {
-    find "$1" \( -type f -o -type l \) -not -path '*/.git/*' | LC_ALL=C sort | while IFS= read -r f; do
-      meta=$(stat -f '%p %HT' "$f" 2>/dev/null)
-      if [ -z "$meta" ]; then meta=$(stat -c '%a %F' "$f" 2>/dev/null); fi
-      printf '%s\t%s\t' "${f#$1}" "$meta"
-      if [ -L "$f" ]; then printf 'link:%s\n' "$(readlink "$f")"; else shasum "$f" | cut -d' ' -f1; fi
+    local f
+    for f in "${FILES[@]}" "$VERDICT_FIXTURE"; do
+      local path="$1/$f"
+      [ -e "$path" ] || { printf '%s\tNONE\n' "$f"; continue; }
+      local meta
+      meta=$(stat -f '%p %HT' "$path" 2>/dev/null)
+      if [ -z "$meta" ]; then meta=$(stat -c '%a %F' "$path" 2>/dev/null); fi
+      printf '%s\t%s\t' "$f" "$meta"
+      if [ -L "$path" ]; then printf 'link:%s\n' "$(readlink "$path")"; else shasum "$path" | cut -d' ' -f1; fi
+    done
+    ls "$1"/docs/engineering/humansearch-kickoff-ledger-verdict-*.md 2>/dev/null | while IFS= read -r v; do
+      printf 'verdict:%s\t' "$(basename "$v")"; shasum "$v" | cut -d' ' -f1
     done
   } | shasum | cut -d' ' -f1
 }
@@ -132,7 +154,7 @@ tree_hash() {
 # 변조해도 판정이 바뀌면 안 되는 시험(과잉 차단 방지). 기대 종료값 0.
 positive() {
   local name="$1" mutate="$2"
-  local d="$TMP/p$checked"
+  local d="$WT"
   if ! make_fixture "$d"; then failc "$name — 시험대 구성 실패"; return; fi
   local before after
   before=$(tree_hash "$d")
@@ -149,7 +171,7 @@ positive() {
 
 negative() {
   local name="$1" mutate="$2" expect="$3"
-  local d="$TMP/m$checked"
+  local d="$WT"
   if ! make_fixture "$d"; then failc "$name — 시험대 구성 실패"; return; fi
   local before after
   before=$(tree_hash "$d")
@@ -190,7 +212,13 @@ negative "음성3 정본 표에 이름이 빈 행" '
 printf "| 99 |  | 이름 없는 행 |\n" >> docs/sot/verification-commands.md' 'CI 스텝 불일치'
 
 negative "음성4 처분표 대상 중복" '
-printf "| PR #13 | 결론=폐기 | 근거=중복 행 테스트 abcdefgh |\n" >> docs/engineering/humansearch-branch-disposition-2026-09-07.md' '처분이 둘 이상'
+python3 - <<'"'"'PY'"'"'
+import pathlib
+p=pathlib.Path("docs/engineering/humansearch-branch-disposition-2026-09-07.md")
+tick=chr(96)
+row = "| 7 | PR #13 중복 | 결론=폐기 | 근거=" + tick + "2d5280d" + tick + " 중복 행 시험 | 없음 |"
+p.write_text(p.read_text() + row + chr(10))
+PY' '처분이 둘 이상'
 
 negative "음성5 근거 자리표시자" '
 python3 - <<'"'"'PY'"'"'
@@ -316,7 +344,7 @@ for i,l in enumerate(lines):
 else:
     raise SystemExit("anchor not found")
 p.write_text("".join(lines))
-PY' '근거가 자리표시자'
+PY' '근거'
 
 negative "음성15 3칸 들여쓴 코드 펜스로 진짜 행 숨김" '
 python3 - <<'"'"'PY'"'"'
@@ -332,15 +360,15 @@ else:
 p.write_text("".join(lines))
 PY' '행 없음'
 
-positive "양성3 워크플로 전체 들여쓰기 이동" '
+negative "음성27 정규 형식을 벗어난 들여쓰기" '
 python3 - <<'"'"'PY'"'"'
 import pathlib
 p=pathlib.Path(".github/workflows/verify.yml")
 out=[]
 for l in p.read_text().splitlines():
     out.append(("  " + l) if l.strip() and l.startswith(" ") else l)
-p.write_text("\n".join(out) + "\n")
-PY'
+p.write_text(chr(10).join(out) + chr(10))
+PY' 'CI 배선 불량'
 
 positive "양성4 스텝에 timeout-minutes 삽입" '
 python3 - <<'"'"'PY'"'"'
@@ -449,7 +477,7 @@ for l in lines:
     out.append(l)
 assert dropped==6, dropped
 p.write_text("".join(out))
-PY' '처분표에'
+PY' '대상 칸에 다른 대상'
 
 negative "음성21 실재하지 않는 근거 경로" '
 python3 - <<'"'"'PY'"'"'
