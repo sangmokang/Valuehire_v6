@@ -63,6 +63,7 @@ FILES=(
   "docs/engineering/history/resume-evidence-supabase-archive-goal-2026-08-17.md"
   "docs/engineering/history/resume-evidence-supabase-implementation-prompt-2026-08-17.md"
   "docs/engineering/goal-prompts/humansearch-journey-kickoff-2026-09-07.md"
+  "scripts/verify/list-workflow-steps.py"
 )
 
 # 사본 하나를 새로 만든다. 판정 문서는 이 시험대 안에서만 쓰는 합성본이다.

@@ -6,8 +6,8 @@
 #   7    docs/sot/verification-commands.md 의 CI 스텝 수·이름·순서 == verify.yml 의 `- name:` (1:1).
 #   8~9  2026-08-17 레쥬메 설계서 2건이 docs/engineering/history/ 에 "v4 전제 역사 기록" 머리말과 함께 있다.
 #   10   착수 프롬프트가 docs/engineering/goal-prompts/ 에 있다.
-#   11   verify.yml 이 이 스크립트와 자기 변이 스크립트를 run-acceptance.sh 로 감싸
-#        **주석이 아닌 실행 줄**로 돌리고, 그 스텝에 조건·오류무시가 없다.
+#   11   verify.yml 을 YAML 로 읽어, 이 스크립트와 자기 변이 스크립트가 스텝의 **실제
+#        실행 명령**이고 그 스텝에 조건·오류무시 키가 없다(중복 키·미끼 문자열 배제).
 #   12   Codex V2 판정 문서가 docs/engineering/ 에 있고 첫 줄이 VERDICT: 다.
 #
 # 강화 이력(Codex V2 2026-09-09 FAIL 판정): 처분 행 유일성·근거 자리표시자·정본 표의
@@ -54,7 +54,7 @@ else
         indent = length($0) - length(line)
       }
       # 마크다운은 3칸까지 들여쓴 코드 펜스도 펜스로 읽는다(Codex V2 3회차 지적).
-      indent <= 3 && substr(line, 1, 3) == "```" { fence = !fence; next }
+      indent <= 3 && (substr(line, 1, 3) == "```" || substr(line, 1, 3) == "~~~") { fence = !fence; next }
       fence { next }
       substr(line, 1, 1) == "|" { if (index($0, t) > 0) print }
     ' "$DISPOSITION"
@@ -90,7 +90,13 @@ fi
 
 # 7 CI 스텝 수
 if [ -f "$VERIFY_YML" ] && [ -f "$VC_DOC" ]; then
-  actual=$(/usr/bin/grep -cE '^[[:space:]]*- name:' "$VERIFY_YML")
+  # `- name:` 을 문자열로 세면 이름 없는 스텝(uses 만 있는 checkout)이 통째로 빠지고,
+  # 여러 줄 문자열 안의 가짜 머리글이 스텝으로 세어진다. YAML 로 읽는다.
+  STEPS=$(python3 scripts/verify/list-workflow-steps.py "$VERIFY_YML" 2>&1) || {
+    failc "워크플로 스텝을 읽지 못했다 — $STEPS"
+    STEPS=""
+  }
+  actual=$(printf '%s' "$STEPS" | /usr/bin/grep -c . )
   documented=$(/usr/bin/grep -oE '워크플로 스텝 [0-9]+개' "$VC_DOC" | head -1 | tr -cd '0-9')
   # 수만 같아서는 안 된다 — 정본은 "이름·순서 그대로"를 주장하므로 이름을 1:1 대조한다(Codex V2 지적).
   doc_rows=$(/usr/bin/grep -cE '^\| [0-9]+ \|' "$VC_DOC")
@@ -98,7 +104,7 @@ if [ -f "$VERIFY_YML" ] && [ -f "$VC_DOC" ]; then
   # 행 번호가 1..N 으로 유일·연속이어야 한다. 번호를 중복시키면 행 수는 맞고 내용만 바뀐다.
   num_seq=$(/usr/bin/grep -E '^\| [0-9]+ \|' "$VC_DOC" | awk -F'|' '{gsub(/ /,"",$2); if ($2+0 != NR) bad=1} END {print bad+0}')
   # 명령치환은 후행 빈 줄을 지운다 — 끝에 표식을 붙여 "이름이 빈 마지막 행"이 사라지지 않게 한다.
-  yaml_names=$(/usr/bin/grep -E '^[[:space:]]*- name:' "$VERIFY_YML" | sed -E 's/^[[:space:]]*- name:[[:space:]]*//'; echo '<끝>')
+  yaml_names=$(printf '%s\n' "$STEPS" | awk -F'\t' 'NF{print $2}'; echo '<끝>')
   doc_names=$(/usr/bin/grep -E '^\| [0-9]+ \|' "$VC_DOC" | awk -F'|' '{gsub(/^ +| +$/,"",$3); print $3}'; echo '<끝>')
   if [ -n "$documented" ] && [ "$documented" = "$actual" ] && [ "$doc_rows" = "$actual" ] \
      && [ "$empty_names" -eq 0 ] && [ "$num_seq" -eq 0 ] && [ "$yaml_names" = "$doc_names" ]; then
@@ -131,51 +137,29 @@ fi
 # 11 CI 배선(자기 자신 + 자기 변이) — 주석이 아닌 실행 줄이어야 하고, 조건·오류무시가 없어야 한다.
 # 문자열 grep 만으로는 실행 줄을 주석으로 위장하고 다른 명령으로 바꿔치기해도 통과한다(Codex V2 지적).
 # 그래서 스텝 블록을 잘라 그 안의 run: 줄과 약화 지시를 함께 본다.
-# 블록 전체를 문자열로 훑으면 env 값 안에 숨긴 미끼 줄도 실행으로 오인한다(Codex V2 2회차).
-# 스텝 키의 들여쓰기를 "- " 위치에서 재고, **그 깊이의 줄만** 스텝의 최상위 키로 인정한다.
+# 11 CI 배선(자기 자신 + 자기 변이) — 실행되는 명령이 정말 이 검사여야 한다.
+# 문자열로 훑으면 주석·env 값·여러 줄 문자열 안의 미끼, 콜론 앞 공백으로 쓴 두 번째 키를
+# 모두 놓친다(Codex V2 1~4회차). YAML 로 읽어 스텝의 실제 run 값과 약화 키를 본다.
+WANT_PREFIX="bash scripts/verify/run-acceptance.sh scripts/"
 wiring_verdict() {
-  awk -v t="$1" '
-    function flush() {
-      # run 키가 둘이면 YAML 은 뒤엣것을 쓴다 — 앞에 정답을 두고 뒤에서 덮어쓰는 위조를 막는다.
-      if (run_ok) { if (run_count > 1) print "DUP"; else if (weak) print "WEAK"; else print "OK" }
-      seen = 0; weak = 0; run_ok = 0; run_count = 0
+  printf '%s\n' "$STEPS" | awk -F'\t' -v want="$WANT_PREFIX$1" '
+    NF && $3 == want {
+      if ($4 + 0 > 1) { print "DUP"; found = 1; exit }
+      if ($5 != "")   { print "WEAK"; found = 1; exit }
+      print "OK"; found = 1; exit
     }
-    { sub(/[ \t]+$/, "") }
-    /^[[:space:]]*- name:/ {
-      flush()
-      key = sprintf("%" (index($0, "-") + 1) "s", "")
-      seen = 1
-      next
-    }
-    seen && key != "" {
-      # 이 스텝의 최상위 키 줄만 본다. 더 깊이 들여쓴 줄(env 값 등)은 실행이 아니다.
-      if (substr($0, 1, length(key)) == key && substr($0, length(key) + 1, 1) != " ") {
-        line = substr($0, length(key) + 1)
-        kname = line
-        sub(/:.*/, "", kname)
-        gsub(/^["\047]|["\047]$/, "", kname)   # 따옴표로 감싼 키도 같은 키다
-        val = line
-        sub(/^[^:]*:[ \t]*/, "", val)
-        if (kname == "run") {
-          run_count++
-          if (val == "bash scripts/verify/run-acceptance.sh scripts/" t) run_ok = 1
-        }
-        if (kname == "if" || kname == "continue-on-error") weak = 1
-      }
-    }
-    END { flush() }
-  ' "$VERIFY_YML" | head -1
+  '
 }
-if [ -f "$VERIFY_YML" ]; then
+if [ -n "$STEPS" ]; then
   w_self=$(wiring_verdict 'acceptance-hs-kickoff.sh')
   w_mut=$(wiring_verdict 'acceptance-hs-kickoff-mutations.sh')
   if [ "$w_self" = "OK" ] && [ "$w_mut" = "OK" ]; then
-    pass "CI 배선 2건 — 본 검사·자기 변이 검사 모두 실행 줄이고 조건·오류무시 없음"
+    pass "CI 배선 2건 — 본 검사·자기 변이 검사가 스텝의 실제 실행 명령이고 조건·오류무시 없음"
   else
-    failc "CI 배선 불량 — 본 검사=${w_self:-없음} 자기 변이=${w_mut:-없음} (주석 위장·조건·오류무시·누락)"
+    failc "CI 배선 불량 — 본 검사=${w_self:-없음} 자기 변이=${w_mut:-없음} (미끼·중복 키·조건·오류무시·누락)"
   fi
 else
-  failc "verify.yml 없음"
+  failc "CI 배선 불량 — 워크플로 스텝을 읽지 못했다"
 fi
 
 # 12 Codex V2 판정 문서

@@ -29,7 +29,7 @@
 - `humansearch-browser-contract.md`: 사람인·잡코리아 = 채널별 비기본 전용 프로필 + 상주 브라우저 + 로컬 진단 포트 + 목표 탭 정확히 1개(§2·§4). LinkedIn Recruiter = 사장님 실제 로그인 프로필을 CDP 로 재사용 + 페이싱(§2-1·§4). **§4 LinkedIn: "후보 상세 저장, 메시지 작성·발송은 이 문서로 허용하지 않는다."** §6 포트·프로필 하드코딩 금지, 매 작업 재발견. §9-5·§11·§14 "자동 재개하지 않는다"(별도 승인 전 NOT_RUN). §12 C1 선행 조건 9개(그중 3 = 실행별 오너 승인, 7 = 채널별 보존기간·삭제·영수증). §15 D1 불변식 8개. **§16 개정 절차 6단계**(새 L3 goal + 결정 카드 / 권한·PII 영향·되돌리기 공개 / 금지 능력 부재·잔여 명령 0 변조 시험 / 대체·역사 문서 갱신 / Claude V1·Codex V2 가 자격증명·전체 프로필·탭 추측·사람 개입·세션 지속성·LinkedIn 범위 6축 공격 / 오너 승인 전 범위 확장 금지). 발송 자동화 금지.
 - `humansearch-l0-surface-contract.md`: L0 는 순수 함수, `AUTHENTICATED` 는 실행 종료가 아니다.
 - `coding-principles.md` P1~P24 + §1-B 5조. 직접 쓰는 것: P2(인수 기준 = 실행 명령+기대 출력), P4(외부 효과 모듈은 네트워크 차단 레인에서 반드시 FAIL), P5/P15(RED 후 시험 파일 불변), **P8("3사 계정 = 사이트당 1석" — ⑪ 로 개정 대상)**, P9(멱등키+write-ahead+readback), P11(파일 soft 300/hard 600, 함수 soft 60/hard 100, PR 3,000줄 금지, 생성물·마이그레이션·fixture 면제, 예외는 owner·reason·expiry), **P13①(계약·검사 파일 diff 는 라벨 `weakens-check` 없이 머지 불가)**, P17(증거는 만든 자가 못 쓴다), P19(외부 경계 라이브 1건), P20(0건 = FAIL), P22(상수는 `contracts/` 만), **§1-B 5조(개입 신호 이후 호출이 타입상 불가능해야 한다)**.
-- `verification-commands.md`: `make` 없음. 게이트 0 = `bash scripts/session-status.sh`(3번째 줄 `RED: N/M` + 뒤 오류 줄까지), 워크트리 = `git worktree add worktrees/<name> -b task/<name>`, 검증 = `bash verify.sh` + CI, 배송 = `git push -u origin task/<name>` + `gh pr create`. **CI 스텝 29개**(2026-09-09 실측; 정본 표도 29 로 갱신됨). 새 `scripts/acceptance-*.sh` 는 `verify.yml` + 이 표 양쪽.
+- `verification-commands.md`: `make` 없음. 게이트 0 = `bash scripts/session-status.sh`(3번째 줄 `RED: N/M` + 뒤 오류 줄까지), 워크트리 = `git worktree add worktrees/<name> -b task/<name>`, 검증 = `bash verify.sh` + CI, 배송 = `git push -u origin task/<name>` + `gh pr create`. **CI 스텝 30개**(2026-09-09 실측; 이름 없는 checkout 스텝 포함. 정본 표도 30 으로 갱신됨). 새 `scripts/acceptance-*.sh` 는 `verify.yml` + 이 표 양쪽.
 - 마스터플랜 §2: **D2(Discord) 선행 = G3**, D3 선행 = D1 + L1, D1 = 자동 기동·생존 감시·포트 자동 탐지.
 
 **브라우저 실측 (2026-09-08 재확인, `lsof`)**
@@ -148,7 +148,7 @@ WU-0A 사실·브랜치 처분·정본 표 갱신
 
 ## §7. 첫 작업(WU-0A) 종료 조건 — 끝나면 곧바로 WU-0B
 
-- 워크트리 `hs-kickoff-ledger` 에 ① 이 프롬프트 ② 처분표(6건 결론+근거) ③ `verification-commands.md` CI 스텝 29 갱신(실측) ④ `scripts/acceptance-hs-kickoff.sh` + `verify.yml` 배선 ⑤ 08-17 설계서 2건 `docs/engineering/history/` 보존 — 커밋 + PR 열림. `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff.sh` → `CHECKED: 12`, exit 0. 자기 변이 `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff-mutations.sh` → `CHECKED: 19`(양성 4 + 음성 15), exit 0. `bash verify.sh` 숫자 PR 본문에.
+- 워크트리 `hs-kickoff-ledger` 에 ① 이 프롬프트 ② 처분표(6건 결론+근거) ③ `verification-commands.md` CI 스텝 30 갱신(실측) ④ `scripts/acceptance-hs-kickoff.sh` + `verify.yml` 배선 ⑤ 08-17 설계서 2건 `docs/engineering/history/` 보존 — 커밋 + PR 열림. `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff.sh` → `CHECKED: 12`, exit 0. 자기 변이 `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff-mutations.sh` → `CHECKED: 26`(양성 7 + 음성 19), exit 0. `bash verify.sh` 숫자 PR 본문에.
 - Codex V2 판정을 `result` 로 회수해 파일 저장(크기 > 0, 첫 줄 `VERDICT:`).
 - 사장님께 남는 것은 **카드 2(봇 계정 만들기) 하나**와 카드 3 의 병합 버튼. 나머지는 기본값. merge 0. 막히면 원인 기록 후 다음 항목, 2회 막히면 질문으로.
 
