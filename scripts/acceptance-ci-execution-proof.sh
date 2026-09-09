@@ -117,9 +117,13 @@ unrunnable() { [ "$1" -eq 127 ] || [ "$1" -eq 126 ]; }
 audit() {  # 검수 실행 → 종료값. expect 파일을 주면 기대 목록을 그것으로 좁힌다.
   local dir="$1" expect="${2:-}" rc=0
   if [ -n "$expect" ]; then
-    ( cd "$CLONE" && ACCEPTANCE_MARKER_DIR="$dir" ACCEPTANCE_EXPECT_LIST="$expect" bash "$AUDITOR" ) >"$SANDBOX/audit.out" 2>&1 || rc=$?
+    # GITHUB_ACTIONS 를 비운다. 이 인수 검사 자체가 CI 안에서 돌면 그 변수가 상속되는데,
+    # 검수기는 러너에서 ACCEPTANCE_EXPECT_LIST 를 거부하도록 되어 있어(2026-09-09
+    # humanreview 반례 차단) 시연이 자기 차단에 걸린다. 시연은 "러너가 아닌 환경"을
+    # 흉내내는 것이 맞고, 러너에서 거부되는지는 아래 전용 시연이 따로 확인한다.
+    ( cd "$CLONE" && GITHUB_ACTIONS= ACCEPTANCE_MARKER_DIR="$dir" ACCEPTANCE_EXPECT_LIST="$expect" bash "$AUDITOR" ) >"$SANDBOX/audit.out" 2>&1 || rc=$?
   else
-    ( cd "$CLONE" && ACCEPTANCE_MARKER_DIR="$dir" bash "$AUDITOR" ) >"$SANDBOX/audit.out" 2>&1 || rc=$?
+    ( cd "$CLONE" && GITHUB_ACTIONS= ACCEPTANCE_MARKER_DIR="$dir" bash "$AUDITOR" ) >"$SANDBOX/audit.out" 2>&1 || rc=$?
   fi
   echo "$rc"
 }
