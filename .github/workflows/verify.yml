@@ -32,7 +32,9 @@ jobs:
         # 패턴은 커밋된 .secret-patterns.default 를 쓴다.
         # 실제 비밀값은 CI에 올리지 않는다 — 저장소 시크릿에 넣는 것도 유출 경로를 늘리는 일이다.
         # 로컬 전용 .secret-patterns 는 gitignore 되어 여기 없다.
-        run: bash verify.sh
+        # 래퍼를 거친다. 직접 부르면 실행 증명 마커가 남지 않아, 이 저장소의 최우선
+        # 방어선인 비밀 스캔만 실행 증명 밖에 남는다(2026-09-09 감사에서 잡힌 공백).
+        run: bash scripts/verify/run-acceptance.sh verify.sh
 
       - name: Strict 원칙 정본·장부·배선 검사
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-principles-check.sh

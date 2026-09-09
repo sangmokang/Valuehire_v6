@@ -66,7 +66,7 @@ while IFS= read -r s; do
   [ -z "$s" ] && continue
   printf '#!/usr/bin/env bash\necho "PASS: stub %s"\necho "CHECKED: 1"\nexit 0\n' "$s" > "$CLONE/$s"
   chmod +x "$CLONE/$s"; stub_count=$((stub_count + 1))
-done < <(cd "$CLONE" && find . -maxdepth 2 -name 'acceptance-*.sh' -not -path './worktrees/*' | sed 's#^\./##' | LC_ALL=C sort)
+done < <(cd "$CLONE" && find . -maxdepth 2 \( -name 'verify.sh' -o -name 'acceptance-*.sh' \) -not -path './worktrees/*' | sed 's#^\./##' | LC_ALL=C sort)
 [ "$stub_count" -ge 5 ] || { echo "FAIL: 스텁 대상이 ${stub_count}개뿐 — 시연 대상 부족 (fail-closed)"; echo "CHECKED: 0"; exit 2; }
 
 # 미니 러너 — 워크플로를 YAML 로 읽어 조건 없는 스텝의 run: 만 실행한다.
@@ -211,7 +211,7 @@ fill_all_markers() {  # 모든 스텁을 래퍼로 실행해 마커를 채운다
     [ -z "$s" ] && continue
     [ -n "$skip" ] && [ "$s" = "$skip" ] && continue
     ( cd "$CLONE" && ACCEPTANCE_MARKER_DIR="$dir" bash "$WRAPPER" "$s" ) </dev/null >/dev/null 2>&1
-  done < <(cd "$CLONE" && find . -maxdepth 2 -name 'acceptance-*.sh' -not -path './worktrees/*' | sed 's#^\./##' | LC_ALL=C sort)
+  done < <(cd "$CLONE" && find . -maxdepth 2 \( -name 'verify.sh' -o -name 'acceptance-*.sh' \) -not -path './worktrees/*' | sed 's#^\./##' | LC_ALL=C sort)
   return 0
 }
 
@@ -243,6 +243,25 @@ else
     else
       record 0 "글로브 기대 목록: 한 개만 빠져도 불합격한다 (생산 경로) — 누락: $SKIP"
     fi
+  fi
+fi
+
+# --- 비밀 스캔(verify.sh)도 실행 증명 대상인가 -----------------------------------
+# 이 저장소의 최우선 방어선인데 인수 스크립트만 세면 그것 하나가 증명 밖에 남는다.
+# 2026-09-09 감사 실측: 마커에 verify.sh 항목이 29개나 있는데도 기대 목록에 없어
+# 대조되지 않았고, CI 의 비밀 스캔 줄을 무력화해도 이 검수는 아무 말을 하지 않았다.
+reset_clone
+DIRV="$SANDBOX/markers-verify"
+if ! fill_all_markers "$DIRV" "verify.sh"; then
+  record 1 "verify.sh 가 빠지면 불합격한다 (비밀 스캔도 증명 대상)" "마커 채우기 실패 — 시연 무효"
+else
+  rc=$(audit "$DIRV")
+  if unrunnable "$rc"; then
+    record 1 "verify.sh 가 빠지면 불합격한다 (비밀 스캔도 증명 대상)" "검수기를 실행할 수 없다 (rc=$rc) — 시연 무효"
+  elif [ "$rc" -eq 0 ]; then
+    record 1 "verify.sh 가 빠지면 불합격한다 (비밀 스캔도 증명 대상)" "verify.sh 를 빼도 통과했다 (rc=0) — 최우선 방어선이 실행 증명 밖에 있다"
+  else
+    record 0 "verify.sh 가 빠지면 불합격한다 (비밀 스캔도 증명 대상)"
   fi
 fi
 
