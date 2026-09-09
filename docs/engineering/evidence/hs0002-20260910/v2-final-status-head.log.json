@@ -1,0 +1,1 @@
+{"original_filename": "v2-final-status-head.log", "sha256": "fdf2184014c0261089f399f31276a32494ab928aaa4e2984f5ffd7e9e43f234f", "text": "M  docs/sot/verification-commands.md\nM  scripts/acceptance-hs-kickoff-mutations.sh\nA  scripts/verify/has-kickoff-failure.py\n?? docs/engineering/evidence/hs0002-20260910/\n?? docs/engineering/humansearch-hs0002-goal-2026-09-10.md\n"}

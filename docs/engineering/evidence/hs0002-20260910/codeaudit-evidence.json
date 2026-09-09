@@ -1,0 +1,208 @@
+{
+  "verdict": "PASS",
+  "session": "/root/hs0002_codeaudit",
+  "skill_path_read": "/Users/kangsangmo/.codex/skills/codeaudit/SKILL.md",
+  "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+  "head": "0263108eab043dbb4780f7c9ca6ac0528808b31d",
+  "same_uid_local_review": true,
+  "limitations": [
+    "same UID local codeaudit only",
+    "not OS isolation",
+    "not P17/live receipt",
+    "not remote CI",
+    "not actual Claude V1",
+    "not fresh Codex V2"
+  ],
+  "candidate_files_sha256": {
+    "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+    "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+    "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+    "docs/sot/verification-commands.md": "73cfc56bcc240a971a48c86248cbd8261c9e8891eb847950907a8b80e1b57298"
+  },
+  "verdict_report": "artifacts/hs0002-20260910/codeaudit-verdict.md",
+  "initial_artifacts_preserved": {
+    "verdict_initial_path": "artifacts/hs0002-20260910/codeaudit-verdict.initial.md",
+    "verdict_initial_sha256": "78b8d745ef2ad42aab96e6aa763fd4aab32011158eff0645b7b4c13edc05628d",
+    "evidence_initial_path": "artifacts/hs0002-20260910/codeaudit-evidence.initial.json",
+    "evidence_initial_sha256": "ae61486ae77018f21a47023fdb04f3b37d6ee22f973e23e7233400f619c08f5d"
+  },
+  "pre_rerun_artifacts_preserved": {
+    "verdict_pre_rerun_path": "artifacts/hs0002-20260910/codeaudit-verdict.pre-rerun-20260909T220808Z.md",
+    "verdict_pre_rerun_sha256": "74452023f4c69cfd641f59f62245cdf7649cbd71ee74bbd74bec7062ef8e2473",
+    "evidence_pre_rerun_path": "artifacts/hs0002-20260910/codeaudit-evidence.pre-rerun-20260909T220808Z.json",
+    "evidence_pre_rerun_sha256": "d9fbccba421b6620878738554c4d7b83193bb6ada4b17586d62b79d900633bdc"
+  },
+  "rerun_evidence": {
+    "purpose": "Independent rerun for reproducible normal-plus-three-mutants evidence. It does not retroactively prove the earlier truncated mutant-probes output.",
+    "script_path": "artifacts/hs0002-20260910/codeaudit-rerun-mutants-20260909T220808Z.sh",
+    "script_sha256": "eb610541690c82b37cee776a0857fc096a0f8594ebce1fc3cc12a26dc2e9f929",
+    "ledger_path": "artifacts/hs0002-20260910/codeaudit-rerun-20260909T220808Z/ledger.json",
+    "run_exit_code": 0,
+    "run_dir": "artifacts/hs0002-20260910/codeaudit-rerun-20260909T220808Z",
+    "product_sha_unchanged": true,
+    "normal_case": {
+      "exit_code": 0,
+      "checked": "20 passed",
+      "stdout_path": "artifacts/hs0002-20260910/codeaudit-rerun-20260909T220808Z/normal/pytest.stdout",
+      "stderr_path": "artifacts/hs0002-20260910/codeaudit-rerun-20260909T220808Z/normal/pytest.stderr",
+      "stdout_sha256": "2fc186ae5e969b80c88472a28442ca34bdd33ee2dc8068a8572c90cbbd0d8db3",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "mutant_cases": [
+      {
+        "name": "always_allow",
+        "exit_code": 1,
+        "checked": "AssertionError",
+        "mutation_diff": "artifacts/hs0002-20260910/codeaudit-rerun-20260909T220808Z/always_allow/mutation.diff",
+        "stdout_path": "artifacts/hs0002-20260910/codeaudit-rerun-20260909T220808Z/always_allow/pytest.stdout",
+        "stderr_path": "artifacts/hs0002-20260910/codeaudit-rerun-20260909T220808Z/always_allow/pytest.stderr",
+        "stdout_sha256": "a43014bb26d8898297b5c533f611ef3d0adb79f87d51e5a89d0f736501098b5a",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "always_reject",
+        "exit_code": 1,
+        "checked": "AssertionError",
+        "mutation_diff": "artifacts/hs0002-20260910/codeaudit-rerun-20260909T220808Z/always_reject/mutation.diff",
+        "stdout_path": "artifacts/hs0002-20260910/codeaudit-rerun-20260909T220808Z/always_reject/pytest.stdout",
+        "stderr_path": "artifacts/hs0002-20260910/codeaudit-rerun-20260909T220808Z/always_reject/pytest.stderr",
+        "stdout_sha256": "b58a4bfade48a5138bff9dafdf5a03555efd5c7dda298f8c6f55d1f1866b3504",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "boundary_substring",
+        "exit_code": 1,
+        "checked": "AssertionError",
+        "mutation_diff": "artifacts/hs0002-20260910/codeaudit-rerun-20260909T220808Z/boundary_substring/mutation.diff",
+        "stdout_path": "artifacts/hs0002-20260910/codeaudit-rerun-20260909T220808Z/boundary_substring/pytest.stdout",
+        "stderr_path": "artifacts/hs0002-20260910/codeaudit-rerun-20260909T220808Z/boundary_substring/pytest.stderr",
+        "stdout_sha256": "cb76ea80f3f6bc43096b3bc1394e645d0eb798b0650882446e198b31fddfbb93",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ]
+  },
+  "command_logs": [
+    {
+      "name": "status-diff",
+      "command": "bash -lc git status --short && git diff --check && git diff --stat && git diff -- scripts/acceptance-hs-kickoff-mutations.sh scripts/verify/has-kickoff-failure.py humansearch/tests/test_hs_0002.py docs/sot/verification-commands.md",
+      "started": "2026-09-09T21:57:33Z",
+      "ended": "2026-09-09T21:57:33Z",
+      "exit_code": 0,
+      "meta_path": "artifacts/hs0002-20260910/codeaudit-status-diff.meta",
+      "full_output_path": "artifacts/hs0002-20260910/codeaudit-status-diff.log",
+      "output_sha256": "e6e0b44d5ca6ccdfaf8f01e7527c09e9a2fe13f474f79da063e498e5ac12665e"
+    },
+    {
+      "name": "target-pytest",
+      "command": "bash -lc cd humansearch && uv run --no-sync pytest -q tests/test_hs_0002.py",
+      "started": "2026-09-09T21:57:33Z",
+      "ended": "2026-09-09T21:57:38Z",
+      "exit_code": 0,
+      "meta_path": "artifacts/hs0002-20260910/codeaudit-target-pytest.meta",
+      "full_output_path": "artifacts/hs0002-20260910/codeaudit-target-pytest.log",
+      "output_sha256": "9502b3583c04289d36e3ad81035156f87240a0186a706b9a34df765dbc6a0ba6"
+    },
+    {
+      "name": "ruff",
+      "command": "bash -lc cd humansearch && uv run --no-sync ruff check src tests ../scripts/verify/has-kickoff-failure.py",
+      "started": "2026-09-09T21:57:38Z",
+      "ended": "2026-09-09T21:57:38Z",
+      "exit_code": 0,
+      "meta_path": "artifacts/hs0002-20260910/codeaudit-ruff.meta",
+      "full_output_path": "artifacts/hs0002-20260910/codeaudit-ruff.log",
+      "output_sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18"
+    },
+    {
+      "name": "mypy",
+      "command": "bash -lc cd humansearch && uv run --no-sync mypy src tests ../scripts/verify/has-kickoff-failure.py",
+      "started": "2026-09-09T21:57:38Z",
+      "ended": "2026-09-09T21:57:39Z",
+      "exit_code": 0,
+      "meta_path": "artifacts/hs0002-20260910/codeaudit-mypy.meta",
+      "full_output_path": "artifacts/hs0002-20260910/codeaudit-mypy.log",
+      "output_sha256": "fdba5b4e396441aaf1ba0d4aee9a2b6de7229057c665772ec81bd032ce1cc3f5"
+    },
+    {
+      "name": "mutations",
+      "command": "bash -lc unset BASH_ENV ENV; for n in ${!GIT_@}; do unset \"$n\"; done; bash scripts/acceptance-hs-kickoff-mutations.sh",
+      "started": "2026-09-09T21:57:39Z",
+      "ended": "2026-09-09T21:58:21Z",
+      "exit_code": 0,
+      "meta_path": "artifacts/hs0002-20260910/codeaudit-mutations.meta",
+      "full_output_path": "artifacts/hs0002-20260910/codeaudit-mutations.log",
+      "output_sha256": "099ddbde4dae0766cbe5c527539429416d3b5d27e7ebbf96e9453d3dbe4cb252"
+    },
+    {
+      "name": "g2",
+      "command": "bash -lc bash scripts/acceptance-hs-gates.sh",
+      "started": "2026-09-09T21:58:21Z",
+      "ended": "2026-09-09T21:58:41Z",
+      "exit_code": 0,
+      "meta_path": "artifacts/hs0002-20260910/codeaudit-g2.meta",
+      "full_output_path": "artifacts/hs0002-20260910/codeaudit-g2.log",
+      "output_sha256": "91de9c0da025bf0dcce77691f37faef4064b7d2adac52a291c2f1672e70e3ba7"
+    },
+    {
+      "name": "helper-probes",
+      "command": "see meta command field",
+      "command_source_path": "artifacts/hs0002-20260910/codeaudit-helper-probes.meta",
+      "command_source_note": "The meta file preserves the full shell-escaped executed command; this JSON entry links that source instead of restating a lossy summary.",
+      "started": "2026-09-09T21:58:41Z",
+      "ended": "2026-09-09T21:58:41Z",
+      "exit_code": 0,
+      "meta_path": "artifacts/hs0002-20260910/codeaudit-helper-probes.meta",
+      "full_output_path": "artifacts/hs0002-20260910/codeaudit-helper-probes.log",
+      "output_sha256": "333652369553cd6147fcca31d0d20245e1aab834269c347b8de25123d0d9471d"
+    },
+    {
+      "name": "search-patterns",
+      "command": "see meta command field",
+      "command_source_path": "artifacts/hs0002-20260910/codeaudit-search-patterns.meta",
+      "command_source_note": "The meta file preserves the full shell-escaped executed rg command; this JSON entry links that source instead of restating a lossy summary.",
+      "started": "2026-09-09T21:58:41Z",
+      "ended": "2026-09-09T21:58:41Z",
+      "exit_code": 0,
+      "meta_path": "artifacts/hs0002-20260910/codeaudit-search-patterns.meta",
+      "full_output_path": "artifacts/hs0002-20260910/codeaudit-search-patterns.log",
+      "output_sha256": "10d331ae6e02277c7a727b744b401d6527ceb1fd7b7e2434da3e4ffc394415d5"
+    },
+    {
+      "name": "mutant-probes",
+      "command": "reconstructed command; see command_artifact_path",
+      "command_artifact_path": "artifacts/hs0002-20260910/codeaudit-mutant-command.txt",
+      "command_source_gap": "The original successful meta command was a non-executable summary and its stdout was truncated. This entry is retained only as gap-marked history, not as the primary PASS basis. The later codeaudit-rerun-* evidence is the reproducible mutant evidence.",
+      "started": "2026-09-09T22:00:47Z",
+      "ended": "2026-09-09T22:02:14Z",
+      "exit_code": 0,
+      "meta_path": "artifacts/hs0002-20260910/codeaudit-mutant-probes.meta",
+      "full_output_path": "artifacts/hs0002-20260910/codeaudit-mutant-probes.log",
+      "output_sha256": "fb01befb29e602047a7b1e2cadbdb25c40a6833868f23a82b4f9fc6da115b7b8"
+    },
+    {
+      "name": "rerun-normal-plus-three-mutants",
+      "command": "artifacts/hs0002-20260910/codeaudit-rerun-mutants-20260909T220808Z.sh",
+      "command_artifact_path": "artifacts/hs0002-20260910/codeaudit-rerun-mutants-20260909T220808Z.sh",
+      "command_artifact_sha256": "eb610541690c82b37cee776a0857fc096a0f8594ebce1fc3cc12a26dc2e9f929",
+      "started": "2026-09-09T22:09:14Z",
+      "ended": "2026-09-09T22:09:58Z",
+      "exit_code": 0,
+      "ledger_path": "artifacts/hs0002-20260910/codeaudit-rerun-20260909T220808Z/ledger.json",
+      "full_output_paths": [
+        "artifacts/hs0002-20260910/codeaudit-rerun-20260909T220808Z/normal/pytest.stdout",
+        "artifacts/hs0002-20260910/codeaudit-rerun-20260909T220808Z/normal/pytest.stderr",
+        "artifacts/hs0002-20260910/codeaudit-rerun-20260909T220808Z/always_allow/pytest.stdout",
+        "artifacts/hs0002-20260910/codeaudit-rerun-20260909T220808Z/always_allow/pytest.stderr",
+        "artifacts/hs0002-20260910/codeaudit-rerun-20260909T220808Z/always_reject/pytest.stdout",
+        "artifacts/hs0002-20260910/codeaudit-rerun-20260909T220808Z/always_reject/pytest.stderr",
+        "artifacts/hs0002-20260910/codeaudit-rerun-20260909T220808Z/boundary_substring/pytest.stdout",
+        "artifacts/hs0002-20260910/codeaudit-rerun-20260909T220808Z/boundary_substring/pytest.stderr"
+      ]
+    }
+  ],
+  "not_run_by_this_codeaudit": [
+    "actual Claude V1",
+    "fresh Codex V2",
+    "remote CI",
+    "live portal or P17 receipt"
+  ]
+}

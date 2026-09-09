@@ -1,0 +1,6 @@
+{
+  "scope": "Only the previously exposed named key; no environment inventory",
+  "jwt_role_unverified_signature": "service_role",
+  "key_value_recorded": false,
+  "remote_request_made": false
+}

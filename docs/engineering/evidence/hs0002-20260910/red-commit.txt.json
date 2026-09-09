@@ -1,0 +1,1 @@
+{"original_filename": "red-commit.txt", "sha256": "6a5ac8e985e88e1dd9609851ae6d8535884e9baa52b30dc9a855707dc0fababf", "text": "잘못된 실패 사유가 성공으로 세어지는 동작을 먼저 고정한다\n\nConstraint: HS-00.02 구현 전 독립 검토한 행동 RED를 별도 커밋한다\nTested: 실제 negative 호출 시험 20개 중 12개 단언 실패와 8개 정상 통과; Ruff 및 mypy 통과\nNot-tested: 아직 구현 전이므로 이 커밋의 RED 실패는 의도된 상태다\nConfidence: high\nScope-risk: narrow\n"}

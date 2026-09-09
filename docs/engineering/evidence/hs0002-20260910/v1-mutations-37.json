@@ -1,0 +1,1 @@
+{"command":"bash scripts/acceptance-hs-kickoff-mutations.sh","cwd":"/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910","start":"2026-09-09T22:04:14Z","end":"2026-09-09T22:04:52Z","exit_code":0,"head":"0263108eab043dbb4780f7c9ca6ac0528808b31d","retry_of":"v1-mutations-37-attempt1-failed.txt"}

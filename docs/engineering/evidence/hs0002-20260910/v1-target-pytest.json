@@ -1,0 +1,1 @@
+{"command":"cd humansearch && uv run --no-sync pytest -q tests/test_hs_0002.py","start":"2026-09-09T22:03:57Z","end":"2026-09-09T22:04:02Z","exit_code":0,"head":"0263108eab043dbb4780f7c9ca6ac0528808b31d"}

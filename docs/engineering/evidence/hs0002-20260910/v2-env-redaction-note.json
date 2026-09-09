@@ -1,0 +1,9 @@
+{
+  "reason": "v2-env was an unnecessary environment inventory and contained secret-bearing variables; redacted in-place and excluded from proof set",
+  "original_sha256": "4e0924755d03d5b019f04086a7e87a3849a3af5c6b1b920068eb01528b8455e7",
+  "redacted_sha256": "22bce9a15be6f49d7bc96512963829a141031115e1b3797eb3cca80e8dc053ff",
+  "redacted_fields": [
+    "SUPABASE_KEY",
+    "SUPABASE_URL"
+  ]
+}

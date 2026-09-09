@@ -186,7 +186,7 @@ negative() {
   local rc; rc=$(run_target "$d")
   if [ "$rc" -eq 0 ]; then
     failc "$name — 변조가 통과했다 (exit 0). 검사가 이 위조를 보지 못한다"
-  elif ! /usr/bin/grep -q -- "$expect" "$TMP/out.log"; then
+  elif ! python3 scripts/verify/has-kickoff-failure.py "$TMP/out.log" "$expect"; then
     failc "$name — 빨개지긴 했으나 사유가 다르다 (exit $rc, 기대 '$expect' 없음: $(/usr/bin/grep -m1 '^FAIL' "$TMP/out.log"))"
   else
     pass "$name — 기대한 사유로 차단됨 (exit $rc, '$expect')"

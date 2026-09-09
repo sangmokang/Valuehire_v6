@@ -1,0 +1,1 @@
+{"original_filename": "bootstrap-hooks.log", "sha256": "ea625c06abb561c0b14dd9de2e390196261d5b45e0faea0c4791fa3ae2d42665", "text": "워크트리 보정: .secret-patterns → /Users/kangsangmo/Desktop/Valuehire_v6/.secret-patterns\ncore.hooksPath = hooks\n설치된 훅:\n  hooks/pre-commit\n  hooks/pre-push\n"}

@@ -1,0 +1,215 @@
+{
+  "verifier": "claude-v2-final",
+  "ran": "2026-09-09T23:09:24.318737+00:00",
+  "python": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/humansearch/.venv/bin/python",
+  "total": 21,
+  "mismatches": [],
+  "results": [
+    {
+      "name": "intended",
+      "out_log": "FAIL: CI 배선 불량 — 본 검사=명령다름",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 0,
+      "exit": 0,
+      "first_line": "PASS: fixture — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')",
+      "checked_1": true,
+      "ok": true
+    },
+    {
+      "name": "bait-then-real",
+      "out_log": "PASS: CI 배선 불량\nFAIL: CI 배선 불량",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 0,
+      "exit": 0,
+      "first_line": "PASS: fixture — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')",
+      "checked_1": true,
+      "ok": true
+    },
+    {
+      "name": "only-bait",
+      "out_log": "PASS: CI 배선 불량\nFAIL: 다른 사유",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 1,
+      "exit": 1,
+      "first_line": "FAIL: fixture — 빨개지긴 했으나 사유가 다르다 (exit 1, 기대 'CI 배선 불량' 없음: FAIL: 다른 사유)",
+      "checked_1": true,
+      "ok": true
+    },
+    {
+      "name": "expected-newline-argv",
+      "out_log": "FAIL: CI 배선 불량",
+      "expected": "CI 배선 불량\nFAIL: x",
+      "wanted_exit": 1,
+      "exit": 1,
+      "first_line": "FAIL: fixture — 빨개지긴 했으나 사유가 다르다 (exit 1, 기대 'CI 배선 불량",
+      "checked_1": true,
+      "ok": true
+    },
+    {
+      "name": "expected-cr-argv",
+      "out_log": "FAIL: CI 배선 불량",
+      "expected": "CI 배선 불량\r",
+      "wanted_exit": 1,
+      "exit": 1,
+      "first_line": "FAIL: fixture — 빨개지긴 했으나 사유가 다르다 (exit 1, 기대 'CI 배선 불량",
+      "checked_1": true,
+      "ok": true
+    },
+    {
+      "name": "expected-shell-metachars",
+      "out_log": "FAIL: $(echo hi) `id` ; rm",
+      "expected": "$(echo hi) `id` ; rm",
+      "wanted_exit": 0,
+      "exit": 0,
+      "first_line": "PASS: fixture — 기대한 사유로 차단됨 (exit 1, '$(echo hi) `id` ; rm')",
+      "checked_1": true,
+      "ok": true
+    },
+    {
+      "name": "expected-shell-metachars-absent",
+      "out_log": "FAIL: hi",
+      "expected": "$(echo hi)",
+      "wanted_exit": 1,
+      "exit": 1,
+      "first_line": "FAIL: fixture — 빨개지긴 했으나 사유가 다르다 (exit 1, 기대 '$(echo hi)' 없음: FAIL: hi)",
+      "checked_1": true,
+      "ok": true
+    },
+    {
+      "name": "expected-glob",
+      "out_log": "FAIL: something",
+      "expected": "*",
+      "wanted_exit": 1,
+      "exit": 1,
+      "first_line": "FAIL: fixture — 빨개지긴 했으나 사유가 다르다 (exit 1, 기대 '*' 없음: FAIL: something)",
+      "checked_1": true,
+      "ok": true
+    },
+    {
+      "name": "expected-dash-dash",
+      "out_log": "FAIL: -- x",
+      "expected": "--",
+      "wanted_exit": 0,
+      "exit": 0,
+      "first_line": "PASS: fixture — 기대한 사유로 차단됨 (exit 1, '--')",
+      "checked_1": true,
+      "ok": true
+    },
+    {
+      "name": "expected-leading-dash",
+      "out_log": "FAIL: -n",
+      "expected": "-n",
+      "wanted_exit": 0,
+      "exit": 0,
+      "first_line": "PASS: fixture — 기대한 사유로 차단됨 (exit 1, '-n')",
+      "checked_1": true,
+      "ok": true
+    },
+    {
+      "name": "legacy-canonical",
+      "out_log": "FAIL: PR #13 행의 대상 칸에 다른 대상 1개가 함께 적혀 있다 — 대상마다 자기 행이 있어야 한다",
+      "expected": "대상 칸에 다른 대상",
+      "wanted_exit": 0,
+      "exit": 0,
+      "first_line": "PASS: fixture — 기대한 사유로 차단됨 (exit 1, '대상 칸에 다른 대상')",
+      "checked_1": true,
+      "ok": true
+    },
+    {
+      "name": "legacy-zero",
+      "out_log": "FAIL: PR #13 행의 대상 칸에 다른 대상 0개가 함께 적혀 있다 — 대상마다 자기 행이 있어야 한다",
+      "expected": "대상 칸에 다른 대상",
+      "wanted_exit": 1,
+      "exit": 1,
+      "first_line": "FAIL: fixture — 빨개지긴 했으나 사유가 다르다 (exit 1, 기대 '대상 칸에 다른 대상' 없음: FAIL: PR #13 행의 대상 칸에 다른 대상 0개가 함께 적혀 있다 — 대상마다 자기 행이 있어야 한다)",
+      "checked_1": true,
+      "ok": true
+    },
+    {
+      "name": "legacy-bare",
+      "out_log": "FAIL: 대상 칸에 다른 대상",
+      "expected": "대상 칸에 다른 대상",
+      "wanted_exit": 1,
+      "exit": 1,
+      "first_line": "FAIL: fixture — 빨개지긴 했으나 사유가 다르다 (exit 1, 기대 '대상 칸에 다른 대상' 없음: FAIL: 대상 칸에 다른 대상)",
+      "checked_1": true,
+      "ok": true
+    },
+    {
+      "name": "legacy-multi-one",
+      "out_log": "FAIL: PR #13 행이 1개 — 같은 대상에 처분이 둘 이상이면 결론이 무엇인지 정해지지 않는다",
+      "expected": "처분이 둘 이상",
+      "wanted_exit": 1,
+      "exit": 1,
+      "first_line": "FAIL: fixture — 빨개지긴 했으나 사유가 다르다 (exit 1, 기대 '처분이 둘 이상' 없음: FAIL: PR #13 행이 1개 — 같은 대상에 처분이 둘 이상이면 결론이 무엇인지 정해지지 않는다)",
+      "checked_1": true,
+      "ok": true
+    },
+    {
+      "name": "blank-expected",
+      "out_log": "FAIL: x",
+      "expected": "   ",
+      "wanted_exit": 1,
+      "exit": 1,
+      "first_line": "FAIL: fixture — 빨개지긴 했으나 사유가 다르다 (exit 1, 기대 '   ' 없음: FAIL: x)",
+      "checked_1": true,
+      "ok": true
+    },
+    {
+      "name": "empty-expected",
+      "out_log": "FAIL: x",
+      "expected": "",
+      "wanted_exit": 1,
+      "exit": 1,
+      "first_line": "FAIL: fixture — 빨개지긴 했으나 사유가 다르다 (exit 1, 기대 '' 없음: FAIL: x)",
+      "checked_1": true,
+      "ok": true
+    },
+    {
+      "name": "extension",
+      "out_log": "FAIL: CI 배선 불량XYZ",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 1,
+      "exit": 1,
+      "first_line": "FAIL: fixture — 빨개지긴 했으나 사유가 다르다 (exit 1, 기대 'CI 배선 불량' 없음: FAIL: CI 배선 불량XYZ)",
+      "checked_1": true,
+      "ok": true
+    },
+    {
+      "name": "emdash-attached",
+      "out_log": "FAIL: CI 배선 불량—x",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 1,
+      "exit": 1,
+      "first_line": "FAIL: fixture — 빨개지긴 했으나 사유가 다르다 (exit 1, 기대 'CI 배선 불량' 없음: FAIL: CI 배선 불량—x)",
+      "checked_1": true,
+      "ok": true
+    },
+    {
+      "name": "slash-detail",
+      "out_log": "FAIL: CI 배선 불량/x",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 0,
+      "exit": 0,
+      "first_line": "PASS: fixture — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')",
+      "checked_1": true,
+      "ok": true
+    },
+    {
+      "name": "unreadable-out-log-fail-closed",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stdout": "FAIL: fixture — 빨개지긴 했으나 사유가 다르다 (exit 1, 기대 'CI 배선 불량' 없음: )\nCHECKED: 1\n",
+      "stderr": "cannot read kickoff output: [Errno 13] Permission denied: '/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v2-final-adv-neg-sfodzg8p/unreadable/out.log'\ngrep: /var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v2-final-adv-neg-sfodzg8p/unreadable/out.log: Permission denied\n",
+      "ok": true
+    },
+    {
+      "name": "wrong-cwd-helper-missing-fail-closed",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stdout": "FAIL: fixture — 빨개지긴 했으나 사유가 다르다 (exit 1, 기대 'CI 배선 불량' 없음: FAIL: CI 배선 불량)\nCHECKED: 1\n",
+      "stderr": "/Cellar/python@3.14/3.14.1/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python: can't open file '/private/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v2-final-adv-neg-sfodzg8p/cwd/scripts/verify/has-kickoff-failure.py': [Errno 2] No such file or directory\n",
+      "ok": true
+    }
+  ]
+}

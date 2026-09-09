@@ -1,0 +1,1 @@
+{"original_filename": "v1-mutations-37-attempt1-failed.txt", "sha256": "036fb3c3cc97bbf3635c8a96eb0e38c1a26ac3a56a5ebb76b4dca70db609ef34", "text": "attempt1 2026-09-09T22:04:02Z: cwd was humansearch/ (persisted from prior pytest cd); relative artifacts path failed with \"no such file or directory\"; script itself never ran. Retrying from repo root with absolute paths.\n"}

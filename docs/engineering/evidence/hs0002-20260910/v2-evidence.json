@@ -1,0 +1,669 @@
+{
+  "wu": "HS-00.02",
+  "verifier": "Codex V2 independent adversarial re-verification",
+  "verdict": "FAIL",
+  "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+  "head": "0263108eab043dbb4780f7c9ca6ac0528808b31d",
+  "base": "6cef849",
+  "checked_at_utc": "2026-09-09T22:29:59.984266+00:00",
+  "target_files": {
+    "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+    "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+    "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+    "docs/sot/verification-commands.md": "73cfc56bcc240a971a48c86248cbd8261c9e8891eb847950907a8b80e1b57298"
+  },
+  "candidate_files_match": true,
+  "v1": {
+    "verdict": "PASS",
+    "cli_session": "b0bc71ce-43ec-4bed-8cc9-38b3e361538b",
+    "cli_exit_code": 0,
+    "cli_elapsed": 925.8471537078731,
+    "cli_raw_sha256": "b3619ea781c941b12a4efb76c4e17480dfbd9d41d2e158e8e66c0a55ecbcfe43",
+    "cli_raw_bytes": 500638,
+    "findings": [
+      "F1",
+      "F2",
+      "F3",
+      "F4",
+      "F5"
+    ]
+  },
+  "reproduced_counts": {
+    "target_pytest": "20 passed",
+    "mutations_37": "CHECKED 37 exit 0",
+    "g2": "COLLECTED 239 exit 0",
+    "budget": "593/51/178, hard600 boundary 600 pass 601 fail zero fail",
+    "mutants_24": {
+      "survived": [
+        "m04-omit-fail-line-filter",
+        "m07-accept-empty-expected",
+        "m09-legacy-match-unanchored-end",
+        "m11-boundary-any-non-alnum",
+        "m15-drop-newline-guard",
+        "m16-unreadable-file-exit0",
+        "m21-pass-lines-also-count",
+        "m24-legacy-count-allow-zero"
+      ],
+      "unexpected": [],
+      "product_unchanged": true
+    },
+    "cli_63": {
+      "total": 63,
+      "mismatches": [
+        "expected-space-only"
+      ],
+      "unchanged": true
+    },
+    "negative_13": {
+      "mismatches": [],
+      "helper_unchanged": true
+    },
+    "shared_blindspot": {
+      "probe_count": 21,
+      "mismatches": [
+        "space-only-expected",
+        "tab-only-expected"
+      ],
+      "helper_unchanged": true
+    }
+  },
+  "finding_verdicts": [
+    {
+      "id": "F1",
+      "v1_status": "낮음/test-strength, product_ok",
+      "v2_status": "REPRODUCED",
+      "v2_judgment": "counter-AC test-strength defect reproduced: m04/m07/m21 survived fixed pytest; direct product probes pass current behavior"
+    },
+    {
+      "id": "F2",
+      "v1_status": "낮음/test-strength, product_ok",
+      "v2_status": "REPRODUCED",
+      "v2_judgment": "legacy end-boundary/boundary character test-strength gap reproduced: m09/m11 survived; direct product probes pass current behavior"
+    },
+    {
+      "id": "F3",
+      "v1_status": "낮음/test-strength, product_ok",
+      "v2_status": "REPRODUCED",
+      "v2_judgment": "unreadable-file CLI path not fixed by pytest reproduced: m16 survived; direct CLI returns 2"
+    },
+    {
+      "id": "F4",
+      "v1_status": "정보",
+      "v2_status": "REPRODUCED_AND_EXTENDED",
+      "v2_judgment": "space-only mismatch reproduced and tab-only mismatch newly added; reclassified as input-boundary product defect under T"
+    },
+    {
+      "id": "F5",
+      "v1_status": "정보(설계)",
+      "v2_status": "REPRODUCED",
+      "v2_judgment": "short prefix accepts multiple CI reasons; no current callsite uses such short expected string; design risk not current failure"
+    }
+  ],
+  "v1_v2_disagreements": [
+    "V1 PASS is overstated under strict T because F4 is not only informational when expected reason is whitespace-only.",
+    "V1 low test-strength gaps are reproduced; V2 does not accept the stronger claim that card counter-AC and R2 strength are fully satisfied.",
+    "V1 omitted v1-budget-attempt1-failed from retry count in prose while evidence names it; V2 treats this as reporting gap, not product defect."
+  ],
+  "privacy": {
+    "v2_env_log_status": "redacted and excluded from proof set",
+    "redaction_note": {
+      "reason": "v2-env was an unnecessary environment inventory and contained secret-bearing variables; redacted in-place and excluded from proof set",
+      "original_sha256": "4e0924755d03d5b019f04086a7e87a3849a3af5c6b1b920068eb01528b8455e7",
+      "redacted_sha256": "22bce9a15be6f49d7bc96512963829a141031115e1b3797eb3cca80e8dc053ff",
+      "redacted_fields": [
+        "SUPABASE_KEY",
+        "SUPABASE_URL"
+      ]
+    },
+    "root_privacy_readback": "root reported current value-match zero in v2 files before final; V2 final zero-match recorded separately after report generation"
+  },
+  "commands": [
+    {
+      "id": "v2-budget-boundaries",
+      "command": [
+        "python3",
+        "artifacts/hs0002-20260910/budget-check.py",
+        "--boundaries"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+      "started": "2026-09-09T22:23:07.916539+00:00",
+      "ended": "2026-09-09T22:23:07.985007+00:00",
+      "exit_code": 0,
+      "output_file": "v2-budget-boundaries.log",
+      "output_sha256": "c0ea78c6d40362d37444763e719363d152bbb488c0ddc62fcdd50c4b5c0d6a86",
+      "files_before": {
+        "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+        "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+        "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+        "docs/sot/verification-commands.md": "73cfc56bcc240a971a48c86248cbd8261c9e8891eb847950907a8b80e1b57298"
+      },
+      "files_after": {
+        "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+        "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+        "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+        "docs/sot/verification-commands.md": "73cfc56bcc240a971a48c86248cbd8261c9e8891eb847950907a8b80e1b57298"
+      }
+    },
+    {
+      "id": "v2-budget-candidate",
+      "command": [
+        "python3",
+        "artifacts/hs0002-20260910/budget-check.py",
+        "artifacts/hs0002-20260910/candidate-files.json"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+      "started": "2026-09-09T22:23:07.770199+00:00",
+      "ended": "2026-09-09T22:23:07.850919+00:00",
+      "exit_code": 0,
+      "output_file": "v2-budget-candidate.log",
+      "output_sha256": "e5a67bbd27535ce7edc98d8703bd983ac00a80369c4034d95d88b34cd07ae0cf",
+      "files_before": {
+        "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+        "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+        "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+        "docs/sot/verification-commands.md": "73cfc56bcc240a971a48c86248cbd8261c9e8891eb847950907a8b80e1b57298"
+      },
+      "files_after": {
+        "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+        "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+        "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+        "docs/sot/verification-commands.md": "73cfc56bcc240a971a48c86248cbd8261c9e8891eb847950907a8b80e1b57298"
+      }
+    },
+    {
+      "id": "v2-budget-own",
+      "command": [
+        "python3",
+        "artifacts/hs0002-20260910/budget-check.py",
+        "artifacts/hs0002-20260910/v2-budget-manifest.json"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+      "started": "2026-09-09T22:23:08.036431+00:00",
+      "ended": "2026-09-09T22:23:08.111320+00:00",
+      "exit_code": 0,
+      "output_file": "v2-budget-own.log",
+      "output_sha256": "e1babef94d2f180913f2c413c7eeb0bb74d49da57eb14402474332cdcdcab7c9",
+      "files_before": {
+        "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+        "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+        "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+        "docs/sot/verification-commands.md": "73cfc56bcc240a971a48c86248cbd8261c9e8891eb847950907a8b80e1b57298"
+      },
+      "files_after": {
+        "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+        "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+        "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+        "docs/sot/verification-commands.md": "73cfc56bcc240a971a48c86248cbd8261c9e8891eb847950907a8b80e1b57298"
+      }
+    },
+    {
+      "id": "v2-cli-probes-run",
+      "command": [
+        "python3",
+        "artifacts/hs0002-20260910/v2-cli-probes.py"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+      "started": "2026-09-09T22:26:55.148492+00:00",
+      "ended": "2026-09-09T22:26:57.074302+00:00",
+      "exit_code": 0,
+      "output_file": "v2-cli-probes-run.log",
+      "output_sha256": "8fcc315f945b0fcf150bcc2d60b33b776b11d9f9a090b61d334650256f7ad5a5",
+      "files_before": {
+        "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+        "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+        "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+        "docs/sot/verification-commands.md": "73cfc56bcc240a971a48c86248cbd8261c9e8891eb847950907a8b80e1b57298"
+      },
+      "files_after": {
+        "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+        "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+        "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+        "docs/sot/verification-commands.md": "73cfc56bcc240a971a48c86248cbd8261c9e8891eb847950907a8b80e1b57298"
+      }
+    },
+    {
+      "id": "v2-diff-check",
+      "command": [
+        "git",
+        "diff",
+        "--check",
+        "6cef849"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+      "started": "2026-09-09T22:22:54.493514+00:00",
+      "ended": "2026-09-09T22:22:54.617424+00:00",
+      "exit_code": 0,
+      "output_file": "v2-diff-check.log",
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "files_before": {
+        "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+        "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+        "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+        "docs/sot/verification-commands.md": "73cfc56bcc240a971a48c86248cbd8261c9e8891eb847950907a8b80e1b57298"
+      },
+      "files_after": {
+        "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+        "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+        "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+        "docs/sot/verification-commands.md": "73cfc56bcc240a971a48c86248cbd8261c9e8891eb847950907a8b80e1b57298"
+      }
+    },
+    {
+      "id": "v2-g2",
+      "command": [
+        "bash",
+        "scripts/acceptance-hs-gates.sh"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+      "started": "2026-09-09T22:22:19.402120+00:00",
+      "ended": "2026-09-09T22:22:39.161503+00:00",
+      "exit_code": 0,
+      "output_file": "v2-g2.log",
+      "output_sha256": "91de9c0da025bf0dcce77691f37faef4064b7d2adac52a291c2f1672e70e3ba7",
+      "files_before": {
+        "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+        "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+        "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+        "docs/sot/verification-commands.md": "73cfc56bcc240a971a48c86248cbd8261c9e8891eb847950907a8b80e1b57298"
+      },
+      "files_after": {
+        "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+        "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+        "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+        "docs/sot/verification-commands.md": "73cfc56bcc240a971a48c86248cbd8261c9e8891eb847950907a8b80e1b57298"
+      }
+    },
+    {
+      "id": "v2-mutants-run",
+      "command": [
+        "python3",
+        "artifacts/hs0002-20260910/v2-mutants.py"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+      "started": "2026-09-09T22:23:19.986168+00:00",
+      "ended": "2026-09-09T22:26:49.445354+00:00",
+      "exit_code": 0,
+      "output_file": "v2-mutants-run.log",
+      "output_sha256": "6cf345bd8e25d126badb36efc498bac95aaec1c0ce53e3d87be8d072f428904f",
+      "files_before": {
+        "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+        "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+        "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+        "docs/sot/verification-commands.md": "73cfc56bcc240a971a48c86248cbd8261c9e8891eb847950907a8b80e1b57298"
+      },
+      "files_after": {
+        "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+        "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+        "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+        "docs/sot/verification-commands.md": "73cfc56bcc240a971a48c86248cbd8261c9e8891eb847950907a8b80e1b57298"
+      }
+    },
+    {
+      "id": "v2-mutations-37",
+      "command": [
+        "bash",
+        "scripts/acceptance-hs-kickoff-mutations.sh"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+      "started": "2026-09-09T22:21:40.732558+00:00",
+      "ended": "2026-09-09T22:22:19.342104+00:00",
+      "exit_code": 0,
+      "output_file": "v2-mutations-37.log",
+      "output_sha256": "099ddbde4dae0766cbe5c527539429416d3b5d27e7ebbf96e9453d3dbe4cb252",
+      "files_before": {
+        "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+        "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+        "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+        "docs/sot/verification-commands.md": "73cfc56bcc240a971a48c86248cbd8261c9e8891eb847950907a8b80e1b57298"
+      },
+      "files_after": {
+        "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+        "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+        "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+        "docs/sot/verification-commands.md": "73cfc56bcc240a971a48c86248cbd8261c9e8891eb847950907a8b80e1b57298"
+      }
+    },
+    {
+      "id": "v2-mypy",
+      "command": [
+        "bash",
+        "-lc",
+        "cd humansearch && uv run --no-sync mypy src tests ../scripts/verify/has-kickoff-failure.py"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+      "started": "2026-09-09T22:22:54.034739+00:00",
+      "ended": "2026-09-09T22:22:54.346078+00:00",
+      "exit_code": 0,
+      "output_file": "v2-mypy.log",
+      "output_sha256": "fdba5b4e396441aaf1ba0d4aee9a2b6de7229057c665772ec81bd032ce1cc3f5",
+      "files_before": {
+        "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+        "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+        "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+        "docs/sot/verification-commands.md": "73cfc56bcc240a971a48c86248cbd8261c9e8891eb847950907a8b80e1b57298"
+      },
+      "files_after": {
+        "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+        "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+        "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+        "docs/sot/verification-commands.md": "73cfc56bcc240a971a48c86248cbd8261c9e8891eb847950907a8b80e1b57298"
+      }
+    },
+    {
+      "id": "v2-negative-extra-run",
+      "command": [
+        "humansearch/.venv/bin/python",
+        "artifacts/hs0002-20260910/v2-negative-extra.py"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+      "started": "2026-09-09T22:26:57.127381+00:00",
+      "ended": "2026-09-09T22:26:58.307693+00:00",
+      "exit_code": 0,
+      "output_file": "v2-negative-extra-run.log",
+      "output_sha256": "93e3155e4bbbf9b588a3d2497abc6de17847d383b595a74cbb0a79dde4bd89cb",
+      "files_before": {
+        "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+        "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+        "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+        "docs/sot/verification-commands.md": "73cfc56bcc240a971a48c86248cbd8261c9e8891eb847950907a8b80e1b57298"
+      },
+      "files_after": {
+        "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+        "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+        "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+        "docs/sot/verification-commands.md": "73cfc56bcc240a971a48c86248cbd8261c9e8891eb847950907a8b80e1b57298"
+      }
+    },
+    {
+      "id": "v2-principles-check",
+      "command": [
+        "bash",
+        "scripts/acceptance-principles-check.sh"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+      "started": "2026-09-09T22:21:10.460176+00:00",
+      "ended": "2026-09-09T22:21:11.006357+00:00",
+      "exit_code": 0,
+      "output_file": "v2-principles-check.log",
+      "output_sha256": "31153ab17a665560a3a4e8a5f2a45bd58275e1d6f1e1d27a21fee40d74197dc2",
+      "files_before": {
+        "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+        "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+        "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+        "docs/sot/verification-commands.md": "73cfc56bcc240a971a48c86248cbd8261c9e8891eb847950907a8b80e1b57298"
+      },
+      "files_after": {
+        "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+        "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+        "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+        "docs/sot/verification-commands.md": "73cfc56bcc240a971a48c86248cbd8261c9e8891eb847950907a8b80e1b57298"
+      }
+    },
+    {
+      "id": "v2-principles-md",
+      "command": [
+        "sed",
+        "-n",
+        "1,260p",
+        "docs/sot/coding-principles.md"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+      "started": "2026-09-09T22:21:10.274521+00:00",
+      "ended": "2026-09-09T22:21:10.307630+00:00",
+      "exit_code": 0,
+      "output_file": "v2-principles-md.log",
+      "output_sha256": "55b136c984d3f93b522b07b33a0f5f74427777eb0901e24acc38c22b2b0e8276",
+      "files_before": {
+        "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+        "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+        "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+        "docs/sot/verification-commands.md": "73cfc56bcc240a971a48c86248cbd8261c9e8891eb847950907a8b80e1b57298"
+      },
+      "files_after": {
+        "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+        "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+        "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+        "docs/sot/verification-commands.md": "73cfc56bcc240a971a48c86248cbd8261c9e8891eb847950907a8b80e1b57298"
+      }
+    },
+    {
+      "id": "v2-principles-yaml",
+      "command": [
+        "sed",
+        "-n",
+        "1,260p",
+        "docs/sot/principles.yaml"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+      "started": "2026-09-09T22:21:10.365364+00:00",
+      "ended": "2026-09-09T22:21:10.407941+00:00",
+      "exit_code": 0,
+      "output_file": "v2-principles-yaml.log",
+      "output_sha256": "dae91e212cf4d49e0703e2543db56f45ba7d7349048719f7a065bf429f795740",
+      "files_before": {
+        "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+        "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+        "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+        "docs/sot/verification-commands.md": "73cfc56bcc240a971a48c86248cbd8261c9e8891eb847950907a8b80e1b57298"
+      },
+      "files_after": {
+        "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+        "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+        "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+        "docs/sot/verification-commands.md": "73cfc56bcc240a971a48c86248cbd8261c9e8891eb847950907a8b80e1b57298"
+      }
+    },
+    {
+      "id": "v2-ruff",
+      "command": [
+        "bash",
+        "-lc",
+        "cd humansearch && uv run --no-sync ruff check src tests ../scripts/verify/has-kickoff-failure.py"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+      "started": "2026-09-09T22:22:53.877210+00:00",
+      "ended": "2026-09-09T22:22:53.982465+00:00",
+      "exit_code": 0,
+      "output_file": "v2-ruff.log",
+      "output_sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+      "files_before": {
+        "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+        "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+        "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+        "docs/sot/verification-commands.md": "73cfc56bcc240a971a48c86248cbd8261c9e8891eb847950907a8b80e1b57298"
+      },
+      "files_after": {
+        "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+        "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+        "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+        "docs/sot/verification-commands.md": "73cfc56bcc240a971a48c86248cbd8261c9e8891eb847950907a8b80e1b57298"
+      }
+    },
+    {
+      "id": "v2-shared-blindspot-run",
+      "command": [
+        "python3",
+        "artifacts/hs0002-20260910/v2-shared-blindspot.py"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+      "started": "2026-09-09T22:28:41.650145+00:00",
+      "ended": "2026-09-09T22:28:41.721489+00:00",
+      "exit_code": 2,
+      "output_file": "v2-shared-blindspot-run.log",
+      "output_sha256": "7fb063bf81d4582fc81a41f805bf22e451fb521cc995ec530c2f58a652404ac7",
+      "files_before": {
+        "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+        "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+        "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+        "docs/sot/verification-commands.md": "73cfc56bcc240a971a48c86248cbd8261c9e8891eb847950907a8b80e1b57298"
+      },
+      "files_after": {
+        "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+        "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+        "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+        "docs/sot/verification-commands.md": "73cfc56bcc240a971a48c86248cbd8261c9e8891eb847950907a8b80e1b57298"
+      }
+    },
+    {
+      "id": "v2-shared-blindspot-run2",
+      "command": [
+        "python3",
+        "artifacts/hs0002-20260910/v2-shared-blindspot.py"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+      "started": "2026-09-09T22:28:51.671573+00:00",
+      "ended": "2026-09-09T22:28:52.361881+00:00",
+      "exit_code": 0,
+      "output_file": "v2-shared-blindspot-run2.log",
+      "output_sha256": "70b3a1c29625cb7c374ebf4cdb1df277fb537201603d666d35cc16b70d55b4d9",
+      "files_before": {
+        "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+        "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+        "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+        "docs/sot/verification-commands.md": "73cfc56bcc240a971a48c86248cbd8261c9e8891eb847950907a8b80e1b57298"
+      },
+      "files_after": {
+        "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+        "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+        "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+        "docs/sot/verification-commands.md": "73cfc56bcc240a971a48c86248cbd8261c9e8891eb847950907a8b80e1b57298"
+      }
+    },
+    {
+      "id": "v2-shell",
+      "command": [
+        "bash",
+        "-lc",
+        "bash -n scripts/acceptance-hs-kickoff-mutations.sh && bash -n scripts/acceptance-hs-gates.sh"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+      "started": "2026-09-09T22:22:54.398706+00:00",
+      "ended": "2026-09-09T22:22:54.439478+00:00",
+      "exit_code": 0,
+      "output_file": "v2-shell.log",
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "files_before": {
+        "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+        "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+        "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+        "docs/sot/verification-commands.md": "73cfc56bcc240a971a48c86248cbd8261c9e8891eb847950907a8b80e1b57298"
+      },
+      "files_after": {
+        "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+        "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+        "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+        "docs/sot/verification-commands.md": "73cfc56bcc240a971a48c86248cbd8261c9e8891eb847950907a8b80e1b57298"
+      }
+    },
+    {
+      "id": "v2-target-pytest",
+      "command": [
+        "bash",
+        "-lc",
+        "cd humansearch && uv run --no-sync pytest -q tests/test_hs_0002.py"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+      "started": "2026-09-09T22:21:35.951141+00:00",
+      "ended": "2026-09-09T22:21:40.678195+00:00",
+      "exit_code": 0,
+      "output_file": "v2-target-pytest.log",
+      "output_sha256": "3b998f4ab64ec9f9f651ef1ee9fc316d2929fcb6b2de4da655c336afe57d4424",
+      "files_before": {
+        "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+        "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+        "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+        "docs/sot/verification-commands.md": "73cfc56bcc240a971a48c86248cbd8261c9e8891eb847950907a8b80e1b57298"
+      },
+      "files_after": {
+        "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+        "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+        "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+        "docs/sot/verification-commands.md": "73cfc56bcc240a971a48c86248cbd8261c9e8891eb847950907a8b80e1b57298"
+      }
+    },
+    {
+      "id": "v2-wc",
+      "command": [
+        "wc",
+        "-l",
+        "scripts/acceptance-hs-kickoff-mutations.sh",
+        "scripts/verify/has-kickoff-failure.py",
+        "humansearch/tests/test_hs_0002.py",
+        "docs/sot/verification-commands.md",
+        "docs/engineering/humansearch-hs0002-goal-2026-09-10.md",
+        "artifacts/hs0002-20260910/v2-mutants.py",
+        "artifacts/hs0002-20260910/v2-cli-probes.py",
+        "artifacts/hs0002-20260910/v2-negative-extra.py"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+      "started": "2026-09-09T22:23:08.164771+00:00",
+      "ended": "2026-09-09T22:23:08.200366+00:00",
+      "exit_code": 0,
+      "output_file": "v2-wc.log",
+      "output_sha256": "46ef8e3e239d431e822eeb049e8c51e0530292f45c617734ccd9bef841c75a9b",
+      "files_before": {
+        "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+        "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+        "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+        "docs/sot/verification-commands.md": "73cfc56bcc240a971a48c86248cbd8261c9e8891eb847950907a8b80e1b57298"
+      },
+      "files_after": {
+        "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+        "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+        "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+        "docs/sot/verification-commands.md": "73cfc56bcc240a971a48c86248cbd8261c9e8891eb847950907a8b80e1b57298"
+      }
+    }
+  ],
+  "verdict_file": {
+    "path": "artifacts/hs0002-20260910/v2-verdict.md",
+    "sha256": "34591bb108406164e92e85980e22828db1964aed2f575ec886c1c017f198bdb1"
+  },
+  "final_privacy_zero_match": {
+    "scope": "artifacts/hs0002-20260910/v2-* files only",
+    "method": "field-name and unredacted-env-line scan; no environment read and no secret value printed",
+    "file_count": 104,
+    "field_name_hits": [
+      {
+        "file": "artifacts/hs0002-20260910/v2-env-redaction-note.json",
+        "field": "SUPABASE_KEY"
+      },
+      {
+        "file": "artifacts/hs0002-20260910/v2-env-redaction-note.json",
+        "field": "SUPABASE_URL"
+      },
+      {
+        "file": "artifacts/hs0002-20260910/v2-env.log",
+        "field": "SUPABASE_KEY="
+      },
+      {
+        "file": "artifacts/hs0002-20260910/v2-env.log",
+        "field": "SUPABASE_URL="
+      },
+      {
+        "file": "artifacts/hs0002-20260910/v2-env.log",
+        "field": "SUPABASE_KEY"
+      },
+      {
+        "file": "artifacts/hs0002-20260910/v2-env.log",
+        "field": "SUPABASE_URL"
+      },
+      {
+        "file": "artifacts/hs0002-20260910/v2-evidence.json",
+        "field": "SUPABASE_KEY"
+      },
+      {
+        "file": "artifacts/hs0002-20260910/v2-evidence.json",
+        "field": "SUPABASE_URL"
+      }
+    ],
+    "unredacted_env_line_files": [],
+    "status": "PASS"
+  },
+  "updated_at_utc": "2026-09-09T22:42:30.517553+00:00",
+  "initial_format_verdict_file": {
+    "path": "artifacts/hs0002-20260910/v2-verdict.initial-format.md",
+    "sha256": "d49f59edf96eb570f95ec61ded1499bbfdd01f8a575307e1a0bf3770ef3618b5",
+    "reason": "preserved before strict finding status vocabulary correction"
+  }
+}

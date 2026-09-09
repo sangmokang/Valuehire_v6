@@ -1,0 +1,163 @@
+[
+  {
+    "name": "normal",
+    "command": [
+      "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/humansearch/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_hs_0002.py"
+    ],
+    "cwd": "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-g-zvyhn_3a/humansearch",
+    "started": "2026-09-09T21:59:25.950319+00:00",
+    "ended": "2026-09-09T21:59:30.594616+00:00",
+    "exit_code": 0,
+    "session": "hs0002-g",
+    "head": "0263108eab043dbb4780f7c9ca6ac0528808b31d",
+    "files": {
+      "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+      "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+      "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43"
+    },
+    "output_file": "g2-normal.log",
+    "diff_file": "g2-normal.diff"
+  },
+  {
+    "name": "always-allow",
+    "command": [
+      "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/humansearch/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_hs_0002.py"
+    ],
+    "cwd": "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-g-0az7hlxs/humansearch",
+    "started": "2026-09-09T21:59:30.614543+00:00",
+    "ended": "2026-09-09T21:59:41.210608+00:00",
+    "exit_code": 1,
+    "session": "hs0002-g",
+    "head": "0263108eab043dbb4780f7c9ca6ac0528808b31d",
+    "files": {
+      "scripts/verify/has-kickoff-failure.py": "52b874a00debfe4304f0555c3336058645294d139843d405e6263ffce4d92864",
+      "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+      "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43"
+    },
+    "output_file": "g2-always-allow.log",
+    "diff_file": "g2-always-allow.diff"
+  },
+  {
+    "name": "always-reject",
+    "command": [
+      "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/humansearch/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_hs_0002.py"
+    ],
+    "cwd": "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-g-s_fr6_6n/humansearch",
+    "started": "2026-09-09T21:59:41.231501+00:00",
+    "ended": "2026-09-09T21:59:53.242639+00:00",
+    "exit_code": 1,
+    "session": "hs0002-g",
+    "head": "0263108eab043dbb4780f7c9ca6ac0528808b31d",
+    "files": {
+      "scripts/verify/has-kickoff-failure.py": "75aff9b3f154bfde890d75657855a2ba5e60c9f3eec7bf88714d058ef7caddff",
+      "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+      "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43"
+    },
+    "output_file": "g2-always-reject.log",
+    "diff_file": "g2-always-reject.diff"
+  },
+  {
+    "name": "omit-boundary",
+    "command": [
+      "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/humansearch/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_hs_0002.py"
+    ],
+    "cwd": "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-g-ow1rp16p/humansearch",
+    "started": "2026-09-09T21:59:53.267699+00:00",
+    "ended": "2026-09-09T22:00:15.674699+00:00",
+    "exit_code": 1,
+    "session": "hs0002-g",
+    "head": "0263108eab043dbb4780f7c9ca6ac0528808b31d",
+    "files": {
+      "scripts/verify/has-kickoff-failure.py": "6ee9d4627d811bdfbc88125b91c29865c67f17783a1288059f67bbbe17f3ae2d",
+      "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+      "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43"
+    },
+    "output_file": "g2-omit-boundary.log",
+    "diff_file": "g2-omit-boundary.diff"
+  },
+  {
+    "name": "legacy-substring",
+    "command": [
+      "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/humansearch/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_hs_0002.py"
+    ],
+    "cwd": "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-g-s5xy1cbd/humansearch",
+    "started": "2026-09-09T22:00:15.700283+00:00",
+    "ended": "2026-09-09T22:00:20.612482+00:00",
+    "exit_code": 1,
+    "session": "hs0002-g",
+    "head": "0263108eab043dbb4780f7c9ca6ac0528808b31d",
+    "files": {
+      "scripts/verify/has-kickoff-failure.py": "e099bffe9aecd9a49d8edb9b8673d803cf77fefb30264f840717d73e1a5193e0",
+      "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+      "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43"
+    },
+    "output_file": "g2-legacy-substring.log",
+    "diff_file": "g2-legacy-substring.diff"
+  },
+  {
+    "name": "empty-allowed",
+    "command": [
+      "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/humansearch/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_hs_0002.py"
+    ],
+    "cwd": "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-g-5r9el7y8/humansearch",
+    "started": "2026-09-09T22:00:20.632249+00:00",
+    "ended": "2026-09-09T22:00:25.409319+00:00",
+    "exit_code": 1,
+    "session": "hs0002-g",
+    "head": "0263108eab043dbb4780f7c9ca6ac0528808b31d",
+    "files": {
+      "scripts/verify/has-kickoff-failure.py": "056d0d3b763027576c7d60e79c1be82b7c340560d7f6b2533e2bf2e1e20dc57c",
+      "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+      "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43"
+    },
+    "output_file": "g2-empty-allowed.log",
+    "diff_file": "g2-empty-allowed.diff"
+  },
+  {
+    "name": "restore-grep",
+    "command": [
+      "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/humansearch/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/test_hs_0002.py"
+    ],
+    "cwd": "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-g-gifo3nnw/humansearch",
+    "started": "2026-09-09T22:00:25.429340+00:00",
+    "ended": "2026-09-09T22:00:32.917044+00:00",
+    "exit_code": 1,
+    "session": "hs0002-g",
+    "head": "0263108eab043dbb4780f7c9ca6ac0528808b31d",
+    "files": {
+      "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+      "scripts/acceptance-hs-kickoff-mutations.sh": "4569309a6e2a5614e43d7442d80bf9808d221995081c2097cf813e6ac0c9181e",
+      "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43"
+    },
+    "output_file": "g2-restore-grep.log",
+    "diff_file": "g2-restore-grep.diff"
+  }
+]

@@ -1,0 +1,21 @@
+{
+  "name": "direct-probes",
+  "command": [
+    "python3",
+    "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/artifacts/hs0002-20260910/codeaudit-final-probes.py"
+  ],
+  "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+  "started": "2026-09-09T22:45:16Z",
+  "ended": "2026-09-09T22:45:16Z",
+  "exit_code": 1,
+  "head_before": "8bef581b2ee64dd57345f92f11f241e0c927b759",
+  "head_after": "8bef581b2ee64dd57345f92f11f241e0c927b759",
+  "stdout_path": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/artifacts/hs0002-20260910/codeaudit-final-direct-probes.stdout",
+  "stderr_path": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/artifacts/hs0002-20260910/codeaudit-final-direct-probes.stderr",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr_sha256": "56c8314a0446f540b14dcbd841f6cd8c81f825a2aa4962e01de175b665cb0b94",
+  "candidate_before_sha_path": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/artifacts/hs0002-20260910/codeaudit-final-direct-probes.before-sha.json",
+  "candidate_after_sha_path": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/artifacts/hs0002-20260910/codeaudit-final-direct-probes.after-sha.json",
+  "candidate_before_sha256": "b4903458fd8bbb59e32548be9f5f1c690b4b51e4e507fccee147d91945da095a",
+  "candidate_after_sha256": "b4903458fd8bbb59e32548be9f5f1c690b4b51e4e507fccee147d91945da095a"
+}

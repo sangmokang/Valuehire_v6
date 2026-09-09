@@ -1,0 +1,136 @@
+{
+  "helper_unchanged": true,
+  "mismatches": [],
+  "results": [
+    {
+      "id": "raw-line-bait-without-prefix",
+      "want": 1,
+      "got": 1,
+      "ok": true,
+      "stdout": "FAIL: fixture — 빨개지긴 했으나 사유가 다르다 (exit 1, 기대 'CI 배선 불량' 없음: FAIL: unrelated actual failure)\nCHECKED: 1\n",
+      "stderr": "",
+      "start": "2026-09-09T22:26:57.383924+00:00",
+      "end": "2026-09-09T22:26:57.453162+00:00"
+    },
+    {
+      "id": "blank-fail-message-empty-expected",
+      "want": 1,
+      "got": 1,
+      "ok": true,
+      "stdout": "FAIL: fixture — 빨개지긴 했으나 사유가 다르다 (exit 1, 기대 '' 없음: FAIL: )\nCHECKED: 1\n",
+      "stderr": "",
+      "start": "2026-09-09T22:26:57.454128+00:00",
+      "end": "2026-09-09T22:26:57.520140+00:00"
+    },
+    {
+      "id": "space-padded-fail-message-empty-expected",
+      "want": 1,
+      "got": 1,
+      "ok": true,
+      "stdout": "FAIL: fixture — 빨개지긴 했으나 사유가 다르다 (exit 1, 기대 '' 없음: FAIL:  padded)\nCHECKED: 1\n",
+      "stderr": "",
+      "start": "2026-09-09T22:26:57.520843+00:00",
+      "end": "2026-09-09T22:26:57.586170+00:00"
+    },
+    {
+      "id": "legacy-suffix-extended",
+      "want": 1,
+      "got": 1,
+      "ok": true,
+      "stdout": "FAIL: fixture — 빨개지긴 했으나 사유가 다르다 (exit 1, 기대 '행 없음' 없음: FAIL: 처분표에 PR #13 행 없음XYZ)\nCHECKED: 1\n",
+      "stderr": "",
+      "start": "2026-09-09T22:26:57.587166+00:00",
+      "end": "2026-09-09T22:26:57.651294+00:00"
+    },
+    {
+      "id": "emdash-without-space",
+      "want": 1,
+      "got": 1,
+      "ok": true,
+      "stdout": "FAIL: fixture — 빨개지긴 했으나 사유가 다르다 (exit 1, 기대 'CI 배선 불량' 없음: FAIL: CI 배선 불량—상세)\nCHECKED: 1\n",
+      "stderr": "",
+      "start": "2026-09-09T22:26:57.652504+00:00",
+      "end": "2026-09-09T22:26:57.739277+00:00"
+    },
+    {
+      "id": "checked-line-bait",
+      "want": 1,
+      "got": 1,
+      "ok": true,
+      "stdout": "FAIL: fixture — 빨개지긴 했으나 사유가 다르다 (exit 1, 기대 'CI 배선 불량' 없음: FAIL: other)\nCHECKED: 1\n",
+      "stderr": "",
+      "start": "2026-09-09T22:26:57.739971+00:00",
+      "end": "2026-09-09T22:26:57.809864+00:00"
+    },
+    {
+      "id": "real-ci-wiring-line",
+      "want": 0,
+      "got": 0,
+      "ok": true,
+      "stdout": "PASS: fixture — 기대한 사유로 차단됨 (exit 1, 'CI 배선 불량')\nCHECKED: 1\n",
+      "stderr": "",
+      "start": "2026-09-09T22:26:57.810534+00:00",
+      "end": "2026-09-09T22:26:57.875832+00:00"
+    },
+    {
+      "id": "real-step-mismatch-line",
+      "want": 0,
+      "got": 0,
+      "ok": true,
+      "stdout": "PASS: fixture — 기대한 사유로 차단됨 (exit 1, 'CI 스텝 불일치')\nCHECKED: 1\n",
+      "stderr": "",
+      "start": "2026-09-09T22:26:57.876744+00:00",
+      "end": "2026-09-09T22:26:57.936409+00:00"
+    },
+    {
+      "id": "real-placeholder-line",
+      "want": 0,
+      "got": 0,
+      "ok": true,
+      "stdout": "PASS: fixture — 기대한 사유로 차단됨 (exit 1, 'PR #13 행의 근거가 자리표시자')\nCHECKED: 1\n",
+      "stderr": "",
+      "start": "2026-09-09T22:26:57.937132+00:00",
+      "end": "2026-09-09T22:26:58.001401+00:00"
+    },
+    {
+      "id": "real-nonexistent-evidence-line",
+      "want": 0,
+      "got": 0,
+      "ok": true,
+      "stdout": "PASS: fixture — 기대한 사유로 차단됨 (exit 1, 'PR #13 행의 근거에 실재하지 않는 것이 있다')\nCHECKED: 1\n",
+      "stderr": "",
+      "start": "2026-09-09T22:26:58.002114+00:00",
+      "end": "2026-09-09T22:26:58.070366+00:00"
+    },
+    {
+      "id": "real-no-repo-path-line",
+      "want": 0,
+      "got": 0,
+      "ok": true,
+      "stdout": "PASS: fixture — 기대한 사유로 차단됨 (exit 1, 'PR #13 행의 근거에 이 저장소에서 확인할 수 있는 경로가 없다')\nCHECKED: 1\n",
+      "stderr": "",
+      "start": "2026-09-09T22:26:58.071256+00:00",
+      "end": "2026-09-09T22:26:58.135600+00:00"
+    },
+    {
+      "id": "real-verdict-line",
+      "want": 0,
+      "got": 0,
+      "ok": true,
+      "stdout": "PASS: fixture — 기대한 사유로 차단됨 (exit 1, '판정 문서 없음')\nCHECKED: 1\n",
+      "stderr": "",
+      "start": "2026-09-09T22:26:58.136318+00:00",
+      "end": "2026-09-09T22:26:58.200209+00:00"
+    },
+    {
+      "id": "wrong-target-PR54-for-PR13-expect",
+      "want": 1,
+      "got": 1,
+      "ok": true,
+      "stdout": "FAIL: fixture — 빨개지긴 했으나 사유가 다르다 (exit 1, 기대 'PR #13 행의 근거가 자리표시자' 없음: FAIL: PR #54 행의 근거가 자리표시자 — x)\nCHECKED: 1\n",
+      "stderr": "",
+      "start": "2026-09-09T22:26:58.200902+00:00",
+      "end": "2026-09-09T22:26:58.267058+00:00"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "checked_files": 76,
+  "variables_present": {
+    "SUPABASE_KEY": true,
+    "SUPABASE_URL": true
+  },
+  "matching_file_names_and_variable_names": {},
+  "values_printed": false
+}

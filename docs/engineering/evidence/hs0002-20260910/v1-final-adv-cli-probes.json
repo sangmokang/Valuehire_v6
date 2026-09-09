@@ -1,0 +1,856 @@
+{
+  "verifier": "claude-v1-final",
+  "ran": "2026-09-09T22:49:05.438352+00:00",
+  "helper": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/scripts/verify/has-kickoff-failure.py",
+  "python": "/opt/homebrew/opt/python@3.14/bin/python3.14",
+  "total": 93,
+  "mismatches": [
+    "expected-zero-width-space"
+  ],
+  "results": [
+    {
+      "name": "literal-exact",
+      "file_bytes": "FAIL: CI 배선 불량\n",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 0,
+      "exit": 0,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "literal-with-dash-details",
+      "file_bytes": "FAIL: CI 배선 불량 — 본 검사=명령다름 자기 변이=OK\n",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 0,
+      "exit": 0,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "literal-word-extension",
+      "file_bytes": "FAIL: CI 배선 불량XYZ\n",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "literal-korean-particle",
+      "file_bytes": "FAIL: CI 배선 불량이 발견\n",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "literal-mid-line",
+      "file_bytes": "FAIL: unrelated CI 배선 불량 suffix\n",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "literal-second-fail-line",
+      "file_bytes": "FAIL: other\nFAIL: CI 배선 불량\n",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 0,
+      "exit": 0,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "literal-on-pass-line-only",
+      "file_bytes": "PASS: CI 배선 불량\nFAIL: other\n",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "literal-no-fail-line",
+      "file_bytes": "CI 배선 불량\n",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "fail-prefix-no-space",
+      "file_bytes": "FAIL:CI 배선 불량\n",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "fail-prefix-double-space",
+      "file_bytes": "FAIL:  CI 배선 불량\n",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "fail-prefix-lowercase",
+      "file_bytes": "fail: CI 배선 불량\n",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "fail-prefix-indented",
+      "file_bytes": "  FAIL: CI 배선 불량\n",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "fail-inside-checked-line",
+      "file_bytes": "CHECKED: 3 FAIL: CI 배선 불량\n",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "expected-contains-fail-prefix",
+      "file_bytes": "FAIL: FAIL: CI 배선 불량\n",
+      "expected": "FAIL: CI 배선 불량",
+      "wanted_exit": 0,
+      "exit": 0,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "expected-empty",
+      "file_bytes": "FAIL: anything\n",
+      "expected": "",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "expected-space",
+      "file_bytes": "FAIL:  \n",
+      "expected": " ",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "expected-tab",
+      "file_bytes": "FAIL: \t\n",
+      "expected": "\t",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "expected-ideographic-space",
+      "file_bytes": "FAIL: 　\n",
+      "expected": "　",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "expected-nbsp",
+      "file_bytes": "FAIL:  \n",
+      "expected": " ",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "expected-zero-width-space",
+      "file_bytes": "FAIL: ​\n",
+      "expected": "​",
+      "wanted_exit": 1,
+      "exit": 0,
+      "stderr": "",
+      "ok": false
+    },
+    {
+      "name": "expected-leading-space-literal",
+      "file_bytes": "FAIL:  literal \n",
+      "expected": " literal ",
+      "wanted_exit": 0,
+      "exit": 0,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "expected-leading-space-absent",
+      "file_bytes": "FAIL: literal \n",
+      "expected": " literal ",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "expected-trailing-space-absent",
+      "file_bytes": "FAIL: literal\n",
+      "expected": "literal ",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "expected-with-lf",
+      "file_bytes": "FAIL: reason\nX\n",
+      "expected": "reason\nX",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "expected-with-cr",
+      "file_bytes": "FAIL: reason\rX\n",
+      "expected": "reason\rX",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "expected-with-crlf",
+      "file_bytes": "FAIL: reason\r\nX\n",
+      "expected": "reason\r\nX",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "boundary-space",
+      "file_bytes": "FAIL: CI 배선 불량 details\n",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 0,
+      "exit": 0,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "boundary-tab",
+      "file_bytes": "FAIL: CI 배선 불량\tdetails\n",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 0,
+      "exit": 0,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "boundary-slash",
+      "file_bytes": "FAIL: CI 배선 불량/details\n",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 0,
+      "exit": 0,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "boundary-emdash-nospace",
+      "file_bytes": "FAIL: CI 배선 불량—details\n",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "boundary-hyphen",
+      "file_bytes": "FAIL: CI 배선 불량-details\n",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "boundary-paren",
+      "file_bytes": "FAIL: CI 배선 불량(details)\n",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "boundary-colon",
+      "file_bytes": "FAIL: CI 배선 불량: details\n",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "boundary-comma",
+      "file_bytes": "FAIL: CI 배선 불량, details\n",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "boundary-ideographic-space",
+      "file_bytes": "FAIL: CI 배선 불량　details\n",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "boundary-nbsp",
+      "file_bytes": "FAIL: CI 배선 불량 details\n",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "boundary-vertical-tab",
+      "file_bytes": "FAIL: CI 배선 불량\u000bdetails\n",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "boundary-formfeed",
+      "file_bytes": "FAIL: CI 배선 불량\fdetails\n",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "boundary-cr-only",
+      "file_bytes": "FAIL: CI 배선 불량\rdetails\n",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "crlf-file-exact",
+      "file_bytes": "FAIL: CI 배선 불량\r\n",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 0,
+      "exit": 0,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "crlf-file-details",
+      "file_bytes": "FAIL: CI 배선 불량 — x\r\nCHECKED: 1\r\n",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 0,
+      "exit": 0,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "crlf-file-extension",
+      "file_bytes": "FAIL: CI 배선 불량XYZ\r\n",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "crlf-trailing-space-literal",
+      "file_bytes": "FAIL:  literal \r\n",
+      "expected": " literal ",
+      "wanted_exit": 0,
+      "exit": 0,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "cr-only-file",
+      "file_bytes": "FAIL: other\rFAIL: CI 배선 불량\r",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "double-cr",
+      "file_bytes": "FAIL: CI 배선 불량\r\r\n",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "bom-prefixed-fail-line",
+      "file_bytes": "﻿FAIL: CI 배선 불량\n",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "regex-meta-literal-present",
+      "file_bytes": "FAIL: .* appears\n",
+      "expected": ".*",
+      "wanted_exit": 0,
+      "exit": 0,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "regex-meta-literal-absent",
+      "file_bytes": "FAIL: anything else\n",
+      "expected": ".*",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "regex-alternation-literal",
+      "file_bytes": "FAIL: CI 스텝 불일치\n",
+      "expected": "CI 배선 불량|CI 스텝 불일치",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "regex-anchor-literal",
+      "file_bytes": "FAIL: CI 배선 불량\n",
+      "expected": "^CI 배선 불량$",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "backslash-literal",
+      "file_bytes": "FAIL: path C:\\\\tmp did not\n",
+      "expected": "path C:\\\\tmp",
+      "wanted_exit": 0,
+      "exit": 0,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "glob-star-literal",
+      "file_bytes": "FAIL: CI 배선 불량\n",
+      "expected": "*",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "legacy-row-missing-pr",
+      "file_bytes": "FAIL: 처분표에 PR #13 행 없음\n",
+      "expected": "행 없음",
+      "wanted_exit": 0,
+      "exit": 0,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "legacy-row-missing-task",
+      "file_bytes": "FAIL: 처분표에 task/hs-0002_x.y 행 없음\n",
+      "expected": "행 없음",
+      "wanted_exit": 0,
+      "exit": 0,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "legacy-row-missing-bare",
+      "file_bytes": "FAIL: 행 없음\n",
+      "expected": "행 없음",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "legacy-row-missing-trailing-space",
+      "file_bytes": "FAIL: 처분표에 PR #13 행 없음 \n",
+      "expected": "행 없음",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "legacy-row-missing-extension",
+      "file_bytes": "FAIL: 처분표에 PR #13 행 없음XYZ\n",
+      "expected": "행 없음",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "legacy-row-missing-context",
+      "file_bytes": "FAIL: quoting 처분표에 PR #13 행 없음\n",
+      "expected": "행 없음",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "legacy-row-missing-target-space",
+      "file_bytes": "FAIL: 처분표에 PR # 13 행 없음\n",
+      "expected": "행 없음",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "legacy-row-missing-target-empty",
+      "file_bytes": "FAIL: 처분표에  행 없음\n",
+      "expected": "행 없음",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "legacy-row-missing-target-other",
+      "file_bytes": "FAIL: 처분표에 issue-7 행 없음\n",
+      "expected": "행 없음",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "legacy-row-missing-multiline-bait",
+      "file_bytes": "FAIL: 처분표에 PR #13\nFAIL: 행 없음\n",
+      "expected": "행 없음",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "legacy-others-1",
+      "file_bytes": "FAIL: PR #13 행의 대상 칸에 다른 대상 1개가 함께 적혀 있다 — 대상마다 자기 행이 있어야 한다\n",
+      "expected": "대상 칸에 다른 대상",
+      "wanted_exit": 0,
+      "exit": 0,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "legacy-others-10",
+      "file_bytes": "FAIL: PR #13 행의 대상 칸에 다른 대상 10개가 함께 적혀 있다 — 대상마다 자기 행이 있어야 한다\n",
+      "expected": "대상 칸에 다른 대상",
+      "wanted_exit": 0,
+      "exit": 0,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "legacy-others-0",
+      "file_bytes": "FAIL: PR #13 행의 대상 칸에 다른 대상 0개가 함께 적혀 있다 — 대상마다 자기 행이 있어야 한다\n",
+      "expected": "대상 칸에 다른 대상",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "legacy-others-01",
+      "file_bytes": "FAIL: PR #13 행의 대상 칸에 다른 대상 01개가 함께 적혀 있다 — 대상마다 자기 행이 있어야 한다\n",
+      "expected": "대상 칸에 다른 대상",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "legacy-others-hyphen-dash",
+      "file_bytes": "FAIL: PR #13 행의 대상 칸에 다른 대상 1개가 함께 적혀 있다 - 대상마다 자기 행이 있어야 한다\n",
+      "expected": "대상 칸에 다른 대상",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "legacy-others-bare",
+      "file_bytes": "FAIL: 대상 칸에 다른 대상\n",
+      "expected": "대상 칸에 다른 대상",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "legacy-multi-2",
+      "file_bytes": "FAIL: PR #13 행이 2개 — 같은 대상에 처분이 둘 이상이면 결론이 무엇인지 정해지지 않는다\n",
+      "expected": "처분이 둘 이상",
+      "wanted_exit": 0,
+      "exit": 0,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "legacy-multi-10",
+      "file_bytes": "FAIL: PR #13 행이 10개 — 같은 대상에 처분이 둘 이상이면 결론이 무엇인지 정해지지 않는다\n",
+      "expected": "처분이 둘 이상",
+      "wanted_exit": 0,
+      "exit": 0,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "legacy-multi-1",
+      "file_bytes": "FAIL: PR #13 행이 1개 — 같은 대상에 처분이 둘 이상이면 결론이 무엇인지 정해지지 않는다\n",
+      "expected": "처분이 둘 이상",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "legacy-multi-0",
+      "file_bytes": "FAIL: PR #13 행이 0개 — 같은 대상에 처분이 둘 이상이면 결론이 무엇인지 정해지지 않는다\n",
+      "expected": "처분이 둘 이상",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "legacy-multi-bare",
+      "file_bytes": "FAIL: 처분이 둘 이상\n",
+      "expected": "처분이 둘 이상",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "legacy-key-as-literal-prefix",
+      "file_bytes": "FAIL: 행 없음 — 상세\n",
+      "expected": "행 없음",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "legacy-key-padded-not-legacy",
+      "file_bytes": "FAIL: 처분표에 PR #13 행 없음\n",
+      "expected": "행 없음 ",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "canonical-full-as-literal",
+      "file_bytes": "FAIL: 처분표에 PR #13 행 없음\n",
+      "expected": "처분표에 PR #13 행 없음",
+      "wanted_exit": 0,
+      "exit": 0,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "verdict-doc-literal",
+      "file_bytes": "FAIL: 판정 문서 없음/빈 파일/첫 줄 VERDICT 아님 (verdict-*.md)\n",
+      "expected": "판정 문서 없음",
+      "wanted_exit": 0,
+      "exit": 0,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "verdict-doc-bait",
+      "file_bytes": "FAIL: x quotes 판정 문서 없음/빈 파일\n",
+      "expected": "판정 문서 없음",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "empty-file",
+      "file_bytes": "",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "only-newlines",
+      "file_bytes": "\n\n\n",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "only-checked-line",
+      "file_bytes": "CHECKED: 0\n",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "invalid-utf8",
+      "file_bytes": "FAIL: CI \\xff\n",
+      "expected": "CI",
+      "wanted_exit": 2,
+      "exit": 2,
+      "stderr": "cannot read kickoff output: 'utf-8' codec can't decode byte 0xff in position 9: invalid start byte",
+      "ok": true
+    },
+    {
+      "name": "invalid-utf8-after-match",
+      "file_bytes": "FAIL: CI 배선 불량\n\\xff\n",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 2,
+      "exit": 2,
+      "stderr": "cannot read kickoff output: 'utf-8' codec can't decode byte 0xff in position 23: invalid start byte",
+      "ok": true
+    },
+    {
+      "name": "utf16-encoded-file",
+      "file_bytes": "\\xff\\xfeF\u0000A\u0000I\u0000L\u0000:\u0000 \u0000C\u0000I\u0000 \u00000\\xbc \\xc1 \u0000\\x88\\xbdɷ\n\u0000",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 2,
+      "exit": 2,
+      "stderr": "cannot read kickoff output: 'utf-8' codec can't decode byte 0xff in position 0: invalid start byte",
+      "ok": true
+    },
+    {
+      "name": "nul-byte-in-file",
+      "file_bytes": "FAIL: CI 배선 불량\u0000\n",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "short-expected-prefix-of-word",
+      "file_bytes": "FAIL: CI 배선 불량\n",
+      "expected": "CI",
+      "wanted_exit": 0,
+      "exit": 0,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "short-expected-C-only",
+      "file_bytes": "FAIL: CI 배선 불량\n",
+      "expected": "C",
+      "wanted_exit": 1,
+      "exit": 1,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "nfd-decomposed-hangul",
+      "file_bytes": "FAIL: CI 배선 불량\n",
+      "expected": "CI 배선 불량",
+      "wanted_exit": 0,
+      "exit": 0,
+      "stderr": "",
+      "ok": true
+    },
+    {
+      "name": "missing-file",
+      "args": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-final-adv-cli-d982io2r/missing-file-target",
+        "CI 배선 불량"
+      ],
+      "wanted_exit": 2,
+      "exit": 2,
+      "stderr": "cannot read kickoff output: [Errno 2] No such file or directory: '/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-final-adv-cli-d982io2r/missing-file-target'",
+      "ok": true
+    },
+    {
+      "name": "directory",
+      "args": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-final-adv-cli-d982io2r/directory-target",
+        "CI 배선 불량"
+      ],
+      "wanted_exit": 2,
+      "exit": 2,
+      "stderr": "cannot read kickoff output: [Errno 21] Is a directory: '/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-final-adv-cli-d982io2r/directory-target'",
+      "ok": true
+    },
+    {
+      "name": "no-args",
+      "args": [],
+      "wanted_exit": 2,
+      "exit": 2,
+      "stderr": "usage: has-kickoff-failure.py LOG EXPECTED",
+      "ok": true
+    },
+    {
+      "name": "one-arg",
+      "args": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-final-adv-cli-d982io2r/one-arg-target"
+      ],
+      "wanted_exit": 2,
+      "exit": 2,
+      "stderr": "usage: has-kickoff-failure.py LOG EXPECTED",
+      "ok": true
+    },
+    {
+      "name": "three-args",
+      "args": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-final-adv-cli-d982io2r/three-args-target",
+        "CI 배선 불량",
+        "extra"
+      ],
+      "wanted_exit": 2,
+      "exit": 2,
+      "stderr": "usage: has-kickoff-failure.py LOG EXPECTED",
+      "ok": true
+    }
+  ]
+}

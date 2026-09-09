@@ -1,0 +1,22 @@
+{
+  "name": "target-43",
+  "command": [
+    "bash",
+    "-lc",
+    "cd humansearch && uv run --no-sync pytest -q tests/test_hs_0002.py tests/test_hs_0002_boundaries.py"
+  ],
+  "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+  "started": "2026-09-09T22:45:09Z",
+  "ended": "2026-09-09T22:45:15Z",
+  "exit_code": 0,
+  "head_before": "8bef581b2ee64dd57345f92f11f241e0c927b759",
+  "head_after": "8bef581b2ee64dd57345f92f11f241e0c927b759",
+  "stdout_path": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/artifacts/hs0002-20260910/codeaudit-final-target-43.stdout",
+  "stderr_path": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/artifacts/hs0002-20260910/codeaudit-final-target-43.stderr",
+  "stdout_sha256": "189768fc7eef5c48a9c5b21f570c9056652fb300bcddd31cc987190ec4cb1880",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "candidate_before_sha_path": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/artifacts/hs0002-20260910/codeaudit-final-target-43.before-sha.json",
+  "candidate_after_sha_path": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/artifacts/hs0002-20260910/codeaudit-final-target-43.after-sha.json",
+  "candidate_before_sha256": "b4903458fd8bbb59e32548be9f5f1c690b4b51e4e507fccee147d91945da095a",
+  "candidate_after_sha256": "b4903458fd8bbb59e32548be9f5f1c690b4b51e4e507fccee147d91945da095a"
+}

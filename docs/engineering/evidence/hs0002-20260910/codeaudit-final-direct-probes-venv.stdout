@@ -1,0 +1,166 @@
+{
+  "results": [
+    {
+      "name": "cli-normal",
+      "kind": "helper-cli",
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "stdout": "",
+      "stderr": "",
+      "passed": true
+    },
+    {
+      "name": "cli-mismatch",
+      "kind": "helper-cli",
+      "exit_code": 1,
+      "expected_exit_code": 1,
+      "stdout": "",
+      "stderr": "",
+      "passed": true
+    },
+    {
+      "name": "cli-empty-expected",
+      "kind": "helper-cli",
+      "exit_code": 1,
+      "expected_exit_code": 1,
+      "stdout": "",
+      "stderr": "",
+      "passed": true
+    },
+    {
+      "name": "cli-space-expected",
+      "kind": "helper-cli",
+      "exit_code": 1,
+      "expected_exit_code": 1,
+      "stdout": "",
+      "stderr": "",
+      "passed": true
+    },
+    {
+      "name": "cli-literal-leading-space",
+      "kind": "helper-cli",
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "stdout": "",
+      "stderr": "",
+      "passed": true
+    },
+    {
+      "name": "cli-leading-space-mismatch",
+      "kind": "helper-cli",
+      "exit_code": 1,
+      "expected_exit_code": 1,
+      "stdout": "",
+      "stderr": "",
+      "passed": true
+    },
+    {
+      "name": "cli-cr-expected",
+      "kind": "helper-cli",
+      "exit_code": 1,
+      "expected_exit_code": 1,
+      "stdout": "",
+      "stderr": "",
+      "passed": true
+    },
+    {
+      "name": "cli-lf-expected",
+      "kind": "helper-cli",
+      "exit_code": 1,
+      "expected_exit_code": 1,
+      "stdout": "",
+      "stderr": "",
+      "passed": true
+    },
+    {
+      "name": "cli-slash-boundary",
+      "kind": "helper-cli",
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "stdout": "",
+      "stderr": "",
+      "passed": true
+    },
+    {
+      "name": "cli-punctuation-boundary",
+      "kind": "helper-cli",
+      "exit_code": 1,
+      "expected_exit_code": 1,
+      "stdout": "",
+      "stderr": "",
+      "passed": true
+    },
+    {
+      "name": "cli-missing-file",
+      "kind": "helper-cli-file-error",
+      "exit_code": 2,
+      "expected_exit_code": 2,
+      "stdout": "",
+      "stderr": "cannot read kickoff output: [Errno 2] No such file or directory: '/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/codeaudit-final-probes-ahesaowv/missing.log'\n",
+      "passed": true
+    },
+    {
+      "name": "cli-directory",
+      "kind": "helper-cli-file-error",
+      "exit_code": 2,
+      "expected_exit_code": 2,
+      "stdout": "",
+      "stderr": "cannot read kickoff output: [Errno 21] Is a directory: '/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/codeaudit-final-probes-ahesaowv/directory'\n",
+      "passed": true
+    },
+    {
+      "name": "cli-invalid-utf8",
+      "kind": "helper-cli-file-error",
+      "exit_code": 2,
+      "expected_exit_code": 2,
+      "stdout": "",
+      "stderr": "cannot read kickoff output: 'utf-8' codec can't decode byte 0xff in position 12: invalid start byte\n",
+      "passed": true
+    },
+    {
+      "name": "negative-blank-reject",
+      "kind": "actual-negative-function",
+      "exit_code": 1,
+      "expected_exit_code": 1,
+      "stdout": "FAIL: fixture — 빨개지긴 했으나 사유가 다르다 (exit 1, 기대 ' ' 없음: FAIL:  )\nCHECKED: 1\n",
+      "stderr": "",
+      "passed": true
+    },
+    {
+      "name": "negative-leading-space-accept",
+      "kind": "actual-negative-function",
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "stdout": "PASS: fixture — 기대한 사유로 차단됨 (exit 1, ' literal ')\nCHECKED: 1\n",
+      "stderr": "",
+      "passed": true
+    },
+    {
+      "name": "negative-pass-bait-reject",
+      "kind": "actual-negative-function",
+      "exit_code": 1,
+      "expected_exit_code": 1,
+      "stdout": "FAIL: fixture — 빨개지긴 했으나 사유가 다르다 (exit 1, 기대 'reason' 없음: FAIL: unrelated)\nCHECKED: 1\n",
+      "stderr": "",
+      "passed": true
+    },
+    {
+      "name": "negative-slash-boundary-accept",
+      "kind": "actual-negative-function",
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "stdout": "PASS: fixture — 기대한 사유로 차단됨 (exit 1, 'reason')\nCHECKED: 1\n",
+      "stderr": "",
+      "passed": true
+    },
+    {
+      "name": "negative-punctuation-reject",
+      "kind": "actual-negative-function",
+      "exit_code": 1,
+      "expected_exit_code": 1,
+      "stdout": "FAIL: fixture — 빨개지긴 했으나 사유가 다르다 (exit 1, 기대 'reason' 없음: FAIL: reason-details)\nCHECKED: 1\n",
+      "stderr": "",
+      "passed": true
+    }
+  ]
+}

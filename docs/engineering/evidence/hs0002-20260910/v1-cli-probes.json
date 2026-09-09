@@ -1,0 +1,951 @@
+{
+  "helper_sha256_before": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+  "helper_sha256_after": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+  "unchanged": true,
+  "total": 63,
+  "mismatches": [
+    "expected-space-only"
+  ],
+  "results": [
+    {
+      "id": "argc-1",
+      "argv_after_script": [],
+      "want": 2,
+      "got": 2,
+      "ok": true,
+      "note": "usage error",
+      "start": "2026-09-09T22:14:21.808079+00:00",
+      "end": "2026-09-09T22:14:21.838283+00:00",
+      "stdout": "",
+      "stderr": "usage: has-kickoff-failure.py LOG EXPECTED\n"
+    },
+    {
+      "id": "argc-4",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/argc-4.log",
+        "a",
+        "b"
+      ],
+      "want": 2,
+      "got": 2,
+      "ok": true,
+      "note": "usage error",
+      "start": "2026-09-09T22:14:21.838625+00:00",
+      "end": "2026-09-09T22:14:21.864570+00:00",
+      "stdout": "",
+      "stderr": "usage: has-kickoff-failure.py LOG EXPECTED\n"
+    },
+    {
+      "id": "missing-file",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/does-not-exist.log",
+        "CI 배선 불량"
+      ],
+      "want": 2,
+      "got": 2,
+      "ok": true,
+      "note": "unreadable",
+      "start": "2026-09-09T22:14:21.864663+00:00",
+      "end": "2026-09-09T22:14:21.891798+00:00",
+      "stdout": "",
+      "stderr": "cannot read kickoff output: [Errno 2] No such file or directory: '/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/does-not-exist.log'\n"
+    },
+    {
+      "id": "directory-as-log",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/directory-as-log.log",
+        "CI 배선 불량"
+      ],
+      "want": 2,
+      "got": 2,
+      "ok": true,
+      "note": "unreadable",
+      "start": "2026-09-09T22:14:21.892067+00:00",
+      "end": "2026-09-09T22:14:21.919238+00:00",
+      "stdout": "",
+      "stderr": "cannot read kickoff output: [Errno 21] Is a directory: '/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/directory-as-log.log'\n"
+    },
+    {
+      "id": "invalid-utf8",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/invalid-utf8.log",
+        "CI"
+      ],
+      "want": 2,
+      "got": 2,
+      "ok": true,
+      "note": "unreadable",
+      "start": "2026-09-09T22:14:21.919568+00:00",
+      "end": "2026-09-09T22:14:21.947586+00:00",
+      "stdout": "",
+      "stderr": "cannot read kickoff output: 'utf-8' codec can't decode byte 0xff in position 9: invalid start byte\n"
+    },
+    {
+      "id": "expected-with-newline",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/expected-with-newline.log",
+        "CI 배선 불량\n"
+      ],
+      "want": 1,
+      "got": 1,
+      "ok": true,
+      "note": "newline rejected",
+      "start": "2026-09-09T22:14:21.947925+00:00",
+      "end": "2026-09-09T22:14:21.982202+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "expected-with-cr",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/expected-with-cr.log",
+        "CI 배선 불량\r"
+      ],
+      "want": 1,
+      "got": 1,
+      "ok": true,
+      "note": "cr rejected",
+      "start": "2026-09-09T22:14:21.982592+00:00",
+      "end": "2026-09-09T22:14:22.011234+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "expected-empty",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/expected-empty.log",
+        ""
+      ],
+      "want": 1,
+      "got": 1,
+      "ok": true,
+      "note": "empty rejected",
+      "start": "2026-09-09T22:14:22.011555+00:00",
+      "end": "2026-09-09T22:14:22.038568+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "expected-space-only",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/expected-space-only.log",
+        " "
+      ],
+      "want": 1,
+      "got": 0,
+      "ok": false,
+      "note": "space-only: message ' x'.startswith(' ') ... contract says literal; see note",
+      "start": "2026-09-09T22:14:22.038918+00:00",
+      "end": "2026-09-09T22:14:22.066023+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "no-space-after-FAIL",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/no-space-after-FAIL.log",
+        "CI 배선 불량"
+      ],
+      "want": 1,
+      "got": 1,
+      "ok": true,
+      "note": "not canonical FAIL line",
+      "start": "2026-09-09T22:14:22.066369+00:00",
+      "end": "2026-09-09T22:14:22.093788+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "leading-space-FAIL",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/leading-space-FAIL.log",
+        "CI 배선 불량"
+      ],
+      "want": 1,
+      "got": 1,
+      "ok": true,
+      "note": "not at line start",
+      "start": "2026-09-09T22:14:22.094159+00:00",
+      "end": "2026-09-09T22:14:22.121086+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "lowercase-fail",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/lowercase-fail.log",
+        "CI 배선 불량"
+      ],
+      "want": 1,
+      "got": 1,
+      "ok": true,
+      "note": "case-sensitive",
+      "start": "2026-09-09T22:14:22.121424+00:00",
+      "end": "2026-09-09T22:14:22.147704+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "crlf-log",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/crlf-log.log",
+        "CI 배선 불량"
+      ],
+      "want": 0,
+      "got": 0,
+      "ok": true,
+      "note": "CRLF tolerated",
+      "start": "2026-09-09T22:14:22.148057+00:00",
+      "end": "2026-09-09T22:14:22.174614+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "tab-after-reason",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/tab-after-reason.log",
+        "CI 배선 불량"
+      ],
+      "want": 0,
+      "got": 0,
+      "ok": true,
+      "note": "tab boundary",
+      "start": "2026-09-09T22:14:22.174941+00:00",
+      "end": "2026-09-09T22:14:22.200973+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "emdash-no-space",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/emdash-no-space.log",
+        "CI 배선 불량"
+      ],
+      "want": 1,
+      "got": 1,
+      "ok": true,
+      "note": "no boundary char",
+      "start": "2026-09-09T22:14:22.201333+00:00",
+      "end": "2026-09-09T22:14:22.227002+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "hyphen-no-space",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/hyphen-no-space.log",
+        "CI 배선 불량"
+      ],
+      "want": 1,
+      "got": 1,
+      "ok": true,
+      "note": "hyphen is not a boundary",
+      "start": "2026-09-09T22:14:22.227348+00:00",
+      "end": "2026-09-09T22:14:22.253198+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "only-pass-lines",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/only-pass-lines.log",
+        "CI 배선 불량"
+      ],
+      "want": 1,
+      "got": 1,
+      "ok": true,
+      "note": "no FAIL line",
+      "start": "2026-09-09T22:14:22.253543+00:00",
+      "end": "2026-09-09T22:14:22.278365+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "fail-after-pass-lines",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/fail-after-pass-lines.log",
+        "CI 배선 불량"
+      ],
+      "want": 0,
+      "got": 0,
+      "ok": true,
+      "note": "later FAIL line found",
+      "start": "2026-09-09T22:14:22.278687+00:00",
+      "end": "2026-09-09T22:14:22.304031+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "fail-line-no-trailing-newline",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/fail-line-no-trailing-newline.log",
+        "CI 배선 불량"
+      ],
+      "want": 0,
+      "got": 0,
+      "ok": true,
+      "note": "EOF boundary",
+      "start": "2026-09-09T22:14:22.304421+00:00",
+      "end": "2026-09-09T22:14:22.334648+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "bom-prefixed",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/bom-prefixed.log",
+        "CI 배선 불량"
+      ],
+      "want": 1,
+      "got": 1,
+      "ok": true,
+      "note": "BOM breaks line start (checker never emits BOM)",
+      "start": "2026-09-09T22:14:22.335025+00:00",
+      "end": "2026-09-09T22:14:22.364295+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "regex-dotstar-literal",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/regex-dotstar-literal.log",
+        ".*"
+      ],
+      "want": 1,
+      "got": 1,
+      "ok": true,
+      "note": "regex not interpreted",
+      "start": "2026-09-09T22:14:22.364613+00:00",
+      "end": "2026-09-09T22:14:22.398924+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "regex-anchor-literal",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/regex-anchor-literal.log",
+        "^CI 배선 불량$"
+      ],
+      "want": 0,
+      "got": 0,
+      "ok": true,
+      "note": "literal anchors accepted",
+      "start": "2026-09-09T22:14:22.399578+00:00",
+      "end": "2026-09-09T22:14:22.428560+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "regex-bracket-literal",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/regex-bracket-literal.log",
+        "[CI] 배선"
+      ],
+      "want": 0,
+      "got": 0,
+      "ok": true,
+      "note": "literal brackets",
+      "start": "2026-09-09T22:14:22.428958+00:00",
+      "end": "2026-09-09T22:14:22.457140+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "regex-alternation-literal",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/regex-alternation-literal.log",
+        "CI 배선 불량|CI 스텝 불일치"
+      ],
+      "want": 1,
+      "got": 1,
+      "ok": true,
+      "note": "alternation not interpreted",
+      "start": "2026-09-09T22:14:22.457516+00:00",
+      "end": "2026-09-09T22:14:22.486819+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "expected-includes-FAIL-prefix",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/expected-includes-FAIL-prefix.log",
+        "FAIL: CI 배선 불량"
+      ],
+      "want": 1,
+      "got": 1,
+      "ok": true,
+      "note": "prefix is stripped before compare",
+      "start": "2026-09-09T22:14:22.487219+00:00",
+      "end": "2026-09-09T22:14:22.512832+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "expected-trailing-space",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/expected-trailing-space.log",
+        "CI 배선 불량 "
+      ],
+      "want": 1,
+      "got": 1,
+      "ok": true,
+      "note": "trailing space in expected then '—' not boundary (edge; none of 31 expects end with space)",
+      "start": "2026-09-09T22:14:22.513227+00:00",
+      "end": "2026-09-09T22:14:22.538720+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "short-prefix-CI",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/short-prefix-CI.log",
+        "CI"
+      ],
+      "want": 0,
+      "got": 0,
+      "ok": true,
+      "note": "design: any word-boundary prefix counts (31 fixed expects are full reasons)",
+      "start": "2026-09-09T22:14:22.539120+00:00",
+      "end": "2026-09-09T22:14:22.564099+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "legacy-bare-line",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/legacy-bare-line.log",
+        "행 없음"
+      ],
+      "want": 1,
+      "got": 1,
+      "ok": true,
+      "note": "legacy needs canonical target form",
+      "start": "2026-09-09T22:14:22.564445+00:00",
+      "end": "2026-09-09T22:14:22.589462+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "legacy-suffix-extended",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/legacy-suffix-extended.log",
+        "행 없음"
+      ],
+      "want": 1,
+      "got": 1,
+      "ok": true,
+      "note": "fullmatch",
+      "start": "2026-09-09T22:14:22.589804+00:00",
+      "end": "2026-09-09T22:14:22.615379+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "legacy-prefix-bait",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/legacy-prefix-bait.log",
+        "행 없음"
+      ],
+      "want": 1,
+      "got": 1,
+      "ok": true,
+      "note": "fullmatch",
+      "start": "2026-09-09T22:14:22.615662+00:00",
+      "end": "2026-09-09T22:14:22.642176+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "legacy-target-131",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/legacy-target-131.log",
+        "행 없음"
+      ],
+      "want": 0,
+      "got": 0,
+      "ok": true,
+      "note": "any numeric PR",
+      "start": "2026-09-09T22:14:22.642566+00:00",
+      "end": "2026-09-09T22:14:22.669749+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "legacy-target-empty-number",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/legacy-target-empty-number.log",
+        "행 없음"
+      ],
+      "want": 1,
+      "got": 1,
+      "ok": true,
+      "note": "malformed target",
+      "start": "2026-09-09T22:14:22.670132+00:00",
+      "end": "2026-09-09T22:14:22.697002+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "legacy-target-branch",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/legacy-target-branch.log",
+        "행 없음"
+      ],
+      "want": 0,
+      "got": 0,
+      "ok": true,
+      "note": "branch target",
+      "start": "2026-09-09T22:14:22.697393+00:00",
+      "end": "2026-09-09T22:14:22.724747+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "legacy-target-space-in-branch",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/legacy-target-space-in-branch.log",
+        "행 없음"
+      ],
+      "want": 1,
+      "got": 1,
+      "ok": true,
+      "note": "malformed target",
+      "start": "2026-09-09T22:14:22.725096+00:00",
+      "end": "2026-09-09T22:14:22.750341+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "legacy-rows-1",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/legacy-rows-1.log",
+        "처분이 둘 이상"
+      ],
+      "want": 1,
+      "got": 1,
+      "ok": true,
+      "note": "1 row is not 'two or more'",
+      "start": "2026-09-09T22:14:22.750679+00:00",
+      "end": "2026-09-09T22:14:22.774901+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "legacy-rows-10",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/legacy-rows-10.log",
+        "처분이 둘 이상"
+      ],
+      "want": 0,
+      "got": 0,
+      "ok": true,
+      "note": "10 rows",
+      "start": "2026-09-09T22:14:22.775219+00:00",
+      "end": "2026-09-09T22:14:22.805583+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "legacy-others-0",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/legacy-others-0.log",
+        "대상 칸에 다른 대상"
+      ],
+      "want": 1,
+      "got": 1,
+      "ok": true,
+      "note": "0 others",
+      "start": "2026-09-09T22:14:22.805922+00:00",
+      "end": "2026-09-09T22:14:22.833430+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "legacy-tail-truncated",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/legacy-tail-truncated.log",
+        "처분이 둘 이상"
+      ],
+      "want": 1,
+      "got": 1,
+      "ok": true,
+      "note": "canonical tail required",
+      "start": "2026-09-09T22:14:22.833842+00:00",
+      "end": "2026-09-09T22:14:22.861613+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "legacy-regex-in-expected",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/legacy-regex-in-expected.log",
+        "행 없.*"
+      ],
+      "want": 1,
+      "got": 1,
+      "ok": true,
+      "note": "expected not a regex",
+      "start": "2026-09-09T22:14:22.861935+00:00",
+      "end": "2026-09-09T22:14:22.888620+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "legacy-as-nonlegacy-prefix",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/legacy-as-nonlegacy-prefix.log",
+        "처분표에 PR #13 행 없음"
+      ],
+      "want": 0,
+      "got": 0,
+      "ok": true,
+      "note": "full literal also accepted via prefix path",
+      "start": "2026-09-09T22:14:22.888959+00:00",
+      "end": "2026-09-09T22:14:22.919022+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "disposition-missing-reason",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/disposition-missing-reason.log",
+        "processing"
+      ],
+      "want": 1,
+      "got": 1,
+      "ok": true,
+      "note": "unrelated",
+      "start": "2026-09-09T22:14:22.919384+00:00",
+      "end": "2026-09-09T22:14:22.948824+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "verdict-doc-slash-boundary",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/verdict-doc-slash-boundary.log",
+        "판정 문서 없음"
+      ],
+      "want": 0,
+      "got": 0,
+      "ok": true,
+      "note": "slash boundary",
+      "start": "2026-09-09T22:14:22.949146+00:00",
+      "end": "2026-09-09T22:14:22.977360+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "two-fail-lines-second-matches",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/two-fail-lines-second-matches.log",
+        "CI 배선 불량"
+      ],
+      "want": 0,
+      "got": 0,
+      "ok": true,
+      "note": "any FAIL line may match",
+      "start": "2026-09-09T22:14:22.977694+00:00",
+      "end": "2026-09-09T22:14:23.005236+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "nul-in-log",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/nul-in-log.log",
+        "CI 배선 불량"
+      ],
+      "want": 0,
+      "got": 0,
+      "ok": true,
+      "note": "NUL tolerated in other line",
+      "start": "2026-09-09T22:14:23.005554+00:00",
+      "end": "2026-09-09T22:14:23.033156+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "very-long-expected",
+      "argv_after_script": "[len>500 omitted]",
+      "want": 1,
+      "got": 1,
+      "ok": true,
+      "note": "no crash",
+      "start": "2026-09-09T22:14:23.033515+00:00",
+      "end": "2026-09-09T22:14:23.067835+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "canonical-00-행 없음",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/canonical-00-행 없음.log",
+        "행 없음"
+      ],
+      "want": 0,
+      "got": 0,
+      "ok": true,
+      "note": "처분표에 PR #13 행 없음",
+      "start": "2026-09-09T22:14:23.068422+00:00",
+      "end": "2026-09-09T22:14:23.095317+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "canonical-01-대상 칸에 다른 대상",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/canonical-01-대상 칸에 다른 대상.log",
+        "대상 칸에 다른 대상"
+      ],
+      "want": 0,
+      "got": 0,
+      "ok": true,
+      "note": "PR #13 행의 대상 칸에 다른 대상 5개가 함께 적혀 있다 — 대상마다 자기 행이 있어야 한다",
+      "start": "2026-09-09T22:14:23.095642+00:00",
+      "end": "2026-09-09T22:14:23.134297+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "canonical-02-처분이 둘 이상",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/canonical-02-처분이 둘 이상.log",
+        "처분이 둘 이상"
+      ],
+      "want": 0,
+      "got": 0,
+      "ok": true,
+      "note": "PR #13 행이 2개 — 같은 대상에 처분이 둘 이상이면 결론이 무엇인지 정해지지 않는다",
+      "start": "2026-09-09T22:14:23.134667+00:00",
+      "end": "2026-09-09T22:14:23.169982+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "canonical-03-행 없음",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/canonical-03-행 없음.log",
+        "행 없음"
+      ],
+      "want": 0,
+      "got": 0,
+      "ok": true,
+      "note": "처분표에 PR #54 행 없음",
+      "start": "2026-09-09T22:14:23.170493+00:00",
+      "end": "2026-09-09T22:14:23.212948+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "canonical-04-대상 칸에 다른 대상",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/canonical-04-대상 칸에 다른 대상.log",
+        "대상 칸에 다른 대상"
+      ],
+      "want": 0,
+      "got": 0,
+      "ok": true,
+      "note": "PR #54 행의 대상 칸에 다른 대상 5개가 함께 적혀 있다 — 대상마다 자기 행이 있어야 한다",
+      "start": "2026-09-09T22:14:23.213293+00:00",
+      "end": "2026-09-09T22:14:23.257648+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "canonical-05-처분이 둘 이상",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/canonical-05-처분이 둘 이상.log",
+        "처분이 둘 이상"
+      ],
+      "want": 0,
+      "got": 0,
+      "ok": true,
+      "note": "PR #54 행이 2개 — 같은 대상에 처분이 둘 이상이면 결론이 무엇인지 정해지지 않는다",
+      "start": "2026-09-09T22:14:23.258118+00:00",
+      "end": "2026-09-09T22:14:23.289970+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "canonical-06-행 없음",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/canonical-06-행 없음.log",
+        "행 없음"
+      ],
+      "want": 0,
+      "got": 0,
+      "ok": true,
+      "note": "처분표에 PR #15 행 없음",
+      "start": "2026-09-09T22:14:23.290291+00:00",
+      "end": "2026-09-09T22:14:23.323666+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "canonical-07-대상 칸에 다른 대상",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/canonical-07-대상 칸에 다른 대상.log",
+        "대상 칸에 다른 대상"
+      ],
+      "want": 0,
+      "got": 0,
+      "ok": true,
+      "note": "PR #15 행의 대상 칸에 다른 대상 5개가 함께 적혀 있다 — 대상마다 자기 행이 있어야 한다",
+      "start": "2026-09-09T22:14:23.324192+00:00",
+      "end": "2026-09-09T22:14:23.352804+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "canonical-08-처분이 둘 이상",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/canonical-08-처분이 둘 이상.log",
+        "처분이 둘 이상"
+      ],
+      "want": 0,
+      "got": 0,
+      "ok": true,
+      "note": "PR #15 행이 2개 — 같은 대상에 처분이 둘 이상이면 결론이 무엇인지 정해지지 않는다",
+      "start": "2026-09-09T22:14:23.353254+00:00",
+      "end": "2026-09-09T22:14:23.381438+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "canonical-09-행 없음",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/canonical-09-행 없음.log",
+        "행 없음"
+      ],
+      "want": 0,
+      "got": 0,
+      "ok": true,
+      "note": "처분표에 task/hs-d1-permit 행 없음",
+      "start": "2026-09-09T22:14:23.381901+00:00",
+      "end": "2026-09-09T22:14:23.408371+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "canonical-10-대상 칸에 다른 대상",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/canonical-10-대상 칸에 다른 대상.log",
+        "대상 칸에 다른 대상"
+      ],
+      "want": 0,
+      "got": 0,
+      "ok": true,
+      "note": "task/hs-d1-permit 행의 대상 칸에 다른 대상 5개가 함께 적혀 있다 — 대상마다 자기 행이 있어야 한다",
+      "start": "2026-09-09T22:14:23.408931+00:00",
+      "end": "2026-09-09T22:14:23.435117+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "canonical-11-처분이 둘 이상",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/canonical-11-처분이 둘 이상.log",
+        "처분이 둘 이상"
+      ],
+      "want": 0,
+      "got": 0,
+      "ok": true,
+      "note": "task/hs-d1-permit 행이 2개 — 같은 대상에 처분이 둘 이상이면 결론이 무엇인지 정해지지 않는다",
+      "start": "2026-09-09T22:14:23.435470+00:00",
+      "end": "2026-09-09T22:14:23.463959+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "canonical-12-행 없음",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/canonical-12-행 없음.log",
+        "행 없음"
+      ],
+      "want": 0,
+      "got": 0,
+      "ok": true,
+      "note": "처분표에 task/hs-l1-malformed-url-fix 행 없음",
+      "start": "2026-09-09T22:14:23.464325+00:00",
+      "end": "2026-09-09T22:14:23.496258+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "canonical-13-대상 칸에 다른 대상",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/canonical-13-대상 칸에 다른 대상.log",
+        "대상 칸에 다른 대상"
+      ],
+      "want": 0,
+      "got": 0,
+      "ok": true,
+      "note": "task/hs-l1-malformed-url-fix 행의 대상 칸에 다른 대상 5개가 함께 적혀 있다 — 대상마다 자기 행이 있어야 한다",
+      "start": "2026-09-09T22:14:23.496602+00:00",
+      "end": "2026-09-09T22:14:23.546468+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "canonical-14-처분이 둘 이상",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/canonical-14-처분이 둘 이상.log",
+        "처분이 둘 이상"
+      ],
+      "want": 0,
+      "got": 0,
+      "ok": true,
+      "note": "task/hs-l1-malformed-url-fix 행이 2개 — 같은 대상에 처분이 둘 이상이면 결론이 무엇인지 정해지지 않는다",
+      "start": "2026-09-09T22:14:23.554088+00:00",
+      "end": "2026-09-09T22:14:23.593368+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "canonical-15-행 없음",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/canonical-15-행 없음.log",
+        "행 없음"
+      ],
+      "want": 0,
+      "got": 0,
+      "ok": true,
+      "note": "처분표에 task/hs-observe-url-crash 행 없음",
+      "start": "2026-09-09T22:14:23.593748+00:00",
+      "end": "2026-09-09T22:14:23.622903+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "canonical-16-대상 칸에 다른 대상",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/canonical-16-대상 칸에 다른 대상.log",
+        "대상 칸에 다른 대상"
+      ],
+      "want": 0,
+      "got": 0,
+      "ok": true,
+      "note": "task/hs-observe-url-crash 행의 대상 칸에 다른 대상 5개가 함께 적혀 있다 — 대상마다 자기 행이 있어야 한다",
+      "start": "2026-09-09T22:14:23.623236+00:00",
+      "end": "2026-09-09T22:14:23.655076+00:00",
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "canonical-17-처분이 둘 이상",
+      "argv_after_script": [
+        "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v1-cli-xdr_g6fi/canonical-17-처분이 둘 이상.log",
+        "처분이 둘 이상"
+      ],
+      "want": 0,
+      "got": 0,
+      "ok": true,
+      "note": "task/hs-observe-url-crash 행이 2개 — 같은 대상에 처분이 둘 이상이면 결론이 무엇인지 정해지지 않는다",
+      "start": "2026-09-09T22:14:23.655627+00:00",
+      "end": "2026-09-09T22:14:23.683450+00:00",
+      "stdout": "",
+      "stderr": ""
+    }
+  ]
+}

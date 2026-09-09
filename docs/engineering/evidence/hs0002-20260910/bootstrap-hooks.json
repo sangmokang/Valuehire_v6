@@ -1,0 +1,15 @@
+{
+  "command": [
+    "bash",
+    "scripts/install-hooks.sh"
+  ],
+  "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+  "started": "2026-09-09T21:40:02.053617+00:00",
+  "ended": "2026-09-09T21:40:02.147086+00:00",
+  "elapsed": 0.07729454105719924,
+  "exit_code": 0,
+  "session": "hs0002-20260910",
+  "head_before": "6cef849b36e4dc11fd272e4bfe50af2f5e8db537",
+  "head_after": "6cef849b36e4dc11fd272e4bfe50af2f5e8db537",
+  "output_file": "bootstrap-hooks.log"
+}

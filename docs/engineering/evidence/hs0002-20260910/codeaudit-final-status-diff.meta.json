@@ -1,0 +1,22 @@
+{
+  "name": "status-diff",
+  "command": [
+    "bash",
+    "-lc",
+    "git status --short && git diff --check && git diff --stat && git diff -- scripts/acceptance-hs-kickoff-mutations.sh scripts/verify/has-kickoff-failure.py humansearch/tests/test_hs_0002.py humansearch/tests/test_hs_0002_boundaries.py docs/sot/verification-commands.md"
+  ],
+  "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+  "started": "2026-09-09T22:45:08Z",
+  "ended": "2026-09-09T22:45:09Z",
+  "exit_code": 0,
+  "head_before": "8bef581b2ee64dd57345f92f11f241e0c927b759",
+  "head_after": "8bef581b2ee64dd57345f92f11f241e0c927b759",
+  "stdout_path": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/artifacts/hs0002-20260910/codeaudit-final-status-diff.stdout",
+  "stderr_path": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/artifacts/hs0002-20260910/codeaudit-final-status-diff.stderr",
+  "stdout_sha256": "136ec8d0717dabef942a26c5a6047f0cb5e52346cfe51e2435ec391f7d63ea4b",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "candidate_before_sha_path": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/artifacts/hs0002-20260910/codeaudit-final-status-diff.before-sha.json",
+  "candidate_after_sha_path": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/artifacts/hs0002-20260910/codeaudit-final-status-diff.after-sha.json",
+  "candidate_before_sha256": "b4903458fd8bbb59e32548be9f5f1c690b4b51e4e507fccee147d91945da095a",
+  "candidate_after_sha256": "b4903458fd8bbb59e32548be9f5f1c690b4b51e4e507fccee147d91945da095a"
+}

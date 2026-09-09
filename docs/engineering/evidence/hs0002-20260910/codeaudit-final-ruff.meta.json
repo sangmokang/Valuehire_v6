@@ -1,0 +1,22 @@
+{
+  "name": "ruff",
+  "command": [
+    "bash",
+    "-lc",
+    "cd humansearch && uv run --no-sync ruff check src tests ../scripts/verify/has-kickoff-failure.py"
+  ],
+  "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+  "started": "2026-09-09T22:45:16Z",
+  "ended": "2026-09-09T22:45:16Z",
+  "exit_code": 0,
+  "head_before": "8bef581b2ee64dd57345f92f11f241e0c927b759",
+  "head_after": "8bef581b2ee64dd57345f92f11f241e0c927b759",
+  "stdout_path": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/artifacts/hs0002-20260910/codeaudit-final-ruff.stdout",
+  "stderr_path": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/artifacts/hs0002-20260910/codeaudit-final-ruff.stderr",
+  "stdout_sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "candidate_before_sha_path": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/artifacts/hs0002-20260910/codeaudit-final-ruff.before-sha.json",
+  "candidate_after_sha_path": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/artifacts/hs0002-20260910/codeaudit-final-ruff.after-sha.json",
+  "candidate_before_sha256": "b4903458fd8bbb59e32548be9f5f1c690b4b51e4e507fccee147d91945da095a",
+  "candidate_after_sha256": "b4903458fd8bbb59e32548be9f5f1c690b4b51e4e507fccee147d91945da095a"
+}

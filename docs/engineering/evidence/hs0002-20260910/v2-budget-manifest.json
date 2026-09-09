@@ -1,0 +1,10 @@
+{
+  "files": [
+    "artifacts/hs0002-20260910/v2-mutants.py",
+    "artifacts/hs0002-20260910/v2-cli-probes.py",
+    "artifacts/hs0002-20260910/v2-negative-extra.py",
+    "humansearch/tests/test_hs_0002.py",
+    "scripts/verify/has-kickoff-failure.py",
+    "scripts/acceptance-hs-kickoff-mutations.sh"
+  ]
+}

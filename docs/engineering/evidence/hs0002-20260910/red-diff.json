@@ -1,0 +1,28 @@
+{
+  "command": [
+    "git",
+    "diff",
+    "--cached",
+    "--check"
+  ],
+  "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+  "started": "2026-09-09T21:51:28.060255+00:00",
+  "ended": "2026-09-09T21:51:28.111935+00:00",
+  "elapsed": 0.019493208033964038,
+  "exit_code": 0,
+  "session": "hs0002-20260910",
+  "head_before": "6cef849b36e4dc11fd272e4bfe50af2f5e8db537",
+  "head_after": "6cef849b36e4dc11fd272e4bfe50af2f5e8db537",
+  "output_file": "red-diff.log",
+  "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "files_before": {
+    "scripts/acceptance-hs-kickoff-mutations.sh": "4569309a6e2a5614e43d7442d80bf9808d221995081c2097cf813e6ac0c9181e",
+    "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+    "docs/sot/verification-commands.md": "cd3af0bed3b8b0415630cd73b2f19e3f3bb7c0fc823dabd16ebddf76b999fe47"
+  },
+  "files_after": {
+    "scripts/acceptance-hs-kickoff-mutations.sh": "4569309a6e2a5614e43d7442d80bf9808d221995081c2097cf813e6ac0c9181e",
+    "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+    "docs/sot/verification-commands.md": "cd3af0bed3b8b0415630cd73b2f19e3f3bb7c0fc823dabd16ebddf76b999fe47"
+  }
+}

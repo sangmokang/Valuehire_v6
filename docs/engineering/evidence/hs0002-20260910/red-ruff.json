@@ -1,0 +1,19 @@
+{
+  "command": [
+    "uv",
+    "run",
+    "--no-sync",
+    "ruff",
+    "check",
+    "tests/test_hs_0002.py"
+  ],
+  "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/humansearch",
+  "started": "2026-09-09T21:48:59.521493+00:00",
+  "ended": "2026-09-09T21:49:00.368343+00:00",
+  "elapsed": 0.8232132918201387,
+  "exit_code": 1,
+  "session": "hs0002-20260910",
+  "head_before": "6cef849b36e4dc11fd272e4bfe50af2f5e8db537",
+  "head_after": "6cef849b36e4dc11fd272e4bfe50af2f5e8db537",
+  "output_file": "red-ruff.log"
+}

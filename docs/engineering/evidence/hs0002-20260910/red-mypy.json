@@ -1,0 +1,19 @@
+{
+  "command": [
+    "uv",
+    "run",
+    "--no-sync",
+    "mypy",
+    "--strict",
+    "tests/test_hs_0002.py"
+  ],
+  "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/humansearch",
+  "started": "2026-09-09T21:48:59.521500+00:00",
+  "ended": "2026-09-09T21:49:04.339862+00:00",
+  "elapsed": 4.7947860839776695,
+  "exit_code": 0,
+  "session": "hs0002-20260910",
+  "head_before": "6cef849b36e4dc11fd272e4bfe50af2f5e8db537",
+  "head_after": "6cef849b36e4dc11fd272e4bfe50af2f5e8db537",
+  "output_file": "red-mypy.log"
+}

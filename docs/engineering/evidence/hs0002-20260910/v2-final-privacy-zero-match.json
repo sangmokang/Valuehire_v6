@@ -1,0 +1,41 @@
+{
+  "scope": "artifacts/hs0002-20260910/v2-* files only",
+  "method": "field-name and unredacted-env-line scan; no environment read and no secret value printed",
+  "file_count": 104,
+  "field_name_hits": [
+    {
+      "file": "artifacts/hs0002-20260910/v2-env-redaction-note.json",
+      "field": "SUPABASE_KEY"
+    },
+    {
+      "file": "artifacts/hs0002-20260910/v2-env-redaction-note.json",
+      "field": "SUPABASE_URL"
+    },
+    {
+      "file": "artifacts/hs0002-20260910/v2-env.log",
+      "field": "SUPABASE_KEY="
+    },
+    {
+      "file": "artifacts/hs0002-20260910/v2-env.log",
+      "field": "SUPABASE_URL="
+    },
+    {
+      "file": "artifacts/hs0002-20260910/v2-env.log",
+      "field": "SUPABASE_KEY"
+    },
+    {
+      "file": "artifacts/hs0002-20260910/v2-env.log",
+      "field": "SUPABASE_URL"
+    },
+    {
+      "file": "artifacts/hs0002-20260910/v2-evidence.json",
+      "field": "SUPABASE_KEY"
+    },
+    {
+      "file": "artifacts/hs0002-20260910/v2-evidence.json",
+      "field": "SUPABASE_URL"
+    }
+  ],
+  "unredacted_env_line_files": [],
+  "status": "PASS"
+}

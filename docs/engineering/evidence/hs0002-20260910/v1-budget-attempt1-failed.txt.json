@@ -1,0 +1,1 @@
+{"original_filename": "v1-budget-attempt1-failed.txt", "sha256": "7d25fed9e2220eefd2926b62105c6273148a0ab4c4a83b93a04474e77739633f", "text": "attempt1: parallel call had cwd=humansearch/ (persisted from a sibling command); budget-check.py not found. Retrying from repo root.\n"}

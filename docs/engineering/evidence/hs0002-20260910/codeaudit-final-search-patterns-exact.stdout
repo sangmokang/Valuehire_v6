@@ -1,0 +1,7 @@
+scripts/acceptance-hs-kickoff-mutations.sh:165:  if ! ( cd "$d" && eval "$mutate" ); then failc "$name — 변조 적용 실패(종료값)"; return; fi
+scripts/acceptance-hs-kickoff-mutations.sh:182:  if ! ( cd "$d" && eval "$mutate" ); then failc "$name — 변조 적용 실패(종료값)"; return; fi
+scripts/verify/has-kickoff-failure.py:23:        return False
+scripts/verify/has-kickoff-failure.py:30:                return True
+scripts/verify/has-kickoff-failure.py:34:                return True
+scripts/verify/has-kickoff-failure.py:35:    return False
+scripts/verify/has-kickoff-failure.py:44:    except (OSError, UnicodeError) as error:

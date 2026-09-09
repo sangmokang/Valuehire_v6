@@ -1,0 +1,31 @@
+{
+  "command": [
+    "python3",
+    "artifacts/hs0002-20260910/budget-check.py",
+    "artifacts/hs0002-20260910/final-candidate-files.json"
+  ],
+  "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+  "started": "2026-09-09T22:44:34.937881+00:00",
+  "ended": "2026-09-09T22:44:35.013802+00:00",
+  "elapsed": 0.04517654096707702,
+  "exit_code": 0,
+  "session": "hs0002-20260910",
+  "head_before": "8bef581b2ee64dd57345f92f11f241e0c927b759",
+  "head_after": "8bef581b2ee64dd57345f92f11f241e0c927b759",
+  "output_file": "final-budget.log",
+  "output_sha256": "4c32207bf7e66c2057bc5e4c320b4e5cc75591effc5c104cce70297c6d0a4458",
+  "files_before": {
+    "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+    "scripts/verify/has-kickoff-failure.py": "4e43ea810cbbfd4a93aea8ac857790a23cc67557e30f693687a2e672cbbab2d0",
+    "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+    "humansearch/tests/test_hs_0002_boundaries.py": "8e946bf4f9e33f0a964754065ad511588d1b950ee57164e455fd3f6b5e3fd928",
+    "docs/sot/verification-commands.md": "f4f71f36895a3fdfc3dfc6800ffac48d0d6ebbc6efa67ad9435eeeb0d980ea34"
+  },
+  "files_after": {
+    "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+    "scripts/verify/has-kickoff-failure.py": "4e43ea810cbbfd4a93aea8ac857790a23cc67557e30f693687a2e672cbbab2d0",
+    "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+    "humansearch/tests/test_hs_0002_boundaries.py": "8e946bf4f9e33f0a964754065ad511588d1b950ee57164e455fd3f6b5e3fd928",
+    "docs/sot/verification-commands.md": "f4f71f36895a3fdfc3dfc6800ffac48d0d6ebbc6efa67ad9435eeeb0d980ea34"
+  }
+}

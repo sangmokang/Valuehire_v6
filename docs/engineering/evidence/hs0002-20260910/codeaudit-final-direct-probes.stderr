@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/artifacts/hs0002-20260910/codeaudit-final-probes.py", line 120, in <module>
+    raise SystemExit(main())
+                     ~~~~^^
+  File "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/artifacts/hs0002-20260910/codeaudit-final-probes.py", line 37, in main
+    from test_hs_0002 import call_negative  # noqa: PLC0415
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/humansearch/tests/test_hs_0002.py", line 7, in <module>
+    import pytest
+ModuleNotFoundError: No module named 'pytest'

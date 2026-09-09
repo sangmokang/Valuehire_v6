@@ -1,0 +1,424 @@
+{
+  "verifier": "Claude V1 (real tool execution, same-UID local review; not an OS/P17 receipt)",
+  "collected": "2026-09-09T22:54:59.577356+00:00",
+  "head": "8bef581b2ee64dd57345f92f11f241e0c927b759",
+  "candidate_manifest": {
+    "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+    "scripts/verify/has-kickoff-failure.py": "4e43ea810cbbfd4a93aea8ac857790a23cc67557e30f693687a2e672cbbab2d0",
+    "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+    "humansearch/tests/test_hs_0002_boundaries.py": "8e946bf4f9e33f0a964754065ad511588d1b950ee57164e455fd3f6b5e3fd928",
+    "docs/sot/verification-commands.md": "f4f71f36895a3fdfc3dfc6800ffac48d0d6ebbc6efa67ad9435eeeb0d980ea34"
+  },
+  "candidate_current_sha256": {
+    "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+    "scripts/verify/has-kickoff-failure.py": "4e43ea810cbbfd4a93aea8ac857790a23cc67557e30f693687a2e672cbbab2d0",
+    "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+    "humansearch/tests/test_hs_0002_boundaries.py": "8e946bf4f9e33f0a964754065ad511588d1b950ee57164e455fd3f6b5e3fd928",
+    "docs/sot/verification-commands.md": "f4f71f36895a3fdfc3dfc6800ffac48d0d6ebbc6efa67ad9435eeeb0d980ea34"
+  },
+  "candidate_matches_manifest": true,
+  "runs": {
+    "v1-final-adv-target-pytest": {
+      "command": [
+        "humansearch/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "humansearch/tests/test_hs_0002.py",
+        "humansearch/tests/test_hs_0002_boundaries.py"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+      "started": "2026-09-09T22:46:48.341678+00:00",
+      "ended": "2026-09-09T22:46:54.837909+00:00",
+      "exit_code": 0,
+      "output_file": "v1-final-adv-target-pytest.log",
+      "output_sha256": "3b2a99851dd45b3b6580030dad29153de1ff5df8b3864f63e93c003cfcf940aa",
+      "files_unchanged": true
+    },
+    "v1-final-adv-target-uv": {
+      "command": [
+        "bash",
+        "-c",
+        "cd humansearch && uv run --no-sync pytest -q tests/test_hs_0002.py tests/test_hs_0002_boundaries.py"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+      "started": "2026-09-09T22:50:44.026418+00:00",
+      "ended": "2026-09-09T22:50:51.144200+00:00",
+      "exit_code": 0,
+      "output_file": "v1-final-adv-target-uv.log",
+      "output_sha256": "a1986e868bb008abd67f9bc73e9d98c4c461650b5dafe5eb4e613019aa921dba",
+      "files_unchanged": true
+    },
+    "v1-final-adv-mutations-37": {
+      "command": [
+        "bash",
+        "scripts/acceptance-hs-kickoff-mutations.sh"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+      "started": "2026-09-09T22:47:03.010868+00:00",
+      "ended": "2026-09-09T22:47:45.829751+00:00",
+      "exit_code": 0,
+      "output_file": "v1-final-adv-mutations-37.log",
+      "output_sha256": "099ddbde4dae0766cbe5c527539429416d3b5d27e7ebbf96e9453d3dbe4cb252",
+      "files_unchanged": true
+    },
+    "v1-final-adv-g2": {
+      "command": [
+        "bash",
+        "scripts/acceptance-hs-gates.sh"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+      "started": "2026-09-09T22:50:17.112610+00:00",
+      "ended": "2026-09-09T22:50:40.719222+00:00",
+      "exit_code": 0,
+      "output_file": "v1-final-adv-g2.log",
+      "output_sha256": "8600c696a30002e20a7e215572db3eefa81e3609bfacb02279f45382b3dbebd0",
+      "files_unchanged": true
+    },
+    "v1-final-adv-static": {
+      "command": [
+        "bash",
+        "-c",
+        "set -x; humansearch/.venv/bin/ruff check scripts/verify/has-kickoff-failure.py humansearch/tests/test_hs_0002.py humansearch/tests/test_hs_0002_boundaries.py artifacts/hs0002-20260910/v1-final-adv-*.py; echo \"ruff rc=$?\"; (cd humansearch && .venv/bin/mypy ../scripts/verify/has-kickoff-failure.py tests/test_hs_0002.py tests/test_hs_0002_boundaries.py); echo \"mypy rc=$?\"; bash -n scripts/acceptance-hs-kickoff-mutations.sh; echo \"bash-n rc=$?\"; git diff --check; echo \"diff-check rc=$?\"; python3 --version; humansearch/.venv/bin/python --version"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+      "started": "2026-09-09T22:50:01.153446+00:00",
+      "ended": "2026-09-09T22:50:01.601105+00:00",
+      "exit_code": 0,
+      "output_file": "v1-final-adv-static.log",
+      "output_sha256": "ce2632f67daa2bdba81ebbd5f0ed76985f8efc6cc787da62af16601a3057125f",
+      "files_unchanged": true
+    },
+    "v1-final-adv-ruff-product": {
+      "command": [
+        "humansearch/.venv/bin/ruff",
+        "check",
+        "scripts/verify/has-kickoff-failure.py",
+        "humansearch/tests/test_hs_0002.py",
+        "humansearch/tests/test_hs_0002_boundaries.py"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+      "started": "2026-09-09T22:50:19.128148+00:00",
+      "ended": "2026-09-09T22:50:19.173937+00:00",
+      "exit_code": 0,
+      "output_file": "v1-final-adv-ruff-product.log",
+      "output_sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+      "files_unchanged": true
+    }
+  },
+  "mutants": {
+    "total": 38,
+    "survived": [
+      "n27-drop-cr-suffix-strip",
+      "n28-fail-prefix-without-space",
+      "n29-legacy-fallthrough-to-literal",
+      "n30-legacy-count-allow-one",
+      "n34-cli-usage-exit0",
+      "n35-split-lines-universal"
+    ],
+    "unexpected": [],
+    "product_unchanged": true,
+    "per_mutant": [
+      {
+        "name": "m00-normal",
+        "status": "PASS",
+        "exit_code": 0,
+        "failed_count": 0,
+        "summary": "43 passed in 6.00s"
+      },
+      {
+        "name": "m01-always-allow",
+        "status": "KILLED",
+        "exit_code": 1,
+        "failed_count": 25,
+        "summary": "25 failed, 18 passed in 16.16s"
+      },
+      {
+        "name": "m02-always-reject",
+        "status": "KILLED",
+        "exit_code": 1,
+        "failed_count": 15,
+        "summary": "15 failed, 28 passed in 14.17s"
+      },
+      {
+        "name": "m03-regex-restore",
+        "status": "KILLED",
+        "exit_code": 1,
+        "failed_count": 10,
+        "summary": "10 failed, 33 passed in 13.14s"
+      },
+      {
+        "name": "m04-omit-fail-line-filter",
+        "status": "KILLED",
+        "exit_code": 1,
+        "failed_count": 2,
+        "summary": "2 failed, 41 passed in 6.20s"
+      },
+      {
+        "name": "m05-omit-boundary",
+        "status": "KILLED",
+        "exit_code": 1,
+        "failed_count": 4,
+        "summary": "4 failed, 39 passed in 23.20s"
+      },
+      {
+        "name": "m06-restore-old-grep",
+        "status": "KILLED",
+        "exit_code": 1,
+        "failed_count": 25,
+        "summary": "25 failed, 18 passed in 8.89s"
+      },
+      {
+        "name": "m07-accept-empty-expected",
+        "status": "KILLED",
+        "exit_code": 1,
+        "failed_count": 5,
+        "summary": "5 failed, 38 passed in 5.88s"
+      },
+      {
+        "name": "m08-legacy-substring",
+        "status": "KILLED",
+        "exit_code": 1,
+        "failed_count": 5,
+        "summary": "5 failed, 38 passed in 6.39s"
+      },
+      {
+        "name": "m09-legacy-match-unanchored-end",
+        "status": "KILLED",
+        "exit_code": 1,
+        "failed_count": 1,
+        "summary": "1 failed, 42 passed in 6.09s"
+      },
+      {
+        "name": "m10-legacy-search",
+        "status": "KILLED",
+        "exit_code": 1,
+        "failed_count": 4,
+        "summary": "4 failed, 39 passed in 5.90s"
+      },
+      {
+        "name": "m11-boundary-any-non-alnum",
+        "status": "KILLED",
+        "exit_code": 1,
+        "failed_count": 2,
+        "summary": "2 failed, 41 passed in 6.21s"
+      },
+      {
+        "name": "m12-substring-anywhere-with-boundary",
+        "status": "KILLED",
+        "exit_code": 1,
+        "failed_count": 3,
+        "summary": "3 failed, 40 passed in 12.78s"
+      },
+      {
+        "name": "m13-legacy-target-wildcard",
+        "status": "KILLED",
+        "exit_code": 1,
+        "failed_count": 2,
+        "summary": "2 failed, 41 passed in 6.71s"
+      },
+      {
+        "name": "m14-drop-slash-boundary",
+        "status": "KILLED",
+        "exit_code": 1,
+        "failed_count": 2,
+        "summary": "2 failed, 41 passed in 6.12s"
+      },
+      {
+        "name": "m15-drop-newline-guard",
+        "status": "KILLED",
+        "exit_code": 1,
+        "failed_count": 1,
+        "summary": "1 failed, 42 passed in 6.33s"
+      },
+      {
+        "name": "m16-unreadable-file-exit0",
+        "status": "KILLED",
+        "exit_code": 1,
+        "failed_count": 3,
+        "summary": "3 failed, 40 passed in 6.21s"
+      },
+      {
+        "name": "m17-shell-inverted",
+        "status": "KILLED",
+        "exit_code": 1,
+        "failed_count": 39,
+        "summary": "39 failed, 4 passed in 20.82s"
+      },
+      {
+        "name": "m18-shell-args-swapped",
+        "status": "KILLED",
+        "exit_code": 1,
+        "failed_count": 14,
+        "summary": "14 failed, 29 passed in 17.83s"
+      },
+      {
+        "name": "m19-shell-unquoted-expect",
+        "status": "KILLED",
+        "exit_code": 1,
+        "failed_count": 15,
+        "summary": "15 failed, 28 passed in 13.21s"
+      },
+      {
+        "name": "m20-exact-full-line-only",
+        "status": "KILLED",
+        "exit_code": 1,
+        "failed_count": 8,
+        "summary": "8 failed, 35 passed in 13.20s"
+      },
+      {
+        "name": "m21-pass-lines-also-count",
+        "status": "KILLED",
+        "exit_code": 1,
+        "failed_count": 1,
+        "summary": "1 failed, 42 passed in 5.90s"
+      },
+      {
+        "name": "m22-no-prefix-strip",
+        "status": "KILLED",
+        "exit_code": 1,
+        "failed_count": 15,
+        "summary": "15 failed, 28 passed in 13.82s"
+      },
+      {
+        "name": "m23-legacy-table-emptied",
+        "status": "KILLED",
+        "exit_code": 1,
+        "failed_count": 4,
+        "summary": "4 failed, 39 passed in 9.74s"
+      },
+      {
+        "name": "m24-legacy-count-allow-zero",
+        "status": "KILLED",
+        "exit_code": 1,
+        "failed_count": 1,
+        "summary": "1 failed, 42 passed in 6.28s"
+      },
+      {
+        "name": "n25-strip-expected-before-compare",
+        "status": "KILLED",
+        "exit_code": 1,
+        "failed_count": 2,
+        "summary": "2 failed, 41 passed in 5.86s"
+      },
+      {
+        "name": "n26-guard-only-empty-not-blank",
+        "status": "KILLED",
+        "exit_code": 1,
+        "failed_count": 4,
+        "summary": "4 failed, 39 passed in 5.78s"
+      },
+      {
+        "name": "n27-drop-cr-suffix-strip",
+        "status": "SURVIVED",
+        "exit_code": 0,
+        "failed_count": 0,
+        "summary": "43 passed in 5.96s"
+      },
+      {
+        "name": "n28-fail-prefix-without-space",
+        "status": "SURVIVED",
+        "exit_code": 0,
+        "failed_count": 0,
+        "summary": "43 passed in 6.20s"
+      },
+      {
+        "name": "n29-legacy-fallthrough-to-literal",
+        "status": "SURVIVED",
+        "exit_code": 0,
+        "failed_count": 0,
+        "summary": "43 passed in 6.18s"
+      },
+      {
+        "name": "n30-legacy-count-allow-one",
+        "status": "SURVIVED",
+        "exit_code": 0,
+        "failed_count": 0,
+        "summary": "43 passed in 6.35s"
+      },
+      {
+        "name": "n31-boundary-adds-emdash",
+        "status": "KILLED",
+        "exit_code": 1,
+        "failed_count": 2,
+        "summary": "2 failed, 41 passed in 6.04s"
+      },
+      {
+        "name": "n32-cli-swallow-unicode-error-exit1",
+        "status": "KILLED",
+        "exit_code": 1,
+        "failed_count": 1,
+        "summary": "1 failed, 42 passed in 10.05s"
+      },
+      {
+        "name": "n33-cli-mismatch-exit0",
+        "status": "KILLED",
+        "exit_code": 1,
+        "failed_count": 25,
+        "summary": "25 failed, 18 passed in 12.05s"
+      },
+      {
+        "name": "n34-cli-usage-exit0",
+        "status": "SURVIVED",
+        "exit_code": 0,
+        "failed_count": 0,
+        "summary": "43 passed in 6.06s"
+      },
+      {
+        "name": "n35-split-lines-universal",
+        "status": "SURVIVED",
+        "exit_code": 0,
+        "failed_count": 0,
+        "summary": "43 passed in 5.94s"
+      },
+      {
+        "name": "n36-shell-ignore-helper-rc",
+        "status": "KILLED",
+        "exit_code": 1,
+        "failed_count": 25,
+        "summary": "25 failed, 18 passed in 12.51s"
+      },
+      {
+        "name": "n37-shell-helper-path-wrong",
+        "status": "KILLED",
+        "exit_code": 1,
+        "failed_count": 14,
+        "summary": "14 failed, 29 passed in 12.92s"
+      }
+    ]
+  },
+  "cli_probes": {
+    "total": 93,
+    "mismatches": [
+      "expected-zero-width-space"
+    ]
+  },
+  "negative_path_probes": {
+    "total": 21,
+    "mismatches": []
+  },
+  "budget_log": "v1-final-adv-budget.log",
+  "retries": [
+    {
+      "what": "v1-final-adv-negative-path.py attempt 1",
+      "cause": "own harness bug: sub-directory not created before write",
+      "log": "v1-final-adv-negative-path-attempt1-failed.log",
+      "product_related": false
+    }
+  ],
+  "own_code_sha256": {
+    "v1-final-adv-record.py": "5f4d83251f95c1133d492b961c2b14c71db65b90e462560aca25d68b8289ccd7",
+    "v1-final-adv-mutants.py": "81bcdf0aec908a9f0ab082f6e1ef138c5680ea0edf1f7a779f0a1e2cb5b47a05",
+    "v1-final-adv-cli-probes.py": "6f89c9b8b3286609541502357539fc502e8d1dd9af5d2463a772b6ef0e3529d8",
+    "v1-final-adv-budget.py": "ad346ef276e3a0b16cc8b0df9368268a43ff0dde5400e993dbda80d03448a92d",
+    "v1-final-adv-negative-path.py": "780e72e21d3087094eb7e4b09ee017f2b4a51fe7f6e18088b37dc45a001dc4e6",
+    "v1-final-adv-collect.py": "0770c16918c247adcf507a034c66836fe5ca338c3ea73cc4ad012e696515d8b1"
+  },
+  "not_run": [
+    "remote CI / merge / push",
+    "live portal, DB, messaging, browser",
+    "HS-00.03 homoglyphs (separated)",
+    "HS-00.04 workflow semantics (separated)",
+    "HS-00.05 pre-step environment (separated)"
+  ]
+}

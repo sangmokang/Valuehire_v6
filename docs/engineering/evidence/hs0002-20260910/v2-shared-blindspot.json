@@ -1,0 +1,445 @@
+{
+  "purpose": "independent shared-blindspot attack beyond V1 scripts",
+  "helper_sha256_before": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+  "helper_sha256_after": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+  "helper_unchanged": true,
+  "callsite_expectation_count": 31,
+  "callsite_unique_expectations": [
+    "CI 배선 불량",
+    "CI 스텝 불일치",
+    "PR #13 행의 근거가 자리표시자",
+    "PR #13 행의 근거에 실재하지 않는 것이 있다",
+    "PR #13 행의 근거에 이 저장소에서 확인할 수 있는 경로가 없다",
+    "대상 칸에 다른 대상",
+    "처분이 둘 이상",
+    "판정 문서 없음",
+    "행 없음"
+  ],
+  "probe_count": 21,
+  "mismatches": [
+    "space-only-expected",
+    "tab-only-expected"
+  ],
+  "probes": [
+    {
+      "id": "prefix-bait:CI 배선 불량",
+      "expected": "CI 배선 불량",
+      "wanted": 1,
+      "log": "FAIL: unrelated CI 배선 불량 suffix",
+      "result": {
+        "command": [
+          "python3",
+          "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/scripts/verify/has-kickoff-failure.py",
+          "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v2-blindspot-fih3wibd/out.log",
+          "CI 배선 불량"
+        ],
+        "started": "2026-09-09T22:28:51.765621+00:00",
+        "ended": "2026-09-09T22:28:51.796036+00:00",
+        "exit_code": 1,
+        "stdout": "",
+        "stderr": ""
+      },
+      "ok": true
+    },
+    {
+      "id": "word-extension:CI 배선 불량",
+      "expected": "CI 배선 불량",
+      "wanted": 1,
+      "log": "FAIL: CI 배선 불량XYZ",
+      "result": {
+        "command": [
+          "python3",
+          "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/scripts/verify/has-kickoff-failure.py",
+          "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v2-blindspot-lb6mped2/out.log",
+          "CI 배선 불량"
+        ],
+        "started": "2026-09-09T22:28:51.797119+00:00",
+        "ended": "2026-09-09T22:28:51.833219+00:00",
+        "exit_code": 1,
+        "stdout": "",
+        "stderr": ""
+      },
+      "ok": true
+    },
+    {
+      "id": "canonical-boundary:CI 배선 불량",
+      "expected": "CI 배선 불량",
+      "wanted": 0,
+      "log": "FAIL: CI 배선 불량 — detail",
+      "result": {
+        "command": [
+          "python3",
+          "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/scripts/verify/has-kickoff-failure.py",
+          "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v2-blindspot-ow2shqsv/out.log",
+          "CI 배선 불량"
+        ],
+        "started": "2026-09-09T22:28:51.834597+00:00",
+        "ended": "2026-09-09T22:28:51.866896+00:00",
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "ok": true
+    },
+    {
+      "id": "prefix-bait:CI 스텝 불일치",
+      "expected": "CI 스텝 불일치",
+      "wanted": 1,
+      "log": "FAIL: unrelated CI 스텝 불일치 suffix",
+      "result": {
+        "command": [
+          "python3",
+          "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/scripts/verify/has-kickoff-failure.py",
+          "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v2-blindspot-odbtz2y0/out.log",
+          "CI 스텝 불일치"
+        ],
+        "started": "2026-09-09T22:28:51.867959+00:00",
+        "ended": "2026-09-09T22:28:51.895209+00:00",
+        "exit_code": 1,
+        "stdout": "",
+        "stderr": ""
+      },
+      "ok": true
+    },
+    {
+      "id": "word-extension:CI 스텝 불일치",
+      "expected": "CI 스텝 불일치",
+      "wanted": 1,
+      "log": "FAIL: CI 스텝 불일치XYZ",
+      "result": {
+        "command": [
+          "python3",
+          "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/scripts/verify/has-kickoff-failure.py",
+          "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v2-blindspot-cpnlj2we/out.log",
+          "CI 스텝 불일치"
+        ],
+        "started": "2026-09-09T22:28:51.896361+00:00",
+        "ended": "2026-09-09T22:28:51.922357+00:00",
+        "exit_code": 1,
+        "stdout": "",
+        "stderr": ""
+      },
+      "ok": true
+    },
+    {
+      "id": "canonical-boundary:CI 스텝 불일치",
+      "expected": "CI 스텝 불일치",
+      "wanted": 0,
+      "log": "FAIL: CI 스텝 불일치 — detail",
+      "result": {
+        "command": [
+          "python3",
+          "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/scripts/verify/has-kickoff-failure.py",
+          "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v2-blindspot-z21hn6em/out.log",
+          "CI 스텝 불일치"
+        ],
+        "started": "2026-09-09T22:28:51.923265+00:00",
+        "ended": "2026-09-09T22:28:51.950764+00:00",
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "ok": true
+    },
+    {
+      "id": "prefix-bait:PR #13 행의 근거가 자리표시자",
+      "expected": "PR #13 행의 근거가 자리표시자",
+      "wanted": 1,
+      "log": "FAIL: unrelated PR #13 행의 근거가 자리표시자 suffix",
+      "result": {
+        "command": [
+          "python3",
+          "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/scripts/verify/has-kickoff-failure.py",
+          "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v2-blindspot-8ktgm52u/out.log",
+          "PR #13 행의 근거가 자리표시자"
+        ],
+        "started": "2026-09-09T22:28:51.951840+00:00",
+        "ended": "2026-09-09T22:28:51.978889+00:00",
+        "exit_code": 1,
+        "stdout": "",
+        "stderr": ""
+      },
+      "ok": true
+    },
+    {
+      "id": "word-extension:PR #13 행의 근거가 자리표시자",
+      "expected": "PR #13 행의 근거가 자리표시자",
+      "wanted": 1,
+      "log": "FAIL: PR #13 행의 근거가 자리표시자XYZ",
+      "result": {
+        "command": [
+          "python3",
+          "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/scripts/verify/has-kickoff-failure.py",
+          "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v2-blindspot-3qk0mr8d/out.log",
+          "PR #13 행의 근거가 자리표시자"
+        ],
+        "started": "2026-09-09T22:28:51.979999+00:00",
+        "ended": "2026-09-09T22:28:52.006748+00:00",
+        "exit_code": 1,
+        "stdout": "",
+        "stderr": ""
+      },
+      "ok": true
+    },
+    {
+      "id": "canonical-boundary:PR #13 행의 근거가 자리표시자",
+      "expected": "PR #13 행의 근거가 자리표시자",
+      "wanted": 0,
+      "log": "FAIL: PR #13 행의 근거가 자리표시자 — detail",
+      "result": {
+        "command": [
+          "python3",
+          "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/scripts/verify/has-kickoff-failure.py",
+          "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v2-blindspot-yv63t7ce/out.log",
+          "PR #13 행의 근거가 자리표시자"
+        ],
+        "started": "2026-09-09T22:28:52.007906+00:00",
+        "ended": "2026-09-09T22:28:52.036905+00:00",
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "ok": true
+    },
+    {
+      "id": "prefix-bait:PR #13 행의 근거에 실재하지 않는 것이 있다",
+      "expected": "PR #13 행의 근거에 실재하지 않는 것이 있다",
+      "wanted": 1,
+      "log": "FAIL: unrelated PR #13 행의 근거에 실재하지 않는 것이 있다 suffix",
+      "result": {
+        "command": [
+          "python3",
+          "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/scripts/verify/has-kickoff-failure.py",
+          "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v2-blindspot-c07rj27d/out.log",
+          "PR #13 행의 근거에 실재하지 않는 것이 있다"
+        ],
+        "started": "2026-09-09T22:28:52.037972+00:00",
+        "ended": "2026-09-09T22:28:52.064528+00:00",
+        "exit_code": 1,
+        "stdout": "",
+        "stderr": ""
+      },
+      "ok": true
+    },
+    {
+      "id": "word-extension:PR #13 행의 근거에 실재하지 않는 것이 있다",
+      "expected": "PR #13 행의 근거에 실재하지 않는 것이 있다",
+      "wanted": 1,
+      "log": "FAIL: PR #13 행의 근거에 실재하지 않는 것이 있다XYZ",
+      "result": {
+        "command": [
+          "python3",
+          "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/scripts/verify/has-kickoff-failure.py",
+          "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v2-blindspot-04ww3m93/out.log",
+          "PR #13 행의 근거에 실재하지 않는 것이 있다"
+        ],
+        "started": "2026-09-09T22:28:52.065521+00:00",
+        "ended": "2026-09-09T22:28:52.090404+00:00",
+        "exit_code": 1,
+        "stdout": "",
+        "stderr": ""
+      },
+      "ok": true
+    },
+    {
+      "id": "canonical-boundary:PR #13 행의 근거에 실재하지 않는 것이 있다",
+      "expected": "PR #13 행의 근거에 실재하지 않는 것이 있다",
+      "wanted": 0,
+      "log": "FAIL: PR #13 행의 근거에 실재하지 않는 것이 있다 — detail",
+      "result": {
+        "command": [
+          "python3",
+          "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/scripts/verify/has-kickoff-failure.py",
+          "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v2-blindspot-vys9oyoz/out.log",
+          "PR #13 행의 근거에 실재하지 않는 것이 있다"
+        ],
+        "started": "2026-09-09T22:28:52.091413+00:00",
+        "ended": "2026-09-09T22:28:52.117907+00:00",
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "ok": true
+    },
+    {
+      "id": "prefix-bait:PR #13 행의 근거에 이 저장소에서 확인할 수 있는 경로가 없다",
+      "expected": "PR #13 행의 근거에 이 저장소에서 확인할 수 있는 경로가 없다",
+      "wanted": 1,
+      "log": "FAIL: unrelated PR #13 행의 근거에 이 저장소에서 확인할 수 있는 경로가 없다 suffix",
+      "result": {
+        "command": [
+          "python3",
+          "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/scripts/verify/has-kickoff-failure.py",
+          "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v2-blindspot-3n33no1_/out.log",
+          "PR #13 행의 근거에 이 저장소에서 확인할 수 있는 경로가 없다"
+        ],
+        "started": "2026-09-09T22:28:52.119002+00:00",
+        "ended": "2026-09-09T22:28:52.145146+00:00",
+        "exit_code": 1,
+        "stdout": "",
+        "stderr": ""
+      },
+      "ok": true
+    },
+    {
+      "id": "word-extension:PR #13 행의 근거에 이 저장소에서 확인할 수 있는 경로가 없다",
+      "expected": "PR #13 행의 근거에 이 저장소에서 확인할 수 있는 경로가 없다",
+      "wanted": 1,
+      "log": "FAIL: PR #13 행의 근거에 이 저장소에서 확인할 수 있는 경로가 없다XYZ",
+      "result": {
+        "command": [
+          "python3",
+          "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/scripts/verify/has-kickoff-failure.py",
+          "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v2-blindspot-w8he8frg/out.log",
+          "PR #13 행의 근거에 이 저장소에서 확인할 수 있는 경로가 없다"
+        ],
+        "started": "2026-09-09T22:28:52.146188+00:00",
+        "ended": "2026-09-09T22:28:52.170770+00:00",
+        "exit_code": 1,
+        "stdout": "",
+        "stderr": ""
+      },
+      "ok": true
+    },
+    {
+      "id": "canonical-boundary:PR #13 행의 근거에 이 저장소에서 확인할 수 있는 경로가 없다",
+      "expected": "PR #13 행의 근거에 이 저장소에서 확인할 수 있는 경로가 없다",
+      "wanted": 0,
+      "log": "FAIL: PR #13 행의 근거에 이 저장소에서 확인할 수 있는 경로가 없다 — detail",
+      "result": {
+        "command": [
+          "python3",
+          "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/scripts/verify/has-kickoff-failure.py",
+          "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v2-blindspot-1asr9iji/out.log",
+          "PR #13 행의 근거에 이 저장소에서 확인할 수 있는 경로가 없다"
+        ],
+        "started": "2026-09-09T22:28:52.171598+00:00",
+        "ended": "2026-09-09T22:28:52.196980+00:00",
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "ok": true
+    },
+    {
+      "id": "prefix-bait:판정 문서 없음",
+      "expected": "판정 문서 없음",
+      "wanted": 1,
+      "log": "FAIL: unrelated 판정 문서 없음 suffix",
+      "result": {
+        "command": [
+          "python3",
+          "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/scripts/verify/has-kickoff-failure.py",
+          "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v2-blindspot-p18ze2td/out.log",
+          "판정 문서 없음"
+        ],
+        "started": "2026-09-09T22:28:52.198011+00:00",
+        "ended": "2026-09-09T22:28:52.225342+00:00",
+        "exit_code": 1,
+        "stdout": "",
+        "stderr": ""
+      },
+      "ok": true
+    },
+    {
+      "id": "word-extension:판정 문서 없음",
+      "expected": "판정 문서 없음",
+      "wanted": 1,
+      "log": "FAIL: 판정 문서 없음XYZ",
+      "result": {
+        "command": [
+          "python3",
+          "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/scripts/verify/has-kickoff-failure.py",
+          "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v2-blindspot-ktbw26ip/out.log",
+          "판정 문서 없음"
+        ],
+        "started": "2026-09-09T22:28:52.226674+00:00",
+        "ended": "2026-09-09T22:28:52.252401+00:00",
+        "exit_code": 1,
+        "stdout": "",
+        "stderr": ""
+      },
+      "ok": true
+    },
+    {
+      "id": "canonical-boundary:판정 문서 없음",
+      "expected": "판정 문서 없음",
+      "wanted": 0,
+      "log": "FAIL: 판정 문서 없음 — detail",
+      "result": {
+        "command": [
+          "python3",
+          "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/scripts/verify/has-kickoff-failure.py",
+          "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v2-blindspot-jhw5r8kq/out.log",
+          "판정 문서 없음"
+        ],
+        "started": "2026-09-09T22:28:52.253391+00:00",
+        "ended": "2026-09-09T22:28:52.277060+00:00",
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "ok": true
+    },
+    {
+      "id": "space-only-expected",
+      "expected": " ",
+      "wanted": 1,
+      "log": "FAIL:   x",
+      "result": {
+        "command": [
+          "python3",
+          "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/scripts/verify/has-kickoff-failure.py",
+          "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v2-blindspot-e5dwwaia/out.log",
+          " "
+        ],
+        "started": "2026-09-09T22:28:52.277928+00:00",
+        "ended": "2026-09-09T22:28:52.301822+00:00",
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "ok": false
+    },
+    {
+      "id": "tab-only-expected",
+      "expected": "\t",
+      "wanted": 1,
+      "log": "FAIL: \t details",
+      "result": {
+        "command": [
+          "python3",
+          "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/scripts/verify/has-kickoff-failure.py",
+          "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v2-blindspot-kzkagqo5/out.log",
+          "\t"
+        ],
+        "started": "2026-09-09T22:28:52.302791+00:00",
+        "ended": "2026-09-09T22:28:52.327785+00:00",
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "ok": false
+    },
+    {
+      "id": "raw-line-without-fail-prefix",
+      "expected": "CI 배선 불량",
+      "wanted": 1,
+      "log": "CI 배선 불량 — raw diagnostic\nFAIL: unrelated",
+      "result": {
+        "command": [
+          "python3",
+          "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/scripts/verify/has-kickoff-failure.py",
+          "/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/hs0002-v2-blindspot-8_2csvm3/out.log",
+          "CI 배선 불량"
+        ],
+        "started": "2026-09-09T22:28:52.328758+00:00",
+        "ended": "2026-09-09T22:28:52.355379+00:00",
+        "exit_code": 1,
+        "stdout": "",
+        "stderr": ""
+      },
+      "ok": true
+    }
+  ]
+}

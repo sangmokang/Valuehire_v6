@@ -1,0 +1,18 @@
+{
+  "files": {
+    "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+    "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+    "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+    "artifacts/hs0002-20260910/budget-check.py": "f7dda3dfb36b5029631498c87197b9fe564a0d3a445dcd7f3e93a738d1a3ce26",
+    "artifacts/hs0002-20260910/codeaudit-rerun-mutants-20260909T220808Z.sh": "eb610541690c82b37cee776a0857fc096a0f8594ebce1fc3cc12a26dc2e9f929",
+    "artifacts/hs0002-20260910/collect-evidence.py": "9ec39d7f3912e0713477cdf115aea0df2c290a471f8d27ebf02a91b90217d33d",
+    "artifacts/hs0002-20260910/g-mutants-initial.py": "a1c3d9a89ee6079827e2a7d6ae8bb6365b6f3d6160b5e10539fc97fced654105",
+    "artifacts/hs0002-20260910/g-mutants.py": "5fa59a4a03302316bc1c607c371ad730bc6d485c8a593058bfa5be9f8c9c2cb1",
+    "artifacts/hs0002-20260910/preserve-v1.py": "745d98664d5e27ffe2aa9e0e828e440ab45a36f2fa665f147382e590e6c0c0fc",
+    "artifacts/hs0002-20260910/run.py": "156e9776924e9dd5f16291bcb873d72562980a1877e6ea47b0c392c4e8286b8d",
+    "artifacts/hs0002-20260910/v1-cli-probes.py": "1955f02c3d687a9c9cb2f78494293972ed99c92154cc2150f3ea1fdcd021328f",
+    "artifacts/hs0002-20260910/v1-mutants.py": "fa1dcd94094259a63ac446f264894d216143305ff0923f197ac116029291d71e",
+    "artifacts/hs0002-20260910/v1-negative-extra.py": "efd311b90dabd29fe12bfdd51994208a71afa9c09da1ffa7b8a2b62606cca28b",
+    "artifacts/hs0002-20260910/v1-run.py": "85aa6d5350312f21700a2113f5e42b06a5e2fa42351f009da35a9efb2b7cef22"
+  }
+}

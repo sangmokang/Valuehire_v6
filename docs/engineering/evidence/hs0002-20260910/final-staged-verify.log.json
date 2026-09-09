@@ -1,0 +1,1 @@
+{"original_filename": "final-staged-verify.log", "sha256": "757c22ef0b961070b50f38c22529cd03a350af7bf292f80a9b83345db1165900", "text": "PASS: no secret-pattern match in any tracked file, .env not tracked\n"}

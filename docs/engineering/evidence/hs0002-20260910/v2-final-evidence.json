@@ -1,0 +1,578 @@
+{
+  "verdict": "PASS",
+  "created": "2026-09-09T23:20:00.313550+00:00",
+  "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+  "head": "8bef581b2ee64dd57345f92f11f241e0c927b759",
+  "candidate_manifest": {
+    "head": "8bef581b2ee64dd57345f92f11f241e0c927b759",
+    "files": {
+      "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+      "scripts/verify/has-kickoff-failure.py": "4e43ea810cbbfd4a93aea8ac857790a23cc67557e30f693687a2e672cbbab2d0",
+      "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+      "humansearch/tests/test_hs_0002_boundaries.py": "8e946bf4f9e33f0a964754065ad511588d1b950ee57164e455fd3f6b5e3fd928",
+      "docs/sot/verification-commands.md": "f4f71f36895a3fdfc3dfc6800ffac48d0d6ebbc6efa67ad9435eeeb0d980ea34"
+    }
+  },
+  "candidate_current_sha256": {
+    "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+    "scripts/verify/has-kickoff-failure.py": "4e43ea810cbbfd4a93aea8ac857790a23cc67557e30f693687a2e672cbbab2d0",
+    "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+    "humansearch/tests/test_hs_0002_boundaries.py": "8e946bf4f9e33f0a964754065ad511588d1b950ee57164e455fd3f6b5e3fd928",
+    "docs/sot/verification-commands.md": "f4f71f36895a3fdfc3dfc6800ffac48d0d6ebbc6efa67ad9435eeeb0d980ea34"
+  },
+  "candidate_matches_manifest": true,
+  "git_status_short": [
+    "M  docs/sot/verification-commands.md",
+    "M  scripts/acceptance-hs-kickoff-mutations.sh",
+    "A  scripts/verify/has-kickoff-failure.py",
+    "?? docs/engineering/evidence/hs0002-20260910/",
+    "?? docs/engineering/humansearch-hs0002-goal-2026-09-10.md"
+  ],
+  "commands": [
+    {
+      "label": "v2-final-principles-md",
+      "command": [
+        "sed",
+        "-n",
+        "1,260p",
+        "docs/sot/coding-principles.md"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+      "started": "2026-09-09T23:01:34.319244+00:00",
+      "ended": "2026-09-09T23:01:34.324386+00:00",
+      "elapsed": 0.005293541820719838,
+      "exit_code": 0,
+      "output_file": "v2-final-principles-md.log",
+      "output_path": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/artifacts/hs0002-20260910/v2-final-principles-md.log",
+      "output_sha256": "55b136c984d3f93b522b07b33a0f5f74427777eb0901e24acc38c22b2b0e8276",
+      "full_output_evidence": true,
+      "files_unchanged": true
+    },
+    {
+      "label": "v2-final-principles-yaml",
+      "command": [
+        "sed",
+        "-n",
+        "1,420p",
+        "docs/sot/principles.yaml"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+      "started": "2026-09-09T23:01:34.382629+00:00",
+      "ended": "2026-09-09T23:01:34.387208+00:00",
+      "elapsed": 0.004727834137156606,
+      "exit_code": 0,
+      "output_file": "v2-final-principles-yaml.log",
+      "output_path": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/artifacts/hs0002-20260910/v2-final-principles-yaml.log",
+      "output_sha256": "a19b29abaf6c61e403d2f1df5720b55ff477942dc9257cb2513043b20855ef22",
+      "full_output_evidence": true,
+      "files_unchanged": true
+    },
+    {
+      "label": "v2-final-principles-check",
+      "command": [
+        "bash",
+        "scripts/acceptance-principles-check.sh"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+      "started": "2026-09-09T23:01:34.448092+00:00",
+      "ended": "2026-09-09T23:01:35.044210+00:00",
+      "elapsed": 0.5962014580145478,
+      "exit_code": 0,
+      "output_file": "v2-final-principles-check.log",
+      "output_path": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/artifacts/hs0002-20260910/v2-final-principles-check.log",
+      "output_sha256": "31153ab17a665560a3a4e8a5f2a45bd58275e1d6f1e1d27a21fee40d74197dc2",
+      "full_output_evidence": true,
+      "files_unchanged": true
+    },
+    {
+      "label": "v2-final-status-head",
+      "command": [
+        "git",
+        "status",
+        "--short"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+      "started": "2026-09-09T23:01:35.096446+00:00",
+      "ended": "2026-09-09T23:01:35.121260+00:00",
+      "elapsed": 0.024896667106077075,
+      "exit_code": 0,
+      "output_file": "v2-final-status-head.log",
+      "output_path": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/artifacts/hs0002-20260910/v2-final-status-head.log",
+      "output_sha256": "fdf2184014c0261089f399f31276a32494ab928aaa4e2984f5ffd7e9e43f234f",
+      "full_output_evidence": true,
+      "files_unchanged": true
+    },
+    {
+      "label": "v2-final-candidate-sha",
+      "command": [
+        "shasum",
+        "-a",
+        "256",
+        "scripts/acceptance-hs-kickoff-mutations.sh",
+        "scripts/verify/has-kickoff-failure.py",
+        "humansearch/tests/test_hs_0002.py",
+        "humansearch/tests/test_hs_0002_boundaries.py",
+        "docs/sot/verification-commands.md"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+      "started": "2026-09-09T23:01:35.174302+00:00",
+      "ended": "2026-09-09T23:01:35.189501+00:00",
+      "elapsed": 0.01539270905777812,
+      "exit_code": 0,
+      "output_file": "v2-final-candidate-sha.log",
+      "output_path": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/artifacts/hs0002-20260910/v2-final-candidate-sha.log",
+      "output_sha256": "c269ec15f0541598c7014d9e65209dff67b7968d7685da5100333e3d03a9a7a2",
+      "full_output_evidence": true,
+      "files_unchanged": true
+    },
+    {
+      "label": "v2-final-adv-target-pytest",
+      "command": [
+        "humansearch/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "humansearch/tests/test_hs_0002.py",
+        "humansearch/tests/test_hs_0002_boundaries.py"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+      "started": "2026-09-09T23:01:48.052190+00:00",
+      "ended": "2026-09-09T23:01:54.502482+00:00",
+      "elapsed": 6.45073595806025,
+      "exit_code": 0,
+      "output_file": "v2-final-adv-target-pytest.log",
+      "output_path": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/artifacts/hs0002-20260910/v2-final-adv-target-pytest.log",
+      "output_sha256": "899b2f41a1139f160d1ab9b31a1f49e21e275d40b52df9d54c2ac92c8f2cb26e",
+      "full_output_evidence": true,
+      "files_unchanged": true
+    },
+    {
+      "label": "v2-final-adv-target-uv",
+      "command": [
+        "bash",
+        "-lc",
+        "cd humansearch && uv run --no-sync pytest -q tests/test_hs_0002.py tests/test_hs_0002_boundaries.py"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+      "started": "2026-09-09T23:01:54.564871+00:00",
+      "ended": "2026-09-09T23:02:00.805895+00:00",
+      "elapsed": 6.242538708029315,
+      "exit_code": 0,
+      "output_file": "v2-final-adv-target-uv.log",
+      "output_path": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/artifacts/hs0002-20260910/v2-final-adv-target-uv.log",
+      "output_sha256": "5abebb9c7f7b6971d7d874011d746e97a8a690a6ccdea8939290d8d4c46767d8",
+      "full_output_evidence": true,
+      "files_unchanged": true
+    },
+    {
+      "label": "v2-final-adv-mutations-37",
+      "command": [
+        "bash",
+        "scripts/acceptance-hs-kickoff-mutations.sh"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+      "started": "2026-09-09T23:02:00.881975+00:00",
+      "ended": "2026-09-09T23:02:40.147993+00:00",
+      "elapsed": 39.26629970804788,
+      "exit_code": 0,
+      "output_file": "v2-final-adv-mutations-37.log",
+      "output_path": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/artifacts/hs0002-20260910/v2-final-adv-mutations-37.log",
+      "output_sha256": "099ddbde4dae0766cbe5c527539429416d3b5d27e7ebbf96e9453d3dbe4cb252",
+      "full_output_evidence": true,
+      "files_unchanged": true
+    },
+    {
+      "label": "v2-final-adv-g2",
+      "command": [
+        "bash",
+        "scripts/acceptance-hs-gates.sh"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+      "started": "2026-09-09T23:02:40.210972+00:00",
+      "ended": "2026-09-09T23:03:00.324792+00:00",
+      "elapsed": 20.11374825006351,
+      "exit_code": 0,
+      "output_file": "v2-final-adv-g2.log",
+      "output_path": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/artifacts/hs0002-20260910/v2-final-adv-g2.log",
+      "output_sha256": "8600c696a30002e20a7e215572db3eefa81e3609bfacb02279f45382b3dbebd0",
+      "full_output_evidence": true,
+      "files_unchanged": true
+    },
+    {
+      "label": "v2-final-adv-static",
+      "command": [
+        "bash",
+        "-lc",
+        "git diff --check && bash -n scripts/acceptance-hs-kickoff-mutations.sh"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+      "started": "2026-09-09T23:03:00.379229+00:00",
+      "ended": "2026-09-09T23:03:00.405078+00:00",
+      "elapsed": 0.025883750058710575,
+      "exit_code": 0,
+      "output_file": "v2-final-adv-static.log",
+      "output_path": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/artifacts/hs0002-20260910/v2-final-adv-static.log",
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "full_output_evidence": true,
+      "files_unchanged": true
+    },
+    {
+      "label": "v2-final-adv-ruff-product",
+      "command": [
+        "bash",
+        "-lc",
+        "cd humansearch && uv run --no-sync ruff check src tests ../scripts/verify/has-kickoff-failure.py && uv run --no-sync mypy src tests ../scripts/verify/has-kickoff-failure.py"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+      "started": "2026-09-09T23:03:00.457533+00:00",
+      "ended": "2026-09-09T23:03:00.643762+00:00",
+      "elapsed": 0.18636616691946983,
+      "exit_code": 0,
+      "output_file": "v2-final-adv-ruff-product.log",
+      "output_path": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/artifacts/hs0002-20260910/v2-final-adv-ruff-product.log",
+      "output_sha256": "dbc368600de0171ce2663a0c71500733e990794ea52a5e2ac10adef1e438d324",
+      "full_output_evidence": true,
+      "files_unchanged": true
+    },
+    {
+      "label": "v2-final-adv-budget",
+      "command": [
+        "python3",
+        "artifacts/hs0002-20260910/v2-final-adv-budget.py",
+        "scripts/acceptance-hs-kickoff-mutations.sh",
+        "scripts/verify/has-kickoff-failure.py",
+        "humansearch/tests/test_hs_0002.py",
+        "humansearch/tests/test_hs_0002_boundaries.py",
+        "docs/sot/verification-commands.md"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+      "started": "2026-09-09T23:03:00.699836+00:00",
+      "ended": "2026-09-09T23:03:00.742037+00:00",
+      "elapsed": 0.0424452091101557,
+      "exit_code": 0,
+      "output_file": "v2-final-adv-budget.log",
+      "output_path": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/artifacts/hs0002-20260910/v2-final-adv-budget.log",
+      "output_sha256": "8fd602169a68c6899b1e56b5289a8d898c8eaae7a89ccdb401b809d32822e072",
+      "full_output_evidence": true,
+      "files_unchanged": true
+    },
+    {
+      "label": "v2-final-adv-budget-boundaries",
+      "command": [
+        "python3",
+        "artifacts/hs0002-20260910/v2-final-adv-budget.py",
+        "--boundaries"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+      "started": "2026-09-09T23:03:00.811918+00:00",
+      "ended": "2026-09-09T23:03:00.855802+00:00",
+      "elapsed": 0.043964624870568514,
+      "exit_code": 0,
+      "output_file": "v2-final-adv-budget-boundaries.log",
+      "output_path": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/artifacts/hs0002-20260910/v2-final-adv-budget-boundaries.log",
+      "output_sha256": "904472783a0ce0243de2cce70fb11e2b09dde58a06957756356eb6c303d52579",
+      "full_output_evidence": true,
+      "files_unchanged": true
+    },
+    {
+      "label": "v2-final-adv-mutants-run",
+      "command": [
+        "python3",
+        "artifacts/hs0002-20260910/v2-final-adv-mutants.py"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+      "started": "2026-09-09T23:03:09.070989+00:00",
+      "ended": "2026-09-09T23:09:02.322811+00:00",
+      "elapsed": 353.24956837506033,
+      "exit_code": 1,
+      "output_file": "v2-final-adv-mutants-run.log",
+      "output_path": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/artifacts/hs0002-20260910/v2-final-adv-mutants-run.log",
+      "output_sha256": "9a8cec40e26eb5ad79dc939999ccc9b30d2a2a91f02a8cb273d567f4d493512a",
+      "full_output_evidence": true,
+      "files_unchanged": true
+    },
+    {
+      "label": "v2-final-adv-cli-probes-run",
+      "command": [
+        "python3",
+        "artifacts/hs0002-20260910/v2-final-adv-cli-probes.py"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+      "started": "2026-09-09T23:09:02.413390+00:00",
+      "ended": "2026-09-09T23:09:05.191691+00:00",
+      "elapsed": 2.778079208917916,
+      "exit_code": 1,
+      "output_file": "v2-final-adv-cli-probes-run.log",
+      "output_path": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/artifacts/hs0002-20260910/v2-final-adv-cli-probes-run.log",
+      "output_sha256": "479dcdfbdceefc56e575f3a8d6d120da30e0cfa71a71e3d3d505fb9a28bfb308",
+      "full_output_evidence": true,
+      "files_unchanged": true
+    },
+    {
+      "label": "v2-final-adv-negative-path-run",
+      "command": [
+        "python3",
+        "artifacts/hs0002-20260910/v2-final-adv-negative-path.py"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+      "started": "2026-09-09T23:09:05.241573+00:00",
+      "ended": "2026-09-09T23:09:05.295706+00:00",
+      "elapsed": 0.05432891706004739,
+      "exit_code": 1,
+      "output_file": "v2-final-adv-negative-path-run.log",
+      "output_path": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/artifacts/hs0002-20260910/v2-final-adv-negative-path-run.log",
+      "output_sha256": "1a5a7a0ca8a5a9c63e44802ca2ca3f0d7570ef734f8c4e3965cf0fee80a9a6b4",
+      "full_output_evidence": true,
+      "files_unchanged": true
+    },
+    {
+      "label": "v2-final-adv-negative-path-rerun",
+      "command": [
+        "humansearch/.venv/bin/python",
+        "artifacts/hs0002-20260910/v2-final-adv-negative-path.py"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+      "started": "2026-09-09T23:09:22.601982+00:00",
+      "ended": "2026-09-09T23:09:24.358997+00:00",
+      "elapsed": 1.757146375020966,
+      "exit_code": 0,
+      "output_file": "v2-final-adv-negative-path-rerun.log",
+      "output_path": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/artifacts/hs0002-20260910/v2-final-adv-negative-path-rerun.log",
+      "output_sha256": "95e65ea303c83f95938c1f0bdb85e44ae876881ca2158edb88e05995c527481c",
+      "full_output_evidence": true,
+      "files_unchanged": true
+    },
+    {
+      "label": "v2-final-prefix-counterprobe",
+      "command": [
+        "python3",
+        "artifacts/hs0002-20260910/final-prefix-counterprobe.py"
+      ],
+      "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+      "started": "2026-09-09T23:09:56.893305+00:00",
+      "ended": "2026-09-09T23:09:57.011826+00:00",
+      "elapsed": 0.1187002919614315,
+      "exit_code": 0,
+      "output_file": "v2-final-prefix-counterprobe.log",
+      "output_path": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910/artifacts/hs0002-20260910/v2-final-prefix-counterprobe.log",
+      "output_sha256": "91957ec77956b6619f9c1564e74684906a1d44a396f011b403746a92daaec3e1",
+      "full_output_evidence": true,
+      "files_unchanged": true
+    }
+  ],
+  "v1_comparison": [
+    {
+      "claim": "V1 실행 신원",
+      "v2_result": "SOURCE_LIMITED",
+      "evidence": "v1-final-identity-readback.json",
+      "v2_judgement": "root 제공 readback 파일을 대조했다. V2가 private raw CLI 파일을 직접 다시 읽었다고 주장하지 않는다."
+    },
+    {
+      "claim": "후보 5파일 지문",
+      "v2_result": "MATCH",
+      "evidence": "final-candidate-files.json + v2-final-candidate-sha.log",
+      "v2_judgement": "현재 지문이 후보 manifest와 일치"
+    },
+    {
+      "claim": "원칙 직접 로드",
+      "v2_result": "MATCH",
+      "evidence": "v2-final-principles-*.log/json",
+      "v2_judgement": "SOT/ledger 로드 및 34/34 검사 통과"
+    },
+    {
+      "claim": "정조준 43개",
+      "v2_result": "MATCH",
+      "evidence": "v2-final-adv-target-pytest.log, v2-final-adv-target-uv.log",
+      "v2_judgement": "두 경로 모두 43 passed"
+    },
+    {
+      "claim": "기존 변이 37개",
+      "v2_result": "MATCH",
+      "evidence": "v2-final-adv-mutations-37.log",
+      "v2_judgement": "CHECKED: 37, exit 0"
+    },
+    {
+      "claim": "G2 전체 회귀",
+      "v2_result": "MATCH",
+      "evidence": "v2-final-adv-g2.log",
+      "v2_judgement": "262 collected/passed, ruff/mypy 통과"
+    },
+    {
+      "claim": "V1 D1 final-g2 오기록",
+      "v2_result": "MATCH_WITH_CLASSIFICATION",
+      "evidence": "final-ledger-reconciliation.md",
+      "v2_judgement": "final-g2 실패는 실제 기록 결함이나 final-g2-recheck와 V2 G2가 같은 지문에서 통과"
+    },
+    {
+      "claim": "정적 검사",
+      "v2_result": "MATCH",
+      "evidence": "v2-final-adv-static.log, v2-final-adv-ruff-product.log",
+      "v2_judgement": "diff check, bash -n, ruff, mypy 통과"
+    },
+    {
+      "claim": "파일/함수 한도",
+      "v2_result": "MATCH",
+      "evidence": "v2-final-adv-budget*.log",
+      "v2_judgement": "hard600/100 이하 및 600/601, 100/101, 0대상 경계 통과"
+    },
+    {
+      "claim": "격리 변이 38개",
+      "v2_result": "MATCH",
+      "evidence": "v2-final-adv-mutants.json",
+      "v2_judgement": "V1과 같은 6개 생존, 원본 지문 불변"
+    },
+    {
+      "claim": "직접 CLI 93건",
+      "v2_result": "MATCH",
+      "evidence": "v2-final-adv-cli-probes.json",
+      "v2_judgement": "V1과 같은 expected-zero-width-space 1건만 스크립트 기대값 불일치"
+    },
+    {
+      "claim": "negative 셸 경로 21건",
+      "v2_result": "MATCH",
+      "evidence": "v2-final-adv-negative-path.json",
+      "v2_judgement": "venv 재실행에서 mismatch 0"
+    },
+    {
+      "claim": "V1 정보3 n28 등가 변이 설명",
+      "v2_result": "MISMATCH",
+      "evidence": "v2-final-prefix-counterprobe.log/json",
+      "v2_judgement": "제품은 거부하지만 n28 변이는 허용한다. '사실상 등가' 설명은 반박됐고, 시험 강도 한계로 분류한다."
+    }
+  ],
+  "discrepancy_counts": {
+    "v1_caught_g_exaggeration": {
+      "count": 1,
+      "targets": [
+        "final-g2.json/log가 존재하지 않는 scripts/acceptance-g2.sh 실행 실패를 보존한 기록 결함"
+      ]
+    },
+    "v2_caught_v1_exaggeration_or_omission": {
+      "count": 1,
+      "targets": [
+        "V1 정보3 n28 '사실상 등가 변이' 설명은 final-prefix-counterprobe로 반박됨"
+      ]
+    },
+    "source_limited_not_counted": [
+      "V1 실행 신원은 root 제공 readback 파일을 대조한 것이며 private raw CLI 원본 재열람은 하지 않음"
+    ]
+  },
+  "mutants": {
+    "total": 38,
+    "survived": [
+      "n27-drop-cr-suffix-strip",
+      "n28-fail-prefix-without-space",
+      "n29-legacy-fallthrough-to-literal",
+      "n30-legacy-count-allow-one",
+      "n34-cli-usage-exit0",
+      "n35-split-lines-universal"
+    ],
+    "unexpected": [],
+    "product_unchanged": true
+  },
+  "cli_probes": {
+    "total": 93,
+    "mismatches": [
+      "expected-zero-width-space"
+    ]
+  },
+  "negative_path": {
+    "total": 21,
+    "mismatches": []
+  },
+  "identity_readback": {
+    "source": "root-provided artifact v1-final-identity-readback.json",
+    "v2_scope": "readback artifact inspected only; no credential/environment inspection and no direct private raw CLI re-read",
+    "session_id": "fdc02069-92a8-4bb7-afa0-11c121e9310a",
+    "apiKeySource": "none",
+    "raw_sha_verified": true,
+    "source_before_after_match": true
+  },
+  "prefix_counterprobe": {
+    "verifier": "claude-v2-final",
+    "command": [
+      "python3",
+      "artifacts/hs0002-20260910/final-prefix-counterprobe.py"
+    ],
+    "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+    "started": "2026-09-09T23:09:56.893305+00:00",
+    "ended": "2026-09-09T23:09:57.011826+00:00",
+    "elapsed": 0.1187002919614315,
+    "exit_code": 0,
+    "head": "8bef581b2ee64dd57345f92f11f241e0c927b759",
+    "output_file": "v2-final-prefix-counterprobe.log",
+    "output_sha256": "91957ec77956b6619f9c1564e74684906a1d44a396f011b403746a92daaec3e1",
+    "files_before": {
+      "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+      "scripts/verify/has-kickoff-failure.py": "4e43ea810cbbfd4a93aea8ac857790a23cc67557e30f693687a2e672cbbab2d0",
+      "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+      "humansearch/tests/test_hs_0002_boundaries.py": "8e946bf4f9e33f0a964754065ad511588d1b950ee57164e455fd3f6b5e3fd928",
+      "docs/sot/verification-commands.md": "f4f71f36895a3fdfc3dfc6800ffac48d0d6ebbc6efa67ad9435eeeb0d980ea34"
+    },
+    "files_after": {
+      "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+      "scripts/verify/has-kickoff-failure.py": "4e43ea810cbbfd4a93aea8ac857790a23cc67557e30f693687a2e672cbbab2d0",
+      "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+      "humansearch/tests/test_hs_0002_boundaries.py": "8e946bf4f9e33f0a964754065ad511588d1b950ee57164e455fd3f6b5e3fd928",
+      "docs/sot/verification-commands.md": "f4f71f36895a3fdfc3dfc6800ffac48d0d6ebbc6efa67ad9435eeeb0d980ea34"
+    },
+    "files_unchanged": true
+  },
+  "findings": [
+    {
+      "id": "F1",
+      "status": "REPRODUCED",
+      "severity": "low",
+      "title": "final-g2 기록 하나가 존재하지 않는 명령을 보존한다",
+      "cause": "final-g2.json/log가 scripts/acceptance-g2.sh를 호출해 rc 127을 남김",
+      "business_impact": "이 파일만 근거로 완료를 말하면 실행하지 않은 검증을 통과로 착각할 수 있음",
+      "classification": "기록 결함, 제품 차단 아님",
+      "evidence": [
+        "final-ledger-reconciliation.md",
+        "v2-final-adv-g2.log"
+      ]
+    },
+    {
+      "id": "F2",
+      "status": "REPRODUCED",
+      "severity": "info",
+      "title": "동결 시험 43개가 n28 no-space FAIL 접두 변이를 잡지 못한다",
+      "cause": "시험 입력에 기대값 자체가 'FAIL:'를 포함하고 출력도 'FAIL:reason'인 사례가 없음",
+      "business_impact": "현재 제품은 올바르게 거부하지만, 같은 종류 회귀를 시험만으로는 놓칠 수 있음",
+      "classification": "검증 강도 한계, 제품 결함 아님",
+      "evidence": [
+        "v2-final-adv-mutants.json",
+        "v2-final-prefix-counterprobe.log"
+      ]
+    },
+    {
+      "id": "F3",
+      "status": "REPRODUCED",
+      "severity": "info",
+      "title": "U+200B만 있는 기대값은 현재 helper가 문자 그대로 허용한다",
+      "cause": "빈값 거부가 Python str.strip() 기준이고 U+200B는 공백으로 제거되지 않음",
+      "business_impact": "HS-00.02 상수 호출처에는 영향이 없고 보이지 않는 문자 정책은 HS-00.03 범위",
+      "classification": "범위 밖 정책 결정, 제품 결함 아님",
+      "evidence": [
+        "v2-final-adv-cli-probes.json"
+      ]
+    }
+  ],
+  "retries": [
+    {
+      "command": "v2-final-adv-negative-path-run",
+      "status": "REPRODUCED",
+      "cause": "system Python lacked pytest; product-independent runner environment issue",
+      "resolution": "v2-final-adv-negative-path-rerun used humansearch/.venv/bin/python and passed 21/21"
+    }
+  ],
+  "not_run_or_out_of_scope": [
+    "remote CI / push / merge",
+    "live portal, DB, browser, messaging",
+    "HS-00.03 homoglyph/invisible-character policy beyond the U+200B observation",
+    "HS-00.04 workflow execution semantics",
+    "HS-00.05 earlier-step runtime environment",
+    "OS/P17 separate-runner receipt; V1/V2 are same-UID local reviews"
+  ],
+  "display_excerpt_policy": "No excerpt is treated as full-output evidence. Full command output is preserved in commands[].output_path with commands[].output_sha256."
+}

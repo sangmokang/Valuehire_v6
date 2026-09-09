@@ -1,0 +1,29 @@
+{
+  "command": [
+    "bash",
+    "-lc",
+    "cd humansearch && uv run --no-sync pytest -q tests/test_hs_0002.py"
+  ],
+  "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+  "started": "2026-09-09T22:21:35.951141+00:00",
+  "ended": "2026-09-09T22:21:40.678195+00:00",
+  "elapsed": 4.693971167085692,
+  "exit_code": 0,
+  "session": "hs0002-20260910",
+  "head_before": "0263108eab043dbb4780f7c9ca6ac0528808b31d",
+  "head_after": "0263108eab043dbb4780f7c9ca6ac0528808b31d",
+  "output_file": "v2-target-pytest.log",
+  "output_sha256": "3b998f4ab64ec9f9f651ef1ee9fc316d2929fcb6b2de4da655c336afe57d4424",
+  "files_before": {
+    "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+    "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+    "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+    "docs/sot/verification-commands.md": "73cfc56bcc240a971a48c86248cbd8261c9e8891eb847950907a8b80e1b57298"
+  },
+  "files_after": {
+    "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+    "scripts/verify/has-kickoff-failure.py": "3ffe9ba1c2cd4c0083e5a8ebfd03106ea1893d91d272c087ff9326349fe5432d",
+    "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+    "docs/sot/verification-commands.md": "73cfc56bcc240a971a48c86248cbd8261c9e8891eb847950907a8b80e1b57298"
+  }
+}

@@ -1,0 +1,1 @@
+{"original_filename": "resume-integrity.log", "sha256": "6d9eb391909f676eaf6b871328abda05acc7a62a60183939015ffa72ea359517", "text": "{\"candidate_files_match\": 5, \"review_evidence\": {\"v1\": {\"run_logs\": 6, \"executions\": 38, \"survived\": 6}, \"v2\": {\"run_logs\": 18, \"executions\": 38, \"survived\": 6}}, \"preserved_originals_match\": 800, \"status\": \"PASS\"}\n"}

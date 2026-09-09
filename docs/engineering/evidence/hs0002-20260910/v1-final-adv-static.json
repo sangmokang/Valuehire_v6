@@ -1,0 +1,31 @@
+{
+  "verifier": "claude-v1-final",
+  "command": [
+    "bash",
+    "-c",
+    "set -x; humansearch/.venv/bin/ruff check scripts/verify/has-kickoff-failure.py humansearch/tests/test_hs_0002.py humansearch/tests/test_hs_0002_boundaries.py artifacts/hs0002-20260910/v1-final-adv-*.py; echo \"ruff rc=$?\"; (cd humansearch && .venv/bin/mypy ../scripts/verify/has-kickoff-failure.py tests/test_hs_0002.py tests/test_hs_0002_boundaries.py); echo \"mypy rc=$?\"; bash -n scripts/acceptance-hs-kickoff-mutations.sh; echo \"bash-n rc=$?\"; git diff --check; echo \"diff-check rc=$?\"; python3 --version; humansearch/.venv/bin/python --version"
+  ],
+  "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+  "started": "2026-09-09T22:50:01.153446+00:00",
+  "ended": "2026-09-09T22:50:01.601105+00:00",
+  "elapsed": 0.44789779209531844,
+  "exit_code": 0,
+  "head": "8bef581b2ee64dd57345f92f11f241e0c927b759",
+  "output_file": "v1-final-adv-static.log",
+  "output_sha256": "ce2632f67daa2bdba81ebbd5f0ed76985f8efc6cc787da62af16601a3057125f",
+  "files_before": {
+    "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+    "scripts/verify/has-kickoff-failure.py": "4e43ea810cbbfd4a93aea8ac857790a23cc67557e30f693687a2e672cbbab2d0",
+    "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+    "humansearch/tests/test_hs_0002_boundaries.py": "8e946bf4f9e33f0a964754065ad511588d1b950ee57164e455fd3f6b5e3fd928",
+    "docs/sot/verification-commands.md": "f4f71f36895a3fdfc3dfc6800ffac48d0d6ebbc6efa67ad9435eeeb0d980ea34"
+  },
+  "files_after": {
+    "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+    "scripts/verify/has-kickoff-failure.py": "4e43ea810cbbfd4a93aea8ac857790a23cc67557e30f693687a2e672cbbab2d0",
+    "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+    "humansearch/tests/test_hs_0002_boundaries.py": "8e946bf4f9e33f0a964754065ad511588d1b950ee57164e455fd3f6b5e3fd928",
+    "docs/sot/verification-commands.md": "f4f71f36895a3fdfc3dfc6800ffac48d0d6ebbc6efa67ad9435eeeb0d980ea34"
+  },
+  "files_unchanged": true
+}

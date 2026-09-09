@@ -88,3 +88,9 @@
 보호하는 hs-kickoff 두 run 단계의 키는 name/run/id/timeout-minutes만 허용하며, shell/env/working-directory를 포함한 나머지 키는 약화로 판정한다. 다른 단계의 uses/with/env는 해당 보호 단계로 오인하지 않는다. 최상위 defaults/env 등 실행 환경 변경은 거부한다. 잡 수준 시간 제한은 양의 정수로 허용한다. concurrency/trigger 내용 검증은 HS-00.04의 별도 부채다.
 처분 대상은 토큰 경계를 지켜 PR #131을 PR #13으로 세지 않는다. 판정 첫 줄은 정확히 `VERDICT: PASS` 또는 `VERDICT: FAIL`이어야 한다. 이 형식 검사는 판정의 의미·권한·최신 지문을 승인하지 않는다. 실제 Codeaudit·Claude V1·Codex V2 원문과 커밋 지문을 별도로 대조한다.
 영향은 착수 문서·검사 입력 형식과 G2 회귀 수집이다. 기존 37종 변이 기대값은 바꾸지 않는다. 근거·기존 판정 대체·롤백은 `docs/engineering/humansearch-hs0001-goal-2026-09-10.md`, 승인은 이번 사용자 실행 요청과 각 독립 검토 원문에 기록한다. 이 개정은 로컬 후보이며 원격 CI/병합 승인을 뜻하지 않는다.
+
+## HS-00.02 실패 사유 대조 회귀
+
+정조준 명령은 humansearch에서 `uv run --no-sync pytest -q tests/test_hs_0002.py tests/test_hs_0002_boundaries.py`다. 기존 G2의 pytest 전체 수집에서 실행하며 새 CI 단계는 추가하지 않는다. 기존 착수 변이의 negative 함수가 `scripts/verify/has-kickoff-failure.py`를 직접 호출한다.
+기대 문구는 정규식이 아닌 문자 그대로이며 실제 `FAIL: ` 행의 사유 시작과 끝/공백/상세 구분자 경계를 대조한다. 기존 짧은 사유 세 종류는 검사기가 출력하는 전체 정규 형식에서만 인정한다. 빈 값이나 공백만인 기대값·빈 출력·다른 실패 사유·정상 출력 미끼는 거부한다. 비어 있지 않은 기대 문구 양끝의 공백은 문자 그대로 유지하고, 내부 CR/LF는 거부한다. 일반 사유의 뒤 경계는 끝/ASCII 공백/탭/슬래시이며 파일 없음·디렉터리·UTF-8 해독 실패는 CLI 종료값 2로 거부한다. 기존 31개 음성 기대 문자열과 6개 양성은 유지한다.
+영향은 기존 37개 변이의 성공 판정과 G2 회귀 수집이다. 이 규칙은 출력의 진위를 인증하거나 workflow 실행 환경을 보호하지 않는다. 이전의 부분문자열 검색을 대체하는 근거·계약·롤백·사용자 실행 승인 및 실제 독립 검토는 `docs/engineering/humansearch-hs0002-goal-2026-09-10.md`에 연결한다. 원격 CI·병합 승인을 뜻하지 않는다.

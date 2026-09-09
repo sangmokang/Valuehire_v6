@@ -1,0 +1,18 @@
+{
+  "name": "brief-lint-rerun",
+  "command": [
+    "bash",
+    "/Users/kangsangmo/.claude/skills/strict/brief-lint.sh",
+    "artifacts/hs0002-20260910/codeaudit-final-verdict.md"
+  ],
+  "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+  "started": "2026-09-09T22:48:07Z",
+  "ended": "2026-09-09T22:48:07Z",
+  "exit_code": 0,
+  "head_before": "8bef581b2ee64dd57345f92f11f241e0c927b759",
+  "head_after": "8bef581b2ee64dd57345f92f11f241e0c927b759",
+  "stdout_path": "artifacts/hs0002-20260910/codeaudit-final-brief-lint-rerun.stdout",
+  "stderr_path": "artifacts/hs0002-20260910/codeaudit-final-brief-lint-rerun.stderr",
+  "stdout_sha256": "6ba2049a886c1f63d015e9f02322d7e04f36b7cdf90580e5eb90779614e7fe1f",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

@@ -1,0 +1,31 @@
+{
+  "command": [
+    "env",
+    "-u",
+    "ANTHROPIC_API_KEY",
+    "claude",
+    "-p",
+    "--safe-mode",
+    "--permission-mode",
+    "dontAsk",
+    "--tools",
+    "Bash,Read,Glob,Grep",
+    "--allowedTools",
+    "Bash,Read,Glob,Grep",
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--session-id",
+    "fdc02069-92a8-4bb7-afa0-11c121e9310a"
+  ],
+  "init": [
+    {
+      "model": "claude-fable-5-1",
+      "apiKeySource": "none",
+      "session_id": "fdc02069-92a8-4bb7-afa0-11c121e9310a",
+      "claude_code_version": "2.1.267"
+    }
+  ],
+  "raw_sha_verified": true,
+  "source_before_after_match": true
+}

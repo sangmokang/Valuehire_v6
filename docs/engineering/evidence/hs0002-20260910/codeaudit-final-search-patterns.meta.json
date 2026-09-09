@@ -1,0 +1,23 @@
+{
+  "name": "search-patterns",
+  "command": [
+    "rg",
+    "-n",
+    "review-risk-patterns",
+    "candidate-files"
+  ],
+  "cwd": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0002-20260910",
+  "started": "2026-09-09T22:46:21Z",
+  "ended": "2026-09-09T22:46:21Z",
+  "exit_code": 0,
+  "head_before": "8bef581b2ee64dd57345f92f11f241e0c927b759",
+  "head_after": "8bef581b2ee64dd57345f92f11f241e0c927b759",
+  "stdout_path": "artifacts/hs0002-20260910/codeaudit-final-search-patterns.stdout",
+  "stderr_path": "artifacts/hs0002-20260910/codeaudit-final-search-patterns.stderr",
+  "stdout_sha256": "55c3732914a9ac8a335d9ef91d000220a388636375dab82b841eeffd7d4cdce8",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "candidate_before_sha_path": "artifacts/hs0002-20260910/codeaudit-final-search-patterns.before-sha.json",
+  "candidate_after_sha_path": "artifacts/hs0002-20260910/codeaudit-final-search-patterns.after-sha.json",
+  "candidate_before_sha256": "b4903458fd8bbb59e32548be9f5f1c690b4b51e4e507fccee147d91945da095a",
+  "candidate_after_sha256": "b4903458fd8bbb59e32548be9f5f1c690b4b51e4e507fccee147d91945da095a"
+}
