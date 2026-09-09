@@ -1,0 +1,73 @@
+{
+  "wu": "HS-00.01",
+  "status": "LOCAL_COMMITTED",
+  "green_commit": "8e7a515a1d3d53a8e4e468d118ffdcb2bbb2a580",
+  "red_commits": [
+    "e2404d3732dfe6167907ebd5a1d76a7aa02ea26b",
+    "16e5d649dbd257e6d01318c1a8fb0fbe8e731596"
+  ],
+  "verified_at": "2026-09-09T21:35:44.924936+00:00",
+  "candidate_sha256": {
+    "scripts/acceptance-hs-kickoff.sh": "58262dbce5b40aead6d57da29f03bbf7860d05d1c0923b1a764f514d1eb2740b",
+    "scripts/acceptance-hs-kickoff-mutations.sh": "4569309a6e2a5614e43d7442d80bf9808d221995081c2097cf813e6ac0c9181e",
+    "scripts/verify/list-workflow-steps.py": "5bf585f31b1ae2fa6915e82606bf8b0b2a1cd3a317d890bfcd6bdc6d541bd28f",
+    "scripts/acceptance-hs-gates-mutations.sh": "d166d802d77c4a99532a72cc5ded838ba6f2126fb3cf7acd8fc226173a6481bf",
+    "scripts/acceptance-hs-gates-antiforge.sh": "de04ebbb8ba07f6cb0acdcb2ab3a6fb377be7e37c44cb1deacd56f59982dc947",
+    "humansearch/tests/test_hs_0001.py": "5e84ee466466147ca377b08928bfd04593184e519dc54677a6dd8fe1c31278bf",
+    "humansearch/tests/test_hs_0001_main_compat.py": "0662357ecb0570bee47983b71afb968644ff22a5de7cd74a0ad550cf41a63070",
+    "docs/sot/verification-commands.md": "cd3af0bed3b8b0415630cd73b2f19e3f3bb7c0fc823dabd16ebddf76b999fe47",
+    ".github/workflows/verify.yml": "175d44e93b0eca518cdd74dd54b971e49b020e66bfd6b3935930ae20fac7ecc5"
+  },
+  "independent_verdict_sha256": "49bdab20f725adfa0db61f1757b96ed7cbc879def40adcd63f62fff5c48da96b",
+  "remote_ci": "NOT_RUN",
+  "push_pr_merge": "NOT_RUN",
+  "live_p17": "NOT_RUN",
+  "evidence_type": "local same-UID readback, not independent receipt",
+  "read_commands": [
+    [
+      "git",
+      "show",
+      "8e7a515a1d3d53a8e4e468d118ffdcb2bbb2a580:scripts/acceptance-hs-kickoff.sh"
+    ],
+    [
+      "git",
+      "show",
+      "8e7a515a1d3d53a8e4e468d118ffdcb2bbb2a580:scripts/acceptance-hs-kickoff-mutations.sh"
+    ],
+    [
+      "git",
+      "show",
+      "8e7a515a1d3d53a8e4e468d118ffdcb2bbb2a580:scripts/verify/list-workflow-steps.py"
+    ],
+    [
+      "git",
+      "show",
+      "8e7a515a1d3d53a8e4e468d118ffdcb2bbb2a580:scripts/acceptance-hs-gates-mutations.sh"
+    ],
+    [
+      "git",
+      "show",
+      "8e7a515a1d3d53a8e4e468d118ffdcb2bbb2a580:scripts/acceptance-hs-gates-antiforge.sh"
+    ],
+    [
+      "git",
+      "show",
+      "8e7a515a1d3d53a8e4e468d118ffdcb2bbb2a580:humansearch/tests/test_hs_0001.py"
+    ],
+    [
+      "git",
+      "show",
+      "8e7a515a1d3d53a8e4e468d118ffdcb2bbb2a580:humansearch/tests/test_hs_0001_main_compat.py"
+    ],
+    [
+      "git",
+      "show",
+      "8e7a515a1d3d53a8e4e468d118ffdcb2bbb2a580:docs/sot/verification-commands.md"
+    ],
+    [
+      "git",
+      "show",
+      "8e7a515a1d3d53a8e4e468d118ffdcb2bbb2a580:.github/workflows/verify.yml"
+    ]
+  ]
+}
