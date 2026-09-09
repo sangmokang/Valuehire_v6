@@ -55,13 +55,29 @@ if [ "$total" -eq 0 ]; then
 fi
 
 red=0
+# 실제로 돌린 개수를 센다. 루프 입력(here-string)은 bash 가 임시 파일을 만들어야
+# 성립하는데, 그 생성이 실패하면 bash 는 루프를 **실행하지 않고** 종료값 1 을 준다.
+# total 은 앞의 find 로 이미 N 이라 `total -eq 0` fail-closed 를 통과하고, red 는
+# 초기값 0 그대로 남아 `RED: 0/N` + exit 0 이라는 거짓 초록이 나온다(codex 샌드박스에서
+# 실제 발동: RED: 0/28). 입력 방식을 파이프로 바꿔도 같은 모양으로 접히므로, 방식이
+# 아니라 **실행 횟수 자체**를 세어 대조한다.
+ran=0
 while IFS= read -r c; do
   if [ -z "$c" ]; then continue; fi
+  ran=$((ran + 1))
   # SECRET_PATTERNS_FILE 을 비워 고정한다. 상속하면 환경변수 하나로 세션 브리핑이
   # 실패 건수를 축소 보고한다 — AC-5 의 존재 이유가 정직한 보고이고, P14 는 판정
   # 수치를 코드가 만들 것을 요구한다. 훅 2종에 넣은 것과 같은 한 줄이다.
   SECRET_PATTERNS_FILE= bash "$c" >/dev/null 2>&1 || red=$((red + 1))
 done <<< "$checks"
+
+# 찾은 개수와 돌린 개수가 다르면 수치를 내지 않는다. 수치를 내면 읽는 사람은 그것을
+# 판정으로 받아들인다 — 게이트 0 은 시작 자격 판정이므로 모르는 것을 0 으로 적으면 안 된다.
+# 부분 실행도 같다. 0회만 잡으면 1개만 돌고 끊긴 경우가 그대로 통과한다.
+if [ "$ran" -ne "$total" ]; then
+  printf 'RED: UNKNOWN (검사기 %d개를 찾았으나 %d개만 실행됐다 — 루프 입력 생성 실패 의심)\n' "$total" "$ran"
+  exit 1
+fi
 
 printf 'RED: %d/%d (%s 제외 — CI 담당)\n' "$red" "$total" "$EXCLUDED"
 exit "$rc"

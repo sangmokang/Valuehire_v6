@@ -138,3 +138,9 @@
   target: "staged_any=$(git diff --cached --name-only)"
   stage: "pre-commit"
   required: true
+- id: "gate0-loop-proof-acceptance-ci"
+  path: ".github/workflows/verify.yml"
+  target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-gate0-loop-proof.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
