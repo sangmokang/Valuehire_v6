@@ -4,7 +4,7 @@
 # 왜 있나: 인수 검사는 "통과"만 보여줘서는 안 된다. 일부러 깨뜨린 사본에서 반드시
 # 빨개져야 그 검사가 실제로 무언가를 보고 있다는 증거가 된다(Codex V2 2026-09-09 지적).
 #
-# 무엇을 검사하나(CHECKED 19 = 양성 4 + 음성 15):
+# 무엇을 검사하나(CHECKED 26 = 양성 7 + 음성 19):
 #   양성  원본 그대로의 사본 → acceptance-hs-kickoff.sh exit 0.
 #   음성1 CI 실행 줄을 주석으로 위장하고 다른 명령으로 바꾼다 → exit != 0.
 #   음성2 CI 스텝에 오류무시 지시(continue-on-error 를 true 로)를 붙인다 → exit != 0.
@@ -23,6 +23,16 @@
 #   음성15 3칸 들여쓴 코드 펜스로 진짜 처분 행을 감싼다 → exit != 0.
 #   양성3 워크플로 전체 들여쓰기를 옮긴다(의미 동등) → exit 0.
 #   양성4 스텝에 timeout-minutes 를 끼운다(정상 설정) → exit 0.
+#   음성16 스텝을 지우고 앞 스텝의 여러 줄 문자열 안에 머리글·실행 줄을 숨긴다 → exit != 0.
+#   음성17 조건 키를 콜론 앞 공백으로 쓴다(if : false) → exit != 0.
+#   음성18 run 키를 콜론 앞 공백으로 한 번 더 써서 덮어쓴다 → exit != 0.
+#   음성19 물결표 펜스로 진짜 처분 행을 감싼다 → exit != 0.
+#   양성5 run 값을 따옴표로 감싼다(같은 명령) → exit 0.
+#   양성6 run 줄 뒤에 주석을 붙인다 → exit 0.
+#   양성7 run 을 한 줄짜리 블록 스칼라로 쓴다 → exit 0.
+#
+# 음성은 종료값만 보지 않는다 — 기대한 실패 사유가 출력에 있어야 한다. 무관한 이유로
+# 빨개진 것을 "막았다"로 세면 검사가 무엇을 보는지 알 수 없다(Codex V2 3회차 지적).
 #   음성10 근거를 뜻 없는 영숫자(abcdefgh)로 바꾼다 → exit != 0.
 #
 # 출력 규약: 판정마다 `PASS: ...` / `FAIL: ...` 한 줄, 마지막에 `CHECKED: <n>`.
@@ -31,7 +41,7 @@ set -u
 cd "$(git rev-parse --show-toplevel)" || exit 1
 
 TARGET="$PWD/scripts/acceptance-hs-kickoff.sh"
-EXPECTED=19
+EXPECTED=26
 checked=0
 fail=0
 pass() { echo "PASS: $1"; checked=$((checked+1)); }
@@ -122,7 +132,7 @@ positive() {
 }
 
 negative() {
-  local name="$1" mutate="$2"
+  local name="$1" mutate="$2" expect="$3"
   local d="$TMP/m$checked"
   if ! make_fixture "$d"; then failc "$name — 시험대 구성 실패"; return; fi
   local before after
@@ -132,10 +142,12 @@ negative() {
   # 변조가 실제로 파일을 바꾸지 않았는데 "차단됨"으로 세면 거짓 초록이 된다.
   if [ "$before" = "$after" ]; then failc "$name — 변조가 파일을 바꾸지 못했다(시험 무효)"; return; fi
   local rc; rc=$(run_target "$d")
-  if [ "$rc" -ne 0 ]; then
-    pass "$name — 변조가 차단됨 (exit $rc)"
-  else
+  if [ "$rc" -eq 0 ]; then
     failc "$name — 변조가 통과했다 (exit 0). 검사가 이 위조를 보지 못한다"
+  elif ! /usr/bin/grep -q -- "$expect" "$TMP/out.log"; then
+    failc "$name — 빨개지긴 했으나 사유가 다르다 (exit $rc, 기대 '$expect' 없음: $(/usr/bin/grep -m1 '^FAIL' "$TMP/out.log"))"
+  else
+    pass "$name — 기대한 사유로 차단됨 (exit $rc, '$expect')"
   fi
 }
 
@@ -146,7 +158,7 @@ p=pathlib.Path(".github/workflows/verify.yml"); s=p.read_text()
 old="        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff.sh"
 assert s.count(old)==1
 p.write_text(s.replace(old,"        # "+old.strip()+"\n        run: printf \"검사생략\\n\""))
-PY'
+PY' 'CI 배선 불량'
 
 negative "음성2 CI 스텝 continue-on-error" '
 python3 - <<'"'"'PY'"'"'
@@ -156,13 +168,13 @@ old="        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-ki
 assert s.count(old)==1
 weaken = "continue-on-" + "error: " + "true"
 p.write_text(s.replace(old,"        "+weaken+"\n"+old))
-PY'
+PY' 'CI 배선 불량'
 
 negative "음성3 정본 표에 이름이 빈 행" '
-printf "| 99 |  | 이름 없는 행 |\n" >> docs/sot/verification-commands.md'
+printf "| 99 |  | 이름 없는 행 |\n" >> docs/sot/verification-commands.md' 'CI 스텝 불일치'
 
 negative "음성4 처분표 대상 중복" '
-printf "| PR #13 | 결론=폐기 | 근거=중복 행 테스트 abcdefgh |\n" >> docs/engineering/humansearch-branch-disposition-2026-09-07.md'
+printf "| PR #13 | 결론=폐기 | 근거=중복 행 테스트 abcdefgh |\n" >> docs/engineering/humansearch-branch-disposition-2026-09-07.md' '처분이 둘 이상'
 
 negative "음성5 근거 자리표시자" '
 python3 - <<'"'"'PY'"'"'
@@ -175,7 +187,7 @@ for i,l in enumerate(lines):
 else:
     raise SystemExit("anchor not found")
 p.write_text("".join(lines))
-PY'
+PY' '근거가 자리표시자'
 
 negative "음성6 판정 문서 첫 줄 위조" '
 python3 - <<'"'"'PY'"'"'
@@ -184,7 +196,7 @@ f=sorted(glob.glob("docs/engineering/humansearch-kickoff-ledger-verdict-*.md"))[
 p=pathlib.Path(f); s=p.read_text().splitlines()
 s[0]="판정 요약"
 p.write_text("\n".join(s)+"\n")
-PY'
+PY' '판정 문서 없음'
 
 negative "음성7 env 미끼로 실행 줄 위장" '
 python3 - <<'"'"'PY'"'"'
@@ -194,7 +206,7 @@ old="        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-ki
 assert s.count(old)==1
 bait = "        env:\n          BAIT: |\n" + "            " + old.strip() + "\n        run: printf \"검사생략\\n\""
 p.write_text(s.replace(old, bait))
-PY'
+PY' 'CI 배선 불량'
 
 negative "음성8 정본 표 행 번호 중복" '
 python3 - <<'"'"'PY'"'"'
@@ -207,7 +219,7 @@ for i,l in enumerate(lines):
 else:
     raise SystemExit("anchor not found")
 p.write_text("".join(lines))
-PY'
+PY' 'CI 스텝 불일치'
 
 negative "음성9 진짜 처분 행을 코드 블록 안으로 숨김" '
 python3 - <<'"'"'PY'"'"'
@@ -221,7 +233,7 @@ for i,l in enumerate(lines):
 else:
     raise SystemExit("anchor not found")
 p.write_text("".join(lines))
-PY'
+PY' '행 없음'
 
 positive "양성2 코드 블록 안 가짜 처분 행" '
 python3 - <<'"'"'PY'"'"'
@@ -244,7 +256,7 @@ for i,l in enumerate(lines):
 else:
     raise SystemExit("anchor not found")
 p.write_text("".join(lines))
-PY'
+PY' '근거가 자리표시자'
 
 negative "음성11 run 키 중복 뒤쪽 덮어쓰기" '
 python3 - <<'"'"'PY'"'"'
@@ -253,7 +265,7 @@ p=pathlib.Path(".github/workflows/verify.yml"); s=p.read_text()
 old="        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff.sh"
 assert s.count(old)==1
 p.write_text(s.replace(old, old + "\n        run: printf \"검사생략\\n\""))
-PY'
+PY' 'CI 배선 불량'
 
 negative "음성12 따옴표 조건 키로 스텝 끄기" '
 python3 - <<'"'"'PY'"'"'
@@ -263,7 +275,7 @@ old="        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-ki
 assert s.count(old)==1
 q=chr(34)
 p.write_text(s.replace(old, "        " + q + "if" + q + ": false\n" + old))
-PY'
+PY' 'CI 배선 불량'
 
 negative "음성13 따옴표 오류무시 키" '
 python3 - <<'"'"'PY'"'"'
@@ -274,7 +286,7 @@ assert s.count(old)==1
 q=chr(34)
 weak = q + "continue-on-" + "error" + q + ": " + "true"
 p.write_text(s.replace(old, "        " + weak + "\n" + old))
-PY'
+PY' 'CI 배선 불량'
 
 negative "음성14 코드 스팬으로 감싼 뜻 없는 근거" '
 python3 - <<'"'"'PY'"'"'
@@ -288,7 +300,7 @@ for i,l in enumerate(lines):
 else:
     raise SystemExit("anchor not found")
 p.write_text("".join(lines))
-PY'
+PY' '근거가 자리표시자'
 
 negative "음성15 3칸 들여쓴 코드 펜스로 진짜 행 숨김" '
 python3 - <<'"'"'PY'"'"'
@@ -302,7 +314,7 @@ for i,l in enumerate(lines):
 else:
     raise SystemExit("anchor not found")
 p.write_text("".join(lines))
-PY'
+PY' '행 없음'
 
 positive "양성3 워크플로 전체 들여쓰기 이동" '
 python3 - <<'"'"'PY'"'"'
@@ -321,6 +333,87 @@ p=pathlib.Path(".github/workflows/verify.yml"); s=p.read_text()
 old="        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff.sh"
 assert s.count(old)==1
 p.write_text(s.replace(old, "        timeout-minutes: 5\n" + old))
+PY'
+
+negative "음성16 스텝 삭제 후 여러 줄 문자열 안에 은닉" '
+python3 - <<'"'"'PY'"'"'
+import pathlib
+p=pathlib.Path(".github/workflows/verify.yml"); s=p.read_text()
+head="      - name: 인수 검사 hs-kickoff (HumanSearch 착수 정리 · WU-0A)"
+run ="        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff.sh"
+nxt ="      - name: 인수 검사 hs-kickoff-mutations"
+assert s.count(head)==1 and s.count(run)==1 and s.count(nxt)==1
+s = s[:s.index(head)] + s[s.index(nxt):]
+old = "        run: |\n          python3 scripts/verify/check-invoice-gate.py\n"
+assert s.count(old)==1
+bait = ("        run: |\n"
+        "          python3 scripts/verify/check-invoice-gate.py\n"
+        "          : " + chr(39) + "\n"
+        "          " + head.strip() + "\n"
+        "          " + run.strip() + "\n"
+        "          " + chr(39) + "\n")
+p.write_text(s.replace(old, bait))
+PY' 'CI 배선 불량'
+
+negative "음성17 콜론 앞 공백 조건 키" '
+python3 - <<'"'"'PY'"'"'
+import pathlib
+p=pathlib.Path(".github/workflows/verify.yml"); s=p.read_text()
+old="        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff.sh"
+assert s.count(old)==1
+p.write_text(s.replace(old, "        if : false\n" + old))
+PY' 'CI 배선 불량'
+
+negative "음성18 콜론 앞 공백 run 키로 덮어쓰기" '
+python3 - <<'"'"'PY'"'"'
+import pathlib
+p=pathlib.Path(".github/workflows/verify.yml"); s=p.read_text()
+old="        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff.sh"
+assert s.count(old)==1
+q=chr(34)
+p.write_text(s.replace(old, old + "\n        " + q + "run" + q + " : printf " + q + "x" + q))
+PY' 'CI 배선 불량'
+
+negative "음성19 물결표 펜스로 진짜 행 숨김" '
+python3 - <<'"'"'PY'"'"'
+import pathlib
+p=pathlib.Path("docs/engineering/humansearch-branch-disposition-2026-09-07.md")
+fence="~" * 3
+lines=p.read_text().splitlines(keepends=True)
+for i,l in enumerate(lines):
+    if l.startswith("|") and "PR #13" in l and "결론=" in l:
+        lines[i]=fence + "\n" + l + fence + "\n"; break
+else:
+    raise SystemExit("anchor not found")
+p.write_text("".join(lines))
+PY' '행 없음'
+
+positive "양성5 run 값을 따옴표로 감싸기" '
+python3 - <<'"'"'PY'"'"'
+import pathlib
+p=pathlib.Path(".github/workflows/verify.yml"); s=p.read_text()
+old="        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff.sh"
+assert s.count(old)==1
+q=chr(34)
+p.write_text(s.replace(old, "        run: " + q + old.split("run: ",1)[1] + q))
+PY'
+
+positive "양성6 run 줄 뒤 주석" '
+python3 - <<'"'"'PY'"'"'
+import pathlib
+p=pathlib.Path(".github/workflows/verify.yml"); s=p.read_text()
+old="        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff.sh"
+assert s.count(old)==1
+p.write_text(s.replace(old, old + "   # 착수 정리"))
+PY'
+
+positive "양성7 한 줄짜리 블록 스칼라 run" '
+python3 - <<'"'"'PY'"'"'
+import pathlib
+p=pathlib.Path(".github/workflows/verify.yml"); s=p.read_text()
+old="        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff.sh"
+assert s.count(old)==1
+p.write_text(s.replace(old, "        run: |\n          " + old.split("run: ",1)[1]))
 PY'
 
 echo "CHECKED: $checked"
