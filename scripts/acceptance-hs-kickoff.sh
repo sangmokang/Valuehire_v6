@@ -3,7 +3,7 @@
 #
 # 무엇을 검사하나(CHECKED 12 = 처분 6 + CI 스텝 수 1 + 문서 3 + CI 배선 1 + 판정 1):
 #   1~6  처분표의 대상 6건 각각에 `결론=(병합요청|재작성|폐기)` 와 `근거=` 가 있다.
-#   7    docs/sot/verification-commands.md 가 적은 CI 스텝 수 == verify.yml 의 `- name:` 수.
+#   7    docs/sot/verification-commands.md 의 CI 스텝 수·이름·순서 == verify.yml 의 `- name:` (1:1).
 #   8~9  2026-08-17 레쥬메 설계서 2건이 docs/engineering/history/ 에 "v4 전제 역사 기록" 머리말과 함께 있다.
 #   10   착수 프롬프트가 docs/engineering/goal-prompts/ 에 있다.
 #   11   verify.yml 이 이 스크립트를 run-acceptance.sh 로 감싸 실행한다.
@@ -46,8 +46,8 @@ else
       failc "처분표에 $t 행 없음"
     elif ! printf '%s' "$row" | /usr/bin/grep -qE '결론=(병합요청|재작성|폐기)'; then
       failc "$t 행에 결론=(병합요청|재작성|폐기) 없음"
-    elif ! printf '%s' "$row" | /usr/bin/grep -qE '근거=[^|]*[a-zA-Z0-9_./#-]'; then
-      failc "$t 행에 근거= 없음"
+    elif ! printf '%s' "$row" | /usr/bin/grep -oE '근거=[^|]*' | /usr/bin/grep -qE '근거=[^|]*[A-Za-z0-9_./#-][^|]{7,}'; then
+      failc "$t 행에 근거= 없음 또는 자리표시자(8자 미만)"
     else
       pass "처분 $t → $(printf '%s' "$row" | /usr/bin/grep -oE '결론=(병합요청|재작성|폐기)' | head -1)"
     fi
@@ -58,10 +58,14 @@ fi
 if [ -f "$VERIFY_YML" ] && [ -f "$VC_DOC" ]; then
   actual=$(/usr/bin/grep -cE '^[[:space:]]*- name:' "$VERIFY_YML")
   documented=$(/usr/bin/grep -oE '워크플로 스텝 [0-9]+개' "$VC_DOC" | head -1 | tr -cd '0-9')
-  if [ -n "$documented" ] && [ "$documented" = "$actual" ]; then
-    pass "CI 스텝 수 정본=$documented 실제=$actual"
+  # 수만 같아서는 안 된다 — 정본은 "이름·순서 그대로"를 주장하므로 이름을 1:1 대조한다(Codex V2 지적).
+  yaml_names=$(/usr/bin/grep -E '^[[:space:]]*- name:' "$VERIFY_YML" | sed -E 's/^[[:space:]]*- name:[[:space:]]*//')
+  doc_names=$(/usr/bin/grep -E '^\| [0-9]+ \|' "$VC_DOC" | awk -F'|' '{gsub(/^ +| +$/,"",$3); print $3}')
+  if [ -n "$documented" ] && [ "$documented" = "$actual" ] && [ "$yaml_names" = "$doc_names" ]; then
+    pass "CI 스텝 수·이름·순서 정본=$documented 실제=$actual 이름 1:1"
   else
-    failc "CI 스텝 수 불일치 정본=${documented:-없음} 실제=$actual"
+    mism=$(diff <(printf '%s\n' "$yaml_names") <(printf '%s\n' "$doc_names") | /usr/bin/grep -c '^[<>]')
+    failc "CI 스텝 불일치 정본=${documented:-없음} 실제=$actual 이름 불일치 줄=$mism"
   fi
 else
   failc "verify.yml 또는 verification-commands.md 없음"
