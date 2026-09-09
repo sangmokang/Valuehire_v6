@@ -55,6 +55,9 @@ Dir.mktmpdir("work-unit-contract-") do |tmp|
     "integer key" => [raw + "123: value\n", "POLICY_SCHEMA_INVALID"],
     "duplicate nested key" => [raw.sub("  claims_per_unit: 1", "  claims_per_unit: 1\n  claims_per_unit: 1"), "POLICY_DUPLICATE_KEY"],
     "alias" => [raw.sub('title: "Work Unit policy"', 'title: &t "Work Unit policy"') + "alias: *t\n", "POLICY_"],
+    "alias with valid schema" => [raw.sub("version: 1", "version: &one 1").sub("claims_per_unit: 1", "claims_per_unit: *one"), "POLICY_YAML_INVALID"],
+    "inline merge" => [raw.sub("  claims_per_unit: 1", "  <<: {claims_per_unit: 1}"), "POLICY_SCHEMA_INVALID"],
+    "shadowed inline merge" => [raw.sub("  claims_per_unit: 1", "  <<: {claims_per_unit: 2}\n  claims_per_unit: 1"), "POLICY_SCHEMA_INVALID"],
     "invalid bytes" => ["\xFF".b, "POLICY_"]
   }
   invalid.each do |label, (content, diagnostic)|
@@ -65,6 +68,18 @@ Dir.mktmpdir("work-unit-contract-") do |tmp|
     rendered, render_err, render_rc = invoke.call(renderer, input)
     assert.call("renderer rejects #{label}", render_rc == 1 && rendered.empty? &&
       render_err.include?("VERDICT: FAIL"), [render_rc, rendered, render_err].inspect)
+  end
+
+  {
+    "parse failure count" => ["broken: [\n", 0],
+    "root failure count" => ["version: 1\n", 1],
+    "nested schema failure count" => [raw.sub("  claims_per_unit: 1\n", ""), 18],
+    "value failure count" => [raw.sub("version: 1", "version: 2"), 22]
+  }.each do |label, (content, count)|
+    File.write(input, content)
+    out, err, rc = invoke.call(checker, input, doc)
+    assert.call(label, rc == 1 && out.lines.map(&:strip).include?("POLICY_CHECKED: #{count}"),
+      [rc, out, err].inspect)
   end
 
   # Property: every mapping permutation preserves meaning; list order does not.
@@ -125,6 +140,29 @@ Dir.mktmpdir("work-unit-contract-") do |tmp|
     out, err, rc = invoke.call(program, *args)
     assert.call("extra arguments #{File.basename(program)}", rc == 2 &&
       (out + err).include?("VERDICT: NOT_RUN"), [rc, out, err].inspect)
+  end
+end
+
+Dir.mktmpdir("work-unit-module-") do |tmp|
+  [checker, renderer].each { |path| FileUtils.cp(path, tmp) }
+  mod = File.join(tmp, "work_unit_policy.rb")
+  original_module = File.read(File.join(repo, "scripts/verify/work_unit_policy.rb"))
+  %w[missing empty symlink directory unreadable syntax].each do |kind|
+    File.unlink(mod) if File.exist?(mod) || File.symlink?(mod)
+    case kind
+    when "empty" then File.write(mod, "")
+    when "symlink" then File.symlink(File.join(repo, "scripts/verify/work_unit_policy.rb"), mod)
+    when "directory" then Dir.mkdir(mod)
+    when "unreadable" then File.write(mod, original_module); File.chmod(0o000, mod)
+    when "syntax" then File.write(mod, "module WorkUnitPolicy; def(; end\n")
+    end
+    [checker, renderer].each do |program|
+      out, err, rc = invoke.call(File.join(tmp, File.basename(program)), policy)
+      assert.call("module #{kind} #{File.basename(program)}", rc == 2 && out.empty? &&
+        err.include?("VERDICT: NOT_RUN"), [rc, out, err].inspect)
+    end
+    Dir.rmdir(mod) if kind == "directory"
+    File.chmod(0o600, mod) if kind == "unreadable"
   end
 end
 
