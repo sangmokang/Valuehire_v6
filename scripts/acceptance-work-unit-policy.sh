@@ -5,6 +5,13 @@ set -uo pipefail
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY \
   GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_PREFIX GIT_QUARANTINE_PATH
 
+if ! command -v ruby >/dev/null 2>&1; then
+  echo "VERDICT: NOT_RUN"
+  echo "REASON: ruby runtime unavailable"
+  echo "CHECKED: 0"
+  exit 2
+fi
+
 REPO=$(git rev-parse --show-toplevel 2>/dev/null) || {
   echo "VERDICT: NOT_RUN"
   echo "REASON: not a git repository"
