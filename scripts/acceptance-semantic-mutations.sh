@@ -268,6 +268,10 @@ else
   record 1 "래퍼 대상 없음 거부" "exit=0 — 없는 검사도 합격이면 파일을 지우면 통과한다"
 fi
 
+work_unit_rc=0
+ruby scripts/verify/work-unit-policy-gates-test.rb || work_unit_rc=$?
+record "$work_unit_rc" "Work Unit 검사·CI 무력화 차단" "격리 실행 반례 exit=$work_unit_rc"
+
 current=$(git status --porcelain)
 if [ "$current" = "$SNAPSHOT" ]; then
   record 0 "원본 저장소 상태 불변" "before/after 동일"
