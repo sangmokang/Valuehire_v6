@@ -48,6 +48,16 @@ git clone --no-local --quiet --no-hardlinks "$REPO" "$CLONE" 2>"$SANDBOX/clone.e
   echo "FAIL: 격리 clone 실패 — $(head -2 "$SANDBOX/clone.err" | tr '\n' ' ')"
   echo "CHECKED: 0"; exit 2; }
 
+# 시연 저장소에 origin/main 참조를 만들어 준다. session-status.sh 는 HEAD 와 origin/main 을
+# 대조해 동기 상태를 보고하는데, 그 참조가 없으면 sync=UNKNOWN 이 되어 rc=1 로 끝난다.
+# 로컬 워크트리에는 origin/main 이 있어서 통과했지만 CI 러너의 체크아웃에는 없어서
+# 대조군이 빨개졌다(실측: PR #75 CI — "HEAD: feedcee (UNKNOWN)").
+# 시연 환경을 갖추는 것이지 판정을 무르는 것이 아니다 — 종료값 0 요구는 그대로다.
+if ! ( cd "$CLONE" && git update-ref refs/remotes/origin/main HEAD ) 2>"$SANDBOX/ref.err"; then
+  echo "FAIL: 시연 저장소에 origin/main 참조를 만들지 못했다 — $(head -1 "$SANDBOX/ref.err")"
+  echo "CHECKED: 0"; exit 2
+fi
+
 # 작업트리 사본으로 덮는다. clone 은 HEAD 를 받으므로 이 줄이 없으면 지금 고치는 중인
 # 판본이 아니라 커밋된 옛 판본을 시험하게 된다.
 cp -p "$TARGET" "$CLONE/$TARGET" && chmod +x "$CLONE/$TARGET" || {
