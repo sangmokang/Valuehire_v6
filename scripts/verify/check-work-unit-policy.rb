@@ -1,32 +1,40 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require_relative "work_unit_policy"
+module_path = File.join(__dir__, "work_unit_policy.rb")
+if ARGV.length > 2 || !File.file?(module_path) || File.symlink?(module_path) || File.zero?(module_path)
+  warn "VERDICT: NOT_RUN\nREASON: invalid arguments or policy module"
+  exit 2
+end
+begin
+  require_relative "work_unit_policy"
+rescue LoadError, SystemCallError => e
+  warn "VERDICT: NOT_RUN\nREASON: policy runtime unavailable (#{e.class})"
+  exit 2
+end
 
 policy_path = ARGV.fetch(0, "docs/sot/work-unit-policy.yaml")
 document_path = ARGV.fetch(1, "docs/sot/work-unit-policy.md")
 
-data, errors = WorkUnitPolicy.load_policy(policy_path)
+data, errors, checked = WorkUnitPolicy.load_policy(policy_path)
 
 if errors.empty?
-  begin
-    expected_document = WorkUnitPolicy.render(data)
-    actual_document = File.read(document_path)
-    errors << "DOCUMENT_OUT_OF_SYNC: #{document_path}" unless actual_document == expected_document
-  rescue Errno::ENOENT
-    errors << "DOCUMENT_FILE_MISSING: #{document_path}"
+  actual_document, document_errors = WorkUnitPolicy.read_input(document_path, "DOCUMENT")
+  errors.concat(document_errors)
+  if errors.empty? && actual_document != WorkUnitPolicy.render(data)
+    errors << "DOCUMENT_OUT_OF_SYNC: #{document_path}"
   end
 end
 
 if errors.empty?
   puts "VERDICT: PASS"
-  puts "POLICY_CHECKED: #{WorkUnitPolicy::POLICY_CHECKED}"
+  puts "POLICY_CHECKED: #{checked}"
   puts "DOCUMENT_SYNC: PASS"
   exit 0
 end
 
 puts "VERDICT: FAIL"
 errors.each { |error| puts error }
-puts "POLICY_CHECKED: 0"
+puts "POLICY_CHECKED: #{checked}"
 puts "DOCUMENT_SYNC: FAIL"
 exit 1

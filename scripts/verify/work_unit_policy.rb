@@ -36,29 +36,42 @@ module WorkUnitPolicy
     "renderer" => "scripts/verify/render-work-unit-policy.rb"
   }.freeze
 
-  POLICY_CHECKED = 19
-
   module_function
 
+  def read_input(path, label)
+    stat = File.lstat(path)
+    return [nil, ["#{label}_FILE_INVALID: #{path}"]] unless stat.file? && !stat.symlink?
+    return [nil, ["#{label}_FILE_EMPTY: #{path}"]] if stat.size.zero?
+    return [nil, ["#{label}_FILE_UNREADABLE: #{path}"]] if (stat.mode & 0o444).zero?
+
+    [File.read(path, encoding: "UTF-8"), []]
+  rescue Errno::ENOENT
+    [nil, ["#{label}_FILE_MISSING: #{path}"]]
+  rescue SystemCallError, IOError => e
+    [nil, ["#{label}_FILE_UNREADABLE: #{path} (#{e.class})"]]
+  end
+
   def load_policy(path)
-    raw = File.read(path)
+    raw, errors = read_input(path, "POLICY")
+    return [nil, errors, 0] unless errors.empty?
+    return [nil, ["POLICY_YAML_INVALID: invalid UTF-8"], 0] unless raw.valid_encoding?
+
     duplicates = duplicate_keys(raw, path)
-    return [nil, duplicates] unless duplicates.empty?
+    return [nil, duplicates, 0] unless duplicates.empty?
 
     data = Psych.safe_load(raw, permitted_classes: [], permitted_symbols: [], aliases: false)
     errors = []
-    validate(data, errors)
-    [data, errors]
+    checked = validate(data, errors)
+    [data, errors, checked]
   rescue Psych::SyntaxError => e
-    [nil, ["POLICY_YAML_INVALID: #{e.problem} line=#{e.line} column=#{e.column}"]]
+    [nil, ["POLICY_YAML_INVALID: #{e.problem} line=#{e.line} column=#{e.column}"], 0]
   rescue Psych::Exception => e
-    [nil, ["POLICY_YAML_INVALID: #{e.message.lines.first.to_s.strip}"]]
-  rescue Errno::ENOENT
-    [nil, ["POLICY_FILE_MISSING: #{path}"]]
+    [nil, ["POLICY_YAML_INVALID: #{e.message.lines.first.to_s.strip}"], 0]
   end
 
   def duplicate_keys(raw, path)
     ast = Psych.parse_stream(raw, filename: path)
+    return ["POLICY_YAML_INVALID: exactly one document required"] unless ast.children.length == 1
     errors = []
     walk_duplicates(ast, "$", errors)
     errors
@@ -88,77 +101,81 @@ module WorkUnitPolicy
   def validate(data, errors)
     unless exact_mapping?(data, EXPECTED_ROOT_KEYS)
       errors << "POLICY_SCHEMA_INVALID: root"
-      return
+      return 1
     end
 
-    expect_value(errors, "version", data["version"], 1)
-    expect_value(errors, "title", data["title"], "Work Unit policy")
-    validate_work_unit(data["work_unit"], errors)
-    validate_pull_request(data["pull_request"], errors)
-    validate_review(data["review"], errors)
-    validate_enforcement(data["enforcement"], errors)
+    checked = 1
+    checked += expect_value(errors, "version", data["version"], 1)
+    checked += expect_value(errors, "title", data["title"], "Work Unit policy")
+    checked += validate_work_unit(data["work_unit"], errors)
+    checked += validate_pull_request(data["pull_request"], errors)
+    checked += validate_review(data["review"], errors)
+    checked + validate_enforcement(data["enforcement"], errors)
   end
 
   def validate_work_unit(section, errors)
     unless exact_mapping?(section, EXPECTED_WORK_UNIT_KEYS)
       errors << "POLICY_SCHEMA_INVALID: work_unit"
-      return
+      return 1
     end
-    expect_value(errors, "work_unit.claims_per_unit", section["claims_per_unit"], 1)
-    expect_value(errors, "work_unit.max_units_per_pr", section["max_units_per_pr"], 5)
-    expect_value(errors, "work_unit.max_branch_lifetime_hours",
+    checked = 1
+    checked += expect_value(errors, "work_unit.claims_per_unit", section["claims_per_unit"], 1)
+    checked += expect_value(errors, "work_unit.max_units_per_pr", section["max_units_per_pr"], 5)
+    checked += expect_value(errors, "work_unit.max_branch_lifetime_hours",
                  section["max_branch_lifetime_hours"], 48)
-    expect_value(errors, "work_unit.completion_requires",
+    checked + expect_value(errors, "work_unit.completion_requires",
                  section["completion_requires"], EXPECTED_COMPLETION_REQUIRES)
   end
 
   def validate_pull_request(section, errors)
     unless exact_mapping?(section, EXPECTED_PULL_REQUEST_KEYS)
       errors << "POLICY_SCHEMA_INVALID: pull_request"
-      return
+      return 1
     end
-    expect_value(errors, "pull_request.final_gates", section["final_gates"], EXPECTED_FINAL_GATES)
-    expect_value(errors, "pull_request.squash_rollback_boundary",
+    checked = 1 + expect_value(errors, "pull_request.final_gates", section["final_gates"], EXPECTED_FINAL_GATES)
+    checked + expect_value(errors, "pull_request.squash_rollback_boundary",
                  section["squash_rollback_boundary"], "pull_request")
   end
 
   def validate_review(section, errors)
     unless exact_mapping?(section, EXPECTED_REVIEW_KEYS)
       errors << "POLICY_SCHEMA_INVALID: review"
-      return
+      return 1
     end
     high_risk = section["high_risk"]
     unless exact_mapping?(high_risk, EXPECTED_HIGH_RISK_KEYS)
       errors << "POLICY_SCHEMA_INVALID: review.high_risk"
-      return
+      return 2
     end
-    expect_value(errors, "review.high_risk.paths", high_risk["paths"], EXPECTED_HIGH_RISK_PATHS)
-    expect_value(errors, "review.high_risk.execution_review_required",
+    checked = 2
+    checked += expect_value(errors, "review.high_risk.paths", high_risk["paths"], EXPECTED_HIGH_RISK_PATHS)
+    checked += expect_value(errors, "review.high_risk.execution_review_required",
                  high_risk["execution_review_required"], true)
-    expect_value(errors, "review.high_risk.document_review_can_pass",
+    checked += expect_value(errors, "review.high_risk.document_review_can_pass",
                  high_risk["document_review_can_pass"], false)
-    expect_value(errors, "review.high_risk.paid_external_review_required",
+    checked + expect_value(errors, "review.high_risk.paid_external_review_required",
                  high_risk["paid_external_review_required"], false)
   end
 
   def validate_enforcement(section, errors)
     unless exact_mapping?(section, EXPECTED_ENFORCEMENT_KEYS)
       errors << "POLICY_SCHEMA_INVALID: enforcement"
-      return
+      return 1
     end
+    checked = 1
     EXPECTED_ENFORCEMENT.each do |key, value|
-      expect_value(errors, "enforcement.#{key}", section[key], value)
+      checked += expect_value(errors, "enforcement.#{key}", section[key], value)
     end
+    checked
   end
 
   def exact_mapping?(value, keys)
-    value.is_a?(Hash) && value.keys == keys
+    value.is_a?(Hash) && value.size == keys.size && keys.all? { |key| value.key?(key) }
   end
 
   def expect_value(errors, path, actual, expected)
-    return if actual == expected
-
-    errors << "POLICY_VALUE_INVALID: #{path}"
+    errors << "POLICY_VALUE_INVALID: #{path}" unless actual.eql?(expected)
+    1
   end
 
   def render(data)

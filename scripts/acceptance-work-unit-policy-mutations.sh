@@ -124,6 +124,14 @@ cp "$DOCUMENT" "$TMP/document-claims.md"
 ruby -e 'p=ARGV[0]; File.write(p, File.read(p) + "\n문서 전용 Work Unit은 두 주장을 포함해도 된다.\n")' "$TMP/document-claims.md"
 run_check "$POLICY" "$TMP/document-claims.md" 1 'DOCUMENT_OUT_OF_SYNC:' "생성 문서에 다중 주장 예외 추가"
 
+checked=$((checked + 1))
+if ruby scripts/verify/work-unit-policy-contract-test.rb; then
+  echo "PASS: 실행 입력 경계 계약"
+else
+  echo "FAIL: 실행 입력 경계 계약"
+  fail=1
+fi
+
 after=$(git status --porcelain=v1)
 checked=$((checked + 1))
 if [ "$after" = "$SNAPSHOT" ]; then

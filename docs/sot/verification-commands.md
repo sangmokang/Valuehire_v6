@@ -27,7 +27,7 @@ Work Unit의 개수·완료 조건·최종 관문 순서·고위험 검토·비�
 
 로컬 `pre-push`는 `acceptance-*.sh` 글로브로 Work Unit 검사를 자동 수집한다. CI는 아래 고정 목록에서 각각 명시적으로 실행한다.
 
-범위 주의: 이 정책은 Work Unit의 구조·문서 동기화·최종 관문 순서를 검증하지만, 실제 개발자가 모든 작업을 Work Unit으로 쪼개 수행하도록 자동 강제하지는 않는다. 현재 `acceptance-work-unit-policy.sh`의 바깥 출력 `CHECKED: 5`는 필수 파일 4개와 검사기 실행 1건을 센 값이고, 검사기 내부의 `POLICY_CHECKED: 19`가 YAML 정책 계약 19개를 센 값이다. 따라서 "5개만 검사했다"와 "정책 19개를 검사한다"는 서로 다른 계층의 출력이다.
+범위 주의: 이 정책은 Work Unit의 구조·문서 동기화·최종 관문 순서를 검증하지만, 실제 개발자가 모든 작업을 Work Unit으로 쪼개 수행하도록 자동 강제하지는 않는다. `acceptance-work-unit-policy.sh`의 바깥 출력 `CHECKED: 5`는 필수 파일 4개와 검사기 실행 1건을 센다. 내부 `ruby scripts/verify/check-work-unit-policy.rb`는 객체 구조 6개와 정책값 16개 단언을 실제 실행해 `POLICY_CHECKED: 22`와 `DOCUMENT_SYNC: PASS`를 출력한다. 종전 고정 상수 19와는 다르다. mutation acceptance의 마지막 `CHECKED: 20`에는 추가 CLI 경계 계약 실행 1건이 포함되며 하위 시험 수와 구분한다.
 
 ### CI(`.github/workflows/verify.yml`)가 실제로 돌리는 것
 
@@ -38,7 +38,7 @@ Work Unit의 개수·완료 조건·최종 관문 순서·고위험 검토·비�
 | 1 | 비밀 스캔 (verify.sh) | `bash verify.sh` — 추적 파일 전체 |
 | 2 | Strict 원칙 정본·장부·배선 검사 | `bash scripts/verify/run-acceptance.sh scripts/acceptance-principles-check.sh` — 원칙 계약 34개, 장치, 명시적 pre-push/CI 배선 |
 | 3 | Strict 원칙 적대 fixture·500/501 경계 | `bash scripts/verify/run-acceptance.sh scripts/acceptance-principles-mutations.sh` — 정상 fixture, 원칙 반례, 500/501 경계 |
-| 4 | Work Unit 구조화 정책·생성 문서 검사 | `bash scripts/verify/run-acceptance.sh scripts/acceptance-work-unit-policy.sh` — YAML 정책 19개 계약과 생성 문서 동기화 |
+| 4 | Work Unit 구조화 정책·생성 문서 검사 | `bash scripts/verify/run-acceptance.sh scripts/acceptance-work-unit-policy.sh` — YAML 정책 22개 단언과 생성 문서 동기화 |
 | 5 | Work Unit 정책 변조·동의어 우회 검사 | `bash scripts/verify/run-acceptance.sh scripts/acceptance-work-unit-policy-mutations.sh` — 값·순서·스키마·문서 변조와 감사 동의어 우회 3종 |
 | 6 | Strict 전역 스킬 잠금 장치 격리 회귀 | `bash scripts/verify/run-acceptance.sh scripts/acceptance-guard-global-skill-files.sh` — lock/check/unlock/recover와 동일 UID 한계 |
 | 7 | P3 조용한 실패 문법·오탐 회귀 | 인라인 — `scripts/acceptance-silent-failure-lint.sh`, `scripts/acceptance-silent-failure-lint-mutations.sh`를 각각 `bash scripts/verify/run-acceptance.sh <검사>`로 실행 |

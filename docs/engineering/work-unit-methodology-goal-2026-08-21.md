@@ -75,12 +75,14 @@ Work Unit 안에서 찾는 것은 “이 주장 하나가 참인가?”이고, P
 
 ## 인수 기준과 counter-AC
 
+2026-09-10 실행 계약 정정: 아래 절차는 정책으로 고정하는 대상이며 실제 PR 나이·단위 장부를 자동 집행하는 기능은 아닙니다. 현재 복구와 실행 증거는 [후속 goal](pr37-resolution-goal-2026-09-10.md)에 연결합니다. 아래 AC의 공개 출력만 정정하며 과거 검증 로그는 당시 값으로 보존합니다.
+
 ### AC-1 — Work Unit 경계
 
 **When** 하나의 목표가 여러 독립 주장을 포함하면, 시스템은 목표를 Work Unit 1~5개로 나누고 각 Work Unit을 하나의 주장과 완료 커밋 경계로 기록해야 합니다.
 
 - 검증 명령: `bash scripts/acceptance-work-unit-policy.sh`
-- 기대값: 종료값 0, `POLICY_CHECKED: 19`, `DOCUMENT_SYNC: PASS`. 하나의 주장, 완료 커밋, PR 상한, 브랜치 수명, 검토 보정, squash 경계가 구조화된 정책으로 직접 검사됩니다.
+- 기대값: 종료값 0, `CHECKED: 5`, `VERDICT: PASS`. 하나의 주장, 완료 커밋, PR 상한, 브랜치 수명, 검토 보정, squash 경계의 정책 일관성을 검사합니다. 내부 세부 출력은 `ruby scripts/verify/check-work-unit-policy.rb`의 `POLICY_CHECKED: 22`, `DOCUMENT_SYNC: PASS`입니다.
 - counter-AC: Work Unit을 파일 단위로 정의, 여러 Work Unit을 한 완료 커밋에 혼합, squash 뒤 개별 커밋 revert 가능하다고 기록.
 
 ### AC-2 — 두 층의 검증
@@ -88,7 +90,7 @@ Work Unit 안에서 찾는 것은 “이 주장 하나가 참인가?”이고, P
 **When** Work Unit 구현이 끝나면, 시스템은 해당 AC와 작은 반증을 먼저 실행하고, 모든 Work Unit 뒤에는 strict·codeaudit·전체 적대검증·CI를 별도로 실행해야 합니다.
 
 - 검증 명령: `bash scripts/acceptance-work-unit-policy.sh`
-- 기대값: 종료값 0, `POLICY_CHECKED: 19`, `DOCUMENT_SYNC: PASS`. Work Unit과 PR 전체 검사의 순서, 고위험 검토 등급·비용·롤백 경계가 구조화된 정책으로 직접 검사됩니다.
+- 기대값: 종료값 0, `CHECKED: 5`, `VERDICT: PASS`. Work Unit과 PR 전체 검사의 순서, 고위험 검토 등급·비용·롤백 경계의 정책 일관성을 검사합니다. 실제 검토 실행 기록까지 검사하는 명령은 아닙니다.
 - counter-AC: Work Unit마다 full codeaudit 강제, 최종 통합 검사를 삭제, CI 초록을 로컬 PASS로 대체.
 
 ### AC-3 — 구조화 정책과 생성 문서 변조 차단
@@ -96,7 +98,7 @@ Work Unit 안에서 찾는 것은 “이 주장 하나가 참인가?”이고, P
 **When** Work Unit 정책의 값·순서·스키마를 바꾸거나 생성 문서에 예외 문장을 덧붙이면, 정책 mutation 게이트는 해당 사본을 실패시켜야 합니다.
 
 - 검증 명령: `bash scripts/acceptance-work-unit-policy-mutations.sh`
-- 기대값: 종료값 0, `CHECKED: 19`, `VERDICT: PASS`. 정상 정책은 통과하고 값·순서·스키마·생성 문서 반례 17개는 모두 기대한 `FAIL`을 관측하며 원본 저장소는 불변입니다.
+- 기대값: 종료값 0, 마지막 `CHECKED: 20`, `VERDICT: PASS`. 정상 정책, 값·순서·스키마·생성 문서 반례 17개, 추가 실행 경계 계약, 원본 저장소 불변을 검사합니다. 하위 계약 시험의 처리 수는 별도 출력입니다.
 - counter-AC: `전체 적대검증 생략`, pre-push로 최종 관문 대체, 고위험 경로 삭제, 문서 REVIEW만으로 고위험 WU PASS, WU·브랜치 상한 완화.
 
 ## Work Unit 장부
