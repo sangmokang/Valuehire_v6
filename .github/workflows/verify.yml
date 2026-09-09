@@ -22,7 +22,7 @@ concurrency:
   #
   # 단 main 은 취소하지 않는다: 초록불 증거가 커밋 SHA 에 귀속되므로(P23),
   # main 실행을 중도 취소하면 그 SHA 에 대한 판정이 영구히 비게 된다.
-  group: verify-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  group: verify-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
