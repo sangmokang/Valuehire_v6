@@ -1,0 +1,30 @@
+name: audit
+
+# "커밋이 없어도 시간이 지나면 저절로 문제가 되는 것"을 잡는 전용 워크플로.
+# verify.yml은 push/PR이 있을 때만 돈다 — 아무도 커밋을 안 하면 억제(suppressions.yaml)
+# 만료일이 지나도 아무도 모르고 지나갈 수 있다. 실패하면 GitHub 기본 동작으로
+# 저장소 계정에 이메일 알림이 간다(별도 알림 장치는 추가하지 않는다).
+on:
+  schedule:
+    - cron: "0 20 * * *"   # UTC 20:00 = KST 05:00, 매일
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: 억제 만료 스캔 (suppressions.yaml)
+        # verify.yml의 같은 이름 스텝과 반드시 같은 스크립트를 부른다(로직 이원화 금지).
+        run: bash scripts/check-suppression-expiry.sh
+
+      - name: 서드파티 액션 SHA 고정 드리프트 검사
+        # actions/checkout을 SHA로 고정했는데(2026-09) 나중에 누군가 실수로 또는
+        # 몰라서 다시 가변 태그(@v4 등)로 되돌리면 이 스텝이 잡는다.
+        run: bash scripts/check-action-sha-drift.sh
