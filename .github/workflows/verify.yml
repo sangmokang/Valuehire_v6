@@ -275,3 +275,10 @@ jobs:
         # 역사 기록" 머리말과 함께 보존됐는가, 착수 프롬프트·이 배선·Codex 판정 문서가
         # 있는가를 12건으로 센다. 로컬 pre-push 글로브에만 두면 P15③ 이 없는 검사로 친다.
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff.sh
+
+      - name: 인수 검사 hs-kickoff-mutations (WU-0A 검사를 속일 수 있는가)
+        # 위 검사가 "통과"만 보여주면 그 검사가 무엇을 보는지 알 수 없다. 이 스텝은
+        # 일부러 깨뜨린 사본 6종(실행 줄 주석 위장·오류무시 지시·정본 표의 빈 이름 행·
+        # 처분 대상 중복·근거 자리표시자·판정 문서 첫 줄 위조)에서 위 검사가 반드시
+        # 빨개지는지, 손대지 않은 사본에서는 통과하는지를 함께 센다(양성 1 + 음성 6).
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff-mutations.sh
