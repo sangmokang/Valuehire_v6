@@ -57,7 +57,7 @@ Work Unit의 개수·완료 조건·최종 관문 순서·고위험 검토·비�
 | 20 | 데이터 노출 스캔 (크기 · 금지경로 · 기록 · 개인정보 내용) | `bash scripts/scan-data-exposure.sh all` — 크기·금지경로·기록·개인정보 (AC-A4) |
 | 21 | 인수 검사 hs-a4 (대용량·산출물 차단이 실제로 도는가) | `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-a4.sh` — 차단이 실제로 도는가 (AC-A4) |
 | 22 | 인수 검사 secret-webhook-vendor (웹훅·벤더 키 탐지 · AC-S1) | `bash scripts/verify/run-acceptance.sh scripts/acceptance-secret-webhook-vendor.sh` |
-| 23 | 인수 검사 verified-sha (초록불이 SHA 에 귀속되는가 · P23) | `bash scripts/verify/run-acceptance.sh scripts/acceptance-verified-sha.sh` — 로컬·원격·CI 검사 SHA 귀속 진리표와 fail-closed |
+| 23 | 인수 검사 verified-sha (초록불이 SHA 에 귀속되는가 · P23) | `bash scripts/verify/run-acceptance.sh scripts/acceptance-verified-sha.sh` — 현재 SHA 귀속·모든 verify 실행 집계·조회 오류 및 순서 반례 44건(P23) |
 | 24 | 인수 검사 ci-step-integrity (스텝을 조용히 끄지 못하는가) | `bash scripts/verify/run-acceptance.sh scripts/acceptance-ci-step-integrity.sh` — 조건부·오류무시로 CI 스텝을 끄는 구조 차단 |
 | 25 | 인수 검사 semantic-mutations (검사를 껐을 때 반드시 빨개지는가) | `bash scripts/verify/run-acceptance.sh scripts/acceptance-semantic-mutations.sh` — 인수 검사 무력화 5종을 전량 격리 사본에서 차단 |
 | 26 | 인수 검사 verify-ac-m (mechanism 명부 대조 · AC-M) | `bash scripts/verify/run-acceptance.sh scripts/acceptance-verify-ac-m.sh` |
