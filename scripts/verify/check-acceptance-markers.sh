@@ -64,7 +64,13 @@ if [ -n "${ACCEPTANCE_EXPECT_LIST:-}" ]; then
 else
   # 생산 경로 — 고정 목록이 아니라 글로브다. 고정 목록이면 새로 추가된 인수 스크립트가
   # 조용히 누락된다(2026-08-07 실측: acceptance-9-9.sh 를 추가해도 "검사 2개 실행"으로 통과).
-  find . -maxdepth 2 -name 'acceptance-*.sh' -not -path './worktrees/*' -not -path './.git/*' \
+  # verify.sh 를 함께 센다. 이 저장소의 **최우선 방어선**(비밀 스캔)인데, 인수 스크립트만
+  # 세면 그것 하나가 실행 증명 밖에 남는다 — CI 의 비밀 스캔 줄을 echo 로 바꿔도 이 검수는
+  # 아무 말을 하지 않는다(2026-09-09 감사 실측: 마커에 verify.sh 항목이 29개 있는데도
+  # 기대 목록에 없어 대조되지 않았다). pre-push 의 문자열 대조와 mechanism-registry 가
+  # 남아 있긴 하지만, 그 둘 다 이 억제가 "수익이 체감한다"고 판정한 문자열 방식이다.
+  find . -maxdepth 2 \( -name 'verify.sh' -o -name 'acceptance-*.sh' \) \
+    -not -path './worktrees/*' -not -path './.git/*' \
     | sed 's#^\./##' | LC_ALL=C sort -u > "$TMP/found" || die "인수 스크립트를 찾지 못했다"
   if [ ! -s "$TMP/found" ]; then
     die "인수 스크립트가 0개 — 검사 대상 0개는 합격이 아니다"
