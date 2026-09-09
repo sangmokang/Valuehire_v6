@@ -32,6 +32,7 @@ REPO=$(git rev-parse --show-toplevel 2>/dev/null) || {
 cd "$REPO" || { echo "FAIL: 저장소 루트로 이동 실패"; echo "CHECKED: 0"; exit 2; }
 
 WF=.github/workflows/verify.yml
+CHECKER_SRC=scripts/verify/check-workflow-deletion.sh
 # 검사기 존재를 전제로 두지 않는다. 두면 검사기가 없을 때 시연이 한 번도 돌지 않고
 # exit 2 로 끝나, "삭제가 차단되지 않는다"는 사실이 관측되지 않는다. 부재는 시연 5 가 잡는다.
 for f in "$WF" hooks/pre-commit; do
@@ -67,6 +68,23 @@ cp -p hooks/pre-commit "$CLONE/.git/hooks/pre-commit" || {
   echo "FAIL: 훅 설치 실패"; echo "CHECKED: 0"; exit 2; }
 chmod +x "$CLONE/.git/hooks/pre-commit"
 
+# 검사기도 **작업트리 사본**으로 덮는다. clone 은 HEAD 를 받으므로, 이 줄이 없으면
+# 훅은 지금 상태를 쓰는데 검사기는 커밋된 옛 버전을 쓰는 어긋난 조합을 시험하게 된다.
+# 실측(2026-09-09): 그 상태에서는 검사기를 어떻게 망가뜨려도 5/5 초록이 나왔다 —
+# 변이 4종(차단 끄기·범위 필터 제거·집합 비교 뒤집기·주석 제외 제거)이 전부 생존했다.
+# 생존은 "도달 불가"가 아니라 "시험이 대상을 안 본다"는 뜻이었다.
+if [ -f "$CHECKER_SRC" ]; then
+  mkdir -p "$CLONE/$(dirname "$CHECKER_SRC")" || {
+    echo "FAIL: 검사기 디렉터리 생성 실패"; echo "CHECKED: 0"; exit 2; }
+  cp -p "$CHECKER_SRC" "$CLONE/$CHECKER_SRC" || {
+    echo "FAIL: 검사기 설치 실패"; echo "CHECKED: 0"; exit 2; }
+  chmod +x "$CLONE/$CHECKER_SRC"
+fi
+
+# 시연마다 여기로 되돌린다. 시연 4 는 seed 커밋을 만들어 HEAD 를 옮기므로 SHA 로 고정한다.
+BASE=$(cd "$CLONE" && git rev-parse HEAD) || {
+  echo "FAIL: 기준 커밋을 읽지 못했다"; echo "CHECKED: 0"; exit 2; }
+
 # 삭제 대상으로 쓸 실행 줄을 실제 워크플로에서 고른다. 하드코딩하면 워크플로가 바뀐 뒤
 # 이 시연이 조용히 무의미해진다(셋업 실패를 합격으로 세는 경로).
 VICTIM=$(grep -n 'run-acceptance\.sh scripts/acceptance-' "$CLONE/$WF" | head -1 | cut -d: -f1)
@@ -80,7 +98,14 @@ VICTIM_PATH=$(sed -n "${VICTIM}p" "$CLONE/$WF" | sed 's/.*run-acceptance\.sh[[:s
 run_case() {
   local desc="$1" expect="$2" setup="$3"
   local log="$SANDBOX/log.$checked"
-  ( cd "$CLONE" && git checkout --quiet -- . && git clean -qfd ) 2>/dev/null
+  # 인덱스까지 되돌린다. checkout -- . 은 작업트리만 복원하므로 앞 시연의 스테이징이
+  # 남아, 다음 시연의 셋업이 엉뚱한 줄을 지우고 "차단되지 않았다"는 거짓 신호를 낸다.
+  ( cd "$CLONE" && git reset --hard --quiet "$BASE" && git clean -qfdx ) 2>/dev/null
+  # reset/clean 이 작업트리 사본을 되돌리므로 매 시연 직전에 다시 덮는다.
+  if [ -f "$CHECKER_SRC" ]; then
+    mkdir -p "$CLONE/$(dirname "$CHECKER_SRC")" 2>/dev/null
+    cp -p "$CHECKER_SRC" "$CLONE/$CHECKER_SRC" 2>/dev/null && chmod +x "$CLONE/$CHECKER_SRC"
+  fi
   if ! ( cd "$CLONE" && $setup ) >"$SANDBOX/setup.err" 2>&1; then
     record 1 "$desc" "셋업 실패 — 위반을 만들지 못했다: $(head -1 "$SANDBOX/setup.err")"
     return
@@ -152,7 +177,47 @@ setup_delete_outside() {
 }
 run_case "워크플로 밖 파일의 같은 줄 삭제는 통과한다 (범위 대조)" pass setup_delete_outside
 
-# 시연 5 (배선) — 검사기가 존재해도 훅이 부르지 않으면 무방비다.
+# 시연 5 (음성 · 주석 대조) — 워크플로 주석에서 스크립트 이름이 든 줄을 지운다.
+# 워크플로 주석에는 "acceptance-0-2 는 여기서 돌리지 않는다" 같은 설명이 흔하다.
+# 주석 삭제는 검사를 끄지 않으므로 통과해야 한다. 이 시연이 없으면 검사기에서 주석
+# 제외를 빼도 전부 초록이었다(2026-09-09 변이 M4 생존 실측).
+# 아무 주석이나 고르면 안 된다. 그 주석이 언급한 스크립트가 실행 줄에도 남아 있으면
+# D-A 가 비어 어떤 구현이든 통과해, 시연이 아무것도 판별하지 못한다(M4 생존 실측).
+# 조건: ① 주석에만 등장하고 ② 저장소에 실존하는 경로. 그래야 주석 제외를 빼는 순간 빨개진다.
+setup_delete_comment() {
+  local active cl p found=""
+  active=$(grep -v '^[[:space:]]*#' "$WF" | grep -oE '[A-Za-z0-9_][A-Za-z0-9_./-]*\.sh' | LC_ALL=C sort -u)
+  while IFS=: read -r cl rest; do
+    [ -n "$cl" ] || continue
+    for p in $(printf '%s' "$rest" | grep -oE '[A-Za-z0-9_][A-Za-z0-9_./-]*\.sh'); do
+      printf '%s\n' "$active" | grep -qx "$p" && continue
+      git ls-files --error-unmatch -- "$p" >/dev/null 2>&1 || continue
+      found="$cl"; break
+    done
+    [ -n "$found" ] && break
+  done < <(grep -nE '^[[:space:]]*#.*[A-Za-z0-9_./-]+\.sh' "$WF")
+  [ -n "$found" ] || return 1
+  sed -i.bak "${found}d" "$WF" && rm -f "$WF.bak" && git add "$WF"
+}
+run_case "워크플로 주석 줄 삭제는 통과한다 (주석 대조)" pass setup_delete_comment
+
+# 시연 6 (음성 · 정당한 제거) — 실행 줄과 스크립트 파일을 **함께** 지운다.
+# 검사를 은퇴시키는 정당한 경로다. 이것까지 막으면 스크립트를 영원히 못 지운다.
+# 이 시연이 없으면 검사기에서 "스크립트가 아직 존재하는가" 확인을 빼도 초록이었다(M5 생존).
+setup_retire_script() {
+  sed -i.bak "${VICTIM}d" "$WF" && rm -f "$WF.bak"
+  git rm -q --cached "$VICTIM_PATH" && rm -f "$VICTIM_PATH" && git add "$WF"
+}
+run_case "실행 줄과 스크립트를 함께 지우면 통과한다 (정당한 은퇴)" pass setup_retire_script
+
+# 시연 7 (양성 · 파일 통째) — 워크플로 파일 자체를 지운다. 가장 거친 약화이고,
+# 줄 단위 diff 만 보면 놓친다(스테이징 목록에서 D 를 빼면 이 시연이 생존했다 · M6).
+setup_delete_workflow() {
+  git rm -q "$WF"
+}
+run_case "워크플로 파일 통째 삭제는 차단된다" block setup_delete_workflow
+
+# 시연 8 (배선) — 검사기가 존재해도 훅이 부르지 않으면 무방비다.
 # 몽키패치로 치워 둔 함수가 시험 0건이 되는 것을 막는다(2026-08-27 PR#54 교훈).
 if grep -q 'check-workflow-deletion\.sh' hooks/pre-commit; then
   record 0 "hooks/pre-commit 이 검사기를 호출한다 (배선)"

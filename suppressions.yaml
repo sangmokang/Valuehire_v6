@@ -25,16 +25,6 @@
     조회한다. 워크플로를 어떻게 편집하든 실행하지 않으면 통과할 수 없으므로, 위 우회 전부와
     항상-거짓 조건이 한꺼번에 닫힌다.
 
-- check: p13-deletion-blindspot
-  reason: >-
-    P13 약화 탐지가 diff 의 추가된 줄(+)만 본다. 검사 줄을 삭제하는 약화는 원리적으로
-    탐지되지 않는다. 삭제 diff 검사를 전면 도입하면 리팩터링마다 오탐이 나서 보류했다.
-  owner: sangmokang
-  expiry: 2026-09-15
-  issue: >-
-    범위를 CI 워크플로 파일(.github/workflows/*)로 한정하면 오탐이 거의 없다는 데
-    V1 과 합의했다 — 그 파일에서 스텝 삭제는 거의 항상 약화다. 그 범위부터 도입한다.
-
 - check: gate-scope-gaps
   reason: >-
     두 게이트의 적용 범위가 좁다. (1) 자기제외 탐지가 verify.sh·scripts/*.sh·hooks/* 만

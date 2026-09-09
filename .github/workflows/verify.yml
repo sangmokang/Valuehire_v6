@@ -230,6 +230,13 @@ jobs:
         # 이 검사는 워크플로를 실제 YAML 로 파싱해 조건부·오류무시 스텝을 구조로 막는다.
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-ci-step-integrity.sh
 
+      - name: 인수 검사 p13-deletion (워크플로 검사 줄을 지우지 못하는가)
+        # 위 ci-step-integrity 는 자기 계약에 "스텝 자체를 삭제하는 것은 막지 못한다"고
+        # 적어 두었고, pre-push 의 실행줄 검사는 DEFERRED 와 PUSH-PERFORMING 선언
+        # 스크립트만 대조한다. 그 사이에 나머지 인수 스크립트 전부가 무방비였다.
+        # 억제 p13-deletion-blindspot 의 해제분이다.
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-p13-deletion.sh
+
       - name: 인수 검사 semantic-mutations (검사를 껐을 때 반드시 빨개지는가)
         # 2026-08-21: acceptance-hs-a4.sh 본문을 `exit 0` 으로 바꿔도 CI 가 초록이었다.
         # CI 가 종료값만 봤기 때문이다 — 종료값 0 은 "통과했다"와 "아무것도 안 했다"를
