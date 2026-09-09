@@ -4,7 +4,7 @@
 # 왜 있나: 인수 검사는 "통과"만 보여줘서는 안 된다. 일부러 깨뜨린 사본에서 반드시
 # 빨개져야 그 검사가 실제로 무언가를 보고 있다는 증거가 된다(Codex V2 2026-09-09 지적).
 #
-# 무엇을 검사하나(CHECKED 26 = 양성 7 + 음성 19):
+# 무엇을 검사하나(CHECKED 33 = 양성 7 + 음성 26):
 #   양성  원본 그대로의 사본 → acceptance-hs-kickoff.sh exit 0.
 #   음성1 CI 실행 줄을 주석으로 위장하고 다른 명령으로 바꾼다 → exit != 0.
 #   음성2 CI 스텝에 오류무시 지시(continue-on-error 를 true 로)를 붙인다 → exit != 0.
@@ -30,6 +30,13 @@
 #   양성5 run 값을 따옴표로 감싼다(같은 명령) → exit 0.
 #   양성6 run 줄 뒤에 주석을 붙인다 → exit 0.
 #   양성7 run 을 한 줄짜리 블록 스칼라로 쓴다 → exit 0.
+#   음성20 대상 6개를 한 행에 몰아 적고 나머지 5행을 지운다 → exit != 0.
+#   음성21 근거를 실재하지 않는 경로로 모두 바꾼다 → exit != 0.
+#   음성22 스텝 이름은 남기고 명령만 다른 스텝으로 옮긴다 → exit != 0.
+#   음성23 워크플로에 탭 문자를 넣는다(YAML 문법 오류) → exit != 0.
+#   음성24 워크플로에 문서 구분자를 넣어 문서를 둘로 만든다 → exit != 0.
+#   음성25 조건 키를 유니코드 이스케이프로 감춘다 → exit != 0.
+#   음성26 병합 키로 조건을 끌어온다 → exit != 0.
 #
 # 음성은 종료값만 보지 않는다 — 기대한 실패 사유가 출력에 있어야 한다. 무관한 이유로
 # 빨개진 것을 "막았다"로 세면 검사가 무엇을 보는지 알 수 없다(Codex V2 3회차 지적).
@@ -41,7 +48,7 @@ set -u
 cd "$(git rev-parse --show-toplevel)" || exit 1
 
 TARGET="$PWD/scripts/acceptance-hs-kickoff.sh"
-EXPECTED=26
+EXPECTED=33
 checked=0
 fail=0
 pass() { echo "PASS: $1"; checked=$((checked+1)); }
@@ -111,7 +118,15 @@ fi
 
 # ── 음성 대조군 ────────────────────────────────────────────────────────────
 tree_hash() {
-  find "$1" -type f -not -path '*/.git/*' | LC_ALL=C sort | xargs shasum 2>/dev/null | shasum | cut -d' ' -f1
+  # 내용만 세면 권한 변경·심볼릭 링크 대상 변경을 "안 바뀜"으로 읽는다(Codex V2 5회차 지적).
+  {
+    find "$1" \( -type f -o -type l \) -not -path '*/.git/*' | LC_ALL=C sort | while IFS= read -r f; do
+      meta=$(stat -f '%p %HT' "$f" 2>/dev/null)
+      if [ -z "$meta" ]; then meta=$(stat -c '%a %F' "$f" 2>/dev/null); fi
+      printf '%s\t%s\t' "${f#$1}" "$meta"
+      if [ -L "$f" ]; then printf 'link:%s\n' "$(readlink "$f")"; else shasum "$f" | cut -d' ' -f1; fi
+    done
+  } | shasum | cut -d' ' -f1
 }
 
 # 변조해도 판정이 바뀌면 안 되는 시험(과잉 차단 방지). 기대 종료값 0.
@@ -416,6 +431,84 @@ old="        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-ki
 assert s.count(old)==1
 p.write_text(s.replace(old, "        run: |\n          " + old.split("run: ",1)[1]))
 PY'
+
+negative "음성20 대상 6개를 한 행에 몰아 적기" '
+python3 - <<'"'"'PY'"'"'
+import pathlib
+p=pathlib.Path("docs/engineering/humansearch-branch-disposition-2026-09-07.md")
+tick=chr(96)
+targets=["PR #13","PR #54","PR #15","task/hs-d1-permit","task/hs-l1-malformed-url-fix","task/hs-observe-url-crash"]
+lines=p.read_text().splitlines(keepends=True)
+out=[]; dropped=0
+for l in lines:
+    if l.startswith("|") and "결론=" in l:
+        dropped+=1
+        if dropped==1:
+            out.append("| 1 | " + " ".join(targets) + " | 결론=폐기 | 근거=" + tick + "docs/sot/coding-principles.md:26" + tick + " | 없음 |\n")
+        continue
+    out.append(l)
+assert dropped==6, dropped
+p.write_text("".join(out))
+PY' '처분표에'
+
+negative "음성21 실재하지 않는 근거 경로" '
+python3 - <<'"'"'PY'"'"'
+import pathlib,re
+p=pathlib.Path("docs/engineering/humansearch-branch-disposition-2026-09-07.md")
+tick=chr(96)
+lines=p.read_text().splitlines(keepends=True)
+n=0
+for i,l in enumerate(lines):
+    if l.startswith("|") and "결론=" in l:
+        lines[i]=re.sub(r"근거=[^|]*", "근거=" + tick + "aaaa/bbbb.md:12" + tick + " ", l); n+=1
+assert n==6, n
+p.write_text("".join(lines))
+PY' '근거'
+
+negative "음성22 명령만 다른 스텝으로 이동" '
+python3 - <<'"'"'PY'"'"'
+import pathlib
+p=pathlib.Path(".github/workflows/verify.yml"); s=p.read_text()
+mine="        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff.sh"
+other="        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-0-6.sh"
+assert s.count(mine)==1 and s.count(other)==1
+# hs-kickoff 스텝은 다른 일을 하고, 우리 명령은 이름이 다른 스텝이 돌린다.
+s=s.replace(mine, "        run: printf \"검사생략\\n\"")
+s=s.replace(other, mine)
+p.write_text(s)
+PY' 'CI 배선 불량'
+
+negative "음성23 탭 문자 주입" '
+python3 - <<'"'"'PY'"'"'
+import pathlib
+p=pathlib.Path(".github/workflows/verify.yml"); s=p.read_text()
+old="        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff.sh"
+assert s.count(old)==1
+p.write_text(s.replace(old, "\t" + old.strip("\n")))
+PY' 'CI 배선 불량'
+
+negative "음성24 문서 구분자로 문서 둘 만들기" '
+printf "\n---\nname: 두번째문서\n" >> .github/workflows/verify.yml' 'CI 배선 불량'
+
+negative "음성25 유니코드 이스케이프 조건 키" '
+python3 - <<'"'"'PY'"'"'
+import pathlib
+p=pathlib.Path(".github/workflows/verify.yml"); s=p.read_text()
+old="        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff.sh"
+assert s.count(old)==1
+q=chr(34)
+esc = q + chr(92) + "u0069f" + q + ": false"
+p.write_text(s.replace(old, "        " + esc + chr(10) + old))
+PY' 'CI 배선 불량'
+
+negative "음성26 병합 키로 조건 끌어오기" '
+python3 - <<'"'"'PY'"'"'
+import pathlib
+p=pathlib.Path(".github/workflows/verify.yml"); s=p.read_text()
+old="        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff.sh"
+assert s.count(old)==1
+p.write_text(s.replace(old, "        <<: *disabled" + chr(10) + old))
+PY' 'CI 배선 불량'
 
 echo "CHECKED: $checked"
 if [ "$checked" -ne "$EXPECTED" ]; then
