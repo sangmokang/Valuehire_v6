@@ -4,7 +4,7 @@
 # 왜 있나: 인수 검사는 "통과"만 보여줘서는 안 된다. 일부러 깨뜨린 사본에서 반드시
 # 빨개져야 그 검사가 실제로 무언가를 보고 있다는 증거가 된다(Codex V2 2026-09-09 지적).
 #
-# 무엇을 검사하나(CHECKED 12 = 양성 2 + 음성 10):
+# 무엇을 검사하나(CHECKED 19 = 양성 4 + 음성 15):
 #   양성  원본 그대로의 사본 → acceptance-hs-kickoff.sh exit 0.
 #   음성1 CI 실행 줄을 주석으로 위장하고 다른 명령으로 바꾼다 → exit != 0.
 #   음성2 CI 스텝에 오류무시 지시(continue-on-error 를 true 로)를 붙인다 → exit != 0.
@@ -16,6 +16,13 @@
 #   음성8 정본 표의 행 번호를 중복시킨다 → exit != 0.
 #   음성9 진짜 처분 행을 코드 블록 안으로 숨긴다 → exit != 0.
 #   양성2 코드 블록 안의 가짜 처분 행은 처분으로 세지 않는다 → exit 0(판정이 흔들리지 않는다).
+#   음성11 run 키를 두 번 두고 뒤쪽을 다른 명령으로 덮어쓴다 → exit != 0.
+#   음성12 조건 키를 따옴표로 감싸("if") 스텝을 끈다 → exit != 0.
+#   음성13 오류무시 키를 따옴표로 감싼다 → exit != 0.
+#   음성14 근거를 코드 스팬으로 감싼 뜻 없는 영숫자로 바꾼다 → exit != 0.
+#   음성15 3칸 들여쓴 코드 펜스로 진짜 처분 행을 감싼다 → exit != 0.
+#   양성3 워크플로 전체 들여쓰기를 옮긴다(의미 동등) → exit 0.
+#   양성4 스텝에 timeout-minutes 를 끼운다(정상 설정) → exit 0.
 #   음성10 근거를 뜻 없는 영숫자(abcdefgh)로 바꾼다 → exit != 0.
 #
 # 출력 규약: 판정마다 `PASS: ...` / `FAIL: ...` 한 줄, 마지막에 `CHECKED: <n>`.
@@ -24,7 +31,7 @@ set -u
 cd "$(git rev-parse --show-toplevel)" || exit 1
 
 TARGET="$PWD/scripts/acceptance-hs-kickoff.sh"
-EXPECTED=12
+EXPECTED=19
 checked=0
 fail=0
 pass() { echo "PASS: $1"; checked=$((checked+1)); }
@@ -237,6 +244,83 @@ for i,l in enumerate(lines):
 else:
     raise SystemExit("anchor not found")
 p.write_text("".join(lines))
+PY'
+
+negative "음성11 run 키 중복 뒤쪽 덮어쓰기" '
+python3 - <<'"'"'PY'"'"'
+import pathlib
+p=pathlib.Path(".github/workflows/verify.yml"); s=p.read_text()
+old="        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff.sh"
+assert s.count(old)==1
+p.write_text(s.replace(old, old + "\n        run: printf \"검사생략\\n\""))
+PY'
+
+negative "음성12 따옴표 조건 키로 스텝 끄기" '
+python3 - <<'"'"'PY'"'"'
+import pathlib
+p=pathlib.Path(".github/workflows/verify.yml"); s=p.read_text()
+old="        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff.sh"
+assert s.count(old)==1
+q=chr(34)
+p.write_text(s.replace(old, "        " + q + "if" + q + ": false\n" + old))
+PY'
+
+negative "음성13 따옴표 오류무시 키" '
+python3 - <<'"'"'PY'"'"'
+import pathlib
+p=pathlib.Path(".github/workflows/verify.yml"); s=p.read_text()
+old="        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff.sh"
+assert s.count(old)==1
+q=chr(34)
+weak = q + "continue-on-" + "error" + q + ": " + "true"
+p.write_text(s.replace(old, "        " + weak + "\n" + old))
+PY'
+
+negative "음성14 코드 스팬으로 감싼 뜻 없는 근거" '
+python3 - <<'"'"'PY'"'"'
+import pathlib,re
+p=pathlib.Path("docs/engineering/humansearch-branch-disposition-2026-09-07.md")
+tick=chr(96)
+lines=p.read_text().splitlines(keepends=True)
+for i,l in enumerate(lines):
+    if l.startswith("|") and "PR #13" in l and "결론=" in l:
+        lines[i]=re.sub(r"근거=[^|]*", "근거=" + tick + "abcdefgh" + tick + " ", l); break
+else:
+    raise SystemExit("anchor not found")
+p.write_text("".join(lines))
+PY'
+
+negative "음성15 3칸 들여쓴 코드 펜스로 진짜 행 숨김" '
+python3 - <<'"'"'PY'"'"'
+import pathlib
+p=pathlib.Path("docs/engineering/humansearch-branch-disposition-2026-09-07.md")
+fence="   " + chr(96)*3
+lines=p.read_text().splitlines(keepends=True)
+for i,l in enumerate(lines):
+    if l.startswith("|") and "PR #13" in l and "결론=" in l:
+        lines[i]=fence + "\n" + l + fence + "\n"; break
+else:
+    raise SystemExit("anchor not found")
+p.write_text("".join(lines))
+PY'
+
+positive "양성3 워크플로 전체 들여쓰기 이동" '
+python3 - <<'"'"'PY'"'"'
+import pathlib
+p=pathlib.Path(".github/workflows/verify.yml")
+out=[]
+for l in p.read_text().splitlines():
+    out.append(("  " + l) if l.strip() and l.startswith(" ") else l)
+p.write_text("\n".join(out) + "\n")
+PY'
+
+positive "양성4 스텝에 timeout-minutes 삽입" '
+python3 - <<'"'"'PY'"'"'
+import pathlib
+p=pathlib.Path(".github/workflows/verify.yml"); s=p.read_text()
+old="        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff.sh"
+assert s.count(old)==1
+p.write_text(s.replace(old, "        timeout-minutes: 5\n" + old))
 PY'
 
 echo "CHECKED: $checked"
