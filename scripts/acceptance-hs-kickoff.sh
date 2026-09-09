@@ -48,9 +48,15 @@ else
   # 코드 블록 안의 표 흉내는 처분이 아니다(Codex V2 2회차 지적). 펜스 안쪽을 버린다.
   disposition_rows() {
     awk -v t="$1" '
-      /^```/ { fence = !fence; next }
+      {
+        line = $0
+        sub(/^[ ]+/, "", line)
+        indent = length($0) - length(line)
+      }
+      # 마크다운은 3칸까지 들여쓴 코드 펜스도 펜스로 읽는다(Codex V2 3회차 지적).
+      indent <= 3 && substr(line, 1, 3) == "```" { fence = !fence; next }
       fence { next }
-      /^\|/ { if (index($0, t) > 0) print }
+      substr(line, 1, 1) == "|" { if (index($0, t) > 0) print }
     ' "$DISPOSITION"
   }
   for t in "${targets[@]}"; do
@@ -62,14 +68,20 @@ else
     # 근거는 "실행한 명령·경로·커밋"이어야 한다. 뜻 없는 영숫자(abcdefgh)를 막으려면
     # 길이만으로는 부족하다 — 코드 스팬(`...`) 한 쌍 이상을 요구한다(Codex V2 2회차 지적).
     ev_ticks=$(printf '%s' "$ev" | tr -cd '`' | wc -c | tr -d ' ')
+    # 코드 스팬으로 감싸기만 하면 `abcdefgh` 도 통과한다(Codex V2 3회차 지적).
+    # 근거의 형태 자체를 요구한다 — PR 번호(#12), 커밋(16진 7자 이상), 경로(a/b), 줄번호(:12).
+    ev_shape=0
+    if printf '%s' "$ev" | /usr/bin/grep -qE '(#[0-9]+|[0-9a-f]{7,}|[A-Za-z0-9_.-]+/[A-Za-z0-9_./-]+|:[0-9]+)'; then
+      ev_shape=1
+    fi
     if [ "$rows" -eq 0 ]; then
       failc "처분표에 $t 행 없음"
     elif [ "$rows" -ne 1 ]; then
       failc "$t 행이 ${rows}개 — 같은 대상에 처분이 둘 이상이면 결론이 무엇인지 정해지지 않는다"
     elif ! printf '%s' "$row" | /usr/bin/grep -qE '결론=(병합요청|재작성|폐기)'; then
       failc "$t 행에 결론=(병합요청|재작성|폐기) 없음"
-    elif [ "$ev_alnum" -lt 4 ] || [ "$ev_solid" -lt 8 ] || [ "$ev_ticks" -lt 2 ]; then
-      failc "$t 행의 근거가 자리표시자 — 영숫자 ${ev_alnum}자(4 미만)·공백 제외 ${ev_solid}바이트(8 미만)·코드 스팬 표시 ${ev_ticks}개(2 미만) 중 하나"
+    elif [ "$ev_alnum" -lt 4 ] || [ "$ev_solid" -lt 8 ] || [ "$ev_ticks" -lt 2 ] || [ "$ev_shape" -eq 0 ]; then
+      failc "$t 행의 근거가 자리표시자 — 영숫자 ${ev_alnum}자(4 미만)·공백 제외 ${ev_solid}바이트(8 미만)·코드 스팬 표시 ${ev_ticks}개(2 미만)·PR/커밋/경로/줄번호 형태 ${ev_shape}(0=없음) 중 하나"
     else
       pass "처분 $t → $(printf '%s' "$row" | /usr/bin/grep -oE '결론=(병합요청|재작성|폐기)' | head -1)"
     fi
@@ -124,8 +136,9 @@ fi
 wiring_verdict() {
   awk -v t="$1" '
     function flush() {
-      if (has_run) { if (weak) print "WEAK"; else print "OK" }
-      seen = 0; weak = 0; has_run = 0
+      # run 키가 둘이면 YAML 은 뒤엣것을 쓴다 — 앞에 정답을 두고 뒤에서 덮어쓰는 위조를 막는다.
+      if (run_ok) { if (run_count > 1) print "DUP"; else if (weak) print "WEAK"; else print "OK" }
+      seen = 0; weak = 0; run_ok = 0; run_count = 0
     }
     { sub(/[ \t]+$/, "") }
     /^[[:space:]]*- name:/ {
@@ -135,8 +148,20 @@ wiring_verdict() {
       next
     }
     seen && key != "" {
-      if ($0 == key "run: bash scripts/verify/run-acceptance.sh scripts/" t) has_run = 1
-      if (index($0, key "if:") == 1 || index($0, key "continue-on-error:") == 1) weak = 1
+      # 이 스텝의 최상위 키 줄만 본다. 더 깊이 들여쓴 줄(env 값 등)은 실행이 아니다.
+      if (substr($0, 1, length(key)) == key && substr($0, length(key) + 1, 1) != " ") {
+        line = substr($0, length(key) + 1)
+        kname = line
+        sub(/:.*/, "", kname)
+        gsub(/^["\047]|["\047]$/, "", kname)   # 따옴표로 감싼 키도 같은 키다
+        val = line
+        sub(/^[^:]*:[ \t]*/, "", val)
+        if (kname == "run") {
+          run_count++
+          if (val == "bash scripts/verify/run-acceptance.sh scripts/" t) run_ok = 1
+        }
+        if (kname == "if" || kname == "continue-on-error") weak = 1
+      }
     }
     END { flush() }
   ' "$VERIFY_YML" | head -1

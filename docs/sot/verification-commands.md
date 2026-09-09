@@ -49,7 +49,7 @@
 | 26 | 인수 검사 invoice (채용 수수료 계산·계약·플랫폼 동등성) | `bash scripts/verify/run-acceptance.sh scripts/acceptance-invoice.sh` — 채용 수수료 계산·기한·계약 변조·Codex/Claude 스킬 동등성 + 임시 PostgreSQL 마이그레이션·동시성·저장/전달 RPC |
 | 27 | Invoice 게이트 자가시험 (위조 출력·스텝 무력화 차단) | 인라인 — 위조 출력·스텝 무력화가 반드시 빨개지는지 |
 | 28 | 인수 검사 hs-kickoff (HumanSearch 착수 정리 · WU-0A) | `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff.sh` — 미병합 6건 처분표·CI 스텝 수 일치·설계서 역사 보존·착수 프롬프트·배선·Codex 판정 문서 12건 |
-| 29 | 인수 검사 hs-kickoff-mutations (WU-0A 검사를 속일 수 있는가) | `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff-mutations.sh` — 양성 2 + 음성 10(실행 줄 주석 위장·오류무시 지시·빈 이름 표 행·표 번호 중복·env 미끼 위장·처분 대상 중복·근거 자리표시자·뜻 없는 영숫자 근거·진짜 처분 행 숨김·판정 문서 첫 줄 위조) 12건 |
+| 29 | 인수 검사 hs-kickoff-mutations (WU-0A 검사를 속일 수 있는가) | `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff-mutations.sh` — 양성 4 + 음성 15(실행 줄 주석 위장·env 미끼 위장·run 키 중복 덮어쓰기·오류무시 지시·따옴표 조건 키·따옴표 오류무시 키·빈 이름 표 행·표 번호 중복·처분 대상 중복·근거 자리표시자·뜻 없는 영숫자 근거·코드 스팬 위장 근거·진짜 처분 행 숨김·3칸 들여쓴 펜스 숨김·판정 문서 첫 줄 위조) 19건 |
 
 *(1번 앞에 `actions/checkout` 이 있고 `fetch-depth: 0` 이다 — 8번이 과거 blob 을 열려면 필요하다.)*
 

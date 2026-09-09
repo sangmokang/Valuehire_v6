@@ -148,7 +148,7 @@ WU-0A 사실·브랜치 처분·정본 표 갱신
 
 ## §7. 첫 작업(WU-0A) 종료 조건 — 끝나면 곧바로 WU-0B
 
-- 워크트리 `hs-kickoff-ledger` 에 ① 이 프롬프트 ② 처분표(6건 결론+근거) ③ `verification-commands.md` CI 스텝 29 갱신(실측) ④ `scripts/acceptance-hs-kickoff.sh` + `verify.yml` 배선 ⑤ 08-17 설계서 2건 `docs/engineering/history/` 보존 — 커밋 + PR 열림. `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff.sh` → `CHECKED: 12`, exit 0. 자기 변이 `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff-mutations.sh` → `CHECKED: 7`, exit 0. `bash verify.sh` 숫자 PR 본문에.
+- 워크트리 `hs-kickoff-ledger` 에 ① 이 프롬프트 ② 처분표(6건 결론+근거) ③ `verification-commands.md` CI 스텝 29 갱신(실측) ④ `scripts/acceptance-hs-kickoff.sh` + `verify.yml` 배선 ⑤ 08-17 설계서 2건 `docs/engineering/history/` 보존 — 커밋 + PR 열림. `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff.sh` → `CHECKED: 12`, exit 0. 자기 변이 `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff-mutations.sh` → `CHECKED: 19`(양성 4 + 음성 15), exit 0. `bash verify.sh` 숫자 PR 본문에.
 - Codex V2 판정을 `result` 로 회수해 파일 저장(크기 > 0, 첫 줄 `VERDICT:`).
 - 사장님께 남는 것은 **카드 2(봇 계정 만들기) 하나**와 카드 3 의 병합 버튼. 나머지는 기본값. merge 0. 막히면 원인 기록 후 다음 항목, 2회 막히면 질문으로.
 
