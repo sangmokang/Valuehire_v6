@@ -8,7 +8,7 @@ if ARGV.length > 2 || !File.file?(module_path) || File.symlink?(module_path) || 
 end
 begin
   require_relative "work_unit_policy"
-rescue LoadError, SystemCallError => e
+rescue LoadError, SyntaxError, SystemCallError => e
   warn "VERDICT: NOT_RUN\nREASON: policy runtime unavailable (#{e.class})"
   exit 2
 end

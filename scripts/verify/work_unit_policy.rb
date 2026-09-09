@@ -89,6 +89,7 @@ module WorkUnitPolicy
           next
         end
         key = key_node.value
+        errors << "POLICY_SCHEMA_INVALID: merge key at #{path}" if key == "<<"
         errors << "POLICY_DUPLICATE_KEY: #{path}.#{key}" if seen.key?(key)
         seen[key] = true
         walk_duplicates(value_node, "#{path}.#{key}", errors)

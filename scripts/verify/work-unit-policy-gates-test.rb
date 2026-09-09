@@ -66,7 +66,8 @@ Dir.mktmpdir("work-unit-gates-") do |tmp|
     File.write(File.join(tmp, checker), body)
     rc, out = run.call(tmp, "bash", acceptance)
     if name == "PASS22"
-      assert.call("fake output can fool positive gate (known boundary)", rc == 0, out)
+      # A stronger positive gate may also reject this fake; do not forbid that improvement.
+      puts "OBSERVED: fake PASS22 positive gate exit=#{rc}"
       rc, out = run.call(tmp, "bash", mutations)
       assert.call("fake PASS22 rejected by negative runtime tests", rc == 1 && out.include?("VERDICT: FAIL"), out)
     else
@@ -74,6 +75,25 @@ Dir.mktmpdir("work-unit-gates-") do |tmp|
     end
   end
   File.write(File.join(tmp, checker), checker_original)
+
+  module_path = "scripts/verify/work_unit_policy.rb"
+  mutations_to_detect = [
+    ["forged failure count", checker,
+     'puts "POLICY_CHECKED: #{checked}"' + "\nputs \"DOCUMENT_SYNC: FAIL\"",
+     'puts "POLICY_CHECKED: 22"' + "\nputs \"DOCUMENT_SYNC: FAIL\""],
+    ["aliases enabled", module_path, "aliases: false", "aliases: true"],
+    ["float equality", module_path, "unless actual.eql?(expected)", "unless actual == expected"]
+  ]
+  mutations_to_detect.each do |label, path, needle, replacement|
+    file = File.join(tmp, path)
+    original = File.read(file)
+    raise "missing mutation target #{label}" unless original.include?(needle)
+
+    File.write(file, original.sub(needle, replacement))
+    rc, out = run.call(tmp, "ruby", "scripts/verify/work-unit-policy-contract-test.rb")
+    assert.call("#{label} rejected by contract", rc == 1 && out.include?("VERDICT: FAIL"), out)
+    File.write(file, original)
+  end
 
   policy = File.join(tmp, "docs/sot/work-unit-policy.yaml")
   document = File.join(tmp, "docs/sot/work-unit-policy.md")

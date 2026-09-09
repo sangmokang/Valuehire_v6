@@ -70,21 +70,11 @@ Dir.mktmpdir("work-unit-contract-") do |tmp|
       render_err.include?("VERDICT: FAIL"), [render_rc, rendered, render_err].inspect)
   end
 
-  {
-    "parse failure count" => ["broken: [\n", 0],
-    "root failure count" => ["version: 1\n", 1],
-    "nested schema failure count" => [raw.sub("  claims_per_unit: 1\n", ""), 18],
-    "value failure count" => [raw.sub("version: 1", "version: 2"), 22]
-  }.each do |label, (content, count)|
-    File.write(input, content)
-    out, err, rc = invoke.call(checker, input, doc)
-    assert.call(label, rc == 1 && out.lines.map(&:strip).include?("POLICY_CHECKED: #{count}"),
-      [rc, out, err].inspect)
-  end
-
   # Property: every mapping permutation preserves meaning; list order does not.
   shuffle = nil
-  rng = Random.new(37)
+  seed = Integer(ENV.fetch("WORK_UNIT_PROPERTY_SEED", Random.new_seed.to_s))
+  puts "PROPERTY_SEED: #{seed} (replay with WORK_UNIT_PROPERTY_SEED)"
+  rng = Random.new(seed)
   shuffle = lambda do |value|
     case value
     when Hash
@@ -140,6 +130,21 @@ Dir.mktmpdir("work-unit-contract-") do |tmp|
     out, err, rc = invoke.call(program, *args)
     assert.call("extra arguments #{File.basename(program)}", rc == 2 &&
       (out + err).include?("VERDICT: NOT_RUN"), [rc, out, err].inspect)
+  end
+end
+
+Dir.mktmpdir("work-unit-count-") do |tmp|
+  input = File.join(tmp, "policy.yaml")
+  {
+    "parse failure count" => ["broken: [\n", 0],
+    "root failure count" => ["version: 1\n", 1],
+    "nested schema failure count" => [raw.sub("  claims_per_unit: 1\n", ""), 18],
+    "value failure count" => [raw.sub("version: 1", "version: 2"), 22]
+  }.each do |label, (content, count)|
+    File.write(input, content)
+    out, err, rc = invoke.call(checker, input, document)
+    assert.call(label, rc == 1 && out.lines.map(&:strip).include?("POLICY_CHECKED: #{count}"),
+      [rc, out, err].inspect)
   end
 end
 
