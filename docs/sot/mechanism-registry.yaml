@@ -138,3 +138,15 @@
   target: "staged_any=$(git diff --cached --name-only)"
   stage: "pre-commit"
   required: true
+- id: "gate0-loop-execution-count"
+  path: "scripts/session-status.sh"
+  target: "if [ \"$ran\" -ne \"$total\" ]; then"
+  stage: "manual"
+  manual_reason: "세션 시작 훅이 부르는 게이트 0 자기검증. 커밋·push 시점 검사가 아니다"
+  required: true
+- id: "gate0-loop-proof-acceptance-ci"
+  path: ".github/workflows/verify.yml"
+  target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-gate0-loop-proof.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
