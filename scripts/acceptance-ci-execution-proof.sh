@@ -289,6 +289,28 @@ else
   fi
 fi
 
+# --- CI 에서 기대 목록을 좁히려는 시도 -------------------------------------------
+# ACCEPTANCE_EXPECT_LIST 는 시연 전용 입구다. 러너에서 허용하면 워크플로 env 에 한 줄만
+# 넣어 기대 목록을 한 개로 줄일 수 있고, 그 한 줄은 P13 약화 패턴 어디에도 걸리지 않는다
+# (2026-09-09 humanreview 실측 — 마커를 위조하는 것보다 훨씬 싼 우회였다).
+reset_clone
+DIRN="$SANDBOX/markers-narrow"
+if ! fill_all_markers "$DIRN"; then
+  record 1 "CI 에서는 기대 목록을 좁힐 수 없다" "마커 채우기 실패 — 시연 무효"
+else
+  printf '%s\n' "$VPATH" > "$SANDBOX/expect.narrow" || record 1 "CI 에서는 기대 목록을 좁힐 수 없다" "기대 목록 파일 생성 실패"
+  nrc=0
+  ( cd "$CLONE" && GITHUB_ACTIONS=true ACCEPTANCE_MARKER_DIR="$DIRN" \
+      ACCEPTANCE_EXPECT_LIST="$SANDBOX/expect.narrow" bash "$AUDITOR" ) >"$SANDBOX/narrow.out" 2>&1 || nrc=$?
+  if unrunnable "$nrc"; then
+    record 1 "CI 에서는 기대 목록을 좁힐 수 없다" "검수기를 실행할 수 없다 (rc=$nrc) — 시연 무효"
+  elif [ "$nrc" -eq 0 ]; then
+    record 1 "CI 에서는 기대 목록을 좁힐 수 없다" "러너 환경에서 좁히기가 통과했다 (rc=0) — env 한 줄로 검수를 무력화할 수 있다"
+  else
+    record 0 "CI 에서는 기대 목록을 좁힐 수 없다"
+  fi
+fi
+
 # --- 마커 디렉터리 자체가 없을 때 (fail-closed) --------------------------------
 rc=$(audit "$SANDBOX/markers-absent-$$")
 if unrunnable "$rc"; then
