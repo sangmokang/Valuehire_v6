@@ -4,7 +4,7 @@
 # 왜 있나: 인수 검사는 "통과"만 보여줘서는 안 된다. 일부러 깨뜨린 사본에서 반드시
 # 빨개져야 그 검사가 실제로 무언가를 보고 있다는 증거가 된다(Codex V2 2026-09-09 지적).
 #
-# 무엇을 검사하나(CHECKED 7 = 양성 1 + 음성 6):
+# 무엇을 검사하나(CHECKED 11 = 양성 1 + 음성 10):
 #   양성  원본 그대로의 사본 → acceptance-hs-kickoff.sh exit 0.
 #   음성1 CI 실행 줄을 주석으로 위장하고 다른 명령으로 바꾼다 → exit != 0.
 #   음성2 CI 스텝에 오류무시 지시(continue-on-error 를 true 로)를 붙인다 → exit != 0.
@@ -12,6 +12,10 @@
 #   음성4 처분표에 같은 대상(PR #13)을 다른 결론으로 중복시킨다 → exit != 0.
 #   음성5 근거를 자리표시자(--------)로 바꾼다 → exit != 0.
 #   음성6 판정 문서 첫 줄에서 VERDICT: 를 지운다 → exit != 0.
+#   음성7 정답 실행 줄을 env 값 안에 미끼로 숨기고 실제 run 은 다른 명령으로 바꾼다 → exit != 0.
+#   음성8 정본 표의 행 번호를 중복시킨다 → exit != 0.
+#   음성9 처분표 밖 코드 블록에 처분 행을 흉내 낸 줄을 넣는다 → exit != 0.
+#   음성10 근거를 뜻 없는 영숫자(abcdefgh)로 바꾼다 → exit != 0.
 #
 # 출력 규약: 판정마다 `PASS: ...` / `FAIL: ...` 한 줄, 마지막에 `CHECKED: <n>`.
 # 종료값 0=PASS, 1=FAIL. 이 스크립트는 저장소를 고치지 않는다 — 임시 디렉터리의 사본만 고친다.
@@ -19,7 +23,7 @@ set -u
 cd "$(git rev-parse --show-toplevel)" || exit 1
 
 TARGET="$PWD/scripts/acceptance-hs-kickoff.sh"
-EXPECTED=7
+EXPECTED=11
 checked=0
 fail=0
 pass() { echo "PASS: $1"; checked=$((checked+1)); }
@@ -87,11 +91,20 @@ else
 fi
 
 # ── 음성 대조군 ────────────────────────────────────────────────────────────
+tree_hash() {
+  find "$1" -type f -not -path '*/.git/*' | LC_ALL=C sort | xargs shasum 2>/dev/null | shasum | cut -d' ' -f1
+}
+
 negative() {
   local name="$1" mutate="$2"
   local d="$TMP/m$checked"
   if ! make_fixture "$d"; then failc "$name — 시험대 구성 실패"; return; fi
-  if ! ( cd "$d" && eval "$mutate" ); then failc "$name — 변조 적용 실패"; return; fi
+  local before after
+  before=$(tree_hash "$d")
+  if ! ( cd "$d" && eval "$mutate" ); then failc "$name — 변조 적용 실패(종료값)"; return; fi
+  after=$(tree_hash "$d")
+  # 변조가 실제로 파일을 바꾸지 않았는데 "차단됨"으로 세면 거짓 초록이 된다.
+  if [ "$before" = "$after" ]; then failc "$name — 변조가 파일을 바꾸지 못했다(시험 무효)"; return; fi
   local rc; rc=$(run_target "$d")
   if [ "$rc" -ne 0 ]; then
     pass "$name — 변조가 차단됨 (exit $rc)"
@@ -145,6 +158,52 @@ f=sorted(glob.glob("docs/engineering/humansearch-kickoff-ledger-verdict-*.md"))[
 p=pathlib.Path(f); s=p.read_text().splitlines()
 s[0]="판정 요약"
 p.write_text("\n".join(s)+"\n")
+PY'
+
+negative "음성7 env 미끼로 실행 줄 위장" '
+python3 - <<'"'"'PY'"'"'
+import pathlib
+p=pathlib.Path(".github/workflows/verify.yml"); s=p.read_text()
+old="        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff.sh"
+assert s.count(old)==1
+bait = "        env:\n          BAIT: |\n" + "            " + old.strip() + "\n        run: printf \"검사생략\\n\""
+p.write_text(s.replace(old, bait))
+PY'
+
+negative "음성8 정본 표 행 번호 중복" '
+python3 - <<'"'"'PY'"'"'
+import pathlib,re
+p=pathlib.Path("docs/sot/verification-commands.md"); lines=p.read_text().splitlines(keepends=True)
+for i,l in enumerate(lines):
+    m=re.match(r"^\| 29 \|", l)
+    if m:
+        lines[i]=re.sub(r"^\| 29 \|", "| 28 |", l); break
+else:
+    raise SystemExit("anchor not found")
+p.write_text("".join(lines))
+PY'
+
+negative "음성9 처분표 밖 코드 블록의 가짜 행" '
+python3 - <<'"'"'PY'"'"'
+import pathlib
+p=pathlib.Path("docs/engineering/humansearch-branch-disposition-2026-09-07.md")
+fence = chr(96)*3
+tick = chr(96)
+row = "| 9 | PR #13 위조 | 결론=병합요청 | 근거=" + tick + "가짜 근거 abcd1234" + tick + " | 없음 |"
+p.write_text(p.read_text() + "\n" + fence + "\n" + row + "\n" + fence + "\n")
+PY'
+
+negative "음성10 뜻 없는 영숫자 근거" '
+python3 - <<'"'"'PY'"'"'
+import pathlib,re
+p=pathlib.Path("docs/engineering/humansearch-branch-disposition-2026-09-07.md")
+lines=p.read_text().splitlines(keepends=True)
+for i,l in enumerate(lines):
+    if l.startswith("|") and "PR #13" in l and "결론=" in l:
+        lines[i]=re.sub(r"근거=[^|]*", "근거=abcdefgh ", l); break
+else:
+    raise SystemExit("anchor not found")
+p.write_text("".join(lines))
 PY'
 
 echo "CHECKED: $checked"
