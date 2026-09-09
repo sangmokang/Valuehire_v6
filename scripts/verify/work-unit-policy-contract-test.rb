@@ -171,6 +171,26 @@ Dir.mktmpdir("work-unit-module-") do |tmp|
   end
 end
 
+Dir.mktmpdir("work-unit-no-ruby-") do |bin|
+  %w[bash git grep tee mktemp rm].each do |name|
+    executable = ENV.fetch("PATH").split(File::PATH_SEPARATOR).map { |dir| File.join(dir, name) }
+      .find { |path| File.file?(path) && File.executable?(path) }
+    raise "missing test prerequisite #{name}" unless executable
+
+    File.symlink(executable, File.join(bin, name))
+  end
+  isolated_env = %w[GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY
+                   GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_PREFIX GIT_QUARANTINE_PATH]
+    .map { |key| [key, nil] }.to_h.merge("PATH" => bin)
+  acceptance = "scripts/acceptance-work-unit-policy.sh"
+  [[acceptance], ["scripts/verify/run-acceptance.sh", acceptance]].each do |args|
+    out, err, status = Open3.capture3(isolated_env, "/bin/bash", *args, chdir: repo)
+    assert.call("Ruby unavailable #{args.first}", status.exitstatus == 2 &&
+      out.include?("VERDICT: NOT_RUN") && out.include?("CHECKED: 0") &&
+      !out.include?("VERDICT: PASS"), [status.exitstatus, out, err].inspect)
+  end
+end
+
 puts "CHECKED: #{checks}"
 puts "VERDICT: #{failures.zero? ? 'PASS' : 'FAIL'}"
 exit(failures.zero? ? 0 : 1)
