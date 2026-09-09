@@ -4,7 +4,7 @@
 # 왜 있나: 인수 검사는 "통과"만 보여줘서는 안 된다. 일부러 깨뜨린 사본에서 반드시
 # 빨개져야 그 검사가 실제로 무언가를 보고 있다는 증거가 된다(Codex V2 2026-09-09 지적).
 #
-# 무엇을 검사하나(CHECKED 33 = 양성 6 + 음성 27):
+# 무엇을 검사하나(CHECKED 37 = 양성 6 + 음성 31):
 #   양성  원본 그대로의 사본 → acceptance-hs-kickoff.sh exit 0.
 #   음성1 CI 실행 줄을 주석으로 위장하고 다른 명령으로 바꾼다 → exit != 0.
 #   음성2 CI 스텝에 오류무시 지시(continue-on-error 를 true 로)를 붙인다 → exit != 0.
@@ -22,6 +22,10 @@
 #   음성14 근거를 코드 스팬으로 감싼 뜻 없는 영숫자로 바꾼다 → exit != 0.
 #   음성15 3칸 들여쓴 코드 펜스로 진짜 처분 행을 감싼다 → exit != 0.
 #   음성27 워크플로 들여쓰기를 정규 형식 밖으로 옮긴다 → exit != 0.
+#   음성28 잡 수준 조건으로 스텝 전체를 끈다 → exit != 0.
+#   음성29 잡 수준 기본 셸을 바꿔 명령이 돌지 않게 한다 → exit != 0.
+#   음성30 값 위치에 앵커·별칭을 쓴다 → exit != 0.
+#   음성31 근거 토큰 끝에 마침표를 붙여 실존 확인을 건너뛰게 한다 → exit != 0.
 #        (의미는 같지만 검사 가능한 형식을 벗어나므로 통과시키지 않는다 — fail-closed)
 #   양성4 스텝에 timeout-minutes 를 끼운다(정상 설정) → exit 0.
 #   음성16 스텝을 지우고 앞 스텝의 여러 줄 문자열 안에 머리글·실행 줄을 숨긴다 → exit != 0.
@@ -49,7 +53,7 @@ set -u
 cd "$(git rev-parse --show-toplevel)" || exit 1
 
 TARGET="$PWD/scripts/acceptance-hs-kickoff.sh"
-EXPECTED=33
+EXPECTED=37
 checked=0
 fail=0
 pass() { echo "PASS: $1"; checked=$((checked+1)); }
@@ -231,7 +235,7 @@ for i,l in enumerate(lines):
 else:
     raise SystemExit("anchor not found")
 p.write_text("".join(lines))
-PY' '근거가 자리표시자'
+PY' 'PR #13 행의 근거가 자리표시자'
 
 negative "음성6 판정 문서 첫 줄 위조" '
 python3 - <<'"'"'PY'"'"'
@@ -300,7 +304,7 @@ for i,l in enumerate(lines):
 else:
     raise SystemExit("anchor not found")
 p.write_text("".join(lines))
-PY' '근거가 자리표시자'
+PY' 'PR #13 행의 근거가 자리표시자'
 
 negative "음성11 run 키 중복 뒤쪽 덮어쓰기" '
 python3 - <<'"'"'PY'"'"'
@@ -344,7 +348,7 @@ for i,l in enumerate(lines):
 else:
     raise SystemExit("anchor not found")
 p.write_text("".join(lines))
-PY' '근거'
+PY' 'PR #13 행의 근거에 실증 가능한 커밋·경로가 없다'
 
 negative "음성15 3칸 들여쓴 코드 펜스로 진짜 행 숨김" '
 python3 - <<'"'"'PY'"'"'
@@ -491,7 +495,7 @@ for i,l in enumerate(lines):
         lines[i]=re.sub(r"근거=[^|]*", "근거=" + tick + "aaaa/bbbb.md:12" + tick + " ", l); n+=1
 assert n==6, n
 p.write_text("".join(lines))
-PY' '근거'
+PY' 'PR #13 행의 근거에 실재하지 않는 것이 있다'
 
 negative "음성22 명령만 다른 스텝으로 이동" '
 python3 - <<'"'"'PY'"'"'
@@ -537,6 +541,49 @@ old="        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-ki
 assert s.count(old)==1
 p.write_text(s.replace(old, "        <<: *disabled" + chr(10) + old))
 PY' 'CI 배선 불량'
+
+negative "음성28 잡 수준 조건으로 스텝 전체 끄기" '
+python3 - <<'"'"'PY'"'"'
+import pathlib
+p=pathlib.Path(".github/workflows/verify.yml"); s=p.read_text()
+old="    runs-on: ubuntu-latest"
+assert s.count(old)==1
+p.write_text(s.replace(old, "    if: false" + chr(10) + old))
+PY' 'CI 배선 불량'
+
+negative "음성29 잡 수준 기본 셸 바꾸기" '
+python3 - <<'"'"'PY'"'"'
+import pathlib
+p=pathlib.Path(".github/workflows/verify.yml"); s=p.read_text()
+old="    runs-on: ubuntu-latest"
+assert s.count(old)==1
+add = "    defaults:" + chr(10) + "      run:" + chr(10) + "        shell: cat"
+p.write_text(s.replace(old, add + chr(10) + old))
+PY' 'CI 배선 불량'
+
+negative "음성30 값 위치 앵커·별칭" '
+python3 - <<'"'"'PY'"'"'
+import pathlib
+p=pathlib.Path(".github/workflows/verify.yml"); s=p.read_text()
+old="        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-kickoff.sh"
+assert s.count(old)==1
+p.write_text(s.replace(old, "        run: &bait " + old.split("run: ",1)[1]))
+PY' 'CI 배선 불량'
+
+negative "음성31 근거 토큰 끝 마침표" '
+python3 - <<'"'"'PY'"'"'
+import pathlib,re
+p=pathlib.Path("docs/engineering/humansearch-branch-disposition-2026-09-07.md")
+tick=chr(96)
+lines=p.read_text().splitlines(keepends=True)
+n=0
+for i,l in enumerate(lines):
+    if l.startswith("|") and "PR #13" in l and "결론=" in l:
+        # 진짜 근거는 남기고, 실재하지 않는 경로를 마침표로 끝맺어 덧붙인다.
+        lines[i]=l.replace("근거=", "근거=" + tick + "aaaa/bbbb.md." + tick + " 실측함, ", 1); n+=1
+assert n==1, n
+p.write_text("".join(lines))
+PY' 'PR #13 행의 근거에 실재하지 않는 것이 있다'
 
 echo "CHECKED: $checked"
 if [ "$checked" -ne "$EXPECTED" ]; then
