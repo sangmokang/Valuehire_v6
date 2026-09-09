@@ -5,6 +5,8 @@
 - [coding-principles.md](coding-principles.md) — P1~P22 확정 원칙 표 + 웹 자동화 5조 + 검증 체제(V-1~V-5)
 - [hook-contracts.md](hook-contracts.md) — 로컬 git hook 5개(pre-commit·pre-push·session-status·acceptance-0-7·install-hooks)의 입출력 계약
 - [git-workflow.md](git-workflow.md) — trunk-based + worktree + 태그 릴리스 규약
+- [work-unit-policy.yaml](work-unit-policy.yaml) — Work Unit 개수·완료·검토·최종 관문의 유일한 기계 정본
+- [work-unit-policy.md](work-unit-policy.md) — 정책 YAML에서 생성한 사람용 설명(직접 편집 금지)
 - [verification-commands.md](verification-commands.md) — 이 저장소의 실제 게이트 명령(make 레포 아님, 실행 확인됨)
 - [humansearch-l0-surface-contract.md](humansearch-l0-surface-contract.md) — HumanSearch L0 인증 화면 분류의 입력·출력·경계
 - [humansearch-browser-contract.md](humansearch-browser-contract.md) — HumanSearch 상주 브라우저 진단 접속·단일 탭·사용권·사람 개입·채널별 경계

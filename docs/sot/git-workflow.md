@@ -1,7 +1,8 @@
 # Valuehire v6 — Git/브랜치 전략 (SOT)
 
-최종 갱신: 2026-08-08
-근거: `docs/engineering/v6-coding-principles-goal-2026-08-06.md` §4
+최종 갱신: 2026-08-21
+근거: `docs/engineering/v6-coding-principles-goal-2026-08-06.md` §4,
+`docs/engineering/work-unit-methodology-goal-2026-08-21.md`
 
 ## 현재 규칙
 
@@ -12,13 +13,19 @@
 **LLM은 충돌을 "코드를 새로 지어내서" 해결한다. v4의 자동로그인 6벌이 그 산물이다.**
 
 **worktree는 브랜치 전략이 아니라 작업 공간 격리 메커니즘**이며 trunk-based와 결합된다.
-작업 1개 = worktree 1개 = 브랜치 1개 = 인수 기준 1개.
+
+### Work Unit 정책의 정본
+
+Work Unit의 개수·수명·완료 조건·검토 강도·최종 관문·롤백 경계는 `docs/sot/work-unit-policy.yaml` 한 벌이 기계 정본이다. 사람이 읽는 `docs/sot/work-unit-policy.md`는 그 YAML에서 생성하며 직접 편집하지 않는다.
+
+이 문서는 trunk-based와 worktree의 역할만 설명한다. Work Unit 규칙을 자연어로 다시 적어 두 벌로 만들지 않는다. 정책값·순서·생성 문서의 일치는 `scripts/acceptance-work-unit-policy*.sh`가 판정한다.
 
 ### 규약
 
 - `main` 보호. 직접 push 금지. **오너 본인도 예외 없음**
-- 작업 브랜치 `task/<name>`, 위치 `worktrees/<name>/`, **수명 24~48시간 상한**. 초과 = 인수 기준이 너무 크다는 신호(v4: 워크트리 77개·미병합 브랜치 113개가 방치된 실측 사례)
-- PR = 인수 기준 1개. **squash merge**, 머지 후 브랜치 삭제
+- 작업 브랜치 `task/<name>`, 위치 `worktrees/<name>/`. 수명 상한과 PR 분리 기준은 Work Unit 정책 정본을 따른다.
+- PR = 사용자 결과 1개. **squash merge**, 머지 후 브랜치 삭제
+- squash 뒤 롤백 경계는 Work Unit 정책 정본을 따른다.
 - 릴리스 = `main` 의 어노테이트 태그 `v6.YYYY.MM.DD-N` → CI가 artifact 빌드 → digest 산출 → `releases/<digest>/` 설치
 - **자동 병합 금지.** 오너가 diff를 실제로 읽는 것이 P11(코드 예산)의 존재 이유
 
