@@ -217,7 +217,23 @@ setup_delete_workflow() {
 }
 run_case "워크플로 파일 통째 삭제는 차단된다" block setup_delete_workflow
 
-# 시연 8 (배선) — 검사기가 존재해도 훅이 부르지 않으면 무방비다.
+# 시연 8 (양성 · 이름 변경) — 워크플로 파일을 GitHub 이 안 읽는 확장자로 바꾼다.
+# `git mv verify.yml verify.yml.bak` 한 번으로 CI 전 스텝이 사라진다. 첫 판은 파일별
+# diff 로 짜서 이것을 놓쳤다(2026-09-09 감사 실측: rc=0 으로 통과). 이 저장소는
+# 2026-08-09 에 `git mv notes.txt leak.db` 로 같은 함정을 이미 한 번 맞았다.
+setup_rename_workflow() {
+  git mv "$WF" "${WF}.bak"
+}
+run_case "워크플로 파일 이름 변경(.yml→.bak)은 차단된다" block setup_rename_workflow
+
+# 시연 9 (음성 · 정당한 이름 변경) — 여전히 워크플로인 다른 .yml 로 옮긴다.
+# 이것까지 막으면 워크플로를 영원히 정리하지 못한다.
+setup_rename_to_yml() {
+  git mv "$WF" ".github/workflows/renamed-verify.yml"
+}
+run_case "다른 .yml 로 이름을 바꾸면 통과한다 (정당한 정리)" pass setup_rename_to_yml
+
+# 시연 10 (배선) — 검사기가 존재해도 훅이 부르지 않으면 무방비다.
 # 몽키패치로 치워 둔 함수가 시험 0건이 되는 것을 막는다(2026-08-27 PR#54 교훈).
 if grep -q 'check-workflow-deletion\.sh' hooks/pre-commit; then
   record 0 "hooks/pre-commit 이 검사기를 호출한다 (배선)"
