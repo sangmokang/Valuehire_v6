@@ -246,6 +246,30 @@ else
   fi
 fi
 
+# --- 마커의 해시가 현재 파일과 다를 때 ------------------------------------------
+# CI 가 돌린 스크립트와 지금 저장소에 있는 스크립트가 다르면 그 마커는 이 커밋의 증명이
+# 아니다. 이 시연이 없으면 검수기에서 해시 대조를 빼도 전부 초록이었다(변이 X2 생존).
+reset_clone
+DIRH="$SANDBOX/markers-hash"
+if ! fill_all_markers "$DIRH"; then
+  record 1 "마커 해시가 현재 파일과 다르면 불합격한다" "마커 채우기 실패 — 시연 무효"
+else
+  HV=$(cd "$CLONE" && find . -maxdepth 2 -name 'acceptance-*.sh' -not -path './worktrees/*' | sed 's#^\./##' | LC_ALL=C sort | head -1)
+  if [ -z "$HV" ] || [ ! -f "$CLONE/$HV" ]; then
+    record 1 "마커 해시가 현재 파일과 다르면 불합격한다" "대상 없음 — 시연 무효"
+  else
+    printf '#!/usr/bin/env bash\n# 마커를 남긴 뒤 내용이 바뀐 상태\necho "PASS: stub"\necho "CHECKED: 1"\nexit 0\n' > "$CLONE/$HV"
+    rc=$(audit "$DIRH")
+    if unrunnable "$rc"; then
+      record 1 "마커 해시가 현재 파일과 다르면 불합격한다" "검수기를 실행할 수 없다 (rc=$rc) — 시연 무효"
+    elif [ "$rc" -eq 0 ]; then
+      record 1 "마커 해시가 현재 파일과 다르면 불합격한다" "$HV 를 바꿨는데 통과했다 (rc=0) — CI 가 돌린 것과 커밋되는 것이 달라도 초록이 난다"
+    else
+      record 0 "마커 해시가 현재 파일과 다르면 불합격한다 — $HV"
+    fi
+  fi
+fi
+
 # --- 마커 디렉터리 자체가 없을 때 (fail-closed) --------------------------------
 rc=$(audit "$SANDBOX/markers-absent-$$")
 if unrunnable "$rc"; then

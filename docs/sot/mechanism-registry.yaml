@@ -141,6 +141,21 @@
 - id: "gate0-loop-proof-acceptance-ci"
   path: ".github/workflows/verify.yml"
   target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-gate0-loop-proof.sh"
+- id: "acceptance-execution-marker"
+  path: "scripts/verify/run-acceptance.sh"
+  target: "write_marker"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
+- id: "acceptance-marker-audit-ci"
+  path: ".github/workflows/verify.yml"
+  target: "run: bash scripts/verify/check-acceptance-markers.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
+- id: "ci-execution-proof-acceptance-ci"
+  path: ".github/workflows/verify.yml"
+  target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-ci-execution-proof.sh"
   stage: "ci"
   ci_mirror_job: "verify"
   required: true

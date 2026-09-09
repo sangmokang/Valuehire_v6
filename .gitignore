@@ -49,3 +49,6 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+
+# CI 실행 증명 마커 — 러너 안에서만 생기고 커밋되지 않는다
+/.acceptance-markers/
