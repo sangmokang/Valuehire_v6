@@ -1,6 +1,6 @@
 # Valuehire v6 — Git/브랜치 전략 (SOT)
 
-최종 갱신: 2026-08-21
+최종 갱신: 2026-09-10
 근거: `docs/engineering/v6-coding-principles-goal-2026-08-06.md` §4,
 `docs/engineering/work-unit-methodology-goal-2026-08-21.md`
 

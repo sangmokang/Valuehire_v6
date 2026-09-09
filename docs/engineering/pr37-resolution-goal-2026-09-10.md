@@ -2,7 +2,7 @@
 
 ## 결론
 
-기존 정책 작업을 보존하면서 최신 변경과 통합하고, 정책 입력과 검사 결과의 허점을 보완합니다. 현재는 시작 단계이며 원격 반영과 병합은 승인 범위 밖입니다.
+기존 정책 작업을 보존하면서 최신 변경과 통합하고, 정책 입력과 검사 결과의 허점을 보완했습니다. 첫 독립 검토에서 발견된 문제를 수정해 재검토 중이며 원격 반영과 병합은 승인 범위 밖입니다.
 
 ## 판단 근거
 
@@ -21,7 +21,7 @@
 - 작업 공간: worktrees/pr37-resolution-codex-20260910. 원본 work-unit-rebased는 읽기만 합니다.
 - 시작 main: 01495b3eae76d3e43e4a6cc8a481ee78258502c6. PR: 0b4dd2c57411a4f3eabc967fb27af071d54f2dfe.
 - 세션: 01a0879f-b739-7bf0-b947-5ac4a184d87b. 2026-09-09T19:31:21Z부터 회수.
-- 읽은 정본: coding-principles.md → principles.yaml. bash scripts/acceptance-principles-check.sh 실행 결과 PASS, CHECKED 34, 배선 pre-push=1 ci=1. 전체 출력은 증거 장부에 보존합니다.
+- 읽은 정본: docs/sot/coding-principles.md → docs/sot/principles.yaml. bash scripts/acceptance-principles-check.sh 실행 결과 PASS, CHECKED 34, 배선 pre-push=1 ci=1. 전체 출력은 증거 장부에 보존합니다. 검증 중 main이 4379b2f로 갱신되어 재통합하고 두 정본을 다시 직접 읽은 뒤 같은 검사를 재실행했습니다.
 - 적용 규칙: 사용자 제공 AGENTS.md, 현재 strict, git-workflow.md, verification-commands.md, mechanism-registry.yaml, hook-contracts.md. 루트 AGENTS.md·CLAUDE.md는 디스크에 없습니다.
 - 회수: 기존 methodology goal·V1·재검토 문서, 기존 RED dc2dad9 / GREEN 28155fc, git log --all, 이전 프롬프트의 진단. V1 비용 제한 기록은 역사 증거이며 새 판정으로 승격하지 않습니다.
 - 파일 hard 600줄, 함수 hard 100줄, PR diff 3000줄 이하. 생성 정책 문서는 파생 산출물이며 파일 한도 예외가 필요하지 않습니다.
@@ -30,13 +30,13 @@
 
 T는 작성자와 독립 검증자가 공유하는 채점 기준입니다. 정책값 정본은 work-unit-policy.yaml, 문서는 결정적 생성 결과입니다. EXPECTED_*는 승인된 v1 의미가 몰래 바뀌지 않도록 고정하는 검증 계약이며 렌더러의 정책 입력은 YAML뿐입니다. 승인된 정책 변경에는 독립 시험 기대값 변경이 먼저 필요합니다.
 
-- 입력: UTF-8 YAML 단일 문서, 정확한 필수 키, 정수 version/claims/max units/hours, 문자열·불리언·순서 있는 목록. 객체 키 순서는 의미가 없으며 목록 순서는 의미가 있습니다. 5.0과 문자열 5는 정수 계약 위반입니다.
+- 입력: UTF-8 YAML 단일 문서, 정확한 필수 키, 정수 version/claims/max units/hours, 문자열·불리언·순서 있는 목록. 객체 키 순서는 의미가 없으며 목록 순서는 의미가 있습니다. 5.0과 문자열 5는 정수 계약 위반입니다. 형식은 파싱된 자료형 기준이며 YAML의 yes/off/0x5처럼 같은 불리언·정수로 읽히는 표기를 금지하는 어휘 규칙은 아닙니다.
 - YAML 중복 키·알 수 없는 키·빈 문서·여러 문서·별칭·잘못된 자료형을 실패시킵니다. 병합 키(<<)는 원문 키·값을 가리는 추가 지시이므로 허용하지 않습니다.
 - 정책·생성 문서·검사 모듈은 일반 비어 있지 않은 파일이어야 합니다. 심볼릭 링크·누락·빈 파일·읽기 실패는 성공하지 않습니다.
 - checker 성공: exit 0, VERDICT PASS, POLICY_CHECKED 22, DOCUMENT_SYNC PASS. 6개 객체 구조와 16개 정책값 단언을 실제 실행해 센다. 종전 19는 실행 계수가 아닌 상수였다. 실패: exit 1, VERDICT FAIL, 원인과 실제 처리 수. 잘못된 CLI 인수 또는 런타임 부재는 NOT_RUN/exit 2.
 - acceptance 성공: exit 0, VERDICT PASS, CHECKED 양수. 내부 checker 세부 출력과 외부 acceptance 공개 출력을 문서에서 구분합니다.
-- renderer는 검증된 입력만 출력하고 잘못된 입력에서는 생성 문서를 덮어쓰지 않습니다. 같은 입력을 두 번 생성해도 바이트가 같아야 합니다.
-- 처리 개수는 실행한 단언으로부터 계산합니다. 출력만 꾸민 checker는 독립적인 고장 입력 시험으로 탐지합니다. 모든 검사기·시험을 함께 수정할 수 있는 같은 사용자 권한의 변조까지 방지한다고 주장하지 않습니다.
+- renderer는 검증된 입력만 표준 출력에 내보내며 파일을 직접 쓰지 않습니다. 잘못된 입력이면 표준 출력은 비고 오류 출력만 남습니다. 호출자가 셸 리다이렉션으로 대상 파일을 먼저 비우는 동작까지 보호하지 않으므로 파일 교체는 성공한 임시 출력 확인 후 수행해야 합니다. 같은 입력을 두 번 생성해도 바이트가 같아야 합니다.
+- 처리 개수는 실행한 단언으로부터 계산합니다. 고정 성공 출력·빈 구현·상수 계수·기록된 정상 입력만 외운 가짜 checker를 실제 반례로 공격합니다. 임의의 악성 프로그램을 전부 증명하거나 모든 검사기·시험을 함께 수정할 수 있는 같은 사용자 권한의 변조까지 방지한다고 주장하지 않습니다. 정상 키 순열은 실행마다 시드를 기록하고 WORK_UNIT_PROPERTY_SEED로 재현합니다.
 - 범위: 정책 정본과 소비 경로의 일치. 실제 작업 단위 장부/PR 개수/시간/승인 기록 자동 강제 시스템은 이 PR에 없습니다. 정책 검사 통과를 그 시스템 구현으로 보고하지 않습니다.
 - 고위험 목록은 정책 설명이며 자동 경로 분류에 사용하는 소비자는 현재 없습니다. 실제 매처가 없는 한국어 항목을 실행 가능한 경로 규칙이라고 설명하지 않습니다.
 
@@ -79,5 +79,5 @@ G=Codex, V1=Claude CLI, V2=새 Codex 맥락. 실제 Claude API 키는 제거하�
 
 ## 검증 장부와 종료
 
-현재: PLAN. 새 원격 결과 없음. 상세 명령·전체 출력·시각·커밋·세션은 docs/engineering/pr37-resolution-evidence-2026-09-10.md에 연결합니다.
+현재: AUDIT. 상세 명령·전체 출력·시각·커밋·세션은 [증거 장부](pr37-resolution-evidence-2026-09-10.md)에 연결합니다. 최초 V1 FAIL 원문은 [첫 판정서](pr37-resolution-v1-verdict-2026-09-10.md)에 그대로 보존하며 수정 후 판정과 구분합니다.
 로컬 검증된 CHECKPOINT까지 진행하고 PR 수정안·충돌 정리·복구 절차를 제공합니다. 원격 PR 상태와 로컬 결과는 분리합니다.
