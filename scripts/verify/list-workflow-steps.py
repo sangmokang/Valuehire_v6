@@ -49,6 +49,21 @@ def main(path: str) -> int:
                  if re.match(r"^  [A-Za-z_][A-Za-z0-9_-]*:", l)]
     if len(job_names) != 1:
         return fail("jobs 아래 잡이 %d개. 하나여야 한다" % len(job_names))
+    # 잡 수준 설정으로 스텝 전체를 끄거나 다른 셸로 돌릴 수 있다(Codex V2 6회차).
+    # 잡 수준에는 runs-on 과 steps 만 허용한다.
+    job_end = next((i for i, l in enumerate(lines[job_names[0] + 1:], job_names[0] + 1)
+                    if l.strip() and not l.startswith("    ")), len(lines))
+    for i in range(job_names[0] + 1, job_end):
+        l = lines[i]
+        if not l.strip() or l.lstrip().startswith("#"):
+            continue
+        if len(l) - len(l.lstrip(" ")) != 4:
+            continue
+        key = l.strip().split(":", 1)[0]
+        if key not in ("runs-on", "steps"):
+            return fail("잡 수준 키 '%s' (%d행). runs-on 과 steps 만 쓴다 — "
+                        "조건·기본 셸·전략으로 스텝 전체를 끌 수 있다" % (key, i + 1))
+
     steps_at = [i for i, l in enumerate(lines) if l.rstrip() == "    steps:"]
     if len(steps_at) != 1:
         return fail("steps: 가 %d개" % len(steps_at))
@@ -92,6 +107,8 @@ def main(path: str) -> int:
             return fail("한 스텝에 같은 키 '%s' 가 두 번 (%d행)" % (key, i + 1))
         seen_keys.add(key)
 
+        if val.startswith(("&", "*")):
+            return fail("값 위치의 앵커·별칭 (%d행). 값은 그대로 적는다" % (i + 1))
         if val.startswith(("{", "[")):
             return fail("흐름 매핑·시퀀스 값 (%d행). 블록 형식으로 적는다" % (i + 1))
         if val.startswith((">", "|")) and val not in ("|",):

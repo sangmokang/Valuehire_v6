@@ -91,11 +91,11 @@ else
     # 근거에 적힌 커밋과 저장소 경로가 **실제로 있는지** 확인한다. 하나 이상 실증돼야 한다.
     ev_real=0
     ev_bad=""
-    for tok in $(printf '%s' "$ev" | tr '`,;()[]' ' ' | tr ' ' '\n' \
-                 | /usr/bin/grep -E '^[0-9a-f]{7,40}$' | /usr/bin/grep -E '[a-f]' | sort -u); do
+    ev_tokens=$(printf '%s' "$ev" | tr '`,;()[]' ' ' | tr ' ' '\n' | sed -E 's/[.,;:)]+$//' | /usr/bin/grep -v '^$')
+    for tok in $(printf '%s\n' "$ev_tokens" | /usr/bin/grep -E '^[0-9a-f]{7,40}$' | /usr/bin/grep -E '[a-f]' | sort -u); do
       if git cat-file -e "${tok}^{commit}" 2>/dev/null; then ev_real=$((ev_real+1)); else ev_bad="$ev_bad $tok"; fi
     done
-    for tok in $(printf '%s' "$ev" | tr '`,;()[]' ' ' | tr ' ' '\n' | sed 's/:[0-9]*$//' \
+    for tok in $(printf '%s\n' "$ev_tokens" | sed 's/:[0-9]*$//' \
                  | /usr/bin/grep -E '^[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)+\.(md|py|sh|yml|yaml|ts|tsx|json)$' | sort -u); do
       if [ -e "$tok" ]; then
         ev_real=$((ev_real+1))
