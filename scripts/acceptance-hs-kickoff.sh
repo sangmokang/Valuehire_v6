@@ -90,20 +90,20 @@ else
     # 형태만 맞으면 `aaaa/bbbb.md:12` 같은 가짜도 통과한다(Codex V2 5회차 지적).
     # 근거에 적힌 커밋과 저장소 경로가 **실제로 있는지** 확인한다. 하나 이상 실증돼야 한다.
     ev_real=0
+    ev_commit=0
     ev_bad=""
-    ev_tokens=$(printf '%s' "$ev" | tr '`,;()[]' ' ' | tr ' ' '\n' | sed -E 's/[.,;:)]+$//' | /usr/bin/grep -v '^$')
+    # 실증 대상은 **코드 스팬 안**에 적은 것만이다. 산문 속 파일명은 설명이지 근거가 아니다.
+    ev_tokens=$(printf '%s' "$ev" | /usr/bin/grep -o '`[^`]*`' | tr -d '`' \
+                | tr ',;()[]' ' ' | tr ' ' '\n' | sed -E 's/[.,;:)]+$//' | /usr/bin/grep -v '^$')
+    # 커밋은 환경에 따라 있고 없다 — 로컬 전용 브랜치의 커밋은 CI 러너에 없다.
+    # 그래서 커밋은 "있으면 실증에 보태고, 없으면 세지 않는다". 실패로 만들지 않는다.
     for tok in $(printf '%s\n' "$ev_tokens" | /usr/bin/grep -E '^[0-9a-f]{7,40}$' | /usr/bin/grep -E '[a-f]' | sort -u); do
-      if git cat-file -e "${tok}^{commit}" 2>/dev/null; then ev_real=$((ev_real+1)); else ev_bad="$ev_bad $tok"; fi
+      if git cat-file -e "${tok}^{commit}" 2>/dev/null; then ev_commit=$((ev_commit+1)); fi
     done
     for tok in $(printf '%s\n' "$ev_tokens" | sed 's/:[0-9]*$//' \
                  | /usr/bin/grep -E '^[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)+\.(md|py|sh|yml|yaml|ts|tsx|json)$' | sort -u); do
-      if [ -e "$tok" ]; then
-        ev_real=$((ev_real+1))
-      elif [ "${t#task/}" != "$t" ] && git cat-file -e "$t:$tok" 2>/dev/null; then
-        ev_real=$((ev_real+1))          # 대상이 브랜치면 그 브랜치에서 확인한다
-      else
-        ev_bad="$ev_bad $tok"
-      fi
+      # 저장소 경로는 어디서 돌려도 같다 — 없으면 실패다.
+      if [ -e "$tok" ]; then ev_real=$((ev_real+1)); else ev_bad="$ev_bad $tok"; fi
     done
     if [ "$rows" -eq 0 ]; then
       failc "처분표에 $t 행 없음"
@@ -118,9 +118,9 @@ else
     elif [ -n "$ev_bad" ]; then
       failc "$t 행의 근거에 실재하지 않는 것이 있다 —$ev_bad"
     elif [ "$ev_real" -eq 0 ]; then
-      failc "$t 행의 근거에 실증 가능한 커밋·경로가 없다 (실존 확인 0건)"
+      failc "$t 행의 근거에 이 저장소에서 확인할 수 있는 경로가 없다 — 커밋만으로는 CI 러너에서 검증되지 않는다"
     else
-      pass "처분 $t → $(printf '%s' "$row" | cut -f2) (근거 실증 $ev_real 건)"
+      pass "처분 $t → $(printf '%s' "$row" | cut -f2) (근거 경로 $ev_real 건·커밋 $ev_commit 건)"
     fi
   done
 fi

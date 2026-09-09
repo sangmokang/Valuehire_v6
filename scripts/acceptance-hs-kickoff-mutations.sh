@@ -348,7 +348,7 @@ for i,l in enumerate(lines):
 else:
     raise SystemExit("anchor not found")
 p.write_text("".join(lines))
-PY' 'PR #13 행의 근거에 실증 가능한 커밋·경로가 없다'
+PY' 'PR #13 행의 근거에 이 저장소에서 확인할 수 있는 경로가 없다'
 
 negative "음성15 3칸 들여쓴 코드 펜스로 진짜 행 숨김" '
 python3 - <<'"'"'PY'"'"'
