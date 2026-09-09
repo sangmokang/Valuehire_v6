@@ -11,9 +11,19 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  # 같은 ref 에서 새 push 가 오면 앞선 실행은 의미가 없다 — 러너를 비운다.
+  # 단 main 은 취소하지 않는다: 초록불 증거가 커밋 SHA 에 귀속되므로(P23),
+  # main 실행을 중도 취소하면 그 SHA 에 대한 판정이 영구히 비게 된다.
+  group: verify-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   verify:
     runs-on: ubuntu-latest
+    # 매달린 스텝이 기본 상한(6시간)까지 러너를 점유하는 것을 막는다.
+    # 과거 Invoice 게이트가 공유메모리 고갈로 멈춘 이력이 있다.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
