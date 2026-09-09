@@ -45,20 +45,31 @@ targets=(
 if [ ! -f "$DISPOSITION" ]; then
   for t in "${targets[@]}"; do failc "처분표 없음 — $t 판정 불가 ($DISPOSITION)"; done
 else
+  # 코드 블록 안의 표 흉내는 처분이 아니다(Codex V2 2회차 지적). 펜스 안쪽을 버린다.
+  disposition_rows() {
+    awk -v t="$1" '
+      /^```/ { fence = !fence; next }
+      fence { next }
+      /^\|/ { if (index($0, t) > 0) print }
+    ' "$DISPOSITION"
+  }
   for t in "${targets[@]}"; do
-    rows=$(/usr/bin/grep -F -- "$t" "$DISPOSITION" | /usr/bin/grep -cE '^\|')
-    row=$(/usr/bin/grep -F -- "$t" "$DISPOSITION" | /usr/bin/grep -E '^\|' | head -1)
+    rows=$(disposition_rows "$t" | /usr/bin/grep -c '^|')
+    row=$(disposition_rows "$t" | head -1)
     ev=$(printf '%s' "$row" | /usr/bin/grep -oE '근거=[^|]*' | head -1 | sed 's/^근거=//')
     ev_alnum=$(printf '%s' "$ev" | tr -cd 'A-Za-z0-9' | wc -c | tr -d ' ')
     ev_solid=$(printf '%s' "$ev" | tr -d '[:space:]' | wc -c | tr -d ' ')
+    # 근거는 "실행한 명령·경로·커밋"이어야 한다. 뜻 없는 영숫자(abcdefgh)를 막으려면
+    # 길이만으로는 부족하다 — 코드 스팬(`...`) 한 쌍 이상을 요구한다(Codex V2 2회차 지적).
+    ev_ticks=$(printf '%s' "$ev" | tr -cd '`' | wc -c | tr -d ' ')
     if [ "$rows" -eq 0 ]; then
       failc "처분표에 $t 행 없음"
     elif [ "$rows" -ne 1 ]; then
       failc "$t 행이 ${rows}개 — 같은 대상에 처분이 둘 이상이면 결론이 무엇인지 정해지지 않는다"
     elif ! printf '%s' "$row" | /usr/bin/grep -qE '결론=(병합요청|재작성|폐기)'; then
       failc "$t 행에 결론=(병합요청|재작성|폐기) 없음"
-    elif [ "$ev_alnum" -lt 4 ] || [ "$ev_solid" -lt 8 ]; then
-      failc "$t 행의 근거가 자리표시자 — 영숫자 ${ev_alnum}자(4 미만) 또는 공백 제외 ${ev_solid}바이트(8 미만)"
+    elif [ "$ev_alnum" -lt 4 ] || [ "$ev_solid" -lt 8 ] || [ "$ev_ticks" -lt 2 ]; then
+      failc "$t 행의 근거가 자리표시자 — 영숫자 ${ev_alnum}자(4 미만)·공백 제외 ${ev_solid}바이트(8 미만)·코드 스팬 표시 ${ev_ticks}개(2 미만) 중 하나"
     else
       pass "처분 $t → $(printf '%s' "$row" | /usr/bin/grep -oE '결론=(병합요청|재작성|폐기)' | head -1)"
     fi
@@ -72,15 +83,17 @@ if [ -f "$VERIFY_YML" ] && [ -f "$VC_DOC" ]; then
   # 수만 같아서는 안 된다 — 정본은 "이름·순서 그대로"를 주장하므로 이름을 1:1 대조한다(Codex V2 지적).
   doc_rows=$(/usr/bin/grep -cE '^\| [0-9]+ \|' "$VC_DOC")
   empty_names=$(/usr/bin/grep -E '^\| [0-9]+ \|' "$VC_DOC" | awk -F'|' '{gsub(/^ +| +$/,"",$3); if ($3 == "") c++} END {print c+0}')
+  # 행 번호가 1..N 으로 유일·연속이어야 한다. 번호를 중복시키면 행 수는 맞고 내용만 바뀐다.
+  num_seq=$(/usr/bin/grep -E '^\| [0-9]+ \|' "$VC_DOC" | awk -F'|' '{gsub(/ /,"",$2); if ($2+0 != NR) bad=1} END {print bad+0}')
   # 명령치환은 후행 빈 줄을 지운다 — 끝에 표식을 붙여 "이름이 빈 마지막 행"이 사라지지 않게 한다.
   yaml_names=$(/usr/bin/grep -E '^[[:space:]]*- name:' "$VERIFY_YML" | sed -E 's/^[[:space:]]*- name:[[:space:]]*//'; echo '<끝>')
   doc_names=$(/usr/bin/grep -E '^\| [0-9]+ \|' "$VC_DOC" | awk -F'|' '{gsub(/^ +| +$/,"",$3); print $3}'; echo '<끝>')
   if [ -n "$documented" ] && [ "$documented" = "$actual" ] && [ "$doc_rows" = "$actual" ] \
-     && [ "$empty_names" -eq 0 ] && [ "$yaml_names" = "$doc_names" ]; then
-    pass "CI 스텝 수·이름·순서 정본=$documented 실제=$actual 표 행=$doc_rows 빈 이름 0 이름 1:1"
+     && [ "$empty_names" -eq 0 ] && [ "$num_seq" -eq 0 ] && [ "$yaml_names" = "$doc_names" ]; then
+    pass "CI 스텝 수·이름·순서 정본=$documented 실제=$actual 표 행=$doc_rows 빈 이름 0 번호 1..$doc_rows 이름 1:1"
   else
     mism=$(diff <(printf '%s\n' "$yaml_names") <(printf '%s\n' "$doc_names") | /usr/bin/grep -c '^[<>]')
-    failc "CI 스텝 불일치 정본=${documented:-없음} 실제=$actual 표 행=$doc_rows 빈 이름=$empty_names 이름 불일치 줄=$mism"
+    failc "CI 스텝 불일치 정본=${documented:-없음} 실제=$actual 표 행=$doc_rows 빈 이름=$empty_names 번호 어긋남=$num_seq 이름 불일치 줄=$mism"
   fi
 else
   failc "verify.yml 또는 verification-commands.md 없음"
@@ -106,22 +119,31 @@ fi
 # 11 CI 배선(자기 자신 + 자기 변이) — 주석이 아닌 실행 줄이어야 하고, 조건·오류무시가 없어야 한다.
 # 문자열 grep 만으로는 실행 줄을 주석으로 위장하고 다른 명령으로 바꿔치기해도 통과한다(Codex V2 지적).
 # 그래서 스텝 블록을 잘라 그 안의 run: 줄과 약화 지시를 함께 본다.
+# 블록 전체를 문자열로 훑으면 env 값 안에 숨긴 미끼 줄도 실행으로 오인한다(Codex V2 2회차).
+# 스텝 키의 들여쓰기를 "- " 위치에서 재고, **그 깊이의 줄만** 스텝의 최상위 키로 인정한다.
 wiring_verdict() {
   awk -v t="$1" '
     function flush() {
-      if (blk != "" && blk ~ ("\n[ \t]*run: bash scripts/verify/run-acceptance\\.sh scripts/" t "[ \t]*\n")) {
-        if (blk ~ /\n[ \t]*if:/ || blk ~ /\n[ \t]*continue-on-error:/) print "WEAK"; else print "OK"
-      }
-      blk = ""
+      if (has_run) { if (weak) print "WEAK"; else print "OK" }
+      seen = 0; weak = 0; has_run = 0
     }
-    /^[[:space:]]*- name:/ { flush() }
-    { blk = blk "\n" $0 }
-    END { blk = blk "\n"; flush() }
+    { sub(/[ \t]+$/, "") }
+    /^[[:space:]]*- name:/ {
+      flush()
+      key = sprintf("%" (index($0, "-") + 1) "s", "")
+      seen = 1
+      next
+    }
+    seen && key != "" {
+      if ($0 == key "run: bash scripts/verify/run-acceptance.sh scripts/" t) has_run = 1
+      if (index($0, key "if:") == 1 || index($0, key "continue-on-error:") == 1) weak = 1
+    }
+    END { flush() }
   ' "$VERIFY_YML" | head -1
 }
 if [ -f "$VERIFY_YML" ]; then
-  w_self=$(wiring_verdict 'acceptance-hs-kickoff\\.sh')
-  w_mut=$(wiring_verdict 'acceptance-hs-kickoff-mutations\\.sh')
+  w_self=$(wiring_verdict 'acceptance-hs-kickoff.sh')
+  w_mut=$(wiring_verdict 'acceptance-hs-kickoff-mutations.sh')
   if [ "$w_self" = "OK" ] && [ "$w_mut" = "OK" ]; then
     pass "CI 배선 2건 — 본 검사·자기 변이 검사 모두 실행 줄이고 조건·오류무시 없음"
   else

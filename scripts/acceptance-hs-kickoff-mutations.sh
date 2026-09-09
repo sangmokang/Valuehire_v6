@@ -4,7 +4,7 @@
 # 왜 있나: 인수 검사는 "통과"만 보여줘서는 안 된다. 일부러 깨뜨린 사본에서 반드시
 # 빨개져야 그 검사가 실제로 무언가를 보고 있다는 증거가 된다(Codex V2 2026-09-09 지적).
 #
-# 무엇을 검사하나(CHECKED 11 = 양성 1 + 음성 10):
+# 무엇을 검사하나(CHECKED 12 = 양성 2 + 음성 10):
 #   양성  원본 그대로의 사본 → acceptance-hs-kickoff.sh exit 0.
 #   음성1 CI 실행 줄을 주석으로 위장하고 다른 명령으로 바꾼다 → exit != 0.
 #   음성2 CI 스텝에 오류무시 지시(continue-on-error 를 true 로)를 붙인다 → exit != 0.
@@ -14,7 +14,8 @@
 #   음성6 판정 문서 첫 줄에서 VERDICT: 를 지운다 → exit != 0.
 #   음성7 정답 실행 줄을 env 값 안에 미끼로 숨기고 실제 run 은 다른 명령으로 바꾼다 → exit != 0.
 #   음성8 정본 표의 행 번호를 중복시킨다 → exit != 0.
-#   음성9 처분표 밖 코드 블록에 처분 행을 흉내 낸 줄을 넣는다 → exit != 0.
+#   음성9 진짜 처분 행을 코드 블록 안으로 숨긴다 → exit != 0.
+#   양성2 코드 블록 안의 가짜 처분 행은 처분으로 세지 않는다 → exit 0(판정이 흔들리지 않는다).
 #   음성10 근거를 뜻 없는 영숫자(abcdefgh)로 바꾼다 → exit != 0.
 #
 # 출력 규약: 판정마다 `PASS: ...` / `FAIL: ...` 한 줄, 마지막에 `CHECKED: <n>`.
@@ -23,7 +24,7 @@ set -u
 cd "$(git rev-parse --show-toplevel)" || exit 1
 
 TARGET="$PWD/scripts/acceptance-hs-kickoff.sh"
-EXPECTED=11
+EXPECTED=12
 checked=0
 fail=0
 pass() { echo "PASS: $1"; checked=$((checked+1)); }
@@ -93,6 +94,24 @@ fi
 # ── 음성 대조군 ────────────────────────────────────────────────────────────
 tree_hash() {
   find "$1" -type f -not -path '*/.git/*' | LC_ALL=C sort | xargs shasum 2>/dev/null | shasum | cut -d' ' -f1
+}
+
+# 변조해도 판정이 바뀌면 안 되는 시험(과잉 차단 방지). 기대 종료값 0.
+positive() {
+  local name="$1" mutate="$2"
+  local d="$TMP/p$checked"
+  if ! make_fixture "$d"; then failc "$name — 시험대 구성 실패"; return; fi
+  local before after
+  before=$(tree_hash "$d")
+  if ! ( cd "$d" && eval "$mutate" ); then failc "$name — 변조 적용 실패(종료값)"; return; fi
+  after=$(tree_hash "$d")
+  if [ "$before" = "$after" ]; then failc "$name — 변조가 파일을 바꾸지 못했다(시험 무효)"; return; fi
+  local rc; rc=$(run_target "$d")
+  if [ "$rc" -eq 0 ]; then
+    pass "$name — 판정이 흔들리지 않음 (exit 0)"
+  else
+    failc "$name — 무해한 변조에 FAIL 을 냈다 (exit $rc). 과잉 차단이다"
+  fi
 }
 
 negative() {
@@ -183,7 +202,21 @@ else:
 p.write_text("".join(lines))
 PY'
 
-negative "음성9 처분표 밖 코드 블록의 가짜 행" '
+negative "음성9 진짜 처분 행을 코드 블록 안으로 숨김" '
+python3 - <<'"'"'PY'"'"'
+import pathlib
+p=pathlib.Path("docs/engineering/humansearch-branch-disposition-2026-09-07.md")
+fence = chr(96)*3
+lines=p.read_text().splitlines(keepends=True)
+for i,l in enumerate(lines):
+    if l.startswith("|") and "PR #13" in l and "결론=" in l:
+        lines[i] = fence + "\n" + l + fence + "\n"; break
+else:
+    raise SystemExit("anchor not found")
+p.write_text("".join(lines))
+PY'
+
+positive "양성2 코드 블록 안 가짜 처분 행" '
 python3 - <<'"'"'PY'"'"'
 import pathlib
 p=pathlib.Path("docs/engineering/humansearch-branch-disposition-2026-09-07.md")
