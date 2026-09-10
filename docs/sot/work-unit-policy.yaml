@@ -33,7 +33,13 @@ tdd:
     - no_tests
   test_files_immutable_after_red: true
   expectation_change_requires_separate_approved_commit: true
+  expectation_approval_must_not_be_green_commit: true
+  red_command_entrypoint_immutable_through_first_green: true
+  first_green_requires_non_test_change: true
   first_green_required_before_completion: true
+  completion_commit_required: true
+  completion_commit_follows_first_green: true
+  manifest_order_requires_prior_completion: true
 context:
   declared_files_only: true
   repository_relative_paths_only: true
@@ -46,7 +52,10 @@ context:
   declared_and_observed_reads_must_match: true
   require_expected_head_match: true
   require_expected_worktree_match: true
+  historical_worktree_requires_contract_evidence: true
   whole_repository_is_not_evidence: true
+  maximum_files_per_unit: 20
+  near_whole_repository_omission_minimum: 2
 not_applicable:
   allowed_change_kinds:
     - ui
