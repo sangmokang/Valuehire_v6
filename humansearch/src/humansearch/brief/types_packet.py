@@ -1,6 +1,7 @@
 """HS-13 브리프 패킷의 산출물 값 타입 — 채널별 JD·팀 메일·서치 패킷.
 
-§7 D3(제목)·D4(1,899자)와 §4 수신자·본문 길이 행을 생성 시점에 강제한다.
+§7 D3(제목)·D4(본문 상한)와 §4 수신자·본문 길이 행을 생성 시점에 강제한다.
+상한값·도메인·접두는 전부 `policy()` 가 계약 파일에서 읽어 온다(P22).
 """
 
 from __future__ import annotations
@@ -8,30 +9,32 @@ from __future__ import annotations
 import hashlib
 import re
 from dataclasses import dataclass
+from dataclasses import field as dataclass_field
 
+from .policy import policy
 from .types import (
     CompanyBrief,
     JdSource,
     PositionSpec,
     _reject,
+    _require_count,
     _require_email,
     _require_sha256,
     _require_text,
 )
 from .types_candidate import CandidateLead
 
-__all__ = ["JdPacket", "SearchPacket", "TeamMail"]
+__all__ = ["JdPacket", "SearchFilters", "SearchPacket", "TeamMail"]
 
-# D4: 본문은 1,899 코드포인트까지. 1,900 이상이면 거부한다(개행 포함).
-_BODY_REJECT_AT = 1900
-_TEAM_DOMAIN = "@valueconnect.kr"
-_SUBJECT_PREFIXES = ("[포지션]", "[ValuehireSearch][포지션]")
+# D4 본문 상한·D3 제목 접두·팀 메일 도메인은 전부 계약 파일이 소유한다(P22).
+# 코드에 같은 숫자를 다시 적으면 계약과 코드가 조용히 갈라진다.
 _PACKET_ID = re.compile(r"[0-9]{8}-[A-Za-z0-9]+-[0-9a-f]{8}")
 
 
 def _require_within_limit(body: str, field: str) -> None:
-    if len(body) >= _BODY_REJECT_AT:
-        _reject(f"{field} 가 {_BODY_REJECT_AT - 1}자를 넘는다: {len(body)}자")
+    limit = policy().linkedin_inmail_max_chars
+    if len(body) > limit:
+        _reject(f"{field} 가 {limit}자를 넘는다: {len(body)}자")
 
 
 def _require_balanced_query(query: str, index: int) -> None:
@@ -81,15 +84,16 @@ class TeamMail:
     body_sha256: str
 
     def __post_init__(self) -> None:
-        if not self.subject.startswith(_SUBJECT_PREFIXES):
+        if not self.subject.startswith(policy().subject_prefixes):
             _reject("TeamMail.subject 는 D3 제목 형식으로 시작해야 한다")
         if not self.to:
             _reject("TeamMail.to 는 1명 이상이어야 한다")
         seen: set[str] = set()
+        team_domain = f"@{policy().team_mail_domain}"
         for label, addresses in (("to", self.to), ("cc", self.cc)):
             for address in addresses:
                 _require_email(address, f"TeamMail.{label}")
-                if not address.endswith(_TEAM_DOMAIN):
+                if not address.endswith(team_domain):
                     _reject(f"TeamMail.{label} 에 계약 도메인 밖 주소가 있다")
                 if address in seen:
                     _reject(f"TeamMail.{label} 에 중복 주소가 있다")
@@ -98,6 +102,28 @@ class TeamMail:
         _require_sha256(self.body_sha256, "TeamMail.body_sha256")
         if self.body_sha256 != hashlib.sha256(self.body.encode("utf-8")).hexdigest():
             _reject("TeamMail.body_sha256 이 본문 해시와 다르다")
+
+
+@dataclass(frozen=True)
+class SearchFilters:
+    """서치 실행 조건. 기본 지역은 코드가 아니라 계약 파일이 정한다(P22)."""
+
+    location: str = dataclass_field(
+        default_factory=lambda: policy().default_search_location,
+    )
+    seniority_years: tuple[int, int] | None = None
+
+    def __post_init__(self) -> None:
+        _require_text(self.location, "SearchFilters.location")
+        bounds = self.seniority_years
+        if bounds is None:
+            return
+        if not isinstance(bounds, tuple) or len(bounds) != 2:
+            _reject("SearchFilters.seniority_years 는 (최소, 최대) 두 값이어야 한다")
+        low = _require_count(bounds[0], "SearchFilters.seniority_years 의 최소")
+        high = _require_count(bounds[1], "SearchFilters.seniority_years 의 최대")
+        if low > high:
+            _reject(f"SearchFilters.seniority_years 의 최소가 최대보다 크다: {low} > {high}")
 
 
 @dataclass(frozen=True)
@@ -113,6 +139,7 @@ class SearchPacket:
     mail: TeamMail
     boolean_queries: tuple[str, ...]
     inmails: tuple[tuple[str, str], ...]
+    search_filters: SearchFilters = dataclass_field(default_factory=SearchFilters)
 
     def __post_init__(self) -> None:
         if not _PACKET_ID.fullmatch(self.packet_id):

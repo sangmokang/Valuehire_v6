@@ -264,6 +264,11 @@ jobs:
           bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1300.sh
           bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1300-mutations.sh
 
+      - name: 인수 검사 hs-1301b (브리프 운영 상수 재정의 0건 · P22)
+        # 1,899자 경계·팀 도메인·프로필 URL 접두·제목 접두·ClickUp 리스트 id 가
+        # contracts/humansearch/brief-policy.json 밖(브리프 코드)에 다시 적혔는지.
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1301b-literals.sh
+
       - name: PostgreSQL 서버 준비 (Invoice 런타임 검사용)
         # 러너에는 psql·pg_config 만 PATH 에 있고 initdb·pg_ctl 은
         # /usr/lib/postgresql/<ver>/bin 에 있다. 없으면 설치해서 BLOCKED 를 없앤다.

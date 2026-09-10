@@ -24,7 +24,7 @@ _SOURCE_ID = re.compile(r"[A-Z]{1,2}[0-9]{1,3}")
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 _HTML_TAG = re.compile(r"<[A-Za-z/!]")
 _EMAIL = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
-_LINKEDIN_PROFILE = re.compile(r"https://(?:www\.|kr\.)?linkedin\.com/in/\S+")
+_PROFILE_TAIL = re.compile(r"\S+")
 
 
 class BriefInputError(ValueError):
@@ -46,8 +46,20 @@ def _require_http_url(value: str, field: str) -> None:
 
 
 def _require_profile_url(value: str, field: str) -> None:
-    if not _LINKEDIN_PROFILE.fullmatch(value):
-        _reject(f"{field} 는 https://[www.|kr.]linkedin.com/in/<식별자> 형태여야 한다")
+    """공개 프로필 URL 접두는 계약 파일이 소유한다(P22).
+
+    `policy` 를 함수 안에서 부르는 이유는 순환 import 때문이다 — `policy.py` 가
+    `_reject` 를 쓰려고 이 모듈을 먼저 읽는다. 의존 방향은 policy → types 한 방향이고,
+    그 예외를 여기 한 곳에만 둔다.
+    """
+
+    from .policy import policy
+
+    prefixes = policy().profile_url_prefixes
+    for prefix in prefixes:
+        if value.startswith(prefix) and _PROFILE_TAIL.fullmatch(value[len(prefix) :]):
+            return
+    _reject(f"{field} 는 계약이 정한 프로필 URL 접두 {prefixes} 뒤에 식별자가 와야 한다")
 
 
 def _require_email(value: str, field: str) -> None:
@@ -134,11 +146,19 @@ class PositionSpec:
 
 @dataclass(frozen=True)
 class JdSource:
-    """러너가 정리해 넘긴 JD 원문 텍스트와 원본 해시."""
+    """러너가 정리해 넘긴 JD 원문 텍스트와 원본 해시.
+
+    `position_count` 는 러너가 **문서에서 실제로 센 포지션 수**다. 합본 JD(한 문서에
+    두 포지션)를 그대로 넣으면 브리프 한 통이 두 포지션을 섞어 내보내므로, 여기서
+    1 이 아닌 값을 거부해 포지션별 분리를 강제한다(§8 예외 표). 기본값 1 은
+    "포지션 1건짜리 문서"라는 뜻이지 검사 면제가 아니다 — 합본을 넣으면서 1 이라고
+    적는 것은 러너의 오기이고, 그 경우는 이 필드가 아니라 13.02 의 몫이다.
+    """
 
     text: str
     raw_sha256: str
     provided_by: str
+    position_count: int = 1
 
     def __post_init__(self) -> None:
         _require_text(self.text, "JdSource.text")
@@ -146,6 +166,14 @@ class JdSource:
             _reject("JdSource.text 에 HTML 태그가 남아 있다(러너가 정리 후 재투입)")
         _require_sha256(self.raw_sha256, "JdSource.raw_sha256")
         _require_text(self.provided_by, "JdSource.provided_by")
+        count = _require_int(self.position_count, "JdSource.position_count")
+        if count < 1:
+            _reject(f"JdSource.position_count 는 1 이상이어야 한다: {count}")
+        if count != 1:
+            _reject(
+                f"JdSource.text 에 포지션이 {count}건 들어 있다 — "
+                "합본 JD 는 포지션별로 나눠 각각 재투입한다(§8 예외 표)"
+            )
 
 
 @dataclass(frozen=True)

@@ -19,6 +19,12 @@ from .linkedin_limit import (
     core_tokens,
     verify_linkedin_fidelity,
 )
+from .policy import (
+    BriefPolicy,
+    load_brief_policy,
+    override_policy_for_tests,
+    policy,
+)
 from .two_field import TwoField, split_two_field
 from .types import (
     BriefInputError,
@@ -36,7 +42,7 @@ from .types_candidate import (
     EmailContact,
     ScoreBreakdown,
 )
-from .types_packet import JdPacket, SearchPacket, TeamMail
+from .types_packet import JdPacket, SearchFilters, SearchPacket, TeamMail
 
 __all__ = [
     "EXTRA_CONDITION_PATTERNS",
@@ -44,6 +50,7 @@ __all__ = [
     "LINKEDIN_FRAME_LINES",
     "BooleanQuerySet",
     "BriefInputError",
+    "BriefPolicy",
     "CandidateEvidence",
     "CandidateLead",
     "Claim",
@@ -57,6 +64,7 @@ __all__ = [
     "LinkedInReport",
     "PositionSpec",
     "ScoreBreakdown",
+    "SearchFilters",
     "SearchPacket",
     "Section",
     "SourceRef",
@@ -68,7 +76,10 @@ __all__ = [
     "content_lines",
     "core_tokens",
     "extract_block",
+    "load_brief_policy",
     "normalize_line",
+    "override_policy_for_tests",
+    "policy",
     "split_sections",
     "split_two_field",
     "verify_fidelity",
