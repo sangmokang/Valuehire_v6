@@ -11,7 +11,7 @@
 - 위험 등급: L3. 합격 여부를 결정하는 공유 착수 검사와 Unicode 식별 경계를 바꾼다.
 - 기준 SHA: HS-00.02 완료 기록 `f75038830b6680f618c5250b0f04faecac77289d`; 그 안의 구현 SHA는 `69801528d794aabfe8ceb84e1ee073d71ceec442`다.
 - 소유: `task/hs-0003-20260910`, `worktrees/hs-0003-20260910`, 세션 `hs0003-20260910`.
-- 상태: GREEN_VERIFIED. 시작 시 main과 origin/main은 `4379b2ff30afa2e37627e85af0b96920af3a38cd`, HS-00.02 작업트리는 보존돼 있으며 추적 파일은 깨끗하고 준비 자료는 무시된 `artifacts/`에만 있다.
+- 상태: LOCAL_COMMITTED. 시작 시 main과 origin/main은 `4379b2ff30afa2e37627e85af0b96920af3a38cd`, HS-00.02 작업트리는 보존돼 있으며 추적 파일은 깨끗하고 준비 자료는 무시된 `artifacts/`에만 있다.
 - 사용자 결과: 보호 스텝 이름·정본 스텝 이름 칸·처분 대상 칸에 보호 토큰처럼 보이는 비ASCII 문자를 섞으면 착수 검사가 거부한다.
 - 포함: 파싱된 workflow step name, 검증 정본의 step-name cell, 처분표 target cell; U+FF01~U+FF5E 전각 ASCII와 Unicode 17.0.0 혼동표의 단일 비ASCII 코드포인트→단일 보호 ASCII 문자 매핑; 기존 토큰 경계; 정상 한글·다국어·무관한 전각 설명; 정상 이름과 위장 이름의 동시 존재; 데이터 오류.
 - 제외: 일반 산문·근거·결론·명령 본문, 전체 문자열 정규화, ASCII `rn`/`m`, 다중문자 매핑, 결합 문자, bidi skeleton, default-ignorable·보이지 않는 문자 전체, U+3000 및 다른 공백 치환, 전체 UTS #39 준수.
@@ -177,3 +177,9 @@ candidate bundle: 9517376e3755a69e4e9dfca8ac5ad859654cbb94dda8cd3b610075c61b40e2
 실제 Claude V1은 Claude Code 2.1.267과 모델 `claude-fable-5-1`로 실행했다. 세션 `ab9f164b-5474-4a48-a7af-88c473281083`의 최종 판정은 PASS이며, 실제 실행 프롬프트 원문은 내부 SHA `2047a051e773203bbeb151f66fab7ca7c6cc24cfcc33680a576c2be73c1c3825`로 `docs/engineering/evidence/hs0003-20260910/claude-v1-final-v2-prompt-raw.json`에 보관했다. 원문은 `docs/engineering/evidence/hs0003-20260910/claude-v1-final-v2-response.md`, 형식 보정본은 `docs/engineering/evidence/hs0003-20260910/claude-v1-final-v2-response-final.md`, 실행 메타는 `docs/engineering/evidence/hs0003-20260910/claude-v1-final-v2-meta.json`에 있다. 새 Codex V2도 PASS했으며 원문은 `docs/engineering/evidence/hs0003-20260910/codex-v2-final-verdict.md`, brief-lint 0건 보정본은 `docs/engineering/evidence/hs0003-20260910/codex-v2-final-verdict-final.md`에 있다.
 
 첫 Codeaudit와 첫 실제 Claude PASS는 새 Codex V2의 경계 FAIL로 무효화했고, 경계 보강 뒤 Claude PASS가 남긴 낮은 공백·시험 공백도 세 번째 RED로 회수했다. 프로젝트 디렉터리에서 시작한 Claude 사전 시도 두 번은 SessionStart 훅으로 각 10분 뒤 중단돼 `NOT_RUN`으로 기록했고, `/tmp`에서 시작한 실제 세션만 최종 판정으로 센다.
+
+## 로컬 커밋과 Git 재읽기
+
+구현 GREEN은 `a2c79f08240cb5be287e8624ed07121ad14dd9ab`이다. 부모는 세 번째 RED `e99b4549ddf617d0d79acdd63880438cfbf9a7c8`, 트리는 `0be78fe33aa0b55d870c03f49da876ccece27015`다. 커밋 객체에서 제품 파일 9개를 다시 읽어 계산한 bundle SHA가 후보의 `9517376e3755a69e4e9dfca8ac5ad859654cbb94dda8cd3b610075c61b40e23d`와 같았고, 커밋 뒤 HS-00.03 시험 23개가 다시 통과했다. 파일별 Git blob과 SHA 대조는 `docs/engineering/evidence/hs0003-20260910/green-readback.json`에 기록했다.
+
+→ 검증 후보와 저장된 구현 커밋이 일치한다. 종료 상태는 원격 배송이 아닌 LOCAL_COMMITTED다.

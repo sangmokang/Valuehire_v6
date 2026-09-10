@@ -1,0 +1,92 @@
+{
+  "schema": "hs0003-green-readback-v1",
+  "recorded_at": "2026-09-10T13:46:15+0900",
+  "branch": "task/hs-0003-20260910",
+  "green": "a2c79f08240cb5be287e8624ed07121ad14dd9ab",
+  "parent": "e99b4549ddf617d0d79acdd63880438cfbf9a7c8",
+  "tree": "0be78fe33aa0b55d870c03f49da876ccece27015",
+  "expected_parent_match": true,
+  "worktree_clean_before_record": true,
+  "candidate_manifest_path": "docs/engineering/evidence/hs0003-20260910/candidate-product-manifest.json",
+  "candidate_manifest_sha256": "c466946aad003159a07c052979e8e0034ec4eeb0d3445d5a9ccb7952a6b7e6d4",
+  "candidate_bundle_sha256": "9517376e3755a69e4e9dfca8ac5ad859654cbb94dda8cd3b610075c61b40e23d",
+  "commit_bundle_sha256": "9517376e3755a69e4e9dfca8ac5ad859654cbb94dda8cd3b610075c61b40e23d",
+  "product_match": true,
+  "files": [
+    {
+      "path": "scripts/acceptance-hs-kickoff.sh",
+      "git_blob": "da1efc28ba2d20ebf4c3e7c787c44ebc80cee927",
+      "sha256": "53e0f1e0610c3446a5062b4770ffdb4e1cac1b5c0cfc4af525167e16b6f0c22a",
+      "bytes": 14385,
+      "match": true
+    },
+    {
+      "path": "scripts/acceptance-hs-kickoff-mutations.sh",
+      "git_blob": "60b8c4d24a85d28942d68bbcd56112c134bb4970",
+      "sha256": "09fc5e28c650f4968c77e95dc72d3bd4126d92caa6c483210e30f2bb0674696e",
+      "bytes": 25921,
+      "match": true
+    },
+    {
+      "path": "scripts/verify/check-hs-kickoff-identities.py",
+      "git_blob": "93f61a180bcb0dec59101ba37177b3cf01c99ae9",
+      "sha256": "dbb0299d0e9f25473e6468a3164dd3c3e44aea16c95bed4ba76093ed729ff0a6",
+      "bytes": 7823,
+      "match": true
+    },
+    {
+      "path": "scripts/verify/generate-hs-kickoff-confusables.py",
+      "git_blob": "d47147e8e6a5deee43769c62ccb3e10b4728d126",
+      "sha256": "7694d91b0af2c7d6ee1e791474a393b8e7a14d9b27542e06315009e6d0f0449d",
+      "bytes": 4311,
+      "match": true
+    },
+    {
+      "path": "scripts/verify/hs-kickoff-confusables-17.0.0.json",
+      "git_blob": "69a30aab25ab7ed4c10a5c3bab820c83ae0b2352",
+      "sha256": "687cd7d5f774002d92a2f994599d614fd08d7d85287ce3a3030c4ef84cd0cdfd",
+      "bytes": 6546,
+      "match": true
+    },
+    {
+      "path": "humansearch/tests/test_hs_0001.py",
+      "git_blob": "fb0e9ebc732d8908bea80ab6d46f6d57fd994ec4",
+      "sha256": "a3d9a9de51d65142fcf9c68b6f268185d0f151b1d4285ce0313ceea18abcbbd9",
+      "bytes": 6553,
+      "match": true
+    },
+    {
+      "path": "humansearch/tests/test_hs_0003.py",
+      "git_blob": "e2c3e9b8b1df402ece8ee4205ce287c3dd4eba3f",
+      "sha256": "2d6ecea834da7b15b6c1e652987435d07118da5b4740773bb46ad2448eb0191a",
+      "bytes": 9745,
+      "match": true
+    },
+    {
+      "path": "docs/sot/verification-commands.md",
+      "git_blob": "2a9f022c29ea5bfa2e91fd2822301f22ea4973e4",
+      "sha256": "493e28059ebf78e9f7073369c08a1d8f1416f12e8261431301d8524ec24b683e",
+      "bytes": 15794,
+      "match": true
+    },
+    {
+      "path": "docs/licenses/unicode-license-v3.txt",
+      "git_blob": "56da58912807030b451a4700687d5bd02c72d6ed",
+      "sha256": "e7a93b009565cfce55919a381437ac4db883e9da2126fa28b91d12732bc53d96",
+      "bytes": 1995,
+      "match": true
+    }
+  ],
+  "post_commit_target": {
+    "command": "cd humansearch && uv run --no-sync pytest -q tests/test_hs_0003.py",
+    "result": "23 passed in 17.41s",
+    "exit_code": 0
+  },
+  "delivery": {
+    "state": "LOCAL_COMMITTED",
+    "remote_push": "NOT_RUN",
+    "pull_request": "NOT_RUN",
+    "merge": "NOT_RUN",
+    "production_write": "NOT_RUN"
+  }
+}
