@@ -29,7 +29,9 @@ commit = lambda do |dir, message|
 end
 
 build_repository = lambda do |root|
+  FileUtils.mkdir_p(File.join(root, "docs/sot"))
   FileUtils.mkdir_p(File.join(root, "lib"))
+  FileUtils.mkdir_p(File.join(root, "scripts"))
   FileUtils.mkdir_p(File.join(root, "test"))
   [%w[init -q], %w[config user.email wu@example.invalid], %w[config user.name wu-test]].each do |args|
     rc, out = run.call(root, {}, "git", *args)
@@ -37,8 +39,17 @@ build_repository = lambda do |root|
   end
 
   File.write(File.join(root, "contract.txt"), "database/api: NOT_APPLICABLE\ntype: boolean\n")
-  File.write(File.join(root, "validate.sh"), "#!/usr/bin/env bash\necho 'WU_TESTS: 1'\necho 'VERDICT: PASS'\n")
-  File.write(File.join(root, "zero.sh"), "#!/usr/bin/env bash\necho 'CHECKED: 0'\necho 'VERDICT: PASS'\n")
+  File.write(File.join(root, "docs/sot/work-unit-policy.yaml"), <<~YAML)
+    completion:
+      approved_commands:
+        - "bash scripts/acceptance-synthetic.sh"
+        - "bash scripts/acceptance-failing.sh"
+        - "bash scripts/acceptance-zero.sh"
+  YAML
+  File.write(File.join(root, "scripts/acceptance-synthetic.sh"), "#!/usr/bin/env bash\necho 'WU_TESTS: 1'\necho 'VERDICT: PASS'\n")
+  File.write(File.join(root, "scripts/acceptance-failing.sh"), "#!/usr/bin/env bash\necho 'WU_TESTS: 1'\necho 'VERDICT: FAIL'\nexit 1\n")
+  File.write(File.join(root, "scripts/acceptance-zero.sh"), "#!/usr/bin/env bash\necho 'CHECKED: 0'\necho 'VERDICT: PASS'\n")
+  File.write(File.join(root, "scripts/acceptance-forged-count.sh"), "#!/usr/bin/env bash\necho 'CHECKED: 1'\necho 'VERDICT: PASS'\n")
   contract_commit = commit.call(root, "contract")
 
   File.write(File.join(root, "lib/feature.rb"), "module Feature\n  def self.enabled?\n    false\n  end\nend\n")
@@ -93,12 +104,13 @@ Dir.mktmpdir("wu-completion-contract-") do |tmp|
   context["observed_reads"] = [receipt]
 
   cases = [
-    ["executed completion commands", "bash validate.sh", "bash validate.sh", 0, "VERDICT: PASS"],
-    ["failing regression command rejected", "false", "bash validate.sh", 1, "REGRESSION_VALIDATION_FAILED"],
-    ["failing adversarial command rejected", "bash validate.sh", "false", 1, "ADVERSARIAL_VALIDATION_FAILED"],
-    ["no-op completion command rejected", "true", "bash validate.sh", 1, "REGRESSION_COMMAND_INVALID"],
-    ["zero-check completion output rejected", "bash zero.sh", "bash validate.sh", 1, "REGRESSION_ZERO_CHECKS"],
-    ["echo-only positive-count forgery rejected", "bash -c 'echo WU_TESTS: 1; echo VERDICT: PASS'", "bash validate.sh", 1, "REGRESSION_COMMAND_INVALID"]
+    ["executed completion commands", "bash scripts/acceptance-synthetic.sh", "bash scripts/acceptance-synthetic.sh", 0, "VERDICT: PASS"],
+    ["failing regression command rejected", "bash scripts/acceptance-failing.sh", "bash scripts/acceptance-synthetic.sh", 1, "REGRESSION_VALIDATION_FAILED"],
+    ["failing adversarial command rejected", "bash scripts/acceptance-synthetic.sh", "bash scripts/acceptance-failing.sh", 1, "ADVERSARIAL_VALIDATION_FAILED"],
+    ["no-op completion command rejected", "true", "bash scripts/acceptance-synthetic.sh", 1, "REGRESSION_COMMAND_INVALID"],
+    ["zero-check completion output rejected", "bash scripts/acceptance-zero.sh", "bash scripts/acceptance-synthetic.sh", 1, "REGRESSION_ZERO_CHECKS"],
+    ["echo-only positive-count forgery rejected", "bash -c 'echo WU_TESTS: 1; echo VERDICT: PASS'", "bash scripts/acceptance-synthetic.sh", 1, "REGRESSION_COMMAND_INVALID"],
+    ["unapproved forged-count script rejected", "bash scripts/acceptance-forged-count.sh", "bash scripts/acceptance-synthetic.sh", 1, "REGRESSION_COMMAND_NOT_APPROVED"]
   ]
 
   cases.each_with_index do |(label, regression, adversarial, wanted, diagnostic), index|
