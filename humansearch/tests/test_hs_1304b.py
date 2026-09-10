@@ -353,3 +353,58 @@ def test_an_empty_subheading_marker_is_rejected_as_an_empty_selection() -> None:
     )
     with pytest.raises(BriefInputError):
         split_two_field(_jd(text), _INTRO, section_markers=("빈 소제목",))
+
+
+# --- ④ Codex 12차: 프레임 줄 조건 은닉·핵심 절 제목 변형·끝 마커 중복/CRLF·빈 소제목 혼합 ----------
+
+
+def test_frame_line_cannot_hide_a_recruiting_condition() -> None:
+    jd = _jd()
+    with pytest.raises(BriefInputError):
+        _packet(jd_packet=_jd_packet(jd, linkedin_body=jd.text + "\n문의: 경력 10년 이상만 지원 가능합니다"))
+    with pytest.raises(BriefInputError):
+        _packet(jd_packet=_jd_packet(jd, linkedin_body="제목: 예시 | 경력 2~6년\n" + jd.text))
+    ok = _packet(jd_packet=_jd_packet(jd, linkedin_body="제목: 예시 고객사 프로덕트 매니저\n" + jd.text + "\n문의: 밸류커넥트"))
+    assert ok.jd_packet.linkedin_body.startswith("제목:")
+
+
+def test_core_section_heading_with_trailing_punctuation_is_still_core() -> None:
+    text = _JD_TEXT.replace("주요업무\n", "주요업무:\n").replace("자격요건\n", "자격요건：\n")
+    jd = _jd(text)
+    markers = ("주요업무:", "자격요건：", "혜택 및 복지", "채용 전형")
+    two = split_two_field(jd, _INTRO, section_markers=markers)
+    packet = _jd_packet(jd, two_field_jd=two.jd_body, two_field_sections=markers, linkedin_body=text)
+    with pytest.raises(BriefInputError):
+        _packet(source=jd, jd_packet=replace(packet, linkedin_omitted_sections=("주요업무:", "자격요건：")))
+
+
+def test_omission_is_refused_when_no_core_section_is_recognised() -> None:
+    text = "\n".join(["Responsibilities", "• ship features", "Benefits", "• snacks"])
+    jd = _jd(text)
+    two = split_two_field(jd, _INTRO, section_markers=("Responsibilities",))
+    packet = _jd_packet(
+        jd,
+        two_field_jd=two.jd_body,
+        two_field_sections=("Responsibilities",),
+        linkedin_body="Responsibilities\n• ship features",
+        linkedin_omitted_sections=("Benefits",),
+    )
+    with pytest.raises(BriefInputError):
+        _packet(source=jd, jd_packet=packet)
+
+
+def test_duplicate_end_marker_and_crlf_body_are_rejected() -> None:
+    jp = _jd_packet(_jd())
+    body = _mail_body(jp)
+    with pytest.raises(BriefInputError):
+        _packet_with_mail(jp, body + "\n[JD 원문 끝]")
+    with pytest.raises(BriefInputError):
+        _packet_with_mail(jp, body + "\n[복사 끝]")
+    with pytest.raises(BriefInputError):
+        _packet_with_mail(jp, body.replace("\n", "\r\n"))
+
+
+def test_an_empty_subheading_mixed_with_a_real_section_is_rejected() -> None:
+    text = _JD_TEXT.replace("[다루는 문제의 범위]\n• 탐색과 거래 흐름을 다룹니다.\n", "[빈 소제목]\n")
+    with pytest.raises(BriefInputError):
+        split_two_field(_jd(text), _INTRO, section_markers=("빈 소제목", "자격요건"))

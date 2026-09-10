@@ -248,3 +248,18 @@ def test_normalize_readback_is_idempotent() -> None:
     text = f"프로필({_wrap(_ENCODED_URL)})\npacket-id: {_PACKET_ID}\n"
     once = normalize_readback(text)
     assert normalize_readback(once) == once
+
+
+# --- Codex 12차: readback 꼬리 packet-id 는 정확히 1줄이고 패킷 id 와 같아야 VERIFIED ---------------
+
+
+def test_verify_requires_exactly_one_matching_packet_id_tail(tmp_path: Path) -> None:
+    body = "본문 첫 줄\n본문 끝 줄"
+    good = f"{body}\npacket-id: {_PACKET_ID}"
+    assert _round_trip(tmp_path, good, body)[0] == 0
+    code, message = _round_trip(tmp_path, body, body)
+    assert code == 1 and "reason=tail_missing" in message
+    code, message = _round_trip(tmp_path, f"{body}\npacket-id: 86e1abcd-deadbeef", body)
+    assert code == 1 and "reason=tail_mismatch" in message
+    code, message = _round_trip(tmp_path, f"{good}\npacket-id: {_PACKET_ID}", body)
+    assert code == 1 and "reason=tail_duplicate" in message
