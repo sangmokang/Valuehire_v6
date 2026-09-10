@@ -218,6 +218,11 @@ module WorkUnitGitEvidence
     if approvals.include?(tdd.fetch("green_commit"))
       errors << "EXPECTATION_APPROVAL_IS_GREEN: #{id}"
     end
+    approvals.each do |approval|
+      unless commit_exists?(repo, approval) && strict_ancestor?(repo, tdd.fetch("green_commit"), approval)
+        errors << "EXPECTATION_APPROVAL_NOT_AFTER_GREEN: #{id} #{approval}"
+      end
+    end
     unapproved = changes.reject do |commit|
       approvals.include?(commit) && approved_commit?(repo, id, commit, tdd, head)
     end
@@ -229,7 +234,7 @@ module WorkUnitGitEvidence
 
   def approved_commit?(repo, id, approval, tdd, head)
     return false unless approval && commit_exists?(repo, approval)
-    return false unless strict_ancestor?(repo, tdd.fetch("red_commit"), approval)
+    return false unless strict_ancestor?(repo, tdd.fetch("green_commit"), approval)
     return false unless ancestor?(repo, approval, head)
 
     rc, message = git(repo, "show", "-s", "--format=%B", approval)

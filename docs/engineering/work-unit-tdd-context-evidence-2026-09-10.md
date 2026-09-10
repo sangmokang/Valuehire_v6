@@ -797,3 +797,20 @@ VERDICT: PASS
 CHECKED: 135
 A9_REPOSITORY_TDD_EXIT:0
 ```
+
+## WU-2R5 감사 보정: GREEN 전 self-approval 차단
+
+RED `a708e86`은 안정된 RED wrapper를 유지한 채 별도 trailer 커밋에서 기대값을 구현에 맞추고, GREEN에는 무의미한 문서 marker만 추가하는 반례를 고정했습니다.
+
+```text
+PASS: marker-only RED and GREEN rejected
+PASS: GREEN cannot self-approve expectation changes
+FAIL: pre-GREEN self-approved expectation change rejected
+VERDICT: PASS
+CHECKED: 27
+WU_TESTS: 12
+CHECKED: 12
+WU_FAILURE_KIND: missing_behavior
+VERDICT: FAIL
+A10_RED_EXIT:1
+```

@@ -34,6 +34,7 @@ tdd:
   test_files_immutable_after_red: true
   expectation_change_requires_separate_approved_commit: true
   expectation_approval_must_not_be_green_commit: true
+  expectation_approval_follows_first_green: true
   red_command_entrypoint_immutable_through_first_green: true
   first_green_requires_non_test_change: true
   first_green_required_before_completion: true
