@@ -65,7 +65,7 @@ build_case = lambda do |root, kind|
   _rc, red_commit = run.call(root, {}, "git", "rev-parse", "HEAD")
   red_commit.strip!
 
-  if kind == :drift
+  if %i[drift restored_drift].include?(kind)
     write_test.call(File.join(root, "test/feature_test.rb"), expected: false)
   else
     File.write(File.join(root, "lib/feature.rb"), "module Feature\n  def self.enabled?\n    true\n  end\nend\n")
@@ -79,6 +79,11 @@ build_case = lambda do |root, kind|
     write_test.call(File.join(root, "test/feature_test.rb"), expected: false)
     run.call(root, {}, "git", "add", "test/feature_test.rb")
     run.call(root, {}, "git", "commit", "-q", "-m", "drift after first green")
+  elsif kind == :restored_drift
+    File.write(File.join(root, "lib/feature.rb"), "module Feature\n  def self.enabled?\n    true\n  end\nend\n")
+    write_test.call(File.join(root, "test/feature_test.rb"), expected: true)
+    run.call(root, {}, "git", "add", "lib/feature.rb", "test/feature_test.rb")
+    run.call(root, {}, "git", "commit", "-q", "-m", "restore test after fake green")
   end
 
   manifest = Marshal.load(Marshal.dump(base_manifest))
@@ -119,7 +124,7 @@ end
 
 Dir.mktmpdir("wu-tdd-contract-") do |tmp|
   cases = {}
-  %i[normal syntax drift late_contract post_green_drift].each do |kind|
+  %i[normal syntax drift late_contract post_green_drift restored_drift].each do |kind|
     case_root = File.join(tmp, kind.to_s)
     FileUtils.mkdir_p(case_root)
     cases[kind] = build_case.call(case_root, kind)
@@ -168,6 +173,16 @@ Dir.mktmpdir("wu-tdd-contract-") do |tmp|
   post_green_ok = rc == 1 && out.include?("TEST_FILE_CHANGED_AFTER_RED")
   missing_behavior ||= rc.zero?
   assert.call("test drift after first GREEN rejected", post_green_ok, out)
+
+  manifest_path, = cases.fetch(:restored_drift)
+  rc, out = run.call(
+    repo_root,
+    { "WORK_UNIT_REPO" => File.join(tmp, "restored_drift"), "WORK_UNIT_TDD_ONLY" => "1" },
+    "ruby", checker, manifest_path
+  )
+  restored_drift_ok = rc == 1 && out.include?("TEST_FILE_CHANGED_AFTER_RED")
+  missing_behavior ||= rc.zero?
+  assert.call("fake GREEN followed by restored expectation rejected", restored_drift_ok, out)
 end
 
 puts "WU_TESTS: #{checked}"
