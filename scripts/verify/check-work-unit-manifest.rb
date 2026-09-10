@@ -48,23 +48,30 @@ unless !errors.empty? || ENV["WORK_UNIT_SCHEMA_ONLY"] == "1"
   tdd_only = ENV["WORK_UNIT_TDD_ONLY"] == "1"
   context_only = ENV["WORK_UNIT_CONTEXT_ONLY"] == "1"
   not_applicable_only = ENV["WORK_UNIT_NOT_APPLICABLE_ONLY"] == "1"
-  unless context_only || not_applicable_only
+  completion_only = ENV["WORK_UNIT_COMPLETION_ONLY"] == "1"
+  unless context_only || not_applicable_only || completion_only
     require_validator("work_unit_git_evidence", "git evidence")
     evidence_errors, evidence_checked = WorkUnitGitEvidence.validate(data, repo)
     errors.concat(evidence_errors)
     checked += evidence_checked
   end
-  unless tdd_only || not_applicable_only
+  unless tdd_only || not_applicable_only || completion_only
     require_validator("work_unit_context_evidence", "context evidence")
     context_errors, context_checked = WorkUnitContextEvidence.validate(data, repo)
     errors.concat(context_errors)
     checked += context_checked
   end
-  unless tdd_only || context_only
+  unless tdd_only || context_only || completion_only
     require_validator("work_unit_not_applicable", "not-applicable")
     not_applicable_errors, not_applicable_checked = WorkUnitNotApplicable.validate(data, repo)
     errors.concat(not_applicable_errors)
     checked += not_applicable_checked
+  end
+  unless tdd_only || context_only || not_applicable_only
+    require_validator("work_unit_completion_evidence", "completion evidence")
+    completion_errors, completion_checked = WorkUnitCompletionEvidence.validate(data, repo)
+    errors.concat(completion_errors)
+    checked += completion_checked
   end
 end
 if errors.empty?
