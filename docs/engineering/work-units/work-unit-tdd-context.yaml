@@ -107,6 +107,7 @@ work_units:
         - "aa875705a442b7e9f34d79aef520049fe174b90b"
         - "14dad68e2a1afe2bda2f8a680a79a4bbe51cc335"
         - "3c7017c2607cb46a20ce2d2d52963217e49ea830"
+        - "e7b73c539f1e486fc134fac0756942acfc1521a1"
     regression_commands:
       - "bash scripts/acceptance-work-unit-contract.sh tdd"
     adversarial_commands:

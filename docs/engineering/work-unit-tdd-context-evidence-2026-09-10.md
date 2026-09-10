@@ -643,3 +643,39 @@ SEMANTIC_MUTATIONS_EXIT=0
 ```
 
 CI integrity 24/24, mechanism registry 25개, AC-M 31건, 원칙 34/34, `verify.sh`, `git diff --check`도 종료값 0입니다. 검증 중 셸 스크립트를 `ruby`로 잘못 호출한 1회는 `LoadError`로 종료값 1이었고, 같은 파일을 올바른 `bash` 명령으로 즉시 재실행해 25/25를 확인했습니다.
+
+## WU-2R4 감사 보정: marker-only GREEN과 GREEN 자체 승인 차단
+
+계약 `2182378` 뒤 RED `e7b73c5`는 기존 7개 TDD 사례를 유지하면서 marker 출력만 바뀐 RED/GREEN과 GREEN 커밋 자체가 기대값 변경을 승인하는 두 반례를 추가했습니다.
+
+```text
+PASS: authentic RED then GREEN
+PASS: zero RED commands rejected
+PASS: syntax-only RED rejected
+PASS: test expectation drift rejected
+PASS: contract declared only after boundary rejected
+PASS: test drift after first GREEN rejected
+PASS: fake GREEN followed by restored expectation rejected
+FAIL: marker-only RED and GREEN rejected
+FAIL: GREEN cannot self-approve expectation changes
+WU_TESTS: 9
+CHECKED: 9
+WU_FAILURE_KIND: missing_behavior
+VERDICT: FAIL
+A7_RED_EXIT:1
+```
+
+GREEN `fd0714d`은 RED 명령의 실행 파일이 첫 GREEN까지 byte-identical인지 확인하고, 첫 GREEN에 시험·RED 실행 파일 밖의 변경을 요구하며, GREEN SHA를 기대값 승인 SHA로 재사용하지 못하게 합니다.
+
+```text
+PASS: marker-only RED and GREEN rejected
+PASS: GREEN cannot self-approve expectation changes
+WU_TESTS: 9
+CHECKED: 9
+VERDICT: PASS
+A7_GREEN_EXIT:0
+
+VERDICT: PASS
+CHECKED: 115
+A7_REPOSITORY_TDD_EXIT:0
+```
