@@ -8,8 +8,9 @@
 #   변이 ⓓ WU 카드 셀 전부 비움     → 검사가 exit 1  (2026-09-10 Codex V1 높음 — 이전 검사기는 통과시켰다)
 #   변이 ⓔ D 결정 기본값 셀 비움    → 검사가 exit 1  (같은 지적)
 #   변이 ⓕ 제목·토큰만 남긴 최소 문서 → 검사가 exit 1  (같은 지적)
+#   변이 ⓖ catch-all 부정어 반전     → 검사가 exit 1  (2026-09-10 Codeaudit D-2)
 #   대조군: 원본 문서            → 검사가 exit 0 (항상-거부 검사기를 잡는다)
-#   출력: PASS:/FAIL: + `CHECKED: 7`, exit 0/1/2
+#   출력: PASS:/FAIL: + `CHECKED: 8`, exit 0/1/2
 # 쓰기 규칙: 저장소에 아무 파일도 만들지 않는다. 고장 사본은 mktemp 디렉터리에만 쓴다.
 set -uo pipefail
 
@@ -21,7 +22,7 @@ cd "$REPO" || { echo "NOT_RUN: 저장소 루트로 이동 실패"; echo "CHECKED
 
 CHECKER=scripts/acceptance-hs-1300.sh
 ORIG=docs/engineering/humansearch-hs13-position-brief-goal-2026-09-10.md
-EXPECTED_CHECKED=7
+EXPECTED_CHECKED=8
 G=/usr/bin/grep
 
 [ -s "$ORIG" ] || { echo "NOT_RUN: 원본 문서 없음 — $ORIG"; echo "CHECKED: 0"; exit 2; }
@@ -88,6 +89,11 @@ expect_rc "변이ⓔ D 결정 기본값 셀 비움 → 불합격" "$TMP/d-empty.
   echo '## 적대 검증 로그'
 } > "$TMP/minimal.md"
 expect_rc "변이ⓕ 제목·토큰만 남긴 최소 문서 → 불합격" "$TMP/minimal.md" 1
+
+# ⓖ §4 catch-all 행의 의미를 정반대로("명시적 거부 안 함")
+sed -E 's/\*\*명시적 거부\(`BriefInputError`\)\*\*/전부 그대로 통과시킨다. 명시적 거부 안 함/' "$ORIG" > "$TMP/negated.md"
+if ! $G -q '명시적 거부 안 함' "$TMP/negated.md"; then echo "NOT_RUN: 변이ⓖ 생성 실패"; echo "CHECKED: $checked"; exit 2; fi
+expect_rc "변이ⓖ §4 catch-all 부정어 반전 → 불합격" "$TMP/negated.md" 1
 
 echo "CHECKED: $checked"
 if [ "$checked" -ne "$EXPECTED_CHECKED" ]; then

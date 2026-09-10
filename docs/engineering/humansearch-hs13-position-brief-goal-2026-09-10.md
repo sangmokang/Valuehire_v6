@@ -30,8 +30,10 @@
 | 5 | 1촌이면 Email Contact 확보 | **부분 채택** | 1촌 여부·연락처는 LinkedIn 로그인 화면에서만 보인다 → HS-11 이후. 지금은 **공개 출처(논문·연구실 페이지·회사 공지)에서 확인된 이메일**만 `EmailContact(source_url, provenance)`로 담고, 출처 없는 이메일은 타입이 거부한다. |
 | 6 | URL·매칭 이유·점수·학력·경력을 DB에 쌓고 4명에게 메일, 제목에 ValuehireSearch | **채택(결정 D2·D3)** | 수신 4명은 `contracts/humansearch/team-recipients.json`(ClickUp 멤버 API 실측: sangmokang·rogan·julian·kcs @valueconnect.kr). DB = HS-03.01 SQLite 스키마가 병합되기 전까지는 **git 밖 패킷 파일**(`~/.humansearch/packets/<id>.json`, 0600)에 저장하고 HS-13.09에서 표로 옮긴다. |
 | 7 | 사람인·잡코리아는 나중에 | **채택** | 사람인·잡코리아용 2필드 텍스트는 지금 만들고(HS-13.04), 사이트 등록 자동화는 기존 스킬 `position-register`·HS-11 범위. |
-| 8 | RPS 프로젝트·South Korea·Boolean AND/OR 반복 서치 | **부분 채택** | Boolean 검색식 생성은 순수 함수(HS-13.07)로 지금 만든다. RPS 화면 조작은 D0 §4·§5가 D1 이후 허용하는 **프로젝트 확인·필터 순회·후보 목록 넘겨보기**까지만 **HS-13.11로 예정**(선행 HS-05·HS-11.04~06). 지시의 "프로젝트 **생성**"은 사이트 변경(되돌리기·중복 방지 필요)이라 별도 L3 결정·오너 승인 없이는 **비범위** — 사장님이 RPS에서 프로젝트를 만들어 두면 코드는 그 프로젝트 id를 확인만 한다. "멈추지 말고 계속"은 D0 §9 사람 개입·1초 멈춤(⑨) 아래에서만 가능. |
+| 8 | RPS 프로젝트·South Korea·Boolean AND/OR 반복 서치 | **부분 채택** | Boolean 검색식 생성은 순수 함수(HS-13.07)로 지금 만든다. RPS 화면 조작은 D0 §4·§5가 D1 이후 허용하는 **프로젝트 확인·필터 순회·후보 목록 넘겨보기**까지만 **HS-13.11로 예정**(선행 HS-05·HS-11.04~06). 지시의 "프로젝트 **생성**"은 사이트 변경(되돌리기·중복 방지 필요)이라 별도 L3 결정·오너 승인 없이는 **비범위** — 사장님이 RPS에서 프로젝트를 만들어 두면 코드는 그 프로젝트 id를 확인만 한다. "멈추지 말고 계속"은 D0 §9(사람 입력·권한 회수)와 2026-09-08 사장님 결정 ⑨(1초 멈춤 장치, `project_humansearch_owner_decisions_20260908`) 아래에서만 가능. |
 | 9 | 후보별 1,900자 InMail 준비 + 이메일로도 전달 | **채택** | `build_inmail()` 순수 함수(HS-13.08). 발송은 절대 자동화하지 않는다(D0 §4 "발송은 별도 L3 승인 없이 항상 금지"). 브리프 메일 하단에 후보별 InMail 초안을 붙인다. |
+
+지시 문장 중 코드 계약으로 옮긴 것: ⓐ **"후보자 입장과 관점에서 회사의 매력도가 충실히 드러나야"** → §6 1절 머리에 후보자 관점 소개 2문단 + `[회사 매력 포인트]` 3개 이상(각각 출처 id 필수, `compose_brief_mail(attraction_points=…)` 이 3개 미만·출처 없음이면 거부, D10). ⓑ **"축약해야 한다면 어미·어조·말투 등 빼도 되는 한국어 구조를 빼거나, 프로세스·복리후생 등 부수적인 것을 생략"** → 두 방식 모두 계약화: 절 생략은 `omittable_sections`(호출자가 절 이름 지정), 어미 축약은 `verify_linkedin_fidelity` 가 **핵심 토큰 열**(어미·조사 목록을 뗀 뒤의 토큰 순서)이 같으면 같은 줄로 인정(D11). 명사·숫자·고유명사 삭제는 축약이 아니라 누락.
 
 추가로 지시에 없지만 필요한 것: ① JD 원문은 **첨부가 아니라 패킷에 해시와 함께 보존**(P9 readback) ② 메일은 **평문 텍스트**(사장님 요구 "디자인된 형식보다 텍스트") ③ 후보 PII는 Git·PR·판정 파일에 0건(P21·scan-data-exposure).
 
@@ -142,6 +144,13 @@ def to_json(packet) / from_json(text)  # 왕복 동일성. PII는 파일에만, 
 def record_intent(dir, intent) -> Path        # 유일키 = (packet_id, channel). 이미 있으면 기존 intent 반환(재발송 금지 신호)
 def mark(dir, packet_id, channel, state, message_id: str | None)  # INTENT→SENT_UNVERIFIED→VERIFIED 단방향. 역전이 거부
 def may_send(dir, packet_id, channel) -> bool  # intent 없음 또는 state==INTENT 이고 message_id 없음일 때만 True
+# __main__.py  (HS-13.10 소유 — 유일한 CLI)
+#   uv run --no-sync python -m humansearch.brief verify --packet <path> --sent <readback.txt>
+#   stdout 1줄: `VERIFIED packet_id=<id> body_sha256=<hex>` (exit 0) | `SENT_UNVERIFIED packet_id=<id> expected=<hex> actual=<hex>` (exit 1)
+#   인자 누락·파일 없음·패킷 손상 → stderr 사유 + exit 2. 다른 하위 명령 없음(발송 명령 없음).
+# types (HS-13.01b 소유 추가)
+@dataclass(frozen=True) class SearchFilters:  location: str = "South Korea"; seniority_years: tuple[int, int] | None = None
+#   SearchPacket.search_filters: SearchFilters — 지시 8단계 "South Korea" 필터를 타입으로 고정(러너가 RPS 좌측 필터에 그대로 옮긴다)
 # policy.py  (P22 — HS-13.01b 소유)
 def load_brief_policy(path=contracts/humansearch/brief-policy.json) -> BriefPolicy
 #   linkedin_max=1899, subject_prefixes, profile_url_prefixes, team_domain, clickup_position_list_id 를 한 곳에서 소유.
@@ -156,14 +165,14 @@ def load_brief_policy(path=contracts/humansearch/brief-policy.json) -> BriefPoli
 (인사 1문단 + 핵심 1줄)
 원문 반영 기준 (글머리표 4줄 이내)
 ====================================================
-1. 일반 Gmail용 | 후보자 전달용        ← JD 전문(verify_fidelity PASS)
+1. 일반 Gmail용 | 후보자 전달용        ← 후보자 관점 소개 2문단 + [회사 매력 포인트] ≥3(출처 id) + [JD 원문 시작]…[JD 원문 끝] 블록(verify_fidelity PASS·블록 안 임의 추가 줄 0)
 ====================================================
 2. LinkedIn RPS용 | 공백·줄바꿈 포함 {n}자   ← [복사 시작]…[복사 끝], n ≤ 1,899
 ====================================================
 3. 사람인·잡코리아용 | 2개 필드          ← [필드 1: 회사 소개] / [필드 2: JD 내용]
 ====================================================
-[회사 리서치 | {날짜} 확인]  1.개요·근무지 2.매출·영업이익·투자 3.연혁 4.제품 5.뉴스 6.대표·C레벨 7.YouTube 8.확인할 항목
-[서치 기준]  키워드 / LinkedIn 검색식(boolean_queries 전부) / 초도 인터뷰 질문
+[회사 리서치 | {날짜} 확인]  1.개요·근무지·**인원** 2.매출·영업이익·투자(단계·금액) 3.연혁 4.제품 5.뉴스 6.대표·C레벨(LinkedIn URL) 7.YouTube 8.확인할 항목
+[서치 기준]  지역 필터: South Korea(SearchFilters.location, 기본값) / 키워드 / LinkedIn 검색식(boolean_queries 3종) / 초도 인터뷰 질문
 ====================================================
 [출처 목록]  [U1][I1][C#][L#][Y#]
 ====================================================
@@ -183,6 +192,8 @@ def load_brief_policy(path=contracts/humansearch/brief-policy.json) -> BriefPoli
 | D6 | 점수 4축 | 역할 40·학력 20·안정성 20·프로필 20. 학교 계층은 계약 파일. 성별·나이·사진 0 | 축·가중치는 계약 파일로 이동 가능 |
 | D7 | 후보 PII 보관 | git 밖 `~/.humansearch/packets/`, 0700/0600. 저장소·PR·판정에는 packet_id·해시·건수만 | HS-03.01 병합 후 SQLite로 이관(HS-13.09) |
 | D8 | 러너 경계 | 리서치(WebSearch)·Gmail 발송·readback은 Claude 세션이 MCP로 수행. 코드는 발송 API를 갖지 않는다 | Python Gmail API 도입은 별도 L3 |
+| D10 | 회사 매력도 표현 | Gmail 판 머리 = 후보자 관점 소개 2문단 + `[회사 매력 포인트]` 3~5개, 각 포인트에 CompanyBrief 출처 id. 3개 미만·출처 없음 → 조립 거부 | — |
+| D11 | 어미 축약 인정 기준 | 줄의 **핵심 토큰 열**(공백 분리 토큰에서 목록의 어미·조사·존칭 접미를 뗀 것)이 JD 줄과 같으면 축약으로 인정. 목록은 `linkedin_limit.KOREAN_ENDINGS`(언어 상수, P22 운영 상수 아님). 명사·숫자·영문 토큰 하나라도 빠지면 누락 | 목록 조정 |
 | D9 | 발송 멱등 | **발송 전** `record_intent`(유일키 packet_id+channel)를 쓰고, 발송 전에 Gmail `in:sent` 에서 제목+`packet_id` 토큰을 검색해 기존 발송이 있으면 **재발송 0**·`SENT_UNVERIFIED`로 복구한다. send 성공 직후 끊겨도 같은 패킷 재실행은 새 발송을 만들지 않는다 | — |
 
 ## 8. 예외 표 (R1)
@@ -197,11 +208,12 @@ def load_brief_policy(path=contracts/humansearch/brief-policy.json) -> BriefPoli
 | 수신자 계약 파일 없음/타 도메인 | 발송 0, 중단 |
 | Gmail 발송 후 readback 불일치 | 성공으로 기록 금지. `SENT_UNVERIFIED`로 남기고 보고 |
 | 후보에게 직접 발송 요청 | 거부(D0 §4). InMail 초안만 |
+| 러너가 `linkedin.com` 프로필 페이지를 직접 열어야 하는 상황 | **열지 않는다**(D0 §5 exact-origin 목록 NOT_RUN). 검색엔진 스니펫·논문·기사·회사 페이지만. 그래서 얻지 못한 값은 `None`/빈 튜플로 두고 점수는 0으로 깎인다(추정 금지). 실측 2026-09-10: WebFetch 는 linkedin.com 에서 HTTP 999 |
 | **그 외 전부** | **명시적 중단 + 이 표 갱신 후 재개** |
 
 ## 9. Issue HS-13 — WU 카드
 
-성공: 실제 포지션 1건의 브리프 메일이 검증된 형식으로 발송·readback 일치. 소유: `src/brief/`, `tests/test_hs_13xx.py`,
+성공: 실제 포지션 1건의 브리프 메일이 검증된 형식으로 발송·readback 일치. 소유: `humansearch/src/humansearch/brief/`, `humansearch/tests/test_hs_13xx.py`,
 `contracts/humansearch/team-recipients.json`, `contracts/humansearch/schools-tier.json`.
 선행: 없음(순수 로직). 라이브(13.10)는 D2 수신 규칙과 §8 예외표 아래에서만.
 공통 인수 명령 꼬리: `cd humansearch && uv run --no-sync ruff check src tests && uv run --no-sync mypy src tests`.
@@ -212,9 +224,9 @@ def load_brief_policy(path=contracts/humansearch/brief-policy.json) -> BriefPoli
 | HS-13.01 | 타입을 fail-fast로 검증한다 | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1301.py` (`>= 20 passed`) | 양성: 합성 SearchPacket 1건 생성. 음성: Claim 출처 0·후보 URL 도메인·이메일 출처 없음·중복 URL·수신자 타 도메인·1,900자 거부; Hypothesis: `linkedin.com/in/` 아닌 URL 전부 거부 | LOCAL_COMMITTED |
 | HS-13.01b | 운영 상수를 계약 파일로 옮긴다(P22) | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1301b.py` (`>= 8 passed`) + `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1301b-literals.sh` (`CHECKED: 5` — `1899`·`valueconnect.kr`·`linkedin.com/in`·`[포지션]`·ClickUp list id 리터럴이 `brief/*.py` 에 0) | 양성: `contracts/humansearch/brief-policy.json` 로드 → 13.01 시험 전부 유지. 음성: 파일 없음·version 다름·도메인 형식 위반 → `BriefInputError`; 계약값을 바꾼 임시 사본으로 1,899→1,000 이 실제 반영 | PLANNED |
 | HS-13.02 | JD 충실도를 줄 단위로 판정한다 | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1302.py` (`>= 15 passed`) | 양성: 합성 JD 원문 그대로·`•`↔`-`·공백 차이 → PASS. 음성: 1줄 삭제·어순 변경·"경력 2년 이상" 추가 → FAIL; 빈 JD 거부 | PLANNED |
-| HS-13.03 | LinkedIn 1,899자 한도와 생략 정책을 강제한다 | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1303.py` (`>= 12 passed`) | 양성: 1,899자 PASS·지정 절(`혜택 및 복지`·`채용 전형`) 생략 PASS. 음성: 1,900자 FAIL(경계 Hypothesis)·미지정 절 누락 FAIL | PLANNED |
+| HS-13.03 | LinkedIn 1,899자 한도와 생략 정책을 강제한다 | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1303.py` (`>= 12 passed`) | 양성: 1,899자 PASS·지정 절(`혜택 및 복지`·`채용 전형`) 생략 PASS·어미 축약 줄("…을 찾습니다"→"…을 찾음") PASS(D11). 음성: 1,900자 FAIL(경계 Hypothesis)·미지정 절 누락 FAIL·명사 1개 삭제 FAIL | PLANNED |
 | HS-13.04 | 사람인·잡코리아 2필드로 나눈다 | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1304.py` (`>= 8 passed`) | 양성: 합성 JD → 필드1·필드2, 필드2 충실도 PASS. 음성: 마커 없음·필드2 빈값 거부 | PLANNED |
-| HS-13.05 | 팀 메일 제목·수신자·평문 본문을 조립한다 | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1305.py` (`>= 12 passed`) + `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1305-pii.sh` (`CHECKED: 4` — `humansearch/tests/`·`docs/engineering/`·`scripts/` 추적 파일에서 ① `linkedin.com/in/<slug>` 중 slug 가 `example-` 로 시작하지 않는 것 0 ② 이메일 중 `holder@valueconnect.kr`·`@example.com` 외 0 ③ 전화 패턴 0 ④ 한국 휴대폰 `010-` 0) | 양성: 제목 2형 정확 일치·§6 절 순서·수신자 계약 로드·body_sha256 왕복·HTML 0. 음성: 타 도메인 수신자 거부·절 누락 거부·PII 게이트 음성 fixture 4종 각 FAIL | PLANNED |
+| HS-13.05 | 팀 메일 제목·수신자·평문 본문을 조립한다 | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1305.py` (`>= 12 passed`) + `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1305-pii.sh` (`CHECKED: 4` — `humansearch/tests/`·`docs/engineering/`·`scripts/` 추적 파일에서 ① `linkedin.com/in/<slug>` 중 slug 가 `example-` 로 시작하지 않는 것 0 ② 이메일 중 `holder@valueconnect.kr`·`@example.com` 외 0 ③ 전화 패턴 0 ④ 한국 휴대폰 `010-` 0) | 양성: 제목 2형 정확 일치·§6 절 순서·`[회사 매력 포인트]` 3개(출처 id)·수신자 계약 로드·body_sha256 왕복·HTML 0. 음성: 타 도메인 수신자 거부·절 누락 거부·매력 포인트 2개/출처 없음 거부(D10)·PII 게이트 음성 fixture 4종 각 FAIL | PLANNED |
 | HS-13.06 | 후보를 순수 함수로 채점한다 | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1306.py` (`>= 15 passed`, Hypothesis 포함) | 양성: 같은 입력 100회 동일·학교 계층 계약(`contracts/humansearch/schools-tier.json`) 로드. 음성: None 학력 = 0(기본값 변이 검출)·축 상한 40/20/20/20 초과 거부·total 0 거부·손상 계약 파일 5종 거부 | PLANNED |
 | HS-13.07 | Boolean 검색식 3종을 만든다 | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1307.py` (`>= 8 passed`) | 양성: 필수어 전부 포함·괄호/따옴표 균형(Hypothesis). 음성: 빈 필수어·따옴표 포함 용어·exclude 중복 거부 | PLANNED |
 | HS-13.08 | 후보별 InMail 초안을 만든다 | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1308.py` (`>= 8 passed`) + `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1308-nosend.sh` (`CHECKED: 3` — `brief/*.py` 에 `smtplib`·`requests`·`send(` 0) | 양성: ≤1,899·후보 이름·매칭 이유 1개 포함. 음성: 초과 시 거부·발송 API 부재 | PLANNED |
@@ -264,3 +276,11 @@ def load_brief_policy(path=contracts/humansearch/brief-policy.json) -> BriefPoli
 - [중간] P22 리터럴 → HS-13.01b 신설(`brief-policy.json` + 리터럴 0건 검사).
 - [중간] `verification-commands.md` 스텝 수 27→28·PostgreSQL 준비 행 누락·래퍼 명령 누락 → 표 재생성.
 Codex 샌드박스는 mktemp 불가라 파일 사본 변이는 NOT_RUN, 인메모리 변이 3종으로 재현함(memory: codex 샌드박스 mktemp 차단).
+
+### 2026-09-10 Claude Codeaudit (읽기 전용·별도 컨텍스트, 7efd6c6 대상)
+
+`VERDICT: PARTIAL` — 높음 3·중간 10·낮음 7. Codex V1 과 겹치는 D-1·D-4·D-5·D-6·D-10·D-11·D-13 은 위 처분으로 해소. 추가 처분:
+- [높음 D-2] catch-all 부정어 반전("명시적 거부 안 함") 통과 → 검사기에 부정어 금지 검사·자기 변이 ⓖ 편입.
+- [높음 D-3] 지시 "후보자 관점 매력도"·"어미 축약" 누락/대체 → D10·D11 신설, §2·§6·13.03·13.05 반영.
+- [중간 D-7] CLI 계약 없음 → §5 `__main__.py` 인자·출력·exit 계약. [중간 D-8] 비숫자 임의 추가 미검출 → 13.02b `extra_lines`·`extract_block`. [중간 D-9] South Korea → `SearchFilters`. [중간 D-12] 러너 linkedin.com 열람 금지 → §8 행.
+- [낮음 D-14·15·16] 인용·경로·인원 정정. [낮음 D-19] mechanism-registry 등재. [낮음 D-18] PR 라벨 `weakens-check` 는 사람이 붙인다(기계 강제 없음 — 선행 공백). [낮음 D-17] 고객사 실명은 공개 기업명이라 유지, 후보자 PII 는 0.

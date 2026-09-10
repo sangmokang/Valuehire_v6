@@ -20,6 +20,7 @@
 #   49 §9 WU 카드 수 == 14 (행 수 정확)
 #   50 §7 D9 행 존재 (발송 멱등 — 2026-09-10 Codex V1 편입)
 #   51~55 §4 입력 영역 표에 이미지·합본·언어·ClickUp 공백·시계 행 (5건)
+#   56~63 §5 계약 함수 8개 펜스 안 존재 · 64 §6·§10 절 실존(record_intent) · 65~66 D10·D11 (Codeaudit 2026-09-10)
 #
 # 2026-09-10 Codex V1: 이전 판은 ID·토큰 존재만 봐서 빈 셀 문서가 통과했다(높음). 위 12·26·35 가 그 반례를 막는다.
 #
@@ -33,7 +34,7 @@ REPO=$(git rev-parse --show-toplevel 2>/dev/null) || { echo "NOT_RUN: git 저장
 cd "$REPO" || { echo "NOT_RUN: 저장소 루트로 이동 실패"; echo "CHECKED: 0"; exit 2; }
 
 DOC="${HS_1300_DOC:-docs/engineering/humansearch-hs13-position-brief-goal-2026-09-10.md}"
-EXPECTED_CHECKED=55
+EXPECTED_CHECKED=66
 
 fail=0
 checked=0
@@ -62,8 +63,8 @@ section() {
   ' "$DOC"
 }
 
-# 2) §4 catch-all
-if section '^## 4\. 입력 영역 표' | $G -E '그 외 전부' | $G -q '명시적 거부'; then
+# 2) §4 catch-all — 부정어 반전("명시적 거부 안 함"·"하지 않") 금지 (2026-09-10 Codeaudit D-2)
+if section '^## 4\. 입력 영역 표' | $G -E '그 외 전부' | $G '명시적 거부' | $G -Evq '안 ?함|하지 ?않|않는다|금지 ?안'; then
   pass "§4 입력 영역 표 catch-all 행(그 외 전부 → 명시적 거부)"
 else
   failed "§4 입력 영역 표에 catch-all 행이 없다"
@@ -79,8 +80,8 @@ for d in D1 D2 D3 D4 D5 D6 D7 D8; do
   fi
 done
 
-# 11) §8 catch-all
-if section '^## 8\. 예외 표' | $G -E '그 외 전부' | $G -q '명시적 중단'; then
+# 11) §8 catch-all — 부정어 반전 금지
+if section '^## 8\. 예외 표' | $G -E '그 외 전부' | $G '명시적 중단' | $G -Evq '안 ?함|하지 ?않|않는다|금지 ?안'; then
   pass "§8 예외 표 catch-all 행(그 외 전부 → 명시적 중단)"
 else
   failed "§8 예외 표에 catch-all 행이 없다"
@@ -166,6 +167,25 @@ if printf '%s\n' "$sec7" | $G -E '^\| *D9 *\|' | $G -q '멱등'; then
 else
   failed "§7 D9 발송 멱등 결정 없음"
 fi
+
+# 56~63) §5 계약 함수 8개 + CLI 계약 (Codeaudit 최소 보강 ②)
+for f in verify_fidelity check_linkedin split_two_field compose_brief_mail load_recipients score_candidate build_boolean_queries build_inmail; do
+  if printf '%s\n' "$sec5_fenced" | $G -Eq "def $f\("; then
+    pass "§5 함수 $f 계약 존재"
+  else
+    failed "§5 함수 $f 계약 없음"
+  fi
+done
+# 64) §6 출력 계약·§10 러너 절차 절 실존 (껍데기 문서 차단)
+if $G -Eq '^### 6\. 출력 계약' "$DOC" && $G -Eq '^## 10\. HS-13\.10 러너 절차' "$DOC" && section '^## 10\. HS-13\.10 러너 절차' | $G -q 'record_intent'; then
+  pass "§6 출력 계약·§10 러너 절차(D9 record_intent 포함) 실존"
+else
+  failed "§6 출력 계약 또는 §10 러너 절차(record_intent) 없음"
+fi
+# 65~66) D10 매력도·D11 어미 축약 결정 (Codeaudit D-3)
+for d in D10 D11; do
+  if printf '%s\n' "$sec7" | $G -Eq "^\| *$d *\|"; then pass "§7 결정 $d 존재"; else failed "§7 결정 $d 없음"; fi
+done
 
 # 51~55) §4 현실 입력 행 5종
 sec4=$(section '^## 4\. 입력 영역 표')
