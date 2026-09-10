@@ -121,4 +121,4 @@ same budget validator: 600 PASS, 601 FAIL, zero targets FAIL
 
 ## 커밋 후 readback
 
-구현 커밋 후 SHA·Git blob·working file SHA 대조와 committed-tree 재실행 결과를 `implementation-readback.md`에 추가한다.
+구현 커밋 `95bb942b0ecda4b4b03e3e49dcc93d91b30bac48` 후 SHA·Git blob·working file SHA 9개가 모두 일치했다. committed-tree에서 canonical 105, 실제 workflow 32, 원칙 34가 종료값 0으로 다시 PASS했고 readback 직전 worktree는 clean이었다. 전체 원문은 `implementation-readback.md`에 보존한다.
