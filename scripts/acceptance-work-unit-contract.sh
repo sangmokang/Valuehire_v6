@@ -34,7 +34,7 @@ run_case() {
 case "$mode" in
   all)
     total=0
-    for part in schema tdd context not-applicable; do
+    for part in schema tdd context not-applicable completion; do
       output=""
       rc=0
       output=$(bash "$0" "$part" 2>&1) || rc=$?
@@ -64,6 +64,10 @@ case "$mode" in
     ;;
   not-applicable)
     ruby scripts/verify/work-unit-not-applicable-contract-test.rb
+    exit $?
+    ;;
+  completion)
+    ruby scripts/verify/work-unit-completion-contract-test.rb
     exit $?
     ;;
   *)
