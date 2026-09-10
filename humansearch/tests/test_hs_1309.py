@@ -126,16 +126,20 @@ def _intent(
 
 
 def _approval(
-    approved_by: str = "sangmokang",
+    approved_by: str = "sangmokang@valueconnect.kr",
     search_query: str = 'in:sent subject:"[포지션]"',
     search_checked_at: str = "2026-09-10T04:00:00+00:00",
     reason: str = "발송함에서 찾지 못해 재시도를 승인한다",
+    packet_id: str = _PACKET_ID,
+    from_attempt: int = 1,
 ) -> Approval:
     return Approval(
         approved_by=approved_by,
         search_query=search_query,
         search_checked_at=search_checked_at,
         reason=reason,
+        packet_id=packet_id,
+        from_attempt=from_attempt,
     )
 
 
@@ -463,7 +467,7 @@ def test_open_new_attempt_can_be_repeated_for_a_second_uncertain_attempt(tmp_pat
     record_intent(directory, _intent())
     open_new_attempt(directory, _PACKET_ID, "gmail", approval=_approval(), at=_LATER)
     third, created = open_new_attempt(
-        directory, _PACKET_ID, "gmail", approval=_approval(), at=_LATER
+        directory, _PACKET_ID, "gmail", approval=_approval(from_attempt=2), at=_LATER
     )
     assert created is True
     assert third.attempt == 3
@@ -481,7 +485,7 @@ def test_open_new_attempt_rejects_blank_approval_field(tmp_path: Path, field: st
             directory,
             _PACKET_ID,
             "gmail",
-            approval=_approval(**{field: "   "}),
+            approval=_approval(**{field: "   "}),  # type: ignore[arg-type]
             at=_LATER,
         )
 
