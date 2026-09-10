@@ -59,6 +59,9 @@ not_applicable:
 enforcement:
   manifest_required: true
   missing_manifest_status: "FAIL"
+  repository_manifest_directory: "docs/engineering/work-units"
+  repository_manifest_acceptance: "scripts/acceptance-work-unit-repository.sh"
+  repository_manifest_must_run_in_ci: true
   all_validation_modes_required_in_ci: true
   pre_push_acceptance_glob_required: true
   checker: "scripts/verify/check-work-unit-manifest.rb"

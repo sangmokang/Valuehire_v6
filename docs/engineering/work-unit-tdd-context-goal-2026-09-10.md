@@ -42,6 +42,7 @@
 - RED: 명령 1개 이상, 실제 시험 1건 이상, 비정상 종료, `missing_behavior` 증거가 필요합니다. 문법/import/수집 오류나 0건은 RED가 아닙니다.
 - GREEN: RED 이후 시험 파일은 고정합니다. 바꾸려면 별도 승인 커밋을 선언하고 그 커밋이 시험 파일만 바꾸며 승인 trailer를 가져야 합니다.
 - 맥락: 선언한 저장소 상대경로마다 commit SHA, SHA-256, 읽기 증거를 요구하고, 선언 목록과 관측된 읽기 영수증 목록이 정확히 같아야 합니다. 현재 예상 HEAD·작업공간과 다르거나 전체 저장소를 근거로 선언하면 실패합니다. 해시는 바이트 접근을 증명하지만 사람이 의미를 이해했다는 사실까지 증명하지 않습니다.
+- 저장소 적용: `docs/engineering/work-units/*.yaml`에 실제 WU manifest가 1개 이상 없거나 CI가 이 manifest를 실행하지 않으면 실패합니다. fixture 통과는 실제 WU 계약의 대체 증거가 아닙니다.
 - NOT_APPLICABLE: 일반 단위 시험이 부적합한 UI·문서·설정·migration 변경만 사유와 대체 검증 명령 1개 이상으로 사용할 수 있습니다.
 
 ## Work Unit 장부
@@ -55,6 +56,7 @@
 | WU-5 | If 검사기나 서버 실행 줄을 무력화하면 독립 공격 검사가 실패를 관측해야 합니다. | exit 0, no-op, echo-only, 항상 거짓 조건 | `bash scripts/acceptance-work-unit-contract-mutations.sh` | WU-4 완료 | PASS · RED `672283c` · 시험 보정 `c78f930` · GREEN `faa8b6f` |
 | WU-2R | When DB/API/Type 선행 근거를 검사하면 각 근거 파일이 contract commit에 이미 존재해야 합니다. | RED에서 뒤늦게 만든 계약 파일 경로를 manifest에 적어 통과 | `bash scripts/acceptance-work-unit-contract.sh tdd` | WU-1~WU-5 완료 뒤 감사 보정 | PASS · 계약 `3c1ad8c` · RED `aa87570` · GREEN `1bdb504` |
 | WU-2R2 | When RED 이후 시험 불변을 검사하면 첫 GREEN 뒤 현재 HEAD까지의 무승인 변경도 거부해야 합니다. | GREEN 다음 커밋에서 기대값 변경 | `bash scripts/acceptance-work-unit-contract.sh tdd` | V1 감사 재현 | PASS · RED `14dad68` · GREEN `0cd7731` |
+| WU-5R | When 저장소 WU gate를 실행하면 실제 WU manifest 1개 이상과 CI 실행 배선이 없을 때 실패해야 합니다. | fixture만 통과하고 실제 WU manifest가 0개인 저장소 | `bash scripts/acceptance-work-unit-repository.sh` | WU-2R2 완료 후 V1 감사 재현 | CONTRACT |
 
 각 WU는 계약 커밋 → RED 커밋 → 최소 GREEN 커밋 → 회귀·적대검증 → 완료 커밋 순서로 닫습니다. 앞 WU의 완료 커밋 전에는 다음 WU 파일을 시작하지 않습니다.
 
