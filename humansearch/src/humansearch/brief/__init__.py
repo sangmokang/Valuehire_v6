@@ -1,5 +1,6 @@
 """HS-13 포지션 브리프·서치 패킷 패키지의 공개 경계."""
 
+from .boolean_query import BooleanQuerySet, build_boolean_queries, check_balanced
 from .types import (
     BriefInputError,
     Claim,
@@ -17,10 +18,6 @@ from .types_candidate import (
     ScoreBreakdown,
 )
 from .types_packet import JdPacket, SearchPacket, TeamMail
-
-# boolean_query 는 위 BriefInputError 가 이미 이 모듈 네임스페이스에 바인딩된 뒤에 임포트한다
-# (boolean_query.py 는 `from . import BriefInputError` 로 이 패키지에서 되돌려 가져온다).
-from .boolean_query import BooleanQuerySet, build_boolean_queries, check_balanced
 
 __all__ = [
     "BooleanQuerySet",

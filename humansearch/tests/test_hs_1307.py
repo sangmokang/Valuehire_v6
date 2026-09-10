@@ -6,7 +6,12 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from humansearch.brief import BooleanQuerySet, BriefInputError, build_boolean_queries, check_balanced
+from humansearch.brief import (
+    BooleanQuerySet,
+    BriefInputError,
+    build_boolean_queries,
+    check_balanced,
+)
 
 # --- 1. 정상 3식 생성 — 정확한 문자열 단언 ------------------------------------
 
@@ -172,7 +177,7 @@ def test_build_boolean_queries_property_balanced_and_contains_required(
         label="exclude",
     )
     keys_pool = required + optional
-    synonyms = data.draw(
+    raw_synonyms = data.draw(
         st.dictionaries(
             keys=st.sampled_from(keys_pool),
             values=st.lists(_term_strategy(), max_size=2, unique=True),
@@ -180,6 +185,9 @@ def test_build_boolean_queries_property_balanced_and_contains_required(
         ),
         label="synonyms",
     )
+    synonyms: dict[str, tuple[str, ...]] = {
+        key: tuple(values) for key, values in raw_synonyms.items()
+    }
 
     result = build_boolean_queries(
         required=tuple(required),
