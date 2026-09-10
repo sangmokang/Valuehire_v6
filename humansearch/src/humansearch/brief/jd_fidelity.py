@@ -147,7 +147,7 @@ class FidelityReport:
 
     @property
     def ok(self) -> bool:
-        raise NotImplementedError("HS-13.02b 미구현")
+        return not self.missing and not self.extra_condition and not self.extra_lines
 
 
 def _matches_condition(line: str) -> bool:
@@ -179,18 +179,40 @@ def verify_fidelity(
     jd_seen = frozenset(jd_lines)
     rendered_seen = frozenset(rendered_lines)
     missing = tuple(line for line in jd_lines if line not in rendered_seen)
-    extra_condition = tuple(
-        line
-        for line in rendered_lines
-        if line not in jd_seen and line not in allowed and _matches_condition(line)
+    extra_lines = tuple(
+        line for line in rendered_lines if line not in jd_seen and line not in allowed
     )
+    extra_condition = tuple(line for line in extra_lines if _matches_condition(line))
     return FidelityReport(
         missing=missing,
         extra_condition=extra_condition,
         jd_line_count=len(jd_lines),
         rendered_line_count=len(rendered_lines),
+        extra_lines=extra_lines,
     )
 
 
+def _marker_index(lines: tuple[str, ...], marker: str, label: str) -> int:
+    target = normalize_line(marker)
+    if not target:
+        raise BriefInputError(f"extract_block 의 {label} 는 내용 없는 줄일 수 없다")
+    hits = [index for index, line in enumerate(lines) if normalize_line(line) == target]
+    if not hits:
+        raise BriefInputError(f"extract_block 이 {label} 줄을 찾지 못했다: {target!r}")
+    if len(hits) > 1:
+        raise BriefInputError(f"extract_block 의 {label} 줄이 {len(hits)}회 나타난다(1회여야 한다)")
+    return hits[0]
+
+
 def extract_block(text: str, start_marker: str, end_marker: str) -> str:
-    raise NotImplementedError("HS-13.02b 미구현")
+    """두 마커 줄(정규화 비교) 사이의 텍스트만 잘라 낸다.
+
+    Gmail 본문 전체가 아니라 이 블록만 충실도 판정 대상이다(블록 밖 인사·회사 소개는 제외).
+    마커가 없거나 2회 이상이거나 끝 마커가 시작 마커보다 앞이면 BriefInputError.
+    """
+    lines = tuple(text.splitlines())
+    start = _marker_index(lines, start_marker, "start_marker")
+    end = _marker_index(lines, end_marker, "end_marker")
+    if end <= start:
+        raise BriefInputError("extract_block 의 end_marker 줄이 start_marker 줄보다 앞에 있다")
+    return "".join(f"{line}\n" for line in lines[start + 1 : end])
