@@ -106,12 +106,17 @@ build_case = lambda do |root, kind|
     run.call(root, {}, "git", "commit", "-q", "-m", "restore test after fake green")
   end
 
+  run.call(root, {}, "git", "commit", "--allow-empty", "-q", "-m", "complete work unit")
+  _rc, completion_commit = run.call(root, {}, "git", "rev-parse", "HEAD")
+  completion_commit.strip!
+
   manifest = Marshal.load(Marshal.dump(base_manifest))
   unit = manifest.fetch("work_units").first
   unit["id"] = "WU-#{kind.to_s.upcase}"
   unit["tdd"]["contract_commit"] = contract_commit
   unit["tdd"]["red_commit"] = red_commit
   unit["tdd"]["green_commit"] = green_commit
+  unit["tdd"]["completion_commit"] = completion_commit
   unit["tdd"]["red_commands"] = [kind == :marker_only ? "bash scripts/fake-red.sh" : "ruby test/feature_test.rb"]
   unit["tdd"]["red_tests"] = 1
   unit["tdd"]["test_files"] = ["test/feature_test.rb"]
@@ -224,6 +229,36 @@ Dir.mktmpdir("wu-tdd-contract-") do |tmp|
   self_approved_ok = rc == 1 && out.include?("EXPECTATION_APPROVAL_IS_GREEN")
   missing_behavior ||= rc.zero?
   assert.call("GREEN cannot self-approve expectation changes", self_approved_ok, out)
+
+  manifest_path, = cases.fetch(:normal)
+  completion_before_green = Psych.safe_load(File.read(manifest_path), aliases: false)
+  completion_before_green["work_units"].first["tdd"]["completion_commit"] =
+    completion_before_green["work_units"].first["tdd"]["red_commit"]
+  completion_before_green_path = File.join(tmp, "completion-before-green.yaml")
+  File.write(completion_before_green_path, Psych.dump(completion_before_green))
+  rc, out = run.call(
+    repo_root,
+    { "WORK_UNIT_REPO" => File.join(tmp, "normal"), "WORK_UNIT_TDD_ONLY" => "1" },
+    "ruby", checker, completion_before_green_path
+  )
+  completion_order_ok = rc == 1 && out.include?("COMPLETION_NOT_AFTER_GREEN")
+  missing_behavior ||= rc.zero?
+  assert.call("completion commit before GREEN rejected", completion_order_ok, out)
+
+  sequence_manifest = Psych.safe_load(File.read(manifest_path), aliases: false)
+  second_unit = Marshal.load(Marshal.dump(sequence_manifest.fetch("work_units").first))
+  second_unit["id"] = "WU-SEQUENCE-2"
+  sequence_manifest["work_units"] << second_unit
+  sequence_path = File.join(tmp, "sequence-before-completion.yaml")
+  File.write(sequence_path, Psych.dump(sequence_manifest))
+  rc, out = run.call(
+    repo_root,
+    { "WORK_UNIT_REPO" => File.join(tmp, "normal"), "WORK_UNIT_TDD_ONLY" => "1" },
+    "ruby", checker, sequence_path
+  )
+  sequence_ok = rc == 1 && out.include?("WU_SEQUENCE_BEFORE_PRIOR_COMPLETION")
+  missing_behavior ||= rc.zero?
+  assert.call("next Work Unit before prior completion rejected", sequence_ok, out)
 end
 
 puts "WU_TESTS: #{checked}"
