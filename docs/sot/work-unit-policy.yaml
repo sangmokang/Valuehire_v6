@@ -21,6 +21,8 @@ work_unit:
     - completion_commit
 tdd:
   contract_commit_precedes_red: true
+  authority_evidence_paths_minimum: 1
+  authority_evidence_must_exist_at_contract_commit: true
   red_commands_minimum: 1
   red_tests_minimum: 1
   red_failure_kind: "missing_behavior"
