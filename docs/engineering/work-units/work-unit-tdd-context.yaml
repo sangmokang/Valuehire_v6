@@ -1,0 +1,306 @@
+manifest_version: 1
+work_units:
+  - id: "WU-1"
+    claim: "Incomplete or duplicate Work Unit contracts are rejected."
+    acceptance_criterion: "When a manifest is checked, the system shall accept only a Work Unit with one AC, at least one counter-AC, every required contract, and a unique ID."
+    counter_acceptance_criteria:
+      - "A named file without an AC or counter-AC passes."
+      - "Two Work Units with the same ID pass."
+    contracts:
+      input: "One repository-relative YAML Work Unit manifest."
+      output: "A PASS verdict with a positive checked count, or a closed failure."
+      errors: "Missing fields, unknown fields, duplicate IDs, and malformed YAML fail."
+      boundaries:
+        - "Exactly one falsifiable claim and one acceptance criterion per Work Unit."
+      database:
+        status: "NOT_APPLICABLE"
+        reason: "This schema checker does not access persistent data or migrations."
+        paths:
+          - "docs/engineering/work-unit-tdd-context-goal-2026-09-10.md"
+      api:
+        status: "NOT_APPLICABLE"
+        reason: "This schema checker has no network or external API boundary."
+        paths:
+          - "docs/engineering/work-unit-tdd-context-goal-2026-09-10.md"
+      types:
+        status: "APPLICABLE"
+        reason: "The policy YAML is the machine-readable manifest type authority."
+        paths:
+          - "docs/sot/work-unit-policy.yaml"
+    tdd:
+      mode: "RED_GREEN"
+      contract_commit: "e80d1809da31b0c0c649d302dfc7c7633f53f26e"
+      red_commit: "14604d568301492f3c73e5cceac8c2b49768e714"
+      green_commit: "18e7535e7e9799d03a14c6b31582e857ae94ddf9"
+      red_commands:
+        - "bash scripts/acceptance-work-unit-contract.sh schema"
+      red_tests: 4
+      red_failure_kind: "missing_behavior"
+      test_files:
+        - "scripts/verify/fixtures/work-unit/ac-missing.yaml"
+        - "scripts/verify/fixtures/work-unit/counter-ac-missing.yaml"
+        - "scripts/verify/fixtures/work-unit/duplicate-id.yaml"
+      expectation_change_approval_commit: null
+    regression_commands:
+      - "bash scripts/acceptance-work-unit-contract.sh schema"
+    adversarial_commands:
+      - "bash scripts/acceptance-work-unit-contract-mutations.sh"
+    context:
+      expected_head: "e80d1809da31b0c0c649d302dfc7c7633f53f26e"
+      expected_worktree: "task/wu-tdd-context-contract-20260910"
+      scope: "minimal"
+      files:
+        - path: "docs/sot/work-unit-policy.yaml"
+          commit_sha: "e80d1809da31b0c0c649d302dfc7c7633f53f26e"
+          sha256: "1fb6be2bf97c16efae5c833f6e4300a8e08fa640133398f83ffdb941abf58a19"
+          read_evidence: "git:e80d1809da31b0c0c649d302dfc7c7633f53f26e:docs/sot/work-unit-policy.yaml:1fb6be2bf97c16efae5c833f6e4300a8e08fa640133398f83ffdb941abf58a19"
+        - path: "docs/engineering/work-unit-tdd-context-goal-2026-09-10.md"
+          commit_sha: "e80d1809da31b0c0c649d302dfc7c7633f53f26e"
+          sha256: "7ba39187d334959d5e689bf75a65f648ae41aeda83090e2df709f87dafca748a"
+          read_evidence: "git:e80d1809da31b0c0c649d302dfc7c7633f53f26e:docs/engineering/work-unit-tdd-context-goal-2026-09-10.md:7ba39187d334959d5e689bf75a65f648ae41aeda83090e2df709f87dafca748a"
+      observed_reads:
+        - "git:e80d1809da31b0c0c649d302dfc7c7633f53f26e:docs/sot/work-unit-policy.yaml:1fb6be2bf97c16efae5c833f6e4300a8e08fa640133398f83ffdb941abf58a19"
+        - "git:e80d1809da31b0c0c649d302dfc7c7633f53f26e:docs/engineering/work-unit-tdd-context-goal-2026-09-10.md:7ba39187d334959d5e689bf75a65f648ae41aeda83090e2df709f87dafca748a"
+    not_applicable: null
+
+  - id: "WU-2"
+    claim: "Only behavior-missing RED evidence and immutable test expectations establish a valid first GREEN."
+    acceptance_criterion: "When RED and GREEN history is checked, the system shall replay a positive test count, reject syntax/import-only failures, and reject unapproved test changes through current HEAD."
+    counter_acceptance_criteria:
+      - "A zero-test or syntax-only RED is accepted."
+      - "An implementation commit can silently rewrite test expectations."
+    contracts:
+      input: "Contract, RED, GREEN commits plus replayable commands and declared test files."
+      output: "Validated RED cause, first GREEN, and post-RED test immutability."
+      errors: "Missing commits, invalid ordering, false RED, or unapproved test drift fail."
+      boundaries:
+        - "Database/API contract and manifest Type evidence must exist at the contract commit."
+      database:
+        status: "NOT_APPLICABLE"
+        reason: "The Git evidence checker reads repository objects only."
+        paths:
+          - "docs/engineering/work-unit-tdd-context-goal-2026-09-10.md"
+      api:
+        status: "NOT_APPLICABLE"
+        reason: "The Git evidence checker performs no external API calls."
+        paths:
+          - "docs/engineering/work-unit-tdd-context-goal-2026-09-10.md"
+      types:
+        status: "APPLICABLE"
+        reason: "The policy YAML defines RED/GREEN evidence fields."
+        paths:
+          - "docs/sot/work-unit-policy.yaml"
+    tdd:
+      mode: "RED_GREEN"
+      contract_commit: "3c1ad8cdf9132f0e8b54bb6e3e725f98662a8dc2"
+      red_commit: "aa875705a442b7e9f34d79aef520049fe174b90b"
+      green_commit: "1bdb5043657f8f080c926807af37ee6488ef1bde"
+      red_commands:
+        - "bash scripts/acceptance-work-unit-contract.sh tdd"
+      red_tests: 5
+      red_failure_kind: "missing_behavior"
+      test_files:
+        - "scripts/verify/work-unit-tdd-contract-test.rb"
+      expectation_change_approval_commit: "14dad68e2a1afe2bda2f8a680a79a4bbe51cc335"
+    regression_commands:
+      - "bash scripts/acceptance-work-unit-contract.sh tdd"
+    adversarial_commands:
+      - "bash scripts/acceptance-work-unit-contract-mutations.sh"
+    context:
+      expected_head: "3c1ad8cdf9132f0e8b54bb6e3e725f98662a8dc2"
+      expected_worktree: "task/wu-tdd-context-contract-20260910"
+      scope: "minimal"
+      files:
+        - path: "docs/sot/work-unit-policy.yaml"
+          commit_sha: "3c1ad8cdf9132f0e8b54bb6e3e725f98662a8dc2"
+          sha256: "0b4e20ad9ab280eba7a43c24ab958bd1d32a13e47a590f6fba5cd6de6df681dc"
+          read_evidence: "git:3c1ad8cdf9132f0e8b54bb6e3e725f98662a8dc2:docs/sot/work-unit-policy.yaml:0b4e20ad9ab280eba7a43c24ab958bd1d32a13e47a590f6fba5cd6de6df681dc"
+        - path: "docs/engineering/work-unit-tdd-context-goal-2026-09-10.md"
+          commit_sha: "3c1ad8cdf9132f0e8b54bb6e3e725f98662a8dc2"
+          sha256: "b05fc04caca68d995124b0bf16dd6ac1639679288760944ff2dc26fea2bc1de7"
+          read_evidence: "git:3c1ad8cdf9132f0e8b54bb6e3e725f98662a8dc2:docs/engineering/work-unit-tdd-context-goal-2026-09-10.md:b05fc04caca68d995124b0bf16dd6ac1639679288760944ff2dc26fea2bc1de7"
+      observed_reads:
+        - "git:3c1ad8cdf9132f0e8b54bb6e3e725f98662a8dc2:docs/sot/work-unit-policy.yaml:0b4e20ad9ab280eba7a43c24ab958bd1d32a13e47a590f6fba5cd6de6df681dc"
+        - "git:3c1ad8cdf9132f0e8b54bb6e3e725f98662a8dc2:docs/engineering/work-unit-tdd-context-goal-2026-09-10.md:b05fc04caca68d995124b0bf16dd6ac1639679288760944ff2dc26fea2bc1de7"
+    not_applicable: null
+
+  - id: "WU-3"
+    claim: "Declared AI context is limited to hashed repository files at the declared commit."
+    acceptance_criterion: "When context evidence is checked, the system shall require matching path, commit, hash, read receipt, HEAD, worktree, and declared/observed read sets."
+    counter_acceptance_criteria:
+      - "A filename without a read receipt passes."
+      - "A stale HEAD, another worktree, or the entire repository passes as evidence."
+    contracts:
+      input: "A minimal list of repository paths with commit SHA, SHA-256, and read receipts."
+      output: "A current active-context verdict or a reproducible historical contract-context verdict."
+      errors: "Missing files, mismatched hashes, stale active HEAD, or extra reads fail."
+      boundaries:
+        - "Historical manifests validate against each WU contract commit; active manifests validate against current HEAD and worktree."
+      database:
+        status: "NOT_APPLICABLE"
+        reason: "Context validation reads Git blobs rather than database state."
+        paths:
+          - "docs/engineering/work-unit-tdd-context-goal-2026-09-10.md"
+      api:
+        status: "NOT_APPLICABLE"
+        reason: "Context validation performs no network or external API calls."
+        paths:
+          - "docs/engineering/work-unit-tdd-context-goal-2026-09-10.md"
+      types:
+        status: "APPLICABLE"
+        reason: "The policy YAML defines context evidence fields and scope."
+        paths:
+          - "docs/sot/work-unit-policy.yaml"
+    tdd:
+      mode: "RED_GREEN"
+      contract_commit: "c28b3a29d4be3509d1d097ec99ce70d9eab676b8"
+      red_commit: "bc5c4d042195ad6f4a5f2903ab5f259475c213b5"
+      green_commit: "2c258798640becaf9b1b3da7723d8c5562bd74e0"
+      red_commands:
+        - "bash scripts/acceptance-work-unit-contract.sh context"
+      red_tests: 7
+      red_failure_kind: "missing_behavior"
+      test_files:
+        - "scripts/verify/work-unit-context-contract-test.rb"
+      expectation_change_approval_commit: "3c418f580b62be1cb28ab5f0aec50afd24d446d2"
+    regression_commands:
+      - "bash scripts/acceptance-work-unit-contract.sh context"
+    adversarial_commands:
+      - "bash scripts/acceptance-work-unit-contract-mutations.sh"
+    context:
+      expected_head: "c28b3a29d4be3509d1d097ec99ce70d9eab676b8"
+      expected_worktree: "task/wu-tdd-context-contract-20260910"
+      scope: "minimal"
+      files:
+        - path: "docs/sot/work-unit-policy.yaml"
+          commit_sha: "c28b3a29d4be3509d1d097ec99ce70d9eab676b8"
+          sha256: "c72c14bc34b9bd4c2faebebd2dc773e23dc6b543f69f4ec763f317e60c58ec01"
+          read_evidence: "git:c28b3a29d4be3509d1d097ec99ce70d9eab676b8:docs/sot/work-unit-policy.yaml:c72c14bc34b9bd4c2faebebd2dc773e23dc6b543f69f4ec763f317e60c58ec01"
+        - path: "docs/engineering/work-unit-tdd-context-goal-2026-09-10.md"
+          commit_sha: "c28b3a29d4be3509d1d097ec99ce70d9eab676b8"
+          sha256: "2719a4c6e1b3b47ae6a7b526849d1b854f7814647f10b544065a1642f3c2a191"
+          read_evidence: "git:c28b3a29d4be3509d1d097ec99ce70d9eab676b8:docs/engineering/work-unit-tdd-context-goal-2026-09-10.md:2719a4c6e1b3b47ae6a7b526849d1b854f7814647f10b544065a1642f3c2a191"
+      observed_reads:
+        - "git:c28b3a29d4be3509d1d097ec99ce70d9eab676b8:docs/sot/work-unit-policy.yaml:c72c14bc34b9bd4c2faebebd2dc773e23dc6b543f69f4ec763f317e60c58ec01"
+        - "git:c28b3a29d4be3509d1d097ec99ce70d9eab676b8:docs/engineering/work-unit-tdd-context-goal-2026-09-10.md:2719a4c6e1b3b47ae6a7b526849d1b854f7814647f10b544065a1642f3c2a191"
+    not_applicable: null
+
+  - id: "WU-4"
+    claim: "A test-inappropriate change cannot skip verification without a reason and executable substitute."
+    acceptance_criterion: "If TDD is NOT_APPLICABLE, the system shall accept only an allowed change kind with a concrete reason and at least one passing alternative validation command."
+    counter_acceptance_criteria:
+      - "An empty reason, zero commands, or an arbitrary change kind passes."
+    contracts:
+      input: "A NOT_APPLICABLE declaration or a normal RED_GREEN declaration."
+      output: "A validated exemption with executed substitute evidence, or a normal TDD result."
+      errors: "Missing reason, invalid kind, empty commands, mixed modes, or failing substitutes fail."
+      boundaries:
+        - "Only UI, documentation, configuration, migration, and explicitly test-inappropriate work may use the exemption."
+      database:
+        status: "NOT_APPLICABLE"
+        reason: "This Work Unit adds the exemption checker and no migration or database state."
+        paths:
+          - "docs/engineering/work-unit-tdd-context-goal-2026-09-10.md"
+      api:
+        status: "NOT_APPLICABLE"
+        reason: "This Work Unit adds no network or external API behavior."
+        paths:
+          - "docs/engineering/work-unit-tdd-context-goal-2026-09-10.md"
+      types:
+        status: "APPLICABLE"
+        reason: "The policy YAML defines allowed NOT_APPLICABLE kinds and fields."
+        paths:
+          - "docs/sot/work-unit-policy.yaml"
+    tdd:
+      mode: "RED_GREEN"
+      contract_commit: "f22cfcf63aa1baae8ec960dd2c689fcec8db7bc7"
+      red_commit: "3c418f580b62be1cb28ab5f0aec50afd24d446d2"
+      green_commit: "597e5a1eac76ca1cf618adc4ad38397140eef3eb"
+      red_commands:
+        - "bash scripts/acceptance-work-unit-contract.sh not-applicable"
+      red_tests: 5
+      red_failure_kind: "missing_behavior"
+      test_files:
+        - "scripts/verify/work-unit-not-applicable-contract-test.rb"
+      expectation_change_approval_commit: null
+    regression_commands:
+      - "bash scripts/acceptance-work-unit-contract.sh not-applicable"
+    adversarial_commands:
+      - "bash scripts/acceptance-work-unit-contract-mutations.sh"
+    context:
+      expected_head: "f22cfcf63aa1baae8ec960dd2c689fcec8db7bc7"
+      expected_worktree: "task/wu-tdd-context-contract-20260910"
+      scope: "minimal"
+      files:
+        - path: "docs/sot/work-unit-policy.yaml"
+          commit_sha: "f22cfcf63aa1baae8ec960dd2c689fcec8db7bc7"
+          sha256: "c72c14bc34b9bd4c2faebebd2dc773e23dc6b543f69f4ec763f317e60c58ec01"
+          read_evidence: "git:f22cfcf63aa1baae8ec960dd2c689fcec8db7bc7:docs/sot/work-unit-policy.yaml:c72c14bc34b9bd4c2faebebd2dc773e23dc6b543f69f4ec763f317e60c58ec01"
+        - path: "docs/engineering/work-unit-tdd-context-goal-2026-09-10.md"
+          commit_sha: "f22cfcf63aa1baae8ec960dd2c689fcec8db7bc7"
+          sha256: "d36f16764534b1594393cdaf7127ae90c1325182608b79bbc38629be274808f6"
+          read_evidence: "git:f22cfcf63aa1baae8ec960dd2c689fcec8db7bc7:docs/engineering/work-unit-tdd-context-goal-2026-09-10.md:d36f16764534b1594393cdaf7127ae90c1325182608b79bbc38629be274808f6"
+      observed_reads:
+        - "git:f22cfcf63aa1baae8ec960dd2c689fcec8db7bc7:docs/sot/work-unit-policy.yaml:c72c14bc34b9bd4c2faebebd2dc773e23dc6b543f69f4ec763f317e60c58ec01"
+        - "git:f22cfcf63aa1baae8ec960dd2c689fcec8db7bc7:docs/engineering/work-unit-tdd-context-goal-2026-09-10.md:d36f16764534b1594393cdaf7127ae90c1325182608b79bbc38629be274808f6"
+    not_applicable: null
+
+  - id: "WU-5"
+    claim: "Independent mutation checks detect disabled Work Unit checkers and CI wiring."
+    acceptance_criterion: "If the checker or CI command is changed to exit zero, no-op, echo-only, or an always-false condition, the mutation acceptance shall observe a failure."
+    counter_acceptance_criteria:
+      - "A disabled checker or skipped CI command remains green."
+    contracts:
+      input: "Synthetic checker and CI mutations plus the real acceptance commands."
+      output: "Each mutation is killed and the unmodified gate passes."
+      errors: "A surviving mutation, missing command, no verdict, or changed original worktree fails."
+      boundaries:
+        - "Fixtures prove the checker; repository manifests separately prove real WU adoption."
+      database:
+        status: "NOT_APPLICABLE"
+        reason: "Mutation fixtures use temporary files and no persistent data."
+        paths:
+          - "docs/engineering/work-unit-tdd-context-goal-2026-09-10.md"
+      api:
+        status: "NOT_APPLICABLE"
+        reason: "Mutation checks perform no network or external API calls."
+        paths:
+          - "docs/engineering/work-unit-tdd-context-goal-2026-09-10.md"
+      types:
+        status: "APPLICABLE"
+        reason: "The policy YAML defines the gate and mutation obligations."
+        paths:
+          - "docs/sot/work-unit-policy.yaml"
+    tdd:
+      mode: "RED_GREEN"
+      contract_commit: "9a0d73cd84d96ef1d70dfb280115582b6f8ea7ca"
+      red_commit: "c78f9305c0d04ed767827c58595c3627c0ac2c31"
+      green_commit: "faa8b6f6fadfdbaafa1684aa24e3fffa1b6efeb1"
+      red_commands:
+        - "bash scripts/acceptance-work-unit-contract-mutations.sh"
+      red_tests: 8
+      red_failure_kind: "missing_behavior"
+      test_files:
+        - "scripts/acceptance-work-unit-contract-mutations.sh"
+      expectation_change_approval_commit: null
+    regression_commands:
+      - "bash scripts/acceptance-work-unit-contract-mutations.sh"
+    adversarial_commands:
+      - "bash scripts/acceptance-semantic-mutations.sh"
+    context:
+      expected_head: "9a0d73cd84d96ef1d70dfb280115582b6f8ea7ca"
+      expected_worktree: "task/wu-tdd-context-contract-20260910"
+      scope: "minimal"
+      files:
+        - path: "docs/sot/work-unit-policy.yaml"
+          commit_sha: "9a0d73cd84d96ef1d70dfb280115582b6f8ea7ca"
+          sha256: "c72c14bc34b9bd4c2faebebd2dc773e23dc6b543f69f4ec763f317e60c58ec01"
+          read_evidence: "git:9a0d73cd84d96ef1d70dfb280115582b6f8ea7ca:docs/sot/work-unit-policy.yaml:c72c14bc34b9bd4c2faebebd2dc773e23dc6b543f69f4ec763f317e60c58ec01"
+        - path: "docs/engineering/work-unit-tdd-context-goal-2026-09-10.md"
+          commit_sha: "9a0d73cd84d96ef1d70dfb280115582b6f8ea7ca"
+          sha256: "4a419d8def6315e62ae75e0e1ffe26fd612f2817e5a1206b2056cccc9aad0ff8"
+          read_evidence: "git:9a0d73cd84d96ef1d70dfb280115582b6f8ea7ca:docs/engineering/work-unit-tdd-context-goal-2026-09-10.md:4a419d8def6315e62ae75e0e1ffe26fd612f2817e5a1206b2056cccc9aad0ff8"
+      observed_reads:
+        - "git:9a0d73cd84d96ef1d70dfb280115582b6f8ea7ca:docs/sot/work-unit-policy.yaml:c72c14bc34b9bd4c2faebebd2dc773e23dc6b543f69f4ec763f317e60c58ec01"
+        - "git:9a0d73cd84d96ef1d70dfb280115582b6f8ea7ca:docs/engineering/work-unit-tdd-context-goal-2026-09-10.md:4a419d8def6315e62ae75e0e1ffe26fd612f2817e5a1206b2056cccc9aad0ff8"
+    not_applicable: null

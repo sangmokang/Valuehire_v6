@@ -16,10 +16,13 @@ module WorkUnitContextEvidence
 
     errors = []
     checked = 1
-    head = git(repo, "rev-parse", "HEAD").last.strip
-    worktree = git(repo, "branch", "--show-current").last.strip
-    tracked = git(repo, "ls-files").last.lines.map(&:strip).reject(&:empty?).sort
+    current_head = git(repo, "rev-parse", "HEAD").last.strip
+    current_worktree = git(repo, "branch", "--show-current").last.strip
+    archive = ENV["WORK_UNIT_CONTEXT_AT_CONTRACT"] == "1"
     data.fetch("work_units").each do |unit|
+      head = archive ? unit.fetch("tdd").fetch("contract_commit") : current_head
+      worktree = archive ? nil : current_worktree
+      tracked = tracked_files(repo, head)
       unit_errors, unit_checked = validate_unit(unit, repo, head, worktree, tracked)
       errors.concat(unit_errors)
       checked += unit_checked
@@ -33,7 +36,9 @@ module WorkUnitContextEvidence
     errors = []
     checked = 4
     errors << "CONTEXT_HEAD_MISMATCH: #{id}" unless context.fetch("expected_head") == head
-    errors << "CONTEXT_WORKTREE_MISMATCH: #{id}" unless context.fetch("expected_worktree") == worktree
+    if worktree && context.fetch("expected_worktree") != worktree
+      errors << "CONTEXT_WORKTREE_MISMATCH: #{id}"
+    end
     errors << "CONTEXT_SCOPE_TOO_BROAD: #{id}" unless context.fetch("scope") == "minimal"
 
     files = context.fetch("files")
@@ -76,6 +81,11 @@ module WorkUnitContextEvidence
   def repository_path?(path)
     path.is_a?(String) && !path.empty? && !path.start_with?("/", "~", ".") &&
       !path.split("/").include?("..") && !path.match?(/[\*?\[\]{}]/)
+  end
+
+  def tracked_files(repo, commit)
+    rc, output = git(repo, "ls-tree", "-r", "--name-only", commit)
+    rc.zero? ? output.lines.map(&:strip).reject(&:empty?).sort : []
   end
 
   def git_repository?(repo)

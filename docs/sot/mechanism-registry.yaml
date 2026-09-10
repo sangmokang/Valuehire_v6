@@ -51,6 +51,12 @@
   stage: "ci"
   ci_mirror_job: "verify"
   required: true
+- id: "work-unit-repository-ci"
+  path: ".github/workflows/verify.yml"
+  target: "bash scripts/verify/run-acceptance.sh scripts/acceptance-work-unit-repository.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
 - id: "work-unit-contract-mutations-ci"
   path: ".github/workflows/verify.yml"
   target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-work-unit-contract-mutations.sh"

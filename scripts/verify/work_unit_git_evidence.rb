@@ -135,7 +135,8 @@ module WorkUnitGitEvidence
     return [errors, checked] if changed.empty?
 
     approval = tdd["expectation_change_approval_commit"]
-    unless approved_change?(repo, id, approval, tdd, changed, head)
+    unless approved_change?(repo, id, approval, tdd, changed, head) ||
+           approved_change_history?(repo, id, tdd, head)
       errors << "TEST_FILE_CHANGED_AFTER_RED: #{changed.join(',')}"
     end
     [errors, checked + 1]
@@ -147,11 +148,39 @@ module WorkUnitGitEvidence
     return false unless ancestor?(repo, approval, head)
 
     rc, message = git(repo, "show", "-s", "--format=%B", approval)
-    return false unless rc.zero? && message.lines.any? { |line| line.strip == "Test-Expectation-Approval: #{id}" }
+    return false unless rc.zero? && approval_trailer?(message, id)
 
     rc, names = git(repo, "diff-tree", "--no-commit-id", "--name-only", "-r", approval)
     files = names.lines.map(&:strip).reject(&:empty?)
-    rc.zero? && !files.empty? && files.sort == changed.sort
+    rc.zero? && !files.empty? && changed.all? { |path| files.include?(path) } &&
+      files.all? { |path| test_evidence_path?(path) }
+  end
+
+  def approved_change_history?(repo, id, tdd, head)
+    rc, output = git(repo, "log", "--format=%H", "#{tdd.fetch('red_commit')}..#{head}", "--", *tdd.fetch("test_files"))
+    return false unless rc.zero?
+
+    commits = output.lines.map(&:strip).reject(&:empty?)
+    return false if commits.empty?
+
+    commits.all? do |commit|
+      message_rc, message = git(repo, "show", "-s", "--format=%B", commit)
+      names_rc, names = git(repo, "diff-tree", "--no-commit-id", "--name-only", "-r", commit)
+      files = names.lines.map(&:strip).reject(&:empty?)
+      message_rc.zero? && names_rc.zero? && approval_trailer?(message, id) &&
+        !files.empty? && files.all? { |path| test_evidence_path?(path) }
+    end
+  end
+
+  def approval_trailer?(message, id)
+    pattern = /\ATest-Expectation-Approval:\s*#{Regexp.escape(id)}(?:\s|\z)/
+    message.lines.any? { |line| line.strip.match?(pattern) }
+  end
+
+  def test_evidence_path?(path)
+    path.start_with?("scripts/verify/fixtures/", "test/", "tests/") ||
+      path.match?(%r{\Ascripts/verify/.*(?:test|spec)\.(?:rb|py|sh)\z}) ||
+      path.match?(%r{\Ascripts/acceptance-[^/]+\.sh\z})
   end
 
   def run_at_commit(repo, commit, command)

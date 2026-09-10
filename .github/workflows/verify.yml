@@ -48,7 +48,9 @@ jobs:
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-principles-mutations.sh
 
       - name: Work Unit TDD·맥락 계약
-        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-work-unit-contract.sh
+        run: |
+          bash scripts/verify/run-acceptance.sh scripts/acceptance-work-unit-contract.sh
+          bash scripts/verify/run-acceptance.sh scripts/acceptance-work-unit-repository.sh
 
       - name: Work Unit 검사기·배선 mutation
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-work-unit-contract-mutations.sh
