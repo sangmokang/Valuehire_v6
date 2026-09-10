@@ -11,6 +11,7 @@ from .jd_fidelity import (
     split_sections,
     verify_fidelity,
 )
+from .two_field import TwoField, split_two_field
 from .types import (
     BriefInputError,
     Claim,
@@ -49,11 +50,13 @@ __all__ = [
     "Section",
     "SourceRef",
     "TeamMail",
+    "TwoField",
     "build_boolean_queries",
     "check_balanced",
     "content_lines",
     "extract_block",
     "normalize_line",
     "split_sections",
+    "split_two_field",
     "verify_fidelity",
 ]
