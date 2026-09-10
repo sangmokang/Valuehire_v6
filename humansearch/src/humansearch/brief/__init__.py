@@ -18,7 +18,12 @@ from .types_candidate import (
 )
 from .types_packet import JdPacket, SearchPacket, TeamMail
 
+# boolean_query 는 위 BriefInputError 가 이미 이 모듈 네임스페이스에 바인딩된 뒤에 임포트한다
+# (boolean_query.py 는 `from . import BriefInputError` 로 이 패키지에서 되돌려 가져온다).
+from .boolean_query import BooleanQuerySet, build_boolean_queries, check_balanced
+
 __all__ = [
+    "BooleanQuerySet",
     "BriefInputError",
     "CandidateEvidence",
     "CandidateLead",
@@ -34,4 +39,6 @@ __all__ = [
     "SearchPacket",
     "SourceRef",
     "TeamMail",
+    "build_boolean_queries",
+    "check_balanced",
 ]
