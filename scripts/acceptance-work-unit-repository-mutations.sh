@@ -31,6 +31,9 @@ if ! git worktree add --detach "$checkout" HEAD >/dev/null 2>&1; then
 fi
 cp "$repo/scripts/acceptance-work-unit-repository.sh" \
   "$checkout/scripts/acceptance-work-unit-repository.sh"
+cp "$repo/scripts/verify/check-work-unit-repository-coverage.rb" \
+  "$checkout/scripts/verify/check-work-unit-repository-coverage.rb"
+cp "$repo/docs/sot/work-unit-policy.yaml" "$checkout/docs/sot/work-unit-policy.yaml"
 
 run_case() {
   local label=$1 wanted=$2 diagnostic=$3
@@ -60,6 +63,16 @@ cp "$checkout/$disabled" "$checkout/docs/engineering/work-units/untracked.yaml"
 run_case "untracked manifest substitute rejected" 1 'untracked WU manifest is not repository evidence'
 mv "$checkout/docs/engineering/work-units/untracked.yaml" "$parent/untracked.yaml"
 mv "$checkout/$disabled" "$checkout/$manifest"
+
+cp "$checkout/$manifest" "$parent/complete-manifest.yaml"
+ruby -rpsych -e '
+  path = ARGV.fetch(0)
+  data = Psych.safe_load(File.read(path), permitted_classes: [], aliases: false)
+  data.fetch("work_units").reject! { |unit| unit.fetch("id") == "WU-5" }
+  File.write(path, Psych.dump(data))
+' "$checkout/$manifest"
+run_case "missing required WU ID rejected" 1 'REQUIRED_WU_MISSING: WU-5'
+cp "$parent/complete-manifest.yaml" "$checkout/$manifest"
 
 ruby -pi -e 'gsub("bash scripts/verify/run-acceptance.sh scripts/acceptance-work-unit-repository.sh", "echo repository-WU-gate-disabled")' \
   "$checkout/.github/workflows/verify.yml"

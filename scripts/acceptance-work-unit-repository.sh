@@ -13,6 +13,7 @@ cd "$repo" || exit 2
 
 manifest_dir=docs/engineering/work-units
 checker=scripts/verify/check-work-unit-manifest.rb
+coverage_checker=scripts/verify/check-work-unit-repository-coverage.rb
 ci=.github/workflows/verify.yml
 fail=0
 checked=0
@@ -44,6 +45,19 @@ else
   printf 'PASS: repository WU manifests discovered — %d\n' "${#manifests[@]}"
 fi
 
+if [ "${#manifests[@]}" -gt 0 ]; then
+  checked=$((checked + 1))
+  coverage_output=""
+  coverage_rc=0
+  coverage_output=$(ruby "$coverage_checker" docs/sot/work-unit-policy.yaml "${manifests[@]}" 2>&1) || coverage_rc=$?
+  if [ "$coverage_rc" -eq 0 ] && printf '%s\n' "$coverage_output" | grep -q '^VERDICT: PASS$'; then
+    echo 'PASS: required repository WU ID set matches manifests'
+  else
+    printf 'FAIL: repository WU ID coverage — exit=%s\n%s\n' "$coverage_rc" "$coverage_output"
+    fail=1
+  fi
+fi
+
 checked=$((checked + 1))
 if grep -Fq 'bash scripts/verify/run-acceptance.sh scripts/acceptance-work-unit-repository.sh' "$ci"; then
   echo 'PASS: repository WU acceptance is wired in CI'
@@ -52,12 +66,12 @@ else
   fail=1
 fi
 
-if [ "${#manifests[@]}" -gt 0 ]; then
+if [ "${#manifests[@]}" -gt 0 ] && [ "$fail" -eq 0 ]; then
   for manifest in "${manifests[@]}"; do
     checked=$((checked + 1))
     output=""
     rc=0
-    output=$(WORK_UNIT_CONTEXT_AT_CONTRACT=1 ruby "$checker" "$manifest" 2>&1) || rc=$?
+    output=$(ruby "$checker" --historical "$manifest" 2>&1) || rc=$?
     if [ "$rc" -eq 0 ] && printf '%s\n' "$output" | grep -q '^VERDICT: PASS$'; then
       printf 'PASS: repository WU manifest — %s\n' "$manifest"
     else

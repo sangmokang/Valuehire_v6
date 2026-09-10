@@ -55,6 +55,8 @@
 
 *(1번 앞에 `actions/checkout` 이 있고 `fetch-depth: 0` 이다 — 8번이 과거 blob 을 열려면 필요하다.)*
 
+Work Unit 단건 원명령은 현재 작업 맥락을 검사하는 `ruby scripts/verify/check-work-unit-manifest.rb <manifest.yaml>`이다. `docs/engineering/work-units/*.yaml`처럼 닫힌 역사 manifest는 `--historical`로 각 WU의 contract commit 맥락을 재현한다. 실제 저장소 적용·필수 ID·CI 배선·완료 명령을 함께 보는 권위 명령은 `bash scripts/acceptance-work-unit-repository.sh`이다.
+
 **CI는 고정 목록이고 로컬 `pre-push`는 글로브(이름 규칙 자동 수집)다.** 그래서 새 인수 스크립트를 만들면 로컬에서는 저절로 돌지만 CI에서는 한 줄도 안 돈다 — P15③("로컬에만 있는 검사는 없는 것으로 친다")에 걸린다. **새 `scripts/acceptance-*.sh`를 추가하는 PR은 `verify.yml`과 이 표 양쪽에 자기 줄을 함께 넣어야 한다.**
 
 ### 데이터 노출 판정기 — `scripts/scan-data-exposure.sh`

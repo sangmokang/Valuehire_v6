@@ -54,13 +54,20 @@
 | WU-3 | When 맥락 manifest를 검사하면 현재 HEAD·작업공간·파일 hash가 모두 맞아야 합니다. | filename-only, 전체 저장소, 오래된 HEAD, 다른 작업공간 | `bash scripts/acceptance-work-unit-contract.sh context` | WU-2 완료 | PASS · RED `bc5c4d0` · GREEN `2c25879` |
 | WU-4 | If 단위 시험이 부적합하면 허용 종류·구체 사유·대체 검증 명령이 있어야 합니다. | 빈 사유, 임의 생략, 실행 명령 0개 | `bash scripts/acceptance-work-unit-contract.sh not-applicable` | WU-3 완료 | PASS · RED `3c418f5` · GREEN `597e5a1` |
 | WU-5 | If 검사기나 서버 실행 줄을 무력화하면 독립 공격 검사가 실패를 관측해야 합니다. | exit 0, no-op, echo-only, 항상 거짓 조건 | `bash scripts/acceptance-work-unit-contract-mutations.sh` | WU-4 완료 | PASS · RED `672283c` · 시험 보정 `c78f930` · GREEN `faa8b6f` |
-| WU-2R | When DB/API/Type 선행 근거를 검사하면 각 근거 파일이 contract commit에 이미 존재해야 합니다. | RED에서 뒤늦게 만든 계약 파일 경로를 manifest에 적어 통과 | `bash scripts/acceptance-work-unit-contract.sh tdd` | WU-1~WU-5 완료 뒤 감사 보정 | PASS · 계약 `3c1ad8c` · RED `aa87570` · GREEN `1bdb504` |
-| WU-2R2 | When RED 이후 시험 불변을 검사하면 첫 GREEN 뒤 현재 HEAD까지의 무승인 변경도 거부해야 합니다. | GREEN 다음 커밋에서 기대값 변경 | `bash scripts/acceptance-work-unit-contract.sh tdd` | V1 감사 재현 | PASS · RED `14dad68` · GREEN `0cd7731` |
-| WU-5R | When 저장소 WU gate를 실행하면 실제 WU manifest 1개 이상과 CI 실행 배선이 없을 때 실패해야 합니다. | fixture만 통과하고 실제 WU manifest가 0개인 저장소 | `bash scripts/acceptance-work-unit-repository.sh` | WU-2R2 완료 후 V1 감사 재현 | PASS · 계약 `9a79acb` · RED `b4a542b` · GREEN `90df3a0` · 적대 회귀 `229bc59` |
-| WU-2R3 | When RED 이후 시험 이력을 검사하면 중간 GREEN에서 기대값을 바꾼 뒤 HEAD에서 원복해도 무승인 변경 커밋을 거부해야 합니다. | 가짜 GREEN 기대값 변경 후 최종 blob 원복 | `bash scripts/acceptance-work-unit-contract.sh tdd` | WU-5R 완료 후 V1 재감사 | PASS · 계약 `4949acb` · RED `3c7017c` · GREEN `77ee839` |
-| WU-5R2 | When WU 완료 증거를 검사하면 regression·adversarial 명령을 현재 저장소에서 실행하고 빈 명령·0건·비정상 종료를 거부해야 합니다. | `false`, `true`, `echo VERDICT: PASS`를 실행 증거로 허용 | `bash scripts/acceptance-work-unit-contract.sh completion` | WU-2R3 완료 후 V1 재감사 | PASS · 계약 `1757cc6` · RED `a9fd860` · GREEN `fd6e6e0` |
 
 각 WU는 계약 커밋 → RED 커밋 → 최소 GREEN 커밋 → 회귀·적대검증 → 완료 커밋 순서로 닫습니다. 앞 WU의 완료 커밋 전에는 다음 WU 파일을 시작하지 않습니다.
+
+## 감사 보정 장부
+
+아래 항목은 새 WU가 아니라 독립 감사가 찾은 기존 WU-2·WU-5 완료 계약의 누락을 보정한 이력입니다. 따라서 실제 WU manifest ID 집합은 위 WU-1~WU-5와 정확히 같아야 합니다.
+
+| 감사 ID | 보정한 WU | 반례 | RED → GREEN |
+|---|---|---|---|
+| A-1 | WU-2 | contract commit 뒤에 만든 DB/API/Type 근거 | `aa87570` → `1bdb504` |
+| A-2 | WU-2 | 첫 GREEN 뒤 무승인 기대값 변경 | `14dad68` → `0cd7731` |
+| A-3 | WU-5 | 실제 manifest 0개·CI 미배선 | `b4a542b` → `90df3a0` · 적대 회귀 `229bc59` |
+| A-4 | WU-2 | 가짜 GREEN 후 최종 blob 원복 | `3c7017c` → `77ee839` |
+| A-5 | WU-5 | regression·adversarial 명령 미실행 | `a9fd860` → `fd6e6e0` |
 
 ## Harness·검증·중단 조건
 

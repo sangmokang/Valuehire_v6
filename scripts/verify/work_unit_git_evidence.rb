@@ -10,6 +10,11 @@ module WorkUnitGitEvidence
     GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY
     GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_PREFIX GIT_QUARANTINE_PATH
   ].freeze
+  CONTROL_ENV_KEYS = %w[
+    WORK_UNIT_SCHEMA_ONLY WORK_UNIT_TDD_ONLY WORK_UNIT_CONTEXT_ONLY
+    WORK_UNIT_NOT_APPLICABLE_ONLY WORK_UNIT_COMPLETION_ONLY
+    WORK_UNIT_CONTEXT_AT_CONTRACT WORK_UNIT_REPO
+  ].freeze
   FORBIDDEN_RED = /syntax error|SyntaxError|LoadError|cannot load such file|collection error|no tests|WU_TESTS:\s*0/i
   EMPTY_COMMAND = /\A\s*(?:echo|printf|true|:)(?:\s|\z)/
 
@@ -224,6 +229,6 @@ module WorkUnitGitEvidence
   end
 
   def clean_env
-    GIT_ENV_KEYS.map { |key| [key, nil] }.to_h
+    (GIT_ENV_KEYS + CONTROL_ENV_KEYS).map { |key| [key, nil] }.to_h
   end
 end

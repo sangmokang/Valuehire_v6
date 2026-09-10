@@ -2,12 +2,15 @@
 # frozen_string_literal: true
 
 # Executable CLI/type boundary. The policy YAML remains the authority.
+historical = ARGV.first == "--historical"
+ARGV.shift if historical
 if ARGV.length != 1
   warn "VERDICT: NOT_RUN"
-  warn "REASON: usage: check-work-unit-manifest.rb <manifest.yaml>"
+  warn "REASON: usage: check-work-unit-manifest.rb [--historical] <manifest.yaml>"
   warn "CHECKED: 0"
   exit 2
 end
+ENV["WORK_UNIT_CONTEXT_AT_CONTRACT"] = "1" if historical
 
 module_path = File.join(__dir__, "work_unit_manifest.rb")
 unless File.file?(module_path) && !File.symlink?(module_path) && !File.zero?(module_path)

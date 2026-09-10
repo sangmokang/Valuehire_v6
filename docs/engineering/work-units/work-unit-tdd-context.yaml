@@ -92,16 +92,19 @@ work_units:
           - "docs/sot/work-unit-policy.yaml"
     tdd:
       mode: "RED_GREEN"
-      contract_commit: "3c1ad8cdf9132f0e8b54bb6e3e725f98662a8dc2"
-      red_commit: "aa875705a442b7e9f34d79aef520049fe174b90b"
-      green_commit: "1bdb5043657f8f080c926807af37ee6488ef1bde"
+      contract_commit: "32d7429a2859ec101151ab9a7757016da7ee0409"
+      red_commit: "f72c029b96d9ef4a59b63fafe5c9913ae3f867ee"
+      green_commit: "f2c609942ebf90040cae91ae10ccafe6eb286bec"
       red_commands:
         - "bash scripts/acceptance-work-unit-contract.sh tdd"
-      red_tests: 5
+      red_tests: 4
       red_failure_kind: "missing_behavior"
       test_files:
         - "scripts/verify/work-unit-tdd-contract-test.rb"
       expectation_change_approval_commit:
+        - "95110bd48da5794ffb9160a8e961d28762c692ab"
+        - "bc5c4d042195ad6f4a5f2903ab5f259475c213b5"
+        - "aa875705a442b7e9f34d79aef520049fe174b90b"
         - "14dad68e2a1afe2bda2f8a680a79a4bbe51cc335"
         - "3c7017c2607cb46a20ce2d2d52963217e49ea830"
     regression_commands:
@@ -109,21 +112,21 @@ work_units:
     adversarial_commands:
       - "bash scripts/acceptance-work-unit-contract-mutations.sh"
     context:
-      expected_head: "3c1ad8cdf9132f0e8b54bb6e3e725f98662a8dc2"
+      expected_head: "32d7429a2859ec101151ab9a7757016da7ee0409"
       expected_worktree: "task/wu-tdd-context-contract-20260910"
       scope: "minimal"
       files:
         - path: "docs/sot/work-unit-policy.yaml"
-          commit_sha: "3c1ad8cdf9132f0e8b54bb6e3e725f98662a8dc2"
-          sha256: "0b4e20ad9ab280eba7a43c24ab958bd1d32a13e47a590f6fba5cd6de6df681dc"
-          read_evidence: "git:3c1ad8cdf9132f0e8b54bb6e3e725f98662a8dc2:docs/sot/work-unit-policy.yaml:0b4e20ad9ab280eba7a43c24ab958bd1d32a13e47a590f6fba5cd6de6df681dc"
+          commit_sha: "32d7429a2859ec101151ab9a7757016da7ee0409"
+          sha256: "1fb6be2bf97c16efae5c833f6e4300a8e08fa640133398f83ffdb941abf58a19"
+          read_evidence: "git:32d7429a2859ec101151ab9a7757016da7ee0409:docs/sot/work-unit-policy.yaml:1fb6be2bf97c16efae5c833f6e4300a8e08fa640133398f83ffdb941abf58a19"
         - path: "docs/engineering/work-unit-tdd-context-goal-2026-09-10.md"
-          commit_sha: "3c1ad8cdf9132f0e8b54bb6e3e725f98662a8dc2"
-          sha256: "b05fc04caca68d995124b0bf16dd6ac1639679288760944ff2dc26fea2bc1de7"
-          read_evidence: "git:3c1ad8cdf9132f0e8b54bb6e3e725f98662a8dc2:docs/engineering/work-unit-tdd-context-goal-2026-09-10.md:b05fc04caca68d995124b0bf16dd6ac1639679288760944ff2dc26fea2bc1de7"
+          commit_sha: "32d7429a2859ec101151ab9a7757016da7ee0409"
+          sha256: "9145924854f93e4754c9a3a3f9a36c2cda0124c25ac3d050a4eb7efc2ee87040"
+          read_evidence: "git:32d7429a2859ec101151ab9a7757016da7ee0409:docs/engineering/work-unit-tdd-context-goal-2026-09-10.md:9145924854f93e4754c9a3a3f9a36c2cda0124c25ac3d050a4eb7efc2ee87040"
       observed_reads:
-        - "git:3c1ad8cdf9132f0e8b54bb6e3e725f98662a8dc2:docs/sot/work-unit-policy.yaml:0b4e20ad9ab280eba7a43c24ab958bd1d32a13e47a590f6fba5cd6de6df681dc"
-        - "git:3c1ad8cdf9132f0e8b54bb6e3e725f98662a8dc2:docs/engineering/work-unit-tdd-context-goal-2026-09-10.md:b05fc04caca68d995124b0bf16dd6ac1639679288760944ff2dc26fea2bc1de7"
+        - "git:32d7429a2859ec101151ab9a7757016da7ee0409:docs/sot/work-unit-policy.yaml:1fb6be2bf97c16efae5c833f6e4300a8e08fa640133398f83ffdb941abf58a19"
+        - "git:32d7429a2859ec101151ab9a7757016da7ee0409:docs/engineering/work-unit-tdd-context-goal-2026-09-10.md:9145924854f93e4754c9a3a3f9a36c2cda0124c25ac3d050a4eb7efc2ee87040"
     not_applicable: null
 
   - id: "WU-3"
