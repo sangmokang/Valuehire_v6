@@ -1,9 +1,14 @@
-"""HS-13 브리프 패킷의 핵심 값 타입 — 포지션·출처·JD 원문·회사 사실."""
+"""HS-13 브리프 패킷의 핵심 값 타입 — 포지션·출처·JD 원문·회사 사실.
+
+§4 입력 영역 표와 §5 계약을 생성 시점에 강제한다(fail-fast). 시계·파일·네트워크 접근 0.
+"""
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import date
+from typing import NoReturn
 
 __all__ = [
     "BriefInputError",
@@ -15,9 +20,64 @@ __all__ = [
     "SourceRef",
 ]
 
+_SOURCE_ID = re.compile(r"[A-Z]{1,2}[0-9]{1,3}")
+_SHA256 = re.compile(r"[0-9a-f]{64}")
+_HTML_TAG = re.compile(r"<[A-Za-z/!]")
+_EMAIL = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
+_LINKEDIN_PROFILE = re.compile(r"https://(?:www\.|kr\.)?linkedin\.com/in/\S+")
+
 
 class BriefInputError(ValueError):
     """브리프 입력 계약(§4 입력 영역 표) 위반. 값 생성 시점에 즉시 던진다."""
+
+
+def _reject(message: str) -> NoReturn:
+    raise BriefInputError(message)
+
+
+def _require_text(value: str, field: str) -> None:
+    if not value.strip():
+        _reject(f"{field} 는 공백만일 수 없다")
+
+
+def _require_http_url(value: str, field: str) -> None:
+    if not value.startswith(("http://", "https://")):
+        _reject(f"{field} 는 http:// 또는 https:// 로 시작해야 한다")
+
+
+def _require_profile_url(value: str, field: str) -> None:
+    if not _LINKEDIN_PROFILE.fullmatch(value):
+        _reject(f"{field} 는 https://[www.|kr.]linkedin.com/in/<식별자> 형태여야 한다")
+
+
+def _require_email(value: str, field: str) -> None:
+    if not _EMAIL.fullmatch(value):
+        _reject(f"{field} 의 주소 형식이 올바르지 않다")
+
+
+def _require_sha256(value: str, field: str) -> None:
+    if not _SHA256.fullmatch(value):
+        _reject(f"{field} 는 64자 소문자 hex 여야 한다")
+
+
+def _require_int(value: object, field: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        _reject(f"{field} 는 정수여야 한다")
+    return value
+
+
+def _require_range(value: object, field: str, low: int, high: int) -> int:
+    number = _require_int(value, field)
+    if not low <= number <= high:
+        _reject(f"{field} 는 {low}..{high} 범위여야 한다")
+    return number
+
+
+def _require_count(value: object, field: str) -> int:
+    number = _require_int(value, field)
+    if number < 0:
+        _reject(f"{field} 는 0 이상이어야 한다")
+    return number
 
 
 @dataclass(frozen=True)
@@ -29,6 +89,14 @@ class SourceRef:
     title: str
     checked_on: date
 
+    def __post_init__(self) -> None:
+        if not _SOURCE_ID.fullmatch(self.id):
+            _reject("SourceRef.id 는 대문자 1~2자 + 숫자 1~3자여야 한다")
+        _require_http_url(self.url, "SourceRef.url")
+        _require_text(self.title, "SourceRef.title")
+        if not isinstance(self.checked_on, date):
+            _reject("SourceRef.checked_on 은 date 여야 한다")
+
 
 @dataclass(frozen=True)
 class Claim:
@@ -36,6 +104,14 @@ class Claim:
 
     value: str
     source_ids: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        _require_text(self.value, "Claim.value")
+        if not self.source_ids:
+            _reject("Claim.source_ids 가 비어 있다(출처 없는 값은 거부)")
+        for source_id in self.source_ids:
+            if not _SOURCE_ID.fullmatch(source_id):
+                _reject(f"Claim.source_ids 의 출처 id 형식이 올바르지 않다: {source_id!r}")
 
 
 @dataclass(frozen=True)
@@ -50,6 +126,11 @@ class PositionSpec:
     location: str | None
     recruiting_window: str | None
 
+    def __post_init__(self) -> None:
+        _require_text(self.clickup_task_id, "PositionSpec.clickup_task_id")
+        _require_text(self.client_name, "PositionSpec.client_name")
+        _require_text(self.title, "PositionSpec.title")
+
 
 @dataclass(frozen=True)
 class JdSource:
@@ -59,6 +140,13 @@ class JdSource:
     raw_sha256: str
     provided_by: str
 
+    def __post_init__(self) -> None:
+        _require_text(self.text, "JdSource.text")
+        if _HTML_TAG.search(self.text):
+            _reject("JdSource.text 에 HTML 태그가 남아 있다(러너가 정리 후 재투입)")
+        _require_sha256(self.raw_sha256, "JdSource.raw_sha256")
+        _require_text(self.provided_by, "JdSource.provided_by")
+
 
 @dataclass(frozen=True)
 class ExecProfile:
@@ -67,6 +155,11 @@ class ExecProfile:
     name_role: str
     linkedin_url: str | None
     summary: Claim
+
+    def __post_init__(self) -> None:
+        _require_text(self.name_role, "ExecProfile.name_role")
+        if self.linkedin_url is not None:
+            _require_profile_url(self.linkedin_url, "ExecProfile.linkedin_url")
 
 
 @dataclass(frozen=True)
@@ -88,3 +181,46 @@ class CompanyBrief:
     youtube: tuple[Claim, ...] = ()
     c_level: tuple[ExecProfile, ...] = ()
     sources: tuple[SourceRef, ...] = ()
+
+    def __post_init__(self) -> None:
+        known: set[str] = set()
+        for ref in self.sources:
+            if ref.id in known:
+                _reject(f"CompanyBrief.sources 에 중복 출처 id 가 있다: {ref.id}")
+            known.add(ref.id)
+        for label, claim in self._claims():
+            unknown = tuple(sorted(set(claim.source_ids) - known))
+            if unknown:
+                _reject(f"CompanyBrief.{label} 의 출처 id 가 sources 에 없다: {unknown}")
+
+    def _claims(self) -> tuple[tuple[str, Claim], ...]:
+        singles = (
+            ("legal_name", self.legal_name),
+            ("founded", self.founded),
+            ("ceo", self.ceo),
+            ("headquarters", self.headquarters),
+            ("headcount", self.headcount),
+            ("revenue", self.revenue),
+            ("operating_profit", self.operating_profit),
+            ("funding_stage", self.funding_stage),
+            ("funding_total", self.funding_total),
+        )
+        groups = (
+            ("products", self.products),
+            ("history", self.history),
+            ("news", self.news),
+            ("youtube", self.youtube),
+        )
+        collected: list[tuple[str, Claim]] = [
+            (label, claim) for label, claim in singles if claim is not None
+        ]
+        collected.extend(
+            (f"{label}[{index}]", claim)
+            for label, group in groups
+            for index, claim in enumerate(group)
+        )
+        collected.extend(
+            (f"c_level[{index}].summary", profile.summary)
+            for index, profile in enumerate(self.c_level)
+        )
+        return tuple(collected)
