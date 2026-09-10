@@ -11,6 +11,14 @@ from .jd_fidelity import (
     split_sections,
     verify_fidelity,
 )
+from .linkedin_limit import (
+    KOREAN_ENDINGS,
+    LINKEDIN_FRAME_LINES,
+    LinkedInReport,
+    check_linkedin,
+    core_tokens,
+    verify_linkedin_fidelity,
+)
 from .types import (
     BriefInputError,
     Claim,
@@ -31,6 +39,8 @@ from .types_packet import JdPacket, SearchPacket, TeamMail
 
 __all__ = [
     "EXTRA_CONDITION_PATTERNS",
+    "KOREAN_ENDINGS",
+    "LINKEDIN_FRAME_LINES",
     "BooleanQuerySet",
     "BriefInputError",
     "CandidateEvidence",
@@ -43,6 +53,7 @@ __all__ = [
     "FidelityReport",
     "JdPacket",
     "JdSource",
+    "LinkedInReport",
     "PositionSpec",
     "ScoreBreakdown",
     "SearchPacket",
@@ -51,9 +62,12 @@ __all__ = [
     "TeamMail",
     "build_boolean_queries",
     "check_balanced",
+    "check_linkedin",
     "content_lines",
+    "core_tokens",
     "extract_block",
     "normalize_line",
     "split_sections",
     "verify_fidelity",
+    "verify_linkedin_fidelity",
 ]
