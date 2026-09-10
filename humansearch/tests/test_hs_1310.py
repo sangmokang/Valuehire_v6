@@ -59,6 +59,7 @@ def _sha256(text: str) -> str:
 def _packet(body: str) -> SearchPacket:
     return SearchPacket(
         packet_id=_PACKET_ID,
+        created_on=_TODAY,
         position=PositionSpec(
             _CLICKUP, "예시 고객사", "백엔드 엔지니어", None, "정규직", "서울", None
         ),

@@ -72,6 +72,7 @@ def _packet(text: str = "예시 문구") -> SearchPacket:
     body = f"{text}\n내부 공유 본문"
     return SearchPacket(
         packet_id=_PACKET_ID,
+        created_on=_TODAY,
         position=PositionSpec(_CLICKUP, "예시 고객사", text, None, "정규직", "서울", None),
         jd=JdSource(_JD_TEXT, _RAW_SHA, "U1"),
         company=CompanyBrief(

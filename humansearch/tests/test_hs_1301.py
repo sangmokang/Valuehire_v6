@@ -188,6 +188,7 @@ def _mail(**overrides: Any) -> TeamMail:
 def _packet(**overrides: Any) -> SearchPacket:
     fields: dict[str, Any] = {
         "packet_id": PACKET_ID,
+        "created_on": TODAY,
         "position": _position(),
         "jd": _jd(),
         "company": _company(),

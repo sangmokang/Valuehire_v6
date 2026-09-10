@@ -201,7 +201,7 @@ def test_created_on_survives_json_round_trip() -> None:
 def test_created_on_rejects_a_datetime() -> None:
     """datetime 은 date 의 하위 타입이라 그냥 두면 JSON 왕복이 깨진다."""
     with pytest.raises(BriefInputError):
-        _packet(created_on=datetime(2026, 9, 10, 12, 0, tzinfo=UTC))  # type: ignore[arg-type]
+        _packet(created_on=datetime(2026, 9, 10, 12, 0, tzinfo=UTC))
 
 
 # --- 4. AC (§7 D9) — 날짜가 바뀌어도 재발송이 열리지 않는다 --------------------

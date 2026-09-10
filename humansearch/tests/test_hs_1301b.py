@@ -116,6 +116,7 @@ def _packet(**overrides: Any) -> SearchPacket:
     )
     fields: dict[str, Any] = {
         "packet_id": PACKET_ID,
+        "created_on": TODAY,
         "position": PositionSpec(
             clickup_task_id="86exampleid",
             client_name="예시고객사",
