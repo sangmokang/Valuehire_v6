@@ -81,7 +81,7 @@ mutation_line='bash scripts/verify/run-acceptance.sh scripts/acceptance-work-uni
 ruby -rpsych -e '
   doc = Psych.safe_load(File.read(ARGV[0]), aliases: true)
   lines = doc.fetch("jobs").values.flat_map { |job| job.fetch("steps", []) }
-    .filter_map { |step| step.is_a?(Hash) ? step["run"] : nil }
+    .map { |step| step.is_a?(Hash) ? step["run"] : nil }.compact
     .flat_map(&:lines).map(&:strip)
   wanted = ARGV.drop(1)
   exit(wanted.all? { |line| lines.include?(line) } ? 0 : 1)
