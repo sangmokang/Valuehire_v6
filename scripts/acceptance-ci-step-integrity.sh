@@ -204,25 +204,25 @@ for key in yes Yes YES no No NO true True TRUE false False FALSE On ON off Off O
 $key: {push: null, pull_request: null, workflow_dispatch: null}")
   expect_structure "quoted on 뒤 YAML boolean $key 충돌 → 구조 오류" "$p"
 done
-p=$(trigger_variant duplicate-push-branches 'on:
-  push:
-    branches: [main]
-    branches: ["**"]
-  pull_request:
-  workflow_dispatch:')
+p=$(trigger_variant duplicate-push-branches 'on: {push: {branches: [main], branches: ["**"]}, pull_request: null, workflow_dispatch: null}')
 expect_structure "push.branches 축소를 뒤 정상 값으로 은닉 → 구조 오류" "$p"
-p=$(trigger_variant duplicate-dispatch-input 'on:
-  push:
-  pull_request:
-  workflow_dispatch:
-    inputs:
-      reason: {required: true}
-      reason: {required: false}')
+p=$(trigger_variant duplicate-dispatch-input 'on: {push: null, pull_request: null, workflow_dispatch: {inputs: {reason: {required: true}, reason: {required: false}}}}')
 expect_structure "workflow_dispatch.inputs 중복 → 구조 오류" "$p"
 p=$(trigger_variant nested-numeric-key 'on: {push: null, pull_request: null, workflow_dispatch: {inputs: {7: {required: false}}}}')
 expect_structure "workflow_dispatch.inputs 숫자 key → 구조 오류" "$p"
 p=$(trigger_variant nested-boolean-key 'on: {push: null, pull_request: null, workflow_dispatch: {inputs: {on: {}, true: {}}}}')
 expect_structure "workflow_dispatch.inputs boolean slot 충돌 → 구조 오류" "$p"
+for tagged in yes true TRUE; do
+  p=$(trigger_variant "tagged-$tagged-before" "!!bool $tagged: {push: null, pull_request: null, workflow_dispatch: null}
+\"on\": {push: {paths-ignore: [\"**\"]}, pull_request: null, workflow_dispatch: null}"); expect_structure "!!bool $tagged 뒤 축소 on 충돌 → 구조 오류" "$p"
+  p=$(trigger_variant "tagged-$tagged-after" "\"on\": {push: {paths-ignore: [\"**\"]}, pull_request: null, workflow_dispatch: null}
+!!bool $tagged: {push: null, pull_request: null, workflow_dispatch: null}"); expect_structure "축소 on 뒤 !!bool $tagged 충돌 → 구조 오류" "$p"
+done
+p=$(trigger_variant tagged-bool-on '!!bool on: {push: null, pull_request: null, workflow_dispatch: null}')
+expect_structure "!!bool on 단독 → 구조 오류" "$p"
+p=$(trigger_variant alias-hidden-duplicate 'x-push: &p {branches: [main], branches: ["**"]}
+on: {push: *p, pull_request: null, workflow_dispatch: null}')
+expect_structure "alias로 바깥 중복 mapping 은닉 → 구조 오류" "$p"
 p=$(trigger_variant trigger-scalar 'on: push')
 expect_trigger_contract "scalar on은 누락 event 계약 위반" "$p" 1 '^FAIL: TRIGGER_CONTRACT:.*pull_request' '^CHECKED: [1-9][0-9]*$'
 p="$TMP/trigger-bom.yml"; { printf '\357\273\277'; cat "$WF"; } > "$p"
