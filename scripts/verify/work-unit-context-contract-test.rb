@@ -45,20 +45,23 @@ Dir.mktmpdir("wu-context-contract-") do |tmp|
     rc, out = run.call(repo, {}, "git", *args)
     raise out unless rc.zero?
   end
-  File.write(File.join(repo, "contract.txt"), "context contract\n")
-  run.call(repo, {}, "git", "add", "contract.txt")
+  run.call(repo, {}, "git", "branch", "-m", "task/context-test")
+  _rc, branch = run.call(repo, {}, "git", "branch", "--show-current")
+  branch.strip!
+  content = "context contract\nworktree: #{branch}\n"
+  File.write(File.join(repo, "contract.txt"), content)
+  File.write(File.join(repo, "baseline-other.txt"), "not context evidence\n")
+  run.call(repo, {}, "git", "add", "contract.txt", "baseline-other.txt")
   run.call(repo, {}, "git", "commit", "-q", "-m", "context contract")
   _rc, old_head = run.call(repo, {}, "git", "rev-parse", "HEAD")
   old_head.strip!
   File.write(File.join(repo, "other.txt"), "not declared by default\n")
-  run.call(repo, {}, "git", "add", "other.txt")
+  File.write(File.join(repo, "extra-1.txt"), "extra one\n")
+  File.write(File.join(repo, "extra-2.txt"), "extra two\n")
+  run.call(repo, {}, "git", "add", "other.txt", "extra-1.txt", "extra-2.txt")
   run.call(repo, {}, "git", "commit", "-q", "-m", "head moves")
   _rc, head = run.call(repo, {}, "git", "rev-parse", "HEAD")
   head.strip!
-  _rc, branch = run.call(repo, {}, "git", "branch", "--show-current")
-  branch.strip!
-
-  content = "context contract\n"
   content_hash = Digest::SHA256.hexdigest(content)
   receipt = "git:#{head}:contract.txt:#{content_hash}"
   manifest = Marshal.load(Marshal.dump(base))
@@ -81,13 +84,16 @@ Dir.mktmpdir("wu-context-contract-") do |tmp|
     "observed_reads" => [receipt]
   }
 
-  invoke = lambda do |name, candidate|
+  invoke = lambda do |name, candidate, historical: false|
     path = File.join(tmp, "#{name}.yaml")
     File.write(path, Psych.dump(candidate))
+    command = ["ruby", checker]
+    command << "--historical" if historical
+    command << path
     run.call(
       repo_root,
       { "WORK_UNIT_REPO" => repo, "WORK_UNIT_CONTEXT_ONLY" => "1" },
-      "ruby", checker, path
+      *command
     )
   end
 
@@ -131,6 +137,39 @@ Dir.mktmpdir("wu-context-contract-") do |tmp|
   undeclared["work_units"].first["context"]["observed_reads"] << "git:#{head}:other.txt:#{other_hash}"
   rc, out = invoke.call("undeclared-read", undeclared)
   assert.call("undeclared observed read rejected", rc == 1 && out.include?("CONTEXT_READ_SET_MISMATCH"), out)
+
+  near_whole = Marshal.load(Marshal.dump(manifest))
+  near_context = near_whole["work_units"].first["context"]
+  %w[other.txt extra-1.txt extra-2.txt].each do |path|
+    body = File.read(File.join(repo, path))
+    digest = Digest::SHA256.hexdigest(body)
+    file_receipt = "git:#{head}:#{path}:#{digest}"
+    near_context["files"] << {
+      "path" => path, "commit_sha" => head,
+      "sha256" => digest, "read_evidence" => file_receipt
+    }
+    near_context["observed_reads"] << file_receipt
+  end
+  rc, out = invoke.call("near-whole-repository", near_whole)
+  near_whole_ok = rc == 1 && out.include?("CONTEXT_SCOPE_TOO_BROAD")
+  missing_behavior ||= rc.zero?
+  assert.call("all-but-one repository context rejected", near_whole_ok, out)
+
+  historical = Marshal.load(Marshal.dump(manifest))
+  historical_unit = historical["work_units"].first
+  historical_unit["tdd"]["contract_commit"] = old_head
+  historical_context = historical_unit["context"]
+  historical_context["expected_head"] = old_head
+  historical_context["expected_worktree"] = "forged-other-worktree"
+  historical_file = historical_context["files"].first
+  historical_file["commit_sha"] = old_head
+  historical_receipt = "git:#{old_head}:contract.txt:#{content_hash}"
+  historical_file["read_evidence"] = historical_receipt
+  historical_context["observed_reads"] = [historical_receipt]
+  rc, out = invoke.call("historical-worktree", historical, historical: true)
+  historical_ok = rc == 1 && out.include?("CONTEXT_WORKTREE_EVIDENCE_MISSING")
+  missing_behavior ||= rc.zero?
+  assert.call("historical worktree forgery rejected", historical_ok, out)
 end
 
 puts "WU_TESTS: #{checked}"
