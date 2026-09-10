@@ -45,7 +45,7 @@
 | 22 | 인수 검사 ci-step-integrity | `bash scripts/acceptance-ci-step-integrity.sh` — 조건부·오류무시·echo 대체 차단 및 main 실행별 그룹·이벤트/ref 분리·30분 상한 회귀 24건 |
 | 23 | 인수 검사 semantic-mutations | `bash scripts/acceptance-semantic-mutations.sh` — 인수 검사 무력화 5종 전량 차단 |
 | 24 | 인수 검사 verify-ac-m | `bash scripts/acceptance-verify-ac-m.sh` — mechanism 명부 대조 (AC-M) |
-| 25 | 인수 검사 hs-1300 | `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1300.sh` + `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1300-mutations.sh` — HumanSearch HS-13.00 브리프 스펙 구조·의미(catch-all·결정 D1~D9 내용·WU 카드 14 의 5셀·명령 형식·타입 12 펜스 안·id↔명령 결합·D9 문구, `CHECKED: 70`) + 자기 변이 10종(`CHECKED: 11`) |
+| 25 | 인수 검사 hs-1300 | `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1300.sh` + `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1300-mutations.sh` — HumanSearch HS-13.00 브리프 스펙 구조·의미(catch-all·결정 D1~D9 내용·WU 카드 14 의 5셀·명령 형식·타입 12 펜스 안·id↔명령 결합·D9 문구, `CHECKED: 70`) + 자기 변이 14종(`CHECKED: 15`) |
 | 26 | 인수 검사 hs-1301b | `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1301b-literals.sh` — 브리프 운영 상수(1899/1900·valueconnect.kr·linkedin.com/in·[포지션]·ClickUp 리스트 id) 가 `contracts/humansearch/brief-policy.json` 밖에 다시 적혔는지 5종 (P22) |
 | 27 | PostgreSQL 서버 준비 | 인라인 — Invoice 런타임 검사용 임시 PostgreSQL 기동(검사가 아니라 준비 스텝) |
 | 28 | 인수 검사 invoice | `bash scripts/verify/run-acceptance.sh scripts/acceptance-invoice.sh` — 채용 수수료 계산·기한·계약 변조·Codex/Claude 스킬 동등성 |

@@ -22,7 +22,7 @@
 #   51~55 §4 입력 영역 표에 이미지·합본·언어·ClickUp 공백·시계 행 (5건)
 #   56~63 §5 계약 함수 8개 펜스 안 존재 · 64 §6·§10 절 실존(record_intent) · 65~66 D10·D11 (Codeaudit 2026-09-10)
 #   67 전 행 PLANNED 금지 · 68~70 D9 at-most-once 문구 3개 (Codex 2차 2026-09-10)
-#   WU 행 검사(12~25)는 id↔명령 파일명 결합·행동 6자·양성/음성·비PLANNED 참조 파일 실존까지 본다 (Codex 2차)
+#   WU 행 검사(12~25)는 정확 파일명 결합·행동 6자·양성/음성 각 10자+없음 거부·괄호는 LOCAL_COMMITTED(task/…)만·참조 파일 실존 (Codex 2·3차)
 #
 # 2026-09-10 Codex V1: 이전 판은 ID·토큰 존재만 봐서 빈 셀 문서가 통과했다(높음). 위 12·26·35 가 그 반례를 막는다.
 #
@@ -105,16 +105,22 @@ wu_row_ok() {
   printf '%s' "$cmd" | $G -Eq 'cd humansearch && uv run --no-sync (pytest|python -m humansearch\.brief)|bash scripts/verify/run-acceptance\.sh scripts/acceptance-hs-13[0-9]{2}[a-z]?[-a-z]*\.sh' || return 1
   # 명령이 이 WU 의 id 와 결합돼 있어야 한다 (Codex 2차: 가짜 경로 scripts/acceptance-hs-1399-fake.sh 가 통과했다)
   local id="${cells[0]//[[:space:]]/}"; id="${id#HS-13.}"
-  printf '%s' "$cmd" | $G -Eq "tests/test_hs_13${id}(_[a-z]+)?\.py|scripts/acceptance-hs-13${id}(-[a-z]+)*\.sh|python -m humansearch\.brief" || return 1
-  # 행동 셀 최소 6자, 정상/반례 셀에 양성·음성 둘 다
+  # 정확한 정본 파일명 결합: tests/test_hs_13<id>.py 글자 그대로(접미 위장 `_zzz` 거부, Codex 3차) 또는 acceptance-hs-13<id>(-단어)*.sh 또는 CLI
+  printf '%s' "$cmd" | $G -Eq "tests/test_hs_13${id}\.py([^a-z_]|$)|scripts/acceptance-hs-13${id}(-[a-z]+)*\.sh|python -m humansearch\.brief" || return 1
+  # 행동 셀 최소 6자, 정상/반례 셀에 양성·음성 둘 다 + 각각 내용 10자 이상 + 없음/N/A/x 거부
   [ "$(printf '%s' "${cells[1]}" | tr -d '[:space:]' | wc -m | tr -d ' ')" -ge 6 ] || return 1
-  printf '%s' "${cells[3]}" | $G -q '양성' || return 1
-  printf '%s' "${cells[3]}" | $G -q '음성' || return 1
+  local pos neg
+  pos="$(printf '%s' "${cells[3]}" | $G -Eo '양성[:：][^.]*' | head -1 | tr -d '[:space:]')"
+  neg="$(printf '%s' "${cells[3]}" | $G -Eo '음성[:：][^.]*' | head -1 | tr -d '[:space:]')"
+  [ "$(printf '%s' "$pos" | wc -m | tr -d ' ')" -ge 13 ] || return 1
+  [ "$(printf '%s' "$neg" | wc -m | tr -d ' ')" -ge 13 ] || return 1
+  printf '%s' "${cells[3]}" | $G -Eq '(양성|음성)[:：] *(없음|N/A|n/a|해당 ?없음|-|x|X)( |$|·|,|\.)' && return 1
   state="$(printf '%s' "${cells[4]}" | tr -d '[:space:]')"
-  printf '%s' "$state" | $G -Eq '^(PLANNED|RED|IMPLEMENTED|AUDITED|LOCAL_COMMITTED|PR_OPEN|VERIFIED|MERGED)(\(.+\))?$|^BLOCKED\(.+\)$' || return 1
-  # PLANNED/BLOCKED 가 아니고 다른 브랜치 표기(괄호)도 없으면 참조 파일이 이 저장소에 실존해야 한다
+  # 괄호는 LOCAL_COMMITTED(task/<branch>) 형태만 허용(다른 브랜치에 있다는 뜻). IMPLEMENTED(x) 같은 회피 금지
+  printf '%s' "$state" | $G -Eq '^(PLANNED|RED|IMPLEMENTED|AUDITED|PR_OPEN|VERIFIED|MERGED)$|^LOCAL_COMMITTED(\(task/[a-z0-9-]+\))?$|^BLOCKED\(.+\)$' || return 1
+  # PLANNED/BLOCKED/다른 브랜치(LOCAL_COMMITTED(task/…)) 가 아니면 참조 파일이 이 저장소에 실존해야 한다
   case "$state" in
-    PLANNED|BLOCKED*|*\(*) ;;
+    PLANNED|BLOCKED*|LOCAL_COMMITTED\(task/*) ;;
     *)
       for f in $(printf '%s' "$cmd" | $G -Eo 'tests/test_hs_13[0-9a-z_]+\.py|scripts/acceptance-hs-13[0-9a-z-]+\.sh'); do
         case "$f" in tests/*) [ -f "humansearch/$f" ] || return 1 ;; *) [ -f "$f" ] || return 1 ;; esac
@@ -138,10 +144,11 @@ for d in D1 D2 D3 D4 D5 D6 D7 D8 D9; do
   IFS='|' read -r -a cells <<< "$row"
   val="$(printf '%s' "${cells[2]:-}" | tr -d '[:space:]')"
   distinct=$(printf '%s' "$val" | $G -o . | LC_ALL=C sort -u | wc -l | tr -d ' ')
-  if [ "${#val}" -ge 10 ] && [ "$distinct" -ge 3 ] && printf '%s' "$val" | $G -q '[가-힣]'; then
-    pass "§7 결정 $d 기본값 셀 내용 있음(${#val}자·문자 ${distinct}종·한글 포함)"
+  words=$(printf '%s' "${cells[2]:-}" | $G -Eo '[가-힣]{2,}' | wc -l | tr -d ' ')
+  if [ "${#val}" -ge 10 ] && [ "$distinct" -ge 3 ] && [ "$words" -ge 2 ]; then
+    pass "§7 결정 $d 기본값 셀 내용 있음(${#val}자·문자 ${distinct}종·한글 단어 ${words}개)"
   else
-    failed "§7 결정 $d 기본값 셀이 비었거나 10자 미만이거나 무의미(문자 ${distinct}종·한글 없음)"
+    failed "§7 결정 $d 기본값 셀이 비었거나 10자 미만이거나 무의미(문자 ${distinct}종·한글 단어 ${words}개)"
   fi
 done
 
@@ -187,12 +194,12 @@ else
 fi
 # 68~70) D9 at-most-once 핵심 문구 3개 (Codex 2차 상충 지적)
 sec5_all=$(section '^## 5\. 계약')
-for k in 'O_CREAT\|O_EXCL' 'intent 파일이 없을 때만 True' 'def reconcile'; do
+for k in 'O_CREAT\|O_EXCL' '하나도 없을 때만' 'def open_new_attempt'; do
   if printf '%s\n' "$sec5_all" | $G -q "$k"; then pass "§5 D9 at-most-once 문구 '$k'"; else failed "§5 D9 문구 '$k' 없음"; fi
 done
 
 # 50) D9 발송 멱등 결정 존재
-if printf '%s\n' "$sec7" | $G -E '^\| *D9 *\|' | $G -q '멱등'; then
+if printf '%s\n' "$sec7" | $G -E '^\| *D9 *\|' | $G -q 'at-most-once'; then
   pass "§7 D9 발송 멱등 결정 존재"
 else
   failed "§7 D9 발송 멱등 결정 없음"

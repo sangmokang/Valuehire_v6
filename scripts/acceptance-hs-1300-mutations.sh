@@ -13,7 +13,8 @@
 #   변이 ⓘ D 기본값을 숫자 10자로     → 검사가 exit 1  (같은 지적)
 #   변이 ⓙ 정상/반례 셀을 x 로       → 검사가 exit 1  (같은 지적)
 #   대조군: 원본 문서            → 검사가 exit 0 (항상-거부 검사기를 잡는다)
-#   출력: PASS:/FAIL: + `CHECKED: 11`, exit 0/1/2
+#   변이 ⓚ id 접미 위장 파일명 · ⓛ '양성:없음 음성:없음' · ⓜ D값 '가123456789' · ⓝ IMPLEMENTED(x)+가짜 파일 → 각 exit 1 (Codex 3차)
+#   출력: PASS:/FAIL: + `CHECKED: 15`, exit 0/1/2
 # 쓰기 규칙: 저장소에 아무 파일도 만들지 않는다. 고장 사본은 mktemp 디렉터리에만 쓴다.
 set -uo pipefail
 
@@ -25,7 +26,7 @@ cd "$REPO" || { echo "NOT_RUN: 저장소 루트로 이동 실패"; echo "CHECKED
 
 CHECKER=scripts/acceptance-hs-1300.sh
 ORIG=docs/engineering/humansearch-hs13-position-brief-goal-2026-09-10.md
-EXPECTED_CHECKED=11
+EXPECTED_CHECKED=15
 G=/usr/bin/grep
 
 [ -s "$ORIG" ] || { echo "NOT_RUN: 원본 문서 없음 — $ORIG"; echo "CHECKED: 0"; exit 2; }
@@ -112,6 +113,20 @@ expect_rc "변이ⓘ D 기본값 숫자 10자 → 불합격" "$TMP/d-digits.md" 
 awk -F'|' 'BEGIN{OFS="|"} /^\| *HS-13\./ { $5=" x " } { print }' "$ORIG" > "$TMP/x-cell.md"
 if $G -E '^\| *HS-13\.06' "$TMP/x-cell.md" | $G -q '양성'; then echo "NOT_RUN: 변이ⓙ 생성 실패"; echo "CHECKED: $checked"; exit 2; fi
 expect_rc "변이ⓙ 정상/반례 셀 x → 불합격" "$TMP/x-cell.md" 1
+
+# ⓚ~ⓝ Codex 3차 반례 그대로
+awk -F'|' 'BEGIN{OFS="|"} /^\| *HS-13\.05 /{ $4=" `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1305_zzz.py` " } { print }' "$ORIG" > "$TMP/zzz.md"
+$G -q 'test_hs_1305_zzz' "$TMP/zzz.md" || { echo "NOT_RUN: 변이ⓚ 생성 실패"; echo "CHECKED: $checked"; exit 2; }
+expect_rc "변이ⓚ id 접미 위장 파일명 → 불합격" "$TMP/zzz.md" 1
+awk -F'|' 'BEGIN{OFS="|"} /^\| *HS-13\.05 /{ $5=" 양성:없음 음성:없음 " } { print }' "$ORIG" > "$TMP/none.md"
+$G -q '양성:없음' "$TMP/none.md" || { echo "NOT_RUN: 변이ⓛ 생성 실패"; echo "CHECKED: $checked"; exit 2; }
+expect_rc "변이ⓛ '양성:없음 음성:없음' → 불합격" "$TMP/none.md" 1
+awk -F'|' 'BEGIN{OFS="|"} /^\| *D[0-9]+ *\|/{ $4=" 가123456789 " } { print }' "$ORIG" > "$TMP/d-ga.md"
+$G -q '가123456789' "$TMP/d-ga.md" || { echo "NOT_RUN: 변이ⓜ 생성 실패"; echo "CHECKED: $checked"; exit 2; }
+expect_rc "변이ⓜ D값 '가123456789' → 불합격" "$TMP/d-ga.md" 1
+awk -F'|' 'BEGIN{OFS="|"} /^\| *HS-13\.05 /{ $4=" `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1305.py` "; $6=" IMPLEMENTED(x) " } { print }' "$ORIG" > "$TMP/impl-x.md"
+$G -q 'IMPLEMENTED(x)' "$TMP/impl-x.md" || { echo "NOT_RUN: 변이ⓝ 생성 실패"; echo "CHECKED: $checked"; exit 2; }
+expect_rc "변이ⓝ IMPLEMENTED(x) 괄호 회피 + 미실존 파일 → 불합격" "$TMP/impl-x.md" 1
 
 echo "CHECKED: $checked"
 if [ "$checked" -ne "$EXPECTED_CHECKED" ]; then
