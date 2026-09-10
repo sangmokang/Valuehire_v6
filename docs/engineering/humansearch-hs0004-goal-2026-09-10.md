@@ -73,7 +73,9 @@ bash scripts/verify/run-acceptance.sh scripts/acceptance-ci-step-integrity.sh
 - 정상 출력: 승인된 trigger와 기존 job/step 계약의 PASS 설명, `CHECKED: N` (`N>0`), 종료값 0.
 - 계약 위반 출력: `FAIL: TRIGGER_CONTRACT: ...`를 포함하고 종료값 1.
 - 파일 없음·YAML 파싱 실패·top-level mapping 아님·trigger를 구조적으로 읽을 수 없음: `FAIL:`과 `CHECKED: 0`, 종료값 2.
-- plain/quoted `on`: 한 가지 표현만 존재하면 동등하게 읽는다. 두 표현이 동시에 서로 다른 key로 존재하면 모호한 입력으로 종료값 2다.
+- plain/quoted `on`: 한 가지 표현만 존재하면 동등하게 읽는다. 같은 top-level mapping에 plain 또는 quoted `on`이 두 번 있거나 plain/quoted 표현이 함께 있으면 값이 같더라도 덮어쓰기 가능한 모호한 입력으로 `FAIL:`·`CHECKED: 0`·종료값 2다.
+- sequence shorthand: `on: [push, pull_request, workflow_dispatch]`처럼 필수 세 event를 모두 포함하면 각 event가 `null`인 mapping과 의미 동등하므로 종료값 0이다. 필수 event가 하나라도 빠지면 종료값 1이다. 알 수 없는 event 추가는 아래 추가-event 계약을 따른다.
+- event key 중복: `on` mapping 안에 `push`, `pull_request`, `workflow_dispatch` 또는 다른 동일 event key가 두 번 있으면 마지막 값으로 덮어쓰지 않고 `FAIL:`·`CHECKED: 0`·종료값 2다.
 - `push`: `null`, 빈 mapping, 또는 `branches: ["**"]`만 정상 의미로 인정한다. `branches: ["**"]` 외 다른 key나 음수 패턴은 거부한다. tag 전용/필터는 거부한다.
 - `pull_request`: `null` 또는 빈 mapping만 인정한다. `types`, `branches`, `branches-ignore`, `paths`, `paths-ignore`를 포함한 축소는 거부한다.
 - `workflow_dispatch`: `null` 또는 mapping을 인정한다. mapping의 `inputs` 의미는 이 WU가 평가하지 않는다.
@@ -89,7 +91,8 @@ bash scripts/verify/run-acceptance.sh scripts/acceptance-ci-step-integrity.sh
 | 항상 허용 변이 | trigger 검사를 무조건 true로 바꿔 모든 음성 사본 생존 | 인수 검사 종료값 비0, 해당 음성 기대 불일치 |
 | 항상 거부 변이 | trigger 검사를 무조건 false로 바꿔 정상·의미 동등 사본도 거부 | 인수 검사 종료값 비0, 정상 대조 실패 |
 | 검사 배선 누락 변이 | checker에서 trigger 검사 호출을 제거 | 음성 사본 하나 이상 생존하여 인수 검사 실패 |
-| 데이터 오류 변이 | YAML 파싱 불가, top-level list, `on`/`true` 중복·모호성, trigger 0개 | checker 종료값 2; 인수 검사는 기대 종료값을 확인 |
+| 데이터 오류 변이 | YAML 파싱 불가, top-level list, duplicate top-level `on`, duplicate event key, trigger 0개 | checker 종료값 2; `FAIL:`과 `CHECKED: 0` |
+| 의미 동등 축약형 | `on: [push, pull_request, workflow_dispatch]`를 구조가 다르다는 이유로 거부하거나 필수 event가 빠진 sequence를 승인 | 필수 세 event가 있으면 종료값 0, 하나라도 빠지면 종료값 1 |
 | 과잉 차단 변이 | quoted `on`, 빈 mapping, workflow_dispatch inputs, 알 수 없는 추가 event를 이유 없이 거부 | 정상 대조군 종료값 0 요구가 변이를 실패시킴 |
 | event 삭제 | push 또는 pull_request 또는 workflow_dispatch 제거 | 종료값 1, 누락 event 이름 포함 |
 | branch 축소 | `push.branches: [main]`, `branches-ignore`, `tags` | 종료값 1, push 범위 축소 설명 |
