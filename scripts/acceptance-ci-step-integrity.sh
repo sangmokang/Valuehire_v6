@@ -196,6 +196,35 @@ expect_trigger_contract "전체 branch와 path 제외 조합 → 계약 위반" 
 p=$(trigger_variant dispatch-sequence 'on: {push: null, pull_request: null, workflow_dispatch: []}')
 expect_trigger_contract "workflow_dispatch sequence 값 → 계약 위반" "$p" 1 '^FAIL: TRIGGER_CONTRACT:.*workflow_dispatch' '^CHECKED: [1-9][0-9]*$'
 
+for key in yes Yes YES no No NO true True TRUE false False FALSE On ON off Off OFF; do
+  p=$(trigger_variant "boolean-$key-before" "$key: {push: null, pull_request: null, workflow_dispatch: null}
+\"on\": {push: null, pull_request: null, workflow_dispatch: null}")
+  expect_structure "YAML boolean $key 뒤 quoted on 충돌 → 구조 오류" "$p"
+  p=$(trigger_variant "boolean-$key-after" "\"on\": {push: null, pull_request: null, workflow_dispatch: null}
+$key: {push: null, pull_request: null, workflow_dispatch: null}")
+  expect_structure "quoted on 뒤 YAML boolean $key 충돌 → 구조 오류" "$p"
+done
+
+p=$(trigger_variant duplicate-push-branches 'on:
+  push:
+    branches: [main]
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:')
+expect_structure "push.branches 축소를 뒤 정상 값으로 은닉 → 구조 오류" "$p"
+p=$(trigger_variant duplicate-dispatch-input 'on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      reason: {required: true}
+      reason: {required: false}')
+expect_structure "workflow_dispatch.inputs 중복 → 구조 오류" "$p"
+p=$(trigger_variant trigger-scalar 'on: push')
+expect_trigger_contract "scalar on은 누락 event 계약 위반" "$p" 1 '^FAIL: TRIGGER_CONTRACT:.*pull_request' '^CHECKED: [1-9][0-9]*$'
+p="$TMP/trigger-bom.yml"; { printf '\357\273\277'; cat "$WF"; } > "$p"
+expect_trigger_contract "UTF-8 BOM 정상 workflow → 통과" "$p" 0 '^PASS: TRIGGER_CONTRACT:' '^CHECKED: [1-9][0-9]*$'
+
 # ── 차단 쪽: 무력화 주입 ─────────────────────────────────────────────────────
 mutate() {
   local name="$1" ruby_code="$2"
