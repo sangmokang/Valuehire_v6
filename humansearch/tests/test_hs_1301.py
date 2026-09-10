@@ -638,8 +638,22 @@ def test_search_packet_rejects_unbalanced_boolean_query(query: str) -> None:
 _BRIEF_DIR = Path(__file__).resolve().parents[1] / "src" / "humansearch" / "brief"
 
 
+# `urllib` 를 통째로 금지하면 순수 문자열 함수인 `urllib.parse.unquote` 까지 막힌다
+# (HS-13.10b readback 정규화가 이것을 쓴다). 네트워크 표면은 `urllib.request` 뿐이므로
+# 그 모듈만, 두 가지 철자 모두를 막는다 — 좁히는 것이 아니라 겨냥을 옮기는 것이다.
 @pytest.mark.parametrize(
-    "token", ["datetime.now", "date.today", "time.time", "requests", "urllib", "socket", "smtplib"]
+    "token",
+    [
+        "datetime.now",
+        "date.today",
+        "time.time",
+        "requests",
+        "urllib.request",
+        "urllib import request",
+        "urlopen",
+        "socket",
+        "smtplib",
+    ],
 )
 def test_brief_package_has_no_clock_or_network_access(token: str) -> None:
     modules = sorted(_BRIEF_DIR.glob("*.py"))
