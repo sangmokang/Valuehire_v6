@@ -22,7 +22,9 @@
 #   51~55 §4 입력 영역 표에 이미지·합본·언어·ClickUp 공백·시계 행 (5건)
 #   56~63 §5 계약 함수 8개 펜스 안 존재 · 64 §6·§10 절 실존(record_intent) · 65~66 D10·D11 (Codeaudit 2026-09-10)
 #   67 전 행 PLANNED 금지 · 68~70 D9 at-most-once 문구 3개 (Codex 2차 2026-09-10)
-#   WU 행 검사(12~25)는 정확 파일명 결합·행동 6자·양성/음성 각 10자+없음 거부·괄호는 LOCAL_COMMITTED(task/…)만·참조 파일 실존 (Codex 2·3차)
+#   WU 행 검사(12~25)는 토큰 경계 정확 파일명·행동 6자·양성/음성 각 10자+없음/반복 거부·LOCAL_COMMITTED(task/…)는 브랜치·파일 실존·그 외 파일 실존 (Codex 2·3·4차)
+#   71~74 §5 13.02b·position_count·Approval 결합 토큰 (Codex 4차)
+#   경계: 산문의 의미 적합성은 판정하지 않는다 — Codeaudit·사장님 검토의 몫(스펙 §9 머리 문단)
 #
 # 2026-09-10 Codex V1: 이전 판은 ID·토큰 존재만 봐서 빈 셀 문서가 통과했다(높음). 위 12·26·35 가 그 반례를 막는다.
 #
@@ -36,7 +38,7 @@ REPO=$(git rev-parse --show-toplevel 2>/dev/null) || { echo "NOT_RUN: git 저장
 cd "$REPO" || { echo "NOT_RUN: 저장소 루트로 이동 실패"; echo "CHECKED: 0"; exit 2; }
 
 DOC="${HS_1300_DOC:-docs/engineering/humansearch-hs13-position-brief-goal-2026-09-10.md}"
-EXPECTED_CHECKED=70
+EXPECTED_CHECKED=80
 
 fail=0
 checked=0
@@ -92,6 +94,14 @@ fi
 # 12~25) §9 WU 카드 14건 — 행 존재 + 5셀 내용 + 명령 형식 + 상태값
 sec9=$(section '^## 9\. Issue HS-13')
 # 표의 한 행을 셀 배열로 쪼갠다(선행·후행 '|' 제거). 백틱 안의 '|' 는 표에 쓰지 않는다는 전제.
+# 2~6자 조각이 바로 이어서 3회 이상 반복되면 무의미 반복으로 본다 (Codex 4차 '통과통과통과…'). 정상 문장의 흩어진 재등장은 허용.
+no_repeat() {
+  # 글자(\p{L}) 2~6개 조각의 연속 3회 반복만 본다 — 숫자·기호(40/20/20/20)는 정상. BSD grep 은 다바이트 역참조를
+  # 놓치므로 perl 을 쓴다(macOS·ubuntu 공통 탑재)
+  if printf '%s' "$1" | perl -CS -ne 'exit(/(\p{L}{2,6})\1\1/ ? 0 : 1)'; then return 1; fi
+  return 0
+}
+
 wu_row_ok() {
   local row="$1" cells n cmd state
   row="${row#|}"; row="${row%|}"
@@ -102,11 +112,29 @@ wu_row_ok() {
     [ -n "$(printf '%s' "$c" | tr -d '[:space:]')" ] || return 1
   done
   cmd="${cells[2]}"
-  printf '%s' "$cmd" | $G -Eq 'cd humansearch && uv run --no-sync (pytest|python -m humansearch\.brief)|bash scripts/verify/run-acceptance\.sh scripts/acceptance-hs-13[0-9]{2}[a-z]?[-a-z]*\.sh' || return 1
-  # 명령이 이 WU 의 id 와 결합돼 있어야 한다 (Codex 2차: 가짜 경로 scripts/acceptance-hs-1399-fake.sh 가 통과했다)
   local id="${cells[0]//[[:space:]]/}"; id="${id#HS-13.}"
-  # 정확한 정본 파일명 결합: tests/test_hs_13<id>.py 글자 그대로(접미 위장 `_zzz` 거부, Codex 3차) 또는 acceptance-hs-13<id>(-단어)*.sh 또는 CLI
-  printf '%s' "$cmd" | $G -Eq "tests/test_hs_13${id}\.py([^a-z_]|$)|scripts/acceptance-hs-13${id}(-[a-z]+)*\.sh|python -m humansearch\.brief" || return 1
+  # 백틱 안 명령 전부를 ID 별 문법으로 고정 (Codex 5차: `true # cd humansearch && …` 가 부분문자열 검사를 통과했다).
+  # 제어 연산자 # ; | & 금지(&& 는 'cd humansearch && ' 접두 1회만). CLI 는 HS-13.10 행에만.
+  local n_cmd=0 c
+  while IFS= read -r c; do
+    [ -n "$c" ] || continue
+    # 백틱 조각 중 명령 형태(cd humansearch … / bash scripts/…)만 명령으로 센다. 기대 출력(`CHECKED: 80`·`>= 20 passed`)은 건너뛴다.
+    # 명령 형태가 아닌데 명령처럼 보이는 조각(`true # cd humansearch …`)은 세지지 않아 n_cmd 부족으로 불합격한다.
+    case "$c" in "cd humansearch "*|"bash scripts/"*) ;; *) continue ;; esac
+    n_cmd=$((n_cmd + 1))
+    if [ "$id" = "10" ]; then
+      printf '%s' "$c" | $G -Eq '^cd humansearch && uv run --no-sync python -m humansearch\.brief verify( --[a-z]+ <[^<>#;|&]+>)+$' || return 1
+    else
+      printf '%s' "$c" | $G -Eq "^cd humansearch && uv run --no-sync pytest -q( tests/test_hs_13${id}[a-z]?\.py)+$|^bash scripts/verify/run-acceptance\.sh scripts/acceptance-hs-13${id}(-[a-z]+)*\.sh$" || return 1
+    fi
+  done < <(printf '%s' "$cmd" | $G -Eo '`[^`]+`' | tr -d '`')
+  [ "$n_cmd" -ge 1 ] || return 1
+  # 정확한 정본 파일명 결합(비-CLI 행은 결합 파일 1개 이상, Codex 2·3차)
+  if [ "$id" != "10" ]; then
+    printf '%s' "$cmd" | $G -Eq "tests/test_hs_13${id}\.py( |\`|$)|scripts/acceptance-hs-13${id}(-[a-z]+)*\.sh( |\`|$)" || return 1
+  fi
+  # 13.02 행은 13.02b 시험 파일도 정확히 참조해야 한다 (Codex 4차)
+  if [ "$id" = "02" ]; then printf '%s' "$cmd" | $G -Eq 'tests/test_hs_1302b\.py( |`|$)' || return 1; fi
   # 행동 셀 최소 6자, 정상/반례 셀에 양성·음성 둘 다 + 각각 내용 10자 이상 + 없음/N/A/x 거부
   [ "$(printf '%s' "${cells[1]}" | tr -d '[:space:]' | wc -m | tr -d ' ')" -ge 6 ] || return 1
   local pos neg
@@ -114,13 +142,25 @@ wu_row_ok() {
   neg="$(printf '%s' "${cells[3]}" | $G -Eo '음성[:：][^.]*' | head -1 | tr -d '[:space:]')"
   [ "$(printf '%s' "$pos" | wc -m | tr -d ' ')" -ge 13 ] || return 1
   [ "$(printf '%s' "$neg" | wc -m | tr -d ' ')" -ge 13 ] || return 1
+  # 무의미 반복 거부: 같은 3자 이상 조각이 3회 이상 (Codex 4차 '통과통과통과…')
+  no_repeat "$pos" || return 1
+  no_repeat "$neg" || return 1
   printf '%s' "${cells[3]}" | $G -Eq '(양성|음성)[:：] *(없음|N/A|n/a|해당 ?없음|-|x|X)( |$|·|,|\.)' && return 1
   state="$(printf '%s' "${cells[4]}" | tr -d '[:space:]')"
   # 괄호는 LOCAL_COMMITTED(task/<branch>) 형태만 허용(다른 브랜치에 있다는 뜻). IMPLEMENTED(x) 같은 회피 금지
   printf '%s' "$state" | $G -Eq '^(PLANNED|RED|IMPLEMENTED|AUDITED|PR_OPEN|VERIFIED|MERGED)$|^LOCAL_COMMITTED(\(task/[a-z0-9-]+\))?$|^BLOCKED\(.+\)$' || return 1
-  # PLANNED/BLOCKED/다른 브랜치(LOCAL_COMMITTED(task/…)) 가 아니면 참조 파일이 이 저장소에 실존해야 한다
+  # PLANNED/BLOCKED 가 아니면 참조 파일이 실존해야 한다. LOCAL_COMMITTED(task/<branch>) 는 그 브랜치가 git 에 실존하고
+  # 그 브랜치 안에 파일이 실존해야 한다 (Codex 4차: 가짜 브랜치 통과 차단)
   case "$state" in
-    PLANNED|BLOCKED*|LOCAL_COMMITTED\(task/*) ;;
+    PLANNED|BLOCKED*) ;;
+    LOCAL_COMMITTED\(task/*)
+      local ref obj
+      ref="${state#LOCAL_COMMITTED(}"; ref="${ref%)}"
+      git show-ref --verify --quiet "refs/heads/$ref" || return 1
+      for f in $(printf '%s' "$cmd" | $G -Eo 'tests/test_hs_13[0-9a-z_]+\.py|scripts/acceptance-hs-13[0-9a-z-]+\.sh'); do
+        case "$f" in tests/*) obj="$ref:humansearch/$f" ;; *) obj="$ref:$f" ;; esac
+        if ! git cat-file -e "$obj" 2>/dev/null; then return 1; fi
+      done ;;
     *)
       for f in $(printf '%s' "$cmd" | $G -Eo 'tests/test_hs_13[0-9a-z_]+\.py|scripts/acceptance-hs-13[0-9a-z-]+\.sh'); do
         case "$f" in tests/*) [ -f "humansearch/$f" ] || return 1 ;; *) [ -f "$f" ] || return 1 ;; esac
@@ -138,14 +178,15 @@ for n in 00 01 01b 02 03 04 05 06 07 08 09 10 11 12; do
 done
 
 # 26~34) §7 D1~D9 기본값 셀 내용(10자 이상)
-for d in D1 D2 D3 D4 D5 D6 D7 D8 D9; do
+for d in D1 D2 D3 D4 D5 D6 D7 D8 D9 D10 D11; do
   row=$(printf '%s\n' "$sec7" | $G -E "^\| *$d *\|" | head -1)
   row="${row#|}"; row="${row%|}"
   IFS='|' read -r -a cells <<< "$row"
   val="$(printf '%s' "${cells[2]:-}" | tr -d '[:space:]')"
   distinct=$(printf '%s' "$val" | $G -o . | LC_ALL=C sort -u | wc -l | tr -d ' ')
   words=$(printf '%s' "${cells[2]:-}" | $G -Eo '[가-힣]{2,}' | wc -l | tr -d ' ')
-  if [ "${#val}" -ge 10 ] && [ "$distinct" -ge 3 ] && [ "$words" -ge 2 ]; then
+  uniq_words=$(printf '%s' "${cells[2]:-}" | $G -Eo '[가-힣]{2,}' | LC_ALL=C sort -u | wc -l | tr -d ' ')
+  if [ "${#val}" -ge 10 ] && [ "$distinct" -ge 3 ] && [ "$words" -ge 2 ] && [ "$uniq_words" -ge 2 ] && no_repeat "$val"; then
     pass "§7 결정 $d 기본값 셀 내용 있음(${#val}자·문자 ${distinct}종·한글 단어 ${words}개)"
   else
     failed "§7 결정 $d 기본값 셀이 비었거나 10자 미만이거나 무의미(문자 ${distinct}종·한글 단어 ${words}개)"
@@ -186,6 +227,11 @@ else
   failed "§9 WU 카드 수 $wu_rows (기대 14)"
 fi
 
+# 71~74) 13.02b·position_count 계약 토큰 (Codex 4차 — 문서에서 사라지면 exit 1)
+for k in 'position_count: int' 'extra_lines: tuple' 'def extract_block' 'from_attempt: int' 'search_filters: SearchFilters' 'multi_position_hint: tuple' 'created_on: date' '날짜 없음'; do
+  if printf '%s\n' "$sec5_fenced" | $G -qF -- "$k"; then pass "§5 계약 토큰 '$k'"; else failed "§5 계약 토큰 '$k' 없음"; fi
+done
+
 # 67) 전 행 PLANNED 금지 — 착수된 WU 가 최소 1개
 if printf '%s\n' "$sec9" | $G -E '^\| *HS-13\.' | $G -Evq '\| *PLANNED *\|$'; then
   pass "§9 PLANNED 가 아닌 WU 카드 1개 이상"
@@ -194,8 +240,8 @@ else
 fi
 # 68~70) D9 at-most-once 핵심 문구 3개 (Codex 2차 상충 지적)
 sec5_all=$(section '^## 5\. 계약')
-for k in 'O_CREAT\|O_EXCL' '하나도 없을 때만' 'def open_new_attempt'; do
-  if printf '%s\n' "$sec5_all" | $G -q "$k"; then pass "§5 D9 at-most-once 문구 '$k'"; else failed "§5 D9 문구 '$k' 없음"; fi
+for k in 'O_CREAT' 'O_EXCL' 'def open_new_attempt'; do
+  if printf '%s\n' "$sec5_all" | $G -qF -- "$k"; then pass "§5 D9 at-most-once 문구 '$k'"; else failed "§5 D9 문구 '$k' 없음"; fi
 done
 
 # 50) D9 발송 멱등 결정 존재
