@@ -19,6 +19,7 @@ from .linkedin_limit import (
     core_tokens,
     verify_linkedin_fidelity,
 )
+from .two_field import TwoField, split_two_field
 from .types import (
     BriefInputError,
     Claim,
@@ -60,6 +61,7 @@ __all__ = [
     "Section",
     "SourceRef",
     "TeamMail",
+    "TwoField",
     "build_boolean_queries",
     "check_balanced",
     "check_linkedin",
@@ -68,6 +70,7 @@ __all__ = [
     "extract_block",
     "normalize_line",
     "split_sections",
+    "split_two_field",
     "verify_fidelity",
     "verify_linkedin_fidelity",
 ]
