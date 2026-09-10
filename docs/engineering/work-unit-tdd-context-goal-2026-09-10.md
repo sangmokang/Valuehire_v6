@@ -49,7 +49,7 @@
 | ID | 하나의 AC | counter-AC | 검증 명령 | 선행 | 상태 |
 |---|---|---|---|---|---|
 | WU-1 | When manifest를 검사하면 필수 필드·유일 ID·AC 1개·counter-AC 1개 이상만 통과해야 합니다. | 파일 존재만으로 통과, 중복 ID, AC/counter-AC 누락 | `bash scripts/acceptance-work-unit-contract.sh schema` | 이 계약 | PASS · RED `14604d5` · GREEN `18e7535` |
-| WU-2 | When RED→GREEN 이력을 검사하면 빠진 동작 RED와 시험 불변 이력만 통과해야 합니다. | 0건, 문법/import 오류, 기대값 동시 변경 | `bash scripts/acceptance-work-unit-contract.sh tdd` | WU-1 완료 | PLANNED |
+| WU-2 | When RED→GREEN 이력을 검사하면 빠진 동작 RED와 시험 불변 이력만 통과해야 합니다. | 0건, 문법/import 오류, 기대값 동시 변경 | `bash scripts/acceptance-work-unit-contract.sh tdd` | WU-1 완료 | PASS · RED `f72c029` · 승인 시험 보정 `95110bd` · GREEN `f2c6099` |
 | WU-3 | When 맥락 manifest를 검사하면 현재 HEAD·작업공간·파일 hash가 모두 맞아야 합니다. | filename-only, 전체 저장소, 오래된 HEAD, 다른 작업공간 | `bash scripts/acceptance-work-unit-contract.sh context` | WU-2 완료 | PLANNED |
 | WU-4 | If 단위 시험이 부적합하면 허용 종류·구체 사유·대체 검증 명령이 있어야 합니다. | 빈 사유, 임의 생략, 실행 명령 0개 | `bash scripts/acceptance-work-unit-contract.sh not-applicable` | WU-3 완료 | PLANNED |
 | WU-5 | If 검사기나 서버 실행 줄을 무력화하면 독립 공격 검사가 실패를 관측해야 합니다. | exit 0, no-op, echo-only, 항상 거짓 조건 | `bash scripts/acceptance-work-unit-contract-mutations.sh` | WU-4 완료 | PLANNED |
@@ -67,4 +67,4 @@
 
 ## 적대 검증 로그
 
-WU-1 원문과 종료값은 [실행 증거 장부](work-unit-tdd-context-evidence-2026-09-10.md)에 보존합니다. 나머지 WU는 아직 실행하지 않았습니다.
+WU-1·WU-2 원문과 종료값은 [실행 증거 장부](work-unit-tdd-context-evidence-2026-09-10.md)에 보존합니다. 나머지 WU는 아직 실행하지 않았습니다.
