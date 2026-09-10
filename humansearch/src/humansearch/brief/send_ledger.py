@@ -31,6 +31,7 @@ from .packet import (
     require_packet_id,
     write_store_file,
 )
+from .recipients import load_recipients
 from .types import _reject, _require_sha256, _require_text
 
 __all__ = [
@@ -83,12 +84,21 @@ class Transition:
 
 @dataclass(frozen=True)
 class Approval:
-    """재시도를 여는 사람의 서명. 무엇을 어떻게 찾아보고 없다고 판단했는지까지 남긴다."""
+    """재시도를 여는 사람의 서명. 무엇을 어떻게 찾아보고 없다고 판단했는지까지 남긴다.
+
+    `packet_id`·`from_attempt` 는 HS-13.09b 결합 필드다 — 이 승인이 **어느 패킷의
+    어느 최신 attempt** 를 여는지 승인 자체가 증명하게 한다. 값이 없으면 다른 패킷·
+    낡은 attempt 에서 만든 승인을 그대로 재사용해 재발송 사고가 날 수 있다.
+    실제로 이 패킷·이 attempt·계약 수신자인지의 대조는 `open_new_attempt` 가 한다 —
+    여기서는 형식(양쪽 다 자기 타입의 형식)만 본다.
+    """
 
     approved_by: str
     search_query: str
     search_checked_at: str
     reason: str
+    packet_id: str
+    from_attempt: int
 
     def __post_init__(self) -> None:
         _require_text(self.approved_by, "Approval.approved_by")
@@ -96,6 +106,8 @@ class Approval:
         _require_text(self.search_checked_at, "Approval.search_checked_at")
         _require_text(self.reason, "Approval.reason")
         require_clock(_parse_moment(self.search_checked_at), "Approval.search_checked_at")
+        require_packet_id(self.packet_id)
+        require_attempt(self.from_attempt)
 
 
 @dataclass(frozen=True)
@@ -304,6 +316,20 @@ def mark(
     return _append(directory, current, updated)
 
 
+def _check_approval_binding(approval: Approval, packet_id: str, latest_attempt: int) -> None:
+    """승인이 이 패킷·이 최신 attempt·팀 수신자 계약 것인지 결합 대조한다(HS-13.09b).
+
+    셋 중 하나라도 어긋나면 다른 패킷·낡은 attempt·계약 밖 서명으로 재발송이 열린다.
+    """
+    if approval.packet_id != packet_id:
+        _reject("승인의 packet_id 가 이 재시도 대상 패킷과 다르다")
+    if approval.from_attempt != latest_attempt:
+        _reject(f"승인은 attempt {approval.from_attempt} 것인데 최신은 attempt {latest_attempt} 다")
+    recipients = load_recipients()
+    if approval.approved_by not in (*recipients.to, *recipients.cc):
+        _reject("승인자가 팀 수신자 계약(to·cc) 밖의 주소다")
+
+
 def open_new_attempt(
     dir: Path,
     packet_id: str,
@@ -326,6 +352,7 @@ def open_new_attempt(
         _reject("연 적 없는 채널에는 재시도가 없다 — record_intent 가 먼저다")
     if current.state is not SendState.INTENT or current.message_id is not None:
         _reject("발송 여부가 이미 확정된 시도는 다시 열 수 없다")
+    _check_approval_binding(approval, packet_id, current.attempt)
     fresh = replace(
         current,
         attempt=current.attempt + 1,
