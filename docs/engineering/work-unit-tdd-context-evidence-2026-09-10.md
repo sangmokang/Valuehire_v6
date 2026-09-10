@@ -2,7 +2,7 @@
 
 ## 결론
 
-WU-1은 불완전한 작업 기록을 실제 입력으로 거부하고, 정상 기록 한 건만 받아들이는 상태입니다. 다음 작업 단위는 아직 시작하지 않았습니다.
+WU-1~WU-3은 각각 스키마, RED/GREEN 이력, 현재 Git 맥락을 실제 입력으로 검증합니다. 완료된 각 WU는 같은 시험의 GREEN과 작은 반례를 통과했고, WU-4·WU-5는 아직 시작하지 않았습니다.
 
 ## WU-1 RED 원문
 
@@ -150,3 +150,64 @@ BROKEN_RED_GUARD_EXIT=1
 ```
 
 → 임시 작업공간에서 RED 원인 거부 줄을 항상 거짓으로 바꾸자 상위 시험이 종료값 1을 냈습니다. 검사 한 줄 고장을 실제로 감지한 좋은 증거입니다.
+
+## WU-3 RED 원문
+
+시각 `2026-09-10T16:26:21+09:00`, 선행 Type 계약 `c28b3a29d4be3509d1d097ec99ce70d9eab676b8`, RED 커밋 `bc5c4d0`.
+
+```text
+FAIL: current exact context
+VERDICT: FAIL
+CONTEXT_SCHEMA_INVALID: work_units[0]
+CHECKED: 11
+FAIL: filename-only declaration rejected
+FAIL: context hash mismatch rejected
+FAIL: stale HEAD rejected
+FAIL: other worktree rejected
+FAIL: whole repository scope rejected
+FAIL: undeclared observed read rejected
+WU_TESTS: 7
+CHECKED: 7
+WU_FAILURE_KIND: missing_behavior
+VERDICT: FAIL
+CONTEXT_EXIT=1
+SCHEMA_EXIT=1
+```
+
+→ 관측 읽기 목록이라는 새 Type 필드와 의미 검증이 아직 없어 정상 사례를 포함한 7건이 모두 실패했습니다. Ruby 문법 검사는 통과했고 시험 7건이 실행됐으므로 문법 오류나 0건 RED가 아닙니다.
+
+## WU-3 GREEN·회귀·작은 공격 원문
+
+시각 `2026-09-10T16:28:46+09:00`, GREEN 커밋 `2c25879`.
+
+```text
+PASS: current exact context
+PASS: filename-only declaration rejected
+PASS: context hash mismatch rejected
+PASS: stale HEAD rejected
+PASS: other worktree rejected
+PASS: whole repository scope rejected
+PASS: undeclared observed read rejected
+WU_TESTS: 7
+CHECKED: 7
+VERDICT: PASS
+PASS: normal manifest — exit=0
+PASS: missing AC — exit=1
+PASS: missing counter-AC — exit=1
+PASS: duplicate ID — exit=1
+WU_TESTS: 4
+CHECKED: 4
+VERDICT: PASS
+PASS: authentic RED then GREEN
+PASS: zero RED commands rejected
+PASS: syntax-only RED rejected
+PASS: test expectation drift rejected
+WU_TESTS: 4
+CHECKED: 4
+VERDICT: PASS
+CONTEXT_EXIT=0
+SCHEMA_EXIT=0
+TDD_EXIT=0
+```
+
+→ 정상 맥락 한 건은 통과하고 filename-only, hash 불일치, 오래된 HEAD, 다른 worktree, 전체 저장소 범위, 미선언 읽기는 모두 종료값 1로 거부됐습니다. WU-3 RED 뒤 context 시험 파일 diff도 0건입니다.
