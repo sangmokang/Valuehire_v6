@@ -62,9 +62,12 @@ build_case = lambda do |root, kind|
       File.join(root, "scripts/fake-red.sh"),
       "#!/usr/bin/env bash\necho 'WU_TESTS: 1'\necho 'WU_FAILURE_KIND: missing_behavior'\necho 'VERDICT: FAIL'\nexit 1\n"
     )
+  elsif kind == :pre_green_approved
+    File.write(File.join(root, "scripts/run-test.sh"), "#!/usr/bin/env bash\nruby test/feature_test.rb\n")
   end
   red_paths = ["lib/feature.rb", "test/feature_test.rb"]
   red_paths << "scripts/fake-red.sh" if kind == :marker_only
+  red_paths << "scripts/run-test.sh" if kind == :pre_green_approved
   run.call(root, {}, "git", "add", *red_paths)
   if kind == :late_contract
     File.write(File.join(root, "late-contract.txt"), "declared after the contract boundary\n")
@@ -74,18 +77,30 @@ build_case = lambda do |root, kind|
   _rc, red_commit = run.call(root, {}, "git", "rev-parse", "HEAD")
   red_commit.strip!
 
+  approval_commit = nil
   if kind == :marker_only
     File.write(
       File.join(root, "scripts/fake-red.sh"),
       "#!/usr/bin/env bash\necho 'WU_TESTS: 1'\necho 'VERDICT: PASS'\nexit 0\n"
     )
+  elsif kind == :pre_green_approved
+    write_test.call(File.join(root, "test/feature_test.rb"), expected: false)
+    run.call(root, {}, "git", "add", "test/feature_test.rb")
+    run.call(
+      root, {}, "git", "commit", "-q", "-m", "approve expectation before green",
+      "-m", "Test-Expectation-Approval: WU-PRE_GREEN_APPROVED"
+    )
+    _rc, approval_commit = run.call(root, {}, "git", "rev-parse", "HEAD")
+    approval_commit.strip!
+    FileUtils.mkdir_p(File.join(root, "docs"))
+    File.write(File.join(root, "docs/non-test-marker.txt"), "not an implementation\n")
   elsif %i[drift restored_drift self_approved].include?(kind)
     write_test.call(File.join(root, "test/feature_test.rb"), expected: false)
   else
     File.write(File.join(root, "lib/feature.rb"), "module Feature\n  def self.enabled?\n    true\n  end\nend\n")
     write_test.call(File.join(root, "test/feature_test.rb"), expected: true) if kind == :syntax
   end
-  green_paths = ["lib/feature.rb", "test/feature_test.rb"]
+  green_paths = kind == :pre_green_approved ? ["docs/non-test-marker.txt"] : ["lib/feature.rb", "test/feature_test.rb"]
   green_paths << "scripts/fake-red.sh" if kind == :marker_only
   run.call(root, {}, "git", "add", *green_paths)
   commit_args = ["commit", "-q", "-m", "green"]
@@ -117,10 +132,16 @@ build_case = lambda do |root, kind|
   unit["tdd"]["red_commit"] = red_commit
   unit["tdd"]["green_commit"] = green_commit
   unit["tdd"]["completion_commit"] = completion_commit
-  unit["tdd"]["red_commands"] = [kind == :marker_only ? "bash scripts/fake-red.sh" : "ruby test/feature_test.rb"]
+  red_command = case kind
+                when :marker_only then "bash scripts/fake-red.sh"
+                when :pre_green_approved then "bash scripts/run-test.sh"
+                else "ruby test/feature_test.rb"
+                end
+  unit["tdd"]["red_commands"] = [red_command]
   unit["tdd"]["red_tests"] = 1
   unit["tdd"]["test_files"] = ["test/feature_test.rb"]
   unit["tdd"]["expectation_change_approval_commit"] = green_commit if kind == :self_approved
+  unit["tdd"]["expectation_change_approval_commit"] = approval_commit if kind == :pre_green_approved
   authority_path = kind == :late_contract ? "late-contract.txt" : "contract.txt"
   %w[database api types].each do |authority|
     unit["contracts"][authority]["paths"] = [authority_path]
@@ -150,7 +171,7 @@ end
 
 Dir.mktmpdir("wu-tdd-contract-") do |tmp|
   cases = {}
-  %i[normal syntax drift late_contract post_green_drift restored_drift marker_only self_approved].each do |kind|
+  %i[normal syntax drift late_contract post_green_drift restored_drift marker_only self_approved pre_green_approved].each do |kind|
     case_root = File.join(tmp, kind.to_s)
     FileUtils.mkdir_p(case_root)
     cases[kind] = build_case.call(case_root, kind)
@@ -229,6 +250,16 @@ Dir.mktmpdir("wu-tdd-contract-") do |tmp|
   self_approved_ok = rc == 1 && out.include?("EXPECTATION_APPROVAL_IS_GREEN")
   missing_behavior ||= rc.zero?
   assert.call("GREEN cannot self-approve expectation changes", self_approved_ok, out)
+
+  manifest_path, = cases.fetch(:pre_green_approved)
+  rc, out = run.call(
+    repo_root,
+    { "WORK_UNIT_REPO" => File.join(tmp, "pre_green_approved"), "WORK_UNIT_TDD_ONLY" => "1" },
+    "ruby", checker, manifest_path
+  )
+  pre_green_approval_ok = rc == 1 && out.include?("EXPECTATION_APPROVAL_NOT_AFTER_GREEN")
+  missing_behavior ||= rc.zero?
+  assert.call("pre-GREEN self-approved expectation change rejected", pre_green_approval_ok, out)
 
   manifest_path, = cases.fetch(:normal)
   completion_before_green = Psych.safe_load(File.read(manifest_path), aliases: false)
