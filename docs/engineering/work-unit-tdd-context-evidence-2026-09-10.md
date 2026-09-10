@@ -510,3 +510,49 @@ CHECKED: 7
 VERDICT: PASS
 RESTORED_DRIFT_GREEN_EXIT=0
 ```
+
+## WU-5R2 감사 보정: 완료 명령 실제 실행
+
+계약 `1757cc6` 뒤 RED `a9fd860`은 정상 명령과 함께 `false`, `true`, 0건 PASS 출력을 manifest에 넣었습니다. 기존 checker는 문자열 형태만 보고 네 가지 부적합 명령을 모두 통과시켰습니다.
+
+```text
+2026-09-10T17:54:58+0900
+PASS: executed completion commands
+FAIL: failing regression command rejected
+FAIL: failing adversarial command rejected
+FAIL: no-op completion command rejected
+FAIL: zero-check completion output rejected
+WU_TESTS: 5
+CHECKED: 5
+WU_FAILURE_KIND: missing_behavior
+VERDICT: FAIL
+COMPLETION_COMMAND_RED_EXIT=1
+```
+
+GREEN `fd6e6e0`은 현재 저장소 HEAD에서 regression·adversarial 명령을 실행하고, 종료값 0·`VERDICT: PASS`·양수 `WU_TESTS` 또는 `CHECKED`를 모두 요구합니다. checker의 제어 환경변수는 자식 명령에 전파하지 않습니다.
+
+```text
+2026-09-10T17:56:15+0900
+PASS: executed completion commands
+PASS: failing regression command rejected
+PASS: failing adversarial command rejected
+PASS: no-op completion command rejected
+PASS: zero-check completion output rejected
+WU_TESTS: 5
+CHECKED: 5
+VERDICT: PASS
+COMPLETION_COMMAND_GREEN_EXIT=0
+
+WU_TESTS: 29
+CHECKED: 29
+VERDICT: PASS
+ALL_AFTER_COMPLETION_EXIT=0
+
+PASS: repository WU manifests discovered — 1
+PASS: repository WU acceptance is wired in CI
+PASS: repository WU manifest — docs/engineering/work-units/work-unit-tdd-context.yaml
+WU_TESTS: 3
+CHECKED: 3
+VERDICT: PASS
+REPOSITORY_WITH_COMPLETION_EXIT=0
+```
