@@ -134,3 +134,16 @@
   stage: "ci"
   ci_mirror_job: "verify"
   required: true
+- id: "hs-1301b-literals-ci"
+  path: ".github/workflows/verify.yml"
+  target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1301b-literals.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
+
+- id: "hs-1308-nosend-ci"
+  path: ".github/workflows/verify.yml"
+  target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1308-nosend.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
