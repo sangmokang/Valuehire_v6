@@ -204,7 +204,6 @@ for key in yes Yes YES no No NO true True TRUE false False FALSE On ON off Off O
 $key: {push: null, pull_request: null, workflow_dispatch: null}")
   expect_structure "quoted on 뒤 YAML boolean $key 충돌 → 구조 오류" "$p"
 done
-
 p=$(trigger_variant duplicate-push-branches 'on:
   push:
     branches: [main]
@@ -220,11 +219,14 @@ p=$(trigger_variant duplicate-dispatch-input 'on:
       reason: {required: true}
       reason: {required: false}')
 expect_structure "workflow_dispatch.inputs 중복 → 구조 오류" "$p"
+p=$(trigger_variant nested-numeric-key 'on: {push: null, pull_request: null, workflow_dispatch: {inputs: {7: {required: false}}}}')
+expect_structure "workflow_dispatch.inputs 숫자 key → 구조 오류" "$p"
+p=$(trigger_variant nested-boolean-key 'on: {push: null, pull_request: null, workflow_dispatch: {inputs: {on: {}, true: {}}}}')
+expect_structure "workflow_dispatch.inputs boolean slot 충돌 → 구조 오류" "$p"
 p=$(trigger_variant trigger-scalar 'on: push')
 expect_trigger_contract "scalar on은 누락 event 계약 위반" "$p" 1 '^FAIL: TRIGGER_CONTRACT:.*pull_request' '^CHECKED: [1-9][0-9]*$'
 p="$TMP/trigger-bom.yml"; { printf '\357\273\277'; cat "$WF"; } > "$p"
 expect_trigger_contract "UTF-8 BOM 정상 workflow → 통과" "$p" 0 '^PASS: TRIGGER_CONTRACT:' '^CHECKED: [1-9][0-9]*$'
-
 # ── 차단 쪽: 무력화 주입 ─────────────────────────────────────────────────────
 mutate() {
   local name="$1" ruby_code="$2"
@@ -233,7 +235,6 @@ mutate() {
   ruby -e "$ruby_code" "$path"
   printf '%s' "$path"
 }
-
 p=$(mutate duplicate-jobs 'p=ARGV[0]; s=File.read(p).sub(/^jobs:/, "jobs:\n  decoy: {runs-on: ubuntu-latest, steps: [{run: true}]}\njobs:"); File.write(p,s)')
 expect_structure "duplicate top-level jobs → 구조 오류" "$p"
 p=$(mutate duplicate-job-id 'p=ARGV[0]; s=File.read(p).sub("jobs:\n  verify:", "jobs:\n  verify: {runs-on: ubuntu-latest, steps: [{run: true}]}\n  verify:"); File.write(p,s)')
@@ -250,7 +251,6 @@ p=$(mutate unreadable '')
 chmod 000 "$p"
 expect_structure "읽기 권한 없는 workflow → 구조 오류" "$p"
 chmod 600 "$p"
-
 p=$(mutate step-if-false 'p=ARGV[0]; s=File.read(p).sub("      - name: 인수 검사 hs-a4", "      - name: 인수 검사 hs-a4\n        if: ${{ false }}"); File.write(p,s)')
 expect_rc "스텝에 if: \${{ false }} 주입 → 불합격" "$p" 1
 
