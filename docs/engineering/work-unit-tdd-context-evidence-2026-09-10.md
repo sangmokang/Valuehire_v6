@@ -2,7 +2,7 @@
 
 ## 결론
 
-WU-1~WU-3은 각각 스키마, RED/GREEN 이력, 현재 Git 맥락을 실제 입력으로 검증합니다. 완료된 각 WU는 같은 시험의 GREEN과 작은 반례를 통과했고, WU-4·WU-5는 아직 시작하지 않았습니다.
+WU-1~WU-5는 각각 스키마, RED/GREEN 이력, 현재 Git 맥락, NOT_APPLICABLE, 검사기·CI mutation을 실제 입력으로 검증합니다. 완료된 각 WU는 같은 시험의 GREEN과 작은 반례를 통과했습니다.
 
 ## WU-1 RED 원문
 
@@ -282,3 +282,71 @@ TDD_EXIT=0
 ```
 
 → 문서 변경은 실제 `test -s README.md` 대체 명령을 실행해 통과했습니다. 빈 사유, 명령 0개, 허용 밖 변경 종류, RED_GREEN과 면제 혼합은 닫힌 실패이며 WU-4 RED 뒤 시험 파일 diff는 0건입니다.
+
+## WU-5 RED 원문
+
+시각 `2026-09-10T16:39:03+09:00`, RED 커밋 `672283c`.
+
+```text
+PASS: 정상 WU gate — all modes exit=0
+PASS: 검사기 무력화 차단: exit-zero — exit=1
+PASS: 검사기 무력화 차단: noop — exit=1
+PASS: 검사기 무력화 차단: echo-only — exit=1
+PASS: 검사기 무력화 차단: always-false — exit=1
+FAIL: WU CI 배선 — one or more executable commands missing
+FAIL: WU CI 항상-거짓 조건 차단 — target step missing
+PASS: 원본 worktree 상태 불변 — before/after identical
+WU_TESTS: 8
+CHECKED: 8
+WU_FAILURE_KIND: missing_behavior
+VERDICT: FAIL
+MUTATION_EXIT=1
+```
+
+→ 검사기 네 변이는 이미 상위 schema gate가 잡았지만, 서버가 WU gate를 호출하지 않아 두 배선 사례가 실패했습니다. 따라서 구현 누락은 CI 연결이며 시험 8건이 실행된 유효한 RED입니다.
+
+### WU-5 시험 런타임 보정과 RED 재현
+
+저장소 Ruby가 `filter_map`을 제공한다고 가정한 시험 결함을 별도 test-only 승인 커밋 `c78f930`에서 `map + compact`로 고쳤습니다. 그 커밋만 분리 체크아웃해 GREEN 파일 없이 다시 실행한 결과입니다.
+
+```text
+PASS: 정상 WU gate — all modes exit=0
+PASS: 검사기 무력화 차단: exit-zero — exit=1
+PASS: 검사기 무력화 차단: noop — exit=1
+PASS: 검사기 무력화 차단: echo-only — exit=1
+PASS: 검사기 무력화 차단: always-false — exit=1
+FAIL: WU CI 배선 — one or more executable commands missing
+FAIL: WU CI 항상-거짓 조건 차단 — target step missing
+PASS: 원본 worktree 상태 불변 — before/after identical
+WU_TESTS: 8
+CHECKED: 8
+WU_FAILURE_KIND: missing_behavior
+VERDICT: FAIL
+CORRECTED_RED_EXIT=1
+```
+
+## WU-5 GREEN·회귀·mutation 원문
+
+시각 `2026-09-10T16:45:21+09:00`, GREEN 커밋 `faa8b6f`, 누락 manifest 회귀 확장 `2b64699`.
+
+```text
+PASS: 정상 WU gate — all modes exit=0
+PASS: 검사기 무력화 차단: exit-zero — exit=1
+PASS: 검사기 무력화 차단: noop — exit=1
+PASS: 검사기 무력화 차단: echo-only — exit=1
+PASS: 검사기 무력화 차단: always-false — exit=1
+PASS: WU CI 배선 — contract and mutation commands present
+PASS: WU CI 항상-거짓 조건 차단 — exit=1
+PASS: 원본 worktree 상태 불변 — before/after identical
+WU_TESTS: 8
+CHECKED: 8
+VERDICT: PASS
+MUTATION_EXIT=0
+CI_TOTAL=30 CI_NAMED=29
+DOC_STEP_ROWS=29
+CI_INTEGRITY: PASS 24/24
+AC_M: PASS 31/31
+PRINCIPLES: PASS 34/34
+```
+
+→ CI는 WU 계약과 mutation 스크립트를 각각 무조건 실행하고, mechanism 명부와 명령 정본도 같은 실행 줄을 가리킵니다. 별도 회귀에서 manifest 파일 자체가 없으면 `MANIFEST_MISSING`, 종료값 1이었고 전체 네 모드는 21/21 PASS였습니다.
