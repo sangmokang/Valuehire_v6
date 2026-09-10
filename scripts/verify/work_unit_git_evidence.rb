@@ -116,7 +116,6 @@ module WorkUnitGitEvidence
   def validate_test_files(repo, id, tdd)
     errors = []
     checked = 0
-    changed = []
     head = git(repo, "rev-parse", "HEAD").last.strip
     tdd.fetch("test_files").each do |path|
       checked += 1
@@ -128,21 +127,24 @@ module WorkUnitGitEvidence
       head_blob = blob(repo, head, path)
       if red_blob.nil? || head_blob.nil?
         errors << "TEST_FILE_MISSING: #{path}"
-      elsif Digest::SHA256.hexdigest(red_blob) != Digest::SHA256.hexdigest(head_blob)
-        changed << path
       end
     end
-    return [errors, checked] if changed.empty?
+    return [errors, checked] unless errors.empty?
 
-    approval = tdd["expectation_change_approval_commit"]
-    unless approved_change?(repo, id, approval, tdd, changed, head) ||
-           approved_change_history?(repo, id, tdd, head)
-      errors << "TEST_FILE_CHANGED_AFTER_RED: #{changed.join(',')}"
+    changes = test_file_change_commits(repo, tdd, head)
+    return [errors, checked] if changes.empty?
+
+    approvals = Array(tdd["expectation_change_approval_commit"])
+    unapproved = changes.reject do |commit|
+      approvals.include?(commit) && approved_commit?(repo, id, commit, tdd, head)
+    end
+    unless unapproved.empty?
+      errors << "TEST_FILE_CHANGED_AFTER_RED: commits=#{unapproved.join(',')}"
     end
     [errors, checked + 1]
   end
 
-  def approved_change?(repo, id, approval, tdd, changed, head)
+  def approved_commit?(repo, id, approval, tdd, head)
     return false unless approval && commit_exists?(repo, approval)
     return false unless strict_ancestor?(repo, tdd.fetch("red_commit"), approval)
     return false unless ancestor?(repo, approval, head)
@@ -152,24 +154,12 @@ module WorkUnitGitEvidence
 
     rc, names = git(repo, "diff-tree", "--no-commit-id", "--name-only", "-r", approval)
     files = names.lines.map(&:strip).reject(&:empty?)
-    rc.zero? && !files.empty? && changed.all? { |path| files.include?(path) } &&
-      files.all? { |path| test_evidence_path?(path) }
+    rc.zero? && !files.empty? && files.all? { |path| test_evidence_path?(path) }
   end
 
-  def approved_change_history?(repo, id, tdd, head)
+  def test_file_change_commits(repo, tdd, head)
     rc, output = git(repo, "log", "--format=%H", "#{tdd.fetch('red_commit')}..#{head}", "--", *tdd.fetch("test_files"))
-    return false unless rc.zero?
-
-    commits = output.lines.map(&:strip).reject(&:empty?)
-    return false if commits.empty?
-
-    commits.all? do |commit|
-      message_rc, message = git(repo, "show", "-s", "--format=%B", commit)
-      names_rc, names = git(repo, "diff-tree", "--no-commit-id", "--name-only", "-r", commit)
-      files = names.lines.map(&:strip).reject(&:empty?)
-      message_rc.zero? && names_rc.zero? && approval_trailer?(message, id) &&
-        !files.empty? && files.all? { |path| test_evidence_path?(path) }
-    end
+    rc.zero? ? output.lines.map(&:strip).reject(&:empty?) : []
   end
 
   def approval_trailer?(message, id)

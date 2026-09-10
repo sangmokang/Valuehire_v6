@@ -168,7 +168,9 @@ module WorkUnitManifest
       validate_not_applicable_tdd(tdd, label, errors)
     end
     approval = tdd["expectation_change_approval_commit"]
-    errors << "APPROVAL_COMMIT_INVALID: #{label}" unless approval.nil? || (approval.is_a?(String) && approval.match?(SHA_PATTERN))
+    valid_approval = approval.nil? || commit?(approval) ||
+                     (approval.is_a?(Array) && !approval.empty? && approval.all? { |item| commit?(item) } && approval.uniq == approval)
+    errors << "APPROVAL_COMMIT_INVALID: #{label}" unless valid_approval
   end
 
   def validate_red_green_tdd(tdd, label, errors)

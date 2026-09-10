@@ -101,7 +101,9 @@ work_units:
       red_failure_kind: "missing_behavior"
       test_files:
         - "scripts/verify/work-unit-tdd-contract-test.rb"
-      expectation_change_approval_commit: "14dad68e2a1afe2bda2f8a680a79a4bbe51cc335"
+      expectation_change_approval_commit:
+        - "14dad68e2a1afe2bda2f8a680a79a4bbe51cc335"
+        - "3c7017c2607cb46a20ce2d2d52963217e49ea830"
     regression_commands:
       - "bash scripts/acceptance-work-unit-contract.sh tdd"
     adversarial_commands:
