@@ -32,7 +32,22 @@ run_case() {
 }
 
 case "$mode" in
-  schema|all)
+  all)
+    total=0
+    for part in schema tdd context not-applicable; do
+      output=""
+      rc=0
+      output=$(bash "$0" "$part" 2>&1) || rc=$?
+      printf '%s\n' "$output"
+      count=$(printf '%s\n' "$output" | awk '/^WU_TESTS:/{value=$2} END{print value+0}')
+      total=$((total + count))
+      if [ "$rc" -ne 0 ]; then fail=1; fi
+    done
+    printf 'WU_TESTS: %d\nCHECKED: %d\n' "$total" "$total"
+    if [ "$fail" -eq 0 ]; then echo 'VERDICT: PASS'; else echo 'VERDICT: FAIL'; fi
+    exit "$fail"
+    ;;
+  schema)
     run_case "normal manifest" "$fixtures/valid.yaml" 0 '^VERDICT: PASS$'
     run_case "missing AC" "$fixtures/ac-missing.yaml" 1 'AC_REQUIRED:'
     run_case "missing counter-AC" "$fixtures/counter-ac-missing.yaml" 1 'COUNTER_AC_REQUIRED:'
