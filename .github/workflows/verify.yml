@@ -257,6 +257,13 @@ jobs:
         # 글로브와 CI 가 같은 인수 스크립트로 실행한다 (판정기 2벌 금지 · P16).
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-verify-ac-m.sh
 
+      - name: 인수 검사 hs-1300 (HumanSearch 브리프 스펙 구조 · HS-13.00)
+        # 스펙 문서가 구현 지시서 자격(catch-all 행·결정 D1~D8·WU 카드 13건·타입 12개)을
+        # 갖췄는지와, 그 검사기가 고장 사본(문서 부재·카드 삭제·catch-all 삭제)을 잡는지.
+        run: |
+          bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1300.sh
+          bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1300-mutations.sh
+
       - name: PostgreSQL 서버 준비 (Invoice 런타임 검사용)
         # 러너에는 psql·pg_config 만 PATH 에 있고 initdb·pg_ctl 은
         # /usr/lib/postgresql/<ver>/bin 에 있다. 없으면 설치해서 BLOCKED 를 없앤다.
