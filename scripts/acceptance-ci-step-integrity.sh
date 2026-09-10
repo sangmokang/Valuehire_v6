@@ -218,11 +218,10 @@ for tagged in yes true TRUE; do
   p=$(trigger_variant "tagged-$tagged-after" "\"on\": {push: {paths-ignore: [\"**\"]}, pull_request: null, workflow_dispatch: null}
 !!bool $tagged: {push: null, pull_request: null, workflow_dispatch: null}"); expect_structure "축소 on 뒤 !!bool $tagged 충돌 → 구조 오류" "$p"
 done
-p=$(trigger_variant tagged-bool-on '!!bool on: {push: null, pull_request: null, workflow_dispatch: null}')
-expect_structure "!!bool on 단독 → 구조 오류" "$p"
+p=$(trigger_variant tagged-bool-on '!!bool on: {push: null, pull_request: null, workflow_dispatch: null}'); expect_structure "!!bool on 단독 → 구조 오류" "$p"
 p=$(trigger_variant alias-hidden-duplicate 'x-push: &p {branches: [main], branches: ["**"]}
-on: {push: *p, pull_request: null, workflow_dispatch: null}')
-expect_structure "alias로 바깥 중복 mapping 은닉 → 구조 오류" "$p"
+on: {push: *p, pull_request: null, workflow_dispatch: null}'); expect_structure "alias로 바깥 중복 mapping 은닉 → 구조 오류" "$p"
+p=$(trigger_variant binary-on-collision $'!!binary b24=: {push: null, pull_request: null, workflow_dispatch: null}\n"on": {push: {paths-ignore: ["**"]}, pull_request: null, workflow_dispatch: null}'); expect_structure "binary가 on 값 후보로 충돌 → 구조 오류" "$p"
 p=$(trigger_variant trigger-scalar 'on: push')
 expect_trigger_contract "scalar on은 누락 event 계약 위반" "$p" 1 '^FAIL: TRIGGER_CONTRACT:.*pull_request' '^CHECKED: [1-9][0-9]*$'
 p="$TMP/trigger-bom.yml"; { printf '\357\273\277'; cat "$WF"; } > "$p"
