@@ -211,3 +211,74 @@ TDD_EXIT=0
 ```
 
 → 정상 맥락 한 건은 통과하고 filename-only, hash 불일치, 오래된 HEAD, 다른 worktree, 전체 저장소 범위, 미선언 읽기는 모두 종료값 1로 거부됐습니다. WU-3 RED 뒤 context 시험 파일 diff도 0건입니다.
+
+## WU-4 RED 원문
+
+시각 `2026-09-10T16:32:16+09:00`, RED 커밋 `3c418f5`.
+
+```text
+FAIL: documented alternative validation
+VERDICT: FAIL
+COMMIT_INVALID: work_units[0].red_commit
+COMMIT_INVALID: work_units[0].green_commit
+RED_COMMAND_REQUIRED: work_units[0]
+RED_FAILURE_KIND_REQUIRED: work_units[0]
+TEST_FILES_REQUIRED: work_units[0]
+CHECKED: 11
+FAIL: missing reason rejected
+FAIL: zero alternative commands rejected
+FAIL: unsupported change kind rejected
+FAIL: RED_GREEN with waiver rejected
+WU_TESTS: 5
+CHECKED: 5
+WU_FAILURE_KIND: missing_behavior
+VERDICT: FAIL
+NOT_APPLICABLE_EXIT=1
+```
+
+→ 기존 형식은 RED/GREEN 값만 허용해 올바른 문서 변경도 표현할 수 없었고, 사유·대체 명령·허용 종류를 판정하는 동작도 없었습니다. 시험 5건과 `missing_behavior`가 출력된 유효한 RED입니다.
+
+## WU-4 GREEN·회귀·작은 공격 원문
+
+시각 `2026-09-10T16:34:07+09:00`, GREEN 커밋 `597e5a1`.
+
+```text
+PASS: documented alternative validation
+PASS: missing reason rejected
+PASS: zero alternative commands rejected
+PASS: unsupported change kind rejected
+PASS: RED_GREEN with waiver rejected
+WU_TESTS: 5
+CHECKED: 5
+VERDICT: PASS
+PASS: current exact context
+PASS: filename-only declaration rejected
+PASS: context hash mismatch rejected
+PASS: stale HEAD rejected
+PASS: other worktree rejected
+PASS: whole repository scope rejected
+PASS: undeclared observed read rejected
+WU_TESTS: 7
+CHECKED: 7
+VERDICT: PASS
+PASS: normal manifest — exit=0
+PASS: missing AC — exit=1
+PASS: missing counter-AC — exit=1
+PASS: duplicate ID — exit=1
+WU_TESTS: 4
+CHECKED: 4
+VERDICT: PASS
+PASS: authentic RED then GREEN
+PASS: zero RED commands rejected
+PASS: syntax-only RED rejected
+PASS: test expectation drift rejected
+WU_TESTS: 4
+CHECKED: 4
+VERDICT: PASS
+NOT_APPLICABLE_EXIT=0
+CONTEXT_EXIT=0
+SCHEMA_EXIT=0
+TDD_EXIT=0
+```
+
+→ 문서 변경은 실제 `test -s README.md` 대체 명령을 실행해 통과했습니다. 빈 사유, 명령 0개, 허용 밖 변경 종류, RED_GREEN과 면제 혼합은 닫힌 실패이며 WU-4 RED 뒤 시험 파일 diff는 0건입니다.
