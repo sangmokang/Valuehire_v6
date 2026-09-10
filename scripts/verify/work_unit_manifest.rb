@@ -16,6 +16,7 @@ module WorkUnitManifest
   ].freeze
   CONTEXT_KEYS = %w[expected_head expected_worktree scope files observed_reads].freeze
   CONTEXT_FILE_KEYS = %w[path commit_sha sha256 read_evidence].freeze
+  NOT_APPLICABLE_KEYS = %w[change_kind reason alternative_validation_commands].freeze
   SHA_PATTERN = /\A[0-9a-f]{40}\z/
   HASH_PATTERN = /\A[0-9a-f]{64}\z/
   ID_PATTERN = /\AWU-[A-Z0-9][A-Z0-9._-]*\z/
@@ -127,9 +128,7 @@ module WorkUnitManifest
     validate_commands(unit["regression_commands"], "REGRESSION_COMMAND_REQUIRED", label, errors)
     validate_commands(unit["adversarial_commands"], "ADVERSARIAL_COMMAND_REQUIRED", label, errors)
     validate_context_shape(unit["context"], label, errors)
-    unless unit["not_applicable"].nil? || unit["not_applicable"].is_a?(Hash)
-      errors << "NOT_APPLICABLE_SCHEMA_INVALID: #{label}"
-    end
+    validate_not_applicable_shape(unit["not_applicable"], label, errors)
     10
   end
 
@@ -162,15 +161,32 @@ module WorkUnitManifest
       return
     end
     errors << "TDD_MODE_INVALID: #{label}" unless %w[RED_GREEN NOT_APPLICABLE].include?(tdd["mode"])
-    %w[contract_commit red_commit green_commit].each do |key|
-      errors << "COMMIT_INVALID: #{label}.#{key}" unless tdd[key].is_a?(String) && tdd[key].match?(SHA_PATTERN)
+    errors << "COMMIT_INVALID: #{label}.contract_commit" unless commit?(tdd["contract_commit"])
+    if tdd["mode"] == "RED_GREEN"
+      validate_red_green_tdd(tdd, label, errors)
+    elsif tdd["mode"] == "NOT_APPLICABLE"
+      validate_not_applicable_tdd(tdd, label, errors)
     end
-    validate_commands(tdd["red_commands"], "RED_COMMAND_REQUIRED", label, errors)
-    errors << "RED_TESTS_INVALID: #{label}" unless tdd["red_tests"].is_a?(Integer) && tdd["red_tests"] >= 0
-    errors << "RED_FAILURE_KIND_REQUIRED: #{label}" unless string?(tdd["red_failure_kind"])
-    errors << "TEST_FILES_REQUIRED: #{label}" unless string_array?(tdd["test_files"])
     approval = tdd["expectation_change_approval_commit"]
     errors << "APPROVAL_COMMIT_INVALID: #{label}" unless approval.nil? || (approval.is_a?(String) && approval.match?(SHA_PATTERN))
+  end
+
+  def validate_red_green_tdd(tdd, label, errors)
+    %w[red_commit green_commit].each do |key|
+      errors << "COMMIT_INVALID: #{label}.#{key}" unless commit?(tdd[key])
+    end
+    validate_commands(tdd["red_commands"], "RED_COMMAND_REQUIRED", label, errors)
+    errors << "RED_TESTS_INVALID: #{label}" unless tdd["red_tests"].is_a?(Integer) && tdd["red_tests"].positive?
+    errors << "RED_FAILURE_KIND_REQUIRED: #{label}" unless tdd["red_failure_kind"] == "missing_behavior"
+    errors << "TEST_FILES_REQUIRED: #{label}" unless string_array?(tdd["test_files"])
+  end
+
+  def validate_not_applicable_tdd(tdd, label, errors)
+    valid = tdd["red_commit"].nil? && tdd["green_commit"].nil? &&
+            tdd["red_commands"] == [] && tdd["red_tests"] == 0 &&
+            tdd["red_failure_kind"].nil? && tdd["test_files"] == [] &&
+            tdd["expectation_change_approval_commit"].nil?
+    errors << "NOT_APPLICABLE_TDD_FIELDS_INVALID: #{label}" unless valid
   end
 
   def validate_context_shape(context, label, errors)
@@ -204,12 +220,27 @@ module WorkUnitManifest
     errors << "#{code}: #{label}" unless string_array?(value)
   end
 
+  def validate_not_applicable_shape(value, label, errors)
+    return if value.nil?
+    unless exact_mapping?(value, NOT_APPLICABLE_KEYS)
+      errors << "NOT_APPLICABLE_SCHEMA_INVALID: #{label}"
+      return
+    end
+    errors << "NOT_APPLICABLE_KIND_REQUIRED: #{label}" unless string?(value["change_kind"])
+    errors << "NOT_APPLICABLE_REASON_REQUIRED: #{label}" unless string?(value["reason"])
+    validate_commands(value["alternative_validation_commands"], "ALTERNATIVE_COMMAND_REQUIRED", label, errors)
+  end
+
   def exact_mapping?(value, keys)
     value.is_a?(Hash) && value.size == keys.size && keys.all? { |key| value.key?(key) }
   end
 
   def string?(value)
     value.is_a?(String) && !value.strip.empty?
+  end
+
+  def commit?(value)
+    value.is_a?(String) && value.match?(SHA_PATTERN)
   end
 
   def string_array?(value)
