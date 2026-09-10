@@ -17,7 +17,7 @@
 
 ### CI(`​.github/workflows/verify.yml`)가 실제로 돌리는 것
 
-**워크플로 스텝 27개 전부**를 적는다(2026-09-10 hs-1300 추가로 갱신; `PostgreSQL 서버 준비` 스텝은 27행에 포함)(2026-08-12 V1 D6: 이전 판은 `bash ...` 직접 명령만 적어 인라인 본문 스텝이 목록에서 빠졌고, 운영자가 실제로 무엇이 도는지 잘못 판단할 수 있었다). 아래는 `verify.yml` 의 `- name:` 스텝 순서 그대로다.
+**워크플로 스텝 28개 전부**를 적는다(2026-09-10 hs-1309 추가로 갱신; `PostgreSQL 서버 준비` 스텝은 28행에 포함)(2026-08-12 V1 D6: 이전 판은 `bash ...` 직접 명령만 적어 인라인 본문 스텝이 목록에서 빠졌고, 운영자가 실제로 무엇이 도는지 잘못 판단할 수 있었다). 아래는 `verify.yml` 의 `- name:` 스텝 순서 그대로다.
 
 | # | 스텝 이름 | 실행 내용 |
 |---|---|---|
@@ -46,8 +46,9 @@
 | 23 | 인수 검사 semantic-mutations | `bash scripts/acceptance-semantic-mutations.sh` — 인수 검사 무력화 5종 전량 차단 |
 | 24 | 인수 검사 verify-ac-m | `bash scripts/acceptance-verify-ac-m.sh` — mechanism 명부 대조 (AC-M) |
 | 25 | 인수 검사 hs-1300 | `bash scripts/acceptance-hs-1300.sh` + `scripts/acceptance-hs-1300-mutations.sh` — HumanSearch HS-13.00 브리프 스펙 구조(catch-all·결정 D1~D8·WU 카드 13·타입 12) + 자기 변이 3종 |
-| 26 | 인수 검사 invoice | `bash scripts/acceptance-invoice.sh` — 채용 수수료 계산·기한·계약 변조·Codex/Claude 스킬 동등성 |
-| 27 | Invoice 독립 런타임 게이트 | 게이트 배선 검사 + Python 단위시험 직접 실행 + 임시 PostgreSQL에서 마이그레이션·수수료 동시성·저장/전달 RPC 검증 |
+| 26 | 인수 검사 hs-1309-paths | `bash scripts/acceptance-hs-1309-paths.sh` — 패킷·발송 장부 경로가 .gitignore·공용 판정기·훅 세 곳에서 막히는가 + brief 모듈 홈·절대 경로 리터럴 0 (HS-13.09 · D7) |
+| 27 | 인수 검사 invoice | `bash scripts/acceptance-invoice.sh` — 채용 수수료 계산·기한·계약 변조·Codex/Claude 스킬 동등성 |
+| 28 | Invoice 독립 런타임 게이트 | 게이트 배선 검사 + Python 단위시험 직접 실행 + 임시 PostgreSQL에서 마이그레이션·수수료 동시성·저장/전달 RPC 검증 |
 
 *(1번 앞에 `actions/checkout` 이 있고 `fetch-depth: 0` 이다 — 8번이 과거 blob 을 열려면 필요하다.)*
 

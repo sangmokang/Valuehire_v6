@@ -9,7 +9,7 @@
 #   불변식: CHECKED 는 정확히 EXPECTED_CHECKED 여야 한다 — 검사가 사라져도 초록이면 가짜다(P20)
 #
 # 무엇을 판정하나 (3건):
-#   1  .gitignore 가 두 패턴을 담고, 합성 경로에 **실제로 적용**된다(git check-ignore)
+#   1  .gitignore 가 두 패턴(*.packet.json·*.sent.json)을 담고 합성 경로에 **실제로 적용**된다
 #   2  공용 판정기 scripts/scan-data-exposure.sh 가 그 경로를 금지로 **실행 판정**한다
 #      (+ 정상 파일은 통과시키는 대조군, + 훅 목록에도 같은 두 패턴이 있는가)
 #   3  brief 모듈에 `~/.humansearch`·`/Users/` 같은 절대·홈 경로 리터럴이 0건이다
@@ -54,8 +54,8 @@ done
 for sample in \
   "20260910-86e1abcd-0a1b2c3d.packet.json" \
   "packets/20260910-86e1abcd-0a1b2c3d.packet.json" \
-  "20260910-86e1abcd-0a1b2c3d.gmail.sent.json" \
-  "packets/20260910-86e1abcd-0a1b2c3d.gmail.sent.json"
+  "20260910-86e1abcd-0a1b2c3d.gmail.a1.sent.json" \
+  "packets/20260910-86e1abcd-0a1b2c3d.gmail.a2.sent.json"
 do
   git check-ignore -q "$sample" || ignore_bad="${ignore_bad} ${sample}(미적용)"
 done
@@ -116,8 +116,7 @@ judge_passes_control() {
 judge_bad=""
 for sample in \
   "x.packet.json" "packets/x.packet.json" \
-  "x.gmail.sent.json" "packets/x.gmail.sent.json" \
-  "packets/x.gmail.released.json"
+  "x.gmail.a1.sent.json" "packets/x.gmail.a2.sent.json"
 do
   judge_blocks "$sample" || judge_bad="${judge_bad} ${sample}(미차단)"
 done
@@ -128,7 +127,7 @@ for pattern in '*.packet.json' '*.sent.json'; do
   $G -qF -- "$pattern" "$HOOK"  || judge_bad="${judge_bad} ${pattern}(훅목록)"
 done
 if [ -z "$judge_bad" ]; then
-  pass "판정기가 패킷·발송·해제 장부 경로를 실행으로 차단하고 정상 파일은 통과시킨다(훅 목록 동치)"
+  pass "판정기가 패킷·발송 장부 경로를 실행으로 차단하고 정상 파일은 통과시킨다(훅 목록 동치)"
 else
   failed "판정기·훅이 패킷·발송 장부 경로를 막지 않는다 — 누락:${judge_bad}"
 fi

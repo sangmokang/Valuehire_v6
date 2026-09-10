@@ -264,6 +264,13 @@ jobs:
           bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1300.sh
           bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1300-mutations.sh
 
+      - name: 인수 검사 hs-1309-paths (패킷·발송 장부가 git 밖에 남는가 · HS-13.09)
+        # 서치 패킷(*.packet.json)·발송 장부(*.sent.json)는 후보자 PII 를 담는다(D7).
+        # .gitignore 가 실제로 적용되는지, 공용 판정기
+        # scripts/scan-data-exposure.sh 가 그 경로를 금지로 판정하는지(임시 저장소 실행),
+        # brief 모듈에 홈·절대 경로 리터럴이 0건인지를 확인한다.
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1309-paths.sh
+
       - name: PostgreSQL 서버 준비 (Invoice 런타임 검사용)
         # 러너에는 psql·pg_config 만 PATH 에 있고 initdb·pg_ctl 은
         # /usr/lib/postgresql/<ver>/bin 에 있다. 없으면 설치해서 BLOCKED 를 없앤다.
