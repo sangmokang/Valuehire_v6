@@ -556,3 +556,18 @@ CHECKED: 3
 VERDICT: PASS
 REPOSITORY_WITH_COMPLETION_EXIT=0
 ```
+
+후속 적대 회귀 `fb1a7ac`은 `bash -c` 안에서 양수 카운트와 PASS 문구만 echo하는 위조를 추가로 차단했습니다.
+
+```text
+PASS: executed completion commands
+PASS: failing regression command rejected
+PASS: failing adversarial command rejected
+PASS: no-op completion command rejected
+PASS: zero-check completion output rejected
+PASS: echo-only positive-count forgery rejected
+WU_TESTS: 6
+CHECKED: 6
+VERDICT: PASS
+COMPLETION_ANTI_FORGE_EXIT=0
+```
