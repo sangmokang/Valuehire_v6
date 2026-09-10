@@ -70,14 +70,19 @@ section() {
 }
 
 # 2) §4 catch-all — 부정어 반전("명시적 거부 안 함"·"하지 않") 금지 (2026-09-10 Codeaudit D-2)
-if section '^## 4\. 입력 영역 표' | $G -E '그 외 전부' | $G '명시적 거부' | $G -Evq '안 ?함|하지 ?않|않는다|금지 ?안'; then
+if section '^## 4\. 입력 영역 표' | $G -E '그 외 전부' | $G '명시적 거부' | $G -Ev '안 ?함|하지 ?않|않는다|금지 ?안' >/dev/null; then
   pass "§4 입력 영역 표 catch-all 행(그 외 전부 → 명시적 거부)"
 else
   failed "§4 입력 영역 표에 catch-all 행이 없다"
 fi
 
 # 3~10) §7 결정 D1~D8
+# 큰 절은 파일로 두고 grep 한다 — `printf | grep -q` 는 grep 이 먼저 닫으면 printf 가 SIGPIPE 를 받아 pipefail 로 거짓 FAIL 이 난다
+# (2026-09-10 PR #83 push 이벤트 CI 실측: "printf: write error: Broken pipe" → 토큰 '없음' 오판).
+SECD=$(mktemp -d) || { echo "NOT_RUN: mktemp 실패"; echo "CHECKED: 0"; exit 2; }
+trap 'rm -rf "$SECD"' EXIT
 sec7=$(section '^## 7\. 결정 목록')
+printf '%s\n' "$sec7" > "$SECD/sec7"
 for d in D1 D2 D3 D4 D5 D6 D7 D8; do
   if printf '%s\n' "$sec7" | $G -Eq "^\| *$d *\|"; then
     pass "§7 결정 $d 행 존재"
@@ -87,7 +92,7 @@ for d in D1 D2 D3 D4 D5 D6 D7 D8; do
 done
 
 # 11) §8 catch-all — 부정어 반전 금지
-if section '^## 8\. 예외 표' | $G -E '그 외 전부' | $G '명시적 중단' | $G -Evq '안 ?함|하지 ?않|않는다|금지 ?안'; then
+if section '^## 8\. 예외 표' | $G -E '그 외 전부' | $G '명시적 중단' | $G -Ev '안 ?함|하지 ?않|않는다|금지 ?안' >/dev/null; then
   pass "§8 예외 표 catch-all 행(그 외 전부 → 명시적 중단)"
 else
   failed "§8 예외 표에 catch-all 행이 없다"
@@ -95,6 +100,7 @@ fi
 
 # 12~25) §9 WU 카드 14건 — 행 존재 + 5셀 내용 + 명령 형식 + 상태값
 sec9=$(section '^## 9\. Issue HS-13')
+printf '%s\n' "$sec9" > "$SECD/sec9"
 # 표의 한 행을 셀 배열로 쪼갠다(선행·후행 '|' 제거). 백틱 안의 '|' 는 표에 쓰지 않는다는 전제.
 # 2~6자 조각이 바로 이어서 3회 이상 반복되면 무의미 반복으로 본다 (Codex 4차 '통과통과통과…'). 정상 문장의 흩어진 재등장은 허용.
 no_repeat() {
@@ -199,9 +205,10 @@ done
 
 # 35~46) §5 공개 타입 이름 12개 — 코드 펜스 안에서만 센다
 sec5_fenced=$(section '^## 5\. 계약' | awk '/^```/{f=!f; next} f{print}')
+printf '%s\n' "$sec5_fenced" > "$SECD/sec5_fenced"
 for t in BriefInputError SourceRef Claim PositionSpec JdSource CompanyBrief \
          EmailContact CandidateEvidence ScoreBreakdown CandidateLead JdPacket SearchPacket; do
-  if printf '%s\n' "$sec5_fenced" | $G -Eq "class $t\b"; then
+  if $G -Eq "class $t\b" "$SECD/sec5_fenced"; then
     pass "§5 타입 $t 선언이 코드 펜스 안에 존재"
   else
     failed "§5 타입 $t 선언이 코드 펜스 안에 없음"
@@ -241,23 +248,24 @@ fi
 
 # 71~74) 13.02b·position_count 계약 토큰 (Codex 4차 — 문서에서 사라지면 exit 1)
 for k in 'position_count: int' 'extra_lines: tuple' 'def extract_block' 'from_attempt: int' 'search_filters: SearchFilters' 'multi_position_hint: tuple' 'created_on: date' '날짜 없음' 'allowed_search_locations'; do
-  if printf '%s\n' "$sec5_fenced" | $G -qF -- "$k"; then pass "§5 계약 토큰 '$k'"; else failed "§5 계약 토큰 '$k' 없음"; fi
+  if $G -qF -- "$k" "$SECD/sec5_fenced"; then pass "§5 계약 토큰 '$k'"; else failed "§5 계약 토큰 '$k' 없음"; fi
 done
 
 # 67) 전 행 PLANNED 금지 — 착수된 WU 가 최소 1개
-if printf '%s\n' "$sec9" | $G -E '^\| *HS-13\.' | $G -Evq '\| *PLANNED *\|$'; then
+if $G -E '^\| *HS-13\.' "$SECD/sec9" | $G -Ev '\| *PLANNED *\|$' >/dev/null; then
   pass "§9 PLANNED 가 아닌 WU 카드 1개 이상"
 else
   failed "§9 모든 WU 가 PLANNED — 착수 상태를 표시하지 않는 문서"
 fi
 # 68~70) D9 at-most-once 핵심 문구 3개 (Codex 2차 상충 지적)
 sec5_all=$(section '^## 5\. 계약')
+printf '%s\n' "$sec5_all" > "$SECD/sec5_all"
 for k in 'O_CREAT' 'O_EXCL' 'def open_new_attempt'; do
-  if printf '%s\n' "$sec5_all" | $G -qF -- "$k"; then pass "§5 D9 at-most-once 문구 '$k'"; else failed "§5 D9 문구 '$k' 없음"; fi
+  if $G -qF -- "$k" "$SECD/sec5_all"; then pass "§5 D9 at-most-once 문구 '$k'"; else failed "§5 D9 문구 '$k' 없음"; fi
 done
 
 # 50) D9 발송 멱등 결정 존재
-if printf '%s\n' "$sec7" | $G -E '^\| *D9 *\|' | $G -q 'at-most-once'; then
+if $G -E '^\| *D9 *\|' "$SECD/sec7" | $G 'at-most-once' >/dev/null; then
   pass "§7 D9 발송 멱등 결정 존재"
 else
   failed "§7 D9 발송 멱등 결정 없음"
@@ -265,14 +273,14 @@ fi
 
 # 56~63) §5 계약 함수 8개 + CLI 계약 (Codeaudit 최소 보강 ②)
 for f in verify_fidelity check_linkedin split_two_field compose_brief_mail load_recipients score_candidate build_boolean_queries build_inmail; do
-  if printf '%s\n' "$sec5_fenced" | $G -Eq "def $f\("; then
+  if $G -Eq "def $f\(" "$SECD/sec5_fenced"; then
     pass "§5 함수 $f 계약 존재"
   else
     failed "§5 함수 $f 계약 없음"
   fi
 done
 # 64) §6 출력 계약·§10 러너 절차 절 실존 (껍데기 문서 차단)
-if $G -Eq '^### 6\. 출력 계약' "$DOC" && $G -Eq '^## 10\. HS-13\.10 러너 절차' "$DOC" && section '^## 10\. HS-13\.10 러너 절차' | $G -q 'record_intent'; then
+if $G -Eq '^### 6\. 출력 계약' "$DOC" && $G -Eq '^## 10\. HS-13\.10 러너 절차' "$DOC" && section '^## 10\. HS-13\.10 러너 절차' | $G 'record_intent' >/dev/null; then
   pass "§6 출력 계약·§10 러너 절차(D9 record_intent 포함) 실존"
 else
   failed "§6 출력 계약 또는 §10 러너 절차(record_intent) 없음"
