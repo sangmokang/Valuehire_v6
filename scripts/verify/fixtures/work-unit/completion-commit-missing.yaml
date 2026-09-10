@@ -1,0 +1,56 @@
+manifest_version: 1
+work_units:
+  - id: "WU-MISSING-COMPLETION"
+    claim: "A Work Unit without a completion commit must fail."
+    acceptance_criterion: "When completion evidence is absent, the manifest shall fail."
+    counter_acceptance_criteria:
+      - "A GREEN commit alone closes the Work Unit."
+    contracts:
+      input: "One manifest without completion_commit."
+      output: "A closed failure."
+      errors: "Missing completion evidence fails."
+      boundaries:
+        - "Completion follows first GREEN."
+      database:
+        status: "NOT_APPLICABLE"
+        reason: "The fixture does not access a database."
+        paths:
+          - "docs/engineering/work-unit-tdd-context-goal-2026-09-10.md"
+      api:
+        status: "NOT_APPLICABLE"
+        reason: "The fixture does not access an API."
+        paths:
+          - "docs/engineering/work-unit-tdd-context-goal-2026-09-10.md"
+      types:
+        status: "APPLICABLE"
+        reason: "The policy defines the manifest shape."
+        paths:
+          - "docs/sot/work-unit-policy.yaml"
+    tdd:
+      mode: "RED_GREEN"
+      contract_commit: "1111111111111111111111111111111111111111"
+      red_commit: "2222222222222222222222222222222222222222"
+      green_commit: "3333333333333333333333333333333333333333"
+      red_commands:
+        - "ruby test/example_test.rb"
+      red_tests: 1
+      red_failure_kind: "missing_behavior"
+      test_files:
+        - "test/example_test.rb"
+      expectation_change_approval_commit: null
+    regression_commands:
+      - "ruby test/example_test.rb"
+    adversarial_commands:
+      - "ruby test/example_mutation_test.rb"
+    context:
+      expected_head: "1111111111111111111111111111111111111111"
+      expected_worktree: "task/example"
+      scope: "minimal"
+      files:
+        - path: "docs/sot/work-unit-policy.yaml"
+          commit_sha: "1111111111111111111111111111111111111111"
+          sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          read_evidence: "blob-sha256"
+      observed_reads:
+        - "blob-sha256"
+    not_applicable: null

@@ -53,6 +53,7 @@ case "$mode" in
     run_case "missing AC" "$fixtures/ac-missing.yaml" 1 'AC_REQUIRED:'
     run_case "missing counter-AC" "$fixtures/counter-ac-missing.yaml" 1 'COUNTER_AC_REQUIRED:'
     run_case "duplicate ID" "$fixtures/duplicate-id.yaml" 1 'ID_DUPLICATE:'
+    run_case "missing completion commit" "$fixtures/completion-commit-missing.yaml" 1 'COMPLETION_COMMIT_REQUIRED:'
     ;;
   tdd)
     ruby scripts/verify/work-unit-tdd-contract-test.rb
