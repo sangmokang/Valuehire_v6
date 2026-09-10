@@ -213,6 +213,21 @@ def test_confusable_token_boundary_does_not_count_as_workflow_name(tmp_path: Pat
     )
 
 
+def test_normal_then_spoofed_token_on_same_line_is_rejected(tmp_path: Path) -> None:
+    repo = copy_fixture(tmp_path)
+    append_workflow_and_sot_step(repo, "hs-kickoff 정상 · hѕ-kickoff 위장")
+    append_disposition_shadow(repo, "PR #13", "PR #13 정상 · PＲ #13 위장")
+
+    result = run_acceptance(repo)
+
+    assert_spoof_rejected(
+        result,
+        "SPOOF: disposition-target line=7 token=PR #13",
+        "SPOOF: workflow-step line=31 token=hs-kickoff",
+        "SPOOF: sot-step line=31 token=hs-kickoff",
+    )
+
+
 def mutate_missing_data(repo: Path) -> None:
     path = repo / DATA
     if path.exists():
@@ -266,8 +281,8 @@ def test_mapping_data_errors_fail_closed(tmp_path: Path, mutate: Callable[[Path]
 
 @pytest.mark.parametrize(
     "payload",
-    (b"", b"\n", b"hs-kickoff\xff\n"),
-    ids=("zero-bytes", "empty-name", "invalid-utf8"),
+    (b"", b"\n", b"   \n", b"hs-kickoff\xff\n"),
+    ids=("zero-bytes", "empty-name", "whitespace-only-name", "invalid-utf8"),
 )
 def test_identity_checker_rejects_empty_or_invalid_utf8_input(payload: bytes) -> None:
     result = subprocess.run(
