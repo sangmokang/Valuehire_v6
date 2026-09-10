@@ -8,24 +8,54 @@
 from __future__ import annotations
 
 import hashlib
+import re
 from pathlib import Path
+from urllib.parse import unquote
 
 from .packet import from_json
 from .types import BriefInputError
 
-__all__ = ["verify"]
+__all__ = ["normalize_readback", "verify"]
 
 _PACKET_ID_TRAILER = "packet-id: "
 
+# 실측(라이브 초안 readback): Gmail 은 본문 링크를 이 형태로 감싼다.
+# 꼬리(`sa=`)를 `[A-Za-z0-9]+` 로 **정확히** 고정한다 — `[^\s]*` 같은 느슨한 꼬리는
+# 뒤따르는 `)` 와 조사까지 한 매치로 삼켜 `(URL)` 을 `(URL` 로 망가뜨린다(반례 고정: HS-13.10b).
+_GMAIL_REDIRECT = re.compile(
+    r"https://www\.google\.com/url\?q=([^&\s]+)&source=gmail&ust=\d+&sa=[A-Za-z0-9]+"
+)
 
-def _normalize_body(text: str) -> str:
-    """CRLF→LF·줄 끝 공백 제거·전체 strip·§10 ③ `packet-id: <id>` 꼬리 줄 제거.
+# 언랩한 URL 은 unquote 를 거친다. 그러면 원문이 이미 퍼센트 인코딩(`.../in/%EC%9D%80…`)일 때
+# readback 쪽만 한글로 풀려 영영 불일치가 난다. 그래서 **양쪽 본문의 URL 에 같은 unquote 를
+# 건다** — 패킷 본문도 같은 값으로 내려와야 대칭이 성립한다(HS-13.10b).
+_URL = re.compile(r'https?://[^\s<>"]+')
 
-    패킷 본문(`mail.body`)에는 보통 꼬리 줄이 없으므로 이 함수를 적용해도 no-op 이고,
-    readback 본문에는 러너가 발송 시 붙인 토큰이 있으므로 여기서 떼어낸다 —
-    같은 함수를 양쪽에 적용해야 두 해시가 같은 기준으로 비교된다.
+
+def _unwrap_gmail_redirect(text: str) -> str:
+    return _GMAIL_REDIRECT.sub(lambda found: unquote(found.group(1)), text)
+
+
+def _unquote_urls(text: str) -> str:
+    return _URL.sub(lambda found: unquote(found.group(0)), text)
+
+
+def normalize_readback(text: str) -> str:
+    """readback 본문과 패킷 본문을 같은 기준으로 내리는 정규화. 순서가 계약이다.
+
+    ① `\r\n` → `\n`
+    ② Gmail 리다이렉트 언랩 — `…/url?q=<URL>&source=gmail&ust=<digits>&sa=<alnum>` → `<URL>`
+    ②' 남은 URL 의 퍼센트 인코딩 해제(양쪽 대칭 — ② 가 만든 비대칭을 여기서 없앤다)
+    ③ 각 줄 오른쪽 공백 제거
+    ④ 끝의 빈 줄 제거 후 마지막 줄이 `packet-id: ` 로 시작하면 제거(§10 ③ 러너가 붙인 토큰)
+    ⑤ 다시 끝 빈 줄 제거·전체 strip
+
+    패킷 본문(`mail.body`)에는 보통 꼬리 줄도 리다이렉트도 없어 ②④ 는 no-op 이고,
+    readback 본문에는 둘 다 있다 — **같은 함수를 양쪽에 적용해야** 두 해시가 같은 기준이 된다.
     """
     text = text.replace("\r\n", "\n")
+    text = _unwrap_gmail_redirect(text)
+    text = _unquote_urls(text)
     lines = [line.rstrip() for line in text.split("\n")]
     text = "\n".join(lines).strip()
     lines = text.split("\n")
@@ -64,8 +94,8 @@ def verify(packet_path: Path, sent_path: Path) -> tuple[int, str]:
     except BriefInputError as error:
         return 2, str(error)
 
-    expected = hashlib.sha256(_normalize_body(packet.mail.body).encode("utf-8")).hexdigest()
-    actual = hashlib.sha256(_normalize_body(sent_text).encode("utf-8")).hexdigest()
+    expected = hashlib.sha256(normalize_readback(packet.mail.body).encode("utf-8")).hexdigest()
+    actual = hashlib.sha256(normalize_readback(sent_text).encode("utf-8")).hexdigest()
 
     if expected == actual:
         return 0, f"VERIFIED packet_id={packet.packet_id} body_sha256={expected}"
