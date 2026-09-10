@@ -11,7 +11,7 @@
 - 위험 등급: L3. 공유 검증 워크플로가 실행되는 조건과 그 무력화 방어를 바꾼다.
 - 선행 완료 기록: HS-00.03 `c28270c1ea6153d4ea0aae83a8562981b2564269`; 그 안의 구현 커밋은 `a2c79f08240cb5be287e8624ed07121ad14dd9ab`이다.
 - 시작 시 저장소: 루트 `HEAD=main=origin/main=fc6beedc78019862bc2f1b3bf4c4ad3bbd8e845b`, 추적 변경 0건. 새 작업은 선행 로컬 계보 `c28270c...`에서 분기했다.
-- 소유: 브랜치 `task/hs-0004-20260910`, 작업공간 `worktrees/hs-0004-20260910`, 세션 `hs0004-20260910`.
+- 소유: 최초 브랜치/작업공간 `task/hs-0004-20260910`/`worktrees/hs-0004-20260910`는 독립 검토자의 범위 위반으로 오염되어 증거 보존만 한다. 유효한 소유 작업선은 브랜치 `task/hs-0004-recovery-20260910`, 작업공간 `worktrees/hs-0004-recovery-20260910`, 세션 `hs0004-spec-review-recovery`다.
 - 중복: 같은 WU 이름의 브랜치·작업공간·커밋은 0건이었다. 관련 온라인 작업은 열린 Issue #69이며 HS-00.04 전용 Issue·PR은 없었다.
 - 기존 담당 경계: `scripts/verify/check-ci-step-integrity.sh`와 `scripts/acceptance-ci-step-integrity.sh`가 조건부 job·step과 오류 무시를 이미 검사하지만 `on` 시작 조건의 의미는 검사하지 않는다. 새 검사기나 CI 단계를 만들지 않고 이 기존 경계를 보강한다.
 - 현재 main 차이: `c28270c...` 이후 main은 같은 CI 무결성 파일에 concurrency·timeout 보강을 포함한다. HS-00.04는 trigger 계약만 소유하며 concurrency·timeout 변경을 가져오거나 되돌리지 않는다. 후속 전달 시 main과 충돌을 수동 재검토한다.
