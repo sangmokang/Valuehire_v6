@@ -189,8 +189,7 @@ on: {<<: *events, workflow_dispatch: null}')
 expect_structure "on merge key → 구조 오류" "$p"
 p=$(trigger_variant trigger-numeric-key 'on: {push: null, pull_request: null, workflow_dispatch: null, 7: null}')
 expect_structure "비문자 event key → 구조 오류" "$p"
-p=$(trigger_variant trigger-numeric-sequence 'on: [push, pull_request, workflow_dispatch, 7]')
-expect_structure "비문자 sequence event → 구조 오류" "$p"
+p=$(trigger_variant trigger-numeric-sequence 'on: [push, pull_request, workflow_dispatch, 7]'); expect_structure "비문자 sequence event → 구조 오류" "$p"
 p=$(trigger_variant push-star-plus-path 'on: {push: {branches: ["**"], paths-ignore: ["**"]}, pull_request: null, workflow_dispatch: null}')
 expect_trigger_contract "전체 branch와 path 제외 조합 → 계약 위반" "$p" 1 '^FAIL: TRIGGER_CONTRACT:.*push' '^CHECKED: [1-9][0-9]*$'
 p=$(trigger_variant dispatch-sequence 'on: {push: null, pull_request: null, workflow_dispatch: []}')
@@ -208,10 +207,13 @@ p=$(trigger_variant duplicate-push-branches 'on: {push: {branches: [main], branc
 expect_structure "push.branches 축소를 뒤 정상 값으로 은닉 → 구조 오류" "$p"
 p=$(trigger_variant duplicate-dispatch-input 'on: {push: null, pull_request: null, workflow_dispatch: {inputs: {reason: {required: true}, reason: {required: false}}}}')
 expect_structure "workflow_dispatch.inputs 중복 → 구조 오류" "$p"
-p=$(trigger_variant nested-numeric-key 'on: {push: null, pull_request: null, workflow_dispatch: {inputs: {7: {required: false}}}}')
-expect_structure "workflow_dispatch.inputs 숫자 key → 구조 오류" "$p"
-p=$(trigger_variant nested-boolean-key 'on: {push: null, pull_request: null, workflow_dispatch: {inputs: {on: {}, true: {}}}}')
-expect_structure "workflow_dispatch.inputs boolean slot 충돌 → 구조 오류" "$p"
+p=$(trigger_variant nested-numeric-key 'on: {push: null, pull_request: null, workflow_dispatch: {inputs: {7: {required: false}}}}'); expect_structure "workflow_dispatch.inputs 숫자 key → 구조 오류" "$p"
+p=$(trigger_variant nested-boolean-key 'on: {push: null, pull_request: null, workflow_dispatch: {inputs: {on: {}, true: {}}}}'); expect_structure "workflow_dispatch.inputs boolean slot 충돌 → 구조 오류" "$p"
+for tagged_key in '!!bool true' '!!int 7' '!!null ""'; do
+  p=$(trigger_variant nested-explicit-tag "on: {push: null, pull_request: null, workflow_dispatch: {inputs: {$tagged_key: {}}}}")
+  expect_structure "workflow_dispatch.inputs $tagged_key → 구조 오류" "$p"
+done
+p=$(trigger_variant inline-merge 'on: {<<: {push: {paths: [docs]}}, push: null, pull_request: null, workflow_dispatch: null}'); expect_structure "alias 없는 inline merge → 구조 오류" "$p"
 for tagged in yes true TRUE; do
   p=$(trigger_variant "tagged-$tagged-before" "!!bool $tagged: {push: null, pull_request: null, workflow_dispatch: null}
 \"on\": {push: {paths-ignore: [\"**\"]}, pull_request: null, workflow_dispatch: null}"); expect_structure "!!bool $tagged 뒤 축소 on 충돌 → 구조 오류" "$p"
@@ -222,10 +224,8 @@ p=$(trigger_variant tagged-bool-on '!!bool on: {push: null, pull_request: null, 
 p=$(trigger_variant alias-hidden-duplicate 'x-push: &p {branches: [main], branches: ["**"]}
 on: {push: *p, pull_request: null, workflow_dispatch: null}'); expect_structure "alias로 바깥 중복 mapping 은닉 → 구조 오류" "$p"
 p=$(trigger_variant binary-on-collision $'!!binary b24=: {push: null, pull_request: null, workflow_dispatch: null}\n"on": {push: {paths-ignore: ["**"]}, pull_request: null, workflow_dispatch: null}'); expect_structure "binary가 on 값 후보로 충돌 → 구조 오류" "$p"
-p=$(trigger_variant trigger-scalar 'on: push')
-expect_trigger_contract "scalar on은 누락 event 계약 위반" "$p" 1 '^FAIL: TRIGGER_CONTRACT:.*pull_request' '^CHECKED: [1-9][0-9]*$'
-p="$TMP/trigger-bom.yml"; { printf '\357\273\277'; cat "$WF"; } > "$p"
-expect_trigger_contract "UTF-8 BOM 정상 workflow → 통과" "$p" 0 '^PASS: TRIGGER_CONTRACT:' '^CHECKED: [1-9][0-9]*$'
+p=$(trigger_variant trigger-scalar 'on: push'); expect_trigger_contract "scalar on은 누락 event 계약 위반" "$p" 1 '^FAIL: TRIGGER_CONTRACT:.*pull_request' '^CHECKED: [1-9][0-9]*$'
+p="$TMP/trigger-bom.yml"; { printf '\357\273\277'; cat "$WF"; } > "$p"; expect_trigger_contract "UTF-8 BOM 정상 workflow → 통과" "$p" 0 '^PASS: TRIGGER_CONTRACT:' '^CHECKED: [1-9][0-9]*$'
 # ── 차단 쪽: 무력화 주입 ─────────────────────────────────────────────────────
 mutate() {
   local name="$1" ruby_code="$2"
