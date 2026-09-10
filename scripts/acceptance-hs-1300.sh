@@ -11,18 +11,19 @@
 #   2  §4 입력 영역 표의 catch-all 행("그 외 전부" + "명시적 거부")
 #   3  §7 결정 목록 D1~D8 전부 존재 (8건 각각 1검사)
 #   11 §8 예외 표의 catch-all 행("그 외 전부" + "명시적 중단")
-#   12 §9 WU 카드 14건(HS-13.00~12 + 01b) 각각: 행 존재 + 5셀 전부 비어있지 않음 + 명령 셀이 실행 형식
+#   12 §9 WU 카드 19건(HS-13.00~12 + 01b·01c·02c·09c·09d·10b) 각각: 행 존재 + 5셀 전부 비어있지 않음 + 명령 셀이 실행 형식
 #      (`cd humansearch && uv run --no-sync pytest|python -m humansearch.brief` 또는 `bash scripts/verify/run-acceptance.sh`) + 상태 셀이 허용값
 #   26 §7 결정 D1~D9 각각 기본값 셀 10자 이상 (9건) — 위 3~10 의 "행 존재"와 별개 검사
 #   35 §5 계약의 공개 타입 이름 12개가 코드 펜스 안에 존재 (각각 1검사)
 #   47 "## 적대 검증 로그" 절 존재
 #   48 §2 지시 9단계 검토 표에 9행
-#   49 §9 WU 카드 수 == 14 (행 수 정확)
+#   49 §9 WU 카드 수 == 19 (행 수 정확) · 75 verification-commands.md 행의 카드/결정 개수 == 실제 루프 수 (Codex 7차)
 #   50 §7 D9 행 존재 (발송 멱등 — 2026-09-10 Codex V1 편입)
 #   51~55 §4 입력 영역 표에 이미지·합본·언어·ClickUp 공백·시계 행 (5건)
 #   56~63 §5 계약 함수 8개 펜스 안 존재 · 64 §6·§10 절 실존(record_intent) · 65~66 D10·D11 (Codeaudit 2026-09-10)
 #   67 전 행 PLANNED 금지 · 68~70 D9 at-most-once 문구 3개 (Codex 2차 2026-09-10)
-#   WU 행 검사(12~25)는 토큰 경계 정확 파일명·행동 6자·양성/음성 각 10자+없음/반복 거부·LOCAL_COMMITTED(task/…)는 브랜치·파일 실존·그 외 파일 실존 (Codex 2·3·4차)
+#   WU 행 검사(12~25)는 토큰 경계 정확 파일명·행동 6자·양성/음성 각 10자+없음/반복 거부·PLANNED/BLOCKED 외 상태는 참조 파일이 **이 트리**에 실존 (Codex 2·3·4차)
+#   형제 브랜치·refs 조회는 하지 않는다 — CI clean checkout 에는 형제 브랜치가 없어 거짓 FAIL 이 났다(Codex 7차). 기대출력 백틱은 셸 메타문자 0 문법만
 #   71~74 §5 13.02b·position_count·Approval 결합 토큰 (Codex 4차)
 #   경계: 산문의 의미 적합성은 판정하지 않는다 — Codeaudit·사장님 검토의 몫(스펙 §9 머리 문단)
 #
@@ -38,7 +39,8 @@ REPO=$(git rev-parse --show-toplevel 2>/dev/null) || { echo "NOT_RUN: git 저장
 cd "$REPO" || { echo "NOT_RUN: 저장소 루트로 이동 실패"; echo "CHECKED: 0"; exit 2; }
 
 DOC="${HS_1300_DOC:-docs/engineering/humansearch-hs13-position-brief-goal-2026-09-10.md}"
-EXPECTED_CHECKED=87
+VC="${HS_1300_VC:-docs/sot/verification-commands.md}"
+EXPECTED_CHECKED=89
 
 fail=0
 checked=0
@@ -117,13 +119,17 @@ wu_row_ok() {
   # 제어 연산자 # ; | & 금지(&& 는 'cd humansearch && ' 접두 1회만). CLI 는 HS-13.10 행에만.
   # 백틱 밖 텍스트에 제어 연산자가 있으면 거부 (Codex 6차: 백틱 뒤 '; true')
   printf '%s' "$cmd" | sed -E 's/`[^`]*`//g' | $G -Eq '[#;|&]' && return 1
+  # 홀수 백틱 = 닫히지 않은 조각이 백틱 밖 검사와 안 검사 사이로 빠진다 (Codex 7차)
+  local n_bt; n_bt=$(printf '%s' "$cmd" | tr -cd '`' | wc -c | tr -d ' ')
+  [ $((n_bt % 2)) -eq 0 ] || return 1
   local n_cmd=0 c coupled=0
   while IFS= read -r c; do
     [ -n "$c" ] || continue
-    # 모든 백틱 조각을 분류한다: 명령 문법 | 기대 출력 문법(`CHECKED: n`·`>= n passed`·`exit n`·정규식 출력 형식) | 그 외 → 거부 (Codex 6차)
+    # 모든 백틱 조각을 분류한다: 명령 문법 | 기대 출력 문법(`CHECKED: n`·`n+ passed`·`VERIFIED packet_id=ID body_sha256=HEX`·`KEY=value`) | 그 외 → 거부 (Codex 6차)
+    # 기대 출력의 값 문자는 [A-Za-z0-9_.:/-] 뿐 — `$ ( ) < > \ ; | &` 가 하나라도 있으면 실행 가능한 조각이므로 거부 (Codex 7차: `RESULT=$(id)`)
     case "$c" in
       "cd humansearch "*|"bash scripts/"*) ;;
-      *) printf '%s' "$c" | $G -Eq '^(CHECKED: [0-9]+|>= [0-9]+ passed|exit [0-9]|(VERIFIED|SENT_UNVERIFIED) packet_id=.*|RESULT=.*|[A-Z_]+=[^ ]+)$' && continue; return 1 ;;
+      *) printf '%s' "$c" | $G -Eq '^(CHECKED: [0-9]+|[0-9]+\+ passed|(VERIFIED|SENT_UNVERIFIED) packet_id=[A-Za-z0-9_-]+( body_sha256=[A-Za-z0-9]+)?|[A-Z_]+=[A-Za-z0-9_.:/-]+)$' && continue; return 1 ;;
     esac
     n_cmd=$((n_cmd + 1))
     # ID 결합은 검증된 명령의 인자에서만 센다
@@ -151,20 +157,11 @@ wu_row_ok() {
   no_repeat "$neg" || return 1
   printf '%s' "${cells[3]}" | $G -Eq '(양성|음성)[:：] *(없음|N/A|n/a|해당 ?없음|-|x|X)( |$|·|,|\.)' && return 1
   state="$(printf '%s' "${cells[4]}" | tr -d '[:space:]')"
-  # 괄호는 LOCAL_COMMITTED(task/<branch>) 형태만 허용(다른 브랜치에 있다는 뜻). IMPLEMENTED(x) 같은 회피 금지
-  printf '%s' "$state" | $G -Eq '^(PLANNED|RED|IMPLEMENTED|AUDITED|PR_OPEN|VERIFIED|MERGED)$|^LOCAL_COMMITTED(\(task/[a-z0-9-]+\))?$|^BLOCKED\(.+\)$' || return 1
-  # PLANNED/BLOCKED 가 아니면 참조 파일이 실존해야 한다. LOCAL_COMMITTED(task/<branch>) 는 그 브랜치가 git 에 실존하고
-  # 그 브랜치 안에 파일이 실존해야 한다 (Codex 4차: 가짜 브랜치 통과 차단)
+  # 괄호는 BLOCKED(사유) 만 허용. IMPLEMENTED(x)·LOCAL_COMMITTED(task/x) 같은 회피 금지 (Codex 3·7차)
+  printf '%s' "$state" | $G -Eq '^(PLANNED|RED|IMPLEMENTED|LOCAL_COMMITTED|AUDITED|PR_OPEN|VERIFIED|MERGED)$|^BLOCKED\(.+\)$' || return 1
+  # PLANNED/BLOCKED 가 아니면 참조 파일이 **이 트리**에 실존해야 한다 — 형제 브랜치 조회 없음(CI clean checkout 동일 판정)
   case "$state" in
     PLANNED|BLOCKED*) ;;
-    LOCAL_COMMITTED\(task/*)
-      local ref obj
-      ref="${state#LOCAL_COMMITTED(}"; ref="${ref%)}"
-      git show-ref --verify --quiet "refs/heads/$ref" || return 1
-      for f in $(printf '%s' "$cmd" | $G -Eo 'tests/test_hs_13[0-9a-z_]+\.py|scripts/acceptance-hs-13[0-9a-z-]+\.sh'); do
-        case "$f" in tests/*) obj="$ref:humansearch/$f" ;; *) obj="$ref:$f" ;; esac
-        if ! git cat-file -e "$obj" 2>/dev/null; then return 1; fi
-      done ;;
     *)
       for f in $(printf '%s' "$cmd" | $G -Eo 'tests/test_hs_13[0-9a-z_]+\.py|scripts/acceptance-hs-13[0-9a-z-]+\.sh'); do
         case "$f" in tests/*) [ -f "humansearch/$f" ] || return 1 ;; *) [ -f "$f" ] || return 1 ;; esac
@@ -172,7 +169,9 @@ wu_row_ok() {
   esac
   return 0
 }
-for n in 00 01 01b 01c 02 02c 03 04 05 06 07 08 09 09c 10 10b 11 12; do
+WU_IDS=(00 01 01b 01c 02 02c 03 04 05 06 07 08 09 09c 09d 10 10b 11 12)
+D_IDS=(D1 D2 D3 D4 D5 D6 D7 D8 D9 D10 D11 D12)
+for n in "${WU_IDS[@]}"; do
   row=$(printf '%s\n' "$sec9" | $G -E "^\| *HS-13\.$n *\|" | head -1)
   if [ -n "$row" ] && wu_row_ok "$row"; then
     pass "§9 WU 카드 HS-13.$n 존재·5셀 내용·명령 형식·상태값"
@@ -182,7 +181,7 @@ for n in 00 01 01b 01c 02 02c 03 04 05 06 07 08 09 09c 10 10b 11 12; do
 done
 
 # 26~34) §7 D1~D9 기본값 셀 내용(10자 이상)
-for d in D1 D2 D3 D4 D5 D6 D7 D8 D9 D10 D11 D12; do
+for d in "${D_IDS[@]}"; do
   row=$(printf '%s\n' "$sec7" | $G -E "^\| *$d *\|" | head -1)
   row="${row#|}"; row="${row%|}"
   IFS='|' read -r -a cells <<< "$row"
@@ -223,12 +222,20 @@ else
   failed "§2 지시 검토 표 행 수 $rows (기대 9)"
 fi
 
-# 49) §9 WU 카드 수 정확히 14
+# 49) §9 WU 카드 수 정확히 ${#WU_IDS[@]}
 wu_rows=$(printf '%s\n' "$sec9" | $G -Ec '^\| *HS-13\.[0-9]{2}[a-z]? *\|')
-if [ "$wu_rows" -eq 18 ]; then
-  pass "§9 WU 카드 수 18"
+if [ "$wu_rows" -eq "${#WU_IDS[@]}" ]; then
+  pass "§9 WU 카드 수 ${#WU_IDS[@]}"
 else
-  failed "§9 WU 카드 수 $wu_rows (기대 18)"
+  failed "§9 WU 카드 수 $wu_rows (기대 ${#WU_IDS[@]})"
+fi
+
+# 75) 정본 verification-commands.md 의 hs-1300 행이 적은 카드 수·결정 범위 == 실제 루프 수 (Codex 7차: 14·D1~D9 로 남아 있었다)
+vc_row=$($G -E 'acceptance-hs-1300\.sh' "$VC" 2>/dev/null | head -1)
+if printf '%s' "$vc_row" | $G -q "WU 카드 ${#WU_IDS[@]} " && printf '%s' "$vc_row" | $G -q "D1~D${#D_IDS[@]} "; then
+  pass "verification-commands.md hs-1300 행: 카드 ${#WU_IDS[@]}·D1~D${#D_IDS[@]} 가 검사기 루프와 일치"
+else
+  failed "verification-commands.md hs-1300 행의 카드/결정 개수가 검사기 루프(${#WU_IDS[@]}·D${#D_IDS[@]})와 다르거나 행 없음"
 fi
 
 # 71~74) 13.02b·position_count 계약 토큰 (Codex 4차 — 문서에서 사라지면 exit 1)

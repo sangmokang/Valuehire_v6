@@ -17,7 +17,8 @@
 #   변이 ⓞ .py.bak 경계 · ⓟ 가짜 브랜치 · ⓠ position_count 삭제 · ⓡ test_hs_1302b 참조 삭제 · ⓢ '통과통과…' 반복 · ⓣ D값 같은 단어 반복 (Codex 4차)
 #   변이 ⓤ `true # …` 제어 연산자 · ⓥ 비-CLI 행에 CLI 명령 · ⓦ O_EXCL 삭제 · ⓧ search_filters 정의 삭제 · ⓨ D10 셀 비움 · ⓩ 명령 백틱 0개 (Codex 5차)
 #   변이 Ⓐ 백틱 밖 '; true' · Ⓑ 미분류 백틱 조각 · Ⓒ 비명령 백틱에 ID 미끼 (Codex 6차)
-#   출력: PASS:/FAIL: + `CHECKED: 30`, exit 0/1/2
+#   변이 Ⓓ 기대출력 자리에 `RESULT=$(id)` · Ⓔ 홀수 백틱 · Ⓕ LOCAL_COMMITTED(task/x) 괄호 상태 · Ⓖ verification-commands 행이 카드 14 (Codex 7차)
+#   출력: PASS:/FAIL: + `CHECKED: 34`, exit 0/1/2
 # 쓰기 규칙: 저장소에 아무 파일도 만들지 않는다. 고장 사본은 mktemp 디렉터리에만 쓴다.
 set -uo pipefail
 
@@ -29,7 +30,7 @@ cd "$REPO" || { echo "NOT_RUN: 저장소 루트로 이동 실패"; echo "CHECKED
 
 CHECKER=scripts/acceptance-hs-1300.sh
 ORIG=docs/engineering/humansearch-hs13-position-brief-goal-2026-09-10.md
-EXPECTED_CHECKED=30
+EXPECTED_CHECKED=34
 G=/usr/bin/grep
 
 [ -s "$ORIG" ] || { echo "NOT_RUN: 원본 문서 없음 — $ORIG"; echo "CHECKED: 0"; exit 2; }
@@ -42,7 +43,7 @@ checked=0
 expect_rc() {
   local desc="$1" doc="$2" want="$3" rc=0
   checked=$((checked + 1))
-  HS_1300_DOC="$doc" bash "$CHECKER" >/dev/null 2>&1
+  HS_1300_DOC="$doc" HS_1300_VC="${VC_OVERRIDE:-docs/sot/verification-commands.md}" bash "$CHECKER" >/dev/null 2>&1
   rc=$?
   if [ "$rc" -eq "$want" ]; then
     printf 'PASS: %s (exit=%s)\n' "$desc" "$rc"
@@ -174,6 +175,20 @@ awk -F'|' 'BEGIN{OFS="|"} /^\| *HS-13\.05 /{ $4=" `cd humansearch && uv run --no
 expect_rc "변이Ⓑ 미분류 백틱 조각 → 불합격" "$TMP/unclassified.md" 1
 awk -F'|' 'BEGIN{OFS="|"} /^\| *HS-13\.05 /{ $4=" `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1305a.py` (`>= 12 passed`) `tests/test_hs_1305.py` " } { print }' "$ORIG" > "$TMP/decoy.md"
 expect_rc "변이Ⓒ 비명령 백틱의 ID 미끼 → 불합격" "$TMP/decoy.md" 1
+
+# Ⓓ~Ⓖ Codex 7차 반례
+awk -F'|' 'BEGIN{OFS="|"} /^\| *HS-13\.05 /{ $4=" `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1305.py` (`RESULT=$(id)`) " } { print }' "$ORIG" > "$TMP/exec-expected.md"
+$G -qF 'RESULT=$(id)' "$TMP/exec-expected.md" || { echo "NOT_RUN: 변이Ⓓ 생성 실패"; echo "CHECKED: $checked"; exit 2; }
+expect_rc "변이Ⓓ 기대출력 자리의 실행 가능 조각 RESULT=\$(id) → 불합격" "$TMP/exec-expected.md" 1
+awk -F'|' 'BEGIN{OFS="|"} /^\| *HS-13\.05 /{ $4=" `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1305.py` (`12+ passed) " } { print }' "$ORIG" > "$TMP/odd-backtick.md"
+expect_rc "변이Ⓔ 홀수 백틱(닫히지 않은 조각) → 불합격" "$TMP/odd-backtick.md" 1
+awk -F'|' 'BEGIN{OFS="|"} /^\| *HS-13\.01 /{ $6=" LOCAL_COMMITTED(task/hs-13-stack-20260910) " } { print }' "$ORIG" > "$TMP/paren-state.md"
+$G -q 'LOCAL_COMMITTED(task/hs-13-stack-20260910)' "$TMP/paren-state.md" || { echo "NOT_RUN: 변이Ⓕ 생성 실패"; echo "CHECKED: $checked"; exit 2; }
+expect_rc "변이Ⓕ 실존 브랜치라도 LOCAL_COMMITTED(task/…) 괄호 상태 → 불합격(형제 브랜치 조회 없음)" "$TMP/paren-state.md" 1
+sed 's/WU 카드 19 /WU 카드 14 /' docs/sot/verification-commands.md > "$TMP/vc-14.md"
+$G -q 'WU 카드 14 ' "$TMP/vc-14.md" || { echo "NOT_RUN: 변이Ⓖ 생성 실패"; echo "CHECKED: $checked"; exit 2; }
+VC_OVERRIDE="$TMP/vc-14.md" expect_rc "변이Ⓖ verification-commands 행이 카드 14 → 불합격" "$ORIG" 1
+unset VC_OVERRIDE
 
 echo "CHECKED: $checked"
 if [ "$checked" -ne "$EXPECTED_CHECKED" ]; then
