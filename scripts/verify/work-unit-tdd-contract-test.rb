@@ -75,6 +75,11 @@ build_case = lambda do |root, kind|
   run.call(root, {}, "git", "commit", "-q", "-m", "green")
   _rc, green_commit = run.call(root, {}, "git", "rev-parse", "HEAD")
   green_commit.strip!
+  if kind == :post_green_drift
+    write_test.call(File.join(root, "test/feature_test.rb"), expected: false)
+    run.call(root, {}, "git", "add", "test/feature_test.rb")
+    run.call(root, {}, "git", "commit", "-q", "-m", "drift after first green")
+  end
 
   manifest = Marshal.load(Marshal.dump(base_manifest))
   unit = manifest.fetch("work_units").first
@@ -114,7 +119,7 @@ end
 
 Dir.mktmpdir("wu-tdd-contract-") do |tmp|
   cases = {}
-  %i[normal syntax drift late_contract].each do |kind|
+  %i[normal syntax drift late_contract post_green_drift].each do |kind|
     case_root = File.join(tmp, kind.to_s)
     FileUtils.mkdir_p(case_root)
     cases[kind] = build_case.call(case_root, kind)
@@ -153,6 +158,16 @@ Dir.mktmpdir("wu-tdd-contract-") do |tmp|
   late_ok = rc == 1 && out.include?("AUTHORITY_PATH_NOT_AT_CONTRACT")
   missing_behavior ||= rc.zero?
   assert.call("contract declared only after boundary rejected", late_ok, out)
+
+  manifest_path, = cases.fetch(:post_green_drift)
+  rc, out = run.call(
+    repo_root,
+    { "WORK_UNIT_REPO" => File.join(tmp, "post_green_drift"), "WORK_UNIT_TDD_ONLY" => "1" },
+    "ruby", checker, manifest_path
+  )
+  post_green_ok = rc == 1 && out.include?("TEST_FILE_CHANGED_AFTER_RED")
+  missing_behavior ||= rc.zero?
+  assert.call("test drift after first GREEN rejected", post_green_ok, out)
 end
 
 puts "WU_TESTS: #{checked}"
