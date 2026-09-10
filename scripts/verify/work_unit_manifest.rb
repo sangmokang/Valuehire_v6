@@ -14,7 +14,7 @@ module WorkUnitManifest
     mode contract_commit red_commit green_commit red_commands red_tests
     red_failure_kind test_files expectation_change_approval_commit
   ].freeze
-  CONTEXT_KEYS = %w[expected_head expected_worktree scope files].freeze
+  CONTEXT_KEYS = %w[expected_head expected_worktree scope files observed_reads].freeze
   CONTEXT_FILE_KEYS = %w[path commit_sha sha256 read_evidence].freeze
   SHA_PATTERN = /\A[0-9a-f]{40}\z/
   HASH_PATTERN = /\A[0-9a-f]{64}\z/
@@ -197,6 +197,7 @@ module WorkUnitManifest
       errors << "CONTEXT_HASH_INVALID: #{file_label}" unless file["sha256"].is_a?(String) && file["sha256"].match?(HASH_PATTERN)
       errors << "READ_EVIDENCE_REQUIRED: #{file_label}" unless string?(file["read_evidence"])
     end
+    errors << "CONTEXT_OBSERVED_READS_REQUIRED: #{label}" unless string_array?(context["observed_reads"])
   end
 
   def validate_commands(value, code, label, errors)
