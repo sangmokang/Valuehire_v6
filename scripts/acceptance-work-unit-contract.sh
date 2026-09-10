@@ -49,6 +49,7 @@ case "$mode" in
     ;;
   schema)
     run_case "normal manifest" "$fixtures/valid.yaml" 0 '^VERDICT: PASS$'
+    run_case "missing manifest" "$fixtures/does-not-exist.yaml" 1 'MANIFEST_MISSING:'
     run_case "missing AC" "$fixtures/ac-missing.yaml" 1 'AC_REQUIRED:'
     run_case "missing counter-AC" "$fixtures/counter-ac-missing.yaml" 1 'COUNTER_AC_REQUIRED:'
     run_case "duplicate ID" "$fixtures/duplicate-id.yaml" 1 'ID_DUPLICATE:'
