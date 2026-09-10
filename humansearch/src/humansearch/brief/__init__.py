@@ -1,6 +1,7 @@
 """HS-13 포지션 브리프·서치 패킷 패키지의 공개 경계."""
 
 from .boolean_query import BooleanQuerySet, build_boolean_queries, check_balanced
+from .inmail import InMailDraft, build_inmail, build_inmails
 from .jd_fidelity import (
     EXTRA_CONDITION_PATTERNS,
     FidelityReport,
@@ -52,6 +53,7 @@ __all__ = [
     "EmailContact",
     "ExecProfile",
     "FidelityReport",
+    "InMailDraft",
     "JdPacket",
     "JdSource",
     "LinkedInReport",
@@ -63,6 +65,8 @@ __all__ = [
     "TeamMail",
     "TwoField",
     "build_boolean_queries",
+    "build_inmail",
+    "build_inmails",
     "check_balanced",
     "check_linkedin",
     "content_lines",

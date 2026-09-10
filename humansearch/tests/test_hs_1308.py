@@ -20,10 +20,12 @@ from humansearch.brief import (
     CandidateLead,
     ConnectionDegree,
     EmailContact,
+    InMailDraft,
     ScoreBreakdown,
+    build_inmail,
+    build_inmails,
     check_linkedin,
 )
-from humansearch.brief.inmail import InMailDraft, build_inmail, build_inmails
 
 LEAD_URL_1 = "https://www.linkedin.com/in/example-0001"
 LEAD_URL_2 = "https://kr.linkedin.com/in/example-0002"
@@ -210,7 +212,7 @@ _ALPHABET = "가나다라마바사아자차카타파하 \nabcXYZ0123·"  # '<' �
 def test_length_ok_matches_exception_behavior(body_text: str) -> None:
     lead = _lead()
     reasons_block = "\n".join(f"• {reason}" for reason in lead.match_reasons[:2])
-    preview = "\n\n".join((GREETING, reasons_block, body_text, SENDER_LINE))
+    preview = f"{GREETING}\n\n{reasons_block}\n\n{body_text}\n\n{SENDER_LINE}"
     expected_ok = check_linkedin(preview).ok
     try:
         draft = build_inmail(lead, body_text, greeting=GREETING, sender_line=SENDER_LINE)
