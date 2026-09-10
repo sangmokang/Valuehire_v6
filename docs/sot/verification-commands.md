@@ -1,6 +1,6 @@
 # Valuehire v6 — 이 저장소의 실제 게이트 명령 (SOT)
 
-최종 갱신: 2026-09-09 (스텝 수 26→30 실측 정정 — PostgreSQL 준비·Invoice 자가시험 스텝 누락 복구, hs-kickoff·hs-kickoff-mutations 추가, 이름 없는 checkout 스텝 복구)
+최종 갱신: 2026-09-10 (HS-00.04 — verify 시작 이벤트 삭제·축소·중복 키 방어를 기존 ci-step-integrity에 추가; 스텝 수 변경 없음)
 근거: `docs/engineering/docs-sot-restructure-goal-2026-08-08.md`
 
 ## 현재 규칙
@@ -43,7 +43,7 @@
 | 20 | 인수 검사 hs-a4 (대용량·산출물 차단이 실제로 도는가) | `bash scripts/acceptance-hs-a4.sh` — 차단이 실제로 도는가 (AC-A4) |
 | 21 | 인수 검사 secret-webhook-vendor (웹훅·벤더 키 탐지 · AC-S1) | `bash scripts/acceptance-secret-webhook-vendor.sh` — 웹훅·벤더 키 (AC-S1) |
 | 22 | 인수 검사 verified-sha (초록불이 SHA 에 귀속되는가 · P23) | `bash scripts/acceptance-verified-sha.sh` — 현재 SHA 귀속 진리표(P23) |
-| 23 | 인수 검사 ci-step-integrity (스텝을 조용히 끄지 못하는가) | `bash scripts/acceptance-ci-step-integrity.sh` — 조건부·오류무시·echo 대체 차단 |
+| 23 | 인수 검사 ci-step-integrity (스텝을 조용히 끄지 못하는가) | `bash scripts/acceptance-ci-step-integrity.sh` — 필수 trigger 삭제·branch/path/activity 필터·중복 YAML key·조건부·오류무시·echo 대체 차단 |
 | 24 | 인수 검사 semantic-mutations (검사를 껐을 때 반드시 빨개지는가) | `bash scripts/acceptance-semantic-mutations.sh` — 인수 검사 무력화 5종 전량 차단 |
 | 25 | 인수 검사 verify-ac-m (mechanism 명부 대조 · AC-M) | `bash scripts/acceptance-verify-ac-m.sh` — mechanism 명부 대조 (AC-M) |
 | 26 | PostgreSQL 서버 준비 (Invoice 런타임 검사용) | 인라인 — Invoice 실증용 임시 PostgreSQL 설치·기동 |
@@ -100,3 +100,11 @@
 정조준 명령은 humansearch에서 `uv run --no-sync pytest -q tests/test_hs_0003.py`다. 이 시험은 기존 G2의 pytest 전체 수집에 포함하며 새 acceptance 프레임워크나 CI 단계는 추가하지 않는다. 실제 `scripts/acceptance-hs-kickoff.sh`가 파싱한 workflow 스텝 이름, 이 문서의 스텝 이름 칸, 처분표 대상 칸을 `scripts/verify/check-hs-kickoff-identities.py`에 전달한다.
 
 판정기는 원문을 승인 값으로 바꾸지 않는다. U+FF01~U+FF5E 직접 대응과 고정 Unicode 17.0.0 단일 코드포인트 매핑으로 보호 토큰 비교 사본만 만든다. 토큰 span 안에 치환이 있거나 원문 ASCII 토큰 바로 앞뒤의 치환 문자가 비교 사본에서 ASCII 식별 경계가 되면 거부한다. 정상 한글·다국어·무관한 전각 설명과 `PR #131`, `hs-kickoff-other`, `ＰR #131`, `hｓ-kickoff-other` 경계는 허용한다. 표준입력은 UTF-8 strict로 읽고 0바이트·빈 이름 한 줄·해독 오류는 종료값 2다. 전각 범위를 제외한 매핑 파일의 버전·지문·메타데이터·628개 항목이 다르면 종료값 2로 실패한다. 결합 문자·bidi·보이지 않는 문자·다중문자 skeleton 전체는 이 WU의 지원 범위가 아니다. 출처·라이선스·재생성·롤백 계약은 `docs/engineering/humansearch-hs0003-goal-2026-09-10.md`에 연결한다.
+
+## HS-00.04 검증 시작 조건 회귀
+
+정조준 명령은 루트에서 `bash scripts/verify/run-acceptance.sh scripts/acceptance-ci-step-integrity.sh`다. 새 검사기나 CI 단계 없이 기존 ci-step-integrity 판정기와 배선을 보강한다.
+
+verify 워크플로는 모든 branch의 `push`, 필터 없는 기본 `pull_request`, 수동 `workflow_dispatch`를 유지해야 한다. plain/quoted/명시적 string tag `on`, UTF-8 BOM, 빈 mapping·null, scalar event, 필수 세 event를 담은 sequence shorthand, dispatch inputs, 알 수 없는 추가 event는 계약에 맞게 읽는다. 필수 event 삭제와 push/PR의 branch·path·tag·activity 필터는 종료값 1과 `TRIGGER_CONTRACT`로 거부한다. top-level `on` 부재·중복·boolean/binary slot 충돌, `on` 하위 duplicate·merge·alias·semantic non-string key, duplicate/non-mapping job·step, top-level 비-mapping, YAML 파싱 실패는 덮어쓰기나 검사 대상 0건을 합격으로 만들지 않고 `CHECKED: 0`, 종료값 2로 닫는다.
+
+이 계약은 GitHub 저장소의 Actions 활성화 설정, branch protection, required checks, commit-message skip, 포크 승인 정책, 앞 단계의 `GITHUB_ENV`·`GITHUB_PATH` 오염을 증명하지 않는다. 상세 EARS·counter-AC·예산·롤백은 `docs/engineering/humansearch-hs0004-goal-2026-09-10.md`에 연결하며 원격 CI·PR·병합 승인을 뜻하지 않는다.

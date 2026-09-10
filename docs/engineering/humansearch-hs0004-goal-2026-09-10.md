@@ -15,7 +15,7 @@
 - 시작 시 중복: 같은 WU 이름의 브랜치·작업공간·커밋은 0건이었다. 이후 최초 독립 검토자가 범위를 위반해 원래 작업선에 커밋·구현을 만들어 현재는 오염 작업선과 recovery 작업선이 각각 존재한다. 오염 작업선은 증거 보존만 하며 소유·구현·판정에 쓰지 않는다. 관련 온라인 작업은 열린 Issue #69이며 HS-00.04 전용 Issue·PR은 없었다.
 - 기존 담당 경계: `scripts/verify/check-ci-step-integrity.sh`와 `scripts/acceptance-ci-step-integrity.sh`가 조건부 job·step과 오류 무시를 이미 검사하지만 `on` 시작 조건의 의미는 검사하지 않는다. 새 검사기나 CI 단계를 만들지 않고 이 기존 경계를 보강한다.
 - 현재 main 차이: `c28270c...` 이후 main은 같은 CI 무결성 파일에 concurrency·timeout 보강을 포함한다. HS-00.04는 trigger 계약만 소유하며 concurrency·timeout 변경을 가져오거나 되돌리지 않는다. 후속 전달 시 main과 충돌을 수동 재검토한다.
-- 시작 검사: Strict 원칙 정본 2개 직접 읽기와 `bash scripts/acceptance-principles-check.sh`는 `CHECKED: 34`, 종료값 0이었다. `scripts/session-status.sh`는 장시간 실행 중인 상태로 별도 원문 결과를 기다린다.
+- 시작 검사: Strict 원칙 정본 2개 직접 읽기와 `bash scripts/acceptance-principles-check.sh`는 `CHECKED: 34`, 종료값 0이었다. `scripts/session-status.sh` readback은 선행 HEAD가 main보다 ahead 33/behind 12, 미해결 RED가 `6/31`이며 `acceptance-0-7.sh`는 CI 담당 제외임을 확인했다.
 - `AGENTS.md`: 저장소 루트 파일은 없었고 사용자가 이번 세션 입력에 전체 내용을 직접 제공했다. 다른 저장소의 파일로 대체하지 않았다.
 
 ## EARS Spec — 한 개 인수 기준
@@ -144,7 +144,7 @@ bash scripts/verify/run-acceptance.sh scripts/acceptance-ci-step-integrity.sh
 ## 결정 카드
 
 > **무엇을** — 기존 CI 무결성 판정기의 YAML 구조 검사에 필수 trigger 의미를 추가한다.<br>
-> **왜** — 새 장치를 만들지 않고 이미 CI와 pre-push에 배선된 한 판정기에서 실행 0 우회를 막을 수 있다.<br>
+> **왜** — 새 장치를 만들지 않고 이미 CI에 배선된 한 판정기에서 실행 0 우회를 막을 수 있다.<br>
 > **버린 길** — `acceptance-hs-kickoff.sh`에 HumanSearch 전용 문자열 검사를 추가하는 길은 전체 verify 워크플로의 시작 조건을 중복 판정하고 HS-00.05와 경계를 섞어 기각한다.<br>
 > **대가** — 현재 저장소의 넓은 실행 정책을 의도적으로 고정하므로 향후 비용 절감을 위한 path filter는 별도 계약 변경과 시험 갱신 없이는 쓸 수 없다.<br>
 > **되돌리기** — 구현 커밋 revert 후 RED 회귀로 보호가 사라졌음을 확인한다.
@@ -159,4 +159,6 @@ bash scripts/verify/run-acceptance.sh scripts/acceptance-ci-step-integrity.sh
 
 ## 적대 검증 로그
 
-아직 구현 전이다. 독립 Spec 검토, RED 검토, Codeaudit, mutation, Claude V1, Codex V2의 명령·시각·종료값·전체 출력·대상 SHA를 이 절과 `docs/engineering/evidence/hs0004-20260910/`에 순서대로 보존한다.
+독립 Spec 검토와 모든 RED 추가 검토는 각각 PASS했다. canonical은 최초 37개에서 V1/V2 반례를 거쳐 52→90→92→100→101→105개로 강화됐으며, 각 새 결함은 테스트 전용 커밋에서 먼저 RED로 재현한 뒤 최소 GREEN을 적용했다. Codeaudit는 nested semantic key 결함을 한 번 FAIL로 잡은 뒤 최종 PASS했고, 실제 Claude V1은 boolean 집합·BOM·scalar·nested duplicate, explicit bool tag·alias, binary semantic `on`, explicit non-string tag·독립 merge mutation을 순차로 찾아 RED 보강을 이끌었다. 마지막 Claude V1은 후보 지문 `74fe789f...`에서 `VERDICT: PASS`, 새 Codex V2도 같은 지문에서 `VERDICT: PASS`였다.
+
+최종 로컬 검증은 targeted 74 passed, G2 Ruff 46·mypy 46·pytest 285, 원칙 34, mutation 105/16/41/37, checker 핵심 mutant 14/14, 별도 적대 반례 16/16, `verify.sh` PASS다. checker 280줄·acceptance 299줄, 최대 함수 상한 27/15줄이다. 독립 V1/V2 검토 당시 누적 구현 diff는 558 insertions/20 deletions이었고 판정 원문·완료 서술을 반영한 구현 커밋 직전 4파일 diff는 560 insertions/20 deletions으로 모두 예산 안이다. 600 허용·601 거부·대상 0 거부도 동일 예산 판정기로 실증했다. 전체 판정 원문·실패 후 재시도·NOT_RUN은 `docs/engineering/evidence/hs0004-20260910/verification-ledger.md`와 동 디렉터리의 V1/V2 판정서에 보존한다.
