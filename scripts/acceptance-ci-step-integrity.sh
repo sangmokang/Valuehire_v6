@@ -50,6 +50,10 @@ expect_trigger_contract() {
   fi
 }
 
+expect_structure() {
+  expect_trigger_contract "$1" "$2" 2 '^FAIL:' '^CHECKED: 0$'
+}
+
 trigger_variant() {
   local name="$1" trigger="$2" path
   path="$TMP/$name.yml"
@@ -170,6 +174,28 @@ p=$(trigger_variant trigger-duplicate-event 'on:
 expect_trigger_contract "duplicate event key → 구조 오류" "$p" 2 \
   '^FAIL:' '^CHECKED: 0$'
 
+# ── V1/V2 반례: AST와 값 계층이 다른 trigger를 고르지 못하게 한다 ─────────
+p=$(trigger_variant trigger-true-before-on 'true: {push: null, pull_request: null, workflow_dispatch: null}
+"on": {push: {paths-ignore: ["**"]}, pull_request: null, workflow_dispatch: null}')
+expect_structure "literal true 뒤 축소 on → 구조 오류" "$p"
+p=$(trigger_variant trigger-on-before-true 'on: {push: {paths-ignore: ["**"]}, pull_request: null, workflow_dispatch: null}
+true: {push: null, pull_request: null, workflow_dispatch: null}')
+expect_structure "축소 on 뒤 literal true → 구조 오류" "$p"
+p=$(trigger_variant trigger-On-before-on 'On: {push: null, pull_request: null, workflow_dispatch: null}
+"on": {push: {paths-ignore: ["**"]}, pull_request: null, workflow_dispatch: null}')
+expect_structure "case-changed On과 on 충돌 → 구조 오류" "$p"
+p=$(trigger_variant trigger-merge 'x-events: &events {push: null, pull_request: null}
+on: {<<: *events, workflow_dispatch: null}')
+expect_structure "on merge key → 구조 오류" "$p"
+p=$(trigger_variant trigger-numeric-key 'on: {push: null, pull_request: null, workflow_dispatch: null, 7: null}')
+expect_structure "비문자 event key → 구조 오류" "$p"
+p=$(trigger_variant trigger-numeric-sequence 'on: [push, pull_request, workflow_dispatch, 7]')
+expect_structure "비문자 sequence event → 구조 오류" "$p"
+p=$(trigger_variant push-star-plus-path 'on: {push: {branches: ["**"], paths-ignore: ["**"]}, pull_request: null, workflow_dispatch: null}')
+expect_trigger_contract "전체 branch와 path 제외 조합 → 계약 위반" "$p" 1 '^FAIL: TRIGGER_CONTRACT:.*push' '^CHECKED: [1-9][0-9]*$'
+p=$(trigger_variant dispatch-sequence 'on: {push: null, pull_request: null, workflow_dispatch: []}')
+expect_trigger_contract "workflow_dispatch sequence 값 → 계약 위반" "$p" 1 '^FAIL: TRIGGER_CONTRACT:.*workflow_dispatch' '^CHECKED: [1-9][0-9]*$'
+
 # ── 차단 쪽: 무력화 주입 ─────────────────────────────────────────────────────
 mutate() {
   local name="$1" ruby_code="$2"
@@ -178,6 +204,23 @@ mutate() {
   ruby -e "$ruby_code" "$path"
   printf '%s' "$path"
 }
+
+p=$(mutate duplicate-jobs 'p=ARGV[0]; s=File.read(p).sub(/^jobs:/, "jobs:\n  decoy: {runs-on: ubuntu-latest, steps: [{run: true}]}\njobs:"); File.write(p,s)')
+expect_structure "duplicate top-level jobs → 구조 오류" "$p"
+p=$(mutate duplicate-job-id 'p=ARGV[0]; s=File.read(p).sub("jobs:\n  verify:", "jobs:\n  verify: {runs-on: ubuntu-latest, steps: [{run: true}]}\n  verify:"); File.write(p,s)')
+expect_structure "duplicate job id → 구조 오류" "$p"
+p=$(mutate duplicate-step-key 'p=ARGV[0]; s=File.read(p).sub("        uses: actions/checkout@v4", "        uses: actions/checkout@v3\n        uses: actions/checkout@v4"); File.write(p,s)')
+expect_structure "duplicate step key → 구조 오류" "$p"
+p=$(mutate duplicate-run 'p=ARGV[0]; s=File.read(p).sub("        run: bash verify.sh", "        run: echo skipped\n        run: bash verify.sh"); File.write(p,s)')
+expect_structure "duplicate step run → 구조 오류" "$p"
+p=$(mutate nonmapping-job 'p=ARGV[0]; s=File.read(p).sub(/^jobs:\n.*\z/m, "jobs:\n  verify: true\n"); File.write(p,s)')
+expect_structure "non-mapping job → 구조 오류" "$p"
+p=$(mutate nonmapping-step 'p=ARGV[0]; s=File.read(p).sub("    steps:\n", "    steps:\n      - true\n"); File.write(p,s)')
+expect_structure "non-mapping step → 구조 오류" "$p"
+p=$(mutate unreadable '')
+chmod 000 "$p"
+expect_structure "읽기 권한 없는 workflow → 구조 오류" "$p"
+chmod 600 "$p"
 
 p=$(mutate step-if-false 'p=ARGV[0]; s=File.read(p).sub("      - name: 인수 검사 hs-a4", "      - name: 인수 검사 hs-a4\n        if: ${{ false }}"); File.write(p,s)')
 expect_rc "스텝에 if: \${{ false }} 주입 → 불합격" "$p" 1
@@ -200,7 +243,7 @@ expect_rc "실행 대신 echo → 불합격" "$p" 1
 p=$(mutate syntax-only 'p=ARGV[0]; s=File.read(p).sub("        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-a4.sh", "        run: bash -n scripts/acceptance-hs-a4.sh"); File.write(p,s)')
 expect_rc "실행 대신 bash -n → 불합격" "$p" 1
 
-p=$(mutate empty-steps 'p=ARGV[0]; require "psych"; d=Psych.safe_load(File.read(p), aliases: true); d["jobs"]["verify"]["steps"]=[]; File.write(p,Psych.dump(d))')
+p=$(mutate empty-steps 'p=ARGV[0]; s=File.read(p).sub(/^    steps:\n.*\z/m, "    steps: []\n"); File.write(p,s)')
 expect_rc "job 의 스텝 전량 삭제 → 불합격" "$p" 1
 
 # ── fail-closed: 읽지 못하는 상황을 통과로 세지 않는다 ───────────────────────
