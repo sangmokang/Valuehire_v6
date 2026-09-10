@@ -1,0 +1,59 @@
+version: 2
+title: "Work Unit TDD and context policy"
+work_unit:
+  claims_per_unit: 1
+  acceptance_criteria_per_unit: 1
+  counter_acceptance_criteria_minimum: 1
+  required_contracts:
+    - input
+    - output
+    - errors
+    - boundaries
+    - database
+    - api
+    - types
+  completion_requires:
+    - red_validation
+    - first_green
+    - regression_validation
+    - adversarial_validation
+    - context_manifest
+    - completion_commit
+tdd:
+  contract_commit_precedes_red: true
+  red_commands_minimum: 1
+  red_tests_minimum: 1
+  red_failure_kind: "missing_behavior"
+  forbidden_red_failure_kinds:
+    - syntax_error
+    - import_error
+    - collection_error
+    - no_tests
+  test_files_immutable_after_red: true
+  expectation_change_requires_separate_approved_commit: true
+  first_green_required_before_completion: true
+context:
+  declared_files_only: true
+  repository_relative_paths_only: true
+  required_evidence:
+    - path
+    - commit_sha
+    - sha256
+    - read_evidence
+  require_expected_head_match: true
+  require_expected_worktree_match: true
+  whole_repository_is_not_evidence: true
+not_applicable:
+  allowed_change_kinds:
+    - ui
+    - documentation
+    - configuration
+    - migration
+    - other_test_inappropriate
+  requires_reason: true
+  alternative_validation_commands_minimum: 1
+enforcement:
+  checker: "scripts/verify/check-work-unit-manifest.rb"
+  acceptance: "scripts/acceptance-work-unit-contract.sh"
+  mutations: "scripts/acceptance-work-unit-contract-mutations.sh"
+  fixture_directory: "scripts/verify/fixtures/work-unit"
