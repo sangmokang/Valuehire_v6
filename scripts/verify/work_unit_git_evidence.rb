@@ -48,6 +48,9 @@ module WorkUnitGitEvidence
     end
     return [errors, checked] unless errors.empty?
 
+    authority_errors, authority_checked = validate_authority_paths(unit, repo, contract_commit)
+    errors.concat(authority_errors)
+    checked += authority_checked
     checked += 2
     unless strict_ancestor?(repo, contract_commit, red_commit)
       errors << "CONTRACT_NOT_BEFORE_RED: #{id}"
@@ -62,6 +65,21 @@ module WorkUnitGitEvidence
     file_errors, file_checked = validate_test_files(repo, id, tdd)
     errors.concat(file_errors)
     checked += file_checked
+    [errors, checked]
+  end
+
+  def validate_authority_paths(unit, repo, contract_commit)
+    errors = []
+    checked = 0
+    %w[database api types].each do |authority|
+      contract = unit.fetch("contracts").fetch(authority)
+      contract.fetch("paths").each do |path|
+        checked += 1
+        unless repository_path?(path) && !blob(repo, contract_commit, path).nil?
+          errors << "AUTHORITY_PATH_NOT_AT_CONTRACT: #{unit.fetch('id')} #{authority} #{path}"
+        end
+      end
+    end
     [errors, checked]
   end
 

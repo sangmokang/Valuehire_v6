@@ -151,7 +151,7 @@ module WorkUnitManifest
       errors << "AUTHORITY_STATUS_INVALID: #{label}.#{key}" unless %w[APPLICABLE NOT_APPLICABLE].include?(authority["status"])
       errors << "AUTHORITY_REASON_REQUIRED: #{label}.#{key}" unless string?(authority["reason"])
       paths = authority["paths"]
-      errors << "AUTHORITY_PATHS_INVALID: #{label}.#{key}" unless paths.is_a?(Array) && paths.all? { |item| string?(item) }
+      errors << "AUTHORITY_PATHS_INVALID: #{label}.#{key}" unless string_array?(paths)
     end
   end
 
