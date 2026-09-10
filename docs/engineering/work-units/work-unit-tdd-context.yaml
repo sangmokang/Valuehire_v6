@@ -168,7 +168,9 @@ work_units:
       red_failure_kind: "missing_behavior"
       test_files:
         - "scripts/verify/work-unit-context-contract-test.rb"
-      expectation_change_approval_commit: "3c418f580b62be1cb28ab5f0aec50afd24d446d2"
+      expectation_change_approval_commit:
+        - "3c418f580b62be1cb28ab5f0aec50afd24d446d2"
+        - "fb63b158e75be9d79406fda56a40d379e5ae136f"
     regression_commands:
       - "bash scripts/acceptance-work-unit-contract.sh context"
     adversarial_commands:

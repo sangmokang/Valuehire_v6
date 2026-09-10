@@ -679,3 +679,39 @@ VERDICT: PASS
 CHECKED: 115
 A7_REPOSITORY_TDD_EXIT:0
 ```
+
+## WU-3R 감사 보정: historical worktree와 과다 맥락 차단
+
+계약 `2182378` 뒤 RED `fb63b15`는 기존 7개 context 사례를 보존하고, historical worktree 위조와 추적 파일 전체에서 한 개만 뺀 context 두 건을 추가했습니다.
+
+```text
+PASS: current exact context
+PASS: filename-only declaration rejected
+PASS: context hash mismatch rejected
+PASS: stale HEAD rejected
+PASS: other worktree rejected
+PASS: whole repository scope rejected
+PASS: undeclared observed read rejected
+FAIL: all-but-one repository context rejected
+FAIL: historical worktree forgery rejected
+WU_TESTS: 9
+CHECKED: 9
+WU_FAILURE_KIND: missing_behavior
+VERDICT: FAIL
+A8_RED_EXIT:1
+```
+
+GREEN `a424e56`은 historical worktree 문자열이 hash로 고정된 계약 맥락 파일에 실제로 기록됐는지 확인하고, 20개 초과 또는 전체에서 1개 이하만 생략한 read set을 과다 범위로 거부합니다.
+
+```text
+PASS: all-but-one repository context rejected
+PASS: historical worktree forgery rejected
+WU_TESTS: 9
+CHECKED: 9
+VERDICT: PASS
+A8_GREEN_EXIT:0
+
+VERDICT: PASS
+CHECKED: 117
+A8_REPOSITORY_CONTEXT_EXIT:0
+```
