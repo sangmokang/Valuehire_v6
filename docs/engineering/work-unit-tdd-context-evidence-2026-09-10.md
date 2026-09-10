@@ -430,3 +430,46 @@ VERDICT: PASS
 ```
 
 → 첫 GREEN 뒤에 시험을 바꾸어도 별도 승인 커밋이 없으면 `TEST_FILE_CHANGED_AFTER_RED`로 거부됩니다.
+
+## WU-5R 감사 보정: 실제 저장소 WU manifest
+
+독립 감사에서 fixture만 검사하고 이 저장소의 실제 WU manifest가 0개여도 CI가 통과하는 구멍을 찾았습니다. 계약 `9a79acb` 뒤 RED `b4a542b`에서 저장소 manifest·CI 실행 누락을 직접 조사했습니다.
+
+```text
+2026-09-10T17:18:47+0900
+FAIL: repository WU manifest 0 — docs/engineering/work-units/*.yaml
+FAIL: repository WU acceptance is not wired in CI
+WU_TESTS: 2
+CHECKED: 2
+WU_FAILURE_KIND: missing_behavior
+VERDICT: FAIL
+REPOSITORY_WU_RED_EXIT=1
+RED_FAILURE_KIND_CHECK_EXIT=0
+```
+
+GREEN `90df3a0`은 `docs/engineering/work-units/work-unit-tdd-context.yaml`에 WU-1~WU-5의 실제 계약·RED·GREEN·맥락 증거를 보존하고 CI가 이를 재실행합니다. 완료 후 HEAD에서 다시 실행한 원문입니다.
+
+```text
+PASS: repository WU manifests discovered — 1
+PASS: repository WU acceptance is wired in CI
+PASS: repository WU manifest — docs/engineering/work-units/work-unit-tdd-context.yaml
+WU_TESTS: 3
+CHECKED: 3
+VERDICT: PASS
+REPOSITORY_WU_FINAL_EXIT=0
+```
+
+적대 회귀 `229bc59`는 manifest 삭제, 미추적 manifest 대체, CI 실행 줄 무력화를 분리 worktree에서 공격합니다.
+
+```text
+PASS: normal repository WU gate — exit=0
+PASS: missing repository manifests rejected — exit=1
+PASS: untracked manifest substitute rejected — exit=1
+PASS: disabled repository CI wiring rejected — exit=1
+PASS: original worktree state unchanged
+WU_TESTS: 5
+CHECKED: 5
+VERDICT: PASS
+```
+
+→ fixture 정상 통과만으로는 완료할 수 없으며, Git에 추적된 실제 manifest와 무조건 CI 호출이 둘 다 필요합니다.
