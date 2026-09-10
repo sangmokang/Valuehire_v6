@@ -159,6 +159,8 @@ class SendState(Enum): INTENT | SEND_CLAIMED | SENT_UNVERIFIED | VERIFIED | ABAN
 #   **직렬화(HS-13.09e)**: 공개 진입점(record_intent·claim_send·mark·open_new_attempt·load_*·may_send)은 `<packet_id>.<channel>.lock` 에
 #   flock(LOCK_EX) 을 잡고 움직인다. `_append` 는 쓰기 직전 디스크 최신본과 CAS 대조 — 낡은 기억 위에 덮어쓰면 거부.
 #   읽기(`_latest`) 는 N+1 이 있는데 N 이 INTENT/SEND_CLAIMED 로 남은 장부를 ABANDONED 로 복구(append, at = N+1 의 recorded_at)한다.
+#   잠금은 같은 스레드 재진입을 깊이로 허용(자기 교착 없음), 다른 스레드·프로세스는 flock 이 막는다. 마커·장부 쓰기는 파일 fsync → link/replace → 디렉터리 fsync
+#   (전원 장애 뒤 묘비·마커 소실 차단). `record_intent`·`open_new_attempt` 의 True 는 감사용 생성 결과이지 발송 권한이 아니다 — 발송 권한은 `claim_send` 의 True 하나.
 def record_intent(dir, intent) -> tuple[SendIntent, bool]   # attempt 1 을 O_CREAT|O_EXCL 로 생성 → (intent, True). 파일이 하나라도 있으면 (latest, False)
 def may_send(dir, packet_id, channel) -> bool                # attempt 파일이 **하나도 없을 때만** True (프리플라이트 전용)
 #   `created` 는 감사 불리언이다 — 발송 허가가 아니다(Codex 7차: 불리언은 재사용되므로 같은 attempt 로 두 번 보낼 수 있었다).
@@ -204,7 +206,8 @@ def load_brief_policy(path=contracts/humansearch/brief-policy.json) -> BriefPoli
 #   linkedin_max=1899, subject_prefixes, profile_url_prefixes, team_domain, clickup_position_list_id, default_search_location,
 #   allowed_search_locations(비어있지 않은 목록·공백 없는 문자열·중복 0·기본값 포함 필수) 를 한 곳에서 소유.
 #   types_*.py 의 리터럴은 이 계약값으로 대체(HS-13.01b). 검사기·런타임·시험이 같은 파일을 읽는다
-#   `override_policy_for_tests` 는 패키지 공개 API(`humansearch.brief.__all__`)에 없고 `PYTEST_CURRENT_TEST` 밖에서는 거부(Codex 8차)
+#   `override_policy_for_tests` 는 패키지 공개 API(`humansearch.brief.__all__`)에 없고 `PYTEST_CURRENT_TEST` 밖에서는 거부(Codex 8차).
+#   `HUMANSEARCH_CONTRACTS_DIR` 환경변수도 pytest 밖에서는 거부(조용히 무시하지 않음) — 운영 정책 소유자는 저장소 정본 계약 하나(Codex 9차)
 ```
 
 ### 6. 출력 계약 — 팀 메일 본문 순서 (황금 표본 `1a085e8e789eaf79`에서 도출)
@@ -287,7 +290,7 @@ def load_brief_policy(path=contracts/humansearch/brief-policy.json) -> BriefPoli
 | HS-13.09 | 패킷·발송 장부를 git 밖에 저장·readback한다 | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1309.py` (`12+ passed`) + `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1309-paths.sh` (`CHECKED: 3` — .gitignore·scan-data-exposure.sh 가 *.packet.json·*.sent.json 차단, ~/.humansearch 경로 리터럴 코드 0) | 양성: 임시 디렉터리 0700/0600·JSON 왕복·D9 a1 INTENT→SEND_CLAIMED→SENT_UNVERIFIED→VERIFIED·`open_new_attempt` 정상(a1 ABANDONED 전이 append·a2 생성·a1 파일 보존)·O_EXCL 동시 2호출 중 1개만 생성. 음성: 손상 파일 거부·같은 packet_id 재저장 → 파일 1개·역전이·건너뛰기 거부·파일에서 읽은 INTENT 로 재실행 → `record_intent` False·발송 0·approval 공백 거부·SENT_UNVERIFIED/VERIFIED/ABANDONED 에서 open_new_attempt 거부·crash-point 4곳 재실행 발송 0·묘비 파일 이름 변경/삭제 함수 부재(정적) | PLANNED |
 | HS-13.09c | packet_id 에서 날짜를 뺀다 | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1309c.py` (`6+ passed`) | 양성: 같은 포지션·JD 는 날짜가 달라도 같은 id·`created_on` JSON 왕복. 음성: 옛 형식 `20260910-…` 거부·날짜 A 에 intent 뒤 날짜 B 재실행 → `may_send` False·created False(발송 0, 날짜 재삽입 변이 검출) | IMPLEMENTED |
 | HS-13.09d | 발송 허가를 한 번 소비되는 청구로 바꾼다(Codex 7차) | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1309d.py` (`13+ passed`) | 양성: INTENT→SEND_CLAIMED 1회·마커 0600·동시 6호출 중 1개만 True·SEND_CLAIMED 에서 open_new_attempt 허용. 음성: 같은 attempt 두 번째 청구 False·청구 없는 mark(SENT_UNVERIFIED) 거부·mark 로 SEND_CLAIMED 생성 거부·고아 마커 재청구 거부·최신 아닌 attempt 거부·SEND_CLAIMED 에 message_id 타입 거부 | IMPLEMENTED |
-| HS-13.09e | 장부 조작을 채널 잠금·CAS 로 직렬화하고 packet_id 를 내용에 결합한다(Codex 8차) | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1309e.py` (`11+ passed`) | 양성: 청구·승인 재시도 동시 12회 → SEND_CLAIMED 가 두 attempt 에 동시에 남지 않음·N+1 뒤 미종단 N 은 읽기 시 ABANDONED 복구·잠금 파일 0600·position/jd 도출 id 통과. 음성: 마커 생성 뒤 끼어든 승인 재시도 위에 낡은 SEND_CLAIMED 덮어쓰기 거부·형식만 맞는 임의 packet_id 3종 거부·override 가 공개 API 에 없음·pytest 밖 override 거부·override 밖에서 살아남은 SearchFilters 를 패킷이 거부 | IMPLEMENTED |
+| HS-13.09e | 장부 조작을 채널 잠금·CAS 로 직렬화하고 packet_id 를 내용에 결합한다(Codex 8차) | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1309e.py` (`16+ passed`) | 양성: 청구·승인 재시도 동시 12회 → SEND_CLAIMED 가 두 attempt 에 동시에 남지 않음·N+1 뒤 미종단 N 은 읽기 시 ABANDONED 복구·잠금 파일 0600·position/jd 도출 id 통과·같은 스레드 재진입 교착 없음·다른 스레드 배제·fsync 파일+디렉터리. 음성: 마커 생성 뒤 끼어든 승인 재시도 위에 낡은 SEND_CLAIMED 덮어쓰기 거부·형식만 맞는 임의 packet_id 3종 거부·override 가 공개 API 에 없음·pytest 밖 override 거부·override 밖에서 살아남은 SearchFilters 를 패킷이 거부·pytest 밖 계약 경로 환경변수 거부·record_intent/open_new_attempt 문서에 발송 권한 문구 0 | IMPLEMENTED |
 | HS-13.10b | readback 정규화 5단계를 고정한다 | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1310b.py` (`6+ passed`) | 양성: Gmail 리다이렉트 1개·여러 개·괄호 안 URL 복원, 퍼센트 인코딩 URL 이 `%` 유지/`%25` 재인코딩 두 변형 모두 일치(양쪽 대칭 unquote). 음성: 느슨한 꼬리가 `)` 를 삼키는 반례·다른 URL 은 exit 1(언랩 생략 변이 검출) | IMPLEMENTED |
 | HS-13.01c | 서치 지역을 계약 허용 목록으로 고정한다(D12) | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1301c.py` (`5+ passed`) | 양성: `South Korea` 통과·계약 기본값 로드. 음성: `Japan` 거부·빈값 거부·계약 목록을 바꾼 임시 정책으로 허용값이 실제 반영(허용 검사 생략 변이 검출)·기본값이 허용 목록 밖인 계약 파일 거부 | IMPLEMENTED |
 | HS-13.10 | 실제 포지션 1건 라이브 | §10 절차 + `cd humansearch && uv run --no-sync python -m humansearch.brief verify --packet <path> --sent <readback.txt>` (exit 0, 출력 `VERIFIED packet_id=ID body_sha256=HEX`) | 양성: 발송 1·readback 해시 일치 1(2026-09-10 실측: 패킷 `86exwz89j-5449bcf5`, Gmail message `1a08971ffd281a48`, RAW MIME 의 text/plain 을 §5 정규화 후 해시 일치). 음성: 불일치 → exit 1 `SENT_UNVERIFIED`(MCP PLAIN_TEXT 변환본은 quoted-printable 을 한 번 더 풀어 `=17`→0x17·`=\n` 소프트 개행이 깨져 불일치가 났다 — readback 은 RAW 로); 같은 패킷 재실행 → 발송 0 | VERIFIED |
@@ -400,6 +403,14 @@ Codex 샌드박스는 mktemp 불가라 파일 사본 변이는 NOT_RUN, 인메�
 - [높음] 형식만 맞는 임의 `packet_id` 로 새 발송 namespace → `SearchPacket.__post_init__` 이 `position.clickup_task_id`·`jd.raw_sha256[:8]` 도출값과 일치 강제(역직렬화도 같은 경로). 반례 3종 시험.
 - [높음] 공개 `override_policy_for_tests` 로 D12 우회 → `humansearch.brief` 공개 API 에서 제거, `PYTEST_CURRENT_TEST` 밖 호출 거부, `SearchPacket` 이 담을 때의 계약으로 `search_filters.location` 재검증(override 밖 생존 객체 차단).
 - 부수: 잠금 뒤 두 번째 승인 재시도는 from_attempt 가 낡아 예외(13.09 시험 갱신 — 약화 아님, 더 엄격).
+
+### 2026-09-10 Codex V1 9차 (fresh·read-only, session `01a08993-48c3-7490-8d80-6eccdce33594`, 스택 f3412fc 대상)
+
+`VERDICT: FAIL` — 높음 3·중간 1(샌드박스 쓰기 거부로 CHECKED·pytest 미실행). 처분(같은 PR, HS-13.09e 확장):
+- [높음] `HUMANSEARCH_CONTRACTS_DIR` 로 운영 경로에서 계약 교체 → pytest 밖에서는 환경변수를 **거부**(무시 아님). 시험 1건.
+- [높음] 마커·장부 쓰기가 fsync 없이 link/replace → 파일 fsync → link/replace → 디렉터리 fsync. `os.fsync` 호출을 세는 시험(intent ≥2, claim +4). 장애 주입 FS 시험은 비범위(로컬 APFS 전제, 한계 ② 옆에 기록).
+- [높음] `record_intent`·`open_new_attempt` 문서가 "True 면 발송 가능" → 감사용 결과로 정정, 발송 권한은 `claim_send` 뿐. 문서 문구 시험(발송할 수 있다 0·claim_send 언급).
+- [중간] 같은 스레드 재진입 flock 자기 교착 → 스레드 로컬 깊이 카운터로 재진입 허용, 다른 스레드는 여전히 배제. 시험 2건(재진입 5초 내 완료·보유 중 타 스레드 진입 0).
 
 ### 2026-09-10 Claude Codeaudit (읽기 전용·별도 컨텍스트, 7efd6c6 대상)
 

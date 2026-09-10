@@ -66,6 +66,12 @@ def _repo_root() -> Path:
 
 def _default_contract_path() -> Path:
     override = os.environ.get(CONTRACTS_DIR_ENV)
+    if override and "PYTEST_CURRENT_TEST" not in os.environ:
+        # 환경변수는 시험 의존성 주입 통로일 뿐이다 — 운영 경로에서 계약 위치를 바꾸면 D12 의
+        # "지역 확대 = 정본 계약 편집(오너 결정)" 이 무너진다(Codex 9차). 조용히 무시하지 않고 거부한다.
+        _reject(
+            f"{CONTRACTS_DIR_ENV} 는 pytest 실행 중에만 허용된다 — 운영 정책은 저장소 정본 계약뿐이다"
+        )
     base = Path(override) if override else _repo_root() / "contracts"
     return base.joinpath(*_CONTRACT_RELPATH)
 

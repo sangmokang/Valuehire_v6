@@ -113,9 +113,7 @@ def _decode_dataclass(hint: type, raw: object, path: str) -> object:
     if missing:
         _reject(f"{path} 에 계약 필드가 빠졌다: {missing}")
     hints = _hints(hint)
-    arguments = {
-        name: _decode(hints[name], raw[name], f"{path}.{name}") for name in sorted(names)
-    }
+    arguments = {name: _decode(hints[name], raw[name], f"{path}.{name}") for name in sorted(names)}
     factory = typing.cast("typing.Callable[..., object]", hint)
     return factory(**arguments)
 
@@ -246,12 +244,24 @@ def write_store_file(directory: Path, target: Path, text: str) -> Path:
     try:
         with os.fdopen(handle, "w", encoding="utf-8") as stream:
             stream.write(text)
+            stream.flush()
+            os.fsync(stream.fileno())
         os.chmod(temporary, FILE_MODE)
         os.replace(temporary, target)
+        fsync_directory(directory)
     except OSError as error:
         temporary.unlink(missing_ok=True)
         _reject(f"저장 파일을 쓰지 못했다: {error.__class__.__name__}")
     return target
+
+
+def fsync_directory(directory: Path) -> None:
+    """디렉터리 엔트리(이름)를 안정 저장한다 — 원자적 가시성은 전원 장애 뒤 영속성을 뜻하지 않는다(Codex 9차)."""
+    handle = os.open(directory, os.O_RDONLY)
+    try:
+        os.fsync(handle)
+    finally:
+        os.close(handle)
 
 
 def require_packet_id(value: object) -> str:

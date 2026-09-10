@@ -23,6 +23,7 @@ import fcntl
 import os
 import re
 import tempfile
+import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
@@ -34,6 +35,7 @@ from .packet import (
     FILE_MODE,
     dumps_value,
     ensure_store_dir,
+    fsync_directory,
     loads_value,
     read_store_file,
     require_packet_id,
@@ -210,16 +212,35 @@ def _lock_path(directory: Path, packet_id: str, channel: str) -> Path:
     return directory / f"{require_packet_id(packet_id)}.{require_channel(channel)}.lock"
 
 
+_held = threading.local()
+
+
 @contextmanager
 def _channel_lock(directory: Path, packet_id: str, channel: str) -> Iterator[None]:
-    """한 패킷·한 채널의 장부 조작을 프로세스 간 직렬화한다. 잠금 파일도 0600, 지우지 않는다."""
-    handle = os.open(_lock_path(directory, packet_id, channel), os.O_CREAT | os.O_RDWR, FILE_MODE)
-    try:
-        os.fchmod(handle, FILE_MODE)
-        fcntl.flock(handle, fcntl.LOCK_EX)
+    """한 패킷·한 채널의 장부 조작을 프로세스 간 직렬화한다. 잠금 파일도 0600, 지우지 않는다.
+
+    같은 스레드의 재진입은 깊이만 센다(Codex 9차: 새 fd 로 flock 을 다시 잡으면 자기 자신에 교착).
+    다른 스레드·다른 프로세스는 flock 이 막는다.
+    """
+    key = str(_lock_path(directory, packet_id, channel))
+    depth: dict[str, int] = getattr(_held, "depth", None) or {}
+    _held.depth = depth
+    if depth.get(key, 0) > 0:
+        depth[key] += 1
         try:
             yield
         finally:
+            depth[key] -= 1
+        return
+    handle = os.open(key, os.O_CREAT | os.O_RDWR, FILE_MODE)
+    try:
+        os.fchmod(handle, FILE_MODE)
+        fcntl.flock(handle, fcntl.LOCK_EX)
+        depth[key] = 1
+        try:
+            yield
+        finally:
+            depth[key] = 0
             fcntl.flock(handle, fcntl.LOCK_UN)
     finally:
         os.close(handle)
@@ -313,8 +334,9 @@ def may_send(dir: Path, packet_id: str, channel: str) -> bool:
 def record_intent(dir: Path, intent: SendIntent) -> tuple[SendIntent, bool]:
     """attempt 1 을 원자적으로 딱 한 번 만든다. 반환 = (기록, 이번 호출이 만들었는가).
 
-    **True 를 받은 프로세스만 발송할 수 있다.** 이미 기록이 있으면 최신 attempt 를 그대로
-    돌려주고 아무것도 쓰지 않는다 — 그 기록이 곧 재발송 금지 신호다.
+    `created` 는 **감사용 생성 결과**다 — 발송 권한이 아니다. 발송 권한은 오직
+    `send_claim.claim_send` 가 돌려주는 `True` 하나뿐이다(HS-13.09d). 이미 기록이 있으면
+    최신 attempt 를 그대로 돌려주고 아무것도 쓰지 않는다 — 그 기록이 곧 재발송 금지 신호다.
     """
     if not isinstance(intent, SendIntent):
         _reject("record_intent(intent) 는 SendIntent 여야 한다")
@@ -414,8 +436,8 @@ def open_new_attempt(
 ) -> tuple[SendIntent, bool]:
     """보냈는지 모르는 시도를 승인 아래 접고 attempt N+1 을 연다. 반환 = (새 기록, 열었는가).
 
-    **True 를 받은 프로세스만 발송할 수 있다.** 직전 attempt 파일은 그대로 남고
-    ABANDONED 전이만 덧붙는다 — 묘비는 지우지 않는다.
+    `opened` 역시 감사용이다 — 새 attempt 로 보내려면 다시 `send_claim.claim_send` 의 `True`
+    가 필요하다. 직전 attempt 파일은 그대로 남고 ABANDONED 전이만 덧붙는다 — 묘비는 지우지 않는다.
     """
     if not isinstance(approval, Approval):
         _reject("open_new_attempt(approval) 은 Approval 이어야 한다")
@@ -496,11 +518,14 @@ def _create_exclusive(directory: Path, target: Path, text: str) -> bool:
     try:
         with os.fdopen(handle, "w", encoding="utf-8") as stream:
             stream.write(text)
+            stream.flush()
+            os.fsync(stream.fileno())
         os.chmod(temporary, FILE_MODE)
         try:
             os.link(temporary, target)
         except FileExistsError:
             return False
+        fsync_directory(directory)  # 이름이 안정 저장돼야 전원 장애 뒤에도 묘비·마커가 남는다
         return True
     except OSError as error:
         _reject(f"발송 장부를 만들지 못했다: {error.__class__.__name__}")

@@ -334,12 +334,12 @@ def test_contracts_dir_env_is_refused_outside_pytest(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """HUMANSEARCH_CONTRACTS_DIR 는 시험 의존성 주입일 뿐 — pytest 밖에서는 계약 경로를 바꿀 수 없다."""
-    from humansearch.brief import policy as policy_module
+    from humansearch.brief.policy import CONTRACTS_DIR_ENV, load_brief_policy
 
-    monkeypatch.setenv(policy_module.CONTRACTS_DIR_ENV, str(tmp_path))
+    monkeypatch.setenv(CONTRACTS_DIR_ENV, str(tmp_path))
     monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
     with pytest.raises(BriefInputError):
-        policy_module.load_brief_policy()
+        load_brief_policy()
 
 
 def test_ledger_writes_fsync_file_and_directory(
@@ -406,7 +406,10 @@ def test_channel_lock_still_excludes_other_threads(tmp_path: Path) -> None:
         with send_ledger_module._channel_lock(directory, _PACKET_ID, "gmail"):
             entered_at.append(1.0)
 
-    threads = [threading.Thread(target=holder, daemon=True), threading.Thread(target=contender, daemon=True)]
+    threads = [
+        threading.Thread(target=holder, daemon=True),
+        threading.Thread(target=contender, daemon=True),
+    ]
     for t in threads:
         t.start()
     holder_ready.wait(timeout=5)
