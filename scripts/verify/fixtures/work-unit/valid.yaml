@@ -49,4 +49,6 @@ work_units:
           commit_sha: "1111111111111111111111111111111111111111"
           sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           read_evidence: "blob-sha256"
+      observed_reads:
+        - "blob-sha256"
     not_applicable: null

@@ -113,24 +113,25 @@ Dir.mktmpdir("wu-tdd-contract-") do |tmp|
   end
 
   manifest_path, = cases.fetch(:normal)
-  rc, out = run.call(repo_root, { "WORK_UNIT_REPO" => File.join(tmp, "normal") }, "ruby", checker, manifest_path)
+  tdd_env = { "WORK_UNIT_REPO" => File.join(tmp, "normal"), "WORK_UNIT_TDD_ONLY" => "1" }
+  rc, out = run.call(repo_root, tdd_env, "ruby", checker, manifest_path)
   assert.call("authentic RED then GREEN", rc.zero? && out.include?("VERDICT: PASS"), out)
 
   zero_manifest = Psych.safe_load(File.read(manifest_path), aliases: false)
   zero_manifest["work_units"].first["tdd"]["red_commands"] = []
   zero_path = File.join(tmp, "zero-commands.yaml")
   File.write(zero_path, Psych.dump(zero_manifest))
-  rc, out = run.call(repo_root, { "WORK_UNIT_REPO" => File.join(tmp, "normal") }, "ruby", checker, zero_path)
+  rc, out = run.call(repo_root, tdd_env, "ruby", checker, zero_path)
   assert.call("zero RED commands rejected", rc == 1 && out.include?("RED_COMMAND_REQUIRED"), out)
 
   manifest_path, = cases.fetch(:syntax)
-  rc, out = run.call(repo_root, { "WORK_UNIT_REPO" => File.join(tmp, "syntax") }, "ruby", checker, manifest_path)
+  rc, out = run.call(repo_root, { "WORK_UNIT_REPO" => File.join(tmp, "syntax"), "WORK_UNIT_TDD_ONLY" => "1" }, "ruby", checker, manifest_path)
   syntax_ok = rc == 1 && out.include?("RED_FAILURE_INVALID")
   missing_behavior ||= rc.zero?
   assert.call("syntax-only RED rejected", syntax_ok, out)
 
   manifest_path, = cases.fetch(:drift)
-  rc, out = run.call(repo_root, { "WORK_UNIT_REPO" => File.join(tmp, "drift") }, "ruby", checker, manifest_path)
+  rc, out = run.call(repo_root, { "WORK_UNIT_REPO" => File.join(tmp, "drift"), "WORK_UNIT_TDD_ONLY" => "1" }, "ruby", checker, manifest_path)
   drift_ok = rc == 1 && out.include?("TEST_FILE_CHANGED_AFTER_RED")
   missing_behavior ||= rc.zero?
   assert.call("test expectation drift rejected", drift_ok, out)

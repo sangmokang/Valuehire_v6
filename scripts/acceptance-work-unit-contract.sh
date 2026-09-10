@@ -42,7 +42,11 @@ case "$mode" in
     ruby scripts/verify/work-unit-tdd-contract-test.rb
     exit $?
     ;;
-  context|not-applicable)
+  context)
+    ruby scripts/verify/work-unit-context-contract-test.rb
+    exit $?
+    ;;
+  not-applicable)
     printf 'VERDICT: NOT_RUN\nREASON: mode %s not implemented\nWU_TESTS: 0\nCHECKED: 0\n' "$mode"
     exit 2
     ;;
