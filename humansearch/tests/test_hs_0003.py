@@ -2,6 +2,7 @@ import importlib
 import json
 import re
 import shutil
+import subprocess
 import sys
 from collections.abc import Callable
 from pathlib import Path
@@ -19,6 +20,7 @@ class ResultLike(Protocol):
 class Hs0001Fixture(Protocol):
     copy_fixture: Callable[[Path], Path]
     run_acceptance: Callable[[Path], ResultLike]
+    clean_env: Callable[[], dict[str, str]]
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -29,6 +31,7 @@ if str(TESTS) not in sys.path:
 fixture = cast(Hs0001Fixture, importlib.import_module("test_hs_0001"))
 base_copy_fixture = fixture.copy_fixture
 run_acceptance = fixture.run_acceptance
+clean_env = fixture.clean_env
 
 RUNTIME_FIXTURE_FILES = (
     "scripts/verify/check-hs-kickoff-identities.py",
@@ -38,6 +41,7 @@ WORKFLOW = Path(".github/workflows/verify.yml")
 SOT = Path("docs/sot/verification-commands.md")
 DISPOSITION = Path("docs/engineering/humansearch-branch-disposition-2026-09-07.md")
 DATA = Path("scripts/verify/hs-kickoff-confusables-17.0.0.json")
+IDENTITY_CHECKER = Path("scripts/verify/check-hs-kickoff-identities.py")
 
 
 def copy_fixture(tmp_path: Path) -> Path:
@@ -82,6 +86,26 @@ def append_disposition_shadow(repo: Path, target: str, spoofed: str) -> None:
     row = next(line for line in text.splitlines() if target in line and line.startswith("| "))
     shadow = re.sub(r"^\| [1-6] \|", "| 7 |", row, count=1).replace(target, spoofed, 1)
     path.write_text(text + "\n" + shadow + "\n", encoding="utf-8")
+
+
+def replace_disposition_target(repo: Path, target: str, spoofed: str) -> None:
+    path = repo / DISPOSITION
+    lines = path.read_text(encoding="utf-8").splitlines()
+    index = next(i for i, line in enumerate(lines) if line.startswith("| ") and target in line)
+    lines[index] = lines[index].replace(target, spoofed, 1)
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def replace_workflow_and_sot_name(repo: Path, old: str, new: str) -> None:
+    workflow = repo / WORKFLOW
+    workflow_text = workflow.read_text(encoding="utf-8")
+    assert workflow_text.count(f"- name: {old}") == 1
+    workflow.write_text(workflow_text.replace(f"- name: {old}", f"- name: {new}", 1))
+
+    sot = repo / SOT
+    sot_text = sot.read_text(encoding="utf-8")
+    assert sot_text.count(f"| {old} |") == 1
+    sot.write_text(sot_text.replace(f"| {old} |", f"| {new} |", 1))
 
 
 def combined(result: ResultLike) -> str:
@@ -161,6 +185,34 @@ def test_spoofed_disposition_targets_are_rejected(
     assert_spoof_rejected(result, f"SPOOF: disposition-target line=7 token={target}")
 
 
+@pytest.mark.parametrize("spoofed", ("PR #13１", "ｘPR #13"))
+def test_confusable_token_boundaries_do_not_count_as_disposition_target(
+    tmp_path: Path,
+    spoofed: str,
+) -> None:
+    repo = copy_fixture(tmp_path)
+    replace_disposition_target(repo, "PR #13", spoofed)
+
+    result = run_acceptance(repo)
+
+    assert_spoof_rejected(result, "SPOOF: disposition-target line=1 token=PR #13")
+
+
+def test_confusable_token_boundary_does_not_count_as_workflow_name(tmp_path: Path) -> None:
+    repo = copy_fixture(tmp_path)
+    old = "인수 검사 hs-kickoff (HumanSearch 착수 정리 · WU-0A)"
+    new = "인수 검사 ｘhs-kickoff (HumanSearch 착수 정리 · WU-0A)"
+    replace_workflow_and_sot_name(repo, old, new)
+
+    result = run_acceptance(repo)
+
+    assert_spoof_rejected(
+        result,
+        "SPOOF: workflow-step line=29 token=hs-kickoff",
+        "SPOOF: sot-step line=29 token=hs-kickoff",
+    )
+
+
 def mutate_missing_data(repo: Path) -> None:
     path = repo / DATA
     if path.exists():
@@ -210,3 +262,29 @@ def test_mapping_data_errors_fail_closed(tmp_path: Path, mutate: Callable[[Path]
     assert result.returncode != 0, output
     assert "CHECKED: 12" in output
     assert "ERROR: Unicode 매핑 데이터" in output
+
+
+@pytest.mark.parametrize(
+    "payload",
+    (b"", b"\n", b"hs-kickoff\xff\n"),
+    ids=("zero-bytes", "empty-name", "invalid-utf8"),
+)
+def test_identity_checker_rejects_empty_or_invalid_utf8_input(payload: bytes) -> None:
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / IDENTITY_CHECKER),
+            "--kind",
+            "workflow-step",
+            "--token",
+            "hs-kickoff",
+        ],
+        cwd=ROOT,
+        env=clean_env(),
+        input=payload,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert b"ERROR:" in result.stderr
