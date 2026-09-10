@@ -57,6 +57,7 @@
 | WU-2R | When DB/API/Type 선행 근거를 검사하면 각 근거 파일이 contract commit에 이미 존재해야 합니다. | RED에서 뒤늦게 만든 계약 파일 경로를 manifest에 적어 통과 | `bash scripts/acceptance-work-unit-contract.sh tdd` | WU-1~WU-5 완료 뒤 감사 보정 | PASS · 계약 `3c1ad8c` · RED `aa87570` · GREEN `1bdb504` |
 | WU-2R2 | When RED 이후 시험 불변을 검사하면 첫 GREEN 뒤 현재 HEAD까지의 무승인 변경도 거부해야 합니다. | GREEN 다음 커밋에서 기대값 변경 | `bash scripts/acceptance-work-unit-contract.sh tdd` | V1 감사 재현 | PASS · RED `14dad68` · GREEN `0cd7731` |
 | WU-5R | When 저장소 WU gate를 실행하면 실제 WU manifest 1개 이상과 CI 실행 배선이 없을 때 실패해야 합니다. | fixture만 통과하고 실제 WU manifest가 0개인 저장소 | `bash scripts/acceptance-work-unit-repository.sh` | WU-2R2 완료 후 V1 감사 재현 | PASS · 계약 `9a79acb` · RED `b4a542b` · GREEN `90df3a0` · 적대 회귀 `229bc59` |
+| WU-2R3 | When RED 이후 시험 이력을 검사하면 중간 GREEN에서 기대값을 바꾼 뒤 HEAD에서 원복해도 무승인 변경 커밋을 거부해야 합니다. | 가짜 GREEN 기대값 변경 후 최종 blob 원복 | `bash scripts/acceptance-work-unit-contract.sh tdd` | WU-5R 완료 후 V1 재감사 | CONTRACT |
 
 각 WU는 계약 커밋 → RED 커밋 → 최소 GREEN 커밋 → 회귀·적대검증 → 완료 커밋 순서로 닫습니다. 앞 WU의 완료 커밋 전에는 다음 WU 파일을 시작하지 않습니다.
 
