@@ -57,6 +57,10 @@ build_case = lambda do |root, kind|
   File.write(File.join(root, "lib/feature.rb"), "module Feature\n  def self.enabled?\n    false\n  end\nend\n")
   write_test.call(File.join(root, "test/feature_test.rb"), syntax_error: kind == :syntax, expected: true)
   run.call(root, {}, "git", "add", "lib/feature.rb", "test/feature_test.rb")
+  if kind == :late_contract
+    File.write(File.join(root, "late-contract.txt"), "declared after the contract boundary\n")
+    run.call(root, {}, "git", "add", "late-contract.txt")
+  end
   run.call(root, {}, "git", "commit", "-q", "-m", "red")
   _rc, red_commit = run.call(root, {}, "git", "rev-parse", "HEAD")
   red_commit.strip!
@@ -81,6 +85,10 @@ build_case = lambda do |root, kind|
   unit["tdd"]["red_commands"] = ["ruby test/feature_test.rb"]
   unit["tdd"]["red_tests"] = 1
   unit["tdd"]["test_files"] = ["test/feature_test.rb"]
+  authority_path = kind == :late_contract ? "late-contract.txt" : "contract.txt"
+  %w[database api types].each do |authority|
+    unit["contracts"][authority]["paths"] = [authority_path]
+  end
   unit["context"]["expected_head"] = green_commit
   unit["context"]["expected_worktree"] = "master"
   unit["context"]["files"].first["commit_sha"] = contract_commit
@@ -106,7 +114,7 @@ end
 
 Dir.mktmpdir("wu-tdd-contract-") do |tmp|
   cases = {}
-  %i[normal syntax drift].each do |kind|
+  %i[normal syntax drift late_contract].each do |kind|
     case_root = File.join(tmp, kind.to_s)
     FileUtils.mkdir_p(case_root)
     cases[kind] = build_case.call(case_root, kind)
@@ -135,6 +143,16 @@ Dir.mktmpdir("wu-tdd-contract-") do |tmp|
   drift_ok = rc == 1 && out.include?("TEST_FILE_CHANGED_AFTER_RED")
   missing_behavior ||= rc.zero?
   assert.call("test expectation drift rejected", drift_ok, out)
+
+  manifest_path, = cases.fetch(:late_contract)
+  rc, out = run.call(
+    repo_root,
+    { "WORK_UNIT_REPO" => File.join(tmp, "late_contract"), "WORK_UNIT_TDD_ONLY" => "1" },
+    "ruby", checker, manifest_path
+  )
+  late_ok = rc == 1 && out.include?("AUTHORITY_PATH_NOT_AT_CONTRACT")
+  missing_behavior ||= rc.zero?
+  assert.call("contract declared only after boundary rejected", late_ok, out)
 end
 
 puts "WU_TESTS: #{checked}"

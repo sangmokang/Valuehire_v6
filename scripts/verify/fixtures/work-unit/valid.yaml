@@ -14,11 +14,13 @@ work_units:
       database:
         status: "NOT_APPLICABLE"
         reason: "The checker does not read or write a database."
-        paths: []
+        paths:
+          - "docs/engineering/work-unit-tdd-context-goal-2026-09-10.md"
       api:
         status: "NOT_APPLICABLE"
         reason: "The checker performs no network or external API calls."
-        paths: []
+        paths:
+          - "docs/engineering/work-unit-tdd-context-goal-2026-09-10.md"
       types:
         status: "APPLICABLE"
         reason: "The policy YAML defines the machine-readable manifest shape."
