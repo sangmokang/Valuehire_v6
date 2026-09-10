@@ -56,6 +56,14 @@ not_applicable:
     - other_test_inappropriate
   requires_reason: true
   alternative_validation_commands_minimum: 1
+completion:
+  approved_commands:
+    - "bash scripts/acceptance-work-unit-contract.sh schema"
+    - "bash scripts/acceptance-work-unit-contract.sh tdd"
+    - "bash scripts/acceptance-work-unit-contract.sh context"
+    - "bash scripts/acceptance-work-unit-contract.sh not-applicable"
+    - "bash scripts/acceptance-work-unit-contract-mutations.sh"
+    - "bash scripts/acceptance-semantic-mutations.sh"
 enforcement:
   manifest_required: true
   missing_manifest_status: "FAIL"

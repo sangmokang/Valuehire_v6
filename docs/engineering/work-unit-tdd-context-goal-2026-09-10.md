@@ -68,6 +68,7 @@
 | A-3 | WU-5 | 실제 manifest 0개·CI 미배선 | `b4a542b` → `90df3a0` · 적대 회귀 `229bc59` |
 | A-4 | WU-2 | 가짜 GREEN 후 최종 blob 원복 | `3c7017c` → `77ee839` |
 | A-5 | WU-5 | regression·adversarial 명령 미실행 | `a9fd860` → `fd6e6e0` |
+| A-6 | WU-5 | 임의 스크립트가 위조한 `VERDICT: PASS`·양수 검사 건수 | 계약 기록 후 RED → GREEN |
 
 ## Harness·검증·중단 조건
 
