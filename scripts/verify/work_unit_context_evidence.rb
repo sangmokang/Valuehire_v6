@@ -4,6 +4,8 @@ require "digest"
 require "open3"
 
 module WorkUnitContextEvidence
+  MAXIMUM_FILES_PER_UNIT = 20
+  NEAR_WHOLE_OMISSION_MINIMUM = 2
   GIT_ENV_KEYS = %w[
     GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY
     GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_PREFIX GIT_QUARANTINE_PATH
@@ -23,14 +25,14 @@ module WorkUnitContextEvidence
       head = archive ? unit.fetch("tdd").fetch("contract_commit") : current_head
       worktree = archive ? nil : current_worktree
       tracked = tracked_files(repo, head)
-      unit_errors, unit_checked = validate_unit(unit, repo, head, worktree, tracked)
+      unit_errors, unit_checked = validate_unit(unit, repo, head, worktree, tracked, archive)
       errors.concat(unit_errors)
       checked += unit_checked
     end
     [errors, checked]
   end
 
-  def validate_unit(unit, repo, head, worktree, tracked)
+  def validate_unit(unit, repo, head, worktree, tracked, archive)
     context = unit.fetch("context")
     id = unit.fetch("id")
     errors = []
@@ -38,6 +40,8 @@ module WorkUnitContextEvidence
     errors << "CONTEXT_HEAD_MISMATCH: #{id}" unless context.fetch("expected_head") == head
     if worktree && context.fetch("expected_worktree") != worktree
       errors << "CONTEXT_WORKTREE_MISMATCH: #{id}"
+    elsif archive && !historical_worktree_evidence?(context, repo, head)
+      errors << "CONTEXT_WORKTREE_EVIDENCE_MISSING: #{id}"
     end
     errors << "CONTEXT_SCOPE_TOO_BROAD: #{id}" unless context.fetch("scope") == "minimal"
 
@@ -45,6 +49,10 @@ module WorkUnitContextEvidence
     paths = files.map { |file| file.fetch("path") }
     errors << "CONTEXT_PATH_DUPLICATE: #{id}" unless paths.uniq.length == paths.length
     errors << "CONTEXT_SCOPE_TOO_BROAD: #{id}" if !tracked.empty? && paths.sort == tracked
+    omitted = tracked - paths
+    if paths.length > MAXIMUM_FILES_PER_UNIT || (paths.length > 1 && omitted.length < NEAR_WHOLE_OMISSION_MINIMUM)
+      errors << "CONTEXT_SCOPE_TOO_BROAD: #{id}"
+    end
 
     declared_receipts = []
     files.each do |file|
@@ -76,6 +84,17 @@ module WorkUnitContextEvidence
     receipt = "git:#{commit}:#{path}:#{digest}"
     errors << "CONTEXT_READ_EVIDENCE_INVALID" unless file.fetch("read_evidence") == receipt
     [errors, checked, receipt]
+  end
+
+  def historical_worktree_evidence?(context, repo, head)
+    expected = context.fetch("expected_worktree")
+    context.fetch("files").any? do |file|
+      path = file.fetch("path")
+      next false unless repository_path?(path)
+
+      rc, content = git(repo, "show", "#{head}:#{path}")
+      rc.zero? && content.lines.any? { |line| line.include?(expected) }
+    end
   end
 
   def repository_path?(path)
