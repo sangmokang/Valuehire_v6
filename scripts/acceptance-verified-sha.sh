@@ -139,7 +139,7 @@ expect_lookup() {
     }
     gh() {
       [ "$1" = api ] && [ "$2" = --paginate ] \
-        && [ "$3" = "repos/{owner}/{repo}/commits/$MOCK_SHA/check-runs" ] \
+        && [ "$3" = "repos/{owner}/{repo}/commits/$MOCK_SHA/check-runs?filter=all" ] \
         && [ "$4" = --jq ] || return 96
       case "$MOCK_RUN_MODE" in
         zero) : ;;
@@ -221,6 +221,21 @@ expect_lookup "레코드 필터 실패 → 조회 불능" filter_fail 2 NOT_RUN
 expect_lookup "현재 브랜치 조회가 출력 뒤 실패 → 조회 불능" branch_fail 2 NOT_RUN
 expect_lookup "로컬 SHA 조회가 출력 뒤 실패 → 조회 불능" local_sha_fail 2 NOT_RUN
 expect_lookup "원격 SHA 조회가 출력 뒤 실패 → 조회 불능" remote_sha_fail 2 NOT_RUN
+
+# 가공 전 응답을 실제 gh의 --jq/--paginate로 처리한다. 외부 접속은 없다.
+for mode in all_success mixed_failure reversed_failure irrelevant_failure no_verify \
+            page2_failure page2_error historical_failure; do
+  out=$(python3 "$REPO/scripts/verify/test-verified-sha-query.py" "$CHECKER" "$mode" 2>&1)
+  rc=$?
+  checked=$((checked + 1))
+  if [ "$rc" -eq 0 ]; then
+    echo "PASS: 실제 gh JSON 조회 $mode"
+  else
+    echo "FAIL: 실제 gh JSON 조회 $mode — exit=$rc"
+    printf '%s\n' "$out"
+    fail=1
+  fi
+done
 
 checked=$((checked + 1))
 bad_runs_rc=0

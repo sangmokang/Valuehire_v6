@@ -178,8 +178,9 @@ fi
 
 # 원격 HEAD SHA 에 붙은 check-run 만 본다. 브랜치나 PR 로 조회하면 옛 커밋의 초록불을
 # 지금 코드의 것으로 착각하게 된다 — 이 스크립트가 존재하는 이유가 바로 그것이다.
+# GitHub REST 기본값은 최신 check run 만 돌려주므로 모든 실행 집계를 위해 filter=all 을 명시한다.
 encoded_runs=$(
-  gh api --paginate "repos/{owner}/{repo}/commits/$remote_sha/check-runs" \
+  gh api --paginate "repos/{owner}/{repo}/commits/$remote_sha/check-runs?filter=all" \
     --jq '.check_runs[] | select(.name=="verify") | "\(.status):\(.conclusion // "none")"' 2>/dev/null |
     awk '{ printf "R%s\n", $0 }'
   pipeline_status=("${PIPESTATUS[@]}")
