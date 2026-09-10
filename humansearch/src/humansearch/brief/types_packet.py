@@ -161,7 +161,19 @@ def _require_faithful(report: FidelityReport, label: str) -> None:
         _reject(f"SearchPacket.jd_packet.{label} 이 JD 원문 줄을 빠뜨렸다: {report.missing[0]!r}")
     if report.extra_lines:
         # 조건이 아니어도 원문에 없는 줄은 허위 문구다(§6 블록 안 임의 추가 0, Codex 11차)
-        _reject(f"SearchPacket.jd_packet.{label} 에 원문에 없는 줄이 끼었다: {report.extra_lines[0]!r}")
+        _reject(
+            f"SearchPacket.jd_packet.{label} 에 원문에 없는 줄이 끼었다: {report.extra_lines[0]!r}"
+        )
+
+
+_RESERVED_MARKERS: tuple[str, ...] = (
+    "[JD 원문 시작]",
+    "[JD 원문 끝]",
+    "[복사 시작]",
+    "[복사 끝]",
+    "[필드 1: 회사 소개]",
+    "[필드 2: JD 내용]",
+)
 
 
 def _block_after(lines: tuple[str, ...], marker: str, expected: tuple[str, ...], label: str) -> int:
@@ -251,16 +263,28 @@ class SearchPacket:
         렌더러(mail_sections)가 넣는 마커와 같은 마커를 찾아 그 뒤 줄들을 jd_packet 과 대조한다.
         """
         packet = self.jd_packet
+        if "\r" in self.mail.body:
+            _reject("TeamMail.body 는 LF 개행만 쓴다(CRLF 정규화는 readback CLI 의 몫)")
         lines = tuple(self.mail.body.splitlines())
-        end = _block_after(lines, "[JD 원문 시작]", tuple(packet.gmail_body.splitlines()), "Gmail JD")
+        for marker in _RESERVED_MARKERS:
+            hits = sum(1 for line in lines if line == marker)
+            if hits != 1:
+                _reject(f"TeamMail.body 에 예약 마커 {marker!r} 가 {hits}회 나타난다(1회여야 한다)")
+        end = _block_after(
+            lines, "[JD 원문 시작]", tuple(packet.gmail_body.splitlines()), "Gmail JD"
+        )
         if end >= len(lines) or lines[end] != "[JD 원문 끝]":
             _reject("TeamMail.body 의 Gmail JD 블록이 '[JD 원문 끝]' 로 닫히지 않는다")
-        end = _block_after(lines, "[복사 시작]", tuple(packet.linkedin_body.splitlines()), "LinkedIn")
+        end = _block_after(
+            lines, "[복사 시작]", tuple(packet.linkedin_body.splitlines()), "LinkedIn"
+        )
         if end >= len(lines) or lines[end] != "[복사 끝]":
             _reject("TeamMail.body 의 LinkedIn 블록이 '[복사 끝]' 로 닫히지 않는다")
         end = _block_after(
             lines, "[필드 1: 회사 소개]", tuple(packet.two_field_company.splitlines()), "필드 1"
         )
         if lines[end : end + 2] != ("", "[필드 2: JD 내용]"):
-            _reject("TeamMail.body 의 필드 1 블록 뒤에 빈 줄과 '[필드 2: JD 내용]' 이 이어지지 않는다")
+            _reject(
+                "TeamMail.body 의 필드 1 블록 뒤에 빈 줄과 '[필드 2: JD 내용]' 이 이어지지 않는다"
+            )
         _block_after(lines, "[필드 2: JD 내용]", tuple(packet.two_field_jd.splitlines()), "필드 2")

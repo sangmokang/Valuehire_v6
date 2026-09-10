@@ -135,6 +135,9 @@ def _packet(body: str) -> SearchPacket:
 
 _JP = _faithful_jd_packet(JdSource(_JD_TEXT, _RAW_SHA, "U1"))
 _BODY = _mail_body(_JP, "고객사 백엔드 엔지니어 | 밸류커넥트 내부 공유\n본문 둘째 줄\n본문 셋째 줄")
+_SENT = (
+    f"{_BODY}\npacket-id: {_PACKET_ID}"  # readback 은 §10 ③ 의 꼬리 줄을 반드시 가진다(Codex 12차)
+)
 
 
 def _write_packet(tmp_path: Path, body: str = _BODY) -> Path:
@@ -154,7 +157,7 @@ def _write_sent(tmp_path: Path, text: str) -> Path:
 
 def test_verify_positive_exact_body_matches(tmp_path: Path) -> None:
     packet_path = _write_packet(tmp_path)
-    sent_path = _write_sent(tmp_path, _BODY)
+    sent_path = _write_sent(tmp_path, _SENT)
     code, message = verify(packet_path, sent_path)
     assert code == 0
     match = _VERIFIED_RE.fullmatch(message)
@@ -168,7 +171,7 @@ def test_verify_positive_exact_body_matches(tmp_path: Path) -> None:
 
 def test_verify_positive_survives_crlf_normalization(tmp_path: Path) -> None:
     packet_path = _write_packet(tmp_path)
-    sent_path = _write_sent(tmp_path, _BODY.replace("\n", "\r\n"))
+    sent_path = _write_sent(tmp_path, _SENT.replace("\n", "\r\n"))
     code, message = verify(packet_path, sent_path)
     assert code == 0
     assert _VERIFIED_RE.fullmatch(message) is not None
@@ -179,7 +182,7 @@ def test_verify_positive_survives_crlf_normalization(tmp_path: Path) -> None:
 
 def test_verify_positive_survives_trailing_whitespace(tmp_path: Path) -> None:
     packet_path = _write_packet(tmp_path)
-    padded = "\n".join(f"{line}   " for line in _BODY.split("\n")) + "  \n\n"
+    padded = "\n".join(f"{line}   " for line in _SENT.split("\n")) + "  \n\n"
     sent_path = _write_sent(tmp_path, padded)
     code, message = verify(packet_path, sent_path)
     assert code == 0
@@ -202,7 +205,7 @@ def test_verify_positive_survives_packet_id_trailer_line(tmp_path: Path) -> None
 
 def test_verify_negative_single_char_change_reports_both_hashes(tmp_path: Path) -> None:
     packet_path = _write_packet(tmp_path)
-    tampered = _BODY.replace("둘째", "넷째")
+    tampered = _SENT.replace("둘째", "넷째")
     sent_path = _write_sent(tmp_path, tampered)
     code, message = verify(packet_path, sent_path)
     assert code == 1
@@ -211,7 +214,7 @@ def test_verify_negative_single_char_change_reports_both_hashes(tmp_path: Path) 
     assert match.group(1) == _PACKET_ID
     expected, actual = match.group(2), match.group(3)
     assert expected == _sha256(_BODY)
-    assert actual == _sha256(tampered)
+    assert actual == _sha256(_BODY.replace("둘째", "넷째"))  # 꼬리 줄은 정규화에서 빠진다
     assert expected != actual
 
 
@@ -219,7 +222,7 @@ def test_verify_negative_single_char_change_reports_both_hashes(tmp_path: Path) 
 
 
 def test_verify_missing_packet_file_exits_2(tmp_path: Path) -> None:
-    sent_path = _write_sent(tmp_path, _BODY)
+    sent_path = _write_sent(tmp_path, _SENT)
     code, message = verify(tmp_path / "no-such-packet.json", sent_path)
     assert code == 2
     assert message.strip() != ""
@@ -228,7 +231,7 @@ def test_verify_missing_packet_file_exits_2(tmp_path: Path) -> None:
 def test_verify_corrupted_packet_file_exits_2(tmp_path: Path) -> None:
     packet_path = tmp_path / "packet.json"
     packet_path.write_text("{이건 JSON 이 아니다", encoding="utf-8")
-    sent_path = _write_sent(tmp_path, _BODY)
+    sent_path = _write_sent(tmp_path, _SENT)
     code, message = verify(packet_path, sent_path)
     assert code == 2
     assert message.strip() != ""
@@ -264,7 +267,7 @@ def _run_module(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
 
 def test_cli_entrypoint_positive(tmp_path: Path) -> None:
     packet_path = _write_packet(tmp_path)
-    sent_path = _write_sent(tmp_path, _BODY)
+    sent_path = _write_sent(tmp_path, _SENT)
     result = _run_module(
         ["verify", "--packet", str(packet_path), "--sent", str(sent_path)], tmp_path
     )

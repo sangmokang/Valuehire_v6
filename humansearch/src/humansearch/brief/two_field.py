@@ -112,6 +112,18 @@ def split_two_field(
     content_line_total = sum(len(lines) - (1 if heading else 0) for heading, lines in selected)
     if content_line_total <= 0:
         raise BriefInputError("section_markers 로 고른 절이 모두 빈 절이다(본문 줄이 없다)")
+    # 요청한 마커 각각이 자기 본문 줄(소제목 흡수분 포함)을 1개 이상 가져야 한다 — 빈 절+정상 절 혼합도 거부(Codex 12차)
+    own: dict[str, int] = {}
+    current = ""
+    for heading, lines in selected:
+        if heading in marker_set:
+            current = heading
+            own[current] = own.get(current, 0) + len(lines) - 1
+        elif current:
+            own[current] += len(lines) - (1 if heading else 0)
+    empty = [name for name in normalized_markers if own.get(name, 0) <= 0]
+    if empty:
+        raise BriefInputError(f"section_markers 의 절에 본문 줄이 없다: {empty[0]!r}")
 
     flat_lines = [line for _, lines in selected for line in lines]
     jd_body = "\n".join(flat_lines)

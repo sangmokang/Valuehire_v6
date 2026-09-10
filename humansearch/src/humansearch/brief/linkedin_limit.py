@@ -56,14 +56,51 @@ LINKEDIN_FRAME_LINES: tuple[str, ...] = (
 # 축약으로 인정할 어미·조사·존칭 접미. 명사·숫자·영문은 여기 없다(빠지면 누락이다).
 KOREAN_ENDINGS: tuple[str, ...] = (
     # 종결 어미(하십시오체·해요체)
-    "기다립니다", "있습니다", "없습니다", "찾습니다", "했습니다",
-    "습니다", "입니다", "합니다", "됩니다",
-    "이에요", "있어요", "없어요", "예요", "해요", "어요", "여요",
+    "기다립니다",
+    "있습니다",
+    "없습니다",
+    "찾습니다",
+    "했습니다",
+    "습니다",
+    "입니다",
+    "합니다",
+    "됩니다",
+    "이에요",
+    "있어요",
+    "없어요",
+    "예요",
+    "해요",
+    "어요",
+    "여요",
     # 연결 어미
-    "하는", "하신", "하실", "하고", "하며", "하여", "되어", "이며", "이고",
+    "하는",
+    "하신",
+    "하실",
+    "하고",
+    "하며",
+    "하여",
+    "되어",
+    "이며",
+    "이고",
     # 조사·존칭 접미
-    "으로", "에서", "에게", "께서",
-    "로", "을", "를", "이", "가", "은", "는", "의", "와", "과", "도", "만", "분", "님",
+    "으로",
+    "에서",
+    "에게",
+    "께서",
+    "로",
+    "을",
+    "를",
+    "이",
+    "가",
+    "은",
+    "는",
+    "의",
+    "와",
+    "과",
+    "도",
+    "만",
+    "분",
+    "님",
 )
 _ENDINGS_LONGEST_FIRST: tuple[str, ...] = tuple(sorted(KOREAN_ENDINGS, key=len, reverse=True))
 
@@ -135,6 +172,14 @@ def core_tokens(line: str) -> tuple[str, ...]:
     return tuple(tokens)
 
 
+_HEADING_TAIL = re.compile(r"[\s:：\.\-–—]+$")
+
+
+def _canonical_heading(text: str) -> str:
+    """절 제목 비교용 — 끝의 콜론·마침표·대시·공백을 지우고 안쪽 공백을 없앤다(`주요업무:`·`주요 업무` = `주요업무`)."""
+    return _HEADING_TAIL.sub("", normalize_line(text)).replace(" ", "")
+
+
 def _is_frame_line(line: str) -> bool:
     return any(line.startswith(normalize_line(prefix)) for prefix in LINKEDIN_FRAME_LINES)
 
@@ -199,10 +244,19 @@ def verify_linkedin_fidelity(
         raise BriefInputError("verify_linkedin_fidelity 의 body 는 공백만일 수 없다")
     sections = split_sections(jd.text)
     omitted = _omitted_headings(sections, omittable_sections)
-    core = frozenset(policy().linkedin_core_sections)
-    blocked = sorted(omitted & core)
+    core = frozenset(_canonical_heading(name) for name in policy().linkedin_core_sections)
+    blocked = sorted(name for name in omitted if _canonical_heading(name) in core)
     if blocked:
-        raise BriefInputError(f"핵심 절은 LinkedIn 판에서 생략할 수 없다(계약 linkedin_core_sections): {blocked[0]!r}")
+        raise BriefInputError(
+            f"핵심 절은 LinkedIn 판에서 생략할 수 없다(계약 linkedin_core_sections): {blocked[0]!r}"
+        )
+    if omitted and not any(
+        section.heading and _canonical_heading(section.heading) in core for section in sections
+    ):
+        # 인식된 핵심 절이 0 인 JD 에서 생략을 허용하면 무엇이 핵심인지 모른 채 본문이 빠진다 — fail-closed(Codex 12차)
+        raise BriefInputError(
+            "JD 에서 계약 핵심 절(linkedin_core_sections)을 하나도 인식하지 못했다 — 절 생략을 허용하지 않는다"
+        )
     checked: list[str] = []
     for section in sections:
         if section.heading and section.heading in omitted:
@@ -216,9 +270,14 @@ def verify_linkedin_fidelity(
     jd_tokens = _token_sets(jd_all)
 
     if not checked:
-        raise BriefInputError("생략 뒤 검사 대상 JD 줄이 0 이다 — 모든 절을 생략한 LinkedIn 판은 산출물이 아니다")
+        raise BriefInputError(
+            "생략 뒤 검사 대상 JD 줄이 0 이다 — 모든 절을 생략한 LinkedIn 판은 산출물이 아니다"
+        )
     body_all = content_lines(body)
-    body_lines = tuple(line for line in body_all if not _is_frame_line(line))
+    # 프레임 줄이라도 채용 조건 문구를 품으면 면제하지 않는다(Codex 12차: `문의: 경력 10년 이상만`)
+    body_lines = tuple(
+        line for line in body_all if not (_is_frame_line(line) and not _matches_condition(line))
+    )
     if not body_lines:
         raise BriefInputError("LinkedIn 본문에 프레임 줄 외 내용 줄이 0 이다")
     body_exact = frozenset(body_lines)

@@ -361,10 +361,18 @@ def test_an_empty_subheading_marker_is_rejected_as_an_empty_selection() -> None:
 def test_frame_line_cannot_hide_a_recruiting_condition() -> None:
     jd = _jd()
     with pytest.raises(BriefInputError):
-        _packet(jd_packet=_jd_packet(jd, linkedin_body=jd.text + "\n문의: 경력 10년 이상만 지원 가능합니다"))
+        _packet(
+            jd_packet=_jd_packet(
+                jd, linkedin_body=jd.text + "\n문의: 경력 10년 이상만 지원 가능합니다"
+            )
+        )
     with pytest.raises(BriefInputError):
         _packet(jd_packet=_jd_packet(jd, linkedin_body="제목: 예시 | 경력 2~6년\n" + jd.text))
-    ok = _packet(jd_packet=_jd_packet(jd, linkedin_body="제목: 예시 고객사 프로덕트 매니저\n" + jd.text + "\n문의: 밸류커넥트"))
+    ok = _packet(
+        jd_packet=_jd_packet(
+            jd, linkedin_body="제목: 예시 고객사 프로덕트 매니저\n" + jd.text + "\n문의: 밸류커넥트"
+        )
+    )
     assert ok.jd_packet.linkedin_body.startswith("제목:")
 
 
@@ -373,21 +381,29 @@ def test_core_section_heading_with_trailing_punctuation_is_still_core() -> None:
     jd = _jd(text)
     markers = ("주요업무:", "자격요건：", "혜택 및 복지", "채용 전형")
     two = split_two_field(jd, _INTRO, section_markers=markers)
-    packet = _jd_packet(jd, two_field_jd=two.jd_body, two_field_sections=markers, linkedin_body=text)
+    packet = JdPacket(
+        gmail_body=text,
+        linkedin_body=text,
+        two_field_company=two.company_intro,
+        two_field_jd=two.jd_body,
+        two_field_sections=markers,
+        linkedin_omitted_sections=("주요업무:", "자격요건："),
+    )
     with pytest.raises(BriefInputError):
-        _packet(source=jd, jd_packet=replace(packet, linkedin_omitted_sections=("주요업무:", "자격요건：")))
+        _packet(source=jd, jd_packet=packet)
 
 
 def test_omission_is_refused_when_no_core_section_is_recognised() -> None:
-    text = "\n".join(["Responsibilities", "• ship features", "Benefits", "• snacks"])
+    text = "Duties\n• ship features\nPerks\n• snacks"
     jd = _jd(text)
-    two = split_two_field(jd, _INTRO, section_markers=("Responsibilities",))
-    packet = _jd_packet(
-        jd,
+    two = split_two_field(jd, _INTRO, section_markers=("Duties",))
+    packet = JdPacket(
+        gmail_body=text,
+        linkedin_body="Duties\n• ship features",
+        two_field_company=two.company_intro,
         two_field_jd=two.jd_body,
-        two_field_sections=("Responsibilities",),
-        linkedin_body="Responsibilities\n• ship features",
-        linkedin_omitted_sections=("Benefits",),
+        two_field_sections=("Duties",),
+        linkedin_omitted_sections=("Perks",),
     )
     with pytest.raises(BriefInputError):
         _packet(source=jd, jd_packet=packet)
@@ -405,6 +421,8 @@ def test_duplicate_end_marker_and_crlf_body_are_rejected() -> None:
 
 
 def test_an_empty_subheading_mixed_with_a_real_section_is_rejected() -> None:
-    text = _JD_TEXT.replace("[다루는 문제의 범위]\n• 탐색과 거래 흐름을 다룹니다.\n", "[빈 소제목]\n")
+    text = _JD_TEXT.replace(
+        "[다루는 문제의 범위]\n• 탐색과 거래 흐름을 다룹니다.\n", "[빈 소제목]\n"
+    )
     with pytest.raises(BriefInputError):
         split_two_field(_jd(text), _INTRO, section_markers=("빈 소제목", "자격요건"))

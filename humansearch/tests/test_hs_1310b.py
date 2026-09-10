@@ -213,7 +213,7 @@ def test_percent_encoded_url_verifies_against_the_packet_body(tmp_path: Path) ->
     """
     packet_body = f"안녕하세요.\n후보 프로필: {_ENCODED_URL}\n확인 부탁드립니다."
     sent_body = f"안녕하세요.\n후보 프로필: {_wrap(_ENCODED_URL)}\n확인 부탁드립니다."
-    code, message = _round_trip(tmp_path, sent_body, packet_body)
+    code, message = _round_trip(tmp_path, f"{sent_body}\npacket-id: {_PACKET_ID}", packet_body)
     assert code == 0, message
 
 
@@ -222,7 +222,7 @@ def test_percent_encoded_url_verifies_when_gmail_double_encodes(tmp_path: Path) 
     packet_body = f"안녕하세요.\n후보 프로필: {_ENCODED_URL}\n확인 부탁드립니다."
     doubled = _ENCODED_URL.replace("%", "%25")
     sent_body = f"안녕하세요.\n후보 프로필: {_wrap(doubled)}\n확인 부탁드립니다."
-    code, message = _round_trip(tmp_path, sent_body, packet_body)
+    code, message = _round_trip(tmp_path, f"{sent_body}\npacket-id: {_PACKET_ID}", packet_body)
     assert code == 0, message
 
 

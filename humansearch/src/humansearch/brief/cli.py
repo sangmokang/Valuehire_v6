@@ -72,9 +72,7 @@ def _read_text(path: Path, label: str) -> str:
     except IsADirectoryError:
         raise BriefInputError(f"{label} 경로가 파일이 아니다: {path}") from None
     except OSError as error:
-        raise BriefInputError(
-            f"{label} 파일을 읽지 못했다: {error.__class__.__name__}"
-        ) from None
+        raise BriefInputError(f"{label} 파일을 읽지 못했다: {error.__class__.__name__}") from None
     except UnicodeDecodeError as error:
         raise BriefInputError(
             f"{label} 파일이 UTF-8 이 아니다: {error.__class__.__name__}"
@@ -96,7 +94,29 @@ def verify(packet_path: Path, sent_path: Path) -> tuple[int, str]:
 
     expected = hashlib.sha256(normalize_readback(packet.mail.body).encode("utf-8")).hexdigest()
     actual = hashlib.sha256(normalize_readback(sent_text).encode("utf-8")).hexdigest()
-
+    tail_problem = _packet_id_tail_problem(sent_text, packet.packet_id)
+    if tail_problem is not None:
+        # 본문이 같아도 꼬리 packet-id 가 없거나 다르거나 겹치면 이 발송본을 이 패킷에 결합할 수 없다(Codex 12차)
+        return 1, (
+            f"SENT_UNVERIFIED packet_id={packet.packet_id} expected={expected} actual={actual}"
+            f" reason={tail_problem}"
+        )
     if expected == actual:
         return 0, f"VERIFIED packet_id={packet.packet_id} body_sha256={expected}"
     return 1, f"SENT_UNVERIFIED packet_id={packet.packet_id} expected={expected} actual={actual}"
+
+
+def _packet_id_tail_problem(sent_text: str, packet_id: str) -> str | None:
+    """readback 의 마지막 내용 줄은 정확히 `packet-id: <packet_id>` 하나여야 한다. 문제 없으면 None."""
+    lines = [line.rstrip() for line in sent_text.replace("\r\n", "\n").split("\n")]
+    tails = [line for line in lines if line.startswith(_PACKET_ID_TRAILER)]
+    if not tails:
+        return "tail_missing"
+    if len(tails) > 1:
+        return "tail_duplicate"
+    content = [line for line in lines if line.strip()]
+    if not content or content[-1] != tails[0]:
+        return "tail_not_last"
+    if tails[0][len(_PACKET_ID_TRAILER) :].strip() != packet_id:
+        return "tail_mismatch"
+    return None
