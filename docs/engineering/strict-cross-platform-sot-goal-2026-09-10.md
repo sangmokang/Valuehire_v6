@@ -25,6 +25,31 @@ Codex와 Claude의 `$strict` 실행면을 동일한 저장소 정본에 연결�
 - AC: P11 수치를 재복제하지 않고 원 정본에서 읽는다. Counter: 초과 파일/함수/PR을 숨기거나 분할 없이 통과시키지 않는다.
 - AC: LLMOps 미구현은 `NOT_IMPLEMENTED`/`NOT_RUN`이다. Counter: 일반 CI를 LLMOps 증거로 부르지 않는다.
 
+## RED — 실패하는 검사 고정 (2026-09-10 21:57 KST, 가지 착수 시점)
+
+이 작업은 문서(SOT 문구) 전용이라 별도 시험 파일을 만들지 않는다. 사유: 검사 대상이 코드 동작이 아니라 정본 문장이며, 아래 grep 한 줄이 그대로 기계 검사(AC-3)다. 시험 파일을 만들면 문장을 복제한 텍스트 단언(P16 금지 패턴)이 된다.
+
+### 착수 시점 두 SHA (0-1)
+
+```text
+$ git rev-parse --short main ; git rev-parse --short origin/main
+f12ea33
+fc6beed
+```
+
+→ 로컬 main이 origin/main보다 1커밋(f12ea33) 앞서 있고, 그 커밋은 워크트리 없이 main에 직접 올라간 미전송 커밋이다. 이 상태가 모든 새 워크트리의 `acceptance-0-5`를 FAIL로 만든다.
+
+### AC-3 검사의 착수 시점 출력 (무한정 매치 3건 — 착수 프롬프트의 "2건"은 실측으로 정정)
+
+```text
+$ grep -n 'work-unit-policy.yaml' docs/sot/strict-workflow.md docs/sot/verification-commands.md
+docs/sot/strict-workflow.md:5:이 문서는 `$strict`가 Codex와 Claude에서 동일한 판정·순서·승인 경계를 사용하도록 고정하는 운영 정본입니다. 원칙의 수치와 Work Unit의 필드는 각각 `coding-principles.md`, `principles.yaml`, `work-unit-policy.yaml`이 소유합니다. 이 문서는 그 값을 복제하지 않고 실행 순서와 플랫폼 공통 의미만 소유합니다.
+docs/sot/strict-workflow.md:60:Strict 실행 시작 시 `docs/sot/coding-principles.md`, `docs/sot/principles.yaml`, `docs/sot/work-unit-policy.yaml`, 이 문서를 직접 읽고 관련 acceptance/hook/CI 배선을 실행합니다. Codex와 Claude의 전역 `SKILL.md`는 이 공통 계약을 읽는 동일한 사본이어야 하며, 동기화 후 `cmp`와 `skill-creator`의 `quick_validate.py`로 각각 검증합니다.
+docs/sot/verification-commands.md:3:`$strict`의 Codex·Claude 공통 순서와 패리티 계약은 [strict-workflow.md](strict-workflow.md)를 정본으로 읽는다. 원칙 수치는 `coding-principles.md`, Work Unit 값은 `work-unit-policy.yaml`이 소유하며 이 문서에 복제하지 않는다.
+```
+
+→ 세 줄 모두 `work-unit-policy.yaml`을 아무 한정 없이 정본으로 지목한다. 그 파일은 origin/main과 f12ea33 어느 쪽 `docs/sot/`에도 없다(`git ls-tree origin/main docs/sot/ | grep -c work-unit` → 0). 미병합 가지 `task/wu-tdd-context-contract-20260910`에만 있다. 이것이 고쳐야 할 RED다. 합격 조건: 각 매치 줄에 "INDEX에 등재된 경우" 또는 "병합 전까지는 git-workflow.md" 한정 문구가 있고, 무한정 매치가 0건.
+
 ## 검증 장부
 
 - `cmp`로 Codex/Claude 전역 스킬 동일성 확인.
