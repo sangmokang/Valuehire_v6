@@ -325,3 +325,93 @@ def test_packet_revalidates_filters_against_the_current_contract() -> None:
         _packet(_PACKET_ID, filters=SearchFilters(location="South Korea")).search_filters.location
         == "South Korea"
     )
+
+
+# --- ④ Codex 9차: 환경변수 계약 교체·내구성·문서 권한 문구·잠금 재진입 ------------------------
+
+
+def test_contracts_dir_env_is_refused_outside_pytest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """HUMANSEARCH_CONTRACTS_DIR 는 시험 의존성 주입일 뿐 — pytest 밖에서는 계약 경로를 바꿀 수 없다."""
+    from humansearch.brief import policy as policy_module
+
+    monkeypatch.setenv(policy_module.CONTRACTS_DIR_ENV, str(tmp_path))
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    with pytest.raises(BriefInputError):
+        policy_module.load_brief_policy()
+
+
+def test_ledger_writes_fsync_file_and_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """청구 마커·장부 교체는 링크/교체 전 파일 fsync + 뒤 디렉터리 fsync 를 거친다(전원 장애 뒤 묘비 소실 차단)."""
+    directory = _ledger(tmp_path)
+    synced: list[int] = []
+    real_fsync = os.fsync
+
+    def spy(fd: int) -> None:
+        synced.append(fd)
+        real_fsync(fd)
+
+    monkeypatch.setattr(os, "fsync", spy)
+    record_intent(directory, _intent())
+    after_intent = len(synced)
+    assert after_intent >= 2  # 임시 파일 + 디렉터리
+    _claim(directory, 1)
+    assert len(synced) >= after_intent + 4  # 마커(파일+디렉터리) + 장부 교체(파일+디렉터리)
+
+
+def test_intent_and_reopen_docstrings_do_not_grant_send_permission() -> None:
+    """발송 권한 문구는 claim_send 에만 있어야 한다 — record_intent/open_new_attempt 의 True 는 감사용 생성 결과다."""
+    for fn in (record_intent, open_new_attempt):
+        doc = fn.__doc__ or ""
+        assert "발송할 수 있다" not in doc, fn.__name__
+        assert "claim_send" in doc, fn.__name__
+    assert "발송" in (claim_send.__doc__ or "")
+
+
+def test_channel_lock_is_reentrant_for_the_same_thread(tmp_path: Path) -> None:
+    """잠금을 쥔 스레드가 같은 채널의 공개 API 로 재진입해도 멈추지 않는다(Codex 9차 교착)."""
+    directory = _ledger(tmp_path)
+    record_intent(directory, _intent())
+    done = threading.Event()
+    seen: list[SendIntent | None] = []
+
+    def nested() -> None:
+        with send_ledger_module._channel_lock(directory, _PACKET_ID, "gmail"):
+            seen.append(load_intent(directory, _PACKET_ID, "gmail"))
+        done.set()
+
+    worker = threading.Thread(target=nested, daemon=True)
+    worker.start()
+    assert done.wait(timeout=5), "같은 스레드 재진입에서 flock 교착"
+    assert seen and seen[0] is not None and seen[0].attempt == 1
+
+
+def test_channel_lock_still_excludes_other_threads(tmp_path: Path) -> None:
+    directory = _ledger(tmp_path)
+    record_intent(directory, _intent())
+    holder_ready = threading.Event()
+    release = threading.Event()
+    entered_at: list[float] = []
+
+    def holder() -> None:
+        with send_ledger_module._channel_lock(directory, _PACKET_ID, "gmail"):
+            holder_ready.set()
+            release.wait(timeout=5)
+
+    def contender() -> None:
+        holder_ready.wait(timeout=5)
+        with send_ledger_module._channel_lock(directory, _PACKET_ID, "gmail"):
+            entered_at.append(1.0)
+
+    threads = [threading.Thread(target=holder, daemon=True), threading.Thread(target=contender, daemon=True)]
+    for t in threads:
+        t.start()
+    holder_ready.wait(timeout=5)
+    threads[1].join(timeout=0.5)
+    assert entered_at == []  # 보유 중에는 못 들어온다
+    release.set()
+    threads[1].join(timeout=5)
+    assert entered_at == [1.0]
