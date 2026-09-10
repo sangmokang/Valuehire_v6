@@ -20,7 +20,7 @@ checked=0
 run_case() {
   local label=$1 path=$2 wanted=$3 diagnostic=$4
   local output="" rc=0
-  output=$(ruby "$checker" "$path" 2>&1) || rc=$?
+  output=$(WORK_UNIT_SCHEMA_ONLY=1 ruby "$checker" "$path" 2>&1) || rc=$?
   checked=$((checked + 1))
   if [ "$rc" -eq "$wanted" ] && printf '%s\n' "$output" | grep -q "$diagnostic"; then
     printf 'PASS: %s — exit=%s\n' "$label" "$rc"
@@ -38,7 +38,11 @@ case "$mode" in
     run_case "missing counter-AC" "$fixtures/counter-ac-missing.yaml" 1 'COUNTER_AC_REQUIRED:'
     run_case "duplicate ID" "$fixtures/duplicate-id.yaml" 1 'ID_DUPLICATE:'
     ;;
-  tdd|context|not-applicable)
+  tdd)
+    ruby scripts/verify/work-unit-tdd-contract-test.rb
+    exit $?
+    ;;
+  context|not-applicable)
     printf 'VERDICT: NOT_RUN\nREASON: mode %s not implemented\nWU_TESTS: 0\nCHECKED: 0\n' "$mode"
     exit 2
     ;;
@@ -54,7 +58,7 @@ if [ "$fail" -eq 0 ]; then
 else
   probe=""
   probe_rc=0
-  probe=$(ruby "$checker" "$fixtures/valid.yaml" 2>&1) || probe_rc=$?
+  probe=$(WORK_UNIT_SCHEMA_ONLY=1 ruby "$checker" "$fixtures/valid.yaml" 2>&1) || probe_rc=$?
   if [ "$probe_rc" -eq 2 ] && printf '%s\n' "$probe" | grep -q 'validation not implemented'; then
     echo 'WU_FAILURE_KIND: missing_behavior'
   fi
