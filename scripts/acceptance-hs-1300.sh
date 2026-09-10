@@ -38,7 +38,7 @@ REPO=$(git rev-parse --show-toplevel 2>/dev/null) || { echo "NOT_RUN: git 저장
 cd "$REPO" || { echo "NOT_RUN: 저장소 루트로 이동 실패"; echo "CHECKED: 0"; exit 2; }
 
 DOC="${HS_1300_DOC:-docs/engineering/humansearch-hs13-position-brief-goal-2026-09-10.md}"
-EXPECTED_CHECKED=80
+EXPECTED_CHECKED=87
 
 fail=0
 checked=0
@@ -115,13 +115,19 @@ wu_row_ok() {
   local id="${cells[0]//[[:space:]]/}"; id="${id#HS-13.}"
   # 백틱 안 명령 전부를 ID 별 문법으로 고정 (Codex 5차: `true # cd humansearch && …` 가 부분문자열 검사를 통과했다).
   # 제어 연산자 # ; | & 금지(&& 는 'cd humansearch && ' 접두 1회만). CLI 는 HS-13.10 행에만.
-  local n_cmd=0 c
+  # 백틱 밖 텍스트에 제어 연산자가 있으면 거부 (Codex 6차: 백틱 뒤 '; true')
+  printf '%s' "$cmd" | sed -E 's/`[^`]*`//g' | $G -Eq '[#;|&]' && return 1
+  local n_cmd=0 c coupled=0
   while IFS= read -r c; do
     [ -n "$c" ] || continue
-    # 백틱 조각 중 명령 형태(cd humansearch … / bash scripts/…)만 명령으로 센다. 기대 출력(`CHECKED: 80`·`>= 20 passed`)은 건너뛴다.
-    # 명령 형태가 아닌데 명령처럼 보이는 조각(`true # cd humansearch …`)은 세지지 않아 n_cmd 부족으로 불합격한다.
-    case "$c" in "cd humansearch "*|"bash scripts/"*) ;; *) continue ;; esac
+    # 모든 백틱 조각을 분류한다: 명령 문법 | 기대 출력 문법(`CHECKED: n`·`>= n passed`·`exit n`·정규식 출력 형식) | 그 외 → 거부 (Codex 6차)
+    case "$c" in
+      "cd humansearch "*|"bash scripts/"*) ;;
+      *) printf '%s' "$c" | $G -Eq '^(CHECKED: [0-9]+|>= [0-9]+ passed|exit [0-9]|(VERIFIED|SENT_UNVERIFIED) packet_id=.*|RESULT=.*|[A-Z_]+=[^ ]+)$' && continue; return 1 ;;
+    esac
     n_cmd=$((n_cmd + 1))
+    # ID 결합은 검증된 명령의 인자에서만 센다
+    printf '%s' "$c" | $G -Eq "tests/test_hs_13${id}\.py( |$)|scripts/acceptance-hs-13${id}(-[a-z]+)*\.sh( |$)" && coupled=1
     if [ "$id" = "10" ]; then
       printf '%s' "$c" | $G -Eq '^cd humansearch && uv run --no-sync python -m humansearch\.brief verify( --[a-z]+ <[^<>#;|&]+>)+$' || return 1
     else
@@ -129,10 +135,8 @@ wu_row_ok() {
     fi
   done < <(printf '%s' "$cmd" | $G -Eo '`[^`]+`' | tr -d '`')
   [ "$n_cmd" -ge 1 ] || return 1
-  # 정확한 정본 파일명 결합(비-CLI 행은 결합 파일 1개 이상, Codex 2·3차)
-  if [ "$id" != "10" ]; then
-    printf '%s' "$cmd" | $G -Eq "tests/test_hs_13${id}\.py( |\`|$)|scripts/acceptance-hs-13${id}(-[a-z]+)*\.sh( |\`|$)" || return 1
-  fi
+  # 정확한 정본 파일명 결합(비-CLI 행은 검증된 명령 안에 결합 파일 1개 이상, Codex 2·3·6차)
+  if [ "$id" != "10" ]; then [ "$coupled" -eq 1 ] || return 1; fi
   # 13.02 행은 13.02b 시험 파일도 정확히 참조해야 한다 (Codex 4차)
   if [ "$id" = "02" ]; then printf '%s' "$cmd" | $G -Eq 'tests/test_hs_1302b\.py( |`|$)' || return 1; fi
   # 행동 셀 최소 6자, 정상/반례 셀에 양성·음성 둘 다 + 각각 내용 10자 이상 + 없음/N/A/x 거부
@@ -168,7 +172,7 @@ wu_row_ok() {
   esac
   return 0
 }
-for n in 00 01 01b 02 03 04 05 06 07 08 09 10 11 12; do
+for n in 00 01 01b 01c 02 02c 03 04 05 06 07 08 09 09c 10 10b 11 12; do
   row=$(printf '%s\n' "$sec9" | $G -E "^\| *HS-13\.$n *\|" | head -1)
   if [ -n "$row" ] && wu_row_ok "$row"; then
     pass "§9 WU 카드 HS-13.$n 존재·5셀 내용·명령 형식·상태값"
@@ -178,7 +182,7 @@ for n in 00 01 01b 02 03 04 05 06 07 08 09 10 11 12; do
 done
 
 # 26~34) §7 D1~D9 기본값 셀 내용(10자 이상)
-for d in D1 D2 D3 D4 D5 D6 D7 D8 D9 D10 D11; do
+for d in D1 D2 D3 D4 D5 D6 D7 D8 D9 D10 D11 D12; do
   row=$(printf '%s\n' "$sec7" | $G -E "^\| *$d *\|" | head -1)
   row="${row#|}"; row="${row%|}"
   IFS='|' read -r -a cells <<< "$row"
@@ -221,14 +225,14 @@ fi
 
 # 49) §9 WU 카드 수 정확히 14
 wu_rows=$(printf '%s\n' "$sec9" | $G -Ec '^\| *HS-13\.[0-9]{2}[a-z]? *\|')
-if [ "$wu_rows" -eq 14 ]; then
-  pass "§9 WU 카드 수 14"
+if [ "$wu_rows" -eq 18 ]; then
+  pass "§9 WU 카드 수 18"
 else
-  failed "§9 WU 카드 수 $wu_rows (기대 14)"
+  failed "§9 WU 카드 수 $wu_rows (기대 18)"
 fi
 
 # 71~74) 13.02b·position_count 계약 토큰 (Codex 4차 — 문서에서 사라지면 exit 1)
-for k in 'position_count: int' 'extra_lines: tuple' 'def extract_block' 'from_attempt: int' 'search_filters: SearchFilters' 'multi_position_hint: tuple' 'created_on: date' '날짜 없음'; do
+for k in 'position_count: int' 'extra_lines: tuple' 'def extract_block' 'from_attempt: int' 'search_filters: SearchFilters' 'multi_position_hint: tuple' 'created_on: date' '날짜 없음' 'allowed_search_locations'; do
   if printf '%s\n' "$sec5_fenced" | $G -qF -- "$k"; then pass "§5 계약 토큰 '$k'"; else failed "§5 계약 토큰 '$k' 없음"; fi
 done
 
@@ -266,7 +270,7 @@ else
   failed "§6 출력 계약 또는 §10 러너 절차(record_intent) 없음"
 fi
 # 65~66) D10 매력도·D11 어미 축약 결정 (Codeaudit D-3)
-for d in D10 D11; do
+for d in D10 D11 D12; do
   if printf '%s\n' "$sec7" | $G -Eq "^\| *$d *\|"; then pass "§7 결정 $d 존재"; else failed "§7 결정 $d 없음"; fi
 done
 
