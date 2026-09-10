@@ -37,7 +37,7 @@ JD_SHA = hashlib.sha256(JD_TEXT.encode("utf-8")).hexdigest()
 LEAD_URL = "https://www.linkedin.com/in/example-0001"
 SECOND_URL = "https://kr.linkedin.com/in/example-0002"
 EXEC_URL = "https://www.linkedin.com/in/example-0003"
-PACKET_ID = f"20260910-86exampleid-{JD_SHA[:8]}"
+PACKET_ID = f"86exampleid-{JD_SHA[:8]}"
 MAIL_BODY = "예시고객사 검색 엔지니어 | 밸류커넥트 내부 공유\n작성·확인 기준일: 2026년 9월 10일\n"
 
 
@@ -604,11 +604,11 @@ def test_search_packet_accepts_inmail_at_the_limit() -> None:
     "bad_id",
     [
         "",
-        "2026091-86exampleid-deadbeef",
-        f"20260910--{JD_SHA[:8]}",
-        "20260910-86exampleid-DEADBEEF",
-        "20260910-86exampleid-deadbee",
-        "20260910-86_example-deadbeef",
+        "20260910-86exampleid-deadbeef",
+        f"-{JD_SHA[:8]}",
+        "86exampleid-DEADBEEF",
+        "86exampleid-deadbee",
+        "86_example-deadbeef",
     ],
 )
 def test_search_packet_rejects_malformed_packet_id(bad_id: str) -> None:
