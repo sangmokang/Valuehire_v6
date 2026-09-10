@@ -19,6 +19,7 @@ __all__ = [
     "Section",
     "content_lines",
     "extract_block",
+    "multi_position_hint",
     "normalize_line",
     "split_sections",
     "verify_fidelity",
@@ -30,6 +31,13 @@ _MARKDOWN_MARKS = re.compile(r"\*\*|__|`")
 _WHITESPACE_RUN = re.compile(r"\s+")
 _SENTENCE_END = (".", "!", "?", "。")
 _HEADING_MAX_LEN = 12
+
+# §4 "JD 합본" 행 — 한 문서에 포지션이 둘 이상 섞였을 수 있다는 **경고**용 머리 줄.
+# 거부 근거는 러너가 적는 `JdSource.position_count` 다(HS-13.01b). 이 휴리스틱은
+# 단일 JD 의 `포지션:`+`직무:` 를 오탐하므로 `ok` 에는 절대 넣지 않는다(Codex 2차 반례).
+_POSITION_HEAD_PREFIXES = ("포지션:", "Position:", "직무:")
+_MARKDOWN_HEADING = "## "
+_MULTI_POSITION_MIN = 2
 
 # 렌더링에만 있으면 FAIL 로 볼 "연차·학력·연봉" 조건. 컴파일은 _matches_condition 에서 한다.
 EXTRA_CONDITION_PATTERNS: tuple[str, ...] = (
@@ -144,10 +152,26 @@ class FidelityReport:
     jd_line_count: int
     rendered_line_count: int
     extra_lines: tuple[str, ...] = ()
+    # 경고 전용(§4). `ok` 는 이 값을 보지 않는다 — 오탐으로 발송을 막으면 안 된다.
+    multi_position_hint: tuple[str, ...] = ()
 
     @property
     def ok(self) -> bool:
         return not self.missing and not self.extra_condition and not self.extra_lines
+
+
+def multi_position_hint(text: str) -> tuple[str, ...]:
+    """합본 의심 머리 줄들. 2개 미만이면 빈 튜플 — 한 줄짜리는 경고할 것이 없다."""
+    heads = [
+        normalized
+        for raw in text.splitlines()
+        if (normalized := normalize_line(raw))
+        and (
+            normalized.startswith(_POSITION_HEAD_PREFIXES)
+            or _raw_body(raw).startswith(_MARKDOWN_HEADING)
+        )
+    ]
+    return tuple(heads) if len(heads) >= _MULTI_POSITION_MIN else ()
 
 
 def _matches_condition(line: str) -> bool:
@@ -189,6 +213,7 @@ def verify_fidelity(
         jd_line_count=len(jd_lines),
         rendered_line_count=len(rendered_lines),
         extra_lines=extra_lines,
+        multi_position_hint=multi_position_hint(jd.text),
     )
 
 
