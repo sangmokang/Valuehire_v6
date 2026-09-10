@@ -1,0 +1,12 @@
+manifest_version: 1
+work_units:
+  - id: "WU-AC-MISSING"
+    claim: "An incomplete unit must fail."
+    counter_acceptance_criteria:
+      - "The missing AC is ignored."
+    contracts: {}
+    tdd: {}
+    regression_commands: []
+    adversarial_commands: []
+    context: {}
+    not_applicable: null

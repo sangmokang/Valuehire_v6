@@ -1,0 +1,24 @@
+manifest_version: 1
+work_units:
+  - id: "WU-DUPLICATE"
+    claim: "The first claim has one AC."
+    acceptance_criterion: "When IDs are checked, the system shall keep them unique."
+    counter_acceptance_criteria:
+      - "Two equal IDs pass."
+    contracts: {}
+    tdd: {}
+    regression_commands: []
+    adversarial_commands: []
+    context: {}
+    not_applicable: null
+  - id: "WU-DUPLICATE"
+    claim: "The second claim repeats the ID."
+    acceptance_criterion: "When IDs are checked, the system shall reject the repeated value."
+    counter_acceptance_criteria:
+      - "The second ID replaces the first."
+    contracts: {}
+    tdd: {}
+    regression_commands: []
+    adversarial_commands: []
+    context: {}
+    not_applicable: null

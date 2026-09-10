@@ -1,0 +1,12 @@
+manifest_version: 1
+work_units:
+  - id: "WU-COUNTER-MISSING"
+    claim: "An incomplete unit must fail."
+    acceptance_criterion: "When the manifest is checked, the system shall reject a missing counter-AC."
+    counter_acceptance_criteria: []
+    contracts: {}
+    tdd: {}
+    regression_commands: []
+    adversarial_commands: []
+    context: {}
+    not_applicable: null

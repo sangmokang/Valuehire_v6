@@ -1,0 +1,52 @@
+manifest_version: 1
+work_units:
+  - id: "WU-EXAMPLE"
+    claim: "The manifest checker rejects incomplete Work Units."
+    acceptance_criterion: "When a Work Unit manifest is checked, the system shall accept exactly one complete claim."
+    counter_acceptance_criteria:
+      - "A file with a name but no acceptance criterion passes."
+    contracts:
+      input: "One repository-local YAML manifest."
+      output: "PASS with a positive checked count or a closed failure."
+      errors: "Malformed, missing, or stale evidence fails."
+      boundaries:
+        - "At least one Work Unit and no duplicate IDs."
+      database:
+        status: "NOT_APPLICABLE"
+        reason: "The checker does not read or write a database."
+        paths: []
+      api:
+        status: "NOT_APPLICABLE"
+        reason: "The checker performs no network or external API calls."
+        paths: []
+      types:
+        status: "APPLICABLE"
+        reason: "The policy YAML defines the machine-readable manifest shape."
+        paths:
+          - "docs/sot/work-unit-policy.yaml"
+    tdd:
+      mode: "RED_GREEN"
+      contract_commit: "1111111111111111111111111111111111111111"
+      red_commit: "2222222222222222222222222222222222222222"
+      green_commit: "3333333333333333333333333333333333333333"
+      red_commands:
+        - "ruby test/example_test.rb"
+      red_tests: 1
+      red_failure_kind: "missing_behavior"
+      test_files:
+        - "test/example_test.rb"
+      expectation_change_approval_commit: null
+    regression_commands:
+      - "ruby test/example_test.rb"
+    adversarial_commands:
+      - "ruby test/example_mutation_test.rb"
+    context:
+      expected_head: "1111111111111111111111111111111111111111"
+      expected_worktree: "task/example"
+      scope: "minimal"
+      files:
+        - path: "docs/sot/work-unit-policy.yaml"
+          commit_sha: "1111111111111111111111111111111111111111"
+          sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          read_evidence: "blob-sha256"
+    not_applicable: null
