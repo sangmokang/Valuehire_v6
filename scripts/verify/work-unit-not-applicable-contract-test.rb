@@ -57,7 +57,7 @@ Dir.mktmpdir("wu-not-applicable-") do |tmp|
     "mode" => "NOT_APPLICABLE", "contract_commit" => head,
     "red_commit" => nil, "green_commit" => nil, "red_commands" => [],
     "red_tests" => 0, "red_failure_kind" => nil, "test_files" => [],
-    "expectation_change_approval_commit" => nil
+    "expectation_change_approval_commit" => nil, "completion_commit" => head
   }
   unit["not_applicable"] = {
     "change_kind" => "documentation",
