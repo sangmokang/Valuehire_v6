@@ -38,6 +38,7 @@ work_units:
       test_files:
         - "test/example_test.rb"
       expectation_change_approval_commit: null
+      completion_commit: "4444444444444444444444444444444444444444"
     regression_commands:
       - "ruby test/example_test.rb"
     adversarial_commands:

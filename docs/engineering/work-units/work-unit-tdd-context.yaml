@@ -41,6 +41,7 @@ work_units:
         - "scripts/verify/fixtures/work-unit/counter-ac-missing.yaml"
         - "scripts/verify/fixtures/work-unit/duplicate-id.yaml"
       expectation_change_approval_commit: null
+      completion_commit: "32d7429a2859ec101151ab9a7757016da7ee0409"
     regression_commands:
       - "bash scripts/acceptance-work-unit-contract.sh schema"
     adversarial_commands:
@@ -108,6 +109,7 @@ work_units:
         - "14dad68e2a1afe2bda2f8a680a79a4bbe51cc335"
         - "3c7017c2607cb46a20ce2d2d52963217e49ea830"
         - "e7b73c539f1e486fc134fac0756942acfc1521a1"
+      completion_commit: "d766c5040f1e0ea6de08fa6d818fc2ec7b799019"
     regression_commands:
       - "bash scripts/acceptance-work-unit-contract.sh tdd"
     adversarial_commands:
@@ -171,6 +173,7 @@ work_units:
       expectation_change_approval_commit:
         - "3c418f580b62be1cb28ab5f0aec50afd24d446d2"
         - "fb63b158e75be9d79406fda56a40d379e5ae136f"
+      completion_commit: "f22cfcf63aa1baae8ec960dd2c689fcec8db7bc7"
     regression_commands:
       - "bash scripts/acceptance-work-unit-contract.sh context"
     adversarial_commands:
@@ -231,6 +234,7 @@ work_units:
       test_files:
         - "scripts/verify/work-unit-not-applicable-contract-test.rb"
       expectation_change_approval_commit: null
+      completion_commit: "9a0d73cd84d96ef1d70dfb280115582b6f8ea7ca"
     regression_commands:
       - "bash scripts/acceptance-work-unit-contract.sh not-applicable"
     adversarial_commands:
@@ -291,6 +295,7 @@ work_units:
       test_files:
         - "scripts/acceptance-work-unit-contract-mutations.sh"
       expectation_change_approval_commit: null
+      completion_commit: "b489a0b39c4c71ed107e4f46a2b24d8aca2549d2"
     regression_commands:
       - "bash scripts/acceptance-work-unit-contract-mutations.sh"
     adversarial_commands:

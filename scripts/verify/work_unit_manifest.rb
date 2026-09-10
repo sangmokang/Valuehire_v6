@@ -12,7 +12,7 @@ module WorkUnitManifest
   AUTHORITY_KEYS = %w[status reason paths].freeze
   TDD_KEYS = %w[
     mode contract_commit red_commit green_commit red_commands red_tests
-    red_failure_kind test_files expectation_change_approval_commit
+    red_failure_kind test_files expectation_change_approval_commit completion_commit
   ].freeze
   CONTEXT_KEYS = %w[expected_head expected_worktree scope files observed_reads].freeze
   CONTEXT_FILE_KEYS = %w[path commit_sha sha256 read_evidence].freeze
@@ -158,10 +158,12 @@ module WorkUnitManifest
   def validate_tdd_shape(tdd, label, errors)
     unless exact_mapping?(tdd, TDD_KEYS)
       errors << "TDD_SCHEMA_INVALID: #{label}"
+      errors << "COMPLETION_COMMIT_REQUIRED: #{label}" unless tdd.is_a?(Hash) && commit?(tdd["completion_commit"])
       return
     end
     errors << "TDD_MODE_INVALID: #{label}" unless %w[RED_GREEN NOT_APPLICABLE].include?(tdd["mode"])
     errors << "COMMIT_INVALID: #{label}.contract_commit" unless commit?(tdd["contract_commit"])
+    errors << "COMPLETION_COMMIT_REQUIRED: #{label}" unless commit?(tdd["completion_commit"])
     if tdd["mode"] == "RED_GREEN"
       validate_red_green_tdd(tdd, label, errors)
     elsif tdd["mode"] == "NOT_APPLICABLE"
