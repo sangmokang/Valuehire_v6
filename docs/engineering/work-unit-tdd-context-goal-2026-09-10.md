@@ -71,7 +71,7 @@
 | A-6 | WU-5 | 임의 스크립트가 위조한 `VERDICT: PASS`·양수 검사 건수 | `b7ffb7f` → `0c7376b` |
 | A-7 | WU-2 | marker-only RED/GREEN·GREEN 자체 기대값 승인·구현 delta 0건 | `e7b73c5` → `fd0714d` |
 | A-8 | WU-3 | historical worktree 위조·전체에서 한 파일만 뺀 과다 맥락 | `fb63b15` → `a424e56` |
-| A-9 | WU-1~5 | completion commit 미선언·앞 WU 완료 전 다음 WU 시작 | 계약 기록 후 RED → GREEN |
+| A-9 | WU-1~5 | completion commit 미선언·GREEN 전 완료·앞 WU 완료 전 다음 WU 시작 | `6c9dbb0` → `3a13b76`; 승인 `1090ffb`; `8f14a7c` → 다음 GREEN |
 
 ## Harness·검증·중단 조건
 

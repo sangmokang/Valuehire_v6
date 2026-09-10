@@ -28,13 +28,19 @@ module WorkUnitGitEvidence
       return [["REPOSITORY_INVALID: #{repo}"], 1]
     end
 
-    data.fetch("work_units").each do |unit|
-      next unless unit.fetch("tdd").fetch("mode") == "RED_GREEN"
-
-      unit_errors, unit_checked = validate_unit(unit, repo)
+    units = data.fetch("work_units")
+    units.each do |unit|
+      unit_errors, unit_checked = if unit.fetch("tdd").fetch("mode") == "RED_GREEN"
+                                     validate_unit(unit, repo)
+                                   else
+                                     validate_not_applicable_unit(unit, repo)
+                                   end
       errors.concat(unit_errors)
       checked += unit_checked
     end
+    sequence_errors, sequence_checked = validate_sequence(units, repo)
+    errors.concat(sequence_errors)
+    checked += sequence_checked
     [errors, checked]
   end
 
@@ -46,8 +52,9 @@ module WorkUnitGitEvidence
     contract_commit = tdd.fetch("contract_commit")
     red_commit = tdd.fetch("red_commit")
     green_commit = tdd.fetch("green_commit")
+    completion_commit = tdd.fetch("completion_commit")
 
-    commits = [contract_commit, red_commit, green_commit]
+    commits = [contract_commit, red_commit, green_commit, completion_commit]
     commits.each do |commit|
       checked += 1
       errors << "COMMIT_NOT_FOUND: #{id} #{commit}" unless commit_exists?(repo, commit)
@@ -57,12 +64,19 @@ module WorkUnitGitEvidence
     authority_errors, authority_checked = validate_authority_paths(unit, repo, contract_commit)
     errors.concat(authority_errors)
     checked += authority_checked
-    checked += 2
+    head = git(repo, "rev-parse", "HEAD").last.strip
+    checked += 4
     unless strict_ancestor?(repo, contract_commit, red_commit)
       errors << "CONTRACT_NOT_BEFORE_RED: #{id}"
     end
     unless strict_ancestor?(repo, red_commit, green_commit)
       errors << "GREEN_NOT_AFTER_RED: #{id}"
+    end
+    unless strict_ancestor?(repo, green_commit, completion_commit)
+      errors << "COMPLETION_NOT_AFTER_GREEN: #{id}"
+    end
+    unless ancestor?(repo, completion_commit, head)
+      errors << "COMPLETION_NOT_IN_HEAD_HISTORY: #{id}"
     end
 
     command_errors, command_checked = validate_commands(repo, red_commit, green_commit, tdd)
@@ -71,6 +85,47 @@ module WorkUnitGitEvidence
     file_errors, file_checked = validate_test_files(repo, id, tdd)
     errors.concat(file_errors)
     checked += file_checked
+    [errors, checked]
+  end
+
+  def validate_not_applicable_unit(unit, repo)
+    errors = []
+    checked = 0
+    tdd = unit.fetch("tdd")
+    id = unit.fetch("id")
+    contract_commit = tdd.fetch("contract_commit")
+    completion_commit = tdd.fetch("completion_commit")
+    head = git(repo, "rev-parse", "HEAD").last.strip
+
+    [contract_commit, completion_commit].each do |commit|
+      checked += 1
+      errors << "COMMIT_NOT_FOUND: #{id} #{commit}" unless commit_exists?(repo, commit)
+    end
+    return [errors, checked] unless errors.empty?
+
+    checked += 2
+    unless ancestor?(repo, contract_commit, completion_commit)
+      errors << "COMPLETION_BEFORE_CONTRACT: #{id}"
+    end
+    unless ancestor?(repo, completion_commit, head)
+      errors << "COMPLETION_NOT_IN_HEAD_HISTORY: #{id}"
+    end
+    [errors, checked]
+  end
+
+  def validate_sequence(units, repo)
+    errors = []
+    checked = 0
+    units.each_cons(2) do |prior, current|
+      prior_completion = prior.fetch("tdd").fetch("completion_commit")
+      current_contract = current.fetch("tdd").fetch("contract_commit")
+      next unless commit_exists?(repo, prior_completion) && commit_exists?(repo, current_contract)
+
+      checked += 1
+      unless ancestor?(repo, prior_completion, current_contract)
+        errors << "WU_SEQUENCE_BEFORE_PRIOR_COMPLETION: #{current.fetch('id')} after #{prior.fetch('id')}"
+      end
+    end
     [errors, checked]
   end
 

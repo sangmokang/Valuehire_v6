@@ -715,3 +715,61 @@ VERDICT: PASS
 CHECKED: 117
 A8_REPOSITORY_CONTEXT_EXIT:0
 ```
+
+## WU 완료 커밋 감사 보정
+
+스키마 RED `6c9dbb0`은 완료 커밋이 없는 manifest가 통과하는 누락을 고정했습니다.
+
+```text
+PASS: normal manifest — exit=0
+PASS: missing manifest — exit=1
+PASS: missing AC — exit=1
+PASS: missing counter-AC — exit=1
+PASS: duplicate ID — exit=1
+FAIL: missing completion commit — expected exit=1 actual exit=0
+WU_TESTS: 6
+CHECKED: 6
+WU_FAILURE_KIND: missing_behavior
+VERDICT: FAIL
+A9_SCHEMA_RED_EXIT:1
+```
+
+스키마 GREEN `3a13b76`은 모든 WU에 `completion_commit`을 요구하고, 테스트 fixture 적응은 별도 승인 커밋 `1090ffb`로 분리했습니다.
+
+```text
+PASS: normal manifest — exit=0
+PASS: missing manifest — exit=1
+PASS: missing AC — exit=1
+PASS: missing counter-AC — exit=1
+PASS: duplicate ID — exit=1
+PASS: missing completion commit — exit=1
+WU_TESTS: 6
+CHECKED: 6
+VERDICT: PASS
+A9_SCHEMA_GREEN_EXIT:0
+```
+
+Git 순서 RED `8f14a7c`은 완료 SHA가 GREEN 뒤에 있지 않은 경우와 앞 WU 완료 전에 다음 WU 계약이 시작된 경우를 추가했습니다.
+
+```text
+PASS: authentic RED then GREEN
+PASS: zero RED commands rejected
+PASS: syntax-only RED rejected
+PASS: test expectation drift rejected
+PASS: contract declared only after boundary rejected
+PASS: test drift after first GREEN rejected
+PASS: fake GREEN followed by restored expectation rejected
+PASS: marker-only RED and GREEN rejected
+PASS: GREEN cannot self-approve expectation changes
+FAIL: completion commit before GREEN rejected
+VERDICT: PASS
+CHECKED: 23
+FAIL: next Work Unit before prior completion rejected
+VERDICT: PASS
+CHECKED: 45
+WU_TESTS: 11
+CHECKED: 11
+WU_FAILURE_KIND: missing_behavior
+VERDICT: FAIL
+A9_ORDER_RED_EXIT:1
+```
