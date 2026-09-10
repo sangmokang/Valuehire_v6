@@ -265,13 +265,12 @@ def test_팀_도메인_정책이_TeamMail_수신자_판정을_실제로_움직�
 
 def test_프로필_접두_정책이_URL_판정을_실제로_움직인다() -> None:
     only_kr = replace(policy(), profile_url_prefixes=("https://kr.linkedin.com/in/",))
-    with override_policy_for_tests(only_kr):
-        with pytest.raises(BriefInputError):
-            ExecProfile(
-                name_role="예시 대표 | CEO",
-                linkedin_url=LEAD_URL,
-                summary=Claim(value="검색 15년", source_ids=("C1",)),
-            )
+    with override_policy_for_tests(only_kr), pytest.raises(BriefInputError):
+        ExecProfile(
+            name_role="예시 대표 | CEO",
+            linkedin_url=LEAD_URL,
+            summary=Claim(value="검색 15년", source_ids=("C1",)),
+        )
     assert (
         ExecProfile(
             name_role="예시 대표 | CEO",
@@ -324,7 +323,25 @@ def test_SearchPacket_은_지정한_search_filters_를_보존한다() -> None:
     assert _packet(search_filters=filters).search_filters is filters
 
 
-# ── 5. 정책은 한 번만 로드하고 캐시한다 ────────────────────────────────────
+# ── 5. 합본 JD 거부 (§4 합본 JD 행) ─────────────────────────────────────────
+def test_JdSource_기본_포지션_수는_1이고_통과한다() -> None:
+    source = JdSource(text=JD_TEXT, raw_sha256=JD_SHA, provided_by="U1")
+    assert source.position_count == 1
+    assert JdSource(text=JD_TEXT, raw_sha256=JD_SHA, provided_by="U1", position_count=1) == source
+
+
+def test_합본_JD_는_거부한다() -> None:
+    with pytest.raises(BriefInputError):
+        JdSource(text=JD_TEXT, raw_sha256=JD_SHA, provided_by="U1", position_count=2)
+
+
+def test_포지션_수가_0이거나_음수면_거부한다() -> None:
+    for count in (0, -1):
+        with pytest.raises(BriefInputError):
+            JdSource(text=JD_TEXT, raw_sha256=JD_SHA, provided_by="U1", position_count=count)
+
+
+# ── 6. 정책은 한 번만 로드하고 캐시한다 ────────────────────────────────────
 def test_policy_는_같은_객체를_돌려준다() -> None:
     assert policy() is policy()
     assert isinstance(policy(), BriefPolicy)
