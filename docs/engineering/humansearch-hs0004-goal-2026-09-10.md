@@ -75,9 +75,9 @@ bash scripts/verify/run-acceptance.sh scripts/acceptance-ci-step-integrity.sh
 - 계약 위반 출력: `FAIL: TRIGGER_CONTRACT: ...`를 포함하고 종료값 1.
 - 파일 없음·권한/읽기 오류·YAML 파싱 실패·top-level mapping 아님·trigger를 구조적으로 읽을 수 없음: `FAIL:`과 `CHECKED: 0`, 종료값 2.
 - plain/quoted `on`: 한 가지 표현만 존재하면 동등하게 읽는다. 같은 top-level mapping에 plain 또는 quoted `on`이 두 번 있거나 plain/quoted 표현이 함께 있으면 값이 같더라도 덮어쓰기 가능한 모호한 입력으로 `FAIL:`·`CHECKED: 0`·종료값 2다.
-- boolean/case 충돌: YAML 1.1 boolean 집합 `yes/no/true/false/on/off`의 대소문자 변형이 실제 `on`과 함께 있으면 AST와 값 계층이 다른 key를 고를 수 있으므로 종료값 2다. 실제 `on` 하나만 plain/quoted/명시적 string tag로 존재하는 정상 입력은 허용한다.
+- boolean/case 충돌: YAML 1.1 boolean 집합 `yes/no/true/false/on/off`의 대소문자 변형이나 명시적 `!!bool` key가 실제 `on`과 함께 있으면 AST와 값 계층이 다른 key를 고를 수 있으므로 종료값 2다. 실제 `on` 하나만 plain/quoted/명시적 string tag로 존재하는 정상 입력은 허용하고 `!!bool on`은 거부한다. 값 계층에서 `"on"`/`true` 후보가 정확히 하나가 아니면 trigger를 임의 순서로 고르지 않고 구조 오류로 닫는다.
 - scalar/sequence shorthand: `on: push`는 GitHub의 유효한 단일 event 표기이므로 구조 오류가 아니라 필수 event 두 개 누락의 계약 위반 종료값 1이다. `on: [push, pull_request, workflow_dispatch]`처럼 필수 세 event를 모두 포함하면 각 event가 `null`인 mapping과 의미 동등하므로 종료값 0이다. 알 수 없는 event 추가는 아래 추가-event 계약을 따른다.
-- event 구조: `on` 하위 모든 mapping에서 동일 key가 두 번 있거나 merge key `<<`·비문자 key가 있으면 값 계층의 병합/덮어쓰기와 GitHub 해석이 갈릴 수 있으므로 `FAIL:`·`CHECKED: 0`·종료값 2다. 따라서 event 이름뿐 아니라 `push.branches`와 `workflow_dispatch.inputs` 내부 중복도 거부한다. sequence 원소도 문자열 event만 허용한다.
+- event 구조: `on` 하위 모든 mapping에서 동일 key가 두 번 있거나 merge key `<<`·비문자 key가 있으면 값 계층의 병합/덮어쓰기와 GitHub 해석이 갈릴 수 있으므로 `FAIL:`·`CHECKED: 0`·종료값 2다. 따라서 event 이름뿐 아니라 `push.branches`와 `workflow_dispatch.inputs` 내부 중복도 거부한다. `on` 하위 alias는 바깥 anchor의 검사되지 않은 mapping을 끌어올 수 있으므로 값과 무관하게 구조 오류로 거부한다. sequence 원소도 문자열 event만 허용한다.
 - `push`: `null`, 빈 mapping, 또는 `branches: ["**"]`만 정상 의미로 인정한다. `branches: ["**"]` 외 다른 key나 음수 패턴은 거부한다. tag 전용/필터는 거부한다.
 - `pull_request`: `null` 또는 빈 mapping만 인정한다. `types`, `branches`, `branches-ignore`, `paths`, `paths-ignore`를 포함한 축소는 거부한다.
 - `workflow_dispatch`: `null` 또는 mapping을 인정한다. mapping의 `inputs` 의미는 이 WU가 평가하지 않는다.
@@ -97,8 +97,10 @@ bash scripts/verify/run-acceptance.sh scripts/acceptance-ci-step-integrity.sh
 | 데이터 오류 변이 | YAML 파싱 불가, top-level list, duplicate top-level `on`, duplicate event key, trigger 0개 | checker 종료값 2; `FAIL:`과 `CHECKED: 0` |
 | V1/V2 boolean 충돌 | literal `true:`/case-changed `On:`과 실제 `on`을 함께 둬 AST와 값 계층이 서로 다른 trigger를 판정 | checker 종료값 2; `FAIL:`과 `CHECKED: 0` |
 | YAML 1.1 boolean 전집 | `yes/Yes/YES` 등 다른 boolean key를 실제 plain/quoted `on` 앞뒤에 둬 값 slot을 가로챔 | checker 종료값 2; `FAIL:`과 `CHECKED: 0` |
+| 명시적 tag slot 충돌 | `!!bool yes/true/TRUE`를 축소된 실제 `on` 앞뒤에 둬 값 계층의 첫 trigger 후보를 바꿈 | checker 종료값 2; `FAIL:`과 `CHECKED: 0`; `!!bool on` 단독도 거부 |
 | YAML 의미 불일치 | `on` mapping에 merge key `<<`, 비문자 event key, sequence 비문자 원소를 넣어 Psych만 의미를 확장 | checker 종료값 2; `FAIL:`과 `CHECKED: 0` |
 | 하위 중복 덮어쓰기 | `push.branches`나 `workflow_dispatch.inputs`를 두 번 써 마지막 안전 값으로 앞의 축소 값을 은닉 | checker 종료값 2; `FAIL:`과 `CHECKED: 0` |
+| alias 중복 은닉 | `on` 밖 anchor에 중복 `branches`를 둔 뒤 `push: *alias`로 마지막 안전 값만 값 계층에 노출 | checker 종료값 2; `FAIL:`과 `CHECKED: 0` |
 | 유효 scalar/BOM | `on: push`를 구조 오류로 분류하거나 UTF-8 BOM 정상 workflow를 파싱 오류로 과잉 차단 | scalar는 종료값 1과 누락 event, BOM 정상 사본은 종료값 0 |
 | 검사 대상 0 은닉 | duplicate `jobs`/job/step key 또는 non-mapping job/step으로 실제 검사 가능한 대상을 없앰 | checker 종료값 2; `FAIL:`과 `CHECKED: 0` |
 | 읽기 실패 | 존재하지만 읽기 권한이 없는 입력에서 Ruby stack trace로 종료 | checker 종료값 2; `FAIL:`과 `CHECKED: 0` |
