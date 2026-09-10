@@ -33,7 +33,8 @@ module WorkUnitCompletionEvidence
 
   def validate_command(id, kind, command, repo, results)
     prefix = kind.upcase
-    return ["#{prefix}_COMMAND_INVALID: #{id} #{command.inspect}"] if command.match?(EMPTY_COMMAND) || command.include?("\n")
+    invalid = command.match?(EMPTY_COMMAND) || command.include?("\n") || command.match?(/\A\s*(?:bash|sh)\s+-c(?:\s|\z)/)
+    return ["#{prefix}_COMMAND_INVALID: #{id} #{command.inspect}"] if invalid
 
     rc, output = results.fetch(command) do
       out, err, status = Open3.capture3(clean_env, "bash", "-c", command, chdir: repo)

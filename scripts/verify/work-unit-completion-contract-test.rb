@@ -38,6 +38,7 @@ build_repository = lambda do |root|
 
   File.write(File.join(root, "contract.txt"), "database/api: NOT_APPLICABLE\ntype: boolean\n")
   File.write(File.join(root, "validate.sh"), "#!/usr/bin/env bash\necho 'WU_TESTS: 1'\necho 'VERDICT: PASS'\n")
+  File.write(File.join(root, "zero.sh"), "#!/usr/bin/env bash\necho 'CHECKED: 0'\necho 'VERDICT: PASS'\n")
   contract_commit = commit.call(root, "contract")
 
   File.write(File.join(root, "lib/feature.rb"), "module Feature\n  def self.enabled?\n    false\n  end\nend\n")
@@ -96,7 +97,8 @@ Dir.mktmpdir("wu-completion-contract-") do |tmp|
     ["failing regression command rejected", "false", "bash validate.sh", 1, "REGRESSION_VALIDATION_FAILED"],
     ["failing adversarial command rejected", "bash validate.sh", "false", 1, "ADVERSARIAL_VALIDATION_FAILED"],
     ["no-op completion command rejected", "true", "bash validate.sh", 1, "REGRESSION_COMMAND_INVALID"],
-    ["zero-check completion output rejected", "bash -c 'printf \"VERDICT: PASS\\nCHECKED: 0\\n\"'", "bash validate.sh", 1, "REGRESSION_ZERO_CHECKS"]
+    ["zero-check completion output rejected", "bash zero.sh", "bash validate.sh", 1, "REGRESSION_ZERO_CHECKS"],
+    ["echo-only positive-count forgery rejected", "bash -c 'echo WU_TESTS: 1; echo VERDICT: PASS'", "bash validate.sh", 1, "REGRESSION_COMMAND_INVALID"]
   ]
 
   cases.each_with_index do |(label, regression, adversarial, wanted, diagnostic), index|
