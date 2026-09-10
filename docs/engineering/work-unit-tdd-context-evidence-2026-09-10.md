@@ -350,3 +350,43 @@ PRINCIPLES: PASS 34/34
 ```
 
 → CI는 WU 계약과 mutation 스크립트를 각각 무조건 실행하고, mechanism 명부와 명령 정본도 같은 실행 줄을 가리킵니다. 별도 회귀에서 manifest 파일 자체가 없으면 `MANIFEST_MISSING`, 종료값 1이었고 전체 네 모드는 21/21 PASS였습니다.
+
+## WU-2R 감사 보정: DB/API/Type 선행 근거
+
+완료 뒤 자체 감사에서 `contract_commit < RED` 순서만 확인하고 authority 근거 파일이 그 contract commit에 존재하는지는 보지 않는 구멍을 찾았습니다. 계약 커밋 `3c1ad8c` 뒤 RED `aa87570`에서 `late-contract.txt`를 RED commit에 처음 추가한 다음 DB/API/Type 근거로 선언했습니다.
+
+```text
+2026-09-10T16:56:45+09:00
+PASS: authentic RED then GREEN
+PASS: zero RED commands rejected
+PASS: syntax-only RED rejected
+PASS: test expectation drift rejected
+FAIL: contract declared only after boundary rejected
+VERDICT: PASS
+CHECKED: 20
+WU_TESTS: 5
+CHECKED: 5
+WU_FAILURE_KIND: missing_behavior
+VERDICT: FAIL
+TDD_REMEDIATION_RED_EXIT=1
+```
+
+→ 기존 checker는 RED 뒤 생긴 계약 파일을 통과시켜 반례가 정확히 재현됐습니다. GREEN `1bdb504`는 DB/API/Type 경로를 1개 이상 요구하고 contract commit의 Git blob을 직접 확인합니다.
+
+```text
+2026-09-10T16:57:55+09:00
+PASS: authentic RED then GREEN
+PASS: zero RED commands rejected
+PASS: syntax-only RED rejected
+PASS: test expectation drift rejected
+PASS: contract declared only after boundary rejected
+WU_TESTS: 5
+CHECKED: 5
+VERDICT: PASS
+TDD_REMEDIATION_GREEN_EXIT=0
+SCHEMA_EXIT=0
+CONTEXT_EXIT=0
+NOT_APPLICABLE_EXIT=0
+```
+
+→ 늦게 만든 계약 파일은 `AUTHORITY_PATH_NOT_AT_CONTRACT`로 거부됐고, 기존 schema·context·NOT_APPLICABLE 회귀도 모두 종료값 0입니다. RED 뒤 시험 diff는 0건입니다.

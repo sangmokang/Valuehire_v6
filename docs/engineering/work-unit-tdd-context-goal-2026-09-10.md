@@ -53,7 +53,7 @@
 | WU-3 | When 맥락 manifest를 검사하면 현재 HEAD·작업공간·파일 hash가 모두 맞아야 합니다. | filename-only, 전체 저장소, 오래된 HEAD, 다른 작업공간 | `bash scripts/acceptance-work-unit-contract.sh context` | WU-2 완료 | PASS · RED `bc5c4d0` · GREEN `2c25879` |
 | WU-4 | If 단위 시험이 부적합하면 허용 종류·구체 사유·대체 검증 명령이 있어야 합니다. | 빈 사유, 임의 생략, 실행 명령 0개 | `bash scripts/acceptance-work-unit-contract.sh not-applicable` | WU-3 완료 | PASS · RED `3c418f5` · GREEN `597e5a1` |
 | WU-5 | If 검사기나 서버 실행 줄을 무력화하면 독립 공격 검사가 실패를 관측해야 합니다. | exit 0, no-op, echo-only, 항상 거짓 조건 | `bash scripts/acceptance-work-unit-contract-mutations.sh` | WU-4 완료 | PASS · RED `672283c` · 시험 보정 `c78f930` · GREEN `faa8b6f` |
-| WU-2R | When DB/API/Type 선행 근거를 검사하면 각 근거 파일이 contract commit에 이미 존재해야 합니다. | RED에서 뒤늦게 만든 계약 파일 경로를 manifest에 적어 통과 | `bash scripts/acceptance-work-unit-contract.sh tdd` | WU-1~WU-5 완료 뒤 감사 보정 | CONTRACT |
+| WU-2R | When DB/API/Type 선행 근거를 검사하면 각 근거 파일이 contract commit에 이미 존재해야 합니다. | RED에서 뒤늦게 만든 계약 파일 경로를 manifest에 적어 통과 | `bash scripts/acceptance-work-unit-contract.sh tdd` | WU-1~WU-5 완료 뒤 감사 보정 | PASS · 계약 `3c1ad8c` · RED `aa87570` · GREEN `1bdb504` |
 
 각 WU는 계약 커밋 → RED 커밋 → 최소 GREEN 커밋 → 회귀·적대검증 → 완료 커밋 순서로 닫습니다. 앞 WU의 완료 커밋 전에는 다음 WU 파일을 시작하지 않습니다.
 
