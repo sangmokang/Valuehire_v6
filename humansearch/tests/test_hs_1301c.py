@@ -19,9 +19,9 @@ from humansearch.brief import (
     BriefInputError,
     SearchFilters,
     load_brief_policy,
-    override_policy_for_tests,
     policy,
 )
+from humansearch.brief.policy import override_policy_for_tests
 
 
 def _payload(**overrides: object) -> dict[str, object]:

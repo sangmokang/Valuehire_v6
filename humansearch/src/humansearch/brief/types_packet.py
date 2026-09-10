@@ -150,6 +150,15 @@ class SearchPacket:
     def __post_init__(self) -> None:
         if not _PACKET_ID.fullmatch(self.packet_id):
             _reject("SearchPacket.packet_id 는 {clickup_id}-{sha8} 형태여야 한다(날짜 없음)")
+        # 형식만 맞는 임의 id 는 같은 포지션·같은 JD 에 새 발송 namespace 를 연다(Codex 8차) — 내용에 결합한다.
+        bound = f"{self.position.clickup_task_id}-{self.jd.raw_sha256[:8]}"
+        if self.packet_id != bound:
+            _reject(
+                "SearchPacket.packet_id 가 position.clickup_task_id·jd.raw_sha256 에서 도출한 값과 다르다"
+            )
+        # 필터는 만들 때가 아니라 패킷에 담을 때의 계약으로 다시 본다(정책 override 밖에서 살아남은 객체 차단).
+        if self.search_filters.location not in policy().allowed_search_locations:
+            _reject("SearchPacket.search_filters.location 이 현재 계약 허용 지역 밖이다")
         # datetime 은 date 의 하위 타입이라 그냥 통과시키면 JSON 왕복(date.fromisoformat)이 깨진다.
         if not isinstance(self.created_on, date) or isinstance(self.created_on, datetime):
             _reject("SearchPacket.created_on 은 date 여야 한다")

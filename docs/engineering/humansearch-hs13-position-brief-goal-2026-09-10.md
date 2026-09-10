@@ -106,7 +106,7 @@ class ConnectionDegree(Enum): UNKNOWN, FIRST, SECOND, THIRD_PLUS
     gmail_body: str; linkedin_body: str; two_field_company: str; two_field_jd: str
 @dataclass(frozen=True) class TeamMail:
     subject: str; to: tuple[str, ...]; cc: tuple[str, ...]; body: str; body_sha256: str
-@dataclass(frozen=True) class SearchPacket:
+@dataclass(frozen=True) class SearchPacket:   # packet_id == f"{position.clickup_task_id}-{jd.raw_sha256[:8]}" 강제(Codex 8차: 형식만 맞는 임의 id 는 새 발송 namespace). search_filters.location 은 담을 때의 계약으로 재검증
     packet_id: str; position: PositionSpec; jd: JdSource; company: CompanyBrief
     jd_packet: JdPacket; candidates: tuple[CandidateLead, ...]; mail: TeamMail
     boolean_queries: tuple[str, ...]; inmails: tuple[tuple[str, str], ...]  # (linkedin_url, body)
@@ -156,6 +156,9 @@ class SendState(Enum): INTENT | SEND_CLAIMED | SENT_UNVERIFIED | VERIFIED | ABAN
     recipients_sha256: str; body_sha256: str; recorded_at: datetime; state: SendState
     message_id: str | None; transitions: tuple[Transition, ...]; approval: Approval | None
 #   파일 `<packet_id>.<channel>.a<attempt>.sent.json` 은 **영구 묘비** — 이름 변경·삭제·덮어쓰기 없음(추가 전이만 append)
+#   **직렬화(HS-13.09e)**: 공개 진입점(record_intent·claim_send·mark·open_new_attempt·load_*·may_send)은 `<packet_id>.<channel>.lock` 에
+#   flock(LOCK_EX) 을 잡고 움직인다. `_append` 는 쓰기 직전 디스크 최신본과 CAS 대조 — 낡은 기억 위에 덮어쓰면 거부.
+#   읽기(`_latest`) 는 N+1 이 있는데 N 이 INTENT/SEND_CLAIMED 로 남은 장부를 ABANDONED 로 복구(append, at = N+1 의 recorded_at)한다.
 def record_intent(dir, intent) -> tuple[SendIntent, bool]   # attempt 1 을 O_CREAT|O_EXCL 로 생성 → (intent, True). 파일이 하나라도 있으면 (latest, False)
 def may_send(dir, packet_id, channel) -> bool                # attempt 파일이 **하나도 없을 때만** True (프리플라이트 전용)
 #   `created` 는 감사 불리언이다 — 발송 허가가 아니다(Codex 7차: 불리언은 재사용되므로 같은 attempt 로 두 번 보낼 수 있었다).
@@ -167,7 +170,7 @@ def claim_send(dir, packet_id, channel, attempt, *, at, evidence) -> tuple[SendI
 #   그 청구는 False 다. 고아 마커(마커만 있고 기록은 INTENT) = 보냈는지 모름 → 재청구 거부, 승인 아래 `open_new_attempt` 만.
 def mark(dir, packet_id, channel, attempt, state, message_id, at, evidence) -> SendIntent   # SEND_CLAIMED→SENT_UNVERIFIED(message_id 필수)→VERIFIED 단방향, transitions append. INTENT→SENT_UNVERIFIED 는 거부(청구 없는 발송 표시)
 def open_new_attempt(dir, packet_id, channel, *, approval: Approval, at) -> tuple[SendIntent, bool]
-#   최신 attempt 가 INTENT 또는 SEND_CLAIMED·message_id 없음(불확실)일 때만. **순서: attempt N+1 파일을 O_EXCL 로 먼저 생성 → 그 다음 attempt N 에
+#   최신 attempt 가 INTENT 또는 SEND_CLAIMED·message_id 없음(불확실)일 때만. 잠금 뒤에 들어온 두 번째 승인은 from_attempt 가 낡아 거부(False 가 아니라 예외). **순서: attempt N+1 파일을 O_EXCL 로 먼저 생성 → 그 다음 attempt N 에
 #   ABANDONED 전이 append.** 두 작업 사이에 끊기면 "N 은 INTENT, N+1 도 INTENT" 가 남는데, 최신 attempt = 번호 최대이고
 #   읽기 시 "N+1 이 있는 N" 은 ABANDONED 로 복구(append)한다 — 어느 지점에서 끊겨도 영구 복구 불능 상태가 없다(Codex 4차 중간).
 #   approval.packet_id·from_attempt 가 현재 패킷·최신 attempt 와 다르거나 approved_by 가 수신자 계약 밖이면 거부.
@@ -201,6 +204,7 @@ def load_brief_policy(path=contracts/humansearch/brief-policy.json) -> BriefPoli
 #   linkedin_max=1899, subject_prefixes, profile_url_prefixes, team_domain, clickup_position_list_id, default_search_location,
 #   allowed_search_locations(비어있지 않은 목록·공백 없는 문자열·중복 0·기본값 포함 필수) 를 한 곳에서 소유.
 #   types_*.py 의 리터럴은 이 계약값으로 대체(HS-13.01b). 검사기·런타임·시험이 같은 파일을 읽는다
+#   `override_policy_for_tests` 는 패키지 공개 API(`humansearch.brief.__all__`)에 없고 `PYTEST_CURRENT_TEST` 밖에서는 거부(Codex 8차)
 ```
 
 ### 6. 출력 계약 — 팀 메일 본문 순서 (황금 표본 `1a085e8e789eaf79`에서 도출)
@@ -265,11 +269,11 @@ def load_brief_policy(path=contracts/humansearch/brief-policy.json) -> BriefPoli
 선행: 없음(순수 로직). 라이브(13.10)는 D2 수신 규칙과 §8 예외표 아래에서만.
 공통 인수 명령 꼬리: `cd humansearch && uv run --no-sync ruff check src tests && uv run --no-sync mypy src tests`.
 
-**검사기의 경계(HS-13.00, Codex 4차 중간 지적에 대한 답):** `acceptance-hs-1300.sh` 는 이 문서가 *구조·결합·실존*(카드 19·결정 D1~D12·ID↔파일명·참조 파일이 **이 브랜치 트리**에 실존(형제 브랜치·refs 조회 없음 — CI clean checkout 에서도 같은 판정, Codex 7차)·타입/함수 시그니처·D9 문구·`verification-commands.md` 행의 카드/결정 개수가 실제 루프와 일치)을 갖췄는지만 기계로 판정한다. 양성/음성 서술과 결정 기본값의 **의미 적합성은 정규식으로 판정할 수 없다** — 그것은 Codeaudit(읽기 전용 감사)과 사장님 검토의 몫이며, 이 문서는 그 두 검토를 `## 적대 검증 로그` 에 남긴다. 검사기는 무의미 반복(같은 3자 이상 조각 3회 반복, 같은 단어 반복)만 추가로 거른다.
+**검사기의 경계(HS-13.00, Codex 4차 중간 지적에 대한 답):** `acceptance-hs-1300.sh` 는 이 문서가 *구조·결합·실존*(카드 20·결정 D1~D12·ID↔파일명·참조 파일이 **이 브랜치 트리**에 실존(형제 브랜치·refs 조회 없음 — CI clean checkout 에서도 같은 판정, Codex 7차)·타입/함수 시그니처·D9 문구·`verification-commands.md` 행의 카드/결정 개수가 실제 루프와 일치)을 갖췄는지만 기계로 판정한다. 양성/음성 서술과 결정 기본값의 **의미 적합성은 정규식으로 판정할 수 없다** — 그것은 Codeaudit(읽기 전용 감사)과 사장님 검토의 몫이며, 이 문서는 그 두 검토를 `## 적대 검증 로그` 에 남긴다. 검사기는 무의미 반복(같은 3자 이상 조각 3회 반복, 같은 단어 반복)만 추가로 거른다.
 
 | WU | 행동 하나 | 인수 명령 (저장소 루트에서 그대로 실행) | 정상 / 반례 | 상태 |
 |---|---|---|---|---|
-| HS-13.00 | 이 스펙·타입·장부를 저장소에 남긴다 | `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1300.sh` (exit 0, `CHECKED: 89`) + `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1300-mutations.sh` (`CHECKED: 34`) | 양성: 이 문서 그대로 → 검사기 exit 0 (CHECKED 89). 음성: 문서 부재·WU 행 삭제·§4 catch-all 삭제·WU 셀 비움·D 셀 비움·토큰만 남긴 최소 문서·catch-all 부정어 반전·가짜 명령 경로·무의미 D값·정상/반례 셀 `x`·**id 접미 위장 파일명·정상/반례 셀을 '없음'으로만 채움·D값을 한글 1자+숫자로·IMPLEMENTED 뒤 괄호로 실존 검사 회피·기대출력 자리의 `RESULT=$(id)`·홀수 백틱·LOCAL_COMMITTED(task/…) 괄호 상태·정본 표의 카드 수 14** → 각 exit 1 | IMPLEMENTED |
+| HS-13.00 | 이 스펙·타입·장부를 저장소에 남긴다 | `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1300.sh` (exit 0, `CHECKED: 90`) + `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1300-mutations.sh` (`CHECKED: 34`) | 양성: 이 문서 그대로 → 검사기 exit 0 (CHECKED 90). 음성: 문서 부재·WU 행 삭제·§4 catch-all 삭제·WU 셀 비움·D 셀 비움·토큰만 남긴 최소 문서·catch-all 부정어 반전·가짜 명령 경로·무의미 D값·정상/반례 셀 `x`·**id 접미 위장 파일명·정상/반례 셀을 '없음'으로만 채움·D값을 한글 1자+숫자로·IMPLEMENTED 뒤 괄호로 실존 검사 회피·기대출력 자리의 `RESULT=$(id)`·홀수 백틱·LOCAL_COMMITTED(task/…) 괄호 상태·정본 표의 카드 수 14** → 각 exit 1 | IMPLEMENTED |
 | HS-13.01 | 타입을 fail-fast로 검증한다 | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1301.py` (`20+ passed`) | 양성: 합성 SearchPacket 1건 생성. 음성: Claim 출처 0·후보 URL 도메인·이메일 출처 없음·중복 URL·수신자 타 도메인·1,900자 거부; Hypothesis: `linkedin.com/in/` 아닌 URL 전부 거부 | IMPLEMENTED |
 | HS-13.01b | 운영 상수를 계약 파일로 옮긴다(P22) | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1301b.py` (`8+ passed`) + `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1301b-literals.sh` (`CHECKED: 5` — 1899·valueconnect.kr·linkedin.com/in·[포지션]·ClickUp list id 리터럴이 brief/*.py 에 0) | 양성: `contracts/humansearch/brief-policy.json` 로드 → 13.01 시험 전부 유지·`JdSource.position_count` 기본값 1 통과·`SearchFilters` 기본 South Korea. 음성: 파일 없음·version 다름·도메인 형식 위반 → `BriefInputError`; `position_count` 0·2 거부; 계약값을 바꾼 임시 사본으로 1,899→1,000 이 실제 반영 | IMPLEMENTED |
 | HS-13.02 | JD 충실도를 줄 단위로 판정한다(13.02b: 블록 안 임의 추가 줄 전부 검출) | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1302.py tests/test_hs_1302b.py` (`23+ passed`) | 양성: 합성 JD 원문 그대로·`•`↔`-`·공백 차이 → PASS·`extract_block` 정상. 음성: 1줄 삭제·어순 변경·"경력 2년 이상" 추가·**비숫자 "재택근무 가능" 추가 → extra_lines**·마커 부재/중복/역순 거부; 빈 JD 거부 | IMPLEMENTED |
@@ -283,6 +287,7 @@ def load_brief_policy(path=contracts/humansearch/brief-policy.json) -> BriefPoli
 | HS-13.09 | 패킷·발송 장부를 git 밖에 저장·readback한다 | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1309.py` (`12+ passed`) + `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1309-paths.sh` (`CHECKED: 3` — .gitignore·scan-data-exposure.sh 가 *.packet.json·*.sent.json 차단, ~/.humansearch 경로 리터럴 코드 0) | 양성: 임시 디렉터리 0700/0600·JSON 왕복·D9 a1 INTENT→SEND_CLAIMED→SENT_UNVERIFIED→VERIFIED·`open_new_attempt` 정상(a1 ABANDONED 전이 append·a2 생성·a1 파일 보존)·O_EXCL 동시 2호출 중 1개만 생성. 음성: 손상 파일 거부·같은 packet_id 재저장 → 파일 1개·역전이·건너뛰기 거부·파일에서 읽은 INTENT 로 재실행 → `record_intent` False·발송 0·approval 공백 거부·SENT_UNVERIFIED/VERIFIED/ABANDONED 에서 open_new_attempt 거부·crash-point 4곳 재실행 발송 0·묘비 파일 이름 변경/삭제 함수 부재(정적) | PLANNED |
 | HS-13.09c | packet_id 에서 날짜를 뺀다 | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1309c.py` (`6+ passed`) | 양성: 같은 포지션·JD 는 날짜가 달라도 같은 id·`created_on` JSON 왕복. 음성: 옛 형식 `20260910-…` 거부·날짜 A 에 intent 뒤 날짜 B 재실행 → `may_send` False·created False(발송 0, 날짜 재삽입 변이 검출) | IMPLEMENTED |
 | HS-13.09d | 발송 허가를 한 번 소비되는 청구로 바꾼다(Codex 7차) | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1309d.py` (`13+ passed`) | 양성: INTENT→SEND_CLAIMED 1회·마커 0600·동시 6호출 중 1개만 True·SEND_CLAIMED 에서 open_new_attempt 허용. 음성: 같은 attempt 두 번째 청구 False·청구 없는 mark(SENT_UNVERIFIED) 거부·mark 로 SEND_CLAIMED 생성 거부·고아 마커 재청구 거부·최신 아닌 attempt 거부·SEND_CLAIMED 에 message_id 타입 거부 | IMPLEMENTED |
+| HS-13.09e | 장부 조작을 채널 잠금·CAS 로 직렬화하고 packet_id 를 내용에 결합한다(Codex 8차) | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1309e.py` (`11+ passed`) | 양성: 청구·승인 재시도 동시 12회 → SEND_CLAIMED 가 두 attempt 에 동시에 남지 않음·N+1 뒤 미종단 N 은 읽기 시 ABANDONED 복구·잠금 파일 0600·position/jd 도출 id 통과. 음성: 마커 생성 뒤 끼어든 승인 재시도 위에 낡은 SEND_CLAIMED 덮어쓰기 거부·형식만 맞는 임의 packet_id 3종 거부·override 가 공개 API 에 없음·pytest 밖 override 거부·override 밖에서 살아남은 SearchFilters 를 패킷이 거부 | IMPLEMENTED |
 | HS-13.10b | readback 정규화 5단계를 고정한다 | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1310b.py` (`6+ passed`) | 양성: Gmail 리다이렉트 1개·여러 개·괄호 안 URL 복원, 퍼센트 인코딩 URL 이 `%` 유지/`%25` 재인코딩 두 변형 모두 일치(양쪽 대칭 unquote). 음성: 느슨한 꼬리가 `)` 를 삼키는 반례·다른 URL 은 exit 1(언랩 생략 변이 검출) | IMPLEMENTED |
 | HS-13.01c | 서치 지역을 계약 허용 목록으로 고정한다(D12) | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1301c.py` (`5+ passed`) | 양성: `South Korea` 통과·계약 기본값 로드. 음성: `Japan` 거부·빈값 거부·계약 목록을 바꾼 임시 정책으로 허용값이 실제 반영(허용 검사 생략 변이 검출)·기본값이 허용 목록 밖인 계약 파일 거부 | IMPLEMENTED |
 | HS-13.10 | 실제 포지션 1건 라이브 | §10 절차 + `cd humansearch && uv run --no-sync python -m humansearch.brief verify --packet <path> --sent <readback.txt>` (exit 0, 출력 `VERIFIED packet_id=ID body_sha256=HEX`) | 양성: 발송 1·readback 해시 일치 1(2026-09-10 실측: 패킷 `86exwz89j-5449bcf5`, Gmail message `1a08971ffd281a48`, RAW MIME 의 text/plain 을 §5 정규화 후 해시 일치). 음성: 불일치 → exit 1 `SENT_UNVERIFIED`(MCP PLAIN_TEXT 변환본은 quoted-printable 을 한 번 더 풀어 `=17`→0x17·`=\n` 소프트 개행이 깨져 불일치가 났다 — readback 은 RAW 로); 같은 패킷 재실행 → 발송 0 | VERIFIED |
@@ -387,6 +392,14 @@ Codex 샌드박스는 mktemp 불가라 파일 사본 변이는 NOT_RUN, 인메�
 - [중간] SearchFilters 리터럴 기본값 vs P22·순수성 → §5 머리를 "I/O 어댑터 5곳" 으로 재서술, `location` 기본값·허용 목록은 `policy()` 로더에서. HS-13.01c 구현(계약 `allowed_search_locations`, 기본값 포함 검증).
 - [중간] D1 vs §10 "또는 최상위" → §10 1단계를 "사장님 지정 task id 필수, 없으면 목록 보고 후 중단" 으로 D1 과 일치.
 - [중간] verification-commands.md 가 카드 14·D1~D9 로 기록 → 19·D12 로 동기화 + 검사기가 그 행의 개수를 실제 루프 수와 대조(변이 Ⓖ SOT 행 14).
+
+### 2026-09-10 Codex V1 8차 (fresh·read-only, session `01a0897f-b40e-79e3-9815-6bdd7f79c2c8`, 스택 badbdab 대상)
+
+`VERDICT: FAIL` — 높음 3, 전부 병합 차단으로 지목(샌드박스 mktemp 차단으로 CHECKED 는 미실행). 처분(같은 PR, HS-13.09e):
+- [높음] `claim_send` 마커 생성과 기록 사이에 `open_new_attempt` 가 끼면 낡은 a1 기억으로 SEND_CLAIMED 를 덮어써 a1·a2 둘 다 무장 → 공개 진입점 전부 채널 flock 직렬화 + `_append` CAS(디스크 최신본 ≠ 기억 → 거부). N+1 생성 뒤 N ABANDONED 전에 죽은 장부는 `_latest` 가 읽기 시 복구. 시험: 결정적 교차(마커 직후 재시도 주입)·동시 12회·복구·잠금 파일.
+- [높음] 형식만 맞는 임의 `packet_id` 로 새 발송 namespace → `SearchPacket.__post_init__` 이 `position.clickup_task_id`·`jd.raw_sha256[:8]` 도출값과 일치 강제(역직렬화도 같은 경로). 반례 3종 시험.
+- [높음] 공개 `override_policy_for_tests` 로 D12 우회 → `humansearch.brief` 공개 API 에서 제거, `PYTEST_CURRENT_TEST` 밖 호출 거부, `SearchPacket` 이 담을 때의 계약으로 `search_filters.location` 재검증(override 밖 생존 객체 차단).
+- 부수: 잠금 뒤 두 번째 승인 재시도는 from_attempt 가 낡아 예외(13.09 시험 갱신 — 약화 아님, 더 엄격).
 
 ### 2026-09-10 Claude Codeaudit (읽기 전용·별도 컨텍스트, 7efd6c6 대상)
 

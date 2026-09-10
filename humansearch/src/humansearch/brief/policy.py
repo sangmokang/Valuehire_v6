@@ -199,6 +199,10 @@ def override_policy_for_tests(replacement: BriefPolicy) -> Iterator[BriefPolicy]
     """
 
     global _override
+    if "PYTEST_CURRENT_TEST" not in os.environ:
+        _reject(
+            "override_policy_for_tests 는 pytest 실행 중에만 부를 수 있다 — 운영 경로의 정책 소유자는 계약 파일뿐이다"
+        )
     if not isinstance(replacement, BriefPolicy):
         _reject("override_policy_for_tests 는 BriefPolicy 만 받는다")
     previous = _override

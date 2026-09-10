@@ -31,7 +31,6 @@ from .packet import PacketStore, from_json, packet_id, to_json
 from .policy import (
     BriefPolicy,
     load_brief_policy,
-    override_policy_for_tests,
     policy,
 )
 from .send_claim import claim_path, claim_send
@@ -120,7 +119,6 @@ __all__ = [
     "may_send",
     "normalize_line",
     "open_new_attempt",
-    "override_policy_for_tests",
     "packet_id",
     "policy",
     "record_intent",

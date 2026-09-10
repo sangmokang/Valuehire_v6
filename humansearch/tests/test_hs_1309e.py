@@ -123,11 +123,17 @@ def test_stale_claim_cannot_overwrite_an_attempt_abandoned_meanwhile(
 
     monkeypatch.setattr(send_ledger_module, "_channel_lock", no_lock)
     monkeypatch.setattr(send_claim_module, "_channel_lock", no_lock)
-    real_create = send_claim_module._create_exclusive
+    real_create = send_ledger_module._create_exclusive
+    fired = False
 
     def create_then_reopen(directory_: Path, target: Path, text: str) -> bool:
+        nonlocal fired
         won = real_create(directory_, target, text)
-        _reopen(directory, 1)  # 경합 상대: a2 생성 + a1 ABANDONED
+        if not fired:
+            fired = True
+            _reopen(
+                directory, 1
+            )  # 경합 상대: a2 생성 + a1 ABANDONED (첫 호출 = 청구 마커 직후에만)
         return won
 
     monkeypatch.setattr(send_claim_module, "_create_exclusive", create_then_reopen)
@@ -142,38 +148,40 @@ def test_stale_claim_cannot_overwrite_an_attempt_abandoned_meanwhile(
     assert won is True
 
 
+def _contention_round(directory: Path) -> None:
+    directory.mkdir(mode=0o700)
+    record_intent(directory, _intent())
+    barrier = threading.Barrier(2)
+
+    def claim_side() -> str:
+        barrier.wait(timeout=5)
+        try:
+            _, won = _claim(directory, 1)
+        except BriefInputError:
+            return "rejected"
+        return "won" if won else "lost"
+
+    def reopen_side() -> str:
+        barrier.wait(timeout=5)
+        _, opened = _reopen(directory, 1)
+        return "opened" if opened else "not-opened"
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        claim_result = pool.submit(claim_side)
+        reopen_result = pool.submit(reopen_side)
+        outcomes = (claim_result.result(), reopen_result.result())
+    assert outcomes[1] == "opened"
+    first = load_attempt(directory, _PACKET_ID, "gmail", 1)
+    second = load_attempt(directory, _PACKET_ID, "gmail", 2)
+    assert first is not None and first.state is SendState.ABANDONED
+    assert second is not None and second.state is SendState.INTENT
+    assert [a for a in (first, second) if a.state is SendState.SEND_CLAIMED] == []
+
+
 def test_claim_and_reopen_under_contention_never_arm_two_attempts(tmp_path: Path) -> None:
     """잠금 아래에서는 어떤 순서로 끝나도 SEND_CLAIMED 가 두 attempt 에 동시에 남지 않는다."""
-    for _ in range(12):
-        directory = tmp_path / f"ledger-{_}"
-        directory.mkdir(mode=0o700)
-        record_intent(directory, _intent())
-        barrier = threading.Barrier(2)
-
-        def claim_side() -> str:
-            barrier.wait(timeout=5)
-            try:
-                _, won = _claim(directory, 1)
-            except BriefInputError:
-                return "rejected"
-            return "won" if won else "lost"
-
-        def reopen_side() -> str:
-            barrier.wait(timeout=5)
-            _, opened = _reopen(directory, 1)
-            return "opened" if opened else "not-opened"
-
-        with ThreadPoolExecutor(max_workers=2) as pool:
-            claim_result = pool.submit(claim_side)
-            reopen_result = pool.submit(reopen_side)
-            outcomes = (claim_result.result(), reopen_result.result())
-        assert outcomes[1] == "opened"
-        first = load_attempt(directory, _PACKET_ID, "gmail", 1)
-        second = load_attempt(directory, _PACKET_ID, "gmail", 2)
-        assert first is not None and first.state is SendState.ABANDONED
-        assert second is not None and second.state is SendState.INTENT
-        armed = [a for a in (first, second) if a.state is SendState.SEND_CLAIMED]
-        assert armed == []
+    for index in range(12):
+        _contention_round(tmp_path / f"ledger-{index}")
 
 
 def test_reading_recovers_an_attempt_left_unsent_behind_a_newer_one(tmp_path: Path) -> None:
@@ -313,4 +321,7 @@ def test_packet_revalidates_filters_against_the_current_contract() -> None:
     assert stale.location == "Japan"
     with pytest.raises(BriefInputError):
         _packet(_PACKET_ID, filters=stale)
-    assert _packet(_PACKET_ID, filters=SearchFilters(location="South Korea")).search_filters.location == "South Korea"
+    assert (
+        _packet(_PACKET_ID, filters=SearchFilters(location="South Korea")).search_filters.location
+        == "South Korea"
+    )

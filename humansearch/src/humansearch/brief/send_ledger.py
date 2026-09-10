@@ -9,15 +9,22 @@
    (HS-13.09d). `record_intent` 의 `created` 는 감사 불리언일 뿐 발송 근거가 아니고,
    파일에서 읽어 온 INTENT 는 보냈는지 모르는 상태라 역시 발송 근거가 되지 못한다.
 
+③ **공개 진입점은 채널 잠금(`<packet>.<channel>.lock`, flock) 아래에서만 읽고 쓴다**(HS-13.09e).
+   `_append` 는 쓰기 직전 디스크 최신본과 대조(CAS)해 낡은 기억 위에 덮어쓰지 않는다 —
+   Codex 8차: 청구 마커 생성과 기록 사이에 승인 재시도가 끼어들면 a1·a2 가 둘 다 무장됐다.
+
 코드는 발송하지 않는다 — 러너(Claude 세션)가 보내고, 이 모듈은 판정만 한다.
 시계는 호출자가 recorded_at·at 으로 주입한다.
 """
 
 from __future__ import annotations
 
+import fcntl
 import os
 import re
 import tempfile
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from datetime import datetime
 from enum import Enum
@@ -199,6 +206,25 @@ def _parse_moment(text: str) -> object:
         _reject("Approval.search_checked_at 은 ISO 8601 시각이어야 한다")
 
 
+def _lock_path(directory: Path, packet_id: str, channel: str) -> Path:
+    return directory / f"{require_packet_id(packet_id)}.{require_channel(channel)}.lock"
+
+
+@contextmanager
+def _channel_lock(directory: Path, packet_id: str, channel: str) -> Iterator[None]:
+    """한 패킷·한 채널의 장부 조작을 프로세스 간 직렬화한다. 잠금 파일도 0600, 지우지 않는다."""
+    handle = os.open(_lock_path(directory, packet_id, channel), os.O_CREAT | os.O_RDWR, FILE_MODE)
+    try:
+        os.fchmod(handle, FILE_MODE)
+        fcntl.flock(handle, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(handle, fcntl.LOCK_UN)
+    finally:
+        os.close(handle)
+
+
 def _attempt_path(directory: Path, packet_id: str, channel: str, attempt: int) -> Path:
     stem = f"{require_packet_id(packet_id)}.{require_channel(channel)}.a{require_attempt(attempt)}"
     return directory / f"{stem}.sent.json"
@@ -206,7 +232,9 @@ def _attempt_path(directory: Path, packet_id: str, channel: str, attempt: int) -
 
 def load_attempt(dir: Path, packet_id: str, channel: str, attempt: int) -> SendIntent | None:
     """attempt 한 개를 읽는다. 없으면 None."""
-    return _read_attempt(ensure_store_dir(dir), packet_id, channel, attempt)
+    directory = ensure_store_dir(dir)
+    with _channel_lock(directory, packet_id, channel):
+        return _read_attempt(directory, packet_id, channel, attempt)
 
 
 def _read_attempt(directory: Path, packet_id: str, channel: str, attempt: int) -> SendIntent | None:
@@ -239,18 +267,42 @@ def _highest_attempt(directory: Path, packet_id: str, channel: str) -> int:
 
 def load_intent(dir: Path, packet_id: str, channel: str) -> SendIntent | None:
     """최신 attempt 를 읽는다. 기록이 하나도 없으면 None."""
-    return _latest(ensure_store_dir(dir), packet_id, channel)
+    directory = ensure_store_dir(dir)
+    with _channel_lock(directory, packet_id, channel):
+        return _latest(directory, packet_id, channel)
 
 
 def _latest(directory: Path, packet_id: str, channel: str) -> SendIntent | None:
     highest = _highest_attempt(directory, packet_id, channel)
     if highest == 0:
         return None
+    newest = _read_attempt(directory, packet_id, channel, highest)
+    if newest is None:
+        _reject("최신 attempt 파일이 있으나 읽지 못했다")
     # 중간 묘비가 사라지면 그 자체가 변조다 — 없는 것으로 접지 않는다(P20 · fail-closed).
     for attempt in range(1, highest):
-        if _read_attempt(directory, packet_id, channel, attempt) is None:
+        older = _read_attempt(directory, packet_id, channel, attempt)
+        if older is None:
             _reject(f"attempt {attempt} 묘비가 사라졌다 — 장부가 변조됐다")
-    return _read_attempt(directory, packet_id, channel, highest)
+        if older.state in _UNSENT:
+            # open_new_attempt 가 N+1 을 만든 뒤 N 의 ABANDONED 를 쓰기 전에 죽은 흔적 — 읽기 시 복구(§5).
+            moment = max(older.recorded_at, newest.recorded_at)
+            _append(
+                directory,
+                older,
+                replace(
+                    older,
+                    state=SendState.ABANDONED,
+                    recorded_at=moment,
+                    transitions=(
+                        *older.transitions,
+                        Transition(
+                            moment, SendState.ABANDONED, f"attempt {highest} 존재 — 읽기 시 복구"
+                        ),
+                    ),
+                ),
+            )
+    return newest
 
 
 def may_send(dir: Path, packet_id: str, channel: str) -> bool:
@@ -273,13 +325,14 @@ def record_intent(dir: Path, intent: SendIntent) -> tuple[SendIntent, bool]:
     if intent.transitions:
         _reject("record_intent 는 전이 없이 시작한다")
     directory = ensure_store_dir(dir)
-    target = _attempt_path(directory, intent.packet_id, intent.channel, 1)
-    if _create_exclusive(directory, target, dumps_value(intent)):
-        return intent, True
-    existing = _latest(directory, intent.packet_id, intent.channel)
-    if existing is None:
-        _reject("발송 장부 파일이 있으나 읽지 못했다")
-    return existing, False
+    with _channel_lock(directory, intent.packet_id, intent.channel):
+        target = _attempt_path(directory, intent.packet_id, intent.channel, 1)
+        if _create_exclusive(directory, target, dumps_value(intent)):
+            return intent, True
+        existing = _latest(directory, intent.packet_id, intent.channel)
+        if existing is None:
+            _reject("발송 장부 파일이 있으나 읽지 못했다")
+        return existing, False
 
 
 def mark(
@@ -300,6 +353,22 @@ def mark(
         _reject("mark(state) 는 SendState 여야 한다")
     moment = require_clock(at)
     directory = ensure_store_dir(dir)
+    with _channel_lock(directory, packet_id, channel):
+        return _mark_locked(
+            directory, packet_id, channel, attempt, state, message_id, moment, evidence
+        )
+
+
+def _mark_locked(
+    directory: Path,
+    packet_id: str,
+    channel: str,
+    attempt: int,
+    state: SendState,
+    message_id: str | None,
+    moment: datetime,
+    evidence: str,
+) -> SendIntent:
     current = _latest(directory, packet_id, channel)
     if current is None:
         _reject("발송 의도가 없는 채널은 표시할 수 없다")
@@ -352,6 +421,13 @@ def open_new_attempt(
         _reject("open_new_attempt(approval) 은 Approval 이어야 한다")
     moment = require_clock(at)
     directory = ensure_store_dir(dir)
+    with _channel_lock(directory, packet_id, channel):
+        return _open_locked(directory, packet_id, channel, approval, moment)
+
+
+def _open_locked(
+    directory: Path, packet_id: str, channel: str, approval: Approval, moment: datetime
+) -> tuple[SendIntent, bool]:
     current = _latest(directory, packet_id, channel)
     if current is None:
         _reject("연 적 없는 채널에는 재시도가 없다 — record_intent 가 먼저다")
@@ -397,6 +473,10 @@ def _append(directory: Path, current: SendIntent, updated: SendIntent) -> SendIn
         _reject("기존 전이 기록을 지우거나 갈아끼울 수 없다")
     if updated.recorded_at < current.recorded_at:
         _reject("기록 시각이 직전 기록보다 과거다")
+    # CAS — 호출자가 기억하는 current 가 디스크 최신본과 다르면 그 사이 누군가 썼다(HS-13.09e).
+    fresh = _read_attempt(directory, current.packet_id, current.channel, current.attempt)
+    if fresh != current:
+        _reject("장부가 그 사이 바뀌었다 — 낡은 기록 위에 쓸 수 없다. 다시 읽고 판단하라")
     write_store_file(
         directory,
         _attempt_path(directory, updated.packet_id, updated.channel, updated.attempt),

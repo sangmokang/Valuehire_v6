@@ -262,7 +262,7 @@ def test_saving_same_packet_twice_leaves_one_file(tmp_path: Path) -> None:
     store = PacketStore(directory)
     store.save(_packet())
     store.save(_packet())
-    assert len(list(directory.iterdir())) == 1
+    assert len(list(directory.glob("*.packet.json"))) == 1
 
 
 def test_resaving_changed_packet_overwrites_in_place(tmp_path: Path) -> None:
@@ -270,7 +270,7 @@ def test_resaving_changed_packet_overwrites_in_place(tmp_path: Path) -> None:
     store = PacketStore(directory)
     store.save(_packet("첫 문구"))
     target = store.save(_packet("두 번째 문구"))
-    assert len(list(directory.iterdir())) == 1
+    assert len(list(directory.glob("*.packet.json"))) == 1
     assert store.load(_PACKET_ID) == _packet("두 번째 문구")
     assert _mode(target) == 0o600
 
@@ -332,7 +332,7 @@ def test_record_intent_twice_returns_the_existing_attempt_and_one_file(tmp_path:
     assert created_first is True
     assert created_second is False
     assert second == first
-    assert len(list(directory.iterdir())) == 1
+    assert len(list(directory.glob("*.sent.json"))) == 1
 
 
 def test_record_intent_creates_exactly_once_under_concurrent_callers(tmp_path: Path) -> None:
@@ -347,7 +347,7 @@ def test_record_intent_creates_exactly_once_under_concurrent_callers(tmp_path: P
     with ThreadPoolExecutor(max_workers=2) as pool:
         results = [future.result() for future in [pool.submit(attempt), pool.submit(attempt)]]
     assert sorted(results) == [False, True]
-    assert len(list(directory.iterdir())) == 1
+    assert len(list(directory.glob("*.sent.json"))) == 1
 
 
 def test_record_intent_rejects_attempt_other_than_one(tmp_path: Path) -> None:
@@ -374,10 +374,19 @@ def test_rerun_after_any_crash_point_grants_no_send(tmp_path: Path, crash_point:
         _claim(directory)
     if crash_point in {"after_mark", "after_readback"}:
         mark(
-            directory, _PACKET_ID, "gmail", 1, SendState.SENT_UNVERIFIED, "msg-1", _LATER, "발송함 id"
+            directory,
+            _PACKET_ID,
+            "gmail",
+            1,
+            SendState.SENT_UNVERIFIED,
+            "msg-1",
+            _LATER,
+            "발송함 id",
         )
     if crash_point == "after_readback":
-        mark(directory, _PACKET_ID, "gmail", 1, SendState.VERIFIED, "msg-1", _LATER, "본문 해시 일치")
+        mark(
+            directory, _PACKET_ID, "gmail", 1, SendState.VERIFIED, "msg-1", _LATER, "본문 해시 일치"
+        )
     replayed, created = record_intent(directory, _intent())
     assert created is False
     assert may_send(directory, _PACKET_ID, "gmail") is False
@@ -438,7 +447,9 @@ def test_mark_rejects_sent_without_message_id(tmp_path: Path) -> None:
 def test_mark_rejects_channel_without_recorded_attempt(tmp_path: Path) -> None:
     directory = tmp_path / "ledger"
     with pytest.raises(BriefInputError):
-        mark(directory, _PACKET_ID, "gmail", 1, SendState.SENT_UNVERIFIED, "msg-1", _AT, "없는 시도")
+        mark(
+            directory, _PACKET_ID, "gmail", 1, SendState.SENT_UNVERIFIED, "msg-1", _AT, "없는 시도"
+        )
 
 
 def test_mark_rejects_an_attempt_that_is_not_the_latest(tmp_path: Path) -> None:
@@ -483,12 +494,10 @@ def test_open_new_attempt_can_be_repeated_for_a_second_uncertain_attempt(tmp_pat
     )
     assert created is True
     assert third.attempt == 3
-    assert len(list(directory.iterdir())) == 3
+    assert len(list(directory.glob("*.sent.json"))) == 3
 
 
-@pytest.mark.parametrize(
-    "field", ["approved_by", "search_query", "search_checked_at", "reason"]
-)
+@pytest.mark.parametrize("field", ["approved_by", "search_query", "search_checked_at", "reason"])
 def test_open_new_attempt_rejects_blank_approval_field(tmp_path: Path, field: str) -> None:
     directory = tmp_path / "ledger"
     record_intent(directory, _intent())
@@ -525,17 +534,20 @@ def test_open_new_attempt_opens_exactly_once_under_concurrent_callers(tmp_path: 
     record_intent(directory, _intent())
     barrier = threading.Barrier(2)
 
-    def attempt() -> bool:
+    def attempt() -> str:
         barrier.wait(timeout=5)
-        _, created = open_new_attempt(
-            directory, _PACKET_ID, "gmail", approval=_approval(), at=_LATER
-        )
-        return created
+        try:
+            _, created = open_new_attempt(
+                directory, _PACKET_ID, "gmail", approval=_approval(), at=_LATER
+            )
+        except BriefInputError:
+            return "stale-approval"  # 잠금 뒤에 들어온 쪽은 최신 attempt 가 2 라 승인(from_attempt=1)이 낡았다
+        return "opened" if created else "not-opened"
 
     with ThreadPoolExecutor(max_workers=2) as pool:
         results = [future.result() for future in [pool.submit(attempt), pool.submit(attempt)]]
-    assert sorted(results) == [False, True]
-    assert len(list(directory.iterdir())) == 2
+    assert sorted(results) == ["opened", "stale-approval"]
+    assert len(list(directory.glob("*.sent.json"))) == 2
 
 
 # --- 6. 타입 불변식 ----------------------------------------------------------

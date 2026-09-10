@@ -38,7 +38,6 @@ from humansearch.brief import (
     SourceRef,
     TeamMail,
     load_brief_policy,
-    override_policy_for_tests,
     policy,
 )
 
@@ -71,6 +70,7 @@ def _payload(**overrides: Any) -> dict[str, Any]:
     }
     base.update(overrides)
     return base
+from humansearch.brief.policy import override_policy_for_tests
 
 
 def _write(tmp_path: Path, payload: dict[str, Any]) -> Path:

@@ -24,6 +24,7 @@ from .send_ledger import (
     Transition,
     _append,
     _attempt_path,
+    _channel_lock,
     _create_exclusive,
     _latest,
     require_attempt,
@@ -61,6 +62,13 @@ def claim_send(
     moment = require_clock(at)
     _require_text(evidence, "claim_send.evidence")
     directory = ensure_store_dir(dir)
+    with _channel_lock(directory, packet_id, channel):
+        return _claim_locked(directory, packet_id, channel, attempt, moment, evidence)
+
+
+def _claim_locked(
+    directory: Path, packet_id: str, channel: str, attempt: int, moment: datetime, evidence: str
+) -> tuple[SendIntent, bool]:
     current = _latest(directory, packet_id, channel)
     if current is None:
         _reject("발송 의도가 없는 채널은 청구할 수 없다 — record_intent 가 먼저다")
