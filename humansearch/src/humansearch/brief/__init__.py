@@ -20,6 +20,13 @@ from .linkedin_limit import (
     core_tokens,
     verify_linkedin_fidelity,
 )
+from .mail import (
+    BriefDraft,
+    Recipients,
+    compose_brief_mail,
+    load_recipients,
+    render_brief_body,
+)
 from .packet import PacketStore, from_json, packet_id, to_json
 from .policy import (
     BriefPolicy,
@@ -64,6 +71,7 @@ __all__ = [
     "LINKEDIN_FRAME_LINES",
     "Approval",
     "BooleanQuerySet",
+    "BriefDraft",
     "BriefInputError",
     "BriefPolicy",
     "CandidateEvidence",
@@ -80,6 +88,7 @@ __all__ = [
     "LinkedInReport",
     "PacketStore",
     "PositionSpec",
+    "Recipients",
     "ScoreBreakdown",
     "SearchFilters",
     "SearchPacket",
@@ -95,6 +104,7 @@ __all__ = [
     "build_inmails",
     "check_balanced",
     "check_linkedin",
+    "compose_brief_mail",
     "content_lines",
     "core_tokens",
     "extract_block",
@@ -102,6 +112,7 @@ __all__ = [
     "load_attempt",
     "load_brief_policy",
     "load_intent",
+    "load_recipients",
     "mark",
     "may_send",
     "normalize_line",
@@ -110,6 +121,7 @@ __all__ = [
     "packet_id",
     "policy",
     "record_intent",
+    "render_brief_body",
     "split_sections",
     "split_two_field",
     "to_json",
