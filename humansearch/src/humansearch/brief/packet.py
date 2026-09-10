@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import tempfile
@@ -176,6 +177,11 @@ def loads_value(hint: type, text: str) -> object:
     return _decode(hint, raw, hint.__name__)
 
 
+def jd_text_sha8(jd: JdSource) -> str:
+    """packet_id 의 내용 식별자 — jd.text 의 sha256 앞 8자리."""
+    return hashlib.sha256(jd.text.encode("utf-8")).hexdigest()[:8]
+
+
 def packet_id(position: PositionSpec, jd: JdSource) -> str:
     """`{clickup_id}-{sha8}`. 날짜를 담지 않는다 — 시계 인자도 받지 않는다(HS-13.09c).
 
@@ -183,7 +189,9 @@ def packet_id(position: PositionSpec, jd: JdSource) -> str:
     재생성이 새 장부 파일 이름을 얻어 승인 없이 재발송이 열린다(§7 D9). 생성 날짜는
     `SearchPacket.created_on` 이 따로 남긴다 — 기록은 남되 동일성 판정에는 끼지 않는다.
     """
-    value = f"{position.clickup_task_id}-{jd.raw_sha256[:8]}"
+    # sha8 은 코드가 원문에서 직접 계산한다 — 호출자가 준 raw_sha256(원본 파일 출처 해시)을 쓰면
+    # 같은 원문에 hash+id 를 같이 바꿔 새 장부 namespace 를 열 수 있다(Codex 10차).
+    value = f"{position.clickup_task_id}-{jd_text_sha8(jd)}"
     if not _PACKET_ID.fullmatch(value):
         _reject(f"packet_id 가 계약 형식과 다르다: {value!r}")
     return value

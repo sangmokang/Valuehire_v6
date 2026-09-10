@@ -43,12 +43,14 @@ from humansearch.brief import (
     may_send,
     packet_id,
     record_intent,
+    split_sections,
+    split_two_field,
     to_json,
 )
 
 # --- 합성 자료 (실명 0) -------------------------------------------------------
 
-_JD_TEXT = "직무: 데이터 엔지니어\n요구: 스트리밍 파이프라인 3년"
+_JD_TEXT = "주요업무\n• 실험을 설계한다.\n자격요건\n• 실험 설계 경험이 있다.\n"
 _OTHER_JD_TEXT = "직무: 데이터 엔지니어\n요구: 배치 파이프라인 5년"
 _RAW_SHA = hashlib.sha256(_JD_TEXT.encode("utf-8")).hexdigest()
 _OTHER_RAW_SHA = hashlib.sha256(_OTHER_JD_TEXT.encode("utf-8")).hexdigest()
@@ -74,6 +76,20 @@ def _jd(text: str = _JD_TEXT) -> JdSource:
     return JdSource(text, _sha256(text), "U1")
 
 
+def _faithful_jd_packet(source: JdSource, company_intro: str = "회사 소개 필드") -> JdPacket:
+    """JD 3종을 원문과 일치하게 만든다 — SearchPacket 이 조립 시 충실도를 재검증한다(HS-13.04b)."""
+    markers = tuple(s.heading for s in split_sections(source.text) if s.heading and s.lines)
+    two = split_two_field(source, company_intro, section_markers=markers)
+    return JdPacket(
+        gmail_body=source.text,
+        linkedin_body=source.text,
+        two_field_company=two.company_intro,
+        two_field_jd=two.jd_body,
+        two_field_sections=markers,
+        linkedin_omitted_sections=(),
+    )
+
+
 def _packet(
     *,
     identifier: str | None = None,
@@ -91,7 +107,7 @@ def _packet(
             legal_name=Claim("예시 주식회사", ("C1",)),
             sources=(SourceRef("C1", "https://example.com/about", "회사 소개", _DAY_A),),
         ),
-        jd_packet=JdPacket("gmail 본문", "링크드인 본문", "회사 소개 필드", "JD 본문 필드"),
+        jd_packet=_faithful_jd_packet(source),
         candidates=(
             CandidateLead(
                 display_name="예시 후보",

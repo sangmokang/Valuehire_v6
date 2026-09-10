@@ -11,13 +11,13 @@
 #   2  §4 입력 영역 표의 catch-all 행("그 외 전부" + "명시적 거부")
 #   3  §7 결정 목록 D1~D8 전부 존재 (8건 각각 1검사)
 #   11 §8 예외 표의 catch-all 행("그 외 전부" + "명시적 중단")
-#   12 §9 WU 카드 20건(HS-13.00~12 + 01b·01c·02c·09c·09d·09e·10b) 각각: 행 존재 + 5셀 전부 비어있지 않음 + 명령 셀이 실행 형식
+#   12 §9 WU 카드 22건(HS-13.00~12 + 01b·01c·02c·04b·09c·09d·09e·09f·10b) 각각: 행 존재 + 5셀 전부 비어있지 않음 + 명령 셀이 실행 형식
 #      (`cd humansearch && uv run --no-sync pytest|python -m humansearch.brief` 또는 `bash scripts/verify/run-acceptance.sh`) + 상태 셀이 허용값
 #   26 §7 결정 D1~D9 각각 기본값 셀 10자 이상 (9건) — 위 3~10 의 "행 존재"와 별개 검사
 #   35 §5 계약의 공개 타입 이름 12개가 코드 펜스 안에 존재 (각각 1검사)
 #   47 "## 적대 검증 로그" 절 존재
 #   48 §2 지시 9단계 검토 표에 9행
-#   49 §9 WU 카드 수 == 20 (행 수 정확) · 75 verification-commands.md 행의 카드/결정 개수 == 실제 루프 수 (Codex 7차)
+#   49 §9 WU 카드 수 == 22 (행 수 정확) · 75 verification-commands.md 행의 카드/결정 개수 == 실제 루프 수 (Codex 7차)
 #   50 §7 D9 행 존재 (발송 멱등 — 2026-09-10 Codex V1 편입)
 #   51~55 §4 입력 영역 표에 이미지·합본·언어·ClickUp 공백·시계 행 (5건)
 #   56~63 §5 계약 함수 8개 펜스 안 존재 · 64 §6·§10 절 실존(record_intent) · 65~66 D10·D11 (Codeaudit 2026-09-10)
@@ -40,7 +40,7 @@ cd "$REPO" || { echo "NOT_RUN: 저장소 루트로 이동 실패"; echo "CHECKED
 
 DOC="${HS_1300_DOC:-docs/engineering/humansearch-hs13-position-brief-goal-2026-09-10.md}"
 VC="${HS_1300_VC:-docs/sot/verification-commands.md}"
-EXPECTED_CHECKED=90
+EXPECTED_CHECKED=92
 
 fail=0
 checked=0
@@ -169,7 +169,7 @@ wu_row_ok() {
   esac
   return 0
 }
-WU_IDS=(00 01 01b 01c 02 02c 03 04 05 06 07 08 09 09c 09d 09e 10 10b 11 12)
+WU_IDS=(00 01 01b 01c 02 02c 03 04 04b 05 06 07 08 09 09c 09d 09e 09f 10 10b 11 12)
 D_IDS=(D1 D2 D3 D4 D5 D6 D7 D8 D9 D10 D11 D12)
 for n in "${WU_IDS[@]}"; do
   row=$(printf '%s\n' "$sec9" | $G -E "^\| *HS-13\.$n *\|" | head -1)

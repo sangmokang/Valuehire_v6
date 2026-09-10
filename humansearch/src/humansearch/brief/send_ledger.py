@@ -466,7 +466,7 @@ def _open_locked(
         approval=approval,
     )
     target = _attempt_path(directory, packet_id, channel, fresh.attempt)
-    # 배타 생성이 유일한 상호배제 지점이다 — 먼저 이긴 쪽만 묘비를 닫고 발송 허가를 받는다.
+    # 배타 생성이 유일한 상호배제 지점이다 — 먼저 이긴 쪽만 묘비를 닫는다(감사용 생성 결과. 발송은 claim_send).
     if not _create_exclusive(directory, target, dumps_value(fresh)):
         existing = _latest(directory, packet_id, channel)
         if existing is None:

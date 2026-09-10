@@ -31,13 +31,15 @@ from humansearch.brief import (
     SearchPacket,
     SourceRef,
     TeamMail,
+    split_sections,
+    split_two_field,
     to_json,
 )
 from humansearch.brief.cli import verify
 
 # --- 합성 패킷 (test_hs_1309.py 의 빌더 구조를 복제) --------------------------
 
-_JD_TEXT = "직무: 백엔드 엔지니어\n요구: 분산 시스템 경험 3년"
+_JD_TEXT = "주요업무\n• 실험을 설계한다.\n자격요건\n• 실험 설계 경험이 있다.\n"
 _RAW_SHA = hashlib.sha256(_JD_TEXT.encode("utf-8")).hexdigest()
 _CLICKUP = "77a2bcde"
 _TODAY = date(2026, 9, 10)
@@ -56,6 +58,20 @@ def _sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+def _faithful_jd_packet(source: JdSource, company_intro: str = "회사 소개 필드") -> JdPacket:
+    """JD 3종을 원문과 일치하게 만든다 — SearchPacket 이 조립 시 충실도를 재검증한다(HS-13.04b)."""
+    markers = tuple(s.heading for s in split_sections(source.text) if s.heading and s.lines)
+    two = split_two_field(source, company_intro, section_markers=markers)
+    return JdPacket(
+        gmail_body=source.text,
+        linkedin_body=source.text,
+        two_field_company=two.company_intro,
+        two_field_jd=two.jd_body,
+        two_field_sections=markers,
+        linkedin_omitted_sections=(),
+    )
+
+
 def _packet(body: str) -> SearchPacket:
     return SearchPacket(
         packet_id=_PACKET_ID,
@@ -68,7 +84,7 @@ def _packet(body: str) -> SearchPacket:
             legal_name=Claim("예시 주식회사", ("C1",)),
             sources=(SourceRef("C1", "https://example.com/about", "회사 소개", _TODAY),),
         ),
-        jd_packet=JdPacket("gmail 본문", "링크드인 본문", "회사 소개 필드", "JD 본문 필드"),
+        jd_packet=_faithful_jd_packet(JdSource(_JD_TEXT, _RAW_SHA, "U1")),
         candidates=(
             CandidateLead(
                 display_name="예시 후보",
@@ -78,13 +94,9 @@ def _packet(body: str) -> SearchPacket:
                 career="예시사 3년",
                 match_reasons=("분산 시스템 경험",),
                 check_points=("도메인 적합성",),
-                evidence=CandidateEvidence(
-                    ("분산시스템",), 1, 2, "석사", 2, (24, 18), 2, 8, 10
-                ),
+                evidence=CandidateEvidence(("분산시스템",), 1, 2, "석사", 2, (24, 18), 2, 8, 10),
                 score=ScoreBreakdown(30, 15, 15, 15),
-                email=EmailContact(
-                    "lead@example.org", "https://example.org/lab", "연구실 페이지"
-                ),
+                email=EmailContact("lead@example.org", "https://example.org/lab", "연구실 페이지"),
                 degree=ConnectionDegree.SECOND,
                 source_note="공개 프로필 URL 일치",
             ),

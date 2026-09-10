@@ -12,12 +12,11 @@
 from __future__ import annotations
 
 import json
-import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
-from .policy import CONTRACTS_DIR_ENV, _repo_root, policy
+from .policy import contracts_dir, policy
 from .types import _reject, _require_email
 
 __all__ = ["Recipients", "load_recipients"]
@@ -36,9 +35,7 @@ class Recipients:
 
 
 def _default_recipients_path() -> Path:
-    override = os.environ.get(CONTRACTS_DIR_ENV)
-    base = Path(override) if override else _repo_root() / "contracts"
-    return base.joinpath(*_CONTRACT_RELPATH)
+    return contracts_dir().joinpath(*_CONTRACT_RELPATH)
 
 
 def _read_contract(path: Path) -> dict[str, object]:

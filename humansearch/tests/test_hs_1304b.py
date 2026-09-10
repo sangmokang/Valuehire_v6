@@ -2,7 +2,7 @@
 
 ① 라이브 실측(2026-09-10 번개장터): `[다루는 문제의 범위]` 같은 괄호 소제목이 별도 절로 잘려
    `주요업무`·`혜택 및 복지` 의 본문이 필드 2 에서 통째로 빠졌다. 처방: 마커 절은 **다음 마커 절이
-   나올 때까지의 범위**다(소제목 절을 흡수). 마커는 JD 순서대로여야 한다.
+   뒤에 이어지는 괄호 소제목 절을 흡수**한다(다음 일반 제목에서 끝). 순서는 결과를 바꾸지 않는다.
 ② Codex V1 10차: 충실도에 실패한 JD 3종을 담은 패킷도 저장·복원·VERIFIED 가 됐다. 처방:
    `JdPacket` 이 절 선택(`two_field_sections`)·LinkedIn 생략 절(`linkedin_omitted_sections`)을 들고,
    `SearchPacket` 이 조립·역직렬화 때 Gmail·LinkedIn·2필드 셋 다 원문과 재검증한다.
@@ -150,13 +150,21 @@ def test_marker_section_absorbs_bracketed_subsections_until_the_next_marker() ->
     assert body.index("주요업무") < body.index("자격요건") < body.index("혜택 및 복지")
 
 
-def test_markers_out_of_document_order_are_rejected() -> None:
-    with pytest.raises(BriefInputError):
-        split_two_field(_jd(), _INTRO, section_markers=("자격요건", "주요업무"))
+def test_marker_order_does_not_change_the_selection() -> None:
+    forward = split_two_field(_jd(), _INTRO, section_markers=_MARKERS)
+    backward = split_two_field(_jd(), _INTRO, section_markers=tuple(reversed(_MARKERS)))
+    assert forward.jd_body == backward.jd_body
+
+
+def test_skipping_a_top_level_section_keeps_its_body_out() -> None:
+    two = split_two_field(_jd(), _INTRO, section_markers=("주요업무", "채용 전형"))
+    assert "• 실험 설계 경험이 있는 분" not in two.jd_body
+    assert "• 고사양 장비 지원" not in two.jd_body
+    assert "• 기능을 기획하고 실험으로 검증합니다." in two.jd_body
 
 
 def test_marker_naming_a_bracketed_subsection_still_works_as_its_own_range() -> None:
-    two = split_two_field(_jd(), _INTRO, section_markers=("[맡게 될 주요 업무]", "자격요건"))
+    two = split_two_field(_jd(), _INTRO, section_markers=("맡게 될 주요 업무", "자격요건"))
     assert "• 기능을 기획하고 실험으로 검증합니다." in two.jd_body
     assert "• 탐색과 거래 흐름을 다룹니다." not in two.jd_body
 
@@ -201,16 +209,18 @@ def test_packet_rejects_linkedin_body_missing_a_non_omitted_section() -> None:
 
 def test_packet_accepts_linkedin_body_that_omits_only_declared_sections() -> None:
     jd = _jd()
-    without_benefits = jd.text.replace("혜택 및 복지\n[몰입 환경]\n• 고사양 장비 지원\n[활력]\n• 식대 지원\n", "")
+    without_benefits = jd.text.replace(
+        "혜택 및 복지\n[몰입 환경]\n• 고사양 장비 지원\n[활력]\n• 식대 지원\n", ""
+    )
     ok = _jd_packet(
         jd,
         linkedin_body=without_benefits,
-        linkedin_omitted_sections=("혜택 및 복지", "[몰입 환경]", "[활력]"),
+        linkedin_omitted_sections=("혜택 및 복지", "몰입 환경", "활력"),
     )
     assert _packet(jd_packet=ok).jd_packet.linkedin_omitted_sections == (
         "혜택 및 복지",
-        "[몰입 환경]",
-        "[활력]",
+        "몰입 환경",
+        "활력",
     )
 
 

@@ -48,6 +48,8 @@ from humansearch.brief import (
     open_new_attempt,
     packet_id,
     record_intent,
+    split_sections,
+    split_two_field,
     to_json,
 )
 from humansearch.brief import packet as packet_module
@@ -55,7 +57,7 @@ from humansearch.brief import send_ledger as send_ledger_module
 
 # --- 합성 패킷 ---------------------------------------------------------------
 
-_JD_TEXT = "직무: 프로덕트 매니저\n요구: 실험 설계 경험 3년"
+_JD_TEXT = "주요업무\n• 실험을 설계한다.\n자격요건\n• 실험 설계 경험이 있다.\n"
 _RAW_SHA = hashlib.sha256(_JD_TEXT.encode("utf-8")).hexdigest()
 _CLICKUP = "86e1abcd"
 _TODAY = date(2026, 9, 10)
@@ -69,6 +71,20 @@ def _sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+def _faithful_jd_packet(source: JdSource, company_intro: str = "회사 소개 필드") -> JdPacket:
+    """JD 3종을 원문과 일치하게 만든다 — SearchPacket 이 조립 시 충실도를 재검증한다(HS-13.04b)."""
+    markers = tuple(s.heading for s in split_sections(source.text) if s.heading and s.lines)
+    two = split_two_field(source, company_intro, section_markers=markers)
+    return JdPacket(
+        gmail_body=source.text,
+        linkedin_body=source.text,
+        two_field_company=two.company_intro,
+        two_field_jd=two.jd_body,
+        two_field_sections=markers,
+        linkedin_omitted_sections=(),
+    )
+
+
 def _packet(text: str = "예시 문구") -> SearchPacket:
     body = f"{text}\n내부 공유 본문"
     return SearchPacket(
@@ -80,7 +96,7 @@ def _packet(text: str = "예시 문구") -> SearchPacket:
             legal_name=Claim(text, ("C1",)),
             sources=(SourceRef("C1", "https://example.com/about", "회사 소개", _TODAY),),
         ),
-        jd_packet=JdPacket(text, "링크드인 본문", "회사 소개 필드", "JD 본문 필드"),
+        jd_packet=_faithful_jd_packet(JdSource(_JD_TEXT, _RAW_SHA, "U1")),
         candidates=(
             CandidateLead(
                 display_name=text,

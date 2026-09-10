@@ -55,6 +55,12 @@ def _raw_sections(text: str) -> tuple[tuple[str, tuple[str, ...]], ...]:
     return tuple(result)
 
 
+def _is_subheading(raw_heading_line: str) -> bool:
+    """`[…]` 로 감싼 제목 = 앞 절에 딸린 소제목. `|` 제목·일반 제목은 최상위다."""
+    body = normalize_line(raw_heading_line)
+    return body.startswith("[") and body.endswith("]")
+
+
 def split_two_field(
     jd: JdSource,
     company_intro: str,
@@ -89,8 +95,20 @@ def split_two_field(
                 f"company_intro 에 JD 절 제목 줄이 그대로 들어 있다: {normalized_line!r}"
             )
 
-    selected = [(heading, lines) for heading, lines in raw_sections if heading in marker_set]
-    content_line_total = sum(len(lines) - 1 for _, lines in selected)
+    # 마커 절은 **바로 뒤에 이어지는 괄호 소제목 절(`[…]`)을 흡수**한다 — 다음 일반 제목이 나오면 끝.
+    # 2026-09-10 라이브 실측: `[다루는 문제의 범위]` 같은 소제목이 별도 절로 잘려 `주요업무` 본문이
+    # 필드 2 에서 통째로 빠졌다(HS-13.04b). 소제목 자체를 마커로 지정하면 그 절 하나만 고른다.
+    selected: list[tuple[str, tuple[str, ...]]] = []
+    absorbing = False
+    for heading, lines in raw_sections:
+        if heading in marker_set:
+            absorbing = True
+            selected.append((heading, lines))
+        elif absorbing and heading and _is_subheading(lines[0]):
+            selected.append((heading, lines))
+        else:
+            absorbing = False
+    content_line_total = sum(len(lines) - (1 if heading else 0) for heading, lines in selected)
     if content_line_total <= 0:
         raise BriefInputError("section_markers 로 고른 절이 모두 빈 절이다(본문 줄이 없다)")
 

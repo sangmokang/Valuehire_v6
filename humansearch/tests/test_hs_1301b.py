@@ -39,13 +39,14 @@ from humansearch.brief import (
     TeamMail,
     load_brief_policy,
     policy,
+    split_two_field,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CONTRACT_PATH = REPO_ROOT / "contracts" / "humansearch" / "brief-policy.json"
 
 TODAY = date(2026, 9, 10)
-JD_TEXT = "핵심 업무: 검색 파이프라인 설계\n자격 요건: Python 5년"
+JD_TEXT = "주요업무\n• 검색 파이프라인 설계\n자격요건\n• Python 5년\n"
 JD_SHA = hashlib.sha256(JD_TEXT.encode("utf-8")).hexdigest()
 LEAD_URL = "https://www.linkedin.com/in/example-0001"
 PACKET_ID = f"86exampleid-{JD_SHA[:8]}"
@@ -70,6 +71,8 @@ def _payload(**overrides: Any) -> dict[str, Any]:
     }
     base.update(overrides)
     return base
+
+
 from humansearch.brief.policy import override_policy_for_tests
 
 
@@ -140,11 +143,17 @@ def _packet(**overrides: Any) -> SearchPacket:
 
 
 def _jd_packet(**overrides: Any) -> JdPacket:
+    source = JdSource(text=JD_TEXT, raw_sha256=JD_SHA, provided_by="U1")
+    two = split_two_field(
+        source, "예시고객사는 검색 제품을 만든다.", section_markers=("주요업무", "자격요건")
+    )
     fields: dict[str, Any] = {
         "gmail_body": JD_TEXT,
         "linkedin_body": JD_TEXT,
-        "two_field_company": "예시고객사는 검색 제품을 만든다.",
-        "two_field_jd": JD_TEXT,
+        "two_field_company": two.company_intro,
+        "two_field_jd": two.jd_body,
+        "two_field_sections": ("주요업무", "자격요건"),
+        "linkedin_omitted_sections": (),
     }
     fields.update(overrides)
     return JdPacket(**fields)
@@ -154,7 +163,7 @@ def _mail(**overrides: Any) -> TeamMail:
     body = overrides.pop("body", "예시고객사 검색 엔지니어 | 밸류커넥트 내부 공유\n")
     fields: dict[str, Any] = {
         "subject": "[포지션]예시고객사, 검색 엔지니어",
-        "to": ("holder@valueconnect.kr",),
+        "to": ("sangmokang@valueconnect.kr",),
         "cc": (),
         "body": body,
         "body_sha256": hashlib.sha256(body.encode("utf-8")).hexdigest(),
@@ -262,10 +271,13 @@ def test_기본_정책은_1899_통과_1900_거부다() -> None:
 def test_팀_도메인_정책이_TeamMail_수신자_판정을_실제로_움직인다() -> None:
     other = replace(policy(), team_mail_domain="example.org")
     with override_policy_for_tests(other):
-        assert _mail(to=("holder@example.org",)).to == ("holder@example.org",)
+        # 도메인 정책이 바뀌면 계약 구성원(valueconnect.kr)도 도메인 검사에서 떨어진다
         with pytest.raises(BriefInputError):
-            _mail(to=("holder@valueconnect.kr",))
-    assert _mail(to=("holder@valueconnect.kr",)).to == ("holder@valueconnect.kr",)
+            _mail(to=("sangmokang@valueconnect.kr",))
+        # 새 도메인이라도 team-recipients.json 구성원이 아니면 역시 거부(HS-13.09f)
+        with pytest.raises(BriefInputError):
+            _mail(to=("holder@example.org",))
+    assert _mail(to=("sangmokang@valueconnect.kr",)).to == ("sangmokang@valueconnect.kr",)
 
 
 def test_프로필_접두_정책이_URL_판정을_실제로_움직인다() -> None:
@@ -297,9 +309,7 @@ def test_제목_접두_정책이_TeamMail_제목_판정을_실제로_움직인�
 # ── 4. SearchFilters ────────────────────────────────────────────────────────
 def test_SearchFilters_기본_지역은_계약값이다() -> None:
     assert SearchFilters().location == "South Korea"
-    japan = replace(
-        policy(), default_search_location="Japan", allowed_search_locations=("Japan",)
-    )
+    japan = replace(policy(), default_search_location="Japan", allowed_search_locations=("Japan",))
     with override_policy_for_tests(japan):
         assert SearchFilters().location == "Japan"
 

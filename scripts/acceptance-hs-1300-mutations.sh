@@ -185,7 +185,7 @@ expect_rc "변이Ⓔ 홀수 백틱(닫히지 않은 조각) → 불합격" "$TMP
 awk -F'|' 'BEGIN{OFS="|"} /^\| *HS-13\.01 /{ $6=" LOCAL_COMMITTED(task/hs-13-stack-20260910) " } { print }' "$ORIG" > "$TMP/paren-state.md"
 $G -q 'LOCAL_COMMITTED(task/hs-13-stack-20260910)' "$TMP/paren-state.md" || { echo "NOT_RUN: 변이Ⓕ 생성 실패"; echo "CHECKED: $checked"; exit 2; }
 expect_rc "변이Ⓕ 실존 브랜치라도 LOCAL_COMMITTED(task/…) 괄호 상태 → 불합격(형제 브랜치 조회 없음)" "$TMP/paren-state.md" 1
-sed 's/WU 카드 20 /WU 카드 14 /' docs/sot/verification-commands.md > "$TMP/vc-14.md"
+sed 's/WU 카드 22 /WU 카드 14 /' docs/sot/verification-commands.md > "$TMP/vc-14.md"
 $G -q 'WU 카드 14 ' "$TMP/vc-14.md" || { echo "NOT_RUN: 변이Ⓖ 생성 실패"; echo "CHECKED: $checked"; exit 2; }
 VC_OVERRIDE="$TMP/vc-14.md" expect_rc "변이Ⓖ verification-commands 행이 카드 14 → 불합격" "$ORIG" 1
 unset VC_OVERRIDE

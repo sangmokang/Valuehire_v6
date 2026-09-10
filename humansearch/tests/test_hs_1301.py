@@ -30,9 +30,10 @@ from humansearch.brief import (
     SourceRef,
     TeamMail,
 )
+from humansearch.brief.two_field import split_two_field
 
 TODAY = date(2026, 9, 10)
-JD_TEXT = "핵심 업무: 검색 파이프라인 설계\n자격 요건: Python 5년\n우대 사항: 랭킹 경험"
+JD_TEXT = "주요업무\n• 검색 파이프라인 설계\n자격요건\n• Python 5년\n우대사항\n• 랭킹 경험\n"
 JD_SHA = hashlib.sha256(JD_TEXT.encode("utf-8")).hexdigest()
 LEAD_URL = "https://www.linkedin.com/in/example-0001"
 SECOND_URL = "https://kr.linkedin.com/in/example-0002"
@@ -162,11 +163,18 @@ def _lead(**overrides: Any) -> CandidateLead:
 
 
 def _jd_packet(**overrides: Any) -> JdPacket:
+    two = split_two_field(
+        _jd(),
+        "예시고객사는 검색 제품을 만드는 회사입니다.",
+        section_markers=("주요업무", "자격요건", "우대사항"),
+    )
     fields: dict[str, Any] = {
         "gmail_body": JD_TEXT,
         "linkedin_body": f"[복사 시작]\n{JD_TEXT}\n[복사 끝]",
-        "two_field_company": "예시고객사는 검색 제품을 만드는 회사입니다.",
-        "two_field_jd": JD_TEXT,
+        "two_field_company": two.company_intro,
+        "two_field_jd": two.jd_body,
+        "two_field_sections": ("주요업무", "자격요건", "우대사항"),
+        "linkedin_omitted_sections": (),
     }
     fields.update(overrides)
     return JdPacket(**fields)
@@ -176,8 +184,8 @@ def _mail(**overrides: Any) -> TeamMail:
     body = overrides.pop("body", MAIL_BODY)
     fields: dict[str, Any] = {
         "subject": "[포지션]예시고객사, 검색 엔지니어",
-        "to": ("holder@valueconnect.kr",),
-        "cc": ("holder2@valueconnect.kr",),
+        "to": ("sangmokang@valueconnect.kr",),
+        "cc": ("rogan@valueconnect.kr",),
         "body": body,
         "body_sha256": hashlib.sha256(body.encode("utf-8")).hexdigest(),
     }
@@ -375,7 +383,14 @@ def test_property_arbitrary_text_urls_are_rejected(raw: str) -> None:
 
 @pytest.mark.parametrize(
     "bad_address",
-    ["", "holder", "holder@example", "holder example@example.com", "a@b@example.com", "@example.com"],
+    [
+        "",
+        "holder",
+        "holder@example",
+        "holder example@example.com",
+        "a@b@example.com",
+        "@example.com",
+    ],
 )
 def test_email_contact_rejects_malformed_address(bad_address: str) -> None:
     with pytest.raises(BriefInputError):
@@ -535,7 +550,8 @@ def test_team_mail_rejects_duplicate_address_inside_to() -> None:
 
 
 @pytest.mark.parametrize(
-    "foreign", ["holder@example.com", "holder@valueconnect.kr.example.com", "holder@valueconnect.co"]
+    "foreign",
+    ["holder@example.com", "holder@valueconnect.kr.example.com", "holder@valueconnect.co"],
 )
 def test_team_mail_rejects_addresses_outside_the_contract_domain(foreign: str) -> None:
     with pytest.raises(BriefInputError):
@@ -554,7 +570,12 @@ def test_team_mail_rejects_truncated_body_hash() -> None:
 
 @pytest.mark.parametrize(
     "subject",
-    ["예시고객사, 검색 엔지니어", "[Position]예시고객사", " [포지션]예시고객사", "[포지션 ]예시고객사"],
+    [
+        "예시고객사, 검색 엔지니어",
+        "[Position]예시고객사",
+        " [포지션]예시고객사",
+        "[포지션 ]예시고객사",
+    ],
 )
 def test_team_mail_rejects_subject_outside_d3(subject: str) -> None:
     with pytest.raises(BriefInputError):
@@ -582,7 +603,9 @@ def test_search_packet_rejects_duplicate_candidate_urls() -> None:
 
 
 def test_search_packet_accepts_two_distinct_candidates() -> None:
-    packet = _packet(candidates=(_lead(), _lead(display_name="예시 후보 B", linkedin_url=SECOND_URL)))
+    packet = _packet(
+        candidates=(_lead(), _lead(display_name="예시 후보 B", linkedin_url=SECOND_URL))
+    )
     assert len(packet.candidates) == 2
 
 

@@ -32,6 +32,7 @@ from humansearch.brief.mail import (
     load_recipients,
     render_brief_body,
 )
+from humansearch.brief.two_field import split_two_field
 from humansearch.brief.types import (
     BriefInputError,
     Claim,
@@ -109,14 +110,19 @@ JD = JdSource(
 )
 
 GMAIL_BODY = "주요업무\n• 검색 랭킹 모델을 설계한다.\n자격요건\n• 검색 시스템 운영 경험이 있다.\n"
-LINKEDIN_BODY = "합성상사에서 검색 백엔드 엔지니어를 찾습니다.\n랭킹 모델 설계와 운영을 맡습니다.\n"
+LINKEDIN_BODY = JD_TEXT  # 어미 축약 없이 원문 그대로(패킷 경계 충실도, HS-13.04b)
 LINKEDIN_CHARS = len(LINKEDIN_BODY)
 
+_TWO_FIELD = split_two_field(
+    JD, "합성상사는 검색 품질을 다루는 조직이다.", section_markers=("주요업무", "자격요건")
+)
 JD_PACKET = JdPacket(
     gmail_body=GMAIL_BODY,
     linkedin_body=LINKEDIN_BODY,
-    two_field_company="합성상사는 검색 품질을 다루는 조직이다.",
-    two_field_jd="주요업무\n• 검색 랭킹 모델을 설계한다.",
+    two_field_company=_TWO_FIELD.company_intro,
+    two_field_jd=_TWO_FIELD.jd_body,
+    two_field_sections=("주요업무", "자격요건"),
+    linkedin_omitted_sections=(),
 )
 
 EVIDENCE = CandidateEvidence(
@@ -243,7 +249,9 @@ def test_subject_brief_form_is_exact() -> None:
 
 def test_subject_search_form_is_exact() -> None:
     mail = compose_brief_mail(_draft(), _recipients(), TODAY, first_live=False, search_mode=True)
-    assert mail.subject == "[ValuehireSearch][포지션]합성상사, 검색 백엔드 엔지니어 | ValuehireSearch"
+    assert (
+        mail.subject == "[ValuehireSearch][포지션]합성상사, 검색 백엔드 엔지니어 | ValuehireSearch"
+    )
 
 
 def test_subject_has_no_search_suffix_without_candidates() -> None:
@@ -331,8 +339,13 @@ def _export_key(name: str) -> tuple[int, str]:
 
 
 def test_public_exports_include_mail_names() -> None:
-    for name in ("BriefDraft", "Recipients", "load_recipients", "render_brief_body",
-                 "compose_brief_mail"):
+    for name in (
+        "BriefDraft",
+        "Recipients",
+        "load_recipients",
+        "render_brief_body",
+        "compose_brief_mail",
+    ):
         assert hasattr(brief_pkg, name), f"__init__ 재수출 누락: {name}"
         assert name in brief_pkg.__all__, f"__all__ 누락: {name}"
     exported = list(brief_pkg.__all__)
