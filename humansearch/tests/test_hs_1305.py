@@ -320,12 +320,24 @@ def test_check_linkedin_length_matches_fixture_count() -> None:
     assert check_linkedin(LINKEDIN_BODY).length == LINKEDIN_CHARS
 
 
+def _export_key(name: str) -> tuple[int, str]:
+    """`__init__.__all__` 의 기존 정렬 규칙: 상수 → 타입 → 함수, 각 묶음 안에서 사전순."""
+
+    if name.isupper():
+        return (0, name)
+    if name[0].isupper():
+        return (1, name)
+    return (2, name)
+
+
 def test_public_exports_include_mail_names() -> None:
     for name in ("BriefDraft", "Recipients", "load_recipients", "render_brief_body",
                  "compose_brief_mail"):
         assert hasattr(brief_pkg, name), f"__init__ 재수출 누락: {name}"
         assert name in brief_pkg.__all__, f"__all__ 누락: {name}"
-    assert list(brief_pkg.__all__) == sorted(brief_pkg.__all__)
+    exported = list(brief_pkg.__all__)
+    assert len(exported) == len(set(exported)), "__all__ 에 중복이 있다"
+    assert exported == sorted(exported, key=_export_key), "__all__ 정렬 규칙이 깨졌다"
 
 
 # --------------------------------------------------------------------------- 음성: 조립 거부
