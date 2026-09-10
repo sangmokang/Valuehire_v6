@@ -64,7 +64,12 @@ Dir.mktmpdir("wu-context-contract-") do |tmp|
   manifest = Marshal.load(Marshal.dump(base))
   unit = manifest.fetch("work_units").first
   unit["id"] = "WU-CONTEXT"
-  unit["tdd"]["mode"] = "NOT_APPLICABLE"
+  unit["tdd"] = {
+    "mode" => "NOT_APPLICABLE", "contract_commit" => head,
+    "red_commit" => nil, "green_commit" => nil, "red_commands" => [],
+    "red_tests" => 0, "red_failure_kind" => nil, "test_files" => [],
+    "expectation_change_approval_commit" => nil
+  }
   unit["context"] = {
     "expected_head" => head,
     "expected_worktree" => branch,

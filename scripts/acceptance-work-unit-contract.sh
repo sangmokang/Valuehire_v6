@@ -47,8 +47,8 @@ case "$mode" in
     exit $?
     ;;
   not-applicable)
-    printf 'VERDICT: NOT_RUN\nREASON: mode %s not implemented\nWU_TESTS: 0\nCHECKED: 0\n' "$mode"
-    exit 2
+    ruby scripts/verify/work-unit-not-applicable-contract-test.rb
+    exit $?
     ;;
   *)
     printf 'VERDICT: NOT_RUN\nREASON: unknown mode %s\nWU_TESTS: 0\nCHECKED: 0\n' "$mode"
