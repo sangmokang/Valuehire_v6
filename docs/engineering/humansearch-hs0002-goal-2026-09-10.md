@@ -8,7 +8,7 @@
 
 ## 판단 근거와 WU 카드
 
-- 상태: 로컬 검증 통과, CHECKPOINT 커밋 및 커밋 후 지문 대조 중. 위험 L3 — 검사의 합격 판정 경계를 수정한다. 배송은 NOT_APPLICABLE: 내부 검증 도구이며 제품 화면·운영 배포를 추가하지 않는다.
+- 상태: LOCAL_COMMITTED. 구현 커밋 `69801528d794aabfe8ceb84e1ee073d71ceec442`의 코드 5개와 증거 파일 811개를 Git에서 다시 읽어 일치를 확인했다. 위험 L3 — 검사의 합격 판정 경계를 수정한다. 배송은 NOT_APPLICABLE: 내부 검증 도구이며 제품 화면·운영 배포를 추가하지 않는다.
 - 사용자 지시: `goal-prompts/humansearch-next-execution-2026-09-10.md`와 실행 장부 HS-00.02. 기존 Issue #69의 착수 정리 후속 부채이며 별도 온라인 등록은 없다.
 - 소유: `worktrees/hs-0002-20260910`, `task/hs-0002-20260910`, 세션 hs0002-20260910. 원래 지정 폴더는 HS-00.01 완료 상태로 보존한다.
 - 기준: HS-00.01 구현 GREEN `8e7a515a1d3d53a8e4e468d118ffdcb2bbb2a580`, 완료 기록 `6cef849b36e4dc11fd272e4bfe50af2f5e8db537` 위 누적 브랜치. 현재 main/origin은 `4379b2ff30afa2e37627e85af0b96920af3a38cd`이며 그 위에 병합됐다고 주장하지 않는다.
@@ -79,7 +79,7 @@ When 기대 문구가 비었거나 공백 문자만 있으면 거부해야 한�
 - 최종 Codeaudit: `codeaudit-final-verdict.md` PASS. 실제 명령 출처가 빠진 옛 메타데이터는 보존하고 exact 재실행으로 보충했습니다.
 - 최종 Claude V1: `v1-final-verdict.md` PASS. 실제 CLI 세션 `fdc02069-92a8-4bb7-afa0-11c121e9310a`, 22:43:46~22:58:33 UTC, 종료값 0, 원시 출력 SHA256 `889aae5af67b9b8cf9c152f4f120ae538eaa950d4b9011d22749170daf74757b`.
 - 최종 새 Codex V2: `v2-final-verdict.md` PASS. 직접 명령과 전체 출력 지문은 `v2-final-evidence.json`에 있습니다. Claude 신원 기록의 작성자와 V2의 직접 재실행을 구분합니다.
-- GREEN SHA: 이 문서를 포함하는 로컬 구현 커밋 뒤 별도 readback 영수증에 기록합니다. 아직 원격에 전달하지 않았습니다.
+- GREEN SHA: `69801528d794aabfe8ceb84e1ee073d71ceec442`. `evidence/hs0002-20260910/green-readback.json`에 커밋 후 지문 대조를 기록했습니다. 아직 원격에 전달하지 않았습니다.
 
 → 최초 결함과 실패 기록을 유지하며, 추가 시험·수정 후 같은 후보 지문에서 세 검토가 통과한 상태입니다. 원문 파일은 모두 이 goal 옆 `evidence/hs0002-20260910/storage-map.json`을 통해 정확한 보존 경로와 지문으로 연결됩니다.
 
@@ -100,3 +100,9 @@ V1의 직접 CLI 93건 중 U+200B 한 건은 시험 작성자가 공백으로 �
 배포 상태는 NOT_APPLICABLE입니다. 내부 검사 경계 변경으로 운영 smoke·DB migration은 해당하지 않습니다. 로컬 검토는 같은 UID에서 수행되어 OS 권한 격리나 P17 영수증이 아닙니다. 원격 push·PR 생성·병합·CI·포털·DB·메시지 발송·실제 업무 완주는 미실행입니다. main 병합 또는 HumanSearch 전체 완료로 표시하지 않습니다.
 
 되돌리기는 이 WU의 GREEN 구현 커밋을 revert하여 수행하며, 두 RED 커밋을 유지해 실패가 다시 나타나는지 확인합니다. 후크는 우회하지 않습니다. 다음 행동은 HS-00.03의 동형 문자 경계 계약을 별도 워크트리에서 고정하는 것입니다.
+
+## 재개 세션의 완료 대조
+
+정조준 43개를 다시 실행해 통과했고, 검토 후보 5개 파일과 V1/V2 실행 출력 지문이 일치했습니다. 원문 809개의 복원 대조와 커밋된 증거 파일 811개의 Git 재읽기도 통과했습니다. 명령·시각·종료값은 `resume-target.json`, `resume-integrity.json`, `resume-secret-scan.json`, `resume-privacy-after-collect.json`에 보존합니다. 이후 추가되는 파일은 이 마무리 기록과 readback뿐입니다. 이 대조는 기존 독립 검토의 재개 확인이며 새 독립 감사로 세지 않습니다.
+
+인증 값 노출 사고는 OPEN이고 키의 현재 유효성·교체는 미확인입니다. 이 로컬 커밋을 원격 VERIFIED·MERGED 또는 HumanSearch 전체 완료로 표시하지 않습니다. 증거 원문 보존으로 이 브랜치의 diff가 PR 3,000줄 한도를 넘으므로, 향후 원격 배송 전에는 원문 보존을 유지하는 증거 전달 방식을 별도로 정리해야 합니다.

@@ -1812,6 +1812,12 @@
     "wrapped": true
   },
   {
+    "original": "green-commit-message.txt",
+    "stored": "green-commit-message.txt.json",
+    "sha256": "2937c38b013b402ba8070353e66bd657a25ffcbc89a27a6aca9146e6bad49dee",
+    "wrapped": true
+  },
+  {
     "original": "green-diff.json",
     "stored": "green-diff.json",
     "sha256": "efd6eb2666f8ae3a6d02e21b4ca5d72ecba1ad93c08b1a0992603a661c1bf929",
@@ -1893,6 +1899,18 @@
     "original": "green-mypy.log",
     "stored": "green-mypy.log.json",
     "sha256": "fdba5b4e396441aaf1ba0d4aee9a2b6de7229057c665772ec81bd032ce1cc3f5",
+    "wrapped": true
+  },
+  {
+    "original": "green-readback.json",
+    "stored": "green-readback.json",
+    "sha256": "e7997545f25ff2189ca4ce49b224a924c7020c59a6e2ea9988da83056ae7860f",
+    "wrapped": false
+  },
+  {
+    "original": "green-readback.py",
+    "stored": "green-readback.py.json",
+    "sha256": "19f2f2e9db4d925bb6b8cb1fc8b10dd8212c8bd721bd6b1ffd6ecfe0b37bbb06",
     "wrapped": true
   },
   {
@@ -2164,6 +2182,18 @@
     "stored": "resume-authored-files.json",
     "sha256": "adec2a8be6c7e9493e1b4da472ba3552aece8b2e92bb8b7282b49015f2ffa911",
     "wrapped": false
+  },
+  {
+    "original": "resume-brief-final.json",
+    "stored": "resume-brief-final.json",
+    "sha256": "5f48009881d680b21f4760fd1d064b7a10f98b24b34fdd8d96b6022f996d880e",
+    "wrapped": false
+  },
+  {
+    "original": "resume-brief-final.log",
+    "stored": "resume-brief-final.log.json",
+    "sha256": "29ddecadf83bce0dd915dbd399f9074fb27683e71e9d9125e100305760f1fdd2",
+    "wrapped": true
   },
   {
     "original": "resume-integrity.json",

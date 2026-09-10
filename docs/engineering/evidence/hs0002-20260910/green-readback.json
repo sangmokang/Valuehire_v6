@@ -1,0 +1,56 @@
+{
+  "wu": "HS-00.02",
+  "status": "LOCAL_COMMITTED",
+  "green_commit": "69801528d794aabfe8ceb84e1ee073d71ceec442",
+  "red_commits": [
+    "0263108eab043dbb4780f7c9ca6ac0528808b31d",
+    "8bef581b2ee64dd57345f92f11f241e0c927b759"
+  ],
+  "verified_at": "2026-09-10T00:01:02.327194+00:00",
+  "candidate_sha256": {
+    "scripts/acceptance-hs-kickoff-mutations.sh": "83e0903b136c73b7b8981c85b37f4bb15c8d7c9d95a6deb073fc852a87475e35",
+    "scripts/verify/has-kickoff-failure.py": "4e43ea810cbbfd4a93aea8ac857790a23cc67557e30f693687a2e672cbbab2d0",
+    "humansearch/tests/test_hs_0002.py": "8817487d8aa6d5dcc741ba3306541cb3addf4db1d754dec87af77f789ed8be43",
+    "humansearch/tests/test_hs_0002_boundaries.py": "8e946bf4f9e33f0a964754065ad511588d1b950ee57164e455fd3f6b5e3fd928",
+    "docs/sot/verification-commands.md": "f4f71f36895a3fdfc3dfc6800ffac48d0d6ebbc6efa67ad9435eeeb0d980ea34"
+  },
+  "verdict_sha256": {
+    "codeaudit-final-verdict.md": "f559653edac44230f893a8939e5bb6074ba1afe238d5c70ee1049f0931930d3c",
+    "v1-final-verdict.md": "b624f10973795723cfb5a56acd2c33aed39afb5f0b5f5a44451592857a371329",
+    "v2-final-verdict.md": "a5eefa6485a1e2abac35e4026544bbda13bbf6037c3a97e8388aaab029fadee5"
+  },
+  "committed_evidence_files_match": 811,
+  "worktree_clean_at_readback": true,
+  "remote_ci": "NOT_RUN",
+  "push_pr_merge": "NOT_RUN",
+  "live_p17": "NOT_RUN",
+  "credential_incident": "OPEN; validity and rotation not verified",
+  "evidence_type": "local same-UID readback, not independent receipt",
+  "read_commands": [
+    [
+      "git",
+      "show",
+      "69801528d794aabfe8ceb84e1ee073d71ceec442:scripts/acceptance-hs-kickoff-mutations.sh"
+    ],
+    [
+      "git",
+      "show",
+      "69801528d794aabfe8ceb84e1ee073d71ceec442:scripts/verify/has-kickoff-failure.py"
+    ],
+    [
+      "git",
+      "show",
+      "69801528d794aabfe8ceb84e1ee073d71ceec442:humansearch/tests/test_hs_0002.py"
+    ],
+    [
+      "git",
+      "show",
+      "69801528d794aabfe8ceb84e1ee073d71ceec442:humansearch/tests/test_hs_0002_boundaries.py"
+    ],
+    [
+      "git",
+      "show",
+      "69801528d794aabfe8ceb84e1ee073d71ceec442:docs/sot/verification-commands.md"
+    ]
+  ]
+}

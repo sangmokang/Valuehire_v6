@@ -6,7 +6,7 @@
 
 ## 증거 연결과 한계
 
-현재 제품 후보는 `final-candidate-files.json`의 다섯 파일이다. 최초 RED는 `0263108`, 공백 경계 추가 RED는 `8bef581`이다. 기존 두 시험 파일의 기대값은 각 RED 커밋 이후 유지한다. 새 Codeaudit·실제 Claude V1·새 Codex V2는 모두 PASS이며, GREEN SHA와 커밋 후 지문 대조는 별도 readback 영수증으로 연결한다. 운영 인증 값 노출 사고는 별도로 OPEN이다.
+현재 제품 후보는 `final-candidate-files.json`의 다섯 파일이다. 최초 RED는 `0263108`, 공백 경계 추가 RED는 `8bef581`이다. 기존 두 시험 파일의 기대값은 각 RED 커밋 이후 유지한다. 새 Codeaudit·실제 Claude V1·새 Codex V2는 모두 PASS이며, GREEN SHA는 `69801528d794aabfe8ceb84e1ee073d71ceec442`이며, 커밋 후 지문 대조는 [green-readback.json](green-readback.json)에 연결한다. 운영 인증 값 노출 사고는 별도로 OPEN이다.
 
 초기 Codeaudit·Claude V1 PASS와 Codex V2 FAIL을 그대로 보존한다. 후속 후보는 정조준 43개·전체 회귀 262개·기존 변이 37개를 통과했다. G의 고장 24종과 실제 후속 Claude V1의 고장 37종은 수와 범위가 다르다. Claude의 정상 사본 1개를 합치면 38번 실행이며, 고장 중 31개는 동결 시험에서 실패하고 6개는 살아남았다. 실제 구현의 직접 입력 결과와 검토자의 해석은 별도로 읽어야 한다.
 
