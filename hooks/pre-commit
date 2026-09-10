@@ -149,6 +149,23 @@ if printf '%s\n' "$staged" | grep -qx 'suppressions.yaml'; then
   if [ "$n_check" -ne "$n_exp" ]; then
     block "억제 항목 ${n_check}건 중 expiry 가 ${n_exp}건뿐 — 만료일 없는 억제는 영구화된다 (P13)"
   fi
+  # owner 와 reason 도 필수다 (2026-09-10 Codex 적대검증 반영). expiry 만 요구하면
+  # "누가 승인했고 왜 유예하는가"가 비어 있는 항목이 통과한다. 특히 `retire:<경로>` 승인은
+  # 검사를 영구히 없애는 결정이라, 책임자와 근거가 없으면 그냥 조용한 삭제와 같아진다.
+  n_own=$(printf '%s\n' "$sup" | awk '/^ *owner:/{c++} END{print c+0}')
+  n_rsn=$(printf '%s\n' "$sup" | awk '/^ *reason:/{c++} END{print c+0}')
+  if [ "$n_check" -ne "$n_own" ]; then
+    block "억제 항목 ${n_check}건 중 owner 가 ${n_own}건뿐 — 책임자 없는 유예는 승인이 아니다 (P13)"
+  fi
+  if [ "$n_check" -ne "$n_rsn" ]; then
+    block "억제 항목 ${n_check}건 중 reason 이 ${n_rsn}건뿐 — 근거 없는 유예는 재검토할 수 없다 (P13)"
+  fi
+  # 개수만 맞추면 `owner:` 빈 값도 통과한다. 값이 실제로 있는지 본다.
+  while IFS= read -r o; do
+    if [ -z "$(printf '%s' "$o" | tr -d '[:space:]"'"'"'')" ]; then
+      block "owner 값이 비었다 — 책임자 없는 유예는 승인이 아니다 (P13)"
+    fi
+  done <<< "$(printf '%s\n' "$sup" | awk '/^ *owner:/{sub(/^ *owner: */,""); print}')"
   # 개수만 맞추면 expiry: 1999-01-01 도 통과한다. 날짜 자체를 본다.
   # 값 정제를 하지 않는다 — gsub 로 숫자만 남기면 'never' 가 빈 문자열이 되어
   # 형식 검사를 빠져나간다. 원문 그대로 받아 YYYY-MM-DD 인지 먼저 확인한다.

@@ -201,14 +201,11 @@ setup_delete_comment() {
 }
 run_case "워크플로 주석 줄 삭제는 통과한다 (주석 대조)" pass setup_delete_comment
 
-# 시연 6 (음성 · 정당한 제거) — 실행 줄과 스크립트 파일을 **함께** 지운다.
-# 검사를 은퇴시키는 정당한 경로다. 이것까지 막으면 스크립트를 영원히 못 지운다.
-# 이 시연이 없으면 검사기에서 "스크립트가 아직 존재하는가" 확인을 빼도 초록이었다(M5 생존).
-setup_retire_script() {
-  sed -i.bak "${VICTIM}d" "$WF" && rm -f "$WF.bak"
-  git rm -q --cached "$VICTIM_PATH" && rm -f "$VICTIM_PATH" && git add "$WF"
-}
-run_case "실행 줄과 스크립트를 함께 지우면 통과한다 (정당한 은퇴)" pass setup_retire_script
+# (옛 시연 제거) "실행 줄과 스크립트를 함께 지우면 통과한다"는 **자동 면제**를 시험하던
+# 것이다. 2026-09-10 Codex 적대검증에서 그 면제가 공격과 정당한 은퇴를 구분하지 못한다는
+# 것이 드러나(233줄 검사가 흔적 없이 사라지는데 통과) 정책을 바꿨다. 이제 은퇴는 막지
+# 않되 suppressions.yaml 승인을 요구한다 — 아래 "승인 없는 은퇴"·"승인된 은퇴" 두 시연이
+# 그 자리를 대신하며, 검사기의 존재 확인 분기도 그 쌍이 잡는다(옛 M5 변이의 대체).
 
 # 시연 7 (양성 · 파일 통째) — 워크플로 파일 자체를 지운다. 가장 거친 약화이고,
 # 줄 단위 diff 만 보면 놓친다(스테이징 목록에서 D 를 빼면 이 시연이 생존했다 · M6).
@@ -233,7 +230,50 @@ setup_rename_to_yml() {
 }
 run_case "다른 .yml 로 이름을 바꾸면 통과한다 (정당한 정리)" pass setup_rename_to_yml
 
-# 시연 10 (배선) — 검사기가 존재해도 훅이 부르지 않으면 무방비다.
+# 시연 10 (양성 · 흔적 없는 은퇴) — 인수 스크립트와 그 CI 스텝을 **한 커밋에 함께** 지운다.
+# 이전 판은 "스크립트가 저장소에서 사라졌으면 정당한 제거"로 자동 면제했다. 그래서 공격과
+# 정당한 은퇴를 구분하지 못했다(2026-09-10 Codex 적대검증 실측: 233줄짜리 검사가 흔적 없이
+# 사라지는데 커밋이 통과했다). 최종 마커 검수도 현재 트리 글로브로 기대 목록을 만들기 때문에
+# 사라진 검사를 요구하지 않는다 — 두 방어선이 같은 맹점을 공유한다.
+# 은퇴는 막지 않되 **기록을 남기게** 한다: suppressions.yaml 의 승인 없이는 차단.
+setup_retire_without_approval() {
+  local v="scripts/acceptance-guard-global-skill-files.sh"
+  [ -f "$v" ] || return 1
+  python3 - "$v" <<'PYEOF'
+import re, sys
+v = sys.argv[1]
+p = '.github/workflows/verify.yml'
+s = open(p).read()
+n = re.sub(r'\n      - name: [^\n]*\n(?:        [^\n]*\n)*?        run: bash scripts/verify/run-acceptance\.sh ' + re.escape(v) + r'\n', '\n', s, count=1)
+assert n != s, "워크플로 스텝 삭제 실패"
+open(p, 'w').write(n)
+PYEOF
+  git rm -q "$v" && git add .github/workflows/verify.yml
+}
+run_case "승인 없는 은퇴(스크립트+스텝 동시 삭제)는 차단된다" block setup_retire_without_approval
+
+# 시연 11 (음성 · 승인된 은퇴) — 같은 삭제를 suppressions.yaml 승인과 함께 한다.
+# 이것까지 막으면 검사를 영원히 은퇴시키지 못하는 벽이 된다.
+setup_retire_with_approval() {
+  local v="scripts/acceptance-guard-global-skill-files.sh"
+  [ -f "$v" ] || return 1
+  python3 - "$v" <<'PYEOF'
+import re, sys, datetime
+v = sys.argv[1]
+p = '.github/workflows/verify.yml'
+s = open(p).read()
+n = re.sub(r'\n      - name: [^\n]*\n(?:        [^\n]*\n)*?        run: bash scripts/verify/run-acceptance\.sh ' + re.escape(v) + r'\n', '\n', s, count=1)
+assert n != s, "워크플로 스텝 삭제 실패"
+open(p, 'w').write(n)
+exp = (datetime.date.today() + datetime.timedelta(days=30)).isoformat()
+with open('suppressions.yaml', 'a') as f:
+    f.write('\n- check: "retire:%s"\n  reason: >-\n    시연용 승인 — 이 검사를 은퇴시킨다.\n  owner: sangmokang\n  expiry: %s\n  issue: >-\n    시연 전용 항목.\n' % (v, exp))
+PYEOF
+  git rm -q "$v" && git add .github/workflows/verify.yml suppressions.yaml
+}
+run_case "승인된 은퇴는 통과한다 (기록만 요구한다)" pass setup_retire_with_approval
+
+# 시연 12 (배선) — 검사기가 존재해도 훅이 부르지 않으면 무방비다.
 # 몽키패치로 치워 둔 함수가 시험 0건이 되는 것을 막는다(2026-08-27 PR#54 교훈).
 if grep -q 'check-workflow-deletion\.sh' hooks/pre-commit; then
   record 0 "hooks/pre-commit 이 검사기를 호출한다 (배선)"

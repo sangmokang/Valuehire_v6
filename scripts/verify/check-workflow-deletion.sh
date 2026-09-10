@@ -24,8 +24,15 @@
 #   그것을 경고하고 있었다 — 새 검사기에서 같은 실수를 반복하지 않도록 방식을 바꾼다.
 #
 #   · 스텝 이동·이름 변경·줄 재배치 → 경로가 AFTER 에 남으므로 통과
-#   · 스크립트 자체를 지우는 정당한 은퇴 → 파일이 없으므로 통과
 #   · 워크플로 파일 이름을 다른 .yml 로 바꾸는 정당한 정리 → 여전히 워크플로라 AFTER 에 남는다
+#   · 스크립트 자체를 함께 지우는 은퇴 → **자동 면제하지 않는다**. suppressions.yaml 에
+#     `retire:<경로>` 승인(owner·reason·expiry 필수)이 있어야 통과한다.
+#
+#     왜 자동 면제를 뺐나 (2026-09-10 Codex 적대검증): 스크립트와 그 워크플로 스텝을 한
+#     커밋에 함께 지우면 공격과 정당한 은퇴가 구분되지 않았다. 실측으로 233줄짜리 검사가
+#     흔적 없이 사라지는데 커밋이 통과했다. 최종 마커 검수도 **현재 트리**의 글로브로 기대
+#     목록을 만들기 때문에 사라진 검사를 요구하지 않는다 — 두 방어선이 같은 맹점을 공유했다.
+#     은퇴를 막지는 않는다. 기록을 남기게 할 뿐이다.
 #
 # 계약: exit 0 (약화 없음) | exit 1 (약화 발견) | exit 2 (검사 실행 불가 · fail-closed)
 #
@@ -97,23 +104,42 @@ collect ""   "$TMP/after"
 
 comm -23 "$TMP/before" "$TMP/after" > "$TMP/gone" || die_setup "집합 비교 실패"
 
+# 은퇴 승인 목록 — suppressions.yaml 의 `check: "retire:<경로>"` 항목.
+# 커밋될 내용(인덱스)에서 읽는다. 작업트리에서 읽으면 승인을 스테이징하지 않고도 통과한다.
+: > "$TMP/approved" || die_setup "작업 파일을 열 수 없다 ($TMP/approved)"
+if git ls-files --error-unmatch -- suppressions.yaml >/dev/null 2>&1; then
+  git show :suppressions.yaml 2>/dev/null \
+    | sed -n 's/^-[[:space:]]*check:[[:space:]]*["'"'"']\{0,1\}retire:\([^"'"'"']*\)["'"'"']\{0,1\}[[:space:]]*$/\1/p' \
+    | LC_ALL=C sort -u > "$TMP/approved" || die_setup "은퇴 승인 목록을 읽지 못했다"
+fi
+
 checked=$(awk 'NF{c++} END{print c+0}' "$TMP/before")
 violation=0
 while IFS= read -r p; do
   [ -z "$p" ] && continue
-  # 스크립트 자체가 저장소에서 사라졌으면 정당한 제거다 (같은 커밋의 삭제 포함).
   if git ls-files --error-unmatch -- "$p" >/dev/null 2>&1; then
-    printf '%s\n' "$p" >> "$TMP/hits" || die_setup "결과 기록 실패"
+    # 스크립트는 남아 있는데 CI 가 더 이상 부르지 않는다 — 언제나 약화다.
+    printf '%s\t%s\n' "$p" "still-present" >> "$TMP/hits" || die_setup "결과 기록 실패"
+    violation=1
+  elif ! grep -qxF "$p" "$TMP/approved"; then
+    # 스크립트도 함께 사라졌다 — 은퇴일 수 있으나 승인이 없으면 흔적 없는 제거다.
+    printf '%s\t%s\n' "$p" "retired-unapproved" >> "$TMP/hits" || die_setup "결과 기록 실패"
     violation=1
   fi
 done < "$TMP/gone"
 
 if [ "$violation" -ne 0 ]; then
-  while IFS= read -r p; do
+  while IFS=$'\t' read -r p why; do
     printf 'BLOCKED: %s — %s 의 실행 줄에서 %s 가 사라졌다.\n' "$BLOCK_MARK" "$WF_DIR" "$p"
-    printf '         스크립트는 저장소에 그대로 있는데 CI 가 더 이상 부르지 않는다.\n'
-    printf '         (줄 삭제·스텝 삭제·파일 삭제·워크플로 파일 이름 변경 전부 여기서 걸린다)\n'
-    printf '         정당하면 스크립트도 함께 지우거나 suppressions.yaml 에 expiry 와 함께 등록하라.\n'
+    if [ "$why" = "still-present" ]; then
+      printf '         스크립트는 저장소에 그대로 있는데 CI 가 더 이상 부르지 않는다.\n'
+      printf '         (줄 삭제·스텝 삭제·파일 삭제·워크플로 파일 이름 변경 전부 여기서 걸린다)\n'
+    else
+      printf '         스크립트도 같은 커밋에서 함께 삭제됐다 — 은퇴라면 기록을 남겨야 한다.\n'
+      printf '         자동 면제하지 않는다: 그러면 공격과 정당한 은퇴가 구분되지 않는다.\n'
+    fi
+    printf '         은퇴하려면 suppressions.yaml 에 다음을 owner·reason·expiry 와 함께 등록하라:\n'
+    printf '           - check: "retire:%s"\n' "$p"
   done < "$TMP/hits"
   echo "CHECKED: $checked"
   exit 1
