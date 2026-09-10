@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 
 import pytest
+from test_hs_1302 import GOLDEN_JD
 
 from humansearch.brief import (
     BriefInputError,
@@ -19,7 +20,6 @@ from humansearch.brief import (
     extract_block,
     verify_fidelity,
 )
-from test_hs_1302 import GOLDEN_JD
 
 START_MARKER = "[JD 원문 시작]"
 END_MARKER = "[JD 원문 끝]"
