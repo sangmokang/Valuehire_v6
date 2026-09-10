@@ -473,3 +473,40 @@ VERDICT: PASS
 ```
 
 → fixture 정상 통과만으로는 완료할 수 없으며, Git에 추적된 실제 manifest와 무조건 CI 호출이 둘 다 필요합니다.
+
+## WU-2R3 감사 보정: 최종 blob 원복으로 숨긴 가짜 GREEN
+
+계약 `4949acb` 뒤 RED `3c7017c`은 GREEN 커밋에서 기대값을 바꿔 구현 없이 통과시킨 뒤, 나중 HEAD에서 시험을 원복하고 구현을 넣는 이력을 만들었습니다.
+
+```text
+2026-09-10T17:47:50+0900
+PASS: authentic RED then GREEN
+PASS: zero RED commands rejected
+PASS: syntax-only RED rejected
+PASS: test expectation drift rejected
+PASS: contract declared only after boundary rejected
+PASS: test drift after first GREEN rejected
+FAIL: fake GREEN followed by restored expectation rejected
+WU_TESTS: 7
+CHECKED: 7
+WU_FAILURE_KIND: missing_behavior
+VERDICT: FAIL
+RESTORED_DRIFT_RED_EXIT=1
+```
+
+GREEN `77ee839`은 최종 blob만 비교하지 않고 `red_commit..HEAD`에서 선언한 시험 파일을 건드린 모든 커밋을 조사합니다. manifest에 승인 SHA가 없거나 해당 커밋에 `Test-Expectation-Approval: <WU-ID>` trailer가 없으면 실패합니다.
+
+```text
+2026-09-10T17:49:39+0900
+PASS: authentic RED then GREEN
+PASS: zero RED commands rejected
+PASS: syntax-only RED rejected
+PASS: test expectation drift rejected
+PASS: contract declared only after boundary rejected
+PASS: test drift after first GREEN rejected
+PASS: fake GREEN followed by restored expectation rejected
+WU_TESTS: 7
+CHECKED: 7
+VERDICT: PASS
+RESTORED_DRIFT_GREEN_EXIT=0
+```
