@@ -26,12 +26,18 @@ VC_DOC="docs/sot/verification-commands.md"
 HIST_DIR="docs/engineering/history"
 PROMPT="docs/engineering/goal-prompts/humansearch-journey-kickoff-2026-09-07.md"
 VERDICT_GLOB="docs/engineering/humansearch-kickoff-ledger-verdict-*.md"
+IDENTITY_CHECKER="scripts/verify/check-hs-kickoff-identities.py"
 EXPECTED=12
 
 checked=0
 fail=0
 pass() { echo "PASS: $1"; checked=$((checked+1)); }
 failc() { echo "FAIL: $1"; checked=$((checked+1)); fail=1; }
+identity_check() {
+  local kind="$1"
+  shift
+  python3 "$IDENTITY_CHECKER" --kind "$kind" "$@"
+}
 
 # 1~6 처분표
 targets=(
@@ -62,6 +68,7 @@ else
         n = split(line, c, "|")
         if (n != 7) next                      # | # | 대상 | 결론 | 근거 | 다음 행동 |
         for (k = 1; k <= n; k++) { gsub(/^[ \t]+|[ \t]+$/, "", c[k]) }
+        if (c[3] == "대상" || c[3] ~ /^-+$/) next
         if (c[3] == "" || c[4] == "") next
         print c[3] "\t" c[4] "\t" c[5]
       }
@@ -69,6 +76,13 @@ else
   }
 
   CELLS=$(disposition_cells)
+  disposition_token_args=()
+  for t in "${targets[@]}"; do disposition_token_args+=(--token "$t"); done
+  disposition_names=$(printf '%s\n' "$CELLS" | cut -f1)
+  disposition_identity=$(identity_check disposition-target "${disposition_token_args[@]}" \
+    <<< "$disposition_names" 2>&1)
+  disposition_identity_rc=$?
+  if [ "$disposition_identity_rc" -ne 0 ]; then printf '%s\n' "$disposition_identity"; fi
   for t in "${targets[@]}"; do
     rows=$(printf '%s\n' "$CELLS" | awk -F'\t' -v t="$t" 'NF && $1 ~ ("(^|[^[:alnum:]_./-])" t "($|[^[:alnum:]_./-])")' | /usr/bin/grep -c .)
     row=$(printf '%s\n' "$CELLS" | awk -F'\t' -v t="$t" 'NF && $1 ~ ("(^|[^[:alnum:]_./-])" t "($|[^[:alnum:]_./-])")' | head -1)
@@ -105,7 +119,12 @@ else
       # 저장소 경로는 어디서 돌려도 같다 — 없으면 실패다.
       if [ -e "$tok" ]; then ev_real=$((ev_real+1)); else ev_bad="$ev_bad $tok"; fi
     done
-    if [ "$rows" -eq 0 ]; then
+    if [ "$disposition_identity_rc" -gt 1 ]; then
+      failc "$t 처분 대상 Unicode 검사 오류"
+    elif [ "$disposition_identity_rc" -eq 1 ] \
+         && printf '%s\n' "$disposition_identity" | /usr/bin/grep -qF -- "token=$t"; then
+      failc "$t 처분 대상에 보호 이름 위장 있음"
+    elif [ "$rows" -eq 0 ]; then
       failc "처분표에 $t 행 없음"
     elif [ "$others" -gt 0 ]; then
       failc "$t 행의 대상 칸에 다른 대상 ${others}개가 함께 적혀 있다 — 대상마다 자기 행이 있어야 한다"
@@ -135,9 +154,32 @@ if [ -f "$VERIFY_YML" ]; then
   }
 fi
 
+# 원문 이름은 기존 1:1 대조에 그대로 쓰고, 별도 shadow 판정은 거부에만 쓴다.
+workflow_identity=""
+workflow_identity_rc=0
+sot_identity=""
+sot_identity_rc=0
+if [ -z "$STEPS_ERR" ] && [ -n "$STEPS" ]; then
+  step_token_args=(--token hs-kickoff --token hs-kickoff-mutations)
+  workflow_names=$(printf '%s\n' "$STEPS" | awk -F'\t' 'NF{print $2}')
+  workflow_identity=$(identity_check workflow-step "${step_token_args[@]}" \
+    <<< "$workflow_names" 2>&1)
+  workflow_identity_rc=$?
+  if [ "$workflow_identity_rc" -ne 0 ]; then printf '%s\n' "$workflow_identity"; fi
+  if [ -f "$VC_DOC" ]; then
+    sot_names=$(/usr/bin/grep -E '^\| [0-9]+ \|' "$VC_DOC" \
+      | awk -F'|' '{gsub(/^ +| +$/,"",$3); print $3}')
+    sot_identity=$(identity_check sot-step "${step_token_args[@]}" <<< "$sot_names" 2>&1)
+    sot_identity_rc=$?
+    if [ "$sot_identity_rc" -ne 0 ]; then printf '%s\n' "$sot_identity"; fi
+  fi
+fi
+
 # 7 CI 스텝 수·이름·순서
 if [ -n "$STEPS_ERR" ]; then
   failc "워크플로를 정규 형식으로 읽지 못했다 — $STEPS_ERR"
+elif [ "$workflow_identity_rc" -ne 0 ] || [ "$sot_identity_rc" -ne 0 ]; then
+  failc "CI·정본 스텝 이름 Unicode 위장 또는 검사 오류"
 elif [ -f "$VERIFY_YML" ] && [ -f "$VC_DOC" ]; then
   # `- name:` 을 문자열로 세면 이름 없는 스텝(uses 만 있는 checkout)이 통째로 빠지고,
   # 여러 줄 문자열 안의 가짜 머리글이 스텝으로 세어진다. YAML 로 읽는다.

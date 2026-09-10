@@ -2,16 +2,16 @@
 
 ## 결론
 
-현재 착수 검사는 정상 이름과 나란히 추가한 전각·키릴 문자 위장 스텝 및 전각 처분 대상을 정상으로 통과시킨다. HS-00.03은 파싱된 이름 칸만 검사하여 이 입력을 거부하고, 정상 한글·다국어 이름과 무관한 전각 설명은 계속 허용한다.
+기준 착수 검사는 정상 이름과 나란히 추가한 전각·키릴 문자 위장 스텝 및 전각 처분 대상을 정상으로 통과시켰다. HS-00.03은 파싱된 이름 칸만 검사하여 이 입력을 거부하고, 정상 한글·다국어 이름과 무관한 전각 설명은 계속 허용한다.
 
-이번 세션은 HS-00.03 한 개 작업 단위만 구현한다. 원격 전송·병합·운영 쓰기는 하지 않으며, 종료 상태는 로컬 커밋과 커밋 후 지문 대조가 끝난 `LOCAL_COMMITTED`로 제한한다.
+이번 세션은 HS-00.03 한 개 작업 단위만 구현한다. 원격 전송·병합·운영 쓰기는 하지 않으며, 종료 상태는 로컬 커밋과 커밋 후 지문 대조가 끝난 LOCAL_COMMITTED로 제한한다.
 
 ## 판단 근거와 WU 카드
 
 - 위험 등급: L3. 합격 여부를 결정하는 공유 착수 검사와 Unicode 식별 경계를 바꾼다.
 - 기준 SHA: HS-00.02 완료 기록 `f75038830b6680f618c5250b0f04faecac77289d`; 그 안의 구현 SHA는 `69801528d794aabfe8ceb84e1ee073d71ceec442`다.
 - 소유: `task/hs-0003-20260910`, `worktrees/hs-0003-20260910`, 세션 `hs0003-20260910`.
-- 상태: PLAN. 시작 시 main과 origin/main은 `4379b2ff30afa2e37627e85af0b96920af3a38cd`, HS-00.02 작업트리는 보존돼 있으며 추적 파일은 깨끗하고 준비 자료는 무시된 `artifacts/`에만 있다.
+- 상태: GREEN_VERIFIED. 시작 시 main과 origin/main은 `4379b2ff30afa2e37627e85af0b96920af3a38cd`, HS-00.02 작업트리는 보존돼 있으며 추적 파일은 깨끗하고 준비 자료는 무시된 `artifacts/`에만 있다.
 - 사용자 결과: 보호 스텝 이름·정본 스텝 이름 칸·처분 대상 칸에 보호 토큰처럼 보이는 비ASCII 문자를 섞으면 착수 검사가 거부한다.
 - 포함: 파싱된 workflow step name, 검증 정본의 step-name cell, 처분표 target cell; U+FF01~U+FF5E 전각 ASCII와 Unicode 17.0.0 혼동표의 단일 비ASCII 코드포인트→단일 보호 ASCII 문자 매핑; 기존 토큰 경계; 정상 한글·다국어·무관한 전각 설명; 정상 이름과 위장 이름의 동시 존재; 데이터 오류.
 - 제외: 일반 산문·근거·결론·명령 본문, 전체 문자열 정규화, ASCII `rn`/`m`, 다중문자 매핑, 결합 문자, bidi skeleton, default-ignorable·보이지 않는 문자 전체, U+3000 및 다른 공백 치환, 전체 UTS #39 준수.
@@ -53,6 +53,7 @@ OK(run-acceptance): scripts/acceptance-hs-kickoff.sh — 판정 12건, CHECKED 1
 5. When 정상 보호 이름과 위장 이름이 동시에 존재하면, 시스템은 정상 이름의 존재를 면제 사유로 쓰지 않고 위장 이름을 거부해야 한다.
 6. If 매핑 데이터가 없거나 비었거나 손상됐거나 선언한 출처·개수·대상 문자 계약과 다르면, 시스템은 빈 정상 결과로 접지 않고 입력/실행 오류로 실패해야 한다.
 7. While 기존 HS-00.01·02 시험과 37종 동결 변이 기대값을 실행하면, 시스템은 그 기대값과 단언을 바꾸지 않고 기존 결과를 유지해야 한다.
+8. When 원문 보호 토큰 바로 앞뒤의 비ASCII 문자가 비교 사본에서 ASCII 식별 경계 문자로 바뀌면, 시스템은 raw 선택이 다른 이름을 보호 이름으로 인정하지 못하게 거부해야 한다.
 
 정조준 인수 명령은 다음 한 개다.
 
@@ -60,7 +61,7 @@ OK(run-acceptance): scripts/acceptance-hs-kickoff.sh — 판정 12건, CHECKED 1
 cd humansearch && uv run --no-sync pytest -q tests/test_hs_0003.py tests/test_hs_0001.py tests/test_hs_0001_main_compat.py tests/test_hs_0002.py tests/test_hs_0002_boundaries.py
 ```
 
-기대 결과는 수집 0건이 아닌 전체 PASS다. 기존 37종 변이는 `bash scripts/acceptance-hs-kickoff-mutations.sh`, 전체 Python 회귀와 정적 검사는 `bash scripts/acceptance-hs-gates.sh`, 저장소 정본 검사는 `bash verify.sh` 및 `docs/sot/verification-commands.md`의 실제 명령으로 확인한다.
+→ 이 명령이 HS-00.03과 선행 HS-00.01·02의 고정 시험 74개를 함께 실행한다. 기대 결과는 수집 0건이 아닌 전체 PASS다. 기존 37종 변이는 `bash scripts/acceptance-hs-kickoff-mutations.sh`, 전체 Python 회귀와 정적 검사는 `bash scripts/acceptance-hs-gates.sh`, 저장소 정본 검사는 `bash verify.sh` 및 `docs/sot/verification-commands.md`의 실제 명령으로 확인한다.
 
 ### counter-AC
 
@@ -70,6 +71,7 @@ cd humansearch && uv run --no-sync pytest -q tests/test_hs_0003.py tests/test_hs
 - raw 이름을 정규화한 뒤 정상 이름으로 승인한다.
 - 모든 비ASCII 또는 모든 전각 문자를 거부해 정상 한글·다국어 이름을 막는다.
 - `PR #131`을 `PR #13`, `hs-kickoff-other`를 `hs-kickoff`로 오인한다.
+- `PR #13１`, `ｘPR #13`, `ｘhs-kickoff (`처럼 토큰 바깥 전각 문자가 ASCII 식별 경계로 바뀌는데 raw 필터만 보고 보호 이름으로 인정한다.
 - 매핑 파일이 깨졌을 때 빈 매핑으로 계속 실행한다.
 - helper 단위 시험만 통과하고 실제 `acceptance-hs-kickoff.sh`에서 호출하지 않는다.
 - 항상 허용 또는 항상 거부 구현이 정상/음성 대조군 중 한쪽만 통과한다.
@@ -84,13 +86,15 @@ python3 scripts/verify/check-hs-kickoff-identities.py \
   --token <ASCII 보호 토큰> [--token ...]
 ```
 
-- 입력: UTF-8 표준입력의 이름/대상 한 줄씩. 토큰은 비어 있지 않은 ASCII 문자열이며 고정 데이터의 보호 ASCII 문자 집합 안에 있어야 한다.
+→ 판정기는 이름 종류와 보호 토큰을 인자로 받고, 검사할 원문 이름 목록은 표준입력으로 받는다.
+
+- 입력: UTF-8 strict 표준입력의 이름/대상 한 줄씩. 0바이트, 빈 문자열 또는 공백뿐인 이름 한 줄, 해독할 수 없는 바이트는 종료값 2다. 토큰은 비어 있지 않은 ASCII 문자열이며 고정 데이터의 보호 ASCII 문자 집합 안에 있어야 한다.
 - 출력: 정상은 출력 없음·종료값 0. 위장은 `SPOOF: <kind> line=<1-based> token=<ASCII token>` 한 줄 이상·종료값 1. 입력/데이터/읽기 오류는 `ERROR: ...`를 표준오류에 쓰고 종료값 2.
 - 원문: 저장·표시·기존 1:1 대조에는 그대로 둔다. 비교 사본은 위장 탐지에만 쓰며 정상 이름으로 승인하지 않는다.
 - 문자 지원: U+FF01~U+FF5E는 코드포인트에서 `0xFEE0`을 빼 ASCII로 대응한다. 그 밖에는 Unicode 17.0.0 `confusables.txt`에서 source 1개·target 1개·source 비ASCII·target이 보호 ASCII 집합인 항목만 쓴다. ASCII source 및 다중문자 target은 제외한다.
-- 경계: 보호 토큰 앞뒤가 ASCII 문자·숫자 또는 `_ . / -`이면 그 span은 보호 토큰으로 보지 않는다. 따라서 `PR #131`과 `hs-kickoff-other`는 유지한다. 한글 등 비ASCII 접두·접미는 ASCII 토큰 경계를 침범하지 않는다.
-- 위장 판정: 비교 사본에서 경계를 지킨 보호 토큰 span이 생기고 그 span 안에 비ASCII→ASCII 치환이 한 개 이상 있으면 거부한다.
-- 빈 입력: 실제 이름/대상 줄이 0개면 종료값 2. 개별 빈 이름의 기존 형식 오류는 기존 검사와 함께 실패한다.
+- 경계: 보호 토큰 앞뒤가 ASCII 문자·숫자 또는 `_ . / -`이면 그 span은 보호 토큰으로 보지 않는다. 따라서 `PR #131`과 `hs-kickoff-other`, 그 안의 치환 사본 `ＰR #131`과 `hｓ-kickoff-other`는 유지한다. 한글처럼 보호 ASCII로 매핑되지 않는 비ASCII 접두·접미는 ASCII 토큰 경계를 침범하지 않는다.
+- 위장 판정: 비교 사본에서 경계를 지킨 보호 토큰 span 안에 비ASCII→ASCII 치환이 있거나, 원문 ASCII 토큰 바로 앞뒤의 치환 문자가 비교 사본에서 ASCII 식별 경계가 되면 거부한다. 후자는 raw 선택과 비교 사본의 불일치로 `PR #13１`, `ｘPR #13`, `ｘhs-kickoff (`가 정상 보호 이름으로 인정되는 것을 막는다.
+- 빈 입력: 실제 이름/대상 줄이 0개이거나 빈 문자열 또는 공백뿐인 이름 한 줄뿐이면 종료값 2. 개별 빈 이름의 기존 형식 오류는 기존 검사와 함께 실패한다.
 
 ## Unicode 데이터·라이선스·재생성 계약
 
@@ -154,5 +158,22 @@ CHECKED: 34
 
 ## 적대 검증 로그
 
-아직 구현 전이다. Codeaudit, Claude V1, Codex V2는 `NOT_RUN`이며 이 절은 실제 실행 결과만 추가한다.
+계약은 `39cc8df54b0095ec85931a547c7dac68188feddc`에 고정했다. 최초 RED `396cd2b7e92f755d65c34cf103d07b8741259cfc`는 14 failed, 1 passed였고 독립 검토가 PASS했다. 초기 V1 뒤 새 V2가 찾은 경계·입력 반례는 두 번째 RED `d1058cadb764056c4f52696ea0321038c660a12c`에서 5 failed, 16 passed로 재현했고 독립 검토가 PASS했다. 보강 후보의 실제 Claude가 찾은 공백 입력과 같은 줄 반복 탐색은 세 번째 RED `e99b4549ddf617d0d79acdd63880438cfbf9a7c8`에서 1 failed, 22 passed로 재현했고 독립 검토가 PASS했다.
 
+```text
+HS-00.03 target: 23 passed
+targeted HS-00.01~03: 74 passed
+G2: ruff 46, mypy 46, pytest collected 285 and passed
+kickoff mutations: CHECKED 37
+principles: CHECKED 34, VERDICT PASS
+principle mutations: CHECKED 41, VERDICT PASS
+adversarial: baseline 23 passed, mutants killed 11/11
+candidate manifest: c466946aad003159a07c052979e8e0034ec4eeb0d3445d5a9ccb7952a6b7e6d4
+candidate bundle: 9517376e3755a69e4e9dfca8ac5ad859654cbb94dda8cd3b610075c61b40e23d
+```
+
+→ 정조준·전체 회귀·기존 기대·원칙·적대 사본이 같은 최종 후보에서 통과했다. Codeaudit는 `docs/engineering/evidence/hs0003-20260910/codeaudit-final-v2-verdict.md`에 PASS를 남겼다.
+
+실제 Claude V1은 Claude Code 2.1.267과 모델 `claude-fable-5-1`로 실행했다. 세션 `ab9f164b-5474-4a48-a7af-88c473281083`의 최종 판정은 PASS이며, 실제 실행 프롬프트 원문은 내부 SHA `2047a051e773203bbeb151f66fab7ca7c6cc24cfcc33680a576c2be73c1c3825`로 `docs/engineering/evidence/hs0003-20260910/claude-v1-final-v2-prompt-raw.json`에 보관했다. 원문은 `docs/engineering/evidence/hs0003-20260910/claude-v1-final-v2-response.md`, 형식 보정본은 `docs/engineering/evidence/hs0003-20260910/claude-v1-final-v2-response-final.md`, 실행 메타는 `docs/engineering/evidence/hs0003-20260910/claude-v1-final-v2-meta.json`에 있다. 새 Codex V2도 PASS했으며 원문은 `docs/engineering/evidence/hs0003-20260910/codex-v2-final-verdict.md`, brief-lint 0건 보정본은 `docs/engineering/evidence/hs0003-20260910/codex-v2-final-verdict-final.md`에 있다.
+
+첫 Codeaudit와 첫 실제 Claude PASS는 새 Codex V2의 경계 FAIL로 무효화했고, 경계 보강 뒤 Claude PASS가 남긴 낮은 공백·시험 공백도 세 번째 RED로 회수했다. 프로젝트 디렉터리에서 시작한 Claude 사전 시도 두 번은 SessionStart 훅으로 각 10분 뒤 중단돼 `NOT_RUN`으로 기록했고, `/tmp`에서 시작한 실제 세션만 최종 판정으로 센다.

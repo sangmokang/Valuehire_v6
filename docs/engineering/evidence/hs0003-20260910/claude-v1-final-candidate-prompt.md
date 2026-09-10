@@ -1,0 +1,85 @@
+# HS-00.03 최종 후보 Claude V1 독립 적대검증 요청
+
+## 결론
+
+현재 최종 후보가 전각·동형 문자로 보호 이름을 위장한 입력과 보호 토큰 양옆의 치환 경계 우회를 거부하면서 정상 한글·다국어 이름을 허용하는지 독립적으로 판정해 주십시오. 작업트리를 수정하지 말고 읽기 전용 검증만 하십시오.
+
+## 판단 근거
+
+이 후보는 첫 Claude V1이 PASS한 뒤 새 Codex V2가 `PR #13１`, `ｘPR #13`, `ｘhs-kickoff (`와 입력 오류 처리를 반례로 찾아 FAIL했습니다. 그 반례는 별도 RED 커밋 `d1058cadb764056c4f52696ea0321038c660a12c`에 먼저 고정했고, 현재 후보가 이를 보강했습니다. 과거 Claude 판정은 현재 후보의 합격 근거로 재사용하지 마십시오.
+
+> **무엇을** — 원문과 별도의 탐지용 비교 사본을 쓰는 보호 이름 검사 최종 후보를 공격합니다.
+> **왜** — 위장 누락, 다른 이름 오인, 정상 이름 과잉 차단, 입력·데이터 오류의 열린 실패를 함께 찾아야 하기 때문입니다.
+> **버린 길** — 전체 문자열 정규화와 전체 Unicode 보안 표준 구현은 이번 한 작업 단위의 범위를 넘으므로 판정 기준에서 제외합니다.
+> **대가** — 결합 문자, 양방향 문자, 보이지 않는 문자, 다중문자 위장은 해결됐다고 말할 수 없습니다.
+> **되돌리기** — 구현 후보만 제거하고 두 RED 시험 커밋을 유지하면 요구 동작이 다시 실패하는지 확인할 수 있습니다.
+
+## 기술 상세와 검증 요청
+
+- 작업트리: `/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-0003-20260910`
+- 현재 HEAD와 두 번째 RED: `d1058cadb764056c4f52696ea0321038c660a12c`
+- 최초 RED: `396cd2b7e92f755d65c34cf103d07b8741259cfc`
+- 검증 대상: 현재 HEAD 위의 working tree GREEN 후보
+- 후보 manifest: `docs/engineering/evidence/hs0003-20260910/candidate-product-manifest.json`
+- manifest SHA-256: `41aa89efa6c883a64d333d9428fea33a22a1f13f8fe1142364e58521649aead4`
+- bundle SHA-256: `0ccf996ee201ecabe4b1a66b6c00f2a04a669c5476960f8c1feca026f12b8c85`
+- bundle 알고리즘: manifest 순서대로 UTF-8 경로, NUL, 원시 파일 바이트, NUL을 SHA-256에 넣습니다.
+- 계약: `docs/engineering/humansearch-hs0003-goal-2026-09-10.md`
+- 정본: `docs/sot/verification-commands.md`
+- 최종 Codeaudit: `docs/engineering/evidence/hs0003-20260910/codeaudit-final-candidate-verdict.md`
+- 적대 검증: `docs/engineering/evidence/hs0003-20260910/adversarial-verification.md`
+
+목표 입력 칸은 파싱된 workflow 스텝 이름, 정본의 스텝 이름 칸, 처분 대상 칸입니다. 원문은 보존하고 비교 사본은 거부 판정에만 사용해야 합니다. `PR #13１`, `ｘPR #13`, `ｘhs-kickoff (`를 실제 shell 경로에서 거부해야 합니다. 빈 입력, 빈 이름 한 줄, 해독할 수 없는 UTF-8은 종료값 2여야 합니다.
+
+정상 대조군에는 한글·일본어·아랍어·라틴 문자 이름, 보호 토큰 밖의 무관한 전각 문장, 정상 이름과 위장 이름의 동시 존재가 포함됩니다. `PR #131`, `ＰR #131`, `hs-kickoff-other`, `hｓ-kickoff-other`는 허용해야 합니다. 이 네 예는 기존 토큰 경계와 치환 경계가 다른 이름을 보호 이름으로 오인하지 않는지 확인합니다.
+
+다음 항목을 직접 확인하십시오.
+
+1. `git status --short`, manifest 파일별 SHA와 bundle을 재계산하여 같은 후보인지 확인합니다.
+2. `cd humansearch && uv run --no-sync pytest -q tests/test_hs_0003.py`를 실행하고 필요하면 정조준 묶음을 실행합니다.
+3. 위 경계 우회 세 개와 정상 대조군 네 개를 helper 또는 실제 acceptance fixture에서 재현합니다.
+4. 0바이트, 빈 이름 한 줄, 잘못된 UTF-8이 종료값 2인지 확인합니다.
+5. helper 결과를 shell이 무시하거나 경계 치환 검사를 제거하는 고장 사본이 시험에 잡히는지 임시 사본에서 확인합니다.
+6. Unicode 17.0.0 원본 SHA `091c7f82fc39ef208faf8f94d29c244de99254675e09de163160c810d13ef22a`, 생성물 SHA `687cd7d5f774002d92a2f994599d614fd08d7d85287ce3a3030c4ef84cd0cdfd`, 선택 수 628, Unicode License v3와 재생성 방법을 대조합니다.
+7. 기존 37종 기대값을 바꾸지 않았는지와 새 의존성·별도 acceptance 단계가 없는지 확인합니다.
+8. 검증 전후 제품 파일 bundle이 같고 작업트리가 검증 때문에 바뀌지 않았는지 확인합니다.
+
+현재 제공된 증거는 다음과 같습니다. 액면 그대로 믿지 말고 핵심을 직접 재실행하십시오.
+
+```text
+HS-00.03: 21 passed
+정조준: 72 passed
+G2: ruff 46 files, mypy 46 source files, pytest collected 283 and passed
+기존 착수 변이: CHECKED 37
+원칙 검사: CHECKED 34, VERDICT PASS
+원칙 변이: CHECKED 41, VERDICT PASS
+적대 검증: baseline 1, mutants killed 10/10, product workspace untouched
+tracked secret-pattern match 없음, .env not tracked
+소유 파일 hard600/hard100 통과, 경계 600 통과·601 실패·대상 0개 실패
+```
+
+→ 구현 세션과 최종 Codeaudit가 주장한 현재 후보 결과입니다. 실행하지 못한 도구는 `NOT_RUN` 또는 `BLOCKED`로 기록하고 제공된 결과와 직접 실행 결과를 구분하십시오.
+
+```text
+manifest algorithm: path + NUL + raw bytes + NUL, in listed order
+expected manifest sha256: 41aa89efa6c883a64d333d9428fea33a22a1f13f8fe1142364e58521649aead4
+expected bundle sha256: 0ccf996ee201ecabe4b1a66b6c00f2a04a669c5476960f8c1feca026f12b8c85
+```
+
+→ 위 알고리즘과 기대값을 함께 제공하므로 결합 지문을 재현할 수 있습니다. 불일치하면 다른 후보를 본 것으로 판정하십시오.
+
+환경 전체 목록, `.env`, 인증 값이나 원시 비밀을 읽거나 출력하지 마십시오. 원격 push·PR·병합·운영 쓰기·키 교체·포털·메시지 발송을 하지 마십시오. 저장소 파일을 작성하거나 고치거나 stage하거나 commit하지 마십시오. 임시 사본은 `/tmp` 아래에만 만들고 종료 전에 정리하십시오.
+
+<!-- lint:skip -->
+```text
+[출력 형식 — 반드시 지킬 것]
+첫 줄은 VERDICT: PASS|FAIL.
+그다음 결론 → 판단 근거 → 기술 상세와 증거 원문 순서로 쓴다.
+결론에는 전문용어를 쓰지 않는다. 판단 근거에는 선택·버린 해석·틀리면 깨지는 것을 쓴다.
+전문용어는 첫 등장 문장 안에서 풀고, 출력·코드·표 바로 아래에는 → 해석을 붙인다.
+file:line에는 줄의 역할을 붙인다. 결함마다 심각도, 원문 제목, 원인, 사업 영향을 쓴다.
+설계 지적은 무엇을/왜/버린 길/대가/되돌리기 다섯 줄로 쓴다.
+건너뜀·미확인·실패 후 재시도와 추정을 판정 앞부분에 밝힌다.
+증거를 생략하지 말고 무엇을 어떻게 깨려다 실패했는지 반증 기록을 남긴다.
+한국어 존칭체로 쓰되 내용을 축소하거나 초등학생 비유를 쓰지 않는다.
+```

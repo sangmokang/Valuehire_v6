@@ -1,0 +1,55 @@
+{
+  "schema": "hs0003-candidate-product-manifest-v1",
+  "head": "e99b4549ddf617d0d79acdd63880438cfbf9a7c8",
+  "red_initial": "396cd2b7e92f755d65c34cf103d07b8741259cfc",
+  "red_boundary": "d1058cadb764056c4f52696ea0321038c660a12c",
+  "algorithm": "In listed order, SHA-256 update with UTF-8 path, NUL, raw file bytes, NUL.",
+  "files": [
+    {
+      "path": "scripts/acceptance-hs-kickoff.sh",
+      "sha256": "53e0f1e0610c3446a5062b4770ffdb4e1cac1b5c0cfc4af525167e16b6f0c22a",
+      "bytes": 14385
+    },
+    {
+      "path": "scripts/acceptance-hs-kickoff-mutations.sh",
+      "sha256": "09fc5e28c650f4968c77e95dc72d3bd4126d92caa6c483210e30f2bb0674696e",
+      "bytes": 25921
+    },
+    {
+      "path": "scripts/verify/check-hs-kickoff-identities.py",
+      "sha256": "dbb0299d0e9f25473e6468a3164dd3c3e44aea16c95bed4ba76093ed729ff0a6",
+      "bytes": 7823
+    },
+    {
+      "path": "scripts/verify/generate-hs-kickoff-confusables.py",
+      "sha256": "7694d91b0af2c7d6ee1e791474a393b8e7a14d9b27542e06315009e6d0f0449d",
+      "bytes": 4311
+    },
+    {
+      "path": "scripts/verify/hs-kickoff-confusables-17.0.0.json",
+      "sha256": "687cd7d5f774002d92a2f994599d614fd08d7d85287ce3a3030c4ef84cd0cdfd",
+      "bytes": 6546
+    },
+    {
+      "path": "humansearch/tests/test_hs_0001.py",
+      "sha256": "a3d9a9de51d65142fcf9c68b6f268185d0f151b1d4285ce0313ceea18abcbbd9",
+      "bytes": 6553
+    },
+    {
+      "path": "humansearch/tests/test_hs_0003.py",
+      "sha256": "2d6ecea834da7b15b6c1e652987435d07118da5b4740773bb46ad2448eb0191a",
+      "bytes": 9745
+    },
+    {
+      "path": "docs/sot/verification-commands.md",
+      "sha256": "493e28059ebf78e9f7073369c08a1d8f1416f12e8261431301d8524ec24b683e",
+      "bytes": 15794
+    },
+    {
+      "path": "docs/licenses/unicode-license-v3.txt",
+      "sha256": "e7a93b009565cfce55919a381437ac4db883e9da2126fa28b91d12732bc53d96",
+      "bytes": 1995
+    }
+  ],
+  "bundle_sha256": "9517376e3755a69e4e9dfca8ac5ad859654cbb94dda8cd3b610075c61b40e23d"
+}

@@ -89,6 +89,8 @@ FILES=(
   "docs/engineering/history/resume-evidence-supabase-archive-goal-2026-08-17.md"
   "docs/engineering/history/resume-evidence-supabase-implementation-prompt-2026-08-17.md"
   "docs/engineering/goal-prompts/humansearch-journey-kickoff-2026-09-07.md"
+  "scripts/verify/check-hs-kickoff-identities.py"
+  "scripts/verify/hs-kickoff-confusables-17.0.0.json"
   "scripts/verify/list-workflow-steps.py"
 )
 

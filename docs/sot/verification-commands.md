@@ -94,3 +94,9 @@
 정조준 명령은 humansearch에서 `uv run --no-sync pytest -q tests/test_hs_0002.py tests/test_hs_0002_boundaries.py`다. 기존 G2의 pytest 전체 수집에서 실행하며 새 CI 단계는 추가하지 않는다. 기존 착수 변이의 negative 함수가 `scripts/verify/has-kickoff-failure.py`를 직접 호출한다.
 기대 문구는 정규식이 아닌 문자 그대로이며 실제 `FAIL: ` 행의 사유 시작과 끝/공백/상세 구분자 경계를 대조한다. 기존 짧은 사유 세 종류는 검사기가 출력하는 전체 정규 형식에서만 인정한다. 빈 값이나 공백만인 기대값·빈 출력·다른 실패 사유·정상 출력 미끼는 거부한다. 비어 있지 않은 기대 문구 양끝의 공백은 문자 그대로 유지하고, 내부 CR/LF는 거부한다. 일반 사유의 뒤 경계는 끝/ASCII 공백/탭/슬래시이며 파일 없음·디렉터리·UTF-8 해독 실패는 CLI 종료값 2로 거부한다. 기존 31개 음성 기대 문자열과 6개 양성은 유지한다.
 영향은 기존 37개 변이의 성공 판정과 G2 회귀 수집이다. 이 규칙은 출력의 진위를 인증하거나 workflow 실행 환경을 보호하지 않는다. 이전의 부분문자열 검색을 대체하는 근거·계약·롤백·사용자 실행 승인 및 실제 독립 검토는 `docs/engineering/humansearch-hs0002-goal-2026-09-10.md`에 연결한다. 원격 CI·병합 승인을 뜻하지 않는다.
+
+## HS-00.03 보호 이름 Unicode 위장 회귀
+
+정조준 명령은 humansearch에서 `uv run --no-sync pytest -q tests/test_hs_0003.py`다. 이 시험은 기존 G2의 pytest 전체 수집에 포함하며 새 acceptance 프레임워크나 CI 단계는 추가하지 않는다. 실제 `scripts/acceptance-hs-kickoff.sh`가 파싱한 workflow 스텝 이름, 이 문서의 스텝 이름 칸, 처분표 대상 칸을 `scripts/verify/check-hs-kickoff-identities.py`에 전달한다.
+
+판정기는 원문을 승인 값으로 바꾸지 않는다. U+FF01~U+FF5E 직접 대응과 고정 Unicode 17.0.0 단일 코드포인트 매핑으로 보호 토큰 비교 사본만 만든다. 토큰 span 안에 치환이 있거나 원문 ASCII 토큰 바로 앞뒤의 치환 문자가 비교 사본에서 ASCII 식별 경계가 되면 거부한다. 정상 한글·다국어·무관한 전각 설명과 `PR #131`, `hs-kickoff-other`, `ＰR #131`, `hｓ-kickoff-other` 경계는 허용한다. 표준입력은 UTF-8 strict로 읽고 0바이트·빈 이름 한 줄·해독 오류는 종료값 2다. 전각 범위를 제외한 매핑 파일의 버전·지문·메타데이터·628개 항목이 다르면 종료값 2로 실패한다. 결합 문자·bidi·보이지 않는 문자·다중문자 skeleton 전체는 이 WU의 지원 범위가 아니다. 출처·라이선스·재생성·롤백 계약은 `docs/engineering/humansearch-hs0003-goal-2026-09-10.md`에 연결한다.
