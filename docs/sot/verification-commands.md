@@ -2,7 +2,7 @@
 
 `$strict`의 Codex·Claude 공통 순서와 패리티 계약은 [strict-workflow.md](strict-workflow.md)를 정본으로 읽는다. 원칙 수치는 `coding-principles.md`, Work Unit 값은 `work-unit-policy.yaml`이 소유하며 이 문서에 복제하지 않는다.
 
-최종 갱신: 2026-09-02 (Invoice 독립 단위·PostgreSQL 런타임 게이트 추가)
+최종 갱신: 2026-09-10 (Work Unit 실제 manifest·CI 게이트 추가)
 근거: `docs/engineering/docs-sot-restructure-goal-2026-08-08.md`
 
 ## 현재 규칙
@@ -26,8 +26,8 @@
 | 1 | 비밀 스캔 (verify.sh) | `bash verify.sh` — 추적 파일 전체 |
 | 2 | Strict 원칙 정본·장부·배선 검사 | `bash scripts/acceptance-principles-check.sh` — 34개 정본 문구·장치·명시적 pre-push/CI 배선 |
 | 3 | Strict 원칙 적대 fixture·500/501 경계 | `bash scripts/acceptance-principles-mutations.sh` — 정상 fixture와 반례 41건·500/501 경계 |
-| 4 | Work Unit TDD·맥락 계약 | `bash scripts/acceptance-work-unit-contract.sh` — schema·TDD·context·NOT_APPLICABLE 4개 모드 |
-| 5 | Work Unit 검사기·배선 mutation | `bash scripts/acceptance-work-unit-contract-mutations.sh` — checker 무력화 4종·CI 누락/조건부 실행 차단 |
+| 4 | Work Unit TDD·맥락 계약 | `bash scripts/acceptance-work-unit-contract.sh` + `bash scripts/acceptance-work-unit-repository.sh` — schema·TDD·context·NOT_APPLICABLE 회귀와 `docs/engineering/work-units/*.yaml` 실제 manifest 재실행 |
+| 5 | Work Unit 검사기·배선 mutation | `bash scripts/acceptance-work-unit-contract-mutations.sh` + `bash scripts/acceptance-work-unit-repository-mutations.sh` — checker 무력화 4종·CI 누락/조건부 실행·manifest 0건/미추적 대체 차단 |
 | 6 | Strict 전역 스킬 잠금 장치 격리 회귀 | `bash scripts/acceptance-guard-global-skill-files.sh` — lock/check/unlock/recover와 동일 UID 한계 |
 | 7 | P3 조용한 실패 문법·오탐 회귀 | `scripts/acceptance-silent-failure-lint.sh` + mutation 34건 — 대소문자 확장자 전체 소스와 스테이지 blob 판정 |
 | 8 | HumanSearch G1 클린룸 경계 | 인라인 8개 — `scripts/acceptance-hs-cleanroom.sh`, `scripts/acceptance-hs-cleanroom-mutations.sh`, `scripts/acceptance-hs-cleanroom-absolute-paths.sh`, `scripts/acceptance-hs-cleanroom-absolute-contexts.sh`, `scripts/acceptance-hs-cleanroom-colon-paths.sh`, `scripts/acceptance-hs-cleanroom-file-urls.sh`, `scripts/acceptance-hs-cleanroom-hook-env.sh`, `scripts/acceptance-hs-cleanroom-hook-env-mutations.sh` |

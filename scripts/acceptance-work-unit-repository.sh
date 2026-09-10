@@ -17,11 +17,23 @@ ci=.github/workflows/verify.yml
 fail=0
 checked=0
 manifests=()
+candidates=()
 
 if [ -d "$manifest_dir" ]; then
   while IFS= read -r -d '' path; do
-    manifests+=("$path")
+    candidates+=("$path")
   done < <(find "$manifest_dir" -type f -name '*.yaml' -print0 | sort -z)
+fi
+
+if [ "${#candidates[@]}" -gt 0 ]; then
+  for path in "${candidates[@]}"; do
+    if git ls-files --error-unmatch "$path" >/dev/null 2>&1; then
+      manifests+=("$path")
+    else
+      printf 'FAIL: untracked WU manifest is not repository evidence — %s\n' "$path"
+      fail=1
+    fi
+  done
 fi
 
 checked=$((checked + 1))
