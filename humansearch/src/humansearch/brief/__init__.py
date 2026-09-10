@@ -11,6 +11,12 @@ from .jd_fidelity import (
     split_sections,
     verify_fidelity,
 )
+from .policy import (
+    BriefPolicy,
+    load_brief_policy,
+    override_policy_for_tests,
+    policy,
+)
 from .types import (
     BriefInputError,
     Claim,
@@ -27,12 +33,13 @@ from .types_candidate import (
     EmailContact,
     ScoreBreakdown,
 )
-from .types_packet import JdPacket, SearchPacket, TeamMail
+from .types_packet import JdPacket, SearchFilters, SearchPacket, TeamMail
 
 __all__ = [
     "EXTRA_CONDITION_PATTERNS",
     "BooleanQuerySet",
     "BriefInputError",
+    "BriefPolicy",
     "CandidateEvidence",
     "CandidateLead",
     "Claim",
@@ -45,6 +52,7 @@ __all__ = [
     "JdSource",
     "PositionSpec",
     "ScoreBreakdown",
+    "SearchFilters",
     "SearchPacket",
     "Section",
     "SourceRef",
@@ -53,7 +61,10 @@ __all__ = [
     "check_balanced",
     "content_lines",
     "extract_block",
+    "load_brief_policy",
     "normalize_line",
+    "override_policy_for_tests",
+    "policy",
     "split_sections",
     "verify_fidelity",
 ]

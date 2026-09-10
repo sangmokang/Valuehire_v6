@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field as dataclass_field
 
 from .types import (
     CompanyBrief,
@@ -20,7 +20,7 @@ from .types import (
 )
 from .types_candidate import CandidateLead
 
-__all__ = ["JdPacket", "SearchPacket", "TeamMail"]
+__all__ = ["JdPacket", "SearchFilters", "SearchPacket", "TeamMail"]
 
 # D4: 본문은 1,899 코드포인트까지. 1,900 이상이면 거부한다(개행 포함).
 _BODY_REJECT_AT = 1900
@@ -101,6 +101,14 @@ class TeamMail:
 
 
 @dataclass(frozen=True)
+class SearchFilters:
+    """서치 실행 필터. RED 골격 — 기본값·검증은 GREEN 에서."""
+
+    location: str = ""
+    seniority_years: tuple[int, int] | None = None
+
+
+@dataclass(frozen=True)
 class SearchPacket:
     """한 포지션의 브리프를 만들기 위해 모은 구조화 자료 묶음."""
 
@@ -113,6 +121,7 @@ class SearchPacket:
     mail: TeamMail
     boolean_queries: tuple[str, ...]
     inmails: tuple[tuple[str, str], ...]
+    search_filters: SearchFilters = dataclass_field(default_factory=SearchFilters)
 
     def __post_init__(self) -> None:
         if not _PACKET_ID.fullmatch(self.packet_id):
