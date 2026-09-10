@@ -67,6 +67,9 @@
      두 값이 다르면 그 사실을 첫 보고에 적는다. 로컬 main에 직접 만든 커밋이 있으면 작업을 시작하지 않고 보고한다.
 0-2. `bash scripts/session-status.sh`를 실행해 3번째 줄 `RED: N/M`을 그대로 적는다. N>0이면 새 작업을 시작하지 않는다.
      이 명령은 인수 스크립트 28개를 실제로 돌리므로 수 분이 걸린다. 120초 제한을 걸지 말고 끝까지 기다린다.
+     N>0이면 어느 스크립트인지 이름을 찾는다(아래 한 줄). `acceptance-0-2`(로컬 전용 `.secret-patterns` 부재)와 `acceptance-0-5`(main ≠ origin/main)는
+     코드 결함이 아니라 환경·상태 문제이므로 원인을 해소한 뒤 다시 센다. 그 밖의 RED는 새 작업보다 먼저 닫는다.
+     `for c in scripts/acceptance-*.sh verify.sh; do SECRET_PATTERNS_FILE= bash "$c" >/dev/null 2>&1 || echo "FAIL $c"; done`
 0-3. 동시 세션을 센다: `ps -Ao pid,etime,command | grep -E 'codex app-server|claude' | grep -v grep`.
      `gh pr list --state open --json number,headRefName`으로 같은 주제의 열린 PR이 있는지 본다. 있으면 중복 착수하지 않고 보고한다.
 0-4. 정본을 직접 읽는다. 메모리·이전 보고서로 대신하지 않는다.
@@ -94,6 +97,7 @@
 
 ## 3. RED → GREEN
 3-1. `git worktree add worktrees/<name> -b task/<name> origin/main`. 메인 작업트리에서 소스를 고치지 않는다.
+     생성 직후 `cp ../../.secret-patterns .`(gitignore된 로컬 전용 파일)을 한다. 없으면 `acceptance-0-2`가 "판정 불가"로 빨개진다(2026-09-10 실측). `verify.sh`는 커밋된 기본 패턴만으로도 돈다.
 3-2. 구현이 없어서 실패하는 시험을 먼저 쓰고 실제로 실행해 실패 이유를 확인한다. 문법·import 오류로 실패하면 RED가 아니다.
 3-3. RED 커밋을 만든다. RED는 로컬 증명 경계다. 원격에 올리지 않는다.
      사실 관계: `hooks/pre-push`는 루트·scripts/의 `verify.sh`·`acceptance-*.sh`만 돌린다. humansearch 시험은 `acceptance-hs-gates.sh`, invoice 시험은 `acceptance-invoice.sh`를 통해 돈다. 그 밖의 시험 RED는 훅이 보지 않지만 규칙은 같다. `git push --no-verify`는 어떤 경우에도 쓰지 않는다.
@@ -164,6 +168,7 @@ Issue → PR 자동화는 다음 순서 외에는 안정성을 주장할 수 없
 | f12ea33 본줄기 직접 커밋 | `git reflog show main -4` → `commit: Unify strict workflow...`; `origin/main`=fc6beed | 19:4x |
 | WU 검사기 가지 3,139줄 | `git diff --stat main task/wu-tdd-context-contract-20260910 | tail -1` → 27 files, 3139 insertions | 19:4x |
 | 원칙 검사기 통과 | `bash scripts/acceptance-principles-check.sh` → `VERDICT: PASS`, `CHECKED: 34`, exit 0 (HEAD f12ea33) | 19:41 |
+| 새 워크트리 RED 2/29의 정체 | `bash scripts/session-status.sh` → `RED: 2/29`; 직접 실행 `acceptance-0-2.sh` → `FAIL: .secret-patterns 없음/빈 파일`, `acceptance-0-5.sh` → `FAIL: origin/main(fc6beed) != main(f12ea33)` | 20:0x |
 
 → 위 표는 이 문서의 모든 사실 주장을 명령으로 되짚을 수 있게 한 것이다. 시각이 `x`로 끝난 항목은 분 단위를 기록하지 않았다는 뜻이며, 명령은 그대로 재실행할 수 있다.
 
