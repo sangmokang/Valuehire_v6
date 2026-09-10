@@ -571,3 +571,75 @@ CHECKED: 6
 VERDICT: PASS
 COMPLETION_ANTI_FORGE_EXIT=0
 ```
+
+## WU-5R3 감사 보정: 승인되지 않은 위조 검사기 차단
+
+독립 공격 리뷰는 `bash -c`만 막아도 저장소 안의 임의 스크립트가 `VERDICT: PASS`와 양수 `CHECKED`를 출력해 완료 증거를 위조할 수 있음을 확인했습니다. SOT 계약 `b42126c` 뒤 RED `b7ffb7f`은 기존 6개 사례를 보존한 채 승인되지 않은 위조 스크립트 한 건만 실패시켰습니다.
+
+```text
+PASS: executed completion commands
+PASS: failing regression command rejected
+PASS: failing adversarial command rejected
+PASS: no-op completion command rejected
+PASS: zero-check completion output rejected
+PASS: echo-only positive-count forgery rejected
+FAIL: unapproved forged-count script rejected
+VERDICT: PASS
+CHECKED: 13
+WU_TESTS: 7
+CHECKED: 7
+WU_FAILURE_KIND: missing_behavior
+VERDICT: FAIL
+RED_EXIT:1
+```
+
+GREEN `0c7376b`은 `docs/sot/work-unit-policy.yaml`의 `completion.approved_commands`와 정확히 일치하는 명령만 실행합니다. 임의 명령은 출력이나 종료값을 보기 전에 `*_COMMAND_NOT_APPROVED`로 거부합니다.
+
+```text
+PASS: executed completion commands
+PASS: failing regression command rejected
+PASS: failing adversarial command rejected
+PASS: no-op completion command rejected
+PASS: zero-check completion output rejected
+PASS: echo-only positive-count forgery rejected
+PASS: unapproved forged-count script rejected
+WU_TESTS: 7
+CHECKED: 7
+VERDICT: PASS
+GREEN_EXIT:0
+
+WU_TESTS: 31
+CHECKED: 31
+VERDICT: PASS
+ALL_CONTRACT_EXIT=0
+
+PASS: repository WU manifests discovered — 1
+PASS: required repository WU ID set matches manifests
+PASS: repository WU acceptance is wired in CI
+PASS: repository WU manifest — docs/engineering/work-units/work-unit-tdd-context.yaml
+WU_TESTS: 4
+CHECKED: 4
+VERDICT: PASS
+REPOSITORY_WU_EXIT=0
+
+WU_TESTS: 8
+CHECKED: 8
+VERDICT: PASS
+CONTRACT_MUTATIONS_EXIT=0
+
+WU_TESTS: 6
+CHECKED: 6
+VERDICT: PASS
+REPOSITORY_MUTATIONS_EXIT=0
+
+PASS: 무력화 차단: exit-zero — 33/33 전부 불합격 처리
+PASS: 무력화 차단: true-only — 33/33 전부 불합격 처리
+PASS: 무력화 차단: noop — 33/33 전부 불합격 처리
+PASS: 무력화 차단: empty — 33/33 전부 불합격 처리
+PASS: 무력화 차단: echo-only — 33/33 전부 불합격 처리
+CHECKED: 16
+VERDICT: PASS
+SEMANTIC_MUTATIONS_EXIT=0
+```
+
+CI integrity 24/24, mechanism registry 25개, AC-M 31건, 원칙 34/34, `verify.sh`, `git diff --check`도 종료값 0입니다. 검증 중 셸 스크립트를 `ruby`로 잘못 호출한 1회는 `LoadError`로 종료값 1이었고, 같은 파일을 올바른 `bash` 명령으로 즉시 재실행해 25/25를 확인했습니다.
