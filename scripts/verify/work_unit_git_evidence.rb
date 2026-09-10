@@ -117,6 +117,7 @@ module WorkUnitGitEvidence
     errors = []
     checked = 0
     changed = []
+    head = git(repo, "rev-parse", "HEAD").last.strip
     tdd.fetch("test_files").each do |path|
       checked += 1
       unless repository_path?(path)
@@ -124,26 +125,26 @@ module WorkUnitGitEvidence
         next
       end
       red_blob = blob(repo, tdd.fetch("red_commit"), path)
-      green_blob = blob(repo, tdd.fetch("green_commit"), path)
-      if red_blob.nil? || green_blob.nil?
+      head_blob = blob(repo, head, path)
+      if red_blob.nil? || head_blob.nil?
         errors << "TEST_FILE_MISSING: #{path}"
-      elsif Digest::SHA256.hexdigest(red_blob) != Digest::SHA256.hexdigest(green_blob)
+      elsif Digest::SHA256.hexdigest(red_blob) != Digest::SHA256.hexdigest(head_blob)
         changed << path
       end
     end
     return [errors, checked] if changed.empty?
 
     approval = tdd["expectation_change_approval_commit"]
-    unless approved_change?(repo, id, approval, tdd, changed)
+    unless approved_change?(repo, id, approval, tdd, changed, head)
       errors << "TEST_FILE_CHANGED_AFTER_RED: #{changed.join(',')}"
     end
     [errors, checked + 1]
   end
 
-  def approved_change?(repo, id, approval, tdd, changed)
+  def approved_change?(repo, id, approval, tdd, changed, head)
     return false unless approval && commit_exists?(repo, approval)
     return false unless strict_ancestor?(repo, tdd.fetch("red_commit"), approval)
-    return false unless ancestor?(repo, approval, tdd.fetch("green_commit"))
+    return false unless ancestor?(repo, approval, head)
 
     rc, message = git(repo, "show", "-s", "--format=%B", approval)
     return false unless rc.zero? && message.lines.any? { |line| line.strip == "Test-Expectation-Approval: #{id}" }
