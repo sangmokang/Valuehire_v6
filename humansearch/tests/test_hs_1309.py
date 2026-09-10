@@ -20,6 +20,7 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from humansearch.brief import (
+    Approval,
     BriefInputError,
     CandidateEvidence,
     CandidateLead,
@@ -37,12 +38,14 @@ from humansearch.brief import (
     SendState,
     SourceRef,
     TeamMail,
+    Transition,
     from_json,
+    load_attempt,
     load_intent,
     mark,
     may_send,
+    open_new_attempt,
     packet_id,
-    reconcile,
     record_intent,
     to_json,
 )
@@ -104,14 +107,35 @@ def _packet(text: str = "예시 문구") -> SearchPacket:
     )
 
 
-def _intent(channel: str = "gmail", recorded_at: datetime = _AT) -> SendIntent:
+def _intent(
+    channel: str = "gmail",
+    recorded_at: datetime = _AT,
+    attempt: int = 1,
+    approval: Approval | None = None,
+) -> SendIntent:
     return SendIntent(
         packet_id=_PACKET_ID,
         channel=channel,
+        attempt=attempt,
         recipients_sha256=_sha256("sangmokang@valueconnect.kr"),
         body_sha256=_sha256("본문"),
         recorded_at=recorded_at,
         state=SendState.INTENT,
+        approval=approval,
+    )
+
+
+def _approval(
+    approved_by: str = "sangmokang",
+    search_query: str = 'in:sent subject:"[포지션]"',
+    search_checked_at: str = "2026-09-10T04:00:00+00:00",
+    reason: str = "발송함에서 찾지 못해 재시도를 승인한다",
+) -> Approval:
+    return Approval(
+        approved_by=approved_by,
+        search_query=search_query,
+        search_checked_at=search_checked_at,
+        reason=reason,
     )
 
 
@@ -277,20 +301,20 @@ def test_readback_is_false_after_file_tampering(tmp_path: Path) -> None:
     assert store.readback(packet) is False
 
 
-# --- 4. 발송 장부 (D9 · at-most-once) ----------------------------------------
+# --- 4. 발송 장부 — 영구 묘비 + attempt (D9) --------------------------------
 
 
-def test_record_intent_reports_creation_and_writes_0600_file(tmp_path: Path) -> None:
+def test_record_intent_reports_creation_and_writes_0600_attempt_file(tmp_path: Path) -> None:
     directory = tmp_path / "ledger"
     stored, created = record_intent(directory, _intent())
     assert created is True
     assert stored == _intent()
-    target = directory / f"{_PACKET_ID}.gmail.sent.json"
+    target = directory / f"{_PACKET_ID}.gmail.a1.sent.json"
     assert _mode(target) == 0o600
     assert _mode(directory) == 0o700
 
 
-def test_record_intent_twice_returns_the_first_intent_and_one_file(tmp_path: Path) -> None:
+def test_record_intent_twice_returns_the_existing_attempt_and_one_file(tmp_path: Path) -> None:
     directory = tmp_path / "ledger"
     first, created_first = record_intent(directory, _intent())
     second, created_second = record_intent(directory, _intent(recorded_at=_LATER))
@@ -315,29 +339,54 @@ def test_record_intent_creates_exactly_once_under_concurrent_callers(tmp_path: P
     assert len(list(directory.iterdir())) == 1
 
 
-def test_may_send_is_true_only_while_no_intent_file_exists(tmp_path: Path) -> None:
+def test_record_intent_rejects_attempt_other_than_one(tmp_path: Path) -> None:
+    with pytest.raises(BriefInputError):
+        record_intent(tmp_path / "ledger", _intent(attempt=2, approval=_approval()))
+
+
+def test_may_send_is_true_only_while_no_attempt_file_exists(tmp_path: Path) -> None:
     directory = tmp_path / "ledger"
     assert may_send(directory, _PACKET_ID, "gmail") is True
     record_intent(directory, _intent())
     assert may_send(directory, _PACKET_ID, "gmail") is False
 
 
-def test_may_send_stays_false_after_the_send_is_marked(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "crash_point",
+    ["after_intent", "after_send", "after_mark", "after_readback"],
+)
+def test_rerun_after_any_crash_point_grants_no_send(tmp_path: Path, crash_point: str) -> None:
+    """중간에 끊긴 뒤 재실행해도 발송 허가는 나오지 않는다 — 허가는 created is True 뿐이다."""
     directory = tmp_path / "ledger"
     record_intent(directory, _intent())
-    mark(directory, _PACKET_ID, "gmail", SendState.SENT_UNVERIFIED, "msg-1", _AT)
+    if crash_point in {"after_mark", "after_readback"}:
+        mark(
+            directory, _PACKET_ID, "gmail", 1, SendState.SENT_UNVERIFIED, "msg-1", _LATER, "발송함 id"
+        )
+    if crash_point == "after_readback":
+        mark(directory, _PACKET_ID, "gmail", 1, SendState.VERIFIED, "msg-1", _LATER, "본문 해시 일치")
+    replayed, created = record_intent(directory, _intent())
+    assert created is False
     assert may_send(directory, _PACKET_ID, "gmail") is False
-    mark(directory, _PACKET_ID, "gmail", SendState.VERIFIED, "msg-1", _LATER)
-    assert may_send(directory, _PACKET_ID, "gmail") is False
+    assert replayed.attempt == 1
 
 
-def test_mark_walks_intent_to_sent_to_verified(tmp_path: Path) -> None:
+def test_mark_walks_intent_to_sent_to_verified_and_appends_transitions(tmp_path: Path) -> None:
     directory = tmp_path / "ledger"
     record_intent(directory, _intent())
-    sent = mark(directory, _PACKET_ID, "gmail", SendState.SENT_UNVERIFIED, "msg-1", _AT)
+    sent = mark(
+        directory, _PACKET_ID, "gmail", 1, SendState.SENT_UNVERIFIED, "msg-1", _LATER, "발송함 id"
+    )
     assert sent.state is SendState.SENT_UNVERIFIED
-    verified = mark(directory, _PACKET_ID, "gmail", SendState.VERIFIED, "msg-1", _LATER)
+    verified = mark(
+        directory, _PACKET_ID, "gmail", 1, SendState.VERIFIED, "msg-1", _LATER, "본문 해시 일치"
+    )
     assert verified.state is SendState.VERIFIED
+    assert tuple(step.state for step in verified.transitions) == (
+        SendState.SENT_UNVERIFIED,
+        SendState.VERIFIED,
+    )
+    assert verified.transitions[0].evidence == "발송함 id"
     assert load_intent(directory, _PACKET_ID, "gmail") == verified
 
 
@@ -345,29 +394,134 @@ def test_mark_rejects_skipping_straight_to_verified(tmp_path: Path) -> None:
     directory = tmp_path / "ledger"
     record_intent(directory, _intent())
     with pytest.raises(BriefInputError):
-        mark(directory, _PACKET_ID, "gmail", SendState.VERIFIED, "msg-1", _AT)
+        mark(directory, _PACKET_ID, "gmail", 1, SendState.VERIFIED, "msg-1", _LATER, "건너뛰기")
 
 
 def test_mark_rejects_backward_transition(tmp_path: Path) -> None:
     directory = tmp_path / "ledger"
     record_intent(directory, _intent())
-    mark(directory, _PACKET_ID, "gmail", SendState.SENT_UNVERIFIED, "msg-1", _AT)
-    mark(directory, _PACKET_ID, "gmail", SendState.VERIFIED, "msg-1", _LATER)
+    mark(directory, _PACKET_ID, "gmail", 1, SendState.SENT_UNVERIFIED, "msg-1", _LATER, "발송함 id")
     with pytest.raises(BriefInputError):
-        mark(directory, _PACKET_ID, "gmail", SendState.INTENT, "msg-1", _LATER)
+        mark(directory, _PACKET_ID, "gmail", 1, SendState.INTENT, "msg-1", _LATER, "되돌리기")
+
+
+def test_mark_rejects_abandoned_as_a_manual_transition(tmp_path: Path) -> None:
+    directory = tmp_path / "ledger"
+    record_intent(directory, _intent())
+    with pytest.raises(BriefInputError):
+        mark(directory, _PACKET_ID, "gmail", 1, SendState.ABANDONED, None, _LATER, "임의 포기")
 
 
 def test_mark_rejects_sent_without_message_id(tmp_path: Path) -> None:
     directory = tmp_path / "ledger"
     record_intent(directory, _intent())
     with pytest.raises(BriefInputError):
-        mark(directory, _PACKET_ID, "gmail", SendState.SENT_UNVERIFIED, None, _AT)
+        mark(directory, _PACKET_ID, "gmail", 1, SendState.SENT_UNVERIFIED, None, _LATER, "id 없음")
 
 
-def test_mark_rejects_channel_without_recorded_intent(tmp_path: Path) -> None:
+def test_mark_rejects_channel_without_recorded_attempt(tmp_path: Path) -> None:
     directory = tmp_path / "ledger"
     with pytest.raises(BriefInputError):
-        mark(directory, _PACKET_ID, "gmail", SendState.SENT_UNVERIFIED, "msg-1", _AT)
+        mark(directory, _PACKET_ID, "gmail", 1, SendState.SENT_UNVERIFIED, "msg-1", _AT, "없는 시도")
+
+
+def test_mark_rejects_an_attempt_that_is_not_the_latest(tmp_path: Path) -> None:
+    directory = tmp_path / "ledger"
+    record_intent(directory, _intent())
+    open_new_attempt(directory, _PACKET_ID, "gmail", approval=_approval(), at=_LATER)
+    with pytest.raises(BriefInputError):
+        mark(directory, _PACKET_ID, "gmail", 1, SendState.SENT_UNVERIFIED, "msg-1", _LATER, "과거")
+
+
+# --- 5. open_new_attempt — 승인 없이는 두 번째 시도가 열리지 않는다 ----------
+
+
+def test_open_new_attempt_abandons_the_uncertain_attempt_and_keeps_its_file(
+    tmp_path: Path,
+) -> None:
+    directory = tmp_path / "ledger"
+    record_intent(directory, _intent())
+    fresh, created = open_new_attempt(
+        directory, _PACKET_ID, "gmail", approval=_approval(), at=_LATER
+    )
+    assert created is True
+    assert fresh.attempt == 2
+    assert fresh.state is SendState.INTENT
+    assert fresh.approval == _approval()
+    first_file = directory / f"{_PACKET_ID}.gmail.a1.sent.json"
+    assert first_file.exists(), "묘비는 지우거나 이름을 바꾸지 않는다"
+    assert (directory / f"{_PACKET_ID}.gmail.a2.sent.json").exists()
+    abandoned = load_attempt(directory, _PACKET_ID, "gmail", 1)
+    assert abandoned is not None
+    assert abandoned.state is SendState.ABANDONED
+    assert abandoned.transitions[-1].state is SendState.ABANDONED
+    assert abandoned.attempt == 1
+
+
+def test_open_new_attempt_can_be_repeated_for_a_second_uncertain_attempt(tmp_path: Path) -> None:
+    directory = tmp_path / "ledger"
+    record_intent(directory, _intent())
+    open_new_attempt(directory, _PACKET_ID, "gmail", approval=_approval(), at=_LATER)
+    third, created = open_new_attempt(
+        directory, _PACKET_ID, "gmail", approval=_approval(), at=_LATER
+    )
+    assert created is True
+    assert third.attempt == 3
+    assert len(list(directory.iterdir())) == 3
+
+
+@pytest.mark.parametrize(
+    "field", ["approved_by", "search_query", "search_checked_at", "reason"]
+)
+def test_open_new_attempt_rejects_blank_approval_field(tmp_path: Path, field: str) -> None:
+    directory = tmp_path / "ledger"
+    record_intent(directory, _intent())
+    with pytest.raises(BriefInputError):
+        open_new_attempt(
+            directory,
+            _PACKET_ID,
+            "gmail",
+            approval=_approval(**{field: "   "}),
+            at=_LATER,
+        )
+
+
+def test_open_new_attempt_is_refused_once_the_send_is_known(tmp_path: Path) -> None:
+    directory = tmp_path / "ledger"
+    record_intent(directory, _intent())
+    mark(directory, _PACKET_ID, "gmail", 1, SendState.SENT_UNVERIFIED, "msg-1", _LATER, "발송함 id")
+    with pytest.raises(BriefInputError):
+        open_new_attempt(directory, _PACKET_ID, "gmail", approval=_approval(), at=_LATER)
+    mark(directory, _PACKET_ID, "gmail", 1, SendState.VERIFIED, "msg-1", _LATER, "본문 해시 일치")
+    with pytest.raises(BriefInputError):
+        open_new_attempt(directory, _PACKET_ID, "gmail", approval=_approval(), at=_LATER)
+
+
+def test_open_new_attempt_is_refused_without_any_recorded_attempt(tmp_path: Path) -> None:
+    directory = tmp_path / "ledger"
+    with pytest.raises(BriefInputError):
+        open_new_attempt(directory, _PACKET_ID, "gmail", approval=_approval(), at=_LATER)
+
+
+def test_open_new_attempt_opens_exactly_once_under_concurrent_callers(tmp_path: Path) -> None:
+    directory = _ledger(tmp_path)
+    record_intent(directory, _intent())
+    barrier = threading.Barrier(2)
+
+    def attempt() -> bool:
+        barrier.wait(timeout=5)
+        _, created = open_new_attempt(
+            directory, _PACKET_ID, "gmail", approval=_approval(), at=_LATER
+        )
+        return created
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = [future.result() for future in [pool.submit(attempt), pool.submit(attempt)]]
+    assert sorted(results) == [False, True]
+    assert len(list(directory.iterdir())) == 2
+
+
+# --- 6. 타입 불변식 ----------------------------------------------------------
 
 
 def test_channel_outside_lowercase_alphabet_is_rejected(tmp_path: Path) -> None:
@@ -384,6 +538,7 @@ def test_send_intent_rejects_naive_datetime() -> None:
         SendIntent(
             packet_id=_PACKET_ID,
             channel="gmail",
+            attempt=1,
             recipients_sha256=_sha256("수신자"),
             body_sha256=_sha256("본문"),
             recorded_at=datetime(2026, 9, 10, 3, 20),  # noqa: DTZ001
@@ -391,59 +546,32 @@ def test_send_intent_rejects_naive_datetime() -> None:
         )
 
 
-# --- 5. reconcile — 끊긴 패킷을 사람이 확인한 뒤 정리한다 --------------------
-
-
-def test_reconcile_promotes_to_sent_unverified_when_the_mail_was_found(tmp_path: Path) -> None:
-    directory = tmp_path / "ledger"
-    record_intent(directory, _intent())
-    settled = reconcile(
-        directory, _PACKET_ID, "gmail", sent_found=True, message_id="msg-9", at=_LATER
-    )
-    assert settled.state is SendState.SENT_UNVERIFIED
-    assert settled.message_id == "msg-9"
-    assert may_send(directory, _PACKET_ID, "gmail") is False
-
-
-def test_reconcile_requires_message_id_when_the_mail_was_found(tmp_path: Path) -> None:
-    directory = tmp_path / "ledger"
-    record_intent(directory, _intent())
+def test_retry_attempt_without_approval_is_rejected_by_the_type() -> None:
     with pytest.raises(BriefInputError):
-        reconcile(directory, _PACKET_ID, "gmail", sent_found=True, message_id=None, at=_LATER)
+        _intent(attempt=2)
 
 
-def test_reconcile_releases_the_intent_when_no_mail_was_found(tmp_path: Path) -> None:
-    directory = tmp_path / "ledger"
-    record_intent(directory, _intent())
-    released = reconcile(
-        directory, _PACKET_ID, "gmail", sent_found=False, message_id=None, at=_LATER
-    )
-    assert released.state is SendState.INTENT
-    assert not (directory / f"{_PACKET_ID}.gmail.sent.json").exists()
-    release_file = directory / f"{_PACKET_ID}.gmail.released.json"
-    assert _mode(release_file) == 0o600
-    payload = json.loads(release_file.read_text(encoding="utf-8"))
-    assert payload["reason"] == "reconcile-not-found"
-    assert payload["released_at"] == _LATER.isoformat()
-    assert payload["body_sha256"] == _sha256("본문")
-    assert may_send(directory, _PACKET_ID, "gmail") is True
-
-
-def test_reconcile_rejects_states_other_than_intent(tmp_path: Path) -> None:
-    directory = tmp_path / "ledger"
-    record_intent(directory, _intent())
-    mark(directory, _PACKET_ID, "gmail", SendState.SENT_UNVERIFIED, "msg-1", _AT)
+def test_first_attempt_with_approval_is_rejected_by_the_type() -> None:
     with pytest.raises(BriefInputError):
-        reconcile(directory, _PACKET_ID, "gmail", sent_found=False, message_id=None, at=_LATER)
+        _intent(approval=_approval())
 
 
-def test_reconcile_rejects_channel_without_recorded_intent(tmp_path: Path) -> None:
-    directory = tmp_path / "ledger"
+def test_abandoned_state_cannot_carry_a_message_id() -> None:
     with pytest.raises(BriefInputError):
-        reconcile(directory, _PACKET_ID, "gmail", sent_found=False, message_id=None, at=_LATER)
+        SendIntent(
+            packet_id=_PACKET_ID,
+            channel="gmail",
+            attempt=1,
+            recipients_sha256=_sha256("수신자"),
+            body_sha256=_sha256("본문"),
+            recorded_at=_AT,
+            state=SendState.ABANDONED,
+            message_id="msg-1",
+            transitions=(Transition(_LATER, SendState.ABANDONED, "포기"),),
+        )
 
 
-# --- 6. 정적 경계 ------------------------------------------------------------
+# --- 7. 정적 경계 ------------------------------------------------------------
 
 
 def test_modules_hold_no_clock_network_or_process_access() -> None:

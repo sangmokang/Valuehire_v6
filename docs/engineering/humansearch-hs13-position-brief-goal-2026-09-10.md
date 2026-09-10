@@ -132,6 +132,39 @@ def build_inmail(lead: CandidateLead, linkedin_body: str, greeting: str) -> str 
 # packet.py
 def packet_id(position: PositionSpec, jd: JdSource, today: date) -> str   # "{yyyymmdd}-{clickup_id}-{sha8}"
 def to_json(packet) / from_json(text)  # 왕복 동일성. PII는 파일에만, 로그 0
+class PacketStore(dir: Path)     # dir 없으면 0700 생성 / symlink·느슨한 권한 거부 (D7)
+    save(packet) -> Path         # <packet_id>.packet.json · 0600 · 임시파일+os.replace 원자 교체
+    load(packet_id) -> SearchPacket        # 파일 부재·손상 JSON 거부
+    readback(packet) -> bool     # 저장 파일을 독립적으로 다시 읽어 to_json 해시 대조 (P9)
+# send_ledger.py — 발송 장부 (D9 · at-most-once). 코드는 발송 API를 갖지 않는다
+class SendState(Enum): INTENT, SENT_UNVERIFIED, VERIFIED, ABANDONED   # ABANDONED 는 종단
+@dataclass(frozen=True) class Transition:  at: datetime; state: SendState; evidence: str
+@dataclass(frozen=True) class Approval:    # 재시도를 여는 사람의 서명. 네 칸 모두 비면 거부
+    approved_by: str; search_query: str; search_checked_at: str; reason: str
+@dataclass(frozen=True) class SendIntent:  # 파일 = <packet_id>.<channel>.a<attempt>.sent.json
+    packet_id: str; channel: str  # channel 은 ^[a-z]+$
+    attempt: int                  # 1부터. attempt 1 은 approval 없음, 2 이상은 approval 필수
+    recipients_sha256: str; body_sha256: str; recorded_at: datetime   # 시계는 호출자가 주입
+    state: SendState; message_id: str | None = None
+    transitions: tuple[Transition, ...] = ()   # 덧붙이기만 한다. 지우거나 갈아끼우지 않는다
+    approval: Approval | None = None
+# 불변식: attempt 파일은 **영구 묘비**다 — 이름 변경·삭제 없음, 내용은 transitions 덧붙이기만.
+# **발송 허가 = 같은 프로세스에서 created is True 를 받은 그 attempt 뿐.**
+# 파일에서 읽어 온 INTENT(message_id 없음)는 "보냈는지 모르는" 상태이므로 발송 불가다.
+def record_intent(dir, intent) -> tuple[SendIntent, bool]
+#   attempt 1 파일을 O_EXCL 로 원자 생성. 이미 attempt 파일이 하나라도 있으면 (최신, False)
+def may_send(dir, packet_id, channel) -> bool
+#   attempt 파일이 **하나도 없을 때만** True. 문서용·프리플라이트 신호이지 발송 허가가 아니다
+def mark(dir, packet_id, channel, attempt, state, message_id, at, evidence) -> SendIntent
+#   INTENT→SENT_UNVERIFIED(message_id 필수)→VERIFIED 단방향, transitions 에 append.
+#   역전이·건너뛰기·최신이 아닌 attempt·ABANDONED 지정 → 거부
+def open_new_attempt(dir, packet_id, channel, *, approval: Approval, at) -> tuple[SendIntent, bool]
+#   최신 attempt 가 INTENT 이고 message_id 없음(= 보냈는지 모름)일 때만 허용.
+#   attempt N+1 파일을 O_EXCL 로 만들고(이 True 를 받은 프로세스만 발송 가능),
+#   최신 attempt 에 ABANDONED 전이(evidence = approval 요약)를 남긴다. 원본 파일은 그대로.
+#   SENT_UNVERIFIED/VERIFIED/ABANDONED 에서 호출 → BriefInputError
+def load_attempt(dir, packet_id, channel, attempt) -> SendIntent | None
+def load_intent(dir, packet_id, channel) -> SendIntent | None   # 최신 attempt
 ```
 
 ### 6. 출력 계약 — 팀 메일 본문 순서 (황금 표본 `1a085e8e789eaf79`에서 도출)
@@ -169,6 +202,7 @@ def to_json(packet) / from_json(text)  # 왕복 동일성. PII는 파일에만, 
 | D6 | 점수 4축 | 역할 40·학력 20·안정성 20·프로필 20. 학교 계층은 계약 파일. 성별·나이·사진 0 | 축·가중치는 계약 파일로 이동 가능 |
 | D7 | 후보 PII 보관 | git 밖 `~/.humansearch/packets/`, 0700/0600. 저장소·PR·판정에는 packet_id·해시·건수만 | HS-03.01 병합 후 SQLite로 이관(HS-13.09) |
 | D8 | 러너 경계 | 리서치(WebSearch)·Gmail 발송·readback은 Claude 세션이 MCP로 수행. 코드는 발송 API를 갖지 않는다 | Python Gmail API 도입은 별도 L3 |
+| D9 | 재발송 방지 강도 | **at-most-once + 영구 묘비**. attempt 파일은 지우지도 이름을 바꾸지도 않는다. 발송 허가는 `record_intent`/`open_new_attempt` 가 같은 프로세스에 준 `created is True` 뿐이고, 파일에서 읽어 온 INTENT 는 '보냈는지 모름'이라 발송 불가다. 재시도는 `Approval`(승인자·검색식·확인시각·사유) 아래에서만 attempt N+1 로 열린다 | 자동 재시도가 필요해지면 승인 정책을 계약 파일로 빼고 이 행을 갱신 |
 
 ## 8. 예외 표 (R1)
 
