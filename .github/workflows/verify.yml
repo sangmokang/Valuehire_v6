@@ -269,6 +269,12 @@ jobs:
         # contracts/humansearch/brief-policy.json 밖(브리프 코드)에 다시 적혔는지.
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1301b-literals.sh
 
+      - name: 인수 검사 hs-1308 (HumanSearch InMail 초안 · HS-13.08 — 발송 API 부재)
+        # humansearch/src/humansearch/brief/*.py 전체에 smtplib·requests·urllib.request
+        # import 와 send/.send(/send_message( 정의·호출이 0건인지 정적으로 확인한다.
+        # 발송은 항상 금지(D0 §4) — 이 모듈은 초안만 만들고 발송 API 를 갖지 않는다.
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1308-nosend.sh
+
       - name: PostgreSQL 서버 준비 (Invoice 런타임 검사용)
         # 러너에는 psql·pg_config 만 PATH 에 있고 initdb·pg_ctl 은
         # /usr/lib/postgresql/<ver>/bin 에 있다. 없으면 설치해서 BLOCKED 를 없앤다.
