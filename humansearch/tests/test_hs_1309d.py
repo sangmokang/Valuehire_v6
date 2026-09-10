@@ -71,7 +71,9 @@ def _ledger(tmp_path: Path) -> Path:
 
 
 def _claim(directory: Path, attempt: int = 1, at: datetime = _CLAIM_AT) -> tuple[SendIntent, bool]:
-    return claim_send(directory, _PACKET_ID, "gmail", attempt, at=at, evidence="러너가 발송 직전 청구")
+    return claim_send(
+        directory, _PACKET_ID, "gmail", attempt, at=at, evidence="러너가 발송 직전 청구"
+    )
 
 
 def _marker(directory: Path, attempt: int = 1) -> Path:
@@ -134,7 +136,16 @@ def test_mark_sent_without_claim_is_rejected(tmp_path: Path) -> None:
     directory = _ledger(tmp_path)
     record_intent(directory, _intent())
     with pytest.raises(BriefInputError):
-        mark(directory, _PACKET_ID, "gmail", 1, SendState.SENT_UNVERIFIED, "msg-1", _LATER, "청구 없음")
+        mark(
+            directory,
+            _PACKET_ID,
+            "gmail",
+            1,
+            SendState.SENT_UNVERIFIED,
+            "msg-1",
+            _LATER,
+            "청구 없음",
+        )
 
 
 def test_mark_cannot_produce_send_claimed_by_itself(tmp_path: Path) -> None:
@@ -149,9 +160,13 @@ def test_claimed_attempt_walks_to_sent_and_verified(tmp_path: Path) -> None:
     directory = _ledger(tmp_path)
     record_intent(directory, _intent())
     _claim(directory)
-    sent = mark(directory, _PACKET_ID, "gmail", 1, SendState.SENT_UNVERIFIED, "msg-1", _LATER, "발송함 id")
+    sent = mark(
+        directory, _PACKET_ID, "gmail", 1, SendState.SENT_UNVERIFIED, "msg-1", _LATER, "발송함 id"
+    )
     assert sent.state is SendState.SENT_UNVERIFIED
-    verified = mark(directory, _PACKET_ID, "gmail", 1, SendState.VERIFIED, "msg-1", _LATER, "해시 일치")
+    verified = mark(
+        directory, _PACKET_ID, "gmail", 1, SendState.VERIFIED, "msg-1", _LATER, "해시 일치"
+    )
     assert [step.state for step in verified.transitions] == [
         SendState.SEND_CLAIMED,
         SendState.SENT_UNVERIFIED,

@@ -52,6 +52,7 @@ class BriefPolicy:
     team_mail_domain: str
     clickup_position_list_id: str
     default_search_location: str
+    allowed_search_locations: tuple[str, ...]
 
 
 def _repo_root() -> Path:
@@ -138,6 +139,14 @@ def load_brief_policy(path: Path | None = None) -> BriefPolicy:
     if not _DIGITS.fullmatch(list_id):
         _reject(f"브리프 정책의 clickup_position_list_id 는 숫자여야 한다: {list_id!r}")
 
+    default_location = _require_nonempty_str(root, "default_search_location")
+    allowed_locations = _require_location_list(root, "allowed_search_locations")
+    if default_location not in allowed_locations:
+        _reject(
+            "브리프 정책의 default_search_location 이 allowed_search_locations 밖이다: "
+            f"{default_location!r}"
+        )
+
     return BriefPolicy(
         version=_CONTRACT_VERSION,
         linkedin_inmail_max_chars=_require_positive_int(root, "linkedin_inmail_max_chars"),
@@ -146,8 +155,24 @@ def load_brief_policy(path: Path | None = None) -> BriefPolicy:
         profile_url_prefixes=_require_prefix_list(root, "profile_url_prefixes"),
         team_mail_domain=domain,
         clickup_position_list_id=list_id,
-        default_search_location=_require_nonempty_str(root, "default_search_location"),
+        default_search_location=default_location,
+        allowed_search_locations=allowed_locations,
     )
+
+
+def _require_location_list(root: dict[str, object], key: str) -> tuple[str, ...]:
+    """D12 허용 지역 목록 — 비어 있지 않고, 각 항목은 공백 없는 정확한 문자열, 중복 0."""
+    value = root.get(key)
+    if not isinstance(value, list) or not value:
+        _reject(f"브리프 정책의 {key} 는 비어 있지 않은 목록이어야 한다")
+    items: list[str] = []
+    for item in value:
+        if not isinstance(item, str) or not item or item != item.strip():
+            _reject(f"브리프 정책의 {key} 항목은 앞뒤 공백 없는 문자열이어야 한다: {item!r}")
+        if item in items:
+            _reject(f"브리프 정책의 {key} 에 같은 지역이 두 번 있다: {item!r}")
+        items.append(item)
+    return tuple(items)
 
 
 _loaded: BriefPolicy | None = None

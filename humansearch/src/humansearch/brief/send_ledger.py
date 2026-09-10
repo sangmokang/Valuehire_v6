@@ -5,8 +5,9 @@
 두 가지 규율이 전부다.
 ① attempt 파일은 **영구 묘비**다 — 이름을 바꾸지도 지우지도 않고, 내용은 transitions 를
    덧붙이기만 한다. 파일을 치우는 순간 "보냈는지 모르는" 패킷이 다시 나갈 길이 열린다.
-② **발송 허가는 같은 프로세스가 받은 `created is True` 뿐이다.** 파일에서 읽어 온 INTENT 는
-   보냈는지 모르는 상태이므로 발송 근거가 되지 못한다.
+② **발송 허가는 `send_claim.claim_send` 가 딱 한 번 돌려주는 `claimed is True` 뿐이다**
+   (HS-13.09d). `record_intent` 의 `created` 는 감사 불리언일 뿐 발송 근거가 아니고,
+   파일에서 읽어 온 INTENT 는 보냈는지 모르는 상태라 역시 발송 근거가 되지 못한다.
 
 코드는 발송하지 않는다 — 러너(Claude 세션)가 보내고, 이 모듈은 판정만 한다.
 시계는 호출자가 recorded_at·at 으로 주입한다.
@@ -55,16 +56,19 @@ class SendState(Enum):
     """발송 진행 상태. 앞으로만 간다 — 되돌리면 재발송 사고가 난다."""
 
     INTENT = "intent"
+    SEND_CLAIMED = "send_claimed"
     SENT_UNVERIFIED = "sent_unverified"
     VERIFIED = "verified"
     ABANDONED = "abandoned"
 
 
-# 단방향 승계. ABANDONED 는 종단이며 open_new_attempt 만 붙일 수 있다(mark 로는 못 간다).
+# 단방향 승계. INTENT → SEND_CLAIMED 는 send_claim.claim_send 만 만든다(mark 로는 못 간다).
+# ABANDONED 는 종단이며 open_new_attempt 만 붙일 수 있다(mark 로는 못 간다).
 _NEXT = {
-    SendState.INTENT: SendState.SENT_UNVERIFIED,
+    SendState.SEND_CLAIMED: SendState.SENT_UNVERIFIED,
     SendState.SENT_UNVERIFIED: SendState.VERIFIED,
 }
+_UNSENT = (SendState.INTENT, SendState.SEND_CLAIMED)
 
 
 @dataclass(frozen=True)
@@ -151,8 +155,8 @@ class SendIntent:
     def _check_message_id(self) -> None:
         if self.message_id is not None:
             _require_text(self.message_id, "SendIntent.message_id")
-            if self.state is SendState.ABANDONED:
-                _reject("ABANDONED 는 message_id 를 가질 수 없다(보냈는지 모르는 시도다)")
+            if self.state in (SendState.ABANDONED, SendState.SEND_CLAIMED):
+                _reject(f"{self.state.value} 는 message_id 를 가질 수 없다(보냈는지 모르는 시도다)")
         elif self.state in (SendState.SENT_UNVERIFIED, SendState.VERIFIED):
             _reject("message_id 없이 발송 이후 상태일 수 없다")
 
@@ -205,9 +209,7 @@ def load_attempt(dir: Path, packet_id: str, channel: str, attempt: int) -> SendI
     return _read_attempt(ensure_store_dir(dir), packet_id, channel, attempt)
 
 
-def _read_attempt(
-    directory: Path, packet_id: str, channel: str, attempt: int
-) -> SendIntent | None:
+def _read_attempt(directory: Path, packet_id: str, channel: str, attempt: int) -> SendIntent | None:
     target = _attempt_path(directory, packet_id, channel, attempt)
     if not target.is_file():
         return None
@@ -290,7 +292,10 @@ def mark(
     at: datetime,
     evidence: str,
 ) -> SendIntent:
-    """INTENT → SENT_UNVERIFIED(message_id 필수) → VERIFIED 단방향. transitions 에 덧붙인다."""
+    """SEND_CLAIMED → SENT_UNVERIFIED(message_id 필수) → VERIFIED 단방향. transitions 에 덧붙인다.
+
+    INTENT 에서 곧장 SENT_UNVERIFIED 로는 못 간다 — 청구(claim_send) 없는 발송은 규약 위반이다.
+    """
     if not isinstance(state, SendState):
         _reject("mark(state) 는 SendState 여야 한다")
     moment = require_clock(at)
@@ -350,7 +355,7 @@ def open_new_attempt(
     current = _latest(directory, packet_id, channel)
     if current is None:
         _reject("연 적 없는 채널에는 재시도가 없다 — record_intent 가 먼저다")
-    if current.state is not SendState.INTENT or current.message_id is not None:
+    if current.state not in _UNSENT or current.message_id is not None:
         _reject("발송 여부가 이미 확정된 시도는 다시 열 수 없다")
     _check_approval_binding(approval, packet_id, current.attempt)
     fresh = replace(

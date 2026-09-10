@@ -109,7 +109,7 @@ class TeamMail:
 
 @dataclass(frozen=True)
 class SearchFilters:
-    """서치 실행 조건. 기본 지역은 코드가 아니라 계약 파일이 정한다(P22)."""
+    """서치 실행 조건. 기본 지역도 허용 지역도 코드가 아니라 계약 파일이 정한다(P22 · D12)."""
 
     location: str = dataclass_field(
         default_factory=lambda: policy().default_search_location,
@@ -118,6 +118,8 @@ class SearchFilters:
 
     def __post_init__(self) -> None:
         _require_text(self.location, "SearchFilters.location")
+        if self.location not in policy().allowed_search_locations:
+            _reject("SearchFilters.location 이 계약 허용 지역(allowed_search_locations) 밖이다")
         bounds = self.seniority_years
         if bounds is None:
             return

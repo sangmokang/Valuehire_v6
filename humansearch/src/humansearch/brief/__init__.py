@@ -34,6 +34,7 @@ from .policy import (
     override_policy_for_tests,
     policy,
 )
+from .send_claim import claim_path, claim_send
 from .send_ledger import (
     Approval,
     SendIntent,
@@ -104,6 +105,8 @@ __all__ = [
     "build_inmails",
     "check_balanced",
     "check_linkedin",
+    "claim_path",
+    "claim_send",
     "compose_brief_mail",
     "content_lines",
     "core_tokens",

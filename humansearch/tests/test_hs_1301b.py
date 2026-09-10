@@ -67,6 +67,7 @@ def _payload(**overrides: Any) -> dict[str, Any]:
         "team_mail_domain": "valueconnect.kr",
         "clickup_position_list_id": "901814621569",
         "default_search_location": "South Korea",
+        "allowed_search_locations": ["South Korea"],
     }
     base.update(overrides)
     return base
@@ -186,7 +187,10 @@ def test_환경변수가_가리키는_계약_디렉터리를_쓴다(
     target = tmp_path / "humansearch"
     target.mkdir()
     (target / "brief-policy.json").write_text(
-        json.dumps(_payload(default_search_location="Japan"), ensure_ascii=False),
+        json.dumps(
+            _payload(default_search_location="Japan", allowed_search_locations=["Japan"]),
+            ensure_ascii=False,
+        ),
         encoding="utf-8",
     )
     monkeypatch.setenv("HUMANSEARCH_CONTRACTS_DIR", str(tmp_path))
@@ -293,7 +297,9 @@ def test_제목_접두_정책이_TeamMail_제목_판정을_실제로_움직인�
 # ── 4. SearchFilters ────────────────────────────────────────────────────────
 def test_SearchFilters_기본_지역은_계약값이다() -> None:
     assert SearchFilters().location == "South Korea"
-    japan = replace(policy(), default_search_location="Japan")
+    japan = replace(
+        policy(), default_search_location="Japan", allowed_search_locations=("Japan",)
+    )
     with override_policy_for_tests(japan):
         assert SearchFilters().location == "Japan"
 
@@ -320,7 +326,7 @@ def test_SearchPacket_은_search_filters_기본값으로_생성된다() -> None:
 
 
 def test_SearchPacket_은_지정한_search_filters_를_보존한다() -> None:
-    filters = SearchFilters(location="Japan", seniority_years=(5, 10))
+    filters = SearchFilters(location="South Korea", seniority_years=(5, 10))
     assert _packet(search_filters=filters).search_filters is filters
 
 

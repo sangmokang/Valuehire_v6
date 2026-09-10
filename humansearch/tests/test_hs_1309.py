@@ -39,6 +39,7 @@ from humansearch.brief import (
     SourceRef,
     TeamMail,
     Transition,
+    claim_send,
     from_json,
     load_attempt,
     load_intent,
@@ -146,6 +147,11 @@ def _approval(
 
 def _mode(target: Path) -> int:
     return stat.S_IMODE(target.stat().st_mode)
+
+
+def _claim(directory: Path) -> None:
+    """러너 규율 ②: 발송 직전 청구 1회(HS-13.09d). 청구 없는 SENT_UNVERIFIED 는 거부된다."""
+    claim_send(directory, _PACKET_ID, "gmail", 1, at=_LATER, evidence="발송 직전 청구")
 
 
 def _ledger(tmp_path: Path) -> Path:
@@ -361,9 +367,11 @@ def test_may_send_is_true_only_while_no_attempt_file_exists(tmp_path: Path) -> N
     ["after_intent", "after_send", "after_mark", "after_readback"],
 )
 def test_rerun_after_any_crash_point_grants_no_send(tmp_path: Path, crash_point: str) -> None:
-    """중간에 끊긴 뒤 재실행해도 발송 허가는 나오지 않는다 — 허가는 created is True 뿐이다."""
+    """중간에 끊긴 뒤 재실행해도 발송 허가는 나오지 않는다 — 허가는 청구 1회(claim_send) 뿐이다."""
     directory = tmp_path / "ledger"
     record_intent(directory, _intent())
+    if crash_point != "after_intent":
+        _claim(directory)
     if crash_point in {"after_mark", "after_readback"}:
         mark(
             directory, _PACKET_ID, "gmail", 1, SendState.SENT_UNVERIFIED, "msg-1", _LATER, "발송함 id"
@@ -379,6 +387,7 @@ def test_rerun_after_any_crash_point_grants_no_send(tmp_path: Path, crash_point:
 def test_mark_walks_intent_to_sent_to_verified_and_appends_transitions(tmp_path: Path) -> None:
     directory = tmp_path / "ledger"
     record_intent(directory, _intent())
+    _claim(directory)
     sent = mark(
         directory, _PACKET_ID, "gmail", 1, SendState.SENT_UNVERIFIED, "msg-1", _LATER, "발송함 id"
     )
@@ -388,10 +397,11 @@ def test_mark_walks_intent_to_sent_to_verified_and_appends_transitions(tmp_path:
     )
     assert verified.state is SendState.VERIFIED
     assert tuple(step.state for step in verified.transitions) == (
+        SendState.SEND_CLAIMED,
         SendState.SENT_UNVERIFIED,
         SendState.VERIFIED,
     )
-    assert verified.transitions[0].evidence == "발송함 id"
+    assert verified.transitions[1].evidence == "발송함 id"
     assert load_intent(directory, _PACKET_ID, "gmail") == verified
 
 
@@ -405,6 +415,7 @@ def test_mark_rejects_skipping_straight_to_verified(tmp_path: Path) -> None:
 def test_mark_rejects_backward_transition(tmp_path: Path) -> None:
     directory = tmp_path / "ledger"
     record_intent(directory, _intent())
+    _claim(directory)
     mark(directory, _PACKET_ID, "gmail", 1, SendState.SENT_UNVERIFIED, "msg-1", _LATER, "발송함 id")
     with pytest.raises(BriefInputError):
         mark(directory, _PACKET_ID, "gmail", 1, SendState.INTENT, "msg-1", _LATER, "되돌리기")
@@ -494,6 +505,7 @@ def test_open_new_attempt_rejects_blank_approval_field(tmp_path: Path, field: st
 def test_open_new_attempt_is_refused_once_the_send_is_known(tmp_path: Path) -> None:
     directory = tmp_path / "ledger"
     record_intent(directory, _intent())
+    _claim(directory)
     mark(directory, _PACKET_ID, "gmail", 1, SendState.SENT_UNVERIFIED, "msg-1", _LATER, "발송함 id")
     with pytest.raises(BriefInputError):
         open_new_attempt(directory, _PACKET_ID, "gmail", approval=_approval(), at=_LATER)
