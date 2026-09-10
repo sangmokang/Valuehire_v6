@@ -187,8 +187,9 @@ for d in "${D_IDS[@]}"; do
   IFS='|' read -r -a cells <<< "$row"
   val="$(printf '%s' "${cells[2]:-}" | tr -d '[:space:]')"
   distinct=$(printf '%s' "$val" | $G -o . | LC_ALL=C sort -u | wc -l | tr -d ' ')
-  words=$(printf '%s' "${cells[2]:-}" | $G -Eo '[가-힣]{2,}' | wc -l | tr -d ' ')
-  uniq_words=$(printf '%s' "${cells[2]:-}" | $G -Eo '[가-힣]{2,}' | LC_ALL=C sort -u | wc -l | tr -d ' ')
+  # 한글 단어 계수는 로케일에 기대지 않는다 — CI(ubuntu, LANG=C)에서 grep '[가-힣]' 은 0건이었다(2026-09-10 PR #83 실측). perl -CS 는 로케일 무관.
+  words=$(printf '%s' "${cells[2]:-}" | perl -CS -ne 'print "$&\n" while /\p{Hangul}{2,}/g' | wc -l | tr -d ' ')
+  uniq_words=$(printf '%s' "${cells[2]:-}" | perl -CS -ne 'print "$&\n" while /\p{Hangul}{2,}/g' | LC_ALL=C sort -u | wc -l | tr -d ' ')
   if [ "${#val}" -ge 10 ] && [ "$distinct" -ge 3 ] && [ "$words" -ge 2 ] && [ "$uniq_words" -ge 2 ] && no_repeat "$val"; then
     pass "§7 결정 $d 기본값 셀 내용 있음(${#val}자·문자 ${distinct}종·한글 단어 ${words}개)"
   else
