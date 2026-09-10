@@ -26,6 +26,10 @@ FIXTURE_FILES = (
     "scripts/verify/list-workflow-steps.py",
     "scripts/verify/run-acceptance.sh",
 )
+OPTIONAL_RUNTIME_FILES = (
+    "scripts/verify/check-hs-kickoff-identities.py",
+    "scripts/verify/hs-kickoff-confusables-17.0.0.json",
+)
 
 
 @dataclass(frozen=True)
@@ -58,6 +62,12 @@ def copy_fixture(tmp_path: Path) -> Path:
         dst = repo / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src, dst)
+    for rel in OPTIONAL_RUNTIME_FILES:
+        src = ROOT / rel
+        if src.is_file():
+            dst = repo / rel
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dst)
     verdict = repo / VERDICT
     verdict.parent.mkdir(parents=True, exist_ok=True)
     verdict.write_text("VERDICT: PASS\n\npytest fixture verdict, not a real review.\n", encoding="utf-8")
