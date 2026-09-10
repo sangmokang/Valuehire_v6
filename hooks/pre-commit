@@ -23,7 +23,14 @@ block() { printf 'BLOCKED: %s\n' "$1" >&2; fail=1; }
 # R(rename)을 넣지 않으면 `git mv notes.txt leak.db` 가 staged 목록에서 빠져
 # 훅을 그대로 통과한다(2026-08-09 실측). 이름만 바꿔도 내용은 그대로다.
 staged=$(git diff --cached --name-only --diff-filter=ACMR)
-if [ -z "$staged" ]; then exit 0; fi
+# 조기 종료는 ACMR 이 아니라 **전체** 스테이징으로 판단한다. ACMR 로 판단하면
+# 삭제만 하는 커밋(git rm)에서 목록이 비어 훅 전체가 exit 0 으로 건너뛰어진다 —
+# 비밀 스캔·자기제외·약화 탐지·억제 만료까지 전부 우회됐다(2026-09-09 실측:
+# `git rm .github/workflows/verify.yml` 단독 커밋이 아무 검사도 거치지 않고 통과).
+# 아래 검사들은 파일 **내용**을 읽으므로 계속 ACMR 목록을 쓴다. 삭제된 파일은 읽을
+# 내용이 없고, 삭제로 인한 약화는 3-b 가 diff 로 따로 본다.
+staged_any=$(git diff --cached --name-only)
+if [ -z "$staged_any" ]; then exit 0; fi
 
 # scan <설명> <파일> <grep 인자...>
 #   반환 0 = 매칭됨 / 1 = 매칭 없음 또는 실행오류(이 경우 block 이 이미 걸림)
@@ -110,6 +117,28 @@ else
     done <<< "$staged"
   fi
   rm -f "$wf"
+fi
+
+# ── 3-b) 검사 실행 줄 삭제 (P13 · 억제 p13-deletion-blindspot 해제) ───────────
+# 위 3) 은 scan_added 라서 **추가된 줄**만 본다. 검사 줄을 지우는 약화는 원리적으로
+# 보이지 않았다. 범위를 .github/workflows/* 로 한정하면 오탐이 거의 없다는 데 V1 과
+# 합의했고, 그 범위부터 도입한다. 판정은 별도 검사기에 위임한다 — 훅 안에 규칙을
+# 인라인하면 그 규칙을 격리 사본으로 공격하는 인수 검사를 쓸 수 없다.
+DEL_CHECKER=scripts/verify/check-workflow-deletion.sh
+if [ ! -x "$DEL_CHECKER" ]; then
+  block "$DEL_CHECKER 없음 또는 실행 권한 없음 — 삭제 약화 탐지 불가 (fail-closed)"
+else
+  dout=$(mktemp) || block "임시 파일 생성 실패 — 삭제 약화 판정 근거를 모을 수 없다 (fail-closed)"
+  if [ -n "${dout:-}" ] && [ -f "$dout" ]; then
+    drc=0
+    bash "$DEL_CHECKER" >"$dout" 2>&1 || drc=$?
+    if [ "$drc" -ne 0 ]; then
+      # 검사기 출력을 그대로 보인다. 사유(경로·스크립트)는 그 안에 있다.
+      cat "$dout" >&2
+      block "검사 실행 줄 삭제 (check-workflow-deletion exit=$drc)"
+    fi
+    rm -f "$dout"
+  fi
 fi
 
 # ── 4) 만료일 없는 억제 (P13 ③ · 98d923f 35일 방치 재현 방지) ─────────────────

@@ -122,3 +122,19 @@
   stage: "ci"
   ci_mirror_job: "verify"
   required: true
+- id: "workflow-deletion-precommit"
+  path: "hooks/pre-commit"
+  target: "DEL_CHECKER=scripts/verify/check-workflow-deletion.sh"
+  stage: "pre-commit"
+  required: true
+- id: "workflow-deletion-acceptance-ci"
+  path: ".github/workflows/verify.yml"
+  target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-p13-deletion.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
+- id: "precommit-delete-only-guard"
+  path: "hooks/pre-commit"
+  target: "staged_any=$(git diff --cached --name-only)"
+  stage: "pre-commit"
+  required: true
