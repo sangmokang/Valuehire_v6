@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# acceptance-ci-step-integrity.sh — 워크플로 스텝을 끄면 반드시 빨개지는가.
+# acceptance-ci-step-integrity.sh — 워크플로 시작 조건·스텝을 끄면 반드시 빨개지는가.
 #
 # scripts/verify/check-ci-step-integrity.sh 를 격리 사본으로 공격한다.
-# 차단 — 조건부·오류무시·빈 job·출력만 하는 스텝 8종을 주입하면 전부 불합격
-# 통과 — 손대지 않은 실제 워크플로와 이유가 적힌 예외는 그대로 합격
+# 차단 — 실행 0 trigger, 조건부·오류무시·빈 job·출력만 하는 스텝을 주입하면 전부 불합격
+# 통과 — 의미 동등 trigger, 손대지 않은 실제 워크플로와 이유가 적힌 예외는 그대로 합격
 set -uo pipefail
 
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY \
@@ -39,8 +39,136 @@ expect_rc() {
   else record 1 "$desc" "expected exit=$wanted actual=$rc"; fi
 }
 
+expect_trigger_contract() {
+  local desc="$1" path="$2" wanted="$3" marker="$4" checked_pattern="$5" rc=0 out
+  out=$(bash "$CHECKER" "$path" 2>&1) || rc=$?
+  if [ "$rc" -eq "$wanted" ] && printf '%s\n' "$out" | grep -q "$marker" \
+      && printf '%s\n' "$out" | grep -Eq "$checked_pattern"; then
+    record 0 "$desc" "exit=$rc, 출력 계약 일치"
+  else
+    record 1 "$desc" "expected exit=$wanted/$marker/$checked_pattern actual exit=$rc"
+  fi
+}
+
+trigger_variant() {
+  local name="$1" trigger="$2" path
+  path="$TMP/$name.yml"
+  cp "$WF" "$path"
+  ruby -e '
+    path, replacement = ARGV
+    source = File.read(path)
+    first = source.index("\non:\n")
+    last = first && source.index("\npermissions:", first + 1)
+    abort "trigger block not found" unless first && last
+    source[(first + 1)...last] = replacement
+    File.write(path, source)
+  ' "$path" "$trigger"
+  printf '%s' "$path"
+}
+
 # ── 통과 쪽: 손대지 않은 실제 워크플로 ───────────────────────────────────────
 expect_rc "실제 워크플로 → 통과" "$WF" 0
+
+# ── 통과 쪽: trigger 의미 동등 표현을 과잉 차단하지 않는다 ────────────────
+p=$(trigger_variant trigger-quoted '"on":
+  push: {}
+  pull_request: {}
+  workflow_dispatch:
+    inputs:
+      reason:
+        required: false
+  schedule:
+    - cron: "17 3 * * 1"')
+expect_trigger_contract "quoted on·빈 mapping·dispatch inputs·추가 event → 통과" "$p" 0 \
+  '^PASS: TRIGGER_CONTRACT:' '^CHECKED: [1-9][0-9]*$'
+
+p=$(trigger_variant trigger-null 'on:
+  push:
+  pull_request:
+  workflow_dispatch:')
+expect_trigger_contract "필수 event null mapping → 통과" "$p" 0 \
+  '^PASS: TRIGGER_CONTRACT:' '^CHECKED: [1-9][0-9]*$'
+
+p=$(trigger_variant trigger-sequence 'on: [push, pull_request, workflow_dispatch]')
+expect_trigger_contract "필수 event sequence shorthand → 통과" "$p" 0 \
+  '^PASS: TRIGGER_CONTRACT:' '^CHECKED: [1-9][0-9]*$'
+
+# ── 차단 쪽: 워크플로 자체가 실행되지 않는 trigger 축소 ──────────────────
+p=$(trigger_variant trigger-no-push 'on:
+  pull_request:
+  workflow_dispatch:')
+expect_trigger_contract "push 삭제 → 계약 위반" "$p" 1 \
+  '^FAIL: TRIGGER_CONTRACT:.*push' '^CHECKED: [1-9][0-9]*$'
+
+p=$(trigger_variant trigger-no-pr 'on:
+  push:
+  workflow_dispatch:')
+expect_trigger_contract "pull_request 삭제 → 계약 위반" "$p" 1 \
+  '^FAIL: TRIGGER_CONTRACT:.*pull_request' '^CHECKED: [1-9][0-9]*$'
+
+p=$(trigger_variant trigger-no-dispatch 'on:
+  push:
+  pull_request:')
+expect_trigger_contract "workflow_dispatch 삭제 → 계약 위반" "$p" 1 \
+  '^FAIL: TRIGGER_CONTRACT:.*workflow_dispatch' '^CHECKED: [1-9][0-9]*$'
+
+for key in branches branches-ignore paths paths-ignore tags; do
+  p=$(trigger_variant "push-$key" "on:
+  push:
+    $key: [main]
+  pull_request:
+  workflow_dispatch:")
+  expect_trigger_contract "push.$key 축소 → 계약 위반" "$p" 1 \
+    '^FAIL: TRIGGER_CONTRACT:.*push' '^CHECKED: [1-9][0-9]*$'
+done
+
+for key in branches branches-ignore paths paths-ignore types; do
+  p=$(trigger_variant "pr-$key" "on:
+  push:
+  pull_request:
+    $key: [main]
+  workflow_dispatch:")
+  expect_trigger_contract "pull_request.$key 축소 → 계약 위반" "$p" 1 \
+    '^FAIL: TRIGGER_CONTRACT:.*pull_request' '^CHECKED: [1-9][0-9]*$'
+done
+
+p=$(trigger_variant trigger-sequence-missing 'on: [push, pull_request]')
+expect_trigger_contract "sequence shorthand 필수 event 누락 → 계약 위반" "$p" 1 \
+  '^FAIL: TRIGGER_CONTRACT:.*workflow_dispatch' '^CHECKED: [1-9][0-9]*$'
+
+# ── 데이터 오류: YAML 덮어쓰기·비정상 구조를 fail-closed 한다 ─────────────
+p=$(trigger_variant trigger-none 'x-trigger: ignored')
+expect_trigger_contract "top-level on 없음 → 구조 오류" "$p" 2 \
+  '^FAIL:' '^CHECKED: 0$'
+
+p=$(trigger_variant trigger-top-list '- push
+- pull_request
+- workflow_dispatch')
+expect_trigger_contract "top-level list → 구조 오류" "$p" 2 \
+  '^FAIL:' '^CHECKED: 0$'
+
+p=$(trigger_variant trigger-duplicate-on 'on: [push, pull_request, workflow_dispatch]
+on: [push, pull_request, workflow_dispatch]')
+expect_trigger_contract "duplicate plain on → 구조 오류" "$p" 2 \
+  '^FAIL:' '^CHECKED: 0$'
+
+p=$(trigger_variant trigger-duplicate-quoted '"on": [push, pull_request, workflow_dispatch]
+"on": [push, pull_request, workflow_dispatch]')
+expect_trigger_contract "duplicate quoted on → 구조 오류" "$p" 2 \
+  '^FAIL:' '^CHECKED: 0$'
+
+p=$(trigger_variant trigger-mixed-on 'on: [push, pull_request, workflow_dispatch]
+"on": [push, pull_request, workflow_dispatch]')
+expect_trigger_contract "plain/quoted on 중복 → 구조 오류" "$p" 2 \
+  '^FAIL:' '^CHECKED: 0$'
+
+p=$(trigger_variant trigger-duplicate-event 'on:
+  push:
+  push: {}
+  pull_request:
+  workflow_dispatch:')
+expect_trigger_contract "duplicate event key → 구조 오류" "$p" 2 \
+  '^FAIL:' '^CHECKED: 0$'
 
 # ── 차단 쪽: 무력화 주입 ─────────────────────────────────────────────────────
 mutate() {
