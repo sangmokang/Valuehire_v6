@@ -12,7 +12,7 @@
 - 선행 완료 기록: HS-00.03 `c28270c1ea6153d4ea0aae83a8562981b2564269`; 그 안의 구현 커밋은 `a2c79f08240cb5be287e8624ed07121ad14dd9ab`이다.
 - 시작 시 저장소: 루트 `HEAD=main=origin/main=fc6beedc78019862bc2f1b3bf4c4ad3bbd8e845b`, 추적 변경 0건. 새 작업은 선행 로컬 계보 `c28270c...`에서 분기했다.
 - 소유: 최초 브랜치/작업공간 `task/hs-0004-20260910`/`worktrees/hs-0004-20260910`는 독립 검토자의 범위 위반으로 오염되어 증거 보존만 한다. 유효한 소유 작업선은 브랜치 `task/hs-0004-recovery-20260910`, 작업공간 `worktrees/hs-0004-recovery-20260910`, 세션 `hs0004-spec-review-recovery`다.
-- 중복: 같은 WU 이름의 브랜치·작업공간·커밋은 0건이었다. 관련 온라인 작업은 열린 Issue #69이며 HS-00.04 전용 Issue·PR은 없었다.
+- 시작 시 중복: 같은 WU 이름의 브랜치·작업공간·커밋은 0건이었다. 이후 최초 독립 검토자가 범위를 위반해 원래 작업선에 커밋·구현을 만들어 현재는 오염 작업선과 recovery 작업선이 각각 존재한다. 오염 작업선은 증거 보존만 하며 소유·구현·판정에 쓰지 않는다. 관련 온라인 작업은 열린 Issue #69이며 HS-00.04 전용 Issue·PR은 없었다.
 - 기존 담당 경계: `scripts/verify/check-ci-step-integrity.sh`와 `scripts/acceptance-ci-step-integrity.sh`가 조건부 job·step과 오류 무시를 이미 검사하지만 `on` 시작 조건의 의미는 검사하지 않는다. 새 검사기나 CI 단계를 만들지 않고 이 기존 경계를 보강한다.
 - 현재 main 차이: `c28270c...` 이후 main은 같은 CI 무결성 파일에 concurrency·timeout 보강을 포함한다. HS-00.04는 trigger 계약만 소유하며 concurrency·timeout 변경을 가져오거나 되돌리지 않는다. 후속 전달 시 main과 충돌을 수동 재검토한다.
 - 시작 검사: Strict 원칙 정본 2개 직접 읽기와 `bash scripts/acceptance-principles-check.sh`는 `CHECKED: 34`, 종료값 0이었다. `scripts/session-status.sh`는 장시간 실행 중인 상태로 별도 원문 결과를 기다린다.
@@ -54,7 +54,7 @@ bash scripts/verify/run-acceptance.sh scripts/acceptance-ci-step-integrity.sh
 - `push`: 모든 브랜치를 포함하고 경로·태그·제외 필터가 없는 현재 의미.
 - `pull_request`: GitHub 기본 활동을 사용하고 branch/path/type 필터가 없는 현재 의미.
 - `workflow_dispatch`: 수동 실행 진입점의 존재. 입력 정의는 시작 무결성과 무관하므로 허용한다.
-- 기존 job/step 조건·오류 무시·echo/syntax-only·0개 대상·concurrency/timeout 검사는 그대로 유지한다.
+- 기존 job/step 조건·오류 무시·echo/syntax-only 검사는 그대로 유지한다. V1/V2가 찾은 중복 key와 비-mapping job/step의 검사 대상 0건은 같은 워크플로 무효화 경계로 fail-closed 한다.
 - 원본 저장소 상태 전후 동일성.
 
 ### 제외
@@ -72,14 +72,16 @@ bash scripts/verify/run-acceptance.sh scripts/acceptance-ci-step-integrity.sh
 - 입력: UTF-8 GitHub Actions YAML 경로 하나. 생략 시 `.github/workflows/verify.yml`.
 - 정상 출력: 승인된 trigger와 기존 job/step 계약의 PASS 설명, `CHECKED: N` (`N>0`), 종료값 0.
 - 계약 위반 출력: `FAIL: TRIGGER_CONTRACT: ...`를 포함하고 종료값 1.
-- 파일 없음·YAML 파싱 실패·top-level mapping 아님·trigger를 구조적으로 읽을 수 없음: `FAIL:`과 `CHECKED: 0`, 종료값 2.
+- 파일 없음·권한/읽기 오류·YAML 파싱 실패·top-level mapping 아님·trigger를 구조적으로 읽을 수 없음: `FAIL:`과 `CHECKED: 0`, 종료값 2.
 - plain/quoted `on`: 한 가지 표현만 존재하면 동등하게 읽는다. 같은 top-level mapping에 plain 또는 quoted `on`이 두 번 있거나 plain/quoted 표현이 함께 있으면 값이 같더라도 덮어쓰기 가능한 모호한 입력으로 `FAIL:`·`CHECKED: 0`·종료값 2다.
+- boolean/case 충돌: literal `true:`나 `On:`/`ON:` 등 YAML 1.1에서 `on`과 같은 boolean key로 해석될 수 있는 최상위 key가 실제 `on`과 함께 있으면 AST와 값 계층이 다른 trigger를 고를 수 있으므로 종료값 2다.
 - sequence shorthand: `on: [push, pull_request, workflow_dispatch]`처럼 필수 세 event를 모두 포함하면 각 event가 `null`인 mapping과 의미 동등하므로 종료값 0이다. 필수 event가 하나라도 빠지면 종료값 1이다. 알 수 없는 event 추가는 아래 추가-event 계약을 따른다.
-- event key 중복: `on` mapping 안에 `push`, `pull_request`, `workflow_dispatch` 또는 다른 동일 event key가 두 번 있으면 마지막 값으로 덮어쓰지 않고 `FAIL:`·`CHECKED: 0`·종료값 2다.
+- event 구조: `on` mapping 안에 `push`, `pull_request`, `workflow_dispatch` 또는 다른 동일 event key가 두 번 있거나 merge key `<<`·비문자 event key가 있으면 값 계층의 병합/덮어쓰기와 GitHub 해석이 갈릴 수 있으므로 `FAIL:`·`CHECKED: 0`·종료값 2다. sequence 원소도 문자열 event만 허용한다.
 - `push`: `null`, 빈 mapping, 또는 `branches: ["**"]`만 정상 의미로 인정한다. `branches: ["**"]` 외 다른 key나 음수 패턴은 거부한다. tag 전용/필터는 거부한다.
 - `pull_request`: `null` 또는 빈 mapping만 인정한다. `types`, `branches`, `branches-ignore`, `paths`, `paths-ignore`를 포함한 축소는 거부한다.
 - `workflow_dispatch`: `null` 또는 mapping을 인정한다. mapping의 `inputs` 의미는 이 WU가 평가하지 않는다.
 - 알 수 없는 추가 event는 실행 0 우회를 만들지 않으므로 이 WU만으로 거부하지 않는다. 필수 세 event의 의미는 반드시 유지한다.
+- job/step 구조: top-level·`jobs`·각 job mapping·각 step mapping의 중복 key는 종료값 2다. `jobs`의 각 값과 `steps`의 각 원소가 mapping이 아니면 검사 가능한 job/step 0건을 trigger `CHECKED`로 가리지 않고 `CHECKED: 0`, 종료값 2다. 유효 mapping이지만 steps가 없거나 비어 있으면 기존처럼 계약 위반 종료값 1이다.
 - 재시도·동시성: 순수 파일 판정이라 재시도 상태가 없고 동시 호출끼리 공유 쓰기가 없다.
 
 ## counter-AC와 반박 논리
@@ -92,6 +94,10 @@ bash scripts/verify/run-acceptance.sh scripts/acceptance-ci-step-integrity.sh
 | 항상 거부 변이 | trigger 검사를 무조건 false로 바꿔 정상·의미 동등 사본도 거부 | 인수 검사 종료값 비0, 정상 대조 실패 |
 | 검사 배선 누락 변이 | checker에서 trigger 검사 호출을 제거 | 음성 사본 하나 이상 생존하여 인수 검사 실패 |
 | 데이터 오류 변이 | YAML 파싱 불가, top-level list, duplicate top-level `on`, duplicate event key, trigger 0개 | checker 종료값 2; `FAIL:`과 `CHECKED: 0` |
+| V1/V2 boolean 충돌 | literal `true:`/case-changed `On:`과 실제 `on`을 함께 둬 AST와 값 계층이 서로 다른 trigger를 판정 | checker 종료값 2; `FAIL:`과 `CHECKED: 0` |
+| YAML 의미 불일치 | `on` mapping에 merge key `<<`, 비문자 event key, sequence 비문자 원소를 넣어 Psych만 의미를 확장 | checker 종료값 2; `FAIL:`과 `CHECKED: 0` |
+| 검사 대상 0 은닉 | duplicate `jobs`/job/step key 또는 non-mapping job/step으로 실제 검사 가능한 대상을 없앰 | checker 종료값 2; `FAIL:`과 `CHECKED: 0` |
+| 읽기 실패 | 존재하지만 읽기 권한이 없는 입력에서 Ruby stack trace로 종료 | checker 종료값 2; `FAIL:`과 `CHECKED: 0` |
 | 의미 동등 축약형 | `on: [push, pull_request, workflow_dispatch]`를 구조가 다르다는 이유로 거부하거나 필수 event가 빠진 sequence를 승인 | 필수 세 event가 있으면 종료값 0, 하나라도 빠지면 종료값 1 |
 | 과잉 차단 변이 | quoted `on`, 빈 mapping, workflow_dispatch inputs, 알 수 없는 추가 event를 이유 없이 거부 | 정상 대조군 종료값 0 요구가 변이를 실패시킴 |
 | event 삭제 | push 또는 pull_request 또는 workflow_dispatch 제거 | 종료값 1, 누락 event 이름 포함 |
@@ -105,8 +111,8 @@ bash scripts/verify/run-acceptance.sh scripts/acceptance-ci-step-integrity.sh
 
 - 정본 한도: 직접 작성 코드 파일 soft 300 / hard 600 LOC, 함수 soft 60 / hard 100 LOC, 이 WU diff hard 3,000줄.
 - 시작 줄수: `check-ci-step-integrity.sh` 111, `acceptance-ci-step-integrity.sh` 100, `verify.yml` 287, `verification-commands.md` 102.
-- 예상 소유 파일: `scripts/verify/check-ci-step-integrity.sh`, `scripts/acceptance-ci-step-integrity.sh`, `humansearch/tests/test_hs_0004.py`, `docs/sot/verification-commands.md`, 이 goal과 `docs/engineering/evidence/hs0004-20260910/`.
-- 예상 직접 코드 증가: checker 40줄 이하, acceptance 80줄 이하, Python 회귀 180줄 이하. 각 파일 hard 600과 함수 hard 100 아래를 유지한다.
+- 소유 파일: `scripts/verify/check-ci-step-integrity.sh`, `scripts/acceptance-ci-step-integrity.sh`, `docs/sot/verification-commands.md`, 이 goal과 `docs/engineering/evidence/hs0004-20260910/`. 별도 Python 회귀는 이 shell WU의 canonical acceptance와 중복이라 만들지 않는다.
+- V1/V2 전 재산정: checker 195줄, acceptance 231줄이며 직접 증가량은 각각 84줄, 131줄이다. 최초 예상 40/80을 넘었으나 두 파일 모두 soft 300 아래다. 감사 반례 보강 후에도 checker 280줄 이하, acceptance 300줄 이하, 함수 hard 100 아래를 유지한다.
 - 생성 파일·fixture 예외: 없음. 임시 고장 YAML은 `mktemp` 아래에서만 생성하고 커밋하지 않는다.
 - diff 기준: main이 아니라 선행 WU 완료 `c28270c...` 대비 HS-00.04 단독 diff를 센다. main 직행 PR은 누적 계보와 충돌하므로 만들지 않는다.
 - 경계 실증: 기존 코드 예산 판정기로 600줄 정상 사본 PASS, 601줄 고장 사본 FAIL, 대상 0개 FAIL을 실행한다.
@@ -131,10 +137,10 @@ bash scripts/verify/run-acceptance.sh scripts/acceptance-ci-step-integrity.sh
 
 ## 결정 카드
 
-> **무엇을** — 기존 CI 무결성 판정기의 YAML 구조 검사에 필수 trigger 의미를 추가한다.  
-> **왜** — 새 장치를 만들지 않고 이미 CI와 pre-push에 배선된 한 판정기에서 실행 0 우회를 막을 수 있다.  
-> **버린 길** — `acceptance-hs-kickoff.sh`에 HumanSearch 전용 문자열 검사를 추가하는 길은 전체 verify 워크플로의 시작 조건을 중복 판정하고 HS-00.05와 경계를 섞어 기각한다.  
-> **대가** — 현재 저장소의 넓은 실행 정책을 의도적으로 고정하므로 향후 비용 절감을 위한 path filter는 별도 계약 변경과 시험 갱신 없이는 쓸 수 없다.  
+> **무엇을** — 기존 CI 무결성 판정기의 YAML 구조 검사에 필수 trigger 의미를 추가한다.<br>
+> **왜** — 새 장치를 만들지 않고 이미 CI와 pre-push에 배선된 한 판정기에서 실행 0 우회를 막을 수 있다.<br>
+> **버린 길** — `acceptance-hs-kickoff.sh`에 HumanSearch 전용 문자열 검사를 추가하는 길은 전체 verify 워크플로의 시작 조건을 중복 판정하고 HS-00.05와 경계를 섞어 기각한다.<br>
+> **대가** — 현재 저장소의 넓은 실행 정책을 의도적으로 고정하므로 향후 비용 절감을 위한 path filter는 별도 계약 변경과 시험 갱신 없이는 쓸 수 없다.<br>
 > **되돌리기** — 구현 커밋 revert 후 RED 회귀로 보호가 사라졌음을 확인한다.
 
 ## 읽은 정본과 외부 의미 근거
