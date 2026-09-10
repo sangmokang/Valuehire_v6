@@ -16,5 +16,15 @@
   "default_search_location": "South Korea",
   "allowed_search_locations": [
     "South Korea"
+  ],
+  "linkedin_core_sections": [
+    "주요업무",
+    "주요 업무",
+    "담당업무",
+    "담당 업무",
+    "자격요건",
+    "자격 요건",
+    "우대사항",
+    "우대 사항"
   ]
 }

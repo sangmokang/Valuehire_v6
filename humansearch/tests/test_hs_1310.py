@@ -72,6 +72,26 @@ def _faithful_jd_packet(source: JdSource, company_intro: str = "회사 소개 �
     )
 
 
+def _mail_body(jp: JdPacket, tail: str = "") -> str:
+    """§6 3절 블록을 렌더러와 같은 마커로 담은 최소 본문(HS-13.04b 메일 결합). tail 은 뒤에 덧붙인다."""
+    lines = [
+        "[JD 원문 시작]",
+        *jp.gmail_body.splitlines(),
+        "[JD 원문 끝]",
+        "[복사 시작]",
+        *jp.linkedin_body.splitlines(),
+        "[복사 끝]",
+        "[필드 1: 회사 소개]",
+        *jp.two_field_company.splitlines(),
+        "",
+        "[필드 2: JD 내용]",
+        *jp.two_field_jd.splitlines(),
+    ]
+    if tail:
+        lines.append(tail)
+    return "\n".join(lines)
+
+
 def _packet(body: str) -> SearchPacket:
     return SearchPacket(
         packet_id=_PACKET_ID,
@@ -84,7 +104,7 @@ def _packet(body: str) -> SearchPacket:
             legal_name=Claim("예시 주식회사", ("C1",)),
             sources=(SourceRef("C1", "https://example.com/about", "회사 소개", _TODAY),),
         ),
-        jd_packet=_faithful_jd_packet(JdSource(_JD_TEXT, _RAW_SHA, "U1")),
+        jd_packet=_JP,
         candidates=(
             CandidateLead(
                 display_name="예시 후보",
@@ -113,7 +133,8 @@ def _packet(body: str) -> SearchPacket:
     )
 
 
-_BODY = "고객사 백엔드 엔지니어 | 밸류커넥트 내부 공유\n본문 둘째 줄\n본문 셋째 줄"
+_JP = _faithful_jd_packet(JdSource(_JD_TEXT, _RAW_SHA, "U1"))
+_BODY = _mail_body(_JP, "고객사 백엔드 엔지니어 | 밸류커넥트 내부 공유\n본문 둘째 줄\n본문 셋째 줄")
 
 
 def _write_packet(tmp_path: Path, body: str = _BODY) -> Path:

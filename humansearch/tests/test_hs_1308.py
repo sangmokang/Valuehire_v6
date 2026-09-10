@@ -178,9 +178,7 @@ def test_html_tag_in_greeting_is_rejected() -> None:
 
 def test_html_tag_in_linkedin_body_is_rejected() -> None:
     with pytest.raises(BriefInputError):
-        build_inmail(
-            _lead(), LINKEDIN_BODY + "<br/>", greeting=GREETING, sender_line=SENDER_LINE
-        )
+        build_inmail(_lead(), LINKEDIN_BODY + "<br/>", greeting=GREETING, sender_line=SENDER_LINE)
 
 
 def test_blank_sender_line_is_rejected() -> None:

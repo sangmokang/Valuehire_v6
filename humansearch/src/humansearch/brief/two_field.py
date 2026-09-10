@@ -102,7 +102,8 @@ def split_two_field(
     absorbing = False
     for heading, lines in raw_sections:
         if heading in marker_set:
-            absorbing = True
+            # 최상위 마커만 뒤따르는 소제목을 흡수한다. 소제목을 마커로 고르면 그 절 하나로 끝(Codex 11차).
+            absorbing = not _is_subheading(lines[0])
             selected.append((heading, lines))
         elif absorbing and heading and _is_subheading(lines[0]):
             selected.append((heading, lines))

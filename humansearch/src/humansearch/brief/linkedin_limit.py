@@ -199,6 +199,10 @@ def verify_linkedin_fidelity(
         raise BriefInputError("verify_linkedin_fidelity 의 body 는 공백만일 수 없다")
     sections = split_sections(jd.text)
     omitted = _omitted_headings(sections, omittable_sections)
+    core = frozenset(policy().linkedin_core_sections)
+    blocked = sorted(omitted & core)
+    if blocked:
+        raise BriefInputError(f"핵심 절은 LinkedIn 판에서 생략할 수 없다(계약 linkedin_core_sections): {blocked[0]!r}")
     checked: list[str] = []
     for section in sections:
         if section.heading and section.heading in omitted:
@@ -211,8 +215,12 @@ def verify_linkedin_fidelity(
     jd_exact = frozenset(jd_all)
     jd_tokens = _token_sets(jd_all)
 
+    if not checked:
+        raise BriefInputError("생략 뒤 검사 대상 JD 줄이 0 이다 — 모든 절을 생략한 LinkedIn 판은 산출물이 아니다")
     body_all = content_lines(body)
     body_lines = tuple(line for line in body_all if not _is_frame_line(line))
+    if not body_lines:
+        raise BriefInputError("LinkedIn 본문에 프레임 줄 외 내용 줄이 0 이다")
     body_exact = frozenset(body_lines)
     body_tokens = _token_sets(body_lines)
 

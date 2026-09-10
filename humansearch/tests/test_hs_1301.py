@@ -39,7 +39,7 @@ LEAD_URL = "https://www.linkedin.com/in/example-0001"
 SECOND_URL = "https://kr.linkedin.com/in/example-0002"
 EXEC_URL = "https://www.linkedin.com/in/example-0003"
 PACKET_ID = f"86exampleid-{JD_SHA[:8]}"
-MAIL_BODY = "예시고객사 검색 엔지니어 | 밸류커넥트 내부 공유\n작성·확인 기준일: 2026년 9월 10일\n"
+MAIL_HEAD = "예시고객사 검색 엔지니어 | 밸류커넥트 내부 공유\n작성·확인 기준일: 2026년 9월 10일"
 
 
 def _source_refs() -> tuple[SourceRef, ...]:
@@ -170,7 +170,7 @@ def _jd_packet(**overrides: Any) -> JdPacket:
     )
     fields: dict[str, Any] = {
         "gmail_body": JD_TEXT,
-        "linkedin_body": f"[복사 시작]\n{JD_TEXT}\n[복사 끝]",
+        "linkedin_body": JD_TEXT,  # 마커 [복사 시작]/[복사 끝] 은 렌더러가 감싼다 — 본문에 넣지 않는다
         "two_field_company": two.company_intro,
         "two_field_jd": two.jd_body,
         "two_field_sections": ("주요업무", "자격요건", "우대사항"),
@@ -178,6 +178,29 @@ def _jd_packet(**overrides: Any) -> JdPacket:
     }
     fields.update(overrides)
     return JdPacket(**fields)
+
+
+def _mail_body(jp: JdPacket, tail: str = "") -> str:
+    """§6 3절 블록을 렌더러와 같은 마커로 담은 최소 본문(HS-13.04b 메일 결합). tail 은 뒤에 덧붙인다."""
+    lines = [
+        "[JD 원문 시작]",
+        *jp.gmail_body.splitlines(),
+        "[JD 원문 끝]",
+        "[복사 시작]",
+        *jp.linkedin_body.splitlines(),
+        "[복사 끝]",
+        "[필드 1: 회사 소개]",
+        *jp.two_field_company.splitlines(),
+        "",
+        "[필드 2: JD 내용]",
+        *jp.two_field_jd.splitlines(),
+    ]
+    if tail:
+        lines.append(tail)
+    return "\n".join(lines)
+
+
+MAIL_BODY = MAIL_HEAD + "\n" + _mail_body(_jd_packet()) + "\n"
 
 
 def _mail(**overrides: Any) -> TeamMail:

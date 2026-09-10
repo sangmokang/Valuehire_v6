@@ -96,8 +96,7 @@ def tiers() -> SchoolTiers:
 
 def test_same_input_scores_identically_across_100_runs() -> None:
     digests = {
-        hashlib.sha256(repr(score_candidate(_ev())).encode("utf-8")).hexdigest()
-        for _ in range(100)
+        hashlib.sha256(repr(score_candidate(_ev())).encode("utf-8")).hexdigest() for _ in range(100)
     }
     assert len(digests) == 1
 

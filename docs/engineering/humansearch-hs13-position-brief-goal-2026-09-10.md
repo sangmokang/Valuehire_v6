@@ -109,6 +109,8 @@ class ConnectionDegree(Enum): UNKNOWN, FIRST, SECOND, THIRD_PLUS
 @dataclass(frozen=True) class TeamMail:
     subject: str; to: tuple[str, ...]; cc: tuple[str, ...]; body: str; body_sha256: str
 #   to·cc 는 계약 도메인이면서 **team-recipients.json 의 to∪cc 구성원**이어야 한다(Codex 10차: 같은 도메인 임의 계정으로 후보 PII 유출 차단)
+#   body 는 §6 의 3절 블록 마커(`[JD 원문 시작]…[JD 원문 끝]`·`[복사 시작]…[복사 끝]`·`[필드 1: 회사 소개]`+빈 줄+`[필드 2: JD 내용]`)를 각 1회 갖고,
+#   그 뒤 줄들이 jd_packet 3종과 **글자 그대로** 일치해야 한다 — SearchPacket 이 조립·역직렬화 때 대조(Codex 11차: 임의 본문 VERIFIED 차단)
 @dataclass(frozen=True) class SearchPacket:   # packet_id == f"{position.clickup_task_id}-{sha256(jd.text)[:8]}" 강제. **조립·역직렬화·저장 공통 경계에서 JD 3종 재검증**: gmail 누락 0·추가 조건 0, linkedin 은 linkedin_omitted_sections 밖 누락 0·추가 조건 0, two_field_jd 는 two_field_sections 로 split_two_field 재계산과 내용 줄 일치(Codex 10차)(Codex 8차: 형식만 맞는 임의 id 는 새 발송 namespace). search_filters.location 은 담을 때의 계약으로 재검증
     packet_id: str; position: PositionSpec; jd: JdSource; company: CompanyBrief
     jd_packet: JdPacket; candidates: tuple[CandidateLead, ...]; mail: TeamMail
@@ -134,7 +136,7 @@ def verify_linkedin_fidelity(jd, body, omittable_sections: tuple[str, ...]) -> F
 #   생략은 호출자가 이름으로 지정한 절(예: "전형 절차","복리후생")의 줄만 허용. 그 밖의 누락은 FAIL
 # two_field.py
 def split_two_field(jd: JdSource, company_intro: str, section_markers: tuple[str, ...]) -> tuple[str, str]
-#   필드1 = 회사 소개(company_intro), 필드2 = section_markers 로 고른 절 + **각 절 바로 뒤에 이어지는 괄호 소제목 절(`[…]`)을 흡수**(HS-13.04b —
+#   필드1 = 회사 소개(company_intro), 필드2 = section_markers 로 고른 절 + **최상위 마커 절 바로 뒤에 이어지는 괄호 소제목 절(`[…]`)을 흡수**(소제목을 마커로 고르면 그 절 하나만, HS-13.04b —
 #   2026-09-10 라이브 실측: `[다루는 문제의 범위]` 가 별도 절로 잘려 `주요업무`·`혜택 및 복지` 본문이 필드 2 에서 빠졌다). 마커 순서는 결과를 바꾸지 않는다. 필드2는 verify_fidelity 통과 필수
 # mail.py
 BRIEF_SUBJECT = "[포지션]{client}, {title}";  SEARCH_SUBJECT = "[ValuehireSearch][포지션]{client}, {title}"
@@ -208,7 +210,7 @@ def open_new_attempt(dir, packet_id, channel, *, approval: Approval, at) -> tupl
 # policy.py  (P22 — HS-13.01b 소유)
 def load_brief_policy(path=contracts/humansearch/brief-policy.json) -> BriefPolicy
 #   linkedin_max=1899, subject_prefixes, profile_url_prefixes, team_domain, clickup_position_list_id, default_search_location,
-#   allowed_search_locations(비어있지 않은 목록·공백 없는 문자열·중복 0·기본값 포함 필수) 를 한 곳에서 소유.
+#   allowed_search_locations(비어있지 않은 목록·공백 없는 문자열·중복 0·기본값 포함 필수)·linkedin_core_sections(LinkedIn 판에서 생략 불가 절 제목, D11) 를 한 곳에서 소유.
 #   types_*.py 의 리터럴은 이 계약값으로 대체(HS-13.01b). 검사기·런타임·시험이 같은 파일을 읽는다
 #   `override_policy_for_tests` 는 패키지 공개 API(`humansearch.brief.__all__`)에 없고 `PYTEST_CURRENT_TEST` 밖에서는 거부(Codex 8차).
 #   `HUMANSEARCH_CONTRACTS_DIR` 환경변수도 pytest 밖에서는 거부(조용히 무시하지 않음) — 운영 정책 소유자는 저장소 정본 계약 하나(Codex 9차)
@@ -287,7 +289,7 @@ def load_brief_policy(path=contracts/humansearch/brief-policy.json) -> BriefPoli
 | HS-13.02c | 합본 JD 경고 필드를 더한다 | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1302c.py` (`5+ passed`) | 양성: 단일 JD → `multi_position_hint == ()`·`ok` 불변. 음성: `포지션:`+`직무:` 2줄·`## A`/`## B` 를 경고 hint 2줄로 보고하고 `ok` 는 원문 기준 유지(hint 항상 () 변이 검출) | IMPLEMENTED |
 | HS-13.03 | LinkedIn 1,899자 한도와 생략 정책을 강제한다 | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1303.py` (`12+ passed`) | 양성: 1,899자 PASS·지정 절(`혜택 및 복지`·`채용 전형`) 생략 PASS·어미 축약 줄("…을 찾습니다"→"…을 찾음") PASS(D11). 음성: 1,900자 FAIL(경계 Hypothesis)·미지정 절 누락 FAIL·명사 1개 삭제 FAIL | IMPLEMENTED |
 | HS-13.04 | 사람인·잡코리아 2필드로 나눈다 | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1304.py` (`8+ passed`) | 양성: 합성 JD → 필드1·필드2, 필드2 충실도 PASS. 음성: 마커 없음·필드2 빈값 거부 | IMPLEMENTED |
-| HS-13.04b | 2필드 절 범위를 소제목 흡수로 고치고 패킷 경계에서 JD 3종을 재검증한다 | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1304b.py` (`12+ passed`) | 양성: 괄호 소제목 절이 마커 절에 흡수·마커 순서 무관·소제목 자체를 마커로 지정 가능·충실한 3종 패킷 왕복. 음성: Gmail 줄 누락·추가 조건 거부·필드 2 절 본문 손실 거부·LinkedIn 미선언 절 누락 거부·two_field_sections 빈값 거부·변조된 저장 파일 로드 거부 | IMPLEMENTED |
+| HS-13.04b | 2필드 절 범위를 소제목 흡수로 고치고 패킷 경계에서 JD 3종을 재검증한다 | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1304b.py` (`25+ passed`) | 양성: 괄호 소제목 절이 최상위 마커 절에 흡수·마커 순서 무관·소제목 마커는 그 절 하나만·충실한 3종 패킷 왕복·§6 블록을 그대로 담은 메일 본문 통과. 음성: Gmail 줄 누락·추가 조건·비조건 추가 줄 거부·필드 2 절 본문 손실 거부·LinkedIn 미선언 절 누락·핵심 절 생략·전 절 생략(빈 판) 거부·two_field_sections 빈값 거부·변조된 저장 파일 로드 거부·메일 본문이 블록을 재현하지 않으면(임의 본문·블록 안 추가·삭제·마커 중복) 거부·빈 소제목 마커 거부 | IMPLEMENTED |
 | HS-13.05 | 팀 메일 제목·수신자·평문 본문을 조립한다 | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1305.py` (`12+ passed`) + `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1305-pii.sh` (`CHECKED: 4` — git ls-files 텍스트 파일 전체(팀 수신자 계약 파일만 allowlist)에서 ① linkedin.com/in/<slug> 중 slug 가 example- 로 시작하지 않는 것 0 ② 이메일 중 holder@valueconnect.kr·@example.com 외 0 ③ 전화 패턴 0 ④ 한국 휴대폰 010- 0) | 양성: 제목 2형 정확 일치·§6 절 순서·`[회사 매력 포인트]` 3개(출처 id)·수신자 계약 로드·body_sha256 왕복·HTML 0. 음성: 타 도메인 수신자 거부·절 누락 거부·매력 포인트 2개/출처 없음 거부(D10)·PII 게이트 음성 fixture 4종 각 FAIL | IMPLEMENTED |
 | HS-13.06 | 후보를 순수 함수로 채점한다 | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1306.py` (`15+ passed`, Hypothesis 포함) | 양성: 같은 입력 100회 동일·학교 계층 계약(`contracts/humansearch/schools-tier.json`) 로드. 음성: None 학력 = 0(기본값 변이 검출)·축 상한 40/20/20/20 초과 거부·total 0 거부·손상 계약 파일 5종 거부 | IMPLEMENTED |
 | HS-13.07 | Boolean 검색식 3종을 만든다 | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1307.py` (`8+ passed`) | 양성: 필수어 전부 포함·괄호/따옴표 균형(Hypothesis). 음성: 빈 필수어·따옴표 포함 용어·exclude 중복 거부 | IMPLEMENTED |
@@ -427,6 +429,14 @@ Codex 샌드박스는 mktemp 불가라 파일 사본 변이는 NOT_RUN, 인메�
 - [높음] recipients 로더가 환경변수 경계 없음 → `policy.contracts_dir()` 단일 해석기(pytest 밖 거부)를 모든 계약 로더가 사용. 정책 캐시 뒤 환경변수 설정 재현 시험.
 - [중간] `_open_locked` 주석의 "발송 허가를 받는다" → 감사용 생성 결과로 정정, 장부·청구 소스 전체에 권한 귀속 정규식 0 시험.
 - 부수: 이미 발송된 라이브 패킷 파일(구 스키마)은 새 경계에서 로드되지 않는다 — 장부 VERIFIED 는 유지, 재검증은 불가(기록만).
+
+### 2026-09-10 Codex V1 11차 (fresh·read-only, session `01a089c4-a567-7d20-b9e7-e4e63afe3366`, 스택 d469955 대상)
+
+`VERDICT: FAIL` — 높음 3·중간 1(CHECKED NOT_RUN, 선택 회귀 8 passed). 처분(같은 PR, HS-13.04b 확장):
+- [높음] 임의 `mail.body` 도 패킷 왕복·VERIFIED → `SearchPacket._check_mail_embeds_jd`: §6 3절 마커(각 1회) 뒤 줄이 jd_packet 3종과 글자 그대로 일치해야 조립·역직렬화 통과. 임의 본문·블록 안 추가/삭제·마커 중복 6종 거부 시험. 모든 시험 fixture 의 메일 본문을 마커 형식으로 갱신(마커는 렌더러가 감싸므로 linkedin_body 자체에는 넣지 않는다).
+- [높음] 모든 절 생략 → 빈 LinkedIn 판 통과 → 계약 `linkedin_core_sections`(P22) 는 생략 불가 + 생략 뒤 검사 대상 JD 줄 ≥1·프레임 밖 본문 줄 ≥1 강제. 전 절 생략·핵심 절 생략 시험.
+- [높음] 비조건 추가 줄 무시 → `_require_faithful` 이 FidelityReport 전체를 받아 `extra_lines` 도 거부(Gmail·LinkedIn 각 시험).
+- [중간] 소제목 마커가 형제 소제목을 흡수 → 소제목 마커는 흡수 시작 안 함(그 절 하나), 빈 소제목 마커는 빈 선택으로 거부. 시험 2건.
 
 ### 2026-09-10 Claude Codeaudit (읽기 전용·별도 컨텍스트, 7efd6c6 대상)
 

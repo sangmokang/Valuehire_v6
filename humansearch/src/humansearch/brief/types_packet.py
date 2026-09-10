@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from dataclasses import field as dataclass_field
 from datetime import date, datetime
 
-from .jd_fidelity import content_lines, verify_fidelity
+from .jd_fidelity import FidelityReport, content_lines, verify_fidelity
 from .linkedin_limit import verify_linkedin_fidelity
 from .policy import policy
 from .recipients import load_recipients
@@ -156,11 +156,24 @@ class SearchFilters:
             _reject(f"SearchFilters.seniority_years 의 최소가 최대보다 크다: {low} > {high}")
 
 
-def _require_faithful(missing: tuple[str, ...], condition: tuple[str, ...], label: str) -> None:
-    if missing:
-        _reject(f"SearchPacket.jd_packet.{label} 이 JD 원문 줄을 빠뜨렸다: {missing[0]!r}")
-    if condition:
-        _reject(f"SearchPacket.jd_packet.{label} 에 원문에 없는 조건이 끼었다: {condition[0]!r}")
+def _require_faithful(report: FidelityReport, label: str) -> None:
+    if report.missing:
+        _reject(f"SearchPacket.jd_packet.{label} 이 JD 원문 줄을 빠뜨렸다: {report.missing[0]!r}")
+    if report.extra_lines:
+        # 조건이 아니어도 원문에 없는 줄은 허위 문구다(§6 블록 안 임의 추가 0, Codex 11차)
+        _reject(f"SearchPacket.jd_packet.{label} 에 원문에 없는 줄이 끼었다: {report.extra_lines[0]!r}")
+
+
+def _block_after(lines: tuple[str, ...], marker: str, expected: tuple[str, ...], label: str) -> int:
+    """`marker` 줄(정확히 1회) 바로 뒤에 `expected` 줄들이 그대로 이어져야 한다. 끝 인덱스를 돌려준다."""
+    hits = [index for index, line in enumerate(lines) if line == marker]
+    if len(hits) != 1:
+        _reject(f"TeamMail.body 에 {marker!r} 마커가 {len(hits)}회 나타난다(1회여야 한다)")
+    start = hits[0] + 1
+    end = start + len(expected)
+    if lines[start:end] != expected:
+        _reject(f"TeamMail.body 의 {label} 블록이 jd_packet 과 글자 그대로 일치하지 않는다")
+    return end
 
 
 @dataclass(frozen=True)
@@ -216,12 +229,13 @@ class SearchPacket:
         2필드: 선언한 절 마커로 `split_two_field` 를 다시 돌려 내용 줄이 정확히 같아야 한다.
         """
         packet = self.jd_packet
-        gmail = verify_fidelity(self.jd, packet.gmail_body)
-        _require_faithful(gmail.missing, gmail.extra_condition, "gmail_body")
-        linkedin = verify_linkedin_fidelity(
-            self.jd, packet.linkedin_body, omittable_sections=packet.linkedin_omitted_sections
+        _require_faithful(verify_fidelity(self.jd, packet.gmail_body), "gmail_body")
+        _require_faithful(
+            verify_linkedin_fidelity(
+                self.jd, packet.linkedin_body, omittable_sections=packet.linkedin_omitted_sections
+            ),
+            "linkedin_body",
         )
-        _require_faithful(linkedin.missing, linkedin.extra_condition, "linkedin_body")
         recomputed = split_two_field(
             self.jd, packet.two_field_company, section_markers=packet.two_field_sections
         )
@@ -229,3 +243,24 @@ class SearchPacket:
             _reject(
                 "SearchPacket.jd_packet.two_field_jd 가 선언한 절(two_field_sections)의 원문과 다르다"
             )
+        self._check_mail_embeds_jd()
+
+    def _check_mail_embeds_jd(self) -> None:
+        """메일 본문(§6)이 JD 3종 블록을 **글자 그대로** 담고 있어야 한다(Codex 11차: 임의 본문 VERIFIED 차단).
+
+        렌더러(mail_sections)가 넣는 마커와 같은 마커를 찾아 그 뒤 줄들을 jd_packet 과 대조한다.
+        """
+        packet = self.jd_packet
+        lines = tuple(self.mail.body.splitlines())
+        end = _block_after(lines, "[JD 원문 시작]", tuple(packet.gmail_body.splitlines()), "Gmail JD")
+        if end >= len(lines) or lines[end] != "[JD 원문 끝]":
+            _reject("TeamMail.body 의 Gmail JD 블록이 '[JD 원문 끝]' 로 닫히지 않는다")
+        end = _block_after(lines, "[복사 시작]", tuple(packet.linkedin_body.splitlines()), "LinkedIn")
+        if end >= len(lines) or lines[end] != "[복사 끝]":
+            _reject("TeamMail.body 의 LinkedIn 블록이 '[복사 끝]' 로 닫히지 않는다")
+        end = _block_after(
+            lines, "[필드 1: 회사 소개]", tuple(packet.two_field_company.splitlines()), "필드 1"
+        )
+        if lines[end : end + 2] != ("", "[필드 2: JD 내용]"):
+            _reject("TeamMail.body 의 필드 1 블록 뒤에 빈 줄과 '[필드 2: JD 내용]' 이 이어지지 않는다")
+        _block_after(lines, "[필드 2: JD 내용]", tuple(packet.two_field_jd.splitlines()), "필드 2")

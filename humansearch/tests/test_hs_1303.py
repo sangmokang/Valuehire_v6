@@ -144,7 +144,9 @@ def test_length_property_holds_for_arbitrary_bodies(seed: str, padding: int) -> 
 
 
 def test_ending_contraction_keeps_the_same_tokens() -> None:
-    assert core_tokens("구조적 사고를 중요하게 생각합니다") == core_tokens("구조적 사고 중요하게 생각")
+    assert core_tokens("구조적 사고를 중요하게 생각합니다") == core_tokens(
+        "구조적 사고 중요하게 생각"
+    )
 
 
 def test_dropping_a_noun_changes_tokens() -> None:
@@ -152,7 +154,9 @@ def test_dropping_a_noun_changes_tokens() -> None:
 
 
 def test_dropping_a_number_changes_tokens() -> None:
-    assert core_tokens("연간 2천만 건의 로그를 다뤘습니다") != core_tokens("연간 건의 로그를 다뤘습니다")
+    assert core_tokens("연간 2천만 건의 로그를 다뤘습니다") != core_tokens(
+        "연간 건의 로그를 다뤘습니다"
+    )
 
 
 def test_sentence_punctuation_is_stripped_around_endings() -> None:

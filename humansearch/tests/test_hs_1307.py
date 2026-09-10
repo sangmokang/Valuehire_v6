@@ -113,13 +113,13 @@ def test_build_boolean_queries_rejects_over_length_result() -> None:
 @pytest.mark.parametrize(
     "query",
     [
-        '(a OR b',
+        "(a OR b",
         '"a OR b',
         "AND a",
         "a OR b)",
         "a AND",
         "NOT a",
-        ')(a)',
+        ")(a)",
     ],
 )
 def test_check_balanced_rejects_malformed_queries(query: str) -> None:

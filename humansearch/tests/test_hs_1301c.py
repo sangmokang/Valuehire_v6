@@ -39,6 +39,7 @@ def _payload(**overrides: object) -> dict[str, object]:
         "clickup_position_list_id": "901814621569",
         "default_search_location": "South Korea",
         "allowed_search_locations": ["South Korea"],
+        "linkedin_core_sections": ["주요업무", "자격요건", "우대사항"],
     }
     base.update(overrides)
     return base

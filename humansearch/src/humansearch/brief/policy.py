@@ -53,6 +53,7 @@ class BriefPolicy:
     clickup_position_list_id: str
     default_search_location: str
     allowed_search_locations: tuple[str, ...]
+    linkedin_core_sections: tuple[str, ...]  # LinkedIn 판에서 절대 생략할 수 없는 절 제목(정규화)
 
 
 def _repo_root() -> Path:
@@ -170,6 +171,7 @@ def load_brief_policy(path: Path | None = None) -> BriefPolicy:
         clickup_position_list_id=list_id,
         default_search_location=default_location,
         allowed_search_locations=allowed_locations,
+        linkedin_core_sections=_require_location_list(root, "linkedin_core_sections"),
     )
 
 
