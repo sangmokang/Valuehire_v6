@@ -11,10 +11,17 @@
 #   2  §4 입력 영역 표의 catch-all 행("그 외 전부" + "명시적 거부")
 #   3  §7 결정 목록 D1~D8 전부 존재 (8건 각각 1검사)
 #   11 §8 예외 표의 catch-all 행("그 외 전부" + "명시적 중단")
-#   12 §9 WU 카드 HS-13.00~HS-13.12 전부 존재 (13건 각각 1검사)
-#   25 §5 계약의 공개 타입 이름 12개 존재 (각각 1검사)
-#   37 "## 적대 검증 로그" 절 존재
-#   38 §2 지시 9단계 검토 표에 9행
+#   12 §9 WU 카드 14건(HS-13.00~12 + 01b) 각각: 행 존재 + 5셀 전부 비어있지 않음 + 명령 셀이 실행 형식
+#      (`cd humansearch && uv run --no-sync pytest|python -m humansearch.brief` 또는 `bash scripts/verify/run-acceptance.sh`) + 상태 셀이 허용값
+#   26 §7 결정 D1~D9 각각 기본값 셀 10자 이상 (9건) — 위 3~10 의 "행 존재"와 별개 검사
+#   35 §5 계약의 공개 타입 이름 12개가 코드 펜스 안에 존재 (각각 1검사)
+#   47 "## 적대 검증 로그" 절 존재
+#   48 §2 지시 9단계 검토 표에 9행
+#   49 §9 WU 카드 수 == 14 (행 수 정확)
+#   50 §7 D9 행 존재 (발송 멱등 — 2026-09-10 Codex V1 편입)
+#   51~55 §4 입력 영역 표에 이미지·합본·언어·ClickUp 공백·시계 행 (5건)
+#
+# 2026-09-10 Codex V1: 이전 판은 ID·토큰 존재만 봐서 빈 셀 문서가 통과했다(높음). 위 12·26·35 가 그 반례를 막는다.
 #
 # HS_1300_DOC 는 자기 변이 검사(acceptance-hs-1300-mutations.sh)가 고장 사본을 먹일 때만 재지정한다.
 set -uo pipefail
@@ -26,7 +33,7 @@ REPO=$(git rev-parse --show-toplevel 2>/dev/null) || { echo "NOT_RUN: git 저장
 cd "$REPO" || { echo "NOT_RUN: 저장소 루트로 이동 실패"; echo "CHECKED: 0"; exit 2; }
 
 DOC="${HS_1300_DOC:-docs/engineering/humansearch-hs13-position-brief-goal-2026-09-10.md}"
-EXPECTED_CHECKED=38
+EXPECTED_CHECKED=55
 
 fail=0
 checked=0
@@ -79,41 +86,96 @@ else
   failed "§8 예외 표에 catch-all 행이 없다"
 fi
 
-# 12~24) §9 WU 카드 13건
+# 12~25) §9 WU 카드 14건 — 행 존재 + 5셀 내용 + 명령 형식 + 상태값
 sec9=$(section '^## 9\. Issue HS-13')
-for n in 00 01 02 03 04 05 06 07 08 09 10 11 12; do
-  if printf '%s\n' "$sec9" | $G -Eq "^\| *HS-13\.$n *\|"; then
-    pass "§9 WU 카드 HS-13.$n 존재"
+# 표의 한 행을 셀 배열로 쪼갠다(선행·후행 '|' 제거). 백틱 안의 '|' 는 표에 쓰지 않는다는 전제.
+wu_row_ok() {
+  local row="$1" cells n cmd state
+  row="${row#|}"; row="${row%|}"
+  IFS='|' read -r -a cells <<< "$row"
+  n=${#cells[@]}
+  [ "$n" -eq 5 ] || return 1
+  for c in "${cells[@]}"; do
+    [ -n "$(printf '%s' "$c" | tr -d '[:space:]')" ] || return 1
+  done
+  cmd="${cells[2]}"
+  printf '%s' "$cmd" | $G -Eq 'cd humansearch && uv run --no-sync (pytest|python -m humansearch\.brief)|bash scripts/verify/run-acceptance\.sh scripts/acceptance-hs-13[0-9]{2}[a-z]?[-a-z]*\.sh' || return 1
+  state="$(printf '%s' "${cells[4]}" | tr -d '[:space:]')"
+  printf '%s' "$state" | $G -Eq '^(PLANNED|RED|IMPLEMENTED|AUDITED|LOCAL_COMMITTED|PR_OPEN|VERIFIED|MERGED|BLOCKED\(.+\))$' || return 1
+  return 0
+}
+for n in 00 01 01b 02 03 04 05 06 07 08 09 10 11 12; do
+  row=$(printf '%s\n' "$sec9" | $G -E "^\| *HS-13\.$n *\|" | head -1)
+  if [ -n "$row" ] && wu_row_ok "$row"; then
+    pass "§9 WU 카드 HS-13.$n 존재·5셀 내용·명령 형식·상태값"
   else
-    failed "§9 WU 카드 HS-13.$n 없음"
+    failed "§9 WU 카드 HS-13.$n 없음 또는 셀 비어있음/명령 형식·상태값 위반"
   fi
 done
 
-# 25~36) §5 공개 타입 이름 12개
-sec5=$(section '^## 5\. 계약')
+# 26~34) §7 D1~D9 기본값 셀 내용(10자 이상)
+for d in D1 D2 D3 D4 D5 D6 D7 D8 D9; do
+  row=$(printf '%s\n' "$sec7" | $G -E "^\| *$d *\|" | head -1)
+  row="${row#|}"; row="${row%|}"
+  IFS='|' read -r -a cells <<< "$row"
+  val="$(printf '%s' "${cells[2]:-}" | tr -d '[:space:]')"
+  if [ "${#val}" -ge 10 ]; then
+    pass "§7 결정 $d 기본값 셀 내용 있음(${#val}자)"
+  else
+    failed "§7 결정 $d 기본값 셀이 비었거나 10자 미만"
+  fi
+done
+
+# 35~46) §5 공개 타입 이름 12개 — 코드 펜스 안에서만 센다
+sec5_fenced=$(section '^## 5\. 계약' | awk '/^```/{f=!f; next} f{print}')
 for t in BriefInputError SourceRef Claim PositionSpec JdSource CompanyBrief \
          EmailContact CandidateEvidence ScoreBreakdown CandidateLead JdPacket SearchPacket; do
-  if printf '%s\n' "$sec5" | $G -Eq "class $t\b"; then
-    pass "§5 타입 $t 선언 존재"
+  if printf '%s\n' "$sec5_fenced" | $G -Eq "class $t\b"; then
+    pass "§5 타입 $t 선언이 코드 펜스 안에 존재"
   else
-    failed "§5 타입 $t 선언 없음"
+    failed "§5 타입 $t 선언이 코드 펜스 안에 없음"
   fi
 done
 
-# 37) 적대 검증 로그 절
+# 47) 적대 검증 로그 절
 if $G -Eq '^## 적대 검증 로그' "$DOC"; then
   pass "'## 적대 검증 로그' 절 존재"
 else
   failed "'## 적대 검증 로그' 절 없음"
 fi
 
-# 38) §2 지시 9단계 검토 표 = 9행 (표 헤더·구분선 제외, 첫 열이 1~9)
+# 48) §2 지시 9단계 검토 표 = 9행 (표 헤더·구분선 제외, 첫 열이 1~9)
 rows=$(section '^## 2\. 사장님 지시' | $G -Ec '^\| *[1-9] *\|')
 if [ "$rows" -eq 9 ]; then
   pass "§2 지시 9단계 검토 표 9행"
 else
   failed "§2 지시 검토 표 행 수 $rows (기대 9)"
 fi
+
+# 49) §9 WU 카드 수 정확히 14
+wu_rows=$(printf '%s\n' "$sec9" | $G -Ec '^\| *HS-13\.[0-9]{2}[a-z]? *\|')
+if [ "$wu_rows" -eq 14 ]; then
+  pass "§9 WU 카드 수 14"
+else
+  failed "§9 WU 카드 수 $wu_rows (기대 14)"
+fi
+
+# 50) D9 발송 멱등 결정 존재
+if printf '%s\n' "$sec7" | $G -E '^\| *D9 *\|' | $G -q '멱등'; then
+  pass "§7 D9 발송 멱등 결정 존재"
+else
+  failed "§7 D9 발송 멱등 결정 없음"
+fi
+
+# 51~55) §4 현실 입력 행 5종
+sec4=$(section '^## 4\. 입력 영역 표')
+for k in '이미지' '합본' '언어' 'ClickUp description' '시계'; do
+  if printf '%s\n' "$sec4" | $G -Eq "^\| *[^|]*$k"; then
+    pass "§4 입력 행 '$k' 존재"
+  else
+    failed "§4 입력 행 '$k' 없음"
+  fi
+done
 
 echo "CHECKED: $checked"
 if [ "$checked" -ne "$EXPECTED_CHECKED" ]; then

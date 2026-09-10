@@ -5,8 +5,11 @@
 #   변이 ⓐ 문서 부재            → 검사가 exit 1
 #   변이 ⓑ WU 카드 1행 삭제      → 검사가 exit 1
 #   변이 ⓒ §4 catch-all 행 삭제  → 검사가 exit 1
+#   변이 ⓓ WU 카드 셀 전부 비움     → 검사가 exit 1  (2026-09-10 Codex V1 높음 — 이전 검사기는 통과시켰다)
+#   변이 ⓔ D 결정 기본값 셀 비움    → 검사가 exit 1  (같은 지적)
+#   변이 ⓕ 제목·토큰만 남긴 최소 문서 → 검사가 exit 1  (같은 지적)
 #   대조군: 원본 문서            → 검사가 exit 0 (항상-거부 검사기를 잡는다)
-#   출력: PASS:/FAIL: + `CHECKED: 4`, exit 0/1/2
+#   출력: PASS:/FAIL: + `CHECKED: 7`, exit 0/1/2
 # 쓰기 규칙: 저장소에 아무 파일도 만들지 않는다. 고장 사본은 mktemp 디렉터리에만 쓴다.
 set -uo pipefail
 
@@ -18,7 +21,7 @@ cd "$REPO" || { echo "NOT_RUN: 저장소 루트로 이동 실패"; echo "CHECKED
 
 CHECKER=scripts/acceptance-hs-1300.sh
 ORIG=docs/engineering/humansearch-hs13-position-brief-goal-2026-09-10.md
-EXPECTED_CHECKED=4
+EXPECTED_CHECKED=7
 G=/usr/bin/grep
 
 [ -s "$ORIG" ] || { echo "NOT_RUN: 원본 문서 없음 — $ORIG"; echo "CHECKED: 0"; exit 2; }
@@ -61,6 +64,30 @@ awk '
 ' "$ORIG" > "$TMP/no-catchall.md"
 if ! $G -q '그 외 전부' "$TMP/no-catchall.md"; then echo "NOT_RUN: 변이ⓒ 가 §8 까지 지웠다"; echo "CHECKED: $checked"; exit 2; fi
 expect_rc "변이ⓒ §4 catch-all 행 삭제 → 불합격" "$TMP/no-catchall.md" 1
+
+# ⓓ WU 카드 행의 ID 만 남기고 나머지 셀을 비운다
+sed -E 's/^\| *(HS-13\.[0-9]{2}[a-z]?) *\|.*$/| \1 | | | | |/' "$ORIG" > "$TMP/wu-empty.md"
+if ! $G -Eq '^\| HS-13\.06 \| \| \| \| \|$' "$TMP/wu-empty.md"; then echo "NOT_RUN: 변이ⓓ 생성 실패"; echo "CHECKED: $checked"; exit 2; fi
+expect_rc "변이ⓓ WU 카드 셀 전부 비움 → 불합격" "$TMP/wu-empty.md" 1
+
+# ⓔ D 결정 행의 기본값 셀을 비운다
+sed -E 's/^\| *(D[0-9]) *\|([^|]*)\|[^|]*\|/| \1 |\2| |/' "$ORIG" > "$TMP/d-empty.md"
+if $G -E '^\| *D2 *\|' "$TMP/d-empty.md" | $G -q 'sangmokang'; then echo "NOT_RUN: 변이ⓔ 생성 실패"; echo "CHECKED: $checked"; exit 2; fi
+expect_rc "변이ⓔ D 결정 기본값 셀 비움 → 불합격" "$TMP/d-empty.md" 1
+
+# ⓕ 절 제목·catch-all 문구·ID·타입 토큰만 남긴 최소 문서
+{
+  echo '## 2. 사장님 지시'; for i in 1 2 3 4 5 6 7 8 9; do echo "| $i | | | |"; done
+  echo '## 4. 입력 영역 표'; echo '| 그 외 전부 | 명시적 거부 |'
+  echo '## 5. 계약'; echo '```python'
+  for t in BriefInputError SourceRef Claim PositionSpec JdSource CompanyBrief EmailContact CandidateEvidence ScoreBreakdown CandidateLead JdPacket SearchPacket; do echo "class $t: ..."; done
+  echo '```'
+  echo '## 7. 결정 목록'; for d in 1 2 3 4 5 6 7 8 9; do echo "| D$d | | | |"; done
+  echo '## 8. 예외 표'; echo '| 그 외 전부 | 명시적 중단 |'
+  echo '## 9. Issue HS-13'; for n in 00 01 01b 02 03 04 05 06 07 08 09 10 11 12; do echo "| HS-13.$n | | | | |"; done
+  echo '## 적대 검증 로그'
+} > "$TMP/minimal.md"
+expect_rc "변이ⓕ 제목·토큰만 남긴 최소 문서 → 불합격" "$TMP/minimal.md" 1
 
 echo "CHECKED: $checked"
 if [ "$checked" -ne "$EXPECTED_CHECKED" ]; then
