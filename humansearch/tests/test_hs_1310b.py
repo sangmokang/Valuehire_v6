@@ -56,7 +56,7 @@ def _wrap(url: str, *, sa: str = "D") -> str:
 _PLAIN_URL = "https://example.com/a"
 _SECOND_URL = "https://example.org/b"
 # 실측 원문 — 퍼센트 인코딩된 한글 프로필 슬러그.
-_ENCODED_URL = "https://www.linkedin.com/in/%EC%9D%80%EC%A7%80-%EC%95%88-675410231/"
+_ENCODED_URL = "https://www.linkedin.com/in/example-%EC%98%88%EC%8B%9C-000001/"
 
 # --- 합성 패킷 (test_hs_1310.py 의 빌더 구조를 복제) --------------------------
 
