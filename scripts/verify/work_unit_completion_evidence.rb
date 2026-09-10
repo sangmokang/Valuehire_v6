@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "open3"
+require "psych"
 
 module WorkUnitCompletionEvidence
   EMPTY_COMMAND = /\A\s*(?:echo|printf|true|:)(?:\s|\z)/
@@ -20,21 +21,25 @@ module WorkUnitCompletionEvidence
     errors = []
     checked = 0
     results = {}
+    approved_commands, policy_error = load_approved_commands(repo)
+    return [[policy_error], checked] if policy_error
+
     data.fetch("work_units").each do |unit|
       %w[regression adversarial].each do |kind|
         unit.fetch("#{kind}_commands").each do |command|
           checked += 1
-          errors.concat(validate_command(unit.fetch("id"), kind, command, repo, results))
+          errors.concat(validate_command(unit.fetch("id"), kind, command, repo, results, approved_commands))
         end
       end
     end
     [errors, checked]
   end
 
-  def validate_command(id, kind, command, repo, results)
+  def validate_command(id, kind, command, repo, results, approved_commands)
     prefix = kind.upcase
     invalid = command.match?(EMPTY_COMMAND) || command.include?("\n") || command.match?(/\A\s*(?:bash|sh)\s+-c(?:\s|\z)/)
     return ["#{prefix}_COMMAND_INVALID: #{id} #{command.inspect}"] if invalid
+    return ["#{prefix}_COMMAND_NOT_APPROVED: #{id} #{command.inspect}"] unless approved_commands.include?(command)
 
     rc, output = results.fetch(command) do
       out, err, status = Open3.capture3(clean_env, "bash", "-c", command, chdir: repo)
@@ -54,6 +59,18 @@ module WorkUnitCompletionEvidence
   def check_count(output)
     values = output.scan(/^(?:WU_TESTS|CHECKED):\s*([0-9]+)/).flatten.map(&:to_i)
     values.empty? ? 0 : values.max
+  end
+
+  def load_approved_commands(repo)
+    path = File.join(repo, "docs/sot/work-unit-policy.yaml")
+    policy = Psych.safe_load(File.read(path), aliases: false)
+    commands = policy.dig("completion", "approved_commands")
+    valid = commands.is_a?(Array) && !commands.empty? && commands.all? { |command| command.is_a?(String) && !command.strip.empty? }
+    return [nil, "COMPLETION_POLICY_INVALID: completion.approved_commands must be a non-empty string array"] unless valid
+
+    [commands.uniq.freeze, nil]
+  rescue Errno::ENOENT, Psych::SyntaxError => e
+    [nil, "COMPLETION_POLICY_NOT_RUN: #{e.class}"]
   end
 
   def clean_env
