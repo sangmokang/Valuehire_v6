@@ -9,8 +9,11 @@
 #   변이 ⓔ D 결정 기본값 셀 비움    → 검사가 exit 1  (같은 지적)
 #   변이 ⓕ 제목·토큰만 남긴 최소 문서 → 검사가 exit 1  (같은 지적)
 #   변이 ⓖ catch-all 부정어 반전     → 검사가 exit 1  (2026-09-10 Codeaudit D-2)
+#   변이 ⓗ 모든 WU 명령을 가짜 경로로 → 검사가 exit 1  (2026-09-10 Codex 2차)
+#   변이 ⓘ D 기본값을 숫자 10자로     → 검사가 exit 1  (같은 지적)
+#   변이 ⓙ 정상/반례 셀을 x 로       → 검사가 exit 1  (같은 지적)
 #   대조군: 원본 문서            → 검사가 exit 0 (항상-거부 검사기를 잡는다)
-#   출력: PASS:/FAIL: + `CHECKED: 8`, exit 0/1/2
+#   출력: PASS:/FAIL: + `CHECKED: 11`, exit 0/1/2
 # 쓰기 규칙: 저장소에 아무 파일도 만들지 않는다. 고장 사본은 mktemp 디렉터리에만 쓴다.
 set -uo pipefail
 
@@ -22,7 +25,7 @@ cd "$REPO" || { echo "NOT_RUN: 저장소 루트로 이동 실패"; echo "CHECKED
 
 CHECKER=scripts/acceptance-hs-1300.sh
 ORIG=docs/engineering/humansearch-hs13-position-brief-goal-2026-09-10.md
-EXPECTED_CHECKED=8
+EXPECTED_CHECKED=11
 G=/usr/bin/grep
 
 [ -s "$ORIG" ] || { echo "NOT_RUN: 원본 문서 없음 — $ORIG"; echo "CHECKED: 0"; exit 2; }
@@ -94,6 +97,21 @@ expect_rc "변이ⓕ 제목·토큰만 남긴 최소 문서 → 불합격" "$TMP
 sed -E 's/\*\*명시적 거부\(`BriefInputError`\)\*\*/전부 그대로 통과시킨다. 명시적 거부 안 함/' "$ORIG" > "$TMP/negated.md"
 if ! $G -q '명시적 거부 안 함' "$TMP/negated.md"; then echo "NOT_RUN: 변이ⓖ 생성 실패"; echo "CHECKED: $checked"; exit 2; fi
 expect_rc "변이ⓖ §4 catch-all 부정어 반전 → 불합격" "$TMP/negated.md" 1
+
+# ⓗ 모든 WU 명령 셀을 형식만 맞는 가짜 경로로 (Codex 2차 반례 그대로)
+awk -F'|' 'BEGIN{OFS="|"} /^\| *HS-13\./ { $4=" `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1399-fake.sh` (exit 0) " } { print }' "$ORIG" > "$TMP/fake-cmd.md"
+if ! $G -q 'hs-1399-fake' "$TMP/fake-cmd.md"; then echo "NOT_RUN: 변이ⓗ 생성 실패"; echo "CHECKED: $checked"; exit 2; fi
+expect_rc "변이ⓗ WU 명령 전부 가짜 경로 → 불합격" "$TMP/fake-cmd.md" 1
+
+# ⓘ D 결정 기본값 셀을 숫자 10자로
+awk -F'|' 'BEGIN{OFS="|"} /^\| *D[0-9]+ *\|/ { $4=" 1234567890 " } { print }' "$ORIG" > "$TMP/d-digits.md"
+if ! $G -q '1234567890' "$TMP/d-digits.md"; then echo "NOT_RUN: 변이ⓘ 생성 실패"; echo "CHECKED: $checked"; exit 2; fi
+expect_rc "변이ⓘ D 기본값 숫자 10자 → 불합격" "$TMP/d-digits.md" 1
+
+# ⓙ 정상/반례 셀을 x 로
+awk -F'|' 'BEGIN{OFS="|"} /^\| *HS-13\./ { $5=" x " } { print }' "$ORIG" > "$TMP/x-cell.md"
+if $G -E '^\| *HS-13\.06' "$TMP/x-cell.md" | $G -q '양성'; then echo "NOT_RUN: 변이ⓙ 생성 실패"; echo "CHECKED: $checked"; exit 2; fi
+expect_rc "변이ⓙ 정상/반례 셀 x → 불합격" "$TMP/x-cell.md" 1
 
 echo "CHECKED: $checked"
 if [ "$checked" -ne "$EXPECTED_CHECKED" ]; then
