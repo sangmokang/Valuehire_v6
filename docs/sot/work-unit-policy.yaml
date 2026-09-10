@@ -40,6 +40,8 @@ context:
     - commit_sha
     - sha256
     - read_evidence
+  observed_reads_required: true
+  declared_and_observed_reads_must_match: true
   require_expected_head_match: true
   require_expected_worktree_match: true
   whole_repository_is_not_evidence: true
