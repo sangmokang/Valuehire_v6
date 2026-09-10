@@ -239,3 +239,93 @@ def test_store_refuses_to_load_a_tampered_unfaithful_packet(tmp_path: Path) -> N
     target.write_text(tampered, encoding="utf-8")
     with pytest.raises(BriefInputError):
         store.load(packet.packet_id)
+
+
+# --- ③ Codex 11차: 메일 본문 결합·빈 LinkedIn 판·비조건 추가 줄·소제목 마커 ---------------------
+
+
+def _mail_body(jp: JdPacket) -> str:
+    """§6 3절 블록을 렌더러와 같은 마커로 담은 최소 본문."""
+    return "\n".join(
+        [
+            "[JD 원문 시작]",
+            *jp.gmail_body.splitlines(),
+            "[JD 원문 끝]",
+            "[복사 시작]",
+            *jp.linkedin_body.splitlines(),
+            "[복사 끝]",
+            "[필드 1: 회사 소개]",
+            *jp.two_field_company.splitlines(),
+            "",
+            "[필드 2: JD 내용]",
+            *jp.two_field_jd.splitlines(),
+        ]
+    )
+
+
+def _packet_with_mail(jp: JdPacket, body: str) -> SearchPacket:
+    base = _packet(jd_packet=jp)
+    return replace(
+        base, mail=replace(base.mail, body=body, body_sha256=_sha256(body))
+    )
+
+
+def test_mail_body_must_embed_all_three_jd_blocks_verbatim() -> None:
+    jp = _jd_packet(_jd())
+    assert _packet_with_mail(jp, _mail_body(jp)).mail.body.startswith("[JD 원문 시작]")
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda b: "예시 문구\n내부 공유 본문",
+        lambda b: b.replace("[JD 원문 끝]", "[JD 원문 끝]\n• 석사 이상 필수", 1),
+        lambda b: b.replace("• 식대 지원\n[JD 원문 끝]", "[JD 원문 끝]", 1),
+        lambda b: b.replace("[복사 시작]\n", "[복사 시작]\n제목: 임의 추가\n", 1).replace("제목: 임의 추가", "석사 우대", 1),
+        lambda b: b.replace("[필드 2: JD 내용]\n주요업무", "[필드 2: JD 내용]\n주요 업무(임의)", 1),
+        lambda b: b + "\n[JD 원문 시작]",
+    ],
+)
+def test_mail_body_that_does_not_reproduce_the_packet_blocks_is_rejected(mutate: object) -> None:
+    jp = _jd_packet(_jd())
+    body = mutate(_mail_body(jp))  # type: ignore[operator]
+    assert body != _mail_body(jp)
+    with pytest.raises(BriefInputError):
+        _packet_with_mail(jp, body)
+
+
+def test_omitting_every_section_cannot_yield_an_empty_linkedin_body() -> None:
+    jd = _jd()
+    headings = tuple(h for h in ("합류하게 될 팀을 소개해요", "Core Product 팀", "주요업무", "다루는 문제의 범위", "맡게 될 주요 업무", "자격요건", "혜택 및 복지", "몰입 환경", "활력", "채용 전형"))
+    with pytest.raises(BriefInputError):
+        _jd_packet(jd, linkedin_body="[복사 시작]\n[복사 끝]", linkedin_omitted_sections=headings)
+    with pytest.raises(BriefInputError):
+        _packet(jd_packet=replace(_jd_packet(jd), linkedin_omitted_sections=("주요업무",)))
+
+
+def test_core_sections_from_the_contract_cannot_be_omitted() -> None:
+    jd = _jd()
+    for core in ("주요업무", "자격요건"):
+        stripped = jd.text
+        with pytest.raises(BriefInputError):
+            _packet(jd_packet=_jd_packet(jd, linkedin_body=stripped, linkedin_omitted_sections=(core,)))
+
+
+@pytest.mark.parametrize("label", ["gmail_body", "linkedin_body"])
+def test_packet_rejects_non_condition_extra_lines_in_jd_channels(label: str) -> None:
+    jd = _jd()
+    extra = jd.text + "\n재택근무 가능\n"
+    with pytest.raises(BriefInputError):
+        _packet(jd_packet=_jd_packet(jd, **{label: extra}))
+
+
+def test_a_subheading_marker_does_not_absorb_its_sibling_subheadings() -> None:
+    two = split_two_field(_jd(), _INTRO, section_markers=("다루는 문제의 범위",))
+    assert "• 탐색과 거래 흐름을 다룹니다." in two.jd_body
+    assert "• 기능을 기획하고 실험으로 검증합니다." not in two.jd_body
+
+
+def test_an_empty_subheading_marker_is_rejected_as_an_empty_selection() -> None:
+    text = _JD_TEXT.replace("[다루는 문제의 범위]\n• 탐색과 거래 흐름을 다룹니다.\n", "[빈 소제목]\n")
+    with pytest.raises(BriefInputError):
+        split_two_field(_jd(text), _INTRO, section_markers=("빈 소제목",))
