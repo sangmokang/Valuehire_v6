@@ -18,6 +18,7 @@ __all__ = [
     "FidelityReport",
     "Section",
     "content_lines",
+    "extract_block",
     "normalize_line",
     "split_sections",
     "verify_fidelity",
@@ -142,10 +143,11 @@ class FidelityReport:
     extra_condition: tuple[str, ...]
     jd_line_count: int
     rendered_line_count: int
+    extra_lines: tuple[str, ...] = ()
 
     @property
     def ok(self) -> bool:
-        return not self.missing and not self.extra_condition
+        raise NotImplementedError("HS-13.02b 미구현")
 
 
 def _matches_condition(line: str) -> bool:
@@ -188,3 +190,7 @@ def verify_fidelity(
         jd_line_count=len(jd_lines),
         rendered_line_count=len(rendered_lines),
     )
+
+
+def extract_block(text: str, start_marker: str, end_marker: str) -> str:
+    raise NotImplementedError("HS-13.02b 미구현")

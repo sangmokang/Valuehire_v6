@@ -165,8 +165,9 @@ def test_allowed_extra_permits_the_same_condition_line() -> None:
 
 
 def test_non_condition_extra_line_is_not_reported() -> None:
-    rendered = GOLDEN_JD + "• 지원 절차는 담당자가 개별 안내한다.\n"
-    report = verify_fidelity(_jd(), rendered)
+    extra = "• 지원 절차는 담당자가 개별 안내한다."
+    rendered = GOLDEN_JD + extra + "\n"
+    report = verify_fidelity(_jd(), rendered, allowed_extra=(extra,))
     assert report.extra_condition == ()
     assert report.ok is True
 
