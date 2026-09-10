@@ -178,11 +178,14 @@ def loads_value(hint: type, text: str) -> object:
     return _decode(hint, raw, hint.__name__)
 
 
-def packet_id(position: PositionSpec, jd: JdSource, today: date) -> str:
-    """`{yyyymmdd}-{clickup_id}-{sha8}`. 시계는 호출자가 today 로 주입한다."""
-    if not isinstance(today, date):
-        _reject("packet_id(today) 는 date 여야 한다")
-    value = f"{today:%Y%m%d}-{position.clickup_task_id}-{jd.raw_sha256[:8]}"
+def packet_id(position: PositionSpec, jd: JdSource) -> str:
+    """`{clickup_id}-{sha8}`. 날짜를 담지 않는다 — 시계 인자도 받지 않는다(HS-13.09c).
+
+    같은 포지션·같은 JD 는 언제 만들어도 같은 식별자여야 한다. 날짜가 섞이면 자정을 넘긴
+    재생성이 새 장부 파일 이름을 얻어 승인 없이 재발송이 열린다(§7 D9). 생성 날짜는
+    `SearchPacket.created_on` 이 따로 남긴다 — 기록은 남되 동일성 판정에는 끼지 않는다.
+    """
+    value = f"{position.clickup_task_id}-{jd.raw_sha256[:8]}"
     if not _PACKET_ID.fullmatch(value):
         _reject(f"packet_id 가 계약 형식과 다르다: {value!r}")
     return value

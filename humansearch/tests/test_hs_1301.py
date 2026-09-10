@@ -37,7 +37,7 @@ JD_SHA = hashlib.sha256(JD_TEXT.encode("utf-8")).hexdigest()
 LEAD_URL = "https://www.linkedin.com/in/example-0001"
 SECOND_URL = "https://kr.linkedin.com/in/example-0002"
 EXEC_URL = "https://www.linkedin.com/in/example-0003"
-PACKET_ID = f"20260910-86exampleid-{JD_SHA[:8]}"
+PACKET_ID = f"86exampleid-{JD_SHA[:8]}"
 MAIL_BODY = "예시고객사 검색 엔지니어 | 밸류커넥트 내부 공유\n작성·확인 기준일: 2026년 9월 10일\n"
 
 
@@ -188,6 +188,7 @@ def _mail(**overrides: Any) -> TeamMail:
 def _packet(**overrides: Any) -> SearchPacket:
     fields: dict[str, Any] = {
         "packet_id": PACKET_ID,
+        "created_on": TODAY,
         "position": _position(),
         "jd": _jd(),
         "company": _company(),
@@ -604,11 +605,11 @@ def test_search_packet_accepts_inmail_at_the_limit() -> None:
     "bad_id",
     [
         "",
-        "2026091-86exampleid-deadbeef",
-        f"20260910--{JD_SHA[:8]}",
-        "20260910-86exampleid-DEADBEEF",
-        "20260910-86exampleid-deadbee",
-        "20260910-86_example-deadbeef",
+        "20260910-86exampleid-deadbeef",
+        f"-{JD_SHA[:8]}",
+        "86exampleid-DEADBEEF",
+        "86exampleid-deadbee",
+        "86_example-deadbeef",
     ],
 )
 def test_search_packet_rejects_malformed_packet_id(bad_id: str) -> None:
@@ -637,8 +638,22 @@ def test_search_packet_rejects_unbalanced_boolean_query(query: str) -> None:
 _BRIEF_DIR = Path(__file__).resolve().parents[1] / "src" / "humansearch" / "brief"
 
 
+# `urllib` 를 통째로 금지하면 순수 문자열 함수인 `urllib.parse.unquote` 까지 막힌다
+# (HS-13.10b readback 정규화가 이것을 쓴다). 네트워크 표면은 `urllib.request` 뿐이므로
+# 그 모듈만, 두 가지 철자 모두를 막는다 — 좁히는 것이 아니라 겨냥을 옮기는 것이다.
 @pytest.mark.parametrize(
-    "token", ["datetime.now", "date.today", "time.time", "requests", "urllib", "socket", "smtplib"]
+    "token",
+    [
+        "datetime.now",
+        "date.today",
+        "time.time",
+        "requests",
+        "urllib.request",
+        "urllib import request",
+        "urlopen",
+        "socket",
+        "smtplib",
+    ],
 )
 def test_brief_package_has_no_clock_or_network_access(token: str) -> None:
     modules = sorted(_BRIEF_DIR.glob("*.py"))

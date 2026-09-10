@@ -41,7 +41,7 @@ _JD_TEXT = "직무: 백엔드 엔지니어\n요구: 분산 시스템 경험 3년
 _RAW_SHA = hashlib.sha256(_JD_TEXT.encode("utf-8")).hexdigest()
 _CLICKUP = "77a2bcde"
 _TODAY = date(2026, 9, 10)
-_PACKET_ID = f"20260910-{_CLICKUP}-{_RAW_SHA[:8]}"
+_PACKET_ID = f"{_CLICKUP}-{_RAW_SHA[:8]}"
 _LEAD_URL = "https://www.linkedin.com/in/example-lead"
 
 _VERIFIED_RE = re.compile(r"^VERIFIED packet_id=(\S+) body_sha256=([0-9a-f]{64})$")
@@ -59,6 +59,7 @@ def _sha256(text: str) -> str:
 def _packet(body: str) -> SearchPacket:
     return SearchPacket(
         packet_id=_PACKET_ID,
+        created_on=_TODAY,
         position=PositionSpec(
             _CLICKUP, "예시 고객사", "백엔드 엔지니어", None, "정규직", "서울", None
         ),

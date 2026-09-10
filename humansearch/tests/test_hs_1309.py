@@ -58,7 +58,7 @@ _JD_TEXT = "직무: 프로덕트 매니저\n요구: 실험 설계 경험 3년"
 _RAW_SHA = hashlib.sha256(_JD_TEXT.encode("utf-8")).hexdigest()
 _CLICKUP = "86e1abcd"
 _TODAY = date(2026, 9, 10)
-_PACKET_ID = f"20260910-{_CLICKUP}-{_RAW_SHA[:8]}"
+_PACKET_ID = f"{_CLICKUP}-{_RAW_SHA[:8]}"
 _LEAD_URL = "https://www.linkedin.com/in/example-lead"
 _AT = datetime(2026, 9, 10, 3, 20, 0, tzinfo=UTC)
 _LATER = datetime(2026, 9, 10, 4, 0, 0, tzinfo=UTC)
@@ -72,6 +72,7 @@ def _packet(text: str = "예시 문구") -> SearchPacket:
     body = f"{text}\n내부 공유 본문"
     return SearchPacket(
         packet_id=_PACKET_ID,
+        created_on=_TODAY,
         position=PositionSpec(_CLICKUP, "예시 고객사", text, None, "정규직", "서울", None),
         jd=JdSource(_JD_TEXT, _RAW_SHA, "U1"),
         company=CompanyBrief(
@@ -157,15 +158,15 @@ def _ledger(tmp_path: Path) -> Path:
 # --- 1. packet_id ------------------------------------------------------------
 
 
-def test_packet_id_is_date_clickup_and_sha8() -> None:
+def test_packet_id_is_clickup_and_sha8() -> None:
     sample = _packet()
-    assert packet_id(sample.position, sample.jd, _TODAY) == f"20260910-{_CLICKUP}-{_RAW_SHA[:8]}"
+    assert packet_id(sample.position, sample.jd) == f"{_CLICKUP}-{_RAW_SHA[:8]}"
 
 
 def test_packet_id_rejects_clickup_id_outside_contract_shape() -> None:
     position = PositionSpec("86e1/../etc", "예시 고객사", "PM", None, None, None, None)
     with pytest.raises(BriefInputError):
-        packet_id(position, _packet().jd, _TODAY)
+        packet_id(position, _packet().jd)
 
 
 # --- 2. JSON 왕복 ------------------------------------------------------------

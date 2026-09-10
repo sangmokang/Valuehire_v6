@@ -49,7 +49,7 @@ TODAY = date(2026, 9, 10)
 JD_TEXT = "핵심 업무: 검색 파이프라인 설계\n자격 요건: Python 5년"
 JD_SHA = hashlib.sha256(JD_TEXT.encode("utf-8")).hexdigest()
 LEAD_URL = "https://www.linkedin.com/in/example-0001"
-PACKET_ID = f"20260910-86exampleid-{JD_SHA[:8]}"
+PACKET_ID = f"86exampleid-{JD_SHA[:8]}"
 
 
 # ── 계약 payload 도우미 ──────────────────────────────────────────────────────
@@ -116,6 +116,7 @@ def _packet(**overrides: Any) -> SearchPacket:
     )
     fields: dict[str, Any] = {
         "packet_id": PACKET_ID,
+        "created_on": TODAY,
         "position": PositionSpec(
             clickup_task_id="86exampleid",
             client_name="예시고객사",

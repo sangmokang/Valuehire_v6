@@ -28,8 +28,8 @@ from humansearch.brief import (
     record_intent,
 )
 
-_PACKET_ID = "20260910-86e1abcd-0a1b2c3d"
-_OTHER_PACKET_ID = "20260910-86e1abcd-1a2b3c4d"
+_PACKET_ID = "86e1abcd-0a1b2c3d"
+_OTHER_PACKET_ID = "86e1abcd-1a2b3c4d"
 _AT = datetime(2026, 9, 10, 3, 20, 0, tzinfo=UTC)
 _LATER = datetime(2026, 9, 10, 4, 0, 0, tzinfo=UTC)
 _EVEN_LATER = datetime(2026, 9, 10, 5, 0, 0, tzinfo=UTC)

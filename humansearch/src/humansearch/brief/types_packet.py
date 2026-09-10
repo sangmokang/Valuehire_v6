@@ -10,6 +10,7 @@ import hashlib
 import re
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
+from datetime import date, datetime
 
 from .policy import policy
 from .types import (
@@ -28,7 +29,9 @@ __all__ = ["JdPacket", "SearchFilters", "SearchPacket", "TeamMail"]
 
 # D4 본문 상한·D3 제목 접두·팀 메일 도메인은 전부 계약 파일이 소유한다(P22).
 # 코드에 같은 숫자를 다시 적으면 계약과 코드가 조용히 갈라진다.
-_PACKET_ID = re.compile(r"[0-9]{8}-[A-Za-z0-9]+-[0-9a-f]{8}")
+# packet_id 에는 날짜가 없다(HS-13.09c) — 자정을 넘겨 같은 포지션·같은 JD 로 다시 만들어도
+# 같은 값이어야 발송 장부(D9)가 파일 이름으로 재발송을 막는다. 날짜는 `created_on` 이 따로 남긴다.
+_PACKET_ID = re.compile(r"^[A-Za-z0-9]+-[0-9a-f]{8}$")
 
 
 def _require_within_limit(body: str, field: str) -> None:
@@ -131,6 +134,7 @@ class SearchPacket:
     """한 포지션의 브리프를 만들기 위해 모은 구조화 자료 묶음."""
 
     packet_id: str
+    created_on: date
     position: PositionSpec
     jd: JdSource
     company: CompanyBrief
@@ -143,7 +147,10 @@ class SearchPacket:
 
     def __post_init__(self) -> None:
         if not _PACKET_ID.fullmatch(self.packet_id):
-            _reject("SearchPacket.packet_id 는 {yyyymmdd}-{clickup_id}-{sha8} 형태여야 한다")
+            _reject("SearchPacket.packet_id 는 {clickup_id}-{sha8} 형태여야 한다(날짜 없음)")
+        # datetime 은 date 의 하위 타입이라 그냥 통과시키면 JSON 왕복(date.fromisoformat)이 깨진다.
+        if not isinstance(self.created_on, date) or isinstance(self.created_on, datetime):
+            _reject("SearchPacket.created_on 은 date 여야 한다")
         known: set[str] = set()
         for lead in self.candidates:
             if lead.linkedin_url in known:
