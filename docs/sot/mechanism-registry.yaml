@@ -39,6 +39,24 @@
   stage: "ci"
   ci_mirror_job: "verify"
   required: true
+- id: "work-unit-contract-checker"
+  path: "scripts/verify/check-work-unit-manifest.rb"
+  target: "VERDICT: FAIL"
+  stage: "manual"
+  manual_reason: "WU manifest 한 건을 현재 Git 증거와 직접 대조하는 원명령"
+  required: true
+- id: "work-unit-contract-ci"
+  path: ".github/workflows/verify.yml"
+  target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-work-unit-contract.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
+- id: "work-unit-contract-mutations-ci"
+  path: ".github/workflows/verify.yml"
+  target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-work-unit-contract-mutations.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
 - id: "p3-lint-precommit"
   path: "hooks/pre-commit"
   target: "bash ${p3_tmp}/lint.sh"

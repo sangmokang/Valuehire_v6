@@ -55,6 +55,10 @@ not_applicable:
   requires_reason: true
   alternative_validation_commands_minimum: 1
 enforcement:
+  manifest_required: true
+  missing_manifest_status: "NOT_RUN"
+  all_validation_modes_required_in_ci: true
+  pre_push_acceptance_glob_required: true
   checker: "scripts/verify/check-work-unit-manifest.rb"
   acceptance: "scripts/acceptance-work-unit-contract.sh"
   mutations: "scripts/acceptance-work-unit-contract-mutations.sh"
