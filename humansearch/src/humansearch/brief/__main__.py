@@ -7,15 +7,36 @@
 
 from __future__ import annotations
 
+import argparse
 import sys
+from pathlib import Path
 
 from .cli import verify
 
 __all__ = ["main"]
 
 
+def _build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="python -m humansearch.brief")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    verify_parser = subparsers.add_parser(
+        "verify", help="패킷과 readback 본문 해시를 대조한다"
+    )
+    verify_parser.add_argument("--packet", required=True, type=Path)
+    verify_parser.add_argument("--sent", required=True, type=Path)
+
+    return parser
+
+
 def main(argv: list[str] | None = None) -> int:
-    raise NotImplementedError("RED: HS-13.10 CLI 진입점은 아직 구현되지 않았다")
+    parser = _build_parser()
+    args = parser.parse_args(argv)
+
+    exit_code, message = verify(args.packet, args.sent)
+    stream = sys.stdout if exit_code in (0, 1) else sys.stderr
+    print(message, file=stream)
+    return exit_code
 
 
 if __name__ == "__main__":

@@ -224,6 +224,7 @@ def _run_module(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
         capture_output=True,
         text=True,
         timeout=30,
+        check=False,
     )
 
 
