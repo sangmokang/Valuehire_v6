@@ -23,6 +23,7 @@ from .jd_fidelity import (
     normalize_line,
     split_sections,
 )
+from .policy import policy
 from .types import BriefInputError, JdSource
 
 __all__ = [
@@ -85,12 +86,14 @@ def _is_copy_marker(line: str) -> bool:
     return any(normalized == normalize_line(marker) for marker in _COPY_MARKERS)
 
 
-def check_linkedin(body: str, *, limit: int = 1899) -> LinkedInReport:
+def check_linkedin(body: str, *, limit: int | None = None) -> LinkedInReport:
     """본문 길이가 한도 이내인지 판정한다(1,899 = 합격, 1,900 = 불합격).
 
     개행을 포함한 코드포인트 수이며 `[복사 시작]`/`[복사 끝]` 줄만 빼고 센다.
     한도가 0 이하면 판정 자체가 성립하지 않으므로 거부한다.
     """
+    if limit is None:
+        limit = policy().linkedin_inmail_max_chars
     if isinstance(limit, bool) or not isinstance(limit, int):
         raise BriefInputError("check_linkedin 의 limit 는 정수여야 한다")
     if limit <= 0:
