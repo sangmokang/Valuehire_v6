@@ -206,9 +206,17 @@ def test_duplicate_linkedin_url_in_build_inmails_is_rejected() -> None:
 
 _ALPHABET = "가나다라마바사아자차카타파하 \nabcXYZ0123·"  # '<' 는 제외(HTML 판정과 분리)
 
+# 길이를 먼저 균등하게 뽑고 그 길이로 정확히 채운다. `st.text(max_size=2200)` 만 쓰면
+# Hypothesis 가 대부분 수십 자짜리만 생성해 1,899 경계 부근을 사실상 탐색하지 않는다
+# (실측: 200회 중 최댓값이 28자였다) — 경계 반례를 놓치는 변이 생존 위험이라 길이를
+# 명시적으로 균등 분포시킨다(0..2,200 전 구간, 1,899 안팎 포함).
+_BODY_TEXT = st.integers(min_value=0, max_value=2200).flatmap(
+    lambda n: st.text(alphabet=_ALPHABET, min_size=n, max_size=n)
+)
+
 
 @settings(max_examples=200, deadline=None)
-@given(body_text=st.text(alphabet=_ALPHABET, min_size=0, max_size=2200))
+@given(body_text=_BODY_TEXT)
 def test_length_ok_matches_exception_behavior(body_text: str) -> None:
     lead = _lead()
     reasons_block = "\n".join(f"• {reason}" for reason in lead.match_reasons[:2])
