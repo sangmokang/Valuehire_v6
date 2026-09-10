@@ -147,3 +147,10 @@
   stage: "ci"
   ci_mirror_job: "verify"
   required: true
+- id: "hs-1309-paths-ci"
+  path: ".github/workflows/verify.yml"
+  target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1309-paths.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
+
