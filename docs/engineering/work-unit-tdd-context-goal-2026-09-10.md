@@ -72,7 +72,7 @@
 | A-7 | WU-2 | marker-only RED/GREEN·GREEN 자체 기대값 승인·구현 delta 0건 | `e7b73c5` → `fd0714d` |
 | A-8 | WU-3 | historical worktree 위조·전체에서 한 파일만 뺀 과다 맥락 | `fb63b15` → `a424e56` |
 | A-9 | WU-1~5 | completion commit 미선언·GREEN 전 완료·앞 WU 완료 전 다음 WU 시작 | `6c9dbb0` → `3a13b76`; 승인 `1090ffb`; `8f14a7c` → `b26438a` |
-| A-10 | WU-2 | GREEN 전 self-approved 기대값 반전 + 비테스트 marker GREEN | `a708e86` → 다음 GREEN |
+| A-10 | WU-2 | GREEN 전 self-approved 기대값 반전 + 비테스트 marker GREEN | `a708e86` → `36aabef` |
 
 ## Harness·검증·중단 조건
 

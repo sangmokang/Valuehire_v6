@@ -814,3 +814,21 @@ WU_FAILURE_KIND: missing_behavior
 VERDICT: FAIL
 A10_RED_EXIT:1
 ```
+
+GREEN `36aabef`은 기대값 승인 SHA가 첫 GREEN의 strict descendant일 때만 유효하게 하고, 과거 fixture 경로 교정 커밋 `95110bd`를 실제 WU-2 RED 경계로 바로잡았습니다.
+
+```text
+PASS: marker-only RED and GREEN rejected
+PASS: GREEN cannot self-approve expectation changes
+PASS: pre-GREEN self-approved expectation change rejected
+PASS: completion commit before GREEN rejected
+PASS: next Work Unit before prior completion rejected
+WU_TESTS: 12
+CHECKED: 12
+VERDICT: PASS
+A10_GREEN_EXIT:0
+
+VERDICT: PASS
+CHECKED: 135
+A10_REPOSITORY_TDD_EXIT:0
+```
