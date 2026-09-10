@@ -390,3 +390,43 @@ NOT_APPLICABLE_EXIT=0
 ```
 
 → 늦게 만든 계약 파일은 `AUTHORITY_PATH_NOT_AT_CONTRACT`로 거부됐고, 기존 schema·context·NOT_APPLICABLE 회귀도 모두 종료값 0입니다. RED 뒤 시험 diff는 0건입니다.
+
+## WU-2R2 감사 보정: 첫 GREEN 뒤 시험 불변
+
+독립 감사에서 RED와 첫 GREEN 사이만 비교하므로 그 뒤의 무승인 기대값 변경을 놓치는 구멍을 찾았습니다. RED `14dad68`은 GREEN 뒤 시험 파일을 바꾼 합성 이력을 만들어 기존 checker가 통과하는지 공격했습니다.
+
+```text
+2026-09-10T17:09:25+09:00
+PASS: authentic RED then GREEN
+PASS: zero RED commands rejected
+PASS: syntax-only RED rejected
+PASS: test expectation drift rejected
+PASS: contract declared only after boundary rejected
+FAIL: post-GREEN test expectation drift rejected — checker unexpectedly passed
+WU_TESTS: 6
+CHECKED: 6
+WU_FAILURE_KIND: missing_behavior
+VERDICT: FAIL
+TDD_POST_GREEN_RED_EXIT=1
+```
+
+GREEN `0cd7731`은 RED 시점 blob을 첫 GREEN이 아닌 현재 저장소 HEAD blob과 비교합니다.
+
+```text
+PASS: authentic RED then GREEN
+PASS: zero RED commands rejected
+PASS: syntax-only RED rejected
+PASS: test expectation drift rejected
+PASS: contract declared only after boundary rejected
+PASS: post-GREEN test expectation drift rejected
+WU_TESTS: 6
+CHECKED: 6
+VERDICT: PASS
+TDD_POST_GREEN_GREEN_EXIT=0
+ALL_MODES_EXIT=0
+WU_TESTS: 23
+CHECKED: 23
+VERDICT: PASS
+```
+
+→ 첫 GREEN 뒤에 시험을 바꾸어도 별도 승인 커밋이 없으면 `TEST_FILE_CHANGED_AFTER_RED`로 거부됩니다.
