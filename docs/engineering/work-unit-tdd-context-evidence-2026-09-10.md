@@ -773,3 +773,27 @@ WU_FAILURE_KIND: missing_behavior
 VERDICT: FAIL
 A9_ORDER_RED_EXIT:1
 ```
+
+Git 순서 GREEN `b26438a`은 각 WU의 완료 SHA 존재 여부, `GREEN < completion <= HEAD`, NOT_APPLICABLE의 `contract <= completion <= HEAD`, 그리고 manifest 인접 WU의 `prior completion <= next contract`를 ancestry로 검사합니다.
+
+```text
+PASS: authentic RED then GREEN
+PASS: zero RED commands rejected
+PASS: syntax-only RED rejected
+PASS: test expectation drift rejected
+PASS: contract declared only after boundary rejected
+PASS: test drift after first GREEN rejected
+PASS: fake GREEN followed by restored expectation rejected
+PASS: marker-only RED and GREEN rejected
+PASS: GREEN cannot self-approve expectation changes
+PASS: completion commit before GREEN rejected
+PASS: next Work Unit before prior completion rejected
+WU_TESTS: 11
+CHECKED: 11
+VERDICT: PASS
+A9_ORDER_GREEN_EXIT:0
+
+VERDICT: PASS
+CHECKED: 135
+A9_REPOSITORY_TDD_EXIT:0
+```
