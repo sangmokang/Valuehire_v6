@@ -3,6 +3,7 @@
 require "digest"
 require "fileutils"
 require "open3"
+require "shellwords"
 require "tmpdir"
 
 module WorkUnitGitEvidence
@@ -92,6 +93,7 @@ module WorkUnitGitEvidence
     errors = []
     checked = 0
     red_total = 0
+    entrypoints = []
     tdd.fetch("red_commands").each do |command|
       checked += 2
       if command.match?(EMPTY_COMMAND) || command.include?("\n")
@@ -110,11 +112,29 @@ module WorkUnitGitEvidence
       valid_green = green_rc.zero? && test_count(green_output).positive? &&
                     green_output.include?("VERDICT: PASS")
       errors << "FIRST_GREEN_INVALID: exit=#{green_rc} command=#{command}" unless valid_green
+
+      entrypoint = command_entrypoint(command)
+      if entrypoint.nil?
+        errors << "RED_COMMAND_ENTRYPOINT_INVALID: #{command.inspect}"
+      else
+        entrypoints << entrypoint
+        red_entrypoint = blob(repo, red_commit, entrypoint)
+        green_entrypoint = blob(repo, green_commit, entrypoint)
+        if red_entrypoint.nil? || green_entrypoint.nil?
+          errors << "RED_COMMAND_ENTRYPOINT_MISSING: #{entrypoint}"
+        elsif red_entrypoint != green_entrypoint
+          errors << "RED_COMMAND_ENTRYPOINT_CHANGED: #{entrypoint}"
+        end
+      end
     end
     checked += 1
     unless red_total == tdd.fetch("red_tests") && red_total.positive?
       errors << "RED_TEST_COUNT_MISMATCH: expected=#{tdd.fetch('red_tests')} actual=#{red_total}"
     end
+    changed = changed_files(repo, red_commit, green_commit)
+    evidence_paths = tdd.fetch("test_files") + entrypoints
+    implementation_changes = changed - evidence_paths
+    errors << "FIRST_GREEN_IMPLEMENTATION_MISSING" if implementation_changes.empty?
     [errors, checked]
   end
 
@@ -140,6 +160,9 @@ module WorkUnitGitEvidence
     return [errors, checked] if changes.empty?
 
     approvals = Array(tdd["expectation_change_approval_commit"])
+    if approvals.include?(tdd.fetch("green_commit"))
+      errors << "EXPECTATION_APPROVAL_IS_GREEN: #{id}"
+    end
     unapproved = changes.reject do |commit|
       approvals.include?(commit) && approved_commit?(repo, id, commit, tdd, head)
     end
@@ -165,6 +188,21 @@ module WorkUnitGitEvidence
   def test_file_change_commits(repo, tdd, head)
     rc, output = git(repo, "log", "--format=%H", "#{tdd.fetch('red_commit')}..#{head}", "--", *tdd.fetch("test_files"))
     rc.zero? ? output.lines.map(&:strip).reject(&:empty?) : []
+  end
+
+  def changed_files(repo, older, newer)
+    rc, output = git(repo, "diff", "--name-only", older, newer)
+    rc.zero? ? output.lines.map(&:strip).reject(&:empty?) : []
+  end
+
+  def command_entrypoint(command)
+    parts = Shellwords.split(command)
+    return nil unless parts.length >= 2 && %w[bash sh ruby].include?(parts.first)
+
+    path = parts.fetch(1)
+    repository_path?(path) ? path : nil
+  rescue ArgumentError
+    nil
   end
 
   def approval_trailer?(message, id)
