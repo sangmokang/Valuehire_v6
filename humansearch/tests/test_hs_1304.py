@@ -89,6 +89,13 @@ def test_unknown_section_marker_is_rejected() -> None:
         split_two_field(_jd(), COMPANY_INTRO, section_markers=("존재하지 않는 절",))
 
 
+def test_unknown_section_marker_is_rejected_even_mixed_with_a_valid_one() -> None:
+    # 실존 검사가 생략되면(변이 ①) "주요업무" 하나만으로도 필드2 가 채워져 조용히 통과한다.
+    # 마커 하나하나가 실존 검사를 통과해야 한다 — 나머지가 유효해도 예외여선 안 된다.
+    with pytest.raises(BriefInputError):
+        split_two_field(_jd(), COMPANY_INTRO, section_markers=("주요업무", "존재하지 않는 절"))
+
+
 def test_blank_company_intro_is_rejected() -> None:
     with pytest.raises(BriefInputError):
         split_two_field(_jd(), "   ", section_markers=MARKERS)
