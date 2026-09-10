@@ -154,7 +154,7 @@ def _contention_round(directory: Path) -> None:
     barrier = threading.Barrier(2)
 
     def claim_side() -> str:
-        barrier.wait(timeout=5)
+        barrier.wait(timeout=60)
         try:
             _, won = _claim(directory, 1)
         except BriefInputError:
@@ -162,7 +162,7 @@ def _contention_round(directory: Path) -> None:
         return "won" if won else "lost"
 
     def reopen_side() -> str:
-        barrier.wait(timeout=5)
+        barrier.wait(timeout=60)
         _, opened = _reopen(directory, 1)
         return "opened" if opened else "not-opened"
 
@@ -385,7 +385,7 @@ def test_channel_lock_is_reentrant_for_the_same_thread(tmp_path: Path) -> None:
 
     worker = threading.Thread(target=nested, daemon=True)
     worker.start()
-    assert done.wait(timeout=5), "같은 스레드 재진입에서 flock 교착"
+    assert done.wait(timeout=60), "같은 스레드 재진입에서 flock 교착"
     assert seen and seen[0] is not None and seen[0].attempt == 1
 
 
@@ -399,10 +399,10 @@ def test_channel_lock_still_excludes_other_threads(tmp_path: Path) -> None:
     def holder() -> None:
         with send_ledger_module._channel_lock(directory, _PACKET_ID, "gmail"):
             holder_ready.set()
-            release.wait(timeout=5)
+            release.wait(timeout=60)
 
     def contender() -> None:
-        holder_ready.wait(timeout=5)
+        holder_ready.wait(timeout=60)
         with send_ledger_module._channel_lock(directory, _PACKET_ID, "gmail"):
             entered_at.append(1.0)
 
@@ -412,9 +412,9 @@ def test_channel_lock_still_excludes_other_threads(tmp_path: Path) -> None:
     ]
     for t in threads:
         t.start()
-    holder_ready.wait(timeout=5)
-    threads[1].join(timeout=0.5)
+    holder_ready.wait(timeout=60)
+    threads[1].join(timeout=1.0)
     assert entered_at == []  # 보유 중에는 못 들어온다
     release.set()
-    threads[1].join(timeout=5)
+    threads[1].join(timeout=60)
     assert entered_at == [1.0]

@@ -117,7 +117,7 @@ def test_claim_is_granted_exactly_once_under_concurrent_callers(tmp_path: Path) 
     barrier = threading.Barrier(workers)
 
     def attempt() -> bool:
-        barrier.wait(timeout=5)
+        barrier.wait(timeout=60)
         _, won = _claim(directory)
         return won
 

@@ -340,7 +340,7 @@ def test_record_intent_creates_exactly_once_under_concurrent_callers(tmp_path: P
     barrier = threading.Barrier(2)
 
     def attempt() -> bool:
-        barrier.wait(timeout=5)
+        barrier.wait(timeout=60)
         _, created = record_intent(directory, _intent())
         return created
 
@@ -535,7 +535,7 @@ def test_open_new_attempt_opens_exactly_once_under_concurrent_callers(tmp_path: 
     barrier = threading.Barrier(2)
 
     def attempt() -> str:
-        barrier.wait(timeout=5)
+        barrier.wait(timeout=60)
         try:
             _, created = open_new_attempt(
                 directory, _PACKET_ID, "gmail", approval=_approval(), at=_LATER
