@@ -45,7 +45,7 @@
 | 22 | 인수 검사 ci-step-integrity | `bash scripts/acceptance-ci-step-integrity.sh` — 조건부·오류무시·echo 대체 차단 및 main 실행별 그룹·이벤트/ref 분리·30분 상한 회귀 24건 |
 | 23 | 인수 검사 semantic-mutations | `bash scripts/acceptance-semantic-mutations.sh` — 인수 검사 무력화 5종 전량 차단 |
 | 24 | 인수 검사 verify-ac-m | `bash scripts/acceptance-verify-ac-m.sh` — mechanism 명부 대조 (AC-M) |
-| 25 | 인수 검사 hs-1300 | `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1300.sh` + `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1300-mutations.sh` — HumanSearch HS-13.00 브리프 스펙 구조·의미(catch-all·결정 D1~D9 내용·WU 카드 14 의 5셀·명령 형식·타입 12 펜스 안·id↔명령 결합·D9 문구, `CHECKED: 74`) + 자기 변이 20종(`CHECKED: 21`) |
+| 25 | 인수 검사 hs-1300 | `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1300.sh` + `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1300-mutations.sh` — HumanSearch HS-13.00 브리프 스펙 구조·의미(catch-all·결정 D1~D9 내용·WU 카드 14 의 5셀·명령 형식·타입 12 펜스 안·id↔명령 결합·D9 문구, `CHECKED: 80`) + 자기 변이 26종(`CHECKED: 27`) |
 | 26 | PostgreSQL 서버 준비 | 인라인 — Invoice 런타임 검사용 임시 PostgreSQL 기동(검사가 아니라 준비 스텝) |
 | 27 | 인수 검사 invoice | `bash scripts/verify/run-acceptance.sh scripts/acceptance-invoice.sh` — 채용 수수료 계산·기한·계약 변조·Codex/Claude 스킬 동등성 |
 | 28 | Invoice 게이트 자가시험 | 게이트 배선 검사 + Python 단위시험 직접 실행 + 임시 PostgreSQL에서 마이그레이션·수수료 동시성·저장/전달 RPC 검증(위조 출력·스텝 무력화 차단) |

@@ -110,6 +110,7 @@ class ConnectionDegree(Enum): UNKNOWN, FIRST, SECOND, THIRD_PLUS
     packet_id: str; position: PositionSpec; jd: JdSource; company: CompanyBrief
     jd_packet: JdPacket; candidates: tuple[CandidateLead, ...]; mail: TeamMail
     boolean_queries: tuple[str, ...]; inmails: tuple[tuple[str, str], ...]  # (linkedin_url, body)
+    search_filters: SearchFilters; created_on: date   # HS-13.01b·13.09c. packet_id 에 날짜를 넣지 않는다(아래 packet.py)
 ```
 
 ```python
@@ -117,6 +118,7 @@ class ConnectionDegree(Enum): UNKNOWN, FIRST, SECOND, THIRD_PLUS
 def content_lines(text: str) -> tuple[str, ...]          # 공백·글머리표·마크다운 기호 정규화 후 빈 줄 제외
 @dataclass(frozen=True) class FidelityReport:  missing: tuple[str,...]; extra_condition: tuple[str,...]
     jd_line_count: int; rendered_line_count: int; extra_lines: tuple[str,...]   # ok = not missing and not extra_condition and not extra_lines
+    multi_position_hint: tuple[str,...] = ()   # JD 원문에 `포지션:`·`Position:`·`직무:`·`## ` 머리 줄이 2개 이상이면 그 줄들(경고 전용, ok 무관 — HS-13.02c)
 def verify_fidelity(jd: JdSource, rendered: str, *, allowed_extra: tuple[str,...] = ()) -> FidelityReport
 #   missing = JD 내용 줄 중 rendered 에 없는 줄. extra_lines = rendered 에만 있고 allowed_extra 도 아닌 줄 **전부**(비숫자 "재택근무 가능" 포함).
 #   extra_condition = extra_lines 중 연차·학력·연봉 조건 패턴(EXTRA_CONDITION_PATTERNS) 매치 — extra_lines 의 부분집합
@@ -142,7 +144,8 @@ def build_boolean_queries(required_terms, synonyms: Mapping[str, tuple[str,...]]
 # inmail.py
 def build_inmail(lead: CandidateLead, linkedin_body: str, greeting: str) -> str   # ≤1899 보장 못 하면 거부
 # packet.py
-def packet_id(position: PositionSpec, jd: JdSource, today: date) -> str   # "{yyyymmdd}-{clickup_id}-{sha8}"
+def packet_id(position: PositionSpec, jd: JdSource) -> str   # "{clickup_id}-{sha8(jd.raw_sha256)}" — **날짜 없음**(Codex 5차: 날짜가 들어가면 자정 뒤 같은 포지션이
+#   새 장부 파일명이 되어 승인 없이 재발송된다). 날짜는 SearchPacket.created_on 메타데이터. 같은 포지션·같은 JD 는 언제 만들어도 같은 id → 같은 묘비
 def to_json(packet) / from_json(text)  # 왕복 동일성. PII는 파일에만, 로그 0
 # send_ledger.py  (D9 발송 at-most-once — HS-13.09 소유)
 class SendState(Enum): INTENT | SENT_UNVERIFIED | VERIFIED | ABANDONED   # ABANDONED 는 종단
@@ -176,6 +179,9 @@ def open_new_attempt(dir, packet_id, channel, *, approval: Approval, at) -> tupl
 # __main__.py  (HS-13.10 소유 — 유일한 CLI)
 #   uv run --no-sync python -m humansearch.brief verify --packet <path> --sent <readback.txt>
 #   stdout 1줄: `VERIFIED packet_id=<id> body_sha256=<hex>` (exit 0) | `SENT_UNVERIFIED packet_id=<id> expected=<hex> actual=<hex>` (exit 1)
+#   비교 전 **양쪽 본문에 같은 정규화**(HS-13.10b, 2026-09-10 초안 readback 실측으로 확정): ① CRLF→LF ② Gmail 리다이렉트 언랩
+#   `https://www.google.com/url?q=<URL>&source=gmail&ust=<digits>&sa=<alnum>` → unquote(<URL>) (꼬리를 정확히 고정 — 느슨하면 뒤의 `)` 를 삼킨다)
+#   ③ 줄 오른쪽 공백 제거 ④ 끝 빈 줄 제거 후 마지막 `packet-id: …` 줄 제거(러너가 §10 ③에서 붙이는 꼬리) ⑤ 전체 strip. 이 규칙 밖의 차이는 전부 불일치
 #   인자 누락·파일 없음·패킷 손상 → stderr 사유 + exit 2. 다른 하위 명령 없음(발송 명령 없음).
 # types (HS-13.01b 소유 추가)
 @dataclass(frozen=True) class SearchFilters:  location: str = "South Korea"; seniority_years: tuple[int, int] | None = None
@@ -215,7 +221,7 @@ def load_brief_policy(path=contracts/humansearch/brief-policy.json) -> BriefPoli
 |---|---|---|---|
 | D1 | 다음 포지션 자동 선택? | **선택하지 않는다.** 우선순위 목록만 제안 | — |
 | D2 | 브리프 메일 수신 방식 | To: 4명 전원(sangmokang·rogan·julian·kcs). **첫 라이브 1건은 To: sangmokang만**(새 코드 첫 출력을 사장님이 먼저 봄), 이후 4명 | 첫 라이브부터 4명이면 계약값 하나만 바꿈 |
-| D3 | 제목 | 브리프 `[포지션]{고객사}, {포지션명}` / 서치 결과 단독 메일 `[ValuehireSearch][포지션]…`. 브리프에 후보가 포함되면 제목 끝에 ` | ValuehireSearch`를 붙여 라벨 필터 가능하게 | — |
+| D3 | 제목 | 브리프 `[포지션]{고객사}, {포지션명}` / 서치 결과 단독 메일 `[ValuehireSearch][포지션]…`. 브리프에 후보가 포함되면 제목 끝에 ` | ValuehireSearch`를 붙여 라벨 필터 가능하게. 본문 끝에는 `packet-id: <id>` 한 줄(readback 대조용, 해시 비교 전 제거) | — |
 | D4 | 1,899자 계산 | Python `len()`(코드포인트), 개행 포함, `[복사 시작]/[복사 끝]` 제외. LinkedIn 실측(09-09 표본 1,710자 표기)과 ±0 일치를 HS-13.03 라이브에서 1회 확인 | — |
 | D5 | JD "100% 정확"의 판정 단위 | **내용 줄**(공백·글머리표·마크다운 기호 정규화 후). 순서 보존은 요구하지 않음. 외부 공고의 연차·학력·연봉 조건 혼입은 FAIL | 순서까지 요구하면 검사 강화 |
 | D6 | 점수 4축 | 역할 40·학력 20·안정성 20·프로필 20. 학교 계층은 계약 파일. 성별·나이·사진 0 | 축·가중치는 계약 파일로 이동 가능 |
@@ -251,7 +257,7 @@ def load_brief_policy(path=contracts/humansearch/brief-policy.json) -> BriefPoli
 
 | WU | 행동 하나 | 인수 명령 (저장소 루트에서 그대로 실행) | 정상 / 반례 | 상태 |
 |---|---|---|---|---|
-| HS-13.00 | 이 스펙·타입·장부를 저장소에 남긴다 | `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1300.sh` (exit 0, `CHECKED: 74`) + `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1300-mutations.sh` (`CHECKED: 21`) | 양성: 이 문서 그대로 → 검사기 exit 0 (CHECKED 74). 음성: 문서 부재·WU 행 삭제·§4 catch-all 삭제·WU 셀 비움·D 셀 비움·토큰만 남긴 최소 문서·catch-all 부정어 반전·가짜 명령 경로·무의미 D값·정상/반례 셀 `x`·**id 접미 위장 파일명·정상/반례 셀을 '없음'으로만 채움·D값을 한글 1자+숫자로·IMPLEMENTED 뒤 괄호로 실존 검사 회피** → 각 exit 1 | IMPLEMENTED |
+| HS-13.00 | 이 스펙·타입·장부를 저장소에 남긴다 | `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1300.sh` (exit 0, `CHECKED: 80`) + `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1300-mutations.sh` (`CHECKED: 27`) | 양성: 이 문서 그대로 → 검사기 exit 0 (CHECKED 80). 음성: 문서 부재·WU 행 삭제·§4 catch-all 삭제·WU 셀 비움·D 셀 비움·토큰만 남긴 최소 문서·catch-all 부정어 반전·가짜 명령 경로·무의미 D값·정상/반례 셀 `x`·**id 접미 위장 파일명·정상/반례 셀을 '없음'으로만 채움·D값을 한글 1자+숫자로·IMPLEMENTED 뒤 괄호로 실존 검사 회피** → 각 exit 1 | IMPLEMENTED |
 | HS-13.01 | 타입을 fail-fast로 검증한다 | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1301.py` (`>= 20 passed`) | 양성: 합성 SearchPacket 1건 생성. 음성: Claim 출처 0·후보 URL 도메인·이메일 출처 없음·중복 URL·수신자 타 도메인·1,900자 거부; Hypothesis: `linkedin.com/in/` 아닌 URL 전부 거부 | LOCAL_COMMITTED(task/hs-1301-types-20260910) |
 | HS-13.01b | 운영 상수를 계약 파일로 옮긴다(P22) | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1301b.py` (`>= 8 passed`) + `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1301b-literals.sh` (`CHECKED: 5` — `1899`·`valueconnect.kr`·`linkedin.com/in`·`[포지션]`·ClickUp list id 리터럴이 `brief/*.py` 에 0) | 양성: `contracts/humansearch/brief-policy.json` 로드 → 13.01 시험 전부 유지·`JdSource.position_count` 기본값 1 통과·`SearchFilters` 기본 South Korea. 음성: 파일 없음·version 다름·도메인 형식 위반 → `BriefInputError`; `position_count` 0·2 거부; 계약값을 바꾼 임시 사본으로 1,899→1,000 이 실제 반영 | LOCAL_COMMITTED(task/hs-1301b-policy-20260910) |
 | HS-13.02 | JD 충실도를 줄 단위로 판정한다(13.02b: 블록 안 임의 추가 줄 전부 검출) | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1302.py tests/test_hs_1302b.py` (`>= 23 passed`) | 양성: 합성 JD 원문 그대로·`•`↔`-`·공백 차이 → PASS·`extract_block` 정상. 음성: 1줄 삭제·어순 변경·"경력 2년 이상" 추가·**비숫자 "재택근무 가능" 추가 → extra_lines**·마커 부재/중복/역순 거부; 빈 JD 거부 | LOCAL_COMMITTED(task/hs-1302-jd-fidelity-20260910) |
@@ -334,6 +340,16 @@ Codex 샌드박스는 mktemp 불가라 파일 사본 변이는 NOT_RUN, 인메�
 - [높음] 같은 UID 로컬 파일 삭제로 우회 → **명시된 한계·부채**: HS-04.02 러너 격리 전까지 LOCAL_ONLY 보증, `created=True` 는 capability 가 아니라 감사 불리언(발송이 코드 밖 D8). Issue #82 부채 행.
 - [중간] 무의미 반복 텍스트 → 3자 조각 3회 반복·같은 한글 단어 반복 거부(변이 ⓢⓣ) + **검사기 경계 문단**(§9 머리) 신설: 의미 적합성은 Codeaudit·사장님 검토.
 - [중간] open_new_attempt 내부 crash → 순서를 "N+1 먼저 생성 → N ABANDONED" 로 고정하고 읽기 시 복구 규칙 명시(13.09 구현은 이미 이 순서).
+
+### 2026-09-10 Codex V1 5차 (job `review-mtuxjipq`, 63b8ac3 대상, 판정 규칙: 명시된 한계 3종 제외)
+
+`VERDICT: FAIL` — 높음 5·중간 1. 처분:
+- [높음] `true # cd humansearch && …python -m humansearch.brief` 로 결합 통과 → 명령 셀은 백틱 안 전체 명령을 ID 별 문법으로 고정(제어 연산자 `#`·`;`·`|`·`||`·`&` 거부, `&&` 는 `cd humansearch &&` 뒤 1회만), CLI 는 HS-13.10 행에만 허용, 그 외 행은 결합 파일 1개 이상 추출 필수. 변이 ⓤⓥ.
+- [높음] `O_CREAT\|O_EXCL` BRE 교대로 하나만 있어도 통과 → 두 문자열을 각각 `grep -F` 로. 변이 ⓦ(O_EXCL 삭제).
+- [높음] packet_id 에 날짜 → 자정 뒤 승인 없는 재발송. **코드 결함 인정** → HS-13.09c: `packet_id = clickup_id-sha8`(날짜 제거), `created_on` 메타데이터, 날짜 A 발송 후 날짜 B 재실행 발송 0 AC.
+- [높음] `packet-id` 꼬리가 해시를 깨뜨림 → 초안(draft) readback 실측으로 확정한 정규화 5단계(Gmail 리다이렉트 언랩 포함)를 §5 CLI 계약에 명시(HS-13.10b). 실측: 언랩 후 초안 본문 = 패킷 본문(해시 일치).
+- [높음] `SearchPacket.search_filters`·`FidelityReport.multi_position_hint` 가 타입 정의에 없음 → §5 정의에 편입, 검사기 토큰·변이 ⓧ.
+- [중간] D10·D11 내용 미검사 → D 내용 검사를 D1~D11 로, 변이 ⓨ.
 
 ### 2026-09-10 Claude Codeaudit (읽기 전용·별도 컨텍스트, 7efd6c6 대상)
 
