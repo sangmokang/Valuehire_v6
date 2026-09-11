@@ -178,7 +178,7 @@
   stage: "pre-commit"
   required: true
 - id: "retire-approval-item-schema"
-  path: "scripts/verify/check-workflow-deletion.sh"
+  path: "scripts/verify/suppression-approvals.awk"
   target: "function flush("
   stage: "pre-commit"
   required: true
@@ -213,11 +213,6 @@
 - id: "workflow-called-script-exists"
   path: "scripts/verify/check-workflow-deletion.sh"
   target: "guard_called_scripts() {"
-  stage: "pre-commit"
-  required: true
-- id: "suppression-approval-shared-parser"
-  path: "scripts/verify/suppression-approvals.awk"
-  target: "function flush("
   stage: "pre-commit"
   required: true
 - id: "narrowing-guard-precommit"
