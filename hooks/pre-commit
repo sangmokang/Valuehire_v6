@@ -157,7 +157,9 @@ fi
 # 그래서 문법이 아니라 **무엇을 잡는가**로 판정한다 — 기준(HEAD) 패턴과 커밋될 패턴으로
 # 카나리를 각각 돌려 검출 집합을 비교한다.
 DETECT_REG_CHECKER=scripts/verify/check-secret-detection-regression.sh
-if printf '%s\n' "$staged_any" | grep -qx '.secret-patterns.default'; then
+# 트리거는 규칙 파일**과 카나리 고정물** 둘 다다. 규칙 파일만 보면 카나리를 줄여
+# 감시를 무장해제하는 경로가 열린다 — 그 다음 커밋부터는 축소가 자유롭다(2026-09-11 실측).
+if printf '%s\n' "$staged_any" | grep -qE '^(\.secret-patterns\.default|scripts/verify/fixtures/secret-canaries/)'; then
   if [ ! -x "$DETECT_REG_CHECKER" ]; then
     block "$DETECT_REG_CHECKER 없음 또는 실행 권한 없음 — 탐지력 축소 판정 불가 (fail-closed)"
   else

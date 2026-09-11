@@ -148,7 +148,26 @@ setup_add_rule() {
 }
 run_case "규칙 추가는 통과한다 (탐지력 증가)" pass setup_add_rule
 
-# 시연 6 (배선) — 검사기가 있어도 훅이 부르지 않으면 무방비다.
+# 시연 6 (양성 · 카나리 자체 축소) — 카나리를 하한 미만으로 줄인다.
+# 카나리가 조용히 줄면 다음 축소를 감시할 수 없다 — 서서히 무장해제된다. 실측으로
+# 겪었다: 시험 중 고정물을 복원하지 못해 양성이 4 → 3건이 되었고, **그 상태에서 수량자
+# 상향이 "탐지력 유지"로 통과했다**. 검사기가 자기 입력이 줄어든 것을 못 보면 판정
+# 전체가 조용히 무의미해진다. 이 시연이 없으면 하한을 0 으로 바꿔도 전부 초록이다(S3 생존).
+setup_shrink_canary() {
+  python3 - "$CANARY_POS" <<'PYEOF'
+import sys
+p = sys.argv[1]
+lines = open(p).read().splitlines(True)
+head = [l for l in lines if l.startswith('#')]
+body = [l for l in lines if not l.startswith('#') and l.strip()]
+assert len(body) > 2, "줄일 대상이 부족하다"
+open(p, 'w').write(''.join(head + body[:2]))
+PYEOF
+  git add "$CANARY_POS"
+}
+run_case "카나리를 하한 미만으로 줄이면 차단된다" block setup_shrink_canary
+
+# 시연 7 (배선) — 검사기가 있어도 훅이 부르지 않으면 무방비다.
 if grep -q 'check-secret-detection-regression\.sh' hooks/pre-commit; then
   record 0 "hooks/pre-commit 이 탐지 회귀 검사기를 호출한다 (배선)"
 else
