@@ -204,6 +204,17 @@
   stage: "ci"
   ci_mirror_job: "verify"
   required: true
+- id: "p13-mutation-suite-ci"
+  path: ".github/workflows/verify.yml"
+  target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-p13-mutation-suite.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
+- id: "workflow-called-script-exists"
+  path: "scripts/verify/check-workflow-deletion.sh"
+  target: "guard_called_scripts() {"
+  stage: "pre-commit"
+  required: true
 - id: "secret-canary-coverage-manifest"
   path: "scripts/verify/check-secret-canary-coverage.sh"
   target: "read_manifest() {"

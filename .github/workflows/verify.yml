@@ -250,6 +250,11 @@ jobs:
         # 2026-09-11 실측 커버 4/25. 규칙 하나하나가 카나리에 연결됐는지를 따로 본다.
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-secret-canary-coverage.sh
 
+      - name: 인수 검사 p13-mutation-suite (방어선 13종을 한자리에서 공격)
+        # 검사기마다 자기 인수 검사가 있지만 각자의 사유로만 판정한다. 공격자는 사유를
+        # 가리지 않는다 — 결과 기준으로 한 번 더 훑는다: 이 커밋이 통과하는가.
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-p13-mutation-suite.sh
+
       - name: 인수 검사 p13-deletion (워크플로 검사 줄을 지우지 못하는가)
         # 위 ci-step-integrity 는 자기 계약에 "스텝 자체를 삭제하는 것은 막지 못한다"고
         # 적어 두었고, pre-push 의 실행줄 검사는 DEFERRED 와 PUSH-PERFORMING 선언

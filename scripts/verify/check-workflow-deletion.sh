@@ -54,7 +54,7 @@ cd "$REPO" || die_setup "저장소 루트로 이동할 수 없다"
 TMP=$(mktemp -d) || die_setup "임시 디렉터리를 만들 수 없다 — 검사 결과를 모을 곳이 없다"
 trap 'rm -rf "$TMP"' EXIT
 
-for f in before after gone hits rejected; do
+for f in before after gone hits rejected blob err; do
   : > "$TMP/$f" || die_setup "작업 파일을 열 수 없다 ($TMP/$f)"
 done
 
@@ -197,8 +197,54 @@ while IFS= read -r p; do
   fi
 done < "$TMP/gone"
 
+# 워크플로가 **아직 부르는** 스크립트는 인덱스에 실존해야 하고, 판정을 내놓아야 한다.
+#
+# 위 집합 비교는 실행 줄이 사라진 것만 본다. 스크립트를 지우거나 이름을 바꾸는 것은
+# 실행 줄을 건드리지 않으므로 BEFORE 와 AFTER 가 같아 걸리지 않는다.
+# 2026-09-11 변조 실측 M01·M02: 233줄짜리 검사를 지우거나 .bak 으로 바꿔도 커밋이
+# 통과했다. CI 는 그때서야 빨개진다 — 로컬에서 알 수 있는 것을 원격까지 미룰 이유가 없다.
+#
+# 껍데기 치환(M04)도 같은 자리에서 본다. scripts/verify/run-acceptance.sh 는 "종료값 0
+# 인데 판정이 한 건도 없는" 스크립트를 실패로 삼는데, 그 규칙이 CI 안에만 있었다.
+# 같은 규칙을 커밋 시점으로 당긴다 — 본문을 `exit 0` 으로 바꿔도 커밋이 통과했다.
+# 실측 기준: 워크플로가 부르는 .sh 37개 전부가 지금 'PASS' 를 출력한다(오탐 0).
+# 명부(mechanism-registry)가 이 배선을 이름으로 지목한다. 이름을 지우면 명부 검사가
+# 빨개진다 — 호출되는 스크립트의 실존·판정 요구를 조용히 없애는 길을 막는다.
+guard_called_scripts() {
+  while IFS= read -r p; do
+    [ -z "$p" ] && continue
+    if ! git ls-files --error-unmatch -- "$p" >/dev/null 2>&1; then
+      printf '%s\t%s\n' "$p" "called-but-missing" >> "$TMP/hits" || die_setup "결과 기록 실패"
+      violation=1
+      continue
+    fi
+    # grep -q 는 일찍 끝나 앞 명령에 SIGPIPE 를 준다. pipefail 과 겹치면 종료값 141 이
+    # 되어 "판정 없음"과 구분되지 않는다 — 파일로 받아서 본다.
+    if ! git show ":$p" > "$TMP/blob" 2>"$TMP/err"; then
+      die_setup "인덱스에서 $p 를 읽지 못했다 — $(head -1 "$TMP/err")"
+    fi
+    if ! grep -q 'PASS' "$TMP/blob"; then
+      printf '%s\t%s\n' "$p" "verdictless" >> "$TMP/hits" || die_setup "결과 기록 실패"
+      violation=1
+    fi
+  done < "$TMP/after"
+}
+guard_called_scripts
+
 if [ "$violation" -ne 0 ]; then
   while IFS=$'\t' read -r p why; do
+    if [ "$why" = "called-but-missing" ]; then
+      printf 'BLOCKED: %s — %s 가 아직 %s 를 부르는데 그 파일이 인덱스에 없다.\n' \
+        "$BLOCK_MARK" "$WF_DIR" "$p"
+      printf '         삭제든 이름 변경이든, 부르는 쪽을 함께 고치지 않으면 CI 가 빈 자리를 실행한다.\n'
+      continue
+    fi
+    if [ "$why" = "verdictless" ]; then
+      printf 'BLOCKED: %s — %s 가 판정을 내놓지 않는다 (출력에 PASS 표식이 없다).\n' \
+        "$BLOCK_MARK" "$p"
+      printf '         실행됐다는 사실은 검사했다는 증거가 아니다 — 본문이 비었거나 조기 종료한다.\n'
+      continue
+    fi
     printf 'BLOCKED: %s — %s 의 실행 줄에서 %s 가 사라졌다.\n' "$BLOCK_MARK" "$WF_DIR" "$p"
     if [ "$why" = "still-present" ]; then
       printf '         스크립트는 저장소에 그대로 있는데 CI 가 더 이상 부르지 않는다.\n'
