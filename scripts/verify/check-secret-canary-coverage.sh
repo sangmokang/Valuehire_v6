@@ -32,7 +32,14 @@ NEG_FILE="$FIX_DIR/negative.txt"
 MANIFEST="$FIX_DIR/manifest.txt"
 SCANNER=verify.sh
 
+# 종료값 2 는 **저장소 내용과 무관한 실행 환경 실패**만 쓴다 — git 부재·mktemp 실패·권한.
+# 저장소 내용이 비었다는 사실은 공격자가 만들 수 있으므로 판정(exit 1)이다.
+# 둘을 섞으면 명백한 공격(manifest 를 통째로 주석 처리하는 등)이 "환경 고장"으로 접히고,
+# 방어 성적표가 두 방향 모두로 틀린다(2026-09-11 V2 적대검증 결함 3).
 die() { printf 'FAIL: %s (fail-closed)\n' "$1"; echo "CHECKED: 0"; exit 2; }
+empty_verdict() { printf 'BLOCKED: %s\n' "$1"
+  printf '         검사 대상 0개는 합격이 아니다. 이것은 실행 환경 고장이 아니라 커밋될 내용의 문제다.\n'
+  echo "CHECKED: 0"; exit 1; }
 block() { printf 'BLOCKED: %s\n' "$1"; }
 
 MODE=cover
@@ -77,7 +84,7 @@ assemble() {  # <원본> <출력>
     [ -n "${a:-}" ] || continue
     printf '%s\t%s%s\n' "$desc" "$a" "${b:-}" >> "$2" || die "카나리 조립 실패"
   done < "$1"
-  [ -s "$2" ] || die "카나리가 0건이다 — 검사 대상 0개는 합격이 아니다 ($1)"
+  [ -s "$2" ] || empty_verdict "카나리가 0건이다 ($1)"
 }
 
 read_indexed "$PATTERNS_FILE" "$TMP/patterns.raw"
@@ -96,7 +103,7 @@ run_oracle() {
 
   tr -d '\r' < "$TMP/patterns.raw" | grep -vE '^[[:space:]]*(#|$)' > "$TMP/clean" \
     || die "패턴 정제 실패"
-  [ -s "$TMP/clean" ] || die "유효 규칙이 0개다 — 검사 대상 0개는 합격이 아니다"
+  [ -s "$TMP/clean" ] || empty_verdict "유효 규칙이 0개다"
 
   ORA="$TMP/oracle"
   mkdir -p "$ORA" || die "oracle 작업 디렉터리를 만들 수 없다"
@@ -153,7 +160,7 @@ run_oracle() {
       fi
     done < "$TMP/$side"
   done
-  [ "$n" -gt 0 ] || die "대조 대상이 0건이다 — 검사 대상 0개는 합격이 아니다"
+  [ "$n" -gt 0 ] || empty_verdict "독립 oracle 대조 대상이 0건이다"
   if [ "$bad" -ne 0 ]; then
     printf '         두 경로가 같은 규칙 파일을 다르게 읽고 있다. 정제 방식을 맞춰라.\n'
     printf 'CHECKED: %d\n' "$n"
@@ -198,7 +205,7 @@ awk '
 ' "$TMP/patterns.raw" > "$TMP/rules" || die "규칙 id 추출 실패"
 
 rule_total=$(awk 'NF{c++} END{print c+0}' "$TMP/rules")
-[ "$rule_total" -gt 0 ] || die "유효 규칙이 0개다 — 검사 대상 0개는 합격이 아니다"
+[ "$rule_total" -gt 0 ] || empty_verdict "유효 규칙이 0개다"
 
 fail=0; checked=0
 
@@ -254,7 +261,7 @@ while IFS=$'\t' read -r cap desc ids why; do
   done
 done < "$TMP/manifest.raw"
 
-[ "${rows:-0}" -gt 0 ] || die "manifest 항목이 0건이다 — 검사 대상 0개는 합격이 아니다"
+[ "${rows:-0}" -gt 0 ] || empty_verdict "manifest 항목이 0건이다"
 
 LC_ALL=C sort -u -o "$TMP/claimed" "$TMP/claimed" || die "집합 정렬 실패"
 while IFS=$'\t' read -r id pat; do

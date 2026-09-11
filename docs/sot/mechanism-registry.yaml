@@ -215,6 +215,21 @@
   target: "guard_called_scripts() {"
   stage: "pre-commit"
   required: true
+- id: "suppression-approval-shared-parser"
+  path: "scripts/verify/suppression-approvals.awk"
+  target: "function flush("
+  stage: "pre-commit"
+  required: true
+- id: "narrowing-guard-precommit"
+  path: "scripts/verify/check-secret-detection-regression.sh"
+  target: "narrow_check() {"
+  stage: "pre-commit"
+  required: true
+- id: "called-script-hollow-guard"
+  path: "scripts/verify/check-workflow-deletion.sh"
+  target: "collect_shrink_approvals() {"
+  stage: "pre-commit"
+  required: true
 - id: "secret-canary-coverage-manifest"
   path: "scripts/verify/check-secret-canary-coverage.sh"
   target: "read_manifest() {"

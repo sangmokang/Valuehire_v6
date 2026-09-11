@@ -22,6 +22,7 @@ set -uo pipefail
 
 PATTERNS_FILE=.secret-patterns.default
 FIX=scripts/verify/fixtures/secret-canaries
+MANIFEST=scripts/verify/fixtures/secret-canaries/manifest.txt
 
 die() { printf 'FAIL: %s (fail-closed)\n' "$1"; echo "CHECKED: 0"; exit 2; }
 
@@ -30,7 +31,7 @@ cd "$REPO" || die "저장소 루트로 이동할 수 없다"
 
 TMP=$(mktemp -d) || die "임시 디렉터리를 만들 수 없다"
 trap 'rm -rf "$TMP"' EXIT
-for f in base head pos neg pos.raw neg.raw err; do : > "$TMP/$f" || die "작업 파일을 열 수 없다 ($TMP/$f)"; done
+for f in base head pos neg pos.raw neg.raw err var varval vb vh vbn vhn vlost vdesc napproved nrej; do : > "$TMP/$f" || die "작업 파일을 열 수 없다 ($TMP/$f)"; done
 
 # 패턴 정제 — verify.sh:40 과 **글자 그대로 같은 방식**이어야 한다.
 # 인라인 주석을 자르면 안 된다. 패턴 자신이 '#' 를 포함하고(끝의 인라인 주석을 허용하는
@@ -90,7 +91,7 @@ assemble() {  # <고정물 내용 파일> <출력>
     [ -n "${a:-}" ] || continue
     printf '%s\t%s%s\n' "$desc" "$a" "${b:-}" >> "$out" || die "카나리 조립 실패"
   done < "$src"
-  [ -s "$out" ] || die "카나리가 0건이다 — 검사 대상 0개는 합격이 아니다 ($src)"
+  [ -s "$out" ] || shrink_block "카나리가 0건이다 ($src) — 검사 대상 0개는 합격이 아니다"
 }
 
 # 카나리 자체가 조용히 줄면 다음 축소를 감시할 수 없다 — 서서히 무장해제된다.
@@ -148,6 +149,130 @@ hit() {
   [ "$rc" -gt 1 ] && die "패턴 실행 오류 (grep exit=$rc) — 정규식이 깨졌을 수 있다"
   return "$rc"
 }
+
+# ── 규칙 좁히기(narrowing) 탐지 ───────────────────────────────────────────────
+#
+# 왜 필요한가 (2026-09-11 V2 적대검증 결함 1 · CRITICAL):
+#   위 집합 비교는 **고정된 카나리 29개**에 대한 판정만 본다. 규칙을 그 카나리 하나에
+#   맞춰 좁히면 카나리는 계속 잡히고 진짜 비밀은 놓친다. 실증:
+#     AKIA[0-9A-Z]{16}  →  AKIA1234[0-9A-Z]{12}
+#   카나리(AKIA + 1234567890ABCDEF)는 계속 잡히므로 커버리지 25/25 도, 탐지 집합 비교도
+#   초록이었고, **바로 다음 커밋에서 진짜 AWS 키가 통과했다.** 착수 문서 §3층이 기록한
+#   그 사고와 결과가 같다 — 방법만 "규칙 삭제"에서 "범위 축소"로 바뀌었다.
+#
+# 어떻게 잡나: 카나리는 규칙이라는 **집합의 한 점**일 뿐이다. 그 점 주위를 흔들어 본다.
+#   카나리 값의 각 자리를 한 글자씩 같은 부류 안에서 돌린다(숫자→숫자·대문자→대문자·
+#   소문자→소문자). 고정된 접두사 자리를 돌린 변형은 기준 규칙도 안 잡으므로 그냥 빠진다.
+#   **기준은 잡는데 커밋될 규칙이 못 잡는 변형**이 하나라도 있으면 범위가 줄어든 것이다.
+#   정규식을 해석하지 않고도 축소를 보는 방법이다 — 이 저장소의 "정규식은 눈으로 읽지
+#   말고 돌려라"를 그대로 따른다.
+#
+# 정당한 좁히기는 막지 않는다. 오탐을 줄이려고 경계를 좁히는 변경이 실제로 있었다
+#   (2026-08-12 D4·D5 — 밑줄을 경계에서 제외). 그런 변경은 억제 원장에
+#   `narrow:<규칙 id>` 승인(owner·reason·expiry 필수)을 **먼저 커밋**해 두면 통과한다.
+#   승인은 기준 브랜치에서만 읽는다 — 같은 커밋에 쓴 승인은 자기 서명이다.
+gen_variants() {  # <조립된 카나리> <출력>
+  : > "$2" || die "작업 파일을 열 수 없다 ($2)"
+  awk -F'\t' '
+    function rot(c,   i) {
+      if (c ~ /^[0-9]$/) return sprintf("%d", (c + 1) % 10)
+      i = index("ABCDEFGHIJKLMNOPQRSTUVWXYZ", c)
+      if (i > 0) return substr("BCDEFGHIJKLMNOPQRSTUVWXYZA", i, 1)
+      i = index("abcdefghijklmnopqrstuvwxyz", c)
+      if (i > 0) return substr("bcdefghijklmnopqrstuvwxyza", i, 1)
+      return ""
+    }
+    NF >= 2 {
+      desc = $1; val = $2
+      for (i = 1; i <= length(val); i++) {
+        c = substr(val, i, 1); r = rot(c)
+        if (r == "") continue
+        printf "%s\t%s%s%s\n", desc, substr(val, 1, i - 1), r, substr(val, i + 1)
+      }
+    }
+  ' "$1" >> "$2" || die "변형 생성 실패"
+}
+
+narrow_check() {
+  gen_variants "$TMP/pos" "$TMP/var"
+  if [ ! -s "$TMP/var" ]; then
+    shrink_block "카나리 변형이 0건이다 — 범위 축소를 볼 수 없다"
+  fi
+  cut -f2 "$TMP/var" > "$TMP/varval" || die "작업 파일을 열 수 없다"
+  # 한 번씩만 돌린다. 변형이 수백 건이라 값마다 grep 을 띄우면 검사가 느려진다.
+  grep -nEi -f "$TMP/base" "$TMP/varval" > "$TMP/vb" || :
+  grep -nEi -f "$TMP/head" "$TMP/varval" > "$TMP/vh" || :
+  cut -d: -f1 "$TMP/vb" | LC_ALL=C sort -u > "$TMP/vbn" || die "작업 파일을 열 수 없다"
+  cut -d: -f1 "$TMP/vh" | LC_ALL=C sort -u > "$TMP/vhn" || die "작업 파일을 열 수 없다"
+  comm -23 "$TMP/vbn" "$TMP/vhn" > "$TMP/vlost" || die "집합 비교 실패"
+  [ -s "$TMP/vlost" ] || return 0
+
+  # 어떤 카나리(=어떤 규칙 묶음)가 좁혀졌는지 모은다.
+  : > "$TMP/vdesc" || die "작업 파일을 열 수 없다"
+  while IFS= read -r n; do
+    [ -z "$n" ] && continue
+    sed -n "${n}p" "$TMP/var" | cut -f1 >> "$TMP/vdesc" || die "결과 기록 실패"
+  done < "$TMP/vlost"
+  LC_ALL=C sort -u -o "$TMP/vdesc" "$TMP/vdesc" || die "집합 정렬 실패"
+
+  # 승인 조회 — 기준 브랜치의 `narrow:<규칙 id>` 항목만 인정한다.
+  : > "$TMP/napproved" || die "작업 파일을 열 수 없다"
+  if git rev-parse --verify --quiet HEAD >/dev/null \
+     && git cat-file -e HEAD:suppressions.yaml 2>/dev/null \
+     && [ -f scripts/verify/suppression-approvals.awk ]; then
+    git show HEAD:suppressions.yaml 2>/dev/null \
+      | awk -v today="$(date +%Y-%m-%d)" -v rej="$TMP/nrej" -v prefix=narrow: \
+            -f scripts/verify/suppression-approvals.awk \
+      | LC_ALL=C sort -u > "$TMP/napproved" || die "좁히기 승인 목록을 읽지 못했다"
+  fi
+
+  # manifest 가 있으면 카나리 설명 → 규칙 id 로 옮겨 승인과 대조한다.
+  unapproved=""
+  while IFS= read -r d; do
+    [ -z "$d" ] && continue
+    ids=""
+    if git ls-files --error-unmatch -- "$MANIFEST" >/dev/null 2>&1; then
+      ids=$(git show ":$MANIFEST" 2>/dev/null \
+            | awk -F'\t' -v d="$d" '$1 !~ /^#/ && $2 == d {print $3}' | tr ',' ' ')
+    fi
+    [ -n "$ids" ] || ids="$d"
+    for id in $ids; do
+      grep -qxF "$id" "$TMP/napproved" || unapproved="${unapproved}${id} "
+    done
+  done < "$TMP/vdesc"
+
+  [ -n "$unapproved" ] || return 0
+  # 예시는 **승인 안 된 규칙**의 변형에서 고른다. 첫 변형을 그냥 쓰면 승인된 규칙의
+  # 값을 증거로 보여 주게 되고, 읽는 사람이 엉뚱한 규칙을 고치러 간다.
+  example=""
+  ex_n=0
+  while IFS= read -r n; do
+    [ -z "$n" ] && continue
+    d=$(sed -n "${n}p" "$TMP/var" | cut -f1)
+    for id in $unapproved; do
+      if git ls-files --error-unmatch -- "$MANIFEST" >/dev/null 2>&1; then
+        git show ":$MANIFEST" 2>/dev/null \
+          | awk -F'\t' -v d="$d" -v i="$id" '$1 !~ /^#/ && $2 == d && index($3, i) > 0 {found=1} END{exit !found}' \
+          && { example=$(sed -n "${n}p" "$TMP/varval"); break; }
+      elif [ "$d" = "$id" ]; then
+        example=$(sed -n "${n}p" "$TMP/varval"); break
+      fi
+    done
+    [ -n "$example" ] && break
+    ex_n=$((ex_n + 1))
+    [ "$ex_n" -gt 200 ] && break
+  done < "$TMP/vlost"
+  printf 'BLOCKED: 비밀 규칙의 탐지 범위가 줄었다 — 카나리는 계속 잡히지만 그 주변이 빠진다.\n'
+  printf '         좁혀진 규칙(승인 없음): %s\n' "$unapproved"
+  printf '         기준에서 잡히던 변형 %s건이 커밋될 규칙에서는 안 잡힌다.\n' \
+    "$(awk 'NF{c++} END{print c+0}' "$TMP/vlost")"
+  printf '         예: %s\n' "${example:-$(sed -n "$(head -1 "$TMP/vlost")p" "$TMP/varval")}"
+  printf '         카나리 하나만 계속 잡도록 규칙을 좁히면 진짜 비밀은 놓친다.\n'
+  printf '         정당한 축소라면 suppressions.yaml 에 narrow:<규칙 id> 승인을 **먼저** 커밋하라.\n'
+  echo "CHECKED: 0"
+  exit 1
+}
+narrow_check
 
 checked=0; fail=0
 lost=""; added=""

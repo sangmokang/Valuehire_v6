@@ -64,7 +64,7 @@ chmod +x "$CLONE/.git/hooks/pre-commit"
 # 묻는데, 격리 사본의 명부가 커밋된 옛 판본이면 새 항목이 없어 무엇을 지워도 통과한다
 # (2026-09-11 실측: 시연 2건이 그 이유로 빨갰다). 검사기만 옮기고 그것이 대조하는
 # 정본을 두고 오면 어긋난 조합을 시험하게 된다.
-INSTALL="$COVER_SRC $REG_SRC $CANARY_POS $CANARY_NEG $MANIFEST $PATTERNS verify.sh hooks/pre-commit docs/sot/mechanism-registry.yaml"
+INSTALL="$COVER_SRC $REG_SRC $CANARY_POS $CANARY_NEG $MANIFEST $PATTERNS verify.sh hooks/pre-commit docs/sot/mechanism-registry.yaml scripts/verify/suppression-approvals.awk"
 # 커버리지 검사기의 **존재를 전제로 두지 않는다**. 전제로 두면 검사기가 없을 때 시연이
 # 한 번도 돌지 않고 exit 2 로 끝나, "커버 공백이 차단되지 않는다"는 사실 자체가
 # 관측되지 않는다(acceptance-p13-deletion 이 같은 이유로 같은 선택을 했다).

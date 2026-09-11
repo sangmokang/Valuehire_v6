@@ -54,7 +54,7 @@ cd "$REPO" || die_setup "저장소 루트로 이동할 수 없다"
 TMP=$(mktemp -d) || die_setup "임시 디렉터리를 만들 수 없다 — 검사 결과를 모을 곳이 없다"
 trap 'rm -rf "$TMP"' EXIT
 
-for f in before after gone hits rejected blob err; do
+for f in before after gone hits rejected blob err shrink_ok shrink_rej; do
   : > "$TMP/$f" || die_setup "작업 파일을 열 수 없다 ($TMP/$f)"
 done
 
@@ -131,56 +131,28 @@ collect_retire_approvals() {  # <승인목록 출력> <거부목록 출력>
     return 0
   fi
   git show HEAD:suppressions.yaml 2>/dev/null \
-    | awk -v today="$(date +%Y-%m-%d)" -v rej="$2" '
-      function trim(s) { gsub(/^[ \t]+|[ \t]+$/, "", s); return s }
-      function unq(s)  { gsub(/^["\x27]|["\x27]$/, "", s); return s }
-      function fieldval(line,   v) { sub(/^[^:]*:/, "", line); return unq(trim(line)) }
-      function isblock(v) { return (v == "" || v == ">-" || v == ">" || v == "|" || v == "|-" || v == ">+" || v == "|+") }
-      function reset() { have_check = 0; check_v = ""; owner_v = ""; reason_v = ""; expiry_v = ""; pending = "" }
-      function flush(   ok, p, why) {
-        if (!have_check) return
-        ok = 1; why = ""
-        if (owner_v  == "") { ok = 0; why = why "owner없음 " }
-        if (reason_v == "") { ok = 0; why = why "reason없음 " }
-        if (expiry_v == "") { ok = 0; why = why "expiry없음 " }
-        else if (expiry_v !~ /^[0-9][0-9][0-9][0-9]-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$/) { ok = 0; why = why "expiry형식(" expiry_v ") " }
-        else if (expiry_v < today) { ok = 0; why = why "expiry만료(" expiry_v ") " }
-        if (check_v ~ /^retire:/) {
-          p = substr(check_v, 8)
-          if (p != "") { if (ok) print p; else printf "%s\t%s\n", p, trim(why) >> rej }
-        }
-        reset()
-      }
-      /^-[ \t]*check:[ \t]*/ {
-        flush(); have_check = 1; check_v = fieldval($0); pending = ""
-        if (isblock(check_v)) { pending = "check"; check_v = "" }
-        next
-      }
-      /^[ \t]*[A-Za-z_][A-Za-z0-9_]*:/ {
-        if (!have_check) next
-        key = $0; sub(/:.*/, "", key); key = trim(key)
-        v = fieldval($0); pending = ""
-        if (isblock(v)) { pending = key; v = "" }
-        if (key == "owner")  owner_v  = v
-        if (key == "reason") reason_v = v
-        if (key == "expiry") expiry_v = v
-        if (key == "check")  check_v  = v
-        next
-      }
-      {
-        if (!have_check || pending == "") next
-        t = trim($0)
-        if (t == "") next
-        if (pending == "owner")  owner_v  = owner_v  (owner_v  == "" ? "" : " ") t
-        if (pending == "reason") reason_v = reason_v (reason_v == "" ? "" : " ") t
-        if (pending == "expiry") expiry_v = expiry_v t
-        if (pending == "check")  check_v  = check_v  t
-      }
-      END { flush() }
-    ' \
+    | awk -v today="$(date +%Y-%m-%d)" -v rej="$2" -v prefix=retire: \
+          -f scripts/verify/suppression-approvals.awk \
     | LC_ALL=C sort -u > "$1" || die_setup "은퇴 승인 목록을 읽지 못했다"
 }
 collect_retire_approvals "$TMP/approved" "$TMP/rejected"
+
+# 본문 축소 승인 — 정당한 큰 축소(분할·재작성)는 기록을 남기고 통과한다.
+# 은퇴 승인과 같은 파서·같은 스키마를 쓰고, 같은 이유로 기준 브랜치에서만 읽는다.
+collect_shrink_approvals() {  # <출력>
+  : > "$1" || die_setup "작업 파일을 열 수 없다 ($1)"
+  if ! git rev-parse --verify --quiet HEAD >/dev/null; then
+    return 0
+  fi
+  if ! git cat-file -e HEAD:suppressions.yaml 2>/dev/null; then
+    return 0
+  fi
+  git show HEAD:suppressions.yaml 2>/dev/null \
+    | awk -v today="$(date +%Y-%m-%d)" -v rej="$TMP/shrink_rej" -v prefix=shrink: \
+          -f scripts/verify/suppression-approvals.awk \
+    | LC_ALL=C sort -u > "$1" || die_setup "축소 승인 목록을 읽지 못했다"
+}
+collect_shrink_approvals "$TMP/shrink_ok"
 
 checked=$(awk 'NF{c++} END{print c+0}' "$TMP/before")
 violation=0
@@ -227,16 +199,63 @@ guard_called_scripts() {
       printf '%s\t%s\n' "$p" "verdictless" >> "$TMP/hits" || die_setup "결과 기록 실패"
       violation=1
     fi
+    # 본문이 통째로 사라졌는가. `grep PASS` 만 보면 `echo PASS` 여섯 줄짜리 껍데기가
+    # 통과한다 — 2026-09-11 V2 적대검증 실증: 269줄 검사기를 출력기로 바꾸고 카나리 없는
+    # 26번째 규칙을 넣었는데 훅·명부·래퍼가 전부 초록이었다.
+    #
+    # 두 조건을 **함께** 만족할 때만 막는다: ① 기준의 절반 미만으로 줄었고 ② 60줄 미만.
+    # 하나만 쓰면 정당한 분할(P11 은 300줄 넘는 파일을 나누라고 한다)이 매번 걸린다.
+    # 300줄을 150줄 둘로 나누는 변경은 ②에 걸리지 않고, 출력기 치환은 둘 다 걸린다.
+    # 지금 워크플로가 부르는 .sh 의 최소 줄수는 35줄이라 현재 오탐은 0이다.
+    #
+    # 이 검사가 막지 못하는 것: 큰 가짜를 써서 줄수를 유지하는 공격. 커밋 권한을 가진
+    # 주체가 모든 검사기를 동시에 속이는 것은 커밋 시점에 완전히 막을 수 없다 —
+    # 남는 방어선은 PR 리뷰이고, 이 검사는 그 가짜를 **크고 눈에 띄게** 만든다.
+    if git cat-file -e "HEAD:$p" 2>/dev/null; then
+      head_n=$(git show "HEAD:$p" 2>/dev/null | awk 'END{print NR+0}')
+      now_n=$(awk 'END{print NR+0}' "$TMP/blob")
+      if [ "$head_n" -gt 0 ] && [ "$now_n" -lt 60 ] && [ $((now_n * 2)) -lt "$head_n" ]; then
+        if ! grep -qxF "$p" "$TMP/shrink_ok"; then
+          printf '%s\t%s\t%s\n' "$p" "hollowed" "${head_n}->${now_n}" >> "$TMP/hits" \
+            || die_setup "결과 기록 실패"
+          violation=1
+        fi
+      fi
+    fi
+    # 실행 권한을 떼면 CI 가 그 줄에서 실패한다. 모드는 인덱스에 기록되므로 커밋 시점에
+    # 판정할 수 있다 — fail-closed 에만 기대면 "실행 불가"로만 막혀 무엇을 막았는지
+    # 장부에 남지 않는다(2026-09-11 V2 적대검증 결함 2 의 뿌리).
+    mode=$(git ls-files --stage -- "$p" | awk '{print $1; exit}')
+    case "${mode:-}" in
+      100755) ;;
+      '') die_setup "인덱스에서 $p 의 모드를 읽지 못했다" ;;
+      *)
+        printf '%s\t%s\n' "$p" "not-executable" >> "$TMP/hits" || die_setup "결과 기록 실패"
+        violation=1
+        ;;
+    esac
   done < "$TMP/after"
 }
 guard_called_scripts
 
 if [ "$violation" -ne 0 ]; then
-  while IFS=$'\t' read -r p why; do
+  while IFS=$'\t' read -r p why detail; do
     if [ "$why" = "called-but-missing" ]; then
       printf 'BLOCKED: %s — %s 가 아직 %s 를 부르는데 그 파일이 인덱스에 없다.\n' \
         "$BLOCK_MARK" "$WF_DIR" "$p"
       printf '         삭제든 이름 변경이든, 부르는 쪽을 함께 고치지 않으면 CI 가 빈 자리를 실행한다.\n'
+      continue
+    fi
+    if [ "$why" = "hollowed" ]; then
+      printf 'BLOCKED: %s — %s 의 본문이 통째로 사라졌다 (줄수 %s).\n' "$BLOCK_MARK" "$p" "$detail"
+      printf '         CI 가 부르는 줄은 그대로인데 그 스크립트가 더는 아무 일도 하지 않는다.\n'
+      printf '         정당한 축소라면 suppressions.yaml 에 shrink:%s 승인을 **먼저** 커밋하라.\n' "$p"
+      continue
+    fi
+    if [ "$why" = "not-executable" ]; then
+      printf 'BLOCKED: %s — %s 에 실행 권한이 없다 (인덱스 모드 %s 아님).\n' \
+        "$BLOCK_MARK" "$p" "100755"
+      printf '         CI 가 부르는 줄은 그대로인데 그 파일이 실행되지 않는다.\n'
       continue
     fi
     if [ "$why" = "verdictless" ]; then
@@ -264,6 +283,17 @@ if [ "$violation" -ne 0 ]; then
     printf '           - check: "retire:%s"\n' "$p"
   done < "$TMP/hits"
   echo "CHECKED: $checked"
+  exit 1
+fi
+
+# 검사 대상 0개는 합격이 아니다. 워크플로에서 실행 줄이 하나도 안 뽑히는 상태는
+# **저장소 내용**이 만든 것이고, 공격자가 도달시킬 수 있다. 실측(2026-09-11 V2 적대검증):
+# 워크플로를 비운 뒤에는 332줄짜리 보호 스크립트를 BLOCKED 한 줄 없이 지울 수 있었다.
+# 래퍼(run-acceptance)는 CHECKED 0 을 거부하지만 훅은 이 검사기를 직접 부른다.
+if [ "$checked" -eq 0 ]; then
+  printf 'BLOCKED: %s — %s 에서 검사 실행 줄이 한 건도 뽑히지 않았다.\n' "$BLOCK_MARK" "$WF_DIR"
+  printf '         검사 대상 0개는 합격이 아니다 — 이 상태에서는 보호 스크립트를 마음대로 지울 수 있다.\n'
+  echo "CHECKED: 0"
   exit 1
 fi
 

@@ -22,8 +22,27 @@ fail=0
 # 검사기·고정물·임시 디렉터리가 망가진 상태가 방어 성공으로 장부에 남는다(P13 counter-AC).
 #   block()            — 판정: 검사가 돌았고 위반을 찾았다
 #   block_unrunnable() — 실행 불가: 검사를 돌리지 못했다. 막기는 하되(fail-closed) 판정은 아니다
-block() { printf 'BLOCKED: %s\n' "$1" >&2; fail=1; }
-block_unrunnable() { printf 'BLOCKED(실행불가): %s\n' "$1" >&2; fail=1; }
+#
+# 분류는 **로그 본문이 아니라 별도 채널**로도 내보낸다. 훅은 하위 검사기의 출력을 그대로
+# 보여 주는데(사유가 그 안에 있으므로), 그 출력도 `BLOCKED:` 로 시작한다. 그래서 로그
+# 줄머리만 보면 **검사기가 쓴 글자**를 훅의 분류로 착각한다 — 검사기 본문은 공격자가
+# 고를 수 있으므로, 판정자가 피고의 진술서를 증거로 쓰는 구조가 된다
+# (2026-09-11 V2 적대검증 결함 2: 검사기가 죽기 직전에 BLOCKED: 한 줄만 찍게 하면
+#  실행 불가로만 막힌 공격이 "판정으로 막혔다"로 집계됐다).
+# 채널은 .git 아래 파일이다. 커밋 내용이 아니므로 이번 커밋으로는 위조할 수 없고,
+# 훅이 **모든 검사가 끝난 뒤** 마지막에 덮어쓰므로 검사기가 미리 써 두어도 지워진다.
+n_verdict=0
+n_unrunnable=0
+block() { printf 'BLOCKED: %s\n' "$1" >&2; fail=1; n_verdict=$((n_verdict + 1)); }
+block_unrunnable() { printf 'BLOCKED(실행불가): %s\n' "$1" >&2; fail=1; n_unrunnable=$((n_unrunnable + 1)); }
+
+HOOK_SUMMARY="$(git rev-parse --git-dir)/p13-last-block-summary"
+write_summary() {
+  printf 'verdict=%d unrunnable=%d\n' "$n_verdict" "$n_unrunnable" > "$HOOK_SUMMARY" 2>/dev/null
+}
+# 먼저 0/0 으로 초기화한다. 안 그러면 조기 종료 경로에서 **지난 커밋의 기록**이 남아
+# 이번 커밋의 분류로 읽힌다.
+write_summary
 
 # R(rename)을 넣지 않으면 `git mv notes.txt leak.db` 가 staged 목록에서 빠져
 # 훅을 그대로 통과한다(2026-08-09 실측). 이름만 바꿔도 내용은 그대로다.
@@ -35,7 +54,7 @@ staged=$(git diff --cached --name-only --diff-filter=ACMR)
 # 아래 검사들은 파일 **내용**을 읽으므로 계속 ACMR 목록을 쓴다. 삭제된 파일은 읽을
 # 내용이 없고, 삭제로 인한 약화는 3-b 가 diff 로 따로 본다.
 staged_any=$(git diff --cached --name-only)
-if [ -z "$staged_any" ]; then exit 0; fi
+if [ -z "$staged_any" ]; then write_summary; exit 0; fi
 
 # scan <설명> <파일> <grep 인자...>
 #   반환 0 = 매칭됨 / 1 = 매칭 없음 또는 실행오류(이 경우 block 이 이미 걸림)
@@ -399,4 +418,5 @@ if [ "${#p3_files[@]}" -gt 0 ]; then
   fi
 fi
 
+write_summary
 exit "$fail"

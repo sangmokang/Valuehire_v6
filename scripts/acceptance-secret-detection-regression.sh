@@ -69,7 +69,7 @@ install_from_worktree() {
 # 두고 오는 실수를 이 저장소는 이미 했다(2026-09-11).
 COVER_SRC=scripts/verify/check-secret-canary-coverage.sh
 MANIFEST=scripts/verify/fixtures/secret-canaries/manifest.txt
-FIXTURES="scripts/verify/fixtures/secret-canaries/positive.txt scripts/verify/fixtures/secret-canaries/negative.txt $MANIFEST $COVER_SRC $PATTERNS"
+FIXTURES="scripts/verify/fixtures/secret-canaries/positive.txt scripts/verify/fixtures/secret-canaries/negative.txt $MANIFEST $COVER_SRC $PATTERNS scripts/verify/suppression-approvals.awk"
 install_from_worktree "$CHECKER_SRC" $FIXTURES || {
   echo "FAIL: 검사기·고정물 설치 실패"; echo "CHECKED: 0"; exit 2; }
 # 작업트리 사본을 clone 에 **커밋**한다. 검사기가 인덱스와 HEAD 를 읽으므로 cp 만으로는

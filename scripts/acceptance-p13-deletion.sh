@@ -33,6 +33,9 @@ cd "$REPO" || { echo "FAIL: 저장소 루트로 이동 실패"; echo "CHECKED: 0
 
 WF=.github/workflows/verify.yml
 CHECKER_SRC=scripts/verify/check-workflow-deletion.sh
+# 검사기가 읽는 공유 승인 파서도 함께 옮긴다 — 검사기만 옮기고 그것이 읽는 것을 두고
+# 오면 어긋난 조합을 시험하게 된다.
+PARSER_SRC=scripts/verify/suppression-approvals.awk
 # 검사기 존재를 전제로 두지 않는다. 두면 검사기가 없을 때 시연이 한 번도 돌지 않고
 # exit 2 로 끝나, "삭제가 차단되지 않는다"는 사실이 관측되지 않는다. 부재는 시연 5 가 잡는다.
 for f in "$WF" hooks/pre-commit; do
@@ -80,6 +83,12 @@ if [ -f "$CHECKER_SRC" ]; then
     echo "FAIL: 검사기 설치 실패"; echo "CHECKED: 0"; exit 2; }
   chmod +x "$CLONE/$CHECKER_SRC"
 fi
+if [ -f "$PARSER_SRC" ]; then
+  mkdir -p "$CLONE/$(dirname "$PARSER_SRC")" || {
+    echo "FAIL: 파서 디렉터리 생성 실패"; echo "CHECKED: 0"; exit 2; }
+  cp -p "$PARSER_SRC" "$CLONE/$PARSER_SRC" || {
+    echo "FAIL: 파서 설치 실패"; echo "CHECKED: 0"; exit 2; }
+fi
 
 # 시연마다 여기로 되돌린다. 시연 4 는 seed 커밋을 만들어 HEAD 를 옮기므로 SHA 로 고정한다.
 BASE=$(cd "$CLONE" && git rev-parse HEAD) || {
@@ -105,6 +114,9 @@ run_case() {
   if [ -f "$CHECKER_SRC" ]; then
     mkdir -p "$CLONE/$(dirname "$CHECKER_SRC")" 2>/dev/null
     cp -p "$CHECKER_SRC" "$CLONE/$CHECKER_SRC" 2>/dev/null && chmod +x "$CLONE/$CHECKER_SRC"
+  fi
+  if [ -f "$PARSER_SRC" ]; then
+    cp -p "$PARSER_SRC" "$CLONE/$PARSER_SRC" 2>/dev/null
   fi
   if ! ( cd "$CLONE" && $setup ) >"$SANDBOX/setup.err" 2>&1; then
     record 1 "$desc" "셋업 실패 — 위반을 만들지 못했다: $(head -1 "$SANDBOX/setup.err")"
