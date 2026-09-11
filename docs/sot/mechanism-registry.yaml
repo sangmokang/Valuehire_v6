@@ -148,3 +148,13 @@
   target: "collect_retire_approvals() {"
   stage: "pre-commit"
   required: true
+- id: "retire-approval-preexistence"
+  path: "scripts/verify/check-workflow-deletion.sh"
+  target: "git show HEAD:suppressions.yaml"
+  stage: "pre-commit"
+  required: true
+- id: "retire-approval-item-schema"
+  path: "scripts/verify/check-workflow-deletion.sh"
+  target: "function flush("
+  stage: "pre-commit"
+  required: true

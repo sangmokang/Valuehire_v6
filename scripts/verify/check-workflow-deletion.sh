@@ -54,7 +54,7 @@ cd "$REPO" || die_setup "저장소 루트로 이동할 수 없다"
 TMP=$(mktemp -d) || die_setup "임시 디렉터리를 만들 수 없다 — 검사 결과를 모을 곳이 없다"
 trap 'rm -rf "$TMP"' EXIT
 
-for f in before after gone hits; do
+for f in before after gone hits rejected; do
   : > "$TMP/$f" || die_setup "작업 파일을 열 수 없다 ($TMP/$f)"
 done
 
@@ -105,18 +105,82 @@ collect ""   "$TMP/after"
 comm -23 "$TMP/before" "$TMP/after" > "$TMP/gone" || die_setup "집합 비교 실패"
 
 # 은퇴 승인 목록 — suppressions.yaml 의 `check: "retire:<경로>"` 항목.
-# 커밋될 내용(인덱스)에서 읽는다. 작업트리에서 읽으면 승인을 스테이징하지 않고도 통과한다.
-collect_retire_approvals() {
+#
+# **기준 브랜치(HEAD)** 에서 읽는다. 인덱스에서 읽으면 지우는 사람이 같은 커밋에 승인을
+# 써 넣어 스스로를 승인할 수 있다 — 2026-09-11 실측으로 233줄짜리 검사가 그렇게 사라졌다
+# (워크플로 스텝 삭제 + 승인 8줄 추가 + git rm 을 한 커밋에 담아 rc=0).
+# 승인이 HEAD 에 이미 있다는 것은 그 승인이 **별도 커밋으로 먼저 기록됐다**는 뜻이고,
+# 그 커밋이 PR 리뷰에 보인다.
+#   한계: 로컬에서 커밋을 둘로 나누는 것까지는 막지 못한다. 이 검사가 없애는 것은
+#   "한 커밋 안에서의 자기 서명"이고, 병합 승인은 PR 리뷰가 맡는다.
+#
+# 파싱은 문자열 포함이 아니라 **항목 단위 스키마**다. check·owner·reason·expiry 네 필드가
+# 한 항목 안에 모두 있고, owner·reason 이 공백이 아니며, expiry 가 YYYY-MM-DD 이고 오늘
+# 이후여야 승인으로 센다. 파일 전체에서 개수만 세면 **앞 항목의 owner 를 빌려 쓰는** 조합이
+# 통과한다(hooks/pre-commit 의 총량 검사가 그 형태다 — 여기서는 항목 경계를 센다).
+# 탈락한 항목은 사유와 함께 남긴다. 조용한 탈락은 "승인이 아예 없음"과 구분되지 않는다.
+collect_retire_approvals() {  # <승인목록 출력> <거부목록 출력>
   : > "$1" || die_setup "작업 파일을 열 수 없다 ($1)"
-  git ls-files --error-unmatch -- suppressions.yaml >/dev/null 2>&1 || return 0
-  git show :suppressions.yaml 2>/dev/null \
-    | sed -n 's/^-[[:space:]]*check:[[:space:]]*["'"'"']\{0,1\}retire:\([^"'"'"']*\)["'"'"']\{0,1\}[[:space:]]*$/\1/p' \
+  : > "$2" || die_setup "작업 파일을 열 수 없다 ($2)"
+  # 첫 커밋이거나 억제 원장이 아직 없는 상태는 **정상**이다. 오류를 삼키는 것이 아니라
+  # "승인이 0건"이라는 처리된 상태로 내려간다 — 그러면 모든 은퇴가 차단된다(fail-closed).
+  if ! git rev-parse --verify --quiet HEAD >/dev/null; then
+    return 0
+  fi
+  if ! git cat-file -e HEAD:suppressions.yaml 2>/dev/null; then
+    return 0
+  fi
+  git show HEAD:suppressions.yaml 2>/dev/null \
+    | awk -v today="$(date +%Y-%m-%d)" -v rej="$2" '
+      function trim(s) { gsub(/^[ \t]+|[ \t]+$/, "", s); return s }
+      function unq(s)  { gsub(/^["\x27]|["\x27]$/, "", s); return s }
+      function fieldval(line,   v) { sub(/^[^:]*:/, "", line); return unq(trim(line)) }
+      function isblock(v) { return (v == "" || v == ">-" || v == ">" || v == "|" || v == "|-" || v == ">+" || v == "|+") }
+      function reset() { have_check = 0; check_v = ""; owner_v = ""; reason_v = ""; expiry_v = ""; pending = "" }
+      function flush(   ok, p, why) {
+        if (!have_check) return
+        ok = 1; why = ""
+        if (owner_v  == "") { ok = 0; why = why "owner없음 " }
+        if (reason_v == "") { ok = 0; why = why "reason없음 " }
+        if (expiry_v == "") { ok = 0; why = why "expiry없음 " }
+        else if (expiry_v !~ /^[0-9][0-9][0-9][0-9]-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$/) { ok = 0; why = why "expiry형식(" expiry_v ") " }
+        else if (expiry_v < today) { ok = 0; why = why "expiry만료(" expiry_v ") " }
+        if (check_v ~ /^retire:/) {
+          p = substr(check_v, 8)
+          if (p != "") { if (ok) print p; else printf "%s\t%s\n", p, trim(why) >> rej }
+        }
+        reset()
+      }
+      /^-[ \t]*check:[ \t]*/ {
+        flush(); have_check = 1; check_v = fieldval($0); pending = ""
+        if (isblock(check_v)) { pending = "check"; check_v = "" }
+        next
+      }
+      /^[ \t]*[A-Za-z_][A-Za-z0-9_]*:/ {
+        if (!have_check) next
+        key = $0; sub(/:.*/, "", key); key = trim(key)
+        v = fieldval($0); pending = ""
+        if (isblock(v)) { pending = key; v = "" }
+        if (key == "owner")  owner_v  = v
+        if (key == "reason") reason_v = v
+        if (key == "expiry") expiry_v = v
+        if (key == "check")  check_v  = v
+        next
+      }
+      {
+        if (!have_check || pending == "") next
+        t = trim($0)
+        if (t == "") next
+        if (pending == "owner")  owner_v  = owner_v  (owner_v  == "" ? "" : " ") t
+        if (pending == "reason") reason_v = reason_v (reason_v == "" ? "" : " ") t
+        if (pending == "expiry") expiry_v = expiry_v t
+        if (pending == "check")  check_v  = check_v  t
+      }
+      END { flush() }
+    ' \
     | LC_ALL=C sort -u > "$1" || die_setup "은퇴 승인 목록을 읽지 못했다"
 }
-collect_retire_approvals "$TMP/approved"
-if false; then
-  :
-fi
+collect_retire_approvals "$TMP/approved" "$TMP/rejected"
 
 checked=$(awk 'NF{c++} END{print c+0}' "$TMP/before")
 violation=0
@@ -142,6 +206,13 @@ if [ "$violation" -ne 0 ]; then
     else
       printf '         스크립트도 같은 커밋에서 함께 삭제됐다 — 은퇴라면 기록을 남겨야 한다.\n'
       printf '         자동 면제하지 않는다: 그러면 공격과 정당한 은퇴가 구분되지 않는다.\n'
+      rj=$(awk -F'\t' -v p="$p" '$1 == p {print $2; exit}' "$TMP/rejected")
+      if [ -n "$rj" ]; then
+        printf '         기준 브랜치(HEAD)에 승인 항목은 있으나 스키마를 만족하지 않는다: %s\n' "$rj"
+      else
+        printf '         기준 브랜치(HEAD)에 이 경로의 은퇴 승인이 없다.\n'
+        printf '         같은 커밋에 써 넣은 승인은 지우는 사람의 자기 서명이라 세지 않는다.\n'
+      fi
     fi
     printf '         은퇴하려면 suppressions.yaml 에 다음을 owner·reason·expiry 와 함께 등록하라:\n'
     printf '           - check: "retire:%s"\n' "$p"
