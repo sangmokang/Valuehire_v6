@@ -152,8 +152,9 @@ if printf '%s\n' "$staged" | grep -qx 'suppressions.yaml'; then
   # owner 와 reason 도 필수다 (2026-09-10 Codex 적대검증 반영). expiry 만 요구하면
   # "누가 승인했고 왜 유예하는가"가 비어 있는 항목이 통과한다. 특히 `retire:<경로>` 승인은
   # 검사를 영구히 없애는 결정이라, 책임자와 근거가 없으면 그냥 조용한 삭제와 같아진다.
-  n_own=$(printf '%s\n' "$sup" | awk '/^ *owner:/{c++} END{print c+0}')
-  n_rsn=$(printf '%s\n' "$sup" | awk '/^ *reason:/{c++} END{print c+0}')
+  count_sup_field() { printf '%s\n' "$sup" | awk -v f="$1" '$0 ~ "^ *" f ":" {c++} END{print c+0}'; }
+  n_own=$(count_sup_field owner)
+  n_rsn=$(count_sup_field reason)
   if [ "$n_check" -ne "$n_own" ]; then
     block "억제 항목 ${n_check}건 중 owner 가 ${n_own}건뿐 — 책임자 없는 유예는 승인이 아니다 (P13)"
   fi

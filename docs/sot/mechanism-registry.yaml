@@ -138,3 +138,13 @@
   target: "staged_any=$(git diff --cached --name-only)"
   stage: "pre-commit"
   required: true
+- id: "suppression-owner-required"
+  path: "hooks/pre-commit"
+  target: "count_sup_field() {"
+  stage: "pre-commit"
+  required: true
+- id: "retire-approval-required"
+  path: "scripts/verify/check-workflow-deletion.sh"
+  target: "collect_retire_approvals() {"
+  stage: "pre-commit"
+  required: true

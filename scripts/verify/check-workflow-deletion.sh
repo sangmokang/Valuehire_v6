@@ -106,11 +106,16 @@ comm -23 "$TMP/before" "$TMP/after" > "$TMP/gone" || die_setup "집합 비교 �
 
 # 은퇴 승인 목록 — suppressions.yaml 의 `check: "retire:<경로>"` 항목.
 # 커밋될 내용(인덱스)에서 읽는다. 작업트리에서 읽으면 승인을 스테이징하지 않고도 통과한다.
-: > "$TMP/approved" || die_setup "작업 파일을 열 수 없다 ($TMP/approved)"
-if git ls-files --error-unmatch -- suppressions.yaml >/dev/null 2>&1; then
+collect_retire_approvals() {
+  : > "$1" || die_setup "작업 파일을 열 수 없다 ($1)"
+  git ls-files --error-unmatch -- suppressions.yaml >/dev/null 2>&1 || return 0
   git show :suppressions.yaml 2>/dev/null \
     | sed -n 's/^-[[:space:]]*check:[[:space:]]*["'"'"']\{0,1\}retire:\([^"'"'"']*\)["'"'"']\{0,1\}[[:space:]]*$/\1/p' \
-    | LC_ALL=C sort -u > "$TMP/approved" || die_setup "은퇴 승인 목록을 읽지 못했다"
+    | LC_ALL=C sort -u > "$1" || die_setup "은퇴 승인 목록을 읽지 못했다"
+}
+collect_retire_approvals "$TMP/approved"
+if false; then
+  :
 fi
 
 checked=$(awk 'NF{c++} END{print c+0}' "$TMP/before")
