@@ -63,15 +63,30 @@ install_from_worktree() {
 FIXTURES="scripts/verify/fixtures/secret-canaries/positive.txt scripts/verify/fixtures/secret-canaries/negative.txt"
 install_from_worktree "$CHECKER_SRC" $FIXTURES || {
   echo "FAIL: 검사기·고정물 설치 실패"; echo "CHECKED: 0"; exit 2; }
+# 작업트리 사본을 clone 에 **커밋**한다. 검사기가 인덱스와 HEAD 를 읽으므로 cp 만으로는
+# 판정 입력이 바뀌지 않는다 — clone 의 HEAD·인덱스에는 커밋된 옛 판본이 그대로 남아,
+# 지금 고치는 중인 판본이 아니라 옛 조합을 시험하게 된다(2026-09-09 에 변이 4종이 전부
+# 생존한 원인이 이 어긋남이었다). 훅은 끄고 커밋한다 — 설치 자체는 시연이 아니다.
+# 작업트리와 clone 의 HEAD 가 이미 같으면 커밋할 것이 없다 — 그것은 정상이다.
+# `nothing to commit` 종료값을 설치 실패로 세면 손대지 않은 상태에서 시연이 0건이 된다.
+( cd "$CLONE" && git add -A -- "$CHECKER_SRC" $FIXTURES \
+  && { git diff --cached --quiet \
+       || git -c user.name=a -c user.email=a@b -c core.hooksPath=/dev/null \
+            commit -qm "작업트리 사본 설치 (시연 기준점)"; } ) >"$SANDBOX/seed.err" 2>&1 || {
+  echo "FAIL: 작업트리 사본 커밋 실패 — $(head -2 "$SANDBOX/seed.err" | tr '\n' ' ')"
+  echo "CHECKED: 0"; exit 2; }
 BASE=$(cd "$CLONE" && git rev-parse HEAD) || {
   echo "FAIL: 기준 커밋을 읽지 못했다"; echo "CHECKED: 0"; exit 2; }
+# 설치본이 기준 커밋에 들어갔는지 확인한다. 안 들어갔으면 모든 시연이 옛 판본을 본다.
+( cd "$CLONE" && git diff --quiet "$BASE" -- "$CHECKER_SRC" $FIXTURES ) || {
+  echo "FAIL: 설치본이 기준 커밋에 반영되지 않았다 — 시연 전체가 무효다"
+  echo "CHECKED: 0"; exit 2; }
 
-run_case() {  # <설명> <block|pass> <셋업 함수명>
-  local desc="$1" expect="$2" setup="$3" log="$SANDBOX/log.$checked"
+run_case() {  # <설명> <block|pass> <셋업 함수명> [기대 종료값 — block 일 때만, 기본 1]
+  local desc="$1" expect="$2" setup="$3" want_rc="${4:-1}" log="$SANDBOX/log.$checked"
+  # BASE 에 설치본이 커밋돼 있으므로 reset --hard 하나로 작업트리·인덱스·HEAD 가 모두
+  # 지금 판본으로 돌아온다. 따로 다시 덮지 않는다.
   ( cd "$CLONE" && git reset --hard --quiet "$BASE" && git clean -qfdx ) 2>/dev/null
-  # reset/clean 이 작업트리 사본을 되돌리므로 매 시연 직전에 다시 덮는다.
-  install_from_worktree "$CHECKER_SRC" $FIXTURES || {
-    record 1 "$desc" "검사기·고정물 재설치 실패 — 시연 무효"; return; }
   if ! ( cd "$CLONE" && $setup ) >"$SANDBOX/setup.err" 2>&1; then
     record 1 "$desc" "셋업 실패 — $(head -1 "$SANDBOX/setup.err")"; return
   fi
@@ -84,6 +99,13 @@ run_case() {  # <설명> <block|pass> <셋업 함수명>
     if [ "$rc" -eq 0 ]; then record 1 "$desc" "차단되지 않았다 (commit rc=0)"; return; fi
     if ! grep -q "$BLOCK_MARK" "$log"; then
       record 1 "$desc" "차단은 됐으나 이 검사의 사유가 아니다 (rc=$rc): $(grep -m1 BLOCKED "$log" | head -c 120)"
+      return
+    fi
+    # 실행 불가(exit 2)와 판정 실패(exit 1)를 가른다. 둘을 같은 신호로 세면
+    # mktemp 거부·고정물 부재 같은 환경 사고가 "차단됨"으로 계수되고,
+    # 구현이 0줄이어도 전부 초록이 난다(counter-AC 5).
+    if ! grep -q "exit=$want_rc" "$log"; then
+      record 1 "$desc" "차단 사유의 종료값이 다르다 (기대 exit=$want_rc): $(grep -m1 -o 'exit=[0-9]*' "$log")"
       return
     fi
     local orc=0
@@ -166,6 +188,54 @@ PYEOF
   git add "$CANARY_POS"
 }
 run_case "카나리를 하한 미만으로 줄이면 차단된다" block setup_shrink_canary
+
+# 시연 7 (양성 · stage/worktree 미끼) — 삭제를 stage 하고 **작업트리만 되돌린다**.
+# 2026-09-11 Codex 적대검증 C3 실측: staged 유효줄 2 / worktree 유효줄 4 인 상태에서
+# 커밋이 rc=0 으로 통과했다. 판정기가 커밋될 내용이 아니라 화면에 열린 파일을 봤다.
+# 이 시연이 없으면 검사기를 작업트리 읽기로 되돌려도 전부 초록이다.
+setup_stage_delete_restore_worktree() {
+  python3 - "$CANARY_POS" <<'PYEOF'
+import sys
+p = sys.argv[1]
+lines = open(p).read().splitlines(True)
+head = [l for l in lines if l.startswith('#')]
+body = [l for l in lines if not l.startswith('#') and l.strip()]
+assert len(body) > 2, "줄일 대상이 부족하다"
+open(p, 'w').write(''.join(head + body[:2]))
+PYEOF
+  git add "$CANARY_POS"
+  # 화면(작업트리)만 원래대로 되돌린다 — 커밋될 내용은 줄어든 채로 남는다.
+  git show "HEAD:$CANARY_POS" > "$CANARY_POS" || return 1
+  git diff --quiet -- "$CANARY_POS" && return 1   # 작업트리가 HEAD 와 같아야 미끼가 성립한다
+  return 0
+}
+run_case "삭제를 stage 하고 작업트리만 복원해도 차단된다 (인덱스 판정)" block setup_stage_delete_restore_worktree
+
+# 시연 8 (양성 · 하한 위 감소) — 카나리를 하한 위에서 한 건만 줄인다(규칙은 그대로).
+# 하한만 두면 하한 위에서의 감소가 자유롭다. 실측으로 4 → 3 이 통과했고, 그 상태에서
+# 수량자 상향이 "탐지력 유지"로 넘어갔다 — 감시 대상이 줄어든 것을 판정기가 못 봤다.
+setup_shrink_canary_above_floor() {
+  python3 - "$CANARY_POS" <<'PYEOF'
+import sys
+p = sys.argv[1]
+lines = open(p).read().splitlines(True)
+head = [l for l in lines if l.startswith('#')]
+body = [l for l in lines if not l.startswith('#') and l.strip()]
+assert len(body) >= 4, "하한 위에서 줄이려면 최소 4건이 필요하다"
+open(p, 'w').write(''.join(head + body[:-1]))
+PYEOF
+  git add "$CANARY_POS"
+}
+run_case "규칙은 그대로 둔 채 카나리만 한 건 줄이면 차단된다 (하한 위)" block setup_shrink_canary_above_floor
+
+# 시연 9 (구분 · 실행 불가) — 고정물을 인덱스에서 통째로 없앤다.
+# fail-closed 로 차단되기는 하지만 그것은 **판정**이 아니라 **실행 불가**다(exit 2).
+# 둘을 같은 신호로 세면 mktemp 거부·고정물 부재 같은 환경 사고가 "차단됨"으로 계수되고,
+# 구현이 0줄이어도 전부 초록이 난다. 이 시연은 두 신호가 실제로 갈라지는지를 본다.
+setup_remove_fixture_from_index() {
+  git rm -q --cached "$CANARY_POS"
+}
+run_case "고정물이 인덱스에 없으면 실행 불가로 끊긴다 (exit 2 · 판정 실패와 구분)" block setup_remove_fixture_from_index 2
 
 # 시연 7 (배선) — 검사기가 있어도 훅이 부르지 않으면 무방비다.
 if grep -q 'check-secret-detection-regression\.sh' hooks/pre-commit; then
