@@ -30,14 +30,22 @@ cd "$REPO" || die "저장소 루트로 이동할 수 없다"
 
 TMP=$(mktemp -d) || die "임시 디렉터리를 만들 수 없다"
 trap 'rm -rf "$TMP"' EXIT
-for f in base head pos neg; do : > "$TMP/$f" || die "작업 파일을 열 수 없다 ($TMP/$f)"; done
+for f in base head pos neg pos.raw neg.raw err; do : > "$TMP/$f" || die "작업 파일을 열 수 없다 ($TMP/$f)"; done
 
 # 패턴 정제 — verify.sh:40 과 **글자 그대로 같은 방식**이어야 한다.
 # 인라인 주석을 자르면 안 된다. 패턴 자신이 '#' 를 포함하고(끝의 인라인 주석을 허용하는
 # 규칙들), 그것을 자르면 문자 클래스가 깨져 grep 이 "brackets not balanced" 로 죽는다.
 # 정제 방식이 갈리면 이 검사와 실제 스캔이 다른 규칙 집합을 보게 된다 —
 # 판정기가 2벌이 되는 것이고, 이 저장소는 그것으로 이미 한 번 갈렸다(2026-08-07).
-clean() { tr -d '\r' | grep -vE '^[[:space:]]*(#|$)'; }
+# grep 의 종료값 1 은 "남은 줄이 없음"이고, 주석뿐인 파일·빈 파일에서는 **정상 입력**이다.
+# 2 이상만 실행 오류다. 둘을 섞으면 빈 규칙 파일이 "읽지 못했다"(exit 2 · 실행 불가)로
+# 둔갑해, 규칙을 통째로 비우는 약화가 판정이 아니라 환경 사고로 보고된다(2026-09-11 실측).
+clean() {
+  local rc=0
+  tr -d '\r' | grep -vE '^[[:space:]]*(#|$)' || rc=$?
+  if [ "$rc" -gt 1 ]; then return "$rc"; fi
+  return 0
+}
 
 # 기준: HEAD 의 패턴. 첫 커밋이면 빈 집합(그때는 비교할 기준이 없으므로 통과).
 if git rev-parse --verify --quiet HEAD >/dev/null; then
@@ -58,9 +66,23 @@ if [ ! -s "$TMP/head" ]; then
 fi
 
 # 카나리 조립 — fixture 는 <설명>\t<앞>\t<뒤> 로 쪼개 두었다(파일 자신이 스캔에 걸리지 않게)
-assemble() {  # <fixture> <출력>
+#
+# 고정물은 **인덱스(커밋될 내용)** 에서 읽는다. 작업트리 파일을 직접 읽으면 다음으로 우회된다:
+#   git rm --cached 로 카나리 삭제를 stage → 작업트리 파일은 원래대로 복원 → commit
+#   (2026-09-11 실측: staged 유효줄 2 / worktree 유효줄 4 인 상태에서 rc=0 으로 통과했고
+#    하한 3건도 함께 무력화됐다. 판정기가 커밋될 내용이 아니라 화면에 열린 파일을 봤다.)
+# 패턴 쪽은 이미 `git show :<path>` 로 읽고 있었다 — 고정물만 작업트리를 봤다.
+read_indexed() {  # <경로> <출력>
+  git ls-files --error-unmatch -- "$1" >/dev/null 2>&1 \
+    || die "카나리 고정물이 인덱스에 없다 — $1 (작업트리 직접 읽기는 금지다)"
+  # 오류 메시지를 버리지 않는다 — 무엇 때문에 못 읽었는지가 복구의 출발점이다.
+  if ! git show ":$1" > "$2" 2>"$TMP/err"; then
+    die "인덱스에서 고정물을 읽지 못했다 — $1: $(head -1 "$TMP/err")"
+  fi
+}
+assemble() {  # <고정물 내용 파일> <출력>
   local src="$1" out="$2"
-  [ -f "$src" ] || die "카나리 고정물이 없다 — $src"
+  [ -f "$src" ] || die "카나리 고정물 내용을 읽을 수 없다 — $src"
   : > "$out" || die "작업 파일을 열 수 없다 ($out)"
   local desc a b
   while IFS=$'\t' read -r desc a b; do
@@ -76,24 +98,48 @@ assemble() {  # <fixture> <출력>
 # 복원하지 못해 양성이 4건 → 3건이 되었고, 그 상태에서 수량자 상향이 "탐지력 유지"로
 # 통과했다. 검사기가 자기 입력이 줄어든 것을 못 보면 판정 전체가 조용히 무의미해진다.
 CANARY_MIN=3
-count_canary() { awk 'NF && $0 !~ /^#/ {c++} END{print c+0}' "$1"; }
-guard_canary_shrink() {  # <fixture 경로> <현재 조립본>
-  local src="$1" now="$2" base_n now_n
+# 하한 위반과 기준 대비 감소는 **판정 실패(exit 1)** 다. 실행 불가(exit 2)와 섞지 않는다 —
+# 섞으면 "임시 디렉터리를 못 만들었다"와 "카나리를 지웠다"가 같은 신호가 되고,
+# 실행 불가를 차단으로 계수하는 순간 구현 0줄에서도 초록이 난다(counter-AC 5).
+shrink_block() {  # <메시지>
+  printf 'BLOCKED: 비밀 탐지 카나리가 줄었다 — %s\n' "$1"
+  printf '         카나리가 조용히 줄면 다음 축소를 감시할 수 없다. 서서히 무장해제된다.\n'
+  printf '         정당한 축소라면 규칙과 카나리를 **함께** 줄여라. 그 삭제는 diff 에 남는다.\n'
+  echo "CHECKED: 0"
+  exit 1
+}
+guard_canary_shrink() {  # <fixture 경로> <현재 조립본> <허용 감소분>
+  local src="$1" now="$2" allow="$3" base_n now_n drop
   now_n=$(awk 'NF{c++} END{print c+0}' "$now")
-  [ "$now_n" -ge "$CANARY_MIN" ] || die "카나리가 ${now_n}건뿐이다 (하한 ${CANARY_MIN}) — $src"
-  if git rev-parse --verify --quiet HEAD >/dev/null \
-     && git cat-file -e "HEAD:$src" 2>/dev/null; then
-    base_n=$(git show "HEAD:$src" 2>/dev/null | awk 'NF && $0 !~ /^#/ {c++} END{print c+0}')
-    if [ "$now_n" -lt "$base_n" ]; then
-      printf 'NOTE: 카나리가 기준보다 줄었다 (%s: %d → %d) — 규칙 축소와 짝인지 확인하라.\n' \
-        "$src" "$base_n" "$now_n"
-    fi
+  [ "$now_n" -ge "$CANARY_MIN" ] \
+    || shrink_block "$src 가 ${now_n}건뿐이다 (하한 ${CANARY_MIN})"
+  # 하한만 두면 하한 위에서의 감소가 자유롭다 — 4 → 3 이 실제로 통과했고, 그 상태에서
+  # 수량자 상향이 "탐지력 유지"로 넘어갔다. 그래서 기준(HEAD)과도 대조한다.
+  # 다만 **규칙을 함께 줄이는 정당한 축소**는 막지 않는다. 허용 감소분은 규칙이 줄어든
+  # 수만큼이고(양성), 음성 카나리는 대응하는 규칙이 없으므로 0 이다.
+  # 첫 커밋이거나 기준에 고정물이 없는 상태는 **정상**이다. 비교할 기준이 없을 뿐이고,
+  # 오류를 삼키는 것이 아니다 — 그 의도가 제어 흐름에 드러나게 쓴다.
+  if ! git rev-parse --verify --quiet HEAD >/dev/null; then
+    return 0
+  fi
+  if ! git cat-file -e "HEAD:$src" 2>/dev/null; then
+    return 0
+  fi
+  base_n=$(git show "HEAD:$src" 2>/dev/null | awk 'NF && $0 !~ /^#/ {c++} END{print c+0}')
+  drop=$((base_n - now_n))
+  if [ "$drop" -gt "$allow" ]; then
+    shrink_block "$src 가 기준보다 ${drop}건 줄었다 (${base_n} → ${now_n}) · 규칙 축소로 정당화되는 감소는 ${allow}건뿐이다"
   fi
 }
-assemble "$FIX/positive.txt" "$TMP/pos"
-assemble "$FIX/negative.txt" "$TMP/neg"
-guard_canary_shrink "$FIX/positive.txt" "$TMP/pos"
-guard_canary_shrink "$FIX/negative.txt" "$TMP/neg"
+read_indexed "$FIX/positive.txt" "$TMP/pos.raw"
+read_indexed "$FIX/negative.txt" "$TMP/neg.raw"
+assemble "$TMP/pos.raw" "$TMP/pos"
+assemble "$TMP/neg.raw" "$TMP/neg"
+# 규칙이 줄어든 만큼은 양성 카나리도 함께 줄일 수 있다(정당한 축소 경로).
+rule_drop=$(( $(awk 'NF{c++} END{print c+0}' "$TMP/base") - $(awk 'NF{c++} END{print c+0}' "$TMP/head") ))
+[ "$rule_drop" -lt 0 ] && rule_drop=0
+guard_canary_shrink "$FIX/positive.txt" "$TMP/pos" "$rule_drop"
+guard_canary_shrink "$FIX/negative.txt" "$TMP/neg" 0
 
 # hit <패턴파일> <값> → 0 = 잡힘 / 1 = 안 잡힘 / 2 = 실행오류
 hit() {
