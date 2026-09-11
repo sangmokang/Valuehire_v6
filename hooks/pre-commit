@@ -176,6 +176,30 @@ if printf '%s\n' "$staged_any" | grep -qE '^(\.secret-patterns\.default|scripts/
   fi
 fi
 
+# ── 3-d) 비밀 규칙 카나리 커버리지 (P13 · 2026-09-11 Codex 적대검증 C2) ──────
+# 위 3-c 는 "기준에서 잡히던 값이 계속 잡히는가"만 본다. 그래서 **어떤 카나리도 대표하지
+# 않는 규칙**은 통째로 사라져도 검출 집합이 안 변해 조용히 통과한다. 실측: 규칙 25개 중
+# 카나리에 연결된 것은 4개뿐이었고, 나머지 21개는 지워도 3-c 가 초록이었다.
+# manifest(capability → 카나리 → 규칙 id)를 정본으로 두고, 적힌 대로 실제 잡히는지
+# 실행으로 확인한다 — 서류만 맞추면 통과하는 검사는 검사가 아니다.
+COVER_CHECKER=scripts/verify/check-secret-canary-coverage.sh
+if printf '%s\n' "$staged_any" | grep -qE '^(\.secret-patterns\.default|scripts/verify/fixtures/secret-canaries/)'; then
+  if [ ! -x "$COVER_CHECKER" ]; then
+    block "$COVER_CHECKER 없음 또는 실행 권한 없음 — 커버리지 판정 불가 (fail-closed)"
+  else
+    cout=$(mktemp) || block "임시 파일 생성 실패 — 커버리지 판정 근거를 모을 수 없다 (fail-closed)"
+    if [ -n "${cout:-}" ] && [ -f "$cout" ]; then
+      crc=0
+      bash "$COVER_CHECKER" >"$cout" 2>&1 || crc=$?
+      if [ "$crc" -ne 0 ]; then
+        cat "$cout" >&2
+        block "비밀 규칙 카나리 커버리지 (check-secret-canary-coverage exit=$crc)"
+      fi
+      rm -f "$cout"
+    fi
+  fi
+fi
+
 # ── 4) 만료일 없는 억제 (P13 ③ · 98d923f 35일 방치 재현 방지) ─────────────────
 if printf '%s\n' "$staged" | grep -qx 'suppressions.yaml'; then
   sup=$(git show ":suppressions.yaml")

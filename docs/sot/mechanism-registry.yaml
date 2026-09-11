@@ -193,3 +193,19 @@
   stage: "ci"
   ci_mirror_job: "verify"
   required: true
+- id: "secret-canary-coverage-precommit"
+  path: "hooks/pre-commit"
+  target: "COVER_CHECKER=scripts/verify/check-secret-canary-coverage.sh"
+  stage: "pre-commit"
+  required: true
+- id: "secret-canary-coverage-acceptance-ci"
+  path: ".github/workflows/verify.yml"
+  target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-secret-canary-coverage.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
+- id: "secret-canary-coverage-manifest"
+  path: "scripts/verify/check-secret-canary-coverage.sh"
+  target: "read_manifest() {"
+  stage: "pre-commit"
+  required: true
