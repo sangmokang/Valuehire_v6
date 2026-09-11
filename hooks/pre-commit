@@ -18,7 +18,12 @@ REPO=$(git rev-parse --show-toplevel)
 cd "$REPO"
 
 fail=0
+# 차단은 둘로 나뉜다. 섞으면 "검사를 못 돌렸다"가 "검사가 위반을 찾았다"로 계수되고,
+# 검사기·고정물·임시 디렉터리가 망가진 상태가 방어 성공으로 장부에 남는다(P13 counter-AC).
+#   block()            — 판정: 검사가 돌았고 위반을 찾았다
+#   block_unrunnable() — 실행 불가: 검사를 돌리지 못했다. 막기는 하되(fail-closed) 판정은 아니다
 block() { printf 'BLOCKED: %s\n' "$1" >&2; fail=1; }
+block_unrunnable() { printf 'BLOCKED(실행불가): %s\n' "$1" >&2; fail=1; }
 
 # R(rename)을 넣지 않으면 `git mv notes.txt leak.db` 가 staged 목록에서 빠져
 # 훅을 그대로 통과한다(2026-08-09 실측). 이름만 바꿔도 내용은 그대로다.
@@ -39,7 +44,7 @@ scan() {
   local rc=0
   git show ":$f" | grep -q "$@" || rc=$?
   if [ "$rc" -gt 1 ]; then
-    block "검사 실행 실패 — $desc / $f (grep exit=$rc · fail-closed)"
+    block_unrunnable "검사 실행 실패 — $desc / $f (grep exit=$rc · fail-closed)"
     return 1
   fi
   return "$rc"
@@ -52,7 +57,7 @@ scan_added() {
   git diff --cached -U0 -- "$f" | sed -n 's/^+//p' | sed '/^++/d' \
     | sed 's/[[:space:]]*#.*//' | grep -q "$@" || rc=$?
   if [ "$rc" -gt 1 ]; then
-    block "검사 실행 실패 — $desc / $f (grep exit=$rc · fail-closed)"
+    block_unrunnable "검사 실행 실패 — $desc / $f (grep exit=$rc · fail-closed)"
     return 1
   fi
   return "$rc"
@@ -69,7 +74,7 @@ clean_patterns() { sed -e 's/[[:space:]]*#.*//' -e '/^[[:space:]]*$/d' "$1"; }
 # 내용은 작업트리에서 읽으므로 다음으로 우회된다(V1 2026-08-07 실측):
 #   git add <비밀> → 작업트리만 깨끗하게 덮어씀 → git commit → 통과, 커밋에는 비밀이 들어감
 if [ ! -f verify.sh ]; then
-  block "verify.sh 없음 — 비밀 스캔 불가 (fail-closed)"
+  block_unrunnable "verify.sh 없음 — 비밀 스캔 불가 (fail-closed)"
 else
   # SECRET_PATTERNS_FILE 을 비워 고정한다. 상속하면 호출자가
   #   SECRET_PATTERNS_FILE=/tmp/weak.txt git commit
@@ -79,7 +84,11 @@ else
   vrc=0
   SECRET_PATTERNS_FILE= VERIFY_SCAN_SOURCE=index bash verify.sh >/dev/null 2>&1 || vrc=$?
   if [ "$vrc" -ne 0 ]; then
-    block "비밀 스캔 실패 (verify.sh --index exit=$vrc). 상세: VERIFY_SCAN_SOURCE=index bash verify.sh"
+    if [ "$vrc" -ge 2 ]; then
+      block_unrunnable "비밀 스캔 실패 (verify.sh --index exit=$vrc). 상세: VERIFY_SCAN_SOURCE=index bash verify.sh"
+    else
+      block "비밀 스캔 실패 (verify.sh --index exit=$vrc). 상세: VERIFY_SCAN_SOURCE=index bash verify.sh"
+    fi
   fi
 fi
 
@@ -100,11 +109,11 @@ done <<< "$staged"
 # ── 3) 검사 약화 (P13 · 48143a7·129f61d 재현 방지) ────────────────────────────
 WEAKEN_FILE=.check-weakening-patterns
 if [ ! -f "$WEAKEN_FILE" ]; then
-  block "$WEAKEN_FILE 없음 — 약화 탐지 불가 (fail-closed)"
+  block_unrunnable "$WEAKEN_FILE 없음 — 약화 탐지 불가 (fail-closed)"
 else
   wf=$(mktemp); clean_patterns "$WEAKEN_FILE" > "$wf"
   if [ ! -s "$wf" ]; then
-    block "$WEAKEN_FILE 에 유효 패턴이 0개 (fail-closed)"
+    block_unrunnable "$WEAKEN_FILE 에 유효 패턴이 0개 (fail-closed)"
   else
     while IFS= read -r f; do
       case "$f" in
@@ -134,16 +143,20 @@ fi
 # 인라인하면 그 규칙을 격리 사본으로 공격하는 인수 검사를 쓸 수 없다.
 DEL_CHECKER=scripts/verify/check-workflow-deletion.sh
 if [ ! -x "$DEL_CHECKER" ]; then
-  block "$DEL_CHECKER 없음 또는 실행 권한 없음 — 삭제 약화 탐지 불가 (fail-closed)"
+  block_unrunnable "$DEL_CHECKER 없음 또는 실행 권한 없음 — 삭제 약화 탐지 불가 (fail-closed)"
 else
-  dout=$(mktemp) || block "임시 파일 생성 실패 — 삭제 약화 판정 근거를 모을 수 없다 (fail-closed)"
+  dout=$(mktemp) || block_unrunnable "임시 파일 생성 실패 — 삭제 약화 판정 근거를 모을 수 없다 (fail-closed)"
   if [ -n "${dout:-}" ] && [ -f "$dout" ]; then
     drc=0
     bash "$DEL_CHECKER" >"$dout" 2>&1 || drc=$?
     if [ "$drc" -ne 0 ]; then
       # 검사기 출력을 그대로 보인다. 사유(경로·스크립트)는 그 안에 있다.
       cat "$dout" >&2
-      block "검사 실행 줄 삭제 (check-workflow-deletion exit=$drc)"
+      if [ "$drc" -ge 2 ]; then
+        block_unrunnable "검사 실행 줄 삭제 (check-workflow-deletion exit=$drc)"
+      else
+        block "검사 실행 줄 삭제 (check-workflow-deletion exit=$drc)"
+      fi
     fi
     rm -f "$dout"
   fi
@@ -161,15 +174,19 @@ DETECT_REG_CHECKER=scripts/verify/check-secret-detection-regression.sh
 # 감시를 무장해제하는 경로가 열린다 — 그 다음 커밋부터는 축소가 자유롭다(2026-09-11 실측).
 if printf '%s\n' "$staged_any" | grep -qE '^(\.secret-patterns\.default|scripts/verify/fixtures/secret-canaries/)'; then
   if [ ! -x "$DETECT_REG_CHECKER" ]; then
-    block "$DETECT_REG_CHECKER 없음 또는 실행 권한 없음 — 탐지력 축소 판정 불가 (fail-closed)"
+    block_unrunnable "$DETECT_REG_CHECKER 없음 또는 실행 권한 없음 — 탐지력 축소 판정 불가 (fail-closed)"
   else
-    sout=$(mktemp) || block "임시 파일 생성 실패 — 탐지력 판정 근거를 모을 수 없다 (fail-closed)"
+    sout=$(mktemp) || block_unrunnable "임시 파일 생성 실패 — 탐지력 판정 근거를 모을 수 없다 (fail-closed)"
     if [ -n "${sout:-}" ] && [ -f "$sout" ]; then
       src=0
       bash "$DETECT_REG_CHECKER" >"$sout" 2>&1 || src=$?
       if [ "$src" -ne 0 ]; then
         cat "$sout" >&2
-        block "비밀 탐지력 축소 (check-secret-detection-regression exit=$src)"
+        if [ "$src" -ge 2 ]; then
+          block_unrunnable "비밀 탐지력 축소 (check-secret-detection-regression exit=$src)"
+        else
+          block "비밀 탐지력 축소 (check-secret-detection-regression exit=$src)"
+        fi
       fi
       rm -f "$sout"
     fi
@@ -185,15 +202,19 @@ fi
 COVER_CHECKER=scripts/verify/check-secret-canary-coverage.sh
 if printf '%s\n' "$staged_any" | grep -qE '^(\.secret-patterns\.default|scripts/verify/fixtures/secret-canaries/)'; then
   if [ ! -x "$COVER_CHECKER" ]; then
-    block "$COVER_CHECKER 없음 또는 실행 권한 없음 — 커버리지 판정 불가 (fail-closed)"
+    block_unrunnable "$COVER_CHECKER 없음 또는 실행 권한 없음 — 커버리지 판정 불가 (fail-closed)"
   else
-    cout=$(mktemp) || block "임시 파일 생성 실패 — 커버리지 판정 근거를 모을 수 없다 (fail-closed)"
+    cout=$(mktemp) || block_unrunnable "임시 파일 생성 실패 — 커버리지 판정 근거를 모을 수 없다 (fail-closed)"
     if [ -n "${cout:-}" ] && [ -f "$cout" ]; then
       crc=0
       bash "$COVER_CHECKER" >"$cout" 2>&1 || crc=$?
       if [ "$crc" -ne 0 ]; then
         cat "$cout" >&2
-        block "비밀 규칙 카나리 커버리지 (check-secret-canary-coverage exit=$crc)"
+        if [ "$crc" -ge 2 ]; then
+          block_unrunnable "비밀 규칙 카나리 커버리지 (check-secret-canary-coverage exit=$crc)"
+        else
+          block "비밀 규칙 카나리 커버리지 (check-secret-canary-coverage exit=$crc)"
+        fi
       fi
       rm -f "$cout"
     fi
@@ -319,7 +340,7 @@ while IFS= read -r f; do
   sz=$(git cat-file -s ":$f" 2>&1) || sz=""
   case "$sz" in
     ''|*[!0-9]*)
-      block "스테이지된 blob 크기를 읽지 못했다 — $f (fail-closed)"
+      block_unrunnable "스테이지된 blob 크기를 읽지 못했다 — $f (fail-closed)"
       ;;
     *)
       if [ "$sz" -gt "$MAX_BYTES" ]; then
@@ -342,9 +363,9 @@ done < <(git diff --cached --name-only -z --diff-filter=ACMR)
 if [ "${#p3_files[@]}" -gt 0 ]; then
   p3_tmp=$(mktemp -d) || p3_tmp=""
   if [ -z "$p3_tmp" ]; then
-    block "P3 임시 검사 공간 생성 실패 (fail-closed)"
+    block_unrunnable "P3 임시 검사 공간 생성 실패 (fail-closed)"
   elif ! git cat-file -e ":scripts/acceptance-silent-failure-lint.sh" 2>/dev/null; then
-    block "P3 린터가 인덱스에 없다 — scripts/acceptance-silent-failure-lint.sh"
+    block_unrunnable "P3 린터가 인덱스에 없다 — scripts/acceptance-silent-failure-lint.sh"
   else
     mkdir -p "$p3_tmp/tree"
     git show ":scripts/acceptance-silent-failure-lint.sh" > "$p3_tmp/lint.sh"
@@ -352,7 +373,7 @@ if [ "${#p3_files[@]}" -gt 0 ]; then
     for f in "${p3_files[@]}"; do
       mkdir -p "$p3_tmp/tree/$(dirname "$f")"
       if ! git show ":$f" > "$p3_tmp/tree/$f"; then
-        block "P3가 스테이지된 파일을 읽지 못했다 — $f"
+        block_unrunnable "P3가 스테이지된 파일을 읽지 못했다 — $f"
         p3_stage_error=1
       fi
     done
@@ -361,7 +382,7 @@ if [ "${#p3_files[@]}" -gt 0 ]; then
       p3_repo=$PWD
       if cd "$p3_tmp/tree"; then
         bash ${p3_tmp}/lint.sh "${p3_files[@]}" > "$p3_tmp/output" 2>&1 || p3_rc=$?
-        cd "$p3_repo" || block "P3 검사 뒤 저장소 루트로 복귀하지 못했다"
+        cd "$p3_repo" || block_unrunnable "P3 검사 뒤 저장소 루트로 복귀하지 못했다"
       else
         p3_rc=2
       fi
@@ -369,7 +390,7 @@ if [ "${#p3_files[@]}" -gt 0 ]; then
         first_hit=$(grep '^FAIL:' "$p3_tmp/output" | head -1 | sed 's/ — .*//')
         block "조용한 실패 패턴 발견 (P3) — ${first_hit:-상세 없음}"
       elif [ "$p3_rc" -ne 0 ]; then
-        block "P3 린터가 판정을 완료하지 못했다 (exit=$p3_rc, fail-closed)"
+        block_unrunnable "P3 린터가 판정을 완료하지 못했다 (exit=$p3_rc, fail-closed)"
       fi
     fi
   fi

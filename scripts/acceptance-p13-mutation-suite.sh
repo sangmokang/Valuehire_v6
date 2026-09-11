@@ -14,7 +14,8 @@
 #   ① 셋업이 실제로 파일을 바꿨는가 — diff 로 확인한다. 변조가 안 걸린 채 "생존"으로
 #      세는 사고가 2026-09-11 세션에만 두 번 났다.
 #   ② 스테이징이 만들어졌는가 — 빈 커밋은 훅 이전에 거부되어 위양성이 된다.
-#   ③ 훅 ON 에서 차단되고 BLOCKED 사유가 남았는가.
+#   ③ 훅 ON 에서 **판정**으로 차단됐는가 — `BLOCKED:` 이지 `BLOCKED(실행불가):` 가 아니어야 한다.
+#      실행 불가를 방어 성공으로 세면 검사기가 망가진 상태가 성공 장부로 남는다.
 #   ④ 훅 OFF 에서는 통과하는가 — 대조군 없이는 "원래 안 되는 커밋"과 구분되지 않는다.
 #
 # 대조군(양성 통제): 아무 해도 없는 변경은 **통과해야** 한다. 전부 막는 벽은 게이트가
@@ -109,15 +110,32 @@ mutate() {
     if [ "$rc" -eq 0 ]; then
       record 1 "$name" "★생존 — 커밋이 통과했다 (rc=0)"; return
     fi
-    if ! grep -q 'BLOCKED:' "$log"; then
+    if ! grep -q 'BLOCKED' "$log"; then
       record 1 "$name" "차단은 됐으나 BLOCKED 사유가 없다 (rc=$rc): $(head -1 "$log" | head -c 120)"; return
+    fi
+    # **판정**으로 막혔는지 본다. 훅은 두 가지를 구분해 찍는다:
+    #   BLOCKED:          — 검사가 돌았고 위반을 찾았다 (판정)
+    #   BLOCKED(실행불가): — 검사를 돌리지 못했다 (fail-closed 지만 판정은 아니다)
+    # 둘을 섞으면 검사기·고정물·임시 디렉터리가 망가진 상태가 "방어 성공"으로 장부에
+    # 남는다. 그러면 무엇을 실제로 막는지 알 수 없고 빈 구현도 초록이 된다(counter-AC 5).
+    # 2026-09-11 V1 적대검증이 이 자리를 정확히 지목했다 — M12 가 exit=2 로 "사망" 처리됐다.
+    if ! grep -q '^BLOCKED:' "$log"; then
+      record 1 "$name" "판정이 아니라 실행 불가로만 막혔다 — $(grep -m1 'BLOCKED(실행불가)' "$log" | head -c 110)"
+      return
     fi
     local orc=0
     ( cd "$CLONE" && git -c core.hooksPath=/dev/null -c user.name=a -c user.email=a@b commit -m mut-off ) >"$log.off" 2>&1 || orc=$?
     if [ "$orc" -ne 0 ]; then
       record 1 "$name" "훅 OFF 에서도 실패했다 (rc=$orc) — 훅이 원인이 아니다"; return
     fi
-    record 0 "$name — 사유: $(grep -m1 'BLOCKED:' "$log" | sed 's/^BLOCKED: //' | head -c 70)"
+    # 실행 불가 차단이 함께 있었으면 숨기지 않고 같이 보인다 — 판정이 있었다는 사실이
+    # 실행 불가가 없었다는 뜻은 아니다.
+    unrun=$(grep -c 'BLOCKED(실행불가)' "$log")
+    if [ "${unrun:-0}" -gt 0 ]; then
+      record 0 "$name — 판정: $(grep -m1 '^BLOCKED:' "$log" | sed 's/^BLOCKED: //' | head -c 55) (실행불가 차단 ${unrun}건 동반)"
+    else
+      record 0 "$name — 판정: $(grep -m1 '^BLOCKED:' "$log" | sed 's/^BLOCKED: //' | head -c 70)"
+    fi
   else
     if [ "$rc" -ne 0 ]; then
       record 1 "$name" "대조군이 차단됐다 (rc=$rc) — 전부 막는 벽은 게이트가 아니다: $(grep -m1 'BLOCKED:' "$log" | head -c 120)"
