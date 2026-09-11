@@ -205,13 +205,13 @@ WU 하나 = 인수 기준 하나 = 워크트리 하나. WU 마다 RED 를 먼저
 | AC-3 인덱스 판정 | PASS | `acceptance-secret-detection-regression.sh` → CHECKED: 12 · 합격 · rc=0 |
 | AC-4 독립 oracle | PASS | `check-secret-canary-coverage.sh --oracle-selftest` → 일치 29/29 · rc=0 |
 | WU-5 변조 스위트 | PASS | `acceptance-p13-mutation-suite.sh` → CHECKED: 20 · 합격 · rc=0 (변조 18종 사망 · 분류기 자기 시험 · 대조군) |
-| 장치 명부 | PASS | `check-mechanism-registry.sh` → CHECKED: 41 · rc=0 |
+| 장치 명부 | PASS | `check-mechanism-registry.sh` → CHECKED: 40 · rc=0 · `acceptance-verify-ac-m.sh` CHECKED: 31 · rc=0 |
 | 비밀 스캔 | PASS | `SECRET_PATTERNS_FILE= bash verify.sh` → PASS · rc=0 |
 | 코딩 원칙 | PASS | `acceptance-principles-check.sh` → VERDICT: PASS · CHECKED: 34 |
 | V1 Codex 적대검증 | FAIL → 대응 `c3287e3` | 아래 적대 검증 로그 · 판정 원문 별도 파일 |
 | V2 새 맥락 재공격 | FAIL(6건) → 대응 `40e49f1`·`cd40b60` | 아래 적대 검증 로그 · 판정 원문 별도 파일 |
 | CI 판정 | NOT_RUN | 2026-09-09 이후 GitHub Actions 가 시작조차 못 함 — 저장소 밖 문제 |
-| 전체 인수 검사 원장 | PASS(조건부) | 인수 검사 전수 → 빨간불 2건 (둘 다 착수 시점과 동일한 환경 원인) |
+| 전체 인수 검사 원장 | PASS(조건부) | 인수 검사 37개 전수(2026-09-11 15:00 · HEAD 353b8b5) → 빨간불 2건. 착수 시점 30개 중 2건과 **동일한 두 건** |
 | 다른 엔진 교차 확인 | PASS | perl 정규식으로 manifest 25건 재대조 → 불일치 0 |
 | 파일 줄수 (P11 hard 600) | PASS | 이번 체인 변경 파일 전부 한도 이하 · 최대 422줄 (hard 초과 0건) |
 
@@ -356,7 +356,7 @@ WU-3(은퇴 승인)은 계약대로 체인 맨 앞 `#74` 에 넣었고, 나머�
 | `acceptance-p13-deletion.sh` | CHECKED: 13 · 합격 |
 | `acceptance-secret-detection-regression.sh` | CHECKED: 12 · 합격 |
 | `acceptance-secret-canary-coverage.sh` | CHECKED: 13 · 합격 |
-| `check-mechanism-registry.sh` | CHECKED: 41 · rc=0 |
+| `check-mechanism-registry.sh` | CHECKED: 40 · rc=0 |
 | `SECRET_PATTERNS_FILE= bash verify.sh` | PASS · rc=0 |
 
 → V2 가 뚫은 규칙 좁히기 공격(`AKIA[0-9A-Z]{16}` → `AKIA1234[0-9A-Z]{12}`)을 격리 사본에서
