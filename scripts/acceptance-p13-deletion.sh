@@ -252,9 +252,11 @@ PYEOF
 }
 run_case "승인 없는 은퇴(스크립트+스텝 동시 삭제)는 차단된다" block setup_retire_without_approval
 
-# 시연 11 (음성 · 승인된 은퇴) — 같은 삭제를 suppressions.yaml 승인과 함께 한다.
-# 이것까지 막으면 검사를 영원히 은퇴시키지 못하는 벽이 된다.
-setup_retire_with_approval() {
+# 시연 11 (양성 · 자기 승인) — 같은 삭제를 **같은 커밋에 쓴 승인**과 함께 한다.
+# 2026-09-11 Codex 적대검증 C1 실측: 이 형태로 233줄짜리 검사가 rc=0 으로 사라졌다.
+# 승인을 인덱스(커밋될 내용)에서 읽으면 지우는 사람이 스스로를 승인할 수 있다 —
+# 자물쇠 옆에 열쇠를 걸어 둔 것과 같다. 승인은 **기준 브랜치에 이미 있던 것**만 센다.
+setup_retire_self_approved() {
   local v="scripts/acceptance-guard-global-skill-files.sh"
   [ -f "$v" ] || return 1
   python3 - "$v" <<'PYEOF'
@@ -267,11 +269,68 @@ assert n != s, "워크플로 스텝 삭제 실패"
 open(p, 'w').write(n)
 exp = (datetime.date.today() + datetime.timedelta(days=30)).isoformat()
 with open('suppressions.yaml', 'a') as f:
-    f.write('\n- check: "retire:%s"\n  reason: >-\n    시연용 승인 — 이 검사를 은퇴시킨다.\n  owner: sangmokang\n  expiry: %s\n  issue: >-\n    시연 전용 항목.\n' % (v, exp))
+    f.write('\n- check: "retire:%s"\n  reason: >-\n    시연용 승인 — 이 검사를 은퇴시킨다.\n  owner: attacker\n  expiry: %s\n  issue: >-\n    시연 전용 항목.\n' % (v, exp))
 PYEOF
   git rm -q "$v" && git add .github/workflows/verify.yml suppressions.yaml
 }
-run_case "승인된 은퇴는 통과한다 (기록만 요구한다)" pass setup_retire_with_approval
+run_case "같은 커밋에 쓴 자기 승인은 차단된다 (선재성)" block setup_retire_self_approved
+
+# 시연 12 (음성 · 선재 승인) — 승인을 **먼저 커밋**하고 다음 커밋에서 삭제한다.
+# 이 경로까지 막으면 검사를 영원히 은퇴시키지 못하는 벽이 된다. 은퇴를 막는 것이
+# 목적이 아니라, 승인이 삭제보다 **먼저** 기록되게 하는 것이 목적이다.
+setup_retire_preapproved() {
+  local v="scripts/acceptance-guard-global-skill-files.sh"
+  [ -f "$v" ] || return 1
+  python3 - "$v" <<'PYEOF'
+import sys, datetime
+v = sys.argv[1]
+exp = (datetime.date.today() + datetime.timedelta(days=30)).isoformat()
+with open('suppressions.yaml', 'a') as f:
+    f.write('\n- check: "retire:%s"\n  reason: >-\n    시연용 승인 — 이 검사를 은퇴시킨다.\n  owner: sangmokang\n  expiry: %s\n  issue: >-\n    시연 전용 항목.\n' % (v, exp))
+PYEOF
+  git add suppressions.yaml
+  git -c user.name=a -c user.email=a@b -c core.hooksPath=/dev/null commit -qm "승인 선행 기록" || return 1
+  python3 - "$v" <<'PYEOF'
+import re, sys
+v = sys.argv[1]
+p = '.github/workflows/verify.yml'
+s = open(p).read()
+n = re.sub(r'\n      - name: [^\n]*\n(?:        [^\n]*\n)*?        run: bash scripts/verify/run-acceptance\.sh ' + re.escape(v) + r'\n', '\n', s, count=1)
+assert n != s, "워크플로 스텝 삭제 실패"
+open(p, 'w').write(n)
+PYEOF
+  git rm -q "$v" && git add .github/workflows/verify.yml
+}
+run_case "선재 승인 뒤 다음 커밋의 은퇴는 통과한다 (정당한 경로)" pass setup_retire_preapproved
+
+# 시연 13 (양성 · 항목 스키마) — 승인은 HEAD 에 선재하지만 owner 가 비어 있다.
+# 필드를 파일 전체에서 **개수로만** 세면 앞 항목의 owner 를 빌려 쓰는 조합이 통과한다.
+# hooks/pre-commit 의 총량 검사가 그 형태이고, 게다가 이 커밋은 suppressions.yaml 을
+# 스테이징하지 않으므로 그 검사가 아예 돌지 않는다 — 항목 경계를 세는 쪽이 필요하다.
+setup_retire_preapproved_bad_schema() {
+  local v="scripts/acceptance-guard-global-skill-files.sh"
+  [ -f "$v" ] || return 1
+  python3 - "$v" <<'PYEOF'
+import sys, datetime
+v = sys.argv[1]
+exp = (datetime.date.today() + datetime.timedelta(days=30)).isoformat()
+with open('suppressions.yaml', 'a') as f:
+    f.write('\n- check: "retire:%s"\n  reason: >-\n    시연용 승인 — owner 가 비었다.\n  owner:\n  expiry: %s\n  issue: >-\n    시연 전용 항목.\n' % (v, exp))
+PYEOF
+  git add suppressions.yaml
+  git -c user.name=a -c user.email=a@b -c core.hooksPath=/dev/null commit -qm "스키마 위반 승인 선행 기록" || return 1
+  python3 - "$v" <<'PYEOF'
+import re, sys
+v = sys.argv[1]
+p = '.github/workflows/verify.yml'
+s = open(p).read()
+n = re.sub(r'\n      - name: [^\n]*\n(?:        [^\n]*\n)*?        run: bash scripts/verify/run-acceptance\.sh ' + re.escape(v) + r'\n', '\n', s, count=1)
+assert n != s, "워크플로 스텝 삭제 실패"
+open(p, 'w').write(n)
+PYEOF
+  git rm -q "$v" && git add .github/workflows/verify.yml
+}
+run_case "owner 가 빈 선재 승인은 차단된다 (항목 단위 스키마)" block setup_retire_preapproved_bad_schema
 
 # 시연 12 (배선) — 검사기가 존재해도 훅이 부르지 않으면 무방비다.
 # 몽키패치로 치워 둔 함수가 시험 0건이 되는 것을 막는다(2026-08-27 PR#54 교훈).
