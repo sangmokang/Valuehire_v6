@@ -149,6 +149,31 @@ else
   fi
 fi
 
+# ── 3-c) 비밀 탐지력 축소 (P13 · 2026-09-10 Codex 적대검증 반례) ──────────────
+# 위 3) 은 추가된 줄을 일반 약화 리터럴 목록과 대조한다. 비밀 규칙 파일에는 그 방식이
+# 원리적으로 통하지 않는다 — 규칙 **삭제**는 추가된 줄이 없어 입력에 들어오지도 않고,
+# 수량 하한을 {16} → {99} 로 올리는 **수정**은 어떤 약화 리터럴과도 일치하지 않는다.
+# 실측: AKIA 규칙을 지운 커밋이 통과했고 **바로 다음 커밋에서 실제 AWS 키가 통과했다**.
+# 그래서 문법이 아니라 **무엇을 잡는가**로 판정한다 — 기준(HEAD) 패턴과 커밋될 패턴으로
+# 카나리를 각각 돌려 검출 집합을 비교한다.
+DETECT_REG_CHECKER=scripts/verify/check-secret-detection-regression.sh
+if printf '%s\n' "$staged_any" | grep -qx '.secret-patterns.default'; then
+  if [ ! -x "$DETECT_REG_CHECKER" ]; then
+    block "$DETECT_REG_CHECKER 없음 또는 실행 권한 없음 — 탐지력 축소 판정 불가 (fail-closed)"
+  else
+    sout=$(mktemp) || block "임시 파일 생성 실패 — 탐지력 판정 근거를 모을 수 없다 (fail-closed)"
+    if [ -n "${sout:-}" ] && [ -f "$sout" ]; then
+      src=0
+      bash "$DETECT_REG_CHECKER" >"$sout" 2>&1 || src=$?
+      if [ "$src" -ne 0 ]; then
+        cat "$sout" >&2
+        block "비밀 탐지력 축소 (check-secret-detection-regression exit=$src)"
+      fi
+      rm -f "$sout"
+    fi
+  fi
+fi
+
 # ── 4) 만료일 없는 억제 (P13 ③ · 98d923f 35일 방치 재현 방지) ─────────────────
 if printf '%s\n' "$staged" | grep -qx 'suppressions.yaml'; then
   sup=$(git show ":suppressions.yaml")

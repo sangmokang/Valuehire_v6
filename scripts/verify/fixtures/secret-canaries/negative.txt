@@ -1,0 +1,5 @@
+# 잡히면 안 되는 값 (오탐 대조). 같은 조립 형식.
+평범한 설정값	WEBHOOK_RETRY_INTERVAL_MS=	300000
+버전 문자열	APP_VERSION=	v2.1.0-rc1
+서비스 이름	SERVICE_NAME=	n8n-prod-01
+날짜	BUILD_DATE=	2026-09-10

@@ -1,0 +1,6 @@
+# 반드시 잡혀야 하는 값. <PREFIX>|<나머지> 형식으로 조립한다 (이 파일 자신이 비밀 스캔에 걸리지 않게).
+# 형식: <설명>\t<앞조각>\t<뒷조각>
+AWS 액세스 키 ID	AKI	A1234567890ABCDEF
+GitHub 개인 토큰	ghp_	abcdefghijklmnopqrstuvwxyz0123456789
+Slack 봇 토큰	xoxb-	123456789012-1234567890123-abcdefghijklmnopqrstuvwx
+개인키 헤더	-----BEG	IN RSA PRIVATE KEY-----

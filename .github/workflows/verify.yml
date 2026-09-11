@@ -238,6 +238,12 @@ jobs:
         # 이 검사는 워크플로를 실제 YAML 로 파싱해 조건부·오류무시 스텝을 구조로 막는다.
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-ci-step-integrity.sh
 
+      - name: 인수 검사 secret-detection-regression (비밀 탐지력이 줄면 빨개지는가)
+        # P13 약화 탐지는 추가된 줄을 약화 리터럴 목록과 대조한다. 비밀 규칙 파일에는
+        # 그 방식이 원리적으로 통하지 않는다 — 삭제는 추가 줄이 없고, {16}→{99} 수정은
+        # 어떤 약화 리터럴과도 일치하지 않는다. 2026-09-10 Codex 적대검증 반례.
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-secret-detection-regression.sh
+
       - name: 인수 검사 p13-deletion (워크플로 검사 줄을 지우지 못하는가)
         # 위 ci-step-integrity 는 자기 계약에 "스텝 자체를 삭제하는 것은 막지 못한다"고
         # 적어 두었고, pre-push 의 실행줄 검사는 DEFERRED 와 PUSH-PERFORMING 선언
