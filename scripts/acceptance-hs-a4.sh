@@ -225,7 +225,7 @@ cp verify.sh .secret-patterns.default .check-weakening-patterns .gitignore "$tmp
 # 차단하므로(P20), 픽스처가 의존물을 빠뜨리면 이 대조군이 "정상 파일까지 차단됨"으로
 # 빨개진다 — 훅에 의존을 추가할 때 이 목록도 같이 늘려야 한다.
 mkdir -p "$tmp/scripts/verify"
-for dep in scripts/verify/check-workflow-deletion.sh; do
+for dep in scripts/verify/check-workflow-deletion.sh scripts/verify/suppression-approvals.awk; do
   [ -f "$dep" ] && cp "$dep" "$tmp/$dep"
 done
 chmod +x "$tmp/hooks/pre-commit" "$tmp/hooks/pre-push"

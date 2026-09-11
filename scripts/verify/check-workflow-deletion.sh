@@ -290,11 +290,19 @@ fi
 # **저장소 내용**이 만든 것이고, 공격자가 도달시킬 수 있다. 실측(2026-09-11 V2 적대검증):
 # 워크플로를 비운 뒤에는 332줄짜리 보호 스크립트를 BLOCKED 한 줄 없이 지울 수 있었다.
 # 래퍼(run-acceptance)는 CHECKED 0 을 거부하지만 훅은 이 검사기를 직접 부른다.
+# 워크플로가 하나도 없는 저장소는 정상일 수 있다(최소 픽스처·신규 저장소). 문제는
+# **인수 스크립트는 있는데 어떤 워크플로도 그것을 부르지 않는** 상태다 — 그 상태에 한 번
+# 도달하면 그 뒤로 보호 스크립트가 전부 무방비가 된다(2026-09-11 V2 실측: 332줄짜리
+# 스크립트가 BLOCKED 한 줄 없이 사라졌다). 그래서 "0건"이 아니라 "지킬 것이 있는데 0건"을 본다.
 if [ "$checked" -eq 0 ]; then
-  printf 'BLOCKED: %s — %s 에서 검사 실행 줄이 한 건도 뽑히지 않았다.\n' "$BLOCK_MARK" "$WF_DIR"
-  printf '         검사 대상 0개는 합격이 아니다 — 이 상태에서는 보호 스크립트를 마음대로 지울 수 있다.\n'
-  echo "CHECKED: 0"
-  exit 1
+  guarded=$(git ls-files --cached -- 'scripts/acceptance-*.sh' | awk 'NF{c++} END{print c+0}')
+  if [ "$guarded" -gt 0 ]; then
+    printf 'BLOCKED: %s — %s 에서 검사 실행 줄이 한 건도 뽑히지 않았다.\n' "$BLOCK_MARK" "$WF_DIR"
+    printf '         인수 스크립트는 %s개 있는데 CI 가 하나도 부르지 않는다.\n' "$guarded"
+    printf '         검사 대상 0개는 합격이 아니다 — 이 상태에서는 보호 스크립트를 마음대로 지울 수 있다.\n'
+    echo "CHECKED: 0"
+    exit 1
+  fi
 fi
 
 printf 'PASS: 워크플로 실행 줄 소실 없음\n'
