@@ -228,6 +228,30 @@ PYEOF
 }
 run_case "규칙은 그대로 둔 채 카나리만 한 건 줄이면 차단된다 (하한 위)" block setup_shrink_canary_above_floor
 
+# 시연 (양성 · 하한은 정당한 축소에도 적용된다) — 규칙 2개와 카나리 2개를 함께 줄여
+# 카나리를 2건으로 만든다. 축소 자체는 규칙 감소로 정당화되지만, 카나리가 하한(3건)
+# 아래로 내려가면 남은 규칙을 감시할 표본이 모자란다.
+#
+# 이 시연이 왜 따로 필요한가: 기준 대비 감소 검사가 하한 검사의 경우를 대부분 가린다.
+# 2026-09-11 변이 실측 — CANARY_MIN 을 0 으로 내려도 다른 시연이 전부 초록이었다.
+# 변조가 생존한 것은 하한이 도달 불가라서가 아니라 그것만 판별하는 시연이 없어서였다.
+setup_shrink_below_floor_with_rules() {
+  python3 - "$PATTERNS" "$CANARY_POS" <<'PYEOF'
+import sys
+pat, can = sys.argv[1], sys.argv[2]
+lines = open(pat).read().splitlines(True)
+out = [l for l in lines if not (l.startswith('AKIA') or l.startswith('ASIA'))]
+assert len(out) == len(lines) - 2, "규칙 2개를 지우지 못했다"
+open(pat, 'w').write(''.join(out))
+cl = open(can).read().splitlines(True)
+co = [l for l in cl if not (l.startswith('AWS 액세스') or l.startswith('Slack 봇 토큰'))]
+assert len(co) == len(cl) - 2, "카나리 2개를 지우지 못했다"
+open(can, 'w').write(''.join(co))
+PYEOF
+  git add "$PATTERNS" "$CANARY_POS"
+}
+run_case "정당한 축소라도 카나리가 하한 아래로 내려가면 차단된다" block setup_shrink_below_floor_with_rules
+
 # 시연 9 (구분 · 실행 불가) — 고정물을 인덱스에서 통째로 없앤다.
 # fail-closed 로 차단되기는 하지만 그것은 **판정**이 아니라 **실행 불가**다(exit 2).
 # 둘을 같은 신호로 세면 mktemp 거부·고정물 부재 같은 환경 사고가 "차단됨"으로 계수되고,
