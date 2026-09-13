@@ -13,6 +13,9 @@
 
 import base64
 import hashlib
+import json
+import socket
+import threading
 from typing import Self
 
 import pytest
@@ -130,3 +133,158 @@ def test_the_proof_is_computed_from_the_key_we_actually_sent() -> None:
         keys.append(_sent_key(connection))
 
     assert len(set(keys)) == 3, "키가 매번 새로 생성되어야 한다"
+
+
+class _LocalCdpServer:
+    """localhost 소켓에서 실제 `observe_markers` 진입 경로를 받는 합성 CDP 서버."""
+
+    def __init__(self, *, accept_mode: str) -> None:
+        self.accept_mode = accept_mode
+        self.request = bytearray()
+        self._ready = threading.Event()
+        self._closed = threading.Event()
+        self._thread = threading.Thread(target=self._serve, daemon=True)
+        self._listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._listener.bind((_HOST, 0))
+        self.port = self._listener.getsockname()[1]
+        self._listener.listen(1)
+
+    def __enter__(self) -> Self:
+        self._thread.start()
+        assert self._ready.wait(timeout=1.0)
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        try:
+            with socket.create_connection((_HOST, self.port), timeout=0.05):
+                pass
+        except OSError:
+            pass
+        self._thread.join(timeout=1.0)
+        self._listener.close()
+        assert self._closed.is_set()
+
+    def _serve(self) -> None:
+        self._ready.set()
+        try:
+            with self._listener:
+                connection, _ = self._listener.accept()
+                with connection:
+                    connection.settimeout(1.0)
+                    if self.accept_mode == "close-before-headers":
+                        return
+                    self._receive_request(connection)
+                    accept = self._accept_header()
+                    if self.accept_mode == "wrong":
+                        accept = "SGVsbG8gdGhlcmUgZnJpZW5k"
+                    response = _response(accept if self.accept_mode != "missing" else None)
+                    connection.sendall(response)
+                    if self.accept_mode in {"correct", "wrong"}:
+                        self._receive_client_frame(connection)
+                        connection.sendall(_server_text_frame(_cdp_answer()))
+        except (OSError, TimeoutError):
+            pass
+        finally:
+            self._closed.set()
+
+    def _receive_request(self, connection: socket.socket) -> None:
+        while b"\r\n\r\n" not in self.request:
+            chunk = connection.recv(4096)
+            if not chunk:
+                return
+            self.request.extend(chunk)
+
+    def _accept_header(self) -> str:
+        return _proof_for(_sent_request_key(bytes(self.request)))
+
+    def _receive_client_frame(self, connection: socket.socket) -> None:
+        header = connection.recv(2)
+        if len(header) < 2:
+            return
+        length = header[1] & 0x7F
+        if length == 126:
+            length = int.from_bytes(connection.recv(2), "big")
+        elif length == 127:
+            length = int.from_bytes(connection.recv(8), "big")
+        _mask = connection.recv(4)
+        remaining = length
+        while remaining:
+            chunk = connection.recv(remaining)
+            if not chunk:
+                return
+            remaining -= len(chunk)
+
+
+def _sent_request_key(request: bytes) -> str:
+    for line in request.decode("latin-1").split("\r\n"):
+        if line.lower().startswith("sec-websocket-key:"):
+            return line.split(":", 1)[1].strip()
+    raise AssertionError("요청에 Sec-WebSocket-Key 가 없다")
+
+
+def _server_text_frame(payload: bytes) -> bytes:
+    length = len(payload)
+    if length < 126:
+        return bytes((0x81, length)) + payload
+    if length <= 0xFFFF:
+        return bytes((0x81, 126)) + length.to_bytes(2, "big") + payload
+    return bytes((0x81, 127)) + length.to_bytes(8, "big") + payload
+
+
+def _cdp_answer() -> bytes:
+    return json.dumps(
+        {
+            "id": 1,
+            "result": {
+                "result": {
+                    "value": {"contract_valid": True, "matched_roles": ["authenticated_surface"]}
+                }
+            },
+        },
+        separators=(",", ":"),
+    ).encode("ascii")
+
+
+def _observe_from(server: _LocalCdpServer) -> object:
+    return _cdp.observe_markers(
+        f"ws://{_HOST}:{server.port}{_PATH}",
+        ("header",),
+        {"authenticated_surface": ("a",)},
+        expected_host=_HOST,
+        expected_port=server.port,
+        timeout=1.0,
+    )
+
+
+def test_observe_markers_accepts_a_real_local_socket_with_a_correct_proof() -> None:
+    with _LocalCdpServer(accept_mode="correct") as server:
+        payload = _observe_from(server)
+
+    assert payload == {"contract_valid": True, "matched_roles": ["authenticated_surface"]}
+    assert b"GET /devtools/page/SYNTHETIC HTTP/1.1\r\n" in bytes(server.request)
+
+
+@pytest.mark.parametrize("accept_mode", ["wrong", "missing"])
+def test_observe_markers_refuses_a_real_local_socket_with_invalid_proof(
+    accept_mode: str,
+) -> None:
+    with (
+        _LocalCdpServer(accept_mode=accept_mode) as server,
+        pytest.raises(_cdp.CdpReadError) as caught,
+    ):
+        _observe_from(server)
+
+    assert "handshake proof was invalid" in str(caught.value)
+
+
+def test_observe_markers_refuses_a_local_socket_that_closes_mid_handshake() -> None:
+    with (
+        _LocalCdpServer(accept_mode="close-before-headers") as server,
+        pytest.raises(_cdp.CdpReadError) as caught,
+    ):
+        _observe_from(server)
+
+    assert str(caught.value) in {
+        "DevTools websocket handshake ended early",
+        "DevTools read failed",
+    }

@@ -213,3 +213,73 @@ FAIL: scanner error — fail-closed (grep/xargs stderr):
   치운다. 그 시험들의 목적은 읽기 루프라 그대로 두되, **이제는 핸드셰이크를 보는 시험이 따로
   있다.** 같은 함정이 다시 생기지 않으려면 "몽키패치로 치운 함수는 어딘가에서 실제로 태워야
   한다"는 규칙이 필요한데, 그것을 기계로 만드는 것은 이 작업의 범위 밖이다.
+
+### 2026-09-14 회수 보강 — 실제 localhost 소켓 경로
+
+9월 14일 v5 실행 지시 회수 뒤 확인한 결론: 기존 WU1 시험은 `_handshake` 를 몽키패치하지 않는
+가짜 소켓 단위 시험으로는 충분했지만, `observe_markers()` 가 `socket.create_connection()` 으로
+로컬 소켓을 열고 CDP 응답을 받는 관통 경로는 비어 있었다. 그래서 같은 파일에 localhost 합성
+서버를 추가했다.
+
+추가한 경계:
+
+- 정상 서버: 실제 로컬 포트에서 올바른 `Sec-WebSocket-Accept` 를 계산하고 CDP 결과 프레임을
+  돌려주면 `observe_markers()` 가 값을 반환한다.
+- 잘못된 서버: 틀린 증명 또는 증명 헤더 없음 뒤에 정상처럼 CDP 결과를 돌려줘도 클라이언트는
+  `handshake proof was invalid` 로 거부한다.
+- 중간 종료 서버: 헤더 전에 연결이 끊기면 값 반환 없이 `CdpReadError` 로 닫힌 실패가 된다.
+
+변조 재실행:
+
+```
+_cdp.py 의 검증 조건을 `if False and headers.get("sec-websocket-accept") != expected:` 로 바꿈
+$ uv run pytest tests/test_cdp_handshake_proof.py -q
+5 failed, 5 passed in 0.38s
+```
+
+→ 무엇을 시켰나: 증명 검사를 일부러 무력화했다. 무엇이 나왔나: 기존 가짜 소켓 거부 3개와 새
+localhost 관통 거부 2개가 실패했다. 좋은 소식: 증명 생략은 단위 함수와 실제 로컬 소켓 진입 경로
+양쪽에서 빨간불이 된다.
+
+검증:
+
+```
+$ uv run pytest tests/test_cdp_handshake_proof.py tests/test_cdp_websocket_parse_failure.py -q
+12 passed in 0.39s
+
+$ uv run pytest -q
+221 passed in 10.73s
+
+$ uv run ruff check .
+All checks passed!
+
+$ uv run mypy src
+Success: no issues found in 13 source files
+
+$ bash verify.sh
+PASS: no secret-pattern match in any tracked file, .env not tracked
+
+$ bash scripts/acceptance-hs-gates.sh
+PASS: ruff clean in 42 python files
+PASS: mypy strict clean in 42 source files
+PASS: pytest collected 221 and passed
+PASS: runtime import proof /Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-cdp-handshake-proof/humansearch/src/humansearch/__init__.py
+COLLECTED: 221
+```
+
+→ 무엇을 시켰나: 변경 파일 중심 시험, HumanSearch 전체 시험·정적 검사, 저장소 비밀 스캔과
+HumanSearch 게이트를 돌렸다. 무엇이 나왔나: 변경 범위 검사는 모두 통과했다.
+
+원격 CI 재현:
+
+```
+$ gh run view 33030699472 --log-failed
+FAIL: 만료된 억제 (expiry 2026-08-26 < 오늘 2026-08-27)
+
+$ bash -lc '<CI 억제 만료 스캔과 같은 비교식>'
+FAIL: 만료된 억제 (expiry 2026-08-26 < 오늘 2026-09-14)
+```
+
+→ 무엇을 시켰나: PR54의 원격 실패 로그를 다시 읽고 같은 억제 만료 판정을 현재 날짜로 재현했다.
+무엇이 나왔나: PR54의 원격 실패 원인은 `suppressions.yaml` 의 공유 검증정책 만료 항목이다.
+이 항목은 HS-01.02 테스트 보강과 별개라 이 작업에서는 수정하지 않는다.
