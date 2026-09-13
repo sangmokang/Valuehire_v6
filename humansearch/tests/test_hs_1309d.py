@@ -41,6 +41,57 @@ def _sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+_raw_claim_send = claim_send
+_raw_open_new_attempt = open_new_attempt
+
+
+def claim_send(
+    dir: Path,
+    packet_id: str,
+    channel: str,
+    attempt: int,
+    *,
+    at: datetime,
+    evidence: str,
+    recipients_sha256: str | None = None,
+    body_sha256: str | None = None,
+) -> tuple[SendIntent, bool]:
+    body_seed = "본문" if attempt == 1 else f"재시도 본문 {attempt}"
+    return _raw_claim_send(
+        dir,
+        packet_id,
+        channel,
+        attempt,
+        at=at,
+        evidence=evidence,
+        recipients_sha256=recipients_sha256 or _sha256("sangmokang@valueconnect.kr"),
+        body_sha256=body_sha256 or _sha256(body_seed),
+    )
+
+
+def open_new_attempt(
+    dir: Path,
+    packet_id: str,
+    channel: str,
+    *,
+    approval: Approval,
+    at: datetime,
+    recipients_sha256: str | None = None,
+    body_sha256: str | None = None,
+) -> tuple[SendIntent, bool]:
+    """테스트 기본 재시도 digest 를 붙인다. 발송 권한은 claim_send 의 True 만이다."""
+    retry_seed = f"재시도 본문 {approval.from_attempt + 1}"
+    return _raw_open_new_attempt(
+        dir,
+        packet_id,
+        channel,
+        approval=approval,
+        at=at,
+        recipients_sha256=recipients_sha256 or _sha256("sangmokang@valueconnect.kr"),
+        body_sha256=body_sha256 or _sha256(retry_seed),
+    )
+
+
 def _intent() -> SendIntent:
     return SendIntent(
         packet_id=_PACKET_ID,
@@ -182,13 +233,9 @@ def test_claimed_attempt_walks_to_sent_and_verified(tmp_path: Path) -> None:
         directory, _PACKET_ID, "gmail", 1, SendState.SENT_UNVERIFIED, "msg-1", _LATER, "발송함 id"
     )
     assert sent.state is SendState.SENT_UNVERIFIED
-    verified = mark(
-        directory, _PACKET_ID, "gmail", 1, SendState.VERIFIED, "msg-1", _LATER, "해시 일치"
-    )
-    assert [step.state for step in verified.transitions] == [
+    assert [step.state for step in sent.transitions] == [
         SendState.SEND_CLAIMED,
         SendState.SENT_UNVERIFIED,
-        SendState.VERIFIED,
     ]
 
 

@@ -43,6 +43,31 @@ def _sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+_raw_open_new_attempt = open_new_attempt
+
+
+def open_new_attempt(
+    dir: Path,
+    packet_id: str,
+    channel: str,
+    *,
+    approval: Approval,
+    at: datetime,
+    recipients_sha256: str | None = None,
+    body_sha256: str | None = None,
+) -> tuple[SendIntent, bool]:
+    retry_seed = f"재시도 본문 {approval.from_attempt + 1}"
+    return _raw_open_new_attempt(
+        dir,
+        packet_id,
+        channel,
+        approval=approval,
+        at=at,
+        recipients_sha256=recipients_sha256 or _sha256("정정된 수신자"),
+        body_sha256=body_sha256 or _sha256(retry_seed),
+    )
+
+
 def _intent(packet_id: str = _PACKET_ID, channel: str = "gmail") -> SendIntent:
     return SendIntent(
         packet_id=packet_id,

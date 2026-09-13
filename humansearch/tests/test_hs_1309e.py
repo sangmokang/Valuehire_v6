@@ -70,6 +70,58 @@ def _sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+_raw_claim_send = claim_send
+_raw_open_new_attempt = open_new_attempt
+
+
+def claim_send(
+    dir: Path,
+    packet_id: str,
+    channel: str,
+    attempt: int,
+    *,
+    at: datetime,
+    evidence: str,
+    recipients_sha256: str | None = None,
+    body_sha256: str | None = None,
+) -> tuple[SendIntent, bool]:
+    """발송 권한은 반환값 True 하나로만 소비한다."""
+    body_seed = "본문" if attempt == 1 else f"재시도 본문 {attempt}"
+    return _raw_claim_send(
+        dir,
+        packet_id,
+        channel,
+        attempt,
+        at=at,
+        evidence=evidence,
+        recipients_sha256=recipients_sha256 or _sha256("sangmokang@valueconnect.kr"),
+        body_sha256=body_sha256 or _sha256(body_seed),
+    )
+
+
+def open_new_attempt(
+    dir: Path,
+    packet_id: str,
+    channel: str,
+    *,
+    approval: Approval,
+    at: datetime,
+    recipients_sha256: str | None = None,
+    body_sha256: str | None = None,
+) -> tuple[SendIntent, bool]:
+    """테스트 기본 재시도 digest 를 붙인다. 발송 권한은 claim_send 의 True 만이다."""
+    retry_seed = f"재시도 본문 {approval.from_attempt + 1}"
+    return _raw_open_new_attempt(
+        dir,
+        packet_id,
+        channel,
+        approval=approval,
+        at=at,
+        recipients_sha256=recipients_sha256 or _sha256("sangmokang@valueconnect.kr"),
+        body_sha256=body_sha256 or _sha256(retry_seed),
+    )
+
+
 def _intent() -> SendIntent:
     return SendIntent(
         packet_id=_PACKET_ID,
@@ -99,8 +151,22 @@ def _ledger(tmp_path: Path) -> Path:
     return directory
 
 
-def _claim(directory: Path, attempt: int, at: datetime = _CLAIM_AT) -> tuple[SendIntent, bool]:
-    return claim_send(directory, _PACKET_ID, "gmail", attempt, at=at, evidence="발송 직전 청구")
+def _claim(
+    directory: Path,
+    attempt: int,
+    at: datetime = _CLAIM_AT,
+    *,
+    body_sha256: str | None = None,
+) -> tuple[SendIntent, bool]:
+    return claim_send(
+        directory,
+        _PACKET_ID,
+        "gmail",
+        attempt,
+        at=at,
+        evidence="발송 직전 청구",
+        body_sha256=body_sha256,
+    )
 
 
 def _reopen(directory: Path, from_attempt: int) -> tuple[SendIntent, bool]:
@@ -214,7 +280,7 @@ def test_reading_recovers_an_attempt_left_unsent_behind_a_newer_one(tmp_path: Pa
     assert recovered.transitions[-1].at == _LATER
     with pytest.raises(BriefInputError):
         _claim(directory, 1)
-    _, won = _claim(directory, 2, at=_LATER)
+    _, won = _claim(directory, 2, at=_LATER, body_sha256=_sha256("본문"))
     assert won is True
 
 

@@ -31,7 +31,7 @@ from .send_ledger import (
     require_channel,
     require_clock,
 )
-from .types import _reject, _require_text
+from .types import _reject, _require_sha256, _require_text
 
 __all__ = ["claim_path", "claim_send"]
 
@@ -50,6 +50,8 @@ def claim_send(
     *,
     at: datetime,
     evidence: str,
+    recipients_sha256: str,
+    body_sha256: str,
 ) -> tuple[SendIntent, bool]:
     """최신 attempt 의 INTENT 를 SEND_CLAIMED 로 딱 한 번 옮긴다. 반환 = (기록, 이번 호출이 땄는가).
 
@@ -61,19 +63,41 @@ def claim_send(
     require_attempt(attempt)
     moment = require_clock(at)
     _require_text(evidence, "claim_send.evidence")
+    _require_sha256(recipients_sha256, "claim_send.recipients_sha256")
+    _require_sha256(body_sha256, "claim_send.body_sha256")
     directory = ensure_store_dir(dir)
     with _channel_lock(directory, packet_id, channel):
-        return _claim_locked(directory, packet_id, channel, attempt, moment, evidence)
+        return _claim_locked(
+            directory,
+            packet_id,
+            channel,
+            attempt,
+            moment,
+            evidence,
+            recipients_sha256,
+            body_sha256,
+        )
 
 
 def _claim_locked(
-    directory: Path, packet_id: str, channel: str, attempt: int, moment: datetime, evidence: str
+    directory: Path,
+    packet_id: str,
+    channel: str,
+    attempt: int,
+    moment: datetime,
+    evidence: str,
+    recipients_sha256: str,
+    body_sha256: str,
 ) -> tuple[SendIntent, bool]:
     current = _latest(directory, packet_id, channel)
     if current is None:
         _reject("발송 의도가 없는 채널은 청구할 수 없다 — record_intent 가 먼저다")
     if current.attempt != attempt:
         _reject(f"최신 시도는 a{current.attempt} 다 — a{attempt} 는 청구할 수 없다")
+    if current.recipients_sha256 != recipients_sha256:
+        _reject("현재 수신자 digest 가 승인된 발송 의도와 다르다")
+    if current.body_sha256 != body_sha256:
+        _reject("현재 본문 digest 가 승인된 발송 의도와 다르다")
     if current.state is SendState.SEND_CLAIMED:
         return current, False
     if current.state is not SendState.INTENT or current.message_id is not None:

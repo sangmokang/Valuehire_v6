@@ -12,10 +12,19 @@ import re
 from pathlib import Path
 from urllib.parse import unquote
 
-from .packet import from_json
+from .packet import ensure_store_dir, from_json
+from .send_ledger import (
+    SendIntent,
+    SendState,
+    Transition,
+    _append,
+    _channel_lock,
+    _latest,
+    require_clock,
+)
 from .types import BriefInputError
 
-__all__ = ["normalize_readback", "verify"]
+__all__ = ["normalize_readback", "verify", "verify_and_mark"]
 
 _PACKET_ID_TRAILER = "packet-id: "
 
@@ -92,9 +101,7 @@ def verify(packet_path: Path, sent_path: Path) -> tuple[int, str]:
     except BriefInputError as error:
         return 2, str(error)
 
-    expected = hashlib.sha256(normalize_readback(packet.mail.body).encode("utf-8")).hexdigest()
-    actual = hashlib.sha256(normalize_readback(sent_text).encode("utf-8")).hexdigest()
-    tail_problem = _packet_id_tail_problem(sent_text, packet.packet_id)
+    expected, actual, tail_problem = _verify_parts(packet.mail.body, sent_text, packet.packet_id)
     if tail_problem is not None:
         # 본문이 같아도 꼬리 packet-id 가 없거나 다르거나 겹치면 이 발송본을 이 패킷에 결합할 수 없다(Codex 12차)
         return 1, (
@@ -104,6 +111,64 @@ def verify(packet_path: Path, sent_path: Path) -> tuple[int, str]:
     if expected == actual:
         return 0, f"VERIFIED packet_id={packet.packet_id} body_sha256={expected}"
     return 1, f"SENT_UNVERIFIED packet_id={packet.packet_id} expected={expected} actual={actual}"
+
+
+def verify_and_mark(
+    dir: Path,
+    packet_path: Path,
+    sent_path: Path,
+    message_id: str,
+    at: object,
+    *,
+    channel: str = "gmail",
+) -> SendIntent:
+    """readback 검증과 VERIFIED 장부 전이를 같은 최신 attempt 에 결합한다."""
+    moment = require_clock(at)
+    packet_text = _read_text(packet_path, "패킷")
+    packet = from_json(packet_text)
+    directory = ensure_store_dir(dir)
+    with _channel_lock(directory, packet.packet_id, channel):
+        packet = from_json(_read_text(packet_path, "패킷"))
+        sent_text = _read_text(sent_path, "readback")
+        expected, actual, tail_problem = _verify_parts(packet.mail.body, sent_text, packet.packet_id)
+        if tail_problem is not None:
+            raise BriefInputError(f"readback 검증 실패: {tail_problem}")
+        if expected != actual:
+            raise BriefInputError("readback 본문 digest 가 패킷과 다르다")
+        current = _latest(directory, packet.packet_id, channel)
+        if current is None:
+            raise BriefInputError("발송 의도가 없는 채널은 VERIFIED 로 표시할 수 없다")
+        if current.state not in (SendState.SEND_CLAIMED, SendState.SENT_UNVERIFIED):
+            raise BriefInputError(f"{current.state.value} 상태는 VERIFIED 로 표시할 수 없다")
+        if current.message_id is not None and current.message_id != message_id:
+            raise BriefInputError("다른 message_id 로 검증된 readback 을 재사용할 수 없다")
+        if current.body_sha256 != packet.mail.body_sha256:
+            raise BriefInputError("현재 패킷 본문 digest 가 발송 청구 digest 와 다르다")
+        evidence = (
+            f"readback verified packet_id={packet.packet_id} attempt={current.attempt} "
+            f"body_sha256={packet.mail.body_sha256} recipients_sha256={current.recipients_sha256} "
+            f"message_id={message_id}"
+        )
+        updated = SendIntent(
+            packet_id=current.packet_id,
+            channel=current.channel,
+            attempt=current.attempt,
+            recipients_sha256=current.recipients_sha256,
+            body_sha256=current.body_sha256,
+            recorded_at=moment,
+            state=SendState.VERIFIED,
+            message_id=message_id,
+            transitions=(*current.transitions, Transition(moment, SendState.VERIFIED, evidence)),
+            approval=current.approval,
+        )
+        return _append(directory, current, updated)
+
+
+def _verify_parts(packet_body: str, sent_text: str, packet_id: str) -> tuple[str, str, str | None]:
+    expected = hashlib.sha256(normalize_readback(packet_body).encode("utf-8")).hexdigest()
+    actual = hashlib.sha256(normalize_readback(sent_text).encode("utf-8")).hexdigest()
+    tail_problem = _packet_id_tail_problem(sent_text, packet_id)
+    return expected, actual, tail_problem
 
 
 def _packet_id_tail_problem(sent_text: str, packet_id: str) -> str | None:

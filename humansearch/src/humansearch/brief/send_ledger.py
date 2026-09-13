@@ -72,10 +72,10 @@ class SendState(Enum):
 
 
 # 단방향 승계. INTENT → SEND_CLAIMED 는 send_claim.claim_send 만 만든다(mark 로는 못 간다).
+# VERIFIED 는 readback 검증과 장부 전이를 결합한 cli.verify_and_mark 만 만든다.
 # ABANDONED 는 종단이며 open_new_attempt 만 붙일 수 있다(mark 로는 못 간다).
 _NEXT = {
     SendState.SEND_CLAIMED: SendState.SENT_UNVERIFIED,
-    SendState.SENT_UNVERIFIED: SendState.VERIFIED,
 }
 _UNSENT = (SendState.INTENT, SendState.SEND_CLAIMED)
 
@@ -433,6 +433,8 @@ def open_new_attempt(
     *,
     approval: Approval,
     at: datetime,
+    recipients_sha256: str,
+    body_sha256: str,
 ) -> tuple[SendIntent, bool]:
     """보냈는지 모르는 시도를 승인 아래 접고 attempt N+1 을 연다. 반환 = (새 기록, 열었는가).
 
@@ -442,13 +444,23 @@ def open_new_attempt(
     if not isinstance(approval, Approval):
         _reject("open_new_attempt(approval) 은 Approval 이어야 한다")
     moment = require_clock(at)
+    _require_sha256(recipients_sha256, "open_new_attempt.recipients_sha256")
+    _require_sha256(body_sha256, "open_new_attempt.body_sha256")
     directory = ensure_store_dir(dir)
     with _channel_lock(directory, packet_id, channel):
-        return _open_locked(directory, packet_id, channel, approval, moment)
+        return _open_locked(
+            directory, packet_id, channel, approval, moment, recipients_sha256, body_sha256
+        )
 
 
 def _open_locked(
-    directory: Path, packet_id: str, channel: str, approval: Approval, moment: datetime
+    directory: Path,
+    packet_id: str,
+    channel: str,
+    approval: Approval,
+    moment: datetime,
+    recipients_sha256: str,
+    body_sha256: str,
 ) -> tuple[SendIntent, bool]:
     current = _latest(directory, packet_id, channel)
     if current is None:
@@ -456,9 +468,17 @@ def _open_locked(
     if current.state not in _UNSENT or current.message_id is not None:
         _reject("발송 여부가 이미 확정된 시도는 다시 열 수 없다")
     _check_approval_binding(approval, packet_id, current.attempt)
+    if (
+        current.recipients_sha256 == recipients_sha256
+        and current.body_sha256 == body_sha256
+        and "정정 없음" not in approval.reason
+    ):
+        _reject("본문·수신자 digest 가 같으면 approval.reason 에 '정정 없음' 이 필요하다")
     fresh = replace(
         current,
         attempt=current.attempt + 1,
+        recipients_sha256=recipients_sha256,
+        body_sha256=body_sha256,
         recorded_at=moment,
         state=SendState.INTENT,
         message_id=None,

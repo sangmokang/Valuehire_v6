@@ -1,6 +1,7 @@
 """HS-13 포지션 브리프·서치 패킷 패키지의 공개 경계."""
 
 from .boolean_query import BooleanQuerySet, build_boolean_queries, check_balanced
+from .cli import verify_and_mark
 from .inmail import InMailDraft, build_inmail, build_inmails
 from .jd_fidelity import (
     EXTRA_CONDITION_PATTERNS,
@@ -126,6 +127,7 @@ __all__ = [
     "split_sections",
     "split_two_field",
     "to_json",
+    "verify_and_mark",
     "verify_fidelity",
     "verify_linkedin_fidelity",
 ]

@@ -71,6 +71,55 @@ def _sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+_raw_claim_send = claim_send
+_raw_open_new_attempt = open_new_attempt
+
+
+def claim_send(
+    dir: Path,
+    packet_id: str,
+    channel: str,
+    attempt: int,
+    *,
+    at: datetime,
+    evidence: str,
+    recipients_sha256: str | None = None,
+    body_sha256: str | None = None,
+) -> tuple[SendIntent, bool]:
+    return _raw_claim_send(
+        dir,
+        packet_id,
+        channel,
+        attempt,
+        at=at,
+        evidence=evidence,
+        recipients_sha256=recipients_sha256 or _sha256("sangmokang@valueconnect.kr"),
+        body_sha256=body_sha256 or _sha256("본문"),
+    )
+
+
+def open_new_attempt(
+    dir: Path,
+    packet_id: str,
+    channel: str,
+    *,
+    approval: Approval,
+    at: datetime,
+    recipients_sha256: str | None = None,
+    body_sha256: str | None = None,
+) -> tuple[SendIntent, bool]:
+    retry_seed = f"재시도 본문 {approval.from_attempt + 1}"
+    return _raw_open_new_attempt(
+        dir,
+        packet_id,
+        channel,
+        approval=approval,
+        at=at,
+        recipients_sha256=recipients_sha256 or _sha256("sangmokang@valueconnect.kr"),
+        body_sha256=body_sha256 or _sha256(retry_seed),
+    )
+
+
 def _faithful_jd_packet(source: JdSource, company_intro: str = "회사 소개 필드") -> JdPacket:
     """JD 3종을 원문과 일치하게 만든다 — SearchPacket 이 조립 시 충실도를 재검증한다(HS-13.04b)."""
     markers = tuple(s.heading for s in split_sections(source.text) if s.heading and s.lines)
@@ -421,16 +470,14 @@ def test_rerun_after_any_crash_point_grants_no_send(tmp_path: Path, crash_point:
             "발송함 id",
         )
     if crash_point == "after_readback":
-        mark(
-            directory, _PACKET_ID, "gmail", 1, SendState.VERIFIED, "msg-1", _LATER, "본문 해시 일치"
-        )
+        assert load_intent(directory, _PACKET_ID, "gmail") is not None
     replayed, created = record_intent(directory, _intent())
     assert created is False
     assert may_send(directory, _PACKET_ID, "gmail") is False
     assert replayed.attempt == 1
 
 
-def test_mark_walks_intent_to_sent_to_verified_and_appends_transitions(tmp_path: Path) -> None:
+def test_mark_walks_claimed_to_sent_and_appends_transitions(tmp_path: Path) -> None:
     directory = tmp_path / "ledger"
     record_intent(directory, _intent())
     _claim(directory)
@@ -438,17 +485,12 @@ def test_mark_walks_intent_to_sent_to_verified_and_appends_transitions(tmp_path:
         directory, _PACKET_ID, "gmail", 1, SendState.SENT_UNVERIFIED, "msg-1", _LATER, "발송함 id"
     )
     assert sent.state is SendState.SENT_UNVERIFIED
-    verified = mark(
-        directory, _PACKET_ID, "gmail", 1, SendState.VERIFIED, "msg-1", _LATER, "본문 해시 일치"
-    )
-    assert verified.state is SendState.VERIFIED
-    assert tuple(step.state for step in verified.transitions) == (
+    assert tuple(step.state for step in sent.transitions) == (
         SendState.SEND_CLAIMED,
         SendState.SENT_UNVERIFIED,
-        SendState.VERIFIED,
     )
-    assert verified.transitions[1].evidence == "발송함 id"
-    assert load_intent(directory, _PACKET_ID, "gmail") == verified
+    assert sent.transitions[1].evidence == "발송함 id"
+    assert load_intent(directory, _PACKET_ID, "gmail") == sent
 
 
 def test_mark_rejects_skipping_straight_to_verified(tmp_path: Path) -> None:
@@ -553,9 +595,6 @@ def test_open_new_attempt_is_refused_once_the_send_is_known(tmp_path: Path) -> N
     record_intent(directory, _intent())
     _claim(directory)
     mark(directory, _PACKET_ID, "gmail", 1, SendState.SENT_UNVERIFIED, "msg-1", _LATER, "발송함 id")
-    with pytest.raises(BriefInputError):
-        open_new_attempt(directory, _PACKET_ID, "gmail", approval=_approval(), at=_LATER)
-    mark(directory, _PACKET_ID, "gmail", 1, SendState.VERIFIED, "msg-1", _LATER, "본문 해시 일치")
     with pytest.raises(BriefInputError):
         open_new_attempt(directory, _PACKET_ID, "gmail", approval=_approval(), at=_LATER)
 
