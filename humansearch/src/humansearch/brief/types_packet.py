@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from dataclasses import field as dataclass_field
 from datetime import date, datetime
 
-from .jd_fidelity import FidelityReport, content_lines, verify_fidelity
+from .jd_fidelity import EXTRA_CONDITION_PATTERNS, FidelityReport, content_lines, verify_fidelity
 from .linkedin_limit import verify_linkedin_fidelity
 from .policy import policy
 from .recipients import load_recipients
@@ -188,6 +188,10 @@ def _block_after(lines: tuple[str, ...], marker: str, expected: tuple[str, ...],
     return end
 
 
+def _has_extra_condition(line: str) -> bool:
+    return any(re.compile(pattern).search(line) for pattern in EXTRA_CONDITION_PATTERNS)
+
+
 @dataclass(frozen=True)
 class SearchPacket:
     """한 포지션의 브리프를 만들기 위해 모은 구조화 자료 묶음."""
@@ -203,8 +207,11 @@ class SearchPacket:
     boolean_queries: tuple[str, ...]
     inmails: tuple[tuple[str, str], ...]
     search_filters: SearchFilters = dataclass_field(default_factory=SearchFilters)
+    schema_version: int = 1
 
     def __post_init__(self) -> None:
+        if isinstance(self.schema_version, bool) or self.schema_version != 1:
+            _reject(f"SearchPacket.schema_version 은 1 이어야 한다: {self.schema_version!r}")
         if not _PACKET_ID.fullmatch(self.packet_id):
             _reject("SearchPacket.packet_id 는 {clickup_id}-{sha8} 형태여야 한다(날짜 없음)")
         # 형식만 맞는 임의 id 는 같은 포지션·같은 JD 에 새 발송 namespace 를 연다(Codex 8차) — 내용에 결합한다.
@@ -266,6 +273,7 @@ class SearchPacket:
         if "\r" in self.mail.body:
             _reject("TeamMail.body 는 LF 개행만 쓴다(CRLF 정규화는 readback CLI 의 몫)")
         lines = tuple(self.mail.body.splitlines())
+        jd_line_indexes: set[int] = set()
         for marker in _RESERVED_MARKERS:
             hits = sum(1 for line in lines if line == marker)
             if hits != 1:
@@ -273,11 +281,13 @@ class SearchPacket:
         end = _block_after(
             lines, "[JD 원문 시작]", tuple(packet.gmail_body.splitlines()), "Gmail JD"
         )
+        jd_line_indexes.update(range(lines.index("[JD 원문 시작]") + 1, end))
         if end >= len(lines) or lines[end] != "[JD 원문 끝]":
             _reject("TeamMail.body 의 Gmail JD 블록이 '[JD 원문 끝]' 로 닫히지 않는다")
         end = _block_after(
             lines, "[복사 시작]", tuple(packet.linkedin_body.splitlines()), "LinkedIn"
         )
+        jd_line_indexes.update(range(lines.index("[복사 시작]") + 1, end))
         if end >= len(lines) or lines[end] != "[복사 끝]":
             _reject("TeamMail.body 의 LinkedIn 블록이 '[복사 끝]' 로 닫히지 않는다")
         end = _block_after(
@@ -287,4 +297,10 @@ class SearchPacket:
             _reject(
                 "TeamMail.body 의 필드 1 블록 뒤에 빈 줄과 '[필드 2: JD 내용]' 이 이어지지 않는다"
             )
-        _block_after(lines, "[필드 2: JD 내용]", tuple(packet.two_field_jd.splitlines()), "필드 2")
+        end = _block_after(
+            lines, "[필드 2: JD 내용]", tuple(packet.two_field_jd.splitlines()), "필드 2"
+        )
+        jd_line_indexes.update(range(lines.index("[필드 2: JD 내용]") + 1, end))
+        for index, line in enumerate(lines):
+            if index not in jd_line_indexes and _has_extra_condition(line):
+                _reject(f"TeamMail.body 의 JD 블록 밖에 채용 조건이 끼었다: {line!r}")

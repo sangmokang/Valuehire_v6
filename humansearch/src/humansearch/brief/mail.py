@@ -57,6 +57,21 @@ _HTML_TAG = re.compile(r"<[A-Za-z/!]")
 _ATTRACTION_RANGE = (3, 5)
 _REFLECTION_RANGE = (1, 4)
 _QUESTION_RANGE = (3, 5)
+_PACKET_ID_LINE = re.compile(r"^\s*packet-id:", re.IGNORECASE)
+
+
+def _require_single_line(value: str, field: str) -> None:
+    _require_text(value, field)
+    if "\n" in value or "\r" in value:
+        _reject(f"{field} 는 한 줄이어야 한다")
+    if _PACKET_ID_LINE.match(value):
+        _reject(f"{field} 는 packet-id 줄을 만들 수 없다")
+
+
+def _reject_packet_id_lines(body: str) -> None:
+    for line in body.splitlines():
+        if _PACKET_ID_LINE.match(line):
+            _reject("팀 메일 본문에는 packet-id 줄을 넣을 수 없다 — 러너 꼬리만 허용된다")
 
 
 @dataclass(frozen=True)
@@ -95,7 +110,7 @@ class BriefDraft:
             _reject("BriefDraft.intro_paragraphs 는 후보자 관점 소개 2문단이어야 한다(D10)")
         for index, paragraph in enumerate(self.intro_paragraphs):
             _require_text(paragraph, f"BriefDraft.intro_paragraphs[{index}]")
-        _require_text(self.key_line, "BriefDraft.key_line")
+        _require_single_line(self.key_line, "BriefDraft.key_line")
 
     def _check_attraction(self) -> None:
         low, high = _ATTRACTION_RANGE
@@ -125,7 +140,7 @@ class BriefDraft:
                 _require_text(value, f"BriefDraft.{label}[{index}]")
 
     def _check_sender(self) -> None:
-        _require_text(self.sender_name, "BriefDraft.sender_name")
+        _require_single_line(self.sender_name, "BriefDraft.sender_name")
         _require_email(self.sender_email, "BriefDraft.sender_email")
         if not self.sender_email.endswith(f"@{policy().team_mail_domain}"):
             _reject("BriefDraft.sender_email 이 계약 팀 도메인 밖이다")
@@ -225,6 +240,7 @@ def compose_brief_mail(
     body = render_brief_body(draft, today)
     if _HTML_TAG.search(body):
         _reject("팀 메일 본문에 HTML 태그가 있다 — 브리프는 평문으로만 나간다")
+    _reject_packet_id_lines(body)
 
     to = recipients.first_live_to_only if first_live else recipients.to
     cc: tuple[str, ...] = () if first_live else recipients.cc
