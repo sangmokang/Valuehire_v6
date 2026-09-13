@@ -382,7 +382,7 @@ def test_save_rejects_changed_packet_after_send_intent_exists(tmp_path: Path) ->
     store = PacketStore(directory)
     original = _packet("첫 문구")
     store.save(original)
-    record_intent(directory, _intent(body_sha256=original.mail.body_sha256))
+    record_intent(directory, _intent())
 
     with pytest.raises(BriefInputError):
         store.save(_packet("두 번째 문구"))

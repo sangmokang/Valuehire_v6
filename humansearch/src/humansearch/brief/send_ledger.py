@@ -19,6 +19,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import fcntl
 import os
 import re
@@ -42,7 +43,7 @@ from .packet import (
     write_store_file,
 )
 from .recipients import load_recipients
-from .types import _reject, _require_sha256, _require_text
+from .types import _reject, _require_email, _require_sha256, _require_text
 
 __all__ = [
     "Approval",
@@ -54,6 +55,7 @@ __all__ = [
     "mark",
     "may_send",
     "open_new_attempt",
+    "recipients_digest",
     "record_intent",
 ]
 
@@ -199,6 +201,25 @@ def require_clock(at: object, field: str = "at") -> datetime:
     if at.tzinfo is None:
         _reject(f"{field} 는 시간대를 가진 datetime 이어야 한다")
     return at
+
+
+def recipients_digest(to: tuple[str, ...], cc: tuple[str, ...]) -> str:
+    """수신자 digest 표준형. to·cc 각각을 정렬하되 두 역할은 섞지 않는다."""
+    if not to:
+        _reject("recipients_digest.to 는 1명 이상이어야 한다")
+    seen: set[str] = set()
+    canonical: dict[str, list[str]] = {"to": [], "cc": []}
+    for label, addresses in (("to", to), ("cc", cc)):
+        for address in addresses:
+            _require_email(address, f"recipients_digest.{label}")
+            if address in seen:
+                _reject("recipients_digest 수신자에 중복 주소가 있다")
+            seen.add(address)
+            canonical[label].append(address)
+    payload = dumps_value(
+        {"to": tuple(sorted(canonical["to"])), "cc": tuple(sorted(canonical["cc"]))}
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def _parse_moment(text: str) -> object:

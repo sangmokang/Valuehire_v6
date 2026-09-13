@@ -20,6 +20,7 @@ from .send_ledger import (
     _append,
     _channel_lock,
     _latest,
+    recipients_digest,
     require_clock,
 )
 from .types import BriefInputError
@@ -144,6 +145,9 @@ def verify_and_mark(
             raise BriefInputError("다른 message_id 로 검증된 readback 을 재사용할 수 없다")
         if current.body_sha256 != packet.mail.body_sha256:
             raise BriefInputError("현재 패킷 본문 digest 가 발송 청구 digest 와 다르다")
+        packet_recipients_sha256 = recipients_digest(packet.mail.to, packet.mail.cc)
+        if current.recipients_sha256 != packet_recipients_sha256:
+            raise BriefInputError("현재 패킷 수신자 digest 가 발송 청구 digest 와 다르다")
         evidence = (
             f"readback verified packet_id={packet.packet_id} attempt={current.attempt} "
             f"body_sha256={packet.mail.body_sha256} recipients_sha256={current.recipients_sha256} "

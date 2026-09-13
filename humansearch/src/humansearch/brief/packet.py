@@ -295,7 +295,18 @@ class PacketStore:
         target = self.path_for(packet.packet_id)
         if target.is_file() and read_store_file(target) == text:
             return target
+        if target.is_file() and self._has_send_intent(packet.packet_id):
+            _reject("발송 intent 가 있는 packet_id 는 다른 패킷 내용으로 저장할 수 없다")
         return write_store_file(self.dir, target, text)
+
+    def _has_send_intent(self, packet_id: str) -> bool:
+        prefix = f"{require_packet_id(packet_id)}."
+        return any(
+            entry.is_file()
+            and entry.name.startswith(prefix)
+            and entry.name.endswith(".sent.json")
+            for entry in self.dir.iterdir()
+        )
 
     def load(self, packet_id: str) -> SearchPacket:
         """저장된 패킷을 복원한다. 파일 부재·손상 JSON 은 전부 거부."""
