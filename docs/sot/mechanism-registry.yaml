@@ -86,6 +86,12 @@
   stage: "manual"
   manual_reason: "검사기 자신의 판정 문구. 실행 배선은 ci-step-integrity-ci 가 대조한다"
   required: true
+- id: "hs-browser-policy-ci"
+  path: ".github/workflows/verify.yml"
+  target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-browser-policy.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
 - id: "verified-sha-ci"
   path: ".github/workflows/verify.yml"
   target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-verified-sha.sh"

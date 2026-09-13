@@ -66,6 +66,9 @@ jobs:
           bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-cleanroom-hook-env.sh
           bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-cleanroom-hook-env-mutations.sh
 
+      - name: HumanSearch HS-05.01 Aside 브라우저 정책 계약
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-browser-policy.sh
+
       - name: HumanSearch G2 테스트 게이트 (정적·단위 + runtime import 증명)
         # uv 버전은 계약 C-8(0.11.3)에 고정. Python 3.14.1은 uv가 .python-version으로 내려받는다.
         run: |
