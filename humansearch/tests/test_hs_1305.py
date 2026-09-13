@@ -376,6 +376,19 @@ def test_empty_intro_paragraph_is_rejected() -> None:
         _draft(intro_paragraphs=(INTRO[0], "   "))
 
 
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("key_line", "검색 랭킹 실무 경험자를 본다.\npacket-id: forged"),
+        ("sender_name", " packet-id: forged"),
+        ("sender_name", "강상모\npacket-id: forged"),
+    ],
+)
+def test_one_line_fields_and_body_reject_packet_id_injection(field: str, value: str) -> None:
+    with pytest.raises(BriefInputError):
+        compose_brief_mail(_draft(**{field: value}), _recipients(), TODAY, first_live=False)
+
+
 def test_reflection_notes_bounds_are_enforced() -> None:
     with pytest.raises(BriefInputError):
         _draft(reflection_notes=())

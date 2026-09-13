@@ -296,6 +296,20 @@ def test_mail_body_that_does_not_reproduce_the_packet_blocks_is_rejected(mutate:
         _packet_with_mail(jp, body)
 
 
+@pytest.mark.parametrize(
+    "condition",
+    [
+        "경력 10년 이상 필수",
+        "연봉 1억 이상 협의",
+        "석사 이상 지원 가능",
+    ],
+)
+def test_mail_body_rejects_recruiting_conditions_outside_jd_blocks(condition: str) -> None:
+    jp = _jd_packet(_jd())
+    with pytest.raises(BriefInputError):
+        _packet_with_mail(jp, _mail_body(jp) + f"\n{condition}")
+
+
 def test_omitting_every_section_cannot_yield_an_empty_linkedin_body() -> None:
     jd = _jd()
     headings = tuple(

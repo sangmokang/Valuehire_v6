@@ -271,6 +271,7 @@ def test_to_json_and_from_json_round_trip_is_identical() -> None:
 
 def test_to_json_encodes_date_enum_and_tuple_in_contract_shape() -> None:
     decoded = json.loads(to_json(_packet()))
+    assert decoded["schema_version"] == 1
     assert decoded["company"]["sources"][0]["checked_on"] == "2026-09-10"
     assert decoded["candidates"][0]["degree"] == "second"
     assert isinstance(decoded["boolean_queries"], list)
@@ -293,6 +294,20 @@ def test_from_json_rejects_unknown_key() -> None:
 def test_from_json_rejects_missing_field() -> None:
     payload = json.loads(to_json(_packet()))
     del payload["mail"]
+    with pytest.raises(BriefInputError):
+        from_json(json.dumps(payload, ensure_ascii=False))
+
+
+def test_from_json_rejects_legacy_packet_without_schema_version() -> None:
+    payload = json.loads(to_json(_packet()))
+    del payload["schema_version"]
+    with pytest.raises(BriefInputError):
+        from_json(json.dumps(payload, ensure_ascii=False))
+
+
+def test_from_json_rejects_packet_with_unknown_schema_version() -> None:
+    payload = json.loads(to_json(_packet()))
+    payload["schema_version"] = 2
     with pytest.raises(BriefInputError):
         from_json(json.dumps(payload, ensure_ascii=False))
 
