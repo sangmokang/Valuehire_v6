@@ -47,6 +47,7 @@ from humansearch.brief import (
     load_intent,
     mark,
     open_new_attempt,
+    recipients_digest,
     record_intent,
     split_sections,
     split_two_field,
@@ -198,7 +199,7 @@ def _intent(body: str = _mail_body(_JP, "정상 본문")) -> SendIntent:
         packet_id=_PACKET_ID,
         channel="gmail",
         attempt=1,
-        recipients_sha256=_sha256("sangmokang@valueconnect.kr"),
+        recipients_sha256=recipients_digest(("sangmokang@valueconnect.kr",), ()),
         body_sha256=_sha256(body),
         recorded_at=_moment(3),
         state=SendState.INTENT,
@@ -213,7 +214,7 @@ def _claim(directory: Path, body: str = _mail_body(_JP, "정상 본문")) -> Non
         1,
         at=_moment(4),
         evidence="러너가 발송 직전 청구",
-        recipients_sha256=_sha256("sangmokang@valueconnect.kr"),
+        recipients_sha256=recipients_digest(("sangmokang@valueconnect.kr",), ()),
         body_sha256=_sha256(body),
     )
 
@@ -401,3 +402,53 @@ def test_verify_and_mark_rejects_message_id_from_another_attempt(tmp_path: Path)
     )
     with pytest.raises(BriefInputError):
         cli_module.verify_and_mark(directory, packet_path, sent_path, "msg-1", _moment(8))
+
+
+def test_verify_and_mark_rejects_packet_recipients_changed_after_send_claim(tmp_path: Path) -> None:
+    body = "정상 본문"
+    directory = _ledger(tmp_path)
+    original = _intent(_mail_body(_JP, body))
+    record_intent(directory, original)
+    _claim(directory, _mail_body(_JP, body))
+    mark(directory, _PACKET_ID, "gmail", 1, SendState.SENT_UNVERIFIED, "msg-1", _moment(5), "발송함 id")
+
+    packet_path, sent_path = _write_packet_and_sent(
+        tmp_path, body, f"{body}\npacket-id: {_PACKET_ID}"
+    )
+    payload = json.loads(packet_path.read_text(encoding="utf-8"))
+    payload["mail"]["to"] = ["other@example.org"]
+    packet_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+    with pytest.raises(BriefInputError):
+        cli_module.verify_and_mark(directory, packet_path, sent_path, "msg-1", _moment(6))
+
+
+def test_main_verify_mark_writes_verified_transition(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    body = "정상 본문"
+    directory = _ledger(tmp_path)
+    record_intent(directory, _intent(_mail_body(_JP, body)))
+    _claim(directory, _mail_body(_JP, body))
+    mark(directory, _PACKET_ID, "gmail", 1, SendState.SENT_UNVERIFIED, "msg-1", _moment(5), "발송함 id")
+    packet_path, sent_path = _write_packet_and_sent(
+        tmp_path, body, f"{body}\npacket-id: {_PACKET_ID}"
+    )
+
+    from humansearch.brief.__main__ import main
+
+    code = main([
+        "verify",
+        "--packet",
+        str(packet_path),
+        "--sent",
+        str(sent_path),
+        "--mark-dir",
+        str(directory),
+        "--message-id",
+        "msg-1",
+        "--at",
+        _moment(6).isoformat(),
+    ])
+
+    assert code == 0
+    assert "VERIFIED" in capsys.readouterr().out
+    assert load_intent(directory, _PACKET_ID, "gmail").state is SendState.VERIFIED

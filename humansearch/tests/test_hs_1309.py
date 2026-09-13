@@ -47,6 +47,7 @@ from humansearch.brief import (
     may_send,
     open_new_attempt,
     packet_id,
+    recipients_digest,
     record_intent,
     split_sections,
     split_two_field,
@@ -374,6 +375,33 @@ def test_resaving_changed_packet_overwrites_in_place(tmp_path: Path) -> None:
     assert len(list(directory.glob("*.packet.json"))) == 1
     assert store.load(_PACKET_ID) == _packet("두 번째 문구")
     assert _mode(target) == 0o600
+
+
+def test_save_rejects_changed_packet_after_send_intent_exists(tmp_path: Path) -> None:
+    directory = tmp_path / "packets"
+    store = PacketStore(directory)
+    original = _packet("첫 문구")
+    store.save(original)
+    record_intent(directory, _intent(body_sha256=original.mail.body_sha256))
+
+    with pytest.raises(BriefInputError):
+        store.save(_packet("두 번째 문구"))
+
+    assert store.load(_PACKET_ID) == original
+
+
+def test_recipients_digest_is_sorted_and_distinguishes_to_from_cc() -> None:
+    assert recipients_digest(
+        ("z@example.org", "a@example.org"), ("c@example.org",)
+    ) == recipients_digest(("a@example.org", "z@example.org"), ("c@example.org",))
+    assert recipients_digest(("a@example.org",), ("c@example.org",)) != recipients_digest(
+        ("a@example.org", "c@example.org"), ()
+    )
+
+
+def test_recipients_digest_rejects_duplicate_across_to_and_cc() -> None:
+    with pytest.raises(BriefInputError):
+        recipients_digest(("a@example.org",), ("a@example.org",))
 
 
 def test_load_returns_the_saved_packet(tmp_path: Path) -> None:
