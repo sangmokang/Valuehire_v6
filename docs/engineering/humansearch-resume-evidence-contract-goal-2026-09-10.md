@@ -156,3 +156,46 @@ WU-0A 의 Codex 적대검증 7회차까지에서 닫지 못한 지적:
 ## 적대 검증 로그
 
 (후기록 — V1/V2 판정 본문을 그대로 append)
+
+## 2026-09-14 회수와 최신 지시 반영
+
+최신 실행 문서 `/Users/kangsangmo/Desktop/hs-next-prompt-v5-20260914.md`를 끝까지 읽고 이 WU를
+HS-02.01 최소 열람 증거 계약으로 회수했다. 이번 범위는 `docs/sot/humansearch-evidence-contract.md`와
+이 goal 연결만 소유한다. RPS 프로젝트 생성·기존 필터 업데이트 입력 계약, Aside 전용 브라우저 정책,
+합성 runtime 스키마 시험은 다른 WU가 소유한다.
+
+원래 goal은 새 인수 검사 스크립트 생성을 계획했지만, 최신 작업 지시는 문서 WU에 대해 필드/반례 대조
+검토면 충분하고 신규 범용 parser/검사기를 만들지 말라고 좁혔다. 따라서 이번 회수에서는 새 검사기를
+추가하지 않고, 계약 문서 안의 `검사 명령:` 줄과 아래 대조 명령으로 확인한다.
+
+### 최신 인수 기준
+
+`docs/sot/humansearch-evidence-contract.md`는 아래를 모두 포함해야 한다.
+
+1. 출처 URL, 관측 시각, 문서 높이, 캡처 구간 좌표와 해시.
+2. `complete` / `partial` / `failed` 구분과 실패 사유.
+3. NULL, 빈 값, 미관측, 제공 안 됨, 가림 상태의 구분.
+4. 회사별 담당 업무와 회사 별칭의 근거 상태.
+5. 후보가 나온 검색 조건 참조와 RPS 필터 적용 결과 재조회 증거 참조.
+6. 독립 재조회 상태와 저장 실패 시 중단 사유.
+7. 8개 counter-AC와 각 항목의 `검사 명령:`.
+
+검증 명령:
+
+```bash
+rg -n '`source_url`|`observed_at`|`document_height_px`|`segments`|`coverage_status`|`coverage_reason`|`last_observed_y_px`|observed_empty|not_observed|not_available|`company_duties`|`company_aliases`|`search_condition_ref`|`readback_status`' docs/sot/humansearch-evidence-contract.md
+rg -n '구간 무누락 manifest|마지막 화면|NULL 구분|회사별 duty|검색 조건 보존|원격 경로 금지|readback|회사 별칭' docs/sot/humansearch-evidence-contract.md
+rg -c '검사 명령:' docs/sot/humansearch-evidence-contract.md
+bash scripts/acceptance-principles-check.sh
+git diff --check
+```
+
+기대값: 첫 두 `rg` 명령은 필요한 필드와 8개 반례를 모두 찾고, `rg -c`는 8 이상을 출력한다.
+Strict 원칙 검사는 `VERDICT: PASS`, `CHECKED: 34`를 출력한다. `git diff --check`는 출력 없이 종료값 0이어야 한다.
+
+### 현재 제한
+
+- `docs/sot/strict-workflow.md`는 이 워크트리에 없어 직접 로드하지 못했다. strict 스킬의 저장소 SOT
+  우선 요구는 `NOT_RUN`으로 기록한다.
+- 최신 v5 문서는 main 병합 전 로컬 stacked 작업을 허용하지만, main 병합 조건을 충족했다고 주장하지 않는다.
+- 실제 브라우저 조작, 후보 개인정보 저장, RPS 프로젝트 쓰기, merge는 이번 WU에서 하지 않는다.
