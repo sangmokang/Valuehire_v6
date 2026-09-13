@@ -156,3 +156,66 @@ def test_open_new_attempt_round_trips_approval_binding_fields_through_the_ledger
     reloaded = load_attempt(directory, _PACKET_ID, "gmail", 2)
     assert reloaded is not None
     assert reloaded.approval == _approval()
+
+
+def test_open_new_attempt_records_the_new_attempt_digest_instead_of_copying_a1(
+    tmp_path: Path,
+) -> None:
+    directory = tmp_path / "ledger"
+    record_intent(directory, _intent())
+    body_sha256 = _sha256("정정된 본문")
+    recipients_sha256 = _sha256("정정된 수신자")
+    fresh, created = open_new_attempt(
+        directory,
+        _PACKET_ID,
+        "gmail",
+        approval=_approval(reason="정정된 본문과 수신자를 확인하고 재시도를 승인한다"),
+        at=_LATER,
+        body_sha256=body_sha256,
+        recipients_sha256=recipients_sha256,
+    )
+    assert created is True
+    assert fresh.body_sha256 == body_sha256
+    assert fresh.recipients_sha256 == recipients_sha256
+    reloaded = load_attempt(directory, _PACKET_ID, "gmail", 2)
+    assert reloaded is not None
+    assert reloaded.body_sha256 == body_sha256
+    assert reloaded.recipients_sha256 == recipients_sha256
+
+
+def test_open_new_attempt_requires_no_change_reason_when_digest_is_unchanged(
+    tmp_path: Path,
+) -> None:
+    directory = tmp_path / "ledger"
+    first = _intent()
+    record_intent(directory, first)
+    with pytest.raises(BriefInputError):
+        open_new_attempt(
+            directory,
+            _PACKET_ID,
+            "gmail",
+            approval=_approval(reason="발송함에서 찾지 못해 재시도를 승인한다"),
+            at=_LATER,
+            body_sha256=first.body_sha256,
+            recipients_sha256=first.recipients_sha256,
+        )
+
+
+def test_open_new_attempt_accepts_unchanged_digest_with_explicit_no_change_reason(
+    tmp_path: Path,
+) -> None:
+    directory = tmp_path / "ledger"
+    first = _intent()
+    record_intent(directory, first)
+    fresh, created = open_new_attempt(
+        directory,
+        _PACKET_ID,
+        "gmail",
+        approval=_approval(reason="정정 없음 — 발송함에서 찾지 못해 재시도를 승인한다"),
+        at=_LATER,
+        body_sha256=first.body_sha256,
+        recipients_sha256=first.recipients_sha256,
+    )
+    assert created is True
+    assert fresh.body_sha256 == first.body_sha256
+    assert fresh.recipients_sha256 == first.recipients_sha256

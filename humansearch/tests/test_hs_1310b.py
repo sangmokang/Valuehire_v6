@@ -24,6 +24,8 @@ from datetime import date
 from pathlib import Path
 from urllib.parse import unquote
 
+import pytest
+
 from humansearch.brief import (
     CandidateEvidence,
     CandidateLead,
@@ -36,12 +38,22 @@ from humansearch.brief import (
     PositionSpec,
     ScoreBreakdown,
     SearchPacket,
+    SendIntent,
+    SendState,
     SourceRef,
     TeamMail,
+    BriefInputError,
+    claim_send,
+    load_intent,
+    mark,
+    open_new_attempt,
+    record_intent,
     split_sections,
     split_two_field,
     to_json,
 )
+from humansearch.brief import Approval
+from humansearch.brief import cli as cli_module
 from humansearch.brief.cli import normalize_readback, verify
 
 # --- 실측 형태 ---------------------------------------------------------------
@@ -72,6 +84,12 @@ _LEAD_URL = "https://www.linkedin.com/in/example-lead"
 
 def _sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _moment(hour: int) -> object:
+    from datetime import UTC, datetime
+
+    return datetime(2026, 9, 10, hour, 0, 0, tzinfo=UTC)
 
 
 def _faithful_jd_packet(source: JdSource, company_intro: str = "회사 소개 필드") -> JdPacket:
@@ -159,6 +177,56 @@ def _round_trip(tmp_path: Path, sent_body: str, packet_body: str) -> tuple[int, 
     sent_path = tmp_path / "sent.txt"
     sent_path.write_bytes(_mail_body(_JP, sent_body).encode("utf-8"))
     return verify(packet_path, sent_path)
+
+
+def _write_packet_and_sent(tmp_path: Path, packet_body: str, sent_body: str) -> tuple[Path, Path]:
+    packet_path = tmp_path / "packet.json"
+    packet_path.write_text(to_json(_packet(_mail_body(_JP, packet_body))), encoding="utf-8")
+    sent_path = tmp_path / "sent.txt"
+    sent_path.write_text(_mail_body(_JP, sent_body), encoding="utf-8")
+    return packet_path, sent_path
+
+
+def _ledger(tmp_path: Path) -> Path:
+    directory = tmp_path / "ledger"
+    directory.mkdir(mode=0o700)
+    return directory
+
+
+def _intent(body: str = _mail_body(_JP, "정상 본문")) -> SendIntent:
+    return SendIntent(
+        packet_id=_PACKET_ID,
+        channel="gmail",
+        attempt=1,
+        recipients_sha256=_sha256("sangmokang@valueconnect.kr"),
+        body_sha256=_sha256(body),
+        recorded_at=_moment(3),
+        state=SendState.INTENT,
+    )
+
+
+def _claim(directory: Path, body: str = _mail_body(_JP, "정상 본문")) -> None:
+    claim_send(
+        directory,
+        _PACKET_ID,
+        "gmail",
+        1,
+        at=_moment(4),
+        evidence="러너가 발송 직전 청구",
+        recipients_sha256=_sha256("sangmokang@valueconnect.kr"),
+        body_sha256=_sha256(body),
+    )
+
+
+def _approval(from_attempt: int = 1) -> Approval:
+    return Approval(
+        approved_by="sangmokang@valueconnect.kr",
+        search_query='in:sent subject:"[포지션]"',
+        search_checked_at="2026-09-10T05:00:00+00:00",
+        reason="정정 없음 — 발송함에서 찾지 못해 재시도를 승인한다",
+        packet_id=_PACKET_ID,
+        from_attempt=from_attempt,
+    )
 
 
 # --- 1. 감싼 URL 1개 -----------------------------------------------------------
@@ -263,3 +331,73 @@ def test_verify_requires_exactly_one_matching_packet_id_tail(tmp_path: Path) -> 
     assert code == 1 and "reason=tail_mismatch" in message
     code, message = _round_trip(tmp_path, f"{good}\npacket-id: {_PACKET_ID}", body)
     assert code == 1 and "reason=tail_duplicate" in message
+
+
+def test_public_mark_cannot_create_verified_state(tmp_path: Path) -> None:
+    directory = _ledger(tmp_path)
+    record_intent(directory, _intent())
+    _claim(directory)
+    mark(directory, _PACKET_ID, "gmail", 1, SendState.SENT_UNVERIFIED, "msg-1", _moment(5), "발송함 id")
+    with pytest.raises(BriefInputError):
+        mark(directory, _PACKET_ID, "gmail", 1, SendState.VERIFIED, "msg-1", _moment(6), "해시 일치")
+
+
+def test_verify_and_mark_rejects_failed_readback_and_keeps_unverified(tmp_path: Path) -> None:
+    body = "정상 본문"
+    directory = _ledger(tmp_path)
+    record_intent(directory, _intent(_mail_body(_JP, body)))
+    _claim(directory, _mail_body(_JP, body))
+    mark(directory, _PACKET_ID, "gmail", 1, SendState.SENT_UNVERIFIED, "msg-1", _moment(5), "발송함 id")
+    packet_path, sent_path = _write_packet_and_sent(tmp_path, body, body)
+    sent_path.write_text(_mail_body(_JP, body), encoding="utf-8")
+    with pytest.raises(BriefInputError):
+        cli_module.verify_and_mark(directory, packet_path, sent_path, "msg-1", _moment(6))
+    current = load_intent(directory, _PACKET_ID, "gmail")
+    assert current is not None
+    assert current.state is SendState.SENT_UNVERIFIED
+
+
+def test_verify_and_mark_rejects_packet_changed_after_send_claim(tmp_path: Path) -> None:
+    original = "정상 본문"
+    changed = "바뀐 본문"
+    directory = _ledger(tmp_path)
+    record_intent(directory, _intent(_mail_body(_JP, original)))
+    _claim(directory, _mail_body(_JP, original))
+    packet_path, sent_path = _write_packet_and_sent(
+        tmp_path, changed, f"{changed}\npacket-id: {_PACKET_ID}"
+    )
+    with pytest.raises(BriefInputError):
+        cli_module.verify_and_mark(directory, packet_path, sent_path, "msg-1", _moment(6))
+
+
+def test_verify_and_mark_rejects_message_id_from_another_attempt(tmp_path: Path) -> None:
+    body = "정상 본문"
+    directory = _ledger(tmp_path)
+    first = _intent(_mail_body(_JP, body))
+    record_intent(directory, first)
+    _claim(directory, _mail_body(_JP, body))
+    open_new_attempt(
+        directory,
+        _PACKET_ID,
+        "gmail",
+        approval=_approval(),
+        at=_moment(5),
+        body_sha256=first.body_sha256,
+        recipients_sha256=first.recipients_sha256,
+    )
+    claim_send(
+        directory,
+        _PACKET_ID,
+        "gmail",
+        2,
+        at=_moment(6),
+        evidence="러너가 발송 직전 청구",
+        recipients_sha256=first.recipients_sha256,
+        body_sha256=first.body_sha256,
+    )
+    mark(directory, _PACKET_ID, "gmail", 2, SendState.SENT_UNVERIFIED, "msg-2", _moment(7), "발송함 id")
+    packet_path, sent_path = _write_packet_and_sent(
+        tmp_path, body, f"{body}\npacket-id: {_PACKET_ID}"
+    )
+    with pytest.raises(BriefInputError):
+        cli_module.verify_and_mark(directory, packet_path, sent_path, "msg-1", _moment(8))

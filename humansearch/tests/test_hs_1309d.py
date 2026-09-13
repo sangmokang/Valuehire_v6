@@ -76,6 +76,24 @@ def _claim(directory: Path, attempt: int = 1, at: datetime = _CLAIM_AT) -> tuple
     )
 
 
+def _claim_with_digest(
+    directory: Path,
+    *,
+    recipients_sha256: str | None = None,
+    body_sha256: str | None = None,
+) -> tuple[SendIntent, bool]:
+    return claim_send(
+        directory,
+        _PACKET_ID,
+        "gmail",
+        1,
+        at=_CLAIM_AT,
+        evidence="러너가 발송 직전 청구",
+        recipients_sha256=recipients_sha256 or _sha256("sangmokang@valueconnect.kr"),
+        body_sha256=body_sha256 or _sha256("본문"),
+    )
+
+
 def _marker(directory: Path, attempt: int = 1) -> Path:
     return directory / f"{_PACKET_ID}.gmail.a{attempt}.claim.json"
 
@@ -252,3 +270,28 @@ def test_claim_rejects_blank_evidence(tmp_path: Path) -> None:
     record_intent(directory, _intent())
     with pytest.raises(BriefInputError):
         claim_send(directory, _PACKET_ID, "gmail", 1, at=_CLAIM_AT, evidence="   ")
+
+
+def test_claim_rejects_body_digest_changed_after_intent(tmp_path: Path) -> None:
+    directory = _ledger(tmp_path)
+    record_intent(directory, _intent())
+    with pytest.raises(BriefInputError):
+        _claim_with_digest(directory, body_sha256=_sha256("바뀐 본문"))
+
+
+def test_claim_rejects_recipients_digest_changed_after_intent(tmp_path: Path) -> None:
+    directory = _ledger(tmp_path)
+    record_intent(directory, _intent())
+    with pytest.raises(BriefInputError):
+        _claim_with_digest(directory, recipients_sha256=_sha256("a,b,c,d"))
+
+
+def test_claim_rejects_both_body_and_recipients_changed_after_intent(tmp_path: Path) -> None:
+    directory = _ledger(tmp_path)
+    record_intent(directory, _intent())
+    with pytest.raises(BriefInputError):
+        _claim_with_digest(
+            directory,
+            recipients_sha256=_sha256("a,b,c,d"),
+            body_sha256=_sha256("바뀐 본문"),
+        )
