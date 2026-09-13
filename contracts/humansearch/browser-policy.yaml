@@ -1,0 +1,27 @@
+# HumanSearch browser policy machine contract.
+# Source SOT: docs/sot/humansearch-browser-contract.md
+# Source prompt: /Users/kangsangmo/Desktop/hs-next-prompt-v5-20260914.md
+version: "2026-09-14.aside-policy"
+automation_app: Aside
+forbidden_app: Chrome
+chrome_non_interference:
+  windows_tabs_ports_profiles_extensions_settings: do_not_change
+  input_policy: do_not_steal_focus_or_type
+  chrome_input_is_owner_activity: true
+channels:
+  saramin: aside_dedicated_profile
+  jobkorea: aside_dedicated_profile
+  linkedin_rps: aside_owner_real_profile
+input_attribution: target_app_profile_tab
+resume_requires: fresh_observation_and_fresh_lease
+explicit_stop_requires_user_clear: true
+live_authority_verified: false
+observed_aside_capabilities:
+  applescript_windows_tabs_read: true
+  applescript_execute_javascript_probe: true
+  cdp_json_version_requires_authorization: true
+non_scope:
+  - rps_project_write
+  - linkedin_resume_save
+  - portal_live_run
+  - chrome_control

@@ -66,5 +66,13 @@ RED 단계는 `scripts/acceptance-hs-browser-policy.sh`를 추가한 뒤 현재 
 ## 검증 장부
 
 - Strict 원칙 직접 로드: `bash scripts/acceptance-principles-check.sh` → `VERDICT: PASS`, `CHECKED: 34`.
-- RED: 아직 실행 전.
-- GREEN: 아직 실행 전.
+- RED: `bash scripts/acceptance-hs-browser-policy.sh` → `VERDICT: FAIL`, `CHECKED: 22`. 이유는 `contracts/humansearch/browser-policy.yaml` 부재, Aside 전용·Chrome 비간섭·채널별 프로필·입력 귀속·재개/STOP 문구 누락, 오래된 `자동 재개하지 않는다.` 문구다.
+- GREEN:
+  - `bash scripts/acceptance-hs-browser-policy.sh` → `VERDICT: PASS`, `CHECKED: 22`.
+  - `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-browser-policy.sh` → `OK(run-acceptance)`, 판정 23건, `CHECKED 22`.
+  - `bash scripts/acceptance-verify-ac-m.sh` → `CHECKED: 31`, mechanism registry 21개와 검사기 보고 21개 일치.
+  - `bash verify.sh` → `PASS: no secret-pattern match in any tracked file, .env not tracked`.
+  - `bash scripts/acceptance-principles-check.sh` → `VERDICT: PASS`, `CHECKED: 34`.
+  - `bash scripts/acceptance-ci-step-integrity.sh` → `VERDICT: PASS`, `CHECKED: 24`.
+  - `bash scripts/acceptance-semantic-mutations.sh` → `VERDICT: PASS`, `CHECKED: 16`.
+  - `bash -n scripts/acceptance-hs-browser-policy.sh && git diff --check` → 종료값 0.
