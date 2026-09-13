@@ -21,13 +21,15 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from urllib.parse import unquote
 
 import pytest
 
 from humansearch.brief import (
+    Approval,
+    BriefInputError,
     CandidateEvidence,
     CandidateLead,
     Claim,
@@ -43,7 +45,6 @@ from humansearch.brief import (
     SendState,
     SourceRef,
     TeamMail,
-    BriefInputError,
     claim_send,
     load_intent,
     mark,
@@ -54,7 +55,6 @@ from humansearch.brief import (
     split_two_field,
     to_json,
 )
-from humansearch.brief import Approval
 from humansearch.brief import cli as cli_module
 from humansearch.brief.cli import normalize_readback, verify
 
@@ -88,7 +88,7 @@ def _sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def _moment(hour: int) -> object:
+def _moment(hour: int) -> datetime:
     from datetime import UTC, datetime
 
     return datetime(2026, 9, 10, hour, 0, 0, tzinfo=UTC)
@@ -452,4 +452,6 @@ def test_main_verify_mark_writes_verified_transition(tmp_path: Path, capsys: pyt
 
     assert code == 0
     assert "VERIFIED" in capsys.readouterr().out
-    assert load_intent(directory, _PACKET_ID, "gmail").state is SendState.VERIFIED
+    verified = load_intent(directory, _PACKET_ID, "gmail")
+    assert verified is not None
+    assert verified.state is SendState.VERIFIED

@@ -24,12 +24,12 @@ from humansearch.brief import (
     BriefInputError,
     SendIntent,
     SendState,
-    claim_send,
     load_intent,
     mark,
-    open_new_attempt,
     record_intent,
 )
+from humansearch.brief import claim_send as _raw_claim_send
+from humansearch.brief import open_new_attempt as _raw_open_new_attempt
 
 _PACKET_ID = "86e1abcd-0123abcd"
 _AT = datetime(2026, 9, 10, 3, 20, 0, tzinfo=UTC)
@@ -41,8 +41,6 @@ def _sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-_raw_claim_send = claim_send
-_raw_open_new_attempt = open_new_attempt
 
 
 def claim_send(

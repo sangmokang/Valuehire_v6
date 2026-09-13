@@ -45,14 +45,14 @@ from humansearch.brief import (
     SendState,
     SourceRef,
     TeamMail,
-    claim_send,
     load_attempt,
     load_intent,
-    open_new_attempt,
     record_intent,
     split_sections,
     split_two_field,
 )
+from humansearch.brief import claim_send as _raw_claim_send
+from humansearch.brief import open_new_attempt as _raw_open_new_attempt
 from humansearch.brief import send_claim as send_claim_module
 from humansearch.brief import send_ledger as send_ledger_module
 from humansearch.brief.policy import override_policy_for_tests, policy
@@ -70,8 +70,6 @@ def _sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-_raw_claim_send = claim_send
-_raw_open_new_attempt = open_new_attempt
 
 
 def claim_send(

@@ -39,13 +39,11 @@ from humansearch.brief import (
     SourceRef,
     TeamMail,
     Transition,
-    claim_send,
     from_json,
     load_attempt,
     load_intent,
     mark,
     may_send,
-    open_new_attempt,
     packet_id,
     recipients_digest,
     record_intent,
@@ -53,6 +51,8 @@ from humansearch.brief import (
     split_two_field,
     to_json,
 )
+from humansearch.brief import claim_send as _raw_claim_send
+from humansearch.brief import open_new_attempt as _raw_open_new_attempt
 from humansearch.brief import packet as packet_module
 from humansearch.brief import send_ledger as send_ledger_module
 
@@ -72,8 +72,6 @@ def _sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-_raw_claim_send = claim_send
-_raw_open_new_attempt = open_new_attempt
 
 
 def claim_send(

@@ -24,9 +24,9 @@ from humansearch.brief import (
     SendIntent,
     SendState,
     load_attempt,
-    open_new_attempt,
     record_intent,
 )
+from humansearch.brief import open_new_attempt as _raw_open_new_attempt
 
 _PACKET_ID = "86e1abcd-0a1b2c3d"
 _OTHER_PACKET_ID = "86e1abcd-1a2b3c4d"
@@ -43,7 +43,6 @@ def _sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-_raw_open_new_attempt = open_new_attempt
 
 
 def open_new_attempt(
