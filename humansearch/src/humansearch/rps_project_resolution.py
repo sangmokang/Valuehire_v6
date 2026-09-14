@@ -75,11 +75,27 @@ class _ProjectLink:
     position_id: str
 
 
+@dataclass(frozen=True, slots=True)
+class _ResolutionInput:
+    target: _Target
+    observation: _Observation
+    project_links: Sequence[_ProjectLink]
+    mapped_project_id: str | None
+    pending_creation_intent: bool
+
+
 def resolve_rps_project(payload: object) -> RpsProjectResolution:
     """Resolve a project from a completed observation without external writes."""
 
     if not isinstance(payload, dict):
         return _result(RpsProjectStatus.INVALID_INPUT, None, None, "payload must be an object")
+    parsed = _resolution_input(payload)
+    if isinstance(parsed, RpsProjectResolution):
+        return parsed
+    return _resolve_observed_projects(parsed)
+
+
+def _resolution_input(payload: Mapping[str, object]) -> _ResolutionInput | RpsProjectResolution:
     target = _target(payload)
     position_id = target.position_id if target is not None else _optional_text(payload, "position_id")
     if target is None:
@@ -129,47 +145,81 @@ def resolve_rps_project(payload: object) -> RpsProjectResolution:
             None,
             "pending_creation_intent must be a bool",
         )
-    projects = observation.projects
-    if _query_failed(observation) or _has_conflicting_duplicate_ids(projects):
+    return _ResolutionInput(
+        target=target,
+        observation=observation,
+        project_links=tuple(project_links),
+        mapped_project_id=mapped_project_id,
+        pending_creation_intent=pending_creation_intent,
+    )
+
+
+def _resolve_observed_projects(context: _ResolutionInput) -> RpsProjectResolution:
+    target = context.target
+    projects = context.observation.projects
+    if _query_failed(context.observation) or _has_conflicting_duplicate_ids(projects):
         return _result(
             RpsProjectStatus.QUERY_FAILED,
             target.position_id,
             None,
             "project observation is incomplete, stale, errored, or internally conflicting",
         )
-    if pending_creation_intent:
+    if context.pending_creation_intent:
         return _result(
             RpsProjectStatus.RECONCILE_REQUIRED,
             target.position_id,
             None,
             "existing creation intent must be reconciled before another create decision",
         )
-    if _target_link_exists(target, project_links) and not isinstance(mapped_project_id, str):
+    if _target_link_exists(target, context.project_links) and context.mapped_project_id is None:
         return _result(
             RpsProjectStatus.MAPPING_CONFLICT,
             target.position_id,
             None,
             "project link for the target exists but no mapped project id was supplied",
         )
-    by_id = {project.project_id: project for project in projects}
-    if isinstance(mapped_project_id, str):
-        mapped = by_id.get(mapped_project_id)
-        if mapped is None or not _has_target_id_evidence(mapped, target):
-            return _result(
-                RpsProjectStatus.MAPPING_CONFLICT,
-                target.position_id,
-                None,
-                "mapped project id was absent or did not match the target evidence",
-            )
-        link_conflict = _link_conflict(mapped.project_id, target, project_links)
-        if link_conflict or _target_link_conflict(mapped.project_id, target, project_links):
-            return _mapping_conflict(target.position_id)
+    if context.mapped_project_id is not None:
+        return _resolve_mapped_project(context, projects)
+    return _resolve_unmapped_projects(context, projects)
+
+
+def _resolve_mapped_project(
+    context: _ResolutionInput, projects: Sequence[_Project]
+) -> RpsProjectResolution:
+    target = context.target
+    mapped_project_id = context.mapped_project_id
+    if mapped_project_id is None:
         return _result(
-            RpsProjectStatus.REUSE,
+            RpsProjectStatus.INVALID_INPUT,
             target.position_id,
-            mapped.project_id,
-            "mapped project id matched the target evidence",
+            None,
+            "mapped project id was required for mapped resolution",
         )
+    by_id = {project.project_id: project for project in projects}
+    mapped = by_id.get(mapped_project_id)
+    if mapped is None or not _has_target_id_evidence(mapped, target):
+        return _result(
+            RpsProjectStatus.MAPPING_CONFLICT,
+            target.position_id,
+            None,
+            "mapped project id was absent or did not match the target evidence",
+        )
+    if _link_conflict(mapped.project_id, target, context.project_links) or _target_link_conflict(
+        mapped.project_id, target, context.project_links
+    ):
+        return _mapping_conflict(target.position_id)
+    return _result(
+        RpsProjectStatus.REUSE,
+        target.position_id,
+        mapped.project_id,
+        "mapped project id matched the target evidence",
+    )
+
+
+def _resolve_unmapped_projects(
+    context: _ResolutionInput, projects: Sequence[_Project]
+) -> RpsProjectResolution:
+    target = context.target
     matching_ids = {
         project.project_id for project in projects if _has_target_id_evidence(project, target)
     }
@@ -177,17 +227,17 @@ def resolve_rps_project(payload: object) -> RpsProjectResolution:
     has_partial_target_id_evidence = any(
         _has_partial_target_id_evidence(project, target) for project in projects
     )
-    if has_name_only_match and matching_ids:
+    if matching_ids and (has_name_only_match or has_partial_target_id_evidence):
         return _result(
             RpsProjectStatus.AMBIGUOUS,
             target.position_id,
             None,
-            "stable target evidence was mixed with name-only project evidence",
+            "stable target evidence was mixed with unresolved project evidence",
         )
     if len(matching_ids) == 1:
         project_id = next(iter(matching_ids))
-        if _link_conflict(project_id, target, project_links) or _target_link_conflict(
-            project_id, target, project_links
+        if _link_conflict(project_id, target, context.project_links) or _target_link_conflict(
+            project_id, target, context.project_links
         ):
             return _mapping_conflict(target.position_id)
         return _result(
