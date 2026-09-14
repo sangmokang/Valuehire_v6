@@ -192,6 +192,20 @@ def _has_extra_condition(line: str) -> bool:
     return any(re.compile(pattern).search(line) for pattern in EXTRA_CONDITION_PATTERNS)
 
 
+_COMPANY_FIELD_CONDITION_PATTERNS: tuple[str, ...] = (
+    r"\d+\s*~?\s*\d*\s*년\s*(이상|이하|차|이내)",
+    r"경력\s*\d+",
+    r"신입",
+    r"(학사|석사|박사)\s*(이상|학위)",
+    r"연봉",
+    r"\d[\d,]*\s*만\s*원",
+)
+
+
+def _has_company_field_condition(line: str) -> bool:
+    return any(re.compile(pattern).search(line) for pattern in _COMPANY_FIELD_CONDITION_PATTERNS)
+
+
 @dataclass(frozen=True)
 class SearchPacket:
     """한 포지션의 브리프를 만들기 위해 모은 구조화 자료 묶음."""
@@ -290,9 +304,12 @@ class SearchPacket:
         jd_line_indexes.update(range(lines.index("[복사 시작]") + 1, end))
         if end >= len(lines) or lines[end] != "[복사 끝]":
             _reject("TeamMail.body 의 LinkedIn 블록이 '[복사 끝]' 로 닫히지 않는다")
+        company_marker_index = lines.index("[필드 1: 회사 소개]")
+        company_line_indexes: set[int] = set()
         end = _block_after(
             lines, "[필드 1: 회사 소개]", tuple(packet.two_field_company.splitlines()), "필드 1"
         )
+        company_line_indexes.update(range(company_marker_index + 1, end))
         if lines[end : end + 2] != ("", "[필드 2: JD 내용]"):
             _reject(
                 "TeamMail.body 의 필드 1 블록 뒤에 빈 줄과 '[필드 2: JD 내용]' 이 이어지지 않는다"
@@ -302,5 +319,12 @@ class SearchPacket:
         )
         jd_line_indexes.update(range(lines.index("[필드 2: JD 내용]") + 1, end))
         for index, line in enumerate(lines):
-            if index not in jd_line_indexes and _has_extra_condition(line):
+            if index in jd_line_indexes:
+                continue
+            has_condition = (
+                _has_company_field_condition(line)
+                if index in company_line_indexes
+                else _has_extra_condition(line)
+            )
+            if has_condition:
                 _reject(f"TeamMail.body 의 JD 블록 밖에 채용 조건이 끼었다: {line!r}")

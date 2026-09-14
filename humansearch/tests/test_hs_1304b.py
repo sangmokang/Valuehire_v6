@@ -310,6 +310,30 @@ def test_mail_body_rejects_recruiting_conditions_outside_jd_blocks(condition: st
         _packet_with_mail(jp, _mail_body(jp) + f"\n{condition}")
 
 
+@pytest.mark.parametrize(
+    "company_intro",
+    [
+        "예시 고객사는 2024년 300억원 누적 투자를 유치했습니다.",
+        "예시 고객사는 연 매출 300억원 규모의 커머스 기업입니다.",
+    ],
+)
+def test_company_intro_allows_business_amount_facts(company_intro: str) -> None:
+    _packet(jd_packet=_jd_packet(_jd(), two_field_company=company_intro))
+
+
+@pytest.mark.parametrize(
+    "company_intro",
+    [
+        "예시 고객사는 경력 10년 이상만 지원할 수 있습니다.",
+        "예시 고객사는 석사 이상 지원 가능합니다.",
+        "예시 고객사는 연봉 1억 이상을 보장합니다.",
+    ],
+)
+def test_company_intro_still_rejects_recruiting_conditions(company_intro: str) -> None:
+    with pytest.raises(BriefInputError):
+        _packet(jd_packet=_jd_packet(_jd(), two_field_company=company_intro))
+
+
 def test_omitting_every_section_cannot_yield_an_empty_linkedin_body() -> None:
     jd = _jd()
     headings = tuple(
