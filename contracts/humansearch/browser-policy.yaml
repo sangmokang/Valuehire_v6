@@ -16,10 +16,6 @@ input_attribution: target_app_profile_tab
 resume_requires: fresh_observation_and_fresh_lease
 explicit_stop_requires_user_clear: true
 live_authority_verified: false
-observed_aside_capabilities:
-  applescript_windows_tabs_read: true
-  applescript_execute_javascript_probe: true
-  cdp_json_version_requires_authorization: true
 non_scope:
   - rps_project_write
   - linkedin_resume_save

@@ -223,7 +223,7 @@ Chrome 공식 문서는 HumanSearch의 목표 탭, 사용권, 사람 입력 감�
 
 ```json
 {
-  "channel": "saramin | jobkorea | linkedin",
+  "channel": "saramin | jobkorea | linkedin_rps",
   "lease_id": "opaque-id",
   "fencing_number": "strictly-increasing-integer",
   "expires_at": "timestamp",
@@ -237,12 +237,14 @@ Chrome 공식 문서는 HumanSearch의 목표 탭, 사용권, 사람 입력 감�
 → 계약이 말하는 것: 만료 시각과 이전 권한을 무효화하는 증가 번호가 없으면 브라우저 명령을 낼 수
 없다. 현재 값보다 작은 증가 번호, 만료된 사용권, 다른 채널의 사용권은 모두 거부한다.
 
-LinkedIn Recruiter도 다른 채널과 같은 사용권 구조를 쓴다. 다만 `profile_instance_proof`는 전용
-새 프로필이 아니라 사장님 실제 로그인 프로필의 증거여야 한다(§4 LinkedIn Recruiter 절).
+LinkedIn Recruiter RPS 채널도 다른 채널과 같은 사용권 구조를 쓴다. 다만 `channel` 값은
+`linkedin_rps`이고, `profile_instance_proof`는 전용 새 프로필이 아니라 사장님 실제 로그인 프로필의
+증거여야 한다(§4 LinkedIn Recruiter 절).
 
 모든 외부 효과 직전에는 사용권, 만료, 증가 번호와 사람 개입 상태를 다시 읽는다. 작업 시작 때 한 번
-검사한 결과를 긴 작업 전체에 재사용하지 않는다. 채널당 두 번째 작업이 사용권을 얻으려 하면 기다리며
-첫 작업의 권한을 훔치거나 브라우저를 다시 시작하지 않는다.
+검사한 결과를 긴 작업 전체에 재사용하지 않는다. 중단 뒤 재개는 기존 사용권 재사용이 아니라 새 관측과
+새 사용권 획득으로만 시작한다. 채널당 두 번째 작업이 사용권을 얻으려 하면 기다리며 첫 작업의 권한을
+훔치거나 브라우저를 다시 시작하지 않는다.
 
 ### 9. 사람 입력과 권한 회수
 
@@ -355,7 +357,7 @@ C1은 로그인 만료, 보안문자, 2단계 인증, 세션 충돌, 사람 입�
 - 정상 작업마다 Active Tab Bridge 버튼을 누른다.
 - 기본 사람 프로필이나 기억한 포트·경로에 직접 붙는다.
 - Chrome의 창·탭·포트·프로필·확장·설정을 변경하거나 Chrome 입력을 Aside 사용자 개입으로 해석한다.
-- 로그인 복구 뒤 자동 재개한다.
+- 로그인 복구만으로 기존 사용권을 이어 자동 재개한다.
 - raw CDP 또는 범용 target 제어가 제품의 기본 경계다.
 - LinkedIn Recruiter 사이트 내부 자동 순회를 오너 승인 없이 전면 금지한다(§2-1 — 2026-08-19 정정으로
   대체됨).

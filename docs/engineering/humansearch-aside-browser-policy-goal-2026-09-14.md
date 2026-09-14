@@ -77,3 +77,6 @@ RED 단계는 `scripts/acceptance-hs-browser-policy.sh`를 추가한 뒤 현재 
   - `bash scripts/acceptance-semantic-mutations.sh` → `VERDICT: PASS`, `CHECKED: 16`.
   - `bash -n scripts/acceptance-hs-browser-policy.sh && git diff --check` → 종료값 0.
 - 외부 결함주입 RED: `automation_app: Aside`를 주석으로 남기고 실제 값을 `Chrome`으로 바꾼 격리 사본이 기존 grep 검사에서 통과했다. 중복키, 불리언 문자열, 주석만 남긴 no-op 계약도 같은 계열 반례로 고정한다.
+
+- 2026-09-14 RED: 부모 독립 반례에서 `automation_app: Aside`가 주석에만 있고 실제 값이 `Chrome`인 계약, 중복 키, 타입 위장도 기존 검사기가 PASS하는 높은 검사무결성 결함이 재현됐다. `scripts/acceptance-hs-browser-policy-mutations.sh`가 현재 정상 계약은 PASS하지만 주석 위장·중복 키·문자열 boolean·comment-only no-op 반례를 잡지 못해 FAIL한다.
+- 2026-09-14 GREEN: `scripts/acceptance-hs-browser-policy.sh`가 Ruby Psych로 계약 YAML의 실제 값·타입·중복 키·허용 키를 검사한다. mutation 검사에서 정상 계약은 PASS, 주석 위장/중복 키/문자열 boolean/comment-only no-op 반례는 모두 exit 1로 고정됐다. SOT §8은 채널 값을 `linkedin_rps`로 맞췄고, §13은 로그인 복구만으로 기존 사용권을 이어 자동 재개하는 주장만 대체한다고 좁혀 새 관측·새 사용권 재개 계약과 충돌하지 않게 했다.
