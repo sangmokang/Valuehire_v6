@@ -182,15 +182,15 @@ def _canonical_heading(text: str) -> str:
 
 def _is_frame_line(line: str) -> bool:
     normalized = normalize_line(line)
-    prefix_allowed = (
-        normalize_line("제목:"),
-        normalize_line("문의:"),
+    prefix_allowed = tuple(
+        normalize_line(prefix) for prefix in LINKEDIN_FRAME_LINES if prefix in {"제목:", "문의:"}
     )
-    return normalized.startswith(prefix_allowed) or normalized in {
-        normalize_line("[복사 시작]"),
-        normalize_line("[복사 끝]"),
-        normalize_line("[회사 정보 보완]"),
+    exact_allowed = {
+        normalize_line(prefix)
+        for prefix in LINKEDIN_FRAME_LINES
+        if prefix not in {"제목:", "문의:"}
     }
+    return normalized.startswith(prefix_allowed) or normalized in exact_allowed
 
 
 def _matches_condition(line: str) -> bool:
