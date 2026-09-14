@@ -246,8 +246,9 @@ def test_rejects_existing_schema_with_hash_check_weakened_to_true(tmp_path: Path
 
 
 def test_rejects_root_inside_git_worktree(tmp_path: Path) -> None:
-    del tmp_path
-    repo_inside = Path.cwd().parent / "data" / "hs-db"
+    worktree = tmp_path / "worktree"
+    (worktree / ".git").mkdir(parents=True)
+    repo_inside = worktree / "data" / "hs-db"
 
     with pytest.raises(StorageSchemaError, match="outside the git worktree"):
         initialize_humansearch_storage(repo_inside)
