@@ -83,3 +83,15 @@ RED 단계는 `scripts/acceptance-hs-browser-policy.sh`를 추가한 뒤 현재 
 - 2026-09-14 RED-2: 독립 재감사에서 `Psych.parse_stream` 결과의 `Stream`/`Document` 노드를 순회하지 않아 마지막 값이 정상인 루트 중복키와 중첩 중복키가 exit 0으로 통과했다. mutation에 root `automation_app: Chrome` 뒤 `automation_app: Aside`, nested `input_policy: steal_focus` 뒤 정상값 반례를 추가해 `VERDICT: FAIL`, `CHECKED: 8`로 재현했다.
 - 2026-09-14 GREEN-2: YAML AST walker가 `Psych::Nodes::Stream`과 `Psych::Nodes::Document`의 children으로 내려가도록 수정했다. root/nested 중복키 반례는 마지막 값이 정상이어도 exit 1로 차단돼야 한다.
 - 2026-09-14 scope note: `live_authority_verified: false`는 정책 불변값이 아니라 현재 live Aside/RPS 권한을 증명하지 못한 상태 필드다. §8 채널당 lease와 다중 브라우저 결정의 관계는 후속 WU 부채로 남기며, HS-05.01에서는 확장하지 않는다.
+
+### 2026-09-14 외부 V1 복구와 현재 판정
+
+기존 Claude credit/기본 모델 제한 뒤 기존 로그인에서 Sonnet으로 제공 파일 검토를 실제 실행했다.
+대상은 18fc1b4의 정책 YAML, browser SOT, goal, 검사기와 변이 시험 전문이다. 종료값 0,
+정책·검사 정합성 PASS(문서/코드 제공 범위), 실제 runtime은 NOT_RUN으로 판정했다.
+외부 검토가 §13의 포괄적 자동 재개 금지 문구까지 제거됐다고 쓴 부분은 root 직접 조회와 달라
+채택하지 않았다. 해당 역사 표를 로그인만 복구한 옛 사용권 재개 금지와 새 관측·새 사용권 재개
+계약으로 분리해 정정했다. 이는 미래 runtime 성공을 주장하지 않는다.
+외부 검토의 channels/non_scope 추가 변이 제안은 현재 동작 결함 재현이 아닌 회귀 보강 제안으로
+남긴다. 기존 root 독립 V2에서 실제 8개 변이/정상 상태 검사 PASS를 확인했다.
+원출력은 private-reviews/hs-0501-20260914/v1-sonnet-root.jsonl 및 meta에 보존한다.
