@@ -102,6 +102,34 @@ else
   record 1 "불리언 문자열 위장 차단" "문자열 true 가 통과"
 fi
 
+root_duplicate_final_good=$(make_case root-duplicate-final-good)
+ruby -e '
+  path = ARGV[0]
+  text = File.read(path)
+  text = text.sub(/^automation_app: Aside$/, "automation_app: Chrome\nautomation_app: Aside")
+  File.write(path, text)
+' "$root_duplicate_final_good/contracts/humansearch/browser-policy.yaml"
+rc=$(run_case "$root_duplicate_final_good")
+if [ "$rc" -ne 0 ]; then
+  record 0 "루트 중복키 최종 정상값 위장 차단" "exit=$rc"
+else
+  record 1 "루트 중복키 최종 정상값 위장 차단" "automation_app 중복키가 통과"
+fi
+
+nested_duplicate_final_good=$(make_case nested-duplicate-final-good)
+ruby -e '
+  path = ARGV[0]
+  text = File.read(path)
+  text = text.sub(/^  input_policy: do_not_steal_focus_or_type$/, "  input_policy: steal_focus\n  input_policy: do_not_steal_focus_or_type")
+  File.write(path, text)
+' "$nested_duplicate_final_good/contracts/humansearch/browser-policy.yaml"
+rc=$(run_case "$nested_duplicate_final_good")
+if [ "$rc" -ne 0 ]; then
+  record 0 "중첩 중복키 최종 정상값 위장 차단" "exit=$rc"
+else
+  record 1 "중첩 중복키 최종 정상값 위장 차단" "chrome_non_interference.input_policy 중복키가 통과"
+fi
+
 comment_only=$(make_case comment-only)
 cat > "$comment_only/contracts/humansearch/browser-policy.yaml" <<'EOF'
 # automation_app: Aside
@@ -129,7 +157,7 @@ else
   record 1 "원본 저장소 상태 불변" "상태 변경 발생"
 fi
 
-if [ "$checked" -lt 6 ]; then
+if [ "$checked" -lt 8 ]; then
   echo "VERDICT: NOT_RUN"
   echo "CHECKED: $checked"
   exit 2
