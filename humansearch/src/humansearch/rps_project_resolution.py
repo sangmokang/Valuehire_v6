@@ -162,7 +162,7 @@ def resolve_rps_project(payload: object) -> RpsProjectResolution:
                 "mapped project id was absent or did not match the target evidence",
             )
         link_conflict = _link_conflict(mapped.project_id, target, project_links)
-        if link_conflict:
+        if link_conflict or _target_link_conflict(mapped.project_id, target, project_links):
             return _mapping_conflict(target.position_id)
         return _result(
             RpsProjectStatus.REUSE,
@@ -174,6 +174,9 @@ def resolve_rps_project(payload: object) -> RpsProjectResolution:
         project.project_id for project in projects if _has_target_id_evidence(project, target)
     }
     has_name_only_match = any(_has_name_only_evidence(project, target) for project in projects)
+    has_partial_target_id_evidence = any(
+        _has_partial_target_id_evidence(project, target) for project in projects
+    )
     if has_name_only_match and matching_ids:
         return _result(
             RpsProjectStatus.AMBIGUOUS,
@@ -183,7 +186,9 @@ def resolve_rps_project(payload: object) -> RpsProjectResolution:
         )
     if len(matching_ids) == 1:
         project_id = next(iter(matching_ids))
-        if _link_conflict(project_id, target, project_links):
+        if _link_conflict(project_id, target, project_links) or _target_link_conflict(
+            project_id, target, project_links
+        ):
             return _mapping_conflict(target.position_id)
         return _result(
             RpsProjectStatus.REUSE,
@@ -204,6 +209,13 @@ def resolve_rps_project(payload: object) -> RpsProjectResolution:
             target.position_id,
             None,
             "visible names matched without stable customer and position id evidence",
+        )
+    if has_partial_target_id_evidence:
+        return _result(
+            RpsProjectStatus.AMBIGUOUS,
+            target.position_id,
+            None,
+            "partial stable target identity was observed without enough evidence to exclude it",
         )
     if any(_lacks_identity_evidence(project) for project in projects):
         return _result(
@@ -441,12 +453,33 @@ def _target_link_exists(target: _Target, project_links: Sequence[_ProjectLink]) 
     )
 
 
+def _target_link_conflict(
+    project_id: str, target: _Target, project_links: Sequence[_ProjectLink]
+) -> bool:
+    return any(
+        link.account_scope == target.account_scope
+        and link.position_id == target.position_id
+        and link.project_id != project_id
+        for link in project_links
+    )
+
+
 def _has_name_only_evidence(project: _Project, target: _Target) -> bool:
     visible_customer = project.customer_name == target.customer_name
     visible_position = project.position_title == target.position_title
     visible_name = project.name == f"{target.customer_name} {target.position_title}"
     lacks_stable_evidence = project.customer_id is None or project.position_id is None
     return lacks_stable_evidence and (visible_customer or visible_position or visible_name)
+
+
+def _has_partial_target_id_evidence(project: _Project, target: _Target) -> bool:
+    customer_matches_without_position = (
+        project.customer_id == target.customer_id and project.position_id is None
+    )
+    position_matches_without_customer = (
+        project.position_id == target.position_id and project.customer_id is None
+    )
+    return customer_matches_without_position or position_matches_without_customer
 
 
 def _lacks_identity_evidence(project: _Project) -> bool:
