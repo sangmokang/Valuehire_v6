@@ -80,4 +80,8 @@ External V1 requested a defense for SQLite rollback journal files created during
 
 ## Root V2 blocking counterexamples
 
-Root V2 found four contract gaps in commit `804bc49`: a protected root inside another Git repository was accepted, a future `hs_schema_migrations.version` was accepted, nullable text primary references allowed malformed candidate/evidence rows, and a pre-existing unprotected SQLite journal sidecar was deleted/accepted instead of rejected. The follow-up RED tests encode those cases before implementation changes.
+Root V2 found four contract gaps in commit `804bc49`: a protected root inside another Git repository was accepted, a future `hs_schema_migrations.version` was accepted, nullable text primary references allowed malformed candidate/evidence rows, and a pre-existing unprotected SQLite journal sidecar was deleted/accepted instead of rejected. Commit `9f13515` captured those as RED assertions: 4 failed and 10 passed before the implementation fix. The follow-up fix rejects any ancestor `.git` marker, rejects migration ledger versions outside the known supported range, marks primary references `not null`, preflights existing SQLite sidecars for owner/mode/symlink/regular-file boundaries, and restores the process umask if `sqlite3.connect` fails.
+
+## Root V2 mutation follow-up
+
+After the root V2 fix, five isolated mutations were run against `humansearch/src/humansearch/storage_schema.py` and then reverted. `git_guard_disabled`, `schema_version_unbounded`, `nullable_primary_refs`, `sidecar_preflight_disabled`, and `connect_umask_restore_disabled` were each killed by the corresponding HS03.01 regression test. The restored source then passed `uv run pytest tests/test_hs_0301.py -q` with 15 passing tests.

@@ -305,3 +305,20 @@ def test_migration_failure_is_atomic(tmp_path: Path, monkeypatch: pytest.MonkeyP
     db_path = root / "humansearch.sqlite3"
     assert db_path.exists()
     assert _tables(db_path) == set()
+
+
+
+def test_connect_failure_restores_process_umask(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def fail_connect(_db_path: Path) -> sqlite3.Connection:
+        raise sqlite3.OperationalError("connect failed")
+
+    monkeypatch.setattr(sqlite3, "connect", fail_connect)
+    previous_umask = os.umask(0o022)
+    try:
+        with pytest.raises(StorageSchemaError, match="migration failed"):
+            initialize_humansearch_storage(_root(tmp_path))
+        observed_umask = os.umask(previous_umask)
+    finally:
+        os.umask(previous_umask)
+
+    assert observed_umask == 0o022

@@ -50,7 +50,7 @@ _MIGRATIONS: tuple[_Migration, ...] = (
             """,
             f"""
             create table hs_candidates (
-              candidate_key_hmac text primary key check (candidate_key_hmac {_SHA64_CHECK}),
+              candidate_key_hmac text primary key not null check (candidate_key_hmac {_SHA64_CHECK}),
               position_ref text not null,
               channel text not null check (channel in ('saramin','jobkorea','linkedin_rps')),
               candidate_ref_state text not null
@@ -63,8 +63,8 @@ _MIGRATIONS: tuple[_Migration, ...] = (
             """,
             f"""
             create table hs_evidence_manifests (
-              evidence_id text primary key,
-              candidate_key_hmac text references hs_candidates(candidate_key_hmac),
+              evidence_id text primary key not null,
+              candidate_key_hmac text not null references hs_candidates(candidate_key_hmac),
               run_id text not null,
               position_ref text not null,
               channel text not null check (channel in ('saramin','jobkorea','linkedin_rps')),
@@ -95,6 +95,7 @@ def initialize_humansearch_storage(
     root = _prepare_root(protected_root)
     db_path = _db_path(root, db_filename)
     _prepare_db_file(db_path)
+    _verify_existing_sidecars(db_path)
     applied = _apply_schema(db_path)
     _verify_path(db_path, expected_mode=0o600, label="db file")
     return StorageSchemaResult(
@@ -149,8 +150,9 @@ def _prepare_db_file(db_path: Path) -> None:
 def _apply_schema(db_path: Path) -> tuple[int, ...]:
     applied: list[int] = []
     old_umask = os.umask(0o077)
-    connection = sqlite3.connect(db_path)
+    connection: sqlite3.Connection | None = None
     try:
+        connection = sqlite3.connect(db_path)
         connection.execute("pragma foreign_keys = on")
         connection.execute("pragma temp_store = memory")
         connection.execute("pragma journal_mode = delete")
@@ -163,10 +165,12 @@ def _apply_schema(db_path: Path) -> tuple[int, ...]:
             applied.append(migration.version)
         connection.commit()
     except sqlite3.Error as exc:
-        connection.rollback()
+        if connection is not None:
+            connection.rollback()
         raise StorageSchemaError("migration failed") from exc
     finally:
-        connection.close()
+        if connection is not None:
+            connection.close()
         os.umask(old_umask)
     return tuple(applied)
 
@@ -186,9 +190,22 @@ def _current_version(connection: sqlite3.Connection) -> int:
     ).fetchone()
     if exists is None:
         return 0
-    row = connection.execute("select max(version) from hs_schema_migrations").fetchone()
-    version = row[0] if row is not None else None
-    return version if isinstance(version, int) else 0
+    rows = connection.execute("select version from hs_schema_migrations").fetchall()
+    if not rows:
+        return 0
+    known_versions = {migration.version for migration in _MIGRATIONS}
+    versions: list[int] = []
+    for row in rows:
+        version = row[0]
+        if (
+            not isinstance(version, int)
+            or version < 1
+            or version > CURRENT_SCHEMA_VERSION
+            or version not in known_versions
+        ):
+            raise StorageSchemaError("unsupported schema version")
+        versions.append(version)
+    return max(versions)
 
 
 def _schema_version(db_path: Path) -> int:
@@ -197,6 +214,18 @@ def _schema_version(db_path: Path) -> int:
         return _current_version(connection)
     finally:
         connection.close()
+
+
+def _verify_existing_sidecars(db_path: Path) -> None:
+    for suffix in ("-journal", "-wal", "-shm"):
+        sidecar = db_path.with_name(db_path.name + suffix)
+        if not sidecar.exists() and not sidecar.is_symlink():
+            continue
+        if sidecar.parent.resolve(strict=True) != db_path.parent.resolve(strict=True):
+            raise StorageSchemaError("sqlite sidecar must stay inside protected root")
+        _verify_path(sidecar, expected_mode=0o600, label="sqlite sidecar")
+        if not sidecar.is_file():
+            raise StorageSchemaError("sqlite sidecar must be a regular file")
 
 
 def _verify_path(path: Path, *, expected_mode: int, label: str) -> None:
@@ -214,9 +243,9 @@ def _verify_path(path: Path, *, expected_mode: int, label: str) -> None:
 
 
 def _inside_git_worktree(path: Path) -> bool:
-    worktree = Path(__file__).resolve().parents[3]
-    try:
-        path.resolve(strict=False).relative_to(worktree)
-    except ValueError:
-        return False
-    return True
+    resolved = path.resolve(strict=False)
+    for candidate in (resolved, *resolved.parents):
+        git_marker = candidate / ".git"
+        if git_marker.exists() or git_marker.is_symlink():
+            return True
+    return False
