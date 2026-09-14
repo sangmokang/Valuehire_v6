@@ -169,6 +169,19 @@ def test_project_link_to_same_position_allows_reuse() -> None:
     assert result.project_id == "rps-1"
 
 
+def test_target_link_to_another_project_blocks_mapped_reuse() -> None:
+    result = resolve_rps_project(
+        _payload(
+            mapped_project_id="selected",
+            projects=[_project("selected")],
+            project_links=[_linked_project("other-existing", "pos-1")],
+        )
+    )
+
+    assert result.status is RpsProjectStatus.MAPPING_CONFLICT
+    assert result.project_id is None
+
+
 def test_stable_match_plus_name_only_duplicate_is_ambiguous() -> None:
     result = resolve_rps_project(
         _payload(
@@ -191,6 +204,24 @@ def test_stable_match_plus_name_only_duplicate_is_ambiguous() -> None:
 def test_project_without_identity_evidence_blocks_create_required() -> None:
     result = resolve_rps_project(
         _payload(projects=[{"project_id": "existing-unknown"}])
+    )
+
+    assert result.status is RpsProjectStatus.AMBIGUOUS
+    assert result.project_id is None
+
+
+def test_partial_stable_customer_evidence_blocks_create_required() -> None:
+    result = resolve_rps_project(
+        _payload(projects=[{"project_id": "existing", "customer_id": "cust-1"}])
+    )
+
+    assert result.status is RpsProjectStatus.AMBIGUOUS
+    assert result.project_id is None
+
+
+def test_partial_stable_position_evidence_blocks_create_required() -> None:
+    result = resolve_rps_project(
+        _payload(projects=[{"project_id": "existing", "position_id": "pos-1"}])
     )
 
     assert result.status is RpsProjectStatus.AMBIGUOUS
