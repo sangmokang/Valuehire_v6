@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from typing import Any
+from dataclasses import FrozenInstanceError
+from typing import cast
+
+import pytest
 
 from humansearch.evidence_validation import (
     SUPPORTED_EVIDENCE_SCHEMA_VERSION,
@@ -108,12 +111,8 @@ def test_result_and_errors_are_frozen_and_typed() -> None:
     assert result.errors
     assert result.errors[0].path == "source_url_hash"
     assert result.errors[0].code == "missing_required_field"
-    try:
-        result.errors += ()
-    except Exception as exc:  # dataclass is frozen, exact exception type is implementation detail.
-        assert type(exc).__name__ in {"FrozenInstanceError", "AttributeError"}
-    else:  # pragma: no cover - defensive assertion for the contract under test.
-        raise AssertionError("result must be frozen")
+    with pytest.raises(FrozenInstanceError):
+        result.errors = ()  # type: ignore[misc]
 
 
 def test_input_error_is_closed_for_non_mapping_payload() -> None:
@@ -194,8 +193,7 @@ def test_rejects_company_duties_state_array_contradictions() -> None:
 
 def test_rejects_segment_coordinate_type_and_shape_errors() -> None:
     manifest = _valid_manifest()
-    segment = deepcopy(manifest["segments"])[0]
-    assert isinstance(segment, dict)
+    segment = cast(list[dict[str, object]], deepcopy(manifest["segments"]))[0]
     segment["bottom_y_px"] = 0
     segment["segment_index"] = True
     manifest["segments"] = [segment]
@@ -205,8 +203,7 @@ def test_rejects_segment_coordinate_type_and_shape_errors() -> None:
 
 def test_rejects_hash_shape_and_failed_segment_without_reason() -> None:
     manifest = _valid_manifest()
-    segment = deepcopy(manifest["segments"])[0]
-    assert isinstance(segment, dict)
+    segment = cast(list[dict[str, object]], deepcopy(manifest["segments"]))[0]
     segment["capture_sha256"] = "not-a-hash"
     segment["segment_status"] = "failed"
     manifest["segments"] = [segment]
