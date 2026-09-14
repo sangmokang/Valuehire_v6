@@ -3,7 +3,8 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import cast
 
-from hypothesis import HealthCheck, given, settings, strategies as st
+from hypothesis import HealthCheck, given, settings
+from hypothesis import strategies as st
 
 from humansearch.evidence_coverage import classify_evidence_coverage
 from humansearch.evidence_validation import validate_evidence_manifest
