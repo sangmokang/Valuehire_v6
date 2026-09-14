@@ -123,13 +123,17 @@ def validate_evidence_manifest(
 
     for field in sorted(_REQUIRED_FIELDS - typed_manifest.keys()):
         errors.add(field, "missing_required_field", "required field is missing")
-    for field in sorted(set(typed_manifest) - _ALLOWED_FIELDS):
-        errors.add(field, "unexpected_field", "field is not part of the evidence contract")
+    for index, _field in enumerate(sorted(set(typed_manifest) - _ALLOWED_FIELDS)):
+        errors.add(
+            f"unknown_fields[{index}]",
+            "unexpected_field",
+            "field is not part of the evidence contract",
+        )
 
     _validate_top_level_scalars(typed_manifest, errors)
     _validate_candidate_ref(typed_manifest, errors)
     _validate_height(typed_manifest, errors)
-    _validate_segments(_object_sequence(typed_manifest.get("segments")), errors)
+    _validate_segments(typed_manifest.get("segments"), errors)
     _validate_extracted_object(typed_manifest.get("extracted_fields"), "extracted_fields", errors)
     _validate_extracted_object(
         typed_manifest.get("observed_contact_fields"), "observed_contact_fields", errors
@@ -200,9 +204,7 @@ def _validate_height(manifest: Mapping[object, object], errors: _Collector) -> N
         )
 
 
-def _validate_segments(segments: Sequence[object] | None, errors: _Collector) -> None:
-    if segments is None:
-        return
+def _validate_segments(segments: object, errors: _Collector) -> None:
     if not isinstance(segments, Sequence) or isinstance(segments, (str, bytes, bytearray)):
         errors.add("segments", "invalid_array", "segments must be a non-empty array")
         return
@@ -236,16 +238,14 @@ def _validate_segments(segments: Sequence[object] | None, errors: _Collector) ->
 
 
 def _validate_extracted_object(value: object, path: str, errors: _Collector) -> None:
-    if value is None:
-        return
     if not isinstance(value, Mapping):
         errors.add(path, "invalid_object", "field collection must be an object")
         return
     if not all(isinstance(key, str) for key in value):
         errors.add(path, "invalid_object", "field collection keys must be strings")
         return
-    for name, wrapper in value.items():
-        _validate_field_wrapper(wrapper, f"{path}.{name}", errors)
+    for index, wrapper in enumerate(value.values()):
+        _validate_field_wrapper(wrapper, f"{path}[{index}]", errors)
 
 
 def _validate_field_wrapper(wrapper: object, path: str, errors: _Collector) -> None:
@@ -303,8 +303,7 @@ def _validate_company_duties(manifest: Mapping[object, object], errors: _Collect
 def _validate_company_aliases(value: object, errors: _Collector) -> None:
     aliases = _object_sequence(value)
     if aliases is None:
-        if value is not None:
-            errors.add("company_aliases", "invalid_array", "company_aliases must be an array")
+        errors.add("company_aliases", "invalid_array", "company_aliases must be an array")
         return
     for index, alias in enumerate(aliases):
         path = f"company_aliases[{index}]"
@@ -323,7 +322,7 @@ def _validate_company_aliases(value: object, errors: _Collector) -> None:
 def _validate_readback(manifest: Mapping[object, object], errors: _Collector) -> None:
     status = manifest.get("readback_status")
     _require_enum(status, "readback_status", _READBACK_STATUSES, errors)
-    if status in {"matched", "mismatch", "blocked"}:
+    if status in {"matched", "mismatch", "blocked"} or "readback_at" in manifest:
         _require_rfc3339(manifest.get("readback_at"), "readback_at", errors)
     if status in {"mismatch", "blocked"} and not _is_non_empty_string(
         manifest.get("readback_failure_reason")
@@ -332,6 +331,14 @@ def _validate_readback(manifest: Mapping[object, object], errors: _Collector) ->
             "readback_failure_reason",
             "missing_conditional_field",
             "failed readback requires a reason",
+        )
+    elif "readback_failure_reason" in manifest and not _is_non_empty_string(
+        manifest.get("readback_failure_reason")
+    ):
+        errors.add(
+            "readback_failure_reason",
+            "invalid_string",
+            "readback failure reason must be a non-empty string",
         )
 
 
