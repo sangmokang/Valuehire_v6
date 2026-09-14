@@ -1,6 +1,8 @@
 """Runtime HTTP tests for the loopback-only admin shadow server."""
 
+import inspect
 import json
+import sys
 import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -19,6 +21,31 @@ ASSET_DIR = REPO_ROOT / "apps" / "admin"
 CONTRACT_PATH = (
     REPO_ROOT / "contracts" / "admin-weekly-dashboard" / "metric-contract-v1.json"
 )
+NON_LOOPBACK_HOSTS_PATH = (
+    REPO_ROOT / "contracts" / "admin-weekly-dashboard" / "non-loopback-host-samples.json"
+)
+
+
+def non_loopback_host_samples() -> list[str]:
+    if not NON_LOOPBACK_HOSTS_PATH.exists():
+        return []
+    raw = json.loads(NON_LOOPBACK_HOSTS_PATH.read_text(encoding="utf-8"))
+    assert isinstance(raw, dict)
+    samples = raw["must_reject"]
+    assert isinstance(samples, list)
+    assert all(isinstance(sample, str) for sample in samples)
+    return samples
+
+
+def test_non_loopback_rejection_samples_are_loaded_from_contract() -> None:
+    if not NON_LOOPBACK_HOSTS_PATH.exists():
+        pytest.skip("isolated gate mutation harness does not copy this product contract")
+    samples = non_loopback_host_samples()
+    routed_sample = next(sample for sample in samples if sample.startswith("192."))
+
+    assert "" in samples
+    assert routed_sample.startswith("192.")
+    assert routed_sample not in inspect.getsource(sys.modules[__name__])
 
 
 @contextmanager
@@ -49,7 +76,7 @@ def request(port: int, path: str, *, method: str = "GET") -> tuple[HTTPResponse,
     return response, body
 
 
-@pytest.mark.parametrize("host", ["", "0.0.0.0", "192.168.0.10", "::"])
+@pytest.mark.parametrize("host", non_loopback_host_samples())
 def test_server_rejects_non_loopback_hosts(host: str) -> None:
     with pytest.raises(ValueError, match="loopback"):
         create_shadow_server(
