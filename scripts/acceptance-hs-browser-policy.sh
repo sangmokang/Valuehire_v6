@@ -73,6 +73,8 @@ end
 walk = nil
 walk = lambda do |node, label|
   case node
+  when Psych::Nodes::Stream, Psych::Nodes::Document
+    node.children.each_with_index { |child, index| walk.call(child, "#{label}[#{index}]") }
   when Psych::Nodes::Mapping
     seen = {}
     node.children.each_slice(2).with_index do |(key_node, value_node), index|

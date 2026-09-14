@@ -15,7 +15,7 @@ channels:
 input_attribution: target_app_profile_tab
 resume_requires: fresh_observation_and_fresh_lease
 explicit_stop_requires_user_clear: true
-live_authority_verified: false
+live_authority_verified: false # state: current live Aside/RPS authority has not been verified
 non_scope:
   - rps_project_write
   - linkedin_resume_save

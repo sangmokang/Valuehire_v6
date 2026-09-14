@@ -80,3 +80,6 @@ RED 단계는 `scripts/acceptance-hs-browser-policy.sh`를 추가한 뒤 현재 
 
 - 2026-09-14 RED: 부모 독립 반례에서 `automation_app: Aside`가 주석에만 있고 실제 값이 `Chrome`인 계약, 중복 키, 타입 위장도 기존 검사기가 PASS하는 높은 검사무결성 결함이 재현됐다. `scripts/acceptance-hs-browser-policy-mutations.sh`가 현재 정상 계약은 PASS하지만 주석 위장·중복 키·문자열 boolean·comment-only no-op 반례를 잡지 못해 FAIL한다.
 - 2026-09-14 GREEN: `scripts/acceptance-hs-browser-policy.sh`가 Ruby Psych로 계약 YAML의 실제 값·타입·중복 키·허용 키를 검사한다. mutation 검사에서 정상 계약은 PASS, 주석 위장/중복 키/문자열 boolean/comment-only no-op 반례는 모두 exit 1로 고정됐다. SOT §8은 채널 값을 `linkedin_rps`로 맞췄고, §13은 로그인 복구만으로 기존 사용권을 이어 자동 재개하는 주장만 대체한다고 좁혀 새 관측·새 사용권 재개 계약과 충돌하지 않게 했다.
+- 2026-09-14 RED-2: 독립 재감사에서 `Psych.parse_stream` 결과의 `Stream`/`Document` 노드를 순회하지 않아 마지막 값이 정상인 루트 중복키와 중첩 중복키가 exit 0으로 통과했다. mutation에 root `automation_app: Chrome` 뒤 `automation_app: Aside`, nested `input_policy: steal_focus` 뒤 정상값 반례를 추가해 `VERDICT: FAIL`, `CHECKED: 8`로 재현했다.
+- 2026-09-14 GREEN-2: YAML AST walker가 `Psych::Nodes::Stream`과 `Psych::Nodes::Document`의 children으로 내려가도록 수정했다. root/nested 중복키 반례는 마지막 값이 정상이어도 exit 1로 차단돼야 한다.
+- 2026-09-14 scope note: `live_authority_verified: false`는 정책 불변값이 아니라 현재 live Aside/RPS 권한을 증명하지 못한 상태 필드다. §8 채널당 lease와 다중 브라우저 결정의 관계는 후속 WU 부채로 남기며, HS-05.01에서는 확장하지 않는다.
