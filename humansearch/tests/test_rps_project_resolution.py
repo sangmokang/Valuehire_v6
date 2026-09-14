@@ -182,6 +182,20 @@ def test_target_link_to_another_project_blocks_mapped_reuse() -> None:
     assert result.project_id is None
 
 
+def test_exact_match_plus_partial_stable_evidence_is_ambiguous() -> None:
+    result = resolve_rps_project(
+        _payload(
+            projects=[
+                _project("exact"),
+                {"project_id": "maybe", "customer_id": "cust-1"},
+            ]
+        )
+    )
+
+    assert result.status is RpsProjectStatus.AMBIGUOUS
+    assert result.project_id is None
+
+
 def test_stable_match_plus_name_only_duplicate_is_ambiguous() -> None:
     result = resolve_rps_project(
         _payload(
