@@ -99,3 +99,7 @@ The schema completeness fix validates the required tables, column order, and con
 ## Root V2 exact schema comparison counterexample
 
 Root V2 found that commit `30999ef` still accepted a schema whose `candidate_key_hmac` hash CHECK had been weakened to `CHECK(1)`, because the verifier only looked for broad SQL fragments. The follow-up RED test mutates the stored SQLite schema definition to `CHECK(1)` and requires initialization to reject it as `schema mismatch`.
+
+## Root V2 exact schema comparison fix and mutation follow-up
+
+The verifier now derives the expected schema signature by executing the approved `_MIGRATIONS` against an in-memory SQLite database, then compares that normalized full user-schema signature with the target DB. The duplicate required-column and SQL-fragment constants were removed, unknown user tables are rejected by signature mismatch, and no SQL parser was added. The `exact_schema_compare_disabled` mutation was killed by `test_rejects_existing_schema_with_hash_check_weakened_to_true`; the restored source then passed `uv run pytest tests/test_hs_0301.py -q` with 18 passing tests.
