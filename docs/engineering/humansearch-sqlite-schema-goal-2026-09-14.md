@@ -85,3 +85,8 @@ Root V2 found four contract gaps in commit `804bc49`: a protected root inside an
 ## Root V2 mutation follow-up
 
 After the root V2 fix, five isolated mutations were run against `humansearch/src/humansearch/storage_schema.py` and then reverted. `git_guard_disabled`, `schema_version_unbounded`, `nullable_primary_refs`, `sidecar_preflight_disabled`, and `connect_umask_restore_disabled` were each killed by the corresponding HS03.01 regression test. The restored source then passed `uv run pytest tests/test_hs_0301.py -q` with 15 passing tests.
+
+
+## Root V2 schema completeness counterexamples
+
+Root V2 then found that commit `17266eb` trusted the migration ledger alone. A DB with `hs_schema_migrations.version = 1` but a dropped `hs_candidates` table was accepted, and the bad source URL hash test failed through missing `candidate_key_hmac` before proving the hash constraint. The follow-up RED tests require existing schema tables and constraint-bearing SQL to match the installed contract and make the bad hash assertion provide a valid candidate FK first.

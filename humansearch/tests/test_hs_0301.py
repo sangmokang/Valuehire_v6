@@ -45,6 +45,17 @@ def _schema_version(db_path: Path) -> int:
     return row[0]
 
 
+def _insert_valid_candidate(connection: sqlite3.Connection, key: str = "a" * 64) -> None:
+    connection.execute(
+        """
+        insert into hs_candidates
+          (candidate_key_hmac, position_ref, channel, candidate_ref_state)
+        values (?, 'POS', 'linkedin_rps', 'observed')
+        """,
+        (key,),
+    )
+
+
 def test_installs_empty_hs_sqlite_schema_with_restricted_modes(tmp_path: Path) -> None:
     root = _root(tmp_path)
 
@@ -114,18 +125,19 @@ def test_schema_constraints_reject_plain_shapes_and_bad_hmac(tmp_path: Path) -> 
                 """,
                 ("not-a-hmac",),
             )
+        _insert_valid_candidate(connection)
         with pytest.raises(sqlite3.IntegrityError):
             connection.execute(
                 """
                 insert into hs_evidence_manifests
-                  (evidence_id, run_id, position_ref, channel, source_url_hash,
+                  (evidence_id, candidate_key_hmac, run_id, position_ref, channel, source_url_hash,
                    observed_at, evidence_manifest_ref, evidence_manifest_sha256,
                    encrypted_payload_refs_ref, coverage_status, readback_status)
                 values
-                  ('ev1', 'run1', 'POS', 'linkedin_rps', ?, '2026-09-14T00:00:00+09:00',
+                  ('ev1', ?, 'run1', 'POS', 'linkedin_rps', ?, '2026-09-14T00:00:00+09:00',
                    'protected://manifest/ev1', ?, 'protected://cipher/ev1', 'partial', 'not_run')
                 """,
-                ("bad-url-hash", "a" * 64),
+                ("a" * 64, "bad-url-hash", "b" * 64),
             )
 
 
@@ -177,6 +189,35 @@ def test_rejects_future_or_corrupt_migration_ledger(tmp_path: Path) -> None:
         connection.execute("update hs_schema_migrations set version = 99")
 
     with pytest.raises(StorageSchemaError, match="unsupported schema version"):
+        initialize_humansearch_storage(root)
+
+
+def test_rejects_existing_schema_missing_required_table(tmp_path: Path) -> None:
+    root = _root(tmp_path)
+    db_path = initialize_humansearch_storage(root).db_path
+    with sqlite3.connect(db_path) as connection:
+        connection.execute("drop table hs_candidates")
+
+    with pytest.raises(StorageSchemaError, match="schema mismatch"):
+        initialize_humansearch_storage(root)
+
+
+def test_rejects_existing_schema_with_required_constraint_changed(tmp_path: Path) -> None:
+    root = _root(tmp_path)
+    db_path = initialize_humansearch_storage(root).db_path
+    with sqlite3.connect(db_path) as connection:
+        connection.execute("pragma writable_schema = on")
+        connection.execute(
+            """
+            update sqlite_schema
+               set sql = replace(sql, 'candidate_key_hmac text primary key not null',
+                                      'candidate_key_hmac text primary key')
+             where type = 'table' and name = 'hs_candidates'
+            """
+        )
+        connection.execute("pragma writable_schema = off")
+
+    with pytest.raises(StorageSchemaError, match="schema mismatch"):
         initialize_humansearch_storage(root)
 
 
