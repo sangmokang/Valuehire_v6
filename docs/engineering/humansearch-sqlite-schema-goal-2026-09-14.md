@@ -71,3 +71,8 @@ Mutation runs were performed against a temporary copy of `humansearch/src/humans
 - `allow_bad_hmac`: removed the `candidate_key_hmac` HMAC shape check. `test_schema_constraints_reject_plain_shapes_and_bad_hmac` failed because bad HMAC inserted. Mutant killed.
 
 A weaker mutation that changed root creation from `0700` to `0755` survived because the implementation wraps creation in restrictive `umask(077)`, so the actual created mode remained `0700`. That survival is not a contract gap; the stronger mode-check-disabled mutation above verifies the enforced invariant.
+
+
+## Sonnet V1 journal umask follow-up
+
+External V1 requested a defense for SQLite rollback journal files created during `_apply_schema`. A new runtime test watches `humansearch.sqlite3-journal` during a long synthetic migration while the process umask is temporarily widened to `000`; every observed journal mode must be `0600`. On this platform the pre-fix implementation already produced `0600`, apparently because SQLite derived the journal mode from the DB file, but `_apply_schema` is now also wrapped in `umask(077)` so sidecar creation does not depend on that SQLite behavior.

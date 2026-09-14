@@ -148,6 +148,7 @@ def _prepare_db_file(db_path: Path) -> None:
 
 def _apply_schema(db_path: Path) -> tuple[int, ...]:
     applied: list[int] = []
+    old_umask = os.umask(0o077)
     connection = sqlite3.connect(db_path)
     try:
         connection.execute("pragma foreign_keys = on")
@@ -166,6 +167,7 @@ def _apply_schema(db_path: Path) -> tuple[int, ...]:
         raise StorageSchemaError("migration failed") from exc
     finally:
         connection.close()
+        os.umask(old_umask)
     return tuple(applied)
 
 

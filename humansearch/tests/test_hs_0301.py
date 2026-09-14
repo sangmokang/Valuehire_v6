@@ -3,6 +3,8 @@ from __future__ import annotations
 import os
 import sqlite3
 import stat
+import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -189,6 +191,43 @@ def test_sqlite_runtime_keeps_journal_and_temp_boundary_inside_root(tmp_path: Pa
     for suffix in ("-wal", "-shm", "-journal"):
         sidecar = result.db_path.with_name(result.db_path.name + suffix)
         assert sidecar.parent == result.db_path.parent
+
+
+def test_sqlite_rollback_journal_is_created_with_restricted_mode(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _root(tmp_path)
+    journal_modes: list[int] = []
+    migration_sql = tuple(
+        [
+            "create table hs_schema_migrations (version integer primary key, name text not null, applied_at text not null default current_timestamp)",
+            "create table hs_big(id integer primary key, payload text)",
+        ]
+        + [f"insert into hs_big(payload) values ('payload-{index}')" for index in range(4000)]
+    )
+    monkeypatch.setattr(
+        storage_schema,
+        "_MIGRATIONS",
+        (storage_schema._Migration(1, "slow", migration_sql),),
+    )
+
+    old_umask = os.umask(0)
+    try:
+        journal = root / "humansearch.sqlite3-journal"
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(initialize_humansearch_storage, root)
+            deadline = time.monotonic() + 5
+            while not future.done() and time.monotonic() < deadline:
+                if journal.exists() and not journal.is_symlink():
+                    journal_modes.append(stat.S_IMODE(journal.stat().st_mode))
+                time.sleep(0.001)
+            result = future.result(timeout=5)
+        assert result.schema_version == CURRENT_SCHEMA_VERSION
+    finally:
+        os.umask(old_umask)
+
+    assert journal_modes
+    assert set(journal_modes) == {0o600}
 
 
 def test_migration_failure_is_atomic(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
