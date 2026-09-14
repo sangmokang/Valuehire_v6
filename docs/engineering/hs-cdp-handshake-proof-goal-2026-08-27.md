@@ -1,6 +1,6 @@
 # CDP 핸드셰이크 증명이 무방비다 — goal (2026-08-27)
 
-등급: **L3** (관측기가 "누구와 이야기하는가"를 확정하는 경계 · 무력화 시 위조된 인증 관측 수용)
+등급: **L3** (CDP WebSocket upgrade 무결성 경계 · 무력화 시 잘못된 upgrade 응답을 수용)
 워크트리: `worktrees/hs-cdp-handshake-proof` · 브랜치 `task/hs-cdp-handshake-proof` · base `3276712`
 
 ## 1층 — 결론
@@ -160,8 +160,9 @@ Codeaudit → 적대검증 → push → PR → CI. **merge 안 함.**
 
 ## 배포 후 관측 항목 (L3)
 
-- `CdpReadError("DevTools websocket handshake proof was invalid")` 가 로그에 뜨면 그 포트에
-  브라우저가 아닌 것이 앉아 있다는 뜻이다 — 즉시 조사.
+- `CdpReadError("DevTools websocket handshake proof was invalid")` 가 로그에 뜨면 그 연결의
+  WebSocket upgrade 응답이 우리가 보낸 키에 대한 RFC 6455 accept 값과 맞지 않는다는 뜻이다.
+  브라우저 신원·Aside 프로필·PID·로그인 상태는 이 신호만으로 결론 내리지 않는다.
 
 ## 비범위
 
