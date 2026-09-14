@@ -1,0 +1,4 @@
+{
+  "purpose": "Packaged mirror of the repository CDP protocol contract for isolated source-copy gates.",
+  "evaluate_method": "Runtime.evaluate"
+}
