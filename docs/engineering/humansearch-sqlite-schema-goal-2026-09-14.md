@@ -94,3 +94,8 @@ Root V2 then found that commit `17266eb` trusted the migration ledger alone. A D
 ## Root V2 schema completeness fix and mutation follow-up
 
 The schema completeness fix validates the required tables, column order, and constraint-bearing SQL fragments for the current migration contract after every initialization. It rejects mismatches instead of repairing them. Three isolated mutations were then run and reverted: `schema_verify_call_disabled`, `constraint_fragment_check_disabled`, and `source_url_hash_check_disabled`. Each was killed by the corresponding HS03.01 regression test, and the restored source passed `uv run pytest tests/test_hs_0301.py -q` with 17 passing tests.
+
+
+## Root V2 exact schema comparison counterexample
+
+Root V2 found that commit `30999ef` still accepted a schema whose `candidate_key_hmac` hash CHECK had been weakened to `CHECK(1)`, because the verifier only looked for broad SQL fragments. The follow-up RED test mutates the stored SQLite schema definition to `CHECK(1)` and requires initialization to reject it as `schema mismatch`.

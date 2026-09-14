@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import sqlite3
 import stat
 import time
@@ -214,6 +215,29 @@ def test_rejects_existing_schema_with_required_constraint_changed(tmp_path: Path
                                       'candidate_key_hmac text primary key')
              where type = 'table' and name = 'hs_candidates'
             """
+        )
+        connection.execute("pragma writable_schema = off")
+
+    with pytest.raises(StorageSchemaError, match="schema mismatch"):
+        initialize_humansearch_storage(root)
+
+
+def test_rejects_existing_schema_with_hash_check_weakened_to_true(tmp_path: Path) -> None:
+    root = _root(tmp_path)
+    db_path = initialize_humansearch_storage(root).db_path
+    with sqlite3.connect(db_path) as connection:
+        row = connection.execute(
+            "select sql from sqlite_schema where type = 'table' and name = 'hs_candidates'"
+        ).fetchone()
+        assert row is not None
+        sql = row[0]
+        assert isinstance(sql, str)
+        weakened = re.sub(r"check \(candidate_key_hmac glob '[^']+'\)", "check (1)", sql)
+        assert weakened != sql
+        connection.execute("pragma writable_schema = on")
+        connection.execute(
+            "update sqlite_schema set sql = ? where type = 'table' and name = 'hs_candidates'",
+            (weakened,),
         )
         connection.execute("pragma writable_schema = off")
 
