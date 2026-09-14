@@ -11,9 +11,22 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  # 작업 브랜치는 같은 이벤트·ref의 이전 실행을 취소한다.
+  # main은 run_id마다 별도 그룹: cancel-in-progress=false만으로는
+  # 같은 그룹의 대기 실행이 새 실행에 밀려 취소되는 것을 막지 못한다.
+  # push/PR 이벤트도 분리한다. P23은 같은 SHA의 모든 verify 결과를 본다.
+  group: verify-${{ github.event_name }}-${{ github.ref }}-${{ github.ref == 'refs/heads/main' && github.run_id || 'branch' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   verify:
     runs-on: ubuntu-latest
+    # 기본 상한은 360분(6시간)이다. 매달린 스텝이 그만큼 러너를 점유하는 것을 막는다.
+    # 값 근거는 정상 시간이 아니라 '허용되는 최악'이다 — Invoice 게이트 내부 카나리아
+    # (check-invoice-gate.py CANARY_TIMEOUT=900) 가 900초를 다 쓰고 나머지 게이트가
+    # 실측 최댓값(최근 성공 15회 3.2~4.8분)을 써도 약 20분이다. 30분은 그 위 여유다.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
@@ -243,3 +256,28 @@ jobs:
         # 검사기 1벌(scripts/verify/check-mechanism-registry.sh)을 로컬 pre-push
         # 글로브와 CI 가 같은 인수 스크립트로 실행한다 (판정기 2벌 금지 · P16).
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-verify-ac-m.sh
+
+      - name: PostgreSQL 서버 준비 (Invoice 런타임 검사용)
+        # 러너에는 psql·pg_config 만 PATH 에 있고 initdb·pg_ctl 은
+        # /usr/lib/postgresql/<ver>/bin 에 있다. 없으면 설치해서 BLOCKED 를 없앤다.
+        run: |
+          if ! ls -d /usr/lib/postgresql/*/bin >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends postgresql
+          fi
+          ls -d /usr/lib/postgresql/*/bin
+
+      - name: 인수 검사 invoice (채용 수수료 계산·계약·플랫폼 동등성)
+        # 인보이스 PDF는 검수 승인 전 발송할 수 없다. CI에서는 개인정보 없는 fixture로
+        # 계산·기한·입력 거부·계약 변조와 Codex/Claude 스킬 동등성을 검증한다.
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-invoice.sh
+
+      - name: Invoice 게이트 자가시험 (위조 출력·스텝 무력화 차단)
+        # 위 인수 검사가 정직한지를 이 스텝이 증명한다. 격리 사본에서 실제 단위 시험과
+        # PostgreSQL 시험을 깨뜨린 뒤 인수 검사가 FAIL 을 내는지 보고, 이 워크플로의
+        # Invoice 스텝이 등록된 명령을 실제로 호출하는지 추적 실행으로 확인한다.
+        # 그래서 CI 한 번에 PostgreSQL 클러스터가 둘이다 — 하나는 진짜 검사,
+        # 하나는 그 검사가 거짓말하지 않는다는 증거다. 예전처럼 같은 검사를 그냥
+        # 두 번 돌리는 중복이 아니다.
+        run: |
+          python3 scripts/verify/check-invoice-gate.py

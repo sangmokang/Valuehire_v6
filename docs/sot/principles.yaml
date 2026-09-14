@@ -325,7 +325,7 @@
 
 - id: "P23"
   principle: "초록불은 커밋 SHA 에 귀속된다. 브랜치나 PR 에 귀속되지 않는다"
-  mechanism_expected: "로컬 HEAD·원격 HEAD·CI 검사 SHA가 같고 결론이 success이고 작업트리가 깨끗할 때만 VERIFIED (scripts/verify/check-verified-sha.sh · scripts/acceptance-verified-sha.sh)"
+  mechanism_expected: "로컬 HEAD·원격 HEAD·CI 검사 SHA가 같고 같은 SHA의 verify 실행을 filter=all로 조회해 전부가 completed/success이며 작업트리가 깨끗할 때만 VERIFIED; 브랜치·로컬·원격 SHA와 작업트리 조회 종료값 및 모든 레코드의 오형식·빈 status·빈 conclusion·콜론 둘 이상·알 수 없는 상태를 순서와 무관하게 검증하고 실제 gh의 JSON 필터·HTTP 페이지 이동·과거 실패 포함 조회 8건과 실제 조회부의 0건·35건·35건 뒤 오형식·성공 사이 빈 레코드·dirty·부분 출력 뒤 gh/필터/브랜치/로컬 SHA/원격 SHA 조회 실패를 포함 (scripts/verify/check-verified-sha.sh · scripts/acceptance-verified-sha.sh 52건)"
   mechanism_found:
     - path: "docs/sot/coding-principles.md"
       check: "scripts/acceptance-principles-check.sh"

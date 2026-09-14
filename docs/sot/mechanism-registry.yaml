@@ -98,3 +98,27 @@
   stage: "manual"
   manual_reason: "원격 조회가 필요해 CI 안에서 자기 SHA 를 검사하는 것은 뜻이 없다. 머지 전 판정 도구"
   required: true
+- id: "invoice-acceptance-ci"
+  path: ".github/workflows/verify.yml"
+  target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-invoice.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
+- id: "invoice-independent-runtime-ci"
+  path: ".github/workflows/verify.yml"
+  target: "python3 scripts/verify/check-invoice-gate.py"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
+- id: "invoice-independent-unit-ci"
+  path: "scripts/acceptance-invoice.sh"
+  target: "python3 -m unittest discover -s tools/invoice/tests -v"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
+- id: "invoice-postgres-runtime-ci"
+  path: "scripts/acceptance-invoice.sh"
+  target: "bash tools/invoice/tests/test_postgres_integrity.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true

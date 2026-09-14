@@ -112,6 +112,145 @@ else
   record 1 "정상 인수 검사 통과" "표본 없음 — $sample"
 fi
 
+# Invoice acceptance가 실제 unittest를 실행하지 않고 "Ran 1 test / OK"만
+# 출력해도 기존 stdout 판정은 속는다. 전용 배선 판정기가 그 수술 변이를 거부해야 한다.
+invoice_mutant="$TMP/acceptance-invoice-fake-tests.sh"
+if ruby -e '
+  source = File.read(ARGV[0])
+  needle = %q{python3 -m unittest discover -s tools/invoice/tests -v >"$test_log" 2>&1}
+  replacement = %q{printf "Ran 1 test in 0.001s\\n\\nOK\\n" >"$test_log"}
+  abort "needle missing" unless source.include?(needle)
+  File.write(ARGV[1], source.sub(needle, replacement))
+' scripts/acceptance-invoice.sh "$invoice_mutant"; then
+  invoice_gate_rc=0
+  python3 scripts/verify/check-invoice-gate.py \
+    --acceptance "$invoice_mutant" --workflow .github/workflows/verify.yml \
+    >/dev/null 2>&1 || invoice_gate_rc=$?
+  if [ "$invoice_gate_rc" -ne 0 ]; then
+    record 0 "Invoice 가짜 테스트 출력 차단" "수술 변이 exit=$invoice_gate_rc"
+  else
+    record 1 "Invoice 가짜 테스트 출력 차단" "실제 unittest 제거 후에도 배선 판정 통과"
+  fi
+else
+  record 1 "Invoice 가짜 테스트 출력 차단" "수술 변이 생성 실패"
+fi
+
+# 삽입형: 필수 실행 줄을 그대로 남긴 채 최종 판정만 덮어쓴다. 2026-09-05 실측에서
+# 이 형태가 문자열 존재 검사를 그대로 통과했다. 게이트가 격리 사본에서 실제 시험을
+# 깨뜨려 보고 판정이 시험 결과에서 나오는지 확인해야 잡힌다.
+insert_mutant="$TMP/acceptance-invoice-forged-verdict.sh"
+if ruby -e '
+  source = File.read(ARGV[0])
+  needle = %Q{if [ "$fail" -ne 0 ]; then\n  echo "VERDICT: FAIL"}
+  abort "needle missing" unless source.include?(needle)
+  File.write(ARGV[1], source.sub(needle, %Q{fail=0\nblocked=0\n} + needle))
+' scripts/acceptance-invoice.sh "$insert_mutant"; then
+  forged_rc=0
+  python3 scripts/verify/check-invoice-gate.py \
+    --acceptance "$insert_mutant" --workflow .github/workflows/verify.yml \
+    >/dev/null 2>&1 || forged_rc=$?
+  if [ "$forged_rc" -ne 0 ]; then
+    record 0 "Invoice 판정 덮어쓰기 차단" "삽입형 변이 exit=$forged_rc"
+  else
+    record 1 "Invoice 판정 덮어쓰기 차단" "필수 줄을 남기고 판정만 바꿔도 통과했다"
+  fi
+else
+  record 1 "Invoice 판정 덮어쓰기 차단" "삽입형 변이 생성 실패"
+fi
+
+# CI 스텝 무력화: run 블록 첫 줄 exit 0. 스텝 글자는 그대로 남는다.
+ci_mutant="$TMP/verify-invoice-step-disabled.yml"
+if ruby -e '
+  source = File.read(ARGV[0])
+  needle = "          python3 scripts/verify/check-invoice-gate.py\n"
+  abort "needle missing" unless source.include?(needle)
+  File.write(ARGV[1], source.sub(needle, "          exit 0\n" + needle))
+' .github/workflows/verify.yml "$ci_mutant"; then
+  ci_rc=0
+  python3 scripts/verify/check-invoice-gate.py --workflow "$ci_mutant" \
+    >/dev/null 2>&1 || ci_rc=$?
+  if [ "$ci_rc" -ne 0 ]; then
+    record 0 "Invoice CI 스텝 무력화 차단" "exit 0 주입 변이 exit=$ci_rc"
+  else
+    record 1 "Invoice CI 스텝 무력화 차단" "run 블록 첫 줄 exit 0 이 통과했다"
+  fi
+else
+  record 1 "Invoice CI 스텝 무력화 차단" "CI 변이 생성 실패"
+fi
+
+# 약한 모드로 갈아치우기: 명령 이름은 그대로 두고 --wiring-only 를 붙인다.
+# 2026-09-05 V1 반례 — 부분문자열 추적은 이 형태를 호출로 인정했다.
+weak_mutant="$TMP/verify-invoice-step-weakened.yml"
+if ruby -e '
+  source = File.read(ARGV[0])
+  needle = "          python3 scripts/verify/check-invoice-gate.py\n"
+  abort "needle missing" unless source.include?(needle)
+  File.write(ARGV[1], source.sub(needle,
+    "          python3 scripts/verify/check-invoice-gate.py --wiring-only\n"))
+' .github/workflows/verify.yml "$weak_mutant"; then
+  weak_rc=0
+  python3 scripts/verify/check-invoice-gate.py --workflow "$weak_mutant" \
+    >/dev/null 2>&1 || weak_rc=$?
+  if [ "$weak_rc" -ne 0 ]; then
+    record 0 "Invoice 게이트 약한 모드 치환 차단" "--wiring-only 주입 변이 exit=$weak_rc"
+  else
+    record 1 "Invoice 게이트 약한 모드 치환 차단" "인자만 붙여 약한 모드로 바꿔도 통과했다"
+  fi
+else
+  record 1 "Invoice 게이트 약한 모드 치환 차단" "약한 모드 변이 생성 실패"
+fi
+
+# 추적 기록 위조: 인자 안에 구분자와 개행을 넣어 가짜 호출 한 건을 만들어 낸다.
+# 2026-09-05 V1 2회차 가설 — 개행 구분 기록에서는 실제로 성립했다.
+forge_rc=0
+python3 - <<'FORGE' >/dev/null 2>&1 || forge_rc=$?
+import importlib.util
+spec = importlib.util.spec_from_file_location("gate", "scripts/verify/check-invoice-gate.py")
+gate = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(gate)
+script = (
+    "bash $'x\\npython3\\x1fscripts/verify/check-invoice-gate.py\\n' --wiring-only\n"
+    "bash scripts/verify/run-acceptance.sh scripts/acceptance-invoice.sh\n"
+)
+called = gate.traced_invocations(script)
+missing = [item for item in gate.REQUIRED_INVOCATIONS if item not in called]
+raise SystemExit(0 if missing else 1)
+FORGE
+if [ "$forge_rc" -eq 0 ]; then
+  record 0 "Invoice 추적 기록 위조 차단" "인자 속 구분자·개행으로 가짜 호출을 만들지 못한다"
+else
+  record 1 "Invoice 추적 기록 위조 차단" "인자에 구분자를 넣어 호출 기록을 위조했다"
+fi
+
+# 생산 호출 형태. CI 는 게이트를 **인자 없이** 부른다. 위 변이들은 전부
+# --acceptance/--workflow 인자를 주기 때문에, 인자 없는 경로만 조기 통과시키는
+# 한 줄 변이(`if not sys.argv[1:]: return 0`)가 전부 살아남았다(2026-09-06 실측:
+# 그 변이로 변이 검사 15건과 인수 검사가 모두 VERDICT: PASS 였다).
+# 그래서 위조된 인수 검사를 심은 격리 사본 안에서 게이트를 인자 없이 실행한다.
+prod_copy="$TMP/prod-shape"
+prod_ready=0
+if [ -f "$insert_mutant" ]; then
+  prod_ready=1
+  while IFS= read -r rel; do
+    mkdir -p "$prod_copy/$(dirname "$rel")"
+    cp -R "$REPO/$rel" "$prod_copy/$(dirname "$rel")/" || prod_ready=0
+  done < <(python3 scripts/verify/check-invoice-gate.py --print-copy-paths)
+fi
+if [ "$prod_ready" -eq 1 ]; then
+  cp "$insert_mutant" "$prod_copy/scripts/acceptance-invoice.sh"
+  git init -q "$prod_copy"
+  prod_rc=0
+  ( cd "$prod_copy" && python3 scripts/verify/check-invoice-gate.py ) >/dev/null 2>&1 \
+    || prod_rc=$?
+  if [ "$prod_rc" -ne 0 ]; then
+    record 0 "Invoice 게이트 생산 호출 형태" "인자 없는 호출도 위조를 잡는다 exit=$prod_rc"
+  else
+    record 1 "Invoice 게이트 생산 호출 형태" "인자 없는 호출이 위조를 통과시켰다 — CI 가 쓰는 형태다"
+  fi
+else
+  record 1 "Invoice 게이트 생산 호출 형태" "격리 사본 준비 실패"
+fi
+
 # ── 래퍼 자신의 fail-closed ──────────────────────────────────────────────────
 noarg_rc=0
 bash "$RUNNER" >/dev/null 2>&1 || noarg_rc=$?

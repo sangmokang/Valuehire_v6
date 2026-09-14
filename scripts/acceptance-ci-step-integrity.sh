@@ -75,6 +75,33 @@ expect_rc "실행 대신 bash -n → 불합격" "$p" 1
 p=$(mutate empty-steps 'p=ARGV[0]; require "psych"; d=Psych.safe_load(File.read(p), aliases: true); d["jobs"]["verify"]["steps"]=[]; File.write(p,Psych.dump(d))')
 expect_rc "job 의 스텝 전량 삭제 → 불합격" "$p" 1
 
+# 실행 제어도 검사 대상이다. 각 변형은 실제 YAML 사본에 적용한다.
+mutate_control() {
+  local name="$1" ruby_code="$2"
+  mutate "$name" 'require "psych"; p=ARGV[0]; d=Psych.safe_load(File.read(p), aliases: true); '"$ruby_code"'; File.write(p, Psych.dump(d))'
+}
+
+p=$(mutate_control no-concurrency 'd.delete("concurrency")')
+expect_rc "동시 실행 제어 삭제 → 불합격" "$p" 1
+p=$(mutate_control shared-main 'd["concurrency"]["group"]="verify-${{ github.event_name }}-${{ github.ref }}"')
+expect_rc "main 대기 실행이 같은 그룹을 공유 → 불합격" "$p" 1
+p=$(mutate_control no-event 'd["concurrency"]["group"].sub!("${{ github.event_name }}", "event")')
+expect_rc "push/PR 그룹 분리 제거 → 불합격" "$p" 1
+p=$(mutate_control no-ref 'd["concurrency"]["group"].sub!("${{ github.ref }}", "ref")')
+expect_rc "브랜치 그룹 분리 제거 → 불합격" "$p" 1
+p=$(mutate_control cancel-main 'd["concurrency"]["cancel-in-progress"]=true')
+expect_rc "main 실행 취소 허용 → 불합격" "$p" 1
+p=$(mutate_control keep-feature 'd["concurrency"]["cancel-in-progress"]=false')
+expect_rc "작업 브랜치 중복 취소 제거 → 불합격" "$p" 1
+p=$(mutate_control max-queue 'd["concurrency"]["queue"]="max"')
+expect_rc "조건부 취소와 호환되지 않는 queue 설정 → 불합격" "$p" 1
+p=$(mutate_control no-timeout 'd["jobs"]["verify"].delete("timeout-minutes")')
+expect_rc "시간 상한 삭제 → 불합격" "$p" 1
+p=$(mutate_control long-timeout 'd["jobs"]["verify"]["timeout-minutes"]=360')
+expect_rc "시간 상한 6시간으로 회귀 → 불합격" "$p" 1
+p=$(mutate_control job-concurrency 'd["jobs"]["verify"]["concurrency"]="shared-main"')
+expect_rc "job 수준에서 main 공유 그룹 재도입 → 불합격" "$p" 1
+
 # ── fail-closed: 읽지 못하는 상황을 통과로 세지 않는다 ───────────────────────
 expect_rc "워크플로 파일 없음 → NOT_RUN" "$TMP/does-not-exist.yml" 2
 

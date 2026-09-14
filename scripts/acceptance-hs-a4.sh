@@ -329,6 +329,33 @@ else
   judge_case "후보자 컬럼 SQL 을 잡는다 (D2)"                 pii     "sc_pii_sql"       1
   judge_case "정상 지표 CSV 는 통과시킨다 (오탐 대조군)"      pii     "sc_ok_csv"        0
   judge_case "정상 마이그레이션 SQL 은 통과시킨다 (오탐 대조군)" pii  "sc_ok_sql"        0
+
+  # 검토 기준선(.data-exposure-reviewed). 규칙을 약화시키지 않으면서 사람이 확인한
+  # 파일만 통과시킨다. 차단과 통과를 한 쌍으로 잰다.
+  sc_reviewed_ok() {
+    printf "INSERT INTO candidates(name,email) VALUES('홍','a@b.c');\n" > seed.sql
+    git add seed.sql
+    printf '%s\t%s\t%s\n' "$(git cat-file blob :seed.sql | shasum -a 256 | cut -d" " -f1)" \
+      "seed.sql" "확인함 — 자리표시자" > .data-exposure-reviewed
+    git add .data-exposure-reviewed; git commit -q -m reviewed
+  }
+  sc_reviewed_stale() {
+    printf "INSERT INTO candidates(name,email) VALUES('홍','a@b.c');\n" > seed.sql
+    git add seed.sql
+    printf '%s\t%s\t%s\n' "$(printf 0%.0s $(seq 64))" "seed.sql" "낡은 해시" \
+      > .data-exposure-reviewed
+    git add .data-exposure-reviewed; git commit -q -m stale
+  }
+  sc_reviewed_dead() {
+    printf 'ok\n' > README.md; git add README.md
+    printf '%s\t%s\t%s\n' "$(printf 0%.0s $(seq 64))" "gone.sql" "지워진 경로" \
+      > .data-exposure-reviewed
+    git add .data-exposure-reviewed; git commit -q -m dead
+  }
+
+  judge_case "검토 기준선에 적힌 파일은 통과시킨다"              pii "sc_reviewed_ok"     0
+  judge_case "해시가 어긋난 기준선은 통과시키지 않는다"          pii "sc_reviewed_stale"  1
+  judge_case "죽은 기준선 항목은 그 자체가 불합격이다"           pii "sc_reviewed_dead"   1
 fi
 
 # D4: CI 가 그 판정기를 **실행 줄**에서 부르는가 + 그 스텝이 조건으로 꺼져 있지 않은가.
