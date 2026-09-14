@@ -4,7 +4,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Any
+from typing import Any, Literal
 
 
 class RpsProjectStatus(str, Enum):
@@ -144,6 +144,13 @@ def resolve_rps_project(payload: object) -> RpsProjectResolution:
             None,
             "existing creation intent must be reconciled before another create decision",
         )
+    if _target_link_exists(target, project_links) and not isinstance(mapped_project_id, str):
+        return _result(
+            RpsProjectStatus.MAPPING_CONFLICT,
+            target.position_id,
+            None,
+            "project link for the target exists but no mapped project id was supplied",
+        )
     by_id = {project.project_id: project for project in projects}
     if isinstance(mapped_project_id, str):
         mapped = by_id.get(mapped_project_id)
@@ -197,6 +204,13 @@ def resolve_rps_project(payload: object) -> RpsProjectResolution:
             target.position_id,
             None,
             "visible names matched without stable customer and position id evidence",
+        )
+    if any(_lacks_identity_evidence(project) for project in projects):
+        return _result(
+            RpsProjectStatus.AMBIGUOUS,
+            target.position_id,
+            None,
+            "at least one observed project lacked customer, position, and visible name evidence",
         )
     return RpsProjectResolution(
         status=RpsProjectStatus.CREATE_REQUIRED,
@@ -301,20 +315,35 @@ def _projects(raw: object) -> list[_Project] | None:
         project_id = _required_text(item, "project_id")
         if project_id is None:
             return None
+        customer_id = _optional_project_text(item, "customer_id")
+        if customer_id is False:
+            return None
+        position_id = _optional_project_text(item, "position_id")
+        if position_id is False:
+            return None
+        customer_name = _optional_project_text(item, "customer_name")
+        if customer_name is False:
+            return None
+        position_title = _optional_project_text(item, "position_title")
+        if position_title is False:
+            return None
+        name = _optional_project_text(item, "name")
+        if name is False:
+            return None
         projects.append(
             _Project(
                 project_id=project_id,
-                customer_id=_optional_text(item, "customer_id"),
-                position_id=_optional_text(item, "position_id"),
-                customer_name=_optional_text(item, "customer_name"),
-                position_title=_optional_text(item, "position_title"),
-                name=_optional_text(item, "name"),
+                customer_id=customer_id,
+                position_id=position_id,
+                customer_name=customer_name,
+                position_title=position_title,
+                name=name,
             )
         )
     return projects
 
 
-def _mapped_project_id(raw: object) -> str | None | bool:
+def _mapped_project_id(raw: object) -> str | None | Literal[False]:
     if raw is None:
         return None
     if isinstance(raw, str) and raw.strip():
@@ -405,12 +434,29 @@ def _link_conflict(
     )
 
 
+def _target_link_exists(target: _Target, project_links: Sequence[_ProjectLink]) -> bool:
+    return any(
+        link.account_scope == target.account_scope and link.position_id == target.position_id
+        for link in project_links
+    )
+
+
 def _has_name_only_evidence(project: _Project, target: _Target) -> bool:
     visible_customer = project.customer_name == target.customer_name
     visible_position = project.position_title == target.position_title
     visible_name = project.name == f"{target.customer_name} {target.position_title}"
     lacks_stable_evidence = project.customer_id is None or project.position_id is None
     return lacks_stable_evidence and (visible_customer or visible_position or visible_name)
+
+
+def _lacks_identity_evidence(project: _Project) -> bool:
+    return (
+        project.customer_id is None
+        and project.position_id is None
+        and project.customer_name is None
+        and project.position_title is None
+        and project.name is None
+    )
 
 
 def _required_text(mapping: Mapping[str, object], key: str) -> str | None:
@@ -427,6 +473,15 @@ def _optional_text(mapping: Mapping[str, object], key: str) -> str | None:
     if isinstance(value, str) and value.strip():
         return value.strip()
     return None
+
+
+def _optional_project_text(mapping: Mapping[str, object], key: str) -> str | None | Literal[False]:
+    if key not in mapping or mapping[key] is None:
+        return None
+    value: Any = mapping[key]
+    if isinstance(value, str):
+        return value.strip() or None
+    return False
 
 
 def _datetime(raw: object) -> datetime | None:
