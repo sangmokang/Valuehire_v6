@@ -88,7 +88,13 @@
   required: true
 - id: "hs-browser-policy-ci"
   path: ".github/workflows/verify.yml"
-  target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-browser-policy.sh"
+  target: "bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-browser-policy.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
+- id: "hs-browser-policy-mutations-ci"
+  path: ".github/workflows/verify.yml"
+  target: "bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-browser-policy-mutations.sh"
   stage: "ci"
   ci_mirror_job: "verify"
   required: true

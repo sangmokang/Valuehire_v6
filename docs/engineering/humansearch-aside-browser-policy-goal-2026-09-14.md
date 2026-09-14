@@ -76,3 +76,4 @@ RED 단계는 `scripts/acceptance-hs-browser-policy.sh`를 추가한 뒤 현재 
   - `bash scripts/acceptance-ci-step-integrity.sh` → `VERDICT: PASS`, `CHECKED: 24`.
   - `bash scripts/acceptance-semantic-mutations.sh` → `VERDICT: PASS`, `CHECKED: 16`.
   - `bash -n scripts/acceptance-hs-browser-policy.sh && git diff --check` → 종료값 0.
+- 외부 결함주입 RED: `automation_app: Aside`를 주석으로 남기고 실제 값을 `Chrome`으로 바꾼 격리 사본이 기존 grep 검사에서 통과했다. 중복키, 불리언 문자열, 주석만 남긴 no-op 계약도 같은 계열 반례로 고정한다.
