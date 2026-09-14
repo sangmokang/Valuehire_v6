@@ -188,6 +188,44 @@ def test_stable_match_plus_name_only_duplicate_is_ambiguous() -> None:
     assert result.project_id is None
 
 
+def test_project_without_identity_evidence_blocks_create_required() -> None:
+    result = resolve_rps_project(
+        _payload(projects=[{"project_id": "existing-unknown"}])
+    )
+
+    assert result.status is RpsProjectStatus.AMBIGUOUS
+    assert result.project_id is None
+
+
+def test_malformed_project_identity_field_fails_query() -> None:
+    result = resolve_rps_project(
+        _payload(
+            projects=[
+                {
+                    "project_id": "existing-unknown",
+                    "customer_id": ["cust-1"],
+                    "position_id": "pos-1",
+                }
+            ]
+        )
+    )
+
+    assert result.status is RpsProjectStatus.QUERY_FAILED
+    assert result.project_id is None
+
+
+def test_existing_target_link_blocks_create_when_mapping_is_missing() -> None:
+    result = resolve_rps_project(
+        _payload(
+            projects=[],
+            project_links=[_linked_project("rps-existing", "pos-1")],
+        )
+    )
+
+    assert result.status is RpsProjectStatus.MAPPING_CONFLICT
+    assert result.project_id is None
+
+
 def test_mapped_matching_project_is_reused() -> None:
     result = resolve_rps_project(
         _payload(
