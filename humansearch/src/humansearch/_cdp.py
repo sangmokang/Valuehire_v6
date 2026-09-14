@@ -7,10 +7,15 @@ import os
 import socket
 import struct
 from collections.abc import Mapping, Sequence
+from functools import lru_cache
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
 _WEBSOCKET_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+_CDP_PROTOCOL_CONTRACT_PATH = (
+    Path(__file__).resolve().parents[3] / "contracts" / "humansearch" / "cdp-protocol.json"
+)
 
 
 class CdpReadError(RuntimeError):
@@ -55,7 +60,7 @@ def observe_markers(
             command = json.dumps(
                 {
                     "id": 1,
-                    "method": "Runtime.evaluate",
+                    "method": _runtime_evaluate_method(),
                     "params": {
                         "expression": expression,
                         "returnByValue": True,
@@ -83,6 +88,24 @@ def observe_markers(
     except (OSError, TimeoutError, ValueError, RecursionError) as exc:
         raise CdpReadError("DevTools read failed") from exc
     raise CdpReadError("DevTools response limit exceeded")
+
+
+@lru_cache(maxsize=1)
+def _runtime_evaluate_method() -> str:
+    return _load_runtime_evaluate_method(_CDP_PROTOCOL_CONTRACT_PATH)
+
+
+def _load_runtime_evaluate_method(path: Path) -> str:
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise CdpReadError("CDP protocol contract is unavailable") from exc
+    if not isinstance(raw, dict):
+        raise CdpReadError("CDP protocol contract is invalid")
+    value = raw.get("evaluate_method")
+    if not isinstance(value, str) or not value:
+        raise CdpReadError("CDP evaluate method contract is invalid")
+    return value
 
 
 def _marker_expression(
