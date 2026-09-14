@@ -2,6 +2,7 @@
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
 from typing import Any
 
@@ -41,10 +42,20 @@ class _Target:
 
 @dataclass(frozen=True, slots=True)
 class _Observation:
+    observation_id: str
     account_scope: str
+    query_scope: str
+    observed_at: datetime
     query_error: str | None
     all_pages_loaded: bool
     stale: bool
+    projects: Sequence[_Project]
+
+
+@dataclass(frozen=True, slots=True)
+class _ObservationLimit:
+    reference_time: datetime
+    max_age_seconds: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,6 +66,13 @@ class _Project:
     customer_name: str | None
     position_title: str | None
     name: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class _ProjectLink:
+    account_scope: str
+    project_id: str
+    position_id: str
 
 
 def resolve_rps_project(payload: object) -> RpsProjectResolution:
@@ -74,18 +92,26 @@ def resolve_rps_project(payload: object) -> RpsProjectResolution:
     observation = _observation(payload.get("observation"))
     if observation is None or observation.account_scope != target.account_scope:
         return _result(
-            RpsProjectStatus.INVALID_INPUT,
+            RpsProjectStatus.QUERY_FAILED,
             target.position_id,
             None,
-            "observation must match the target account scope",
+            "observation identity, scope, account, time, and projects must be complete",
         )
-    projects = _projects(payload.get("projects"))
-    if projects is None:
+    observation_limit = _observation_limit(payload.get("observation_limit"))
+    if observation_limit is None or not _within_observation_limit(observation, observation_limit):
+        return _result(
+            RpsProjectStatus.QUERY_FAILED,
+            target.position_id,
+            None,
+            "observation was outside the permitted time window",
+        )
+    project_links = _project_links(payload.get("project_links"))
+    if project_links is None:
         return _result(
             RpsProjectStatus.INVALID_INPUT,
             target.position_id,
             None,
-            "projects must be a list of project objects",
+            "project_links must be a list of project link objects",
         )
     mapped_project_id = _mapped_project_id(payload.get("mapped_project_id"))
     if mapped_project_id is False:
@@ -103,6 +129,7 @@ def resolve_rps_project(payload: object) -> RpsProjectResolution:
             None,
             "pending_creation_intent must be a bool",
         )
+    projects = observation.projects
     if _query_failed(observation) or _has_conflicting_duplicate_ids(projects):
         return _result(
             RpsProjectStatus.QUERY_FAILED,
@@ -127,6 +154,9 @@ def resolve_rps_project(payload: object) -> RpsProjectResolution:
                 None,
                 "mapped project id was absent or did not match the target evidence",
             )
+        link_conflict = _link_conflict(mapped.project_id, target, project_links)
+        if link_conflict:
+            return _mapping_conflict(target.position_id)
         return _result(
             RpsProjectStatus.REUSE,
             target.position_id,
@@ -136,11 +166,22 @@ def resolve_rps_project(payload: object) -> RpsProjectResolution:
     matching_ids = {
         project.project_id for project in projects if _has_target_id_evidence(project, target)
     }
+    has_name_only_match = any(_has_name_only_evidence(project, target) for project in projects)
+    if has_name_only_match and matching_ids:
+        return _result(
+            RpsProjectStatus.AMBIGUOUS,
+            target.position_id,
+            None,
+            "stable target evidence was mixed with name-only project evidence",
+        )
     if len(matching_ids) == 1:
+        project_id = next(iter(matching_ids))
+        if _link_conflict(project_id, target, project_links):
+            return _mapping_conflict(target.position_id)
         return _result(
             RpsProjectStatus.REUSE,
             target.position_id,
-            next(iter(matching_ids)),
+            project_id,
             "exactly one project matched customer and position id evidence",
         )
     if len(matching_ids) > 1:
@@ -150,7 +191,7 @@ def resolve_rps_project(payload: object) -> RpsProjectResolution:
             None,
             "multiple projects matched customer and position id evidence",
         )
-    if any(_has_name_only_evidence(project, target) for project in projects):
+    if has_name_only_match:
         return _result(
             RpsProjectStatus.AMBIGUOUS,
             target.position_id,
@@ -162,6 +203,15 @@ def resolve_rps_project(payload: object) -> RpsProjectResolution:
         position_id=target.position_id,
         project_id=None,
         reason="complete fresh observation found no project for the target",
+    )
+
+
+def _mapping_conflict(position_id: str) -> RpsProjectResolution:
+    return _result(
+        RpsProjectStatus.MAPPING_CONFLICT,
+        position_id,
+        None,
+        "selected project was already linked to another position",
     )
 
 
@@ -204,8 +254,18 @@ def _target(payload: Mapping[str, object]) -> _Target | None:
 def _observation(raw: object) -> _Observation | None:
     if not isinstance(raw, dict):
         return None
+    observation_id = _required_text(raw, "observation_id")
     account_scope = _required_text(raw, "account_scope")
-    if account_scope is None:
+    query_scope = _required_text(raw, "query_scope")
+    observed_at = _datetime(raw.get("observed_at"))
+    projects = _projects(raw.get("projects"))
+    if (
+        observation_id is None
+        or account_scope is None
+        or query_scope is None
+        or observed_at is None
+        or projects is None
+    ):
         return None
     query_error_raw = raw.get("query_error")
     query_error: str | None
@@ -220,10 +280,14 @@ def _observation(raw: object) -> _Observation | None:
     if type(all_pages_loaded) is not bool or type(stale) is not bool:
         return None
     return _Observation(
+        observation_id=observation_id,
         account_scope=account_scope,
+        query_scope=query_scope,
+        observed_at=observed_at,
         query_error=query_error,
         all_pages_loaded=all_pages_loaded,
         stale=stale,
+        projects=tuple(projects),
     )
 
 
@@ -258,6 +322,50 @@ def _mapped_project_id(raw: object) -> str | None | bool:
     return False
 
 
+def _observation_limit(raw: object) -> _ObservationLimit | None:
+    if not isinstance(raw, dict):
+        return None
+    reference_time = _datetime(raw.get("reference_time"))
+    max_age_seconds = raw.get("max_age_seconds")
+    if reference_time is None:
+        return None
+    if type(max_age_seconds) is not int or max_age_seconds <= 0:
+        return None
+    return _ObservationLimit(
+        reference_time=reference_time,
+        max_age_seconds=max_age_seconds,
+    )
+
+
+def _within_observation_limit(
+    observation: _Observation, observation_limit: _ObservationLimit
+) -> bool:
+    age_seconds = (observation_limit.reference_time - observation.observed_at).total_seconds()
+    return 0 <= age_seconds <= observation_limit.max_age_seconds
+
+
+def _project_links(raw: object) -> list[_ProjectLink] | None:
+    if not isinstance(raw, list):
+        return None
+    links: list[_ProjectLink] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            return None
+        account_scope = _required_text(item, "account_scope")
+        project_id = _required_text(item, "project_id")
+        position_id = _required_text(item, "position_id")
+        if account_scope is None or project_id is None or position_id is None:
+            return None
+        links.append(
+            _ProjectLink(
+                account_scope=account_scope,
+                project_id=project_id,
+                position_id=position_id,
+            )
+        )
+    return links
+
+
 def _query_failed(observation: _Observation) -> bool:
     return (
         (observation.query_error is not None and bool(observation.query_error.strip()))
@@ -286,6 +394,17 @@ def _has_target_id_evidence(project: _Project, target: _Target) -> bool:
     return project.customer_id == target.customer_id and project.position_id == target.position_id
 
 
+def _link_conflict(
+    project_id: str, target: _Target, project_links: Sequence[_ProjectLink]
+) -> bool:
+    return any(
+        link.account_scope == target.account_scope
+        and link.project_id == project_id
+        and link.position_id != target.position_id
+        for link in project_links
+    )
+
+
 def _has_name_only_evidence(project: _Project, target: _Target) -> bool:
     visible_customer = project.customer_name == target.customer_name
     visible_position = project.position_title == target.position_title
@@ -308,3 +427,16 @@ def _optional_text(mapping: Mapping[str, object], key: str) -> str | None:
     if isinstance(value, str) and value.strip():
         return value.strip()
     return None
+
+
+def _datetime(raw: object) -> datetime | None:
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    normalized = raw.strip().replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return parsed
