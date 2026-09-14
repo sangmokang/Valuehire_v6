@@ -26,3 +26,14 @@
 “명시 설치 없으면 반드시 실패”는 재현된 결함으로 채택하지 않았다. 다만 `uv python install 3.14`를
 안내에 추가해 준비 단계를 분명히 했다. 원격 ref 사전 조회와 다른 worktree의 스킬 회수 명령도 보강했다.
 로그·원문은 보호 경로에 보존하며 GitHub 인계 및 새 clone 검증은 아직 진행 중이다.
+
+GitHub 인계 후보 0d53074는 원격 push와 pre-push 27개 검사를 통과했다. 별도 GitHub clone에서
+8개 문서/지침의 원격 SHA·내용 일치 및 hooks readback을 확인했다. 같은 clone의 PR83 2acc828
+worktree에서 805 tests·Ruff·mypy 85파일·verify를 통과했다. 다른 실제 PC/OS 시험은 NOT_RUN이다.
+현재 안내에는 원격 branch 실제 이름, CI의 uv 버전 고정, `humansearch/.python-version`, 공식 Aside 설치
+경로를 추가 대조했다. 본인 안내 메일은 아직 전송하지 않았으며 제품 운영 완료와 구분한다.
+
+현재 안내 보강은 native 독립 V2에서 안전 차단 결함 없음으로 검토됐다. Python 파일의 정확한
+상대경로 지적은 `humansearch/.python-version`으로 반영했다. 과거 커밋은 당시 로컬 Git 설정
+acceptance@local을 사용했으며 실제 작업 주체는 Codex다. 공개 이력을 재작성하지 않고 후속
+커밋은 현재 실행자를 명시한다. 공유/전역 Git 설정은 변경하지 않는다.
