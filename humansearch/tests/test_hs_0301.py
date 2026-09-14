@@ -129,6 +129,33 @@ def test_schema_constraints_reject_plain_shapes_and_bad_hmac(tmp_path: Path) -> 
             )
 
 
+def test_candidate_and_evidence_primary_refs_reject_null_keys(tmp_path: Path) -> None:
+    db_path = initialize_humansearch_storage(_root(tmp_path)).db_path
+
+    with sqlite3.connect(db_path) as connection:
+        with pytest.raises(sqlite3.IntegrityError):
+            connection.execute(
+                """
+                insert into hs_candidates
+                  (candidate_key_hmac, position_ref, channel, candidate_ref_state)
+                values (null, 'POS', 'jobkorea', 'observed')
+                """
+            )
+        with pytest.raises(sqlite3.IntegrityError):
+            connection.execute(
+                """
+                insert into hs_evidence_manifests
+                  (evidence_id, candidate_key_hmac, run_id, position_ref, channel, source_url_hash,
+                   observed_at, evidence_manifest_ref, evidence_manifest_sha256,
+                   encrypted_payload_refs_ref, coverage_status, readback_status)
+                values
+                  (null, null, 'run1', 'POS', 'jobkorea', ?, '2026-09-14T00:00:00+09:00',
+                   'protected://manifest/ev-null', ?, 'protected://cipher/ev-null', 'partial', 'not_run')
+                """,
+                ("a" * 64, "b" * 64),
+            )
+
+
 def test_migration_is_idempotent_and_uses_n_minus_one_range(tmp_path: Path) -> None:
     root = _root(tmp_path)
 
@@ -143,12 +170,30 @@ def test_migration_is_idempotent_and_uses_n_minus_one_range(tmp_path: Path) -> N
     assert row == (1,)
 
 
+def test_rejects_future_or_corrupt_migration_ledger(tmp_path: Path) -> None:
+    root = _root(tmp_path)
+    db_path = initialize_humansearch_storage(root).db_path
+    with sqlite3.connect(db_path) as connection:
+        connection.execute("update hs_schema_migrations set version = 99")
+
+    with pytest.raises(StorageSchemaError, match="unsupported schema version"):
+        initialize_humansearch_storage(root)
+
+
 def test_rejects_root_inside_git_worktree(tmp_path: Path) -> None:
     del tmp_path
     repo_inside = Path.cwd().parent / "data" / "hs-db"
 
     with pytest.raises(StorageSchemaError, match="outside the git worktree"):
         initialize_humansearch_storage(repo_inside)
+
+
+def test_rejects_root_inside_any_git_repository(tmp_path: Path) -> None:
+    other_repo = tmp_path / "otherrepo"
+    (other_repo / ".git").mkdir(parents=True)
+
+    with pytest.raises(StorageSchemaError, match="outside the git worktree"):
+        initialize_humansearch_storage(other_repo / "secrets")
 
 
 def test_rejects_symlink_root_and_db_target(tmp_path: Path) -> None:
@@ -191,6 +236,20 @@ def test_sqlite_runtime_keeps_journal_and_temp_boundary_inside_root(tmp_path: Pa
     for suffix in ("-wal", "-shm", "-journal"):
         sidecar = result.db_path.with_name(result.db_path.name + suffix)
         assert sidecar.parent == result.db_path.parent
+
+
+def test_rejects_existing_unprotected_sqlite_sidecars(tmp_path: Path) -> None:
+    root = _root(tmp_path)
+    root.mkdir(mode=0o700)
+    journal = root / "humansearch.sqlite3-journal"
+    journal.write_text("stale", encoding="utf-8")
+    journal.chmod(0o644)
+
+    with pytest.raises(StorageSchemaError, match="sidecar"):
+        initialize_humansearch_storage(root)
+
+    assert journal.exists()
+    assert stat.S_IMODE(journal.stat().st_mode) == 0o644
 
 
 def test_sqlite_rollback_journal_is_created_with_restricted_mode(

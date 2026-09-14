@@ -76,3 +76,8 @@ A weaker mutation that changed root creation from `0700` to `0755` survived beca
 ## Sonnet V1 journal umask follow-up
 
 External V1 requested a defense for SQLite rollback journal files created during `_apply_schema`. A new runtime test watches `humansearch.sqlite3-journal` during a long synthetic migration while the process umask is temporarily widened to `000`; every observed journal mode must be `0600`. On this platform the pre-fix implementation already produced `0600`, apparently because SQLite derived the journal mode from the DB file, but `_apply_schema` is now also wrapped in `umask(077)` so sidecar creation does not depend on that SQLite behavior.
+
+
+## Root V2 blocking counterexamples
+
+Root V2 found four contract gaps in commit `804bc49`: a protected root inside another Git repository was accepted, a future `hs_schema_migrations.version` was accepted, nullable text primary references allowed malformed candidate/evidence rows, and a pre-existing unprotected SQLite journal sidecar was deleted/accepted instead of rejected. The follow-up RED tests encode those cases before implementation changes.
