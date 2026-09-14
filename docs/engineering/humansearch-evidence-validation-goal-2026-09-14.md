@@ -97,3 +97,24 @@ assert True is False
 ```
 
 → 이 결과는 `segments=None`만 허용하는 mutant가 새 테스트에 의해 죽는다는 뜻이다. 변이 파일은 즉시 원복했고, 원복 후 같은 단일 테스트는 PASS했다.
+
+
+## 9월 14일 enum 타입 반례 정정
+
+원격 e02f544의 이전 감사·CI 성공 뒤 root가 상태 필드에 JSON 배열/객체를 넣으면 `TypeError`가
+밖으로 나오는 반례를 실제 재현했다. 기존 enum helper는 오류를 수집했지만 후속 상태 조합의
+set membership이 해시 불가능한 값을 다시 평가했다. 이전 성공 기록이 이 입력 경계를 증명하지는 않는다.
+
+RED f115be3에서 최상위·구간·추출·연락처·회사별 업무·별칭의 상태 필드 11개에 배열/객체를
+각각 넣었다. 실제 assertion 14개 실패, 8개 통과를 확인한 뒤 후속 membership 8곳을 tuple로 바꿨다.
+기존 `_require_enum`의 문자열 가드는 유지한다. 정상 문자열의 상태 조합과 오류 형식은 동일하다.
+
+- 대상 40시험, 전체 251시험, Ruff, mypy 43파일, diff check, verify 통과.
+- 독립 임시 사본에서 tuple membership을 set으로 되돌린 실제 변이: baseline 22통과,
+  mutant 14실패/8통과. 원본 파일 SHA 불변 확인.
+- 외부 Sonnet V1은 수정된 source/test 두 파일을 읽고 PASS를 반환했다. 이는 정적 검토이며
+  reviewer가 시험을 실행했다거나 OS 격리를 증명했다는 뜻이 아니다.
+- 독립 native V2도 이 enum 변경에 한정해 PASS했다. 대상 40시험·Ruff·mypy를 직접 실행했으며,
+  다른 예외를 숨기지 않고 기존 정상 문자열 시험이 보존되는 것을 확인했다.
+- 비민감 검토 지문과 보호 원출력: `private-reviews/hs-0202-enum-root/` (Git 제외).
+- 라이브·저장·main 병합 증거는 제공하지 않는다. 현재 SHA 원격 검사는 push 후 따로 확인한다.

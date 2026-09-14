@@ -354,7 +354,7 @@ def test_container_enum_values_return_closed_validation_errors(
     escaped_error: Exception | None = None
     try:
         result = validate_evidence_manifest(manifest)
-    except Exception as exc:
+    except TypeError as exc:
         escaped_error = exc
     assert escaped_error is None, "invalid enum escaped the closed validation boundary"
     assert result.valid is False
