@@ -1,8 +1,8 @@
-"""WU1 — 관측기가 진짜 브라우저 진단 통로하고만 이야기한다는 것을 지킨다.
+"""WU1 — CDP WebSocket upgrade 증명 검사를 제품 진입 경로에서 지킨다.
 
-`_handshake` 는 서버가 우리가 보낸 임의 키로 RFC 6455 계산을 해냈는지 확인한다. 해내지 못하면
-웹소켓을 말할 줄 모르는 다른 프로그램이다. 그 확인을 지우면 **그 포트에 앉아 있는 아무
-프로그램이나 브라우저 행세를 할 수 있고, 관측기는 그것이 준 "로그인 되어 있음"을 그대로 믿는다.**
+`_handshake` 는 서버가 우리가 보낸 임의 키로 RFC 6455 계산을 해냈는지 확인한다. 이 확인은
+상대가 같은 요청에 대한 WebSocket upgrade 응답을 만들었는지 보는 프로토콜 무결성 검사다.
+브라우저 프로세스 신원, Aside 프로필, 로그인 상태, PID 일치를 증명하지는 않는다.
 
 그 한 줄을 지워도 시험 118건이 전부 통과했다(실측). 원인은 하필 이 저장소의 다른 시험 셋이
 전부 `_handshake` 자체를 몽키패치로 치워 버렸기 때문이다 — 읽기 루프를 보려고 그렇게 했는데,
@@ -25,6 +25,9 @@ from humansearch import _cdp
 _HOST = "127.0.0.1"
 _PORT = 9225
 _PATH = "/" + "dev" + "tools/page/SYNTHETIC"  # 세션 URL 모양은 저장소에 두지 않는다
+_RFC6455_WEBSOCKET_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+_RFC6455_SAMPLE_KEY = "dGhlIHNhbXBsZSBub25jZQ=="
+_RFC6455_SAMPLE_ACCEPT = "s3pPLMBiTxaQ9kYGzzhZRbK+xOo="
 
 
 class _ScriptedSocket:
@@ -61,8 +64,9 @@ def _sent_key(connection: _ScriptedSocket) -> str:
 
 
 def _proof_for(key: str) -> str:
-    guid = _cdp._WEBSOCKET_GUID
-    return base64.b64encode(hashlib.sha1(f"{key}{guid}".encode("ascii")).digest()).decode("ascii")
+    return base64.b64encode(
+        hashlib.sha1(f"{key}{_RFC6455_WEBSOCKET_GUID}".encode("ascii")).digest()
+    ).decode("ascii")
 
 
 def _response(accept: str | None) -> bytes:
@@ -73,7 +77,7 @@ def _response(accept: str | None) -> bytes:
 
 
 class _AnsweringSocket(_ScriptedSocket):
-    """우리가 보낸 키로 **올바른** 증명을 계산해 돌려주는 소켓 — 정직한 서버 역할."""
+    """우리가 보낸 키로 올바른 RFC 6455 accept 값을 계산해 돌려주는 소켓."""
 
     def __init__(self) -> None:
         super().__init__(b"")
@@ -83,8 +87,15 @@ class _AnsweringSocket(_ScriptedSocket):
         self._response = _response(_proof_for(_sent_key(self)))
 
 
+def test_rfc6455_accept_uses_the_official_guid_and_vector() -> None:
+    """제품 상수와 시험 헬퍼가 같이 틀어지는 일을 막는다."""
+
+    assert _cdp._WEBSOCKET_GUID == _RFC6455_WEBSOCKET_GUID
+    assert _proof_for(_RFC6455_SAMPLE_KEY) == _RFC6455_SAMPLE_ACCEPT
+
+
 def test_a_correct_proof_is_accepted() -> None:
-    """정상 증명은 통과해야 한다 — 거부 방향으로만 좁힌다."""
+    """정상 WebSocket upgrade 증명은 통과해야 한다 — 거부 방향으로만 좁힌다."""
 
     connection = _AnsweringSocket()
 
