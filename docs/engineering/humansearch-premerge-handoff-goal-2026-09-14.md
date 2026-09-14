@@ -2,11 +2,11 @@
 
 ## 결론
 
-이번 종료 조건은 고정한 작업의 완료 여부·남은 이유·검증 근거·병합 순서·다른 PC 시작 지점을 연결하는 것이다. 제품 전체 완료와 병합은 범위 밖이다. 대상 12건의 현재 상태와 미완료 사유 분류, 인계 명령 결함 수정, 메일 초안 정리는 끝났다. 새 인계 보강의 원격 전달은 최신 검증 문서 누락과 외부 검토 장애 때문에 남았다. 확인되지 않은 항목은 통과로 올리지 않는다.
+이번 종료 조건은 고정한 작업의 완료 여부·남은 이유·검증 근거·병합 순서·다른 PC 시작 지점을 연결하는 것이다. 제품 전체 완료와 병합은 범위 밖이다. 대상 12건의 이전 조회와 분류는 아래에 보존했다. 이번 후속 작업에서는 인계 명령의 오류 중단을 수정하고 로컬 22개 사례를 검증했다. 새 수정본의 독립 검토와 원격 전달은 미완료이며, 현재 원격 상태를 이번에 재조회한 것은 아니다. 확인되지 않은 항목은 통과로 올리지 않는다.
 
 ## 계약과 범위
 
-위험등급: 문서 보강 L1. 제품·SOT·검사기 수정 없음. 제품 배송 상태 NOT_APPLICABLE.
+위험등급: 실행 가능한 복원 명령의 제어 흐름 변경이므로 이번 후속 수정은 L2로 판정한다. 이전 문서 보강의 L1 기록과 구분한다. 제품·SOT·공유 검사기 수정 없음. 제품 배송 상태 NOT_APPLICABLE.
 입력은 최신 사용자 요청, 기존 인계 문서, 실행 프롬프트 v5, 현재 GitHub 조회와 로컬 상태다.
 출력은 PR별 근거 장부, 안전한 복원 명령, 승인 구분, 설정 안내 메일 초안이다.
 오류·경계: 조회 실패는 미확인, 시험 미실행은 NOT_RUN. 다른 세션의 파일·브랜치를 변경하지 않는다.
@@ -45,46 +45,61 @@ main protection API는 403 및 요금제/공개 저장소 안내를 반환했다
 
 ## 다른 PC 안전 복원
 
-기존 인계 문서의 무조건 branch 생성 예시는 아래 절차로 대체한다. 아래 명령은 이미 인증된 gh/git 환경에서 Bash로 실행한다.
-기존 clone은 현재 위치에서 origin이 정확한 저장소인지 먼저 확인한다. 새 clone만 빈 경로로 생성한다.
+아래 블록은 인증된 gh/git 환경의 Bash에서 실행한다. `HS_REPO_DIR`에 기존 저장소의 최상위 경로를 지정하거나,
+존재하지 않는 새 경로를 지정한다. 미지정이면 현재 위치 아래 Valuehire_v6-handoff를 사용한다.
+`HS_PR`은 기본91이며 아래 고정 목록의 번호만 허용한다. 기존 사용자 변경은 보존하고 검토용 폴더를 새로 만든다.
 
 ```bash
-# 기존 clone이면 이 clone 줄을 생략하고 해당 저장소로 이동한다.
-# 폴더가 이미 있으면 git clone은 실패하며 덮어쓰지 않는다.
-gh repo clone sangmokang/Valuehire_v6 Valuehire_v6-handoff
-cd Valuehire_v6-handoff
-
-git remote get-url origin
-git status --short --branch
-git worktree list
-# origin이 sangmokang/Valuehire_v6인 것을 확인한 뒤 진행한다.
-git fetch origin
-```
-
-→ 기존 작업의 전환·초기화 없이 원격 참조만 받아온다. 기존 폴더를 사용하는 경우 clone/cd 두 줄을 생략한다.
-
-```bash
-# Bash에서 실행. PR 번호만 이번 고정 대상 중 하나로 바꾼다.
-pr=91
-case "$pr" in 54|83|85|86|87|88|89|90|91|92|93|94) ;; *) exit 1 ;; esac
-branch=$(gh pr view "$pr" --json headRefName --jq .headRefName) || exit 1
-sha=$(gh pr view "$pr" --json headRefOid --jq .headRefOid) || exit 1
+# Bash에서 블록 전체를 실행한다. 경로와 PR 번호만 지정한다.
+(
+set -euo pipefail
+repo_slug='sangmokang/Valuehire_v6'
+repo_dir=${HS_REPO_DIR:-"$PWD/Valuehire_v6-handoff"}
+pr=${HS_PR:-91}
+case "$pr" in 54|83|85|86|87|88|89|90|91|92|93|94) ;; *) echo '허용하지 않은 PR' >&2; exit 1 ;; esac
+if [ -L "$repo_dir" ]; then echo '심볼릭 링크 경로는 사용하지 않음' >&2; exit 1; fi
+if [ ! -e "$repo_dir" ]; then
+  gh repo clone "$repo_slug" "$repo_dir" || exit 1
+fi
+[ -d "$repo_dir" ] || { echo '저장소 폴더가 아님' >&2; exit 1; }
+cd "$repo_dir" || exit 1
+here=$(pwd -P) || exit 1
+top=$(git rev-parse --show-toplevel) || exit 1
+[ "$here" = "$top" ] || { echo '저장소 최상위 폴더를 지정할 것' >&2; exit 1; }
+origin=$(git remote get-url origin) || exit 1
+case "$origin" in
+  https://github.com/sangmokang/Valuehire_v6|https://github.com/sangmokang/Valuehire_v6.git|git@github.com:sangmokang/Valuehire_v6.git|ssh://git@github.com/sangmokang/Valuehire_v6.git) ;;
+  *) echo '대상 저장소와 origin이 다름: 중단' >&2; exit 1 ;;
+esac
+# 기존 사용자 변경은 그대로 둔다. checkout/switch/reset/stash를 실행하지 않는다.
+git status --short --branch || exit 1
+git worktree list || exit 1
+# 한 번의 응답에서 브랜치와 SHA를 함께 읽는다.
+head_info=$(gh pr view "$pr" --repo "$repo_slug" --json headRefName,headRefOid --jq '[.headRefName,.headRefOid] | @tsv') || exit 1
+IFS=$'\t' read -r branch sha <<< "$head_info" || exit 1
+git check-ref-format "refs/heads/$branch" || exit 1
+[[ "$sha" =~ ^[0-9a-f]{40}$ ]] || { echo '잘못된 커밋 값' >&2; exit 1; }
 git fetch origin "refs/heads/$branch" || exit 1
 fetched=$(git rev-parse FETCH_HEAD) || exit 1
-[ "$fetched" = "$sha" ] || { echo '조회 중 원격 변경: 다시 확인'; exit 1; }
-# 매번 새 빈 형제 경로를 예약하므로 기존 폴더와 로컬 브랜치를 건드리지 않는다.
-parent=$(dirname "$(git rev-parse --show-toplevel)") || exit 1
+[ "$fetched" = "$sha" ] || { echo '조회 중 원격 변경: 다시 확인' >&2; exit 1; }
+parent=$(dirname "$here") || exit 1
 restore=$(mktemp -d "$parent/hs-pr${pr}-restore.XXXXXX") || exit 1
+# 실패해도 이 경로를 자동 삭제하지 않는다. 아래 기록으로 회수한다.
+printf '검토 폴더 예약: %s\n' "$restore" || exit 1
 git worktree add --detach "$restore" "$sha" || exit 1
-git -C "$restore" status --short --branch
-git -C "$restore" rev-parse HEAD
-printf '복원 위치: %s
-' "$restore"
+actual=$(git -C "$restore" rev-parse HEAD) || exit 1
+[ "$actual" = "$sha" ] || { echo '복원된 커밋 불일치' >&2; exit 1; }
+restored_status=$(git -C "$restore" status --porcelain=v1 --untracked-files=all) || exit 1
+[ -z "$restored_status" ] || { echo '복원 폴더에 예상하지 못한 변경 있음' >&2; exit 1; }
+printf '복원 확인 완료: %s\n커밋: %s\n' "$restore" "$actual"
+)
 ```
 
-→ 분리된 복원 폴더는 검토용이다. 같은 로컬 브랜치가 존재하거나 다른 worktree에서 열려 있어도 충돌하지 않는다.
-편집을 시작하려면 먼저 이전 PC/세션과 소유권을 정리하고 대상 브랜치를 연결한다. 자동 branch 이동이나 push는 하지 않는다.
-기존 branch가 있는 경우 `git worktree list`에서 그 위치를 확인하고 HEAD·dirty·원격 차이를 먼저 판정한다.
+→ 잘못된 저장소·조회 실패·커밋 불일치는 성공 메시지 전에 중단한다. 같은 브랜치가 있어도 새 detached 폴더를 쓴다.
+예약 이후 실패한 폴더는 자동 삭제하지 않으므로 기록된 위치를 확인한다. 실제 GitHub 인증·다른 PC 실행은 별도 검증이다.
+
+복원 대상은 실행 시 PR의 최신 커밋이며, 아래 과거 검증 표의 커밋과 다르면 그 표의 통과를 재사용하지 않는다.
+편집 전에 이전 PC/세션과 소유권을 정리한다. 이 절차는 기존 브랜치 이동이나 push를 하지 않는다.
 
 복원된 checkout에서 기존 인계 문서 §1의 도구 준비와 해당 SHA의 CI 명령을 사용한다.
 공유 저장소의 hooks 설정을 변경하기 전에 `git config --show-origin --get core.hooksPath`를 확인한다.
@@ -111,10 +126,11 @@ printf '복원 위치: %s
 
 제목: [HumanSearch] 다른 PC 재개 설정과 병합 전 확인 사항 — 2026-09-14
 
-본인에게 전달할 초안입니다. 이번 고정 대상은 PR54·83·85~94이며, 코드와 문서는 아래 인계 PR에서 복원할 수 있습니다.
+본인에게 전달할 초안입니다. 이번 고정 대상은 PR54·83·85~94입니다. 아래 PR은 기존 인계 입구이며,
+이번 로컬 보강은 아직 게시되지 않았습니다. 보내기 전에 최종 게시 SHA와 수정된 복원 안내의 존재를 확인해야 합니다.
 https://github.com/sangmokang/Valuehire_v6/pull/91
 
-이 문서의 안전 복원 절차로 PR91 안내를 먼저 연 뒤, 병합 표에서 다음 대상 하나를 고르세요.
+최신 보강이 PR91에 게시된 것을 확인한 뒤 안전 복원 절차를 사용하세요. 게시 전에는 이 초안을 발송 준비 완료로 보지 않습니다.
 기존 폴더·브랜치는 전환하거나 덮어쓰지 않고 새 검토 폴더에 정확한 커밋을 복원합니다.
 Git·gh·uv와 해당 브랜치의 Python 버전, Bash·Ruby·Perl·Node 준비 및 훅 확인은 기존 인계 문서 §1을 따릅니다.
 Codex/Claude/ClickUp/Gmail 로그인과 Aside·운영 계정·OS 권한은 새 환경에서 각각 확인해야 합니다.
@@ -172,7 +188,7 @@ handoff-diff-check.json / handoff-verify.json이다. 여기에는 SHA8552796 이
 서비스가 `Credit balance is too low`를 반환했다. 외부 V1 상태는 BLOCKED이며 명령의 종료만으로 PASS라고 하지 않는다.
 호출·신원·원출력·문서 지문은 handoff-v1-meta.json / handoff-v1.json / handoff-v1-prompt.txt에 보존한다.
 자체/동일 엔진 문서 점검은 외부 V1을 대신하지 않는다. 새 문서 전체 Strict PASS, 원격 전달 완료는 주장하지 않는다.
-현재 대상에 빠진 최신 정본과 외부 검토 장애를 우회해 push하지 않는다. 로컬 보존과 다른 PC에서 필요한 추가 전달물을 분리 보고한다.
+앞선 L1 기록에서 외부 검토 장애를 필수 push 차단으로 삼은 적용 근거는 불완전했다. 이번 L2 후속 수정의 독립 검토 필요성과 별개로 보존한다. 로컬 보존과 다른 PC에서 필요한 추가 전달물을 분리 보고한다.
 
 ## 최신 리뷰 귀속과 로컬 시험
 
@@ -191,8 +207,8 @@ PR87의 최종 scope 검토도 PASS 본문이 있고 source/test 두 파일은 b
 
 ## 병합 순서와 남은 조건
 
-현재 모든 행은 최신 Strict 정본 누락과 Owner 검토 미완료라는 공통 조건을 가진다.
-‘조건부 권고’는 그 조건을 해소한 뒤 해당 변경 범위에서 검토할 후보라는 뜻이며 지금 즉시 병합하라는 뜻이 아니다.
+아래 표는 이전 조회 시점의 판정이다. 최신 정본 누락은 전체 Strict 판정의 공백이며, 각 PR의 제품 결함과 같지 않다. 원격 필수 검사와 Owner 검토는 전달·병합 전에 다시 확인한다.
+‘조건부 권고’는 해당 변경 범위에서 검토할 후보라는 뜻이며 지금 즉시 병합하라는 뜻이 아니다. 표의 “공통 조건”은 누락 규칙의 적용 범위와 Owner 검토를 재확인할 필요를 뜻한다.
 
 | 순서 | PR | 검증 SHA | 추천 판정 | 근거 및 남은 조건 |
 |---|---|---|---|---|
@@ -214,7 +230,8 @@ PR87의 최종 scope 검토도 PASS 본문이 있고 source/test 두 파일은 b
 
 ## 다음 시작 지점과 로컬 전용 자료
 
-먼저 이 장부의 로컬 보강을 검토·정상 전달한 뒤 PR91의 새 SHA를 다시 확인한다.
+게시·착수 순서: 이 장부의 로컬 보강을 검토·정상 전달하고 PR91의 새 SHA를 확인한 뒤 새 PC가 먼저 읽는다.
+제품 병합 순서: 위 선행 계약 관계를 따른다. PR91을 먼저 읽는 것과 병합 표의 마지막 배치는 서로 다른 순서다.
 제품은 #85/#86/#88의 계약 검토와 #83 최종 리뷰 귀속 확인에서 시작한다. 선행 병합 대기 중 신규 구현을 자동 시작하지 않는다.
 고정된 12개 기존 SHA는 GitHub에서 fetch할 수 있다. 이번 문서 보강과 원명령 원장은 아직 현재 PC에만 있다.
 기존 private-reviews 원문, 미게시 보존 브랜치, 후보 DB·키·브라우저 로그인은 GitHub 인계에 포함되지 않는다.
@@ -272,3 +289,23 @@ Gmail 검색 원응답은 gmail-sent-query.json에 보존했다. 동일 Codex �
 ‘문서만 변경’이라는 이번 diff 범위는 commit 전후 name-status/numstat로 별도 확인한다. 과거 전체 제품 손실에 대한 주장은 하지 않는다.
 형식 검사 brief-lint는 선택 검사 SKIPPED(이번 환경에서 호출 경로를 확정하지 않음)이고, 본문 근거·한계·표 해석은 보조 검토와 자체 확인했다.
 제출 직전 §8-6b 아홉 항목: 모두 아니오. 이는 품질에 대한 자체 점검이며 독립 V1 판정이 아니다.
+
+## 후속 수정 검증 — 2026-09-14
+
+입력: PR 번호와 저장소 최상위 경로. 출력: 새로운 검토 폴더와 확인된 전체 SHA. 오류: 비정상 종료이며 성공 메시지를 내지 않는다.
+When clone·저장소 확인·조회·fetch·복원 후 검사 중 하나라도 실패하면 절차는 성공으로 끝나지 않아야 한다.
+When 기존 사용자 변경과 동명 브랜치가 있으면 내용을 보존하고 별도 폴더로 복원해야 한다.
+counter-AC: 마지막 printf가 실패 종료값을 덮기, 잘못된 origin에서 계속 진행하기, 옛 SHA 검사를 새 복원에 붙이기.
+
+기준 커밋은4591d778658d3238b9b9f86844a71b78bf8d7e3f이고, 이번 결과는 그 뒤의 문서 수정분을 포함한다.
+원장은 `/Users/kangsangmo/Desktop/hs-handoff-followup-20260914-evidence/`이다.
+수정 전 red/evidence.json에서 두 명령 블록의 오류 주입에도 exit0을 다시 확인했다.
+수정 후 test_restore.py와 green.json은22사례를 기록한다: 오류 사례18개는 비정상 종료, 정상 사례4개는 성공했다.
+그중 실제 로컬 Git 복원2회는 같은 브랜치·추적 파일 수정·미추적 파일을 보존하고 서로 다른 폴더에 정확한 SHA를 복원했다.
+gh 응답과 승인 origin 표시만 대역이며 fetch·worktree·HEAD·status는 file 전송만 허용한 실제 Git이다. 실제 GitHub나 다른 PC 성공 증거가 아니다.
+
+이번 변경은 셸 실행 흐름을 고치므로 strict SKILL.md §0.5의 L2와 §5 “독립 1차 적대검증 V1 — L2+”를 적용한다.
+이 판정은 기존12개 PR을 일괄 L2로 바꾸거나 최신 SOT를 다른 작업에서 복사하라는 뜻이 아니다.
+새 변경의 외부 독립 V1은 미실행이다. 과거의 잔액 부족·timeout은 과거 증거로 보존하며 현재 서비스 상태로 단정하지 않는다.
+동일 Codex 계열 보조 검토는 V1을 대체하지 않는다. 새 변경의 전체 Strict PASS·원격 전달 완료·병합 권고는 아직 주장하지 않는다.
+이 절의 새 로컬 결과가 앞선 17시대 실행 기록을 덮어쓰지 않는다. 원격 CI·필수 설정·전체 제품시험은 이번에 새로 실행하지 않았다.
