@@ -390,6 +390,13 @@ def test_frame_line_cannot_hide_a_recruiting_condition() -> None:
     assert ok.jd_packet.linkedin_body.startswith("제목:")
 
 
+@pytest.mark.parametrize("marker", ["[복사 시작]", "[복사 끝]", "[회사 정보 보완]"])
+def test_exact_frame_marker_cannot_hide_a_recruiting_condition(marker: str) -> None:
+    jd = _jd()
+    with pytest.raises(BriefInputError):
+        _packet(jd_packet=_jd_packet(jd, linkedin_body=f"{jd.text}\n{marker} 경력 10년 이상"))
+
+
 def test_core_section_heading_with_trailing_punctuation_is_still_core() -> None:
     text = _JD_TEXT.replace("주요업무\n", "주요업무:\n").replace("자격요건\n", "자격요건：\n")
     jd = _jd(text)

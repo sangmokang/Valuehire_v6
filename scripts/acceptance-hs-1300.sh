@@ -109,6 +109,10 @@ no_repeat() {
   if printf '%s' "$1" | perl -CS -ne 'exit(/(\p{L}{2,6})\1\1/ ? 0 : 1)'; then return 1; fi
   return 0
 }
+nospace_chars() {
+  # wc -m 은 LC_ALL=C 에서 한글 바이트를 문자로 세지 못한다. perl -CS 로 UTF-8 문자 수를 센다.
+  printf '%s' "$1" | perl -CS -Mutf8 -0777 -ne 's/\s+//g; print length($_)'
+}
 
 wu_row_ok() {
   local row="$1" cells n cmd state
@@ -152,12 +156,12 @@ wu_row_ok() {
   # 13.02 행은 13.02b 시험 파일도 정확히 참조해야 한다 (Codex 4차)
   if [ "$id" = "02" ]; then printf '%s' "$cmd" | $G -Eq 'tests/test_hs_1302b\.py( |`|$)' || return 1; fi
   # 행동 셀 최소 6자, 정상/반례 셀에 양성·음성 둘 다 + 각각 내용 10자 이상 + 없음/N/A/x 거부
-  [ "$(printf '%s' "${cells[1]}" | tr -d '[:space:]' | wc -m | tr -d ' ')" -ge 6 ] || return 1
+  [ "$(nospace_chars "${cells[1]}")" -ge 6 ] || return 1
   local pos neg
   pos="$(printf '%s' "${cells[3]}" | $G -Eo '양성[:：][^.]*' | head -1 | tr -d '[:space:]')"
   neg="$(printf '%s' "${cells[3]}" | $G -Eo '음성[:：][^.]*' | head -1 | tr -d '[:space:]')"
-  [ "$(printf '%s' "$pos" | wc -m | tr -d ' ')" -ge 13 ] || return 1
-  [ "$(printf '%s' "$neg" | wc -m | tr -d ' ')" -ge 13 ] || return 1
+  [ "$(nospace_chars "$pos")" -ge 13 ] || return 1
+  [ "$(nospace_chars "$neg")" -ge 13 ] || return 1
   # 무의미 반복 거부: 같은 3자 이상 조각이 3회 이상 (Codex 4차 '통과통과통과…')
   no_repeat "$pos" || return 1
   no_repeat "$neg" || return 1

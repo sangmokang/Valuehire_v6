@@ -194,6 +194,7 @@ def test_second_claim_on_the_same_attempt_is_refused(tmp_path: Path) -> None:
 
 def test_claim_is_granted_exactly_once_under_concurrent_callers(tmp_path: Path) -> None:
     directory = _ledger(tmp_path)
+    _ensure_current_packet(directory)
     record_intent(directory, _intent())
     workers = 6
     barrier = threading.Barrier(workers)

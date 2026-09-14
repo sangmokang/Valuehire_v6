@@ -38,8 +38,8 @@ __all__ = [
 # 길이 계산에서 빼는 복사 마커. 러너가 붙였다 떼는 프레임이지 본문이 아니다(§7 D4).
 _COPY_MARKERS: tuple[str, ...] = ("[복사 시작]", "[복사 끝]")
 
-# 본문 밖 프레임 줄의 **접두사** 목록. 정규화한 줄이 이 중 하나로 시작하면
-# JD 내용 줄이 아니므로 누락·추가 판정에서 모두 제외한다.
+# 본문 밖 프레임 줄 목록. 제목·문의는 실제 내용이 뒤따르므로 접두로 허용하되,
+# 복사/회사정보 마커는 정확히 같은 줄만 JD 내용 줄에서 제외한다.
 #   "제목:"          — InMail 제목 줄
 #   "[복사 시작]"    — 복사 구간 시작
 #   "[복사 끝]"      — 복사 구간 끝
@@ -181,7 +181,16 @@ def _canonical_heading(text: str) -> str:
 
 
 def _is_frame_line(line: str) -> bool:
-    return any(line.startswith(normalize_line(prefix)) for prefix in LINKEDIN_FRAME_LINES)
+    normalized = normalize_line(line)
+    prefix_allowed = (
+        normalize_line("제목:"),
+        normalize_line("문의:"),
+    )
+    return normalized.startswith(prefix_allowed) or normalized in {
+        normalize_line("[복사 시작]"),
+        normalize_line("[복사 끝]"),
+        normalize_line("[회사 정보 보완]"),
+    }
 
 
 def _matches_condition(line: str) -> bool:
