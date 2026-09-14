@@ -78,6 +78,8 @@ def _partial(reason: str, last_observed_y_px: int) -> EvidenceCoverageResult:
 def _partial_reason(manifest: JsonMapping, intervals: Sequence[tuple[int, int]], height: int) -> str:
     if not intervals:
         return "no_observed_segments"
+    if height == 0:
+        return "zero_document_height"
     cursor = 0
     for top, bottom in intervals:
         if top > cursor:
@@ -91,6 +93,8 @@ def _partial_reason(manifest: JsonMapping, intervals: Sequence[tuple[int, int]],
 def _covers_height(intervals: Sequence[tuple[int, int]], height: int) -> bool:
     if not intervals:
         return False
+    if height == 0:
+        return False
     cursor = 0
     for top, bottom in intervals:
         if top > cursor:
@@ -98,7 +102,7 @@ def _covers_height(intervals: Sequence[tuple[int, int]], height: int) -> bool:
         cursor = max(cursor, bottom)
         if cursor >= height:
             return True
-    return height == 0 or cursor >= height
+    return cursor >= height
 
 
 def _observed_intervals(manifest: JsonMapping) -> list[tuple[int, int]]:

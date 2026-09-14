@@ -135,6 +135,16 @@ def test_zero_height_without_observed_segments_is_not_complete() -> None:
     assert result.last_observed_y_px == 0
 
 
+def test_zero_height_with_observed_segment_is_not_complete() -> None:
+    manifest = _manifest([_segment(0, 0, 1)], height=0)
+
+    result = classify_evidence_coverage(manifest)
+
+    assert result.coverage_status == "partial"
+    assert result.coverage_reason == "zero_document_height"
+    assert result.last_observed_y_px == 1
+
+
 def test_failed_segment_in_middle_reports_segment_gap() -> None:
     manifest = _manifest(
         [
