@@ -30,7 +30,7 @@
 | 5 | 1촌이면 Email Contact 확보 | **부분 채택** | 1촌 여부·연락처는 LinkedIn 로그인 화면에서만 보인다 → HS-11 이후. 지금은 **공개 출처(논문·연구실 페이지·회사 공지)에서 확인된 이메일**만 `EmailContact(source_url, provenance)`로 담고, 출처 없는 이메일은 타입이 거부한다. |
 | 6 | URL·매칭 이유·점수·학력·경력을 DB에 쌓고 4명에게 메일, 제목에 ValuehireSearch | **채택(결정 D2·D3)** | 수신 4명은 `contracts/humansearch/team-recipients.json`(ClickUp 멤버 API 실측: sangmokang·rogan·julian·kcs @valueconnect.kr). DB = HS-03.01 SQLite 스키마가 병합되기 전까지는 **git 밖 패킷 파일**(`~/.humansearch/packets/<id>.json`, 0600)에 저장하고 HS-13.09에서 표로 옮긴다. |
 | 7 | 사람인·잡코리아는 나중에 | **채택** | 사람인·잡코리아용 2필드 텍스트는 지금 만들고(HS-13.04), 사이트 등록 자동화는 기존 스킬 `position-register`·HS-11 범위. |
-| 8 | RPS 프로젝트·South Korea·Boolean AND/OR 반복 서치 | **부분 채택** | Boolean 검색식 생성은 순수 함수(HS-13.07)로 지금 만든다. RPS 화면 조작은 D0 §4·§5가 D1 이후 허용하는 **프로젝트 확인·필터 순회·후보 목록 넘겨보기**까지만 **HS-13.11로 예정**(선행 HS-05·HS-11.04~06). 지시의 "프로젝트 **생성**"은 사이트 변경(되돌리기·중복 방지 필요)이라 별도 L3 결정·오너 승인 없이는 **비범위** — 사장님이 RPS에서 프로젝트를 만들어 두면 코드는 그 프로젝트 id를 확인만 한다. "멈추지 말고 계속"은 D0 §9(사람 입력·권한 회수)와 2026-09-08 사장님 결정 ⑨(1초 멈춤 장치, `project_humansearch_owner_decisions_20260908`) 아래에서만 가능. |
+| 8 | RPS 프로젝트·South Korea·Boolean AND/OR 반복 서치 | **부분 채택** | Boolean 검색식 생성은 순수 함수(HS-13.07)로 지금 만든다. 2026-09-14 최신 결정은 RPS 프로젝트가 없으면 생성, 있으면 기존 필터를 업데이트하고 재조회로 중복 생성을 막는 것이다. 그 라이브 조작 계약은 새 정본 `docs/sot/humansearch-rps-project-contract.md` 가 소유한다(이 브랜치에는 아직 미병합 참조). HS-13은 RPS에 옮길 `SearchFilters`·Boolean 산출물과 패킷 검증만 소유하고, 과거 "프로젝트 생성 비범위" 문구로 같은 승인을 다시 요구하지 않는다. |
 | 9 | 후보별 1,900자 InMail 준비 + 이메일로도 전달 | **채택** | `build_inmail()` 순수 함수(HS-13.08). 발송은 절대 자동화하지 않는다(D0 §4 "발송은 별도 L3 승인 없이 항상 금지"). 브리프 메일 하단에 후보별 InMail 초안을 붙인다. |
 
 지시 문장 중 코드 계약으로 옮긴 것: ⓐ **"후보자 입장과 관점에서 회사의 매력도가 충실히 드러나야"** → §6 1절 머리에 후보자 관점 소개 2문단 + `[회사 매력 포인트]` 3개 이상(각각 출처 id 필수, `compose_brief_mail(attraction_points=…)` 이 3개 미만·출처 없음이면 거부, D10). ⓑ **"축약해야 한다면 어미·어조·말투 등 빼도 되는 한국어 구조를 빼거나, 프로세스·복리후생 등 부수적인 것을 생략"** → 두 방식 모두 계약화: 절 생략은 `omittable_sections`(호출자가 절 이름 지정), 어미 축약은 `verify_linkedin_fidelity` 가 **핵심 토큰 열**(어미·조사 목록을 뗀 뒤의 토큰 순서)이 같으면 같은 줄로 인정(D11). 명사·숫자·고유명사 삭제는 축약이 아니라 누락.
@@ -116,7 +116,7 @@ class ConnectionDegree(Enum): UNKNOWN, FIRST, SECOND, THIRD_PLUS
     packet_id: str; position: PositionSpec; jd: JdSource; company: CompanyBrief
     jd_packet: JdPacket; candidates: tuple[CandidateLead, ...]; mail: TeamMail
     boolean_queries: tuple[str, ...]; inmails: tuple[tuple[str, str], ...]  # (linkedin_url, body)
-    search_filters: SearchFilters; created_on: date   # HS-13.01b·13.09c. packet_id 에 날짜를 넣지 않는다(아래 packet.py)
+    search_filters: SearchFilters; created_on: date; schema_version: int = 1   # HS-13.01b·13.09c·13.09g. packet_id 에 날짜를 넣지 않는다(아래 packet.py), legacy JSON 은 거부
 ```
 
 ```python
@@ -153,7 +153,7 @@ def build_inmail(lead: CandidateLead, linkedin_body: str, greeting: str) -> str 
 # packet.py
 def packet_id(position: PositionSpec, jd: JdSource) -> str   # "{clickup_id}-{sha256(jd.text)[:8]}" — sha8 은 코드가 원문에서 계산(호출자의 raw_sha256 은 출처 해시일 뿐, Codex 10차) — **날짜 없음**(Codex 5차: 날짜가 들어가면 자정 뒤 같은 포지션이
 #   새 장부 파일명이 되어 승인 없이 재발송된다). 날짜는 SearchPacket.created_on 메타데이터. 같은 포지션·같은 JD 는 언제 만들어도 같은 id → 같은 묘비
-def to_json(packet) / from_json(text)  # 왕복 동일성. PII는 파일에만, 로그 0
+def to_json(packet) / from_json(text)  # 왕복 동일성. schema_version=1 필수, legacy/unknown version 거부. PII는 파일에만, 로그 0
 # send_ledger.py  (D9 발송 at-most-once — HS-13.09 소유)
 class SendState(Enum): INTENT | SEND_CLAIMED | SENT_UNVERIFIED | VERIFIED | ABANDONED   # ABANDONED 는 종단. SEND_CLAIMED = 청구됨(HS-13.09d)
 @dataclass(frozen=True) class Approval:  approved_by: str; search_query: str; search_checked_at: datetime; reason: str
@@ -172,13 +172,14 @@ def record_intent(dir, intent) -> tuple[SendIntent, bool]   # attempt 1 을 O_CR
 def may_send(dir, packet_id, channel) -> bool                # attempt 파일이 **하나도 없을 때만** True (프리플라이트 전용)
 #   `created` 는 감사 불리언이다 — 발송 허가가 아니다(Codex 7차: 불리언은 재사용되므로 같은 attempt 로 두 번 보낼 수 있었다).
 # send_claim.py  (HS-13.09d 소유 — 발송 허가는 한 번 소비되는 청구)
-def claim_send(dir, packet_id, channel, attempt, *, at, evidence) -> tuple[SendIntent, bool]
+def recipients_digest(to: tuple[str, ...], cc: tuple[str, ...]) -> str   # to·cc 각각 정렬, 역할은 분리, 중복 0. SendIntent 수신자 digest 의 표준 입력(D13)
+def claim_send(dir, packet_id, channel, attempt, *, at, evidence, recipients_sha256, body_sha256) -> tuple[SendIntent, bool]
 #   최신 attempt 가 INTENT·message_id 없음일 때 마커 `<packet_id>.<channel>.a<attempt>.claim.json` 을 O_CREAT|O_EXCL(os.link) 로 만들고
 #   SEND_CLAIMED 전이를 append → (기록, True). 마커가 이미 있으면(같은 프로세스든 다른 프로세스든, 고아 마커든) (기록, False).
 #   **발송 허가 = `claim_send` 가 돌려준 `True` 딱 하나. 청구 1건 = 외부 발송 호출 1회.** 두 번째 `send_message` 호출은 두 번째 청구가 필요하고
 #   그 청구는 False 다. 고아 마커(마커만 있고 기록은 INTENT) = 보냈는지 모름 → 재청구 거부, 승인 아래 `open_new_attempt` 만.
-def mark(dir, packet_id, channel, attempt, state, message_id, at, evidence) -> SendIntent   # SEND_CLAIMED→SENT_UNVERIFIED(message_id 필수)→VERIFIED 단방향, transitions append. INTENT→SENT_UNVERIFIED 는 거부(청구 없는 발송 표시)
-def open_new_attempt(dir, packet_id, channel, *, approval: Approval, at) -> tuple[SendIntent, bool]
+def mark(dir, packet_id, channel, attempt, state, message_id, at, evidence) -> SendIntent   # SEND_CLAIMED→SENT_UNVERIFIED(message_id 필수) 단방향, transitions append. INTENT→SENT_UNVERIFIED·mark(VERIFIED) 는 거부(청구 없는 발송 표시·readback 없는 검증 표시 차단)
+def open_new_attempt(dir, packet_id, channel, *, approval: Approval, at, recipients_sha256, body_sha256) -> tuple[SendIntent, bool]
 #   최신 attempt 가 INTENT 또는 SEND_CLAIMED·message_id 없음(불확실)일 때만. 잠금 뒤에 들어온 두 번째 승인은 from_attempt 가 낡아 거부(False 가 아니라 예외). **순서: attempt N+1 파일을 O_EXCL 로 먼저 생성 → 그 다음 attempt N 에
 #   ABANDONED 전이 append.** 두 작업 사이에 끊기면 "N 은 INTENT, N+1 도 INTENT" 가 남는데, 최신 attempt = 번호 최대이고
 #   읽기 시 "N+1 이 있는 N" 은 ABANDONED 로 복구(append)한다 — 어느 지점에서 끊겨도 영구 복구 불능 상태가 없다(Codex 4차 중간).
@@ -202,12 +203,14 @@ def open_new_attempt(dir, packet_id, channel, *, approval: Approval, at) -> tupl
 #     LinkedIn 판에만 적용(Gmail·2필드는 원문 그대로) ② 사장님 검토 항목에 "LinkedIn 판 어미 축약 줄 눈으로 대조" 유지 ③ 형태소 분석기 도입은 별도 WU(Issue #82 부채 행).
 # __main__.py  (HS-13.10 소유 — 유일한 CLI)
 #   uv run --no-sync python -m humansearch.brief verify --packet <path> --sent <readback.txt>
+#   uv run --no-sync python -m humansearch.brief verify --packet <path> --sent <readback.txt> --mark-dir <ledger> --message-id <id> --at <iso>
 #   stdout 1줄: `VERIFIED packet_id=<id> body_sha256=<hex>` (exit 0) | `SENT_UNVERIFIED packet_id=<id> expected=<hex> actual=<hex>` (exit 1)
 #   readback 의 마지막 내용 줄은 정확히 `packet-id: <packet_id>` 1줄이어야 한다 — 없음·불일치·중복·마지막 아님이면 본문이 같아도
 #   `SENT_UNVERIFIED … reason=tail_missing|tail_mismatch|tail_duplicate|tail_not_last` (Codex 12차: 잘못된 발송본이 패킷에 결합되는 것 차단)
 #   비교 전 **양쪽 본문에 같은 정규화**(HS-13.10b, 2026-09-10 초안 readback 실측으로 확정): ① CRLF→LF ② Gmail 리다이렉트 언랩
 #   `https://www.google.com/url?q=<URL>&source=gmail&ust=<digits>&sa=<alnum>` → unquote(<URL>) (꼬리를 정확히 고정 — 느슨하면 뒤의 `)` 를 삼킨다)
 #   ③ 줄 오른쪽 공백 제거 ④ 끝 빈 줄 제거 후 마지막 `packet-id: …` 줄 제거(러너가 §10 ③에서 붙이는 꼬리) ⑤ 전체 strip. 이 규칙 밖의 차이는 전부 불일치
+#   `--mark-dir` 경로는 readback 성공 뒤 최신 attempt 의 body_sha256·recipients_sha256·message_id 를 현재 패킷과 다시 대조하고 VERIFIED 전이를 append 한다.
 #   인자 누락·파일 없음·패킷 손상 → stderr 사유 + exit 2. 다른 하위 명령 없음(발송 명령 없음).
 # types (HS-13.01b 소유 추가)
 @dataclass(frozen=True) class SearchFilters:  location: str = <policy().default_search_location>; seniority_years: tuple[int, int] | None = None
@@ -261,6 +264,7 @@ def load_brief_policy(path=contracts/humansearch/brief-policy.json) -> BriefPoli
 | D10 | 회사 매력도 표현 | Gmail 판 머리 = 후보자 관점 소개 2문단 + `[회사 매력 포인트]` 3~5개, 각 포인트에 CompanyBrief 출처 id. 3개 미만·출처 없음 → 조립 거부 | — |
 | D12 | 서치 지역 | `SearchFilters.location` 은 `brief-policy.json` 의 `allowed_search_locations`(초기값 `["South Korea"]`) 안의 값만 허용(타입 거부). 기본값도 계약에서 읽는다. 지역을 넓히는 것은 계약 파일 편집 = 오너 결정(P13 라벨) | 허용 목록 확장 |
 | D11 | 어미 축약 인정 기준 | 줄의 **핵심 토큰 열**(공백 분리 토큰에서 목록의 어미·조사·존칭 접미를 뗀 것)이 JD 줄과 같으면 축약으로 인정. 목록은 `linkedin_limit.KOREAN_ENDINGS`(언어 상수, P22 운영 상수 아님). 명사·숫자·영문 토큰 하나라도 빠지면 누락 | 목록 조정 |
+| D13 | 패킷-발송 digest 결합 | SendIntent 의 `recipients_sha256` 은 `recipients_digest(mail.to, mail.cc)` 만 사용한다(to·cc 내부 정렬, 역할 분리, 중복 거부). `claim_send` 는 현재 intent digest 와 호출 digest 를 대조하고, `verify_and_mark` 는 readback 성공 뒤 현재 패킷의 body·recipients digest 와 최신 attempt/message_id 를 다시 대조한 경우에만 VERIFIED 를 만든다. 같은 packet_id 에 intent 가 생기면 다른 패킷 내용으로 저장할 수 없고, packet JSON 은 `schema_version=1` 없이는 로드하지 않는다 | 공급자 멱등키 도입 시 message_id 결합 강화 |
 | D9 | 발송 at-most-once(코드 경로) | intent 파일은 영구 묘비(attempt 번호). 발송 허가 = `claim_send` 가 청구 마커(O_EXCL)로 **딱 한 번** 돌려주는 `True`(INTENT→SEND_CLAIMED, HS-13.09d) — 청구 1건 = 발송 호출 1회, `record_intent` 의 `created` 는 감사 불리언일 뿐. 파일에서 읽은 INTENT·고아 마커는 불확실 전송이라 발송 불가. 끊긴 패킷은 사람이 Gmail `in:sent` 를 확인해 찾았으면 `mark(SENT_UNVERIFIED, message_id)`, 못 찾았으면 패킷·attempt 에 결합된 승인 증거(수신자 계약 안의 승인자·검색식·확인 시각·사유)를 가진 `open_new_attempt` 만이 새 attempt 를 연다(N+1 먼저 생성, N 은 ABANDONED). crash-point 4곳 각각 재실행 → 발송 0 이 13.09 AC. **명시된 한계**: 승인 재발송은 사람의 at-least-once 결정(Gmail 멱등키 없음), 장부는 같은 UID 로컬 파일이라 삭제되면 보증이 깨짐(HS-04.02 러너 격리 전까지 LOCAL_ONLY) | 공급자 멱등키·러너 격리 |
 
 ## 8. 예외 표 (R1)
@@ -283,13 +287,13 @@ def load_brief_policy(path=contracts/humansearch/brief-policy.json) -> BriefPoli
 성공: 실제 포지션 1건의 브리프 메일이 검증된 형식으로 발송·readback 일치. 소유: `humansearch/src/humansearch/brief/`, `humansearch/tests/test_hs_13xx.py`,
 `contracts/humansearch/team-recipients.json`, `contracts/humansearch/schools-tier.json`.
 선행: 없음(순수 로직). 라이브(13.10)는 D2 수신 규칙과 §8 예외표 아래에서만.
-공통 인수 명령 꼬리: `cd humansearch && uv run --no-sync ruff check src tests && uv run --no-sync mypy src tests`.
+공통 인수 명령 꼬리: `cd humansearch && uv run --no-sync ruff check src tests && uv run --no-sync mypy --strict src tests`.
 
-**검사기의 경계(HS-13.00, Codex 4차 중간 지적에 대한 답):** `acceptance-hs-1300.sh` 는 이 문서가 *구조·결합·실존*(카드 22·결정 D1~D12·ID↔파일명·참조 파일이 **이 브랜치 트리**에 실존(형제 브랜치·refs 조회 없음 — CI clean checkout 에서도 같은 판정, Codex 7차)·타입/함수 시그니처·D9 문구·`verification-commands.md` 행의 카드/결정 개수가 실제 루프와 일치)을 갖췄는지만 기계로 판정한다. 양성/음성 서술과 결정 기본값의 **의미 적합성은 정규식으로 판정할 수 없다** — 그것은 Codeaudit(읽기 전용 감사)과 사장님 검토의 몫이며, 이 문서는 그 두 검토를 `## 적대 검증 로그` 에 남긴다. 검사기는 무의미 반복(같은 3자 이상 조각 3회 반복, 같은 단어 반복)만 추가로 거른다.
+**검사기의 경계(HS-13.00, Codex 4차 중간 지적에 대한 답):** `acceptance-hs-1300.sh` 는 이 문서가 *구조·결합·실존*(카드 26·결정 D1~D13·ID↔파일명·참조 파일이 **이 브랜치 트리**에 실존(형제 브랜치·refs 조회 없음 — CI clean checkout 에서도 같은 판정, Codex 7차)·타입/함수 시그니처·D9 문구·`verification-commands.md` 행의 카드/결정 개수가 실제 루프와 일치)을 갖췄는지만 기계로 판정한다. 양성/음성 서술과 결정 기본값의 **의미 적합성은 정규식으로 판정할 수 없다** — 그것은 Codeaudit(읽기 전용 감사)과 사장님 검토의 몫이며, 이 문서는 그 두 검토를 `## 적대 검증 로그` 에 남긴다. 검사기는 무의미 반복(같은 3자 이상 조각 3회 반복, 같은 단어 반복)만 추가로 거른다.
 
 | WU | 행동 하나 | 인수 명령 (저장소 루트에서 그대로 실행) | 정상 / 반례 | 상태 |
 |---|---|---|---|---|
-| HS-13.00 | 이 스펙·타입·장부를 저장소에 남긴다 | `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1300.sh` (exit 0, `CHECKED: 92`) + `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1300-mutations.sh` (`CHECKED: 34`) | 양성: 이 문서 그대로 → 검사기 exit 0 (CHECKED 92). 음성: 문서 부재·WU 행 삭제·§4 catch-all 삭제·WU 셀 비움·D 셀 비움·토큰만 남긴 최소 문서·catch-all 부정어 반전·가짜 명령 경로·무의미 D값·정상/반례 셀 `x`·**id 접미 위장 파일명·정상/반례 셀을 '없음'으로만 채움·D값을 한글 1자+숫자로·IMPLEMENTED 뒤 괄호로 실존 검사 회피·기대출력 자리의 `RESULT=$(id)`·홀수 백틱·LOCAL_COMMITTED(task/…) 괄호 상태·정본 표의 카드 수 14** → 각 exit 1 | IMPLEMENTED |
+| HS-13.00 | 이 스펙·타입·장부를 저장소에 남긴다 | `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1300.sh` (exit 0, `CHECKED: 98`) + `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1300-mutations.sh` (`CHECKED: 34`) | 양성: 이 문서 그대로 → 검사기 exit 0 (CHECKED 98). 음성: 문서 부재·WU 행 삭제·§4 catch-all 삭제·WU 셀 비움·D 셀 비움·토큰만 남긴 최소 문서·catch-all 부정어 반전·가짜 명령 경로·무의미 D값·정상/반례 셀 `x`·**id 접미 위장 파일명·정상/반례 셀을 '없음'으로만 채움·D값을 한글 1자+숫자로·IMPLEMENTED 뒤 괄호로 실존 검사 회피·기대출력 자리의 `RESULT=$(id)`·홀수 백틱·LOCAL_COMMITTED(task/…) 괄호 상태·정본 표의 카드 수 14** → 각 exit 1 | IMPLEMENTED |
 | HS-13.01 | 타입을 fail-fast로 검증한다 | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1301.py` (`20+ passed`) | 양성: 합성 SearchPacket 1건 생성. 음성: Claim 출처 0·후보 URL 도메인·이메일 출처 없음·중복 URL·수신자 타 도메인·1,900자 거부; Hypothesis: `linkedin.com/in/` 아닌 URL 전부 거부 | IMPLEMENTED |
 | HS-13.01b | 운영 상수를 계약 파일로 옮긴다(P22) | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1301b.py` (`8+ passed`) + `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1301b-literals.sh` (`CHECKED: 5` — 1899·valueconnect.kr·linkedin.com/in·[포지션]·ClickUp list id 리터럴이 brief/*.py 에 0) | 양성: `contracts/humansearch/brief-policy.json` 로드 → 13.01 시험 전부 유지·`JdSource.position_count` 기본값 1 통과·`SearchFilters` 기본 South Korea. 음성: 파일 없음·version 다름·도메인 형식 위반 → `BriefInputError`; `position_count` 0·2 거부; 계약값을 바꾼 임시 사본으로 1,899→1,000 이 실제 반영 | IMPLEMENTED |
 | HS-13.02 | JD 충실도를 줄 단위로 판정한다(13.02b: 블록 안 임의 추가 줄 전부 검출) | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1302.py tests/test_hs_1302b.py` (`23+ passed`) | 양성: 합성 JD 원문 그대로·`•`↔`-`·공백 차이 → PASS·`extract_block` 정상. 음성: 1줄 삭제·어순 변경·"경력 2년 이상" 추가·**비숫자 "재택근무 가능" 추가 → extra_lines**·마커 부재/중복/역순 거부; 빈 JD 거부 | IMPLEMENTED |
@@ -297,7 +301,9 @@ def load_brief_policy(path=contracts/humansearch/brief-policy.json) -> BriefPoli
 | HS-13.03 | LinkedIn 1,899자 한도와 생략 정책을 강제한다 | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1303.py` (`12+ passed`) | 양성: 1,899자 PASS·지정 절(`혜택 및 복지`·`채용 전형`) 생략 PASS·어미 축약 줄("…을 찾습니다"→"…을 찾음") PASS(D11). 음성: 1,900자 FAIL(경계 Hypothesis)·미지정 절 누락 FAIL·명사 1개 삭제 FAIL | IMPLEMENTED |
 | HS-13.04 | 사람인·잡코리아 2필드로 나눈다 | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1304.py` (`8+ passed`) | 양성: 합성 JD → 필드1·필드2, 필드2 충실도 PASS. 음성: 마커 없음·필드2 빈값 거부 | IMPLEMENTED |
 | HS-13.04b | 2필드 절 범위를 소제목 흡수로 고치고 패킷 경계에서 JD 3종을 재검증한다 | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1304b.py` (`30+ passed`) | 양성: 괄호 소제목 절이 최상위 마커 절에 흡수·마커 순서 무관·소제목 마커는 그 절 하나만·충실한 3종 패킷 왕복·§6 블록을 그대로 담은 메일 본문 통과·조건 없는 프레임 줄 통과. 음성: Gmail 줄 누락·추가 조건·비조건 추가 줄 거부·필드 2 절 본문 손실 거부·LinkedIn 미선언 절 누락·핵심 절 생략·전 절 생략(빈 판) 거부·two_field_sections 빈값 거부·변조된 저장 파일 로드 거부·메일 본문이 블록을 재현하지 않으면(임의 본문·블록 안 추가·삭제·마커 중복·끝 마커 중복·CRLF) 거부·빈 소제목 마커(단독·혼합) 거부·프레임 줄 조건 은닉 거부·핵심 절 제목 콜론 변형 생략 거부·핵심 절 미인식 JD 의 생략 거부 | IMPLEMENTED |
+| HS-13.04c | JD 블록 밖 채용 조건 은닉을 거부한다 | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1304c.py` (`3+ passed`) | 양성: §6 JD 블록 안 원문 조건은 그대로 통과. 음성: 본문 꼬리의 경력·연봉·학력 조건 추가는 패킷 생성 시 거부 | IMPLEMENTED |
 | HS-13.05 | 팀 메일 제목·수신자·평문 본문을 조립한다 | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1305.py` (`12+ passed`) + `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1305-pii.sh` (`CHECKED: 4` — git ls-files 텍스트 파일 전체(팀 수신자 계약 파일만 allowlist)에서 ① linkedin.com/in/<slug> 중 slug 가 example- 로 시작하지 않는 것 0 ② 이메일 중 holder@valueconnect.kr·@example.com 외 0 ③ 전화 패턴 0 ④ 한국 휴대폰 010- 0) | 양성: 제목 2형 정확 일치·§6 절 순서·`[회사 매력 포인트]` 3개(출처 id)·수신자 계약 로드·body_sha256 왕복·HTML 0. 음성: 타 도메인 수신자 거부·절 누락 거부·매력 포인트 2개/출처 없음 거부(D10)·PII 게이트 음성 fixture 4종 각 FAIL | IMPLEMENTED |
+| HS-13.05b | 팀 메일 입력이 packet-id 줄을 만들 수 없게 한다 | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1305b.py` (`3+ passed`) | 양성: 러너가 readback 꼬리로 붙이는 packet-id 는 §10 소유. 음성: key_line·sender_name 이 줄바꿈이나 앞공백으로 `packet-id:` 줄을 만들면 조립 거부 | IMPLEMENTED |
 | HS-13.06 | 후보를 순수 함수로 채점한다 | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1306.py` (`15+ passed`, Hypothesis 포함) | 양성: 같은 입력 100회 동일·학교 계층 계약(`contracts/humansearch/schools-tier.json`) 로드. 음성: None 학력 = 0(기본값 변이 검출)·축 상한 40/20/20/20 초과 거부·total 0 거부·손상 계약 파일 5종 거부 | IMPLEMENTED |
 | HS-13.07 | Boolean 검색식 3종을 만든다 | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1307.py` (`8+ passed`) | 양성: 필수어 전부 포함·괄호/따옴표 균형(Hypothesis). 음성: 빈 필수어·따옴표 포함 용어·exclude 중복 거부 | IMPLEMENTED |
 | HS-13.08 | 후보별 InMail 초안을 만든다 | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1308.py` (`8+ passed`) + `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1308-nosend.sh` (`CHECKED: 3` — brief/*.py 에 smtplib·requests·send( 0) | 양성: ≤1,899·후보 이름·매칭 이유 1개 포함. 음성: 초과 시 거부·발송 API 부재 | IMPLEMENTED |
@@ -306,13 +312,15 @@ def load_brief_policy(path=contracts/humansearch/brief-policy.json) -> BriefPoli
 | HS-13.09d | 발송 허가를 한 번 소비되는 청구로 바꾼다(Codex 7차) | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1309d.py` (`13+ passed`) | 양성: INTENT→SEND_CLAIMED 1회·마커 0600·동시 6호출 중 1개만 True·SEND_CLAIMED 에서 open_new_attempt 허용. 음성: 같은 attempt 두 번째 청구 False·청구 없는 mark(SENT_UNVERIFIED) 거부·mark 로 SEND_CLAIMED 생성 거부·고아 마커 재청구 거부·최신 아닌 attempt 거부·SEND_CLAIMED 에 message_id 타입 거부 | IMPLEMENTED |
 | HS-13.09e | 장부 조작을 채널 잠금·CAS 로 직렬화하고 packet_id 를 내용에 결합한다(Codex 8차) | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1309e.py` (`16+ passed`) | 양성: 청구·승인 재시도 동시 12회 → SEND_CLAIMED 가 두 attempt 에 동시에 남지 않음·N+1 뒤 미종단 N 은 읽기 시 ABANDONED 복구·잠금 파일 0600·position/jd 도출 id 통과·같은 스레드 재진입 교착 없음·다른 스레드 배제·fsync 파일+디렉터리. 음성: 마커 생성 뒤 끼어든 승인 재시도 위에 낡은 SEND_CLAIMED 덮어쓰기 거부·형식만 맞는 임의 packet_id 3종 거부·override 가 공개 API 에 없음·pytest 밖 override 거부·override 밖에서 살아남은 SearchFilters 를 패킷이 거부·pytest 밖 계약 경로 환경변수 거부·record_intent/open_new_attempt 문서에 발송 권한 문구 0 | IMPLEMENTED |
 | HS-13.09f | packet_id 를 원문 해시로, 수신자를 계약 구성원으로, 계약 경로를 단일 해석기로 묶는다(Codex 10차) | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1309f.py` (`7+ passed`) | 양성: 같은 원문에 다른 raw_sha256 → 같은 packet_id·계약 구성원 수신자 통과. 음성: 같은 도메인 임의 주소 3종 거부·정책 캐시 뒤 환경변수로 수신자 계약 교체 거부·장부 소스에 발송 권한 귀속 문구 0 | IMPLEMENTED |
+| HS-13.09g | 패킷 schema·수신자 digest·intent 뒤 저장 불변성을 묶는다 | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1309g.py` (`3+ passed`) | 양성: schema_version=1 JSON·to/cc 내부 순서가 달라도 같은 digest. 음성: legacy/unknown schema 거부·to와 cc 역할 변경은 다른 digest·중복 주소 거부·intent 이후 같은 packet_id 다른 내용 저장 거부 | IMPLEMENTED |
 | HS-13.10b | readback 정규화 5단계를 고정한다 | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1310b.py` (`7+ passed`) | 양성: Gmail 리다이렉트 1개·여러 개·괄호 안 URL 복원, 퍼센트 인코딩 URL 이 `%` 유지/`%25` 재인코딩 두 변형 모두 일치(양쪽 대칭 unquote). 음성: 느슨한 꼬리가 `)` 를 삼키는 반례·다른 URL 은 exit 1(언랩 생략 변이 검출) 꼬리 `packet-id:` 줄이 없음·불일치·중복이면 본문이 같아도 SENT_UNVERIFIED(reason=tail_*) | IMPLEMENTED |
+| HS-13.10c | VERIFIED 전이를 readback·digest·message_id 대조와 결합한다 | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1310c.py` (`2+ passed`) | 양성: CLI `verify --mark-dir --message-id --at` 이 최신 attempt 를 VERIFIED 로 append. 음성: readback 본문·현재 패킷 수신자·message_id 중 하나라도 다르면 VERIFIED 전이 없음 | IMPLEMENTED |
 | HS-13.01c | 서치 지역을 계약 허용 목록으로 고정한다(D12) | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1301c.py` (`5+ passed`) | 양성: `South Korea` 통과·계약 기본값 로드. 음성: `Japan` 거부·빈값 거부·계약 목록을 바꾼 임시 정책으로 허용값이 실제 반영(허용 검사 생략 변이 검출)·기본값이 허용 목록 밖인 계약 파일 거부 | IMPLEMENTED |
 | HS-13.10 | 실제 포지션 1건 라이브 | §10 절차 + `cd humansearch && uv run --no-sync python -m humansearch.brief verify --packet <path> --sent <readback.txt>` (exit 0, 출력 `VERIFIED packet_id=ID body_sha256=HEX`) | 양성: 발송 1·readback 해시 일치 1(2026-09-10 실측: 패킷 `86exwz89j-5449bcf5`, Gmail message `1a08971ffd281a48`, RAW MIME 의 text/plain 을 §5 정규화 후 해시 일치). **발송 후 발견한 결함**: 필드 2(사람인·잡코리아용)가 `주요업무`·`혜택 및 복지` 본문을 빠뜨렸다(괄호 소제목 절 분리, 1,334자) — HS-13.04b 로 수정(같은 JD 에서 2,915자·5절 전부 포함 실측). 같은 메일의 Gmail 판은 JD 전문이라 팀은 원문을 갖고 있다. 정정본 재발송은 같은 packet_id 묘비 아래 사장님 승인(open_new_attempt) 사안 — 자동 재발송 없음. 음성: 불일치 → exit 1 `SENT_UNVERIFIED`(MCP PLAIN_TEXT 변환본은 quoted-printable 을 한 번 더 풀어 `=17`→0x17·`=\n` 소프트 개행이 깨져 불일치가 났다 — readback 은 RAW 로); 같은 패킷 재실행 → 발송 0 | VERIFIED |
-| HS-13.11 | RPS 프로젝트 확인·필터 순회·후보 목록 읽기(D0 §4 허용 범위만) | `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1311-rps-readonly.sh` (`CHECKED: 4` — 프로젝트 id readback 1·필터 적용 readback 1·캡차/2FA fixture 즉시 STOP 1·발송·저장 호출 0 정적 1) | 양성: 사장님이 만든 프로젝트 1개 확인 → 후보 목록 1페이지 읽기. 음성: 없는 프로젝트 → 순회 0·프로젝트 생성 호출 0 | BLOCKED(선행 HS-05·HS-11.04~06 병합) |
+| HS-13.11 | RPS 프로젝트 생성·기존 필터 업데이트 계약과 HS-13 산출물 연결 | `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1311-rps-readonly.sh` (`CHECKED: 4` — 프로젝트 readback 1·필터 적용 readback 1·캡차/2FA fixture 즉시 STOP 1·발송·저장 호출 0 정적 1) | 양성: 새 RPS 계약(`docs/sot/humansearch-rps-project-contract.md`, 이 브랜치 미병합 참조)이 프로젝트 생성/기존 필터 업데이트 뒤 readback 으로 중복 생성을 막고, HS-13 패킷의 Boolean/SearchFilters 를 입력으로 받는다. 음성: 대상 ClickUp position/JD/filter 가 확정되지 않으면 라이브 조작을 시작하지 않는다 | BLOCKED(새 RPS 계약 병합·대상 입력 확정 전) |
 | HS-13.12 | 패킷 → SQLite 이관 | `cd humansearch && uv run --no-sync pytest -q tests/test_hs_1312.py` (`8+ passed`) | 양성: 패킷 1건 → `search_packets`·`candidate_leads` 행 → 재조회 왕복 동일. 음성: 같은 packet_id 2회 → 1행·손상 패킷 거부·PII 열이 암호화 경계(HS-03.03) 밖에 평문 0 | BLOCKED(선행 HS-03.01 병합) |
 
-→ 00 → 01 → (01b, 02, 06, 07 병렬) → 03 → 04 → 05 → 08 → 09 → 10. 11·12는 선행 병합 뒤. 카드 수 = 18(00~12 + 01b·01c·02c·09c·10b).
+→ 00 → 01 → (01b, 02, 06, 07 병렬) → 03 → 04 → 05 → 08 → 09 → 10. 11·12는 선행 병합 뒤. 카드 수 = 26(00~12 + 01b·01c·02c·04b·04c·05b·09c·09d·09e·09f·09g·10b·10c).
 각 WU = 워크트리 1개 = PR 1개. 선행 PR 미병합이면 그 브랜치를 base로 잡고 PR 본문에 SHA를 적는다.
 
 ## 10. HS-13.10 러너 절차 (R3 — 손 조작은 러너, 판단은 코드)
@@ -321,7 +329,7 @@ def load_brief_policy(path=contracts/humansearch/brief-policy.json) -> BriefPoli
 2. WebSearch로 회사 사실 수집. 모든 값에 출처 id. 미확인은 `None`.
 3. 공개 LinkedIn 프로필 검색(WebSearch, `site:linkedin.com/in`) → 후보 3~5명. 구조화 `CandidateEvidence` 추출.
 4. 코드: `verify_fidelity`·`check_linkedin`·`split_two_field`·`score_candidate`·`build_boolean_queries`·`build_inmail`·`compose_brief_mail` → 패킷 저장.
-5. 러너(D9 순서 고정): ① `record_intent` 가 `(…, False)` 면 **아무것도 보내지 않고** 상태를 보고(INTENT·message_id 없음이면 Gmail `in:sent` 에서 제목+`packet_id` 토큰을 사람 눈으로 확인 → 찾았으면 `mark(SENT_UNVERIFIED, message_id)`, 못 찾았으면 사장님 승인 증거를 받아 `open_new_attempt`; 그 외 상태는 종료) → ② 최신 attempt 에 `claim_send(…)` 를 불러 **`(…, True)` 를 받은 그 한 번**에 대해서만(13.09d — 청구 1건 = `send_message` 1회. False 면 발송 0·상태 보고) ③ `send_message`(subject·to·body 를 패킷에서 그대로, 본문 끝에 `packet_id` 토큰 1줄) → 즉시 `mark(SENT_UNVERIFIED, message_id)` → ④ `get_message(RAW)` 의 MIME text/plain 을 디코드해 readback(PLAIN_TEXT 변환본은 quoted-printable 이 이중 해제돼 쓰지 않는다) → `verify --sent` 해시 일치만 `mark(VERIFIED)` = `PRODUCTION_VERIFIED`. 불일치는 `SENT_UNVERIFIED` 유지·보고. 어느 지점에서 끊겨도 재실행은 ①에서 멈춘다(발송 0).
+5. 러너(D9 순서 고정): ① `record_intent` 가 `(…, False)` 면 **아무것도 보내지 않고** 상태를 보고(INTENT·message_id 없음이면 Gmail `in:sent` 에서 제목+`packet_id` 토큰을 사람 눈으로 확인 → 찾았으면 `mark(SENT_UNVERIFIED, message_id)`, 못 찾았으면 사장님 승인 증거를 받아 `open_new_attempt`; 그 외 상태는 종료) → ② 최신 attempt 에 `claim_send(…)` 를 불러 **`(…, True)` 를 받은 그 한 번**에 대해서만(13.09d — 청구 1건 = `send_message` 1회. False 면 발송 0·상태 보고) ③ `send_message`(subject·to·body 를 패킷에서 그대로, 본문 끝에 `packet_id` 토큰 1줄) → 즉시 `mark(SENT_UNVERIFIED, message_id)` → ④ `get_message(RAW)` 의 MIME text/plain 을 디코드해 readback(PLAIN_TEXT 변환본은 quoted-printable 이 이중 해제돼 쓰지 않는다) → `verify --mark-dir --message-id --at` 이 readback·body_sha256·recipients_sha256·message_id 를 결합해 VERIFIED 전이를 만든다. 불일치는 `SENT_UNVERIFIED` 유지·보고. 어느 지점에서 끊겨도 재실행은 ①에서 멈춘다(발송 0).
 6. 보고: packet_id·해시·수신자 수·후보 수·글자 수만. 이름·URL·이메일은 보고에 0.
 
 ## 11. 게이트 계획·적대검증 정조준
@@ -336,7 +344,7 @@ def load_brief_policy(path=contracts/humansearch/brief-policy.json) -> BriefPoli
 
 - HS-13.00~09: `NOT_APPLICABLE`(내부 로직). HS-13.10: `PRODUCTION_VERIFIED`는 readback 일치 시에만, `BUSINESS_USED`는 사장님이 실제 그 메일을 팀에 전달·활용한 뒤에만.
 - **2026-09-10 라이브 1건 = `PRODUCTION_VERIFIED`**: 패킷 `86exwz89j-5449bcf5`(번개장터 Product Manager(Core Product)), To 1명(D2), Gmail message id `1a08971ffd281a48`, 본문 sha256 `3c7f360d…881261`(정규화 후 초안·발송본·RAW readback 셋 다 일치), 장부 a1 INTENT→SENT_UNVERIFIED→VERIFIED. 이 발송은 13.09d 이전 규약(`created=True` → send)으로 나갔다 — 청구 단계는 다음 발송부터 §10 ② 로 강제.
-- 비범위: 후보 자동 발송, LinkedIn 로그인·RPS 조작, ChatGPT 브라우저 자동화, 사람인·잡코리아 등록 자동화, Supabase 업로드, Discord.
+- 비범위: 후보 자동 발송, LinkedIn 로그인 세션 획득, ChatGPT 브라우저 자동화, 사람인·잡코리아 등록 자동화, Supabase 업로드, Discord. RPS 프로젝트 생성·기존 필터 업데이트 자체는 HS-13 비범위가 아니라 새 RPS 계약(`docs/sot/humansearch-rps-project-contract.md`, 이 브랜치 미병합 참조) 소유다.
 - 롤백: 코드는 `humansearch/brief/` 패키지 삭제로 원복. 발송된 메일은 회수 불가 → D2 첫 라이브 수신 1명 제한이 영향 반경.
 - 배포 후 관측: 브리프 메일 1통당 `verify` exit 0 여부와 LinkedIn 글자 수. 둘 중 하나라도 실패가 2회 반복되면 HS-13.02/03 스펙 재검토.
 

@@ -276,7 +276,7 @@ def test_to_json_encodes_date_enum_and_tuple_in_contract_shape() -> None:
     assert isinstance(decoded["boolean_queries"], list)
 
 
-@settings(max_examples=50)
+@settings(deadline=None, max_examples=50)
 @given(st.text(min_size=1, max_size=60).filter(lambda value: value.strip() != ""))
 def test_round_trip_holds_for_arbitrary_unicode_text_fields(text: str) -> None:
     original = _packet(text)

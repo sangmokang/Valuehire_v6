@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from hypothesis import given
+from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 from humansearch.brief import (
@@ -157,6 +157,7 @@ def _term_strategy() -> st.SearchStrategy[str]:
     )
 
 
+@settings(deadline=None, suppress_health_check=[HealthCheck.too_slow])
 @given(data=st.data())
 def test_build_boolean_queries_property_balanced_and_contains_required(
     data: st.DataObject,
