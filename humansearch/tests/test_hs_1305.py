@@ -487,6 +487,7 @@ def test_section_order_holds_for_arbitrary_intro(first: str, second: str) -> Non
     if not first.strip() or not second.strip():
         return
     body = render_brief_body(_draft(intro_paragraphs=(first, second)), TODAY)
-    positions = [body.index(title) for title in SECTION_TITLES if title in body]
+    lines = body.splitlines()
+    positions = [lines.index(title) for title in SECTION_TITLES if title in lines]
     assert len(positions) == len(SECTION_TITLES)
     assert positions == sorted(positions)
