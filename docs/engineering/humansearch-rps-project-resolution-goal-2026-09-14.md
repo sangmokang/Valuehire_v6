@@ -20,9 +20,11 @@ RPS 프로젝트는 있으면 재사용하고 없으면 만들어야 하지만, 
 ## 입력·출력 계약
 
 입력은 JSON 또는 Python 객체로 같은 구조를 가진다.
-`position_id`, `customer_id`, `customer_name`, `position_title`, `account_scope`, `observation`, `projects`, `mapped_project_id`, `pending_creation_intent`를 받는다.
-문자열 ID는 비어 있으면 안 된다. 조회는 같은 `account_scope`여야 하고, 오류가 없으며, 모든 페이지가 끝났고, 새 관측이어야 한다.
+`position_id`, `customer_id`, `customer_name`, `position_title`, `account_scope`, `observation`, `observation_limit`, `project_links`, `mapped_project_id`, `pending_creation_intent`를 받는다.
+문자열 ID는 비어 있으면 안 된다. 조회는 같은 `account_scope`여야 하고, 오류가 없으며, 모든 페이지가 끝났고, 관측 ID·관측 시각·검색 범위·프로젝트 목록이 같은 observation 객체 안에 결합돼야 한다.
+최신 root 미커밋 계약에서 추가된 `observation_limit`과 `project_links`는 base `63d61e4` 계약과 별도 추가 범위로 반영한다.
 프로젝트 항목은 `project_id`, 고객 근거, 포지션 근거를 가진다. 이름만 같은 항목은 일치 근거가 아니다.
+선택된 프로젝트가 같은 계정의 `project_links`에서 다른 포지션에 이미 연결돼 있으면 재사용하지 않는다.
 
 출력은 `status`, `position_id`, `project_id 또는 null`, `reason`, `plan_only=true`, `allows_write=false`를 가진다.
 CLI 출력은 다음 쓰기 단계의 참고 자료일 뿐 쓰기 권한이 아니다.
