@@ -69,7 +69,7 @@ When 후보 원문, 캡처, 추출물, 연락처, 민감 URL 원문을 저장할
 검증 명령:
 
 ```bash
-rg -n '암호화|readback|confirmed|저장 완료가 아니다|복호화 payload|writer의 메모리|현재 HumanSearch 코드에는 재사용 가능한 암호화 저장 구현이 없다' docs/sot/humansearch-storage-contract.md
+rg -n '암호화|readback|confirmed|저장 완료가 아니다|복호화 payload|writer의 메모리|현재 HumanSearch 코드에는 재사용 가능한 암호화 저장 구현이 없다|새 crypto 라이브러리|임의 선택' docs/sot/humansearch-storage-contract.md
 ```
 
 counter-AC: 파일 write만 성공하고 `confirmed`로 처리한다.
@@ -100,12 +100,12 @@ counter-AC: 보존기간 만료로 자동 삭제하거나 purge 영수증에 이
 
 ### AC-5 권한과 Git 유출 금지
 
-When 원본 DB와 암호화 파일을 쓸 때 시스템은 Git 밖 보호 위치, 디렉터리 0700, 파일 0600, 생성 시 restrictive mode/umask, 쓰기 전 owner/mode/symlink/root 검증, SQLite WAL/SHM/journal/temp/백업 권한, OS 독립 쓰기 권한을 요구하고 같은 UID 하위 에이전트 검토를 권한 격리 증거로 부르지 않아야 한다.
+When 원본 DB와 암호화 파일을 쓸 때 시스템은 Git 밖 보호 위치, 디렉터리 0700, 파일 0600, 생성 시 restrictive mode/umask, 쓰기 직전 부모 디렉터리와 대상 파일 경로 자체의 owner/mode/symlink/root 검증, SQLite WAL/SHM/journal/temp/백업 권한, OS 독립 쓰기 권한을 요구하고 같은 UID 하위 에이전트 검토를 권한 격리 증거로 부르지 않아야 한다.
 
 검증 명령:
 
 ```bash
-rg -n 'Git 밖|0700|0600|umask|쓰기 전에|WAL|SHM|journal|temp|백업|EACCES|symlink|같은 UID|Git에 넣지 않는다|운영 프로젝트 입력' docs/sot/humansearch-storage-contract.md
+rg -n 'Git 밖|0700|0600|umask|쓰기 직전에|대상 파일 경로 자체|WAL|SHM|journal|temp|백업|EACCES|symlink|같은 UID|Git에 넣지 않는다|운영 프로젝트 입력' docs/sot/humansearch-storage-contract.md
 ```
 
 counter-AC: 같은 UID에서 작성한 검토 파일을 독립 실행기 영수증으로 인정한다.
@@ -158,10 +158,10 @@ rg -n 'humansearch-storage-contract|무기한 보존|명시적 purge|파생 삭�
 ```bash
 bash scripts/acceptance-principles-check.sh
 rg -n '단일 원본|SQLite|Supabase|파생|outbox|로컬 저장 완료를 대신하지 않는다|저장 상태와 열람 완전성은 독립|partial.*complete' docs/sot/humansearch-storage-contract.md
-rg -n '암호화|readback|confirmed|저장 완료가 아니다|복호화 payload|writer의 메모리|현재 HumanSearch 코드에는 재사용 가능한 암호화 저장 구현이 없다' docs/sot/humansearch-storage-contract.md
+rg -n '암호화|readback|confirmed|저장 완료가 아니다|복호화 payload|writer의 메모리|현재 HumanSearch 코드에는 재사용 가능한 암호화 저장 구현이 없다|새 crypto 라이브러리|임의 선택' docs/sot/humansearch-storage-contract.md
 rg -n '순회 중단|다음 후보|forbidden_input|partial|failed|recovery_required|coverage 오류|recovery 격리|비밀값 제거' docs/sot/humansearch-storage-contract.md
 rg -n '무기한|명시적 purge|자동 만료 삭제|PII 없는 영수증|recovery_required|멱등|tombstone|outbox|Supabase|재생성|단순 DB 삭제' docs/sot/humansearch-storage-contract.md
-rg -n 'Git 밖|0700|0600|umask|쓰기 전에|WAL|SHM|journal|temp|백업|EACCES|symlink|같은 UID|Git에 넣지 않는다|운영 프로젝트 입력' docs/sot/humansearch-storage-contract.md
+rg -n 'Git 밖|0700|0600|umask|쓰기 직전에|대상 파일 경로 자체|WAL|SHM|journal|temp|백업|EACCES|symlink|같은 UID|Git에 넣지 않는다|운영 프로젝트 입력' docs/sot/humansearch-storage-contract.md
 rg -n '토큰|쿠키|storageState|세션|forbidden_input|비밀값 제거|1촌|보이지 않는|추정' docs/sot/humansearch-storage-contract.md
 rg -n 'humansearch-storage-contract|무기한 보존|명시적 purge|파생 삭제|저장 실패 시 순회 중단|독립 readback|실제 시험을 대신하지 않는다' docs/sot/humansearch-browser-contract.md
 git diff --check
@@ -177,17 +177,18 @@ bash verify.sh
 
 ## 2026-09-14 외부 V1·codeaudit 상태
 
-외부 V1은 시도했지만 완료하지 못했다. 완료한 검증과 미완료 검증은 아래처럼 구분한다.
+외부 V1은 초기 legacy CLI 경로에서는 완료하지 못했지만, root가 지정한 Claude Sonnet helper 경로로 완료했다. 완료한 검증과 미완료 검증은 아래처럼 구분한다.
 
 | 항목 | 상태 | 증거 |
 |---|---|---|
-| Claude V1 1차 | `NOT_RUN` | 3분 이상 응답 없음, 중단 뒤 `Error: No messages returned from query`, 종료값 130 |
-| Claude V1 2차 | `NOT_RUN` | CLI 옵션 파싱 오류로 prompt가 tool deny rule로 해석됨, 종료값 1 |
-| Claude V1 3차 | `NOT_RUN` | 파일 내용을 prompt에 직접 포함했으나 `Credit balance is too low`, 종료값 1 |
+| Claude legacy CLI 1차 | `NOT_RUN` | 3분 이상 응답 없음, 중단 뒤 `Error: No messages returned from query`, 종료값 130 |
+| Claude legacy CLI 2차 | `NOT_RUN` | CLI 옵션 파싱 오류로 prompt가 tool deny rule로 해석됨, 종료값 1 |
+| Claude legacy CLI 3차 | `NOT_RUN` | 파일 내용을 prompt에 직접 포함했으나 `Credit balance is too low`, 종료값 1 |
+| Claude Sonnet V1 helper | `PASS` | `private-reviews/hs-0401-20260914/v1-sonnet.*` exit_code 0. Helper가 먼저 AC-2 crypto 검증 패턴 누락과 §3 대상 파일 경로 symlink 검증 누락을 찾았고, 둘 다 이 문서와 storage SOT에 반영한 뒤 최종 helper 재검토에서 blocking finding이 없다. |
 | Gemini V1 | `NOT_RUN` | 로컬 `gemini` binary 없음. `omx ask gemini`도 `[ask-gemini] Missing required local CLI binary: gemini`로 종료값 1 |
 | root codeaudit | `APPROVE` | root가 commit `235a62d` 범위에서 다섯 storage 계약 결함 해소를 실제 SOT 검토로 승인 |
 | root §12 V2 | `PASS` | root가 `private-reviews/hs-0401-20260914/codeaudit-storage-policy-v2.md`에서 §12 only diff 독립 V2 PASS를 보고하고 commit 소유를 이 WU에 인계 |
 | 별도 codeaudit runner | `NOT_RUN` | 별도 독립 codeaudit 실행자는 없음. root codeaudit 승인, root §12 V2, 로컬 AC 대조까지만 완료 |
 
 따라서 이 WU의 현재 증거는 로컬 문서 AC 대조, strict 원칙 검사, diff 공백 검사, 비밀 스캔, root 수동 감사 지적
-반영, root codeaudit 승인, root §12 V2 PASS다. Claude/Gemini 외부 V1 통과나 런타임 저장 검증으로 확대해 말하지 않는다.
+반영, root codeaudit 승인, root §12 V2 PASS, Claude Sonnet V1 helper 재검토 PASS다. Gemini 외부 V1 통과나 런타임 저장 검증으로 확대해 말하지 않는다.

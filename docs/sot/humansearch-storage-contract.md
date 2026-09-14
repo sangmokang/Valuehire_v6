@@ -77,14 +77,14 @@ rg -n '단일 원본|SQLite|Supabase|파생|outbox|로컬 저장 완료를 대�
 운영 설정에서 정하되, 저장소 안 `data/`, `artifacts/`, `private-reviews/`, 추적 파일, PR 본문, 일반 로그에
 원본 후보 데이터·세션 값·키를 쓰지 않는다.
 
-보호 디렉터리는 mode `0700`, 원본 DB·캡처·manifest·암호문 파일은 mode `0600`이어야 한다. 구현은 쓰기 전에
-부모 디렉터리의 owner, mode, symlink 여부, 실제 경로가 승인된 보호 root 안인지 확인해야 한다. 생성은 restrictive
-mode 또는 restrictive `umask` 안에서 수행하고, 쓰기 뒤 owner/mode가 바뀌지 않았는지 다시 확인한다. 권한 완화,
-소유자 불일치, symlink, 승인 root 탈출은 저장 실패다.
+보호 디렉터리는 mode `0700`, 원본 DB·캡처·manifest·암호문 파일은 mode `0600`이어야 한다. 구현은 쓰기 직전에
+부모 디렉터리와 대상 파일 경로 자체의 owner, mode, symlink 여부, 실제 경로가 승인된 보호 root 안인지 확인해야 한다.
+생성은 restrictive mode 또는 restrictive `umask` 안에서 수행하고, 쓰기 뒤 owner/mode가 바뀌지 않았는지 다시 확인한다.
+권한 완화, 소유자 불일치, symlink, 승인 root 탈출은 저장 실패다.
 
 권한 계약은 SQLite 본체만 보지 않는다. DB와 같은 보호 범위 안의 WAL, SHM, rollback journal, SQLite temp 파일,
-백업, export staging, recovery quarantine 파일도 같은 owner/mode/root/symlink 규칙을 따라야 한다. HS-03 후속
-구현은 이 보조 파일들이 평문 원본이나 완화 권한으로 생기지 않는지 시험해야 한다.
+백업, export staging, recovery quarantine 파일도 부모 디렉터리와 대상 파일 경로 자체에 같은 owner/mode/root/symlink
+규칙을 따라야 한다. HS-03 후속 구현은 이 보조 파일들이 평문 원본이나 완화 권한으로 생기지 않는지 시험해야 한다.
 
 OS 권한 분리는 같은 사용자 안의 에이전트 분리와 다르다. 독립 실행기 WU는 쓰기 가능한 UID와 구현자 UID가
 다른지, 구현자 쓰기가 `EACCES`로 실패하는지, 실행기 쓰기가 성공하는지, symlink 우회가 거부되는지 따로
@@ -93,7 +93,7 @@ OS 권한 분리는 같은 사용자 안의 에이전트 분리와 다르다. �
 검사 명령:
 
 ```bash
-rg -n 'Git 밖|0700|0600|umask|쓰기 전에|WAL|SHM|journal|temp|백업|EACCES|symlink|같은 UID|NOT_RUN' docs/sot/humansearch-storage-contract.md
+rg -n 'Git 밖|0700|0600|umask|쓰기 직전에|대상 파일 경로 자체|WAL|SHM|journal|temp|백업|EACCES|symlink|같은 UID|NOT_RUN' docs/sot/humansearch-storage-contract.md
 ```
 
 ### 4. 암호화와 키 경계
