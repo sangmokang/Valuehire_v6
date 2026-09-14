@@ -122,3 +122,41 @@
   stage: "ci"
   ci_mirror_job: "verify"
   required: true
+- id: "hs-1300-brief-spec-ci"
+  path: ".github/workflows/verify.yml"
+  target: "bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1300.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
+- id: "hs-1300-brief-spec-mutations-ci"
+  path: ".github/workflows/verify.yml"
+  target: "bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1300-mutations.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
+- id: "hs-1301b-literals-ci"
+  path: ".github/workflows/verify.yml"
+  target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1301b-literals.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
+
+- id: "hs-1308-nosend-ci"
+  path: ".github/workflows/verify.yml"
+  target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1308-nosend.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
+- id: "hs-1309-paths-ci"
+  path: ".github/workflows/verify.yml"
+  target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1309-paths.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
+- id: "hs-1305-pii-ci"
+  path: ".github/workflows/verify.yml"
+  target: "bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1305-pii.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true
+

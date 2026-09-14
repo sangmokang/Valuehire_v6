@@ -180,6 +180,8 @@ done <<< "$staged"
 # 않은 행 전체를 담고, .jsonl/.ndjson/.parquet 은 후보자 덤프의 실제 형식이다.
 # 의도적으로 뺀 것: *.sql(마이그레이션이 정상 산출물) · *.csv(소형 픽스처와 구분 불가).
 # 그 둘은 크기 검사와 비밀/PII 내용 검사에 맡긴다 — 여기서 막으면 정상 작업이 멈춘다.
+# HS-13.09 추가: *.packet.json(서치 패킷)·*.sent.json(발송 장부)은 후보자 이름·프로필 URL·
+# 이메일을 그대로 담는다(D7). .gitignore 도 같은 두 패턴을 덮는다.
 MAX_BYTES=1048576
 while IFS= read -r f; do
   if [ -z "$f" ]; then continue; fi
@@ -187,7 +189,8 @@ while IFS= read -r f; do
   lf=$(printf '%s' "$f" | tr '[:upper:]' '[:lower:]')
   case "$lf" in
     artifacts/*|*/artifacts/*|data/*|*/data/*|private-reviews/*|*/private-reviews/*|\
-    *.db|*.db-*|*.sqlite|*.sqlite-*|*.sqlite3|*.sqlite3-*|*.jsonl|*.ndjson|*.parquet)
+    *.db|*.db-*|*.sqlite|*.sqlite-*|*.sqlite3|*.sqlite3-*|*.jsonl|*.ndjson|*.parquet|\
+    *.packet.json|*.sent.json)
       block "산출물·데이터 경로는 커밋하지 않는다 — $f (P21 · 후보자 PII)"
       continue
       ;;

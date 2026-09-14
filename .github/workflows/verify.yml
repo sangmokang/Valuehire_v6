@@ -257,6 +257,39 @@ jobs:
         # 글로브와 CI 가 같은 인수 스크립트로 실행한다 (판정기 2벌 금지 · P16).
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-verify-ac-m.sh
 
+      - name: 인수 검사 hs-1300 (HumanSearch 브리프 스펙 구조 · HS-13.00)
+        # 스펙 문서가 구현 지시서 자격(catch-all 행·결정 D1~D8·WU 카드 13건·타입 12개)을
+        # 갖췄는지와, 그 검사기가 고장 사본(문서 부재·카드 삭제·catch-all 삭제)을 잡는지.
+        run: |
+          bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1300.sh
+          bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1300-mutations.sh
+
+      - name: 인수 검사 hs-1301b (브리프 운영 상수 재정의 0건 · P22)
+        # 1,899자 경계·팀 도메인·프로필 URL 접두·제목 접두·ClickUp 리스트 id 가
+        # contracts/humansearch/brief-policy.json 밖(브리프 코드)에 다시 적혔는지.
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1301b-literals.sh
+
+      - name: 인수 검사 hs-1308 (HumanSearch InMail 초안 · HS-13.08 — 발송 API 부재)
+        # humansearch/src/humansearch/brief/*.py 전체에 smtplib·requests·urllib.request
+        # import 와 send/.send(/send_message( 정의·호출이 0건인지 정적으로 확인한다.
+        # 발송은 항상 금지(D0 §4) — 이 모듈은 초안만 만들고 발송 API 를 갖지 않는다.
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1308-nosend.sh
+
+      - name: 인수 검사 hs-1309-paths (패킷·발송 장부가 git 밖에 남는가 · HS-13.09)
+        # 서치 패킷(*.packet.json)·발송 장부(*.sent.json)는 후보자 PII 를 담는다(D7).
+        # .gitignore 가 실제로 적용되는지, 공용 판정기
+        # scripts/scan-data-exposure.sh 가 그 경로를 금지로 판정하는지(임시 저장소 실행),
+        # brief 모듈에 홈·절대 경로 리터럴이 0건인지를 확인한다.
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1309-paths.sh
+
+      - name: 인수 검사 hs-1305 (후보자 PII 0건 · HS-13.05)
+        # 추적 텍스트 파일 전체에서 실 LinkedIn 프로필 URL·허용 밖 이메일·전화·휴대폰이
+        # 0건인지와, 그 검사기가 실제 형태의 PII 를 넣은 파일을 잡는지(자기 변이 2종).
+        # 사람 이름은 정규식으로 잡을 수 없다 — 그건 D7(패킷을 git 밖에 둔다)이 막는다.
+        run: |
+          bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1305-pii.sh
+          bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1305-pii-mutations.sh
+
       - name: PostgreSQL 서버 준비 (Invoice 런타임 검사용)
         # 러너에는 psql·pg_config 만 PATH 에 있고 initdb·pg_ctl 은
         # /usr/lib/postgresql/<ver>/bin 에 있다. 없으면 설치해서 BLOCKED 를 없앤다.

@@ -1,0 +1,539 @@
+"""HS-13.09e — Codex V1 8차 반례 3건의 회귀 시험.
+
+① claim_send 와 open_new_attempt 의 교차 경합: 청구가 마커를 만든 뒤 기록을 쓰기 전에 승인 재시도가
+   a2 를 열고 a1 을 ABANDONED 로 접으면, 낡은 a1 기억으로 SEND_CLAIMED 를 덮어써 a1·a2 둘 다 발송 권한을
+   얻었다 → `_append` 는 디스크 최신본과 CAS 대조하고, 공개 진입점은 채널 잠금(flock) 아래에서만 움직인다.
+   a2 생성 뒤 a1 ABANDONED 전에 죽은 장부는 읽기 시 복구(append)한다(§5 open_new_attempt 계약).
+② SearchPacket.packet_id 가 position·jd 에서 도출한 값과 다르면 새 발송 namespace 가 열린다 → 타입이 결합 강제.
+③ 공개된 override_policy_for_tests 로 운영 경로가 D12 를 우회 → 패키지 공개 API 에서 제거, pytest 밖 호출 거부,
+   SearchPacket 조립 시 현재 계약으로 필터 재검증.
+"""
+
+from __future__ import annotations
+
+import contextlib
+import hashlib
+import json
+import os
+import threading
+from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
+from datetime import UTC, date, datetime
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+import humansearch.brief as brief_pkg
+from humansearch.brief import (
+    Approval,
+    BriefInputError,
+    CandidateEvidence,
+    CandidateLead,
+    Claim,
+    CompanyBrief,
+    ConnectionDegree,
+    EmailContact,
+    JdPacket,
+    JdSource,
+    PacketStore,
+    PositionSpec,
+    ScoreBreakdown,
+    SearchFilters,
+    SearchPacket,
+    SendIntent,
+    SendState,
+    SourceRef,
+    TeamMail,
+    load_attempt,
+    load_intent,
+    recipients_digest,
+    record_intent,
+    split_sections,
+    split_two_field,
+)
+from humansearch.brief import claim_send as _raw_claim_send
+from humansearch.brief import open_new_attempt as _raw_open_new_attempt
+from humansearch.brief import send_claim as send_claim_module
+from humansearch.brief import send_ledger as send_ledger_module
+from humansearch.brief.policy import override_policy_for_tests, policy
+
+_JD_TEXT = "주요업무\n• 실험을 설계한다.\n자격요건\n• 실험 설계 경험이 있다.\n"
+_RAW_SHA = hashlib.sha256(_JD_TEXT.encode("utf-8")).hexdigest()
+_CLICKUP = "86e1abcd"
+_PACKET_ID = f"{_CLICKUP}-{_RAW_SHA[:8]}"
+_AT = datetime(2026, 9, 10, 3, 20, 0, tzinfo=UTC)
+_CLAIM_AT = datetime(2026, 9, 10, 3, 30, 0, tzinfo=UTC)
+_LATER = datetime(2026, 9, 10, 4, 0, 0, tzinfo=UTC)
+
+
+def _sha256(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+
+
+def claim_send(
+    dir: Path,
+    packet_id: str,
+    channel: str,
+    attempt: int,
+    *,
+    at: datetime,
+    evidence: str,
+    recipients_sha256: str | None = None,
+    body_sha256: str | None = None,
+) -> tuple[SendIntent, bool]:
+    """발송 권한은 반환값 True 하나로만 소비한다."""
+    return _raw_claim_send(
+        dir,
+        packet_id,
+        channel,
+        attempt,
+        at=at,
+        evidence=evidence,
+        recipients_sha256=recipients_sha256 or _current_recipients_sha256(),
+        body_sha256=body_sha256 or _current_body_sha256(),
+    )
+
+
+def open_new_attempt(
+    dir: Path,
+    packet_id: str,
+    channel: str,
+    *,
+    approval: Approval,
+    at: datetime,
+    recipients_sha256: str | None = None,
+    body_sha256: str | None = None,
+) -> tuple[SendIntent, bool]:
+    """테스트 기본 재시도 digest 를 붙인다. 발송 권한은 claim_send 의 True 만이다."""
+    return _raw_open_new_attempt(
+        dir,
+        packet_id,
+        channel,
+        approval=approval,
+        at=at,
+        recipients_sha256=recipients_sha256 or _current_recipients_sha256(),
+        body_sha256=body_sha256 or _current_body_sha256(),
+    )
+
+
+def _current_packet() -> SearchPacket:
+    return _packet(_PACKET_ID)
+
+
+def _current_recipients_sha256() -> str:
+    packet = _current_packet()
+    return recipients_digest(packet.mail.to, packet.mail.cc)
+
+
+def _current_body_sha256() -> str:
+    return _current_packet().mail.body_sha256
+
+
+def _ensure_current_packet(directory: Path) -> None:
+    PacketStore(directory).save(_current_packet())
+
+
+def _intent() -> SendIntent:
+    return SendIntent(
+        packet_id=_PACKET_ID,
+        channel="gmail",
+        attempt=1,
+        recipients_sha256=_current_recipients_sha256(),
+        body_sha256=_current_body_sha256(),
+        recorded_at=_AT,
+        state=SendState.INTENT,
+    )
+
+
+def _approval(from_attempt: int) -> Approval:
+    return Approval(
+        approved_by="sangmokang@valueconnect.kr",
+        search_query='in:sent subject:"[포지션]"',
+        search_checked_at="2026-09-10T04:00:00+00:00",
+        reason="정정 없음 — 발송함에서 찾지 못해 재시도를 승인한다",
+        packet_id=_PACKET_ID,
+        from_attempt=from_attempt,
+    )
+
+
+def _ledger(tmp_path: Path) -> Path:
+    directory = tmp_path / "ledger"
+    directory.mkdir(mode=0o700)
+    return directory
+
+
+def _claim(
+    directory: Path,
+    attempt: int,
+    at: datetime = _CLAIM_AT,
+    *,
+    body_sha256: str | None = None,
+) -> tuple[SendIntent, bool]:
+    _ensure_current_packet(directory)
+    return claim_send(
+        directory,
+        _PACKET_ID,
+        "gmail",
+        attempt,
+        at=at,
+        evidence="발송 직전 청구",
+        body_sha256=body_sha256,
+    )
+
+
+def _reopen(directory: Path, from_attempt: int) -> tuple[SendIntent, bool]:
+    return open_new_attempt(
+        directory, _PACKET_ID, "gmail", approval=_approval(from_attempt), at=_LATER
+    )
+
+
+# --- ① 교차 경합 -------------------------------------------------------------------
+
+
+def test_stale_claim_cannot_overwrite_an_attempt_abandoned_meanwhile(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """마커 생성과 기록 사이에 승인 재시도가 끼어들면 청구는 실패해야 하고 a1 은 ABANDONED 로 남는다."""
+    directory = _ledger(tmp_path)
+    record_intent(directory, _intent())
+
+    @contextlib.contextmanager
+    def no_lock(*_: object) -> Iterator[None]:
+        yield
+
+    monkeypatch.setattr(send_ledger_module, "_channel_lock", no_lock)
+    monkeypatch.setattr(send_claim_module, "_channel_lock", no_lock)
+    real_create = send_ledger_module._create_exclusive
+    fired = False
+
+    def create_then_reopen(directory_: Path, target: Path, text: str) -> bool:
+        nonlocal fired
+        won = real_create(directory_, target, text)
+        if not fired:
+            fired = True
+            _reopen(
+                directory, 1
+            )  # 경합 상대: a2 생성 + a1 ABANDONED (첫 호출 = 청구 마커 직후에만)
+        return won
+
+    monkeypatch.setattr(send_claim_module, "_create_exclusive", create_then_reopen)
+    with pytest.raises(BriefInputError):
+        _claim(directory, 1)
+    first = load_attempt(directory, _PACKET_ID, "gmail", 1)
+    second = load_attempt(directory, _PACKET_ID, "gmail", 2)
+    assert first is not None and first.state is SendState.ABANDONED
+    assert SendState.SEND_CLAIMED not in {step.state for step in first.transitions}
+    assert second is not None and second.state is SendState.INTENT
+    _, won = _claim(directory, 2, at=_LATER)
+    assert won is True
+
+
+def _contention_round(directory: Path) -> None:
+    directory.mkdir(mode=0o700)
+    record_intent(directory, _intent())
+    barrier = threading.Barrier(2)
+
+    def claim_side() -> str:
+        barrier.wait(timeout=60)
+        try:
+            _, won = _claim(directory, 1)
+        except BriefInputError:
+            return "rejected"
+        return "won" if won else "lost"
+
+    def reopen_side() -> str:
+        barrier.wait(timeout=60)
+        _, opened = _reopen(directory, 1)
+        return "opened" if opened else "not-opened"
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        claim_result = pool.submit(claim_side)
+        reopen_result = pool.submit(reopen_side)
+        outcomes = (claim_result.result(), reopen_result.result())
+    assert outcomes[1] == "opened"
+    first = load_attempt(directory, _PACKET_ID, "gmail", 1)
+    second = load_attempt(directory, _PACKET_ID, "gmail", 2)
+    assert first is not None and first.state is SendState.ABANDONED
+    assert second is not None and second.state is SendState.INTENT
+    assert [a for a in (first, second) if a.state is SendState.SEND_CLAIMED] == []
+
+
+def test_claim_and_reopen_under_contention_never_arm_two_attempts(tmp_path: Path) -> None:
+    """잠금 아래에서는 어떤 순서로 끝나도 SEND_CLAIMED 가 두 attempt 에 동시에 남지 않는다."""
+    for index in range(12):
+        _contention_round(tmp_path / f"ledger-{index}")
+
+
+def test_reading_recovers_an_attempt_left_unsent_behind_a_newer_one(tmp_path: Path) -> None:
+    """a2 파일은 생겼는데 a1 ABANDONED 를 쓰기 전에 죽은 장부 — 읽기만 해도 a1 이 ABANDONED 로 닫힌다."""
+    directory = _ledger(tmp_path)
+    record_intent(directory, _intent())
+    first_path = directory / f"{_PACKET_ID}.gmail.a1.sent.json"
+    second_payload: dict[str, Any] = json.loads(first_path.read_text(encoding="utf-8"))
+    second_payload["attempt"] = 2
+    second_payload["recorded_at"] = _LATER.isoformat()
+    second_payload["approval"] = {
+        "approved_by": "sangmokang@valueconnect.kr",
+        "search_query": 'in:sent subject:"[포지션]"',
+        "search_checked_at": "2026-09-10T04:00:00+00:00",
+        "reason": "정정 없음 — 발송함에서 찾지 못해 재시도를 승인한다",
+        "packet_id": _PACKET_ID,
+        "from_attempt": 1,
+    }
+    second_path = directory / f"{_PACKET_ID}.gmail.a2.sent.json"
+    second_path.write_text(json.dumps(second_payload, ensure_ascii=False), encoding="utf-8")
+    os.chmod(second_path, 0o600)
+
+    latest = load_intent(directory, _PACKET_ID, "gmail")
+    assert latest is not None and latest.attempt == 2
+    recovered = load_attempt(directory, _PACKET_ID, "gmail", 1)
+    assert recovered is not None
+    assert recovered.state is SendState.ABANDONED
+    assert recovered.transitions[-1].at == _LATER
+    with pytest.raises(BriefInputError):
+        _claim(directory, 1)
+    _, won = _claim(directory, 2, at=_LATER, body_sha256=_current_body_sha256())
+    assert won is True
+
+
+def test_lock_file_is_left_next_to_the_ledger_with_owner_only_mode(tmp_path: Path) -> None:
+    directory = _ledger(tmp_path)
+    record_intent(directory, _intent())
+    lock = directory / f"{_PACKET_ID}.gmail.lock"
+    assert lock.is_file()
+    assert (lock.stat().st_mode & 0o777) == 0o600
+
+
+# --- ② packet_id 결합 --------------------------------------------------------------
+
+
+_LEAD_URL = "https://www.linkedin.com/in/example-%EC%98%88%EC%8B%9C-000001/"
+_DAY_A = date(2026, 9, 10)
+
+
+def _position() -> PositionSpec:
+    return PositionSpec(_CLICKUP, "예시 고객사", "프로덕트 매니저", None, "정규직", "서울", None)
+
+
+def _jd() -> JdSource:
+    return JdSource(_JD_TEXT, _RAW_SHA, "U1")
+
+
+def _faithful_jd_packet(source: JdSource, company_intro: str = "회사 소개 필드") -> JdPacket:
+    """JD 3종을 원문과 일치하게 만든다 — SearchPacket 이 조립 시 충실도를 재검증한다(HS-13.04b)."""
+    markers = tuple(s.heading for s in split_sections(source.text) if s.heading and s.lines)
+    two = split_two_field(source, company_intro, section_markers=markers)
+    return JdPacket(
+        gmail_body=source.text,
+        linkedin_body=source.text,
+        two_field_company=two.company_intro,
+        two_field_jd=two.jd_body,
+        two_field_sections=markers,
+        linkedin_omitted_sections=(),
+    )
+
+
+def _mail_body(jp: JdPacket, tail: str = "") -> str:
+    """§6 3절 블록을 렌더러와 같은 마커로 담은 최소 본문(HS-13.04b 메일 결합). tail 은 뒤에 덧붙인다."""
+    lines = [
+        "[JD 원문 시작]",
+        *jp.gmail_body.splitlines(),
+        "[JD 원문 끝]",
+        "[복사 시작]",
+        *jp.linkedin_body.splitlines(),
+        "[복사 끝]",
+        "[필드 1: 회사 소개]",
+        *jp.two_field_company.splitlines(),
+        "",
+        "[필드 2: JD 내용]",
+        *jp.two_field_jd.splitlines(),
+    ]
+    if tail:
+        lines.append(tail)
+    return "\n".join(lines) + "\n"
+
+
+def _packet(identifier: str, filters: SearchFilters | None = None) -> SearchPacket:
+    source = _jd()
+    jp = _faithful_jd_packet(source)
+    body = _mail_body(jp, "예시 문구\n내부 공유 본문")
+    kwargs: dict[str, Any] = {}
+    if filters is not None:
+        kwargs["search_filters"] = filters
+    return SearchPacket(
+        packet_id=identifier,
+        created_on=_DAY_A,
+        position=_position(),
+        jd=source,
+        company=CompanyBrief(
+            legal_name=Claim("예시 주식회사", ("C1",)),
+            sources=(SourceRef("C1", "https://example.com/about", "회사 소개", _DAY_A),),
+        ),
+        jd_packet=jp,
+        candidates=(
+            CandidateLead(
+                display_name="예시 후보",
+                headline="프로덕트 매니저",
+                linkedin_url=_LEAD_URL,
+                education="예시대학원 석사",
+                career="예시사 3년",
+                match_reasons=("실험 설계 경험",),
+                check_points=("도메인 적합성",),
+                evidence=CandidateEvidence(("실험",), 1, 2, "석사", 2, (24, 18), 2, 8, 10),
+                score=ScoreBreakdown(30, 15, 15, 15),
+                email=EmailContact("lead@example.org", "https://example.org/lab", "연구실"),
+                degree=ConnectionDegree.SECOND,
+                source_note="공개 프로필 URL 일치",
+            ),
+        ),
+        mail=TeamMail(
+            subject="[포지션]예시 고객사, 프로덕트 매니저",
+            to=("sangmokang@valueconnect.kr",),
+            cc=(),
+            body=body,
+            body_sha256=_sha256(body),
+        ),
+        boolean_queries=('("Product Manager" OR PM) AND 실험',),
+        inmails=((_LEAD_URL, "안녕하세요, 포지션을 제안드립니다."),),
+        **kwargs,
+    )
+
+
+def test_search_packet_accepts_the_id_derived_from_position_and_jd() -> None:
+    assert _packet(_PACKET_ID).packet_id == _PACKET_ID
+
+
+@pytest.mark.parametrize(
+    "decoy",
+    [f"86other00-{_RAW_SHA[:8]}", f"{_CLICKUP}-deadbeef", "86other00-deadbeef"],
+)
+def test_search_packet_rejects_a_well_formed_but_unbound_id(decoy: str) -> None:
+    with pytest.raises(BriefInputError):
+        _packet(decoy)
+
+
+# --- ③ 정책 override 경계 ------------------------------------------------------------
+
+
+def test_override_is_not_part_of_the_public_package_api() -> None:
+    assert "override_policy_for_tests" not in brief_pkg.__all__
+    assert not hasattr(brief_pkg, "override_policy_for_tests")
+
+
+def test_override_refuses_to_run_outside_pytest(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    wider = replace(policy(), allowed_search_locations=("South Korea", "Japan"))
+    with pytest.raises(BriefInputError), override_policy_for_tests(wider):
+        pass
+
+
+def test_packet_revalidates_filters_against_the_current_contract() -> None:
+    wider = replace(
+        policy(), allowed_search_locations=("South Korea", "Japan"), default_search_location="Japan"
+    )
+    with override_policy_for_tests(wider):
+        stale = SearchFilters(location="Japan")
+    assert stale.location == "Japan"
+    with pytest.raises(BriefInputError):
+        _packet(_PACKET_ID, filters=stale)
+    assert (
+        _packet(_PACKET_ID, filters=SearchFilters(location="South Korea")).search_filters.location
+        == "South Korea"
+    )
+
+
+# --- ④ Codex 9차: 환경변수 계약 교체·내구성·문서 권한 문구·잠금 재진입 ------------------------
+
+
+def test_contracts_dir_env_is_refused_outside_pytest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """HUMANSEARCH_CONTRACTS_DIR 는 시험 의존성 주입일 뿐 — pytest 밖에서는 계약 경로를 바꿀 수 없다."""
+    from humansearch.brief.policy import CONTRACTS_DIR_ENV, load_brief_policy
+
+    monkeypatch.setenv(CONTRACTS_DIR_ENV, str(tmp_path))
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    with pytest.raises(BriefInputError):
+        load_brief_policy()
+
+
+def test_ledger_writes_fsync_file_and_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """청구 마커·장부 교체는 링크/교체 전 파일 fsync + 뒤 디렉터리 fsync 를 거친다(전원 장애 뒤 묘비 소실 차단)."""
+    directory = _ledger(tmp_path)
+    synced: list[int] = []
+    real_fsync = os.fsync
+
+    def spy(fd: int) -> None:
+        synced.append(fd)
+        real_fsync(fd)
+
+    monkeypatch.setattr(os, "fsync", spy)
+    record_intent(directory, _intent())
+    after_intent = len(synced)
+    assert after_intent >= 2  # 임시 파일 + 디렉터리
+    _claim(directory, 1)
+    assert len(synced) >= after_intent + 4  # 마커(파일+디렉터리) + 장부 교체(파일+디렉터리)
+
+
+def test_intent_and_reopen_docstrings_do_not_grant_send_permission() -> None:
+    """발송 권한 문구는 claim_send 에만 있어야 한다 — record_intent/open_new_attempt 의 True 는 감사용 생성 결과다."""
+    for fn in (record_intent, open_new_attempt):
+        doc = fn.__doc__ or ""
+        assert "발송할 수 있다" not in doc, fn.__name__
+        assert "claim_send" in doc, fn.__name__
+    assert "발송" in (claim_send.__doc__ or "")
+
+
+def test_channel_lock_is_reentrant_for_the_same_thread(tmp_path: Path) -> None:
+    """잠금을 쥔 스레드가 같은 채널의 공개 API 로 재진입해도 멈추지 않는다(Codex 9차 교착)."""
+    directory = _ledger(tmp_path)
+    record_intent(directory, _intent())
+    done = threading.Event()
+    seen: list[SendIntent | None] = []
+
+    def nested() -> None:
+        with send_ledger_module._channel_lock(directory, _PACKET_ID, "gmail"):
+            seen.append(load_intent(directory, _PACKET_ID, "gmail"))
+        done.set()
+
+    worker = threading.Thread(target=nested, daemon=True)
+    worker.start()
+    assert done.wait(timeout=60), "같은 스레드 재진입에서 flock 교착"
+    assert seen and seen[0] is not None and seen[0].attempt == 1
+
+
+def test_channel_lock_still_excludes_other_threads(tmp_path: Path) -> None:
+    directory = _ledger(tmp_path)
+    record_intent(directory, _intent())
+    holder_ready = threading.Event()
+    release = threading.Event()
+    entered_at: list[float] = []
+
+    def holder() -> None:
+        with send_ledger_module._channel_lock(directory, _PACKET_ID, "gmail"):
+            holder_ready.set()
+            release.wait(timeout=60)
+
+    def contender() -> None:
+        holder_ready.wait(timeout=60)
+        with send_ledger_module._channel_lock(directory, _PACKET_ID, "gmail"):
+            entered_at.append(1.0)
+
+    threads = [
+        threading.Thread(target=holder, daemon=True),
+        threading.Thread(target=contender, daemon=True),
+    ]
+    for t in threads:
+        t.start()
+    holder_ready.wait(timeout=60)
+    threads[1].join(timeout=1.0)
+    assert entered_at == []  # 보유 중에는 못 들어온다
+    release.set()
+    threads[1].join(timeout=60)
+    assert entered_at == [1.0]
