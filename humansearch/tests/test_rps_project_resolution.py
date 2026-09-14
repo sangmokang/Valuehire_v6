@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 from typing import Any, Literal
 
+import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
@@ -47,7 +48,7 @@ def _payload(
     account_scope: str = "rps-main",
     observed_at: str = "2026-09-14T10:00:00Z",
     observation_id: str | None = "obs-1",
-    query_scope: str | None = "account-projects",
+    query_scope: str | None = "auto",
     observation_projects: Literal["same", "missing"] = "same",
     project_links: list[dict[str, object]] | None = None,
 ) -> dict[str, object]:
@@ -61,6 +62,10 @@ def _payload(
     }
     if observation_id is not None:
         observation["observation_id"] = observation_id
+    if query_scope == "auto":
+        query_scope = (
+            "account-projects" if mapped_project_id is None else f"project-by-id:{mapped_project_id}"
+        )
     if query_scope is not None:
         observation["query_scope"] = query_scope
     if observation_projects == "same":
@@ -457,3 +462,26 @@ def test_cli_is_plan_only_json(tmp_path: Path) -> None:
     assert output["status"] == "CREATE_REQUIRED"
     assert output["plan_only"] is True
     assert output["allows_write"] is False
+
+
+@pytest.mark.parametrize(
+    ("mapped_id", "query_scope"),
+    [
+        (None, "project-by-id:rps-1"),
+        (None, "filtered-projects"),
+        ("rps-1", "account-projects"),
+        ("rps-1", "project-by-id:other"),
+    ],
+)
+def test_query_scope_must_match_the_resolution_target(
+    mapped_id: str | None, query_scope: str
+) -> None:
+    payload = _payload(
+        mapped_project_id=mapped_id,
+        query_scope=query_scope,
+        projects=[] if mapped_id is None else [_project(mapped_id)],
+    )
+    result = resolve_rps_project(payload)
+    assert result.status is RpsProjectStatus.QUERY_FAILED
+    assert result.project_id is None
+    assert result.allows_write is False
