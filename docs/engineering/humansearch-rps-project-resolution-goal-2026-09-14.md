@@ -3,7 +3,7 @@
 ## 결론
 
 이번 작업은 RPS 화면이나 DB를 쓰지 않고, 조회 결과만으로 프로젝트 확보 상태를 판정하는 순수 코드를 만든다.
-부모 계약 `63d61e4` 위에 쌓인 stacked 작업이며 부모 PR이 아직 병합되지 않았으므로 단독 main 병합 완료로 주장하지 않는다.
+부모 계약 브랜치 `task/hs-1104a-rps-project-contract-20260914` 위에 쌓인 stacked 작업이며 부모 PR이 아직 병합되지 않았으므로 단독 main 병합 완료로 주장하지 않는다.
 
 ## 판단 근거
 
@@ -11,7 +11,7 @@ RPS 프로젝트는 있으면 재사용하고 없으면 만들어야 하지만, 
 그래서 이번 WU는 외부 쓰기 전에 REUSE, CREATE_REQUIRED, AMBIGUOUS, QUERY_FAILED, MAPPING_CONFLICT, RECONCILE_REQUIRED 같은 닫힌 상태를 먼저 계산한다.
 
 - 위험: L2. 순수 코드와 CLI, 합성 테스트만 추가한다. 외부 브라우저·DB·필터·후보 저장은 없음.
-- 기준: `task/hs-1104a-rps-project-contract-20260914`의 `63d61e4`.
+- 기준: 부모 계약 브랜치 `task/hs-1104a-rps-project-contract-20260914`.
 - 한계: 선행 계약은 Codeaudit PASS였지만 외부 V1 재시도와 V2는 미완료라는 한계를 유지한다.
 - 배송 상태: NOT_APPLICABLE. 제품·운영 사이트 쓰기 없음.
 - 읽은 정본: strict SKILL, `docs/sot/strict-workflow.md`, `docs/sot/coding-principles.md`, `docs/sot/principles.yaml`, `docs/sot/verification-commands.md`, `docs/sot/humansearch-rps-project-contract.md`, 사용자 v5 프롬프트.
@@ -22,7 +22,7 @@ RPS 프로젝트는 있으면 재사용하고 없으면 만들어야 하지만, 
 입력은 JSON 또는 Python 객체로 같은 구조를 가진다.
 `position_id`, `customer_id`, `customer_name`, `position_title`, `account_scope`, `observation`, `observation_limit`, `project_links`, `mapped_project_id`, `pending_creation_intent`를 받는다.
 문자열 ID는 비어 있으면 안 된다. 조회는 같은 `account_scope`여야 하고, 오류가 없으며, 모든 페이지가 끝났고, 관측 ID·관측 시각·검색 범위·프로젝트 목록이 같은 observation 객체 안에 결합돼야 한다.
-최신 root 미커밋 계약에서 추가된 `observation_limit`과 `project_links`는 base `63d61e4` 계약과 별도 추가 범위로 반영한다.
+최신 부모 계약에서 요구한 `observation_limit`과 `project_links`를 별도 추가 범위로 반영한다.
 프로젝트 항목은 `project_id`, 고객 근거, 포지션 근거를 가진다. 이름만 같은 항목은 일치 근거가 아니다.
 선택된 프로젝트가 같은 계정의 `project_links`에서 다른 포지션에 이미 연결돼 있으면 재사용하지 않는다.
 
