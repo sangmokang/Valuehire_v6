@@ -1,0 +1,78 @@
+# HS-04.02a HumanSearch runner boundary — goal (2026-09-14)
+
+## 결론
+
+HS-04.02a는 HS-04.03이 Git 밖 보호 경로에 원본 출력과 영수증을 저장할 때 쓸 최소 쓰기 경계를 만든다. 이 WU는 계정 생성, sudo, 기존 권한 변경, 실제 별도 UID EACCES 실증을 하지 않는다. 현재 환경에서 `id -u hsrunner`는 `id: hsrunner: no such user`로 실패했으므로 별도 계정 경계 실증은 `NOT_RUN`이다.
+
+V2 보안 결론: caller가 임의 `runner_uid`나 `current_uid`를 public API로 넣어 OS 신원 증거를 위조할 수 없어야 한다. runner 신원은 미리 준비된 실제 OS 계정 이름 `hsrunner` lookup 결과에만 결합한다. `hsrunner` 계정이 없으면 쓰기를 하지 않고 `not_run`을 반환한다.
+
+## 범위
+
+소유 파일은 아래 세 개다.
+
+- `humansearch/src/humansearch/runner_boundary.py`
+- `humansearch/tests/test_hs_0402a.py`
+- `docs/engineering/humansearch-runner-boundary-goal-2026-09-14.md`
+
+공유 SOT, CI, 계정, 서비스, 권한 설정은 수정하지 않는다.
+
+## API 계약
+
+입력은 명시적인 `implementer_uid`, `protected_root`, `relative_path`, `payload`다. `runner_uid`와 `current_uid`는 caller 입력이 아니다. runner UID는 OS의 `hsrunner` 계정 lookup으로만 얻는다.
+
+상태는 `written`, `denied`, `not_run`이다.
+
+- `hsrunner` 계정 lookup이 실패하면 OS runner 경계를 실행할 수 없으므로 `not_run`이다.
+- lookup된 runner UID와 `implementer_uid`가 같으면 OS 권한 분리를 증명할 수 없으므로 `not_run`이다.
+- 현재 실제 프로세스 UID가 lookup된 runner UID가 아니면 보호 파일 쓰기는 `denied`다.
+- `protected_root`는 절대 경로, symlink 아님, owner가 lookup된 runner UID, mode가 정확히 `0700`이어야 한다.
+- 대상 상대 경로는 root 밖으로 escape할 수 없고, 부모 디렉터리와 대상 파일 경로 자체의 symlink를 거부한다. 새로 만드는 부모 디렉터리는 restrictive umask에서도 최종 mode `0700`으로 확인한다.
+- 기존 파일 overwrite는 하지 않는다. 새 파일은 restrictive umask에서도 최종 mode `0600`으로 만들고 write 뒤 owner/mode/regular-file 상태를 다시 확인한다.
+- 일반 로그와 반환값에는 raw payload를 넣지 않는다. 반환값은 경로, 상태, reason, sha256, byte count만 허용한다.
+- `written`은 현재 프로세스가 파일을 썼다는 제품 경계 결과다. 구현자 UID의 외부 별도 process `EACCES`와 runner process write 성공이 실증되기 전까지 OS 격리 검증 완료 상태로 승격하지 않는다.
+
+## 인수 기준
+
+### AC-1 hsrunner 계정 없음은 NOT_RUN
+
+When OS에 `hsrunner` 계정이 없으면, 시스템은 runner 권한 경계를 실행하지 않고 쓰기 전에 `not_run`을 반환해야 한다.
+
+### AC-2 caller 신원 위조 표면 없음
+
+When caller가 임의 implementer UID를 넣어도, 시스템은 public `runner_uid`나 `current_uid` 입력 없이 실제 `hsrunner` lookup과 `os.getuid()`만으로 실행 여부를 판정해야 한다.
+
+### AC-3 같은 UID는 NOT_RUN
+
+When lookup된 runner UID와 implementer UID가 같으면, 시스템은 같은 UID agent 검토를 OS 격리로 인정하지 않고 쓰기 전에 `not_run`을 반환해야 한다.
+
+### AC-4 current process runner 아님 거부
+
+When 현재 실제 프로세스 UID가 lookup된 runner UID가 아니면, 시스템은 보호 파일 쓰기를 `denied`로 반환하고 파일을 만들지 않아야 한다.
+
+### AC-5 보호 root 검사
+
+When 보호 root가 symlink이거나 root 밖 escape 상대 경로가 들어오거나 target 파일 경로가 symlink이거나 대상 일반 파일이 이미 존재하면, 시스템은 쓰기를 거부해야 한다.
+
+### AC-6 runner 경계 통과 시 실제 파일 생성
+
+When 현재 프로세스 UID가 lookup된 runner UID이고 implementer UID가 다르며 보호 root owner/mode와 대상 경로가 유효하면, 시스템은 새 보호 파일을 mode `0600`으로 쓰고 payload hash와 byte count만 반환해야 한다.
+
+## trusted bootstrap 경계
+
+`hsrunner` 계정과 `hsrunner` 소유 `0700` 보호 root는 이 WU가 만들지 않는다. 운영 bootstrap 또는 후속 root-owned 준비 작업이 계정, 디렉터리 소유권, 권한, 실행 위임을 Git 밖에서 준비해야 한다. 이 WU는 그 준비가 없을 때 `not_run`을 반환하고, 준비가 있을 때만 현재 프로세스가 실제 runner UID인지 확인한다.
+
+## 검증
+
+```bash
+cd humansearch && uv run --no-sync pytest -q tests/test_hs_0402a.py
+cd humansearch && uv run --no-sync ruff check
+cd humansearch && uv run --no-sync mypy src tests
+cd humansearch && uv run --no-sync pytest -q
+bash verify.sh
+```
+
+테스트의 `hsrunner` lookup은 unit 합성이다. mock/unit 성공은 실제 OS 별도 계정 증명이 아니다.
+
+## 후속 NOT_RUN
+
+실제 `hsrunner` 계정 소유 디렉터리, 구현자 UID 쓰기 `EACCES`, runner 쓰기 성공, sudo-free 실행 위임은 별도 계정 경계 준비 전까지 `NOT_RUN`이다. HS-04.03은 이 경계를 사용해 원본 출력을 Git 밖 보호 경로에 저장하되 일반 보고에는 원문을 노출하지 않고 hash와 PII 없는 요약만 남겨야 한다.
