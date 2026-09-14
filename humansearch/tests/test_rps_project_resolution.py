@@ -90,6 +90,15 @@ def test_mapping_conflict_does_not_fall_back_to_matching_name() -> None:
     assert result.project_id is None
 
 
+def test_same_customer_different_position_does_not_count_as_match() -> None:
+    result = resolve_rps_project(
+        _payload(projects=[_project("rps-2", position_id="pos-2")])
+    )
+
+    assert result.status is RpsProjectStatus.CREATE_REQUIRED
+    assert result.project_id is None
+
+
 def test_complete_empty_query_requires_create_but_does_not_grant_write() -> None:
     result = resolve_rps_project(_payload(projects=[]))
 
