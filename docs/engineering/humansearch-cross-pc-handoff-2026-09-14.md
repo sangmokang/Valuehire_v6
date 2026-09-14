@@ -5,6 +5,10 @@
 현재 제품 작업은 진행 중이다. GitHub 인계 준비와 제품 운영 완료는 별개다. 이 문서는 GitHub에서 코드·요구·작업 기록을 복원하는 안내이며,
 잡코리아/RPS 운영 완료나 발송 허가를 뜻하지 않는다. 기본 설정은 현재 검증 환경과 같은 macOS다.
 
+이번 병합 전 마무리의 고정 대상·최신 검증·안전 복원·메일 초안은
+[병합 전 인계 장부](humansearch-premerge-handoff-goal-2026-09-14.md)를 먼저 읽는다.
+아래 §4와 §6은 과거 시점 기록이다. 이 문서의 과거 CI/시험 수를 최신 코드 판정으로 재사용하지 않는다.
+
 ## 1. 새 PC 준비
 
 Git, GitHub CLI(`gh`), Python 패키지 관리자 `uv`, Bash, Ruby, Perl, Node.js가 필요하다.
@@ -26,25 +30,13 @@ uv의 다른 설치 방법은 [uv 공식 설치 문서](https://docs.astral.sh/u
 GitHub 접근 권한이 있는 본인 계정으로 로그인하고 새 폴더에 복제한다.
 이미 복제한 폴더라면 다시 clone하지 말고 `git status` 확인 후 `git fetch origin`으로 갱신한다.
 
-```bash
-gh auth login
-gh repo clone sangmokang/Valuehire_v6
-cd Valuehire_v6
-git fetch origin
-git ls-remote --heads origin task/hs-cross-pc-handoff-20260914
-git switch --track origin/task/hs-cross-pc-handoff-20260914
-bash scripts/install-hooks.sh
-git config --get core.hooksPath
-```
+기존 폴더·동명 브랜치가 있는 경우까지 처리하는 정확한 명령은
+[병합 전 인계 장부의 안전 복원 절차](humansearch-premerge-handoff-goal-2026-09-14.md#다른-pc-안전-복원)를 따른다.
+PR91 안내를 먼저 복원하고, 다음 작업 하나를 별도 검토 폴더에 복원한다. 인계 브랜치는 제품 통합 브랜치가 아니다.
 
-→ 마지막 결과는 `hooks`여야 한다. 이 안내 브랜치는 제품 변경을 모두 합친 브랜치가 아니다.
-과거 HS00 장부와 9월 8일 kickoff 원문도 이 브랜치에 보존했다(출처 464220f).
-이 원문 보존은 HS00 코드 전체 감사·병합을 뜻하지 않는다. 아래 표에서 이어갈 작업 하나를 선택해 별도 worktree를 만든다. 이미 존재하는 worktree는 재생성하지 않는다.
+복원된 제품 폴더에서는 그 SHA의 CI와 버전 계약을 확인한 뒤 아래 로컬 검사를 실행한다.
 
 ```bash
-git worktree add -b task/hs-13-stack-20260910 worktrees/hs-13-stack-20260910 origin/task/hs-13-stack-20260910
-cd worktrees/hs-13-stack-20260910
-bash scripts/install-hooks.sh
 cd humansearch
 uv sync --locked
 uv run pytest -q
@@ -55,19 +47,8 @@ git diff --check
 bash verify.sh
 ```
 
-→ 위 예시는 기존 PR83 작업을 이어받는다. 새 기능은 `origin/main` 또는 승인된 선행 작업 SHA에서
-새 `task/<name>` 브랜치와 worktree를 만든다. 서로 다른 PC에서 같은 브랜치를 동시에 편집하지 않는다.
-인계 전 현재 PC에서 커밋·push를 마치고, 새 PC에서는 원격 SHA와 상태를 재조회한다.
-
-```bash
-git status --short --branch
-git rev-parse HEAD
-gh pr view 83 --json headRefOid,statusCheckRollup,mergeStateStatus
-```
-
-→ 로컬 HEAD와 PR headRefOid가 같아야 같은 버전의 검증 결과를 읽은 것이다.
-`main` 직접 push, 자동 merge, force push, 훅 우회는 금지한다. 기존 로컬 main 문제(Issue84)를
-새 PC 작업에 끌어와 reset하거나 복원하지 않는다. PR 병합은 사용자가 diff를 검토한 뒤 수행한다.
+→ 설치·시험 결과는 복원한 SHA에만 귀속된다. 실제 다른 PC의 로그인·보호 데이터·Aside 운영 증거가 아니다.
+기존 Git 훅 설정을 덮어쓰지 않는 설치 조건은 새 장부에 있다. main 직접 push, 자동 병합, 강제 push, 훅 우회는 하지 않는다.
 
 ## 2. Codex와 외부 연결
 
@@ -87,7 +68,7 @@ OMX를 사용하는 환경은 설치된 OMX의 공식 설치 절차로 준비하
 Codex App에서 OMX 런타임 상태가 없으면 실행 중인 OMX 팀이 이어졌다고 가정하지 않는다.
 
 ClickUp·Gmail 커넥터는 새 PC 세션에서 연결 상태를 확인한다. 실제 대상 포지션은 사용자에게
-이미 받은 ClickUp 카드다. 본인에게 보낸 인계 메일의 대상 카드 링크를 사용하며,
+이미 받은 ClickUp 카드다. 기존 사용자 제공 기록에서 인증된 조회로 대상 카드 링크를 회수하며,
 카드 링크 자체가 이 Git 문서에 없다는 이유로 프로젝트 생성 승인을 다시 묻지 않는다. 카드 원문과 JD는
 인증된 ClickUp 조회로 다시 확보한다. 운영 입력값은 아래 보호 데이터와 같은 경계로 취급한다.
 
@@ -161,7 +142,7 @@ Chrome 업무에 간섭하지 말고 후보 접촉·팀메일 발송·자동 mer
 다른 worktree라면 clone 루트의 안내 브랜치 경로에서 위 지침을 회수하라.
 경로가 없으면 git show origin/task/hs-cross-pc-handoff-20260914:.codex/skills/strict/SKILL.md
 형식으로 Git 원문을 읽고 codeaudit도 같은 방식으로 회수하라.
-실행 대상은 인계 메일에 보존된 사용자 제공 ClickUp 카드 링크로 회수하라.
+실행 대상은 기존 사용자 제공 ClickUp 카드 기록으로 회수하라. 인계 메일 실제 발송과 카드 보존 여부는 미확인이다.
 현재 원격 SHA·작업 소유권·검증·필수 병합 상태를 조회하고, 실패 기록을 보존하며
 독립적으로 가능한 구현·검증·커밋·PR을 계속하라. 미검증 항목은 완료로 보고하지 마라.
 ```
