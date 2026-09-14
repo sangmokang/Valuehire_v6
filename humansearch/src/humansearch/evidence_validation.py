@@ -176,7 +176,7 @@ def _validate_candidate_ref(manifest: Mapping[object, object], errors: _Collecto
     if state == "observed":
         if not _is_non_empty_string(ref):
             errors.add("candidate_ref", "state_value_mismatch", "observed candidate_ref must be present")
-    elif state in {"not_observed", "not_available"} and ref is not None:
+    elif state in ("not_observed", "not_available") and ref is not None:
         errors.add("candidate_ref", "state_value_mismatch", "unobserved candidate_ref must be null")
 
 
@@ -186,11 +186,11 @@ def _validate_height(manifest: Mapping[object, object], errors: _Collector) -> N
     height = manifest.get("document_height_px")
     if state == "observed_stable":
         _require_integer(height, "document_height_px", errors)
-    elif state in {"observed_changed", "not_observed", "not_applicable"}:
+    elif state in ("observed_changed", "not_observed", "not_applicable"):
         if height is not None:
             errors.add("document_height_px", "state_value_mismatch", "unstable or unobserved height must be null")
         note = manifest.get("height_observation_note")
-        if state in {"observed_changed", "not_observed"} and not _is_non_empty_string(note):
+        if state in ("observed_changed", "not_observed") and not _is_non_empty_string(note):
             errors.add(
                 "height_observation_note",
                 "missing_conditional_field",
@@ -259,7 +259,7 @@ def _validate_field_wrapper(wrapper: object, path: str, errors: _Collector) -> N
     value = wrapper.get("value")
     if state == "observed_value" and value is None:
         errors.add(f"{path}.value", "state_value_mismatch", "observed value cannot be null")
-    if state in {"not_observed", "not_available", "redacted"} and value is not None:
+    if state in ("not_observed", "not_available", "redacted") and value is not None:
         errors.add(f"{path}.value", "state_value_mismatch", "unobserved value must be null")
     if state == "observed_empty" and value not in ("", (), [], {}):
         errors.add(f"{path}.value", "state_value_mismatch", "observed empty must use an empty value")
@@ -279,7 +279,7 @@ def _validate_company_duties(manifest: Mapping[object, object], errors: _Collect
         return
     if state == "observed" and not duties:
         errors.add("company_duties", "state_value_mismatch", "observed company duties must be non-empty")
-    if state in {"observed_empty", "not_observed", "not_available", "redacted"} and duties:
+    if state in ("observed_empty", "not_observed", "not_available", "redacted") and duties:
         errors.add("company_duties", "state_value_mismatch", "unobserved company duties must be empty")
     for index, duty in enumerate(duties):
         path = f"company_duties[{index}]"
@@ -295,7 +295,7 @@ def _validate_company_duties(manifest: Mapping[object, object], errors: _Collect
         duty_text = duty.get("duty_text")
         if state_value == "observed_value" and not _is_non_empty_string(duty_text):
             errors.add(f"{path}.duty_text", "missing_conditional_field", "observed duty requires text")
-        if state_value in {"not_observed", "not_available", "redacted"} and duty_text is not None:
+        if state_value in ("not_observed", "not_available", "redacted") and duty_text is not None:
             errors.add(f"{path}.duty_text", "state_value_mismatch", "unobserved duty text must be absent")
         _validate_source_segment_indexes(duty.get("source_segment_indexes"), f"{path}.source_segment_indexes", errors)
 
@@ -322,9 +322,9 @@ def _validate_company_aliases(value: object, errors: _Collector) -> None:
 def _validate_readback(manifest: Mapping[object, object], errors: _Collector) -> None:
     status = manifest.get("readback_status")
     _require_enum(status, "readback_status", _READBACK_STATUSES, errors)
-    if status in {"matched", "mismatch", "blocked"} or "readback_at" in manifest:
+    if status in ("matched", "mismatch", "blocked") or "readback_at" in manifest:
         _require_rfc3339(manifest.get("readback_at"), "readback_at", errors)
-    if status in {"mismatch", "blocked"} and not _is_non_empty_string(
+    if status in ("mismatch", "blocked") and not _is_non_empty_string(
         manifest.get("readback_failure_reason")
     ):
         errors.add(

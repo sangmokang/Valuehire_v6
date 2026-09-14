@@ -317,3 +317,45 @@ def test_error_paths_do_not_echo_unknown_top_level_or_extracted_field_names() ->
     assert private_field_name not in rendered_errors
     assert "jane.doe@example.com" not in rendered_errors
     assert "010-1234-5678" not in rendered_errors
+
+
+@pytest.mark.parametrize("invalid_state", [[], {}])
+@pytest.mark.parametrize(
+    "path",
+    [
+        ("channel",),
+        ("candidate_ref_state",),
+        ("height_state",),
+        ("coverage_status",),
+        ("company_duties_state",),
+        ("readback_status",),
+        ("segments", 0, "segment_status"),
+        ("extracted_fields", "name", "state"),
+        ("observed_contact_fields", "email", "state"),
+        ("company_duties", 0, "duty_state"),
+        ("company_aliases", 0, "alias_basis"),
+    ],
+)
+def test_container_enum_values_return_closed_validation_errors(
+    path: tuple[str | int, ...], invalid_state: object
+) -> None:
+    manifest = _valid_manifest()
+    parent: object = manifest
+    for key in path[:-1]:
+        if isinstance(key, int):
+            assert isinstance(parent, list)
+            parent = parent[key]
+        else:
+            assert isinstance(parent, dict)
+            parent = parent[key]
+    assert isinstance(parent, dict)
+    parent[path[-1]] = invalid_state
+
+    escaped_error: Exception | None = None
+    try:
+        result = validate_evidence_manifest(manifest)
+    except TypeError as exc:
+        escaped_error = exc
+    assert escaped_error is None, "invalid enum escaped the closed validation boundary"
+    assert result.valid is False
+    assert "invalid_enum" in {error.code for error in result.errors}
