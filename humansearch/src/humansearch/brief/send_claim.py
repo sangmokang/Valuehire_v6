@@ -17,7 +17,7 @@ from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 
-from .packet import dumps_value, ensure_store_dir, require_packet_id
+from .packet import dumps_value, ensure_store_dir, from_json, read_store_file, require_packet_id
 from .send_ledger import (
     SendIntent,
     SendState,
@@ -27,6 +27,7 @@ from .send_ledger import (
     _channel_lock,
     _create_exclusive,
     _latest,
+    recipients_digest,
     require_attempt,
     require_channel,
     require_clock,
@@ -98,6 +99,7 @@ def _claim_locked(
         _reject("현재 수신자 digest 가 승인된 발송 의도와 다르다")
     if current.body_sha256 != body_sha256:
         _reject("현재 본문 digest 가 승인된 발송 의도와 다르다")
+    _check_current_packet_digest(directory, packet_id, current)
     if current.state is SendState.SEND_CLAIMED:
         return current, False
     if current.state is not SendState.INTENT or current.message_id is not None:
@@ -120,3 +122,15 @@ def _claim_locked(
         transitions=(*current.transitions, Transition(moment, SendState.SEND_CLAIMED, evidence)),
     )
     return _append(directory, current, claimed), True
+
+
+def _check_current_packet_digest(directory: Path, packet_id: str, current: SendIntent) -> None:
+    target = directory / f"{require_packet_id(packet_id)}.packet.json"
+    if not target.is_file():
+        return
+    packet = from_json(read_store_file(target))
+    actual_recipients_sha256 = recipients_digest(packet.mail.to, packet.mail.cc)
+    if current.recipients_sha256 != actual_recipients_sha256:
+        _reject("현재 패킷 수신자 digest 가 승인된 발송 의도와 다르다")
+    if current.body_sha256 != packet.mail.body_sha256:
+        _reject("현재 패킷 본문 digest 가 승인된 발송 의도와 다르다")

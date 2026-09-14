@@ -139,9 +139,9 @@ def verify_and_mark(
         current = _latest(directory, packet.packet_id, channel)
         if current is None:
             raise BriefInputError("발송 의도가 없는 채널은 VERIFIED 로 표시할 수 없다")
-        if current.state not in (SendState.SEND_CLAIMED, SendState.SENT_UNVERIFIED):
+        if current.state is not SendState.SENT_UNVERIFIED:
             raise BriefInputError(f"{current.state.value} 상태는 VERIFIED 로 표시할 수 없다")
-        if current.message_id is not None and current.message_id != message_id:
+        if current.message_id != message_id:
             raise BriefInputError("다른 message_id 로 검증된 readback 을 재사용할 수 없다")
         if current.body_sha256 != packet.mail.body_sha256:
             raise BriefInputError("현재 패킷 본문 digest 가 발송 청구 digest 와 다르다")
