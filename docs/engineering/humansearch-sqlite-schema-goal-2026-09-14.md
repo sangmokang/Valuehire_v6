@@ -61,3 +61,13 @@ cd humansearch && uv run ruff check src tests
 ```bash
 cd humansearch && uv run mypy src tests
 ```
+
+## Isolation mutation evidence
+
+Mutation runs were performed against a temporary copy of `humansearch/src/humansearch/storage_schema.py` and restored immediately after each run.
+
+- `mode_check_disabled`: changed `if actual_mode != expected_mode:` to `if False and ...`. `test_rejects_broad_modes_and_path_escape` failed because root mode `0755` was accepted. Mutant killed.
+- `no_git_guard`: disabled the Git-worktree root check. `test_rejects_root_inside_git_worktree` failed because `data/hs-db` under the repo was accepted. Mutant killed.
+- `allow_bad_hmac`: removed the `candidate_key_hmac` HMAC shape check. `test_schema_constraints_reject_plain_shapes_and_bad_hmac` failed because bad HMAC inserted. Mutant killed.
+
+A weaker mutation that changed root creation from `0700` to `0755` survived because the implementation wraps creation in restrictive `umask(077)`, so the actual created mode remained `0700`. That survival is not a contract gap; the stronger mode-check-disabled mutation above verifies the enforced invariant.
