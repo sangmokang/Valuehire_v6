@@ -51,7 +51,11 @@ R5 는 순서 규율이고 이것은 인용 경로의 실존 문제다).
 버리면 그 안의 **8개 counter-AC 와 실측 수치**까지 함께 사라진다. 그래서 WU-0A 가 원문을 해시와 함께 보존했고,
 이 작업은 그것을 **시험 문제로만 쓰고 답은 v6 클린룸으로 다시 쓴다**.
 
-## 인수 기준 (1개)
+## 인수 기준 (2026-09-14 회수로 대체됨)
+
+아래 9개 검사기 중심 기준은 2026-09-10 착수 당시 계획이다. 2026-09-14 최신 지시가 문서 WU는
+필드/반례 대조 검토로 충분하고 신규 범용 parser/검사기를 만들지 말라고 좁혔으므로, 현재 유효 기준은
+이 문서 하단의 `2026-09-14 회수와 최신 지시 반영` 섹션이다. 아래 내용은 회수 전 역사 기록으로만 남긴다.
 
 `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-resume-contract.sh` 가 **exit 0**,
 출력에 `CHECKED: 9` 줄이 있다. (래퍼가 뒤에 `OK(run-acceptance)` 한 줄을 덧붙이므로 "마지막 줄"이 아니라 "출력에 포함")
@@ -88,7 +92,10 @@ v4 재사용 전제가 문장 하나로도 다시 들어오면 클린룸이 깨�
 필드 목록·타입·필수 여부를 표로 적고, 각 counter-AC 를 그 표의 어느 필드가 막는지 연결한다.
 **저장 구현(SQLite·원격)은 이 작업의 범위가 아니다** — 모양만 확정한다.
 
-## 결정성 규율 — 입력 영역 표 (§3 ①)
+## 결정성 규율 — 입력 영역 표 (§3 ①, 2026-09-14 회수 전 기록)
+
+아래 입력 표는 새 검사 스크립트를 만들던 원래 계획의 결정성 규율이다. 현재 실행에서는 새 검사기를 추가하지
+않았고, SOT 문서의 필드와 반례를 `rg` 대조·형식 lint·독립 codeaudit로 검토한다.
 
 이 작업의 "입력"은 계약 문서 자신이다. 검사기가 받는 입력을 전부 열거한다.
 
@@ -110,7 +117,10 @@ v4 재사용 전제가 문장 하나로도 다시 들어오면 클린룸이 깨�
 | 2 | 금지어에 `v5` 도 넣을 것인가 | **넣지 않는다** (정본 §3 은 v4 계열만 지정) |
 | 3 | 8개 항목의 이름을 정본 문구 그대로 쓸 것인가 | **그대로 쓴다** (정본과 글자 단위 대조 가능하게) |
 
-## 게이트 계획
+## 게이트 계획 (2026-09-14 회수로 대체됨)
+
+아래 RED/GREEN 검사기 계획은 더 이상 현재 실행 게이트가 아니다. 현재 실행 게이트는 새 검사기 없는 문서 대조,
+strict 원칙 검사, 비밀 스캔, 기존 acceptance, 독립 codeaudit 지적 5건 회수다.
 
 `RED`(검사기 먼저, 문서 없어 FAIL) → `GREEN`(계약 문서 작성) → 자기 변이 검사
 (`scripts/acceptance-hs-resume-contract-mutations.sh`, 정본 §3 공통 꼬리) → Full Strict →
@@ -178,13 +188,17 @@ HS-02.01 최소 열람 증거 계약으로 회수했다. 이번 범위는 `docs/
 4. 회사별 담당 업무와 회사 별칭의 근거 상태.
 5. 후보가 나온 검색 조건 참조와 RPS 필터 적용 결과 재조회 증거 참조.
 6. 독립 재조회 상태와 저장 실패 시 중단 사유.
-7. 8개 counter-AC와 각 항목의 `검사 명령:`.
+7. 조건부 필드의 상태와 값 모양: `candidate_ref`, `document_height_px`, `company_duties`.
+8. 동적 문서 높이와 실패·가림 구간이 `complete`를 만들지 못하는 판정 기준.
+9. 화면에 보인 연락처 관측 필드와 연락처 수집·패킷 사용의 후속 소유권.
+10. 8개 counter-AC와 각 항목의 `검사 명령:`.
 
 검증 명령:
 
 ```bash
-rg -n '`source_url`|`observed_at`|`document_height_px`|`segments`|`coverage_status`|`coverage_reason`|`last_observed_y_px`|observed_empty|not_observed|not_available|`company_duties`|`company_aliases`|`search_condition_ref`|`readback_status`' docs/sot/humansearch-evidence-contract.md
+rg -n '`source_url`|`observed_at`|`document_height_px`|`height_state`|`segments`|`coverage_status`|`coverage_reason`|`last_observed_y_px`|observed_empty|not_observed|not_available|`company_duties`|`company_duties_state`|`company_aliases`|`observed_contact_fields`|`search_condition_ref`|`readback_status`' docs/sot/humansearch-evidence-contract.md
 rg -n '구간 무누락 manifest|마지막 화면|NULL 구분|회사별 duty|검색 조건 보존|원격 경로 금지|readback|회사 별칭' docs/sot/humansearch-evidence-contract.md
+rg -n '조건부|observed_changed|`segment_status=observed`|추정하지 않는다|후속 저장·패킷 계약' docs/sot/humansearch-evidence-contract.md
 rg -c '검사 명령:' docs/sot/humansearch-evidence-contract.md
 bash scripts/acceptance-principles-check.sh
 git diff --check

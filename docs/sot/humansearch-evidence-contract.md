@@ -54,15 +54,16 @@ readback 시험을 함께 되돌려야 한다.
 | `run_id` | 예 | opaque string | 검색 실행 또는 재개 실행의 식별자다. |
 | `position_ref` | 예 | string | ClickUp 포지션 ID 또는 후속 계약이 승인한 포지션 식별자다. |
 | `channel` | 예 | enum | `saramin`, `jobkorea`, `linkedin_rps` 중 하나다. |
-| `candidate_ref` | 예 | string | 채널 안에서 후보를 다시 찾을 수 있는 안정 식별자다. 없으면 `candidate_ref_state`가 이유를 설명해야 한다. |
+| `candidate_ref` | 조건부 | string 또는 null | `candidate_ref_state=observed`이면 비어 있지 않은 문자열이다. 그 밖의 상태이면 null이다. |
 | `candidate_ref_state` | 예 | enum | `observed`, `not_observed`, `not_available` 중 하나다. |
 | `source_url` | 예 | URL string | query 안의 계정·세션·후보 민감값은 보호 저장소 원문에만 두고 보고용에는 정규화 URL을 둔다. |
 | `source_url_hash` | 예 | sha256 hex | 민감 URL 원문을 일반 로그에 쓰지 않고도 동일 출처를 대조하는 지문이다. |
 | `observed_at` | 예 | RFC3339 timestamp | 화면을 관측한 시각이다. 저장 시각과 다를 수 있다. |
 | `browser_context_ref` | 예 | string | Aside 앱·프로필·탭 증거의 참조다. Chrome 탭이나 전역 입력을 가리키면 안 된다. |
 | `search_condition_ref` | 예 | string | 어떤 검색 조건에서 나온 후보인지 가리킨다. 검색 조건 본문은 §5 형식을 따른다. |
-| `document_height_px` | 예 | integer >= 0 | 관측 시점의 문서 전체 높이다. 알 수 없으면 `height_state`를 `not_observed`로 둔다. |
-| `height_state` | 예 | enum | `observed`, `not_observed`, `not_applicable` 중 하나다. |
+| `document_height_px` | 조건부 | integer >= 0 또는 null | `height_state=observed_stable`이면 최종 안정화 뒤 문서 전체 높이다. 그 밖의 상태이면 null이다. |
+| `height_state` | 예 | enum | `observed_stable`, `observed_changed`, `not_observed`, `not_applicable` 중 하나다. |
+| `height_observation_note` | 조건부 | string | 높이가 바뀌었거나 관측되지 않았을 때 필수다. |
 | `viewport_width_px` | 예 | integer >= 0 | 캡처 구간 좌표 해석에 필요한 화면 폭이다. |
 | `viewport_height_px` | 예 | integer >= 0 | 캡처 구간 좌표 해석에 필요한 화면 높이다. |
 | `segments` | 예 | array | §3의 캡처 구간 목록이다. 1개 이상이어야 한다. |
@@ -70,21 +71,23 @@ readback 시험을 함께 되돌려야 한다.
 | `coverage_reason` | 예 | string | `partial` 또는 `failed`일 때 사람이 이해할 수 있는 이유다. `complete`이면 `all_segments_observed`를 적는다. |
 | `last_observed_y_px` | 예 | integer >= 0 | 마지막으로 관측한 세로 위치다. 어디까지 봤는지 복원하는 경계다. |
 | `extracted_fields` | 예 | object | §4의 NULL/미관측 구분 규칙을 따르는 추출 결과다. |
-| `company_duties` | 예 | array | §6의 회사별 담당 업무 목록이다. 관측하지 못했으면 빈 배열 대신 상태값으로 이유를 남긴다. |
+| `company_duties` | 조건부 | array | `company_duties_state=observed`이면 1개 이상이다. 그 밖의 상태이면 빈 배열이어도 된다. |
+| `company_duties_state` | 예 | enum | `observed`, `observed_empty`, `not_observed`, `not_available`, `redacted` 중 하나다. |
 | `company_aliases` | 예 | array | §7의 회사 별칭 목록이다. 표준명 추정만 있고 근거가 없으면 별칭으로 확정하지 않는다. |
+| `observed_contact_fields` | 예 | object | 화면에 보인 연락처 필드의 관측 상태만 남긴다. 연락처 수집 허용과 패킷 사용은 후속 계약이 소유한다. |
 | `readback_status` | 예 | enum | `not_run`, `matched`, `mismatch`, `blocked` 중 하나다. |
 | `readback_at` | 조건부 | RFC3339 timestamp | 재조회가 실행됐을 때 필수다. |
 | `readback_failure_reason` | 조건부 | string | `mismatch` 또는 `blocked`일 때 필수다. |
 
-→ 표가 말하는 것: 증거 한 건은 출처, 시각, 브라우저 맥락, 검색 조건, 캡처 범위, 전체/부분 상태, 재조회 상태를 함께 가져야 한다.
+→ 표가 말하는 것: 증거 한 건은 출처, 시각, 브라우저 맥락, 검색 조건, 캡처 범위, 전체/부분 상태, 재조회 상태를 함께 가져야 한다. 조건부 필드는 상태값과 실제 값 모양이 서로 맞아야 한다.
 
 검사 명령:
 
 ```bash
-rg -n '`source_url`|`observed_at`|`document_height_px`|`segments`|`coverage_status`|`coverage_reason`|`readback_status`' docs/sot/humansearch-evidence-contract.md
+rg -n '`candidate_ref`.*조건부|`document_height_px`.*조건부|`company_duties_state`|`observed_contact_fields`|`source_url`|`observed_at`|`segments`|`coverage_status`|`coverage_reason`|`readback_status`' docs/sot/humansearch-evidence-contract.md
 ```
 
-→ 이 명령은 증거의 출처, 시각, 높이, 구간, 전체/부분/실패 판정, 재조회 상태 필드가 문서에 있는지 확인한다.
+→ 이 명령은 증거의 출처, 시각, 조건부 후보 식별자와 높이, 구간, 전체/부분/실패 판정, 연락처 관측 상태, 재조회 상태 필드가 문서에 있는지 확인한다.
 
 ### 3. 캡처 구간 manifest
 
@@ -103,16 +106,19 @@ rg -n '`source_url`|`observed_at`|`document_height_px`|`segments`|`coverage_stat
 
 → 표가 말하는 것: 캡처는 파일 하나가 아니라 문서 좌표 구간과 파일 지문을 가진 조각들의 목록이다.
 
-`coverage_status=complete`가 되려면 `segments`가 `0..document_height_px` 범위를 누락 없이 덮어야 한다.
-구간 사이에 빈 공간이 있거나 마지막 구간의 `bottom_y_px`가 문서 높이보다 작으면 `partial`이다.
+`coverage_status=complete`가 되려면 `height_state=observed_stable`이고, `segment_status=observed`인 구간만으로
+`0..document_height_px` 범위를 누락 없이 덮어야 한다. `failed`나 `redacted` 구간은 전체 열람을 증명하는
+덮개로 계산하지 않는다. 구간 사이에 빈 공간이 있거나 마지막 관측 구간의 `bottom_y_px`가 문서 높이보다
+작으면 `partial`이다. 스크롤 중 문서 높이가 바뀌어 최종 안정 높이를 확정하지 못하면 `height_state=observed_changed`이고
+`coverage_status`는 `partial` 또는 `failed`다.
 
 검사 명령:
 
 ```bash
-rg -n '`top_y_px`|`bottom_y_px`|`capture_sha256`|`failure_reason`|누락 없이|`partial`' docs/sot/humansearch-evidence-contract.md
+rg -n '`top_y_px`|`bottom_y_px`|`capture_sha256`|`failure_reason`|`segment_status=observed`|`observed_changed`|누락 없이|`partial`' docs/sot/humansearch-evidence-contract.md
 ```
 
-→ 이 명령은 구간 좌표, 해시, 실패 사유와 전체/부분 판정 기준이 문서에 있는지 확인한다.
+→ 이 명령은 구간 좌표, 해시, 실패 사유, 동적 높이 처리와 전체/부분 판정 기준이 문서에 있는지 확인한다.
 
 ### 4. NULL, 빈 값, 미관측 구분
 
@@ -133,13 +139,17 @@ rg -n '`top_y_px`|`bottom_y_px`|`capture_sha256`|`failure_reason`|누락 없이|
 `not_available`은 포털이 제공하지 않는 항목임을 확인했다는 뜻이다. 세 상태를 모두 빈 문자열이나 NULL 하나로
 합치면 안 된다.
 
+`observed_contact_fields`도 이 모양을 따른다. 화면에 보인 연락처만 `observed_value`로 남기며, 보이지 않는
+이메일·전화번호·메신저 주소를 추정하지 않는다. 연락처를 수집해도 되는 채널 조건, 저장 암호화, 패킷 사용 여부는
+후속 저장·패킷 계약이 소유한다.
+
 검사 명령:
 
 ```bash
-rg -n 'observed_empty|not_observed|not_available|redacted|source_segment_indexes' docs/sot/humansearch-evidence-contract.md
+rg -n 'observed_empty|not_observed|not_available|redacted|source_segment_indexes|observed_contact_fields|추정하지 않는다' docs/sot/humansearch-evidence-contract.md
 ```
 
-→ 이 명령은 값 없음과 미관측이 서로 다른 상태로 남는지 확인한다.
+→ 이 명령은 값 없음과 미관측이 서로 다른 상태로 남고, 연락처가 보이는 값 관측으로만 제한되는지 확인한다.
 
 ### 5. 검색 조건 보존
 
@@ -173,6 +183,8 @@ rg -n '`search_condition_ref`|`filters_json`|`applied_result_proof`|RPS 프로�
 ### 6. 회사별 담당 업무
 
 경력 항목은 회사 단위로 나눠 저장한다. 여러 회사의 담당 업무를 하나의 긴 문자열로 합치면 안 된다.
+`company_duties_state=observed`인데 `company_duties`가 빈 배열이면 계약 위반이다. 반대로 경력 구간을
+관측하지 못했으면 `company_duties_state=not_observed`와 빈 배열을 함께 쓸 수 있다.
 
 `company_duties`의 각 항목은 아래 필드를 가진다.
 
@@ -191,10 +203,10 @@ rg -n '`search_condition_ref`|`filters_json`|`applied_result_proof`|RPS 프로�
 검사 명령:
 
 ```bash
-rg -n '`company_duties`|`company_observed_name`|`duty_text`|`duty_state`|`source_segment_indexes`' docs/sot/humansearch-evidence-contract.md
+rg -n '`company_duties`|`company_duties_state`|`company_observed_name`|`duty_text`|`duty_state`|`source_segment_indexes`|빈 배열' docs/sot/humansearch-evidence-contract.md
 ```
 
-→ 이 명령은 담당 업무가 후보 전체가 아니라 회사별 경력 항목에 붙는지 확인한다.
+→ 이 명령은 담당 업무가 후보 전체가 아니라 회사별 경력 항목에 붙고, 배열과 상태값의 조합이 판정 가능하게 적혔는지 확인한다.
 
 ### 7. 회사 별칭
 
