@@ -299,11 +299,15 @@ def test_sqlite_rollback_journal_is_created_with_restricted_mode(
     root = _root(tmp_path)
     journal_modes: list[int] = []
     migration_sql = tuple(
-        [
-            "create table hs_schema_migrations (version integer primary key, name text not null, applied_at text not null default current_timestamp)",
-            "create table hs_big(id integer primary key, payload text)",
+        list(storage_schema._MIGRATIONS[0].statements)
+        + [
+            f"""
+            insert into hs_candidates
+              (candidate_key_hmac, position_ref, channel, candidate_ref_state)
+            values ('{index:064x}', 'POS', 'jobkorea', 'observed')
+            """
+            for index in range(1, 4001)
         ]
-        + [f"insert into hs_big(payload) values ('payload-{index}')" for index in range(4000)]
     )
     monkeypatch.setattr(
         storage_schema,

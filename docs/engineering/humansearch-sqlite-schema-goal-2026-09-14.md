@@ -90,3 +90,7 @@ After the root V2 fix, five isolated mutations were run against `humansearch/src
 ## Root V2 schema completeness counterexamples
 
 Root V2 then found that commit `17266eb` trusted the migration ledger alone. A DB with `hs_schema_migrations.version = 1` but a dropped `hs_candidates` table was accepted, and the bad source URL hash test failed through missing `candidate_key_hmac` before proving the hash constraint. The follow-up RED tests require existing schema tables and constraint-bearing SQL to match the installed contract and make the bad hash assertion provide a valid candidate FK first.
+
+## Root V2 schema completeness fix and mutation follow-up
+
+The schema completeness fix validates the required tables, column order, and constraint-bearing SQL fragments for the current migration contract after every initialization. It rejects mismatches instead of repairing them. Three isolated mutations were then run and reverted: `schema_verify_call_disabled`, `constraint_fragment_check_disabled`, and `source_url_hash_check_disabled`. Each was killed by the corresponding HS03.01 regression test, and the restored source passed `uv run pytest tests/test_hs_0301.py -q` with 17 passing tests.

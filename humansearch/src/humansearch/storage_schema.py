@@ -85,6 +85,55 @@ _MIGRATIONS: tuple[_Migration, ...] = (
 )
 
 
+_REQUIRED_TABLE_COLUMNS: Final = {
+    "hs_schema_migrations": ("version", "name", "applied_at"),
+    "hs_candidates": (
+        "candidate_key_hmac",
+        "position_ref",
+        "channel",
+        "candidate_ref_state",
+        "candidate_ref_hash",
+        "storage_status",
+        "created_at",
+    ),
+    "hs_evidence_manifests": (
+        "evidence_id",
+        "candidate_key_hmac",
+        "run_id",
+        "position_ref",
+        "channel",
+        "source_url_hash",
+        "observed_at",
+        "evidence_manifest_ref",
+        "evidence_manifest_sha256",
+        "encrypted_payload_refs_ref",
+        "coverage_status",
+        "readback_status",
+        "storage_status",
+        "created_at",
+    ),
+}
+_SCHEMA_SQL_FRAGMENTS: Final = {
+    "hs_schema_migrations": ("version integer primary key", "name text not null"),
+    "hs_candidates": (
+        "candidate_key_hmac text primary key not null check",
+        "position_ref text not null",
+        "channel text not null check",
+        "candidate_ref_state text not null",
+        "candidate_ref_hash text check",
+        "storage_status text not null default 'schema_only'",
+    ),
+    "hs_evidence_manifests": (
+        "evidence_id text primary key not null",
+        "candidate_key_hmac text not null references hs_candidates(candidate_key_hmac)",
+        "source_url_hash text not null check",
+        "evidence_manifest_sha256 text not null check",
+        "coverage_status text not null check",
+        "readback_status text not null check",
+    ),
+}
+
+
 def initialize_humansearch_storage(
     protected_root: Path,
     *,
@@ -163,7 +212,12 @@ def _apply_schema(db_path: Path) -> tuple[int, ...]:
                 continue
             _run_migration(connection, migration)
             applied.append(migration.version)
+        _verify_schema_contract(connection)
         connection.commit()
+    except StorageSchemaError:
+        if connection is not None:
+            connection.rollback()
+        raise
     except sqlite3.Error as exc:
         if connection is not None:
             connection.rollback()
@@ -206,6 +260,23 @@ def _current_version(connection: sqlite3.Connection) -> int:
             raise StorageSchemaError("unsupported schema version")
         versions.append(version)
     return max(versions)
+
+
+def _verify_schema_contract(connection: sqlite3.Connection) -> None:
+    rows = connection.execute(
+        "select name, sql from sqlite_master where type = 'table' "
+        "and name in ('hs_schema_migrations','hs_candidates','hs_evidence_manifests')"
+    ).fetchall()
+    table_sql = {row[0]: row[1] for row in rows if isinstance(row[0], str) and isinstance(row[1], str)}
+    if set(table_sql) != set(_REQUIRED_TABLE_COLUMNS):
+        raise StorageSchemaError("schema mismatch")
+    for table, expected_columns in _REQUIRED_TABLE_COLUMNS.items():
+        observed = tuple(row[1] for row in connection.execute(f"pragma table_info({table})"))
+        normalized_sql = " ".join(table_sql[table].lower().split())
+        if observed != expected_columns:
+            raise StorageSchemaError("schema mismatch")
+        if any(fragment not in normalized_sql for fragment in _SCHEMA_SQL_FRAGMENTS[table]):
+            raise StorageSchemaError("schema mismatch")
 
 
 def _schema_version(db_path: Path) -> int:
