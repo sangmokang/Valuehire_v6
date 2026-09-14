@@ -206,7 +206,7 @@ def test_invalid_manifest_is_failed_without_echoing_private_values() -> None:
 
     assert result.coverage_status == "failed"
     assert result.coverage_reason == "invalid_manifest"
-    assert result.last_observed_y_px == 1200
+    assert result.last_observed_y_px == 0
     assert "candidate-private-url" not in repr(result)
 
 
@@ -282,6 +282,18 @@ def test_bool_coordinates_are_failed_through_parent_validator() -> None:
     manifest = _manifest([_segment(0, 0, 1200)])
     segments = cast(list[dict[str, object]], manifest["segments"])
     segments[0]["bottom_y_px"] = True
+
+    result = classify_evidence_coverage(manifest)
+
+    assert result.coverage_status == "failed"
+    assert result.coverage_reason == "invalid_manifest"
+    assert result.last_observed_y_px == 0
+
+
+def test_invalid_negative_coordinate_does_not_become_last_observed_y() -> None:
+    manifest = _manifest([_segment(0, 0, 1200)])
+    segments = cast(list[dict[str, object]], manifest["segments"])
+    segments[0]["bottom_y_px"] = -7
 
     result = classify_evidence_coverage(manifest)
 

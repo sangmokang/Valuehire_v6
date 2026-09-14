@@ -29,7 +29,7 @@ def classify_evidence_coverage(manifest: object) -> EvidenceCoverageResult:
         return EvidenceCoverageResult(
             coverage_status="failed",
             coverage_reason="invalid_manifest",
-            last_observed_y_px=_last_observed_y(manifest),
+            last_observed_y_px=0,
         )
     if not isinstance(manifest, Mapping):
         return EvidenceCoverageResult(
