@@ -39,13 +39,14 @@ PII 없는 영수증이 준비돼야 C1 접속이 가능하다고 했지만 구�
 
 ## 범위
 
-소유 쓰기 범위는 아래 두 파일뿐이다.
+storage 문서 소유 쓰기 범위는 아래 두 파일이다.
 
 - `docs/sot/humansearch-storage-contract.md`
 - `docs/engineering/humansearch-storage-policy-goal-2026-09-14.md`
 
-`docs/sot/humansearch-browser-contract.md`는 root 통합 소유라 직접 수정하지 않는다. 필요한 exact diff는 이 goal의
-마지막 섹션에 보고한다.
+`docs/sot/humansearch-browser-contract.md`는 root 통합 소유다. 2026-09-14 root가 이 worktree에서 §12 storage
+연결만 추가해 같은 HS-04.01 PR에 포함하기로 했다. LinkedIn §4/5 변경은 별도 root 브랜치 소유이며 이 PR 범위가
+아니다.
 
 ## 인수 기준
 
@@ -141,21 +142,15 @@ counter-AC: 보이지 않는 이메일·전화번호를 추정하거나 CDP cook
 - 독립 실행기 OS 계정 생성 또는 권한 변경.
 - main merge.
 
-## Browser SOT §12 통합 요청 diff
+## Browser SOT §12 통합 상태
 
-root 통합 소유 파일이라 이번 WU에서 직접 수정하지 않는다. 새 storage SOT가 병합된 뒤 root가 아래 diff를 적용하면
-§12 조건 6/7이 새 정본으로 연결된다.
+root가 `docs/sot/humansearch-browser-contract.md` §12 조건 6/7과 C1 serializer 문단을 storage SOT에 연결했다.
+이 변경은 storage 정책 연결만 포함하며, LinkedIn §4/5 정리는 별도 root PR 소유다.
 
-```diff
-diff --git a/docs/sot/humansearch-browser-contract.md b/docs/sot/humansearch-browser-contract.md
-@@
--6. Git 밖 원본 저장 위치, 암호화, 디렉터리 0700·파일 0600 권한이 준비됐다.
--7. 채널별 보존기간, 삭제 작업과 PII 없는 삭제 결과 영수증 계약이 승인되고 시험됐다.
-+6. `docs/sot/humansearch-storage-contract.md`에 따른 Git 밖 원본 저장 위치, 전량 암호화, 생성 시 restrictive mode/umask, 쓰기 전 owner/mode/symlink/root 검증, 디렉터리 0700·파일 0600 권한, SQLite WAL/SHM/journal/temp/백업 권한, 키 원본 격리, OS 독립 쓰기 권한 경계가 준비됐다.
-+7. `docs/sot/humansearch-storage-contract.md`에 따른 보존 무기한, 명시적 purge, PII 없는 삭제 결과 영수증, 저장 실패 시 순회 중단, evidence coverage와 storage confirmed 분리, 복호화 payload·manifest·SQLite 관계 독립 readback, tombstone·Supabase 파생·outbox 재생성 방지 계약이 승인되고 시험됐다.
-@@
--PII 없는 provenance만 허용한다. 구체적인 serializer·보존·삭제 계약은 병합된 C1 정본이 소유한다.
-+PII 없는 provenance만 허용한다. 구체적인 serializer·보존·삭제 계약은 병합된 `docs/sot/humansearch-storage-contract.md`가 소유한다.
+검증 명령:
+
+```bash
+rg -n 'humansearch-storage-contract|무기한 보존|명시적 purge|파생 삭제|저장 실패 시 순회 중단|독립 readback|실제 시험을 대신하지 않는다' docs/sot/humansearch-browser-contract.md
 ```
 
 ## 검증 계획
@@ -168,6 +163,7 @@ rg -n '순회 중단|다음 후보|forbidden_input|partial|failed|recovery_requi
 rg -n '무기한|명시적 purge|자동 만료 삭제|PII 없는 영수증|recovery_required|멱등|tombstone|outbox|Supabase|재생성|단순 DB 삭제' docs/sot/humansearch-storage-contract.md
 rg -n 'Git 밖|0700|0600|umask|쓰기 전에|WAL|SHM|journal|temp|백업|EACCES|symlink|같은 UID|Git에 넣지 않는다|운영 프로젝트 입력' docs/sot/humansearch-storage-contract.md
 rg -n '토큰|쿠키|storageState|세션|forbidden_input|비밀값 제거|1촌|보이지 않는|추정' docs/sot/humansearch-storage-contract.md
+rg -n 'humansearch-storage-contract|무기한 보존|명시적 purge|파생 삭제|저장 실패 시 순회 중단|독립 readback|실제 시험을 대신하지 않는다' docs/sot/humansearch-browser-contract.md
 git diff --check
 bash verify.sh
 ```
@@ -187,7 +183,8 @@ bash verify.sh
 | Claude V1 2차 | `NOT_RUN` | CLI 옵션 파싱 오류로 prompt가 tool deny rule로 해석됨, 종료값 1 |
 | Claude V1 3차 | `NOT_RUN` | 파일 내용을 prompt에 직접 포함했으나 `Credit balance is too low`, 종료값 1 |
 | Gemini V1 | `NOT_RUN` | 로컬 `gemini` binary 없음. `omx ask gemini`도 `[ask-gemini] Missing required local CLI binary: gemini`로 종료값 1 |
-| codeaudit | `NOT_RUN` | 별도 독립 codeaudit 실행자는 없음. 이 문서는 로컬 AC 대조와 root 감사 지적 반영까지만 완료 |
+| root codeaudit | `APPROVE` | root가 commit `235a62d` 범위에서 다섯 storage 계약 결함 해소를 실제 SOT 검토로 승인 |
+| 별도 codeaudit runner | `NOT_RUN` | 별도 독립 codeaudit 실행자는 없음. root codeaudit 승인과 로컬 AC 대조까지만 완료 |
 
 따라서 이 WU의 현재 증거는 로컬 문서 AC 대조, strict 원칙 검사, diff 공백 검사, 비밀 스캔, root 수동 감사 지적
-반영이다. 외부 V1 또는 codeaudit 통과로 확대해 말하지 않는다.
+반영, root codeaudit 승인이다. Claude/Gemini 외부 V1 통과로 확대해 말하지 않는다.
