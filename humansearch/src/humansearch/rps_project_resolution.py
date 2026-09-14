@@ -227,7 +227,10 @@ def _resolve_unmapped_projects(
     has_partial_target_id_evidence = any(
         _has_partial_target_id_evidence(project, target) for project in projects
     )
-    if matching_ids and (has_name_only_match or has_partial_target_id_evidence):
+    has_unknown_identity_evidence = any(_lacks_identity_evidence(project) for project in projects)
+    if matching_ids and (
+        has_name_only_match or has_partial_target_id_evidence or has_unknown_identity_evidence
+    ):
         return _result(
             RpsProjectStatus.AMBIGUOUS,
             target.position_id,
@@ -267,7 +270,7 @@ def _resolve_unmapped_projects(
             None,
             "partial stable target identity was observed without enough evidence to exclude it",
         )
-    if any(_lacks_identity_evidence(project) for project in projects):
+    if has_unknown_identity_evidence:
         return _result(
             RpsProjectStatus.AMBIGUOUS,
             target.position_id,
