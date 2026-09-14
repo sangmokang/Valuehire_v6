@@ -75,3 +75,25 @@ cd humansearch && uv run mypy src tests
 - 알 수 없는 top-level key와 extracted field key가 오류 path에 원문으로 노출될 수 있었다. 이 key는 개인정보 형태일 수 있으므로 path는 schema 위치와 index로 sanitize해야 한다.
 
 V2 수정은 위 반례 assertion을 먼저 RED로 남긴 뒤, 같은 3개 소유 파일 안에서 필수 array/object 검증과 sanitized path를 구현한다.
+
+## V2 null-only segment mutant 확인
+
+`segments` 문자열 반례와 다른 required object null 반례만으로는 `segments=None`만 허용하는 변이를 격리해 죽였다고 말할 수 없었다. 따라서 `test_rejects_segments_none_as_required_array`를 추가해 `segments=None` 단독 반례를 고정했다.
+
+임시 변이:
+
+```python
+def _validate_segments(segments: object, errors: _Collector) -> None:
+    if segments is None:
+        return
+    ...
+```
+
+결과:
+
+```text
+tests/test_hs_0202.py::test_rejects_segments_none_as_required_array FAILED
+assert True is False
+```
+
+→ 이 결과는 `segments=None`만 허용하는 mutant가 새 테스트에 의해 죽는다는 뜻이다. 변이 파일은 즉시 원복했고, 원복 후 같은 단일 테스트는 PASS했다.

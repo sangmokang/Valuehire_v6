@@ -273,6 +273,16 @@ def test_rejects_required_array_and_object_fields_even_when_none_or_string() -> 
     assert {error.code for error in result.errors} >= {"invalid_array", "invalid_object"}
 
 
+def test_rejects_segments_none_as_required_array() -> None:
+    manifest = _valid_manifest()
+    manifest["segments"] = None
+
+    result = validate_evidence_manifest(manifest)
+
+    assert result.valid is False
+    assert ("segments", "invalid_array") in {(error.path, error.code) for error in result.errors}
+
+
 def test_validates_optional_readback_fields_when_not_required() -> None:
     manifest = _valid_manifest()
     manifest["readback_status"] = "not_run"
