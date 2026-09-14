@@ -171,7 +171,9 @@ bash verify.sh
 ## 현재 검증 제한
 
 로컬 검증, 외부 V1, PR, CI, main 병합, 운영 실증은 서로 다른 상태다. 이 문서 WU는 stable candidate commit,
-외부 V1, push/PR까지 수행할 수 있지만 main merge와 browser SOT §12 직접 수정은 이 WU의 소유 범위가 아니다.
+외부 V1, push/PR까지 수행할 수 있지만 main merge와 런타임 저장 구현은 이 WU의 소유 범위가 아니다.
+`docs/sot/humansearch-browser-contract.md` §12 storage 연결은 root가 이 worktree에서 내용 변경을 완료하고 commit 소유를
+이 WU에 명시 인계했다.
 
 ## 2026-09-14 외부 V1·codeaudit 상태
 
@@ -184,7 +186,8 @@ bash verify.sh
 | Claude V1 3차 | `NOT_RUN` | 파일 내용을 prompt에 직접 포함했으나 `Credit balance is too low`, 종료값 1 |
 | Gemini V1 | `NOT_RUN` | 로컬 `gemini` binary 없음. `omx ask gemini`도 `[ask-gemini] Missing required local CLI binary: gemini`로 종료값 1 |
 | root codeaudit | `APPROVE` | root가 commit `235a62d` 범위에서 다섯 storage 계약 결함 해소를 실제 SOT 검토로 승인 |
-| 별도 codeaudit runner | `NOT_RUN` | 별도 독립 codeaudit 실행자는 없음. root codeaudit 승인과 로컬 AC 대조까지만 완료 |
+| root §12 V2 | `PASS` | root가 `private-reviews/hs-0401-20260914/codeaudit-storage-policy-v2.md`에서 §12 only diff 독립 V2 PASS를 보고하고 commit 소유를 이 WU에 인계 |
+| 별도 codeaudit runner | `NOT_RUN` | 별도 독립 codeaudit 실행자는 없음. root codeaudit 승인, root §12 V2, 로컬 AC 대조까지만 완료 |
 
 따라서 이 WU의 현재 증거는 로컬 문서 AC 대조, strict 원칙 검사, diff 공백 검사, 비밀 스캔, root 수동 감사 지적
-반영, root codeaudit 승인이다. Claude/Gemini 외부 V1 통과로 확대해 말하지 않는다.
+반영, root codeaudit 승인, root §12 V2 PASS다. Claude/Gemini 외부 V1 통과나 런타임 저장 검증으로 확대해 말하지 않는다.
