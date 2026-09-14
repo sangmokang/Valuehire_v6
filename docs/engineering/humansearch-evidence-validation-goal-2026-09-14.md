@@ -62,3 +62,16 @@ cd humansearch && uv run mypy src tests
 ```
 
 → strict typecheck를 본다.
+
+
+## V2 독립감사 반례 회수
+
+`e087322`의 RED는 구현 모듈 부재를 확인한 collection error였고, SOT 계약 자체의 실패 증거는 아니었다. V2 독립감사는 구현 후보 `15d4e75`에서 다음 실제 계약 구멍을 찾았다.
+
+- `segments`가 문자열 또는 null이어도 invalid array로 닫히지 않았다.
+- `extracted_fields`와 `observed_contact_fields`가 null이어도 required object 오류가 나지 않았다.
+- `company_aliases`가 null이어도 required array 오류가 나지 않았다.
+- `readback_status=not_run`일 때 존재하는 `readback_at`의 잘못된 timestamp와 빈 `readback_failure_reason`을 검사하지 않았다.
+- 알 수 없는 top-level key와 extracted field key가 오류 path에 원문으로 노출될 수 있었다. 이 key는 개인정보 형태일 수 있으므로 path는 schema 위치와 index로 sanitize해야 한다.
+
+V2 수정은 위 반례 assertion을 먼저 RED로 남긴 뒤, 같은 3개 소유 파일 안에서 필수 array/object 검증과 sanitized path를 구현한다.

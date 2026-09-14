@@ -217,9 +217,9 @@ def test_rejects_extracted_field_and_contact_shapes() -> None:
     manifest["observed_contact_fields"] = {"email": {"value": "a@example.com", "state": "hidden"}}
 
     assert _error_paths(manifest) >= {
-        "extracted_fields.name.source_segment_indexes",
-        "extracted_fields.name.value",
-        "observed_contact_fields.email.state",
+        "extracted_fields[0].source_segment_indexes",
+        "extracted_fields[0].value",
+        "observed_contact_fields[0].state",
     }
 
 
@@ -252,3 +252,58 @@ def test_rejects_readback_conditional_fields() -> None:
     manifest["readback_status"] = "blocked"
 
     assert _error_paths(manifest) >= {"readback_at", "readback_failure_reason"}
+
+
+def test_rejects_required_array_and_object_fields_even_when_none_or_string() -> None:
+    manifest = _valid_manifest()
+    manifest["segments"] = "not-an-array"
+    manifest["extracted_fields"] = None
+    manifest["observed_contact_fields"] = None
+    manifest["company_aliases"] = None
+
+    result = validate_evidence_manifest(manifest)
+
+    assert result.valid is False
+    assert {error.path for error in result.errors} >= {
+        "segments",
+        "extracted_fields",
+        "observed_contact_fields",
+        "company_aliases",
+    }
+    assert {error.code for error in result.errors} >= {"invalid_array", "invalid_object"}
+
+
+def test_validates_optional_readback_fields_when_not_required() -> None:
+    manifest = _valid_manifest()
+    manifest["readback_status"] = "not_run"
+    manifest["readback_at"] = "not-a-timestamp"
+    manifest["readback_failure_reason"] = ""
+
+    assert _error_paths(manifest) >= {"readback_at", "readback_failure_reason"}
+
+
+def test_error_paths_do_not_echo_unknown_top_level_or_extracted_field_names() -> None:
+    private_top_level = "candidate_email_jane.doe@example.com"
+    private_field_name = "phone_010-1234-5678"
+    manifest = _valid_manifest()
+    manifest[private_top_level] = "secret"
+    manifest["extracted_fields"] = {
+        private_field_name: {
+            "value": "secret",
+            "state": "not_observed",
+            "source_segment_indexes": [],
+        }
+    }
+
+    result = validate_evidence_manifest(manifest)
+
+    assert result.valid is False
+    assert "unknown_fields[0]" in {error.path for error in result.errors}
+    assert {"extracted_fields[0].value", "extracted_fields[0].source_segment_indexes"} <= {
+        error.path for error in result.errors
+    }
+    rendered_errors = repr(result.errors)
+    assert private_top_level not in rendered_errors
+    assert private_field_name not in rendered_errors
+    assert "jane.doe@example.com" not in rendered_errors
+    assert "010-1234-5678" not in rendered_errors
