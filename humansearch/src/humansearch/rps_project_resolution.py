@@ -137,6 +137,14 @@ def _resolution_input(payload: Mapping[str, object]) -> _ResolutionInput | RpsPr
             None,
             "mapped_project_id must be null or a non-empty string",
         )
+    expected_scope = (
+        "account-projects" if mapped_project_id is None else f"project-by-id:{mapped_project_id}"
+    )
+    if observation.query_scope != expected_scope:
+        return _result(
+            RpsProjectStatus.QUERY_FAILED, target.position_id, None,
+            "observation query scope did not match the required target lookup",
+        )
     pending_creation_intent = payload.get("pending_creation_intent")
     if type(pending_creation_intent) is not bool:
         return _result(
