@@ -37,6 +37,7 @@ from humansearch.brief import (
     EmailContact,
     JdPacket,
     JdSource,
+    PacketStore,
     PositionSpec,
     ScoreBreakdown,
     SearchFilters,
@@ -47,6 +48,7 @@ from humansearch.brief import (
     TeamMail,
     load_attempt,
     load_intent,
+    recipients_digest,
     record_intent,
     split_sections,
     split_two_field,
@@ -84,7 +86,6 @@ def claim_send(
     body_sha256: str | None = None,
 ) -> tuple[SendIntent, bool]:
     """발송 권한은 반환값 True 하나로만 소비한다."""
-    body_seed = "본문" if attempt == 1 else f"재시도 본문 {attempt}"
     return _raw_claim_send(
         dir,
         packet_id,
@@ -92,8 +93,8 @@ def claim_send(
         attempt,
         at=at,
         evidence=evidence,
-        recipients_sha256=recipients_sha256 or _sha256("sangmokang@valueconnect.kr"),
-        body_sha256=body_sha256 or _sha256(body_seed),
+        recipients_sha256=recipients_sha256 or _current_recipients_sha256(),
+        body_sha256=body_sha256 or _current_body_sha256(),
     )
 
 
@@ -108,16 +109,32 @@ def open_new_attempt(
     body_sha256: str | None = None,
 ) -> tuple[SendIntent, bool]:
     """테스트 기본 재시도 digest 를 붙인다. 발송 권한은 claim_send 의 True 만이다."""
-    retry_seed = f"재시도 본문 {approval.from_attempt + 1}"
     return _raw_open_new_attempt(
         dir,
         packet_id,
         channel,
         approval=approval,
         at=at,
-        recipients_sha256=recipients_sha256 or _sha256("sangmokang@valueconnect.kr"),
-        body_sha256=body_sha256 or _sha256(retry_seed),
+        recipients_sha256=recipients_sha256 or _current_recipients_sha256(),
+        body_sha256=body_sha256 or _current_body_sha256(),
     )
+
+
+def _current_packet() -> SearchPacket:
+    return _packet(_PACKET_ID)
+
+
+def _current_recipients_sha256() -> str:
+    packet = _current_packet()
+    return recipients_digest(packet.mail.to, packet.mail.cc)
+
+
+def _current_body_sha256() -> str:
+    return _current_packet().mail.body_sha256
+
+
+def _ensure_current_packet(directory: Path) -> None:
+    PacketStore(directory).save(_current_packet())
 
 
 def _intent() -> SendIntent:
@@ -125,8 +142,8 @@ def _intent() -> SendIntent:
         packet_id=_PACKET_ID,
         channel="gmail",
         attempt=1,
-        recipients_sha256=_sha256("sangmokang@valueconnect.kr"),
-        body_sha256=_sha256("본문"),
+        recipients_sha256=_current_recipients_sha256(),
+        body_sha256=_current_body_sha256(),
         recorded_at=_AT,
         state=SendState.INTENT,
     )
@@ -137,7 +154,7 @@ def _approval(from_attempt: int) -> Approval:
         approved_by="sangmokang@valueconnect.kr",
         search_query='in:sent subject:"[포지션]"',
         search_checked_at="2026-09-10T04:00:00+00:00",
-        reason="발송함에서 찾지 못해 재시도를 승인한다",
+        reason="정정 없음 — 발송함에서 찾지 못해 재시도를 승인한다",
         packet_id=_PACKET_ID,
         from_attempt=from_attempt,
     )
@@ -156,6 +173,7 @@ def _claim(
     *,
     body_sha256: str | None = None,
 ) -> tuple[SendIntent, bool]:
+    _ensure_current_packet(directory)
     return claim_send(
         directory,
         _PACKET_ID,
@@ -262,7 +280,7 @@ def test_reading_recovers_an_attempt_left_unsent_behind_a_newer_one(tmp_path: Pa
         "approved_by": "sangmokang@valueconnect.kr",
         "search_query": 'in:sent subject:"[포지션]"',
         "search_checked_at": "2026-09-10T04:00:00+00:00",
-        "reason": "발송함에서 찾지 못해 재시도를 승인한다",
+        "reason": "정정 없음 — 발송함에서 찾지 못해 재시도를 승인한다",
         "packet_id": _PACKET_ID,
         "from_attempt": 1,
     }
@@ -278,7 +296,7 @@ def test_reading_recovers_an_attempt_left_unsent_behind_a_newer_one(tmp_path: Pa
     assert recovered.transitions[-1].at == _LATER
     with pytest.raises(BriefInputError):
         _claim(directory, 1)
-    _, won = _claim(directory, 2, at=_LATER, body_sha256=_sha256("본문"))
+    _, won = _claim(directory, 2, at=_LATER, body_sha256=_current_body_sha256())
     assert won is True
 
 

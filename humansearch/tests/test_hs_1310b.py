@@ -189,6 +189,42 @@ def _write_packet_and_sent(tmp_path: Path, packet_body: str, sent_body: str) -> 
     return packet_path, sent_path
 
 
+def _write_current_packet(directory: Path, full_body: str) -> Path:
+    packet_path = directory / f"{_PACKET_ID}.packet.json"
+    packet_path.write_text(to_json(_packet(full_body)), encoding="utf-8")
+    return packet_path
+
+
+def _write_packet_and_receipt(
+    tmp_path: Path,
+    packet_body: str,
+    receipt_body: str,
+    *,
+    attempt: int = 1,
+    message_id: str = "msg-1",
+    to: tuple[str, ...] = ("sangmokang@valueconnect.kr",),
+    cc: tuple[str, ...] = (),
+) -> tuple[Path, Path]:
+    packet_path = tmp_path / "packet.json"
+    packet_path.write_text(to_json(_packet(_mail_body(_JP, packet_body))), encoding="utf-8")
+    receipt_path = tmp_path / "receipt.json"
+    receipt_path.write_text(
+        json.dumps(
+            {
+                "packet_id": _PACKET_ID,
+                "attempt": attempt,
+                "message_id": message_id,
+                "to": list(to),
+                "cc": list(cc),
+                "body": _mail_body(_JP, receipt_body),
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    return packet_path, receipt_path
+
+
 def _ledger(tmp_path: Path) -> Path:
     directory = tmp_path / "ledger"
     directory.mkdir(mode=0o700)
@@ -208,6 +244,7 @@ def _intent(body: str = _mail_body(_JP, "정상 본문")) -> SendIntent:
 
 
 def _claim(directory: Path, body: str = _mail_body(_JP, "정상 본문")) -> None:
+    _write_current_packet(directory, body)
     claim_send(
         directory,
         _PACKET_ID,
@@ -350,8 +387,7 @@ def test_verify_and_mark_rejects_failed_readback_and_keeps_unverified(tmp_path: 
     record_intent(directory, _intent(_mail_body(_JP, body)))
     _claim(directory, _mail_body(_JP, body))
     mark(directory, _PACKET_ID, "gmail", 1, SendState.SENT_UNVERIFIED, "msg-1", _moment(5), "발송함 id")
-    packet_path, sent_path = _write_packet_and_sent(tmp_path, body, body)
-    sent_path.write_text(_mail_body(_JP, body), encoding="utf-8")
+    packet_path, sent_path = _write_packet_and_receipt(tmp_path, body, body)
     with pytest.raises(BriefInputError):
         cli_module.verify_and_mark(directory, packet_path, sent_path, "msg-1", _moment(6))
     current = load_intent(directory, _PACKET_ID, "gmail")
@@ -365,7 +401,7 @@ def test_verify_and_mark_rejects_packet_changed_after_send_claim(tmp_path: Path)
     directory = _ledger(tmp_path)
     record_intent(directory, _intent(_mail_body(_JP, original)))
     _claim(directory, _mail_body(_JP, original))
-    packet_path, sent_path = _write_packet_and_sent(
+    packet_path, sent_path = _write_packet_and_receipt(
         tmp_path, changed, f"{changed}\npacket-id: {_PACKET_ID}"
     )
     with pytest.raises(BriefInputError):
@@ -398,8 +434,8 @@ def test_verify_and_mark_rejects_message_id_from_another_attempt(tmp_path: Path)
         body_sha256=first.body_sha256,
     )
     mark(directory, _PACKET_ID, "gmail", 2, SendState.SENT_UNVERIFIED, "msg-2", _moment(7), "발송함 id")
-    packet_path, sent_path = _write_packet_and_sent(
-        tmp_path, body, f"{body}\npacket-id: {_PACKET_ID}"
+    packet_path, sent_path = _write_packet_and_receipt(
+        tmp_path, body, f"{body}\npacket-id: {_PACKET_ID}", attempt=1, message_id="msg-1"
     )
     with pytest.raises(BriefInputError):
         cli_module.verify_and_mark(directory, packet_path, sent_path, "msg-1", _moment(8))
@@ -413,7 +449,7 @@ def test_verify_and_mark_rejects_packet_recipients_changed_after_send_claim(tmp_
     _claim(directory, _mail_body(_JP, body))
     mark(directory, _PACKET_ID, "gmail", 1, SendState.SENT_UNVERIFIED, "msg-1", _moment(5), "발송함 id")
 
-    packet_path, sent_path = _write_packet_and_sent(
+    packet_path, sent_path = _write_packet_and_receipt(
         tmp_path, body, f"{body}\npacket-id: {_PACKET_ID}"
     )
     payload = json.loads(packet_path.read_text(encoding="utf-8"))
@@ -430,7 +466,7 @@ def test_main_verify_mark_writes_verified_transition(tmp_path: Path, capsys: pyt
     record_intent(directory, _intent(_mail_body(_JP, body)))
     _claim(directory, _mail_body(_JP, body))
     mark(directory, _PACKET_ID, "gmail", 1, SendState.SENT_UNVERIFIED, "msg-1", _moment(5), "발송함 id")
-    packet_path, sent_path = _write_packet_and_sent(
+    packet_path, sent_path = _write_packet_and_receipt(
         tmp_path, body, f"{body}\npacket-id: {_PACKET_ID}"
     )
 

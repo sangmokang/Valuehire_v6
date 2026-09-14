@@ -98,3 +98,43 @@ def test_claim_send_rejects_stale_hashes_after_packet_file_body_changes(tmp_path
             recipients_sha256=recipients_sha256,
             body_sha256=original.mail.body_sha256,
         )
+
+
+def test_claim_send_rejects_packet_file_named_for_another_internal_packet_id(tmp_path: Path) -> None:
+    directory = tmp_path / "packets"
+    store = PacketStore(directory)
+    original = _packet("첫 문구")
+    store.save(original)
+    recipients_sha256 = recipients_digest(original.mail.to, original.mail.cc)
+    record_intent(
+        directory,
+        SendIntent(
+            packet_id=_PACKET_ID,
+            channel="gmail",
+            attempt=1,
+            recipients_sha256=recipients_sha256,
+            body_sha256=original.mail.body_sha256,
+            recorded_at=_AT,
+            state=SendState.INTENT,
+        ),
+    )
+    other_clickup = "86e1abce"
+    other_packet_id = f"{other_clickup}-{original.jd.raw_sha256[:8]}"
+    other = replace(
+        original,
+        packet_id=other_packet_id,
+        position=replace(original.position, clickup_task_id=other_clickup),
+    )
+    store.path_for(_PACKET_ID).write_text(to_json(other), encoding="utf-8")
+
+    with pytest.raises(BriefInputError):
+        claim_send(
+            directory,
+            _PACKET_ID,
+            "gmail",
+            1,
+            at=_AT,
+            evidence="러너가 발송 직전 청구",
+            recipients_sha256=recipients_sha256,
+            body_sha256=original.mail.body_sha256,
+        )

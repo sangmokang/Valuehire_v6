@@ -92,8 +92,8 @@ def claim_send(
         attempt,
         at=at,
         evidence=evidence,
-        recipients_sha256=recipients_sha256 or _sha256("sangmokang@valueconnect.kr"),
-        body_sha256=body_sha256 or _sha256("본문"),
+        recipients_sha256=recipients_sha256 or _current_recipients_sha256(),
+        body_sha256=body_sha256 or _current_body_sha256(),
     )
 
 
@@ -107,15 +107,14 @@ def open_new_attempt(
     recipients_sha256: str | None = None,
     body_sha256: str | None = None,
 ) -> tuple[SendIntent, bool]:
-    retry_seed = f"재시도 본문 {approval.from_attempt + 1}"
     return _raw_open_new_attempt(
         dir,
         packet_id,
         channel,
         approval=approval,
         at=at,
-        recipients_sha256=recipients_sha256 or _sha256("sangmokang@valueconnect.kr"),
-        body_sha256=body_sha256 or _sha256(retry_seed),
+        recipients_sha256=recipients_sha256 or _current_recipients_sha256(),
+        body_sha256=body_sha256 or _current_body_sha256(),
     )
 
 
@@ -194,6 +193,19 @@ def _packet(text: str = "예시 문구") -> SearchPacket:
     )
 
 
+def _current_recipients_sha256() -> str:
+    packet = _packet()
+    return recipients_digest(packet.mail.to, packet.mail.cc)
+
+
+def _current_body_sha256() -> str:
+    return _packet().mail.body_sha256
+
+
+def _ensure_current_packet(directory: Path) -> None:
+    PacketStore(directory).save(_packet())
+
+
 def _intent(
     channel: str = "gmail",
     recorded_at: datetime = _AT,
@@ -204,8 +216,8 @@ def _intent(
         packet_id=_PACKET_ID,
         channel=channel,
         attempt=attempt,
-        recipients_sha256=_sha256("sangmokang@valueconnect.kr"),
-        body_sha256=_sha256("본문"),
+        recipients_sha256=_current_recipients_sha256(),
+        body_sha256=_current_body_sha256(),
         recorded_at=recorded_at,
         state=SendState.INTENT,
         approval=approval,
@@ -216,7 +228,7 @@ def _approval(
     approved_by: str = "sangmokang@valueconnect.kr",
     search_query: str = 'in:sent subject:"[포지션]"',
     search_checked_at: str = "2026-09-10T04:00:00+00:00",
-    reason: str = "발송함에서 찾지 못해 재시도를 승인한다",
+    reason: str = "정정 없음 — 발송함에서 찾지 못해 재시도를 승인한다",
     packet_id: str = _PACKET_ID,
     from_attempt: int = 1,
 ) -> Approval:
@@ -236,6 +248,7 @@ def _mode(target: Path) -> int:
 
 def _claim(directory: Path) -> None:
     """러너 규율 ②: 발송 직전 청구 1회(HS-13.09d). 청구 없는 SENT_UNVERIFIED 는 거부된다."""
+    _ensure_current_packet(directory)
     claim_send(directory, _PACKET_ID, "gmail", 1, at=_LATER, evidence="발송 직전 청구")
 
 

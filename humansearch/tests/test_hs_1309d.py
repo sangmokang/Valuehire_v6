@@ -18,20 +18,23 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
+from test_hs_1309 import _packet
 
 from humansearch.brief import (
     Approval,
     BriefInputError,
+    PacketStore,
     SendIntent,
     SendState,
     load_intent,
     mark,
+    recipients_digest,
     record_intent,
 )
 from humansearch.brief import claim_send as _raw_claim_send
 from humansearch.brief import open_new_attempt as _raw_open_new_attempt
 
-_PACKET_ID = "86e1abcd-0123abcd"
+_PACKET_ID = _packet().packet_id
 _AT = datetime(2026, 9, 10, 3, 20, 0, tzinfo=UTC)
 _CLAIM_AT = datetime(2026, 9, 10, 3, 30, 0, tzinfo=UTC)
 _LATER = datetime(2026, 9, 10, 4, 0, 0, tzinfo=UTC)
@@ -54,7 +57,6 @@ def claim_send(
     recipients_sha256: str | None = None,
     body_sha256: str | None = None,
 ) -> tuple[SendIntent, bool]:
-    body_seed = "본문" if attempt == 1 else f"재시도 본문 {attempt}"
     return _raw_claim_send(
         dir,
         packet_id,
@@ -62,8 +64,8 @@ def claim_send(
         attempt,
         at=at,
         evidence=evidence,
-        recipients_sha256=recipients_sha256 or _sha256("sangmokang@valueconnect.kr"),
-        body_sha256=body_sha256 or _sha256(body_seed),
+        recipients_sha256=recipients_sha256 or _current_recipients_sha256(),
+        body_sha256=body_sha256 or _current_body_sha256(),
     )
 
 
@@ -78,16 +80,28 @@ def open_new_attempt(
     body_sha256: str | None = None,
 ) -> tuple[SendIntent, bool]:
     """테스트 기본 재시도 digest 를 붙인다. 발송 권한은 claim_send 의 True 만이다."""
-    retry_seed = f"재시도 본문 {approval.from_attempt + 1}"
     return _raw_open_new_attempt(
         dir,
         packet_id,
         channel,
         approval=approval,
         at=at,
-        recipients_sha256=recipients_sha256 or _sha256("sangmokang@valueconnect.kr"),
-        body_sha256=body_sha256 or _sha256(retry_seed),
+        recipients_sha256=recipients_sha256 or _current_recipients_sha256(),
+        body_sha256=body_sha256 or _current_body_sha256(),
     )
+
+
+def _current_recipients_sha256() -> str:
+    packet = _packet()
+    return recipients_digest(packet.mail.to, packet.mail.cc)
+
+
+def _current_body_sha256() -> str:
+    return _packet().mail.body_sha256
+
+
+def _ensure_current_packet(directory: Path) -> None:
+    PacketStore(directory).save(_packet())
 
 
 def _intent() -> SendIntent:
@@ -95,8 +109,8 @@ def _intent() -> SendIntent:
         packet_id=_PACKET_ID,
         channel="gmail",
         attempt=1,
-        recipients_sha256=_sha256("sangmokang@valueconnect.kr"),
-        body_sha256=_sha256("본문"),
+        recipients_sha256=_current_recipients_sha256(),
+        body_sha256=_current_body_sha256(),
         recorded_at=_AT,
         state=SendState.INTENT,
     )
@@ -107,7 +121,7 @@ def _approval(from_attempt: int) -> Approval:
         approved_by="sangmokang@valueconnect.kr",
         search_query='in:sent subject:"[포지션]"',
         search_checked_at="2026-09-10T04:00:00+00:00",
-        reason="발송함에서 찾지 못해 재시도를 승인한다",
+        reason="정정 없음 — 발송함에서 찾지 못해 재시도를 승인한다",
         packet_id=_PACKET_ID,
         from_attempt=from_attempt,
     )
@@ -120,6 +134,7 @@ def _ledger(tmp_path: Path) -> Path:
 
 
 def _claim(directory: Path, attempt: int = 1, at: datetime = _CLAIM_AT) -> tuple[SendIntent, bool]:
+    _ensure_current_packet(directory)
     return claim_send(
         directory, _PACKET_ID, "gmail", attempt, at=at, evidence="러너가 발송 직전 청구"
     )

@@ -8,7 +8,9 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
+from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import unquote
 
@@ -21,11 +23,12 @@ from .send_ledger import (
     _channel_lock,
     _latest,
     recipients_digest,
+    require_attempt,
     require_clock,
 )
 from .types import BriefInputError
 
-__all__ = ["normalize_readback", "verify", "verify_and_mark"]
+__all__ = ["ReadbackReceipt", "normalize_readback", "verify", "verify_and_mark"]
 
 _PACKET_ID_TRAILER = "packet-id: "
 
@@ -40,6 +43,18 @@ _GMAIL_REDIRECT = re.compile(
 # readback 쪽만 한글로 풀려 영영 불일치가 난다. 그래서 **양쪽 본문의 URL 에 같은 unquote 를
 # 건다** — 패킷 본문도 같은 값으로 내려와야 대칭이 성립한다(HS-13.10b).
 _URL = re.compile(r'https?://[^\s<>"]+')
+
+@dataclass(frozen=True)
+class ReadbackReceipt:
+    """검증 전이에 쓰는 구조화 readback 영수증. 평문 verify 는 이 계약을 요구하지 않는다."""
+
+    packet_id: str
+    attempt: int
+    message_id: str
+    to: tuple[str, ...]
+    cc: tuple[str, ...]
+    body: str
+
 
 
 def _unwrap_gmail_redirect(text: str) -> str:
@@ -89,6 +104,37 @@ def _read_text(path: Path, label: str) -> str:
         ) from None
 
 
+def _read_receipt(path: Path) -> ReadbackReceipt:
+    text = _read_text(path, "readback 영수증")
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError as error:
+        raise BriefInputError("VERIFIED 전이는 구조화 readback 영수증 JSON 이 필요하다") from error
+    if not isinstance(payload, dict):
+        raise BriefInputError("readback 영수증은 JSON object 여야 한다")
+    try:
+        packet_id = payload["packet_id"]
+        attempt = payload["attempt"]
+        message_id = payload["message_id"]
+        to = payload["to"]
+        cc = payload.get("cc", [])
+        body = payload["body"]
+    except KeyError as error:
+        raise BriefInputError(f"readback 영수증 필드가 없다: {error.args[0]}") from None
+    if not isinstance(packet_id, str) or not packet_id.strip():
+        raise BriefInputError("readback 영수증 packet_id 가 비어 있다")
+    attempt = require_attempt(attempt)
+    if not isinstance(message_id, str) or not message_id.strip():
+        raise BriefInputError("readback 영수증 message_id 가 비어 있다")
+    if not isinstance(body, str):
+        raise BriefInputError("readback 영수증 body 는 문자열이어야 한다")
+    if not isinstance(to, list) or not all(isinstance(item, str) for item in to):
+        raise BriefInputError("readback 영수증 to 는 문자열 배열이어야 한다")
+    if not isinstance(cc, list) or not all(isinstance(item, str) for item in cc):
+        raise BriefInputError("readback 영수증 cc 는 문자열 배열이어야 한다")
+    return ReadbackReceipt(packet_id, attempt, message_id, tuple(to), tuple(cc), body)
+
+
 def verify(packet_path: Path, sent_path: Path) -> tuple[int, str]:
     """패킷과 readback 본문을 정규화해 대조한다.
 
@@ -129,9 +175,16 @@ def verify_and_mark(
     packet = from_json(packet_text)
     directory = ensure_store_dir(dir)
     with _channel_lock(directory, packet.packet_id, channel):
+        locked_packet_id = packet.packet_id
         packet = from_json(_read_text(packet_path, "패킷"))
-        sent_text = _read_text(sent_path, "readback")
-        expected, actual, tail_problem = _verify_parts(packet.mail.body, sent_text, packet.packet_id)
+        if packet.packet_id != locked_packet_id:
+            raise BriefInputError("잠금 중 패킷 파일의 packet_id 가 바뀌었다")
+        receipt = _read_receipt(sent_path)
+        if receipt.packet_id != packet.packet_id:
+            raise BriefInputError("readback 영수증 packet_id 가 패킷과 다르다")
+        if receipt.message_id != message_id:
+            raise BriefInputError("readback 영수증 message_id 가 인자와 다르다")
+        expected, actual, tail_problem = _verify_parts(packet.mail.body, receipt.body, packet.packet_id)
         if tail_problem is not None:
             raise BriefInputError(f"readback 검증 실패: {tail_problem}")
         if expected != actual:
@@ -141,13 +194,18 @@ def verify_and_mark(
             raise BriefInputError("발송 의도가 없는 채널은 VERIFIED 로 표시할 수 없다")
         if current.state is not SendState.SENT_UNVERIFIED:
             raise BriefInputError(f"{current.state.value} 상태는 VERIFIED 로 표시할 수 없다")
+        if receipt.attempt != current.attempt:
+            raise BriefInputError("readback 영수증 attempt 가 최신 attempt 와 다르다")
         if current.message_id != message_id:
             raise BriefInputError("다른 message_id 로 검증된 readback 을 재사용할 수 없다")
         if current.body_sha256 != packet.mail.body_sha256:
             raise BriefInputError("현재 패킷 본문 digest 가 발송 청구 digest 와 다르다")
         packet_recipients_sha256 = recipients_digest(packet.mail.to, packet.mail.cc)
+        receipt_recipients_sha256 = recipients_digest(receipt.to, receipt.cc)
         if current.recipients_sha256 != packet_recipients_sha256:
             raise BriefInputError("현재 패킷 수신자 digest 가 발송 청구 digest 와 다르다")
+        if current.recipients_sha256 != receipt_recipients_sha256:
+            raise BriefInputError("readback 영수증 수신자 digest 가 발송 청구 digest 와 다르다")
         evidence = (
             f"readback verified packet_id={packet.packet_id} attempt={current.attempt} "
             f"body_sha256={packet.mail.body_sha256} recipients_sha256={current.recipients_sha256} "

@@ -135,13 +135,13 @@ wu_row_ok() {
     # 기대 출력의 값 문자는 [A-Za-z0-9_.:/-] 뿐 — `$ ( ) < > \ ; | &` 가 하나라도 있으면 실행 가능한 조각이므로 거부 (Codex 7차: `RESULT=$(id)`)
     case "$c" in
       "cd humansearch "*|"bash scripts/"*) ;;
-      *) printf '%s' "$c" | $G -Eq '^(CHECKED: [0-9]+|[0-9]+\+ passed|(VERIFIED|SENT_UNVERIFIED) packet_id=[A-Za-z0-9_-]+( body_sha256=[A-Za-z0-9]+)?|[A-Z_]+=[A-Za-z0-9_.:/-]+)$' && continue; return 1 ;;
+      *) printf '%s' "$c" | $G -Eq '^(CHECKED: [0-9]+|[0-9]+\+ passed|(VERIFIED|SENT_UNVERIFIED) packet_id=[A-Za-z0-9_-]+( body_sha256=[A-Za-z0-9]+)?( recipients_sha256=[A-Za-z0-9]+)?|[A-Z_]+=[A-Za-z0-9_.:/-]+)$' && continue; return 1 ;;
     esac
     n_cmd=$((n_cmd + 1))
     # ID 결합은 검증된 명령의 인자에서만 센다
     printf '%s' "$c" | $G -Eq "tests/test_hs_13${id}\.py( |$)|scripts/acceptance-hs-13${id}(-[a-z]+)*\.sh( |$)" && coupled=1
     if [ "$id" = "10" ]; then
-      printf '%s' "$c" | $G -Eq '^cd humansearch && uv run --no-sync python -m humansearch\.brief verify( --[a-z]+ <[^<>#;|&]+>)+$' || return 1
+      printf '%s' "$c" | $G -Eq '^cd humansearch && uv run --no-sync python -m humansearch\.brief verify( --[a-z-]+ <[^<>#;|&]+>)+$' || return 1
     else
       printf '%s' "$c" | $G -Eq "^cd humansearch && uv run --no-sync pytest -q( tests/test_hs_13${id}[a-z]?\.py)+$|^bash scripts/verify/run-acceptance\.sh scripts/acceptance-hs-13${id}(-[a-z]+)*\.sh$" || return 1
     fi

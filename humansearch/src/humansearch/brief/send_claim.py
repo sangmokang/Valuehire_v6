@@ -127,8 +127,10 @@ def _claim_locked(
 def _check_current_packet_digest(directory: Path, packet_id: str, current: SendIntent) -> None:
     target = directory / f"{require_packet_id(packet_id)}.packet.json"
     if not target.is_file():
-        return
+        _reject("현재 패킷 파일이 없어 발송을 청구할 수 없다")
     packet = from_json(read_store_file(target))
+    if packet.packet_id != packet_id:
+        _reject("현재 패킷 파일 이름과 내부 packet_id 가 다르다")
     actual_recipients_sha256 = recipients_digest(packet.mail.to, packet.mail.cc)
     if current.recipients_sha256 != actual_recipients_sha256:
         _reject("현재 패킷 수신자 digest 가 승인된 발송 의도와 다르다")
