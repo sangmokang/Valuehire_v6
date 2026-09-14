@@ -63,7 +63,7 @@ def classify_evidence_coverage(manifest: object) -> EvidenceCoverageResult:
             last_observed_y_px=document_height,
         )
 
-    reason = _partial_reason(manifest, intervals, document_height)
+    reason = _partial_reason(intervals, document_height)
     return _partial(reason, last_observed_y_px)
 
 
@@ -75,7 +75,7 @@ def _partial(reason: str, last_observed_y_px: int) -> EvidenceCoverageResult:
     )
 
 
-def _partial_reason(manifest: JsonMapping, intervals: Sequence[tuple[int, int]], height: int) -> str:
+def _partial_reason(intervals: Sequence[tuple[int, int]], height: int) -> str:
     if not intervals:
         return "no_observed_segments"
     if height == 0:
