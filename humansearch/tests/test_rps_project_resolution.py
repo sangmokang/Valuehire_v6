@@ -4,7 +4,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from hypothesis import given
 from hypothesis import strategies as st
@@ -45,7 +45,26 @@ def _payload(
     position_id: str = "pos-1",
     customer_id: str = "cust-1",
     account_scope: str = "rps-main",
+    observed_at: str = "2026-09-14T10:00:00Z",
+    observation_id: str | None = "obs-1",
+    query_scope: str | None = "account-projects",
+    observation_projects: Literal["same", "missing"] = "same",
+    project_links: list[dict[str, object]] | None = None,
 ) -> dict[str, object]:
+    project_list = [] if projects is None else projects
+    observation: dict[str, object] = {
+        "account_scope": account_scope,
+        "query_error": query_error,
+        "all_pages_loaded": all_pages_loaded,
+        "stale": stale,
+        "observed_at": observed_at,
+    }
+    if observation_id is not None:
+        observation["observation_id"] = observation_id
+    if query_scope is not None:
+        observation["query_scope"] = query_scope
+    if observation_projects == "same":
+        observation["projects"] = project_list
     return {
         "position_id": position_id,
         "customer_id": customer_id,
@@ -54,14 +73,119 @@ def _payload(
         "account_scope": account_scope,
         "mapped_project_id": mapped_project_id,
         "pending_creation_intent": pending_creation_intent,
-        "observation": {
-            "account_scope": account_scope,
-            "query_error": query_error,
-            "all_pages_loaded": all_pages_loaded,
-            "stale": stale,
+        "observation_limit": {
+            "reference_time": "2026-09-14T10:01:00Z",
+            "max_age_seconds": 120,
         },
-        "projects": [] if projects is None else projects,
+        "project_links": [] if project_links is None else project_links,
+        "projects": project_list,
+        "observation": observation,
     }
+
+
+def _linked_project(project_id: str, position_id: str) -> dict[str, object]:
+    return {
+        "account_scope": "rps-main",
+        "project_id": project_id,
+        "position_id": position_id,
+    }
+
+
+def _without_observation_field(field: str) -> dict[str, object]:
+    payload = _payload(projects=[_project("rps-1")])
+    observation = payload["observation"]
+    assert isinstance(observation, dict)
+    del observation[field]
+    return payload
+
+
+def _with_observation_limit(
+    *, observed_at: str, reference_time: str, max_age_seconds: int
+) -> dict[str, object]:
+    payload = _payload(projects=[_project("rps-1")], observed_at=observed_at)
+    payload["observation_limit"] = {
+        "reference_time": reference_time,
+        "max_age_seconds": max_age_seconds,
+    }
+    return payload
+
+
+def _expected_query_failed(payload: dict[str, object]) -> None:
+    result = resolve_rps_project(payload)
+
+    assert result.status is RpsProjectStatus.QUERY_FAILED
+    assert result.project_id is None
+
+
+def test_missing_observation_identity_time_scope_or_project_list_blocks_resolution() -> None:
+    _expected_query_failed(_without_observation_field("observation_id"))
+    _expected_query_failed(_without_observation_field("observed_at"))
+    _expected_query_failed(_without_observation_field("query_scope"))
+    _expected_query_failed(
+        _payload(projects=[_project("rps-1")], observation_projects="missing")
+    )
+
+
+def test_observation_limit_rejects_expired_and_future_observations() -> None:
+    _expected_query_failed(
+        _with_observation_limit(
+            observed_at="2026-09-14T09:58:59Z",
+            reference_time="2026-09-14T10:01:00Z",
+            max_age_seconds=120,
+        )
+    )
+    _expected_query_failed(
+        _with_observation_limit(
+            observed_at="2026-09-14T10:01:01Z",
+            reference_time="2026-09-14T10:01:00Z",
+            max_age_seconds=120,
+        )
+    )
+
+
+def test_project_link_to_another_position_blocks_reuse_even_with_matching_project() -> None:
+    result = resolve_rps_project(
+        _payload(
+            mapped_project_id="rps-1",
+            projects=[_project("rps-1")],
+            project_links=[_linked_project("rps-1", "pos-other")],
+        )
+    )
+
+    assert result.status is RpsProjectStatus.MAPPING_CONFLICT
+    assert result.project_id is None
+
+
+def test_project_link_to_same_position_allows_reuse() -> None:
+    result = resolve_rps_project(
+        _payload(
+            mapped_project_id="rps-1",
+            projects=[_project("rps-1")],
+            project_links=[_linked_project("rps-1", "pos-1")],
+        )
+    )
+
+    assert result.status is RpsProjectStatus.REUSE
+    assert result.project_id == "rps-1"
+
+
+def test_stable_match_plus_name_only_duplicate_is_ambiguous() -> None:
+    result = resolve_rps_project(
+        _payload(
+            projects=[
+                _project("rps-1"),
+                {
+                    "project_id": "rps-name-only",
+                    "name": "Acme Backend Engineer",
+                    "customer_name": "Acme",
+                    "position_title": "Backend Engineer",
+                },
+            ]
+        )
+    )
+
+    assert result.status is RpsProjectStatus.AMBIGUOUS
+    assert result.project_id is None
 
 
 def test_mapped_matching_project_is_reused() -> None:
