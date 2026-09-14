@@ -72,6 +72,8 @@ Aside 프로세스의 루프백 진단 listener는 현재 응답하나 /json/ver
 | PR·현재 SHA CI·main 병합 | NOT_RUN. 각 단계별 재조회 필요 |
 | 제품·라이브 | NOT_RUN. 문서 합격과 구분 |
 
+→ 통과한 범위는 계약 문서의 일관성이다. 원격 CI·필수 병합·실제 동작의 미실행을 대신하지 않는다.
+
 ## 적대 검증 로그
 
 V1 원문: `claude-v1-focused.jsonl`, 추출 `claude-v1-focused-review.md`.
