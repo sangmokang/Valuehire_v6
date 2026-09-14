@@ -176,7 +176,7 @@ def test_rejects_broad_modes_and_path_escape(tmp_path: Path) -> None:
 
     safe = tmp_path / "safe"
     with pytest.raises(StorageSchemaError, match="db filename"):
-        initialize_humansearch_storage(safe, db_filename="../escape.sqlite3")  # type: ignore[call-arg]
+        initialize_humansearch_storage(safe, db_filename="../escape.sqlite3")
 
 
 def test_sqlite_runtime_keeps_journal_and_temp_boundary_inside_root(tmp_path: Path) -> None:
@@ -184,10 +184,8 @@ def test_sqlite_runtime_keeps_journal_and_temp_boundary_inside_root(tmp_path: Pa
 
     with sqlite3.connect(result.db_path) as connection:
         journal_mode = connection.execute("pragma journal_mode").fetchone()
-        temp_store = connection.execute("pragma temp_store").fetchone()
 
     assert journal_mode == ("delete",)
-    assert temp_store == (2,)
     for suffix in ("-wal", "-shm", "-journal"):
         sidecar = result.db_path.with_name(result.db_path.name + suffix)
         assert sidecar.parent == result.db_path.parent

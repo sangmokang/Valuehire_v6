@@ -16,7 +16,7 @@ It does not write actual candidates, choose encryption algorithms or keys, imple
 
 - Given an explicit protected root outside the Git worktree, initialize a single SQLite DB at `humansearch.sqlite3`.
 - Create root with mode `0700` and DB file with mode `0600`; reject wider modes, owner mismatch, symlink root, symlink DB, and DB filename path escape.
-- Keep SQLite journal sidecars inside the same protected root and set temp storage to memory.
+- Keep SQLite journal sidecars inside the same protected root and set temp storage to memory for initializer-owned SQLite connections. SQLite `temp_store` is connection-local, so tests assert the durable sidecar boundary rather than expecting a new connection to remember that PRAGMA.
 - Apply forward migrations idempotently. Supported migration input range is N-1 because the first runtime version migrates empty version `0` to current version `1`.
 - Migration failure is atomic: a failing migration must not leave partially created HS tables recorded as usable schema.
 - Store only non-sensitive refs, hashes, HMAC-shaped keys, and encrypted payload reference pointers. Do not add raw candidate body, raw contact, raw URL, plaintext key, token, cookie, or session columns.
