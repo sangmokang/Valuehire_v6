@@ -76,8 +76,6 @@ def _partial(reason: str, last_observed_y_px: int) -> EvidenceCoverageResult:
 
 
 def _partial_reason(manifest: JsonMapping, intervals: Sequence[tuple[int, int]], height: int) -> str:
-    if _has_unobserved_segment(manifest) and not _covers_height(intervals, height):
-        return "unobserved_segment"
     if not intervals:
         return "no_observed_segments"
     cursor = 0
@@ -91,6 +89,8 @@ def _partial_reason(manifest: JsonMapping, intervals: Sequence[tuple[int, int]],
 
 
 def _covers_height(intervals: Sequence[tuple[int, int]], height: int) -> bool:
+    if not intervals:
+        return False
     cursor = 0
     for top, bottom in intervals:
         if top > cursor:
@@ -130,17 +130,6 @@ def _last_observed_y(manifest: object) -> int:
         if _is_int(bottom):
             observed_bottoms.append(bottom)
     return max(observed_bottoms, default=0)
-
-
-def _has_unobserved_segment(manifest: JsonMapping) -> bool:
-    segments = manifest.get("segments")
-    if not _is_sequence(segments):
-        return False
-    return any(
-        isinstance(segment, Mapping) and segment.get("segment_status") in {"failed", "redacted"}
-        for segment in segments
-    )
-
 
 def _is_sequence(value: object) -> TypeGuard[Sequence[object]]:
     return isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray))

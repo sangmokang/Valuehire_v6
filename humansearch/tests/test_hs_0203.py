@@ -120,9 +120,34 @@ def test_failed_and_redacted_segments_do_not_prove_complete_coverage() -> None:
     redacted = _manifest([_segment(0, 0, 800), _segment(1, 800, 1200, status="redacted")])
 
     assert classify_evidence_coverage(failed).coverage_status == "partial"
-    assert classify_evidence_coverage(failed).coverage_reason == "unobserved_segment"
+    assert classify_evidence_coverage(failed).coverage_reason == "trailing_gap"
     assert classify_evidence_coverage(redacted).coverage_status == "partial"
-    assert classify_evidence_coverage(redacted).coverage_reason == "unobserved_segment"
+    assert classify_evidence_coverage(redacted).coverage_reason == "trailing_gap"
+
+
+def test_zero_height_without_observed_segments_is_not_complete() -> None:
+    manifest = _manifest([_segment(0, 0, 1, status="failed")], height=0)
+
+    result = classify_evidence_coverage(manifest)
+
+    assert result.coverage_status == "partial"
+    assert result.coverage_reason == "no_observed_segments"
+    assert result.last_observed_y_px == 0
+
+
+def test_failed_segment_in_middle_reports_segment_gap() -> None:
+    manifest = _manifest(
+        [
+            _segment(0, 0, 400),
+            _segment(1, 400, 500, status="failed"),
+            _segment(2, 500, 1200),
+        ]
+    )
+
+    result = classify_evidence_coverage(manifest)
+
+    assert result.coverage_status == "partial"
+    assert result.coverage_reason == "segment_gap"
 
 
 def test_changed_height_is_never_promoted_to_complete() -> None:
@@ -148,6 +173,18 @@ def test_unknown_height_remains_partial_even_with_observed_segment() -> None:
 
     assert result.coverage_status == "partial"
     assert result.coverage_reason == "height_not_observed"
+    assert result.last_observed_y_px == 1200
+
+
+def test_not_applicable_height_remains_partial() -> None:
+    manifest = _manifest([_segment(0, 0, 1200)])
+    manifest["height_state"] = "not_applicable"
+    manifest["document_height_px"] = None
+
+    result = classify_evidence_coverage(manifest)
+
+    assert result.coverage_status == "partial"
+    assert result.coverage_reason == "height_not_applicable"
     assert result.last_observed_y_px == 1200
 
 

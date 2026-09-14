@@ -18,9 +18,10 @@ HS-02.03은 이미 형식 검증을 통과할 수 있는 증거 manifest를 받�
 - `height_state=observed_stable`이고 관측 구간이 `0..document_height_px`를 빈틈 없이 덮으면 `complete`다.
 - 중간 구멍은 `partial`과 `segment_gap`이다.
 - 마지막 관측 구간 끝이 문서 높이보다 작으면 `partial`과 `trailing_gap`이다.
+- 관측 구간이 하나도 없으면 `partial`과 `no_observed_segments`다.
 - 문서 높이가 바뀌었으면 `partial`과 `height_observed_changed`다.
 - 문서 높이를 관측하지 못했으면 `partial`과 `height_not_observed`다.
-- 문서 높이가 적용 불가이면 전체 문서 경계를 증명할 수 없으므로 `partial`이다.
+- 문서 높이가 적용 불가이면 전체 문서 경계를 증명할 수 없으므로 `partial`과 `height_not_applicable`이다.
 
 ## Counter-AC
 
