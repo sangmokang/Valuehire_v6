@@ -100,11 +100,14 @@ assert_fail_closed() {
     tail -12 "$log"
     return
   fi
-  trailing=$(tail -n "+$((line + 1))" "$log" | "$GREP" -c '^PASS:')
+  # PASS 만 세면 부족하다 — 중첩 차단처럼 바로 뒤에서 끝나는 경로가 있으면 fail-open
+  # 이어도 뒤에 PASS 가 안 붙는다(2026-09-15 변이 N6 실측). 첫 NOT_RUN 뒤에는 어떤
+  # 판정 줄도 없어야 한다: 두 번째 NOT_RUN 은 "멈추지 않고 계속 갔다"는 증거다.
+  trailing=$(tail -n "+$((line + 1))" "$log" | "$GREP" -cE '^(PASS|FAIL|NOT_RUN):')
   if [ "$rc" -eq 2 ] && [ "${trailing:-1}" -eq 0 ] && "$GREP" -q "$reason" "$log"; then
     pass_item "$desc"
   else
-    fail_item "$desc — 종료값 ${rc}, NOT_RUN 줄 ${line}, 뒤따른 PASS ${trailing}건"
+    fail_item "$desc — 종료값 ${rc}, NOT_RUN 줄 ${line}, 뒤따른 판정 ${trailing}건"
     tail -12 "$log"
   fi
 }
