@@ -359,14 +359,17 @@ mutation_case() {
   fi
 }
 mutation_case "승인 장부 대조 제거" \
-  's/^    if not _is_approved_db(db_path, approved_root):$/    if False:/' \
+  's/^    if approved is None or approved.db_path != db_path:$/    if False:/' \
   'test_(unapproved_private|self_approved_private|other_db_filename)' 3
 mutation_case "열린 연결 main 경로 대조 제거" \
   's/^        if len(main_files) != 1 or Path(main_files\[0\]) != db_path:$/        if False:/' \
   'test_connect_swap_back' 1
 mutation_case "DB hard link 대조 제거" \
-  's/^    if db_path.stat(follow_symlinks=False).st_nlink != 1:$/    if False:/' \
+  's/^    if info.st_nlink != 1:$/    if False:/' \
   'test_hardlinked_db_is_refused' 2
+mutation_case "DB 파일 정체성(st_dev·st_ino) 대조 제거" \
+  's/^    if (info.st_dev, info.st_ino) != (approved.st_dev, approved.st_ino):$/    if False:/' \
+  'test_renamed_in_compatible_db' 1
 # ── fail-closed 자기 검사 ──────────────────────────────────────────────────
 sed 's/^BASE_SHA=.*/BASE_SHA=0000000000000000000000000000000000000000/' "$SELF" \
   > "$WORK/failclosed_probe.sh"
