@@ -33,7 +33,6 @@ _TEST_KEY = bytes(range(32))
 _OBSERVED_AT = "2026-09-15T10:00:00Z"
 _KEY_BASENAME = "hs-candidate.key"
 _DB_BASENAME = "humansearch.sqlite3"
-_ACCEPTANCE_RUN = "bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-0302.sh"
 
 # 같은 후보다 — 결합형 é 와 분해형 e+U+0301. NFC 에서 같아진다.
 _NFC_PAIR = ("café", "café")
@@ -53,10 +52,6 @@ def _load_identity_module() -> ModuleType:
     if missing:
         pytest.fail(f"record function missing: {_MODULE_NAME}.{'/'.join(missing)}")
     return module
-
-
-def _repo_root() -> Path:
-    return Path(__file__).resolve().parents[2]
 
 
 def _assert_tmp_is_symlink_free(tmp_path: Path) -> None:
@@ -246,47 +241,12 @@ def test_surrounding_whitespace_is_stripped_before_normalisation(tmp_path: Path)
     assert (first, second) == ("inserted", "duplicate")
     assert _count_rows(db_path) == 1
 
-
-# ── 결함 2 [high] CI 배선 ───────────────────────────────────────────────────
-
-
-def _workflow_text() -> str:
-    return (_repo_root() / ".github/workflows/verify.yml").read_text(encoding="utf-8")
-
-
-def test_acceptance_script_runs_as_its_own_ci_step() -> None:
-    """정본 53행 — 새 acceptance-*.sh 는 verify.yml 에 자기 줄을 넣어야 한다.
-
-    로컬 pre-push 는 글로브로 전량 실행하지만 CI 는 고정 목록이다. 여기 없으면
-    '로컬에만 있는 검사'가 되고 P15③ 은 그것을 없는 것으로 친다.
-    """
-
-    assert _ACCEPTANCE_RUN in _workflow_text(), "CI 고정 목록에 이 인수 검사가 없다"
-
-
-def test_acceptance_script_is_listed_in_the_verification_sot() -> None:
-    """정본 53행 — 명부에도 같은 PR 에서 자기 줄이 들어가야 한다."""
-
-    roster = (_repo_root() / "docs/sot/verification-commands.md").read_text(encoding="utf-8")
-
-    assert "acceptance-hs-0302.sh" in roster, "검증 명부에 이 인수 검사가 없다"
-
-
-def test_ci_step_is_not_conditional_or_error_suppressed() -> None:
-    """스텝이 있어도 조건부거나 오류무시면 꺼진 것과 같다."""
-
-    lines = _workflow_text().splitlines()
-    run_at = [index for index, line in enumerate(lines) if _ACCEPTANCE_RUN in line]
-    assert run_at, "CI 고정 목록에 이 인수 검사가 없다"
-
-    start = run_at[0]
-    while start > 0 and "- name:" not in lines[start]:
-        start -= 1
-    end = run_at[0] + 1
-    while end < len(lines) and "- name:" not in lines[end]:
-        end += 1
-    block = "\n".join(lines[start:end])
-
-    assert "if:" not in block, f"조건부 스텝이다:\n{block}"
-    assert "continue-on-error" not in block, f"오류를 무시한다:\n{block}"
-    assert "echo " not in block, f"실행을 echo 로 대체했다:\n{block}"
+# 결함 2(CI 배선)와 결함 3(인수 실행 필터·fail-closed)의 판정은 여기 없다.
+# `scripts/acceptance-hs-0302.sh` 의 bash 자기 검사가 맡는다.
+#
+# 왜 pytest 가 아닌가 (2026-09-15 실측): G2 게이트 `acceptance-hs-gates-mutations.sh` 는
+# `humansearch/src` 와 `humansearch/tests` 만 임시 사본으로 복사해 strict type error 를
+# 심고 pytest 가 **그 이유로만** 실패하는지 본다. 시험이 `scripts/`·`.github/`·`docs/`
+# 를 읽으면 사본에 그 경로가 없어 FileNotFoundError 로 먼저 죽고, 게이트는 "mutation
+# failed for the wrong reason" 으로 push 를 막는다. pytest 시험 집합은 humansearch/
+# 밖 파일의 존재에 의존하지 않는다.

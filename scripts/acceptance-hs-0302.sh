@@ -70,17 +70,18 @@ MODULE=humansearch/src/humansearch/candidate_identity.py
 TESTS=humansearch/tests/test_hs_0302_candidate_identity.py
 TESTS_R2=humansearch/tests/test_hs_0302_r2_hardening.py
 TESTS_R3=humansearch/tests/test_hs_0302_r3_hardening.py
-TESTS_PROBE=humansearch/tests/test_hs_0302_acceptance_probe.py
 # 인수 실행이 돌리는 시험 전부. 필터는 두지 않는다 — 필터를 두면 필수 음성 대조군이
 # 인수 실행 안에서 돌지 않는다(Codex V1 2차 F0302-4 잔여).
-TEST_FILES="tests/test_hs_0302_candidate_identity.py tests/test_hs_0302_r2_hardening.py tests/test_hs_0302_r3_hardening.py tests/test_hs_0302_acceptance_probe.py"
+TEST_FILES="tests/test_hs_0302_candidate_identity.py tests/test_hs_0302_r2_hardening.py tests/test_hs_0302_r3_hardening.py"
 PYTEST_EXTRA=""
 SCHEMA=humansearch/src/humansearch/storage_schema.py
+WORKFLOW=.github/workflows/verify.yml
+SOT_ROSTER=docs/sot/verification-commands.md
+ACCEPTANCE_RUN="bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-0302.sh"
 BASE_SHA=7473ec8
 MIN_TESTS=6
 MIN_R2_TESTS=10
-MIN_R3_TESTS=8
-MIN_PROBE_TESTS=5
+MIN_R3_TESTS=6
 
 WORK=$(mktemp -d) || { echo "NOT_RUN: mktemp 실패"; echo "CHECKED: 0"; exit 2; }
 trap 'rm -rf "$WORK"' EXIT
@@ -115,7 +116,7 @@ assert_fail_closed() {
 # 필수 검사를 할 수 없으면 건수만 늘리고 통과시키지 않는다 — 그 자리에서 끝낸다.
 abort_not_run() { echo "NOT_RUN: $1"; echo "CHECKED: $checked"; exit 2; }
 
-for required in "$MODULE" "$TESTS" "$TESTS_R2" "$TESTS_R3" "$TESTS_PROBE" "$SCHEMA"; do
+for required in "$MODULE" "$TESTS" "$TESTS_R2" "$TESTS_R3" "$WORKFLOW" "$SOT_ROSTER" "$SCHEMA"; do
   if [ ! -f "$required" ]; then
     echo "NOT_RUN: $required 없음 — 검사 대상이 성립하지 않는다"
     echo "CHECKED: 0"
@@ -151,13 +152,12 @@ count_tests() {
 }
 r2_count=$(count_tests "$TESTS_R2")
 r3_count=$(count_tests "$TESTS_R3")
-probe_count=$(count_tests "$TESTS_PROBE")
-total_tests=$((test_count + r2_count + r3_count + probe_count))
+total_tests=$((test_count + r2_count + r3_count))
 if [ "$test_count" -ge "$MIN_TESTS" ] && [ "$r2_count" -ge "$MIN_R2_TESTS" ] \
-   && [ "$r3_count" -ge "$MIN_R3_TESTS" ] && [ "$probe_count" -ge "$MIN_PROBE_TESTS" ]; then
-  pass_item "시험 함수 1차 ${test_count} · 2차 ${r2_count} · 3차 ${r3_count} · probe ${probe_count} = ${total_tests}개"
+   && [ "$r3_count" -ge "$MIN_R3_TESTS" ]; then
+  pass_item "시험 함수 1차 ${test_count} · 2차 ${r2_count} · 3차 ${r3_count} = ${total_tests}개"
 else
-  fail_item "시험 함수 부족 — 1차 ${test_count}(>=${MIN_TESTS}) · 2차 ${r2_count}(>=${MIN_R2_TESTS}) · 3차 ${r3_count}(>=${MIN_R3_TESTS}) · probe ${probe_count}(>=${MIN_PROBE_TESTS})"
+  fail_item "시험 함수 부족 — 1차 ${test_count}(>=${MIN_TESTS}) · 2차 ${r2_count}(>=${MIN_R2_TESTS}) · 3차 ${r3_count}(>=${MIN_R3_TESTS})"
 fi
 
 # 두 연결 경쟁 시험이 실제로 스레드 2개를 쓰는가(같은 연결 재사용이면 AC-3 가 무효다)
@@ -400,6 +400,115 @@ sed "s|^GREP=/usr/bin/grep\$|GREP=$WORK/fake-grep|" "$SELF" > "$WORK/failclosed_
 HS0302_ACCEPTANCE_DEPTH=9 bash "$WORK/failclosed_scan_probe.sh" > "$WORK/failclosed_scan.log" 2>&1
 assert_fail_closed "$WORK/failclosed_scan.log" "$?" 'create table 스캔' \
   "fail-closed 자기 검사 ② 우회 표 스캔이 깨진 사본이 그 자리에서 끝난다"
+
+# ── 건너뛰기 보조 부재 · 즉시 종료 · 차단 분리 (정적) ──────────────────────
+# 건수만 늘리고 실패는 안 하는 보조가 남아 있으면 안 된다. 중첩 차단이 fail-closed
+# 보조를 거치면 그 보조를 되돌리는 변이에 함께 죽는다(2차 실측: 프로세스 1,493개).
+#
+# 찾는 문자열을 이 줄에 리터럴로 두면 검사가 자기 자신을 잡아 항상 참이 된다
+# (acceptance-hs-a3.sh 의 카나리 조립과 같은 이유). 런타임에 합친다.
+N_SKIP=$(printf 'skip%s' '_item')
+N_EXIT=$(printf 'exit%s' ' 2')
+N_DEPTH=$(printf 'HS0302_ACCEPTANCE%s' '_DEPTH')
+N_ROUTED=$(printf 'abort_not_run "%s' '중첩')
+guard_shape=0
+"$GREP" -qF "$N_SKIP" "$SELF" && guard_shape=1
+"$GREP" -qF "$N_EXIT" "$SELF" || guard_shape=1
+"$GREP" -qF "$N_DEPTH" "$SELF" || guard_shape=1
+"$GREP" -qF "$N_ROUTED" "$SELF" && guard_shape=1
+if [ "$guard_shape" -eq 0 ]; then
+  pass_item "건너뛰기 보조 없음 · 즉시 종료 경로 있음 · 중첩 차단이 fail-closed 보조와 분리돼 있다"
+else
+  fail_item "건너뛰기 보조가 있거나, 즉시 종료·중첩 차단이 없거나, 차단이 보조를 거친다"
+fi
+
+# 탐지기 자기 검사 — 위 네 needle 이 실제로 무언가를 가리키는지 확인한다. 조립이
+# 어긋나 빈 문자열이 되면 -qF 가 전부 참이 되어 검사가 조용히 무의미해진다.
+needle_ok=1
+for needle in "$N_SKIP" "$N_EXIT" "$N_DEPTH" "$N_ROUTED"; do
+  [ -n "$needle" ] || needle_ok=0
+done
+"$GREP" -qF "$N_DEPTH" "$SELF" || needle_ok=0
+printf '%s\n' "$N_SKIP" > "$WORK/needle_probe.txt"
+"$GREP" -qF "$N_SKIP" "$WORK/needle_probe.txt" || needle_ok=0
+if [ "$needle_ok" -eq 1 ]; then
+  pass_item "탐지기 needle 조립 검증 — 4개 모두 비어 있지 않고 양성 대조군에서 잡힌다"
+else
+  fail_item "탐지기 needle 조립이 깨졌다 — 위 정적 검사가 무의미해진다"
+fi
+
+# ── fail-closed 판정기 자신의 음성 대조군 ──────────────────────────────────
+# 판정기가 항상 통과하면 위 자기 검사 두 건이 무의미하다. abort_not_run 을 fail-open 으로
+# 되돌리고 기준 SHA 까지 깨뜨린 사본은 **반드시** 엄격 기준을 어겨야 한다.
+sed -e 's/^BASE_SHA=.*/BASE_SHA=0000000000000000000000000000000000000000/' \
+    -e 's|^abort_not_run() .*|abort_not_run() { echo "NOT_RUN: $1"; checked=$((checked + 1)); }|' \
+    "$SELF" > "$WORK/failopen_control.sh"
+HS0302_ACCEPTANCE_DEPTH=9 bash "$WORK/failopen_control.sh" > "$WORK/failopen.log" 2>&1
+fo_rc=$?
+fo_line=$("$GREP" -n '^NOT_RUN:' "$WORK/failopen.log" | head -1 | cut -d: -f1)
+if [ -n "$fo_line" ]; then
+  fo_trailing=$(tail -n "+$((fo_line + 1))" "$WORK/failopen.log" | "$GREP" -cE '^(PASS|FAIL|NOT_RUN):')
+else
+  fo_trailing=0
+fi
+if [ "$fo_rc" -ne 2 ] || [ "${fo_trailing:-0}" -gt 0 ]; then
+  pass_item "fail-closed 판정기 음성 대조군 — fail-open 사본은 기준을 어긴다 (종료값 ${fo_rc}, 뒤따른 판정 ${fo_trailing}건)"
+else
+  fail_item "fail-closed 판정기가 fail-open 사본도 통과시킨다 — 판정기가 무의미하다"
+fi
+
+# ── CI 배선 (정본 53행) ────────────────────────────────────────────────────
+# 로컬 pre-push 는 글로브로 전량 실행하지만 CI 는 고정 목록이다. 여기 없으면
+# '로컬에만 있는 검사'가 되고 P15③ 은 그것을 없는 것으로 친다.
+# 이 판정은 pytest 가 아니라 여기 있어야 한다 — G2 게이트는 humansearch/ 만 사본으로
+# 복사하므로 시험이 .github/·docs/ 를 읽으면 엉뚱한 이유로 죽는다(2026-09-15 실측).
+if "$GREP" -qF "$ACCEPTANCE_RUN" "$WORKFLOW"; then
+  pass_item "CI 고정 목록에 전용 스텝이 있다 ($WORKFLOW)"
+else
+  fail_item "CI 고정 목록에 이 인수 검사가 없다 — 로컬에만 있는 검사는 없는 것으로 친다"
+fi
+
+if "$GREP" -q 'acceptance-hs-0302.sh' "$SOT_ROSTER"; then
+  pass_item "검증 명부에 자기 줄이 있다 ($SOT_ROSTER)"
+else
+  fail_item "검증 명부에 이 인수 검사가 없다 (정본 53행 위반)"
+fi
+
+# 스텝이 있어도 조건부·오류무시·echo 대체면 꺼진 것과 같다. 해당 스텝 블록만 떼어 본다.
+awk -v needle="$ACCEPTANCE_RUN" '
+  /- name:/ { block = ""; inblock = 1 }
+  inblock { block = block $0 "\n" }
+  index($0, needle) { found = block; got = 1 }
+  found && /- name:/ && got && index($0, needle) == 0 { print found; exit }
+  END { if (got && !printed) print found }
+' "$WORKFLOW" > "$WORK/ci_step_block.txt"
+if [ ! -s "$WORK/ci_step_block.txt" ]; then
+  fail_item "CI 스텝 블록을 떼어내지 못했다 — 배선 형태를 판정할 수 없다"
+elif "$GREP" -qE '^[[:space:]]*(if:|continue-on-error)' "$WORK/ci_step_block.txt" \
+     || "$GREP" -qE '^[[:space:]]*run:[[:space:]]*echo' "$WORK/ci_step_block.txt"; then
+  fail_item "CI 스텝이 조건부·오류무시·echo 대체다 — 있으나 꺼진 것과 같다"
+  cat "$WORK/ci_step_block.txt"
+else
+  pass_item "CI 스텝이 무조건 실행이다 (조건부·오류무시·echo 대체 없음)"
+fi
+
+# ── 시험이 humansearch/ 밖으로 손을 뻗지 않는가 ────────────────────────────
+# G2 게이트는 humansearch/src 와 tests 만 사본으로 복사한다. 시험이 저장소의 다른
+# 경로를 읽으면 사본에서 FileNotFoundError 로 죽고, 게이트는 그것을 "엉뚱한 이유로
+# 실패"로 보고 push 를 막는다(2026-09-15 실측: 8건).
+"$GREP" -nE "parents\[2\]|['\"](scripts|\.github|docs)/" "$TESTS" "$TESTS_R2" "$TESTS_R3" \
+  > "$WORK/out_of_tree.txt"
+rc=$?
+if [ "$rc" -gt 1 ]; then
+  abort_not_run "시험의 저장소 밖 참조 스캔 중 grep 오류 (rc=$rc)"
+fi
+out_of_tree=$("$GREP" -c . "$WORK/out_of_tree.txt")
+if [ "${out_of_tree:-0}" -eq 0 ]; then
+  pass_item "HS-03.02 시험이 humansearch/ 밖 파일을 읽지 않는다 (G2 격리 사본 안전)"
+else
+  fail_item "시험이 humansearch/ 밖 경로를 참조한다 ${out_of_tree}건 — G2 게이트가 push 를 막는다"
+  cat "$WORK/out_of_tree.txt"
+fi
 
 # ── 자기 오염 감지 ─────────────────────────────────────────────────────────
 SNAP1=$(git status --porcelain)
