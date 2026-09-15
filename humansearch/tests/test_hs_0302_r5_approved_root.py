@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 import sqlite3
 from pathlib import Path
@@ -151,3 +152,25 @@ def test_initialized_storage_result_still_records(tmp_path: Path) -> None:
 
     assert outcome == "inserted"
     assert _rows(approved.db_path) == 1
+
+
+@pytest.mark.parametrize("direction", ["link-out", "link-in"])
+def test_hardlinked_db_is_refused(tmp_path: Path, direction: str) -> None:
+    """symlink 처럼 hard link 도 경로 표면만 승인 root 안이다 — 같은 inode 가 밖에서도 열린다."""
+
+    approved = initialize_humansearch_storage(tmp_path / "approved")
+    alternate = initialize_humansearch_storage(tmp_path / "alternate")
+    key_path = _key_file(tmp_path / "keys")
+    if direction == "link-out":
+        os.link(approved.db_path, alternate.protected_root / "leak.sqlite3")
+    else:
+        approved.db_path.unlink()
+        os.link(alternate.db_path, approved.db_path)
+
+    with pytest.raises(CandidateIdentityError, match="link"):
+        record_candidate_identity(
+            approved.db_path, _RECORD, hmac_key_path=key_path, approved_root=approved.protected_root
+        )
+
+    assert _rows(approved.db_path) == 0
+    assert _rows(alternate.db_path) == 0
