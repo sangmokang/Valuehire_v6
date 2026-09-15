@@ -44,13 +44,21 @@ class RunnerBoundaryConfig:
 
 @dataclass(frozen=True)
 class BoundaryReceipt:
-    """PII-safe receipt for a protected write attempt."""
+    """PII-safe receipt for a protected write attempt.
+
+    ``device`` and ``inode`` name the published file itself. A later readback
+    or delete must match on that pair, not on ``path``: the path string can be
+    made to point elsewhere after this receipt is issued, while the pair keeps
+    naming the same filesystem object. ``path`` stays for human reading.
+    """
 
     status: BoundaryStatus
     reason: str
     path: Path | None = None
     sha256: str | None = None
     byte_count: int = 0
+    device: int | None = None
+    inode: int | None = None
 
 
 class RunnerBoundary:
@@ -102,19 +110,38 @@ class RunnerBoundary:
         if isinstance(opened, BoundaryReceipt):
             return opened
         root_fd = opened
-        try:
-            parent_fd = self._ensure_parent(root_fd, parts[:-1], runner_uid)
-            if isinstance(parent_fd, BoundaryReceipt):
-                return parent_fd
-            try:
-                return self._write_new_file(
-                    parent_fd, parts[-1], root.joinpath(*parts), payload, runner_uid
-                )
-            finally:
-                if parent_fd != root_fd:
-                    self._close_fd(parent_fd)
-        finally:
-            self._close_fd(root_fd)
+        parent_fd = self._ensure_parent(root_fd, parts[:-1], runner_uid)
+        if isinstance(parent_fd, BoundaryReceipt):
+            return self._settle(parent_fd, self._close_fd(root_fd))
+        receipt = self._write_new_file(
+            parent_fd, parts[-1], root.joinpath(*parts), payload, runner_uid
+        )
+        released = True
+        if parent_fd != root_fd:
+            released = self._close_fd(parent_fd)
+        released = self._close_fd(root_fd) and released
+        return self._settle(receipt, released)
+
+    def _settle(self, receipt: BoundaryReceipt, released: bool) -> BoundaryReceipt:
+        """Fold the directory-handle cleanup result into the receipt.
+
+        A close that reports an error leaves the descriptor in an unspecified
+        state, so a successful write whose handles could not be released is not
+        reported as success. The published file is left alone and the receipt
+        keeps ``path`` and the device/inode pair so a person can check it.
+        """
+
+        if released or receipt.status is not BoundaryStatus.WRITTEN:
+            return receipt
+        return BoundaryReceipt(
+            BoundaryStatus.DENIED,
+            "recovery_required",
+            receipt.path,
+            receipt.sha256,
+            receipt.byte_count,
+            receipt.device,
+            receipt.inode,
+        )
 
     def _open_root_chain(self, root: Path, runner_uid: int) -> int | BoundaryReceipt:
         """Open every component of the root path one descriptor at a time.
@@ -141,11 +168,13 @@ class RunnerBoundary:
             except OSError:
                 self._close_fd(current)
                 return BoundaryReceipt(BoundaryStatus.DENIED, reason)
-            self._close_fd(current)
+            released = self._close_fd(current)
             current = opened
             invalid = self._check_open_directory(
                 current, runner_uid, reason, ancestor=not is_root
             )
+            if invalid is None and not released:
+                invalid = BoundaryReceipt(BoundaryStatus.DENIED, reason)
             if invalid is not None:
                 self._close_fd(current)
                 return invalid
@@ -202,8 +231,11 @@ class RunnerBoundary:
             invalid = self._check_open_directory(
                 next_fd, runner_uid, reason, ancestor=False
             )
+            released = True
             if current_fd != root_fd:
-                self._close_fd(current_fd)
+                released = self._close_fd(current_fd)
+            if invalid is None and not released:
+                invalid = BoundaryReceipt(BoundaryStatus.DENIED, reason)
             if invalid is not None:
                 self._close_fd(next_fd)
                 return invalid
@@ -213,12 +245,23 @@ class RunnerBoundary:
     def _release(
         self, dir_fd: int, root_fd: int, receipt: BoundaryReceipt
     ) -> BoundaryReceipt:
+        """Close an intermediate handle on a path that already failed.
+
+        The close result is deliberately not promoted here: nothing was written,
+        and the caller's reason names the actual problem more precisely.
+        """
+
         if dir_fd != root_fd:
             self._close_fd(dir_fd)
         return receipt
 
     def _close_fd(self, fd: int) -> bool:
-        """Close one descriptor. POSIX releases it even when close reports an error."""
+        """Close one descriptor and say whether that succeeded.
+
+        POSIX leaves the descriptor state unspecified when ``close`` reports an
+        error, so a failure here is never treated as a harmless detail: callers
+        must decide what it means for the receipt they are about to return.
+        """
 
         if fd == _NO_FD:
             return True
@@ -301,12 +344,35 @@ class RunnerBoundary:
             )
             return self._discard(parent_fd, temp_name, reason)
         if not self._published_path_matches(parent_fd, name, final_path):
-            return self._roll_back(parent_fd, name, "published_path_mismatch")
+            return self._undo_publication(parent_fd, temp_name, name)
+        identity = self._file_identity(parent_fd, name)
+        if identity is None:
+            return self._undo_publication(parent_fd, temp_name, name)
         if not self._remove(parent_fd, temp_name):
             return self._roll_back(parent_fd, name, "cleanup_failed")
+        device, inode = identity
         return BoundaryReceipt(
-            BoundaryStatus.WRITTEN, "written", final_path, digest, byte_count
+            BoundaryStatus.WRITTEN, "written", final_path, digest, byte_count,
+            device, inode,
         )
+
+    def _undo_publication(
+        self, parent_fd: int, temp_name: str, name: str
+    ) -> BoundaryReceipt:
+        """Remove both names after a mismatch. Neither may be left behind."""
+
+        removed_final = self._remove(parent_fd, name)
+        removed_temp = self._remove(parent_fd, temp_name)
+        if not removed_final or not removed_temp:
+            return BoundaryReceipt(BoundaryStatus.DENIED, "recovery_required")
+        return BoundaryReceipt(BoundaryStatus.DENIED, "published_path_mismatch")
+
+    def _file_identity(self, parent_fd: int, name: str) -> tuple[int, int] | None:
+        try:
+            info = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+        except OSError:
+            return None
+        return info.st_dev, info.st_ino
 
     def _published_path_matches(
         self, parent_fd: int, name: str, final_path: Path
