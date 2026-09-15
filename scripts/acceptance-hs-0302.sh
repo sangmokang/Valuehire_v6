@@ -78,10 +78,13 @@ SCHEMA=humansearch/src/humansearch/storage_schema.py
 WORKFLOW=.github/workflows/verify.yml
 SOT_ROSTER=docs/sot/verification-commands.md
 ACCEPTANCE_RUN="bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-0302.sh"
+REQUIRED_TESTS=scripts/verify/fixtures/hs-0302-required-tests.txt
+WIRING_CHECKER=scripts/verify/check-hs-0302-ci-wiring.rb
 BASE_SHA=7473ec8
 MIN_TESTS=6
 MIN_R2_TESTS=10
 MIN_R3_TESTS=6
+MIN_REQUIRED_IDS=80
 
 WORK=$(mktemp -d) || { echo "NOT_RUN: mktemp 실패"; echo "CHECKED: 0"; exit 2; }
 trap 'rm -rf "$WORK"' EXIT
@@ -122,7 +125,8 @@ assert_fail_closed() {
 # 필수 검사를 할 수 없으면 건수만 늘리고 통과시키지 않는다 — 그 자리에서 끝낸다.
 abort_not_run() { echo "NOT_RUN: $1"; echo "CHECKED: $checked"; exit 2; }
 
-for required in "$MODULE" "$TESTS" "$TESTS_R2" "$TESTS_R3" "$WORKFLOW" "$SOT_ROSTER" "$SCHEMA"; do
+for required in "$MODULE" "$TESTS" "$TESTS_R2" "$TESTS_R3" "$WORKFLOW" "$SOT_ROSTER" \
+                "$REQUIRED_TESTS" "$WIRING_CHECKER" "$SCHEMA"; do
   if [ ! -f "$required" ]; then
     echo "NOT_RUN: $required 없음 — 검사 대상이 성립하지 않는다"
     echo "CHECKED: 0"
@@ -475,22 +479,58 @@ else
   fail_item "검증 명부에 이 인수 검사가 없다 (정본 53행 위반)"
 fi
 
-# 스텝이 있어도 조건부·오류무시·echo 대체면 꺼진 것과 같다. 해당 스텝 블록만 떼어 본다.
-awk -v needle="$ACCEPTANCE_RUN" '
-  /- name:/ { block = ""; inblock = 1 }
-  inblock { block = block $0 "\n" }
-  index($0, needle) { found = block; got = 1 }
-  found && /- name:/ && got && index($0, needle) == 0 { print found; exit }
-  END { if (got && !printed) print found }
-' "$WORKFLOW" > "$WORK/ci_step_block.txt"
-if [ ! -s "$WORK/ci_step_block.txt" ]; then
-  fail_item "CI 스텝 블록을 떼어내지 못했다 — 배선 형태를 판정할 수 없다"
-elif "$GREP" -qE '^[[:space:]]*(if:|continue-on-error)' "$WORK/ci_step_block.txt" \
-     || "$GREP" -qE '^[[:space:]]*run:[[:space:]]*echo' "$WORK/ci_step_block.txt"; then
-  fail_item "CI 스텝이 조건부·오류무시·echo 대체다 — 있으나 꺼진 것과 같다"
-  cat "$WORK/ci_step_block.txt"
+# 스텝이 있어도 run 값이 무엇이냐가 계약이다. 판정 본문은 검사기 한 곳에 둔다 —
+# 진짜 워크플로와 실패를 삼키는 꼬리를 심은 임시 사본에 **같은 검사기**를 돌려 통과와 차단을
+# 한 쌍으로 증명한다. 사본은 저장소 밖에만 만든다.
+if [ ! -f "$WIRING_CHECKER" ]; then
+  abort_not_run "배선 검사기가 없다 — $WIRING_CHECKER"
+fi
+ruby "$WIRING_CHECKER" "$WORKFLOW" > "$WORK/wiring.log" 2>&1
+wiring_rc=$?
+if [ "$wiring_rc" -eq 0 ] && "$GREP" -q '^WIRING_OK:' "$WORK/wiring.log"; then
+  pass_item "CI 스텝 run 이 정확한 단일 명령이다 (YAML 파싱·셸 제어 연산자 0개)"
 else
-  pass_item "CI 스텝이 무조건 실행이다 (조건부·오류무시·echo 대체 없음)"
+  fail_item "CI 스텝 run 계약 위반 (종료값 ${wiring_rc})"
+  cat "$WORK/wiring.log"
+fi
+
+# 변이 꼬리(논리 OR 로 실패를 삼키는 형태)를 런타임에 조립한다. 리터럴로 두면 P13
+# 검사 약화 탐지가 이 파일 자체를 잡는다(acceptance-hs-a3.sh 의 카나리 조립과 같은 이유).
+MUT_TAIL="$(printf '|%s' '|') $(printf 'tr%s' 'ue')"
+sed "s%^\( *\)run: ${ACCEPTANCE_RUN}\$%\1run: ${ACCEPTANCE_RUN} ${MUT_TAIL}%" "$WORKFLOW" \
+  > "$WORK/workflow_mutated.yml"
+if ! "$GREP" -qF "${ACCEPTANCE_RUN} ${MUT_TAIL}" "$WORK/workflow_mutated.yml"; then
+  fail_item "배선 탐지기 음성 대조군을 만들지 못했다 — run 줄 형태가 예상과 다르다"
+else
+  ruby "$WIRING_CHECKER" "$WORK/workflow_mutated.yml" > "$WORK/wiring_mutated.log" 2>&1
+  if [ $? -eq 1 ] && "$GREP" -q '^WIRING_BAD:' "$WORK/wiring_mutated.log"; then
+    pass_item "배선 탐지기 음성 대조군 — run 에 실패를 삼키는 꼬리를 붙인 사본은 불합격한다"
+  else
+    fail_item "배선 탐지기가 실패를 삼키는 사본도 통과시킨다 — 탐지기가 무의미하다"
+    cat "$WORK/wiring_mutated.log"
+  fi
+fi
+
+# ── 필수 시험 명부 대조 ────────────────────────────────────────────────────
+# 수집 == 통과 대조는 "선택된 것을 전부 돌렸다"만 본다. 매개변수 사례 한 건을 지우면
+# 수집과 통과가 함께 줄어 두 조건을 모두 만족한다(Codex V1 3차). 요구 node-id 를 고정
+# 명부와 집합으로 대조한다 — 누락은 "시험이 사라졌다", 추가는 "명부를 갱신하라".
+"$GREP" -vE '^[[:space:]]*(#|$)' "$REQUIRED_TESTS" | LC_ALL=C sort > "$WORK/required_ids.txt"
+required_n=$("$GREP" -c . "$WORK/required_ids.txt")
+if [ "${required_n:-0}" -lt "$MIN_REQUIRED_IDS" ]; then
+  abort_not_run "필수 시험 명부가 ${required_n:-0}건 — ${MIN_REQUIRED_IDS}건 미만이면 명부가 비워진 것이다"
+fi
+"$GREP" '::' "$collect_log" | LC_ALL=C sort > "$WORK/actual_ids.txt"
+comm -23 "$WORK/required_ids.txt" "$WORK/actual_ids.txt" > "$WORK/ids_missing.txt"
+comm -13 "$WORK/required_ids.txt" "$WORK/actual_ids.txt" > "$WORK/ids_extra.txt"
+ids_missing=$("$GREP" -c . "$WORK/ids_missing.txt")
+ids_extra=$("$GREP" -c . "$WORK/ids_extra.txt")
+if [ "${ids_missing:-1}" -eq 0 ] && [ "${ids_extra:-1}" -eq 0 ]; then
+  pass_item "필수 시험 명부 ${required_n}건과 수집 결과가 정확히 같다 (누락 0 · 추가 0)"
+else
+  fail_item "필수 시험 명부 불일치 — 누락 ${ids_missing}건 · 명부 밖 추가 ${ids_extra}건"
+  head -5 "$WORK/ids_missing.txt"
+  head -5 "$WORK/ids_extra.txt"
 fi
 
 # ── 시험이 humansearch/ 밖으로 손을 뻗지 않는가 ────────────────────────────
