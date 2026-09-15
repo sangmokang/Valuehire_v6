@@ -73,9 +73,23 @@ def _require_profile_url(value: str, field: str) -> None:
     _reject(f"{field} 는 계약이 정한 프로필 URL 접두 {prefixes} 뒤에 식별자가 와야 한다")
 
 
+# 주소 길이 상한(ASCII 전용 계약). 모양만 맞고 길이가 넘치면 실제로 회신이 가지 않는다.
+_LOCAL_MAX, _LABEL_MAX, _DOMAIN_MAX, _EMAIL_MAX = 64, 63, 253, 254
+
+
 def _require_email(value: str, field: str) -> None:
     if not _EMAIL.fullmatch(value):
         _reject(f"{field} 의 주소 형식이 올바르지 않다")
+    if len(value) > _EMAIL_MAX:
+        _reject(f"{field} 가 {_EMAIL_MAX}자를 넘는다: {len(value)}자")
+    local, _, domain = value.rpartition("@")
+    if len(local) > _LOCAL_MAX:
+        _reject(f"{field} 의 로컬파트가 {_LOCAL_MAX}자를 넘는다: {len(local)}자")
+    if len(domain) > _DOMAIN_MAX:
+        _reject(f"{field} 의 도메인이 {_DOMAIN_MAX}자를 넘는다: {len(domain)}자")
+    for label in domain.split("."):
+        if len(label) > _LABEL_MAX:
+            _reject(f"{field} 의 도메인 라벨이 {_LABEL_MAX}자를 넘는다: {len(label)}자")
 
 
 def _require_sha256(value: str, field: str) -> None:

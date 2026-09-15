@@ -109,15 +109,49 @@ def _script_of(char: str) -> str | None:
     return name.split(" ", 1)[0]
 
 
-def mixed_script_word(text: str) -> str | None:
-    """한글과 비-라틴 외국 문자 체계가 **한 어절 안에** 섞인 첫 어절. 없으면 None.
+def _is_foreign(char: str) -> bool:
+    return _script_of(char) in _FOREIGN_SCRIPTS
 
-    라틴 문자·숫자·부호는 정상 혼용이라 보지 않는다(`Python 개발자`·`Series-B` 는 통과).
+
+def _is_hangul(char: str) -> bool:
+    return _script_of(char) in _HANGUL
+
+
+def _wedged_between_hangul(word: str) -> bool:
+    """외국 문자가 한글 음절 **사이**에 끼어 있는가. 앞뒤에 붙은 표기는 아니다."""
+    return any(
+        _is_foreign(char) and _is_hangul(word[index - 1]) and _is_hangul(word[index + 1])
+        for index, char in enumerate(word)
+        if 0 < index < len(word) - 1
+    )
+
+
+def mixed_script_word(text: str) -> str | None:
+    """거부해야 할 혼합 문자 어절. 없으면 None.
+
+    두 경우만 거부한다.
+    ① 외국 문자를 지웠더니 금지 조건이 되살아난다 — 동형문자를 끼워 검사를 피한 것이다.
+    ② 외국 문자가 한글 음절 사이에 끼어 있다 — 위치 자체가 쐐기다.
+
+    `α세대 제품`·`β버전 출시` 처럼 어절 앞뒤에 붙은 정상 표기는 통과시킨다. 그렇게 하지
+    않으면 제품 세대·버전 표기가 든 정상 브리프가 통째로 막힌다(Codex V1 5차 회귀).
+    라틴 문자·숫자·부호는 애초에 혼합으로 보지 않는다(`C++개발자`·`R&D개발자` 통과).
     """
-    for word in judgement_form(text).split():
-        scripts = {script for script in (_script_of(ch) for ch in word) if script is not None}
-        if scripts & set(_HANGUL) and scripts & set(_FOREIGN_SCRIPTS):
-            return word
+    probe = judgement_form(text)
+    words = probe.split()
+    mixed = [
+        word
+        for word in words
+        if any(_is_foreign(char) for char in word) and any(_is_hangul(char) for char in word)
+    ]
+    if not mixed:
+        return None
+    stripped = "".join(char for char in probe if not _is_foreign(char))
+    if stripped != probe and _matches_condition(stripped):
+        return mixed[0]  # ① 지우면 금지 조건이 되살아난다
+    for word in mixed:
+        if _wedged_between_hangul(word):
+            return word  # ② 한글 음절 사이의 쐐기
     return None
 
 
