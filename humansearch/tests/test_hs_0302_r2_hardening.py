@@ -5,6 +5,7 @@
   2 [high]  키 경계 — DB 보호 루트의 하위 디렉터리에 키를 둘 수 있다
   3 [medium] RFC3339 — 달력·시각·오프셋 범위를 검증하지 않는다
   4 [medium] 인수 스크립트 fail-open — 필수 비교·스캔 불가가 성공으로 접힌다
+        → 재귀를 피하려고 tests/test_hs_0302_acceptance_probe.py 로 옮겼다(2차 V1 반영)
 
 시험 데이터는 전부 합성이다. 실명·이력서 원문·실제 키를 쓰지 않는다.
 RED 규칙은 1차와 같다 — 모듈을 최상단에서 import 하지 않고 기록 동작의 부재로 실패시킨다.
@@ -14,9 +15,7 @@ from __future__ import annotations
 
 import hmac
 import importlib
-import os
 import sqlite3
-import subprocess
 from pathlib import Path
 from types import ModuleType
 
@@ -34,7 +33,6 @@ _REQUIRED_NAMES = (
 _TEST_KEY = bytes(range(32))
 _OBSERVED_AT = "2026-09-15T10:00:00Z"
 _KEY_BASENAME = "hs-candidate.key"
-_ACCEPTANCE = "scripts/acceptance-hs-0302.sh"
 
 # Codex V1 이 제시한 충돌 쌍. 구분자 결합에서는 두 입력이 같은 바이트열이 된다.
 _INJECTED_A = ("a", "saramin", "x\x1fjobkorea\x1fy")
@@ -55,10 +53,6 @@ def _load_identity_module() -> ModuleType:
     if missing:
         pytest.fail(f"record function missing: {_MODULE_NAME}.{'/'.join(missing)}")
     return module
-
-
-def _repo_root() -> Path:
-    return Path(__file__).resolve().parents[2]
 
 
 def _assert_tmp_is_symlink_free(tmp_path: Path) -> None:
@@ -320,95 +314,5 @@ def test_real_rfc3339_instants_are_accepted(tmp_path: Path, observed_at: str) ->
     assert _record(identity, db_path, key_path, observed_at=observed_at) == "inserted"
     assert _count_rows(db_path) == 1
 
-
-# ── 결함 4 [medium] 인수 스크립트 fail-open ──────────────────────────────────
-
-
-def _run_acceptance_copy(script: Path) -> subprocess.CompletedProcess[str]:
-    # timeout 은 안전장치다. fail-closed 가 퇴화하면 이 사본이 다시 인수 검사를 부르고
-    # 그 안에서 또 이 시험이 돌아 무한 재귀가 된다(2026-09-15 실측). 스크립트 쪽 깊이
-    # 차단이 1차 방어이고, 이것이 2차 방어다.
-    return subprocess.run(
-        ["bash", str(script)],
-        cwd=_repo_root(),
-        capture_output=True,
-        text=True,
-        check=False,
-        timeout=300,
-    )
-
-
-def _assert_fail_closed(result: subprocess.CompletedProcess[str], reason: str) -> None:
-    """필수 검사를 못 했으면 그 자리에서 끝나야 한다.
-
-    종료값만 보면 부족하다 — 건너뛴 뒤 다른 경로로 2 가 나와도 통과해 버린다.
-    NOT_RUN 뒤에 PASS 가 한 줄이라도 이어지면 그것이 바로 fail-open 이다.
-    """
-
-    lines = result.stdout.splitlines()
-    assert result.returncode == 2, result.stdout + result.stderr
-    not_run_at = [index for index, line in enumerate(lines) if line.startswith("NOT_RUN:")]
-    assert not_run_at, result.stdout
-    assert any(reason in lines[index] for index in not_run_at), result.stdout
-    trailing = [line for line in lines[not_run_at[0] + 1 :] if line.startswith("PASS:")]
-    assert trailing == [], f"NOT_RUN 뒤에 판정이 이어졌다: {trailing}"
-    assert "OK(run-acceptance)" not in result.stdout
-
-
-def test_acceptance_aborts_when_base_commit_is_missing(tmp_path: Path) -> None:
-    """기준 SHA 를 못 찾으면 건너뛰고 통과하는 대신 exit 2 로 끝나야 한다."""
-
-    original = (_repo_root() / _ACCEPTANCE).read_text(encoding="utf-8")
-    assert "BASE_SHA=7473ec8" in original
-    copy = tmp_path / "acceptance-missing-base.sh"
-    copy.write_text(
-        original.replace("BASE_SHA=7473ec8", "BASE_SHA=0000000000000000000000000000000000000000"),
-        encoding="utf-8",
-    )
-
-    result = _run_acceptance_copy(copy)
-
-    _assert_fail_closed(result, "기준 커밋")
-
-
-def test_acceptance_aborts_when_create_table_scan_fails(tmp_path: Path) -> None:
-    """우회 표 스캔이 오류를 내면 그 판정을 포기한 채 통과해서는 안 된다."""
-
-    original = (_repo_root() / _ACCEPTANCE).read_text(encoding="utf-8")
-    assert "GREP=/usr/bin/grep" in original
-    fake_grep = tmp_path / "fake-grep"
-    fake_grep.write_text(
-        "#!/bin/bash\n"
-        'for arg in "$@"; do\n'
-        '  case "$arg" in\n'
-        "    *create*table*) exit 2 ;;\n"
-        "  esac\n"
-        "done\n"
-        'exec /usr/bin/grep "$@"\n',
-        encoding="utf-8",
-    )
-    fake_grep.chmod(0o755)
-    copy = tmp_path / "acceptance-broken-scan.sh"
-    copy.write_text(
-        original.replace("GREP=/usr/bin/grep", f"GREP={fake_grep}"),
-        encoding="utf-8",
-    )
-
-    result = _run_acceptance_copy(copy)
-
-    _assert_fail_closed(result, "create table 스캔")
-
-
-def test_acceptance_script_has_no_fail_open_skip_helper() -> None:
-    """`skip_item` 같은 '건수만 늘리고 실패는 안 하는' 보조가 남아 있으면 안 된다."""
-
-    text = (_repo_root() / _ACCEPTANCE).read_text(encoding="utf-8")
-
-    assert "skip_item" not in text, "필수 검사 불가를 성공으로 접는 보조가 남아 있다"
-    assert "exit 2" in text, "NOT_RUN 뒤 즉시 종료하는 경로가 없다"
-    assert "HS0302_ACCEPTANCE_DEPTH" in text, "중첩 실행 재귀 차단이 없다"
-    # 차단이 변이 대상 보조(abort_not_run)를 거치면 같은 변이에 함께 죽는다(실측).
-    assert 'abort_not_run "중첩' not in text, "중첩 차단이 fail-closed 보조와 같은 경로를 쓴다"
-    assert "not acceptance_aborts" in text, "인수 검사가 자기를 부르는 시험을 다시 돌린다"
-    assert "failclosed_probe" in text, "인수 검사가 자기 fail-closed 음성 대조군을 갖고 있지 않다"
-    assert os.access(_repo_root() / _ACCEPTANCE, os.X_OK)
+# 결함 4(인수 스크립트 fail-closed)는 재귀를 피하려고 별도 비재귀 모듈로 옮겼다:
+#   tests/test_hs_0302_acceptance_probe.py — Codex V1 2차 F0302-4 잔여 지적 반영.
