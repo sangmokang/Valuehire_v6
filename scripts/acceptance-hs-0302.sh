@@ -496,7 +496,11 @@ fi
 # G2 게이트는 humansearch/src 와 tests 만 사본으로 복사한다. 시험이 저장소의 다른
 # 경로를 읽으면 사본에서 FileNotFoundError 로 죽고, 게이트는 그것을 "엉뚱한 이유로
 # 실패"로 보고 push 를 막는다(2026-09-15 실측: 8건).
-"$GREP" -nE "parents\[2\]|['\"](scripts|\.github|docs)/" "$TESTS" "$TESTS_R2" "$TESTS_R3" \
+# 판정 기준은 지시받은 검증 명령과 **같은 패턴**이다. 두 벌로 적으면 갈라진다.
+# 경로 문자열이 주석에만 있어도 불합격시킨다 — 시험이 실제로 읽는지 아닌지를 이 검사가
+# 판별하려 들면 판별기가 또 하나의 약점이 된다. 아예 쓰지 않는 쪽이 검사하기 쉽다.
+OUT_OF_TREE_RE=$(printf 'parents\\[2\\]|%s/|\\.github|docs/sot' 'scripts')
+"$GREP" -nE "$OUT_OF_TREE_RE" "$TESTS" "$TESTS_R2" "$TESTS_R3" \
   > "$WORK/out_of_tree.txt"
 rc=$?
 if [ "$rc" -gt 1 ]; then

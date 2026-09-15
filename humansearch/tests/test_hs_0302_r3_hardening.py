@@ -242,11 +242,12 @@ def test_surrounding_whitespace_is_stripped_before_normalisation(tmp_path: Path)
     assert _count_rows(db_path) == 1
 
 # 결함 2(CI 배선)와 결함 3(인수 실행 필터·fail-closed)의 판정은 여기 없다.
-# `scripts/acceptance-hs-0302.sh` 의 bash 자기 검사가 맡는다.
+# 저장소 루트의 인수 스크립트(acceptance-hs-0302.sh)가 bash 자기 검사로 맡는다.
 #
-# 왜 pytest 가 아닌가 (2026-09-15 실측): G2 게이트 `acceptance-hs-gates-mutations.sh` 는
-# `humansearch/src` 와 `humansearch/tests` 만 임시 사본으로 복사해 strict type error 를
-# 심고 pytest 가 **그 이유로만** 실패하는지 본다. 시험이 `scripts/`·`.github/`·`docs/`
-# 를 읽으면 사본에 그 경로가 없어 FileNotFoundError 로 먼저 죽고, 게이트는 "mutation
-# failed for the wrong reason" 으로 push 를 막는다. pytest 시험 집합은 humansearch/
-# 밖 파일의 존재에 의존하지 않는다.
+# 왜 pytest 가 아닌가 (2026-09-15 실측): G2 게이트 acceptance-hs-gates-mutations.sh 는
+# humansearch 패키지의 src 와 tests 만 임시 사본으로 복사해 strict type error 를 심고
+# pytest 가 **그 이유로만** 실패하는지 본다. 시험이 패키지 밖 경로(인수 스크립트 디렉터리,
+# 워크플로 파일, 정본 문서)를 읽으면 사본에 그 경로가 없어 FileNotFoundError 로 먼저
+# 죽고, 게이트는 "mutation failed for the wrong reason" 으로 push 를 막는다.
+# 이 파일을 포함한 HS-03.02 시험 집합은 humansearch 패키지 밖 파일을 열지 않는다.
+# 그 불변식은 인수 스크립트가 기계적으로 검사한다 — 경로 문자열조차 두지 않는다.
