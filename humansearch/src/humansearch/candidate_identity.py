@@ -296,6 +296,10 @@ def _verify_db_boundary(db_path: Path, approved_root: Path) -> None:
     _verify(db_path, expected_mode=_DB_FILE_MODE, label="db file")
     if not db_path.is_file():
         raise CandidateIdentityError("db file must be a regular file")
+    # symlink 만 막으면 hard link 가 남는다 — 같은 inode 가 승인 root 밖 이름으로도 열린다
+    # (자기 공격 실측: 밖 경로 link 뒤 inserted, nlink=2). 이름이 둘 이상이면 경계가 아니다.
+    if db_path.stat(follow_symlinks=False).st_nlink != 1:
+        raise CandidateIdentityError("db file must not have extra hard links")
     if _inside_git_worktree(db_path.parent):
         raise CandidateIdentityError("db file must be outside the git worktree")
     _verify_sidecars(db_path)
@@ -338,6 +342,8 @@ def _verify_sidecars(db_path: Path) -> None:
             raise CandidateIdentityError(f"sqlite sidecar mode must be {_DB_FILE_MODE:04o}")
         if not stat.S_ISREG(info.st_mode):
             raise CandidateIdentityError("sqlite sidecar must be a regular file")
+        if info.st_nlink != 1:
+            raise CandidateIdentityError("sqlite sidecar must not have extra hard links")
 
 
 def _insert_once(
