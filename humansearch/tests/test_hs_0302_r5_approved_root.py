@@ -9,6 +9,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+import humansearch.candidate_identity as identity_module
 
 from humansearch.candidate_identity import (
     CandidateIdentityError,
@@ -193,3 +194,79 @@ def test_renamed_in_compatible_db_at_approved_path_is_refused(tmp_path: Path) ->
 
     assert _rows(approved.db_path) == 0
     assert _rows(parked) == 0
+
+
+def test_regular_inode_swap_during_connect_and_commit_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    approved = initialize_humansearch_storage(tmp_path / "approved")
+    alternate = initialize_humansearch_storage(tmp_path / "alternate")
+    key_path = _key_file(tmp_path / "keys")
+    parked = approved.protected_root / "parked-original.sqlite3"
+    real_verify = identity_module
+    check = real_verify._verify_db_boundary
+    calls = 0
+
+    def raced_verify(path: Path, root: Path) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 3:
+            approved.db_path.rename(alternate.db_path)
+            parked.rename(approved.db_path)
+            try:
+                check(path, root)
+            finally:
+                approved.db_path.rename(parked)
+                alternate.db_path.rename(approved.db_path)
+            return
+        check(path, root)
+        if calls == 2:
+            approved.db_path.rename(parked)
+            alternate.db_path.rename(approved.db_path)
+
+    monkeypatch.setattr(real_verify, "_verify_db_boundary", raced_verify)
+    with pytest.raises(CandidateIdentityError):
+        record_candidate_identity(
+            approved.db_path, _RECORD, hmac_key_path=key_path, approved_root=approved.protected_root
+        )
+    assert calls >= 2
+    assert _rows(approved.db_path) == 0
+    assert _rows(parked) == 0
+
+
+def test_regular_inode_swap_back_after_connect_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    approved = initialize_humansearch_storage(tmp_path / "approved")
+    alternate = initialize_humansearch_storage(tmp_path / "alternate")
+    key_path = _key_file(tmp_path / "keys")
+    with sqlite3.connect(alternate.db_path) as connection:
+        assert connection.execute("pragma journal_mode=wal").fetchone()[0] == "wal"
+    real_connect = sqlite3.connect
+    parked = approved.protected_root / "parked-original.sqlite3"
+    opened = False
+
+    def swap_connect(path: Path, *, isolation_level: None, timeout: float) -> sqlite3.Connection:
+        nonlocal opened
+        approved.db_path.rename(parked)
+        alternate.db_path.rename(approved.db_path)
+        try:
+            connection = real_connect(path, isolation_level=isolation_level, timeout=timeout)
+            opened = True
+        finally:
+            approved.db_path.rename(alternate.db_path)
+            parked.rename(approved.db_path)
+        return connection
+
+    monkeypatch.setattr(
+        "humansearch.candidate_identity.sqlite3",
+        SimpleNamespace(connect=swap_connect, IntegrityError=sqlite3.IntegrityError,
+                        OperationalError=sqlite3.OperationalError),
+    )
+    with pytest.raises(CandidateIdentityError):
+        record_candidate_identity(
+            approved.db_path, _RECORD, hmac_key_path=key_path, approved_root=approved.protected_root
+        )
+    assert opened
+    assert _rows(approved.db_path) == 0
+    assert _rows(alternate.db_path) == 0
