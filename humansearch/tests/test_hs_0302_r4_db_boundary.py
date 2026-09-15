@@ -272,6 +272,61 @@ def test_sqlite_sidecar_that_is_not_a_regular_file_is_refused(tmp_path: Path, su
     assert _count_rows(db_path) == 0
 
 
+# ── 키 경로 경쟁 (독립 검토 2회차 probe, 16:42 재현) ────────────────────────────
+
+
+def test_key_file_vanishing_after_checks_is_a_closed_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """키 검사를 통과한 뒤 읽기 직전에 키 파일이 사라지면 OS 오류가 경로째 새면 안 된다.
+
+    재현: 검사 통과 → 키 삭제 → read_bytes → `FileNotFoundError: [Errno 2] ... /key-root/...`
+    가 그대로 올라왔다. 닫힌 오류 계약(경로 원문 없음, CandidateIdentityError)을 깬다.
+    """
+
+    identity = _load_identity_module()
+    db_path = _protected_db(tmp_path)
+    key_path = _key_at(tmp_path / "key-root")
+    original = identity._verify_db_location
+
+    def vanish_then_verify(path: Path) -> Path:
+        key_path.unlink()
+        return Path(original(path))
+
+    monkeypatch.setattr(identity, "_verify_db_location", vanish_then_verify)
+
+    with pytest.raises(identity.CandidateIdentityError) as caught:
+        _record(identity, db_path, key_path)
+
+    _assert_closed_error(caught.value, tmp_path)
+    assert _count_rows(db_path) == 0
+
+
+def test_key_directory_vanishing_after_checks_is_a_closed_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """키 폴더가 사슬 검사 뒤 사라지면 resolve(strict=True) 의 OS 오류도 닫힌 오류여야 한다."""
+
+    identity = _load_identity_module()
+    db_path = _protected_db(tmp_path)
+    key_dir = tmp_path / "key-root"
+    key_path = _key_at(key_dir)
+    original = identity._reject_symlinked_chain
+
+    def verify_then_vanish(path: Path, *, label: str) -> None:
+        original(path, label=label)
+        if label == "hmac key path":
+            shutil.rmtree(key_dir)
+
+    monkeypatch.setattr(identity, "_reject_symlinked_chain", verify_then_vanish)
+
+    with pytest.raises(identity.CandidateIdentityError) as caught:
+        _record(identity, db_path, key_path)
+
+    _assert_closed_error(caught.value, tmp_path)
+    assert _count_rows(db_path) == 0
+
+
 # ── 대조군 (c) ────────────────────────────────────────────────────────────────
 
 
