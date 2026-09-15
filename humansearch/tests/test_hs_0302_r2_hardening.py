@@ -121,35 +121,48 @@ def _count_rows(db_path: Path) -> int:
 # ── 결함 1 [high] 구분자 주입 ────────────────────────────────────────────────
 
 
-def test_v1_separator_injection_pair_creates_two_rows(tmp_path: Path) -> None:
-    """Codex 의 두 입력을 실제 DB 에 연속 기록하면 둘 다 inserted 이고 행이 2개여야 한다.
+def test_v1_separator_injection_pair_is_refused_at_the_db_path(tmp_path: Path) -> None:
+    """Codex 의 두 입력은 DB 경로에서 **둘 다 거부**되어야 하고 행이 0개여야 한다.
 
-    현재 구현은 두 번째를 duplicate 로 접어 서로 다른 후보 하나를 조용히 잃는다.
+    계약 충돌 해소 기록 — 지시서는 "둘 다 inserted, 행 2개"를 요구했지만, 같은 지시서가
+    요구한 제어문자 거부(AC-4 확장)를 적용하면 두 입력 모두 U+001F 를 담고 있어 애초에
+    기록되지 않는다. 두 요구는 동시에 성립할 수 없다. 더 보수적인 쪽(거부)을 택한다.
+    직렬화가 실제로 충돌을 없앴는지는 순수 함수 수준 시험
+    `test_key_hmac_is_length_prefixed_so_injected_separators_cannot_collide` 가 따로 본다.
+    현재 HEAD 에서는 거부가 없어 두 입력이 통과하므로 이 시험은 여전히 RED 다.
     """
 
     identity = _load_identity_module()
     db_path = _db_path(tmp_path)
     key_path = _key_at(tmp_path / "key-root")
 
-    first = _record(
-        identity,
-        db_path,
-        key_path,
-        position_ref=_INJECTED_A[0],
-        channel=_INJECTED_A[1],
-        candidate_ref=_INJECTED_A[2],
-    )
-    second = _record(
-        identity,
-        db_path,
-        key_path,
-        position_ref=_INJECTED_B[0],
-        channel=_INJECTED_B[1],
-        candidate_ref=_INJECTED_B[2],
-    )
+    for position_ref, channel, candidate_ref in (_INJECTED_A, _INJECTED_B):
+        with pytest.raises(identity.CandidateIdentityError):
+            _record(
+                identity,
+                db_path,
+                key_path,
+                position_ref=position_ref,
+                channel=channel,
+                candidate_ref=candidate_ref,
+            )
+
+    assert _count_rows(db_path) == 0
+
+
+def test_length_prefix_keeps_ambiguous_field_splits_as_separate_rows(tmp_path: Path) -> None:
+    """DB 수준 회귀 — 이어 붙이면 같아지는 두 후보가 별도 행으로 남아야 한다."""
+
+    identity = _load_identity_module()
+    db_path = _db_path(tmp_path)
+    key_path = _key_at(tmp_path / "key-root")
+
+    first = _record(identity, db_path, key_path, position_ref="ab", candidate_ref="c")
+    second = _record(identity, db_path, key_path, position_ref="a", candidate_ref="bc")
 
     assert (first, second) == ("inserted", "inserted")
     assert _count_rows(db_path) == 2
+    assert _independent_key_hmac("ab", "saramin", "c") != _independent_key_hmac("a", "saramin", "bc")
 
 
 def test_key_hmac_is_length_prefixed_so_injected_separators_cannot_collide() -> None:
