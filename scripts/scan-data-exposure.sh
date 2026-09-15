@@ -125,6 +125,45 @@ scan_history() {
 # 검사를 약화시키는 대신 이름을 고친다.
 PII_COLUMN_WORDS='name|email|e_mail|mail|phone|mobile|tel|school|univ|university|profile_url|linkedin|resume|birth|이름|이메일|전화|휴대폰|학교|생년|프로필'
 
+# 산문(.md 등) 문서에 박힌 후보자 개인정보는 컬럼-이름 조합으로 못 잡는다(스키마가 없다).
+# "라벨 + 사외 연락처"가 함께 있을 때만 차단한다 — 둘 중 하나만 요구하면 오탐이 폭증한다
+# (2026-09-15 실측: origin/main 추적 .md 113개 중 라벨 단어만 있는 파일 29개·이메일만 있는
+# 파일 6개가 있었지만, "라벨+사외연락처"를 동시에 만족하는 파일은 0개였다). 이 조합은
+# 오탐 없이 신규 유입만 잡는다는 뜻이다. 사내 도메인 이메일은 신호에서 제외한다.
+PII_PROSE_LABEL_WORDS='담당자|이름|연락처|이메일|전화|휴대폰|후보자|지원자'
+PII_SAFE_EMAIL_DOMAINS='valueconnect\.kr|example\.invalid'
+
+md_prose_pii_signal() {
+  local body="$1" label_hit ext_email phone
+  label_hit=$(printf '%s' "$body" | grep -cE "$PII_PROSE_LABEL_WORDS")
+  [ "$label_hit" -ge 1 ] || return 1
+  ext_email=$(printf '%s' "$body" | grep -oE '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}' | grep -vE "@(${PII_SAFE_EMAIL_DOMAINS})\$")
+  phone=$(printf '%s' "$body" | grep -oE '01[0-9]-[0-9]{3,4}-[0-9]{4}')
+  [ -n "$ext_email" ] || [ -n "$phone" ]
+}
+
+# 산문 개인정보 승인 목록 — 파일 경로 하나만, 사람이 결정한 뒤에만 여기 오른다. 목록에
+# 없는 .md 는 위 신호가 있으면 무조건 차단하며 어떤 원장으로도 통과시킬 수 없다(자동
+# 승인 경로 자체가 없다 — 2026-09-15 재작성 근거는 pii-sot-exception-redo-goal 참고).
+PII_APPROVED_DOCS='docs/engineering/weekly-brief-FY26W38-2026-09-14.md'
+
+is_pii_approved_doc() {
+  local target="$1" p
+  for p in $PII_APPROVED_DOCS; do
+    [ "$target" = "$p" ] && return 0
+  done
+  return 1
+}
+
+# 승인 문서 전용 결정 ID 레지스트리. 원장(REVIEWED_FILE)의 사유 칸에 자유 텍스트를 적어
+# 작성자 본인이 자가 승인하는 것을 막는다 — 2026-09-15 적대검증에서 자유 텍스트 자가
+# 기입이 그대로 REVIEWED 로 통과함을 실측했다. 사유는 이 레지스트리의 ID와 정확히 같고
+# docs/sot/coding-principles.md 본문에도 그 ID가 있어야 한다.
+# 한계(정직하게 남긴다): 저장소 쓰기 권한이 있는 동일 작성자가 이 레지스트리와
+# coding-principles.md 를 같은 커밋에서 함께 고치면 여전히 통과시킬 수 있다 — 서명된
+# 커밋·별도 필수 리뷰어 같은 저장소 밖 통제 없이는 완전한 위조 불가능성은 못 만든다.
+DECISION_REGISTRY='DECISION-C-20260915'
+
 # 검토 기준선. "이 파일을 사람이 전수 확인했고 후보자 개인정보가 없다"를 **내용 해시**와
 # 함께 적는다. 경로 예외나 기한 유예가 아니다 — 파일이 한 글자라도 바뀌면 해시가 어긋나
 # 다시 차단된다. 규칙 자체는 어디서도 약해지지 않는다.
@@ -150,6 +189,20 @@ reviewed_reason() {
     '$1==s && $2==p {print $3; found=1} END{exit found?0:1}' "$REVIEWED_FILE"
 }
 
+# 승인 문서 전용 게이트 — reviewed_reason() 이 돌려주는 사유가 DECISION_REGISTRY 에
+# 등록된 결정 ID와 정확히 같고, 그 ID가 SOT 본문에도 있어야 REVIEWED 로 인정한다.
+# csv/tsv/sql 의 일반 검토 원장(자유 텍스트 사유)과는 별도 게이트다 — 섞으면 기존
+# 마이그레이션 검토 항목(자유 텍스트)이 전부 깨진다.
+approved_doc_decision_id() {
+  local path="$1" sha="$2" id
+  id=$(reviewed_reason "$path" "$sha") || return 1
+  case " $DECISION_REGISTRY " in *" $id "*) ;; *) return 1 ;; esac
+  if ! grep -qF -- "$id" docs/sot/coding-principles.md 2>/dev/null; then
+    return 1
+  fi
+  printf '%s' "$id"
+}
+
 # 원장이 썩는 것을 막는다 — 지워진 파일이나 바뀐 내용을 가리키는 항목은 그 자체가 불합격.
 check_reviewed_ledger() {
   local bad=0 sha path reason
@@ -172,13 +225,30 @@ check_reviewed_ledger() {
 pii_word_count() { printf '%s' "$1" | tr 'A-Z' 'a-z' | grep -oE "$PII_COLUMN_WORDS" | sort -u | wc -l | tr -d ' '; }
 
 scan_pii() {
-  local n=0 files=0 bad=0 f lf header rows hits body
+  local n=0 files=0 bad=0 f lf header rows hits body reason
   while IFS= read -r -d '' f; do
     n=$((n + 1))
+    if is_pii_approved_doc "$f"; then
+      files=$((files + 1))
+      if reason=$(approved_doc_decision_id "$f" "$(blob_sha "$f")"); then
+        echo "REVIEWED: $f — 결정 ID $reason"
+      else
+        echo "FAIL: 승인 목록의 개인정보 문서인데 등록된 결정 ID로 검토되지 않음: $f (재검토 필요)"
+        bad=1
+      fi
+      continue
+    fi
     lf=$(printf '%s' "$f" | tr 'A-Z' 'a-z')
-    case "$lf" in *.csv|*.tsv) ;; *.sql) ;; *) continue ;; esac
+    case "$lf" in *.csv|*.tsv|*.sql|*.md) ;; *) continue ;; esac
     files=$((files + 1))
     case "$lf" in
+      *.md)
+        body=$(git cat-file blob ":$f" 2>/dev/null)
+        if md_prose_pii_signal "$body"; then
+          echo "FAIL: 승인되지 않은 문서에 개인정보로 보이는 라벨+연락처가 있음: $f (PII_APPROVED_DOCS 목록에 없음)"
+          bad=1
+        fi
+        ;;
       *.csv|*.tsv)
         header=$(git cat-file blob ":$f" 2>/dev/null | head -1)
         rows=$(git cat-file blob ":$f" 2>/dev/null | tail -n +2 | grep -cE '[^[:space:],]')
@@ -210,7 +280,7 @@ scan_pii() {
     echo "FAIL: 추적 파일 0개 — 스캔 무효 (P20)"; return 2
   fi
   check_reviewed_ledger || bad=1
-  [ "$bad" -eq 0 ] && echo "PASS: csv/tsv/sql ${files}개 검사(추적 ${n}개 중), 개인정보 적재 0건"
+  [ "$bad" -eq 0 ] && echo "PASS: csv/tsv/sql/md ${files}개 검사(추적 ${n}개 중), 개인정보 적재 0건"
   return "$bad"
 }
 

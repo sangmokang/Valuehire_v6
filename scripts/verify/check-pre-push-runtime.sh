@@ -65,9 +65,18 @@ cat > "$SANDBOX/verify.sh" <<'EOF'
 echo "PASS: sandbox stub"
 exit 0
 EOF
+# pre-push 는 원칙 검사와 같은 자리에서 개인정보 판정기(scan-data-exposure.sh)도
+# 직접 부른다(P21 · 2026-09-15). 이 샌드박스가 그 파일을 안 주면 probe 를 발견하기도
+# 전에 "파일 없음"으로 죽어, 이 검사가 원래 증명하려던 것(probe 발견·실행)과 무관한
+# 이유로 실패한다 — verify.sh 와 같은 이유의 최소 스텁을 둔다.
+cat > "$SANDBOX/scripts/scan-data-exposure.sh" <<'EOF'
+#!/usr/bin/env bash
+echo "PASS: sandbox stub"
+exit 0
+EOF
 chmod +x "$SANDBOX/hooks/pre-push" "$SANDBOX/scripts/verify/run-acceptance.sh" \
   "$SANDBOX/scripts/acceptance-principles-check.sh" \
-  "$SANDBOX/$PROBE_REL" "$SANDBOX/verify.sh"
+  "$SANDBOX/$PROBE_REL" "$SANDBOX/verify.sh" "$SANDBOX/scripts/scan-data-exposure.sh"
 
 git -C "$SANDBOX" init -q || exit 2
 git -C "$SANDBOX" config user.name "Runtime $NONCE"

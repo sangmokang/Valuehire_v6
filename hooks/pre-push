@@ -46,6 +46,12 @@ fi
 # 우회를 막는 독립 증거다.
 bash scripts/acceptance-principles-check.sh
 
+# 개인정보 판정기도 같은 이유로 여기서 직접 실행한다(P21 · 2026-09-15). scan-data-exposure.sh
+# 는 acceptance-*.sh 이름 규칙이 아니라 아래 글로브에 안 잡힌다 — 이름을 맞추는 대신 여기서
+# 명시적으로 부른다. 이 지점은 위 청결 검사(①)를 통과한 뒤라 색인 == HEAD == 작업트리이므로
+# 디스크에서 그대로 실행해도 색인 추출과 동일하다.
+bash scripts/scan-data-exposure.sh pii
+
 # ── 2) push 안전성 검사 ──────────────────────────────────────────────────────
 #
 # pre-push 가 판정하는 것은 "이 push 가 안전한가"이지 "저장소가 이상적 상태인가"가

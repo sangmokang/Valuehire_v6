@@ -98,12 +98,13 @@ run_hook_case() {
   git init -q "$tmp"
   mkdir -p "$tmp/hooks" "$tmp/scripts"
   cp hooks/pre-commit hooks/pre-push "$tmp/hooks/"
+  cp scripts/scan-data-exposure.sh "$tmp/scripts/"
   cp verify.sh "$tmp/"
   cp .secret-patterns.default "$tmp/"
   cp .check-weakening-patterns "$tmp/"
   cp .gitignore "$tmp/"
   [ -f suppressions.yaml ] && cp suppressions.yaml "$tmp/"
-  chmod +x "$tmp/hooks/pre-commit" "$tmp/hooks/pre-push"
+  chmod +x "$tmp/hooks/pre-commit" "$tmp/hooks/pre-push" "$tmp/scripts/scan-data-exposure.sh"
   # 한 번만 실행하고 종료코드와 출력(BLOCKED 사유)을 함께 받는다.
   out=$(
     cd "$tmp" || exit 9
@@ -112,7 +113,9 @@ run_hook_case() {
     git config user.name t
     mkdir -p "$(dirname "$path")"
     "$maker" "$path"
-    git add -f "$path" >/dev/null 2>&1
+    # scan-data-exposure.sh 는 색인(git cat-file -e ":...")에 있어야 pre-commit 의 새
+    # §9 단계가 "판정기 없음"으로 오인 차단하지 않는다 — 디스크 존재만으론 부족하다.
+    git add -f scripts/scan-data-exposure.sh "$path" >/dev/null 2>&1
     bash hooks/pre-commit 2>&1
   )
   rc=$?
@@ -154,16 +157,17 @@ run_hook_case "비공개 리뷰 경로"       "private-reviews/r.md"       make_
 tmp=$(mktemp -d) || bad "임시 저장소 생성 실패 (인덱스 측정 검사)"
 if [ -n "$tmp" ] && [ -d "$tmp" ]; then
   TMPDIRS="$TMPDIRS $tmp"
-  git init -q "$tmp"; mkdir -p "$tmp/hooks"
+  git init -q "$tmp"; mkdir -p "$tmp/hooks" "$tmp/scripts"
   cp hooks/pre-commit hooks/pre-push "$tmp/hooks/"
+  cp scripts/scan-data-exposure.sh "$tmp/scripts/"
   cp verify.sh .secret-patterns.default .check-weakening-patterns .gitignore "$tmp/"
   [ -f suppressions.yaml ] && cp suppressions.yaml "$tmp/"
-  chmod +x "$tmp/hooks/pre-commit" "$tmp/hooks/pre-push"
+  chmod +x "$tmp/hooks/pre-commit" "$tmp/hooks/pre-push" "$tmp/scripts/scan-data-exposure.sh"
   out=$(
     cd "$tmp" || exit 9
     git config core.hooksPath hooks; git config user.email a@b.c; git config user.name t
     dd if=/dev/zero of=payload.bin bs=1024 count=1200 status=none
-    git add -f payload.bin >/dev/null 2>&1
+    git add -f scripts/scan-data-exposure.sh payload.bin >/dev/null 2>&1
     printf 'x\n' > payload.bin          # 작업트리만 작게 덮어쓴다
     bash hooks/pre-commit 2>&1
   )
@@ -179,18 +183,19 @@ fi
 # ── 3-c) rename 이 검사 대상에 포함되는가 ────────────────────────────────────
 tmp=$(mktemp -d) || bad "임시 저장소 생성 실패 (rename 검사)"
 if [ -n "$tmp" ] && [ -d "$tmp" ]; then
-  git init -q "$tmp"; mkdir -p "$tmp/hooks"
+  git init -q "$tmp"; mkdir -p "$tmp/hooks" "$tmp/scripts"
   cp hooks/pre-commit hooks/pre-push "$tmp/hooks/"
+  cp scripts/scan-data-exposure.sh "$tmp/scripts/"
   cp verify.sh .secret-patterns.default .check-weakening-patterns .gitignore "$tmp/"
   [ -f suppressions.yaml ] && cp suppressions.yaml "$tmp/"
-  chmod +x "$tmp/hooks/pre-commit" "$tmp/hooks/pre-push"
+  chmod +x "$tmp/hooks/pre-commit" "$tmp/hooks/pre-push" "$tmp/scripts/scan-data-exposure.sh"
   out=$(
     cd "$tmp" || exit 9
     git config user.email a@b.c; git config user.name t
     # 씨앗 커밋은 훅을 붙이기 **전에** 만든다. 훅 우회 옵션을 쓰면 그 리터럴 자체가
     # 검사 약화 패턴이라 이 스크립트가 커밋되지 않는다(2026-08-09 실측 — 훅이 나를 막았다).
     printf 'notes\n' > notes.txt
-    git add notes.txt >/dev/null 2>&1
+    git add -f scripts/scan-data-exposure.sh notes.txt >/dev/null 2>&1
     git commit -q -m seed >/dev/null 2>&1
     git config core.hooksPath hooks
     git mv notes.txt leak.db >/dev/null 2>&1
@@ -217,11 +222,12 @@ fi
 # ── 4) 대조군: 정상 파일은 통과해야 한다 (차단이 전부 막는 것이면 게이트가 아니다) ──
 tmp=$(mktemp -d)
 git init -q "$tmp"
-mkdir -p "$tmp/hooks"
+mkdir -p "$tmp/hooks" "$tmp/scripts"
 cp hooks/pre-commit hooks/pre-push "$tmp/hooks/"
+cp scripts/scan-data-exposure.sh "$tmp/scripts/"
 cp verify.sh .secret-patterns.default .check-weakening-patterns .gitignore "$tmp/"
 [ -f suppressions.yaml ] && cp suppressions.yaml "$tmp/"
-chmod +x "$tmp/hooks/pre-commit" "$tmp/hooks/pre-push"
+chmod +x "$tmp/hooks/pre-commit" "$tmp/hooks/pre-push" "$tmp/scripts/scan-data-exposure.sh"
 rc=0
 (
   cd "$tmp" || exit 9
@@ -229,7 +235,7 @@ rc=0
   git config user.email a@b.c
   git config user.name t
   printf '# hello\n' > README.md
-  git add README.md >/dev/null 2>&1
+  git add -f scripts/scan-data-exposure.sh README.md >/dev/null 2>&1
   bash hooks/pre-commit
 ) >/dev/null 2>&1
 rc=$?
@@ -356,6 +362,83 @@ else
   judge_case "검토 기준선에 적힌 파일은 통과시킨다"              pii "sc_reviewed_ok"     0
   judge_case "해시가 어긋난 기준선은 통과시키지 않는다"          pii "sc_reviewed_stale"  1
   judge_case "죽은 기준선 항목은 그 자체가 불합격이다"           pii "sc_reviewed_dead"   1
+
+  # ── E1: 산문(.md) 개인정보 — 라벨+사외 연락처 조합만 차단한다 (2026-09-15 재작성) ──
+  # 승인 목록 밖의 .md 에 개인정보 라벨과 사외 이메일/전화가 함께 있으면 막는다.
+  # 파일명을 바꿔도(rename/copy) 내용 기반이라 그대로 걸려야 한다.
+  sc_unapproved_md_with_pii() {
+    mkdir -p docs/engineering
+    printf '## 다른 문서\n담당자: 김철수 <c@client.example>\n' > docs/engineering/other-brief.md
+    git add docs/engineering/other-brief.md; git commit -q -m other
+  }
+  sc_unapproved_md_with_pii_renamed() {
+    mkdir -p docs/engineering
+    printf '## 또 다른 문서\n담당자: 이영희 <lee@ex.com>\n' > docs/engineering/copied-brief-2.md
+    git add docs/engineering/copied-brief-2.md; git commit -q -m renamed
+  }
+  # 대조군 — 사내 이메일만 있거나 라벨만 있는 정상 문서는 막히면 안 된다(오탐 방지).
+  sc_ok_md_company_email_only() {
+    mkdir -p docs/engineering
+    printf '## 공지\n담당자: sangmokang@valueconnect.kr\n' > docs/engineering/notice.md
+    git add docs/engineering/notice.md; git commit -q -m ok
+  }
+  sc_ok_md_label_only() {
+    mkdir -p docs/engineering
+    printf '## 설계 문서\n담당자 필드는 스키마에 있다. 연락처 컬럼은 별도 테이블.\n' > docs/engineering/design.md
+    git add docs/engineering/design.md; git commit -q -m ok
+  }
+
+  judge_case "승인 목록 밖 .md 의 라벨+사외연락처를 잡는다"        pii "sc_unapproved_md_with_pii"          1
+  judge_case "파일명을 바꿔도(rename/copy) 내용 기반으로 잡는다"  pii "sc_unapproved_md_with_pii_renamed"  1
+  judge_case "사내 이메일만 있는 문서는 통과시킨다 (오탐 대조군)" pii "sc_ok_md_company_email_only"        0
+  judge_case "라벨 단어만 있는 문서는 통과시킨다 (오탐 대조군)"   pii "sc_ok_md_label_only"                0
+
+  # ── E2: 승인 목록 문서 — 결정 ID 레지스트리 대조 (자가승인 우회 차단, 2026-09-15) ──
+  APPROVED_DOC='docs/engineering/weekly-brief-FY26W38-2026-09-14.md'
+  sc_approved_doc_reviewed() {
+    mkdir -p docs/engineering docs/sot
+    printf '## 브리핑\n담당자: 홍길동 <a@b.c>\n' > "$APPROVED_DOC"
+    # 결정 ID는 원장뿐 아니라 SOT 본문에도 있어야 REVIEWED 된다 — 이 격리 저장소에
+    # 실제 저장소의 coding-principles.md 를 흉내낸 최소 스텁을 함께 둔다.
+    printf 'P21 결정 ID: DECISION-C-20260915\n' > docs/sot/coding-principles.md
+    git add "$APPROVED_DOC" docs/sot/coding-principles.md
+    printf '%s\t%s\t%s\n' "$(git cat-file blob ":$APPROVED_DOC" | shasum -a 256 | cut -d' ' -f1)" \
+      "$APPROVED_DOC" "DECISION-C-20260915" > .data-exposure-reviewed
+    git add .data-exposure-reviewed; git commit -q -m approved
+  }
+  sc_approved_doc_unreviewed() {
+    mkdir -p docs/engineering
+    printf '## 브리핑\n담당자: 홍길동 <a@b.c>\n' > "$APPROVED_DOC"
+    git add "$APPROVED_DOC"; git commit -q -m unreviewed
+  }
+  sc_approved_doc_stale() {
+    mkdir -p docs/engineering
+    printf '## 브리핑\n담당자: 홍길동 <a@b.c>\n' > "$APPROVED_DOC"
+    git add "$APPROVED_DOC"
+    printf '%s\t%s\t%s\n' "$(printf 0%.0s $(seq 64))" "$APPROVED_DOC" "DECISION-C-20260915" \
+      > .data-exposure-reviewed
+    git add .data-exposure-reviewed; git commit -q -m stale
+  }
+  # 자기서명 우회 재현: 등록된 결정 ID 대신 작성자가 스스로 적은 자유 텍스트 사유.
+  sc_approved_doc_self_signed_reason() {
+    mkdir -p docs/engineering
+    printf '## 브리핑\n담당자: 홍길동 <a@b.c>\n' > "$APPROVED_DOC"
+    git add "$APPROVED_DOC"
+    printf '%s\t%s\t%s\n' "$(git cat-file blob ":$APPROVED_DOC" | shasum -a 256 | cut -d' ' -f1)" \
+      "$APPROVED_DOC" "내가 검토했다고 스스로 적음" > .data-exposure-reviewed
+    git add .data-exposure-reviewed; git commit -q -m self-signed
+  }
+  sc_unapproved_md_with_pii_control() {
+    mkdir -p docs/engineering
+    printf '## 다른 문서\n담당자: 김철수 <c@client.example>\n' > docs/engineering/other-brief.md
+    git add docs/engineering/other-brief.md; git commit -q -m other
+  }
+
+  judge_case "승인 목록 문서는 등록된 결정 ID면 통과시킨다"        pii "sc_approved_doc_reviewed"           0
+  judge_case "승인 목록 문서인데 검토 기준선이 없으면 막는다"      pii "sc_approved_doc_unreviewed"         1
+  judge_case "승인 목록 문서가 검토 이후 바뀌면 다시 막는다"       pii "sc_approved_doc_stale"              1
+  judge_case "결정 ID 대신 자유 텍스트 자가 기입은 막는다(자가승인 우회 차단)" pii "sc_approved_doc_self_signed_reason" 1
+  judge_case "승인 목록 밖의 .md 는 예외가 새지 않아 여전히 차단된다(과거엔 통과였다)" pii "sc_unapproved_md_with_pii_control" 1
 fi
 
 # D4: CI 가 그 판정기를 **실행 줄**에서 부르는가 + 그 스텝이 조건으로 꺼져 있지 않은가.
@@ -382,6 +465,65 @@ else
     ok "판정기 스텝에 비활성화 조건 없음"
   fi
 fi
+
+# ── E3: 로컬 훅(pre-commit·pre-push)이 CI 이전에 같은 판정기를 부르는가 (AC-3) ──
+# 2026-09-15 적대검증: CI 에서만 걸리고 로컬에서는 전혀 안 걸려 개인정보가 이미
+# 로컬 커밋·원격 push 까지 도달한 뒤에야 발견됐다. 여기서는 ①실행 줄 정적 배선과
+# ②실제 git commit 을 둘 다 확인한다(문자열 대조만으로는 부족 — R2).
+hook_wires_pii_judge() {
+  local hook="$1"
+  [ -f "$hook" ] || return 1
+  grep -v '^[[:space:]]*#' "$hook" | grep -q -- "${JUDGE##*/}"
+}
+if hook_wires_pii_judge hooks/pre-commit; then
+  ok "pre-commit 이 개인정보 판정기를 실행 줄에서 부른다"
+else
+  bad "pre-commit 이 개인정보 판정기를 부르지 않는다 (AC-3)"
+fi
+if hook_wires_pii_judge hooks/pre-push; then
+  ok "pre-push 가 개인정보 판정기를 실행 줄에서 부른다"
+else
+  bad "pre-push 가 개인정보 판정기를 부르지 않는다 (AC-3)"
+fi
+
+# 실행 확인 — §3 의 run_hook_case 와 같은 패턴(git commit 을 거치지 않고 pre-commit 을
+# 직접 실행)을 그대로 쓴다. git commit 경로는 이 저장소 환경에서 원인 불명의 정지가
+# 재현돼(2026-09-15 디버그) 이미 검증된 §3 방식으로 바꿨다 — scripts/ 만 추가로 심는다.
+run_pii_hook_case() {
+  local desc="$1" path="$2" maker="$3" want="$4"
+  local tmp rc=0 out=""
+  tmp=$(mktemp -d) || { bad "임시 저장소 생성 실패 — $desc (fail-closed)"; return; }
+  [ -n "$tmp" ] && [ -d "$tmp" ] || { bad "임시 저장소 경로 이상 — $desc (fail-closed)"; return; }
+  git init -q "$tmp"
+  mkdir -p "$tmp/hooks" "$tmp/scripts" "$tmp/docs/engineering"
+  cp hooks/pre-commit hooks/pre-push "$tmp/hooks/"
+  cp scripts/scan-data-exposure.sh "$tmp/scripts/"
+  cp verify.sh .secret-patterns.default .check-weakening-patterns .gitignore "$tmp/"
+  [ -f suppressions.yaml ] && cp suppressions.yaml "$tmp/"
+  chmod +x "$tmp/hooks/pre-commit" "$tmp/hooks/pre-push" "$tmp/scripts/scan-data-exposure.sh"
+  out=$(
+    cd "$tmp" || exit 9
+    git config core.hooksPath hooks
+    git config user.email a@b.c; git config user.name t
+    mkdir -p "$(dirname "$path")"
+    "$maker" "$path"
+    # scan-data-exposure.sh 는 색인(git cat-file -e ":...")에 있어야 pre-commit 의 새
+    # §9 단계가 "판정기 없음"으로 오인 차단하지 않는다 — 디스크 존재만으론 부족하다.
+    git add -f scripts/scan-data-exposure.sh "$path" >/dev/null 2>&1
+    bash hooks/pre-commit 2>&1
+  )
+  rc=$?
+  rm -rf "$tmp"
+  if [ "$rc" -eq 0 ]; then
+    bad "pre-commit 통과함 — $desc (차단되어야 한다)"
+  elif printf '%s\n' "$out" | grep -qE "$want"; then
+    ok "pre-commit 차단 확인 — $desc (exit=$rc · 사유 일치)"
+  else
+    bad "pre-commit 이 막긴 했으나 사유가 다르다(엉뚱한 이유로 통과 판정 방지) — $desc (기대: $want / 실제: ${out%%$'\n'*})"
+  fi
+}
+make_unapproved_pii_md() { printf '## 새 브리핑\n담당자: 김철수 <c@client.example>\n' > "$1"; }
+run_pii_hook_case "미승인 PII 문서(.md)" "docs/engineering/other-brief.md" make_unapproved_pii_md "개인정보 판정기"
 
 if [ "$checked" -eq 0 ]; then
   echo "FAIL: 검사 항목 0개 — 0건 처리로 통과는 금지한다 (P20)"

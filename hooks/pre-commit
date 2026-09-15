@@ -254,4 +254,32 @@ if [ "${#p3_files[@]}" -gt 0 ]; then
   fi
 fi
 
+# ── 9) 개인정보 판정기 배선 (P21 · pii 모드, 색인 기준 · 2026-09-15) ────────────
+#
+# 왜 여기 배선하는가: pii 모드는 이미 git 색인(git cat-file blob ":path")을 기준으로
+# 판정해 커밋될 내용과 일치한다. 이전에는 이 판정기가 CI(verify.yml)에서만 돌아,
+# 개인정보가 로컬 커밋·push 까지 도달한 뒤에야 발견됐다 — 재작성 근거는
+# docs/engineering/pii-sot-exception-redo-goal-2026-09-15.md.
+#
+# 판정기 자신은 **색인에서 추출**해 실행한다(P3 와 같은 이유, 위 §8). 작업트리의
+# scan-data-exposure.sh 를 그대로 실행하면, 그 파일만 디스크에서 무력화하고 스테이지는
+# 안 해서 "이번 커밋만 통과시키는" 우회가 생긴다.
+if ! git cat-file -e ":scripts/scan-data-exposure.sh" 2>/dev/null; then
+  block "개인정보 판정기가 색인에 없다 — scripts/scan-data-exposure.sh (fail-closed)"
+else
+  pii_tmp=$(mktemp -d) || pii_tmp=""
+  if [ -z "$pii_tmp" ]; then
+    block "개인정보 판정기 임시 공간 생성 실패 (fail-closed)"
+  else
+    git show ":scripts/scan-data-exposure.sh" > "$pii_tmp/judge.sh"
+    pii_rc=0
+    pii_out=$(bash "$pii_tmp/judge.sh" pii 2>&1) || pii_rc=$?
+    if [ "$pii_rc" -ne 0 ]; then
+      block "개인정보 판정기 실패 (exit=$pii_rc) — 아래 출력 참고"
+      printf '%s\n' "$pii_out" | sed 's/^/         /' >&2
+    fi
+    ruby -rfileutils -e 'FileUtils.remove_entry(ARGV[0]) if File.exist?(ARGV[0])' "$pii_tmp"
+  fi
+fi
+
 exit "$fail"
