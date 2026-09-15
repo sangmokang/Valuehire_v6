@@ -47,7 +47,7 @@
 | 24 | 인수 검사 verify-ac-m | `bash scripts/acceptance-verify-ac-m.sh` — mechanism 명부 대조 (AC-M) |
 | 25 | 인수 검사 invoice | `bash scripts/acceptance-invoice.sh` — 채용 수수료 계산·기한·계약 변조·Codex/Claude 스킬 동등성 |
 | 26 | Invoice 독립 런타임 게이트 | 게이트 배선 검사 + Python 단위시험 직접 실행 + 임시 PostgreSQL에서 마이그레이션·수수료 동시성·저장/전달 RPC 검증 |
-| 27 | 인수 검사 hs-0302 | `bash scripts/acceptance-hs-0302.sh` — 후보 식별키 HMAC 의미(구분자 주입 충돌·길이 접두 계약·제어문자 거부) 실행 판정, 키/DB 경로 경계, #97 마이그레이션 무변경, 시험 수집 건수 정확 대조, 자기 fail-closed 음성 대조군 2종, CI 스텝 run 정확 대조(scripts/verify/check-hs-0302-ci-wiring.rb), 필수 node-id 명부(scripts/verify/fixtures/hs-0302-required-tests.txt) 집합 대조, 승인 장부·열린 연결·hard link·파일 정체성 대조 약화 변이 4종 검출 |
+| 27 | 인수 검사 hs-0302 | `bash scripts/acceptance-hs-0302.sh` — 후보 식별키 HMAC 의미(구분자 주입 충돌·길이 접두 계약·제어문자 거부) 실행 판정, 키/DB 경로 경계, #97 마이그레이션 무변경, 시험 수집 건수 정확 대조, 자기 fail-closed 음성 대조군 2종, CI 스텝 run 정확 대조(scripts/verify/check-hs-0302-ci-wiring.rb), 필수 node-id 명부 121건과 8c5494b 기준 R5 시험·명부·상수 보존 검사, 단독·동반 약화 4종 및 검사기 자체 변이 거부, 승인 장부·열린 파일 descriptor·hard link·경로/descriptor 동반 약화 변이 4종 검출 |
 
 *(1번 앞에 `actions/checkout` 이 있고 `fetch-depth: 0` 이다 — 8번이 과거 blob 을 열려면 필요하다.)*
 

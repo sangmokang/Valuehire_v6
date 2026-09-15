@@ -43,6 +43,8 @@ SOT_ROSTER=docs/sot/verification-commands.md
 ACCEPTANCE_RUN="bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-0302.sh"
 REQUIRED_TESTS=scripts/verify/fixtures/hs-0302-required-tests.txt
 WIRING_CHECKER=scripts/verify/check-hs-0302-ci-wiring.rb
+BASELINE_CHECKER=scripts/verify/check-hs-0302-baseline.rb
+BASELINE_TEST=scripts/verify/test-hs-0302-baseline.rb
 BASE_SHA=7473ec8
 MIN_TESTS=6
 MIN_R2_TESTS=10
@@ -78,15 +80,40 @@ assert_fail_closed() {
 }
 abort_not_run() { echo "NOT_RUN: $1"; echo "CHECKED: $checked"; exit 2; }
 for required in "$MODULE" "$TESTS" "$TESTS_R2" "$TESTS_R3" "$TESTS_R4" "$TESTS_R5" "$WORKFLOW" "$SOT_ROSTER" \
-                "$REQUIRED_TESTS" "$WIRING_CHECKER" "$SCHEMA"; do
+                "$REQUIRED_TESTS" "$WIRING_CHECKER" "$BASELINE_CHECKER" "$BASELINE_TEST" "$SCHEMA"; do
   if [ ! -f "$required" ]; then
     echo "NOT_RUN: $required 없음 — 검사 대상이 성립하지 않는다"
     echo "CHECKED: 0"
     exit 2
   fi
 done
+ruby "$BASELINE_CHECKER" > "$WORK/baseline.log" 2>&1
+if [ $? -eq 0 ] && "$GREP" -q '^VERDICT: PASS$' "$WORK/baseline.log"; then
+  pass_item "신뢰 SHA의 R5 시험·명부·최소 기준을 현재 파일이 보존한다"
+else
+  fail_item "신뢰 SHA 대비 필수 시험·명부·기준값 약화"
+  cat "$WORK/baseline.log"
+fi
+ruby "$BASELINE_TEST" > "$WORK/baseline-test.log" 2>&1
+if [ $? -eq 0 ] && "$GREP" -q '^VERDICT: PASS$' "$WORK/baseline-test.log"; then
+  pass_item "시험·명부·기준값 단독·동반 약화 4종을 독립 검사기가 거부한다"
+else
+  fail_item "독립 검사기 약화 fixture 실패"
+  cat "$WORK/baseline-test.log"
+fi
+sed '/^problems <<.*R5_TEST_PREFIX/s/^/# /' "$BASELINE_CHECKER" > "$WORK/weakened-baseline.rb"
+if cmp -s "$BASELINE_CHECKER" "$WORK/weakened-baseline.rb"; then
+  fail_item "검사기 자체 약화 변이 앵커 없음"
+else
+  ruby "$BASELINE_TEST" "$WORK/weakened-baseline.rb" > "$WORK/weakened-baseline.log" 2>&1
+  if [ $? -eq 1 ] && "$GREP" -q 'required test deletion survived' "$WORK/weakened-baseline.log"; then
+    pass_item "검사기 자체 R5 보호 제거 변이를 음성 fixture가 잡는다"
+  else
+    fail_item "검사기 자체 약화 변이가 생존했다"
+    cat "$WORK/weakened-baseline.log"
+  fi
+fi
 
-# ── 탐지기 정의 (진짜/음성 대조군 양쪽에 같은 함수를 쓴다) ────────────────────
 pk_guard_present() {
   local file=$1 ctx
   ctx=$("$GREP" -B2 'return "duplicate"' "$file" 2>/dev/null) || return 1
@@ -127,13 +154,11 @@ if "$GREP" -q 'ThreadPoolExecutor' "$TESTS" && "$GREP" -q 'threading.Barrier' "$
 else
   fail_item "AC-3 경쟁 시험에 동시성 장치가 없다 — 순차 호출은 경쟁을 판정하지 못한다"
 fi
-# ── 2. 기본키 충돌만 duplicate 로 접는가 (양성) ──────────────────────────────
 if pk_guard_present "$MODULE"; then
   pass_item "기본키 충돌만 duplicate 로 번역한다 (sqlite_errorname 비교 존재)"
 else
   fail_item "IntegrityError 를 무조건 duplicate 로 접는다 — 다른 무결성 오류가 둔갑한다"
 fi
-# ── 3. 탐지기 음성 대조군: 가드를 지운 사본은 반드시 잡혀야 한다 ─────────────
 sed 's/^\( *\)if exc.sqlite_errorname == _PRIMARY_KEY_CONSTRAINT:/\1if True:/' \
   "$MODULE" > "$WORK/module_no_guard.py"
 if "$GREP" -q 'if True:' "$WORK/module_no_guard.py" && ! pk_guard_present "$WORK/module_no_guard.py"; then
@@ -240,8 +265,6 @@ else
   fail_item "HMAC 의미 probe 판정 ${probe_ok:-0}건 — 검사 대상이 사라졌다"
 fi
 # ── 6. #97 마이그레이션을 건드리지 않았는가 ─────────────────────────────────
-# 줄 단위 허용 목록이 아니라 마이그레이션 블록 자체(`_MIGRATIONS` 와 버전 상수)를 기준 커밋과
-# 대조한다. 초기화 결과·승인 장부처럼 스키마 밖 변경은 허용하고, 표·열·버전 변경만 잡는다.
 migration_block() {
   awk '/^CURRENT_SCHEMA_VERSION|^SUPPORTED_MIGRATION_RANGE/{print}
        /^_MIGRATIONS: tuple/{on=1} on{print} on && /^\)$/{on=0}' "$1"
@@ -268,7 +291,6 @@ if git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
 else
   abort_not_run "기준 커밋 ${BASE_SHA} 를 찾을 수 없다 — 마이그레이션 동일성을 대조하지 못한 채로는 합격시키지 않는다"
 fi
-# ── 7. hs_candidates 를 우회하는 새 표가 src 에 없는가 ───────────────────────
 "$GREP" -rniE '^[[:space:]]*create[[:space:]]+table' humansearch/src --include='*.py' \
   > "$WORK/create_table.txt"
 rc=$?
@@ -326,9 +348,6 @@ else
   fail_item "pytest 실제 실행 — 종료값 ${pytest_rc}, 수집 ${selected:-0}, 요약 '${run_line}'"
   tail -20 "$pytest_log"
 fi
-# ── 9. 약화 변이 — 승인 장부 대조·열린 연결 대조를 지운 사본은 전용 시험이 반드시 잡는다 ──
-# 격리 사본(src·tests 복사)에 sed 로 한 줄만 고장 내고 r5 시험을 돌린다. 잡히지 않으면
-# 그 검사는 존재만 하고 판정하지 않는 것이다(P13⑥). 사본을 실제로 읽었는지 module 경로로 확인한다.
 mutation_case() {
   local label=$1 expr=$2 must_fail=$3 min_failed=$4 case_dir mutated loaded failed rc
   case_dir=$(mktemp -d "$WORK/mutation.XXXXXX") || { fail_item "약화 변이 '${label}' — 사본 폴더 생성 실패"; return; }
@@ -358,21 +377,18 @@ mutation_case() {
     tail -15 "$case_dir/pytest.log"
   fi
 }
-# 장부 조회를 지우기만 하면 승인 없음(None)으로 흘러 여전히 거부된다. 실제 약화는 "장부에 없으면
-# 지금 그 파일을 승인으로 지어내는" 것이므로 그 형태로 변이한다.
 mutation_case "승인 장부 조회를 자기 승인으로 대체" \
   's/^    approved = approved_db(approved_root)$/    approved = approved_db(approved_root) or ApprovedDb(db_path, db_path.stat().st_dev, db_path.stat().st_ino)/' \
   'test_self_approved_private' 1
-mutation_case "열린 연결 main 경로 대조 제거" \
-  's/^        if len(main_files) != 1 or Path(main_files\[0\]) != db_path:$/        if False:/' \
-  'test_connect_swap_back' 1
+mutation_case "열린 파일 정체성 대조 제거" \
+  's/^            if len(main) != 1 or not all(_allowed_new_sidecar_fd(fd, db_path) for fd in extras):$/            if False:/' \
+  'test_regular_inode_swap_back' 1
 mutation_case "DB hard link 대조 제거" \
   's/^    if info.st_nlink != 1:$/    if False:/' \
-  'test_hardlinked_db_is_refused' 2
-mutation_case "DB 파일 정체성(st_dev·st_ino) 대조 제거" \
-  's/^    if (info.st_dev, info.st_ino) != (approved.st_dev, approved.st_ino):$/    if False:/' \
+  'test_hardlinked_db_is_refused' 1
+mutation_case "경로·열린 파일 정체성 대조 동반 제거" \
+  's/^    if (info.st_dev, info.st_ino) != (approved.st_dev, approved.st_ino):$/    if False:/; s/^            if len(main) != 1 or not all(_allowed_new_sidecar_fd(fd, db_path) for fd in extras):$/            if False:/' \
   'test_renamed_in_compatible_db' 1
-# ── fail-closed 자기 검사 ──────────────────────────────────────────────────
 sed 's/^BASE_SHA=.*/BASE_SHA=0000000000000000000000000000000000000000/' "$SELF" \
   > "$WORK/failclosed_probe.sh"
 HS0302_ACCEPTANCE_DEPTH=9 bash "$WORK/failclosed_probe.sh" > "$WORK/failclosed.log" 2>&1
@@ -391,7 +407,6 @@ sed "s|^GREP=/usr/bin/grep\$|GREP=$WORK/fake-grep|" "$SELF" > "$WORK/failclosed_
 HS0302_ACCEPTANCE_DEPTH=9 bash "$WORK/failclosed_scan_probe.sh" > "$WORK/failclosed_scan.log" 2>&1
 assert_fail_closed "$WORK/failclosed_scan.log" "$?" 'create table 스캔' \
   "fail-closed 자기 검사 ② 우회 표 스캔이 깨진 사본이 그 자리에서 끝난다"
-# ── 건너뛰기 보조 부재 · 즉시 종료 · 차단 분리 (정적) ──────────────────────
 N_SKIP=$(printf 'skip%s' '_item')
 N_EXIT=$(printf 'exit%s' ' 2')
 N_DEPTH=$(printf 'HS0302_ACCEPTANCE%s' '_DEPTH')
@@ -418,7 +433,6 @@ if [ "$needle_ok" -eq 1 ]; then
 else
   fail_item "탐지기 needle 조립이 깨졌다 — 위 정적 검사가 무의미해진다"
 fi
-# ── fail-closed 판정기 자신의 음성 대조군 ──────────────────────────────────
 sed -e 's/^BASE_SHA=.*/BASE_SHA=0000000000000000000000000000000000000000/' \
     -e 's|^abort_not_run() .*|abort_not_run() { echo "NOT_RUN: $1"; checked=$((checked + 1)); }|' \
     "$SELF" > "$WORK/failopen_control.sh"
