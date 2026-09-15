@@ -1005,3 +1005,47 @@ Next steps:
 - `1000원` 거부와 국제화·따옴표 이메일 미지원이 의도된 제품 계약인지 문서에 명시하십시오.
 - 범위 밖 세 구조 변경은 이번 결함 수에 합치지 말고 별도 사장님 결정 항목으로 유지하십시오.
 ```
+
+## 재검토 2026-09-15 — PR #96 6차 GREEN(60c4fb8) Codex V1
+
+실행 12:42:45~12:49:02, verdict needs-attention. 5차 잔여 2건 중 안정 부모 경로에서의 정리 실패·단독 close 실패는 보강 확인. 남은 것: (a) 루트 디렉터리 자체 이동 시 temp_path 낡음 — 같은 UID 동시 실행 봉투, HS-05.04 이관(Codex 도 새 결함으로 세지 않음, 단 goal 문서 이관 문구 미확인), (b) in-scope: `_discard` 가 권한검증 실패+unlink 실패에서 영수증 필드 전부 None, (c) in-scope: 쓰기 실패+close 실패 결합이 write_failed. 7차(최종) 지시(12:51): (b)(c)+goal 이관 문구.
+
+```text
+# Codex Adversarial Review
+
+Target: branch diff against origin/main
+Verdict: needs-attention
+
+VERDICT: FAIL. 지금 상태로는 내보내시면 안 됩니다. 미확인: 읽기 전용 환경 때문에 전체 pytest·verify.sh·실제 hsrunner/EACCES·CI는 실행하지 못했습니다. uv 재시도 전에는 캐시 권한 오류(exit 2), 직접 pytest는 사용 가능한 임시 디렉터리 부재(exit 1)였습니다. F96-1은 부분 해결, F96-2도 부분 해결입니다. 안정된 부모 경로에서의 정상 정리 실패와 단독 close 실패는 보강됐지만, 결합 실패 반례 두 건이 현재 HEAD에서 재현됩니다. 선택한 해석은 ‘남은 임시 파일에 실제로 닿아야 하고, 임시 FD를 닫지 못한 모든 경로가 러너 폐기를 요구한다’입니다. 정상 사례만 충족하면 된다는 해석은 버렸습니다. 이 판단이 틀리면 복구해야 할 원문을 찾지 못하거나, 열린 손잡이를 가진 러너가 다음 후보를 계속 처리합니다. 같은 러너 UID가 최종 이름만 바꾸는 창은 사용자 선언에 따라 HS-05.04 선행조건으로 보고 새 결함으로 세지 않았습니다. 다만 현재 checkout의 goal 문서에서는 HS-05.04 이관 문구를 찾지 못해 그 문서화 상태는 미확인입니다. 반증 기록: ruff는 “All checks passed!”, mypy는 “Success: no issues found in 46 source files”, AST 파싱은 “AST_OK 46 files”, git diff --check는 exit 0이었습니다. 열린 FD를 정리하면서 다시 FD 자체를 조작하는 경로는 찾지 못했고, 파일 526줄·최장 함수 54줄은 P11의 hard 600/100 안이라 결함으로 세지 않았습니다.
+
+Findings:
+- [high] [F96-1] 정리 실패 영수증이 A의 위치를 보장하지 못함 (humansearch/src/humansearch/runner_boundary.py:383-398)
+  원인: humansearch/src/humansearch/runner_boundary.py:383-398은 잔류 임시 경로를 고정된 `final_path.parent` 문자열로 만듭니다. 보호 루트가 열린 디렉터리 파일 디스크립터(FD, 열린 디렉터리를 가리키는 운영체제 손잡이)로 고정된 뒤 이름이 이동하면 실제 파일은 이동한 디렉터리에 남지만 `temp_path`는 옛 경로를 가리킵니다. 기존 결합 시험도 tests/test_runner_boundary_receipt.py:107-129에서 루트 이동과 unlink 실패를 만들면서 상태와 이유만 확인해 이 불일치를 놓칩니다. 또한 runner_boundary.py:500-507의 일반 `_discard`는 완성 파일의 권한 검증 실패 뒤 unlink까지 실패해도 sha256/device/inode/temp_path를 모두 버립니다.
+사업 영향: 복구가 필요하다는 영수증은 남지만 소비자가 원문 A를 열 수 없어 감사 자료나 후보 원문을 사실상 잃을 수 있습니다.
+증거 원문:
+root-move+cleanup-failure receipt: BoundaryReceipt(status=<BoundaryStatus.DENIED: 'denied'>, reason='recovery_required', path=PosixPath('/holder/root/final'), sha256='digest', byte_count=7, device=11, inode=22, temp_path=PosixPath('/holder/root/.3132333435363738.tmp'))
+receipt candidate: /holder/root/.3132333435363738.tmp
+actual pinned-directory location after /holder/root -> /holder/moved rename: /holder/moved/.3132333435363738.tmp
+→ 해석: 영수증의 두 후보 경로 모두 실제 잔류 파일에 닿지 않습니다.
+추가 반례 원문:
+F96-1 counterexample: BoundaryReceipt(status=<BoundaryStatus.DENIED: 'denied'>, reason='recovery_required', path=None, sha256=None, byte_count=0, device=None, inode=None, temp_path=None)
+→ 해석: 완성된 payload의 권한 검증과 삭제가 연속 실패하면 ‘항상 보존’해야 할 값도 사라집니다.
+  Recommendation: 무엇을: 모든 정리 실패를 하나의 영수증 생성 경로로 모으고, 알려진 digest·fstat 값과 실제로 다시 열 수 있는 복구 위치를 보존하십시오.
+왜: device/inode는 위치를 찾는 값이 아니므로 유효한 후보 경로가 반드시 필요합니다.
+버린 길: `final_path.parent / temp_name` 문자열만 반환하는 방식과 `_discard`의 빈 영수증은 버리십시오.
+대가: 보호 루트의 직접 부모를 러너가 이동할 수 없게 하는 bootstrap 계약 또는 고정된 recovery 위치에 hard-link하는 절차가 추가됩니다.
+되돌리기: 새 복구 위치와 영수증 필드를 함께 제거하고 이전 API로 되돌릴 수 있게 변경을 한 커밋에 묶으십시오. 루트 이동+unlink 실패 및 완성 파일 검증 실패+unlink 실패 시험에서 경로·sha256·device·inode를 모두 검증하십시오.
+- [medium] [F96-2] 쓰기 실패와 겹친 임시 FD close 실패가 write_failed로 접힘 (humansearch/src/humansearch/runner_boundary.py:303-307)
+  원인: humansearch/src/humansearch/runner_boundary.py:303-307은 `_fill_temp_file` 오류 뒤 `_close_fd(fd)`의 False 결과를 버리고 곧바로 `_discard(..., "write_failed")`를 반환합니다. 성공적으로 채운 뒤의 close 실패만 308-311에서 `recovery_required`로 승격됐습니다.
+사업 영향: 실제로 열린 임시 FD가 남았는데 호출자는 단순 쓰기 실패로 오인해 러너를 재사용할 수 있습니다. 그 결과 FD 누적, 삭제된 파일의 저장공간 유지, 다음 후보 처리의 신뢰 경계 붕괴가 생길 수 있습니다.
+증거 원문:
+F96-2 counterexample: BoundaryReceipt(status=<BoundaryStatus.DENIED: 'denied'>, reason='write_failed', path=None, sha256=None, byte_count=0, device=None, inode=None, temp_path=None)
+F96-2 close attempts: 1
+→ 해석: ENOSPC 쓰기 실패와 실제 close 전 EIO를 함께 주입했으며 close 실패가 있었음에도 러너 폐기 신호가 반환되지 않았습니다. 현재 시험 tests/test_runner_boundary_failures.py:180-229은 쓰기가 먼저 성공한 단독 close 실패만 다룹니다.
+  Recommendation: `except OSError`에서 close 결과를 보존하고, False이면 정리 성공 여부와 무관하게 `recovery_required`를 반환하십시오. ENOSPC 또는 fsync/fstat 오류와 close-before-close 오류를 동시에 주입해 열린 FD를 확인한 뒤, 영수증이 `recovery_required`인지 검증하는 회귀 시험을 추가하십시오.
+
+Next steps:
+- F96-1의 안정적인 복구 위치와 모든 cleanup 경로의 식별값 보존을 구현하십시오.
+- F96-2의 쓰기 실패+close 실패 결합 경로를 `recovery_required`로 승격하십시오.
+- 쓰기 가능한 환경에서 대상 pytest, 전체 pytest, ruff, mypy, verify.sh를 다시 실행하고 실제 hsrunner 분리 실증은 계속 NOT_RUN으로 명시하십시오.
+```
