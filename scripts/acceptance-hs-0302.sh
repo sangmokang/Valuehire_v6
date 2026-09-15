@@ -31,6 +31,13 @@ set -uo pipefail
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY \
       GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_PREFIX GIT_QUARANTINE_PATH
 
+# 재귀 차단 (2026-09-15 실측). 이 스크립트의 pytest 단계는 자기 자신을 호출하는 시험을
+# 돌린다. fail-closed 가 퇴화하면 그 시험이 다시 이 스크립트를 부르고, 그 안에서 또 시험이
+# 돌아 프로세스가 기하급수로 늘어난다(변이 검증 중 수백 개까지 늘어 강제 종료했다).
+# 깊이를 표시해 중첩 실행에서는 시험 단계를 아예 돌리지 않는다.
+HS0302_NESTED="${HS0302_ACCEPTANCE_DEPTH:-0}"
+export HS0302_ACCEPTANCE_DEPTH=$((HS0302_NESTED + 1))
+
 GREP=/usr/bin/grep
 if [ ! -x "$GREP" ]; then
   echo "NOT_RUN: $GREP 없음 — PATH 의 grep 이 ugrep 으로 가려질 수 있어 절대경로만 쓴다"
@@ -273,6 +280,9 @@ else
 fi
 
 # ── 8. 시험을 실제로 돌린다 (문자열 검사만으로는 동작을 판정하지 못한다) ─────
+if [ "$HS0302_NESTED" -ge 1 ]; then
+  abort_not_run "중첩 실행(depth=${HS0302_NESTED}) — 시험 단계를 돌리면 무한 재귀가 된다"
+fi
 pytest_log="$WORK/pytest.log"
 # 1차와 2차(Codex V1 결함) 시험을 모두 돌린다. 한쪽만 돌리면 닫은 결함이 다시 열려도 모른다.
 ( cd humansearch && uv run pytest tests/test_hs_0302_candidate_identity.py tests/test_hs_0302_r2_hardening.py -q ) \

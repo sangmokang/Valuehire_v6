@@ -325,13 +325,34 @@ def test_real_rfc3339_instants_are_accepted(tmp_path: Path, observed_at: str) ->
 
 
 def _run_acceptance_copy(script: Path) -> subprocess.CompletedProcess[str]:
+    # timeout 은 안전장치다. fail-closed 가 퇴화하면 이 사본이 다시 인수 검사를 부르고
+    # 그 안에서 또 이 시험이 돌아 무한 재귀가 된다(2026-09-15 실측). 스크립트 쪽 깊이
+    # 차단이 1차 방어이고, 이것이 2차 방어다.
     return subprocess.run(
         ["bash", str(script)],
         cwd=_repo_root(),
         capture_output=True,
         text=True,
         check=False,
+        timeout=300,
     )
+
+
+def _assert_fail_closed(result: subprocess.CompletedProcess[str], reason: str) -> None:
+    """필수 검사를 못 했으면 그 자리에서 끝나야 한다.
+
+    종료값만 보면 부족하다 — 건너뛴 뒤 다른 경로로 2 가 나와도 통과해 버린다.
+    NOT_RUN 뒤에 PASS 가 한 줄이라도 이어지면 그것이 바로 fail-open 이다.
+    """
+
+    lines = result.stdout.splitlines()
+    assert result.returncode == 2, result.stdout + result.stderr
+    not_run_at = [index for index, line in enumerate(lines) if line.startswith("NOT_RUN:")]
+    assert not_run_at, result.stdout
+    assert any(reason in lines[index] for index in not_run_at), result.stdout
+    trailing = [line for line in lines[not_run_at[0] + 1 :] if line.startswith("PASS:")]
+    assert trailing == [], f"NOT_RUN 뒤에 판정이 이어졌다: {trailing}"
+    assert "OK(run-acceptance)" not in result.stdout
 
 
 def test_acceptance_aborts_when_base_commit_is_missing(tmp_path: Path) -> None:
@@ -347,8 +368,7 @@ def test_acceptance_aborts_when_base_commit_is_missing(tmp_path: Path) -> None:
 
     result = _run_acceptance_copy(copy)
 
-    assert result.returncode == 2, result.stdout + result.stderr
-    assert "NOT_RUN:" in result.stdout
+    _assert_fail_closed(result, "기준 커밋")
 
 
 def test_acceptance_aborts_when_create_table_scan_fails(tmp_path: Path) -> None:
@@ -376,8 +396,7 @@ def test_acceptance_aborts_when_create_table_scan_fails(tmp_path: Path) -> None:
 
     result = _run_acceptance_copy(copy)
 
-    assert result.returncode == 2, result.stdout + result.stderr
-    assert "NOT_RUN:" in result.stdout
+    _assert_fail_closed(result, "create table 스캔")
 
 
 def test_acceptance_script_has_no_fail_open_skip_helper() -> None:
@@ -386,4 +405,6 @@ def test_acceptance_script_has_no_fail_open_skip_helper() -> None:
     text = (_repo_root() / _ACCEPTANCE).read_text(encoding="utf-8")
 
     assert "skip_item" not in text, "필수 검사 불가를 성공으로 접는 보조가 남아 있다"
+    assert "exit 2" in text, "NOT_RUN 뒤 즉시 종료하는 경로가 없다"
+    assert "HS0302_ACCEPTANCE_DEPTH" in text, "중첩 실행 재귀 차단이 없다"
     assert os.access(_repo_root() / _ACCEPTANCE, os.X_OK)
