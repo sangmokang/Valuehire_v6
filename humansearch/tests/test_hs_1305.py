@@ -19,7 +19,7 @@ from datetime import date
 from pathlib import Path
 
 import pytest
-from hypothesis import given, settings
+from hypothesis import example, given, settings
 from hypothesis import strategies as st
 
 import humansearch.brief as brief_pkg
@@ -479,15 +479,42 @@ def test_load_recipients_rejects_malformed_address(tmp_path: Path) -> None:
 
 
 @settings(max_examples=40, deadline=None)
+@example(first="[회사 매력 포인트]", second="0")  # 도입 문단이 절 머리와 같은 반례(hypothesis 발견)
 @given(
     first=st.text(alphabet=st.characters(blacklist_characters="<>"), min_size=1, max_size=120),
     second=st.text(alphabet=st.characters(blacklist_characters="<>"), min_size=1, max_size=120),
 )
 def test_section_order_holds_for_arbitrary_intro(first: str, second: str) -> None:
+    """어떤 도입 문단을 넣어도 절 순서가 유지되거나, 조립 자체가 거부된다.
+
+    도입 문단은 접두 없이 한 줄로 나가는 유일한 자유 문구라 절 머리와 같은 줄을 담을 수
+    있었다. 그 줄을 그대로 렌더하면 읽는 사람 눈에 절이 둘로 보이므로 렌더러가 거부한다.
+    시험이 `index` 대신 마지막 등장을 보게 고치는 것은 결함을 덮는 것이라 하지 않았다.
+    """
     if not first.strip() or not second.strip():
         return
-    body = render_brief_body(_draft(intro_paragraphs=(first, second)), TODAY)
+    try:
+        body = render_brief_body(_draft(intro_paragraphs=(first, second)), TODAY)
+    except BriefInputError:
+        return  # 절 머리와 충돌하는 도입 문단은 조립 단계에서 막힌다
     lines = body.splitlines()
     positions = [lines.index(title) for title in SECTION_TITLES if title in lines]
     assert len(positions) == len(SECTION_TITLES)
     assert positions == sorted(positions)
+
+
+def test_an_intro_paragraph_equal_to_a_section_head_is_rejected() -> None:
+    """위 속성 시험이 조용히 통과하지 않도록 거부 경로를 따로 못박는다."""
+    for title in SECTION_TITLES:
+        with pytest.raises(BriefInputError):
+            render_brief_body(_draft(intro_paragraphs=(title, "정상 두 번째 문단")), TODAY)
+        with pytest.raises(BriefInputError):
+            render_brief_body(_draft(intro_paragraphs=("정상 첫 문단", title)), TODAY)
+
+
+def test_an_intro_paragraph_hiding_a_section_head_on_its_second_line_is_rejected() -> None:
+    """여러 줄 도입 문단의 둘째 줄에 숨겨도 같은 판정이다."""
+    with pytest.raises(BriefInputError):
+        render_brief_body(
+            _draft(intro_paragraphs=("정상 문장\n[출처 목록]", "정상 두 번째 문단")), TODAY
+        )

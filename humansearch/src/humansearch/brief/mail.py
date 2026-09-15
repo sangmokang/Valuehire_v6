@@ -161,8 +161,35 @@ class BriefDraft:
             _require_text(body, f"BriefDraft.inmails[{index}] 본문")
 
 
+# 도입 문단 자리에 잠시 넣어 두는 표식. 본문에 절대 나올 수 없는 제어문자를 쓴다 —
+# 이 표식이 있는 줄만 나중에 진짜 도입 문단으로 바꾼다.
+_INTRO_SLOTS: tuple[str, ...] = ("\x00intro-0\x00", "\x00intro-1\x00")
+
+
+def _reject_intro_colliding_with_a_section_head(
+    intros: tuple[str, ...], structural: frozenset[str]
+) -> None:
+    """도입 문단 줄이 다른 절 머리와 글자 그대로 같으면 거부한다.
+
+    그대로 두면 읽는 사람 눈에 같은 절이 두 개로 보이고, 줄 번호로 절 순서를 찾는 쪽은
+    도입 줄을 절 머리로 착각한다(hypothesis 반례: 도입 문단이 `[회사 매력 포인트]`).
+    자유 문구가 구조를 흉내 내지 못하게 조립 시점에 막는다.
+    """
+    for index, paragraph in enumerate(intros):
+        for line in paragraph.splitlines() or [paragraph]:
+            if line in structural:
+                _reject(
+                    f"BriefDraft.intro_paragraphs[{index}] 의 줄이 절 머리와 같다: {line!r}"
+                    " (도입 문단은 절 제목과 같은 줄을 담을 수 없다)"
+                )
+
+
 def render_brief_body(draft: BriefDraft, today: date) -> str:
-    """§6 출력 계약 순서 그대로 평문 본문을 만든다(HTML 0)."""
+    """§6 출력 계약 순서 그대로 평문 본문을 만든다(HTML 0).
+
+    도입 문단은 접두 없이 한 줄로 나가는 **유일한** 자유 문구다. 그래서 절 머리와 같은
+    줄을 담으면 구조가 흐트러진다 — 조립을 마친 뒤 절 머리 집합과 대조해 거부한다.
+    """
 
     if not isinstance(today, date):
         _reject("render_brief_body 의 today 는 date 여야 한다")
@@ -171,7 +198,7 @@ def render_brief_body(draft: BriefDraft, today: date) -> str:
         render_header(
             draft.position,
             today,
-            draft.intro_paragraphs[0],
+            _INTRO_SLOTS[0],
             draft.key_line,
             draft.reflection_notes,
         )
@@ -180,7 +207,7 @@ def render_brief_body(draft: BriefDraft, today: date) -> str:
     lines.append(SEPARATOR)
     lines.extend(
         render_gmail_channel(
-            draft.intro_paragraphs[1],
+            _INTRO_SLOTS[1],
             draft.attraction_points,
             packet.gmail_body,
             draft.sender_name,
@@ -212,6 +239,14 @@ def render_brief_body(draft: BriefDraft, today: date) -> str:
     lines.append(SEPARATOR)
     lines.extend(render_candidates(draft.candidates))
     lines.extend(render_inmails(draft.inmails, draft.candidates))
+
+    # 절 머리 집합은 **실제로 조립된 줄**에서 뽑는다 — 목록을 손으로 적으면 제목이 바뀔 때
+    # 조용히 갈라진다. 표식 줄만 빼면 남는 것이 구조 줄이다.
+    slots = frozenset(_INTRO_SLOTS)
+    structural = frozenset(line for line in lines if line not in slots)
+    _reject_intro_colliding_with_a_section_head(draft.intro_paragraphs, structural)
+    for slot, paragraph in zip(_INTRO_SLOTS, draft.intro_paragraphs, strict=True):
+        lines[lines.index(slot)] = paragraph
     return "\n".join(lines) + "\n"
 
 
