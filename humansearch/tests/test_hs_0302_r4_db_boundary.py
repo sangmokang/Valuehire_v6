@@ -20,6 +20,7 @@ import os
 import shutil
 import sqlite3
 import subprocess
+import traceback
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 
@@ -412,3 +413,121 @@ def test_permission_loosened_during_write_is_refused_before_commit(
     db_path.chmod(0o600)
     db_path.parent.chmod(0o700)
     assert _count_rows(db_path) == 0, "확정 전에 잡아야 하므로 행이 남으면 안 된다"
+
+
+# ── 독립 검토(Codex, ced77fe) 결함 3건 — 재현된 것만 시험으로 고정한다 ─────────
+
+
+def _hold_write_lock(db_path: Path) -> sqlite3.Connection:
+    holder = sqlite3.connect(db_path, isolation_level=None)
+    holder.execute("begin immediate")
+    return holder
+
+
+def test_lock_wait_exceeded_without_winner_is_a_closed_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """다른 쓰기 연결이 잠금을 오래 잡으면 원문 OperationalError 가 아니라 닫힌 오류여야 한다.
+
+    재현(2026-09-15 21:07:06, 격리): 별도 연결이 `begin immediate` 를 잡은 채 기록 호출 →
+    5.73초 뒤 `sqlite3.OperationalError(SQLITE_BUSY, database is locked)` 가 그대로 올라왔다.
+    """
+
+    identity = _load_identity_module()
+    db_path = _protected_db(tmp_path)
+    key_path = _key_at(tmp_path / "key-root")
+    monkeypatch.setattr(identity, "_LOCK_WAIT_SECONDS", 0.2, raising=False)
+    holder = _hold_write_lock(db_path)
+    try:
+        with pytest.raises(identity.CandidateIdentityError) as caught:
+            _record(identity, db_path, key_path)
+    finally:
+        holder.execute("rollback")
+        holder.close()
+
+    _assert_closed_error(caught.value, tmp_path)
+    assert "lock" in str(caught.value)
+    assert _count_rows(db_path) == 0
+
+
+def test_lock_wait_exceeded_after_winner_committed_is_duplicate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """이긴 쪽이 이미 같은 키를 확정했다면, 잠금 대기를 넘겨도 결과는 `duplicate` 다(AC-3)."""
+
+    identity = _load_identity_module()
+    db_path = _protected_db(tmp_path)
+    key_path = _key_at(tmp_path / "key-root")
+    monkeypatch.setattr(identity, "_LOCK_WAIT_SECONDS", 0.2, raising=False)
+    assert _record(identity, db_path, key_path) == "inserted"
+    holder = _hold_write_lock(db_path)
+    try:
+        outcome = _record(identity, db_path, key_path)
+    finally:
+        holder.execute("rollback")
+        holder.close()
+
+    assert outcome == "duplicate"
+    assert _count_rows(db_path) == 1
+
+
+def test_key_file_vanishing_leaves_no_path_in_cause_chain(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """닫힌 오류의 원인 사슬(`__cause__`/`__context__`)에도 키 경로가 남으면 안 된다.
+
+    재현(19:27:46·Codex step-13): `str(exc)` 는 깨끗하지만 `traceback.format_exc()` 에
+    `FileNotFoundError: … /key-root/hs-candidate.key` 가 원인으로 실린다.
+    """
+
+    identity = _load_identity_module()
+    db_path = _protected_db(tmp_path)
+    key_path = _key_at(tmp_path / "key-root")
+    original = identity._verify_db_location
+
+    def vanish_then_verify(path: Path) -> Path:
+        key_path.unlink()
+        return Path(original(path))
+
+    monkeypatch.setattr(identity, "_verify_db_location", vanish_then_verify)
+
+    try:
+        _record(identity, db_path, key_path)
+    except identity.CandidateIdentityError:
+        rendered = traceback.format_exc()
+    else:
+        pytest.fail("DID NOT RAISE CandidateIdentityError")
+
+    assert str(tmp_path) not in rendered, "원인 사슬에 키 경로가 실렸다"
+
+
+def test_sqlite_sidecar_owned_by_another_uid_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """보조 파일도 대상 파일 자체의 소유자를 본다(저장 계약 §3). 다른 UID 파일은 같은 UID 로
+    만들 수 없어(chown → EPERM) stat 결과의 st_uid 만 바꿔 재현한다."""
+
+    identity = _load_identity_module()
+    db_path = _protected_db(tmp_path)
+    key_path = _key_at(tmp_path / "key-root")
+    sidecar = db_path.with_name(db_path.name + "-journal")
+    sidecar.write_bytes(b"")
+    sidecar.chmod(0o600)
+    real_stat = Path.stat
+
+    def foreign_owner_stat(self: Path, *, follow_symlinks: bool = True) -> os.stat_result:
+        info = real_stat(self, follow_symlinks=follow_symlinks)
+        if self == sidecar:
+            fields = list(info)
+            fields[4] = info.st_uid + 1
+            return os.stat_result(tuple(fields))
+        return info
+
+    monkeypatch.setattr(Path, "stat", foreign_owner_stat)
+
+    with pytest.raises(identity.CandidateIdentityError) as caught:
+        _record(identity, db_path, key_path)
+
+    _assert_closed_error(caught.value, tmp_path)
+    assert "owner" in str(caught.value)
+    assert _count_rows(db_path) == 0
