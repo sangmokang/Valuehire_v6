@@ -213,6 +213,18 @@ def _has_company_field_condition(line: str) -> bool:
 # `[회사 리서치 | 2026-09-10 확인]` — 날짜는 렌더러가 넣으므로 모양만 고정한다.
 _RESEARCH_HEAD = re.compile(r"\[회사 리서치 \| .+ 확인\]")
 
+# 회사 절에서 조건 검사를 면제받을 수 있는 **금액 필드**와 렌더러가 쓰는 라벨.
+# "렌더러가 만들었다" 는 면제 근거가 될 수 없다 — CompanyBrief 에 조건을 먼저 심으면
+# 그 줄이 그대로 허용 집합에 들어간다(Codex V1: `- 매출: 경력 5년 이상 [I1]`).
+_AMOUNT_FIELDS: tuple[tuple[str, str], ...] = (
+    ("매출", "revenue"),
+    ("영업이익", "operating_profit"),
+    ("누적 투자금", "funding_total"),
+)
+
+# 회사 금액으로 인정하는 값의 모양. 값 전체가 여기 맞을 때만 면제한다.
+_AMOUNT_VALUE = re.compile(r"\d[\d,]*(\.\d+)?\s*(억|만|조)?\s*(원|달러|USD|KRW)")
+
 
 def _company_research_indexes(lines: tuple[str, ...]) -> frozenset[int]:
     """[회사 리서치] 절 본문의 줄 번호. 빈 줄이나 다음 절 머리(`[`)에서 끝난다."""
@@ -348,8 +360,8 @@ class SearchPacket:
             if index in jd_line_indexes:
                 continue
             if index in research_indexes and line in rendered:
-                # 회사 리서치 절이 CompanyBrief 의 검증된 렌더링 결과 그대로면 채용 조건이 아니다.
-                # (Codex 13차 F83-3: `- 매출: 300억 원 [I1]` 이 금액 패턴에 걸려 정상 브리프가 막혔다)
+                # 회사 리서치 절에서 면제받는 줄은 **금액 필드에서 렌더한 금액 모양** 하나뿐이다.
+                # (F83-3: `- 매출: 300억 원 [I1]` 오탐을 풀되, `- 매출: 경력 5년 이상 [I1]` 은 막는다)
                 continue
             has_condition = (
                 _has_company_field_condition(line)
@@ -360,12 +372,23 @@ class SearchPacket:
                 _reject(f"TeamMail.body 의 JD 블록 밖에 채용 조건이 끼었다: {line!r}")
 
     def _rendered_company_lines(self) -> frozenset[str]:
-        """이 패킷의 CompanyBrief 로 렌더러가 만들 수 있는 회사 사실 줄 전부.
+        """조건 검사를 면제할 회사 절 줄 — **금액 필드에서 렌더한 금액 모양 줄**만.
 
         `mail_sections` 가 `types_packet` 을 import 하므로 최상단 import 는 순환이다 —
-        렌더러를 복제해 라벨이 갈라지느니 호출 시점에 한 번 불러온다(정본은 한 곳뿐).
-        `open_items` 는 러너 자유 문구라 여기 넣지 않는다 — 그 줄은 계속 조건 검사를 받는다.
+        렌더러를 복제해 줄 모양이 갈라지느니 호출 시점에 한 번 불러온다(정본은 한 곳뿐).
+        렌더러가 실제로 내보내는 줄인지도 교차 확인한다 — 라벨이 갈라지면 면제가
+        조용히 넓어지는 대신 좁아지고, 정상 경로 시험이 곧바로 깨진다.
+        `open_items`·제품·연혁·뉴스 같은 자유 문구는 여기 없다 — 계속 조건 검사를 받는다.
         """
-        from .mail_sections import render_company_research
+        from .mail_sections import _claim_line, render_company_research
 
-        return frozenset(render_company_research(self.company, (), self.created_on))
+        rendered = frozenset(render_company_research(self.company, (), self.created_on))
+        allowed: set[str] = set()
+        for label, attribute in _AMOUNT_FIELDS:
+            claim = getattr(self.company, attribute)
+            if claim is None or not _AMOUNT_VALUE.fullmatch(claim.value.strip()):
+                continue
+            line = _claim_line(label, claim)
+            if line in rendered:
+                allowed.add(line)
+        return frozenset(allowed)
