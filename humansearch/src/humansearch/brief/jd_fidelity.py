@@ -20,6 +20,7 @@ __all__ = [
     "content_lines",
     "extract_block",
     "judgement_form",
+    "mixed_script_word",
     "multi_position_hint",
     "normalize_line",
     "split_sections",
@@ -52,25 +53,72 @@ EXTRA_CONDITION_PATTERNS: tuple[str, ...] = (
 )
 
 
-# 판정용 사본에서 지우는 것: 유니코드 format 문자(Cf — 영폭 공백·ZWNJ·ZWJ·BOM 등)와
-# 마크다운 강조 기호. 사람 눈에는 `경력 5년 이상` 인데 글자 사이가 갈려 조건 정규식을
-# 빠져나가는 변형을 막는다(Codex V2 2차: `경\u200b력 5년 이\u200b상`·`경**력** 5년 이**상**`).
+# 판정용 사본에서 지우는 것: 화면에 나타나지 않는 문자와 마크다운 표시 문법.
+# 사람 눈에는 `경력 5년 이상` 인데 글자 사이가 갈려 조건 정규식을 빠져나가는 변형을 막는다.
+#   Codex V2 2차: `경\u200b력 5년 이\u200b상` · `경**력** 5년 이**상**`
+#   Codex V1 3차: `경\ufe0f력 5년 이\ufe0f상`(U+FE0F 는 Cf 가 아니라 Mn 이다) · `경[력]() 5년 이[상]()`
 _EMPHASIS = re.compile(r"\*\*|__|~~|[*_`]")
+
+# `[표시](주소)` · `![표시](주소)` · `[표시]()` 를 표시 문자열로 되돌린다. 주소는 판정에서 뺀다 —
+# 사람이 화면에서 읽는 것은 표시 문자열뿐이기 때문이다.
+_MARKDOWN_LINK = re.compile(r"!?\[([^\]\[]*)\]\([^()]*\)")
+
+# 기본적으로 보이지 않는데 Cf 가 아닌 것들: 변이 선택자와 결합 격리(전부 Mn 범주).
+_INVISIBLE_MARKS = frozenset(
+    chr(cp)
+    for cp in (*range(0xFE00, 0xFE10), *range(0x180B, 0x180E), *range(0xE0100, 0xE01F0), 0x034F)
+)
+
+
+def _is_invisible(char: str) -> bool:
+    return unicodedata.category(char) == "Cf" or char in _INVISIBLE_MARKS
 
 
 def judgement_form(text: str) -> str:
     """조건 판정·충실도 대조에 쓰는 **사본**. 원문은 호출자가 그대로 보관한다.
 
-    ① NFKC 정규화(전각 `５` → `5`) ② Cf 범주 문자 제거 ③ 마크다운 강조 기호 제거.
-    ②③ 은 고정점까지 반복한다 — 한 번만 지우면 남은 기호가 새 쌍을 만든다.
-    이것은 **의미 검증이 아니다**. 목록 밖 표현은 그대로 통과한다(§7-5 결정 카드).
+    ① NFKC 정규화(전각 `５` → `5`) ② 마크다운 링크·이미지를 표시 문자열로 환원
+    ③ 보이지 않는 문자 제거(Cf + 변이 선택자 + 결합 격리) ④ 마크다운 강조 기호 제거.
+    ②③④ 는 고정점까지 반복한다 — 한 번만 지우면 남은 기호가 새 쌍·새 링크를 만든다.
+
+    이것은 **의미 검증이 아니다**. 화면에 같아 보이게 만드는 문자 장난을 걷어 낼 뿐이고,
+    목록 밖 표현은 그대로 통과한다(§7-5 결정 카드 ⑤).
+    서로 다른 문자 체계를 섞은 글자는 여기서 고치지 않는다 — `mixed_script_word` 가 거부한다.
     """
     current = unicodedata.normalize("NFKC", text)
     while True:
-        shorter = _EMPHASIS.sub("", "".join(ch for ch in current if unicodedata.category(ch) != "Cf"))
+        without_links = _MARKDOWN_LINK.sub(r"\1", current)
+        visible = "".join(ch for ch in without_links if not _is_invisible(ch))
+        shorter = _EMPHASIS.sub("", visible)
         if shorter == current:
             return current
         current = shorter
+
+
+# 한글과 섞이면 거부할 문자 체계. NFKC 는 키릴 `а` 를 한글로 바꾸지 않으므로 정규화로는
+# 못 막는다 — 닮은 글자를 끼워 조건 문구를 끊는 입력은 아예 받지 않는다(Codex V1 3차).
+_FOREIGN_SCRIPTS = ("CYRILLIC", "GREEK", "ARMENIAN")
+_HANGUL = ("HANGUL",)
+
+
+def _script_of(char: str) -> str | None:
+    try:
+        name = unicodedata.name(char)
+    except ValueError:
+        return None
+    return name.split(" ", 1)[0]
+
+
+def mixed_script_word(text: str) -> str | None:
+    """한글과 비-라틴 외국 문자 체계가 **한 어절 안에** 섞인 첫 어절. 없으면 None.
+
+    라틴 문자·숫자·부호는 정상 혼용이라 보지 않는다(`Python 개발자`·`Series-B` 는 통과).
+    """
+    for word in judgement_form(text).split():
+        scripts = {script for script in (_script_of(ch) for ch in word) if script is not None}
+        if scripts & set(_HANGUL) and scripts & set(_FOREIGN_SCRIPTS):
+            return word
+    return None
 
 
 def _strip_bullets(text: str) -> str:

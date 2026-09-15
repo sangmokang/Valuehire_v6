@@ -17,6 +17,7 @@ from .jd_fidelity import (
     FidelityReport,
     content_lines,
     judgement_form,
+    mixed_script_word,
     verify_fidelity,
 )
 from .linkedin_limit import verify_linkedin_fidelity
@@ -91,6 +92,10 @@ class Contact:
             _reject(
                 f"Contact.name 은 {_CONTACT_NAME_MIN}~{_CONTACT_NAME_MAX}자여야 한다: {len(self.name)}자"
             )
+        mixed = mixed_script_word(self.name)
+        if mixed is not None:
+            # NFKC 는 키릴 `а` 를 한글로 바꾸지 않는다 — 정규화가 아니라 입력 거부다.
+            _reject(f"Contact.name 에 한글과 다른 문자 체계가 섞인 어절이 있다: {mixed!r}")
         if _has_extra_condition(self.name):
             # 판정용 사본에서 본다 — `경(영폭)력 5년 이(영폭)상` 도 같은 문구다.
             _reject(f"Contact.name 이 채용 조건 문구다: {self.name!r}")
@@ -421,6 +426,12 @@ class SearchPacket:
                 # 회사 리서치 절에서 면제받는 줄은 **금액 필드에서 렌더한 금액 모양** 하나뿐이다.
                 # (F83-3: `- 매출: 300억 원 [I1]` 오탐을 풀되, `- 매출: 경력 5년 이상 [I1]` 은 막는다)
                 continue
+            mixed = mixed_script_word(line)
+            if mixed is not None:
+                _reject(
+                    "TeamMail.body 의 JD 블록 밖 줄에 한글과 다른 문자 체계가 섞인 어절이 있다: "
+                    f"{mixed!r}"
+                )
             has_condition = (
                 _has_company_field_condition(line)
                 if index in company_line_indexes
