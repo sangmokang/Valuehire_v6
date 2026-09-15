@@ -222,3 +222,23 @@ def test_retry_after_interrupted_write_succeeds(
     assert receipt.reason == "written"
     assert (root / "e.jsonl").read_bytes() == PAYLOAD
     assert (root / "e.jsonl").stat().st_mode & 0o777 == 0o600
+
+
+def test_platform_without_dir_fd_support_is_not_run(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    """디렉터리 FD 상대 호출이 없는 플랫폼에서는 쓰지 않고 멈춘다.
+
+    경계의 보장은 dir_fd 상대 열기에 기대고 있다. 그 전제가 없으면 조용히
+    경로 문자열로 되돌아가지 않고 NOT_RUN 으로 멈춘다.
+    """
+
+    _hsrunner(monkeypatch)
+    root = _mkdir(tmp_path / "root", 0o700)
+    monkeypatch.setattr(os, "supports_dir_fd", frozenset())
+
+    receipt = write_protected_file(_config(root), "p.jsonl", PAYLOAD)
+
+    assert receipt.status is BoundaryStatus.NOT_RUN
+    assert receipt.reason == "platform_lacks_dir_fd"
+    assert list(root.iterdir()) == []
