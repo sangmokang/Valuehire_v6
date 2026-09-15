@@ -215,5 +215,16 @@ HMAC 입력 누락, 예외 삼킴 범위, 키 파일 검사 우회(symlink·모�
 | 변이 M-C 정본 명부 행 삭제 | 생존 0 | 12:43 → `FAIL: 검증 명부에 이 인수 검사가 없다`, rc=1 |
 | 변이 M-D 저장소 밖 참조 재도입 | 생존 0 | 12:44:03 → 인수 `FAIL: 시험이 humansearch/ 밖 경로를 참조한다 2건`, rc=1. G2 게이트도 같은 변이에서 `mutation failed for the wrong reason` 으로 차단 — 재발 방지 검사가 G2 보다 먼저 잡는다 |
 | 자기 매칭 함정 | 해소 | 정적 검사의 needle 을 검사 줄에 리터럴로 두자 검사가 자기를 잡아 항상 참이 됐다(첫 실행에서 FAIL 로 드러남). 런타임 조립 + 양성 대조군으로 고쳤다 |
+| 4차 — 지시 검증 명령 0건화 | PASS | `8c65d84`. `grep -rln 'scripts/\|\.github\|docs/sot' humansearch/tests/test_hs_0302*.py` 가 주석 1건을 잡고 있었다(파일 열기는 이미 0). 문구를 바꿔 0건. 인수 검사 판정 패턴도 같은 명령과 일치시켰다 — 기준을 두 벌로 적으면 갈라진다 |
+| 4차 — fail-closed 기준 단일화 | PASS | `49d98df`. pytest 층을 걷어낸 뒤 변이 N6 을 다시 돌리니 **아무도 잡지 못했다**. 자기 검사와 음성 대조군이 서로 다른 조건을 따로 적고 있었다. `fail_closed_ok()` 하나로 모아 양방향에서 쓰게 했다 |
+| 변이 N6a 기준 함수 완화 | 생존 0 | 12:55:50 → `FAIL: fail-closed 판정기가 fail-open 사본도 통과시킨다`, rc=1 |
+| 변이 N6b abort_not_run 만 fail-open | 생존 0 | 12:55 → 자기 검사 2건 `FAIL: ... fail-closed 기준 위반`, rc=1 |
+| 변이 N3a/N3b/N3c (bash 기준) | 생존 0 | 12:53:22 → 각각 `FAIL` + rc=1. pytest 없이 bash 자기 검사만으로 잡는다 |
+| 변이 N4b (bash 기준) | 생존 0 | 12:53 → `'70/71 tests collected (1 deselected)'`, rc=1 |
+| G2 gates-mutations (종료 조건) | PASS | 12:56:08 → `PASS: gates mutations blocked 6/6`, rc=0 |
+| G2 gates | PASS | 12:56 → `ruff clean in 47` · `mypy strict clean in 47` · `pytest collected 300 and passed` · `COLLECTED: 300`, rc=0 |
+| G2 gates-antiforge | PASS | 12:56 → `PASS: gates antiforge 3/3`, rc=0 |
+| ci-step-integrity | PASS | 12:56 → `CHECKED: 24`, `VERDICT: PASS`, rc=0 |
+| 4차 재검증 | PASS | 12:58:16 → 전체 `300 passed in 9.59s`, ruff rc=0, mypy rc=0, 인수 `CHECKED: 20` rc=0, V2 재현기 그대로 |
 | V1 (3차) | NOT_RUN | 독립 검증 엔진 대기 |
 | push·Draft PR | NOT_RUN | 공통 규칙상 이 세션은 push·PR 을 하지 않는다 |
