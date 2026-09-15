@@ -114,10 +114,26 @@ HMAC 입력 누락, 예외 삼킴 범위, 키 파일 검사 우회(symlink·모�
 
 ## 검증 장부
 
+기준 커밋 7473ec8(#97 HEAD). 아래 명령은 워크트리
+`worktrees/hs-0302-candidate-identity-20260914` 에서 2026-09-15 에 실제로 실행한 것이다.
+
 | 단계 | 상태 | 증거 |
 |---|---|---|
 | strict 0.1 원칙 로드 | PASS | `bash scripts/acceptance-principles-check.sh` @6f8b98b 10:29:08 → `VERDICT: PASS`, `MECHANISMS: PASS 34/34`, `WIRING: PASS pre-push=1 ci=1`, `CHECKED: 34`, rc=0 |
-| RED 커밋 | NOT_RUN | 아래 갱신 |
-| GREEN 커밋 | NOT_RUN | |
-| 검증 명령 | NOT_RUN | |
-| V1 | NOT_RUN | |
+| 기준선 재측정 | PASS(불일치 기록) | `uv run pytest -q` @23a4890 10:36:55 → `229 passed in 12.25s`, `229 tests collected`. 이 문서 "현재 상태" 표의 241 은 이 워크트리에서 재현되지 않는다 — 기준선은 **229** 다 |
+| RED 커밋 | PASS | `838577b` (시험 파일 1개, 434줄). 직전 `uv run pytest tests/test_hs_0302_candidate_identity.py -q` 10:41:54 → `28 failed in 0.56s`, 실패 사유 28건 전부 `Failed: record function missing: humansearch.candidate_identity` — import/문법 오류가 아니라 빠진 동작이다 |
+| GREEN 커밋 | PASS | `4f51ca6` (`humansearch/src/humansearch/candidate_identity.py` 178줄 + `scripts/acceptance-hs-0302.sh` 215줄). `storage_schema.py` 수정 0줄, 마이그레이션 추가 0개 |
+| 검증 — 새 시험 | PASS | `uv run pytest tests/test_hs_0302*.py -q` 10:48:00 → `28 passed in 0.99s` |
+| 검증 — 전체 시험 | PASS | `uv run pytest -q` 10:48 → `257 passed in 14.32s` (229 기준선 + 28 신규, 기존 시험 약화·삭제·skip 0) |
+| 검증 — ruff·mypy | PASS | `uv run ruff check src tests` → `All checks passed!`; `uv run mypy src tests` → `Success: no issues found in 45 source files`, rc=0 |
+| 검증 — 인수 스크립트 | PASS | `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-0302.sh` 10:48:27 → `PASS` 11줄, `CHECKED: 11`, `OK(run-acceptance): ... 판정 11건, CHECKED 11`, rc=0 |
+| 변이 (1) 기본키 제약 제거 | 생존 0 | `storage_schema.py:53` 에서 `primary key` 삭제 10:46:14 → `test_ac1_same_triplet_twice_leaves_one_row`, `test_ac3_two_connections_racing_the_same_key_keep_one_row` 2건 실패. `AssertionError: round 0: ['inserted', 'inserted']`. `git checkout --` 로 복구, `git status --short` 0줄 |
+| 변이 (2) HMAC 입력에서 channel 제거 | 생존 0 | `channel.encode("utf-8"),` 삭제 10:46:21 → `test_ac2_position_or_channel_difference_creates_separate_rows`, `test_ac1_key_hmac_separator_distinguishes_field_boundaries` 2건 실패. `assert 'duplicate' == 'inserted'` (채널만 다른 후보가 한 행으로 합쳐졌다). 복구 후 0줄 |
+| 변이 (3) IntegrityError 통째로 duplicate | 생존 0 | 가드 삭제 10:46:32 → `test_non_primary_key_integrity_error_is_not_folded_into_duplicate` 실패 (`DID NOT RAISE IntegrityError`). 인수 스크립트도 같은 변이에서 `FAIL` 3줄 + rc=1. 복구 후 0줄 |
+| 변이 (4) 키 검사 제거 | 생존 0 | `_load_hmac_key` 를 `read_bytes()` 한 줄로 치환 10:46:57 → 키 시험 6건 실패 (부재·DB 루트 내부·모드 0644·부모 0755·symlink·32바이트 미만). 복구 후 0줄 |
+| counter-AC 검출 (변이와 별건) | PASS | 응용 코드 `SELECT`-then-`INSERT` + 기본키 제약 없음 사본 10:47:25 → `test_ac3...` 실패, `round 1: ['inserted', 'inserted']` (2행 생성). 복구 후 `git status --short` 0줄, `git diff 7473ec8 -- storage_schema.py` 0줄 |
+| AC-3 독립 연결 실측 | PASS | 계측 스크립트 10:47:52 → `connect calls (worker)=2`, `distinct worker threads=2`, `distinct connection ids=2`, `same connection shared=False`, `rows in hs_candidates=1`. 같은 연결 공유가 아니다 |
+| `sqlite_errorname` 실측 | PASS | Python 3.14.1 / SQLite 3.51.1 → 클래스 `hasattr(sqlite3.IntegrityError, "sqlite_errorname")` = `False`, 인스턴스는 기본키 충돌 `SQLITE_CONSTRAINT_PRIMARYKEY`, CHECK 위반 `SQLITE_CONSTRAINT_CHECK`, NOT NULL 위반 `SQLITE_CONSTRAINT_NOTNULL` |
+| P11 코드 예산 | PASS | `candidate_identity.py` 178줄 / 최장 함수 `_insert_once` 29줄. 시험 파일 434줄 / 최장 함수 51줄. 인수 스크립트 215줄. hard 600·100 이내 |
+| V1 | NOT_RUN | 독립 검증 엔진 대기 |
+| push·Draft PR | NOT_RUN | 공통 규칙상 이 세션은 push·PR 을 하지 않는다 |
