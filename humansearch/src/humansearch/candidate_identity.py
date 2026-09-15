@@ -17,13 +17,14 @@ from __future__ import annotations
 import hmac
 import re
 import sqlite3
+import stat
 import unicodedata
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Final, Literal
 
-from humansearch.storage_schema import StorageSchemaError, _verify_path
+from humansearch.storage_schema import StorageSchemaError, _inside_git_worktree, _verify_path
 
 Channel = Literal["saramin", "jobkorea", "linkedin_rps"]
 RecordOutcome = Literal["inserted", "duplicate"]
@@ -42,6 +43,9 @@ _MAX_FIELD_CHARS: Final = 512
 _PRIMARY_KEY_CONSTRAINT: Final = "SQLITE_CONSTRAINT_PRIMARYKEY"
 _KEY_FILE_MODE: Final = 0o600
 _KEY_DIR_MODE: Final = 0o700
+_DB_FILE_MODE: Final = 0o600
+_DB_DIR_MODE: Final = 0o700
+_SIDECAR_SUFFIXES: Final = ("-journal", "-wal", "-shm")
 # C0(0x00-0x1F) · DEL(0x7F) · C1(0x80-0x9F). 필드 경계를 흉내 내거나 strip 에 조용히
 # 잘려 키를 바꾸는 문자를 전부 막는다.
 _CONTROL_CHARACTERS: Final = re.compile(r"[\x00-\x1f\x7f-\x9f]")
@@ -241,6 +245,45 @@ def _load_hmac_key(hmac_key_path: Path, db_path: Path) -> bytes:
     return key
 
 
+def _verify_db_boundary(db_path: Path) -> None:
+    """쓰기 직전 보호 경계 — 저장 계약 §3.
+
+    HS-03.01 이 초기화 때 본 권한·위치는 그 시점의 사실일 뿐이다. 기록 시점에 부모
+    0700 · DB 0600 · 현재 UID · 일반 파일 · Git 밖 · 보조 파일을 다시 본다. 권한 완화·
+    소유자 불일치·symlink·승인 root 탈출은 저장 실패다(Codex 14:50 높음).
+    """
+
+    _verify(db_path.parent, expected_mode=_DB_DIR_MODE, label="db directory")
+    _verify(db_path, expected_mode=_DB_FILE_MODE, label="db file")
+    if not db_path.is_file():
+        raise CandidateIdentityError("db file must be a regular file")
+    if _inside_git_worktree(db_path.parent):
+        raise CandidateIdentityError("db file must be outside the git worktree")
+    _verify_sidecars(db_path)
+
+
+def _verify_sidecars(db_path: Path) -> None:
+    """journal/wal/shm 도 같은 보호 범위다 — 단, 한 번의 lstat 로만 본다.
+
+    HS-03.01 의 초기화 검사는 exists() 뒤 stat() 을 다시 하는데, 경쟁하는 다른 연결이
+    journal 을 만들었다 지우는 사이에 사라지면 "missing" 으로 거부한다(AC-3 경쟁 시험
+    20회 중 7회 실측). 없어진 보조 파일은 위반이 아니다. 소유자는 따로 보지 않는다 —
+    0700 부모 안에 다른 UID 가 파일을 만들 수 없고, 부모 검사가 앞에서 끝난다.
+    """
+
+    for suffix in _SIDECAR_SUFFIXES:
+        try:
+            info = db_path.with_name(db_path.name + suffix).stat(follow_symlinks=False)
+        except FileNotFoundError:
+            continue
+        if stat.S_ISLNK(info.st_mode):
+            raise CandidateIdentityError("sqlite sidecar must not be a symlink")
+        if stat.S_IMODE(info.st_mode) != _DB_FILE_MODE:
+            raise CandidateIdentityError(f"sqlite sidecar mode must be {_DB_FILE_MODE:04o}")
+        if not stat.S_ISREG(info.st_mode):
+            raise CandidateIdentityError("sqlite sidecar must be a regular file")
+
+
 def _insert_once(
     db_path: Path,
     *,
@@ -251,6 +294,7 @@ def _insert_once(
 ) -> RecordOutcome:
     """Single INSERT. 경쟁은 기본키 제약이 막고, 진 쪽만 duplicate 가 된다."""
 
+    _verify_db_boundary(db_path)
     connection = sqlite3.connect(db_path, isolation_level=None)
     try:
         connection.execute("pragma foreign_keys = on")
