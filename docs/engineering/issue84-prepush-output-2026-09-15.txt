@@ -1,0 +1,42 @@
+COMMAND: git -C /var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/tmp.yhlPpSVMio/repo push --dry-run /var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/tmp.yhlPpSVMio/remote.git HEAD:refs/heads/task/issue84-commit-guards-20260915
+TIME: 2026-09-15 23:57:03 KST
+VERDICT: PASS
+SOT_LOAD: PASS docs/sot/coding-principles.md
+LEDGER_LOAD: PASS docs/sot/principles.yaml
+MECHANISMS: PASS 34/34 strict-contract-bindings
+WIRING: PASS pre-push=1 ci=1
+CHECKED: 34
+  skip ./scripts/acceptance-0-2.sh (DEFERRED · CI 담당)
+  skip ./scripts/acceptance-0-5.sh (DEFERRED · CI 담당)
+  skip ./scripts/acceptance-0-7.sh (PUSH-PERFORMING · CI 담당)
+pre-push: 검사 28개 실행
+  ok  ./scripts/acceptance-0-2-unreachable-content.sh
+  ok  ./scripts/acceptance-0-6.sh
+  ok  ./scripts/acceptance-ci-step-integrity.sh
+  ok  ./scripts/acceptance-commit-worktree-guards.sh
+  ok  ./scripts/acceptance-guard-global-skill-files.sh
+  ok  ./scripts/acceptance-hs-a3.sh
+BLOCKED: ./scripts/acceptance-hs-a4.sh exit=1
+  ok  ./scripts/acceptance-hs-cleanroom-absolute-contexts.sh
+  ok  ./scripts/acceptance-hs-cleanroom-absolute-paths.sh
+  ok  ./scripts/acceptance-hs-cleanroom-colon-paths.sh
+  ok  ./scripts/acceptance-hs-cleanroom-file-urls.sh
+  ok  ./scripts/acceptance-hs-cleanroom-hook-env-mutations.sh
+  ok  ./scripts/acceptance-hs-cleanroom-hook-env.sh
+  ok  ./scripts/acceptance-hs-cleanroom-mutations.sh
+  ok  ./scripts/acceptance-hs-cleanroom.sh
+  ok  ./scripts/acceptance-hs-gates-antiforge.sh
+  ok  ./scripts/acceptance-hs-gates-mutations.sh
+  ok  ./scripts/acceptance-hs-gates.sh
+  ok  ./scripts/acceptance-invoice.sh
+  ok  ./scripts/acceptance-principles-check.sh
+  ok  ./scripts/acceptance-principles-mutations.sh
+  ok  ./scripts/acceptance-secret-webhook-vendor.sh
+  ok  ./scripts/acceptance-semantic-mutations.sh
+BLOCKED: ./scripts/acceptance-silent-failure-lint-mutations.sh exit=1
+  ok  ./scripts/acceptance-silent-failure-lint.sh
+  ok  ./scripts/acceptance-verified-sha.sh
+  ok  ./scripts/acceptance-verify-ac-m.sh
+  ok  ./verify.sh
+error: failed to push some refs to '/var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/tmp.yhlPpSVMio/remote.git'
+EXIT: 1

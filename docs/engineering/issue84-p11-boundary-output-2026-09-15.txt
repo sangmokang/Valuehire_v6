@@ -1,0 +1,8 @@
+PASS: P11 hard=600 exact=600 accepted
+PASS: P11 hard+1=601 rejected
+CODE_FILE: hooks/pre-commit LOC=284 hard=600
+CODE_FILE: scripts/acceptance-0-7.sh LOC=221 hard=600
+CODE_FILE: scripts/acceptance-hs-a4.sh LOC=416 hard=600
+CODE_FILE: scripts/acceptance-silent-failure-lint-mutations.sh LOC=362 hard=600
+CODE_FILE: scripts/acceptance-commit-worktree-guards.sh LOC=151 hard=600
+VERDICT: PASS

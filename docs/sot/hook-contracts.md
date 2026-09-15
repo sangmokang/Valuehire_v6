@@ -7,7 +7,8 @@
 
 ### `hooks/pre-commit`
 ```
-입력  : stdin 없음. 현재 HEAD의 전체 참조, Git의 git-dir/common-dir,
+입력  : stdin 없음. `git symbolic-ref -q HEAD`의 현재 브랜치 참조
+        (첫 커밋 전 unborn branch도 참조로 읽음), Git의 git-dir/common-dir,
         스테이징된 파일 목록(git diff --cached --name-only --diff-filter=ACMR)
         ※ R(rename) 포함. 빼면 `git mv notes.txt leak.db` 가 목록에서 사라져 그대로 통과한다
 출력  : exit 0 (통과) | exit 1 (차단)
@@ -37,6 +38,7 @@
           사용하지 않는다. CI는 같은 린터와 mutation 회귀를 전체 추적 파일에 실행한다
 불변식: set -euo pipefail. 검사를 실행하지 못하면 exit 1 (fail-closed).
         위치 정책은 staged 파일이 0개여도 먼저 판정하며, 차단 시 HEAD를 바꾸지 않는다.
+        detached HEAD는 유효한 커밋인지 확인하고 두 위치 정책의 범위 밖으로 둔다.
 제외  : 없음. 자기 자신(hooks/)도 검사 대상이다
 한계  : 표준 Git 로컬 훅은 git commit --no-verify 등으로 우회할 수 있다.
         CI는 개발자 로컬의 기본 worktree 위치를 볼 수 없고 GitHub branch

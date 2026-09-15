@@ -1,0 +1,13 @@
+TIME: 2026-09-16 00:05:11 KST
+COMMAND: git -C <mktemp>/repo commit -m "unborn main probe"
+HOOKS_PATH: hooks
+EXIT: 1
+BRANCH_BEFORE: refs/heads/main
+BRANCH_AFTER: refs/heads/main
+HEAD_BEFORE: NONE
+HEAD_AFTER: NONE
+STDOUT_BEGIN
+STDOUT_END
+STDERR_BEGIN
+BLOCKED: direct commit to main
+STDERR_END

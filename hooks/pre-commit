@@ -23,10 +23,15 @@ block() { printf 'BLOCKED: %s\n' "$1" >&2; fail=1; }
 # 이슈 #84: 정확한 HEAD와 Git 관리 디렉터리로 커밋 위치를 먼저 판정한다.
 # --git-dir == --git-common-dir인 checkout이 기본 worktree다. 연결된 worktree는
 # 자체 git-dir이 공통 .git/worktrees/<id>에 있어 두 실제 경로가 다르다.
-head_ref=$(git rev-parse --symbolic-full-name HEAD) || {
+head_ref=""
+if head_ref=$(git symbolic-ref -q HEAD); then
+  : # unborn branch에도 refs/heads/<name>을 반환한다.
+elif git rev-parse --verify HEAD >/dev/null 2>&1; then
+  head_ref=detached-HEAD
+else
   block "HEAD 참조 조회 실패 (fail-closed)"
   exit 1
-}
+fi
 if [ "$head_ref" = refs/heads/main ]; then
   block "direct commit to main"
   exit 1

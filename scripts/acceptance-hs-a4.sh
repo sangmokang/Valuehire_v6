@@ -96,6 +96,9 @@ run_hook_case() {
     return
   fi
   git init -q "$tmp"
+  # P21만 정조준한다. 머신의 init.defaultBranch=main이면 이슈 #84 위치
+  # 정책이 먼저 막아 기대한 크기/경로 판정을 가리므로 fixture 참조를 고정한다.
+  git -C "$tmp" symbolic-ref HEAD refs/heads/acceptance-fixture
   mkdir -p "$tmp/hooks" "$tmp/scripts"
   cp hooks/pre-commit hooks/pre-push "$tmp/hooks/"
   cp verify.sh "$tmp/"
@@ -155,6 +158,7 @@ tmp=$(mktemp -d) || bad "임시 저장소 생성 실패 (인덱스 측정 검사
 if [ -n "$tmp" ] && [ -d "$tmp" ]; then
   TMPDIRS="$TMPDIRS $tmp"
   git init -q "$tmp"; mkdir -p "$tmp/hooks"
+  git -C "$tmp" symbolic-ref HEAD refs/heads/acceptance-fixture
   cp hooks/pre-commit hooks/pre-push "$tmp/hooks/"
   cp verify.sh .secret-patterns.default .check-weakening-patterns .gitignore "$tmp/"
   [ -f suppressions.yaml ] && cp suppressions.yaml "$tmp/"
@@ -180,6 +184,7 @@ fi
 tmp=$(mktemp -d) || bad "임시 저장소 생성 실패 (rename 검사)"
 if [ -n "$tmp" ] && [ -d "$tmp" ]; then
   git init -q "$tmp"; mkdir -p "$tmp/hooks"
+  git -C "$tmp" symbolic-ref HEAD refs/heads/acceptance-fixture
   cp hooks/pre-commit hooks/pre-push "$tmp/hooks/"
   cp verify.sh .secret-patterns.default .check-weakening-patterns .gitignore "$tmp/"
   [ -f suppressions.yaml ] && cp suppressions.yaml "$tmp/"
@@ -217,6 +222,7 @@ fi
 # ── 4) 대조군: 정상 파일은 통과해야 한다 (차단이 전부 막는 것이면 게이트가 아니다) ──
 tmp=$(mktemp -d)
 git init -q "$tmp"
+git -C "$tmp" symbolic-ref HEAD refs/heads/acceptance-fixture
 mkdir -p "$tmp/hooks"
 cp hooks/pre-commit hooks/pre-push "$tmp/hooks/"
 cp verify.sh .secret-patterns.default .check-weakening-patterns .gitignore "$tmp/"

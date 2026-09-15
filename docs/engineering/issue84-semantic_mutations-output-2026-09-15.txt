@@ -1,0 +1,19 @@
+PASS: 대상 수집 — 인수 검사 30개 (하한 5)
+PASS: 무력화 차단: exit-zero — 30/30 전부 불합격 처리
+PASS: 무력화 차단: true-only — 30/30 전부 불합격 처리
+PASS: 무력화 차단: noop — 30/30 전부 불합격 처리
+PASS: 무력화 차단: empty — 30/30 전부 불합격 처리
+PASS: 무력화 차단: echo-only — 30/30 전부 불합격 처리
+PASS: 정상 인수 검사 통과 — acceptance-guard-global-skill-files.sh exit=0 (과잉 차단 없음)
+PASS: Invoice 가짜 테스트 출력 차단 — 수술 변이 exit=1
+PASS: Invoice 판정 덮어쓰기 차단 — 삽입형 변이 exit=1
+PASS: Invoice CI 스텝 무력화 차단 — exit 0 주입 변이 exit=1
+PASS: Invoice 게이트 약한 모드 치환 차단 — --wiring-only 주입 변이 exit=1
+PASS: Invoice 추적 기록 위조 차단 — 인자 속 구분자·개행으로 가짜 호출을 만들지 못한다
+PASS: Invoice 게이트 생산 호출 형태 — 인자 없는 호출도 위조를 잡는다 exit=1
+PASS: 래퍼 인자 없음 거부 — exit=2
+PASS: 래퍼 대상 없음 거부 — exit=2
+PASS: 원본 저장소 상태 불변 — before/after 동일
+CHECKED: 16
+VERDICT: PASS
+OK(run-acceptance): scripts/acceptance-semantic-mutations.sh — 판정 17건, CHECKED 16

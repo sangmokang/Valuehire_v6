@@ -1,0 +1,27 @@
+PASS: 실제 워크플로 → 통과 — exit=0
+PASS: 스텝에 if: ${{ false }} 주입 → 불합격 — exit=1
+PASS: 스텝에 항상-거짓 조건 주입 → 불합격 — exit=1
+PASS: 스텝에 항상-참 조건(always) 주입 → 불합격 — exit=1
+PASS: 스텝에 continue-on-error 주입 → 불합격 — exit=1
+PASS: job 에 if 주입 → 불합격 — exit=1
+PASS: 실행 대신 echo → 불합격 — exit=1
+PASS: 실행 대신 bash -n → 불합격 — exit=1
+PASS: job 의 스텝 전량 삭제 → 불합격 — exit=1
+PASS: 동시 실행 제어 삭제 → 불합격 — exit=1
+PASS: main 대기 실행이 같은 그룹을 공유 → 불합격 — exit=1
+PASS: push/PR 그룹 분리 제거 → 불합격 — exit=1
+PASS: 브랜치 그룹 분리 제거 → 불합격 — exit=1
+PASS: main 실행 취소 허용 → 불합격 — exit=1
+PASS: 작업 브랜치 중복 취소 제거 → 불합격 — exit=1
+PASS: 조건부 취소와 호환되지 않는 queue 설정 → 불합격 — exit=1
+PASS: 시간 상한 삭제 → 불합격 — exit=1
+PASS: 시간 상한 6시간으로 회귀 → 불합격 — exit=1
+PASS: job 수준에서 main 공유 그룹 재도입 → 불합격 — exit=1
+PASS: 워크플로 파일 없음 → NOT_RUN — exit=2
+PASS: 파싱 불가 워크플로 → NOT_RUN — exit=2
+PASS: job 0개 → NOT_RUN — exit=2
+PASS: 이유가 적힌 예외는 통과 — 0-5 의 main 전용 조건
+PASS: 원본 저장소 상태 불변 — before/after 동일
+CHECKED: 24
+VERDICT: PASS
+OK(run-acceptance): scripts/acceptance-ci-step-integrity.sh — 판정 25건, CHECKED 24

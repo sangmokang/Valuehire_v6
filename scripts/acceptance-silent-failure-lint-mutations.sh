@@ -294,6 +294,15 @@ HOOK_REPO="$TMP/hook-repo"
 git clone --quiet --shared "$REPO" "$HOOK_REPO" 2>/dev/null
 hook_setup=$?
 if [ "$hook_setup" -eq 0 ]; then
+  # 이슈 #84: 기본 clone의 task/* 위치 차단이 P3 인덱스 blob 검사를 가리지
+  # 않도록 실제 분리 task worktree에서 기존 세 사례를 그대로 실행한다.
+  if git -C "$HOOK_REPO" worktree add -q -b task/p3-fixture "$TMP/hook-linked" HEAD; then
+    HOOK_REPO="$TMP/hook-linked"
+  else
+    hook_setup=1
+  fi
+fi
+if [ "$hook_setup" -eq 0 ]; then
   cp "$REPO/hooks/pre-commit" "$HOOK_REPO/hooks/pre-commit"
   cp "$LINT" "$HOOK_REPO/scripts/acceptance-silent-failure-lint.sh"
   chmod +x "$HOOK_REPO/hooks/pre-commit" "$HOOK_REPO/scripts/acceptance-silent-failure-lint.sh"

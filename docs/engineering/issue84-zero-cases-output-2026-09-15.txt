@@ -1,0 +1,4 @@
+CHECKED: 0
+VERDICT: FAIL
+REASON: fixture=0 target=0 case=0
+FAIL(run-acceptance): scripts/acceptance-commit-worktree-guards.sh 종료값 1

@@ -1,0 +1,36 @@
+PASS: 구체적 Python 예외 처리 — exit=0, marker=PASS:
+PASS: Python bare except 차단 — exit=1, marker=bare-except
+PASS: JavaScript 모듈 빈 catch 차단 — exit=1, marker=bare-catch
+PASS: catch return null 차단 — exit=1, marker=catch-return-null
+PASS: return null 뒤 죽은 문장으로 우회 불가 — exit=1, marker=catch-return-null
+PASS: 로그 뒤 catch return null도 차단 — exit=1, marker=catch-return-null
+PASS: 조건문 안 catch return null도 차단 — exit=1, marker=catch-return-null
+PASS: 일반 || [] 기본값 차단 — exit=1, marker=or-empty-array-fallback
+PASS: 일반 ?? 기본값 차단 — exit=1, marker=nullish-coalescing-fallback
+PASS: 복합 대입 기본값 2종 차단 — exit=1, markers=2
+PASS: 선언된 Map.get 빈 컬렉션 모델링 허용 — exit=0, marker=PASS:
+PASS: 재할당 가능한 Map 변수는 예외 아님 — exit=1, marker=or-empty-array-fallback
+PASS: 임의 get 호출의 || []는 예외 아님 — exit=1, marker=or-empty-array-fallback
+PASS: Map 이름을 가린 함수 매개변수는 예외 아님 — exit=1, marker=or-empty-array-fallback
+PASS: Map 이름을 가린 내부 선언은 예외 아님 — exit=1, marker=or-empty-array-fallback
+PASS: Map 이름을 가린 화살표 매개변수는 예외 아님 — exit=1, marker=or-empty-array-fallback
+PASS: 다중 지역 선언의 Map 이름 가림도 예외 아님 — exit=1, marker=or-empty-array-fallback
+PASS: 다른 lexical scope의 Map capture는 자동 예외 아님 — exit=1, marker=or-empty-array-fallback
+PASS: 타입 이름은 값 Map binding을 가리지 않음 — exit=0, marker=PASS:
+PASS: 다른 블록의 Map 이름은 예외로 새지 않음 — exit=1, marker=or-empty-array-fallback
+PASS: 지역 함수 binding은 바깥 Map 예외를 상속하지 않음 — exit=1, marker=or-empty-array-fallback
+PASS: 지역 class binding은 바깥 Map 예외를 상속하지 않음 — exit=1, marker=or-empty-array-fallback
+PASS: 구조분해 binding은 바깥 Map 예외를 상속하지 않음 — exit=1, marker=or-empty-array-fallback
+PASS: 문자열·정규식·JSX 본문과 처리된 catch 허용 — exit=0, marker=PASS:
+PASS: 템플릿 보간식 안 실행 ?? 차단 — exit=1, marker=nullish-coalescing-fallback
+PASS: 전체 수집은 대문자 확장자 3종 포함 — exit=1, checked=3
+PASS: 깨진 Python은 합격 대신 NOT_RUN — exit=2, marker=NOT_RUN:
+PASS: 존재하지 않는 입력은 NOT_RUN — exit=2, marker=NOT_RUN:
+PASS: 정상 파일에 누락 입력을 섞어도 fail-closed — exit=2
+FAIL: pre-commit 위반 blob 차단 — exit=1 output=BLOCKED: development commit in primary worktree
+FAIL: pre-commit은 작업트리 미끼 대신 정상 index blob 판정 — exit=1 output=BLOCKED: development commit in primary worktree
+FAIL: pre-commit은 대문자 확장자 index blob 차단 — exit=1 output=BLOCKED: development commit in primary worktree
+PASS: 현재 main 소스 전체 회귀 — exit=0, checked=61
+PASS: 원본 worktree 기준선 보존 — before=after
+CHECKED: 34
+FAIL(run-acceptance): scripts/acceptance-silent-failure-lint-mutations.sh 종료값 1

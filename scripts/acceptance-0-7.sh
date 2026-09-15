@@ -104,7 +104,7 @@ hp=$(git config --get core.hooksPath) || hp=""
   || { echo "FAIL: 기존 검사 fixture가 분리 worktree가 아니다"; exit 1; }
 
 BASE=$(git rev-parse HEAD)
-echo "=== 시연 (샌드박스: $sandbox/repo · 각 시연마다 훅 ON/OFF 대조) ==="
+echo "=== 시연 (샌드박스: $sandbox/task-worktree · 각 시연마다 훅 ON/OFF 대조) ==="
 
 reset_tree() {
   git reset -q --hard "$BASE"

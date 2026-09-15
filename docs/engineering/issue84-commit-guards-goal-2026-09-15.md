@@ -29,14 +29,16 @@ GitHub 이슈 #84의 원문은 2026-09-10의 `f12ea33` 직접 커밋을 재발 �
 
 ```text
 entry: Git의 표준 pre-commit 호출 → hooks/pre-commit (stdin 없음)
-input: 현재 HEAD의 symbolic full ref, --git-dir, --git-common-dir, staged ACMR 목록
+input: 현재 HEAD의 `git symbolic-ref -q HEAD` 참조(unborn branch 포함),
+       --git-dir, --git-common-dir, staged ACMR 목록
 output: 허용 exit 0; 차단 exit 1 + stderr `BLOCKED: direct commit to main` 또는
         `BLOCKED: development commit in primary worktree` (사유는 분리)
 error: Git 조회/디렉터리 정규화 실패 시 exit 1 + BLOCKED (fail-closed)
 boundary: main은 모든 worktree에서 차단. 기본 worktree의 task/*는 차단.
           별도 worktree의 task/*는 기존 비밀·약화 검사를 통과해야 허용.
           task/* 이외 개발 브랜치는 git-workflow의 허용 범위 밖이며 이 AC의 허용 사례가 아니다.
-          detached HEAD는 두 정책의 범위 밖; 별도 실증으로 관찰하고 미보호 범위를 명시.
+          detached HEAD는 유효한 커밋 확인 뒤 두 정책의 범위 밖;
+          unborn main도 `refs/heads/main`이므로 차단.
 side effect: 훅 차단 시 HEAD 불변. Git의 기존 staged change는 그대로 남음.
 ```
 
@@ -73,6 +75,27 @@ Git 디렉터리 비교는 실제 경로로 정규화합니다. 기본 worktree�
 | RED 실제 커밋 시험 | `bash scripts/verify/run-acceptance.sh scripts/acceptance-commit-worktree-guards.sh` | 23:44:55~23:45:06 | 1 | 전체 출력: `docs/engineering/issue84-commit-guards-red-output-2026-09-15.txt`; A/B는 exit 0·HEAD 전진, 허용은 exit 0·HEAD 전진, 5사례·4 fixture | fc6beed | FAIL(의도한 RED) |
 | 첫 GREEN 임시 구현 사본 | `git clone . <mktemp>/repo; git apply <변경 diff>; git commit <임시>; bash scripts/install-hooks.sh; bash scripts/verify/run-acceptance.sh scripts/acceptance-commit-worktree-guards.sh` | 23:48:34~23:48:42 | 0 | 전체 출력: `docs/engineering/issue84-commit-guards-green-output-2026-09-15.txt`; A/B exit 1·각각 다른 stderr·HEAD 불변, 허용 exit 0·HEAD 전진, 5사례·4 fixture | 임시 7fd6eb1 | PASS |
 | 기존 훅 6종 GREEN 회귀 | 위와 같은 임시 구현 사본에서 `bash scripts/verify/run-acceptance.sh scripts/acceptance-0-7.sh` | 23:49 | 0 | 전체 출력: `docs/engineering/issue84-existing-hook-regression-output-2026-09-15.txt`; 6/6 훅 ON 차단·OFF 허용 | 임시 구현 사본 | PASS |
+| 최종 AC(첫 구현 커밋) | `bash scripts/verify/run-acceptance.sh scripts/acceptance-commit-worktree-guards.sh` | 23:51:23~23:51:30 | 0 | 전체 출력: `docs/engineering/issue84-final-ac-output-2026-09-15.txt`; A/B exit 1·stderr 분리·HEAD 불변, 허용 exit 0·HEAD 전진, 5사례·4 fixture | 352b72f | PASS |
+| 0건 공격 | `bash scripts/verify/run-acceptance.sh scripts/acceptance-commit-worktree-guards.sh --self-test-empty` | 23:51 | 1 | 전체 출력: `docs/engineering/issue84-zero-cases-output-2026-09-15.txt`; CHECKED: 0, VERDICT: FAIL | 352b72f | PASS(거부 판정) |
+| A 판정 한 줄 고장 | `refs/heads/main` 비교를 `refs/heads/nonmain`으로 바꾼 mktemp 커밋 사본에서 원 인수 명령 | 23:51:59~23:52:07 | 1 | 전체 출력: `docs/engineering/issue84-main-predicate-mutation-output-2026-09-15.txt`; AC1 FAIL·AC3 PASS | 임시 cbca01c | PASS(시험 감도) |
+| B 판정 한 줄 고장 | 기본/공통 git-dir 비교를 `/nonexistent`로 바꾼 mktemp 커밋 사본에서 원 인수 명령 | 23:56:02~23:56:14 | 1 | 전체 출력: `docs/engineering/issue84-primary-predicate-mutation-output-2026-09-15.txt`; AC3 FAIL·AC1 PASS | 임시 99f4c5a | PASS(시험 감도) |
+| 실제 pre-push 첫 실행 | mktemp clone·bare에서 `git push --dry-run <bare> HEAD:refs/heads/task/issue84-commit-guards-20260915` | 23:57:03~00:00 | 1 | 전체 출력: `docs/engineering/issue84-prepush-output-2026-09-15.txt`; 신규 인수는 ok, hs-a4·silent-failure-lint-mutations는 BLOCKED. 전체 원명령 FAIL | 352b72f | FAIL(복구 필요) |
+| 하위 실패 원인 재현 | 352b72f의 임시 clone에서 두 원 인수 명령 | 00:03 | 각 1 | 전체 출력: `issue84-hs-a4-prefixed-fail-output-2026-09-16.txt`, `issue84-silent-lint-prefixed-fail-output-2026-09-16.txt` | 352b72f | REPRODUCED |
+| 하위 원명령 수정 후 재실행 | `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-a4.sh`; `... scripts/acceptance-silent-failure-lint-mutations.sh` | 00:02~00:04 | 각 0 | 전체 출력: `issue84-hs-a4-diagnosis-output-2026-09-16.txt`(33건), `issue84-silent-lint-diagnosis-output-2026-09-16.txt`(34건) | 352b72f+미커밋 수정 | PASS(하위만) |
+
+첫 병렬 검증에서 기존 훅 0-7, semantic mutations, mechanism registry의 원본 상태
+비교가 새 증거 파일 생성과 충돌해 각각 FAIL했습니다. 출력은 각 기존 로그의 첫
+실행에 있었고, 파일 이름을 고정한 뒤 **같은 원명령**을 순차 재실행해 6/6,
+30개 대상×5 무력화, 명부 31건 모두 PASS를 받았습니다. 병렬 실패를 대체
+검사의 PASS로 쓰지 않습니다.
+
+pre-push 하위 실패의 원인은 두 가지입니다. 새 훅이 초기 커밋 전(unborn) HEAD에
+`git rev-parse --symbolic-full-name HEAD`를 써 P21 fixture가 검사 전 fatal로
+끝났습니다. P3의 기본 clone은 HEAD가 task/*라 위치 정책이 먼저 차단했습니다.
+훅은 `git symbolic-ref -q HEAD`로 unborn 참조를 읽게 수정했고, 기존 fixture는
+P21용 비개발 참조와 P3용 실제 분리 task worktree로 옮겼습니다. 두 검사 모두
+원래 크기/경로·index blob 판정을 다시 확인했습니다. **전체 pre-push는 아직
+재실행 전이므로 PASS가 아닙니다.**
 
 ## 적대 검증 로그
 

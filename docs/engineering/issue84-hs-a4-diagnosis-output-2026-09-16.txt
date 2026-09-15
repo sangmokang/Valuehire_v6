@@ -1,0 +1,35 @@
+PASS: gitignore 적용 — artifacts/x.png
+PASS: gitignore 적용 — data/humansearch.sqlite3
+PASS: gitignore 적용 — humansearch.db
+PASS: gitignore 적용 — run.sqlite
+PASS: gitignore 적용 — private-reviews/x.md
+PASS: 추적 파일 269개 중 1048576 바이트 초과 0건
+PASS: pre-commit 차단 확인 — 1MB 초과 파일 (exit=1 · 사유 일치)
+PASS: pre-commit 차단 확인 — SQLite 파일 (exit=1 · 사유 일치)
+PASS: pre-commit 차단 확인 — 아티팩트 스크린샷 (exit=1 · 사유 일치)
+PASS: pre-commit 차단 확인 — 하위 경로 아티팩트 (exit=1 · 사유 일치)
+PASS: pre-commit 차단 확인 — 하위 경로 데이터 (exit=1 · 사유 일치)
+PASS: pre-commit 차단 확인 — SQLite WAL 사이드카 (exit=1 · 사유 일치)
+PASS: pre-commit 차단 확인 — JSONL 덤프 (exit=1 · 사유 일치)
+PASS: pre-commit 차단 확인 — 대문자 확장자 (exit=1 · 사유 일치)
+PASS: pre-commit 차단 확인 — 디렉터리 규칙(확장자 무해) (exit=1 · 사유 일치)
+PASS: pre-commit 차단 확인 — 비공개 리뷰 경로 (exit=1 · 사유 일치)
+PASS: 인덱스 blob 기준 측정 확인 (작업트리 덮어쓰기로 우회 불가)
+PASS: rename 도 검사 대상 (git mv 로 우회 불가)
+PASS: 하위 경로 정상 소스는 조용히 사라지지 않는다 (앵커 확인)
+PASS: 정상 파일은 통과 (차단과 통과가 한 쌍)
+PASS: 훅과 공용 판정기의 금지 경로 패턴이 동치 (하위경로·사이드카·덤프·비공개리뷰 포함)
+PASS: 판정기 실행 — 기록에만 남은 1MB 초과 파일을 잡는다 (D1) (exit=1)
+PASS: 판정기 실행 — 깨끗한 기록은 통과시킨다 (차단과 통과가 한 쌍) (exit=0)
+PASS: 판정기 실행 — 후보자 컬럼 CSV 를 잡는다 (D2) (exit=1)
+PASS: 판정기 실행 — 후보자 컬럼 SQL 을 잡는다 (D2) (exit=1)
+PASS: 판정기 실행 — 정상 지표 CSV 는 통과시킨다 (오탐 대조군) (exit=0)
+PASS: 판정기 실행 — 정상 마이그레이션 SQL 은 통과시킨다 (오탐 대조군) (exit=0)
+PASS: 판정기 실행 — 검토 기준선에 적힌 파일은 통과시킨다 (exit=0)
+PASS: 판정기 실행 — 해시가 어긋난 기준선은 통과시키지 않는다 (exit=1)
+PASS: 판정기 실행 — 죽은 기준선 항목은 그 자체가 불합격이다 (exit=1)
+PASS: CI 가 공용 판정기를 실행 줄에서 호출한다
+PASS: 판정기 스텝에 비활성화 조건 없음
+PASS: 작업트리 무오염 (git status 기준 — git 설정·내부 객체·참조는 범위 밖)
+CHECKED: 33
+OK(run-acceptance): scripts/acceptance-hs-a4.sh — 판정 33건, CHECKED 33

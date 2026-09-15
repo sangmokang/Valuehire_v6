@@ -1,0 +1,73 @@
+CASE: AC1-main-block
+COMMAND: git -C /var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/tmp.SO5bhXVVAX/main-repo commit -m "acceptance: AC1-main-block"
+TIME: 2026-09-15 23:56:02 KST
+EXIT: 1
+HEAD_BEFORE: 99f4c5a4e25c4738b3bfa69025039c5bafa9f180
+HEAD_AFTER: 99f4c5a4e25c4738b3bfa69025039c5bafa9f180
+STDOUT_BEGIN
+STDOUT_END
+STDERR_BEGIN
+BLOCKED: direct commit to main
+STDERR_END
+PASS: AC1-main-block — blocked for expected reason, HEAD unchanged
+CASE: AC1-main-hook-off-control
+COMMAND: git -C /var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/tmp.SO5bhXVVAX/main-repo commit -m "acceptance: AC1-main-hook-off-control"
+TIME: 2026-09-15 23:56:02 KST
+EXIT: 0
+HEAD_BEFORE: 99f4c5a4e25c4738b3bfa69025039c5bafa9f180
+HEAD_AFTER: dea75a90be164c71c4dfc0ffa3b35094800fd23e
+STDOUT_BEGIN
+[main dea75a9] acceptance: AC1-main-hook-off-control
+ 1 file changed, 1 insertion(+)
+ create mode 100644 main-control.txt
+STDOUT_END
+STDERR_BEGIN
+STDERR_END
+PASS: AC1-main-hook-off-control — commit allowed, HEAD advanced
+CASE: AC2-linked-task-allow
+COMMAND: git -C /var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/tmp.SO5bhXVVAX/task-example commit -m "acceptance: AC2-linked-task-allow"
+TIME: 2026-09-15 23:56:08 KST
+EXIT: 0
+HEAD_BEFORE: 99f4c5a4e25c4738b3bfa69025039c5bafa9f180
+HEAD_AFTER: 1316aac19e8fa39bf4f777d6247d8a2383c6dcfb
+STDOUT_BEGIN
+[task/example 1316aac] acceptance: AC2-linked-task-allow
+ 1 file changed, 1 insertion(+)
+ create mode 100644 linked-probe.txt
+STDOUT_END
+STDERR_BEGIN
+STDERR_END
+PASS: AC2-linked-task-allow — commit allowed, HEAD advanced
+CASE: AC3-primary-task-block
+COMMAND: git -C /var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/tmp.SO5bhXVVAX/primary-repo commit -m "acceptance: AC3-primary-task-block"
+TIME: 2026-09-15 23:56:14 KST
+EXIT: 0
+HEAD_BEFORE: 99f4c5a4e25c4738b3bfa69025039c5bafa9f180
+HEAD_AFTER: 217a390248d9c4c4d27a37033caca4d11596183f
+STDOUT_BEGIN
+[task/primary-example 217a390] acceptance: AC3-primary-task-block
+ 1 file changed, 1 insertion(+)
+ create mode 100644 primary-probe.txt
+STDOUT_END
+STDERR_BEGIN
+STDERR_END
+FAIL: AC3-primary-task-block — expected blocked reason=BLOCKED: development commit in primary worktree and unchanged HEAD; actual exit=0
+CASE: AC3-primary-hook-off-control
+COMMAND: git -C /var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/tmp.SO5bhXVVAX/primary-repo commit -m "acceptance: AC3-primary-hook-off-control"
+TIME: 2026-09-15 23:56:14 KST
+EXIT: 0
+HEAD_BEFORE: 99f4c5a4e25c4738b3bfa69025039c5bafa9f180
+HEAD_AFTER: b6b1934b528fda7831821f260e0f7b78533dcb79
+STDOUT_BEGIN
+[task/primary-example b6b1934] acceptance: AC3-primary-hook-off-control
+ 1 file changed, 1 insertion(+)
+ create mode 100644 primary-control.txt
+STDOUT_END
+STDERR_BEGIN
+STDERR_END
+PASS: AC3-primary-hook-off-control — commit allowed, HEAD advanced
+FIXTURES: 4
+CASES: 5
+CHECKED: 5
+VERDICT: FAIL
+FAIL(run-acceptance): scripts/acceptance-commit-worktree-guards.sh 종료값 1
