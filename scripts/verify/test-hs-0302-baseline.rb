@@ -4,7 +4,7 @@ require 'open3'
 require 'tmpdir'
 
 repo = File.expand_path('../..', __dir__)
-checker = File.join(repo, 'scripts/verify/check-hs-0302-baseline.rb')
+checker = ARGV.fetch(0, File.join(repo, 'scripts/verify/check-hs-0302-baseline.rb'))
 paths = %w[humansearch/tests/test_hs_0302_r5_approved_root.py
            scripts/verify/fixtures/hs-0302-required-tests.txt scripts/acceptance-hs-0302.sh]
 missing_id = 'tests/test_hs_0302_r5_approved_root.py::test_other_db_filename_inside_approved_root_is_refused'

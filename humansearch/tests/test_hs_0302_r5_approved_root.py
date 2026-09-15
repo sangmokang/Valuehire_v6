@@ -9,7 +9,6 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-import humansearch.candidate_identity as identity_module
 
 from humansearch.candidate_identity import (
     CandidateIdentityError,
@@ -199,6 +198,8 @@ def test_renamed_in_compatible_db_at_approved_path_is_refused(tmp_path: Path) ->
 def test_regular_inode_swap_during_connect_and_commit_is_refused(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    from humansearch import candidate_identity as identity_module
+
     approved = initialize_humansearch_storage(tmp_path / "approved")
     alternate = initialize_humansearch_storage(tmp_path / "alternate")
     key_path = _key_file(tmp_path / "keys")
