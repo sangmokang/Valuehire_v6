@@ -1104,3 +1104,76 @@ Next steps:
 - 소문자 RFC3339 UTC 표기를 처리한 뒤 쓰기 가능한 환경에서 전체 pytest·인수 검사·DB symlink 반례를 새 HEAD로 다시 실행하십시오.
 - 현재 49d98df는 요청 대상 ad26e91 이후 커밋이므로 별도 4차 검토로 판정을 갱신하십시오.
 ```
+
+## 재검토 2026-09-15 — PR #96 7차(최종) GREEN(c7edd64) Codex V1 + WU 최종 상태
+
+실행 13:03:08~13:10:47, verdict needs-attention. 6차 지적 (b)(c) **해결**, (a) HS-05.04 이관 goal 문서 2개에서 확인. 잔여 medium 1건: `_fill_temp_file` 실패(예: fsync 실패) 경로에서 close 전 best-effort fstat 을 안 해 device/inode·실제 byte_count 손실(구현자가 7차 보고서 '남은 한계'로 자진 명시). 팀리드 처분(13:12): 7차가 마지막 라운드이므로 구현 중단. **F96-1·F96-2 는 Codex 5차·7차에서 해결 판정**. 잔여 1건은 §7-5 결정 카드(병합 전 소규모 후속 수정 / 잔여 안고 병합).
+
+| ID | 최종 | 근거 |
+|---|---|---|
+| F96-1 (high) | 해결 | FD 사슬(2차)·식별값 임시 FD 결합(4차)·소유 불확실 이름 미삭제(5차). Codex 5차 표 '해결' |
+| F96-2 (medium) | 해결 | 임시 이름 쓰기+link 게시(1차)·정리 실패 상태 승격(2차~7차). Codex 5차·7차 표 '해결' |
+| 잔여 medium | 미해결(범위 안) | fill 실패 경로 fstat 미수집 — 결정 카드 |
+| 루트/최종 이름 이동 창 | HS-05.04 이관 | goal 문서 2개 결정 카드, Codex 새 결함 불산입 |
+
+```text
+# Codex Adversarial Review
+
+Target: branch diff against origin/main
+Verdict: needs-attention
+
+VERDICT: FAIL
+
+건너뜀·미확인·재시도: 실제 `hsrunner` 분리 계정·다른 사용자 쓰기 거부·CI는 NOT_RUN입니다. 대상 pytest는 uv 캐시 변경 재시도도 쓰기 금지로 exit 2였고, 직접 수집은 46건·exit 0이지만 실행은 임시 디렉터리 부재로 NOT_RUN입니다. `verify.sh`와 원칙 검사는 `mktemp: Operation not permitted`로 각각 exit 1이었습니다.
+
+결론: 아직 내보내시면 안 됩니다. 6차의 두 문제 자체는 고쳤지만, 쓰기가 끝난 뒤 마무리에 실패하여 임시 파일이 남는 경우 그 파일을 확실히 확인하는 데 필요한 정보가 사라집니다.
+
+판단 근거: 모든 정리 실패는 닫기 전에 얻을 수 있는 정보를 보존해야 한다는 해석을 선택했습니다. 새로 추가된 두 시험만 통과하면 충분하다는 해석과 경로·내용 지문만 있으면 충분하다는 해석은 버렸습니다. 이 판단이 틀리면 남은 후보 원문을 안전하게 식별하지 못하거나 다른 파일과 혼동할 수 있습니다. 같은 러너 UID가 보호 루트나 최종 이름을 바꾸는 창은 HS-05.04로 이관된 미해결 사항으로만 기록하며 새 결함으로 세지 않았습니다.
+
+| 항목 | 최종 상태 | 증거 |
+|---|---|---|
+| F96-1(b), 권한검증 실패+임시 이름 삭제 실패 | 해결 | `runner_boundary.py:324-333` — 열린 파일 정보가 `_PendingWrite`에 들어간 뒤 단일 정리 경로로 전달되는 역할. `tests/test_runner_boundary_receipt.py:624-663` — 해시·크기·임시 경로·장치/파일 번호를 모두 검증하는 역할. |
+| F96-2(c), 쓰기 실패+닫기 실패 | 해결 | `runner_boundary.py:318-323` — 파일 디스크립터(FD, 운영체제가 연 파일을 가리키는 번호)의 닫기 결과를 정리 결과보다 먼저 보존하는 역할. 정리 성공/실패 모두 `recovery_required`였습니다. `tests/test_runner_boundary_receipt.py:666-719` — 결합 실패 회귀 시험 역할. |
+| F96-1 관련 전체 보존 계약 | 부분 해결 | `_fill_temp_file` 예외 뒤 가능한 열린 파일 정보가 수집되지 않는 반례가 남았습니다. |
+| (a) 보호 루트·최종 이름 이동 창 | HS-05.04 이관 완료, 새 결함 불산입 | 러너 goal `:85-91`, storage goal `:196-202` — 무엇/이유/현재 계약/대가/되돌리기와 채널당 러너 1개 선행조건을 기록하는 역할. |
+→ 해석: 요구하신 두 과거 결함은 해결됐지만, 같은 영수증 보존 계약의 다른 실패 단계가 닫히지 않아 WU 전체는 PASS가 아닙니다.
+
+기술 상세와 증거 원문:
+`RED_PRE_FIX_F96_1B ... sha256=None, byte_count=0, device=None, inode=None, temp_path=None`
+`RED_PRE_FIX_F96_2C ... reason='write_failed'`
+`NEW_TEST_EXPECTATIONS_KILL_OLD False False`
+→ 해석: f1c1a94 시점 구현을 메모리에서 재실행했을 때 새 시험 기대값이 실제로 이전 결함을 죽였습니다.
+
+`F96-1B_CURRENT ... sha256='98058b…', byte_count=24, device=11, inode=22, temp_path=/protected/.….tmp`
+`CLOSE_FAIL cleanup_ok=True reason=recovery_required temp_path=None`
+`CLOSE_FAIL cleanup_ok=False reason=recovery_required temp_path=/protected/.….tmp`
+→ 해석: HEAD에서 (b)와 (c)는 해결됐고, 닫기 실패 결과는 정리 성공 여부와 독립적으로 보존됩니다.
+
+`FILL_FAIL_CLEANUP_FAIL ... sha256='98058b…', byte_count=0, device=None, inode=None, temp_path=/protected/.….tmp`
+`FSTAT_CALLS_AFTER_FILL_EXCEPTION 0`
+반례 단언 종료값: 1, `AssertionError: recoverable descriptor identity was lost`
+→ 해석: 모든 바이트를 쓴 뒤 동기화만 실패하도록 만들고 임시 이름 삭제도 실패시켰습니다. 열린 파일 정보 조회(fstat)는 성공할 수 있게 했지만 호출되지 않았습니다.
+
+정적 검증 원문: ruff `All checks passed!` exit 0, mypy `Success: no issues found in 46 source files` exit 0, `git diff --check` exit 0. 파일은 정확히 521줄이고 최장 함수는 `_publish` 44줄이므로 100줄 제한 안입니다. 60c4fb8 이후 시험 diff는 `+99/-0`, skip·xfail 검색 결과는 0건입니다.
+→ 해석: 형식·타입·크기 제한과 기존 시험 비약화에서는 반증에 실패했습니다. 최종 작업트리는 깨끗하고 HEAD는 c7edd6403ba2845db1ceb5d469101934680a5175입니다.
+
+Findings:
+- [medium] [F96-1] 정리 실패 영수증이 A의 위치를 보장하지 못함 — 채움 실패 경로의 식별값 손실 (humansearch/src/humansearch/runner_boundary.py:318-323)
+  원인: `runner_boundary.py:318-323`은 `_fill_temp_file` 예외 뒤 `_PendingWrite.written`을 채우지 않고 즉시 닫기와 정리로 넘어가는 역할입니다. 모든 쓰기가 끝난 뒤 `fsync`만 실패한 경우에도 열린 FD에서 크기·장치 번호·파일 번호를 얻을 수 있지만 시도하지 않습니다. `runner_boundary.py:371-380`의 조립 함수는 `written=None`을 0/None/None으로 접는 역할이라, 삭제까지 실패하면 실제 파일이 남아도 영수증은 `byte_count=0`, `device=None`, `inode=None`입니다.
+
+사업 영향: 남은 후보 원문을 문서가 요구하는 장치 번호·파일 번호·파일 내용 지문(SHA-256) 조합으로 확인할 수 없어 복구 자료를 잃거나 잘못 식별할 수 있습니다.
+
+문서 불일치: runner goal `:31-36`과 두 goal의 이관 카드(`:89`, `:200`)는 후보 경로를 device/inode/sha256으로 대조한다고 규정하지만, `_fill_temp_file` 실패 시 이 값들을 못 채운다는 한계는 적지 않았습니다. `tests/test_runner_boundary_failures.py:156-177`은 쓰기 실패+삭제 실패의 상태와 최종 파일 부재만 확인하는 역할이라 필드 손실을 허용합니다.
+
+이 finding은 보호 루트 자체 이동 창을 다시 센 것이 아닙니다. 이미 열린 자기 임시 FD에서 얻을 수 있는 정보를 버리는 범위 안 결함입니다.
+  Recommendation: 무엇을: `_fill_temp_file` 실패 시 FD를 닫기 전에 best-effort `os.fstat(fd)`를 수행하고, 실제 기록 크기와 가능한 device/inode를 `_PendingWrite`에 보존하십시오.
+왜: 남은 임시 파일을 영수증 계약대로 확인하려면 닫기 전에 얻을 수 있는 식별값을 버리면 안 됩니다.
+버린 길: 실패를 무조건 `written=None`으로 접거나 `temp_path`와 입력 전체 해시만 반환하는 길은 버리십시오.
+대가: 실패 단계와 `byte_count`의 의미를 명시하고, `fstat` 자체도 실패하는 경우를 별도 상태로 다뤄야 합니다.
+되돌리기: 영수증 필드 의미 변경과 회귀 시험을 한 커밋에 묶어 되돌릴 수 있게 하십시오.
+
+Next steps:
+- `fsync` 실패+unlink 실패 및 부분 write 실패+unlink 실패 시험에서 sha256·실제 byte_count·temp_path·가능한 device/inode를 모두 검증하십시오.
+- `fstat` 자체가 실패해 식별값을 얻지 못하는 한계와 `byte_count=0`의 의미를 goal/API 계약에 명시하십시오.
+- 쓰기 가능한 환경에서 대상·전체 pytest, 원칙 검사와 verify.sh를 재실행한 뒤 변경된 HEAD를 다시 검토하십시오.
+```
