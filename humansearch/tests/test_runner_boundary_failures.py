@@ -180,33 +180,52 @@ def test_failed_write_cleanup_failure_reports_recovery_required(
 def test_close_failure_returns_receipt_and_removes_temp_file(
     tmp_path: Path, monkeypatch: MonkeyPatch
 ) -> None:
-    """임시 파일 close 가 실패해도 예외가 새지 않고 임시 파일이 정리된다."""
+    """임시 파일 close 가 실패하면 손잡이가 남으므로 러너를 폐기하라고 알린다.
+
+    고장은 실제 close 를 부르기 **전에** 넣는다(디렉터리 FD 시험의 CloseTrap
+    과 같은 방식). 실제로 닫은 뒤 예외만 던지면 디스크립터가 이미 풀려 있어
+    "열린 채 남는" 경우를 보지 못한다. 임시 파일은 치우되, 손잡이가 남은
+    프로세스를 계속 돌릴 수 없으므로 ``recovery_required`` 다.
+    """
 
     _hsrunner(monkeypatch)
     root = _mkdir(tmp_path / "root", 0o700)
     real_open = os.open
     real_close = os.close
-    temp_fds: set[int] = set()
+    targets: set[int] = set()
+    still_open: list[int] = []
 
     def track_open(path: Any, *args: Any, **kwargs: Any) -> int:
         fd = real_open(path, *args, **kwargs)
         if _is_temp_name(path):
-            temp_fds.add(fd)
+            targets.add(fd)
         return fd
 
     def fail_close(fd: int) -> None:
-        real_close(fd)
-        if fd in temp_fds:
-            temp_fds.discard(fd)
+        if fd in targets:
+            targets.discard(fd)
+            still_open.append(fd)
             raise OSError(errno.EIO, "Input/output error")
+        real_close(fd)
 
-    with MonkeyPatch.context() as patched:
-        patched.setattr(os, "open", track_open)
-        patched.setattr(os, "close", fail_close)
-        receipt = write_protected_file(_config(root), "final.jsonl", PAYLOAD)
+    try:
+        with MonkeyPatch.context() as patched:
+            patched.setattr(os, "open", track_open)
+            patched.setattr(os, "close", fail_close)
+            receipt = write_protected_file(_config(root), "final.jsonl", PAYLOAD)
+        assert len(still_open) == 1
+        os.fstat(still_open[0])
+    finally:
+        for leaked in still_open:
+            try:
+                real_close(leaked)
+            except OSError:
+                pass
 
     assert receipt.status is BoundaryStatus.DENIED
-    assert receipt.reason == "write_failed"
+    assert receipt.reason == "recovery_required"
+    assert receipt.device is not None
+    assert receipt.temp_path is None
     assert list(root.iterdir()) == []
 
 

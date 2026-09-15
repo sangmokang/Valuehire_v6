@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import errno
+import hashlib
 import os
 import pwd
 from pathlib import Path
@@ -532,3 +533,88 @@ def test_mismatch_with_cleanup_failure_keeps_the_replacement(
     assert receipt.reason == "recovery_required"
     assert survivor.read_bytes() == OTHER_PAYLOAD
     assert (info.st_dev, info.st_ino) == (seen["device"], seen["inode"])
+
+
+def test_cleanup_failure_names_a_candidate_path_for_our_file(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    """정리에 실패하면 우리 파일을 열 수 있는 후보 경로를 영수증에 담는다.
+
+    대조를 통과한 뒤 임시 이름을 지우기 전까지도 최종 이름은 바뀔 수 있다.
+    그러면 ``path`` 자리에는 남의 파일이 있고 우리 파일은 임시 이름으로만
+    남는다. 영수증이 그 임시 경로를 함께 주지 않으면 소비자가 우리 파일에
+    닿을 방법이 없다.
+    """
+
+    _hsrunner(monkeypatch)
+    root = _mkdir(tmp_path / "root", 0o700)
+    original = RunnerBoundary._published_entry_is
+    swapped = {"done": False}
+    real_unlink = os.unlink
+
+    def take_over_after_confirm(
+        self: RunnerBoundary, parent_fd: int, name: str, written: os.stat_result
+    ) -> bool:
+        result = original(self, parent_fd, name, written)
+        if not swapped["done"]:
+            swapped["done"] = True
+            real_unlink(name, dir_fd=parent_fd)
+            imposter = os.open(
+                name, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600, dir_fd=parent_fd
+            )
+            os.write(imposter, OTHER_PAYLOAD)
+            os.close(imposter)
+        return result
+
+    def bad_unlink(name: Any, *args: Any, **kwargs: Any) -> None:
+        if _is_temp_name(name):
+            raise OSError(errno.EIO, "Input/output error")
+        real_unlink(name, *args, **kwargs)
+
+    monkeypatch.setattr(RunnerBoundary, "_published_entry_is", take_over_after_confirm)
+    with MonkeyPatch.context() as patched:
+        patched.setattr(os, "unlink", bad_unlink)
+        receipt = write_protected_file(_config(root), "moved.jsonl", PAYLOAD)
+
+    assert swapped["done"]
+    assert receipt.status is BoundaryStatus.DENIED
+    assert receipt.reason == "cleanup_failed"
+    assert receipt.temp_path is not None
+    assert receipt.temp_path.is_file()
+    stranded = os.stat(receipt.temp_path)
+    assert (stranded.st_dev, stranded.st_ino) == (receipt.device, receipt.inode)
+    assert receipt.temp_path.read_bytes() == PAYLOAD
+    assert receipt.sha256 == hashlib.sha256(PAYLOAD).hexdigest()
+    assert (root / "moved.jsonl").read_bytes() == OTHER_PAYLOAD
+
+
+def test_mismatch_cleanup_failure_names_a_candidate_path_for_our_file(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    """불일치에 정리 실패까지 겹쳐도 우리 파일의 후보 경로와 값을 준다."""
+
+    _hsrunner(monkeypatch)
+    root = _mkdir(tmp_path / "root", 0o700)
+    seen: dict[str, Any] = {}
+    _take_over_final_name(monkeypatch, "taken.jsonl", seen)
+    real_unlink = os.unlink
+
+    def bad_unlink(name: Any, *args: Any, **kwargs: Any) -> None:
+        if _is_temp_name(name):
+            raise OSError(errno.EIO, "Input/output error")
+        real_unlink(name, *args, **kwargs)
+
+    with MonkeyPatch.context() as patched:
+        patched.setattr(os, "unlink", bad_unlink)
+        receipt = write_protected_file(_config(root), "taken.jsonl", PAYLOAD)
+
+    assert receipt.status is BoundaryStatus.DENIED
+    assert receipt.reason == "recovery_required"
+    assert receipt.temp_path is not None
+    assert receipt.temp_path.read_bytes() == PAYLOAD
+    stranded = os.stat(receipt.temp_path)
+    assert (stranded.st_dev, stranded.st_ino) == (receipt.device, receipt.inode)
+    assert receipt.sha256 == hashlib.sha256(PAYLOAD).hexdigest()
+    survivor = root / "taken.jsonl"
+    assert survivor.is_file(), "이름을 차지한 다른 실행의 파일이 지워졌다"
+    assert survivor.read_bytes() == OTHER_PAYLOAD
