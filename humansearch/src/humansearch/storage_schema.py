@@ -14,6 +14,9 @@ SUPPORTED_MIGRATION_RANGE: Final = (0, CURRENT_SCHEMA_VERSION)
 _DB_FILENAME: Final = "humansearch.sqlite3"
 _HEX64: Final = "[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]"
 _SHA64_CHECK: Final = "glob '" + (_HEX64 * 8) + "'"
+# 초기화가 승인한 (protected_root → db_path) 장부. 승인 root 는 이 장부에서만 나온다 —
+# 경로 모양(0700/0600·Git 밖)이 같아도 여기 없으면 승인이 아니다(저장 계약 §3).
+_APPROVED_DB_PATHS: dict[Path, Path] = {}
 
 
 class StorageSchemaError(ValueError):
@@ -99,12 +102,19 @@ def initialize_humansearch_storage(
     _verify_existing_sidecars(db_path)
     applied = _apply_schema(db_path)
     _verify_path(db_path, expected_mode=0o600, label="db file")
+    _APPROVED_DB_PATHS[root] = db_path
     return StorageSchemaResult(
         db_path=db_path,
         protected_root=root,
         schema_version=_schema_version(db_path),
         applied_migrations=applied,
     )
+
+
+def approved_db_path(protected_root: Path) -> Path | None:
+    """Return the DB path this process initialized under ``protected_root``, else ``None``."""
+
+    return _APPROVED_DB_PATHS.get(protected_root)
 
 
 def _prepare_root(root: Path) -> Path:

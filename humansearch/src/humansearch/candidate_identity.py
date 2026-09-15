@@ -26,7 +26,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Final, Literal
 
-from humansearch.storage_schema import StorageSchemaError, _inside_git_worktree, _verify_path
+from humansearch.storage_schema import (
+    StorageSchemaError,
+    _inside_git_worktree,
+    _verify_path,
+    approved_db_path,
+)
 
 Channel = Literal["saramin", "jobkorea", "linkedin_rps"]
 RecordOutcome = Literal["inserted", "duplicate"]
@@ -284,9 +289,7 @@ def _verify_db_boundary(db_path: Path, approved_root: Path) -> None:
     소유자 불일치·symlink·승인 root 탈출은 저장 실패다(Codex 14:50 높음).
     """
 
-    # 승인 루트는 DB 경로에서 추론하지 않는다. 초기화 결과나 신뢰된 설정의 절대 경로를
-    # 호출자가 제공해야 한다. 다른 0700/0600 호환 DB 는 같은 UID 여도 승인되지 않았다.
-    if not approved_root.is_absolute() or db_path.parent != approved_root:
+    if not _is_approved_db(db_path, approved_root):
         raise CandidateIdentityError("db file is outside the approved root")
     _reject_symlinked_chain(db_path, label="db path")
     _verify(approved_root, expected_mode=_DB_DIR_MODE, label="db directory")
@@ -296,6 +299,21 @@ def _verify_db_boundary(db_path: Path, approved_root: Path) -> None:
     if _inside_git_worktree(db_path.parent):
         raise CandidateIdentityError("db file must be outside the git worktree")
     _verify_sidecars(db_path)
+
+
+def _is_approved_db(db_path: Path, approved_root: Path) -> bool:
+    """승인 root 는 초기화 장부에 결합돼 있다 — 경로 모양은 승인이 아니다.
+
+    호출자가 `approved_root=db_path.parent` 로 스스로 채워도, 같은 UID 의 0700/0600 호환 DB 여도,
+    `initialize_humansearch_storage` 가 이 프로세스에서 그 root 에 돌려준 바로 그 DB 파일이
+    아니면 거부한다. 승인 root 안의 다른 파일명도 마찬가지다.
+    """
+
+    return (
+        approved_root.is_absolute()
+        and db_path.parent == approved_root
+        and approved_db_path(approved_root) == db_path
+    )
 
 
 def _verify_sidecars(db_path: Path) -> None:
