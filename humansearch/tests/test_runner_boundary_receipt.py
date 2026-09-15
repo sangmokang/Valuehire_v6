@@ -21,6 +21,7 @@ from typing import Any
 from pytest import MonkeyPatch
 
 from humansearch.runner_boundary import (
+    BoundaryReceipt,
     BoundaryStatus,
     RunnerBoundary,
     RunnerBoundaryConfig,
@@ -618,3 +619,101 @@ def test_mismatch_cleanup_failure_names_a_candidate_path_for_our_file(
     survivor = root / "taken.jsonl"
     assert survivor.is_file(), "이름을 차지한 다른 실행의 파일이 지워졌다"
     assert survivor.read_bytes() == OTHER_PAYLOAD
+
+
+def test_permission_check_failure_with_cleanup_failure_keeps_what_we_know(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    """완성 파일 검증이 거부되고 정리까지 실패해도 아는 값을 잃지 않는다.
+
+    이 경로에서는 파일을 다 쓰고 손잡이에서 크기·식별값까지 읽은 뒤다.
+    그 값을 버리고 빈 영수증을 돌려주면, 남은 임시 파일을 누가 어떻게
+    확인해야 하는지 알 길이 없다.
+    """
+
+    _hsrunner(monkeypatch)
+    root = _mkdir(tmp_path / "root", 0o700)
+    real_unlink = os.unlink
+
+    def reject(
+        self: RunnerBoundary, info: os.stat_result, runner_uid: int
+    ) -> Any:
+        return BoundaryReceipt(
+            BoundaryStatus.DENIED, "written_file_permission_invalid"
+        )
+
+    def bad_unlink(name: Any, *args: Any, **kwargs: Any) -> None:
+        if _is_temp_name(name):
+            raise OSError(errno.EIO, "Input/output error")
+        real_unlink(name, *args, **kwargs)
+
+    monkeypatch.setattr(RunnerBoundary, "_check_written_file", reject)
+    with MonkeyPatch.context() as patched:
+        patched.setattr(os, "unlink", bad_unlink)
+        receipt = write_protected_file(_config(root), "rejected.jsonl", PAYLOAD)
+
+    assert receipt.status is BoundaryStatus.DENIED
+    assert receipt.reason == "recovery_required"
+    assert receipt.sha256 == hashlib.sha256(PAYLOAD).hexdigest()
+    assert receipt.byte_count == len(PAYLOAD)
+    assert receipt.temp_path is not None
+    assert receipt.temp_path.is_file()
+    stranded = os.stat(receipt.temp_path)
+    assert (stranded.st_dev, stranded.st_ino) == (receipt.device, receipt.inode)
+    assert not (root / "rejected.jsonl").exists()
+
+
+def test_write_failure_with_close_failure_reports_recovery_required(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    """쓰기 실패에 닫기 실패가 겹치면 정리에 성공해도 러너를 폐기하라고 알린다.
+
+    쓰기가 실패한 것만이면 이번 건만 버리면 된다. 그런데 손잡이까지 놓치면
+    이 프로세스는 회수하지 못한 손잡이를 들고 있다. 정리가 잘 끝났다고
+    가벼운 실패로 접으면 호출자가 같은 프로세스로 계속 쓴다.
+    """
+
+    _hsrunner(monkeypatch)
+    root = _mkdir(tmp_path / "root", 0o700)
+    real_open = os.open
+    real_close = os.close
+    real_write = os.write
+    targets: set[int] = set()
+    still_open: list[int] = []
+
+    def track_open(path: Any, *args: Any, **kwargs: Any) -> int:
+        fd = real_open(path, *args, **kwargs)
+        if _is_temp_name(path):
+            targets.add(fd)
+        return fd
+
+    def fail_write(fd: int, data: Any) -> int:
+        if bytes(data) == PAYLOAD:
+            raise OSError(errno.ENOSPC, "No space left on device")
+        return real_write(fd, data)
+
+    def fail_close(fd: int) -> None:
+        if fd in targets:
+            targets.discard(fd)
+            still_open.append(fd)
+            raise OSError(errno.EIO, "Input/output error")
+        real_close(fd)
+
+    try:
+        with MonkeyPatch.context() as patched:
+            patched.setattr(os, "open", track_open)
+            patched.setattr(os, "write", fail_write)
+            patched.setattr(os, "close", fail_close)
+            receipt = write_protected_file(_config(root), "lost.jsonl", PAYLOAD)
+        assert len(still_open) == 1
+        os.fstat(still_open[0])
+    finally:
+        for leaked in still_open:
+            try:
+                real_close(leaked)
+            except OSError:
+                pass
+
+    assert receipt.status is BoundaryStatus.DENIED
+    assert receipt.reason == "recovery_required"
+    assert list(root.iterdir()) == []
