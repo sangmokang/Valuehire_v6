@@ -352,3 +352,55 @@ def test_intermediate_parent_close_failure_stops_before_writing(
     assert receipt.reason == "parent_directory_invalid"
     assert list((root / "sub" / "inner").iterdir()) == []
     assert sorted(trap.opened) == sorted(trap.attempted)
+
+
+def test_receipt_identity_is_not_re_read_after_the_check(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    """식별값을 대조 뒤에 다시 읽지 않는다.
+
+    대조를 통과한 뒤에도 영수증을 만들기 전까지는 최종 이름이 바뀔 수 있다.
+    그 창에서 이름을 갈아치운 뒤, 영수증이 임시 디스크립터에서 얻은 값을
+    그대로 담고 있는지 본다. 이 시험이 잡는 것은 "대조는 하되 값은 최종
+    이름에서 다시 읽는" 구현이다.
+
+    임시 파일 삭제(``_remove``)를 창의 위치로 쓴다. 영수증 생성 바로 앞이고
+    구현이 바뀌어도 그 자리에 남아 있다.
+    """
+
+    _hsrunner(monkeypatch)
+    root = _mkdir(tmp_path / "root", 0o700)
+    fill = RunnerBoundary._fill_temp_file
+    remove = RunnerBoundary._remove
+    seen: list[os.stat_result] = []
+    swapped = {"done": False}
+
+    def record(self: RunnerBoundary, *args: Any, **kwargs: Any) -> os.stat_result:
+        info = fill(self, *args, **kwargs)
+        seen.append(info)
+        return info
+
+    def take_over_on_cleanup(self: RunnerBoundary, parent_fd: int, name: str) -> bool:
+        result = remove(self, parent_fd, name)
+        if _is_temp_name(name) and not swapped["done"]:
+            swapped["done"] = True
+            os.unlink("three.jsonl", dir_fd=parent_fd)
+            imposter = os.open(
+                "three.jsonl",
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                0o600,
+                dir_fd=parent_fd,
+            )
+            os.write(imposter, b"a-different-file")
+            os.close(imposter)
+        return result
+
+    monkeypatch.setattr(RunnerBoundary, "_fill_temp_file", record)
+    monkeypatch.setattr(RunnerBoundary, "_remove", take_over_on_cleanup)
+
+    receipt = write_protected_file(_config(root), "three.jsonl", PAYLOAD)
+
+    assert swapped["done"]
+    assert len(seen) == 1
+    assert (receipt.device, receipt.inode) == (seen[0].st_dev, seen[0].st_ino)
+    assert receipt.byte_count == len(PAYLOAD)
