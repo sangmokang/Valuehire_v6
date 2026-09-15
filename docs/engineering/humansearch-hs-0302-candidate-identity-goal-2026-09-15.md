@@ -243,5 +243,16 @@ HMAC 입력 누락, 예외 삼킴 범위, 키 파일 검사 우회(symlink·모�
 | 6차 — 정확 대조 | PASS | 하한 `MIN_REQUIRED_IDS=80` 을 정확 기대값 `EXPECTED_REQUIRED_IDS=82` 로 교체. 다르면 FAIL. 시험 추가·삭제 시 명부와 상수를 함께 올린다는 주석 포함 |
 | 변이 Q1 시험+명부 동반 삭제 | 생존 0 | 13:28 → `FAIL: 필수 시험 명부가 80건 — 기대값 82건과 다르다`, rc=1 |
 | 6차 재검증 | PASS | 인수 `CHECKED: 22` rc0 · G2 mutations `6/6` rc0 · 전체 `311 passed` · ruff rc0 |
+| 7차 — 착수 조건 | PASS | 15:25 @c14638d → status 비어 있음 · `5 0`(로컬 5 앞) · PR #100 OPEN·Draft·base #97 · hooksPath hooks · `311 passed` · ruff rc0 · mypy rc0 · 인수 `CHECKED: 22` rc0. `docs/sot/strict-workflow.md` 는 이 브랜치에 없어 그 항목은 NOT_RUN(공통 정본 f12ea33 이 main 에만 있다) |
+| 7차 — WU-D 재현 | REPRODUCED | 15:29:58 mktemp 격리·GIT_* 제거 → (a) DB 0644·부모 0755 `outcome=inserted rows=1`, (b) git init 폴더 아래 호환 DB `outcome=inserted rows=1`, (c) 대조군 `inserted rows=1`. 함수는 링크·존재만 보고 연결을 열었다 |
+| 7차 — WU-D RED | PASS | `29f5f74` r4 시험 15건: 15:32:11 → `13 failed, 2 passed`(DID NOT RAISE / sqlite OperationalError), 대조군 2건 통과. 명부 미갱신 인수 → `FAIL: 필수 시험 명부 불일치 — 누락 0건 · 명부 밖 추가 15건`; 상수 미갱신 → `FAIL: 필수 시험 명부가 97건 — 기대값 82건과 다르다` |
+| 7차 — 첫 GREEN 시도 결함 | 기록 | HS-03.01 `_verify_existing_sidecars` 재사용 → AC-3 경쟁 시험 20회 중 7회 `sqlite sidecar is missing`(exists→stat 사이에 경쟁 연결의 journal 소멸). 재사용을 버리고 한 번의 lstat 로 보는 `_verify_sidecars` 로 교체 |
+| 7차 — WU-D RED2 | PASS | `a70bee8` 보조 파일 자리 디렉터리 3건 추가(명부 97→100). 15:54:18 구현 없는 HEAD → `16 failed, 2 passed`. amend 2회(행 수 계수 전 디렉터리 제거 · symlink 사유 문구 단언) — 모두 push 전 로컬 |
+| 7차 — WU-D GREEN | PASS | `09602ac` 15:54~15:55 → r4 `18 passed` · 전체 `329 passed` · ruff rc0 · mypy rc0 · 인수 `CHECKED: 22` rc0 · AC-3 30회 연속 통과 |
+| 7차 — AC-D1 변이 | 생존 0 | 15:54:30 격리 사본(import 경로 사본 확인) 변이 10종 전부 KILLED. 첫 실행 15:53:33 은 M7(symlink 줄 삭제) 생존 — 링크 lstat 모드가 0600 이 아니라 모드 검사가 대신 잡았다. 시험이 `"symlink" in str(exc)` 를 단언하도록 좁힌 뒤 `3 failed` 로 KILLED |
+| 7차 — AC-D2 대조군 | PASS | 15:53:03 수정 후 (a) `CandidateIdentityError(db directory mode must be 0700) rows=0` (b) `CandidateIdentityError(db file must be outside the git worktree) rows=0` (c) `inserted rows=1`. 수정 전(15:29:58)도 (c) 1행 |
+| 7차 — 외부 피드백 실측 | 기록 | 사장님 전달 리뷰 3건: "예외 누출" → `_verify` 가 재포장, 경계 코드에 `_verify_path` 직접 호출 0건, 실측 `CandidateIdentityError(db file mode must be 0600)`; "is_file symlink 우회" → symlink DB 는 `db path must not contain a symlink` 로 먼저 거부; "2중 stat" → 첫 시도에 실재, 현재 보조 파일당 stat 1회. 제안 코드는 exists+lstat+_verify_path 3회로 경쟁을 되살리고 OSError 원문(경로)을 메시지에 넣어 미채택 |
+| 7차 — WU-A' | PASS | `603e49b` 머리글 26→27. 15:55 `grep -c '^      - name:'` = 28 − checkout 각주 1 = 표 번호행 `awk` = 27 = 머리글 27. AC-A3 `CHECKED: 24 VERDICT: PASS` rc0 · AC-A4 `CHECKED: 34` rc0 |
+| 7차 — 최종 검증 @603e49b | PASS | 15:56:31~15:58:50 → `329 passed in 10.91s` rc0 · ruff `All checks passed!` rc0 · mypy `no issues found in 48 source files` rc0 · `git diff --check 7473ec8..HEAD` rc0 · 인수 `CHECKED: 22` rc0 · ci-step-integrity `CHECKED: 24 VERDICT: PASS` rc0 · G2 mutations `blocked 6/6` rc0 · gates `COLLECTED: 329` rc0 · antiforge `3/3` rc0 · 검사 후 status 비어 있음 |
 | V1 (5차) | NOT_RUN | 독립 검증 엔진 대기 |
 | push·Draft PR | NOT_RUN | 공통 규칙상 이 세션은 push·PR 을 하지 않는다 |
