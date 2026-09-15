@@ -203,5 +203,17 @@ HMAC 입력 누락, 예외 삼킴 범위, 키 파일 검사 우회(symlink·모�
 | 변이 N6 판정기 완화 + fail-open | 생존 0 (강화 후) | 12:29 최초 실행에서 자기 검사 2건이 **통과**했다 — 첫 NOT_RUN 뒤에 중첩 차단이 바로 와서 "뒤따르는 PASS 0건" 이 우연히 성립. 판정을 "첫 NOT_RUN 뒤 어떤 판정 줄도 없어야 한다"로 바꾼 뒤 12:30:27 재실행 → probe 2건 모두 실패 |
 | 원상복구 | PASS | 12:31:25 `git status --short` 0줄, `git diff 7473ec8 -- storage_schema.py` 0줄 |
 | P11 코드 예산 | PASS | 모듈 251줄/최장 29줄 · 1차 435 · 2차 318 · 3차 292/25 · probe 146/24 · 인수 418줄. hard 600·100 이내 |
+| pre-push G2 차단 | 해소 | `3061bd3` push 가 `acceptance-hs-gates-mutations.sh` 에서 BLOCKED. 재현 12:36:45 → `FAIL: mutation failed for the wrong reason: planted strict type error (exit=1)`, `FileNotFoundError: .../tmp.bn5D4duWth/.github/workflows/verify.yml`, `8 failed, 300 passed`. 그 게이트는 `humansearch/src`·`tests` 만 사본으로 복사한다 |
+| 시험의 저장소 밖 의존 제거 | PASS | `f86c138` — `test_hs_0302_acceptance_probe.py` 삭제, 3차 시험의 CI 배선 3건 제거. 같은 판정을 bash 인수 스크립트로 이관 |
+| 이관 후 인수 | PASS | 12:39:30 → `PASS` 20줄, `CHECKED: 20`, rc=0. 새 항목 — 건너뛰기 보조 부재·needle 조립 검증·fail-closed 판정기 음성 대조군·CI 스텝 존재·무조건 실행·정본 명부 행·시험의 저장소 밖 참조 0건 |
+| G2 gates-mutations | PASS | 12:40:58 → `PASS: gates mutations blocked 6/6`, rc=0 (이것이 통과해야 push 가 된다) |
+| G2 gates | PASS | 12:41 → `ruff clean in 47`, `mypy strict clean in 47`, `pytest collected 300 and passed`, `COLLECTED: 300`, rc=0 |
+| G2 gates-antiforge | PASS | 12:41 → `PASS: gates antiforge 3/3 (evidence forgery + CI disable blocked)`, rc=0 |
+| 이관 후 재검증 | PASS | 12:42:52 → HS-03.02 `71 passed`, 전체 `300 passed`, ruff·mypy rc=0, V2 재현기 9줄 전부 기대치 일치 |
+| 변이 M-A CI 스텝 삭제 | 생존 0 | 12:43:40 → bash 인수 `FAIL` 2줄, rc=1 |
+| 변이 M-B CI 스텝 echo 대체 | 생존 0 | 12:43 → `FAIL: CI 스텝이 조건부·오류무시·echo 대체다`, rc=1 |
+| 변이 M-C 정본 명부 행 삭제 | 생존 0 | 12:43 → `FAIL: 검증 명부에 이 인수 검사가 없다`, rc=1 |
+| 변이 M-D 저장소 밖 참조 재도입 | 생존 0 | 12:44:03 → 인수 `FAIL: 시험이 humansearch/ 밖 경로를 참조한다 2건`, rc=1. G2 게이트도 같은 변이에서 `mutation failed for the wrong reason` 으로 차단 — 재발 방지 검사가 G2 보다 먼저 잡는다 |
+| 자기 매칭 함정 | 해소 | 정적 검사의 needle 을 검사 줄에 리터럴로 두자 검사가 자기를 잡아 항상 참이 됐다(첫 실행에서 FAIL 로 드러남). 런타임 조립 + 양성 대조군으로 고쳤다 |
 | V1 (3차) | NOT_RUN | 독립 검증 엔진 대기 |
 | push·Draft PR | NOT_RUN | 공통 규칙상 이 세션은 push·PR 을 하지 않는다 |
