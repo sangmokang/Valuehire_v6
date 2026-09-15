@@ -47,6 +47,7 @@
 | 24 | 인수 검사 verify-ac-m | `bash scripts/acceptance-verify-ac-m.sh` — mechanism 명부 대조 (AC-M) |
 | 25 | 인수 검사 invoice | `bash scripts/acceptance-invoice.sh` — 채용 수수료 계산·기한·계약 변조·Codex/Claude 스킬 동등성 |
 | 26 | Invoice 독립 런타임 게이트 | 게이트 배선 검사 + Python 단위시험 직접 실행 + 임시 PostgreSQL에서 마이그레이션·수수료 동시성·저장/전달 RPC 검증 |
+| 27 | 인수 검사 hs-0302 | `bash scripts/acceptance-hs-0302.sh` — 후보 식별키 HMAC 의미(구분자 주입 충돌·길이 접두 계약·제어문자 거부) 실행 판정, 키/DB 경로 경계, #97 마이그레이션 무변경, 시험 수집 건수 정확 대조, 자기 fail-closed 음성 대조군 2종 |
 
 *(1번 앞에 `actions/checkout` 이 있고 `fetch-depth: 0` 이다 — 8번이 과거 blob 을 열려면 필요하다.)*
 
