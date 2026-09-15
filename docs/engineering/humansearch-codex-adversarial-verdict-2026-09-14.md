@@ -557,3 +557,27 @@ Next steps:
 - `_open_root_chain`과 `_ensure_parent`의 중간 FD close-before-close 고장을 각각 직접 고정하는 회귀 시험을 추가하십시오.
 - 원격 origin/main 최신성, PR CI, 실제 hsrunner UID 경계는 별도 증거로 확인하십시오.
 ```
+
+### Claude V2 재현 — PR #83 2차 GREEN 5576b02 (12:11:38, `v2_pr83_r2.py`)
+
+```
+[codex] 문의: 대졸 필수 + contact.name='대졸 필수': REJECTED
+[codex] 문의: 재택근무 가능 + contact.name='재택근무 가능': REJECTED
+[codex] 문의: 야간 근무 가능 + contact.name='야간 근무 가능': REJECTED
+[codex] 제목: 대졸 필수 + contact.name='대졸 필수': REJECTED
+[ok] 문의: 홍길동 (x@example.kr): PASSED_THROUGH
+[residual1] 문의: 대졸 필수 (x@example.kr) + contact.name='대졸 필수': PASSED_THROUGH
+[residual2] 제목: 대졸 필수 + position.title='대졸 필수': REJECTED (구현자 probe 는 PASS — 구성 차이, V1 2차가 판정)
+[F83-3] revenue/funding_total/headcount/ceo='경력 5년 이상': 전부 REJECTED
+```
+→ Codex 1차 우회 4건과 CompanyBrief 주입은 닫혔다. 구현자가 스스로 보고한 잔여 구멍(담당자 이름 칸에 정규식이 모르는 조건 문구 + 본문을 렌더 형식으로; 완전히 다른 두 디렉터리)은 신뢰 경계(Contact·position.title 이 운영자 설정값인지 LLM 산출물인지) 결정 사항으로 §7-5 카드에 올린다.
+
+### Claude V2 재현 — HS-03.02 2차 GREEN 3061bd3 (12:08, `v2_0302_codex_after_green.py`)
+
+지시 모순 정정: 제어문자 거부(b)와 "Codex 충돌 쌍 둘 다 inserted"(a)는 양립 불가(쌍 자체가  를 담음). 구현자가 (b) 거부를 택하고 합법 경계쌍 ab/c vs a/bc 가 별도 2행인 DB 회귀 시험을 추가했다. 팀리드가 이 해석을 승인.
+```
+(1a) separator collision : False | (1b) A·B 둘 다 REJECTED control characters | (1c) rows 0
+(1d) legal pair ab/c, a/bc 둘 다 inserted | (1e) rows 2
+(2) key under db root : REJECTED | (3) 2026-99-99T99:99:99 : REJECTED
+```
+→ 4건 전부 뒤집혔다. 인수 스크립트 실행 2.99초, CHECKED 11(구현자 보고: 변이 M5 에서 인수 스크립트의 pytest 단계가 자기 호출 시험을 돌려 프로세스 1,493개 폭증·612초 타임아웃 2회 → deselect 로 순환 제거·깊이 차단을 변이 대상과 분리·subprocess timeout 300초).
