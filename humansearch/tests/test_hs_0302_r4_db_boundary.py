@@ -1,17 +1,4 @@
-"""HS-03.02 4차 RED — DB 저장 경계(Codex 14:50 높음 결함) 를 시험으로 먼저 고정한다.
-
-재현 원문(2026-09-15 15:29:58, mktemp 격리, GIT_* 환경변수 제거):
-  (a) DB 0644 · 부모 0755 로 완화 → outcome=inserted rows=1   ← 기록됐다
-  (b) 호환 스키마 DB 를 git init 한 폴더 아래에 두고 호출 → outcome=inserted rows=1 ← 기록됐다
-  (c) 대조군(정상 권한 · Git 밖) → outcome=inserted rows=1
-
-저장 정본(HumanSearch 저장 계약 §3)은 "쓰기 직전에 부모 디렉터리와 대상
-파일 경로 자체의 owner, mode, symlink 여부, 실제 경로가 승인된 보호 root 안인지 확인"하고
-"권한 완화, 소유자 불일치, symlink, 승인 root 탈출은 저장 실패"라고 정한다. 보조 파일
-(journal/wal/shm)도 같은 규칙을 따른다. 기록 함수는 링크와 존재만 보고 연결을 열었다.
-
-시험 데이터는 전부 합성이다. 실명·이력서 원문·실제 키를 쓰지 않는다.
-"""
+"""HS-03.02 4차 RED — DB 저장 경계(Codex 14:50 높음 결함) 를 시험으로 먼저 고정한다."""
 
 from __future__ import annotations
 
@@ -84,7 +71,9 @@ def _record(identity: ModuleType, db_path: Path, key_path: Path) -> str:
         candidate_ref=_CANDIDATE_REF,
         observed_at=_OBSERVED_AT,
     )
-    return str(identity.record_candidate_identity(db_path, record, hmac_key_path=key_path))
+    return str(identity.record_candidate_identity(
+        db_path, record, hmac_key_path=key_path, approved_root=db_path.parent
+    ))
 
 
 def _count_rows(db_path: Path) -> int:
@@ -95,7 +84,6 @@ def _count_rows(db_path: Path) -> int:
 
 def _assert_closed_error(exc: BaseException, tmp_path: Path) -> None:
     """거부 메시지는 경로 원문·키 바이트·position_ref·candidate_ref 를 담지 않는다."""
-
     text = str(exc)
     assert str(tmp_path) not in text
     assert _TEST_KEY.hex() not in text
@@ -105,11 +93,9 @@ def _assert_closed_error(exc: BaseException, tmp_path: Path) -> None:
 
 def _git_env_without_repo_hints() -> dict[str, str]:
     """바깥 셸의 GIT_DIR 류가 새 저장소 생성 위치를 바꾸지 못하게 한다."""
-
     return {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
 
 
-# ── 반례 (a) 권한 완화 ─────────────────────────────────────────────────────────
 
 
 @pytest.mark.parametrize(
@@ -120,26 +106,21 @@ def test_loose_db_or_parent_permissions_are_refused(
     tmp_path: Path, db_mode: int, dir_mode: int
 ) -> None:
     """DB 0600 · 부모 0700 이 아니면 쓰기 직전에 거부하고 행을 남기지 않는다."""
-
     identity = _load_identity_module()
     db_path = _protected_db(tmp_path)
     key_path = _key_at(tmp_path / "key-root")
     db_path.chmod(db_mode)
     db_path.parent.chmod(dir_mode)
-
     with pytest.raises(identity.CandidateIdentityError) as caught:
         _record(identity, db_path, key_path)
-
     _assert_closed_error(caught.value, tmp_path)
     assert _count_rows(db_path) == 0
 
 
-# ── 반례 (b) Git 작업 폴더 아래 ────────────────────────────────────────────────
 
 
 def _compatible_db_under(tmp_path: Path, parent: Path) -> Path:
     """정상 초기화한 DB 를 다른 부모 아래로 옮긴 호환 스키마 사본을 만든다."""
-
     source = _protected_db(tmp_path, "source-root")
     parent.mkdir(mode=0o700, parents=True)
     copy = parent / _DB_BASENAME
@@ -150,7 +131,6 @@ def _compatible_db_under(tmp_path: Path, parent: Path) -> Path:
 
 def test_db_under_git_init_directory_is_refused(tmp_path: Path) -> None:
     """`git init` 한 폴더 아래 DB 는 승인된 보호 root 밖이다 — Git 밖 규칙 위반."""
-
     identity = _load_identity_module()
     _assert_tmp_is_symlink_free(tmp_path)
     repo = tmp_path / "repo"
@@ -164,17 +144,14 @@ def test_db_under_git_init_directory_is_refused(tmp_path: Path) -> None:
     assert (repo / ".git").is_dir()
     db_path = _compatible_db_under(tmp_path, repo / "protected")
     key_path = _key_at(tmp_path / "key-root")
-
     with pytest.raises(identity.CandidateIdentityError) as caught:
         _record(identity, db_path, key_path)
-
     _assert_closed_error(caught.value, tmp_path)
     assert _count_rows(db_path) == 0
 
 
 def test_db_under_git_worktree_file_marker_is_refused(tmp_path: Path) -> None:
     """워크트리는 `.git` 이 디렉터리가 아니라 파일이다 — 그 형태도 Git 안이다."""
-
     identity = _load_identity_module()
     _assert_tmp_is_symlink_free(tmp_path)
     worktree = tmp_path / "worktree"
@@ -182,22 +159,18 @@ def test_db_under_git_worktree_file_marker_is_refused(tmp_path: Path) -> None:
     (worktree / ".git").write_text("gitdir: elsewhere\n", encoding="utf-8")
     db_path = _compatible_db_under(tmp_path, worktree / "nested" / "protected")
     key_path = _key_at(tmp_path / "key-root")
-
     with pytest.raises(identity.CandidateIdentityError) as caught:
         _record(identity, db_path, key_path)
-
     _assert_closed_error(caught.value, tmp_path)
     assert _count_rows(db_path) == 0
 
 
-# ── 일반 파일 · 보조 파일 경계 ─────────────────────────────────────────────────
 
 
 def test_db_path_that_is_not_a_regular_file_is_refused_with_closed_error(
     tmp_path: Path,
 ) -> None:
     """모드가 맞아도 일반 파일이 아니면 sqlite 오류가 아니라 닫힌 도메인 오류로 거부한다."""
-
     identity = _load_identity_module()
     _assert_tmp_is_symlink_free(tmp_path)
     root = tmp_path / "protected-root"
@@ -205,27 +178,22 @@ def test_db_path_that_is_not_a_regular_file_is_refused_with_closed_error(
     db_path = root / _DB_BASENAME
     db_path.mkdir(mode=0o600)
     key_path = _key_at(tmp_path / "key-root")
-
     with pytest.raises(identity.CandidateIdentityError) as caught:
         _record(identity, db_path, key_path)
-
     _assert_closed_error(caught.value, tmp_path)
 
 
 @pytest.mark.parametrize("suffix", list(_SIDECAR_SUFFIXES))
 def test_loose_sqlite_sidecar_next_to_db_is_refused(tmp_path: Path, suffix: str) -> None:
     """journal/wal/shm 이 완화 권한으로 남아 있으면 같은 보호 범위 위반이다."""
-
     identity = _load_identity_module()
     db_path = _protected_db(tmp_path)
     key_path = _key_at(tmp_path / "key-root")
     sidecar = db_path.with_name(db_path.name + suffix)
     sidecar.write_bytes(b"")
     sidecar.chmod(0o644)
-
     with pytest.raises(identity.CandidateIdentityError) as caught:
         _record(identity, db_path, key_path)
-
     _assert_closed_error(caught.value, tmp_path)
     assert _count_rows(db_path) == 0
 
@@ -233,7 +201,6 @@ def test_loose_sqlite_sidecar_next_to_db_is_refused(tmp_path: Path, suffix: str)
 @pytest.mark.parametrize("suffix", list(_SIDECAR_SUFFIXES))
 def test_symlinked_sqlite_sidecar_is_refused(tmp_path: Path, suffix: str) -> None:
     """보조 파일이 symlink 면 보호 root 밖으로 평문이 샌다."""
-
     identity = _load_identity_module()
     db_path = _protected_db(tmp_path)
     key_path = _key_at(tmp_path / "key-root")
@@ -243,13 +210,9 @@ def test_symlinked_sqlite_sidecar_is_refused(tmp_path: Path, suffix: str) -> Non
     target.write_bytes(b"")
     target.chmod(0o600)
     db_path.with_name(db_path.name + suffix).symlink_to(target)
-
     with pytest.raises(identity.CandidateIdentityError) as caught:
         _record(identity, db_path, key_path)
-
     _assert_closed_error(caught.value, tmp_path)
-    # 링크 자체의 모드는 0600 이 아니어서 모드 검사도 걸리지만, 사유는 symlink 여야 한다 —
-    # 그래야 symlink 검사 줄을 지운 변이가 살아남지 못한다(2026-09-15 AC-D1 M7 실측).
     assert "symlink" in str(caught.value)
     assert _count_rows(db_path) == 0
 
@@ -257,48 +220,34 @@ def test_symlinked_sqlite_sidecar_is_refused(tmp_path: Path, suffix: str) -> Non
 @pytest.mark.parametrize("suffix", list(_SIDECAR_SUFFIXES))
 def test_sqlite_sidecar_that_is_not_a_regular_file_is_refused(tmp_path: Path, suffix: str) -> None:
     """모드가 맞아도 보조 파일 자리에 일반 파일이 아닌 것이 있으면 닫힌 오류로 거부한다."""
-
     identity = _load_identity_module()
     db_path = _protected_db(tmp_path)
     key_path = _key_at(tmp_path / "key-root")
     sidecar = db_path.with_name(db_path.name + suffix)
     sidecar.mkdir(mode=0o600)
-
     with pytest.raises(identity.CandidateIdentityError) as caught:
         _record(identity, db_path, key_path)
-
     _assert_closed_error(caught.value, tmp_path)
-    # SQLite 는 journal/wal 자리의 디렉터리를 열려다 I/O 오류를 낸다 — 행 수는 치운 뒤 센다.
     sidecar.rmdir()
     assert _count_rows(db_path) == 0
 
 
-# ── 키 경로 경쟁 (독립 검토 2회차 probe, 16:42 재현) ────────────────────────────
 
 
 def test_key_file_vanishing_after_checks_is_a_closed_error(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """키 검사를 통과한 뒤 읽기 직전에 키 파일이 사라지면 OS 오류가 경로째 새면 안 된다.
-
-    재현: 검사 통과 → 키 삭제 → read_bytes → `FileNotFoundError: [Errno 2] ... /key-root/...`
-    가 그대로 올라왔다. 닫힌 오류 계약(경로 원문 없음, CandidateIdentityError)을 깬다.
-    """
-
+    """키 검사를 통과한 뒤 읽기 직전에 키 파일이 사라지면 OS 오류가 경로째 새면 안 된다."""
     identity = _load_identity_module()
     db_path = _protected_db(tmp_path)
     key_path = _key_at(tmp_path / "key-root")
     original = identity._verify_db_location
-
     def vanish_then_verify(path: Path) -> Path:
         key_path.unlink()
         return Path(original(path))
-
     monkeypatch.setattr(identity, "_verify_db_location", vanish_then_verify)
-
     with pytest.raises(identity.CandidateIdentityError) as caught:
         _record(identity, db_path, key_path)
-
     _assert_closed_error(caught.value, tmp_path)
     assert _count_rows(db_path) == 0
 
@@ -307,37 +256,29 @@ def test_key_directory_vanishing_after_checks_is_a_closed_error(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """키 폴더가 사슬 검사 뒤 사라지면 resolve(strict=True) 의 OS 오류도 닫힌 오류여야 한다."""
-
     identity = _load_identity_module()
     db_path = _protected_db(tmp_path)
     key_dir = tmp_path / "key-root"
     key_path = _key_at(key_dir)
     original = identity._reject_symlinked_chain
-
     def verify_then_vanish(path: Path, *, label: str) -> None:
         original(path, label=label)
         if label == "hmac key path":
             shutil.rmtree(key_dir)
-
     monkeypatch.setattr(identity, "_reject_symlinked_chain", verify_then_vanish)
-
     with pytest.raises(identity.CandidateIdentityError) as caught:
         _record(identity, db_path, key_path)
-
     _assert_closed_error(caught.value, tmp_path)
     assert _count_rows(db_path) == 0
 
 
-# ── 대조군 (c) ────────────────────────────────────────────────────────────────
 
 
 def test_protected_db_outside_git_still_records(tmp_path: Path) -> None:
     """양성 대조군 — 정상 권한 · Git 밖 · 보조 파일 없음이면 그대로 1행 기록된다."""
-
     identity = _load_identity_module()
     db_path = _protected_db(tmp_path)
     key_path = _key_at(tmp_path / "key-root")
-
     assert _record(identity, db_path, key_path) == "inserted"
     assert _count_rows(db_path) == 1
     assert oct(db_path.stat().st_mode & 0o777) == oct(0o600)
@@ -348,41 +289,30 @@ def test_protected_db_outside_git_still_records(tmp_path: Path) -> None:
 
 def test_protected_db_with_clean_sidecar_still_records(tmp_path: Path) -> None:
     """양성 대조군 — 정상 권한의 보조 파일은 거부 사유가 아니다."""
-
     identity = _load_identity_module()
     db_path = _protected_db(tmp_path)
     key_path = _key_at(tmp_path / "key-root")
     sidecar = db_path.with_name(db_path.name + "-journal")
     sidecar.write_bytes(b"")
     sidecar.chmod(0o600)
-
     assert _record(identity, db_path, key_path) == "inserted"
     assert _count_rows(db_path) == 1
 
 
-# ── 쓰기 뒤 재확인 (저장 계약 §3: "쓰기 뒤 owner/mode가 바뀌지 않았는지 다시 확인") ──
 
 
 @pytest.mark.parametrize("loosen", ["db-file", "db-directory"])
 def test_permission_loosened_during_write_is_refused_before_commit(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, loosen: str
 ) -> None:
-    """INSERT 뒤·반환 전에 권한이 완화되면 저장 실패여야 하고 행이 남지 않아야 한다.
-
-    재현(2026-09-15 19:27:46, 격리 폴더): INSERT 직후 DB 0644·부모 0755 로 완화 →
-    `outcome=inserted rows=1`, DB 는 0644 인 채 함수가 성공을 돌려줬다. 쓰기 직전 검사만
-    있고 쓰기 뒤 재확인이 없다.
-    """
-
+    """INSERT 뒤·반환 전에 권한이 완화되면 저장 실패여야 하고 행이 남지 않아야 한다."""
     identity = _load_identity_module()
     db_path = _protected_db(tmp_path)
     key_path = _key_at(tmp_path / "key-root")
     real_sqlite3 = identity.sqlite3
-
     class _LoosenAfterInsert:
         def __init__(self, connection: sqlite3.Connection) -> None:
             self._connection = connection
-
         def execute(self, sql: str, params: tuple[str, ...] = ()) -> sqlite3.Cursor:
             cursor = self._connection.execute(sql, params)
             if "insert into hs_candidates" in sql:
@@ -391,23 +321,17 @@ def test_permission_loosened_during_write_is_refused_before_commit(
                 else:
                     db_path.parent.chmod(0o755)
             return cursor
-
         def close(self) -> None:
             self._connection.close()
-
     def connect(path: Path, *args: object, **kwargs: object) -> _LoosenAfterInsert:
         return _LoosenAfterInsert(real_sqlite3.connect(path, *args, **kwargs))
-
-    # 모듈 안의 `sqlite3` 이름만 바꾼다 — 시험 쪽 행 수 조회는 진짜 모듈을 쓴다.
     monkeypatch.setattr(
         identity,
         "sqlite3",
         SimpleNamespace(connect=connect, IntegrityError=real_sqlite3.IntegrityError),
     )
-
     with pytest.raises(identity.CandidateIdentityError) as caught:
         _record(identity, db_path, key_path)
-
     _assert_closed_error(caught.value, tmp_path)
     assert "mode must be" in str(caught.value)
     db_path.chmod(0o600)
@@ -415,7 +339,6 @@ def test_permission_loosened_during_write_is_refused_before_commit(
     assert _count_rows(db_path) == 0, "확정 전에 잡아야 하므로 행이 남으면 안 된다"
 
 
-# ── 독립 검토(Codex, ced77fe) 결함 3건 — 재현된 것만 시험으로 고정한다 ─────────
 
 
 def _hold_write_lock(db_path: Path) -> sqlite3.Connection:
@@ -427,12 +350,7 @@ def _hold_write_lock(db_path: Path) -> sqlite3.Connection:
 def test_lock_wait_exceeded_without_winner_is_a_closed_error(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """다른 쓰기 연결이 잠금을 오래 잡으면 원문 OperationalError 가 아니라 닫힌 오류여야 한다.
-
-    재현(2026-09-15 21:07:06, 격리): 별도 연결이 `begin immediate` 를 잡은 채 기록 호출 →
-    5.73초 뒤 `sqlite3.OperationalError(SQLITE_BUSY, database is locked)` 가 그대로 올라왔다.
-    """
-
+    """다른 쓰기 연결이 잠금을 오래 잡으면 원문 OperationalError 가 아니라 닫힌 오류여야 한다."""
     identity = _load_identity_module()
     db_path = _protected_db(tmp_path)
     key_path = _key_at(tmp_path / "key-root")
@@ -444,7 +362,6 @@ def test_lock_wait_exceeded_without_winner_is_a_closed_error(
     finally:
         holder.execute("rollback")
         holder.close()
-
     _assert_closed_error(caught.value, tmp_path)
     assert "lock" in str(caught.value)
     assert _count_rows(db_path) == 0
@@ -454,7 +371,6 @@ def test_lock_wait_exceeded_after_winner_committed_is_duplicate(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """이긴 쪽이 이미 같은 키를 확정했다면, 잠금 대기를 넘겨도 결과는 `duplicate` 다(AC-3)."""
-
     identity = _load_identity_module()
     db_path = _protected_db(tmp_path)
     key_path = _key_at(tmp_path / "key-root")
@@ -466,7 +382,6 @@ def test_lock_wait_exceeded_after_winner_committed_is_duplicate(
     finally:
         holder.execute("rollback")
         holder.close()
-
     assert outcome == "duplicate"
     assert _count_rows(db_path) == 1
 
@@ -474,39 +389,28 @@ def test_lock_wait_exceeded_after_winner_committed_is_duplicate(
 def test_key_file_vanishing_leaves_no_path_in_cause_chain(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """닫힌 오류의 원인 사슬(`__cause__`/`__context__`)에도 키 경로가 남으면 안 된다.
-
-    재현(19:27:46·Codex step-13): `str(exc)` 는 깨끗하지만 `traceback.format_exc()` 에
-    `FileNotFoundError: … /key-root/hs-candidate.key` 가 원인으로 실린다.
-    """
-
+    """닫힌 오류의 원인 사슬(`__cause__`/`__context__`)에도 키 경로가 남으면 안 된다."""
     identity = _load_identity_module()
     db_path = _protected_db(tmp_path)
     key_path = _key_at(tmp_path / "key-root")
     original = identity._verify_db_location
-
     def vanish_then_verify(path: Path) -> Path:
         key_path.unlink()
         return Path(original(path))
-
     monkeypatch.setattr(identity, "_verify_db_location", vanish_then_verify)
-
     try:
         _record(identity, db_path, key_path)
     except identity.CandidateIdentityError:
         rendered = traceback.format_exc()
     else:
         pytest.fail("DID NOT RAISE CandidateIdentityError")
-
     assert str(tmp_path) not in rendered, "원인 사슬에 키 경로가 실렸다"
 
 
 def test_sqlite_sidecar_owned_by_another_uid_is_refused(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """보조 파일도 대상 파일 자체의 소유자를 본다(저장 계약 §3). 다른 UID 파일은 같은 UID 로
-    만들 수 없어(chown → EPERM) stat 결과의 st_uid 만 바꿔 재현한다."""
-
+    """보조 파일도 대상 파일 자체의 소유자를 본다(저장 계약 §3). 다른 UID 파일은 같은 UID 로"""
     identity = _load_identity_module()
     db_path = _protected_db(tmp_path)
     key_path = _key_at(tmp_path / "key-root")
@@ -514,7 +418,6 @@ def test_sqlite_sidecar_owned_by_another_uid_is_refused(
     sidecar.write_bytes(b"")
     sidecar.chmod(0o600)
     real_stat = Path.stat
-
     def foreign_owner_stat(self: Path, *, follow_symlinks: bool = True) -> os.stat_result:
         info = real_stat(self, follow_symlinks=follow_symlinks)
         if self == sidecar:
@@ -522,12 +425,9 @@ def test_sqlite_sidecar_owned_by_another_uid_is_refused(
             fields[4] = info.st_uid + 1
             return os.stat_result(tuple(fields))
         return info
-
     monkeypatch.setattr(Path, "stat", foreign_owner_stat)
-
     with pytest.raises(identity.CandidateIdentityError) as caught:
         _record(identity, db_path, key_path)
-
     _assert_closed_error(caught.value, tmp_path)
     assert "owner" in str(caught.value)
     assert _count_rows(db_path) == 0
@@ -542,15 +442,12 @@ def _render_closed_error(identity: ModuleType, db_path: Path, key_path: Path) ->
 
 
 def test_missing_key_file_leaves_no_path_in_cause_chain(tmp_path: Path) -> None:
-    """경쟁 없는 키 누락은 HS-03.01 검사기의 오류(원인 = 경로 담긴 FileNotFoundError)를
-    재포장한다. 그 사슬도 끊겨야 한다(변이 P5 가 살아남아 추가)."""
-
+    """경쟁 없는 키 누락은 HS-03.01 검사기의 오류(원인 = 경로 담긴 FileNotFoundError)를"""
     identity = _load_identity_module()
     db_path = _protected_db(tmp_path)
     key_dir = tmp_path / "key-root"
     key_dir.mkdir()
     key_dir.chmod(0o700)
-
     rendered = _render_closed_error(identity, db_path, key_dir / _KEY_BASENAME)
     assert str(tmp_path) not in rendered
 
@@ -563,14 +460,11 @@ def test_key_directory_vanishing_leaves_no_path_in_cause_chain(
     key_dir = tmp_path / "key-root"
     key_path = _key_at(key_dir)
     original = identity._reject_symlinked_chain
-
     def verify_then_vanish(path: Path, *, label: str) -> None:
         original(path, label=label)
         if label == "hmac key path":
             shutil.rmtree(key_dir)
-
     monkeypatch.setattr(identity, "_reject_symlinked_chain", verify_then_vanish)
-
     rendered = _render_closed_error(identity, db_path, key_path)
     assert str(tmp_path) not in rendered
 
@@ -580,6 +474,5 @@ def test_missing_db_file_leaves_no_path_in_cause_chain(tmp_path: Path) -> None:
     db_path = _protected_db(tmp_path)
     key_path = _key_at(tmp_path / "key-root")
     db_path.unlink()
-
     rendered = _render_closed_error(identity, db_path, key_path)
     assert str(tmp_path) not in rendered

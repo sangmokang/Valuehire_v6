@@ -46,7 +46,7 @@ def test_unapproved_private_compatible_db_is_refused(tmp_path: Path) -> None:
 
     with pytest.raises(CandidateIdentityError, match="approved"):
         record_candidate_identity(
-            other_db, _RECORD, hmac_key_path=key_path, approved_root=approved.db_path.parent
+            other_db, _RECORD, hmac_key_path=key_path, approved_root=approved.protected_root
         )
 
     assert _rows(other_db) == 0
@@ -90,7 +90,7 @@ def test_connect_swap_back_to_other_compatible_db_is_refused(
             approved.db_path,
             _RECORD,
             hmac_key_path=key_path,
-            approved_root=approved.db_path.parent,
+            approved_root=approved.protected_root,
         )
 
     assert opened_alternate

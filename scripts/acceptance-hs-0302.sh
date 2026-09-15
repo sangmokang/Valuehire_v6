@@ -10,31 +10,11 @@
 #
 # 무엇을 막는가 / 막지 못하는가:
 #   막는다   — 기록 시험 파일 삭제·축소, 기본키 충돌 판별을 지우고 모든 IntegrityError 를
-#              duplicate 로 접는 것, HMAC 직렬화에서 필드를 빼거나 길이 접두를 구분자
-#              결합으로 되돌리는 것, 제어문자 거부를 지우는 것, #97 마이그레이션 수정,
-#              hs_candidates 를 우회하는 새 표 추가, 시험 미실행, 그리고 이 스크립트 자신이
-#              필수 비교·스캔을 못 한 채 초록이 되는 것.
-#   막지 못함 — 시험 본문이 맞는 것을 보는지(그것은 pytest 와 변이 검증의 몫),
-#              런타임 동시성 자체(그것은 test_ac3 가 20회 실제 경쟁으로 판정한다).
-#
-# fail-closed (2026-09-15, Codex V1 결함 4): 필수 비교나 스캔이 불가능하면 건너뛰고
-#   통과하지 않는다. 즉시 NOT_RUN 을 찍고 exit 2 로 끝내며, 그 항목은 CHECKED 에 넣지
-#   않는다. 종료값 0 은 "모든 필수 검사를 실제로 했고 전부 통과했다"만 의미해야 한다.
-#
-# 자기 검사: 탐지기(가드 탐지·HMAC 입력 탐지)는 반드시 "잡는다"와 "안 잡는다"를
-#   한 쌍으로 증명한다. 진짜 파일에서 통과만 확인하면 탐지기가 항상 통과해도 모른다.
-#   음성 대조군은 저장소 밖 임시 사본에만 만든다 — 검증기가 대상을 오염시키면 판정이 무효다.
 set -uo pipefail
 
-# git 훅은 GIT_DIR·GIT_INDEX_FILE 등을 자식으로 export 한다. 상속을 끊지 않으면
-# 임시 디렉터리로 cd 해도 git 이 실제 저장소에 붙는다(acceptance-hs-a3.sh 2026-08-09 사고).
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY \
       GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_PREFIX GIT_QUARANTINE_PATH
 
-# 재귀 차단 (2026-09-15 실측). 이 스크립트의 pytest 단계는 자기 자신을 호출하는 시험을
-# 돌린다. fail-closed 가 퇴화하면 그 시험이 다시 이 스크립트를 부르고, 그 안에서 또 시험이
-# 돌아 프로세스가 기하급수로 늘어난다(변이 검증 중 수백 개까지 늘어 강제 종료했다).
-# 깊이를 표시해 중첩 실행에서는 시험 단계를 아예 돌리지 않는다.
 HS0302_NESTED="${HS0302_ACCEPTANCE_DEPTH:-0}"
 export HS0302_ACCEPTANCE_DEPTH=$((HS0302_NESTED + 1))
 SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
@@ -45,7 +25,6 @@ if [ ! -x "$GREP" ]; then
   echo "CHECKED: 0"
   exit 2
 fi
-# grep 자기검사 — 양성 1건과 음성 1건이 모두 기대대로여야 판정을 시작한다.
 if ! printf 'alpha\n' | "$GREP" -q 'alpha'; then
   echo "NOT_RUN: grep 양성 자기검사 실패 — 판정기를 신뢰할 수 없다"
   echo "CHECKED: 0"
@@ -71,9 +50,8 @@ TESTS=humansearch/tests/test_hs_0302_candidate_identity.py
 TESTS_R2=humansearch/tests/test_hs_0302_r2_hardening.py
 TESTS_R3=humansearch/tests/test_hs_0302_r3_hardening.py
 TESTS_R4=humansearch/tests/test_hs_0302_r4_db_boundary.py
-# 인수 실행이 돌리는 시험 전부. 필터는 두지 않는다 — 필터를 두면 필수 음성 대조군이
-# 인수 실행 안에서 돌지 않는다(Codex V1 2차 F0302-4 잔여).
-TEST_FILES="tests/test_hs_0302_candidate_identity.py tests/test_hs_0302_r2_hardening.py tests/test_hs_0302_r3_hardening.py tests/test_hs_0302_r4_db_boundary.py"
+TESTS_R5=humansearch/tests/test_hs_0302_r5_approved_root.py
+TEST_FILES="tests/test_hs_0302_candidate_identity.py tests/test_hs_0302_r2_hardening.py tests/test_hs_0302_r3_hardening.py tests/test_hs_0302_r4_db_boundary.py tests/test_hs_0302_r5_approved_root.py"
 PYTEST_EXTRA=""
 SCHEMA=humansearch/src/humansearch/storage_schema.py
 WORKFLOW=.github/workflows/verify.yml
@@ -86,11 +64,8 @@ MIN_TESTS=6
 MIN_R2_TESTS=10
 MIN_R3_TESTS=6
 MIN_R4_TESTS=7
-# 명부 건수는 하한이 아니라 **정확한 기대값**이다. 하한이면 시험 함수와 명부 줄을 함께
-# 지워 하한까지 내려앉을 수 있다 — 그러면 required·collected·missing·extra 가 모두
-# 맞아떨어져 통과한다(Codex V1 4차 실측: 82→80). 시험을 추가·삭제할 때는 명부 파일과
-# 이 상수를 **함께** 올린다. 2026-09-15 4차: 82→97→100→102(DB 저장 경계 15건 + 보조 파일 비일반 3건 + 키 경로 경쟁 2건).
-EXPECTED_REQUIRED_IDS=111
+MIN_R5_TESTS=2
+EXPECTED_REQUIRED_IDS=113
 
 WORK=$(mktemp -d) || { echo "NOT_RUN: mktemp 실패"; echo "CHECKED: 0"; exit 2; }
 trap 'rm -rf "$WORK"' EXIT
@@ -99,14 +74,6 @@ fail=0
 checked=0
 pass_item() { echo "PASS: $1"; checked=$((checked + 1)); }
 fail_item() { echo "FAIL: $1"; fail=1; checked=$((checked + 1)); }
-# fail-closed 자기 검사 판정. 종료값만 보면 부족하다 — 건너뛴 뒤 다른 경로로 2 가
-# 나와도 통과한다. NOT_RUN 뒤에 판정(PASS)이 한 줄이라도 이어지면 그것이 fail-open 이다.
-# abort_not_run 을 쓰지 않는다: fail-closed 를 되돌리는 변이가 그 보조를 건드리므로.
-# fail-closed 기준을 **한 곳에만** 둔다. 자기 검사(통과해야 하는 쪽)와 음성 대조군
-# (어겨야 하는 쪽)이 같은 함수를 쓴다. 두 벌로 적으면 한쪽만 완화해도 다른 쪽이 못 잡는다
-# — 2026-09-15 변이 N6 에서 실제로 그랬다(pytest 층을 걷어내자 완화가 무탐지가 됐다).
-# 종료값만 보면 부족하다: 건너뛴 뒤 다른 경로로 2 가 나와도 통과한다. 첫 NOT_RUN 뒤에
-# 어떤 판정 줄(PASS·FAIL·NOT_RUN)이라도 있으면 "멈추지 않고 계속 갔다"는 증거다.
 fail_closed_ok() {
   local log=$1 rc=$2 reason=$3 line trailing
   line=$("$GREP" -n '^NOT_RUN:' "$log" | head -1 | cut -d: -f1)
@@ -128,10 +95,9 @@ assert_fail_closed() {
   fi
 }
 
-# 필수 검사를 할 수 없으면 건수만 늘리고 통과시키지 않는다 — 그 자리에서 끝낸다.
 abort_not_run() { echo "NOT_RUN: $1"; echo "CHECKED: $checked"; exit 2; }
 
-for required in "$MODULE" "$TESTS" "$TESTS_R2" "$TESTS_R3" "$TESTS_R4" "$WORKFLOW" "$SOT_ROSTER" \
+for required in "$MODULE" "$TESTS" "$TESTS_R2" "$TESTS_R3" "$TESTS_R4" "$TESTS_R5" "$WORKFLOW" "$SOT_ROSTER" \
                 "$REQUIRED_TESTS" "$WIRING_CHECKER" "$SCHEMA"; do
   if [ ! -f "$required" ]; then
     echo "NOT_RUN: $required 없음 — 검사 대상이 성립하지 않는다"
@@ -141,8 +107,6 @@ for required in "$MODULE" "$TESTS" "$TESTS_R2" "$TESTS_R3" "$TESTS_R4" "$WORKFLO
 done
 
 # ── 탐지기 정의 (진짜/음성 대조군 양쪽에 같은 함수를 쓴다) ────────────────────
-# 기본키 충돌만 duplicate 로 접는가: `return "duplicate"` 바로 앞 2줄 안에
-# sqlite_errorname 과 SQLITE_CONSTRAINT_PRIMARYKEY 비교가 있어야 한다.
 pk_guard_present() {
   local file=$1 ctx
   ctx=$("$GREP" -B2 'return "duplicate"' "$file" 2>/dev/null) || return 1
@@ -169,15 +133,16 @@ count_tests() {
 r2_count=$(count_tests "$TESTS_R2")
 r3_count=$(count_tests "$TESTS_R3")
 r4_count=$(count_tests "$TESTS_R4")
-total_tests=$((test_count + r2_count + r3_count + r4_count))
+r5_count=$(count_tests "$TESTS_R5")
+total_tests=$((test_count + r2_count + r3_count + r4_count + r5_count))
 if [ "$test_count" -ge "$MIN_TESTS" ] && [ "$r2_count" -ge "$MIN_R2_TESTS" ] \
-   && [ "$r3_count" -ge "$MIN_R3_TESTS" ] && [ "$r4_count" -ge "$MIN_R4_TESTS" ]; then
-  pass_item "시험 함수 1차 ${test_count} · 2차 ${r2_count} · 3차 ${r3_count} · 4차 ${r4_count} = ${total_tests}개"
+   && [ "$r3_count" -ge "$MIN_R3_TESTS" ] && [ "$r4_count" -ge "$MIN_R4_TESTS" ] \
+   && [ "$r5_count" -ge "$MIN_R5_TESTS" ]; then
+  pass_item "시험 함수 1차 ${test_count} · 2차 ${r2_count} · 3차 ${r3_count} · 4차 ${r4_count} · 5차 ${r5_count} = ${total_tests}개"
 else
-  fail_item "시험 함수 부족 — 1차 ${test_count}(>=${MIN_TESTS}) · 2차 ${r2_count}(>=${MIN_R2_TESTS}) · 3차 ${r3_count}(>=${MIN_R3_TESTS}) · 4차 ${r4_count}(>=${MIN_R4_TESTS})"
+  fail_item "시험 함수 부족 — 1차 ${test_count}(>=${MIN_TESTS}) · 2차 ${r2_count}(>=${MIN_R2_TESTS}) · 3차 ${r3_count}(>=${MIN_R3_TESTS}) · 4차 ${r4_count}(>=${MIN_R4_TESTS}) · 5차 ${r5_count}(>=${MIN_R5_TESTS})"
 fi
 
-# 두 연결 경쟁 시험이 실제로 스레드 2개를 쓰는가(같은 연결 재사용이면 AC-3 가 무효다)
 if "$GREP" -q 'ThreadPoolExecutor' "$TESTS" && "$GREP" -q 'threading.Barrier' "$TESTS"; then
   pass_item "AC-3 경쟁 시험이 ThreadPoolExecutor + Barrier 로 두 워커를 동시에 띄운다"
 else
@@ -201,11 +166,6 @@ else
 fi
 
 # ── 4-5. HMAC 직렬화와 제어문자 거부는 **실행해서** 판정한다 ────────────────
-# 문자열 탐지기는 구현을 같은 뜻으로 다시 써도 불합격시킨다(거짓 빨강). 더 나쁜 건
-# 반대다 — 모양만 맞추면 통과한다. Codex V1 이 뚫은 것은 모양이 아니라 의미였으므로
-# 여기서는 함수를 직접 불러 충돌 여부를 본다. probe 는 자기 음성 대조군을 품는다:
-# 옛 구분자 결합 방식으로 계산하면 같은 쌍이 **반드시 충돌**해야 하고, 충돌이 안 보이면
-# probe 자신이 고장 난 것이므로 BAD 로 보고한다.
 cat > "$WORK/hmac_probe.py" <<'PROBE'
 """candidate_key_hmac 의미 판정 — 저장소를 건드리지 않고 함수만 부른다."""
 
@@ -249,13 +209,12 @@ def separator_joined(position_ref, channel, candidate_ref):
 def refusal_reason(position_ref, channel, candidate_ref, observed_at=GOOD_TIME):
     record = CandidateIdentityInput(position_ref, channel, candidate_ref, observed_at)
     try:
-        record_candidate_identity(NOWHERE, record, hmac_key_path=NOKEY)
+        record_candidate_identity(NOWHERE, record, hmac_key_path=NOKEY, approved_root=NOWHERE.parent)
     except CandidateIdentityError as exc:
         return str(exc)
     return ""
 
 
-# probe 자기 음성 대조군 — 옛 방식에서는 이 쌍이 반드시 충돌해야 한다.
 check("probe-can-see-collisions", separator_joined(*A) == separator_joined(*B))
 check("injected-pair-does-not-collide", candidate_key_hmac(KEY, *A) != candidate_key_hmac(KEY, *B))
 for label, triple in (
@@ -270,8 +229,6 @@ check("channel-changes-key", candidate_key_hmac(KEY, "P", "saramin", "c") != can
 check("position-changes-key", candidate_key_hmac(KEY, "P1", "saramin", "c") != candidate_key_hmac(KEY, "P2", "saramin", "c"))
 check("split-ambiguity-separated", candidate_key_hmac(KEY, "ab", "saramin", "c") != candidate_key_hmac(KEY, "a", "saramin", "bc"))
 
-# 제어문자 거부가 파일시스템에 닿기 전에 먼저 걸리는가.
-# 양성 대조군: 합법 입력은 "키 없음"이라는 **다른** 이유로 거부돼야 한다.
 legal = refusal_reason("POS-1", "saramin", "cand-1")
 check("legal-input-fails-on-missing-key", "control characters" not in legal and legal != "")
 for name, triple in (
@@ -301,7 +258,6 @@ else
   "$GREP" '^PROBE_BAD:' "$WORK/probe.log" || tail -20 "$WORK/probe.log"
 fi
 
-# probe 가 "아무것도 판정하지 않고 초록"이 되는 경우를 막는다 — 0건은 통과가 아니다.
 if [ "${probe_ok:-0}" -ge 10 ]; then
   pass_item "HMAC 의미 probe 가 판정한 항목 ${probe_ok}건 (>= 10)"
 else
@@ -310,11 +266,14 @@ fi
 
 # ── 6. #97 마이그레이션을 건드리지 않았는가 ─────────────────────────────────
 if git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
-  schema_diff=$(git diff "$BASE_SHA" -- "$SCHEMA" | wc -l | tr -d ' ')
-  if [ "$schema_diff" = "0" ]; then
-    pass_item "storage_schema.py 가 ${BASE_SHA}(#97) 과 동일하다 (diff 0줄)"
+  git diff --unified=0 "$BASE_SHA" -- "$SCHEMA" > "$WORK/schema.diff"
+  "$GREP" -E '^[+-][^+-]' "$WORK/schema.diff" > "$WORK/schema.changes"
+  if diff -u <(printf '%s\n' '+    protected_root: Path' '+        protected_root=root,') \
+            "$WORK/schema.changes" > "$WORK/schema-only-root.diff"; then
+    pass_item "storage_schema.py 의 마이그레이션 불변 — 초기화 결과에 승인 root 두 줄만 추가"
   else
-    fail_item "storage_schema.py 가 ${BASE_SHA} 대비 ${schema_diff}줄 다르다 — 이 WU 는 마이그레이션을 바꾸지 않는다"
+    fail_item "storage_schema.py 가 ${BASE_SHA} 대비 승인 root 두 줄 외에 변경됐다 — 마이그레이션 무변경 계약 위반"
+    cat "$WORK/schema-only-root.diff"
   fi
 else
   abort_not_run "기준 커밋 ${BASE_SHA} 를 찾을 수 없다 — 마이그레이션 동일성을 대조하지 못한 채로는 합격시키지 않는다"
@@ -336,25 +295,16 @@ else
 fi
 
 # ── 8. 시험을 실제로 돌린다 (문자열 검사만으로는 동작을 판정하지 못한다) ─────
-# 중첩 차단은 abort_not_run 을 쓰지 않는다. fail-closed 를 되돌리는 변이가 그 보조를
-# 건드리면 차단까지 같이 죽기 때문이다(2026-09-15 실측: 프로세스 1,493개). 직접 끝낸다.
 if [ "$HS0302_NESTED" -ge 1 ]; then
   echo "NOT_RUN: 중첩 실행(depth=${HS0302_NESTED}) — 시험 단계를 돌리면 무한 재귀가 된다"
   echo "CHECKED: $checked"
   exit 2
 fi
-# 무엇을 돌려야 하는지를 먼저 수집해 둔다. "통과 수 >= 함수 수" 같은 하한은 매개변수
-# 확장 때문에 부풀어, 필수 시험이 빠져도 성립한다(Codex V1 2차). 수집 건수와 **정확히**
-# 같아야 하고 deselected·skipped·기대실패 표시가 하나라도 붙으면 불합격이다.
-# 판정은 요약 줄이 정확히 `<수집건수> passed in ` 모양인지로 본다 — 다른 표시가
-# 하나라도 붙으면 그 모양이 깨진다.
 collect_log="$WORK/collect.log"
 ( cd humansearch && uv run pytest $TEST_FILES $PYTEST_EXTRA --collect-only -q ) \
   > "$collect_log" 2>&1
 collect_rc=$?
 if ! tail -5 "$collect_log" | "$GREP" -E 'tests? collected' > "$WORK/collect_summary.txt"; then
-  # 매치 없음(rc 1)과 리다이렉션 실패(rc 1)가 겹친다. 어느 쪽이든 판정 근거가 없으므로
-  # 빈 파일로 두고 아래에서 abort_not_run 이 받는다 — 조용히 넘기지 않는다.
   : > "$WORK/collect_summary.txt"
 fi
 collect_line=$(tail -1 "$WORK/collect_summary.txt")
@@ -391,20 +341,13 @@ else
 fi
 
 # ── fail-closed 자기 검사 ──────────────────────────────────────────────────
-# 필수 비교를 못 하게 만든 자기 사본이 "건너뛰고 통과"하지 않는지 직접 본다. 종료값만
-# 보면 부족하다 — 건너뛴 뒤 다른 경로로 2 가 나와도 통과한다. NOT_RUN 뒤에 판정(PASS)이
-# 한 줄이라도 이어지면 그것이 fail-open 이다. 사본은 depth 9 로 띄워 시험 단계에 닿지
-# 못하게 한다(재귀 방지).
 sed 's/^BASE_SHA=.*/BASE_SHA=0000000000000000000000000000000000000000/' "$SELF" \
   > "$WORK/failclosed_probe.sh"
 HS0302_ACCEPTANCE_DEPTH=9 bash "$WORK/failclosed_probe.sh" > "$WORK/failclosed.log" 2>&1
 assert_fail_closed "$WORK/failclosed.log" "$?" '기준 커밋' \
   "fail-closed 자기 검사 ① 기준 SHA 를 지운 사본이 그 자리에서 끝난다"
 
-# 두 번째 경로 — 우회 표 스캔이 오류를 낼 때. 기준 SHA 만 대체하면 이 경로는 인수 실행
-# 안에서 한 번도 판정되지 않는다(Codex V1 2차).
 cat > "$WORK/fake-grep" <<'FAKEGREP'
-#!/bin/bash
 for arg in "$@"; do
   case "$arg" in
     *create*table*) exit 2 ;;
@@ -419,11 +362,6 @@ assert_fail_closed "$WORK/failclosed_scan.log" "$?" 'create table 스캔' \
   "fail-closed 자기 검사 ② 우회 표 스캔이 깨진 사본이 그 자리에서 끝난다"
 
 # ── 건너뛰기 보조 부재 · 즉시 종료 · 차단 분리 (정적) ──────────────────────
-# 건수만 늘리고 실패는 안 하는 보조가 남아 있으면 안 된다. 중첩 차단이 fail-closed
-# 보조를 거치면 그 보조를 되돌리는 변이에 함께 죽는다(2차 실측: 프로세스 1,493개).
-#
-# 찾는 문자열을 이 줄에 리터럴로 두면 검사가 자기 자신을 잡아 항상 참이 된다
-# (acceptance-hs-a3.sh 의 카나리 조립과 같은 이유). 런타임에 합친다.
 N_SKIP=$(printf 'skip%s' '_item')
 N_EXIT=$(printf 'exit%s' ' 2')
 N_DEPTH=$(printf 'HS0302_ACCEPTANCE%s' '_DEPTH')
@@ -439,8 +377,6 @@ else
   fail_item "건너뛰기 보조가 있거나, 즉시 종료·중첩 차단이 없거나, 차단이 보조를 거친다"
 fi
 
-# 탐지기 자기 검사 — 위 네 needle 이 실제로 무언가를 가리키는지 확인한다. 조립이
-# 어긋나 빈 문자열이 되면 -qF 가 전부 참이 되어 검사가 조용히 무의미해진다.
 needle_ok=1
 for needle in "$N_SKIP" "$N_EXIT" "$N_DEPTH" "$N_ROUTED"; do
   [ -n "$needle" ] || needle_ok=0
@@ -455,8 +391,6 @@ else
 fi
 
 # ── fail-closed 판정기 자신의 음성 대조군 ──────────────────────────────────
-# 판정기가 항상 통과하면 위 자기 검사 두 건이 무의미하다. abort_not_run 을 fail-open 으로
-# 되돌리고 기준 SHA 까지 깨뜨린 사본은 **반드시** 엄격 기준을 어겨야 한다.
 sed -e 's/^BASE_SHA=.*/BASE_SHA=0000000000000000000000000000000000000000/' \
     -e 's|^abort_not_run() .*|abort_not_run() { echo "NOT_RUN: $1"; checked=$((checked + 1)); }|' \
     "$SELF" > "$WORK/failopen_control.sh"
@@ -470,10 +404,6 @@ else
 fi
 
 # ── CI 배선 (정본 53행) ────────────────────────────────────────────────────
-# 로컬 pre-push 는 글로브로 전량 실행하지만 CI 는 고정 목록이다. 여기 없으면
-# '로컬에만 있는 검사'가 되고 P15③ 은 그것을 없는 것으로 친다.
-# 이 판정은 pytest 가 아니라 여기 있어야 한다 — G2 게이트는 humansearch/ 만 사본으로
-# 복사하므로 시험이 .github/·docs/ 를 읽으면 엉뚱한 이유로 죽는다(2026-09-15 실측).
 if "$GREP" -qF "$ACCEPTANCE_RUN" "$WORKFLOW"; then
   pass_item "CI 고정 목록에 전용 스텝이 있다 ($WORKFLOW)"
 else
@@ -486,9 +416,6 @@ else
   fail_item "검증 명부에 이 인수 검사가 없다 (정본 53행 위반)"
 fi
 
-# 스텝이 있어도 run 값이 무엇이냐가 계약이다. 판정 본문은 검사기 한 곳에 둔다 —
-# 진짜 워크플로와 실패를 삼키는 꼬리를 심은 임시 사본에 **같은 검사기**를 돌려 통과와 차단을
-# 한 쌍으로 증명한다. 사본은 저장소 밖에만 만든다.
 if [ ! -f "$WIRING_CHECKER" ]; then
   abort_not_run "배선 검사기가 없다 — $WIRING_CHECKER"
 fi
@@ -501,8 +428,6 @@ else
   cat "$WORK/wiring.log"
 fi
 
-# 변이 꼬리(논리 OR 로 실패를 삼키는 형태)를 런타임에 조립한다. 리터럴로 두면 P13
-# 검사 약화 탐지가 이 파일 자체를 잡는다(acceptance-hs-a3.sh 의 카나리 조립과 같은 이유).
 MUT_TAIL="$(printf '|%s' '|') $(printf 'tr%s' 'ue')"
 sed "s%^\( *\)run: ${ACCEPTANCE_RUN}\$%\1run: ${ACCEPTANCE_RUN} ${MUT_TAIL}%" "$WORKFLOW" \
   > "$WORK/workflow_mutated.yml"
@@ -519,9 +444,6 @@ else
 fi
 
 # ── 필수 시험 명부 대조 ────────────────────────────────────────────────────
-# 수집 == 통과 대조는 "선택된 것을 전부 돌렸다"만 본다. 매개변수 사례 한 건을 지우면
-# 수집과 통과가 함께 줄어 두 조건을 모두 만족한다(Codex V1 3차). 요구 node-id 를 고정
-# 명부와 집합으로 대조한다 — 누락은 "시험이 사라졌다", 추가는 "명부를 갱신하라".
 "$GREP" -vE '^[[:space:]]*(#|$)' "$REQUIRED_TESTS" | LC_ALL=C sort > "$WORK/required_ids.txt"
 required_n=$("$GREP" -c . "$WORK/required_ids.txt")
 if [ "${required_n:-0}" -ne "$EXPECTED_REQUIRED_IDS" ]; then
@@ -541,14 +463,8 @@ else
 fi
 
 # ── 시험이 humansearch/ 밖으로 손을 뻗지 않는가 ────────────────────────────
-# G2 게이트는 humansearch/src 와 tests 만 사본으로 복사한다. 시험이 저장소의 다른
-# 경로를 읽으면 사본에서 FileNotFoundError 로 죽고, 게이트는 그것을 "엉뚱한 이유로
-# 실패"로 보고 push 를 막는다(2026-09-15 실측: 8건).
-# 판정 기준은 지시받은 검증 명령과 **같은 패턴**이다. 두 벌로 적으면 갈라진다.
-# 경로 문자열이 주석에만 있어도 불합격시킨다 — 시험이 실제로 읽는지 아닌지를 이 검사가
-# 판별하려 들면 판별기가 또 하나의 약점이 된다. 아예 쓰지 않는 쪽이 검사하기 쉽다.
 OUT_OF_TREE_RE=$(printf 'parents\\[2\\]|%s/|\\.github|docs/sot' 'scripts')
-"$GREP" -nE "$OUT_OF_TREE_RE" "$TESTS" "$TESTS_R2" "$TESTS_R3" "$TESTS_R4" \
+"$GREP" -nE "$OUT_OF_TREE_RE" "$TESTS" "$TESTS_R2" "$TESTS_R3" "$TESTS_R4" "$TESTS_R5" \
   > "$WORK/out_of_tree.txt"
 rc=$?
 if [ "$rc" -gt 1 ]; then

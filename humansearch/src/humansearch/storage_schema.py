@@ -25,6 +25,7 @@ class StorageSchemaResult:
     """Result returned after schema setup."""
 
     db_path: Path
+    protected_root: Path
     schema_version: int
     applied_migrations: tuple[int, ...]
 
@@ -100,6 +101,7 @@ def initialize_humansearch_storage(
     _verify_path(db_path, expected_mode=0o600, label="db file")
     return StorageSchemaResult(
         db_path=db_path,
+        protected_root=root,
         schema_version=_schema_version(db_path),
         applied_migrations=applied,
     )

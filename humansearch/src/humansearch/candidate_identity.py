@@ -105,13 +105,16 @@ def record_candidate_identity(
     record: CandidateIdentityInput,
     *,
     hmac_key_path: Path,
+    approved_root: Path,
 ) -> RecordOutcome:
-    """Record one candidate identity, returning whether the row was new."""
+    """Record one identity under the caller's initialized, approved storage root."""
 
     position_ref, channel, candidate_ref = _validated_fields(record)
+    _verify_db_boundary(db_path, approved_root)
     key = _load_hmac_key(hmac_key_path, db_path)
     return _insert_once(
         db_path,
+        approved_root=approved_root,
         key_hmac=candidate_key_hmac(key, position_ref, channel, candidate_ref),
         position_ref=position_ref,
         channel=channel,
@@ -273,7 +276,7 @@ def _load_hmac_key(hmac_key_path: Path, db_path: Path) -> bytes:
     return key
 
 
-def _verify_db_boundary(db_path: Path) -> None:
+def _verify_db_boundary(db_path: Path, approved_root: Path) -> None:
     """쓰기 직전 보호 경계 — 저장 계약 §3.
 
     HS-03.01 이 초기화 때 본 권한·위치는 그 시점의 사실일 뿐이다. 기록 시점에 부모
@@ -281,7 +284,12 @@ def _verify_db_boundary(db_path: Path) -> None:
     소유자 불일치·symlink·승인 root 탈출은 저장 실패다(Codex 14:50 높음).
     """
 
-    _verify(db_path.parent, expected_mode=_DB_DIR_MODE, label="db directory")
+    # 승인 루트는 DB 경로에서 추론하지 않는다. 초기화 결과나 신뢰된 설정의 절대 경로를
+    # 호출자가 제공해야 한다. 다른 0700/0600 호환 DB 는 같은 UID 여도 승인되지 않았다.
+    if not approved_root.is_absolute() or db_path.parent != approved_root:
+        raise CandidateIdentityError("db file is outside the approved root")
+    _reject_symlinked_chain(db_path, label="db path")
+    _verify(approved_root, expected_mode=_DB_DIR_MODE, label="db directory")
     _verify(db_path, expected_mode=_DB_FILE_MODE, label="db file")
     if not db_path.is_file():
         raise CandidateIdentityError("db file must be a regular file")
@@ -317,6 +325,7 @@ def _verify_sidecars(db_path: Path) -> None:
 def _insert_once(
     db_path: Path,
     *,
+    approved_root: Path,
     key_hmac: str,
     position_ref: str,
     channel: str,
@@ -330,9 +339,14 @@ def _insert_once(
     롤백해 행을 남기지 않는다 — 확정 뒤에 보면 오류를 내도 행은 이미 남는다.
     """
 
-    _verify_db_boundary(db_path)
+    _verify_db_boundary(db_path, approved_root)
     connection = sqlite3.connect(db_path, isolation_level=None, timeout=_LOCK_WAIT_SECONDS)
     try:
+        # sqlite3.connect 는 검사와 별도의 경로 해석이다. 검사 직후 symlink 를 다른
+        # 호환 DB 로 바꾸고 connect 직후 되돌려도 열린 연결의 main 경로는 바뀌지 않는다.
+        main_files = [row[2] for row in connection.execute("pragma database_list") if row[1] == "main"]
+        if len(main_files) != 1 or Path(main_files[0]) != db_path:
+            raise CandidateIdentityError("opened db is outside the approved root")
         connection.execute("pragma foreign_keys = on")
         try:
             connection.execute("begin immediate")
@@ -356,7 +370,7 @@ def _insert_once(
             raise
         # 확정 전 재확인. 여기서 예외가 나면 commit 없이 close() 로 가고, SQLite 는
         # 열린 트랜잭션을 닫을 때 되돌린다(명시적 rollback 변이가 동작 동일로 생존 — 중복이라 뺐다).
-        _verify_db_boundary(db_path)
+        _verify_db_boundary(db_path, approved_root)
         connection.execute("commit")
     finally:
         connection.close()
