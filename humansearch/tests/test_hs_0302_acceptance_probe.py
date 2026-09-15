@@ -57,7 +57,13 @@ def _assert_fail_closed(result: subprocess.CompletedProcess[str], reason: str) -
     not_run_at = [index for index, line in enumerate(lines) if line.startswith("NOT_RUN:")]
     assert not_run_at, result.stdout
     assert any(reason in lines[index] for index in not_run_at), result.stdout
-    trailing = [line for line in lines[not_run_at[0] + 1 :] if line.startswith("PASS:")]
+    # PASS 만 세면 부족하다 — 중첩 차단처럼 바로 뒤에서 끝나는 경로가 있으면 fail-open
+    # 이어도 뒤에 PASS 가 안 붙는다(변이 N6 실측). 첫 NOT_RUN 뒤에는 어떤 판정 줄도
+    # 없어야 한다: 두 번째 NOT_RUN 은 "멈추지 않고 계속 갔다"는 증거다.
+    verdicts = ("PASS:", "FAIL:", "NOT_RUN:")
+    trailing = [
+        line for line in lines[not_run_at[0] + 1 :] if line.startswith(verdicts)
+    ]
     assert trailing == [], f"NOT_RUN 뒤에 판정이 이어졌다: {trailing}"
     assert "OK(run-acceptance)" not in result.stdout
 
