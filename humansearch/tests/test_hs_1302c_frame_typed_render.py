@@ -46,7 +46,7 @@ NORMALIZATION_VARIANTS: tuple[str, ...] = (
 )
 
 CONTACT_NAME = "홍길동"
-CONTACT_EMAIL = "hong@example.kr"
+CONTACT_EMAIL = "hong@example.com"
 CONTACT_LINE = f"문의: {CONTACT_NAME} ({CONTACT_EMAIL})"
 
 
@@ -125,7 +125,7 @@ def test_a_condition_line_without_a_matching_rendered_source_is_rejected(hidden:
             jd_packet=_jd_packet(
                 jd,
                 linkedin_body=f"{jd.text}\n{hidden}",
-                linkedin_contact=_contact(hidden.split(": ", 1)[1], "x@example.kr"),
+                linkedin_contact=_contact(hidden.split(": ", 1)[1], "x@example.com"),
             )
         )
 
@@ -135,12 +135,12 @@ def test_an_unknown_condition_as_contact_name_passes_with_the_real_rendered_line
     """**현재 계약에서는 통과하는 잔여 구멍.** 실제 렌더 줄을 그대로 쓴 반례다.
 
     `대졸 필수` 는 조건 정규식이 모르는 문구라 담당자 이름 검증을 빠져나가고,
-    본문에 `문의: 대졸 필수 (x@example.kr)` 를 그대로 적으면 렌더 결과와 일치해 면제된다.
+    본문에 `문의: 대졸 필수 (x@example.com)` 를 그대로 적으면 렌더 결과와 일치해 면제된다.
     닫으려면 담당자를 패킷 자유 입력이 아니라 운영자 소유 설정에서 조회해야 한다.
     구멍이 닫히면 strict xfail 이 **실패로** 알려 준다.
     """
     jd = _jd()
-    contact = _contact("대졸 필수", "x@example.kr")
+    contact = _contact("대졸 필수", "x@example.com")
     with pytest.raises(BriefInputError):
         _packet(
             jd_packet=_jd_packet(
@@ -179,7 +179,7 @@ def test_normalization_variants_of_a_hidden_condition_are_rejected(variant: str)
             jd_packet=_jd_packet(
                 jd,
                 linkedin_body=f"{jd.text}\n{variant}",
-                linkedin_contact=_contact("대졸 필수", "x@example.kr"),
+                linkedin_contact=_contact("대졸 필수", "x@example.com"),
             )
         )
 
@@ -193,17 +193,17 @@ def test_normalization_variants_of_a_hidden_condition_are_rejected(variant: str)
 )
 def test_contact_name_shape_is_enforced(name: str) -> None:
     with pytest.raises(BriefInputError):
-        _contact(name, "x@example.kr")
+        _contact(name, "x@example.com")
 
 
-@pytest.mark.parametrize("email", ["", "hong", "hong@", "@example.kr", "hong example.kr"])
+@pytest.mark.parametrize("email", ["", "hong", "hong@", "@example.com", "hong example.com"])
 def test_contact_email_format_is_enforced(email: str) -> None:
     with pytest.raises(BriefInputError):
         _contact("홍길동", email)
 
 
 def test_a_two_character_name_is_the_lower_bound() -> None:
-    assert _contact("홍길", "x@example.kr").name == "홍길"  # type: ignore[attr-defined]
+    assert _contact("홍길", "x@example.com").name == "홍길"  # type: ignore[attr-defined]
 
 
 # ---------------------------------------------------------------- JSON 왕복

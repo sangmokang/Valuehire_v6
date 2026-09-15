@@ -407,7 +407,7 @@ def test_frame_line_cannot_hide_a_recruiting_condition() -> None:
         )
     with pytest.raises(BriefInputError):
         _packet(jd_packet=_jd_packet(jd, linkedin_body="제목: 예시 | 경력 2~6년\n" + jd.text))
-    contact = Contact(name="담당 컨설턴트", email="consultant@example.kr")
+    contact = Contact(name="담당 컨설턴트", email="consultant@example.com")
     title = f"제목: {_position().title}"
     with pytest.raises(BriefInputError):
         # 접두만으로는 면제되지 않는다 — 타입 출처가 없는 회신 줄은 원문에 없는 줄이다(F83-1)

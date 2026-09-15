@@ -24,7 +24,7 @@ _SOURCE_ID = re.compile(r"[A-Z]{1,2}[0-9]{1,3}")
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 _HTML_TAG = re.compile(r"<[A-Za-z/!]")
 # 로컬@도메인. 도메인은 `[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?` 라벨을 점으로 이은 2개 이상이고
-# 마지막 라벨은 알파벳 2자 이상이다. 느슨한 `[^@\s]+\.[^@\s]+` 는 `a@b..com`·`a@-b.com` 처럼
+# 마지막 라벨은 알파벳 2자 이상이다. 느슨한 `[^@\s]+\.[^@\s]+` 는 `holder@b..com`·`holder@-b.com` 처럼
 # 회신이 불가능한 주소를 통과시킨다(Codex V2 2차).
 _EMAIL = re.compile(
     r"[^@\s]+@(?:[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\.)+[A-Za-z]{2,}"

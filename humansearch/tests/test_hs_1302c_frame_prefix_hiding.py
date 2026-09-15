@@ -40,7 +40,7 @@ HIDDEN_CONDITIONS: tuple[str, ...] = (
 )
 
 # 조건이 아닌 안내 문구 — 타입 출처(Contact)가 있으면 통과해야 한다.
-CONTACT = Contact(name="담당 컨설턴트", email="consultant@example.kr")
+CONTACT = Contact(name="담당 컨설턴트", email="consultant@example.com")
 CONTACT_LINE = CONTACT.rendered_line()
 
 _COND_JD_TEXT = "주요업무\n• 검색 랭킹을 설계한다.\n자격요건\n• 경력 3년 이상\n"
@@ -116,7 +116,7 @@ def test_json_roundtrip_rejects_a_frame_line_that_was_not_declared() -> None:
 def test_a_contact_still_cannot_carry_a_known_condition() -> None:
     """타입 필드도 면제권이 아니다 — 조건 문구는 담당자 이름이 될 수 없다."""
     with pytest.raises(BriefInputError):
-        Contact(name="경력 10년 이상", email="x@example.kr")
+        Contact(name="경력 10년 이상", email="x@example.com")
     jd = _jd()
     hidden = "문의: 경력 10년 이상만 지원 가능합니다"
     with pytest.raises(BriefInputError):

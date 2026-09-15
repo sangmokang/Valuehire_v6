@@ -1,10 +1,10 @@
 """PR #83 3차 — 판정 직전 정규화·이메일 형식·금액 형식을 조인다(값싼 방어 3건).
 
 Codex V2 2차 반증(5576b02):
-- `EMAIL_DOUBLE_DOT_RENDERED=PASS:문의: 홍길동 (a@b..com)` · `EMAIL_LEADING_HYPHEN_DOMAIN=PASS:a@-b.com`
+- `EMAIL_DOUBLE_DOT_RENDERED=PASS:문의: 홍길동 (holder@b..com)` · `EMAIL_LEADING_HYPHEN_DOMAIN=PASS:holder@-b.com`
 - `COMPANY_ZWSP_VISIBLE_KNOWN=PASS:- 매출: 경(ZWSP)력 5년 이(ZWSP)상 [I1]`
 - `COMPANY_MARKDOWN_VISIBLE_KNOWN=PASS:- 매출: 경**력** 5년 이**상** [I1]`
-- `CONTACT_ZWSP_VISIBLE_KNOWN=PASS:문의: 경(ZWSP)력 5년 이(ZWSP)상 (x@example.kr)`
+- `CONTACT_ZWSP_VISIBLE_KNOWN=PASS:문의: 경(ZWSP)력 5년 이(ZWSP)상 (x@example.com)`
 - `MALFORMED_AMOUNT_SHAPE=PASS:- 매출: 1,,,원 [I1]`
 
 계약:
@@ -54,8 +54,25 @@ FULLWIDTH = "경력 ５년 이상"
 BOM_MIX = BOM + "경력 5년" + ZWNJ + " 이상"
 VISIBLE_SAME: tuple[str, ...] = (INVISIBLE, MARKDOWN, UNDERSCORE, FULLWIDTH, BOM_MIX)
 
-BAD_EMAILS: tuple[str, ...] = ("a@b..com", "a@-b.com", "a@b", "a@@b.com", "a b@c.kr", "a@b-.com")
-GOOD_EMAILS: tuple[str, ...] = ("a.b+c@d-e.co.kr", "hong@example.kr", "x@a.io")
+# PII 게이트(scripts/acceptance-hs-1305-pii.sh)가 허용하는 형태만 쓴다 — 로컬파트가 정확히
+# `holder` 이거나 주소가 `@example.com` 으로 끝나는 합성 주소다. 그래서 형식 위반 음성
+# 주소는 로컬파트를 `holder` 로 두고 도메인 쪽만 망가뜨렸다(게이트는 도메인을 보지 않는다).
+BAD_EMAILS: tuple[str, ...] = (
+    "holder@b..com",  # 빈 라벨
+    "holder@-b.com",  # 라벨이 하이픈으로 시작
+    "holder@b-.com",  # 라벨이 하이픈으로 끝
+    "holder@b",  # 점이 없다(라벨 1개)
+    "holder@@b.com",  # @ 가 둘
+    "holder b@example.com",  # 로컬파트에 공백
+)
+# 점·플러스(로컬파트)와 하이픈 라벨·다단 도메인을 나눠서 덮는다 — 한 주소로는 게이트
+# 허용 형태를 만족시키면서 둘 다 담을 수 없다.
+GOOD_EMAILS: tuple[str, ...] = (
+    "a.b+c@example.com",  # 로컬파트의 점과 플러스
+    "holder@d-e.example.com",  # 하이픈이 든 라벨 + 3단 도메인
+    "holder@a.io",  # 한 글자 라벨 + 두 글자 최상위
+    "hong@example.com",
+)
 
 BAD_AMOUNTS: tuple[str, ...] = ("1,,,원", "1,00원", ",100원", "1,2345원", "억 원")
 GOOD_AMOUNTS: tuple[str, ...] = ("300억 원", "1,234억 원", "12.5억 원", "3,000만 원", "500달러")
@@ -111,7 +128,7 @@ def test_a_malformed_email_cannot_reach_the_packet() -> None:
     """잘못된 주소가 렌더 줄을 타고 패킷 경계를 넘지 못한다."""
     jd = _jd()
     with pytest.raises(BriefInputError):
-        contact = Contact(name="홍길동", email="a@b..com")
+        contact = Contact(name="홍길동", email="holder@b..com")
         _packet(
             jd_packet=_jd_packet(
                 jd,
@@ -128,7 +145,7 @@ def test_a_malformed_email_cannot_reach_the_packet() -> None:
 def test_an_invisible_or_marked_up_condition_cannot_be_a_contact_name(variant: str) -> None:
     """눈에 같은 조건 문구는 글자 사이를 갈라도 담당자 이름이 될 수 없다."""
     with pytest.raises(BriefInputError):
-        Contact(name=variant, email="x@example.kr")
+        Contact(name=variant, email="x@example.com")
 
 
 @pytest.mark.parametrize("variant", VISIBLE_SAME)
@@ -163,7 +180,7 @@ def test_normal_lines_still_pass_after_normalization() -> None:
     """정규화가 정상 경로를 막지 않는다 — 양성 대조군."""
     assert "- 매출: 300억 원 [I1]" in _company_packet(COMPANY).mail.body.splitlines()
     jd = _jd()
-    contact = Contact(name="홍길동", email="hong@example.kr")
+    contact = Contact(name="홍길동", email="hong@example.com")
     ok = _packet(
         jd_packet=_jd_packet(
             jd,

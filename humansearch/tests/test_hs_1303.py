@@ -59,7 +59,7 @@ SAMPLE_JD = JD_HEAD + JD_TAIL
 
 # 프레임 줄은 자유 문자열이 아니라 **타입 출처에서 렌더한 결과**다(Codex V1 F83-1).
 POSITION_TITLE = "합성 예시 조직 인재 플랫폼 엔지니어 포지션 제안"
-CONTACT = Contact(name="회신 담당", email="reply@example.kr")
+CONTACT = Contact(name="회신 담당", email="reply@example.com")
 TITLE_LINE = f"제목: {POSITION_TITLE}"
 CONTACT_LINE = CONTACT.rendered_line()
 FRAME_HEAD = f"{TITLE_LINE}\n[복사 시작]\n"
