@@ -93,22 +93,28 @@ fail_item() { echo "FAIL: $1"; fail=1; checked=$((checked + 1)); }
 # fail-closed 자기 검사 판정. 종료값만 보면 부족하다 — 건너뛴 뒤 다른 경로로 2 가
 # 나와도 통과한다. NOT_RUN 뒤에 판정(PASS)이 한 줄이라도 이어지면 그것이 fail-open 이다.
 # abort_not_run 을 쓰지 않는다: fail-closed 를 되돌리는 변이가 그 보조를 건드리므로.
-assert_fail_closed() {
-  local log=$1 rc=$2 reason=$3 desc=$4 line trailing
+# fail-closed 기준을 **한 곳에만** 둔다. 자기 검사(통과해야 하는 쪽)와 음성 대조군
+# (어겨야 하는 쪽)이 같은 함수를 쓴다. 두 벌로 적으면 한쪽만 완화해도 다른 쪽이 못 잡는다
+# — 2026-09-15 변이 N6 에서 실제로 그랬다(pytest 층을 걷어내자 완화가 무탐지가 됐다).
+# 종료값만 보면 부족하다: 건너뛴 뒤 다른 경로로 2 가 나와도 통과한다. 첫 NOT_RUN 뒤에
+# 어떤 판정 줄(PASS·FAIL·NOT_RUN)이라도 있으면 "멈추지 않고 계속 갔다"는 증거다.
+fail_closed_ok() {
+  local log=$1 rc=$2 reason=$3 line trailing
   line=$("$GREP" -n '^NOT_RUN:' "$log" | head -1 | cut -d: -f1)
-  if [ -z "$line" ]; then
-    fail_item "$desc — NOT_RUN 줄이 없다 (종료값 ${rc})"
-    tail -12 "$log"
-    return
-  fi
-  # PASS 만 세면 부족하다 — 중첩 차단처럼 바로 뒤에서 끝나는 경로가 있으면 fail-open
-  # 이어도 뒤에 PASS 가 안 붙는다(2026-09-15 변이 N6 실측). 첫 NOT_RUN 뒤에는 어떤
-  # 판정 줄도 없어야 한다: 두 번째 NOT_RUN 은 "멈추지 않고 계속 갔다"는 증거다.
+  [ -n "$line" ] || return 1
   trailing=$(tail -n "+$((line + 1))" "$log" | "$GREP" -cE '^(PASS|FAIL|NOT_RUN):')
-  if [ "$rc" -eq 2 ] && [ "${trailing:-1}" -eq 0 ] && "$GREP" -q "$reason" "$log"; then
+  [ "$rc" -eq 2 ] || return 1
+  [ "${trailing:-1}" -eq 0 ] || return 1
+  "$GREP" -q "$reason" "$log" || return 1
+  return 0
+}
+
+assert_fail_closed() {
+  local log=$1 rc=$2 reason=$3 desc=$4
+  if fail_closed_ok "$log" "$rc" "$reason"; then
     pass_item "$desc"
   else
-    fail_item "$desc — 종료값 ${rc}, NOT_RUN 줄 ${line}, 뒤따른 판정 ${trailing}건"
+    fail_item "$desc — fail-closed 기준 위반 (종료값 ${rc})"
     tail -12 "$log"
   fi
 }
@@ -445,16 +451,11 @@ sed -e 's/^BASE_SHA=.*/BASE_SHA=0000000000000000000000000000000000000000/' \
     "$SELF" > "$WORK/failopen_control.sh"
 HS0302_ACCEPTANCE_DEPTH=9 bash "$WORK/failopen_control.sh" > "$WORK/failopen.log" 2>&1
 fo_rc=$?
-fo_line=$("$GREP" -n '^NOT_RUN:' "$WORK/failopen.log" | head -1 | cut -d: -f1)
-if [ -n "$fo_line" ]; then
-  fo_trailing=$(tail -n "+$((fo_line + 1))" "$WORK/failopen.log" | "$GREP" -cE '^(PASS|FAIL|NOT_RUN):')
-else
-  fo_trailing=0
-fi
-if [ "$fo_rc" -ne 2 ] || [ "${fo_trailing:-0}" -gt 0 ]; then
-  pass_item "fail-closed 판정기 음성 대조군 — fail-open 사본은 기준을 어긴다 (종료값 ${fo_rc}, 뒤따른 판정 ${fo_trailing}건)"
-else
+if fail_closed_ok "$WORK/failopen.log" "$fo_rc" '기준 커밋'; then
   fail_item "fail-closed 판정기가 fail-open 사본도 통과시킨다 — 판정기가 무의미하다"
+  tail -12 "$WORK/failopen.log"
+else
+  pass_item "fail-closed 판정기 음성 대조군 — 같은 기준으로 fail-open 사본은 불합격한다"
 fi
 
 # ── CI 배선 (정본 53행) ────────────────────────────────────────────────────
