@@ -241,6 +241,72 @@ def test_surrounding_whitespace_is_stripped_before_normalisation(tmp_path: Path)
     assert (first, second) == ("inserted", "duplicate")
     assert _count_rows(db_path) == 1
 
+# ── 3차 V1 잔여 [medium] RFC3339 소문자 표기 ────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "observed_at",
+    [
+        "2026-09-15t00:00:00z",
+        "2026-09-15T00:00:00z",
+        "2026-09-15t00:00:00Z",
+        "2026-09-15t10:00:00.123z",
+        "2026-09-15t10:00:00+09:00",
+    ],
+)
+def test_lowercase_rfc3339_designators_are_accepted(tmp_path: Path, observed_at: str) -> None:
+    """RFC3339 는 `t`·`z` 소문자를 허용한다. 앞 단계가 허용한 것을 뒤 단계가 거부하면 안 된다.
+
+    정규식은 `[Tt]`·`[Zz]` 로 받는데 `datetime.fromisoformat` 은 소문자 `z` 를 거부한다
+    (실측). 두 단계가 서로 다른 규칙을 쓰면, 소문자 표기를 내는 정상 공급자의 후보가
+    전부 거부된다.
+    """
+
+    identity = _load_identity_module()
+    _assert_tmp_is_symlink_free(tmp_path)
+    db_path = initialize_humansearch_storage(tmp_path / "protected-root").db_path
+    key_path = _key_at(tmp_path / "key-root")
+
+    assert _record(identity, db_path, key_path, observed_at=observed_at) == "inserted"
+    assert _count_rows(db_path) == 1
+
+
+@pytest.mark.parametrize(
+    "observed_at",
+    ["2026-09-15T00:00:00Z", "2026-09-15T10:00:00.123Z", "2026-09-15T10:00:00+09:00"],
+)
+def test_uppercase_rfc3339_designators_stay_accepted(tmp_path: Path, observed_at: str) -> None:
+    """대문자 대조군 — 소문자 처리를 넣다가 대문자를 깨뜨리지 않았는지 본다."""
+
+    identity = _load_identity_module()
+    _assert_tmp_is_symlink_free(tmp_path)
+    db_path = initialize_humansearch_storage(tmp_path / "protected-root").db_path
+    key_path = _key_at(tmp_path / "key-root")
+
+    assert _record(identity, db_path, key_path, observed_at=observed_at) == "inserted"
+    assert _count_rows(db_path) == 1
+
+
+@pytest.mark.parametrize(
+    "observed_at",
+    ["2026-02-29t00:00:00z", "2026-09-15t24:00:00z", "2026-09-15t10:00:00+24:00"],
+)
+def test_lowercase_designators_do_not_bypass_semantic_checks(
+    tmp_path: Path, observed_at: str
+) -> None:
+    """소문자를 받아들이되 달력·범위 검증은 그대로여야 한다 — 우회 통로가 되면 안 된다."""
+
+    identity = _load_identity_module()
+    _assert_tmp_is_symlink_free(tmp_path)
+    db_path = initialize_humansearch_storage(tmp_path / "protected-root").db_path
+    key_path = _key_at(tmp_path / "key-root")
+
+    with pytest.raises(identity.CandidateIdentityError):
+        _record(identity, db_path, key_path, observed_at=observed_at)
+
+    assert _count_rows(db_path) == 0
+
+
 # 결함 2(CI 배선)와 결함 3(인수 실행 필터·fail-closed)의 판정은 여기 없다.
 # 저장소 루트의 인수 스크립트(acceptance-hs-0302.sh)가 bash 자기 검사로 맡는다.
 #
