@@ -133,13 +133,15 @@ def test_written_receipt_carries_device_and_inode(
     assert receipt.inode == info.st_ino
 
 
-def test_receipt_identity_finds_the_file_after_a_late_root_move(
+def test_receipt_identity_still_names_the_same_file_after_a_late_root_move(
     tmp_path: Path, monkeypatch: MonkeyPatch
 ) -> None:
-    """경로 대조 직후 루트가 옮겨져도 식별값으로 게시 파일을 찾을 수 있다.
+    """경로 대조 직후 루트가 옮겨져도 식별값은 같은 파일을 가리킨다.
 
-    경로 문자열은 영수증을 낸 뒤에도 다른 곳을 가리키게 만들 수 있다. 장치·
-    inode 쌍은 같은 파일시스템 객체를 계속 가리키므로 재조회의 기준이 된다.
+    주장을 낮춘다. 이 시험은 "영수증만으로 재조회할 수 있다"를 증명하지
+    않는다. fixture 가 옮겨진 위치를 알고 순회할 뿐이다. 보이는 것은 경로
+    문자열이 낡아도 장치·inode 쌍은 같은 객체를 계속 가리킨다는 사실이며,
+    그래서 이 쌍은 위치를 찾는 값이 아니라 **대조용 검증값**이다.
     """
 
     _hsrunner(monkeypatch)
@@ -244,4 +246,109 @@ def test_root_close_failure_is_not_reported_as_written(
     assert receipt.reason == "recovery_required"
     assert receipt.device is not None
     assert (root / "final.jsonl").read_bytes() == PAYLOAD
+    assert sorted(trap.opened) == sorted(trap.attempted)
+
+
+def test_final_name_taken_over_after_check_is_not_reported_as_written(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    """경로 대조 직후 최종 이름이 다른 파일로 바뀌면 성공으로 보고하지 않는다.
+
+    같은 러너 uid 의 다른 실행이 최종 이름을 같은 권한의 다른 일반 파일로
+    갈아치우는 상황이다. 최종 이름을 다시 읽어 식별값을 얻으면 영수증이
+    "원문 A 의 해시 + 파일 B 의 식별값" 이 된다. 식별값은 페이로드를 담았던
+    임시 디스크립터에서 얻은 값이어야 한다.
+
+    교체본은 우리가 만든 것이 아니므로 잔여물 목록은 단언하지 않는다.
+    """
+
+    _hsrunner(monkeypatch)
+    root = _mkdir(tmp_path / "root", 0o700)
+    original = RunnerBoundary._published_path_matches
+    swapped = {"done": False}
+
+    def take_over_final_name(
+        self: RunnerBoundary, parent_fd: int, name: str, final_path: Path
+    ) -> Any:
+        result = original(self, parent_fd, name, final_path)
+        if not swapped["done"]:
+            swapped["done"] = True
+            os.unlink(name, dir_fd=parent_fd)
+            imposter = os.open(
+                name, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600, dir_fd=parent_fd
+            )
+            os.write(imposter, b"a-different-file")
+            os.close(imposter)
+        return result
+
+    monkeypatch.setattr(RunnerBoundary, "_published_path_matches", take_over_final_name)
+
+    receipt = write_protected_file(_config(root), "taken.jsonl", PAYLOAD)
+
+    assert swapped["done"]
+    assert receipt.status is BoundaryStatus.DENIED
+
+
+def test_written_receipt_identity_comes_from_the_written_file(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    """성공 영수증의 식별값은 페이로드를 담았던 디스크립터에서 온 값이다."""
+
+    _hsrunner(monkeypatch)
+    root = _mkdir(tmp_path / "root", 0o700)
+    original = RunnerBoundary._fill_temp_file
+    seen: list[os.stat_result] = []
+
+    def record(self: RunnerBoundary, *args: Any, **kwargs: Any) -> os.stat_result:
+        info = original(self, *args, **kwargs)
+        seen.append(info)
+        return info
+
+    monkeypatch.setattr(RunnerBoundary, "_fill_temp_file", record)
+
+    receipt = write_protected_file(_config(root), "two.jsonl", PAYLOAD)
+
+    published = os.stat(root / "two.jsonl")
+    assert receipt.status is BoundaryStatus.WRITTEN
+    assert len(seen) == 1
+    assert (receipt.device, receipt.inode) == (seen[0].st_dev, seen[0].st_ino)
+    assert (receipt.device, receipt.inode) == (published.st_dev, published.st_ino)
+    assert receipt.byte_count == len(PAYLOAD)
+
+
+def test_ancestor_close_failure_stops_before_writing(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    """루트 사슬 중간 디렉터리를 닫지 못하면 쓰기로 넘어가지 않는다."""
+
+    _hsrunner(monkeypatch)
+    root = _mkdir(tmp_path / "root", 0o700)
+
+    with MonkeyPatch.context() as patched:
+        trap = CloseTrap(patched, root.parent.name)
+        receipt = write_protected_file(_config(root), "never.jsonl", PAYLOAD)
+    trap.drain()
+
+    assert receipt.status is BoundaryStatus.DENIED
+    assert receipt.reason == "protected_root_ancestor_invalid"
+    assert list(root.iterdir()) == []
+    assert sorted(trap.opened) == sorted(trap.attempted)
+
+
+def test_intermediate_parent_close_failure_stops_before_writing(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    """부모 사슬 중간 디렉터리를 닫지 못하면 쓰기로 넘어가지 않는다."""
+
+    _hsrunner(monkeypatch)
+    root = _mkdir(tmp_path / "root", 0o700)
+
+    with MonkeyPatch.context() as patched:
+        trap = CloseTrap(patched, "sub")
+        receipt = write_protected_file(_config(root), "sub/inner/never.jsonl", PAYLOAD)
+    trap.drain()
+
+    assert receipt.status is BoundaryStatus.DENIED
+    assert receipt.reason == "parent_directory_invalid"
+    assert list((root / "sub" / "inner").iterdir()) == []
     assert sorted(trap.opened) == sorted(trap.attempted)
