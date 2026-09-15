@@ -233,13 +233,21 @@ def _load_hmac_key(hmac_key_path: Path, db_path: Path) -> bytes:
     if not hmac_key_path.is_file():
         raise CandidateIdentityError("hmac key must be a regular file")
     _reject_symlinked_chain(hmac_key_path, label="hmac key path")
-    key_root = key_dir.resolve(strict=True)
+    # 검사 뒤 읽기 전에 키 폴더·키 파일이 사라지는 경쟁에서 OS 오류가 절대 경로를 담은 채
+    # 그대로 올라왔다(독립 검토 2회차 probe, 16:42 재현). 닫힌 오류로만 내보낸다.
+    try:
+        key_root = key_dir.resolve(strict=True)
+    except OSError as exc:
+        raise CandidateIdentityError("hmac key directory is missing") from exc
     db_root = _verify_db_location(db_path)
     # 동일 경로만 막으면 dbroot/keys/k 가 통과한다. DB 루트를 한 번 복사·유출하면
     # 키까지 함께 나가므로 분리 보관이 무너진다(Codex V1). 포함은 양방향으로 막는다.
     if key_root.is_relative_to(db_root) or db_root.is_relative_to(key_root):
         raise CandidateIdentityError("hmac key must not share the db protected root")
-    key = hmac_key_path.read_bytes()
+    try:
+        key = hmac_key_path.read_bytes()
+    except OSError as exc:
+        raise CandidateIdentityError("hmac key is unreadable") from exc
     if len(key) < _MIN_KEY_BYTES:
         raise CandidateIdentityError(f"hmac key must be at least {_MIN_KEY_BYTES} bytes")
     return key
