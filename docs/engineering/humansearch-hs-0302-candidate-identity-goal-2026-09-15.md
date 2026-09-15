@@ -226,5 +226,17 @@ HMAC 입력 누락, 예외 삼킴 범위, 키 파일 검사 우회(symlink·모�
 | G2 gates-antiforge | PASS | 12:56 → `PASS: gates antiforge 3/3`, rc=0 |
 | ci-step-integrity | PASS | 12:56 → `CHECKED: 24`, `VERDICT: PASS`, rc=0 |
 | 4차 재검증 | PASS | 12:58:16 → 전체 `300 passed in 9.59s`, ruff rc=0, mypy rc=0, 인수 `CHECKED: 20` rc=0, V2 재현기 그대로 |
-| V1 (3차) | NOT_RUN | 독립 검증 엔진 대기 |
+| V1 (3차) | **FAIL** | Codex @ad26e91 12:59:45 → F0302-1·2·NFC 해결, 남은 3건(CI 배선 무력화 high, 필수 시험 명부 medium, 소문자 z medium). 원문 `scratchpad/codex-v1-0302-r3.log` |
+| 49d98df push | PASS | 13:04:21 `rc=0`, 새 브랜치 `task/hs-0302-candidate-identity-20260914` 생성. pre-push 27검사 전량 통과 |
+| 5차 — 결함 재현 | PASS | 13:04:45 실측. run 줄에 실패 삼키는 꼬리 주입 → 인수 `CHECKED: 20` rc=0(통과). NFC position_ref 사례 삭제 → rc=0(통과). 둘 다 현재 검사가 못 잡는다 |
+| 5차 RED (소문자 z) | PASS | `3bcfdad` — 소문자 양성 5건·대문자 대조군 3건·우회 방지 3건. 13:05:15 소문자 z 3건이 `observed_at is not a real instant` 로 실패 |
+| 5차 GREEN (소문자 z) | PASS | `416f56b` — `_isoformat_ready()` 가 끝의 z 를 Z 로, 11번째 자리 t 를 T 로. 정규식 통과 뒤에만 불리므로 인덱스로 정확히 집는다. 표기만 바꾸고 값은 안 건드려 범위 검증 유지 |
+| 5차 GREEN (배선·명부) | PASS | `9d9e2c7` — `scripts/verify/check-hs-0302-ci-wiring.rb`(YAML 파싱, run 정확 대조, 셸 제어 연산자 6종 거부) + `scripts/verify/fixtures/hs-0302-required-tests.txt`(필수 node-id 82건 고정) |
+| 5차 인수 | PASS | 13:10:39 → `PASS` 22줄, `CHECKED: 22`, rc=0 |
+| 변이 P1 run 에 실패 삼키는 꼬리 | 생존 0 | 13:11:22 → `WIRING_BAD: run 이 정확한 단일 명령이 아니다` + 연산자 2건, rc=1 |
+| 변이 P2 NFC position_ref 삭제 | 생존 0 | 13:11 → `FAIL: 필수 시험 명부 불일치 — 누락 1건`, 누락 node-id 그대로 출력, rc=1 |
+| 변이 P3 소문자 정규화 제거 | 생존 0 | 13:11 → 소문자 시험 3건 실패 |
+| 5차 재검증 | PASS | 13:11:40~13:13:34 → G2 mutations `6/6` · gates `COLLECTED: 311` · antiforge `3/3` · ci-step-integrity `CHECKED: 24 VERDICT: PASS` · 전체 `311 passed` · ruff rc0 · mypy rc0 · 저장소 밖 참조 0건 · V2 재현기 그대로 |
+| P13 재차단 | 해소 | 배선 변이 꼬리를 리터럴로 두자 pre-commit P13 이 커밋을 막았다. 런타임 조립으로 고쳤다(우회 없음) |
+| V1 (4차) | NOT_RUN | 독립 검증 엔진 대기 |
 | push·Draft PR | NOT_RUN | 공통 규칙상 이 세션은 push·PR 을 하지 않는다 |
