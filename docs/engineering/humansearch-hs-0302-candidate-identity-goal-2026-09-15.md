@@ -28,6 +28,7 @@
 - AC-8: When `_verify_db_boundary`가 끝난 뒤 `sqlite3.connect`가 열기 직전에 DB 경로가 다른 호환 DB symlink로 바뀌었다가 곧바로 원상복구되면 시스템은 원본·대체 DB 어느 쪽에도 행을 만들지 않고 `CandidateIdentityError`를 내야 한다.
 - AC-9: When 호출자가 `approved_root`를 DB 부모 경로로 스스로 채워도 그 root가 이 프로세스에서 `initialize_humansearch_storage`를 통과한 root가 아니면 시스템은 행을 만들지 않고 `CandidateIdentityError`를 내야 한다.
 - AC-10: When 승인 root 안이라도 초기화가 돌려준 DB 파일이 아닌 다른 0600 파일을 넘기면 시스템은 행을 만들지 않고 `CandidateIdentityError`를 내야 한다. 초기화 결과의 `(db_path, protected_root)` 쌍은 그대로 `inserted`여야 한다.
+- AC-11: When 승인 DB 파일 또는 sidecar 가 hard link 로 다른 이름을 하나라도 더 가지면(`st_nlink != 1`) 시스템은 쓰기 직전과 확정 전에 행을 만들지 않고 `CandidateIdentityError`를 내야 한다. 밖으로 건 링크와 다른 DB 를 승인 자리에 건 링크 모두 해당한다.
 
 ## counter-AC
 
@@ -77,18 +78,19 @@
 | V1 6회차 | 역사적 APPROVE | @`eb0b225`, AC-1~4·저장 경계·검증 연결 PASS, OS 분리 NOT_RUN, variant 생존 0, 명부 111=수집 111. 원문은 보존하되 `604974d` 이후 현재 HEAD 승인 근거로 쓰지 않는다 |
 | 11차 approved-root/swap-back | PASS(부분) | `604974d` RED → `e25ac5e` GREEN. 재검증: 604974d의 r5 2건은 `TypeError: unexpected keyword argument 'approved_root'`로 실패해 빠진 동작의 RED가 아니었다(2026-09-15T15:54Z 격리 재실행). `pragma database_list`가 symlink를 실제 경로로 푸는 것은 sqlite 3.51.1에서 실측 |
 | 12차 승인 장부 결합 | PASS | `3d936fd` RED: `test_self_approved_private_compatible_db_is_refused`·`test_other_db_filename_inside_approved_root_is_refused` "DID NOT RAISE" 2 failed·32 passed. `c146b78` GREEN: 전용 116 passed, ruff·mypy rc0. 인수 검사에 약화 변이 2종(승인 장부 대조 제거 → 3건 검출, 열린 연결 대조 제거 → 1건 검출)과 마이그레이션 블록 대조·음성 대조군 추가, run-acceptance `CHECKED: 25` rc0 |
+| 13차 hard link 경계 | PASS | 자기 공격 실측(16:04Z): 밖 경로 hard link 뒤 `inserted`·밖에서 1행 읽힘(nlink=2), 다른 DB 의 link 를 승인 자리에 두면 다른 DB 에 1행. `fb4d760` RED "DID NOT RAISE" 2 failed·5 passed, GREEN: DB·sidecar `st_nlink != 1` 거부, 전용 118 passed. 약화 변이 3종째(nlink 대조 제거 → 2건 검출) 추가 |
 | 범위 밖 변경 회수 | PASS | `b25a68d`가 바꾼 전역 검사기 `scripts/acceptance-principles-mutations.sh`·`scripts/verify/check-strict-principles-skills.sh`(파일 한도 500→P11 600)와 정본 3행은 HS-03.02 인수 기준 밖이고 검사 강도를 낮추므로 기준 커밋 상태로 되돌린다. P11 hard 600과 검사기 500의 드리프트는 별도 WU 대상이다 |
 | push·Draft PR | NOT_RUN | 사용자 지시와 공통 규칙상 이 세션에서는 push·PR 갱신을 하지 않는다 |
 
 ## 롤백·영향 반경·데이터 안전
 
 - 롤백: PR 닫기 또는 이 WU 커밋 되돌리기. 마이그레이션 변경이 없어 DB 재초기화는 필요 없다.
-- 영향 반경: `candidate_identity.py`, `storage_schema.py`(승인 장부 3줄·`approved_db_path`), HS-03.02 전용 시험 5파일, 인수 스크립트, CI wiring checker, 필수 node-id 명부, `verify.yml`, verification SOT.
+- 영향 반경: `candidate_identity.py`(승인 장부 결합·hard link 거부), `storage_schema.py`(승인 장부 3줄·`approved_db_path`), HS-03.02 전용 시험 5파일, 인수 스크립트, CI wiring checker, 필수 node-id 명부, `verify.yml`, verification SOT.
 - 데이터 안전: 후보 원문·이름·URL은 입력·저장·로그에 없다. 저장되는 후보 참조 파생값은 키 기반 HMAC이다. 시험 데이터는 합성이다.
 
 ## 변경량 축소 계획
 
-116건 명부·인수 검사 25건·약화 변이 2종으로 동작을 잠근 뒤, 시험 함수·매개변수·단언·검사 명령은 유지한 채 빈 줄·중복 설명, 범위 밖 전역 검사기 변경, 역사적 V1 원문(→ `private-reviews/`)만 뺀다.
+118건 명부·인수 검사 26건·약화 변이 3종으로 동작을 잠근 뒤, 시험 함수·매개변수·단언·검사 명령은 유지한 채 빈 줄·중복 설명, 범위 밖 전역 검사기 변경, 역사적 V1 원문(→ `private-reviews/`)만 뺀다.
 
 **무엇을** — 역사적 V1 원문을 추적 파일에서 빼고 해시만 남긴다. **왜** — P11③ 3,000줄 상한이 절대 금지이고 그 원문은 현재 HEAD의 승인 근거가 아니다. **버린 길** — 시험 docstring·인수 검사 항목을 줄이는 길(필수 시험 약화), 원문을 요약본으로 바꾸는 길(원문 100% 보존 규칙 위반). **대가** — 원문이 저장소 밖에 있어 다른 PC에서는 해시로만 대조한다. **되돌리기** — `git show e25ac5e^:docs/engineering/…verdict-eb0b225…md`로 복원 가능.
 
