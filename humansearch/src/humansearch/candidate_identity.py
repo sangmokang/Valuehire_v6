@@ -27,10 +27,11 @@ from pathlib import Path
 from typing import Final, Literal
 
 from humansearch.storage_schema import (
+    ApprovedDb,
     StorageSchemaError,
     _inside_git_worktree,
     _verify_path,
-    approved_db_path,
+    approved_db,
 )
 
 Channel = Literal["saramin", "jobkorea", "linkedin_rps"]
@@ -289,35 +290,43 @@ def _verify_db_boundary(db_path: Path, approved_root: Path) -> None:
     소유자 불일치·symlink·승인 root 탈출은 저장 실패다(Codex 14:50 높음).
     """
 
-    if not _is_approved_db(db_path, approved_root):
+    approved = _approved_db(db_path, approved_root)
+    if approved is None:
         raise CandidateIdentityError("db file is outside the approved root")
     _reject_symlinked_chain(db_path, label="db path")
     _verify(approved_root, expected_mode=_DB_DIR_MODE, label="db directory")
     _verify(db_path, expected_mode=_DB_FILE_MODE, label="db file")
     if not db_path.is_file():
         raise CandidateIdentityError("db file must be a regular file")
+    info = db_path.stat(follow_symlinks=False)
     # symlink 만 막으면 hard link 가 남는다 — 같은 inode 가 승인 root 밖 이름으로도 열린다
     # (자기 공격 실측: 밖 경로 link 뒤 inserted, nlink=2). 이름이 둘 이상이면 경계가 아니다.
-    if db_path.stat(follow_symlinks=False).st_nlink != 1:
+    if info.st_nlink != 1:
         raise CandidateIdentityError("db file must not have extra hard links")
+    # 경로가 같아도 파일이 바뀌었을 수 있다 — 승인 DB 를 치우고 다른 호환 DB 를 같은 이름으로
+    # rename 하면 경로·권한·nlink 검사가 전부 통과한다(V1 결함 1). 초기화 때의 정체성과 대조한다.
+    if (info.st_dev, info.st_ino) != (approved.st_dev, approved.st_ino):
+        raise CandidateIdentityError("db file is not the approved file")
     if _inside_git_worktree(db_path.parent):
         raise CandidateIdentityError("db file must be outside the git worktree")
     _verify_sidecars(db_path)
 
 
-def _is_approved_db(db_path: Path, approved_root: Path) -> bool:
+def _approved_db(db_path: Path, approved_root: Path) -> ApprovedDb | None:
     """승인 root 는 초기화 장부에 결합돼 있다 — 경로 모양은 승인이 아니다.
 
     호출자가 `approved_root=db_path.parent` 로 스스로 채워도, 같은 UID 의 0700/0600 호환 DB 여도,
     `initialize_humansearch_storage` 가 이 프로세스에서 그 root 에 돌려준 바로 그 DB 파일이
-    아니면 거부한다. 승인 root 안의 다른 파일명도 마찬가지다.
+    아니면 승인이 없다. 승인 root 안의 다른 파일명도 마찬가지다. 파일 정체성(st_dev·st_ino)은
+    돌려준 항목으로 `_verify_db_boundary` 가 대조한다.
     """
 
-    return (
-        approved_root.is_absolute()
-        and db_path.parent == approved_root
-        and approved_db_path(approved_root) == db_path
-    )
+    if not approved_root.is_absolute() or db_path.parent != approved_root:
+        return None
+    approved = approved_db(approved_root)
+    if approved is None or approved.db_path != db_path:
+        return None
+    return approved
 
 
 def _verify_sidecars(db_path: Path) -> None:
