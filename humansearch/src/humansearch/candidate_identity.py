@@ -17,6 +17,7 @@ from __future__ import annotations
 import hmac
 import re
 import sqlite3
+import unicodedata
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -43,6 +44,9 @@ _KEY_DIR_MODE: Final = 0o700
 # C0(0x00-0x1F) · DEL(0x7F) · C1(0x80-0x9F). 필드 경계를 흉내 내거나 strip 에 조용히
 # 잘려 키를 바꾸는 문자를 전부 막는다.
 _CONTROL_CHARACTERS: Final = re.compile(r"[\x00-\x1f\x7f-\x9f]")
+# 세 필드는 의미 문자열이다. strip 뒤 NFC 로 대표형을 정한다. NFKC 는 쓰지 않는다 —
+# 호환문자(`\u2460` vs `1`, 전각 `\uff21` vs `A`)까지 합쳐 서로 다른 포털 ID 를 오병합한다.
+_NORMALIZATION_FORM: Final = "NFC"
 # 자리수만 세면 2026-99-99T99:99:99+99:99 가 통과한다. 여기서 달력·시각·오프셋 범위를
 # 먼저 좁히고, 아래에서 datetime 으로 실재 여부를 다시 확인한다.
 _RFC3339: Final = re.compile(
@@ -117,7 +121,9 @@ def _required_field(value: str, label: str) -> str:
     # 잘라내는데(실측), 잘라내면 키가 소리 없이 바뀐다.
     if _CONTROL_CHARACTERS.search(value) is not None:
         raise CandidateIdentityError(f"{label} must not contain control characters")
-    cleaned = value.strip()
+    # strip 뒤 NFC. 같은 글자가 여러 코드열로 올 수 있어(결합형 vs 분해형) 대표형을
+    # 정하지 않으면 같은 후보가 두 행이 된다. NFC 는 제어문자를 만들지 않는다(실측).
+    cleaned = unicodedata.normalize(_NORMALIZATION_FORM, value.strip())
     if not cleaned:
         raise CandidateIdentityError(f"{label} must not be blank")
     if len(cleaned) > _MAX_FIELD_CHARS:
@@ -176,6 +182,23 @@ def _reject_symlinked_chain(path: Path, *, label: str) -> None:
             raise CandidateIdentityError(f"{label} must not contain a symlink")
 
 
+def _verify_db_location(db_path: Path) -> Path:
+    """Return the real directory the DB will be written to.
+
+    검사한 경로와 실제로 여는 파일이 같아야 경계 검사가 성립한다. `db_path.parent` 만
+    해석하면 마지막 구성요소가 symlink 일 때 둘이 갈라진다 — alias 디렉터리의 링크가
+    키 디렉터리 안 실제 DB 를 가리키면 비교는 alias 를 보고 통과하지만 `sqlite3.connect`
+    는 링크를 따라가 키와 같은 루트에 쓴다(Codex V1 2차). 마지막 파일까지 포함해 사슬을
+    검사하고, 해석된 실제 위치를 돌려준다.
+    """
+
+    _reject_symlinked_chain(db_path, label="db path")
+    try:
+        return db_path.resolve(strict=True).parent
+    except OSError as exc:
+        raise CandidateIdentityError("db file is missing") from exc
+
+
 def _load_hmac_key(hmac_key_path: Path, db_path: Path) -> bytes:
     """Read the HMAC key from its own protected directory. 암묵 생성은 하지 않는다."""
 
@@ -186,7 +209,7 @@ def _load_hmac_key(hmac_key_path: Path, db_path: Path) -> bytes:
         raise CandidateIdentityError("hmac key must be a regular file")
     _reject_symlinked_chain(hmac_key_path, label="hmac key path")
     key_root = key_dir.resolve(strict=True)
-    db_root = db_path.parent.resolve(strict=True)
+    db_root = _verify_db_location(db_path)
     # 동일 경로만 막으면 dbroot/keys/k 가 통과한다. DB 루트를 한 번 복사·유출하면
     # 키까지 함께 나가므로 분리 보관이 무너진다(Codex V1). 포함은 양방향으로 막는다.
     if key_root.is_relative_to(db_root) or db_root.is_relative_to(key_root):

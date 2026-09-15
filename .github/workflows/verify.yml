@@ -224,6 +224,15 @@ jobs:
       - name: 인수 검사 hs-a4 (대용량·산출물 차단이 실제로 도는가)
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-a4.sh
 
+      - name: 인수 검사 hs-0302 (후보 식별키 중복·키 경계·인수 fail-closed)
+        # 로컬 pre-push 는 acceptance-*.sh 를 글로브로 전량 실행하지만 CI 는 고정 목록이다.
+        # 정본 docs/sot/verification-commands.md 53행: 새 acceptance-*.sh 를 추가하는 PR 은
+        # verify.yml 과 그 명부 양쪽에 자기 줄을 함께 넣어야 한다.
+        # 이 검사가 판정하는 것 — HMAC 직렬화 의미(충돌 없음·길이 접두 계약 일치·제어문자
+        # 거부)를 함수 실행으로, #97 마이그레이션 무변경, hs_candidates 우회 표 부재,
+        # 시험 실제 실행(수집 건수와 정확히 대조), 그리고 자기 자신의 fail-closed.
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-0302.sh
+
       - name: 인수 검사 secret-webhook-vendor (웹훅·벤더 키 탐지 · AC-S1)
         # 로컬 pre-push 는 acceptance-*.sh 를 글로브로 전량 실행하지만 CI 는 고정 목록이다.
         # 여기 등록하지 않으면 이 검사는 '로컬에만 있는 검사'가 되고, P15③ 은 그것을

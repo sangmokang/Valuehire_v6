@@ -69,10 +69,18 @@ SNAP0=$(git status --porcelain)
 MODULE=humansearch/src/humansearch/candidate_identity.py
 TESTS=humansearch/tests/test_hs_0302_candidate_identity.py
 TESTS_R2=humansearch/tests/test_hs_0302_r2_hardening.py
+TESTS_R3=humansearch/tests/test_hs_0302_r3_hardening.py
+TESTS_PROBE=humansearch/tests/test_hs_0302_acceptance_probe.py
+# 인수 실행이 돌리는 시험 전부. 필터는 두지 않는다 — 필터를 두면 필수 음성 대조군이
+# 인수 실행 안에서 돌지 않는다(Codex V1 2차 F0302-4 잔여).
+TEST_FILES="tests/test_hs_0302_candidate_identity.py tests/test_hs_0302_r2_hardening.py tests/test_hs_0302_r3_hardening.py tests/test_hs_0302_acceptance_probe.py"
+PYTEST_EXTRA=""
 SCHEMA=humansearch/src/humansearch/storage_schema.py
 BASE_SHA=7473ec8
 MIN_TESTS=6
 MIN_R2_TESTS=10
+MIN_R3_TESTS=8
+MIN_PROBE_TESTS=5
 
 WORK=$(mktemp -d) || { echo "NOT_RUN: mktemp 실패"; echo "CHECKED: 0"; exit 2; }
 trap 'rm -rf "$WORK"' EXIT
@@ -81,10 +89,30 @@ fail=0
 checked=0
 pass_item() { echo "PASS: $1"; checked=$((checked + 1)); }
 fail_item() { echo "FAIL: $1"; fail=1; checked=$((checked + 1)); }
+# fail-closed 자기 검사 판정. 종료값만 보면 부족하다 — 건너뛴 뒤 다른 경로로 2 가
+# 나와도 통과한다. NOT_RUN 뒤에 판정(PASS)이 한 줄이라도 이어지면 그것이 fail-open 이다.
+# abort_not_run 을 쓰지 않는다: fail-closed 를 되돌리는 변이가 그 보조를 건드리므로.
+assert_fail_closed() {
+  local log=$1 rc=$2 reason=$3 desc=$4 line trailing
+  line=$("$GREP" -n '^NOT_RUN:' "$log" | head -1 | cut -d: -f1)
+  if [ -z "$line" ]; then
+    fail_item "$desc — NOT_RUN 줄이 없다 (종료값 ${rc})"
+    tail -12 "$log"
+    return
+  fi
+  trailing=$(tail -n "+$((line + 1))" "$log" | "$GREP" -c '^PASS:')
+  if [ "$rc" -eq 2 ] && [ "${trailing:-1}" -eq 0 ] && "$GREP" -q "$reason" "$log"; then
+    pass_item "$desc"
+  else
+    fail_item "$desc — 종료값 ${rc}, NOT_RUN 줄 ${line}, 뒤따른 PASS ${trailing}건"
+    tail -12 "$log"
+  fi
+}
+
 # 필수 검사를 할 수 없으면 건수만 늘리고 통과시키지 않는다 — 그 자리에서 끝낸다.
 abort_not_run() { echo "NOT_RUN: $1"; echo "CHECKED: $checked"; exit 2; }
 
-for required in "$MODULE" "$TESTS" "$TESTS_R2" "$SCHEMA"; do
+for required in "$MODULE" "$TESTS" "$TESTS_R2" "$TESTS_R3" "$TESTS_PROBE" "$SCHEMA"; do
   if [ ! -f "$required" ]; then
     echo "NOT_RUN: $required 없음 — 검사 대상이 성립하지 않는다"
     echo "CHECKED: 0"
@@ -110,16 +138,23 @@ case $? in
   0|1) : ;;
   *) echo "NOT_RUN: 시험 함수 계수 중 grep 오류"; echo "CHECKED: 0"; exit 2 ;;
 esac
-r2_count=$("$GREP" -c '^def test_' "$TESTS_R2")
-case $? in
-  0|1) : ;;
-  *) abort_not_run "2차 시험 함수 계수 중 grep 오류" ;;
-esac
-total_tests=$((test_count + r2_count))
-if [ "$test_count" -ge "$MIN_TESTS" ] && [ "$r2_count" -ge "$MIN_R2_TESTS" ]; then
-  pass_item "기록 시험 함수 ${test_count}개 + V1 결함 시험 ${r2_count}개 = ${total_tests}개"
+count_tests() {
+  local file=$1 n
+  n=$("$GREP" -c '^def test_' "$file")
+  case $? in
+    0|1) printf '%s\n' "${n:-0}" ;;
+    *) abort_not_run "시험 함수 계수 중 grep 오류 — $file" ;;
+  esac
+}
+r2_count=$(count_tests "$TESTS_R2")
+r3_count=$(count_tests "$TESTS_R3")
+probe_count=$(count_tests "$TESTS_PROBE")
+total_tests=$((test_count + r2_count + r3_count + probe_count))
+if [ "$test_count" -ge "$MIN_TESTS" ] && [ "$r2_count" -ge "$MIN_R2_TESTS" ] \
+   && [ "$r3_count" -ge "$MIN_R3_TESTS" ] && [ "$probe_count" -ge "$MIN_PROBE_TESTS" ]; then
+  pass_item "시험 함수 1차 ${test_count} · 2차 ${r2_count} · 3차 ${r3_count} · probe ${probe_count} = ${total_tests}개"
 else
-  fail_item "시험 함수 부족 — 1차 ${test_count}(>= ${MIN_TESTS}) · 2차 ${r2_count}(>= ${MIN_R2_TESTS})"
+  fail_item "시험 함수 부족 — 1차 ${test_count}(>=${MIN_TESTS}) · 2차 ${r2_count}(>=${MIN_R2_TESTS}) · 3차 ${r3_count}(>=${MIN_R3_TESTS}) · probe ${probe_count}(>=${MIN_PROBE_TESTS})"
 fi
 
 # 두 연결 경쟁 시험이 실제로 스레드 2개를 쓰는가(같은 연결 재사용이면 AC-3 가 무효다)
@@ -288,20 +323,50 @@ if [ "$HS0302_NESTED" -ge 1 ]; then
   echo "CHECKED: $checked"
   exit 2
 fi
-pytest_log="$WORK/pytest.log"
-# 1차와 2차(Codex V1 결함) 시험을 모두 돌린다. 한쪽만 돌리면 닫은 결함이 다시 열려도 모른다.
-# `-k not acceptance_aborts` — 이 스크립트를 다시 실행하는 두 시험만 뺀다. 넣으면
-# 인수 검사 → 시험 → 인수 검사 순환이 생긴다. 그 두 시험은 아래 자기 사본 검사와
-# CI 의 일반 pytest 가 대신 판정한다(deselect 는 여기서만 적용된다).
-( cd humansearch && uv run pytest tests/test_hs_0302_candidate_identity.py tests/test_hs_0302_r2_hardening.py -q -k "not acceptance_aborts" ) \
-  > "$pytest_log" 2>&1
-pytest_rc=$?
-passed=$("$GREP" -oE '[0-9]+ passed' "$pytest_log" | tail -1 | "$GREP" -oE '[0-9]+')
-failed=$("$GREP" -cE '^FAILED|^ERROR' "$pytest_log")
-if [ "$pytest_rc" -eq 0 ] && [ "${passed:-0}" -ge "$total_tests" ] && [ "${failed:-0}" -eq 0 ]; then
-  pass_item "pytest 실제 실행 — ${passed} passed, 실패 0, 종료값 0"
+# 무엇을 돌려야 하는지를 먼저 수집해 둔다. "통과 수 >= 함수 수" 같은 하한은 매개변수
+# 확장 때문에 부풀어, 필수 시험이 빠져도 성립한다(Codex V1 2차). 수집 건수와 **정확히**
+# 같아야 하고 deselected·skipped·기대실패 표시가 하나라도 붙으면 불합격이다.
+# 판정은 요약 줄이 정확히 `<수집건수> passed in ` 모양인지로 본다 — 다른 표시가
+# 하나라도 붙으면 그 모양이 깨진다.
+collect_log="$WORK/collect.log"
+( cd humansearch && uv run pytest $TEST_FILES $PYTEST_EXTRA --collect-only -q ) \
+  > "$collect_log" 2>&1
+collect_rc=$?
+if ! tail -5 "$collect_log" | "$GREP" -E 'tests? collected' > "$WORK/collect_summary.txt"; then
+  # 매치 없음(rc 1)과 리다이렉션 실패(rc 1)가 겹친다. 어느 쪽이든 판정 근거가 없으므로
+  # 빈 파일로 두고 아래에서 abort_not_run 이 받는다 — 조용히 넘기지 않는다.
+  : > "$WORK/collect_summary.txt"
+fi
+collect_line=$(tail -1 "$WORK/collect_summary.txt")
+if [ "$collect_rc" -ne 0 ] || [ -z "$collect_line" ]; then
+  abort_not_run "pytest 수집 실패 — 무엇을 돌려야 하는지 모른 채로는 합격시키지 않는다"
+fi
+printf '%s\n' "$collect_line" > "$WORK/collect_line.txt"
+if ! "$GREP" -qE '^[0-9]+ tests? collected in ' "$WORK/collect_line.txt"; then
+  fail_item "pytest 수집 요약이 단순 수집이 아니다 — '${collect_line}' (필터·deselect 흔적)"
+  selected=0
 else
-  fail_item "pytest 실제 실행 — 종료값 ${pytest_rc}, passed=${passed:-0}, 실패줄=${failed:-0}"
+  selected=$("$GREP" -oE '^[0-9]+' "$WORK/collect_line.txt")
+  if [ "${selected:-0}" -ge "$total_tests" ]; then
+    pass_item "pytest 수집 ${selected}건 — 필터 없이 전부 선택됐다 (함수 ${total_tests}개 이상)"
+  else
+    fail_item "pytest 수집 ${selected:-0}건 — 함수 ${total_tests}개보다 적다 (시험이 사라졌다)"
+  fi
+fi
+
+pytest_log="$WORK/pytest.log"
+( cd humansearch && uv run pytest $TEST_FILES $PYTEST_EXTRA -q ) > "$pytest_log" 2>&1
+pytest_rc=$?
+if ! tail -5 "$pytest_log" | "$GREP" -E 'passed|failed|error|no tests ran' > "$WORK/run_summary.txt"; then
+  : > "$WORK/run_summary.txt"
+fi
+run_line=$(tail -1 "$WORK/run_summary.txt")
+printf '%s\n' "$run_line" > "$WORK/run_line.txt"
+if [ "$pytest_rc" -eq 0 ] && [ "${selected:-0}" -gt 0 ] \
+   && "$GREP" -qE "^${selected} passed in " "$WORK/run_line.txt"; then
+  pass_item "pytest 실제 실행 — ${selected} passed, 수집 건수와 정확히 일치, 종료값 0"
+else
+  fail_item "pytest 실제 실행 — 종료값 ${pytest_rc}, 수집 ${selected:-0}, 요약 '${run_line}'"
   tail -20 "$pytest_log"
 fi
 
@@ -313,20 +378,25 @@ fi
 sed 's/^BASE_SHA=.*/BASE_SHA=0000000000000000000000000000000000000000/' "$SELF" \
   > "$WORK/failclosed_probe.sh"
 HS0302_ACCEPTANCE_DEPTH=9 bash "$WORK/failclosed_probe.sh" > "$WORK/failclosed.log" 2>&1
-fc_rc=$?
-fc_line=$("$GREP" -n '^NOT_RUN:' "$WORK/failclosed.log" | head -1 | cut -d: -f1)
-if [ -n "$fc_line" ]; then
-  fc_trailing=$(tail -n "+$((fc_line + 1))" "$WORK/failclosed.log" | "$GREP" -c '^PASS:')
-else
-  fc_trailing=-1
-fi
-if [ "$fc_rc" -eq 2 ] && [ -n "$fc_line" ] && [ "${fc_trailing:-1}" -eq 0 ] \
-   && "$GREP" -q '기준 커밋' "$WORK/failclosed.log"; then
-  pass_item "fail-closed 자기 검사 — 기준 SHA 를 지운 사본이 exit 2 로 끝나고 뒤에 판정이 없다"
-else
-  fail_item "fail-closed 자기 검사 — 종료값 ${fc_rc}, NOT_RUN 줄 ${fc_line:-없음}, 뒤따른 PASS ${fc_trailing}건"
-  tail -12 "$WORK/failclosed.log"
-fi
+assert_fail_closed "$WORK/failclosed.log" "$?" '기준 커밋' \
+  "fail-closed 자기 검사 ① 기준 SHA 를 지운 사본이 그 자리에서 끝난다"
+
+# 두 번째 경로 — 우회 표 스캔이 오류를 낼 때. 기준 SHA 만 대체하면 이 경로는 인수 실행
+# 안에서 한 번도 판정되지 않는다(Codex V1 2차).
+cat > "$WORK/fake-grep" <<'FAKEGREP'
+#!/bin/bash
+for arg in "$@"; do
+  case "$arg" in
+    *create*table*) exit 2 ;;
+  esac
+done
+exec /usr/bin/grep "$@"
+FAKEGREP
+chmod +x "$WORK/fake-grep"
+sed "s|^GREP=/usr/bin/grep\$|GREP=$WORK/fake-grep|" "$SELF" > "$WORK/failclosed_scan_probe.sh"
+HS0302_ACCEPTANCE_DEPTH=9 bash "$WORK/failclosed_scan_probe.sh" > "$WORK/failclosed_scan.log" 2>&1
+assert_fail_closed "$WORK/failclosed_scan.log" "$?" 'create table 스캔' \
+  "fail-closed 자기 검사 ② 우회 표 스캔이 깨진 사본이 그 자리에서 끝난다"
 
 # ── 자기 오염 감지 ─────────────────────────────────────────────────────────
 SNAP1=$(git status --porcelain)
