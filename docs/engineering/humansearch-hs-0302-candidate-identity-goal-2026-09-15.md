@@ -155,7 +155,7 @@ HMAC 입력 누락, 예외 삼킴 범위, 키 파일 검사 우회(symlink·모�
 | 재검증 — 전체 | PASS | `uv run pytest -q` 12:00 → `295 passed in 14.58s` (229 기준선 + 66) |
 | 재검증 — ruff·mypy | PASS | `All checks passed!` · `Success: no issues found in 46 source files`, rc=0 |
 | 재검증 — 인수 | PASS | 12:00:45 → `PASS` 11줄, `CHECKED: 11`, rc=0. HMAC 판정을 문자열 탐지에서 실행 probe(16건)로 교체 |
-| V2 재현기 (GREEN 후) | PASS(주의) | 원본 `v2_0302_codex.py` 는 (1) 에서 `CandidateIdentityError: candidate_ref must not contain control characters` 로 중단된다 — 계약 충돌 때문에 원본 기대 `(1) inserted inserted 2` 는 도달 불가. 사본 `v2_0302_codex_after_green.py` 12:25:31 → `(1a) collision False`·`(1b) 둘 다 REJECTED`·`(1c) rows 0`·`(1d) 합법쌍 둘 다 inserted`·`(1e) rows 2`·`(2) REJECTED`·`(3) REJECTED` |
+| V2 재현기 (GREEN 후) | PASS(주의) | 원본 `v2_0302_codex.py` 는 (1) 에서 `CandidateIdentityError: candidate_ref must not contain control characters` 로 중단된다 — 계약 충돌 때문에 원본 기대 `(1) inserted inserted 2` 는 도달 불가. 사본 `v2_0302_codex_after_green.py` 11:25:31 → `(1a) collision False`·`(1b) 둘 다 REJECTED`·`(1c) rows 0`·`(1d) 합법쌍 둘 다 inserted`·`(1e) rows 2`·`(2) REJECTED`·`(3) REJECTED` |
 | 변이 M1 제어문자 거부 제거 | 생존 0 | 11:27:09 → 11 failed. 길이 접두는 유지되므로 순수 함수 충돌 시험 3건은 여전히 통과 — 이중 방어가 실제로 독립임을 보여준다 |
 | 변이 M2 길이 접두→구분자 결합 | 생존 0 | 11:27:42 → 6 failed. 인수 probe 도 `BAD` 6건으로 불합격 |
 | 변이 M3 양방향 포함→동일 비교 | 생존 0 | 11:28:14 → 키 경계 2건 실패(중첩 하위·역방향) |
