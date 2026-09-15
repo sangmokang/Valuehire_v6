@@ -247,6 +247,28 @@ def test_symlinked_sqlite_sidecar_is_refused(tmp_path: Path, suffix: str) -> Non
         _record(identity, db_path, key_path)
 
     _assert_closed_error(caught.value, tmp_path)
+    # 링크 자체의 모드는 0600 이 아니어서 모드 검사도 걸리지만, 사유는 symlink 여야 한다 —
+    # 그래야 symlink 검사 줄을 지운 변이가 살아남지 못한다(2026-09-15 AC-D1 M7 실측).
+    assert "symlink" in str(caught.value)
+    assert _count_rows(db_path) == 0
+
+
+@pytest.mark.parametrize("suffix", list(_SIDECAR_SUFFIXES))
+def test_sqlite_sidecar_that_is_not_a_regular_file_is_refused(tmp_path: Path, suffix: str) -> None:
+    """모드가 맞아도 보조 파일 자리에 일반 파일이 아닌 것이 있으면 닫힌 오류로 거부한다."""
+
+    identity = _load_identity_module()
+    db_path = _protected_db(tmp_path)
+    key_path = _key_at(tmp_path / "key-root")
+    sidecar = db_path.with_name(db_path.name + suffix)
+    sidecar.mkdir(mode=0o600)
+
+    with pytest.raises(identity.CandidateIdentityError) as caught:
+        _record(identity, db_path, key_path)
+
+    _assert_closed_error(caught.value, tmp_path)
+    # SQLite 는 journal/wal 자리의 디렉터리를 열려다 I/O 오류를 낸다 — 행 수는 치운 뒤 센다.
+    sidecar.rmdir()
     assert _count_rows(db_path) == 0
 
 
