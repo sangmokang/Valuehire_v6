@@ -1049,3 +1049,58 @@ Next steps:
 - F96-2의 쓰기 실패+close 실패 결합 경로를 `recovery_required`로 승격하십시오.
 - 쓰기 가능한 환경에서 대상 pytest, 전체 pytest, ruff, mypy, verify.sh를 다시 실행하고 실제 hsrunner 분리 실증은 계속 NOT_RUN으로 명시하십시오.
 ```
+
+## 재검토 2026-09-15 — HS-03.02 3차 GREEN(ad26e91) Codex V1
+
+실행 12:51:18~12:59:45, `--base 7473ec8`, verdict needs-attention. F0302-1 해결·F0302-2 해결(DB 전 구성요소 symlink 거부)·NFC 해결. 부분: F0302-3(정규식 `[Zz]` 허용인데 fromisoformat 이 소문자 z 거부), F0302-4(collect-only==passed 대조는 매개변수 사례 1건 삭제를 못 잡음 → node-id 명부 필요), CI 배선(run 줄 `|| true` 주입을 문자열 검사가 못 잡음 → YAML 파싱·정확 단일 명령 대조). hard-link·검사 후 교체는 범위 밖 유지. 검토 중 HEAD 가 49d98df 로 이동(구현자 후속 커밋 2개: 시험 주석의 경로 문자열 제거·fail-closed 기준 단일화). 5차 지시 예정(push 종료 뒤).
+
+```text
+# Codex Adversarial Review
+
+Target: branch diff against 7473ec8
+Verdict: needs-attention
+
+VERDICT: FAIL.
+
+결론: ad26e91은 아직 보내시면 안 됩니다. 자동검사가 꺼져도 성공으로 보일 수 있고, 필수 시험이 줄어도 알아채지 못하며, 허용한다고 적은 시각 표기 하나를 실제로 거부합니다.
+
+건너뜀·미확인: 읽기 전용 환경이 임시 파일 생성을 막아 전체 pytest, DB·심볼릭 링크 재현, 인수 스크립트는 NOT_RUN입니다. 직접 인수 실행은 `mktemp 실패`, `CHECKED: 0`, rc=2였습니다. pytest도 처음에는 임시 캡처 파일 생성에 실패했고, `-s -p no:cacheprovider`로 재시도한 순수 HMAC 시험 3건은 통과했습니다. ruff와 mypy도 rc=0이었습니다. 원격 CI·push·PR은 미확인입니다. 검토 중 브랜치 HEAD가 49d98df로 이동했지만 요청대로 ad26e91을 고정해 판정했습니다.
+
+3차 재검토 표: F0302-2 DB 마지막 구성요소 symlink=해결; 신규 high CI·명부 배선=구현은 해결, 무력화 방어는 부분; F0302-4 자기 호출·시험 수 판정=부분; 신규 medium NFC=해결.
+F0302-1~4 최종 표: F0302-1=해결; F0302-2=해결; F0302-3=부분(범위 검증은 해결, 소문자 z 불일치 신규); F0302-4=부분.
+
+반증 기록: 제어문자 거부→strip→NFC 순서는 코드상 맞고, 정규화된 position_ref와 candidate_ref가 저장값·해시에 전달됩니다. NFKC 전용 쌍은 합치지 않습니다. DB 경로는 마지막 파일을 포함한 전 구성요소의 symlink를 거부하고 해석된 부모를 양방향 포함 비교합니다. HMAC 기대값은 시험에서 구현 상수를 가져오지 않고 독립 계산하므로 해당 부분은 자기확인식 시험이 아닙니다. needle 네 값의 빈 문자열은 `-n` 검사로 잡히며 재귀 차단은 `abort_not_run`과 분리돼 있습니다. hard-link 동일 inode와 검사 후 교체 경쟁은 지시대로 범위 밖 잔여 위험으로만 기록하고 결함 수에 포함하지 않았습니다.
+
+Findings:
+- [high] CI 실행 줄의 `|| true`가 인수 검사 실패를 숨겨도 차단되지 않습니다 (scripts/acceptance-hs-0302.sh:477-492)
+  원인: `scripts/acceptance-hs-0302.sh:477-492`의 CI 스텝 검사 역할은 `if:`, `continue-on-error`, `run: echo`만 찾습니다. 공통 YAML 검사기도 같은 종류와 `bash -n`만 검사합니다. 실행 줄을 `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-0302.sh || true`로 바꿔 동일 판정 조건을 실행한 결과 원문은 `MUTATED_RUN=... || true`, `EXISTING_INTEGRITY_PREDICATES_CATCH=false`, rc=0이었습니다.
+→ 해석: 인수 검사가 실패해도 셸이 성공을 반환하며, 배선 검사는 이를 오류 무시로 판정하지 않습니다.
+사업 영향: 후보 중복·키 경계 검사가 깨진 상태에서도 CI가 정상으로 표시될 수 있어, 2차의 신규 high 배선 결함이 완전히 닫히지 않았습니다.
+설계 지적 — 무엇을: CI run 명령을 구조적으로 제한해야 합니다.
+왜: 명령 존재 여부와 실패 전파 여부는 서로 다른 계약입니다.
+버린 길: `if`와 `continue-on-error`만 금지하는 현재 문자열 검사는 셸 내부 오류 무시를 놓칩니다.
+대가: 허용할 run 형태를 명시적으로 관리해야 합니다.
+되돌리기: 해당 스텝을 정확한 단일 명령으로 고정한 검사만 제거하면 기존 동작으로 돌아갑니다.
+  Recommendation: YAML을 파싱해 hs-0302 스텝의 run 값을 정확한 단일 명령과 대조하고 `||`, `&&`, `;`, 파이프·서브셸 같은 셸 제어 연산자를 거부하십시오. `|| true` 변이를 실제 checker에 넣어 rc=1을 확인하는 회귀도 추가하십시오.
+- [medium] 수집 건수와 통과 건수를 함께 줄이면 필수 시험 삭제가 통과합니다 (scripts/acceptance-hs-0302.sh:82-84)
+  원인: 파일별 함수 하한은 6·10·6인데 실제 함수 수는 13·10·6입니다. 이후 검사는 현재 파일에서 다시 수집한 `selected`와 현재 통과 수만 정확히 비교합니다. 예를 들어 `test_nfc_equivalent_fields_collapse_into_one_row`의 `position_ref` 매개변수 한 건을 삭제하면 함수 수는 그대로이고, 수집과 통과가 71→70으로 함께 줄어 두 조건을 모두 만족합니다.
+→ 해석: 정확 대조는 선택된 시험을 전부 실행했다는 사실만 보장하며, 요구된 시험이 그대로 남았다는 사실은 보장하지 않습니다.
+사업 영향: position_ref 정규화 같은 필수 반례가 조용히 사라져도 인수 검사가 통과하므로 F0302-4의 ‘통과 하한 함수 수’ 잔여가 부분 해결에 머뭅니다.
+설계 지적 — 무엇을: 필수 시험 명부 또는 고정된 node-id 집합을 대조해야 합니다.
+왜: 함수 수는 매개변수별 계약을 식별하지 못합니다.
+버린 길: 현재 파일에서 계산한 수집 수를 자기 자신과 비교하면 삭제가 기준값까지 함께 낮아집니다.
+대가: 시험 추가·변경 때 명부를 함께 갱신해야 합니다.
+되돌리기: 명부 대조만 제거하면 현재 하한 방식으로 복귀합니다.
+  Recommendation: 필수 pytest node-id와 매개변수 사례를 정본 명부로 고정해 collect-only 결과와 집합으로 대조하십시오. 최소한 현재 71건을 고정하고, NFC position_ref 사례 또는 제어문자 사례 하나를 삭제한 사본이 rc=1인지 변이 검증하십시오.
+- [medium] RFC3339 정규식이 허용한 소문자 `z`를 실제 검증기가 거부합니다 (humansearch/src/humansearch/candidate_identity.py:52-55)
+  원인: `_RFC3339`는 `[Zz]`로 소문자 UTC 표기를 허용하지만, 다음 단계의 `datetime.fromisoformat`은 소문자 `z`를 받지 않습니다. 직접 실행 원문은 대문자 `Z`가 `UPPER_Z=PASS`, rc=0인 반면 소문자 `z`는 `ValueError: Invalid isoformat string` 뒤 `CandidateIdentityError: observed_at is not a real instant`, rc=1이었습니다.
+→ 해석: 앞 단계가 유효하다고 판정한 입력을 뒤 단계가 서로 다른 규칙으로 거부합니다.
+사업 영향: 소문자 UTC 표기를 내는 정상 공급자의 후보 기록이 전부 거부될 수 있습니다. 기존 F0302-3의 잘못된 날짜·시각 범위는 고쳤지만 RFC3339 입력 계약 전체는 아직 일관되지 않습니다.
+  Recommendation: 파싱 전에 끝의 `z`를 `Z`로 정규화하거나 RFC3339를 일관되게 지원하는 파서를 사용하십시오. 소문자 `t`·`z` 양성 시험과 대문자 대조군을 추가하십시오.
+
+Next steps:
+- CI 스텝에 `|| true`를 주입한 실제 변이 시험이 rc=1이 되도록 배선 검사기를 강화하십시오.
+- 필수 71개 시험의 node-id·매개변수 집합을 고정하고 시험 한 건 삭제 변이를 차단하십시오.
+- 소문자 RFC3339 UTC 표기를 처리한 뒤 쓰기 가능한 환경에서 전체 pytest·인수 검사·DB symlink 반례를 새 HEAD로 다시 실행하십시오.
+- 현재 49d98df는 요청 대상 ad26e91 이후 커밋이므로 별도 4차 검토로 판정을 갱신하십시오.
+```
