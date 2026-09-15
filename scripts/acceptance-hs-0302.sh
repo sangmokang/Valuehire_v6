@@ -37,6 +37,7 @@ unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY \
 # 깊이를 표시해 중첩 실행에서는 시험 단계를 아예 돌리지 않는다.
 HS0302_NESTED="${HS0302_ACCEPTANCE_DEPTH:-0}"
 export HS0302_ACCEPTANCE_DEPTH=$((HS0302_NESTED + 1))
+SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 
 GREP=/usr/bin/grep
 if [ ! -x "$GREP" ]; then
@@ -280,12 +281,19 @@ else
 fi
 
 # ── 8. 시험을 실제로 돌린다 (문자열 검사만으로는 동작을 판정하지 못한다) ─────
+# 중첩 차단은 abort_not_run 을 쓰지 않는다. fail-closed 를 되돌리는 변이가 그 보조를
+# 건드리면 차단까지 같이 죽기 때문이다(2026-09-15 실측: 프로세스 1,493개). 직접 끝낸다.
 if [ "$HS0302_NESTED" -ge 1 ]; then
-  abort_not_run "중첩 실행(depth=${HS0302_NESTED}) — 시험 단계를 돌리면 무한 재귀가 된다"
+  echo "NOT_RUN: 중첩 실행(depth=${HS0302_NESTED}) — 시험 단계를 돌리면 무한 재귀가 된다"
+  echo "CHECKED: $checked"
+  exit 2
 fi
 pytest_log="$WORK/pytest.log"
 # 1차와 2차(Codex V1 결함) 시험을 모두 돌린다. 한쪽만 돌리면 닫은 결함이 다시 열려도 모른다.
-( cd humansearch && uv run pytest tests/test_hs_0302_candidate_identity.py tests/test_hs_0302_r2_hardening.py -q ) \
+# `-k not acceptance_aborts` — 이 스크립트를 다시 실행하는 두 시험만 뺀다. 넣으면
+# 인수 검사 → 시험 → 인수 검사 순환이 생긴다. 그 두 시험은 아래 자기 사본 검사와
+# CI 의 일반 pytest 가 대신 판정한다(deselect 는 여기서만 적용된다).
+( cd humansearch && uv run pytest tests/test_hs_0302_candidate_identity.py tests/test_hs_0302_r2_hardening.py -q -k "not acceptance_aborts" ) \
   > "$pytest_log" 2>&1
 pytest_rc=$?
 passed=$("$GREP" -oE '[0-9]+ passed' "$pytest_log" | tail -1 | "$GREP" -oE '[0-9]+')
@@ -295,6 +303,29 @@ if [ "$pytest_rc" -eq 0 ] && [ "${passed:-0}" -ge "$total_tests" ] && [ "${faile
 else
   fail_item "pytest 실제 실행 — 종료값 ${pytest_rc}, passed=${passed:-0}, 실패줄=${failed:-0}"
   tail -20 "$pytest_log"
+fi
+
+# ── fail-closed 자기 검사 ──────────────────────────────────────────────────
+# 필수 비교를 못 하게 만든 자기 사본이 "건너뛰고 통과"하지 않는지 직접 본다. 종료값만
+# 보면 부족하다 — 건너뛴 뒤 다른 경로로 2 가 나와도 통과한다. NOT_RUN 뒤에 판정(PASS)이
+# 한 줄이라도 이어지면 그것이 fail-open 이다. 사본은 depth 9 로 띄워 시험 단계에 닿지
+# 못하게 한다(재귀 방지).
+sed 's/^BASE_SHA=.*/BASE_SHA=0000000000000000000000000000000000000000/' "$SELF" \
+  > "$WORK/failclosed_probe.sh"
+HS0302_ACCEPTANCE_DEPTH=9 bash "$WORK/failclosed_probe.sh" > "$WORK/failclosed.log" 2>&1
+fc_rc=$?
+fc_line=$("$GREP" -n '^NOT_RUN:' "$WORK/failclosed.log" | head -1 | cut -d: -f1)
+if [ -n "$fc_line" ]; then
+  fc_trailing=$(tail -n "+$((fc_line + 1))" "$WORK/failclosed.log" | "$GREP" -c '^PASS:')
+else
+  fc_trailing=-1
+fi
+if [ "$fc_rc" -eq 2 ] && [ -n "$fc_line" ] && [ "${fc_trailing:-1}" -eq 0 ] \
+   && "$GREP" -q '기준 커밋' "$WORK/failclosed.log"; then
+  pass_item "fail-closed 자기 검사 — 기준 SHA 를 지운 사본이 exit 2 로 끝나고 뒤에 판정이 없다"
+else
+  fail_item "fail-closed 자기 검사 — 종료값 ${fc_rc}, NOT_RUN 줄 ${fc_line:-없음}, 뒤따른 PASS ${fc_trailing}건"
+  tail -12 "$WORK/failclosed.log"
 fi
 
 # ── 자기 오염 감지 ─────────────────────────────────────────────────────────

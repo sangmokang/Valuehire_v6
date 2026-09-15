@@ -407,4 +407,8 @@ def test_acceptance_script_has_no_fail_open_skip_helper() -> None:
     assert "skip_item" not in text, "필수 검사 불가를 성공으로 접는 보조가 남아 있다"
     assert "exit 2" in text, "NOT_RUN 뒤 즉시 종료하는 경로가 없다"
     assert "HS0302_ACCEPTANCE_DEPTH" in text, "중첩 실행 재귀 차단이 없다"
+    # 차단이 변이 대상 보조(abort_not_run)를 거치면 같은 변이에 함께 죽는다(실측).
+    assert 'abort_not_run "중첩' not in text, "중첩 차단이 fail-closed 보조와 같은 경로를 쓴다"
+    assert "not acceptance_aborts" in text, "인수 검사가 자기를 부르는 시험을 다시 돌린다"
+    assert "failclosed_probe" in text, "인수 검사가 자기 fail-closed 음성 대조군을 갖고 있지 않다"
     assert os.access(_repo_root() / _ACCEPTANCE, os.X_OK)
