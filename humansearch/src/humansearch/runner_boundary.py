@@ -46,10 +46,11 @@ class RunnerBoundaryConfig:
 class BoundaryReceipt:
     """PII-safe receipt for a protected write attempt.
 
-    ``device`` and ``inode`` name the published file itself. A later readback
-    or delete must match on that pair, not on ``path``: the path string can be
-    made to point elsewhere after this receipt is issued, while the pair keeps
-    naming the same filesystem object. ``path`` stays for human reading.
+    ``device`` and ``inode`` come from the descriptor that held the payload, so
+    they identify the bytes this receipt is about. They are a **check value,
+    not a locator**: no API here opens a file from that pair. A consumer opens
+    the file by ``path`` (or through a pinned directory handle) and then
+    confirms it is the right one by matching this pair and ``sha256``.
     """
 
     status: BoundaryStatus
@@ -174,7 +175,11 @@ class RunnerBoundary:
                 current, runner_uid, reason, ancestor=not is_root
             )
             if invalid is None and not released:
-                invalid = BoundaryReceipt(BoundaryStatus.DENIED, reason)
+                # 닫지 못한 손잡이는 방금 지나온 조상이다. 이유를 현재 단계가
+                # 아니라 그 손잡이에 붙여야 어디가 막혔는지 읽힌다.
+                invalid = BoundaryReceipt(
+                    BoundaryStatus.DENIED, "protected_root_ancestor_invalid"
+                )
             if invalid is not None:
                 self._close_fd(current)
                 return invalid
@@ -294,9 +299,7 @@ class RunnerBoundary:
         invalid = self._check_written_file(stored, runner_uid)
         if invalid is not None:
             return self._discard(parent_fd, temp_name, invalid.reason)
-        return self._publish(
-            parent_fd, temp_name, name, final_path, digest, len(payload)
-        )
+        return self._publish(parent_fd, temp_name, name, final_path, digest, stored)
 
     def _store_payload(
         self, parent_fd: int, fd: int, temp_name: str, payload: bytes
@@ -326,9 +329,16 @@ class RunnerBoundary:
         name: str,
         final_path: Path,
         digest: str,
-        byte_count: int,
+        written: os.stat_result,
     ) -> BoundaryReceipt:
-        """Give the finished temporary file its final name, or undo everything."""
+        """Give the finished temporary file its final name, or undo everything.
+
+        ``written`` comes from ``fstat`` on the descriptor that actually held the
+        payload, so it names our bytes. The entry now sitting under ``name`` has
+        to be that same object; anything else means the name was taken over
+        between the link and this check, and the receipt would otherwise pair
+        our payload hash with somebody else's file.
+        """
 
         try:
             os.link(
@@ -345,16 +355,25 @@ class RunnerBoundary:
             return self._discard(parent_fd, temp_name, reason)
         if not self._published_path_matches(parent_fd, name, final_path):
             return self._undo_publication(parent_fd, temp_name, name)
-        identity = self._file_identity(parent_fd, name)
-        if identity is None:
+        if not self._published_entry_is(parent_fd, name, written):
             return self._undo_publication(parent_fd, temp_name, name)
         if not self._remove(parent_fd, temp_name):
             return self._roll_back(parent_fd, name, "cleanup_failed")
-        device, inode = identity
         return BoundaryReceipt(
-            BoundaryStatus.WRITTEN, "written", final_path, digest, byte_count,
-            device, inode,
+            BoundaryStatus.WRITTEN, "written", final_path, digest,
+            written.st_size, written.st_dev, written.st_ino,
         )
+
+    def _published_entry_is(
+        self, parent_fd: int, name: str, written: os.stat_result
+    ) -> bool:
+        """Check the entry under ``name`` is the object we wrote, not a stand-in."""
+
+        try:
+            info = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+        except OSError:
+            return False
+        return (info.st_dev, info.st_ino) == (written.st_dev, written.st_ino)
 
     def _undo_publication(
         self, parent_fd: int, temp_name: str, name: str
@@ -366,13 +385,6 @@ class RunnerBoundary:
         if not removed_final or not removed_temp:
             return BoundaryReceipt(BoundaryStatus.DENIED, "recovery_required")
         return BoundaryReceipt(BoundaryStatus.DENIED, "published_path_mismatch")
-
-    def _file_identity(self, parent_fd: int, name: str) -> tuple[int, int] | None:
-        try:
-            info = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
-        except OSError:
-            return None
-        return info.st_dev, info.st_ino
 
     def _published_path_matches(
         self, parent_fd: int, name: str, final_path: Path
