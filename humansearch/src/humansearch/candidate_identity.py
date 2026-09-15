@@ -36,6 +36,7 @@ _KEY_DOMAIN: Final = b"hs-candidate-key-v2"
 _REF_DOMAIN: Final = b"hs-candidate-ref-v1"
 _FIELD_SEPARATOR: Final = b"\x1f"
 _LENGTH_PREFIX_BYTES: Final = 4
+_DESIGNATOR_INDEX: Final = 10  # "YYYY-MM-DD" 다음 자리 = T/t
 _MIN_KEY_BYTES: Final = 32
 _MAX_FIELD_CHARS: Final = 512
 _PRIMARY_KEY_CONSTRAINT: Final = "SQLITE_CONSTRAINT_PRIMARYKEY"
@@ -152,11 +153,31 @@ def _validated_observed_at(observed_at: str) -> None:
     if _RFC3339.fullmatch(observed_at) is None:
         raise CandidateIdentityError("observed_at must be an RFC3339 timestamp")
     try:
-        parsed = datetime.fromisoformat(observed_at)
+        parsed = datetime.fromisoformat(_isoformat_ready(observed_at))
     except ValueError as exc:
         raise CandidateIdentityError("observed_at is not a real instant") from exc
     if parsed.tzinfo is None:
         raise CandidateIdentityError("observed_at must carry a UTC offset")
+
+
+def _isoformat_ready(observed_at: str) -> str:
+    """RFC3339 의 소문자 표기를 `datetime.fromisoformat` 이 받는 형태로 맞춘다.
+
+    RFC3339 는 날짜·시각 구분자 `T` 와 UTC 표기 `Z` 의 소문자를 허용하고 우리 정규식도
+    `[Tt]`·`[Zz]` 로 받는다. 그런데 `fromisoformat` 은 소문자 `z` 를 거부한다(실측).
+    앞 단계가 허용한 입력을 뒤 단계가 다른 규칙으로 거부하면 정상 공급자가 통째로 막힌다.
+
+    표기만 대문자로 바꾼다 — 값은 건드리지 않으므로 달력·범위 검증은 그대로 걸린다.
+    """
+
+    # 이 함수는 _RFC3339 통과 뒤에만 불린다. 그래서 구분자 위치가 고정돼 있다 —
+    # `YYYY-MM-DD` 10자 다음이 T/t 이고, UTC 표기면 마지막 글자가 Z/z 다.
+    body = observed_at
+    if body.endswith("z"):
+        body = body[:-1] + "Z"
+    if len(body) > _DESIGNATOR_INDEX and body[_DESIGNATOR_INDEX] == "t":
+        body = body[:_DESIGNATOR_INDEX] + "T" + body[_DESIGNATOR_INDEX + 1 :]
+    return body
 
 
 def _verify(path: Path, *, expected_mode: int, label: str) -> None:
