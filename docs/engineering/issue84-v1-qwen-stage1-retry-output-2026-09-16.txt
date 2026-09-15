@@ -1,0 +1,10 @@
+다음은 T 계약을 깨뜨릴 수 있는 실제 bash 반례 명령입니다:
+
+```bash
+git worktree add -b main-linked ../main-linked main
+cd ../main-linked
+git symbolic-ref HEAD refs/heads/task/bypass
+git commit --allow-empty -m "bypass task commit"
+```
+
+이 명령은 `git worktree`를 사용하여 `main` 브랜치의 링크된 작업 트리브랜치를 생성하고, 이를 `task/bypass`로 변경한 후 커밋을 시도합니다. 이로 인해 `BLOCKED: development commit in primary worktree` 메시지 없이 커밋이 허용되어야 합니다. 예상되는 `exit` 코드는 0이며, `stderr`에는 아무 메시지도 출력되지 않아야 합니다. 또한 `HEAD`는 변경되어야 합니다. 만약 이 명령이 예상대로 작동하지 않으면, 훅 정책이 예상치 못한 작업 트리브랜치를 처리하지 못하는 결함이 있는 것으로 간주됩니다.

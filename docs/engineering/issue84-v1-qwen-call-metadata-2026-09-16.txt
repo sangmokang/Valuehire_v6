@@ -1,0 +1,31 @@
+CALL: stage1
+COMMAND: POST http://localhost:11434/api/generate model=qwen2.5:14b stream=false
+SOURCE_SHA: 5a67dfb7c6298bd3467d9179a211f4f6cf730fc1
+MODEL: qwen2.5:14b
+CREATED_AT_UTC: 2026-09-15T15:22:20.491553Z
+DONE: True
+PROMPT_EVAL_COUNT: 2050
+EVAL_COUNT: 821
+PROMPT_SHA256: 3e4637aadaed02316b3eca6380016b2b0ff43028b1f97690e11fda996428ab3f
+RAW_API_SHA256: 0b2b04671309bac0fb9b7b65515557c4e06c56955a706dcb82bcbdfb1d9466c8
+RESPONSE_SHA256: 258241f5301fd4e19f18116b07ee12df4aebffa5bf3a4ef0d6d61b3ec08a86e5
+RESPONSE_FILE: docs/engineering/issue84-v1-qwen-stage1-api-2026-09-16.json (response field)
+RAW_API_FILE: docs/engineering/issue84-v1-qwen-stage1-api-2026-09-16.json
+EXIT: 0
+QUALIFIED_V1: NO — stage1 only summarized SOT; retry omitted staged change, mktemp, Git env cleanup and install-hooks
+
+CALL: stage1-retry
+COMMAND: POST http://localhost:11434/api/generate model=qwen2.5:14b stream=false
+SOURCE_SHA: 5a67dfb7c6298bd3467d9179a211f4f6cf730fc1
+MODEL: qwen2.5:14b
+CREATED_AT_UTC: 2026-09-15T15:23:56.511969Z
+DONE: True
+PROMPT_EVAL_COUNT: 2920
+EVAL_COUNT: 239
+PROMPT_SHA256: 2977bf6bfb459897392c289e769e8c09460a54c855ccb77882ad1f10a6c2e21a
+RAW_API_SHA256: 396f3fc199205fb1c9ecf1215321aaf7aa1d9bf1a45aebd3a69443f55b77a9df
+RESPONSE_SHA256: a4e7e592a0c86711b8c33bddbfa0daba22f4dc8e423af535ca172665f6ae7fa3
+RESPONSE_FILE: docs/engineering/issue84-v1-qwen-stage1-retry-output-2026-09-16.txt
+RAW_API_FILE: docs/engineering/issue84-v1-qwen-stage1-retry-api-2026-09-16.json
+EXIT: 0
+QUALIFIED_V1: NO — stage1 only summarized SOT; retry omitted staged change, mktemp, Git env cleanup and install-hooks

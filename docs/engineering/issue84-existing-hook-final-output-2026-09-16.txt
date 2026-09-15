@@ -1,0 +1,21 @@
+=== 전제 검사: 훅 인프라 ===
+OK: 훅 파일 4종 + settings.json 존재
+
+=== 시연 (샌드박스: /var/folders/4h/jphmynjn2jl54cqy8d_ddhkh0000gn/T/tmp.RgJDwmREmY/task-worktree · 각 시연마다 훅 ON/OFF 대조) ===
+[1/6] 검사기 자기 제외 → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+         BLOCKED: 검사기 자기 제외 — scripts/acceptance-0-6.sh 가 자기 자신을 검사 대상에서 뺀다 (P13)
+[2/6] 검사 약화(실패 무시) → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+         BLOCKED: 검사 약화 패턴 추가 — scripts/acceptance-0-2.sh (P13). 정당하면 suppressions.yaml 에 expiry 와 함께 등록하라
+[3/6] 만료일 없는 억제 → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+         BLOCKED: 억제 항목 1건 중 expiry 가 0건뿐 — 만료일 없는 억제는 영구화된다 (P13)
+[4/6] LLM 출력→판정 필드 → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+         BLOCKED: LLM 출력을 판정 수치로 변환 — src/scoring.js. 판정 수치는 순수 함수가 만든다 (P14)
+[5/6] 미커밋 상태로 push → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+         BLOCKED: 작업트리가 깨끗하지 않다 — 미커밋/미추적 변경이 있는 상태의 push (P15)
+[6/6] 가짜 외부효과 모듈 → BLOCKED (훅ON=1 · 훅OFF=0) ✓ 훅이 원인
+         BLOCKED: 외부 효과를 표방하는데 네트워크 호출이 0건 — src/portal-login.js. 시뮬레이션 의심 (P4)
+
+OK: 원본 저장소 무변경 확인 (29d358c344b3eb2e2c314b33855c71462b907f72)
+
+PASS: 위반 6 종이 전부 차단됨 (각 건 훅 OFF 대조 통과)
+OK(run-acceptance): scripts/acceptance-0-7.sh — 판정 1건

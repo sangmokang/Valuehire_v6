@@ -82,6 +82,10 @@ Git 디렉터리 비교는 실제 경로로 정규화합니다. 기본 worktree�
 | 실제 pre-push 첫 실행 | mktemp clone·bare에서 `git push --dry-run <bare> HEAD:refs/heads/task/issue84-commit-guards-20260915` | 23:57:03~00:00 | 1 | 전체 출력: `docs/engineering/issue84-prepush-output-2026-09-15.txt`; 신규 인수는 ok, hs-a4·silent-failure-lint-mutations는 BLOCKED. 전체 원명령 FAIL | 352b72f | FAIL(복구 필요) |
 | 하위 실패 원인 재현 | 352b72f의 임시 clone에서 두 원 인수 명령 | 00:03 | 각 1 | 전체 출력: `issue84-hs-a4-prefixed-fail-output-2026-09-16.txt`, `issue84-silent-lint-prefixed-fail-output-2026-09-16.txt` | 352b72f | REPRODUCED |
 | 하위 원명령 수정 후 재실행 | `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-a4.sh`; `... scripts/acceptance-silent-failure-lint-mutations.sh` | 00:02~00:04 | 각 0 | 전체 출력: `issue84-hs-a4-diagnosis-output-2026-09-16.txt`(33건), `issue84-silent-lint-diagnosis-output-2026-09-16.txt`(34건) | 352b72f+미커밋 수정 | PASS(하위만) |
+| fixture 복구 후 최종 AC | `bash scripts/verify/run-acceptance.sh scripts/acceptance-commit-worktree-guards.sh` | 2026-09-16 00:06:24~00:06:32 | 0 | 전체 출력: `issue84-final-ac-after-fixture-repair-output-2026-09-16.txt`; A exit 1/main stderr/HEAD 불변, 허용 exit 0/HEAD 전진, B exit 1/primary stderr/HEAD 불변, 대조군 각 exit 0, fixture 4·실행 사례 5·CHECKED 5 | 5a67dfb | PASS |
+| 기존 훅 회귀 재실행 | `bash scripts/verify/run-acceptance.sh scripts/acceptance-0-7.sh` | 2026-09-16 00:06~00:17 | 0 | 전체 출력: `issue84-existing-hook-final-output-2026-09-16.txt`; 6/6 종전 사유 차단, 훅 OFF 각 허용 | 5a67dfb | PASS |
+| 실제 pre-push 재실행 | mktemp clone·bare에서 `git push --dry-run <bare> HEAD:refs/heads/task/issue84-commit-guards-20260915` | 2026-09-16 00:06:46 | 0 | 전체 출력: `issue84-prepush-final-output-2026-09-16.txt`; 28개 인수 및 `verify.sh` ok, 전송은 dry-run | 5a67dfb | PASS |
+| 셸 문법 | `git ls-files -z '*.sh' hooks/pre-commit hooks/pre-push`의 각 파일에 `bash -n` | 2026-09-16 00:20 | 0 | 전체 출력: `issue84-shell_syntax-output-2026-09-16.txt`; 53/53, 실패 0 | 5a67dfb+증거 파일 | PASS |
 
 첫 병렬 검증에서 기존 훅 0-7, semantic mutations, mechanism registry의 원본 상태
 비교가 새 증거 파일 생성과 충돌해 각각 FAIL했습니다. 출력은 각 기존 로그의 첫
@@ -94,9 +98,15 @@ pre-push 하위 실패의 원인은 두 가지입니다. 새 훅이 초기 커�
 끝났습니다. P3의 기본 clone은 HEAD가 task/*라 위치 정책이 먼저 차단했습니다.
 훅은 `git symbolic-ref -q HEAD`로 unborn 참조를 읽게 수정했고, 기존 fixture는
 P21용 비개발 참조와 P3용 실제 분리 task worktree로 옮겼습니다. 두 검사 모두
-원래 크기/경로·index blob 판정을 다시 확인했습니다. **전체 pre-push는 아직
-재실행 전이므로 PASS가 아닙니다.**
+원래 크기/경로·index blob 판정을 다시 확인했습니다. **첫 전체 pre-push는
+FAIL이었고, 그 원명령을 고친 HEAD에서 재실행한 출력만 PASS입니다.**
 
 ## 적대 검증 로그
 
 V1/V2 실행 신원·명령·전체 출력·판정 비교를 여기에 덧붙입니다. 미실행을 PASS로 적지 않습니다.
+
+- V1 Claude 호출: 세션 `56535434-d51b-4f6a-85bb-99817b97c99b`, 2026-09-16 00:12:49 KST, 소스 `5a67dfb7c6298bd3467d9179a211f4f6cf730fc1`, 독립 임시 clone `7b01b6b79efbcf60c2a795f973605ef35dd1eda7`. 명령·종료값 1은 `issue84-v1-call-metadata-2026-09-16.txt`, 전체 stdout 원문은 `issue84-v1-raw-output-2026-09-16.txt` (`Credit balance is too low`), stderr는 0바이트였습니다. 프롬프트 `issue84-v1-review-prompt-2026-09-16.md` SHA256 `3644b132152d8d08706842905eeccd96e6054dab53b94752b3c1c449fe899f53`; stdout SHA256 `2d261f78bd528eea493c197ee3fd6b424be3251d4e557faa3c1da9f86e0678a9`. 외부 검증은 판정 전에 권한 밖 크레딧 부족으로 중단돼 **V1 BLOCKED**, 합격 근거가 아닙니다. 로컬 재사용 기록은 `.omx/artifacts/claude-issue84-v1-20260916.md`입니다.
+- Gemini 대체 확인: 2026-09-16 00:17:14 KST `command -v gemini` 종료값 1·출력 빈 값(`issue84-gemini-cli-check-metadata-2026-09-16.txt`); 이전 `gemini --version`은 종료값 127로 command not found, `omx ask gemini --help`도 실행 경로가 없어 종료값 1이었습니다. 실제 Gemini 프롬프트 전송·판정은 없습니다. `.omx/artifacts/gemini-issue84-v1-fallback-20260916.md`에 대체 경로 확인을 보존했습니다.
+- 로컬 Ollama의 독립 `qwen2.5:14b` 엔진으로 V1 대체를 두 번 시도했습니다. 공식 API의 `POST /api/generate`, `stream=false`를 사용했고 모델·시각·출력 전체·SHA256은 `issue84-v1-qwen-call-metadata-2026-09-16.txt`, 두 원문 프롬프트·API JSON·답변 파일에 보존했습니다. 첫 응답은 정본 요약뿐이며 실제 반례가 0개였습니다. `num_ctx=8192`의 좁은 재요청 응답은 `git worktree add ...; git symbolic-ref ...; git commit --allow-empty`를 제안했으나 staged change가 없고 `mktemp`, Git 환경변수 제거, 실제 훅 설치도 없어 T 계약의 유효한 시험이 아닙니다. 원본 밖 경로에서 실행될 수 있어 그대로 실행하지 않았습니다. API 호출은 각각 종료값 0이지만 **유효 V1 판정 0건**으로 남깁니다. 이 독립 엔진 응답을 자기 시험의 PASS로 바꾸지 않습니다.
+- V2는 재공격할 V1 판정 원문이 없어 **NOT_RUN**입니다. Codex 내부 fresh-context 검토는 추가 보조 검증일 뿐 V1/V2의 대체 PASS가 아닙니다. G/V1/V2 합치 판정과 이슈 완료 선언은 금지합니다.
+- Codex native `verifier`의 읽기 전용 보조 감사(2026-09-16 00:14~00:24 KST)는 `PARTIAL`입니다. 깨끗한 임시 clone에서 AC 5건, 빈 검사 exit 1, 비밀 scan, P3 34건, HS-A4 33건, semantic mutations 30 대상, CI-step integrity 24건, 실제 dry-run pre-push 28건을 독립 명령으로 재현했고, policy 본문 `hooks/pre-commit:23-47`과 정본 `git-workflow.md:21-27`·`hook-contracts.md:19-22,39-41` 일치를 확인했습니다. 감사 시점의 라이브 작업 공간은 이 증거 문서와 주석 수정 때문에 미커밋 상태였으므로 현재 checkout의 pre-push는 exit 1로 끝났습니다. 이는 로컬 증거 커밋 후 새 HEAD에서 재실행해 해소하며, 외부 V1 판정이나 원격 보호 확인으로 계산하지 않습니다.

@@ -1,0 +1,6 @@
+SESSION_ID: 56535434-d51b-4f6a-85bb-99817b97c99b
+SOURCE_SHA: 5a67dfb7c6298bd3467d9179a211f4f6cf730fc1
+REVIEW_CLONE_SHA: 7b01b6b79efbcf60c2a795f973605ef35dd1eda7
+TIME: 2026-09-16 00:12:49 KST
+COMMAND: claude -p --safe-mode --permission-mode bypassPermissions --tools Read,Bash --output-format text --session-id <uuid> < issue84-v1-review-prompt
+EXIT: 1
