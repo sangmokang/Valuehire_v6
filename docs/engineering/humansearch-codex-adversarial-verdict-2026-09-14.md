@@ -460,3 +460,100 @@ F83-1 declared [제목: 대졸 필수]: PASSED_THROUGH in body=True
 F83-3 revenue='경력 5년 이상': PASSED_THROUGH | line in body: True
 ```
 → Codex 의 F83-1 선언 우회 4건과 F83-3 CompanyBrief 주입 1건을 독립 스크립트로 재현했다(REPRODUCED). F83-2 디렉터리 분리는 코드 경로(`packet.py:303` 잠금 경로가 호출자 dir 종속, `cli.py:162-180` 별도 packet_path)로 확인. V1 과장 0건.
+
+## 재검토 2026-09-15 — PR #96 3차 GREEN(be20d9b) Codex V1
+
+실행 11:41:34~11:52:02, verdict needs-attention. **F96-2 해결**, 디렉터리 close 은폐 해결, 자식 fstat 시험 해결. 남은 high 1건: 게시 확인 직후 최종 이름 교체 시 영수증이 원문 A 해시 + 교체 파일 B 식별값이 됨(임시 FD fstat 값을 _publish 에 안 넘김) + "식별값으로 재조회" 주장에 소비자 없음. 4차 지시(11:54).
+
+```text
+# Codex Adversarial Review
+
+Target: branch diff against origin/main
+Verdict: needs-attention
+
+VERDICT: FAIL
+
+결론
+이 변경은 아직 합치면 안 됩니다. 저장했다고 돌려준 결과가 실제로 저장한 내용이 아닌 교체된 파일을 가리킬 수 있고, 나중에 그 파일을 다시 찾는 방법도 제공하지 않습니다.
+
+판정 전 제한
+- 건너뜀: 실제 `hsrunner` 계정 실증과 원격 CI는 범위·환경상 실행하지 못했습니다.
+- 미확인: `origin/main=fc6beed`는 로컬 추적 참조이며 원격 최신성은 네트워크 제한으로 확인하지 못했습니다.
+- 실패 후 재시도: 표적 pytest는 쓰기 가능한 임시 디렉터리가 없어 수집 전에 exit 1이었습니다. 같은 제한에서 무의미한 재시도 대신 `--collect-only`, ruff, mypy, diff 검사와 메모리 기반 반례로 전환했습니다.
+- 추정: 최종 이름 교체 경쟁은 실제 파일시스템으로 실행하지 못했지만, 해당 시점의 메서드 반환값을 교체해 같은 제어 흐름을 재현했습니다.
+
+판단 근거
+- 선택: `REQUEST_CHANGES`에 해당합니다. 페이로드(payload, 저장 요청의 원문 바이트)의 식별값을 버린 뒤 변경 가능한 최종 이름에서 식별값을 다시 읽어 성공 처리합니다.
+- 버린 해석: 디바이스(device, 파일시스템 장치 번호)와 아이노드(inode, 파일시스템 내부 객체 번호) 쌍만 있으면 경로 없이 파일을 다시 열 수 있다는 해석을 버렸습니다. 현재 플랫폼에는 그 쌍을 받아 여는 API가 없고 저장소에도 소비자가 없습니다.
+- 틀리면 깨지는 것: 영수증의 해시는 원문 A, 경로와 식별값은 교체 파일 B가 되어 독립 재조회·감사·삭제가 잘못된 파일을 대상으로 할 수 있습니다.
+
+2차 잔여 3건 최종 상태
+| 항목 | 상태 | 근거 |
+|---|---|---|
+| high: 불일치 되돌리기·낡은 영수증 경로 | 부분 | 최종·임시 이름 정리와 실패 승격은 해결됐으나, 식별값이 작성 원문에 묶이지 않고 경로 없는 재조회 소비자가 없습니다. |
+| medium: 디렉터리 FD close 실패가 WRITTEN 뒤에 숨음 | 해결 | 파일 디스크립터(FD, 열린 파일·디렉터리를 가리키는 운영체제 손잡이)인 부모·루트 닫기 실패를 `DENIED/recovery_required`로 바꾸고 path·device·inode를 보존합니다. |
+| medium: 자식 fstat 시험이 호출 횟수 기반 | 해결 | fstat(열린 손잡이의 파일 정보를 읽는 호출) 실패 대상이 `sub`를 열어 받은 FD 집합으로 고정됐습니다. |
+→ 해석: 첫 항목의 두 하위 문제 중 정리만 닫혔으므로 전체 판정은 부분 해결입니다.
+
+원래 ID 최종 상태
+| ID | 상태 | 근거 |
+|---|---|---|
+| F96-1 | 부분 | 루트·조상 치환에 따른 보호 밖 쓰기는 FD 사슬로 막았지만, 게시 뒤 이동된 파일을 영수증만으로 다시 찾는 계약은 닫히지 않았습니다. |
+| F96-2 | 해결 | 중단 쓰기와 정리 실패는 최종 성공으로 접히지 않으며, 삭제 실패는 `recovery_required`가 됩니다. |
+→ 해석: F96-1의 쓰기 경계는 좋아졌지만 재조회까지 포함한 증거 사슬은 미완성입니다.
+
+새 시험 6건 평가
+| 시험 | 평가 |
+|---|---|
+| 불일치 시 두 이름 제거 | 코드와 단언이 최종·임시 잔여 0건을 확인합니다. |
+| 불일치 정리 실패 | 임시 이름 삭제 실패를 주입해 `recovery_required`를 확인합니다. 최종 삭제 실패는 시험하지 않지만 코드가 두 삭제를 모두 호출함을 별도 반례로 확인했습니다. |
+| 성공 영수증 device/inode | 정상 시점 일치만 확인하며 게시 이름 교체 경쟁은 잡지 못합니다. |
+| 늦은 루트 이동 뒤 식별값 탐색 | fixture가 알고 있는 `holder/moved`를 직접 순회합니다. 제품 소비자가 영수증만으로 같은 탐색을 할 수 있다는 증거가 아닙니다. |
+| 부모 FD close 실패 | `os.close`를 부르기 전에 EIO를 발생시킵니다. 올바른 고장 주입입니다. |
+| 루트 FD close 실패 | `os.close`를 부르기 전에 EIO를 발생시킵니다. 올바른 고장 주입입니다. |
+→ 해석: close 관련 두 시험은 실제 close 이전 고장을 검증하지만, 식별값 관련 두 시험은 핵심 재조회·교체 경쟁을 증명하지 못합니다.
+
+`_open_root_chain`과 `_ensure_parent` 중간 close 실패는 별도 신규 시험이 없습니다. 다만 메모리 주입에서 각각 `denied/protected_root_ancestor_invalid`, `denied/parent_directory_invalid`로 성공 전에 차단됐습니다.
+
+크기 한도
+| 대상 | 실측 | 판정 |
+|---|---:|---|
+| `runner_boundary.py` | 445줄 | soft 300 초과, hard 600 이내 |
+| 최장 함수 `_ensure_parent` | 37줄 | hard 100 이내 |
+| origin/main 대비 전체 diff | +2536/-3, 합계 2539줄 | PR hard 3000 이내 |
+→ 해석: 크기 hard 한도 위반은 없습니다.
+
+증거 원문
+- 표적 pytest: `FileNotFoundError: No usable temporary directory found ...`, exit 1.
+→ 해석: 코드 실패가 아니라 실행 환경 제한이므로 런타임 PASS로 인정하지 않았습니다.
+- 대체 검증: `12 tests collected`, `All checks passed!`, `Success: no issues found in 3 source files`, diff-check 출력 없음, exit 0.
+→ 해석: 시험 수집·ruff·mypy·공백 검사는 통과했지만 파일 동작 시험을 대신하지 않습니다.
+- 반증 성공: `UNDO_ONE_FAIL denied recovery_required ['final', '.abc.tmp']`.
+→ 해석: 최종 삭제가 실패해도 임시 삭제를 시도하고 복구 필요 상태로 반환합니다.
+- 반증 성공: `OPEN_CHAIN_CLOSE_FAIL denied protected_root_ancestor_invalid`, `ENSURE_PARENT_CLOSE_FAIL denied parent_directory_invalid`.
+→ 해석: 중간 디렉터리 close 실패는 쓰기 성공으로 진행되지 않습니다.
+- 결함 재현: `IDENTITY_SWAP written sha-of-payload-A 99 123`.
+→ 해석: 작성 원문의 식별값을 대조하지 않아 임의의 최종 이름 식별값과 원문 A의 해시를 함께 성공 영수증으로 만들 수 있습니다.
+- 검토 전후 HEAD `be20d9b108e7c3463f78d9705d31b6ee50adaaa2`, 추적 작업트리 변경 0건입니다.
+
+Findings:
+- [high] [원문 high — 부분 해결] 성공 영수증이 작성한 원문이 아닌 교체 파일을 가리킬 수 있으며 식별값만으로 재조회할 수 없습니다 (humansearch/src/humansearch/runner_boundary.py:291-356)
+  원인: `runner_boundary.py:291-299 — 임시 파일 검증 역할`에서 `_fill_temp_file`이 얻은 원문 파일의 stat 결과를 검사한 뒤 `_publish`에 전달하지 않습니다. `runner_boundary.py:346-356 — 게시 확인과 영수증 생성 역할`은 변경 가능한 최종 이름을 다시 stat하여 그 식별값을 원문 해시와 결합합니다. 같은 runner UID의 동시 실행이 `_published_path_matches` 직후 최종 이름을 교체하면, 영수증은 원문 A의 sha256과 교체 파일 B의 device/inode를 `WRITTEN`으로 반환할 수 있습니다. 이는 코드 흐름과 메모리 주입 결과에 기반한 추론입니다.
+
+또한 `BoundaryReceipt`의 설명은 식별값이 경로를 대신한다고 주장하지만, 저장소 검색상 이를 소비하는 재조회 함수는 없고 시험은 fixture가 미리 아는 이동 경로를 순회합니다. device/inode는 후보 경로를 연 뒤 동일성을 확인하는 값이지, 현재 지원 플랫폼에서 그 자체로 파일을 여는 위치 정보가 아닙니다.
+
+사업 영향: 독립 재조회가 다른 파일을 정상 원문으로 승인하거나, 감사·복구·삭제가 잘못된 파일을 대상으로 삼을 수 있습니다. 저장 성공 장부와 실제 후보 원문이 분리되는 데이터 무결성 결함입니다.
+
+무엇을 — 영수증 식별값을 작성한 임시 파일의 열린 FD에서 얻은 식별값에 직접 묶고 실제 재조회 소비 경계를 추가해야 합니다.
+왜 — 변경 가능한 최종 이름을 다시 읽는 것만으로는 원문과 영수증의 동일성을 증명하지 못합니다.
+버린 길 — device/inode만 저장하고 소비자가 전체 디렉터리를 탐색하게 하는 길은 이동 위치를 알아야 하며 inode 재사용도 막지 못해 버립니다.
+대가 — 임시 FD를 게시·검증까지 유지하거나, 경로를 locator로 사용하되 device/inode와 sha256을 검증값으로 쓰는 별도 readback API가 필요합니다.
+되돌리기 — 소비 계약이 준비되지 않으면 ‘경로 대신 식별값’ 주장을 되돌리고 늦은 이동 상황을 성공으로 보고하지 않아야 합니다.
+  Recommendation: `stored`의 `(st_dev, st_ino)`를 `_publish`에 전달하고 게시된 최종 항목이 그 값과 일치하는지 비교하십시오. `_published_path_matches` 반환 직후 최종 이름을 다른 0600 일반 파일로 교체하는 시험을 추가해 `WRITTEN`을 금지하십시오. 이어서 pinned root/parent FD로 경로를 열고 device/inode와 sha256을 함께 검증하는 실제 readback API를 제공하거나, 이동 후 경로 없이 찾을 수 있다는 계약을 제거하십시오.
+
+Next steps:
+- 이 finding이 닫히기 전에는 병합하지 마십시오.
+- 쓰기 가능한 임시 디렉터리 환경에서 표적 pytest 전체를 다시 실행하고 종료값 0을 확보하십시오.
+- `_open_root_chain`과 `_ensure_parent`의 중간 FD close-before-close 고장을 각각 직접 고정하는 회귀 시험을 추가하십시오.
+- 원격 origin/main 최신성, PR CI, 실제 hsrunner UID 경계는 별도 증거로 확인하십시오.
+```
