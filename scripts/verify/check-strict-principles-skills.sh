@@ -26,6 +26,10 @@ fi
 ruby - "$CODEX_SKILL" "$CLAUDE_SKILL" <<'RUBY'
 codex_file, claude_file = ARGV
 errors = []
+principles = File.read("docs/sot/coding-principles.md")
+p11 = principles.lines.find { |line| line.start_with?("| **P11**") }
+hard_limit = p11&.match(/hard (\d+) LOC/)&.captures&.first
+errors << "P11_HARD_LIMIT_MISSING" unless hard_limit
 start_marker = "<!-- STRICT_PRINCIPLES_CONTRACT:START -->"
 end_marker = "<!-- STRICT_PRINCIPLES_CONTRACT:END -->"
 
@@ -71,7 +75,7 @@ errors << "CLAUDE_ENGINE_ORDER_INVALID" unless claude.include?(claude_order)
 
 { codex_file => codex, claude_file => claude }.each do |path, text|
   lines = text.lines.length
-  errors << "LINE_LIMIT_EXCEEDED: #{path}=#{lines}" if lines > 500
+  errors << "LINE_LIMIT_EXCEEDED: #{path}=#{lines}" if hard_limit && lines > hard_limit.to_i
 end
 
 if errors.empty?

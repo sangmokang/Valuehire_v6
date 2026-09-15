@@ -1,24 +1,11 @@
 #!/usr/bin/env bash
-# acceptance-hs-0302.sh — 후보 식별키가 중복 없이 기록되는가 (HS-03.02 AC-1~4)
-#
-# 계약: docs/engineering/humansearch-hs-0302-candidate-identity-goal-2026-09-15.md
-#   EARS : When 같은 (position_ref, channel, candidate_ref) 를 두 번(또는 두 연결이
-#          동시에) 기록하면, then 행은 하나만 남아야 한다.
-#   출력 : exit 0 = PASS | exit 1 = FAIL | exit 2 = NOT_RUN
-#   stdout: 항목마다 PASS:/FAIL:/NOT_RUN: 을 전부 출력하고, 마지막 줄에 `CHECKED: <검사 수>`
-#   불변식: 0건 검사는 통과가 아니다 (P20)
-#
-# 무엇을 막는가 / 막지 못하는가:
-#   막는다   — 기록 시험 파일 삭제·축소, 기본키 충돌 판별을 지우고 모든 IntegrityError 를
+# acceptance-hs-0302.sh — 후보 식별키 중복·승인 DB 경계 (HS-03.02)
 set -uo pipefail
-
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY \
       GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_PREFIX GIT_QUARANTINE_PATH
-
 HS0302_NESTED="${HS0302_ACCEPTANCE_DEPTH:-0}"
 export HS0302_ACCEPTANCE_DEPTH=$((HS0302_NESTED + 1))
 SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
-
 GREP=/usr/bin/grep
 if [ ! -x "$GREP" ]; then
   echo "NOT_RUN: $GREP 없음 — PATH 의 grep 이 ugrep 으로 가려질 수 있어 절대경로만 쓴다"
@@ -35,16 +22,13 @@ if printf 'alpha\n' | "$GREP" -q 'beta'; then
   echo "CHECKED: 0"
   exit 2
 fi
-
 REPO=$(git rev-parse --show-toplevel 2>/dev/null) || {
   echo "NOT_RUN: git 저장소가 아니다"
   echo "CHECKED: 0"
   exit 2
 }
 cd "$REPO" || { echo "NOT_RUN: 저장소 이동 실패"; echo "CHECKED: 0"; exit 2; }
-
 SNAP0=$(git status --porcelain)
-
 MODULE=humansearch/src/humansearch/candidate_identity.py
 TESTS=humansearch/tests/test_hs_0302_candidate_identity.py
 TESTS_R2=humansearch/tests/test_hs_0302_r2_hardening.py
@@ -66,10 +50,8 @@ MIN_R3_TESTS=6
 MIN_R4_TESTS=7
 MIN_R5_TESTS=2
 EXPECTED_REQUIRED_IDS=113
-
 WORK=$(mktemp -d) || { echo "NOT_RUN: mktemp 실패"; echo "CHECKED: 0"; exit 2; }
 trap 'rm -rf "$WORK"' EXIT
-
 fail=0
 checked=0
 pass_item() { echo "PASS: $1"; checked=$((checked + 1)); }
@@ -94,9 +76,7 @@ assert_fail_closed() {
     tail -12 "$log"
   fi
 }
-
 abort_not_run() { echo "NOT_RUN: $1"; echo "CHECKED: $checked"; exit 2; }
-
 for required in "$MODULE" "$TESTS" "$TESTS_R2" "$TESTS_R3" "$TESTS_R4" "$TESTS_R5" "$WORKFLOW" "$SOT_ROSTER" \
                 "$REQUIRED_TESTS" "$WIRING_CHECKER" "$SCHEMA"; do
   if [ ! -f "$required" ]; then
@@ -142,20 +122,17 @@ if [ "$test_count" -ge "$MIN_TESTS" ] && [ "$r2_count" -ge "$MIN_R2_TESTS" ] \
 else
   fail_item "시험 함수 부족 — 1차 ${test_count}(>=${MIN_TESTS}) · 2차 ${r2_count}(>=${MIN_R2_TESTS}) · 3차 ${r3_count}(>=${MIN_R3_TESTS}) · 4차 ${r4_count}(>=${MIN_R4_TESTS}) · 5차 ${r5_count}(>=${MIN_R5_TESTS})"
 fi
-
 if "$GREP" -q 'ThreadPoolExecutor' "$TESTS" && "$GREP" -q 'threading.Barrier' "$TESTS"; then
   pass_item "AC-3 경쟁 시험이 ThreadPoolExecutor + Barrier 로 두 워커를 동시에 띄운다"
 else
   fail_item "AC-3 경쟁 시험에 동시성 장치가 없다 — 순차 호출은 경쟁을 판정하지 못한다"
 fi
-
 # ── 2. 기본키 충돌만 duplicate 로 접는가 (양성) ──────────────────────────────
 if pk_guard_present "$MODULE"; then
   pass_item "기본키 충돌만 duplicate 로 번역한다 (sqlite_errorname 비교 존재)"
 else
   fail_item "IntegrityError 를 무조건 duplicate 로 접는다 — 다른 무결성 오류가 둔갑한다"
 fi
-
 # ── 3. 탐지기 음성 대조군: 가드를 지운 사본은 반드시 잡혀야 한다 ─────────────
 sed 's/^\( *\)if exc.sqlite_errorname == _PRIMARY_KEY_CONSTRAINT:/\1if True:/' \
   "$MODULE" > "$WORK/module_no_guard.py"
@@ -257,13 +234,11 @@ else
   fail_item "HMAC 의미 probe — 종료값 ${probe_rc}, OK=${probe_ok:-0}, BAD=${probe_bad:-0}"
   "$GREP" '^PROBE_BAD:' "$WORK/probe.log" || tail -20 "$WORK/probe.log"
 fi
-
 if [ "${probe_ok:-0}" -ge 10 ]; then
   pass_item "HMAC 의미 probe 가 판정한 항목 ${probe_ok}건 (>= 10)"
 else
   fail_item "HMAC 의미 probe 판정 ${probe_ok:-0}건 — 검사 대상이 사라졌다"
 fi
-
 # ── 6. #97 마이그레이션을 건드리지 않았는가 ─────────────────────────────────
 if git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
   git diff --unified=0 "$BASE_SHA" -- "$SCHEMA" > "$WORK/schema.diff"
@@ -278,7 +253,6 @@ if git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
 else
   abort_not_run "기준 커밋 ${BASE_SHA} 를 찾을 수 없다 — 마이그레이션 동일성을 대조하지 못한 채로는 합격시키지 않는다"
 fi
-
 # ── 7. hs_candidates 를 우회하는 새 표가 src 에 없는가 ───────────────────────
 "$GREP" -rniE '^[[:space:]]*create[[:space:]]+table' humansearch/src --include='*.py' \
   > "$WORK/create_table.txt"
@@ -293,7 +267,6 @@ else
     fail_item "storage_schema.py 밖에서 create table ${stray}건 — hs_candidates 우회 표가 생겼다"
   fi
 fi
-
 # ── 8. 시험을 실제로 돌린다 (문자열 검사만으로는 동작을 판정하지 못한다) ─────
 if [ "$HS0302_NESTED" -ge 1 ]; then
   echo "NOT_RUN: 중첩 실행(depth=${HS0302_NESTED}) — 시험 단계를 돌리면 무한 재귀가 된다"
@@ -323,7 +296,6 @@ else
     fail_item "pytest 수집 ${selected:-0}건 — 함수 ${total_tests}개보다 적다 (시험이 사라졌다)"
   fi
 fi
-
 pytest_log="$WORK/pytest.log"
 ( cd humansearch && uv run pytest $TEST_FILES $PYTEST_EXTRA -q ) > "$pytest_log" 2>&1
 pytest_rc=$?
@@ -339,14 +311,12 @@ else
   fail_item "pytest 실제 실행 — 종료값 ${pytest_rc}, 수집 ${selected:-0}, 요약 '${run_line}'"
   tail -20 "$pytest_log"
 fi
-
 # ── fail-closed 자기 검사 ──────────────────────────────────────────────────
 sed 's/^BASE_SHA=.*/BASE_SHA=0000000000000000000000000000000000000000/' "$SELF" \
   > "$WORK/failclosed_probe.sh"
 HS0302_ACCEPTANCE_DEPTH=9 bash "$WORK/failclosed_probe.sh" > "$WORK/failclosed.log" 2>&1
 assert_fail_closed "$WORK/failclosed.log" "$?" '기준 커밋' \
   "fail-closed 자기 검사 ① 기준 SHA 를 지운 사본이 그 자리에서 끝난다"
-
 cat > "$WORK/fake-grep" <<'FAKEGREP'
 for arg in "$@"; do
   case "$arg" in
@@ -360,7 +330,6 @@ sed "s|^GREP=/usr/bin/grep\$|GREP=$WORK/fake-grep|" "$SELF" > "$WORK/failclosed_
 HS0302_ACCEPTANCE_DEPTH=9 bash "$WORK/failclosed_scan_probe.sh" > "$WORK/failclosed_scan.log" 2>&1
 assert_fail_closed "$WORK/failclosed_scan.log" "$?" 'create table 스캔' \
   "fail-closed 자기 검사 ② 우회 표 스캔이 깨진 사본이 그 자리에서 끝난다"
-
 # ── 건너뛰기 보조 부재 · 즉시 종료 · 차단 분리 (정적) ──────────────────────
 N_SKIP=$(printf 'skip%s' '_item')
 N_EXIT=$(printf 'exit%s' ' 2')
@@ -376,7 +345,6 @@ if [ "$guard_shape" -eq 0 ]; then
 else
   fail_item "건너뛰기 보조가 있거나, 즉시 종료·중첩 차단이 없거나, 차단이 보조를 거친다"
 fi
-
 needle_ok=1
 for needle in "$N_SKIP" "$N_EXIT" "$N_DEPTH" "$N_ROUTED"; do
   [ -n "$needle" ] || needle_ok=0
@@ -389,7 +357,6 @@ if [ "$needle_ok" -eq 1 ]; then
 else
   fail_item "탐지기 needle 조립이 깨졌다 — 위 정적 검사가 무의미해진다"
 fi
-
 # ── fail-closed 판정기 자신의 음성 대조군 ──────────────────────────────────
 sed -e 's/^BASE_SHA=.*/BASE_SHA=0000000000000000000000000000000000000000/' \
     -e 's|^abort_not_run() .*|abort_not_run() { echo "NOT_RUN: $1"; checked=$((checked + 1)); }|' \
@@ -402,20 +369,17 @@ if fail_closed_ok "$WORK/failopen.log" "$fo_rc" '기준 커밋'; then
 else
   pass_item "fail-closed 판정기 음성 대조군 — 같은 기준으로 fail-open 사본은 불합격한다"
 fi
-
 # ── CI 배선 (정본 53행) ────────────────────────────────────────────────────
 if "$GREP" -qF "$ACCEPTANCE_RUN" "$WORKFLOW"; then
   pass_item "CI 고정 목록에 전용 스텝이 있다 ($WORKFLOW)"
 else
   fail_item "CI 고정 목록에 이 인수 검사가 없다 — 로컬에만 있는 검사는 없는 것으로 친다"
 fi
-
 if "$GREP" -q 'acceptance-hs-0302.sh' "$SOT_ROSTER"; then
   pass_item "검증 명부에 자기 줄이 있다 ($SOT_ROSTER)"
 else
   fail_item "검증 명부에 이 인수 검사가 없다 (정본 53행 위반)"
 fi
-
 if [ ! -f "$WIRING_CHECKER" ]; then
   abort_not_run "배선 검사기가 없다 — $WIRING_CHECKER"
 fi
@@ -427,7 +391,6 @@ else
   fail_item "CI 스텝 run 계약 위반 (종료값 ${wiring_rc})"
   cat "$WORK/wiring.log"
 fi
-
 MUT_TAIL="$(printf '|%s' '|') $(printf 'tr%s' 'ue')"
 sed "s%^\( *\)run: ${ACCEPTANCE_RUN}\$%\1run: ${ACCEPTANCE_RUN} ${MUT_TAIL}%" "$WORKFLOW" \
   > "$WORK/workflow_mutated.yml"
@@ -442,7 +405,6 @@ else
     cat "$WORK/wiring_mutated.log"
   fi
 fi
-
 # ── 필수 시험 명부 대조 ────────────────────────────────────────────────────
 "$GREP" -vE '^[[:space:]]*(#|$)' "$REQUIRED_TESTS" | LC_ALL=C sort > "$WORK/required_ids.txt"
 required_n=$("$GREP" -c . "$WORK/required_ids.txt")
@@ -461,7 +423,6 @@ else
   head -5 "$WORK/ids_missing.txt"
   head -5 "$WORK/ids_extra.txt"
 fi
-
 # ── 시험이 humansearch/ 밖으로 손을 뻗지 않는가 ────────────────────────────
 OUT_OF_TREE_RE=$(printf 'parents\\[2\\]|%s/|\\.github|docs/sot' 'scripts')
 "$GREP" -nE "$OUT_OF_TREE_RE" "$TESTS" "$TESTS_R2" "$TESTS_R3" "$TESTS_R4" "$TESTS_R5" \
@@ -477,7 +438,6 @@ else
   fail_item "시험이 humansearch/ 밖 경로를 참조한다 ${out_of_tree}건 — G2 게이트가 push 를 막는다"
   cat "$WORK/out_of_tree.txt"
 fi
-
 # ── 자기 오염 감지 ─────────────────────────────────────────────────────────
 SNAP1=$(git status --porcelain)
 if [ "$SNAP0" = "$SNAP1" ]; then
@@ -485,7 +445,6 @@ if [ "$SNAP0" = "$SNAP1" ]; then
 else
   fail_item "검사가 저장소 상태를 바꿨다 — 이 판정은 무효다"
 fi
-
 echo "CHECKED: $checked"
 if [ "$checked" -lt 1 ]; then
   echo "FAIL: 검사 대상 0개는 합격이 아니다"

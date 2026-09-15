@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Strict 원칙 계약의 정상 fixture, 14개 반례, 500/501 경계를 격리 사본에서 실행한다.
+# Strict 원칙 계약의 정상 fixture, 14개 반례, P11 경계를 격리 사본에서 실행한다.
 set -uo pipefail
 
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY \
@@ -281,35 +281,40 @@ mkdir -p "$CASE/.omx"
 printf '{"truncated":' > "$CASE/.omx/project-memory.json"
 expect_principles "C14-B" "메모리 파일 잘림, 현재 SOT 직접 로드" 0 PASS
 
-cp "$SKILL_TMP/codex.md" "$SKILL_TMP/codex-500.md"
-cp "$SKILL_TMP/claude.md" "$SKILL_TMP/claude-500.md"
-chmod u+w "$SKILL_TMP/codex-500.md" "$SKILL_TMP/claude-500.md"
-for file in "$SKILL_TMP/codex-500.md" "$SKILL_TMP/claude-500.md"; do
+hard_limit=$(ruby -ne 'if /^\| \*\*P11\*\*/ && /hard (\d+) LOC/; puts $1; exit; end' docs/sot/coding-principles.md)
+if [[ ! "$hard_limit" =~ ^[1-9][0-9]*$ ]]; then
+  echo 'FAIL: P11 hard LOC limit missing'
+  exit 1
+fi
+cp "$SKILL_TMP/codex.md" "$SKILL_TMP/codex-boundary.md"
+cp "$SKILL_TMP/claude.md" "$SKILL_TMP/claude-boundary.md"
+chmod u+w "$SKILL_TMP/codex-boundary.md" "$SKILL_TMP/claude-boundary.md"
+for file in "$SKILL_TMP/codex-boundary.md" "$SKILL_TMP/claude-boundary.md"; do
   lines=$(wc -l < "$file" | tr -d ' ')
-  while [ "$lines" -lt 500 ]; do
+  while [ "$lines" -lt "$hard_limit" ]; do
     printf '# boundary padding\n' >> "$file"
     lines=$((lines + 1))
   done
 done
 rc=0
-output=$(bash scripts/verify/check-strict-principles-skills.sh "$SKILL_TMP/codex-500.md" "$SKILL_TMP/claude-500.md" 2>&1) || rc=$?
+output=$(bash scripts/verify/check-strict-principles-skills.sh "$SKILL_TMP/codex-boundary.md" "$SKILL_TMP/claude-boundary.md" 2>&1) || rc=$?
 checked=$((checked + 1))
 if [ "$rc" -eq 0 ]; then
-  echo "PASS: BOUNDARY-500 직접 작성 코드 500줄 — PASS"
+  echo "PASS: BOUNDARY-$hard_limit 직접 작성 코드 ${hard_limit}줄 — PASS"
 else
-  printf 'FAIL: BOUNDARY-500 expected PASS exit=0 actual=%s\n%s\n' "$rc" "$output"
+  printf 'FAIL: BOUNDARY-%s expected PASS exit=0 actual=%s\n%s\n' "$hard_limit" "$rc" "$output"
   fail=1
 fi
 
-cp "$SKILL_TMP/codex-500.md" "$SKILL_TMP/codex-501.md"
-printf '# line 501\n' >> "$SKILL_TMP/codex-501.md"
+cp "$SKILL_TMP/codex-boundary.md" "$SKILL_TMP/codex-over-boundary.md"
+printf '# line %s\n' "$((hard_limit + 1))" >> "$SKILL_TMP/codex-over-boundary.md"
 rc=0
-output=$(bash scripts/verify/check-strict-principles-skills.sh "$SKILL_TMP/codex-501.md" "$SKILL_TMP/claude-500.md" 2>&1) || rc=$?
+output=$(bash scripts/verify/check-strict-principles-skills.sh "$SKILL_TMP/codex-over-boundary.md" "$SKILL_TMP/claude-boundary.md" 2>&1) || rc=$?
 checked=$((checked + 1))
 if [ "$rc" -eq 1 ] && printf '%s\n' "$output" | grep -q '^LINE_LIMIT_EXCEEDED:'; then
-  echo "PASS: BOUNDARY-501 직접 작성 코드 501줄 — FAIL"
+  echo "PASS: BOUNDARY-$((hard_limit + 1)) 직접 작성 코드 $((hard_limit + 1))줄 — FAIL"
 else
-  printf 'FAIL: BOUNDARY-501 expected FAIL exit=1 actual=%s\n%s\n' "$rc" "$output"
+  printf 'FAIL: BOUNDARY-%s expected FAIL exit=1 actual=%s\n%s\n' "$((hard_limit + 1))" "$rc" "$output"
   fail=1
 fi
 
