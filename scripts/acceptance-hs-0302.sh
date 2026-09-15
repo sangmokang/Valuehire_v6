@@ -240,15 +240,30 @@ else
   fail_item "HMAC 의미 probe 판정 ${probe_ok:-0}건 — 검사 대상이 사라졌다"
 fi
 # ── 6. #97 마이그레이션을 건드리지 않았는가 ─────────────────────────────────
+# 줄 단위 허용 목록이 아니라 마이그레이션 블록 자체(`_MIGRATIONS` 와 버전 상수)를 기준 커밋과
+# 대조한다. 초기화 결과·승인 장부처럼 스키마 밖 변경은 허용하고, 표·열·버전 변경만 잡는다.
+migration_block() {
+  awk '/^CURRENT_SCHEMA_VERSION|^SUPPORTED_MIGRATION_RANGE/{print}
+       /^_MIGRATIONS: tuple/{on=1} on{print} on && /^\)$/{on=0}' "$1"
+}
 if git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
-  git diff --unified=0 "$BASE_SHA" -- "$SCHEMA" > "$WORK/schema.diff"
-  "$GREP" -E '^[+-][^+-]' "$WORK/schema.diff" > "$WORK/schema.changes"
-  if diff -u <(printf '%s\n' '+    protected_root: Path' '+        protected_root=root,') \
-            "$WORK/schema.changes" > "$WORK/schema-only-root.diff"; then
-    pass_item "storage_schema.py 의 마이그레이션 불변 — 초기화 결과에 승인 root 두 줄만 추가"
+  git show "${BASE_SHA}:${SCHEMA}" > "$WORK/schema.base.py"
+  migration_block "$WORK/schema.base.py" > "$WORK/mig.base"
+  migration_block "$SCHEMA" > "$WORK/mig.head"
+  if [ -s "$WORK/mig.base" ] && "$GREP" -q 'create table hs_candidates' "$WORK/mig.base" \
+     && cmp -s "$WORK/mig.base" "$WORK/mig.head"; then
+    pass_item "storage_schema.py 의 마이그레이션 블록·버전 상수가 ${BASE_SHA} 와 같다"
   else
-    fail_item "storage_schema.py 가 ${BASE_SHA} 대비 승인 root 두 줄 외에 변경됐다 — 마이그레이션 무변경 계약 위반"
-    cat "$WORK/schema-only-root.diff"
+    fail_item "storage_schema.py 의 마이그레이션 블록이 ${BASE_SHA} 대비 바뀌었다 — 마이그레이션 무변경 계약 위반"
+    diff -u "$WORK/mig.base" "$WORK/mig.head" | head -20
+  fi
+  sed '/^_MIGRATIONS: tuple/,/^)$/ s/create table hs_candidates (/create table hs_candidates_v2 (/' \
+    "$SCHEMA" > "$WORK/schema.mutated.py"
+  migration_block "$WORK/schema.mutated.py" > "$WORK/mig.mutated"
+  if "$GREP" -q 'hs_candidates_v2' "$WORK/mig.mutated" && ! cmp -s "$WORK/mig.base" "$WORK/mig.mutated"; then
+    pass_item "마이그레이션 대조기 음성 대조군 — 표 이름을 바꾼 사본은 불일치로 잡힌다"
+  else
+    fail_item "마이그레이션 대조기가 표 이름을 바꾼 사본도 같다고 본다 — 대조기가 무의미하다"
   fi
 else
   abort_not_run "기준 커밋 ${BASE_SHA} 를 찾을 수 없다 — 마이그레이션 동일성을 대조하지 못한 채로는 합격시키지 않는다"
@@ -311,6 +326,44 @@ else
   fail_item "pytest 실제 실행 — 종료값 ${pytest_rc}, 수집 ${selected:-0}, 요약 '${run_line}'"
   tail -20 "$pytest_log"
 fi
+# ── 9. 약화 변이 — 승인 장부 대조·열린 연결 대조를 지운 사본은 전용 시험이 반드시 잡는다 ──
+# 격리 사본(src·tests 복사)에 sed 로 한 줄만 고장 내고 r5 시험을 돌린다. 잡히지 않으면
+# 그 검사는 존재만 하고 판정하지 않는 것이다(P13⑥). 사본을 실제로 읽었는지 module 경로로 확인한다.
+mutation_case() {
+  local label=$1 expr=$2 must_fail=$3 min_failed=$4 case_dir mutated loaded failed rc
+  case_dir=$(mktemp -d "$WORK/mutation.XXXXXX") || { fail_item "약화 변이 '${label}' — 사본 폴더 생성 실패"; return; }
+  cp humansearch/pyproject.toml "$case_dir/" && cp -R humansearch/src humansearch/tests "$case_dir/"
+  mutated="$case_dir/src/humansearch/candidate_identity.py"
+  sed "$expr" "$MODULE" > "$mutated"
+  if cmp -s "$MODULE" "$mutated"; then
+    fail_item "약화 변이 '${label}' — sed 앵커가 원본에 없어 변이가 적용되지 않았다"
+    return
+  fi
+  loaded=$(cd "$case_dir" && PYTHONPATH="$case_dir/src" uv run --frozen --project "$REPO/humansearch" \
+    python -c 'import humansearch.candidate_identity as m; print(m.__file__)' 2>/dev/null)
+  if [ "$loaded" != "$mutated" ]; then
+    fail_item "약화 변이 '${label}' — 사본이 아니라 '${loaded}' 를 읽었다 (시험이 대상을 안 본다)"
+    return
+  fi
+  ( cd "$case_dir" && PYTHONPATH="$case_dir/src" uv run --frozen --project "$REPO/humansearch" \
+      pytest -c pyproject.toml -p no:cacheprovider -q tests/test_hs_0302_r5_approved_root.py ) \
+    > "$case_dir/pytest.log" 2>&1
+  rc=$?
+  failed=$("$GREP" -cE "^FAILED .*::(${must_fail})" "$case_dir/pytest.log")
+  if [ "$rc" -ne 0 ] && [ "${failed:-0}" -ge "$min_failed" ] \
+     && ! "$GREP" -qE '^FAILED .*still_records' "$case_dir/pytest.log"; then
+    pass_item "약화 변이 '${label}' — 전용 시험 ${failed}건이 잡았다, 양성 대조군은 통과"
+  else
+    fail_item "약화 변이 '${label}' 생존 — 종료값 ${rc}, 잡힌 시험 ${failed:-0}건 (>= ${min_failed})"
+    tail -15 "$case_dir/pytest.log"
+  fi
+}
+mutation_case "승인 장부 대조 제거" \
+  's/^    if not _is_approved_db(db_path, approved_root):$/    if False:/' \
+  'test_(unapproved_private|self_approved_private|other_db_filename)' 3
+mutation_case "열린 연결 main 경로 대조 제거" \
+  's/^        if len(main_files) != 1 or Path(main_files\[0\]) != db_path:$/        if False:/' \
+  'test_connect_swap_back' 1
 # ── fail-closed 자기 검사 ──────────────────────────────────────────────────
 sed 's/^BASE_SHA=.*/BASE_SHA=0000000000000000000000000000000000000000/' "$SELF" \
   > "$WORK/failclosed_probe.sh"
