@@ -88,9 +88,20 @@ git config user.email "acceptance@local"
 git config user.name "acceptance"
 bash scripts/install-hooks.sh >/dev/null 2>&1 || { echo "FAIL: install-hooks.sh 실패"; exit 1; }
 
+# 이슈 #84: 기존 6종 staged 검사 시연은 task/* 개발 커밋이다. 기본 clone 에서
+# 시연하면 새 위치 정책이 먼저 막아 원래 검사 목적의 위양성이 된다. 실제 분리
+# task worktree를 만들어 그곳에서 기존 비밀·약화 정책을 계속 실증한다.
+git worktree add -q -b task/acceptance-0-7 "$sandbox/task-worktree" HEAD \
+  || { echo "FAIL: 분리 task worktree 생성 실패"; exit 1; }
+cd "$sandbox/task-worktree"
+bash scripts/install-hooks.sh >/dev/null 2>&1 \
+  || { echo "FAIL: 분리 task worktree의 훅 설치 실패"; exit 1; }
+
 hp=$(git config --get core.hooksPath) || hp=""
 [ "$hp" = "hooks" ] || { echo "FAIL: core.hooksPath='$hp' (기대 'hooks')"; exit 1; }
 [ -x hooks/pre-commit ] || { echo "FAIL: clone 에서 pre-commit 실행 권한 없음"; exit 1; }
+[ "$(git rev-parse --git-dir)" != "$(git rev-parse --git-common-dir)" ] \
+  || { echo "FAIL: 기존 검사 fixture가 분리 worktree가 아니다"; exit 1; }
 
 BASE=$(git rev-parse HEAD)
 echo "=== 시연 (샌드박스: $sandbox/repo · 각 시연마다 훅 ON/OFF 대조) ==="

@@ -7,12 +7,19 @@
 
 ### `hooks/pre-commit`
 ```
-입력  : stdin 없음. 스테이징된 파일 목록(git diff --cached --name-only --diff-filter=ACMR)
+입력  : stdin 없음. 현재 HEAD의 전체 참조, Git의 git-dir/common-dir,
+        스테이징된 파일 목록(git diff --cached --name-only --diff-filter=ACMR)
         ※ R(rename) 포함. 빼면 `git mv notes.txt leak.db` 가 목록에서 사라져 그대로 통과한다
 출력  : exit 0 (통과) | exit 1 (차단)
-        차단 시 stderr: "BLOCKED: <검사이름> — <파일경로> (패턴: <패턴이름>)"
+        위치 정책 차단 시 stderr: "BLOCKED: direct commit to main" 또는
+        "BLOCKED: development commit in primary worktree".
+        기존 staged 검사 차단 시 stderr: "BLOCKED: <검사이름> — <파일경로> (패턴: <패턴이름>)"
         ※ 매칭된 실제 값은 절대 출력하지 않는다
-검사  : ① 비밀 스캔(verify.sh 위임, VERIFY_SCAN_SOURCE=index) ② 검사기 자기 제외
+검사  : ⓪ HEAD=refs/heads/main의 직접 커밋 차단(모든 worktree);
+        HEAD=refs/heads/task/*이고 git-dir과 git-common-dir의 실제 경로가 같은
+        기본 worktree의 개발 커밋 차단. 분리 worktree의 task/*는 아래 기존 staged
+        검사 결과에 따라 허용. Git 경로 조회·정규화 오류는 차단한다.
+        ① 비밀 스캔(verify.sh 위임, VERIFY_SCAN_SOURCE=index) ② 검사기 자기 제외
         ③ 검사 약화 패턴 ④ 만료 없는/지난 억제 ⑤ LLM 출력→판정 수치 ⑥ 외부효과 모듈 네트워크 0건
         ⑦ 대용량 파일(1,048,576 바이트 초과) · 산출물 경로(artifacts/·data/·private-reviews/·
           *.db·*.sqlite·*.sqlite3) 차단 — P21. gitignore 가 `git add -f` 로 우회되므로
@@ -28,8 +35,12 @@
           계열 blob을 같은 커밋의
           `scripts/acceptance-silent-failure-lint.sh`로 검사한다. 작업트리 사본은 판정에
           사용하지 않는다. CI는 같은 린터와 mutation 회귀를 전체 추적 파일에 실행한다
-불변식: set -euo pipefail. 검사를 실행하지 못하면 exit 1 (fail-closed)
+불변식: set -euo pipefail. 검사를 실행하지 못하면 exit 1 (fail-closed).
+        위치 정책은 staged 파일이 0개여도 먼저 판정하며, 차단 시 HEAD를 바꾸지 않는다.
 제외  : 없음. 자기 자신(hooks/)도 검사 대상이다
+한계  : 표준 Git 로컬 훅은 git commit --no-verify 등으로 우회할 수 있다.
+        CI는 개발자 로컬의 기본 worktree 위치를 볼 수 없고 GitHub branch
+        protection·PR·CI가 최종 main 보호를 맡는다. 현재 원격 보호 설정은 미확인.
 ```
 
 ### `hooks/pre-push`

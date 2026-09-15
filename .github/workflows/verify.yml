@@ -144,6 +144,11 @@ jobs:
       - name: 인수 검사 0-7 (훅이 위반 6종을 실제로 차단하는가)
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-0-7.sh
 
+      - name: 인수 검사 issue84 커밋 위치 (main·기본 task 차단과 분리 task 허용)
+        # GitHub 러너는 개발자의 로컬 기본 worktree를 볼 수 없다. 설치된 실제 훅을
+        # mktemp 임시 저장소에서 git commit으로 실행해 로컬 정책의 동작을 검증한다.
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-commit-worktree-guards.sh
+
       - name: 인수 검사 0-5 (push · CI 연결)
         # origin/main==main 을 검사하므로 main 참조가 유효한 경우에만 의미가 있다.
         if: github.ref == 'refs/heads/main'

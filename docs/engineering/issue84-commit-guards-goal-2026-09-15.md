@@ -71,6 +71,8 @@ Git 디렉터리 비교는 실제 경로로 정규화합니다. 기본 worktree�
 | 원칙 장부 직접 로드 | `cat docs/sot/principles.yaml` | 23:40 | 0 | 전체 파일을 직접 읽음(34 IDs) | fc6beed | PASS |
 | 원칙 검사 | `bash scripts/acceptance-principles-check.sh` | 23:40 | 0 | `VERDICT: PASS` / `SOT_LOAD: PASS docs/sot/coding-principles.md` / `LEDGER_LOAD: PASS docs/sot/principles.yaml` / `MECHANISMS: PASS 34/34 strict-contract-bindings` / `WIRING: PASS pre-push=1 ci=1` / `CHECKED: 34` | fc6beed | PASS |
 | RED 실제 커밋 시험 | `bash scripts/verify/run-acceptance.sh scripts/acceptance-commit-worktree-guards.sh` | 23:44:55~23:45:06 | 1 | 전체 출력: `docs/engineering/issue84-commit-guards-red-output-2026-09-15.txt`; A/B는 exit 0·HEAD 전진, 허용은 exit 0·HEAD 전진, 5사례·4 fixture | fc6beed | FAIL(의도한 RED) |
+| 첫 GREEN 임시 구현 사본 | `git clone . <mktemp>/repo; git apply <변경 diff>; git commit <임시>; bash scripts/install-hooks.sh; bash scripts/verify/run-acceptance.sh scripts/acceptance-commit-worktree-guards.sh` | 23:48:34~23:48:42 | 0 | 전체 출력: `docs/engineering/issue84-commit-guards-green-output-2026-09-15.txt`; A/B exit 1·각각 다른 stderr·HEAD 불변, 허용 exit 0·HEAD 전진, 5사례·4 fixture | 임시 7fd6eb1 | PASS |
+| 기존 훅 6종 GREEN 회귀 | 위와 같은 임시 구현 사본에서 `bash scripts/verify/run-acceptance.sh scripts/acceptance-0-7.sh` | 23:49 | 0 | 전체 출력: `docs/engineering/issue84-existing-hook-regression-output-2026-09-15.txt`; 6/6 훅 ON 차단·OFF 허용 | 임시 구현 사본 | PASS |
 
 ## 적대 검증 로그
 
