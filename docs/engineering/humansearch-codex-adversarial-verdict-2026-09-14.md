@@ -56,3 +56,110 @@ Codex 원문 라벨 기준: **high 3건, medium 2건**. 이전 v6 §2의 "S1 4�
 Codex 한계(원문): 원격 조회 네트워크 차단, 임시 디렉터리 생성 제한으로 원칙 검사 불가, 기존 5개 결함 재현 미재실행, Image #5 미수신(LinkedIn Hiring Assistant 는 Claude 가 메모리 `reference_linkedin_hiring_assistant.md` 에 저장).
 
 Claude 자기 검증에서만 잡힌 것: 워크트리 수 "43" 은 재지 않고 적은 숫자(실측 45) → 정정. 스택 베이스를 두 개 지정한 행 2개(HS-05.02·05.04) → 단일 베이스 + 두 사슬 합류 조건으로 교체.
+
+## 재검토 2026-09-15 — PR #96 1차 GREEN(5c71817) Codex V1 + Claude V2
+
+V1 실행: `codex-companion.mjs adversarial-review --wait --scope branch --base origin/main` @ worktree hs-0402a HEAD 5c71817, 10:48:04~10:59:43, rc=0, verdict needs-attention. 원문 로그는 세션 스크래치 `codex-v1-96.log`, 판정 본문은 아래에 전문 보존.
+
+| ID | Codex 판정 | Claude V2 재현(11:00:50, 제어 호출 `v2_pr96_codex.py`) | 처분 |
+|---|---|---|---|
+| F96-1 | 부분 해결(high) — 조상 lstat 검사와 루트 open 사이 교체 틈 | 코드 구조로 확인(`runner_boundary.py:96-115` 문자열 순회 → `:126` 전체 경로 open). 악용은 조상을 바꿀 권한(러너·root)이 필요 | 2차 GREEN 지시: `/` 부터 dir_fd 사슬로 열기 |
+| F96-2 | 미해결(high) — 게시 뒤 unlink 실패·정리 unlink 실패·close 실패 | (A) `written` 인데 임시+final 잔존 (B) `denied write_failed` 인데 임시 잔존 (C) OSError 5 예외 유출 — 셋 다 REPRODUCED | 2차 GREEN 지시: cleanup_failed/recovery_required 상태, close try 안으로 |
+| 추가 | medium — 자식 fstat 실패 시 FD 누수·예외 | (D) opened [3,4] closed [3] leaked [4], OSError 5 — REPRODUCED | 2차 GREEN 지시 |
+
+V2 출력 원문:
+```
+=== V2 11:00:50 HEAD 5c71817
+(A) post-link unlink fail : written written | names: ['.f73c31bddbfe8939.tmp', 'final']
+(B) discard unlink fail   : denied write_failed | names: ['.8b40bcee8599a6e3.tmp']
+(C) close fail            : EXCEPTION OSError 5 | names: ['.428524d353765102.tmp']
+(D) child fstat fail      : EXCEPTION OSError 5 | opened: [3, 4] closed: [3] leaked: [4]
+```
+→ Codex 의 제어 호출 재현 4건을 독립 스크립트로 재현했다. V1 과장 0건, V2 가 잡은 V1 누락 0건. 2차 GREEN 뒤 V1 을 다시 돌린다.
+
+### Codex V1 판정 전문(5c71817)
+
+```text
+# Codex Adversarial Review
+
+Target: branch diff against origin/main
+Verdict: needs-attention
+
+VERDICT: FAIL
+
+결론
+이 변경은 아직 내보내면 안 됩니다. 검사한 장소 밖에 기록될 가능성과 실패 뒤 찌꺼기가 남는 경로가 모두 닫히지 않았습니다.
+
+건너뜀·미확인·재시도·추정
+- 실제 `hsrunner` 계정은 없어 별도 사용자 시험은 `NOT_RUN`입니다.
+- 실제 OS 임시 디렉터리 시험은 읽기 전용 sandbox 때문에 실행하지 못했습니다. `uv pytest`는 캐시 권한 오류로 exit 2, 직접 pytest는 사용 가능한 임시 디렉터리 부재로 exit 1이었습니다. collect-only는 22개 시험 수집, exit 0이었습니다.
+- mypy는 캐시 DB 생성 실패로 exit 2, ruff는 exit 0이었습니다.
+- F96 판정 장부는 현재 branch와 origin/main에 없습니다. 별도 branch의 commit `6981035`에서 원문을 회수했으며, 이 commit은 HEAD와 origin/main 어느 쪽의 조상도 아닙니다.
+- 경쟁 공격은 실제 파일시스템 재현이 아니라 운영체제 호출을 제어한 실행입니다. 실제 악용에는 검사된 조상을 교체할 권한이 있는 주체가 필요합니다.
+
+| ID | 판정 | 이유 |
+|---|---|---|
+| F96-1 | 부분 해결 | 상위 symlink·sticky 없는 0777·루트 개방 뒤 교체는 방어하지만, 조상 검사와 루트 개방 사이 교체는 남았습니다. |
+| F96-2 | 미해결 | 일반 쓰기 실패는 정리하지만 unlink·close 실패에서 임시 파일이 남고 성공으로도 보고됩니다. |
+→ 해석: 하나라도 미해결이면 ‘검증된 경계 밖 write 0’과 ‘부분 쓰기 잔존 0’을 보장할 수 없습니다.
+
+판단 근거
+- 선택: `needs-attention`입니다. 통제 실행에서 경계 밖 게시와 임시 파일 잔존을 각각 재현했습니다.
+- 버린 해석: 추가된 회귀 시험과 commit 설명만으로 해결됐다는 해석은 버렸습니다. 시험은 정확한 검사-개방 틈과 정리 실패를 때리지 않습니다.
+- 틀리면 깨지는 것: 후보 원문이 승인되지 않은 위치나 숨은 임시 이름에 남고, 성공 영수증이 실제 저장 상태와 달라지며, 반복 장애에서 열린 파일 손잡이가 고갈될 수 있습니다.
+
+반증 기록
+- sticky 예외 공격: `ATTACK_STICKY None`; sticky 없는 0777 대조군은 `denied protected_root_ancestor_invalid`였습니다. 소유자 검사와 sticky 규칙 자체를 깨지는 못했습니다.
+- 임시 이름 충돌: `denied write_failed`로 닫혀 경계 밖 쓰기는 없었습니다. 다만 새 이름 재시도는 하지 않습니다.
+- dir_fd 제거: `not_run platform_lacks_dir_fd`로 멈춰 조용한 경로 기반 폴백은 없었습니다.
+- uid 대체 코드는 두 시험 파일에만 있고 제품 코드는 실제 `pwd.getpwnam("hsrunner")`를 사용합니다.
+
+Findings:
+- [high] F96-1 원문 — 루트 검사(lstat·0700): 검사 후 교체 미방어가 남아 있습니다 (humansearch/src/humansearch/runner_boundary.py:71-126)
+  원인: TOCTOU(time-of-check to time-of-use, 검사 시점과 사용 시점 사이의 교체 경쟁)가 남았습니다. `runner_boundary.py:71`—조상 검사 호출이 경로 문자열로 끝난 뒤, `runner_boundary.py:126`—루트 개방이 전체 경로를 다시 해석합니다. `O_NOFOLLOW`는 마지막 요소만 보호하므로 중간 조상의 교체를 고정하지 않습니다. 기존 `test_runner_boundary_hardening.py:126`—교체 시험은 `_ensure_parent` 반환 뒤, 즉 루트가 이미 열린 뒤에만 교체합니다.
+
+증거 원문:
+`ATTACK_ROOT_CHECK_OPEN_GAP written published_dir_fd= 20 (20=post-swap outside)`
+→ 해석: 조상 검사 직후 경로 해석을 바꾸자 현재 코드가 교체 뒤 디렉터리에 최종 이름을 게시하고 `written`을 반환했습니다. 실제 OS 재현이 아닌 제어 호출 재현이며, 공격자가 해당 조상을 바꿀 권한이 있다는 전제가 필요합니다.
+
+사업 영향: 절대 불변조건으로 내건 보호 경계 밖 write 0을 입증하지 못합니다. 또한 개방 뒤 루트가 이동하면 `runner_boundary.py:140`의 반환 경로는 실제 FD가 가리킨 파일과 달라져 후속 readback이 다른 위치를 읽을 수 있습니다.
+  Recommendation: 무엇을 — `/` 또는 신뢰한 bootstrap FD부터 각 경로 요소를 `openat` 계열로 열고 즉시 `fstat`하여 다음 요소를 같은 FD 사슬에서 여십시오.
+왜 — 검사한 객체와 실제 사용하는 객체를 동일하게 고정해야 합니다.
+버린 길 — 현재처럼 모든 조상을 `lstat`한 뒤 전체 경로를 한 번에 여는 방식은 마지막 요소 보호만으로 충분하지 않습니다.
+대가 — FD 생명주기와 플랫폼별 지원 처리가 늘어납니다.
+되돌리기 — 새 FD 순회 구현을 별도 함수로 두고 실패 시 기존 구현으로 폴백하지 말고 `NOT_RUN`으로 되돌리십시오.
+- [high] F96-2 원문 — `_write_new_file` except 분기: 부분 쓰기 잔존·재시도 거부가 정리 실패에서 재발합니다 (humansearch/src/humansearch/runner_boundary.py:219-285)
+  원인: hard link(동일 파일을 가리키는 두 이름) 게시 뒤 `runner_boundary.py:237`에서 임시 이름 삭제 결과를 확인하지 않고, `runner_boundary.py:281-285`는 모든 unlink 오류를 삼킵니다. 실패 정리에서도 `_discard`가 같은 무시 함수를 사용합니다. `runner_boundary.py:219`의 close 오류는 보호된 예외 처리 밖에서 발생합니다.
+
+증거 원문:
+`ATTACK_POST_LINK_UNLINK_FAILURE written names= ['.3132333435363738.tmp', 'final']`
+→ 해석: 최종 파일과 임시 파일이 함께 남았지만 성공으로 보고됐습니다.
+
+`ATTACK_FAILURE_UNLINK_FAILURE denied names= ['.3132333435363738.tmp']`
+→ 해석: 쓰기 실패를 반환했지만 부분 임시 파일이 남았습니다.
+
+`ATTACK_CLOSE_FAILURE OSError 5 names= ['.3132333435363738.tmp']`
+→ 해석: close 실패에서는 영수증도 반환하지 못하고 임시 파일도 정리하지 않았습니다.
+
+사업 영향: 후보 원문이 숨은 임시 파일로 중복 잔존하고, 삭제·readback·재시도 장부가 이를 알지 못합니다. 현재의 ENOSPC 단일 시험 통과만으로 F96-2를 닫을 수 없습니다.
+  Recommendation: 무엇을 — unlink·close 실패를 별도 실패 상태로 올리고, close는 `finally` 안에서 처리하며 정리 결과를 반드시 검사하십시오.
+왜 — 정리에 실패했는데 `WRITTEN` 또는 일반 `DENIED`로 접으면 잔존 파일을 복구할 수 없습니다.
+버린 길 — `_remove`에서 모든 `OSError`를 무시하는 방식은 폐기하십시오.
+대가 — `cleanup_failed`/`recovery_required` 상태와 임시 참조를 PII 없이 기록하는 계약이 필요합니다.
+되돌리기 — 새 상태를 소비자가 처리하지 못하면 배포를 중단하고 기존 성공 상태로 폴백하지 마십시오. unlink·close·게시 후 정리 실패 회귀 시험도 추가하십시오.
+- [medium] 추가 결함 — 디렉터리 검증 오류에서 FD가 누수되고 경계가 영수증 없이 예외를 던집니다 (humansearch/src/humansearch/runner_boundary.py:174-187)
+  원인: FD(file descriptor, 열린 파일이나 디렉터리를 가리키는 운영체제 손잡이)를 연 뒤 `runner_boundary.py:182`의 `fstat`이 실패하면 `next_fd`를 닫는 `finally`가 없습니다. 바깥 `finally`는 루트 FD만 닫습니다. 같은 구조의 close 호출도 실패를 안전한 상태로 변환하지 않습니다.
+
+증거 원문:
+`ATTACK_FSTAT_FD_LEAK OSError 5 opened= [10, 11] closed= [10] leaked= [11]`
+→ 해석: 두 디렉터리를 연 뒤 두 번째 검증을 실패시키자 루트만 닫히고 자식 FD가 남았습니다.
+
+사업 영향: 손상되거나 불안정한 파일시스템에서 요청이 반복되면 프로세스 FD 한도에 도달해 이후 저장 전체가 중단될 수 있으며, 호출자는 `BoundaryReceipt` 대신 예외를 받습니다.
+  Recommendation: 각 `os.open` 직후 소유권을 명확히 하고 `try/finally` 또는 `ExitStack`으로 모든 반환·예외 경로에서 정확히 한 번 닫으십시오. `fstat`, 중간 close, 최종 close 실패를 주입해 열린 FD 수가 전후 동일하고 항상 명시적 실패 영수증이 반환되는지 시험하십시오.
+
+Next steps:
+- F96-1의 정확한 조상 검사→루트 open 틈을 실제 OS 디렉터리에서 교체하는 회귀 시험을 추가하고, 구성요소별 FD 순회로 닫으십시오.
+- F96-2에 unlink 실패, 게시 뒤 정리 실패, close 실패, 고정된 임시 이름 충돌 시험을 추가하십시오.
+- 실제 `hsrunner`/구현자 UID 두 개로 sticky 경계와 EACCES를 검증하고 전체 pytest·mypy를 쓰기 가능한 검증 환경에서 재실행하십시오.
+- 판정 장부 commit을 대상 branch 역사에 포함하거나 현재 HEAD를 명시한 새 판정 장부를 만들어 증거 사슬을 닫으십시오.
+```
