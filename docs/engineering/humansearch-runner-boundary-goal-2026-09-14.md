@@ -28,7 +28,10 @@ V2 보안 결론: caller가 임의 `runner_uid`나 `current_uid`를 public API�
 - `protected_root`는 절대 경로, symlink 아님, owner가 lookup된 runner UID, mode가 정확히 `0700`이어야 한다.
 - 대상 상대 경로는 root 밖으로 escape할 수 없고, 부모 디렉터리와 대상 파일 경로 자체의 symlink를 거부한다. 새로 만드는 부모 디렉터리는 restrictive umask에서도 최종 mode `0700`으로 확인한다.
 - 기존 파일 overwrite는 하지 않는다. 새 파일은 restrictive umask에서도 최종 mode `0600`으로 만들고 write 뒤 owner/mode/regular-file 상태를 다시 확인한다.
-- 일반 로그와 반환값에는 raw payload를 넣지 않는다. 반환값은 경로, 상태, reason, sha256, byte count만 허용한다.
+- 일반 로그와 반환값에는 raw payload를 넣지 않는다. 반환값은 경로, 상태, reason, sha256, byte count, 그리고 쓴 파일의 device/inode만 허용한다.
+- device/inode는 payload를 담은 file descriptor의 `fstat`에서 얻는다. 게시된 최종 이름을 다시 stat해서 얻지 않는다. 같은 runner UID의 다른 실행이 그 이름을 차지하면 원문 hash와 남의 파일 식별값이 한 영수증에 묶이기 때문이다.
+- device/inode는 파일을 여는 값(locator)이 아니라 대조용 검증값이다. 소비자는 경로나 고정된 디렉터리 fd로 연 뒤 이 쌍과 sha256으로 같은 파일인지 확인한다.
+- 소유를 증명할 수 없는 최종 이름은 어떤 실패 경로에서도 unlink하지 않는다. 게시 대조가 실패하면 임시 이름만 제거한다. 대조를 통과한 파일은 임시 정리에 실패해도 그대로 둔다.
 - `written`은 현재 프로세스가 파일을 썼다는 제품 경계 결과다. 구현자 UID의 외부 별도 process `EACCES`와 runner process write 성공이 실증되기 전까지 OS 격리 검증 완료 상태로 승격하지 않는다.
 
 ## 인수 기준
@@ -55,7 +58,7 @@ When 보호 root가 symlink이거나 root 밖 escape 상대 경로가 들어오�
 
 ### AC-6 runner 경계 통과 시 실제 파일 생성
 
-When 현재 프로세스 UID가 lookup된 runner UID이고 implementer UID가 다르며 보호 root owner/mode와 대상 경로가 유효하면, 시스템은 새 보호 파일을 mode `0600`으로 쓰고 payload hash와 byte count만 반환해야 한다.
+When 현재 프로세스 UID가 lookup된 runner UID이고 implementer UID가 다르며 보호 root owner/mode와 대상 경로가 유효하면, 시스템은 새 보호 파일을 mode `0600`으로 쓰고 payload hash, byte count, 그리고 그 파일을 쓴 file descriptor에서 얻은 device/inode만 반환해야 한다.
 
 ## trusted bootstrap 경계
 
