@@ -18,6 +18,7 @@ import hmac
 import re
 import sqlite3
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Final, Literal
 
@@ -28,16 +29,26 @@ RecordOutcome = Literal["inserted", "duplicate"]
 
 ALLOWED_CHANNELS: Final[tuple[str, ...]] = ("saramin", "jobkorea", "linkedin_rps")
 
-_KEY_DOMAIN: Final = b"hs-candidate-key-v1"
+# 직렬화가 구분자 결합에서 길이 접두로 바뀌었으므로 도메인 태그를 v2 로 올린다.
+# 같은 세 값이라도 v1 이 만든 키 값과 다르다.
+_KEY_DOMAIN: Final = b"hs-candidate-key-v2"
 _REF_DOMAIN: Final = b"hs-candidate-ref-v1"
 _FIELD_SEPARATOR: Final = b"\x1f"
+_LENGTH_PREFIX_BYTES: Final = 4
 _MIN_KEY_BYTES: Final = 32
 _MAX_FIELD_CHARS: Final = 512
 _PRIMARY_KEY_CONSTRAINT: Final = "SQLITE_CONSTRAINT_PRIMARYKEY"
 _KEY_FILE_MODE: Final = 0o600
 _KEY_DIR_MODE: Final = 0o700
+# C0(0x00-0x1F) · DEL(0x7F) · C1(0x80-0x9F). 필드 경계를 흉내 내거나 strip 에 조용히
+# 잘려 키를 바꾸는 문자를 전부 막는다.
+_CONTROL_CHARACTERS: Final = re.compile(r"[\x00-\x1f\x7f-\x9f]")
+# 자리수만 세면 2026-99-99T99:99:99+99:99 가 통과한다. 여기서 달력·시각·오프셋 범위를
+# 먼저 좁히고, 아래에서 datetime 으로 실재 여부를 다시 확인한다.
 _RFC3339: Final = re.compile(
-    r"\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2}(\.\d+)?([Zz]|[+-]\d{2}:\d{2})"
+    r"\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])"
+    r"[Tt]([01]\d|2[0-3]):[0-5]\d:[0-5]\d(\.\d+)?"
+    r"([Zz]|[+-]([01]\d|2[0-3]):[0-5]\d)"
 )
 
 
@@ -58,19 +69,21 @@ class CandidateIdentityInput:
 def candidate_key_hmac(key: bytes, position_ref: str, channel: str, candidate_ref: str) -> str:
     """Duplicate-prevention key derived from all three identity fields.
 
-    `\\x1f` 구분자가 필드 경계를 고정한다. 없으면 ("a","bc") 와 ("ab","c") 가
-    같은 키가 되어 서로 다른 후보가 한 행으로 합쳐진다.
+    길이 접두 정규 직렬화 — 도메인 태그 뒤에 각 필드를
+    `길이(4바이트 big-endian) + utf-8 바이트` 로 이어 붙인다.
+
+    구분자 결합은 그 구분자가 필드 **안에** 들어오면 경계가 무너진다. Codex V1 이
+    `("a","saramin","x\\x1fjobkorea\\x1fy")` 와 `("a\\x1fsaramin\\x1fx","jobkorea","y")` 가
+    같은 바이트열이 되는 것을 실측했다. 길이는 내용에 섞일 수 없으므로 이 계열의
+    주입이 원천적으로 불가능하다.
     """
 
-    message = _FIELD_SEPARATOR.join(
-        (
-            _KEY_DOMAIN,
-            position_ref.encode("utf-8"),
-            channel.encode("utf-8"),
-            candidate_ref.encode("utf-8"),
-        )
-    )
-    return hmac.new(key, message, "sha256").hexdigest()
+    message = bytearray(_KEY_DOMAIN)
+    for field in (position_ref, channel, candidate_ref):
+        raw = field.encode("utf-8")
+        message += len(raw).to_bytes(_LENGTH_PREFIX_BYTES, "big")
+        message += raw
+    return hmac.new(key, bytes(message), "sha256").hexdigest()
 
 
 def record_candidate_identity(
@@ -100,6 +113,10 @@ def _candidate_ref_hash(key: bytes, candidate_ref: str) -> str:
 
 
 def _required_field(value: str, label: str) -> str:
+    # strip 보다 먼저 본다. Python 은 \x1c-\x1f 와 \x85 를 공백으로 보고 조용히
+    # 잘라내는데(실측), 잘라내면 키가 소리 없이 바뀐다.
+    if _CONTROL_CHARACTERS.search(value) is not None:
+        raise CandidateIdentityError(f"{label} must not contain control characters")
     cleaned = value.strip()
     if not cleaned:
         raise CandidateIdentityError(f"{label} must not be blank")
@@ -114,10 +131,26 @@ def _validated_fields(record: CandidateIdentityInput) -> tuple[str, str, str]:
     if channel not in ALLOWED_CHANNELS:
         raise CandidateIdentityError("channel is not an allowed portal channel")
     candidate_ref = _required_field(record.candidate_ref, "candidate_ref")
-    observed_at = _required_field(record.observed_at, "observed_at")
+    _validated_observed_at(_required_field(record.observed_at, "observed_at"))
+    return position_ref, channel, candidate_ref
+
+
+def _validated_observed_at(observed_at: str) -> None:
+    """모양 뒤에 실재를 확인한다.
+
+    정규식만으로는 2026-02-29(윤년 아님) 같은 값을 못 거른다. 반대로
+    `datetime.fromisoformat` 만으로도 부족하다 — 실측상 `24:00:00` 을 통과시킨다.
+    두 겹을 모두 둔다.
+    """
+
     if _RFC3339.fullmatch(observed_at) is None:
         raise CandidateIdentityError("observed_at must be an RFC3339 timestamp")
-    return position_ref, channel, candidate_ref
+    try:
+        parsed = datetime.fromisoformat(observed_at)
+    except ValueError as exc:
+        raise CandidateIdentityError("observed_at is not a real instant") from exc
+    if parsed.tzinfo is None:
+        raise CandidateIdentityError("observed_at must carry a UTC offset")
 
 
 def _verify(path: Path, *, expected_mode: int, label: str) -> None:
@@ -131,6 +164,18 @@ def _verify(path: Path, *, expected_mode: int, label: str) -> None:
         raise CandidateIdentityError(str(exc)) from exc
 
 
+def _reject_symlinked_chain(path: Path, *, label: str) -> None:
+    """상위 사슬의 symlink 는 `stat(follow_symlinks=False)` 이 못 본다.
+
+    마지막 구성요소만 따라가지 않으므로, 부모의 부모가 symlink 면 모드 검사는 실체
+    디렉터리를 보고 통과한다. 사슬을 직접 걸어 확인한다.
+    """
+
+    for candidate in (path, *path.parents):
+        if candidate.is_symlink():
+            raise CandidateIdentityError(f"{label} must not contain a symlink")
+
+
 def _load_hmac_key(hmac_key_path: Path, db_path: Path) -> bytes:
     """Read the HMAC key from its own protected directory. 암묵 생성은 하지 않는다."""
 
@@ -139,7 +184,12 @@ def _load_hmac_key(hmac_key_path: Path, db_path: Path) -> bytes:
     _verify(hmac_key_path, expected_mode=_KEY_FILE_MODE, label="hmac key")
     if not hmac_key_path.is_file():
         raise CandidateIdentityError("hmac key must be a regular file")
-    if key_dir.resolve(strict=True) == db_path.parent.resolve(strict=True):
+    _reject_symlinked_chain(hmac_key_path, label="hmac key path")
+    key_root = key_dir.resolve(strict=True)
+    db_root = db_path.parent.resolve(strict=True)
+    # 동일 경로만 막으면 dbroot/keys/k 가 통과한다. DB 루트를 한 번 복사·유출하면
+    # 키까지 함께 나가므로 분리 보관이 무너진다(Codex V1). 포함은 양방향으로 막는다.
+    if key_root.is_relative_to(db_root) or db_root.is_relative_to(key_root):
         raise CandidateIdentityError("hmac key must not share the db protected root")
     key = hmac_key_path.read_bytes()
     if len(key) < _MIN_KEY_BYTES:
