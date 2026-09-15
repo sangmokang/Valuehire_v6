@@ -358,9 +358,11 @@ mutation_case() {
     tail -15 "$case_dir/pytest.log"
   fi
 }
-mutation_case "승인 장부 대조 제거" \
-  's/^    if approved is None or approved.db_path != db_path:$/    if False:/' \
-  'test_(unapproved_private|self_approved_private|other_db_filename)' 3
+# 장부 조회를 지우기만 하면 승인 없음(None)으로 흘러 여전히 거부된다. 실제 약화는 "장부에 없으면
+# 지금 그 파일을 승인으로 지어내는" 것이므로 그 형태로 변이한다.
+mutation_case "승인 장부 조회를 자기 승인으로 대체" \
+  's/^    approved = approved_db(approved_root)$/    approved = approved_db(approved_root) or ApprovedDb(db_path, db_path.stat().st_dev, db_path.stat().st_ino)/' \
+  'test_self_approved_private' 1
 mutation_case "열린 연결 main 경로 대조 제거" \
   's/^        if len(main_files) != 1 or Path(main_files\[0\]) != db_path:$/        if False:/' \
   'test_connect_swap_back' 1
