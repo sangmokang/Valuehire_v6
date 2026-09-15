@@ -48,9 +48,15 @@ class BoundaryReceipt:
 
     ``device`` and ``inode`` come from the descriptor that held the payload, so
     they identify the bytes this receipt is about. They are a **check value,
-    not a locator**: no API here opens a file from that pair. A consumer opens
-    the file by ``path`` (or through a pinned directory handle) and then
-    confirms it is the right one by matching this pair and ``sha256``.
+    not a locator**: no API here opens a file from that pair.
+
+    ``path`` is where the file was published at that moment and can name a
+    different file afterwards. ``temp_path`` names our temporary file when
+    cleanup could not remove it. A consumer opens each candidate in turn and
+    takes the one whose ``device``, ``inode`` and ``sha256`` match.
+
+    A ``recovery_required`` receipt means the runner process cannot be trusted
+    to continue: the caller stops iterating and discards the runner process.
     """
 
     status: BoundaryStatus
@@ -60,6 +66,7 @@ class BoundaryReceipt:
     byte_count: int = 0
     device: int | None = None
     inode: int | None = None
+    temp_path: Path | None = None
 
 
 class RunnerBoundary:
@@ -293,25 +300,42 @@ class RunnerBoundary:
             fd = os.open(temp_name, _NEW_FILE_FLAGS, _FILE_MODE, dir_fd=parent_fd)
         except OSError:
             return BoundaryReceipt(BoundaryStatus.DENIED, "write_failed")
-        stored = self._store_payload(parent_fd, fd, temp_name, payload)
-        if isinstance(stored, BoundaryReceipt):
-            return stored
+        try:
+            stored = self._fill_temp_file(fd, payload)
+        except OSError:
+            self._close_fd(fd)
+            return self._discard(parent_fd, temp_name, "write_failed")
+        if not self._close_fd(fd):
+            return self._strand_open_handle(
+                parent_fd, temp_name, final_path, digest, stored
+            )
         invalid = self._check_written_file(stored, runner_uid)
         if invalid is not None:
             return self._discard(parent_fd, temp_name, invalid.reason)
         return self._publish(parent_fd, temp_name, name, final_path, digest, stored)
 
-    def _store_payload(
-        self, parent_fd: int, fd: int, temp_name: str, payload: bytes
-    ) -> os.stat_result | BoundaryReceipt:
-        try:
-            info = self._fill_temp_file(fd, payload)
-        except OSError:
-            self._close_fd(fd)
-            return self._discard(parent_fd, temp_name, "write_failed")
-        if not self._close_fd(fd):
-            return self._discard(parent_fd, temp_name, "write_failed")
-        return info
+    def _strand_open_handle(
+        self,
+        parent_fd: int,
+        temp_name: str,
+        final_path: Path,
+        digest: str,
+        written: os.stat_result,
+    ) -> BoundaryReceipt:
+        """Report a temporary handle that could not be released.
+
+        ``close`` reporting an error leaves the descriptor in an unspecified
+        state, so this process may be holding a handle it cannot account for.
+        Cleanup is still attempted, but the caller must stop iterating and
+        discard the runner process rather than write again through it.
+        """
+
+        stranded = None
+        if not self._remove(parent_fd, temp_name):
+            stranded = final_path.parent / temp_name
+        return self._describe(
+            BoundaryStatus.DENIED, "recovery_required", None, digest, written, stranded
+        )
 
     def _fill_temp_file(self, fd: int, payload: bytes) -> os.stat_result:
         os.fchmod(fd, _FILE_MODE)
@@ -356,15 +380,21 @@ class RunnerBoundary:
         confirmed = self._published_path_matches(parent_fd, name, final_path)
         if confirmed:
             confirmed = self._published_entry_is(parent_fd, name, written)
+        stranded = final_path.parent / temp_name
         if not confirmed:
             return self._abandon_publication(
                 parent_fd,
                 temp_name,
                 self._mismatch_receipt(parent_fd, name, final_path, digest, written),
+                self._describe(
+                    BoundaryStatus.DENIED, "recovery_required", final_path, digest,
+                    written, stranded,
+                ),
             )
         if not self._remove(parent_fd, temp_name):
             return self._describe(
-                BoundaryStatus.DENIED, "cleanup_failed", final_path, digest, written
+                BoundaryStatus.DENIED, "cleanup_failed", final_path, digest, written,
+                stranded,
             )
         return self._describe(
             BoundaryStatus.WRITTEN, "written", final_path, digest, written
@@ -374,15 +404,16 @@ class RunnerBoundary:
         self,
         status: BoundaryStatus,
         reason: str,
-        final_path: Path,
+        final_path: Path | None,
         digest: str,
         written: os.stat_result,
+        temp_path: Path | None = None,
     ) -> BoundaryReceipt:
         """Name the file we wrote, using the descriptor that held the payload."""
 
         return BoundaryReceipt(
             status, reason, final_path, digest,
-            written.st_size, written.st_dev, written.st_ino,
+            written.st_size, written.st_dev, written.st_ino, temp_path,
         )
 
     def _mismatch_receipt(
@@ -402,7 +433,11 @@ class RunnerBoundary:
         )
 
     def _abandon_publication(
-        self, parent_fd: int, temp_name: str, found: BoundaryReceipt
+        self,
+        parent_fd: int,
+        temp_name: str,
+        found: BoundaryReceipt,
+        stranded: BoundaryReceipt,
     ) -> BoundaryReceipt:
         """Drop only our temporary file and leave the final name untouched.
 
@@ -413,7 +448,7 @@ class RunnerBoundary:
         """
 
         if not self._remove(parent_fd, temp_name):
-            return BoundaryReceipt(BoundaryStatus.DENIED, "recovery_required")
+            return stranded
         return found
 
     def _published_entry_is(
