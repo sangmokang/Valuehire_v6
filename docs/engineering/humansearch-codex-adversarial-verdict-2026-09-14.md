@@ -638,3 +638,78 @@ Next steps:
 - goal 문서의 ‘반환값은 path/status/reason/sha256/byte count만’ 문구를 실제 device/inode 계약과 맞춥니다.
 - 쓰기 가능한 검증 환경에서 전체 pytest와 과거 커밋 RED 행렬을 다시 실행합니다.
 ```
+
+## 재검토 2026-09-15 — HS-03.02 2차 GREEN(3061bd3) Codex V1
+
+실행 12:08:43~12:15:57, `--base 7473ec8`, verdict needs-attention. F0302-1 해결·F0302-3 해결·F0302-2 부분(DB 파일 마지막 구성요소 symlink 미검사)·F0302-4 부분(자기 호출 시험 2건 deselect, 통과 하한을 함수 수로). 신규 high: 인수 스크립트가 verify.yml·verification-commands.md 미배선(정본 53행). 신규 medium: NFC 미정규화로 같은 후보 2행. 3차 지시(12:20).
+
+```text
+# Codex Adversarial Review
+
+Target: branch diff against 7473ec8
+Verdict: needs-attention
+
+지금은 내보내시면 안 됩니다. 1차 4건 판정은 F0302-1 해결, F0302-2 부분 해결, F0302-3 해결, F0302-4 부분 해결입니다. 건너뜀·미확인: 전체 pytest와 인수·변이 검증은 읽기 전용 환경 때문에 실행하지 못했습니다. `uv run pytest`는 캐시 쓰기 거부(rc=2), `.venv/bin/pytest` 재시도는 `No usable temporary directory`(rc=1)였습니다. 대신 현재 HEAD 3061bd3·깨끗한 작업트리·7473ec8 대비 5파일/1592줄 추가, ruff 성공, 셸 문법 성공, `storage_schema.py` SHA 동일을 확인했습니다. 직접 실행 결과 제어문자는 strip 전에 거부됐고, HMAC은 독립 계산한 4바이트 big-endian 길이 접두값과 일치했으며 구분자·합법 경계쌍 충돌도 없었습니다. 버린 해석은 과거 검증 장부만으로 현재 합격을 인정하는 것, 호출자가 언제나 안전한 DB 경로만 준다고 가정하는 것, 글자가 같아 보이면 바이트 차이를 무시해도 된다는 것입니다.
+
+Findings:
+- [high] F0302-2 [high] 키 파일이 DB 루트 하위면 통과 — DB 파일 심볼릭 링크로 경계를 우회할 수 있습니다 (humansearch/src/humansearch/candidate_identity.py:188-194)
+  원인: 키 쪽은 해석된 디렉터리를 쓰지만 DB 쪽은 `db_path.parent.resolve()`만 검사하고 마지막 DB 파일 자체는 해석하거나 심볼릭 링크인지 확인하지 않습니다. 이후 `sqlite3.connect(db_path)`는 마지막 링크를 따라갑니다.
+
+증거 원문:
+`key_root = key_dir.resolve(strict=True)`
+`db_root = db_path.parent.resolve(strict=True)`
+`sqlite3.connect(db_path, isolation_level=None)`
+또한 로컬 확인에서 `/dev/stdin`은 `parent.resolve()=/dev`, 파일 전체 `resolve()=/dev/fd/0`으로 달랐습니다.
+→ 해석: 별도 디렉터리의 `alias/humansearch.sqlite3`를 키 디렉터리 안 실제 DB로 연결하면 비교 대상은 alias 디렉터리지만 쓰기는 키와 같은 실제 루트의 DB에 도달합니다. 파일 생성이 금지된 환경이라 전체 DB 재현은 미확인이고, 코드·경로 의미론에 따른 추론입니다.
+
+사업 영향: DB와 HMAC 키를 한 번에 복사·유출할 수 있어 보호 루트 분리 목적이 무너지고, 유출된 후보 식별값의 대입 검증이 가능해집니다.
+
+무엇을: DB 파일과 상위 경로도 링크 없이 검증하고 실제 DB 위치를 기준으로 비교해야 합니다.
+왜: 검사한 경로와 실제로 연 파일이 같아야 경계 검사가 성립합니다.
+버린 길: 호출자가 초기화 함수 반환값만 전달한다고 가정하는 방식은 공개 함수 경계를 보호하지 못합니다.
+대가: 기존에 링크된 DB를 사용하던 호출은 거부됩니다.
+되돌리기: DB 경로 검증을 별도 보조 함수로 격리하면 정책 변경 시 그 경계만 되돌릴 수 있습니다.
+  Recommendation: `db_path`의 모든 구성요소와 마지막 파일의 symlink를 거부하고, `db_path.resolve(strict=True).parent`를 키 루트와 양방향 비교하십시오. 가능하면 검증한 파일 descriptor를 사용해 검사 후 교체 경쟁도 막고, DB 최종 구성요소 symlink·조상 symlink·hard-link 경계를 회귀 시험으로 추가하십시오.
+- [high] 신규 [high] 새 인수 검사가 CI의 고정 실행 목록에 연결되지 않았습니다 (.github/workflows/verify.yml:227-231)
+  원인: `scripts/acceptance-hs-0302.sh`를 추가했지만 `.github/workflows/verify.yml`과 `docs/sot/verification-commands.md`에는 실행 항목이 없습니다.
+
+증거 원문:
+`rg -n "acceptance-hs-0302" .github/workflows/verify.yml docs/sot/verification-commands.md` → 0건
+정본 53행: `새 scripts/acceptance-*.sh를 추가하는 PR은 verify.yml과 이 표 양쪽에 자기 줄을 함께 넣어야 한다.`
+→ 해석: 로컬 pre-push 글로브에서는 실행되지만, 우회 가능한 로컬 훅과 달리 최종 판정권을 가진 CI는 이 인수 검사를 직접 실행하지 않습니다.
+
+사업 영향: HMAC 의미 검사, 스키마 무변경 검사, 우회 테이블 검사와 fail-closed 자기 검사가 CI에서 빠진 채 병합될 수 있습니다. 저장소의 P15 배송 규칙을 직접 위반합니다.
+  Recommendation: `verify.yml`에 `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-0302.sh` 전용 단계를 추가하고 `docs/sot/verification-commands.md` 명부도 함께 갱신하십시오. CI 배선 제거·echo 대체 변이가 실패하는지도 확인하십시오.
+- [medium] F0302-4 [medium] 인수 스크립트 skip_item fail-open — 필수 fail-closed 시험을 제외하고도 PASS가 가능합니다 (scripts/acceptance-hs-0302.sh:293-301)
+  원인: pytest 단계가 `-k "not acceptance_aborts"`로 기준 SHA 실패와 create-table 스캔 실패 시험을 모두 제외합니다. 성공 하한은 실제 수집·선택된 시험 수가 아니라 함수 정의 26개이며, 매개변수 확장으로 실행 건수가 부풀어 일부 필수 시험이 빠져도 `passed >= total_tests`가 성립합니다. 아래 자기 검사는 기준 SHA 실패만 대체하고 create-table 스캔 실패는 대체하지 않습니다.
+
+증거 원문:
+`-k "not acceptance_aborts"`
+`if ... "${passed:-0}" -ge "$total_tests" ...`
+함수 계수: 1차 13개 + 2차 13개. 제외 대상에는 `test_acceptance_aborts_when_create_table_scan_fails`가 포함됩니다.
+→ 해석: 자기 호출 순환은 제거됐지만, F0302-4의 필수 음성 대조군 하나가 인수 실행 안에서는 실제로 돌지 않습니다. 필터가 더 넓어지는 회귀도 부풀려진 통과 수가 가릴 수 있습니다.
+
+사업 영향: 스캔 오류가 다시 성공으로 처리되어도 인수 명령이 성공할 수 있고, 필수 검사를 실제로 돌렸다는 보고가 거짓이 됩니다.
+  Recommendation: 자기 호출 시험을 별도 비재귀 시험 모듈이나 직접 probe로 분리해 모두 실행하십시오. `pytest --collect-only`의 선택 건수와 실제 passed 건수를 정확히 대조하고, deselected·skipped·xfail이 하나라도 있으면 실패하도록 하십시오.
+- [medium] 신규 [medium] 유니코드 정규화 차이로 같은 후보가 두 행이 됩니다 (humansearch/src/humansearch/candidate_identity.py:115-125)
+  원인: 입력 처리는 제어문자 검사와 `strip()`만 수행하고, HMAC은 원래 UTF-8 바이트를 그대로 사용합니다. 유니코드 정규화는 같은 글자를 여러 코드열로 표현할 수 있게 하는 규칙인데, NFC 등 대표형을 정하지 않았습니다.
+
+증거 원문:
+`café`와 `cafe\u0301`은 NFC 정규화 후 같고 원문은 다릅니다.
+직접 실행: `nfc_equal=True`, `hmac_a=e2aa...`, `hmac_b=8474...`, `hmac_equal=False`.
+→ 해석: 두 입력은 모두 현재 검증을 통과하고 서로 다른 기본키가 되므로, 동일한 포털 후보 식별자가 수집 경로의 정규화 차이만으로 중복 저장됩니다. 두 행 생성은 기본키 정의로부터의 추론이며 쓰기 금지 환경 때문에 DB 실행은 미확인입니다.
+
+사업 영향: 후보 수 과대계상, 중복 접촉, 후속 증거·상태가 두 후보 행으로 갈라지는 문제가 발생합니다.
+
+무엇을: 후보 식별 문자열의 정규화 계약을 명시해야 합니다.
+왜: 중복 제거는 동일 후보가 항상 동일 바이트열이 된다는 전제에 의존합니다.
+버린 길: NFKC를 무조건 적용하면 호환문자까지 합쳐 서로 다른 포털 ID를 오병합할 수 있습니다.
+대가: NFC 강제 또는 비정규 입력 거부에 따라 일부 기존 입력의 키가 바뀌거나 거부됩니다.
+되돌리기: 도메인 버전을 올리고 전환 규칙을 분리하면 기존 키 형식을 보존할 수 있습니다.
+  Recommendation: 포털 식별자가 유니코드 의미 문자열인지 불투명 ID인지 먼저 계약으로 고정하십시오. 의미 문자열이면 strip 후 NFC로 정규화하거나 비-NFC 입력을 거부하고, 불투명 ID이면 허용 문자 집합을 좁히십시오. NFC 조합형/분해형과 NFKC에서만 같아지는 문자를 각각 별도 회귀 시험으로 두어 중복과 오병합을 모두 막으십시오.
+
+Next steps:
+- DB 최종 파일 링크 우회, 유니코드 동등쌍, create-table 스캔 fail-open 변이를 회귀 시험으로 고정하십시오.
+- 새 인수 스크립트를 CI와 검증 명부에 직접 연결하십시오.
+- 쓰기 가능한 검증 환경에서 전체 pytest, ruff, mypy, 인수 스크립트, 새 변이 시험을 다시 실행하고 현재 HEAD에 귀속된 원문 출력을 남기십시오.
+```
