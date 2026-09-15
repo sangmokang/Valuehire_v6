@@ -353,16 +353,68 @@ class RunnerBoundary:
                 "target_already_exists" if exc.errno == errno.EEXIST else "write_failed"
             )
             return self._discard(parent_fd, temp_name, reason)
-        if not self._published_path_matches(parent_fd, name, final_path):
-            return self._undo_publication(parent_fd, temp_name, name)
-        if not self._published_entry_is(parent_fd, name, written):
-            return self._undo_publication(parent_fd, temp_name, name)
+        confirmed = self._published_path_matches(parent_fd, name, final_path)
+        if confirmed:
+            confirmed = self._published_entry_is(parent_fd, name, written)
+        if not confirmed:
+            return self._abandon_publication(
+                parent_fd,
+                temp_name,
+                self._mismatch_receipt(parent_fd, name, final_path, digest, written),
+            )
         if not self._remove(parent_fd, temp_name):
-            return self._roll_back(parent_fd, name, "cleanup_failed")
+            return self._describe(
+                BoundaryStatus.DENIED, "cleanup_failed", final_path, digest, written
+            )
+        return self._describe(
+            BoundaryStatus.WRITTEN, "written", final_path, digest, written
+        )
+
+    def _describe(
+        self,
+        status: BoundaryStatus,
+        reason: str,
+        final_path: Path,
+        digest: str,
+        written: os.stat_result,
+    ) -> BoundaryReceipt:
+        """Name the file we wrote, using the descriptor that held the payload."""
+
         return BoundaryReceipt(
-            BoundaryStatus.WRITTEN, "written", final_path, digest,
+            status, reason, final_path, digest,
             written.st_size, written.st_dev, written.st_ino,
         )
+
+    def _mismatch_receipt(
+        self,
+        parent_fd: int,
+        name: str,
+        final_path: Path,
+        digest: str,
+        written: os.stat_result,
+    ) -> BoundaryReceipt:
+        """Describe a failed confirmation, naming our file only when it is ours."""
+
+        if not self._published_entry_is(parent_fd, name, written):
+            return BoundaryReceipt(BoundaryStatus.DENIED, "published_path_mismatch")
+        return self._describe(
+            BoundaryStatus.DENIED, "published_path_mismatch", final_path, digest, written
+        )
+
+    def _abandon_publication(
+        self, parent_fd: int, temp_name: str, found: BoundaryReceipt
+    ) -> BoundaryReceipt:
+        """Drop only our temporary file and leave the final name untouched.
+
+        A failed confirmation is exactly the evidence that the final name may
+        hold another run's file, so it is never unlinked. Re-checking ownership
+        just before unlinking would leave the same window open, so the boundary
+        does not unlink a name it cannot own outright.
+        """
+
+        if not self._remove(parent_fd, temp_name):
+            return BoundaryReceipt(BoundaryStatus.DENIED, "recovery_required")
+        return found
 
     def _published_entry_is(
         self, parent_fd: int, name: str, written: os.stat_result
@@ -374,17 +426,6 @@ class RunnerBoundary:
         except OSError:
             return False
         return (info.st_dev, info.st_ino) == (written.st_dev, written.st_ino)
-
-    def _undo_publication(
-        self, parent_fd: int, temp_name: str, name: str
-    ) -> BoundaryReceipt:
-        """Remove both names after a mismatch. Neither may be left behind."""
-
-        removed_final = self._remove(parent_fd, name)
-        removed_temp = self._remove(parent_fd, temp_name)
-        if not removed_final or not removed_temp:
-            return BoundaryReceipt(BoundaryStatus.DENIED, "recovery_required")
-        return BoundaryReceipt(BoundaryStatus.DENIED, "published_path_mismatch")
 
     def _published_path_matches(
         self, parent_fd: int, name: str, final_path: Path
@@ -400,13 +441,6 @@ class RunnerBoundary:
             through_path.st_dev,
             through_path.st_ino,
         )
-
-    def _roll_back(self, parent_fd: int, name: str, reason: str) -> BoundaryReceipt:
-        """Undo a published name so a half-finished state is never a success."""
-
-        if not self._remove(parent_fd, name):
-            return BoundaryReceipt(BoundaryStatus.DENIED, "recovery_required")
-        return BoundaryReceipt(BoundaryStatus.DENIED, reason)
 
     def _check_target_absent(self, parent_fd: int, name: str) -> BoundaryReceipt | None:
         try:

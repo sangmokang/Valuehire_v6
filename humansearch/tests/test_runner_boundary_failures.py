@@ -135,7 +135,11 @@ def test_written_receipt_path_matches_the_published_file(
 def test_cleanup_failure_after_publish_is_not_reported_as_written(
     tmp_path: Path, monkeypatch: MonkeyPatch
 ) -> None:
-    """게시 뒤 임시 이름 삭제가 실패하면 최종 이름을 되돌리고 성공으로 보고하지 않는다."""
+    """게시 뒤 임시 이름 삭제가 실패하면 성공으로 보고하지 않는다.
+
+    최종 이름은 되돌리지 않는다. 대조로 소유가 증명된 우리 파일이라 지우면
+    올바른 데이터를 잃는다. 이 단언은 2026-09-15 계약 변경을 따른다.
+    """
 
     _hsrunner(monkeypatch)
     root = _mkdir(tmp_path / "root", 0o700)
@@ -146,7 +150,7 @@ def test_cleanup_failure_after_publish_is_not_reported_as_written(
 
     assert receipt.status is BoundaryStatus.DENIED
     assert receipt.reason == "cleanup_failed"
-    assert not (root / "final.jsonl").exists()
+    assert (root / "final.jsonl").read_bytes() == PAYLOAD
 
 
 def test_failed_write_cleanup_failure_reports_recovery_required(
