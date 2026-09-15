@@ -21,8 +21,10 @@ from __future__ import annotations
 
 import dataclasses
 import json
+from dataclasses import replace
 
 import pytest
+import test_hs_1304b as test_module
 from test_hs_1304b import _jd, _jd_packet, _packet, _position
 
 import humansearch.brief as brief_pkg
@@ -110,8 +112,13 @@ def test_a_contact_frame_line_without_a_declared_contact_is_rejected() -> None:
 
 
 @pytest.mark.parametrize("hidden", HIDDEN_CONDITIONS)
-def test_hidden_conditions_cannot_be_smuggled_through_the_contact_field(hidden: str) -> None:
-    """네 문구를 담당자 이름 자리에 넣어도 본문의 그 줄은 통과하지 못한다."""
+def test_a_condition_line_without_a_matching_rendered_source_is_rejected(hidden: str) -> None:
+    """타입 출처가 만든 줄과 다르면 거부된다 — 거부 근거는 **문자열 불일치**다.
+
+    Codex V2 지적: 이 시험만 보면 "조건이라서 막혔다" 로 읽히지만, 실제로는 담당자 렌더
+    결과(`문의: 이름 (주소)`)에 이메일이 붙어 있어 본문 줄과 다르기 때문이다.
+    조건 판정 자체를 보는 시험은 바로 아래 xfail 두 건이 따로 고정한다.
+    """
     jd = _jd()
     with pytest.raises(BriefInputError):
         _packet(
@@ -121,6 +128,46 @@ def test_hidden_conditions_cannot_be_smuggled_through_the_contact_field(hidden: 
                 linkedin_contact=_contact(hidden.split(": ", 1)[1], "x@example.kr"),
             )
         )
+
+
+@pytest.mark.xfail(strict=True, reason="구조 변경 결정 대기 — §7-5 카드(담당자를 운영자 설정에서 조회)")
+def test_an_unknown_condition_as_contact_name_passes_with_the_real_rendered_line() -> None:
+    """**현재 계약에서는 통과하는 잔여 구멍.** 실제 렌더 줄을 그대로 쓴 반례다.
+
+    `대졸 필수` 는 조건 정규식이 모르는 문구라 담당자 이름 검증을 빠져나가고,
+    본문에 `문의: 대졸 필수 (x@example.kr)` 를 그대로 적으면 렌더 결과와 일치해 면제된다.
+    닫으려면 담당자를 패킷 자유 입력이 아니라 운영자 소유 설정에서 조회해야 한다.
+    구멍이 닫히면 strict xfail 이 **실패로** 알려 준다.
+    """
+    jd = _jd()
+    contact = _contact("대졸 필수", "x@example.kr")
+    with pytest.raises(BriefInputError):
+        _packet(
+            jd_packet=_jd_packet(
+                jd,
+                linkedin_body=f"{jd.text}\n{contact.rendered_line()}",  # type: ignore[attr-defined]
+                linkedin_contact=contact,
+            )
+        )
+
+
+@pytest.mark.xfail(strict=True, reason="구조 변경 결정 대기 — §7-5 카드(position.title 면제 폐지)")
+def test_an_unknown_condition_as_position_title_passes() -> None:
+    """**현재 계약에서는 통과하는 잔여 구멍.** 포지션 제목이 곧 면제권이다.
+
+    `제목:` 줄은 `제목: {position.title}` 과 같으면 통과하므로, 포지션 제목 자체가
+    조건 문구이면 그 줄이 그대로 나간다. 닫으려면 포지션 제목의 신뢰 출처를 코드로
+    증명하거나 제목 줄 면제를 폐지해야 한다.
+    """
+    jd = _jd()
+    title = "대졸 필수"
+    original = test_module._position
+    test_module._position = lambda: replace(original(), title=title)
+    try:
+        with pytest.raises(BriefInputError):
+            _packet(jd_packet=_jd_packet(jd, linkedin_body=f"제목: {title}\n{jd.text}"))
+    finally:
+        test_module._position = original
 
 
 @pytest.mark.parametrize("variant", NORMALIZATION_VARIANTS)
