@@ -27,6 +27,7 @@ from humansearch.runner_boundary import (
 )
 
 PAYLOAD = b"synthetic-runner-payload"
+OTHER_PAYLOAD = b"a-file-from-another-run"
 
 
 def _uid() -> int:
@@ -72,10 +73,17 @@ def _swap_root_at(
     monkeypatch.setattr(RunnerBoundary, seam, swapped)
 
 
-def test_published_path_mismatch_removes_both_names(
+def test_published_path_mismatch_keeps_our_file_and_drops_the_temp(
     tmp_path: Path, monkeypatch: MonkeyPatch
 ) -> None:
-    """영수증 경로가 게시 파일과 어긋나면 최종 이름도 임시 이름도 남기지 않는다."""
+    """영수증 경로가 어긋나도 최종 이름은 건드리지 않고 임시 이름만 치운다.
+
+    대조 실패는 "그 이름이 우리 것인지 확신할 수 없다"는 뜻이다. 지우기
+    직전에 다시 확인해도 그 사이에 바뀔 수 있으므로, 최종 이름은 어떤
+    경로에서도 지우지 않는다. 여기서는 루트가 옮겨져 경로만 낡았고 파일은
+    우리 것이므로 내용이 그대로 남아야 하고, 영수증에 식별값이 채워져
+    사람이 찾아갈 수 있어야 한다.
+    """
 
     _hsrunner(monkeypatch)
     holder = _mkdir(tmp_path / "holder", 0o700)
@@ -85,9 +93,13 @@ def test_published_path_mismatch_removes_both_names(
 
     receipt = write_protected_file(_config(root), "z.jsonl", PAYLOAD)
 
+    moved = holder / "moved"
     assert receipt.status is BoundaryStatus.DENIED
     assert receipt.reason == "published_path_mismatch"
-    assert sorted(entry.name for entry in (holder / "moved").iterdir()) == []
+    assert sorted(entry.name for entry in moved.iterdir()) == ["z.jsonl"]
+    assert (moved / "z.jsonl").read_bytes() == PAYLOAD
+    published = os.stat(moved / "z.jsonl")
+    assert (receipt.device, receipt.inode) == (published.st_dev, published.st_ino)
     assert list(outside.iterdir()) == []
 
 
@@ -404,3 +416,119 @@ def test_receipt_identity_is_not_re_read_after_the_check(
     assert len(seen) == 1
     assert (receipt.device, receipt.inode) == (seen[0].st_dev, seen[0].st_ino)
     assert receipt.byte_count == len(PAYLOAD)
+
+
+def _take_over_final_name(
+    monkeypatch: MonkeyPatch, final_name: str, seen: dict[str, Any]
+) -> None:
+    """경로 대조 직후 최종 이름을 같은 권한의 다른 일반 파일 B 로 갈아치운다.
+
+    같은 러너 uid 의 다른 실행이 그 이름을 차지한 상황이다. B 는 우리 것이
+    아니므로 경계가 지워서는 안 된다.
+    """
+
+    original = RunnerBoundary._published_path_matches
+
+    def take_over(
+        self: RunnerBoundary, parent_fd: int, name: str, final_path: Path
+    ) -> Any:
+        result = original(self, parent_fd, name, final_path)
+        if "device" not in seen:
+            os.unlink(final_name, dir_fd=parent_fd)
+            imposter = os.open(
+                final_name,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                0o600,
+                dir_fd=parent_fd,
+            )
+            os.write(imposter, OTHER_PAYLOAD)
+            info = os.fstat(imposter)
+            os.close(imposter)
+            seen["device"] = info.st_dev
+            seen["inode"] = info.st_ino
+        return result
+
+    monkeypatch.setattr(RunnerBoundary, "_published_path_matches", take_over)
+
+
+def test_replacement_file_is_never_deleted_on_mismatch(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    """최종 이름을 차지한 다른 실행의 파일은 지우지 않는다."""
+
+    _hsrunner(monkeypatch)
+    root = _mkdir(tmp_path / "root", 0o700)
+    seen: dict[str, Any] = {}
+    _take_over_final_name(monkeypatch, "taken.jsonl", seen)
+
+    receipt = write_protected_file(_config(root), "taken.jsonl", PAYLOAD)
+
+    survivor = root / "taken.jsonl"
+    assert survivor.is_file(), "이름을 차지한 다른 실행의 파일이 지워졌다"
+    info = os.stat(survivor)
+    assert receipt.status is BoundaryStatus.DENIED
+    assert receipt.reason == "published_path_mismatch"
+    assert survivor.read_bytes() == OTHER_PAYLOAD
+    assert (info.st_dev, info.st_ino) == (seen["device"], seen["inode"])
+    assert sorted(entry.name for entry in root.iterdir()) == ["taken.jsonl"]
+
+
+def test_cleanup_failure_keeps_the_published_file(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    """대조를 통과한 우리 파일은 임시 정리에 실패해도 지우지 않는다.
+
+    대조로 소유가 증명된 파일이다. 되돌린다며 지우면 올바른 데이터를 잃는다.
+    영수증에 경로와 식별값을 채워 사람이 이어받게 한다.
+    """
+
+    _hsrunner(monkeypatch)
+    root = _mkdir(tmp_path / "root", 0o700)
+    real_unlink = os.unlink
+
+    def bad_unlink(name: Any, *args: Any, **kwargs: Any) -> None:
+        if _is_temp_name(name):
+            raise OSError(errno.EIO, "Input/output error")
+        real_unlink(name, *args, **kwargs)
+
+    with MonkeyPatch.context() as patched:
+        patched.setattr(os, "unlink", bad_unlink)
+        receipt = write_protected_file(_config(root), "kept.jsonl", PAYLOAD)
+
+    kept = root / "kept.jsonl"
+    assert kept.is_file(), "대조를 통과한 우리 파일이 지워졌다"
+    info = os.stat(kept)
+    assert receipt.status is BoundaryStatus.DENIED
+    assert receipt.reason == "cleanup_failed"
+    assert kept.read_bytes() == PAYLOAD
+    assert receipt.path == kept
+    assert (receipt.device, receipt.inode) == (info.st_dev, info.st_ino)
+
+
+def test_mismatch_with_cleanup_failure_keeps_the_replacement(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    """이름을 차지한 파일은 임시 정리까지 실패해도 그대로 둔다."""
+
+    _hsrunner(monkeypatch)
+    root = _mkdir(tmp_path / "root", 0o700)
+    seen: dict[str, Any] = {}
+    _take_over_final_name(monkeypatch, "taken.jsonl", seen)
+    real_unlink = os.unlink
+
+    def bad_temp_unlink(name: Any, *args: Any, **kwargs: Any) -> None:
+        if _is_temp_name(name):
+            raise OSError(errno.EIO, "Input/output error")
+        real_unlink(name, *args, **kwargs)
+
+    with MonkeyPatch.context() as patched:
+        patched.setattr(os, "unlink", bad_temp_unlink)
+        receipt = write_protected_file(_config(root), "taken.jsonl", PAYLOAD)
+
+    survivor = root / "taken.jsonl"
+    assert survivor.is_file(), "이름을 차지한 다른 실행의 파일이 지워졌다"
+    info = os.stat(survivor)
+    assert receipt.status is BoundaryStatus.DENIED
+    assert receipt.reason == "recovery_required"
+    assert survivor.read_bytes() == OTHER_PAYLOAD
+    assert (info.st_dev, info.st_ino) == (seen["device"], seen["inode"])
