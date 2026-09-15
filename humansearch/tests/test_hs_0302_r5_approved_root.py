@@ -96,3 +96,58 @@ def test_connect_swap_back_to_other_compatible_db_is_refused(
     assert opened_alternate
     assert _rows(approved.db_path) == 0
     assert _rows(alternate.db_path) == 0
+
+
+def _compatible_copy(source: Path, target_root: Path, name: str) -> Path:
+    """정상 초기화 DB를 다른 자리로 옮긴 0600 호환 사본 — 모양은 같지만 승인은 없다."""
+
+    target_root.mkdir(mode=0o700, exist_ok=True)
+    copy = target_root / name
+    shutil.copyfile(source, copy)
+    copy.chmod(0o600)
+    return copy
+
+
+def test_self_approved_private_compatible_db_is_refused(tmp_path: Path) -> None:
+    """승인 root 인자를 DB 부모로 스스로 채워도 초기화가 승인한 root가 아니면 기록하지 않는다."""
+
+    approved = initialize_humansearch_storage(tmp_path / "approved")
+    other_db = _compatible_copy(approved.db_path, tmp_path / "unapproved", approved.db_path.name)
+    key_path = _key_file(tmp_path / "keys")
+
+    with pytest.raises(CandidateIdentityError, match="approved"):
+        record_candidate_identity(
+            other_db, _RECORD, hmac_key_path=key_path, approved_root=other_db.parent
+        )
+
+    assert _rows(other_db) == 0
+
+
+def test_other_db_filename_inside_approved_root_is_refused(tmp_path: Path) -> None:
+    """승인 root 안이라도 초기화가 돌려준 DB 파일이 아니면 기록하지 않는다."""
+
+    approved = initialize_humansearch_storage(tmp_path / "approved")
+    other_db = _compatible_copy(approved.db_path, approved.protected_root, "parked.sqlite3")
+    key_path = _key_file(tmp_path / "keys")
+
+    with pytest.raises(CandidateIdentityError, match="approved"):
+        record_candidate_identity(
+            other_db, _RECORD, hmac_key_path=key_path, approved_root=approved.protected_root
+        )
+
+    assert _rows(other_db) == 0
+    assert _rows(approved.db_path) == 0
+
+
+def test_initialized_storage_result_still_records(tmp_path: Path) -> None:
+    """양성 대조군 — 초기화 결과의 db_path·protected_root 쌍은 그대로 기록된다."""
+
+    approved = initialize_humansearch_storage(tmp_path / "approved")
+    key_path = _key_file(tmp_path / "keys")
+
+    outcome = record_candidate_identity(
+        approved.db_path, _RECORD, hmac_key_path=key_path, approved_root=approved.protected_root
+    )
+
+    assert outcome == "inserted"
+    assert _rows(approved.db_path) == 1

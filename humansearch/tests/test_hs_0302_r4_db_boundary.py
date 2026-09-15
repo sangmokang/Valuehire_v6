@@ -24,7 +24,6 @@ _REQUIRED_NAMES = (
 _TEST_KEY = bytes(range(32))
 _OBSERVED_AT = "2026-09-15T10:00:00Z"
 _KEY_BASENAME = "hs-candidate.key"
-_DB_BASENAME = "humansearch.sqlite3"
 _POSITION_REF = "POS-1"
 _CANDIDATE_REF = "cand-1"
 _SIDECAR_SUFFIXES = ("-journal", "-wal", "-shm")
@@ -96,8 +95,6 @@ def _git_env_without_repo_hints() -> dict[str, str]:
     return {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
 
 
-
-
 @pytest.mark.parametrize(
     ("db_mode", "dir_mode"),
     [(0o644, 0o700), (0o600, 0o755), (0o644, 0o755), (0o600, 0o750)],
@@ -117,24 +114,11 @@ def test_loose_db_or_parent_permissions_are_refused(
     assert _count_rows(db_path) == 0
 
 
-
-
-def _compatible_db_under(tmp_path: Path, parent: Path) -> Path:
-    """정상 초기화한 DB 를 다른 부모 아래로 옮긴 호환 스키마 사본을 만든다."""
-    source = _protected_db(tmp_path, "source-root")
-    parent.mkdir(mode=0o700, parents=True)
-    copy = parent / _DB_BASENAME
-    shutil.copyfile(source, copy)
-    copy.chmod(0o600)
-    return copy
-
-
 def test_db_under_git_init_directory_is_refused(tmp_path: Path) -> None:
-    """`git init` 한 폴더 아래 DB 는 승인된 보호 root 밖이다 — Git 밖 규칙 위반."""
+    """초기화 뒤 그 폴더가 `git init` 되면 승인된 DB 라도 Git 밖 규칙 위반이다 — 쓰기 직전에 다시 본다."""
     identity = _load_identity_module()
-    _assert_tmp_is_symlink_free(tmp_path)
     repo = tmp_path / "repo"
-    repo.mkdir(mode=0o700)
+    db_path = _protected_db(tmp_path, "repo/protected")
     subprocess.run(
         ["git", "init", "-q", str(repo)],
         check=True,
@@ -142,7 +126,6 @@ def test_db_under_git_init_directory_is_refused(tmp_path: Path) -> None:
         stdin=subprocess.DEVNULL,
     )
     assert (repo / ".git").is_dir()
-    db_path = _compatible_db_under(tmp_path, repo / "protected")
     key_path = _key_at(tmp_path / "key-root")
     with pytest.raises(identity.CandidateIdentityError) as caught:
         _record(identity, db_path, key_path)
@@ -151,13 +134,10 @@ def test_db_under_git_init_directory_is_refused(tmp_path: Path) -> None:
 
 
 def test_db_under_git_worktree_file_marker_is_refused(tmp_path: Path) -> None:
-    """워크트리는 `.git` 이 디렉터리가 아니라 파일이다 — 그 형태도 Git 안이다."""
+    """워크트리는 `.git` 이 디렉터리가 아니라 파일이다 — 초기화 뒤 생겨도 Git 안이다."""
     identity = _load_identity_module()
-    _assert_tmp_is_symlink_free(tmp_path)
-    worktree = tmp_path / "worktree"
-    worktree.mkdir(mode=0o700)
-    (worktree / ".git").write_text("gitdir: elsewhere\n", encoding="utf-8")
-    db_path = _compatible_db_under(tmp_path, worktree / "nested" / "protected")
+    db_path = _protected_db(tmp_path, "worktree/nested/protected")
+    (tmp_path / "worktree" / ".git").write_text("gitdir: elsewhere\n", encoding="utf-8")
     key_path = _key_at(tmp_path / "key-root")
     with pytest.raises(identity.CandidateIdentityError) as caught:
         _record(identity, db_path, key_path)
@@ -165,17 +145,13 @@ def test_db_under_git_worktree_file_marker_is_refused(tmp_path: Path) -> None:
     assert _count_rows(db_path) == 0
 
 
-
-
 def test_db_path_that_is_not_a_regular_file_is_refused_with_closed_error(
     tmp_path: Path,
 ) -> None:
-    """모드가 맞아도 일반 파일이 아니면 sqlite 오류가 아니라 닫힌 도메인 오류로 거부한다."""
+    """초기화 뒤 DB 자리에 일반 파일이 아닌 것이 오면 sqlite 오류가 아니라 닫힌 도메인 오류다."""
     identity = _load_identity_module()
-    _assert_tmp_is_symlink_free(tmp_path)
-    root = tmp_path / "protected-root"
-    root.mkdir(mode=0o700)
-    db_path = root / _DB_BASENAME
+    db_path = _protected_db(tmp_path)
+    db_path.unlink()
     db_path.mkdir(mode=0o600)
     key_path = _key_at(tmp_path / "key-root")
     with pytest.raises(identity.CandidateIdentityError) as caught:
@@ -232,8 +208,6 @@ def test_sqlite_sidecar_that_is_not_a_regular_file_is_refused(tmp_path: Path, su
     assert _count_rows(db_path) == 0
 
 
-
-
 def test_key_file_vanishing_after_checks_is_a_closed_error(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -272,8 +246,6 @@ def test_key_directory_vanishing_after_checks_is_a_closed_error(
     assert _count_rows(db_path) == 0
 
 
-
-
 def test_protected_db_outside_git_still_records(tmp_path: Path) -> None:
     """양성 대조군 — 정상 권한 · Git 밖 · 보조 파일 없음이면 그대로 1행 기록된다."""
     identity = _load_identity_module()
@@ -297,8 +269,6 @@ def test_protected_db_with_clean_sidecar_still_records(tmp_path: Path) -> None:
     sidecar.chmod(0o600)
     assert _record(identity, db_path, key_path) == "inserted"
     assert _count_rows(db_path) == 1
-
-
 
 
 @pytest.mark.parametrize("loosen", ["db-file", "db-directory"])
@@ -337,8 +307,6 @@ def test_permission_loosened_during_write_is_refused_before_commit(
     db_path.chmod(0o600)
     db_path.parent.chmod(0o700)
     assert _count_rows(db_path) == 0, "확정 전에 잡아야 하므로 행이 남으면 안 된다"
-
-
 
 
 def _hold_write_lock(db_path: Path) -> sqlite3.Connection:
