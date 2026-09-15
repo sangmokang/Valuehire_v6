@@ -531,3 +531,55 @@ def test_sqlite_sidecar_owned_by_another_uid_is_refused(
     _assert_closed_error(caught.value, tmp_path)
     assert "owner" in str(caught.value)
     assert _count_rows(db_path) == 0
+
+
+def _render_closed_error(identity: ModuleType, db_path: Path, key_path: Path) -> str:
+    try:
+        _record(identity, db_path, key_path)
+    except identity.CandidateIdentityError:
+        return traceback.format_exc()
+    pytest.fail("DID NOT RAISE CandidateIdentityError")
+
+
+def test_missing_key_file_leaves_no_path_in_cause_chain(tmp_path: Path) -> None:
+    """경쟁 없는 키 누락은 HS-03.01 검사기의 오류(원인 = 경로 담긴 FileNotFoundError)를
+    재포장한다. 그 사슬도 끊겨야 한다(변이 P5 가 살아남아 추가)."""
+
+    identity = _load_identity_module()
+    db_path = _protected_db(tmp_path)
+    key_dir = tmp_path / "key-root"
+    key_dir.mkdir()
+    key_dir.chmod(0o700)
+
+    rendered = _render_closed_error(identity, db_path, key_dir / _KEY_BASENAME)
+    assert str(tmp_path) not in rendered
+
+
+def test_key_directory_vanishing_leaves_no_path_in_cause_chain(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    identity = _load_identity_module()
+    db_path = _protected_db(tmp_path)
+    key_dir = tmp_path / "key-root"
+    key_path = _key_at(key_dir)
+    original = identity._reject_symlinked_chain
+
+    def verify_then_vanish(path: Path, *, label: str) -> None:
+        original(path, label=label)
+        if label == "hmac key path":
+            shutil.rmtree(key_dir)
+
+    monkeypatch.setattr(identity, "_reject_symlinked_chain", verify_then_vanish)
+
+    rendered = _render_closed_error(identity, db_path, key_path)
+    assert str(tmp_path) not in rendered
+
+
+def test_missing_db_file_leaves_no_path_in_cause_chain(tmp_path: Path) -> None:
+    identity = _load_identity_module()
+    db_path = _protected_db(tmp_path)
+    key_path = _key_at(tmp_path / "key-root")
+    db_path.unlink()
+
+    rendered = _render_closed_error(identity, db_path, key_path)
+    assert str(tmp_path) not in rendered
