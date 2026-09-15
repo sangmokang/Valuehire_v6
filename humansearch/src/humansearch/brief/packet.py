@@ -376,18 +376,28 @@ class PacketStore:
         with _channel_lock(self.dir, packet.packet_id, PACKET_LOCK_CHANNEL):
             if target.is_file() and read_store_file(target) == text:
                 return target
+            # 잠금은 다른 스레드·다른 프로세스를 막는다. 같은 스레드가 확인 도중 청구를 끼워 넣는
+            # 재진입 경로는 잠금이 막지 못하므로, 확인 전후로 장부가 그대로인지도 본다.
+            before = self._send_intent_files(packet.packet_id)
             if target.is_file() and self._has_send_intent(packet.packet_id):
                 _reject("발송 intent 가 있는 packet_id 는 다른 패킷 내용으로 저장할 수 없다")
+            if self._send_intent_files(packet.packet_id) != before:
+                _reject("저장을 확인하는 동안 발송 intent 가 생겼다 — 이 패킷은 저장하지 않는다")
             return write_store_file(self.dir, target, text)
 
-    def _has_send_intent(self, packet_id: str) -> bool:
+    def _send_intent_files(self, packet_id: str) -> frozenset[str]:
+        """이 packet_id 의 발송 attempt 파일 이름들. 묘비라 사라지지 않으므로 집합 비교가 성립한다."""
         prefix = f"{require_packet_id(packet_id)}."
-        return any(
-            entry.is_file()
+        return frozenset(
+            entry.name
+            for entry in self.dir.iterdir()
+            if entry.is_file()
             and entry.name.startswith(prefix)
             and entry.name.endswith(".sent.json")
-            for entry in self.dir.iterdir()
         )
+
+    def _has_send_intent(self, packet_id: str) -> bool:
+        return bool(self._send_intent_files(packet_id))
 
     def load(self, packet_id: str) -> SearchPacket:
         """저장된 패킷을 복원한다. 파일 부재·손상 JSON 은 전부 거부."""

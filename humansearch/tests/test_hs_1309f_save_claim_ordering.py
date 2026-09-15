@@ -20,6 +20,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from pathlib import Path
 
+import pytest
 from test_hs_1309e import (
     _CLAIM_AT,
     _PACKET_ID,
@@ -97,6 +98,34 @@ def test_save_cannot_replace_a_packet_while_a_claim_is_being_taken(
     won = bool(claimed and claimed[0])
     assert not (won and stored.mail.body_sha256 != approved.mail.body_sha256)
     assert saved == "rejected" or won is False
+
+
+def test_a_claim_wedged_into_the_same_thread_check_cannot_survive(tmp_path: Path) -> None:
+    """같은 스레드가 확인 도중 청구를 끼워 넣어도(재진입) 승인 본문은 교체되지 않는다.
+
+    flock 은 같은 스레드의 재진입을 막지 않는다 — 잠금만으로는 이 경로가 열린 채로 남는다.
+    """
+    directory = _ledger(tmp_path)
+    approved = _current_packet()
+    store = PacketStore(directory)
+    store.save(approved)
+    fired: list[bool] = []
+    original = PacketStore._has_send_intent
+
+    def wedge(self: PacketStore, packet_id: str) -> bool:
+        seen = original(self, packet_id)
+        if not fired:
+            fired.append(_take_claim(directory))
+        return seen
+
+    PacketStore._has_send_intent = wedge  # type: ignore[method-assign]
+    try:
+        with pytest.raises(BriefInputError):
+            store.save(_other_packet())
+    finally:
+        PacketStore._has_send_intent = original  # type: ignore[method-assign]
+    assert fired == [True]
+    assert store.load(_PACKET_ID).mail.body_sha256 == approved.mail.body_sha256
 
 
 # ---------------------------------------------------------------- ② 동시 경합
