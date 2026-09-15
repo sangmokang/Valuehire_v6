@@ -95,16 +95,17 @@ def _record(
 
 
 def _independent_key_hmac(position_ref: str, channel: str, candidate_ref: str) -> str:
-    """구현을 보지 않고 계약 문구만으로 다시 계산한다(tautology 방지)."""
+    """구현을 보지 않고 계약 문구만으로 다시 계산한다(tautology 방지).
 
-    message = b"\x1f".join(
-        (
-            b"hs-candidate-key-v1",
-            position_ref.encode("utf-8"),
-            channel.encode("utf-8"),
-            candidate_ref.encode("utf-8"),
-        )
-    )
+    계약 v2 — `msg = b"hs-candidate-key-v2"` 뒤에 각 필드를
+    `길이(4바이트 big-endian) + utf-8 바이트` 로 이어 붙인다. 구분자 결합은 필드 안에
+    그 구분자가 들어오면 경계가 무너진다(Codex V1 AC-2 반례).
+    """
+
+    message = b"hs-candidate-key-v2"
+    for field in (position_ref, channel, candidate_ref):
+        raw = field.encode("utf-8")
+        message += len(raw).to_bytes(4, "big") + raw
     return hmac.new(_TEST_KEY, message, "sha256").hexdigest()
 
 
