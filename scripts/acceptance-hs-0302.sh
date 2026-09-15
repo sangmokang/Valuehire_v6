@@ -84,7 +84,11 @@ BASE_SHA=7473ec8
 MIN_TESTS=6
 MIN_R2_TESTS=10
 MIN_R3_TESTS=6
-MIN_REQUIRED_IDS=80
+# 명부 건수는 하한이 아니라 **정확한 기대값**이다. 하한이면 시험 함수와 명부 줄을 함께
+# 지워 하한까지 내려앉을 수 있다 — 그러면 required·collected·missing·extra 가 모두
+# 맞아떨어져 통과한다(Codex V1 4차 실측: 82→80). 시험을 추가·삭제할 때는 명부 파일과
+# 이 상수를 **함께** 올린다.
+EXPECTED_REQUIRED_IDS=82
 
 WORK=$(mktemp -d) || { echo "NOT_RUN: mktemp 실패"; echo "CHECKED: 0"; exit 2; }
 trap 'rm -rf "$WORK"' EXIT
@@ -517,8 +521,8 @@ fi
 # 명부와 집합으로 대조한다 — 누락은 "시험이 사라졌다", 추가는 "명부를 갱신하라".
 "$GREP" -vE '^[[:space:]]*(#|$)' "$REQUIRED_TESTS" | LC_ALL=C sort > "$WORK/required_ids.txt"
 required_n=$("$GREP" -c . "$WORK/required_ids.txt")
-if [ "${required_n:-0}" -lt "$MIN_REQUIRED_IDS" ]; then
-  abort_not_run "필수 시험 명부가 ${required_n:-0}건 — ${MIN_REQUIRED_IDS}건 미만이면 명부가 비워진 것이다"
+if [ "${required_n:-0}" -ne "$EXPECTED_REQUIRED_IDS" ]; then
+  fail_item "필수 시험 명부가 ${required_n:-0}건 — 기대값 ${EXPECTED_REQUIRED_IDS}건과 다르다 (명부와 상수를 함께 올렸는가)"
 fi
 "$GREP" '::' "$collect_log" | LC_ALL=C sort > "$WORK/actual_ids.txt"
 comm -23 "$WORK/required_ids.txt" "$WORK/actual_ids.txt" > "$WORK/ids_missing.txt"

@@ -238,5 +238,10 @@ HMAC 입력 누락, 예외 삼킴 범위, 키 파일 검사 우회(symlink·모�
 | 변이 P3 소문자 정규화 제거 | 생존 0 | 13:11 → 소문자 시험 3건 실패 |
 | 5차 재검증 | PASS | 13:11:40~13:13:34 → G2 mutations `6/6` · gates `COLLECTED: 311` · antiforge `3/3` · ci-step-integrity `CHECKED: 24 VERDICT: PASS` · 전체 `311 passed` · ruff rc0 · mypy rc0 · 저장소 밖 참조 0건 · V2 재현기 그대로 |
 | P13 재차단 | 해소 | 배선 변이 꼬리를 리터럴로 두자 pre-commit P13 이 커밋을 막았다. 런타임 조립으로 고쳤다(우회 없음) |
-| V1 (4차) | NOT_RUN | 독립 검증 엔진 대기 |
+| V1 (4차) | **부분** | Codex @9107bcf → F0302-1·2·3 해결, F0302-4 부분. 명부 하한 80 인데 명부가 82건이라 시험 함수와 명부 2줄을 함께 지우면 80/80 으로 맞아떨어져 통과 |
+| 6차 — 결함 재현 | PASS | 13:26:59 NFKC 시험 함수 + 명부 2줄 동반 삭제 → `PASS: 필수 시험 명부 80건과 수집 결과가 정확히 같다`, `CHECKED: 22`, rc=0 (통과했다) |
+| 6차 — 정확 대조 | PASS | 하한 `MIN_REQUIRED_IDS=80` 을 정확 기대값 `EXPECTED_REQUIRED_IDS=82` 로 교체. 다르면 FAIL. 시험 추가·삭제 시 명부와 상수를 함께 올린다는 주석 포함 |
+| 변이 Q1 시험+명부 동반 삭제 | 생존 0 | 13:28 → `FAIL: 필수 시험 명부가 80건 — 기대값 82건과 다르다`, rc=1 |
+| 6차 재검증 | PASS | 인수 `CHECKED: 22` rc0 · G2 mutations `6/6` rc0 · 전체 `311 passed` · ruff rc0 |
+| V1 (5차) | NOT_RUN | 독립 검증 엔진 대기 |
 | push·Draft PR | NOT_RUN | 공통 규칙상 이 세션은 push·PR 을 하지 않는다 |
