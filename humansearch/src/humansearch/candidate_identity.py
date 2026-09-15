@@ -300,25 +300,37 @@ def _insert_once(
     channel: str,
     candidate_ref_hash: str,
 ) -> RecordOutcome:
-    """Single INSERT. 경쟁은 기본키 제약이 막고, 진 쪽만 duplicate 가 된다."""
+    """Single INSERT. 경쟁은 기본키 제약이 막고, 진 쪽만 duplicate 가 된다.
+
+    쓰기 직전 검사만으로는 부족하다 — INSERT 와 반환 사이에 권한이 완화되면 함수가
+    성공을 돌려줬다(격리 재현 19:27:46, DB 0644 인 채 `inserted`). 저장 계약 §3 은
+    쓰기 뒤 owner/mode 재확인을 요구한다. 확정(commit) **전에** 다시 보고, 위반이면
+    롤백해 행을 남기지 않는다 — 확정 뒤에 보면 오류를 내도 행은 이미 남는다.
+    """
 
     _verify_db_boundary(db_path)
     connection = sqlite3.connect(db_path, isolation_level=None)
     try:
         connection.execute("pragma foreign_keys = on")
-        connection.execute(
-            """
-            insert into hs_candidates
-              (candidate_key_hmac, position_ref, channel,
-               candidate_ref_state, candidate_ref_hash, storage_status)
-            values (?, ?, ?, 'observed', ?, 'pending')
-            """,
-            (key_hmac, position_ref, channel, candidate_ref_hash),
-        )
-    except sqlite3.IntegrityError as exc:
-        if exc.sqlite_errorname == _PRIMARY_KEY_CONSTRAINT:
-            return "duplicate"
-        raise
+        connection.execute("begin immediate")
+        try:
+            connection.execute(
+                """
+                insert into hs_candidates
+                  (candidate_key_hmac, position_ref, channel,
+                   candidate_ref_state, candidate_ref_hash, storage_status)
+                values (?, ?, ?, 'observed', ?, 'pending')
+                """,
+                (key_hmac, position_ref, channel, candidate_ref_hash),
+            )
+        except sqlite3.IntegrityError as exc:
+            if exc.sqlite_errorname == _PRIMARY_KEY_CONSTRAINT:
+                return "duplicate"
+            raise
+        # 확정 전 재확인. 여기서 예외가 나면 commit 없이 close() 로 가고, SQLite 는
+        # 열린 트랜잭션을 닫을 때 되돌린다(명시적 rollback 변이가 동작 동일로 생존 — 중복이라 뺐다).
+        _verify_db_boundary(db_path)
+        connection.execute("commit")
     finally:
         connection.close()
     return "inserted"
