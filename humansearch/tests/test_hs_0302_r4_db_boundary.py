@@ -21,7 +21,7 @@ import shutil
 import sqlite3
 import subprocess
 from pathlib import Path
-from types import ModuleType
+from types import ModuleType, SimpleNamespace
 
 import pytest
 
@@ -357,3 +357,58 @@ def test_protected_db_with_clean_sidecar_still_records(tmp_path: Path) -> None:
 
     assert _record(identity, db_path, key_path) == "inserted"
     assert _count_rows(db_path) == 1
+
+
+# ── 쓰기 뒤 재확인 (저장 계약 §3: "쓰기 뒤 owner/mode가 바뀌지 않았는지 다시 확인") ──
+
+
+@pytest.mark.parametrize("loosen", ["db-file", "db-directory"])
+def test_permission_loosened_during_write_is_refused_before_commit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, loosen: str
+) -> None:
+    """INSERT 뒤·반환 전에 권한이 완화되면 저장 실패여야 하고 행이 남지 않아야 한다.
+
+    재현(2026-09-15 19:27:46, 격리 폴더): INSERT 직후 DB 0644·부모 0755 로 완화 →
+    `outcome=inserted rows=1`, DB 는 0644 인 채 함수가 성공을 돌려줬다. 쓰기 직전 검사만
+    있고 쓰기 뒤 재확인이 없다.
+    """
+
+    identity = _load_identity_module()
+    db_path = _protected_db(tmp_path)
+    key_path = _key_at(tmp_path / "key-root")
+    real_sqlite3 = identity.sqlite3
+
+    class _LoosenAfterInsert:
+        def __init__(self, connection: sqlite3.Connection) -> None:
+            self._connection = connection
+
+        def execute(self, sql: str, params: tuple[str, ...] = ()) -> sqlite3.Cursor:
+            cursor = self._connection.execute(sql, params)
+            if "insert into hs_candidates" in sql:
+                if loosen == "db-file":
+                    db_path.chmod(0o644)
+                else:
+                    db_path.parent.chmod(0o755)
+            return cursor
+
+        def close(self) -> None:
+            self._connection.close()
+
+    def connect(path: Path, *args: object, **kwargs: object) -> _LoosenAfterInsert:
+        return _LoosenAfterInsert(real_sqlite3.connect(path, *args, **kwargs))
+
+    # 모듈 안의 `sqlite3` 이름만 바꾼다 — 시험 쪽 행 수 조회는 진짜 모듈을 쓴다.
+    monkeypatch.setattr(
+        identity,
+        "sqlite3",
+        SimpleNamespace(connect=connect, IntegrityError=real_sqlite3.IntegrityError),
+    )
+
+    with pytest.raises(identity.CandidateIdentityError) as caught:
+        _record(identity, db_path, key_path)
+
+    _assert_closed_error(caught.value, tmp_path)
+    assert "mode must be" in str(caught.value)
+    db_path.chmod(0o600)
+    db_path.parent.chmod(0o700)
+    assert _count_rows(db_path) == 0, "확정 전에 잡아야 하므로 행이 남으면 안 된다"

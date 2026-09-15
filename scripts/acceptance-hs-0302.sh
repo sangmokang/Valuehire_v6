@@ -90,7 +90,7 @@ MIN_R4_TESTS=7
 # 지워 하한까지 내려앉을 수 있다 — 그러면 required·collected·missing·extra 가 모두
 # 맞아떨어져 통과한다(Codex V1 4차 실측: 82→80). 시험을 추가·삭제할 때는 명부 파일과
 # 이 상수를 **함께** 올린다. 2026-09-15 4차: 82→97→100→102(DB 저장 경계 15건 + 보조 파일 비일반 3건 + 키 경로 경쟁 2건).
-EXPECTED_REQUIRED_IDS=102
+EXPECTED_REQUIRED_IDS=104
 
 WORK=$(mktemp -d) || { echo "NOT_RUN: mktemp 실패"; echo "CHECKED: 0"; exit 2; }
 trap 'rm -rf "$WORK"' EXIT
