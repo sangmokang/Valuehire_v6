@@ -18,10 +18,11 @@ _FILE_MODE = 0o600
 _PERMISSION_BITS = 0o777
 # "타인 쓰기 가능"의 정의: 그룹 write 또는 기타 write 비트가 서 있는 것.
 # 예외는 sticky(S_ISVTX) 하나뿐이다. sticky 디렉터리에서는 자기 소유가 아닌
-# 항목을 지우거나 이름을 바꿀 수 없으므로 우리 루트 항목이 치환되지 않는다.
+# 항목을 지우거나 이름을 바꿀 수 없으므로 우리 경로 요소가 치환되지 않는다.
 _OTHER_WRITE_BITS = stat.S_IWGRP | stat.S_IWOTH
 _DIR_FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
 _NEW_FILE_FLAGS = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
+_NO_FD = -1
 _REQUIRED_DIR_FD_CALLS = (os.open, os.mkdir, os.chmod, os.stat, os.link, os.unlink)
 
 
@@ -68,9 +69,6 @@ class RunnerBoundary:
         root = self.config.protected_root
         if not root.is_absolute():
             return BoundaryReceipt(BoundaryStatus.DENIED, "protected_root_not_absolute")
-        ancestors = self._check_ancestors(root, runner_uid)
-        if ancestors is not None:
-            return ancestors
         parts = self._relative_parts(relative_path)
         if parts is None:
             return BoundaryReceipt(BoundaryStatus.DENIED, "target_escapes_protected_root")
@@ -91,28 +89,6 @@ class RunnerBoundary:
             return BoundaryReceipt(BoundaryStatus.DENIED, "current_process_is_not_runner")
         return None
 
-    def _check_ancestors(self, root: Path, runner_uid: int) -> BoundaryReceipt | None:
-        """Reject a root whose path components could be substituted by others.
-
-        Walks every component from ``/`` down to the root's parent. Each one must
-        be a real directory (never a symlink), owned by the runner or by root,
-        and not group/other writable unless it carries the sticky bit.
-        """
-
-        denied = BoundaryReceipt(BoundaryStatus.DENIED, "protected_root_ancestor_invalid")
-        for ancestor in reversed(root.parents):
-            try:
-                info = os.lstat(ancestor)
-            except OSError:
-                return denied
-            if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode):
-                return denied
-            if info.st_uid not in (runner_uid, _ROOT_UID):
-                return denied
-            if info.st_mode & _OTHER_WRITE_BITS and not info.st_mode & stat.S_ISVTX:
-                return denied
-        return None
-
     def _relative_parts(self, relative_path: str | Path) -> tuple[str, ...] | None:
         raw = Path(relative_path)
         if raw.is_absolute() or not raw.parts or ".." in raw.parts:
@@ -122,16 +98,11 @@ class RunnerBoundary:
     def _write_under_root(
         self, root: Path, parts: tuple[str, ...], payload: bytes, runner_uid: int
     ) -> BoundaryReceipt:
+        opened = self._open_root_chain(root, runner_uid)
+        if isinstance(opened, BoundaryReceipt):
+            return opened
+        root_fd = opened
         try:
-            root_fd = os.open(root, _DIR_FLAGS)
-        except OSError:
-            return BoundaryReceipt(BoundaryStatus.DENIED, "protected_root_invalid")
-        try:
-            invalid = self._check_open_directory(
-                root_fd, runner_uid, "protected_root_invalid"
-            )
-            if invalid is not None:
-                return invalid
             parent_fd = self._ensure_parent(root_fd, parts[:-1], runner_uid)
             if isinstance(parent_fd, BoundaryReceipt):
                 return parent_fd
@@ -141,18 +112,67 @@ class RunnerBoundary:
                 )
             finally:
                 if parent_fd != root_fd:
-                    os.close(parent_fd)
+                    self._close_fd(parent_fd)
         finally:
-            os.close(root_fd)
+            self._close_fd(root_fd)
+
+    def _open_root_chain(self, root: Path, runner_uid: int) -> int | BoundaryReceipt:
+        """Open every component of the root path one descriptor at a time.
+
+        Each component is opened relative to the previous component's descriptor
+        with ``O_NOFOLLOW`` and is validated through that descriptor, so the
+        object we checked is the object we keep using. The path string is never
+        resolved again afterwards, which closes the check-then-open gap.
+        """
+
+        parts = root.parts
+        last = len(parts) - 1
+        current = _NO_FD
+        for index, part in enumerate(parts):
+            is_root = index == last
+            reason = (
+                "protected_root_invalid" if is_root else "protected_root_ancestor_invalid"
+            )
+            try:
+                if current == _NO_FD:
+                    opened = os.open(part, _DIR_FLAGS)
+                else:
+                    opened = os.open(part, _DIR_FLAGS, dir_fd=current)
+            except OSError:
+                self._close_fd(current)
+                return BoundaryReceipt(BoundaryStatus.DENIED, reason)
+            self._close_fd(current)
+            current = opened
+            invalid = self._check_open_directory(
+                current, runner_uid, reason, ancestor=not is_root
+            )
+            if invalid is not None:
+                self._close_fd(current)
+                return invalid
+        return current
 
     def _check_open_directory(
-        self, dir_fd: int, runner_uid: int, reason: str
+        self, dir_fd: int, runner_uid: int, reason: str, *, ancestor: bool
     ) -> BoundaryReceipt | None:
-        info = os.fstat(dir_fd)
+        """Validate an already-open directory. Never raises, always decides."""
+
+        denied = BoundaryReceipt(BoundaryStatus.DENIED, reason)
+        try:
+            info = os.fstat(dir_fd)
+        except OSError:
+            return denied
         if not stat.S_ISDIR(info.st_mode):
-            return BoundaryReceipt(BoundaryStatus.DENIED, reason)
-        if info.st_uid != runner_uid or info.st_mode & _PERMISSION_BITS != _DIR_MODE:
-            return BoundaryReceipt(BoundaryStatus.DENIED, reason)
+            return denied
+        if not ancestor:
+            if info.st_uid != runner_uid:
+                return denied
+            if info.st_mode & _PERMISSION_BITS != _DIR_MODE:
+                return denied
+            return None
+        if info.st_uid not in (runner_uid, _ROOT_UID):
+            return denied
+        if info.st_mode & _OTHER_WRITE_BITS and not info.st_mode & stat.S_ISVTX:
+            return denied
         return None
 
     def _ensure_parent(
@@ -179,11 +199,13 @@ class RunnerBoundary:
                 next_fd = os.open(part, _DIR_FLAGS, dir_fd=current_fd)
             except OSError:
                 return self._release(current_fd, root_fd, denied)
-            invalid = self._check_open_directory(next_fd, runner_uid, reason)
+            invalid = self._check_open_directory(
+                next_fd, runner_uid, reason, ancestor=False
+            )
             if current_fd != root_fd:
-                os.close(current_fd)
+                self._close_fd(current_fd)
             if invalid is not None:
-                os.close(next_fd)
+                self._close_fd(next_fd)
                 return invalid
             current_fd = next_fd
         return current_fd
@@ -192,8 +214,19 @@ class RunnerBoundary:
         self, dir_fd: int, root_fd: int, receipt: BoundaryReceipt
     ) -> BoundaryReceipt:
         if dir_fd != root_fd:
-            os.close(dir_fd)
+            self._close_fd(dir_fd)
         return receipt
+
+    def _close_fd(self, fd: int) -> bool:
+        """Close one descriptor. POSIX releases it even when close reports an error."""
+
+        if fd == _NO_FD:
+            return True
+        try:
+            os.close(fd)
+        except OSError:
+            return False
+        return True
 
     def _write_new_file(
         self,
@@ -212,15 +245,48 @@ class RunnerBoundary:
             fd = os.open(temp_name, _NEW_FILE_FLAGS, _FILE_MODE, dir_fd=parent_fd)
         except OSError:
             return BoundaryReceipt(BoundaryStatus.DENIED, "write_failed")
+        stored = self._store_payload(parent_fd, fd, temp_name, payload)
+        if isinstance(stored, BoundaryReceipt):
+            return stored
+        invalid = self._check_written_file(stored, runner_uid)
+        if invalid is not None:
+            return self._discard(parent_fd, temp_name, invalid.reason)
+        return self._publish(
+            parent_fd, temp_name, name, final_path, digest, len(payload)
+        )
+
+    def _store_payload(
+        self, parent_fd: int, fd: int, temp_name: str, payload: bytes
+    ) -> os.stat_result | BoundaryReceipt:
         try:
             info = self._fill_temp_file(fd, payload)
         except OSError:
-            return self._discard(parent_fd, temp_name, fd, "write_failed")
-        os.close(fd)
-        invalid = self._check_written_file(info, runner_uid)
-        if invalid is not None:
-            self._remove(parent_fd, temp_name)
-            return invalid
+            self._close_fd(fd)
+            return self._discard(parent_fd, temp_name, "write_failed")
+        if not self._close_fd(fd):
+            return self._discard(parent_fd, temp_name, "write_failed")
+        return info
+
+    def _fill_temp_file(self, fd: int, payload: bytes) -> os.stat_result:
+        os.fchmod(fd, _FILE_MODE)
+        view = memoryview(payload)
+        sent = 0
+        while sent < len(view):
+            sent += os.write(fd, view[sent:])
+        os.fsync(fd)
+        return os.fstat(fd)
+
+    def _publish(
+        self,
+        parent_fd: int,
+        temp_name: str,
+        name: str,
+        final_path: Path,
+        digest: str,
+        byte_count: int,
+    ) -> BoundaryReceipt:
+        """Give the finished temporary file its final name, or undo everything."""
+
         try:
             os.link(
                 temp_name,
@@ -233,20 +299,36 @@ class RunnerBoundary:
             reason = (
                 "target_already_exists" if exc.errno == errno.EEXIST else "write_failed"
             )
-            return self._discard(parent_fd, temp_name, None, reason)
-        self._remove(parent_fd, temp_name)
+            return self._discard(parent_fd, temp_name, reason)
+        if not self._published_path_matches(parent_fd, name, final_path):
+            return self._roll_back(parent_fd, name, "published_path_mismatch")
+        if not self._remove(parent_fd, temp_name):
+            return self._roll_back(parent_fd, name, "cleanup_failed")
         return BoundaryReceipt(
-            BoundaryStatus.WRITTEN, "written", final_path, digest, len(payload)
+            BoundaryStatus.WRITTEN, "written", final_path, digest, byte_count
         )
 
-    def _fill_temp_file(self, fd: int, payload: bytes) -> os.stat_result:
-        os.fchmod(fd, _FILE_MODE)
-        view = memoryview(payload)
-        sent = 0
-        while sent < len(view):
-            sent += os.write(fd, view[sent:])
-        os.fsync(fd)
-        return os.fstat(fd)
+    def _published_path_matches(
+        self, parent_fd: int, name: str, final_path: Path
+    ) -> bool:
+        """Check the receipt path names the very file we published."""
+
+        try:
+            through_fd = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+            through_path = os.lstat(final_path)
+        except OSError:
+            return False
+        return (through_fd.st_dev, through_fd.st_ino) == (
+            through_path.st_dev,
+            through_path.st_ino,
+        )
+
+    def _roll_back(self, parent_fd: int, name: str, reason: str) -> BoundaryReceipt:
+        """Undo a published name so a half-finished state is never a success."""
+
+        if not self._remove(parent_fd, name):
+            return BoundaryReceipt(BoundaryStatus.DENIED, "recovery_required")
+        return BoundaryReceipt(BoundaryStatus.DENIED, reason)
 
     def _check_target_absent(self, parent_fd: int, name: str) -> BoundaryReceipt | None:
         try:
@@ -269,20 +351,22 @@ class RunnerBoundary:
         return None
 
     def _discard(
-        self, parent_fd: int, temp_name: str, fd: int | None, reason: str
+        self, parent_fd: int, temp_name: str, reason: str
     ) -> BoundaryReceipt:
-        """Close the open handle and delete the half-written temporary file."""
+        """Delete the temporary file. Say so plainly when that is impossible."""
 
-        if fd is not None:
-            os.close(fd)
-        self._remove(parent_fd, temp_name)
+        if not self._remove(parent_fd, temp_name):
+            return BoundaryReceipt(BoundaryStatus.DENIED, "recovery_required")
         return BoundaryReceipt(BoundaryStatus.DENIED, reason)
 
-    def _remove(self, parent_fd: int, name: str) -> None:
+    def _remove(self, parent_fd: int, name: str) -> bool:
         try:
             os.unlink(name, dir_fd=parent_fd)
+        except FileNotFoundError:
+            return True
         except OSError:
-            pass
+            return False
+        return True
 
 
 def write_protected_file(
