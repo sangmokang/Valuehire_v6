@@ -23,7 +23,7 @@
 |---|---|---|
 | 1 | 비밀 스캔 (verify.sh) | `bash verify.sh` — 추적 파일 전체 |
 | 2 | Strict 원칙 정본·장부·배선 검사 | `bash scripts/acceptance-principles-check.sh` — 34개 정본 문구·장치·명시적 pre-push/CI 배선 |
-| 3 | Strict 원칙 적대 fixture·P11 경계 | `bash scripts/acceptance-principles-mutations.sh` — 정상 fixture와 반례 41건·P11 hard LOC 및 초과 경계 |
+| 3 | Strict 원칙 적대 fixture·500/501 경계 | `bash scripts/acceptance-principles-mutations.sh` — 정상 fixture와 반례 41건·500/501 경계 |
 | 4 | Strict 전역 스킬 잠금 장치 격리 회귀 | `bash scripts/acceptance-guard-global-skill-files.sh` — lock/check/unlock/recover와 동일 UID 한계 |
 | 5 | P3 조용한 실패 문법·오탐 회귀 | `scripts/acceptance-silent-failure-lint.sh` + mutation 34건 — 대소문자 확장자 전체 소스와 스테이지 blob 판정 |
 | 6 | HumanSearch G1 클린룸 경계 | 인라인 8개 — `scripts/acceptance-hs-cleanroom.sh`, `scripts/acceptance-hs-cleanroom-mutations.sh`, `scripts/acceptance-hs-cleanroom-absolute-paths.sh`, `scripts/acceptance-hs-cleanroom-absolute-contexts.sh`, `scripts/acceptance-hs-cleanroom-colon-paths.sh`, `scripts/acceptance-hs-cleanroom-file-urls.sh`, `scripts/acceptance-hs-cleanroom-hook-env.sh`, `scripts/acceptance-hs-cleanroom-hook-env-mutations.sh` |
@@ -47,7 +47,7 @@
 | 24 | 인수 검사 verify-ac-m | `bash scripts/acceptance-verify-ac-m.sh` — mechanism 명부 대조 (AC-M) |
 | 25 | 인수 검사 invoice | `bash scripts/acceptance-invoice.sh` — 채용 수수료 계산·기한·계약 변조·Codex/Claude 스킬 동등성 |
 | 26 | Invoice 독립 런타임 게이트 | 게이트 배선 검사 + Python 단위시험 직접 실행 + 임시 PostgreSQL에서 마이그레이션·수수료 동시성·저장/전달 RPC 검증 |
-| 27 | 인수 검사 hs-0302 | `bash scripts/acceptance-hs-0302.sh` — 후보 식별키 HMAC 의미(구분자 주입 충돌·길이 접두 계약·제어문자 거부) 실행 판정, 키/DB 경로 경계, #97 마이그레이션 무변경, 시험 수집 건수 정확 대조, 자기 fail-closed 음성 대조군 2종, CI 스텝 run 정확 대조(scripts/verify/check-hs-0302-ci-wiring.rb), 필수 node-id 명부(scripts/verify/fixtures/hs-0302-required-tests.txt) 집합 대조 |
+| 27 | 인수 검사 hs-0302 | `bash scripts/acceptance-hs-0302.sh` — 후보 식별키 HMAC 의미(구분자 주입 충돌·길이 접두 계약·제어문자 거부) 실행 판정, 키/DB 경로 경계, #97 마이그레이션 무변경, 시험 수집 건수 정확 대조, 자기 fail-closed 음성 대조군 2종, CI 스텝 run 정확 대조(scripts/verify/check-hs-0302-ci-wiring.rb), 필수 node-id 명부(scripts/verify/fixtures/hs-0302-required-tests.txt) 집합 대조, 승인 장부·열린 연결 대조 약화 변이 2종 검출 |
 
 *(1번 앞에 `actions/checkout` 이 있고 `fetch-depth: 0` 이다 — 8번이 과거 blob 을 열려면 필요하다.)*
 
