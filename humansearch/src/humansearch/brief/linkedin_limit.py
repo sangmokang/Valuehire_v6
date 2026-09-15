@@ -38,8 +38,7 @@ __all__ = [
 # 길이 계산에서 빼는 복사 마커. 러너가 붙였다 떼는 프레임이지 본문이 아니다(§7 D4).
 _COPY_MARKERS: tuple[str, ...] = ("[복사 시작]", "[복사 끝]")
 
-# 본문 밖 프레임 줄 목록. 제목·문의는 실제 내용이 뒤따르므로 접두로 허용하되,
-# 복사/회사정보 마커는 정확히 같은 줄만 JD 내용 줄에서 제외한다.
+# 본문 밖 프레임 줄 목록.
 #   "제목:"          — InMail 제목 줄
 #   "[복사 시작]"    — 복사 구간 시작
 #   "[복사 끝]"      — 복사 구간 끝
@@ -52,6 +51,15 @@ LINKEDIN_FRAME_LINES: tuple[str, ...] = (
     "[회사 정보 보완]",
     "문의:",
 )
+
+# 내용이 뒤따르는 접두. **면제 접두가 아니다** — 접두를 떼고 뒤의 내용을 그대로 판정한다.
+# 접두만으로 면제하면 조건 정규식이 못 잡는 `문의: 대졸 필수`·`문의: 야간 근무 가능` 이
+# 검사에서 통째로 빠진다(Codex 13차 F83-1). 정규식에 단어를 더 넣는 처방은 다음 반례에서
+# 다시 뚫리므로 **면제 자체**를 없애고, 자유 문구는 호출자가 `frame_lines` 로 선언하게 한다.
+_FRAME_PREFIXES: tuple[str, ...] = ("제목:", "문의:")
+
+# 내용이 없는 순수 마커. 이것만 정확히 같은 줄일 때 판정에서 빠진다.
+_FRAME_MARKERS: tuple[str, ...] = ("[복사 시작]", "[복사 끝]", "[회사 정보 보완]")
 
 # 축약으로 인정할 어미·조사·존칭 접미. 명사·숫자·영문은 여기 없다(빠지면 누락이다).
 KOREAN_ENDINGS: tuple[str, ...] = (
@@ -180,17 +188,25 @@ def _canonical_heading(text: str) -> str:
     return _HEADING_TAIL.sub("", normalize_line(text)).replace(" ", "")
 
 
-def _is_frame_line(line: str) -> bool:
+def _is_frame_marker(line: str) -> bool:
+    """내용이 없는 순수 마커 줄인가. 이것만 정확 일치로 판정에서 빠진다."""
     normalized = normalize_line(line)
-    prefix_allowed = tuple(
-        normalize_line(prefix) for prefix in LINKEDIN_FRAME_LINES if prefix in {"제목:", "문의:"}
-    )
-    exact_allowed = {
-        normalize_line(prefix)
-        for prefix in LINKEDIN_FRAME_LINES
-        if prefix not in {"제목:", "문의:"}
-    }
-    return normalized.startswith(prefix_allowed) or normalized in exact_allowed
+    return any(normalized == normalize_line(marker) for marker in _FRAME_MARKERS)
+
+
+def _frame_payload(line: str) -> str:
+    """프레임 접두를 떼고 **뒤에 오는 내용**을 돌려준다. 접두가 없으면 줄 그대로.
+
+    접두는 판정을 면제하지 않는다 — 떼고 남은 내용이 JD 에 있으면 덮인 줄이고,
+    없으면 원문에 없는 줄이다. `문의: 경력 3년 이상` 처럼 JD 조건 줄을 프레임 위치로
+    옮겨도 검사 대상으로 남는 이유가 이것이다.
+    """
+    normalized = normalize_line(line)
+    for prefix in _FRAME_PREFIXES:
+        head = normalize_line(prefix)
+        if normalized.startswith(head):
+            return normalize_line(normalized[len(head) :])
+    return normalized
 
 
 def _matches_condition(line: str) -> bool:
@@ -240,12 +256,15 @@ def verify_linkedin_fidelity(
     *,
     omittable_sections: tuple[str, ...] = (),
     allowed_extra: tuple[str, ...] = (),
+    frame_lines: tuple[str, ...] = (),
 ) -> FidelityReport:
     """지정 절 생략과 어미 축약만 허용하고 그 밖의 누락·추가를 잡아낸다.
 
     `omittable_sections` 는 JD 절 heading 과 정규화 후 정확 일치해야 한다(오타는 거부).
-    `allowed_extra` 는 호출자가 명시적으로 승인한 추가 줄이다. 프레임 줄
-    (`LINKEDIN_FRAME_LINES` 접두)은 애초에 판정 대상이 아니다.
+    `allowed_extra` 는 호출자가 명시적으로 승인한 추가 줄이다.
+    `frame_lines` 는 호출자가 구조화 필드에서 렌더해 **선언한 프레임 줄 전문**이다 —
+    정확히 일치하는 줄만 판정에서 빠지고, 접두(`제목:`·`문의:`)만으로는 빠지지 않는다.
+    선언한 줄이라도 채용 조건 문구를 품으면 면제하지 않는다.
     `jd_line_count` 는 **검사 대상으로 남은** JD 줄 수, `rendered_line_count` 는 본문의
     전체 내용 줄 수(프레임 포함)다.
     """
@@ -283,9 +302,15 @@ def verify_linkedin_fidelity(
             "생략 뒤 검사 대상 JD 줄이 0 이다 — 모든 절을 생략한 LinkedIn 판은 산출물이 아니다"
         )
     body_all = content_lines(body)
-    # 프레임 줄이라도 채용 조건 문구를 품으면 면제하지 않는다(Codex 12차: `문의: 경력 10년 이상만`)
+    # 선언한 프레임 줄만 정확 일치로 빠진다. 그래도 채용 조건 문구를 품으면 면제하지 않는다
+    # (Codex 12차: `문의: 경력 10년 이상만`). 그 밖의 줄은 접두를 떼고 **내용**을 판정한다.
+    declared = frozenset(_normalized_names(frame_lines, "frame_lines"))
     body_lines = tuple(
-        line for line in body_all if not (_is_frame_line(line) and not _matches_condition(line))
+        payload
+        for line in body_all
+        if not _is_frame_marker(line)
+        and not (normalize_line(line) in declared and not _matches_condition(line))
+        and (payload := _frame_payload(line))
     )
     if not body_lines:
         raise BriefInputError("LinkedIn 본문에 프레임 줄 외 내용 줄이 0 이다")

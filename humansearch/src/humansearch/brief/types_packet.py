@@ -71,6 +71,9 @@ class JdPacket:
         str, ...
     ]  # 필드 2 에 담은 JD 절(마커, JD 순서) — SearchPacket 이 재계산해 대조
     linkedin_omitted_sections: tuple[str, ...]  # LinkedIn 판에서 생략한 절 — 그 밖의 누락은 거부
+    # LinkedIn 판의 프레임 줄 전문(`제목: …`·`문의: …`). 접두 면제를 대신하는 **선언**이다 —
+    # 여기 적힌 줄과 정확히 같을 때만 충실도 판정에서 빠진다(Codex 13차 F83-1).
+    linkedin_frame_lines: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.two_field_sections:
@@ -80,6 +83,7 @@ class JdPacket:
         for label, names in (
             ("two_field_sections", self.two_field_sections),
             ("linkedin_omitted_sections", self.linkedin_omitted_sections),
+            ("linkedin_frame_lines", self.linkedin_frame_lines),
         ):
             for name in names:
                 _require_text(name, f"JdPacket.{label}[]")
@@ -282,7 +286,10 @@ class SearchPacket:
         _require_faithful(verify_fidelity(self.jd, packet.gmail_body), "gmail_body")
         _require_faithful(
             verify_linkedin_fidelity(
-                self.jd, packet.linkedin_body, omittable_sections=packet.linkedin_omitted_sections
+                self.jd,
+                packet.linkedin_body,
+                omittable_sections=packet.linkedin_omitted_sections,
+                frame_lines=packet.linkedin_frame_lines,
             ),
             "linkedin_body",
         )

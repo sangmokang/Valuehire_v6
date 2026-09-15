@@ -31,7 +31,7 @@ from test_hs_1309e import (
 )
 
 from humansearch.brief import BriefInputError, PacketStore, SearchPacket, record_intent
-from humansearch.brief import send_ledger as send_ledger_module
+from humansearch.brief import packet as packet_module
 
 _JOIN_TIMEOUT = 60.0
 _BLOCKED_WAIT = 2.0
@@ -151,7 +151,7 @@ def test_a_held_channel_lock_blocks_packet_save(tmp_path: Path) -> None:
     finished: list[int] = []
 
     def holder() -> None:
-        with send_ledger_module._channel_lock(directory, _PACKET_ID, "gmail"):
+        with packet_module._channel_lock(directory, _PACKET_ID, "gmail"):
             holder_ready.set()
             release.wait(timeout=_JOIN_TIMEOUT)
 

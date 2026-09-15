@@ -55,6 +55,7 @@ from humansearch.brief import (
 )
 from humansearch.brief import claim_send as _raw_claim_send
 from humansearch.brief import open_new_attempt as _raw_open_new_attempt
+from humansearch.brief import packet as packet_module
 from humansearch.brief import send_claim as send_claim_module
 from humansearch.brief import send_ledger as send_ledger_module
 from humansearch.brief.policy import override_policy_for_tests, policy
@@ -498,7 +499,7 @@ def test_channel_lock_is_reentrant_for_the_same_thread(tmp_path: Path) -> None:
     seen: list[SendIntent | None] = []
 
     def nested() -> None:
-        with send_ledger_module._channel_lock(directory, _PACKET_ID, "gmail"):
+        with packet_module._channel_lock(directory, _PACKET_ID, "gmail"):
             seen.append(load_intent(directory, _PACKET_ID, "gmail"))
         done.set()
 
@@ -516,13 +517,13 @@ def test_channel_lock_still_excludes_other_threads(tmp_path: Path) -> None:
     entered_at: list[float] = []
 
     def holder() -> None:
-        with send_ledger_module._channel_lock(directory, _PACKET_ID, "gmail"):
+        with packet_module._channel_lock(directory, _PACKET_ID, "gmail"):
             holder_ready.set()
             release.wait(timeout=60)
 
     def contender() -> None:
         holder_ready.wait(timeout=60)
-        with send_ledger_module._channel_lock(directory, _PACKET_ID, "gmail"):
+        with packet_module._channel_lock(directory, _PACKET_ID, "gmail"):
             entered_at.append(1.0)
 
     threads = [

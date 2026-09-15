@@ -19,6 +19,7 @@ from humansearch.brief import (
     KOREAN_ENDINGS,
     LINKEDIN_FRAME_LINES,
     BriefInputError,
+    FidelityReport,
     JdSource,
     check_linkedin,
     core_tokens,
@@ -55,8 +56,12 @@ JD_TAIL = """\
 
 SAMPLE_JD = JD_HEAD + JD_TAIL
 
-FRAME_HEAD = "제목: 합성 예시 조직 인재 플랫폼 엔지니어 포지션 제안\n[복사 시작]\n"
-FRAME_TAIL = "[복사 끝]\n[회사 정보 보완]\n문의: 회신으로 알려주세요\n"
+TITLE_LINE = "제목: 합성 예시 조직 인재 플랫폼 엔지니어 포지션 제안"
+CONTACT_LINE = "문의: 회신으로 알려주세요"
+FRAME_HEAD = f"{TITLE_LINE}\n[복사 시작]\n"
+FRAME_TAIL = f"[복사 끝]\n[회사 정보 보완]\n{CONTACT_LINE}\n"
+# 프레임 접두만으로는 판정에서 빠지지 않는다 — 자유 문구 프레임 줄은 전문을 선언해야 한다.
+FRAME_LINES: tuple[str, ...] = (TITLE_LINE, CONTACT_LINE)
 
 THINKING_LINE = "• 구조적 사고를 중요하게 생각합니다\n"
 THINKING_SHORT = "• 구조적 사고를 중요하게 생각\n"
@@ -78,6 +83,12 @@ def _jd(text: str = SAMPLE_JD) -> JdSource:
 
 def _body(block: str = SAMPLE_JD) -> str:
     return f"{FRAME_HEAD}{block}{FRAME_TAIL}"
+
+
+def _verify(jd: JdSource, body: str, **options: object) -> FidelityReport:
+    """이 fixture 의 프레임 줄을 선언한 채로 판정한다(선언 없이는 원문에 없는 줄이다)."""
+    options.setdefault("frame_lines", FRAME_LINES)
+    return verify_linkedin_fidelity(jd, body, **options)  # type: ignore[arg-type]
 
 
 # ---------------------------------------------------------------- check_linkedin 경계
@@ -180,7 +191,7 @@ def test_language_constants_are_populated() -> None:
 
 
 def test_verbatim_body_passes() -> None:
-    report = verify_linkedin_fidelity(_jd(), _body())
+    report = _verify(_jd(), _body())
     assert report.missing == ()
     assert report.extra_lines == ()
     assert report.ok is True
@@ -190,14 +201,14 @@ def test_verbatim_body_passes() -> None:
 def test_ending_contraction_in_body_passes() -> None:
     body = _body().replace(THINKING_LINE, THINKING_SHORT)
     assert THINKING_SHORT in body
-    report = verify_linkedin_fidelity(_jd(), body)
+    report = _verify(_jd(), body)
     assert report.missing == ()
     assert report.extra_lines == ()
     assert report.ok is True
 
 
 def test_declared_sections_may_be_omitted() -> None:
-    report = verify_linkedin_fidelity(
+    report = _verify(
         _jd(),
         _body(JD_HEAD),
         omittable_sections=("혜택 및 복지", "채용 전형"),
@@ -212,14 +223,14 @@ def test_declared_sections_may_be_omitted() -> None:
 
 def test_undeclared_section_line_removal_is_missing() -> None:
     body = _body().replace(PYTHON_LINE, "")
-    report = verify_linkedin_fidelity(_jd(), body)
+    report = _verify(_jd(), body)
     assert "파이썬으로 데이터 파이프라인을 작성할 수 있습니다" in report.missing
     assert report.ok is False
 
 
 def test_omitting_a_section_does_not_excuse_other_sections() -> None:
     body = _body(JD_HEAD.replace(PYTHON_LINE, ""))
-    report = verify_linkedin_fidelity(
+    report = _verify(
         _jd(),
         body,
         omittable_sections=("혜택 및 복지", "채용 전형"),
@@ -230,14 +241,14 @@ def test_omitting_a_section_does_not_excuse_other_sections() -> None:
 
 def test_dropping_one_noun_is_missing() -> None:
     body = _body().replace(CUSTOMER_LINE, CUSTOMER_NO_NOUN)
-    report = verify_linkedin_fidelity(_jd(), body)
+    report = _verify(_jd(), body)
     assert "고객 문제를 관찰하고 가설을 세워 본 경험이 있습니다" in report.missing
     assert report.ok is False
 
 
 def test_unlisted_ending_form_is_not_a_contraction() -> None:
     body = _body().replace(SEEK_LINE, SEEK_NOUNISED)
-    report = verify_linkedin_fidelity(_jd(), body)
+    report = _verify(_jd(), body)
     assert "검색 품질 지표를 직접 정의해 본 분을 찾습니다" in report.missing
     assert report.ok is False
 
@@ -245,12 +256,12 @@ def test_unlisted_ending_form_is_not_a_contraction() -> None:
 @pytest.mark.parametrize("name", ["복리후생", "전형 절차", "", "  "])
 def test_unknown_omittable_section_name_is_rejected(name: str) -> None:
     with pytest.raises(BriefInputError):
-        verify_linkedin_fidelity(_jd(), _body(), omittable_sections=(name,))
+        _verify(_jd(), _body(), omittable_sections=(name,))
 
 
 def test_free_line_inside_block_is_extra() -> None:
     body = _body(SAMPLE_JD + FREE_LINE)
-    report = verify_linkedin_fidelity(_jd(), body)
+    report = _verify(_jd(), body)
     assert report.missing == ()
     assert "재택근무 가능" in report.extra_lines
     assert report.ok is False
@@ -258,25 +269,33 @@ def test_free_line_inside_block_is_extra() -> None:
 
 def test_extra_condition_line_is_reported_on_its_own_axis() -> None:
     body = _body(SAMPLE_JD + CONDITION_LINE)
-    report = verify_linkedin_fidelity(_jd(), body)
+    report = _verify(_jd(), body)
     assert "경력 3년 이상" in report.extra_condition
     assert "경력 3년 이상" in report.extra_lines
     assert report.ok is False
 
 
-def test_frame_lines_are_not_counted_as_extra() -> None:
-    report = verify_linkedin_fidelity(_jd(), _body())
+def test_declared_frame_lines_are_not_counted_as_extra() -> None:
+    report = _verify(_jd(), _body())
     assert report.extra_lines == ()
     assert report.rendered_line_count > report.jd_line_count
 
 
+def test_undeclared_frame_lines_are_extra() -> None:
+    """선언하지 않으면 프레임 접두가 있어도 원문에 없는 줄이다(접두 면제 폐지)."""
+    report = _verify(_jd(), _body(), frame_lines=())
+    assert report.ok is False
+    assert "합성 예시 조직 인재 플랫폼 엔지니어 포지션 제안" in report.extra_lines
+    assert "회신으로 알려주세요" in report.extra_lines
+
+
 def test_allowed_extra_removes_a_declared_line() -> None:
     body = _body(SAMPLE_JD + FREE_LINE)
-    report = verify_linkedin_fidelity(_jd(), body, allowed_extra=("• 재택근무 가능",))
+    report = _verify(_jd(), body, allowed_extra=("• 재택근무 가능",))
     assert report.extra_lines == ()
     assert report.ok is True
 
 
 def test_blank_body_is_rejected() -> None:
     with pytest.raises(BriefInputError):
-        verify_linkedin_fidelity(_jd(), "   \n\n")
+        _verify(_jd(), "   \n\n")
