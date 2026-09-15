@@ -449,3 +449,14 @@ Next steps:
 - 저장 루트를 단일 객체로 결합하고 서로 다른 디렉터리·실제 프로세스 경합을 F83-2 시험에 추가하십시오.
 - 세 반례가 실패하고 관련 전체 pytest·ruff·mypy가 쓰기 가능한 환경에서 새로 통과하기 전에는 병합하지 마십시오.
 ```
+
+### Claude V2 재현 — PR #83 3ebb38c (11:30:24, `v2_pr83_codex.py`)
+
+```
+F83-1 declared [문의: 대졸 필수]: PASSED_THROUGH in body=True
+F83-1 declared [문의: 재택근무 가능]: PASSED_THROUGH in body=True
+F83-1 declared [문의: 야간 근무 가능]: PASSED_THROUGH in body=True
+F83-1 declared [제목: 대졸 필수]: PASSED_THROUGH in body=True
+F83-3 revenue='경력 5년 이상': PASSED_THROUGH | line in body: True
+```
+→ Codex 의 F83-1 선언 우회 4건과 F83-3 CompanyBrief 주입 1건을 독립 스크립트로 재현했다(REPRODUCED). F83-2 디렉터리 분리는 코드 경로(`packet.py:303` 잠금 경로가 호출자 dir 종속, `cli.py:162-180` 별도 packet_path)로 확인. V1 과장 0건.
