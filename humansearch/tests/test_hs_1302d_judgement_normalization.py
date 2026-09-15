@@ -133,6 +133,19 @@ def test_an_invisible_or_marked_up_condition_cannot_be_a_contact_name(variant: s
 
 @pytest.mark.parametrize("variant", VISIBLE_SAME)
 def test_an_invisible_or_marked_up_condition_in_a_company_field_is_rejected(variant: str) -> None:
+    """금액 필드가 아닌 자리에 넣는다 — 금액 형식 검사가 대신 막아 주면 정규화를 안 보게 된다.
+
+    `products` 는 자유 서술이라 조건 정규식만이 유일한 방어선이고, 그래서 이 시험이
+    판정용 정규화를 정조준한다.
+    """
+    company = replace(COMPANY, products=(Claim(variant, ("C1",)),))
+    with pytest.raises(BriefInputError):
+        _company_packet(company)
+
+
+@pytest.mark.parametrize("variant", VISIBLE_SAME)
+def test_an_invisible_or_marked_up_condition_in_an_amount_field_is_rejected(variant: str) -> None:
+    """금액 자리에 넣으면 금액 형식 검사와 조건 검사 둘 다 막는다(이중 방어)."""
     with pytest.raises(BriefInputError):
         _company_packet(_with_revenue(variant))
 
