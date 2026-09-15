@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import replace
+from typing import Any
 
 import pytest
 from test_hs_1305 import COMPANY, TODAY, _draft, _recipients
@@ -110,7 +111,8 @@ def test_every_amount_field_with_an_amount_shaped_value_passes() -> None:
 @pytest.mark.parametrize("field", SINGLE_FIELDS)
 @pytest.mark.parametrize("condition", CONDITIONS)
 def test_a_condition_in_any_single_company_field_is_rejected(field: str, condition: str) -> None:
-    company = replace(COMPANY, **{field: Claim(condition, ("I1",))})
+    change: dict[str, Any] = {field: Claim(condition, ("I1",))}
+    company = replace(COMPANY, **change)
     with pytest.raises(BriefInputError):
         _packet(company)
 
@@ -118,7 +120,8 @@ def test_a_condition_in_any_single_company_field_is_rejected(field: str, conditi
 @pytest.mark.parametrize("field", LIST_FIELDS)
 @pytest.mark.parametrize("condition", CONDITIONS)
 def test_a_condition_in_any_company_list_field_is_rejected(field: str, condition: str) -> None:
-    company = replace(COMPANY, **{field: (Claim(condition, ("C1",)),)})
+    change: dict[str, Any] = {field: (Claim(condition, ("C1",)),)}
+    company = replace(COMPANY, **change)
     with pytest.raises(BriefInputError):
         _packet(company)
 

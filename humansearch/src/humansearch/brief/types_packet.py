@@ -29,7 +29,7 @@ from .types import (
 )
 from .types_candidate import CandidateLead
 
-__all__ = ["JdPacket", "SearchFilters", "SearchPacket", "TeamMail"]
+__all__ = ["Contact", "JdPacket", "SearchFilters", "SearchPacket", "TeamMail"]
 
 # D4 본문 상한·D3 제목 접두·팀 메일 도메인은 전부 계약 파일이 소유한다(P22).
 # 코드에 같은 숫자를 다시 적으면 계약과 코드가 조용히 갈라진다.
@@ -59,6 +59,41 @@ def _require_balanced_query(query: str, index: int) -> None:
         _reject(f"boolean_queries[{index}] 의 괄호가 닫히지 않았다")
 
 
+# 담당자 이름 자리에 들어갈 수 없는 것: 제어문자·줄바꿈. 길이는 공백 포함 2~20자.
+_CONTROL = re.compile(r"[\x00-\x1f\x7f]")
+_CONTACT_NAME_MIN = 2
+_CONTACT_NAME_MAX = 20
+
+
+@dataclass(frozen=True)
+class Contact:
+    """LinkedIn 판 회신 안내 줄의 **구조화된** 출처. 자유 문자열 한 줄이 아니다.
+
+    프레임 줄 면제를 자유 문자열 선언 목록으로 주면, 조건 문구 자체를 그 목록에 적는
+    것만으로 충실도 검사를 통과한다(Codex V1 F83-1). 그래서 `문의:` 줄은 이 타입에서
+    `문의: {name} ({email})` 로 **렌더한 결과**와 정확히 같을 때만 통과한다.
+    """
+
+    name: str
+    email: str
+
+    def __post_init__(self) -> None:
+        _require_text(self.name, "Contact.name")
+        if _CONTROL.search(self.name):
+            _reject("Contact.name 에 제어문자가 있다")
+        if not _CONTACT_NAME_MIN <= len(self.name) <= _CONTACT_NAME_MAX:
+            _reject(
+                f"Contact.name 은 {_CONTACT_NAME_MIN}~{_CONTACT_NAME_MAX}자여야 한다: {len(self.name)}자"
+            )
+        if _has_extra_condition(self.name):
+            _reject(f"Contact.name 이 채용 조건 문구다: {self.name!r}")
+        _require_email(self.email, "Contact.email")
+
+    def rendered_line(self) -> str:
+        """본문에서 이 담당자를 가리킬 수 있는 **유일한** 줄."""
+        return f"문의: {self.name} ({self.email})"
+
+
 @dataclass(frozen=True)
 class JdPacket:
     """채널별 JD 3종(Gmail·LinkedIn·2필드)."""
@@ -71,9 +106,9 @@ class JdPacket:
         str, ...
     ]  # 필드 2 에 담은 JD 절(마커, JD 순서) — SearchPacket 이 재계산해 대조
     linkedin_omitted_sections: tuple[str, ...]  # LinkedIn 판에서 생략한 절 — 그 밖의 누락은 거부
-    # LinkedIn 판의 프레임 줄 전문(`제목: …`·`문의: …`). 접두 면제를 대신하는 **선언**이다 —
-    # 여기 적힌 줄과 정확히 같을 때만 충실도 판정에서 빠진다(Codex 13차 F83-1).
-    linkedin_frame_lines: tuple[str, ...] = ()
+    # LinkedIn 판 회신 안내 줄의 출처. 자유 문자열이 아니라 검증된 타입이다 —
+    # 본문의 `문의:` 줄은 이 값에서 렌더한 결과와 같을 때만 판정에서 빠진다(F83-1).
+    linkedin_contact: Contact | None = None
 
     def __post_init__(self) -> None:
         if not self.two_field_sections:
@@ -83,7 +118,6 @@ class JdPacket:
         for label, names in (
             ("two_field_sections", self.two_field_sections),
             ("linkedin_omitted_sections", self.linkedin_omitted_sections),
-            ("linkedin_frame_lines", self.linkedin_frame_lines),
         ):
             for name in names:
                 _require_text(name, f"JdPacket.{label}[]")
@@ -288,6 +322,18 @@ class SearchPacket:
             _require_balanced_query(query, index)
         self._check_jd_fidelity()
 
+    def _rendered_frame_lines(self) -> tuple[str, ...]:
+        """타입 필드에서 렌더한 프레임 줄 전부. 이 문자열들만 충실도 판정에서 빠진다.
+
+        `제목:` 은 포지션 제목, `문의:` 는 `JdPacket.linkedin_contact` 에서 나온다.
+        호출자가 넘긴 자유 문자열은 여기 한 글자도 섞이지 않는다(Codex V1 F83-1).
+        """
+        lines = [f"제목: {self.position.title}"]
+        contact = self.jd_packet.linkedin_contact
+        if contact is not None:
+            lines.append(contact.rendered_line())
+        return tuple(lines)
+
     def _check_jd_fidelity(self) -> None:
         """조립·역직렬화·저장 공통 경계 — JD 3종이 원문과 맞지 않는 패킷은 존재할 수 없다(Codex 10차).
 
@@ -301,7 +347,7 @@ class SearchPacket:
                 self.jd,
                 packet.linkedin_body,
                 omittable_sections=packet.linkedin_omitted_sections,
-                frame_lines=packet.linkedin_frame_lines,
+                frame_lines=self._rendered_frame_lines(),
             ),
             "linkedin_body",
         )

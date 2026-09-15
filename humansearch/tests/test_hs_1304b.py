@@ -25,6 +25,7 @@ from humansearch.brief import (
     Claim,
     CompanyBrief,
     ConnectionDegree,
+    Contact,
     EmailContact,
     JdPacket,
     JdSource,
@@ -406,15 +407,29 @@ def test_frame_line_cannot_hide_a_recruiting_condition() -> None:
         )
     with pytest.raises(BriefInputError):
         _packet(jd_packet=_jd_packet(jd, linkedin_body="제목: 예시 | 경력 2~6년\n" + jd.text))
-    title, contact = "제목: 예시 고객사 프로덕트 매니저", "문의: 밸류커넥트"
+    contact = Contact(name="담당 컨설턴트", email="consultant@example.kr")
+    title = f"제목: {_position().title}"
     with pytest.raises(BriefInputError):
-        # 접두만으로는 면제되지 않는다 — 선언 없는 자유 문구는 원문에 없는 줄이다(Codex 13차 F83-1)
-        _packet(jd_packet=_jd_packet(jd, linkedin_body=f"{title}\n{jd.text}\n{contact}"))
+        # 접두만으로는 면제되지 않는다 — 타입 출처가 없는 회신 줄은 원문에 없는 줄이다(F83-1)
+        _packet(
+            jd_packet=_jd_packet(
+                jd, linkedin_body=f"{title}\n{jd.text}\n{contact.rendered_line()}"
+            )
+        )
+    with pytest.raises(BriefInputError):
+        # 제목 줄은 포지션 제목과 같아야 한다 — 아무 제목이나 붙일 수 없다
+        _packet(
+            jd_packet=_jd_packet(
+                jd,
+                linkedin_body=f"제목: 예시 고객사 프로덕트 매니저\n{jd.text}",
+                linkedin_contact=contact,
+            )
+        )
     ok = _packet(
         jd_packet=_jd_packet(
             jd,
-            linkedin_body=f"{title}\n{jd.text}\n{contact}",
-            linkedin_frame_lines=(title, contact),
+            linkedin_body=f"{title}\n{jd.text}\n{contact.rendered_line()}",
+            linkedin_contact=contact,
         )
     )
     assert ok.jd_packet.linkedin_body.startswith("제목:")

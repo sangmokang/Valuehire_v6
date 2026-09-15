@@ -65,7 +65,7 @@ from .types_candidate import (
     EmailContact,
     ScoreBreakdown,
 )
-from .types_packet import JdPacket, SearchFilters, SearchPacket, TeamMail
+from .types_packet import Contact, JdPacket, SearchFilters, SearchPacket, TeamMail
 
 __all__ = [
     "EXTRA_CONDITION_PATTERNS",
@@ -81,6 +81,7 @@ __all__ = [
     "Claim",
     "CompanyBrief",
     "ConnectionDegree",
+    "Contact",
     "EmailContact",
     "ExecProfile",
     "FidelityReport",

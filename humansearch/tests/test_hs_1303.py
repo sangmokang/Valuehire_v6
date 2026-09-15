@@ -19,6 +19,7 @@ from humansearch.brief import (
     KOREAN_ENDINGS,
     LINKEDIN_FRAME_LINES,
     BriefInputError,
+    Contact,
     FidelityReport,
     JdSource,
     check_linkedin,
@@ -56,11 +57,13 @@ JD_TAIL = """\
 
 SAMPLE_JD = JD_HEAD + JD_TAIL
 
-TITLE_LINE = "제목: 합성 예시 조직 인재 플랫폼 엔지니어 포지션 제안"
-CONTACT_LINE = "문의: 회신으로 알려주세요"
+# 프레임 줄은 자유 문자열이 아니라 **타입 출처에서 렌더한 결과**다(Codex V1 F83-1).
+POSITION_TITLE = "합성 예시 조직 인재 플랫폼 엔지니어 포지션 제안"
+CONTACT = Contact(name="회신 담당", email="reply@example.kr")
+TITLE_LINE = f"제목: {POSITION_TITLE}"
+CONTACT_LINE = CONTACT.rendered_line()
 FRAME_HEAD = f"{TITLE_LINE}\n[복사 시작]\n"
 FRAME_TAIL = f"[복사 끝]\n[회사 정보 보완]\n{CONTACT_LINE}\n"
-# 프레임 접두만으로는 판정에서 빠지지 않는다 — 자유 문구 프레임 줄은 전문을 선언해야 한다.
 FRAME_LINES: tuple[str, ...] = (TITLE_LINE, CONTACT_LINE)
 
 THINKING_LINE = "• 구조적 사고를 중요하게 생각합니다\n"
@@ -286,7 +289,7 @@ def test_undeclared_frame_lines_are_extra() -> None:
     report = _verify(_jd(), _body(), frame_lines=())
     assert report.ok is False
     assert "합성 예시 조직 인재 플랫폼 엔지니어 포지션 제안" in report.extra_lines
-    assert "회신으로 알려주세요" in report.extra_lines
+    assert CONTACT.rendered_line().removeprefix("문의: ") in report.extra_lines
 
 
 def test_allowed_extra_removes_a_declared_line() -> None:

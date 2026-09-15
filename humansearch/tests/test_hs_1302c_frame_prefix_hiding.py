@@ -23,6 +23,7 @@ from test_hs_1304b import _jd, _jd_packet, _packet
 
 from humansearch.brief import (
     BriefInputError,
+    Contact,
     JdPacket,
     JdSource,
     from_json,
@@ -38,8 +39,9 @@ HIDDEN_CONDITIONS: tuple[str, ...] = (
     "제목: 대졸 필수",
 )
 
-# 조건이 아닌 안내 문구 — 선언하면 통과해야 한다.
-CONTACT_LINE = "문의: 담당 컨설턴트"
+# 조건이 아닌 안내 문구 — 타입 출처(Contact)가 있으면 통과해야 한다.
+CONTACT = Contact(name="담당 컨설턴트", email="consultant@example.kr")
+CONTACT_LINE = CONTACT.rendered_line()
 
 _COND_JD_TEXT = "주요업무\n• 검색 랭킹을 설계한다.\n자격요건\n• 경력 3년 이상\n"
 
@@ -70,10 +72,15 @@ def test_an_undeclared_plain_frame_line_is_also_rejected() -> None:
 # ---------------------------------------------------------------- 선언 필드
 
 
-def test_jd_packet_declares_its_linkedin_frame_lines() -> None:
-    """허용 프레임 줄은 패킷이 구조화 필드로 선언한다 — 접두 기반 면제를 대체한다."""
+def test_jd_packet_declares_its_linkedin_contact() -> None:
+    """허용 프레임 줄의 출처는 패킷의 **타입 필드**다 — 접두 기반 면제를 대체한다.
+
+    1차에서는 자유 문자열 목록(`linkedin_frame_lines`)이었으나, 조건 문구를 그 목록에
+    적는 것만으로 뚫려(Codex V1) 타입 필드로 옮겼다.
+    """
     names = {field.name for field in dataclasses.fields(JdPacket)}
-    assert "linkedin_frame_lines" in names
+    assert "linkedin_contact" in names
+    assert "linkedin_frame_lines" not in names
 
 
 def test_a_declared_frame_line_passes_and_survives_json_roundtrip() -> None:
@@ -82,12 +89,12 @@ def test_a_declared_frame_line_passes_and_survives_json_roundtrip() -> None:
         jd_packet=_jd_packet(
             jd,
             linkedin_body=jd.text + "\n" + CONTACT_LINE,
-            linkedin_frame_lines=(CONTACT_LINE,),
+            linkedin_contact=CONTACT,
         )
     )
     restored = from_json(to_json(packet))
     assert CONTACT_LINE in restored.jd_packet.linkedin_body
-    assert restored.jd_packet.linkedin_frame_lines == (CONTACT_LINE,)
+    assert restored.jd_packet.linkedin_contact == CONTACT
 
 
 def test_json_roundtrip_rejects_a_frame_line_that_was_not_declared() -> None:
@@ -97,25 +104,25 @@ def test_json_roundtrip_rejects_a_frame_line_that_was_not_declared() -> None:
         jd_packet=_jd_packet(
             jd,
             linkedin_body=jd.text + "\n" + CONTACT_LINE,
-            linkedin_frame_lines=(CONTACT_LINE,),
+            linkedin_contact=CONTACT,
         )
     )
     raw = json.loads(to_json(packet))
-    raw["jd_packet"]["linkedin_frame_lines"] = []
+    raw["jd_packet"]["linkedin_contact"] = None
     with pytest.raises(BriefInputError):
         from_json(json.dumps(raw, ensure_ascii=False))
 
 
-def test_a_declared_frame_line_still_cannot_carry_a_known_condition() -> None:
-    """선언은 면제권이 아니다 — Codex 12차가 막던 조건 줄은 선언해도 막힌다."""
+def test_a_contact_still_cannot_carry_a_known_condition() -> None:
+    """타입 필드도 면제권이 아니다 — 조건 문구는 담당자 이름이 될 수 없다."""
+    with pytest.raises(BriefInputError):
+        Contact(name="경력 10년 이상", email="x@example.kr")
     jd = _jd()
     hidden = "문의: 경력 10년 이상만 지원 가능합니다"
     with pytest.raises(BriefInputError):
         _packet(
             jd_packet=_jd_packet(
-                jd,
-                linkedin_body=jd.text + "\n" + hidden,
-                linkedin_frame_lines=(hidden,),
+                jd, linkedin_body=jd.text + "\n" + hidden, linkedin_contact=CONTACT
             )
         )
 
