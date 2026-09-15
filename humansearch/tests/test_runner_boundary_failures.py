@@ -206,10 +206,15 @@ def test_close_failure_returns_receipt_and_removes_temp_file(
     assert list(root.iterdir()) == []
 
 
-def test_directory_check_failure_closes_every_opened_descriptor(
+def test_child_directory_check_failure_closes_every_opened_descriptor(
     tmp_path: Path, monkeypatch: MonkeyPatch
 ) -> None:
-    """디렉터리 검증이 실패해도 연 FD 를 모두 닫고 영수증을 돌려준다."""
+    """자식 디렉터리 검증이 실패해도 연 FD 를 모두 닫고 영수증을 돌려준다.
+
+    고장 지점을 호출 횟수가 아니라 대상으로 고정한다. ``sub`` 를 연 직후
+    받은 FD 의 fstat 만 실패시키므로, 구현이 조상 검사를 몇 번 하든 공격
+    지점이 자식 디렉터리 검사에 그대로 머문다.
+    """
 
     _hsrunner(monkeypatch)
     root = _mkdir(tmp_path / "root", 0o700)
@@ -218,20 +223,22 @@ def test_directory_check_failure_closes_every_opened_descriptor(
     real_fstat = os.fstat
     opened: list[int] = []
     closed: list[int] = []
-    calls = {"n": 0}
+    targets: set[int] = set()
 
-    def track_open(*args: Any, **kwargs: Any) -> int:
-        fd = real_open(*args, **kwargs)
+    def track_open(path: Any, *args: Any, **kwargs: Any) -> int:
+        fd = real_open(path, *args, **kwargs)
         opened.append(fd)
+        if str(path) == "sub":
+            targets.add(fd)
         return fd
 
     def track_close(fd: int) -> None:
         closed.append(fd)
+        targets.discard(fd)
         real_close(fd)
 
-    def fail_second_fstat(fd: int) -> os.stat_result:
-        calls["n"] += 1
-        if calls["n"] == 2:
+    def fail_child_fstat(fd: int) -> os.stat_result:
+        if fd in targets:
             raise OSError(errno.EIO, "Input/output error")
         return real_fstat(fd)
 
@@ -239,7 +246,7 @@ def test_directory_check_failure_closes_every_opened_descriptor(
         with MonkeyPatch.context() as patched:
             patched.setattr(os, "open", track_open)
             patched.setattr(os, "close", track_close)
-            patched.setattr(os, "fstat", fail_second_fstat)
+            patched.setattr(os, "fstat", fail_child_fstat)
             receipt = write_protected_file(_config(root), "sub/final.jsonl", PAYLOAD)
     finally:
         for leaked in [fd for fd in opened if fd not in closed]:
@@ -249,4 +256,5 @@ def test_directory_check_failure_closes_every_opened_descriptor(
                 pass
 
     assert receipt.status is BoundaryStatus.DENIED
-    assert [fd for fd in opened if fd not in closed] == []
+    assert receipt.reason == "parent_directory_invalid"
+    assert sorted(opened) == sorted(closed)
