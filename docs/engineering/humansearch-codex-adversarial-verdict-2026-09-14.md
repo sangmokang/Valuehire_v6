@@ -806,3 +806,96 @@ Next steps:
 - 쓰기 가능한 환경에서 전체 pytest·mypy와 test_hs_1309f_store_root_binding.py의 프로세스 경합 시험을 다시 실행하십시오.
 - git diff --check의 mechanism-registry.yaml 끝 빈 줄도 정리한 뒤 재검토하십시오.
 ```
+
+## 재검토 2026-09-15 — PR #96 5차 GREEN(cc74f1a) Codex V1
+
+실행 12:24:05~12:34:15, verdict needs-attention. **F96-1 해결·F96-2 해결·4차 신규 high 해결**(`_remove` 는 temp_name 만, B 보존). 신규 high: 대조 성공 뒤 임시 unlink 실패 사이 최종 이름 교체 시 cleanup_failed 의 path 가 B 자리(A 임시 경로 없음), 불일치+정리 실패의 recovery_required 에 path·식별값 None. 신규 medium: 임시 FD close-before-close 실패가 write_failed 로 접힘. 6차(마지막) 지시(12:36): temp_path 후보 경로·recovery_required+러너 중단 계약. 종료 기준: 이후 잔여가 같은 UID 동시 실행 봉투 안이면 HS-05.04 사용권 선행으로 이관.
+
+```text
+# Codex Adversarial Review
+
+Target: branch diff against origin/main
+Verdict: needs-attention
+
+VERDICT: FAIL
+
+결론
+다른 실행의 파일을 지우던 문제 자체는 해결됐습니다. 그러나 작업이 겹치면 실패 보고가 보존된 파일을 찾지 못하고, 반복 장애가 실행기를 멈출 수 있어 아직 내보내시면 안 됩니다.
+
+판정 전 제한
+- 실제 `hsrunner` 계정·별도 UID·원격 CI는 미확인입니다.
+- 표적 pytest는 `uv` 캐시 쓰기 거부로 종료값 2, 직접 실행은 사용 가능한 임시 디렉터리 부재로 종료값 1이었습니다. 재시도 후 42건 수집, ruff·mypy는 종료값 0이었습니다.
+- 경쟁 재현은 실제 파일시스템 실행이 아니라 메서드 순서를 고정한 제어 호출입니다. 같은 UID 실행이 최종 이름을 바꿀 수 있다는 조건에 기반한 추론입니다.
+- HEAD는 `cc74f1a4e9e6da5b38fa96a9496fde4f78b44029`, 로컬 `origin/main`은 `fc6beedc78019862bc2f1b3bf4c4ad3bbd8e845b`이며 검토 전후 작업트리는 깨끗했습니다.
+
+판단 근거
+- 선택: `needs-attention`입니다. 이전 삭제 결함은 닫혔지만 실패 후 복구 계약을 깨는 새 순서를 재현했습니다.
+- 버린 해석: 새 시험 세 건이 모든 동시 실행을 포괄한다는 해석은 버렸습니다. 시험은 최종 이름 교체와 임시 삭제 실패를 같은 구간에 배치하지 않습니다.
+- 틀리면 깨지는 것: 후보 원문 A가 임시 이름으로 남으면서 영수증 경로는 B를 가리키고, 반복 close 장애는 열린 파일을 누적시킵니다.
+
+원래 ID 최종 상태
+- F96-1: 해결. 루트·조상은 FD 사슬로 고정됩니다.
+- F96-2: 원래 결함은 해결. 중단 쓰기가 최종 이름을 선점해 재시도를 막는 경로는 사라졌습니다.
+- 4차 신규 high: 해결. `_undo_publication`·`_roll_back`은 삭제됐고 `_remove` 호출 세 곳 모두 `temp_name`만 받습니다.
+- 5차 최종 상태: 아래 신규 high·medium 때문에 전체 WU는 미완료입니다.
+
+반증 기록
+- 최종 이름 삭제를 다시 찾으려 했으나 `REMOVE_CALL 365 temp_name`, `415 temp_name`, `470 temp_name`만 확인됐습니다.
+→ 해석: B를 이 구현이 직접 삭제하던 4차 결함은 닫혔습니다.
+- 불일치 시험은 B의 내용과 `(device, inode)`를 보존하고, 동시 정리 실패도 `recovery_required`와 B 생존을 단언합니다.
+→ 해석: 신규 시험은 삭제 방지 방향의 반대 요구이며 약화가 아닙니다.
+- 기존 시험 두 건은 ‘최종 파일 없음’에서 ‘A 보존’, ‘두 이름 없음’에서 ‘A와 식별값 보존’으로 바뀌었습니다.
+→ 해석: 계약 변경에 따른 의도적인 반대 방향 요구입니다.
+- goal 문서와 `BoundaryReceipt` 필드는 `status, reason, path, sha256, byte_count, device, inode`로 일치합니다.
+→ 해석: cc74f1a의 반환값 문서 정합 공격은 실패했습니다.
+- 파일은 정확히 491줄, 최장 함수 `_publish`는 47줄, 전체 diff는 2,879줄입니다.
+→ 해석: 파일 hard 600, 함수 hard 100, PR hard 3,000 한도는 통과합니다. 파일 soft 300은 초과합니다.
+
+Findings:
+- [high] 정리 실패 영수증이 보존된 파일 A의 위치를 보장하지 못합니다 (humansearch/src/humansearch/runner_boundary.py:356-416)
+  원문 제목: 정리 실패 영수증이 보존된 파일 A의 위치를 보장하지 못합니다.
+
+원인: `runner_boundary.py:356-358 — 게시된 항목이 A인지 확인하는 역할`과 `:365-368 — 임시 이름 삭제 실패 영수증을 만드는 역할` 사이에 최종 이름이 다시 바뀔 수 있습니다. 같은 UID 실행이 이때 B를 설치하고 임시 삭제가 실패하면 A는 임시 이름에 남지만, `cleanup_failed`의 `path`는 B가 있는 최종 경로이고 식별값은 A입니다. 또한 `:415-416 — 불일치 후 임시 정리 실패를 반환하는 역할`은 기존 영수증을 버리고 path·hash·device·inode가 모두 없는 `recovery_required`를 만듭니다.
+
+증거 원문:
+`ATTACK_CLEANUP_RACE denied cleanup_failed receipt_path=/protected/final.jsonl receipt_id=(7,101) path_now_id=(7,202) A_temp_id=(7,101) remove_calls=['.a.tmp']`
+→ 해석: 최종 이름은 B인데 영수증은 그 경로와 A의 식별값을 결합했습니다. A를 여는 경로는 반환되지 않았습니다.
+
+`ATTACK_MISMATCH_PLUS_CLEANUP_FAIL denied recovery_required final_B_id=(7,202) remove_calls=['.a.tmp'] receipt_path=None receipt_id=(None,None)`
+→ 해석: B는 보존됐지만 남은 A 임시 파일을 어느 영수증과 연결해야 하는지 알 수 없습니다.
+
+시험 공백: `test_runner_boundary_receipt.py:476-505 — cleanup_failed 영수증 시험 역할`은 최종 이름 교체 없이 정리 실패만 만듭니다. `:508-534 — 불일치와 정리 실패 동시 시험 역할`은 B만 검증하고 남은 A의 위치·식별값은 검증하지 않습니다.
+
+사업 영향: 후보 원문이 임의 임시 이름으로 장기 잔존하지만 복구·readback·purge가 어느 파일인지 결정할 수 없습니다. 이는 보호 자료의 추적 불가능한 잔존과 수동 오삭제 위험으로 이어집니다.
+
+무엇을 — 실패 영수증이 A를 열 수 있는 후보 경로와 A의 hash·device·inode를 함께 보존하게 하십시오.
+왜 — device/inode는 위치 탐색값이 아니므로 경로 없이 A를 복구할 수 없습니다.
+버린 길 — 최종 경로를 계속 A의 경로라고 쓰는 방식은 같은 경쟁 창 때문에 버려야 합니다.
+대가 — receipt에 검증 대상인 `temp_path` 또는 복수 후보 경로를 추가하고 소비자가 식별값·hash를 확인해야 합니다.
+되돌리기 — 이 계약을 제공할 수 없으면 해당 순서를 `recovery_required`로 중단하고 자동 복구 가능 주장을 제거하십시오.
+  Recommendation: 최종 경로와 임시 경로를 신뢰도와 함께 구분해 반환하고, 동일 구간에 B 교체와 임시 unlink 실패를 주입하여 반환된 후보 경로 중 하나가 A의 device/inode와 hash를 실제로 만족하는지 시험하십시오.
+- [medium] 임시 파일 close 실패가 열린 FD를 남겨도 일반 write_failed로 접힙니다 (humansearch/src/humansearch/runner_boundary.py:304-313)
+  원문 제목: 임시 파일 close 실패가 열린 FD를 남겨도 일반 write_failed로 접힙니다.
+
+원인: `runner_boundary.py:263-268 — close 실패 시 FD 상태가 불확실하다고 정의하는 역할`과 달리 `:312-313 — 임시 FD close 실패 처리 역할`은 이름만 unlink하고 일반 `write_failed`를 반환합니다. close가 실제 호출 전에 실패하면 FD는 열린 채인데 이후 실행을 중단하거나 복구 필요 상태로 올리는 장치가 없습니다.
+
+증거 원문:
+`ATTACK_TEMP_CLOSE_BEFORE_CLOSE denied write_failed fd_still_open=True name_removed=True receipt_id=(None,None)`
+→ 해석: 이름은 없어졌지만 열린 객체가 프로세스에 남았고, 영수증은 이를 복구 필요 상태로 구분하지 못했습니다.
+
+시험 공백: `test_runner_boundary_failures.py:197-201 — 임시 close 고장 주입 역할`은 `real_close(fd)`를 먼저 실행한 뒤 예외를 던집니다. 따라서 ‘실패했지만 실제로 닫히지 않은’ 경우를 시험하지 않습니다. 디렉터리 FD용 `CloseTrap`은 반대로 실제 close 전에 실패시키므로 시험 방식도 일관되지 않습니다.
+
+사업 영향: 장시간 실행되는 러너에서 같은 장애가 반복되면 열린 FD와 unlink된 원문 객체가 누적되어 이후 모든 저장이 실패할 수 있습니다.
+
+무엇을 — 실제 close 전 실패를 모델링하고 이 경우 프로세스를 계속 정상 사용하지 않도록 하십시오.
+왜 — close 오류 뒤 FD 소유 상태를 휴리스틱으로 정상 처리할 수 없다고 코드 자체가 선언합니다.
+버린 길 — 실제 close 후 예외만 던지는 시험은 핵심 실패를 제거하므로 버려야 합니다.
+대가 — `recovery_required`와 러너 중단·재시작 정책이 필요합니다.
+되돌리기 — 안전한 회수 계약이 없으면 close 실패 후 같은 프로세스에서 추가 저장을 허용하지 마십시오.
+  Recommendation: 임시 FD의 close를 실제로 수행하기 전에 오류를 주입하는 회귀 시험을 추가하고, 실패 시 `recovery_required`로 반환한 뒤 호출자가 순회를 중단하고 해당 러너 프로세스를 폐기하도록 계약하십시오.
+
+Next steps:
+- cleanup_failed/recovery_required 영수증에 A를 열 수 있는 검증 가능한 경로와 hash·device·inode를 보존하십시오.
+- 임시 FD close-before-close 실패 시험과 러너 중단·재시작 계약을 추가하십시오.
+- 쓰기 가능한 환경에서 표적 42건과 전체 pytest를 실행하고, 실제 별도 UID 실증은 기존 계약대로 NOT_RUN 상태를 유지하십시오.
+```
