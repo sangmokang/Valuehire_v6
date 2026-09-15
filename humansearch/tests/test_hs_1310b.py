@@ -204,8 +204,15 @@ def _write_packet_and_receipt(
     message_id: str = "msg-1",
     to: tuple[str, ...] = ("sangmokang@valueconnect.kr",),
     cc: tuple[str, ...] = (),
+    store_dir: Path | None = None,
 ) -> tuple[Path, Path]:
-    packet_path = tmp_path / "packet.json"
+    # 장부를 함께 쓰는 시험은 패킷을 그 장부 안 정규 이름에 둔다 — 장부와 패킷은
+    # 한 저장 루트에 있어야 한다(Codex V1 F83-2).
+    packet_path = (
+        tmp_path / "packet.json"
+        if store_dir is None
+        else store_dir / f"{_PACKET_ID}.packet.json"
+    )
     packet_path.write_text(to_json(_packet(_mail_body(_JP, packet_body))), encoding="utf-8")
     receipt_path = tmp_path / "receipt.json"
     receipt_path.write_text(
@@ -387,7 +394,7 @@ def test_verify_and_mark_rejects_failed_readback_and_keeps_unverified(tmp_path: 
     record_intent(directory, _intent(_mail_body(_JP, body)))
     _claim(directory, _mail_body(_JP, body))
     mark(directory, _PACKET_ID, "gmail", 1, SendState.SENT_UNVERIFIED, "msg-1", _moment(5), "발송함 id")
-    packet_path, sent_path = _write_packet_and_receipt(tmp_path, body, body)
+    packet_path, sent_path = _write_packet_and_receipt(tmp_path, body, body, store_dir=directory)
     with pytest.raises(BriefInputError):
         cli_module.verify_and_mark(directory, packet_path, sent_path, "msg-1", _moment(6))
     current = load_intent(directory, _PACKET_ID, "gmail")
@@ -402,7 +409,7 @@ def test_verify_and_mark_rejects_packet_changed_after_send_claim(tmp_path: Path)
     record_intent(directory, _intent(_mail_body(_JP, original)))
     _claim(directory, _mail_body(_JP, original))
     packet_path, sent_path = _write_packet_and_receipt(
-        tmp_path, changed, f"{changed}\npacket-id: {_PACKET_ID}"
+        tmp_path, changed, f"{changed}\npacket-id: {_PACKET_ID}", store_dir=directory
     )
     with pytest.raises(BriefInputError):
         cli_module.verify_and_mark(directory, packet_path, sent_path, "msg-1", _moment(6))
@@ -435,7 +442,7 @@ def test_verify_and_mark_rejects_message_id_from_another_attempt(tmp_path: Path)
     )
     mark(directory, _PACKET_ID, "gmail", 2, SendState.SENT_UNVERIFIED, "msg-2", _moment(7), "발송함 id")
     packet_path, sent_path = _write_packet_and_receipt(
-        tmp_path, body, f"{body}\npacket-id: {_PACKET_ID}", attempt=1, message_id="msg-1"
+        tmp_path, body, f"{body}\npacket-id: {_PACKET_ID}", attempt=1, message_id="msg-1", store_dir=directory
     )
     with pytest.raises(BriefInputError):
         cli_module.verify_and_mark(directory, packet_path, sent_path, "msg-1", _moment(8))
@@ -450,7 +457,7 @@ def test_verify_and_mark_rejects_packet_recipients_changed_after_send_claim(tmp_
     mark(directory, _PACKET_ID, "gmail", 1, SendState.SENT_UNVERIFIED, "msg-1", _moment(5), "발송함 id")
 
     packet_path, sent_path = _write_packet_and_receipt(
-        tmp_path, body, f"{body}\npacket-id: {_PACKET_ID}"
+        tmp_path, body, f"{body}\npacket-id: {_PACKET_ID}", store_dir=directory
     )
     payload = json.loads(packet_path.read_text(encoding="utf-8"))
     payload["mail"]["to"] = ["other@example.org"]
@@ -467,7 +474,7 @@ def test_main_verify_mark_writes_verified_transition(tmp_path: Path, capsys: pyt
     _claim(directory, _mail_body(_JP, body))
     mark(directory, _PACKET_ID, "gmail", 1, SendState.SENT_UNVERIFIED, "msg-1", _moment(5), "발송함 id")
     packet_path, sent_path = _write_packet_and_receipt(
-        tmp_path, body, f"{body}\npacket-id: {_PACKET_ID}"
+        tmp_path, body, f"{body}\npacket-id: {_PACKET_ID}", store_dir=directory
     )
 
     from humansearch.brief.__main__ import main

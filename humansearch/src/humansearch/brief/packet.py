@@ -29,6 +29,7 @@ from .types_packet import _PACKET_ID, SearchPacket
 
 __all__ = [
     "PacketStore",
+    "canonical_store_dir",
     "ensure_store_dir",
     "from_json",
     "packet_id",
@@ -219,7 +220,12 @@ def from_json(text: str) -> SearchPacket:
 
 
 def ensure_store_dir(path: Path) -> Path:
-    """저장 디렉터리를 0700 으로 보장한다. symlink·느슨한 권한은 거부(D7)."""
+    """저장 디렉터리를 0700 으로 보장하고 **정규 경로**를 돌려준다. symlink·느슨한 권한은 거부(D7).
+
+    돌려주는 값이 잠금 파일·패킷 파일 경로의 뿌리가 된다. 정규화하지 않으면 같은
+    디렉터리를 두 이름으로 부른 호출자가 서로 다른 잠금을 잡고, 한 패킷이 이름마다
+    한 번씩 발송 권한을 얻는다(Codex V1 F83-2). `resolve()` 가 그 이름들을 하나로 합친다.
+    """
     if not isinstance(path, Path):
         _reject("저장 디렉터리는 Path 여야 한다")
     # exists() 는 symlink 를 따라가므로 먼저 본다 — 링크를 통해 0700 밖으로 새는 것을 막는다.
@@ -234,13 +240,21 @@ def ensure_store_dir(path: Path) -> Path:
             _reject(f"저장 디렉터리를 만들지 못했다: {error.__class__.__name__}")
         else:
             os.chmod(path, DIR_MODE)  # umask 가 깎은 비트를 되돌린다
-            return path
+            return canonical_store_dir(path)
     if not path.is_dir():
         _reject(f"저장 경로가 디렉터리가 아니다: {path.name}")
     mode = os.stat(path).st_mode & 0o777
     if mode != DIR_MODE:
         _reject(f"저장 디렉터리 권한이 0700 이 아니다: {mode:04o}")
-    return path
+    return canonical_store_dir(path)
+
+
+def canonical_store_dir(path: Path) -> Path:
+    """저장 루트의 유일한 이름. 잠금·패킷 경로는 전부 이 값에서 나온다."""
+    try:
+        return path.resolve(strict=True)
+    except OSError as error:
+        _reject(f"저장 디렉터리 경로를 정규화하지 못했다: {error.__class__.__name__}")
 
 
 def read_store_file(target: Path) -> str:

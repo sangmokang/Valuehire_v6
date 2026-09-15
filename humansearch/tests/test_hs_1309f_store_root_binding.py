@@ -43,7 +43,6 @@ from humansearch.brief import (
     SearchPacket,
     SendState,
     mark,
-    recipients_digest,
     record_intent,
 )
 from humansearch.brief.cli import verify_and_mark

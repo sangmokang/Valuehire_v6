@@ -14,7 +14,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import unquote
 
-from .packet import _channel_lock, ensure_store_dir, from_json
+from .packet import (
+    _channel_lock,
+    canonical_store_dir,
+    ensure_store_dir,
+    from_json,
+    require_packet_id,
+)
 from .send_ledger import (
     SendIntent,
     SendState,
@@ -159,6 +165,23 @@ def verify(packet_path: Path, sent_path: Path) -> tuple[int, str]:
     return 1, f"SENT_UNVERIFIED packet_id={packet.packet_id} expected={expected} actual={actual}"
 
 
+def _require_packet_inside(directory: Path, packet_path: Path, packet_id: str) -> None:
+    """`packet_path` 가 이 장부의 `<packet_id>.packet.json` 과 같은 파일인지 확인한다.
+
+    이름이 아니라 정규 경로로 본다 — 심볼릭 링크를 지나는 다른 이름은 같은 파일이므로
+    통과하고, 다른 디렉터리의 동명이인 파일은 거부된다.
+    """
+    expected = canonical_store_dir(directory) / f"{require_packet_id(packet_id)}.packet.json"
+    try:
+        given = packet_path.resolve(strict=True)
+    except OSError:
+        raise BriefInputError("패킷 파일 경로를 정규화하지 못했다") from None
+    if given != expected.resolve():
+        raise BriefInputError(
+            "패킷 파일이 이 장부 디렉터리의 패킷이 아니다 — 장부와 패킷은 한 저장 루트에 있어야 한다"
+        )
+
+
 def verify_and_mark(
     dir: Path,
     packet_path: Path,
@@ -168,16 +191,23 @@ def verify_and_mark(
     *,
     channel: str = "gmail",
 ) -> SendIntent:
-    """readback 검증과 VERIFIED 장부 전이를 같은 최신 attempt 에 결합한다."""
+    """readback 검증과 VERIFIED 장부 전이를 같은 최신 attempt 에 결합한다.
+
+    검증 대상 패킷은 **이 장부 디렉터리 안의 그 패킷 파일**이어야 한다. 장부는 이쪽,
+    패킷 파일은 저쪽인 조합을 허용하면 잠금과 청구가 디렉터리마다 따로 생겨
+    한 패킷이 두 번 나갈 수 있다(Codex V1 F83-2).
+    """
     moment = require_clock(at)
     packet_text = _read_text(packet_path, "패킷")
     packet = from_json(packet_text)
     directory = ensure_store_dir(dir)
+    _require_packet_inside(directory, packet_path, packet.packet_id)
     with _channel_lock(directory, packet.packet_id, channel):
         locked_packet_id = packet.packet_id
         packet = from_json(_read_text(packet_path, "패킷"))
         if packet.packet_id != locked_packet_id:
             raise BriefInputError("잠금 중 패킷 파일의 packet_id 가 바뀌었다")
+        _require_packet_inside(directory, packet_path, packet.packet_id)
         receipt = _read_receipt(sent_path)
         if receipt.packet_id != packet.packet_id:
             raise BriefInputError("readback 영수증 packet_id 가 패킷과 다르다")

@@ -42,7 +42,7 @@ def test_verify_and_mark_rejects_packet_recipients_changed_after_send_claim(tmp_
     _claim(directory, _mail_body(_JP, body))
     mark(directory, _PACKET_ID, "gmail", 1, SendState.SENT_UNVERIFIED, "msg-1", _moment(5), "발송함 id")
     packet_path, sent_path = _write_packet_and_receipt(
-        tmp_path, body, f"{body}\npacket-id: {_PACKET_ID}"
+        tmp_path, body, f"{body}\npacket-id: {_PACKET_ID}", store_dir=directory
     )
     payload = json.loads(packet_path.read_text(encoding="utf-8"))
     payload["mail"]["to"] = ["other@example.org"]
@@ -59,7 +59,7 @@ def test_main_verify_mark_writes_verified_transition(tmp_path: Path, capsys: pyt
     _claim(directory, _mail_body(_JP, body))
     mark(directory, _PACKET_ID, "gmail", 1, SendState.SENT_UNVERIFIED, "msg-1", _moment(5), "발송함 id")
     packet_path, sent_path = _write_packet_and_receipt(
-        tmp_path, body, f"{body}\npacket-id: {_PACKET_ID}"
+        tmp_path, body, f"{body}\npacket-id: {_PACKET_ID}", store_dir=directory
     )
 
     from humansearch.brief.__main__ import main
@@ -112,7 +112,7 @@ def test_verify_and_mark_rejects_previous_attempt_readback_on_approved_retry(tmp
         body_sha256=first.body_sha256,
     )
     packet_path, sent_path = _write_packet_and_receipt(
-        tmp_path, body, f"{body}\npacket-id: {_PACKET_ID}", attempt=1, message_id="msg-a1"
+        tmp_path, body, f"{body}\npacket-id: {_PACKET_ID}", attempt=1, message_id="msg-a1", store_dir=directory
     )
 
     with pytest.raises(BriefInputError):
@@ -162,7 +162,7 @@ def test_verify_and_mark_rejects_packet_id_changed_between_prelock_and_locked_re
     _claim(directory, _mail_body(_JP, body))
     mark(directory, _PACKET_ID, "gmail", 1, SendState.SENT_UNVERIFIED, "msg-1", _moment(5), "발송함 id")
     packet_path, receipt_path = _write_packet_and_receipt(
-        tmp_path, body, f"{body}\npacket-id: {_PACKET_ID}"
+        tmp_path, body, f"{body}\npacket-id: {_PACKET_ID}", store_dir=directory
     )
     original_packet = _packet(_mail_body(_JP, body))
     other_clickup = "77a2bcdf"
