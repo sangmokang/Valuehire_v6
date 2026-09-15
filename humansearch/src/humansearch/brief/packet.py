@@ -7,11 +7,16 @@
 
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import json
 import os
+import re
 import tempfile
+import threading
 import typing
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import fields, is_dataclass
 from datetime import date, datetime
 from enum import Enum
@@ -27,6 +32,7 @@ __all__ = [
     "ensure_store_dir",
     "from_json",
     "packet_id",
+    "require_channel",
     "to_json",
 ]
 
@@ -279,6 +285,75 @@ def require_packet_id(value: object) -> str:
     return value
 
 
+# 발송 장부(send_ledger)와 패킷 저장이 **같은 디렉터리의 같은 flock 파일**을 쓴다 —
+# 잠금 파일 경로가 다르면 그것은 잠금이 아니다. `packet` 은 패킷 파일 전체를 덮는 예약 채널이고,
+# 실제 채널 잠금은 언제나 이 잠금을 먼저 잡고 안쪽으로 들어간다(획득 순서가 하나뿐 = 교착 없음).
+PACKET_LOCK_CHANNEL = "packet"
+
+_CHANNEL = re.compile(r"[a-z]+")
+
+
+def require_channel(value: object) -> str:
+    """채널 이름은 소문자 알파벳만 — 경로 조각이 되므로 구분자·상위 이동을 원천 차단한다."""
+    if not isinstance(value, str) or not _CHANNEL.fullmatch(value):
+        _reject("channel 은 소문자 알파벳만 허용한다")
+    return value
+
+
+def _lock_path(directory: Path, packet_id: str, channel: str) -> Path:
+    return directory / f"{require_packet_id(packet_id)}.{require_channel(channel)}.lock"
+
+
+_held = threading.local()
+
+
+@contextmanager
+def _flock(directory: Path, packet_id: str, channel: str) -> Iterator[None]:
+    """잠금 파일 하나를 배타적으로 잡는다. 잠금 파일도 0600 이고 지우지 않는다.
+
+    같은 스레드의 재진입은 깊이만 센다(Codex 9차: 새 fd 로 flock 을 다시 잡으면 자기 자신에 교착).
+    다른 스레드·다른 프로세스는 flock 이 막는다.
+    """
+    key = str(_lock_path(directory, packet_id, channel))
+    depth: dict[str, int] = getattr(_held, "depth", None) or {}
+    _held.depth = depth
+    if depth.get(key, 0) > 0:
+        depth[key] += 1
+        try:
+            yield
+        finally:
+            depth[key] -= 1
+        return
+    handle = os.open(key, os.O_CREAT | os.O_RDWR, FILE_MODE)
+    try:
+        os.fchmod(handle, FILE_MODE)
+        fcntl.flock(handle, fcntl.LOCK_EX)
+        depth[key] = 1
+        try:
+            yield
+        finally:
+            depth[key] = 0
+            fcntl.flock(handle, fcntl.LOCK_UN)
+    finally:
+        os.close(handle)
+
+
+@contextmanager
+def _channel_lock(directory: Path, packet_id: str, channel: str) -> Iterator[None]:
+    """한 패킷·한 채널의 장부 조작을 프로세스 간 직렬화한다.
+
+    채널 잠금은 패킷 잠금 안쪽에서만 잡는다 — 패킷 파일을 바꾸는 `PacketStore.save` 와
+    장부를 움직이는 `record_intent`·`claim_send` 가 같은 잠금 앞에 줄을 서야, save 의
+    "발송 intent 없음" 확인과 교체 사이로 청구가 끼어들지 못한다(Codex 13차 F83-2).
+    """
+    if require_channel(channel) == PACKET_LOCK_CHANNEL:
+        with _flock(directory, packet_id, channel):
+            yield
+        return
+    with _flock(directory, packet_id, PACKET_LOCK_CHANNEL), _flock(directory, packet_id, channel):
+        yield
+
+
 class PacketStore:
     """패킷 파일 저장소. 디렉터리 0700 · 파일 0600 · 원자 교체 · 독립 readback."""
 
@@ -290,14 +365,20 @@ class PacketStore:
         return self.dir / f"{require_packet_id(packet_id)}.packet.json"
 
     def save(self, packet: SearchPacket) -> Path:
-        """같은 packet_id 재저장은 내용이 같으면 no-op, 다르면 덮어쓴다 — 어느 쪽이든 파일 1개."""
+        """같은 packet_id 재저장은 내용이 같으면 no-op, 다르면 덮어쓴다 — 어느 쪽이든 파일 1개.
+
+        확인(발송 intent 유무)과 교체를 **패킷 잠금 하나 안에서** 끝낸다. 둘이 갈라져 있으면
+        "intent 없음" 을 본 뒤 청구가 끼어들어, 승인된 본문이 아닌 패킷이 저장된 채로
+        발송 권한만 살아남는다(Codex 13차 F83-2 — 순서를 뒤집은 반례).
+        """
         text = to_json(packet)
         target = self.path_for(packet.packet_id)
-        if target.is_file() and read_store_file(target) == text:
-            return target
-        if target.is_file() and self._has_send_intent(packet.packet_id):
-            _reject("발송 intent 가 있는 packet_id 는 다른 패킷 내용으로 저장할 수 없다")
-        return write_store_file(self.dir, target, text)
+        with _channel_lock(self.dir, packet.packet_id, PACKET_LOCK_CHANNEL):
+            if target.is_file() and read_store_file(target) == text:
+                return target
+            if target.is_file() and self._has_send_intent(packet.packet_id):
+                _reject("발송 intent 가 있는 packet_id 는 다른 패킷 내용으로 저장할 수 없다")
+            return write_store_file(self.dir, target, text)
 
     def _has_send_intent(self, packet_id: str) -> bool:
         prefix = f"{require_packet_id(packet_id)}."

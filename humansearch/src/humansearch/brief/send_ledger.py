@@ -19,14 +19,10 @@
 
 from __future__ import annotations
 
-import fcntl
 import hashlib
 import os
 import re
 import tempfile
-import threading
-from collections.abc import Iterator
-from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from datetime import datetime
 from enum import Enum
@@ -34,11 +30,13 @@ from pathlib import Path
 
 from .packet import (
     FILE_MODE,
+    _channel_lock,
     dumps_value,
     ensure_store_dir,
     fsync_directory,
     loads_value,
     read_store_file,
+    require_channel,
     require_packet_id,
     write_store_file,
 )
@@ -59,7 +57,6 @@ __all__ = [
     "record_intent",
 ]
 
-_CHANNEL = re.compile(r"[a-z]+")
 _ATTEMPT_SUFFIX = re.compile(r"a([1-9][0-9]{0,3})\.sent\.json")
 
 
@@ -180,13 +177,6 @@ class SendIntent:
             _reject("두 번째 이후 시도는 Approval 없이 열 수 없다")
 
 
-def require_channel(value: object) -> str:
-    """채널 이름은 소문자 알파벳만 — 경로 조각이 되므로 구분자·상위 이동을 원천 차단한다."""
-    if not isinstance(value, str) or not _CHANNEL.fullmatch(value):
-        _reject("channel 은 소문자 알파벳만 허용한다")
-    return value
-
-
 def require_attempt(value: object) -> int:
     """attempt 는 1부터. 파일 이름의 일부라 형식이 곧 경로 안전성이다."""
     if isinstance(value, bool) or not isinstance(value, int) or value < 1:
@@ -227,44 +217,6 @@ def _parse_moment(text: str) -> object:
         return datetime.fromisoformat(text)
     except ValueError:
         _reject("Approval.search_checked_at 은 ISO 8601 시각이어야 한다")
-
-
-def _lock_path(directory: Path, packet_id: str, channel: str) -> Path:
-    return directory / f"{require_packet_id(packet_id)}.{require_channel(channel)}.lock"
-
-
-_held = threading.local()
-
-
-@contextmanager
-def _channel_lock(directory: Path, packet_id: str, channel: str) -> Iterator[None]:
-    """한 패킷·한 채널의 장부 조작을 프로세스 간 직렬화한다. 잠금 파일도 0600, 지우지 않는다.
-
-    같은 스레드의 재진입은 깊이만 센다(Codex 9차: 새 fd 로 flock 을 다시 잡으면 자기 자신에 교착).
-    다른 스레드·다른 프로세스는 flock 이 막는다.
-    """
-    key = str(_lock_path(directory, packet_id, channel))
-    depth: dict[str, int] = getattr(_held, "depth", None) or {}
-    _held.depth = depth
-    if depth.get(key, 0) > 0:
-        depth[key] += 1
-        try:
-            yield
-        finally:
-            depth[key] -= 1
-        return
-    handle = os.open(key, os.O_CREAT | os.O_RDWR, FILE_MODE)
-    try:
-        os.fchmod(handle, FILE_MODE)
-        fcntl.flock(handle, fcntl.LOCK_EX)
-        depth[key] = 1
-        try:
-            yield
-        finally:
-            depth[key] = 0
-            fcntl.flock(handle, fcntl.LOCK_UN)
-    finally:
-        os.close(handle)
 
 
 def _attempt_path(directory: Path, packet_id: str, channel: str, attempt: int) -> Path:

@@ -17,19 +17,25 @@ from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 
-from .packet import dumps_value, ensure_store_dir, from_json, read_store_file, require_packet_id
+from .packet import (
+    _channel_lock,
+    dumps_value,
+    ensure_store_dir,
+    from_json,
+    read_store_file,
+    require_channel,
+    require_packet_id,
+)
 from .send_ledger import (
     SendIntent,
     SendState,
     Transition,
     _append,
     _attempt_path,
-    _channel_lock,
     _create_exclusive,
     _latest,
     recipients_digest,
     require_attempt,
-    require_channel,
     require_clock,
 )
 from .types import _reject, _require_sha256, _require_text

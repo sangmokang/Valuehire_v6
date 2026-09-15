@@ -14,13 +14,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import unquote
 
-from .packet import ensure_store_dir, from_json
+from .packet import _channel_lock, ensure_store_dir, from_json
 from .send_ledger import (
     SendIntent,
     SendState,
     Transition,
     _append,
-    _channel_lock,
     _latest,
     recipients_digest,
     require_attempt,
