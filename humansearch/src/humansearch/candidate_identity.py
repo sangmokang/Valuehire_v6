@@ -14,7 +14,9 @@ HMAC 으로 정의하고, INSERT 는 한 번만 한다. 기본키 충돌만 `dup
 
 from __future__ import annotations
 
+import errno
 import hmac
+import os
 import re
 import sqlite3
 import stat
@@ -46,6 +48,9 @@ _KEY_DIR_MODE: Final = 0o700
 _DB_FILE_MODE: Final = 0o600
 _DB_DIR_MODE: Final = 0o700
 _SIDECAR_SUFFIXES: Final = ("-journal", "-wal", "-shm")
+_BUSY: Final = "SQLITE_BUSY"
+# 다른 쓰기 연결의 잠금을 기다리는 상한. 초과하면 원문 OperationalError 가 아니라 닫힌 오류다.
+_LOCK_WAIT_SECONDS: Final = 5.0
 # C0(0x00-0x1F) · DEL(0x7F) · C1(0x80-0x9F). 필드 경계를 흉내 내거나 strip 에 조용히
 # 잘려 키를 바꾸는 문자를 전부 막는다.
 _CONTROL_CHARACTERS: Final = re.compile(r"[\x00-\x1f\x7f-\x9f]")
@@ -184,15 +189,30 @@ def _isoformat_ready(observed_at: str) -> str:
     return body
 
 
+def _closed_os_error(message: str, exc: OSError) -> CandidateIdentityError:
+    """OS 오류를 경로 없는 닫힌 오류로 바꾼다.
+
+    `raise … from exc` 는 원인 사슬(`__cause__`)에 FileNotFoundError 를 그대로 남기고,
+    그 안에는 절대 경로가 있다 — `traceback.format_exc()` 가 실리는 일반 장애 로그에
+    키 저장소 위치가 남는다(독립 검토 step-13, 19:27:46 재현). errno 이름만 싣고 사슬은 끊는다.
+    """
+
+    code = errno.errorcode.get(exc.errno or 0, "EUNKNOWN")
+    return CandidateIdentityError(f"{message} ({code})")
+
+
 def _verify(path: Path, *, expected_mode: int, label: str) -> None:
-    """Reuse the HS-03.01 path guard, re-raised inside this module's closed error."""
+    """Reuse the HS-03.01 path guard, re-raised inside this module's closed error.
+
+    HS-03.01 의 오류는 원인으로 FileNotFoundError(경로 포함)를 달고 있으므로 사슬을 끊는다.
+    """
 
     try:
         _verify_path(path, expected_mode=expected_mode, label=label)
     except CandidateIdentityError:
         raise
     except StorageSchemaError as exc:
-        raise CandidateIdentityError(str(exc)) from exc
+        raise CandidateIdentityError(str(exc)) from None
 
 
 def _reject_symlinked_chain(path: Path, *, label: str) -> None:
@@ -221,7 +241,7 @@ def _verify_db_location(db_path: Path) -> Path:
     try:
         return db_path.resolve(strict=True).parent
     except OSError as exc:
-        raise CandidateIdentityError("db file is missing") from exc
+        raise _closed_os_error("db file is missing", exc) from None
 
 
 def _load_hmac_key(hmac_key_path: Path, db_path: Path) -> bytes:
@@ -238,7 +258,7 @@ def _load_hmac_key(hmac_key_path: Path, db_path: Path) -> bytes:
     try:
         key_root = key_dir.resolve(strict=True)
     except OSError as exc:
-        raise CandidateIdentityError("hmac key directory is missing") from exc
+        raise _closed_os_error("hmac key directory is missing", exc) from None
     db_root = _verify_db_location(db_path)
     # 동일 경로만 막으면 dbroot/keys/k 가 통과한다. DB 루트를 한 번 복사·유출하면
     # 키까지 함께 나가므로 분리 보관이 무너진다(Codex V1). 포함은 양방향으로 막는다.
@@ -247,7 +267,7 @@ def _load_hmac_key(hmac_key_path: Path, db_path: Path) -> bytes:
     try:
         key = hmac_key_path.read_bytes()
     except OSError as exc:
-        raise CandidateIdentityError("hmac key is unreadable") from exc
+        raise _closed_os_error("hmac key is unreadable", exc) from None
     if len(key) < _MIN_KEY_BYTES:
         raise CandidateIdentityError(f"hmac key must be at least {_MIN_KEY_BYTES} bytes")
     return key
@@ -275,8 +295,8 @@ def _verify_sidecars(db_path: Path) -> None:
 
     HS-03.01 의 초기화 검사는 exists() 뒤 stat() 을 다시 하는데, 경쟁하는 다른 연결이
     journal 을 만들었다 지우는 사이에 사라지면 "missing" 으로 거부한다(AC-3 경쟁 시험
-    20회 중 7회 실측). 없어진 보조 파일은 위반이 아니다. 소유자는 따로 보지 않는다 —
-    0700 부모 안에 다른 UID 가 파일을 만들 수 없고, 부모 검사가 앞에서 끝난다.
+    20회 중 7회 실측). 없어진 보조 파일은 위반이 아니다. 소유자도 대상 파일 자체에서 본다 —
+    저장 계약 §3 은 부모의 접근성 추론이 아니라 보조 파일 자체의 owner 확인을 요구한다.
     """
 
     for suffix in _SIDECAR_SUFFIXES:
@@ -286,6 +306,8 @@ def _verify_sidecars(db_path: Path) -> None:
             continue
         if stat.S_ISLNK(info.st_mode):
             raise CandidateIdentityError("sqlite sidecar must not be a symlink")
+        if info.st_uid != os.getuid():
+            raise CandidateIdentityError("sqlite sidecar owner mismatch")
         if stat.S_IMODE(info.st_mode) != _DB_FILE_MODE:
             raise CandidateIdentityError(f"sqlite sidecar mode must be {_DB_FILE_MODE:04o}")
         if not stat.S_ISREG(info.st_mode):
@@ -309,10 +331,15 @@ def _insert_once(
     """
 
     _verify_db_boundary(db_path)
-    connection = sqlite3.connect(db_path, isolation_level=None)
+    connection = sqlite3.connect(db_path, isolation_level=None, timeout=_LOCK_WAIT_SECONDS)
     try:
         connection.execute("pragma foreign_keys = on")
-        connection.execute("begin immediate")
+        try:
+            connection.execute("begin immediate")
+        except sqlite3.OperationalError as exc:
+            if exc.sqlite_errorname != _BUSY:
+                raise
+            return _outcome_after_lock_wait(connection, key_hmac)
         try:
             connection.execute(
                 """
@@ -334,3 +361,23 @@ def _insert_once(
     finally:
         connection.close()
     return "inserted"
+
+
+def _outcome_after_lock_wait(connection: sqlite3.Connection, key_hmac: str) -> RecordOutcome:
+    """잠금 대기를 넘긴 뒤의 결과 — 이긴 쪽이 이미 확정했으면 `duplicate`, 아니면 닫힌 오류.
+
+    독립 검토(step-12)가 5.689초 뒤 `OperationalError(SQLITE_BUSY)` 원문 노출을 실측했다.
+    무한 재시도는 두지 않는다 — 한 번의 읽기로 승자 확정 여부만 본다. 읽기마저 잠기면 닫힌 오류다.
+    """
+
+    try:
+        row = connection.execute(
+            "select 1 from hs_candidates where candidate_key_hmac = ?", (key_hmac,)
+        ).fetchone()
+    except sqlite3.OperationalError as exc:
+        if exc.sqlite_errorname != _BUSY:
+            raise
+        raise CandidateIdentityError("db write lock wait exceeded") from None
+    if row is not None:
+        return "duplicate"
+    raise CandidateIdentityError("db write lock wait exceeded")
