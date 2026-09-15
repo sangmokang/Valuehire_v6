@@ -206,6 +206,23 @@ def _has_company_field_condition(line: str) -> bool:
     return any(re.compile(pattern).search(line) for pattern in _COMPANY_FIELD_CONDITION_PATTERNS)
 
 
+# `[회사 리서치 | 2026-09-10 확인]` — 날짜는 렌더러가 넣으므로 모양만 고정한다.
+_RESEARCH_HEAD = re.compile(r"\[회사 리서치 \| .+ 확인\]")
+
+
+def _company_research_indexes(lines: tuple[str, ...]) -> frozenset[int]:
+    """[회사 리서치] 절 본문의 줄 번호. 빈 줄이나 다음 절 머리(`[`)에서 끝난다."""
+    start = next((i for i, line in enumerate(lines) if _RESEARCH_HEAD.fullmatch(line)), None)
+    if start is None:
+        return frozenset()
+    end = len(lines)
+    for index in range(start + 1, len(lines)):
+        if not lines[index] or lines[index].startswith("["):
+            end = index
+            break
+    return frozenset(range(start + 1, end))
+
+
 @dataclass(frozen=True)
 class SearchPacket:
     """한 포지션의 브리프를 만들기 위해 모은 구조화 자료 묶음."""
@@ -318,8 +335,14 @@ class SearchPacket:
             lines, "[필드 2: JD 내용]", tuple(packet.two_field_jd.splitlines()), "필드 2"
         )
         jd_line_indexes.update(range(lines.index("[필드 2: JD 내용]") + 1, end))
+        research_indexes = _company_research_indexes(lines)
+        rendered = self._rendered_company_lines() if research_indexes else frozenset[str]()
         for index, line in enumerate(lines):
             if index in jd_line_indexes:
+                continue
+            if index in research_indexes and line in rendered:
+                # 회사 리서치 절이 CompanyBrief 의 검증된 렌더링 결과 그대로면 채용 조건이 아니다.
+                # (Codex 13차 F83-3: `- 매출: 300억 원 [I1]` 이 금액 패턴에 걸려 정상 브리프가 막혔다)
                 continue
             has_condition = (
                 _has_company_field_condition(line)
@@ -328,3 +351,14 @@ class SearchPacket:
             )
             if has_condition:
                 _reject(f"TeamMail.body 의 JD 블록 밖에 채용 조건이 끼었다: {line!r}")
+
+    def _rendered_company_lines(self) -> frozenset[str]:
+        """이 패킷의 CompanyBrief 로 렌더러가 만들 수 있는 회사 사실 줄 전부.
+
+        `mail_sections` 가 `types_packet` 을 import 하므로 최상단 import 는 순환이다 —
+        렌더러를 복제해 라벨이 갈라지느니 호출 시점에 한 번 불러온다(정본은 한 곳뿐).
+        `open_items` 는 러너 자유 문구라 여기 넣지 않는다 — 그 줄은 계속 조건 검사를 받는다.
+        """
+        from .mail_sections import render_company_research
+
+        return frozenset(render_company_research(self.company, (), self.created_on))
