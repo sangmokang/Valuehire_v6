@@ -70,9 +70,10 @@ MODULE=humansearch/src/humansearch/candidate_identity.py
 TESTS=humansearch/tests/test_hs_0302_candidate_identity.py
 TESTS_R2=humansearch/tests/test_hs_0302_r2_hardening.py
 TESTS_R3=humansearch/tests/test_hs_0302_r3_hardening.py
+TESTS_R4=humansearch/tests/test_hs_0302_r4_db_boundary.py
 # 인수 실행이 돌리는 시험 전부. 필터는 두지 않는다 — 필터를 두면 필수 음성 대조군이
 # 인수 실행 안에서 돌지 않는다(Codex V1 2차 F0302-4 잔여).
-TEST_FILES="tests/test_hs_0302_candidate_identity.py tests/test_hs_0302_r2_hardening.py tests/test_hs_0302_r3_hardening.py"
+TEST_FILES="tests/test_hs_0302_candidate_identity.py tests/test_hs_0302_r2_hardening.py tests/test_hs_0302_r3_hardening.py tests/test_hs_0302_r4_db_boundary.py"
 PYTEST_EXTRA=""
 SCHEMA=humansearch/src/humansearch/storage_schema.py
 WORKFLOW=.github/workflows/verify.yml
@@ -84,11 +85,12 @@ BASE_SHA=7473ec8
 MIN_TESTS=6
 MIN_R2_TESTS=10
 MIN_R3_TESTS=6
+MIN_R4_TESTS=7
 # 명부 건수는 하한이 아니라 **정확한 기대값**이다. 하한이면 시험 함수와 명부 줄을 함께
 # 지워 하한까지 내려앉을 수 있다 — 그러면 required·collected·missing·extra 가 모두
 # 맞아떨어져 통과한다(Codex V1 4차 실측: 82→80). 시험을 추가·삭제할 때는 명부 파일과
-# 이 상수를 **함께** 올린다.
-EXPECTED_REQUIRED_IDS=82
+# 이 상수를 **함께** 올린다. 2026-09-15 4차: 82→97(DB 저장 경계 15건).
+EXPECTED_REQUIRED_IDS=97
 
 WORK=$(mktemp -d) || { echo "NOT_RUN: mktemp 실패"; echo "CHECKED: 0"; exit 2; }
 trap 'rm -rf "$WORK"' EXIT
@@ -129,7 +131,7 @@ assert_fail_closed() {
 # 필수 검사를 할 수 없으면 건수만 늘리고 통과시키지 않는다 — 그 자리에서 끝낸다.
 abort_not_run() { echo "NOT_RUN: $1"; echo "CHECKED: $checked"; exit 2; }
 
-for required in "$MODULE" "$TESTS" "$TESTS_R2" "$TESTS_R3" "$WORKFLOW" "$SOT_ROSTER" \
+for required in "$MODULE" "$TESTS" "$TESTS_R2" "$TESTS_R3" "$TESTS_R4" "$WORKFLOW" "$SOT_ROSTER" \
                 "$REQUIRED_TESTS" "$WIRING_CHECKER" "$SCHEMA"; do
   if [ ! -f "$required" ]; then
     echo "NOT_RUN: $required 없음 — 검사 대상이 성립하지 않는다"
@@ -166,12 +168,13 @@ count_tests() {
 }
 r2_count=$(count_tests "$TESTS_R2")
 r3_count=$(count_tests "$TESTS_R3")
-total_tests=$((test_count + r2_count + r3_count))
+r4_count=$(count_tests "$TESTS_R4")
+total_tests=$((test_count + r2_count + r3_count + r4_count))
 if [ "$test_count" -ge "$MIN_TESTS" ] && [ "$r2_count" -ge "$MIN_R2_TESTS" ] \
-   && [ "$r3_count" -ge "$MIN_R3_TESTS" ]; then
-  pass_item "시험 함수 1차 ${test_count} · 2차 ${r2_count} · 3차 ${r3_count} = ${total_tests}개"
+   && [ "$r3_count" -ge "$MIN_R3_TESTS" ] && [ "$r4_count" -ge "$MIN_R4_TESTS" ]; then
+  pass_item "시험 함수 1차 ${test_count} · 2차 ${r2_count} · 3차 ${r3_count} · 4차 ${r4_count} = ${total_tests}개"
 else
-  fail_item "시험 함수 부족 — 1차 ${test_count}(>=${MIN_TESTS}) · 2차 ${r2_count}(>=${MIN_R2_TESTS}) · 3차 ${r3_count}(>=${MIN_R3_TESTS})"
+  fail_item "시험 함수 부족 — 1차 ${test_count}(>=${MIN_TESTS}) · 2차 ${r2_count}(>=${MIN_R2_TESTS}) · 3차 ${r3_count}(>=${MIN_R3_TESTS}) · 4차 ${r4_count}(>=${MIN_R4_TESTS})"
 fi
 
 # 두 연결 경쟁 시험이 실제로 스레드 2개를 쓰는가(같은 연결 재사용이면 AC-3 가 무효다)
@@ -545,7 +548,7 @@ fi
 # 경로 문자열이 주석에만 있어도 불합격시킨다 — 시험이 실제로 읽는지 아닌지를 이 검사가
 # 판별하려 들면 판별기가 또 하나의 약점이 된다. 아예 쓰지 않는 쪽이 검사하기 쉽다.
 OUT_OF_TREE_RE=$(printf 'parents\\[2\\]|%s/|\\.github|docs/sot' 'scripts')
-"$GREP" -nE "$OUT_OF_TREE_RE" "$TESTS" "$TESTS_R2" "$TESTS_R3" \
+"$GREP" -nE "$OUT_OF_TREE_RE" "$TESTS" "$TESTS_R2" "$TESTS_R3" "$TESTS_R4" \
   > "$WORK/out_of_tree.txt"
 rc=$?
 if [ "$rc" -gt 1 ]; then
