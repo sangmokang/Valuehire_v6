@@ -69,6 +69,20 @@ class BoundaryReceipt:
     temp_path: Path | None = None
 
 
+@dataclass(frozen=True)
+class _PendingWrite:
+    """What we already know about the file being written.
+
+    Carried into every receipt so no failure path throws away the digest or the
+    size and identity read from the descriptor that held the payload.
+    """
+
+    final_path: Path
+    temp_path: Path
+    digest: str
+    written: os.stat_result | None = None
+
+
 class RunnerBoundary:
     """Validate a runner-owned root and write new files without exposing payloads."""
 
@@ -296,45 +310,74 @@ class RunnerBoundary:
             return occupied
         digest = hashlib.sha256(payload).hexdigest()
         temp_name = f".{os.urandom(8).hex()}.tmp"
+        pending = _PendingWrite(final_path, final_path.parent / temp_name, digest)
         try:
             fd = os.open(temp_name, _NEW_FILE_FLAGS, _FILE_MODE, dir_fd=parent_fd)
         except OSError:
-            return BoundaryReceipt(BoundaryStatus.DENIED, "write_failed")
+            return BoundaryReceipt(BoundaryStatus.DENIED, "write_failed", None, digest)
         try:
             stored = self._fill_temp_file(fd, payload)
         except OSError:
-            self._close_fd(fd)
-            return self._discard(parent_fd, temp_name, "write_failed")
+            # 손잡이까지 놓치면 이번 건의 실패가 아니라 프로세스의 문제다.
+            reason = "write_failed" if self._close_fd(fd) else "recovery_required"
+            return self._settle_cleanup(parent_fd, temp_name, reason, pending)
+        pending = _PendingWrite(final_path, pending.temp_path, digest, stored)
         if not self._close_fd(fd):
-            return self._strand_open_handle(
-                parent_fd, temp_name, final_path, digest, stored
+            return self._settle_cleanup(
+                parent_fd, temp_name, "recovery_required", pending
             )
         invalid = self._check_written_file(stored, runner_uid)
         if invalid is not None:
-            return self._discard(parent_fd, temp_name, invalid.reason)
-        return self._publish(parent_fd, temp_name, name, final_path, digest, stored)
+            return self._settle_cleanup(
+                parent_fd, temp_name, invalid.reason, pending
+            )
+        return self._publish(parent_fd, temp_name, name, pending)
 
-    def _strand_open_handle(
+    def _settle_cleanup(
         self,
         parent_fd: int,
         temp_name: str,
-        final_path: Path,
-        digest: str,
-        written: os.stat_result,
+        reason: str,
+        pending: _PendingWrite,
+        *,
+        path: Path | None = None,
     ) -> BoundaryReceipt:
-        """Report a temporary handle that could not be released.
+        """Drop our temporary file and describe what is left, in one place.
 
-        ``close`` reporting an error leaves the descriptor in an unspecified
-        state, so this process may be holding a handle it cannot account for.
-        Cleanup is still attempted, but the caller must stop iterating and
-        discard the runner process rather than write again through it.
+        Every cleanup-failure receipt is built here so nothing we already know
+        is lost: the payload digest, and the size and identity read from the
+        descriptor that held it. When the temporary file cannot be removed its
+        path is handed back as a candidate, and the reason becomes
+        ``recovery_required`` — the caller stops iterating and discards the
+        runner process rather than writing again through it.
         """
 
-        stranded = None
-        if not self._remove(parent_fd, temp_name):
-            stranded = final_path.parent / temp_name
-        return self._describe(
-            BoundaryStatus.DENIED, "recovery_required", None, digest, written, stranded
+        if self._remove(parent_fd, temp_name):
+            return self._assemble(BoundaryStatus.DENIED, reason, pending, path, None)
+        return self._assemble(
+            BoundaryStatus.DENIED, "recovery_required", pending, path, pending.temp_path
+        )
+
+    def _assemble(
+        self,
+        status: BoundaryStatus,
+        reason: str,
+        pending: _PendingWrite,
+        path: Path | None,
+        temp_path: Path | None,
+    ) -> BoundaryReceipt:
+        """Build one receipt from everything known about the write."""
+
+        written = pending.written
+        return BoundaryReceipt(
+            status,
+            reason,
+            path,
+            pending.digest,
+            0 if written is None else written.st_size,
+            None if written is None else written.st_dev,
+            None if written is None else written.st_ino,
+            temp_path,
         )
 
     def _fill_temp_file(self, fd: int, payload: bytes) -> os.stat_result:
@@ -347,21 +390,15 @@ class RunnerBoundary:
         return os.fstat(fd)
 
     def _publish(
-        self,
-        parent_fd: int,
-        temp_name: str,
-        name: str,
-        final_path: Path,
-        digest: str,
-        written: os.stat_result,
+        self, parent_fd: int, temp_name: str, name: str, pending: _PendingWrite
     ) -> BoundaryReceipt:
         """Give the finished temporary file its final name, or undo everything.
 
-        ``written`` comes from ``fstat`` on the descriptor that actually held the
-        payload, so it names our bytes. The entry now sitting under ``name`` has
-        to be that same object; anything else means the name was taken over
-        between the link and this check, and the receipt would otherwise pair
-        our payload hash with somebody else's file.
+        ``pending.written`` comes from ``fstat`` on the descriptor that actually
+        held the payload, so it names our bytes. The entry now sitting under
+        ``name`` has to be that same object; anything else means the name was
+        taken over between the link and this check, and the receipt would
+        otherwise pair our payload hash with somebody else's file.
         """
 
         try:
@@ -376,86 +413,53 @@ class RunnerBoundary:
             reason = (
                 "target_already_exists" if exc.errno == errno.EEXIST else "write_failed"
             )
-            return self._discard(parent_fd, temp_name, reason)
-        confirmed = self._published_path_matches(parent_fd, name, final_path)
+            return self._settle_cleanup(parent_fd, temp_name, reason, pending)
+        confirmed = self._published_path_matches(parent_fd, name, pending.final_path)
         if confirmed:
-            confirmed = self._published_entry_is(parent_fd, name, written)
-        stranded = final_path.parent / temp_name
+            confirmed = self._published_entry_is(parent_fd, name, pending.written)
         if not confirmed:
-            return self._abandon_publication(
+            return self._settle_cleanup(
                 parent_fd,
                 temp_name,
-                self._mismatch_receipt(parent_fd, name, final_path, digest, written),
-                self._describe(
-                    BoundaryStatus.DENIED, "recovery_required", final_path, digest,
-                    written, stranded,
-                ),
+                "published_path_mismatch",
+                pending,
+                path=self._mismatch_path(parent_fd, name, pending),
             )
         if not self._remove(parent_fd, temp_name):
-            return self._describe(
-                BoundaryStatus.DENIED, "cleanup_failed", final_path, digest, written,
-                stranded,
+            return self._assemble(
+                BoundaryStatus.DENIED, "cleanup_failed", pending,
+                pending.final_path, pending.temp_path,
             )
-        return self._describe(
-            BoundaryStatus.WRITTEN, "written", final_path, digest, written
+        return self._assemble(
+            BoundaryStatus.WRITTEN, "written", pending, pending.final_path, None
         )
 
-    def _describe(
-        self,
-        status: BoundaryStatus,
-        reason: str,
-        final_path: Path | None,
-        digest: str,
-        written: os.stat_result,
-        temp_path: Path | None = None,
-    ) -> BoundaryReceipt:
-        """Name the file we wrote, using the descriptor that held the payload."""
 
-        return BoundaryReceipt(
-            status, reason, final_path, digest,
-            written.st_size, written.st_dev, written.st_ino, temp_path,
-        )
-
-    def _mismatch_receipt(
-        self,
-        parent_fd: int,
-        name: str,
-        final_path: Path,
-        digest: str,
-        written: os.stat_result,
-    ) -> BoundaryReceipt:
-        """Describe a failed confirmation, naming our file only when it is ours."""
-
-        if not self._published_entry_is(parent_fd, name, written):
-            return BoundaryReceipt(BoundaryStatus.DENIED, "published_path_mismatch")
-        return self._describe(
-            BoundaryStatus.DENIED, "published_path_mismatch", final_path, digest, written
-        )
-
-    def _abandon_publication(
-        self,
-        parent_fd: int,
-        temp_name: str,
-        found: BoundaryReceipt,
-        stranded: BoundaryReceipt,
-    ) -> BoundaryReceipt:
-        """Drop only our temporary file and leave the final name untouched.
+    def _mismatch_path(
+        self, parent_fd: int, name: str, pending: _PendingWrite
+    ) -> Path | None:
+        """Offer the published path only when that entry is provably ours.
 
         A failed confirmation is exactly the evidence that the final name may
-        hold another run's file, so it is never unlinked. Re-checking ownership
-        just before unlinking would leave the same window open, so the boundary
-        does not unlink a name it cannot own outright.
+        hold another run's file. That name is never unlinked and never named as
+        ours; re-checking ownership just before acting would leave the same
+        window open, so the boundary does not claim a name it cannot own.
         """
 
-        if not self._remove(parent_fd, temp_name):
-            return stranded
-        return found
+        if pending.written is None:
+            return None
+        if not self._published_entry_is(parent_fd, name, pending.written):
+            return None
+        return pending.final_path
+
 
     def _published_entry_is(
-        self, parent_fd: int, name: str, written: os.stat_result
+        self, parent_fd: int, name: str, written: os.stat_result | None
     ) -> bool:
         """Check the entry under ``name`` is the object we wrote, not a stand-in."""
 
+        if written is None:
+            return False
         try:
             info = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
         except OSError:
@@ -496,15 +500,6 @@ class RunnerBoundary:
         if info.st_uid != runner_uid or info.st_mode & _PERMISSION_BITS != _FILE_MODE:
             return BoundaryReceipt(BoundaryStatus.DENIED, "written_file_permission_invalid")
         return None
-
-    def _discard(
-        self, parent_fd: int, temp_name: str, reason: str
-    ) -> BoundaryReceipt:
-        """Delete the temporary file. Say so plainly when that is impossible."""
-
-        if not self._remove(parent_fd, temp_name):
-            return BoundaryReceipt(BoundaryStatus.DENIED, "recovery_required")
-        return BoundaryReceipt(BoundaryStatus.DENIED, reason)
 
     def _remove(self, parent_fd: int, name: str) -> bool:
         try:
