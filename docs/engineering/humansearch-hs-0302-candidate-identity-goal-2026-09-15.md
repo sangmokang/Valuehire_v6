@@ -41,19 +41,31 @@ WU 장부 168행(`worktrees/hs-0004-recovery-20260910/docs/engineering/humansear
 - AC-3: While SQLite 연결 2개가 같은 키를 동시에 넣으면 시스템은 기본키 제약으로 1행을 보장하고, 진 쪽은 명시적 `duplicate` 결과를 돌려줘야 한다(`sqlite3.IntegrityError` 삼킴 금지, 다른 오류는 그대로 올림).
 - AC-4: If 세 값 중 하나라도 비거나 `channel` 이 허용값 밖이면 시스템은 기록을 거부하고 DB 에 행을 만들지 않아야 한다.
 
-counter-AC(가짜 합격): 응용 코드에서 `SELECT` 뒤 `INSERT` 로만 막는 것(AC-3 경쟁 시험에서 2행 생김). HMAC 입력에서 `position_ref` 나 `channel` 을 빼는 것(AC-2 위반). HMAC 키를 코드 상수로 두는 것. 스키마 표를 새로 하나 더 만들어 기존 `hs_candidates` 를 우회하는 것. 기본키 예외뿐 아니라 모든 `IntegrityError` 를 `duplicate` 로 접는 것.
+counter-AC(가짜 합격, 2026-09-15 Codex V1 로 4건 추가): 필드 안에 구분자를 넣어 서로 다른 세 값이 같은 키가 되게 두는 것. 키를 DB 보호 루트의 **하위** 디렉터리에 두도록 허용하는 것. RFC3339 를 자리수만 세어 통과시키는 것. 인수 스크립트가 필수 비교·스캔을 못 한 채 건너뛰고 종료값 0 을 내는 것. — 그리고 원래 목록: 응용 코드에서 `SELECT` 뒤 `INSERT` 로만 막는 것(AC-3 경쟁 시험에서 2행 생김). HMAC 입력에서 `position_ref` 나 `channel` 을 빼는 것(AC-2 위반). HMAC 키를 코드 상수로 두는 것. 스키마 표를 새로 하나 더 만들어 기존 `hs_candidates` 를 우회하는 것. 기본키 예외뿐 아니라 모든 `IntegrityError` 를 `duplicate` 로 접는 것.
 
 ## 입출력·오류·경계 계약
 
-- 입력: `CandidateIdentityInput(position_ref: str, channel: Literal["saramin","jobkorea","linkedin_rps"], candidate_ref: str, observed_at: str  # RFC3339)`. 세 문자열은 strip 후 비어 있으면 거부. `observed_at` 은 RFC3339(`YYYY-MM-DDTHH:MM:SS(.fff)?(Z|±HH:MM)`) 아니면 거부.
+- 입력: `CandidateIdentityInput(position_ref: str, channel: Literal["saramin","jobkorea","linkedin_rps"], candidate_ref: str, observed_at: str  # RFC3339)`. 네 문자열 모두 **strip 하기 전에** 제어문자(C0 `0x00-0x1F`·DEL `0x7F`·C1 `0x80-0x9F`)가 있으면 거부한다 — Python 의 `str.strip()` 은 `\x1c-\x1f` 와 `\x85` 를 공백으로 보고 조용히 잘라내며(실측), 잘라내면 키가 소리 없이 바뀐다. 그 다음 strip 후 비어 있으면 거부.
 - 출력: `Literal["inserted", "duplicate"]`.
 - 오류: `CandidateIdentityError(StorageSchemaError)`. 메시지에 `candidate_ref`·`position_ref`·키 값을 넣지 않는다.
-- HMAC: `hmac.new(key, msg, "sha256")`, `msg = b"hs-candidate-key-v1\x1f" + position_ref + b"\x1f" + channel + b"\x1f" + candidate_ref` (구분자 `\x1f` 로 필드 경계를 고정해 `"a"+"bc"` 와 `"ab"+"c"` 를 구분). 키는 32바이트 이상 raw bytes.
-- 키 파일: `hmac_key_path` 인자로 받는다. 파일은 소유자 = 현재 uid, 모드 0600, symlink 아님, 부모 디렉터리 모드 0700·symlink 아님, 그리고 **DB 파일의 보호 루트와 다른 디렉터리**(정본 109행). 검사는 `storage_schema._verify_path` 재사용. 없으면 `CandidateIdentityError("hmac key is missing")` — 암묵 생성 금지.
+- HMAC(**v2, 2026-09-15 개정**): `hmac.new(key, msg, "sha256")`, `msg = b"hs-candidate-key-v2"` 뒤에 세 필드를 **길이 접두 정규 직렬화**로 이어 붙인다 — 필드마다 `len(utf8 bytes).to_bytes(4, "big") + utf8 bytes`. 키는 32바이트 이상 raw bytes.
+  - 왜 바꿨나: 구분자 결합(v1)은 그 구분자가 필드 **안에** 들어오면 경계가 무너진다. Codex V1 이 `("a","saramin","x\x1fjobkorea\x1fy")` 와 `("a\x1fsaramin\x1fx","jobkorea","y")` 가 같은 바이트열이 되는 것을 실측했다(AC-2 위반). 길이는 내용에 섞일 수 없어 이 계열 주입이 원천 차단된다.
+  - 도메인 태그를 v1→v2 로 올린다. 같은 세 값이라도 v1 이 만든 키 값과 다르다. 이 WU 는 운영 데이터가 없어(`LOCAL_ONLY`) 재계산 대상이 없다.
+  - 제어문자 거부와 길이 접두는 **둘 다** 둔다. 하나가 뚫려도 다른 하나가 막는다.
+- 키 파일: `hmac_key_path` 인자로 받는다. 파일은 소유자 = 현재 uid, 모드 0600, 부모 디렉터리 모드 0700. 검사는 `storage_schema._verify_path` 재사용. 없으면 `CandidateIdentityError("hmac key is missing")` — 암묵 생성 금지.
+  - symlink: 키 파일과 부모뿐 아니라 **상위 사슬 전체**에 symlink 가 없어야 한다. `stat(follow_symlinks=False)` 는 마지막 구성요소만 따라가지 않으므로 조부모 symlink 를 못 본다(Codex V1). 사슬을 직접 걸어 확인한다.
+  - 보호 루트 분리(정본 109행): 해석된 키 디렉터리가 DB 보호 루트와 같거나 **그 하위**여도 거부하고, 반대로 DB 루트가 키 디렉터리의 하위여도 거부한다(`Path.is_relative_to` 양방향). 동일 경로만 막으면 `dbroot/keys/k` 가 통과해, DB 루트를 한 번 복사·유출하면 키까지 함께 나간다.
 - 저장 열 매핑: `candidate_ref_state='observed'`, `candidate_ref_hash = HMAC(key, b"hs-candidate-ref-v1\x1f"+candidate_ref)`(평문 sha256 은 추측 가능한 개인정보 지문이라 쓰지 않는다), `storage_status='pending'`(행은 있으나 증거 readback 전), `created_at` 은 DB 기본값.
+- `observed_at` 검증은 두 겹이다. ① 정규식이 달력·시각·오프셋 **범위**까지 좁힌다(월 01-12, 일 01-31, 시 00-23, 분·초 00-59, 오프셋 ±00:00-23:59 또는 `Z`). ② `datetime.fromisoformat` 으로 실재를 확인하고 `tzinfo is None` 이면 거부한다. 한 겹으로는 부족하다 — 정규식만으로는 `2026-02-29`(윤년 아님)를, `fromisoformat` 만으로는 `24:00:00` 을 못 막는다(둘 다 실측).
 - `observed_at` 은 검증만 하고 `hs_candidates` 에는 저장하지 않는다(열이 없고 버전 2 마이그레이션을 피한다). 증거 시각은 HS-03.04 가 `hs_evidence_manifests.observed_at` 에 기록한다.
 - 동시성: `INSERT` 한 번. `sqlite3.IntegrityError` 중 `sqlite_errorname == "SQLITE_CONSTRAINT_PRIMARYKEY"` 만 `duplicate` 로 번역하고 나머지는 그대로 올린다. 연결마다 `pragma foreign_keys=on`, `busy_timeout` 은 기본값(5초) 유지.
 - 기존 마이그레이션 1 은 수정하지 않는다. 열 추가가 필요하면 `_MIGRATIONS` 에 버전 2 로 추가하고 `_expected_schema_signature` 가 바뀐 표를 포함해야 한다 — 이 WU 는 열을 추가하지 않는다.
+
+## 계약 충돌 기록 (2026-09-15)
+
+V1 후속 지시는 Codex 충돌 쌍을 "둘 다 `inserted`, 행 2개"로 기록하라고 요구하면서, 같은 지시로 그 쌍이 담고 있는 U+001F 를 거부하라고 요구했다. **두 요구는 동시에 성립하지 않는다.** 제어문자를 거부하면 그 쌍은 애초에 기록되지 않는다. 또 허용 채널이 고정 집합이고 제어문자가 막히면, 구분자 결합에서 충돌하는 **합법** 입력쌍 자체가 존재하지 않는다 — 따라서 "둘 다 inserted" 는 거부를 포기해야만 도달한다.
+
+더 보수적인 쪽(거부)을 택했다. DB 경로 시험은 "둘 다 거부·행 0"으로 두고, 직렬화가 실제로 충돌을 없앴는지는 순수 함수 시험이 따로 본다. 이어 붙이면 같아지는 **합법** 쌍(`("ab","saramin","c")` vs `("a","saramin","bc")`)이 별도 행으로 남는지 보는 DB 회귀 시험을 하나 더 뒀다 — 전부 거부하는 구현을 막는 양성 대조군이다.
 
 ## 결정 카드
 
@@ -135,5 +147,24 @@ HMAC 입력 누락, 예외 삼킴 범위, 키 파일 검사 우회(symlink·모�
 | AC-3 독립 연결 실측 | PASS | 계측 스크립트 10:47:52 → `connect calls (worker)=2`, `distinct worker threads=2`, `distinct connection ids=2`, `same connection shared=False`, `rows in hs_candidates=1`. 같은 연결 공유가 아니다 |
 | `sqlite_errorname` 실측 | PASS | Python 3.14.1 / SQLite 3.51.1 → 클래스 `hasattr(sqlite3.IntegrityError, "sqlite_errorname")` = `False`, 인스턴스는 기본키 충돌 `SQLITE_CONSTRAINT_PRIMARYKEY`, CHECK 위반 `SQLITE_CONSTRAINT_CHECK`, NOT NULL 위반 `SQLITE_CONSTRAINT_NOTNULL` |
 | P11 코드 예산 | PASS | `candidate_identity.py` 178줄 / 최장 함수 `_insert_once` 29줄. 시험 파일 434줄 / 최장 함수 51줄. 인수 스크립트 215줄. hard 600·100 이내 |
-| V1 | NOT_RUN | 독립 검증 엔진 대기 |
+| V1 (1차) | **FAIL** | Codex 독립 검증 @9ac10f9 11:01:55 → `VERDICT: FAIL`, 결함 4건(high 2·medium 2). AC-2 REPRODUCED, 나머지 3건 REPRODUCED. 판정 원문 `scratchpad/codex-v1-0302.log` |
+| V1 결함 재현 | PASS | `v2_0302_codex.py` @9ac10f9 11:06:01 → `(1) separator collision: True`, `(1) db outcome: inserted duplicate | rows: 1`, `(2) key under db root: ACCEPTED inserted`, `(3) 2026-99-99T99:99:99: ACCEPTED inserted` — 3건 모두 내 손으로 재현 |
+| 2차 RED | PASS | `efaefab`(새 파일 + 1차 독립 HMAC 을 계약 v2 로 재작성) → 새 파일 28 failed/9 passed, 1차 파일 4 failed/24 passed. 계약 충돌 정정 `6395056` 후에도 대상 시험은 여전히 RED |
+| 2차 GREEN | PASS | `1396faf`(모듈 + 인수 스크립트) · `f03cbc7`(재귀 차단·판정 정밀화) · `b0f1805`(순환 제거·차단 독립·자기 검사) |
+| 재검증 — 새 시험 | PASS | `uv run pytest tests/test_hs_0302*.py -q` 12:00:20 → `66 passed in 4.11s` (1차 28 + 2차 38) |
+| 재검증 — 전체 | PASS | `uv run pytest -q` 12:00 → `295 passed in 14.58s` (229 기준선 + 66) |
+| 재검증 — ruff·mypy | PASS | `All checks passed!` · `Success: no issues found in 46 source files`, rc=0 |
+| 재검증 — 인수 | PASS | 12:00:45 → `PASS` 11줄, `CHECKED: 11`, rc=0. HMAC 판정을 문자열 탐지에서 실행 probe(16건)로 교체 |
+| V2 재현기 (GREEN 후) | PASS(주의) | 원본 `v2_0302_codex.py` 는 (1) 에서 `CandidateIdentityError: candidate_ref must not contain control characters` 로 중단된다 — 계약 충돌 때문에 원본 기대 `(1) inserted inserted 2` 는 도달 불가. 사본 `v2_0302_codex_after_green.py` 12:25:31 → `(1a) collision False`·`(1b) 둘 다 REJECTED`·`(1c) rows 0`·`(1d) 합법쌍 둘 다 inserted`·`(1e) rows 2`·`(2) REJECTED`·`(3) REJECTED` |
+| 변이 M1 제어문자 거부 제거 | 생존 0 | 11:27:09 → 11 failed. 길이 접두는 유지되므로 순수 함수 충돌 시험 3건은 여전히 통과 — 이중 방어가 실제로 독립임을 보여준다 |
+| 변이 M2 길이 접두→구분자 결합 | 생존 0 | 11:27:42 → 6 failed. 인수 probe 도 `BAD` 6건으로 불합격 |
+| 변이 M3 양방향 포함→동일 비교 | 생존 0 | 11:28:14 → 키 경계 2건 실패(중첩 하위·역방향) |
+| 변이 M3b 상위 사슬 symlink 검사 제거 | 생존 0 | 11:28:25 → 조부모 symlink 시험 1건 실패 |
+| 변이 M4 fromisoformat 제거 | 생존 0 | 11:28:26 → `2026-02-29T00:00:00Z` 1건 실패(정규식이 못 잡는 사례) |
+| 변이 M4b 정규식 범위 제거 | 생존 0 | 11:28:42 → `2026-09-15T24:00:00Z` 1건 실패(fromisoformat 이 못 잡는 사례). M4 와 M4b 가 서로 다른 사례를 잡는다 |
+| 변이 M5 fail-closed→skip | 생존 0 | 11:59:55 → 인수 스크립트 자기 검사 `FAIL` + rc=1, pytest 2건 실패, 9.56초 |
+| 사고 — 인수 검사 무한 재귀 | 해소 | 1차 시도에서 인수 검사의 pytest 단계가 자기를 부르는 시험을 돌려 프로세스가 1,493개까지 늘었다(612초 타임아웃). 강제 종료 후 ① pytest 단계에서 자기 호출 시험 deselect ② 중첩 차단을 `abort_not_run` 과 분리 ③ subprocess timeout 300초 로 해소. 재실행 9.56초 |
+| 원상복구 | PASS | 12:00:20 `git status --short` 0줄, `git diff --stat` 0줄, `git diff 7473ec8 -- storage_schema.py` 0줄 |
+| P11 코드 예산 | PASS | 모듈 228줄/최장 29줄 · 1차 시험 435줄/51줄 · 2차 시험 414줄/27줄 · 인수 345줄. hard 600·100 이내 |
+| V1 (2차) | NOT_RUN | 독립 검증 엔진 대기 |
 | push·Draft PR | NOT_RUN | 공통 규칙상 이 세션은 push·PR 을 하지 않는다 |
