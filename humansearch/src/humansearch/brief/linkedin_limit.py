@@ -20,6 +20,7 @@ from .jd_fidelity import (
     FidelityReport,
     Section,
     content_lines,
+    judgement_form,
     normalize_line,
     split_sections,
 )
@@ -210,7 +211,9 @@ def _frame_payload(line: str) -> str:
 
 
 def _matches_condition(line: str) -> bool:
-    return any(re.compile(pattern).search(line) for pattern in EXTRA_CONDITION_PATTERNS)
+    """조건 문구인가. 판정용 사본에서 본다(영폭·마크다운으로 가른 변형을 같이 잡는다)."""
+    probe = judgement_form(line)
+    return any(re.compile(pattern).search(probe) for pattern in EXTRA_CONDITION_PATTERNS)
 
 
 def _normalized_names(names: tuple[str, ...], field: str) -> tuple[str, ...]:
@@ -235,7 +238,9 @@ def _omitted_headings(sections: tuple[Section, ...], names: tuple[str, ...]) -> 
 
 
 def _token_sets(lines: tuple[str, ...]) -> frozenset[tuple[str, ...]]:
-    return frozenset(tokens for tokens in (core_tokens(line) for line in lines) if tokens)
+    return frozenset(
+        tokens for tokens in (core_tokens(judgement_form(line)) for line in lines) if tokens
+    )
 
 
 def _covered(
@@ -244,9 +249,9 @@ def _covered(
     tokens: frozenset[tuple[str, ...]],
 ) -> bool:
     """(a) 정규화 동일 또는 (b) 핵심 토큰 열 동일이면 덮인 것으로 본다."""
-    if line in exact:
+    if judgement_form(line) in exact:
         return True
-    line_tokens = core_tokens(line)
+    line_tokens = core_tokens(judgement_form(line))
     return bool(line_tokens) and line_tokens in tokens
 
 
@@ -294,7 +299,7 @@ def verify_linkedin_fidelity(
         checked.extend(section.lines)
 
     jd_all = content_lines(jd.text) + tuple(s.heading for s in sections if s.heading)
-    jd_exact = frozenset(jd_all)
+    jd_exact = frozenset(judgement_form(line) for line in jd_all)
     jd_tokens = _token_sets(jd_all)
 
     if not checked:
@@ -314,15 +319,15 @@ def verify_linkedin_fidelity(
     )
     if not body_lines:
         raise BriefInputError("LinkedIn 본문에 프레임 줄 외 내용 줄이 0 이다")
-    body_exact = frozenset(body_lines)
+    body_exact = frozenset(judgement_form(line) for line in body_lines)
     body_tokens = _token_sets(body_lines)
 
-    allowed = frozenset(_normalized_names(allowed_extra, "allowed_extra"))
+    allowed = frozenset(judgement_form(name) for name in _normalized_names(allowed_extra, "allowed_extra"))
     missing = tuple(line for line in checked if not _covered(line, body_exact, body_tokens))
     extra_lines = tuple(
         line
         for line in body_lines
-        if line not in allowed and not _covered(line, jd_exact, jd_tokens)
+        if judgement_form(line) not in allowed and not _covered(line, jd_exact, jd_tokens)
     )
     return FidelityReport(
         missing=missing,

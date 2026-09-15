@@ -12,7 +12,13 @@ from dataclasses import dataclass
 from dataclasses import field as dataclass_field
 from datetime import date, datetime
 
-from .jd_fidelity import EXTRA_CONDITION_PATTERNS, FidelityReport, content_lines, verify_fidelity
+from .jd_fidelity import (
+    EXTRA_CONDITION_PATTERNS,
+    FidelityReport,
+    content_lines,
+    judgement_form,
+    verify_fidelity,
+)
 from .linkedin_limit import verify_linkedin_fidelity
 from .policy import policy
 from .recipients import load_recipients
@@ -86,6 +92,7 @@ class Contact:
                 f"Contact.name 은 {_CONTACT_NAME_MIN}~{_CONTACT_NAME_MAX}자여야 한다: {len(self.name)}자"
             )
         if _has_extra_condition(self.name):
+            # 판정용 사본에서 본다 — `경(영폭)력 5년 이(영폭)상` 도 같은 문구다.
             _reject(f"Contact.name 이 채용 조건 문구다: {self.name!r}")
         _require_email(self.email, "Contact.email")
 
@@ -227,7 +234,9 @@ def _block_after(lines: tuple[str, ...], marker: str, expected: tuple[str, ...],
 
 
 def _has_extra_condition(line: str) -> bool:
-    return any(re.compile(pattern).search(line) for pattern in EXTRA_CONDITION_PATTERNS)
+    """판정용 사본에서 본다 — 영폭 문자·마크다운으로 가른 조건도 같이 잡는다(Codex V2 2차)."""
+    probe = judgement_form(line)
+    return any(re.compile(pattern).search(probe) for pattern in EXTRA_CONDITION_PATTERNS)
 
 
 _COMPANY_FIELD_CONDITION_PATTERNS: tuple[str, ...] = (
@@ -241,7 +250,8 @@ _COMPANY_FIELD_CONDITION_PATTERNS: tuple[str, ...] = (
 
 
 def _has_company_field_condition(line: str) -> bool:
-    return any(re.compile(pattern).search(line) for pattern in _COMPANY_FIELD_CONDITION_PATTERNS)
+    probe = judgement_form(line)
+    return any(re.compile(pattern).search(probe) for pattern in _COMPANY_FIELD_CONDITION_PATTERNS)
 
 
 # `[회사 리서치 | 2026-09-10 확인]` — 날짜는 렌더러가 넣으므로 모양만 고정한다.
@@ -257,7 +267,9 @@ _AMOUNT_FIELDS: tuple[tuple[str, str], ...] = (
 )
 
 # 회사 금액으로 인정하는 값의 모양. 값 전체가 여기 맞을 때만 면제한다.
-_AMOUNT_VALUE = re.compile(r"\d[\d,]*(\.\d+)?\s*(억|만|조)?\s*(원|달러|USD|KRW)")
+# `\d[\d,]*` 는 `1,,,원`·`1,00원` 같은 엉터리 쉼표를 통과시켰다(Codex V2 2차) —
+# 천 단위 묶음을 정확히 요구한다.
+_AMOUNT_VALUE = re.compile(r"\d{1,3}(,\d{3})*(\.\d+)?\s*(억|만|조)?\s*(원|달러|USD|KRW)")
 
 
 def _company_research_indexes(lines: tuple[str, ...]) -> frozenset[int]:
@@ -432,8 +444,14 @@ class SearchPacket:
         allowed: set[str] = set()
         for label, attribute in _AMOUNT_FIELDS:
             claim = getattr(self.company, attribute)
-            if claim is None or not _AMOUNT_VALUE.fullmatch(claim.value.strip()):
+            if claim is None:
                 continue
+            if not _AMOUNT_VALUE.fullmatch(judgement_form(claim.value).strip()):
+                # 면제만 빼면 조건 정규식 밖이라 그대로 통과한다 — 금액 자리는 금액이어야 한다.
+                _reject(
+                    f"CompanyBrief.{attribute} 가 금액 형식이 아니다: {claim.value!r}"
+                    " (값을 모르면 필드를 비워 '미확인' 으로 렌더한다)"
+                )
             line = _claim_line(label, claim)
             if line in rendered:
                 allowed.add(line)

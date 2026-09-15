@@ -19,6 +19,7 @@ __all__ = [
     "Section",
     "content_lines",
     "extract_block",
+    "judgement_form",
     "multi_position_hint",
     "normalize_line",
     "split_sections",
@@ -49,6 +50,27 @@ EXTRA_CONDITION_PATTERNS: tuple[str, ...] = (
     r"\d[\d,]*\s*만\s*원",
     r"\d[\d,]*\s*억",
 )
+
+
+# 판정용 사본에서 지우는 것: 유니코드 format 문자(Cf — 영폭 공백·ZWNJ·ZWJ·BOM 등)와
+# 마크다운 강조 기호. 사람 눈에는 `경력 5년 이상` 인데 글자 사이가 갈려 조건 정규식을
+# 빠져나가는 변형을 막는다(Codex V2 2차: `경\u200b력 5년 이\u200b상`·`경**력** 5년 이**상**`).
+_EMPHASIS = re.compile(r"\*\*|__|~~|[*_`]")
+
+
+def judgement_form(text: str) -> str:
+    """조건 판정·충실도 대조에 쓰는 **사본**. 원문은 호출자가 그대로 보관한다.
+
+    ① NFKC 정규화(전각 `５` → `5`) ② Cf 범주 문자 제거 ③ 마크다운 강조 기호 제거.
+    ②③ 은 고정점까지 반복한다 — 한 번만 지우면 남은 기호가 새 쌍을 만든다.
+    이것은 **의미 검증이 아니다**. 목록 밖 표현은 그대로 통과한다(§7-5 결정 카드).
+    """
+    current = unicodedata.normalize("NFKC", text)
+    while True:
+        shorter = _EMPHASIS.sub("", "".join(ch for ch in current if unicodedata.category(ch) != "Cf"))
+        if shorter == current:
+            return current
+        current = shorter
 
 
 def _strip_bullets(text: str) -> str:
@@ -175,7 +197,9 @@ def multi_position_hint(text: str) -> tuple[str, ...]:
 
 
 def _matches_condition(line: str) -> bool:
-    return any(re.compile(pattern).search(line) for pattern in EXTRA_CONDITION_PATTERNS)
+    """조건 문구인가. 반드시 판정용 사본에서 본다 — 원문에는 보이지 않는 갈라짐이 있다."""
+    probe = judgement_form(line)
+    return any(re.compile(pattern).search(probe) for pattern in EXTRA_CONDITION_PATTERNS)
 
 
 def _normalized_allowlist(allowed_extra: tuple[str, ...]) -> frozenset[str]:
