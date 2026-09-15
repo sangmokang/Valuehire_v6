@@ -174,3 +174,22 @@ def test_hardlinked_db_is_refused(tmp_path: Path, direction: str) -> None:
 
     assert _rows(approved.db_path) == 0
     assert _rows(alternate.db_path) == 0
+
+
+def test_renamed_in_compatible_db_at_approved_path_is_refused(tmp_path: Path) -> None:
+    """경로 이름만 같고 파일 정체성(st_dev·st_ino)이 다르면 초기화가 돌려준 그 파일이 아니다(V1 결함 1)."""
+
+    approved = initialize_humansearch_storage(tmp_path / "approved")
+    alternate = initialize_humansearch_storage(tmp_path / "alternate")
+    key_path = _key_file(tmp_path / "keys")
+    parked = approved.protected_root / "parked-original.sqlite3"
+    approved.db_path.rename(parked)
+    alternate.db_path.rename(approved.db_path)
+
+    with pytest.raises(CandidateIdentityError, match="approved"):
+        record_candidate_identity(
+            approved.db_path, _RECORD, hmac_key_path=key_path, approved_root=approved.protected_root
+        )
+
+    assert _rows(approved.db_path) == 0
+    assert _rows(parked) == 0

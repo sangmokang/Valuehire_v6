@@ -128,3 +128,4 @@ tests/test_hs_0302_r5_approved_root.py::test_other_db_filename_inside_approved_r
 tests/test_hs_0302_r5_approved_root.py::test_self_approved_private_compatible_db_is_refused
 tests/test_hs_0302_r5_approved_root.py::test_hardlinked_db_is_refused[link-in]
 tests/test_hs_0302_r5_approved_root.py::test_hardlinked_db_is_refused[link-out]
+tests/test_hs_0302_r5_approved_root.py::test_renamed_in_compatible_db_at_approved_path_is_refused
