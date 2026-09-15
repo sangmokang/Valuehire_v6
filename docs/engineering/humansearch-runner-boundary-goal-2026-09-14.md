@@ -32,6 +32,8 @@ V2 보안 결론: caller가 임의 `runner_uid`나 `current_uid`를 public API�
 - device/inode는 payload를 담은 file descriptor의 `fstat`에서 얻는다. 게시된 최종 이름을 다시 stat해서 얻지 않는다. 같은 runner UID의 다른 실행이 그 이름을 차지하면 원문 hash와 남의 파일 식별값이 한 영수증에 묶이기 때문이다.
 - device/inode는 파일을 여는 값(locator)이 아니라 대조용 검증값이다. 소비자는 경로나 고정된 디렉터리 fd로 연 뒤 이 쌍과 sha256으로 같은 파일인지 확인한다.
 - 소유를 증명할 수 없는 최종 이름은 어떤 실패 경로에서도 unlink하지 않는다. 게시 대조가 실패하면 임시 이름만 제거한다. 대조를 통과한 파일은 임시 정리에 실패해도 그대로 둔다.
+- 정리에 실패해 임시 파일이 남으면 반환값에 그 경로를 `temp_path`로 담는다. `path`는 게시 시점 경로이며 이후 다른 파일을 가리킬 수 있으므로, 소비자는 `path`와 `temp_path` 후보를 차례로 열어 device/inode/sha256이 맞는 것을 우리 파일로 본다.
+- `recovery_required`는 러너 프로세스를 더 믿을 수 없다는 뜻이다. 호출자는 순회를 중단하고 러너 프로세스를 폐기한다. 임시 파일 file descriptor의 `close` 실패도 여기에 해당한다. `close`가 오류를 내면 descriptor 상태가 POSIX상 미정의라 회수하지 못한 손잡이가 남을 수 있다.
 - `written`은 현재 프로세스가 파일을 썼다는 제품 경계 결과다. 구현자 UID의 외부 별도 process `EACCES`와 runner process write 성공이 실증되기 전까지 OS 격리 검증 완료 상태로 승격하지 않는다.
 
 ## 인수 기준
