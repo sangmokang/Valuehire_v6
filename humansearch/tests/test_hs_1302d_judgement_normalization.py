@@ -77,6 +77,18 @@ BAD_EMAILS: tuple[str, ...] = (
 )
 # 점·플러스(로컬파트)와 하이픈 라벨·다단 도메인을 나눠서 덮는다 — 한 주소로는 게이트
 # 허용 형태를 만족시키면서 둘 다 담을 수 없다.
+# 길이 경계 — 로컬파트 64자·도메인 라벨 63자·도메인 253자·전체 254자가 상한이다.
+LOCAL_MAX, LABEL_MAX = 64, 63
+OVERLONG_EMAILS: tuple[str, ...] = (
+    "h" * (LOCAL_MAX + 1) + "@example.com",  # 로컬파트 65자
+    "holder@" + "d" * (LABEL_MAX + 1) + ".example.com",  # 라벨 64자
+    "holder@" + ".".join(["d" * LABEL_MAX] * 4) + ".com",  # 도메인·전체 상한 초과
+)
+BOUNDARY_EMAILS: tuple[str, ...] = (
+    "h" * LOCAL_MAX + "@example.com",  # 로컬파트 정확히 64자
+    "holder@" + "d" * LABEL_MAX + ".example.com",  # 라벨 정확히 63자
+)
+
 GOOD_EMAILS: tuple[str, ...] = (
     "a.b+c@example.com",  # 로컬파트의 점과 플러스
     "holder@d-e.example.com",  # 하이픈이 든 라벨 + 3단 도메인
@@ -131,6 +143,19 @@ def test_a_malformed_email_is_rejected(email: str) -> None:
 
 @pytest.mark.parametrize("email", GOOD_EMAILS)
 def test_a_well_formed_email_is_accepted(email: str) -> None:
+    assert Contact(name="홍길동", email=email).email == email
+
+
+@pytest.mark.parametrize("email", OVERLONG_EMAILS)
+def test_an_overlong_email_is_rejected(email: str) -> None:
+    """모양이 맞아도 길이 상한을 넘으면 회신이 불가능하다."""
+    with pytest.raises(BriefInputError):
+        Contact(name="홍길동", email=email)
+
+
+@pytest.mark.parametrize("email", BOUNDARY_EMAILS)
+def test_an_email_exactly_at_the_length_boundary_is_accepted(email: str) -> None:
+    """경계값은 통과한다 — 한 글자 차이로 정상 주소를 막지 않는다."""
     assert Contact(name="홍길동", email=email).email == email
 
 

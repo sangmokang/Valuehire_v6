@@ -70,12 +70,23 @@ MIXED_SCRIPT: tuple[str, ...] = (
     CYRILLIC_A + "경력 5년 이상",
 )
 
-# 섞이지 않은 정상 문구 — 거부하면 안 된다.
+# 섞이지 않았거나, 섞였어도 정상인 문구 — 거부하면 안 된다.
+# α·β·γ 는 제품 버전·세대 표기로 흔히 쓰인다. 어절 앞뒤에 붙은 이런 표기까지 막으면
+# 정상 브리프가 통째로 만들어지지 않는다(Codex V1 5차 회귀 지적).
 NOT_MIXED: tuple[str, ...] = (
     "Python 개발자",
     "합성 검색 엔진",
     "AI 기반 B2B SaaS 2026",
     "Series-B 투자 유치",
+    "α세대 제품",
+    "β버전 출시",
+    "γ선 검사 장비",
+    "제품 β",
+    "C++개발자",
+    "R&D개발자",
+    "Python개발자",
+    "AI기반B2B서비스",
+    "한글-영문123",
 )
 
 
@@ -181,8 +192,25 @@ def test_a_mixed_script_word_cannot_reach_the_company_section(variant: str) -> N
 
 @pytest.mark.parametrize("text", NOT_MIXED)
 def test_ordinary_korean_english_and_digits_are_not_mixed_script(text: str) -> None:
-    """한글·영문·숫자 혼용은 정상이다 — 거부하면 정상 브리프가 막힌다."""
+    """한글·영문·숫자 혼용과 정상 α·β 표기는 통과해야 한다 — 거부하면 정상 브리프가 막힌다."""
     assert _company_packet(_with_products(text)).company.products[0].value == text
+
+
+def test_a_foreign_letter_wedged_between_hangul_syllables_is_rejected() -> None:
+    """한글 음절 **사이**에 낀 외국 문자는 조건을 만들지 않아도 거부한다 — 동형문자 쐐기다."""
+    from humansearch.brief.jd_fidelity import mixed_script_word
+
+    assert mixed_script_word("합" + CYRILLIC_A + "성 회사") == "합" + CYRILLIC_A + "성"
+    assert mixed_script_word("α세대 제품") is None
+    assert mixed_script_word("제품 β") is None
+
+
+def test_a_foreign_letter_that_restores_a_condition_when_removed_is_rejected() -> None:
+    """지우면 금지 문구가 되살아나는 삽입은 위치와 무관하게 거부한다."""
+    from humansearch.brief.jd_fidelity import mixed_script_word
+
+    assert mixed_script_word("경" + CYRILLIC_A + "력 5년 이" + CYRILLIC_A + "상") is not None
+    assert mixed_script_word("경력 " + GREEK_O + "5년 이상") is not None
 
 
 # ---------------------------------------------------------------- 양성 대조군
