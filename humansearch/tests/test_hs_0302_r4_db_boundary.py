@@ -444,3 +444,23 @@ def test_missing_db_file_leaves_no_path_in_cause_chain(tmp_path: Path) -> None:
     db_path.unlink()
     rendered = _render_closed_error(identity, db_path, key_path)
     assert str(tmp_path) not in rendered
+
+
+def test_db_file_vanishing_between_checks_is_a_closed_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """is_file() 직후 DB 파일이 옆 이름으로 옮겨지면 OS 오류가 경로째 새면 안 된다(V1 8회차 결함 1)."""
+    identity = _load_identity_module()
+    db_path = _protected_db(tmp_path)
+    key_path = _key_at(tmp_path / "key-root")
+    parked = db_path.with_name("parked.sqlite3")
+    real_is_file = Path.is_file
+    def is_file_then_move(self: Path, *, follow_symlinks: bool = True) -> bool:
+        result = real_is_file(self, follow_symlinks=follow_symlinks)
+        if self == db_path and result and not parked.exists():
+            db_path.rename(parked)
+        return result
+    monkeypatch.setattr(Path, "is_file", is_file_then_move)
+    rendered = _render_closed_error(identity, db_path, key_path)
+    assert str(tmp_path) not in rendered, "원인 사슬에 보호 경로가 실렸다"
+    assert _count_rows(parked) == 0

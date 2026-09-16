@@ -271,3 +271,37 @@ def test_regular_inode_swap_back_after_connect_is_refused(
     assert opened
     assert _rows(approved.db_path) == 0
     assert _rows(alternate.db_path) == 0
+
+
+def test_unrelated_open_files_in_other_threads_do_not_refuse_writes(tmp_path: Path) -> None:
+    """다른 스레드가 무관한 파일을 여닫는 동안에도 정상 쓰기는 거부되면 안 된다(오거부 = 순회 중단)."""
+    import threading
+
+    approved = initialize_humansearch_storage(tmp_path / "approved")
+    key_path = _key_file(tmp_path / "keys")
+    scratch = tmp_path / "scratch.txt"
+    scratch.write_text("x")
+    stop = threading.Event()
+
+    def churn() -> None:
+        while not stop.is_set():
+            with scratch.open() as handle:
+                handle.read()
+
+    worker = threading.Thread(target=churn)
+    worker.start()
+    try:
+        outcomes = [
+            record_candidate_identity(
+                approved.db_path,
+                CandidateIdentityInput(f"POS-{index}", "saramin", "cand", "2026-09-15T10:00:00Z"),
+                hmac_key_path=key_path,
+                approved_root=approved.protected_root,
+            )
+            for index in range(60)
+        ]
+    finally:
+        stop.set()
+        worker.join()
+    assert outcomes == ["inserted"] * 60
+    assert _rows(approved.db_path) == 60
