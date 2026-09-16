@@ -35,7 +35,10 @@ TESTS_R2=humansearch/tests/test_hs_0302_r2_hardening.py
 TESTS_R3=humansearch/tests/test_hs_0302_r3_hardening.py
 TESTS_R4=humansearch/tests/test_hs_0302_r4_db_boundary.py
 TESTS_R5=humansearch/tests/test_hs_0302_r5_approved_root.py
-TEST_FILES="tests/test_hs_0302_candidate_identity.py tests/test_hs_0302_r2_hardening.py tests/test_hs_0302_r3_hardening.py tests/test_hs_0302_r4_db_boundary.py tests/test_hs_0302_r5_approved_root.py"
+TESTS_R6=humansearch/tests/test_hs_0302_r6_survivor_defenses.py
+TEST_FILES="tests/test_hs_0302_candidate_identity.py tests/test_hs_0302_r2_hardening.py tests/test_hs_0302_r3_hardening.py tests/test_hs_0302_r4_db_boundary.py tests/test_hs_0302_r5_approved_root.py tests/test_hs_0302_r6_survivor_defenses.py"
+# 약화 변이는 방어 지점을 직접 겨눈 5·6차 시험으로 판정한다(전량 실행은 변이당 수십 초라 두지 않는다).
+MUT_TEST_FILES="tests/test_hs_0302_r5_approved_root.py tests/test_hs_0302_r6_survivor_defenses.py"
 PYTEST_EXTRA=""
 SCHEMA=humansearch/src/humansearch/storage_schema.py
 WORKFLOW=.github/workflows/verify.yml
@@ -49,7 +52,8 @@ MIN_R2_TESTS=10
 MIN_R3_TESTS=6
 MIN_R4_TESTS=7
 MIN_R5_TESTS=7
-EXPECTED_REQUIRED_IDS=127
+MIN_R6_TESTS=8
+EXPECTED_REQUIRED_IDS=137
 WORK=$(mktemp -d) || { echo "NOT_RUN: mktemp 실패"; echo "CHECKED: 0"; exit 2; }
 trap 'rm -rf "$WORK"' EXIT
 fail=0
@@ -77,7 +81,7 @@ assert_fail_closed() {
   fi
 }
 abort_not_run() { echo "NOT_RUN: $1"; echo "CHECKED: $checked"; exit 2; }
-for required in "$MODULE" "$TESTS" "$TESTS_R2" "$TESTS_R3" "$TESTS_R4" "$TESTS_R5" "$WORKFLOW" "$SOT_ROSTER" \
+for required in "$MODULE" "$TESTS" "$TESTS_R2" "$TESTS_R3" "$TESTS_R4" "$TESTS_R5" "$TESTS_R6" "$WORKFLOW" "$SOT_ROSTER" \
                 "$REQUIRED_TESTS" "$WIRING_CHECKER" "$SCHEMA"; do
   if [ ! -f "$required" ]; then
     echo "NOT_RUN: $required 없음 — 검사 대상이 성립하지 않는다"
@@ -112,13 +116,14 @@ r2_count=$(count_tests "$TESTS_R2")
 r3_count=$(count_tests "$TESTS_R3")
 r4_count=$(count_tests "$TESTS_R4")
 r5_count=$(count_tests "$TESTS_R5")
-total_tests=$((test_count + r2_count + r3_count + r4_count + r5_count))
+r6_count=$(count_tests "$TESTS_R6")
+total_tests=$((test_count + r2_count + r3_count + r4_count + r5_count + r6_count))
 if [ "$test_count" -ge "$MIN_TESTS" ] && [ "$r2_count" -ge "$MIN_R2_TESTS" ] \
    && [ "$r3_count" -ge "$MIN_R3_TESTS" ] && [ "$r4_count" -ge "$MIN_R4_TESTS" ] \
-   && [ "$r5_count" -ge "$MIN_R5_TESTS" ]; then
-  pass_item "시험 함수 1차 ${test_count} · 2차 ${r2_count} · 3차 ${r3_count} · 4차 ${r4_count} · 5차 ${r5_count} = ${total_tests}개"
+   && [ "$r5_count" -ge "$MIN_R5_TESTS" ] && [ "$r6_count" -ge "$MIN_R6_TESTS" ]; then
+  pass_item "시험 함수 1차 ${test_count} · 2차 ${r2_count} · 3차 ${r3_count} · 4차 ${r4_count} · 5차 ${r5_count} · 6차 ${r6_count} = ${total_tests}개"
 else
-  fail_item "시험 함수 부족 — 1차 ${test_count}(>=${MIN_TESTS}) · 2차 ${r2_count}(>=${MIN_R2_TESTS}) · 3차 ${r3_count}(>=${MIN_R3_TESTS}) · 4차 ${r4_count}(>=${MIN_R4_TESTS}) · 5차 ${r5_count}(>=${MIN_R5_TESTS})"
+  fail_item "시험 함수 부족 — 1차 ${test_count}(>=${MIN_TESTS}) · 2차 ${r2_count}(>=${MIN_R2_TESTS}) · 3차 ${r3_count}(>=${MIN_R3_TESTS}) · 4차 ${r4_count}(>=${MIN_R4_TESTS}) · 5차 ${r5_count}(>=${MIN_R5_TESTS}) · 6차 ${r6_count}(>=${MIN_R6_TESTS})"
 fi
 if "$GREP" -q 'ThreadPoolExecutor' "$TESTS" && "$GREP" -q 'threading.Barrier' "$TESTS"; then
   pass_item "AC-3 경쟁 시험이 ThreadPoolExecutor + Barrier 로 두 워커를 동시에 띄운다"
@@ -331,7 +336,7 @@ mutation_case() {
     return
   fi
   ( cd "$case_dir" && PYTHONPATH="$case_dir/src" uv run --frozen --project "$REPO/humansearch" \
-      pytest -c pyproject.toml -p no:cacheprovider -q tests/test_hs_0302_r5_approved_root.py ) \
+      pytest -c pyproject.toml -p no:cacheprovider -q $MUT_TEST_FILES ) \
     > "$case_dir/pytest.log" 2>&1
   rc=$?
   failed=$("$GREP" -cE "^FAILED .*::(${must_fail})" "$case_dir/pytest.log")
@@ -495,7 +500,7 @@ else
 fi
 # ── 시험이 humansearch/ 밖으로 손을 뻗지 않는가 ────────────────────────────
 OUT_OF_TREE_RE=$(printf 'parents\\[2\\]|%s/|\\.github|docs/sot' 'scripts')
-"$GREP" -nE "$OUT_OF_TREE_RE" "$TESTS" "$TESTS_R2" "$TESTS_R3" "$TESTS_R4" "$TESTS_R5" \
+"$GREP" -nE "$OUT_OF_TREE_RE" "$TESTS" "$TESTS_R2" "$TESTS_R3" "$TESTS_R4" "$TESTS_R5" "$TESTS_R6" \
   > "$WORK/out_of_tree.txt"
 rc=$?
 if [ "$rc" -gt 1 ]; then
