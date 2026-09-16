@@ -381,13 +381,13 @@ mutation_case "승인 장부 조회를 자기 승인으로 대체" \
   's/^    approved = approved_db(approved_root)$/    approved = approved_db(approved_root) or ApprovedDb(db_path, db_path.stat().st_dev, db_path.stat().st_ino)/' \
   'test_self_approved_private' 1
 mutation_case "열린 파일 정체성 대조 제거" \
-  's/^            if len(main) != 1 or not all(_allowed_new_sidecar_fd(fd, db_path) for fd in extras):$/            if False:/' \
+  's/^            if (approved.st_dev, approved.st_ino) not in opened:$/            if False:/' \
   'test_regular_inode_swap_back' 1
 mutation_case "DB hard link 대조 제거" \
   's/^    if info.st_nlink != 1:$/    if False:/' \
-  'test_hardlinked_db_is_refused' 1
+  'test_hardlinked_db_is_refused' 2
 mutation_case "경로·열린 파일 정체성 대조 동반 제거" \
-  's/^    if (info.st_dev, info.st_ino) != (approved.st_dev, approved.st_ino):$/    if False:/; s/^            if len(main) != 1 or not all(_allowed_new_sidecar_fd(fd, db_path) for fd in extras):$/            if False:/' \
+  's/^    if (info.st_dev, info.st_ino) != (approved.st_dev, approved.st_ino):$/    if False:/; s/^            if (approved.st_dev, approved.st_ino) not in opened:$/            if False:/' \
   'test_renamed_in_compatible_db' 1
 sed 's/^BASE_SHA=.*/BASE_SHA=0000000000000000000000000000000000000000/' "$SELF" \
   > "$WORK/failclosed_probe.sh"
