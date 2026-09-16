@@ -1,4 +1,5 @@
 # HS-03.02 필수 pytest node-id 명부 (매개변수 사례 포함).
+tests/test_hs_0302_candidate_identity.py::test_writes_to_different_approved_roots_do_not_block_each_other
 #
 # 왜 필요한가 (Codex V1 3차): 수집 건수 == 통과 건수 대조는 '선택된 시험을 전부
 # 실행했다'만 보장한다. 매개변수 사례 한 건을 삭제하면 수집과 통과가 함께 줄어
