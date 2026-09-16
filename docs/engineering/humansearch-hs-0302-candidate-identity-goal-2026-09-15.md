@@ -90,6 +90,9 @@
 | V2 새 맥락 @c5f5896 | FAIL→닫음 | V1 결함 1 불일치(352 passed), 결함 2·설계 지적 재현. 새 변이 18종 중 2종 생존: pragma database_list 경로 대조·sidecar hard link 대조가 무보호 → `2468827` RED(변이 생존) / `a578b62` GREEN(시험 4건, 명부 127, 변이 6종 검출). 두 프로세스 경쟁 10회 1:1. 원문 sha256 `5030ca4b…b28`(private-reviews/hs-0302/v2-verdict-c5f5896-2026-09-16.md) |
 | 17차 기준선 검사기 제거 | PASS | V1·V2 가 모두 지적한 7,303바이트 접두 해시 검사기(오탐: 앞부분 docstring 한 글자 수정에 FAIL, 미탐: 뒤쪽 시험 삭제에 PASS)를 제거하고 AC-14 를 명부 정확 대조 + P13① 라벨로 재정의. 인수 CHECKED 29 rc0 |
 | 최종 코드 SHA 게이트 @3b25ef0 (src 는 c5f5896 과 동일) | PASS | 06:40Z pytest 356 passed·ruff·mypy rc0, 인수 CHECKED 29(변이 6종), ci-step 24 PASS, principles 34, diff --check rc0, 변경량 2,940; applicable gate sweep 06:41:29Z~06:46:50Z 27/27 rc0, 전후 clean. V1·V2 는 c5f5896 대상(코드 동일)이며 최종 SHA 자체의 V1/V2 는 다음 세션 |
+| V1 10회차 Codex @782a0f3 (격리 클론, gpt-5.6-sol) | FAIL(절차) | 제품 결함 0, AC-1~16 전부 PASS, 변이 6종 검출. 결함 1(중간) P5① 절차 위반(아래 D1). 전체 pytest 16건 실패는 샌드박스 socket bind → V2 로컬 356 passed 로 환경 산물 확정. 원문 sha256 `1dec8e18…4278`(private-reviews/hs-0302/v1-round10-verdict-782a0f3-2026-09-16.md) |
+| V2 새 맥락 @782a0f3 | FAIL→후속 WU | V1 PASS 근거 19항목 전부 재현. 인수 변이 목록 밖 새 변이 45종 중 비equivalent 생존 7(중간 1: `candidate_identity.py:222` commit 직전 승인 inode 대조 단독 제거 시 127건 전부 초록 — 변이 사본은 root 밖으로 옮긴 파일에 1행 확정. 낮음 6: L177 경로 노출·512자 상한·키 FIFO·sidecar FIFO·READONLY→duplicate·EXCLUSIVE 잠금 원문). 7건 모두 Claude 가 원본/변이 대조군으로 재현. 처분: 스택 WU `task/hs-0302-r6-survivor-defenses-20260916`(RED `b7f832c`→GREEN, 6차 시험 10건·변이 13종·명부 137). 이 브랜치에 넣지 않은 이유는 P11③ 3,000줄 상한(2,972+약 280). 원문 sha256 `c1ece6e6…3d6a`(private-reviews/hs-0302/v2-round2-verdict-782a0f3-2026-09-16.md) |
+| D1 — P5① 이력 처리 (B: 위반 사실 기록, 2026-09-16) | 위반 기록 | RED `604974d` 뒤 구현 커밋 `e25ac5e` 가 시험 5파일을 수정(호출 도우미에 `approved_root` 인자 추가·설명문 축약, `--unified=0` 실측 assert/pytest.raises 삭제 0·추가 0, `def test_` 수 13/10/9/19/2 동일). RED `a0a2cdc` 뒤 `2d4722a` 가 R5 시험의 제품 모듈 import 를 함수 안으로 이동(단언 변화 0). P5① 검사기는 scripts/hooks/CI 어디에도 없어(rg 0건) 기계 차단은 없었고, 이 행은 위반의 해소가 아니라 사실의 보존이다. A(rebase)는 다른 세션 커밋과 얽혀 실행하지 않았다. 사장님 지시 "문제 해결" 을 B 로 해석했으며, 이 해석이 틀리면 이 행을 지우고 A 를 별도 결정한다 |
 | Codex 적대 리뷰(설계) @3b25ef0 | 6건 | 높음 4: 키 교체 시 같은 후보 중복(키 지문 미결합), /dev/fd 차분은 연결 귀속 증거가 아님(decoy fd), 명부 대조는 동반 약화를 못 막음, 최종 SHA 증거 미기록. 중간 2: 프로세스 로컬 장부(spawn/fork), 프롬프트 v1 결함(R3~R6, v2 815495b 로 수정). 처분은 아래 후속 WU |
 
 ## 롤백·영향 반경·데이터 안전
@@ -114,6 +117,11 @@
 - **/dev/fd 차분은 탐지 휴리스틱** — 다른 스레드가 같은 순간 승인 DB 를 열면(decoy) 교체된 연결도 통과할 수 있다. 같은 프로세스의 악성 코드를 막는 보안 경계가 아니라 설정 실수·경쟁을 잡는 장치로만 부른다. HS-03.04(readback 연결 추가) 전에 decoy fd 변이 시험을 넣고, 연결 귀속 검증(VFS·단일 writer broker)은 별도 결정.
 - **프로세스 로컬 승인 장부** — spawn 워커는 장부가 없어 거부되고 fork 워커는 낡은 장부를 복제한다. 단일 프로세스 writer 를 운영 계약으로 두며 #96 RunnerBoundary 연동 시 spawn/fork/독립 프로세스 회귀 시험을 요구한다.
 - **동반 약화** — 시험·명부·상수를 한 PR 에서 같이 낮추면 인수 검사가 통과한다. 접두 해시 검사기(오탐·미탐)를 복원하지 않고, 기준 커밋에 고정한 구조 서명(함수명+단언 수+raises 대상) 검사기를 별도 WU 로 둔다. 그때까지는 P13① 라벨·오너 검토.
+
+## 후속 WU (2026-09-16 마감 검증에서 파생)
+
+- `task/hs-0302-r6-survivor-defenses-20260916` — V2 생존 방어 7곳의 시험·인수 변이 편입(이 브랜치 위 스택). 착수 프롬프트 v3: `docs/engineering/goal-prompts/hs-0302-r6-next-prompt-2026-09-16.md`(스택 브랜치에 있음).
+- 억제 2건(`ci-transfer-guarantee`·`p13-deletion-blindspot`, expiry 2026-09-15)은 이 WU 범위 밖이며, 해소 전에는 이 브랜치와 main 모두 CI "억제 만료 스캔" 스텝이 빨갛다. 별도 PR.
 
 ## 비범위
 
