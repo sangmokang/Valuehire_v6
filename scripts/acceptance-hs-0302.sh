@@ -190,10 +190,8 @@ GOOD_TIME = "2026-09-15T10:00:00Z"
 
 results = []
 
-
 def check(name, ok):
     results.append((name, bool(ok)))
-
 
 def length_prefixed(position_ref, channel, candidate_ref):
     message = b"hs-candidate-key-v2"
@@ -202,11 +200,9 @@ def length_prefixed(position_ref, channel, candidate_ref):
         message += len(raw).to_bytes(4, "big") + raw
     return hmac.new(KEY, message, "sha256").hexdigest()
 
-
 def separator_joined(position_ref, channel, candidate_ref):
     parts = [b"hs-candidate-key-v1", position_ref.encode(), channel.encode(), candidate_ref.encode()]
     return hmac.new(KEY, b"\x1f".join(parts), "sha256").hexdigest()
-
 
 def refusal_reason(position_ref, channel, candidate_ref, observed_at=GOOD_TIME):
     record = CandidateIdentityInput(position_ref, channel, candidate_ref, observed_at)
@@ -215,7 +211,6 @@ def refusal_reason(position_ref, channel, candidate_ref, observed_at=GOOD_TIME):
     except CandidateIdentityError as exc:
         return str(exc)
     return ""
-
 
 check("probe-can-see-collisions", separator_joined(*A) == separator_joined(*B))
 check("injected-pair-does-not-collide", candidate_key_hmac(KEY, *A) != candidate_key_hmac(KEY, *B))
@@ -389,6 +384,12 @@ mutation_case "DB hard link 대조 제거" \
 mutation_case "경로·열린 파일 정체성 대조 동반 제거" \
   's/^    if (info.st_dev, info.st_ino) != (approved.st_dev, approved.st_ino):$/    if False:/; s/^            if (approved.st_dev, approved.st_ino) not in opened:$/            if False:/' \
   'test_renamed_in_compatible_db' 1
+mutation_case "열린 연결 pragma database_list 경로 대조 제거" \
+  's/^        if len(main_files) != 1 or Path(main_files\[0\]) != db_path:$/        if False:/' \
+  'test_opened_db_reported_outside_approved_path' 1
+mutation_case "sidecar hard link 대조 제거" \
+  's/^        if info.st_nlink != 1:$/        if False:/' \
+  'test_hardlinked_sqlite_sidecar_is_refused' 3
 sed 's/^BASE_SHA=.*/BASE_SHA=0000000000000000000000000000000000000000/' "$SELF" \
   > "$WORK/failclosed_probe.sh"
 HS0302_ACCEPTANCE_DEPTH=9 bash "$WORK/failclosed_probe.sh" > "$WORK/failclosed.log" 2>&1
