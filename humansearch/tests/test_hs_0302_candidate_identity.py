@@ -6,6 +6,7 @@ import hmac
 import importlib
 import sqlite3
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
@@ -241,6 +242,53 @@ def test_ac3_two_connections_racing_the_same_key_keep_one_row(
     monkeypatch.undo()
     assert connect_calls == 1, f"브로커가 재연결을 반복했다: {connect_calls} 회"
     assert _count_rows(db_path) == _RACE_ROUNDS
+
+
+def test_writes_to_different_approved_roots_do_not_block_each_other(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """서로 무관한 승인 root 에 대한 기록은 같은 락을 공유하지 않는다.
+
+    Codex V1 2026-09-17 발견: 락이 프로세스 전역 하나였을 때는 root A 에 대한 느린
+    기록이 root B(완전히 다른 DB)에 대한 기록까지 붙잡았다(실측 1.86초). root 별 락
+    (`_root_lock`)으로 바꾼 뒤에는 root A 가 블록돼 있어도 root B 는 즉시 끝나야 한다.
+    """
+    identity = _load_identity_module()
+    db_path_a = _db_path(tmp_path / "a")
+    db_path_b = _db_path(tmp_path / "b")
+    key_path = _key_path(tmp_path)
+
+    root_a_entered = threading.Event()
+    release_root_a = threading.Event()
+    real_bind = identity._bind_key_epoch
+
+    def blocking_bind(approved_root: Path, key: bytes) -> None:
+        if approved_root == db_path_a.parent:
+            root_a_entered.set()
+            assert release_root_a.wait(timeout=_BARRIER_TIMEOUT), "release 신호가 오지 않았다"
+        real_bind(approved_root, key)
+
+    monkeypatch.setattr(identity, "_bind_key_epoch", blocking_bind)
+
+    def write_a() -> str:
+        return _record(identity, db_path_a, key_path, position_ref="POS-A")
+
+    worker = threading.Thread(target=write_a)
+    worker.start()
+    try:
+        assert root_a_entered.wait(timeout=_BARRIER_TIMEOUT), "root A 기록이 시작되지 않았다"
+
+        started = time.monotonic()
+        outcome_b = _record(identity, db_path_b, key_path, position_ref="POS-B")
+        elapsed_b = time.monotonic() - started
+        assert outcome_b == "inserted"
+        assert elapsed_b < 1.0, f"root B 기록이 root A 락에 걸렸다: {elapsed_b:.3f}초"
+    finally:
+        release_root_a.set()
+        worker.join(timeout=_BARRIER_TIMEOUT)
+    assert not worker.is_alive()
+    assert _count_rows(db_path_a) == 1
+    assert _count_rows(db_path_b) == 1
 
 
 @pytest.mark.parametrize(

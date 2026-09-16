@@ -44,7 +44,6 @@ _DB_DIR_MODE: Final = 0o700
 _SIDECAR_SUFFIXES: Final = ("-journal", "-wal", "-shm")
 _BUSY: Final = "SQLITE_BUSY"
 _LOCK_WAIT_SECONDS: Final = 5.0
-_CONNECT_IDENTITY_LOCK = threading.Lock()
 _KEY_FINGERPRINT_DOMAIN: Final = b"hs-key-fingerprint-v1"
 _KEY_FINGERPRINT_FILENAME: Final = "hs-key-fingerprint"
 _KEY_FINGERPRINT_MODE: Final = 0o600
@@ -62,6 +61,23 @@ _RFC3339: Final = re.compile(
 # 좁아진다 — stdlib sqlite3 는 fd 를 노출하지 않으므로 그 1회조차 native 하게 증명할
 # 수는 없다(BLOCKED, 후속 WU: apsw 커스텀 VFS 승인 뒤 재검토).
 _BROKER_CONNECTIONS: dict[Path, sqlite3.Connection] = {}
+
+# 승인 root 별로 독립된 락을 쓴다 — 프로세스 전역에 락 하나만 두면 서로 무관한 DB에
+# 대한 기록까지 전부 직렬화된다(Codex V1 2026-09-17 발견: root A 쓰기가 느릴 때 root B
+# 쓰기가 불필요하게 대기하는 것을 실측). 이 레지스트리 자체에 대한 접근만 별도로
+# 잠근다 — 개별 root 락을 실제로 쥐는 동안은 이 메타 락을 쥐지 않는다.
+_ROOT_LOCK_REGISTRY_LOCK = threading.Lock()
+_ROOT_LOCKS: dict[Path, threading.Lock] = {}
+
+
+def _root_lock(approved_root: Path) -> threading.Lock:
+    """One lock per approved root, created lazily and reused for the process lifetime."""
+    with _ROOT_LOCK_REGISTRY_LOCK:
+        lock = _ROOT_LOCKS.get(approved_root)
+        if lock is None:
+            lock = threading.Lock()
+            _ROOT_LOCKS[approved_root] = lock
+        return lock
 
 
 class CandidateIdentityError(StorageSchemaError):
@@ -95,11 +111,13 @@ def record_candidate_identity(
 ) -> RecordOutcome:
     """Record one identity under the caller's initialized, approved storage root.
 
-    단일 writer 브로커의 커넥션은 프로세스 전체에서 하나뿐이므로, 한 번에 하나의 기록만
-    진행되도록 전체를 한 락으로 감싼다 — 그래야 다른 스레드가 같은 커넥션을 동시에
+    승인 root 마다 커넥션이 하나뿐이므로(단일 writer), 그 root 에 대한 기록은 한 번에
+    하나만 진행되도록 root 별 락으로 감싼다 — 그래야 다른 스레드가 같은 커넥션을 동시에
     호출하는 일(sqlite3 는 스레드 안전하지 않다)도, 검사와 커넥션 획득 사이의 경합도 없다.
+    락을 root 별로 나누는 이유: 프로세스 전역에 락 하나만 두면 서로 무관한 root 에 대한
+    기록까지 전부 직렬화된다(위 `_root_lock` 주석 참고).
     """
-    with _CONNECT_IDENTITY_LOCK:
+    with _root_lock(approved_root):
         position_ref, channel, candidate_ref = _validated_fields(record)
         _verify_db_boundary(db_path, approved_root)
         key = _load_hmac_key(hmac_key_path, db_path)
@@ -371,10 +389,16 @@ def _insert_once(
 
 
 def _rollback(connection: sqlite3.Connection) -> None:
-    """Best-effort rollback — a connection already broken by the failure must not mask it."""
+    """Best-effort rollback — a connection already broken by the failure must not mask it.
+
+    `sqlite3.Error` 로 좁혀 잡지 않는다 — 이 모듈의 `sqlite3` 이름은 시험에서 통째로
+    교체되기도 하고(Codex V1 2026-09-17 발견), 그 대체 객체가 `Error` 속성을 안 가지고
+    있으면 이 except 절 자체가 AttributeError 를 낸다. rollback 실패를 삼키는 목적에는
+    실제 예외 타입이 무엇이든 상관없으므로 넓게 잡는다.
+    """
     try:
         connection.execute("rollback")
-    except sqlite3.Error:
+    except Exception:  # noqa: BLE001, S110 -- 의도된 best-effort 삼킴, 위 docstring 근거
         pass
 
 
@@ -415,7 +439,8 @@ def _connect_approved_db(db_path: Path, approved_root: Path) -> sqlite3.Connecti
     으로 좁힌다 — 이후 모든 쓰기는 이미 검증된 커넥션을 재사용해 이 경합에 다시 노출되지
     않는다. 그래서 관대한(저오거부) 판정을 유지해도 노출 총량은 구현 이전보다 훨씬 작다.
 
-    Caller must already hold ``_CONNECT_IDENTITY_LOCK`` — this never locks itself.
+    Caller must already hold that approved root's lock (``_root_lock(approved_root)``) —
+    this never locks itself.
     """
     approved = _approved_db(db_path, approved_root)
     if approved is None:
