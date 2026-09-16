@@ -361,6 +361,29 @@ mutation_case "열린 연결 pragma database_list 경로 대조 제거" \
 mutation_case "sidecar hard link 대조 제거" \
   's/^        if info.st_nlink != 1:$/        if False:/' \
   'test_hardlinked_sqlite_sidecar_is_refused' 3
+# V2(2026-09-16) 새 맥락 재검증이 인수 변이 목록 밖에서 만든 45종 중 비equivalent 생존 7종.
+# 변이는 목록이 아니라 방어 지점마다 생성으로 잡는다 — 아래는 그 생존분을 목록에 영구 편입한 것이다.
+mutation_case "commit 직전 승인 inode 대조 단독 제거" \
+  's/^    if (info.st_dev, info.st_ino) != (approved.st_dev, approved.st_ino):$/    if False:/' \
+  'test_db_swapped_out_of_root_between_insert_and_commit_is_refused' 1
+mutation_case "DB 위치 확인의 닫힌 오류 변환 제거" \
+  '/^def _verify_db_location/,/^$/ s/^        raise _closed_os_error("db file is missing", exc) from None$/        raise/' \
+  'test_db_unlinked_after_first_boundary_check_is_a_closed_error' 1
+mutation_case "필드 길이 상한 제거" \
+  's/^    if len(cleaned) > _MAX_FIELD_CHARS:$/    if False:/' \
+  'test_over_length_field_is_refused' 3
+mutation_case "키 파일 regular 검사 제거" \
+  's/^    if not hmac_key_path.is_file():$/    if False:/' \
+  'test_fifo_at_key_path_is_refused_without_blocking' 1
+mutation_case "sidecar regular 검사 제거" \
+  's/^        if not stat.S_ISREG(info.st_mode):$/        if False:/' \
+  'test_fifo_sqlite_sidecar_is_refused_without_blocking' 1
+mutation_case "BUSY 아닌 begin 오류를 잠금 대기 경로로 접기" \
+  's/^            if exc.sqlite_errorname != _BUSY:$/            if False:/' \
+  'test_non_busy_begin_error_is_not_folded_into_duplicate' 1
+mutation_case "잠금 대기 뒤 조회 오류의 닫힌 변환 제거" \
+  's/^        raise CandidateIdentityError("db write lock wait exceeded") from None$/        raise/' \
+  'test_exclusive_lock_wait_exceeded_is_a_closed_error' 1
 sed 's/^BASE_SHA=.*/BASE_SHA=0000000000000000000000000000000000000000/' "$SELF" \
   > "$WORK/failclosed_probe.sh"
 HS0302_ACCEPTANCE_DEPTH=9 bash "$WORK/failclosed_probe.sh" > "$WORK/failclosed.log" 2>&1
