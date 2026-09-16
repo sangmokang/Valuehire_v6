@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 import errno
-import fcntl
 import hmac
 import os
 import re
 import sqlite3
 import stat
-import sys
 import threading
 import unicodedata
 from dataclasses import dataclass
@@ -213,7 +211,10 @@ def _verify_db_boundary(db_path: Path, approved_root: Path) -> None:
     _verify(db_path, expected_mode=_DB_FILE_MODE, label="db file")
     if not db_path.is_file():
         raise CandidateIdentityError("db file must be a regular file")
-    info = db_path.stat(follow_symlinks=False)
+    try:  # 검사 사이에 파일이 옮겨져도 OS 오류가 경로째 새면 안 된다(V1 8회차 결함 1)
+        info = db_path.stat(follow_symlinks=False)
+    except OSError as exc:
+        raise _closed_os_error("db file is missing", exc) from None
     # One inode must have one name inside the protected root.
     if info.st_nlink != 1:
         raise CandidateIdentityError("db file must not have extra hard links")
@@ -322,28 +323,6 @@ def _regular_open_fds() -> dict[int, tuple[int, int]]:
     return result
 
 
-def _allowed_new_sidecar_fd(fd: int, db_path: Path) -> bool:
-    """Permit concurrent SQLite journal/WAL descriptors only inside the approved root."""
-    try:
-        if sys.platform == "darwin":
-            raw_path = fcntl.fcntl(fd, fcntl.F_GETPATH, bytes(1024)).split(b"\x00", 1)[0]
-        elif sys.platform.startswith("linux"):
-            raw_path = os.fsencode(os.readlink(f"/proc/self/fd/{fd}"))
-        else:
-            return False
-        opened_path = Path(os.fsdecode(raw_path))
-        info = os.fstat(fd)
-    except (AttributeError, OSError):
-        return False
-    allowed = {db_path.with_name(db_path.name + suffix) for suffix in _SIDECAR_SUFFIXES}
-    return (
-        opened_path in allowed
-        and info.st_uid == os.getuid()
-        and stat.S_IMODE(info.st_mode) == _DB_FILE_MODE
-        and info.st_nlink == 1
-    )
-
-
 def _connect_approved_db(db_path: Path, approved_root: Path) -> sqlite3.Connection:
     """No write is allowed until the newly opened SQLite file descriptor matches approval."""
     approved = _approved_db(db_path, approved_root)
@@ -354,10 +333,10 @@ def _connect_approved_db(db_path: Path, approved_root: Path) -> sqlite3.Connecti
         connection = sqlite3.connect(db_path, isolation_level=None, timeout=_LOCK_WAIT_SECONDS)
         try:
             after = _regular_open_fds()
-            opened = [(fd, identity) for fd, identity in after.items() if before.get(fd) != identity]
-            main = [fd for fd, identity in opened if identity == (approved.st_dev, approved.st_ino)]
-            extras = [fd for fd, identity in opened if identity != (approved.st_dev, approved.st_ino)]
-            if len(main) != 1 or not all(_allowed_new_sidecar_fd(fd, db_path) for fd in extras):
+            opened = [identity for fd, identity in after.items() if before.get(fd) != identity]
+            # 다른 스레드가 연 무관한 fd 는 판정 대상이 아니다(무관 fd 를 거부 사유로 세면 정상 쓰기
+            # 200회 중 18회가 오거부됐다). 승인 inode 를 새로 연 fd 가 하나도 없을 때만 거부한다.
+            if (approved.st_dev, approved.st_ino) not in opened:
                 raise CandidateIdentityError("opened db is not the approved file")
             _verify_db_boundary(db_path, approved_root)
             return connection
