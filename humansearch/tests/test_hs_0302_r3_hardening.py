@@ -1,0 +1,251 @@
+"""HS-03.02 3차 RED — Codex V1 2차가 낸 잔여·신규 결함을 닫는다."""
+
+from __future__ import annotations
+
+import hmac
+import importlib
+import sqlite3
+import unicodedata
+from pathlib import Path
+from types import ModuleType
+
+import pytest
+
+from humansearch.storage_schema import initialize_humansearch_storage
+
+_MODULE_NAME = "humansearch.candidate_identity"
+_REQUIRED_NAMES = (
+    "CandidateIdentityInput",
+    "CandidateIdentityError",
+    "record_candidate_identity",
+    "candidate_key_hmac",
+)
+_TEST_KEY = bytes(range(32))
+_OBSERVED_AT = "2026-09-15T10:00:00Z"
+_KEY_BASENAME = "hs-candidate.key"
+_DB_BASENAME = "humansearch.sqlite3"
+
+_NFC_PAIR = ("café", "café")
+_NFKC_ONLY_PAIRS = [("①", "1"), ("Ａ", "A")]
+
+
+def _load_identity_module() -> ModuleType:
+    module: ModuleType | None
+    try:
+        module = importlib.import_module(_MODULE_NAME)
+    except ModuleNotFoundError:
+        module = None
+    if module is None:
+        pytest.fail(f"record function missing: {_MODULE_NAME}")
+    missing = [name for name in _REQUIRED_NAMES if not hasattr(module, name)]
+    if missing:
+        pytest.fail(f"record function missing: {_MODULE_NAME}.{'/'.join(missing)}")
+    return module
+
+
+def _assert_tmp_is_symlink_free(tmp_path: Path) -> None:
+    assert tmp_path.resolve(strict=True) == tmp_path, (
+        "pytest tmp_path 에 symlink 구성요소가 있다 — 경로 시험의 전제가 깨졌다"
+    )
+
+
+def _key_at(directory: Path, *, key: bytes = _TEST_KEY) -> Path:
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / _KEY_BASENAME
+    path.write_bytes(key)
+    path.chmod(0o600)
+    directory.chmod(0o700)
+    return path
+
+
+def _record(
+    identity: ModuleType,
+    db_path: Path,
+    key_path: Path,
+    *,
+    position_ref: str = "POS-1",
+    channel: str = "saramin",
+    candidate_ref: str = "cand-1",
+    observed_at: str = _OBSERVED_AT,
+) -> str:
+    record = identity.CandidateIdentityInput(
+        position_ref=position_ref,
+        channel=channel,
+        candidate_ref=candidate_ref,
+        observed_at=observed_at,
+    )
+    return str(identity.record_candidate_identity(
+        db_path, record, hmac_key_path=key_path, approved_root=db_path.parent
+    ))
+
+
+def _independent_key_hmac(position_ref: str, channel: str, candidate_ref: str) -> str:
+    """계약 문구만으로 다시 계산한다 — 길이 접두 정규 직렬화, 도메인 v2."""
+    message = b"hs-candidate-key-v2"
+    for field in (position_ref, channel, candidate_ref):
+        raw = field.encode("utf-8")
+        message += len(raw).to_bytes(4, "big") + raw
+    return hmac.new(_TEST_KEY, message, "sha256").hexdigest()
+
+
+def _nfc(value: str) -> str:
+    return unicodedata.normalize("NFC", value)
+
+
+def _count_rows(db_path: Path) -> int:
+    with sqlite3.connect(db_path) as connection:
+        row = connection.execute("select count(*) from hs_candidates").fetchone()
+    return int(row[0])
+
+
+def _has_key(db_path: Path, key: str) -> bool:
+    with sqlite3.connect(db_path) as connection:
+        row = connection.execute(
+            "select 1 from hs_candidates where candidate_key_hmac = ?", (key,)
+        ).fetchone()
+    return row is not None
+
+
+def test_db_file_symlink_into_key_root_is_refused(tmp_path: Path) -> None:
+    """DB 파일 마지막 구성요소가 symlink 면 비교한 경로와 실제로 여는 파일이 갈라진다."""
+    identity = _load_identity_module()
+    _assert_tmp_is_symlink_free(tmp_path)
+    key_root = tmp_path / "key-root"
+    key_root.mkdir(mode=0o700)
+    real = initialize_humansearch_storage(key_root / "realdb")
+    key_path = key_root / _KEY_BASENAME
+    key_path.write_bytes(_TEST_KEY)
+    key_path.chmod(0o600)
+    key_root.chmod(0o700)
+    alias = tmp_path / "alias"
+    alias.mkdir(mode=0o700)
+    aliased_db = alias / _DB_BASENAME
+    aliased_db.symlink_to(real.db_path)
+    with pytest.raises(identity.CandidateIdentityError):
+        _record(identity, aliased_db, key_path)
+    assert _count_rows(real.db_path) == 0
+
+
+def test_db_ancestor_symlink_is_refused(tmp_path: Path) -> None:
+    """DB 경로 조상이 symlink 여도 거부한다 — 검사한 경로와 연 파일이 같아야 한다."""
+    identity = _load_identity_module()
+    _assert_tmp_is_symlink_free(tmp_path)
+    real_root = tmp_path / "real-db-root"
+    real_root.mkdir(mode=0o700)
+    result = initialize_humansearch_storage(real_root / "protected-root")
+    key_path = _key_at(tmp_path / "key-root")
+    linked_root = tmp_path / "linked-db-root"
+    linked_root.symlink_to(real_root, target_is_directory=True)
+    with pytest.raises(identity.CandidateIdentityError):
+        _record(identity, linked_root / "protected-root" / _DB_BASENAME, key_path)
+    assert _count_rows(result.db_path) == 0
+
+
+def test_plain_db_path_still_records(tmp_path: Path) -> None:
+    """양성 대조군 — 링크 없는 평범한 DB 경로는 그대로 기록된다."""
+    identity = _load_identity_module()
+    _assert_tmp_is_symlink_free(tmp_path)
+    db_path = initialize_humansearch_storage(tmp_path / "protected-root").db_path
+    key_path = _key_at(tmp_path / "key-root")
+    assert _record(identity, db_path, key_path) == "inserted"
+    assert _count_rows(db_path) == 1
+
+
+@pytest.mark.parametrize("field", ["position_ref", "candidate_ref"])
+def test_nfc_equivalent_fields_collapse_into_one_row(tmp_path: Path, field: str) -> None:
+    """결합형과 분해형은 같은 후보다 — 행이 하나만 남아야 한다."""
+    identity = _load_identity_module()
+    _assert_tmp_is_symlink_free(tmp_path)
+    db_path = initialize_humansearch_storage(tmp_path / "protected-root").db_path
+    key_path = _key_at(tmp_path / "key-root")
+    composed = {"position_ref": "POS-1", "candidate_ref": "cand-1"}
+    decomposed = dict(composed)
+    composed[field] = _NFC_PAIR[0]
+    decomposed[field] = _NFC_PAIR[1]
+    first = _record(identity, db_path, key_path, **composed)
+    second = _record(identity, db_path, key_path, **decomposed)
+    assert (first, second) == ("inserted", "duplicate")
+    assert _count_rows(db_path) == 1
+    expected = _independent_key_hmac(
+        _nfc(composed["position_ref"]), "saramin", _nfc(composed["candidate_ref"])
+    )
+    assert _has_key(db_path, expected), "저장된 키가 NFC 정규화 뒤 계약 계산과 다르다"
+
+
+@pytest.mark.parametrize(("left", "right"), _NFKC_ONLY_PAIRS)
+def test_nfkc_only_equivalents_stay_separate_rows(tmp_path: Path, left: str, right: str) -> None:
+    """NFKC 에서만 같아지는 호환문자는 다른 후보다 — 합치면 오병합이다."""
+    identity = _load_identity_module()
+    _assert_tmp_is_symlink_free(tmp_path)
+    db_path = initialize_humansearch_storage(tmp_path / "protected-root").db_path
+    key_path = _key_at(tmp_path / "key-root")
+    first = _record(identity, db_path, key_path, candidate_ref=f"cand-{left}")
+    second = _record(identity, db_path, key_path, candidate_ref=f"cand-{right}")
+    assert (first, second) == ("inserted", "inserted")
+    assert _count_rows(db_path) == 2
+    assert unicodedata.normalize("NFKC", left) == unicodedata.normalize("NFKC", right), (
+        "이 쌍이 NFKC 에서 같지 않으면 오병합 시험이 성립하지 않는다"
+    )
+
+
+def test_surrounding_whitespace_is_stripped_before_normalisation(tmp_path: Path) -> None:
+    """strip 뒤 NFC 라는 순서를 고정한다 — 앞뒤 공백이 다른 같은 후보는 한 행이다."""
+    identity = _load_identity_module()
+    _assert_tmp_is_symlink_free(tmp_path)
+    db_path = initialize_humansearch_storage(tmp_path / "protected-root").db_path
+    key_path = _key_at(tmp_path / "key-root")
+    first = _record(identity, db_path, key_path, candidate_ref=_NFC_PAIR[0])
+    second = _record(identity, db_path, key_path, candidate_ref=f"  {_NFC_PAIR[1]}  ")
+    assert (first, second) == ("inserted", "duplicate")
+    assert _count_rows(db_path) == 1
+
+
+@pytest.mark.parametrize(
+    "observed_at",
+    [
+        "2026-09-15t00:00:00z",
+        "2026-09-15T00:00:00z",
+        "2026-09-15t00:00:00Z",
+        "2026-09-15t10:00:00.123z",
+        "2026-09-15t10:00:00+09:00",
+    ],
+)
+def test_lowercase_rfc3339_designators_are_accepted(tmp_path: Path, observed_at: str) -> None:
+    """RFC3339 는 `t`·`z` 소문자를 허용한다. 앞 단계가 허용한 것을 뒤 단계가 거부하면 안 된다."""
+    identity = _load_identity_module()
+    _assert_tmp_is_symlink_free(tmp_path)
+    db_path = initialize_humansearch_storage(tmp_path / "protected-root").db_path
+    key_path = _key_at(tmp_path / "key-root")
+    assert _record(identity, db_path, key_path, observed_at=observed_at) == "inserted"
+    assert _count_rows(db_path) == 1
+
+
+@pytest.mark.parametrize(
+    "observed_at",
+    ["2026-09-15T00:00:00Z", "2026-09-15T10:00:00.123Z", "2026-09-15T10:00:00+09:00"],
+)
+def test_uppercase_rfc3339_designators_stay_accepted(tmp_path: Path, observed_at: str) -> None:
+    """대문자 대조군 — 소문자 처리를 넣다가 대문자를 깨뜨리지 않았는지 본다."""
+    identity = _load_identity_module()
+    _assert_tmp_is_symlink_free(tmp_path)
+    db_path = initialize_humansearch_storage(tmp_path / "protected-root").db_path
+    key_path = _key_at(tmp_path / "key-root")
+    assert _record(identity, db_path, key_path, observed_at=observed_at) == "inserted"
+    assert _count_rows(db_path) == 1
+
+
+@pytest.mark.parametrize(
+    "observed_at",
+    ["2026-02-29t00:00:00z", "2026-09-15t24:00:00z", "2026-09-15t10:00:00+24:00"],
+)
+def test_lowercase_designators_do_not_bypass_semantic_checks(
+    tmp_path: Path, observed_at: str
+) -> None:
+    """소문자를 받아들이되 달력·범위 검증은 그대로여야 한다 — 우회 통로가 되면 안 된다."""
+    identity = _load_identity_module()
+    _assert_tmp_is_symlink_free(tmp_path)
+    db_path = initialize_humansearch_storage(tmp_path / "protected-root").db_path
+    key_path = _key_at(tmp_path / "key-root")
+    with pytest.raises(identity.CandidateIdentityError):
+        _record(identity, db_path, key_path, observed_at=observed_at)
+    assert _count_rows(db_path) == 0
