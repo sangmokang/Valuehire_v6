@@ -43,8 +43,6 @@ SOT_ROSTER=docs/sot/verification-commands.md
 ACCEPTANCE_RUN="bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-0302.sh"
 REQUIRED_TESTS=scripts/verify/fixtures/hs-0302-required-tests.txt
 WIRING_CHECKER=scripts/verify/check-hs-0302-ci-wiring.rb
-BASELINE_CHECKER=scripts/verify/check-hs-0302-baseline.rb
-BASELINE_TEST=scripts/verify/test-hs-0302-baseline.rb
 BASE_SHA=7473ec8
 MIN_TESTS=6
 MIN_R2_TESTS=10
@@ -80,40 +78,13 @@ assert_fail_closed() {
 }
 abort_not_run() { echo "NOT_RUN: $1"; echo "CHECKED: $checked"; exit 2; }
 for required in "$MODULE" "$TESTS" "$TESTS_R2" "$TESTS_R3" "$TESTS_R4" "$TESTS_R5" "$WORKFLOW" "$SOT_ROSTER" \
-                "$REQUIRED_TESTS" "$WIRING_CHECKER" "$BASELINE_CHECKER" "$BASELINE_TEST" "$SCHEMA"; do
+                "$REQUIRED_TESTS" "$WIRING_CHECKER" "$SCHEMA"; do
   if [ ! -f "$required" ]; then
     echo "NOT_RUN: $required 없음 — 검사 대상이 성립하지 않는다"
     echo "CHECKED: 0"
     exit 2
   fi
 done
-ruby "$BASELINE_CHECKER" > "$WORK/baseline.log" 2>&1
-if [ $? -eq 0 ] && "$GREP" -q '^VERDICT: PASS$' "$WORK/baseline.log"; then
-  pass_item "신뢰 SHA의 R5 시험·명부·최소 기준을 현재 파일이 보존한다"
-else
-  fail_item "신뢰 SHA 대비 필수 시험·명부·기준값 약화"
-  cat "$WORK/baseline.log"
-fi
-ruby "$BASELINE_TEST" > "$WORK/baseline-test.log" 2>&1
-if [ $? -eq 0 ] && "$GREP" -q '^VERDICT: PASS$' "$WORK/baseline-test.log"; then
-  pass_item "시험·명부·기준값 단독·동반 약화 4종을 독립 검사기가 거부한다"
-else
-  fail_item "독립 검사기 약화 fixture 실패"
-  cat "$WORK/baseline-test.log"
-fi
-sed '/^problems <<.*R5_TEST_PREFIX/s/^/# /' "$BASELINE_CHECKER" > "$WORK/weakened-baseline.rb"
-if cmp -s "$BASELINE_CHECKER" "$WORK/weakened-baseline.rb"; then
-  fail_item "검사기 자체 약화 변이 앵커 없음"
-else
-  ruby "$BASELINE_TEST" "$WORK/weakened-baseline.rb" > "$WORK/weakened-baseline.log" 2>&1
-  if [ $? -eq 1 ] && "$GREP" -q 'required test deletion survived' "$WORK/weakened-baseline.log"; then
-    pass_item "검사기 자체 R5 보호 제거 변이를 음성 fixture가 잡는다"
-  else
-    fail_item "검사기 자체 약화 변이가 생존했다"
-    cat "$WORK/weakened-baseline.log"
-  fi
-fi
-
 pk_guard_present() {
   local file=$1 ctx
   ctx=$("$GREP" -B2 'return "duplicate"' "$file" 2>/dev/null) || return 1

@@ -33,7 +33,7 @@
 - AC-13: When 검사 직후 일반 파일 inode 교체 또는 connect 직후 swap-back이 일어나면 시스템은 connect 동안 새로 열린 OS descriptor 중 승인 inode 를 가리키는 것이 하나도 없을 때 쓰기 전에 닫힌 오류를 내야 한다. 초기화 결과의 정상 DB는 `inserted`여야 한다.
 - AC-15: While 같은 프로세스의 다른 스레드가 무관한 파일을 여닫는 동안에도 시스템은 정상 쓰기를 거부하지 않아야 한다(무관한 descriptor 는 거부 사유가 아니다).
 - AC-16: When `is_file()` 통과 뒤 `stat` 전에 DB 파일이 옮겨지면 시스템은 `FileNotFoundError` 대신 경로 없는 `CandidateIdentityError`를 내야 하고 일반 traceback 에 보호 경로가 남지 않아야 한다.
-- AC-14: When 필수 R5 시험·명부·최소 기준·총 기준을 단독 또는 함께 낮추면 시스템은 인수 검사를 거부해야 한다. 검사기에서 R5 보호를 제거한 사본도 음성 fixture가 거부해야 한다.
+- AC-14: When 필수 시험을 지우면 시스템은 명부와 수집 결과의 정확 대조(누락 0·추가 0)로 인수 검사를 거부해야 한다. 시험·명부·상수를 함께 낮추는 동반 약화는 저장소 안 검사기로 막을 수 없으므로(검사기도 같은 PR 에서 바뀐다) P13① `weakens-check` 라벨과 오너 검토가 담당한다.
 
 ## counter-AC
 
@@ -86,7 +86,10 @@
 | V1 8회차 Codex @8c5494b | FAIL→닫음 | 결함 1: is_file 뒤 stat 사이 파일 이동 시 FileNotFoundError 경로 누출 → `e259f68`/`4d28832`. 원문 sha256 `3a7ae037…b61` |
 | 15차 `a0a2cdc`→`80238a3` (병행 세션) | PASS(부분) | 일반 inode 교체·connect 뒤 swap-back RED 2 failed → GREEN, 기준선 검사기 신설, R5 10 passed·인수 30/30 |
 | 16차 `e259f68`→`4d28832` | PASS | RED: 파일 이동 경로 누출 + 무관 fd 오거부(200회 중 18회 실측) 2 failed·39 passed. GREEN: stat 닫힌 오류, `/dev/fd` 판정을 "승인 inode 새 fd 부재" 로만 축소(`_allowed_new_sidecar_fd` 제거). 352 passed, 인수 30/30, 오거부 0/200 |
-| 최종 SHA 게이트·V1·V2 | 아래 갱신 | — |
+| V1 9회차 Codex @c5f5896 | FAIL(환경·절차) | 기능 AC-1~16 전부 PASS, 변이 6종 검출. 결함 1(높음) 전체 pytest 16건은 샌드박스 socket bind 금지 → V2 가 로컬에서 352 passed 로 환경 산물 확정. 결함 2(중간) P5 위반: `e25ac5e`·`2d4722a` 가 RED 뒤 시험 파일 수정(단언 삭제 없음, 설명문·import 위치). 원문 sha256 `bee5161c…f54` |
+| V2 새 맥락 @c5f5896 | FAIL→닫음 | V1 결함 1 불일치(352 passed), 결함 2·설계 지적 재현. 새 변이 18종 중 2종 생존: pragma database_list 경로 대조·sidecar hard link 대조가 무보호 → `2468827` RED(변이 생존) / `a578b62` GREEN(시험 4건, 명부 127, 변이 6종 검출). 두 프로세스 경쟁 10회 1:1. 원문 sha256 `5030ca4b…b28`(private-reviews/hs-0302/v2-verdict-c5f5896-2026-09-16.md) |
+| 17차 기준선 검사기 제거 | PASS | V1·V2 가 모두 지적한 7,303바이트 접두 해시 검사기(오탐: 앞부분 docstring 한 글자 수정에 FAIL, 미탐: 뒤쪽 시험 삭제에 PASS)를 제거하고 AC-14 를 명부 정확 대조 + P13① 라벨로 재정의. 인수 CHECKED 29 rc0 |
+| 최종 SHA 게이트 | 아래 갱신 | — |
 
 ## 롤백·영향 반경·데이터 안전
 
@@ -96,7 +99,9 @@
 
 ## 결정 카드
 
-**무엇을** — 초기화 장부의 inode와 connect 동안 새로 열린 승인 DB descriptor 1개 및 보호된 sidecar descriptor를 `fstat`으로 대조하고 불명확하면 쓰기 전에 거부한다.
+**무엇을** — 초기화 장부의 inode와 connect 동안 새로 열린 descriptor 를 `fstat` 으로 대조해 승인 inode 를 연 것이 없으면 쓰기 전에 거부한다.
+
+**무엇을(17차)** — 7,303바이트 접두 해시 기준선 검사기를 제거한다. **왜** — 독립 검증 두 곳이 오탐(정당한 설명문 수정에 FAIL)과 미탐(접두 뒤 시험 삭제에 PASS)을 동시에 실측했고, 검사기 자체가 같은 PR 에서 갱신되므로 동반 약화를 막지 못한다. **버린 길** — 시험 함수별 구조 서명 검사기로 교체(별도 WU 로 미룸), 유지하고 갱신 절차 문서화(오탐이 정상 경로가 돼 진짜 약화도 같은 동작으로 통과). **대가** — 시험·명부·상수를 한 PR 에서 같이 낮추는 약화는 P13① 라벨·오너 검토에만 기댄다. **되돌리기** — `git revert` 로 검사기 두 파일과 인수 배선이 함께 돌아온다.
 **왜** — 경로·PRAGMA에는 실제 열린 inode가 없다.
 **버린 길** — `/proc/self/fd` URI: macOS에 `/proc`가 없고 `/dev/fd` URI도 쓰기 연결에 실패했다.
 **대가** — `/dev/fd` 열거가 불가능한 환경에서는 정상 요청도 거부한다. 무관한 descriptor 는 판정에서 빼므로(16차) 같은 프로세스의 다른 스레드가 여는 파일로 오거부되지 않지만, 같은 프로세스의 악성 코드까지 막는 경계는 아니다.
