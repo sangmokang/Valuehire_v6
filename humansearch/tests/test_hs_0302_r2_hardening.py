@@ -100,8 +100,6 @@ def _count_rows(db_path: Path) -> int:
     return int(row[0])
 
 
-
-
 def test_v1_separator_injection_pair_is_refused_at_the_db_path(tmp_path: Path) -> None:
     """Codex 의 두 입력은 DB 경로에서 **둘 다 거부**되어야 하고 행이 0개여야 한다."""
     identity = _load_identity_module()
@@ -167,8 +165,6 @@ def test_control_characters_in_any_field_are_refused(
     assert _count_rows(db_path) == 0
 
 
-
-
 def test_key_directory_nested_under_db_protected_root_is_refused(tmp_path: Path) -> None:
     """dbroot/keys/k 는 DB 루트를 한 번 복사하면 키까지 함께 새어 나간다."""
     identity = _load_identity_module()
@@ -203,8 +199,6 @@ def test_symlinked_ancestor_above_key_directory_is_refused(tmp_path: Path) -> No
     with pytest.raises(identity.CandidateIdentityError):
         _record(identity, db_path, linked_root / "keys" / _KEY_BASENAME)
     assert _count_rows(db_path) == 0
-
-
 
 
 @pytest.mark.parametrize(

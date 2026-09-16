@@ -30,7 +30,9 @@
 - AC-10: When 승인 root 안이라도 초기화가 돌려준 DB 파일이 아닌 다른 0600 파일을 넘기면 시스템은 행을 만들지 않고 `CandidateIdentityError`를 내야 한다. 초기화 결과의 `(db_path, protected_root)` 쌍은 그대로 `inserted`여야 한다.
 - AC-11: When 승인 DB 파일 또는 sidecar 가 hard link 로 다른 이름을 하나라도 더 가지면(`st_nlink != 1`) 시스템은 쓰기 직전과 확정 전에 행을 만들지 않고 `CandidateIdentityError`를 내야 한다. 밖으로 건 링크와 다른 DB 를 승인 자리에 건 링크 모두 해당한다.
 - AC-12: When 승인 DB 를 치우고 다른 호환 DB 를 같은 이름으로 rename 해 두면(경로·권한·nlink 는 모두 정상) 시스템은 초기화 때 장부에 남긴 파일 정체성(`st_dev`·`st_ino`)과 달라 행을 만들지 않고 `CandidateIdentityError`를 내야 한다.
-- AC-13: When 검사 직후 일반 파일 inode 교체 또는 connect 직후 swap-back이 일어나면 시스템은 SQLite가 연 새 파일의 OS descriptor 정체성을 승인 장부와 대조하고, 불명확하거나 다르면 쓰기 전에 닫힌 오류를 내야 한다. 초기화 결과의 정상 DB는 `inserted`여야 한다.
+- AC-13: When 검사 직후 일반 파일 inode 교체 또는 connect 직후 swap-back이 일어나면 시스템은 connect 동안 새로 열린 OS descriptor 중 승인 inode 를 가리키는 것이 하나도 없을 때 쓰기 전에 닫힌 오류를 내야 한다. 초기화 결과의 정상 DB는 `inserted`여야 한다.
+- AC-15: While 같은 프로세스의 다른 스레드가 무관한 파일을 여닫는 동안에도 시스템은 정상 쓰기를 거부하지 않아야 한다(무관한 descriptor 는 거부 사유가 아니다).
+- AC-16: When `is_file()` 통과 뒤 `stat` 전에 DB 파일이 옮겨지면 시스템은 `FileNotFoundError` 대신 경로 없는 `CandidateIdentityError`를 내야 하고 일반 traceback 에 보호 경로가 남지 않아야 한다.
 - AC-14: When 필수 R5 시험·명부·최소 기준·총 기준을 단독 또는 함께 낮추면 시스템은 인수 검사를 거부해야 한다. 검사기에서 R5 보호를 제거한 사본도 음성 fixture가 거부해야 한다.
 
 ## counter-AC
@@ -77,9 +79,14 @@
 
 | 단계 | 상태 | 증거 |
 |---|---|---|
-| 현재 HEAD 반례 | REPRODUCED | 일반 inode를 검사 사이에 바꾸면 `inserted`, 교체 DB 1행·승인 inode 0행. R5 시험·명부·MIN·총 기준을 함께 낮추면 인수 27/27 통과(별도 임시 worktree). |
-| RED `a0a2cdc` | EXPECTED_FAIL | R5 2 failed/8 passed (`DID NOT RAISE`); 독립 기준 검사 시험은 약화 생존으로 rc1. |
-| 첫 GREEN | PASS(부분) | R5 10 passed, 전용 121 passed, ruff/mypy rc0, 인수 30/30. 최종 SHA 전체 게이트·V1/V2 전에는 완료 판정 금지. |
+| 1~10차 (~eb0b225) | 역사 | 중복·경쟁·입력·Unicode·CI 배선·명부·DB 경계·키 경로·commit 전 재검증. V1 4·6회차 APPROVE 는 현재 SHA 근거가 아니다(6회차 원문 sha256 `a5feee91…dede`, `private-reviews/hs-0302/`) |
+| 11차 `604974d`→`e25ac5e` | 재검증 | RED 가 `TypeError: unexpected keyword 'approved_root'` 로 실패해 동작 RED 가 아니었고 `approved_root=db_path.parent` 로 채우면 통과했다 |
+| 12~14차 `3d936fd`→`39d12ad` | PASS | 자기승인·다른 파일명(DID NOT RAISE 2)·hard link(2)·rename 교체(1) RED→GREEN, 약화 변이 4종, 마이그레이션 블록 대조, `b25a68d` 전역 검사기 500→600 되돌림 |
+| V1 7회차 Codex @4f88b04 | FAIL→닫음 | 1차 정책 차단 NOT_RUN, 2차 결함 1(rename 교체) → `cc0700e`/`39d12ad`. 원문 sha256 `e102599b…7cc` |
+| V1 8회차 Codex @8c5494b | FAIL→닫음 | 결함 1: is_file 뒤 stat 사이 파일 이동 시 FileNotFoundError 경로 누출 → `e259f68`/`4d28832`. 원문 sha256 `3a7ae037…b61` |
+| 15차 `a0a2cdc`→`80238a3` (병행 세션) | PASS(부분) | 일반 inode 교체·connect 뒤 swap-back RED 2 failed → GREEN, 기준선 검사기 신설, R5 10 passed·인수 30/30 |
+| 16차 `e259f68`→`4d28832` | PASS | RED: 파일 이동 경로 누출 + 무관 fd 오거부(200회 중 18회 실측) 2 failed·39 passed. GREEN: stat 닫힌 오류, `/dev/fd` 판정을 "승인 inode 새 fd 부재" 로만 축소(`_allowed_new_sidecar_fd` 제거). 352 passed, 인수 30/30, 오거부 0/200 |
+| 최종 SHA 게이트·V1·V2 | 아래 갱신 | — |
 
 ## 롤백·영향 반경·데이터 안전
 
@@ -92,9 +99,11 @@
 **무엇을** — 초기화 장부의 inode와 connect 동안 새로 열린 승인 DB descriptor 1개 및 보호된 sidecar descriptor를 `fstat`으로 대조하고 불명확하면 쓰기 전에 거부한다.
 **왜** — 경로·PRAGMA에는 실제 열린 inode가 없다.
 **버린 길** — `/proc/self/fd` URI: macOS에 `/proc`가 없고 `/dev/fd` URI도 쓰기 연결에 실패했다.
-**대가** — `/dev/fd` 열거로 단일 새 descriptor를 식별할 수 없는 VFS·환경·경쟁 상황에서는 정상 요청도 거부한다. 같은 프로세스의 악성 코드까지 막는 경계는 아니다.
+**대가** — `/dev/fd` 열거가 불가능한 환경에서는 정상 요청도 거부한다. 무관한 descriptor 는 판정에서 빼므로(16차) 같은 프로세스의 다른 스레드가 여는 파일로 오거부되지 않지만, 같은 프로세스의 악성 코드까지 막는 경계는 아니다.
 **되돌리기** — 로컬 구현 커밋을 revert한다. 스키마·운영 데이터 변경은 없다.
 
 ## 비범위
+
+`docs/sot/strict-workflow.md` 는 main 이 이미 소유하므로 이 브랜치의 사본(4줄 차이)은 제거한다 — 병합 시 main 판이 그대로 남는다.
 
 HS-03.03 암호화 저장, HS-03.04 readback, HS-03.05 삭제, 실제 포털 후보 읽기, #96 `RunnerBoundary` 연동, Supabase, 운영 배포, merge, push.

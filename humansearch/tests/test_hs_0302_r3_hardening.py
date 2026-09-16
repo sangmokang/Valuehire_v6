@@ -106,8 +106,6 @@ def _has_key(db_path: Path, key: str) -> bool:
     return row is not None
 
 
-
-
 def test_db_file_symlink_into_key_root_is_refused(tmp_path: Path) -> None:
     """DB 파일 마지막 구성요소가 symlink 면 비교한 경로와 실제로 여는 파일이 갈라진다."""
     identity = _load_identity_module()
@@ -151,8 +149,6 @@ def test_plain_db_path_still_records(tmp_path: Path) -> None:
     key_path = _key_at(tmp_path / "key-root")
     assert _record(identity, db_path, key_path) == "inserted"
     assert _count_rows(db_path) == 1
-
-
 
 
 @pytest.mark.parametrize("field", ["position_ref", "candidate_ref"])
@@ -202,7 +198,6 @@ def test_surrounding_whitespace_is_stripped_before_normalisation(tmp_path: Path)
     second = _record(identity, db_path, key_path, candidate_ref=f"  {_NFC_PAIR[1]}  ")
     assert (first, second) == ("inserted", "duplicate")
     assert _count_rows(db_path) == 1
-
 
 
 @pytest.mark.parametrize(
