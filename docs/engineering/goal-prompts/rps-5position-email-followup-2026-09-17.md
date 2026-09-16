@@ -1,5 +1,7 @@
 # LinkedIn Recruiter(RPS) 후속 서치 실행 프롬프트 — 5개 포지션 신규 후보 이메일 확보 (2026-09-17)
 
+> **[SUPERSEDED]** Codex·Gemini 적대적 리뷰에서 이 프롬프트가 유도하는 결과물 구조(레코드 파편화, 필드 상태값 뭉뚱그림, 기컨택 미검증)에 결함이 확인됐다. 이 문서 그대로 실행하지 말고 `rps-candidate-ledger-v2-2026-09-17.md`를 사용할 것.
+
 너는 Valuehire v6 저장소(/Users/kangsangmo/Desktop/Valuehire_v6)에서 Aside 브라우저(claude-in-chrome MCP)로 LinkedIn Recruiter(RPS) 라이브 조사를 이어서 수행한다. 2026-09-17 1차 조사(기존 40명 이메일 확보 + 5개 포지션 1촌 신규 발굴)의 후속 작업이다. **이번 작업 범위는 아래 "신규 발굴 후보 26명의 이메일·프로필 확정"에 한정한다** — 포지션 재정의나 재검색 기준 변경은 하지 않는다.
 
 ## 이번 프롬프트가 반영한 1차 조사 시행착오 (반드시 준수)
