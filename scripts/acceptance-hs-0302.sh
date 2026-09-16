@@ -51,7 +51,7 @@ MIN_R2_TESTS=10
 MIN_R3_TESTS=6
 MIN_R4_TESTS=7
 MIN_R5_TESTS=7
-EXPECTED_REQUIRED_IDS=123
+EXPECTED_REQUIRED_IDS=127
 WORK=$(mktemp -d) || { echo "NOT_RUN: mktemp 실패"; echo "CHECKED: 0"; exit 2; }
 trap 'rm -rf "$WORK"' EXIT
 fail=0

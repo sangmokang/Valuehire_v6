@@ -305,3 +305,60 @@ def test_unrelated_open_files_in_other_threads_do_not_refuse_writes(tmp_path: Pa
         worker.join()
     assert outcomes == ["inserted"] * 60
     assert _rows(approved.db_path) == 60
+
+
+def test_opened_db_reported_outside_approved_path_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """열린 연결이 승인 경로가 아닌 파일을 main 으로 보고하면 INSERT 전에 거부한다(AC-8, V2 결함 1)."""
+
+    approved = initialize_humansearch_storage(tmp_path / "approved")
+    key_path = _key_file(tmp_path / "keys")
+    real_connect = sqlite3.connect
+    elsewhere = str(approved.protected_root / "elsewhere.sqlite3")
+
+    class _Misreporting:
+        def __init__(self, connection: sqlite3.Connection) -> None:
+            self._connection = connection
+
+        def execute(self, sql: str, params: tuple[str, ...] = ()) -> object:
+            if sql.strip().startswith("pragma database_list"):
+                return [(0, "main", elsewhere)]
+            return self._connection.execute(sql, params)
+
+        def close(self) -> None:
+            self._connection.close()
+
+    def connect(path: Path, *, isolation_level: None, timeout: float) -> _Misreporting:
+        return _Misreporting(real_connect(path, isolation_level=isolation_level, timeout=timeout))
+
+    monkeypatch.setattr(
+        "humansearch.candidate_identity.sqlite3",
+        SimpleNamespace(connect=connect, IntegrityError=sqlite3.IntegrityError,
+                        OperationalError=sqlite3.OperationalError),
+    )
+    with pytest.raises(CandidateIdentityError, match="opened db is outside"):
+        record_candidate_identity(
+            approved.db_path, _RECORD, hmac_key_path=key_path, approved_root=approved.protected_root
+        )
+    assert _rows(approved.db_path) == 0
+
+
+@pytest.mark.parametrize("suffix", ["-journal", "-wal", "-shm"])
+def test_hardlinked_sqlite_sidecar_is_refused(tmp_path: Path, suffix: str) -> None:
+    """보조 파일도 hard link 로 다른 이름을 가지면 보호 범위 밖에서 읽힌다(AC-11 sidecar 절반, V2 결함 2)."""
+
+    approved = initialize_humansearch_storage(tmp_path / "approved")
+    key_path = _key_file(tmp_path / "keys")
+    sidecar = approved.db_path.with_name(approved.db_path.name + suffix)
+    sidecar.write_bytes(b"")
+    sidecar.chmod(0o600)
+    outside = tmp_path / "outside"
+    outside.mkdir(mode=0o700)
+    os.link(sidecar, outside / "leak")
+
+    with pytest.raises(CandidateIdentityError, match="link"):
+        record_candidate_identity(
+            approved.db_path, _RECORD, hmac_key_path=key_path, approved_root=approved.protected_root
+        )
+    assert _rows(approved.db_path) == 0
