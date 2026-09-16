@@ -44,6 +44,7 @@ HS-03.02 브랜치에 직접 넣지 않은 이유는 P11③ 3,000줄 상한이�
 |---|---|---|
 | RED `974c711`(rebase 전 `b7f832c`) | 생존 7 | 인수 CHECKED 36 · FAIL 7(생존, 잡힌 시험 0) · rc 1 |
 | GREEN `da45ff9`(rebase 전 `4fdae9a`) | PASS | 6차 10 passed, 변이 사본 7종 각각 전용 시험 failed(1·1·3·1·1·1·1), 인수 CHECKED 36 rc 0(변이 13종), 명부 137 정확, ruff·mypy rc 0 |
+| Codex 적대 리뷰 @bc7f558 | NO-SHIP 3건 → v3.1 | 전부 다음 프롬프트 v3 결함: ① 소유권 미증명 공유메모리 자동 삭제 지시 ② V1 클론의 venv 복사 ③ 변이 사본 명령 오기. ②는 실측으로 확정 — 복사한 venv 의 `bin/pytest` shebang 이 원 워크트리 python 을 가리켜 `uv run pytest` 가 원 워크트리 src 를 실행했다(`sys.executable`·모듈 경로 실측). 이 WU 의 bc7f558 pytest 증거와 HS-03.02 V1 10회차의 전체 pytest 도 같은 함정 아래였다(소스 내용은 동일 SHA 라 판정은 유지, 격리 주장은 철회). 조치: R6 venv 를 `uv sync --frozen` 으로 재생성하고 최종 SHA 에서 재검증, 프롬프트 v3.1 |
 | 최종 SHA 검증 | 이 문서·프롬프트 커밋에서 실행 | 결과는 `private-reviews/hs-0302/claude-r6-closeout-<sha>/`(gitignored)와 다음 세션 재검증(프롬프트 v3)이 담는다 |
 
 ## 비범위
