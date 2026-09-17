@@ -236,8 +236,9 @@ jobs:
       - name: 인수 검사 hs0302-preflight (마감 사전검사기가 실패 방향으로 닫혀 있는가)
         # 정본 docs/sot/verification-commands.md 53행: 새 acceptance-*.sh 는 verify.yml 과 명부 양쪽에 등록한다.
         # 이 검사가 판정하는 것 — scripts/verify/hs0302-closeout-preflight.sh(마감 프롬프트 0·2·5·7단계의 실행부)를
-        # 원본 밖 사본에서 반례 12종(mktemp·git 조회 실패 주입, 빈 스크립트·exit 0·VERDICT 문구만, 필수 검사 삭제,
-        # 자기 재호출, V1 rc 파일 없음·SHA 불일치, 기준 조회 비SHA·프롬프트 경로 미존재·옵션 값 누락)으로 공격하고
+        # 원본 밖 사본에서 반례 15종(mktemp·git 조회 실패 주입, 빈 스크립트·exit 0·VERDICT 문구만, 필수 검사 삭제,
+        # 자기 재호출, V1 rc 파일 없음·SHA 불일치, 기준 조회 비SHA·프롬프트 경로 미존재·옵션 값 누락,
+        # 프롬프트 커밋 조회 비SHA·V1 HEAD 조회 비SHA·V1 뒤 venv 심볼릭 링크 대상 변경)으로 공격하고
         # 정상 사본은 합성 저장소 + 대역 명령(uv·ps·lsof·ipcs)에서 PASS 인지 본다. 실제 환경 실행은 마감 세션 몫이다.
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs0302-preflight.sh
 
