@@ -58,7 +58,7 @@ def test_first_write_stores_raw_and_normalized_email_and_url(tmp_path: Path) -> 
     assert result.candidate.email_raw == "John.Kim@Example.com"
     assert result.candidate.email_normalized == "john.kim@example.com"
     assert result.candidate.profile_url_raw == "https://www.linkedin.com/in/abc/?trk=test"
-    assert result.candidate.profile_url_normalized == "https://www.linkedin.com/in/abc"
+    assert result.candidate.profile_url_normalized == "https://linkedin.com/in/abc"
     # counter-AC: a "success" that only proves an INSERT ran, not a committed+readable row, is fake.
     connection = sqlite3.connect(db_path)
     try:
@@ -282,6 +282,61 @@ def test_url_shaped_candidate_ref_dedups_ignoring_tracking_params(tmp_path: Path
     finally:
         connection.close()
     assert candidate_count == 1
+
+
+# --- LinkedIn profile URLs are case-insensitive and www-optional (Codex V1 finding F-2,
+# 2026-09-17): the fix for tracking-param dedup did not also fold case or strip www. ---
+
+
+def test_linkedin_url_dedups_across_case_and_www_prefix(tmp_path: Path) -> None:
+    db_path = _db(tmp_path)
+    variants = [
+        "https://www.linkedin.com/in/JohnDoe/?trk=x",
+        "https://www.linkedin.com/in/johndoe",
+        "https://linkedin.com/in/johndoe",
+    ]
+    candidate_ids = {
+        record_candidate_observation(
+            db_path,
+            _input(channel="linkedin_rps", candidate_ref=url, ingestion_id=f"run-{i}"),
+        ).candidate.candidate_id
+        for i, url in enumerate(variants)
+    }
+    assert len(candidate_ids) == 1
+
+
+# --- a burst of concurrent writers for the same candidate must all succeed, not
+# just avoid data corruption (Codex V1 finding F-1, 2026-09-17): the old retry
+# budget (5 tries, ~0.75s total) let normal contention exhaust retries and lose
+# observations outright, even though no row was ever corrupted or duplicated. ---
+
+
+def test_forty_concurrent_writes_of_the_same_candidate_all_succeed(tmp_path: Path) -> None:
+    db_path = _db(tmp_path)
+    errors: list[BaseException] = []
+
+    def _write(i: int) -> None:
+        try:
+            record_candidate_observation(db_path, _input(ingestion_id=f"burst-{i}"))
+        except BaseException as exc:  # noqa: BLE001 -- collected for the assertion below
+            errors.append(exc)
+
+    threads = [threading.Thread(target=_write, args=(i,)) for i in range(40)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert errors == []
+    connection = sqlite3.connect(db_path)
+    try:
+        candidate_count = connection.execute("select count(*) from hs_candidates").fetchone()[0]
+        observation_count = connection.execute(
+            "select count(*) from hs_candidate_observations"
+        ).fetchone()[0]
+    finally:
+        connection.close()
+    assert candidate_count == 1
+    assert observation_count == 40
 
 
 # --- distinct candidates must never be merged into one row ---

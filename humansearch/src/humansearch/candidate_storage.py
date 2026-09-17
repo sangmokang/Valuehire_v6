@@ -14,6 +14,7 @@ from __future__ import annotations
 import hmac as hmac_lib
 import re
 import sqlite3
+import threading
 import time
 import unicodedata
 from dataclasses import dataclass
@@ -37,8 +38,15 @@ _RFC3339: Final = re.compile(
 )
 _EMAIL: Final = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 _BUSY: Final = "SQLITE_BUSY"
-_MAX_RETRIES: Final = 5
-_RETRY_BACKOFF_SECONDS: Final = 0.05
+# A linear 5-try/0.05s budget (max ~0.75s total wait) let ordinary contention — not a
+# stuck lock — exhaust retries under a burst of concurrent writers for the same
+# candidate: an independent adversarial review (2026-09-17) reproduced ~10-30% failure
+# at 10-40 concurrent writers with no code change. Exponential backoff with a higher
+# cap absorbs realistic bursts while staying bounded (AC-10 still requires a hard
+# stop, not indefinite blocking) — worst case is ~6.5s across 10 tries.
+_MAX_RETRIES: Final = 10
+_RETRY_BACKOFF_BASE_SECONDS: Final = 0.05
+_RETRY_BACKOFF_CAP_SECONDS: Final = 1.0
 _KEY_DOMAIN: Final = b"hs-candidate-key-v2"
 _FIELD_SEPARATOR: Final = b"\x1f"
 
@@ -98,6 +106,29 @@ class _Validated:
     profile_url_normalized: str | None
 
 
+_WRITE_LOCK_REGISTRY_LOCK: Final = threading.Lock()
+_WRITE_LOCKS: dict[str, threading.Lock] = {}
+
+
+def _write_lock_for(db_path: Path) -> threading.Lock:
+    """One lock per DB path, shared by every in-process caller.
+
+    Without this, N threads all racing `begin immediate` on the same SQLite file
+    lose the SQLITE_BUSY lottery independently — an adversarial review (2026-09-17)
+    reproduced 10-30% failure at 10-40 concurrent writers this way, even with a
+    generous retry budget. Serializing writers in-process turns that thundering herd
+    into an orderly queue; the retry/backoff below still exists as a fallback for
+    genuine cross-process contention, which this lock cannot see.
+    """
+    key = str(db_path)
+    with _WRITE_LOCK_REGISTRY_LOCK:
+        lock = _WRITE_LOCKS.get(key)
+        if lock is None:
+            lock = threading.Lock()
+            _WRITE_LOCKS[key] = lock
+        return lock
+
+
 def record_candidate_observation(
     db_path: Path,
     record: CandidateObservationInput,
@@ -119,7 +150,8 @@ def record_candidate_observation(
     # bounded retry loop is the only place that waits.
     connection = sqlite3.connect(db_path, timeout=0.0, check_same_thread=False)
     try:
-        return _write_with_retry(connection, validated, hmac_key)
+        with _write_lock_for(db_path):
+            return _write_with_retry(connection, validated, hmac_key)
     finally:
         connection.close()
 
@@ -208,11 +240,23 @@ def _normalize_email(value: str) -> str:
     return _nfc_strip(value).lower()
 
 
+_WWW_PREFIX: Final = "www."
+# LinkedIn's public profile vanity slug is case-insensitive (linkedin.com/in/JohnDoe ==
+# .../johndoe) — verified by an independent adversarial review (2026-09-17) that the
+# original fix for tracking-param dedup missed this. Only fold path case for hosts we
+# know behave this way; other channels may embed case-sensitive identifiers in a URL
+# path, and folding those blindly would merge two different real candidates.
+_CASE_INSENSITIVE_PATH_HOSTS: Final = frozenset({"linkedin.com"})
+
+
 def _normalize_url(value: str) -> str:
     parts = urlsplit(_nfc_strip(value))
     scheme = parts.scheme.lower()
     netloc = parts.netloc.lower()
+    netloc = netloc.removeprefix(_WWW_PREFIX)
     path = parts.path.rstrip("/") or "/"
+    if netloc in _CASE_INSENSITIVE_PATH_HOSTS:
+        path = path.lower()
     return f"{scheme}://{netloc}{path}"
 
 
@@ -249,7 +293,8 @@ def _write_with_retry(
                 if error_name == _BUSY:
                     raise CandidateStorageRetryExhausted("db write lock wait exceeded") from None
                 raise
-            time.sleep(_RETRY_BACKOFF_SECONDS * (attempt + 1))
+            backoff = min(_RETRY_BACKOFF_BASE_SECONDS * (2**attempt), _RETRY_BACKOFF_CAP_SECONDS)
+            time.sleep(backoff)
             attempt += 1
 
 
