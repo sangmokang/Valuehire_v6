@@ -339,6 +339,62 @@ def test_forty_concurrent_writes_of_the_same_candidate_all_succeed(tmp_path: Pat
     assert observation_count == 40
 
 
+# --- a query-string identifier (e.g. saramin/jobkorea resume view links) must NOT be
+# stripped like a tracking param (Codex V1 re-verification finding, 2026-09-17): the
+# fix for F-2 normalized URLs by dropping the whole query string, which silently
+# merged two different real candidates into one row and discarded the second
+# person's identifying URL. ---
+
+
+def test_query_string_identifier_is_preserved_not_treated_as_tracking(tmp_path: Path) -> None:
+    db_path = _db(tmp_path)
+    first = record_candidate_observation(
+        db_path,
+        _input(
+            channel="saramin",
+            candidate_ref="https://www.saramin.co.kr/zf_user/resume/view?rec_idx=39825930",
+            ingestion_id="run-1",
+        ),
+    )
+    second = record_candidate_observation(
+        db_path,
+        _input(
+            channel="saramin",
+            candidate_ref="https://www.saramin.co.kr/zf_user/resume/view?rec_idx=51002211",
+            ingestion_id="run-2",
+        ),
+    )
+    assert first.candidate.candidate_id != second.candidate.candidate_id
+    assert second.outcome == "candidate_created"
+    assert (
+        second.candidate.candidate_ref_raw
+        == "https://www.saramin.co.kr/zf_user/resume/view?rec_idx=51002211"
+    )
+
+
+def test_known_tracking_params_are_still_stripped_alongside_a_real_identifier(
+    tmp_path: Path,
+) -> None:
+    db_path = _db(tmp_path)
+    first = record_candidate_observation(
+        db_path,
+        _input(
+            channel="saramin",
+            candidate_ref="https://www.saramin.co.kr/zf_user/resume/view?rec_idx=1&trk=email",
+            ingestion_id="run-1",
+        ),
+    )
+    second = record_candidate_observation(
+        db_path,
+        _input(
+            channel="saramin",
+            candidate_ref="https://www.saramin.co.kr/zf_user/resume/view?trk=push&rec_idx=1",
+            ingestion_id="run-2",
+        ),
+    )
+    assert first.candidate.candidate_id == second.candidate.candidate_id
+
+
 # --- distinct candidates must never be merged into one row ---
 
 

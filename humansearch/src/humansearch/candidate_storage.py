@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Final, Literal
-from urllib.parse import urlsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit
 
 Channel = Literal["saramin", "jobkorea", "linkedin_rps"]
 RecordOutcome = Literal["candidate_created", "observation_added", "duplicate_observation"]
@@ -120,7 +120,9 @@ def _write_lock_for(db_path: Path) -> threading.Lock:
     into an orderly queue; the retry/backoff below still exists as a fallback for
     genuine cross-process contention, which this lock cannot see.
     """
-    key = str(db_path)
+    # Resolve first — two differently-spelled paths to the same file (e.g. an
+    # unresolved ".." segment) must share one lock, not race through separate ones.
+    key = str(db_path.resolve())
     with _WRITE_LOCK_REGISTRY_LOCK:
         lock = _WRITE_LOCKS.get(key)
         if lock is None:
@@ -248,16 +250,38 @@ _WWW_PREFIX: Final = "www."
 # path, and folding those blindly would merge two different real candidates.
 _CASE_INSENSITIVE_PATH_HOSTS: Final = frozenset({"linkedin.com"})
 
+# Only drop query params known to be tracking noise, never the whole query string.
+# A first version dropped everything, which silently merged two different real
+# candidates whose channel (e.g. a saramin/jobkorea resume link) identifies them by
+# a query param such as ?rec_idx=... — reproduced by an independent adversarial
+# review (2026-09-17): two different rec_idx values collapsed into one candidate row
+# and the second person's identifying URL was discarded.
+_TRACKING_PARAM_NAMES: Final = frozenset({"trk", "ref", "refid", "fbclid", "gclid", "mc_cid", "mc_eid"})
+_TRACKING_PARAM_PREFIXES: Final = ("utm_",)
+
+
+def _is_tracking_param(name: str) -> bool:
+    lowered = name.lower()
+    return lowered in _TRACKING_PARAM_NAMES or lowered.startswith(_TRACKING_PARAM_PREFIXES)
+
+
+def _normalize_query(query: str) -> str:
+    if not query:
+        return ""
+    kept = sorted(pair for pair in parse_qsl(query, keep_blank_values=True) if not _is_tracking_param(pair[0]))
+    return urlencode(kept)
+
 
 def _normalize_url(value: str) -> str:
     parts = urlsplit(_nfc_strip(value))
     scheme = parts.scheme.lower()
-    netloc = parts.netloc.lower()
-    netloc = netloc.removeprefix(_WWW_PREFIX)
+    netloc = parts.netloc.lower().removeprefix(_WWW_PREFIX)
     path = parts.path.rstrip("/") or "/"
     if netloc in _CASE_INSENSITIVE_PATH_HOSTS:
         path = path.lower()
-    return f"{scheme}://{netloc}{path}"
+    query = _normalize_query(parts.query)
+    suffix = f"?{query}" if query else ""
+    return f"{scheme}://{netloc}{path}{suffix}"
 
 
 def _normalize_candidate_ref(value: str) -> str:
