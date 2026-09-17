@@ -60,7 +60,8 @@ pass() { checked=$((checked + 1)); passed="$passed$1 "; printf 'PASS: %s — %s\
 fail() { checked=$((checked + 1)); fails=$((fails + 1)); printf 'FAIL: %s — %s\n' "$1" "$2"; }
 blocked() { checked=$((checked + 1)); blocks=$((blocks + 1)); printf 'BLOCKED: %s — %s\n' "$1" "$2"; }
 SNAP_PID=""
-stop_sampler() { if [ -n "$SNAP_PID" ]; then kill "$SNAP_PID" 2>>"$S/sampler.err" || :; wait "$SNAP_PID" 2>>"$S/sampler.err" || :; SNAP_PID=""; fi; }
+stop_sampler() { # kill 이 아니라 정지 표식으로 끝낸다 — 죽인 표본기의 sleep 자식이 워크트리 cwd 를 쥔 고아로 남는다(2026-09-17 실측)
+  if [ -n "$SNAP_PID" ]; then : > "$S/sampler.stop"; wait "$SNAP_PID" 2>>"$S/sampler.err" || :; SNAP_PID=""; fi; }
 finish() {
   stop_sampler
   local required="$REQUIRED_FULL" n
@@ -152,8 +153,9 @@ check_proc_codex() {
     || blocked proc.codex "다른 codex 프로세스가 떠 있다(동시 편집 위험): $(printf '%s' "$hits" | head -3 | cut -c1-90 | tr '\n' ';')"
 }
 check_proc_cwd() {
-  local rc=0 rel self=0 other=0 others="" line pid cmd path
-  lsof -d cwd -Fpcn > "$S/lsof-cwd.txt" 2>"$S/lsof.err" || rc=$?
+  local rc=0 rel self=0 other=0 others="" pid cmd path lsof_pid
+  lsof -d cwd -Fpcn > "$S/lsof-cwd.txt" 2>"$S/lsof.err" & lsof_pid=$!   # lsof 는 ps 스냅샷 뒤에 태어나므로 pid 를 직접 받아 제외한다
+  wait "$lsof_pid" || rc=$?
   [ "$rc" -eq 0 ] && "$GREP" -q '^p' "$S/lsof-cwd.txt" || { blocked proc.cwd "lsof 조회 실패 rc=$rc 또는 p 줄 0"; return; }
   # 자기 셸·조상·자손(파이프라인 자식)은 제외한다. 계통은 ps 스냅샷으로 재구성한다.
   rel=$(awk -v me="$$" 'NR>1{pp[$1]=$2} END{r[me]=1; p=me; for(i=0;i<64&&(p in pp)&&pp[p]>1;i++){p=pp[p]; r[p]=1}
@@ -162,7 +164,7 @@ check_proc_cwd() {
     [ -n "$pid" ] || continue
     case "$path" in "$W"|"$W"/*) ;; *) continue ;; esac
     if [ "$pid" = "$$" ]; then self=1
-    elif printf '%s\n' "$rel" | "$GREP" -qx "$pid"; then :
+    elif [ "$pid" = "$lsof_pid" ] || printf '%s\n' "$rel" | "$GREP" -qx "$pid"; then :
     else other=$((other + 1)); others="$others $pid($cmd)"; fi
   done < <(awk '/^p/{pid=substr($0,2)} /^c/{cmd=substr($0,2)} /^n/{print pid "\t" cmd "\t" substr($0,2)}' "$S/lsof-cwd.txt")
   [ "$self" -eq 1 ] || { blocked proc.cwd "자기 셸(pid $$)이 lsof 에 안 보인다 — 검사가 살아 있지 않다"; return; }
@@ -184,7 +186,7 @@ check_shm_ledger() {
   awk '{print "  shm 사전 장부:", $0}' "$S/shm-pre.txt"
   if [ "$n" -ge 30 ]; then blocked shm.ledger "공유메모리 세그먼트 ${n}개 ≥ 30 — invoice 게이트가 shmget ENOSPC 로 죽는다. 정리는 사람 결정"
   else pass shm.ledger "사전 장부 ${n}개(ID OWNER CPID), 한도 30 미만"; fi
-  ( while sleep 1; do printf 'T %s\n' "$(date +%s)"; LC_ALL=C ps -axo pid=,ppid=,lstart=; done >> "$S/ps-snap.txt" ) 2>/dev/null &
+  ( while [ ! -e "$S/sampler.stop" ]; do printf 'T %s\n' "$(date +%s)"; LC_ALL=C ps -axo pid=,ppid=,lstart=; sleep 1; done >> "$S/ps-snap.txt" ) 2>>"$S/sampler.err" &
   SNAP_PID=$!
   : > "$S/sweep-pids.txt"
 }
