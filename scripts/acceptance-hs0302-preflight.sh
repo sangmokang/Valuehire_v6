@@ -2,7 +2,7 @@
 # acceptance-hs0302-preflight.sh — 마감 사전검사기가 실패 방향으로 닫혀 있는가 (HS-03.02 R6).
 #
 # 대상: scripts/verify/hs0302-closeout-preflight.sh (마감 프롬프트 0·2·5·7단계의 실행부).
-# 차단 — 아래 반례 33종을 원본 밖 임시 사본에서 돌려 전부 거부돼야 한다. 기대값은 "통과 아님" 이 아니라 정확한 판정·종료값이다.
+# 차단 — 아래 반례 35종을 원본 밖 임시 사본에서 돌려 전부 거부돼야 한다. 기대값은 "통과 아님" 이 아니라 정확한 판정·종료값이다.
 #   1 mktemp 실패 주입 → BLOCKED      2 git 조회 실패 주입 → BLOCKED (조회 실패는 대상 결함이 아니다)
 #   3 빈 스크립트 → 거부               4 exit 0 만 → 거부
 #   5 VERDICT: PASS 문구만 출력 → 거부  6 필수 검사 하나 삭제 → FAIL
@@ -26,6 +26,8 @@
 #   28 미커밋 변경 → FAIL(git.clean)   29 lsof 에 자기 셸 없음 → BLOCKED   30 공유메모리 30개 → BLOCKED   31 클론 venv 안에 원본 경로 → FAIL
 #   32 --help 뒤에 다른 인자(--help --bogus) → FAIL 이되 꼬리가 있어야 한다 (Codex V1 8회차: 도움말이 뒤 인자를 검사하지 않고 rc 0 으로 끝났다)
 #   33 값 자리에 다른 옵션(--worktree --help) → FAIL 이되 꼬리가 있어야 한다 (같은 회차: --help 를 경로 값으로 삼켜 BLOCKED 로 분류했다)
+#   34 값 자리에 짧은 옵션(--worktree -h) → FAIL (Codex V1 9회차: --* 만 거르면 -h 가 경로 값으로 들어갔다)
+#   35 사본 pyproject.toml 권한만 바뀜(0644→0755) → ac2.copy FAIL (Codex V1 9회차: 권한 대조가 src·tests 에만 있었다)
 #   기록만(시험 없음): M04 신호 트랩 제거(EXIT 트랩만으로도 정지·PASS 부재 성립 — 부분 등가), M12 -newer 제거(지문이 mtime 포함 — 거의 등가),
 #   M22 grep 자기검사, M25 클론에 .venv 사전 존재(합성 저장소에서 재현 불가).
 # 통과 — 손대지 않은 사본은 고정 환경(합성 저장소 + 대역 명령)에서 PASS 여야 한다.
@@ -183,6 +185,8 @@ IPCS
   # 반례 29: lsof 에 자기 셸이 없다(조회가 죽어 있음) / 반례 30: 공유메모리 세그먼트 30개
   printf '#!/usr/bin/env bash\nprintf "p1\\nclaunchd\\nf cwd\\nn/\\n"\n' > "$TMP/bin-noself/lsof"
   printf '#!/usr/bin/env bash\nprintf "IPC status\\nT     ID     KEY        MODE       OWNER    GROUP  CPID  LPID\\nShared Memory:\\n"; for i in $(seq 1 30); do printf "m %%d 0x0 --rw------- u g %%d 1 0 0 0 0 0 0 00:00:00 00:00:00 00:00:00\\n" "$((65536+i))" "$((1000+i))"; done\n' > "$TMP/bin-shm30/ipcs"
+  # 반례 35: 복제 뒤 사본 pyproject.toml 의 권한만 바꾼다(내용 동일)
+  mkdir -p "$TMP/bin-permcp" && printf '#!/usr/bin/env bash\n/bin/cp "$@" || exit $?\nfor a in "$@"; do case "$a" in */pyproject.toml) for d in "$@"; do :; done; chmod 755 "${@: -1}/pyproject.toml" 2>/dev/null ;; esac; done\nexit 0\n' > "$TMP/bin-permcp/cp"; chmod +x "$TMP/bin-permcp/cp"
   # 반례 25: 복제가 하드링크로 이뤄진다(실제 cp 뒤 사본 파일을 원본의 하드링크로 교체)
   cat > "$TMP/bin-hardcp/cp" <<'HCP'
 #!/usr/bin/env bash
@@ -302,8 +306,9 @@ run_case "반례12 옵션 값 누락 → FAIL(꼬리 있음)" FAIL "$TMP/pristin
 run_case "반례16 알 수 없는 인자 → FAIL(꼬리 있음)" FAIL "$TMP/pristine.sh" "" "$STUB_PATH" --bogus
 # 32 --help 뒤 다른 인자 → FAIL(꼬리 있음). 단독 --help 는 도움말(rc 0)이 맞다.
 run_case "반례32 --help 뒤 인자 → FAIL(꼬리 있음)" FAIL "$TMP/pristine.sh" "" "$STUB_PATH" --help --bogus
-# 33 값 자리에 다른 옵션 → FAIL(값 누락, 꼬리 있음)
+# 33 값 자리에 다른 옵션 → FAIL(값 누락, 꼬리 있음) / 34 짧은 옵션도 같다
 run_case "반례33 값 자리에 다른 옵션 → FAIL(꼬리 있음)" FAIL "$TMP/pristine.sh" "" "$STUB_PATH" --worktree --help
+run_case "반례34 값 자리에 짧은 옵션 → FAIL(꼬리 있음)" FAIL "$TMP/pristine.sh" "" "$STUB_PATH" --worktree -h
 # 19 프롬프트 커밋 조회 rc 0 + 빈 출력 → BLOCKED
 run_case "반례19 프롬프트 커밋 조회 빈 출력 → BLOCKED" BLOCKED "$TMP/pristine.sh" "" "$TMP/bin-emptylog:$STUB_PATH" "${FULL_ARGS[@]}"
 # 21 격리 클론의 git 객체가 원본과 하드링크면 --no-local 이 빠진 것이다(정상 세션 폴더로 확인)
@@ -319,6 +324,8 @@ run_case "반례31 클론 venv 안 원본 경로 → FAIL" FAIL "$TMP/pristine.s
 printf '*.local\n' >> "$WT/.git/info/exclude"; ln -s __init__.py "$WT/humansearch/src/humansearch/x.local"   # 커밋하지 않는다(커밋하면 git.prompt-tail 이 먼저 FAIL 한다)
 run_case "반례24 src 안 symlink → FAIL" FAIL "$TMP/pristine.sh" "" "$STUB_PATH" "${FULL_ARGS[@]}"
 rm -f "$WT/humansearch/src/humansearch/x.local"
+# 35 사본 pyproject.toml 권한만 변경 → FAIL(내용·권한 동일성 규칙)
+run_case "반례35 사본 pyproject 권한 변경 → FAIL" FAIL "$TMP/pristine.sh" "" "$TMP/bin-permcp:$STUB_PATH" "${FULL_ARGS[@]}"
 # 25 복제가 하드링크로 이뤄짐 → FAIL(사본 hardlink 0 규칙)
 run_case "반례25 복제가 하드링크 → FAIL" FAIL "$TMP/pristine.sh" "" "$TMP/bin-hardcp:$STUB_PATH" "${FULL_ARGS[@]}"
 # 27 존재하지 않는 --worktree → BLOCKED rc 2 (die_blocked 계약) / 29 lsof 에 자기 셸 없음 → BLOCKED / 30 공유메모리 30개 → BLOCKED
