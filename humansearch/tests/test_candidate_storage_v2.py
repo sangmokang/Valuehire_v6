@@ -198,7 +198,9 @@ def test_mid_transaction_failure_rolls_back_candidate_and_observation(
             raise sqlite3.OperationalError("simulated mid-transaction failure")
 
     def _connect_with_failing_commit(*args: object, **kwargs: object) -> sqlite3.Connection:
-        return real_connect(*args, **{**kwargs, "factory": _FailingCommitConnection})  # type: ignore[arg-type]
+        return real_connect(  # type: ignore[call-overload, no-any-return]
+            *args, **{**kwargs, "factory": _FailingCommitConnection}
+        )
 
     monkeypatch.setattr(sqlite3, "connect", _connect_with_failing_commit)
     with pytest.raises(sqlite3.OperationalError):
