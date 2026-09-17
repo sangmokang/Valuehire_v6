@@ -515,6 +515,54 @@ def test_unapproved_host_fragment_is_preserved_not_dropped_like_a_tracking_param
     )
 
 
+def test_unapproved_host_trailing_slash_is_preserved_not_stripped(tmp_path: Path) -> None:
+    """Codex V1 4th-round finding, 2026-09-17: the trailing-slash strip ran before
+    the approval check, so an unapproved host still lost a path difference that
+    could be a real identifier boundary."""
+    db_path = _db(tmp_path)
+    first = record_candidate_observation(
+        db_path,
+        _input(
+            channel="saramin",
+            candidate_ref="https://www.saramin.co.kr/zf_user/resume/view/applicant-1",
+            ingestion_id="run-1",
+        ),
+    )
+    second = record_candidate_observation(
+        db_path,
+        _input(
+            channel="saramin",
+            candidate_ref="https://www.saramin.co.kr/zf_user/resume/view/applicant-1/",
+            ingestion_id="run-2",
+        ),
+    )
+    assert first.candidate.candidate_id != second.candidate.candidate_id
+
+
+def test_unapproved_host_userinfo_case_is_preserved(tmp_path: Path) -> None:
+    """Codex V1 4th-round finding, 2026-09-17: lowercasing the whole netloc also
+    lowercased URL userinfo (before the @), which is not a DNS-aliasing fact and
+    could be a real identifier on a host we have not verified."""
+    db_path = _db(tmp_path)
+    first = record_candidate_observation(
+        db_path,
+        _input(
+            channel="saramin",
+            candidate_ref="https://Applicant-A@saramin.co.kr/x",
+            ingestion_id="run-1",
+        ),
+    )
+    second = record_candidate_observation(
+        db_path,
+        _input(
+            channel="saramin",
+            candidate_ref="https://applicant-a@saramin.co.kr/x",
+            ingestion_id="run-2",
+        ),
+    )
+    assert first.candidate.candidate_id != second.candidate.candidate_id
+
+
 # --- distinct candidates must never be merged into one row ---
 
 

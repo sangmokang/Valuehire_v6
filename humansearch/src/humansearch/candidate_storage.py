@@ -283,21 +283,30 @@ def _normalize_query(query: str) -> str:
     return urlencode(kept)
 
 
+def _normalized_netloc(netloc: str) -> str:
+    """Lowercase and www-strip only the host:port tail, never the userinfo (the
+    part before an '@', if any) — userinfo is not a DNS-aliasing fact and could be
+    a real per-candidate identifier on a host we have not verified (Codex V1
+    4th-round finding, 2026-09-17: 'Applicant-A@saramin.co.kr' and
+    'applicant-a@saramin.co.kr' must not collapse to the same value)."""
+    userinfo, sep, host_port = netloc.rpartition("@")
+    return f"{userinfo}{sep}{host_port.lower().removeprefix(_WWW_PREFIX)}"
+
+
 def _normalize_url(value: str) -> str:
     parts = urlsplit(_nfc_strip(value))
     scheme = parts.scheme.lower()
-    # www-stripping and scheme/host lowercasing are host-aliasing facts, not identity
-    # guesses — safe for every host, verified or not.
-    netloc = parts.netloc.lower().removeprefix(_WWW_PREFIX)
-    path = parts.path.rstrip("/") or "/"
+    netloc = _normalized_netloc(parts.netloc)
     if netloc not in _APPROVED_CANONICALIZATION_HOSTS:
-        # Same reasoning as the query string: an unverified host's fragment (#...)
-        # might carry a real per-candidate identifier (e.g. fragment-based client
-        # routing) — leave it untouched rather than silently dropping it.
+        # Unverified host: touch only scheme case and the netloc normalization
+        # above — never the path (including a trailing slash), query, or fragment.
+        # Any of those might be a real per-candidate identifier on a host we
+        # haven't verified (Codex V1 4th-round finding, 2026-09-17: the trailing
+        # slash was being stripped here before this check ever ran).
         query_suffix = f"?{parts.query}" if parts.query else ""
         fragment_suffix = f"#{parts.fragment}" if parts.fragment else ""
-        return f"{scheme}://{netloc}{path}{query_suffix}{fragment_suffix}"
-    path = path.lower()
+        return f"{scheme}://{netloc}{parts.path}{query_suffix}{fragment_suffix}"
+    path = (parts.path.rstrip("/") or "/").lower()
     query = _normalize_query(parts.query)
     suffix = f"?{query}" if query else ""
     return f"{scheme}://{netloc}{path}{suffix}"
