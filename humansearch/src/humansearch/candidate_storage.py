@@ -284,13 +284,17 @@ def _normalize_query(query: str) -> str:
 
 
 def _normalized_netloc(netloc: str) -> str:
-    """Lowercase and www-strip only the host:port tail, never the userinfo (the
-    part before an '@', if any) — userinfo is not a DNS-aliasing fact and could be
-    a real per-candidate identifier on a host we have not verified (Codex V1
-    4th-round finding, 2026-09-17: 'Applicant-A@saramin.co.kr' and
-    'applicant-a@saramin.co.kr' must not collapse to the same value)."""
+    """Lowercase and www-strip only the hostname — never the userinfo (before an
+    '@', if any) or whatever follows a ':' (normally a numeric port, but
+    ``urlsplit`` never validates that — Codex V1 5th-round finding, 2026-09-17:
+    a non-numeric "port" position, e.g. from a malformed URL, was getting
+    case-folded like a real hostname). Userinfo and the post-colon tail are not
+    DNS-aliasing facts and could be real per-candidate identifiers on a host we
+    have not verified."""
     userinfo, sep, host_port = netloc.rpartition("@")
-    return f"{userinfo}{sep}{host_port.lower().removeprefix(_WWW_PREFIX)}"
+    host, colon, port = host_port.partition(":")
+    normalized_host = host.lower().removeprefix(_WWW_PREFIX)
+    return f"{userinfo}{sep}{normalized_host}{colon}{port}"
 
 
 def _normalize_url(value: str) -> str:

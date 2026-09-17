@@ -563,6 +563,31 @@ def test_unapproved_host_userinfo_case_is_preserved(tmp_path: Path) -> None:
     assert first.candidate.candidate_id != second.candidate.candidate_id
 
 
+def test_unapproved_host_non_numeric_port_position_case_is_preserved(tmp_path: Path) -> None:
+    """Codex V1 5th-round finding, 2026-09-17: `_normalized_netloc` lowercased the
+    entire host:port tail, including whatever follows a ':' — even non-numeric text
+    (urlsplit does not validate that a "port" is actually numeric). A malformed URL
+    using that position to carry an identifier must not have it case-folded."""
+    db_path = _db(tmp_path)
+    first = record_candidate_observation(
+        db_path,
+        _input(
+            channel="saramin",
+            candidate_ref="https://unapproved.invalid:Applicant-A/candidate",
+            ingestion_id="run-1",
+        ),
+    )
+    second = record_candidate_observation(
+        db_path,
+        _input(
+            channel="saramin",
+            candidate_ref="https://unapproved.invalid:applicant-a/candidate",
+            ingestion_id="run-2",
+        ),
+    )
+    assert first.candidate.candidate_id != second.candidate.candidate_id
+
+
 # --- distinct candidates must never be merged into one row ---
 
 
