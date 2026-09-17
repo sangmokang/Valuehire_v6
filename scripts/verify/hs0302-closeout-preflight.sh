@@ -15,7 +15,8 @@
 #   PASS 는 필수 검사 이름마다 `PASS: <이름>` 이 남아야만 난다(CHECKED 는 보고용 숫자일 뿐이다).
 #   FAIL = 대상이 틀렸다. BLOCKED = 검증 환경을 못 만들었다(mktemp 실패·경로 미존재·조회 실패·동시 편집).
 # 한계: ipcs 헤더 `T `·stat/date 의 BSD 형식은 macOS 기준이다(GNU 는 대체 형식으로 시도). 검사기 자신의
-#   문법·판정 논리는 scripts/acceptance-hs0302-preflight.sh 가 반례 16종으로 공격한다.
+#   문법·판정 논리는 scripts/acceptance-hs0302-preflight.sh 가 반례 18종으로 공격한다.
+#   --check-v1 은 "클론 환경이 그대로인가" 를 증명하지 판정이 그 클론에서 나왔는지는 증명하지 못한다(자기 신고) — 2026-09-17 codeaudit B5.
 set -euo pipefail
 
 if [ "${HS0302_PREFLIGHT_DEPTH:-0}" -gt 0 ]; then
@@ -102,6 +103,9 @@ S=$(mktemp -d 2>/dev/null) || { echo "BLOCKED: session.mktemp — 임시 폴더�
 [ -d "$W" ] || die_blocked "worktree.path" "경로가 없다: $W"
 W=$(physdir "$W") || die_blocked "worktree.path" "실경로를 얻지 못했다: $W"
 cd -- "$W" || die_blocked "worktree.path" "이동 실패: $W"
+# 강제 종료(메모리 부족·kill)에도 표본기를 남기지 않고, 신호로 끊긴 실행은 PASS 를 찍지 못한다(codeaudit B2 + 반례 18 실측: 트랩이 정지만 하면 실행이 이어져 PASS 까지 찍혔다)
+on_signal() { stop_sampler; printf 'CHECKED: %d\n' "$checked"; echo "VERDICT: BLOCKED"; exit 2; }
+trap on_signal INT TERM; trap stop_sampler EXIT
 printf 'SESSION_DIR=%s\nWORKTREE=%s\nMODE=%s\n' "$S" "$W" "$MODE"
 
 # ── a. git 상태 ──────────────────────────────────────────────────────────────
@@ -244,7 +248,7 @@ check_ac2_copy() {
   local cd0 st0 st1 venv0 venv1 loaded rc=0 n
   [ -d "$W/humansearch/.venv" ] || { blocked ac2.copy "원본 $W/humansearch/.venv 가 없다(3단계 pytest 를 먼저 돌려야 한다)"; return; }
   gitq st0 status --porcelain || { blocked ac2.copy "git status 실패"; return; }
-  venv0=$(fp_stat "$W/humansearch/.venv")
+  venv0=$(fp_full "$W/humansearch/.venv")   # 원본 venv 도 링크 대상까지 — 파일 전용 지문은 bin/python 링크 교체를 못 본다(codeaudit B1)
   cd0=$(mktemp -d "$S/ac2-copy.XXXXXX" 2>/dev/null) || { blocked ac2.copy "사본 mktemp 실패"; return; }
   printf 'AC2_COPY=%s\n' "$cd0"
   cp "$W/humansearch/pyproject.toml" "$cd0/" && cp -R "$W/humansearch/src" "$W/humansearch/tests" "$cd0/" || { blocked ac2.copy "복제 실패"; return; }
@@ -264,7 +268,7 @@ check_ac2_copy() {
   [ "$rc" -eq 0 ] || { blocked ac2.copy "사본 모듈 로드 실행 실패 rc=$rc: $(head -1 "$S/ac2-load.log")"; return; }
   case "$loaded" in "$(physdir "$cd0")"/*) ;; *) fail ac2.copy "사본이 아니라 다른 경로의 모듈이 실행됐다: $loaded"; return ;; esac
   n=$(find "$W/humansearch/.venv" -newer "$cd0/pyproject.toml" | wc -l | tr -d ' ')
-  venv1=$(fp_stat "$W/humansearch/.venv"); gitq st1 status --porcelain || { blocked ac2.copy "git status 실패(사후)"; return; }
+  venv1=$(fp_full "$W/humansearch/.venv"); gitq st1 status --porcelain || { blocked ac2.copy "git status 실패(사후)"; return; }
   [ "$n" = 0 ] && [ "$venv0" = "$venv1" ] || { fail ac2.copy "원본 .venv 가 바뀌었다(newer ${n}개, 지문 전후 $([ "$venv0" = "$venv1" ] && echo 동일 || echo 상이))"; return; }
   [ "$st0" = "$st1" ] && pass ac2.copy "사본 $cd0 동일·링크 0·모듈 realpath 사본 안·원본 .venv 지문 불변·git status 불변" || fail ac2.copy "git status 가 전후 다르다"
 }

@@ -2,7 +2,7 @@
 # acceptance-hs0302-preflight.sh — 마감 사전검사기가 실패 방향으로 닫혀 있는가 (HS-03.02 R6).
 #
 # 대상: scripts/verify/hs0302-closeout-preflight.sh (마감 프롬프트 0·2·5·7단계의 실행부).
-# 차단 — 아래 반례 16종을 원본 밖 임시 사본에서 돌려 전부 거부돼야 한다. 기대값은 "통과 아님" 이 아니라 정확한 판정·종료값이다.
+# 차단 — 아래 반례 18종을 원본 밖 임시 사본에서 돌려 전부 거부돼야 한다. 기대값은 "통과 아님" 이 아니라 정확한 판정·종료값이다.
 #   1 mktemp 실패 주입 → BLOCKED      2 git 조회 실패 주입 → BLOCKED (조회 실패는 대상 결함이 아니다)
 #   3 빈 스크립트 → 거부               4 exit 0 만 → 거부
 #   5 VERDICT: PASS 문구만 출력 → 거부  6 필수 검사 하나 삭제 → FAIL
@@ -16,6 +16,8 @@
 #   13 프롬프트 커밋 조회 출력이 SHA 가 아님 → BLOCKED   14 --check-v1 의 HEAD 조회 출력이 SHA 가 아님 → BLOCKED
 #   15 V1 뒤 클론 venv 의 심볼릭 링크 대상만 바뀜 → --check-v1 FAIL (파일 전용 지문은 이것을 "동일" 로 봤다)
 #   16 알 수 없는 인자(--bogus) → FAIL 이되 꼬리가 있어야 한다 (Codex V1 4회차: 이 분기의 꼬리를 지워도 시험이 초록이었다)
+#   17 c 단계 도중 원본 venv 의 bin/python 링크 대상을 바꾸고 시각을 복원 → ac2.copy FAIL (codeaudit B1: 파일 전용 지문은 "불변" 으로 봤다)
+#   18 d 단계 도중 SIGTERM → 표본기(ps 스냅샷)가 3초 안에 멈춰야 한다 (codeaudit B2: trap 이 없으면 고아가 워크트리 cwd 를 쥐고 영구 BLOCKED)
 # 통과 — 손대지 않은 사본은 고정 환경(합성 저장소 + 대역 명령)에서 PASS 여야 한다.
 #   대역(uv·ps·lsof·ipcs)은 검사기의 판정 논리를 재기 위한 것이다. 실제 환경 실행은
 #   마감 세션이 같은 검사기를 실제 워크트리에서 돌리는 것으로 증명한다(여기서 대신하지 않는다).
@@ -95,6 +97,7 @@ build_fixture() {
   git -C "$WT" commit -q -am prompt || return 1
   # 원본 워크트리의 .venv 대역(git 이 무시하는 경로) — AC-2 의 불변 확인 대상
   mkdir -p "$WT/humansearch/.venv/bin" "$WT/humansearch/.venv/lib/python3.14/site-packages" || return 1
+  ln -s ../lib/python3.14 "$WT/humansearch/.venv/bin/python"
   printf '#!/bin/sh\nexec python "$@"\n' > "$WT/humansearch/.venv/bin/pytest"
   printf '%s/humansearch/src\n' "$WT" > "$WT/humansearch/.venv/lib/python3.14/site-packages/humansearch.pth"
   printf 'import _virtualenv\n' > "$WT/humansearch/.venv/lib/python3.14/site-packages/_virtualenv.pth"
@@ -160,7 +163,17 @@ IPCS
   # 반례 13·14: 프롬프트 커밋 조회(log -1 --format=%H) / HEAD 조회(rev-parse HEAD)만 rc 0 + NOT_A_SHA
   printf '#!/usr/bin/env bash\ncase "$*" in *"log -1 --format=%%H"*) echo NOT_A_SHA; exit 0 ;; esac\nexec %s "$@"\n' "$REAL_GIT" > "$TMP/bin-notsha-log/git"
   printf '#!/usr/bin/env bash\ncase "$*" in *"rev-parse HEAD"*) echo NOT_A_SHA; exit 0 ;; esac\nexec %s "$@"\n' "$REAL_GIT" > "$TMP/bin-notsha-head/git"
-  chmod +x "$STUB"/* "$TMP/bin-badmktemp/mktemp" "$TMP/bin-badgit/git" "$TMP/bin-notsha/git" "$TMP/bin-notsha-log/git" "$TMP/bin-notsha-head/git"
+  # 반례 17: c 단계의 uv run(모듈 로드) 사이에 원본 venv 링크 대상을 바꾸고 링크·부모 폴더 시각을 복원(-newer 검사를 피하는 공격 형태)
+  mkdir -p "$TMP/bin-venvswap" && cat > "$TMP/bin-venvswap/uv" <<'SWAP'
+#!/usr/bin/env bash
+w=""; prev=""; for a in "$@"; do [ "$prev" = "--project" ] && w="$a"; prev="$a"; done
+case " $* " in *" python "*) if [ -n "$w" ] && [ -L "$w/.venv/bin/python" ]; then
+  ln -sfn ../lib "$w/.venv/bin/python"; touch -h -r "$w/pyproject.toml" "$w/.venv/bin/python"; touch -r "$w/pyproject.toml" "$w/.venv/bin"; fi ;; esac
+exec "$(dirname "$0")/../bin/uv" "$@"
+SWAP
+  # 반례 18: d 단계의 uv run pytest 를 6초 늦춰 SIGTERM 을 보낼 창을 만든다
+  mkdir -p "$TMP/bin-slow" && printf '#!/usr/bin/env bash\ncase " $* " in *" pytest "*) sleep 6 ;; esac\nexec "$(dirname "$0")/../bin/uv" "$@"\n' > "$TMP/bin-slow/uv"
+  chmod +x "$STUB"/* "$TMP/bin-badmktemp/mktemp" "$TMP/bin-badgit/git" "$TMP/bin-notsha/git" "$TMP/bin-notsha-log/git" "$TMP/bin-notsha-head/git" "$TMP/bin-venvswap/uv" "$TMP/bin-slow/uv"
 }
 
 if build_fixture && build_stubs; then record 0 "고정 환경 준비" "합성 저장소 $WT, 대역 uv·ps·lsof·ipcs"
@@ -256,6 +269,21 @@ run_case "반례11 프롬프트 경로 미존재 → BLOCKED" BLOCKED "$TMP/pris
 run_case "반례12 옵션 값 누락 → FAIL(꼬리 있음)" FAIL "$TMP/pristine.sh" "" "$STUB_PATH" --worktree
 # 16 알 수 없는 인자 → FAIL 이되 꼬리(CHECKED·VERDICT)가 있어야 한다
 run_case "반례16 알 수 없는 인자 → FAIL(꼬리 있음)" FAIL "$TMP/pristine.sh" "" "$STUB_PATH" --bogus
+# 17 c 단계 도중 원본 venv 링크 교체(시각 복원) → FAIL
+run_case "반례17 원본 venv 링크 교체 → FAIL" FAIL "$TMP/pristine.sh" "" "$TMP/bin-venvswap:$STUB_PATH" "${FULL_ARGS[@]}"
+if [ "$(readlink "$WT/humansearch/.venv/bin/python")" = "../lib" ]; then ln -sfn ../lib/python3.14 "$WT/humansearch/.venv/bin/python"; fi
+# 18 d 단계 도중 SIGTERM → 표본기가 멈춰야 한다(고아가 남으면 다음 실행이 영구 BLOCKED)
+sig_out="$TMP/out-sigterm.txt"; (cd "$TMP" && PATH="$TMP/bin-slow:$STUB_PATH" exec bash "$TMP/pristine.sh" "${FULL_ARGS[@]}") > "$sig_out" 2>&1 & sig_pid=$!
+for _ in $(seq 1 100); do "$GREP" -q '^PASS: ac2.copy' "$sig_out" 2>/dev/null && break; sleep 0.1; done
+sig_s=$(sed -n 's/^SESSION_DIR=//p' "$sig_out" | tail -1); printf '%s\n' "$sig_s" >> "$SESSIONS"
+kill -TERM "$sig_pid" 2>>"$TMP/sig.err"; wait "$sig_pid" 2>>"$TMP/sig.err"; sleep 3
+size1=$(wc -c < "$sig_s/ps-snap.txt" 2>>"$TMP/sig.err" | tr -d ' '); sleep 2.5; size2=$(wc -c < "$sig_s/ps-snap.txt" 2>>"$TMP/sig.err" | tr -d ' ')
+if [ -n "$sig_s" ] && [ -f "$sig_s/ps-snap.txt" ] && [ "$size1" = "$size2" ] && ! "$GREP" -q '^VERDICT: PASS' "$sig_out"; then
+  record 0 "반례18 SIGTERM 뒤 표본기 정지" "ps-snap ${size1}B 로 정지(2.5초 불변), 판정 PASS 없음"
+else
+  record 1 "반례18 SIGTERM 뒤 표본기 정지" "ps-snap ${size1:-없음}→${size2:-없음}B (계속 자라면 고아), 세션 ${sig_s:-없음}"
+  lsof -t "$sig_s/ps-snap.txt" 2>>"$TMP/sig.err" | xargs kill 2>>"$TMP/sig.err"
+fi
 # 13 프롬프트 커밋 조회 출력이 SHA 가 아님 → BLOCKED (기준 조회만 막고 다른 조회를 두면 같은 오염이 FAIL 로 갈린다)
 run_case "반례13 프롬프트 커밋 조회 비SHA → BLOCKED" BLOCKED "$TMP/pristine.sh" "" "$TMP/bin-notsha-log:$STUB_PATH" "${FULL_ARGS[@]}"
 

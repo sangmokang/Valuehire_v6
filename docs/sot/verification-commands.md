@@ -17,7 +17,7 @@
 
 ### CI(`​.github/workflows/verify.yml`)가 실제로 돌리는 것
 
-**워크플로 스텝 28개 전부**를 적는다(2026-08-12 V1 D6: 이전 판은 `bash ...` 직접 명령만 적어 인라인 본문 스텝이 목록에서 빠졌고, 운영자가 실제로 무엇이 도는지 잘못 판단할 수 있었다). 아래는 `verify.yml` 의 `- name:` 스텝 순서 그대로다.
+**워크플로 스텝 29개 전부**를 적는다(2026-08-12 V1 D6: 이전 판은 `bash ...` 직접 명령만 적어 인라인 본문 스텝이 목록에서 빠졌고, 운영자가 실제로 무엇이 도는지 잘못 판단할 수 있었다). 아래는 `verify.yml` 의 `- name:` 스텝을 모두 담되 번호는 명부 순서다(CI 실행 순서와 1:1 이 아니다 — 2026-09-17 codeaudit B3, 인라인 본문 스텝 "PostgreSQL 서버 준비" 가 빠져 있던 것을 24a 로 추가).
 
 | # | 스텝 이름 | 실행 내용 |
 |---|---|---|
@@ -45,10 +45,11 @@
 | 22 | 인수 검사 ci-step-integrity | `bash scripts/acceptance-ci-step-integrity.sh` — 조건부·오류무시·echo 대체 차단 및 main 실행별 그룹·이벤트/ref 분리·30분 상한 회귀 24건 |
 | 23 | 인수 검사 semantic-mutations | `bash scripts/acceptance-semantic-mutations.sh` — 인수 검사 무력화 5종 전량 차단 |
 | 24 | 인수 검사 verify-ac-m | `bash scripts/acceptance-verify-ac-m.sh` — mechanism 명부 대조 (AC-M) |
+| 24a | PostgreSQL 서버 준비 | `run: \|` 인라인 — 러너에 initdb·pg_ctl 이 없으면 apt 로 설치(Invoice 런타임 검사용, 판정 없음) |
 | 25 | 인수 검사 invoice | `bash scripts/acceptance-invoice.sh` — 채용 수수료 계산·기한·계약 변조·Codex/Claude 스킬 동등성 |
 | 26 | Invoice 독립 런타임 게이트 | 게이트 배선 검사 + Python 단위시험 직접 실행 + 임시 PostgreSQL에서 마이그레이션·수수료 동시성·저장/전달 RPC 검증 |
 | 27 | 인수 검사 hs-0302 | `bash scripts/acceptance-hs-0302.sh` — 후보 식별키 HMAC 의미(구분자 주입 충돌·길이 접두 계약·제어문자 거부) 실행 판정, 키/DB 경로 경계, #97 마이그레이션 무변경, 시험 수집 건수 정확 대조, 자기 fail-closed 음성 대조군 2종, CI 스텝 run 정확 대조(scripts/verify/check-hs-0302-ci-wiring.rb), 필수 node-id 명부 137건과 pytest 수집의 정확 대조(누락·추가 0), 제품 방어 13곳 약화 변이 검출(승인 장부·열린 fd·hard link·경로+fd·pragma 경로·sidecar hard link, 그리고 V2 2026-09-16 생존분 7곳: commit 전 inode 단독·DB 위치 닫힌 변환·길이 상한·키 regular·sidecar regular·BUSY 아닌 begin·잠금 뒤 조회 닫힌 변환). 시험·명부·상수를 한 PR 에서 함께 낮추는 동반 약화는 이 검사가 막지 못하며 P13① `weakens-check` 라벨·오너 검토가 담당한다 |
-| 28 | 인수 검사 hs0302-preflight | `bash scripts/acceptance-hs0302-preflight.sh` — 마감 사전검사기(scripts/verify/hs0302-closeout-preflight.sh: git 상태·동시 편집/공유메모리 보고·변이 사본 AC-2·격리 클론 AC-3·`--check-v1` V1 증거)가 실패 방향으로 닫혀 있는가. 원본 밖 사본에서 반례 16종(mktemp 실패·git 조회 실패 주입, 빈 스크립트·exit 0·VERDICT 문구만, 필수 검사 삭제, 자기 재호출, V1 rc 파일 없음·SHA 불일치, 기준 조회 출력 비SHA·프롬프트 경로 미존재·옵션 값 누락, 프롬프트 커밋 조회 비SHA·V1 HEAD 조회 비SHA·V1 뒤 venv 심볼릭 링크 대상 변경, 알 수 없는 인자 — 뒤 7종은 2026-09-17 Codex V1 1·2·4회차가 실제로 뚫은 경로의 회귀 봉인; 기대값은 정확한 판정·종료값) 전부 거부 + 정상 사본(합성 저장소·대역 uv·ps·lsof·ipcs) PASS, 검사기 600줄 이하, 전후 git status 불변. 대역은 판정 논리만 재므로 실제 환경 실행(마감 세션의 `bash scripts/verify/hs0302-closeout-preflight.sh`)을 대신하지 않는다 |
+| 28 | 인수 검사 hs0302-preflight | `bash scripts/acceptance-hs0302-preflight.sh` — 마감 사전검사기(scripts/verify/hs0302-closeout-preflight.sh: git 상태·동시 편집/공유메모리 보고·변이 사본 AC-2·격리 클론 AC-3·`--check-v1` V1 증거)가 실패 방향으로 닫혀 있는가. 원본 밖 사본에서 반례 18종(mktemp 실패·git 조회 실패 주입, 빈 스크립트·exit 0·VERDICT 문구만, 필수 검사 삭제, 자기 재호출, V1 rc 파일 없음·SHA 불일치, 기준 조회 출력 비SHA·프롬프트 경로 미존재·옵션 값 누락, 프롬프트 커밋 조회 비SHA·V1 HEAD 조회 비SHA·V1 뒤 venv 심볼릭 링크 대상 변경, 알 수 없는 인자, c 단계 중 원본 venv 링크 교체(시각 복원), d 단계 중 강제 종료 뒤 표본기 정지 — 뒤 9종은 2026-09-17 Codex V1 1·2·4회차와 codeaudit 이 실제로 뚫은 경로의 회귀 봉인; 기대값은 정확한 판정·종료값) 전부 거부 + 정상 사본(합성 저장소·대역 uv·ps·lsof·ipcs) PASS, 검사기 600줄 이하, 전후 git status 불변. 대역은 판정 논리만 재므로 실제 환경 실행(마감 세션의 `bash scripts/verify/hs0302-closeout-preflight.sh`)을 대신하지 않는다 |
 
 *(1번 앞에 `actions/checkout` 이 있고 `fetch-depth: 0` 이다 — 8번이 과거 blob 을 열려면 필요하다.)*
 
