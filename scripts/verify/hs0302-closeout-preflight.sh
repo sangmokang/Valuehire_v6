@@ -37,15 +37,16 @@ usage() {
       hs0302-closeout-preflight.sh --check-v1 <SHA> --session <S> [--worktree DIR] [--evidence-dir DIR]
 USAGE
 }
+need() { [ $# -ge 2 ] || { echo "FAIL: 인자 $1 의 값이 없다"; usage; echo "CHECKED: 0"; echo "VERDICT: FAIL"; exit 1; }; }
 while [ $# -gt 0 ]; do
   case "$1" in
-    --worktree) W="$2"; shift 2 ;;
-    --branch) BRANCH="$2"; shift 2 ;;
-    --base) BASE="$2"; shift 2 ;;
-    --prompt) PROMPT="$2"; shift 2 ;;
-    --check-v1) MODE=v1; V1_SHA="$2"; shift 2 ;;
-    --session) SESSION="$2"; shift 2 ;;
-    --evidence-dir) EVIDENCE="$2"; shift 2 ;;
+    --worktree) need "$@"; W="$2"; shift 2 ;;
+    --branch) need "$@"; BRANCH="$2"; shift 2 ;;
+    --base) need "$@"; BASE="$2"; shift 2 ;;
+    --prompt) need "$@"; PROMPT="$2"; shift 2 ;;
+    --check-v1) need "$@"; MODE=v1; V1_SHA="$2"; shift 2 ;;
+    --session) need "$@"; SESSION="$2"; shift 2 ;;
+    --evidence-dir) need "$@"; EVIDENCE="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "FAIL: 알 수 없는 인자 $1"; usage; echo "CHECKED: 0"; echo "VERDICT: FAIL"; exit 1 ;;
   esac
@@ -122,6 +123,7 @@ check_git_clean() {
 check_git_base_ancestor() {
   local x rc=0
   gitq x rev-parse --verify "$BASE^{commit}" || { blocked git.base-ancestor "기준 브랜치 조회 실패 $BASE: $(head -1 "$S/git.err")"; return; }
+  is_sha "$x" || { blocked git.base-ancestor "기준 조회 출력이 SHA 가 아니다: '$x' (조회 계층 오염)"; return; }
   git -C "$W" merge-base --is-ancestor "$BASE" HEAD 2>"$S/git.err" || rc=$?
   case "$rc" in
     0) pass git.base-ancestor "$BASE($x) 은 HEAD 의 조상" ;;
@@ -134,6 +136,7 @@ check_git_prompt_tail() {
   gitq head rev-parse HEAD || { blocked git.prompt-tail "HEAD 조회 실패"; return; }
   is_sha "$head" || { blocked git.prompt-tail "HEAD 가 SHA 가 아니다: '$head'"; return; }
   HEAD_SHA="$head"
+  [ -f "$W/$PROMPT" ] || { blocked git.prompt-tail "프롬프트 경로가 없다(검증 입력 부재): $PROMPT"; return; }
   gitq p log -1 --format=%H -- "$PROMPT" || { blocked git.prompt-tail "프롬프트 커밋 조회 실패: $(head -1 "$S/git.err")"; return; }
   is_sha "$p" || { fail git.prompt-tail "프롬프트 파일의 커밋이 없다(빈 SHA): $PROMPT"; return; }
   gitq diff diff --name-only "$p..HEAD" || { blocked git.prompt-tail "diff 조회 실패: $(head -1 "$S/git.err")"; return; }
