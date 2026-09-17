@@ -16,7 +16,7 @@
 #   FAIL = 대상이 틀렸다. BLOCKED = 검증 환경을 못 만들었다(mktemp 실패·경로 미존재·조회 실패·동시 편집).
 # 한계: 공유메모리 조회(ipcs)는 macOS 형식(`T ` 헤더·`m` 행) 전용이며 GNU util-linux 형식에서는 shm.ledger 가 BLOCKED 로 끝난다 —
 #   리눅스에서 실제 마감 실행은 불가하고, CI 의 인수 시험은 macOS 모양 대역으로 판정 논리만 잰다(Codex 적대 리뷰 D3). stat/date 는 GNU 대체 형식. 검사기 자신의
-#   문법·판정 논리는 scripts/acceptance-hs0302-preflight.sh 가 반례 31종으로 공격한다.
+#   문법·판정 논리는 scripts/acceptance-hs0302-preflight.sh 가 반례 33종으로 공격한다.
 #   --check-v1 은 "클론 환경이 그대로인가" 를 증명하지 판정이 그 클론에서 나왔는지는 증명하지 못한다(자기 신고) — 2026-09-17 codeaudit B5.
 set -euo pipefail
 
@@ -39,7 +39,7 @@ usage() {
       hs0302-closeout-preflight.sh --check-v1 <SHA> --session <S> [--worktree DIR] [--evidence-dir DIR]
 USAGE
 }
-need() { [ $# -ge 2 ] || { echo "FAIL: 인자 $1 의 값이 없다"; usage; echo "CHECKED: 0"; echo "VERDICT: FAIL"; exit 1; }; }
+need() { [ $# -ge 2 ] && case "$2" in --*) false ;; *) true ;; esac || { echo "FAIL: 인자 $1 의 값이 없다(다음 토큰: ${2:-<없음>})"; usage; echo "CHECKED: 0"; echo "VERDICT: FAIL"; exit 1; }; }   # 값 자리에 다른 --옵션이 오면 값 누락(Codex V1 8회차)
 while [ $# -gt 0 ]; do
   case "$1" in
     --worktree) need "$@"; W="$2"; shift 2 ;;
@@ -49,7 +49,7 @@ while [ $# -gt 0 ]; do
     --check-v1) need "$@"; MODE=v1; V1_SHA="$2"; shift 2 ;;
     --session) need "$@"; SESSION="$2"; shift 2 ;;
     --evidence-dir) need "$@"; EVIDENCE="$2"; shift 2 ;;
-    -h|--help) usage; exit 0 ;;
+    -h|--help) [ $# -eq 1 ] || { echo "FAIL: --help 는 단독으로만 쓴다(뒤에 붙은 인자: ${*:2})"; usage; echo "CHECKED: 0"; echo "VERDICT: FAIL"; exit 1; }; usage; exit 0 ;;   # Codex V1 8회차: --help 뒤 잘못된 인자가 rc 0·꼬리 없이 끝났다
     *) echo "FAIL: 알 수 없는 인자 $1"; usage; echo "CHECKED: 0"; echo "VERDICT: FAIL"; exit 1 ;;
   esac
 done
