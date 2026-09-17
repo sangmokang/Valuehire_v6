@@ -255,7 +255,13 @@ _CASE_INSENSITIVE_PATH_HOSTS: Final = frozenset({"linkedin.com"})
 # candidates whose channel (e.g. a saramin/jobkorea resume link) identifies them by
 # a query param such as ?rec_idx=... — reproduced by an independent adversarial
 # review (2026-09-17): two different rec_idx values collapsed into one candidate row
-# and the second person's identifying URL was discarded.
+# and the second person's identifying URL was discarded. This trades one risk for a
+# smaller one (Codex V1 3rd-round review, 2026-09-17): a tracker name not on this
+# list can still leave the same real candidate split into two rows (recoverable —
+# both raw URLs survive), which is preferred over silently merging two different
+# people (unrecoverable — one person's raw value is lost). Before adding a new
+# channel, check that none of these names collide with that channel's real
+# per-candidate identifier — a collision would reintroduce the same-row-merge bug.
 _TRACKING_PARAM_NAMES: Final = frozenset({"trk", "ref", "refid", "fbclid", "gclid", "mc_cid", "mc_eid"})
 _TRACKING_PARAM_PREFIXES: Final = ("utm_",)
 

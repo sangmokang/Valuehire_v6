@@ -395,6 +395,30 @@ def test_known_tracking_params_are_still_stripped_alongside_a_real_identifier(
     assert first.candidate.candidate_id == second.candidate.candidate_id
 
 
+def test_non_tracking_param_order_does_not_affect_dedup(tmp_path: Path) -> None:
+    """Codex V1 3rd-round finding: the previous tracking-param test left only one
+    non-tracking key after filtering, so a broken `sorted()` in `_normalize_query`
+    would not have failed it. This uses two non-tracking keys in reversed order."""
+    db_path = _db(tmp_path)
+    first = record_candidate_observation(
+        db_path,
+        _input(
+            channel="saramin",
+            candidate_ref="https://www.saramin.co.kr/zf_user/resume/view?rec_idx=1&region=seoul&trk=a",
+            ingestion_id="run-1",
+        ),
+    )
+    second = record_candidate_observation(
+        db_path,
+        _input(
+            channel="saramin",
+            candidate_ref="https://www.saramin.co.kr/zf_user/resume/view?region=seoul&trk=b&rec_idx=1",
+            ingestion_id="run-2",
+        ),
+    )
+    assert first.candidate.candidate_id == second.candidate.candidate_id
+
+
 # --- distinct candidates must never be merged into one row ---
 
 
