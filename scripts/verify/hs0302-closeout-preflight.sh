@@ -15,7 +15,7 @@
 #   PASS 는 필수 검사 이름마다 `PASS: <이름>` 이 남아야만 난다(CHECKED 는 보고용 숫자일 뿐이다).
 #   FAIL = 대상이 틀렸다. BLOCKED = 검증 환경을 못 만들었다(mktemp 실패·경로 미존재·조회 실패·동시 편집).
 # 한계: ipcs 헤더 `T `·stat/date 의 BSD 형식은 macOS 기준이다(GNU 는 대체 형식으로 시도). 검사기 자신의
-#   문법·판정 논리는 scripts/acceptance-hs0302-preflight.sh 가 반례 9종으로 공격한다.
+#   문법·판정 논리는 scripts/acceptance-hs0302-preflight.sh 가 반례 15종으로 공격한다.
 set -euo pipefail
 
 if [ "${HS0302_PREFLIGHT_DEPTH:-0}" -gt 0 ]; then
@@ -84,7 +84,8 @@ physdir() { (cd -- "$1" 2>/dev/null && pwd -P); }
 if stat -f '%i' / >/dev/null 2>&1; then STAT_FP=(stat -f '%i %z %m %p %l %N'); STAT_PERM=(stat -f '%Lp %N')
 else STAT_FP=(stat -c '%i %s %Y %a %h %n'); STAT_PERM=(stat -c '%a %n'); fi
 fp_stat() { find "$1" -type f -exec "${STAT_FP[@]}" {} + | sort | shasum -a 256; }
-fp_full() { { find "$1" -type f -exec "${STAT_FP[@]}" {} + | sort; find "$1" -type f -exec shasum -a 256 {} + | sort -k2; } | shasum -a 256; }
+# 전체 지문 = 일반 파일(stat·내용 해시) + 심볼릭 링크의 대상. 링크 대상을 빼면 bin/python 이 다른 인터프리터를 가리켜도 "동일" 로 나온다(Codex V1 2026-09-17 실증).
+fp_full() { { find "$1" -type f -exec "${STAT_FP[@]}" {} + | sort; find "$1" -type f -exec shasum -a 256 {} + | sort -k2; find "$1" -type l -exec sh -c 'for l; do printf "L %s -> %s\n" "$l" "$(readlink "$l")"; done' _ {} + | sort; } | shasum -a 256; }
 perm_list() { (cd -- "$1" && find src tests -type f -not -path '*/__pycache__/*' -exec "${STAT_PERM[@]}" {} + | sort); }
 gitq() { # gitq <outvar> <args...> : 종료값 0 이 아니면 1 을 돌려준다(호출자가 BLOCKED 로 적는다)
   local __v="$1"; shift; local out rc=0
@@ -138,7 +139,8 @@ check_git_prompt_tail() {
   HEAD_SHA="$head"
   [ -f "$W/$PROMPT" ] || { blocked git.prompt-tail "프롬프트 경로가 없다(검증 입력 부재): $PROMPT"; return; }
   gitq p log -1 --format=%H -- "$PROMPT" || { blocked git.prompt-tail "프롬프트 커밋 조회 실패: $(head -1 "$S/git.err")"; return; }
-  is_sha "$p" || { fail git.prompt-tail "프롬프트 파일의 커밋이 없다(빈 SHA): $PROMPT"; return; }
+  [ -n "$p" ] || { fail git.prompt-tail "프롬프트 파일의 커밋이 없다(추적되지 않은 파일): $PROMPT"; return; }
+  is_sha "$p" || { blocked git.prompt-tail "프롬프트 커밋 조회 출력이 SHA 가 아니다: '$p' (조회 계층 오염)"; return; }
   gitq diff diff --name-only "$p..HEAD" || { blocked git.prompt-tail "diff 조회 실패: $(head -1 "$S/git.err")"; return; }
   out=$(printf '%s\n' "$diff" | "$GREP" -v -e '^$' -e '^docs/engineering/goal-prompts/') || rc=$?
   [ "$rc" -le 1 ] || { blocked git.prompt-tail "grep 실행 오류 rc=$rc"; return; }
@@ -346,6 +348,7 @@ check_ac3_clone() {
 check_v1_sha() { is_sha "$V1_SHA" && pass v1.sha "$V1_SHA" || fail v1.sha "대상 SHA 형식이 아니다: '$V1_SHA'"; }
 check_v1_head() {
   local h; gitq h rev-parse HEAD || { blocked v1.head "HEAD 조회 실패"; return; }
+  is_sha "$h" || { blocked v1.head "HEAD 조회 출력이 SHA 가 아니다: '$h' (조회 계층 오염)"; return; }
   [ "$h" = "$V1_SHA" ] && pass v1.head "HEAD = 대상 SHA" || fail v1.head "HEAD $h ≠ 대상 $V1_SHA (다른 트리의 판정이다)"
 }
 check_v1_rc() {
