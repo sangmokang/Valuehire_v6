@@ -2,11 +2,11 @@
 # acceptance-hs0302-preflight.sh — 마감 사전검사기가 실패 방향으로 닫혀 있는가 (HS-03.02 R6).
 #
 # 대상: scripts/verify/hs0302-closeout-preflight.sh (마감 프롬프트 0·2·5·7단계의 실행부).
-# 차단 — 아래 반례 15종을 원본 밖 임시 사본에서 돌려 전부 거부돼야 한다.
-#   1 mktemp 실패 주입 → BLOCKED      2 git 조회 실패 주입 → FAIL 또는 BLOCKED
+# 차단 — 아래 반례 16종을 원본 밖 임시 사본에서 돌려 전부 거부돼야 한다. 기대값은 "통과 아님" 이 아니라 정확한 판정·종료값이다.
+#   1 mktemp 실패 주입 → BLOCKED      2 git 조회 실패 주입 → BLOCKED (조회 실패는 대상 결함이 아니다)
 #   3 빈 스크립트 → 거부               4 exit 0 만 → 거부
 #   5 VERDICT: PASS 문구만 출력 → 거부  6 필수 검사 하나 삭제 → FAIL
-#   7 자기 자신 재호출 → FAIL           8 V1 rc 파일 없음 → FAIL 또는 BLOCKED
+#   7 자기 자신 재호출 → FAIL           8 V1 rc 파일 없음 → FAIL (증거 없는 주장은 채택하지 않는다)
 #   9 V1 SHA 불일치 → FAIL
 #   10~12 Codex V1(2026-09-17, e7a1a9a) 이 실제로 뚫은 경로의 회귀 봉인:
 #   10 기준 조회 출력이 SHA 가 아님(rc 0 + NOT_A_SHA) → BLOCKED (e7a1a9a 는 이것을 PASS 로 접었다)
@@ -15,6 +15,7 @@
 #   13~15 Codex V1 2회차(f86d08b) 가 뚫은 경로의 회귀 봉인:
 #   13 프롬프트 커밋 조회 출력이 SHA 가 아님 → BLOCKED   14 --check-v1 의 HEAD 조회 출력이 SHA 가 아님 → BLOCKED
 #   15 V1 뒤 클론 venv 의 심볼릭 링크 대상만 바뀜 → --check-v1 FAIL (파일 전용 지문은 이것을 "동일" 로 봤다)
+#   16 알 수 없는 인자(--bogus) → FAIL 이되 꼬리가 있어야 한다 (Codex V1 4회차: 이 분기의 꼬리를 지워도 시험이 초록이었다)
 # 통과 — 손대지 않은 사본은 고정 환경(합성 저장소 + 대역 명령)에서 PASS 여야 한다.
 #   대역(uv·ps·lsof·ipcs)은 검사기의 판정 논리를 재기 위한 것이다. 실제 환경 실행은
 #   마감 세션이 같은 검사기를 실제 워크트리에서 돌리는 것으로 증명한다(여기서 대신하지 않는다).
@@ -227,8 +228,8 @@ fi
 
 # 1 mktemp 실패 주입 → BLOCKED (검증 환경을 못 만든 것이지 대상이 틀린 게 아니다)
 run_case "반례1 mktemp 실패 → BLOCKED" BLOCKED "$TMP/pristine.sh" "" "$TMP/bin-badmktemp:$STUB_PATH" "${FULL_ARGS[@]}"
-# 2 git 조회 실패 주입 → FAIL/BLOCKED (조회 실패를 '변경 0건' 으로 접지 않는다)
-run_case "반례2 git 조회 실패 → FAIL/BLOCKED" FAIL_OR_BLOCKED "$TMP/pristine.sh" "" "$TMP/bin-badgit:$STUB_PATH" "${FULL_ARGS[@]}"
+# 2 git 조회 실패 주입 → BLOCKED (조회 실패를 '변경 0건' 으로 접지 않고, 대상 결함으로도 분류하지 않는다)
+run_case "반례2 git 조회 실패 → BLOCKED" BLOCKED "$TMP/pristine.sh" "" "$TMP/bin-badgit:$STUB_PATH" "${FULL_ARGS[@]}"
 # 3 빈 스크립트 → 거부
 printf '#!/usr/bin/env bash\n' > "$TMP/mut-empty.sh"
 run_case "반례3 빈 스크립트 → 거부" REJECT "$TMP/mut-empty.sh" "$REQ_FULL" "$STUB_PATH" "${FULL_ARGS[@]}"
@@ -253,6 +254,8 @@ run_case "반례10 기준 조회 출력 비SHA → BLOCKED" BLOCKED "$TMP/pristi
 run_case "반례11 프롬프트 경로 미존재 → BLOCKED" BLOCKED "$TMP/pristine.sh" "" "$STUB_PATH" --worktree "$WT" --branch "$BRANCH" --base "$BASE" --prompt docs/engineering/goal-prompts/does-not-exist.md
 # 12 값 없는 옵션 → FAIL 이되 꼬리(CHECKED·VERDICT)가 있어야 한다
 run_case "반례12 옵션 값 누락 → FAIL(꼬리 있음)" FAIL "$TMP/pristine.sh" "" "$STUB_PATH" --worktree
+# 16 알 수 없는 인자 → FAIL 이되 꼬리(CHECKED·VERDICT)가 있어야 한다
+run_case "반례16 알 수 없는 인자 → FAIL(꼬리 있음)" FAIL "$TMP/pristine.sh" "" "$STUB_PATH" --bogus
 # 13 프롬프트 커밋 조회 출력이 SHA 가 아님 → BLOCKED (기준 조회만 막고 다른 조회를 두면 같은 오염이 FAIL 로 갈린다)
 run_case "반례13 프롬프트 커밋 조회 비SHA → BLOCKED" BLOCKED "$TMP/pristine.sh" "" "$TMP/bin-notsha-log:$STUB_PATH" "${FULL_ARGS[@]}"
 
@@ -272,7 +275,7 @@ if write_v1_evidence "$SHA"; then
   run_case "반례14 V1 HEAD 조회 비SHA → BLOCKED" BLOCKED "$TMP/pristine.sh" "" "$TMP/bin-notsha-head:$STUB_PATH" --check-v1 "$SHA" "${V1_ARGS[@]}"
   # 8 V1 rc 파일 없음
   rm -f "$EV/v1-rc.txt"
-  run_case "반례8 V1 rc 파일 없음 → FAIL/BLOCKED" FAIL_OR_BLOCKED "$TMP/pristine.sh" "" "$STUB_PATH" --check-v1 "$SHA" "${V1_ARGS[@]}"
+  run_case "반례8 V1 rc 파일 없음 → FAIL" FAIL "$TMP/pristine.sh" "" "$STUB_PATH" --check-v1 "$SHA" "${V1_ARGS[@]}"
 else record 1 "정상 V1 증거 PASS(--check-v1)" "증거 파일 생성 실패"; fi
 # 9 V1 SHA 불일치 → FAIL (판정 본문의 SHA 가 대상과 다르다)
 OTHER_SHA=$(printf '%s' "$SHA" | tr '0123456789abcdef' '123456789abcdef0')

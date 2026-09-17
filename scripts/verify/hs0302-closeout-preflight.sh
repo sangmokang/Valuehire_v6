@@ -15,7 +15,7 @@
 #   PASS 는 필수 검사 이름마다 `PASS: <이름>` 이 남아야만 난다(CHECKED 는 보고용 숫자일 뿐이다).
 #   FAIL = 대상이 틀렸다. BLOCKED = 검증 환경을 못 만들었다(mktemp 실패·경로 미존재·조회 실패·동시 편집).
 # 한계: ipcs 헤더 `T `·stat/date 의 BSD 형식은 macOS 기준이다(GNU 는 대체 형식으로 시도). 검사기 자신의
-#   문법·판정 논리는 scripts/acceptance-hs0302-preflight.sh 가 반례 15종으로 공격한다.
+#   문법·판정 논리는 scripts/acceptance-hs0302-preflight.sh 가 반례 16종으로 공격한다.
 set -euo pipefail
 
 if [ "${HS0302_PREFLIGHT_DEPTH:-0}" -gt 0 ]; then
