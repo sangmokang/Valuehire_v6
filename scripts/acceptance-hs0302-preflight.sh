@@ -2,7 +2,7 @@
 # acceptance-hs0302-preflight.sh — 마감 사전검사기가 실패 방향으로 닫혀 있는가 (HS-03.02 R6).
 #
 # 대상: scripts/verify/hs0302-closeout-preflight.sh (마감 프롬프트 0·2·5·7단계의 실행부).
-# 차단 — 아래 반례 35종을 원본 밖 임시 사본에서 돌려 전부 거부돼야 한다. 기대값은 "통과 아님" 이 아니라 정확한 판정·종료값이다.
+# 차단 — 아래 반례 36종을 원본 밖 임시 사본에서 돌려 전부 거부돼야 한다. 기대값은 "통과 아님" 이 아니라 정확한 판정·종료값이다.
 #   1 mktemp 실패 주입 → BLOCKED      2 git 조회 실패 주입 → BLOCKED (조회 실패는 대상 결함이 아니다)
 #   3 빈 스크립트 → 거부               4 exit 0 만 → 거부
 #   5 VERDICT: PASS 문구만 출력 → 거부  6 필수 검사 하나 삭제 → FAIL
@@ -28,6 +28,7 @@
 #   33 값 자리에 다른 옵션(--worktree --help) → FAIL 이되 꼬리가 있어야 한다 (같은 회차: --help 를 경로 값으로 삼켜 BLOCKED 로 분류했다)
 #   34 값 자리에 짧은 옵션(--worktree -h) → FAIL (Codex V1 9회차: --* 만 거르면 -h 가 경로 값으로 들어갔다)
 #   35 사본 pyproject.toml 권한만 바뀜(0644→0755) → ac2.copy FAIL (Codex V1 9회차: 권한 대조가 src·tests 에만 있었다)
+#   36 조회 출력이 "SHA + 다른 줄" 여러 줄 → BLOCKED (Codex V1 10회차: grep 은 한 줄만 맞아도 SHA 로 인정했다)
 #   기록만(시험 없음): M04 신호 트랩 제거(EXIT 트랩만으로도 정지·PASS 부재 성립 — 부분 등가), M12 -newer 제거(지문이 mtime 포함 — 거의 등가),
 #   M22 grep 자기검사, M25 클론에 .venv 사전 존재(합성 저장소에서 재현 불가).
 # 통과 — 손대지 않은 사본은 고정 환경(합성 저장소 + 대역 명령)에서 PASS 여야 한다.
@@ -176,6 +177,8 @@ IPCS
   printf '#!/usr/bin/env bash\ncase "$*" in *"log -1 --format=%%H"*) echo NOT_A_SHA; exit 0 ;; esac\nexec %s "$@"\n' "$REAL_GIT" > "$TMP/bin-notsha-log/git"
   printf '#!/usr/bin/env bash\ncase "$*" in *"rev-parse HEAD"*) echo NOT_A_SHA; exit 0 ;; esac\nexec %s "$@"\n' "$REAL_GIT" > "$TMP/bin-notsha-head/git"
   mkdir -p "$TMP/bin-emptylog" && printf '#!/usr/bin/env bash\ncase "$*" in *"log -1 --format=%%H"*) exit 0 ;; esac\nexec %s "$@"\n' "$REAL_GIT" > "$TMP/bin-emptylog/git"
+  # 반례 36: 기준 조회가 정상 SHA 뒤에 다른 줄을 덧붙인다(여러 줄 출력)
+  mkdir -p "$TMP/bin-multiline" && printf '#!/usr/bin/env bash\ncase "$*" in *"rev-parse --verify "*"^{commit}"*) %s "$@"; echo "warning: something"; exit 0 ;; esac\nexec %s "$@"\n' "$REAL_GIT" "$REAL_GIT" > "$TMP/bin-multiline/git"
   # 반례 22·23·26·31: uv 대역 변형 — 하나의 동작만 나쁘게 하고 나머지는 기본 대역에 위임
   mkdir -p "$TMP/bin-copyvenv" "$TMP/bin-badprobe" "$TMP/bin-outsidemod" "$TMP/bin-leakpath" "$TMP/bin-noself" "$TMP/bin-shm30" "$TMP/bin-hardcp" || return 1
   printf '#!/usr/bin/env bash\ncase "${1:-}" in sync) "$(dirname "$0")/../bin/uv" "$@" >/dev/null; printf "Installed 1 package in 1ms\\n" ;; *) exec "$(dirname "$0")/../bin/uv" "$@" ;; esac\n' > "$TMP/bin-copyvenv/uv"
@@ -208,7 +211,7 @@ exec "$(dirname "$0")/../bin/uv" "$@"
 SWAP
   # 반례 18: d 단계의 uv run pytest 를 6초 늦춰 SIGTERM 을 보낼 창을 만든다
   mkdir -p "$TMP/bin-slow" && printf '#!/usr/bin/env bash\ncase " $* " in *" pytest "*) sleep 6 ;; esac\nexec "$(dirname "$0")/../bin/uv" "$@"\n' > "$TMP/bin-slow/uv"
-  chmod +x "$STUB"/* "$TMP/bin-badmktemp/mktemp" "$TMP/bin-badgit/git" "$TMP/bin-notsha/git" "$TMP/bin-notsha-log/git" "$TMP/bin-notsha-head/git" "$TMP/bin-emptylog/git" "$TMP/bin-venvswap/uv" "$TMP/bin-slow/uv" "$TMP"/bin-copyvenv/uv "$TMP"/bin-badprobe/uv "$TMP"/bin-outsidemod/uv "$TMP"/bin-leakpath/uv "$TMP"/bin-noself/lsof "$TMP"/bin-shm30/ipcs "$TMP"/bin-hardcp/cp
+  chmod +x "$STUB"/* "$TMP/bin-badmktemp/mktemp" "$TMP/bin-badgit/git" "$TMP/bin-notsha/git" "$TMP/bin-notsha-log/git" "$TMP/bin-notsha-head/git" "$TMP/bin-emptylog/git" "$TMP/bin-multiline/git" "$TMP/bin-venvswap/uv" "$TMP/bin-slow/uv" "$TMP"/bin-copyvenv/uv "$TMP"/bin-badprobe/uv "$TMP"/bin-outsidemod/uv "$TMP"/bin-leakpath/uv "$TMP"/bin-noself/lsof "$TMP"/bin-shm30/ipcs "$TMP"/bin-hardcp/cp
 }
 
 if build_fixture && build_stubs; then record 0 "고정 환경 준비" "합성 저장소 $WT, 대역 uv·ps·lsof·ipcs"
@@ -309,6 +312,8 @@ run_case "반례32 --help 뒤 인자 → FAIL(꼬리 있음)" FAIL "$TMP/pristin
 # 33 값 자리에 다른 옵션 → FAIL(값 누락, 꼬리 있음) / 34 짧은 옵션도 같다
 run_case "반례33 값 자리에 다른 옵션 → FAIL(꼬리 있음)" FAIL "$TMP/pristine.sh" "" "$STUB_PATH" --worktree --help
 run_case "반례34 값 자리에 짧은 옵션 → FAIL(꼬리 있음)" FAIL "$TMP/pristine.sh" "" "$STUB_PATH" --worktree -h
+# 36 기준 조회 출력이 SHA 뒤 다른 줄을 포함 → BLOCKED (한 줄만 맞는 것은 SHA 가 아니다)
+run_case "반례36 조회 출력 여러 줄(SHA+잡음) → BLOCKED" BLOCKED "$TMP/pristine.sh" "" "$TMP/bin-multiline:$STUB_PATH" "${FULL_ARGS[@]}"
 # 19 프롬프트 커밋 조회 rc 0 + 빈 출력 → BLOCKED
 run_case "반례19 프롬프트 커밋 조회 빈 출력 → BLOCKED" BLOCKED "$TMP/pristine.sh" "" "$TMP/bin-emptylog:$STUB_PATH" "${FULL_ARGS[@]}"
 # 21 격리 클론의 git 객체가 원본과 하드링크면 --no-local 이 빠진 것이다(정상 세션 폴더로 확인)

@@ -16,7 +16,7 @@
 #   FAIL = 대상이 틀렸다. BLOCKED = 검증 환경을 못 만들었다(mktemp 실패·경로 미존재·조회 실패·동시 편집).
 # 한계: 공유메모리 조회(ipcs)는 macOS 형식(`T ` 헤더·`m` 행) 전용이며 GNU util-linux 형식에서는 shm.ledger 가 BLOCKED 로 끝난다 —
 #   리눅스에서 실제 마감 실행은 불가하고, CI 의 인수 시험은 macOS 모양 대역으로 판정 논리만 잰다(Codex 적대 리뷰 D3). stat/date 는 GNU 대체 형식. 검사기 자신의
-#   문법·판정 논리는 scripts/acceptance-hs0302-preflight.sh 가 반례 35종으로 공격한다.
+#   문법·판정 논리는 scripts/acceptance-hs0302-preflight.sh 가 반례 36종으로 공격한다.
 #   --check-v1 은 "클론 환경이 그대로인가" 를 증명하지 판정이 그 클론에서 나왔는지는 증명하지 못한다(자기 신고) — 2026-09-17 codeaudit B5.
 set -euo pipefail
 
@@ -94,7 +94,7 @@ gitq() { # gitq <outvar> <args...> : 종료값 0 이 아니면 1 을 돌려준�
   out=$(git -C "$W" "$@" 2>"$S/git.err") || rc=$?
   printf -v "$__v" '%s' "$out"; return "$rc"
 }
-is_sha() { printf '%s' "$1" | "$GREP" -qE '^[0-9a-f]{40}$'; }
+is_sha() { [[ "$1" =~ ^[0-9a-f]{40}$ ]]; }   # 출력 전체가 정확히 SHA 한 값이어야 한다 — grep 은 여러 줄 중 한 줄만 맞아도 통과시켰다(Codex V1 10회차)
 
 if [ ! -x "$GREP" ] || ! printf 'alpha\n' | "$GREP" -q 'alpha' || printf 'alpha\n' | "$GREP" -q 'beta'; then
   echo "BLOCKED: grep.self — $GREP 자기검사 실패(PATH 의 grep 은 ugrep 으로 가려질 수 있어 절대경로만 쓴다)"
