@@ -35,7 +35,10 @@ REQ_FULL="git.worktree git.branch git.clean git.base-ancestor git.prompt-tail pr
 REQ_V1="v1.sha v1.head v1.rc v1.verdict v1.venv-same"
 SNAP0=$(git status --porcelain)
 TMP=$(mktemp -d) || { echo "NOT_RUN: mktemp 실패"; echo "CHECKED: 0"; exit 2; }
-trap 'rm -rf "$TMP"' EXIT
+# 검사기는 증거 보존을 위해 자기 세션 폴더(mktemp)를 지우지 않는다. 여기서는 사본 실행이 만든 세션 폴더를 모아 지운다.
+SESSIONS="$TMP/sessions.txt"; : > "$SESSIONS"
+cleanup() { while IFS= read -r d; do [ -n "$d" ] && [ -d "$d" ] && rm -rf "$d"; done < "$SESSIONS"; rm -rf "$TMP"; }
+trap cleanup EXIT
 
 fail=0
 checked=0
@@ -150,10 +153,13 @@ STUB_PATH="$STUB:$PATH"
 
 # ── 판정: 사본을 돌리고 출력 꼬리(CHECKED·VERDICT)와 필수 PASS 줄로 판정한다 ────
 # accepted(사본) = rc 0 이고 마지막 두 줄이 CHECKED: N(N≥1)·VERDICT: PASS 이며 필수 이름마다 PASS 줄이 있다.
+case_no=0; CASE_OUT=""
 run_case() {
   local name="$1" expect="$2" copy="$3" req="$4" path="$5"; shift 5
-  local out="$TMP/out-$name.txt" rc=0 last prev n verdict=NONE accepted=0 missing=""
+  local out rc=0 last prev n verdict=NONE accepted=0 missing=""
+  case_no=$((case_no + 1)); out="$TMP/out-$case_no.txt"; CASE_OUT="$out"
   (cd "$TMP" && PATH="$path" bash "$copy" "$@") > "$out" 2>&1 || rc=$?
+  sed -n 's/^SESSION_DIR=//p' "$out" >> "$SESSIONS"
   last=$(tail -n 1 "$out"); prev=$(tail -n 2 "$out" | head -n 1)
   case "$last" in "VERDICT: "*) verdict=${last#VERDICT: } ;; esac
   n=$(printf '%s' "$prev" | sed -n 's/^CHECKED: \([0-9][0-9]*\)$/\1/p')
@@ -176,7 +182,8 @@ run_case() {
 
 # 사본 생성: 정확히 1곳이 바뀌었는지 확인하고, 아니면 사본을 만들지 않는다(변이 실패를 통과로 접지 않는다)
 mutate() {
-  local name="$1" mode="$2" needle="$3" copy="$TMP/mut-$name.sh" hits
+  local name="$1" mode="$2" needle="$3" copy hits
+  copy="$TMP/mut-$name.sh"
   case "$mode" in
     delete-line)
       hits=$("$GREP" -c -- "$needle" "$SCRIPT")
@@ -196,7 +203,7 @@ cp "$SCRIPT" "$TMP/pristine.sh"
 
 # 통과 쪽 — 정상 사본은 고정 환경에서 PASS 여야 한다(이 결과의 세션 폴더를 V1 검사에 재사용한다)
 run_case "정상 사본 PASS(전체)" PASS "$TMP/pristine.sh" "$REQ_FULL" "$STUB_PATH" "${FULL_ARGS[@]}"
-SESSION=$(sed -n 's/^SESSION_DIR=//p' "$TMP/out-정상 사본 PASS(전체).txt" | tail -1)
+SESSION=$(sed -n 's/^SESSION_DIR=//p' "$CASE_OUT" | tail -1)
 if [ -n "$SESSION" ] && [ -d "$SESSION" ] && [ -f "$SESSION/v1-venv-id.txt" ]; then
   record 0 "세션 폴더·venv 지문 산출" "$SESSION"
 else
