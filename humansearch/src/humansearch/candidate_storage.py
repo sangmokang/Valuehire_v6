@@ -291,8 +291,12 @@ def _normalize_url(value: str) -> str:
     netloc = parts.netloc.lower().removeprefix(_WWW_PREFIX)
     path = parts.path.rstrip("/") or "/"
     if netloc not in _APPROVED_CANONICALIZATION_HOSTS:
-        suffix = f"?{parts.query}" if parts.query else ""
-        return f"{scheme}://{netloc}{path}{suffix}"
+        # Same reasoning as the query string: an unverified host's fragment (#...)
+        # might carry a real per-candidate identifier (e.g. fragment-based client
+        # routing) — leave it untouched rather than silently dropping it.
+        query_suffix = f"?{parts.query}" if parts.query else ""
+        fragment_suffix = f"#{parts.fragment}" if parts.fragment else ""
+        return f"{scheme}://{netloc}{path}{query_suffix}{fragment_suffix}"
     path = path.lower()
     query = _normalize_query(parts.query)
     suffix = f"?{query}" if query else ""

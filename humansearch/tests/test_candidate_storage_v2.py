@@ -484,6 +484,37 @@ def test_unapproved_host_never_treats_a_tracking_style_name_as_a_real_identifier
     )
 
 
+def test_unapproved_host_fragment_is_preserved_not_dropped_like_a_tracking_param(
+    tmp_path: Path,
+) -> None:
+    """Codex V1 4th-round finding, 2026-09-17: `_normalize_url` never referenced
+    ``parts.fragment`` at all, so it was silently dropped for every host — the same
+    class of bug as the query-string merge (F-1), just in the URL fragment (#...)
+    instead. A site using fragment-based routing to identify a candidate would have
+    two different real people merge on an unapproved host."""
+    db_path = _db(tmp_path)
+    first = record_candidate_observation(
+        db_path,
+        _input(
+            channel="saramin",
+            candidate_ref="https://www.saramin.co.kr/zf_user/resume/view#applicant-39825930",
+            ingestion_id="run-1",
+        ),
+    )
+    second = record_candidate_observation(
+        db_path,
+        _input(
+            channel="saramin",
+            candidate_ref="https://www.saramin.co.kr/zf_user/resume/view#applicant-51002211",
+            ingestion_id="run-2",
+        ),
+    )
+    assert first.candidate.candidate_id != second.candidate.candidate_id
+    assert second.candidate.candidate_ref_raw == (
+        "https://www.saramin.co.kr/zf_user/resume/view#applicant-51002211"
+    )
+
+
 # --- distinct candidates must never be merged into one row ---
 
 
