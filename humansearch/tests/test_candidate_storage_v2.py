@@ -377,6 +377,61 @@ def test_query_string_identifier_is_preserved_not_treated_as_tracking(tmp_path: 
 def test_known_tracking_params_are_still_stripped_alongside_a_real_identifier(
     tmp_path: Path,
 ) -> None:
+    """Tracking-param stripping only applies to an approved host (linkedin.com) —
+    see the unapproved-host tests below for why saramin/jobkorea must NOT get this."""
+    db_path = _db(tmp_path)
+    first = record_candidate_observation(
+        db_path,
+        _input(
+            channel="linkedin_rps",
+            candidate_ref="https://www.linkedin.com/in/abc/?trk=email",
+            ingestion_id="run-1",
+        ),
+    )
+    second = record_candidate_observation(
+        db_path,
+        _input(
+            channel="linkedin_rps",
+            candidate_ref="https://www.linkedin.com/in/abc/?trk=push",
+            ingestion_id="run-2",
+        ),
+    )
+    assert first.candidate.candidate_id == second.candidate.candidate_id
+
+
+def test_non_tracking_param_order_does_not_affect_dedup(tmp_path: Path) -> None:
+    """Codex V1 3rd-round finding: the previous tracking-param test left only one
+    non-tracking key after filtering, so a broken `sorted()` in `_normalize_query`
+    would not have failed it. This uses two non-tracking keys in reversed order, on
+    the one approved host where query normalization applies at all."""
+    db_path = _db(tmp_path)
+    first = record_candidate_observation(
+        db_path,
+        _input(
+            channel="linkedin_rps",
+            candidate_ref="https://www.linkedin.com/in/abc/?a=1&b=seoul&trk=a",
+            ingestion_id="run-1",
+        ),
+    )
+    second = record_candidate_observation(
+        db_path,
+        _input(
+            channel="linkedin_rps",
+            candidate_ref="https://www.linkedin.com/in/abc/?b=seoul&trk=b&a=1",
+            ingestion_id="run-2",
+        ),
+    )
+    assert first.candidate.candidate_id == second.candidate.candidate_id
+
+
+# --- owner-directed scope narrowing (2026-09-17): a host with no verified
+# equivalence rule must get NO query canonicalization at all, so an assumed
+# "tracking" param can never cause a false merge on that host. ---
+
+
+def test_unapproved_host_query_is_untouched_so_tracking_looking_params_still_split(
+    tmp_path: Path,
+) -> None:
     db_path = _db(tmp_path)
     first = record_candidate_observation(
         db_path,
@@ -394,19 +449,24 @@ def test_known_tracking_params_are_still_stripped_alongside_a_real_identifier(
             ingestion_id="run-2",
         ),
     )
-    assert first.candidate.candidate_id == second.candidate.candidate_id
+    # Not merged: on an unapproved host we cannot tell "trk" is noise, and the two
+    # query strings differ verbatim (order and value both differ). A recoverable
+    # duplicate is accepted here — the alternative (guessing wrong) is not.
+    assert first.candidate.candidate_id != second.candidate.candidate_id
 
 
-def test_non_tracking_param_order_does_not_affect_dedup(tmp_path: Path) -> None:
-    """Codex V1 3rd-round finding: the previous tracking-param test left only one
-    non-tracking key after filtering, so a broken `sorted()` in `_normalize_query`
-    would not have failed it. This uses two non-tracking keys in reversed order."""
+def test_unapproved_host_never_treats_a_tracking_style_name_as_a_real_identifier(
+    tmp_path: Path,
+) -> None:
+    """A channel could legitimately use a name like "ref" as its own real per-
+    candidate identifier. Because saramin is not an approved host, that value must
+    survive untouched even though "ref" is on the LinkedIn tracking-param list."""
     db_path = _db(tmp_path)
     first = record_candidate_observation(
         db_path,
         _input(
             channel="saramin",
-            candidate_ref="https://www.saramin.co.kr/zf_user/resume/view?rec_idx=1&region=seoul&trk=a",
+            candidate_ref="https://www.saramin.co.kr/zf_user/resume/view?ref=applicant-001",
             ingestion_id="run-1",
         ),
     )
@@ -414,11 +474,14 @@ def test_non_tracking_param_order_does_not_affect_dedup(tmp_path: Path) -> None:
         db_path,
         _input(
             channel="saramin",
-            candidate_ref="https://www.saramin.co.kr/zf_user/resume/view?region=seoul&trk=b&rec_idx=1",
+            candidate_ref="https://www.saramin.co.kr/zf_user/resume/view?ref=applicant-002",
             ingestion_id="run-2",
         ),
     )
-    assert first.candidate.candidate_id == second.candidate.candidate_id
+    assert first.candidate.candidate_id != second.candidate.candidate_id
+    assert second.candidate.candidate_ref_raw == (
+        "https://www.saramin.co.kr/zf_user/resume/view?ref=applicant-002"
+    )
 
 
 # --- distinct candidates must never be merged into one row ---

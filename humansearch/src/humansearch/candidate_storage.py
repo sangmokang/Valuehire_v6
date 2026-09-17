@@ -243,25 +243,30 @@ def _normalize_email(value: str) -> str:
 
 
 _WWW_PREFIX: Final = "www."
-# LinkedIn's public profile vanity slug is case-insensitive (linkedin.com/in/JohnDoe ==
-# .../johndoe) — verified by an independent adversarial review (2026-09-17) that the
-# original fix for tracking-param dedup missed this. Only fold path case for hosts we
-# know behave this way; other channels may embed case-sensitive identifiers in a URL
-# path, and folding those blindly would merge two different real candidates.
-_CASE_INSENSITIVE_PATH_HOSTS: Final = frozenset({"linkedin.com"})
 
-# Only drop query params known to be tracking noise, never the whole query string.
-# A first version dropped everything, which silently merged two different real
-# candidates whose channel (e.g. a saramin/jobkorea resume link) identifies them by
-# a query param such as ?rec_idx=... — reproduced by an independent adversarial
-# review (2026-09-17): two different rec_idx values collapsed into one candidate row
-# and the second person's identifying URL was discarded. This trades one risk for a
-# smaller one (Codex V1 3rd-round review, 2026-09-17): a tracker name not on this
-# list can still leave the same real candidate split into two rows (recoverable —
-# both raw URLs survive), which is preferred over silently merging two different
-# people (unrecoverable — one person's raw value is lost). Before adding a new
-# channel, check that none of these names collide with that channel's real
-# per-candidate identifier — a collision would reintroduce the same-row-merge bug.
+# Path-case-folding and query-param stripping are only safe for hosts where the
+# equivalence rule has actually been verified — currently just LinkedIn's public
+# profile pages (case-insensitive vanity slug; tracking params like ?trk=... are
+# provably noise). Every other host gets NO path or query canonicalization, on
+# purpose: an unverified host's query string might be a real per-candidate
+# identifier (e.g. saramin/jobkorea's ?rec_idx=...), and "we don't know what this
+# means" must default to "leave it alone," never to "assume it's noise and merge."
+#
+# History (2026-09-17, three rounds of independent adversarial review):
+#   round 1: no query handling at all -> same LinkedIn profile with a different
+#            ?trk= value was wrongly split into two candidates.
+#   round 2: stripped the WHOLE query string for every host -> two different real
+#            saramin candidates (different ?rec_idx=...) were wrongly merged into
+#            one row, discarding the second person's identifying URL. This is the
+#            worse failure: false-merge loses data and cannot be told apart from a
+#            correct merge after the fact, while false-split just costs a
+#            recoverable duplicate row (both raw URLs still exist).
+#   round 3 (this fix, owner-directed scope narrowing): stop applying ANY
+#            general-purpose canonicalization rule to hosts we have not verified.
+#            Only linkedin.com gets path/query normalization; everything else is
+#            compared on the untouched (scheme+host-cased, www-stripped) URL.
+_APPROVED_CANONICALIZATION_HOSTS: Final = frozenset({"linkedin.com"})
+
 _TRACKING_PARAM_NAMES: Final = frozenset({"trk", "ref", "refid", "fbclid", "gclid", "mc_cid", "mc_eid"})
 _TRACKING_PARAM_PREFIXES: Final = ("utm_",)
 
@@ -281,10 +286,14 @@ def _normalize_query(query: str) -> str:
 def _normalize_url(value: str) -> str:
     parts = urlsplit(_nfc_strip(value))
     scheme = parts.scheme.lower()
+    # www-stripping and scheme/host lowercasing are host-aliasing facts, not identity
+    # guesses — safe for every host, verified or not.
     netloc = parts.netloc.lower().removeprefix(_WWW_PREFIX)
     path = parts.path.rstrip("/") or "/"
-    if netloc in _CASE_INSENSITIVE_PATH_HOSTS:
-        path = path.lower()
+    if netloc not in _APPROVED_CANONICALIZATION_HOSTS:
+        suffix = f"?{parts.query}" if parts.query else ""
+        return f"{scheme}://{netloc}{path}{suffix}"
+    path = path.lower()
     query = _normalize_query(parts.query)
     suffix = f"?{query}" if query else ""
     return f"{scheme}://{netloc}{path}{suffix}"
