@@ -2,12 +2,16 @@
 # acceptance-hs0302-preflight.sh — 마감 사전검사기가 실패 방향으로 닫혀 있는가 (HS-03.02 R6).
 #
 # 대상: scripts/verify/hs0302-closeout-preflight.sh (마감 프롬프트 0·2·5·7단계의 실행부).
-# 차단 — 아래 반례 9종을 원본 밖 임시 사본에서 돌려 전부 거부돼야 한다.
+# 차단 — 아래 반례 12종을 원본 밖 임시 사본에서 돌려 전부 거부돼야 한다.
 #   1 mktemp 실패 주입 → BLOCKED      2 git 조회 실패 주입 → FAIL 또는 BLOCKED
 #   3 빈 스크립트 → 거부               4 exit 0 만 → 거부
 #   5 VERDICT: PASS 문구만 출력 → 거부  6 필수 검사 하나 삭제 → FAIL
 #   7 자기 자신 재호출 → FAIL           8 V1 rc 파일 없음 → FAIL 또는 BLOCKED
 #   9 V1 SHA 불일치 → FAIL
+#   10~12 Codex V1(2026-09-17, e7a1a9a) 이 실제로 뚫은 경로의 회귀 봉인:
+#   10 기준 조회 출력이 SHA 가 아님(rc 0 + NOT_A_SHA) → BLOCKED (e7a1a9a 는 이것을 PASS 로 접었다)
+#   11 프롬프트 경로 미존재 → BLOCKED (e7a1a9a 는 FAIL 로 분류했다)
+#   12 값 없는 옵션(--worktree 만) → FAIL 이되 CHECKED·VERDICT 꼬리가 있어야 한다 (e7a1a9a 는 꼬리 없이 죽었다)
 # 통과 — 손대지 않은 사본은 고정 환경(합성 저장소 + 대역 명령)에서 PASS 여야 한다.
 #   대역(uv·ps·lsof·ipcs)은 검사기의 판정 논리를 재기 위한 것이다. 실제 환경 실행은
 #   마감 세션이 같은 검사기를 실제 워크트리에서 돌리는 것으로 증명한다(여기서 대신하지 않는다).
@@ -93,6 +97,7 @@ build_fixture() {
 }
 
 STUB="$TMP/bin"
+REAL_GIT=$(command -v git)
 build_stubs() {
   mkdir -p "$STUB" "$TMP/bin-badmktemp" "$TMP/bin-badgit" || return 1
   cat > "$STUB/uv" <<'UV'
@@ -144,7 +149,10 @@ printf 'IPC status from <running system> as of now\nT     ID     KEY        MODE
 IPCS
   printf '#!/usr/bin/env bash\necho "mktemp: injected failure" >&2\nexit 1\n' > "$TMP/bin-badmktemp/mktemp"
   printf '#!/usr/bin/env bash\necho "fatal: injected git failure" >&2\nexit 128\n' > "$TMP/bin-badgit/git"
-  chmod +x "$STUB"/* "$TMP/bin-badmktemp/mktemp" "$TMP/bin-badgit/git"
+  # 반례 10: 기준 조회(rev-parse --verify <ref>^{commit})만 rc 0 으로 SHA 아닌 값을 내고 나머지는 실제 git 에 위임
+  mkdir -p "$TMP/bin-notsha" || return 1
+  printf '#!/usr/bin/env bash\ncase "$*" in *"rev-parse --verify "*"^{commit}"*) echo NOT_A_SHA; exit 0 ;; esac\nexec %s "$@"\n' "$REAL_GIT" > "$TMP/bin-notsha/git"
+  chmod +x "$STUB"/* "$TMP/bin-badmktemp/mktemp" "$TMP/bin-badgit/git" "$TMP/bin-notsha/git"
 }
 
 if build_fixture && build_stubs; then record 0 "고정 환경 준비" "합성 저장소 $WT, 대역 uv·ps·lsof·ipcs"
@@ -231,6 +239,13 @@ else record 1 "반례6 필수 검사 삭제 → FAIL" "$copy"; fi
 if copy=$(mutate self-reinvoke insert-after 'export HS0302_PREFLIGHT_DEPTH' 'bash "$0" "$@"; exit $?'); then
   run_case "반례7 자기 재호출 → FAIL" FAIL "$copy" "" "$STUB_PATH" "${FULL_ARGS[@]}"
 else record 1 "반례7 자기 재호출 → FAIL" "$copy"; fi
+
+# 10 기준 조회 출력이 SHA 가 아님 → BLOCKED (조회 계층 오염을 PASS 로 접지 않는다)
+run_case "반례10 기준 조회 출력 비SHA → BLOCKED" BLOCKED "$TMP/pristine.sh" "" "$TMP/bin-notsha:$STUB_PATH" "${FULL_ARGS[@]}"
+# 11 프롬프트 경로 미존재 → BLOCKED (검증 입력 부재는 대상 결함이 아니다)
+run_case "반례11 프롬프트 경로 미존재 → BLOCKED" BLOCKED "$TMP/pristine.sh" "" "$STUB_PATH" --worktree "$WT" --branch "$BRANCH" --base "$BASE" --prompt docs/engineering/goal-prompts/does-not-exist.md
+# 12 값 없는 옵션 → FAIL 이되 꼬리(CHECKED·VERDICT)가 있어야 한다
+run_case "반례12 옵션 값 누락 → FAIL(꼬리 있음)" FAIL "$TMP/pristine.sh" "" "$STUB_PATH" --worktree
 
 # ── V1 증거 검사(--check-v1): 정상 → PASS, rc 파일 없음 → FAIL/BLOCKED, SHA 불일치 → FAIL ──
 SHA=$(git -C "$WT" rev-parse HEAD)
