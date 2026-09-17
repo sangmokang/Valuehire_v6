@@ -15,7 +15,7 @@
 #   PASS 는 필수 검사 이름마다 `PASS: <이름>` 이 남아야만 난다(CHECKED 는 보고용 숫자일 뿐이다).
 #   FAIL = 대상이 틀렸다. BLOCKED = 검증 환경을 못 만들었다(mktemp 실패·경로 미존재·조회 실패·동시 편집).
 # 한계: ipcs 헤더 `T `·stat/date 의 BSD 형식은 macOS 기준이다(GNU 는 대체 형식으로 시도). 검사기 자신의
-#   문법·판정 논리는 scripts/acceptance-hs0302-preflight.sh 가 반례 18종으로 공격한다.
+#   문법·판정 논리는 scripts/acceptance-hs0302-preflight.sh 가 반례 19종으로 공격한다.
 #   --check-v1 은 "클론 환경이 그대로인가" 를 증명하지 판정이 그 클론에서 나왔는지는 증명하지 못한다(자기 신고) — 2026-09-17 codeaudit B5.
 set -euo pipefail
 
@@ -143,8 +143,8 @@ check_git_prompt_tail() {
   HEAD_SHA="$head"
   [ -f "$W/$PROMPT" ] || { blocked git.prompt-tail "프롬프트 경로가 없다(검증 입력 부재): $PROMPT"; return; }
   gitq p log -1 --format=%H -- "$PROMPT" || { blocked git.prompt-tail "프롬프트 커밋 조회 실패: $(head -1 "$S/git.err")"; return; }
-  [ -n "$p" ] || { fail git.prompt-tail "프롬프트 파일의 커밋이 없다(추적되지 않은 파일): $PROMPT"; return; }
-  is_sha "$p" || { blocked git.prompt-tail "프롬프트 커밋 조회 출력이 SHA 가 아니다: '$p' (조회 계층 오염)"; return; }
+  # 빈 출력도 SHA 가 아니다 — 추적되지 않은 파일인지 조회 이상인지 여기서 구분할 수 없으므로 계약대로 BLOCKED(Codex V1 5회차)
+  is_sha "$p" || { blocked git.prompt-tail "프롬프트 커밋 조회 출력이 SHA 가 아니다: '${p:-<빈 출력>}' (추적되지 않은 파일이거나 조회 계층 이상)"; return; }
   gitq diff diff --name-only "$p..HEAD" || { blocked git.prompt-tail "diff 조회 실패: $(head -1 "$S/git.err")"; return; }
   out=$(printf '%s\n' "$diff" | "$GREP" -v -e '^$' -e '^docs/engineering/goal-prompts/') || rc=$?
   [ "$rc" -le 1 ] || { blocked git.prompt-tail "grep 실행 오류 rc=$rc"; return; }

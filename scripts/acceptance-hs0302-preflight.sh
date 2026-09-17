@@ -2,7 +2,7 @@
 # acceptance-hs0302-preflight.sh — 마감 사전검사기가 실패 방향으로 닫혀 있는가 (HS-03.02 R6).
 #
 # 대상: scripts/verify/hs0302-closeout-preflight.sh (마감 프롬프트 0·2·5·7단계의 실행부).
-# 차단 — 아래 반례 18종을 원본 밖 임시 사본에서 돌려 전부 거부돼야 한다. 기대값은 "통과 아님" 이 아니라 정확한 판정·종료값이다.
+# 차단 — 아래 반례 19종을 원본 밖 임시 사본에서 돌려 전부 거부돼야 한다. 기대값은 "통과 아님" 이 아니라 정확한 판정·종료값이다.
 #   1 mktemp 실패 주입 → BLOCKED      2 git 조회 실패 주입 → BLOCKED (조회 실패는 대상 결함이 아니다)
 #   3 빈 스크립트 → 거부               4 exit 0 만 → 거부
 #   5 VERDICT: PASS 문구만 출력 → 거부  6 필수 검사 하나 삭제 → FAIL
@@ -18,6 +18,7 @@
 #   16 알 수 없는 인자(--bogus) → FAIL 이되 꼬리가 있어야 한다 (Codex V1 4회차: 이 분기의 꼬리를 지워도 시험이 초록이었다)
 #   17 c 단계 도중 원본 venv 의 bin/python 링크 대상을 바꾸고 시각을 복원 → ac2.copy FAIL (codeaudit B1: 파일 전용 지문은 "불변" 으로 봤다)
 #   18 d 단계 도중 SIGTERM → 표본기(ps 스냅샷)가 3초 안에 멈춰야 한다 (codeaudit B2: trap 이 없으면 고아가 워크트리 cwd 를 쥐고 영구 BLOCKED)
+#   19 프롬프트 커밋 조회가 rc 0 + 빈 출력 → BLOCKED (Codex V1 5회차: 빈 값을 FAIL 로 보내던 별도 분기)
 # 통과 — 손대지 않은 사본은 고정 환경(합성 저장소 + 대역 명령)에서 PASS 여야 한다.
 #   대역(uv·ps·lsof·ipcs)은 검사기의 판정 논리를 재기 위한 것이다. 실제 환경 실행은
 #   마감 세션이 같은 검사기를 실제 워크트리에서 돌리는 것으로 증명한다(여기서 대신하지 않는다).
@@ -163,6 +164,7 @@ IPCS
   # 반례 13·14: 프롬프트 커밋 조회(log -1 --format=%H) / HEAD 조회(rev-parse HEAD)만 rc 0 + NOT_A_SHA
   printf '#!/usr/bin/env bash\ncase "$*" in *"log -1 --format=%%H"*) echo NOT_A_SHA; exit 0 ;; esac\nexec %s "$@"\n' "$REAL_GIT" > "$TMP/bin-notsha-log/git"
   printf '#!/usr/bin/env bash\ncase "$*" in *"rev-parse HEAD"*) echo NOT_A_SHA; exit 0 ;; esac\nexec %s "$@"\n' "$REAL_GIT" > "$TMP/bin-notsha-head/git"
+  mkdir -p "$TMP/bin-emptylog" && printf '#!/usr/bin/env bash\ncase "$*" in *"log -1 --format=%%H"*) exit 0 ;; esac\nexec %s "$@"\n' "$REAL_GIT" > "$TMP/bin-emptylog/git"
   # 반례 17: c 단계의 uv run(모듈 로드) 사이에 원본 venv 링크 대상을 바꾸고 링크·부모 폴더 시각을 복원(-newer 검사를 피하는 공격 형태)
   mkdir -p "$TMP/bin-venvswap" && cat > "$TMP/bin-venvswap/uv" <<'SWAP'
 #!/usr/bin/env bash
@@ -173,7 +175,7 @@ exec "$(dirname "$0")/../bin/uv" "$@"
 SWAP
   # 반례 18: d 단계의 uv run pytest 를 6초 늦춰 SIGTERM 을 보낼 창을 만든다
   mkdir -p "$TMP/bin-slow" && printf '#!/usr/bin/env bash\ncase " $* " in *" pytest "*) sleep 6 ;; esac\nexec "$(dirname "$0")/../bin/uv" "$@"\n' > "$TMP/bin-slow/uv"
-  chmod +x "$STUB"/* "$TMP/bin-badmktemp/mktemp" "$TMP/bin-badgit/git" "$TMP/bin-notsha/git" "$TMP/bin-notsha-log/git" "$TMP/bin-notsha-head/git" "$TMP/bin-venvswap/uv" "$TMP/bin-slow/uv"
+  chmod +x "$STUB"/* "$TMP/bin-badmktemp/mktemp" "$TMP/bin-badgit/git" "$TMP/bin-notsha/git" "$TMP/bin-notsha-log/git" "$TMP/bin-notsha-head/git" "$TMP/bin-emptylog/git" "$TMP/bin-venvswap/uv" "$TMP/bin-slow/uv"
 }
 
 if build_fixture && build_stubs; then record 0 "고정 환경 준비" "합성 저장소 $WT, 대역 uv·ps·lsof·ipcs"
@@ -269,6 +271,8 @@ run_case "반례11 프롬프트 경로 미존재 → BLOCKED" BLOCKED "$TMP/pris
 run_case "반례12 옵션 값 누락 → FAIL(꼬리 있음)" FAIL "$TMP/pristine.sh" "" "$STUB_PATH" --worktree
 # 16 알 수 없는 인자 → FAIL 이되 꼬리(CHECKED·VERDICT)가 있어야 한다
 run_case "반례16 알 수 없는 인자 → FAIL(꼬리 있음)" FAIL "$TMP/pristine.sh" "" "$STUB_PATH" --bogus
+# 19 프롬프트 커밋 조회 rc 0 + 빈 출력 → BLOCKED
+run_case "반례19 프롬프트 커밋 조회 빈 출력 → BLOCKED" BLOCKED "$TMP/pristine.sh" "" "$TMP/bin-emptylog:$STUB_PATH" "${FULL_ARGS[@]}"
 # 17 c 단계 도중 원본 venv 링크 교체(시각 복원) → FAIL
 run_case "반례17 원본 venv 링크 교체 → FAIL" FAIL "$TMP/pristine.sh" "" "$TMP/bin-venvswap:$STUB_PATH" "${FULL_ARGS[@]}"
 if [ "$(readlink "$WT/humansearch/.venv/bin/python")" = "../lib" ]; then ln -sfn ../lib/python3.14 "$WT/humansearch/.venv/bin/python"; fi
