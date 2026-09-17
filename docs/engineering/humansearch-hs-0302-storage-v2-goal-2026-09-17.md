@@ -134,6 +134,29 @@ rename 스왑 탐지, VFS 가로채기)는 전부 들어내며, HMAC은 선택�
 - 게이트 5(CHECKPOINT): 이 커밋까지가 로컬 안전 커밋이다. push·PR 생성은 사람 승인 뒤 별도
   수동 실행 — 이 문서 제출 시점까지는 실행하지 않는다.
 
+## 적대 검증 로그 — 사장님 리뷰 기반 자체 재검증 (2026-09-17, 같은 세션)
+
+사장님이 외부 리뷰(검토서)를 전달하며 "제공 기록 기준"이라는 리뷰 자신의 한계를 지적했다. 리뷰가
+제시한 반례 A/G/H를 실제 코드로 직접 재현했다(추측이 아니라 실행):
+
+- **Case A**(같은 ingestion_id 10개 스레드 동시 재시도) — `hs_candidates` 1행, `hs_candidate_observations`
+  1행, 오류 0건. SQLite `begin immediate` 잠금이 직렬화해 안전함을 확인. **안전(문제 없음)**.
+- **Case G**(같은 정규화 이메일, 대소문자만 다른 원본) — 최초 관측의 원본(`John.Kim@Example.com`)이
+  이후 관측(`JOHN.KIM@EXAMPLE.COM`)에 덮이지 않고 유지됨. **의도대로 동작**.
+- **Case H**(같은 LinkedIn 프로필을 추적 파라미터만 다른 URL로 재관측) — **실제 결함 재현**:
+  `candidate_ref_normalized`가 URL 형태를 인식하지 않고 문자열 그대로 비교해, 같은 실사람이 후보자
+  행 2개로 쪼개졌다(`candidate_id` 1, 2). 후속 진입점 연결 시 `linkedin_rps` 채널의 `candidate_ref`가
+  실제로는 프로필 URL일 가능성이 높아 실무 영향이 크다고 판단해 **즉시 수정**했다.
+
+### 수정 — `_normalize_candidate_ref` 신설
+
+`candidate_storage.py`의 `_normalize_generic`을 `_normalize_candidate_ref`로 대체: 값이 http(s) URL
+형태이면 `_normalize_url`과 동일한 규칙(스킴/호스트 소문자화, 쿼리스트링 제거, 끝 슬래시 제거)으로
+정규화하고, URL이 아니면 기존처럼 NFC+trim만 적용한다. RED
+(`test_url_shaped_candidate_ref_dedups_ignoring_tracking_params`, 수정 전 `candidate_id` 1≠2로 실패)
+→ GREEN(수정 후 1행으로 수렴, 원본 URL은 그대로 보존) 확인. 패키지 전체 `pytest` 224건(기존 223 +
+신규 1) 통과, ruff/mypy strict 통과.
+
 ## L3 — 롤백·영향 반경·데이터 안전 AC
 
 - 롤백: 이 브랜치는 아직 main에 병합되지 않았다 — 롤백은 병합하지 않는 것 자체다. 병합 후

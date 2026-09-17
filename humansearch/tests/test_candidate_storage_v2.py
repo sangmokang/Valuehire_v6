@@ -249,6 +249,41 @@ def test_ten_concurrent_writes_of_the_same_candidate_yield_one_candidate_row(
     assert observation_count == 10
 
 
+# --- a URL-shaped candidate_ref must dedup like a URL, not split on tracking params ---
+# (reproduced 2026-09-17 via adversarial check against an owner-side review: two
+# observations of the same LinkedIn profile URL, differing only by ?trk=..., were
+# silently creating two separate candidate rows before this fix.)
+
+
+def test_url_shaped_candidate_ref_dedups_ignoring_tracking_params(tmp_path: Path) -> None:
+    db_path = _db(tmp_path)
+    first = record_candidate_observation(
+        db_path,
+        _input(
+            channel="linkedin_rps",
+            candidate_ref="https://www.linkedin.com/in/abc/?trk=test",
+            ingestion_id="run-1",
+        ),
+    )
+    second = record_candidate_observation(
+        db_path,
+        _input(
+            channel="linkedin_rps",
+            candidate_ref="https://www.linkedin.com/in/abc/?trk=other",
+            ingestion_id="run-2",
+        ),
+    )
+    assert first.candidate.candidate_id == second.candidate.candidate_id
+    # raw evidence for each distinct URL variant must still be preserved verbatim
+    assert first.candidate.candidate_ref_raw == "https://www.linkedin.com/in/abc/?trk=test"
+    connection = sqlite3.connect(db_path)
+    try:
+        candidate_count = connection.execute("select count(*) from hs_candidates").fetchone()[0]
+    finally:
+        connection.close()
+    assert candidate_count == 1
+
+
 # --- distinct candidates must never be merged into one row ---
 
 

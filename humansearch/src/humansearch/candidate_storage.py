@@ -139,7 +139,7 @@ def _validate(record: CandidateObservationInput) -> _Validated:
         position_ref=position_ref,
         channel=channel,
         candidate_ref_raw=candidate_ref_raw,
-        candidate_ref_normalized=_normalize_generic(candidate_ref_raw),
+        candidate_ref_normalized=_normalize_candidate_ref(candidate_ref_raw),
         observed_at=observed_at,
         ingestion_id=ingestion_id,
         email_raw=email_raw,
@@ -200,20 +200,32 @@ def _optional_url(value: str | None) -> str | None:
     return cleaned
 
 
-def _normalize_generic(value: str) -> str:
+def _nfc_strip(value: str) -> str:
     return unicodedata.normalize(_NORMALIZATION_FORM, value.strip())
 
 
 def _normalize_email(value: str) -> str:
-    return _normalize_generic(value).lower()
+    return _nfc_strip(value).lower()
 
 
 def _normalize_url(value: str) -> str:
-    parts = urlsplit(_normalize_generic(value))
+    parts = urlsplit(_nfc_strip(value))
     scheme = parts.scheme.lower()
     netloc = parts.netloc.lower()
     path = parts.path.rstrip("/") or "/"
     return f"{scheme}://{netloc}{path}"
+
+
+def _normalize_candidate_ref(value: str) -> str:
+    """URL-shaped candidate refs (e.g. a LinkedIn profile URL used as the per-channel
+    identifier) must dedup the same way ``profile_url`` does — otherwise a tracking
+    query param or trailing slash silently splits one real candidate into two rows
+    (reproduced 2026-09-17; see the goal doc's adversarial-check log)."""
+    cleaned = _nfc_strip(value)
+    parts = urlsplit(cleaned)
+    if parts.scheme in ("http", "https") and parts.netloc:
+        return _normalize_url(cleaned)
+    return cleaned
 
 
 def _candidate_key_hmac(key: bytes, v: _Validated) -> str:
