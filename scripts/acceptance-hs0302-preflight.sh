@@ -328,12 +328,15 @@ if [ "$(readlink "$WT/humansearch/.venv/bin/python")" = "../lib" ]; then ln -sfn
 sig_out="$TMP/out-sigterm.txt"; (cd "$TMP" && PATH="$TMP/bin-slow:$STUB_PATH" exec bash "$TMP/pristine.sh" "${FULL_ARGS[@]}") > "$sig_out" 2>&1 & sig_pid=$!
 for _ in $(seq 1 100); do "$GREP" -q '^PASS: ac2.copy' "$sig_out" 2>/dev/null && break; sleep 0.1; done
 sig_s=$(sed -n 's/^SESSION_DIR=//p' "$sig_out" | tail -1); printf '%s\n' "$sig_s" >> "$SESSIONS"
-kill -TERM "$sig_pid" 2>>"$TMP/sig.err"; wait "$sig_pid" 2>>"$TMP/sig.err"; sleep 3
+kill_rc=0; kill -TERM "$sig_pid" 2>>"$TMP/sig.err" || kill_rc=$?; sig_rc=0; wait "$sig_pid" 2>>"$TMP/sig.err" || sig_rc=$?; sleep 3
 size1=$(wc -c < "$sig_s/ps-snap.txt" 2>>"$TMP/sig.err" | tr -d ' '); sleep 2.5; size2=$(wc -c < "$sig_s/ps-snap.txt" 2>>"$TMP/sig.err" | tr -d ' ')
-if [ -n "$sig_s" ] && [ -f "$sig_s/ps-snap.txt" ] && [ "$size1" = "$size2" ] && ! "$GREP" -q '^VERDICT: PASS' "$sig_out"; then
-  record 0 "반례18 SIGTERM 뒤 표본기 정지" "ps-snap ${size1}B 로 정지(2.5초 불변), 판정 PASS 없음"
+sig_last=$(tail -n 1 "$sig_out"); sig_prev=$(tail -n 2 "$sig_out" | head -n 1)
+# 정리(표본기 정지)만이 아니라 결과 계약도 요구한다: kill 성공, 종료값 2, 마지막 두 줄 CHECKED·VERDICT: BLOCKED (Codex 적대 리뷰 D1: 꼬리 없는 종료·FAIL 종료가 살아남았다)
+if [ -n "$sig_s" ] && [ -f "$sig_s/ps-snap.txt" ] && [ "$size1" = "$size2" ] && [ "$kill_rc" -eq 0 ] && [ "$sig_rc" -eq 2 ] \
+   && [ "$sig_last" = "VERDICT: BLOCKED" ] && printf '%s' "$sig_prev" | "$GREP" -qE '^CHECKED: [0-9]+$'; then
+  record 0 "반례18 SIGTERM 뒤 표본기 정지·BLOCKED 꼬리" "ps-snap ${size1}B 로 정지(2.5초 불변), rc=$sig_rc, 꼬리 '$sig_prev' / '$sig_last'"
 else
-  record 1 "반례18 SIGTERM 뒤 표본기 정지" "ps-snap ${size1:-없음}→${size2:-없음}B (계속 자라면 고아), 세션 ${sig_s:-없음}"
+  record 1 "반례18 SIGTERM 뒤 표본기 정지·BLOCKED 꼬리" "ps-snap ${size1:-없음}→${size2:-없음}B, kill_rc=$kill_rc rc=$sig_rc 꼬리 '${sig_prev}' / '${sig_last}', 세션 ${sig_s:-없음}"
   lsof -t "$sig_s/ps-snap.txt" 2>>"$TMP/sig.err" | xargs kill 2>>"$TMP/sig.err"
 fi
 # 13 프롬프트 커밋 조회 출력이 SHA 가 아님 → BLOCKED (기준 조회만 막고 다른 조회를 두면 같은 오염이 FAIL 로 갈린다)
