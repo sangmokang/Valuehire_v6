@@ -115,6 +115,21 @@
 - 사용자가 명시적으로 지시하지 않는 한 LinkedIn 메시지·InMail·후보자 이메일 발송 0건.
 - 내부 보고 이메일(사용자 앞)은 사용자가 지시한 경우에만 발송하며, 발송 전 위 완결성 체크를 통과한 레코드만 포함한다.
 
+## 프로필 아카이빙 (2026-09-17 추가 — 반드시 실행)
+
+크롬 익스텐션(Valuehire 프로필 아카이버)이 자동화된 탭에서는 권한 문제(`Either the 'all_urls' or 'activeTab' permission is required`)로 캡처하지 못하는 것을 확인했다. 익스텐션과 무관하게, 아카이버 서버(`/Users/kangsangmo/Desktop/Valuehire_v4/tools/profile-archiver/server/index.js:2072`)에는 인증 없는 범용 저장 API `POST http://127.0.0.1:7777/api/archive`가 이미 있다. **프로필을 방문해서 `get_page_text`(또는 `read_page`)로 내용을 뽑은 직후마다** 이 API로 저장해라:
+
+```bash
+curl -s -X POST http://127.0.0.1:7777/api/archive \
+  -H 'Content-Type: application/json' \
+  -d '{"url":"<프로필 URL>","pageTitle":"<페이지 제목>","textContent":"<get_page_text 결과 텍스트>"}'
+```
+
+- `url` 만 필수. `screenshots`는 생략 가능(없어도 저장됨).
+- 저장되면 SQLite에 즉시 insert 되고, 서버가 30초마다 자동으로 Supabase에 동기화한다(추가 조치 불필요).
+- 중복 방지: 같은 URL을 최근에 이미 저장했으면 서버가 자동으로 스킵한다(`force=1` 안 주면 됨) — 매번 호출해도 안전하다.
+- 이 저장은 조사 결과 이메일 발송과 별개다 — 이메일을 안 보내는 중간 조사(예: 이메일 확인만 위해 잠깐 들어간 프로필)도 저장해라.
+
 ## 이전 조사 결과 취급 방법
 
 2026-09-17 1차 조사(기존 40명 + 5개 포지션 26명 신규 발굴) 결과와 사용자가 공유한 ChatGPT 답변은 **정본이 아니라 재검증할 가설**이다. "이미 이메일 확보됨"으로 표기된 10명도 이번 원장에서는 프로필을 다시 방문해 확인 상태·확인 시각을 새로 기록한다(값이 이미 맞다면 재확인 결과로 갱신, 라벨을 그대로 복사하지 않는다).
