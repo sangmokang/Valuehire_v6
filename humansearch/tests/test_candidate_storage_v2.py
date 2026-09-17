@@ -588,6 +588,33 @@ def test_unapproved_host_non_numeric_port_position_case_is_preserved(tmp_path: P
     assert first.candidate.candidate_id != second.candidate.candidate_id
 
 
+def test_unapproved_host_www_prefix_is_not_assumed_equivalent_to_apex(tmp_path: Path) -> None:
+    """Owner-directed narrowing, round 6 (2026-09-17, via external review): scheme
+    and host case-folding are RFC 3986 syntax facts (the spec defines them as
+    case-insensitive), but "www.X and X are the same host" is a DNS/CNAME
+    convention, not a URI-syntax fact — treating them as equivalent for a channel
+    nobody has verified is a business identity call this codebase must not make
+    unilaterally. Only the approved host (linkedin.com) gets that assumption."""
+    db_path = _db(tmp_path)
+    first = record_candidate_observation(
+        db_path,
+        _input(
+            channel="saramin",
+            candidate_ref="https://www.unapproved.invalid/candidate/42",
+            ingestion_id="run-1",
+        ),
+    )
+    second = record_candidate_observation(
+        db_path,
+        _input(
+            channel="saramin",
+            candidate_ref="https://unapproved.invalid/candidate/42",
+            ingestion_id="run-2",
+        ),
+    )
+    assert first.candidate.candidate_id != second.candidate.candidate_id
+
+
 # --- distinct candidates must never be merged into one row ---
 
 

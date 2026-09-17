@@ -283,37 +283,43 @@ def _normalize_query(query: str) -> str:
     return urlencode(kept)
 
 
-def _normalized_netloc(netloc: str) -> str:
-    """Lowercase and www-strip only the hostname — never the userinfo (before an
-    '@', if any) or whatever follows a ':' (normally a numeric port, but
-    ``urlsplit`` never validates that — Codex V1 5th-round finding, 2026-09-17:
-    a non-numeric "port" position, e.g. from a malformed URL, was getting
-    case-folded like a real hostname). Userinfo and the post-colon tail are not
-    DNS-aliasing facts and could be real per-candidate identifiers on a host we
-    have not verified."""
+def _cased_netloc(netloc: str) -> str:
+    """Fold case per RFC 3986 (scheme and host are case-insensitive by the URI
+    syntax spec itself) — never the userinfo (before an '@') or whatever follows
+    a ':' (normally a numeric port, but ``urlsplit`` never validates that — Codex
+    V1 5th-round finding, 2026-09-17: a non-numeric "port" position, e.g. from a
+    malformed URL, was getting case-folded like a real hostname). Neither
+    userinfo nor a port-position string is case-insensitive by the URI spec, and
+    either could be a real per-candidate identifier on a host we have not
+    verified."""
     userinfo, sep, host_port = netloc.rpartition("@")
     host, colon, port = host_port.partition(":")
-    normalized_host = host.lower().removeprefix(_WWW_PREFIX)
-    return f"{userinfo}{sep}{normalized_host}{colon}{port}"
+    return f"{userinfo}{sep}{host.lower()}{colon}{port}"
 
 
 def _normalize_url(value: str) -> str:
     parts = urlsplit(_nfc_strip(value))
     scheme = parts.scheme.lower()
-    netloc = _normalized_netloc(parts.netloc)
-    if netloc not in _APPROVED_CANONICALIZATION_HOSTS:
-        # Unverified host: touch only scheme case and the netloc normalization
-        # above — never the path (including a trailing slash), query, or fragment.
-        # Any of those might be a real per-candidate identifier on a host we
-        # haven't verified (Codex V1 4th-round finding, 2026-09-17: the trailing
-        # slash was being stripped here before this check ever ran).
+    netloc = _cased_netloc(parts.netloc)
+    approved_netloc = netloc.removeprefix(_WWW_PREFIX)
+    if approved_netloc not in _APPROVED_CANONICALIZATION_HOSTS:
+        # Unverified host: fold only what RFC 3986 defines as case-insensitive
+        # (scheme, host) — that is a URI-syntax fact, not a guess. Do NOT also
+        # assume "www.X" and "X" are the same host: that equivalence is a
+        # DNS/CNAME convention, not URI syntax, so treating it as free is a
+        # business identity-policy call this codebase must not make unilaterally
+        # for a channel nobody has verified (round 6, 2026-09-17, external
+        # review: the earlier "DNS convention is safe" justification blurred a
+        # technical fact with a business decision). Path (including a trailing
+        # slash), query, and fragment stay untouched for the same reason as the
+        # earlier rounds' fixes.
         query_suffix = f"?{parts.query}" if parts.query else ""
         fragment_suffix = f"#{parts.fragment}" if parts.fragment else ""
         return f"{scheme}://{netloc}{parts.path}{query_suffix}{fragment_suffix}"
     path = (parts.path.rstrip("/") or "/").lower()
     query = _normalize_query(parts.query)
     suffix = f"?{query}" if query else ""
-    return f"{scheme}://{netloc}{path}{suffix}"
+    return f"{scheme}://{approved_netloc}{path}{suffix}"
 
 
 def _normalize_candidate_ref(value: str) -> str:
