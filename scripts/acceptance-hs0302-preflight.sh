@@ -2,7 +2,7 @@
 # acceptance-hs0302-preflight.sh — 마감 사전검사기가 실패 방향으로 닫혀 있는가 (HS-03.02 R6).
 #
 # 대상: scripts/verify/hs0302-closeout-preflight.sh (마감 프롬프트 0·2·5·7단계의 실행부).
-# 차단 — 아래 반례 19종을 원본 밖 임시 사본에서 돌려 전부 거부돼야 한다. 기대값은 "통과 아님" 이 아니라 정확한 판정·종료값이다.
+# 차단 — 아래 반례 31종을 원본 밖 임시 사본에서 돌려 전부 거부돼야 한다. 기대값은 "통과 아님" 이 아니라 정확한 판정·종료값이다.
 #   1 mktemp 실패 주입 → BLOCKED      2 git 조회 실패 주입 → BLOCKED (조회 실패는 대상 결함이 아니다)
 #   3 빈 스크립트 → 거부               4 exit 0 만 → 거부
 #   5 VERDICT: PASS 문구만 출력 → 거부  6 필수 검사 하나 삭제 → FAIL
@@ -19,6 +19,13 @@
 #   17 c 단계 도중 원본 venv 의 bin/python 링크 대상을 바꾸고 시각을 복원 → ac2.copy FAIL (codeaudit B1: 파일 전용 지문은 "불변" 으로 봤다)
 #   18 d 단계 도중 SIGTERM → 표본기(ps 스냅샷)가 3초 안에 멈춰야 한다 (codeaudit B2: trap 이 없으면 고아가 워크트리 cwd 를 쥐고 영구 BLOCKED)
 #   19 프롬프트 커밋 조회가 rc 0 + 빈 출력 → BLOCKED (Codex V1 5회차: 빈 값을 FAIL 로 보내던 별도 분기)
+#   20~31 humanreview(c9dffa1) 변이 30종 중 생존 15종의 봉인 — "환경이 나쁠 때 잡는 검사" 마다 음성 대조군:
+#   20 --check-v1 대상 SHA ≠ HEAD → FAIL   21 격리 클론의 객체가 원본과 하드링크(--no-local 부재) → 0 이어야
+#   22 uv sync 로그에 새 설치 증거 없음 → FAIL   23 탐침이 OUTSIDE·1 failed → FAIL   24 src 에 symlink → FAIL(사본 링크 0 규칙)
+#   25 복제가 하드링크로 이뤄짐 → FAIL   26 사본 모듈 realpath 가 사본 밖 → FAIL   27 존재하지 않는 --worktree → BLOCKED rc 2(die_blocked)
+#   28 미커밋 변경 → FAIL(git.clean)   29 lsof 에 자기 셸 없음 → BLOCKED   30 공유메모리 30개 → BLOCKED   31 클론 venv 안에 원본 경로 → FAIL
+#   기록만(시험 없음): M04 신호 트랩 제거(EXIT 트랩만으로도 정지·PASS 부재 성립 — 부분 등가), M12 -newer 제거(지문이 mtime 포함 — 거의 등가),
+#   M22 grep 자기검사, M25 클론에 .venv 사전 존재(합성 저장소에서 재현 불가).
 # 통과 — 손대지 않은 사본은 고정 환경(합성 저장소 + 대역 명령)에서 PASS 여야 한다.
 #   대역(uv·ps·lsof·ipcs)은 검사기의 판정 논리를 재기 위한 것이다. 실제 환경 실행은
 #   마감 세션이 같은 검사기를 실제 워크트리에서 돌리는 것으로 증명한다(여기서 대신하지 않는다).
@@ -165,6 +172,26 @@ IPCS
   printf '#!/usr/bin/env bash\ncase "$*" in *"log -1 --format=%%H"*) echo NOT_A_SHA; exit 0 ;; esac\nexec %s "$@"\n' "$REAL_GIT" > "$TMP/bin-notsha-log/git"
   printf '#!/usr/bin/env bash\ncase "$*" in *"rev-parse HEAD"*) echo NOT_A_SHA; exit 0 ;; esac\nexec %s "$@"\n' "$REAL_GIT" > "$TMP/bin-notsha-head/git"
   mkdir -p "$TMP/bin-emptylog" && printf '#!/usr/bin/env bash\ncase "$*" in *"log -1 --format=%%H"*) exit 0 ;; esac\nexec %s "$@"\n' "$REAL_GIT" > "$TMP/bin-emptylog/git"
+  # 반례 22·23·26·31: uv 대역 변형 — 하나의 동작만 나쁘게 하고 나머지는 기본 대역에 위임
+  mkdir -p "$TMP/bin-copyvenv" "$TMP/bin-badprobe" "$TMP/bin-outsidemod" "$TMP/bin-leakpath" "$TMP/bin-noself" "$TMP/bin-shm30" "$TMP/bin-hardcp" || return 1
+  printf '#!/usr/bin/env bash\ncase "${1:-}" in sync) "$(dirname "$0")/../bin/uv" "$@" >/dev/null; printf "Installed 1 package in 1ms\\n" ;; *) exec "$(dirname "$0")/../bin/uv" "$@" ;; esac\n' > "$TMP/bin-copyvenv/uv"
+  printf '#!/usr/bin/env bash\ncase " $* " in *" pytest "*) printf "OUTSIDE sys.prefix = /elsewhere\\n1 failed in 0.01s\\n"; exit 1 ;; *) exec "$(dirname "$0")/../bin/uv" "$@" ;; esac\n' > "$TMP/bin-badprobe/uv"
+  printf '#!/usr/bin/env bash\ncase " $* " in *" python "*) echo /elsewhere/humansearch/candidate_identity.py ;; *) exec "$(dirname "$0")/../bin/uv" "$@" ;; esac\n' > "$TMP/bin-outsidemod/uv"
+  printf '#!/usr/bin/env bash\ncase "${1:-}" in sync) "$(dirname "$0")/../bin/uv" "$@"; git config --get remote.origin.url > .venv/leak.txt ;; *) exec "$(dirname "$0")/../bin/uv" "$@" ;; esac\n' > "$TMP/bin-leakpath/uv"
+  # 반례 29: lsof 에 자기 셸이 없다(조회가 죽어 있음) / 반례 30: 공유메모리 세그먼트 30개
+  printf '#!/usr/bin/env bash\nprintf "p1\\nclaunchd\\nf cwd\\nn/\\n"\n' > "$TMP/bin-noself/lsof"
+  printf '#!/usr/bin/env bash\nprintf "IPC status\\nT     ID     KEY        MODE       OWNER    GROUP  CPID  LPID\\nShared Memory:\\n"; for i in $(seq 1 30); do printf "m %%d 0x0 --rw------- u g %%d 1 0 0 0 0 0 0 00:00:00 00:00:00 00:00:00\\n" "$((65536+i))" "$((1000+i))"; done\n' > "$TMP/bin-shm30/ipcs"
+  # 반례 25: 복제가 하드링크로 이뤄진다(실제 cp 뒤 사본 파일을 원본의 하드링크로 교체)
+  cat > "$TMP/bin-hardcp/cp" <<'HCP'
+#!/usr/bin/env bash
+/bin/cp "$@" || exit $?
+args=(); for a in "$@"; do case "$a" in -*) ;; *) args+=("$a") ;; esac; done
+n=${#args[@]}; [ "$n" -ge 2 ] || exit 0; dest="${args[$((n-1))]}"
+for ((i=0; i<n-1; i++)); do src="${args[$i]}"
+  if [ -f "$src" ]; then ln -f "$src" "$dest/$(basename "$src")"
+  elif [ -d "$src" ]; then (cd "$src" && find . -type f) | while IFS= read -r rel; do ln -f "$src/$rel" "$dest/$(basename "$src")/$rel"; done; fi
+done
+HCP
   # 반례 17: c 단계의 uv run(모듈 로드) 사이에 원본 venv 링크 대상을 바꾸고 링크·부모 폴더 시각을 복원(-newer 검사를 피하는 공격 형태)
   mkdir -p "$TMP/bin-venvswap" && cat > "$TMP/bin-venvswap/uv" <<'SWAP'
 #!/usr/bin/env bash
@@ -175,7 +202,7 @@ exec "$(dirname "$0")/../bin/uv" "$@"
 SWAP
   # 반례 18: d 단계의 uv run pytest 를 6초 늦춰 SIGTERM 을 보낼 창을 만든다
   mkdir -p "$TMP/bin-slow" && printf '#!/usr/bin/env bash\ncase " $* " in *" pytest "*) sleep 6 ;; esac\nexec "$(dirname "$0")/../bin/uv" "$@"\n' > "$TMP/bin-slow/uv"
-  chmod +x "$STUB"/* "$TMP/bin-badmktemp/mktemp" "$TMP/bin-badgit/git" "$TMP/bin-notsha/git" "$TMP/bin-notsha-log/git" "$TMP/bin-notsha-head/git" "$TMP/bin-emptylog/git" "$TMP/bin-venvswap/uv" "$TMP/bin-slow/uv"
+  chmod +x "$STUB"/* "$TMP/bin-badmktemp/mktemp" "$TMP/bin-badgit/git" "$TMP/bin-notsha/git" "$TMP/bin-notsha-log/git" "$TMP/bin-notsha-head/git" "$TMP/bin-emptylog/git" "$TMP/bin-venvswap/uv" "$TMP/bin-slow/uv" "$TMP"/bin-copyvenv/uv "$TMP"/bin-badprobe/uv "$TMP"/bin-outsidemod/uv "$TMP"/bin-leakpath/uv "$TMP"/bin-noself/lsof "$TMP"/bin-shm30/ipcs "$TMP"/bin-hardcp/cp
 }
 
 if build_fixture && build_stubs; then record 0 "고정 환경 준비" "합성 저장소 $WT, 대역 uv·ps·lsof·ipcs"
@@ -273,6 +300,27 @@ run_case "반례12 옵션 값 누락 → FAIL(꼬리 있음)" FAIL "$TMP/pristin
 run_case "반례16 알 수 없는 인자 → FAIL(꼬리 있음)" FAIL "$TMP/pristine.sh" "" "$STUB_PATH" --bogus
 # 19 프롬프트 커밋 조회 rc 0 + 빈 출력 → BLOCKED
 run_case "반례19 프롬프트 커밋 조회 빈 출력 → BLOCKED" BLOCKED "$TMP/pristine.sh" "" "$TMP/bin-emptylog:$STUB_PATH" "${FULL_ARGS[@]}"
+# 21 격리 클론의 git 객체가 원본과 하드링크면 --no-local 이 빠진 것이다(정상 세션 폴더로 확인)
+hl=$(find "${SESSION:-$TMP/no-session}/v1-clone/.git/objects" -type f -links +1 2>>"$TMP/hl.err" | wc -l | tr -d ' ')
+if [ -d "${SESSION:-}/v1-clone/.git/objects" ] && [ "$hl" = 0 ]; then record 0 "반례21 클론 객체 하드링크 0(--no-local)" "links+1 = $hl"
+else record 1 "반례21 클론 객체 하드링크 0(--no-local)" "links+1 = ${hl:-없음} (0 이어야; 0 이 아니면 원본 저장소와 객체를 공유한다)"; fi
+# 22 새 설치 증거 없음(Installed 1 package 만) → FAIL / 23 탐침 OUTSIDE·1 failed → FAIL / 26 사본 모듈 realpath 사본 밖 → FAIL / 31 클론 venv 안 원본 경로 → FAIL
+run_case "반례22 새 venv 설치 증거 없음 → FAIL" FAIL "$TMP/pristine.sh" "" "$TMP/bin-copyvenv:$STUB_PATH" "${FULL_ARGS[@]}"
+run_case "반례23 탐침 OUTSIDE·1 failed → FAIL" FAIL "$TMP/pristine.sh" "" "$TMP/bin-badprobe:$STUB_PATH" "${FULL_ARGS[@]}"
+run_case "반례26 사본 모듈 realpath 사본 밖 → FAIL" FAIL "$TMP/pristine.sh" "" "$TMP/bin-outsidemod:$STUB_PATH" "${FULL_ARGS[@]}"
+run_case "반례31 클론 venv 안 원본 경로 → FAIL" FAIL "$TMP/pristine.sh" "" "$TMP/bin-leakpath:$STUB_PATH" "${FULL_ARGS[@]}"
+# 24 src 안 symlink(git 이 무시하는 이름) → 사본 링크 0 규칙으로 FAIL
+printf '*.local\n' >> "$WT/.git/info/exclude"; ln -s __init__.py "$WT/humansearch/src/humansearch/x.local"   # 커밋하지 않는다(커밋하면 git.prompt-tail 이 먼저 FAIL 한다)
+run_case "반례24 src 안 symlink → FAIL" FAIL "$TMP/pristine.sh" "" "$STUB_PATH" "${FULL_ARGS[@]}"
+rm -f "$WT/humansearch/src/humansearch/x.local"
+# 25 복제가 하드링크로 이뤄짐 → FAIL(사본 hardlink 0 규칙)
+run_case "반례25 복제가 하드링크 → FAIL" FAIL "$TMP/pristine.sh" "" "$TMP/bin-hardcp:$STUB_PATH" "${FULL_ARGS[@]}"
+# 27 존재하지 않는 --worktree → BLOCKED rc 2 (die_blocked 계약) / 29 lsof 에 자기 셸 없음 → BLOCKED / 30 공유메모리 30개 → BLOCKED
+run_case "반례27 존재하지 않는 워크트리 → BLOCKED" BLOCKED "$TMP/pristine.sh" "" "$STUB_PATH" --worktree "$TMP/does-not-exist"
+run_case "반례29 lsof 자기 셸 없음 → BLOCKED" BLOCKED "$TMP/pristine.sh" "" "$TMP/bin-noself:$STUB_PATH" "${FULL_ARGS[@]}"
+run_case "반례30 공유메모리 30개 → BLOCKED" BLOCKED "$TMP/pristine.sh" "" "$TMP/bin-shm30:$STUB_PATH" "${FULL_ARGS[@]}"
+# 28 미커밋 변경 → FAIL(git.clean)
+printf 'dirty\n' > "$WT/dirty.txt"; run_case "반례28 미커밋 변경 → FAIL" FAIL "$TMP/pristine.sh" "" "$STUB_PATH" "${FULL_ARGS[@]}"; rm -f "$WT/dirty.txt"
 # 17 c 단계 도중 원본 venv 링크 교체(시각 복원) → FAIL
 run_case "반례17 원본 venv 링크 교체 → FAIL" FAIL "$TMP/pristine.sh" "" "$TMP/bin-venvswap:$STUB_PATH" "${FULL_ARGS[@]}"
 if [ "$(readlink "$WT/humansearch/.venv/bin/python")" = "../lib" ]; then ln -sfn ../lib/python3.14 "$WT/humansearch/.venv/bin/python"; fi
@@ -309,6 +357,11 @@ if write_v1_evidence "$SHA"; then
   rm -f "$EV/v1-rc.txt"
   run_case "반례8 V1 rc 파일 없음 → FAIL" FAIL "$TMP/pristine.sh" "" "$STUB_PATH" --check-v1 "$SHA" "${V1_ARGS[@]}"
 else record 1 "정상 V1 증거 PASS(--check-v1)" "증거 파일 생성 실패"; fi
+# 20 --check-v1 대상 SHA 가 HEAD 가 아니다(다른 커밋의 완전한 증거) → FAIL(v1.head)
+BASE_SHA=$(git -C "$WT" rev-parse "$BASE")
+if [ -n "$BASE_SHA" ] && mkdir -p "$EV" && printf 'VERDICT: PASS\n\n대상 SHA %s\n' "$BASE_SHA" > "$EV/codex-v1-${BASE_SHA:0:7}.md" && printf '0\n' > "$EV/v1-rc.txt"; then
+  run_case "반례20 V1 대상 SHA ≠ HEAD → FAIL" FAIL "$TMP/pristine.sh" "" "$STUB_PATH" --check-v1 "$BASE_SHA" "${V1_ARGS[@]}"
+else record 1 "반례20 V1 대상 SHA ≠ HEAD → FAIL" "증거 준비 실패"; fi
 # 9 V1 SHA 불일치 → FAIL (판정 본문의 SHA 가 대상과 다르다)
 OTHER_SHA=$(printf '%s' "$SHA" | tr '0123456789abcdef' '123456789abcdef0')
 if write_v1_evidence "$OTHER_SHA"; then
