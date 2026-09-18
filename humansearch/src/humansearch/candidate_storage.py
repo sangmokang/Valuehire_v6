@@ -366,6 +366,13 @@ def _write_once(connection: sqlite3.Connection, v: _Validated, hmac_key: bytes |
     try:
         candidate_id, created = _upsert_candidate(connection, v, hmac_key)
         observation_id, obs_outcome = _insert_observation(connection, candidate_id, v)
+        # Only a genuinely new observation may fill evidence gaps. A duplicate
+        # ingestion_id retry must leave the candidate row untouched — otherwise a
+        # caller bug that resends the same ingestion_id with a different payload
+        # would silently mutate a candidate while reporting "duplicate_observation"
+        # (Codex adversarial review finding, 2026-09-18).
+        if not created and obs_outcome == "inserted":
+            _backfill_missing_evidence(connection, candidate_id, v)
         connection.commit()
     except BaseException:
         _rollback(connection)
@@ -420,7 +427,6 @@ def _upsert_candidate(
         ).fetchone()
         if row is None:
             raise CandidateStorageError("candidate upsert conflict without a matching row") from exc
-        _backfill_missing_evidence(connection, row[0], v)
         return row[0], False
 
 
@@ -454,13 +460,15 @@ def _insert_observation(
         cursor = connection.execute(
             """
             insert into hs_candidate_observations
-              (candidate_id, source_type, source_url_raw, source_url_normalized,
-               observed_at, ingestion_id)
-            values (?, ?, ?, ?, ?, ?)
+              (candidate_id, source_type, candidate_ref_raw, candidate_ref_normalized,
+               source_url_raw, source_url_normalized, observed_at, ingestion_id)
+            values (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 candidate_id,
                 v.channel,
+                v.candidate_ref_raw,
+                v.candidate_ref_normalized,
                 v.profile_url_raw,
                 v.profile_url_normalized,
                 v.observed_at,

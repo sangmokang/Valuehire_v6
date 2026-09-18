@@ -54,6 +54,8 @@ _MIGRATIONS: Final[tuple[tuple[int, str, tuple[str, ...]], ...]] = (
               observation_id integer primary key autoincrement,
               candidate_id integer not null references hs_candidates(candidate_id),
               source_type text not null check (source_type in ('saramin','jobkorea','linkedin_rps')),
+              candidate_ref_raw text not null,
+              candidate_ref_normalized text not null,
               source_url_raw text,
               source_url_normalized text,
               observed_at text not null,

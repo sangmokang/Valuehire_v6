@@ -286,6 +286,47 @@ def test_url_shaped_candidate_ref_dedups_ignoring_tracking_params(tmp_path: Path
     assert candidate_count == 1
 
 
+def test_second_candidate_ref_variant_raw_is_preserved_in_its_observation(
+    tmp_path: Path,
+) -> None:
+    """Codex adversarial review finding, 2026-09-18: when two candidate_ref values
+    normalize to the same candidate, the candidate row only ever keeps the
+    first-seen raw value (by design — evidence is never overwritten). Without a
+    per-observation raw column, the second variant's raw form was not stored
+    anywhere and was unrecoverable."""
+    db_path = _db(tmp_path)
+    record_candidate_observation(
+        db_path,
+        _input(
+            channel="linkedin_rps",
+            candidate_ref="https://www.linkedin.com/in/abc/?trk=test",
+            ingestion_id="run-1",
+        ),
+    )
+    record_candidate_observation(
+        db_path,
+        _input(
+            channel="linkedin_rps",
+            candidate_ref="https://www.linkedin.com/in/abc/?trk=other",
+            ingestion_id="run-2",
+        ),
+    )
+    connection = sqlite3.connect(db_path)
+    try:
+        raws = [
+            row[0]
+            for row in connection.execute(
+                "select candidate_ref_raw from hs_candidate_observations order by observation_id"
+            )
+        ]
+    finally:
+        connection.close()
+    assert raws == [
+        "https://www.linkedin.com/in/abc/?trk=test",
+        "https://www.linkedin.com/in/abc/?trk=other",
+    ]
+
+
 # --- LinkedIn profile URLs are case-insensitive and www-optional (Codex V1 finding F-2,
 # 2026-09-17): the fix for tracking-param dedup did not also fold case or strip www. ---
 
