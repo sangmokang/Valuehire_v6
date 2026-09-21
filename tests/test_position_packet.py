@@ -21,6 +21,8 @@ def packet():
                 source_lines=source.splitlines(),
                 excluded_lines=[dict(text=source.splitlines()[-1], reason='직접 지원 경로 제거')],
                 allowed_additions=['회사 소개', '밸류커넥트를 통해 지원'],
+                selections=dict(category='AI 개발', experience_min='3년', experience_max='무관',
+                                salary_min='', salary_max='', ai=False),
                 forbidden_literals=['https://example.com/apply'], limit=2000, title_limit=35)
 
 
@@ -43,6 +45,19 @@ class PacketTests(unittest.TestCase):
         data['fields'][0] += '\n연봉 1억원 보장'
         self.assert_rejected(data)
 
+    def test_approved_additions_are_mandatory_once_and_ordered(self):
+        cases = [
+            ['회사 소개'],
+            ['밸류커넥트를 통해 지원', '회사 소개'],
+            ['회사 소개', '밸류커넥트를 통해 지원', '밸류커넥트를 통해 지원'],
+            ['회사 소개', '밸류커넥트를 통해 지원', '재무: 전망과 실적 구분'],
+        ]
+        for additions in cases:
+            with self.subTest(additions=additions):
+                data = packet()
+                data['allowed_additions'] = additions
+                self.assert_rejected(data)
+
     def test_source_ledger_and_hash(self):
         for key, value in [('source_sha256', '0' * 64), ('source_lines', ['주요 업무'])]:
             data = packet()
@@ -64,6 +79,16 @@ class PacketTests(unittest.TestCase):
         data = packet()
         data['fields'][0] = '회사 소개'
         self.assert_rejected(data)
+
+    def test_urls_and_emails_are_rejected_even_when_self_allowed(self):
+        for value in ['https://wrtn.io/jobs', 'http://wrtn.io/jobs', 'www.wrtn.io/jobs',
+                      'talent@wrtn.io']:
+            with self.subTest(value=value):
+                data = packet()
+                data['fields'][0] += '\n' + value
+                data['allowed_additions'].append(value)
+                data['forbidden_literals'] = ['https://example.com/apply']
+                self.assert_rejected(data)
 
     def test_field_cap_even_if_config_increased(self):
         for size in [2000, 2001, 2100]:
@@ -89,7 +114,8 @@ class PacketTests(unittest.TestCase):
 
     def test_schema(self):
         for key, value in [('fields', ['a']), ('fields', [1, 2]), ('limit', True),
-                           ('title', ''), ('source_text', None), ('allowed_additions', 'x')]:
+                           ('title', ''), ('source_text', None), ('allowed_additions', 'x'),
+                           ('selections', {}), ('selections', dict(category='AI 개발'))]:
             data = packet()
             data[key] = value
             self.assert_rejected(data)
@@ -101,12 +127,29 @@ class PacketTests(unittest.TestCase):
 
     def test_readback_exact_and_missing(self):
         data = packet()
-        observed = {key: copy.deepcopy(data[key]) for key in ['title', 'fields']}
+        observed = {key: copy.deepcopy(data[key]) for key in ['title', 'fields', 'selections']}
         observed['fields'][0] = observed['fields'][0].replace('\n', '\r\n')
         self.assertEqual(module.readback(data, observed)['status'], 'PASS')
         observed['fields'][0] += ' '
         self.assertEqual(module.readback(data, observed)['status'], 'FAIL')
         self.assertEqual(module.readback(data, {})['status'], 'FAIL')
+
+    def test_readback_selection_mismatch_and_missing(self):
+        data = packet()
+        observed = {key: copy.deepcopy(data[key]) for key in ['title', 'fields', 'selections']}
+        observed['selections']['experience_min'] = '5년'
+        self.assertEqual(module.readback(data, observed)['status'], 'FAIL')
+        observed = {key: copy.deepcopy(data[key]) for key in ['title', 'fields']}
+        self.assertEqual(module.readback(data, observed)['status'], 'FAIL')
+
+    def test_readback_observed_raw_count_over_limit(self):
+        data = packet()
+        data['fields'][0] = '밸류커넥트' + '가' * 1994 + '\n'
+        data['allowed_additions'] = [data['fields'][0]]
+        self.assertEqual(module.validate(data)['status'], 'PASS')
+        observed = {key: copy.deepcopy(data[key]) for key in ['title', 'fields', 'selections']}
+        observed['fields'][0] = observed['fields'][0].replace('\n', '\r\n')
+        self.assertEqual(module.readback(data, observed)['status'], 'FAIL')
 
     def test_repeated_source_and_empty_forbidden_list(self):
         data = packet()

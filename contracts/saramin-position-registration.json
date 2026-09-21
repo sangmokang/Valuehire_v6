@@ -1,13 +1,24 @@
 {
   "version": 1,
-  "observed_at": "2026-09-21",
+  "observed_at": "2026-09-21T17:18:41.830462+09:00",
   "surface": "Saramin talent-pool candidate-manage position modal, not public recruitment advertisement",
   "url": "https://www.saramin.co.kr/zf_user/memcom/talent-pool/main/candidate-manage",
   "form": "form.wrap_talentpool_form.type_column",
-  "title": {"selector": "#position_title", "limit": 35},
+  "title": {
+    "selector": "#position_title",
+    "limit": 35
+  },
   "fields": [
-    {"label": "제안 내용", "selector": "#position_content", "limit": 2000},
-    {"label": "업무 내용", "selector": "#work_content", "limit": 2000}
+    {
+      "label": "제안 내용",
+      "selector": "#position_content",
+      "limit": 2000
+    },
+    {
+      "label": "업무 내용",
+      "selector": "#work_content",
+      "limit": 2000
+    }
   ],
   "add": "button.btn_add_position",
   "save": "button.btn_save",
@@ -20,5 +31,24 @@
   "search": "input[placeholder='포지션 및 생성자명을 검색해주세요']",
   "search_button": "#applicant_search_btn",
   "cards": ".position_card_list",
-  "constraint": "Selectors are observations; re-observe uniqueness, labels, limits and account before any write. Never blind-retry save."
+  "constraint": "Selectors are observations; re-observe uniqueness, labels, limits and account before any write. Never blind-retry save.",
+  "candidate_text_policy": {
+    "allow_urls": false,
+    "allow_emails": false
+  },
+  "limit_evidence": "Observed DOM maxlength=35/2000/2000 and live UI MsgCount matching UTF-16; source packet checks code points and UTF-16.",
+  "observed_account": "Valueconnect / 강상모",
+  "card": ".position_card",
+  "card_id": "input[id^=\"position_chk_\"]",
+  "card_detail_link": "a[href*=\"hiringSpecSeq=\"]",
+  "card_options": ".btn_position_option",
+  "edit_button_text": "포지션 수정",
+  "date_evidence": "Read visible text of the selected card; do not assume a nested date class",
+  "ai_generation_label": "내용 생성하기",
+  "ai_generation_context": "위 정보로 제안 내용, 업무 내용을 자동 작성 해드릴까요?",
+  "selection_labels": {
+    "category": "직무",
+    "experience": "경력",
+    "salary": "연봉"
+  }
 }

@@ -6,6 +6,11 @@ import json
 from pathlib import Path
 import re
 
+CONTRACT = Path(__file__).resolve().parents[1] / 'contracts/saramin-position-registration.json'
+SELECTION_KEYS = ['category', 'experience_min', 'experience_max', 'salary_min', 'salary_max']
+URL_RE = re.compile(r'(?i)\b(?:https?://|www\.)\S+')
+EMAIL_RE = re.compile(r'(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b')
+
 
 def normalize(text):
     return ' '.join(re.sub('[\u200b\u200c\u200d\ufeff]', '', text).split())
@@ -17,6 +22,30 @@ def lengths(text):
 
 def string_list(value):
     return isinstance(value, list) and all(isinstance(item, str) for item in value)
+
+
+def candidate_text_policy():
+    try:
+        contract = json.loads(CONTRACT.read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        contract = {}
+    policy = contract.get('candidate_text_policy', {})
+    return {
+        'allow_urls': policy.get('allow_urls') is True,
+        'allow_emails': policy.get('allow_emails') is True,
+    }
+
+
+def selection_errors(value, label):
+    if not isinstance(value, dict):
+        return [f'{label} selections required']
+    errors = []
+    for key in SELECTION_KEYS:
+        if not isinstance(value.get(key), str):
+            errors.append(f'{label} selection {key} must be a string')
+    if type(value.get('ai')) is not bool:
+        errors.append(f'{label} selection ai must be a boolean')
+    return errors
 
 
 def schema_errors(packet):
@@ -35,6 +64,9 @@ def schema_errors(packet):
     for key in ['limit', 'title_limit']:
         if type(packet.get(key)) is not int or packet[key] < 1:
             errors.append(f'{key} must be a positive integer')
+    errors.extend(selection_errors(packet.get('selections'), 'packet'))
+    if packet.get('forbidden_literals') == []:
+        errors.append('forbidden_literals cannot be empty')
     excluded = packet.get('excluded_lines')
     if not isinstance(excluded, list) or any(
         not isinstance(item, dict) or any(not isinstance(item.get(key), str) or
@@ -66,32 +98,32 @@ def content_errors(packet):
             retained.append(line)
     output = normalize('\n'.join(packet['fields']))
     cursor = 0
+    gaps = []
     for line in retained:
         location = output.find(line, cursor)
         if location < 0:
             errors.append(f'source line absent or out of order: {line}')
         else:
+            gaps.append(output[cursor:location])
             cursor = location + len(line)
     additions = [normalize(line) for item in packet['allowed_additions']
                  for line in item.splitlines() if normalize(line)]
-    tokens = sorted(set(retained + additions), key=len, reverse=True)
-    reachable = {0}
-    for offset in range(len(output) + 1):
-        if offset not in reachable:
-            continue
-        if offset < len(output) and output[offset].isspace():
-            reachable.add(offset + 1)
-        for token in tokens:
-            if output.startswith(token, offset):
-                reachable.add(offset + len(token))
-    if len(output) not in reachable:
-        errors.append('output contains text outside retained source and allowed additions')
+    gaps.append(output[cursor:])
+    addition_output = normalize(' '.join(gaps))
+    if addition_output != normalize(' '.join(additions)):
+        errors.append('approved additions missing, reordered, repeated, or changed')
     if '밸류커넥트' not in output:
         errors.append('ValueConnect application wording missing')
+    policy = candidate_text_policy()
+    candidate_text = normalize(packet['title'] + '\n' + output)
+    if not policy['allow_urls'] and URL_RE.search(candidate_text):
+        errors.append('candidate text contains URL')
+    if not policy['allow_emails'] and EMAIL_RE.search(candidate_text):
+        errors.append('candidate text contains email')
     for literal in packet['forbidden_literals']:
         if not normalize(literal):
             errors.append('forbidden literals cannot be empty')
-        elif normalize(literal) in normalize(packet['title'] + '\n' + output):
+        elif normalize(literal) in candidate_text:
             errors.append(f'forbidden application literal present: {literal}')
     return errors
 
@@ -137,6 +169,16 @@ def readback(packet, observed):
                 expected, actual = line_endings(expected), line_endings(actual)
             if expected != actual:
                 result['errors'].append(f'readback {key} mismatch')
+        observed_lengths = [lengths(field) for field in observed['fields']]
+        for index, count in enumerate(observed_lengths):
+            if max(count.values()) > min(2000, packet.get('limit', 0)):
+                result['errors'].append(f'observed field {index + 1} exceeds limit')
+    selection_result = selection_errors(observed.get('selections') if isinstance(observed, dict) else None,
+                                       'observed')
+    result['errors'].extend(selection_result)
+    if not selection_result and isinstance(packet.get('selections'), dict) and \
+            observed.get('selections') != packet['selections']:
+        result['errors'].append('readback selections mismatch')
     result['status'] = 'FAIL' if result['errors'] else 'PASS'
     return result
 

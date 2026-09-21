@@ -42,3 +42,14 @@ V1 NOT_RUN; V2 NOT_RUN. 이후 원문과 실행 기록 연결.
 ## 대상 결정과 현재 검증
 동일 직무 기존 ID 1739634(2026.06.22), 1738074(2026.06.19)를 발견했다. 사용자 계속 진행 지시를 신규 등록 요청의 지속으로 해석하여 기존 두 건을 보존하고 새 1건으로 진행한다. 앞선 수정/신규 질문에 명시 옵션 답은 없었으므로 기존 건 덮어쓰기는 하지 않는다.
 신규 검증기 13개 테스트 PASS. 실제 packet 및 제출 전 DOM 대조 PASS. 두 필드 1349/1354자, 제목30자. 실제 저장 후 재조회와 메일 발송은 아직 NOT_RUN. RED 시험 원출력은 artifacts/position-packet-verifier/red.log에 있으나 선행 RED 커밋은 생성하지 못했으므로 엄격 절차 완전 준수로 주장하지 않는다.
+
+## 보강 시험과 복구 기록
+V2 독립 반례에서 원문 중복 재삽입과 빈 금지목록 우회가 재현됐다. 실제 등록 packet에는 없었다. 3ada12c에 실패 시험을 고정하고, 잔여 출력은 승인 추가문만 허용하며 빈 금지목록은 거부하도록 수정했다. 14개 시험과 실제 packet 모두 PASS. 원출력 hardening-red.log / hardening-green.log / hardening.json.
+Claude V1 첫 실행은 API 400 credit low로 실패했다. 로그인된 Max 계정으로 재호출했으나 5분 이상 무출력이어서 중단했다. 부가 훅·MCP를 비활성화한 읽기 전용 호출로 최신 산출물을 다시 제출했다. 각 원출력은 v1-output.json / v1-retry-output.json / v1-final-output.json. 미응답과 잔액 실패를 검증 합격으로 바꾸지 않는다.
+
+## AUDIT — 최신 준비물
+초기 Claude V1은 FAIL(8항목). 유효한 지적은 URL·이메일 고정 차단, 승인 회사 문장 누락/재조합 차단, 선택값 비교, 실제 재조회 길이 확인, 해당 반례 시험으로 보강했다. 회사 사실 미확인=오류라는 단정 및 필드2 1800자 추정은 원문 출처·실측으로 반박했다. V2의 8항목 교차표는 artifacts/saramin-registration-20260921/v2/v2-final-cross-table-prior-v1.md이며 현재 저장 전 계약 PASS(배송 완료 아님).
+최신 본문 1350/1354자, 제목30자. pre-submit-final.json은 최신 실제DOM이며 제목·필드·선택값 전부일치한다. 과거 pre-submit.json은출처라벨변경이전증거로보존하며현행증거로쓰지않는다.
+최신18개시험·실제packet/DOM비교·원칙34개·diff공백검사 모두종료0. 전체출력과파일지문은 final-local-verification.json. 208줄/180줄, 최대함수49줄/13줄로600/100한도내. 최신독립V1재심결과는 v1-recheck-output.json에보존한다.
+
+최신 Claude V1 재심 PASS(세션99cd9235-5325-4d51-aa71-b1bdcdded417). 정적 독립검토이며 실제실행재현은V2장부와구분한다. 마지막화면선택라벨은 회계·세무·재무 / 5년이상 / 상한·급여선택없음이며 pre-submit-final.json에원문보존. pre-save-final-verification.json의원명령 readback PASS.
