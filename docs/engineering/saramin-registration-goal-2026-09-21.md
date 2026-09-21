@@ -1,7 +1,7 @@
 # 사람인 후보자용 포지션 등록 — 2026-09-21
 
 ## 결론
-진행 중. 뤼튼 공고 199492를 회사 조사와 함께 2,000자 두 필드에 배분해 사람인에 1건 등록하고, 동일 본문을 사용자가 지정한 본인 메일로 보낸다. v4 코드·셀렉터·설계는 회수/복사/실행하지 않는다.
+사람인 후보자용 포지션 신규 1건(ID1832999) 등록과 sangmokang@valueconnect.kr 이메일 1건 발송을 완료했다. 저장 후 독립 재조회와 보낸 편지 재조회에서 동일 본문을 확인했다. 두 필드는 1,350/1,354자다. 엄격 절차 전체 PASS는 최초 RED 선행 커밋 누락 때문에 주장하지 않는다. v4 코드·셀렉터·설계는 회수/복사/실행하지 않는다.
 
 ## 판단 근거와 승인
 현재 대화의 2026-09-21 요청이 회사 조사, 사람인 등록 1건, sangmokang 이메일 1건 및 정본 변경의 승인이다. 후보자 접촉, 결제, 잡코리아 등록, push/PR/merge는 범위 밖이다. 이메일 주소는 연결 계정 프로필로 확정한다. 기존 main의 미커밋 변경은 타 작업 소유이며 보존한다.
@@ -37,9 +37,9 @@ SHIP: 사용자 승인된 사람인 등록 1건+자기 이메일 1건, 각 readb
 기존 브라우저 정본의 D0/D1 개발 범위는 유지한다. 이 작업의 명시적 승인에 따라 Aside 현재 로그인 세션의 선택된 사람인 탭 UI에 한한 관측·입력·저장과 공개 JD 열기를 허용하는 별도 운영 정본을 만든다. 비밀번호/쿠키/토큰 읽기·복사, 브라우저 종료/프로필 변경, 후보 개인정보 수집은 금지한다.
 
 ## 적대 검증 로그
-V1 NOT_RUN; V2 NOT_RUN. 이후 원문과 실행 기록 연결.
+저장 전 준비물: 최신 V1 PASS, V2 PASS. 최초 V1 FAIL·복구·보강 이력은 아래 AUDIT와 artifacts에 원문 보존. 실제 저장 후 대조와 메일 대조는 SHIP 영수증을 따른다.
 
-## 대상 결정과 현재 검증
+## 대상 결정과 초기 검증
 동일 직무 기존 ID 1739634(2026.06.22), 1738074(2026.06.19)를 발견했다. 사용자 계속 진행 지시를 신규 등록 요청의 지속으로 해석하여 기존 두 건을 보존하고 새 1건으로 진행한다. 앞선 수정/신규 질문에 명시 옵션 답은 없었으므로 기존 건 덮어쓰기는 하지 않는다.
 신규 검증기 13개 테스트 PASS. 실제 packet 및 제출 전 DOM 대조 PASS. 두 필드 1349/1354자, 제목30자. 실제 저장 후 재조회와 메일 발송은 아직 NOT_RUN. RED 시험 원출력은 artifacts/position-packet-verifier/red.log에 있으나 선행 RED 커밋은 생성하지 못했으므로 엄격 절차 완전 준수로 주장하지 않는다.
 
@@ -53,3 +53,17 @@ Claude V1 첫 실행은 API 400 credit low로 실패했다. 로그인된 Max 계
 최신18개시험·실제packet/DOM비교·원칙34개·diff공백검사 모두종료0. 전체출력과파일지문은 final-local-verification.json. 208줄/180줄, 최대함수49줄/13줄로600/100한도내. 최신독립V1재심결과는 v1-recheck-output.json에보존한다.
 
 최신 Claude V1 재심 PASS(세션99cd9235-5325-4d51-aa71-b1bdcdded417). 정적 독립검토이며 실제실행재현은V2장부와구분한다. 마지막화면선택라벨은 회계·세무·재무 / 5년이상 / 상한·급여선택없음이며 pre-submit-final.json에원문보존. pre-save-final-verification.json의원명령 readback PASS.
+
+## SHIP 결과와 영수증
+- 사람인: https://www.saramin.co.kr/zf_user/memcom/talent-pool/main/candidate-detail/propose-expected?hiringSpecSeq=1832999&tRef=candidate-manage
+- 최초 저장 후 제목·두 본문은 일치했으나 직무 카테고리가 빈 값이었다. post-save-verification.json에 FAIL을 보존했다. 상세 직무 재무기획(364)을 체크하고 검색창을 닫아 태그를 확정한 뒤, 같은 ID에서 수정 1회를 수행했다. 새로 등록한 포지션은 1개다.
+- 최종 fresh navigation → 신규 ID 수정 화면 재열람: 제목·두 필드·직무3·경력5년·급여/상한 공란·AI 꺼짐 일치. 상세 직무364도 별도 대조 PASS. post-correction-readback.json 및 post-correction-verification.json에 원출력 보존. saved-position-modal.png 시각 확인 완료.
+- 기존 ID1739634, 1738074 보존. 후보자 제안·발송 0건. 이 작업은 공개 채용광고 게시가 아니라 인재풀 포지션 등록이다.
+- 메일: sangmokang@valueconnect.kr 단독, 제목 [사람인 등록 완료] 뤼튼 Finance Data Analyst (FP&A) — 회사 소개 및 JD. Gmail ID1a0c32ed12fc21dc. email-receipt.json에 send/readback 원응답과 To·Subject·body·SENT·CC/BCC 없음 검사 모두 true를 보존했다.
+- 배송 상태: 포털 등록 PRODUCTION_VERIFIED. 저장소 운영 문서/검증 CLI는 LOCAL_ONLY. 사용자 업무 사용 확인은 별도이며 BUSINESS_USED를 주장하지 않는다. 새 제품/DB/서버 배포는 NOT_APPLICABLE.
+
+## 최종 한계
+V1은 Claude 독립 정적 검토이며 실행 결과를 지어낸 최초 응답은 무효로 남겼다. V2가 실제 명령과 반례를 별도 재현했다. 초기 V1 FAIL의 실질 지적은 보강했고 과장된 팩트/분량 판단은 원문·실측으로 반박했다. 최신 V1/V2 저장 전 준비물 PASS와 실제 외부 영수증을 구분한다.
+최초 구현의 RED 로그는 있으나 선행 RED 커밋은 없었다. 이후 보강 RED는 3ada12c에 고정했지만 이 사실로 최초 누락을 소급 해소하지 않는다. 따라서 업무 실행 완료와 strict 전체 절차 PASS를 동일하게 부르지 않는다. 원격 push/PR/merge/CI는 수행하지 않았다.
+
+최종 외부 영수증 V2도 PASS: artifacts/saramin-registration-20260921/v2/ship-receipt-verdict.md. 포털 수정 후 readback 명령을 독립 재실행했고 이메일의 두 필드가 packet과 정확히 일치함을 별도 대조했다.

@@ -50,5 +50,11 @@
     "category": "직무",
     "experience": "경력",
     "salary": "연봉"
-  }
+  },
+  "detail_search": "input[placeholder=\"상세 직무를 입력해 주세요. (최대 3개)\"]",
+  "detail_close": ".form_row:has(#job_select) .btn_autocomplete_close",
+  "selected_job_codes": ".selected_job_keyword li",
+  "selected_job_code_attribute": "value",
+  "detail_persistence_note": "Select a detail checkbox then close autocomplete and verify a selected keyword chip before save. Category alone did not persist in the live run. Read back both category and selected detail chips.",
+  "close_modal": "button.BtnClose"
 }
