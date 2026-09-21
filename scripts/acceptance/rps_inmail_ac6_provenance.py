@@ -28,7 +28,7 @@ def main() -> int:
             print(f"    {h.rule} {h.description} -> {h.match}")
         checked += 1
         bad += len(hits)
-    print(f"CHECKED_JD {checked}")
+    print(f"CHECKED: {checked}")
     if checked < MIN_JD:
         print(f"대조한 JD 가 {MIN_JD}건 미만 — 검사 대상 0개는 합격이 아니다")
         return 1

@@ -32,6 +32,7 @@ def main() -> int:
     print("양성 대조군 통과 — 정상 JD 위반 0건")
 
     raw = json.loads(units_path.read_text(encoding="utf-8"))
+    checked = 0
     for rule, injected in INJECTIONS.items():
         mutated = json.loads(json.dumps(raw))
         mutated["units"].append({
@@ -47,6 +48,10 @@ def main() -> int:
         if rule not in rules:
             print(f"{rule}: 주입한 가짜 사실을 못 잡았다")
             return 1
+        checked += 1
+    # 하위 검사기도 자기가 무엇을 판정했는지 남긴다. 이 줄이 없으면
+    # 본문을 no-op 로 바꿔도 상위 인수 스크립트가 통과시킨다.
+    print(f"CHECKED: {checked}")
     return 0
 
 

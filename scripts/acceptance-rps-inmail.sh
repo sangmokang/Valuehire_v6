@@ -8,10 +8,20 @@ cd "$(dirname "$0")/.."
 
 PASS=0; FAIL=0
 run() { # run <AC 이름> <python 파일>
-  local name="$1" f="$2" out rc
+  # 종료값 0 만 보면 본문을 `sys.exit(0)` 으로 바꾼 검사기가 통과한다
+  # (2026-09-22 humanreview 실측). 그래서 하위 검사기에도 판정 근거를 요구한다:
+  # `CHECKED: N` 이 있어야 하고 N 은 1 이상이어야 한다.
+  local name="$1" f="$2" out rc checked
   out="$(python3 "$f" 2>&1 </dev/null)"; rc=$?
-  if [ "$rc" -eq 0 ]; then echo "PASS $name"; PASS=$((PASS+1));
-  else echo "FAIL $name (rc=$rc)"; echo "$out" | sed 's/^/     /'; FAIL=$((FAIL+1)); fi
+  if [ "$rc" -ne 0 ]; then
+    echo "FAIL $name (rc=$rc)"; echo "$out" | sed 's/^/     /'; FAIL=$((FAIL+1)); return
+  fi
+  checked="$(printf '%s\n' "$out" | sed -n 's/.*CHECKED:[[:space:]]*\([0-9][0-9]*\).*/\1/p' | tail -1)"
+  if [ -z "$checked" ] || [ "$checked" -lt 1 ]; then
+    echo "FAIL $name (종료값 0 이지만 CHECKED 근거가 ${checked:-없음} — 검사 대상 0개는 합격이 아니다)"
+    echo "$out" | sed 's/^/     /'; FAIL=$((FAIL+1)); return
+  fi
+  echo "PASS $name (CHECKED $checked)"; PASS=$((PASS+1))
 }
 
 TD="$(mktemp -d)"; trap 'rm -rf "$TD"' EXIT
@@ -23,12 +33,14 @@ import sys; sys.path.insert(0, 'scripts')
 from pathlib import Path
 from jd_channels.checks import scan_inmail
 bad = []
-for f in ('rps_wrtn_golden.txt', 'rps_bunjang_golden.txt'):
+files = ('rps_wrtn_golden.txt', 'rps_bunjang_golden.txt')
+for f in files:
     t = Path(f'outputs/_golden/{f}').read_text(encoding='utf-8').strip()
     hits = sorted({h.rule for h in scan_inmail(t)})
     print(f, hits)
     if hits:
         bad.append((f, hits))
+print(f'CHECKED: {len(files)}')
 raise SystemExit(1 if bad else 0)
 PY
 run AC-0-골든금지0건 "$TD/ac0.py"
@@ -47,6 +59,7 @@ for f in files:
     print(f, '금지', hits, '구조', st)
     if hits or st:
         bad.append(f)
+print(f'CHECKED: {len(files)}')
 raise SystemExit(1 if bad else 0)
 PY
 run AC-1-골든통과 "$TD/ac1.py"
@@ -66,6 +79,7 @@ if missing:
     print('놓친 규칙', sorted(missing)); raise SystemExit(1)
 if len(rules) < 4:
     print('규칙 4개 미만'); raise SystemExit(1)
+print(f'CHECKED: {len(want)}')
 PY
 run AC-2-AI티차단 "$TD/ac2.py"
 
@@ -75,6 +89,7 @@ import re, sys; sys.path.insert(0, 'scripts')
 from jd_channels.units import load
 from jd_channels.render import render
 bad = []
+checked = 0
 for u in ('wrtn__finance-data-analyst', 'bunjang__core-product-pm'):
     b = render(load(f'outputs/_units/{u}.json'), 'linkedin_rps').body
     sec = len(re.findall(r'^■ ', b, re.M))
@@ -83,6 +98,8 @@ for u in ('wrtn__finance-data-analyst', 'bunjang__core-product-pm'):
     print(u, '섹션', sec, '불릿', bul, '볼드', bold, '자', len(b))
     if not (sec >= 4 and bul >= 8 and bold >= 5 and len(b) <= 1899):
         bad.append(u)
+    checked += 1
+print(f'CHECKED: {checked}')
 raise SystemExit(1 if bad else 0)
 PY
 run AC-3-생성구조 "$TD/ac3.py"
@@ -116,6 +133,7 @@ for u, reqs in MUST.items():
         print(f'{u}: 평가 우선순위 ※ 줄 누락'); bad.append((u, 'note'))
 if not bad:
     print('핵심 조건 전건 보존')
+print(f'CHECKED: {sum(len(v) for v in MUST.values())}')
 raise SystemExit(1 if bad else 0)
 PY
 run AC-4-핵심조건 "$TD/ac4.py"
@@ -147,6 +165,7 @@ with tempfile.TemporaryDirectory() as tmp:
     b = render(load(p), 'linkedin_rps').body
 sec = len(re.findall(r'^■ ', b, re.M)); bul = len(re.findall(r'^• ', b, re.M))
 print('제3 JD 섹션', sec, '불릿', bul, '자', len(b))
+print('CHECKED: 2')
 raise SystemExit(0 if sec >= 4 and bul >= 8 else 1)
 PY
 run CAC-1-제3JD구조 "$TD/cac1.py"
@@ -172,6 +191,7 @@ b = sorted({h.rule for h in inmail_structure(translated)})
 print('원본', a, '/ 한글로 푼 판', b)
 if a: print('정상 원고가 불합격했다'); raise SystemExit(1)
 if 'INMAIL_TERM_TRANSLATED' not in b: print('G4 위반을 못 잡았다'); raise SystemExit(1)
+print('CHECKED: 2')
 PY
 run CAC-2-영문용어보존 "$TD/cac2.py"
 
@@ -186,6 +206,7 @@ if not p.exists():
     print('산문판 없음 — 음성 대조군을 세울 수 없다'); raise SystemExit(1)
 rules = sorted({h.rule for h in inmail_structure(p.read_text(encoding='utf-8').strip())})
 print('산문판 구조 판정', rules)
+print('CHECKED: 1')
 raise SystemExit(0 if rules else 1)
 PY
 run CAC-3-산문판불합격 "$TD/cac3.py"
