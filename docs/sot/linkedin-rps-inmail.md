@@ -114,3 +114,24 @@ RPS는 공고판이 아니라 사람과 사람이 연결되는 자리다. 그렇
 
 같은 이름의 `ver1.0` 템플릿이 다른 소유자(Sanghyuk Lee) 앞으로 따로 있다. 타인 소유 템플릿은
 수정하지 않고 **Save as new 로 제목을 달리해 ver2 를 새로 만든다**(§5 1항의 예외).
+
+## 7. RPS 컴포저 입력 형식 (2026-09-22 실측)
+
+RPS 컴포저는 Quill 에디터다. 마크다운을 해석하지 않으므로 `**볼드**` 를 그대로 넣으면
+후보자에게 별표가 그대로 보인다. `scripts/jd_channels/richtext.py` 의 `to_html()` 로
+`<strong>` 과 `<p>` 로 옮겨 넣는다.
+
+| 표기 | 컴포저 처리 | 대응 |
+|---|---|---|
+| `**볼드**` | 별표가 그대로 보임 | `<strong>` 으로 변환 |
+| `<ul><li>` | **통째로 삭제됨** (본문 1,445자 → 1,073자, 불릿 11개 유실) | `<p>• 텍스트</p>` 로 문자 불릿 사용 |
+| `■` / `•` / `※` | 그대로 들어감 | 변환 없음 |
+
+입력 절차: `.ql-editor[aria-label="Compose a message"]` 에 innerHTML 을 넣고
+`input` 이벤트를 보낸다. 제목은 `input[aria-label="Message subject"]` 에
+네이티브 setter 로 넣고 `input`·`change` 를 보낸다. 저장 전 본문 길이·볼드 수·불릿 수·
+섹션 수·별표 0개를 DOM 으로 센다.
+
+타인 소유 템플릿은 수정하지 않는다. `Save as new template` → 템플릿명 입력 →
+`Anyone in my organization` 라디오 클릭 → `Only me=false` 확인 → Save →
+템플릿 재검색으로 Owner·Updated 확인.
