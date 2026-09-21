@@ -114,6 +114,22 @@ RPS는 공고판이 아니라 사람과 사람이 연결되는 자리다. 그렇
 
 같은 이름의 `ver1.0` 템플릿이 다른 소유자(Sanghyuk Lee) 앞으로 따로 있다. 타인 소유 템플릿은
 수정하지 않고 **Save as new 로 제목을 달리해 ver2 를 새로 만든다**(§5 1항의 예외).
+2026-09-22 실행 결과: `[제안]뤼튼, Finance Data Analyst (FP&A) ver2.0` 신규 저장(섹션 5·불릿 11·볼드 30·1,497자,
+`Anyone in my organization` checked / `Only me` unchecked, Send 미클릭). ver1.0 은 건드리지 않았다.
+
+## 7. 컴포저는 Quill 리치텍스트다 — 마크다운을 그대로 넣지 않는다
+
+RPS 컴포저 본문은 `div.ql-editor[aria-label="Compose a message"]`(Quill)다. 2026-09-22 실측:
+
+| 넣은 것 | 결과 |
+|---|---|
+| `**볼드**` 원문 그대로 | 별표가 후보자에게 그대로 보인다 |
+| `<strong>` | 정상 — 실제 볼드로 저장된다 |
+| `<ul><li>` | **Quill 이 지운다.** 불릿 0개, 본문 1,445자 → 1,073자로 손실 |
+| `<p>• ...</p>` | 정상 — 골든 원문과 같은 문자 불릿 |
+
+변환기는 `scripts/jd_channels/richtext.py` 의 `to_html()` 이다. 입력 전
+`<ul>` 이 0개인지, 붙여넣은 뒤 `innerText` 길이·불릿 수·볼드 수를 다시 세어 확인한다.
 
 ## 7. RPS 컴포저 입력 형식 (2026-09-22 실측)
 
