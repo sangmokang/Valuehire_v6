@@ -163,7 +163,7 @@ ok = "\n".join([
     "■ Key Responsibilities",
     "• KPI 정의", "• SQL 추출", "• BI 구축", "• Reporting", "",
     "■ Requirements", "• **5년+**", "• SQL", "• Finance Domain", "",
-    "■ Preferred", "• FinOps", "• dbt", "• Audit Trail", "",
+    "■ Preferred", "• **FinOps**", "• dbt", "• **Audit Trail**", "",
     "■ Process", "서류 → 실무 → Culture Fit → Reference Check → Offer", "",
     "관심 있으시면 LinkedIn 수락 또는 간단한 회신만 주셔도 상세 JD를 공유드리겠습니다."])
 translated = ok.replace('Reference Check', '평판 조회').replace('Culture Fit', '조직 적합도')
@@ -201,5 +201,6 @@ fi
 echo
 echo "VERDICT: $([ "$FAIL" -eq 0 ] && echo PASS || echo FAIL)"
 echo "PASS=$PASS FAIL=$FAIL TOTAL=$((PASS+FAIL))"
+echo "CHECKED: $((PASS+FAIL))"
 [ "$((PASS+FAIL))" -ge 9 ] || { echo "검사 항목이 8개 미만 — 검사 대상 0개는 합격이 아니다"; exit 2; }
 exit $([ "$FAIL" -eq 0 ] && echo 0 || echo 1)

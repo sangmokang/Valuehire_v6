@@ -12,7 +12,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from jd_channels.checks import inmail_tone, scan, scan_inmail  # noqa: E402
+from jd_channels.checks import (  # noqa: E402
+    inmail_structure, inmail_tone, scan, scan_inmail,
+)
 from jd_channels.measure import (  # noqa: E402
     PORTAL_SAFE_SUBSTITUTE, measure, normalize_for_compare, scan_portal_risk,
 )
@@ -220,48 +222,113 @@ class ErrorPathTest(unittest.TestCase):
             self.assertEqual(hits, {}, f"{portal} 원고에 변환 위험 문자: {hits}")
 
     def test_inmail_rejects_ai_tells(self):
-        """RPS InMail 은 목록이 아니라 이어지는 글이어야 한다(SOT L4·L5)."""
+        """사람이 쓰지 않는 문구는 계속 잡는다. 서식(볼드·■·•)은 금지 대상이 아니다."""
         bad = ("안녕하세요 전혜인 매니저님\n\n귀하의 경력을 주목하여 연락드립니다 \U0001F642\n"
-               "- 항목1\n- 항목2\n**굵게** {{first_name}}")
+               "{{first_name}}님께 좋은 기회가 될 것입니다")
         rules = {h.rule for h in scan_inmail(bad)}
         for want in ("INMAIL_NAME_HARDCODED", "INMAIL_STOCK_PHRASE",
-                     "INMAIL_EMOJI", "INMAIL_MARKDOWN", "INMAIL_RAW_VAR"):
+                     "INMAIL_EMOJI", "INMAIL_RAW_VAR"):
             self.assertIn(want, rules, f"{want} 를 못 잡았다")
-        self.assertGreater(inmail_tone(bad)["bullet_ratio"], 0.3)
+
+    def test_inmail_formatting_is_not_banned(self):
+        """2026-09-22 오전 회귀 방지 — 골든의 서식을 금지 규칙으로 잡으면 안 된다."""
+        for name in ("rps_wrtn_golden.txt", "rps_bunjang_golden.txt"):
+            text = (ROOT / "outputs/_golden" / name).read_text(encoding="utf-8").strip()
+            with self.subTest(golden=name):
+                self.assertEqual(scan_inmail(text), [], "골든 샘플이 금지 규칙에 걸렸다")
+                self.assertEqual(inmail_structure(text), [], "골든 샘플이 구조 검사에 걸렸다")
+                self.assertGreater(inmail_tone(text)["bullet_ratio"], 0.3,
+                                   "골든은 불릿 비율이 0.44~0.46 이다")
+
+    def test_inmail_structure_catches_prose_only_draft(self):
+        """음성 대조군 — 불릿·섹션 없는 산문 원고는 구조 검사에서 걸린다."""
+        prose = (ROOT / "outputs/run-20260921/wrtn__finance-data-analyst__199492"
+                        "/linkedin_rps_inmail.txt")
+        if not prose.exists():
+            self.skipTest("산문판 없음")
+        rules = {h.rule for h in inmail_structure(prose.read_text(encoding="utf-8"))}
+        self.assertIn("INMAIL_NO_SECTION", rules)
+        self.assertIn("INMAIL_NO_BULLET", rules)
+
+    def test_inmail_structure_mutation_is_detected(self):
+        """R2 — 골든에서 한 요소씩 고장 내면 그 규칙만 뜬다(검사기가 살아 있는지)."""
+        golden = (ROOT / "outputs/_golden/rps_wrtn_golden.txt").read_text(
+            encoding="utf-8").strip()
+        cases = (
+            ("INMAIL_NO_SECTION", golden.replace("■ ", "")),
+            ("INMAIL_NO_POSITION_HEADER", golden.replace("■ Position | ", "Position | ")),
+            ("INMAIL_NO_BULLET", golden.replace("• ", "")),
+            ("INMAIL_NO_BOLD", golden.replace("**", "")),
+            ("INMAIL_SIGNATURE", golden.replace("테크 전문 서치펌", "서치펌")),
+            ("INMAIL_NEGATIVE_METRIC", golden + "\n영업손실 588억원"),
+            ("INMAIL_TERM_TRANSLATED", golden.replace("Reference Check", "평판 조회")),
+            ("INMAIL_CLOSING", golden.replace("LinkedIn 수락 또는 간단한 회신만 주셔도",
+                                              "이력서를 보내주시면")),
+            ("INMAIL_TOO_LONG", golden + "가" * 1900),
+        )
+        for rule, mutated in cases:
+            with self.subTest(rule=rule):
+                self.assertIn(rule, {h.rule for h in inmail_structure(mutated)},
+                              f"{rule} 변이가 살아남았다")
 
     def test_inmail_good_body_passes(self):
-        """실제 등록한 본문은 금지 0건이고 불릿으로 끊기지 않는다."""
-        body = (ROOT / "outputs/run-20260921/wrtn__finance-data-analyst__199492"
-                       "/linkedin_rps_inmail.txt")
-        if not body.exists():
-            self.skipTest("등록본 파일 없음")
-        text = body.read_text(encoding="utf-8").strip()
-        self.assertEqual(scan_inmail(text), [], "등록본에 금지 항목이 있다")
-        tone = inmail_tone(text)
-        self.assertEqual(tone["bullet_ratio"], 0.0, "InMail 이 불릿 목록이 됐다")
-        self.assertGreaterEqual(tone["paragraphs"], 5, "문단이 너무 적다")
+        """생성 원고는 금지 0건·구조 0건이고 골든과 같은 불릿 밀도를 갖는다."""
+        for name in ("wrtn__finance-data-analyst", "bunjang__core-product-pm"):
+            with self.subTest(jd=name):
+                body = render(load(ROOT / f"outputs/_units/{name}.json"),
+                              "linkedin_rps").body
+                self.assertEqual(scan_inmail(body), [], "생성 원고에 금지 항목이 있다")
+                self.assertEqual(inmail_structure(body), [], "생성 원고가 골든 구조를 벗어났다")
+                tone = inmail_tone(body)
+                self.assertEqual(tone["bullet_verdict"], "ok",
+                                 f"불릿 비율 {tone['bullet_ratio']} — 조건이 산문에 묻혔다")
 
     def test_inmail_length_within_hard_cap(self):
         """제목+빈 줄+본문 합계가 1,899자를 넘지 않는다(SOT L1)."""
-        body = (ROOT / "outputs/run-20260921/wrtn__finance-data-analyst__199492"
-                       "/linkedin_rps_inmail.txt")
-        if not body.exists():
-            self.skipTest("등록본 파일 없음")
-        subject = "[포지션]뤼튼테크놀로지스, Finance Data Analyst (FP&A)"
-        from jd_channels.measure import compose
-        total = measure(compose(subject, body.read_text(encoding="utf-8").strip()))
-        self.assertLessEqual(total.codepoints, 1899)
+        for name in ("wrtn__finance-data-analyst", "bunjang__core-product-pm"):
+            with self.subTest(jd=name):
+                draft = render(load(ROOT / f"outputs/_units/{name}.json"), "linkedin_rps")
+                self.assertLessEqual(draft.measured.codepoints, 1899)
+                self.assertEqual(draft.status, "READY_DRAFT")
 
     def test_inmail_keeps_core_conditions(self):
-        """축약해도 핵심 조건은 남는다(SOT L2·L3)."""
-        body = (ROOT / "outputs/run-20260921/wrtn__finance-data-analyst__199492"
-                       "/linkedin_rps_inmail.txt")
-        if not body.exists():
-            self.skipTest("등록본 파일 없음")
-        text = body.read_text(encoding="utf-8")
-        for must in ("5년 이상", "준하는 경험", "정규직", "수습 3개월",
-                     "레퍼런스 체크", "조정될 수 있습니다"):
-            self.assertIn(must, text, f"핵심 조건 누락: {must}")
+        """축약해도 핵심 조건은 남는다(SOT L2·L3). 골든 기준 영문 용어도 보존한다."""
+        must = {
+            "wrtn__finance-data-analyst": (
+                "5년", "또는 이에 준하는 경험", "정규직", "수습 3개월",
+                "Reference Check", "Culture Fit", "Offer"),
+            "bunjang__core-product-pm": (
+                "2년", "정규직", "수습 3개월", "Outcome", "MVP", "Cross-functional"),
+        }
+        for name, needles in must.items():
+            body = render(load(ROOT / f"outputs/_units/{name}.json"), "linkedin_rps").body
+            for needle in needles:
+                with self.subTest(jd=name, needle=needle):
+                    self.assertIn(needle, body, f"핵심 조건 누락: {needle}")
+
+    def test_inmail_drops_negative_metrics_but_keeps_growth(self):
+        """G7 — 영업손실·인원은 빼고 매출·투자·사용자 규모는 남긴다."""
+        wrtn = render(load(ROOT / "outputs/_units/wrtn__finance-data-analyst.json"),
+                      "linkedin_rps").body
+        self.assertNotIn("영업손실", wrtn)
+        self.assertIn("471억원", wrtn, "매출까지 같이 버렸다")
+        bunjang = render(load(ROOT / "outputs/_units/bunjang__core-product-pm.json"),
+                         "linkedin_rps").body
+        self.assertNotIn("영업손실", bunjang)
+        self.assertNotIn("192명", bunjang)
+        self.assertIn("Series E", bunjang, "투자 정보까지 같이 버렸다")
+
+    def test_inmail_core_units_are_never_dropped(self):
+        """rps_drop 은 core 에 쓸 수 없다 — 채널이 달라도 core 삭제 금지는 같다."""
+        units = [unit("Q1", "requirements", "core", "- 필수", rps_drop=True)]
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(UnitError):
+                load(write(tmp, doc(units)))
+        for name in ("wrtn__finance-data-analyst", "bunjang__core-product-pm"):
+            src = load(ROOT / f"outputs/_units/{name}.json")
+            dropped = set(render(src, "linkedin_rps").dropped_units)
+            core = {u.id for u in src.units if u.kind == "core"}
+            self.assertEqual(dropped & core, set(), f"{name}: core 단위가 생략됐다")
 
     def test_legit_conditions_are_not_flagged(self):
         legit = ("- 전형 절차는 일정 및 상황에 따라 일부 추가/생략될 수 있습니다.\n"

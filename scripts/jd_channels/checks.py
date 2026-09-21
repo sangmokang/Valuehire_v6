@@ -86,10 +86,12 @@ def required_vs_preferred(requirement_text: str, preferred_text: str) -> tuple[b
 
 
 # ── LinkedIn RPS InMail 전용 ──────────────────────────────
-# 관계형 서비스라 본문이 목록이 아니라 이어지는 글이어야 한다(SOT L4·L5).
+# 구조는 사장님 골든 샘플(outputs/_golden/rps_*_golden.txt)에서 역산했다.
+# 골든은 `■ 섹션` + `• 불릿` + `**볼드**` 로 쓰여 있다. 2026-09-22 오전에
+# 이 기호들을 INMAIL_MARKDOWN 으로 금지했다가 골든 2건을 모두 불합격시켰다.
+# 금지 대상은 서식이 아니라 사람이 쓰지 않는 문구(상투어·이모지·원시 변수)다.
 
 INMAIL_BANNED = [
-    ("INMAIL_MARKDOWN", "마크다운 기호", r"(?:\*\*|^#{1,6}\s|^\s*[-*]\s+\S.*\n\s*[-*]\s)"),
     ("INMAIL_EMOJI", "이모지", r"[\U0001F300-\U0001FAFF☀-➿]"),
     ("INMAIL_RAW_VAR", "치환되지 않은 원시 변수", r"\{\{[^}]*\}\}"),
     ("INMAIL_NAME_HARDCODED", "특정 후보자 이름이 본문에 박힘",
@@ -114,7 +116,10 @@ def inmail_tone(text: str) -> dict[str, object]:
     """AI 티가 나는 신호를 센다. 판정이 아니라 사람이 볼 지표다.
 
     bullet_ratio 는 불릿 줄 비율, ending_repeat 는 가장 흔한 문장 어미의 비율이다.
-    둘 다 높으면 목록처럼 읽히고 기계가 쓴 티가 난다.
+    2026-09-22 오전까지는 "불릿 비율이 높으면 AI 티"로 읽었는데, 골든 실측이
+    0.444 / 0.462 로 나와 해석이 뒤집혔다. 불릿 비율이 **너무 낮을 때**가
+    위험 신호다(조건을 산문에 녹여 읽히지 않게 만든 것). ending_repeat 만
+    높을수록 나쁘다 — 골든은 0.143 / 0.074 다.
     """
     lines = [ln for ln in text.split("\n") if ln.strip()]
     bullets = [ln for ln in lines if re.match(r"^\s*[-*·•]\s", ln)]
@@ -131,4 +136,99 @@ def inmail_tone(text: str) -> dict[str, object]:
         "sentences": len(sentences),
         "ending_repeat": round(top / len(sentences), 3) if sentences else 0.0,
         "paragraphs": len([p for p in text.split("\n\n") if p.strip()]),
+        # 골든 범위를 벗어난 방향을 한 단어로 알려준다.
+        "bullet_verdict": (
+            "too_few" if lines and len(bullets) / len(lines) < 0.25 else "ok"),
     }
+
+
+# ── 골든 구조 검사 ────────────────────────────────────────
+# 서식을 금지하는 대신 "골든 구조를 벗어났는가"를 잰다. 아래 수치는
+# 골든 2건의 실측값(섹션 5/5, 불릿 12/12, 볼드 12/7, 1,308자/1,067자)에서
+# 여유를 두고 내린 하한이다. 상한은 SOT L1 의 1,899자만 둔다.
+MIN_SECTIONS = 4
+MIN_BULLETS = 8
+MIN_BOLD_PAIRS = 5
+HARD_CAP = 1899
+
+SIGNATURE_LINE = "테크 전문 서치펌 밸류커넥트의 헤드헌터 강상모"
+
+# G7 — 후보자에게 보내는 제안에 네거티브 지표를 싣지 않는다.
+# 매출·성장·투자·사용자 규모는 남기고 손실과 인원만 뺀다.
+NEGATIVE_METRIC = re.compile(r"영업\s*(?:손실|적자)|당기\s*순손실|인원\s*[:：]?\s*\d+\s*명")
+
+# G4 — 업계에서 영문 그대로 쓰는 용어를 한글로 풀면 원문 신호가 사라진다.
+# 음차(컬처핏·레퍼런스 체크)가 아니라 "번역해 버린 말"만 막는다.
+TRANSLATED_TERMS = {
+    "평판 조회": "Reference Check",
+    "조직 적합도": "Culture Fit",
+    "문화 적합성": "Culture Fit",
+    "핵심성과지표": "KPI",
+    "데이터 웨어하우스": "DW",
+    "비즈니스 인텔리전스": "BI",
+    "감사 추적": "Audit Trail",
+    "교차 기능": "Cross-functional",
+    "부서 간 협업": "Cross-functional",
+    "최소 기능 제품": "MVP",
+    "최소 실행 단위": "MVP",
+    "목표 및 핵심 결과": "OKR",
+    "구조화 질의": "SQL/Query",
+}
+
+
+def inmail_structure(text: str) -> list[Hit]:
+    """골든 구조를 벗어난 지점을 찾는다. 빈 결과가 곧 좋은 글은 아니다.
+
+    `scan_inmail` 이 "쓰면 안 되는 문구"를 본다면 이쪽은 "있어야 하는 뼈대"를 본다.
+    둘을 나눈 이유: 금지 규칙만으로는 산문 일색 원고를 걸러내지 못한다.
+    """
+    hits: list[Hit] = []
+
+    def add(rule: str, desc: str, match: str, line: int = 1) -> None:
+        hits.append(Hit(rule, desc, match, line))
+
+    sections = re.findall(r"^■ .+$", text, re.M)
+    if len(sections) < MIN_SECTIONS:
+        add("INMAIL_NO_SECTION",
+            f"■ 섹션 헤더가 {MIN_SECTIONS}개 미만 (G1)", f"{len(sections)}개")
+
+    bullets = re.findall(r"^• .+$", text, re.M)
+    if len(bullets) < MIN_BULLETS:
+        add("INMAIL_NO_BULLET",
+            f"• 불릿이 {MIN_BULLETS}개 미만 — 산문만으로는 조건이 읽히지 않는다 (G2)",
+            f"{len(bullets)}개")
+
+    bold = len(re.findall(r"\*\*", text)) // 2
+    if bold < MIN_BOLD_PAIRS:
+        add("INMAIL_NO_BOLD",
+            f"**볼드**가 {MIN_BOLD_PAIRS}쌍 미만 — 숫자·핵심 역량을 강조하지 않았다 (G3)",
+            f"{bold}쌍")
+
+    # 섹션 총수만 세면 "■ Position | ..." 한 줄만 망가져도 4개가 남아 통과한다.
+    # 2026-09-22 변이 실증에서 살아남은 지점이라 이름을 따로 건다.
+    if not re.search(r"^■ Position \| .+$", text, re.M):
+        add("INMAIL_NO_POSITION_HEADER",
+            "■ Position | {포지션명} 줄이 없다 (G1)", "(없음)")
+
+    if SIGNATURE_LINE not in text:
+        add("INMAIL_SIGNATURE", "호칭이 골든과 다르다 (G5)", SIGNATURE_LINE)
+
+    for m in NEGATIVE_METRIC.finditer(text):
+        add("INMAIL_NEGATIVE_METRIC", "네거티브 지표는 제안 본문에서 뺀다 (G7)",
+            m.group(0), text.count("\n", 0, m.start()) + 1)
+
+    for ko, en in TRANSLATED_TERMS.items():
+        at = text.find(ko)
+        if at >= 0:
+            add("INMAIL_TERM_TRANSLATED", f"영문 용어를 한글로 풀었다 — {en} (G4)",
+                ko, text.count("\n", 0, at) + 1)
+
+    tail = text[-200:]
+    if not re.search(r"LinkedIn\s*수락|간단한\s*회신", tail):
+        add("INMAIL_CLOSING", "클로징이 LinkedIn 수락·간단한 회신으로 끝나지 않는다 (G10)",
+            tail.splitlines()[-1] if tail.strip() else "(빈 클로징)")
+
+    if len(text) > HARD_CAP:
+        add("INMAIL_TOO_LONG", f"본문이 {HARD_CAP}자를 넘는다 (SOT L1)", f"{len(text)}자")
+
+    return sorted(hits, key=lambda h: (h.line, h.rule))

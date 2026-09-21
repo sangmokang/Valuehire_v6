@@ -49,8 +49,10 @@ def _missing_core(src: JDSource, draft: Draft) -> tuple[str, ...]:
             continue
         # 출력에 적용한 포털 치환을 기대값에도 똑같이 적용한다.
         # 그러지 않으면 정상 치환을 누락으로 오판한다.
+        # RPS 는 단위의 rps 표현으로 렌더된다. 후보에서 빼면 정상 출력을
+        # core 누락으로 오판한다(2026-09-22 실측: 37개 중 22개 오탐).
         cands = [normalize_for_compare(sanitize_for_portal(t, portal))
-                 for t in (unit.full, unit.compact)]
+                 for t in (unit.full, unit.compact, unit.rps) if t]
         if not any(c and c in body for c in cands):
             missing.append(unit.id)
     return tuple(missing)
@@ -80,7 +82,7 @@ def verify(src: JDSource, draft: Draft) -> Report:
             body_n = normalize_for_compare(draft.body)
             portal = PROFILES[draft.channel].portal
             variants = tuple(normalize_for_compare(sanitize_for_portal(t, portal))
-                             for t in (unit.full, unit.compact))
+                             for t in (unit.full, unit.compact, unit.rps) if t)
             if not any(v and v in body_n for v in variants):
                 notes.append(f"평가 우선순위 누락: {unit.id}")
 

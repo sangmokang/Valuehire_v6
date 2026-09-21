@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .inmail import dropped_for_inmail, render_inmail
 from .measure import (
     PORTAL_SAFE_SUBSTITUTE, Measured, compose, measure, over_limit, scan_portal_risk,
 )
@@ -223,11 +224,32 @@ class Draft:
         }
 
 
+def _render_rps(src: JDSource, profile: ChannelProfile, subj: str) -> Draft:
+    """RPS 는 다른 채널과 조립 방식이 다르다 — 골든 뼈대를 따로 만든다.
+
+    줄이는 수단은 여전히 두 가지뿐이다. (1) 단위의 rps/compact 표현,
+    (2) core 가 아닌 단위 생략. 문자열은 자르지 않는다.
+    """
+    attempts: list[tuple[str, str, set[str], Measured]] = []
+    for name, _compact, drop in STRATEGIES:
+        keep = {u.id for u in src.units if not u.rps_drop and _keep(u, drop)}
+        body = render_inmail(src, keep)
+        m = measure(compose(subj, body))
+        attempts.append((name, body, keep, m))
+        if not over_limit(m, profile.limit or 0):
+            return Draft(profile.key, subj, body, compose(subj, body), name,
+                         dropped_for_inmail(src, keep), m, "READY_DRAFT")
+    name, body, keep, m = attempts[-1]
+    return Draft(profile.key, subj, body, compose(subj, body), name,
+                 dropped_for_inmail(src, keep), m, "NEEDS_LENGTH_DECISION")
+
+
 def render(src: JDSource, channel: str) -> Draft:
     profile = PROFILES[channel]
-    short_greeting = profile.key == "linkedin_rps"
-    head = greeting(src, short=short_greeting)
     subj = subject(src)
+    if profile.key == "linkedin_rps":
+        return _render_rps(src, profile, subj)
+    head = greeting(src, short=False)
     attempts: list[tuple[str, str, int, Measured]] = []
 
     for name, compact, drop in STRATEGIES:
