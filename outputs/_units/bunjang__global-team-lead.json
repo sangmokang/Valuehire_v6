@@ -3,15 +3,16 @@
   "position": "Global Team Lead",
   "source_url": "https://team.bgzt.co.kr/hiring",
   "captured_at": "2026-09-22T17:00:00+00:00",
-  "source_status": "FETCHED_VERBATIM",
+  "source_status": "USER_PROVIDED_VERBATIM",
   "jd_id": "z8nfn6nu3c",
   "company_slug": "bunjang",
   "position_slug": "global-team-lead",
   "role_label": "Global Team Lead",
   "notes": [
-    "JD 원문은 2026-09-22 사장님이 직접 제공한 team.bgzt.co.kr 채용페이지 본문",
+    "원문 전문: outputs/_sources/bunjang__global-team-lead.txt (2026-09-22 사장님 붙여넣기)",
     "회사 수치는 bunjang__core-product-pm.json 과 같은 출처(2026-09-21 수집분)",
-    "ClickUp 기존 태스크 z8nfn6nu3c 에 대응 — 신규 생성 아님"
+    "ClickUp 기존 태스크 z8nfn6nu3c 에 대응 — 신규 생성 아님",
+    "2026-09-22 정정: 원문에 없는 고용형태·연차·근무지·마감 조건 단위(N01) 삭제. 회사 수치 단위의 source 를 채용페이지에서 회사 조사로 정정"
   ],
   "units": [
     {
@@ -21,7 +22,7 @@
       "meaning": "company C01",
       "full": "- 설립: 2011년 1월 27일 / 인원: 192명",
       "compact": "- 2011년 설립 / 192명",
-      "source": "https://team.bgzt.co.kr/hiring",
+      "source": "회사 조사(2026-09-21 수집) — outputs/_units/bunjang__core-product-pm.json 과 동일",
       "rps_drop": true
     },
     {
@@ -31,7 +32,7 @@
       "meaning": "company C02",
       "full": "- 대표: 강승현·최재화 공동대표",
       "compact": "- 대표: 강승현·최재화 공동대표",
-      "source": "https://team.bgzt.co.kr/hiring",
+      "source": "회사 조사(2026-09-21 수집) — outputs/_units/bunjang__core-product-pm.json 과 동일",
       "rps_drop": true
     },
     {
@@ -41,7 +42,7 @@
       "meaning": "company C03",
       "full": "- 실적: 2025년 매출 581억원 / 영업손실 199억원",
       "compact": "- 2025년 매출 581억원, 영업손실 199억원",
-      "source": "https://team.bgzt.co.kr/hiring",
+      "source": "회사 조사(2026-09-21 수집) — outputs/_units/bunjang__core-product-pm.json 과 동일",
       "rps_drop": true
     },
     {
@@ -51,7 +52,7 @@
       "meaning": "company C04",
       "full": "- 투자: 2024년 7월 Series E 400억원 유치, 하나대체투자자산운용 주도",
       "compact": "- 2024년 7월 Series E 400억원 유치",
-      "source": "https://team.bgzt.co.kr/hiring",
+      "source": "회사 조사(2026-09-21 수집) — outputs/_units/bunjang__core-product-pm.json 과 동일",
       "rps_block": "intro",
       "rps_order": 4,
       "rps": "2024년 7월 **Series E 400억원**을 유치했습니다."
@@ -63,7 +64,7 @@
       "meaning": "company C05",
       "full": "- 위치: 서울 서초구 서초대로38길 12, 마제스타시티 타워2",
       "compact": "- 서울 서초",
-      "source": "https://team.bgzt.co.kr/hiring",
+      "source": "회사 조사(2026-09-21 수집) — outputs/_units/bunjang__core-product-pm.json 과 동일",
       "rps_drop": true
     },
     {
@@ -315,16 +316,6 @@
       "source": "https://team.bgzt.co.kr/hiring",
       "rps_block": "footnote",
       "rps": "자사 채널과 30개+ 해외 채널 두 축을 동시에 다루는 스케일 경험"
-    },
-    {
-      "id": "N01",
-      "section": "conditions",
-      "kind": "core",
-      "meaning": "conditions N01",
-      "full": "- 정규직 / 경력 6년 이상 / 서울 서초 오피스 / 채용 시 마감",
-      "compact": "- 정규직 / 경력 6년 이상 / 서초 오피스",
-      "source": "https://team.bgzt.co.kr/hiring",
-      "rps": "정규직 · 경력 6년 이상 · 서초 오피스 · 채용 시 마감"
     },
     {
       "id": "S01",

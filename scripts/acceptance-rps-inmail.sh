@@ -190,6 +190,10 @@ raise SystemExit(0 if rules else 1)
 PY
 run CAC-3-산문판불합격 "$TD/cac3.py"
 
+# ── AC-6 / CAC-4 원문 대조 — 지어낸 사실 차단 ──────────
+run AC-6-원문대조 scripts/acceptance/rps_inmail_ac6_provenance.py
+run CAC-4-가짜사실차단 scripts/acceptance/rps_inmail_cac4_fabricated.py
+
 # ── AC-5 회귀 ────────────────────────────────────────────────────
 echo "--- AC-5 회귀: python3 -m unittest tests.test_jd_channels"
 if python3 -m unittest tests.test_jd_channels </dev/null 2>&1 | tail -3 | grep -q '^OK'; then
@@ -202,5 +206,5 @@ echo
 echo "VERDICT: $([ "$FAIL" -eq 0 ] && echo PASS || echo FAIL)"
 echo "PASS=$PASS FAIL=$FAIL TOTAL=$((PASS+FAIL))"
 echo "CHECKED: $((PASS+FAIL))"
-[ "$((PASS+FAIL))" -ge 9 ] || { echo "검사 항목이 8개 미만 — 검사 대상 0개는 합격이 아니다"; exit 2; }
+[ "$((PASS+FAIL))" -ge 11 ] || { echo "검사 항목이 8개 미만 — 검사 대상 0개는 합격이 아니다"; exit 2; }
 exit $([ "$FAIL" -eq 0 ] && echo 0 || echo 1)
