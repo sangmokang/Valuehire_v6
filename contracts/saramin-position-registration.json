@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "observed_at": "2026-09-21",
+  "surface": "Saramin talent-pool candidate-manage position modal, not public recruitment advertisement",
+  "url": "https://www.saramin.co.kr/zf_user/memcom/talent-pool/main/candidate-manage",
+  "form": "form.wrap_talentpool_form.type_column",
+  "title": {"selector": "#position_title", "limit": 35},
+  "fields": [
+    {"label": "제안 내용", "selector": "#position_content", "limit": 2000},
+    {"label": "업무 내용", "selector": "#work_content", "limit": 2000}
+  ],
+  "add": "button.btn_add_position",
+  "save": "button.btn_save",
+  "category": "select#job_select",
+  "minimum_experience": "select#offer_career_min",
+  "maximum_experience": "select#offer_career_max",
+  "salary_minimum": "select#offer_salary_min",
+  "salary_maximum": "select#offer_salary_max",
+  "ai_generation": "input#jobCareerOnOff",
+  "search": "input[placeholder='포지션 및 생성자명을 검색해주세요']",
+  "search_button": "#applicant_search_btn",
+  "cards": ".position_card_list",
+  "constraint": "Selectors are observations; re-observe uniqueness, labels, limits and account before any write. Never blind-retry save."
+}
