@@ -92,6 +92,11 @@ def required_vs_preferred(requirement_text: str, preferred_text: str) -> tuple[b
 # 금지 대상은 서식이 아니라 사람이 쓰지 않는 문구(상투어·이모지·원시 변수)다.
 
 INMAIL_BANNED = [
+    # 허용하는 서식은 **볼드**·■·• 세 가지뿐이다. 2026-09-22 Codex V1 결함 4:
+    # INMAIL_MARKDOWN 을 통째로 지운 탓에 `## 제목`·`- 불릿`·`__강조` 까지
+    # 함께 통과했다. 골든 2건에는 이 표기가 한 번도 없다.
+    ("INMAIL_FOREIGN_MARKUP", "허용하지 않는 마크다운 표기",
+     r"^#{1,6}\s|^\s*[-*]\s+\S|__[^_\n]+__"),
     ("INMAIL_EMOJI", "이모지", r"[\U0001F300-\U0001FAFF☀-➿]"),
     ("INMAIL_RAW_VAR", "치환되지 않은 원시 변수", r"\{\{[^}]*\}\}"),
     ("INMAIL_NAME_HARDCODED", "특정 후보자 이름이 본문에 박힘",

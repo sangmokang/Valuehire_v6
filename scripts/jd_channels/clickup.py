@@ -44,7 +44,9 @@ def render_task_body(src: JDSource, *, channel_paths: dict[str, str] | None = No
 
     if channel_paths:
         out.append("## 채널 원고")
-        out.extend(f"- {k}: `{v}`" for k, v in sorted(channel_paths.items()))
+        # 백틱을 쓰지 않는다 — ClickUp 에디터에 자바스크립트로 넣을 때
+        # 템플릿 리터럴을 끊어 버린다(2026-09-22 실측).
+        out.extend(f"- {k}: {v}" for k, v in sorted(channel_paths.items()))
         out.append("")
 
     return "\n".join(out).rstrip() + "\n"

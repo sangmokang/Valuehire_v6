@@ -49,7 +49,9 @@ GMAIL = ChannelProfile("gmail", None, (
     _g("[지원 서류]", "documents"),
 ), compact_default=False)
 
-RPS = ChannelProfile("linkedin_rps", 1900, (
+# 정본 L1 의 실무 상한은 1,899자다. 1900 으로 두면 제목 포함 1,900자가
+# 통과한다(2026-09-22 Codex V1 결함 5 실측).
+RPS = ChannelProfile("linkedin_rps", 1899, (
     _g("[{company}]", "company"),
     _g("[팀·역할]", "team", "domain", "role"),
     _g("[주요 업무]", "duties"),

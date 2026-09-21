@@ -5,7 +5,10 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-from .checks import greeting_ok, required_vs_preferred, scan
+from .checks import (
+    greeting_ok, inmail_structure, required_vs_preferred, scan, scan_inmail,
+)
+from .conditions import missing as missing_conditions
 from .measure import normalize_for_compare
 from .render import PROFILES, Draft, render, sanitize_for_portal
 from .units import JDSource, load
@@ -62,6 +65,20 @@ def verify(src: JDSource, draft: Draft) -> Report:
     profile = PROFILES[draft.channel]
     hits = scan(draft.full_text)
     notes: list[str] = []
+
+    # RPS 는 전용 금지·구조 규칙이 따로 있다. 만들어 두고 부르지 않으면
+    # 이모지가 든 원고도 ok=True 로 나온다(2026-09-22 Codex V1 결함 2 실측).
+    if profile.key == "linkedin_rps":
+        seen = {h.rule for h in hits}
+        for hit in scan_inmail(draft.body) + inmail_structure(draft.body):
+            if hit.rule not in seen:
+                seen.add(hit.rule)
+                hits.append(hit)
+
+    # 조건 보존은 단위가 실어나르는 문자열과 독립으로 잰다. rps 표현 자체를
+    # 정답으로 삼으면 rps 에서 조건을 지운 것을 발견할 수 없다(결함 1).
+    for label in missing_conditions(src, draft.body):
+        notes.append(f"조건 누락: {label}")
 
     ok, why = greeting_ok(draft.body)
     if not ok:
