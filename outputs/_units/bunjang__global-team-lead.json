@@ -1,0 +1,340 @@
+{
+  "company": "번개장터",
+  "position": "Global Team Lead",
+  "source_url": "https://team.bgzt.co.kr/hiring",
+  "captured_at": "2026-09-22T17:00:00+00:00",
+  "source_status": "FETCHED_VERBATIM",
+  "jd_id": "z8nfn6nu3c",
+  "company_slug": "bunjang",
+  "position_slug": "global-team-lead",
+  "role_label": "Global Team Lead",
+  "notes": [
+    "JD 원문은 2026-09-22 사장님이 직접 제공한 team.bgzt.co.kr 채용페이지 본문",
+    "회사 수치는 bunjang__core-product-pm.json 과 같은 출처(2026-09-21 수집분)",
+    "ClickUp 기존 태스크 z8nfn6nu3c 에 대응 — 신규 생성 아님"
+  ],
+  "units": [
+    {
+      "id": "C01",
+      "section": "company",
+      "kind": "company",
+      "meaning": "company C01",
+      "full": "- 설립: 2011년 1월 27일 / 인원: 192명",
+      "compact": "- 2011년 설립 / 192명",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps_drop": true
+    },
+    {
+      "id": "C02",
+      "section": "company",
+      "kind": "company",
+      "meaning": "company C02",
+      "full": "- 대표: 강승현·최재화 공동대표",
+      "compact": "- 대표: 강승현·최재화 공동대표",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps_drop": true
+    },
+    {
+      "id": "C03",
+      "section": "company",
+      "kind": "company",
+      "meaning": "company C03",
+      "full": "- 실적: 2025년 매출 581억원 / 영업손실 199억원",
+      "compact": "- 2025년 매출 581억원, 영업손실 199억원",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps_drop": true
+    },
+    {
+      "id": "C04",
+      "section": "company",
+      "kind": "company",
+      "meaning": "company C04",
+      "full": "- 투자: 2024년 7월 Series E 400억원 유치, 하나대체투자자산운용 주도",
+      "compact": "- 2024년 7월 Series E 400억원 유치",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps_block": "intro",
+      "rps_order": 4,
+      "rps": "2024년 7월 **Series E 400억원**을 유치했습니다."
+    },
+    {
+      "id": "C05",
+      "section": "company",
+      "kind": "company",
+      "meaning": "company C05",
+      "full": "- 위치: 서울 서초구 서초대로38길 12, 마제스타시티 타워2",
+      "compact": "- 서울 서초",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps_drop": true
+    },
+    {
+      "id": "T01",
+      "section": "team",
+      "kind": "core",
+      "meaning": "team T01",
+      "full": "Global팀은 연간 등록되는 4,000만 개의 번개장터 상품을 전 세계 유저에게 연결하는 서비스를 만듭니다.",
+      "compact": "Global팀은 연 4,000만 개 상품을 전 세계 유저에게 연결합니다.",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "heading": "Global팀",
+      "rps_order": 1,
+      "rps": "번개장터 Global팀은 연간 등록되는 **4,000만 개 상품**을 전 세계 유저에게 연결합니다."
+    },
+    {
+      "id": "T02",
+      "section": "team",
+      "kind": "core",
+      "meaning": "team T02",
+      "full": "자사 채널인 800만 MAU의 번장 글로벌(Bunjang Global)과 30개 이상 해외 채널에 오픈 API 기반으로 연동 판매하는 두 축으로 사업을 확장합니다.",
+      "compact": "자사 채널 번장 글로벌(800만 MAU)과 30개+ 해외 채널 오픈 API 연동 두 축으로 확장합니다.",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps_order": 2,
+      "rps": "자사 채널 **Bunjang Global(800만 MAU)** 과 **30개+ 해외 채널 Open API 연동**, 두 축으로 사업을 확장하고 있습니다."
+    },
+    {
+      "id": "T03",
+      "section": "team",
+      "kind": "core",
+      "meaning": "team T03",
+      "full": "해외에서 인기가 많은 K-pop, K-fashion 카테고리를 필두로 해외 GMV 연 1,000억 이상 규모를 목표로 성장하고 있습니다.",
+      "compact": "K-pop·K-fashion을 필두로 해외 GMV 연 1,000억+ 목표로 성장 중입니다.",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps_order": 3,
+      "rps": "K-pop·K-fashion을 필두로 해외 **GMV 연 1,000억+** 규모를 목표로 빠르게 성장하고 있습니다."
+    },
+    {
+      "id": "R01",
+      "section": "role",
+      "kind": "core",
+      "meaning": "role R01",
+      "full": "글로벌 사업의 P&L을 책임지며 매출 구조와 비용 구조를 함께 설계하는 리더 역할입니다.",
+      "compact": "글로벌 사업 P&L을 책임지고 매출·비용 구조를 설계하는 리더입니다.",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps": "글로벌 사업의 **P&L을 책임지며 매출 구조와 비용 구조를 함께 설계**하는 리더 역할입니다."
+    },
+    {
+      "id": "R02",
+      "section": "role",
+      "kind": "core",
+      "meaning": "role R02",
+      "full": "프로덕트·마케팅·BD를 분리된 기능이 아니라 하나의 성장 루프로 통합해 리드합니다.",
+      "compact": "프로덕트·마케팅·BD를 하나의 성장 루프로 통합 리드합니다.",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps": "**Product · Marketing · BD** 를 분리된 기능이 아니라 하나의 성장 루프로 통합해 리드합니다."
+    },
+    {
+      "id": "W01",
+      "section": "duties",
+      "kind": "core",
+      "meaning": "duties W01",
+      "full": "- 글로벌 사업을 성공시키기 위한 Key Success Factor를 정의하고, BD·프로덕트·마케팅 실행 과제로 분해해요.",
+      "compact": "- Key Success Factor 정의 및 BD·프로덕트·마케팅 실행 과제 분해",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "heading": "글로벌 사업 전체 책임",
+      "rps": "**Key Success Factor** 정의 및 BD·Product·Marketing 실행 과제 분해"
+    },
+    {
+      "id": "W02",
+      "section": "duties",
+      "kind": "core",
+      "meaning": "duties W02",
+      "full": "- 어디에 더 자원을 넣고 무엇을 접을지 판단하며, 그 결과에 책임져요.",
+      "compact": "- 자원 배분·중단 판단과 결과 책임",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps": "자원 배분·중단 의사결정과 그 결과에 대한 책임"
+    },
+    {
+      "id": "W03",
+      "section": "duties",
+      "kind": "core",
+      "meaning": "duties W03",
+      "full": "- 유입부터 탐색, 결제, 배송, CS까지 거래 경험에서 퍼널 지표로 병목을 특정하고, 개선 우선순위를 정해 구매 전환을 끌어올려요.",
+      "compact": "- 유입→탐색→결제→배송→CS 퍼널 병목 특정 및 구매 전환 개선",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "heading": "성장 루프 통합 리드",
+      "rps": "유입 → 탐색 → 결제 → 배송 → CS **Funnel** 병목 특정 및 구매 전환 개선"
+    },
+    {
+      "id": "W04",
+      "section": "duties",
+      "kind": "core",
+      "meaning": "duties W04",
+      "full": "- 국가별·채널별로 다른 유저와 경쟁 환경을 읽고 집중할 곳과 메시지를 정하며, 유저 획득·리텐션 혁신과 브랜드 전략을 세워요.",
+      "compact": "- 국가·채널별 경쟁 환경 분석, 유저 획득·리텐션·브랜드 전략 수립",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps": "국가·채널별 경쟁 환경 분석, 유저 획득·**Retention**·Brand 전략 수립"
+    },
+    {
+      "id": "W05",
+      "section": "duties",
+      "kind": "core",
+      "meaning": "duties W05",
+      "full": "- 어떤 채널과 어떤 조건으로 연동할지 판단하고, 파트너십을 사업 성과로 연결해요.",
+      "compact": "- 채널 연동 조건 판단 및 파트너십의 사업 성과 연결",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "heading": "오픈 API 채널 사업 확장",
+      "rps": "채널 연동 조건 판단 및 **Partnership** 의 사업 성과 연결"
+    },
+    {
+      "id": "W06",
+      "section": "duties",
+      "kind": "core",
+      "meaning": "duties W06",
+      "full": "- 상품·검색·주문 API 등 연동 인프라와 파트너센터 등 셀러 인프라의 투자 방향을 결정해요.",
+      "compact": "- 상품·검색·주문 API 연동 인프라와 셀러 인프라 투자 방향 결정",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps": "상품·검색·주문 **API** 연동 인프라와 Seller 인프라 투자 방향 결정"
+    },
+    {
+      "id": "W07",
+      "section": "duties",
+      "kind": "core",
+      "meaning": "duties W07",
+      "full": "- 프로덕트·마케팅·BD가 함께 있는 조직을 운영하며 목표를 분해하고 구성원의 아웃풋을 끌어올려요. 경영진·유관 본부와 사업 방향을 조율하고 자원을 확보해요.",
+      "compact": "- 조직 운영·목표 분해·구성원 아웃풋 관리, 경영진·유관 본부 조율 및 자원 확보",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "heading": "조직 리드",
+      "rps": "조직 운영·목표 분해·구성원 **Output** 관리, 경영진·유관 본부 조율 및 자원 확보"
+    },
+    {
+      "id": "Q01",
+      "section": "requirements",
+      "kind": "core",
+      "meaning": "requirements Q01",
+      "full": "- 사업 단위의 손익, 또는 이에 준하는 목표를 직접 책임지고 달성해 본 경험을 보유하신 분",
+      "compact": "- 사업 단위 손익 또는 이에 준하는 목표를 직접 책임진 경험",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps": "사업 단위 **P&L** 또는 이에 준하는 목표를 직접 책임지고 달성한 경험"
+    },
+    {
+      "id": "Q02",
+      "section": "requirements",
+      "kind": "core",
+      "meaning": "requirements Q02",
+      "full": "- 글로벌 사업 또는 해외향 서비스를 직접 리드해 본 경험을 보유하신 분",
+      "compact": "- 글로벌 사업·해외향 서비스 직접 리드 경험",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps": "글로벌 사업 또는 해외향 서비스를 직접 리드한 경험"
+    },
+    {
+      "id": "Q03",
+      "section": "requirements",
+      "kind": "core",
+      "meaning": "requirements Q03",
+      "full": "- 사업, 프로덕트, 마케팅을 분리된 기능이 아니라 하나의 성장 루프로 설계하고 실행할 수 있으신 분",
+      "compact": "- 사업·프로덕트·마케팅을 하나의 성장 루프로 설계·실행 가능",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps": "**Business · Product · Marketing** 을 하나의 성장 루프로 설계·실행할 수 있는 분"
+    },
+    {
+      "id": "Q04",
+      "section": "requirements",
+      "kind": "core",
+      "meaning": "requirements Q04",
+      "full": "- Key Success Factor를 도출하고 자원 배분의 우선순위를 정할 수 있으신 분",
+      "compact": "- Key Success Factor 도출 및 자원 배분 우선순위 결정 가능",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps": "**Key Success Factor** 도출 및 자원 배분 우선순위 결정"
+    },
+    {
+      "id": "Q05",
+      "section": "requirements",
+      "kind": "core",
+      "meaning": "requirements Q05",
+      "full": "- 복잡한 문제를 구조적으로 재정의하고 스스로 답을 찾아내는 문제 해결 역량을 갖추신 분",
+      "compact": "- 복잡한 문제의 구조적 재정의와 자기주도 문제 해결 역량",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps": "복잡한 문제를 구조적으로 재정의하고 스스로 답을 찾아내는 문제 해결 역량"
+    },
+    {
+      "id": "Q06",
+      "section": "requirements",
+      "kind": "core",
+      "meaning": "requirements Q06",
+      "full": "- 조직을 맡아 목표를 분해하고 구성원의 아웃풋을 끌어올린 경험을 보유하신 분",
+      "compact": "- 조직 운영·목표 분해·구성원 아웃풋 향상 경험",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps": "조직을 맡아 목표를 분해하고 구성원 **Output** 을 끌어올린 경험"
+    },
+    {
+      "id": "P01",
+      "section": "preferred",
+      "kind": "core",
+      "meaning": "preferred P01",
+      "full": "- 0→1 또는 1→100 등 크로스보더 커머스, 글로벌 마켓플레이스에서 핵심 지표 성장을 직접 만들어낸 경험",
+      "compact": "- 크로스보더 커머스·글로벌 마켓플레이스 핵심 지표 성장 경험",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps": "**Cross-border Commerce / Global Marketplace** 에서 0→1 또는 1→100 핵심 지표 성장 경험"
+    },
+    {
+      "id": "P02",
+      "section": "preferred",
+      "kind": "core",
+      "meaning": "preferred P02",
+      "full": "- 사업뿐만 아니라 프로덕트와 마케팅 두 영역을 모두 깊이 있게 다뤄본 경험",
+      "compact": "- 사업·프로덕트·마케팅 전 영역 경험",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps": "사업뿐 아니라 Product 와 Marketing 두 영역을 모두 깊이 다뤄본 경험"
+    },
+    {
+      "id": "P03",
+      "section": "preferred",
+      "kind": "core",
+      "meaning": "preferred P03",
+      "full": "- 개발, 디자인 등 메이커 조직과 깊이 있게 협업해본 경험",
+      "compact": "- 개발·디자인 등 메이커 조직 협업 경험",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps": "Engineer·Designer 등 Maker 조직과의 깊은 **Cross-functional** 협업 경험"
+    },
+    {
+      "id": "P04",
+      "section": "preferred",
+      "kind": "core",
+      "meaning": "preferred P04",
+      "full": "- API 기반 채널 연동, 파트너 연동 프로덕트를 다뤄본 경험이 있으신 분",
+      "compact": "- API 기반 채널 연동·파트너 연동 프로덕트 경험",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps": "**API** 기반 채널 연동 및 파트너 연동 Product 경험"
+    },
+    {
+      "id": "G01",
+      "section": "growth",
+      "kind": "core",
+      "meaning": "growth G01",
+      "full": "- 연 1,000억 규모 해외 GMV를 목표로 프로덕트·마케팅·BD 액션까지 글로벌 사업의 A to Z를 설계하고 이끄는 경험",
+      "compact": "- 해외 GMV 연 1,000억 목표 글로벌 사업 A to Z 설계·리드 경험",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps_block": "footnote",
+      "rps": "해외 GMV 연 1,000억 목표로 글로벌 사업 A to Z 를 설계하고 이끄는 경험"
+    },
+    {
+      "id": "G02",
+      "section": "growth",
+      "kind": "core",
+      "meaning": "growth G02",
+      "full": "- 800만 MAU 자사 채널과 30개 이상 해외 채널 두 축을 동시에 다루며 글로벌 리커머스 사업의 스케일을 만드는 경험",
+      "compact": "- 자사 채널과 30개+ 해외 채널 두 축 동시 운영 경험",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps_block": "footnote",
+      "rps": "자사 채널과 30개+ 해외 채널 두 축을 동시에 다루는 스케일 경험"
+    },
+    {
+      "id": "N01",
+      "section": "conditions",
+      "kind": "core",
+      "meaning": "conditions N01",
+      "full": "- 정규직 / 경력 6년 이상 / 서울 서초 오피스 / 채용 시 마감",
+      "compact": "- 정규직 / 경력 6년 이상 / 서초 오피스",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps": "정규직 · 경력 6년 이상 · 서초 오피스 · 채용 시 마감"
+    },
+    {
+      "id": "S01",
+      "section": "process",
+      "kind": "core",
+      "meaning": "process S01",
+      "full": "- 서류 전형 → 1차 인터뷰 → 2차 인터뷰 → 처우 협의 → 최종 합격",
+      "compact": "- 서류→1차→2차 인터뷰→처우 협의→최종 합격",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps": "서류 → 1차 → 2차 인터뷰 → 처우 협의 → Offer"
+    }
+  ]
+}

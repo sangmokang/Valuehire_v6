@@ -1,0 +1,330 @@
+{
+  "company": "번개장터",
+  "position": "Global Business Manager",
+  "source_url": "https://team.bgzt.co.kr/hiring",
+  "captured_at": "2026-09-22T17:00:00+00:00",
+  "source_status": "FETCHED_VERBATIM",
+  "jd_id": "86exxxqau",
+  "company_slug": "bunjang",
+  "position_slug": "global-business-manager",
+  "role_label": "Global Business Manager",
+  "rps_labels": {
+    "requirements": "Looking for"
+  },
+  "notes": [
+    "JD 원문은 2026-09-22 사장님이 직접 제공한 team.bgzt.co.kr 채용페이지 본문",
+    "회사 수치는 bunjang__core-product-pm.json 과 같은 출처(2026-09-21 수집분)",
+    "ClickUp 기존 태스크 86exxxqau 에 대응 — 신규 생성 아님"
+  ],
+  "units": [
+    {
+      "id": "C01",
+      "section": "company",
+      "kind": "company",
+      "meaning": "company C01",
+      "full": "- 설립: 2011년 1월 27일 / 인원: 192명",
+      "compact": "- 2011년 설립 / 192명",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps_drop": true
+    },
+    {
+      "id": "C02",
+      "section": "company",
+      "kind": "company",
+      "meaning": "company C02",
+      "full": "- 대표: 강승현·최재화 공동대표",
+      "compact": "- 대표: 강승현·최재화 공동대표",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps_drop": true
+    },
+    {
+      "id": "C03",
+      "section": "company",
+      "kind": "company",
+      "meaning": "company C03",
+      "full": "- 실적: 2025년 매출 581억원 / 영업손실 199억원",
+      "compact": "- 2025년 매출 581억원, 영업손실 199억원",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps_drop": true
+    },
+    {
+      "id": "C04",
+      "section": "company",
+      "kind": "company",
+      "meaning": "company C04",
+      "full": "- 투자: 2024년 7월 Series E 400억원 유치, 하나대체투자자산운용 주도",
+      "compact": "- 2024년 7월 Series E 400억원 유치",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps_block": "intro",
+      "rps_order": 3,
+      "rps": "2024년 7월 **Series E 400억원**을 유치했습니다."
+    },
+    {
+      "id": "C05",
+      "section": "company",
+      "kind": "company",
+      "meaning": "company C05",
+      "full": "- 위치: 서울 서초구 서초대로38길 12, 마제스타시티 타워2",
+      "compact": "- 서울 서초",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps_drop": true
+    },
+    {
+      "id": "C06",
+      "section": "company",
+      "kind": "company",
+      "meaning": "company C06",
+      "full": "- 제품: 번개장터·번개페이·번개케어·번장 글로벌·메루카리 연계 서비스",
+      "compact": "- 번개페이·번개케어·번장 글로벌·메루카리 연계",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps_drop": true
+    },
+    {
+      "id": "T01",
+      "section": "team",
+      "kind": "core",
+      "meaning": "team T01",
+      "full": "Global BD팀은 번개장터의 글로벌 거래 확장을 책임집니다. 국내 C2C 기반 상품을 해외 플랫폼 및 파트너와 연결하는 아웃바운드 사업을 운영합니다.",
+      "compact": "Global BD팀은 국내 C2C 상품을 해외 플랫폼·파트너와 연결하는 아웃바운드 사업을 운영합니다.",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "heading": "Global BD팀",
+      "rps_order": 1,
+      "rps": "번개장터 Global BD팀은 국내 **C2C 상품을 해외 플랫폼·파트너와 연결하는 아웃바운드 사업**을 책임집니다."
+    },
+    {
+      "id": "T02",
+      "section": "team",
+      "kind": "core",
+      "meaning": "team T02",
+      "full": "신규 국가 및 플랫폼 진출, 전략적 제휴 모델 설계, 글로벌 거래 구조 고도화 등 글로벌 사업 전반의 확장을 리딩합니다.",
+      "compact": "신규 국가·플랫폼 진출, 전략적 제휴 모델 설계, 글로벌 거래 구조 고도화를 리딩합니다.",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps_order": 4,
+      "rps": "신규 국가·플랫폼 진출, 전략적 제휴 모델 설계, 글로벌 거래 구조 고도화까지 함께 리딩합니다."
+    },
+    {
+      "id": "R01",
+      "section": "role",
+      "kind": "core",
+      "meaning": "role R01",
+      "full": "단순한 영업을 넘어 글로벌 비즈니스 모델을 설계하고 확장하며, 번개장터의 영토를 넓히는 역할입니다.",
+      "compact": "단순 영업을 넘어 글로벌 비즈니스 모델을 설계·확장하는 역할입니다.",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps": "단순 영업을 넘어 **글로벌 비즈니스 모델을 설계하고 확장**하는 역할입니다."
+    },
+    {
+      "id": "R02",
+      "section": "role",
+      "kind": "core",
+      "meaning": "role R02",
+      "full": "파트너 발굴부터 계약·연동·첫 거래 온보딩·매출 확장까지 한 사이클을 직접 책임집니다.",
+      "compact": "파트너 발굴 → 계약 → 연동 → 온보딩 → 매출 확장 한 사이클을 책임집니다.",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps": "**파트너 발굴 → 계약 → 연동 → 온보딩 → 매출 확장**까지 한 사이클을 직접 책임집니다."
+    },
+    {
+      "id": "W01",
+      "section": "duties",
+      "kind": "core",
+      "meaning": "duties W01",
+      "full": "- 글로벌 시장 및 플랫폼을 분석하고, 신규 파트너를 발굴해요.",
+      "compact": "- 글로벌 시장·플랫폼 분석 및 신규 파트너 발굴",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps": "글로벌 시장·**Marketplace** 분석 및 신규 파트너 발굴"
+    },
+    {
+      "id": "W02",
+      "section": "duties",
+      "kind": "core",
+      "meaning": "duties W02",
+      "full": "- 국가·플랫폼 특성에 맞는 제휴 및 거래 모델을 기획하고, 수수료·정산 구조·운영 방식 등을 설계해요.",
+      "compact": "- 국가·플랫폼별 제휴·거래 모델 기획, 수수료·정산 구조·운영 방식 설계",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps": "국가·플랫폼별 제휴·거래 모델 기획, **수수료·정산 구조·운영 방식** 설계"
+    },
+    {
+      "id": "W03",
+      "section": "duties",
+      "kind": "core",
+      "meaning": "duties W03",
+      "full": "- 해외 파트너와 계약 조건을 협의하고 체결해요.",
+      "compact": "- 해외 파트너 계약 조건 협의·체결",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps": "해외 파트너 계약 조건 협의·체결"
+    },
+    {
+      "id": "W04",
+      "section": "duties",
+      "kind": "core",
+      "meaning": "duties W04",
+      "full": "- 계약 이후 개발·운영 연동을 리딩하고, 첫 거래가 안정적으로 발생할 때까지 온보딩을 총괄해요.",
+      "compact": "- 계약 후 개발·운영 연동 리딩, 첫 거래 안정화까지 온보딩 총괄",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps": "계약 후 개발·운영 **Integration** 리딩, 첫 거래 안정화까지 **Onboarding** 총괄"
+    },
+    {
+      "id": "W05",
+      "section": "duties",
+      "kind": "core",
+      "meaning": "duties W05",
+      "full": "- 거래 데이터 분석을 기반으로 가격·프로모션·구조를 개선하여, 파트너 매출을 확장해요.",
+      "compact": "- 거래 데이터 분석 기반 가격·프로모션·구조 개선으로 파트너 매출 확장",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps": "거래 **Data** 분석 기반 가격·프로모션·구조 개선으로 파트너 매출 확장"
+    },
+    {
+      "id": "W06",
+      "section": "duties",
+      "kind": "core",
+      "meaning": "duties W06",
+      "full": "- 신규 국가 진출, 신규 플랫폼 입점, 신규 카테고리 확장 등 글로벌 확장 프로젝트를 기획하고 실행해요.",
+      "compact": "- 신규 국가 진출·플랫폼 입점·카테고리 확장 등 글로벌 확장 프로젝트 기획·실행",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps": "신규 국가 진출·플랫폼 입점·카테고리 확장 등 글로벌 확장 프로젝트 기획·실행"
+    },
+    {
+      "id": "Q01",
+      "section": "requirements",
+      "kind": "core",
+      "meaning": "requirements Q01",
+      "full": "- 영어로 해외 파트너와 원활한 비즈니스 커뮤니케이션이 가능하신 분 (필수)",
+      "compact": "- 영어 비즈니스 커뮤니케이션 가능(필수)",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps": "영어 **Business Communication** 가능 (필수)"
+    },
+    {
+      "id": "Q02",
+      "section": "requirements",
+      "kind": "core",
+      "meaning": "requirements Q02",
+      "full": "- 5년 이상 B2B 또는 파트너십 기반 사업 경험을 보유하신 분",
+      "compact": "- B2B·파트너십 기반 사업 경험 5년 이상",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps": "**B2B / Partnership** 기반 사업 경험 **5년+**"
+    },
+    {
+      "id": "Q03",
+      "section": "requirements",
+      "kind": "core",
+      "meaning": "requirements Q03",
+      "full": "- 사업/제휴 모델을 기획하고 구조화해본 경험이 있으신 분",
+      "compact": "- 사업·제휴 모델 기획·구조화 경험",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps": "사업·제휴 모델 기획 및 구조화 경험"
+    },
+    {
+      "id": "Q04",
+      "section": "requirements",
+      "kind": "core",
+      "meaning": "requirements Q04",
+      "full": "- 신규 비즈니스 기회를 발굴하고 실행해 본 경험이 있으신 분",
+      "compact": "- 신규 비즈니스 기회 발굴·실행 경험",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps": "신규 **Business Opportunity** 발굴·실행 경험"
+    },
+    {
+      "id": "Q05",
+      "section": "requirements",
+      "kind": "core",
+      "meaning": "requirements Q05",
+      "full": "- 목표 달성을 위해 주도적으로 움직이는 실행력을 갖추신 분",
+      "compact": "- 목표 달성을 위한 주도적 실행력",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps": "목표 달성을 위해 주도적으로 움직이는 실행력"
+    },
+    {
+      "id": "P01",
+      "section": "preferred",
+      "kind": "core",
+      "meaning": "preferred P01",
+      "full": "- 일본어, 중국어 등 제2외국어 비즈니스가 가능하신 분",
+      "compact": "- 일본어·중국어 등 제2외국어 비즈니스 가능",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps": "일본어·중국어 등 제2외국어 비즈니스 가능"
+    },
+    {
+      "id": "P02",
+      "section": "preferred",
+      "kind": "core",
+      "meaning": "preferred P02",
+      "full": "- 글로벌 이커머스 또는 마켓플레이스 관련 경험이 있으신 분",
+      "compact": "- 글로벌 이커머스·마켓플레이스 경험",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps": "글로벌 **E-commerce / Marketplace** 경험"
+    },
+    {
+      "id": "P03",
+      "section": "preferred",
+      "kind": "core",
+      "meaning": "preferred P03",
+      "full": "- 신규 시장 개척이나 신규 사업 프로젝트 경험이 있으신 분",
+      "compact": "- 신규 시장 개척·신규 사업 프로젝트 경험",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps": "신규 시장 개척 또는 신규 사업 프로젝트 경험"
+    },
+    {
+      "id": "P04",
+      "section": "preferred",
+      "kind": "core",
+      "meaning": "preferred P04",
+      "full": "- 전략적 제휴 또는 파트너십 구조를 설계해 본 경험이 있으신 분",
+      "compact": "- 전략적 제휴·파트너십 구조 설계 경험",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps": "전략적 제휴 또는 **Partnership** 구조 설계 경험"
+    },
+    {
+      "id": "G01",
+      "section": "growth",
+      "kind": "core",
+      "meaning": "growth G01",
+      "full": "- 누적 가입자 2천만, DAU 100만 트래픽의 중고거래 플랫폼에서 더 좋은 서비스와 가치를 만드는 경험",
+      "compact": "- 가입자 2천만·DAU 100만 규모 플랫폼 경험",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps_block": "intro",
+      "rps_order": 2,
+      "rps": "누적 가입자 **2천만+, DAU 100만+** 규모의 C2C 플랫폼입니다."
+    },
+    {
+      "id": "G02",
+      "section": "growth",
+      "kind": "core",
+      "meaning": "growth G02",
+      "full": "- 글로벌 파트너십을 직접 성사시키며 비즈니스 영향력을 확장하는 경험",
+      "compact": "- 글로벌 파트너십 직접 성사 경험",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps_block": "footnote",
+      "rps": "글로벌 파트너십을 직접 성사시키며 비즈니스 영향력을 확장"
+    },
+    {
+      "id": "G03",
+      "section": "growth",
+      "kind": "core",
+      "meaning": "growth G03",
+      "full": "- 글로벌 사업 모델 설계, 신규 국가·플랫폼 진출 프로젝트 참여를 통해 글로벌 BD 전문가로 성장",
+      "compact": "- 글로벌 사업 모델 설계·신규 국가 진출 프로젝트 경험",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps_block": "footnote",
+      "rps": "글로벌 사업 모델 설계와 신규 국가·플랫폼 진출 프로젝트 참여"
+    },
+    {
+      "id": "N01",
+      "section": "conditions",
+      "kind": "core",
+      "meaning": "conditions N01",
+      "full": "- 정규직 / 경력 5년 이상 / 서울 서초 오피스 / 채용 시 마감",
+      "compact": "- 정규직 / 경력 5년 이상 / 서초 오피스",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps": "정규직 · 경력 5년 이상 · 서초 오피스 · 채용 시 마감"
+    },
+    {
+      "id": "S01",
+      "section": "process",
+      "kind": "core",
+      "meaning": "process S01",
+      "full": "- 서류 전형 → 1차 인터뷰 → 2차 인터뷰 → 3차 인터뷰 → 처우 협의 → 최종 합격",
+      "compact": "- 서류→1차→2차→3차 인터뷰→처우 협의→최종 합격",
+      "source": "https://team.bgzt.co.kr/hiring",
+      "rps": "서류 → 1차 → 2차 → 3차 인터뷰 → 처우 협의 → Offer"
+    }
+  ]
+}
