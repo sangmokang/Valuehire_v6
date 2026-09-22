@@ -218,3 +218,26 @@ python3 -m unittest tests.test_jd_channels
 버린 길 — 출력 패턴만 더 요구하는 방식은 모든 패턴을 위조하면 우회됩니다.
 대가 — 신뢰된 기준과 외부 실행 강제는 이 PR만으로 성립하지 않을 수 있습니다.
 되돌리기 — 이번 보완 커밋만 revert하고 보존 사본은 유지합니다.
+
+### 재개 결과와 네 상태 (원격 전달 전 기록)
+
+- Feature verification: 지원한 조건 범위의 인수 12/12, 단위 회귀 50/50 PASS. 기존 30 + 조건 9 + 핵심 변경 탐지 11. 9종 구현 고장 주입 모두 차단하고 복구본은 통과했다.
+- Verification integrity: FAIL. `echo PASS; exit 0` 및 VERDICT/PASS/CHECKED 전부 위조가 기존 래퍼를 통과했다. 새 비교기의 로컬 변경 탐지는 PASS지만 외부 필수 검사 배선은 미적용이다.
+- Repository CI: 시작 원격 SHA baf20dc의 push/PR verify 둘 다 FAIL. base/head 격리 재현에서 suppression 두 항목(2026-09-15)이 2026-09-22에 만료돼 동일 실패. 별도 기존 이슈 #71/#72에 속하며 이 PR에서는 억제를 바꾸지 않았다. 최종 원격 SHA 결과는 PR 본문에 새로 조회해 기록한다.
+- Merge readiness: NOT_READY. 위 미해결, 외부 검증 미실행, active JD 연계 누락을 기능 PASS로 덮지 않는다.
+
+조건 비교는 원문 full을 고정한 채 본문만 바꾼다. 5년→3년, 이상→이하, 정규직→계약직, 수습 3개월→6개월, 지원한 조건 종류의 임의 추가를 차단한다. 5년 이상↔5년+와 기존 정상 4개 JD는 통과한다. 선택(extra) 조건은 삭제해도 필수 조건으로 승격하지 않는다. 자유로운 동의어·복잡한 범위·부정문·필수/우대 간 의미 이동 전체를 이해하는 자연어 판정기는 아니므로 그 의미를 보장하지 않는다.
+
+RPS 조회: 새 Aside 세션 `2026-09-22_s9As92eub6VtTEwx`에서 Settings → Message templates → View로 동일 제목·소유자의 ver2.0 두 행을 각각 조회했다. 두 본문은 모두 저장 전 후보 파일 `outputs/run-20260922/rps_inmail_wrtn.txt`와 1,445자로 일치. 정규화: 쌍을 이룬 Markdown 볼드 표식 제거, CRLF→LF, 앞뒤 공백 제거만 허용. 회사·직무·조건 모두 일치, 본문 이메일/URL은 없음, 별도 서명 이메일은 확인. 과거 1,497자 저장 기록과 안정적 ID 연결은 UNRESOLVED이므로 historical E2E PASS는 주장하지 않는다. 추가 저장·삭제·발송 없음.
+
+동시 변경: 루트 작업트리는 다른 세션이 `task/cross-pc-handoff-20260922`로 전환하고 eaaee62를 커밋했다. 시작 사본 79개는 SHA/링크 재대조 79/79 일치하며 다른 세션 원본을 되돌리지 않았다. PR 작업트리도 검증 중 7e0baae로 이동했다. 그 변경은 되돌리지 않고 커밋된 코드 기준으로 원명령을 재실행했다. 최초 CI-step-integrity 원본 불변 검사는 이 동시 변경 중 FAIL했고, 상태 고정 후 같은 원명령은 24/24 PASS였다.
+
+### 적대 검증 로그
+
+원문은 기존 ignored `private-reviews/`에 보존한다. `startup.log`(정본 전체 로드·원칙), `condition-followup.log`(조건 RED/GREEN), `trust-followup.log`(성공 문구 위조 RED·변경 감지), `ci-followup.log`(GitHub 응답·base/head 만료 재현), `final-feature.log`, `principles-mutations-final.log`, `mutation-rerun.log` 및 `mutation-rerun/*.log`, `size-check.log`, `preservation.log`, `rps-fresh-1.json`, `rps-fresh-2.json`, `rps-roundtrip.log`. 이 경로는 커밋되지 않는 로컬 증거이며 CI 영수증으로 부르지 않는다.
+
+V1 외부 Claude CLI를 API 환경 및 기존 로그인 경로로 각각 실행했으나 응답 없음 오류/90초 시간 초과로 판정을 얻지 못했다(`v1-availability.log`, `v1-login-availability.log`). V1=NOT_RUN, V1 판정 재현 V2도 NOT_RUN. 별도 Codex 교차검토는 외부 독립 검증으로 부르지 않는다. 따라서 Strict 전체 PASS 불가.
+
+파일/함수 한도 검사: 이번 직접 코드 파일은 600줄 이하, Python 함수는 100줄 이하. 동일 줄수 계산기로 격리 사본 600 통과/601 거부 확인. 기존 원칙 mutation은 고유 500/501 fixture 41건 통과이며 이것을 P11 600 경계 증거와 혼동하지 않는다. 기존 PR 전체는 약 6,602줄 추가여서 P11의 PR 3,000줄 초과도 남은 제약이다. 이번 요청의 최소 보완 범위에서 이전 PR 전체를 재설계/분할하지 않았다.
+
+`brief-lint.sh`는 이 저장소에서 찾지 못해 선택 문서 검사 SKIPPED. 제출 전 9문항은 과장/미확인 숨김/표 해석/전문용어 풀이/버린 대안·대가/추정 표시를 직접 확인한다. 미해결을 완료로 표시하지 않는다.
