@@ -241,3 +241,30 @@ V1 외부 Claude CLI를 API 환경 및 기존 로그인 경로로 각각 실행�
 파일/함수 한도 검사: 이번 직접 코드 파일은 600줄 이하, Python 함수는 100줄 이하. 동일 줄수 계산기로 격리 사본 600 통과/601 거부 확인. 기존 원칙 mutation은 고유 500/501 fixture 41건 통과이며 이것을 P11 600 경계 증거와 혼동하지 않는다. 기존 PR 전체는 약 6,602줄 추가여서 P11의 PR 3,000줄 초과도 남은 제약이다. 이번 요청의 최소 보완 범위에서 이전 PR 전체를 재설계/분할하지 않았다.
 
 `brief-lint.sh`는 이 저장소에서 찾지 못해 선택 문서 검사 SKIPPED. 제출 전 9문항은 과장/미확인 숨김/표 해석/전문용어 풀이/버린 대안·대가/추정 표시를 직접 확인한다. 미해결을 완료로 표시하지 않는다.
+
+## 9. 외부 검증 경계 후속 — 2026-09-22
+
+결론(시작): 검사 대상 밖에서 실행할 코드와 GitHub의 강제 설정을 분리해 검증합니다. 현재 HEAD `66101c317ca555ee6d52134b7535ce567f5fe346`에는 외부 호출이 없고 필수 체크는 Actions 앱의 `verify`뿐입니다. L3, 운영 배송 NOT_APPLICABLE. 기존 goal만 확장하며 새 장부/서비스는 만들지 않습니다.
+
+범위는 verification-integrity 한 건입니다. suppression, JD, 파서, 포털 저장, main 병합/배포는 제외합니다. 루트의 현재 다른 세션 변경 7개는 `Valuehire_v6-integrity-backup-20260922-134632`에 보존/대조했고 원본은 수정하지 않습니다. 정본 직접 로드 및 원칙 검사 34건은 `private-reviews/external-startup.log`에 기록합니다.
+
+### 계약과 반례
+
+- When GitHub PR 이벤트가 도착하면 신뢰된 workflow 정의는 보호된 main을 대상으로 한 이벤트의 base/head 전체 SHA로 비교해야 합니다. 다른 base 브랜치는 거부합니다. HEAD의 환경파일/인수/비교기/출력은 기준 선택에 참여하지 않습니다.
+- When checker, acceptance, 경로목록, workflow/helper가 바뀌면 base의 검토된 검사기로 탐지해야 합니다. HEAD를 checkout하거나 실행하지 않습니다. base에 검사기가 없으면 실패하며 HEAD 사본으로 대체하지 않습니다.
+- When core 변경이 있으면 종료값 20을 일반 기능 PASS로 덮지 않습니다. 정상 core 개발은 GitHub의 현재 base/head `reviewDecision=APPROVED`와 기존 보호 규칙(승인 1건 이상·stale 철회·마지막 pusher 외 승인·관리자 적용)으로 판단합니다. PR 개설자와 실제 push한 사람이 다를 수 있으므로 자체 리뷰 목록/커밋 author를 신뢰하지 않습니다.
+- When 기능/무관 파일만 바뀌면 별도 승인 없이 통과해야 합니다. 빈/오형식 SHA, Git/API 실패, 이벤트 이후 HEAD/base 이동은 실패 처리합니다.
+- Counter-AC: 성공 문자열 전체 위조, 검사기 자기 제외, helper 호출 제거, 공격자 base=HEAD, HEAD에 동명 성공 job 추가. 마지막 공격은 로컬 코드 시험으로 GitHub 설정의 강제를 증명할 수 없으며 별도 외부 적용 증거가 필요합니다.
+
+입출력: GitHub 이벤트 JSON + repository/event-name 환경, GitHub 읽기 API, Git 객체 → 실제 종료값(0=변경 없음 또는 유효 검토, 20=검토 대기, 그 외=실패). 새로운 DB/API/서명/서비스 없음. 외부 API는 PR 현재 SHA와 기존 리뷰/권한 읽기에만 사용합니다. 승인 뒤 새 push는 다른 HEAD라 자동 승계하지 않습니다.
+
+WU: 격리 RED → 작은 trusted workflow와 기존 테스트 확장 → 동일 공격 GREEN 및 회귀 → 외부 강제 가능성/부트스트랩 차단 기록 → 정상 훅으로 커밋/push와 최종 SHA CI 조회. 저장소 설정을 약화하거나 가짜 성공 체크를 원격에 발행하지 않습니다. 롤백은 이 후속 커밋만 revert. 전체 PR 또는 다른 세션 변경은 되돌리지 않습니다.
+
+### 실행 결과
+
+- RED: `private-reviews/external-red.log`에서 현재 HEAD의 후보-controlled checker/acceptance/helper/base override 5종이 모두 exit 0으로 우회됨을 재현했습니다.
+- GREEN(로컬 workflow runtime): `python3 -m unittest tests.test_verification_core` 22건 PASS. 정상 기능 변경은 0, 정상 core 변경은 20, checker PASS 변조·성공 문자열 위조·core 목록 축소·helper 제거·base override·동명 후보 workflow 추가는 20 또는 fail-closed입니다. GitHub native `reviewDecision` APPROVED와 보호 규칙이 유지될 때만 정상 core 변경을 0으로 허용합니다.
+- 회귀: `python3 -m unittest tests.test_jd_channels tests.test_rps_conditions tests.test_verification_core` 61건 PASS, `bash scripts/verify/run-acceptance.sh scripts/acceptance-rps-inmail.sh` 12/12 PASS, `bash scripts/acceptance-principles-check.sh` 34/34 PASS.
+- 실제 PR 데이터 로컬 실행: `private-reviews/external-live-bootstrap.log`에서 PR #104 base `fc6beedc78019862bc2f1b3bf4c4ad3bbd8e845b`에 trusted checker가 없어 exit 1 fail-closed. HEAD 사본으로 대체하지 않았습니다.
+- Repository CI: 이 후속 변경 push 전 최신 원격 SHA `66101c317ca555ee6d52134b7535ce567f5fe346`의 기존 `verify` 두 실행은 suppression 만료로 FAIL입니다. 이는 이번 verification-integrity 코드의 로컬 PASS와 분리합니다.
+- Merge readiness: 코드 측 준비는 진행됐지만 외부 required workflow/source-pinned 강제는 미적용입니다. `main` base에 workflow+checker가 먼저 신뢰 반영되고 required workflow 또는 동등한 외부 강제가 실제 적용되기 전에는 Verification integrity와 Merge readiness를 PASS로 표시하지 않습니다.
