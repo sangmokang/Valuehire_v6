@@ -7,7 +7,7 @@
 # 0-7 인수 스크립트 — 로컬 강제 장치(git hook)가 실제로 위반을 차단하는가.
 #
 # 계약: docs/sot/hook-contracts.md
-#   출력  : exit 0 (6종 전부 BLOCKED) | exit 1 (하나라도 통과·위양성·셋업 실패)
+#   출력  : exit 0 (차단 7종 + 정상 변경 5종) | exit 1 (오탐·누락·셋업 실패)
 #   불변식: 모든 시연은 mktemp -d 안의 clone 에서 수행한다. 원본 저장소를 건드리지 않는다.
 #          검사를 실행하지 못한 경우도 실패로 판정한다(fail-closed).
 #
@@ -44,7 +44,7 @@ if [ -n "${VH_PREPUSH_DEPTH:-}" ]; then
   exit 1
 fi
 
-TOTAL=6
+TOTAL=12
 fail=0
 step=0
 
@@ -86,6 +86,12 @@ cd "$sandbox/repo"
 git remote add sandbox "$sandbox/remote.git"
 git config user.email "acceptance@local"
 git config user.name "acceptance"
+# 작업 중인 훅을 복사해야 커밋 전 RED→GREEN을 같은 스크립트로 확인할 수 있다.
+cp "$REPO_ROOT/hooks/pre-commit" hooks/pre-commit
+if ! git diff --quiet -- hooks/pre-commit; then
+  git add hooks/pre-commit
+  git -c core.hooksPath=/dev/null commit -q -m "test fixture: current pre-commit"
+fi
 bash scripts/install-hooks.sh >/dev/null 2>&1 || { echo "FAIL: install-hooks.sh 실패"; exit 1; }
 
 hp=$(git config --get core.hooksPath) || hp=""
@@ -143,6 +149,49 @@ demo() {
   fi
 }
 
+# allow <이름> <셋업코드> <행위코드>
+# 정상 변경은 훅 ON/OFF 모두 성공해야 한다. ON만 실패하면 과잉 차단이다.
+allow() {
+  local name="$1" setup="$2" action="$3"
+  step=$((step + 1))
+  local sON sOFF aON aOFF
+
+  reset_tree; git config core.hooksPath hooks
+  set +e
+  ( eval "$setup" )  >"$outdir/setup.on.$step" 2>&1; sON=$?
+  ( eval "$action" ) >"$outdir/act.on.$step"   2>&1; aON=$?
+  set -e
+
+  reset_tree; git config core.hooksPath /dev/null
+  set +e
+  ( eval "$setup" )  >"$outdir/setup.off.$step" 2>&1; sOFF=$?
+  ( eval "$action" ) >"$outdir/act.off.$step"   2>&1; aOFF=$?
+  set -e
+
+  reset_tree; git config core.hooksPath hooks
+
+  if [ "$sON" -ne 0 ] || [ "$sOFF" -ne 0 ]; then
+    printf '[%d/%d] %s → SETUP FAILED (on=%d off=%d)\n' \
+      "$step" "$TOTAL" "$name" "$sON" "$sOFF"
+    fail=1
+  elif [ "$aON" -eq 0 ] && [ "$aOFF" -eq 0 ]; then
+    printf '[%d/%d] %s → PASSED (훅ON=0 · 훅OFF=0) ✓ 오탐 없음\n' \
+      "$step" "$TOTAL" "$name"
+  else
+    printf '[%d/%d] %s → OVERBLOCKED (훅ON=%d · 훅OFF=%d)\n' \
+      "$step" "$TOTAL" "$name" "$aON" "$aOFF"
+    fail=1
+  fi
+}
+
+TARGET_WF=.github/workflows/verify.yml
+TARGET_NAME='      - name: Strict 원칙 정본·장부·배선 검사'
+TARGET_RUN='        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-principles-check.sh'
+edit_once() {
+  ruby -e 'p, old, new = ARGV; s = File.read(p); abort "target count != 1" unless s.scan(old).length == 1; File.write(p, s.sub(old, new))' \
+    "$1" "$2" "$3"
+}
+
 # 1. 검사기가 자기 자신을 검사 대상에서 제외 (§0 E1 재현)
 #
 #    대상은 verify.sh 가 아니라 acceptance-0-6.sh 다. verify.sh 를 변조하면 그 파일이
@@ -191,6 +240,41 @@ demo "가짜 외부효과 모듈" \
    test -s src/portal-login.js' \
   'git add src/portal-login.js && git commit -m "feat: portal login"'
 
+# 7. CI 워크플로의 인수 검사 실행 줄 삭제 (#71 재현)
+demo "워크플로 검사 실행 줄 삭제" \
+  'edit_once "$TARGET_WF" "$TARGET_RUN" ""
+   ! grep -qF "$TARGET_RUN" "$TARGET_WF"' \
+  'git add "$TARGET_WF" && git commit -m "weaken: delete acceptance run"'
+
+# 다음 다섯 건은 #71 방어가 막으면 안 되는 정상 변경이다.
+allow "워크플로 주석 변경" \
+  'edit_once "$TARGET_WF" "# 로컬 전용 .secret-patterns 는 gitignore 되어 여기 없다." "# 로컬 전용 비밀 패턴은 CI 저장소에 없다."' \
+  'git add "$TARGET_WF" && git commit -m "docs: clarify workflow comment"'
+
+allow "워크플로 스텝 이름 변경" \
+  'edit_once "$TARGET_WF" "$TARGET_NAME" "      - name: Strict 원칙 계약 검사"' \
+  'git add "$TARGET_WF" && git commit -m "chore: rename workflow step"'
+
+allow "검사 스텝 위치 이동" \
+  'block="${TARGET_NAME}"$'"'"'\n'"'"'"${TARGET_RUN}"$'"'"'\n\n'"'"'
+   edit_once "$TARGET_WF" "$block" ""
+   anchor="      - name: Strict 원칙 적대 fixture·500/501 경계"$'"'"'\n'"'"'"        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-principles-mutations.sh"$'"'"'\n'"'"'
+   moved="${anchor}"$'"'"'\n'"'"'"${TARGET_NAME}"$'"'"'\n'"'"'"${TARGET_RUN}"$'"'"'\n'"'"'
+   edit_once "$TARGET_WF" "$anchor" "$moved"' \
+  'git add "$TARGET_WF" && git commit -m "chore: move workflow step"'
+
+allow "워크플로 스텝 추가" \
+  'added="      - name: 추가 진단\n        run: printf ok\n\n$TARGET_NAME"
+   edit_once "$TARGET_WF" "$TARGET_NAME" "$added"' \
+  'git add "$TARGET_WF" && git commit -m "chore: add workflow step"'
+
+allow "워크플로 밖 무관한 실행 문구 삭제" \
+  'printf "%s\n" "$TARGET_RUN" > issue-71-outside.txt
+   git add issue-71-outside.txt
+   git -c core.hooksPath=/dev/null commit -q -m "test: outside fixture"
+   edit_once issue-71-outside.txt "$TARGET_RUN" ""' \
+  'git add issue-71-outside.txt && git commit -m "docs: delete outside mention"'
+
 # --- 원본 오염 검사 -----------------------------------------------------------
 echo
 ORIG_AFTER=$(orig_state)
@@ -203,7 +287,7 @@ fi
 
 echo
 if [ "$fail" -eq 0 ]; then
-  echo "PASS: 위반 $TOTAL 종이 전부 차단됨 (각 건 훅 OFF 대조 통과)"
+  echo "PASS: #71 차단 1건·기존 차단 6건·정상 변경 5건 판별 (훅 OFF 대조 통과)"
   exit 0
 fi
 echo "RESULT: 차단되지 않았거나 시연이 무효인 항목이 있다. exit 1"

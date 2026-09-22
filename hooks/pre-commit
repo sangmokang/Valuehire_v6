@@ -112,6 +112,42 @@ else
   rm -f "$wf"
 fi
 
+# ── 3-b) 워크플로 인수 검사 실행 줄 삭제 (#71) ──────────────────────────────
+# 3)은 추가된 줄만 보므로 기존 실행 줄을 지우는 약화는 보지 못한다. 삭제된 인수
+# 스크립트 경로가 커밋될 워크플로 어디엔가 그대로 남아 있으면 이동으로 보고 통과한다.
+# 주석·스텝 이름·추가 스텝과 워크플로 밖 변경은 이 비교 대상이 아니다.
+AC_RUN='scripts/verify/run-acceptance\.sh[[:space:]]+scripts/acceptance-[A-Za-z0-9._/-]+\.sh'
+AC_PATH='scripts/acceptance-[A-Za-z0-9._/-]+\.sh'
+removed_rc=0
+removed_acceptance=$(
+  git diff --cached -U0 -- '.github/workflows/*.yml' '.github/workflows/*.yaml' \
+    | sed -n 's/^-//p' | sed '/^[[:space:]]*#/d' \
+    | grep -E "$AC_RUN" | grep -Eo "$AC_PATH" | LC_ALL=C sort -u
+) || removed_rc=$?
+if [ "$removed_rc" -gt 1 ]; then
+  block "워크플로 삭제 줄 조회 실패 (pipeline exit=$removed_rc · fail-closed)"
+elif [ -n "$removed_acceptance" ]; then
+  active_rc=0
+  active_lines=$(git grep --cached -h -E "$AC_RUN" -- \
+    '.github/workflows/*.yml' '.github/workflows/*.yaml') || active_rc=$?
+  if [ "$active_rc" -gt 1 ]; then
+    block "워크플로 인수 검사 실행 줄 조회 실패 (git grep exit=$active_rc · fail-closed)"
+  else
+    active_path_rc=0
+    active_acceptance=$(printf '%s\n' "$active_lines" | sed '/^[[:space:]]*#/d' \
+      | grep -Eo "$AC_PATH" | LC_ALL=C sort -u) || active_path_rc=$?
+    if [ "$active_path_rc" -gt 1 ]; then
+      block "워크플로 인수 검사 경로 추출 실패 (pipeline exit=$active_path_rc · fail-closed)"
+    else
+      while IFS= read -r script; do
+        if ! printf '%s\n' "$active_acceptance" | grep -qxF "$script"; then
+          block "워크플로 인수 검사 실행 줄 삭제 — $script (#71)"
+        fi
+      done <<< "$removed_acceptance"
+    fi
+  fi
+fi
+
 # ── 4) 만료일 없는 억제 (P13 ③ · 98d923f 35일 방치 재현 방지) ─────────────────
 if printf '%s\n' "$staged" | grep -qx 'suppressions.yaml'; then
   sup=$(git show ":suppressions.yaml")
