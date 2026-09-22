@@ -5,7 +5,7 @@ import subprocess
 import sys
 import unittest
 from pathlib import Path
-from test_jd_registration import ROOT, source, unit, write
+from test_jd_registration import RICH_COMPANY, ROOT, source, unit, write
 from jd_channels.registration import build_packet, counts, readback_compare
 from jd_channels.units import load
 
@@ -54,7 +54,7 @@ class SavedReadbackTest(unittest.TestCase):
 
     def test_readback_rejects_packet_metadata_tamper(self):
         tmp, p = write(source([
-            unit("C1", "company", "company", "- 회사 소개"),
+            unit("C1", "company", "company", RICH_COMPANY),
             unit("D1", "duties", "core", "- 업무"),
         ]))
         self.addCleanup(tmp.cleanup)
@@ -92,7 +92,7 @@ class SavedReadbackTest(unittest.TestCase):
 
     def test_readback_rejects_excluded_units_tamper(self):
         tmp, p = write(source([
-            unit("C1", "company", "company", "- 회사 소개"),
+            unit("C1", "company", "company", RICH_COMPANY),
             unit("D1", "duties", "core", "- 업무"),
         ], excluded_units=[{
             "id": "X_DOCUMENTS",
@@ -118,7 +118,7 @@ class SavedReadbackTest(unittest.TestCase):
 
     def test_readback_rejects_noncanonical_packet_value_and_field_errors(self):
         tmp, p = write(source([
-            unit("C1", "company", "company", "- 회사 소개"),
+            unit("C1", "company", "company", RICH_COMPANY),
             unit("D1", "duties", "core", "- 업무"),
         ]))
         self.addCleanup(tmp.cleanup)
@@ -173,7 +173,7 @@ class SavedReadbackTest(unittest.TestCase):
 
     def test_readback_rejects_assignment_without_unit_text_and_zero_units(self):
         tmp, p = write(source([
-            unit("C1", "company", "company", "- 회사 소개"),
+            unit("C1", "company", "company", RICH_COMPANY),
             unit("D1", "duties", "core", "- 업무"),
         ]))
         self.addCleanup(tmp.cleanup)
@@ -203,7 +203,7 @@ class SavedReadbackTest(unittest.TestCase):
 
     def test_readback_rejects_observed_extra_fields_and_assignment_tamper(self):
         tmp, p = write(source([
-            unit("C1", "company", "company", "- 회사 소개"),
+            unit("C1", "company", "company", RICH_COMPANY),
             unit("D1", "duties", "core", "- 업무"),
         ]))
         self.addCleanup(tmp.cleanup)
@@ -273,7 +273,7 @@ class SavedReadbackTest(unittest.TestCase):
 
     def test_jobkorea_transient_mismatch_does_not_poison_position(self):
         tmp, p = write(source([
-            unit("C1", "company", "company", "- 회사 소개"),
+            unit("C1", "company", "company", RICH_COMPANY),
             unit("D1", "duties", "core", "- 업무"),
             unit("P1", "preferred", "core", "- 우대"),
         ]))
@@ -369,7 +369,7 @@ class SavedReadbackTest(unittest.TestCase):
         requirement = "- " + "필수요건 " * 190
         preferred = "- " + "우대경험 " * 25
         tmp, p = write(source([
-            unit("C1", "company", "company", "- 회사 소개"),
+            unit("C1", "company", "company", RICH_COMPANY),
             unit("BW01", "duties", "core", duty),
             unit("BQ01", "requirements", "core", requirement),
             unit("BP01", "preferred", "core", preferred),
@@ -379,14 +379,14 @@ class SavedReadbackTest(unittest.TestCase):
         packet = build_packet(load(p), "jobkorea")
 
         self.assertEqual(packet["status"], "READY_FOR_UI")
-        self.assertEqual(packet["assignments"]["EXEC_WORK"], ["BQ01"])
-        self.assertEqual(packet["assignments"]["ST"], ["BW01", "BP01", "BR01"])
-        self.assertNotIn("BW01", packet["assignments"]["proposalMessage"])
+        self.assertEqual(packet["assignments"]["EXEC_WORK"], ["BW01", "BP01", "BR01"])
+        self.assertEqual(packet["assignments"]["ST"], ["BQ01", "AUTO_T"])
+        self.assertNotIn("BQ01", packet["assignments"]["proposalMessage"])
         self.assertNotIn("BR01", packet["assignments"]["proposalMessage"])
         self.assertLessEqual(packet["fields"]["EXEC_WORK"]["counts"]["codepoints"], 1000)
         self.assertLessEqual(packet["fields"]["ST"]["counts"]["codepoints"], 1000)
-        self.assertIn("[주요 업무]", packet["fields"]["ST"]["value"])
-        self.assertIn("[채용 절차]", packet["fields"]["ST"]["value"])
+        self.assertIn("[자격요건]", packet["fields"]["ST"]["value"])
+        self.assertIn("[채용 절차]", packet["fields"]["EXEC_WORK"]["value"])
         self.assertEqual(packet["permanent_overflow_units"], [])
 
 

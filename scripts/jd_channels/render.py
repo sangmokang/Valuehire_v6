@@ -49,13 +49,13 @@ GMAIL = ChannelProfile("gmail", None, (
 ), compact_default=False)
 
 RPS = ChannelProfile("linkedin_rps", 1900, (
-    _g("[{company}]", "company"),
+    _g("[회사 소개 | {company}]", "company"),
     _g("[팀·역할]", "team", "domain", "role"),
     _g("[주요 업무]", "duties"),
     _g("[자격요건]", "requirements"),
     _g("[우대사항]", "preferred"),
     _g("[성장·조건]", "growth", "conditions", "process", "documents"),
-), compact_default=True, show_headings=False)
+), compact_default=True, show_headings=True)
 
 SARAMIN = ChannelProfile("saramin", 4000, GMAIL.groups, compact_default=False,
                          portal="saramin")
@@ -73,10 +73,9 @@ def greeting(src: JDSource, *, short: bool) -> str:
     head = f"안녕하세요. 테크 서치펌 밸류커넥트의 헤드헌터 {SIGNATURE_NAME}입니다."
     if short:
         return (
-            f"{head}\n"
-            f"{src.company} {src.position}를 제안드립니다. 이직은 신중한 결정인 만큼, "
-            f"먼저 회사와 역할을 살펴보셨으면 합니다. 이력서를 보내주시면 {SERVICE}를 통해 "
-            f"경력에 맞는 채용 연결과 커리어 상담을 돕습니다. 편하게 수락·회신해 주세요."
+            f"안녕하세요. 밸류커넥트 헤드헌터 {SIGNATURE_NAME}입니다.\n"
+            f"{src.company} {src.position} 포지션의 핵심 내용을 제안드립니다. "
+            "검토 후 편하게 회신해 주세요."
         )
     return (
         f"{head}\n\n"

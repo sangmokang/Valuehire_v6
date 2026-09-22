@@ -58,15 +58,6 @@
       "source": "FIXTURE"
     },
     {
-      "id": "C06",
-      "section": "company",
-      "kind": "company",
-      "meaning": "본사 위치",
-      "full": "- 위치: 서울 서초구 서초대로38길 12, 마제스타시티 타워2 7·10층",
-      "compact": "- 서울 서초",
-      "source": "FIXTURE"
-    },
-    {
       "id": "C07",
       "section": "company",
       "kind": "company",
@@ -314,9 +305,9 @@
       "id": "N01",
       "section": "conditions",
       "kind": "core",
-      "meaning": "조직·직무·고용형태·수습·근무지·마감",
-      "full": "- Core Product / PM / 정규직 / 수습 3개월 / 서초 오피스 / 채용 시 마감",
-      "compact": "- 정규직 / 수습 3개월 / 채용 시 마감",
+      "meaning": "수습 조건",
+      "full": "- 수습 3개월",
+      "compact": "- 수습 3개월",
       "source": "FIXTURE"
     },
     {
@@ -341,29 +332,48 @@
       "id": "S02",
       "section": "process",
       "kind": "core",
-      "meaning": "레퍼런스 체크 동의 조건과 전형 변동 가능성",
-      "full": "- 2차 이후 동의하에 레퍼런스 체크 가능, 일정·상황에 따라 전형 추가·생략 가능",
-      "compact": "- 2차 이후 동의하에 레퍼런스 체크 가능, 전형 추가·생략 가능",
-      "source": "FIXTURE"
-    },
-    {
-      "id": "A01",
-      "section": "documents",
-      "kind": "core",
-      "meaning": "자유양식 이력서와 직무 무관 개인정보·연봉 제외 요청",
-      "full": "자유양식 이력서. 직무와 무관한 신체조건·출신지역·혼인여부·재산·가족의 학력/직업/재산 및 연봉정보는 제외해 주세요.",
-      "compact": "- 자유양식 이력서(직무 무관 개인정보·연봉 제외)",
-      "source": "FIXTURE"
-    },
-    {
-      "id": "A02",
-      "section": "documents",
-      "kind": "core",
-      "meaning": "허위 기재 시 합격 취소, 취업보호대상자 우대, 제출서류 파기",
-      "full": "허위 기재 시 합격 취소 가능, 취업보호대상자는 관계법령에 따라 우대합니다. 가상기업 제출 서류는 삭제 요청 시 지체 없이 파기됩니다.",
-      "compact": "- 허위 기재 시 합격 취소 가능, 취업보호대상자 법령상 우대, 제출 서류는 삭제 요청 시 지체 없이 파기",
+      "meaning": "동의 기반 레퍼런스 체크",
+      "full": "- 2차 인터뷰 이후 후보자 동의하에 레퍼런스 체크 진행 가능",
+      "compact": "- 2차 이후 동의 기반 레퍼런스 체크",
       "source": "FIXTURE"
     }
   ],
-  "role_label": "Core Product PM"
+  "role_label": "Core Product PM",
+  "excluded_units": [
+    {
+      "id": "X_C06",
+      "section": "company",
+      "reason": "standing_user_exclusion: generic office address",
+      "full": "- 위치: 서울 서초구 서초대로38길 12, 마제스타시티 타워2 7·10층",
+      "source": "FIXTURE"
+    },
+    {
+      "id": "X_N01_GENERIC",
+      "section": "conditions",
+      "reason": "standing_user_exclusion: regular employment, office and rolling deadline boilerplate",
+      "full": "- Core Product / PM / 정규직 / 서초 오피스 / 채용 시 마감",
+      "source": "FIXTURE"
+    },
+    {
+      "id": "X_S02_VARIABILITY",
+      "section": "process",
+      "reason": "standing_user_exclusion: process-stage addition or omission boilerplate",
+      "full": "- 일정·상황에 따라 전형 추가·생략 가능",
+      "source": "FIXTURE"
+    },
+    {
+      "id": "X_A01",
+      "section": "documents",
+      "reason": "standing_user_exclusion: generic resume and private-information instructions",
+      "full": "자유양식 이력서 및 직무 무관 개인정보·연봉 제외 안내",
+      "source": "FIXTURE"
+    },
+    {
+      "id": "X_A02",
+      "section": "documents",
+      "reason": "standing_user_exclusion: generic cancellation, protected-applicant and disposal notice",
+      "full": "허위 기재 취소, 취업보호대상자 우대, 제출서류 파기 안내",
+      "source": "FIXTURE"
+    }
+  ]
 }

@@ -33,6 +33,10 @@ def unit(uid, section, kind, full, **kw):
 
 
 def source(units, **kw):
+    if not any(item["section"] == "company" for item in units):
+        units = [unit("AUTO_C", "company", "company", RICH_COMPANY), *units]
+    if not any(item["section"] in {"team", "role", "growth"} for item in units):
+        units = [*units, unit("AUTO_T", "team", "core", "- 제품 품질과 사업 성장을 연결하는 팀")]
     base = {
         "company": "테스트회사",
         "position": "QA Manager",
@@ -98,7 +102,8 @@ class RegistrationPacketTest(unittest.TestCase):
         self.assertLessEqual(packet["fields"]["EXEC_WORK"]["counts"]["codepoints"], 1000)
         self.assertLessEqual(packet["fields"]["ST"]["counts"]["codepoints"], 1000)
         assigned = [uid for field in packet["assignments"].values() for uid in field]
-        self.assertEqual(assigned, ["C1", "T1", "G1", "R1", "D1", "Q1", "P1"])
+        self.assertEqual(set(assigned), {"C1", "T1", "G1", "R1", "D1", "Q1", "P1"})
+        self.assertEqual(len(assigned), 7)
 
     def test_explicit_user_exclusions_are_preserved_outside_portal_fields(self):
         tmp, p = write(source([
@@ -206,18 +211,34 @@ class RegistrationPacketTest(unittest.TestCase):
             self.assertIn("final_reason", row)
 
     def test_jobkorea_moved_requirement_keeps_requirement_heading(self):
-        long_duty = "- " + ("글로벌 사업 포트폴리오 운영 " * 32)
+        long_duty = "- " + ("글로벌 사업 포트폴리오 운영 " * 58)
+        requirement = "- " + ("글로벌 사업 리드 경력 6년 이상 및 P&L 책임 경험 " * 3)
         tmp, p = write(source([
             unit("C1", "company", "company", RICH_COMPANY),
             unit("T1", "team", "core", "- 글로벌팀에서 사업을 운영"),
             unit("D1", "duties", "core", long_duty),
-            unit("Q1", "requirements", "core", "- 글로벌 사업 리드 경력 6년 이상"),
+            unit("Q1", "requirements", "core", requirement),
             unit("P1", "preferred", "core", "- 크로스보더 커머스 경험"),
         ]))
         self.addCleanup(tmp.cleanup)
         packet = build_packet(load(p), "jobkorea")
         self.assertIn("Q1", packet["assignments"]["ST"])
         self.assertIn("[자격요건]", packet["fields"]["ST"]["value"])
+
+    def test_repeated_section_is_rendered_under_one_heading(self):
+        tmp, p = write(source([
+            unit("C1", "company", "company", RICH_COMPANY),
+            unit("D1", "duties", "core", "- 글로벌 사업 전략 수립"),
+            unit("C2", "conditions", "core", "- 시차출퇴근제"),
+            unit("P1", "process", "core", "- 서류 전형 > 인터뷰"),
+            unit("C3", "conditions", "core", "- 3개월 수습기간"),
+        ]))
+        self.addCleanup(tmp.cleanup)
+
+        packet = build_packet(load(p), "saramin")
+        offer = packet["fields"]["offerComment"]["value"]
+        self.assertEqual(offer.count("[근무조건]"), 1)
+        self.assertIn("3개월 수습기간", offer)
 
     def test_refuses_non_ok_source_status(self):
         tmp, p = write(source([unit("Q1", "requirements", "core", "- 필수")], source_status="NEEDS_SOURCE_REVIEW"))

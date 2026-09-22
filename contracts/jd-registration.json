@@ -40,6 +40,9 @@
     },
     "linkedin_rps": {
       "total_limit": 1900,
+      "limit_kind": "internal_authoring_limit",
+      "count_scope": "subject + LF + LF + body",
+      "platform_limit_verified": false,
       "owner": "scripts/jd_channels/render.py"
     }
   },
@@ -52,7 +55,10 @@
   ],
   "rules": [
     "Do not truncate, compact, or drop portal packet units.",
-    "Use bullet-first concise company introductions in candidate-facing portal packets; avoid long prose company paragraphs.",
+    "Require a substantive, sourced, role-linked company introduction; concise wording must not collapse it to a company-name and industry label.",
+    "Use all available permanent JobKorea field capacity for whole substantive JD units before leaving those units only in transient proposalMessage.",
+    "Record required characters, remaining permanent-field characters, move feasibility, and final reason for every JobKorea proposalMessage unit.",
+    "Generate Gmail as an uncapped standalone candidate JD and LinkedIn RPS under the 1900-character internal authoring limit counted as subject plus blank line plus body.",
     "Raw JD facts excluded from candidate copy by explicit or standing user instruction must be represented in excluded_units with reason starting explicit_user_exclusion or standing_user_exclusion.",
     "Do not include generic documents/application boilerplate or obvious conditions when the user explicitly or standingly excludes them; preserve them only as excluded_units evidence.",
     "Assign each source unit id exactly once per portal packet.",
@@ -80,10 +86,6 @@
         "pattern": "\\[\\s*지원\\s*서류\\s*\\]|지원\\s*전\\s*확인|(?:이력서[^.。!?]{0,30}자유\\s*양식|자유\\s*양식[^.。!?]{0,30}이력서)"
       },
       {
-        "id": "probation",
-        "pattern": "(?:수습[^.。!?]{0,20}3\\s*개월|3\\s*개월[^.。!?]{0,20}수습)"
-      },
-      {
         "id": "cancellation",
         "pattern": "(?:허위|기재\\s*사항|기재사항)[^.。!?]{0,80}합격[^.。!?]{0,15}취소"
       },
@@ -101,7 +103,7 @@
       },
       {
         "id": "generic_conditions",
-        "pattern": "고용\\s*형태\\s*[/|:\\n]*\\s*정규직|채용\\s*시\\s*마감|서초\\s*오피스"
+        "pattern": "고용\\s*형태\\s*[/|:\\n]*\\s*정규직|(?:^|\\n)\\s*[-•·]?\\s*정규직\\s*(?:$|\\n)|채용\\s*시\\s*마감|(?:서초\\s*오피스|(?:회사\\s*)?(?:위치|주소|근무지)\\s*[:：/|]?[^\\n]{0,80}(?:오피스|빌딩|타워|\\d+층))"
       },
       {
         "id": "direct_email",

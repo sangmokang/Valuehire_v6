@@ -26,9 +26,10 @@ class CopyPolicyTest(unittest.TestCase):
 
     def test_boilerplate_is_blocked(self):
         for text in ('[지원서류]\n자유 양식 이력서 제출',
-                     '📢 지원 전 확인해주세요', '입사 후 수습 3개월 안내',
+                     '📢 지원 전 확인해주세요',
                      '허위 기재 시 합격 취소', '고용 형태 / 정규직',
-                     '접수 기간 / 채용 시 마감', '근무지 / 서초 오피스'):
+                     '- 정규직', '접수 기간 / 채용 시 마감',
+                     '근무지 / 서초 오피스', '회사 주소: 마제스타시티 타워2 7층'):
             with self.subTest(text=text):
                 self.assertEqual(self.packet(text, 'jobkorea')['status'], 'BLOCKED')
 
@@ -36,7 +37,9 @@ class CopyPolicyTest(unittest.TestCase):
         for text in ('서류 → 1차 → 2차 → 처우 협의 → 최종 합격',
                      '후보자 동의 후 레퍼런스 체크가 진행될 수 있습니다.',
                      '서비스에 API 기능을 추가하고 불필요한 운영 단계를 생략합니다.',
-                     '필수 포트폴리오: 제품 설계 사례 2건', '경력 6년 이상'):
+                     '필수 포트폴리오: 제품 설계 사례 2건', '경력 6년 이상',
+                     '입사 후 적응을 위한 수습 3개월',
+                     '정규직(상호 합의 시 계약직 전환 가능)'):
             for channel in ('saramin', 'jobkorea'):
                 with self.subTest(text=text, channel=channel):
                     self.assertEqual(self.packet(text, channel)['status'], 'READY_FOR_UI')

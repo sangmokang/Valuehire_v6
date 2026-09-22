@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .content_contract import company_intro_errors, placement_audit
 from .copy_policy import exclusion_hits
 from .measure import PORTAL_SAFE_SUBSTITUTE, measure, scan_portal_risk
 from .units import JDSource, SECTION_LABEL, Unit, UnitError, load
@@ -53,7 +54,7 @@ def _specs(channel: str) -> dict[str, FieldSpec]:
 SARAMIN_OFFER = {"company", "team", "domain", "role", "growth", "conditions", "process", "documents"}
 JOBKOREA_PROPOSAL = {"company", "team", "domain", "role", "growth", "conditions", "process", "documents"}
 JOBKOREA_WORK = {"duties", "requirements"}
-JOBKOREA_ST_CORE_SPARE = {"process", "conditions"}
+JOBKOREA_PERSISTENT_PRIORITY = ("role", "team", "growth", "process", "conditions", "domain", "documents")
 
 
 def nfc_lf(text: str) -> str:
@@ -92,18 +93,18 @@ def _unit_heading(unit: Unit) -> str:
 
 
 def _join(units: list[Unit], *, intro: str = "") -> str:
-    blocks: list[str] = []
-    current = None
-    bucket: list[str] = []
+    """Render one block per semantic heading while preserving unit text.
+
+    Allocation may place a later source unit into a field that already has the
+    same section. Grouping by first heading occurrence prevents duplicate
+    labels without dropping or rewriting any source unit.
+    """
+    grouped: dict[str, list[str]] = {}
     for unit in units:
         heading = _unit_heading(unit)
-        if current is not None and heading != current:
-            blocks.append(current + "\n" + "\n".join(bucket))
-            bucket = []
-        current = heading
-        bucket.append(_unit_line(unit))
-    if current is not None:
-        blocks.append(current + "\n" + "\n".join(bucket))
+        grouped.setdefault(heading, []).append(_unit_line(unit))
+    blocks = [heading + "\n" + "\n".join(lines)
+              for heading, lines in grouped.items()]
     if intro:
         blocks.insert(0, nfc_lf(intro.strip()))
     return nfc_lf("\n\n".join(b for b in blocks if b.strip()))
@@ -163,10 +164,14 @@ def _assert_source(src: JDSource) -> None:
 
 
 def _finish(src: JDSource, channel: str, fields: dict[str, dict[str, Any]],
-            assignments: dict[str, list[str]], overflow: list[str] | None = None) -> dict[str, Any]:
+            assignments: dict[str, list[str]], overflow: list[str] | None = None,
+            audit: list[dict[str, Any]] | None = None,
+            extra_errors: list[str] | None = None) -> dict[str, Any]:
     assigned = [uid for ids in assignments.values() for uid in ids]
     expected = [u.id for u in src.units]
     errors: list[str] = []
+    errors.extend(company_intro_errors(src))
+    errors.extend(extra_errors or [])
     if sorted(assigned) != sorted(expected) or len(assigned) != len(set(assigned)):
         errors.append(f"UNIT_ASSIGNMENT_MISMATCH:expected_once={expected}:actual={assigned}")
     for name, field in fields.items():
@@ -175,7 +180,7 @@ def _finish(src: JDSource, channel: str, fields: dict[str, dict[str, Any]],
     packet = {
         "schema": "jd-registration/2026-09-22",
         "presentation_contract": {
-            "company_intro": "bullet_first_concise",
+            "company_intro": "substantive_role_linked",
             "source_exclusions": "explicit_or_standing_user_exclusion",
         },
         "channel": channel,
@@ -192,6 +197,7 @@ def _finish(src: JDSource, channel: str, fields: dict[str, dict[str, Any]],
         "unit_order": expected,
         "errors": errors,
         "permanent_overflow_units": overflow or [],
+        "placement_audit": audit or [],
         "readback_status": "NOT_VERIFIED",
     }
     if channel == "jobkorea":
@@ -236,29 +242,32 @@ def _build_jobkorea(src: JDSource) -> dict[str, Any]:
     specs = _specs("jobkorea")
     title = _title(src, specs["GI_PSTN"].limit)
     proposal = _ordered(src, lambda u: u.section in JOBKOREA_PROPOSAL)
-    work = _ordered(src, lambda u: u.section in JOBKOREA_WORK)
-    preferred = _ordered(src, lambda u: u.section == "preferred")
-    st_units = list(preferred)
+    work: list[Unit] = []
+    st_units: list[Unit] = []
+    overflow: list[Unit] = []
     work_overflow: list[Unit] = []
-    proposal_overflow: list[Unit] = []
-    while work and not _fits(work, specs["EXEC_WORK"], "jobkorea"):
-        work_overflow.append(work.pop(0))
-    while st_units and not _fits(st_units, specs["ST"], "jobkorea"):
-        proposal_overflow.append(st_units.pop(0))
-    for moved in work_overflow:
-        st_units, placed = _append_if_fits(src, st_units, moved, specs["ST"])
+    for unit in _ordered(src, lambda u: u.section in JOBKOREA_WORK):
+        work, placed = _append_if_fits(src, work, unit, specs["EXEC_WORK"])
         if not placed:
-            proposal_overflow.append(moved)
-    if work_overflow:
-        for moved in _ordered(src, lambda u: u.section in JOBKOREA_ST_CORE_SPARE and u.kind == "core"):
-            st_units, placed = _append_if_fits(src, st_units, moved, specs["ST"])
+            work_overflow.append(unit)
+    for unit in work_overflow:
+        st_units, placed = _append_if_fits(src, st_units, unit, specs["ST"])
+        if not placed:
+            overflow.append(unit)
+    for unit in _ordered(src, lambda u: u.section == "preferred"):
+        st_units, placed = _append_if_fits(src, st_units, unit, specs["ST"])
+        if not placed:
+            work, placed = _append_if_fits(src, work, unit, specs["EXEC_WORK"])
+        if not placed:
+            overflow.append(unit)
+    for section in JOBKOREA_PERSISTENT_PRIORITY:
+        for unit in [u for u in proposal if u.section == section]:
+            st_units, placed = _append_if_fits(src, st_units, unit, specs["ST"])
+            if not placed:
+                work, placed = _append_if_fits(src, work, unit, specs["EXEC_WORK"])
             if placed:
-                proposal = [u for u in proposal if u.id != moved.id]
-        for moved in _ordered(src, lambda u: u.section == "documents" and u.kind == "core"):
-            st_units, placed = _append_if_fits(src, st_units, moved, specs["ST"])
-            if placed:
-                proposal = [u for u in proposal if u.id != moved.id]
-    proposal = _source_order(src, [u for u in proposal + proposal_overflow if u.id not in {s.id for s in st_units}])
+                proposal.remove(unit)
+    proposal = _source_order(src, proposal + overflow)
     intro = "후속 절차는 밸류커넥트를 통해 안내드립니다."
     fields = {
         "GI_PSTN": _field(title, specs["GI_PSTN"], "jobkorea"),
@@ -266,11 +275,17 @@ def _build_jobkorea(src: JDSource) -> dict[str, Any]:
         "EXEC_WORK": _field(_join(work), specs["EXEC_WORK"], "jobkorea"),
         "ST": _field(_join(st_units), specs["ST"], "jobkorea"),
     }
+    audit, unused = placement_audit(
+        src, proposal, {"EXEC_WORK": work, "ST": st_units},
+        {"EXEC_WORK": specs["EXEC_WORK"].limit, "ST": specs["ST"].limit},
+        _join, lambda units: _source_order(src, units),
+    )
     return _finish(src, "jobkorea", fields, {
         "proposalMessage": [u.id for u in proposal],
         "EXEC_WORK": [u.id for u in work],
         "ST": [u.id for u in st_units],
-    }, [u.id for u in proposal_overflow])
+    }, [u.id for u in proposal if u.section != "company"], audit,
+       [f"PERSISTENT_SPACE_UNUSED:{uid}" for uid in unused])
 
 
 def _balance_saramin(offer: list[Unit], work: list[Unit], specs: dict[str, FieldSpec],

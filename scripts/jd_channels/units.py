@@ -32,7 +32,7 @@ SECTION_LABEL = {
 }
 
 # core   : 채용 판단에 직접 쓰이는 정보. 어떤 채널에서도 삭제 금지.
-# company: 부가 회사 정보. 길이 압박 시 5순위로 생략 가능.
+# company: 후보자 판단에 필요한 회사 정보. RPS에서도 소개 전체 삭제 금지.
 # extra  : 있으면 좋은 맥락. company 다음으로 생략 가능.
 KINDS = ("core", "company", "extra")
 
@@ -42,7 +42,7 @@ class UnitError(ValueError):
 
 
 # 생략 순서. 숫자가 클수록 먼저 버린다. core(0)는 절대 버리지 않는다.
-# 지시서 6절 5순위: 회사 연혁·대표 부가경력·인터뷰 설명부터 생략한다.
+# 비핵심 회사 부가정보는 줄일 수 있으나 검증기가 회사 소개의 존재·충실도를 별도 확인한다.
 DEFAULT_RANK = {"core": 0, "company": 1, "extra": 3}
 MAX_RANK = 3
 

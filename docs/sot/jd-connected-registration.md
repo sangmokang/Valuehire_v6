@@ -43,23 +43,11 @@ Do not use previous drafts, old generated copy, stale CDP flows, or hidden assum
 
 ## Company Briefing
 
-When company context is requested or needed for candidate copy, collect nine facts with sources:
-
-1. company history
-2. financial state
-3. funding stage
-4. cumulative funding
-5. product lineup
-6. recent CEO interview
-7. CEO profile
-8. company location
-9. headcount
-
-Use current public sources or approved internal records. Separate `company_fact_status` from `jd_source_status`. Unknown facts do not block packet generation unless the user required that fact in the candidate-facing copy; then mark `NEEDS_SOURCE_REVIEW`.
+When company context is requested or needed for candidate copy, check current public sources or approved internal records for business/products, customer·transaction·revenue scale, investment·financial state, and growth direction. Select the facts that materially help a candidate judge the position; do not list every researched category mechanically. Separate `company_fact_status` from `jd_source_status`, dates from current claims, actual results from targets, and MAU from DAU. Unknown facts are omitted rather than softened into claims.
 
 Candidate-facing copy may include sourced facts and careful date labels. Unknown facts are omitted. Do not soften an unknown into a claim. Candidate-facing text must not include internal uncertainty labels such as `unknown`, `not verified`, source IDs, or audit tags. Public measurement bases and dates, such as 국민연금 가입자 수, must remain when needed to avoid misleading headcount claims.
 
-Company introductions in Saramin and JobKorea candidate-facing fields are bullet-first and concise by default. Prefer short bullets for history/funding, product and channel scale, team mission, traffic or GMV scale, and leadership facts when those facts are relevant and sourced. Avoid one long prose paragraph that mixes every company fact. Keep detailed source URLs and caveats in the owner report or evidence JSON, not in the candidate-facing field.
+Company introductions in Saramin, JobKorea and Gmail must be substantive and role-linked. They explain what the company builds or sells, its relevant scale or financial/growth context, and why this role matters. A company-name/industry label is a blocked result. Prefer short sourced bullets and clear transitions over one long paragraph, but never treat concise style as permission to delete decision-useful facts. LinkedIn RPS keeps a compressed version of the same core meaning. Keep detailed source URLs and caveats in evidence JSON, not candidate copy.
 
 ## Candidate-Facing Removal Rules
 
@@ -149,7 +137,7 @@ Fields:
 
 Use both 2,000-character fields as one candidate-facing surface. A good split usually places company briefing, team, role, growth, conditions, and process in field 1, then duties, requirements, and preferred qualifications in field 2. The split may change as long as facts are preserved exactly once and readback passes.
 
-For candidate readability, `offerComment` should normally start with ValueConnect routing and a concise bullet-first `[회사 소개]`, then team/growth/process/remaining conditions. Do not use a long company prose paragraph when the same facts can be carried as bullets.
+For candidate readability, `offerComment` should normally start with ValueConnect routing and a substantive `[회사 소개]`, then team/growth/process/remaining conditions. Use concise bullets, but include enough sourced business, product, scale or financial/growth context for the candidate to understand the company and opportunity. Move whole source units between the two body fields with explicit headings when capacity remains; do not leave a maintained unit out because of a fixed default section.
 
 When a user supplies a golden sample, rejects a copy style, or asks to make the rule reusable, preserve the decision as a machine-readable position artifact such as `copy-style-spec.json`. The JSON spec must include the affected channel fields, required company-introduction style, prohibited patterns, preferred patterns, explicit exclusions, source capture paths/hashes where available, and a boundary that the golden sample controls style only, not role facts.
 
@@ -162,17 +150,21 @@ Fields:
 - `EXEC_WORK`: registration modal "입사 후 업무"; target 1,000 characters including spaces
 - `ST`: registration modal "우대사항"; target 1,000 characters including spaces
 
-Observed HTML limits are `proposalMessage maxlength=3000`, `EXEC_WORK maxlength=1000`, and `ST maxlength=1000`. `EXEC_WORK` and `ST` are each 1,000 characters, not a combined 1,000-character budget. The user also provided a measured accepted proposal sample of 2,999 characters including spaces/LF and 2,351 characters after removing spaces and line breaks. The permanent modal fields are tight. Put substantial company/team context into `proposalMessage`, but use free `ST` capacity for overflow duties, qualifications, process, and conditions before leaving core facts transient. Keep explicit section headings so fields do not reclassify required qualifications as preferences.
+Observed HTML limits are `proposalMessage maxlength=3000`, `EXEC_WORK maxlength=1000`, and `ST maxlength=1000`. `EXEC_WORK` and `ST` are each 1,000 characters, not a combined budget. Fill duties and requirements first, then preferred content, then any whole team/role/growth/process/condition/domain unit that fits in either permanent field. Keep explicit section headings so a qualification moved into `ST` is still shown as `[자격요건]`. For every unit left in transient `proposalMessage`, record its added character cost, remaining characters in each permanent field, whether a whole-unit move is possible, and the final reason. Any non-company unit that still fits but remains transient blocks completion.
 
-`proposalMessage` company context follows the same concise bullet-first company-introduction rule as Saramin. Keep generic application-document boilerplate out when explicitly excluded; do not spend transient proposal space on statements professional candidates already know unless the user requests them.
+`proposalMessage` retains the substantive company introduction because it is the candidate-facing proposal surface. Keep it concise and sourced, not label-only. Keep generic application-document boilerplate out; do not spend transient proposal space on statements professional candidates already know.
 
 `proposalMessage` is transient proposal content unless a screen proves otherwise. It must be injected and verified for each candidate proposal or position proposal operation. Do not report it as saved permanent position content merely because the permanent modal saved.
 
 If `GI_PSTN` is disabled in JobKorea, treat the observed disabled title as the canonical portal identity for that saved record. Do not overwrite it blindly. If the disabled title differs from the intended packet title, report the binding explicitly and decide whether the existing portal record is the correct target before saving.
 
+### Gmail candidate JD
+
+Gmail candidate copy has no portal or RPS length cap. Produce a standalone message with the substantive company introduction and every maintained team, mission, role, duty, requirement, preference, growth opportunity, material condition and core hiring stage. It is not an owner operation report, and an operation report cannot replace it. Excluded boilerplate remains only in restricted local evidence.
+
 ### LinkedIn RPS
 
-RPS content limit is 1,900 characters total. This is a compact outreach/inmail body, not a Saramin/JobKorea registration packet. Do not run RPS external actions unless the user explicitly requests RPS.
+Use 1,900 characters as an internal authoring limit, not a claim about the latest platform limit. Count the exact scope as subject + one blank line + body with `measure.compose()`. Keep a compressed company introduction and clear headings for duties, requirements and preferences. Preserve responsibility scope, years, core capabilities, key figures and material conditions; reduce repeated greetings, long endings and CTA repetition before considering any non-core omission. Do not run RPS external actions unless explicitly requested.
 
 ## Aside Operation
 
@@ -275,8 +267,10 @@ See [Aside operations](jd-aside-operations.md) for the repeated browser procedur
 
 공식 원문 각 문장/항목과 실제 새 저장값의 대응을 source-coverage.json에 기록한다. ID, 원문, 대상 필드/의미 구획, 실제 대응 문장, 원문 유지/의미 동일 편집/명시 삭제/미배치, 출처 및 저장 증거가 필수다. 패킷끼리의 일치는 원문 추출의 완전성을 증명하지 않는다. 승인된 삭제 외 핵심 미배치는 완료를 차단한다. 임시 제안 입력은 저장 대응으로 계산하지 않는다.
 
-상시 제외: 일반 지원 안내 구획과 지정 푸터 전체, 자유양식 이력서 안내, 직무 무관 개인정보 및 연봉 삭제 안내, 수습 안내, 허위기재 취소, 취업보호 우대, 제출서류 삭제 안내, 직접 지원 이메일, 지정된 일반 고용/마감/오피스 문구. 전형 단계의 추가/생략 안내는 공백·구두점·줄바꿈·같은 의미 변형까지 제외한다. 핵심 전형과 후보자 동의 후 레퍼런스 체크는 유지한다. 꼬리 블록의 소속/경력은 필요한 사실만 본문에 한 번 정돈한다.
+상시 제외: 일반 지원 안내 구획과 지정 푸터 전체, 자유양식 이력서 안내, 직무 무관 개인정보 및 연봉 삭제 안내, 허위기재 취소, 취업보호 우대, 제출서류 삭제 안내, 직접 지원 이메일, 일반적인 정규직/마감/오피스 문구. 전형 단계의 추가/생략 안내는 공백·구두점·줄바꿈·같은 의미 변형까지 제외한다. 계약직·수습·해외 근무/이주·필수 출장·교대근무·필수 자격·포트폴리오 등 판단을 바꾸는 조건, 핵심 전형, 후보자 동의 후 레퍼런스 체크는 유지한다.
 
 삭제 원문은 로컬 raw-source/excluded_units에만 보존한다. 보고 메일 전체에도 원문 보관 부록으로 재노출하지 않는다. 제외 내역은 ID·범주·건수로 보고한다. 계약 JSON의 copy_policy와 jd_channels.copy_policy.exclusion_hits를 포털 필드 및 전체 보고 본문에 적용하고, 정규식 밖 의미 변형은 직접 검토한다. 메일의 operation ID를 발송 전 보낸편지함에서 검색하고, 한 번 발송 후 수신자·본문 전체·ID·시각을 대조한다.
 
-이번 원문 보존 정정의 fresh readback: 사람인 1833171 제목/제안/업무 21/932/1383자, 원문 유지 대상 37개 저장. 잡코리아 그룹 1506767 최종 1601701 제목/업무/ST 21/982/582자 정확 일치, 제안 749자 입력 뒤 112자 기본값 복원. 원문 유지 대상 37개 중 영구 필드 29개, 임시 제안 8개 미저장으로 전체 PARTIAL. 사람인 후보자용 미리보기는 미확인(상세 링크는 기업용 후보자 관리 화면). UI 입력/편집 저장 검증을 후보자 표시 검증으로 확대하지 않는다.
+### 폐기된 2026-09-22 실행 판단과 사실 보존
+
+과거 실행은 사람인 1833171 제목/제안/업무 21/932/1383자, 잡코리아 그룹 1506767·포지션 1601701 제목/업무/ST 21/982/582자, 제안 749자 입력 뒤 112자 기본값 복원을 관찰했다. 당시 유지 대상 37개 중 잡코리아 영구 필드 29개·임시 제안 8개로 보고했고 회사 소개를 라벨형으로 축소했다. 이 수치와 readback은 과거 사실로 보존하지만, 회사 소개 축소와 영구 필드 여유를 두고 원문을 transient에 남긴 판단은 `SUPERSEDED`이며 활성 작성 규칙으로 재사용하지 않는다.

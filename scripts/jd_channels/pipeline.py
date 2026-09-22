@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .checks import greeting_ok, required_vs_preferred, scan
+from .content_contract import company_intro_errors
+from .copy_policy import exclusion_hits
 from .measure import normalize_for_compare
 from .render import PROFILES, Draft, render, sanitize_for_portal
 from .units import JDSource, load
@@ -61,6 +63,8 @@ def verify(src: JDSource, draft: Draft) -> Report:
     hits = scan(draft.full_text)
     notes: list[str] = []
 
+    notes.extend(f"회사 소개: {error}" for error in company_intro_errors(src))
+
     ok, why = greeting_ok(draft.body)
     if not ok:
         notes.append(f"CTA: {why}")
@@ -88,7 +92,8 @@ def verify(src: JDSource, draft: Draft) -> Report:
         channel=draft.channel, status=draft.status,
         codepoints=draft.measured.codepoints, utf16=draft.measured.utf16_units,
         limit=profile.limit, strategy=draft.strategy, dropped=draft.dropped_units,
-        missing_core=_missing_core(src, draft), banned=tuple(h.rule for h in hits),
+        missing_core=_missing_core(src, draft),
+        banned=tuple([h.rule for h in hits] + exclusion_hits(draft.full_text)),
         notes=tuple(notes),
     )
 

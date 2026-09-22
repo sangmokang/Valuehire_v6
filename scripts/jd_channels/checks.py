@@ -89,7 +89,7 @@ def required_vs_preferred(requirement_text: str, preferred_text: str) -> tuple[b
 # 관계형 서비스라 본문이 목록이 아니라 이어지는 글이어야 한다(SOT L4·L5).
 
 INMAIL_BANNED = [
-    ("INMAIL_MARKDOWN", "마크다운 기호", r"(?:\*\*|^#{1,6}\s|^\s*[-*]\s+\S.*\n\s*[-*]\s)"),
+    ("INMAIL_MARKDOWN", "마크다운 기호", r"(?:\*\*|^#{1,6}\s)"),
     ("INMAIL_EMOJI", "이모지", r"[\U0001F300-\U0001FAFF☀-➿]"),
     ("INMAIL_RAW_VAR", "치환되지 않은 원시 변수", r"\{\{[^}]*\}\}"),
     ("INMAIL_NAME_HARDCODED", "특정 후보자 이름이 본문에 박힘",
