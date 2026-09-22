@@ -13,7 +13,7 @@
 ## 검증과 한계
 
 - HumanSearch: 230 tests, ruff, mypy strict 실행 통과.
-- 루트 JD·채용 도구: 기존 106 tests 실행 통과.
+- 루트 JD·채용 도구: 111 tests 실행 통과(심볼릭 링크 비밀 검사 회귀 5건 포함).
 - 로컬 출력 파일에 의존하던 InMail 검사 세 개를 추적 fixture로 전환.
 - 루트 회귀시험을 GitHub verify workflow에 추가.
 - 실제 사이트 로그인·메일·Supabase·아카이버 재연결과 타 PC 실기기 실행은 별도다.

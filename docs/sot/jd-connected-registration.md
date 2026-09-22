@@ -16,7 +16,7 @@ The workflow covers:
 - saved UI readback
 - one owner report email per registered position when explicitly requested
 
-The workflow does not imply candidate outreach, bulk posting, unattended login automation, paid actions, ontology/org mapping, or reuse of old company caches unless the user asks for those actions in the current task. When the user asks for LinkedIn/company organization research as part of a JD packet or owner report, run the company-intelligence workflow before final wording and report the scope, sources, and unknowns.
+The workflow does not imply candidate outreach, bulk posting, unattended login automation, paid actions, ontology/org mapping, or reuse of old company caches unless the user asks for those actions in the current task. When company context is researched for a JD packet or owner report, attempt LinkedIn company/people organization research as a standard company-intelligence step, record the checked LinkedIn pages and visible organization signals, and report access limits or unknowns. Do not infer reporting lines or role ownership from visible employee names unless the profile evidence supports it.
 
 ## Source Identity
 
@@ -147,6 +147,8 @@ Fields:
 Use both 2,000-character fields as one candidate-facing surface. A good split usually places company briefing, team, role, growth, conditions, and process in field 1, then duties, requirements, and preferred qualifications in field 2. The split may change as long as facts are preserved exactly once and readback passes.
 
 For candidate readability, `offerComment` should normally start with ValueConnect routing and a concise bullet-first `[회사 소개]`, then team/growth/process/remaining conditions. Do not use a long company prose paragraph when the same facts can be carried as bullets.
+
+When a user supplies a golden sample, rejects a copy style, or asks to make the rule reusable, preserve the decision as a machine-readable position artifact such as `copy-style-spec.json`. The JSON spec must include the affected channel fields, required company-introduction style, prohibited patterns, preferred patterns, explicit exclusions, source capture paths/hashes where available, and a boundary that the golden sample controls style only, not role facts.
 
 ### JobKorea
 

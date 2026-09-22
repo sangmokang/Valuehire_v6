@@ -17,6 +17,7 @@ This is the shared entrypoint for Codex and Claude. Do not fork separate logic b
 - Keep JD facts and company facts separate. Employer JD text is evidence for role requirements; company briefing facts need their own sources or must be marked unknown.
 - Do not fabricate the nine company briefing facts: history, financial state, funding stage, cumulative funding, product lineup, recent CEO interview, CEO profile, location, headcount.
 - Write Saramin and JobKorea company introductions as concise bullet-first candidate copy. Do not turn every company fact into one long prose paragraph.
+- When the user corrects copy against a golden sample or asks to preserve a writing/style rule, create or update a machine-readable `copy-style-spec.json` artifact for the position. The spec must name the affected fields, company-introduction style, prohibited patterns, preferred patterns, explicit exclusions, source captures, and the golden basis used for style only.
 - When the user explicitly excludes generic or obvious candidate-facing boilerplate, keep the raw fact in `excluded_units` with an `explicit_user_exclusion` reason instead of putting it in portal fields.
 - Do not send candidate messages or publish broadly unless the user explicitly authorizes that external action. A portal registration or owner report email is authorized only when the user has asked for it.
 - One position produces one owner report email covering its requested portal outcomes when already authorized. Include the original JD source, exact entered fields, and partial status when readback is partial; do not ask for a second approval just to send the already-requested owner report.
@@ -24,7 +25,7 @@ This is the shared entrypoint for Codex and Claude. Do not fork separate logic b
 ## Workflow
 
 1. Create a raw source record for each job under the current task artifacts path. Include `source_status`, `source_url` or `source_kind=pasted_text`, capture time, company, position, and a hash of the raw text.
-2. Research the company briefing facts from current sources when the user requests a briefing or when candidate-facing portal text needs company context. If a value is unverified, write `unknown` internally and omit it from candidate copy. If the user requests LinkedIn/company organization research, run the company-intelligence workflow before final wording and record checked sources, people/organization observations, and unknowns.
+2. Research the company briefing facts from current sources when the user requests a briefing or when candidate-facing portal text needs company context. If a value is unverified, write `unknown` internally and omit it from candidate copy. As part of company intelligence, attempt LinkedIn company/people organization research by default, record checked pages, visible organization signals, people/profile observations, access limits, and unknowns, and keep unsupported reporting-line assumptions out of candidate copy.
 3. Convert the JD into semantic units. Units are the only input to packet generation; do not trim text by substring to fit portal limits. For explicitly excluded boilerplate, add `excluded_units` with `reason` beginning `explicit_user_exclusion`.
 4. Run the shared CLI:
 
