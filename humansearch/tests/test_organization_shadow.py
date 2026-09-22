@@ -291,6 +291,27 @@ def test_hash_changes_when_atomic_question_text_changes() -> None:
     assert revised != baseline
 
 
+def test_pattern_version_mismatch_is_rejected_before_judge_execution() -> None:
+    config = load_shadow_config(CONFIG_PATH)
+    mismatched = replace(
+        snapshot(observation("person-a"), observation("person-b"), observation("person-c")),
+        pattern_version="other-pattern-v9",
+    )
+    judge = FakeJudge(successful_response())
+
+    with pytest.raises(ValueError, match="pattern snapshot version"):
+        run_shadow_review(
+            a_review=a_review(),
+            jd_evidence=role_evidence(suffix=" jd"),
+            candidate_evidence=role_evidence(suffix=" candidate"),
+            pattern_snapshot=mismatched,
+            config=config,
+            judge=judge,
+        )
+
+    assert judge.state is None
+
+
 def test_semantic_state_excludes_identity_and_demographic_proxies() -> None:
     pattern = snapshot(observation("person-a"), observation("person-b"), observation("person-c"))
     state = build_semantic_state(
@@ -372,14 +393,16 @@ def test_low_organization_similarity_cannot_change_a_score_gate_or_recommendatio
     assert result.semantic.organization_similarity["classification"] == "low"
 
 
-def test_disabled_judge_returns_not_run_without_changing_a_review() -> None:
+def test_fallback_when_judge_disabled_returns_not_run_without_changing_a_review() -> None:
     config = load_shadow_config(CONFIG_PATH)
     original = a_review()
     result = run_shadow_review(
         a_review=original,
         jd_evidence=role_evidence(suffix=" jd"),
         candidate_evidence=role_evidence(suffix=" candidate"),
-        pattern_snapshot=snapshot(observation("person-a")),
+        pattern_snapshot=snapshot(
+            observation("person-a"), observation("person-b"), observation("person-c")
+        ),
         config=config,
         judge=None,
     )
@@ -391,14 +414,16 @@ def test_disabled_judge_returns_not_run_without_changing_a_review() -> None:
     assert result.semantic.human_review_status is HumanReviewStatus.NOT_RUN
 
 
-def test_judge_error_returns_error_without_changing_a_review() -> None:
+def test_fallback_when_judge_errors_returns_error_without_changing_a_review() -> None:
     config = load_shadow_config(CONFIG_PATH)
     original = a_review()
     result = run_shadow_review(
         a_review=original,
         jd_evidence=role_evidence(suffix=" jd"),
         candidate_evidence=role_evidence(suffix=" candidate"),
-        pattern_snapshot=snapshot(observation("person-a")),
+        pattern_snapshot=snapshot(
+            observation("person-a"), observation("person-b"), observation("person-c")
+        ),
         config=config,
         judge=FakeJudge(TimeoutError("private response body must not leak")),
     )

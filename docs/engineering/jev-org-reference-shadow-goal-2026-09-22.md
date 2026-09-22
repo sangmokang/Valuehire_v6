@@ -1,11 +1,11 @@
 # Jev 조직 참조 집단 shadow 평가기 L3 goal
 
-## 1층 결론
+## 결론
 
 외부 재직자 수집이나 후보 연락 없이, 기존 JD 평가를 그대로 보존하는 로컬 shadow 평가기를 만든다.
 조직 유사도가 낮거나 Jev가 실행되지 않아도 기존 점수·필수조건·추천 상태는 바뀌지 않아야 한다.
 
-배송 목표는 `LOCAL_ONLY`다. 라이브 Jev 호출과 실제 평가셋 실행이 없으면 Jev 품질은 `PASS`로
+배송 목표는 로컬 전용이다. 라이브 Jev 호출과 실제 평가셋 실행이 없으면 Jev 품질은 합격으로
 표시하지 않으며, 운영 배포·외부 저장·포털·메일 동작은 하지 않는다.
 
 ## 2층 판단 근거
@@ -15,19 +15,15 @@
 기존 점수 함수를 수정하지 않고, 구조화된 역할 근거만 받는 별도 shadow 경로를 추가한다.
 
 **무엇을** — 공식 Python SDK를 정확 버전으로 고정한 교체 가능한 Jev 어댑터와 로컬 CLI를 만든다.
-
 **왜** — v6는 Python 3.14가 주 실행 환경이고 공식 SDK 0.7.1이 Python 3.14를 명시 지원한다. SDK는
 요청·응답 타입과 인증 오류를 제공하므로 임의 HTTP 구현보다 계약 이탈 가능성이 작다.
-
 **버린 길** — 이동 별칭 `jev-latest`는 동일 입력의 의미가 바뀔 수 있어 버린다. 비공식 SDK와 직접
 HTTP 어댑터도 공식 호환 SDK가 확인됐으므로 버린다. 기존 `Criterion`에 B/C 값을 넣는 방식은 A 점수
 분모와 gate에 섞일 위험이 있어 버린다.
-
 **대가** — 새 런타임 의존성의 잠금 파일이 바뀌고, 실제 모델 품질은 키와 승인된 평가셋 없이는
 검증할 수 없다. SDK 디버그 로그는 요청·응답 본문을 가리지 않으므로 제품 경계에서 debug logging을
 사용하지 않고 원문 응답을 저장하지 않는다.
-
-**되돌리기** — 이 작업의 로컬 커밋을 되돌리면 된다. DB migration·운영 데이터·외부 상태를 만들지
+**되돌리는 법** — 이 작업의 로컬 커밋을 되돌리면 된다. DB migration·운영 데이터·외부 상태를 만들지
 않으므로 별도 데이터 복구는 없다.
 
 ## 3층 계약과 증거
@@ -131,10 +127,10 @@ When pattern이 소표본·직무 편중·근거 없음이면 시스템은 이�
 - 명령: `uv run --project humansearch --no-sync pytest -q humansearch/tests/test_organization_shadow.py -k sample`
 - 기대값: `LIMITED` 또는 `NO_EVIDENCE`, company-wide 표식 없음.
 
-### AC-4 — 대리변수 배제
+### AC-4 — 명시 대리변수 field 배제
 
-When 회사명·학교명·성별·나이·국적만 일치하면 시스템은 이를 조직 적합 근거로 인정하거나 Jev state에
-포함하지 않아야 한다.
+When 회사명·학교명·성별·나이·국적 field가 입력되면 시스템은 이를 Jev state에 포함하지 않고 입력
+경계에서 거부해야 한다.
 
 - 명령: `uv run --project humansearch --no-sync pytest -q humansearch/tests/test_organization_shadow.py -k forbidden`
 - 기대값: 금지 field 입력은 runtime validation 실패, semantic state에는 canonical company/person ID 없음.
@@ -190,7 +186,7 @@ While shadow mode이면 시스템은 외부 DB, ClickUp, Gmail, LinkedIn, 후보
 
 - B score를 A의 100점 분모나 획득점에 가산한다.
 - 낮은 B로 recommendation을 바꾸거나 후보를 제외한다.
-- 회사명 또는 학교/브랜드 token만으로 높은 값을 만든다.
+- 명시 company/school/demographic field를 허용하거나 cohort/person/evidence ID를 Jev state에 넣는다.
 - 한 사람의 중복 관찰을 서로 다른 표본처럼 센다.
 - Noul answer에서 존재하지 않는 `confidence`를 읽거나 허용한다.
 - key 부재·timeout·schema mismatch를 0점이나 성공으로 접는다.
@@ -211,8 +207,11 @@ CLI JSON은 기존 A 평가 입력과 다음 구조화된 field만 받는다.
   `known_denominator`.
 - observation: 안정 `observation_id`, 가명 `person_id`, employment 상태, observation/source 시각,
   evidence ID, 역할·책임·문제·ownership·운영·제품 단계·도메인 문제·기술 환경 tag.
-- candidate/JD semantic evidence: 같은 역할 중심 allowlist field만 허용.
+- candidate/JD semantic evidence: 같은 역할 중심 allowlist field만 허용. 문자열은 upstream에서 이미
+  비식별화된 역할·책임·ownership·문제·운영 근거여야 한다.
 - company name, school, gender, age, nationality와 알 수 없는 field는 입력 검증에서 거부한다.
+- 이 모듈은 자유문장 속 임의 고유명사를 단어 목록으로 추정하지 않는다. upstream 비식별화가 지켜지지
+  않은 입력은 계약 위반이며, 실제 표본과 오탐 기준 없이 자연어 탐지기로 보완하지 않는다.
 
 ### 출력
 
@@ -235,7 +234,7 @@ CLI JSON은 기존 A 평가 입력과 다음 구조화된 field만 받는다.
 
 - 라이브 flag가 없으면 네트워크 client를 만들지 않는다.
 - API key는 `TYPESAFE_API_KEY` 환경변수에서 SDK가 읽으며 파일·출력·예외에 기록하지 않는다.
-- Jev state에는 회사/person/evidence ID, 이름, 학교, 성별, 나이, 국적을 넣지 않는다.
+- Jev state에는 구조화된 회사/person/evidence ID, 이름, 학교, 성별, 나이, 국적 field를 넣지 않는다.
 - git에는 synthetic fixture와 계약만 둔다. raw 후보/profile 자료는 ignored artifact에만 둘 수 있다.
 - 동시성은 제공하지 않는다. CLI 1회는 입력 1건을 직렬 처리하고 output은 지정한 한 파일에 원자적으로
   쓴다.
@@ -344,11 +343,10 @@ EXIT_CODE=0
 Error: [explore] cargo was not found. Install a Rust toolchain, use a compatible packaged omx-explore prebuilt, or set OMX_EXPLORE_BIN to a prebuilt harness binary.
 ```
 
+→ 단순 탐색 우선 경로는 Rust 실행기 부재로 실패해 저장소 기본 도구로 전환했다.
+
 - 종료값: 1
 - 상태: `FAIL` 후 일반 `rg`/`sed` 읽기 전용 탐색으로 전환.
-
-→ 단순 탐색 우선 경로는 Rust 실행기 부재로 실패했다. 같은 방식을 반복하지 않고 저장소 기본 도구로
-전환했으며, 이 실패를 전체 검증 PASS로 숨기지 않는다.
 
 ### Gate 2 RED
 
@@ -361,6 +359,8 @@ EXIT_CODE=1
 대표 원인: NotImplementedError: shadow config loading is not implemented
 CLI 원인: NotImplementedError: organization shadow CLI is not implemented
 ```
+
+→ 시험 19개 중 18개가 구현 부재 때문에 실패해 올바른 RED를 증명했다.
 
 - 상태: `RED` (의도한 구현 부재)
 - 수집 오류, syntax 오류, fixture 개인정보 의존이 아니라 config/cohort/hash/orchestration/CLI의 실제
@@ -379,6 +379,8 @@ Success: no issues found in 20 source files
 EXIT_CODE=0
 ```
 
+→ 같은 시험 19개가 최소 구현 뒤 모두 통과했으며, 라이브 Jev 품질은 증명하지 않는다.
+
 - RED commit `148b5af`의 두 시험 파일은 변경하지 않았다.
 - 이 GREEN은 synthetic 계약·배선 검증이며 Jev 라이브 품질 검증은 아니다.
 
@@ -392,6 +394,8 @@ FF                                                                       [100%]
 2 failed in 0.44s
 EXIT_CODE=1
 ```
+
+→ 반복 인물 경계를 일부러 고장 내자 두 시험이 실패해 검사 민감도를 증명했다.
 
 같은 한 줄을 복구한 뒤 targeted suite는 `22 passed in 0.70s`, 종료값 0이었다.
 
@@ -414,6 +418,8 @@ BOUNDARY_VERDICT: PASS
 EXIT_CODE=0
 ```
 
+→ 당시 직접 작성 파일·함수와 한도 경계 사본이 모두 정본 P11을 통과했다.
+
 ### Gate 4 회귀·정적·노출 검사
 
 - `cd humansearch && uv run --no-sync pytest -q tests/test_recruiting_review.py` → `19 passed`, exit 0.
@@ -433,4 +439,53 @@ EXIT_CODE=0
 
 ## 적대 검증 로그
 
-V1/V2 실행 뒤 명령·시각·세션 식별자·전체 판정·재현표를 이 절에 추가한다.
+### V1 — 외부 독립 엔진
+
+- Claude 역할 래퍼 첫 실행: 지원하지 않는 옵션으로 실패. 원문 artifact를 `.omx/artifacts/`에 보존했다.
+- Claude API key 경로 재실행: `Credit balance is too low`, 유효 판정 없음.
+- API key를 제거한 OAuth 경로: 약 10분 동안 출력 없이 대기하여 중단(exit 130), 유효 판정 없음.
+- Gemini 대체 경로: `gemini: command not found`.
+- 판정: `BLOCKED`. 독립 엔진의 PASS/FAIL을 얻지 못했으므로 V1 PASS와 전체 품질 PASS를 주장하지 않는다.
+  같은 Codex 세션의 하위 에이전트는 독립 엔진으로 대체하지 않는다.
+
+### V2 — 최초 공격과 범위 정정
+
+독립 V1 결과를 PASS로 가정하지 않은 채, fresh-context verifier가 계약·diff·실행 증거를 공격했다.
+
+1. `HIGH`: 자유문장 속 회사/학교/브랜드를 막는 결정론적 경계가 없었다. 후속으로 만든 키워드
+   탐지기는 정상 `company-wide` 경험을 차단하면서 `Acme Corp`은 통과시켜 오탐·누락이 함께
+   재현됐다. 이 탐지 계층은 제거하고 명시 field 거부 + upstream 비식별화 입력 계약으로 범위를
+   정정했다. 자유문장 고유명사 완전 탐지를 주장하지 않는다.
+2. `MEDIUM`: snapshot과 config의 `pattern_version` 불일치를 허용해 장부가 입력과 다른 버전을
+   표기할 수 있었다. hash 생성 전에 불일치를 거부하도록 수정했다.
+3. `MEDIUM`: AC-5의 정확한 `-k fallback` 명령이 0개를 선택했다. 시험명을 명시적으로
+   `fallback`으로 바꾸고 key 부재/호출 실패 두 경로가 수집되도록 수정했다.
+
+3,017줄이 될 예정이던 dirty 상태에서 자연어 탐지 계층을 제거해 P11의 3,000줄 상한 아래로 되돌린다.
+수정 뒤 exact AC 선택자와 전체 gate를 다시 실행하며, 외부 V1이 `BLOCKED`인 사실은 바꾸지 않는다.
+
+### 코드 다이어트와 최종 로컬 검증
+
+- 자연어 키워드 탐지 모듈·분기·시험을 삭제했다. 명시 field 거부와 upstream 비식별화 입력 계약은
+  유지했고, A/B/C/D·hash/version·validator·CLI는 보존했다.
+- targeted ruff + strict mypy + shadow/CLI/recruiting review: `42 passed`, exit 0.
+- exact AC 선택자: hash 2, A 3, sample 3, forbidden 1, fallback 2, response 5, duplicate 2,
+  version 2개가 각각 1개 이상 수집되어 모두 exit 0. CLI 2개와 local-only 1개도 exit 0.
+- `bash scripts/acceptance-hs-gates.sh`: ruff/mypy/import와 pytest `253 passed`, exit 0.
+- `python3 -m unittest discover -s tests -v`: `Ran 111 tests`, `OK`, exit 0.
+- `bash verify.sh`, tracked exposure 328개, PII 5개, principles 34/34, `git diff --check`: 모두 exit 0.
+- P11: 직접 코드·시험 파일 600줄 이하, 함수 100줄 이하, 600/601·100/101 경계 PASS.
+  base 대비 `2,855 insertions`, untracked 0개로 3,000줄 상한 아래다.
+
+### V2 — 정리 후 재공격
+
+새 맥락 verifier가 현재 dirty tree를 독립적으로 읽고 exact AC, CLI probe, mismatch-before-judge,
+forbidden-field 비노출, no-key 출력의 ID 비노출, P11을 재실행했다.
+
+- 판정: `VERDICT PASS` — 요청 범위에서 blocking finding 없음.
+- A는 모든 success/fallback/error 경로에서 원본 `ReviewResult`로 반환됐다.
+- snapshot/config pattern version 불일치는 judge 실행 전에 거부됐다.
+- Jev state와 local-only 출력에 company/person/evidence ID가 없었다.
+- `candidate_evidence.school`은 CLI exit 2, output 미생성, 거부값 비노출로 재현됐다.
+- V2는 로컬 구현 판정일 뿐 외부 독립 V1을 대체하지 않는다. V1은 계속 `BLOCKED`이며 라이브
+  Jev 품질은 `NOT_RUN`이다.

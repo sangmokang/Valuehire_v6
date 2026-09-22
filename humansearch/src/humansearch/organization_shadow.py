@@ -161,6 +161,8 @@ def semantic_input_hash(
     pattern_snapshot: PatternSnapshot,
     config: ShadowConfig,
 ) -> str:
+    if pattern_snapshot.pattern_version != config.pattern_version:
+        raise ValueError("pattern snapshot version does not match config")
     payload = {
         "schema_version": "organization-shadow-input-v1",
         "a_review": _a_review_payload(a_review),
