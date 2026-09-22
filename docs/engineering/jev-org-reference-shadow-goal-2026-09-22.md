@@ -382,6 +382,55 @@ EXIT_CODE=0
 - RED commit `148b5af`의 두 시험 파일은 변경하지 않았다.
 - 이 GREEN은 synthetic 계약·배선 검증이며 Jev 라이브 품질 검증은 아니다.
 
+### R2 mutation과 P11 경계
+
+반복 패턴 판정의 `distinct_people >= minimum_distinct_people`를 임시로 `>= 1`로 고장 내고
+중복 인물 시험 두 개를 실행했다.
+
+```text
+FF                                                                       [100%]
+2 failed in 0.44s
+EXIT_CODE=1
+```
+
+같은 한 줄을 복구한 뒤 targeted suite는 `22 passed in 0.70s`, 종료값 0이었다.
+
+P11의 정본 규칙과 같은 AST/`splitlines()` 판정으로 직접 작성 파일·함수를 검사했다.
+
+```text
+organization_reference.py 318/600
+organization_shadow.py 563/600
+organization_shadow_cli.py 371/600
+organization_shadow_jev.py 42/600
+organization_shadow_validation.py 111/600
+test_organization_shadow.py 494/600
+test_organization_shadow_cli.py 142/600
+LIMIT_PASS: direct files <=600 lines and Python functions <=100 lines
+BOUNDARY_FILE_600=True
+BOUNDARY_FILE_601=False
+BOUNDARY_FUNCTION_100=True
+BOUNDARY_FUNCTION_101=False
+BOUNDARY_VERDICT: PASS
+EXIT_CODE=0
+```
+
+### Gate 4 회귀·정적·노출 검사
+
+- `cd humansearch && uv run --no-sync pytest -q tests/test_recruiting_review.py` → `19 passed`, exit 0.
+- `cd humansearch && uv run --no-sync pytest -q` → `252 passed in 10.24s`, exit 0.
+- `bash scripts/acceptance-hs-gates.sh` → ruff/mypy 51개, pytest 252개, 독립 import 증명 모두
+  `PASS`, exit 0.
+- `python3 -m unittest discover -s tests -v` → `Ran 111 tests`, `OK`, exit 0.
+- `bash verify.sh` → tracked secret pattern 및 `.env` 검사 `PASS`, exit 0.
+- `bash scripts/acceptance-principles-check.sh` → 34/34 mechanism과 pre-push/CI wiring `PASS`, exit 0.
+- `git diff --check` → 출력 없음, exit 0.
+- 새 contract/source/test에서 고정 조사 대상 회사명, LinkedIn URL, Gmail 주소, 내장 API key 검색 →
+  0건, exit 0.
+- `bash scripts/scan-data-exposure.sh all` → current tracked 328개 위반 0건, current CSV/TSV/SQL
+  개인정보 적재 0건. 다만 과거 reachable blob `docs/decisions/finding-events.jsonl`
+  (`d8148f1065ecf5244e3a41585313165a4f13b2ae`) 때문에 history 단계는 exit 1. 해당 blob은 기준
+  commit 이전 이력이며 이번 diff나 현재 추적 파일이 아니고, history rewrite는 비범위·파괴적이라 수정하지 않는다.
+
 ## 적대 검증 로그
 
 V1/V2 실행 뒤 명령·시각·세션 식별자·전체 판정·재현표를 이 절에 추가한다.
