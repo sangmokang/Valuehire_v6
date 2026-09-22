@@ -1,0 +1,61 @@
+{
+  "version": "2026-09-22",
+  "status": "observed_field_contract",
+  "channels": {
+    "saramin": {
+      "title": {
+        "field": "hiringTitle",
+        "limit": 35
+      },
+      "fields": {
+        "offerComment": {
+          "limit": 2000,
+          "persistent": true
+        },
+        "chargeWork": {
+          "limit": 2000,
+          "persistent": true
+        }
+      }
+    },
+    "jobkorea": {
+      "title": {
+        "field": "GI_PSTN",
+        "limit": 50
+      },
+      "fields": {
+        "proposalMessage": {
+          "limit": 3000,
+          "persistent": false
+        },
+        "EXEC_WORK": {
+          "limit": 1000,
+          "persistent": true
+        },
+        "ST": {
+          "limit": 1000,
+          "persistent": true
+        }
+      }
+    },
+    "linkedin_rps": {
+      "total_limit": 1900,
+      "owner": "scripts/jd_channels/render.py"
+    }
+  },
+  "measurement": [
+    "NFC",
+    "LF",
+    "codepoints",
+    "utf16_units",
+    "without_whitespace"
+  ],
+  "rules": [
+    "Do not truncate, compact, or drop portal packet units.",
+    "Assign each source unit id exactly once per portal packet.",
+    "Refuse non-OK source_status.",
+    "Refuse URL, email, and direct-apply text in candidate-visible fields.",
+    "JobKorea proposalMessage is transient until read back from a proposal flow."
+  ],
+  "source_hash_version": 2
+}

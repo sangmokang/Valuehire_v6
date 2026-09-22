@@ -1,0 +1,196 @@
+{
+  "captured_at": "2026-09-21T23:51:09.954119+00:00",
+  "artifacts_root": "/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/jd-connected-registration-20260922/artifacts/jd-connected-20260922",
+  "items": [
+    {
+      "file": "bg-jobkorea-packet-before-source-hash-v2.json",
+      "sha256": "2934b7e6b74ae8c09e322c8eace6d486672bf6349e2e476b3e867542f3c5b074",
+      "bytes": 18697
+    },
+    {
+      "file": "bg-jobkorea-packet.json",
+      "sha256": "5c4cc1874edc4d7356778fa440b7657aeda0cb9707f0b74822dd37caf5d29be2",
+      "bytes": 18725
+    },
+    {
+      "file": "bg-jobkorea-readback-final-v2-result.json",
+      "sha256": "70268b704dba53ea412ca849fa1cdc75e958a92fb6945e55e7f7106fad628142",
+      "bytes": 344
+    },
+    {
+      "file": "bg-jobkorea-readback-result.json",
+      "sha256": "70268b704dba53ea412ca849fa1cdc75e958a92fb6945e55e7f7106fad628142",
+      "bytes": 344
+    },
+    {
+      "file": "bg-jobkorea-readback.json",
+      "sha256": "88b953d21f3acb6670624003a6efb69e53c0a4024f6a53fadbb119eed3c93078",
+      "bytes": 4657
+    },
+    {
+      "file": "bg-owner-email-receipt.json",
+      "sha256": "1b4f5244057e9f120b0e422b33a502e94ddc874ad4a5fbae9e309453e3dc58eb",
+      "bytes": 276
+    },
+    {
+      "file": "bg-owner-email.txt",
+      "sha256": "debec775e86fe1d35115b8ecd55dddca2a7e60399625e90a002606e89650d081",
+      "bytes": 23613
+    },
+    {
+      "file": "bg-saramin-packet-before-source-hash-v2.json",
+      "sha256": "a81823029ce547944469addc9dff5e0fd1021852e243e4caf3e6bc352897525e",
+      "bytes": 18433
+    },
+    {
+      "file": "bg-saramin-packet.json",
+      "sha256": "27ddd0bff18eb22520cbb13f1cb63cab9f43fb21c6e65ff507006f126f86b04a",
+      "bytes": 18461
+    },
+    {
+      "file": "bg-saramin-readback-final-v2-result.json",
+      "sha256": "fb36dfc35f3fc6e9d1f31afb6b053f6c00b45a4edd717470782a2356a90cd598",
+      "bytes": 316
+    },
+    {
+      "file": "bg-saramin-readback-result.json",
+      "sha256": "fb36dfc35f3fc6e9d1f31afb6b053f6c00b45a4edd717470782a2356a90cd598",
+      "bytes": 316
+    },
+    {
+      "file": "bg-saramin-readback.json",
+      "sha256": "74a831eff6c7dd05b07fefcc5b90566cd989b9ed302435dbcb2cee40029d2f48",
+      "bytes": 7649
+    },
+    {
+      "file": "final-jd-tests.txt",
+      "sha256": "6d72c73a65c8111975bdcd75683cb4cd9ea2013b1869e021ab7caa954417c481",
+      "bytes": 7990
+    },
+    {
+      "file": "metadata-red.txt",
+      "sha256": "510609590f59ee797f1d40f0e448217f64dfee2870b5cad3f829d17b6830f353",
+      "bytes": 5414
+    },
+    {
+      "file": "p11-size.json",
+      "sha256": "326f728b9c26bec37ab19026731891ebfa9057db0c8c56f2dd37cbefcc874b33",
+      "bytes": 403
+    },
+    {
+      "file": "packet-metadata-migration.txt",
+      "sha256": "b3eccf644d499207195cc399a4c8e10bdf3ae8bc2910b5c438284cd447100ed2",
+      "bytes": 392
+    },
+    {
+      "file": "principles-final.txt",
+      "sha256": "31153ab17a665560a3a4e8a5f2a45bd58275e1d6f1e1d27a21fee40d74197dc2",
+      "bytes": 191
+    },
+    {
+      "file": "qa-jobkorea-packet-before-source-hash-v2.json",
+      "sha256": "415715d15680ab731dd90f93d82b7b9f8e1697849cfee23ddabd5a20561a0ab4",
+      "bytes": 16410
+    },
+    {
+      "file": "qa-jobkorea-packet.json",
+      "sha256": "9fa05560739a18d8ce864458eeff82c334eddcd514fa20dd2a700e32c8c26f87",
+      "bytes": 16439
+    },
+    {
+      "file": "qa-jobkorea-proposal-persistence.json",
+      "sha256": "74d21250945944536a618d05427a51e3cd08363afb497c60737bcc429b877df5",
+      "bytes": 494
+    },
+    {
+      "file": "qa-jobkorea-readback-final-v2-result.json",
+      "sha256": "3cb16b34064a59b5a6d68ad43e61529f0cca11519c20c2cdecdd1788a4f3c268",
+      "bytes": 344
+    },
+    {
+      "file": "qa-jobkorea-readback-final.json",
+      "sha256": "fdcfeed1ec947fe8c3022bf527100a75ef299a7e192f9f2dfeb78a846353971f",
+      "bytes": 2779
+    },
+    {
+      "file": "qa-jobkorea-readback-result-final.json",
+      "sha256": "3cb16b34064a59b5a6d68ad43e61529f0cca11519c20c2cdecdd1788a4f3c268",
+      "bytes": 344
+    },
+    {
+      "file": "qa-jobkorea-readback.json",
+      "sha256": "f88df265a2fbe94aa423dd3c913cf9119f906cf456878b53b4b2d8ea6d013e6d",
+      "bytes": 2604
+    },
+    {
+      "file": "qa-owner-email-receipt.json",
+      "sha256": "eb57d18e6e45f73abad455c9c6137468b1ff9db402ee6716f6457ed2565e2670",
+      "bytes": 272
+    },
+    {
+      "file": "qa-owner-email.txt",
+      "sha256": "e75912db38ffea3d3fafe998c5cd0d90cac9a04e643285147619c933f24c1ef7",
+      "bytes": 15262
+    },
+    {
+      "file": "qa-saramin-packet-before-source-hash-v2.json",
+      "sha256": "fb193689094b3e7d2ddab6a32f0802d67d34bf433072b310b1d22778dfb2471d",
+      "bytes": 15489
+    },
+    {
+      "file": "qa-saramin-packet.json",
+      "sha256": "6945d9a4af380c730f8616cdbb469ec59dfc30017363ac1db3d55549df3d411c",
+      "bytes": 15517
+    },
+    {
+      "file": "qa-saramin-readback-final-v2-result.json",
+      "sha256": "0ae79cb46153977560abffc713c9b7baaaa061166a433fab5e3d56f60161b1d3",
+      "bytes": 316
+    },
+    {
+      "file": "qa-saramin-readback-final.json",
+      "sha256": "09637ce7f222fc6a4dfddb161e3eb225d171468fb8bad79fae67f359045f801c",
+      "bytes": 4931
+    },
+    {
+      "file": "qa-saramin-readback-result-final.json",
+      "sha256": "0ae79cb46153977560abffc713c9b7baaaa061166a433fab5e3d56f60161b1d3",
+      "bytes": 316
+    },
+    {
+      "file": "qa-saramin-readback.json",
+      "sha256": "7ddd1082981106306ade98a09c4fd9186621d4104de97b823e69b60d8fca10c0",
+      "bytes": 5223
+    },
+    {
+      "file": "root-final-jd-tests.txt",
+      "sha256": "b9f7249a9beef9c29d66b365ae611dded8745ea8b67852d5f1857e4a6c3721e6",
+      "bytes": 7885
+    },
+    {
+      "file": "skill-install-receipt.json",
+      "sha256": "aa64962efc4109bc6daca38dead19dc36781986535e832bc634cd7bfdf285d9c",
+      "bytes": 1833
+    },
+    {
+      "file": "tech-domain-red.txt",
+      "sha256": "2692b8a8f887675afd11ecd4e519381965948651ebefb8691168f2620ffeb030",
+      "bytes": 843
+    },
+    {
+      "file": "v1-fixes-green.txt",
+      "sha256": "39d8ae8f051a30a160ccb8fdee05e13c3d6fac744790caeb30f68f3a9f1e4fcc",
+      "bytes": 7990
+    },
+    {
+      "file": "v1-fixes-red.txt",
+      "sha256": "60bac03e2bb0c480b9334b45687d8376c3ffac8016e5ad9bd1dd2543c3c82e79",
+      "bytes": 9301
+    },
+    {
+      "file": "v1-static-result.json",
+      "sha256": "f9162b899f9bbd48e45768a5a29451f655f401caff2e771089f675a5a3dec207",
+      "bytes": 15655
+    }
+  ]
+}

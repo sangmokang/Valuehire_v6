@@ -20,7 +20,7 @@ from jd_channels.pipeline import run, verify  # noqa: E402
 from jd_channels.render import render  # noqa: E402
 from jd_channels.units import UnitError, load  # noqa: E402
 
-REAL_UNITS = ROOT / "outputs/_units/bunjang__core-product-pm.json"
+REAL_UNITS = ROOT / "tests/fixtures/jd_core_pm.json"
 
 
 def unit(uid, section, kind, full, compact=None, **kw):
