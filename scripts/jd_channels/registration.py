@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .copy_policy import exclusion_hits
 from .measure import PORTAL_SAFE_SUBSTITUTE, measure, scan_portal_risk
 from .units import JDSource, SECTION_LABEL, Unit, UnitError, load
 
@@ -134,6 +135,7 @@ def _field(value: str, spec: FieldSpec, portal: str) -> dict[str, Any]:
                      if m.group().casefold() not in tech_names]
     if DIRECT_APPLY.search(value) or direct_routes:
         errors.append(f"FORBIDDEN_TEXT:{spec.name}")
+    errors.extend(f"EXCLUDED_COPY:{spec.name}:{rule}" for rule in exclusion_hits(value))
     return {"value": value, "limit": spec.limit, "persistent": spec.persistent,
             "counts": c, "errors": errors, "portal_changes": changes}
 
@@ -174,7 +176,7 @@ def _finish(src: JDSource, channel: str, fields: dict[str, dict[str, Any]],
         "schema": "jd-registration/2026-09-22",
         "presentation_contract": {
             "company_intro": "bullet_first_concise",
-            "source_exclusions": "explicit_user_exclusion_only",
+            "source_exclusions": "explicit_or_standing_user_exclusion",
         },
         "channel": channel,
         "source": {"company": src.company, "position": src.position, "jd_id": src.jd_id,

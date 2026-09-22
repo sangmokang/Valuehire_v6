@@ -147,8 +147,12 @@ def load(path: str | Path) -> JDSource:
             raise UnitError(f"excluded_units id conflicts with unit id: {item['id']}")
         if item["section"] not in SECTION_ORDER:
             raise UnitError(f"excluded_units {item['id']}: 알 수 없는 section {item['section']!r}")
-        if not str(item["reason"]).startswith("explicit_user_exclusion"):
-            raise UnitError(f"excluded_units {item['id']}: reason must start with explicit_user_exclusion")
+        reason = str(item["reason"])
+        if not (reason.startswith("explicit_user_exclusion") or reason.startswith("standing_user_exclusion")):
+            raise UnitError(
+                f"excluded_units {item['id']}: reason must start with explicit_user_exclusion "
+                "or standing_user_exclusion"
+            )
     return JDSource(
         company=raw["company"], position=raw["position"], source_url=raw["source_url"],
         captured_at=raw["captured_at"], source_status=raw["source_status"],

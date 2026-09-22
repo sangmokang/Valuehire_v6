@@ -16,7 +16,10 @@ The workflow covers:
 - saved UI readback
 - one owner report email per registered position when explicitly requested
 
-The workflow does not imply candidate outreach, bulk posting, unattended login automation, paid actions, ontology/org mapping, or reuse of old company caches unless the user asks for those actions in the current task. When the user asks for LinkedIn/company organization research as part of a JD packet or owner report, run the company-intelligence workflow before final wording and report the scope, sources, and unknowns.
+
+Live browser operation and final owner-email sending are main-operator-only actions. Subagents or helper lanes may create local owned artifacts, drafts, analyses, and verification inputs, but they must not operate live portal sessions or send owner/candidate emails unless the main operator explicitly transfers that exact action. If a helper sends an outdated or duplicate report, the main operator must send a correction and preserve both message IDs.
+
+The workflow does not imply candidate outreach, bulk posting, unattended login automation, paid actions, ontology/org mapping, or reuse of old company caches unless the user asks for those actions in the current task. When company context is researched for a JD packet or owner report, attempt LinkedIn company/people organization research as a standard company-intelligence step, record the checked LinkedIn pages and visible organization signals, and report access limits or unknowns. Do not infer reporting lines or role ownership from visible employee names unless the profile evidence supports it.
 
 ## Source Identity
 
@@ -68,9 +71,9 @@ Remove these from every portal field and owner email's "registered text" candida
 
 Replace next-step language with ValueConnect routing, for example: `후속 절차는 밸류커넥트를 통해 안내드립니다.`
 
-Do not remove actual hiring process facts such as interview stages, tasks, reference checks, employment type, location, or required documents by default.
+Preserve material hiring process and condition facts such as interview stages, tasks, reference checks, non-standard employment type, meaningful location constraints, mandatory documents, portfolio requirements, licenses, travel constraints, or security/eligibility requirements. Do not spend candidate-facing portal space on generic application boilerplate that professional candidates already understand.
 
-If the user explicitly excludes generic or obvious candidate-facing boilerplate, such as the entire support-documents section, employment type `정규직`, `채용 시 마감`, or a self-evident office label, remove it from Saramin/JobKorea candidate fields and owner-email registered-text blocks. Preserve the raw fact in `excluded_units` with `reason` starting `explicit_user_exclusion`, including the user instruction, source, and captured text. This is an intentional source-coverage exception, not a renderer drop.
+By default, remove generic or obvious candidate-facing boilerplate from Saramin/JobKorea fields and owner-email registered-text blocks when it does not materially change the candidate decision. This includes generic support-document sections, employment type `정규직`, `채용 시 마감`, and self-evident office labels such as a plain office name. Preserve each omitted raw fact in `excluded_units` with `reason` starting `explicit_user_exclusion` or `standing_user_exclusion`, including the instruction basis, source, and captured text. This is an intentional source-coverage exception, not a renderer drop.
 
 ## Semantic Units
 
@@ -148,6 +151,8 @@ Use both 2,000-character fields as one candidate-facing surface. A good split us
 
 For candidate readability, `offerComment` should normally start with ValueConnect routing and a concise bullet-first `[회사 소개]`, then team/growth/process/remaining conditions. Do not use a long company prose paragraph when the same facts can be carried as bullets.
 
+When a user supplies a golden sample, rejects a copy style, or asks to make the rule reusable, preserve the decision as a machine-readable position artifact such as `copy-style-spec.json`. The JSON spec must include the affected channel fields, required company-introduction style, prohibited patterns, preferred patterns, explicit exclusions, source capture paths/hashes where available, and a boundary that the golden sample controls style only, not role facts.
+
 ### JobKorea
 
 Fields:
@@ -196,6 +201,7 @@ Success messages, toast notifications, and "button clicked" states are not compl
 
 Current measured transformations:
 
+- JobKorea stores bullet `•` as `?` (2026-09-22 fresh reopen); render it as ASCII `-` before entry.
 - JobKorea stores en dash as `?`
 - JobKorea permanent fields convert ASCII `>` into `≫`. For interview process separators, use `→` in semantic units; it survives JobKorea and becomes `>` in Saramin. Do not silently normalize failed readback away.
 - JobKorea stores single quotes as backticks
@@ -227,11 +233,11 @@ The email must include:
 - saved position id and proposal id when available
 - packet status and readback status
 - field names and character counts
-- the complete original JD source text plus its URL/source marker
+- the source URL/marker and per-item coverage summary; never excluded original text or a raw-source appendix
 - exact registered text for each field
 - partial status and reason, if any
 - remaining caveats such as `proposalMessage` transient verification
-- explicit `excluded_units` and the current user instruction that authorized each exclusion
+- excluded-unit IDs/categories/counts and their instruction basis, without reproducing removed text
 - LinkedIn/company organization research scope when requested, including sources checked and unresolved unknowns
 
 Do not combine two positions into one report when the user asked to process them separately.
@@ -262,3 +268,15 @@ Disabled-title binding only accepts the title value already in the reviewed pack
 Readback JSON is the result artifact. Input packets remain immutable generation artifacts; their initial `NOT_VERIFIED` markers are not overwritten by the readback command. Read the result file. Exit code 3 requires inspection of `position_status` and `proposal_status`; it is never an unqualified success code.
 
 See [Aside operations](jd-aside-operations.md) for the repeated browser procedure. The tested local/manual workflow does not provide unattended registration, server-side browser attestation, or candidate-send automation.
+
+## 2026-09-22 원문 보존 및 보고 재노출 방지
+
+사람인의 “3구획”은 현재 로그인 편집·미리보기/상세 UI에서 구획명·DOM ID·글자 제한·표시 순서·영구 저장을 먼저 확인한다. 제목을 본문으로 쓰지 않고 가상의 본문 필드를 만들지 않는다. 이번 편집 관찰은 포지션명/제안 내용/업무 내용, 35/2000/2000자다. 후보자 상세 화면의 확인 범위는 실행 증빙에 별도로 남긴다.
+
+공식 원문 각 문장/항목과 실제 새 저장값의 대응을 source-coverage.json에 기록한다. ID, 원문, 대상 필드/의미 구획, 실제 대응 문장, 원문 유지/의미 동일 편집/명시 삭제/미배치, 출처 및 저장 증거가 필수다. 패킷끼리의 일치는 원문 추출의 완전성을 증명하지 않는다. 승인된 삭제 외 핵심 미배치는 완료를 차단한다. 임시 제안 입력은 저장 대응으로 계산하지 않는다.
+
+상시 제외: 일반 지원 안내 구획과 지정 푸터 전체, 자유양식 이력서 안내, 직무 무관 개인정보 및 연봉 삭제 안내, 수습 안내, 허위기재 취소, 취업보호 우대, 제출서류 삭제 안내, 직접 지원 이메일, 지정된 일반 고용/마감/오피스 문구. 전형 단계의 추가/생략 안내는 공백·구두점·줄바꿈·같은 의미 변형까지 제외한다. 핵심 전형과 후보자 동의 후 레퍼런스 체크는 유지한다. 꼬리 블록의 소속/경력은 필요한 사실만 본문에 한 번 정돈한다.
+
+삭제 원문은 로컬 raw-source/excluded_units에만 보존한다. 보고 메일 전체에도 원문 보관 부록으로 재노출하지 않는다. 제외 내역은 ID·범주·건수로 보고한다. 계약 JSON의 copy_policy와 jd_channels.copy_policy.exclusion_hits를 포털 필드 및 전체 보고 본문에 적용하고, 정규식 밖 의미 변형은 직접 검토한다. 메일의 operation ID를 발송 전 보낸편지함에서 검색하고, 한 번 발송 후 수신자·본문 전체·ID·시각을 대조한다.
+
+이번 원문 보존 정정의 fresh readback: 사람인 1833171 제목/제안/업무 21/932/1383자, 원문 유지 대상 37개 저장. 잡코리아 그룹 1506767 최종 1601701 제목/업무/ST 21/982/582자 정확 일치, 제안 749자 입력 뒤 112자 기본값 복원. 원문 유지 대상 37개 중 영구 필드 29개, 임시 제안 8개 미저장으로 전체 PARTIAL. 사람인 후보자용 미리보기는 미확인(상세 링크는 기업용 후보자 관리 화면). UI 입력/편집 저장 검증을 후보자 표시 검증으로 확대하지 않는다.

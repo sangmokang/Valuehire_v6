@@ -29,7 +29,7 @@
 
 로그인한 인재검색 화면의 `button.dev-positionoffer`에서 포지션 제안 화면을 엽니다. 중간 안내의 `a.dev-open-position-offer`는 제안 화면 열기이며 실제 발송과 구분합니다.
 
-1. `input.dev_lb_postion_info`의 value(포지션 ID), `data-title`, `data-pstn-group-no`를 비교해 중복을 확인합니다.
+1. 목록이 접힌 상태라면 `input#posgtitle`(placeholder `등록 포지션 명 검색`)에 검색어를 넣고 `button.devposgsearch`를 클릭해 목록을 엽니다. 입력만으로 목록이 열리지 않을 수 있습니다. `input.dev_lb_postion_info`의 value(포지션 ID), `data-title`, `data-pstn-group-no`를 비교해 중복을 확인합니다.
 2. 기존 항목의 상위 `li` 내 `.devPositionEdit`로 수정합니다. 신규는 `button.positionadd`입니다.
 3. `#GI_PSTN`, `#EXEC_WORK`, `#ST`에 패킷 값을 입력합니다. 기존 제목이 disabled이면 속성을 해제하지 않습니다. 기존 제목과 동일 포지션임을 확인해 명시적으로 바인딩합니다.
 4. 고용형태와 `button.devListContainer` 직무 선택은 현재 화면의 label을 확인해 결정합니다. 직무 선택의 `button.devSubmitBtn`은 선택 확인 버튼입니다. 이것을 후보자 발송 버튼과 혼동하지 않습니다.
@@ -40,6 +40,14 @@
 
 ## 보고 메일
 
-명시된 수신자에게 포지션마다 한 통을 보냅니다. 원문 JD 전체, 출처, 각 채널의 정확한 입력값·글자 수·포지션 ID, 저장 결과와 남은 항목을 담습니다. JobKorea 제안 내용은 영구 저장을 확인하지 못했다면 준비된 문안으로 표시합니다.
+명시된 수신자에게 포지션마다 한 통을 보냅니다. 원문 출처와 항목별 보존/삭제 대조(삭제 원문은 제외), 각 채널의 정확한 입력값·글자 수·포지션 ID, 저장 결과와 남은 항목을 담습니다. JobKorea 제안 내용은 영구 저장을 확인하지 못했다면 준비된 문안으로 표시합니다.
 
 Gmail 전송 응답 ID만으로 완료하지 않습니다. 해당 ID를 `format=full`로 읽어 SENT 라벨, 수신자, 제목, 본문 전체가 예상과 같은지 비교하고 메일 ID와 비교 결과를 증거로 저장합니다.
+
+## 이번 정정의 추가 확인 계약
+
+- 사람인 편집에는 포지션명 `#position_title`(35), 제안 내용 `#position_content`(2000), 업무 내용 `#work_content`(2000)가 관찰됐다. 본문은 두 개다. 편집 관찰만으로 후보자 표시 순서를 확정하지 않고 상세/미리보기도 따로 캡처한다.
+- 원문 source-unit와 fresh readback을 문장별 대조한다. 제외 문구는 등록 필드뿐 아니라 메일 본문 전체에서 검사하고 raw 원문 부록을 만들지 않는다.
+- 잡코리아의 제안 화면 진입은 현재 검색 화면→이력서 화면의 `button.dev-positionoffer`→`a.dev-open-position-offer` 확인으로 관찰됐다. 이력서 본문을 수집하지 않고 편집 폼만 읽는다. 발송 버튼은 누르지 않는다.
+- Aside 일회성 REPL 사이에는 변수가 유지되지 않는다. 작업용 대화형 `aside repl`을 유지하고, 파일은 그 세션 폴더에 저장한 뒤 작업 워크트리의 ignored artifacts로 복사한다.
+- 사용자가 기존 브라우저에서 로그인한 뒤 작업 탭을 다시 조회하면 인증이 반영되는지 확인한다. 로그인 수행 권한은 최신 사용자 지시를 따른다. 비밀번호/세션을 로그에 기록하지 않는다.

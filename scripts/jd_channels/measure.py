@@ -46,6 +46,7 @@ class Measured:
 # 넣으면 후보자가 보는 글이 깨지므로, 쓰기 전에 scan_portal_risk 로 걸러낸다.
 PORTAL_RISK: dict[str, dict[str, str]] = {
     "jobkorea": {
+        "•": "bullet → 물음표로 저장됨 (2026-09-22 fresh reopen 실측)",
         "\u2013": "en dash → 물음표로 저장됨 (2026-09-21 실측)",
         "\u2014": "em dash → 물음표 가능 (en dash와 같은 계열)",
         "'": "작은따옴표 → 백틱(`)으로 치환됨 (2026-09-22 실측)",
@@ -58,6 +59,7 @@ PORTAL_RISK: dict[str, dict[str, str]] = {
 }
 # 대신 쓸 수 있는 안전한 표기. 단어와 순서는 바꾸지 않는다.
 PORTAL_SAFE_SUBSTITUTE = {
+    "•": "-",
     "\u2013": "-", "\u2014": "-", "\u2192": ">",
     "'": "", "\u2018": "", "\u2019": "",
 }
