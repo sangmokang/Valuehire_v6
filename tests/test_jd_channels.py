@@ -91,6 +91,22 @@ class GoldenShapeTest(unittest.TestCase):
         draft = render(self.src, "linkedin_rps")
         self.assertLessEqual(draft.measured.codepoints, 1900)
         self.assertIn("Series E", draft.body, "한도에 여유가 있는데 회사 정보를 버렸다")
+        self.assertIn("[회사 소개", draft.body)
+        self.assertIn("[주요 업무]", draft.body)
+        self.assertIn("[자격요건]", draft.body)
+        self.assertIn("[우대사항]", draft.body)
+
+    def test_label_only_company_intro_fails_channel_verification(self):
+        units = [
+            unit("C1", "company", "company", "- 픽스처컴퍼니 | IT 서비스"),
+            unit("T1", "team", "core", "- 글로벌팀에서 사업 성장을 이끄는 역할"),
+            unit("Q1", "requirements", "core", "- 관련 경력 5년 이상"),
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            src = load(write(tmp, doc(units)))
+            report = verify(src, render(src, "gmail"))
+        self.assertIn("회사 소개: COMPANY_INTRO_TOO_THIN", report.notes)
+        self.assertFalse(report.ok)
 
     def test_gmail_is_longer_than_rps(self):
         """Gmail 을 RPS 수준으로 줄이지 않는다."""
@@ -220,7 +236,7 @@ class ErrorPathTest(unittest.TestCase):
             self.assertEqual(hits, {}, f"{portal} 원고에 변환 위험 문자: {hits}")
 
     def test_inmail_rejects_ai_tells(self):
-        """RPS InMail 은 목록이 아니라 이어지는 글이어야 한다(SOT L4·L5)."""
+        """RPS InMail 은 구조화된 불릿을 허용하되 AI 티가 나는 표식은 막는다."""
         bad = ("안녕하세요 전혜인 매니저님\n\n귀하의 경력을 주목하여 연락드립니다 \U0001F642\n"
                "- 항목1\n- 항목2\n**굵게** {{first_name}}")
         rules = {h.rule for h in scan_inmail(bad)}
@@ -228,6 +244,13 @@ class ErrorPathTest(unittest.TestCase):
                      "INMAIL_EMOJI", "INMAIL_MARKDOWN", "INMAIL_RAW_VAR"):
             self.assertIn(want, rules, f"{want} 를 못 잡았다")
         self.assertGreater(inmail_tone(bad)["bullet_ratio"], 0.3)
+
+    def test_inmail_allows_clear_heading_and_bullet_structure(self):
+        body = ("안녕하세요. 포지션을 제안드립니다.\n\n"
+                "[회사 소개]\n- 검증된 제품과 성장 사실\n\n"
+                "[주요 업무]\n- 글로벌 사업 P&L 책임\n\n"
+                "[자격요건]\n- 관련 경력 6년 이상")
+        self.assertNotIn("INMAIL_MARKDOWN", {hit.rule for hit in scan_inmail(body)})
 
     def test_inmail_good_body_passes(self):
         """고정 회귀 본문은 금지 0건이고 불릿으로 끊기지 않는다."""
