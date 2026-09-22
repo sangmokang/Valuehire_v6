@@ -268,3 +268,23 @@ WU: 격리 RED → 작은 trusted workflow와 기존 테스트 확장 → 동일
 - 실제 PR 데이터 로컬 실행: `private-reviews/external-live-bootstrap.log`에서 PR #104 base `fc6beedc78019862bc2f1b3bf4c4ad3bbd8e845b`에 trusted checker가 없어 exit 1 fail-closed. HEAD 사본으로 대체하지 않았습니다.
 - Repository CI: 이 후속 변경 push 전 최신 원격 SHA `66101c317ca555ee6d52134b7535ce567f5fe346`의 기존 `verify` 두 실행은 suppression 만료로 FAIL입니다. 이는 이번 verification-integrity 코드의 로컬 PASS와 분리합니다.
 - Merge readiness: 코드 측 준비는 진행됐지만 외부 required workflow/source-pinned 강제는 미적용입니다. `main` base에 workflow+checker가 먼저 신뢰 반영되고 required workflow 또는 동등한 외부 강제가 실제 적용되기 전에는 Verification integrity와 Merge readiness를 PASS로 표시하지 않습니다.
+
+### 후속 결과 (코드 검증 완료, 외부 적용 미완료)
+
+격리 RED는 `private-reviews/external-red.py`/`external-red.log`: 시작 HEAD를 복제해 checker PASS, 성공 문구 전체 위조, 목록 자기 제외, helper 제거, base=HEAD+동일-ref 허용 호출의 5개 개별 경로가 종료값 0인 것을 재현했다. 이 수치는 기존 원격 전체 CI 통과가 아니다.
+
+새 workflow 본문을 직접 실행하는 회귀는 기존 테스트 파일을 확장했다. API 응답과 Git fetch의 네트워크 주소만 fixture로 바꾸고 실제 Git 객체 비교와 base 검사기를 실행한다. 기능 변경 0, 정상 core/동시 변조/목록 축소/helper 제거/base 환경 조작은 20, 비-main base/옛 이벤트/없는 base 검사기는 실패했다. GitHub 원시 승인 상태 APPROVED + 같은 SHA + 기존 보호 규칙이면 정상 core 변경 0; REVIEW_REQUIRED/CHANGES_REQUESTED/null·옛 SHA·완화한 정책이면 통과하지 않는다. GitHub가 실제 리뷰어 권한을 평가하는 내부 동작이나 원격 required workflow 강제를 fixture로 증명했다고 하지 않는다.
+
+실행: `python3 -m unittest discover -s tests` 61/61, RPS 인수 원명령 12/12, CI-step-integrity 24/24, 비밀 검사 및 diff 검사 PASS. workflow 자체를 항상 0으로 바꾸거나 base 대신 HEAD의 검사기를 실행하는 두 고장 사본은 기대값 불일치로 실패했고 원본은 복구 PASS였다. 출력·시각·명령·종료값·workflow/test SHA-256은 `private-reviews/external-final-tests.log`에 보존한다. 직접 코드 파일은 P11 hard 600, 함수 100 이하이며 같은 줄수 계산의 600/601 경계를 확인했다. 기존 PR 전체 P11 초과는 이번 최소 보완으로 해소하지 않았다.
+
+실제 GitHub 읽기 확인: base에 검사기가 없어서 새 실행 경로가 실패하며 HEAD 사본으로 대체하지 않는다(`external-live-bootstrap.log`, 로컬 실행이며 hosted 증거 아님). GraphQL 현재 PR은 REVIEW_REQUIRED, 보호 규칙의 승인/이전 승인 철회/마지막 push 외 승인/관리자 적용 모두 확인(`external-native-review.json`). 이 조회는 로컬 기존 로그인으로 했으며 hosted GITHUB_TOKEN 권한으로는 아직 실행하지 않았다.
+
+교차검토 중 PR 개설자와 실제 pusher를 혼동한 자체 리뷰 판정 결함을 발견해 해당 로직을 삭제하고 GitHub의 원시 reviewDecision/보호 규칙을 사용하도록 바꿨다. 같은 엔진의 별도 교차검토이며 독립 V1이 아니다. 외부 Claude 재시도는 90초 시간 초과로 V1=NOT_RUN(`external-v1.log`), V1 재현 V2도 NOT_RUN. Strict 전체 PASS는 아니다.
+
+외부 차단: 관리자 권한은 확인됐지만 현재 저장소는 개인 소유이고 classic required check는 workflow identity를 구별하지 않는다. 조직 required workflow 설치, 신뢰된 default/base 부트스트랩, 동명 가짜 check의 실제 병합 차단 실증이 남았다. main 병합·조직 이관·새 서비스는 이번 범위에서 실행하지 않는다. 보호 설정에 동명 required check만 추가해 해결처럼 보이게 하지 않는다. 설정·suppression·JD·파서·발송·포털 저장 변경 없음. 네 상태는 Feature verification=지원 범위 PASS, Verification integrity=외부 강제 미해결, Repository CI=최종 SHA 원격 결과를 PR 본문에 갱신, Merge readiness=NOT_READY다.
+
+무엇을 — 이벤트 SHA + 신뢰된 base 검사기를 쓰는 작은 target workflow.
+왜 — 후보 HEAD가 검사기·문구·목록·호출을 함께 바꿔도 그 코드를 실행하지 않게 한다.
+버린 길 — 출력 문구 강화와 이름만 같은 required check는 신뢰 경계를 만들지 않는다. 자체 리뷰 목록 판정도 GitHub 승인 규칙을 불완전하게 복제하므로 제거했다.
+대가 — 현재 개인 저장소의 외부 강제와 기본 브랜치 선행 반영은 아직 필요하다. fork 및 hosted 토큰 경로는 미검증이다.
+되돌리기 — 이 후속 커밋만 revert. 원격 설정은 바꾸지 않았으므로 설정 롤백은 없다.
