@@ -81,6 +81,7 @@ def test_local_only_cli_runs_real_shadow_entrypoint_and_writes_traceable_ledger(
             str(output_path),
             "--config",
             str(CONFIG),
+            "--live-jev",
         ],
         cwd=ROOT / "humansearch",
         env=environment,

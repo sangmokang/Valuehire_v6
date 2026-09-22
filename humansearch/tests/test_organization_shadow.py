@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Callable, Mapping
 from dataclasses import replace
 from datetime import UTC, date, datetime
 from pathlib import Path
-from typing import Any
+from types import SimpleNamespace
+from typing import Any, cast
 
 import pytest
 from hypothesis import given
@@ -27,6 +29,7 @@ from humansearch.organization_shadow import (
     run_shadow_review,
     semantic_input_hash,
 )
+from humansearch.organization_shadow_jev import TypeSafeJevJudge
 from humansearch.recruiting_review import (
     Criterion,
     CriterionStatus,
@@ -262,6 +265,32 @@ def test_hash_is_stable_and_changes_with_pattern_or_question_version() -> None:
     assert len(first) == 64
 
 
+def test_hash_changes_when_atomic_question_text_changes() -> None:
+    config = load_shadow_config(CONFIG_PATH)
+    questions = {name: dict(question) for name, question in config.questions.items()}
+    question = questions["ownership_scope_similarity"]
+    question["instructions"] = f"{question['instructions']} revised"
+    changed = replace(config, questions=questions)
+    pattern = snapshot(observation("person-a"), observation("person-b"), observation("person-c"))
+
+    baseline = semantic_input_hash(
+        a_review=a_review(),
+        jd_evidence=role_evidence(suffix=" jd"),
+        candidate_evidence=role_evidence(suffix=" candidate"),
+        pattern_snapshot=pattern,
+        config=config,
+    )
+    revised = semantic_input_hash(
+        a_review=a_review(),
+        jd_evidence=role_evidence(suffix=" jd"),
+        candidate_evidence=role_evidence(suffix=" candidate"),
+        pattern_snapshot=pattern,
+        config=changed,
+    )
+
+    assert revised != baseline
+
+
 def test_semantic_state_excludes_identity_and_demographic_proxies() -> None:
     pattern = snapshot(observation("person-a"), observation("person-b"), observation("person-c"))
     state = build_semantic_state(
@@ -315,6 +344,32 @@ def test_completed_shadow_keeps_a_review_unchanged_and_separates_b_c_d() -> None
     assert result.semantic.transferable_experience["classification"] == "high"
     assert result.semantic.human_review_status is HumanReviewStatus.NOT_REQUIRED
     assert set(result.semantic.primitive_answers) == set(config.questions)
+
+
+def test_low_organization_similarity_cannot_change_a_score_gate_or_recommendation() -> None:
+    config = load_shadow_config(CONFIG_PATH)
+    original = a_review()
+    response = successful_response()
+    for name, answer in response["answers"].items():
+        if answer["type"] == "score" and name != "transferable_experience_strength":
+            answer["score"] = 0.0
+            answer["probabilities"] = {str(index): 1.0 if index == 0 else 0.0 for index in range(4)}
+    result = run_shadow_review(
+        a_review=original,
+        jd_evidence=role_evidence(suffix=" jd"),
+        candidate_evidence=role_evidence(suffix=" candidate"),
+        pattern_snapshot=snapshot(
+            observation("person-a"), observation("person-b"), observation("person-c")
+        ),
+        config=config,
+        judge=FakeJudge(response),
+    )
+
+    assert result.a_review == original
+    assert result.a_review.gate == original.gate
+    assert result.a_review.score == original.score
+    assert result.a_review.recommendation == original.recommendation
+    assert result.semantic.organization_similarity["classification"] == "low"
 
 
 def test_disabled_judge_returns_not_run_without_changing_a_review() -> None:
@@ -384,6 +439,46 @@ def test_invalid_jev_response_is_explicit_and_never_successful(
     assert result.semantic.status is SemanticStatus.INVALID_RESPONSE
     assert result.semantic.error_code == "judge_response_invalid"
     assert result.semantic.primitive_answers == {}
+
+
+def test_official_sdk_adapter_returns_raw_shape_for_strict_validation() -> None:
+    response = successful_response()
+    response["answers"]["direct_evidence_present"]["confidence"] = 0.9
+
+    class FakeSdkClient:
+        def __init__(self) -> None:
+            self.call: dict[str, object] = {}
+
+        def system_one(
+            self,
+            state: object,
+            questions: object,
+            *,
+            model: str,
+            timeout: float,
+        ) -> object:
+            self.call = {
+                "state": state,
+                "questions": questions,
+                "model": model,
+                "timeout": timeout,
+            }
+            raw_http_response = SimpleNamespace(content=json.dumps(response).encode())
+            return SimpleNamespace(raw_http_response=raw_http_response)
+
+    client = FakeSdkClient()
+    adapter = TypeSafeJevJudge(client=cast(Any, client))
+    raw = adapter.evaluate(
+        state={"role": "synthetic"},
+        questions=load_shadow_config(CONFIG_PATH).questions,
+        model="jev-1.13.0",
+        timeout_seconds=10.0,
+    )
+
+    raw_answers = cast(Mapping[str, Mapping[str, object]], raw["answers"])
+    assert raw_answers["direct_evidence_present"]["confidence"] == 0.9
+    assert client.call["model"] == "jev-1.13.0"
+    assert client.call["timeout"] == 10.0
 
 
 @given(extra_duplicates=st.integers(min_value=0, max_value=12))

@@ -5,7 +5,7 @@ import json
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from enum import StrEnum
 
 
@@ -277,15 +277,15 @@ def _snapshot_input_hash(
         "minimum_distinct_people": minimum_distinct_people,
         "stale_after_days": stale_after_days,
         "observations": sorted(
-            (_observation_payload(item) for item in observations), key=_sort_key
+            (_observation_payload(item) for item in observations), key=_canonical_sort_key
         ),
     }
     canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode()).hexdigest()
 
 
-def _sort_key(item: Mapping[str, object]) -> tuple[str, str]:
-    return str(item["observation_id"]), str(item["person_id"])
+def _canonical_sort_key(item: Mapping[str, object]) -> str:
+    return json.dumps(item, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
 def _observation_payload(item: ReferenceObservation) -> Mapping[str, object]:
@@ -300,10 +300,16 @@ def _observation_payload(item: ReferenceObservation) -> Mapping[str, object]:
         },
         "employment_status": item.employment_status.value,
         "observation_date": item.observation_date.isoformat(),
-        "source_timestamp": item.source_timestamp.isoformat(),
+        "source_timestamp": item.source_timestamp.astimezone(UTC).isoformat(),
         "evidence_ids": sorted(item.evidence_ids),
         "role_evidence": {
-            category: value for category, value in _evidence_values(item.role_evidence)
+            "primary_role_family": item.role_evidence.primary_role_family,
+            "responsibilities": item.role_evidence.responsibilities,
+            "ownership_scope": item.role_evidence.ownership_scope,
+            "production_operating": item.role_evidence.production_operating,
+            "product_stage": item.role_evidence.product_stage,
+            "domain_problems": item.role_evidence.domain_problems,
+            "technical_environment": item.role_evidence.technical_environment,
         },
     }
 

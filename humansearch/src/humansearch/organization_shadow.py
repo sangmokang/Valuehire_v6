@@ -103,6 +103,22 @@ def load_shadow_config(path: Path) -> ShadowConfig:
     )
     pattern = _mapping(root["pattern"], "pattern")
     thresholds = _mapping(root["thresholds"], "thresholds")
+    _exact_keys(
+        pattern,
+        {"minimum_cohort_size", "minimum_distinct_people", "stale_after_days"},
+        "pattern",
+    )
+    _exact_keys(
+        thresholds,
+        {
+            "score_low_max",
+            "score_high_min",
+            "confidence_floor",
+            "direct_evidence_present",
+            "requires_human_verification",
+        },
+        "thresholds",
+    )
     questions = _validate_questions(_mapping(root["questions"], "questions"))
     model = _text(root["model_version"], "model_version")
     if not _is_pinned_jev_model(model):
@@ -272,24 +288,24 @@ def run_shadow_review(
 
 def _validate_questions(raw: Mapping[str, object]) -> Mapping[str, Mapping[str, Any]]:
     expected = {
-        "primary_role_family",
-        "ownership_scope_similarity",
-        "production_operating_similarity",
-        "product_stage_similarity",
-        "domain_problem_similarity",
-        "technical_environment_similarity",
-        "transferable_experience_strength",
-        "direct_evidence_present",
-        "requires_human_verification",
+        "primary_role_family": "choice",
+        "ownership_scope_similarity": "score",
+        "production_operating_similarity": "score",
+        "product_stage_similarity": "score",
+        "domain_problem_similarity": "score",
+        "technical_environment_similarity": "score",
+        "transferable_experience_strength": "score",
+        "direct_evidence_present": "noul",
+        "requires_human_verification": "noul",
     }
-    _exact_keys(raw, expected, "questions")
+    _exact_keys(raw, set(expected), "questions")
     validated: dict[str, Mapping[str, Any]] = {}
     for name, value in raw.items():
         question = _mapping(value, f"questions.{name}")
         _exact_keys(question, {"type", "instructions", "criteria"}, f"questions.{name}")
         primitive = _text(question["type"], f"questions.{name}.type")
-        if primitive not in {"choice", "score", "noul"}:
-            raise ValueError("unsupported question primitive")
+        if primitive != expected[name]:
+            raise ValueError("question primitive differs from the atomic contract")
         _text(question["instructions"], f"questions.{name}.instructions")
         _validate_question_criteria(name, primitive, question["criteria"])
         validated[name] = dict(question)
