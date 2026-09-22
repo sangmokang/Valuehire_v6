@@ -204,6 +204,17 @@ class VerificationCoreCheckTest(unittest.TestCase):
         self.assertIn("VERIFICATION_CORE_UNCHANGED", cp.stdout)
         self.assertIn("CHECKED:", cp.stdout)
 
+    def test_direct_ci_scanner_tamper_requires_review(self):
+        scanner = self.repo / "scripts/scan-data-exposure.sh"
+        scanner.write_text("#!/usr/bin/env bash\nexit 1\n", encoding="utf-8")
+        base = self.commit("install direct CI scanner")
+        for payload in ("exit 0", "true", "", "echo 'VERDICT: PASS'"):
+            with self.subTest(payload=payload):
+                scanner.write_text("#!/usr/bin/env bash\n" + payload + "\n", encoding="utf-8")
+                head = self.commit("disable direct CI scanner")
+                rc, out = self.workflow_check(base, head)
+                self.assertEqual(rc, 20, out)
+
     def test_core_change_requires_review(self):
         (self.repo / "scripts/verify/other-check.sh").write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
         head = self.commit("core change")

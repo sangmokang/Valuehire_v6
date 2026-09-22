@@ -105,3 +105,17 @@ PR #104의 기준 `fc6beedc78019862bc2f1b3bf4c4ad3bbd8e845b`에는 이 비교기
 3. 보호된 소스 정의로 실행한 실제 PR에서 정상 기능 변경 성공, core 변경의 검토 대기, 동명 가짜 성공 job으로 필수 workflow 실패를 덮지 못함을 확인한다. 이 원격 실증 전에는 integrity/merge-ready 완료 판정을 하지 않는다.
 
 `pull_request_target`는 base 저장소의 신뢰된 workflow 정의를 사용한다. [공식 보안 문서](https://docs.github.com/en/actions/reference/security/securely-using-pull_request_target)는 이 이벤트가 높은 신뢰 권한에서 동작하므로 PR code checkout/실행을 피하라고 설명한다. 현재 workflow는 읽기 권한만 요청하고 checkout·cache·artifact·HEAD 실행을 하지 않는다. 원격 보호 규칙·환경·이벤트 정책을 이번 작업에서 변경하지 않는다.
+
+### 2026-09-22 후속 감사 정정
+
+직접 CI 단계가 호출하는 `scripts/scan-data-exposure.sh`가 핵심 경로에서 빠져 있었다.
+이 파일을 exit 0 / true / 빈 본문 / PASS 출력으로 바꾼 격리 반례 4종에서 기존 workflow 본문은 0을 반환했다.
+핵심 경로에 해당 파일 한 개를 추가하고 같은 반례가 20(검토 필요)을 반환하도록 수정했다.
+이는 경로 누락의 로컬 수정이며 외부 required workflow 설치를 의미하지 않는다.
+
+소유 형태/권한은 후속 조회에서 개인(User)·public·관리자 권한으로 확인했다. 구독 상품은 API null로 미확인이다.
+[공식 required workflows 규칙](https://docs.github.com/en/enterprise-cloud%40latest/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/available-rules-for-rulesets)은 organization/enterprise 수준이다.
+현재 개인 저장소의 필수 check 이름+Actions 앱 지정으로 workflow 정체성을 고정하지 못한다.
+기존의 “소유자/플랜/권한 확인은 범위 밖”은 앞선 단계 기록이며 현재 확인 범위는 위와 같다.
+코드 준비는 검증된 경로 범위에 한정하며, 모든 검증 의존성의 무결성을 증명한 것이 아니다.
+외부 강제 미완료와 merge-ready 아님을 유지한다. suppression #71/#72는 별도 작업으로 남긴다.

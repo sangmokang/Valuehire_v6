@@ -52,6 +52,7 @@ core_paths=(
   "scripts/verify/"
   "scripts/acceptance-*"
   "scripts/acceptance/"
+  "scripts/scan-data-exposure.sh"
   ".github/workflows/"
   "hooks/"
   ".githooks/"
