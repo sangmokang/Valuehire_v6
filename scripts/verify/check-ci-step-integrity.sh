@@ -50,9 +50,27 @@ unless jobs.is_a?(Hash) && !jobs.empty?
   exit 2
 end
 
+# 승인된 실행 제어 계약을 고정한다. 표현식 일반 해석기는 만들지 않는다.
+# main의 run_id는 고유하므로 A 실행 중 B/C 도착에도 pending 교체가 없다.
+# 변경 시 아래 계약과 독립 변이 검사를 함께 검토해야 한다.
+expected_group = "verify-${{ github.event_name }}-${{ github.ref }}-${{ github.ref == \x27refs/heads/main\x27 && github.run_id || \x27branch\x27 }}"
+expected_cancel = "${{ github.ref != \x27refs/heads/main\x27 }}"
+control = doc["concurrency"]
+checked += 1
+unless control.is_a?(Hash) && control.keys.sort == ["cancel-in-progress", "group"] &&
+       control["group"] == expected_group && control["cancel-in-progress"] == expected_cancel
+  errors << "CONCURRENCY_CONTRACT: main 실행별 고유 그룹·이벤트/ref 분리·작업 브랜치 취소 계약 불일치"
+end
+verify_job = jobs["verify"]
+checked += 1
+unless verify_job.is_a?(Hash) && verify_job["timeout-minutes"] == 30
+  errors << "TIMEOUT_CONTRACT: verify job의 시간 상한은 30분이어야 한다"
+end
+
 jobs.each do |job_name, job|
   next unless job.is_a?(Hash)
   checked += 1
+  errors << "JOB_CONCURRENCY: job 수준의 그룹이 workflow 보호를 무력화할 수 있다" if job.key?("concurrency")
   errors << "JOB_CONDITIONAL: jobs.#{job_name} 에 if 가 있다 — job 을 통째로 끌 수 있다" if job.key?("if")
   errors << "JOB_CONTINUE_ON_ERROR: jobs.#{job_name} 이 실패를 무시한다" if job["continue-on-error"]
 
@@ -100,7 +118,7 @@ jobs.each do |job_name, job|
 end
 
 if errors.empty?
-  puts "PASS: 조건부·오류무시 스텝 없음 (job·step #{checked}개 검사)"
+  puts "PASS: 실행 제어 계약 충족·조건부·오류무시 스텝 없음 (job·step #{checked}개 검사)"
   puts "CHECKED: #{checked}"
   exit 0
 else

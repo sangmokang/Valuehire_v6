@@ -11,9 +11,22 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  # 작업 브랜치는 같은 이벤트·ref의 이전 실행을 취소한다.
+  # main은 run_id마다 별도 그룹: cancel-in-progress=false만으로는
+  # 같은 그룹의 대기 실행이 새 실행에 밀려 취소되는 것을 막지 못한다.
+  # push/PR 이벤트도 분리한다. P23은 같은 SHA의 모든 verify 결과를 본다.
+  group: verify-${{ github.event_name }}-${{ github.ref }}-${{ github.ref == 'refs/heads/main' && github.run_id || 'branch' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   verify:
     runs-on: ubuntu-latest
+    # 기본 상한은 360분(6시간)이다. 매달린 스텝이 그만큼 러너를 점유하는 것을 막는다.
+    # 값 근거는 정상 시간이 아니라 '허용되는 최악'이다 — Invoice 게이트 내부 카나리아
+    # (check-invoice-gate.py CANARY_TIMEOUT=900) 가 900초를 다 쓰고 나머지 게이트가
+    # 실측 최댓값(최근 성공 15회 3.2~4.8분)을 써도 약 20분이다. 30분은 그 위 여유다.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
