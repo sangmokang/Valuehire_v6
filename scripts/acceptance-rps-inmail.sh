@@ -217,11 +217,16 @@ run CAC-4-가짜사실차단 scripts/acceptance/rps_inmail_cac4_fabricated.py
 run V1-결함5건회귀 scripts/acceptance/rps_inmail_v1_findings.py
 
 # ── AC-5 회귀 ────────────────────────────────────────────────────
-echo "--- AC-5 회귀: python3 -m unittest tests.test_jd_channels"
-if python3 -m unittest tests.test_jd_channels </dev/null 2>&1 | tail -3 | grep -q '^OK'; then
-  echo "PASS AC-5-회귀"; PASS=$((PASS+1))
+echo "--- AC-5 회귀: python3 -m unittest tests.test_jd_channels tests.test_rps_conditions tests.test_verification_core"
+ac5_out="$(python3 -m unittest tests.test_jd_channels tests.test_rps_conditions tests.test_verification_core 2>&1 </dev/null)"
+ac5_rc=$?
+ac5_checked="$(printf '%s\n' "$ac5_out" | sed -n 's/^Ran \([0-9][0-9]*\) tests.*/\1/p' | tail -1)"
+if [ "$ac5_rc" -eq 0 ] && [ -n "$ac5_checked" ] && [ "$ac5_checked" -ge 1 ]; then
+  echo "$ac5_out" | sed 's/^/     /'
+  echo "PASS AC-5-회귀 (CHECKED $ac5_checked)"; PASS=$((PASS+1))
 else
-  echo "FAIL AC-5-회귀"; python3 -m unittest tests.test_jd_channels </dev/null 2>&1 | tail -20 | sed 's/^/     /'; FAIL=$((FAIL+1))
+  echo "FAIL AC-5-회귀 (rc=$ac5_rc, CHECKED ${ac5_checked:-없음})"
+  echo "$ac5_out" | sed 's/^/     /'; FAIL=$((FAIL+1))
 fi
 
 echo

@@ -79,3 +79,11 @@
 
 - `main` 브랜치 GitHub 보호 규칙의 실제 활성화 여부는 확인하지 않았다(`docs/sot/git-workflow.md` 한계와 동일).
 - 이 표는 2026-08-22 실행 결과의 스냅샷이다. 스크립트가 추가/삭제되면 다시 확인해야 한다.
+
+### 검증 핵심 변경의 별도 검토 상태
+
+`bash scripts/verify/check-verification-core.sh <trusted-base-full-sha> <candidate-head-full-sha>`는 검증 핵심 경로의 추가·변경·삭제·이동을 비교한다. 종료값 0은 지정된 두 커밋 사이 핵심 변경 없음, 20은 `VERIFICATION_CORE_CHANGED`(검토 필요), 2는 입력/조회 실패다. 20은 악성 변경 확정이 아니며 정상적인 검사기 수정도 검토 후 진행할 수 있다. 기능 인수 PASS로 20을 덮어쓰지 않는다.
+
+신뢰 조건: 검토된 비교기 사본과 base/head 선택 및 호출 배선은 후보 HEAD 밖에서 관리해야 한다. 후보 HEAD의 비교기를 실행한 결과는 자기 신뢰성을 증명하지 못한다. `--allow-same-ref`는 동일 커밋 정상 대조 시험 전용이며 병합 검증에 쓰지 않는다.
+
+PR #104의 기준 `fc6beedc78019862bc2f1b3bf4c4ad3bbd8e845b`에는 이 비교기가 없다. 따라서 현재 추가는 로컬 구현과 회귀 배선이며, 이미 신뢰된 base 검사기나 외부 필수 검사를 설치했다는 뜻이 아니다. 별도 선행 검토/기준 반영과 HEAD 밖 실행 및 필수 체크 설정이 실제 적용되기 전에는 self-bypass finding을 미해결로 둔다. 새 비교기의 회귀는 기존 `acceptance-rps-inmail.sh` AC-5가 조건 회귀와 함께 실행한다.

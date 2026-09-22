@@ -1,4 +1,4 @@
-"""채용 조건이 어떤 표현으로 바뀌어도 사라지지 않았는지 본다.
+"""채용 조건의 핵심 값이 지원 범위 안에서 사라지거나 바뀌지 않았는지 본다.
 
 `_missing_core` 는 단위가 실어나르는 문자열(full/compact/rps)이 원고에 있는지만
 본다. 그래서 `rps` 자체에서 조건을 지우면 "지워진 문장이 나왔다"는 이유로
@@ -29,14 +29,91 @@ CONDITION_RULES: tuple[tuple[str, str], ...] = (
 )
 
 _COMPILED = {label: re.compile(pat) for label, pat in CONDITION_RULES}
+_YEAR = re.compile(r"(?:(경력)\s*)?(\d+)\s*년\s*(이상|이하|차|\*{0,2}\+)?")
+_PROBATION = (
+    re.compile(r"수습\s*(?:기간)?\s*(\d+)\s*개월"),
+    re.compile(r"(\d+)\s*개월(?:의)?\s*수습\s*기간"),
+)
+_EMPLOYMENT = re.compile(r"정규직|계약직|인턴|파트타임|프리랜서")
+
+
+def _year_key(number: str, suffix: str | None) -> str:
+    if suffix in ("이상", "+", "**+"):
+        return f"{number}년 이상"
+    if suffix == "이하":
+        return f"{number}년 이하"
+    if suffix == "차":
+        return f"{number}년차"
+    return f"{number}년"
+
+
+def _years(text: str) -> tuple[str, ...]:
+    found: set[str] = set()
+    for m in _YEAR.finditer(text):
+        # "2026년 8월" 같은 날짜는 연차가 아니다. 경력 또는 이상/차/+가 있을 때만 센다.
+        if m.group(1) or m.group(3):
+            found.add(_year_key(m.group(2), m.group(3)))
+    return tuple(sorted(found))
+
+
+def _terms(rx: re.Pattern[str], text: str) -> tuple[str, ...]:
+    return tuple(sorted(set(rx.findall(text))))
+
+
+def _probation(text: str) -> tuple[str, ...]:
+    found: set[str] = set()
+    for rx in _PROBATION:
+        found.update(f"{m}개월" for m in rx.findall(text))
+    return tuple(sorted(found))
+
+
+def _spec(text: str) -> dict[str, tuple[str, ...]]:
+    return {
+        "labels": tuple(label for label, rx in _COMPILED.items() if rx.search(text)),
+        "years": _years(text),
+        "probation": _probation(text),
+        "employment": _terms(_EMPLOYMENT, text),
+    }
+
+
+def _origin(src: JDSource) -> str:
+    return "\n".join(u.full for u in src.units if u.kind == "core")
+
+
+def _source_text(src: JDSource) -> str:
+    return "\n".join(u.full for u in src.units)
 
 
 def required(src: JDSource) -> list[str]:
     """원문 core 단위에 실제로 있던 조건 라벨. 없던 조건은 요구하지 않는다."""
-    origin = "\n".join(u.full for u in src.units if u.kind == "core")
-    return [label for label, rx in _COMPILED.items() if rx.search(origin)]
+    return list(_spec(_origin(src))["labels"])
 
 
 def missing(src: JDSource, body: str) -> list[str]:
     """원문에는 있었는데 원고에서 사라진 조건 라벨."""
-    return [label for label in required(src) if not _COMPILED[label].search(body)]
+    expected = _spec(_origin(src))
+    sourced = _spec(_source_text(src))
+    actual = _spec(body)
+    notes = [label for label in expected["labels"] if label not in actual["labels"]]
+    for label in actual["labels"]:
+        if label not in sourced["labels"]:
+            notes.append(f"원문에 없는 조건: {label}")
+    for year in expected["years"]:
+        if year not in actual["years"]:
+            notes.append(f"연차 값 누락: {year}")
+    for year in actual["years"]:
+        if year not in sourced["years"]:
+            notes.append(f"원문에 없는 연차 값: {year}")
+    for months in expected["probation"]:
+        if months not in actual["probation"]:
+            notes.append(f"수습 기간 누락: {months}")
+    for months in actual["probation"]:
+        if months not in sourced["probation"]:
+            notes.append(f"원문에 없는 수습 기간: {months}")
+    for term in expected["employment"]:
+        if term not in actual["employment"]:
+            notes.append(f"고용형태 값 누락: {term}")
+    for term in actual["employment"]:
+        if term not in sourced["employment"]:
+            notes.append(f"원문에 없는 고용형태: {term}")
+    return notes

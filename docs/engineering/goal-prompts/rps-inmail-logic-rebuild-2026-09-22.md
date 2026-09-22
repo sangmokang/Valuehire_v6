@@ -191,3 +191,30 @@ python3 -m unittest tests.test_jd_channels
 - JD 원문: `outputs/_sources/wrtn__finance-data-analyst.json`, `outputs/_sources/bunjang__core-product-pm.json`
 - 현재 포털 저장본 장부: `artifacts/portal-edit-20260922/ledger.md`
 - RPS 저장 절차 상세: `~/.claude/skills/linkedin-rps-jd-set-builder/SKILL.md` (R0 Send 금지, R11 Update current, R12 visibility)
+
+## 8. PR #104 인계 재개 계약 — 2026-09-22
+
+현재 결론: 전체 합격 및 병합 가능 판정은 금지합니다. 기능 시험, 검사 신뢰성, 저장소 CI, 병합 준비를 따로 판정합니다. 과거 성공 출력은 현재 실행 증거를 대신하지 않습니다.
+
+판단 근거: 시작 HEAD는 `baf20dc65426e664041d3eee2dddedab29e87dc1`, 원격 base는 `fc6beedc78019862bc2f1b3bf4c4ad3bbd8e845b`입니다. 작업트리는 clean이었습니다. main 미커밋 79개 파일/심링크를 저장소 밖 `Valuehire_v6-session-backup-20260922-101700`에 복사하고 파일 SHA-256/링크 대상을 대조했습니다. main은 수정하지 않습니다.
+
+위험등급 L3. 읽은 정본: strict-workflow.md, coding-principles.md, principles.yaml, verification-commands.md, git-workflow.md, linkedin-rps-inmail.md. AGENTS.md/CLAUDE.md 물리 파일과 work-unit-policy.yaml은 이 작업트리에 없습니다. 제공된 AGENTS 지침을 적용하며 누락 정책을 임의 생성하지 않습니다. 코드 한도는 P11 hard 600줄입니다.
+
+### 이번 작업 단위와 계약
+
+- WU1: When 출력만 필수조건을 삭제·추가·의미 변경하면 조건 검사는 실패해야 합니다. 동의 표현/빈 조건/선택 조건/기존 fixture의 정상 범위를 함께 시험합니다. 입력은 기존 UnitDoc와 본문 문자열, 출력은 Hit 목록이며 JSON/DB/API 스키마 변경은 없습니다. 반례: 원문까지 같이 바꾸고 보존 성공이라고 주장하기, 조건 종류만 일치시키기.
+- WU2: When 검사 핵심 파일이 base 대비 추가·변경·삭제되면 외부에서 보존한 작은 비교기는 `VERIFICATION_CORE_CHANGED` 검토 필요 상태를 반환해야 합니다. 입력은 검토자가 확인한 불변 base/head SHA, 출력은 변경 경로와 종료값입니다. 잘못된 ref/조회 오류는 실패 처리합니다. 비핵심 변경 대조군은 통과해야 합니다. 반례: PASS/VERDICT/CHECKED 출력 위조, 비교기·기준 ref·워크플로 동시 변조. 새 파일은 기존 base에 없는 이상 이미 신뢰된 비교기가 아닙니다. 선행 병합/외부 필수 검사 설정 없이는 신뢰성 해결로 표시하지 않습니다.
+- WU3: When 저장된 RPS ver2를 새로 조회하면 저장 전 canonical 본문과 회사·직무·조건·이메일·URL을 대조해야 합니다. 목록만 확인/로컬 재렌더/저장 알림은 성공이 아닙니다. 허용 정규화는 확인된 서식과 줄바꿈만이며 숫자·조건·URL을 변경하지 않습니다. 원본 부재나 접근 불가는 미검증으로 보존합니다. 후보 발송 금지.
+- WU4: When 최신 SHA CI가 실패하면 기존 문제라도 Repository CI=FAIL, Merge readiness=NOT_READY여야 합니다. suppression 연장·약화·기능 PR에 만료 해결 혼합 금지.
+
+### 검증 및 중단 경계
+
+원칙 로드/검사 원문은 `private-reviews/startup.log`에 명령·시각·SHA·세션과 함께 보존합니다. 인수 원명령은 `bash scripts/verify/run-acceptance.sh scripts/acceptance-rps-inmail.sh`, 회귀는 `python3 -m unittest discover -s tests`입니다. 우회 공격은 mktemp 격리 저장소에서만 수행합니다. V1은 외부 Claude 실행, V2는 새 맥락의 별도 교차검토로 실행 여부를 기록합니다. 같은 엔진 하위 에이전트를 독립 V1로 부르지 않습니다.
+
+제품 배송 상태는 NOT_APPLICABLE(내부 생성/검사 도구, 배포 표면 변경 없음), RPS 저장 조회 결과는 별도 운영 증거입니다. DB 변경 없음. 롤백은 이번 추가 커밋만 역순 revert하며 다른 세션 원본/심링크를 되돌리지 않습니다. 영향 범위는 조건 판정·검증 핵심 변경 탐지·기존 운영 문서이며 새 기능/프레임워크/장부를 추가하지 않습니다.
+
+무엇을 — 기존 코드와 문서의 좁은 보완 및 신뢰 경계의 명시.
+왜 — HEAD가 작성한 성공 문구로 HEAD 검사의 신뢰성을 증명할 수 없습니다.
+버린 길 — 출력 패턴만 더 요구하는 방식은 모든 패턴을 위조하면 우회됩니다.
+대가 — 신뢰된 기준과 외부 실행 강제는 이 PR만으로 성립하지 않을 수 있습니다.
+되돌리기 — 이번 보완 커밋만 revert하고 보존 사본은 유지합니다.

@@ -113,7 +113,7 @@ RPS는 공고판이 아니라 사람과 사람이 연결되는 자리다. 그렇
 | 번개장터 Product Manager (Core Product) | 5 | 10 | 18쌍 | 1,592자 | 1,643자 |
 
 같은 이름의 `ver1.0` 템플릿이 다른 소유자(Sanghyuk Lee) 앞으로 따로 있다. 타인 소유 템플릿은
-수정하지 않고 **Save as new 로 제목을 달리해 ver2 를 새로 만든다**(§5 1항의 예외).
+수정하지 않는다. 당시에는 제목을 달리해 ver2를 신규 저장했지만, 이후 작업은 기존 ver2를 먼저 조회하며 같은 이름으로 추가 생성하지 않는다.
 2026-09-22 실행 결과: `[제안]뤼튼, Finance Data Analyst (FP&A) ver2.0` 신규 저장(섹션 5·불릿 11·볼드 30·1,497자,
 `Anyone in my organization` checked / `Only me` unchecked, Send 미클릭). ver1.0 은 건드리지 않았다.
 
@@ -148,6 +148,6 @@ RPS 컴포저는 Quill 에디터다. 마크다운을 해석하지 않으므로 `
 네이티브 setter 로 넣고 `input`·`change` 를 보낸다. 저장 전 본문 길이·볼드 수·불릿 수·
 섹션 수·별표 0개를 DOM 으로 센다.
 
-타인 소유 템플릿은 수정하지 않는다. `Save as new template` → 템플릿명 입력 →
-`Anyone in my organization` 라디오 클릭 → `Only me=false` 확인 → Save →
-템플릿 재검색으로 Owner·Updated 확인.
+타인 소유 템플릿은 수정하지 않는다. 저장이 승인된 경우에도 회사·직무·소유자·기존 본문을 먼저 확인하고 같은 대상은 갱신한다. 신규 생성은 기존 대상이 없을 때만 한다. 저장 후 목록 노출이나 성공 알림은 완료 증거가 아니며, 새로 연 본문을 저장 전 원문과 대조해야 한다.
+
+2026-09-22 후속 조회: Settings → Message templates → Shared의 View로 동일 이름 ver2.0 두 행을 각각 열었다. 두 본문 모두 `outputs/run-20260922/rps_inmail_wrtn.txt`와 일치했다. 허용 정규화는 짝지어진 볼드 표식 제거, CRLF→LF, 앞뒤 공백 제거뿐이다. 숫자·조건·URL은 바꾸지 않았다. 정규화 본문 1,445자, 회사·직무·5년+·대체 인정·정규직·수습 3개월·전형 보존. 본문 이메일/URL은 없고, 별도 서명에는 담당자 이메일이 있다. 과거 1,497자 기록 및 안정적 템플릿 ID와의 연결은 미확정이다. 새 저장·삭제·후보 발송은 하지 않았다. 원문 조회 증거는 `private-reviews/rps-fresh-1.json`, `rps-fresh-2.json`, 대조 결과는 `private-reviews/rps-roundtrip-compare.log`에 보존한다.
