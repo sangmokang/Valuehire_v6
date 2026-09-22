@@ -367,6 +367,21 @@ CLI 원인: NotImplementedError: organization shadow CLI is not implemented
   미구현 때문에 실패했다.
 - 이 시점의 테스트를 RED commit에 고정하고 첫 GREEN까지 변경하지 않는다.
 
+### Gate 3 first GREEN
+
+명령: `cd humansearch && uv run --no-sync ruff check src && uv run --no-sync mypy src && uv run --no-sync pytest -q tests/test_organization_shadow.py tests/test_organization_shadow_cli.py`
+
+```text
+All checks passed!
+Success: no issues found in 20 source files
+...................                                                      [100%]
+19 passed in 0.62s
+EXIT_CODE=0
+```
+
+- RED commit `148b5af`의 두 시험 파일은 변경하지 않았다.
+- 이 GREEN은 synthetic 계약·배선 검증이며 Jev 라이브 품질 검증은 아니다.
+
 ## 적대 검증 로그
 
 V1/V2 실행 뒤 명령·시각·세션 식별자·전체 판정·재현표를 이 절에 추가한다.
