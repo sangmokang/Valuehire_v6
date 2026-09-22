@@ -113,6 +113,27 @@ end
 expected_ids = (1..24).map { |n| "P#{n}" } +
   (1..5).map { |n| "§1-B-#{n}" } +
   (1..5).map { |n| "V-#{n}" }
+source_lines = File.readlines(source_file, chomp: true)
+contract_heading = '#### 검증 결과 분리'
+heading_indexes = source_lines.each_index.select { |index| source_lines[index] == contract_heading }
+errors << "VERIFICATION_CONTRACT_SECTION_COUNT: expected=1 actual=#{heading_indexes.length}" unless heading_indexes.length == 1
+contract_lines = []
+if heading_indexes.length == 1
+  source_lines[(heading_indexes.first + 1)..].to_a.each do |line|
+    break if line.match?(/^\#{1,4} /)
+    contract_lines << line if line.start_with?('- ')
+  end
+end
+verification_invariants = [
+  '자동 테스트, LLM 교차검토, 독립 인간 검토는 각각 `PASS / FAIL / NOT_RUN`으로 기록한다.',
+  '실행하지 않은 검증을 `PASS`로 표시하거나 세 채널을 하나의 종합 `PASS`로 합치지 않는다.',
+  '필수 자동 테스트가 `FAIL` 또는 `NOT_RUN`이면 완료로 보고하지 않는다.',
+  '일반 작업의 독립 인간 검토 `NOT_RUN`은 비차단이며, 데이터 삭제·인증/권한·대규모 DB 마이그레이션처럼 goal이 명시한 고위험 작업에서만 독립 인간 검토를 필수화할 수 있다.'
+]
+errors << "VERIFICATION_CONTRACT_LINE_COUNT: expected=4 actual=#{contract_lines.length}" unless contract_lines.length == verification_invariants.length
+verification_invariants.each_with_index do |sentence, index|
+  errors << "VERIFICATION_INVARIANT_#{index + 1}_MISSING" unless contract_lines.include?("- #{sentence}")
+end
 top_keys = %w[id principle mechanism_expected mechanism_found status evidence]
 mechanism_keys = %w[path check stages]
 required_stages = %w[strict pre-push ci]

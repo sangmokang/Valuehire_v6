@@ -6,9 +6,9 @@
 #   CI 는 스크립트를 부르고 종료값만 봤기 때문이다. 종료값 0 은 "검사가 통과했다"와
 #   "검사가 아무것도 하지 않았다"를 구분하지 못한다.
 #
-# 계약: 대상 스크립트가 종료값 0 으로 끝났다면, 표준 출력에 자기가 무엇을 판정했는지
-#       최소 한 줄(PASS 표식) 남겨야 한다. CHECKED 건수를 내는 스크립트는 그 값이
-#       1 이상이어야 한다. 둘 중 하나라도 어기면 이 래퍼가 불합격시킨다.
+# 계약: 대상 스크립트가 종료값 0 으로 끝났더라도 실제 FAIL 줄을 내면 실패다. VERDICT를
+#       쓰는 검사는 정확히 하나의 VERDICT: PASS만 성공이고, 기존 검사는 최소 한 줄의
+#       PASS 표식을 남겨야 한다. CHECKED 건수를 내면 그 값도 1 이상이어야 한다.
 #
 # 막는 것 / 막지 못하는 것:
 #   막는다   — 본문 삭제, `exit 0`, `true`, `: # no-op`, 검사 함수 제거, 조용한 조기 종료
@@ -41,6 +41,20 @@ if [ "$rc" -ne 0 ]; then
   # 원래 실패는 원래 종료값 그대로 넘긴다. 래퍼가 실패 이유를 바꾸지 않는다.
   echo "FAIL(run-acceptance): $target 종료값 $rc"
   exit "$rc"
+fi
+
+fail_lines=$(grep -c '^FAIL:' "$out")
+if [ "$fail_lines" -gt 0 ]; then
+  echo "FAIL(run-acceptance): $target 이 종료값 0 이지만 FAIL 판정 ${fail_lines}건을 출력했다."
+  exit 1
+fi
+
+verdict_lines=$(grep -c '^VERDICT:' "$out")
+if [ "$verdict_lines" -gt 0 ]; then
+  if [ "$verdict_lines" -ne 1 ] || ! grep -qx 'VERDICT: PASS' "$out"; then
+    echo "FAIL(run-acceptance): $target 의 VERDICT는 정확히 하나의 PASS여야 한다 (actual=${verdict_lines})."
+    exit 1
+  fi
 fi
 
 # 종료값 0 인데 판정 근거가 없다 — 이것이 exit 0 치환이 통과하던 구멍이다.

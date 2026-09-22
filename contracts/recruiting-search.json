@@ -1,0 +1,14 @@
+{
+  "version": "2026-09-20",
+  "jobkorea": {
+    "origin": "https://www.jobkorea.co.kr",
+    "search_path": "/corp/person/find",
+    "reset": "#dvbtnReset",
+    "keyword": "#txtKeyword",
+    "submit": "#btnKeywordSearch",
+    "rows": "tr.dvResumeTr",
+    "profile_link": "a.dvResumeLink",
+    "loading_text": "로딩중",
+    "conditions": "#ulConditions"
+  }
+}

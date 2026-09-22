@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Strict 원칙 계약의 정상 fixture, 14개 반례, 500/501 경계를 격리 사본에서 실행한다.
+# Strict 원칙 계약의 정상 fixture, 독립 반례, 500/501 경계를 격리 사본에서 실행한다.
 set -uo pipefail
 
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY \
@@ -58,8 +58,65 @@ expect_principles() {
   fi
 }
 
+mutate_source_once() {
+  local id="$1" needle="$2" replacement="$3"
+  if ruby -e '
+    path, needle, replacement = ARGV
+    source = File.read(path)
+    abort "expected one mutation anchor, got #{source.scan(needle).length}" unless source.scan(needle).length == 1
+    File.write(path, source.sub(needle, replacement))
+  ' "$CASE/docs/sot/coding-principles.md" "$needle" "$replacement"; then
+    return 0
+  fi
+  printf 'FAIL: %s 반례 생성 실패 — 정상 문서로 검사를 계속하지 않음\n' "$id"
+  fail=1
+  return 1
+}
+
+expect_invariant_failure() {
+  local id="$1" invariant="$2" description="$3" rc=0 output=""
+  checked=$((checked + 1))
+  output=$(cd "$CASE" && bash scripts/acceptance-principles-check.sh 2>&1) || rc=$?
+  if [ "$rc" -eq 1 ] && printf '%s\n' "$output" | grep -qx 'VERDICT: FAIL' && \
+     printf '%s\n' "$output" | grep -qx "VERIFICATION_INVARIANT_${invariant}_MISSING" && \
+     printf '%s\n' "$output" | grep -qx 'FAILURES: 1'; then
+    printf 'PASS: %s %s — 독립 FAIL (exit=1)\n' "$id" "$description"
+  else
+    printf 'FAIL: %s %s — 독립 실패 조건 불충족 exit=%s\n%s\n' "$id" "$description" "$rc" "$output"
+    fail=1
+  fi
+}
+
 new_case normal
 expect_principles "FIXTURE-NORMAL" "정상 fixture" 0 PASS
+
+new_case invariant_1_channels
+if mutate_source_once "INVARIANT-1" \
+  '- 자동 테스트, LLM 교차검토, 독립 인간 검토는 각각 `PASS / FAIL / NOT_RUN`으로 기록한다.' \
+  '- 자동 테스트와 LLM 교차검토만 `PASS / FAIL / NOT_RUN`으로 기록한다.'; then
+  expect_invariant_failure "INVARIANT-1" 1 "세 채널 독립 상태 기록 반전"
+fi
+
+new_case invariant_2_no_composite
+if mutate_source_once "INVARIANT-2" \
+  '- 실행하지 않은 검증을 `PASS`로 표시하거나 세 채널을 하나의 종합 `PASS`로 합치지 않는다.' \
+  '- 실행하지 않은 검증을 `PASS`로 표시하고 세 채널을 하나의 종합 `PASS`로 합친다.'; then
+  expect_invariant_failure "INVARIANT-2" 2 "미실행 승격·종합 PASS 금지 반전"
+fi
+
+new_case invariant_3_required_automatic
+if mutate_source_once "INVARIANT-3" \
+  '- 필수 자동 테스트가 `FAIL` 또는 `NOT_RUN`이면 완료로 보고하지 않는다.' \
+  $'- 필수 자동 테스트가 `FAIL` 또는 `NOT_RUN`이어도 완료로 보고한다.\n<!-- decoy: 필수 자동 테스트가 `FAIL` 또는 `NOT_RUN`이면 완료로 보고하지 않는다. -->'; then
+  expect_invariant_failure "INVARIANT-3" 3 "필수 자동 테스트 차단 문장 삭제와 주석 decoy"
+fi
+
+new_case invariant_4_human_review
+if mutate_source_once "INVARIANT-4" \
+  '- 일반 작업의 독립 인간 검토 `NOT_RUN`은 비차단이며, 데이터 삭제·인증/권한·대규모 DB 마이그레이션처럼 goal이 명시한 고위험 작업에서만 독립 인간 검토를 필수화할 수 있다.' \
+  '- 일반 작업의 독립 인간 검토 `NOT_RUN`도 차단하며, 고위험 작업에서도 독립 인간 검토를 필수화할 수 없다.'; then
+  expect_invariant_failure "INVARIANT-4" 4 "일반 비차단·고위험 필수 가능성 반전"
+fi
 
 new_case c1
 rm "$CASE/docs/sot/principles.yaml"
