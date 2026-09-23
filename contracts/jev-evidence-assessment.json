@@ -1,0 +1,23 @@
+{
+  "schema_version": "jev-evidence-assessment-config-v1",
+  "model_version": "jev-1.13.0",
+  "question_version": "evidence-assessment-question-v1",
+  "mapping_version": "evidence-assessment-projection-v2-career",
+  "access_policy_version": "evidence-assessment-access-v2-transfer-allowed-activation-wu3",
+  "confidence_floor": 0.6,
+  "timeout_seconds": 10.0,
+  "live_calls_allowed": false,
+  "limits": {
+    "max_evidence": 5,
+    "max_text_chars": 1500
+  },
+  "source_locator_patterns": {
+    "gmail_rec": "^body:paragraph:[0-9]+$",
+    "gmail_reply": "^body:paragraph:[0-9]+$",
+    "resume_attachment": "^att:[^:\\s]+:page:[0-9]+(:block:[0-9]+)?$",
+    "rps_card": "^card:(experience|education|headline):[0-9]+$",
+    "clickup": "^comment:[A-Za-z0-9]+$",
+    "note": "^note:[0-9]+$",
+    "career_summary": "^career:[0-9]+$"
+  }
+}
