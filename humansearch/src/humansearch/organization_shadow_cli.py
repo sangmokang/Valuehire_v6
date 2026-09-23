@@ -1,15 +1,16 @@
-"""Local-only command line entrypoint for organization shadow review."""
+"""Organization shadow review CLI. Live Jev needs ``--live-jev`` and ``TYPESAFE_API_KEY``;
+``delivery_status`` reports whether a request was attempted."""
 
 import argparse
 import json
 import os
 import sys
 import tempfile
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict
 from datetime import date, datetime
 from pathlib import Path
-from typing import Never
+from typing import Any, Never
 
 from humansearch.organization_reference import (
     CohortKey,
@@ -28,6 +29,32 @@ from humansearch.recruiting_review import (
 )
 
 
+class CountingJudge:
+    """Builds the SDK client right before the first request and counts every attempt, so a
+    timeout or 5xx after sending still reports EXTERNAL_JEV (never under-report delivery)."""
+
+    def __init__(self, factory: Callable[[], TypeSafeJevJudge]) -> None:
+        self.request_attempts = 0
+        self._factory = factory
+        self._judge: TypeSafeJevJudge | None = None
+
+    def evaluate(self, *, state: Mapping[str, object], questions: Mapping[str, Mapping[str, Any]],
+                 model: str, timeout_seconds: float) -> Mapping[str, object]:
+        self._judge = self._judge or self._factory()
+        self.request_attempts += 1
+        return self._judge.evaluate(state=state, questions=questions, model=model,
+                                    timeout_seconds=timeout_seconds)
+
+    def close(self) -> None:
+        if self._judge is not None:
+            self._judge.close()
+
+
+def delivery(judge: CountingJudge | None) -> dict[str, object]:
+    attempts = 0 if judge is None else judge.request_attempts
+    return {"delivery_status": "EXTERNAL_JEV" if attempts else "LOCAL_ONLY", "request_attempts": attempts}
+
+
 class SafeInputError(ValueError):
     """Input error carrying a field name but never the rejected value."""
 
@@ -43,17 +70,24 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--live-jev", action="store_true")
     args = parser.parse_args(argv)
+    judge: CountingJudge | None = None
     try:
         payload = _load_input(args.input)
         config = load_shadow_config(args.config)
-        result = _evaluate(payload, config=config, live_jev=args.live_jev)
-        _write_atomic(args.output, result)
+        if args.live_jev and os.environ.get("TYPESAFE_API_KEY", "").strip():
+            judge = CountingJudge(TypeSafeJevJudge)
+        try:
+            result = _evaluate(payload, config=config, judge=judge)
+        finally:
+            if judge is not None:
+                judge.close()
+        _write_atomic(args.output, {**result, **delivery(judge)})
     except SafeInputError as error:
-        _fail("invalid_input", field=error.field)
+        _fail("invalid_input", judge, field=error.field)
     except (OSError, ValueError, TypeError, json.JSONDecodeError):
-        _fail("invalid_input_or_config")
+        _fail("invalid_input_or_config", judge)
     except Exception:  # noqa: BLE001 - the CLI must not print raw SDK or candidate data.
-        _fail("shadow_execution_failed")
+        _fail("shadow_execution_failed", judge)
     return 0
 
 
@@ -78,7 +112,7 @@ def _load_input(path: Path) -> Mapping[str, object]:
 
 
 def _evaluate(
-    payload: Mapping[str, object], *, config: ShadowConfig, live_jev: bool
+    payload: Mapping[str, object], *, config: ShadowConfig, judge: CountingJudge | None
 ) -> Mapping[str, object]:
     as_of = _date(payload["as_of"], "as_of")
     criteria = _criteria(payload["criteria"])
@@ -103,24 +137,16 @@ def _evaluate(
         minimum_distinct_people=config.minimum_distinct_people,
         stale_after_days=config.stale_after_days,
     )
-    judge = None
-    if live_jev and os.environ.get("TYPESAFE_API_KEY", "").strip():
-        judge = TypeSafeJevJudge()
-    try:
-        result = run_shadow_review(
-            a_review=a_review,
-            jd_evidence=jd_evidence,
-            candidate_evidence=candidate_evidence,
-            pattern_snapshot=snapshot,
-            config=config,
-            judge=judge,
-        )
-    finally:
-        if judge is not None:
-            judge.close()
+    result = run_shadow_review(
+        a_review=a_review,
+        jd_evidence=jd_evidence,
+        candidate_evidence=candidate_evidence,
+        pattern_snapshot=snapshot,
+        config=config,
+        judge=judge,
+    )
     semantic = result.semantic
     return {
-        "delivery_status": "LOCAL_ONLY",
         "a": asdict(result.a_review),
         "semantic": {
             "status": semantic.status.value,
@@ -359,8 +385,9 @@ def _write_atomic(path: Path, payload: Mapping[str, object]) -> None:
             temporary.unlink()
 
 
-def _fail(code: str, *, field: str | None = None) -> Never:
-    payload = {"ok": False, "error_code": code}
+def _fail(code: str, judge: CountingJudge | None, *, field: str | None = None) -> Never:
+    """A failure after a request (e.g. the output write) still reports that data may have left."""
+    payload: dict[str, object] = {"ok": False, "error_code": code, **delivery(judge)}
     if field is not None:
         payload["field"] = field
     print(json.dumps(payload, sort_keys=True), file=sys.stderr)

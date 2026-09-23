@@ -1,0 +1,14 @@
+{
+  "school_tier_version": "school-tier-synthetic-v2",
+  "status": "SYNTHETIC_PLACEHOLDER_OWNER_TO_FILL",
+  "approval": null,
+  "tiers": [{"tier": "T1", "rank": 1, "verdict": "SUPPORTED"}, {"tier": "T2", "rank": 2, "verdict": "PARTIAL"},
+            {"tier": "T3", "rank": 3, "verdict": "PARTIAL"}],
+  "schools": {
+    "합성제일대학교": {"tier": "T1", "synthetic": true},
+    "합성공과대학교": {"tier": "T1", "synthetic": true},
+    "합성중앙대학교": {"tier": "T2", "synthetic": true},
+    "합성지역대학교": {"tier": "T3", "synthetic": true}
+  },
+  "aliases": {"Synthetic First University": "합성제일대학교", "SFU": "합성제일대학교", "합성공대": "합성공과대학교", "Synthetic Central University": "합성중앙대학교"}
+}

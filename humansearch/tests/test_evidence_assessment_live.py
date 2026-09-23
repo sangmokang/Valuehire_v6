@@ -1,0 +1,190 @@
+"""AC-7 failure status, AC-11 local only, AC-12 SDK shape, AC-17 delivery status."""
+
+from __future__ import annotations
+
+import json
+import socket
+from pathlib import Path
+from types import SimpleNamespace
+from typing import Any
+
+import httpx2
+import pytest
+import typesafe_sdk as sdk
+from ea_support import (
+    CONFIG_PATH,
+    FakeJudge,
+    config,
+    constructor_spy,
+    jev_response,
+    live_config,
+    payload,
+    run,
+    run_cli,
+    school_payload,
+)
+
+from humansearch import evidence_assessment_cli as cli
+from humansearch.evidence_assessment import QUESTIONS, load_evidence_config
+from humansearch.organization_shadow_jev import TypeSafeJevJudge
+
+
+class FakeTypeSafeClient:
+    def __init__(self, body: bytes | None = None) -> None:
+        self.body = body if body is not None else json.dumps(jev_response("PARTIAL")).encode()
+        self.calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
+
+    def system_one(self, *args: object, **kwargs: object) -> SimpleNamespace:
+        self.calls.append((args, kwargs))
+        return SimpleNamespace(raw_http_response=SimpleNamespace(content=self.body))
+
+
+def _no_output_on_failure(result: dict[str, Any]) -> None:
+    assert result["assessment"]["verdict"] is None
+    assert result["projection"] is None and result["coverage"] is None
+    assert result["assessment"]["requires_human_review"] is True
+
+
+# AC-7 --------------------------------------------------------------------------------------------
+def test_failure_status_missing_key_is_not_run(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
+    calls = constructor_spy(monkeypatch, FakeJudge())
+    result = run_cli(tmp_path, payload(), "--live-jev", cfg=live_config())
+    assert calls == [] and result["request_attempts"] == 0
+    assert result["assessment"]["status"] == "not_run" and result["assessment"]["error_reason"] is None
+    _no_output_on_failure(result)
+
+
+def test_failure_status_policy_blocks_live_with_key(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("TYPESAFE_API_KEY", "synthetic-key-not-real")
+    calls = constructor_spy(monkeypatch, FakeJudge())
+    assert run_cli(tmp_path, payload(), "--live-jev")["assessment"]["status"] == "not_run"
+    assert calls == []
+    result = run_cli(tmp_path, payload(), "--live-jev", cfg=live_config())
+    assert calls == [1]  # the gate is not vacuous: allowed policy + key + flag builds one client
+    assert result["assessment"]["status"] == "completed"
+
+
+@pytest.mark.parametrize(("error", "reason"), [
+    (sdk.TypeSafeAPITimeoutError(10.0), "timeout"),
+    (sdk.TypeSafeRateLimitError(429, {"detail": "slow"}, httpx2.Headers()), "rate_limited"),
+    (sdk.TypeSafeNotFoundError(404, {"detail": "no model"}, httpx2.Headers()), "model_unavailable"),
+    (sdk.TypeSafeInternalServerError(503, {"detail": "down"}, httpx2.Headers()), "model_unavailable"),
+    (sdk.TypeSafeAuthenticationError(401, {"detail": "bad key"}, httpx2.Headers()), "access_denied"),
+    (RuntimeError("sk-synthetic-secret Ran the payment API on call."), "other"),
+])
+def test_failure_status_error_reasons(error: Exception, reason: str) -> None:
+    result = run(payload(), FakeJudge(raises=error))
+    assert result["assessment"]["status"] == "error"
+    assert result["assessment"]["error_reason"] == reason
+    _no_output_on_failure(result)
+    assert "sk-synthetic-secret" not in json.dumps(result, ensure_ascii=False)
+
+
+@pytest.mark.parametrize("judge", [
+    lambda: FakeJudge(raw=jev_response("SUPPORTED") | {"answers": {}}),
+    lambda: FakeJudge(raw=jev_response("SUPPORTED") | {"answers": {"q1": jev_response("SUPPORTED")[
+        "answers"]["q1"] | {"choice": "MAYBE"}}}),
+    lambda: FakeJudge(raw=jev_response("SUPPORTED", model="jev-1.12.0")),
+    lambda: FakeJudge(raises=sdk.TypeSafeAPIResponseValidationError(200, {}, httpx2.Headers(), "answers")),
+    lambda: TypeSafeJevJudge(client=FakeTypeSafeClient(b"not json")),  # type: ignore[arg-type]
+    lambda: TypeSafeJevJudge(client=FakeTypeSafeClient(b"[]")),  # type: ignore[arg-type]
+], ids=["choice_missing", "undefined_choice", "model_mismatch", "sdk_validation", "json_parse",
+        "non_object"])
+def test_failure_status_invalid_response(judge: Any) -> None:
+    result = run(payload(), judge())
+    assert result["assessment"]["status"] == "invalid_response"
+    assert result["assessment"]["error_reason"] is None
+    _no_output_on_failure(result)
+
+
+@pytest.mark.parametrize("model", ["jev-latest", "jev-1.13", "gpt-1.13.0"])
+def test_failure_status_floating_model_is_rejected(model: str, tmp_path: Path) -> None:
+    (path := tmp_path / "cfg.json").write_text(
+        json.dumps(json.loads(CONFIG_PATH.read_text(encoding="utf-8")) | {"model_version": model}))
+    with pytest.raises(ValueError):
+        load_evidence_config(path)
+
+
+# AC-11 -------------------------------------------------------------------------------------------
+def test_local_only_cli_with_sockets_blocked(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    def refuse(*args: object, **kwargs: object) -> None:
+        raise AssertionError("network attempted")
+
+    monkeypatch.setattr(socket.socket, "connect", refuse)
+    monkeypatch.setattr(socket, "create_connection", refuse)
+    monkeypatch.setenv("TYPESAFE_API_KEY", "synthetic-key-not-real")
+    calls = constructor_spy(monkeypatch, FakeJudge())
+    result = run_cli(tmp_path, payload(), cfg=live_config())  # no --live-jev
+    assert calls == [] and result["assessment"]["status"] == "not_run"
+    assert result["delivery_status"] == "LOCAL_ONLY"
+
+
+# AC-12 -------------------------------------------------------------------------------------------
+def test_sdk_shape_real_adapter_called_once() -> None:
+    client = FakeTypeSafeClient()
+    result = run(payload(), TypeSafeJevJudge(client=client))  # type: ignore[arg-type]
+    assert result["assessment"]["verdict"] == "PARTIAL" and len(client.calls) == 1
+    args, kwargs = client.calls[0]
+    assert len(args) == 2 and args[1] is QUESTIONS
+    assert set(dict(args[0])) == {"requirement", "evidence"}  # type: ignore[call-overload]
+    assert kwargs == {"model": "jev-1.13.0", "timeout": config().timeout_seconds}
+
+
+# AC-17 -------------------------------------------------------------------------------------------
+@pytest.fixture
+def live(monkeypatch: pytest.MonkeyPatch) -> pytest.MonkeyPatch:
+    monkeypatch.setenv("TYPESAFE_API_KEY", "synthetic-key-not-real")
+    return monkeypatch
+
+
+def test_delivery_status_local_without_live_conditions(live: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    calls = constructor_spy(live, FakeJudge())
+    for extra, cfg in (((), live_config()), (("--live-jev",), None)):
+        result = run_cli(tmp_path, payload(), *extra, cfg=cfg)
+        assert (result["delivery_status"], result["request_attempts"], calls) == ("LOCAL_ONLY", 0, [])
+
+
+@pytest.mark.parametrize("judge", [
+    lambda: FakeJudge("SUPPORTED"),
+    lambda: FakeJudge(raises=sdk.TypeSafeInternalServerError(502, {}, httpx2.Headers())),
+    lambda: FakeJudge(raises=sdk.TypeSafeAPITimeoutError(10.0)),
+], ids=["answered", "server_error", "timeout"])
+def test_delivery_status_counts_attempts(judge: Any, live: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    calls = constructor_spy(live, judge())
+    result = run_cli(tmp_path, payload(), "--live-jev", cfg=live_config())
+    assert (result["delivery_status"], result["request_attempts"], calls) == ("EXTERNAL_JEV", 1, [1])
+
+
+def test_delivery_status_school_path_builds_no_client(live: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    calls = constructor_spy(live, FakeJudge())
+    result = run_cli(tmp_path, school_payload("합성제일대학교"), "--live-jev", cfg=live_config())
+    assert result["school_tier"]["tier"] == "T1" and result["assessment"]["verdict"] == "SUPPORTED"
+    assert (result["delivery_status"], result["request_attempts"], calls) == ("LOCAL_ONLY", 0, [])
+
+
+def test_delivery_status_outside_config_cannot_allow_live(live: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    calls = constructor_spy(live, FakeJudge())
+    (tmp_path / "other").mkdir()
+    for path in (tmp_path / "cfg.json", tmp_path / "other" / CONFIG_PATH.name):  # F19: same name elsewhere
+        for allowed, code in ((True, 2), (False, 0)):
+            path.write_text(json.dumps(
+                json.loads(CONFIG_PATH.read_text(encoding="utf-8")) | {"live_calls_allowed": allowed}))
+            run_cli(path.parent, payload(), "--live-jev", "--config", str(path), code=code)
+    assert calls == []
+
+
+def test_delivery_status_survives_output_failure(live: pytest.MonkeyPatch, tmp_path: Path,
+                                                 capsys: pytest.CaptureFixture[str]) -> None:
+    calls = constructor_spy(live, FakeJudge("SUPPORTED"))
+    (source := tmp_path / "in.json").write_text(json.dumps(payload()), encoding="utf-8")
+    (blocker := tmp_path / "file").write_text("x")
+    with pytest.raises(SystemExit):  # the output path sits under a regular file
+        cli.main(["--input", str(source), "--output", str(blocker / "out.json"), "--live-jev"],
+                 config=live_config())
+    assert calls == [1] and '"request_attempts": 1' in capsys.readouterr().err
+
+
+def test_delivery_status_contract_keeps_live_off() -> None:
+    assert json.loads(CONFIG_PATH.read_text(encoding="utf-8"))["live_calls_allowed"] is False
+    assert config().live_calls_allowed is False
