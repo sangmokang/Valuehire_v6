@@ -132,5 +132,7 @@ for key in F:  # the copy must be back to the original bytes
         print(f"FAIL: copy not restored: {F[key]}"); sys.exit(2)
 survivors = rows.count(False)
 print(f"MUTANTS: {len(rows) - 1} (+1 probe) SURVIVORS: {survivors} RESTORED: yes")
+print(f"FAIL: {survivors} mutant(s) survived" if survivors else f"PASS: all {len(rows) - 1} mutants killed")
+print(f"CHECKED: {len(rows) - 1}")  # run-acceptance.sh needs a verdict line and a nonzero count
 sys.exit(1 if survivors else 0)
 PYEOF
