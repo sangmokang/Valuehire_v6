@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 계약: docs/engineering/jev-evidence-assessment-wu1-goal-2026-09-23.md (F12, v7 F16~F19·S1~S2)
+# 계약: docs/engineering/jev-evidence-assessment-wu1-goal-2026-09-23.md (F12, v7 F16~F19·S1~S3)
 # 방어 지점마다 한 곳을 고장 낸 mktemp 사본에서, 생산 호출 형태(assess_evidence·CLI main) 인수 시험이
 # 실패하는지 본다. 변이마다 원복·__pycache__ 삭제. 탐침(모듈 첫 줄 예외)이 먼저 실패해야 유효하다.
 # exit 0 = 전부 잡힘 | 1 = 생존 또는 탐침 실패 | 2 = 실행 준비 실패 (fail-closed)
@@ -94,13 +94,16 @@ M = [  # (name, file, old, new, selector) — each old string must occur exactly
  ("R5 failure hides attempts", "CLI", '{"ok": False, "error_code": code, **delivery(judge)}', '{"ok": False, "error_code": code}', "delivery_status"),
  ("N26 career start unchecked", "EA", '        _month(record["start"], "career.start", optional=False)\n', "", "evidence_identity"),
  ("F14 output collision unchecked", "CLI", "    if _same_file(args.output, [args.input, args.config, CONTRACT_PATH, *TIER_PATHS.values()]):", "    if False:", "output_collision"),
- ("F14b hard link not compared", "CLI", "(inode is not None and inode == _inode(path))", "False", "output_collision"),
+ ("F14b hard link not compared", "OSC", "(inode is not None and inode == _inode(path))", "False", "output_collision"),
  ("F16 contract dropped from collision list", "CLI", "args.config, CONTRACT_PATH, *TIER_PATHS", "args.config, *TIER_PATHS", "output_collision"),
- ("F17 alias may shadow an entry", "TT", "        if key in entries or key in aliases:", "        if key in aliases:", "table_status"),
- ("F17b aliases may overwrite each other", "TT", "        if key in entries or key in aliases:", "        if key in entries:", "table_status"),
- ("F18 paths compared unresolved", "CLI", "output.resolve() == path.resolve()", "output == path", "output_collision"),
+ ("F17 alias may shadow an entry", "TT", "(key in entries and goal != key) or ", "", "table_status"),
+ ("F17b aliases may overwrite each other", "TT", " or aliases.get(key, goal) != goal", "", "table_status"),
+ ("F17c self alias rejected", "TT", "(key in entries and goal != key)", "key in entries", "accepts_aliases"),
+ ("F17d agreeing aliases rejected", "TT", "aliases.get(key, goal) != goal", "key in aliases", "accepts_aliases"),
+ ("F18 paths compared unresolved", "OSC", "output.resolve() == path.resolve()", "output == path", "output_collision"),
  ("F19 contract matched by file name", "CLI", "path.resolve() != CONTRACT_PATH:", "path.name != CONTRACT_PATH.name:", "delivery_status"),
  ("S1 shadow output always local", "OSC", "{**result, **delivery(judge)}", "{**result, **delivery(None)}", "live_shadow"),
+ ("S3 shadow output collision unchecked", "OSC", "    if _same_file(args.output, [args.input, args.config]):", "    if False:", "never_overwrites"),
  ("S2 shadow failure hides attempts", "OSC", '"error_code": code, **delivery(judge)}', '"error_code": code}', "live_shadow"),
  ("F15 CLI tier flag restored", "CLI", "    args = parser.parse_args(argv)\n", '    parser.add_argument("--school-tiers", type=Path, default=TIER_PATHS["school"])\n    args = parser.parse_args(argv)\n    TIER_PATHS["school"] = args.school_tiers\n', "table_status"),
 ]

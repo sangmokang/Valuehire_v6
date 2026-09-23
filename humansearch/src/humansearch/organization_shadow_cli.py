@@ -71,6 +71,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--live-jev", action="store_true")
     args = parser.parse_args(argv)
     judge: CountingJudge | None = None
+    if _same_file(args.output, [args.input, args.config]):
+        _fail("output_collision", judge)
     try:
         payload = _load_input(args.input)
         config = load_shadow_config(args.config)
@@ -360,6 +362,21 @@ def _datetime(value: object, field: str) -> datetime:
         return datetime.fromisoformat(_text(value, field))
     except ValueError as error:
         raise SafeInputError(field) from error
+
+
+def _same_file(output: Path, sources: Sequence[Path]) -> bool:
+    """F14: equal resolved paths (symlinks) or equal (st_dev, st_ino) (hard links) are one file."""
+    inode = _inode(output)
+    return any(output.resolve() == path.resolve() or (inode is not None and inode == _inode(path))
+               for path in sources)
+
+
+def _inode(path: Path) -> tuple[int, int] | None:
+    try:
+        status = path.stat()
+    except OSError:
+        return None
+    return status.st_dev, status.st_ino
 
 
 def _write_atomic(path: Path, payload: Mapping[str, object]) -> None:
