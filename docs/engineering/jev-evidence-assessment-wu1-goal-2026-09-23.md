@@ -11,6 +11,12 @@ v4가 독립 검증 두 번과 Codex 검토에서 받은 결함 13건(F1~F13)을
 
 - 이 작업이 기대는 기반 9커밋(`6d7afa0` 이하)은 원격에 올라간 적이 없고 원격 검사(CI)를 통과한 적이 없다.
 - 실제 Jev 호출 품질은 확인하지 않았다(`NOT_RUN`). 모든 시험은 가짜 판정기만 쓴다.
+- **라이브 Jev 검증: `NOT_RUN: provider signup/API access unavailable`** (2026-09-24 사장님 확인 — 공급자가 신규 가입·키 발급을
+  막았다). 이것은 결함도 합격도 아니며 완료 조건에서 분리한다. 키가 없으면 두 CLI 모두 종료값 0, `delivery_status: LOCAL_ONLY`,
+  요청 0회, 상태 `not_run`, 판정 없음·사람 검토로 끝난다(실측). 복구 시 최소 절차: ① 공식 경로로 발급한 키를 `TYPESAFE_API_KEY`로
+  주입 ② 사장님 승인 뒤 `contracts/jev-evidence-assessment.json`의 `live_calls_allowed`를 한 건 시험 동안만 `true` ③ 합성 입력 1건으로
+  `python -m humansearch.evidence_assessment_cli --input <합성> --output <tmp> --live-jev` 실행 → `EXTERNAL_JEV`·`request_attempts 1`·
+  모델 `jev-1.13.0`·5상태 중 하나를 확인 ④ 같은 방식으로 `organization_shadow_cli` 1건 ⑤ `live_calls_allowed`를 `false`로 되돌리고 결과를 이 장부에 기록.
 - 학교·회사 등급표 2종은 합성 자리값이라, 사장님이 채워 승인하기 전에는 점수를 내지 않고 사람 검토로 넘긴다.
 - 변경 규모는 지시 한도 1,200줄을 넘는 1,790줄이다. 2026-09-23 사장님이 이번 작업에 한해 1,790줄로 예외
   승인했다(작업 분할 대신. 저장소 원칙 P11은 3,000줄 초과만 절대 금지한다).
