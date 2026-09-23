@@ -1,4 +1,5 @@
 """Both runtimes must load one canonical JD skill and its executable dependencies."""
+import json
 import unittest
 from pathlib import Path
 
@@ -28,6 +29,15 @@ class SharedJDSkillTest(unittest.TestCase):
         self.assertIn('BLOCKED_DEPENDENCY', skill)
         self.assertIn('python3 -m jd_channels packet', skill)
         self.assertIn('python3 -m jd_channels readback', skill)
+
+    def test_linkedin_registration_requires_explicit_storage_without_send(self):
+        contract = json.loads((ROOT / 'contracts/jd-registration.json').read_text())
+        registration = contract['channels']['linkedin_rps']['registration']
+        self.assertEqual(registration['operation'], 'message_template_save')
+        self.assertTrue(registration['requires_explicit_user_request'])
+        self.assertEqual(registration['visibility'], 'Anyone in my organization')
+        self.assertFalse(registration['candidate_send_authorized'])
+        self.assertIn('reopen', registration['completion_evidence'])
 
 
 if __name__ == '__main__':

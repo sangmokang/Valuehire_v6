@@ -1,8 +1,8 @@
 # JD Connected Registration SOT
 
-Last updated: 2026-09-22. Applies to Codex and Claude.
+Last updated: 2026-09-23. Applies to Codex and Claude.
 
-This document is the single source of truth for turning a JD source into candidate-facing registration text and proving that Saramin or JobKorea contains what was intended. Runtime-specific skills should link here instead of copying their own portal logic.
+This document is the single source of truth for turning a JD source into candidate-facing registration text and proving that Saramin/JobKorea positions or a LinkedIn RPS message template contain what was intended. Runtime-specific skills should link here instead of copying their own portal logic.
 
 ## Scope
 
@@ -14,12 +14,13 @@ The workflow covers:
 - deterministic packet generation
 - Aside browser portal entry
 - saved UI readback
+- LinkedIn RPS message-template save and fresh readback when explicitly requested
 - one owner report email per registered position when explicitly requested
 
 
 Live browser operation and final owner-email sending are main-operator-only actions. Subagents or helper lanes may create local owned artifacts, drafts, analyses, and verification inputs, but they must not operate live portal sessions or send owner/candidate emails unless the main operator explicitly transfers that exact action. If a helper sends an outdated or duplicate report, the main operator must send a correction and preserve both message IDs.
 
-The workflow does not imply candidate outreach, bulk posting, unattended login automation, paid actions, ontology/org mapping, or reuse of old company caches unless the user asks for those actions in the current task. When company context is researched for a JD packet or owner report, attempt LinkedIn company/people organization research as a standard company-intelligence step, record the checked LinkedIn pages and visible organization signals, and report access limits or unknowns. Do not infer reporting lines or role ownership from visible employee names unless the profile evidence supports it.
+The workflow does not imply candidate outreach, bulk posting, unattended login automation, paid actions, ontology/org mapping, or reuse of old company caches unless the user asks for those actions in the current task. An explicit position/template registration request authorizes the requested portal writes and readback, but not any candidate proposal or InMail send. When company context is researched for a JD packet or owner report, attempt LinkedIn company/people organization research as a standard company-intelligence step, record the checked LinkedIn pages and visible organization signals, and report access limits or unknowns. Do not infer reporting lines or role ownership from visible employee names unless the profile evidence supports it.
 
 ## Source Identity
 
@@ -166,6 +167,8 @@ Gmail candidate copy has no portal or RPS length cap. Produce a standalone messa
 
 Use 1,900 characters as an internal authoring limit, not a claim about the latest platform limit. Count the exact scope as subject + one blank line + body with `measure.compose()`. Keep a compressed company introduction and clear headings for duties, requirements and preferences. Preserve responsibility scope, years, core capabilities, key figures and material conditions; reduce repeated greetings, long endings and CTA repetition before considering any non-core omission. Do not run RPS external actions unless explicitly requested.
 
+When template registration is explicitly requested, use the exact identity `[포지션]{회사명}, {포지션명}` for both template name and subject unless the user supplies another name. Search both personal and shared templates for that exact identity before creation. Save the message template as visible to `Anyone in my organization`, then reload the template-management page, search the exact name, reopen it, and compare template name, subject, body, visibility and measured length. Template registration never authorizes candidate selection or InMail sending.
+
 ## Aside Operation
 
 Use the Aside browser and the user's existing logged-in portal sessions. The main operator owns live browser work; do not delegate live portal manipulation to subagents. Do not implement or call legacy automatic login, fixed browser credentials, old CDP snippets, or employment defaults.
@@ -186,6 +189,8 @@ After saving:
 - normalize only documented portal transformations
 - compare against the packet with the readback CLI
 - preserve screenshot/HTML/text artifacts outside git if they contain portal or candidate data
+
+For LinkedIn RPS template registration, a save toast is only intermediate evidence. Reload the message-template page, search the exact name, reopen the saved template, and record exact subject/body/visibility comparison. Do not use a candidate profile or send flow when the template-management page can perform the authorized save directly.
 
 Success messages, toast notifications, and "button clicked" states are not completion evidence.
 
@@ -211,6 +216,7 @@ These are observed portal outcomes, not universal guarantees.
 - JobKorea QA proposal: proposal text measured 1,103 characters and filled exactly on the active proposal screen, but after save-checkbox and reopen it reset to the 112-character default. No candidate was sent. Therefore position status was `COMPLETE`, proposal status was `NOT_SAVED`, and overall status was `PARTIAL`.
 
 - Bunjang Global Team Lead live save: Saramin `1833171`, body fields 1810/1410; JobKorea group `1506767`, final position `1600840`, body fields 1000/715. Permanent fields matched fresh readback. Proposal1503 reset to112 on reopen, so proposal `NOT_SAVED`.
+- Bunjang Global Business Manager LinkedIn RPS template: `[포지션]번개장터, Global Business Manager` saved organization-visible; fresh reload/search/reopen matched template name, subject and 1,051-character body exactly. Internal subject + blank line + body measurement was 1,087/1,900. No candidate InMail was sent.
 
 This observation creates a rule: when JobKorea proposal text is required for a candidate send, replay the proposal packet into the proposal field during that authorized send operation and verify the active proposal screen. Do not mark the whole JobKorea job `COMPLETE` unless both the persisted position fields and the required proposal state are proven for the specific operation. Proposal completion additionally requires `fresh_saved_proposal=true` and a proposal ID; position reopen evidence alone is insufficient.
 
