@@ -187,3 +187,21 @@ def test_live_shadow_output_failure_still_reports_the_request(tmp_path: Path, mo
     error = json.loads(capsys.readouterr().err)
     assert (stop.value.code, judge.calls) == (2, 1)
     assert (error["delivery_status"], error["request_attempts"]) == ("EXTERNAL_JEV", 1)
+
+
+@pytest.mark.parametrize("target", ["input", "config", "input_symlink", "input_hardlink"])
+def test_shadow_output_never_overwrites_input_or_config(target: str, tmp_path: Path,
+                                                        capsys: pytest.CaptureFixture[str]) -> None:
+    (source := tmp_path / "input.json").write_text(json.dumps(synthetic_payload()), encoding="utf-8")
+    (config := tmp_path / "config.json").write_bytes(CONFIG.read_bytes())  # never the repo contract
+    output = {"input": source, "config": config, "input_symlink": tmp_path / "link.json",
+              "input_hardlink": tmp_path / "hard.json"}[target]
+    if target == "input_symlink":
+        output.symlink_to(source)
+    if target == "input_hardlink":
+        os.link(source, output)
+    before = {path: path.read_bytes() for path in (source, config)}
+    with pytest.raises(SystemExit) as stop:
+        shadow_cli.main(["--input", str(source), "--output", str(output), "--config", str(config)])
+    assert stop.value.code == 2 and json.loads(capsys.readouterr().err)["error_code"] == "output_collision"
+    assert {path: path.read_bytes() for path in (source, config)} == before

@@ -32,7 +32,7 @@ from ea_support import (
 )
 
 from humansearch import evidence_assessment_cli as cli
-from humansearch.tier_table import tier_table_from
+from humansearch.tier_table import resolve_tier, tier_table_from
 
 
 # AC-13 -------------------------------------------------------------------------------------------
@@ -194,6 +194,19 @@ def test_table_status_loader_rejects(kind: str, case: str, tmp_path: Path,
     (path := tmp_path / "t.json").write_text(json.dumps(_bad(kind, case), ensure_ascii=False))
     monkeypatch.setattr(cli, "TIER_PATHS", TABLE_PATHS | {kind: path}, raising=False)  # code-only seam
     run_cli(tmp_path, payload(), code=2)
+
+
+@pytest.mark.parametrize("kind", ["school", "company"])
+@pytest.mark.parametrize("case", ["self_alias", "aliases_share_target"])
+def test_table_status_loader_accepts_aliases_that_agree(kind: str, case: str) -> None:
+    """F17 must not reject an alias that resolves to the row it already names."""
+    owner = owner_table(kind)
+    first, *_, last = owner[PLURAL[kind]]
+    extra = {"self_alias": {f" {first} ": first},
+             "aliases_share_target": {"Dup Alias": first, "dupalias": first}}[case]
+    table = tier_table_from(owner | {"aliases": owner["aliases"] | extra}, kind)  # type: ignore[arg-type]
+    assert resolve_tier(["Dup Alias", first], table)[0] == owner[PLURAL[kind]][first]["tier"]
+    assert owner[PLURAL[kind]][first]["tier"] != owner[PLURAL[kind]][last]["tier"]
 
 
 @pytest.mark.parametrize("kind", ["school", "company"])
