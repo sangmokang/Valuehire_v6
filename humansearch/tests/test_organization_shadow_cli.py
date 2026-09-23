@@ -8,6 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).parents[2]
 CONFIG = ROOT / "contracts/jev-org-reference-shadow.json"
+PROJECT = Path(__file__).parents[1]  # the humansearch project, wherever it is copied
 
 
 def synthetic_payload() -> dict[str, object]:
@@ -83,7 +84,7 @@ def test_local_only_cli_runs_real_shadow_entrypoint_and_writes_traceable_ledger(
             str(CONFIG),
             "--live-jev",
         ],
-        cwd=ROOT / "humansearch",
+        cwd=PROJECT,
         env=environment,
         text=True,
         capture_output=True,
@@ -130,7 +131,7 @@ def test_cli_rejects_forbidden_identity_proxy_fields(tmp_path: Path) -> None:
             "--config",
             str(CONFIG),
         ],
-        cwd=ROOT / "humansearch",
+        cwd=PROJECT,
         text=True,
         capture_output=True,
         check=False,
