@@ -270,7 +270,7 @@ def run_shadow_review(
             questions=config.questions,
             model_version=config.model_version,
         )
-    except KeyError, TypeError, ValueError:
+    except (KeyError, TypeError, ValueError):
         semantic = _empty_review(
             config=config,
             input_hash=input_hash,

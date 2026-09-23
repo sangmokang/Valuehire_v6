@@ -50,7 +50,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         _write_atomic(args.output, result)
     except SafeInputError as error:
         _fail("invalid_input", field=error.field)
-    except OSError, ValueError, TypeError, json.JSONDecodeError:
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
         _fail("invalid_input_or_config")
     except Exception:  # noqa: BLE001 - the CLI must not print raw SDK or candidate data.
         _fail("shadow_execution_failed")
