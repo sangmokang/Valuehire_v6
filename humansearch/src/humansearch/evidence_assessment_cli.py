@@ -11,7 +11,7 @@ from typing import Never
 
 from humansearch.evidence_assessment import EvidenceConfig, assess_evidence, load_evidence_config
 from humansearch.organization_shadow import _mapping
-from humansearch.organization_shadow_cli import CountingJudge, _write_atomic, delivery
+from humansearch.organization_shadow_cli import CountingJudge, _same_file, _write_atomic, delivery
 from humansearch.organization_shadow_jev import TypeSafeJevJudge
 from humansearch.tier_table import load_tier_table
 
@@ -58,21 +58,6 @@ def _stop(code: str, judge: CountingJudge | None) -> Never:
     print(json.dumps({"ok": False, "error_code": code, **delivery(judge)}, sort_keys=True),
           file=sys.stderr)
     raise SystemExit(2)
-
-
-def _same_file(output: Path, sources: Sequence[Path]) -> bool:
-    """F14: equal resolved paths (symlinks) or equal (st_dev, st_ino) (hard links) are one file."""
-    inode = _inode(output)
-    return any(output.resolve() == path.resolve() or (inode is not None and inode == _inode(path))
-               for path in sources)
-
-
-def _inode(path: Path) -> tuple[int, int] | None:
-    try:
-        status = path.stat()
-    except OSError:
-        return None
-    return status.st_dev, status.st_ino
 
 
 def _file_config(path: Path) -> EvidenceConfig:

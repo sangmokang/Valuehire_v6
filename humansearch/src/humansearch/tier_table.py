@@ -64,10 +64,11 @@ def tier_table_from(raw: object, kind: Kind) -> TierTable:
         synthetic = synthetic or entry["synthetic"] or _marked(name)
     aliases: dict[str, str] = {}
     for alias, target in _mapping(root["aliases"], "aliases").items():
-        key = normalize_name(_text(alias, "alias"))
-        if key in entries or key in aliases:  # F17: an alias may never shadow a row or another alias
+        key, goal = normalize_name(_text(alias, "alias")), normalize_name(_text(target, "alias"))
+        # F17: an alias may never point a row's name or another alias somewhere else.
+        if (key in entries and goal != key) or aliases.get(key, goal) != goal:
             raise ValueError(f"a tier alias collides with a {kind} name or another alias")
-        aliases[key] = normalize_name(_text(target, "alias"))
+        aliases[key] = goal
     if set(aliases.values()) - set(entries):
         raise ValueError("tier aliases point to an unknown name")
     synthetic = synthetic or any(_marked(alias) for alias in aliases)
