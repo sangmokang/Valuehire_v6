@@ -17,7 +17,7 @@
 
 ### CI(`​.github/workflows/verify.yml`)가 실제로 돌리는 것
 
-**워크플로 스텝 26개 전부**를 적는다(2026-08-12 V1 D6: 이전 판은 `bash ...` 직접 명령만 적어 인라인 본문 스텝이 목록에서 빠졌고, 운영자가 실제로 무엇이 도는지 잘못 판단할 수 있었다). 아래는 `verify.yml` 의 `- name:` 스텝 순서 그대로다.
+**워크플로 스텝 27개 전부**를 적는다(2026-08-12 V1 D6: 이전 판은 `bash ...` 직접 명령만 적어 인라인 본문 스텝이 목록에서 빠졌고, 운영자가 실제로 무엇이 도는지 잘못 판단할 수 있었다). 아래는 `verify.yml` 의 `- name:` 스텝 순서 그대로다.
 
 | # | 스텝 이름 | 실행 내용 |
 |---|---|---|
@@ -47,6 +47,7 @@
 | 24 | 인수 검사 verify-ac-m | `bash scripts/acceptance-verify-ac-m.sh` — mechanism 명부 대조 (AC-M) |
 | 25 | 인수 검사 invoice | `bash scripts/acceptance-invoice.sh` — 채용 수수료 계산·기한·계약 변조·Codex/Claude 스킬 동등성 |
 | 26 | Invoice 독립 런타임 게이트 | 게이트 배선 검사 + Python 단위시험 직접 실행 + 임시 PostgreSQL에서 마이그레이션·수수료 동시성·저장/전달 RPC 검증 |
+| 27 | 인수 검사 hs-0302 | `bash scripts/acceptance-hs-0302.sh` — 후보 식별키 HMAC 의미(구분자 주입 충돌·길이 접두 계약·제어문자 거부) 실행 판정, 키/DB 경로 경계, #97 마이그레이션 무변경, 시험 수집 건수 정확 대조, 자기 fail-closed 음성 대조군 2종, CI 스텝 run 정확 대조(scripts/verify/check-hs-0302-ci-wiring.rb), 필수 node-id 명부 127건과 pytest 수집의 정확 대조(누락·추가 0), 제품 방어 6곳 약화 변이 검출(승인 장부·열린 fd·hard link·경로+fd·pragma 경로·sidecar hard link). 시험·명부·상수를 한 PR 에서 함께 낮추는 동반 약화는 이 검사가 막지 못하며 P13① `weakens-check` 라벨·오너 검토가 담당한다 |
 
 *(1번 앞에 `actions/checkout` 이 있고 `fetch-depth: 0` 이다 — 8번이 과거 blob 을 열려면 필요하다.)*
 

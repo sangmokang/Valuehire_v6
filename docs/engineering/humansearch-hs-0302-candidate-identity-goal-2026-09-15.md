@@ -1,0 +1,130 @@
+# HS-03.02 후보 식별키 중복 없는 기록 — goal (2026-09-15)
+
+위험등급 L3(저장 계층·개인정보 파생값·동시성). 기준은 `task/hs-0301-sqlite-schema-20260914`의 `7473ec8`이며, 제품 배송 상태는 `LOCAL_ONLY`다. 운영 배포·운영 쓰기·실제 후보 원문 저장은 이 WU 범위가 아니다.
+
+## 1층 — 결론
+
+`hs_candidates`에 후보 식별 행을 기록하는 제품 경로를 추가한다. 같은 `(position_ref, channel, candidate_ref)`는 한 행만 남고, 포지션이나 채널이 다르면 별도 행이어야 한다. 두 SQLite 연결이 동시에 같은 키를 넣어도 기본키 제약과 잠금 후 readback으로 `inserted`/`duplicate` 중 하나를 돌려야 한다. 빈 값, 허용 밖 채널, 느슨한 키·DB·sidecar 경계, Git 안 DB, symlink, 검사 뒤 경계 변경은 닫힌 오류로 거부한다. 11차 보강은 Git 밖의 0700/0600 호환 DB라도 `StorageSchemaResult.protected_root`가 승인한 root가 아니면 거부하고, connect 직전 DB 경로를 다른 호환 DB symlink로 바꿨다가 되돌리는 swap-back 경쟁도 거부하도록 고정한다. 12차는 승인 root를 호출자 인자가 아니라 초기화 장부에 결합한다 — `approved_root=db_path.parent`로 스스로 채운 값과 승인 root 안의 다른 파일명도 거부한다.
+
+## 2층 — 판단 근거
+
+기준 스키마의 `hs_candidates` 기본키는 `candidate_key_hmac` 하나다. 새 마이그레이션 없이 중복을 막으려면 세 식별값을 모두 HMAC 입력에 넣고 SQLite 기본키를 그대로 사용해야 한다. 응용 코드의 선조회 뒤 INSERT 방식은 두 연결이 동시에 "없음"을 볼 수 있어 AC-3을 만족하지 못한다.
+
+검증 중 독립 리뷰는 세 차례 결함을 닫았다. 첫째, DB 마지막 구성요소 symlink와 Unicode 정규화 문제가 있었고 길이 접두 HMAC·NFC·마지막 파일 symlink 거부로 닫았다. 둘째, 쓰기 직전 DB 권한·위치 검사와 commit 전 재검증을 추가했다. 셋째, 장기 잠금에서 `SQLITE_BUSY` 원문이 새고 키 경로가 원인 사슬에 남는 문제를 닫힌 도메인 오류와 잠금 후 readback으로 닫았다. 11차 RED(`604974d`)는 "외부 private DB 자동 승인"과 "verify 뒤 connect 대상 swap-back"을 다시 열었고 `e25ac5e`가 닫았다. 다만 그 RED는 `approved_root` 인자가 없어 `TypeError`로 실패한 것이라 빠진 동작을 증명하지 못했고, `approved_root=db_path.parent`로 채우면 어떤 0700/0600 DB든 통과했다. 12차 RED(`3d936fd`)는 이 두 구멍을 "DID NOT RAISE"로 고정하고 `c146b78`이 초기화 장부 결합으로 닫았다.
+
+## 현재 상태
+
+기준 SHA는 `7473ec8c343cb906b3f510c2d50f72dc8004cedd`, 제품 코드는 `humansearch/src/humansearch/candidate_identity.py`다. 기준 `hs_candidates`만 쓰며 새 표·마이그레이션은 없다. 저장값은 HMAC 파생값과 포지션·채널 상태뿐이고 후보 원문·이름·URL·`observed_at`은 저장하지 않는다. 이전 APPROVE·시험은 현재 SHA의 증거로 사용하지 않는다.
+
+## 인수 기준 (EARS)
+
+- AC-1: When 같은 `(position_ref, channel, candidate_ref)`로 2회 기록하면 시스템은 `hs_candidates` 행 1개만 남기고 두 번째 결과를 `duplicate`로 돌려야 한다.
+- AC-2: When `position_ref` 또는 `channel`이 다르면 시스템은 이름·이메일이 같아도 별도 행을 만들어야 한다.
+- AC-3: While SQLite 연결 2개가 같은 키를 동시에 넣으면 시스템은 기본키 제약과 잠금 후 readback으로 1행을 보장하고 진 쪽을 `duplicate`로 돌려야 한다.
+- AC-4: If 세 값 중 하나라도 비거나 `channel`이 허용값 밖이면 시스템은 행을 만들지 않고 `CandidateIdentityError`를 내야 한다.
+- AC-5: When DB 또는 key path가 Git 안, symlink, wrong owner, wrong mode, non-regular file, key/DB root 중첩, 또는 검사 뒤 완화 상태이면 시스템은 commit 전에 닫힌 오류로 거부해야 한다.
+- AC-6: When CI·명부·인수 검사·필수 node-id가 약화되면 시스템은 fail-closed로 막아야 한다.
+- AC-7: When 호출자가 Git 밖의 별도 0700 directory와 0600 호환 DB를 직접 넘겨도 그 directory가 trusted `StorageSchemaResult.protected_root`와 같지 않으면 시스템은 행을 만들지 않고 `CandidateIdentityError`를 내야 한다.
+- AC-8: When `_verify_db_boundary`가 끝난 뒤 `sqlite3.connect`가 열기 직전에 DB 경로가 다른 호환 DB symlink로 바뀌었다가 곧바로 원상복구되면 시스템은 원본·대체 DB 어느 쪽에도 행을 만들지 않고 `CandidateIdentityError`를 내야 한다.
+- AC-9: When 호출자가 `approved_root`를 DB 부모 경로로 스스로 채워도 그 root가 이 프로세스에서 `initialize_humansearch_storage`를 통과한 root가 아니면 시스템은 행을 만들지 않고 `CandidateIdentityError`를 내야 한다.
+- AC-10: When 승인 root 안이라도 초기화가 돌려준 DB 파일이 아닌 다른 0600 파일을 넘기면 시스템은 행을 만들지 않고 `CandidateIdentityError`를 내야 한다. 초기화 결과의 `(db_path, protected_root)` 쌍은 그대로 `inserted`여야 한다.
+- AC-11: When 승인 DB 파일 또는 sidecar 가 hard link 로 다른 이름을 하나라도 더 가지면(`st_nlink != 1`) 시스템은 쓰기 직전과 확정 전에 행을 만들지 않고 `CandidateIdentityError`를 내야 한다. 밖으로 건 링크와 다른 DB 를 승인 자리에 건 링크 모두 해당한다.
+- AC-12: When 승인 DB 를 치우고 다른 호환 DB 를 같은 이름으로 rename 해 두면(경로·권한·nlink 는 모두 정상) 시스템은 초기화 때 장부에 남긴 파일 정체성(`st_dev`·`st_ino`)과 달라 행을 만들지 않고 `CandidateIdentityError`를 내야 한다.
+- AC-13: When 검사 직후 일반 파일 inode 교체 또는 connect 직후 swap-back이 일어나면 시스템은 connect 동안 새로 열린 OS descriptor 중 승인 inode 를 가리키는 것이 하나도 없을 때 쓰기 전에 닫힌 오류를 내야 한다. 초기화 결과의 정상 DB는 `inserted`여야 한다.
+- AC-15: While 같은 프로세스의 다른 스레드가 무관한 파일을 여닫는 동안에도 시스템은 정상 쓰기를 거부하지 않아야 한다(무관한 descriptor 는 거부 사유가 아니다).
+- AC-16: When `is_file()` 통과 뒤 `stat` 전에 DB 파일이 옮겨지면 시스템은 `FileNotFoundError` 대신 경로 없는 `CandidateIdentityError`를 내야 하고 일반 traceback 에 보호 경로가 남지 않아야 한다.
+- AC-14: When 필수 시험을 지우면 시스템은 명부와 수집 결과의 정확 대조(누락 0·추가 0)로 인수 검사를 거부해야 한다. 시험·명부·상수를 함께 낮추는 동반 약화는 저장소 안 검사기로 막을 수 없으므로(검사기도 같은 PR 에서 바뀐다) P13① `weakens-check` 라벨과 오너 검토가 담당한다.
+
+## counter-AC
+
+- HMAC 입력에서 `position_ref`나 `channel`을 빼서 다른 포지션·다른 채널 후보를 합친다.
+- 구분자 결합으로 필드를 직렬화해 필드 안 구분자 주입이 같은 바이트열을 만든다.
+- 제어문자 strip 또는 Unicode 분해형을 그대로 둬 같은 후보가 다른 키가 된다.
+- NFKC까지 적용해 호환문자만 같은 서로 다른 포털 ID를 한 행으로 합친다.
+- `_verify_db_boundary` 뒤 DB 경로·권한·sidecar를 바꾸고 commit 전에 다시 확인하지 않는다.
+- DB path의 부모가 0700이고 DB가 0600이면 trusted config에서 나온 root인지 보지 않고 승인한다.
+- 열린 연결의 `pragma database_list` main 경로를 승인 DB 경로와 대조하지 않아 swap-back이 검사 뒤 사라진다.
+- 잠금 초과 `sqlite3.OperationalError`나 `FileNotFoundError` 경로를 공개 traceback으로 흘린다.
+- 새 인수 스크립트·CI 스텝·필수 명부·기대 상수를 함께 낮춰 필수 시험을 조용히 지운다.
+- `approved_root=db_path.parent`처럼 호출자가 승인 root를 스스로 채우면 통과한다.
+- 승인 장부 대조나 열린 연결 `pragma database_list` 대조를 지워도 전용 시험이 초록이다(약화 변이 생존).
+- 승인 경로에 다른 호환 DB 를 같은 이름으로 rename 해 두면 경로·권한·nlink 만 보고 승인한다(V1 7회차 결함 1).
+- 열린 연결의 경로만 승인하고 새 descriptor의 inode를 보지 않아 regular-file swap-back이 통과한다.
+- 필수 R5 시험 1개·명부 ID 1개·`MIN_R5_TESTS`와 `EXPECTED_REQUIRED_IDS`를 함께 낮춰도 118/118로 통과한다.
+
+## 입출력·오류·경계 계약
+
+- 입력: `CandidateIdentityInput(position_ref: str, channel: Literal["saramin","jobkorea","linkedin_rps"], candidate_ref: str, observed_at: str)`, `hmac_key_path: Path`, `approved_root: Path`.
+- `approved_root`: `initialize_humansearch_storage(...)`가 검사를 통과한 뒤 프로세스 장부 `_APPROVED_DBS[protected_root] = ApprovedDb(db_path, st_dev, st_ino)`에 남긴 root여야 하고, `db_path`는 그 장부의 바로 그 파일(경로와 정체성)이어야 한다(`storage_schema.approved_db`). 검사 순서는 장부 → symlink 사슬 → owner/mode → regular → hard link → 정체성 → Git 밖 → sidecar 다. 함수는 DB 경로에서 승인 root를 추론하지 않으며, 장부는 같은 프로세스 안의 코드까지 막는 보안 경계가 아니라 경로 입력만으로는 승인이 생기지 않게 하는 설정 결합이다.
+- 정규화: C0·DEL·C1 제어문자는 strip 전에 거부한다. 그 뒤 strip, NFC 정규화를 적용하고 빈 값·길이 초과를 거부한다. NFKC는 사용하지 않는다.
+- `observed_at`: RFC3339 정규식으로 범위를 좁히고 `datetime.fromisoformat`으로 실제 날짜·시각·UTC offset을 확인한다. 검증만 하고 `hs_candidates`에는 저장하지 않는다.
+- HMAC: `b"hs-candidate-key-v2"` 도메인 태그와 세 필드의 4바이트 big-endian 길이 접두 UTF-8 바이트열을 `sha256` HMAC으로 계산한다. 키는 32바이트 이상 raw bytes다.
+- 키 파일: 현재 uid 소유, 부모 0700, 파일 0600, regular file, 전체 상위 사슬 symlink 없음. DB 보호 root와 양방향 포함 관계면 거부한다. 없거나 읽기 실패하면 경로 없는 `CandidateIdentityError`로 닫는다.
+- DB 파일: Git worktree 밖, 현재 uid 소유, 부모 0700, 파일 0600, regular file, 전체 상위 사슬과 마지막 파일 symlink 없음. SQLite sidecar(`-journal`, `-wal`, `-shm`)도 같은 owner/mode/root/regular/symlink 규칙으로 본다.
+- DB 승인 root: `db_path.parent == approved_root`를 검사하고, `approved_root` 자체도 owner 0700 regular directory boundary를 만족해야 한다. Git 밖 0700/0600 DB라도 approved root가 다르면 거부한다.
+- connect 경계: 초기화 장부의 `(st_dev, st_ino)`와 connect 동안 새로 열린 승인 DB descriptor 1개와 검증된 journal/WAL 보조 descriptor의 `os.fstat` 값을 대조한다. `/dev/fd` 열거가 없거나 승인 DB descriptor가 0개·2개 이상·불일치하거나 추가 descriptor가 보호된 sidecar가 아닐 때이면 쓰기 전 실패한다. connect/close descriptor 교체의 자가 경쟁은 lock으로 막는다. `PRAGMA database_list`는 추가 경로 검사일 뿐 inode 증거가 아니다.
+- 동시성: `BEGIN IMMEDIATE` 뒤 INSERT 한 번, commit 직전 `_verify_db_boundary` 재확인. 기본키 충돌만 `duplicate`로 접고 다른 무결성 오류는 그대로 올린다. `SQLITE_BUSY` 뒤 승자 행이 보이면 `duplicate`, 없으면 `CandidateIdentityError("db write lock wait exceeded")`.
+- 오류: `CandidateIdentityError(StorageSchemaError)`. 메시지와 일반 traceback에 `candidate_ref`, `position_ref`, key bytes, HMAC hex, 보호 경로 원문을 넣지 않는다.
+
+공식 근거: [Python sqlite3.connect](https://docs.python.org/3/library/sqlite3.html#sqlite3.connect)는 path/URI만 받으며 열린 FD를 넘기는 공개 API가 없다. [SQLite open_v2](https://www.sqlite.org/c3ref/open.html)는 filename을 열고, [database_list](https://www.sqlite.org/pragma.html#pragma_database_list)는 이름을 반환한다. [Apple fstat](https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man2/fstat.2.html)은 열린 descriptor의 dev/inode를 반환한다.
+실행 근거(macOS 15.7.3, Python 3.14.1, SQLite 3.51.1): `/proc/self/fd` 없음, `/dev/fd` 열거 가능, path 연결 직후 새 일반 파일 FD 1개·승인 inode 일치. int/file-object connect는 TypeError, `/dev/fd/N?mode=rw` URI는 OperationalError. 따라서 URI 우회 대신 단일 새 FD 관측이 불가능하면 fail-closed다.
+
+## 검증 명령
+
+필수: `uv run --frozen pytest tests/test_hs_0302*.py -q`, `uv run --frozen pytest -q`, `uv run --frozen ruff check src tests`, `uv run --frozen mypy src tests`, `bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-0302.sh`, `bash scripts/acceptance-hs-gates-mutations.sh`, `bash scripts/acceptance-hs-gates.sh`, `bash scripts/acceptance-hs-gates-antiforge.sh`, `bash scripts/acceptance-ci-step-integrity.sh`, `bash scripts/acceptance-principles-check.sh`, `git diff --check 7473ec8..HEAD`.
+
+## 검증 장부
+
+이전 장부의 PASS·APPROVE는 역사 기록이며 이번 최종 판정에 사용하지 않는다. 이번 세션의 RED는 `a0a2cdc`에서 R5 2 failed/8 passed와 검사기 변이 1 failed였고, 현재 GREEN은 R5 10 passed·인수 30/30이다. 최종 SHA 검증과 새 V1/V2만 최종 판정한다.
+
+| 단계 | 상태 | 증거 |
+|---|---|---|
+| 1~10차 (~eb0b225) | 역사 | 중복·경쟁·입력·Unicode·CI 배선·명부·DB 경계·키 경로·commit 전 재검증. V1 4·6회차 APPROVE 는 현재 SHA 근거가 아니다(6회차 원문 sha256 `a5feee91…dede`, `private-reviews/hs-0302/`) |
+| 11차 `604974d`→`e25ac5e` | 재검증 | RED 가 `TypeError: unexpected keyword 'approved_root'` 로 실패해 동작 RED 가 아니었고 `approved_root=db_path.parent` 로 채우면 통과했다 |
+| 12~14차 `3d936fd`→`39d12ad` | PASS | 자기승인·다른 파일명(DID NOT RAISE 2)·hard link(2)·rename 교체(1) RED→GREEN, 약화 변이 4종, 마이그레이션 블록 대조, `b25a68d` 전역 검사기 500→600 되돌림 |
+| V1 7회차 Codex @4f88b04 | FAIL→닫음 | 1차 정책 차단 NOT_RUN, 2차 결함 1(rename 교체) → `cc0700e`/`39d12ad`. 원문 sha256 `e102599b…7cc` |
+| V1 8회차 Codex @8c5494b | FAIL→닫음 | 결함 1: is_file 뒤 stat 사이 파일 이동 시 FileNotFoundError 경로 누출 → `e259f68`/`4d28832`. 원문 sha256 `3a7ae037…b61` |
+| 15차 `a0a2cdc`→`80238a3` (병행 세션) | PASS(부분) | 일반 inode 교체·connect 뒤 swap-back RED 2 failed → GREEN, 기준선 검사기 신설, R5 10 passed·인수 30/30 |
+| 16차 `e259f68`→`4d28832` | PASS | RED: 파일 이동 경로 누출 + 무관 fd 오거부(200회 중 18회 실측) 2 failed·39 passed. GREEN: stat 닫힌 오류, `/dev/fd` 판정을 "승인 inode 새 fd 부재" 로만 축소(`_allowed_new_sidecar_fd` 제거). 352 passed, 인수 30/30, 오거부 0/200 |
+| V1 9회차 Codex @c5f5896 | FAIL(환경·절차) | 기능 AC-1~16 전부 PASS, 변이 6종 검출. 결함 1(높음) 전체 pytest 16건은 샌드박스 socket bind 금지 → V2 가 로컬에서 352 passed 로 환경 산물 확정. 결함 2(중간) P5 위반: `e25ac5e`·`2d4722a` 가 RED 뒤 시험 파일 수정(단언 삭제 없음, 설명문·import 위치). 원문 sha256 `bee5161c…f54` |
+| V2 새 맥락 @c5f5896 | FAIL→닫음 | V1 결함 1 불일치(352 passed), 결함 2·설계 지적 재현. 새 변이 18종 중 2종 생존: pragma database_list 경로 대조·sidecar hard link 대조가 무보호 → `2468827` RED(변이 생존) / `a578b62` GREEN(시험 4건, 명부 127, 변이 6종 검출). 두 프로세스 경쟁 10회 1:1. 원문 sha256 `5030ca4b…b28`(private-reviews/hs-0302/v2-verdict-c5f5896-2026-09-16.md) |
+| 17차 기준선 검사기 제거 | PASS | V1·V2 가 모두 지적한 7,303바이트 접두 해시 검사기(오탐: 앞부분 docstring 한 글자 수정에 FAIL, 미탐: 뒤쪽 시험 삭제에 PASS)를 제거하고 AC-14 를 명부 정확 대조 + P13① 라벨로 재정의. 인수 CHECKED 29 rc0 |
+| 최종 코드 SHA 게이트 @3b25ef0 (src 는 c5f5896 과 동일) | PASS | 06:40Z pytest 356 passed·ruff·mypy rc0, 인수 CHECKED 29(변이 6종), ci-step 24 PASS, principles 34, diff --check rc0, 변경량 2,940; applicable gate sweep 06:41:29Z~06:46:50Z 27/27 rc0, 전후 clean. V1·V2 는 c5f5896 대상(코드 동일)이며 최종 SHA 자체의 V1/V2 는 다음 세션 |
+| V1 10회차 Codex @782a0f3 (격리 클론, gpt-5.6-sol) | FAIL(절차) | 제품 결함 0, AC-1~16 전부 PASS, 변이 6종 검출. 결함 1(중간) P5① 절차 위반(아래 D1). 전체 pytest 16건 실패는 샌드박스 socket bind → V2 로컬 356 passed 로 환경 산물 확정. 원문 sha256 `1dec8e18…4278`(private-reviews/hs-0302/v1-round10-verdict-782a0f3-2026-09-16.md) |
+| V2 새 맥락 @782a0f3 | FAIL→후속 WU | V1 PASS 근거 19항목 전부 재현. 인수 변이 목록 밖 새 변이 45종 중 비equivalent 생존 7(중간 1: `candidate_identity.py:222` commit 직전 승인 inode 대조 단독 제거 시 127건 전부 초록 — 변이 사본은 root 밖으로 옮긴 파일에 1행 확정. 낮음 6: L177 경로 노출·512자 상한·키 FIFO·sidecar FIFO·READONLY→duplicate·EXCLUSIVE 잠금 원문). 7건 모두 Claude 가 원본/변이 대조군으로 재현. 처분: 스택 WU `task/hs-0302-r6-survivor-defenses-20260916`(RED `b7f832c`→GREEN, 6차 시험 10건·변이 13종·명부 137). 이 브랜치에 넣지 않은 이유는 P11③ 3,000줄 상한(2,972+약 280). 원문 sha256 `c1ece6e6…3d6a`(private-reviews/hs-0302/v2-round2-verdict-782a0f3-2026-09-16.md) |
+| D1 — P5① 이력 처리 (B: 위반 사실 기록, 2026-09-16) | 위반 기록 | RED `604974d` 뒤 구현 커밋 `e25ac5e` 가 시험 5파일을 수정(호출 도우미에 `approved_root` 인자 추가·설명문 축약, `--unified=0` 실측 assert/pytest.raises 삭제 0·추가 0, `def test_` 수 13/10/9/19/2 동일). RED `a0a2cdc` 뒤 `2d4722a` 가 R5 시험의 제품 모듈 import 를 함수 안으로 이동(단언 변화 0). P5① 검사기는 scripts/hooks/CI 어디에도 없어(rg 0건) 기계 차단은 없었고, 이 행은 위반의 해소가 아니라 사실의 보존이다. A(rebase)는 다른 세션 커밋과 얽혀 실행하지 않았다. 사장님 지시 "문제 해결" 을 B 로 해석했으며, 이 해석이 틀리면 이 행을 지우고 A 를 별도 결정한다 |
+| Codex 적대 리뷰(설계) @3b25ef0 | 6건 | 높음 4: 키 교체 시 같은 후보 중복(키 지문 미결합), /dev/fd 차분은 연결 귀속 증거가 아님(decoy fd), 명부 대조는 동반 약화를 못 막음, 최종 SHA 증거 미기록. 중간 2: 프로세스 로컬 장부(spawn/fork), 프롬프트 v1 결함(R3~R6, v2 815495b 로 수정). 처분은 아래 후속 WU |
+
+## 롤백·영향 반경·데이터 안전
+
+- 롤백: PR 닫기 또는 이 WU 커밋 되돌리기. 마이그레이션 변경이 없어 DB 재초기화는 필요 없다.
+- 영향 반경: `candidate_identity.py`(승인 장부·파일 정체성 결합, hard link 거부), `storage_schema.py`(`ApprovedDb` 장부·`approved_db`), HS-03.02 전용 시험 5파일, 인수 스크립트, CI wiring checker, 필수 node-id 명부, `verify.yml`, verification SOT.
+- 데이터 안전: 후보 원문·이름·URL은 입력·저장·로그에 없다. 저장되는 후보 참조 파생값은 키 기반 HMAC이다. 시험 데이터는 합성이다.
+
+## 결정 카드
+
+**무엇을** — 초기화 장부의 inode와 connect 동안 새로 열린 descriptor 를 `fstat` 으로 대조해 승인 inode 를 연 것이 없으면 쓰기 전에 거부한다.
+
+**무엇을(17차)** — 7,303바이트 접두 해시 기준선 검사기를 제거한다. **왜** — 독립 검증 두 곳이 오탐(정당한 설명문 수정에 FAIL)과 미탐(접두 뒤 시험 삭제에 PASS)을 동시에 실측했고, 검사기 자체가 같은 PR 에서 갱신되므로 동반 약화를 막지 못한다. **버린 길** — 시험 함수별 구조 서명 검사기로 교체(별도 WU 로 미룸), 유지하고 갱신 절차 문서화(오탐이 정상 경로가 돼 진짜 약화도 같은 동작으로 통과). **대가** — 시험·명부·상수를 한 PR 에서 같이 낮추는 약화는 P13① 라벨·오너 검토에만 기댄다. **되돌리기** — `git revert` 로 검사기 두 파일과 인수 배선이 함께 돌아온다.
+**왜** — 경로·PRAGMA에는 실제 열린 inode가 없다.
+**버린 길** — `/proc/self/fd` URI: macOS에 `/proc`가 없고 `/dev/fd` URI도 쓰기 연결에 실패했다.
+**대가** — `/dev/fd` 열거가 불가능한 환경에서는 정상 요청도 거부한다. 무관한 descriptor 는 판정에서 빼므로(16차) 같은 프로세스의 다른 스레드가 여는 파일로 오거부되지 않지만, 같은 프로세스의 악성 코드까지 막는 경계는 아니다.
+**되돌리기** — 로컬 구현 커밋을 revert한다. 스키마·운영 데이터 변경은 없다.
+
+## 후속 WU 로 넘기는 설계 위험 (Codex 적대 리뷰 2026-09-16, 이번 WU 에서 고치지 않음)
+
+- **키 지문 결합** — 같은 (position_ref, channel, candidate_ref) 를 다른 32바이트 키로 기록하면 기본키가 달라 두 행이 남는다. 키 원본·회전은 저장 계약 §4·§11 이 HS-03.03 에 둔 범위라 여기서는 "키 파일은 DB 당 하나, 회전 없음" 을 운영 전제로 적는다. HS-03.03 이 승인 DB 에 키 지문을 결합하고 다른 키로 같은 후보를 넣는 회귀 시험을 가져간다.
+- **/dev/fd 차분은 탐지 휴리스틱** — 다른 스레드가 같은 순간 승인 DB 를 열면(decoy) 교체된 연결도 통과할 수 있다. 같은 프로세스의 악성 코드를 막는 보안 경계가 아니라 설정 실수·경쟁을 잡는 장치로만 부른다. HS-03.04(readback 연결 추가) 전에 decoy fd 변이 시험을 넣고, 연결 귀속 검증(VFS·단일 writer broker)은 별도 결정.
+- **프로세스 로컬 승인 장부** — spawn 워커는 장부가 없어 거부되고 fork 워커는 낡은 장부를 복제한다. 단일 프로세스 writer 를 운영 계약으로 두며 #96 RunnerBoundary 연동 시 spawn/fork/독립 프로세스 회귀 시험을 요구한다.
+- **동반 약화** — 시험·명부·상수를 한 PR 에서 같이 낮추면 인수 검사가 통과한다. 접두 해시 검사기(오탐·미탐)를 복원하지 않고, 기준 커밋에 고정한 구조 서명(함수명+단언 수+raises 대상) 검사기를 별도 WU 로 둔다. 그때까지는 P13① 라벨·오너 검토.
+
+## 후속 WU (2026-09-16 마감 검증에서 파생)
+
+- `task/hs-0302-r6-survivor-defenses-20260916` — V2 생존 방어 7곳의 시험·인수 변이 편입(이 브랜치 위 스택). 착수 프롬프트 v3: `docs/engineering/goal-prompts/hs-0302-r6-next-prompt-2026-09-16.md`(스택 브랜치에 있음).
+- 억제 2건(`ci-transfer-guarantee`·`p13-deletion-blindspot`, expiry 2026-09-15)은 이 WU 범위 밖이며, 해소 전에는 이 브랜치와 main 모두 CI "억제 만료 스캔" 스텝이 빨갛다. 별도 PR.
+
+## 비범위
+
+`docs/sot/strict-workflow.md` 는 main 이 이미 소유하므로 이 브랜치의 사본(4줄 차이)은 제거한다 — 병합 시 main 판이 그대로 남는다.
+
+HS-03.03 암호화 저장, HS-03.04 readback, HS-03.05 삭제, 실제 포털 후보 읽기, #96 `RunnerBoundary` 연동, Supabase, 운영 배포, merge, push.

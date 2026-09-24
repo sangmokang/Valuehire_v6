@@ -16,6 +16,21 @@ _HEX64: Final = "[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f
 _SHA64_CHECK: Final = "glob '" + (_HEX64 * 8) + "'"
 
 
+@dataclass(frozen=True, slots=True)
+class ApprovedDb:
+    """초기화가 승인한 DB 파일 — 경로와 그때의 파일 정체성(st_dev·st_ino)."""
+
+    db_path: Path
+    st_dev: int
+    st_ino: int
+
+
+# 초기화가 승인한 (protected_root → ApprovedDb) 장부. 승인 root 는 이 장부에서만 나온다 —
+# 경로 모양(0700/0600·Git 밖)이 같아도 여기 없으면 승인이 아니고, 같은 이름으로 다른 파일을
+# 바꿔 넣어도(V1 결함 1: rename 교체) 정체성이 달라 승인이 아니다(저장 계약 §3).
+_APPROVED_DBS: dict[Path, ApprovedDb] = {}
+
+
 class StorageSchemaError(ValueError):
     """Closed storage schema setup error without private payload values."""
 
@@ -25,6 +40,7 @@ class StorageSchemaResult:
     """Result returned after schema setup."""
 
     db_path: Path
+    protected_root: Path
     schema_version: int
     applied_migrations: tuple[int, ...]
 
@@ -98,11 +114,20 @@ def initialize_humansearch_storage(
     _verify_existing_sidecars(db_path)
     applied = _apply_schema(db_path)
     _verify_path(db_path, expected_mode=0o600, label="db file")
+    info = db_path.stat(follow_symlinks=False)
+    _APPROVED_DBS[root] = ApprovedDb(db_path, info.st_dev, info.st_ino)
     return StorageSchemaResult(
         db_path=db_path,
+        protected_root=root,
         schema_version=_schema_version(db_path),
         applied_migrations=applied,
     )
+
+
+def approved_db(protected_root: Path) -> ApprovedDb | None:
+    """Return the DB this process initialized under ``protected_root``, else ``None``."""
+
+    return _APPROVED_DBS.get(protected_root)
 
 
 def _prepare_root(root: Path) -> Path:

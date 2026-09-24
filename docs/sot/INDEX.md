@@ -9,6 +9,7 @@
 - [humansearch-l0-surface-contract.md](humansearch-l0-surface-contract.md) — HumanSearch L0 인증 화면 분류의 입력·출력·경계
 - [humansearch-browser-contract.md](humansearch-browser-contract.md) — HumanSearch 상주 브라우저 진단 접속·단일 탭·사용권·사람 개입·채널별 경계
 - [humansearch-evidence-contract.md](humansearch-evidence-contract.md) — HumanSearch 이력서·LinkedIn Recruiter 상세 열람 증거의 출처·구간·전체/부분·NULL/미관측·검색조건·readback 경계
+- [humansearch-storage-contract.md](humansearch-storage-contract.md) — HumanSearch 로컬 원본 저장·권한·readback 경계
 - [invoice.md](invoice.md) — 밸류커넥트 채용 수수료 인보이스의 입력·계산·PDF·개인정보·Gmail 발송 승인 계약
 - [invoice-storage.md](invoice-storage.md) — V4 Supabase 원장 재사용, 고객사·포지션별 수수료 계약, SQLite 미러·동기화 상태 계약
 
