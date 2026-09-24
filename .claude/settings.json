@@ -1,4 +1,15 @@
 {
+  "extraKnownMarketplaces": {
+    "jev-skill": {
+      "source": {
+        "source": "github",
+        "repo": "heyman333/jev-skill"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "jev@jev-skill": true
+  },
   "hooks": {
     "SessionStart": [
       {
@@ -6,6 +17,18 @@
           {
             "type": "command",
             "command": "bash scripts/session-status.sh"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/jev-command-gate.mjs\"",
+            "timeout": 15
           }
         ]
       }

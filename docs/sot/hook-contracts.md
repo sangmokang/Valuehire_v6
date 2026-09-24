@@ -79,3 +79,26 @@
 
 - 6종 위반 시연의 실제 실행 결과·적대검증 판정(V1 조건부 REJECT→승인까지 5차 판정)은 `docs/engineering/hook-enforcement-goal-2026-08-07.md` 실행 결과·적대 검증 로그 절에 있다. 이 문서는 재현하지 않는다.
 - `git push --no-verify` 우회는 구조적으로 탐지 불가(2026-08-07 확정) — CI가 최종 방어선이라는 전제가 깨지면 이 문서 전체가 무효하다.
+
+### `.claude/hooks/jev-command-gate.mjs` (에이전트 PreToolUse · Bash)
+```
+목적  : 에이전트가 실행하려는 셸 명령이 기존 데이터를 복구 불가능하게 지우거나 덮어쓰는지
+        Jev(TypeSafe AI)에 물어 확률을 받고, 기준선 이상이면 실행 전에 막는다.
+        git hook 이 아니라 .claude/settings.json 의 PreToolUse(matcher: Bash) 훅이다.
+호출  : Vercel AI Gateway (https://ai-gateway.vercel.sh/v4/ai/evaluation-model, ai-model-id
+        typesafe-ai/jev). Hobby(무료) 티어 키로 동작한다. 키: AI_GATEWAY_API_KEY (vck_…)
+입력  : stdin JSON {session_id, tool_name, tool_input.command}
+출력  : 확률 < 기준선  → 출력 없음, exit 0 (allow 를 내지 않는다 — 기존 권한 흐름 유지)
+        확률 ≥ 기준선  → hookSpecificOutput.permissionDecision = deny (JEV_GATE_ACTION=ask 면 ask)
+                         사유에 "jev 위험도 <p> ≥ 기준선 <t>" 를 적는다
+        판정 불가(키 없음·HTTP 오류·시간 초과·응답 모양 이상)
+                       → systemMessage "jev 게이트 NOT_RUN: <사유>" (세션·사유당 1회), exit 0
+                         JEV_GATE_ON_ERROR=closed 면 deny
+        설정 오류(JEV_GATE_THRESHOLD 범위 밖 등) → stderr, exit 1 (closed 면 exit 2)
+설정  : JEV_GATE_THRESHOLD(기본 0.45) · JEV_GATE_ACTION(deny|ask) · JEV_GATE_ON_ERROR(open|closed)
+        JEV_GATE_TIMEOUT_MS(기본 5000) · JEV_GATE=off(명시적 비활성) · JEV_ENDPOINT(테스트용)
+한계  : 기본은 fail-open 이다 — 키가 없거나 게이트웨이가 죽으면 검사 없이 진행한다(대신 알린다).
+        확률은 모델 추정이며 권한 체계를 대체하지 않는다. 차단 판정만 추가하고 허용은 하지 않는다.
+        명령 문자열이 외부(Vercel·TypeSafe)로 전송된다. 비밀이 인자로 들어간 명령도 그대로 간다.
+회귀  : scripts/acceptance-jev-gate.sh (로컬 mock 서버로 분기·요청 모양 검사)
+```
