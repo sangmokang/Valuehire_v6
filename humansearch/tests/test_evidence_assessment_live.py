@@ -13,6 +13,7 @@ import pytest
 import typesafe_sdk as sdk
 from ea_support import (
     CONFIG_PATH,
+    ROOT,
     FakeJudge,
     config,
     constructor_spy,
@@ -23,12 +24,14 @@ from ea_support import (
     run_cli,
     school_payload,
 )
+from test_organization_shadow import successful_response
 from typesafe_sdk import TypeSafeClient
-from typesafe_sdk._core.retry import RetryPolicy
 
 from humansearch import evidence_assessment_cli as cli
 from humansearch.evidence_assessment import QUESTIONS, load_evidence_config
+from humansearch.organization_shadow import load_shadow_config
 from humansearch.organization_shadow_jev import TypeSafeJevJudge
+from humansearch.organization_shadow_validation import validate_response
 
 
 class FakeTypeSafeClient:
@@ -211,8 +214,7 @@ def _gateway_spy(monkeypatch: pytest.MonkeyPatch, status: int, body: dict[str, A
 
     def build(**kwargs: Any) -> TypeSafeJevJudge:
         transport = httpx2.Client(transport=httpx2.MockTransport(handler))
-        return TypeSafeJevJudge(client=TypeSafeClient(**kwargs, http_client=transport,
-                                                      retry=RetryPolicy(max_retries=0)))
+        return TypeSafeJevJudge(client=TypeSafeClient(**kwargs, http_client=transport))
 
     monkeypatch.setattr(cli, "TypeSafeJevJudge", build)
     monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
@@ -252,3 +254,21 @@ def test_gateway_key_obeys_policy_off(monkeypatch: pytest.MonkeyPatch, tmp_path:
     result = run_cli(tmp_path, payload(), "--live-jev")  # repository contract: live_calls_allowed false
     assert seen == [] and result["assessment"]["status"] == "not_run"
     assert (result["delivery_status"], result["request_attempts"], result["jev_call"]) == ("LOCAL_ONLY", 0, None)
+
+
+def test_gateway_reflected_key_never_reaches_output(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    body = jev_response("SUPPORTED", model="jev") | {
+        "provider_metadata": {"gateway": {"echo": "Bearer synthetic-gateway-key"}}}
+    seen = _gateway_spy(monkeypatch, 200, body)
+    result = run_cli(tmp_path, payload(), "--live-jev", cfg=live_config())
+    assert len(seen) == 1 and result["assessment"]["status"] == "completed"
+    assert result["jev_call"]["provider_metadata"] is None
+    assert "synthetic-gateway-key" not in (tmp_path / "output.json").read_text(encoding="utf-8")
+
+
+def test_shadow_response_rejects_gateway_metadata() -> None:
+    """Only the evidence assessment path admits the Gateway's provider_metadata."""
+    shadow = load_shadow_config(ROOT / "contracts/jev-org-reference-shadow.json")
+    response = successful_response() | {"provider_metadata": {"gateway": {}}}
+    with pytest.raises(ValueError):
+        validate_response(response, questions=shadow.questions, model_version=shadow.model_version)
