@@ -76,7 +76,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--live-jev", action="store_true")
     args = parser.parse_args(argv)
     judge: CountingJudge | None = None
-    if _same_file(args.output, [args.input, args.config]):
+    if _same_file(args.output, [args.input, args.config, LIVE_POLICY_PATH]):
         _fail("output_collision", judge)
     try:
         payload = _load_input(args.input)
