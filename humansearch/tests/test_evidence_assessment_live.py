@@ -27,6 +27,8 @@ from ea_support import (
 from humansearch import evidence_assessment_cli as cli
 from humansearch.evidence_assessment import QUESTIONS, load_evidence_config
 from humansearch.organization_shadow_jev import TypeSafeJevJudge
+from typesafe_sdk import TypeSafeClient
+from typesafe_sdk._core.retry import RetryPolicy
 
 
 class FakeTypeSafeClient:
@@ -48,6 +50,7 @@ def _no_output_on_failure(result: dict[str, Any]) -> None:
 # AC-7 --------------------------------------------------------------------------------------------
 def test_failure_status_missing_key_is_not_run(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
+    monkeypatch.delenv("AI_GATEWAY_API_KEY", raising=False)
     calls = constructor_spy(monkeypatch, FakeJudge())
     result = run_cli(tmp_path, payload(), "--live-jev", cfg=live_config())
     assert calls == [] and result["request_attempts"] == 0
@@ -128,7 +131,7 @@ def test_sdk_shape_real_adapter_called_once() -> None:
     args, kwargs = client.calls[0]
     assert len(args) == 2 and args[1] is QUESTIONS
     assert set(dict(args[0])) == {"requirement", "evidence"}  # type: ignore[call-overload]
-    assert kwargs == {"model": "jev-1.13.0", "timeout": config().timeout_seconds}
+    assert kwargs == {"model": "jev", "timeout": config().timeout_seconds}
 
 
 # AC-17 -------------------------------------------------------------------------------------------
@@ -188,3 +191,64 @@ def test_delivery_status_survives_output_failure(live: pytest.MonkeyPatch, tmp_p
 def test_delivery_status_contract_keeps_live_off() -> None:
     assert json.loads(CONFIG_PATH.read_text(encoding="utf-8"))["live_calls_allowed"] is False
     assert config().live_calls_allowed is False
+
+
+# Gateway product path ---------------------------------------------------------------------------
+GATEWAY_URL = "https://ai-gateway.vercel.sh/typesafe"
+# Shape observed from the 2026-09-25 synthetic smoke: Gateway adds provider_metadata to the body.
+GATEWAY_METADATA = {"gateway": {"routing": {"originalModelId": "typesafe-ai/jev", "finalProvider": "typesafe-ai",
+                                            "providerAttempts": [{"provider": "typesafe-ai", "statusCode": 200}]},
+                                "generationId": "gen_synthetic"}}
+
+
+def _gateway_spy(monkeypatch: pytest.MonkeyPatch, status: int, body: dict[str, Any]) -> list[str]:
+    """Real SDK client built from the CLI's own arguments; only the HTTP transport is offline."""
+    seen: list[str] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append(f"{request.url.host}{request.url.path} {request.headers['authorization']}")
+        return httpx2.Response(status, json=body)
+
+    def build(**kwargs: Any) -> TypeSafeJevJudge:
+        transport = httpx2.Client(transport=httpx2.MockTransport(handler))
+        return TypeSafeJevJudge(client=TypeSafeClient(**kwargs, http_client=transport,
+                                                      retry=RetryPolicy(max_retries=0)))
+
+    monkeypatch.setattr(cli, "TypeSafeJevJudge", build)
+    monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
+    monkeypatch.setenv("AI_GATEWAY_API_KEY", "synthetic-gateway-key")
+    return seen
+
+
+@pytest.mark.parametrize(("status", "body", "expected"), [
+    (200, jev_response("SUPPORTED", model="jev") | {"provider_metadata": GATEWAY_METADATA}, "completed"),
+    (503, {"detail": "Service temporarily unavailable"}, "error"),
+    (200, jev_response("SUPPORTED", model="jev") | {"provider_metadata": GATEWAY_METADATA, "debug": 1},
+     "invalid_response"),
+    (200, jev_response("SUPPORTED", model="jev") | {"provider_metadata": "not-a-mapping"}, "invalid_response"),
+], ids=["answered", "gateway_503", "unknown_top_key", "metadata_not_object"])
+def test_gateway_product_cli_sends_to_gateway(status: int, body: dict[str, Any], expected: str,
+                                              monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    seen = _gateway_spy(monkeypatch, status, body)
+    result = run_cli(tmp_path, payload(), "--live-jev", cfg=live_config())
+    assert seen == ["ai-gateway.vercel.sh/typesafe/v1/systemone Bearer synthetic-gateway-key"]
+    assert (result["delivery_status"], result["request_attempts"]) == ("EXTERNAL_JEV", 1)
+    assert result["assessment"]["status"] == expected
+    assert (result["projection"] is not None) is (expected == "completed")
+    call = result["jev_call"]
+    assert (call["endpoint"], call["requested_model"]) == (GATEWAY_URL, "jev")
+    if expected == "completed":
+        assert call["response_model"] == "jev" and call["provider_metadata"] == GATEWAY_METADATA
+    assert "synthetic-gateway-key" not in json.dumps(result)
+
+
+def test_gateway_key_obeys_policy_off(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    def refuse(*args: object, **kwargs: object) -> None:
+        raise AssertionError("network attempted")
+
+    monkeypatch.setattr(socket.socket, "connect", refuse)
+    monkeypatch.setattr(socket, "create_connection", refuse)
+    seen = _gateway_spy(monkeypatch, 200, jev_response("SUPPORTED", model="jev"))
+    result = run_cli(tmp_path, payload(), "--live-jev")  # repository contract: live_calls_allowed false
+    assert seen == [] and result["assessment"]["status"] == "not_run"
+    assert (result["delivery_status"], result["request_attempts"], result["jev_call"]) == ("LOCAL_ONLY", 0, None)

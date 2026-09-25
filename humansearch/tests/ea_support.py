@@ -98,7 +98,7 @@ def school_payload(*names: str, career: list[dict[str, object]] | None = None,
                    weight=30, education=[school(name) for name in names], career=career)
 
 
-def jev_response(choice: str, *, confidence: float = 0.9, model: str = "jev-1.13.0") -> dict[str, Any]:
+def jev_response(choice: str, *, confidence: float = 0.9, model: str = "jev") -> dict[str, Any]:
     probabilities = {name: 0.05 for name in VERDICTS} | {choice: 0.8}
     return {"model": model,
             "answers": {"q1": {"type": "choice", "choice": choice,
