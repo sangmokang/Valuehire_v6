@@ -1,4 +1,5 @@
-"""Organization shadow review CLI. Live Jev needs ``--live-jev`` and ``TYPESAFE_API_KEY``;
+"""Organization shadow review CLI. Live Jev needs ``--live-jev``, ``TYPESAFE_API_KEY`` and permission in
+the repository live policy (the evidence assessment contract);
 ``delivery_status`` reports whether a request was attempted."""
 
 import argparse
@@ -12,6 +13,7 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Never
 
+from humansearch.evidence_assessment import load_evidence_config
 from humansearch.organization_reference import (
     CohortKey,
     EmploymentStatus,
@@ -27,6 +29,9 @@ from humansearch.recruiting_review import (
     ExperiencePeriod,
     review_candidate,
 )
+
+# One live switch for every Jev CLI: the evidence assessment CLI reads the same contract.
+LIVE_POLICY_PATH = Path(__file__).resolve().parents[3] / "contracts/jev-evidence-assessment.json"
 
 
 class CountingJudge:
@@ -76,7 +81,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         payload = _load_input(args.input)
         config = load_shadow_config(args.config)
-        if args.live_jev and os.environ.get("TYPESAFE_API_KEY", "").strip():
+        live = args.live_jev and load_evidence_config(LIVE_POLICY_PATH).live_calls_allowed
+        if live and os.environ.get("TYPESAFE_API_KEY", "").strip():
             judge = CountingJudge(TypeSafeJevJudge)
         try:
             result = _evaluate(payload, config=config, judge=judge)

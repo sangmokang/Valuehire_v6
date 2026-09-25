@@ -165,6 +165,9 @@ class _Judge:
 
 def _live_shadow(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, judge: _Judge,
                  output: Path) -> int:
+    policy = json.loads(shadow_cli.LIVE_POLICY_PATH.read_text(encoding="utf-8")) | {"live_calls_allowed": True}
+    (allowed := tmp_path / "live-policy.json").write_text(json.dumps(policy), encoding="utf-8")
+    monkeypatch.setattr(shadow_cli, "LIVE_POLICY_PATH", allowed)
     monkeypatch.setenv("TYPESAFE_API_KEY", "synthetic-key-not-real")
     monkeypatch.setattr(shadow_cli, "TypeSafeJevJudge", lambda: judge)
     (source := tmp_path / "input.json").write_text(json.dumps(synthetic_payload()), encoding="utf-8")
@@ -183,16 +186,21 @@ def test_live_shadow_request_is_recorded_as_external(raises: Exception | None, t
 
 def test_live_shadow_obeys_the_repository_live_policy(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     # The repository contract keeps live calls off, so a key and --live-jev alone must send nothing.
-    built, connects = [], []
+    built: list[int] = []
+    connects: list[int] = []
 
     def refuse(*_: Any, **__: Any) -> None:
         connects.append(1)
         raise OSError("network blocked")
 
+    def build() -> _Judge:
+        built.append(1)
+        return _Judge()
+
     monkeypatch.setattr(socket.socket, "connect", refuse)
     monkeypatch.setattr(socket, "create_connection", refuse)
     monkeypatch.setenv("TYPESAFE_API_KEY", "synthetic-key-not-real")
-    monkeypatch.setattr(shadow_cli, "TypeSafeJevJudge", lambda: built.append(1) or _Judge())
+    monkeypatch.setattr(shadow_cli, "TypeSafeJevJudge", build)
     (source := tmp_path / "input.json").write_text(json.dumps(synthetic_payload()), encoding="utf-8")
     output = tmp_path / "out.json"
     assert shadow_cli.main(["--input", str(source), "--output", str(output), "--config", str(CONFIG),
