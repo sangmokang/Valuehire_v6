@@ -311,3 +311,13 @@ def test_gateway_trace_drops_key_fragments_and_caps_attempts(monkeypatch: pytest
     assert (trace["final_provider"], trace["generation_id"], trace["original_model"]) == (
         None, None, "typesafe-ai/jev")
     assert len(trace["provider_attempts"]) == 10 and trace["provider_attempts_dropped"] == 2
+
+
+def test_direct_key_fragment_is_dropped_too(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    metadata = {"gateway": {"routing": {"finalProvider": "direct-secr"}}}
+    seen = _gateway_spy(monkeypatch, 200, jev_response("SUPPORTED", model="jev") | {"provider_metadata": metadata})
+    monkeypatch.delenv("AI_GATEWAY_API_KEY")
+    monkeypatch.setenv("TYPESAFE_API_KEY", "direct-secret-value")
+    call = run_cli(tmp_path, payload(), "--live-jev", cfg=live_config())["jev_call"]
+    assert seen[0].endswith("Bearer direct-secret-value") and call["endpoint"] == "typesafe-sdk-default"
+    assert call["gateway_trace"]["final_provider"] is None
