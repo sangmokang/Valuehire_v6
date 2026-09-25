@@ -286,3 +286,14 @@ def test_shadow_response_rejects_gateway_metadata() -> None:
     response = successful_response() | {"provider_metadata": {"gateway": {}}}
     with pytest.raises(ValueError):
         validate_response(response, questions=shadow.questions, model_version=shadow.model_version)
+
+
+def test_gateway_trace_drops_free_text_in_listed_fields(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    echo = "Bearer synthetic-gateway-key"
+    metadata = {"gateway": {"generationId": echo, "marketCost": "x" * 65, "routing": {
+        "finalProvider": echo, "modelAttempts": [{"providerAttempts": [
+            {"provider": echo, "statusCode": True, "success": "yes"}]}]}}}
+    _gateway_spy(monkeypatch, 200, jev_response("SUPPORTED", model="jev") | {"provider_metadata": metadata})
+    trace = run_cli(tmp_path, payload(), "--live-jev", cfg=live_config())["jev_call"]["gateway_trace"]
+    assert trace == {"original_model": None, "final_provider": None, "generation_id": None, "market_cost": None,
+                     "provider_attempts": [{"provider": None, "status": None, "success": False}]}
