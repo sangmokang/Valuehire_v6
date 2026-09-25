@@ -209,7 +209,7 @@ GATEWAY_METADATA = {"gateway": {
 GATEWAY_TRACE = {"original_model": "typesafe-ai/jev", "final_provider": "typesafe-ai",
                  "provider_attempts": [{"provider": "digitalocean", "status": 503, "success": False},
                                        {"provider": "typesafe-ai", "status": 200, "success": True}],
-                 "generation_id": "gen_synthetic", "market_cost": "0.000021924"}
+                 "generation_id": "gen_synthetic", "market_cost": "0.000021924", "provider_attempts_dropped": 0}
 
 
 def _gateway_spy(monkeypatch: pytest.MonkeyPatch, status: int, body: dict[str, Any]) -> list[str]:
@@ -296,4 +296,18 @@ def test_gateway_trace_drops_free_text_in_listed_fields(monkeypatch: pytest.Monk
     _gateway_spy(monkeypatch, 200, jev_response("SUPPORTED", model="jev") | {"provider_metadata": metadata})
     trace = run_cli(tmp_path, payload(), "--live-jev", cfg=live_config())["jev_call"]["gateway_trace"]
     assert trace == {"original_model": None, "final_provider": None, "generation_id": None, "market_cost": None,
-                     "provider_attempts": [{"provider": None, "status": None, "success": False}]}
+                     "provider_attempts": [{"provider": None, "status": None, "success": False}],
+                     "provider_attempts_dropped": 0}
+
+
+def test_gateway_trace_drops_key_fragments_and_caps_attempts(monkeypatch: pytest.MonkeyPatch,
+                                                             tmp_path: Path) -> None:
+    attempts = [{"provider": "typesafe-ai", "statusCode": 200, "success": True}] * 12
+    metadata = {"gateway": {"generationId": "gen_gateway-key", "routing": {
+        "finalProvider": "synthetic-ga", "originalModelId": "typesafe-ai/jev",
+        "modelAttempts": [{"providerAttempts": attempts}]}}}
+    _gateway_spy(monkeypatch, 200, jev_response("SUPPORTED", model="jev") | {"provider_metadata": metadata})
+    trace = run_cli(tmp_path, payload(), "--live-jev", cfg=live_config())["jev_call"]["gateway_trace"]
+    assert (trace["final_provider"], trace["generation_id"], trace["original_model"]) == (
+        None, None, "typesafe-ai/jev")
+    assert len(trace["provider_attempts"]) == 10 and trace["provider_attempts_dropped"] == 2
