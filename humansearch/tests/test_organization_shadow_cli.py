@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import socket
 import subprocess
 import sys
 from pathlib import Path
@@ -178,6 +179,26 @@ def test_live_shadow_request_is_recorded_as_external(raises: Exception | None, t
     assert _live_shadow(monkeypatch, tmp_path, judge, output) == 0
     result = json.loads(output.read_text(encoding="utf-8"))
     assert (judge.calls, result["delivery_status"], result["request_attempts"]) == (1, "EXTERNAL_JEV", 1)
+
+
+def test_live_shadow_obeys_the_repository_live_policy(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # The repository contract keeps live calls off, so a key and --live-jev alone must send nothing.
+    built, connects = [], []
+
+    def refuse(*_: Any, **__: Any) -> None:
+        connects.append(1)
+        raise OSError("network blocked")
+
+    monkeypatch.setattr(socket.socket, "connect", refuse)
+    monkeypatch.setattr(socket, "create_connection", refuse)
+    monkeypatch.setenv("TYPESAFE_API_KEY", "synthetic-key-not-real")
+    monkeypatch.setattr(shadow_cli, "TypeSafeJevJudge", lambda: built.append(1) or _Judge())
+    (source := tmp_path / "input.json").write_text(json.dumps(synthetic_payload()), encoding="utf-8")
+    output = tmp_path / "out.json"
+    assert shadow_cli.main(["--input", str(source), "--output", str(output), "--config", str(CONFIG),
+                            "--live-jev"]) == 0
+    result = json.loads(output.read_text(encoding="utf-8"))
+    assert (built, connects, result["delivery_status"], result["request_attempts"]) == ([], [], "LOCAL_ONLY", 0)
 
 
 def test_live_shadow_output_failure_still_reports_the_request(tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
