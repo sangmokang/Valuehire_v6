@@ -34,6 +34,14 @@ Jev 연결
   모델 목록 GET /typesafe/v1/models. 요금은 Vercel 청구.
 - 충돌: 계약 두 개(contracts/jev-evidence-assessment.json, contracts/jev-org-reference-shadow.json)가 model_version
   "jev-1.13.0" 고정이고 evidence_assessment.py 가 고정 버전이 아니면 거부한다(_is_pinned_jev_model).
+- 2026-09-25 AI Gateway 키 발급 완료: 팀 team_NB0uDciuQYLf5akFKK7Sb3pU, 용도 ai-gateway, 끝자리 …4NYg9M, 월 한도 5달러, 90일 만료.
+  값은 macOS 키체인에만 있다: `security find-generic-password -s valuehire-ai-gateway -a sangmokang -w` (출력·커밋 금지, 환경변수로만 주입).
+- 같은 날 GET /typesafe/v1/models (요금 없음) → HTTP 200, 모델은 이름 "jev"(release_date 2026-09-15) 하나뿐. 고정 버전 이름 없음.
+  따라서 계약의 "jev-1.13.0" 고정 규칙과 충돌 → 1단계에서 사장님 결정 필요.
+- Codex 적대 검토(bjfunadwq) 결함 2건 — 2단계보다 먼저 닫는다:
+  [높음] organization_shadow_cli 는 live_calls_allowed 를 보지 않고 --live-jev+키만으로 요청한다 → 게이트웨이 키를 인정하기 전에
+  두 CLI 가 같은 라이브 허용 정책을 따르게 하고, 정책 false 면 요청 0회인 시험을 먼저 만든다.
+  [중간] organization_reference.py:118-125 표본 2명(LIMITED)에서도 B classification=high 가 나온다 → READY 가 아니면 분류를 내지 않는 시험 먼저.
 - 저장소에는 package.json·vercel.json·.vercel 이 없다. Vercel CLI 는 설치돼 있다. EvidenceAssessmentV1 이라는 이름은 없다.
 - 거부한 초안: TypeScript/npm/AI SDK 로 새 evaluateEvidence 모듈을 만드는 프롬프트 — 기존 Python 연결을 중복한다.
 
