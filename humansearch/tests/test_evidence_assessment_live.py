@@ -205,11 +205,11 @@ GATEWAY_METADATA = {"gateway": {
                 "modelAttempts": [{"providerAttempts": [
                     {"provider": "digitalocean", "statusCode": 503, "success": False, "error": "free text"},
                     {"provider": "typesafe-ai", "statusCode": 200, "success": True}]}]},
-    "generationId": "gen_synthetic", "marketCost": "0.000021924"}}
+    "generationId": "gen_01M3D3DW6C", "marketCost": "0.000021924"}}
 GATEWAY_TRACE = {"original_model": "typesafe-ai/jev", "final_provider": "typesafe-ai",
                  "provider_attempts": [{"provider": "digitalocean", "status": 503, "success": False},
                                        {"provider": "typesafe-ai", "status": 200, "success": True}],
-                 "generation_id": "gen_synthetic", "market_cost": "0.000021924", "provider_attempts_dropped": 0}
+                 "generation_id": "gen_01M3D3DW6C", "market_cost": "0.000021924", "provider_attempts_dropped": 0}
 
 
 def _gateway_spy(monkeypatch: pytest.MonkeyPatch, status: int, body: dict[str, Any]) -> list[str]:

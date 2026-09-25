@@ -7,6 +7,7 @@ import json
 import os
 import sys
 from collections.abc import Mapping, Sequence
+from functools import partial
 from pathlib import Path
 from typing import Never
 
@@ -19,6 +20,8 @@ from humansearch.organization_shadow_jev import TypeSafeJevJudge
 from humansearch.tier_table import load_tier_table
 
 GATEWAY_URL = "https://ai-gateway.vercel.sh/typesafe"
+MAX_TRACE_ATTEMPTS = 10
+KEY_RUN = 6
 
 CONTRACT_PATH = Path(__file__).resolve().parents[3] / "contracts/jev-evidence-assessment.json"
 # F15: tier tables come only from the repository; other tables enter through assess_evidence(...).
@@ -83,22 +86,26 @@ def _call_record(judge: CountingJudge | None, settings: EvidenceConfig,
     if judge is None or not judge.request_attempts:
         return None
     response = judge.last_response or {}
+    key = gateway_key or os.environ.get("TYPESAFE_API_KEY", "").strip()
     return {"endpoint": GATEWAY_URL if gateway_key else "typesafe-sdk-default",
             "requested_model": settings.model_version, "response_model": response.get("model"),
-            "gateway_trace": _gateway_trace(response.get("provider_metadata"))}
+            "gateway_trace": _gateway_trace(response.get("provider_metadata"), key)}
 
 
-def _gateway_trace(metadata: object) -> dict[str, object] | None:
+def _gateway_trace(metadata: object, key: str) -> dict[str, object] | None:
     """Listed routing facts only: free text (errors, reasoning) could echo request secrets."""
     gateway = _map(_map(metadata).get("gateway"))
     routing = _map(gateway.get("routing"))
-    attempts = [{"provider": _text(a.get("provider")), "status": _status(a.get("statusCode")),
+    text = partial(_text, key=key)
+    attempts = [{"provider": text(a.get("provider")), "status": _status(a.get("statusCode")),
                  "success": a.get("success") is True}
                 for m in _maps(routing.get("modelAttempts")) for a in _maps(m.get("providerAttempts"))]
-    return {"original_model": _text(routing.get("originalModelId")),
-            "final_provider": _text(routing.get("finalProvider")), "provider_attempts": attempts,
-            "generation_id": _text(gateway.get("generationId")),
-            "market_cost": _text(gateway.get("marketCost"))} if gateway else None
+    return {"original_model": text(routing.get("originalModelId")),
+            "final_provider": text(routing.get("finalProvider")),
+            "provider_attempts": attempts[:MAX_TRACE_ATTEMPTS],
+            "provider_attempts_dropped": max(0, len(attempts) - MAX_TRACE_ATTEMPTS),
+            "generation_id": text(gateway.get("generationId")),
+            "market_cost": text(gateway.get("marketCost"))} if gateway else None
 
 
 def _map(value: object) -> Mapping[str, object]:
@@ -109,10 +116,13 @@ def _maps(value: object) -> list[Mapping[str, object]]:
     return [item for item in value if isinstance(item, Mapping)] if isinstance(value, list) else []
 
 
-def _text(value: object) -> str | None:
-    """Identifiers only: provider slugs, generation ids and decimal costs."""
-    safe = isinstance(value, str) and len(value) <= 64 and all(c.isalnum() or c in "_./-" for c in value)
-    return value if safe and isinstance(value, str) else None
+def _text(value: object, *, key: str) -> str | None:
+    """Identifiers only (provider slugs, generation ids, decimal costs), sharing no 6-character run
+    with the key used for the request."""
+    if not (isinstance(value, str) and len(value) <= 64 and all(c.isalnum() or c in "_./-" for c in value)):
+        return None
+    runs = {key[i:i + KEY_RUN] for i in range(len(key) - KEY_RUN + 1)}
+    return None if any(run in value for run in runs) else value
 
 
 def _status(value: object) -> int | None:
