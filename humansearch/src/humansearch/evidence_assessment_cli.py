@@ -10,6 +10,8 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Never
 
+from typesafe_sdk import RetryPolicy
+
 from humansearch.evidence_assessment import EvidenceConfig, assess_evidence, load_evidence_config
 from humansearch.organization_shadow import _mapping
 from humansearch.organization_shadow_cli import CountingJudge, _same_file, _write_atomic, delivery
@@ -67,10 +69,12 @@ def _stop(code: str, judge: CountingJudge | None) -> Never:
 
 
 def _judge(gateway_key: str) -> TypeSafeJevJudge:
-    """The Gateway key wins: direct TypeSafe signup is closed (2026-09-24)."""
+    """The Gateway key wins: direct TypeSafe signup is closed (2026-09-24). SDK retries are off so
+    request_attempts equals HTTP requests; the Gateway already falls back across providers."""
+    once = RetryPolicy(max_retries=0)
     if gateway_key:
-        return TypeSafeJevJudge(api_key=gateway_key, base_url=GATEWAY_URL)
-    return TypeSafeJevJudge()
+        return TypeSafeJevJudge(api_key=gateway_key, base_url=GATEWAY_URL, retry=once)
+    return TypeSafeJevJudge(retry=once)
 
 
 def _call_record(judge: CountingJudge | None, settings: EvidenceConfig,
@@ -79,9 +83,13 @@ def _call_record(judge: CountingJudge | None, settings: EvidenceConfig,
     if judge is None or not judge.request_attempts:
         return None
     response = judge.last_response or {}
+    metadata = response.get("provider_metadata")
+    key = gateway_key or os.environ.get("TYPESAFE_API_KEY", "").strip()
+    if key and key in json.dumps(metadata):
+        metadata = None  # a reflected key must never reach the result file
     return {"endpoint": GATEWAY_URL if gateway_key else "typesafe-sdk-default",
             "requested_model": settings.model_version, "response_model": response.get("model"),
-            "provider_metadata": response.get("provider_metadata")}
+            "provider_metadata": metadata}
 
 
 def _file_config(path: Path) -> EvidenceConfig:

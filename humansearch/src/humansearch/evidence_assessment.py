@@ -277,7 +277,8 @@ def _judge_outcome(requirement_text: str, evidence: tuple[EvidenceItem, ...], co
     except Exception as error:  # noqa: BLE001 - any judge failure must stay a typed shadow status.
         return _Outcome(SemanticStatus.ERROR, error_reason=_error_reason(error))
     try:
-        answers = validate_response(raw, questions=QUESTIONS, model_version=config.model_version)
+        answers = validate_response(raw, questions=QUESTIONS, model_version=config.model_version,
+                                    gateway_metadata=True)
         answer = answers[QUESTION_NAME]
         verdict = EvidenceVerdict(str(answer["choice"]))
     except (KeyError, TypeError, ValueError):
