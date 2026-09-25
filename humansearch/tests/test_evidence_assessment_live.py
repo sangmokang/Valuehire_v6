@@ -199,9 +199,17 @@ def test_delivery_status_contract_keeps_live_off() -> None:
 # Gateway product path ---------------------------------------------------------------------------
 GATEWAY_URL = "https://ai-gateway.vercel.sh/typesafe"
 # Shape observed from the 2026-09-25 synthetic smoke: Gateway adds provider_metadata to the body.
-GATEWAY_METADATA = {"gateway": {"routing": {"originalModelId": "typesafe-ai/jev", "finalProvider": "typesafe-ai",
-                                            "providerAttempts": [{"provider": "typesafe-ai", "statusCode": 200}]},
-                                "generationId": "gen_synthetic"}}
+GATEWAY_METADATA = {"gateway": {
+    "routing": {"originalModelId": "typesafe-ai/jev", "finalProvider": "typesafe-ai",
+                "planningReasoning": "free text",
+                "modelAttempts": [{"providerAttempts": [
+                    {"provider": "digitalocean", "statusCode": 503, "success": False, "error": "free text"},
+                    {"provider": "typesafe-ai", "statusCode": 200, "success": True}]}]},
+    "generationId": "gen_synthetic", "marketCost": "0.000021924"}}
+GATEWAY_TRACE = {"original_model": "typesafe-ai/jev", "final_provider": "typesafe-ai",
+                 "provider_attempts": [{"provider": "digitalocean", "status": 503, "success": False},
+                                       {"provider": "typesafe-ai", "status": 200, "success": True}],
+                 "generation_id": "gen_synthetic", "market_cost": "0.000021924"}
 
 
 def _gateway_spy(monkeypatch: pytest.MonkeyPatch, status: int, body: dict[str, Any]) -> list[str]:
@@ -240,7 +248,7 @@ def test_gateway_product_cli_sends_to_gateway(status: int, body: dict[str, Any],
     call = result["jev_call"]
     assert (call["endpoint"], call["requested_model"]) == (GATEWAY_URL, "jev")
     if expected == "completed":
-        assert call["response_model"] == "jev" and call["provider_metadata"] == GATEWAY_METADATA
+        assert call["response_model"] == "jev" and call["gateway_trace"] == GATEWAY_TRACE
     assert "synthetic-gateway-key" not in json.dumps(result)
 
 
@@ -256,14 +264,20 @@ def test_gateway_key_obeys_policy_off(monkeypatch: pytest.MonkeyPatch, tmp_path:
     assert (result["delivery_status"], result["request_attempts"], result["jev_call"]) == ("LOCAL_ONLY", 0, None)
 
 
-def test_gateway_reflected_key_never_reaches_output(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    body = jev_response("SUPPORTED", model="jev") | {
-        "provider_metadata": {"gateway": {"echo": "Bearer synthetic-gateway-key"}}}
-    seen = _gateway_spy(monkeypatch, 200, body)
+@pytest.mark.parametrize("echo", ["Bearer synthetic-gateway-key", "synthetic-ga", "gateway-key"])
+def test_gateway_reflected_key_never_reaches_output(echo: str, monkeypatch: pytest.MonkeyPatch,
+                                                    tmp_path: Path) -> None:
+    """Free text anywhere in the metadata may echo the key, whole or in part; only listed facts stay."""
+    metadata = {"echo": echo, "gateway": {"echo": echo, "routing": {
+        "planningReasoning": echo, "modelAttempts": [{"providerAttempts": [
+            {"provider": "typesafe-ai", "statusCode": 200, "success": True, "error": echo}]}]}}}
+    seen = _gateway_spy(monkeypatch, 200, jev_response("SUPPORTED", model="jev") | {"provider_metadata": metadata})
     result = run_cli(tmp_path, payload(), "--live-jev", cfg=live_config())
     assert len(seen) == 1 and result["assessment"]["status"] == "completed"
-    assert result["jev_call"]["provider_metadata"] is None
-    assert "synthetic-gateway-key" not in (tmp_path / "output.json").read_text(encoding="utf-8")
+    assert result["jev_call"]["gateway_trace"]["provider_attempts"] == [
+        {"provider": "typesafe-ai", "status": 200, "success": True}]
+    written = (tmp_path / "output.json").read_text(encoding="utf-8")
+    assert echo not in written and "synthetic-ga" not in written
 
 
 def test_shadow_response_rejects_gateway_metadata() -> None:
