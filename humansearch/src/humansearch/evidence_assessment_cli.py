@@ -6,7 +6,7 @@ import argparse
 import json
 import os
 import sys
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Never
 
@@ -83,13 +83,40 @@ def _call_record(judge: CountingJudge | None, settings: EvidenceConfig,
     if judge is None or not judge.request_attempts:
         return None
     response = judge.last_response or {}
-    metadata = response.get("provider_metadata")
-    key = gateway_key or os.environ.get("TYPESAFE_API_KEY", "").strip()
-    if key and key in json.dumps(metadata):
-        metadata = None  # a reflected key must never reach the result file
     return {"endpoint": GATEWAY_URL if gateway_key else "typesafe-sdk-default",
             "requested_model": settings.model_version, "response_model": response.get("model"),
-            "provider_metadata": metadata}
+            "gateway_trace": _gateway_trace(response.get("provider_metadata"))}
+
+
+def _gateway_trace(metadata: object) -> dict[str, object] | None:
+    """Listed routing facts only: free text (errors, reasoning) could echo request secrets."""
+    gateway = _map(_map(metadata).get("gateway"))
+    routing = _map(gateway.get("routing"))
+    attempts = [{"provider": _text(a.get("provider")), "status": _status(a.get("statusCode")),
+                 "success": a.get("success") is True}
+                for m in _maps(routing.get("modelAttempts")) for a in _maps(m.get("providerAttempts"))]
+    return {"original_model": _text(routing.get("originalModelId")),
+            "final_provider": _text(routing.get("finalProvider")), "provider_attempts": attempts,
+            "generation_id": _text(gateway.get("generationId")),
+            "market_cost": _text(gateway.get("marketCost"))} if gateway else None
+
+
+def _map(value: object) -> Mapping[str, object]:
+    return value if isinstance(value, Mapping) else {}
+
+
+def _maps(value: object) -> list[Mapping[str, object]]:
+    return [item for item in value if isinstance(item, Mapping)] if isinstance(value, list) else []
+
+
+def _text(value: object) -> str | None:
+    """Identifiers only: provider slugs, generation ids and decimal costs."""
+    safe = isinstance(value, str) and len(value) <= 64 and all(c.isalnum() or c in "_./-" for c in value)
+    return value if safe and isinstance(value, str) else None
+
+
+def _status(value: object) -> int | None:
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
 
 
 def _file_config(path: Path) -> EvidenceConfig:
