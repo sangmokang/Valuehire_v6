@@ -23,12 +23,12 @@ from ea_support import (
     run_cli,
     school_payload,
 )
+from typesafe_sdk import TypeSafeClient
+from typesafe_sdk._core.retry import RetryPolicy
 
 from humansearch import evidence_assessment_cli as cli
 from humansearch.evidence_assessment import QUESTIONS, load_evidence_config
 from humansearch.organization_shadow_jev import TypeSafeJevJudge
-from typesafe_sdk import TypeSafeClient
-from typesafe_sdk._core.retry import RetryPolicy
 
 
 class FakeTypeSafeClient:

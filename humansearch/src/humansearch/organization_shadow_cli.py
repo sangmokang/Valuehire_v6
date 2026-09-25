@@ -42,13 +42,15 @@ class CountingJudge:
         self.request_attempts = 0
         self._factory = factory
         self._judge: TypeSafeJevJudge | None = None
+        self.last_response: Mapping[str, object] | None = None
 
     def evaluate(self, *, state: Mapping[str, object], questions: Mapping[str, Mapping[str, Any]],
                  model: str, timeout_seconds: float) -> Mapping[str, object]:
         self._judge = self._judge or self._factory()
         self.request_attempts += 1
-        return self._judge.evaluate(state=state, questions=questions, model=model,
-                                    timeout_seconds=timeout_seconds)
+        self.last_response = self._judge.evaluate(state=state, questions=questions, model=model,
+                                                  timeout_seconds=timeout_seconds)
+        return self.last_response
 
     def close(self) -> None:
         if self._judge is not None:

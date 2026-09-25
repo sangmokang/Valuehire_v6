@@ -124,8 +124,9 @@ def load_evidence_config(path: Path) -> EvidenceConfig:
                        "access_policy_version", "confidence_floor", "timeout_seconds",
                        "live_calls_allowed", "limits", "source_locator_patterns"}, "config")
     model = _text(root["model_version"], "model_version")
-    if not _is_pinned_jev_model(model):
-        raise ValueError("model_version must be a pinned Jev release")
+    # "jev" is the only name the Vercel AI Gateway serves (no pinned release there, 2026-09-25).
+    if model != "jev" and not _is_pinned_jev_model(model):
+        raise ValueError("model_version must be jev or a pinned Jev release")
     if not isinstance(root["live_calls_allowed"], bool):
         raise TypeError("live_calls_allowed must be a boolean")
     limits = _mapping(root["limits"], "limits")

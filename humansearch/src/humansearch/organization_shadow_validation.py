@@ -12,7 +12,11 @@ def validate_response(
     model_version: str,
 ) -> Mapping[str, Mapping[str, object]]:
     root = _mapping(raw, "response")
-    _exact_keys(root, {"model", "answers", "usage"}, "response")
+    # The Vercel AI Gateway adds routing and cost details; nothing else may appear.
+    metadata = {"provider_metadata"} & set(root)
+    _exact_keys(root, {"model", "answers", "usage"} | metadata, "response")
+    if metadata:
+        _mapping(root["provider_metadata"], "provider_metadata")
     if root["model"] != model_version:
         raise ValueError("response model does not match pinned model")
     answers = _mapping(root["answers"], "answers")

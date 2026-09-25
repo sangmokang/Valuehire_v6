@@ -1,6 +1,6 @@
 {
   "schema_version": "jev-evidence-assessment-config-v1",
-  "model_version": "jev-1.13.0",
+  "model_version": "jev",
   "question_version": "evidence-assessment-question-v1",
   "mapping_version": "evidence-assessment-projection-v2-career",
   "access_policy_version": "evidence-assessment-access-v2-transfer-allowed-activation-wu3",
