@@ -209,6 +209,18 @@ def test_live_shadow_obeys_the_repository_live_policy(tmp_path: Path, monkeypatc
     assert (built, connects, result["delivery_status"], result["request_attempts"]) == ([], [], "LOCAL_ONLY", 0)
 
 
+def test_shadow_output_never_overwrites_the_live_policy(tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+                                                      capsys: pytest.CaptureFixture[str]) -> None:
+    (policy := tmp_path / "live-policy.json").write_bytes(shadow_cli.LIVE_POLICY_PATH.read_bytes())
+    monkeypatch.setattr(shadow_cli, "LIVE_POLICY_PATH", policy)  # never the repository contract itself
+    (source := tmp_path / "input.json").write_text(json.dumps(synthetic_payload()), encoding="utf-8")
+    before = policy.read_bytes()
+    with pytest.raises(SystemExit) as stop:
+        shadow_cli.main(["--input", str(source), "--output", str(policy), "--config", str(CONFIG)])
+    assert (stop.value.code, json.loads(capsys.readouterr().err)["error_code"]) == (2, "output_collision")
+    assert policy.read_bytes() == before
+
+
 def test_live_shadow_output_failure_still_reports_the_request(tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
                                                              capsys: pytest.CaptureFixture[str]) -> None:
     (blocker := tmp_path / "file").write_text("x")
