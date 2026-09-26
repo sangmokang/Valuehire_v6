@@ -88,7 +88,7 @@ def _call_record(judge: CountingJudge | None, settings: EvidenceConfig,
     response = judge.last_response or {}
     key = gateway_key or os.environ.get("TYPESAFE_API_KEY", "").strip()
     return {"endpoint": GATEWAY_URL if gateway_key else "typesafe-sdk-default",
-            "requested_model": settings.model_version, "response_model": response.get("model"),
+            "requested_model": settings.model_version, "response_model": _text(response.get("model"), key=key),
             "gateway_trace": _gateway_trace(response.get("provider_metadata"), key)}
 
 
