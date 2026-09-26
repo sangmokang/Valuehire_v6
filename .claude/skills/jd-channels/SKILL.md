@@ -1,0 +1,1 @@
+../../../.agents/skills/jd-channels/SKILL.md
