@@ -236,7 +236,8 @@ def _gateway_spy(monkeypatch: pytest.MonkeyPatch, status: int, body: dict[str, A
     (200, jev_response("SUPPORTED", model="jev") | {"provider_metadata": GATEWAY_METADATA, "debug": 1},
      "invalid_response"),
     (200, jev_response("SUPPORTED", model="jev") | {"provider_metadata": "not-a-mapping"}, "invalid_response"),
-], ids=["answered", "gateway_503", "unknown_top_key", "metadata_not_object"])
+    (200, jev_response("SUPPORTED", model="Bearer synthetic-gateway-key"), "invalid_response"),
+], ids=["answered", "gateway_503", "unknown_top_key", "metadata_not_object", "model_echoes_key"])
 def test_gateway_product_cli_sends_to_gateway(status: int, body: dict[str, Any], expected: str,
                                               monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     seen = _gateway_spy(monkeypatch, status, body)
