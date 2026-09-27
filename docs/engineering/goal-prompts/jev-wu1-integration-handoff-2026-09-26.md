@@ -170,6 +170,21 @@ main 반영을 막는 것(blocker)
 - main 보호 규칙: gh api 403(요금제) → 확인 불가. 9/23 기록은 필수 검사 verify + 본인 외 승인 1건 + ruleset acceptance 배포.
   그러나 9/25 main 직접 push가 성공함 → 지금 시행 여부 불명. 협업자는 sangmokang 1명.
 
+## 2026-09-27 재조사로 추가된 사실 (역시 0단계에서 재확인)
+- 위 PR·CI·억제 사실은 9/27에 전부 재측정해 일치. #75 의 마지막 CI 초록은 9/9(억제 만료 전)라 무의미, #77·#78 은 CI 기록 없음.
+- #74 는 9/22 41f1d67 에서 "실행 줄 삭제 한 건"으로 의도적으로 축소됐다(커밋 본문: "#72와 workflow identity 문제를 이 PR에 다시 섞지 말 것").
+  축소 전 끝은 7d56bd8 = backup/p13-deletion-guard-before-minimal-20260922.
+- 로컬 체인 브랜치는 그 축소 전 7d56bd8 위에 다시 쌓여 있다: gate0-loop-proof 2a6aadf(8 ahead/4 behind), ci-execution-proof eb5eda0(16/12),
+  p13-patterns-scope e190d60(39/13). 로컬 미푸시 목록에 섞인 #71 커밋 4개(bdd6930 2862664 cc22e0a 7d56bd8)는 #74 에서 이미 걷어낸 내용이다.
+  → 로컬 체인을 그대로 push 하면 사장님이 9/22 기각한 범위가 #75 에 되살아난다.
+- 원격 PR head(#75 9fced45, #77 7dcba17, #78 5e7b050)는 옛 main 01495b3 위에 있고 #74 를 조상으로 갖지 않는다 → #75 충돌 원인.
+- #73 커밋 중 9fced45·305ba87 는 로컬(2a6aadf·ddec3e5)과 내용이 다르다(재정렬 중 충돌 해소 차이). 나머지 원격 커밋은 로컬과 같은 변경(patch-id 일치).
+- 로컬 체인 3개의 끝 SHA 는 원격 origin/sync/task/<이름>-20260924 와 9/23 bundle 에 이미 있다(유실 위험 없음).
+  wu1-split 22개와 jev-shadow-base-split 은 bundle 에 없고, wu1-split 22개는 원격 어디에도 없다(로컬 전용, 옛 wu1 브랜치와 같은 변경 0개).
+- 9/27 백업 ref(로컬만): backup/task/{gate0-loop-proof,ci-execution-proof,p13-patterns-scope,jev-evidence-assessment-wu1-split}-20260927, 원래 SHA 와 일치 확인.
+- 체인이 전부 병합돼도 남는 억제는 gate-scope-gaps(9/30) 하나이고, 이것을 해제하는 브랜치는 로컬·원격 어디에도 없다 → 10/1 부터 다시 빨간불.
+- 대상 7개 워크트리는 모두 깨끗(untracked 0), cwd 로 쓰는 다른 프로세스 0.
+
 ## 0단계 — 재확인 (쓰기 없음)
 a. 작업 폴더를 cwd로 쓰는 다른 세션: lsof -a -d cwd -Fpcn 을 awk로 p/c/n 필드 묶어 경로 대조.
    부모 PID 1인 Codex 브로커(app-server-broker)와 그 자손(codex app-server, oh-my-codex mcp)은 작업 세션이 아니다. 다른 작업 세션이 있으면 멈추고 보고.
@@ -183,8 +198,11 @@ e. gh api repos/sangmokang/Valuehire_v6/branches/main/protection (GET). 403 이�
 f. 결과를 "기록/실측/일치 여부" 표로. 불일치가 판단을 바꾸면 멈추고 보고.
 
 ## 1단계 — 사장님 결정 (코드 전, 두 가지만)
-1) 만료 억제 처리: (가) 체인 정리 — #75를 현재 #74 위로 다시 쌓아 충돌 해소(새 커밋, force push 없이 가능한 방법으로) → #77 순으로 병합 준비
-   / (나) 만료일 연장 커밋. gate-scope-gaps(9/30)도 함께 정한다. 사장님 방침: "유예를 기본 처리로 삼지 말 것".
+1) 만료 억제 처리 (9/27 재조사 반영):
+   (가) 축소된 #74 먼저 병합 → 원격 #75·#77 head 에 새 main 을 merge 로 들여 충돌 해소(로컬 체인의 축소 전 #71 커밋 4개는 넣지 않음)
+   / (나) 로컬 체인(축소 전 #71 포함)을 그대로 push — 9/22 축소 결정을 뒤집는 것이라 사장님 명시 결정 필요
+   / (다) 만료일 연장 커밋. gate-scope-gaps(9/30)는 해제 브랜치가 없으므로 어느 길이든 별도로 정한다(수정 작업 착수 또는 연장).
+   사장님 방침: "유예를 기본 처리로 삼지 말 것".
 2) main 보호 규칙: 사장님이 GitHub 웹 Settings → Branches·Rules 에서 현재 시행 여부 확인.
    본인 외 승인이 강제되면 병합 경로가 없다 → 규칙 변경은 사장님만 결정.
 결정 없이는 2단계로 가지 않는다. 선택지를 2~3개로 좁혀 결정 카드(무엇을/왜/버린 길/대가/되돌리기)로 올린다.
