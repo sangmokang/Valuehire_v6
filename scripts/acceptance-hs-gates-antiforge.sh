@@ -19,7 +19,9 @@ WF=".github/workflows/verify.yml"
 for required in "$GATES" "$WF" "humansearch/pyproject.toml" "humansearch/uv.lock" \
   "humansearch/.python-version" "humansearch/src/humansearch/__init__.py" "humansearch/tests" \
   "contracts/admin-weekly-dashboard/metric-contract-v1.json" \
-  "contracts/admin-weekly-dashboard/source-contract-v1.json" "apps/admin"; do
+  "contracts/admin-weekly-dashboard/source-contract-v1.json" "apps/admin" \
+  "contracts/jev-evidence-assessment.json" "contracts/jev-org-reference-shadow.json" \
+  "contracts/school-tier.json" "contracts/company-tier.json"; do
   [ -e "$required" ] || { echo "FAIL: required for antiforge missing: $required"; exit 2; }
 done
 
@@ -40,6 +42,8 @@ cp contracts/admin-weekly-dashboard/metric-contract-v1.json \
   "$SANDBOX/contracts/admin-weekly-dashboard/"
 cp contracts/admin-weekly-dashboard/source-contract-v1.json \
   "$SANDBOX/contracts/admin-weekly-dashboard/"
+cp contracts/jev-evidence-assessment.json contracts/jev-org-reference-shadow.json \
+  contracts/school-tier.json contracts/company-tier.json "$SANDBOX/contracts/"
 mkdir -p "$SANDBOX/apps"
 cp -R apps/admin "$SANDBOX/apps/"
 
