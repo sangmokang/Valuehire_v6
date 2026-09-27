@@ -46,7 +46,7 @@ def main(argv: Sequence[str] | None = None, *, config: EvidenceConfig | None = N
             if judge is not None:
                 judge.close()
         _write_atomic(args.output, {**delivery(judge), **result})
-    except OSError, ValueError, TypeError:
+    except (OSError, ValueError, TypeError):
         _stop("invalid_input_or_config", judge)
     except Exception:  # noqa: BLE001 - the CLI must not print raw SDK or candidate data.
         _stop("evidence_assessment_failed", judge)
