@@ -198,6 +198,31 @@ def test_non_finite_weights_are_rejected(weight: float) -> None:
         )
 
 
+@pytest.mark.parametrize("weights", ((60,), (70, 40)), ids=["under_100", "over_100"])
+def test_weights_that_do_not_sum_to_100_are_rejected(weights: tuple[int, ...]) -> None:
+    # A partial table must not be renormalised into a 100-point priority recommendation.
+    with pytest.raises(ValueError, match="must sum to 100"):
+        review_candidate(
+            criteria=tuple(
+                Criterion(f"c{index}", f"Criterion {index}", weight, CriterionStatus.MET,
+                          evidence=("Shipped it",))
+                for index, weight in enumerate(weights)
+            )
+        )
+
+
+def test_weights_summing_to_100_keep_the_existing_result() -> None:
+    result = review_candidate(
+        criteria=(
+            Criterion("backend", "Backend context", 80, CriterionStatus.MET, evidence=("API work",)),
+            Criterion("ai", "AI product experience", 20, CriterionStatus.UNMET),
+        )
+    )
+
+    assert (result.score.score, result.score.scored_weight) == (80.0, 100)
+    assert result.recommendation is Recommendation.REVIEW
+
+
 def test_overlapping_relevant_experience_is_not_double_counted() -> None:
     months = union_experience_months(
         (
