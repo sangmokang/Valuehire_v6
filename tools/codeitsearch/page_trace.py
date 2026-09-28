@@ -25,7 +25,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from supabase_io import insert, next_id, select  # noqa: E402
+from supabase_io import insert, select  # noqa: E402
 
 JOBS_TABLE = "search_jobs"
 SNAPSHOTS_TABLE = "page_snapshots"
@@ -48,23 +48,22 @@ def _now() -> str:
 
 
 def open_job(command: str, params: dict[str, Any], requested_by: str) -> int:
-    job_id = next_id(JOBS_TABLE)
-    insert(
-        JOBS_TABLE,
-        [
-            {
-                "id": job_id,
-                "command": command,
-                "params": params,
-                "status": "running",
-                "requested_by": requested_by,
-                "requested_at": _now(),
-                "started_at": _now(),
-                "retry_count": 0,
-            }
-        ],
-    )
-    return job_id
+    """Create the job row and return the id Supabase actually stored.
+
+    ``insert(assign_ids=...)`` may re-pick the id after a PK conflict, so the id is read
+    back from the mutated row rather than from the first allocation.
+    """
+    row: dict[str, Any] = {
+        "command": command,
+        "params": params,
+        "status": "running",
+        "requested_by": requested_by,
+        "requested_at": _now(),
+        "started_at": _now(),
+        "retry_count": 0,
+    }
+    insert(JOBS_TABLE, [row], assign_ids="id")
+    return int(row["id"])
 
 
 def record(job_id: int, snapshots: list[dict[str, Any]]) -> int:
@@ -82,13 +81,11 @@ def record(job_id: int, snapshots: list[dict[str, Any]]) -> int:
          ("order", "step_index.desc"), ("limit", "1")],
     )
     step = (existing[0]["step_index"] + 1) if existing else 0
-    base_id = next_id(SNAPSHOTS_TABLE)
 
     rows = []
     for offset, snapshot in enumerate(snapshots):
         rows.append(
             {
-                "id": base_id + offset,
                 "search_job_id": job_id,
                 "platform": snapshot.get("platform", "saramin"),
                 "step_index": step + offset,
@@ -100,7 +97,7 @@ def record(job_id: int, snapshots: list[dict[str, Any]]) -> int:
                 "captured_at": snapshot.get("captured_at") or _now(),
             }
         )
-    return insert(SNAPSHOTS_TABLE, rows)
+    return insert(SNAPSHOTS_TABLE, rows, assign_ids="id")
 
 
 #: ``search_jobs.status`` carries a CHECK constraint that only accepts these. "blocked"

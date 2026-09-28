@@ -67,5 +67,19 @@ Windows / macOS 모두 같은 명령으로 돈다. 표준 라이브러리 외 �
   판정은 `인재풀 바로가기` CTA의 href가 `auth?ut=c` 인지로 한다.
 - **Gmail 커넥터 스코프 부족** — `gmail.labels`/`gmail.modify` 미승인 상태라 `aisearch` 라벨
   생성·부착이 거부된다. 스코프 승인 또는 수동 라벨 생성 필요.
-- `jobmarket_positions.id` 시퀀스가 과거 벌크 적재로 어긋나 있어 `next_id()`로 명시 할당한다.
-  동시 적재가 겹치면 PK 충돌이 날 수 있다(현재 운영상 단일 실행 전제).
+- `jobmarket_positions` 는 **자연 유니크 키 `uq_jmp`**(snapshot_date, platform, segment,
+  title, company, url, source_file)를 갖는다. 같은 키의 행은 지운 뒤에야 다시 넣을 수 있다.
+- `jobmarket_positions.id` 시퀀스가 과거 벌크 적재로 어긋나 있어 `insert(assign_ids="id")`
+  로 명시 할당하고, **PK 충돌 시에만** max 를 다시 읽어 재시도한다(자연 키 충돌은 재시도하지 않음).
+  `max(id)+1` 이라 동시 실행에는 여전히 경쟁이 있고, 재시도가 그것을 흡수한다.
+- PostgREST 에는 트랜잭션이 없다. 적재는 **삭제 전에 기존 행을 백업**하고 insert 실패 시
+  되돌린다(best effort). 완전한 원자성은 DDL/RPC 없이는 불가능하다 — 남은 위험은
+  "백업 복구마저 실패" 뿐이고, 그 경우 stderr 에 남는다.
+
+## 적대 검증 이력
+
+- 2026-09-28 `codex exec` 적대 리뷰 1차: BLOCKER 2 / MAJOR 6 / MINOR 1 → 전부 수정, 회귀 테스트 고정.
+  주요 실측 결함: 분교 캠퍼스 in_seoul 오분류, 짧은 영문 약어(MIT/ETH/NUS) 부분일치,
+  `산업대학` 표지가 한국산업기술대(4년제)를 전문대로 하드제외, `degree` 미검사,
+  하드제외 시 총점≠내역합, 재입사 이직 2회 계산, 메일 경로의 점수 미검증,
+  삭제 후 삽입 실패 시 데이터 손실, `max(id)+1` 경쟁.

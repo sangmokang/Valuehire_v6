@@ -15,6 +15,7 @@ Inherits the v6 founding spec (``docs/engineering/humansearch-v6-founding-spec-2
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -99,25 +100,51 @@ def _normalize(text: str, contract: dict[str, Any]) -> str:
     return out.casefold() if rules.get("casefold") else out
 
 
+def _raw(text: str) -> str:
+    """Casefolded name with whitespace removed, but suffixes intact.
+
+    Branch-campus markers must be matched here rather than against ``_normalize``:
+    normalization strips ``캠퍼스``, which would turn the marker ``세종캠퍼스`` into
+    ``세종`` and collide with 세종대 (an in-Seoul university).
+    """
+    return "".join(text.split()).casefold()
+
+
 def school_tier(school: str | None, contract: dict[str, Any]) -> str:
     """Classify a school string against the contract. Unknown/missing -> OTHER."""
     if not school:
         return SchoolTier.OTHER
+    raw = _raw(school)
     normalized = _normalize(school, contract)
+    tokens = {token.casefold() for token in re.findall(r"[A-Za-z0-9]+", school)}
+    max_len = contract.get("ascii_token_match_max_len", 5)
+
+    def hit(name: str) -> bool:
+        if name.isascii():
+            folded = "".join(name.split()).casefold()
+            return folded in tokens if len(name) <= max_len else folded in raw
+        return _normalize(name, contract) in normalized
+
+    # 전문대 표지는 원문 기준으로 본다. 정규화는 '산업대학'을 '산업'으로 줄여
+    # '한국산업기술대학교'(4년제)를 전문대로 하드제외했다 (실측 2026-09-28).
     for marker in contract["hard_exclude"]["two_year_college_markers"]:
-        if _normalize(marker, contract) in normalized:
+        if _raw(marker) in raw:
             return SchoolTier.TWO_YEAR
     for marker in contract.get("downgrade_markers", {}).get("markers", ()):
         if _normalize(marker, contract) in normalized:
             return SchoolTier.OTHER
+    # 분교·이원화 캠퍼스는 본교 어간을 그대로 달고 있어 in_seoul 판정 전에 걸러야 한다.
+    for marker in contract.get("branch_campus", {}).get("markers", ()):
+        if _raw(marker) in raw:
+            return SchoolTier.OTHER
     for name in contract["special_tier"]["world_top"]:
-        if _normalize(name, contract) in normalized:
+        if hit(name):
             return SchoolTier.WORLD_TOP
     for name in contract["national_tier"]["members"]:
-        if _normalize(name, contract) in normalized:
+        if hit(name):
             return SchoolTier.NATIONAL
     for name in contract["in_seoul"]:
-        if _normalize(name, contract) in normalized:
+        if hit(name):
             return SchoolTier.IN_SEOUL
     return SchoolTier.OTHER
 
@@ -137,8 +164,13 @@ def company_tenures(roles: tuple[tuple[str, int], ...]) -> list[tuple[str, int]]
 
 
 def job_changes(roles: tuple[tuple[str, int], ...]) -> int:
-    tenures = company_tenures(roles)
-    return max(len(tenures) - 1, 0)
+    """창립 스펙 그대로 ``unique_companies - 1``.
+
+    Counting tenure spans instead would charge a boomerang (A -> B -> A) two job
+    changes for two employers.
+    """
+    companies = {company for company, _ in roles}
+    return max(len(companies) - 1, 0)
 
 
 def short_stint_count(roles: tuple[tuple[str, int], ...], *, threshold_months: int = 12) -> int:
@@ -151,12 +183,21 @@ def short_stint_count(roles: tuple[tuple[str, int], ...], *, threshold_months: i
     return sum(1 for _, months in tenures[1:] if months < threshold_months)
 
 
+def _degree_is_two_year(degree: str | None, contract: dict[str, Any]) -> bool:
+    """전문학사는 학교명이 4년제로 보여도 전문대 학력이다. degree 필드를 실제로 읽는다."""
+    if not degree:
+        return False
+    folded = _raw(degree)
+    return any(_raw(marker) in folded for marker in contract["hard_exclude"]["two_year_college_markers"])
+
+
 def _hard_exclude(candidate: Candidate, tier: str, contract: dict[str, Any]) -> str | None:
     if candidate.is_freelancer:
         return "freelancer"
     if short_stint_count(candidate.roles) >= 2:
         return "short_stint_2plus"
-    if tier == SchoolTier.TWO_YEAR and candidate.channel in contract["hard_exclude"]["channels"]:
+    school_cut = tier == SchoolTier.TWO_YEAR or _degree_is_two_year(candidate.degree, contract)
+    if school_cut and candidate.channel in contract["hard_exclude"]["channels"]:
         return "two_year_college"
     if not candidate.profile_url.startswith(("http://", "https://")):
         return "invalid_profile_url"
@@ -230,7 +271,12 @@ def score(
     total = sum(breakdown.values())
 
     if reason:
-        total = min(total, 49)
+        # 게이트 캡을 breakdown 에도 반영한다. total 만 깎으면 메일에 찍히는 점수 내역의
+        # 합과 총점이 어긋난다 (실측 82 vs 49, 2026-09-28).
+        capped = min(total, 49)
+        if capped != total:
+            breakdown["hard_exclude_cap"] = capped - total
+        total = capped
         notes.append(f"하드제외: {reason}")
 
     grade = "strong" if total >= STRONG_MIN else "fit" if total >= AISEARCH_REGISTER_MIN else "below"

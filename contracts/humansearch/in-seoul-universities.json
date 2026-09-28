@@ -1,9 +1,9 @@
 {
   "contract": "in-seoul-universities",
-  "version": "v1",
+  "version": "v2",
   "note": "인서울 판정은 계약 데이터로만 한다 — 코드에 학교명을 하드코딩하면 v5처럼 러너마다 기준이 갈린다. 창립 스펙 §열람순서 참조.",
   "updated": "2026-09-28",
-  "match": "normalized_contains",
+  "match": "korean_substring_plus_ascii_token",
   "normalize": {
     "strip": [
       "대학교",
@@ -132,5 +132,29 @@
       "학점은행",
       "디지털대"
     ]
+  },
+  "match_note": "한글 어간은 정규화 후 부분일치. ASCII 항목은 5자 이하면 **토큰 완전일치**만 인정한다 — 'MIT'가 'Smith College'에, 'ETH'가 'Methodist University'에 부분일치해 세계명문으로 오분류되던 실측 결함(2026-09-28) 때문이다. 6자 이상 ASCII는 공백 제거 후 부분일치 허용.",
+  "ascii_token_match_max_len": 5,
+  "branch_campus": {
+    "note": "분교·이원화 캠퍼스는 인서울이 아니다. 본교 어간이 이름에 남아 있어 부분일치로 전부 in_seoul 로 잡히던 실측 결함(2026-09-28). in_seoul 판정 **전에** 걸러 OTHER 로 내린다.",
+    "markers": [
+      "ERICA",
+      "에리카",
+      "세종캠퍼스",
+      "미래캠퍼스",
+      "WISE",
+      "와이즈",
+      "글로컬",
+      "다빈치",
+      "글로벌캠퍼스",
+      "안산캠퍼스",
+      "원주캠퍼스",
+      "천안캠퍼스",
+      "충주캠퍼스",
+      "경주캠퍼스",
+      "제2캠퍼스",
+      "분교"
+    ],
+    "marker_note": "'세종'·'미래'·'글로벌' 단독은 쓰지 않는다 — '세종대'(인서울)와 충돌한다. 반드시 '캠퍼스'가 붙은 형태이거나 고유 브랜드명(ERICA/WISE/글로컬/다빈치)만 쓴다."
   }
 }

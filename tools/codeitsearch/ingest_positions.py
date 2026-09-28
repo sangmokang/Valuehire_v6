@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from datetime import datetime, timezone
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -81,6 +82,7 @@ def build_snapshot_row(snapshot: dict[str, Any], rows: list[dict[str, Any]]) -> 
         "total_companies": 1,
         "per_platform_json": {snapshot["platform"]: len(rows)},
         "per_segment_json": dict(sorted(per_segment.items())),
+        "loaded_at": datetime.now(timezone.utc).isoformat(),
     }
 
 
@@ -112,20 +114,35 @@ def main(argv: list[str] | None = None) -> int:
         ("snapshot_date", f"eq.{snapshot['snapshot_date']}"),
         ("source_file", f"eq.{rows[0]['source_file']}"),
     ]
+    # jobmarket_positions carries a natural unique key (uq_jmp on snapshot_date,
+    # platform, segment, title, company, url, source_file), so the rows for this key
+    # must go away before the new ones land. That delete is the dangerous step on a
+    # production database: PostgREST gives us no transaction, so a failing insert would
+    # leave the day's snapshot simply gone. Keep a copy and put it back if the insert
+    # fails — best effort, but never a silent loss.
+    backup = select(POSITIONS_TABLE, [*key, ("select", "*")])
     removed = delete(POSITIONS_TABLE, key)
-    # jobmarket_positions.id was filled by an earlier bulk import, leaving its identity
-    # sequence behind the live max — a plain insert collides on the primary key. Allocate
-    # ids explicitly from the current max instead of relying on the default.
-    for offset, row in enumerate(rows, start=next_id(POSITIONS_TABLE)):
-        row["id"] = offset
-    written = insert(POSITIONS_TABLE, rows)
+    try:
+        # The id sequence lags an earlier bulk import, so ids are allocated here.
+        written = insert(POSITIONS_TABLE, rows, assign_ids="id")
+    except Exception:
+        if backup:
+            insert(POSITIONS_TABLE, backup)
+            print(f"insert failed — restored {len(backup)} previous rows", file=sys.stderr)
+        raise
 
     snapshot_key = [
         ("snapshot_date", f"eq.{snapshot['snapshot_date']}"),
         ("source_file", f"eq.{snapshot_row['source_file']}"),
     ]
+    snapshot_backup = select(SNAPSHOTS_TABLE, [*snapshot_key, ("select", "*")])
     delete(SNAPSHOTS_TABLE, snapshot_key)
-    insert(SNAPSHOTS_TABLE, [snapshot_row])
+    try:
+        insert(SNAPSHOTS_TABLE, [snapshot_row])
+    except Exception:
+        if snapshot_backup:
+            insert(SNAPSHOTS_TABLE, snapshot_backup)
+        raise
 
     verified = select(POSITIONS_TABLE, [*key, ("select", "posting_id")])
     print(f"\ndeleted {len(removed)} stale, inserted {written}, verified {len(verified)} in Supabase")

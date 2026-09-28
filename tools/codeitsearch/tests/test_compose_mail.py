@@ -1,9 +1,17 @@
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from compose_mail import LABEL, RECIPIENTS, compose, subject_for  # noqa: E402
+from compose_mail import (  # noqa: E402
+    LABEL,
+    RECIPIENTS,
+    UnverifiedCandidate,
+    compose,
+    subject_for,
+)
 
 RESULTS = {
     "company": "코드잇",
@@ -69,3 +77,40 @@ class TestCompose:
     def test_score_breakdown_is_reported_as_code_computed(self):
         body = compose(RESULTS)["body"]
         assert "코드 계산" in body
+
+
+class TestVerification:
+    """메일 경로는 '코드 계산' 이라고 인쇄한다 — 그 주장을 강제한다."""
+
+    def _with(self, **overrides):
+        candidate = {**RESULTS["candidates"][0], **overrides}
+        return {**RESULTS, "candidates": [candidate]}
+
+    def test_hand_written_score_is_refused(self):
+        with pytest.raises(UnverifiedCandidate, match="손으로 쓴 점수"):
+            compose(self._with(match=99))
+
+    def test_missing_breakdown_is_refused(self):
+        with pytest.raises(UnverifiedCandidate, match="score_breakdown"):
+            compose(self._with(score_breakdown=None))
+
+    def test_below_the_gate_is_refused(self):
+        with pytest.raises(UnverifiedCandidate, match="등록 문턱"):
+            compose(self._with(match=40, score_breakdown={"keyword_fit_40": 40}))
+
+    def test_hard_excluded_candidate_is_refused(self):
+        with pytest.raises(UnverifiedCandidate, match="하드제외"):
+            compose(self._with(hard_exclude_reason="freelancer"))
+
+    def test_a_real_scored_candidate_passes(self):
+        from scoring import Candidate, load_school_contract, score as score_fn
+
+        verdict = score_fn(
+            Candidate(name="홍길동", profile_url="https://www.saramin.co.kr/p/1",
+                      school="연세대학교", roles=(("A", 40), ("B", 36)),
+                      keyword_hits=("Spring", "Kotlin")),
+            required_terms=["Spring", "Kotlin"], preferred_terms=["에듀테크"],
+            contract=load_school_contract(),
+        )
+        mail = compose(self._with(match=verdict.total, score_breakdown=verdict.breakdown))
+        assert f"총점 {verdict.total}" in mail["body"]
