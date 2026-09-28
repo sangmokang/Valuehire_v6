@@ -92,16 +92,25 @@ class TestCompanyIsolation:
 
 
 class TestWriteBeforeDelete:
-    """운영 DB다 — PostgREST 에 트랜잭션이 없으므로 순서가 유일한 안전장치다."""
+    """운영 DB다 — PostgREST 에 트랜잭션이 없으므로 순서가 유일한 안전장치다.
 
-    def _run(self, monkeypatch, tmp_path, insert_fails=False):
+    ① insert → ② 검증 → ③ 요약 → ④ 이전 실행분 delete.
+    """
+
+    def _harness(self, monkeypatch, tmp_path, *, insert_fails=False,
+                 verified_rows=None, snapshot_insert_fails=False, extra_rows=()):
         calls = []
-
         stale = f"{ingest_positions.source_prefix_for(SNAPSHOT)}#run-OLD"
+        rows_in_db = [{"id": 1, "source_file": stale, "company_norm": "codeit"}, *extra_rows]
 
         def fake_select(table, query):
+            fields = dict(query)
+            if fields.get("select") == "posting_id":
+                # 검증 조회
+                n = len(SNAPSHOT["positions"]) if verified_rows is None else verified_rows
+                return [{"posting_id": f"p{i}"} for i in range(n)]
             if table == ingest_positions.POSITIONS_TABLE:
-                return [{"id": 1, "source_file": stale}]
+                return rows_in_db
             return []
 
         def fake_delete(table, query):
@@ -112,6 +121,8 @@ class TestWriteBeforeDelete:
             calls.append(("insert", table, len(rows)))
             if insert_fails and table == ingest_positions.POSITIONS_TABLE:
                 raise supabase_io.SupabaseError("boom")
+            if snapshot_insert_fails and table == ingest_positions.SNAPSHOTS_TABLE:
+                raise supabase_io.SupabaseError("snapshot boom")
             return len(rows)
 
         monkeypatch.setattr(ingest_positions, "select", fake_select)
@@ -121,19 +132,48 @@ class TestWriteBeforeDelete:
         path.write_text(json.dumps(SNAPSHOT, ensure_ascii=False), encoding="utf-8")
         return calls, path
 
-    def test_nothing_is_deleted_before_the_insert_succeeds(self, monkeypatch, tmp_path):
-        calls, path = self._run(monkeypatch, tmp_path)
-        ingest_positions.main([str(path)])
+    def test_insert_comes_before_any_delete(self, monkeypatch, tmp_path):
+        calls, path = self._harness(monkeypatch, tmp_path)
+        assert ingest_positions.main([str(path)]) == 0
         kinds = [c[0] for c in calls]
-        assert kinds[0] == "insert", f"first call must be an insert, got {kinds}"
-        first_delete = kinds.index("delete")
-        assert kinds[:first_delete].count("insert") >= 1
+        assert kinds[0] == "insert"
+        assert "delete" in kinds
+        assert kinds.index("insert") < kinds.index("delete")
 
     def test_a_failing_insert_deletes_nothing(self, monkeypatch, tmp_path):
-        calls, path = self._run(monkeypatch, tmp_path, insert_fails=True)
+        calls, path = self._harness(monkeypatch, tmp_path, insert_fails=True)
         with pytest.raises(supabase_io.SupabaseError):
             ingest_positions.main([str(path)])
-        assert not [c for c in calls if c[0] == "delete"], "실패한 실행이 기존 행을 지웠다"
+        assert not [c for c in calls if c[0] == "delete"]
+
+    def test_a_failed_verification_deletes_nothing(self, monkeypatch, tmp_path):
+        # insert 응답은 성공했지만 되읽기가 모자란 경우 — 기존 행을 지우면 안 된다 (codex 3차).
+        calls, path = self._harness(monkeypatch, tmp_path, verified_rows=3)
+        assert ingest_positions.main([str(path)]) == 1
+        assert not [c for c in calls if c[0] == "delete"], "검증 실패인데 기존 행을 지웠다"
+
+    def test_snapshot_row_is_written_before_the_cleanup(self, monkeypatch, tmp_path):
+        calls, path = self._harness(monkeypatch, tmp_path, snapshot_insert_fails=True)
+        with pytest.raises(supabase_io.SupabaseError):
+            ingest_positions.main([str(path)])
+        assert not [c for c in calls if c[0] == "delete"], "요약 행 실패인데 정리를 진행했다"
+
+    def test_another_company_with_the_same_prefix_is_not_deleted(self, monkeypatch, tmp_path):
+        other = {"id": 99,
+                 "source_file": f"{ingest_positions.source_prefix_for(SNAPSHOT)}#run-OTHER",
+                 "company_norm": "someoneelse"}
+        calls, path = self._harness(monkeypatch, tmp_path, extra_rows=(other,))
+        assert ingest_positions.main([str(path)]) == 0
+        deletes = [c for c in calls if c[0] == "delete"
+                   and c[1] == ingest_positions.POSITIONS_TABLE]
+        assert len(deletes) == 1
+        assert deletes[0][2]["id"] == "in.(1)", deletes[0][2]
+
+    def test_stale_selection_uses_ids_never_a_like_pattern(self, monkeypatch, tmp_path):
+        calls, path = self._harness(monkeypatch, tmp_path)
+        ingest_positions.main([str(path)])
+        for _, table, query in [c for c in calls if c[0] == "delete"]:
+            assert not any("like" in str(v) for v in query.values()), query
 
     def test_each_run_gets_its_own_source_file(self):
         a = ingest_positions.build_rows({**SNAPSHOT, "run_id": "A"})[0]["source_file"]
@@ -142,34 +182,10 @@ class TestWriteBeforeDelete:
         prefix = ingest_positions.source_prefix_for(SNAPSHOT)
         assert a.startswith(prefix) and b.startswith(prefix)
 
-    def test_stale_rows_are_deleted_by_id_not_by_a_like_pattern(self, monkeypatch, tmp_path):
-        # source_file 에 '_' 나 '%' 가 있으면 LIKE 가 다른 회사 행까지 지운다.
-        captured = {}
-        other = "othersearch/job_posting/2026-09-28#run-X"
-        mine_old = f"{ingest_positions.source_prefix_for(SNAPSHOT)}#run-OLD"
-
-        def fake_select(table, query):
-            if table == ingest_positions.POSITIONS_TABLE:
-                return [{"id": 1, "source_file": mine_old},
-                        {"id": 2, "source_file": other},
-                        {"id": 3, "source_file": None}]
-            return []
-
-        def fake_delete(table, query):
-            captured.setdefault(table, []).append(dict(query))
-            return []
-
-        monkeypatch.setattr(ingest_positions, "select", fake_select)
-        monkeypatch.setattr(ingest_positions, "delete", fake_delete)
-        monkeypatch.setattr(ingest_positions, "insert", lambda t, r, **k: len(r))
-        path = tmp_path / "snap.json"
-        path.write_text(json.dumps(SNAPSHOT, ensure_ascii=False), encoding="utf-8")
-        ingest_positions.main([str(path)])
-
-        filters = captured[ingest_positions.POSITIONS_TABLE]
-        assert len(filters) == 1
-        assert filters[0]["id"] == "in.(1)", filters[0]
-        assert not any("like" in str(v) for v in filters[0].values())
+    def test_two_runs_in_the_same_second_get_different_source_files(self):
+        a = ingest_positions.build_rows(dict(SNAPSHOT))[0]["source_file"]
+        b = ingest_positions.build_rows(dict(SNAPSHOT))[0]["source_file"]
+        assert a != b
 
     def test_empty_snapshot_fails_instead_of_indexing_row_zero(self, monkeypatch, tmp_path):
         def explode(*a, **k):
@@ -181,13 +197,6 @@ class TestWriteBeforeDelete:
         path.write_text(json.dumps({**SNAPSHOT, "positions": []}, ensure_ascii=False),
                         encoding="utf-8")
         assert ingest_positions.main([str(path)]) == 1
-
-    def test_two_runs_in_the_same_second_get_different_source_files(self, tmp_path):
-        # run_id 가 초 단위면 같은 초의 두 실행이 uq_jmp 로 충돌한다.
-        import ingest_positions as ip
-        a = ip.build_rows({k: v for k, v in SNAPSHOT.items()})[0]["source_file"]
-        b = ip.build_rows({k: v for k, v in SNAPSHOT.items()})[0]["source_file"]
-        assert a != b
 
     def test_dry_run_writes_nothing(self, monkeypatch, tmp_path):
         def explode(*args, **kwargs):

@@ -157,36 +157,57 @@ def main(argv: list[str] | None = None) -> int:
         print("\n[dry-run] nothing written")
         return 0
 
-    # 새 행을 먼저 쓰고, 성공한 뒤에 이전 실행분을 지운다. PostgREST 에는 트랜잭션이
-    # 없으므로 순서가 곧 안전장치다 — insert 가 실패하면 이전 실행분이 그대로 남는다.
+    # 순서가 전부다. PostgREST 에는 트랜잭션이 없으므로
+    #   ① 새 행 insert → ② 새 행 검증 → ③ 요약 행 insert → ④ 이전 실행분 delete
+    # 어느 단계가 실패해도 이전 실행분은 그대로 남는다. 검증(②)보다 삭제를 먼저 하면
+    # "insert 는 200 이었는데 조회하면 0행" 인 경우 기존 데이터까지 잃는다(codex 3차).
     prefix = source_prefix_for(snapshot)
     current_source = rows[0]["source_file"]
+    company_norm = rows[0]["company_norm"]
     day_key = [
         ("platform", f"eq.{snapshot['platform']}"),
         ("snapshot_date", f"eq.{snapshot['snapshot_date']}"),
     ]
     # 지울 대상은 id 로 특정한다. source_file 로 LIKE 를 걸면 '_' 와 '%' 가 SQL 와일드카드라
     # 파일명에 그 글자가 하나만 들어와도 다른 회사 행까지 지워진다.
-    before = select(POSITIONS_TABLE, [*day_key, ("select", "id,source_file")])
-    stale_ids = [
-        r["id"] for r in before
-        if str(r.get("source_file", "")).startswith(prefix) and r["source_file"] != current_source
-    ]
+    before = select(POSITIONS_TABLE, [*day_key, ("select", "id,source_file,company_norm")])
 
+    # ① 새 행
     written = insert(POSITIONS_TABLE, rows, assign_ids="id")
 
+    # ② 검증 — 여기서 실패하면 아무것도 지우지 않고 그대로 멈춘다.
+    verified = select(
+        POSITIONS_TABLE,
+        [*day_key, ("source_file", f"eq.{current_source}"), ("select", "posting_id")],
+    )
+    if len(verified) != len(rows):
+        print(
+            f"MISMATCH — wrote {written} but only {len(verified)} rows read back; "
+            "previous run left untouched",
+            file=sys.stderr,
+        )
+        return 1
+
+    # ③ 요약 행 — 포지션 행과 같은 source_file 을 가리킨다.
+    insert(SNAPSHOTS_TABLE, [snapshot_row])
+
+    # ④ 이전 실행분만 정리. 회사까지 확인해 같은 접두사를 가진 남의 행을 건드리지 않는다.
+    stale_ids = [
+        r["id"]
+        for r in before
+        if str(r.get("source_file", "")).startswith(prefix)
+        and r["source_file"] != current_source
+        and r.get("company_norm") == company_norm
+    ]
     removed = []
     if stale_ids:
         removed = delete(
             POSITIONS_TABLE, [*day_key, ("id", f"in.({','.join(map(str, stale_ids))})")]
         )
-
-    insert(SNAPSHOTS_TABLE, [snapshot_row])
-    old_snapshots = select(
+    for row in select(
         SNAPSHOTS_TABLE,
         [("snapshot_date", f"eq.{snapshot['snapshot_date']}"), ("select", "source_file")],
-    )
-    for row in old_snapshots:
+    ):
         source = str(row.get("source_file", ""))
         if source.startswith(prefix) and source != snapshot_row["source_file"]:
             delete(
@@ -197,22 +218,10 @@ def main(argv: list[str] | None = None) -> int:
                 ],
             )
 
-    verified = select(
-        POSITIONS_TABLE,
-        [
-            ("platform", f"eq.{snapshot['platform']}"),
-            ("snapshot_date", f"eq.{snapshot['snapshot_date']}"),
-            ("source_file", f"eq.{rows[0]['source_file']}"),
-            ("select", "posting_id"),
-        ],
-    )
     print(
-        f"\nwrote {written} rows first, then removed {len(removed)} from earlier runs; "
-        f"verified {len(verified)} in Supabase"
+        f"\nwrote {written} rows, verified {len(verified)}, "
+        f"then removed {len(removed)} from earlier runs"
     )
-    if len(verified) != len(rows):
-        print("MISMATCH — verified count does not equal built rows", file=sys.stderr)
-        return 1
     return 0
 
 

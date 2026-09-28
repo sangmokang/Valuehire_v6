@@ -1,6 +1,6 @@
 {
   "contract": "in-seoul-universities",
-  "version": "v4",
+  "version": "v5",
   "note": "인서울 판정은 계약 데이터로만 한다 — 코드에 학교명을 하드코딩하면 v5처럼 러너마다 기준이 갈린다. 창립 스펙 §열람순서 참조.",
   "updated": "2026-09-28",
   "match": "korean_substring_plus_ascii_token",
@@ -100,7 +100,24 @@
       "University of Tokyo",
       "Kyoto University"
     ],
-    "match_note": "단일 토큰 항목은 토큰 완전일치, 다중 토큰 항목은 **연속 토큰 부분수열** 일치. 'Michigan'·'Toronto'·'Columbia' 같은 모호한 어간이 Michigan State / Toronto Metropolitan / Columbia College Chicago 를 명문대로 올리던 실측 결함(codex 2차) 때문에 정식 명칭으로 적는다."
+    "match_note": "단일 토큰 항목은 토큰 완전일치, 다중 토큰 항목은 **연속 토큰 부분수열** 일치. 'Michigan'·'Toronto'·'Columbia' 같은 모호한 어간이 Michigan State / Toronto Metropolitan / Columbia College Chicago 를 명문대로 올리던 실측 결함(codex 2차) 때문에 정식 명칭으로 적는다.",
+    "trailing_token_allowlist": [
+      "the",
+      "university",
+      "college",
+      "school",
+      "of",
+      "graduate",
+      "business",
+      "engineering",
+      "medicine",
+      "law",
+      "sloan",
+      "institute",
+      "technology",
+      "campus"
+    ],
+    "trailing_note": "정식 명칭 뒤에 남는 토큰이 이 목록 밖이면 다른 학교다 — 'University of Michigan-Flint'/'-Dearborn' 이 world_top 으로 잡히던 실측 결함(codex 3차)."
   },
   "national_tier": {
     "note": "인서울은 아니지만 이공계 최상위 — 학력 감점 대상이 아니다.",
@@ -167,5 +184,21 @@
       "분교"
     ],
     "marker_note": "'캠퍼스' 없이 브랜드명만 쓰는 경우를 위한 보조 목록."
+  },
+  "korean_match": {
+    "rule": "prefix_anchored",
+    "note": "한글 어간은 정규화된 이름의 **앞부분**에만 일치시킨다. 부분일치였을 때 '동서울대학교'(경기 성남)가 '서울대' 어간에 걸려 in_seoul 이 됐다(codex 3차)."
+  },
+  "not_in_seoul": {
+    "note": "이름이 인서울 어간으로 시작하지만 소재지가 서울이 아닌 학교. 앞부분 일치로도 걸러지지 않아 명시 목록이 필요하다. 발견될 때마다 여기에 추가한다.",
+    "names": [
+      "서울신학대",
+      "서울장신대",
+      "서울한영대",
+      "서울기독대학교부천",
+      "동서울대",
+      "서울사이버대",
+      "서울디지털대"
+    ]
   }
 }
