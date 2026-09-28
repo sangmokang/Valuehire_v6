@@ -151,21 +151,23 @@ def _is_branch_campus(raw: str, contract: dict[str, Any]) -> bool:
     return not any(_raw(name) in raw for name in branch.get("seoul_campus_allowlist", ()))
 
 
-def _ascii_hit(entry: str, tokens: list[str]) -> bool:
+def _ascii_hit(entry: str, tokens: list[str], allowed_extra: set[str]) -> bool:
     """Match an ASCII contract entry against the school's token sequence.
 
-    A single token must appear whole (so ``MIT`` no longer hits "Smith College"), and a
-    multi-token entry must appear as a contiguous run — ``University of Michigan`` must
-    not match "Michigan State University".
+    The entry must appear as a contiguous run, and every token outside that run must be
+    a generic word. Without the second half, ``University of Michigan`` matched
+    "University of Michigan-Flint" — a different university (measured, codex round 3).
     """
     wanted = [part.casefold() for part in re.findall(r"[A-Za-z0-9]+", entry)]
-    if not wanted:
+    if not wanted or len(wanted) > len(tokens):
         return False
-    if len(wanted) == 1:
-        return wanted[0] in tokens
-    return any(
-        tokens[i : i + len(wanted)] == wanted for i in range(len(tokens) - len(wanted) + 1)
-    )
+    for start in range(len(tokens) - len(wanted) + 1):
+        if tokens[start : start + len(wanted)] != wanted:
+            continue
+        leftover = tokens[:start] + tokens[start + len(wanted) :]
+        if all(token in allowed_extra for token in leftover):
+            return True
+    return False
 
 
 def school_tier(school: str | None, contract: dict[str, Any]) -> str:
@@ -175,11 +177,16 @@ def school_tier(school: str | None, contract: dict[str, Any]) -> str:
     raw = _raw(school)
     normalized = _normalize(school, contract)
     tokens = [token.casefold() for token in re.findall(r"[A-Za-z0-9]+", school)]
+    allowed_extra = {
+        word.casefold()
+        for word in contract["special_tier"].get("trailing_token_allowlist", ())
+    }
 
     def hit(name: str) -> bool:
         if name.isascii():
-            return _ascii_hit(name, tokens)
-        return _normalize(name, contract) in normalized
+            return _ascii_hit(name, tokens, allowed_extra)
+        # 앞부분 일치 — 부분일치면 '동서울대' 가 '서울대' 로 잡힌다.
+        return normalized.startswith(_normalize(name, contract))
 
     # 전문대 표지는 원문 기준으로 본다. 정규화는 '산업대학'을 '산업'으로 줄여
     # '한국산업기술대학교'(4년제)를 전문대로 하드제외했다 (실측 2026-09-28).
@@ -191,6 +198,10 @@ def school_tier(school: str | None, contract: dict[str, Any]) -> str:
     # 분교·이원화 캠퍼스는 본교 어간을 그대로 달고 있어 in_seoul 판정 전에 걸러야 한다.
     if _is_branch_campus(raw, contract):
         return SchoolTier.OTHER
+    # 이름이 인서울 어간으로 시작하지만 서울이 아닌 학교 (서울신학대 등).
+    for name in contract.get("not_in_seoul", {}).get("names", ()):
+        if normalized.startswith(_normalize(name, contract)):
+            return SchoolTier.OTHER
     for name in contract["special_tier"]["world_top"]:
         if hit(name):
             return SchoolTier.WORLD_TOP

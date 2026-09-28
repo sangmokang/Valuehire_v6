@@ -20,7 +20,14 @@ from typing import Any
 
 #: scoring.AISEARCH_REGISTER_MIN 과 한 세트. 여기서만 다시 선언하지 않고 import 한다.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from scoring import AISEARCH_REGISTER_MIN, AXIS_CAPS, CAP_AXIS  # noqa: E402
+from scoring import (  # noqa: E402
+    AISEARCH_REGISTER_MIN,
+    AXIS_CAPS,
+    CAP_AXIS,
+    Candidate,
+    load_school_contract,
+    score,
+)
 
 SUBJECT_PREFIX = "[aisearch]Claude-win"
 RECIPIENTS = (
@@ -45,49 +52,68 @@ class UnverifiedCandidate(ValueError):
     """Raised when a candidate was not produced by ``scoring.score``."""
 
 
-def _verify(candidate: dict[str, Any]) -> None:
-    """Refuse anything the scorer did not actually produce.
+def _recompute(candidate: dict[str, Any], results: dict[str, Any]) -> None:
+    """Recompute the score from the raw profile and overwrite whatever was handed in.
 
-    The mail prints "코드 계산" next to every total. That claim is only true if the
-    breakdown really adds up to the reported match and the candidate cleared the
-    registration gate — otherwise a hand-written 99% would ship as a computed score.
+    Checking the shape of a ``score_breakdown`` only proves it looks like one: a
+    hand-written ``40/25/20/15`` passed every format check and printed as "코드 계산"
+    (measured, codex round 3). The only way the claim can be true is to run
+    ``scoring.score`` here, on the raw profile, and report what it returns.
     """
     name = candidate.get("name", "<unnamed>")
-    match = candidate.get("match")
-    if not isinstance(match, int):
-        raise UnverifiedCandidate(f"{name}: match must be an int produced by score()")
-    breakdown = candidate.get("score_breakdown")
-    if not isinstance(breakdown, dict) or not breakdown:
-        raise UnverifiedCandidate(f"{name}: score_breakdown missing — 코드 계산 점수가 아니다")
-    # 축 이름과 상한까지 본다. 합계만 맞추면 {"forged": 100} 같은 위조 점수가 통과했다
-    # (codex 2차 검증). score() 가 만든 breakdown 은 이 축들만, 상한 안에서 갖는다.
-    unknown = sorted(set(breakdown) - set(AXIS_CAPS) - {CAP_AXIS})
-    if unknown:
+    raw = candidate.get("candidate_input")
+    if not isinstance(raw, dict):
         raise UnverifiedCandidate(
-            f"{name}: score() 가 만들지 않는 축 {unknown} — 위조된 점수다"
+            f"{name}: candidate_input 이 없다 — 점수를 재계산할 수 없으므로 보고하지 않는다"
         )
-    missing = sorted(set(AXIS_CAPS) - set(breakdown))
-    if missing:
-        raise UnverifiedCandidate(f"{name}: 축 {missing} 누락 — 코드 계산 점수가 아니다")
-    for axis, cap in AXIS_CAPS.items():
-        value = breakdown[axis]
-        if not isinstance(value, int) or not 0 <= value <= cap:
-            raise UnverifiedCandidate(f"{name}: {axis}={value} 는 0..{cap} 범위 밖이다")
-    if breakdown.get(CAP_AXIS, 0) > 0:
-        raise UnverifiedCandidate(f"{name}: {CAP_AXIS} 는 음수여야 한다")
-    total = sum(breakdown.values())
-    if total != match:
+    required = results.get("required_terms")
+    preferred = results.get("preferred_terms", [])
+    if not required:
+        raise UnverifiedCandidate("results.required_terms 없이는 점수를 재계산할 수 없다")
+
+    try:
+        profile = Candidate(
+            name=raw.get("name", name),
+            profile_url=raw["profile_url"],
+            school=raw.get("school"),
+            degree=raw.get("degree"),
+            roles=tuple((c, int(m)) for c, m in raw.get("roles", ())),
+            is_freelancer=bool(raw.get("is_freelancer", False)),
+            open_to_work=bool(raw.get("open_to_work", False)),
+            keyword_hits=tuple(raw.get("keyword_hits", ())),
+            channel=raw.get("channel", "saramin"),
+        )
+    except (KeyError, TypeError, ValueError) as error:
+        raise UnverifiedCandidate(f"{name}: candidate_input 이 잘못됐다 — {error}") from error
+
+    verdict = score(
+        profile,
+        required_terms=list(required),
+        preferred_terms=list(preferred),
+        contract=load_school_contract(),
+    )
+    if verdict.hard_exclude_reason:
         raise UnverifiedCandidate(
-            f"{name}: score_breakdown 합 {total} != match {match} — 손으로 쓴 점수다"
+            f"{name}: 하드제외({verdict.hard_exclude_reason}) 후보는 보고하지 않는다"
         )
-    if match < AISEARCH_REGISTER_MIN:
+    if not verdict.eligible:
         raise UnverifiedCandidate(
-            f"{name}: {match}점은 aisearch 등록 문턱 {AISEARCH_REGISTER_MIN} 미만이다"
+            f"{name}: 재계산 {verdict.total}점은 등록 문턱 {AISEARCH_REGISTER_MIN} 미만이다"
         )
-    if candidate.get("hard_exclude_reason"):
+
+    claimed = candidate.get("match")
+    if isinstance(claimed, int) and claimed != verdict.total:
         raise UnverifiedCandidate(
-            f"{name}: 하드제외({candidate['hard_exclude_reason']}) 후보는 보고하지 않는다"
+            f"{name}: 제출된 {claimed}점과 재계산 {verdict.total}점이 다르다"
         )
+    # 보고에 실리는 값은 언제나 방금 계산한 값이다.
+    candidate["match"] = verdict.total
+    candidate["score_breakdown"] = dict(verdict.breakdown)
+    candidate["triage_tier"] = verdict.triage_tier
+
+    unknown = sorted(set(candidate["score_breakdown"]) - set(AXIS_CAPS) - {CAP_AXIS})
+    if unknown:  # score() 가 축을 바꾸면 메일 포맷도 같이 바뀌어야 한다
+        raise UnverifiedCandidate(f"{name}: score() 가 새 축 {unknown} 을 냈다")
 
 
 def _candidate_block(index: int, candidate: dict[str, Any]) -> str:
@@ -129,7 +155,7 @@ def compose(results: dict[str, Any]) -> dict[str, Any]:
     position = results["position"]
     candidates = results.get("candidates", [])
     for candidate in candidates:
-        _verify(candidate)
+        _recompute(candidate, results)
 
     summary = [
         f"Company / Position: {company} / {position}",

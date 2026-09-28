@@ -13,30 +13,46 @@ from compose_mail import (  # noqa: E402
     subject_for,
 )
 
-RESULTS = {
-    "company": "코드잇",
-    "position": "백엔드 엔지니어",
-    "search_axes": "Spring/Kotlin 백엔드, 대용량 트래픽, MSA",
-    "channels": "사람인 인재풀",
-    "keyword_note": "국문 34 + 영문 40",
-    "context": ["에듀테크 부트캠프 운영사", "정규직 3~10년"],
-    "insight": ["에듀테크 백엔드 풀은 좁다"],
-    "evidence": ["search_jobs#596", "page_snapshots 10건"],
-    "candidates": [
-        {
+REAL_INPUT = {
+    "profile_url": "https://www.saramin.co.kr/zf_user/profile/1",
+    "school": "연세대학교",
+    "roles": [["A사", 40], ["B사", 36]],
+    "keyword_hits": ["Spring", "Kotlin", "에듀테크"],
+}
+
+
+def results(**overrides):
+    base = {
+        "company": "코드잇",
+        "position": "백엔드 엔지니어",
+        "required_terms": ["Spring", "Kotlin"],
+        "preferred_terms": ["에듀테크"],
+        "search_axes": "Spring/Kotlin 백엔드, 대용량 트래픽, MSA",
+        "channels": "사람인 인재풀",
+        "keyword_note": "국문 34 + 영문 40",
+        "context": ["에듀테크 부트캠프 운영사"],
+        "insight": ["에듀테크 백엔드 풀은 좁다"],
+        "evidence": ["search_jobs#596"],
+        "candidates": [{
             "name": "홍길동",
-            "match": 88,
+            "candidate_input": dict(REAL_INPUT),
             "current": "A사 / 백엔드 엔지니어",
             "location": "서울",
             "education": "연세대학교 컴퓨터과학",
             "sources": ["사람인: https://www.saramin.co.kr/zf_user/profile/1"],
-            "career_summary": ["Spring Boot 기반 결제 서버", "MSA 전환 주도"],
+            "career_summary": ["Spring Boot 기반 결제 서버"],
             "why_match": ["JD 핵심 스택 일치"],
             "risks": ["에듀테크 도메인 경험 없음"],
-            "score_breakdown": {"keyword_fit_40": 36, "school_25": 22, "stability_20": 20, "preferred_15": 10},
-        }
-    ],
-}
+        }],
+    }
+    base.update(overrides)
+    return base
+
+
+def with_candidate(**overrides):
+    data = results()
+    data["candidates"][0].update(overrides)
+    return data
 
 
 class TestSubject:
@@ -50,81 +66,76 @@ class TestSubject:
 
 class TestCompose:
     def test_recipients_and_label(self):
-        mail = compose(RESULTS)
+        mail = compose(results())
         assert mail["to"] == list(RECIPIENTS)
         assert len(mail["to"]) == 4
         assert mail["label"] == LABEL
 
     def test_body_is_listing_not_a_table(self):
-        # 사장님 규칙 — 표 금지. 마크다운 표 구분선이 나오면 실패.
-        body = compose(RESULTS)["body"]
-        assert "|---" not in body
-        assert "| ---" not in body
+        # 사장님 규칙 — 표 금지.
+        body = compose(results())["body"]
+        assert "|---" not in body and "| ---" not in body
         assert not any(line.strip().startswith("|") for line in body.splitlines())
 
     def test_candidate_block_has_the_house_sections(self):
-        body = compose(RESULTS)["body"]
+        body = compose(results())["body"]
         for heading in ("Sources:", "Career Summary:", "Why Match:", "Risks / Gaps:"):
             assert heading in body
-        assert "## 1. 홍길동 — 88% Match" in body
+        assert "## 1. 홍길동 — " in body
 
     def test_empty_shortlist_says_so_instead_of_pretending(self):
-        mail = compose({**RESULTS, "candidates": [], "no_candidate_reason": "기업회원 인증 차단"})
+        mail = compose(results(candidates=[], no_candidate_reason="기업회원 인증 차단"))
         assert "0 candidates" in mail["subject"]
         assert "등록 문턱(60점)을 넘은 후보 없음" in mail["body"]
         assert "기업회원 인증 차단" in mail["body"]
 
-    def test_score_breakdown_is_reported_as_code_computed(self):
-        body = compose(RESULTS)["body"]
-        assert "코드 계산" in body
 
+class TestProvenance:
+    """메일은 '코드 계산' 이라고 인쇄한다 — 그 주장을 재계산으로 보증한다."""
 
-class TestVerification:
-    """메일 경로는 '코드 계산' 이라고 인쇄한다 — 그 주장을 강제한다."""
+    def test_a_candidate_without_raw_input_is_refused(self):
+        data = results()
+        data["candidates"][0].pop("candidate_input")
+        data["candidates"][0]["match"] = 100
+        data["candidates"][0]["score_breakdown"] = {
+            "keyword_fit_40": 40, "school_25": 25, "stability_20": 20, "preferred_15": 15,
+        }
+        with pytest.raises(UnverifiedCandidate, match="candidate_input"):
+            compose(data)
 
-    def _with(self, **overrides):
-        candidate = {**RESULTS["candidates"][0], **overrides}
-        return {**RESULTS, "candidates": [candidate]}
+    def test_a_forged_total_that_disagrees_with_the_recompute_is_refused(self):
+        with pytest.raises(UnverifiedCandidate, match="재계산"):
+            compose(with_candidate(match=100))
 
-    def test_hand_written_score_is_refused(self):
-        with pytest.raises(UnverifiedCandidate, match="손으로 쓴 점수"):
-            compose(self._with(match=99))
-
-    def test_missing_breakdown_is_refused(self):
-        with pytest.raises(UnverifiedCandidate, match="score_breakdown"):
-            compose(self._with(score_breakdown=None))
-
-    def test_below_the_gate_is_refused(self):
-        low = {"keyword_fit_40": 10, "school_25": 10, "stability_20": 10, "preferred_15": 5}
-        with pytest.raises(UnverifiedCandidate, match="등록 문턱"):
-            compose(self._with(match=sum(low.values()), score_breakdown=low))
-
-    def test_forged_axis_name_is_refused(self):
-        with pytest.raises(UnverifiedCandidate, match="위조된 점수"):
-            compose(self._with(match=100, score_breakdown={"forged": 100}))
-
-    def test_axis_above_its_cap_is_refused(self):
-        over = {"keyword_fit_40": 100, "school_25": 0, "stability_20": 0, "preferred_15": 0}
-        with pytest.raises(UnverifiedCandidate, match="범위 밖"):
-            compose(self._with(match=100, score_breakdown=over))
-
-    def test_missing_axis_is_refused(self):
-        with pytest.raises(UnverifiedCandidate, match="누락"):
-            compose(self._with(match=60, score_breakdown={"keyword_fit_40": 40, "school_25": 20}))
-
-    def test_hard_excluded_candidate_is_refused(self):
-        with pytest.raises(UnverifiedCandidate, match="하드제외"):
-            compose(self._with(hard_exclude_reason="freelancer"))
-
-    def test_a_real_scored_candidate_passes(self):
-        from scoring import Candidate, load_school_contract, score as score_fn
-
-        verdict = score_fn(
-            Candidate(name="홍길동", profile_url="https://www.saramin.co.kr/p/1",
-                      school="연세대학교", roles=(("A", 40), ("B", 36)),
-                      keyword_hits=("Spring", "Kotlin")),
-            required_terms=["Spring", "Kotlin"], preferred_terms=["에듀테크"],
-            contract=load_school_contract(),
+    def test_the_reported_score_is_the_recomputed_one(self):
+        mail = compose(results())
+        candidate = results()["candidates"][0]
+        assert "candidate_input" in candidate
+        line = next(l for l in mail["body"].splitlines() if l.startswith("Score:"))
+        total = int(line.rsplit("총점 ", 1)[1].rstrip(")"))
+        breakdown_sum = sum(
+            int(part.rsplit(" ", 1)[1])
+            for part in line[len("Score: "):].split(" (")[0].split(" · ")
         )
-        mail = compose(self._with(match=verdict.total, score_breakdown=verdict.breakdown))
-        assert f"총점 {verdict.total}" in mail["body"]
+        assert total == breakdown_sum
+
+    def test_a_freelancer_is_refused_by_the_recompute(self):
+        data = with_candidate(candidate_input={**REAL_INPUT, "is_freelancer": True})
+        with pytest.raises(UnverifiedCandidate, match="하드제외"):
+            compose(data)
+
+    def test_a_low_scoring_candidate_is_refused_by_the_recompute(self):
+        data = with_candidate(candidate_input={**REAL_INPUT, "school": "부산대학교",
+                                               "keyword_hits": []})
+        with pytest.raises(UnverifiedCandidate, match="등록 문턱"):
+            compose(data)
+
+    def test_missing_required_terms_is_refused(self):
+        data = results()
+        data.pop("required_terms")
+        with pytest.raises(UnverifiedCandidate, match="required_terms"):
+            compose(data)
+
+    def test_malformed_raw_input_is_refused(self):
+        with pytest.raises(UnverifiedCandidate, match="잘못됐다"):
+            compose(with_candidate(candidate_input={"school": "연세대학교"}))

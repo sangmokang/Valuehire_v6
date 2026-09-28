@@ -99,6 +99,33 @@ class TestSchoolTier:
     def test_the_real_world_top_schools_still_match(self, school):
         assert school_tier(school, CONTRACT) == SchoolTier.WORLD_TOP
 
+    @pytest.mark.parametrize(
+        "school,expected",
+        [("동서울대학교", SchoolTier.OTHER), ("서울신학대학교", SchoolTier.OTHER),
+         ("서울대학교", SchoolTier.IN_SEOUL), ("서울시립대학교", SchoolTier.IN_SEOUL),
+         ("서울과학기술대학교", SchoolTier.IN_SEOUL), ("이화여자대학교", SchoolTier.IN_SEOUL)],
+    )
+    def test_korean_stems_match_only_at_the_start(self, school, expected):
+        # 부분일치였을 때 '동서울대' 가 '서울대' 로 잡혔다 (codex 3차).
+        assert school_tier(school, CONTRACT) == expected
+
+    def test_a_major_after_the_school_name_does_not_break_matching(self):
+        assert school_tier("연세대학교 컴퓨터과학과", CONTRACT) == SchoolTier.IN_SEOUL
+
+    @pytest.mark.parametrize(
+        "school",
+        ["University of Michigan-Flint", "University of Michigan-Dearborn"],
+    )
+    def test_satellite_campuses_of_world_top_schools_are_excluded(self, school):
+        # 정식 명칭의 연속 부분수열이어도 뒤에 다른 지명이 남으면 다른 학교다 (codex 3차).
+        assert school_tier(school, CONTRACT) == SchoolTier.OTHER
+
+    @pytest.mark.parametrize(
+        "school", ["MIT Sloan", "Harvard Business School", "The University of Oxford"]
+    )
+    def test_generic_trailing_words_still_match(self, school):
+        assert school_tier(school, CONTRACT) == SchoolTier.WORLD_TOP
+
     @pytest.mark.parametrize("school", ["Smith College", "Methodist University"])
     def test_short_ascii_acronyms_do_not_substring_match(self, school):
         # MIT -> "Smith", ETH -> "Methodist" 로 world_top 승격되던 실측 결함 (2026-09-28).
