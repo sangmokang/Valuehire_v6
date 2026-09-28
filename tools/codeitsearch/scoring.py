@@ -22,6 +22,8 @@ from typing import Any
 
 __all__ = (
     "AISEARCH_REGISTER_MIN",
+    "AXIS_CAPS",
+    "CAP_AXIS",
     "Candidate",
     "Verdict",
     "SchoolTier",
@@ -35,6 +37,17 @@ __all__ = (
 
 AISEARCH_REGISTER_MIN = 60
 STRONG_MIN = 85
+
+#: 축 이름과 상한. compose_mail 이 "코드 계산" 주장을 검증할 때 이 표를 쓴다 —
+#: 축 이름을 지어내거나 상한을 넘긴 점수는 score() 가 만든 것이 아니다.
+AXIS_CAPS = {
+    "keyword_fit_40": 40,
+    "school_25": 25,
+    "stability_20": 20,
+    "preferred_15": 15,
+}
+#: 하드제외 게이트 캡. 음수이며 총점을 49 이하로 끌어내린다.
+CAP_AXIS = "hard_exclude_cap"
 
 _CONTRACT_PATH = (
     Path(__file__).resolve().parents[2]
@@ -123,19 +136,49 @@ def _is_two_year_name(raw: str, contract: dict[str, Any]) -> bool:
     return any(_raw(marker) in residue for marker in cut["two_year_college_markers"])
 
 
+def _is_branch_campus(raw: str, contract: dict[str, Any]) -> bool:
+    """True for a campus outside Seoul.
+
+    Listing branch campuses one by one leaked 국제캠퍼스 (연세, 인천) and 자연과학캠퍼스
+    (성균관, 수원). The rule is inverted instead: a name that says 캠퍼스 must name a
+    Seoul campus from the allowlist, otherwise it is a branch.
+    """
+    branch = contract.get("branch_campus", {})
+    if any(_raw(marker) in raw for marker in branch.get("markers", ())):
+        return True
+    if "캠퍼스" not in raw:
+        return False
+    return not any(_raw(name) in raw for name in branch.get("seoul_campus_allowlist", ()))
+
+
+def _ascii_hit(entry: str, tokens: list[str]) -> bool:
+    """Match an ASCII contract entry against the school's token sequence.
+
+    A single token must appear whole (so ``MIT`` no longer hits "Smith College"), and a
+    multi-token entry must appear as a contiguous run — ``University of Michigan`` must
+    not match "Michigan State University".
+    """
+    wanted = [part.casefold() for part in re.findall(r"[A-Za-z0-9]+", entry)]
+    if not wanted:
+        return False
+    if len(wanted) == 1:
+        return wanted[0] in tokens
+    return any(
+        tokens[i : i + len(wanted)] == wanted for i in range(len(tokens) - len(wanted) + 1)
+    )
+
+
 def school_tier(school: str | None, contract: dict[str, Any]) -> str:
     """Classify a school string against the contract. Unknown/missing -> OTHER."""
     if not school:
         return SchoolTier.OTHER
     raw = _raw(school)
     normalized = _normalize(school, contract)
-    tokens = {token.casefold() for token in re.findall(r"[A-Za-z0-9]+", school)}
-    max_len = contract.get("ascii_token_match_max_len", 5)
+    tokens = [token.casefold() for token in re.findall(r"[A-Za-z0-9]+", school)]
 
     def hit(name: str) -> bool:
         if name.isascii():
-            folded = "".join(name.split()).casefold()
-            return folded in tokens if len(name) <= max_len else folded in raw
+            return _ascii_hit(name, tokens)
         return _normalize(name, contract) in normalized
 
     # 전문대 표지는 원문 기준으로 본다. 정규화는 '산업대학'을 '산업'으로 줄여
@@ -146,9 +189,8 @@ def school_tier(school: str | None, contract: dict[str, Any]) -> str:
         if _normalize(marker, contract) in normalized:
             return SchoolTier.OTHER
     # 분교·이원화 캠퍼스는 본교 어간을 그대로 달고 있어 in_seoul 판정 전에 걸러야 한다.
-    for marker in contract.get("branch_campus", {}).get("markers", ()):
-        if _raw(marker) in raw:
-            return SchoolTier.OTHER
+    if _is_branch_campus(raw, contract):
+        return SchoolTier.OTHER
     for name in contract["special_tier"]["world_top"]:
         if hit(name):
             return SchoolTier.WORLD_TOP
@@ -286,7 +328,7 @@ def score(
         # 합과 총점이 어긋난다 (실측 82 vs 49, 2026-09-28).
         capped = min(total, 49)
         if capped != total:
-            breakdown["hard_exclude_cap"] = capped - total
+            breakdown[CAP_AXIS] = capped - total
         total = capped
         notes.append(f"하드제외: {reason}")
 

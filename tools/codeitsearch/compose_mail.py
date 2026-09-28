@@ -20,7 +20,7 @@ from typing import Any
 
 #: scoring.AISEARCH_REGISTER_MIN 과 한 세트. 여기서만 다시 선언하지 않고 import 한다.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from scoring import AISEARCH_REGISTER_MIN  # noqa: E402
+from scoring import AISEARCH_REGISTER_MIN, AXIS_CAPS, CAP_AXIS  # noqa: E402
 
 SUBJECT_PREFIX = "[aisearch]Claude-win"
 RECIPIENTS = (
@@ -59,6 +59,22 @@ def _verify(candidate: dict[str, Any]) -> None:
     breakdown = candidate.get("score_breakdown")
     if not isinstance(breakdown, dict) or not breakdown:
         raise UnverifiedCandidate(f"{name}: score_breakdown missing — 코드 계산 점수가 아니다")
+    # 축 이름과 상한까지 본다. 합계만 맞추면 {"forged": 100} 같은 위조 점수가 통과했다
+    # (codex 2차 검증). score() 가 만든 breakdown 은 이 축들만, 상한 안에서 갖는다.
+    unknown = sorted(set(breakdown) - set(AXIS_CAPS) - {CAP_AXIS})
+    if unknown:
+        raise UnverifiedCandidate(
+            f"{name}: score() 가 만들지 않는 축 {unknown} — 위조된 점수다"
+        )
+    missing = sorted(set(AXIS_CAPS) - set(breakdown))
+    if missing:
+        raise UnverifiedCandidate(f"{name}: 축 {missing} 누락 — 코드 계산 점수가 아니다")
+    for axis, cap in AXIS_CAPS.items():
+        value = breakdown[axis]
+        if not isinstance(value, int) or not 0 <= value <= cap:
+            raise UnverifiedCandidate(f"{name}: {axis}={value} 는 0..{cap} 범위 밖이다")
+    if breakdown.get(CAP_AXIS, 0) > 0:
+        raise UnverifiedCandidate(f"{name}: {CAP_AXIS} 는 음수여야 한다")
     total = sum(breakdown.values())
     if total != match:
         raise UnverifiedCandidate(

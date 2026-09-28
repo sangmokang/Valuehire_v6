@@ -13,7 +13,16 @@ import urllib.parse
 import urllib.request
 from typing import Any
 
-__all__ = ("SupabaseError", "credentials", "delete", "insert", "next_id", "select")
+__all__ = (
+    "SupabaseError",
+    "credentials",
+    "delete",
+    "insert",
+    "next_id",
+    "patch",
+    "select",
+    "upsert",
+)
 
 
 class SupabaseError(Exception):
@@ -101,6 +110,15 @@ def _is_pk_conflict(error: Exception, column: str) -> bool:
     return UNIQUE_VIOLATION in text and ("_pkey" in text or f"Key ({column})=" in text)
 
 
+def patch(table: str, query: list[tuple[str, str]], values: dict[str, Any]) -> int:
+    """Update matching rows in place. ``query`` must be non-empty."""
+    if not query:
+        raise SupabaseError("refusing an unfiltered update")
+    path = f"{table}?{urllib.parse.urlencode(query)}"
+    echoed = _request("PATCH", path, payload=values, prefer="return=representation")
+    return len(echoed) if isinstance(echoed, list) else 0
+
+
 def insert(
     table: str,
     rows: list[dict[str, Any]],
@@ -145,3 +163,34 @@ def next_id(table: str, *, column: str = "id") -> int:
     """Return max(column)+1, for tables whose identity sequence lags a bulk import."""
     rows = select(table, [("select", column), ("order", f"{column}.desc"), ("limit", "1")])
     return int(rows[0][column]) + 1 if rows else 1
+
+
+def upsert(
+    table: str,
+    rows: list[dict[str, Any]],
+    *,
+    on_conflict: str,
+    chunk: int = 200,
+) -> int:
+    """Insert-or-update on a natural unique key, one atomic statement per chunk.
+
+    This is what a snapshot reload should use. Delete-then-insert has no transaction
+    behind it in PostgREST, so a failing insert leaves the previous snapshot gone; an
+    upsert never removes anything, and a failure leaves the prior rows untouched.
+    ``on_conflict`` must name the columns of an existing unique constraint.
+    """
+    written = 0
+    for start in range(0, len(rows), chunk):
+        batch = rows[start : start + chunk]
+        path = f"{table}?{urllib.parse.urlencode([('on_conflict', on_conflict)])}"
+        echoed = _request(
+            "POST", path, payload=batch,
+            prefer="resolution=merge-duplicates,return=representation",
+        )
+        if not isinstance(echoed, list) or len(echoed) != len(batch):
+            raise SupabaseError(
+                f"{table}: expected {len(batch)} rows echoed, got "
+                f"{len(echoed) if isinstance(echoed, list) else type(echoed).__name__}"
+            )
+        written += len(echoed)
+    return written

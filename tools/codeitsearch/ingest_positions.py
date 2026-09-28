@@ -4,9 +4,9 @@ Usage:
     python tools/codeitsearch/ingest_positions.py tools/codeitsearch/data/<snapshot>.json
     python tools/codeitsearch/ingest_positions.py <snapshot> --dry-run
 
-Re-running the same snapshot is idempotent: rows for (platform, snapshot_date,
-source_file) are deleted before the insert, so a partial earlier run cannot
-double-count.
+Re-running the same snapshot is idempotent and never leaves a gap: each run writes
+under its own source_file suffix first, and only then removes the previous run's rows.
+PostgREST has no transaction, so that order is the whole safety mechanism.
 """
 
 from __future__ import annotations
@@ -22,10 +22,15 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from segmentation import segment_positions  # noqa: E402
-from supabase_io import delete, insert, next_id, select  # noqa: E402
+from supabase_io import delete, insert, select  # noqa: E402
 
 POSITIONS_TABLE = "jobmarket_positions"
 SNAPSHOTS_TABLE = "jobmarket_snapshots"
+
+#: uq_jmp 는 COALESCE 표현식 위의 유니크 인덱스라 PostgREST 의 on_conflict(컬럼 목록)로는
+#: 지정할 수 없다 — 42P10. 그래서 upsert 대신, 실행마다 source_file 에 run 접미사를 붙여
+#: **새 행을 먼저 쓰고** 성공한 뒤에 이전 실행분을 지운다. 어느 순간에도 데이터가 비지 않는다.
+RUN_SEPARATOR = "#run-"
 REGISTRY = (
     Path(__file__).resolve().parents[2]
     / "contracts" / "humansearch" / "company-careers-sources.json"
@@ -47,6 +52,14 @@ def company_entry(company_key: str) -> dict[str, Any]:
     raise KeyError(f"unknown company_key {company_key!r}; registry has: {known}")
 
 
+def source_prefix_for(snapshot: dict[str, Any]) -> str:
+    """Stable part of source_file — every run of this snapshot shares it."""
+    company_key = snapshot["company_key"]
+    return (
+        f"{company_key}search/{Path(snapshot['source']).name}/{snapshot['snapshot_date']}"
+    )
+
+
 def build_rows(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
     platform = snapshot["platform"]
     snapshot_date = snapshot["snapshot_date"]
@@ -56,7 +69,11 @@ def build_rows(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
     # 모르는 값은 지어내지 않는다 — 레지스트리에 상세 URL 형식이 없으면 url 은 비운다.
     template = entry.get("detail_url_template")
     location = snapshot.get("location")
-    source_file = f"{company_key}search/{Path(snapshot['source']).name}/{snapshot_date}"
+    source_prefix = f"{company_key}search/{Path(snapshot['source']).name}/{snapshot_date}"
+    # run_id 가 없으면 지금 시각으로 만든다 — source_file 이 실행마다 달라야
+    # 새 행이 기존 행과 자연 키로 충돌하지 않고 "삭제 없이 먼저 쓰기" 가 성립한다.
+    run_id = snapshot.get("run_id") or datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    source_file = f"{source_prefix}{RUN_SEPARATOR}{run_id}"
     rows = []
     for position in segment_positions(snapshot["positions"]):
         keywords = position["keywords"]
@@ -118,6 +135,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     snapshot = json.loads(args.snapshot.read_text(encoding="utf-8"))
+    # run_id 는 source_file 을 실행마다 유일하게 만들어, 새 행이 기존 행과 자연 키로
+    # 충돌하지 않게 한다. 이것이 "삭제 없이 먼저 쓰기"를 가능하게 하는 유일한 장치다.
+    snapshot.setdefault("run_id", datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ"))
     rows = build_rows(snapshot)
     snapshot_row = build_snapshot_row(snapshot, rows)
 
@@ -134,43 +154,42 @@ def main(argv: list[str] | None = None) -> int:
         print("\n[dry-run] nothing written")
         return 0
 
-    key = [
+    # 새 행을 먼저 쓰고, 성공한 뒤에 이전 실행분을 지운다. PostgREST 에는 트랜잭션이
+    # 없으므로 순서가 곧 안전장치다 — insert 가 실패하면 이전 실행분이 그대로 남는다.
+    prefix = source_prefix_for(snapshot)
+    prefix_key = [
         ("platform", f"eq.{snapshot['platform']}"),
         ("snapshot_date", f"eq.{snapshot['snapshot_date']}"),
-        ("source_file", f"eq.{rows[0]['source_file']}"),
+        ("source_file", f"like.{prefix}*"),
     ]
-    # jobmarket_positions carries a natural unique key (uq_jmp on snapshot_date,
-    # platform, segment, title, company, url, source_file), so the rows for this key
-    # must go away before the new ones land. That delete is the dangerous step on a
-    # production database: PostgREST gives us no transaction, so a failing insert would
-    # leave the day's snapshot simply gone. Keep a copy and put it back if the insert
-    # fails — best effort, but never a silent loss.
-    backup = select(POSITIONS_TABLE, [*key, ("select", "*")])
-    removed = delete(POSITIONS_TABLE, key)
-    try:
-        # The id sequence lags an earlier bulk import, so ids are allocated here.
-        written = insert(POSITIONS_TABLE, rows, assign_ids="id")
-    except Exception:
-        if backup:
-            insert(POSITIONS_TABLE, backup)
-            print(f"insert failed — restored {len(backup)} previous rows", file=sys.stderr)
-        raise
+    written = insert(POSITIONS_TABLE, rows, assign_ids="id")
+    removed = delete(
+        POSITIONS_TABLE, [*prefix_key, ("source_file", f"neq.{rows[0]['source_file']}")]
+    )
 
-    snapshot_key = [
-        ("snapshot_date", f"eq.{snapshot['snapshot_date']}"),
-        ("source_file", f"eq.{snapshot_row['source_file']}"),
-    ]
-    snapshot_backup = select(SNAPSHOTS_TABLE, [*snapshot_key, ("select", "*")])
-    delete(SNAPSHOTS_TABLE, snapshot_key)
-    try:
-        insert(SNAPSHOTS_TABLE, [snapshot_row])
-    except Exception:
-        if snapshot_backup:
-            insert(SNAPSHOTS_TABLE, snapshot_backup)
-        raise
+    insert(SNAPSHOTS_TABLE, [snapshot_row])
+    delete(
+        SNAPSHOTS_TABLE,
+        [
+            ("snapshot_date", f"eq.{snapshot['snapshot_date']}"),
+            ("source_file", f"like.{prefix}*"),
+            ("source_file", f"neq.{snapshot_row['source_file']}"),
+        ],
+    )
 
-    verified = select(POSITIONS_TABLE, [*key, ("select", "posting_id")])
-    print(f"\ndeleted {len(removed)} stale, inserted {written}, verified {len(verified)} in Supabase")
+    verified = select(
+        POSITIONS_TABLE,
+        [
+            ("platform", f"eq.{snapshot['platform']}"),
+            ("snapshot_date", f"eq.{snapshot['snapshot_date']}"),
+            ("source_file", f"eq.{rows[0]['source_file']}"),
+            ("select", "posting_id"),
+        ],
+    )
+    print(
+        f"\nwrote {written} rows first, then removed {len(removed)} from earlier runs; "
+        f"verified {len(verified)} in Supabase"
+    )
     if len(verified) != len(rows):
         print("MISMATCH — verified count does not equal built rows", file=sys.stderr)
         return 1
