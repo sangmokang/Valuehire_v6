@@ -72,7 +72,7 @@ def build_rows(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
     source_prefix = f"{company_key}search/{Path(snapshot['source']).name}/{snapshot_date}"
     # run_id 가 없으면 지금 시각으로 만든다 — source_file 이 실행마다 달라야
     # 새 행이 기존 행과 자연 키로 충돌하지 않고 "삭제 없이 먼저 쓰기" 가 성립한다.
-    run_id = snapshot.get("run_id") or datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    run_id = snapshot.get("run_id") or datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     source_file = f"{source_prefix}{RUN_SEPARATOR}{run_id}"
     rows = []
     for position in segment_positions(snapshot["positions"]):
@@ -137,8 +137,11 @@ def main(argv: list[str] | None = None) -> int:
     snapshot = json.loads(args.snapshot.read_text(encoding="utf-8"))
     # run_id 는 source_file 을 실행마다 유일하게 만들어, 새 행이 기존 행과 자연 키로
     # 충돌하지 않게 한다. 이것이 "삭제 없이 먼저 쓰기"를 가능하게 하는 유일한 장치다.
-    snapshot.setdefault("run_id", datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ"))
+    snapshot.setdefault("run_id", datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ"))
     rows = build_rows(snapshot)
+    if not rows:
+        print("snapshot has no positions — nothing to ingest", file=sys.stderr)
+        return 1
     snapshot_row = build_snapshot_row(snapshot, rows)
 
     searchable = [r for r in rows if r["raw_titles_json"]["searchable"]]
@@ -157,25 +160,42 @@ def main(argv: list[str] | None = None) -> int:
     # 새 행을 먼저 쓰고, 성공한 뒤에 이전 실행분을 지운다. PostgREST 에는 트랜잭션이
     # 없으므로 순서가 곧 안전장치다 — insert 가 실패하면 이전 실행분이 그대로 남는다.
     prefix = source_prefix_for(snapshot)
-    prefix_key = [
+    current_source = rows[0]["source_file"]
+    day_key = [
         ("platform", f"eq.{snapshot['platform']}"),
         ("snapshot_date", f"eq.{snapshot['snapshot_date']}"),
-        ("source_file", f"like.{prefix}*"),
     ]
+    # 지울 대상은 id 로 특정한다. source_file 로 LIKE 를 걸면 '_' 와 '%' 가 SQL 와일드카드라
+    # 파일명에 그 글자가 하나만 들어와도 다른 회사 행까지 지워진다.
+    before = select(POSITIONS_TABLE, [*day_key, ("select", "id,source_file")])
+    stale_ids = [
+        r["id"] for r in before
+        if str(r.get("source_file", "")).startswith(prefix) and r["source_file"] != current_source
+    ]
+
     written = insert(POSITIONS_TABLE, rows, assign_ids="id")
-    removed = delete(
-        POSITIONS_TABLE, [*prefix_key, ("source_file", f"neq.{rows[0]['source_file']}")]
-    )
+
+    removed = []
+    if stale_ids:
+        removed = delete(
+            POSITIONS_TABLE, [*day_key, ("id", f"in.({','.join(map(str, stale_ids))})")]
+        )
 
     insert(SNAPSHOTS_TABLE, [snapshot_row])
-    delete(
+    old_snapshots = select(
         SNAPSHOTS_TABLE,
-        [
-            ("snapshot_date", f"eq.{snapshot['snapshot_date']}"),
-            ("source_file", f"like.{prefix}*"),
-            ("source_file", f"neq.{snapshot_row['source_file']}"),
-        ],
+        [("snapshot_date", f"eq.{snapshot['snapshot_date']}"), ("select", "source_file")],
     )
+    for row in old_snapshots:
+        source = str(row.get("source_file", ""))
+        if source.startswith(prefix) and source != snapshot_row["source_file"]:
+            delete(
+                SNAPSHOTS_TABLE,
+                [
+                    ("snapshot_date", f"eq.{snapshot['snapshot_date']}"),
+                    ("source_file", f"eq.{source}"),
+                ],
+            )
 
     verified = select(
         POSITIONS_TABLE,
