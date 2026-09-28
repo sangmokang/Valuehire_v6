@@ -1,0 +1,90 @@
+{
+  "contract": "company-careers-sources",
+  "version": "v1",
+  "updated": "2026-09-28",
+  "note": "OOOsearch 스킬이 도는 대상 기업 레지스트리. 자사 채용 페이지를 성실히 업데이트하는 기업만 넣는다. 한 기업을 추가한다는 것은 여기에 harvest 규칙을 확정해 적는다는 뜻이고, 규칙을 모르는 채로 status: mapped 를 쓰면 안 된다.",
+  "harvest_status": {
+    "mapped": "리스팅 순회 규칙이 실측으로 확인됨 — 바로 수집 가능",
+    "unmapped": "아직 실측 안 됨 — 첫 실행 때 discovery 절차를 돌리고 이 파일을 갱신할 것"
+  },
+  "discovery": [
+    "1. 채용 리스트 URL을 열고 get_page_text 로 카드 텍스트 줄 구조를 확인한다.",
+    "2. 상세 링크 셀렉터를 찾는다 (예: a[href^=\"/c/\"]).",
+    "3. 페이지네이션이 쿼리 파라미터인지 버튼인지 확인한다. 쿼리면 그 파라미터를 page_param 에 적는다.",
+    "4. 1페이지와 마지막 페이지를 실제로 열어 총건수를 대조한다.",
+    "5. 확인된 값으로 이 파일의 항목을 mapped 로 승격한다."
+  ],
+  "companies": [
+    {
+      "key": "codeit",
+      "name_ko": "코드잇",
+      "name_en": "Codeit",
+      "platform": "codeit_careers",
+      "careers_url": "https://careers.codeit.com/recruit",
+      "detail_url_template": "https://careers.codeit.com/c/{posting_id}",
+      "harvest": {
+        "status": "mapped",
+        "verified_on": "2026-09-28",
+        "page_param": "page",
+        "page_index_base": 0,
+        "page_count": 7,
+        "per_page": 10,
+        "total_verified": 62,
+        "detail_link_selector": "a[href^=\"/c/\"]",
+        "posting_id_from": "href_segment_after_/c/",
+        "card_text_fields": ["title", "group", "job", "exp", "etype", "status"],
+        "duplicate_dom": true,
+        "duplicate_dom_note": "반응형으로 카드가 3벌 렌더된다. 앞에서 per_page 개만 취하거나 posting_id 로 dedupe 할 것."
+      }
+    },
+    {
+      "key": "wrtn",
+      "name_ko": "뤼튼테크놀로지스",
+      "name_en": "Wrtn Technologies",
+      "platform": "wrtn_careers",
+      "careers_url": "https://wrtn.career.greetinghr.com",
+      "harvest": {"status": "unmapped"},
+      "note": "기존 5포지션 서치 이력 있음 — docs/engineering/goal-prompts/codex-5position-search-2026-08-15.md. 포지션 id 는 ClickUp 태스크 id 로도 관리됨."
+    },
+    {
+      "key": "spoonlabs",
+      "name_ko": "스푼랩스",
+      "name_en": "Spoon Labs",
+      "platform": "spoonlabs_careers",
+      "careers_url": "https://spoonlabs.career.greetinghr.com",
+      "harvest": {"status": "unmapped"}
+    },
+    {
+      "key": "goodchoice",
+      "name_ko": "여기어때",
+      "name_en": "GoodChoice",
+      "platform": "goodchoice_careers",
+      "careers_url": "https://gccompany.career.greetinghr.com",
+      "harvest": {"status": "unmapped"}
+    },
+    {
+      "key": "bunjang",
+      "name_ko": "번개장터",
+      "name_en": "Bunjang",
+      "platform": "bunjang_careers",
+      "careers_url": "https://bunjang.career.greetinghr.com",
+      "harvest": {"status": "unmapped"}
+    }
+  ],
+  "channels": [
+    {
+      "key": "saramin",
+      "name_ko": "사람인",
+      "status": "mapped_to_auth_wall",
+      "talent_search_url": "https://www.saramin.co.kr/zf_user/memcom/talent-pool/main/search",
+      "auth_redirect": "https://www.saramin.co.kr/zf_user/auth?ut=c&url=%2Fzf_user%2Fmemcom%2Ftalent-pool%2Fmain%2Fsearch",
+      "public_onboarding_page": "https://www.saramin.co.kr/zf_user/memcom/talent-pool/main/tutorial",
+      "requires": "기업회원(ut=c) 로그인 + 인재풀/이직제안 이용권",
+      "auth_contract": "contracts/humansearch/saramin-markers.json",
+      "auth_note": "/tutorial 로 리다이렉트되는 것은 로그인 증거가 아니다 — 비로그인도 열리는 공개 페이지다. 권위 있는 신호는 /talent-pool/main/search 가 auth?ut=c 로 튕기는지, 그리고 '인재풀 바로가기' CTA 의 href 가 auth 로 렌더되는지다.",
+      "billing_hint": "https://billing.saramin.co.kr/products/details/job_offer_60_d30"
+    },
+    {"key": "jobkorea", "name_ko": "잡코리아", "status": "planned"},
+    {"key": "linkedin", "name_ko": "링크드인 RPS", "status": "planned"}
+  ]
+}
