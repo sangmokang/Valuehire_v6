@@ -1,0 +1,136 @@
+{
+  "contract": "in-seoul-universities",
+  "version": "v1",
+  "note": "인서울 판정은 계약 데이터로만 한다 — 코드에 학교명을 하드코딩하면 v5처럼 러너마다 기준이 갈린다. 창립 스펙 §열람순서 참조.",
+  "updated": "2026-09-28",
+  "match": "normalized_contains",
+  "normalize": {
+    "strip": [
+      "대학교",
+      "대학원",
+      "대학",
+      "캠퍼스",
+      " ",
+      "(",
+      ")",
+      "-",
+      "·"
+    ],
+    "trailing_strip": [
+      "대"
+    ],
+    "casefold": true
+  },
+  "in_seoul": [
+    "서울대",
+    "연세대",
+    "고려대",
+    "서강대",
+    "성균관대",
+    "한양대",
+    "중앙대",
+    "경희대",
+    "한국외국어대",
+    "한국외대",
+    "서울시립대",
+    "건국대",
+    "동국대",
+    "홍익대",
+    "숙명여대",
+    "이화여대",
+    "국민대",
+    "숭실대",
+    "세종대",
+    "광운대",
+    "명지대",
+    "상명대",
+    "가톨릭대",
+    "성신여대",
+    "덕성여대",
+    "동덕여대",
+    "서울여대",
+    "한성대",
+    "삼육대",
+    "서경대",
+    "한국체육대",
+    "서울과학기술대",
+    "총신대",
+    "장로회신학대",
+    "감리교신학대",
+    "추계예술대",
+    "한영신학대",
+    "서울기독대",
+    "KC대",
+    "성공회대",
+    "그리스도대",
+    "예술종합학교",
+    "한국예술종합학교",
+    "경기대서울",
+    "연세대서울",
+    "고려대서울"
+  ],
+  "special_tier": {
+    "note": "세계 명문대는 학력 만점 (2026-06-26 결정). 인서울 층과 동급으로 취급한다.",
+    "world_top": [
+      "MIT",
+      "Stanford",
+      "Harvard",
+      "Berkeley",
+      "CarnegieMellon",
+      "Caltech",
+      "Princeton",
+      "Yale",
+      "Columbia",
+      "Cornell",
+      "Oxford",
+      "Cambridge",
+      "ImperialCollege",
+      "ETH",
+      "NUS",
+      "NTU",
+      "Tsinghua",
+      "PekingUniversity",
+      "TokyoUniversity",
+      "KyotoUniversity",
+      "UCLA",
+      "UIUC",
+      "GeorgiaTech",
+      "Michigan",
+      "Waterloo",
+      "Toronto"
+    ]
+  },
+  "national_tier": {
+    "note": "인서울은 아니지만 이공계 최상위 — 학력 감점 대상이 아니다.",
+    "members": [
+      "KAIST",
+      "POSTECH",
+      "GIST",
+      "DGIST",
+      "UNIST",
+      "한국과학기술원",
+      "포항공과대"
+    ]
+  },
+  "hard_exclude": {
+    "note": "사람인·잡코리아만 학교 하드컷. 링크드인은 학교 하드컷 없음 (창립 스펙).",
+    "two_year_college_markers": [
+      "전문대",
+      "전문학사",
+      "산업대학"
+    ],
+    "channels": [
+      "saramin",
+      "jobkorea"
+    ]
+  },
+  "downgrade_markers": {
+    "note": "사이버·방송통신·학점은행은 인서울 가중치 대상이 아니다. 이름에 인서울 대학 어간이 들어가도 OTHER로 내린다.",
+    "markers": [
+      "사이버",
+      "방송통신",
+      "학점은행",
+      "디지털대"
+    ]
+  }
+}
