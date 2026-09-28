@@ -110,6 +110,19 @@ def _raw(text: str) -> str:
     return "".join(text.split()).casefold()
 
 
+def _is_two_year_name(raw: str, contract: dict[str, Any]) -> bool:
+    """Two-year-college markers, with professional graduate schools carved out first.
+
+    ``전문대학원`` (경영/법학/의학) contains ``전문대`` but is a graduate school at a
+    four-year university — matching it hard-excluded 서울대 경영전문대학원 MBA holders.
+    """
+    cut = contract["hard_exclude"]
+    residue = raw
+    for negative in cut.get("negative_markers", ()):
+        residue = residue.replace(_raw(negative), "")
+    return any(_raw(marker) in residue for marker in cut["two_year_college_markers"])
+
+
 def school_tier(school: str | None, contract: dict[str, Any]) -> str:
     """Classify a school string against the contract. Unknown/missing -> OTHER."""
     if not school:
@@ -127,9 +140,8 @@ def school_tier(school: str | None, contract: dict[str, Any]) -> str:
 
     # 전문대 표지는 원문 기준으로 본다. 정규화는 '산업대학'을 '산업'으로 줄여
     # '한국산업기술대학교'(4년제)를 전문대로 하드제외했다 (실측 2026-09-28).
-    for marker in contract["hard_exclude"]["two_year_college_markers"]:
-        if _raw(marker) in raw:
-            return SchoolTier.TWO_YEAR
+    if _is_two_year_name(raw, contract):
+        return SchoolTier.TWO_YEAR
     for marker in contract.get("downgrade_markers", {}).get("markers", ()):
         if _normalize(marker, contract) in normalized:
             return SchoolTier.OTHER
@@ -187,8 +199,7 @@ def _degree_is_two_year(degree: str | None, contract: dict[str, Any]) -> bool:
     """전문학사는 학교명이 4년제로 보여도 전문대 학력이다. degree 필드를 실제로 읽는다."""
     if not degree:
         return False
-    folded = _raw(degree)
-    return any(_raw(marker) in folded for marker in contract["hard_exclude"]["two_year_college_markers"])
+    return _is_two_year_name(_raw(degree), contract)
 
 
 def _hard_exclude(candidate: Candidate, tier: str, contract: dict[str, Any]) -> str | None:
