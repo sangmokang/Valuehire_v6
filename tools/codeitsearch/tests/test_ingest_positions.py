@@ -46,6 +46,51 @@ class TestBuildRows:
         assert sum(summary["per_segment_json"].values()) == len(rows)
 
 
+class TestCompanyIsolation:
+    """반례 C — 다른 회사 스냅샷에 Codeit 값이 단 한 건도 섞이면 안 된다."""
+
+    WRTN = {
+        "source": "https://wrtn.career.greetinghr.com",
+        "company_key": "wrtn",
+        "company": "뤼튼테크놀로지스",
+        "platform": "wrtn_careers",
+        "snapshot_date": "2026-09-28",
+        "positions": [
+            {"posting_id": "abc123", "title": "백엔드 엔지니어", "group": "Tech",
+             "job": "소프트웨어 엔지니어링", "exp": "경력 (3~10년)",
+             "etype": "정규직", "status": "상시 채용"},
+        ],
+    }
+
+    def test_no_codeit_value_leaks_into_another_company(self):
+        rows = ingest_positions.build_rows(self.WRTN)
+        blob = json.dumps(rows, ensure_ascii=False)
+        assert "codeit" not in blob.lower()
+        assert "코드잇" not in blob
+        assert rows[0]["company_norm"] == "wrtn"
+        assert rows[0]["platform"] == "wrtn_careers"
+        assert rows[0]["source_file"].startswith("wrtnsearch/")
+
+    def test_unknown_detail_url_is_left_empty_not_invented(self):
+        # 레지스트리에 wrtn 의 detail_url_template 이 없다 — 지어내면 안 된다.
+        rows = ingest_positions.build_rows(self.WRTN)
+        assert rows[0]["url"] is None
+
+    def test_absent_location_is_not_defaulted_to_seoul(self):
+        rows = ingest_positions.build_rows(self.WRTN)
+        assert rows[0]["location"] is None
+
+    def test_unknown_company_key_fails_loudly(self):
+        with pytest.raises(KeyError, match="unknown company_key"):
+            ingest_positions.build_rows({**self.WRTN, "company_key": "nosuchco"})
+
+    def test_codeit_snapshot_still_gets_its_real_values(self):
+        rows = ingest_positions.build_rows(SNAPSHOT)
+        assert rows[0]["company_norm"] == "codeit"
+        assert rows[0]["location"] == "서울"
+        assert rows[0]["url"].startswith("https://careers.codeit.com/c/")
+
+
 class TestDestructiveWriteSafety:
     """운영 DB다 — insert 가 실패해도 이전 스냅샷이 사라지면 안 된다."""
 

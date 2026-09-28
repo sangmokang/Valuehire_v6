@@ -12,7 +12,7 @@
 - 저장소: Valuehire_v6 루트. 브랜치 `feat/codeitsearch-aisearch-module`. `git status`로 기존 변경부터 확인한다.
   남의 미커밋 변경(예: `scoring.py`·`test_scoring.py`·`in-seoul-universities.json`)이 있으면 **건드리지도 되돌리지도 않는다.**
 - 코드 수정은 워크트리에서: `git worktree add worktrees/codeit-minfix -b task/codeit-minfix` (`docs/sot/git-workflow.md:27`).
-- 정본: `.claude/skills/codeitsearch/SKILL.md`, 실행 프롬프트 `docs/engineering/goal-prompts/oooseach-codeitsearch-2026-09-28.md`.
+- 정본: `.claude/skills/codeitsearch/SKILL.md`, 실행 프롬프트 `docs/engineering/goal-prompts/ooosearch-codeitsearch-2026-09-28.md`.
 - 테스트: `uv run --with pytest python -m pytest tools/codeitsearch/tests -q` (system python엔 pytest 없음).
 - 2026-09-28 기록(현장 재조회 전까지 **미확인** 취급):
   - 사람인 인재풀은 확장이 붙은 Chrome("Browser 1")에서 **미인증**이었다 — `/talent-pool/main/search`가 tutorial로 튕기고, `인재풀 바로가기` href=`/zf_user/auth?ut=c&...`, 헤더에 `로그인` 링크. CDP 9225 꺼짐. 사장님 "로그인했어" 후 재확인에도 동일.
