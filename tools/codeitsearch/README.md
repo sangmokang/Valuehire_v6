@@ -67,17 +67,26 @@ Windows / macOS 모두 같은 명령으로 돈다. 표준 라이브러리 외 �
   판정은 `인재풀 바로가기` CTA의 href가 `auth?ut=c` 인지로 한다.
 - **Gmail 커넥터 스코프 부족** — `gmail.labels`/`gmail.modify` 미승인 상태라 `aisearch` 라벨
   생성·부착이 거부된다. 스코프 승인 또는 수동 라벨 생성 필요.
-- `jobmarket_positions` 는 **자연 유니크 키 `uq_jmp`**(snapshot_date, platform, segment,
-  title, company, url, source_file)를 갖는다. 같은 키의 행은 지운 뒤에야 다시 넣을 수 있다.
+- `jobmarket_positions` 의 자연 유니크 키 **`uq_jmp`** 는 `COALESCE(...)` 표현식 위의
+  인덱스라 PostgREST 의 `on_conflict`(컬럼 목록)로 지정할 수 없다 — upsert 불가(42P10).
+- 그래서 적재는 **실행마다 `source_file` 에 `#run-<UTC타임스탬프>` 접미사**를 붙여 새 행을
+  **먼저 쓰고**, 성공한 뒤에 같은 prefix 의 이전 실행분을 지운다. PostgREST 에 트랜잭션이
+  없으므로 이 순서가 유일한 안전장치다 — insert 가 실패하면 이전 실행분이 그대로 남는다.
 - `jobmarket_positions.id` 시퀀스가 과거 벌크 적재로 어긋나 있어 `insert(assign_ids="id")`
-  로 명시 할당하고, **PK 충돌 시에만** max 를 다시 읽어 재시도한다(자연 키 충돌은 재시도하지 않음).
-  `max(id)+1` 이라 동시 실행에는 여전히 경쟁이 있고, 재시도가 그것을 흡수한다.
-- PostgREST 에는 트랜잭션이 없다. 적재는 **삭제 전에 기존 행을 백업**하고 insert 실패 시
-  되돌린다(best effort). 완전한 원자성은 DDL/RPC 없이는 불가능하다 — 남은 위험은
-  "백업 복구마저 실패" 뿐이고, 그 경우 stderr 에 남는다.
+  로 명시 할당하고, **PK 충돌 시에만** max 를 다시 읽어 재시도한다.
+- 학교 판정: 이름에 `캠퍼스` 가 있으면 **서울 캠퍼스 허용목록**에 있을 때만 인서울(표지 나열
+  방식은 국제·자연과학캠퍼스를 놓쳤다). 영문 항목은 단일 토큰이면 토큰 완전일치, 다중
+  토큰이면 **연속 토큰 부분수열** 일치(`University of Michigan` ≠ `Michigan State University`).
+- 메일 합성은 `score_breakdown` 의 **축 이름·상한·합계·문턱**을 전부 검증한다. 손으로 쓴
+  점수나 지어낸 축은 `UnverifiedCandidate` 로 거부된다.
 
 ## 적대 검증 이력
 
+- 2026-09-28 `codex exec` 적대 리뷰 **2차**: BLOCKER 1(적재 데이터 손실) / MAJOR 4 PARTIAL.
+  → 삭제-우선을 버리고 run 접미사 기반 쓰기-우선으로 재설계, 캠퍼스 허용목록 규칙,
+  연속 토큰 부분수열 매칭, `대학원` 예외, 메일 축·상한 검증까지 반영. 테스트 50 → 126개.
+  codex 가 지적한 "테스트 위장" 2건(복구 테스트가 실제 경로 우회, 재시도 테스트가 next_id 고정)도
+  실제 순서·재조회를 단언하도록 다시 썼다.
 - 2026-09-28 `codex exec` 적대 리뷰 1차: BLOCKER 2 / MAJOR 6 / MINOR 1 → 전부 수정, 회귀 테스트 고정.
   주요 실측 결함: 분교 캠퍼스 in_seoul 오분류, 짧은 영문 약어(MIT/ETH/NUS) 부분일치,
   `산업대학` 표지가 한국산업기술대(4년제)를 전문대로 하드제외, `degree` 미검사,

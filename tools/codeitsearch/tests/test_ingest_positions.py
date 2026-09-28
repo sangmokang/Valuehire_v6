@@ -91,46 +91,58 @@ class TestCompanyIsolation:
         assert rows[0]["url"].startswith("https://careers.codeit.com/c/")
 
 
-class TestDestructiveWriteSafety:
-    """운영 DB다 — insert 가 실패해도 이전 스냅샷이 사라지면 안 된다."""
+class TestWriteBeforeDelete:
+    """운영 DB다 — PostgREST 에 트랜잭션이 없으므로 순서가 유일한 안전장치다."""
 
-    def test_failed_insert_restores_the_backup(self, monkeypatch, tmp_path, capsys):
-        previous = [{"id": 1, "title": "old"}, {"id": 2, "title": "older"}]
-        calls = {"deleted": 0, "restored": None}
+    def _run(self, monkeypatch, tmp_path, insert_fails=False):
+        calls = []
 
         def fake_select(table, query):
-            return previous if any(k == "select" and v == "*" for k, v in query) else []
+            return []
 
         def fake_delete(table, query):
-            calls["deleted"] += 1
-            return previous
+            calls.append(("delete", table, dict(query)))
+            return []
 
         def fake_insert(table, rows, **kwargs):
-            if rows is previous:
-                calls["restored"] = list(rows)
-                return len(rows)
-            raise supabase_io.SupabaseError("Supabase HTTP 500 boom")
+            calls.append(("insert", table, len(rows)))
+            if insert_fails and table == ingest_positions.POSITIONS_TABLE:
+                raise supabase_io.SupabaseError("boom")
+            return len(rows)
 
         monkeypatch.setattr(ingest_positions, "select", fake_select)
         monkeypatch.setattr(ingest_positions, "delete", fake_delete)
         monkeypatch.setattr(ingest_positions, "insert", fake_insert)
-        monkeypatch.setattr(ingest_positions, "next_id", lambda *a, **k: 1000)
-
         path = tmp_path / "snap.json"
         path.write_text(json.dumps(SNAPSHOT, ensure_ascii=False), encoding="utf-8")
+        return calls, path
 
+    def test_nothing_is_deleted_before_the_insert_succeeds(self, monkeypatch, tmp_path):
+        calls, path = self._run(monkeypatch, tmp_path)
+        ingest_positions.main([str(path)])
+        kinds = [c[0] for c in calls]
+        assert kinds[0] == "insert", f"first call must be an insert, got {kinds}"
+        first_delete = kinds.index("delete")
+        assert kinds[:first_delete].count("insert") >= 1
+
+    def test_a_failing_insert_deletes_nothing(self, monkeypatch, tmp_path):
+        calls, path = self._run(monkeypatch, tmp_path, insert_fails=True)
         with pytest.raises(supabase_io.SupabaseError):
             ingest_positions.main([str(path)])
+        assert not [c for c in calls if c[0] == "delete"], "실패한 실행이 기존 행을 지웠다"
 
-        assert calls["deleted"] == 1
-        assert calls["restored"] == previous
-        assert "restored 2 previous rows" in capsys.readouterr().err
+    def test_each_run_gets_its_own_source_file(self):
+        a = ingest_positions.build_rows({**SNAPSHOT, "run_id": "A"})[0]["source_file"]
+        b = ingest_positions.build_rows({**SNAPSHOT, "run_id": "B"})[0]["source_file"]
+        assert a != b
+        prefix = ingest_positions.source_prefix_for(SNAPSHOT)
+        assert a.startswith(prefix) and b.startswith(prefix)
 
     def test_dry_run_writes_nothing(self, monkeypatch, tmp_path):
         def explode(*args, **kwargs):
             raise AssertionError("--dry-run must not touch Supabase")
 
-        for name in ("select", "delete", "insert", "next_id"):
+        for name in ("select", "delete", "insert"):
             monkeypatch.setattr(ingest_positions, name, explode)
         path = tmp_path / "snap.json"
         path.write_text(json.dumps(SNAPSHOT, ensure_ascii=False), encoding="utf-8")
@@ -150,8 +162,10 @@ class TestIdRetry:
         assert supabase_io._is_pk_conflict(pk_error, "id") is True
         assert supabase_io._is_pk_conflict(natural_error, "id") is False
 
-    def test_insert_retries_once_then_succeeds(self, monkeypatch):
+    def test_retry_re_reads_the_max_instead_of_reusing_the_clashing_id(self, monkeypatch):
+        # next_id 를 상수로 고정하면 "재조회로 id 가 바뀌는지" 를 검증하지 못한다.
         attempts = {"n": 0}
+        allocations = iter([5, 11])
 
         def fake_request(method, path, *, payload=None, prefer=None):
             attempts["n"] += 1
@@ -162,8 +176,23 @@ class TestIdRetry:
             return payload
 
         monkeypatch.setattr(supabase_io, "_request", fake_request)
-        monkeypatch.setattr(supabase_io, "next_id", lambda *a, **k: 5)
+        monkeypatch.setattr(supabase_io, "next_id", lambda *a, **k: next(allocations))
         rows = [{"a": 1}, {"a": 2}]
         assert supabase_io.insert("t", rows, assign_ids="id") == 2
         assert attempts["n"] == 2
-        assert [r["id"] for r in rows] == [5, 6]
+        assert [r["id"] for r in rows] == [11, 12], "재시도가 같은 id 를 다시 썼다"
+
+    def test_a_natural_key_conflict_is_not_retried(self, monkeypatch):
+        attempts = {"n": 0}
+
+        def fake_request(method, path, *, payload=None, prefer=None):
+            attempts["n"] += 1
+            raise supabase_io.SupabaseError(
+                '{"code":"23505","message":"violates unique constraint \\"uq_jmp\\""}'
+            )
+
+        monkeypatch.setattr(supabase_io, "_request", fake_request)
+        monkeypatch.setattr(supabase_io, "next_id", lambda *a, **k: 5)
+        with pytest.raises(supabase_io.SupabaseError):
+            supabase_io.insert("t", [{"a": 1}], assign_ids="id")
+        assert attempts["n"] == 1, "자연 키 충돌을 재시도했다"

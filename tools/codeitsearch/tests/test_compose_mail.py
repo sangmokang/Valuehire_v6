@@ -95,8 +95,22 @@ class TestVerification:
             compose(self._with(score_breakdown=None))
 
     def test_below_the_gate_is_refused(self):
+        low = {"keyword_fit_40": 10, "school_25": 10, "stability_20": 10, "preferred_15": 5}
         with pytest.raises(UnverifiedCandidate, match="등록 문턱"):
-            compose(self._with(match=40, score_breakdown={"keyword_fit_40": 40}))
+            compose(self._with(match=sum(low.values()), score_breakdown=low))
+
+    def test_forged_axis_name_is_refused(self):
+        with pytest.raises(UnverifiedCandidate, match="위조된 점수"):
+            compose(self._with(match=100, score_breakdown={"forged": 100}))
+
+    def test_axis_above_its_cap_is_refused(self):
+        over = {"keyword_fit_40": 100, "school_25": 0, "stability_20": 0, "preferred_15": 0}
+        with pytest.raises(UnverifiedCandidate, match="범위 밖"):
+            compose(self._with(match=100, score_breakdown=over))
+
+    def test_missing_axis_is_refused(self):
+        with pytest.raises(UnverifiedCandidate, match="누락"):
+            compose(self._with(match=60, score_breakdown={"keyword_fit_40": 40, "school_25": 20}))
 
     def test_hard_excluded_candidate_is_refused(self):
         with pytest.raises(UnverifiedCandidate, match="하드제외"):

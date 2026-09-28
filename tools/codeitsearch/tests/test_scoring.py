@@ -67,6 +67,38 @@ class TestSchoolTier:
         # 분교 필터가 본교까지 깎으면 안 된다 — 특히 세종대 vs 세종캠퍼스.
         assert school_tier(school, CONTRACT) == SchoolTier.IN_SEOUL
 
+    @pytest.mark.parametrize(
+        "school",
+        ["연세대학교 국제캠퍼스", "성균관대학교 자연과학캠퍼스", "고려대학교 세종캠퍼스"],
+    )
+    def test_any_non_seoul_campus_is_excluded_not_just_listed_ones(self, school):
+        # 표지 나열 방식이 국제·자연과학캠퍼스를 놓치던 실측 결함 (codex 2차).
+        assert school_tier(school, CONTRACT) == SchoolTier.OTHER
+
+    @pytest.mark.parametrize(
+        "school",
+        ["연세대학교 신촌캠퍼스", "성균관대학교 인문사회과학캠퍼스", "고려대학교 안암캠퍼스"],
+    )
+    def test_seoul_campuses_stay_in_seoul(self, school):
+        assert school_tier(school, CONTRACT) == SchoolTier.IN_SEOUL
+
+    @pytest.mark.parametrize(
+        "school",
+        ["Michigan State University", "Toronto Metropolitan University",
+         "Columbia College Chicago", "Oxford Brookes University"],
+    )
+    def test_lookalike_english_names_are_not_world_top(self, school):
+        # 'Michigan'·'Toronto'·'Columbia'·'Oxford' 어간 부분일치 실측 결함 (codex 2차).
+        assert school_tier(school, CONTRACT) == SchoolTier.OTHER
+
+    @pytest.mark.parametrize(
+        "school",
+        ["University of Michigan", "University of Toronto", "Columbia University",
+         "University of Oxford", "MIT Sloan"],
+    )
+    def test_the_real_world_top_schools_still_match(self, school):
+        assert school_tier(school, CONTRACT) == SchoolTier.WORLD_TOP
+
     @pytest.mark.parametrize("school", ["Smith College", "Methodist University"])
     def test_short_ascii_acronyms_do_not_substring_match(self, school):
         # MIT -> "Smith", ETH -> "Methodist" 로 world_top 승격되던 실측 결함 (2026-09-28).
@@ -143,6 +175,19 @@ class TestHardExclude:
     def test_professional_graduate_schools_are_not_two_year(self, school, expected):
         # '전문대학원' 안의 '전문대' 에 걸려 서울대 MBA 가 하드제외되던 실측 결함 (2026-09-28).
         assert school_tier(school, CONTRACT) == expected
+
+    @pytest.mark.parametrize("degree", ["산업대학원 석사", "경영전문대학원 석사", "일반대학원 박사"])
+    def test_graduate_degrees_are_never_two_year(self, degree):
+        # '산업대학원' 이 '산업대학' 표지에 걸려 하드제외되던 실측 결함 (codex 2차).
+        verdict = score(candidate(school="부산대학교", degree=degree), required_terms=REQUIRED,
+                        preferred_terms=PREFERRED, contract=CONTRACT)
+        assert verdict.hard_exclude_reason is None
+
+    @pytest.mark.parametrize("degree", ["전문학사", "2년제 학사", "Associate Degree"])
+    def test_every_two_year_degree_spelling_is_cut(self, degree):
+        verdict = score(candidate(school="부산대학교", degree=degree, channel="saramin"),
+                        required_terms=REQUIRED, preferred_terms=PREFERRED, contract=CONTRACT)
+        assert verdict.hard_exclude_reason == "two_year_college"
 
     def test_mba_degree_string_is_not_a_two_year_degree(self):
         verdict = score(candidate(school="서울대학교", degree="경영전문대학원 석사"),

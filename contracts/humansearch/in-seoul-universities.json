@@ -1,6 +1,6 @@
 {
   "contract": "in-seoul-universities",
-  "version": "v3",
+  "version": "v4",
   "note": "인서울 판정은 계약 데이터로만 한다 — 코드에 학교명을 하드코딩하면 v5처럼 러너마다 기준이 갈린다. 창립 스펙 §열람순서 참조.",
   "updated": "2026-09-28",
   "match": "korean_substring_plus_ascii_token",
@@ -75,30 +75,32 @@
       "MIT",
       "Stanford",
       "Harvard",
-      "Berkeley",
-      "CarnegieMellon",
       "Caltech",
       "Princeton",
       "Yale",
-      "Columbia",
       "Cornell",
-      "Oxford",
-      "Cambridge",
-      "ImperialCollege",
-      "ETH",
-      "NUS",
-      "NTU",
-      "Tsinghua",
-      "PekingUniversity",
-      "TokyoUniversity",
-      "KyotoUniversity",
       "UCLA",
       "UIUC",
-      "GeorgiaTech",
-      "Michigan",
-      "Waterloo",
-      "Toronto"
-    ]
+      "Berkeley",
+      "University of Oxford",
+      "University of Cambridge",
+      "Imperial College London",
+      "ETH Zurich",
+      "Carnegie Mellon University",
+      "Columbia University",
+      "University of Michigan",
+      "University of Toronto",
+      "University of Waterloo",
+      "Georgia Institute of Technology",
+      "Georgia Tech",
+      "National University of Singapore",
+      "Nanyang Technological University",
+      "Tsinghua University",
+      "Peking University",
+      "University of Tokyo",
+      "Kyoto University"
+    ],
+    "match_note": "단일 토큰 항목은 토큰 완전일치, 다중 토큰 항목은 **연속 토큰 부분수열** 일치. 'Michigan'·'Toronto'·'Columbia' 같은 모호한 어간이 Michigan State / Toronto Metropolitan / Columbia College Chicago 를 명문대로 올리던 실측 결함(codex 2차) 때문에 정식 명칭으로 적는다."
   },
   "national_tier": {
     "note": "인서울은 아니지만 이공계 최상위 — 학력 감점 대상이 아니다.",
@@ -117,16 +119,20 @@
     "two_year_college_markers": [
       "전문대",
       "전문학사",
-      "산업대학"
+      "산업대학",
+      "2년제",
+      "3년제",
+      "associatedegree",
+      "associate'sdegree"
     ],
     "channels": [
       "saramin",
       "jobkorea"
     ],
     "negative_markers": [
-      "전문대학원"
+      "대학원"
     ],
-    "negative_marker_note": "'전문대학원'(경영·법학·의학)은 4년제 대학의 대학원이지 전문대가 아니다. '전문대' 표지가 그 안에 들어 있어 서울대 경영전문대학원 MBA 가 하드제외되던 실측 결함 (2026-09-28, 2차 자체검증). 표지 검사 전에 이 문자열을 먼저 제거한다."
+    "negative_marker_note": "'대학원' 이 붙은 학력은 전문대가 아니다. '전문대학원'(경영·법학·의학)과 '산업대학원' 이 각각 '전문대'·'산업대학' 표지에 걸려 하드제외되던 실측 결함(2026-09-28). 표지 검사 전에 '대학원' 을 원문에서 제거한다."
   },
   "downgrade_markers": {
     "note": "사이버·방송통신·학점은행은 인서울 가중치 대상이 아니다. 이름에 인서울 대학 어간이 들어가도 OTHER로 내린다.",
@@ -140,25 +146,26 @@
   "match_note": "한글 어간은 정규화 후 부분일치. ASCII 항목은 5자 이하면 **토큰 완전일치**만 인정한다 — 'MIT'가 'Smith College'에, 'ETH'가 'Methodist University'에 부분일치해 세계명문으로 오분류되던 실측 결함(2026-09-28) 때문이다. 6자 이상 ASCII는 공백 제거 후 부분일치 허용.",
   "ascii_token_match_max_len": 5,
   "branch_campus": {
-    "note": "분교·이원화 캠퍼스는 인서울이 아니다. 본교 어간이 이름에 남아 있어 부분일치로 전부 in_seoul 로 잡히던 실측 결함(2026-09-28). in_seoul 판정 **전에** 걸러 OTHER 로 내린다.",
+    "note": "분교·이원화 캠퍼스는 인서울이 아니다. 표지를 일일이 나열하면 '국제캠퍼스'(연세 인천)·'자연과학캠퍼스'(성대 수원)처럼 목록 밖 캠퍼스가 새어나간다(codex 2차 검증). 그래서 규칙을 뒤집는다 — 이름에 '캠퍼스' 가 있으면 서울 캠퍼스 허용목록에 있을 때만 인서울.",
+    "rule": "campus_token_must_be_allowlisted",
+    "seoul_campus_allowlist": [
+      "서울캠퍼스",
+      "신촌캠퍼스",
+      "안암캠퍼스",
+      "명륜캠퍼스",
+      "혜화캠퍼스",
+      "인문사회과학캠퍼스",
+      "본교캠퍼스"
+    ],
     "markers": [
       "ERICA",
       "에리카",
-      "세종캠퍼스",
-      "미래캠퍼스",
       "WISE",
       "와이즈",
       "글로컬",
       "다빈치",
-      "글로벌캠퍼스",
-      "안산캠퍼스",
-      "원주캠퍼스",
-      "천안캠퍼스",
-      "충주캠퍼스",
-      "경주캠퍼스",
-      "제2캠퍼스",
       "분교"
     ],
-    "marker_note": "'세종'·'미래'·'글로벌' 단독은 쓰지 않는다 — '세종대'(인서울)와 충돌한다. 반드시 '캠퍼스'가 붙은 형태이거나 고유 브랜드명(ERICA/WISE/글로컬/다빈치)만 쓴다."
+    "marker_note": "'캠퍼스' 없이 브랜드명만 쓰는 경우를 위한 보조 목록."
   }
 }
