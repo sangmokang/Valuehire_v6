@@ -26,14 +26,37 @@ from supabase_io import delete, insert, next_id, select  # noqa: E402
 
 POSITIONS_TABLE = "jobmarket_positions"
 SNAPSHOTS_TABLE = "jobmarket_snapshots"
-DETAIL_URL = "https://careers.codeit.com/c/{posting_id}"
+REGISTRY = (
+    Path(__file__).resolve().parents[2]
+    / "contracts" / "humansearch" / "company-careers-sources.json"
+)
+
+
+def company_entry(company_key: str) -> dict[str, Any]:
+    """Look the company up in the registry. An unknown key is a hard failure.
+
+    Without this the ingester quietly stamped Codeit's detail-URL template, company_norm
+    and location onto every company's rows — so a wrtnsearch run would have written
+    Codeit data under Wrtn's name.
+    """
+    registry = json.loads(REGISTRY.read_text(encoding="utf-8"))
+    for entry in registry["companies"]:
+        if entry["key"] == company_key:
+            return entry
+    known = ", ".join(e["key"] for e in registry["companies"])
+    raise KeyError(f"unknown company_key {company_key!r}; registry has: {known}")
 
 
 def build_rows(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
     platform = snapshot["platform"]
     snapshot_date = snapshot["snapshot_date"]
     company = snapshot["company"]
-    source_file = f"codeitsearch/{Path(snapshot['source']).name}/{snapshot_date}"
+    company_key = snapshot["company_key"]
+    entry = company_entry(company_key)
+    # 모르는 값은 지어내지 않는다 — 레지스트리에 상세 URL 형식이 없으면 url 은 비운다.
+    template = entry.get("detail_url_template")
+    location = snapshot.get("location")
+    source_file = f"{company_key}search/{Path(snapshot['source']).name}/{snapshot_date}"
     rows = []
     for position in segment_positions(snapshot["positions"]):
         keywords = position["keywords"]
@@ -45,9 +68,11 @@ def build_rows(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
                 "keyword": keywords["core"][0] if keywords["core"] else None,
                 "title": position["title"],
                 "company": company,
-                "company_norm": "codeit",
-                "location": "서울",
-                "url": DETAIL_URL.format(posting_id=position["posting_id"]),
+                "company_norm": company_key,
+                "location": location,
+                "url": (
+                    template.format(posting_id=position["posting_id"]) if template else None
+                ),
                 "posting_id": position["posting_id"],
                 "annual_from": position["annual_from"],
                 "annual_to": position["annual_to"],
@@ -65,8 +90,8 @@ def build_rows(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
                 "core_keywords_json": keywords["core"],
                 "key_phrases_json": keywords["expanded"] + keywords["stack"],
                 "preferred_keywords_json": keywords["preferred"],
-                "jd_keyword_analysis_source": "codeitsearch_segmentation",
-                "jd_keyword_analysis_version": "codeitsearch-segment-v2-bilingual",
+                "jd_keyword_analysis_source": "ooosearch_segmentation",
+                "jd_keyword_analysis_version": "ooosearch-segment-v2-bilingual",
             }
         )
     return rows

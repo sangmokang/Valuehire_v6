@@ -1,78 +1,570 @@
 {
   "source": "https://careers.codeit.com/recruit",
+  "company_key": "codeit",
   "company": "코드잇",
   "platform": "codeit_careers",
+  "location": "서울",
   "snapshot_date": "2026-09-28",
   "collected_by": "codeitsearch/browser-harvest-v1",
   "page_count": 7,
   "positions": [
-    {"posting_id": "ktL1Ef3FMo", "title": "교육 행정 매니저", "group": "Business & Operations", "job": "교육 행정", "exp": "경력 (1년 이상)", "etype": "정규직", "status": "지원 마감"},
-    {"posting_id": "SYP16oYqQg", "title": "기업교육 어카운트 매니저", "group": "Business & Operations", "job": "교육 운영", "exp": "경력 (5년 이하)", "etype": "정규직", "status": "상시 채용"},
-    {"posting_id": "jnu2SeGs83", "title": "기업교육 운영 매니저", "group": "Business & Operations", "job": "교육 운영", "exp": "경력 무관", "etype": "정규직", "status": "상시 채용"},
-    {"posting_id": "fwzjpQtmMG", "title": "기업교육 운영 매니저 (계약직)", "group": "Business & Operations", "job": "교육 운영", "exp": "경력 무관", "etype": "계약직", "status": "상시 채용"},
-    {"posting_id": "pG5t4dHctk", "title": "보안 담당자", "group": "Staff", "job": "보안", "exp": "경력 (3~10년)", "etype": "정규직", "status": "상시 채용"},
-    {"posting_id": "7c9PDApHYU", "title": "부트캠프 세일즈·CX 리드", "group": "Business & Operations", "job": "교육 운영", "exp": "경력 (3~10년)", "etype": "정규직", "status": "상시 채용"},
-    {"posting_id": "2KXWvGgB6J", "title": "교육 보조 인턴 [부트캠프]", "group": "Business & Operations", "job": "교육 행정", "exp": "경력 무관", "etype": "인턴", "status": "상시 채용"},
-    {"posting_id": "BX8faVhL49", "title": "데이터 분석가 부트캠프 보조강사", "group": "Data·AI", "job": "강사·멘토", "exp": "경력 (2~20년)", "etype": "프리랜서", "status": "상시 채용"},
-    {"posting_id": "VTRw8kuRUG", "title": "총무(GA) 매니저", "group": "Staff", "job": "HR", "exp": "경력 (1년 이상)", "etype": "계약직", "status": "상시 채용"},
-    {"posting_id": "gyAPfKtsLe", "title": "로보틱스&피지컬 AI 강사 (커리큘럼 기획)", "group": "Data·AI", "job": "강사·멘토", "exp": "경력 (3년 이상)", "etype": "계약직", "status": "상시 채용"},
-
-    {"posting_id": "X5996p3iCb", "title": "AI 엔지니어 부트캠프 강사", "group": "Data·AI", "job": "강사·멘토", "exp": "경력 (3~20년)", "etype": "프리랜서", "status": "상시 채용"},
-    {"posting_id": "xx1hzZSJqj", "title": "AI 엔지니어 부트캠프 멘토", "group": "Data·AI", "job": "강사·멘토", "exp": "경력 (1~20년)", "etype": "프리랜서", "status": "상시 채용"},
-    {"posting_id": "xxsvt9LraM", "title": "AI 엔지니어 커리어 멘토 (이력서 코칭/모의면접)", "group": "Data·AI", "job": "강사·멘토", "exp": "경력 (3~20년)", "etype": "프리랜서", "status": "상시 채용"},
-    {"posting_id": "7MSAY3BpDt", "title": "IT 창업 부트캠프 강사", "group": "Tech", "job": "강사·멘토", "exp": "경력 (3~20년)", "etype": "프리랜서", "status": "상시 채용"},
-    {"posting_id": "tCwUcLDYXG", "title": "IT 창업 부트캠프 멘토 (비즈니스 기획, UX/UI 디자인)", "group": "Tech", "job": "강사·멘토", "exp": "경력 (1~20년)", "etype": "프리랜서", "status": "상시 채용"},
-    {"posting_id": "bkCwzsnhm8", "title": "IT 창업 부트캠프 멘토 (풀스택 개발)", "group": "Tech", "job": "강사·멘토", "exp": "경력 (1~20년)", "etype": "프리랜서", "status": "상시 채용"},
-    {"posting_id": "uVzFJaKsu7", "title": "Node.js 백엔드 엔지니어 커리어 멘토 (이력서 코칭/모의면접)", "group": "Tech", "job": "강사·멘토", "exp": "경력 (3년 이상)", "etype": "프리랜서", "status": "상시 채용"},
-    {"posting_id": "77tgHKNUPx", "title": "Spring 백엔드 부트캠프 강사", "group": "Tech", "job": "강사·멘토", "exp": "경력 (3~20년)", "etype": "프리랜서", "status": "상시 채용"},
-    {"posting_id": "LtPFphsRUm", "title": "Spring 백엔드 부트캠프 멘토", "group": "Tech", "job": "강사·멘토", "exp": "경력 (1~20년)", "etype": "프리랜서", "status": "상시 채용"},
-    {"posting_id": "v9E5vmR6iN", "title": "Spring 백엔드 엔지니어 커리어 멘토 (이력서 코칭/모의면접)", "group": "Tech", "job": "강사·멘토", "exp": "경력 (3~20년)", "etype": "프리랜서", "status": "상시 채용"},
-
-    {"posting_id": "uWLqfnWHGg", "title": "교육 행정 매니저 (계약직)", "group": "Business & Operations", "job": "교육 행정", "exp": "경력 무관", "etype": "계약직", "status": "상시 채용"},
-    {"posting_id": "BucPHLbxM4", "title": "그래픽 디자인 특강 강사", "group": "Design", "job": "강사·멘토", "exp": "경력 (3~20년)", "etype": "프리랜서", "status": "상시 채용"},
-    {"posting_id": "7dRgBA4mhL", "title": "기업교육 세일즈 매니저", "group": "Sales", "job": "세일즈", "exp": "경력 무관", "etype": "정규직", "status": "상시 채용"},
-    {"posting_id": "Qj4eAE3fwU", "title": "기업교육 운영 인턴", "group": "Business & Operations", "job": "교육 운영", "exp": "신입", "etype": "인턴", "status": "상시 채용"},
-    {"posting_id": "fxx2jogP97", "title": "데이터 분석 특강 강사", "group": "Data·AI", "job": "강사·멘토", "exp": "경력 (3~20년)", "etype": "프리랜서", "status": "상시 채용"},
-    {"posting_id": "VoqxYcZcvM", "title": "데이터 분석가 부트캠프 강사", "group": "Data·AI", "job": "강사·멘토", "exp": "경력 (3~20년)", "etype": "프리랜서", "status": "상시 채용"},
-    {"posting_id": "UZeo8goSde", "title": "데이터 분석가 부트캠프 멘토", "group": "Data·AI", "job": "강사·멘토", "exp": "경력 (1~20년)", "etype": "프리랜서", "status": "상시 채용"},
-    {"posting_id": "6M4czhoqzb", "title": "데이터 분석가 커리어 멘토 (이력서 코칭/모의면접)", "group": "Data·AI", "job": "강사·멘토", "exp": "경력 (3년 이상)", "etype": "프리랜서", "status": "상시 채용"},
-    {"posting_id": "Fh26cJTStE", "title": "마케팅 매니저", "group": "Marketing", "job": "마케팅", "exp": "경력 (3~7년)", "etype": "정규직", "status": "상시 채용"},
-    {"posting_id": "i86W4rdxE9", "title": "마케팅 특강 강사", "group": "Marketing", "job": "강사·멘토", "exp": "경력 (3~20년)", "etype": "프리랜서", "status": "상시 채용"},
-
-    {"posting_id": "vekFaLfyp7", "title": "백엔드 엔지니어", "group": "Tech", "job": "소프트웨어 엔지니어링", "exp": "경력 (3~10년)", "etype": "정규직", "status": "상시 채용"},
-    {"posting_id": "VhocmZxWah", "title": "(산업기능요원) 백엔드 엔지니어", "group": "Tech", "job": "소프트웨어 엔지니어링", "exp": "경력 무관", "etype": "정규직", "status": "상시 채용"},
-    {"posting_id": "hFt8uhocrz", "title": "부트캠프 교육 운영 유닛 리드", "group": "Business & Operations", "job": "교육 운영", "exp": "경력 (3~10년)", "etype": "정규직", "status": "상시 채용"},
-    {"posting_id": "y9NCeXaob9", "title": "부트캠프 세일즈 매니저", "group": "Sales", "job": "세일즈", "exp": "경력 무관", "etype": "정규직", "status": "상시 채용"},
-    {"posting_id": "hHkskExFoX", "title": "세일즈 리드", "group": "Sales", "job": "세일즈", "exp": "경력 (5년 이상)", "etype": "정규직", "status": "지원 마감"},
-    {"posting_id": "bnUWi9f8W6", "title": "솔루션 세일즈 매니저", "group": "Sales", "job": "세일즈", "exp": "경력 무관", "etype": "정규직", "status": "상시 채용"},
-    {"posting_id": "9CdnE5idPc", "title": "영상 PD", "group": "Design", "job": "영상", "exp": "경력 무관", "etype": "정규직", "status": "상시 채용"},
-    {"posting_id": "JWfhLk4fhh", "title": "웹 퍼블리싱 특강 강사", "group": "Tech", "job": "강사·멘토", "exp": "경력 (3~20년)", "etype": "프리랜서", "status": "상시 채용"},
-    {"posting_id": "xSYmUtfkww", "title": "콘텐츠 파트너 [AI 활용 투자]", "group": null, "job": null, "exp": "경력 무관", "etype": "프리랜서", "status": "상시 채용"},
-    {"posting_id": "9qUuQQVK7N", "title": "콘텐츠 파트너 [공통]", "group": null, "job": null, "exp": "경력 무관", "etype": "프리랜서", "status": "상시 채용"},
-
-    {"posting_id": "mbkSZuZZfK", "title": "풀스택 부트캠프 강사", "group": "Tech", "job": "강사·멘토", "exp": "경력 (3~20년)", "etype": "프리랜서", "status": "상시 채용"},
-    {"posting_id": "2pb9eBtt34", "title": "풀스택 부트캠프 멘토", "group": "Tech", "job": "강사·멘토", "exp": "경력 (1~20년)", "etype": "프리랜서", "status": "상시 채용"},
-    {"posting_id": "JEde6yhbRZ", "title": "프로덕트 디자이너 (계약직)", "group": "Design", "job": "프로덕트 디자인", "exp": "경력 무관", "etype": "계약직", "status": "상시 채용"},
-    {"posting_id": "hDyErFzFkf", "title": "프로덕트 디자이너 커리어 멘토 (이력서 코칭/모의면접)", "group": "Design", "job": "강사·멘토", "exp": "경력 (3년 이상)", "etype": "프리랜서", "status": "상시 채용"},
-    {"posting_id": "Hx5TZ45mgL", "title": "프로덕트 디자이너", "group": "Design", "job": "프로덕트 디자인", "exp": "경력 (3~10년)", "etype": "정규직", "status": "상시 채용"},
-    {"posting_id": "3kChWd9ML2", "title": "프로덕트 디자인 부트캠프 강사", "group": "Design", "job": "강사·멘토", "exp": "경력 (3~20년)", "etype": "프리랜서", "status": "상시 채용"},
-    {"posting_id": "an6n5eyWZT", "title": "프로덕트 디자인 부트캠프 멘토", "group": "Design", "job": "강사·멘토", "exp": "경력 (1~20년)", "etype": "프리랜서", "status": "상시 채용"},
-    {"posting_id": "uis93cJTrR", "title": "프로덕트 디자인 부트캠프 보조강사", "group": "Design", "job": "강사·멘토", "exp": "경력 (2~20년)", "etype": "프리랜서", "status": "상시 채용"},
-    {"posting_id": "m3i4VsPvKM", "title": "프로덕트 매니저(PM)", "group": "Tech", "job": "PM", "exp": "경력 (3~10년)", "etype": "정규직", "status": "상시 채용"},
-    {"posting_id": "qWUpVMBSnV", "title": "프론트엔드 엔지니어 커리어 멘토 (이력서 코칭/모의면접)", "group": "Tech", "job": "강사·멘토", "exp": "경력 (3~20년)", "etype": "프리랜서", "status": "상시 채용"},
-
-    {"posting_id": "aw93Zmn31g", "title": "CX 매니저", "group": "Business & Operations", "job": "CX", "exp": "경력 (1년 이상)", "etype": "정규직", "status": "상시 채용"},
-    {"posting_id": "CQMmBfYJk7", "title": "CX 매니저 (계약직)", "group": "Business & Operations", "job": "CX", "exp": "경력 무관", "etype": "계약직", "status": "상시 채용"},
-    {"posting_id": "heHTS33BKS", "title": "[텐엑스] AI 숏폼 올인원 과정 Q&A 전문가", "group": "Design", "job": "강사·멘토", "exp": "경력 (1년 이상)", "etype": "프리랜서", "status": "상시 채용"},
-    {"posting_id": "LV5xNuirg9", "title": "📝 인재풀 등록 - 교육 보조 인턴", "group": null, "job": null, "exp": "신입", "etype": "인턴", "status": "상시 채용"},
-    {"posting_id": "8anwmTy64z", "title": "📝 인재풀 등록 - 교육 운영 인턴 [부트캠프]", "group": null, "job": null, "exp": "경력 무관", "etype": "인턴", "status": "상시 채용"},
-    {"posting_id": "wtnA4CveYF", "title": "📝 인재풀 등록 - 기업교육 강사", "group": "Data·AI", "job": "강사·멘토", "exp": "경력 (3~20년)", "etype": "정규직", "status": "상시 채용"},
-    {"posting_id": "xBFJzoCKT5", "title": "📝 인재풀 등록 - 데이터 분석가 부트캠프 멘토", "group": "Data·AI", "job": "강사·멘토", "exp": "경력 (1~20년)", "etype": "프리랜서", "status": "상시 채용"},
-    {"posting_id": "E7qsgDZNkL", "title": "📝 인재풀 등록 - 백엔드 부트캠프 멘토", "group": "Tech", "job": "강사·멘토", "exp": "경력 (1~20년)", "etype": "프리랜서", "status": "상시 채용"},
-    {"posting_id": "2saeVvhqRc", "title": "📝 인재풀 등록 - 코드잇 상시 인재풀", "group": null, "job": null, "exp": "경력 무관", "etype": null, "status": "상시 채용"},
-    {"posting_id": "fBwMcebGWW", "title": "📝 인재풀 등록 - 코드잇 부트캠프 강사", "group": null, "job": null, "exp": "경력 (1~20년)", "etype": "프리랜서", "status": "상시 채용"},
-
-    {"posting_id": "kg3r1ASYoe", "title": "📝 인재풀 등록 - 풀스택 부트캠프 멘토", "group": "Tech", "job": "강사·멘토", "exp": "경력 (1~20년)", "etype": "프리랜서", "status": "상시 채용"},
-    {"posting_id": "jJFUE6AgEJ", "title": "📝 인재풀 등록 - 프론트엔드 부트캠프 멘토", "group": "Tech", "job": "강사·멘토", "exp": "경력 (1~20년)", "etype": "프리랜서", "status": "상시 채용"}
+    {
+      "posting_id": "ktL1Ef3FMo",
+      "title": "교육 행정 매니저",
+      "group": "Business & Operations",
+      "job": "교육 행정",
+      "exp": "경력 (1년 이상)",
+      "etype": "정규직",
+      "status": "지원 마감"
+    },
+    {
+      "posting_id": "SYP16oYqQg",
+      "title": "기업교육 어카운트 매니저",
+      "group": "Business & Operations",
+      "job": "교육 운영",
+      "exp": "경력 (5년 이하)",
+      "etype": "정규직",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "jnu2SeGs83",
+      "title": "기업교육 운영 매니저",
+      "group": "Business & Operations",
+      "job": "교육 운영",
+      "exp": "경력 무관",
+      "etype": "정규직",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "fwzjpQtmMG",
+      "title": "기업교육 운영 매니저 (계약직)",
+      "group": "Business & Operations",
+      "job": "교육 운영",
+      "exp": "경력 무관",
+      "etype": "계약직",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "pG5t4dHctk",
+      "title": "보안 담당자",
+      "group": "Staff",
+      "job": "보안",
+      "exp": "경력 (3~10년)",
+      "etype": "정규직",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "7c9PDApHYU",
+      "title": "부트캠프 세일즈·CX 리드",
+      "group": "Business & Operations",
+      "job": "교육 운영",
+      "exp": "경력 (3~10년)",
+      "etype": "정규직",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "2KXWvGgB6J",
+      "title": "교육 보조 인턴 [부트캠프]",
+      "group": "Business & Operations",
+      "job": "교육 행정",
+      "exp": "경력 무관",
+      "etype": "인턴",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "BX8faVhL49",
+      "title": "데이터 분석가 부트캠프 보조강사",
+      "group": "Data·AI",
+      "job": "강사·멘토",
+      "exp": "경력 (2~20년)",
+      "etype": "프리랜서",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "VTRw8kuRUG",
+      "title": "총무(GA) 매니저",
+      "group": "Staff",
+      "job": "HR",
+      "exp": "경력 (1년 이상)",
+      "etype": "계약직",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "gyAPfKtsLe",
+      "title": "로보틱스&피지컬 AI 강사 (커리큘럼 기획)",
+      "group": "Data·AI",
+      "job": "강사·멘토",
+      "exp": "경력 (3년 이상)",
+      "etype": "계약직",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "X5996p3iCb",
+      "title": "AI 엔지니어 부트캠프 강사",
+      "group": "Data·AI",
+      "job": "강사·멘토",
+      "exp": "경력 (3~20년)",
+      "etype": "프리랜서",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "xx1hzZSJqj",
+      "title": "AI 엔지니어 부트캠프 멘토",
+      "group": "Data·AI",
+      "job": "강사·멘토",
+      "exp": "경력 (1~20년)",
+      "etype": "프리랜서",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "xxsvt9LraM",
+      "title": "AI 엔지니어 커리어 멘토 (이력서 코칭/모의면접)",
+      "group": "Data·AI",
+      "job": "강사·멘토",
+      "exp": "경력 (3~20년)",
+      "etype": "프리랜서",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "7MSAY3BpDt",
+      "title": "IT 창업 부트캠프 강사",
+      "group": "Tech",
+      "job": "강사·멘토",
+      "exp": "경력 (3~20년)",
+      "etype": "프리랜서",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "tCwUcLDYXG",
+      "title": "IT 창업 부트캠프 멘토 (비즈니스 기획, UX/UI 디자인)",
+      "group": "Tech",
+      "job": "강사·멘토",
+      "exp": "경력 (1~20년)",
+      "etype": "프리랜서",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "bkCwzsnhm8",
+      "title": "IT 창업 부트캠프 멘토 (풀스택 개발)",
+      "group": "Tech",
+      "job": "강사·멘토",
+      "exp": "경력 (1~20년)",
+      "etype": "프리랜서",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "uVzFJaKsu7",
+      "title": "Node.js 백엔드 엔지니어 커리어 멘토 (이력서 코칭/모의면접)",
+      "group": "Tech",
+      "job": "강사·멘토",
+      "exp": "경력 (3년 이상)",
+      "etype": "프리랜서",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "77tgHKNUPx",
+      "title": "Spring 백엔드 부트캠프 강사",
+      "group": "Tech",
+      "job": "강사·멘토",
+      "exp": "경력 (3~20년)",
+      "etype": "프리랜서",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "LtPFphsRUm",
+      "title": "Spring 백엔드 부트캠프 멘토",
+      "group": "Tech",
+      "job": "강사·멘토",
+      "exp": "경력 (1~20년)",
+      "etype": "프리랜서",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "v9E5vmR6iN",
+      "title": "Spring 백엔드 엔지니어 커리어 멘토 (이력서 코칭/모의면접)",
+      "group": "Tech",
+      "job": "강사·멘토",
+      "exp": "경력 (3~20년)",
+      "etype": "프리랜서",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "uWLqfnWHGg",
+      "title": "교육 행정 매니저 (계약직)",
+      "group": "Business & Operations",
+      "job": "교육 행정",
+      "exp": "경력 무관",
+      "etype": "계약직",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "BucPHLbxM4",
+      "title": "그래픽 디자인 특강 강사",
+      "group": "Design",
+      "job": "강사·멘토",
+      "exp": "경력 (3~20년)",
+      "etype": "프리랜서",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "7dRgBA4mhL",
+      "title": "기업교육 세일즈 매니저",
+      "group": "Sales",
+      "job": "세일즈",
+      "exp": "경력 무관",
+      "etype": "정규직",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "Qj4eAE3fwU",
+      "title": "기업교육 운영 인턴",
+      "group": "Business & Operations",
+      "job": "교육 운영",
+      "exp": "신입",
+      "etype": "인턴",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "fxx2jogP97",
+      "title": "데이터 분석 특강 강사",
+      "group": "Data·AI",
+      "job": "강사·멘토",
+      "exp": "경력 (3~20년)",
+      "etype": "프리랜서",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "VoqxYcZcvM",
+      "title": "데이터 분석가 부트캠프 강사",
+      "group": "Data·AI",
+      "job": "강사·멘토",
+      "exp": "경력 (3~20년)",
+      "etype": "프리랜서",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "UZeo8goSde",
+      "title": "데이터 분석가 부트캠프 멘토",
+      "group": "Data·AI",
+      "job": "강사·멘토",
+      "exp": "경력 (1~20년)",
+      "etype": "프리랜서",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "6M4czhoqzb",
+      "title": "데이터 분석가 커리어 멘토 (이력서 코칭/모의면접)",
+      "group": "Data·AI",
+      "job": "강사·멘토",
+      "exp": "경력 (3년 이상)",
+      "etype": "프리랜서",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "Fh26cJTStE",
+      "title": "마케팅 매니저",
+      "group": "Marketing",
+      "job": "마케팅",
+      "exp": "경력 (3~7년)",
+      "etype": "정규직",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "i86W4rdxE9",
+      "title": "마케팅 특강 강사",
+      "group": "Marketing",
+      "job": "강사·멘토",
+      "exp": "경력 (3~20년)",
+      "etype": "프리랜서",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "vekFaLfyp7",
+      "title": "백엔드 엔지니어",
+      "group": "Tech",
+      "job": "소프트웨어 엔지니어링",
+      "exp": "경력 (3~10년)",
+      "etype": "정규직",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "VhocmZxWah",
+      "title": "(산업기능요원) 백엔드 엔지니어",
+      "group": "Tech",
+      "job": "소프트웨어 엔지니어링",
+      "exp": "경력 무관",
+      "etype": "정규직",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "hFt8uhocrz",
+      "title": "부트캠프 교육 운영 유닛 리드",
+      "group": "Business & Operations",
+      "job": "교육 운영",
+      "exp": "경력 (3~10년)",
+      "etype": "정규직",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "y9NCeXaob9",
+      "title": "부트캠프 세일즈 매니저",
+      "group": "Sales",
+      "job": "세일즈",
+      "exp": "경력 무관",
+      "etype": "정규직",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "hHkskExFoX",
+      "title": "세일즈 리드",
+      "group": "Sales",
+      "job": "세일즈",
+      "exp": "경력 (5년 이상)",
+      "etype": "정규직",
+      "status": "지원 마감"
+    },
+    {
+      "posting_id": "bnUWi9f8W6",
+      "title": "솔루션 세일즈 매니저",
+      "group": "Sales",
+      "job": "세일즈",
+      "exp": "경력 무관",
+      "etype": "정규직",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "9CdnE5idPc",
+      "title": "영상 PD",
+      "group": "Design",
+      "job": "영상",
+      "exp": "경력 무관",
+      "etype": "정규직",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "JWfhLk4fhh",
+      "title": "웹 퍼블리싱 특강 강사",
+      "group": "Tech",
+      "job": "강사·멘토",
+      "exp": "경력 (3~20년)",
+      "etype": "프리랜서",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "xSYmUtfkww",
+      "title": "콘텐츠 파트너 [AI 활용 투자]",
+      "group": null,
+      "job": null,
+      "exp": "경력 무관",
+      "etype": "프리랜서",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "9qUuQQVK7N",
+      "title": "콘텐츠 파트너 [공통]",
+      "group": null,
+      "job": null,
+      "exp": "경력 무관",
+      "etype": "프리랜서",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "mbkSZuZZfK",
+      "title": "풀스택 부트캠프 강사",
+      "group": "Tech",
+      "job": "강사·멘토",
+      "exp": "경력 (3~20년)",
+      "etype": "프리랜서",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "2pb9eBtt34",
+      "title": "풀스택 부트캠프 멘토",
+      "group": "Tech",
+      "job": "강사·멘토",
+      "exp": "경력 (1~20년)",
+      "etype": "프리랜서",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "JEde6yhbRZ",
+      "title": "프로덕트 디자이너 (계약직)",
+      "group": "Design",
+      "job": "프로덕트 디자인",
+      "exp": "경력 무관",
+      "etype": "계약직",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "hDyErFzFkf",
+      "title": "프로덕트 디자이너 커리어 멘토 (이력서 코칭/모의면접)",
+      "group": "Design",
+      "job": "강사·멘토",
+      "exp": "경력 (3년 이상)",
+      "etype": "프리랜서",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "Hx5TZ45mgL",
+      "title": "프로덕트 디자이너",
+      "group": "Design",
+      "job": "프로덕트 디자인",
+      "exp": "경력 (3~10년)",
+      "etype": "정규직",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "3kChWd9ML2",
+      "title": "프로덕트 디자인 부트캠프 강사",
+      "group": "Design",
+      "job": "강사·멘토",
+      "exp": "경력 (3~20년)",
+      "etype": "프리랜서",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "an6n5eyWZT",
+      "title": "프로덕트 디자인 부트캠프 멘토",
+      "group": "Design",
+      "job": "강사·멘토",
+      "exp": "경력 (1~20년)",
+      "etype": "프리랜서",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "uis93cJTrR",
+      "title": "프로덕트 디자인 부트캠프 보조강사",
+      "group": "Design",
+      "job": "강사·멘토",
+      "exp": "경력 (2~20년)",
+      "etype": "프리랜서",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "m3i4VsPvKM",
+      "title": "프로덕트 매니저(PM)",
+      "group": "Tech",
+      "job": "PM",
+      "exp": "경력 (3~10년)",
+      "etype": "정규직",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "qWUpVMBSnV",
+      "title": "프론트엔드 엔지니어 커리어 멘토 (이력서 코칭/모의면접)",
+      "group": "Tech",
+      "job": "강사·멘토",
+      "exp": "경력 (3~20년)",
+      "etype": "프리랜서",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "aw93Zmn31g",
+      "title": "CX 매니저",
+      "group": "Business & Operations",
+      "job": "CX",
+      "exp": "경력 (1년 이상)",
+      "etype": "정규직",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "CQMmBfYJk7",
+      "title": "CX 매니저 (계약직)",
+      "group": "Business & Operations",
+      "job": "CX",
+      "exp": "경력 무관",
+      "etype": "계약직",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "heHTS33BKS",
+      "title": "[텐엑스] AI 숏폼 올인원 과정 Q&A 전문가",
+      "group": "Design",
+      "job": "강사·멘토",
+      "exp": "경력 (1년 이상)",
+      "etype": "프리랜서",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "LV5xNuirg9",
+      "title": "📝 인재풀 등록 - 교육 보조 인턴",
+      "group": null,
+      "job": null,
+      "exp": "신입",
+      "etype": "인턴",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "8anwmTy64z",
+      "title": "📝 인재풀 등록 - 교육 운영 인턴 [부트캠프]",
+      "group": null,
+      "job": null,
+      "exp": "경력 무관",
+      "etype": "인턴",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "wtnA4CveYF",
+      "title": "📝 인재풀 등록 - 기업교육 강사",
+      "group": "Data·AI",
+      "job": "강사·멘토",
+      "exp": "경력 (3~20년)",
+      "etype": "정규직",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "xBFJzoCKT5",
+      "title": "📝 인재풀 등록 - 데이터 분석가 부트캠프 멘토",
+      "group": "Data·AI",
+      "job": "강사·멘토",
+      "exp": "경력 (1~20년)",
+      "etype": "프리랜서",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "E7qsgDZNkL",
+      "title": "📝 인재풀 등록 - 백엔드 부트캠프 멘토",
+      "group": "Tech",
+      "job": "강사·멘토",
+      "exp": "경력 (1~20년)",
+      "etype": "프리랜서",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "2saeVvhqRc",
+      "title": "📝 인재풀 등록 - 코드잇 상시 인재풀",
+      "group": null,
+      "job": null,
+      "exp": "경력 무관",
+      "etype": null,
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "fBwMcebGWW",
+      "title": "📝 인재풀 등록 - 코드잇 부트캠프 강사",
+      "group": null,
+      "job": null,
+      "exp": "경력 (1~20년)",
+      "etype": "프리랜서",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "kg3r1ASYoe",
+      "title": "📝 인재풀 등록 - 풀스택 부트캠프 멘토",
+      "group": "Tech",
+      "job": "강사·멘토",
+      "exp": "경력 (1~20년)",
+      "etype": "프리랜서",
+      "status": "상시 채용"
+    },
+    {
+      "posting_id": "jJFUE6AgEJ",
+      "title": "📝 인재풀 등록 - 프론트엔드 부트캠프 멘토",
+      "group": "Tech",
+      "job": "강사·멘토",
+      "exp": "경력 (1~20년)",
+      "etype": "프리랜서",
+      "status": "상시 채용"
+    }
   ]
 }
