@@ -14,8 +14,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 from typing import Any
+
+#: scoring.AISEARCH_REGISTER_MIN 과 한 세트. 여기서만 다시 선언하지 않고 import 한다.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from scoring import AISEARCH_REGISTER_MIN  # noqa: E402
 
 SUBJECT_PREFIX = "[aisearch]Claude-win"
 RECIPIENTS = (
@@ -34,6 +39,39 @@ def subject_for(company: str, position: str, count: int) -> str:
 
 def _bullets(lines: list[str] | None, dash: str = "- ") -> str:
     return "\n".join(f"{dash}{line}" for line in (lines or []))
+
+
+class UnverifiedCandidate(ValueError):
+    """Raised when a candidate was not produced by ``scoring.score``."""
+
+
+def _verify(candidate: dict[str, Any]) -> None:
+    """Refuse anything the scorer did not actually produce.
+
+    The mail prints "코드 계산" next to every total. That claim is only true if the
+    breakdown really adds up to the reported match and the candidate cleared the
+    registration gate — otherwise a hand-written 99% would ship as a computed score.
+    """
+    name = candidate.get("name", "<unnamed>")
+    match = candidate.get("match")
+    if not isinstance(match, int):
+        raise UnverifiedCandidate(f"{name}: match must be an int produced by score()")
+    breakdown = candidate.get("score_breakdown")
+    if not isinstance(breakdown, dict) or not breakdown:
+        raise UnverifiedCandidate(f"{name}: score_breakdown missing — 코드 계산 점수가 아니다")
+    total = sum(breakdown.values())
+    if total != match:
+        raise UnverifiedCandidate(
+            f"{name}: score_breakdown 합 {total} != match {match} — 손으로 쓴 점수다"
+        )
+    if match < AISEARCH_REGISTER_MIN:
+        raise UnverifiedCandidate(
+            f"{name}: {match}점은 aisearch 등록 문턱 {AISEARCH_REGISTER_MIN} 미만이다"
+        )
+    if candidate.get("hard_exclude_reason"):
+        raise UnverifiedCandidate(
+            f"{name}: 하드제외({candidate['hard_exclude_reason']}) 후보는 보고하지 않는다"
+        )
 
 
 def _candidate_block(index: int, candidate: dict[str, Any]) -> str:
@@ -74,6 +112,8 @@ def compose(results: dict[str, Any]) -> dict[str, Any]:
     company = results["company"]
     position = results["position"]
     candidates = results.get("candidates", [])
+    for candidate in candidates:
+        _verify(candidate)
 
     summary = [
         f"Company / Position: {company} / {position}",

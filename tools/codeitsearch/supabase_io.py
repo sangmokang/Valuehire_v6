@@ -88,18 +88,56 @@ def delete(table: str, query: list[tuple[str, str]]) -> list[dict[str, Any]]:
     return rows if isinstance(rows, list) else []
 
 
-def insert(table: str, rows: list[dict[str, Any]], *, chunk: int = 200) -> int:
-    """Insert rows in chunks, returning the number Supabase echoed back."""
+UNIQUE_VIOLATION = "23505"
+
+
+def _is_pk_conflict(error: Exception, column: str) -> bool:
+    """True only for a primary-key clash on the column we allocate ourselves.
+
+    jobmarket_positions also carries a natural unique key (uq_jmp). Retrying that one
+    would just re-send the same rows four times and hide a real duplicate.
+    """
+    text = str(error)
+    return UNIQUE_VIOLATION in text and ("_pkey" in text or f"Key ({column})=" in text)
+
+
+def insert(
+    table: str,
+    rows: list[dict[str, Any]],
+    *,
+    chunk: int = 200,
+    assign_ids: str | None = None,
+    attempts: int = 4,
+) -> int:
+    """Insert rows in chunks, returning the number Supabase echoed back.
+
+    ``assign_ids`` names a primary-key column this client must fill itself, for tables
+    whose identity sequence lags an earlier bulk import. That allocation reads
+    ``max(id)+1``, so two concurrent runs can pick the same block; the insert then fails
+    with ``23505``. Rather than corrupt or half-write, re-read the max and retry the
+    whole batch — the ids are ours to choose, so a retry is safe and idempotent.
+    """
     written = 0
     for start in range(0, len(rows), chunk):
         batch = rows[start : start + chunk]
-        echoed = _request("POST", table, payload=batch, prefer="return=representation")
-        if not isinstance(echoed, list) or len(echoed) != len(batch):
-            raise SupabaseError(
-                f"{table}: expected {len(batch)} rows echoed, got "
-                f"{len(echoed) if isinstance(echoed, list) else type(echoed).__name__}"
-            )
-        written += len(echoed)
+        for attempt in range(1, attempts + 1):
+            if assign_ids:
+                base = next_id(table, column=assign_ids)
+                for offset, row in enumerate(batch):
+                    row[assign_ids] = base + offset
+            try:
+                echoed = _request("POST", table, payload=batch, prefer="return=representation")
+            except SupabaseError as error:
+                if assign_ids and attempt < attempts and _is_pk_conflict(error, assign_ids):
+                    continue
+                raise
+            if not isinstance(echoed, list) or len(echoed) != len(batch):
+                raise SupabaseError(
+                    f"{table}: expected {len(batch)} rows echoed, got "
+                    f"{len(echoed) if isinstance(echoed, list) else type(echoed).__name__}"
+                )
+            written += len(echoed)
+            break
     return written
 
 
