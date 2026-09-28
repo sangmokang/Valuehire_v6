@@ -134,6 +134,21 @@ class TestHardExclude:
         # '산업대학' 이 정규화로 '산업' 이 되어 한국산업기술대(4년제)를 전문대로 자르던 실측 결함.
         assert school_tier(school, CONTRACT) == expected
 
+    @pytest.mark.parametrize(
+        "school,expected",
+        [("서울대학교 경영전문대학원", SchoolTier.IN_SEOUL),
+         ("연세대학교 법학전문대학원", SchoolTier.IN_SEOUL),
+         ("KAIST 경영전문대학원", SchoolTier.NATIONAL)],
+    )
+    def test_professional_graduate_schools_are_not_two_year(self, school, expected):
+        # '전문대학원' 안의 '전문대' 에 걸려 서울대 MBA 가 하드제외되던 실측 결함 (2026-09-28).
+        assert school_tier(school, CONTRACT) == expected
+
+    def test_mba_degree_string_is_not_a_two_year_degree(self):
+        verdict = score(candidate(school="서울대학교", degree="경영전문대학원 석사"),
+                        required_terms=REQUIRED, preferred_terms=PREFERRED, contract=CONTRACT)
+        assert verdict.hard_exclude_reason is None
+
     def test_associate_degree_is_cut_even_when_the_school_looks_four_year(self):
         # degree 필드를 아예 안 읽어 전문학사가 통과하던 실측 결함 (2026-09-28).
         verdict = score(candidate(school="부산대학교", degree="전문학사", channel="saramin"),
