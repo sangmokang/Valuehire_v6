@@ -126,6 +126,23 @@ class TestSchoolTier:
     def test_generic_trailing_words_still_match(self, school):
         assert school_tier(school, CONTRACT) == SchoolTier.WORLD_TOP
 
+    @pytest.mark.parametrize(
+        "school",
+        ["University of California, Berkeley", "Harvard Medical School",
+         "MIT Sloan School of Management"],
+    )
+    def test_official_full_names_did_not_lose_world_top(self, school):
+        # 잔여 토큰 규칙(codex 3차)이 정식 명칭까지 막아 school_25 가 25 -> 10 으로,
+        # 총점 65 -> 50 으로 떨어져 등록 문턱에서 탈락했다 (codex 4차 회귀).
+        assert school_tier(school, CONTRACT) == SchoolTier.WORLD_TOP
+
+    @pytest.mark.parametrize(
+        "school", ["University of California, Merced", "Berkeley College Woodland Park"]
+    )
+    def test_widening_the_allowlist_did_not_reopen_other_campuses(self, school):
+        # 위 수정은 허용어에 지명을 넣지 않고 정식 명칭을 항목으로 추가해서 막는다.
+        assert school_tier(school, CONTRACT) == SchoolTier.OTHER
+
     @pytest.mark.parametrize("school", ["Smith College", "Methodist University"])
     def test_short_ascii_acronyms_do_not_substring_match(self, school):
         # MIT -> "Smith", ETH -> "Methodist" 로 world_top 승격되던 실측 결함 (2026-09-28).
