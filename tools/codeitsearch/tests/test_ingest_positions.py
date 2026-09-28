@@ -97,7 +97,11 @@ class TestWriteBeforeDelete:
     def _run(self, monkeypatch, tmp_path, insert_fails=False):
         calls = []
 
+        stale = f"{ingest_positions.source_prefix_for(SNAPSHOT)}#run-OLD"
+
         def fake_select(table, query):
+            if table == ingest_positions.POSITIONS_TABLE:
+                return [{"id": 1, "source_file": stale}]
             return []
 
         def fake_delete(table, query):
@@ -137,6 +141,53 @@ class TestWriteBeforeDelete:
         assert a != b
         prefix = ingest_positions.source_prefix_for(SNAPSHOT)
         assert a.startswith(prefix) and b.startswith(prefix)
+
+    def test_stale_rows_are_deleted_by_id_not_by_a_like_pattern(self, monkeypatch, tmp_path):
+        # source_file 에 '_' 나 '%' 가 있으면 LIKE 가 다른 회사 행까지 지운다.
+        captured = {}
+        other = "othersearch/job_posting/2026-09-28#run-X"
+        mine_old = f"{ingest_positions.source_prefix_for(SNAPSHOT)}#run-OLD"
+
+        def fake_select(table, query):
+            if table == ingest_positions.POSITIONS_TABLE:
+                return [{"id": 1, "source_file": mine_old},
+                        {"id": 2, "source_file": other},
+                        {"id": 3, "source_file": None}]
+            return []
+
+        def fake_delete(table, query):
+            captured.setdefault(table, []).append(dict(query))
+            return []
+
+        monkeypatch.setattr(ingest_positions, "select", fake_select)
+        monkeypatch.setattr(ingest_positions, "delete", fake_delete)
+        monkeypatch.setattr(ingest_positions, "insert", lambda t, r, **k: len(r))
+        path = tmp_path / "snap.json"
+        path.write_text(json.dumps(SNAPSHOT, ensure_ascii=False), encoding="utf-8")
+        ingest_positions.main([str(path)])
+
+        filters = captured[ingest_positions.POSITIONS_TABLE]
+        assert len(filters) == 1
+        assert filters[0]["id"] == "in.(1)", filters[0]
+        assert not any("like" in str(v) for v in filters[0].values())
+
+    def test_empty_snapshot_fails_instead_of_indexing_row_zero(self, monkeypatch, tmp_path):
+        def explode(*a, **k):
+            raise AssertionError("must not touch Supabase for an empty snapshot")
+
+        for name in ("select", "delete", "insert"):
+            monkeypatch.setattr(ingest_positions, name, explode)
+        path = tmp_path / "snap.json"
+        path.write_text(json.dumps({**SNAPSHOT, "positions": []}, ensure_ascii=False),
+                        encoding="utf-8")
+        assert ingest_positions.main([str(path)]) == 1
+
+    def test_two_runs_in_the_same_second_get_different_source_files(self, tmp_path):
+        # run_id 가 초 단위면 같은 초의 두 실행이 uq_jmp 로 충돌한다.
+        import ingest_positions as ip
+        a = ip.build_rows({k: v for k, v in SNAPSHOT.items()})[0]["source_file"]
+        b = ip.build_rows({k: v for k, v in SNAPSHOT.items()})[0]["source_file"]
+        assert a != b
 
     def test_dry_run_writes_nothing(self, monkeypatch, tmp_path):
         def explode(*args, **kwargs):
