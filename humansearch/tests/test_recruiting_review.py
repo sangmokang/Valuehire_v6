@@ -21,7 +21,7 @@ def test_required_failure_excludes_even_when_weighted_score_is_high() -> None:
             Criterion(
                 "backend",
                 "Backend context",
-                35,
+                50,
                 CriterionStatus.MET,
                 required=False,
                 evidence=("Built B2B APIs",),
@@ -29,7 +29,7 @@ def test_required_failure_excludes_even_when_weighted_score_is_high() -> None:
             Criterion(
                 "python",
                 "Python/FastAPI",
-                30,
+                49,
                 CriterionStatus.MET,
                 required=False,
                 evidence=("FastAPI production service",),
@@ -55,7 +55,7 @@ def test_unknown_required_condition_needs_confirmation_and_keeps_unknown_weight(
             Criterion(
                 "job_context",
                 "B2B SaaS backend",
-                35,
+                95,
                 CriterionStatus.MET,
                 required=True,
                 evidence=("Owned SaaS API modules",),
@@ -72,7 +72,7 @@ def test_unknown_required_condition_needs_confirmation_and_keeps_unknown_weight(
 
     assert result.recommendation is Recommendation.NEEDS_CONFIRMATION
     assert result.gate.unknown_required == ("degree",)
-    assert result.score.score == 87.5
+    assert result.score.score == 95.0
     assert result.score.unknown_weight == 5
 
 
@@ -110,7 +110,7 @@ def test_required_partial_condition_needs_confirmation() -> None:
             Criterion(
                 "role_context",
                 "Backend platform context",
-                35,
+                85,
                 CriterionStatus.MET,
                 required=False,
                 evidence=("Backend platform work",),
@@ -253,7 +253,7 @@ def test_review_returns_stable_schema_version_and_input_hash() -> None:
         Criterion(
             "role",
             "Role context",
-            35,
+            100,
             CriterionStatus.MET,
             required=True,
             evidence=("API platform lead",),
@@ -284,7 +284,7 @@ def test_review_hash_changes_when_input_changes() -> None:
             Criterion(
                 "role",
                 "Role context",
-                35,
+                100,
                 CriterionStatus.MET,
                 required=True,
                 evidence=("API platform lead",),
@@ -297,7 +297,7 @@ def test_review_hash_changes_when_input_changes() -> None:
             Criterion(
                 "role",
                 "Role context",
-                35,
+                100,
                 CriterionStatus.MET,
                 required=True,
                 evidence=("API platform lead",),

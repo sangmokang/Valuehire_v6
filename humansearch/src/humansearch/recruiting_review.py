@@ -231,6 +231,8 @@ def _validate_criteria(criteria: Sequence[Criterion]) -> None:
                     )
         if criterion.status is CriterionStatus.UNMET and criterion.required:
             continue
+    if math.fsum(criterion.weight for criterion in criteria) != 100:
+        raise ValueError("criterion weights must sum to 100")
 
 
 def _status_ratio(status: CriterionStatus) -> float:
