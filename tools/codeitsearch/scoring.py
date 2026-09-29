@@ -202,10 +202,12 @@ def school_tier(school: str | None, contract: dict[str, Any]) -> str:
     for name in contract.get("not_in_seoul", {}).get("names", ()):
         if normalized.startswith(_normalize(name, contract)):
             return SchoolTier.OTHER
-    # 명문대 이름을 단 별개 학교 — 이름 전체가 같을 때만 막는다. 부분 일치로 막으면
-    # 'UC Berkeley College of Engineering' 까지 떨어진다 (codex V1 2026-09-30).
+    # 명문대 이름을 단 별개 학교 — 이름이 그것으로 **시작**하면 막는다. 단 바로 뒤가 'of' 면
+    # 'Berkeley College of Engineering'(UC Berkeley 단과대)이므로 통과시킨다. 이름 중간 일치로
+    # 막으면 'UC Berkeley College of Engineering' 까지 떨어진다 (codex V1 2026-09-30, 2차).
     for name in contract["special_tier"].get("not_world_top_exact", ()):
-        if tokens == [part.casefold() for part in re.findall(r"[A-Za-z0-9]+", name)]:
+        wanted = [part.casefold() for part in re.findall(r"[A-Za-z0-9]+", name)]
+        if tokens[: len(wanted)] == wanted and tokens[len(wanted) : len(wanted) + 1] != ["of"]:
             return SchoolTier.OTHER
     for name in contract["special_tier"]["world_top"]:
         if hit(name):
@@ -260,6 +262,17 @@ def _degree_is_two_year(degree: str | None, contract: dict[str, Any]) -> bool:
     return _is_two_year_name(_raw(degree), contract)
 
 
+def _degree_is_four_year(candidate: Candidate, contract: dict[str, Any]) -> bool:
+    """학력 칸이 명시적으로 4년제이고, 학교 칸에 '(2,3년)' 같은 전문대 표기가 직접 붙지 않았다."""
+    if not candidate.degree or _is_two_year_name(_raw(candidate.degree), contract):
+        return False
+    school_raw = _raw(candidate.school or "")
+    if any(_raw(m) in school_raw for m in contract["hard_exclude"].get("explicit_two_year_labels", ())):
+        return False
+    labels = contract["hard_exclude"].get("four_year_degree_labels", ())
+    return any(_raw(label) in _raw(candidate.degree) for label in labels)
+
+
 def _hard_exclude(candidate: Candidate, tier: str, contract: dict[str, Any]) -> str | None:
     if candidate.is_freelancer:
         return "freelancer"
@@ -308,6 +321,10 @@ def score(
     """Compute the whole verdict. Callers never assemble a total themselves."""
     contract = contract or load_school_contract()
     tier = school_tier(candidate.school, contract)
+    if tier == SchoolTier.TWO_YEAR and _degree_is_four_year(candidate, contract):
+        # 한양여대·서울여자간호대처럼 이름은 전문대 표지에 걸려도 4년제 학사 과정이 있다.
+        # 학력 칸이 명시적으로 4년이면 이름 추정보다 학력을 믿는다 (codex V1 2차).
+        tier = SchoolTier.OTHER
     reason = _hard_exclude(candidate, tier, contract)
     notes: list[str] = []
 

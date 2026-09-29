@@ -156,7 +156,7 @@ def compose(results: dict[str, Any]) -> dict[str, Any]:
     candidates = results.get("candidates", [])
     # 차단·실패한 실행은 "검색했는데 후보 없음" 과 다르다 (codex V1 2026-09-30).
     status = results.get("status", "done")
-    if not candidates and not results.get("no_candidate_reason"):
+    if not candidates and not str(results.get("no_candidate_reason") or "").strip():
         raise ValueError("후보 0명 보고에는 no_candidate_reason 이 필요하다 — 사유 없는 0명은 보내지 않는다")
     for candidate in candidates:
         _recompute(candidate, results)
