@@ -367,12 +367,18 @@ class TestReview20260930:
         "school",
         ["삼육보건대학(2,3년)", "서강정보대학(2,3년)", "한양여자대학(2,3년)",
          "한양여자대학교", "삼육보건대학교", "서강정보대학교", "서울여자간호대학교",
-         "서울예술대학교"],
+         "서울예술대학교(2,3년)"],
     )
     def test_seoul_two_year_colleges_are_two_year(self, school):
         # 인서울 어간으로 시작하는 전문대가 in_seoul(22점)로 올라가고 하드컷도 피했다.
         # '(2,3년)' 표기는 수집 기록에 107건 실재.
         assert school_tier(school, CONTRACT) == SchoolTier.TWO_YEAR
+
+    @pytest.mark.parametrize("school", ["서울예술대학교", "서울예술대학교(4년)"])
+    def test_seoul_institute_of_the_arts_is_neither_in_seoul_nor_cut_by_name(self, school):
+        # 서울예대는 안산 소재이고 4년제 과정도 있다 — 포털이 '(4년)' 으로 준 기록 2건.
+        # 이름만으로 전문대 하드컷하면 4년 과정 졸업자를 잘못 제외한다.
+        assert school_tier(school, CONTRACT) == SchoolTier.OTHER
 
     @pytest.mark.parametrize("degree", ["대학(2,3년)", "대학(2,3년) (졸업)", "대졸(2,3년)", "초대졸"])
     def test_portal_two_year_degree_labels_are_hard_excluded(self, degree):
