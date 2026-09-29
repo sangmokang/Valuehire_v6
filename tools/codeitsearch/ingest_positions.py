@@ -66,6 +66,15 @@ def build_rows(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
     company = snapshot["company"]
     company_key = snapshot["company_key"]
     entry = company_entry(company_key)
+    # company_key 하나만 믿으면 뤼튼 스냅샷에 codeit 키가 붙었을 때 코드잇 상세 URL 이 뤼튼 행에
+    # 박힌다 (codex V1 2026-09-30). 회사명·플랫폼이 같은 레지스트리 항목을 가리키는지 확인한다.
+    names = {entry.get("name_ko"), entry.get("name_en")} - {None}
+    if company not in names or platform != entry.get("platform"):
+        raise ValueError(
+            f"snapshot disagrees with registry entry {company_key!r}: "
+            f"company={company!r} (registry {sorted(names)}), "
+            f"platform={platform!r} (registry {entry.get('platform')!r})"
+        )
     # 모르는 값은 지어내지 않는다 — 레지스트리에 상세 URL 형식이 없으면 url 은 비운다.
     template = entry.get("detail_url_template")
     location = snapshot.get("location")
@@ -142,9 +151,19 @@ def main(argv: list[str] | None = None) -> int:
     if not rows:
         print("snapshot has no positions — nothing to ingest", file=sys.stderr)
         return 1
+    searchable = [r for r in rows if r["raw_titles_json"]["searchable"]]
+    # 검색 대상인데 검색어가 0개면 적재돼도 서치에서 조용히 빠진다. keywords.py 매핑이 먼저다.
+    unmapped = sorted({r["raw_titles_json"]["job"] or "<없음>"
+                       for r in searchable if not r["core_keywords_json"]})
+    if unmapped:
+        print(
+            f"searchable postings without keywords — map these jobs in keywords.py first: "
+            f"{unmapped}",
+            file=sys.stderr,
+        )
+        return 1
     snapshot_row = build_snapshot_row(snapshot, rows)
 
-    searchable = [r for r in rows if r["raw_titles_json"]["searchable"]]
     print(f"snapshot     : {args.snapshot}")
     print(f"positions    : {len(rows)}")
     print(f"searchable   : {len(searchable)} (정규직 · 상시채용 · 비프리랜서)")
@@ -192,10 +211,12 @@ def main(argv: list[str] | None = None) -> int:
     insert(SNAPSHOTS_TABLE, [snapshot_row])
 
     # ④ 이전 실행분만 정리. 회사까지 확인해 같은 접두사를 가진 남의 행을 건드리지 않는다.
+    # 접두사만 보면 '<prefix>-archive' 같은 같은 회사의 별도 출처까지 지워진다 — run 표지까지 본다.
+    run_prefix = f"{prefix}{RUN_SEPARATOR}"
     stale_ids = [
         r["id"]
         for r in before
-        if str(r.get("source_file", "")).startswith(prefix)
+        if str(r.get("source_file", "")).startswith(run_prefix)
         and r["source_file"] != current_source
         and r.get("company_norm") == company_norm
     ]
@@ -209,7 +230,7 @@ def main(argv: list[str] | None = None) -> int:
         [("snapshot_date", f"eq.{snapshot['snapshot_date']}"), ("select", "source_file")],
     ):
         source = str(row.get("source_file", ""))
-        if source.startswith(prefix) and source != snapshot_row["source_file"]:
+        if source.startswith(run_prefix) and source != snapshot_row["source_file"]:
             delete(
                 SNAPSHOTS_TABLE,
                 [

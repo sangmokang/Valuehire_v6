@@ -154,6 +154,10 @@ def compose(results: dict[str, Any]) -> dict[str, Any]:
     company = results["company"]
     position = results["position"]
     candidates = results.get("candidates", [])
+    # 차단·실패한 실행은 "검색했는데 후보 없음" 과 다르다 (codex V1 2026-09-30).
+    status = results.get("status", "done")
+    if not candidates and not results.get("no_candidate_reason"):
+        raise ValueError("후보 0명 보고에는 no_candidate_reason 이 필요하다 — 사유 없는 0명은 보내지 않는다")
     for candidate in candidates:
         _recompute(candidate, results)
 
@@ -185,11 +189,16 @@ def compose(results: dict[str, Any]) -> dict[str, Any]:
             _candidate_block(i, c) for i, c in enumerate(candidates, start=1)
         )
         parts.append(body)
+    elif status != "done":
+        parts.append(
+            f"## 후보\n- 검색 미완료(status: {status}) — 후보 유무를 판단할 수 없음.\n"
+            f"- 사유: {results['no_candidate_reason']}"
+        )
     else:
         # 후보가 없으면 없다고 쓴다. 빈 리스트를 성과처럼 포장하지 않는다.
         parts.append(
             "## 후보\n- 이번 실행에서 등록 문턱(60점)을 넘은 후보 없음.\n"
-            f"- 사유: {results.get('no_candidate_reason', '사유 미기재')}"
+            f"- 사유: {results['no_candidate_reason']}"
         )
 
     if results.get("insight"):
@@ -199,8 +208,9 @@ def compose(results: dict[str, Any]) -> dict[str, Any]:
 
     parts.append("감사합니다.")
 
+    subject = subject_for(company, position, len(candidates))
     return {
-        "subject": subject_for(company, position, len(candidates)),
+        "subject": subject if status == "done" else f"{subject} [{status.upper()}]",
         "to": list(RECIPIENTS),
         "label": LABEL,
         "body": "\n\n".join(parts),

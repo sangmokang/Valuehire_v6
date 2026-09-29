@@ -202,6 +202,11 @@ def school_tier(school: str | None, contract: dict[str, Any]) -> str:
     for name in contract.get("not_in_seoul", {}).get("names", ()):
         if normalized.startswith(_normalize(name, contract)):
             return SchoolTier.OTHER
+    # 명문대 이름을 단 별개 학교 — 이름 전체가 같을 때만 막는다. 부분 일치로 막으면
+    # 'UC Berkeley College of Engineering' 까지 떨어진다 (codex V1 2026-09-30).
+    for name in contract["special_tier"].get("not_world_top_exact", ()):
+        if tokens == [part.casefold() for part in re.findall(r"[A-Za-z0-9]+", name)]:
+            return SchoolTier.OTHER
     for name in contract["special_tier"]["world_top"]:
         if hit(name):
             return SchoolTier.WORLD_TOP
