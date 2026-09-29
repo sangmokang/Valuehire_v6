@@ -256,3 +256,67 @@ class TestIdRetry:
         with pytest.raises(supabase_io.SupabaseError):
             supabase_io.insert("t", [{"a": 1}], assign_ids="id")
         assert attempts["n"] == 1, "자연 키 충돌을 재시도했다"
+
+
+class TestReview20260930:
+    """2026-09-30 이어받기 검토(codex V1 지적, Claude 재현)."""
+
+    WRTN = TestCompanyIsolation.WRTN
+
+    @pytest.mark.parametrize(
+        "override",
+        [{"company_key": "codeit"},                 # 뤼튼 스냅샷에 codeit 키
+         {"company": "코드잇"},                      # 회사명만 어긋남
+         {"platform": "codeit_careers"}],           # 플랫폼만 어긋남
+    )
+    def test_snapshot_that_disagrees_with_the_registry_is_refused(self, override):
+        # 어긋난 채로 통과하면 뤼튼 행에 https://careers.codeit.com/c/... 가 붙었다.
+        with pytest.raises(ValueError):
+            ingest_positions.build_rows({**self.WRTN, **override})
+
+    def test_matching_snapshots_still_build(self):
+        assert ingest_positions.build_rows(self.WRTN)
+        assert ingest_positions.build_rows(SNAPSHOT)
+
+    def test_only_rows_carrying_the_run_marker_are_stale(self, monkeypatch, tmp_path):
+        # 접두사만 보면 '<prefix>-archive' 같은 같은 회사의 별도 출처까지 지웠다.
+        archive = {"id": 3,
+                   "source_file": f"{ingest_positions.source_prefix_for(SNAPSHOT)}-archive",
+                   "company_norm": "codeit"}
+        calls, path = TestWriteBeforeDelete()._harness(
+            monkeypatch, tmp_path, extra_rows=(archive,))
+        assert ingest_positions.main([str(path)]) == 0
+        deletes = [c for c in calls if c[0] == "delete"
+                   and c[1] == ingest_positions.POSITIONS_TABLE]
+        assert [d[2]["id"] for d in deletes] == ["in.(1)"]
+
+    def test_summary_cleanup_also_requires_the_run_marker(self, monkeypatch, tmp_path):
+        prefix = ingest_positions.source_prefix_for(SNAPSHOT)
+        calls, path = TestWriteBeforeDelete()._harness(monkeypatch, tmp_path)
+        inner = ingest_positions.select
+
+        def select(table, query):
+            if table == ingest_positions.SNAPSHOTS_TABLE:
+                return [{"source_file": f"{prefix}#run-OLD"},
+                        {"source_file": f"{prefix}-archive"}]
+            return inner(table, query)
+
+        monkeypatch.setattr(ingest_positions, "select", select)
+        assert ingest_positions.main([str(path)]) == 0
+        removed = [c[2]["source_file"] for c in calls
+                   if c[0] == "delete" and c[1] == ingest_positions.SNAPSHOTS_TABLE]
+        assert removed == [f"eq.{prefix}#run-OLD"]
+
+    def test_searchable_posting_without_keywords_is_refused(self, monkeypatch, tmp_path):
+        # 매핑 안 된 직무명(영문 등)은 segment=unsegmented, 검색어 0개인데 searchable=True 로
+        # 적재돼 검색에서 조용히 빠졌다. 적재 전에 멈춰야 한다.
+        def explode(*a, **k):
+            raise AssertionError("must not touch Supabase")
+
+        for name in ("select", "delete", "insert"):
+            monkeypatch.setattr(ingest_positions, name, explode)
+        position = {**self.WRTN["positions"][0], "job": "Software Engineering"}
+        path = tmp_path / "snap.json"
+        path.write_text(json.dumps({**self.WRTN, "positions": [position]}, ensure_ascii=False),
+                        encoding="utf-8")
+        assert ingest_positions.main([str(path)]) == 1
