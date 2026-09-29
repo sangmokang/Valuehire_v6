@@ -1,4 +1,4 @@
-# 회사 단위 서치 착수 프롬프트 — `OOOsearch` v2 (2026-09-29)
+# 회사 단위 서치 착수 프롬프트 — `OOOsearch` v2.1 (2026-09-29)
 
 사용법: `/clear` 후 아래 `---` 이하를 붙여넣고, 첫 줄의 `{COMPANY}`, `{SLUG}`(영문 소문자·하이픈), `{CAREERS_URL}`(모르면 `unknown`)만 바꿉니다.
 
@@ -37,7 +37,7 @@
 7. **채널 접근.** Aside에서 RPS 검색, 사람인 기업회원 인재풀, 잡코리아 인재검색을 실제로 열고 로그인 상태 스크린샷을 `$RUN/gate0-*.png`로 남긴다.
 
 ## 저장 규칙 (모든 단계 공통) — 연 화면은 전부 저장한다
-- 화면을 하나 열 때마다(채용 페이지, 목록 한 페이지, 프로필, 직원 프로필, Contact info) 캡처 JSON `$RUN/captures/C####.json` = `{"url","title","text","run_id":"$RUN_ID","kind":"careers|listing|profile|org|contact","channel","query","filters","page","jd_or_segment"}`을 쓰고 곧바로 아래를 실행한다.
+- 화면을 하나 열 때마다(채용 페이지, 목록 한 페이지, 프로필, 직원 프로필, Contact info) 캡처 JSON `$RUN/captures/C####.json` = `{"url","title","text","run_id":"$RUN_ID","kind":"careers|listing|profile|org|contact","channel","query","filters","page","jd_or_segment"}`을 쓴다. 같은 `text`를 `$RUN/profiles/C####.txt`에도 저장한다(메일 인용 QA의 원문 파일). 그다음 곧바로 아래를 실행한다.
   `python3 $SOT/scripts/recruiting_archive.py --config $RUN/archive-config.json --capture $RUN/captures/C####.json --ledger $RUN/archive-ledger/C####.json`
   종료값 0과 원장의 `"state":"verified"`가 나와야 저장이 끝난 것이다. 이 스크립트가 SQLite와 Supabase 양쪽을 다시 읽어 대조한다. 실패하면 원장의 `error`를 기록하고 한 번 재시도한다. 그래도 실패하면 그 캡처를 `저장 실패`로 두고 계속 진행한다. 저장 실패를 숨기지 않는다.
 - 스크린샷은 `$RUN/screen/C####.png`로 로컬에 저장한다. 이 스크립트는 이미지를 클라우드에 올리지 않는다. 클라우드 이미지 저장은 `artifacts/codeit-search-20260922/store_screenshot_objects.py`로 시도할 수 있고, 시도하지 않았으면 `NOT RUN`으로 보고한다.
@@ -67,14 +67,14 @@
 ## 4. 후보 서치 — 쉬운 세그먼트부터
 - 8단계의 **예상 난이도**(검색 전, `JD 요건 기준 예상`)로 순서를 정한다.
 - 채널 순서: RPS 1촌 → 2·3촌 → 사람인 → 잡코리아. 막힌 채널은 건너뛰고 기록한다.
-- 조합마다 `$RUN/listings/combos.jsonl`에 `{combo_id, segment, channel, 개념, 입력어, 화면에서 다시 읽은 적용 검색어·필터, 총 인원, 본 페이지, 캡처ID[], 새로 찾은 적합 후보 수}`를 남긴다. 입력한 뒤에는 화면에서 검색어·필터를 다시 읽는다(SOT의 사람인·RPS 입력 함정 참조).
+- 조합마다 `$RUN/listings/combos.jsonl`에 `{combo_id, segment, channel, 개념, 입력어, 화면에서 다시 읽은 적용 검색어·필터, 총 인원, 본 페이지, 캡처ID[], 새로 찾은 적합 후보 수}`를 남긴다. 입력한 뒤에는 화면에서 검색어·필터를 다시 읽는다(SOT의 사람인·RPS 입력 함정 참조). 조합마다 결과 페이지를 계속 넘긴다. 한 페이지 전체에서 새 관련 후보가 0명이거나 결과 끝에 닿았을 때만 그 조합을 멈추고, 본 페이지 번호를 기록한다.
 - **키워드 누락 금지 규칙.** 2단계의 모든 개념 × 모든 변형은 채널마다 적어도 한 조합에 들어가야 한다(문법상 불가하면 이유 기록). 결과는 `$RUN/plan/S##-coverage.md` 표로 남긴다. 이 커버리지를 채우기 전에는 세그먼트를 끝내지 않는다.
 - **확장 순서**(커버리지를 채운 뒤에도 후보가 부족하거나 질이 낮을 때): 직무명 변형 → 핵심 기술 변형 → 한/영 → 유사 직무 → 유사 회사 → 인접 산업. 확장 조합이 연속 2개 동안 새 적합 후보 0명이면 그 세그먼트를 끝내고 이유를 적는다. 결과가 충분한 키워드는 더 변형하지 않는다.
 - 인원 상한은 없다. 기준을 낮춰 인원을 늘리지 않는다.
 
 ## 5. 후보 평가 — 이 순서로, 앞에서 걸리면 뒤로 가지 않는다
 원장: `$RUN/ledger/candidates.jsonl`, 후보 한 명당 한 줄. 동일인은 채널 내부 ID·프로필 URL 같은 식별자로만 합친다. URL 표기 차이나 이름 띄어쓰기 차이로 같은 사람을 여러 명으로 세지 않는다.
-1. **대상 회사 현·과거 재직 → HARD EXCLUDE.** 후보 원문 경력에 `company_aliases.json`의 표기가 있으면 즉시 `excluded_target_company`로 두고 근거 캡처ID를 적는다. 이 후보는 더 평가하지 않고, 추천 목록과 메일 추천 명단에 넣지 않는다. 기록은 남긴다. 이름이 비슷하다는 것만으로는 제외하지 않고 `확인 필요`로 둔다.
+1. **대상 회사 현·과거 재직 → HARD EXCLUDE.** 후보 원문 경력 항목의 **소속 회사(고용주) 칸**이 `company_aliases.json`의 표기와 일치하면 즉시 `excluded_target_company`로 두고 근거 캡처ID를 적는다. 이 후보는 더 평가하지 않고, 추천 목록과 메일 추천 명단에 넣지 않는다. 기록은 남긴다. 설명 본문에 고객사·협업사·프로젝트로 회사명이 나오는 것은 재직이 아니다. 이름이 비슷하다는 것만으로도 제외하지 않고 `확인 필요`로 둔다.
 2. **JD 필수요건.** 항목마다 met/partial/unmet/unknown과 원문 인용을 적는다.
 3. **핵심 업무·도메인 경력.** 원문 인용과 함께 적는다.
 4. **재직 안정성.** 경력마다 시작·종료 월을 원문대로 적는다. 사유가 원문에 명시된 계약직·프로젝트직·인턴·인수합병·조직 폐쇄·그룹 내 이동은 감점하지 않는다. 사유를 지어내지 않는다. 기본 규칙(조정 가능): **최근 5년 안에 예외 사유 없는 12개월 미만 재직이 2회면 −15점, 3회 이상이면 −30점이고 판정은 최대 `조건부`.** 해당하면 `잦은 이직 리스크` 표시와 재직기간 근거를 적는다.
@@ -87,16 +87,16 @@
 
 ## 6. 저장 검증 — 저장 완료라고 쓰기 전에
 아래 네 검사 결과를 `$RUN/ledger/storage_check.json`에 쓴다.
-- (a) `$RUN/captures/*.json` 개수 = `$RUN/archive-ledger/*.json` 중 `state=="verified"`인 개수. 차이가 나는 캡처ID를 나열한다.
+- (a) **캡처 하나하나**에 대해: 원장 `archive-ledger/C####.json`이 있고, `state=="verified"`이며, `result.id`가 (b)의 SQLite 집합과 Supabase 집합에 모두 들어 있다. 이 원장 상태는 `recruiting_archive.py`가 캡처마다 SQLite·Supabase 양쪽에서 url·본문·run_id·captured_at을 다시 읽어 대조한 결과다. 하나라도 어긋나는 캡처ID는 나열한다.
 - (b) SQLite `SELECT id FROM archives WHERE run_id='$RUN_ID'`의 ID 집합 = Supabase `profile_archives?run_id=eq.$RUN_ID`의 `local_id` 집합 = 원장들의 `result.id` 집합. 결과가 1000건이면 페이지를 나눠 읽는다. 집합이 0건이면 실패로 본다.
 - (c) 음성 대조군: 원장 ID 하나를 뺀 집합으로 (b)를 다시 비교했을 때 불일치가 검출되어야 한다. 검출되지 않으면 검사기 자체가 고장이다.
 - (d) 모든 프로필 캡처가 원장 후보나 직원 표본 중 한 곳에 연결되어 있다(연결 안 된 캡처 0).
-넷 다 맞아야 저장 `DONE`이다. 하나라도 틀리면 `PARTIAL`로 두고 빠진 목록을 남긴다. 클라우드 스크린샷은 별도로 표기한다.
+넷 다 맞아야 **텍스트 저장** `DONE`이다. 하나라도 틀리면 `PARTIAL`로 두고 빠진 목록을 남긴다. 화면 이미지의 클라우드 저장은 이 검사와 별개인 상태(`DONE` 또는 `NOT RUN`)로 따로 보고한다. 이미지를 확인하지 않은 채 "화면까지 양쪽 저장"이라고 쓰지 않는다.
 
 ## 7. 브리핑 메일 — 내부 4명
 - **발송 게이트.** ① 0단계 6번이 통과했고 ② 인용 QA에서 miss가 0이며 ③ 같은 제목이 보낸편지함에 없어야 한다. 저장이 `PARTIAL`이어도 보낼 수 있다. 다만 그때는 제목에 `[PARTIAL]`을 붙이고 본문 맨 위에 빠진 목록을 적는다.
-- **인용 QA.** 본문에 넣는 모든 원문 인용은 `<q data-src="profiles/파일.txt">…</q>`로 감싼다. 발송 전에 모든 `<q>`의 텍스트가(공백 정규화 후) `data-src` 파일 안에 실제로 있는지 검사하고 결과를 `$RUN/mail/qa.txt`(`quotes=N miss=0`)에 쓴다. `data-src`가 없는 인용이 하나라도 있으면 miss로 센다.
-- **도구.** `cp $ROOT/artifacts/search-20260928-r2/bin/send_mail.py $RUN/bin/`. 실행: `cd $RUN/bin && AGENT=claudecode python3 send_mail.py {SLUG} "<제목>" $RUN/mail/briefing.html`. 제목에 `RUN_ID`를 넣는다. 예: `[{COMPANY} 회사 서치 {RUN_ID}] 포지션 N·추천 N·조건부 N`. 스크립트가 `[aisearch]claudecode ` 접두사를 붙이고, 보낸편지함에 같은 제목이 있으면 `DUPLICATE_EXISTS`와 함께 rc=2로 멈춘다. 발송 응답이 없으면 다시 보내지 말고 먼저 보낸편지함을 확인한다.
+- **인용 QA.** 후보 행마다 "왜 잘 맞는가"와 "핵심 경력"은 후보 원문 인용을 **2개 이상** 포함하고, 인용은 `<q data-src="profiles/C####.txt">…</q>`로 감싼다. 발송 전에 모든 `<q>`의 텍스트가(공백 정규화 후) `data-src` 파일 안에 실제로 있는지 검사하고 결과를 `$RUN/mail/qa.txt`(`quotes=N miss=0 rows_under_2=0`)에 쓴다. `data-src`가 없는 인용, 다른 후보의 파일을 가리키는 인용, 인용이 2개 미만인 후보 행, `quotes=0`은 모두 실패로 본다.
+- **도구.** `cp $ROOT/artifacts/search-20260928-r2/bin/send_mail.py $RUN/bin/`. 실행: `cd $RUN/bin && AGENT=claudecode python3 send_mail.py {SLUG} "<제목>" $RUN/mail/briefing.html`. 제목에 `RUN_ID`를 넣는다. 예: `[{COMPANY} 회사 서치 {RUN_ID}] 포지션 N·추천 N·조건부 N`. 스크립트가 `[aisearch]claudecode ` 접두사를 붙이고, 보낸편지함에 같은 제목이 있으면 `DUPLICATE_EXISTS`와 함께 rc=2로 멈춘다. 이 스크립트는 최근 3일만 검색하고, 발송이 끝난 뒤에야 로그를 쓴다. 그래서 재시도하기 전에는 반드시 Gmail MCP `search_threads`로 기간 제한 없이 `in:sent "{RUN_ID}"`를 검색한다. 1건이라도 나오면 다시 보내지 않고 그 message_id를 기록한다.
 - **발송 후.** `$RUN/ledger/mail_log.jsonl`에 있는 message_id를 Gmail에서 다시 조회해(`in:sent` 제목 검색) 수신자 4명과 message_id를 확인한다.
 - **본문 순서.**
   1. **맨 위 — 포지션 난이도 순위(쉬운 것부터).** 8단계 표를 넣고, 각 행에 `실측` 또는 `JD 요건 기준 예상`을 표시한다.
@@ -155,5 +155,7 @@ VERDICT: COMPLETE | PARTIAL | BLOCKED     RUN_ID
 | 점수 재계산 검사 없음 | Codex adv #13 | §5 AC-5 |
 | 자동화 백브리핑 근거 없음 | Codex adv #14 | actions.jsonl, §9 |
 | 예상/실측 난이도 혼동 | Codex adv(2차) | §8 |
+| 캡처별 양측 대조·이미지 별도 상태·QA 인용 최소 2개·기간 무제한 중복 검사·페이지 순회·고용주 칸 한정 제외·profiles 원문 파일 | Codex 확인 검증(v2 REVISE) | 저장 규칙, §4, §5-1, §6, §7 |
+| 학교 순위의 동점 정렬 사용 유지 | 사장님 9/23 결정·SOT 9/28 (Codex는 금지 권고) | §5-6 — 사장님 확인 필요 |
 | 단계별 DONE/PARTIAL/BLOCKED/NOT RUN | ChatGPT | §10 |
 | 멈춤 신호·rescue 개입 조건 | ChatGPT §11 | 절대 규칙 |
