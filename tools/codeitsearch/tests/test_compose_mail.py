@@ -139,3 +139,18 @@ class TestProvenance:
     def test_malformed_raw_input_is_refused(self):
         with pytest.raises(UnverifiedCandidate, match="잘못됐다"):
             compose(with_candidate(candidate_input={"school": "연세대학교"}))
+
+
+class TestReview20260930:
+    """빈 후보 목록을 '검색했는데 없음' 으로 둔갑시키지 않는다 (codex V1 지적)."""
+
+    def test_empty_shortlist_without_a_reason_is_refused(self):
+        with pytest.raises(ValueError):
+            compose(results(candidates=[]))
+
+    def test_a_blocked_run_is_not_reported_as_nobody_passed(self):
+        mail = compose(results(candidates=[], status="blocked",
+                               no_candidate_reason="사람인 기업회원 미인증"))
+        assert "등록 문턱(60점)을 넘은 후보 없음" not in mail["body"]
+        assert "blocked" in mail["body"]
+        assert "BLOCKED" in mail["subject"]

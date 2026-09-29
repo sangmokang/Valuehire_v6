@@ -300,3 +300,89 @@ class TestScore:
                         preferred_terms=PREFERRED, contract=CONTRACT)
         assert verdict.eligible is False
         assert verdict.grade == "below"
+
+
+class TestReview20260930:
+    """2026-09-30 이어받기 검토(codex V1 + 독립 재현)에서 확인된 학교 판정 결함."""
+
+    @pytest.mark.parametrize(
+        "school",
+        ["UC Berkeley", "U.C. Berkeley", "Berkeley Haas",
+         "UC Berkeley Haas School of Business", "Haas School of Business, UC Berkeley",
+         "UCLA Anderson", "UCLA Anderson School of Management",
+         "UCLA Samueli School of Engineering", "Stanford GSB", "Harvard Kennedy School",
+         "Cornell Tech", "University of Michigan, Ann Arbor",
+         "University of Michigan Ross School of Business",
+         "Said Business School, University of Oxford",
+         "Judge Business School, University of Cambridge"],
+    )
+    def test_third_round_regressions_the_fourth_round_missed(self, school):
+        # b536e30 에서 world_top 이던 표기 15건이 1836f0f 잔여 토큰 규칙으로 other 가 됐고,
+        # 0f83c64 는 그중 3건만 되살렸다. 전수 생성 비교로 찾은 나머지다.
+        assert school_tier(school, CONTRACT) == SchoolTier.WORLD_TOP
+
+    @pytest.mark.parametrize(
+        "school",
+        ["Berkeley College", "Cornell College", "Berkeley College, New York",
+         "UC Berkeley Extension", "Harvard Extension School", "Oxford Brookes University",
+         "Michigan State University", "University of Toronto Mississauga",
+         "Georgia Tech Lorraine", "Columbia College Chicago"],
+    )
+    def test_different_institutions_stay_out_of_world_top(self, school):
+        # 'Berkeley College'(뉴욕 영리대학)·'Cornell College'(아이오와)는 이름만 겹치는 별개 학교다.
+        assert school_tier(school, CONTRACT) == SchoolTier.OTHER
+
+    @pytest.mark.parametrize(
+        "school",
+        ["UC Berkeley College of Engineering",
+         "University of California, Berkeley College of Engineering"],
+    )
+    def test_excluding_berkeley_college_keeps_berkeleys_own_colleges(self, school):
+        assert school_tier(school, CONTRACT) == SchoolTier.WORLD_TOP
+
+    @pytest.mark.parametrize(
+        "school",
+        ["한국외국어대학교(용인)", "한국외국어대학교(글로벌)", "연세대학교(원주)",
+         "연세대학교(미래)", "고려대학교(세종)", "홍익대학교(세종)", "중앙대학교(안성)",
+         "경희대학교(국제)", "경희대학교(수원)", "성균관대학교(자연과학)",
+         "명지대학교(자연)", "명지대학교(용인)", "상명대학교(천안)", "동국대학교(경주)",
+         "건국대학교(충주)", "한양대학교(안산)"],
+    )
+    def test_portal_parenthesised_branch_campuses_are_not_in_seoul(self, school):
+        # 사람인·잡코리아는 캠퍼스를 '학교명(지역)' 으로 준다. 수집 기록 실측:
+        # 한국외국어대학교(용인) 343건, 연세대학교(원주)·고려대학교(세종)·동국대학교(경주) 등.
+        assert school_tier(school, CONTRACT) == SchoolTier.OTHER
+
+    @pytest.mark.parametrize(
+        "school",
+        ["한양대학교(서울)", "고려대학교(안암)", "연세대학교(서울)", "성균관대학교(SKKU)",
+         "성균관대학교(인문사회과학)", "명지대학교(인문)", "세종대학교(4년)",
+         "서강대학교(4년제)", "명지대학교 인문캠퍼스"],
+    )
+    def test_seoul_campus_qualifiers_stay_in_seoul(self, school):
+        # 위 분교 차단이 서울 본교 표기까지 막으면 안 된다. 명지대 인문캠퍼스는 서울이다.
+        assert school_tier(school, CONTRACT) == SchoolTier.IN_SEOUL
+
+    @pytest.mark.parametrize(
+        "school",
+        ["삼육보건대학(2,3년)", "서강정보대학(2,3년)", "한양여자대학(2,3년)",
+         "한양여자대학교", "삼육보건대학교", "서강정보대학교", "서울여자간호대학교",
+         "서울예술대학교"],
+    )
+    def test_seoul_two_year_colleges_are_two_year(self, school):
+        # 인서울 어간으로 시작하는 전문대가 in_seoul(22점)로 올라가고 하드컷도 피했다.
+        # '(2,3년)' 표기는 수집 기록에 107건 실재.
+        assert school_tier(school, CONTRACT) == SchoolTier.TWO_YEAR
+
+    @pytest.mark.parametrize("degree", ["대학(2,3년)", "대학(2,3년) (졸업)", "대졸(2,3년)", "초대졸"])
+    def test_portal_two_year_degree_labels_are_hard_excluded(self, degree):
+        # 사람인은 학력을 '대학교(4년) (졸업)' 체계로 준다 — 전문대는 '(2,3년)'.
+        verdict = score(candidate(school="인덕대학교", degree=degree, channel="saramin"),
+                        required_terms=REQUIRED, preferred_terms=PREFERRED, contract=CONTRACT)
+        assert verdict.hard_exclude_reason == "two_year_college"
+
+    @pytest.mark.parametrize("degree", ["대학교(4년) (졸업)", "대학원(석사)", "경영전문대학원 석사"])
+    def test_four_year_and_graduate_labels_are_not_hard_excluded(self, degree):
+        verdict = score(candidate(school="부산대학교", degree=degree, channel="saramin"),
+                        required_terms=REQUIRED, preferred_terms=PREFERRED, contract=CONTRACT)
+        assert verdict.hard_exclude_reason is None
