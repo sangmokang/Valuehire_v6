@@ -51,3 +51,24 @@
 - 계약 JSON(`in-seoul-universities.json`, `company-careers-sources.json` 미변경)과 `tools/codeitsearch/` 만 바뀐다. 다른 모듈의 소비자 없음(`rg in-seoul-universities` 로 확인).
 - 되돌리기: 이 goal 의 수정 커밋 1개를 `git revert` 하면 0f83c64 동작으로 복귀한다.
 - 데이터 안전: 삭제 범위는 좁아지기만 한다(AC-6). 넓어지는 변경 없음.
+
+## 적대 검증 로그
+
+| 회차 | 대상 | 판정 | 처리 |
+|---|---|---|---|
+| V1 1차 | 0f83c64 | FAIL — MAJOR 5·MINOR 1 | MAJOR 5 는 415260a 에서 수정. 독립 재현으로 V1 이 놓친 MAJOR 3(3차 회귀 15건 잔존·괄호 분교·(2,3년) 전문대) 추가 수정 |
+| V1 2차 | 415260a | FAIL — MAJOR 3·MINOR 1 | MAJOR 3(Berkeley College 뒤 단어·4년제 학력자 오제외·공백 사유) 다음 커밋에서 수정. MINOR(서울대학교(자연) 류)는 수집 기록 0건이라 목록으로 남김 |
+
+원문: `docs/engineering/codeitsearch-handoff-review-v1-2026-09-30.md`
+
+### 남은 MINOR (사장님 확인 대기)
+
+1. 괄호 분교 표지가 학교 구분 없이 적용 — `서울대학교(자연)` 류가 other 로 내려감(수집 기록 0건).
+2. 영문 학위 `Associate of Science/Arts` 가 전문대 하드컷에 안 걸림.
+3. `ETH Zürich`(움라우트), `Massachusetts Institute of Technology`·`Oxford University`·`CMU` 같은 정식/약칭 표기 일부가 world_top 미인식(3차 이전부터).
+4. `가톨릭대`(성심교정=부천)가 in_seoul 목록에 있음.
+5. `page_trace close-job` 이 없는 job id 를 PATCH 해도 0행을 성공으로 보고.
+6. 적재 전 조회가 PostgREST 기본 1,000행 상한을 넘으면 정리 누락(현재 코드잇 62행이라 무해).
+7. 적재 도중 실패하면 새 행과 이전 행이 함께 남아 다음 성공 실행 전까지 중복 노출.
+8. 메일 후보 한 명이 재계산에서 탈락하면 메일 전체가 실패(그 후보만 빼지 않음).
+9. 커밋 훅 `scan()` 이 `git show | grep -q` + pipefail 로 큰 파일에서 141(SIGPIPE) 오차단 — 공용 훅.

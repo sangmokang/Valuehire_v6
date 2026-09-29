@@ -139,7 +139,7 @@
       "Berkeley College",
       "Cornell College"
     ],
-    "not_world_top_exact_note": "이름 전체가 정확히 이것일 때만 other. 'Berkeley College'(뉴욕 영리대학)·'Cornell College'(아이오와)는 명문대 이름을 단 별개 학교다(codex V1 2026-09-30). 부분 일치로 막으면 'UC Berkeley College of Engineering' 까지 떨어진다."
+    "not_world_top_exact_note": "이름이 이것으로 시작하면 other (바로 뒤가 'of' 인 'Berkeley College of Engineering' 은 UC Berkeley 단과대라 제외). 'Berkeley College'(뉴욕 영리대학)·'Cornell College'(아이오와)는 명문대 이름을 단 별개 학교다(codex V1 2026-09-30, 2차)."
   },
   "national_tier": {
     "note": "인서울은 아니지만 이공계 최상위 — 학력 감점 대상이 아니다.",
@@ -178,7 +178,15 @@
       "대학원"
     ],
     "negative_marker_note": "'대학원' 이 붙은 학력은 전문대가 아니다. '전문대학원'(경영·법학·의학)과 '산업대학원' 이 각각 '전문대'·'산업대학' 표지에 걸려 하드제외되던 실측 결함(2026-09-28). 표지 검사 전에 '대학원' 을 원문에서 제거한다.",
-    "portal_marker_note": "사람인은 학력을 '대학교(4년) (졸업)' 체계로, 전문대는 '대학(2,3년)' 으로 준다(수집 기록 '(2,3년)' 107건). 인서울 어간으로 시작하는 서울 소재 전문대 이름은 in_seoul 로 오판되므로 이름째 표지로 둔다(2026-09-30). 서울예술대는 4년제 과정도 있어 포털이 '(4년)' 으로 주므로(수집 기록 2건) 이름 표지에서 빼고 not_in_seoul 에 둔다 — 소재지가 안산이다."
+    "portal_marker_note": "사람인은 학력을 '대학교(4년) (졸업)' 체계로, 전문대는 '대학(2,3년)' 으로 준다(수집 기록 '(2,3년)' 107건). 인서울 어간으로 시작하는 서울 소재 전문대 이름은 in_seoul 로 오판되므로 이름째 표지로 둔다(2026-09-30). 서울예술대는 4년제 과정도 있어 포털이 '(4년)' 으로 주므로(수집 기록 2건) 이름 표지에서 빼고 not_in_seoul 에 둔다 — 소재지가 안산이다.",
+    "four_year_degree_labels": [
+      "(4년)",
+      "4년제"
+    ],
+    "explicit_two_year_labels": [
+      "2,3년"
+    ],
+    "degree_priority_note": "학교 이름 표지(한양여자대 등)로 two_year 가 됐어도 학력 칸이 명시적으로 4년제면 other 로 본다 — 두 학교 모두 4년제 학사 과정이 있다(codex V1 2차, 2026-09-30). 단 학교 칸에 '(2,3년)' 이 직접 붙었으면 학교 칸을 따른다."
   },
   "downgrade_markers": {
     "note": "사이버·방송통신·학점은행은 인서울 가중치 대상이 아니다. 이름에 인서울 대학 어간이 들어가도 OTHER로 내린다.",
