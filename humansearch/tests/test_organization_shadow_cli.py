@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import json
 import os
+import socket
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -145,6 +147,88 @@ def test_cli_rejects_forbidden_identity_proxy_fields(tmp_path: Path) -> None:
     assert not output_path.exists()
     assert "school" in completed.stderr
     assert "prestige-only" not in completed.stderr
+
+
+class _Judge:
+    def __init__(self, raises: Exception | None = None) -> None:
+        self.raises, self.calls = raises, 0
+
+    def evaluate(self, **_: Any) -> dict[str, object]:
+        self.calls += 1
+        if self.raises is not None:
+            raise self.raises
+        return {"model": "jev-1.13.0", "answers": {}, "usage": {}}
+
+    def close(self) -> None:
+        return None
+
+
+def _live_shadow(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, judge: _Judge,
+                 output: Path) -> int:
+    policy = json.loads(shadow_cli.LIVE_POLICY_PATH.read_text(encoding="utf-8")) | {"live_calls_allowed": True}
+    (allowed := tmp_path / "live-policy.json").write_text(json.dumps(policy), encoding="utf-8")
+    monkeypatch.setattr(shadow_cli, "LIVE_POLICY_PATH", allowed)
+    monkeypatch.setenv("TYPESAFE_API_KEY", "synthetic-key-not-real")
+    monkeypatch.setattr(shadow_cli, "TypeSafeJevJudge", lambda: judge)
+    (source := tmp_path / "input.json").write_text(json.dumps(synthetic_payload()), encoding="utf-8")
+    return shadow_cli.main(["--input", str(source), "--output", str(output), "--config", str(CONFIG),
+                            "--live-jev"])
+
+
+@pytest.mark.parametrize("raises", [None, TimeoutError("synthetic")], ids=["answered", "raised"])
+def test_live_shadow_request_is_recorded_as_external(raises: Exception | None, tmp_path: Path,
+                                                     monkeypatch: pytest.MonkeyPatch) -> None:
+    judge, output = _Judge(raises), tmp_path / "out.json"
+    assert _live_shadow(monkeypatch, tmp_path, judge, output) == 0
+    result = json.loads(output.read_text(encoding="utf-8"))
+    assert (judge.calls, result["delivery_status"], result["request_attempts"]) == (1, "EXTERNAL_JEV", 1)
+
+
+def test_live_shadow_obeys_the_repository_live_policy(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # The repository contract keeps live calls off, so a key and --live-jev alone must send nothing.
+    built: list[int] = []
+    connects: list[int] = []
+
+    def refuse(*_: Any, **__: Any) -> None:
+        connects.append(1)
+        raise OSError("network blocked")
+
+    def build() -> _Judge:
+        built.append(1)
+        return _Judge()
+
+    monkeypatch.setattr(socket.socket, "connect", refuse)
+    monkeypatch.setattr(socket, "create_connection", refuse)
+    monkeypatch.setenv("TYPESAFE_API_KEY", "synthetic-key-not-real")
+    monkeypatch.setattr(shadow_cli, "TypeSafeJevJudge", build)
+    (source := tmp_path / "input.json").write_text(json.dumps(synthetic_payload()), encoding="utf-8")
+    output = tmp_path / "out.json"
+    assert shadow_cli.main(["--input", str(source), "--output", str(output), "--config", str(CONFIG),
+                            "--live-jev"]) == 0
+    result = json.loads(output.read_text(encoding="utf-8"))
+    assert (built, connects, result["delivery_status"], result["request_attempts"]) == ([], [], "LOCAL_ONLY", 0)
+
+
+def test_shadow_output_never_overwrites_the_live_policy(tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+                                                      capsys: pytest.CaptureFixture[str]) -> None:
+    (policy := tmp_path / "live-policy.json").write_bytes(shadow_cli.LIVE_POLICY_PATH.read_bytes())
+    monkeypatch.setattr(shadow_cli, "LIVE_POLICY_PATH", policy)  # never the repository contract itself
+    (source := tmp_path / "input.json").write_text(json.dumps(synthetic_payload()), encoding="utf-8")
+    before = policy.read_bytes()
+    with pytest.raises(SystemExit) as stop:
+        shadow_cli.main(["--input", str(source), "--output", str(policy), "--config", str(CONFIG)])
+    assert (stop.value.code, json.loads(capsys.readouterr().err)["error_code"]) == (2, "output_collision")
+    assert policy.read_bytes() == before
+
+
+def test_live_shadow_output_failure_still_reports_the_request(tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+                                                             capsys: pytest.CaptureFixture[str]) -> None:
+    (blocker := tmp_path / "file").write_text("x")
+    with pytest.raises(SystemExit) as stop:  # the output path sits under a regular file
+        _live_shadow(monkeypatch, tmp_path, judge := _Judge(), blocker / "out.json")
+    error = json.loads(capsys.readouterr().err)
+    assert (stop.value.code, judge.calls) == (2, 1)
+    assert (error["delivery_status"], error["request_attempts"]) == ("EXTERNAL_JEV", 1)
 
 
 @pytest.mark.parametrize("target", ["input", "config", "input_symlink", "input_hardlink"])

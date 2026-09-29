@@ -21,7 +21,7 @@ def test_required_failure_excludes_even_when_weighted_score_is_high() -> None:
             Criterion(
                 "backend",
                 "Backend context",
-                35,
+                50,
                 CriterionStatus.MET,
                 required=False,
                 evidence=("Built B2B APIs",),
@@ -29,7 +29,7 @@ def test_required_failure_excludes_even_when_weighted_score_is_high() -> None:
             Criterion(
                 "python",
                 "Python/FastAPI",
-                30,
+                49,
                 CriterionStatus.MET,
                 required=False,
                 evidence=("FastAPI production service",),
@@ -55,7 +55,7 @@ def test_unknown_required_condition_needs_confirmation_and_keeps_unknown_weight(
             Criterion(
                 "job_context",
                 "B2B SaaS backend",
-                35,
+                95,
                 CriterionStatus.MET,
                 required=True,
                 evidence=("Owned SaaS API modules",),
@@ -72,7 +72,7 @@ def test_unknown_required_condition_needs_confirmation_and_keeps_unknown_weight(
 
     assert result.recommendation is Recommendation.NEEDS_CONFIRMATION
     assert result.gate.unknown_required == ("degree",)
-    assert result.score.score == 87.5
+    assert result.score.score == 95.0
     assert result.score.unknown_weight == 5
 
 
@@ -110,7 +110,7 @@ def test_required_partial_condition_needs_confirmation() -> None:
             Criterion(
                 "role_context",
                 "Backend platform context",
-                35,
+                85,
                 CriterionStatus.MET,
                 required=False,
                 evidence=("Backend platform work",),
@@ -198,6 +198,31 @@ def test_non_finite_weights_are_rejected(weight: float) -> None:
         )
 
 
+@pytest.mark.parametrize("weights", ((60,), (70, 40)), ids=["under_100", "over_100"])
+def test_weights_that_do_not_sum_to_100_are_rejected(weights: tuple[int, ...]) -> None:
+    # A partial table must not be renormalised into a 100-point priority recommendation.
+    with pytest.raises(ValueError, match="must sum to 100"):
+        review_candidate(
+            criteria=tuple(
+                Criterion(f"c{index}", f"Criterion {index}", weight, CriterionStatus.MET,
+                          evidence=("Shipped it",))
+                for index, weight in enumerate(weights)
+            )
+        )
+
+
+def test_weights_summing_to_100_keep_the_existing_result() -> None:
+    result = review_candidate(
+        criteria=(
+            Criterion("backend", "Backend context", 80, CriterionStatus.MET, evidence=("API work",)),
+            Criterion("ai", "AI product experience", 20, CriterionStatus.UNMET),
+        )
+    )
+
+    assert (result.score.score, result.score.scored_weight) == (80.0, 100)
+    assert result.recommendation is Recommendation.REVIEW
+
+
 def test_overlapping_relevant_experience_is_not_double_counted() -> None:
     months = union_experience_months(
         (
@@ -228,7 +253,7 @@ def test_review_returns_stable_schema_version_and_input_hash() -> None:
         Criterion(
             "role",
             "Role context",
-            35,
+            100,
             CriterionStatus.MET,
             required=True,
             evidence=("API platform lead",),
@@ -259,7 +284,7 @@ def test_review_hash_changes_when_input_changes() -> None:
             Criterion(
                 "role",
                 "Role context",
-                35,
+                100,
                 CriterionStatus.MET,
                 required=True,
                 evidence=("API platform lead",),
@@ -272,7 +297,7 @@ def test_review_hash_changes_when_input_changes() -> None:
             Criterion(
                 "role",
                 "Role context",
-                35,
+                100,
                 CriterionStatus.MET,
                 required=True,
                 evidence=("API platform lead",),

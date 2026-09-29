@@ -1,0 +1,14 @@
+{
+  "company_tier_version": "company-tier-synthetic-v1",
+  "status": "SYNTHETIC_PLACEHOLDER_OWNER_TO_FILL",
+  "approval": null,
+  "tiers": [{"tier": "T1", "rank": 1, "verdict": "SUPPORTED"}, {"tier": "T2", "rank": 2, "verdict": "PARTIAL"},
+            {"tier": "T3", "rank": 3, "verdict": "PARTIAL"}],
+  "companies": {
+    "합성테크": {"tier": "T1", "synthetic": true},
+    "합성커머스": {"tier": "T2", "synthetic": true},
+    "합성솔루션": {"tier": "T3", "synthetic": true},
+    "Synthetic Labs": {"tier": "T1", "synthetic": true}
+  },
+  "aliases": {"합성테크(주)": "합성테크"}
+}
