@@ -154,3 +154,7 @@ class TestReview20260930:
         assert "등록 문턱(60점)을 넘은 후보 없음" not in mail["body"]
         assert "blocked" in mail["body"]
         assert "BLOCKED" in mail["subject"]
+
+    def test_a_blank_reason_is_not_a_reason(self):
+        with pytest.raises(ValueError):
+            compose(results(candidates=[], no_candidate_reason="   "))

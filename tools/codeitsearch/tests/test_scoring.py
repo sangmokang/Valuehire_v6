@@ -392,3 +392,30 @@ class TestReview20260930:
         verdict = score(candidate(school="부산대학교", degree=degree, channel="saramin"),
                         required_terms=REQUIRED, preferred_terms=PREFERRED, contract=CONTRACT)
         assert verdict.hard_exclude_reason is None
+
+
+class TestReview20260930Round2:
+    """수정분 재검증(codex V1 2차)에서 재현된 경계."""
+
+    @pytest.mark.parametrize(
+        "school",
+        ["Berkeley College School of Business", "Berkeley College Tech", "Cornell College Tech"],
+    )
+    def test_look_alike_schools_stay_out_even_with_trailing_words(self, school):
+        assert school_tier(school, CONTRACT) == SchoolTier.OTHER
+
+    def test_berkeleys_own_college_of_engineering_is_kept(self):
+        assert school_tier("Berkeley College of Engineering", CONTRACT) == SchoolTier.WORLD_TOP
+
+    @pytest.mark.parametrize("school", ["한양여자대학교", "서울여자간호대학교"])
+    def test_explicit_four_year_degree_overrides_the_two_year_name(self, school):
+        # 두 학교 모두 4년제 학사 과정이 있다. 학력 칸이 명시적으로 4년이면 이름으로 자르지 않는다.
+        verdict = score(candidate(school=school, degree="대학교(4년) (졸업)", channel="saramin"),
+                        required_terms=REQUIRED, preferred_terms=PREFERRED, contract=CONTRACT)
+        assert verdict.hard_exclude_reason is None
+
+    def test_explicit_two_year_label_on_the_school_still_cuts(self):
+        verdict = score(candidate(school="한양여자대학(2,3년)", degree="대학교(4년) (졸업)",
+                                  channel="saramin"),
+                        required_terms=REQUIRED, preferred_terms=PREFERRED, contract=CONTRACT)
+        assert verdict.hard_exclude_reason == "two_year_college"
