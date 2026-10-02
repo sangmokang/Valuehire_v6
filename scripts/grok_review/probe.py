@@ -266,7 +266,10 @@ def test_cli_and_workflow() -> None:
     run_line = 'python3 "$GITHUB_WORKSPACE/reviewer/scripts/grok_review/run_diff.py"'
     record("라이브 워크플로가 신뢰된 스크립트를 실행한다", workflow.count(run_line) == 1)
     record("pull_request_target 으로 기본 브랜치 워크플로를 쓴다", "\n  pull_request_target:\n" in workflow)
-    record("평일 아침 한 차례 일정", workflow.count('cron: "0 0 * * 1-5"') == 1 and 'cron: "0 8 * * 1-5"' not in workflow)
+    record(
+        "매일 09:00 KST 한 차례 일정",
+        workflow.count('cron: "0 0 * * *"') == 1 and 'cron: "0 0 * * 1-5"' not in workflow,
+    )
     record("리뷰 스텝이 실패를 무시하지 않는다", "continue-on-error" not in workflow)
     review_step = workflow.split("name: Grok 호출", 1)[1].split("run:", 1)[0]
     record("모델 스텝에 if 가 없다", "\nif:" not in review_step and "\n        if:" not in review_step)
@@ -371,6 +374,113 @@ def test_diff_pack() -> None:
         ("2026-10-03", engine.review_marker(sha_b) + "\n갱신", 3),
     ])
     record("표식 있는 최신 코멘트를 고친다", chosen == 3)
+    record(
+        "draft 는 일정 대상이 아니다",
+        gate.is_draft({"draft": True}) and not gate.is_draft({"draft": False}) and not gate.is_draft({}),
+    )
+
+
+def _added_diff(path: str, lines: list[str]) -> str:
+    body = [f"diff --git a/{path} b/{path}", f"--- a/{path}", f"+++ b/{path}", f"@@ -0,0 +1,{len(lines)} @@"]
+    body.extend(f"+{line}" for line in lines)
+    return "\n".join(body) + "\n"
+
+
+def test_diff_coverage_edges() -> None:
+    config = {
+        "max_changed_lines_per_chunk": 200,
+        "max_chunks": 10,
+        "call_timeout_seconds": 480,
+        "max_findings_per_chunk": 7,
+        "reason_max_chars": 300,
+        "exclude_globs": ["**/package-lock.json"],
+    }
+    for count in (200, 201, 400, 401):
+        diff = _added_diff("a.py", [f"L{number}" for number in range(1, count + 1)])
+        packed = diffpack.pack_diff(diff, config)
+        sent = [item.key() for chunk in packed.chunks for item in chunk.lines]
+        expected = [item.key() for item in diffpack.parse_unified(diff)]
+        displays = [line for chunk in packed.chunks for line in chunk.text.splitlines()]
+        record(
+            f"{count}줄 경계는 한 번씩만 전달",
+            sent == expected and len(sent) == count and all(item.display() in displays for item in packed.chunks[0].lines),
+        )
+    empty = _added_diff("a.py", ["", "가나다"])
+    packed = diffpack.pack_diff(empty, config)
+    record("빈 줄과 한글이 청크 본문에 있다", any("+1|" in chunk.text.splitlines() for chunk in packed.chunks) and "가나다" in packed.chunks[0].text)
+    deleted = "diff --git a/old.py b/old.py\n--- a/old.py\n+++ /dev/null\n@@ -1,1 +0,0 @@\n-gone\n"
+    created = "diff --git a/new.py b/new.py\n--- /dev/null\n+++ b/new.py\n@@ -0,0 +1,1 @@\n+born\n"
+    record("삭제 파일 줄은 old 경로다", diffpack.parse_unified(deleted)[0].path == "old.py")
+    record("새 파일 줄은 new 경로다", diffpack.parse_unified(created)[0].path == "new.py")
+    crlf = _added_diff("a.py", ["a", "b"]).replace("\n", "\r\n")
+    record("CRLF diff 도 두 줄", len(diffpack.pack_diff(crlf, config).chunks[0].lines) == 2)
+    no_nl = _added_diff("a.py", ["tail"]).rstrip("\n")
+    record("마지막 줄바꿈이 없어도 그 줄은 있다", diffpack.pack_diff(no_nl, config).changed_lines == 1)
+
+
+def test_fetch_line_count() -> None:
+    import fetch_diff
+
+    patterns: list = []
+    good = [{"filename": "a.py", "changes": 1, "patch": "@@ -0,0 +1 @@\n+only\n"}]
+    diff, excluded = fetch_diff.render_files(good, patterns)
+    record("patch 줄 수가 changes 와 같으면 받는다", "+only" in diff and excluded == [])
+    bad = [{"filename": "a.py", "changes": 2, "patch": "@@ -0,0 +1 @@\n+only\n"}]
+    try:
+        fetch_diff.render_files(bad, patterns)
+    except SystemExit as error:
+        record("줄 수 불일치는 실패", "diff 줄 수" in str(error))
+        return
+    record("줄 수 불일치는 실패", False)
+
+
+def test_fail_closed() -> None:
+    import run_diff
+
+    sha = "c" * 40
+    item = {"head": sha, "compare": "a...b", "body": "", "pr": "66"}
+    config = {
+        "max_changed_lines_per_chunk": 1,
+        "max_chunks": 1,
+        "call_timeout_seconds": 480,
+        "max_findings_per_chunk": 7,
+        "reason_max_chars": 300,
+        "exclude_globs": ["**/package-lock.json"],
+    }
+    diff = _added_diff("a.py", ["one", "two"])
+    expect_error("규모 초과는 표식 없이 실패", lambda: run_diff.review_item(item, diff, config))
+    empty_cfg = dict(config)
+    empty_cfg["max_chunks"] = 3
+    empty = run_diff.review_item(item, "", empty_cfg)
+    record("리뷰할 줄이 없으면 호출 없이 표식만 남긴다", engine.review_marker(sha) in empty["body"] and "변경 줄: 0" in empty["body"])
+    secret = "unit-test-not-a-real-key"
+    previous = os.environ.get("XAI_API_KEY")
+    os.environ["XAI_API_KEY"] = secret
+    original = run_diff._call_chunk
+
+    def fake_call(*_args, **_kwargs):
+        return 1, "", f"boom {secret}"
+
+    run_diff._call_chunk = fake_call
+    one = _added_diff("a.py", ["only"])
+    one_cfg = dict(config)
+    one_cfg["max_changed_lines_per_chunk"] = 10
+    try:
+        try:
+            run_diff.review_item(item, one, one_cfg)
+        except engine.ReviewError as error:
+            message = str(error)
+            record("청크 실패는 성공으로 끝나지 않는다", "청크 실패" in message)
+            record("실패 문구에 키를 남기지 않는다", secret not in message and "[REDACTED]" in message)
+        else:
+            record("청크 실패는 성공으로 끝나지 않는다", False)
+            record("실패 문구에 키를 남기지 않는다", False)
+    finally:
+        run_diff._call_chunk = original
+        if previous is None:
+            os.environ.pop("XAI_API_KEY", None)
+        else:
+            os.environ["XAI_API_KEY"] = previous
 
 
 def main() -> int:
@@ -383,6 +493,9 @@ def main() -> int:
     test_schedule_accounting()
     test_cli_and_workflow()
     test_diff_pack()
+    test_diff_coverage_edges()
+    test_fetch_line_count()
+    test_fail_closed()
     print(f"CHECKED: {CHECKED}")
     return FAILED
 

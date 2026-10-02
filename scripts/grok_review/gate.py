@@ -22,6 +22,10 @@ def marker(sha: str) -> str:
     return f"<!-- grok-review sha={sha.lower()} -->"
 
 
+def is_draft(item: dict) -> bool:
+    return item.get("draft") is True
+
+
 def decide(comments_newest_first: list[tuple[str, str]], head: str, event: str) -> tuple[bool, str]:
     """(skip, previous_sha). previous_sha 는 synchronize 이고 표식이 있을 때만 채운다."""
     if not SHA_RE.fullmatch(head):
@@ -156,6 +160,9 @@ def main() -> int:
         for item in payload:
             if not isinstance(item, dict):
                 raise SystemExit("FAIL: PR 항목이 객체가 아니다")
+            if is_draft(item):
+                print(f"DRAFT {item.get('number')}", flush=True)
+                continue
             pull = _pull(item)
             pairs = comment_pairs(repo, pull["pr"], token)
             skip, _previous = decide(pairs, pull["head"], "schedule")

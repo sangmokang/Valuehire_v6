@@ -13,11 +13,13 @@ name: grok-review
 # 결과 파일은 artifact 로만 넘긴다. artifact 를 올리고 받으려면 actions 권한이 필요하다.
 # 그 권한은 저장소 내용을 쓰거나 모델을 부르지 않는다.
 #
-# 일정은 월–금 09:00 KST 한 번이다. draft 건너뜀, 증분 diff, PR 번호 동시실행 취소는
-# pull_request_target 에만 적용한다.
+# 일정은 매일 09:00 KST 한 번이다. GitHub cron 은 UTC 이므로 00:00 이다.
+# 한국은 서머타임을 쓰지 않는다. draft 는 이벤트와 일정 모두 건너뛴다.
+# 증분 diff 와 PR 번호 동시실행 취소는 pull_request_target 에만 적용한다.
+# 청크 실패나 규모 초과는 리뷰 표식을 남기지 않고, fail-closed 잡이 워크플로를 실패로 끝낸다.
 on:
   schedule:
-    - cron: "0 0 * * 1-5"
+    - cron: "0 0 * * *"
   pull_request_target:
     types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
@@ -91,6 +93,10 @@ jobs:
 
           def marker(sha: str) -> str:
               return f"<!-- grok-review sha={sha.lower()} -->"
+
+
+          def is_draft(item: dict) -> bool:
+              return item.get("draft") is True
 
 
           def decide(comments_newest_first: list[tuple[str, str]], head: str, event: str) -> tuple[bool, str]:
@@ -227,6 +233,9 @@ jobs:
                   for item in payload:
                       if not isinstance(item, dict):
                           raise SystemExit("FAIL: PR 항목이 객체가 아니다")
+                      if is_draft(item):
+                          print(f"DRAFT {item.get('number')}", flush=True)
+                          continue
                       pull = _pull(item)
                       pairs = comment_pairs(repo, pull["pr"], token)
                       skip, _previous = decide(pairs, pull["head"], "schedule")
@@ -293,6 +302,9 @@ jobs:
     permissions:
       contents: read
       actions: write
+    outputs:
+      code: ${{ steps.grok.outputs.code }}
+      has_result: ${{ steps.grok.outputs.has_result }}
     steps:
       - name: 신뢰된 리뷰 스크립트
         uses: actions/checkout@v4
@@ -317,6 +329,7 @@ jobs:
         run: python3 "$GITHUB_WORKSPACE/reviewer/scripts/grok_review/fetch_diff.py"
 
       - name: Grok 호출
+        id: grok
         working-directory: reviewer
         env:
           XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
@@ -324,12 +337,24 @@ jobs:
           GROK_REASONING_EFFORT: ${{ vars.GROK_REASONING_EFFORT }}
           OUT_DIR: ${{ github.workspace }}/pr-data
           PR_NUMBER: ${{ needs.gate.outputs.pr_number }}
-        run: python3 "$GITHUB_WORKSPACE/reviewer/scripts/grok_review/run_diff.py"
+        run: |
+          set +e
+          python3 "$GITHUB_WORKSPACE/reviewer/scripts/grok_review/run_diff.py"
+          code=$?
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          if [ -f "$GITHUB_WORKSPACE/pr-data/result.json" ]; then
+            echo "has_result=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_result=false" >> "$GITHUB_OUTPUT"
+          fi
+          exit 0
 
       - name: 게시 스크립트 동봉
+        if: steps.grok.outputs.has_result == 'true'
         run: cp "$GITHUB_WORKSPACE/reviewer/scripts/grok_review/post_comment.py" "$GITHUB_WORKSPACE/pr-data/post_comment.py"
 
       - name: 결과 업로드
+        if: steps.grok.outputs.has_result == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: grok-review-result
@@ -339,9 +364,18 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  fail-closed:
+    needs: [gate, review]
+    if: ${{ always() && needs.gate.result == 'success' && needs.review.result == 'success' && needs.review.outputs.code != '0' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: 리뷰가 끝나지 않으면 워크플로를 실패로 남긴다
+        run: exit 1
+
   post:
     needs: [gate, review]
-    if: ${{ needs.gate.result == 'success' && needs.gate.outputs.skip != 'true' && needs.review.result == 'success' }}
+    if: ${{ needs.gate.result == 'success' && needs.gate.outputs.skip != 'true' && needs.review.result == 'success' && needs.review.outputs.has_result == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
