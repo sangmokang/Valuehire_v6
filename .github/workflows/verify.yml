@@ -281,3 +281,8 @@ jobs:
         # 두 번 돌리는 중복이 아니다.
         run: |
           python3 scripts/verify/check-invoice-gate.py
+
+      - name: 인수 검사 grok-review (줄 커버리지·키 없으면 실패)
+        # 모델 호출은 하지 않는다. 청크가 모든 줄을 담는지, 키가 없으면
+        # 리포트를 만들지 않고 실패하는지를 실행으로 확인한다.
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-grok-review.sh
