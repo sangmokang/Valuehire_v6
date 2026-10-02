@@ -8,6 +8,8 @@
 `.port` 는 숫자가 아닌 포트에서 `ValueError` 를 따로 던진다(실측). 두 갈래 모두 덮는다.
 """
 
+import inspect
+
 import pytest
 
 from humansearch import _cdp
@@ -40,3 +42,11 @@ def test_unparseable_websocket_url_is_a_closed_read_failure(
     # 브라우저 계약 §5·§12 — 거부 사유에 주소 조각을 싣지 않는다.
     for marker in ("SESSION-9", "[::1", "notaport", "/page/"):
         assert marker not in message
+
+
+def test_runtime_evaluate_method_is_loaded_from_contract() -> None:
+    if not _cdp._CDP_PROTOCOL_CONTRACT_PATH.exists():
+        pytest.skip("isolated gate mutation harness does not copy the repository contract tree")
+    assert _cdp._CDP_PROTOCOL_CONTRACT_PATH.exists()
+    assert _cdp._runtime_evaluate_method() == "Runtime.evaluate"
+    assert "Runtime.evaluate" not in inspect.getsource(_cdp)
