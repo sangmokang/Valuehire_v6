@@ -1,0 +1,79 @@
+name: grok-review
+
+# PR이 열리거나 갱신되면 Grok이 변경 파일의 모든 줄을 리뷰하고 코멘트를 단다.
+# 표본 추출과 잘라내기는 없다. 텍스트 줄은 용량으로 빼지 않는다.
+# 빈 모델 응답을 "결함 없음"으로 치지 않는다.
+#
+# 체크가 초록인 것은 결함이 없다는 뜻이 아니다. 대상 줄을 모두 보냈다는 뜻이다.
+# 결함은 PR 코멘트다. 키 없음·API 실패·커버리지 구멍은 실패다.
+#
+# pull_request_target 인 이유: 시크릿을 받는 워크플로는 기본 브랜치의 것이어야 한다.
+# PR 브랜치의 review.py 를 실행하면 그 PR이 XAI_API_KEY 와 GITHUB_TOKEN 을 가져갈 수 있다.
+# 스크립트는 reviewer/ (base) 에서 오고, 읽는 코드는 target/ (PR head) 이다.
+# target 안의 코드는 실행하지 않는다.
+#
+# 정기 실행은 이 워크플로의 schedule 이다. 사용자 브라우저의 로그인 세션은
+# GitHub 러너에 없다. 같은 head SHA 에 리뷰 표식이 있으면 줄을 다시 보내지 않는다.
+on:
+  schedule:
+    # 월–금 09:00, 17:00 KST (UTC 00:00, 08:00).
+    - cron: "0 0 * * 1-5"
+    - cron: "0 8 * * 1-5"
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: "pr = 변경 파일의 모든 줄, full = 추적된 텍스트의 모든 줄"
+        type: choice
+        options: [pr, full]
+        default: pr
+      pr_number:
+        description: "workflow_dispatch 에서 코멘트를 달 PR 번호. 비우면 리포트만 만든다."
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: grok-review-${{ github.event_name == 'schedule' && 'schedule' || github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: 신뢰된 리뷰 스크립트
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          persist-credentials: false
+          path: reviewer
+          fetch-depth: 1
+
+      - name: 리뷰 대상 체크아웃
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          # 비공개 저장소에서 base SHA 를 가져오려면 이 체크아웃에만 자격 증명이 필요하다.
+          # 실행하는 코드는 reviewer/ 의 스크립트뿐이라 PR 쪽 훅은 돌지 않는다.
+          persist-credentials: true
+          path: target
+          fetch-depth: 0
+
+      - name: Grok 라인 리뷰
+        working-directory: target
+        env:
+          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+          XAI_MODEL: ${{ vars.XAI_MODEL }}
+          GROK_REASONING_EFFORT: ${{ vars.GROK_REASONING_EFFORT }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
+          REVIEW_BASE: ${{ github.event.pull_request.base.sha }}
+          REVIEW_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+          REVIEW_SCOPE: ${{ github.event_name == 'schedule' && 'open-prs' || (github.event_name == 'workflow_dispatch' && github.event.inputs.scope || 'pr') }}
+        run: python3 "$GITHUB_WORKSPACE/reviewer/scripts/grok_review/review.py" review
