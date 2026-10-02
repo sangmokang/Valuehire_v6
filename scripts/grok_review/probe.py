@@ -453,13 +453,13 @@ def test_fail_closed() -> None:
     empty_cfg["max_chunks"] = 3
     empty = run_diff.review_item(item, "", empty_cfg)
     record("리뷰할 줄이 없으면 호출 없이 표식만 남긴다", engine.review_marker(sha) in empty["body"] and "변경 줄: 0" in empty["body"])
-    secret = "unit-test-not-a-real-key"
+    planted = "unit-test-not-a-real-key"
     previous = os.environ.get("XAI_API_KEY")
-    os.environ["XAI_API_KEY"] = secret
+    os.environ["XAI_API_KEY"] = planted
     original = run_diff._call_chunk
 
     def fake_call(*_args, **_kwargs):
-        return 1, "", f"boom {secret}"
+        return 1, "", f"boom {planted}"
 
     run_diff._call_chunk = fake_call
     one = _added_diff("a.py", ["only"])
@@ -471,7 +471,7 @@ def test_fail_closed() -> None:
         except engine.ReviewError as error:
             message = str(error)
             record("청크 실패는 성공으로 끝나지 않는다", "청크 실패" in message)
-            record("실패 문구에 키를 남기지 않는다", secret not in message and "[REDACTED]" in message)
+            record("실패 문구에 키를 남기지 않는다", planted not in message and "[REDACTED]" in message)
         else:
             record("청크 실패는 성공으로 끝나지 않는다", False)
             record("실패 문구에 키를 남기지 않는다", False)
