@@ -39,11 +39,14 @@ fail=0
 # 금지 경로 판정 — 훅(hooks/pre-commit)과 **같은 목록**이어야 한다.
 # 목록이 갈라지면 한쪽만 막는 비대칭이 생기고, 그 비대칭이 훅 우회 습관을 만든다.
 # 확장자 비교는 대소문자를 무시한다(dump.DB 가 통과한 2026-08-09 실측).
+# HS-13.09 추가: *.packet.json(서치 패킷)·*.sent.json(발송 장부)은 후보자 이름·프로필 URL·
+# 이메일을 그대로 담는다(D7). .gitignore 도 같은 두 패턴을 덮는다.
 is_forbidden_path() {
   local lf; lf=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
   case "$lf" in
     artifacts/*|*/artifacts/*|data/*|*/data/*|private-reviews/*|*/private-reviews/*|\
-    *.db|*.db-*|*.sqlite|*.sqlite-*|*.sqlite3|*.sqlite3-*|*.jsonl|*.ndjson|*.parquet)
+    *.db|*.db-*|*.sqlite|*.sqlite-*|*.sqlite3|*.sqlite3-*|*.jsonl|*.ndjson|*.parquet|\
+    *.packet.json|*.sent.json)
       return 0 ;;
   esac
   return 1

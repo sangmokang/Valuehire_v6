@@ -42,6 +42,12 @@ worktrees/
 # 비공개 리뷰 결과 (루트). 기존 규칙은 .claude/private-reviews/ 만 덮고 있었다.
 /private-reviews/
 
+# 서치 패킷·발송 장부 (P21 · HS-13.09 D7) — 후보자 PII 가 담기므로 git 밖에만 둔다.
+# 파일명 규칙: <packet_id>.packet.json / <packet_id>.<channel>.a<attempt>.sent.json
+# 앵커를 두지 않는다 — 이 파일들은 어느 깊이에 생겨도 추적 대상이면 안 된다.
+*.packet.json
+*.sent.json
+
 # Python (G2 게이트가 humansearch/ 에서 만드는 로컬 산출물 — 커밋 금지)
 .venv/
 __pycache__/

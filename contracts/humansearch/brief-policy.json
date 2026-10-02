@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "linkedin_inmail_max_chars": 1899,
+  "subject_prefixes": [
+    "[포지션]",
+    "[ValuehireSearch][포지션]"
+  ],
+  "subject_search_suffix": " | ValuehireSearch",
+  "profile_url_prefixes": [
+    "https://www.linkedin.com/in/",
+    "https://kr.linkedin.com/in/",
+    "https://linkedin.com/in/"
+  ],
+  "team_mail_domain": "valueconnect.kr",
+  "clickup_position_list_id": "901814621569",
+  "default_search_location": "South Korea",
+  "allowed_search_locations": [
+    "South Korea"
+  ],
+  "linkedin_core_sections": [
+    "주요업무",
+    "주요 업무",
+    "담당업무",
+    "담당 업무",
+    "자격요건",
+    "자격 요건",
+    "우대사항",
+    "우대 사항"
+  ]
+}
