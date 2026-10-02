@@ -79,3 +79,43 @@
 
 - `main` 브랜치 GitHub 보호 규칙의 실제 활성화 여부는 확인하지 않았다(`docs/sot/git-workflow.md` 한계와 동일).
 - 이 표는 2026-08-22 실행 결과의 스냅샷이다. 스크립트가 추가/삭제되면 다시 확인해야 한다.
+
+### 검증 핵심 변경의 별도 검토 상태
+
+`bash scripts/verify/check-verification-core.sh <trusted-base-full-sha> <candidate-head-full-sha>`는 검증 핵심 경로의 추가·변경·삭제·이동을 비교한다. 종료값 0은 지정된 두 커밋 사이 핵심 변경 없음, 20은 `VERIFICATION_CORE_CHANGED`(검토 필요), 2는 입력/조회 실패다. 20은 악성 변경 확정이 아니며 정상적인 검사기 수정도 검토 후 진행할 수 있다. 기능 인수 PASS로 20을 덮어쓰지 않는다.
+
+신뢰 조건: 검토된 비교기 사본과 base/head 선택 및 호출 배선은 후보 HEAD 밖에서 관리해야 한다. 후보 HEAD의 비교기를 실행한 결과는 자기 신뢰성을 증명하지 못한다. `--allow-same-ref`는 동일 커밋 정상 대조 시험 전용이며 병합 검증에 쓰지 않는다.
+
+PR #104의 기준 `fc6beedc78019862bc2f1b3bf4c4ad3bbd8e845b`에는 이 비교기가 없다. 따라서 현재 추가는 로컬 구현과 회귀 배선이며, 이미 신뢰된 base 검사기나 외부 필수 검사를 설치했다는 뜻이 아니다. 별도 선행 검토/기준 반영과 HEAD 밖 실행 및 필수 체크 설정이 실제 적용되기 전에는 self-bypass finding을 미해결로 둔다. 새 비교기의 회귀는 기존 `acceptance-rps-inmail.sh` AC-5가 조건 회귀와 함께 실행한다.
+
+### 외부 실행 준비와 설치 경계 (PR #104 후속)
+
+`.github/workflows/verification-integrity.yml`은 `pull_request_target`의 신뢰된 정의에서 실행하도록 준비한 코드다. GitHub 이벤트의 PR base/head SHA와 base 브랜치 `main`을 현재 PR API 응답과 대조하고, 빈 bare Git 저장소에 객체만 fetch한다. 보호되지 않은 다른 base 브랜치의 helper는 실행하지 않는다. base의 `scripts/verify/check-verification-core.sh`를 꺼내 실행하며 HEAD 파일·helper·환경파일·성공 문구는 실행/판정 근거로 사용하지 않는다. base에 검사기가 없으면 실패하며 HEAD 사본으로 대체하지 않는다.
+
+핵심 변경 없음은 0, 핵심 변경은 20이다. 정상적인 core 수정은 **GitHub의 현재 base/head에 대한 `reviewDecision=APPROVED`**를 사용한다. 리뷰 작성자 목록이나 Git 커밋 작성자 정보로 자체 승인 규칙을 만들지 않는다. GraphQL로 기존 branch protection의 승인 1건 이상·stale 승인 철회·마지막 push한 사람 외 승인·관리자 적용이 모두 유지되는지도 확인한다. 정책 누락/완화, 옛 SHA, `REVIEW_REQUIRED`/`CHANGES_REQUESTED`/null은 통과하지 않는다. 새 승인 시스템이나 라벨을 만들지 않는다. 리뷰 이후 기존 target 실행을 재실행하며 다른 branch protection 조건은 별도로 계속 적용한다.
+
+로컬 회귀는 `python3 -m unittest tests.test_verification_core`이며 기존 RPS 인수 AC-5 → pre-push/verify 경로에서 실행한다. 이는 준비한 workflow 본문을 실제 실행하는 fixture 시험이지, GitHub required workflow가 설치됐다는 증거가 아니다.
+
+**현재 상태: 코드 측 준비 / 외부 강제 미적용.** `main` base `fc6beedc...`에는 workflow와 검사기가 없다. 현재 저장소의 필수 status check는 `verify`/GitHub Actions 앱(15368)이며 workflow identity를 고정하지 않는다. [GitHub 공식 문서](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/troubleshooting-rules)는 required status checks가 workflow·matrix·event 종류를 구별하지 않는다고 명시한다. 따라서 이름 `verification-integrity`를 required check에 추가하는 것만으로 동명 가짜 job 공격을 닫았다고 할 수 없다.
+
+실제 강제의 선행 조건:
+
+1. 검토된 workflow와 검사기를 신뢰된 default/base에 먼저 반영한다. 이번 작업의 main 병합 금지 범위에서는 실행하지 않는다.
+2. 이름이 아니라 **source repository + workflow path + trusted ref를 지정하는 required workflow 규칙**을 활성화하고 우회 주체를 허용하지 않는다. 공식 설정은 [조직 ruleset](https://docs.github.com/en/organizations/managing-organization-settings/creating-rulesets-for-repositories-in-your-organization)에 있다. 현재 저장소에는 이 required workflow 규칙을 적용하지 않았으며, 필요한 소유자/플랜/권한 확인은 이번 범위 밖이다. 같은 Actions 앱 이름 제한 또는 CODEOWNERS만으로 이 강제와 동등하다고 주장하지 않는다. 별도 서비스/App를 새로 만들지 않는다.
+3. 보호된 소스 정의로 실행한 실제 PR에서 정상 기능 변경 성공, core 변경의 검토 대기, 동명 가짜 성공 job으로 필수 workflow 실패를 덮지 못함을 확인한다. 이 원격 실증 전에는 integrity/merge-ready 완료 판정을 하지 않는다.
+
+`pull_request_target`는 base 저장소의 신뢰된 workflow 정의를 사용한다. [공식 보안 문서](https://docs.github.com/en/actions/reference/security/securely-using-pull_request_target)는 이 이벤트가 높은 신뢰 권한에서 동작하므로 PR code checkout/실행을 피하라고 설명한다. 현재 workflow는 읽기 권한만 요청하고 checkout·cache·artifact·HEAD 실행을 하지 않는다. 원격 보호 규칙·환경·이벤트 정책을 이번 작업에서 변경하지 않는다.
+
+### 2026-09-22 후속 감사 정정
+
+직접 CI 단계가 호출하는 `scripts/scan-data-exposure.sh`가 핵심 경로에서 빠져 있었다.
+이 파일을 exit 0 / true / 빈 본문 / PASS 출력으로 바꾼 격리 반례 4종에서 기존 workflow 본문은 0을 반환했다.
+핵심 경로에 해당 파일 한 개를 추가하고 같은 반례가 20(검토 필요)을 반환하도록 수정했다.
+이는 경로 누락의 로컬 수정이며 외부 required workflow 설치를 의미하지 않는다.
+
+소유 형태/권한은 후속 조회에서 개인(User)·public·관리자 권한으로 확인했다. 구독 상품은 API null로 미확인이다.
+[공식 required workflows 규칙](https://docs.github.com/en/enterprise-cloud%40latest/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/available-rules-for-rulesets)은 organization/enterprise 수준이다.
+현재 개인 저장소의 필수 check 이름+Actions 앱 지정으로 workflow 정체성을 고정하지 못한다.
+기존의 “소유자/플랜/권한 확인은 범위 밖”은 앞선 단계 기록이며 현재 확인 범위는 위와 같다.
+코드 준비는 검증된 경로 범위에 한정하며, 모든 검증 의존성의 무결성을 증명한 것이 아니다.
+외부 강제 미완료와 merge-ready 아님을 유지한다. suppression #71/#72는 별도 작업으로 남긴다.

@@ -1,0 +1,421 @@
+{
+  "company": "번개장터",
+  "position": "Product Manager(Core Product)",
+  "source_url": "https://team.bgzt.co.kr/job_posting/02o6EksJ",
+  "captured_at": "2026-09-21T09:00:00+00:00",
+  "source_status": "FETCHED_VERBATIM",
+  "jd_id": "02o6EksJ",
+  "company_slug": "bunjang",
+  "position_slug": "core-product-pm",
+  "notes": [
+    "회사 소개 수치(인원·실적·투자·대표 프로필)는 사용자 제공 골든 샘플 기준이며 원출처 재확인 안 됨",
+    "공식 확인 범위: 2011년 런칭, 제품 라인업, 서초 근무지, JD 본문 전량"
+  ],
+  "units": [
+    {
+      "id": "C01",
+      "section": "company",
+      "kind": "company",
+      "meaning": "설립연도와 인원 규모",
+      "full": "- 설립: 2011년 1월 27일 / 인원: 192명",
+      "compact": "- 2011년 설립 / 192명",
+      "source": "research:golden_sample",
+      "rps_drop": true
+    },
+    {
+      "id": "C02",
+      "section": "company",
+      "kind": "company",
+      "meaning": "현재 공동대표",
+      "full": "- 대표: 강승현·최재화 공동대표",
+      "compact": "- 대표: 강승현·최재화 공동대표",
+      "source": "research:golden_sample",
+      "rps_drop": true
+    },
+    {
+      "id": "C03",
+      "section": "company",
+      "kind": "company",
+      "meaning": "대표 프로필(학력·이전 경력·합류 시점)",
+      "full": "- 최재화 대표: Harvard Business School MBA. Bain & Company·AB InBev·Google Korea를 거쳐 2020년 번개장터 CMO로 합류, 2022년 대표 취임",
+      "compact": "- 최재화 대표: Harvard Business School MBA, Bain & Company·AB InBev·Google Korea 출신",
+      "source": "research:golden_sample",
+      "drop_rank": 2,
+      "rps_drop": true
+    },
+    {
+      "id": "C04",
+      "section": "company",
+      "kind": "company",
+      "meaning": "2025년 매출과 영업손실",
+      "full": "- 실적: 2025년 매출 581억원 / 영업손실 199억원",
+      "compact": "- 2025년 매출 581억원, 영업손실 199억원",
+      "source": "research:golden_sample",
+      "rps_drop": true
+    },
+    {
+      "id": "C05",
+      "section": "company",
+      "kind": "company",
+      "meaning": "최근 투자 라운드",
+      "full": "- 투자: 2024년 7월 Series E 400억원 유치, 하나대체투자자산운용 주도",
+      "compact": "- 2024년 7월 Series E 400억원 유치(하나대체투자자산운용 주도)",
+      "source": "research:golden_sample",
+      "rps_block": "intro",
+      "rps_order": 3,
+      "rps": "2024년 7월 **Series E 400억원**을 유치했습니다."
+    },
+    {
+      "id": "C06",
+      "section": "company",
+      "kind": "company",
+      "meaning": "본사 위치",
+      "full": "- 위치: 서울 서초구 서초대로38길 12, 마제스타시티 타워2 7·10층",
+      "compact": "- 서울 서초",
+      "source": "research:golden_sample + jd:근무지",
+      "rps_drop": true
+    },
+    {
+      "id": "C07",
+      "section": "company",
+      "kind": "company",
+      "meaning": "제품 라인업",
+      "full": "- 제품: 번개장터·번개페이·번개케어·번장 글로벌·메루카리 연계 서비스",
+      "compact": "- 번개페이·번개케어·번장 글로벌·메루카리 연계",
+      "source": "homepage:team.bgzt.co.kr 제품 섹션",
+      "rps_drop": true
+    },
+    {
+      "id": "C08",
+      "section": "company",
+      "kind": "extra",
+      "meaning": "CEO 인터뷰 기반 사업 방향",
+      "full": "- CEO 인터뷰(2026년 1월): 취향 기반 중고거래, AI/ML 기반 등록·탐색 개선, 거래 신뢰와 글로벌 확장 강조",
+      "compact": "- 취향 기반 중고거래·AI/ML 탐색 개선·글로벌 확장",
+      "source": "research:golden_sample",
+      "rps_drop": true
+    },
+    {
+      "id": "T01",
+      "section": "team",
+      "kind": "core",
+      "meaning": "Core Product 팀이 탐색→등록→거래→정산 전 여정을 설계·개선한다",
+      "full": "탐색 → 등록 → 거래 → 정산까지 전 고객 여정을 설계·개선합니다. 상품 발견부터 판매자와의 조건 조율, 거래 완료까지 하나의 경험으로 다룹니다.",
+      "compact": "Core Product는 탐색→등록→거래→정산 전 여정을 설계합니다.",
+      "source": "jd:합류하게 될 팀",
+      "heading": "Core Product",
+      "rps_order": 1,
+      "rps": "번개장터 Core Product팀은 **탐색 → 등록 → 거래 → 정산**까지 중고거래의 전체 고객 여정을 설계하고 개선합니다."
+    },
+    {
+      "id": "T02",
+      "section": "team",
+      "kind": "core",
+      "meaning": "정답 예측이 아니라 빠른 실험·학습으로 문제를 발견·검증한다",
+      "full": "중고거래는 사용자 상황과 맥락에 따라 행동이 달라집니다. 정답을 예측하기보다 빠른 실험과 학습으로 실제 고객 문제를 발견하고 해결 방향을 검증합니다.",
+      "compact": "사용자 맥락에 따라 달라지는 문제를 빠른 실험·학습으로 해결합니다.",
+      "source": "jd:우리의 미션과 일하는 방식",
+      "rps_order": 4,
+      "rps": "정답을 예측하기보다 빠른 실험과 학습으로 실제 고객 문제를 발견하고 해결 방향을 검증합니다."
+    },
+    {
+      "id": "D00",
+      "section": "domain",
+      "kind": "core",
+      "meaning": "C2C 고유 특성이 세 가지임을 제시",
+      "full": "팀이 다루는 C2C의 특성은 세 가지입니다.",
+      "compact": "C2C 특성:",
+      "source": "jd:우리팀이 다루는 C2C 고유의 특성",
+      "merge_group": "c2c",
+      "rps": "중고거래는 C2C 특성상 세 가지 구조를 동시에 다룹니다."
+    },
+    {
+      "id": "D01",
+      "section": "domain",
+      "kind": "core",
+      "meaning": "인벤토리 — 동일 상품이라도 중고 재고는 1개뿐",
+      "full": "- 인벤토리: 동일 상품이라도 개별 중고 재고는 단 1개",
+      "compact": "재고 단 1개",
+      "source": "jd:인벤토리(Inventory)",
+      "merge_group": "c2c",
+      "rps": "**1개성 Inventory** — 동일 상품이라도 개별 중고 재고는 단 1개입니다."
+    },
+    {
+      "id": "D02",
+      "section": "domain",
+      "kind": "core",
+      "meaning": "탐색 — 롱테일 분산 수요에서 구매자·판매자 연결",
+      "full": "- 탐색: 수요가 넓게 분산되는 롱테일 구조에서 구매자·판매자 연결",
+      "compact": "롱테일 수요",
+      "source": "jd:탐색(Discovery)",
+      "merge_group": "c2c",
+      "rps": "**Long-tail Discovery** — 수요가 넓게 분산된 구조에서 구매자·판매자를 연결합니다."
+    },
+    {
+      "id": "D03",
+      "section": "domain",
+      "kind": "core",
+      "meaning": "거래 — 다양한 가격 협상과 복잡한 거래 과정 최적화",
+      "full": "- 거래: 다양한 가격 협상과 복잡한 거래 과정 최적화",
+      "compact": "다양한 가격 협상",
+      "source": "jd:거래(Transaction)",
+      "merge_group": "c2c",
+      "rps": "**복잡한 Transaction** — 다양한 가격 협상과 거래 과정을 최적화합니다."
+    },
+    {
+      "id": "R01",
+      "section": "role",
+      "kind": "core",
+      "meaning": "기능 구현을 넘어 세 역할을 수행",
+      "full": "단순한 기능 구현을 넘어, 중고거래의 특성을 이해하고 세 가지 역할을 수행합니다.\n- 문제 정의: 고객의 근본적인 문제를 발견하고 명확히 정의\n- 구조 설계: 문제 해결을 위한 구조와 시스템 설계\n- 실험 검증: 가설을 기반으로 빠르게 실험하고 결과로 해결책 검증",
+      "compact": "PM은 문제 정의→구조 설계→실험 검증을 수행하고",
+      "source": "jd:Core Product PM의 역할",
+      "merge_group": "pm_role",
+      "rps": "단순 기능 기획을 넘어 **고객 문제 정의 → 구조/정책 설계 → 실험 → 검증 → 개선**까지 리드하는 역할입니다."
+    },
+    {
+      "id": "R02",
+      "section": "role",
+      "kind": "core",
+      "meaning": "Silo의 핵심 경험 정의와 Squad의 기능·시스템 구축 리드",
+      "full": "Silo에서 핵심 경험을 정의하고 Squad의 기능·시스템 구축을 함께 리드합니다. 출시 후에도 실험과 개선을 반복하며 고객 경험을 발전시킵니다.",
+      "compact": "Silo의 핵심 경험과 Squad의 기능·시스템 구축을 함께 리드합니다.",
+      "source": "jd:PM은 Silo 단위에서",
+      "merge_group": "pm_role",
+      "rps": "Silo에서 핵심 경험을 정의하고 Squad의 기능·시스템 구축을 함께 리드합니다."
+    },
+    {
+      "id": "W00",
+      "section": "duties",
+      "kind": "core",
+      "meaning": "고객 여정 전반에서 기능·시스템·정책을 함께 다룸",
+      "full": "고객이 상품을 찾고 → 조건을 조율하고 → 거래를 마무리하는 과정에서 기능·시스템·정책을 함께 다룹니다.\n- 탐색·발견: 검색과 탐색의 흐름을 매끄럽게 연결하고 효율화\n- 거래 의사결정: 구매자·판매자의 판단 과정을 이해하고 필요한 커뮤니케이션 도구 기획\n- 거래 안정성: 거래가 원활하게 마무리되도록 시스템·정책의 일관성 설계",
+      "compact": "- 탐색·검색 연결 개선, 구매·판매 의사결정용 커뮤니케이션 도구 기획, 안정적 거래를 위한 시스템·정책 설계",
+      "source": "jd:다루는 문제의 범위",
+      "rps": "검색/탐색/거래 전반의 고객 문제 정의 및 개선"
+    },
+    {
+      "id": "W01",
+      "section": "duties",
+      "kind": "core",
+      "meaning": "A 기능 기획·출시: 문제 관찰→기획→협업 출시→데이터 검증·반복, 목표는 고객 문제 해결·기능 성과",
+      "full": "- 고객 문제 관찰 및 해결 기능 기획\n- 디자이너·개발자와 제품 출시, 데이터 기반 효과 검증·반복 개선\n- 목표: 고객 문제 해결과 기능 성과 달성",
+      "compact": "- 기능 기획·출시: 고객 문제 관찰, 디자이너·개발자 협업, 데이터 실험·개선으로 고객 문제 해결·성과 달성",
+      "source": "jd:A. 서비스 기능 기획/출시",
+      "heading": "A. 서비스 기능 기획·출시 | Feature Delivery",
+      "rps": "신규 기능 기획·출시 및 **Data 기반 실험**/고도화, Designer/Engineer 등 **Cross-functional** 협업 리드"
+    },
+    {
+      "id": "W02",
+      "section": "duties",
+      "kind": "core",
+      "meaning": "B 시스템 구조 설계: 충돌 방지 위계·규칙, 정합성·일관성·재현성, 목표는 안정성·일관성",
+      "full": "- 기능·정책 간 충돌을 막는 위계와 규칙 설계\n- 정합성·일관성·재현성을 갖춘 시스템 기반 구축\n- 목표: 시스템 안정성과 일관성 확보",
+      "compact": "- 시스템 구조: 기능·정책의 위계·규칙으로 충돌 방지, 정합성·일관성·재현성과 안정성 확보",
+      "source": "jd:B. 제품/시스템 구조 설계",
+      "heading": "B. 제품·시스템 구조 설계 | System Reasoning",
+      "rps": "기능·정책·시스템 구조 간 위계/규칙/정합성 설계"
+    },
+    {
+      "id": "W03",
+      "section": "duties",
+      "kind": "core",
+      "meaning": "C 정책 설계: OKR 목적 정의·MVP 설계, 고객행동·데이터 기반 정책 개선, 목표는 전략 목표·비즈니스 로직 최적화",
+      "full": "- OKR 기반 목적 정의 및 검증용 실험 단위(MVP) 설계\n- 고객 행동·데이터 해석을 통한 정책 개선과 서비스 적용\n- 목표: 전략 목표 달성과 비즈니스 로직 최적화",
+      "compact": "- 비즈니스 로직: OKR 목적·검증용 MVP 설계, 고객 행동·데이터 기반 정책 개선으로 전략 목표 달성",
+      "source": "jd:C. 전략 목표 달성을 위한 정책 설계",
+      "heading": "C. 전략 목표를 위한 정책 설계 | Business Logic",
+      "rps": "**OKR** 기반 **MVP** 및 실험 설계, 비즈니스 로직 성과 검증"
+    },
+    {
+      "id": "Q00",
+      "section": "requirements",
+      "kind": "core",
+      "meaning": "경력 2년 이상",
+      "full": "- 경력 2년 이상",
+      "compact": "- 경력 2년 이상",
+      "source": "jd:경력 2년 이상",
+      "rps": "경력 **2년+**"
+    },
+    {
+      "id": "Q01",
+      "section": "requirements",
+      "kind": "core",
+      "meaning": "Outcome 중심 사고: 변화 먼저 정의, 왜 필요한가 설명, PMF 관점 목표 집중",
+      "full": "- 달성할 변화를 먼저 정의하고 해결 방식을 선택\n- 기능 구현에 앞서 변화가 필요한 이유를 설명\n- PMF(Problem-Market-Fit) 관점에서 문제를 바라보고 목표에 집중",
+      "compact": "- 해결 수단보다 Outcome을 먼저 정의하고 변화의 필요성을 설명하며 PMF(Problem-Market-Fit) 관점에서 목표에 집중",
+      "source": "jd:A. 목적과 수단을 분리해 사고",
+      "heading": "A. Outcome 중심 사고",
+      "rps": "Feature 자체보다 **Outcome**/문제 해결 중심으로 사고하시는 분"
+    },
+    {
+      "id": "Q02",
+      "section": "requirements",
+      "kind": "core",
+      "meaning": "실험·학습: 작은 실험으로 가설 검증, 완성도보다 MVP 신속 실행, 고객행동 관찰로 가설 반복 수정",
+      "full": "- 작은 실험으로 가설을 검증하고 불확실성 축소\n- 완성도보다 의사결정에 필요한 최소 실행 단위(MVP)를 정의해 신속히 실행\n- 고객 행동을 관찰하고 가설을 반복 수정",
+      "compact": "- 완성도보다 의사결정용 최소 실험(MVP)을 빠르게 실행하고, 고객 행동에 따라 가설 수정",
+      "source": "jd:B. 불확실성을 줄이기 위해 실험하고 학습",
+      "heading": "B. 실험·학습 역량",
+      "rps": "가설 → **MVP** → 실험 → 학습의 반복에 익숙한 분"
+    },
+    {
+      "id": "Q03",
+      "section": "requirements",
+      "kind": "core",
+      "meaning": "구조적 이해·설계: 위계·규칙·파급효과 이해, 정합성·일관성·재현성 우선, 인과·제약·흐름으로 재구성",
+      "full": "- 기능·정책·시스템의 위계·규칙과 변화의 전체 파급효과 이해\n- 일회성 해결보다 정합성·일관성·재현성 중시\n- 문제를 인과·제약·흐름으로 재구성해 논리적으로 설명",
+      "compact": "- 위계·규칙·전체 파급효과를 이해하고 인과·제약·흐름으로 문제를 설명하며, 일회성 해결보다 정합성·일관성·재현성 중시",
+      "source": "jd:C. 문제를 구조적으로 이해하여 설계",
+      "heading": "C. 구조적 문제 이해·설계",
+      "rps": "복잡한 문제를 인과·제약·Flow로 구조화하고, 일회성 해결보다 정합성·일관성·재현성을 중시하는 분"
+    },
+    {
+      "id": "P01",
+      "section": "preferred",
+      "kind": "core",
+      "meaning": "정량 의사결정·도메인 기술정책·논리적 구조 배경지식",
+      "full": "- 통계·실험 설계·데이터 해석 등 정량적 의사결정 이해\n- 검색·정렬·추천, 인증·정산·결제의 기술·정책에 대한 관심 또는 지식\n- 시스템의 위계·규칙·흐름을 이해하는 논리적·구조적 배경지식",
+      "compact": "- 통계·실험 설계·데이터 해석 이해\n- 검색·정렬·추천, 인증·정산·결제의 기술·정책에 대한 관심 또는 지식\n- 위계·규칙·흐름을 이해하는 논리적·구조적 배경지식",
+      "source": "jd:A. 문제를 더 깊게 이해하는 데 도움이 되는 지식",
+      "heading": "A. 문제 이해를 돕는 지식",
+      "rps": "통계/실험설계/Data 분석 기반 의사결정 경험"
+    },
+    {
+      "id": "P02",
+      "section": "preferred",
+      "kind": "core",
+      "meaning": "평가 우선순위: 중고거래 도메인 경력보다 구조적 이해·실험 검증 기반을 중시",
+      "full": "※ 중고거래 도메인 경력 자체보다 구조적 문제 이해와 실험 검증의 기반 지식·경험을 중시합니다.",
+      "compact": "중고거래 경력 자체보다 구조적 문제 이해·실험 역량을 중시합니다.",
+      "source": "jd:[Note] 중고거래 도메인 경험보다",
+      "heading": "A. 문제 이해를 돕는 지식",
+      "note": true,
+      "rps": "중고거래 경력 자체보다 **구조적 문제 해결 및 실험 역량**을 더 중요하게 봅니다."
+    },
+    {
+      "id": "P03",
+      "section": "preferred",
+      "kind": "core",
+      "meaning": "cross-functional 여정 완성, 변경 전체 영향 검토, 고객행동 기반 실험·의사결정 검증 경험",
+      "full": "- 여러 팀과 하나의 고객 여정을 완성한 Cross-functional 프로젝트\n- 기능·정책·시스템 변경의 전체 영향 검토\n- 고객 행동 기반 실험 설계 또는 의사결정 검증",
+      "compact": "- 여러 팀과 고객 여정 완성, 기능·정책·시스템 변경의 전체 영향 검토, 고객 행동 기반 실험·의사결정 검증 경험",
+      "source": "jd:B. 서비스의 흐름을 조율해본 경험",
+      "heading": "B. 서비스 흐름 조율 경험",
+      "rps": "검색·추천·인증·결제·정산 등 Product Domain 이해와 **Cross-functional** 프로젝트 리딩 경험"
+    },
+    {
+      "id": "P04",
+      "section": "preferred",
+      "kind": "core",
+      "meaning": "평가 우선순위: 요청 실행보다 해결 구조를 함께 설계한 경험을 중시",
+      "full": "※ 요청을 그대로 실행한 경험보다 문제 해결의 구조를 함께 설계한 경험을 중시합니다.",
+      "compact": "요청 실행보다 해결 구조를 함께 설계한 경험을 중시합니다.",
+      "source": "jd:[Note] 클라이언트 요청을 그대로 수행",
+      "heading": "B. 서비스 흐름 조율 경험",
+      "note": true,
+      "rps": "요청 실행보다 해결 구조를 함께 설계한 경험을 중시합니다."
+    },
+    {
+      "id": "G01",
+      "section": "growth",
+      "kind": "core",
+      "meaning": "누적 가입자 2천만·DAU 100만 플랫폼 경험",
+      "full": "- 누적 가입자 2,000만 명·DAU 100만 명 규모의 플랫폼 경험(채용공고 기준)",
+      "compact": "- 가입자 2,000만·DAU 100만 규모의 플랫폼(채용공고 기준)",
+      "source": "jd:이런 성장을 기대할 수 있어요",
+      "rps_block": "intro",
+      "rps_order": 2,
+      "rps": "누적 가입자 **2천만+, DAU 100만+** 규모의 C2C 플랫폼입니다."
+    },
+    {
+      "id": "G02",
+      "section": "growth",
+      "kind": "core",
+      "meaning": "주요 프로덕트 과제 리드와 여러 지면·서비스 기획",
+      "full": "- 다수 고객에게 영향을 미치는 주요 프로덕트 과제 리드\n- 하나의 화면·도메인을 넘어 여러 지면과 서비스에 걸친 기획",
+      "compact": "- 다수 고객에게 영향을 주는 주요 과제 리드, 여러 지면·서비스 기획",
+      "source": "jd:주요한 프로덕트 과제들을 리드",
+      "rps_block": "footnote",
+      "rps": "다수 고객에게 영향을 주는 주요 프로덕트 과제 리드"
+    },
+    {
+      "id": "G03",
+      "section": "growth",
+      "kind": "core",
+      "meaning": "데이터 인프라 기반 문제 해결·출시, 시니어 협업, C2C 생태계 설계",
+      "full": "- 데이터 인프라를 활용한 문제 해결과 서비스 출시\n- 시니어·동료와의 협업을 통한 사고력·문제 해결 역량 강화\n- 구매자·판매자가 상호작용하는 C2C 생태계 설계",
+      "compact": "- 데이터 인프라 기반 문제 해결·출시, 시니어·동료와 사고력·문제 해결 역량 강화, C2C 생태계 설계",
+      "source": "jd:훌륭한 데이터 인프라를 갖춘",
+      "rps_block": "footnote",
+      "rps": "데이터 인프라 기반 문제 해결과 C2C 생태계 설계 경험"
+    },
+    {
+      "id": "N01",
+      "section": "conditions",
+      "kind": "core",
+      "meaning": "조직·직무·고용형태·수습·근무지·마감",
+      "full": "- Core Product / PM / 정규직 / 수습 3개월 / 서초 오피스 / 채용 시 마감",
+      "compact": "- 정규직 / 수습 3개월 / 채용 시 마감",
+      "source": "jd:근무환경 + 수습기간 3개월",
+      "rps": "정규직 · 수습 3개월 · 서초 오피스 · 채용 시 마감"
+    },
+    {
+      "id": "N02",
+      "section": "conditions",
+      "kind": "extra",
+      "meaning": "시차출근·조기퇴근·식대",
+      "full": "- 오전 8~11시 시차출근, 매월 2시간 조기퇴근(오아시스 제도), 식대 지원",
+      "compact": "- 8~11시 시차출근·매월 2시간 조기퇴근·식대 지원",
+      "source": "jd:근무환경과 혜택",
+      "rps_drop": true
+    },
+    {
+      "id": "S01",
+      "section": "process",
+      "kind": "core",
+      "meaning": "전형 단계",
+      "full": "- 서류 → 화상 스크리닝(20분) → 1차 → 2차 → 처우 협의 → 최종 합격",
+      "compact": "- 서류→화상 스크리닝(20분)→1차→2차→처우 협의→최종 합격",
+      "source": "jd:합류 여정",
+      "rps": "서류 → Screening(20분) → 1차 → 2차 → 처우협의 → 최종"
+    },
+    {
+      "id": "S02",
+      "section": "process",
+      "kind": "core",
+      "meaning": "레퍼런스 체크 동의 조건과 전형 변동 가능성",
+      "full": "- 2차 이후 동의하에 레퍼런스 체크 가능, 일정·상황에 따라 전형 추가·생략 가능",
+      "compact": "- 2차 이후 동의하에 레퍼런스 체크 가능, 전형 추가·생략 가능",
+      "source": "jd:※ 2차 인터뷰 이후 / ※ 전형 절차는",
+      "rps_block": "footnote",
+      "rps": "2차 이후 동의하에 Reference Check 가능, 전형 추가·생략 가능"
+    },
+    {
+      "id": "A01",
+      "section": "documents",
+      "kind": "core",
+      "meaning": "자유양식 이력서와 직무 무관 개인정보·연봉 제외 요청",
+      "full": "자유양식 이력서. 직무와 무관한 신체조건·출신지역·혼인여부·재산·가족의 학력/직업/재산 및 연봉정보는 제외해 주세요.",
+      "compact": "- 자유양식 이력서(직무 무관 개인정보·연봉 제외)",
+      "source": "jd:지원 전 확인해주세요",
+      "rps_block": "footnote",
+      "rps": "자유양식 이력서"
+    },
+    {
+      "id": "A02",
+      "section": "documents",
+      "kind": "core",
+      "meaning": "허위 기재 시 합격 취소, 취업보호대상자 우대, 제출서류 파기",
+      "full": "허위 기재 시 합격 취소 가능, 취업보호대상자는 관계법령에 따라 우대합니다. 번개장터 제출 서류는 삭제 요청 시 지체 없이 파기됩니다.",
+      "compact": "- 허위 기재 시 합격 취소 가능, 취업보호대상자 법령상 우대, 제출 서류는 삭제 요청 시 지체 없이 파기",
+      "source": "jd:입사지원서 기재사항 / 국가유공자 / 삭제 요청",
+      "rps_block": "footnote",
+      "rps": "허위 기재 시 합격 취소 가능, 제출 서류는 요청 시 지체 없이 파기"
+    }
+  ],
+  "role_label": "Core Product PM",
+  "rps_labels": {
+    "requirements": "Looking for"
+  }
+}
