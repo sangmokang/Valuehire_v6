@@ -359,7 +359,6 @@ _HTML_TEMPLATE = """<!doctype html>
     </section>
 
     <footer>
-      <span>입사 후 {payment['due_offset_days']}일 이내 입금 부탁드립니다.</span>
       <span class="notice">{draft_notice}</span>
     </footer>
   </main>
@@ -389,7 +388,6 @@ def render_html(invoice: InvoiceResult, contract: dict[str, Any]) -> str:
         "{html.escape(payment['bank_name'])}": context["bank"],
         "{html.escape(payment['account_number_display'])}": context["account"],
         "{html.escape(payment['account_holder'])}": context["account_holder"],
-        "{payment['due_offset_days']}": context["due_offset"],
         "{draft_notice}": context["draft_notice"],
     }
     for token, value in replacements.items():
