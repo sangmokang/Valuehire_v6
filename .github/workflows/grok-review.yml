@@ -20,8 +20,6 @@ name: grok-review
 on:
   schedule:
     - cron: "0 0 * * *"
-  push:
-    branches: [cursor/grok-review-operate-3dd3]
   pull_request_target:
     types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
@@ -64,13 +62,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          EVENT_NAME: ${{ github.event_name == 'push' && 'workflow_dispatch' || github.event_name }}
+          EVENT_NAME: ${{ github.event_name }}
           EVENT_ACTION: ${{ github.event.action }}
-          PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr_number || (github.event_name == 'push' && '66' || '') }}
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_BODY: ${{ github.event.pull_request.body }}
-          DISPATCH_SCOPE: ${{ github.event.inputs.scope || (github.event_name == 'push' && 'pr' || '') }}
+          DISPATCH_SCOPE: ${{ github.event.inputs.scope }}
         run: |
           python3 - <<'PY'
           #!/usr/bin/env python3
