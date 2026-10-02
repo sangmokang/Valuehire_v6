@@ -49,3 +49,24 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+
+# jd-channels 실행 산출물 (원고는 실행마다 재생성, 정의는 outputs/_units 유지)
+outputs/run-*/
+
+# Machine-local agent state and private recruiting records
+/.omx/
+/.hypothesis/
+/wrtn-finance-data-search/
+/scratchpad-sot-exception-status.md
+.agents/skills/**/*.bak-*
+# Job-specific drafts and fetched source copies stay local.
+/outputs/
+
+# Private execution evidence and client delivery receipts (preserved locally).
+/docs/engineering/jd-connected-evidence-2026-09-22.json
+/docs/engineering/jd-connected-goal-2026-09-22.md
+/docs/engineering/search-company-intelligence-result-2026-09-22.md
+/docs/engineering/jobkorea-jd-registration-goal-2026-09-21.md
+/docs/engineering/search-company-intelligence-goal-2026-09-22.md
+/docs/engineering/search-grok-execution-prompt.md
+/docs/engineering/search-skill-goal-2026-09-22.md

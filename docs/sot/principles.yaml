@@ -25,7 +25,7 @@
 
 - id: "P3"
   principle: "조용한 실패 금지"
-  mechanism_expected: "3상태 판정 + bare except/catch 금지 lint + 핸들러 DB 기록"
+  mechanism_expected: "정본: docs/sot/coding-principles.md#검증-결과-분리; 검사기: scripts/acceptance-principles-check.sh"
   mechanism_found:
     - path: "docs/sot/coding-principles.md"
       check: "scripts/acceptance-principles-check.sh"
@@ -342,4 +342,3 @@
       stages: ["strict", "pre-push", "ci"]
   status: "PASS"
   evidence: "Strict 계약 편입 장치의 실존·직접 실행만 PASS다. mechanism_expected에 적힌 제품 장치의 구현 완료를 주장하지 않는다."
-

@@ -45,6 +45,35 @@ fi
 
 FAIL=0
 
+match_stream() {
+  local path="$1"
+  local rc=0
+  grep -qEif "$CLEAN" || rc=$?
+  case "$rc" in
+    0)
+      printf '%s\n' "$path"
+      ;;
+    1)
+      ;;
+    *)
+      printf 'grep 실행 오류: %s\n' "$path" >> "$ERRS"
+      ;;
+  esac
+}
+
+scan_worktree_file() {
+  local f="$1"
+  if [ -L "$f" ]; then
+    if ! readlink -- "$f" 2>>"$ERRS" | match_stream "$f"; then
+      printf 'symlink read 오류: %s\n' "$f" >> "$ERRS"
+    fi
+  elif [ -f "$f" ] && [ -r "$f" ]; then
+    grep -lEif "$CLEAN" -- "$f" 2>>"$ERRS"
+  else
+    printf 'tracked file missing/not-a-file/unreadable: %s\n' "$f" >> "$ERRS"
+  fi
+}
+
 # 스캔 소스 (V1 2026-08-07 지적 반영):
 #   worktree(기본) — 작업트리 파일 내용을 읽는다. CI·수동 검사용.
 #   index          — 인덱스(스테이지)에 등록된 blob 내용을 읽는다. pre-commit 용.
@@ -69,7 +98,14 @@ if [ "$SCAN_SOURCE" = "index" ]; then
   done < <(git ls-files -z)
   LEAKS="${LEAKS%$'\n'}"
 else
-  LEAKS=$(git ls-files -z | xargs -0 grep -lEif "$CLEAN" -- 2>"$ERRS")
+  LEAKS=""
+  while IFS= read -r -d '' f; do
+    file_leaks=$(scan_worktree_file "$f")
+    if [ -n "$file_leaks" ]; then
+      LEAKS="${LEAKS}${file_leaks}"$'\n'
+    fi
+  done < <(git ls-files -z)
+  LEAKS="${LEAKS%$'\n'}"
 fi
 set -e
 if [ -s "$ERRS" ]; then
