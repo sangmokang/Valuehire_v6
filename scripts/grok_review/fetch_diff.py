@@ -16,6 +16,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import diffpack  # noqa: E402
+import engine  # noqa: E402
 
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
@@ -86,6 +87,14 @@ def render_files(files: object, patterns: list[re.Pattern[str]]) -> tuple[str, l
             block = f"diff --git a/{path} b/{path}\n--- a/{path}\n+++ b/{path}\n{patch}"
         if not block.endswith("\n"):
             block += "\n"
+        try:
+            parsed = diffpack.parse_unified(block)
+        except engine.ReviewError as error:
+            raise SystemExit(str(error)) from error
+        if len(parsed) != changes:
+            raise SystemExit(
+                f"FAIL: diff 줄 수가 변경 수와 다르다 — {path} parsed={len(parsed)} changes={changes}"
+            )
         parts.append(block)
     return "".join(parts), excluded
 

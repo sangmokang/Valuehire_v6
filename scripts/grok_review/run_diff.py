@@ -28,6 +28,13 @@ def _model_env() -> dict[str, str]:
     return {key: value for key, value in os.environ.items() if key not in blocked}
 
 
+def _redact(text: str) -> str:
+    secret = os.environ.get("XAI_API_KEY", "").strip()
+    if secret:
+        return text.replace(secret, "[REDACTED]")
+    return text
+
+
 def _call_chunk(chunk: diffpack.PackedChunk, pr_body: str, timeout_s: int, rejection: str) -> tuple[int, str, str]:
     system, user = diffpack.prompts(chunk, pr_body)
     if rejection:
@@ -56,12 +63,17 @@ def review_item(item: dict, diff_text: str, config: dict) -> dict:
     packed = replace(packed, excluded=names)
     sha = item["head"]
     compare = item["compare"]
-    if packed.too_large or not packed.chunks:
+    if packed.too_large:
+        raise engine.ReviewError(
+            f"FAIL: 규모 초과 — 청크 {len(packed.chunks)} > 상한 {packed.max_chunks}. "
+            "모델을 호출하지 않았고 리뷰 표식을 남기지 않는다"
+        )
+    if not packed.chunks:
         body = diffpack.render_comment(
             sha=sha, result=packed, findings=[], failures=[], dropped=0, compare=compare,
         )
         print(
-            f"PASS: coverage lines={packed.changed_lines} chunks={len(packed.chunks)} "
+            f"PASS: coverage lines={packed.changed_lines} chunks=0 "
             f"missing={packed.missing} duplicate={packed.duplicate}",
             flush=True,
         )
@@ -89,7 +101,7 @@ def review_item(item: dict, diff_text: str, config: dict) -> dict:
                 rejection = detail
                 continue
             if code != 0:
-                detail = f"리뷰 실패: {stderr or '모델 호출 실패'}"[:300]
+                detail = _redact(f"리뷰 실패: {stderr or '모델 호출 실패'}")[:300]
                 rejection = detail
                 continue
             try:
@@ -103,11 +115,16 @@ def review_item(item: dict, diff_text: str, config: dict) -> dict:
                 parsed = None
         if parsed is None:
             failures.append({"chunk_id": chunk.chunk_id, "detail": detail})
-            print(f"FAIL_CHUNK {chunk.chunk_id} {detail}", flush=True)
-            continue
+            print(f"FAIL_CHUNK {chunk.chunk_id} {_redact(detail)}", flush=True)
+            break
         findings.extend(parsed)
         dropped += drop
         print(f"REVIEWED {chunk.chunk_id} findings={len(parsed)} dropped={drop}", flush=True)
+    if failures:
+        summary = "; ".join(f"{item['chunk_id']} {item['detail']}" for item in failures)
+        raise engine.ReviewError(
+            f"FAIL: 청크 실패 {len(failures)}/{len(packed.chunks)} — {_redact(summary)}"
+        )
     body = diffpack.render_comment(
         sha=sha, result=packed, findings=findings, failures=failures, dropped=dropped, compare=compare,
     )
@@ -159,18 +176,32 @@ def main() -> int:
             if not isinstance(items, list):
                 raise engine.ReviewError("FAIL: work.json items 가 배열이 아니다")
             comments = []
+            failed = 0
             for item in items:
                 if not isinstance(item, dict):
                     raise engine.ReviewError("FAIL: work 항목이 객체가 아니다")
-                diff_path = out_dir / str(item.get("diff_file") or "")
-                diff_text = diff_path.read_text(encoding="utf-8")
-                comments.append(review_item(item, diff_text, config))
-        (out_dir / "result.json").write_text(
-            json.dumps({"comments": comments}, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+                try:
+                    diff_path = out_dir / str(item.get("diff_file") or "")
+                    diff_text = diff_path.read_text(encoding="utf-8")
+                    comments.append(review_item(item, diff_text, config))
+                except (engine.ReviewError, OSError) as error:
+                    failed += 1
+                    print(_redact(str(error)), flush=True)
+            if failed:
+                if comments:
+                    (out_dir / "result.json").write_text(
+                        json.dumps({"comments": comments}, ensure_ascii=False, indent=2),
+                        encoding="utf-8",
+                    )
+                print(f"FAIL: 완료하지 못한 항목 {failed}건", flush=True)
+                return 1
+        if comments or work.get("mode") == "full":
+            (out_dir / "result.json").write_text(
+                json.dumps({"comments": comments}, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
     except engine.ReviewError as error:
-        print(str(error))
+        print(_redact(str(error)))
         return 1
     except OSError as error:
         print(f"FAIL: 결과 파일을 쓰지 못했다 — {error}")

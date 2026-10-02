@@ -100,8 +100,11 @@ def violations(text: str, gate_source: str) -> list[str]:
         found.append("draft-skip")
     if "github.event.pull_request.number" not in text or "cancel-in-progress:" not in text:
         found.append("concurrency")
-    if text.count('cron: "0 0 * * 1-5"') != 1 or 'cron: "0 8 * * 1-5"' in text:
+    if text.count('cron: "0 0 * * *"') != 1 or 'cron: "0 0 * * 1-5"' in text or 'cron: "0 8 * * 1-5"' in text:
         found.append("schedule")
+    closed = _job_block(text, "fail-closed")
+    if "timeout-minutes:" not in closed or "exit 1" not in closed or "needs.review.outputs.code" not in text:
+        found.append("fail-closed")
     for kind in ("opened", "reopened", "synchronize", "ready_for_review"):
         if kind not in text:
             found.append(f"type-{kind}")
