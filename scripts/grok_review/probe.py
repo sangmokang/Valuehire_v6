@@ -11,7 +11,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import diffpack  # noqa: E402
 import engine  # noqa: E402
+import gate  # noqa: E402
+import post_comment  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 CHECKED = 0
@@ -260,17 +263,114 @@ def test_cli_and_workflow() -> None:
         record("키 없으면 review 는 실패", denied.returncode == 1 and "FAIL: XAI_API_KEY" in denied.stdout)
         record("키 없을 때 리포트를 만들지 않는다", not report.exists())
     workflow = (ROOT / ".github" / "workflows" / "grok-review.yml").read_text(encoding="utf-8")
-    run_line = 'python3 "$GITHUB_WORKSPACE/reviewer/scripts/grok_review/review.py" review'
+    run_line = 'python3 "$GITHUB_WORKSPACE/reviewer/scripts/grok_review/run_diff.py"'
     record("라이브 워크플로가 신뢰된 스크립트를 실행한다", workflow.count(run_line) == 1)
-    record("pull_request_target 으로 기본 브랜치 워크플로를 쓴다", "pull_request_target:" in workflow)
-    record("평일 두 차례 일정", workflow.count('cron: "0 0 * * 1-5"') == 1 and workflow.count('cron: "0 8 * * 1-5"') == 1)
-    record("일정 범위는 열린 PR", "&& 'open-prs'" in workflow and "&& 'schedule'" in workflow)
+    record("pull_request_target 으로 기본 브랜치 워크플로를 쓴다", "\n  pull_request_target:\n" in workflow)
+    record("평일 아침 한 차례 일정", workflow.count('cron: "0 0 * * 1-5"') == 1 and 'cron: "0 8 * * 1-5"' not in workflow)
     record("리뷰 스텝이 실패를 무시하지 않는다", "continue-on-error" not in workflow)
-    review_step = workflow.split("name: Grok 라인 리뷰", 1)[1].split("run:", 1)[0]
-    record("리뷰 스텝에 if 가 없다", "\nif:" not in review_step and "\n        if:" not in review_step)
+    review_step = workflow.split("name: Grok 호출", 1)[1].split("run:", 1)[0]
+    record("모델 스텝에 if 가 없다", "\nif:" not in review_step and "\n        if:" not in review_step)
+    record("모델 스텝에 토큰 env 가 없다", "GH_TOKEN" not in review_step and "GITHUB_TOKEN" not in review_step)
     verify = (ROOT / ".github" / "workflows" / "verify.yml").read_text(encoding="utf-8")
     acceptance = "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-grok-review.sh"
     record("verify 가 커버리지 인수 검사를 실행한다", verify.count(acceptance) == 1)
+
+
+def test_diff_pack() -> None:
+    diff = (
+        "diff --git a/a.py b/a.py\n"
+        "--- a/a.py\n"
+        "+++ b/a.py\n"
+        "@@ -1,2 +1,2 @@\n"
+        " keep\n"
+        "-old\n"
+        "+new\n"
+        "diff --git a/package-lock.json b/package-lock.json\n"
+        "--- a/package-lock.json\n"
+        "+++ b/package-lock.json\n"
+        "@@ -1 +1 @@\n"
+        "-lockold\n"
+        "+locknew\n"
+    )
+    config = {
+        "max_changed_lines_per_chunk": 1,
+        "max_chunks": 3,
+        "call_timeout_seconds": 480,
+        "max_findings_per_chunk": 7,
+        "reason_max_chars": 300,
+        "exclude_globs": diffpack.load_config()["exclude_globs"],
+    }
+    packed = diffpack.pack_diff(diff, config)
+    record("lock 파일은 커버리지에서 빠진다", packed.excluded == ("package-lock.json",) and packed.changed_lines == 2)
+    record("파일 단위 청크가 줄을 한 번씩 담는다", len(packed.chunks) == 2 and packed.missing == 0 and packed.duplicate == 0)
+    shared_cfg = dict(config)
+    shared_cfg["max_changed_lines_per_chunk"] = 800
+    two_files = diff + (
+        "diff --git a/b.py b/b.py\n"
+        "--- a/b.py\n"
+        "+++ b/b.py\n"
+        "@@ -0,0 +1 @@\n"
+        "+added\n"
+    )
+    shared = diffpack.pack_diff(two_files, shared_cfg)
+    record("상한 안의 두 파일은 한 청크다", len(shared.chunks) == 1 and shared.changed_lines == 3)
+    record("규모 상한 이하면 모델을 막을 이유가 없다", not packed.too_large)
+    small = dict(config)
+    small["max_chunks"] = 1
+    overflow = diffpack.pack_diff(diff, small)
+    record("청크 상한을 넘으면 규모 초과다", overflow.too_large and overflow.changed_lines == 2)
+    chunk = packed.chunks[0]
+    kept, dropped = diffpack.parse_chunk_output(
+        '{"chunk_id":"%s","findings":[{"severity":"high","file":"a.py","line":%d,"reason":"조건이 반대로 되어 있다."},'
+        '{"severity":"low","file":"a.py","line":99,"reason":"범위 밖이다."}]}' % (chunk.chunk_id, chunk.lines[0].line_no),
+        chunk,
+        max_findings=7,
+        reason_max=300,
+    )
+    record("범위 안 지적만 남긴다", len(kept) == 1 and dropped == 1)
+    expect_error(
+        "지적이 7개를 넘으면 거절",
+        lambda: diffpack.parse_chunk_output(
+            '{"chunk_id":"%s","findings":[%s]}' % (
+                chunk.chunk_id,
+                ",".join(
+                    '{"severity":"low","file":"a.py","line":%d,"reason":"문장 %d."}' % (chunk.lines[0].line_no, index)
+                    for index in range(8)
+                ),
+            ),
+            chunk,
+            max_findings=7,
+            reason_max=300,
+        ),
+    )
+    comment = diffpack.render_comment(
+        sha="a" * 40,
+        result=packed,
+        findings=kept,
+        failures=[{"chunk_id": "c2", "detail": "리뷰 실패: 시간 초과"}],
+        dropped=dropped,
+        compare="abc...def",
+    )
+    record(
+        "코멘트 머리에 커버리지 숫자가 있다",
+        "변경 줄: 2" in comment and "청크: 2" in comment and "누락: 0" in comment and "중복: 0" in comment,
+    )
+    record("코멘트에 sha 표식이 있다", engine.review_marker("a" * 40) in comment)
+    sha_b = "b" * 40
+    sha_a = "a" * 40
+    comments = [("2026-10-02T00:00:00Z", engine.review_marker(sha_a))]
+    skip, previous = gate.decide(comments, sha_b, "synchronize")
+    record("synchronize 는 직전 표식 SHA 를 고른다", not skip and previous == sha_a)
+    skip_same, _previous_same = gate.decide(comments, sha_a, "synchronize")
+    record("같은 SHA 표식이 있으면 skip", skip_same)
+    opened_skip, opened_prev = gate.decide(comments, sha_b, "opened")
+    record("opened 는 증분 SHA 를 비운다", not opened_skip and opened_prev == "")
+    chosen = post_comment.choose_id([
+        ("2026-10-01", "일반 코멘트", 1),
+        ("2026-10-02", engine.review_marker(sha_a) + "\n본문", 2),
+        ("2026-10-03", engine.review_marker(sha_b) + "\n갱신", 3),
+    ])
+    record("표식 있는 최신 코멘트를 고친다", chosen == 3)
 
 
 def main() -> int:
@@ -282,6 +382,7 @@ def main() -> int:
     test_schedule_parser()
     test_schedule_accounting()
     test_cli_and_workflow()
+    test_diff_pack()
     print(f"CHECKED: {CHECKED}")
     return FAILED
 

@@ -16,4 +16,5 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 2
 fi
 
-exec python3 scripts/grok_review/probe.py
+python3 scripts/grok_review/probe.py || exit $?
+python3 scripts/grok_review/workflow_check.py

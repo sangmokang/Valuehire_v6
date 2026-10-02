@@ -23,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import engine  # noqa: E402
 
 API_URL = "https://api.x.ai/v1/chat/completions"
+DEFAULT_MODEL = "grok-4.7"
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 REF_RE = re.compile(r"[A-Za-z0-9._/-]+")
 RETRY_STATUS = {429, 500, 502, 503, 504}
@@ -225,20 +226,17 @@ def _post_json(url: str, headers: dict[str, str], body: dict, timeout: int) -> d
     return parsed
 
 
-def call_model(api_key: str, model: str, effort: str, chunk: engine.Chunk, timeout: int, rejection: str = "") -> str:
+def call_texts(api_key: str, model: str, effort: str, system: str, user: str, timeout: int) -> str:
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
         "User-Agent": "valuehire-grok-review",
     }
-    user = engine.user_prompt(chunk)
-    if rejection:
-        user += f"\n이전 출력은 거절됐다: {rejection}\nJSON 객체만 다시 답한다.\n"
     body: dict = {
         "model": model,
         "stream": False,
         "messages": [
-            {"role": "system", "content": engine.system_prompt()},
+            {"role": "system", "content": system},
             {"role": "user", "content": user},
         ],
     }
@@ -261,6 +259,43 @@ def call_model(api_key: str, model: str, effort: str, chunk: engine.Chunk, timeo
     if last is None:
         raise ApiError("FAIL: 모델 호출이 비었다")
     raise last
+
+
+def call_model(api_key: str, model: str, effort: str, chunk: engine.Chunk, timeout: int, rejection: str = "") -> str:
+    user = engine.user_prompt(chunk)
+    if rejection:
+        user += f"\n이전 출력은 거절됐다: {rejection}\nJSON 객체만 다시 답한다.\n"
+    return call_texts(api_key, model, effort, engine.system_prompt(), user, timeout)
+
+
+def review_one(argv: list[str]) -> int:
+    """청크 하나를 timeout 자식 프로세스로 호출할 때 쓰는 진입점. 코멘트는 달지 않는다."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--request", required=True)
+    args = parser.parse_args(argv)
+    api_key = os.environ.get("XAI_API_KEY", "").strip()
+    if not api_key:
+        print("FAIL: XAI_API_KEY 가 없다 — 리뷰를 실행하지 않았다", file=sys.stderr)
+        return 1
+    try:
+        payload = json.loads(Path(args.request).read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        print(f"FAIL: 청크 요청을 읽지 못했다 — {error}", file=sys.stderr)
+        return 1
+    system = payload.get("system")
+    user = payload.get("user")
+    if not isinstance(system, str) or not isinstance(user, str):
+        print("FAIL: 청크 요청에 system, user 가 없다", file=sys.stderr)
+        return 1
+    model = os.environ.get("XAI_MODEL", "").strip() or DEFAULT_MODEL
+    effort = os.environ.get("GROK_REASONING_EFFORT", "").strip() or "medium"
+    timeout = _positive_int("GROK_REVIEW_TIMEOUT", 180)
+    try:
+        sys.stdout.write(call_texts(api_key, model, effort, system, user, timeout))
+    except ApiError as error:
+        print(str(error), file=sys.stderr)
+        return 1
+    return 0
 
 
 def review_chunks(planned: list[engine.PlannedFile], api_key: str, model: str, effort: str, timeout: int) -> tuple[list[engine.Finding], int]:
@@ -483,6 +518,9 @@ def _review_with_env(number: str, base: str, head: str, out: str) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] == "review-one":
+        return review_one(argv[1:])
     args = _parser().parse_args(argv)
     out = args.out or os.environ.get("GROK_REVIEW_OUT", "").strip()
     if args.command == "review" and not out:
@@ -508,7 +546,7 @@ def main(argv: list[str] | None = None) -> int:
         reviewed_lines = sum(item.line_count for item in reviewed)
         chunk_count = sum(1 for item in reviewed for chunk in item.chunks if chunk.end != 0)
         if args.command == "plan":
-            payload = _report(planned, sha, os.environ.get("XAI_MODEL", "").strip() or "grok-4.6", scope, [], 0, False)
+            payload = _report(planned, sha, os.environ.get("XAI_MODEL", "").strip() or DEFAULT_MODEL, scope, [], 0, False)
             if out:
                 write_report(out, payload)
             print(
@@ -517,7 +555,7 @@ def main(argv: list[str] | None = None) -> int:
             )
             return 0
 
-        model = os.environ.get("XAI_MODEL", "").strip() or "grok-4.6"
+        model = os.environ.get("XAI_MODEL", "").strip() or DEFAULT_MODEL
         effort = os.environ.get("GROK_REASONING_EFFORT", "").strip() or "medium"
         timeout = _positive_int("GROK_REVIEW_TIMEOUT", 180)
         api_key = os.environ["XAI_API_KEY"].strip()

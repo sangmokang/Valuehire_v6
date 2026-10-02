@@ -77,7 +77,7 @@ CHATGPT_PASSWORD=
 
 `.claude/skills/grokreview/SKILL.md`
 
-ChatGPT 브라우저 리뷰와 별개다. GitHub Actions(`.github/workflows/grok-review.yml`)가 PR마다, 그리고 월–금 09:00·17:00 KST 에 열린 PR의 변경 파일 **모든 줄**을 Grok에 보내고 결함만 코멘트로 남긴다. 같은 커밋은 다시 보내지 않는다. 사용자 브라우저 로그인으로는 이 일정을 돌릴 수 없다.
+ChatGPT 브라우저 리뷰와 별개다. GitHub Actions(`.github/workflows/grok-review.yml`)가 PR마다, 그리고 월–금 09:00 KST 에 열린 PR의 추가·삭제 줄을 Grok에 보내고 코멘트 하나로 남긴다. 같은 커밋은 다시 보내지 않는다. 사용자 브라우저 로그인으로는 이 일정을 돌릴 수 없다.
 
 일회 설정은 Actions secret `XAI_API_KEY` 하나다. 키를 저장소에 적지 않는다.
 체크가 초록인 것은 결함이 없다는 뜻이 아니다. 대상 줄을 빠짐없이 보냈다는 뜻이다.
