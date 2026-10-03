@@ -9,6 +9,7 @@
 - [strict-workflow.md](strict-workflow.md) — Codex·Claude `$strict` 공통 실행 순서·Type/DB/API·PR·자동화 경계 정본
 - [humansearch-l0-surface-contract.md](humansearch-l0-surface-contract.md) — HumanSearch L0 인증 화면 분류의 입력·출력·경계
 - [humansearch-browser-contract.md](humansearch-browser-contract.md) — HumanSearch 상주 브라우저 진단 접속·단일 탭·사용권·사람 개입·채널별 경계
+- [aside-browser-control.md](aside-browser-control.md) — AISearch 의 Aside 브라우저 제어 경로(MCP·AppleScript·CDP) 우선순위·탭 재사용·사이트 요령·중단 코드
 - [invoice.md](invoice.md) — 밸류커넥트 채용 수수료 인보이스의 입력·계산·PDF·개인정보·Gmail 발송 승인 계약
 - [invoice-storage.md](invoice-storage.md) — V4 Supabase 원장 재사용, 고객사·포지션별 수수료 계약, SQLite 미러·동기화 상태 계약
 
