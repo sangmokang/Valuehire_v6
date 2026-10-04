@@ -38,3 +38,4 @@ herdr 워크스페이스 1개에 작업 1개(worktree·브랜치·pane 3개)를 
 
 - **V1-1** (Codex, herdr `review`로 실행, 2026-10-04 15:07) — FAIL. MAJOR 2: 기존 경로 브랜치 미확인, 작업 중 에이전트가 있어도 `done` 제거. → d502c17에서 해소, 실측 확인.
 - **V1-2** (19:15) — FAIL. MAJOR 3: goal 문서 부재, `test` 기본값(verify.sh=비밀 스캔)을 게이트 전체처럼 서술, `done`이 ignored 파일 미확인. → 본 문서 추가, 서술 정정, `-IncludeIgnored` 동의 게이트 추가.
+- **V1-3** (19:22, `-Goal` 지정) — **PASS**. 발견 없음. 반증 시도: 중복·slug·경로 브랜치, 마커 정규식·종료 코드, done 3중 게이트, 반복 review 이름 충돌, CI·SOT 무변경, `git diff --check`.
