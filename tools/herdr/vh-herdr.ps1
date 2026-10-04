@@ -130,6 +130,10 @@ function Cmd-Task([string]$slug) {
     $branchExists = ($LASTEXITCODE -eq 0)
 
     if (Test-Path $path) {
+        # 기존 경로는 그 체크아웃이 정확히 task/<slug> 일 때만 연다 (다른 브랜치 오염 방지).
+        $head = (& git -C $path rev-parse --abbrev-ref HEAD | Out-String).Trim()
+        if ($LASTEXITCODE -ne 0) { throw "$path 는 git worktree 가 아님 — 직접 확인 후 정리" }
+        if ($head -ne $branch) { throw "$path 의 브랜치가 '$head' (기대: $branch) — 경로 충돌, 직접 정리 필요" }
         $created = Invoke-Herdr worktree open --cwd $RepoRoot --path $path --label $slug --no-focus
     } elseif ($branchExists) {
         $created = Invoke-Herdr worktree create --cwd $RepoRoot --branch $branch --path $path --label $slug --no-focus
@@ -214,7 +218,7 @@ function Cmd-Review([string]$slug) {
 "@ | Set-Content -Path $brief -Encoding UTF8
 
     $name = "$slug-review"
-    Invoke-Herdr agent start $name --kind codex --pane $pane --timeout 90000 -- --no-daemon --sandbox read-only | Out-Null
+    Invoke-Herdr agent start $name --kind codex --pane $pane --timeout 90000 '--' --no-daemon --sandbox read-only | Out-Null
     Write-Output "reviewer 기동 ($pane). 검토 중… (최대 $TimeoutSec 초)"
     Invoke-Herdr agent prompt $name "검토 의뢰서 $brief 를 읽고 그 지시대로 검토하라." --wait --until idle --until done --until blocked --timeout ($TimeoutSec * 1000) | Out-Null
     $agent = (Invoke-Herdr agent get $name).agent
@@ -246,6 +250,13 @@ function Cmd-Status {
 
 function Cmd-Done([string]$slug) {
     $ws = Require-Workspace $slug
+    # 일하는 중이거나 상태를 모르는 에이전트가 있으면 지우지 않는다 (아직 디스크에 안 쓴 작업 보호).
+    $busy = @((Invoke-Herdr agent list).agents | Where-Object {
+        $_.workspace_id -eq $ws.workspace_id -and @("idle", "done") -notcontains $_.agent_status })
+    if ($busy.Count -gt 0) {
+        $desc = ($busy | ForEach-Object { "$($_.pane_id)=$($_.agent_status)" }) -join ", "
+        throw "작업 중/미확인 에이전트 있음 ($desc) — 멈추거나 종료한 뒤 다시 실행"
+    }
     $dirty = & git -C $ws.worktree.checkout_path status --porcelain
     if ($LASTEXITCODE -ne 0) { throw "git status 실패" }
     if ($dirty) { throw "미커밋 변경 있음 — 커밋하거나 직접 정리 후 다시 실행 (강제 삭제 안 함)" }
