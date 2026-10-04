@@ -117,7 +117,8 @@ ID는 예측하지 말고 생성 명령의 JSON 응답에서 꺼낸다. 전체 �
 
 - `task`: `git fetch` → `herdr worktree create --branch task/<name> --base origin/main --path worktrees/<name>` → pane 3개(coder/review/test) → coder에 Claude 기동 → `-Prompt`가 있으면 지시서 파일을 만들어 전달.
 - `review`: 기존 review pane을 닫고 새로 만든 뒤 Codex를 read-only로 띄워 **검토 의뢰서 파일**을 읽힌다. 의뢰서는 diff 범위·goal·출력 형식을 담고, 마지막 줄 `VH_VERDICT: PASS|FAIL`을 요구한다. 판정 줄이 없으면 무효(exit 1). 원문은 `%LOCALAPPDATA%\vh-herdr\<name>\review-*.md`에 남는다.
-- `test`: 무작위 마커로 `<marker>=<exit code>` 줄을 찍게 하고 그 줄 전체가 일치할 때만 인정한다. 화면 기록은 `test-*.log`.
+- `test`: 무작위 마커로 `<marker>=<exit code>` 줄을 찍게 하고 그 줄 전체가 일치할 때만 인정한다. 화면 기록은 `test-*.log`. **기본 명령 `bash verify.sh`는 비밀 스캔 하나뿐이다** — 전체 검증이 아니다. 무엇을 돌려야 하는지는 `docs/sot/verification-commands.md`가 정본이며, 필요한 인수 스크립트는 `-Cmd`로 지정한다(예: `-Cmd "& 'C:\Program Files\Git\bin\bash.exe' scripts/acceptance-invoice.sh"` — 바깥만 큰따옴표). push 때 `hooks/pre-push`가 verify.sh + `acceptance-*.sh` 전량을, PR에서 CI가 고정 목록을 다시 돈다.
+- `done`: 같은 워크스페이스에 idle/done이 아닌 에이전트가 있거나 미커밋 변경이 있으면 거부한다. `.gitignore` 대상 파일은 `git worktree remove`가 묻지 않고 지우므로 목록을 보여주고 `-IncludeIgnored` 없이는 거부한다. (`task`는 기존 경로가 다른 브랜치이면 거부한다.)
 - 종료 코드: 0 성공 / 1 실패·FAIL·판정 누락 / 2 사용법 오류. 실패를 조용히 넘기지 않는다.
 
 ### 4.3 strict 흐름과의 연결
@@ -125,7 +126,7 @@ ID는 예측하지 말고 생성 명령의 JSON 응답에서 꺼낸다. 전체 �
 ```
 Issue → task <name> (worktree+브랜치+pane 3개)
       → coder: goal 문서 → RED 커밋 → GREEN → 커밋
-      → test <name>                         (게이트 4: verify.sh exit 0)
+      → test <name> [-Cmd ...]              (게이트 4 일부: 기본은 비밀 스캔뿐. 정본 목록은 verification-commands.md)
       → review <name> -Goal <goal>          (V1: fresh·read-only Codex, VH_VERDICT)
       → V2·codeaudit (기존 절차 그대로)
       → push → PR → CI 초록 → 사장님 merge

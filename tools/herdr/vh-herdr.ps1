@@ -13,7 +13,7 @@ vh-herdr.ps1 — Valuehire 작업을 herdr 워크스페이스로 띄우는 런�
   .\tools\herdr\vh-herdr.ps1 test <name> [-Cmd <명령>] # 기본: bash verify.sh
   .\tools\herdr\vh-herdr.ps1 review <name> [-Goal <goal 문서 경로>]
   .\tools\herdr\vh-herdr.ps1 status                    # 모든 에이전트 상태 (blocked 먼저)
-  .\tools\herdr\vh-herdr.ps1 done <name>               # worktree 제거 (브랜치는 남긴다)
+  .\tools\herdr\vh-herdr.ps1 done <name> [-IncludeIgnored] # worktree 제거 (브랜치는 남긴다)
 
 종료 코드: 0 성공 | 1 실패(명령 실패·검증 FAIL·판정 누락) | 2 사용법 오류.
 조용한 실패 금지: herdr 호출이 실패하면 즉시 throw 한다.
@@ -27,7 +27,8 @@ param(
     [string]$Goal = "",
     [string]$CoderArgs = "",
     [int]$TimeoutSec = 1800,
-    [switch]$NoCoder
+    [switch]$NoCoder,
+    [switch]$IncludeIgnored
 )
 
 $ErrorActionPreference = "Stop"
@@ -260,6 +261,13 @@ function Cmd-Done([string]$slug) {
     $dirty = & git -C $ws.worktree.checkout_path status --porcelain
     if ($LASTEXITCODE -ne 0) { throw "git status 실패" }
     if ($dirty) { throw "미커밋 변경 있음 — 커밋하거나 직접 정리 후 다시 실행 (강제 삭제 안 함)" }
+    # git worktree remove 는 .gitignore 대상 파일을 묻지 않고 함께 지운다. 있으면 명시적 동의를 요구한다.
+    $ignored = @(& git -C $ws.worktree.checkout_path status --porcelain --ignored | Where-Object { $_.StartsWith("!! ") })
+    if ($LASTEXITCODE -ne 0) { throw "git status --ignored 실패" }
+    if ($ignored.Count -gt 0 -and -not $IncludeIgnored) {
+        $ignored | Select-Object -First 15 | Write-Output
+        throw "무시(ignored) 파일 $($ignored.Count)건이 worktree 와 함께 삭제됨 — 옮기거나, 지워도 되면 -IncludeIgnored 로 다시 실행"
+    }
     Invoke-Herdr worktree remove --workspace $ws.workspace_id | Out-Null
     Write-Output "worktree 제거: $($ws.worktree.checkout_path) (브랜치 task/$slug 는 남김)"
 }
