@@ -1,0 +1,1 @@
+var r=document.querySelectorAll("model-response");var stop=!!document.querySelector('button[aria-label*="중지"],button[aria-label*="Stop"]');"STOP="+stop+"\n"+(r.length?r[r.length-1].innerText:(document.querySelector("main")||document.body).innerText.slice(-3000))
