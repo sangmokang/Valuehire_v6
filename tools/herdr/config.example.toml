@@ -1,0 +1,26 @@
+# Valuehire 표준 herdr 설정 (herdr 0.9.3 기준)
+# 설치 위치  Windows: %APPDATA%\herdr\config.toml   macOS/Linux: ~/.config/herdr/config.toml
+# 적용       herdr server reload-config   (일부 항목은 서버 재시작 필요)
+# 전체 기본값 herdr --default-config
+
+# 첫 실행 알림 설정 마법사를 이미 끝냈다면 false
+onboarding = false
+
+[terminal]
+# 새 pane/tab은 원본 pane의 디렉터리를 따른다 (worktree 안에서 split하면 그 worktree로).
+new_cwd = "follow"
+# Windows Terminal은 Kitty graphics 경로를 노출하지 않는다.
+kitty_graphics = false
+
+[ui]
+# Windows 기본값("auto")은 커서를 셀로 그려서 한글 IME 조합창 위치가 틀어진다.
+# 한글 입력이 잦으므로 native로 둔다 (대신 출력 중 커서가 가끔 깜빡일 수 있음).
+host_cursor = "native"
+
+[session]
+# 서버/PC 재시작 후 Claude·Codex 세션을 이어서 띄운다 (integration 필요).
+resume_agents_on_restore = true
+
+[experimental]
+# prefix(ctrl+b) 누르는 동안 한글 IME를 영문으로 바꿨다가 되돌린다 (Korean IME 전용 실험 기능).
+switch_ascii_input_source_in_prefix = true
