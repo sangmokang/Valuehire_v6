@@ -61,7 +61,8 @@ function Invoke-Herdr {
 }
 
 function Get-Slug([string]$raw) {
-    if ($raw -notmatch '^[a-z][a-z0-9-]{0,23}$') {
+    # -cnotmatch: PowerShell 비교 연산자는 기본이 대소문자 무시라 'MyTask'가 통과했다 (agent 이름은 소문자만 허용).
+    if ($raw -cnotmatch '^[a-z][a-z0-9-]{0,23}$') {
         throw "작업 이름은 ^[a-z][a-z0-9-]{0,23}$ (예: codeit-minfix). 받은 값: '$raw'"
     }
     return $raw
