@@ -4,7 +4,6 @@ import argparse
 import contextlib
 import json
 import os
-import re
 import sys
 import tempfile
 from collections.abc import Mapping, Sequence
@@ -34,7 +33,9 @@ from humansearch.recruiting_review import (
     review_candidate,
 )
 
-_FIELD_NAME = re.compile(r"[a-z][a-z0-9_]{0,63}\Z")
+# Unknown keys are user-controlled and may carry PII or secrets even when they look like field names.
+# Only these code-known identity-proxy names (rejected by contract) are echoed for diagnosis.
+_DIAGNOSABLE_KEYS = frozenset({"company_name", "school", "gender", "age", "nationality"})
 
 
 class _UnavailableJudge:
@@ -306,8 +307,7 @@ def _exact_keys(value: Mapping[str, object], expected: set[str], field: str) -> 
     unknown = sorted(set(value) - expected)
     missing = sorted(expected - set(value))
     if unknown:
-        # Echo only field-shaped names; a key can carry PII (e.g. an email), never print it.
-        name = unknown[0] if _FIELD_NAME.match(unknown[0]) else "<unknown>"
+        name = unknown[0] if unknown[0] in _DIAGNOSABLE_KEYS else "<unknown>"
         raise SafeInputError(f"{field}.{name}")
     if missing:
         raise SafeInputError(f"{field}.{missing[0]}")
