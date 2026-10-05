@@ -18,8 +18,8 @@
 ## 인수 기준 (EARS)
 - AC1: If judge 응답의 숫자 필드가 float 로 표현 불가한 큰 정수이면, 시스템은 A 를 그대로 두고 `INVALID_RESPONSE`/`judge_response_invalid` 를 반환해야 한다. 검증: `pytest tests/test_organization_shadow.py -k invalid_jev_response` (큰 정수 2케이스 포함).
 - AC2: If `--live-jev` 이고 judge 생성이 예외를 내면, CLI 는 종료값 0 으로 A 가 든 LOCAL_ONLY 출력을 쓰고 semantic 을 `error`/`judge_call_failed` 로 기록해야 한다. If judge.close() 가 예외를 내면, 이미 계산된 결과가 그대로 기록되어야 한다. 검증: `pytest tests/test_organization_shadow_cli.py -k judge_lifecycle`.
-- AC3: When antiforge 가 위조 사본으로 게이트를 실행하면, 시스템은 사본이 저장소 수준 계약을 모두 가지게 하고, 사본이 위조 대조 단계에서 `(tampering)` 으로 거부된 경우에만 통과해야 한다(그 밖의 모든 조기 실패는 FAIL — 허용 목록). 검증: `bash scripts/acceptance-hs-gates-antiforge.sh` (계약 복사 제거 시 FAIL, 원복 시 PASS) + 조기 실패 출력 6종 차단·정상 탐지 1종 통과 대조.
-- AC4: If 입력에 알 수 없는 키가 있으면, CLI 는 그 키가 필드 이름 모양(`^[a-z][a-z0-9_]{0,63}$`)일 때만 이름을 보고하고 아니면 `<unknown>` 으로 보고해야 한다. 검증: `pytest tests/test_organization_shadow_cli.py -k unknown_key` + 기존 `school` 시험 유지.
+- AC3: When antiforge 가 위조 사본으로 게이트를 실행하면, 시스템은 사본이 저장소 수준 계약을 모두 가지게 하고, 사본이 위조 대조 단계에서 거부되어, 게이트의 마지막 판정 줄이 정확히 `FAIL: spy count [..] disagrees with independent count [..] (tampering)` 이고 종료값 1 인 경우에만 통과해야 한다(사본 시험 출력은 공격자 통제이므로 출력 전체 검색 금지). 검증: `bash scripts/acceptance-hs-gates-antiforge.sh` (계약 복사 제거 시 FAIL, 원복 시 PASS) + 조기 실패 출력 6종 차단·정상 탐지 1종 통과 대조.
+- AC4: If 입력에 알 수 없는 키가 있으면, CLI 는 그 키가 필드 이름 모양(`[a-z][a-z0-9_]{0,63}\Z`, 개행 꼬리 불허)일 때만 이름을 보고하고 아니면 `<unknown>` 으로 보고해야 한다. 검증: `pytest tests/test_organization_shadow_cli.py -k unknown_key` + 기존 `school` 시험 유지.
 - AC5: If 출력 경로 해석(`_same_file`)이 예외를 내면, CLI 는 traceback·경로 없이 JSON 오류와 종료값 2 를 내야 한다. (실제 심볼릭 링크 루프는 Python 3.14 에서 예외가 나지 않아 재현 불가 — 예외 주입으로 시험.) 검증: `pytest tests/test_organization_shadow_cli.py -k resolution_error`.
 
 ## counter-AC (가짜 완료)
@@ -41,3 +41,8 @@ NOT_APPLICABLE — 로컬 전용 CLI·시험·검사 스크립트. 운영 배포
   - 보조: D1 시험이 A 동일성 미단언 → `result.a_review == original` 추가.
   - 한계: 읽기 전용이라 uv 캐시·mktemp 불가 → 전체 시험·스크립트 미실행(V1 이 스스로 밝힘).
 - 오케스트레이터 재실행: humansearch pytest 264 passed, ruff/mypy 통과, gates COLLECTED 263·mutations 6/6·antiforge 3/3.
+- V2 Codex (`-s workspace-write`, `--no-local` 복제본 9f4c863, 구독 인증): **VERDICT: FAIL**.
+  - V1 결함 2·보조 지적 해결 확인, AC1·AC2·AC4 추가 공격 반례 없음.
+  - 높음(신규): 허용 목록이 출력 어디든 `(tampering)` 만 있으면 통과 → 사본 시험이 문자열을 섞으면 조기 실패도 합격. → 게이트 마지막 판정 줄 정확 일치 + 종료값 1 로 교체. 우회 5종 BLOCKED·정상 탐지 ACCEPTED·실제 PASS·계약 복사 제거 FAIL 실측.
+  - 버린 길: 무작위 비밀값 판정 파일(별도 통로) — 게이트 스크립트까지 바꿔 검사 장치가 본체보다 커짐.
+  - V2 환경 한계: 오프라인 캐시 부족으로 지정 명령 미완주, 소켓 권한으로 16건 실패(전부 PermissionError) — 오케스트레이터 환경에서 264 passed.

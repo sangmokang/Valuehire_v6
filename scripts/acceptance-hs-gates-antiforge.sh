@@ -77,8 +77,11 @@ PY
 forge_rc=0
 forge_out=$(HS_GATES_PROJECT="$FORGE" bash "$GATES" 2>&1) || forge_rc=$?
 # 위조 사본은 반드시 위조 대조 단계에서 거부되어야 한다. 그 전에(환경·린트·수집·pytest·파일 없음 등) 멈추면
-# 아래 단언이 공회전하므로, 거부 사유가 대조 탐지(tampering)가 아니면 FAIL 한다 (허용 목록).
-if [ "$forge_rc" -eq 0 ] || ! printf '%s\n' "$forge_out" | grep -qF '(tampering)'; then
+# 아래 단언이 공회전한다. 사본의 시험 출력은 공격자가 쓸 수 있으므로 출력 전체에서 문자열을 찾지 않고,
+# 게이트가 마지막에 직접 찍는 판정 줄이 대조 탐지 형식일 때만 통과한다(조기 종료는 늘 자기 FAIL 줄로 끝난다).
+forge_last=$(printf '%s\n' "$forge_out" | awk 'NF{l=$0} END{print l}')
+if [ "$forge_rc" -ne 1 ] || ! printf '%s\n' "$forge_last" |
+  grep -qE '^FAIL: spy count \[-?[0-9]+\] disagrees with independent count \[[0-9]+\] \(tampering\)$'; then
   echo "FAIL: forge copy was not rejected by the forgery check (exit=$forge_rc)"
   printf '%s\n' "$forge_out" | tail -5
   exit 1
