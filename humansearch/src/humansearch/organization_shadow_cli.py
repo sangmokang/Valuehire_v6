@@ -274,18 +274,19 @@ def _role_evidence(raw: object, field: str) -> RoleEvidence:
         "technical_environment",
     }
     _exact_keys(item, names, field)
+
+    def category(name: str) -> tuple[str, ...]:
+        # An empty category is missing evidence (RoleEvidence allows it), not malformed input.
+        return _strings(item[name], f"{field}.{name}", allow_empty=True)
+
     return RoleEvidence(
         primary_role_family=_text(item["primary_role_family"], f"{field}.primary_role_family"),
-        responsibilities=_strings(item["responsibilities"], f"{field}.responsibilities"),
-        ownership_scope=_strings(item["ownership_scope"], f"{field}.ownership_scope"),
-        production_operating=_strings(
-            item["production_operating"], f"{field}.production_operating"
-        ),
-        product_stage=_strings(item["product_stage"], f"{field}.product_stage"),
-        domain_problems=_strings(item["domain_problems"], f"{field}.domain_problems"),
-        technical_environment=_strings(
-            item["technical_environment"], f"{field}.technical_environment"
-        ),
+        responsibilities=category("responsibilities"),
+        ownership_scope=category("ownership_scope"),
+        production_operating=category("production_operating"),
+        product_stage=category("product_stage"),
+        domain_problems=category("domain_problems"),
+        technical_environment=category("technical_environment"),
     )
 
 

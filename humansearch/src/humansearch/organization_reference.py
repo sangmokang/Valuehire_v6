@@ -184,6 +184,10 @@ def _validate_observation(item: ReferenceObservation, *, as_of: date) -> None:
     for _, value in _evidence_values(item.role_evidence):
         if not value.strip():
             raise ValueError("role evidence values must not be empty")
+    # A cohort pattern may only be built from evidence of that cohort's role family; there is no
+    # approved cross-family mapping, so only the aggregation's whitespace normalization applies.
+    if item.role_evidence.primary_role_family.strip() != item.cohort.role_family.strip():
+        raise ValueError("observation role family must match its cohort role family")
 
 
 def _resolve_observation_ids(
