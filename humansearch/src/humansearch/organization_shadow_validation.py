@@ -1,5 +1,6 @@
 """Strict validation for untrusted Jev response payloads."""
 
+import contextlib
 import math
 from collections.abc import Mapping
 from typing import Any
@@ -93,9 +94,13 @@ def _text(value: object, field: str) -> str:
 
 
 def _number(value: object, field: str) -> float:
-    if isinstance(value, bool) or not isinstance(value, int | float) or not math.isfinite(value):
+    number = math.nan
+    if not isinstance(value, bool) and isinstance(value, int | float):
+        with contextlib.suppress(OverflowError):  # JSON ints can exceed float range
+            number = float(value)
+    if not math.isfinite(number):
         raise ValueError(f"{field} must be a finite number")
-    return float(value)
+    return number
 
 
 def _probability(value: object, field: str) -> float:

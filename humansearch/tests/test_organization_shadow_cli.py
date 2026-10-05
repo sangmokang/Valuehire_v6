@@ -163,3 +163,65 @@ def test_shadow_output_never_overwrites_input_or_config(target: str, tmp_path: P
         shadow_cli.main(["--input", str(source), "--output", str(output), "--config", str(config)])
     assert stop.value.code == 2 and json.loads(capsys.readouterr().err)["error_code"] == "output_collision"
     assert {path: path.read_bytes() for path in (source, config)} == before
+
+
+def _run_in_process(tmp_path: Path, payload: dict[str, object], *extra: str) -> tuple[Path, Path]:
+    (source := tmp_path / "input.json").write_text(json.dumps(payload), encoding="utf-8")
+    output = tmp_path / "output.json"
+    shadow_cli.main(["--input", str(source), "--output", str(output), "--config", str(CONFIG), *extra])
+    return source, output
+
+
+class _BrokenInitJudge:
+    def __init__(self) -> None:
+        raise RuntimeError("sdk init failed: private detail must not leak")
+
+
+class _BrokenCloseJudge:
+    closed = 0
+
+    def evaluate(self, **_: object) -> object:
+        raise TimeoutError("private response body must not leak")
+
+    def close(self) -> None:
+        _BrokenCloseJudge.closed += 1
+        raise RuntimeError("close failed")
+
+
+@pytest.mark.parametrize("judge_class", [_BrokenInitJudge, _BrokenCloseJudge])
+def test_judge_lifecycle_failure_keeps_local_a_result(
+    judge_class: type, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """D2: judge 생성·종료 예외도 A 를 보존하고 ERROR 로 기록해야 한다(NOT_RUN 으로 접지 않는다)."""
+    monkeypatch.setenv("TYPESAFE_API_KEY", "synthetic-key")
+    monkeypatch.setattr(shadow_cli, "TypeSafeJevJudge", judge_class)
+    _, output = _run_in_process(tmp_path, synthetic_payload(), "--live-jev")
+    result = json.loads(output.read_text(encoding="utf-8"))
+    assert result["a"]["score"]["score"] == 100
+    assert result["a"]["recommendation"] == "priority"
+    assert result["semantic"]["status"] == "error"
+    assert result["semantic"]["error_code"] == "judge_call_failed"
+    assert "private" not in output.read_text(encoding="utf-8") + capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    ("key", "expected_field"),
+    [("candidate@example.com", "candidate_evidence.<unknown>"), ("school", "candidate_evidence.school")],
+)
+def test_unknown_key_name_is_reported_only_when_it_is_field_shaped(
+    key: str, expected_field: str, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+) -> None:
+    """D6: 사용자 제어 키 문자열(이메일 등)은 stderr 에 그대로 나가면 안 된다."""
+    payload = synthetic_payload()
+    candidate = dict(payload["candidate_evidence"])  # type: ignore[call-overload]
+    candidate[key] = ["value"]
+    payload["candidate_evidence"] = candidate
+    with pytest.raises(SystemExit) as stop:
+        _run_in_process(tmp_path, payload)
+    err = capsys.readouterr().err
+    assert stop.value.code == 2
+    assert json.loads(err)["field"] == expected_field
+    if key != "school":
+        assert key not in err
+

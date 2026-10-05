@@ -1,8 +1,10 @@
 """Local-only command line entrypoint for organization shadow review."""
 
 import argparse
+import contextlib
 import json
 import os
+import re
 import sys
 import tempfile
 from collections.abc import Mapping, Sequence
@@ -18,7 +20,12 @@ from humansearch.organization_reference import (
     RoleEvidence,
     build_pattern_snapshot,
 )
-from humansearch.organization_shadow import ShadowConfig, load_shadow_config, run_shadow_review
+from humansearch.organization_shadow import (
+    SemanticJudge,
+    ShadowConfig,
+    load_shadow_config,
+    run_shadow_review,
+)
 from humansearch.organization_shadow_jev import TypeSafeJevJudge
 from humansearch.recruiting_review import (
     Criterion,
@@ -26,6 +33,15 @@ from humansearch.recruiting_review import (
     ExperiencePeriod,
     review_candidate,
 )
+
+_FIELD_NAME = re.compile(r"[a-z][a-z0-9_]{0,63}\Z")
+
+
+class _UnavailableJudge:
+    """Stands in for a live judge that failed to start, so the shadow records ERROR and keeps A."""
+
+    def evaluate(self, **_: object) -> Mapping[str, object]:
+        raise RuntimeError("judge unavailable")
 
 
 class SafeInputError(ValueError):
@@ -105,9 +121,13 @@ def _evaluate(
         minimum_distinct_people=config.minimum_distinct_people,
         stale_after_days=config.stale_after_days,
     )
-    judge = None
+    judge: SemanticJudge | None = None
+    owned: TypeSafeJevJudge | None = None
     if live_jev and os.environ.get("TYPESAFE_API_KEY", "").strip():
-        judge = TypeSafeJevJudge()
+        try:
+            judge = owned = TypeSafeJevJudge()
+        except Exception:  # noqa: BLE001 - a judge that cannot start is a judge error, not a CLI crash.
+            judge = _UnavailableJudge()
     try:
         result = run_shadow_review(
             a_review=a_review,
@@ -118,8 +138,9 @@ def _evaluate(
             judge=judge,
         )
     finally:
-        if judge is not None:
-            judge.close()
+        if owned is not None:
+            with contextlib.suppress(Exception):  # close failure must not discard a computed result
+                owned.close()
     semantic = result.semantic
     return {
         "delivery_status": "LOCAL_ONLY",
@@ -284,7 +305,9 @@ def _exact_keys(value: Mapping[str, object], expected: set[str], field: str) -> 
     unknown = sorted(set(value) - expected)
     missing = sorted(expected - set(value))
     if unknown:
-        raise SafeInputError(f"{field}.{unknown[0]}")
+        # Echo only field-shaped names; a key can carry PII (e.g. an email), never print it.
+        name = unknown[0] if _FIELD_NAME.match(unknown[0]) else "<unknown>"
+        raise SafeInputError(f"{field}.{name}")
     if missing:
         raise SafeInputError(f"{field}.{missing[0]}")
 

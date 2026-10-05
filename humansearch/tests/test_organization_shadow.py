@@ -442,6 +442,9 @@ def test_fallback_when_judge_errors_returns_error_without_changing_a_review() ->
         lambda body: body["answers"]["primary_role_family"].update(choice="unknown-choice"),
         lambda body: body["answers"]["direct_evidence_present"].update(confidence=0.9),
         lambda body: body.update(model="jev-latest"),
+        # D1: JSON 정수는 float 로 표현할 수 없을 만큼 클 수 있다(OverflowError 경로).
+        lambda body: body["answers"]["ownership_scope_similarity"].update(score=10**400),
+        lambda body: body["answers"]["primary_role_family"].update(confidence=10**400),
     ),
 )
 def test_invalid_jev_response_is_explicit_and_never_successful(
