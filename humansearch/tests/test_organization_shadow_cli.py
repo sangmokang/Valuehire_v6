@@ -208,9 +208,16 @@ def test_judge_lifecycle_failure_keeps_local_a_result(
 
 @pytest.mark.parametrize(
     ("key", "expected_field"),
-    [("candidate@example.com", "candidate_evidence.<unknown>"), ("school", "candidate_evidence.school")],
+    [
+        *((key, "candidate_evidence.<unknown>") for key in (
+            "candidate@example.com", "person_12345", "kim_minsu", "sk_live_4ec39hqlyjwdarjtt1zdp7dc",
+            "school\n", "x" * 300, "\x1b[31mred", "responsibilites",
+        )),
+        ("school", "candidate_evidence.school"),
+        ("nationality", "candidate_evidence.nationality"),
+    ],
 )
-def test_unknown_key_name_is_reported_only_when_it_is_field_shaped(
+def test_unknown_key_name_is_reported_only_when_it_is_a_known_field_name(
     key: str, expected_field: str, tmp_path: Path, capsys: pytest.CaptureFixture[str],
 ) -> None:
     """D6: 사용자 제어 키 문자열(이메일 등)은 stderr 에 그대로 나가면 안 된다."""
@@ -223,8 +230,8 @@ def test_unknown_key_name_is_reported_only_when_it_is_field_shaped(
     err = capsys.readouterr().err
     assert stop.value.code == 2
     assert json.loads(err)["field"] == expected_field
-    if key != "school":
-        assert key not in err
+    if expected_field.endswith("<unknown>"):
+        assert key not in err and json.dumps(key)[1:-1] not in err
 
 
 
