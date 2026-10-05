@@ -46,3 +46,10 @@ NOT_APPLICABLE — 로컬 전용 CLI·시험·검사 스크립트. 운영 배포
   - 높음(신규): 허용 목록이 출력 어디든 `(tampering)` 만 있으면 통과 → 사본 시험이 문자열을 섞으면 조기 실패도 합격. → 게이트 마지막 판정 줄 정확 일치 + 종료값 1 로 교체. 우회 5종 BLOCKED·정상 탐지 ACCEPTED·실제 PASS·계약 복사 제거 FAIL 실측.
   - 버린 길: 무작위 비밀값 판정 파일(별도 통로) — 게이트 스크립트까지 바꿔 검사 장치가 본체보다 커짐.
   - V2 환경 한계: 오프라인 캐시 부족으로 지정 명령 미완주, 소켓 권한으로 16건 실패(전부 PermissionError) — 오케스트레이터 환경에서 264 passed.
+- 집중 재검증 Codex `-m gpt-5.5`(기본 gpt-6-sol 은 2회 "model at capacity" 로 판정 전 중단), 복제본 157101d: **VERDICT: PASS** — 판정 정규식이 게이트 127행 출력과 정확 일치, 변형 9종 실측, 모든 종료 경로의 마지막 줄이 게이트 자신의 출력이거나 `set -e` 무출력 사망(→ 판정 불일치로 FAIL, fail-closed). 의존성 준비 실패 환경에서 antiforge 가 FAIL 을 낸 것도 공회전 제거의 실증.
+- 잔여 위험(낮음): gates.sh:107 이 `module_file`(사본 import 출력)을 실패 문구에 이어 붙여, 사본 코드가 종료 시점에 위조 판정 줄을 출력하면 마지막 줄이 될 수 있다. 이때도 게이트는 거부(종료값 1)하며 antiforge 사본은 antiforge 가 만드는 고정 파일이다.
+- Gate 4: `./verify.sh` 종료값 0. humansearch pytest 264 passed · ruff · mypy(19 files) · gates COLLECTED 263 · mutations 6/6 · antiforge 3/3.
+
+## 남은 결정
+- D4 집단 `role_family` ↔ 근거 `primary_role_family` 불일치 거부 여부(정본 미정).
+- D5 근거 범주 빈 목록 허용 여부(계약에 `insufficient_evidence` 선택지는 있으나 입력 규칙 미정).
