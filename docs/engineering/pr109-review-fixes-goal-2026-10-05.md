@@ -64,7 +64,7 @@ NOT_APPLICABLE — 로컬 전용 CLI·시험·검사 스크립트. 운영 배포
 - AC6 (D4): If 관측치의 `role_evidence.primary_role_family` 가 앞뒤 공백 제거 후 `cohort.role_family` 와 다르면, 시스템은 snapshot 생성을 `ValueError("...role family...")` 로 거부하고 CLI 는 `invalid_input_or_config`·종료값 2·출력 없음이어야 한다. 후보·JD 직무군 차이와 다른 회사 cohort 는 거부하지 않는다. 검증: `pytest -k "role_family or another_role_family or another_company"`.
 - AC7 (D5): When 근거 범주 6개 중 일부 또는 전부가 `[]` 이면, CLI 는 종료값 0 으로 A 와 shadow 결과를 써야 한다. If 직무군이 빈 문자열이거나, 범주 키가 없거나, 범주에 공백 문자열·비목록이 오거나, `evidence_ids` 가 비면 기존대로 거부해야 한다. 검증: `pytest -k "empty_optional or all_categories_empty or still_rejected"`.
 - AC8 (D6): If 모르는 키가 `company_name|school|gender|age|nationality` 가 아니면, CLI 는 `<상위경로>.<unknown>` 만 보고하고 키 원문(이스케이프 형태 포함)을 stderr 에 남기지 않아야 한다. 검증: `pytest -k unknown_key` (공격 키 8종 + 진단 키 2종).
-- AC9 (D2 보강): If 판정이 유효하게 끝난 뒤 close 만 실패하면, CLI 는 `completed` 결과를 그대로 기록해야 한다. 검증: `pytest -k close_failure_after`.
+- AC9 (D2 보강, V1 지적으로 정정): If 판정이 유효하게 끝난 뒤 close 만 실패하면, CLI 는 `completed` 결과를 그대로 기록하고 stderr 에 `{"warning": "judge_close_failed"}` 한 줄을 남겨야 한다(예외 원문 금지). 검증: `pytest -k 'close_failure_after or lifecycle'`.
 
 ### counter-AC (2차)
 - D4 를 대소문자 무시·별칭 추정으로 넓혀 "다른 직무군"을 통과시키는 것 → `Backend_Platform`·`backend` 거부 단언.
@@ -82,6 +82,10 @@ D1 가드 제거·D2 생성→NOT_RUN·D2 close 무보호·D6 원문 반사·D7 
 
 ### S3 처리
 - 수정: 없음(D7 은 1차에서 수정). 보류: D8 시험 잠금 보강, D9 `as_of` 기본값(CLI 경로 무관), D10 순서 중복·문서 AC, argparse 오류의 JSON 경계 밖 출력(사용자 동작 변경).
+
+### 적대 검증 로그 (2차)
+- V1 Codex (codex-cli 0.160.0, `-m gpt-5.5`, `-s workspace-write`, `--no-local` 복제본 9741774, OPENAI_API_KEY 제거, 세션 01a10c0e-0ff1-7eb1-81ef-89d3bda777bc, 명령 57회): **VERDICT: FAIL** — 높음 1건: close 실패를 `contextlib.suppress` 로 삼켜 completed·error_code None 으로 은폐(구 AC9 가 이를 기대값으로 고정). D1·D4·D5·D6(2차)·D7 통과, D3 는 환경(소켓 bind 금지·uv 캐시·오프라인) 때문에 보조 shim 실행에서만 `PASS 3/3`. 원문은 private-reviews/pr109-review-fixes/V1-VERDICT.md.
+  - 조치: 결과 보존 + stderr 경고(`judge_close_failed`)로 수정(f35196f 뒤 RED·c47cf5f GREEN), 뮤테이션 경고 삭제·원문 누설 2종 KILLED.
 
 ## 남은 결정
 - 없음(D4·D5 는 2026-10-05 사장님 지시로 결정됨).
