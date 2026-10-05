@@ -86,6 +86,8 @@ D1 가드 제거·D2 생성→NOT_RUN·D2 close 무보호·D6 원문 반사·D7 
 ### 적대 검증 로그 (2차)
 - V1 Codex (codex-cli 0.160.0, `-m gpt-5.5`, `-s workspace-write`, `--no-local` 복제본 9741774, OPENAI_API_KEY 제거, 세션 01a10c0e-0ff1-7eb1-81ef-89d3bda777bc, 명령 57회): **VERDICT: FAIL** — 높음 1건: close 실패를 `contextlib.suppress` 로 삼켜 completed·error_code None 으로 은폐(구 AC9 가 이를 기대값으로 고정). D1·D4·D5·D6(2차)·D7 통과, D3 는 환경(소켓 bind 금지·uv 캐시·오프라인) 때문에 보조 shim 실행에서만 `PASS 3/3`. 원문은 private-reviews/pr109-review-fixes/V1-VERDICT.md.
   - 조치: 결과 보존 + stderr 경고(`judge_close_failed`)로 수정(f35196f 뒤 RED·c47cf5f GREEN), 뮤테이션 경고 삭제·원문 누설 2종 KILLED.
+- V2 Codex (새 세션 01a10c17-fa23-7321-9df0-2d2f72936559, `--no-local` 복제본 4c29435, 명령 49회, V1 판정서 입력): **VERDICT: PASS** — V1 FAIL 해소 확인(제품 진입점 주입: rc 0·completed·stderr `{"warning": "judge_close_failed"}` 단일 JSON·원문 비노출), D1·D4·D5·D6·D7 PASS, 신규 중간 이상 결함 0. 독자 변이 3종(경고 삭제·casefold·allow_empty=False) KILLED. D3 는 V1 과 같은 샌드박스 제약(소켓 bind·오프라인)으로 전체 미재현 — 오케스트레이터 환경 실측(정상 rc 0 PASS 3/3, 계약 복사 제거·빈 계약·엉뚱한 계약 rc 1, 계약 없음 rc 2)으로 보완. 원문 private-reviews/pr109-review-fixes/V2-VERDICT.md.
+- Gate 4 (4c29435): verify.sh · principles-check(34) · silent-failure-lint · hs-cleanroom · cleanroom-mutations 10/10 · hs-gates COLLECTED 290 · gates-mutations 6/6 · antiforge 3/3 — 전부 종료값 0.
 
 ## 남은 결정
-- 없음(D4·D5 는 2026-10-05 사장님 지시로 결정됨).
+- 없음(D4·D5 는 2026-10-05 사장님 지시로 결정됨). 배송(push·PR 반영)만 승인 대기.
