@@ -198,10 +198,10 @@ class _AnswersThenBrokenCloseJudge:
         raise RuntimeError("close failed after a valid answer")
 
 
-def test_close_failure_after_a_valid_answer_keeps_the_completed_result(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+def test_close_failure_after_a_valid_answer_keeps_the_result_and_reports_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """D2: 판정이 끝난 뒤 종료만 실패하면 완성된 A·B/C/D 를 그대로 기록한다(실패로 바꾸지도, 버리지도 않는다)."""
+    """D2: 판정 뒤 종료만 실패하면 완성된 결과는 그대로 쓰되, 그 실패를 숨기지 않고 stderr 에 알린다."""
     monkeypatch.setenv("TYPESAFE_API_KEY", "synthetic-key")
     monkeypatch.setattr(shadow_cli, "TypeSafeJevJudge", _AnswersThenBrokenCloseJudge)
     _, output = _run_in_process(tmp_path, synthetic_payload(), "--live-jev")
@@ -210,6 +210,9 @@ def test_close_failure_after_a_valid_answer_keeps_the_completed_result(
     assert result["semantic"]["status"] == "completed"
     assert result["semantic"]["error_code"] is None
     assert set(result["ledger"]["primitive_answers"]) == set(successful_response()["answers"])
+    err = capsys.readouterr().err
+    assert json.loads(err) == {"warning": "judge_close_failed"}
+    assert "close failed" not in err
 
 
 @pytest.mark.parametrize("judge_class", [_BrokenInitJudge, _BrokenCloseJudge])
@@ -226,7 +229,9 @@ def test_judge_lifecycle_failure_keeps_local_a_result(
     assert result["a"]["recommendation"] == "priority"
     assert result["semantic"]["status"] == "error"
     assert result["semantic"]["error_code"] == "judge_call_failed"
-    assert "private" not in output.read_text(encoding="utf-8") + capsys.readouterr().err
+    err = capsys.readouterr().err
+    assert "private" not in output.read_text(encoding="utf-8") + err
+    assert ("judge_close_failed" in err) is (judge_class is _BrokenCloseJudge)
 
 
 @pytest.mark.parametrize(
