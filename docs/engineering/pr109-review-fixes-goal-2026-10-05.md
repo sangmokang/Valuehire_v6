@@ -50,6 +50,38 @@ NOT_APPLICABLE — 로컬 전용 CLI·시험·검사 스크립트. 운영 배포
 - 잔여 위험(낮음): gates.sh:107 이 `module_file`(사본 import 출력)을 실패 문구에 이어 붙여, 사본 코드가 종료 시점에 위조 판정 줄을 출력하면 마지막 줄이 될 수 있다. 이때도 게이트는 거부(종료값 1)하며 antiforge 사본은 antiforge 가 만드는 고정 파일이다.
 - Gate 4: `./verify.sh` 종료값 0. humansearch pytest 264 passed · ruff · mypy(19 files) · gates COLLECTED 263 · mutations 6/6 · antiforge 3/3.
 
+## 2차 작업 (2026-10-05 밤) — D4·D5 결정 반영, D6 부분 해결 보완
+
+### 결론
+사장님 지시로 D4 는 "막기(승인된 교차 직무군 계약이 있으면 판단 보류)", D5 는 "먼저 반증, 실제 거부일 때만 수정"으로 정해졌다. 정본·계약·시험 어디에도 교차 직무군 허용 조항이 없어 D4 를 fail-closed 로 고쳤고, D5 는 PR 원본에서 재현되어 고쳤다. 재검증 중 1차의 D6 수정이 부분 해결(필드 모양 식별자·이름·비밀값 노출)임을 발견해 보완했다.
+
+### 판단 근거
+- D4 정본: jev goal counter-AC "회사×직무군×seniority가 다른 관찰을 한 cohort로 합친다" 금지, 오류 절 "cohort 혼합: 명시적 validation error와 CLI nonzero". 교차 허용·별칭 매핑 계약 0건(`role_family|primary_role_family|alias` 검색). 정규화는 패턴 집계가 이미 쓰는 앞뒤 공백 제거만 적용 — 새 별칭 체계는 만들지 않음.
+- D5 정본: 핵심 `RoleEvidence` 가 빈 범주를 허용하고(`_validate_observation` 은 존재하는 값의 공백만 검사), 핵심 시험이 빈 범주로 객체를 만들며, 계약 JSON 에 `insufficient_evidence` 선택지가 있다. CLI 만 빈 목록을 `invalid_input` 으로 거부 — 계약 불일치. 필수 항목(직무군·evidence_ids·키 존재·공백 문자열)은 그대로 거부.
+- D6 보완: `[a-z][a-z0-9_]{0,63}` 모양 판정은 `person_12345`·`kim_minsu`·소문자 비밀값을 그대로 반사(실측). 개행 꼬리 변이는 시험 없이 생존. → 정본이 정한 금지 필드 이름 5개만 반사.
+
+### 인수 기준 (EARS, 2차)
+- AC6 (D4): If 관측치의 `role_evidence.primary_role_family` 가 앞뒤 공백 제거 후 `cohort.role_family` 와 다르면, 시스템은 snapshot 생성을 `ValueError("...role family...")` 로 거부하고 CLI 는 `invalid_input_or_config`·종료값 2·출력 없음이어야 한다. 후보·JD 직무군 차이와 다른 회사 cohort 는 거부하지 않는다. 검증: `pytest -k "role_family or another_role_family or another_company"`.
+- AC7 (D5): When 근거 범주 6개 중 일부 또는 전부가 `[]` 이면, CLI 는 종료값 0 으로 A 와 shadow 결과를 써야 한다. If 직무군이 빈 문자열이거나, 범주 키가 없거나, 범주에 공백 문자열·비목록이 오거나, `evidence_ids` 가 비면 기존대로 거부해야 한다. 검증: `pytest -k "empty_optional or all_categories_empty or still_rejected"`.
+- AC8 (D6): If 모르는 키가 `company_name|school|gender|age|nationality` 가 아니면, CLI 는 `<상위경로>.<unknown>` 만 보고하고 키 원문(이스케이프 형태 포함)을 stderr 에 남기지 않아야 한다. 검증: `pytest -k unknown_key` (공격 키 8종 + 진단 키 2종).
+- AC9 (D2 보강): If 판정이 유효하게 끝난 뒤 close 만 실패하면, CLI 는 `completed` 결과를 그대로 기록해야 한다. 검증: `pytest -k close_failure_after`.
+
+### counter-AC (2차)
+- D4 를 대소문자 무시·별칭 추정으로 넓혀 "다른 직무군"을 통과시키는 것 → `Backend_Platform`·`backend` 거부 단언.
+- D4 가 후보 직무군 차이까지 막아 B 판정 대상을 입력 오류로 만드는 것 → 후보 `data` 통과 단언.
+- D5 를 위해 `_strings` 전체 또는 직무군·evidence_ids 까지 느슨하게 하는 것 → 필수 4종 거부 단언.
+- D6 을 모든 키 숨김으로 바꿔 진단을 없애는 것 → `school`·`nationality` 반사 단언.
+
+### 뮤테이션 (R2) — 고장 사본 16종
+D1 가드 제거·D2 생성→NOT_RUN·D2 close 무보호·D6 원문 반사·D7 경계 밖·D4 검사 제거·D4 strip 제거·D4 casefold·D5 빈 목록 거부·D5 직무군 느슨화·D5 공백 허용·D6(신) 전부 반사·전부 숨김·식별자 모양 허용·nationality 제거: 전부 KILLED. 1차 판정식의 개행 꼬리(`\Z`→`$`) 변이는 1차 시험에서 SURVIVED → 2차 시험으로 대체.
+
+### 재실측 (PR 원본 6ce1e6a vs 현재)
+- 원본에 현재 시험을 얹으면 D1·D2·D6·D7 6건 RED(OverflowError·init/close RuntimeError·이메일 반사), D4·D5 9건 RED.
+- D3: 원본 antiforge `PASS 3/3` 인데 위조 사본은 `FAIL: pytest exit 1`(계약 부재)에서 멈춤 — 공회전 재현. 현재: 정상 PASS(0), 계약 복사 제거·빈 계약·엉뚱한 계약 FAIL(1), 계약 없음 FAIL(2).
+- D1: 점수·확률 필드는 큰 정수·NaN·±inf·bool·문자열 거부, 임의 정수 필드(`usage` 토큰)는 10**400 도 `completed`·A 동일.
+
+### S3 처리
+- 수정: 없음(D7 은 1차에서 수정). 보류: D8 시험 잠금 보강, D9 `as_of` 기본값(CLI 경로 무관), D10 순서 중복·문서 AC, argparse 오류의 JSON 경계 밖 출력(사용자 동작 변경).
+
 ## 남은 결정
-- D4 집단 `role_family` ↔ 근거 `primary_role_family` 불일치 거부 여부(정본 미정).
-- D5 근거 범주 빈 목록 허용 여부(계약에 `insufficient_evidence` 선택지는 있으나 입력 규칙 미정).
+- 없음(D4·D5 는 2026-10-05 사장님 지시로 결정됨).
