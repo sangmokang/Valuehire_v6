@@ -39,3 +39,16 @@
 | 연결 해제·오류 + 중지 없음 + 결과 없음 2분 | 같은 대화 "다시 시도/재생성" 클릭(최대 2회) |
 | 그래도 실패 | 종료값 7 → 드라이버가 새 대화로 1회 재시작 |
 | 60분 초과 | 종료값 2, 장부 기록 후 정지 |
+
+## Aside 정식 통로 — 가려진 창에서도 조작 (2026-10-05 실측, 권장)
+- AppleScript `execute javascript` 의 합성 클릭은 창이 가려지면(macOS 가림 판정 → `visibilityState=hidden`) Gemini 가 전송을 무시하고 팝업도 안 그린다. `osascript activate` 로 앞으로 올리는 것도 최신 macOS 가 막는다.
+- 해결: `~/.local/bin/aside repl --account <id> "<JS>"` (모델 미사용·크레딧 0, Playwright 방식). `listBrowserTabs()` → `attachBrowserTab(targetId)` → `page.keyboard.insertText()` + `locator.click()` 는 **진짜 입력**이라 비활성·가려진 탭에서도 전송된다(Gemini WU02: 사장님이 다른 탭을 보는 중 100,054자 전송 확인).
+- **계정 함정**: `aside account list` 에서 지금 열린 창이 속한 프로필의 계정을 골라야 한다(이 Mac 은 u0=Profile 1 은 탭 0개, **u2=Profile 0 이 실제 창**). 빈 목록이면 계정부터 의심.
+- repl 의 `fs` 는 프로젝트·세션 폴더 밖 파일을 거부("Path escapes Project and session roots") → 긴 지시문은 base64 로 코드에 실어 `Buffer.from(b64,'base64')` 로 복원.
+- 결과 읽기는 AppleScript `textContent` 로 충분(가려진 탭도 읽힘). `innerText` 는 가려진 탭에서 접힌 부분을 빼 짧게 나온다.
+- 스크립트: `rlaunch.sh`(새 대화 전송), `rretry.sh`(같은 대화에 코드블록 재출력 요청), `mdriver2.sh`(MPOLL·GEM_WIN 으로 탭 선택).
+
+## Gemini 출력 함정
+- 결과 JSON 을 문단으로 쓰게 하면 Gemini 가 키를 가나다순으로 섞고 값을 첫 단어만 남긴다. **반드시 ```json 코드블록 안에** 쓰게 하고, 수집기는 `<pre>` 원문을 `@@PRE@@` 로 따로 저장, `recover_codeblock.py` 가 그중 온전한 JSON 을 고른다.
+- 입력창 비우기(`execCommand("delete")`) 후 긴 삽입은 Quill 상태를 깨 첫 줄만 남는다 → 비우지 말고 새 채팅에 바로 삽입, 전송 직전 길이 재확인.
+- Gemini Planner 는 diff 줄 수를 매번 다르게 틀렸다(uv.lock 187·179, 실제 184) → Coverage 대조 FAIL.
