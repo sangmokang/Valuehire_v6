@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import pytest
+from test_organization_shadow import successful_response
 
 from humansearch import organization_shadow_cli as shadow_cli
 
@@ -187,6 +188,28 @@ class _BrokenCloseJudge:
     def close(self) -> None:
         _BrokenCloseJudge.closed += 1
         raise RuntimeError("close failed")
+
+
+class _AnswersThenBrokenCloseJudge:
+    def evaluate(self, **_: object) -> object:
+        return successful_response()
+
+    def close(self) -> None:
+        raise RuntimeError("close failed after a valid answer")
+
+
+def test_close_failure_after_a_valid_answer_keeps_the_completed_result(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """D2: 판정이 끝난 뒤 종료만 실패하면 완성된 A·B/C/D 를 그대로 기록한다(실패로 바꾸지도, 버리지도 않는다)."""
+    monkeypatch.setenv("TYPESAFE_API_KEY", "synthetic-key")
+    monkeypatch.setattr(shadow_cli, "TypeSafeJevJudge", _AnswersThenBrokenCloseJudge)
+    _, output = _run_in_process(tmp_path, synthetic_payload(), "--live-jev")
+    result = json.loads(output.read_text(encoding="utf-8"))
+    assert result["a"]["score"]["score"] == 100
+    assert result["semantic"]["status"] == "completed"
+    assert result["semantic"]["error_code"] is None
+    assert set(result["ledger"]["primitive_answers"]) == set(successful_response()["answers"])
 
 
 @pytest.mark.parametrize("judge_class", [_BrokenInitJudge, _BrokenCloseJudge])
