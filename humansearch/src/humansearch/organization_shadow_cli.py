@@ -1,7 +1,6 @@
 """Local-only command line entrypoint for organization shadow review."""
 
 import argparse
-import contextlib
 import json
 import os
 import sys
@@ -140,8 +139,10 @@ def _evaluate(
         )
     finally:
         if owned is not None:
-            with contextlib.suppress(Exception):  # close failure must not discard a computed result
+            try:
                 owned.close()
+            except Exception:  # noqa: BLE001 - keep the computed result, but never hide the judge failure.
+                print(json.dumps({"warning": "judge_close_failed"}), file=sys.stderr)
     semantic = result.semantic
     return {
         "delivery_status": "LOCAL_ONLY",
