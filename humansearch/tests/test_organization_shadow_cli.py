@@ -5,6 +5,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
@@ -242,3 +243,102 @@ def test_output_path_resolution_error_stays_inside_json_error_boundary(
     assert stop.value.code == 2
     assert json.loads(err)["ok"] is False
     assert str(tmp_path) not in err and not (tmp_path / "o.json").exists()
+
+
+def _with(payload: dict[str, object], path: tuple[str | int, ...], value: object) -> dict[str, object]:
+    copied: Any = json.loads(json.dumps(payload))
+    target = copied
+    for step in path[:-1]:
+        target = target[step]
+    target[path[-1]] = value
+    return cast(dict[str, object], copied)
+
+
+OBSERVED = ("reference_observations", 0, "role_evidence")
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        ("candidate_evidence", "production_operating"),
+        ("jd_evidence", "technical_environment"),
+        (*OBSERVED, "domain_problems"),
+    ],
+)
+def test_empty_optional_evidence_category_is_accepted(
+    path: tuple[str | int, ...], tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """D5: 근거 범주 하나가 비어 있는 것은 근거 부족이지 입력 오류가 아니다(핵심 RoleEvidence 계약과 일치)."""
+    monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
+    _, output = _run_in_process(tmp_path, _with(synthetic_payload(), path, []))
+    result = json.loads(output.read_text(encoding="utf-8"))
+    assert result["a"]["score"]["score"] == 100
+    assert result["semantic"]["status"] == "not_run"
+
+
+def test_candidate_with_all_categories_empty_is_accepted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
+    payload = synthetic_payload()
+    for name in ("responsibilities", "ownership_scope", "production_operating",
+                 "product_stage", "domain_problems", "technical_environment"):
+        payload = _with(payload, ("candidate_evidence", name), [])
+    _, output = _run_in_process(tmp_path, payload)
+    assert json.loads(output.read_text(encoding="utf-8"))["a"]["recommendation"] == "priority"
+
+
+@pytest.mark.parametrize(
+    ("path", "value", "field"),
+    [
+        (("candidate_evidence", "primary_role_family"), "", "candidate_evidence.primary_role_family"),
+        (("candidate_evidence", "responsibilities"), ["  "], "candidate_evidence.responsibilities"),
+        (("candidate_evidence", "responsibilities"), None, "candidate_evidence.responsibilities"),
+        (("reference_observations", 0, "evidence_ids"), [], "reference_observations[0].evidence_ids"),
+    ],
+)
+def test_required_evidence_is_still_rejected(
+    path: tuple[str | int, ...], value: object, field: str, tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with pytest.raises(SystemExit) as stop:
+        _run_in_process(tmp_path, _with(synthetic_payload(), path, value))
+    assert stop.value.code == 2
+    assert json.loads(capsys.readouterr().err)["field"] == field
+    assert not (tmp_path / "output.json").exists()
+
+
+def test_missing_evidence_category_key_is_still_rejected(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str],
+) -> None:
+    payload = _with(synthetic_payload(), ("as_of",), "2026-09-22")  # deep copy: evidence dicts are shared
+    del cast(dict[str, object], payload["candidate_evidence"])["ownership_scope"]
+    with pytest.raises(SystemExit) as stop:
+        _run_in_process(tmp_path, payload)
+    assert stop.value.code == 2
+    assert json.loads(capsys.readouterr().err)["field"] == "candidate_evidence.ownership_scope"
+
+
+def test_reference_evidence_role_family_mismatch_is_rejected_by_cli(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str],
+) -> None:
+    """D4: CLI 경로에서도 cohort 직무군과 다른 근거는 명시적 오류·종료값 2·출력 없음."""
+    payload = synthetic_payload()
+    for index in range(3):
+        payload = _with(payload, ("reference_observations", index, "role_evidence",
+                                  "primary_role_family"), "data")
+    with pytest.raises(SystemExit) as stop:
+        _run_in_process(tmp_path, payload)
+    assert stop.value.code == 2
+    assert json.loads(capsys.readouterr().err)["error_code"] == "invalid_input_or_config"
+    assert not (tmp_path / "output.json").exists()
+
+
+def test_candidate_from_another_role_family_is_still_reviewed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """D4 과잉 차단 방지: 후보·JD 의 직무군 차이는 판정 대상(B)이지 입력 오류가 아니다."""
+    monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
+    payload = _with(synthetic_payload(), ("candidate_evidence", "primary_role_family"), "data")
+    _, output = _run_in_process(tmp_path, payload)
+    assert json.loads(output.read_text(encoding="utf-8"))["a"]["score"]["score"] == 100

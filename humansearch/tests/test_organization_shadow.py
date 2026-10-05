@@ -214,6 +214,29 @@ def test_mixed_company_role_or_seniority_cohort_is_rejected() -> None:
         snapshot(observation("person-a"), observation("person-b", cohort=mixed))
 
 
+def three_people(evidence: RoleEvidence, cohort: CohortKey = COHORT) -> PatternSnapshot:
+    return snapshot(*(observation(p, evidence=evidence, cohort=cohort) for p in ("a", "b", "c")))
+
+
+@pytest.mark.parametrize("family", ["data", "unknown", "Backend_Platform", "backend"])
+def test_reference_evidence_from_another_role_family_is_rejected(family: str) -> None:
+    """D4: 같은 회사·같은 cohort 라도 다른(또는 미확정·별칭) 직무군 근거로 그 직무군 패턴을 만들 수 없다."""
+    with pytest.raises(ValueError, match="role family"):
+        three_people(replace(role_evidence(), primary_role_family=family))
+
+
+def test_role_family_match_ignores_only_surrounding_whitespace() -> None:
+    """패턴 집계와 같은 정규화(앞뒤 공백)만 같은 직무군으로 본다."""
+    padded = three_people(replace(role_evidence(), primary_role_family=" backend_platform "))
+    assert padded.status is PatternStatus.READY
+
+
+def test_matching_role_family_in_another_company_cohort_is_still_accepted() -> None:
+    other = CohortKey("company-synthetic-002", "data", "lead", None)
+    result = three_people(replace(role_evidence(), primary_role_family="data"), other)
+    assert result.cohort == other and result.status is PatternStatus.READY
+
+
 def test_stale_and_conflicting_observations_do_not_become_repeated_patterns() -> None:
     old = observation("person-a", observed_on=date(2025, 1, 1))
     conflicting = observation(
