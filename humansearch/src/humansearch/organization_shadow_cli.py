@@ -59,9 +59,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--live-jev", action="store_true")
     args = parser.parse_args(argv)
-    if _same_file(args.output, [args.input, args.config]):
-        _fail("output_collision")
     try:
+        if _same_file(args.output, [args.input, args.config]):
+            _fail("output_collision")
         payload = _load_input(args.input)
         config = load_shadow_config(args.config)
         result = _evaluate(payload, config=config, live_jev=args.live_jev)

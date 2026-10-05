@@ -453,8 +453,9 @@ def test_invalid_jev_response_is_explicit_and_never_successful(
     config = load_shadow_config(CONFIG_PATH)
     response = successful_response()
     mutate(response)
+    original = a_review()
     result = run_shadow_review(
-        a_review=a_review(),
+        a_review=original,
         jd_evidence=role_evidence(suffix=" jd"),
         candidate_evidence=role_evidence(suffix=" candidate"),
         pattern_snapshot=snapshot(
@@ -464,6 +465,7 @@ def test_invalid_jev_response_is_explicit_and_never_successful(
         judge=FakeJudge(response),
     )
 
+    assert result.a_review == original
     assert result.semantic.status is SemanticStatus.INVALID_RESPONSE
     assert result.semantic.error_code == "judge_response_invalid"
     assert result.semantic.primitive_answers == {}

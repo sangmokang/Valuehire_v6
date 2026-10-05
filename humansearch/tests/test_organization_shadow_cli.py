@@ -225,3 +225,20 @@ def test_unknown_key_name_is_reported_only_when_it_is_field_shaped(
     if key != "school":
         assert key not in err
 
+
+
+def test_output_path_resolution_error_stays_inside_json_error_boundary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+) -> None:
+    """출력 경로 해석이 예외를 내도(링크 순환·권한 등) traceback 없이 JSON 오류·종료값 2 로 끝나야 한다."""
+    def broken(*_: object) -> bool:
+        raise RuntimeError(f"Symlink loop from {tmp_path}")
+
+    monkeypatch.setattr(shadow_cli, "_same_file", broken)
+    (source := tmp_path / "input.json").write_text(json.dumps(synthetic_payload()), encoding="utf-8")
+    with pytest.raises(SystemExit) as stop:
+        shadow_cli.main(["--input", str(source), "--output", str(tmp_path / "o.json"), "--config", str(CONFIG)])
+    err = capsys.readouterr().err
+    assert stop.value.code == 2
+    assert json.loads(err)["ok"] is False
+    assert str(tmp_path) not in err and not (tmp_path / "o.json").exists()

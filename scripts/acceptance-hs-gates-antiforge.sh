@@ -76,9 +76,10 @@ PY
 
 forge_rc=0
 forge_out=$(HS_GATES_PROJECT="$FORGE" bash "$GATES" 2>&1) || forge_rc=$?
-# 위조 사본이 위조 대조 단계 전에(환경·수집·pytest 실패) 멈추면 아래 단언이 공회전한다. 그런 실패는 FAIL.
-if printf '%s\n' "$forge_out" | grep -qE 'FAIL: (pytest exit|pytest collection error|environment sync|collected 0 tests)'; then
-  echo "FAIL: forge copy stopped before the forgery check ran (exit=$forge_rc)"
+# 위조 사본은 반드시 위조 대조 단계에서 거부되어야 한다. 그 전에(환경·린트·수집·pytest·파일 없음 등) 멈추면
+# 아래 단언이 공회전하므로, 거부 사유가 대조 탐지(tampering)가 아니면 FAIL 한다 (허용 목록).
+if [ "$forge_rc" -eq 0 ] || ! printf '%s\n' "$forge_out" | grep -qF '(tampering)'; then
+  echo "FAIL: forge copy was not rejected by the forgery check (exit=$forge_rc)"
   printf '%s\n' "$forge_out" | tail -5
   exit 1
 fi
