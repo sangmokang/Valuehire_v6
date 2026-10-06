@@ -1,0 +1,51 @@
+name: pr-triage
+
+# 매일 09:00 KST 에 열린 PR 을 🔴/🟡/🟢 로 나눠 'pr-triage' 라벨 이슈에 댓글 하나로 남긴다.
+# 댓글은 GitHub 기본 알림(메일)으로 사장님께 간다 — 별도 서버·DB·메일 경로 없음.
+# 판정 규칙은 scripts/pr-triage.sh 한 곳(시험: scripts/acceptance-pr-triage.sh).
+# PR 코드를 실행하지 않는다: 예약·수동 실행만, 항상 기본 브랜치의 파일로 돈다.
+on:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: write
+  checks: read
+  statuses: read
+
+concurrency:
+  group: pr-triage
+  cancel-in-progress: false
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: PR 관제 집계·이슈 댓글
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          bash scripts/pr-triage.sh > triage.md
+          cat triage.md >> "$GITHUB_STEP_SUMMARY"
+          labels=$(gh label list --limit 500 --json name --jq '.[].name')
+          if ! grep -qx 'pr-triage' <<<"$labels"; then
+            gh label create pr-triage --color BFD4F2 --description "PR 관제 매일 요약"
+          fi
+          num=$(gh issue list --label pr-triage --state open --limit 1 --json number --jq '.[0].number // ""')
+          if [ -z "$num" ]; then
+            url=$(gh issue create --title "PR 관제 (매일 09:00 KST)" --label pr-triage \
+              --body "scripts/pr-triage.sh 가 매일 이 이슈에 댓글로 열린 PR 요약을 남깁니다.")
+            num=${url##*/}
+          fi
+          gh issue comment "$num" --body-file triage.md
+          echo "PASS: 이슈 #$num 에 PR 관제 댓글 게시"
