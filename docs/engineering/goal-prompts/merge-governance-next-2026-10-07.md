@@ -21,7 +21,7 @@ git show origin/main:suppressions.yaml | grep expiry   # 10-13 만료 확인
 기대와 다르면 그 차이부터 보고하고 멈춘다.
 
 # 1. 지난 세션 상태 (2026-10-07 01:50 KST 기준)
-- 브랜치 `task/merge-governance-20261007` (워크트리 `worktrees/merge-governance`), origin/main 55240f7 위 커밋: 8f3d5a9(RED) 48bc61a(RED) f2652b9(GREEN) 8eeb71f(배선) e09df7a(근거 문서) + 이후 V1 반영 커밋. PR 번호는 `gh pr list --head task/merge-governance-20261007` 로 확인.
+- 브랜치 `task/merge-governance-20261007` (워크트리 `worktrees/merge-governance`), origin/main 55240f7 위. **PR #129** (https://github.com/sangmokang/Valuehire_v6/pull/129). 커밋: RED 8f3d5a9·48bc61a·03776f0·6b898d0 / GREEN f2652b9 / 배선 8eeb71f / 문서 e09df7a / V1 반영 c5c5757 / V2 반영(마지막 커밋 — `git log -1 origin/task/merge-governance-20261007`).
 - **해결한 병합 규칙 문제**: main ruleset 23568184 를 `required_deployments[acceptance]`(배포 경로 0 → 정직한 PR 영구 차단, API 가짜 배포로 통과) → `main-pr-verify-gate` = PR 필수(승인 0) + `verify`(Actions, integration 15368) 필수 + strict. 2026-10-06T16:39Z GitHub 에 이미 적용됨. 되돌리기: `gh api -X PUT repos/sangmokang/Valuehire_v6/rulesets/23568184 --input docs/engineering/evidence/merge-governance-20261007/ruleset-main-before.json`.
 - 실험 근거: `docs/engineering/evidence/merge-governance-20261007/probe-matrix.md` (A·B 재현, POS/NEG/STRICT 기대대로). 임시 자원 정리 완료.
 - 근거·분류 전문: `docs/engineering/merge-governance-goal-2026-10-07.md`.
@@ -33,12 +33,12 @@ git show origin/main:suppressions.yaml | grep expiry   # 10-13 만료 확인
 - STALE_NEEDS_DECISION: 갱신만 하면 판정 가능 #116 #115 #112 #102 #107 #103 / HS 계열 #85 #86 #88 #91 #92 #87 #89 #90 #93 #94 #96 #97 #100 #95 / 오래된 충돌 #14 #15 #37 #43 #48 #68 / 옛 초록 #47 #54 #61 #63 #65 #66 #67 #79 / 초안 #106 #114 #117 / 폐기 결정·대체 확인 #121(Grok API 경로 폐기 결정) #119(10-02 스냅샷) #108(핵심 파일은 f12ea33 로 main 에, 판정 문서 등 고유분 잔존)
 
 # 3. 실행한 검증과 결과
-- `acceptance-principles-check.sh` PASS 34 · `acceptance-pr-triage.sh` PASS(26판정/CHECKED 25) · 뮤테이션 10/10 KILLED · `check-mechanism-registry.sh` PASS 21 · `verify.sh` PASS · `pr-triage.sh` 실 조회 rc 0
-- V1(Codex, session 01a1121d…): FAIL 5건 → 전부 재현·반영(RED 03776f0 → GREEN, CHECKED 35). 뮤테이션 18종 15 KILLED, 생존 3 은 조합 변이·중복 조항으로 등가 판별
+- `acceptance-principles-check.sh` PASS 34 · `acceptance-pr-triage.sh` PASS(44판정/CHECKED 43) · 뮤테이션 누적 26종: 생존은 대조군 + 등가 4건(중복 조항·2중 방어선, 조합 변이로 판별) · `check-mechanism-registry.sh` PASS 21 · `verify.sh` PASS · pre-push 28 ok/0 fail · PR #129 CI verify 2건 SUCCESS(V2 반영 전 커밋 기준) · `pr-triage.sh` 실 조회 rc 0(1회 HTTP 502 → rc 2 후 재시도 성공)
+- V1(Codex, session 01a1121d…): FAIL 5건 → 전부 재현·반영. V2(Claude 새 맥락): PASS, V1 결함 수정 확인 + 누락 4건(workflow 변경 PR 🟢, 제목 주입, 문서 숫자, 알림 멘션) → 전부 RED→GREEN 반영. 원문 `docs/engineering/evidence/merge-governance-20261007/v1-codex-verdict.md`, `v2-claude-verdict.md`
 
 # 4. 미실행 검증
 - `pr-triage.yml` 예약 실행·이슈 생성·댓글 알림(기본 브랜치 병합 후에만 가능) → 병합 후 `gh workflow run pr-triage` 1회, `gh run watch`, 이슈 댓글 확인
-- V2(새 맥락 재현) 미실행이면 여기서 실행
+- 매일 댓글이 사장님 메일로 실제 오는지(멘션 포함) — 첫 실행 후 받은편지함 확인
 - R-2(10-02 이전 규칙 미평가 원인), R-3(push/PR 두 verify 결과 충돌 시 GitHub 판정) 미확인
 
 # 5. 다음 작업 우선순위 (이 순서로)

@@ -25,7 +25,7 @@ elif [ $# -gt 0 ]; then
   echo "FAIL: 알 수 없는 인자 — $*" >&2; exit 2
 fi
 
-QUERY='query($owner:String!,$name:String!){repository(owner:$owner,name:$name){pullRequests(states:OPEN,first:100,orderBy:{field:UPDATED_AT,direction:DESC}){totalCount nodes{number title url isDraft baseRefName mergeable mergeStateStatus updatedAt labels(first:100){totalCount nodes{name}} commits(last:1){nodes{commit{statusCheckRollup{state}}}}}}}}'
+QUERY='query($owner:String!,$name:String!){repository(owner:$owner,name:$name){pullRequests(states:OPEN,first:100,orderBy:{field:UPDATED_AT,direction:DESC}){totalCount nodes{number title url isDraft baseRefName mergeable mergeStateStatus updatedAt labels(first:100){totalCount nodes{name}} files(first:100){totalCount nodes{path}} commits(last:1){nodes{commit{statusCheckRollup{state}}}}}}}}'
 
 if [ -z "$input" ]; then
   repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner) || { echo "FAIL: 저장소 조회 실패" >&2; exit 2; }
@@ -45,6 +45,8 @@ printf '%s' "$raw" | jq -e '
     and (.labels|type=="object") and (.labels.nodes|type=="array")
     and (.labels.totalCount == (.labels.nodes|length))
     and all(.labels.nodes[]; type=="object" and (.name|type=="string"))
+    and (.files|type=="object") and (.files.totalCount|type=="number") and (.files.nodes|type=="array")
+    and all(.files.nodes[]; type=="object" and (.path|type=="string"))
     and (.commits|type=="object") and (.commits.nodes|type=="array") and ((.commits.nodes|length) <= 1)
     and all(.commits.nodes[]; type=="object" and (.commit|type=="object")
       and (.commit.statusCheckRollup == null
@@ -58,6 +60,9 @@ printf '%s' "$raw" | jq -e '
 now=$(date -u +%s)
 out=$(printf '%s' "$raw" | jq -r --argjson now "$now" --argjson stale "$STALE_DAYS" '
   def ci: (.commits.nodes[0].commit.statusCheckRollup.state // "NONE");
+  def wf: any(.files.nodes[].path; startswith(".github/workflows/"));
+  def files_cut: .files.totalCount != (.files.nodes|length);
+  def safe: gsub("[\r\n]+"; " ") | gsub("(?<c>[\\[\\]`<>#@])"; "\\\(.c)");
   def age: (($now - (.updatedAt|fromdateiso8601)) / 86400 | floor);
   def verdict:
     if .baseRefName != "main" then ["Y", "스택 PR(base=\(.baseRefName)) — 아래 PR 이 먼저 병합돼야 한다"]
@@ -65,6 +70,8 @@ out=$(printf '%s' "$raw" | jq -r --argjson now "$now" --argjson stale "$STALE_DA
     elif ([.labels.nodes[].name | ascii_downcase] | index("needs-fix")) then ["R", "리뷰 결함 미해결(needs-fix 라벨)"]
     elif .mergeable == "CONFLICTING" then ["R", "main 과 충돌"]
     elif (ci == "FAILURE" or ci == "ERROR") then ["R", "CI 실패"]
+    elif wf then ["Y", "workflow 변경 — 자기 검사를 약화했을 수 있어 diff 확인 필요"]
+    elif files_cut then ["Y", "변경 파일 100개 초과 — workflow 변경 여부 확인 불가"]
     elif (.mergeable == "MERGEABLE" and .mergeStateStatus == "CLEAN" and ci == "SUCCESS") then ["G", "필수 검사 통과·충돌 없음·main 최신"]
     elif .mergeStateStatus == "BEHIND" then ["Y", "main 보다 뒤처짐 — Update branch 후 CI 재실행"]
     elif (ci == "PENDING" or ci == "EXPECTED") then ["Y", "CI 진행 중"]
@@ -73,7 +80,7 @@ out=$(printf '%s' "$raw" | jq -r --argjson now "$now" --argjson stale "$STALE_DA
     end;
   .data.repository.pullRequests.nodes
   | map(. + {v: verdict, a: age})
-  | def line: "- [#\(.number)](\(.url)) \(.title) — \(.v[1])" + (if .a >= $stale then " · \(.a)일 미변경" else "" end);
+  | def line: "- [#\(.number)](\(.url)) \(.title|safe) — \(.v[1])" + (if .a >= $stale then " · \(.a)일 미변경" else "" end);
     def section($k; $h): (map(select(.v[0]==$k))) as $xs
       | "### \($h) (\($xs|length))", (if ($xs|length)==0 then "- 없음" else ($xs|sort_by(.number)|.[]|line) end), "";
     "## PR 관제 — 열린 PR \(length)개", "",

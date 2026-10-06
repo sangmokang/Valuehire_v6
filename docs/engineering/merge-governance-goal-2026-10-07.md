@@ -67,7 +67,7 @@
 > **대가** — main 이 바뀔 때마다 다른 PR 은 "Update branch" 후 CI(약 4~6분)를 다시 기다려야 한다. PR 이 자기 `verify.yml` 을 약화하면 그 PR 의 검사도 약화된 채 초록일 수 있다(사람 diff 검토가 방어선).
 > **되돌리기** — `gh api -X PUT repos/sangmokang/Valuehire_v6/rulesets/23568184 --input docs/engineering/evidence/merge-governance-20261007/ruleset-main-before.json` 한 줄(1분).
 
-> **무엇을** — 관제는 GitHub 상태만 읽는 69줄 스크립트 + 매일 1회 이슈 댓글.
+> **무엇을** — 관제는 GitHub 상태만 읽는 92줄 스크립트 + 매일 1회 이슈 댓글.
 > **왜** — GitHub 기본 알림 메일을 그대로 쓰므로 새 서버·DB·메일 경로가 없다. 어디서 돌려도 같은 답이 나온다.
 > **버린 길** — `task/review-status`(1,789줄, 미푸시): LLM 리뷰 장부·메일·댓글 갱신까지 묶여 있어 "관제 자체가 관리 대상"이 된다. 장부가 Mac 에만 있어 Actions 에서 못 읽는다.
 > **대가** — 리뷰 결함은 GitHub 이 모르므로 사람이 `needs-fix` 라벨을 달아야 🔴 로 뜬다.
@@ -81,7 +81,7 @@
 | AC-2 | If `verify` 가 실패하면, 시스템은 병합을 거부해야 한다 | 실험 NEG-1 405 `is failing`; 실제 #116 405 | 실패 PR 이 BEHIND 라서만 막힌 것(→ NEG-1 은 base 최신 상태에서 실패로 거부) |
 | AC-3 | If PR 없이 main 에 push 하면, 시스템은 거부해야 한다 | 실험 NEG-2a/2b 422 `Changes must be made through a pull request` | 검사 미완료라서만 거부된 것(→ 2b 는 검사 완료 후) |
 | AC-4 | While PR 이 main 보다 뒤처져 있으면, 시스템은 옛 초록으로 병합을 허용하지 않아야 한다 | 실험 STRICT-NEG 405 → update 후 STRICT-POS 성공; 실제 #85 405 | strict 없이 옛 초록 통과 |
-| AC-5 | When 관제를 실행하면, 시스템은 판정 순서 ① 스택(base≠main)·초안 → 🟡(작성 중이라 병합 대상 아님 — 실패·충돌이 있어도 🟡) ② needs-fix 라벨(대소문자 무시)·충돌·CI 실패/오류 → 🔴 ③ MERGEABLE+CLEAN+CI 성공 → 🟢 ④ 나머지 → 🟡 로 출력하고, GraphQL 부분 오류·필드 누락/타입 오류·PR 100건 초과·라벨 100개 초과는 종료값 2 여야 한다 | `bash scripts/verify/run-acceptance.sh scripts/acceptance-pr-triage.sh` → `VERDICT: PASS`, `CHECKED: 35` | CLEAN 만 보고 CI 없음·초안·mergeable UNKNOWN 을 🟢 로 / 라벨이 잘려 needs-fix 를 놓침 / 부분 실패 응답을 정상 판정 |
+| AC-5 | When 관제를 실행하면, 시스템은 판정 순서 ① 스택(base≠main)·초안 → 🟡(작성 중이라 병합 대상 아님 — 실패·충돌이 있어도 🟡) ② needs-fix 라벨(대소문자 무시)·충돌·CI 실패/오류 → 🔴 ③ `.github/workflows/` 를 바꾼 PR·변경 파일 100개 초과 → 🟡(자기 검사를 약화했을 수 있음) ④ MERGEABLE+CLEAN+CI 성공 → 🟢 ⑤ 나머지 → 🟡, PR 제목의 줄바꿈·마크다운은 무력화 로 출력하고, GraphQL 부분 오류·필드 누락/타입 오류·PR 100건 초과·라벨 100개 초과는 종료값 2 여야 한다 | `bash scripts/verify/run-acceptance.sh scripts/acceptance-pr-triage.sh` → `VERDICT: PASS`, `CHECKED: 43` | CLEAN 만 보고 CI 없음·초안·mergeable UNKNOWN 을 🟢 로 / 라벨이 잘려 needs-fix 를 놓침 / 부분 실패 응답을 정상 판정 |
 | AC-6 | 규칙 변경 후 우회 권한자는 0 이어야 한다 | `gh api .../rulesets/23568184 --jq .bypass_actors` → `[]` | 관리자 우회를 열어 둔 채 "막힌다" 주장 |
 
 ## 테스트 실행 기록
@@ -94,6 +94,10 @@
 | 같은 시험 GREEN | PASS 26판정/CHECKED 25 — f2652b9 |
 | V1 반례 10건 RED | FAIL 10건(라벨 대소문자·mergeable UNKNOWN·errors 동반·updatedAt 누락/형식·노드 null·라벨 null/잘림·isDraft 누락·commits 형식) — 03776f0 |
 | V1 반영 GREEN | PASS 36판정/CHECKED 35 |
+| V2 지적 RED | FAIL 6건(workflow 변경 PR·파일 목록 잘림·제목 칸 주입·멘션/링크·files 누락·files 타입) — 6b898d0 |
+| V2 반영 GREEN | PASS 44판정/CHECKED 43 |
+| V2 반영 뮤테이션 8종 + 조합 | 6 KILLED 후 시험 1건 추가로 N3 KILLED. N6(files 형식)·N6+방어선 생존 = 바로 뒤 `all(.files.nodes[];…)` 가 같은 입력에서 종료값 2 를 내는 중복 조항(등가). N7+방어선 KILLED |
+| 실제 조회 | 1회 HTTP 502 → rc 2(의도대로 판정 거부), 재시도 3/3 rc 0·5~6초. workflow 에 30초 간격 3회 재시도 추가, 3회 실패 시 job 실패 |
 | 뮤테이션 18종(V1 반영 후) | 15 KILLED · 무변경 대조군 SURVIVED · 생존 3(M15 날짜 형식, M17 commits 타입, M18 라벨 null) |
 | 생존 3건 판별(조합 변이) | M15+판정단계 방어선 삭제 → KILLED(두 방어선 모두 시험 유효). M17·M18 은 바로 뒤 `all(.commits.nodes[];…)`·`all(.labels.nodes[];…)` 가 같은 입력에서 오류 → 종료값 2 를 내는 중복 조항이라 등가 변이(막아야 할 입력은 계속 막힘) |
 | `check-mechanism-registry.sh` | PASS CHECKED 21 (pr-triage-ci 포함) |
@@ -140,7 +144,7 @@
 
 ## 잔여 위험·미확인
 
-- **R-1** PR 이 `verify.yml` 을 약화하면 그 PR 의 `verify` 도 약화된 채 초록 — 필수 검사는 PR 쪽 workflow 로 돈다. 방어선은 사람 diff 검토(자동 병합 금지). NOT_TESTED.
+- **R-1** PR 이 `verify.yml` 을 약화하거나 `verify` 라는 job 을 가진 새 workflow 를 추가하면(외부 포크 포함 — 공개 저장소, 포크 workflow 승인은 첫 기여자만) 그 PR 의 `verify` 가 약화된 채 초록일 수 있다. 관제는 `.github/workflows/` 를 바꾼 PR 을 🟢 로 띄우지 않는다(V2-1 반영). 최종 방어선은 사람 diff 검토(자동 병합 금지). 시연 NOT_TESTED.
 - **R-2** 10-02 이전 직접 push·#111 병합이 규칙 평가 없이 통과한 원인 UNRESOLVED.
 - **R-3** 같은 SHA 에 push·pull_request 두 `verify` 가 있고 결과가 갈릴 때(#109) GitHub 이 어느 쪽을 보는지 NOT_TESTED. 어느 쪽이든 PR 결과(병합 결과물 검사)가 실패면 막힌다.
 - **R-4** `pr-triage.yml` 예약 실행·이슈 생성·댓글 알림 NOT_RUN(병합 후 확인).
@@ -162,3 +166,23 @@
 
 - 조건부 지적 `mergeable=UNKNOWN`+CLEAN→🟢 도 RED 로 고정하고 🟢 조건에 `MERGEABLE` 추가.
 - V1 이 깨뜨리지 못한 것: `mergeStateStatus` UNKNOWN/HAS_HOOKS/UNSTABLE, CI null, PR 0·100·101건, ruleset 우회자 0·규칙 2종 GET 확인, 표본 5건(#122 #123 #120 #85 #74) 상태 일치, workflow 가 PR 코드를 실행하는 경로 없음.
+
+### V2 — Claude 새 맥락(Opus 서브에이전트, 구현 맥락 미공유)
+- 대상 HEAD c5c5757. GitHub 읽기 전용. 원문 `evidence/merge-governance-20261007/v2-claude-verdict.md` (sha256 앞 16자 `6c2e62644929e0be`).
+- 판정 **VERDICT: PASS** — V1 결함 1·2 반례 13종 재투입 전부 🔴 또는 종료값 2(NOT_REPRODUCIBLE = 수정 확인), 결함 3·4·5 문서 대조로 해소 확인. V1 이 건너뛴 실제 GraphQL 실행을 메움(rc 0, 55건, 21/1/33 일치). ruleset 실제 값·우회자 0·다른 ruleset/고전 보호 없음 확인.
+
+| 구분 | 건수 |
+|---|---|
+| V1 이 잡은 G(구현) 결함 | 5 (+조건부 1) — 전부 수정 확인 |
+| V2 가 잡은 V1 과장 | 1 — 결함 3 의 "우선순위를 잘못 잡게 한다" 사업 영향(초안·스택은 병합 대상이 아님) |
+| V2 가 잡은 V1 누락 | 4 — 아래 |
+
+| V2 결함 | 심각도 | 처리 |
+|---|---|---|
+| V2-1 workflow 를 바꾼 PR(외부 포크 포함)이 자기 `verify` 로 🟢 "필수 검사 통과" | S2 조건부 | `files(first:100)` 조회, workflow 변경·목록 잘림 → 🟡. R-1 범위 확대 |
+| V2-2 PR 제목 줄바꿈·마크다운으로 가짜 칸·링크·멘션 | S3 | 줄바꿈 공백화, `[ ] \` < > # @` 이스케이프 |
+| V2-3 정본·goal 숫자 불일치(14/6종, 69줄) | S3 | 실제 값으로 수정 |
+| V2-4 봇 댓글 메일 수신 전제 미확인 | S3 | 댓글 첫 줄 `@${{ github.repository_owner }}` 멘션. 실제 수신은 병합 후 확인(R-4) |
+
+- 추가 V1 재실행은 하지 않았다: V2 지적은 모두 RED→GREEN·뮤테이션으로 닫았고, 검증 계층을 더 쌓지 않는다(2026-09-18 사장님 지시 "검증 계층을 무한히 쌓지 마라").
+

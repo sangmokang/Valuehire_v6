@@ -1,7 +1,7 @@
 name: pr-triage
 
 # 매일 09:00 KST 에 열린 PR 을 🔴/🟡/🟢 로 나눠 'pr-triage' 라벨 이슈에 댓글 하나로 남긴다.
-# 댓글은 GitHub 기본 알림(메일)으로 사장님께 간다 — 별도 서버·DB·메일 경로 없음.
+# 댓글 첫 줄에 저장소 소유자를 멘션해 GitHub 기본 알림(메일)으로 보낸다 — 별도 서버·DB·메일 경로 없음.
 # 판정 규칙은 scripts/pr-triage.sh 한 곳(시험: scripts/acceptance-pr-triage.sh).
 # PR 코드를 실행하지 않는다: 예약·수동 실행만, 항상 기본 브랜치의 파일로 돈다.
 on:
@@ -33,10 +33,21 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          OWNER: ${{ github.repository_owner }}
         run: |
           set -euo pipefail
-          bash scripts/pr-triage.sh > triage.md
+          # GitHub GraphQL 일시 장애(HTTP 502 실측 2026-10-07)로 하루 보고를 잃지 않도록 3회까지만 다시 시도한다.
+          # 세 번 다 실패하면 job 을 실패로 남긴다 — 빈 보고나 옛 보고를 내지 않는다.
+          ok=0
+          for attempt in 1 2 3; do
+            if bash scripts/pr-triage.sh > triage.md; then ok=1; break; fi
+            echo "PR 조회 실패 ${attempt}/3"
+            sleep 30
+          done
+          if [ "$ok" -ne 1 ]; then echo "FAIL: PR 관제 조회 3회 실패 — 오늘 보고를 내지 않는다"; exit 1; fi
           cat triage.md >> "$GITHUB_STEP_SUMMARY"
+          # 봇 댓글은 참여자가 아니면 알림이 안 갈 수 있어 저장소 소유자를 멘션한다(V2-4).
+          { echo "@${OWNER} 오늘의 PR 관제입니다."; echo; cat triage.md; } > comment.md
           labels=$(gh label list --limit 500 --json name --jq '.[].name')
           if ! grep -qx 'pr-triage' <<<"$labels"; then
             gh label create pr-triage --color BFD4F2 --description "PR 관제 매일 요약"
@@ -47,5 +58,5 @@ jobs:
               --body "scripts/pr-triage.sh 가 매일 이 이슈에 댓글로 열린 PR 요약을 남깁니다.")
             num=${url##*/}
           fi
-          gh issue comment "$num" --body-file triage.md
+          gh issue comment "$num" --body-file comment.md
           echo "PASS: 이슈 #$num 에 PR 관제 댓글 게시"

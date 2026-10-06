@@ -238,7 +238,7 @@ jobs:
 
       - name: 인수 검사 pr-triage (PR 관제 🔴/🟡/🟢 분류 규칙)
         # 관제가 CI 실패·충돌·뒤처진 PR 을 🟢 로 띄우면 "봐야 할 PR" 목록이 거짓이 된다.
-        # 픽스처로 분류 규칙 14종과 조회 실패 6종(종료값 2)을 검사한다. 네트워크 없음.
+        # 픽스처로 분류 19건·제목 주입 무력화·판정 거부(종료값 2) 16건을 검사한다. 네트워크 없음.
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-pr-triage.sh
 
       - name: 인수 검사 ci-step-integrity (스텝을 조용히 끄지 못하는가)

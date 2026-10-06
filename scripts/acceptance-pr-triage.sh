@@ -76,8 +76,9 @@ expect "mergeable 이 UNKNOWN 이면 CLEAN 이어도 병합 가능 아님" "🟡
 expect "workflow 를 바꾼 PR 은 자기 verify 를 약화했을 수 있어 병합 가능 아님(V2-1)" "🟡" 17
 expect "변경 파일 목록이 잘리면 workflow 변경 여부를 몰라 병합 가능 아님" "🟡" 18
 expect "제목이 위험해도 정상 PR 은 병합 가능" "🟢" 19
+n=$((n+1)); if grep -F '[#19](u19)' "$tmp/out" | grep -q '가짜'; then echo "PASS: 제목 줄바꿈이 한 줄로 합쳐짐"; else echo "FAIL: 제목 줄바꿈이 항목을 여러 줄로 쪼갬"; fail=1; fi
 n=$((n+1)); if [ "$(grep -c '^### ' "$tmp/out")" -eq 3 ]; then echo "PASS: PR 제목이 보고의 칸 제목을 만들지 못함(V2-2)"; else echo "FAIL: 제목 주입으로 칸 제목이 $(grep -c '^### ' "$tmp/out")개"; fail=1; fi
-n=$((n+1)); if grep -qE '(^|[^\\])@someone|\]\(https://evil\)' "$tmp/out"; then echo "FAIL: 제목의 멘션·링크 문법이 그대로 나감"; fail=1; else echo "PASS: 제목의 멘션·링크 문법 무력화"; fi
+n=$((n+1)); if grep -qE '(^|[^\\])@someone|(^|[^\\])\]\(https://evil\)' "$tmp/out"; then echo "FAIL: 제목의 멘션·링크 문법이 그대로 나감"; fail=1; else echo "PASS: 제목의 멘션·링크 문법 무력화"; fi
 
 n=$((n+1)); if grep -q '#12.*30일 미변경' "$tmp/out"; then echo "PASS: 장기 미변경 표시"; else echo "FAIL: 30일 미변경 표시 없음"; fail=1; fi
 n=$((n+1)); if grep -F '[#1](u1)' "$tmp/out" | grep -q '미변경'; then echo "FAIL: 최근 PR 에 미변경 표시"; fail=1; else echo "PASS: 최근 PR 은 미변경 표시 없음"; fi

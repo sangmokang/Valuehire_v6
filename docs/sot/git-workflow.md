@@ -34,4 +34,4 @@
 
 - CI가 각 원칙(P1~P22)을 어떻게 강제하는지의 전체 매핑표는 여기 옮기지 않았다 — 원본 goal 문서 §4 "CI가 강제할 것"에 있다.
 - 이 저장소는 고전 branch protection 을 쓰지 않는다(`branches/main/protection` 은 404 가 정상). 보호는 위 ruleset 하나다.
-- PR 이 자기 `verify.yml` 을 약화하면 그 PR 의 `verify` 도 약화된 채 초록일 수 있다 — 필수 검사는 PR 쪽 워크플로 파일로 돈다. 이 경우의 방어선은 사람의 diff 검토다(자동 병합 금지 규약).
+- PR 이 자기 `verify.yml` 을 약화하거나 `verify` 라는 job 을 가진 새 워크플로를 추가하면(외부 포크 포함) 그 PR 의 `verify` 도 약화된 채 초록일 수 있다 — 필수 검사는 PR 쪽 워크플로 파일로 돈다. PR 관제는 `.github/workflows/` 를 바꾼 PR 을 🟢 로 띄우지 않지만, 최종 방어선은 사람의 diff 검토다(자동 병합 금지 규약).
