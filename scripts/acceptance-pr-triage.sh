@@ -14,11 +14,12 @@ recent=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 old=$(date -u -r $(( $(date -u +%s) - 30*86400 )) +%Y-%m-%dT%H:%M:%SZ 2>/dev/null \
       || date -u -d '30 days ago' +%Y-%m-%dT%H:%M:%SZ)
 
-# pr <번호> <draft> <base> <mergeable> <mergeState> <rollup|null> <updatedAt>
+# pr <번호> <draft> <base> <mergeable> <mergeState> <rollup|null> <updatedAt> [라벨]
 pr() {
   local roll='null'; [ "$6" != null ] && roll="{\"state\":\"$6\"}"
-  printf '{"number":%s,"title":"t%s","url":"u%s","isDraft":%s,"baseRefName":"%s","mergeable":"%s","mergeStateStatus":"%s","updatedAt":"%s","commits":{"nodes":[{"commit":{"statusCheckRollup":%s}}]}}' \
-    "$1" "$1" "$1" "$2" "$3" "$4" "$5" "$7" "$roll"
+  local lab='[]'; [ -n "${8:-}" ] && lab="[{\"name\":\"$8\"}]"
+  printf '{"number":%s,"title":"t%s","url":"u%s","isDraft":%s,"baseRefName":"%s","mergeable":"%s","mergeStateStatus":"%s","updatedAt":"%s","labels":{"nodes":%s},"commits":{"nodes":[{"commit":{"statusCheckRollup":%s}}]}}' \
+    "$1" "$1" "$1" "$2" "$3" "$4" "$5" "$7" "$lab" "$roll"
 }
 wrap() { local IFS=,; printf '{"data":{"repository":{"pullRequests":{"totalCount":%s,"nodes":[%s]}}}}' "$#" "$*"; }
 
@@ -44,6 +45,8 @@ wrap \
   "$(pr 10 false main MERGEABLE BLOCKED ERROR "$recent")" \
   "$(pr 11 false main MERGEABLE CLEAN null "$recent")" \
   "$(pr 12 false main MERGEABLE CLEAN SUCCESS "$old")" \
+  "$(pr 13 false main MERGEABLE CLEAN SUCCESS "$recent" needs-fix)" \
+  "$(pr 14 false main MERGEABLE CLEAN SUCCESS "$recent" docs)" \
   > "$tmp/in.json"
 
 bash "$T" --input "$tmp/in.json" > "$tmp/out" 2>&1; rc=$?
@@ -61,10 +64,12 @@ expect "초안은 CLEAN 이어도 병합 가능이 아니다"      "🟡" 9
 expect "CI ERROR 는 즉시 확인"                       "🔴" 10
 expect "CLEAN 이라도 CI 결과가 없으면 병합 가능 아님" "🟡" 11
 expect "오래된 정상 PR 도 병합 가능"                 "🟢" 12
+expect "needs-fix 라벨은 GitHub 이 CLEAN 이어도 즉시 확인" "🔴" 13
+expect "다른 라벨은 분류에 영향 없음"           "🟢" 14
 
 n=$((n+1)); if grep -q '#12.*30일 미변경' "$tmp/out"; then echo "PASS: 장기 미변경 표시"; else echo "FAIL: 30일 미변경 표시 없음"; fail=1; fi
 n=$((n+1)); if grep -F '[#1](u1)' "$tmp/out" | grep -q '미변경'; then echo "FAIL: 최근 PR 에 미변경 표시"; fail=1; else echo "PASS: 최근 PR 은 미변경 표시 없음"; fi
-n=$((n+1)); if grep -q '^## PR 관제 — 열린 PR 12개' "$tmp/out"; then echo "PASS: 총 개수 12"; else echo "FAIL: 총 개수 표시 오류"; fail=1; fi
+n=$((n+1)); if grep -q '^## PR 관제 — 열린 PR 14개' "$tmp/out"; then echo "PASS: 총 개수 14"; else echo "FAIL: 총 개수 표시 오류"; fail=1; fi
 
 # 빈 목록은 정상(0개)으로 판정하되 칸마다 '없음'을 쓴다
 wrap > "$tmp/empty.json"
