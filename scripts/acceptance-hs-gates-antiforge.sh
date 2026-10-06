@@ -19,7 +19,8 @@ WF=".github/workflows/verify.yml"
 for required in "$GATES" "$WF" "humansearch/pyproject.toml" "humansearch/uv.lock" \
   "humansearch/.python-version" "humansearch/src/humansearch/__init__.py" "humansearch/tests" \
   "contracts/admin-weekly-dashboard/metric-contract-v1.json" \
-  "contracts/admin-weekly-dashboard/source-contract-v1.json" "apps/admin"; do
+  "contracts/admin-weekly-dashboard/source-contract-v1.json" \
+  "contracts/jev-org-reference-shadow.json" "apps/admin"; do
   [ -e "$required" ] || { echo "FAIL: required for antiforge missing: $required"; exit 2; }
 done
 
@@ -33,13 +34,10 @@ trap 'cleanup; trap - EXIT; exit 129' HUP
 pass=0
 total=0
 
-# Dashboard tests resolve contracts/assets from the parent of each isolated project.
-# Copy every repository-level fixture so antiforge verdicts cannot pass for FileNotFound.
-mkdir -p "$SANDBOX/contracts/admin-weekly-dashboard"
-cp contracts/admin-weekly-dashboard/metric-contract-v1.json \
-  "$SANDBOX/contracts/admin-weekly-dashboard/"
-cp contracts/admin-weekly-dashboard/source-contract-v1.json \
-  "$SANDBOX/contracts/admin-weekly-dashboard/"
+# Dashboard and Jev shadow tests resolve contracts/assets from the parent of each isolated project.
+# Copy the whole repository-level contracts tree (as acceptance-hs-gates-mutations.sh does) so
+# antiforge verdicts cannot pass for FileNotFound.
+cp -R contracts "$SANDBOX/"
 mkdir -p "$SANDBOX/apps"
 cp -R apps/admin "$SANDBOX/apps/"
 
@@ -78,6 +76,16 @@ PY
 
 forge_rc=0
 forge_out=$(HS_GATES_PROJECT="$FORGE" bash "$GATES" 2>&1) || forge_rc=$?
+# 위조 사본은 반드시 위조 대조 단계에서 거부되어야 한다. 그 전에(환경·린트·수집·pytest·파일 없음 등) 멈추면
+# 아래 단언이 공회전한다. 사본의 시험 출력은 공격자가 쓸 수 있으므로 출력 전체에서 문자열을 찾지 않고,
+# 게이트가 마지막에 직접 찍는 판정 줄이 대조 탐지 형식일 때만 통과한다(조기 종료는 늘 자기 FAIL 줄로 끝난다).
+forge_last=$(printf '%s\n' "$forge_out" | awk 'NF{l=$0} END{print l}')
+if [ "$forge_rc" -ne 1 ] || ! printf '%s\n' "$forge_last" |
+  grep -qE '^FAIL: spy count \[-?[0-9]+\] disagrees with independent count \[[0-9]+\] \(tampering\)$'; then
+  echo "FAIL: forge copy was not rejected by the forgery check (exit=$forge_rc)"
+  printf '%s\n' "$forge_out" | tail -5
+  exit 1
+fi
 # 위조가 무력화됐다 = 게이트가 999 라는 거짓 숫자를 절대 보고하지 않는다.
 # (게이트가 이 사본을 통과시키든 거부하든, 위조된 999·거짓 경로가 결과에 새면 안 된다.)
 if printf '%s\n' "$forge_out" | grep -qE 'collected 999|COLLECTED: 999'; then
