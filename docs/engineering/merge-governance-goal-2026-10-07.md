@@ -8,7 +8,7 @@
 - **main 병합을 막던 것은 `acceptance` 배포 요구 하나였고, 그 배포를 만드는 경로는 저장소 어디에도 없었다.** 9-17 이후 열린 PR 은 코드가 멀쩡해도 영원히 병합될 수 없었다(10-02 22:26 부터 실측 확인, 오늘 재현).
 - 같은 규칙은 **명령 두 줄짜리 가짜 배포 기록으로 통과**됐다(오늘 임시 브랜치에서 재현). 막아야 할 것은 못 막고 막지 말아야 할 것만 막는 장치였다.
 - 그 규칙을 **"PR 필수 + `verify` 검사 통과 + main 최신 기준"** 으로 바꿨다. 실패 PR·뒤처진 PR·PR 없는 직접 push 는 여전히 막히고, 정상 PR 만 풀린다(임시 브랜치와 실제 main 에서 실측).
-- 열린 PR 55개 분류: 병합 가능 1(#122) · 수정 필요 12 · 대체/중복 5 · 사람 결정 37.
+- 열린 PR 55개 분류: 병합 가능 1(#122) · 수정 필요 12 · 대체/중복 2 · 사람 결정 40.
 - 매일 09:00 KST 에 "지금 봐야 할 PR" 을 🔴/🟡/🟢 로 이슈 댓글 하나에 남기는 관제를 추가했다(이 PR 병합 후 동작).
 - **가장 급한 일: 10-13 에 억제 3건이 만료되면 모든 PR 의 CI 가 다시 빨개진다.** 그 전에 연장하거나 해제 체인(#74→#75→#77→#78)을 정리해야 한다.
 
@@ -81,7 +81,7 @@
 | AC-2 | If `verify` 가 실패하면, 시스템은 병합을 거부해야 한다 | 실험 NEG-1 405 `is failing`; 실제 #116 405 | 실패 PR 이 BEHIND 라서만 막힌 것(→ NEG-1 은 base 최신 상태에서 실패로 거부) |
 | AC-3 | If PR 없이 main 에 push 하면, 시스템은 거부해야 한다 | 실험 NEG-2a/2b 422 `Changes must be made through a pull request` | 검사 미완료라서만 거부된 것(→ 2b 는 검사 완료 후) |
 | AC-4 | While PR 이 main 보다 뒤처져 있으면, 시스템은 옛 초록으로 병합을 허용하지 않아야 한다 | 실험 STRICT-NEG 405 → update 후 STRICT-POS 성공; 실제 #85 405 | strict 없이 옛 초록 통과 |
-| AC-5 | When 관제를 실행하면, 시스템은 CI 실패·충돌·needs-fix 를 🔴, CLEAN+CI 성공만 🟢, 나머지를 🟡 로 출력하고 조회·형식 실패는 종료값 2 여야 한다 | `bash scripts/verify/run-acceptance.sh scripts/acceptance-pr-triage.sh` → `VERDICT: PASS`, `CHECKED: 25` | CLEAN 만 보고 CI 없음·초안을 🟢 로 |
+| AC-5 | When 관제를 실행하면, 시스템은 판정 순서 ① 스택(base≠main)·초안 → 🟡(작성 중이라 병합 대상 아님 — 실패·충돌이 있어도 🟡) ② needs-fix 라벨(대소문자 무시)·충돌·CI 실패/오류 → 🔴 ③ MERGEABLE+CLEAN+CI 성공 → 🟢 ④ 나머지 → 🟡 로 출력하고, GraphQL 부분 오류·필드 누락/타입 오류·PR 100건 초과·라벨 100개 초과는 종료값 2 여야 한다 | `bash scripts/verify/run-acceptance.sh scripts/acceptance-pr-triage.sh` → `VERDICT: PASS`, `CHECKED: 35` | CLEAN 만 보고 CI 없음·초안·mergeable UNKNOWN 을 🟢 로 / 라벨이 잘려 needs-fix 를 놓침 / 부분 실패 응답을 정상 판정 |
 | AC-6 | 규칙 변경 후 우회 권한자는 0 이어야 한다 | `gh api .../rulesets/23568184 --jq .bypass_actors` → `[]` | 관리자 우회를 열어 둔 채 "막힌다" 주장 |
 
 ## 테스트 실행 기록
@@ -92,7 +92,10 @@
 | `acceptance-pr-triage.sh` RED(구현 없음) | FAIL rc 1 — 8f3d5a9 |
 | 같은 시험 RED(needs-fix 규칙 없음) | FAIL `#13 이 '🔴' 칸에 없다` — 48bc61a |
 | 같은 시험 GREEN | PASS 26판정/CHECKED 25 — f2652b9 |
-| 뮤테이션 10종(충돌·CI 요구·스택·잘림·뒤처짐·형식실패·ERROR·초안·라벨·미변경 기준) | 10/10 KILLED, 무변경 대조군 SURVIVED |
+| V1 반례 10건 RED | FAIL 10건(라벨 대소문자·mergeable UNKNOWN·errors 동반·updatedAt 누락/형식·노드 null·라벨 null/잘림·isDraft 누락·commits 형식) — 03776f0 |
+| V1 반영 GREEN | PASS 36판정/CHECKED 35 |
+| 뮤테이션 18종(V1 반영 후) | 15 KILLED · 무변경 대조군 SURVIVED · 생존 3(M15 날짜 형식, M17 commits 타입, M18 라벨 null) |
+| 생존 3건 판별(조합 변이) | M15+판정단계 방어선 삭제 → KILLED(두 방어선 모두 시험 유효). M17·M18 은 바로 뒤 `all(.commits.nodes[];…)`·`all(.labels.nodes[];…)` 가 같은 입력에서 오류 → 종료값 2 를 내는 중복 조항이라 등가 변이(막아야 할 입력은 계속 막힘) |
 | `check-mechanism-registry.sh` | PASS CHECKED 21 (pr-triage-ci 포함) |
 | `check-ci-step-integrity.sh verify.yml` | PASS 32 |
 | `pr-triage.sh` 실제 실행(읽기 전용) | rc 0, 55개 → 🔴21 🟢1 🟡33 (`triage-after-rule-change.md`) |
@@ -118,16 +121,14 @@
 | #104 | S2 | 7,703줄(P11③ 초과), `outputs/` 실행 산출물 49개 커밋(P21 데이터는 git 밖) — 후보자 개인정보는 검색 0건(채용공고 문구만) | REPRODUCED |
 | #105 | S2 | 7,557줄(P11③ 초과) 스냅샷 | REPRODUCED |
 
-### C — SUPERSEDED_OR_DUPLICATE (5)
+### C — SUPERSEDED_OR_DUPLICATE (2)
+트리·커밋 근거가 있는 것만 둔다(V1 2026-10-07 지적: 운영 결정은 내용 대체의 증거가 아니다).
 | PR | 대체 근거 |
 |---|---|
-| #120 | #121 과 트리 완전 동일(`git diff` 0줄), head 브랜치 삭제됨 |
-| #118 | #121 의 조상 커밋(`merge-base --is-ancestor` 참), 10개 파일 동일 blob |
-| #121 | GitHub Actions + XAI API 리뷰 경로는 2026-10-06 사장님 결정으로 폐기 — 대체: #123 llmcodereview(Aside × Cursor 웹) |
-| #119 | 10-02 시점 "열린 PR 병합 판정" 스냅샷 — 이 문서의 10-07 baseline·분류와 `pr-triage.sh` 가 대체 |
-| #108 | 핵심 파일 `docs/sot/strict-workflow.md` 는 f12ea33 으로 이미 main 에 있음(차이 2줄). 남은 고유분은 판정 문서 2개·goal 문서 증분 — 보존 여부만 결정 |
+| #120 | #121 과 head 트리 동일(`fff4f91e…`, `git diff` 0줄), head 브랜치 삭제됨 |
+| #118 | #121 의 조상 커밋(`merge-base --is-ancestor` 참, compare `ahead_by:2 behind_by:0`), 10개 파일 동일 blob |
 
-### D — STALE_NEEDS_DECISION (37)
+### D — STALE_NEEDS_DECISION (40)
 | 묶음 | PR | 사람 결정이 필요한 이유 |
 |---|---|---|
 | 갱신만 하면 판정 가능(작고 최근) | #116 #115 #112 #102 #107 #103 | 실패 원인이 억제 만료(시간 부패)뿐. "Update branch" 1회로 현재 main 기준 CI 가 판정. 브랜치에 커밋이 추가되므로 다른 세션 작업 여부 확인 후 실행 |
@@ -135,6 +136,7 @@
 | 오래된 충돌 | #14 #15 #37 #43 #48 #68 | 19~73커밋 뒤처진 채 충돌. 되살리려면 충돌 해소(재작성 수준). #37 의 work-unit 정본은 9-18 goal 이 삭제 대상으로 지정 |
 | 오래된 문서·인프라(옛 초록) | #47 #54 #61 #63 #65 #66 #67 #79 | 19~42커밋 뒤처짐. 여전히 필요한지 |
 | 초안 | #106 #114 #117 | 작성자가 완료 표시 전 |
+| 폐기 결정·대체 확인 필요 | #121 #119 #108 | #121: GitHub Actions + XAI API 리뷰 경로는 2026-10-06 사장님 결정으로 폐기(대체 방향 #123) — 결정이지 내용 이관 증거는 아니므로 닫기는 승인 후. #119: 10-02 시점 PR 판정 스냅샷 — 기록으로 남길지. #108: 핵심 `docs/sot/strict-workflow.md` 는 f12ea33 으로 main 에 있으나(차이 2줄) 판정 문서 2개·goal 증분 137줄이 고유 |
 
 ## 잔여 위험·미확인
 
@@ -145,4 +147,18 @@
 
 ## 적대 검증 로그
 
-(아래에 V1·V2 원문 경로와 판정을 덧붙인다.)
+### V1 — Codex (독립 엔진)
+- 실행: `codex exec -s workspace-write -c sandbox_workspace_write.network_access=true -C <--no-local 복제본> "<v1-prompt>" </dev/null`, 2026-10-06T16:47:51Z~16:52:56Z, rc 0, session `01a1121d-49fb-74f2-8250-5d6996a7d405`, 셸 실행 63회. 대상 HEAD e09df7a. GitHub 는 GET 만 허용.
+- 원문: `evidence/merge-governance-20261007/v1-codex-verdict.md` (sha256 앞 16자 `5e3de6635f2d7068`).
+- 판정 **VERDICT: FAIL** — 결함 5건.
+
+| V1 결함 | 심각도 | 내 재현 | 처리 |
+|---|---|---|---|
+| 1 라벨 첫 20개만 조회·`needs-fix` 대소문자 정확 일치 → 결함 라벨 누락 시 🟢 | 높음 | REPRODUCED(RED 03776f0: `Needs-Fix`→🟢, 라벨 잘림→rc 0) | `labels(first:100){totalCount}` + 개수 불일치 종료값 2, `ascii_downcase` 비교 |
+| 2 GraphQL `errors`·필드 누락·형식 오류가 rc 0/5 로 빠짐 | 높음 | REPRODUCED(RED: errors→0, updatedAt 누락→5, 노드 null→5, 라벨 null→0, isDraft 누락→0, commits 형식→5) | 노드 단위 타입·날짜 검증 + 판정 단계 실패도 종료값 2 |
+| 3 초안·스택 우선이 AC-5 문구와 모순 | 중간 | REPRODUCED(문서 대조) | 동작 유지(초안·스택은 병합 대상 아님), AC-5 를 판정 순서로 명시 |
+| 4 #121·#119·#108 은 트리 대체 근거 없음 | 중간 | REPRODUCED | C 5→2(#118·#120), 셋은 D 로 이동 |
+| 5 정본이 미실행 매일 알림을 현재형으로 서술 | 낮음 | REPRODUCED(`git-workflow.md:31`) | "기본 브랜치에 들어간 뒤부터" 로 수정 |
+
+- 조건부 지적 `mergeable=UNKNOWN`+CLEAN→🟢 도 RED 로 고정하고 🟢 조건에 `MERGEABLE` 추가.
+- V1 이 깨뜨리지 못한 것: `mergeStateStatus` UNKNOWN/HAS_HOOKS/UNSTABLE, CI null, PR 0·100·101건, ruleset 우회자 0·규칙 2종 GET 확인, 표본 5건(#122 #123 #120 #85 #74) 상태 일치, workflow 가 PR 코드를 실행하는 경로 없음.

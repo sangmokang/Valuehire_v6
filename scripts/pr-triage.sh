@@ -25,7 +25,7 @@ elif [ $# -gt 0 ]; then
   echo "FAIL: 알 수 없는 인자 — $*" >&2; exit 2
 fi
 
-QUERY='query($owner:String!,$name:String!){repository(owner:$owner,name:$name){pullRequests(states:OPEN,first:100,orderBy:{field:UPDATED_AT,direction:DESC}){totalCount nodes{number title url isDraft baseRefName mergeable mergeStateStatus updatedAt labels(first:20){nodes{name}} commits(last:1){nodes{commit{statusCheckRollup{state}}}}}}}}'
+QUERY='query($owner:String!,$name:String!){repository(owner:$owner,name:$name){pullRequests(states:OPEN,first:100,orderBy:{field:UPDATED_AT,direction:DESC}){totalCount nodes{number title url isDraft baseRefName mergeable mergeStateStatus updatedAt labels(first:100){totalCount nodes{name}} commits(last:1){nodes{commit{statusCheckRollup{state}}}}}}}}'
 
 if [ -z "$input" ]; then
   repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner) || { echo "FAIL: 저장소 조회 실패" >&2; exit 2; }
@@ -34,23 +34,38 @@ else
   raw=$(cat "$input") || { echo "FAIL: 입력 읽기 실패" >&2; exit 2; }
 fi
 
-# 형식 검사: 모르는 것은 통과가 아니다. 100건 초과면 잘린 목록이므로 판정하지 않는다.
+# 형식 검사: 모르는 것은 통과가 아니다. GraphQL 부분 오류, 필드 누락·타입 오류, PR 100건 초과·라벨 100개
+# 초과로 잘린 목록은 판정하지 않는다(라벨이 잘리면 needs-fix 를 놓쳐 🟢 로 둔갑한다 — V1 2026-10-07).
 printf '%s' "$raw" | jq -e '
-  .data.repository.pullRequests
-  | (.totalCount|type=="number") and (.nodes|type=="array") and (.totalCount == (.nodes|length))
-' >/dev/null 2>&1 || { echo "FAIL: 조회 결과 형식 오류 또는 100건 초과로 잘림 — 판정하지 않는다" >&2; exit 2; }
+  def iso: type=="string" and test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$");
+  def node_ok: type=="object"
+    and (.number|type=="number") and (.title|type=="string") and (.url|type=="string")
+    and (.isDraft|type=="boolean") and (.baseRefName|type=="string")
+    and (.mergeable|type=="string") and (.mergeStateStatus|type=="string") and (.updatedAt|iso)
+    and (.labels|type=="object") and (.labels.nodes|type=="array")
+    and (.labels.totalCount == (.labels.nodes|length))
+    and all(.labels.nodes[]; type=="object" and (.name|type=="string"))
+    and (.commits|type=="object") and (.commits.nodes|type=="array") and ((.commits.nodes|length) <= 1)
+    and all(.commits.nodes[]; type=="object" and (.commit|type=="object")
+      and (.commit.statusCheckRollup == null
+           or ((.commit.statusCheckRollup|type=="object") and (.commit.statusCheckRollup.state|type=="string"))));
+  (has("errors")|not)
+  and (.data.repository.pullRequests
+       | (.totalCount|type=="number") and (.nodes|type=="array")
+         and (.totalCount == (.nodes|length)) and all(.nodes[]; node_ok))
+' >/dev/null 2>&1 || { echo "FAIL: 조회 결과 형식 오류·부분 오류 또는 잘린 목록 — 판정하지 않는다" >&2; exit 2; }
 
 now=$(date -u +%s)
-printf '%s' "$raw" | jq -r --argjson now "$now" --argjson stale "$STALE_DAYS" '
+out=$(printf '%s' "$raw" | jq -r --argjson now "$now" --argjson stale "$STALE_DAYS" '
   def ci: (.commits.nodes[0].commit.statusCheckRollup.state // "NONE");
   def age: (($now - (.updatedAt|fromdateiso8601)) / 86400 | floor);
   def verdict:
     if .baseRefName != "main" then ["Y", "스택 PR(base=\(.baseRefName)) — 아래 PR 이 먼저 병합돼야 한다"]
     elif .isDraft then ["Y", "초안(Draft)"]
-    elif ([.labels.nodes[]?.name] | index("needs-fix")) then ["R", "리뷰 결함 미해결(needs-fix 라벨)"]
+    elif ([.labels.nodes[].name | ascii_downcase] | index("needs-fix")) then ["R", "리뷰 결함 미해결(needs-fix 라벨)"]
     elif .mergeable == "CONFLICTING" then ["R", "main 과 충돌"]
     elif (ci == "FAILURE" or ci == "ERROR") then ["R", "CI 실패"]
-    elif (.mergeStateStatus == "CLEAN" and ci == "SUCCESS") then ["G", "필수 검사 통과·충돌 없음·main 최신"]
+    elif (.mergeable == "MERGEABLE" and .mergeStateStatus == "CLEAN" and ci == "SUCCESS") then ["G", "필수 검사 통과·충돌 없음·main 최신"]
     elif .mergeStateStatus == "BEHIND" then ["Y", "main 보다 뒤처짐 — Update branch 후 CI 재실행"]
     elif (ci == "PENDING" or ci == "EXPECTED") then ["Y", "CI 진행 중"]
     elif ci == "NONE" then ["Y", "CI 결과 없음"]
@@ -65,5 +80,6 @@ printf '%s' "$raw" | jq -r --argjson now "$now" --argjson stale "$STALE_DAYS" '
     section("R"; "🔴 즉시 확인"),
     section("G"; "🟢 병합 가능"),
     section("Y"; "🟡 사람 결정·대기"),
-    "판정 근거: GitHub mergeStateStatus·mergeable·최신 커밋 검사 결과만 사용. 병합은 사람이 직접 한다."
-'
+    "판정 근거: GitHub mergeStateStatus·mergeable·최신 커밋 검사 결과·needs-fix 라벨만 사용. 병합은 사람이 직접 한다."
+') || { echo "FAIL: 판정 단계 실패 — 출력하지 않는다" >&2; exit 2; }
+printf '%s\n' "$out"
