@@ -18,7 +18,7 @@ old=$(date -u -r $(( $(date -u +%s) - 30*86400 )) +%Y-%m-%dT%H:%M:%SZ 2>/dev/nul
 pr() {
   local roll='null'; [ "$6" != null ] && roll="{\"state\":\"$6\"}"
   local lab='{"totalCount":0,"nodes":[]}'; [ -n "${8:-}" ] && lab="{\"totalCount\":1,\"nodes\":[{\"name\":\"$8\"}]}"
-  printf '{"number":%s,"title":"t%s","url":"u%s","isDraft":%s,"baseRefName":"%s","mergeable":"%s","mergeStateStatus":"%s","updatedAt":"%s","labels":%s,"commits":{"nodes":[{"commit":{"statusCheckRollup":%s}}]}}' \
+  printf '{"number":%s,"title":"t%s","url":"u%s","isDraft":%s,"baseRefName":"%s","mergeable":"%s","mergeStateStatus":"%s","updatedAt":"%s","labels":%s,"files":{"totalCount":0,"nodes":[]},"commits":{"nodes":[{"commit":{"statusCheckRollup":%s}}]}}' \
     "$1" "$1" "$1" "$2" "$3" "$4" "$5" "$7" "$lab" "$roll"
 }
 wrap() { local IFS=,; printf '{"data":{"repository":{"pullRequests":{"totalCount":%s,"nodes":[%s]}}}}' "$#" "$*"; }
@@ -49,6 +49,9 @@ wrap \
   "$(pr 14 false main MERGEABLE CLEAN SUCCESS "$recent" docs)" \
   "$(pr 15 false main MERGEABLE CLEAN SUCCESS "$recent" Needs-Fix)" \
   "$(pr 16 false main UNKNOWN CLEAN SUCCESS "$recent")" \
+  "$(pr 17 false main MERGEABLE CLEAN SUCCESS "$recent" | jq -c '.files={totalCount:2,nodes:[{path:"docs/a.md"},{path:".github/workflows/verify.yml"}]}')" \
+  "$(pr 18 false main MERGEABLE CLEAN SUCCESS "$recent" | jq -c '.files={totalCount:101,nodes:[{path:"docs/a.md"}]}')" \
+  "$(pr 19 false main MERGEABLE CLEAN SUCCESS "$recent" | jq -c '.title="x\n### 🟢 병합 가능 (9)\n- [#999](https://evil) 가짜 @someone"')" \
   > "$tmp/in.json"
 
 bash "$T" --input "$tmp/in.json" > "$tmp/out" 2>&1; rc=$?
@@ -70,10 +73,15 @@ expect "needs-fix 라벨은 GitHub 이 CLEAN 이어도 즉시 확인" "🔴" 13
 expect "다른 라벨은 분류에 영향 없음"           "🟢" 14
 expect "라벨 대소문자가 달라도 needs-fix 로 본다(GitHub 라벨은 대소문자 무시)" "🔴" 15
 expect "mergeable 이 UNKNOWN 이면 CLEAN 이어도 병합 가능 아님" "🟡" 16
+expect "workflow 를 바꾼 PR 은 자기 verify 를 약화했을 수 있어 병합 가능 아님(V2-1)" "🟡" 17
+expect "변경 파일 목록이 잘리면 workflow 변경 여부를 몰라 병합 가능 아님" "🟡" 18
+expect "제목이 위험해도 정상 PR 은 병합 가능" "🟢" 19
+n=$((n+1)); if [ "$(grep -c '^### ' "$tmp/out")" -eq 3 ]; then echo "PASS: PR 제목이 보고의 칸 제목을 만들지 못함(V2-2)"; else echo "FAIL: 제목 주입으로 칸 제목이 $(grep -c '^### ' "$tmp/out")개"; fail=1; fi
+n=$((n+1)); if grep -qE '(^|[^\\])@someone|\]\(https://evil\)' "$tmp/out"; then echo "FAIL: 제목의 멘션·링크 문법이 그대로 나감"; fail=1; else echo "PASS: 제목의 멘션·링크 문법 무력화"; fi
 
 n=$((n+1)); if grep -q '#12.*30일 미변경' "$tmp/out"; then echo "PASS: 장기 미변경 표시"; else echo "FAIL: 30일 미변경 표시 없음"; fail=1; fi
 n=$((n+1)); if grep -F '[#1](u1)' "$tmp/out" | grep -q '미변경'; then echo "FAIL: 최근 PR 에 미변경 표시"; fail=1; else echo "PASS: 최근 PR 은 미변경 표시 없음"; fi
-n=$((n+1)); if grep -q '^## PR 관제 — 열린 PR 16개' "$tmp/out"; then echo "PASS: 총 개수 16"; else echo "FAIL: 총 개수 표시 오류"; fail=1; fi
+n=$((n+1)); if grep -q '^## PR 관제 — 열린 PR 19개' "$tmp/out"; then echo "PASS: 총 개수 19"; else echo "FAIL: 총 개수 표시 오류"; fail=1; fi
 
 # 빈 목록은 정상(0개)으로 판정하되 칸마다 '없음'을 쓴다
 wrap > "$tmp/empty.json"
@@ -104,6 +112,8 @@ one "$(printf '%s' "$ok" | jq -c '.labels.nodes=null')";           bad "라벨 �
 one "$(printf '%s' "$ok" | jq -c '.labels.totalCount=101')";       bad "라벨 목록 잘림"       --input "$tmp/case.json"
 one "$(printf '%s' "$ok" | jq -c 'del(.isDraft)')";                bad "isDraft 누락"         --input "$tmp/case.json"
 one "$(printf '%s' "$ok" | jq -c '.commits.nodes="x"')";           bad "commits 형식 오류"    --input "$tmp/case.json"
+one "$(printf '%s' "$ok" | jq -c 'del(.files)')";                  bad "files 누락"           --input "$tmp/case.json"
+one "$(printf '%s' "$ok" | jq -c '.files.nodes=[{path:1}]')";      bad "files 경로 타입 오류" --input "$tmp/case.json"
 bad "JSON 아님"               --input "$tmp/broken.json"
 bad "저장소 응답 null"        --input "$tmp/null.json"
 bad "없는 입력 파일"          --input "$tmp/nope.json"
