@@ -14,6 +14,21 @@ description: 큰 GitHub PR 을 이미 결제 중인 웹 구독 모델(Cursor Gro
 - 브라우저는 Aside 만. 사장님 활성 탭을 빼앗지 않는다. 엔진마다 전용 탭 1개를 정해 그 탭만 주소를 바꿔 쓴다.
 - 결과·원문은 gitignore 된 `private-reviews/cursor-pr-review/` 에만. 저장소에는 절차·스크립트만.
 
+## 0.5 기본 경로 — 셸 교차검증 (Claude ↔ Codex 구독, 브라우저 불필요)
+모든 PR 의 기본은 이 경로다. 아래 1~3절의 브라우저 분할 리뷰(Grok·ChatGPT·Gemini)는 **선택** — 수천 줄 PR 이거나 Codex 가 BLOCKED 일 때만. 같은 headRefOid 로 이미 끝난 리뷰는 다시 돌리지 않는다(새 커밋이 생긴 SHA 만).
+1. **상태 복원**: `gh pr view <N> --json headRefOid,files,state,mergeable`, PR 워크트리 HEAD 일치·`git status` 깨끗, `gh pr checks <N>` 를 push/pull_request 이벤트로 나눠 본다. 기존 판정·장부(`private-reviews/cursor-pr-review/pr<N>/`)와 사장님 결정(ADR·goal)을 먼저 읽는다.
+2. **Claude 요구사항 대조**: 정본 goal 의 AC·counter-AC 와 변경 파일 전체를 대조한다. 결정된 사항(예: 2026-09-23 개인정보·Jev 전송 허용)과 충돌하는 지적은 결함으로 세지 않는다.
+3. **Codex 적대검증**(`codex login status` 로 구독 인증 확인 후, PR 워크트리에서 백그라운드):
+   `node ~/.claude/plugins/cache/openai-codex/codex/<ver>/scripts/codex-companion.mjs adversarial-review --base origin/main "<중립 문구: 무엇을 의심할지·결정된 허용 범위·재현 명령 요구>" > private-reviews/cursor-pr-review/pr<N>/codex-adversarial-<날짜>-<sha>.raw.txt 2>&1`
+   - `--base origin/main` 필수(로컬 main 은 뒤처질 수 있다). `--help` 는 사용법이 아니라 **리뷰 주제로 실행된다** — 쓰지 말 것.
+   - "깨뜨려라·우회" 같은 공격 문구는 정책 차단을 부른다. 실패·인증 불가면 `BLOCKED` 로 기록, 성공으로 적지 않는다.
+   - companion 샌드박스는 읽기 전용이라 pytest·mktemp 가 안 돈다 → 시험 실행은 4단계에서 Claude 가 한다.
+4. **Claude 독립 재현**: 지적마다 코드 경로·정본·반대 증거를 확인하고, 재현되면 **실패 시험(RED) 먼저 커밋** → 최소 수정(GREEN) → 수정 줄 고장 사본(뮤테이션)으로 시험 민감도 확인 → 저장소 게이트 원명령 재실행. 의견 일치는 증거가 아니다.
+   - 시험의 합성 비밀값은 `SECRET = "..."` 처럼 키워드-값 형태로 쓰면 pre-commit 비밀 스캔에 걸린다. 의미대로 `MARKER` 같은 이름과 접두어 없는 고유 문자열을 쓴다(스캐너 회피용 문자열 쪼개기 금지).
+5. **파일별 전수 장부**: `pr<N>/FILE-REVIEW-LEDGER-<날짜>.md` — 파일·줄·변경 목적·요구사항·호출 경로·검토 상태(REVIEWED 는 파일 전체를 실제로 읽은 경우만 / PARTIAL 은 읽은 범위 명시 / GENERATED 는 정합성 명령)·결함·시험 결과·미검증. 검토 범위와 시험 범위를 섞지 않는다.
+6. **판정**: 코드/아키텍처/진행 판단 + 병합 가능 여부. merge·push 는 사장님 승인 전 하지 않는다.
+실례: PR #109 (2026-10-10) — Codex 지적 3건 전부 Claude 재현·수정, 장부 `pr109/FILE-REVIEW-LEDGER-2026-10-10.md`.
+
 ## 1. 준비 (매 실행)
 ```bash
 SK=.claude/skills/llmcodereview/scripts
