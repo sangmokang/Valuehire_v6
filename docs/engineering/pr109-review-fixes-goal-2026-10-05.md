@@ -91,3 +91,49 @@ D1 가드 제거·D2 생성→NOT_RUN·D2 close 무보호·D6 원문 반사·D7 
 
 ## 남은 결정
 - 없음(D4·D5 는 2026-10-05 사장님 지시로 결정됨). 배송(push·PR 반영)만 승인 대기.
+
+## 3차 작업 (2026-10-10) — Codex 적대검증 잔여 3건(ISSUE-1~3)
+
+### 결론
+2026-10-09 Codex 적대검증이 낸 4건 중 이메일 Jev 전달은 2026-09-23 사장님 결정(개인정보·Jev 전송 허용) 범위라 결함에서 제외했다. 나머지 3건은 현재 코드에서 모두 재현됐고 정본 계약이 분명해 최소 변경으로 고쳤다. 새 오류 코드·새 상태값·새 점수 체계는 만들지 않았다.
+
+### 판단 근거
+- ISSUE-1 정본: jev goal AC-3 "근거 없음이면 `LIMITED` 또는 `NO_EVIDENCE`". 원인은 2차 수정끼리의 상호작용 — D4(`organization_reference.py:189`)가 근거 직무명을 cohort 직무군과 같게 강제하므로 2명 이상 cohort 에서 직무명은 항상 반복 패턴이 되고, D5 가 6범주 전부 빈 근거를 허용하면서 `_pattern_status` 의 `not repeated_patterns` 분기가 사문화됐다. → READY 판정에서만 `primary_role_family` 범주를 빼고, 출력 `repeated_patterns` 는 그대로 둔다(기존 시험 `:174-183` 유지).
+- ISSUE-2 정본: 설치된 `typesafe-sdk==0.7.1` `_schemas/models.py` `ScoreAnswer.score` = "the probability-weighted average of the rubric levels". 허용오차는 기존 합계 허용오차 `1e-6` 을 최대 단계 수만큼 전파한 `1e-6 × (단계 수 − 1)` — 새 수치를 만들지 않았다.
+- ISSUE-3 정본: D6 원 지적(argparse 오류가 JSON 경계 밖) + 배송 프롬프트 3단계 보류 항목. 2026-10-10 사장님 지시문이 수정을 명시해 승인으로 본다. 오류 코드는 1차 계약대로 `invalid_input_or_config` 재사용, `--help` 는 종료값 0 유지.
+
+### 인수 기준 (EARS, 3차)
+- AC10 (ISSUE-1): If cohort 의 반복 패턴이 `primary_role_family` 범주뿐이면, 시스템은 `pattern_status` 를 `limited` 로 두고 완료된 판정의 `human_review_status` 를 `required` 로 해야 한다. When 6범주 중 하나라도 2명 이상 반복되면 `ready` 를 유지해야 한다. 검증: `pytest tests/test_organization_shadow_contract_gaps.py -k "role_family_only or substantive"`.
+- AC11 (ISSUE-2): If score 답의 `score` 가 확률 가중평균과 `1e-6×(단계 수−1)` 넘게 다르면, 시스템은 `invalid_response`/`judge_response_invalid` 로 처리하고 A 를 보존해야 한다. 가중평균과 일치(부동소수점 1e-7 잡음 포함)하면 `completed` 를 유지해야 한다. 검증: `pytest ... -k score_`.
+- AC12 (ISSUE-3): If 실행 인자가 잘못되면(모르는 인자·위치 인자·약어·필수 누락), CLI 는 stdout 을 비우고 stderr 에 `{"ok": false, "error_code": "invalid_input_or_config"}` 한 줄만 쓰고 종료값 2 여야 하며 인자 원문을 출력하지 않아야 한다. 검증: `pytest ... -k "argument or help or valid_arguments"`.
+
+### counter-AC (3차)
+- ISSUE-1 을 `repeated_patterns` 에서 직무명을 지워 고치는 것 → 기존 출력 계약·시험 변경. 직무명이 여전히 보고되는지 단언.
+- ISSUE-1 을 "6범주 전부 비면" 으로만 좁혀 한 사람만 본 근거로 READY 가 되는 것 → 단독 근거 3명 반례.
+- ISSUE-2 허용오차를 0 으로 두어 부동소수점 잡음까지 거부하거나, 1.0 처럼 넓혀 모순을 통과시키는 것 → 1e-7 통과·1e-3 거부 쌍.
+- ISSUE-3 을 `--help` 까지 막거나 정상 실행을 깨는 것 → `--help` rc 0, 정상 실행 `ready`·A 100점 단언.
+
+### 커밋
+- 078f37f RED(13 실패·13 통과, 실패 사유 전부 동작 단언), 8053e10 GREEN, 8f12eb4 시험 타입 표기.
+- 첫 RED 커밋은 pre-commit 비밀 스캔에 막혔다(`SECRET = "..."` 키워드-값 형태). 스캐너를 피하는 문자열 쪼개기 대신 실제 의미대로 `MARKER` 로 이름을 바꿨다.
+
+### 뮤테이션 (R2) — 고장 사본 7종, 전부 KILLED
+M1 직무명 필터 제거·M2 엉뚱한 범주 제외 → ISSUE-1 시험 3건 실패. M3 점수 검사 끔(4)·M4 허용오차 1.0(2)·M5 허용오차 0(정상 잡음 1)·M7 가중치 무시(정상 9) → ISSUE-2 시험. M6 파서 재정의 제거 → ISSUE-3 시험 6건.
+
+### Gate 4 (8f12eb4)
+verify.sh · principles-check(34) · silent-failure-lint · hs-cleanroom(172) · cleanroom-mutations 10/10 · hs-gates COLLECTED 316 · gates-mutations 6/6 · antiforge 3/3 — 전부 종료값 0. 첫 실행(8053e10)에서 hs-gates·gates-mutations 가 시험 파일 mypy(arg-type 2건)로 FAIL → 8f12eb4 에서 같은 원명령 재실행 PASS.
+
+### 배송 상태
+NOT_APPLICABLE — 로컬 전용 CLI·시험. 운영 배포·라이브 Jev 호출 없음.
+
+### 적대 검증 로그 (3차)
+- Codex `codex-companion adversarial-review --base origin/main` (codex-cli 0.160.0, ChatGPT 구독 인증, 읽기 전용 샌드박스), 대상 8f12eb4, 기준 55240f7, 2026-10-10 20:39~20:44, 명령 25회, 세션 01a1259b-fc0a-7180-ae73-54308ddc1ac6. 원문 `private-reviews/cursor-pr-review/pr109/codex-adversarial-2026-10-10-8f12eb4.raw.txt`(gitignore). **Verdict: needs-attention**.
+  - ISSUE-1(직무명만 반복)·ISSUE-3(인자 값 노출) 우회: Codex 도 재현 못 함.
+  - F-A [medium] 반올림 점수(1.67 vs 가중평균 1.667) 거부 — Claude 재현 REPRODUCED. 단 확률도 같은 자릿수(0.33/0.67)면 통과하고, Codex 근거("SDK 가 수용")는 SDK 가 score=3·P(0)=1 모순도 수용하므로 결함 증거가 아님. 실제 Jev 반올림 여부는 라이브 미실행으로 UNRESOLVED → **사장님 결정 D7'**. 실패 방향은 fail-closed(A 보존, B/C/D `invalid_response` 로 드러남).
+  - F-B [medium] 기준일 이후 `source_timestamp` 로 READY — Claude 재현 REPRODUCED. 정본에 출처 시각 규칙 0건, 원 커밋 0d121bd 부터 존재(이번 변경 무관) → **사장님 결정 D8'**, 코드 무수정.
+  - Codex 전체 pytest 는 샌드박스 임시 디렉터리 불가로 미완료 — Claude 환경에서 316 passed(Gate 4).
+- V2(새 맥락 재공격): NOT_RUN — 이번 지시의 교차검증 흐름(Codex 1회 + Claude 독립 재현)으로 한정.
+
+## 남은 결정 (3차)
+- D7' 점수 반올림 허용: (A 권고) 라이브 응답 1건 확인 전까지 현행 엄격 유지 / (B) 소수 둘째 자리 반올림 허용(±0.005).
+- D8' 출처 시각이 기준일보다 늦은 관측: (A 권고) 거부(입력 오류) / (B) stale 처럼 제외 / (C) 현행 유지.
