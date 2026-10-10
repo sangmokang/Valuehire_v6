@@ -257,7 +257,10 @@ def _pattern_status(
 ) -> PatternStatus:
     if sample_size == 0:
         return PatternStatus.NO_EVIDENCE
-    if sample_size < minimum_cohort_size or not repeated_patterns:
+    # Every observation must carry the cohort's role family, so that value always repeats; only a
+    # repeated pattern in one of the six evidence categories counts as substantive evidence.
+    substantive = [item for item in repeated_patterns if item.category != "primary_role_family"]
+    if sample_size < minimum_cohort_size or not substantive:
         return PatternStatus.LIMITED
     return PatternStatus.READY
 

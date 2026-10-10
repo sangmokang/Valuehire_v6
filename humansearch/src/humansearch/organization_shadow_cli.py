@@ -52,8 +52,15 @@ class SafeInputError(ValueError):
         self.field = field
 
 
+class _ValueFreeArgumentParser(argparse.ArgumentParser):
+    """argparse echoes rejected arguments; keep its errors inside the value-free JSON boundary."""
+
+    def error(self, message: str) -> Never:
+        _fail("invalid_input_or_config")
+
+
 def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Run a local-only organization shadow review")
+    parser = _ValueFreeArgumentParser(description="Run a local-only organization shadow review")
     parser.add_argument("--input", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--config", type=Path, required=True)
