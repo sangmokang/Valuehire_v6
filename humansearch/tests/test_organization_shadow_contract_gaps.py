@@ -13,7 +13,7 @@ import subprocess
 import sys
 from dataclasses import replace
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from test_organization_shadow import (
@@ -53,7 +53,7 @@ def _three(evidence: RoleEvidence | list[RoleEvidence]) -> PatternSnapshot:
     return snapshot(*(observation(f"person-{i}", evidence=e) for i, e in enumerate(items)))
 
 
-ROLE_ONLY = replace(role_evidence(), **{name: () for name in CATEGORIES})
+ROLE_ONLY = replace(role_evidence(), **cast(dict[str, Any], {name: () for name in CATEGORIES}))
 
 
 def test_role_family_only_evidence_is_limited_not_ready() -> None:
@@ -71,7 +71,7 @@ def test_substantive_evidence_seen_by_one_person_only_is_limited() -> None:
 
 @pytest.mark.parametrize("category", CATEGORIES)
 def test_one_repeated_substantive_category_keeps_ready(category: str) -> None:
-    assert _three(replace(ROLE_ONLY, **{category: ("shared signal",)})).status is PatternStatus.READY
+    assert _three(replace(ROLE_ONLY, **cast(dict[str, Any], {category: ("shared signal",)}))).status is PatternStatus.READY
 
 
 def test_role_family_only_cohort_requires_human_review_even_with_a_confident_judge() -> None:
