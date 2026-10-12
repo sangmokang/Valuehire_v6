@@ -77,6 +77,8 @@ bash scripts/acceptance-hs-gates.sh
 
 `acceptance-hs-gates.sh`는 `uv sync --locked --project humansearch`, pytest 수집/실행, runtime import 증명, ruff, mypy strict를 한 번에 확인한다. CI의 전체 목록은 `docs/sot/verification-commands.md`가 정본이다.
 
+Windows 이관의 첫 확인은 `.github/workflows/windows-handoff-smoke.yml`에서 `windows-2025` 러너에 Ubuntu WSL을 설치해 수행한다. Windows 체크아웃을 WSL의 Linux 파일시스템으로 다시 clone한 뒤 공유 스킬 심볼릭 링크, 훅 설치 결과, `verify.sh`를 확인한다. 이 검사는 새 PC의 Git·파일시스템 경계를 재현하지만, 개인 Windows PC의 로그인·자격증명·브라우저 연결까지 증명하지는 않는다.
+
 ## 6. Cursor에서 열 때
 
 Cursor가 저장소를 열면 `.cursor/rules/repository.mdc`를 먼저 읽게 둔다. 새 작업을 시작하기 전 AI에게 다음 파일을 읽으라고 지시하면 된다.
