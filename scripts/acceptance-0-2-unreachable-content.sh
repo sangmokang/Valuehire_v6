@@ -21,9 +21,9 @@ if [ -n "${AC19_COUNT_MISMATCH_PROBE:-}" ]; then
 elif [ -n "${AC19_PATTERN_ENV_PROBE:-}" ]; then
   TOTAL=1
 elif [ -n "${AC19_INNER_HOOK_PROBE:-}" ]; then
-  TOTAL=16
+  TOTAL=19
 else
-  TOTAL=20
+  TOTAL=23
 fi
 checked=0
 failed=0
@@ -73,6 +73,7 @@ run_case() {
   local fixture=$4
   shift 4
   local output rc=0
+  local forbidden_marker="${RUN_CASE_FORBIDDEN_MARKER:-}"
 
   output="$(cd "$fixture" && "$@" 2>&1)" || rc=$?
   checked=$((checked + 1))
@@ -82,7 +83,9 @@ run_case() {
     return
   fi
   if [ "$expected" = blocked ] && [ "$rc" -ne 0 ] \
-     && printf '%s\n' "$output" | grep -Fq -- "$expected_marker"; then
+     && printf '%s\n' "$output" | grep -Fq -- "$expected_marker" \
+     && { [ -z "$forbidden_marker" ] \
+          || ! printf '%s\n' "$output" | grep -Fq -- "$forbidden_marker"; }; then
     printf '[%d/%d] %s -> BLOCKED (exit=%d)\n' "$checked" "$TOTAL" "$label" "$rc"
     return
   fi
@@ -229,6 +232,47 @@ run_case '도달 가능한 blob 읽기 실패를 값 없음으로 통과하지 �
   'FAIL: 도달 가능 blob 읽기 실패' "$reachable_read_failure" \
   env PATH="$reachable_read_failure/bin:$PATH" REAL_GIT="$REAL_GIT" \
   FAIL_REACHABLE_CAT_FILE_SHA="$reachable_read_failure_sha" bash scripts/acceptance-0-2.sh
+
+rev_list_failure="$TMP/rev-list-failure"
+make_fixture "$rev_list_failure"
+mkdir -p "$rev_list_failure/bin"
+printf '%s\n' '#!/usr/bin/env bash' \
+  'if [ "${1:-}" = rev-list ]; then' \
+  '  printf "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n"' \
+  '  printf "synthetic rev-list failure\n" >&2' \
+  '  exit 73' \
+  'fi' \
+  'exec "$REAL_GIT" "$@"' > "$rev_list_failure/bin/git"
+chmod +x "$rev_list_failure/bin/git"
+RUN_CASE_FORBIDDEN_MARKER='FAIL: 도달 가능 객체형 읽기 실패' \
+run_case '도달 가능한 객체 목록 생성 실패를 빈 검사로 통과하지 않음' blocked \
+  'FAIL: git rev-list 실패 — 히스토리를 읽지 못했다(스캔 무효) (exit=73)' \
+  "$rev_list_failure" env PATH="$rev_list_failure/bin:$PATH" REAL_GIT="$REAL_GIT" \
+  bash scripts/acceptance-0-2.sh
+
+rev_list_empty="$TMP/rev-list-empty"
+make_fixture "$rev_list_empty"
+mkdir -p "$rev_list_empty/bin"
+printf '%s\n' '#!/usr/bin/env bash' \
+  'if [ "${1:-}" = rev-list ]; then exit 0; fi' \
+  'exec "$REAL_GIT" "$@"' > "$rev_list_empty/bin/git"
+chmod +x "$rev_list_empty/bin/git"
+run_case '도달 가능한 객체 목록이 비면 검사 대상 0건으로 통과하지 않음' blocked \
+  'FAIL: 도달 가능 객체가 0개 — 저장소를 제대로 읽지 못했다(스캔 무효)' \
+  "$rev_list_empty" env PATH="$rev_list_empty/bin:$PATH" REAL_GIT="$REAL_GIT" \
+  bash scripts/acceptance-0-2.sh
+
+rev_list_one="$TMP/rev-list-one"
+make_fixture "$rev_list_one"
+mkdir -p "$rev_list_one/bin"
+printf '%s\n' '#!/usr/bin/env bash' \
+  'if [ "${1:-}" = rev-list ]; then exec "$REAL_GIT" rev-parse HEAD; fi' \
+  'exec "$REAL_GIT" "$@"' > "$rev_list_one/bin/git"
+chmod +x "$rev_list_one/bin/git"
+run_case '도달 가능한 객체 목록이 하나뿐이면 불완전한 검사로 차단' blocked \
+  'FAIL: 도달 가능 객체가 1개 — 저장소를 제대로 읽지 못했다(스캔 무효)' \
+  "$rev_list_one" env PATH="$rev_list_one/bin:$PATH" REAL_GIT="$REAL_GIT" \
+  bash scripts/acceptance-0-2.sh
 
 ci_reachable_small="$TMP/ci-reachable-small"
 make_fixture "$ci_reachable_small"
