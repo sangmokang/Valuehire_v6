@@ -137,3 +137,35 @@ NOT_APPLICABLE — 로컬 전용 CLI·시험. 운영 배포·라이브 Jev 호�
 ## 남은 결정 (3차)
 - D7' 점수 반올림 허용: (A 권고) 라이브 응답 1건 확인 전까지 현행 엄격 유지 / (B) 소수 둘째 자리 반올림 허용(±0.005).
 - D8' 출처 시각이 기준일보다 늦은 관측: (A 권고) 거부(입력 오류) / (B) stale 처럼 제외 / (C) 현행 유지.
+
+## 4차 작업 (2026-10-12) — D7'·D8' 사장님 결정 반영
+
+### 결론
+사장님 결정 2026-10-12: D7'=A(합성 입력 라이브 Jev 1회로 정밀도 확인), D8'=A(기준일 이후 출처 시각 거부), push 승인(억제 만료는 별도 작업). 라이브 1회에서 3차 ISSUE-2 수정(허용오차 3e-6)이 **실제 Jev 정상 응답을 거부**함이 드러나 고쳤다.
+
+### 판단 근거
+- D7' 실측: `jev-1.13.0`(TypeSafe 직접, 합성 state, 0.35초, 원문 `private-reviews/cursor-pr-review/pr109/d7-live-jev-2026-10-12.json`)은 score·확률을 소수 둘째 자리로 **따로** 반올림 — 점수형 6개 중 2개가 가중평균과 0.01 차이, 확률 합은 7개 모두 1.00. 3e-6 검증기는 REJECTED.
+- 1차 수정(0.005×(1+단계합) 고정식)은 Codex(8390fc4)가 합=1 제약 무시로 불가능한 점수(2.00, 상한 1.99)를 수용한다고 반증 → Claude 재현 후 **실현 가능 구간**으로 교체: 각 참 확률 ∈ 보고값±0.005(≥0)·합=1 에서 참 평균 최소·최대(탐욕 = 선형계획 해, Codex 6,000 분포 대조 일치) ± score 반올림 0.005.
+- D8': 정본 goal 입력 계약(:208)은 observation/source 시각의 순서를 정하지 않음(계약 공백) → 사장님 결정으로 채움. UTC 날짜 비교(해시 정규화 :307 과 동일).
+
+### 인수 기준 (EARS, 4차)
+- AC13 (D7'): When score 가 확률 반올림(±0.005, 합=1)과 자체 반올림(±0.005)으로 설명 가능하면 `completed`, 아니면 `invalid_response`. 라이브 원문 수용·같은 원문 score=0 거부. 검증: `pytest ... -k "live_two_decimal or rounding or impossible or contradicting or matching"`.
+- AC14 (D8'): If `source_timestamp` 의 UTC 날짜가 `as_of` 보다 늦으면 snapshot 은 `ValueError("source timestamp ...")`, CLI 는 `invalid_input_or_config`·종료값 2·출력 없음. 같은 날 23:59:59 UTC·KST 다음 날 아침(UTC 같은 날)은 수용. 검증: `pytest ... -k source_timestamp`.
+
+### 커밋
+d804f69 D8' RED → 8104ae0 GREEN · 477b9a6 D7' RED → 8390fc4 GREEN(고정식) · a5926a5 보강 RED → 5752ef0 GREEN(실현 가능 구간). 3차 ISSUE-2 RED 의 "0.001 차이 = 무효" 사례는 추측 허용오차를 고정한 값이라 실측으로 반증되어 경계 쌍으로 대체(모순 3종은 유지).
+
+### 뮤테이션
+D8' 4종(시간대 무시·하루 여유·같은 날 거부·검사 제거) 전부 KILLED. 구간 계산 5종(여유 1.0·여유 1e-6·합 제약 제거·최소/최대 뒤바꿈·반단위 0.05) 전부 KILLED.
+
+### Gate 4 (5752ef0)
+verify.sh · uv lock --check · principles 34 · silent-failure · cleanroom 172 · cleanroom-mutations 10/10 · hs-gates COLLECTED 331 · gates-mutations 6/6 · antiforge 3/3 — 전부 종료값 0.
+
+### 적대 검증 로그 (4차)
+- Codex 집중 1 (base a764444, 8390fc4, 명령 34회): needs-attention — [high] 고정식이 불가능한 점수 수용 → REPRODUCED → 수정(5752ef0). D8' 반례 없음.
+- Codex 집중 2 (base 8390fc4, 5752ef0, 명령 16회): needs-attention — 탐욕 계산 6,000 분포 LP 일치·정상 오거부 0. [medium] 2단계 점수에서 score 0.51·p1 0.50 수용 → REPRODUCED, **미수정**: 계약의 점수 질문 6개 모두 4단계(2단계 질문 0개), "score 와 확률이 같은 참값·같은 반올림 규칙" 가정은 미확인(틀리면 수정이 정상 응답을 거부), 영향 ≤0.01. 잔여 위험 S3.
+- 원문: `private-reviews/cursor-pr-review/pr109/codex-adversarial-2026-10-12-{8390fc4,5752ef0}.raw.txt`.
+
+### 남은 위험
+- 확률 합 허용오차 1e-6(1차부터 기존): 라이브 1회는 합 1.00 이었으나, 반올림된 확률 합이 0.99/1.01 로 오면 거부된다. WU3-6(다른 브랜치 validator) invalid_response 19/1,514 의 원인은 미확인.
+- 하위 브랜치 `task/jev-evidence-assessment-wu1-split` 가 같은 CLI 를 별도 수정(CountingJudge) — PR #109 병합 뒤 충돌 해소 필요.
