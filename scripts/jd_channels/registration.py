@@ -22,11 +22,11 @@ from .units import JDSource, SECTION_LABEL, Unit, UnitError, load
 DIRECT_APPLY = re.compile(
     r"(?:https?://|www\.|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}|"
     r"지원\s*(?:하기|버튼|링크|URL|메일|이메일|페이지|해\s*주세요)|"
-    r"apply\s*(?:now|here)|career\.|recruit\.)",
+    r"apply\s*(?:now|here))",
     re.IGNORECASE,
 )
 DIRECT_ROUTE = re.compile(
-    r"(?:[A-Za-z0-9-]+\.)+(?:com|co\.kr|kr|io|net|org)(?:/|\b)|"
+    r"(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,63}(?:/|\b)|"
     r"(?:당사|회사|자사|채용)\s*(?:홈페이지|페이지|사이트).*?(?:지원|접수)", re.IGNORECASE)
 
 

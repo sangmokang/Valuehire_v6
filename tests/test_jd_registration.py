@@ -574,7 +574,9 @@ class RegistrationPacketTest(unittest.TestCase):
         self.assertEqual(readback_compare(packet, observed)['status'], 'FAIL')
 
     def test_bare_direct_apply_paths_are_blocked(self):
-        for text in ('example.co.kr/careers', '당사 홈페이지에서 지원해 주시기 바랍니다',
+        for text in ('example.co.kr/careers', 'career.example.ai/jobs',
+                     'recruit.example.dev/jobs', 'careers.example.ai/jobs',
+                     'example.ai/careers', '당사 홈페이지에서 지원해 주시기 바랍니다',
                      '채용 페이지에서 접수해 주세요'):
             with self.subTest(text=text):
                 tmp, path = write(source([unit('D1', 'duties', 'core', text)]))
@@ -583,6 +585,25 @@ class RegistrationPacketTest(unittest.TestCase):
         tmp, path = write(source([unit('D1', 'duties', 'core', 'ASP.NET 및 Socket.IO 개발 경험')]))
         self.addCleanup(tmp.cleanup)
         self.assertEqual(build_packet(load(path), 'saramin')['status'], 'READY_FOR_UI')
+
+    def test_english_career_and_recruit_sentence_endings_are_not_direct_apply(self):
+        text = 'This role can grow your career. Recruit and mentor QA engineers.'
+        tmp, path = write(source([unit('D1', 'duties', 'core', text)]))
+        self.addCleanup(tmp.cleanup)
+        self.assertEqual(build_packet(load(path), 'saramin')['status'], 'READY_FOR_UI')
+
+    def test_jobkorea_ascii_gt_is_sanitized_before_packet_validation(self):
+        tmp, path = write(source([
+            unit('R1', 'process', 'core', '- 서류 전형 > 실무 인터뷰 > 최종 합격'),
+        ]))
+        self.addCleanup(tmp.cleanup)
+        packet = build_packet(load(path), 'jobkorea')
+        field = packet['fields']['proposalMessage']
+        self.assertEqual(packet['status'], 'READY_FOR_UI')
+        self.assertIn('≫', field['value'])
+        self.assertNotIn('>', field['value'])
+        self.assertEqual(field['portal_changes'][0]['from'], '>')
+        self.assertEqual(field['portal_changes'][0]['to'], '≫')
 
     def test_cli_json_roundtrip_and_invalid_channel_exit(self):
         tmp, path = write(source([unit('D1', 'duties', 'core', '검증 업무')]))

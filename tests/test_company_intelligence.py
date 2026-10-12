@@ -136,6 +136,23 @@ class CompanyIntelligenceTest(unittest.TestCase):
             b = company_intelligence.run(payload(person(), employment(), homepage="https://other.example.com"), tmp)
             self.assertNotEqual(a["cache"]["company_key"], b["cache"]["company_key"])
 
+    def test_www_homepage_variant_reuses_existing_company_cache(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            first = company_intelligence.run(
+                payload(person("old"), employment("old"), homepage="https://www.example.com"),
+                tmp,
+            )
+            second = company_intelligence.run(payload(
+                person("new", url="https://www.linkedin.com/in/new"),
+                employment("new", url="https://www.linkedin.com/in/new"),
+                homepage="https://example.com",
+            ), tmp)
+            self.assertEqual(first["cache"]["company_key"], second["cache"]["company_key"])
+            self.assertEqual(second["cache"]["previous_snapshot_count"], 1)
+            snapshot = json.loads(Path(second["snapshot_path"]).read_text())
+            self.assertEqual({item["id"] for item in snapshot["raw_observations"]},
+                             {"old", "employment-old", "new", "employment-new"})
+
     def test_corrupt_cached_snapshot_is_rejected_not_skipped(self):
         with tempfile.TemporaryDirectory() as tmp:
             first = company_intelligence.run(payload(person(), employment()), tmp)

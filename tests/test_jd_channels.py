@@ -176,9 +176,12 @@ class ErrorPathTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             src = load(write(tmp, doc(units + [unit("Q1", "requirements", "core", "- 경력 2년")])))
             report = verify(src, render(src, "gmail"))
-        self.assertIn("PENSION_SOURCE", report.banned)
         self.assertIn("SELF_HEDGE_ASSERT", report.banned)
         self.assertFalse(report.ok)
+
+    def test_public_pension_basis_is_allowed_when_not_hedged(self):
+        text = "- 인원: 192명(2026년 9월 국민연금 가입자 수 기준)"
+        self.assertEqual(scan(text), [])
 
     def test_invisible_character_is_flagged(self):
         m = measure("한도​우회")
@@ -186,10 +189,11 @@ class ErrorPathTest(unittest.TestCase):
 
     def test_portal_transform_is_detected(self):
         """포털이 저장하면서 바꾸는 문자를 쓰기 전에 잡는다(2026-09-21·22 실측)."""
-        jk = "크랙(일본 '캬라푸') 정의\u2013수집"
+        jk = "크랙(일본 '캬라푸') 정의\u2013수집 > 운영"
         hits = scan_portal_risk(jk, "jobkorea")
         self.assertIn("'", hits, "잡코리아: 작은따옴표→백틱 치환을 못 잡았다")
         self.assertIn("\u2013", hits, "잡코리아: en dash→물음표를 못 잡았다")
+        self.assertIn(">", hits, "잡코리아: ASCII >→≫ 치환을 못 잡았다")
 
         sr = "서류 전형 \u2192 실무 인터뷰 \u2192 컬처핏"
         hits = scan_portal_risk(sr, "saramin")
@@ -203,7 +207,7 @@ class ErrorPathTest(unittest.TestCase):
 
     def test_safe_substitutes_clear_the_scan(self):
         """권장 대체 표기로 바꾸면 경고가 사라지고 단어는 남는다."""
-        for portal, text in (("jobkorea", "'캬라푸' 정의\u2013수집"),
+        for portal, text in (("jobkorea", "'캬라푸' 정의\u2013수집 > 운영"),
                              ("saramin", "서류 \u2192 면접")):
             fixed = text
             for bad, good in PORTAL_SAFE_SUBSTITUTE.items():

@@ -100,7 +100,9 @@ def run(document, store_dir, *, stale_after_days=STALE_DAYS):
     previous = []
     for path in company_dir.glob("snapshot-*.json"):
         loaded = _load_snapshot(path)
-        if loaded["company"].get("homepage") != initial["company"]["homepage"]:
+        cached_domain = _company_domain(loaded["company"].get("homepage"))
+        current_domain = _company_domain(initial["company"]["homepage"])
+        if cached_domain != current_domain:
             raise CompanyIntelligenceError("cached company homepage mismatch")
         if loaded.get("snapshot_hash") != initial["snapshot_hash"]:
             previous.append((path, loaded))
@@ -811,12 +813,17 @@ def _top(counter, provenance=None):
 
 
 def _company_key(homepage):
+    domain = _company_domain(homepage)
+    digest = hashlib.sha256(domain.encode("utf-8")).hexdigest()[:10]
+    return _slug(domain) + "-" + digest
+
+
+def _company_domain(homepage):
     parsed = urlparse(_url(homepage, "company.homepage"))
     domain = parsed.netloc.casefold()
     if domain.startswith("www."):
         domain = domain[4:]
-    digest = hashlib.sha256(domain.encode("utf-8")).hexdigest()[:10]
-    return _slug(domain) + "-" + digest
+    return domain
 
 
 def _slug(value):

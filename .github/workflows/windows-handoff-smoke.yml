@@ -29,27 +29,38 @@ jobs:
       - name: Install Ubuntu in WSL
         shell: pwsh
         run: |
-          wsl --install Ubuntu
+          wsl --install Ubuntu --no-launch --web-download
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           wsl --list --verbose
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          wsl -d Ubuntu --user root -- bash -c 'command -v git || (apt-get update && apt-get install -y git)'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Clone into WSL filesystem and verify handoff
         shell: pwsh
         run: |
-          $source = (wsl -d Ubuntu -- wslpath -u "$env:GITHUB_WORKSPACE" | Out-String).Trim()
+          $source = (wsl -d Ubuntu --user root -- wslpath -u "$env:GITHUB_WORKSPACE" | Out-String).Trim()
           if ($LASTEXITCODE -ne 0 -or -not $source) { throw 'WSL source path resolution failed' }
           $smoke = @'
           set -euo pipefail
           git clone --no-hardlinks "$1" "$HOME/valuehire-v6"
           cd "$HOME/valuehire-v6"
-          test -L .codex/skills/jd
-          test -L .claude/skills/jd
-          test -f .agents/skills/jd/SKILL.md
+          for entrypoint in .codex .claude; do
+            for skill in jd jd-channels position-register; do
+              link="$entrypoint/skills/$skill"
+              test -L "$link"
+              test "$(readlink "$link")" = "../../.agents/skills/$skill"
+              test -f "$link/SKILL.md"
+            done
+          done
           bash scripts/install-hooks.sh
           test "$(git config --get core.hooksPath)" = hooks
           bash verify.sh
-          git status --short
+          status=$(git status --short)
+          if [ -n "$status" ]; then
+            printf 'Dirty WSL checkout after setup:\n%s\n' "$status"
+            exit 1
+          fi
           '@
-          wsl -d Ubuntu -- bash -c $smoke -- $source
+          wsl -d Ubuntu --user root -- bash -c $smoke -- $source
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
