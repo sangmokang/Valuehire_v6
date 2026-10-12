@@ -45,7 +45,7 @@ jobs:
           wsl -d Ubuntu --user root -- test -d $source
           if ($LASTEXITCODE -ne 0) { throw "WSL source path unavailable: $source" }
           $smoke = @'
-          set -euo pipefail
+          set -euxo pipefail
           git clone --no-hardlinks "__SOURCE__" "$HOME/valuehire-v6"
           cd "$HOME/valuehire-v6"
           for entrypoint in .codex .claude; do
