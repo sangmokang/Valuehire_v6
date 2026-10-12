@@ -181,6 +181,9 @@ def _validate_observation(item: ReferenceObservation, *, as_of: date) -> None:
         raise ValueError("source timestamp must be timezone-aware")
     if item.observation_date > as_of:
         raise ValueError("observation date must not be after snapshot date")
+    # Owner decision 2026-10-12 (D8'): a source that did not exist on the snapshot date is invalid.
+    if item.source_timestamp.astimezone(UTC).date() > as_of:
+        raise ValueError("source timestamp must not be after snapshot date")
     for _, value in _evidence_values(item.role_evidence):
         if not value.strip():
             raise ValueError("role evidence values must not be empty")
