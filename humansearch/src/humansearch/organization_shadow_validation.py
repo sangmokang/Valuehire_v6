@@ -72,12 +72,31 @@ def _validate_score(name: str, answer: Mapping[str, object], question: Mapping[s
     )
     # typesafe-sdk ScoreAnswer.score is "the probability-weighted average of the rubric levels".
     # Jev reports the score and each probability rounded to two decimals on their own (live call,
-    # 2026-10-12), so allow half a unit for the score plus half a unit times every level.
-    weighted = sum(int(level) * value for level, value in probabilities.items())
-    top = len(criteria) - 1
-    if not math.isclose(score, weighted, abs_tol=_REPORTED_HALF_UNIT * (1 + top * (top + 1) / 2)):
+    # 2026-10-12), so the score must lie in the band that rounding can explain.
+    low, high = _feasible_mean_band(probabilities)
+    slack = _REPORTED_HALF_UNIT + _SUM_TOLERANCE
+    if score < low - slack or score > high + slack:
         raise ValueError("score differs from its probability-weighted average")
     _probability(answer["confidence"], f"answers.{name}.confidence")
+
+
+def _feasible_mean_band(reported: Mapping[str, float]) -> tuple[float, float]:
+    """Lowest and highest mean of true probabilities within half a unit of each reported value."""
+
+    levels = sorted((int(level), value) for level, value in reported.items())
+    floor = [max(0.0, value - _REPORTED_HALF_UNIT) for _, value in levels]
+    room = [value + _REPORTED_HALF_UNIT - low for (_, value), low in zip(levels, floor, strict=True)]
+    base = sum(level * low for (level, _), low in zip(levels, floor, strict=True))
+
+    def extreme(order: list[int]) -> float:
+        remaining, mean = max(0.0, 1.0 - sum(floor)), base
+        for index in order:
+            added = min(remaining, room[index])
+            mean, remaining = mean + levels[index][0] * added, remaining - added
+        return mean
+
+    indexes = list(range(len(levels)))
+    return extreme(indexes), extreme(indexes[::-1])
 
 
 def _validate_probabilities(raw: object, expected: set[str], field: str) -> Mapping[str, float]:

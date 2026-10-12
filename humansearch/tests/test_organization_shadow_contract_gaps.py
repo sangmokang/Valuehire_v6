@@ -30,7 +30,6 @@ from test_organization_shadow import (
 from test_organization_shadow_cli import synthetic_payload
 
 from humansearch import organization_shadow_cli as shadow_cli
-from humansearch.organization_shadow_validation import _validate_score
 from humansearch.organization_reference import PatternSnapshot, PatternStatus, RoleEvidence
 from humansearch.organization_shadow import (
     HumanReviewStatus,
@@ -38,6 +37,7 @@ from humansearch.organization_shadow import (
     load_shadow_config,
     run_shadow_review,
 )
+from humansearch.organization_shadow_validation import _validate_score
 
 CATEGORIES = (
     "responsibilities",
