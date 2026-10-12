@@ -30,6 +30,7 @@ from test_organization_shadow import (
 from test_organization_shadow_cli import synthetic_payload
 
 from humansearch import organization_shadow_cli as shadow_cli
+from humansearch.organization_shadow_validation import _validate_score
 from humansearch.organization_reference import PatternSnapshot, PatternStatus, RoleEvidence
 from humansearch.organization_shadow import (
     HumanReviewStatus,
@@ -258,7 +259,31 @@ def test_live_two_decimal_rounding_is_still_completed(
     assert _judge(_score_response(score, probabilities)) is SemanticStatus.COMPLETED
 
 
-@pytest.mark.parametrize(("offset", "expected"), [(0.034, "completed"), (0.036, "invalid_response")])
-def test_rounding_tolerance_boundary(offset: float, expected: str) -> None:
-    probabilities = {"0": 0.1, "1": 0.1, "2": 0.8, "3": 0.0}  # weighted 1.7
-    assert _judge(_score_response(1.7 + offset, probabilities)).value == expected
+# Feasible band for {0.1, 0.1, 0.8, 0}: true probabilities within +-0.005 summing to one give a mean in
+# [1.69, 1.72]; the score's own rounding widens it to [1.685, 1.725].
+@pytest.mark.parametrize(
+    ("score", "expected"),
+    [(1.724, "completed"), (1.726, "invalid_response"), (1.686, "completed"), (1.684, "invalid_response")],
+)
+def test_rounding_tolerance_boundary(score: float, expected: str) -> None:
+    probabilities = {"0": 0.1, "1": 0.1, "2": 0.8, "3": 0.0}
+    assert _judge(_score_response(score, probabilities)).value == expected
+
+
+def test_score_impossible_under_two_decimal_rounding_is_invalid() -> None:
+    # Codex 2026-10-12: the true mean is at most 1.99, so a reported 2.00 cannot come from rounding.
+    response = _score_response(2.0, {"0": 0.0, "1": 0.03, "2": 0.97, "3": 0.0})
+    assert _judge(response) is SemanticStatus.INVALID_RESPONSE
+
+
+def test_rounding_band_does_not_grow_with_more_levels() -> None:
+    criteria = [f"level {i}" for i in range(11)]
+    answer = {
+        "type": "score",
+        "score": 0.28,
+        "legend": {str(i): value for i, value in enumerate(criteria)},
+        "probabilities": {str(i): 1.0 if i == 0 else 0.0 for i in range(11)},
+        "confidence": 1.0,
+    }
+    with pytest.raises(ValueError, match="weighted average"):
+        _validate_score("x", answer, {"criteria": criteria})
