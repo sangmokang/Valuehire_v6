@@ -65,5 +65,6 @@ jobs:
             exit 1
           fi
           '@
+          $smoke = $smoke.Replace("`r", '')
           wsl -d Ubuntu --user root -- bash -c $smoke -- $source
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
