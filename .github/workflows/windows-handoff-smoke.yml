@@ -39,8 +39,11 @@ jobs:
       - name: Clone into WSL filesystem and verify handoff
         shell: pwsh
         run: |
-          $source = (wsl -d Ubuntu --user root -- wslpath -u "$env:GITHUB_WORKSPACE" | Out-String).Trim()
-          if ($LASTEXITCODE -ne 0 -or -not $source) { throw 'WSL source path resolution failed' }
+          $drive = $env:GITHUB_WORKSPACE.Substring(0, 1).ToLowerInvariant()
+          $rest = $env:GITHUB_WORKSPACE.Substring(2).Replace('\', '/')
+          $source = "/mnt/$drive$rest"
+          wsl -d Ubuntu --user root -- test -d $source
+          if ($LASTEXITCODE -ne 0) { throw "WSL source path unavailable: $source" }
           $smoke = @'
           set -euo pipefail
           git clone --no-hardlinks "$1" "$HOME/valuehire-v6"
