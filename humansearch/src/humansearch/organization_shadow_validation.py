@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from typing import Any
 
 _SUM_TOLERANCE = 1e-6  # probabilities sum to one within this absolute tolerance
+_REPORTED_HALF_UNIT = 0.005  # Jev answers carry two decimals
 
 
 def validate_response(
@@ -70,9 +71,11 @@ def _validate_score(name: str, answer: Mapping[str, object], question: Mapping[s
         answer["probabilities"], set(expected), f"answers.{name}.probabilities"
     )
     # typesafe-sdk ScoreAnswer.score is "the probability-weighted average of the rubric levels".
-    # The tolerance carries the sum-to-one tolerance across the largest level.
+    # Jev reports the score and each probability rounded to two decimals on their own (live call,
+    # 2026-10-12), so allow half a unit for the score plus half a unit times every level.
     weighted = sum(int(level) * value for level, value in probabilities.items())
-    if not math.isclose(score, weighted, abs_tol=_SUM_TOLERANCE * (len(criteria) - 1)):
+    top = len(criteria) - 1
+    if not math.isclose(score, weighted, abs_tol=_REPORTED_HALF_UNIT * (1 + top * (top + 1) / 2)):
         raise ValueError("score differs from its probability-weighted average")
     _probability(answer["confidence"], f"answers.{name}.confidence")
 
