@@ -42,6 +42,9 @@ worktrees/
 # 비공개 리뷰 결과 (루트). 기존 규칙은 .claude/private-reviews/ 만 덮고 있었다.
 /private-reviews/
 
+# 브라우저 리뷰 도중 생성되는 임시 JS (프롬프트와 원문이 들어갈 수 있음)
+/.claude/skills/llmcodereview/scripts/aside/_*.js
+
 # Python (G2 게이트가 humansearch/ 에서 만드는 로컬 산출물 — 커밋 금지)
 .venv/
 __pycache__/

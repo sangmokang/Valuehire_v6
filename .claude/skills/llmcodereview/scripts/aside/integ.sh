@@ -1,9 +1,12 @@
 #!/bin/bash
+set -euo pipefail
 S=$(dirname "$0"); source $S/env.sh; R=$LCR_ROOT; T=$(cd $S/.. && pwd)
 python3 - <<PY
-import json,glob,os
+import json,os
 P="$P"; out={}
-for w in [f"WU0{i}" for i in range(1,10)]:
+plan=json.load(open(f"{P}/planner.json"))
+for wu in plan["wus"]:
+    w=wu["id"]
     r=json.load(open(f"{P}/{w}.json")); a=f"{P}/{w}-audit.json"
     out[w]={"verdict":r.get("verdict"),"core_flow":str(r.get("core_flow",""))[:600],
       "findings":[{k:f.get(k) for k in ("id","severity","evidence","file_func","condition","minimal_fix")} for f in r.get("findings",[])]}

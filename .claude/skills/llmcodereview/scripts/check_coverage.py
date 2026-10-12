@@ -38,10 +38,14 @@ def main(raw_path, inv_path, out_path):
     for line in Path(inv_path).read_text().splitlines():
         f, a, d = line.split("\t"); inv[f] = (int(a), int(d))
     problems = []
+    if not inv:
+        problems.append("EMPTY_INVENTORY")
     if plan.get("head_sha_checked", "").strip() != os.environ["LCR_SHA"]:
         problems.append(f"head_sha_checked={plan.get('head_sha_checked')!r}")
     ledger = plan.get("coverage_ledger", [])
-    wu_ids = {w["id"] for w in plan.get("wus", [])}
+    wus = plan.get("wus", [])
+    wu_ids = {w["id"] for w in wus}
+    wu_files_by_id = {w["id"]: set(w.get("files", [])) for w in wus}
     seen = {}
     for row in ledger:
         seen.setdefault(row["file"], []).append(row.get("primary_wu"))
@@ -49,12 +53,13 @@ def main(raw_path, inv_path, out_path):
         if f not in seen: problems.append(f"MISSING {f}")
         elif len(seen[f]) != 1: problems.append(f"DUP_PRIMARY {f} {seen[f]}")
         elif seen[f][0] not in wu_ids: problems.append(f"UNKNOWN_WU {f} {seen[f][0]}")
+        elif f not in wu_files_by_id.get(seen[f][0], set()): problems.append(f"PRIMARY_WU_FILE_MISMATCH {f} {seen[f][0]}")
     for f in seen:
         if f not in inv: problems.append(f"EXTRA {f}")
     for row in ledger:
         if row["file"] in inv and (row.get("added"), row.get("deleted")) != inv[row["file"]]:
             problems.append(f"LINES {row['file']} plan={row.get('added')}/{row.get('deleted')} diff={inv[row['file']]}")
-    wu_files = {f for w in plan.get("wus", []) for f in w.get("files", [])}
+    wu_files = {f for w in wus for f in w.get("files", [])}
     for f in inv:
         if f not in wu_files: problems.append(f"NOT_IN_WU_FILES {f}")
     print(f"diff_files={len(inv)} ledger_unique={len(seen)} wus={len(wu_ids)}")

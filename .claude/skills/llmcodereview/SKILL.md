@@ -5,7 +5,7 @@ description: 큰 GitHub PR 을 이미 결제 중인 웹 구독 모델(Cursor Gro
 
 # llmcodereview — 웹 구독 LLM 으로 큰 PR 분할 리뷰
 
-완료 = 변경 파일 전부가 어느 WU 에서 검토됐는지 추적되고, 고위험 연결 코드와 WU 사이 경계까지 검증된 상태. "모델이 다 봤다"는 말은 증거가 아니다. 대조는 스크립트가 한다.
+완료 = 변경 파일 전부가 어느 WU 에서 검토됐는지 추적되고, 고위험 연결 코드와 WU 사이 경계까지 검증된 상태. "모델이 다 봤다"는 말은 증거가 아니다. 스크립트의 줄 수 대조는 누락 탐지용이며 실제 독해를 증명하지 못한다. 재사용 가능한 셸+Aside 전수 리뷰 지시문은 [references/full-review-prompt.md](references/full-review-prompt.md)에 있다.
 
 ## 0. 절대 규칙
 - 추가 비용 0: xAI/OpenAI/Anthropic 등 종량 API·XAI_API_KEY 호출 금지. Cursor On-Demand·크레딧 구매·업그레이드 금지. 한도·결제 화면이 뜨면 `BLOCKED_INCLUDED_USAGE` 로 멈춘다.

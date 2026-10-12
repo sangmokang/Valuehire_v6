@@ -1,6 +1,6 @@
 #!/bin/bash
 # usage: glaunch.sh <prompt.txt> <short_instruction>  -> prints CONV <url>
-S=$(dirname "$0"); source $S/env.sh; W=$ASIDE_WIN; T=${GPT_TAB:?}; PROJ="$GPT_PROJECT_URL"
+S=$(dirname "$0"); source $S/env.sh; W=$ASIDE_WIN; T=${GPT_TAB:?}; PROJ=${GPT_PROJECT_URL:?GPT_PROJECT_URL(ChatGPT 프로젝트 주소) 필요}
 js(){ printf '%s' "$1" > $S/_q.js; bash $S/gpt_js.sh $S/_q.js; }
 osascript -e "tell application \"Aside\" to set URL of (tab id $T of window id $W) to \"$PROJ\""
 for i in $(seq 1 20); do sleep 2; r=$(js 'var b=[].slice.call(document.querySelectorAll("button[aria-label=\"파일 등 추가\"]")).filter(function(e){return e.getBoundingClientRect().width>0})[0]; (b&&location.pathname.indexOf("/project")>0)?"READY":"WAIT"'); [ "$r" = READY ] && break; done
@@ -29,30 +29,8 @@ for i in 1 2 3; do
   [ "$(chip)" = CHIP_OK ] && break
   sleep 2
 done
-# 2) 대체: 실제 클릭 (전면 앱·로딩·결과 확인, 3회)
-if [ "$(chip)" != CHIP_OK ]; then
-  FRONT=$(osascript -e 'tell application "System Events" to get name of first process whose frontmost is true')
-  for i in 1 2 3; do
-    until [ "$(js 'document.readyState')" = complete ]; do sleep 1; done
-    osascript -e "tell application \"Aside\"
-activate
-set w to window id $W
-set n to 0
-repeat with t in tabs of w
-set n to n + 1
-if id of t is $T then set active tab index of w to n
-end repeat
-set index of w to 1
-end tell"; sleep 1.5
-    [ "$(osascript -e 'tell application "System Events" to get name of first process whose frontmost is true')" = Aside ] || { echo "front_not_aside try=$i"; continue; }
-    pos=$(js 'var b=[].slice.call(document.querySelectorAll("button[aria-label="파일 등 추가"]")).filter(function(e){return e.getBoundingClientRect().width>0})[0];var r=b.getBoundingClientRect();(window.screenX+Math.round(r.left+r.width/2))+","+(window.screenY+window.outerHeight-window.innerHeight+Math.round(r.top+r.height/2))')
-    cliclick c:$pos; sleep 2
-    [ "$(js "$pick"'c.length?"OPEN":"CLOSED"')" = OPEN ] || { echo "menu_closed try=$i"; continue; }
-    js "$pick"'c[0].click();"C"' >/dev/null; sleep 1.5
-    [ "$(chip)" = CHIP_OK ] && break
-  done
-  osascript -e "tell application "$FRONT" to activate" 2>/dev/null
-fi
+# If the GitHub chip cannot be selected through the tab, stop without taking
+# the foreground app or sending a mouse click to an unknown window.
 restore_tab; c=$(chip); echo "$c"; [ "$c" = CHIP_OK ] || { echo BLOCKED_CHATGPT_UI_NO_CHIP; exit 4; }
 B=$(base64 < "$1" | tr -d '\n'); IB=$(printf '%s' "$2" | base64 | tr -d '\n')
 cat > $S/_p.js <<JS

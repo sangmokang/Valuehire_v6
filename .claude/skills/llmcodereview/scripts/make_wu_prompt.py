@@ -5,8 +5,8 @@ PR, SHA, BASE = os.environ["LCR_PR"], os.environ["LCR_SHA"], os.environ["LCR_BAS
 
 COMMON = f"""[절대 금지 — 읽기 전용]
 - 파일 수정, git commit/push, 브랜치·PR 생성, PR 코멘트·리뷰·승인, 병합 금지. 수정이 필요하면 '최소 수정 권고'로 글만 쓰세요.
-- 외부 유료 API(xAI/OpenAI/Anthropic 등)·외부 전송(--live-jev 등) 실행 금지. 비밀값 읽기·출력 금지.
-- 외부 SDK(typesafe_sdk 등) 설치·import·실행 금지. SDK 동작은 저장소 코드와 lock 정보로 정적으로만 판단하세요. 같은 실험·명령을 2회 넘게 반복하지 마세요. 막히면 NOT_TESTED 로 적고 진행하세요.
+- 외부 유료 API(xAI/OpenAI/Anthropic 등)·외부 전송 실행 금지. 비밀값 읽기·출력 금지.
+- 외부 SDK 설치·import·실행 금지. SDK 동작은 저장소 코드와 lock 정보로 정적으로만 판단하세요. 같은 실험·명령을 2회 넘게 반복하지 마세요. 막히면 NOT_TESTED 로 적고 진행하세요.
 - 실행하지 않은 테스트를 실행했다고 쓰지 마세요. 실행했다면 명령과 출력 원문(요약 말고)과 종료값을 붙이세요.
 
 [대상]
@@ -71,7 +71,7 @@ def planner_prompt():
 def wu_prompt(plan, wid):
     w = next(x for x in plan["wus"] if x["id"] == wid)
     others = [f"{x['id']} {x['title']}" for x in plan["wus"] if x["id"] != wid]
-    return f"""[역할] WU Reviewer — {wid} (PR #109, 새 세션, 읽기 전용)
+    return f"""[역할] WU Reviewer — {wid} (PR #{PR}, 새 세션, 읽기 전용)
 {COMMON}
 [이 WU]
 - 목적: {w.get('purpose')}
@@ -88,7 +88,7 @@ C. 데이터 흐름: 입력 → 검증 → 핵심 로직 → 저장/외부 → �
 D. 요구사항 검증: PR 설명·goal 문서 주장 → 실제 코드 → 시험을 대조(설명을 사실로 가정 금지).
 E. 관련 위험만: 정확성·경계·null·타입·시간대·상태전이·권한·개인정보/외부전송·계약·원자성·동시성·중복실행·재시도·타임아웃·부분성공·비밀유출·비용폭증·시험회귀.
 F. 적대적 검증: "이 구현이 틀렸다면 어떤 입력·순서·장애에서 드러나는가?" 시나리오마다 규칙/사전조건/입력순서/기대/코드상 예상/실제 실행 여부.
-G. 가능하면 관련 시험만 실행: cd humansearch && uv run --frozen pytest <해당 시험> -q (네트워크·설치가 막히면 NOT_RUN 과 이유).
+G. 가능하면 저장소의 기존 테스트 방식으로 관련 시험만 실행하고, 네트워크·설치가 막히면 NOT_RUN 과 이유를 적으세요.
 {FINDING}
 
 [출력] 한국어 요약(코드 판단/아키텍처 판단/진행 판단 각 한 줄 포함) 뒤, 마지막에 표식 사이 JSON 하나:
@@ -103,7 +103,7 @@ WU_JSON>>>
 
 def auditor_prompt(plan, wid, reviewer_json):
     w = next(x for x in plan["wus"] if x["id"] == wid)
-    return f"""[역할] Adversarial Auditor — {wid} (PR #109, 새 세션, 읽기 전용)
+    return f"""[역할] Adversarial Auditor — {wid} (PR #{PR}, 새 세션, 읽기 전용)
 {COMMON}
 이전 Reviewer 의 결론을 믿지 마세요. 목표: Reviewer 결론을 반증할 실제 경로가 있는가?
 - Reviewer 가 PASS/철회한 것은 누락·과소평가를, finding 으로 낸 것은 과장·오탐을 공격하세요.
@@ -120,7 +120,7 @@ AUDIT_JSON>>>
 """
 
 def integration_prompt(plan, results):
-    return f"""[역할] Cross-WU Integration Reviewer (PR #109, 새 세션, 읽기 전용)
+    return f"""[역할] Cross-WU Integration Reviewer (PR #{PR}, 새 세션, 읽기 전용)
 {COMMON}
 전체 코드를 처음부터 다시 읽지 마세요. WU 사이 경계를 공격하세요. WU PASS 의 합은 PR PASS 가 아닙니다.
 확인할 경계(관련된 것만): API↔Service 인자/반환/오류, Service↔저장 스키마·null·원자성, 계약 JSON↔런타임, 권한·개인정보 전송↔업무 로직,

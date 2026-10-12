@@ -14,8 +14,9 @@ SHA = os.environ["LCR_SHA"]
 sys.path.insert(0, str(Path(__file__).parent))
 import make_wu_prompt as M  # noqa: E402
 
-PLAN = json.load(open(PRD / "planner.json"))
-FILES = {w["id"]: w["files"] for w in PLAN["wus"]}
+kind = sys.argv[1]
+PLAN = json.load(open(PRD / "planner.json")) if kind != "planner" else None
+FILES = {w["id"]: w["files"] for w in PLAN["wus"]} if PLAN else {}
 EXTRA = json.loads(os.environ.get("LCR_EXTRA_FILES", "{}"))  # 예: {"WU07":["scripts/x.sh"],"INTEG":["scripts/x.sh"]}
 BUNDLE_NOTE = f"""- GitHub 플러그인으로 sangmokang/Valuehire_v6 를 커밋 {SHA} 기준으로 '읽기 전용' 조회할 수 있습니다(호출 관계·첨부 밖 파일 확인용).
   GitHub 쓰기 작업(코멘트·리뷰·승인·이슈·PR·브랜치·워크플로 실행) 절대 금지. 조회도 안 되면 그 사실을 적고 첨부만으로 진행하세요.
@@ -30,7 +31,11 @@ N 은 각 파일의 END FILE 표식 바로 앞 줄번호(직접 본 값)입니�
 JSON 은 표식 줄 사이에 ```json 코드블록 없이 그대로 쓰세요."""
 
 def show(f):
-    return subprocess.run(["git", "-C", str(REPO), "show", f"{SHA}:{f}"], capture_output=True, text=True).stdout
+    r = subprocess.run(["git", "-C", str(REPO), "show", f"{SHA}:{f}"], capture_output=True, text=True)
+    if r.returncode != 0:
+        msg = r.stderr.strip() or r.stdout.strip() or "git show failed"
+        raise SystemExit(f"ATTACH_FAIL {f}: {msg}")
+    return r.stdout
 
 def attach(paths):
     out = [f"\n[첨부 원문 — HEAD {SHA}]"]
@@ -45,7 +50,8 @@ def attach(paths):
 
 def adapt(text):
     text = re.sub(r"- 먼저 실행: git fetch.*?멈추세요\.\n(  결과가 다르면.*?멈추세요\.\n)?", BUNDLE_NOTE, text, flags=re.S)
-    return text.replace("rg 로 추적(명령과 결과 줄 수 기재)", "첨부 원문에서 추적(file:line 기재)")
+    text = text.replace("rg 로 추적(명령과 결과 줄 수 기재)", "첨부 원문에서 추적(file:line 기재)")
+    return re.sub(r"git diff [^\n]+ -- <파일> 로 확인하고, ", "첨부 원문의 줄번호로 확인하고, ", text)
 
 def code(f):
     return not f.endswith((".md", "uv.lock"))
@@ -54,12 +60,10 @@ def wu_files(wid):
     w = next(x for x in PLAN["wus"] if x["id"] == wid)
     return set(w["files"]) | {f for r in w.get("related_wus", []) for f in FILES[r] if code(f)} | set(EXTRA.get(wid, []))
 
-kind = sys.argv[1]
 if kind == "planner":
     text = M.planner_prompt()
     text = re.sub(r"- 먼저 실행: git fetch.*?BLOCKED_CODEBASE_CONTEXT 라고 쓰고 멈추세요\.\)\n", BUNDLE_NOTE +
                   "- 변경 목록은 첨부 [PR diff] 에서 직접 세세요. numstat_cmd_output 에는 직접 센 파일별 +/− 를 적으세요.\n", text, flags=re.S)
-    allfiles = [r["file"] for r in PLAN["coverage_ledger"] if code(r["file"])]
     text += "\n[PR diff — gh pr diff 원문]\n" + (PRD / "pr.diff").read_text() + "\n[PR diff 끝]\n"
     out = sys.argv[2]
 elif kind == "wu":
