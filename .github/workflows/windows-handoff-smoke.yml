@@ -46,7 +46,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "WSL source path unavailable: $source" }
           $smoke = @'
           set -euo pipefail
-          git clone --no-hardlinks "$1" "$HOME/valuehire-v6"
+          git clone --no-hardlinks "__SOURCE__" "$HOME/valuehire-v6"
           cd "$HOME/valuehire-v6"
           for entrypoint in .codex .claude; do
             for skill in jd jd-channels position-register; do
@@ -65,6 +65,6 @@ jobs:
             exit 1
           fi
           '@
-          $smoke = $smoke.Replace("`r", '')
-          wsl -d Ubuntu --user root -- bash -c $smoke -- $source
+          $smoke = $smoke.Replace("`r", '').Replace('__SOURCE__', $source)
+          wsl -d Ubuntu --user root -- bash -c $smoke
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
