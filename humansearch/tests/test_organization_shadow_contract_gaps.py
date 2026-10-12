@@ -3,6 +3,7 @@
 ISSUE-1: role-family-only evidence must not make a cohort READY (jev goal AC-3).
 ISSUE-2: a score answer must equal the probability-weighted average (typesafe-sdk 0.7.1 ScoreAnswer).
 ISSUE-3: argparse errors must stay inside the value-free JSON error boundary (D6 remainder).
+D8': a source timestamp after the snapshot date (UTC) is invalid input (owner decision 2026-10-12).
 """
 
 from __future__ import annotations
@@ -12,6 +13,7 @@ import os
 import subprocess
 import sys
 from dataclasses import replace
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, cast
 
@@ -193,3 +195,49 @@ def test_valid_arguments_still_run_the_cli(
     result = json.loads(output.read_text(encoding="utf-8"))
     assert result["a"]["score"]["score"] == 100
     assert result["semantic"]["d_additional_checks"]["pattern_status"] == "ready"
+
+
+def _sourced_at(moment: datetime) -> PatternSnapshot:
+    return snapshot(*(replace(observation(f"p{i}"), source_timestamp=moment) for i in range(3)))
+
+
+@pytest.mark.parametrize(
+    "moment",
+    [
+        datetime(2027, 1, 1, tzinfo=UTC),
+        datetime(2026, 9, 23, 0, 0, tzinfo=UTC),
+        datetime(2026, 9, 22, 20, 0, tzinfo=timezone(timedelta(hours=-5))),  # 09-23 01:00 UTC
+    ],
+)
+def test_source_timestamp_after_snapshot_date_is_rejected(moment: datetime) -> None:
+    with pytest.raises(ValueError, match="source timestamp"):
+        _sourced_at(moment)
+
+
+@pytest.mark.parametrize(
+    "moment",
+    [
+        datetime(2026, 9, 1, tzinfo=UTC),
+        datetime(2026, 9, 22, 23, 59, 59, tzinfo=UTC),
+        datetime(2026, 9, 23, 8, 0, tzinfo=timezone(timedelta(hours=9))),  # 09-22 23:00 UTC
+    ],
+)
+def test_source_timestamp_on_or_before_snapshot_date_is_accepted(moment: datetime) -> None:
+    assert _sourced_at(moment).status is PatternStatus.READY
+
+
+def test_cli_rejects_a_future_source_timestamp_without_output(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    payload = synthetic_payload()
+    observations = payload["reference_observations"]
+    assert isinstance(observations, list)
+    for item in observations:
+        item["source_timestamp"] = "2027-01-01T00:00:00+00:00"
+    (source := tmp_path / "input.json").write_text(json.dumps(payload), "utf-8")
+    output = tmp_path / "output.json"
+    with pytest.raises(SystemExit) as stop:
+        shadow_cli.main(["--input", str(source), "--output", str(output), "--config", str(CONFIG_PATH)])
+    assert stop.value.code == 2
+    assert json.loads(capsys.readouterr().err) == {"ok": False, "error_code": "invalid_input_or_config"}
+    assert not output.exists()
