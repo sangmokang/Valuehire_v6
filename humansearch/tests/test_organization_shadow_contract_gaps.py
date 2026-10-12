@@ -115,7 +115,6 @@ def _judge(response: dict[str, Any]) -> SemanticStatus:
         (3.0, {"0": 1.0, "1": 0.0, "2": 0.0, "3": 0.0}),  # the reproduced contradiction
         (0.0, {"0": 0.0, "1": 0.0, "2": 0.0, "3": 1.0}),
         (1.7, {"0": 0.0, "1": 0.0, "2": 1.0, "3": 0.0}),
-        (1.7 + 1e-3, {"0": 0.1, "1": 0.1, "2": 0.8, "3": 0.0}),
     ],
 )
 def test_score_contradicting_its_probabilities_is_invalid(
@@ -241,3 +240,25 @@ def test_cli_rejects_a_future_source_timestamp_without_output(
     assert stop.value.code == 2
     assert json.loads(capsys.readouterr().err) == {"ok": False, "error_code": "invalid_input_or_config"}
     assert not output.exists()
+
+
+# D7' (live Jev 1 call, 2026-10-12): jev-1.13.0 reports score and probabilities rounded to two
+# decimals independently, so the score can differ from the weighted average by 0.01.
+LIVE_ROUNDED = [
+    (2.93, {"0": 0.0, "1": 0.0, "2": 0.06, "3": 0.94}),  # weighted 2.94
+    (2.93, {"0": 0.01, "1": 0.0, "2": 0.05, "3": 0.94}),  # weighted 2.92
+    (1.67, {"0": 0.0, "1": 0.33, "2": 0.67, "3": 0.0}),  # weighted 1.67, true mean 1.667
+]
+
+
+@pytest.mark.parametrize(("score", "probabilities"), LIVE_ROUNDED)
+def test_live_two_decimal_rounding_is_still_completed(
+    score: float, probabilities: dict[str, float]
+) -> None:
+    assert _judge(_score_response(score, probabilities)) is SemanticStatus.COMPLETED
+
+
+@pytest.mark.parametrize(("offset", "expected"), [(0.034, "completed"), (0.036, "invalid_response")])
+def test_rounding_tolerance_boundary(offset: float, expected: str) -> None:
+    probabilities = {"0": 0.1, "1": 0.1, "2": 0.8, "3": 0.0}  # weighted 1.7
+    assert _judge(_score_response(1.7 + offset, probabilities)).value == expected
