@@ -66,5 +66,10 @@ jobs:
           fi
           '@
           $smoke = $smoke.Replace("`r", '').Replace('__SOURCE__', $source)
-          wsl -d Ubuntu --user root -- bash -c $smoke
+          [System.IO.File]::WriteAllText(
+            (Join-Path $env:GITHUB_WORKSPACE '.wsl-handoff-smoke.sh'),
+            $smoke,
+            [System.Text.UTF8Encoding]::new($false)
+          )
+          wsl -d Ubuntu --user root -- bash "$source/.wsl-handoff-smoke.sh"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
