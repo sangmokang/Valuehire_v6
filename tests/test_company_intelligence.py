@@ -118,7 +118,11 @@ class CompanyIntelligenceTest(unittest.TestCase):
     def test_existing_company_cache_is_loaded_with_staleness(self):
         with tempfile.TemporaryDirectory() as tmp:
             old = payload(person("old", "이전사람"), employment("old"))
-            old["company_intelligence"]["as_of"] = "2026-01-01T00:00:00+09:00"
+            old_time = "2026-01-01T00:00:00+09:00"
+            old["company_intelligence"]["as_of"] = old_time
+            for observation in old["company_intelligence"]["observations"]:
+                observation["collected_at"] = old_time
+                observation["evidence"][0]["observed_at"] = old_time
             company_intelligence.run(old, tmp)
             fresh = company_intelligence.run(payload(
                 person("new", "새사람", "https://www.linkedin.com/in/new"),
@@ -204,6 +208,33 @@ class CompanyIntelligenceTest(unittest.TestCase):
         self.assertEqual(len(names), 2)
         self.assertEqual(names.count("김검색"), 2)
 
+    def test_duplicate_raw_person_observation_id_is_rejected(self):
+        alice = person("person-1", "Alice", "https://www.linkedin.com/in/alice")
+        bob = person("person-1", "Bob", "https://www.linkedin.com/in/bob")
+        with self.assertRaisesRegex(company_intelligence.CompanyIntelligenceError, "duplicate observation id"):
+            company_intelligence.build_snapshot(payload(alice, bob))
+
+    def test_explicit_identity_merge_uses_distinct_observation_id(self):
+        alias = person("alias-1", "김검색", "https://github.com/person-1", skills=["Python"])
+        alias["same_person_as"] = "person-1"
+        alias["identity_evidence"] = evidence("https://example.com/person-identity")
+        result = company_intelligence.build_snapshot(payload(person("person-1"), alias))
+        self.assertEqual(len(result["people"]), 1)
+        self.assertEqual(sorted(result["people"][0]["source_observation_ids"]),
+                         ["alias-1", "person-1"])
+
+    def test_explicit_identity_merge_preserves_name_conflict(self):
+        alias = person("alias-1", "다른이름", "https://github.com/person-1", skills=["Python"])
+        alias["same_person_as"] = "person-1"
+        alias["identity_evidence"] = evidence("https://example.com/person-identity")
+        result = company_intelligence.build_snapshot(payload(person("person-1", "김검색"), alias))
+        conflicts = [
+            (item["field"], item["values"])
+            for item in result["conflicts"]
+            if item.get("person_id") == "person-1"
+        ]
+        self.assertIn(("name", ["김검색", "다른이름"]), conflicts)
+
     def test_same_article_url_can_support_multiple_distinct_people_without_profile_url(self):
         article_url = "https://blog.example.com/global-team-interview"
         jayden = person("article-jayden", "Jayden")
@@ -218,7 +249,7 @@ class CompanyIntelligenceTest(unittest.TestCase):
             self.assertEqual(item["profile_urls"], [])
 
     def test_changed_profile_facts_preserve_conflict(self):
-        changed = person(skills=["Kotlin"], current_title="Staff Backend Engineer")
+        changed = person("person-1-alias", skills=["Kotlin"], current_title="Staff Backend Engineer")
         changed["same_person_as"] = "person-1"
         changed["identity_evidence"] = evidence("https://example.com/person-identity")
         result = company_intelligence.build_snapshot(payload(person(skills=["Python"]), changed))
@@ -313,7 +344,7 @@ class CompanyIntelligenceTest(unittest.TestCase):
 
     def test_patterns_use_only_current_confirmed_company_people(self):
         current = person("current", skills=["QA"], domains=["mobile testing"], previous_companies=["Line"])
-        former = person("former", "과거", "https://www.linkedin.com/in/former", skills=["Python"], domains=["AI"])
+        former = person("former", "과거", "https://www.linkedin.com/in/former", skills=["FormerOnlySkill"], domains=["AI"])
         tentative = person("tentative", "잠정", "https://www.linkedin.com/in/tentative",
                            confidence="tentative", skills=["Rust"], domains=["infra"])
         result = company_intelligence.build_snapshot(payload(
@@ -324,7 +355,8 @@ class CompanyIntelligenceTest(unittest.TestCase):
         plan = " ".join(result["channel_search_plan"]["linkedin_rps"])
         self.assertIn("mobile testing", plan)
         self.assertNotIn("AI", plan)
-        self.assertNotIn("Python", plan)
+        self.assertNotIn("FormerOnlySkill", plan)
+        self.assertNotIn("Rust", plan)
         self.assertNotIn("Line", plan)
 
     def test_function_mismatch_does_not_seed_position_specific_queries(self):
@@ -355,12 +387,134 @@ class CompanyIntelligenceTest(unittest.TestCase):
             stale_employment,
             conflict_person,
             employment("conflict", status="current", url="https://www.linkedin.com/in/conflict"),
-            employment("conflict", status="former", url="https://www.linkedin.com/in/conflict", end=None),
+            employment("conflict", status="former", url="https://www.linkedin.com/in/conflict", end=None,
+                       id="employment-conflict-former"),
         ))
         plan = " ".join(result["channel_search_plan"]["jobkorea"])
         self.assertNotIn("AncientSkill", plan)
         self.assertNotIn("ConflictSkill", plan)
         self.assertTrue(any(item["type"] == "employment_status_conflict" for item in result["conflicts"]))
+
+    def test_invalid_published_at_does_not_bypass_freshness(self):
+        for published_at in ("not-a-date", "", None, "2026-13", "2026-02-30", "2026-09-01T00:00:00"):
+            with self.subTest(published_at=published_at):
+                bad_evidence = evidence(published_at=published_at)
+                stale_person = person("bad-date", skills=["AncientSkill"], domains=["old domain"], evidence=bad_evidence)
+                stale_employment = employment("bad-date", evidence=bad_evidence)
+                with self.assertRaisesRegex(company_intelligence.CompanyIntelligenceError, "published_at"):
+                    company_intelligence.build_snapshot(payload(stale_person, stale_employment))
+
+    def test_supported_published_at_formats_are_accepted(self):
+        for published_at in ("2026-09", "2026-09-01", "2026-09-01T00:00:00+09:00"):
+            with self.subTest(published_at=published_at):
+                proof = evidence("https://example.com/date-" + published_at.replace(":", "-"), published_at=published_at)
+                result = company_intelligence.build_snapshot(payload(
+                    person("date-" + published_at[:7], evidence=proof),
+                    employment("date-" + published_at[:7], evidence=proof),
+                ))
+                self.assertEqual(result["status"], "ready")
+
+    def test_future_cached_snapshot_is_not_merged_into_past_as_of(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            future = payload(
+                person("future", url="https://www.linkedin.com/in/future",
+                       skills=["FutureSkill"], domains=["future domain"]),
+                employment("future", url="https://www.linkedin.com/in/future"),
+            )
+            future["company_intelligence"]["as_of"] = "2026-09-22T00:00:00+09:00"
+            future_path = Path(company_intelligence.run(future, tmp)["snapshot_path"])
+            original_bytes = future_path.read_bytes()
+            past = payload(
+                person("past", skills=["Python"], domains=["large traffic"],
+                       url="https://www.linkedin.com/in/past",
+                       evidence=evidence("https://www.linkedin.com/in/past", observed_at="2026-01-01T00:00:00+09:00"),
+                       collected_at="2026-01-01T00:00:00+09:00"),
+                employment("past", url="https://www.linkedin.com/in/past",
+                           evidence=evidence("https://www.linkedin.com/in/past", observed_at="2026-01-01T00:00:00+09:00"),
+                           collected_at="2026-01-01T00:00:00+09:00"),
+            )
+            past["company_intelligence"]["as_of"] = "2026-01-01T00:00:00+09:00"
+            result = company_intelligence.run(past, tmp)
+            self.assertEqual(result["cache"]["previous_snapshot_count"], 0)
+            snapshot = json.loads(Path(result["snapshot_path"]).read_text())
+            raw_ids = {item["id"] for item in snapshot["raw_observations"]}
+            self.assertNotIn("future", raw_ids)
+            self.assertNotIn("FutureSkill", " ".join(snapshot["channel_search_plan"]["jobkorea"]))
+            self.assertEqual(future_path.read_bytes(), original_bytes)
+
+    def test_future_input_observation_times_are_rejected(self):
+        later = "2026-09-23T00:00:00+09:00"
+        for field in ("collected_at", "evidence", "identity_evidence"):
+            alias = person("alias", url="https://github.com/alias")
+            expected = "collected_at" if field == "collected_at" else "observed_at"
+            if field == "collected_at":
+                alias[field] = later
+            else:
+                alias[field] = evidence(observed_at=later)
+            if field == "identity_evidence":
+                alias["same_person_as"] = "person-1"
+            with self.subTest(field=field), self.assertRaisesRegex(company_intelligence.CompanyIntelligenceError, expected):
+                company_intelligence.build_snapshot(payload(person(), alias))
+        alias["identity_evidence"] = evidence(observed_at="2026-09-22T00:00:00")
+        with self.assertRaisesRegex(company_intelligence.CompanyIntelligenceError, "timezone"):
+            company_intelligence.build_snapshot(payload(person(), alias))
+
+    def test_identical_cached_observation_is_reused_without_duplication(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old = payload(person("cached"), employment("cached"))
+            company_intelligence.run(old, tmp)
+            current = json.loads(json.dumps(old))
+            current["company_intelligence"]["as_of"] = "2026-09-23T00:00:00+09:00"
+            result = company_intelligence.run(current, tmp)
+            snapshot = json.loads(Path(result["snapshot_path"]).read_text())
+            ids = [item["id"] for item in snapshot["raw_observations"]]
+            self.assertEqual(ids.count("cached"), 1)
+            self.assertEqual(ids.count("employment-cached"), 1)
+            self.assertEqual(company_intelligence.run(current, tmp)["snapshot_hash"], result["snapshot_hash"])
+
+    def test_cached_observation_id_with_changed_content_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old = payload(person("cached", skills=["Python"]), employment("cached"))
+            company_intelligence.run(old, tmp)
+            current = json.loads(json.dumps(old))
+            current["company_intelligence"]["as_of"] = "2026-09-23T00:00:00+09:00"
+            current["company_intelligence"]["observations"][0]["skills"] = ["Go"]
+            with self.assertRaisesRegex(company_intelligence.CompanyIntelligenceError, "observation id changed"):
+                company_intelligence.run(current, tmp)
+
+    def test_channel_plan_keeps_jd_anchors_when_company_patterns_differ(self):
+        result = company_intelligence.build_snapshot(payload(
+            person(skills=["Go"], domains=["commerce"]),
+            employment(),
+        ))
+        for channel, queries in result["channel_search_plan"].items():
+            with self.subTest(channel=channel):
+                for anchor in ("Backend Engineer", "Python", "large traffic", "Go", "commerce"):
+                    self.assertIn(anchor, queries)
+        data = payload(person(), employment())
+        data["manual_hypothesis"] = {
+            "priority": ["expansion-" + str(i) for i in range(12)],
+            "evidence_urls": [data["jd"]["source_url"]],
+        }
+        crowded = company_intelligence.build_snapshot(data)
+        for queries in crowded["channel_search_plan"].values():
+            self.assertTrue({"Backend Engineer", "Python", "large traffic"}.issubset(queries))
+
+    def test_pattern_sample_size_counts_actual_contributors(self):
+        tentative = person("tentative", "잠정", "https://www.linkedin.com/in/tentative",
+                           confidence="tentative", skills=["Rust"], domains=["infra"])
+        result = company_intelligence.build_snapshot(payload(tentative, employment("tentative")))
+        self.assertEqual(result["talent_patterns"]["sample_size"], 0)
+        self.assertEqual(result["talent_patterns"]["relevant_current_employee_sample_size"], 0)
+        self.assertEqual(result["talent_patterns"]["current_employee_sample_size"], 1)
+        self.assertEqual(result["talent_patterns"]["observed_skills"], [])
+        empty = person(skills=[], domains=[], previous_companies=[], seniority=None)
+        stale = person(evidence=evidence(published_at="2020-01"))
+        for observed in (empty, stale):
+            with self.subTest(observed=observed["skills"]):
+                patterns = company_intelligence.build_snapshot(payload(observed, employment()))["talent_patterns"]
+                self.assertEqual(patterns["sample_size"], 0)
+                self.assertEqual(patterns["pattern_contributor_sample_size"], 0)
 
     def test_former_employment_allows_unknown_end_date(self):
         result = company_intelligence.build_snapshot(payload(
@@ -410,7 +564,7 @@ class CompanyIntelligenceTest(unittest.TestCase):
             evidence=evidence("https://example.com/old-profile", published_at="2025-01-01"),
         )
         fresh_employment = employment("stale-person", evidence=evidence("https://example.com/current-employment"))
-        conflicted = person("conflicted", url="https://www.linkedin.com/in/conflicted", skills=["Python"])
+        conflicted = person("conflicted", url="https://www.linkedin.com/in/conflicted", skills=["PriorConflictSkill"])
         changed = person("changed", url="https://github.com/conflicted", skills=["Kotlin"])
         changed["same_person_as"] = "conflicted"
         changed["identity_evidence"] = evidence("https://example.com/conflicted-identity")
@@ -424,7 +578,7 @@ class CompanyIntelligenceTest(unittest.TestCase):
         plan = " ".join(result["channel_search_plan"]["jobkorea"])
         self.assertNotIn("LegacySkill", plan)
         self.assertNotIn("legacy domain", plan)
-        self.assertNotIn("Python", plan)
+        self.assertNotIn("PriorConflictSkill", plan)
         self.assertNotIn("Kotlin", plan)
 
     def test_cli_writes_summary(self):

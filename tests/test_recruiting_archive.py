@@ -166,6 +166,19 @@ class ArchiveTest(unittest.TestCase):
             self.execute()
         self.assertEqual(self.posts, 0)
 
+    def test_persist_replaces_existing_path_with_owner_only_permissions(self):
+        target = self.root / 'persist-output.json'
+        target.write_text('old')
+        target.chmod(0o644)
+        stale_tmp = target.with_name(target.name + '.tmp')
+        stale_tmp.write_text('stale')
+        stale_tmp.chmod(0o644)
+        archive.persist(target, {'ok': True})
+        self.assertEqual(json.loads(target.read_text()), {'ok': True})
+        self.assertEqual(target.stat().st_mode & 0o777, 0o600)
+        self.assertTrue(stale_tmp.exists())
+        self.assertEqual(stale_tmp.stat().st_mode & 0o777, 0o644)
+
     def test_remote_timestamp_mismatch_rejected(self):
         self.remote_timestamp = '2001-01-01T00:00:00Z'
         with self.assertRaisesRegex(archive.ArchiveError, 'mismatch: captured_at'):

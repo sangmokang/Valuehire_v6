@@ -105,7 +105,8 @@ class BrowserCliTest(unittest.TestCase):
         seen = []
         with patch.object(browser, "aside", self.fake_aside(seen)):
             rc = self.run_cli("search", "--url", "https://www.jobkorea.co.kr/Search/Resume",
-                              "--company-snapshot", str(self.snapshot), "--query-index", "0")
+                              "--company-snapshot", str(self.snapshot), "--query-index", "0",
+                              "--run-id", "run-1")
         self.assertEqual(rc, 0)
         out = json.loads((self.root / "out.json").read_text())
         self.assertEqual(out["requested_keyword"], "QA Engineer mobile testing")
@@ -132,7 +133,7 @@ class BrowserCliTest(unittest.TestCase):
             browser.BrowserInputError, "not present in company snapshot"
         ):
             self.run_cli("search", "--tab", "tab-id", "--keyword", "outside",
-                         "--company-snapshot", str(self.snapshot))
+                         "--company-snapshot", str(self.snapshot), "--run-id", "run-1")
         self.assertEqual(seen, [])
 
     def test_malformed_tampered_blocked_or_empty_snapshot_blocks_before_browser(self):
@@ -146,8 +147,49 @@ class BrowserCliTest(unittest.TestCase):
                 self.write_snapshot(**override)
                 seen = []
                 with patch.object(browser, "aside", self.fake_aside(seen)), self.assertRaises(browser.BrowserInputError):
-                    self.run_cli("search", "--tab", "tab-id", "--company-snapshot", str(self.snapshot))
+                    self.run_cli("search", "--tab", "tab-id", "--company-snapshot", str(self.snapshot),
+                                 "--run-id", "run-1")
                 self.assertEqual(seen, [])
+
+    def test_search_requires_nonempty_run_id_before_browser(self):
+        for value in (None, ""):
+            seen = []
+            args = ["search", "--tab", "tab-id", "--company-snapshot", str(self.snapshot)]
+            if value is not None:
+                args.extend(["--run-id", value])
+            with self.subTest(value=value), patch.object(browser, "aside", self.fake_aside(seen)), self.assertRaisesRegex(
+                browser.BrowserInputError, "run_id"
+            ):
+                self.run_cli(*args)
+            self.assertEqual(seen, [])
+
+    def test_snapshot_requires_nonempty_run_id_before_browser(self):
+        seen = []
+        with patch.object(browser, "aside", self.fake_aside(seen)), self.assertRaisesRegex(
+            browser.BrowserInputError, "run_id"
+        ):
+            self.run_cli("snapshot", "--tab", "tab-id")
+        self.assertEqual(seen, [])
+
+    def test_profile_requires_nonempty_run_id_before_browser_even_local_only(self):
+        seen = []
+        with patch.object(browser, "aside", self.fake_aside(seen)), self.assertRaisesRegex(
+            browser.BrowserInputError, "run_id"
+        ):
+            self.run_cli("profile", "--url", "https://www.jobkorea.co.kr/User/Profile/1", "--local-only")
+        self.assertEqual(seen, [])
+
+    def test_capture_output_is_replaced_with_owner_only_permissions(self):
+        out = self.root / "out.json"
+        out.write_text("old")
+        out.chmod(0o644)
+        seen = []
+        with patch.object(browser, "aside", self.fake_aside(seen)):
+            rc = self.run_cli("search", "--url", "https://www.jobkorea.co.kr/Search/Resume",
+                              "--company-snapshot", str(self.snapshot), "--query-index", "0",
+                              "--run-id", "run-1")
+        self.assertEqual(rc, 0)
+        self.assertEqual(out.stat().st_mode & 0o777, 0o600)
 
     def test_profile_local_only_saves_without_archive_remote_write(self):
         seen = []

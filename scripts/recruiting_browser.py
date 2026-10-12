@@ -12,6 +12,14 @@ class BrowserInputError(Exception):
     pass
 
 
+def persist_output(path, value):
+    try:
+        from scripts.recruiting_archive import persist
+    except ModuleNotFoundError:
+        from recruiting_archive import persist
+    persist(path, value)
+
+
 def aside(code):
     result = subprocess.run(
         ["aside", "repl", code], capture_output=True, text=True, timeout=90, check=False
@@ -146,6 +154,10 @@ def main(argv=None):
     parser.add_argument("--local-only", action="store_true")
     args = parser.parse_args(argv)
     cfg = json.loads(args.contract.read_text())["jobkorea"]
+    if args.mode in ("profile", "search", "snapshot") and (not args.run_id or not args.run_id.strip()):
+        raise BrowserInputError(args.mode + " evidence requires nonempty run_id")
+    if args.run_id:
+        args.run_id = args.run_id.strip()
     if args.mode in ("jd", "profile"):
         if not args.url:
             raise BrowserInputError("jd/profile requires --url")
@@ -175,8 +187,7 @@ def main(argv=None):
     else:
         capture["requested_keyword"] = args.keyword
     capture["run_id"] = args.run_id
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(capture, ensure_ascii=False, indent=2))
+    persist_output(args.output, capture)
     if args.mode == "profile":
         if args.local_only:
             receipt = {"ok": False, "state": "NOT_RUN_PERMISSION",
@@ -186,7 +197,7 @@ def main(argv=None):
             receipt = run(json.loads(args.archive_config.read_text()), capture,
                           args.output.with_suffix(".ledger.json"))
         capture["persistence_receipt"] = receipt
-        args.output.write_text(json.dumps(capture, ensure_ascii=False, indent=2))
+        persist_output(args.output, capture)
         print(json.dumps(receipt))
     print(json.dumps({"saved": str(args.output), "characters": len(capture["text"]),
                       "rows": len(capture.get("rows", []))}))

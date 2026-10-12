@@ -12,6 +12,7 @@ import json
 import os
 import re
 import sys
+import tempfile
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -42,6 +43,8 @@ def build_snapshot(document):
         raise CompanyIntelligenceError("company_intelligence.observations must be a list")
 
     raw_observations = [_observation(obs) for obs in observations]
+    _reject_duplicate_observation_ids(raw_observations)
+    _reject_future_observations(raw_observations, as_of)
     people, conflicts = _build_people(raw_observations)
     person_conflicted_fields = _person_conflicted_fields(conflicts)
     employment, employment_conflicts = _build_employment(raw_observations, people, company, as_of)
@@ -93,6 +96,7 @@ def build_snapshot(document):
 
 def run(document, store_dir, *, stale_after_days=STALE_DAYS):
     initial = build_snapshot(document)
+    current_as_of = _parse(initial["as_of"])
     root = Path(store_dir)
     company_dir = root / initial["company"]["company_key"]
     company_dir.mkdir(parents=True, exist_ok=True)
@@ -102,16 +106,18 @@ def run(document, store_dir, *, stale_after_days=STALE_DAYS):
         loaded = _load_snapshot(path)
         if loaded["company"].get("homepage") != initial["company"]["homepage"]:
             raise CompanyIntelligenceError("cached company homepage mismatch")
+        loaded_as_of = _parse(_instant(loaded.get("as_of"), "cached snapshot.as_of"))
+        if loaded_as_of > current_as_of:
+            continue
         if loaded.get("snapshot_hash") != initial["snapshot_hash"]:
             previous.append((path, loaded))
 
     document = _merge_cached_observations(document, previous)
     snapshot = build_snapshot(document)
-    previous.sort(key=lambda item: item[1].get("as_of", ""))
+    previous.sort(key=lambda item: _parse(item[1]["as_of"]))
     stale = False
     if previous:
         latest_as_of = _parse(previous[-1][1].get("as_of"))
-        current_as_of = _parse(snapshot["as_of"])
         stale = latest_as_of is None or current_as_of is None or (
             current_as_of - latest_as_of
         ).days > stale_after_days
@@ -276,7 +282,7 @@ def _build_people(observations):
         existing["profile_urls"] = sorted(set(existing["profile_urls"]) | set(normalized["profile_urls"]))
         existing["evidence"].extend(normalized["evidence"])
         existing["identity_evidence"].extend(normalized["identity_evidence"])
-        for field in ("current_title", "function", "seniority", "education", "skills", "domains", "previous_companies"):
+        for field in ("name", "current_title", "function", "seniority", "education", "skills", "domains", "previous_companies"):
             before = existing.get(field)
             after = normalized.get(field)
             if after in (None, [], ""):
@@ -421,41 +427,51 @@ def _build_patterns(people, employment, position, as_of, conflicted_fields=None)
         and not item.get("has_status_conflict")
         and not item.get("freshness", {}).get("stale_for_current_fact")
     }
+    contributors = set()
     for person in people:
         if person["id"] not in current_people or person["confidence"] != "confirmed" or person["snippet_only"]:
             continue
         if _freshness(person["evidence"], as_of)["stale_for_current_fact"]:
             continue
+        contributed = False
         evidence_urls = {item["url"] for item in person["evidence"]}
         person_conflicts = conflicted_fields.get(person["id"], set())
         if "previous_companies" not in person_conflicts:
             previous.update(person.get("previous_companies", []))
             for value in person.get("previous_companies", []):
+                contributed = True
                 provenance["previous"][value]["person_ids"].add(person["id"])
                 provenance["previous"][value]["evidence_urls"].update(evidence_urls)
         if "skills" not in person_conflicts:
             skills.update(person.get("skills", []))
             for value in person.get("skills", []):
+                contributed = True
                 provenance["skills"][value]["person_ids"].add(person["id"])
                 provenance["skills"][value]["evidence_urls"].update(evidence_urls)
         if "domains" not in person_conflicts:
             domains.update(person.get("domains", []))
             for value in person.get("domains", []):
+                contributed = True
                 provenance["domains"][value]["person_ids"].add(person["id"])
                 provenance["domains"][value]["evidence_urls"].update(evidence_urls)
         if person.get("seniority") and "seniority" not in person_conflicts:
+            contributed = True
             seniority[person["seniority"]] += 1
             provenance["seniority"][person["seniority"]]["person_ids"].add(person["id"])
             provenance["seniority"][person["seniority"]]["evidence_urls"].update(evidence_urls)
+        if contributed:
+            contributors.add(person["id"])
     limit = (
         "sample_size="
-        + str(len(current_people))
-        + "; observed patterns are scoped to confirmed current employees with direct evidence"
+        + str(len(contributors))
+        + "; observed patterns are scoped to confirmed current employees with fresh direct person evidence"
     )
+    contributor_count = len(contributors)
     return {
-        "sample_size": len(current_people),
+        "sample_size": contributor_count,
         "current_employee_sample_size": len(fallback_current_people),
-        "relevant_current_employee_sample_size": len(current_people),
+        "relevant_current_employee_sample_size": contributor_count,
+        "pattern_contributor_sample_size": contributor_count,
         "raw_people_count": len(people_by_id),
         "sample_limited": True,
         "limits": [
@@ -474,6 +490,7 @@ def _build_patterns(people, employment, position, as_of, conflicted_fields=None)
 
 def _build_hypothesis(position, patterns, manual_hypothesis=None):
     hard_keys = [item["key"] for item in position["hard_requirements"]]
+    hard_labels = [item["label"] for item in position["hard_requirements"]]
     jd_tech = {tech.casefold() for tech in position["technologies"]}
     observed_skills = [item["value"] for item in patterns["observed_skills"]]
     observed_domains = [item["value"] for item in patterns["observed_domains"]]
@@ -498,6 +515,9 @@ def _build_hypothesis(position, patterns, manual_hypothesis=None):
             differences.append({"jd": "technology", "observed_pattern": skill, "action": "expand search, keep separate from hard requirements"})
     return {
         "hard_requirements": hard_keys,
+        "hard_requirement_labels": hard_labels,
+        "jd_title": position["title"],
+        "jd_technologies": position["technologies"],
         "priority": priority,
         "expansion": expansion,
         "expansion_signals": expansion_signals,
@@ -511,6 +531,12 @@ def _build_hypothesis(position, patterns, manual_hypothesis=None):
 
 def _build_channel_plan(position, patterns, hypothesis):
     queries = []
+    anchors = [position["title"]]
+    anchors.extend(item["label"] for item in position["hard_requirements"])
+    anchors.extend(position["technologies"])
+    for signal in anchors:
+        if signal not in queries:
+            queries.append(signal)
     search_signals = list(hypothesis["priority"])
     for item in hypothesis.get("expansion_signals", []):
         if item not in search_signals:
@@ -522,9 +548,8 @@ def _build_channel_plan(position, patterns, hypothesis):
         if skill["value"] not in search_signals:
             search_signals.append(skill["value"])
     for signal in search_signals[:8]:
-        queries.append(signal)
-    if not queries:
-        queries.append(position["title"])
+        if signal not in queries:
+            queries.append(signal)
     return {
         "jobkorea": queries,
         "saramin": queries,
@@ -545,6 +570,8 @@ def _observation(obs):
     snippet_only = bool(item.get("snippet_only", False))
     if snippet_only and confidence == "confirmed":
         raise CompanyIntelligenceError("snippet-only observation cannot be confirmed")
+    if item.get("same_person_as"):
+        item = {**item, "identity_evidence": _evidence(item.get("identity_evidence"), "person.identity_evidence")}
     return {
         **item,
         "id": _text(item.get("id"), "observation.id"),
@@ -554,6 +581,34 @@ def _observation(obs):
         "evidence": evidence,
         "collected_at": _instant(item.get("collected_at"), "observation.collected_at"),
     }
+
+
+def _reject_duplicate_observation_ids(observations):
+    seen = {}
+    for item in observations:
+        obs_id = item["id"]
+        previous = seen.get(obs_id)
+        if previous is not None:
+            raise CompanyIntelligenceError("duplicate observation id: " + obs_id)
+        seen[obs_id] = item
+
+
+def _reject_future_observations(observations, as_of):
+    as_of_dt = _parse(as_of)
+    if as_of_dt is None:
+        raise CompanyIntelligenceError("company_intelligence.as_of must be ISO 8601")
+    for item in observations:
+        collected_at = _parse(item.get("collected_at"))
+        if collected_at and collected_at > as_of_dt:
+            raise CompanyIntelligenceError("observation.collected_at cannot be after company_intelligence.as_of")
+        for evidence_item in item.get("evidence", []):
+            observed_at = _parse(evidence_item.get("observed_at"))
+            if observed_at and observed_at > as_of_dt:
+                raise CompanyIntelligenceError("evidence.observed_at cannot be after company_intelligence.as_of")
+        for evidence_item in item.get("identity_evidence", []):
+            observed_at = _parse(evidence_item.get("observed_at"))
+            if observed_at and observed_at > as_of_dt:
+                raise CompanyIntelligenceError("identity_evidence.observed_at cannot be after company_intelligence.as_of")
 
 
 def _validate_manual_hypothesis(value, company, source_url, position, observations):
@@ -657,9 +712,11 @@ def _evidence(value, field):
             "url": _url(mapping.get("url"), f"{field}[{index}].url"),
             "observed_at": _instant(observed_at, f"{field}[{index}].observed_at"),
         }
-        for optional in ("excerpt", "published_at", "source_label", "capture_path"):
+        for optional in ("excerpt", "source_label", "capture_path"):
             if optional in mapping:
                 evidence[optional] = _optional_text(mapping.get(optional))
+        if "published_at" in mapping:
+            evidence["published_at"] = _source_date(mapping.get("published_at"), f"{field}[{index}].published_at")
         if "asserts" in mapping:
             evidence["asserts"] = _require_mapping(mapping["asserts"], f"{field}[{index}].asserts")
         out.append(
@@ -708,6 +765,13 @@ def _freshness(evidence, as_of):
         source_date = item.get("published_at") or item["observed_at"]
         parsed = _parse_source_date(source_date)
         if parsed is None:
+            row = {
+                "url": item["url"],
+                "source_date": source_date,
+                "age_days": None,
+            }
+            dates.append(row)
+            stale_dates.append(row)
             continue
         age_days = (as_of_dt - parsed).days if as_of_dt else None
         row = {
@@ -735,9 +799,17 @@ def _parse_source_date(value):
     elif re.fullmatch(r"\d{4}-\d{2}", text):
         text = text + "-01T00:00:00+00:00"
     parsed = _parse(text)
-    if parsed is not None:
+    if parsed is not None and parsed.tzinfo is not None:
         return parsed
     return None
+
+
+def _source_date(value, field):
+    text = _text(value, field)
+    parsed = _parse_source_date(text)
+    if parsed is None:
+        raise CompanyIntelligenceError(field + " must be date, year-month, or timezone-aware ISO 8601")
+    return text
 
 
 def _employment_matches_position(item, position):
@@ -849,18 +921,27 @@ def _merge_cached_observations(document, previous):
         return document
     merged = json.loads(json.dumps(document, ensure_ascii=False))
     observations = []
-    seen = set()
+    seen_by_id = {}
+    as_of = _parse(_instant(merged["company_intelligence"]["as_of"], "company_intelligence.as_of"))
     for _, snapshot in previous:
+        if _parse(_instant(snapshot.get("as_of"), "cached snapshot.as_of")) > as_of:
+            continue
         for item in snapshot.get("raw_observations", []):
-            marker = _hash(item)
-            if marker not in seen:
-                observations.append(item)
-                seen.add(marker)
+            normalized = _observation(item)
+            existing = seen_by_id.get(normalized["id"])
+            if existing is None:
+                observations.append(normalized)
+                seen_by_id[normalized["id"]] = normalized
+            elif _hash(existing) != _hash(normalized):
+                raise CompanyIntelligenceError("cached observation id changed: " + normalized["id"])
     for item in merged["company_intelligence"].get("observations", []):
-        marker = _hash(item)
-        if marker not in seen:
-            observations.append(item)
-            seen.add(marker)
+        normalized = _observation(item)
+        existing = seen_by_id.get(normalized["id"])
+        if existing is None:
+            observations.append(normalized)
+            seen_by_id[normalized["id"]] = normalized
+        elif _hash(existing) != _hash(normalized):
+            raise CompanyIntelligenceError("observation id changed across cache: " + normalized["id"])
     merged["company_intelligence"]["observations"] = observations
     return merged
 
@@ -868,13 +949,20 @@ def _merge_cached_observations(document, previous):
 def _persist(path, value):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(path.name + ".tmp")
-    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w") as out:
-        json.dump(value, out, ensure_ascii=False, indent=2)
-        out.flush()
-        os.fsync(out.fileno())
-    os.replace(tmp, path)
+    fd, tmp_name = tempfile.mkstemp(prefix=path.name + ".", suffix=".tmp", dir=path.parent)
+    try:
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "w") as out:
+            json.dump(value, out, ensure_ascii=False, indent=2)
+            out.flush()
+            os.fsync(out.fileno())
+        os.replace(tmp_name, path)
+    except Exception:
+        try:
+            os.unlink(tmp_name)
+        except FileNotFoundError:
+            pass
+        raise
 
 
 if __name__ == "__main__":
