@@ -28,7 +28,7 @@ jobs:
     # 실측 최댓값(최근 성공 15회 3.2~4.8분)을 써도 약 20분이다. 30분은 그 위 여유다.
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0   # 아래 "히스토리 전량 스캔" 스텝이 과거 커밋의 blob까지 열어보는 데 필요
           # 이 job 은 읽기만 한다. 기본값(true)은 인증 토큰을 러너의 git 설정에 남겨
