@@ -63,8 +63,8 @@ last_updated_at) 4개만으로 `SourceState`(PASS/FAIL/NOT_RUN)를 반환하는 
 ### 위험등급과 세션
 
 - 위험등급: **L2** (일반 코드 변경 — PII 인접 소스 접근이지만 마이그레이션·
-  외부 발송·과금 아님. `service_role` 키를 다루므로 자격증명 취급만 L3급
-  주의로 격상해 취급한다: 로그·테스트 출력·커밋에 값 노출 금지)
+  외부 발송·과금 아님. 조회용 자격증명은 L3급 주의로 취급한다:
+  로그·테스트 출력·커밋에 값 노출 금지)
 - 기준 SHA: `b7240936827032d5ee6791fa8cdb7d62ef6584b4` (main, clean)
 - 워크트리: `worktrees/admin-dashboard-position-cards-e1/` · 브랜치
   `task/admin-dashboard-position-cards-e1`
@@ -75,11 +75,10 @@ last_updated_at) 4개만으로 `SourceState`(PASS/FAIL/NOT_RUN)를 반환하는 
 
 ### 재발 원장 인용
 
-- `docs/sot/coding-principles.md` P16(판정을 한 곳에만 둔다)·P20(검사 대상
-  0건은 통과가 아니다fail-closed)을 이번 counter-AC의 "빈 테이블 조용한
-  통과 금지"에 직접 적용한다 — 네트워크 오류/스키마 불일치/빈 테이블 세
-  경로가 전부 서로 다른 코드 분기로 떨어지게 만들어, 한쪽 실패가 다른
-  쪽(예: "그냥 0건 반환")으로 위장할 수 없게 한다.
+- `docs/sot/coding-principles.md` P3(조용한 실패 금지)를 이번 counter-AC에
+  적용한다 — 네트워크 오류/스키마 불일치/빈 테이블 세 경로를 구분해,
+  실패가 "그냥 0건 반환"으로 위장하지 못하게 한다. P16(런타임 동작 검사)에
+  따라 세 경로의 테스트는 대상 모듈을 import해 실제 반환값을 검증한다.
 
 ### 인수 기준 (1개, EARS)
 
@@ -105,6 +104,10 @@ When `position_cards` 소스를 조회하면, 시스템은 `source-contract-v1.j
   가능하게 만들어 counter-AC의 "조용한 위장"을 차단한다 — 즉 "빈 테이블이
   항상 FAIL"이 아니라 "빈 테이블이 오류를 가장한 결과가 될 수 없다"가 이
   구현의 불변식)
+- 조회에는 해당 4개 컬럼만 읽을 수 있고 쓰기 권한이 없는 자격증명을 사용한다.
+  `service_role`은 RLS를 우회하므로 사용하지 않는다. 코드의 `select` 제한과
+  `supabase_writes: DISABLED`만으로 DB 권한을 제한할 수 없다. 이 권한을 가진
+  자격증명 또는 제한된 뷰가 준비되지 않으면 라이브 검증과 구현 완료를 보류한다.
 
 ### 검증 계획
 
@@ -116,9 +119,9 @@ When `position_cards` 소스를 조회하면, 시스템은 `source-contract-v1.j
 - 정적 검사: `uv run ruff check src/humansearch/admin_weekly_dashboard/position_cards_source.py`,
   `uv run mypy --strict src/humansearch/admin_weekly_dashboard/position_cards_source.py`.
 - 비밀 스캔: `bash verify.sh`, `bash scripts/scan-data-exposure.sh all`,
-  `.env`에 `SUPABASE_URL`/`SUPABASE_KEY` 추가 후 두 스캔 모두 PASS 확인
+  `.env`에 `SUPABASE_URL`/조회 전용 키 추가 후 두 스캔 모두 PASS 확인
   (값은 어디에도 출력하지 않는다).
-- 라이브 1건: 실제 `.env`의 `SUPABASE_URL`/`SUPABASE_KEY`로
+- 라이브 1건: 실제 `.env`의 `SUPABASE_URL`/조회 전용 키로
   `fetch_position_cards()`를 1회 호출해 `status=PASS`와 행 개수만 출력
   (행 내용/키 값 비노출).
 
