@@ -1,5 +1,7 @@
 VERDICT: PASS
 
+> 후속 상태 (2026-08-25): 아래 malformed URL 결함은 판정 당시의 상태다. 이후 관측기 URL 파싱 수정으로 해소됐다.
+
 ## 결론
 현재 산출물은 V1-G 결함을 “해결됨”이나 “허용 동작”으로 과장하지 않고, `KNOWN_DEFECT`로 좁혀 문서화했습니다. 최신 문구 기준으로 `raw URL 전체` 표현은 사라졌고, 세 문서 모두 malformed target URL에서 `ValueError`가 정규화되지 않아 traceback·URL 조각·exit 1이 날 수 있다는 현재 제한으로 일치합니다.
 

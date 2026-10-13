@@ -23,17 +23,17 @@ VERDICT: FAIL
 
 ### 1. 주장 1 — `8/15`는 “보호 범위”가 아닙니다
 
-현재 워크플로에는 `bash scripts/...` 실행 줄이 정확히 23개입니다. [verify.yml:29](/Users/kangsangmo/Desktop/Valuehire_v6/.github/workflows/verify.yml:29) 역할: 첫 번째 대상 실행 줄, [verify.yml:196](/Users/kangsangmo/Desktop/Valuehire_v6/.github/workflows/verify.yml:196) 역할: 마지막 대상 실행 줄입니다.
+현재 워크플로에는 `bash scripts/...` 실행 줄이 정확히 23개입니다. [verify.yml:29](../../.github/workflows/verify.yml#L29) 역할: 첫 번째 대상 실행 줄, [verify.yml:196](../../.github/workflows/verify.yml#L196) 역할: 마지막 대상 실행 줄입니다.
 
 반증 과정에서 워크플로를 읽는 경로를 전수 검색했습니다. 실질적으로 추가되는 것은 다음뿐이었습니다.
 
-- [acceptance-0-5.sh:15](/Users/kangsangmo/Desktop/Valuehire_v6/scripts/acceptance-0-5.sh:15) 역할: `verify.sh`와 `acceptance-0-6.sh` 이름 존재를 확인합니다.
-- [acceptance-hs-gates-mutations.sh:27](/Users/kangsangmo/Desktop/Valuehire_v6/scripts/acceptance-hs-gates-mutations.sh:27) 역할: G2 두 실행 줄을 확인하지만, 제출 후보의 antiforge 검사와 범위가 겹칩니다.
-- [check-pre-push-runtime.sh:48](/Users/kangsangmo/Desktop/Valuehire_v6/scripts/verify/check-pre-push-runtime.sh:48) 역할: 격리된 훅 실행을 재현하지만, 제출 후보의 pre-push 판정과 동일한 범위입니다.
+- [acceptance-0-5.sh:15](../../scripts/acceptance-0-5.sh#L15) 역할: `verify.sh`와 `acceptance-0-6.sh` 이름 존재를 확인합니다.
+- [acceptance-hs-gates-mutations.sh:27](../../scripts/acceptance-hs-gates-mutations.sh#L27) 역할: G2 두 실행 줄을 확인하지만, 제출 후보의 antiforge 검사와 범위가 겹칩니다.
+- [check-pre-push-runtime.sh:48](../../scripts/verify/check-pre-push-runtime.sh#L48) 역할: 격리된 훅 실행을 재현하지만, 제출 후보의 pre-push 판정과 동일한 범위입니다.
 - 루트 `package.json`과 `Makefile`은 없습니다.
-- `pre-commit`은 워크플로 전체 의미를 검사하지 않습니다. [pre-commit:103](/Users/kangsangmo/Desktop/Valuehire_v6/hooks/pre-commit:103) 역할: 추가된 줄만 약화 패턴과 대조합니다.
+- `pre-commit`은 워크플로 전체 의미를 검사하지 않습니다. [pre-commit:103](../../hooks/pre-commit#L103) 역할: 추가된 줄만 약화 패턴과 대조합니다.
 
-저장소가 삭제 공백을 이미 인정합니다. [suppressions.yaml:28](/Users/kangsangmo/Desktop/Valuehire_v6/suppressions.yaml:28) 역할: 삭제 탐지 공백을 등록하며, [suppressions.yaml:30](/Users/kangsangmo/Desktop/Valuehire_v6/suppressions.yaml:30) 역할: 추가된 줄만 검사하므로 삭제를 못 잡는다고 명시합니다.
+저장소가 삭제 공백을 이미 인정합니다. [suppressions.yaml:28](../../suppressions.yaml#L28) 역할: 삭제 탐지 공백을 등록하며, [suppressions.yaml:30](../../suppressions.yaml#L30) 역할: 추가된 줄만 검사하므로 삭제를 못 잡는다고 명시합니다.
 
 #### 변조별 결과
 
@@ -61,7 +61,7 @@ acceptance_0_6 direct_rc=1 cat_pipe_rc=1
 
 기준선(baseline, 변조 전 정상 결과)이 실패한 검사를 단순히 `exit!=0` 탐지기로 세면 모든 변조를 잡은 것처럼 보입니다. 따라서 제외 자체는 타당했지만, 기준선을 정상화하지 않은 채 검사 전체를 버린 것은 불완전합니다.
 
-- `echo` 실험에는 영향이 없습니다. [acceptance-0-5.sh:18](/Users/kangsangmo/Desktop/Valuehire_v6/scripts/acceptance-0-5.sh:18) 역할: 파일명 존재만 보므로 `echo` 뒤에도 이름이 남습니다.
+- `echo` 실험에는 영향이 없습니다. [acceptance-0-5.sh:18](../../scripts/acceptance-0-5.sh#L18) 역할: 파일명 존재만 보므로 `echo` 뒤에도 이름이 남습니다.
 - 단계 삭제 실험에는 영향이 있습니다. 같은 줄이 사라지면 추가로 실패합니다.
 - 올바른 재시험은 복제본의 `main`과 `origin/main`을 맞춰 기준선을 성공시키거나, 배송 대조와 워크플로 이름 검사를 분리해 판정하는 것입니다.
 
@@ -89,12 +89,12 @@ acceptance_0_6 direct_rc=1 cat_pipe_rc=1
 
 원본의 가능한 실행 순서는 다음과 같습니다.
 
-1. [guard-global-skill-files.sh:112](/Users/kangsangmo/Desktop/Valuehire_v6/scripts/guard-global-skill-files.sh:112) 역할: 임시 기록을 최종 상태 파일로 공개합니다.
-2. `recover`가 [guard-global-skill-files.sh:227](/Users/kangsangmo/Desktop/Valuehire_v6/scripts/guard-global-skill-files.sh:227) 역할: 복구를 시작합니다.
-3. [guard-global-skill-files.sh:232](/Users/kangsangmo/Desktop/Valuehire_v6/scripts/guard-global-skill-files.sh:232) 역할: 원래 권한을 복원합니다.
-4. [guard-global-skill-files.sh:233](/Users/kangsangmo/Desktop/Valuehire_v6/scripts/guard-global-skill-files.sh:233) 역할: 상태 파일을 삭제합니다.
-5. 먼저 시작한 `lock`이 [guard-global-skill-files.sh:132](/Users/kangsangmo/Desktop/Valuehire_v6/scripts/guard-global-skill-files.sh:132) 역할: 두 파일을 444로 바꿉니다.
-6. [guard-global-skill-files.sh:140](/Users/kangsangmo/Desktop/Valuehire_v6/scripts/guard-global-skill-files.sh:140) 역할: 성공을 출력합니다.
+1. [guard-global-skill-files.sh:112](../../scripts/guard-global-skill-files.sh#L112) 역할: 임시 기록을 최종 상태 파일로 공개합니다.
+2. `recover`가 [guard-global-skill-files.sh:227](../../scripts/guard-global-skill-files.sh#L227) 역할: 복구를 시작합니다.
+3. [guard-global-skill-files.sh:232](../../scripts/guard-global-skill-files.sh#L232) 역할: 원래 권한을 복원합니다.
+4. [guard-global-skill-files.sh:233](../../scripts/guard-global-skill-files.sh#L233) 역할: 상태 파일을 삭제합니다.
+5. 먼저 시작한 `lock`이 [guard-global-skill-files.sh:132](../../scripts/guard-global-skill-files.sh#L132) 역할: 두 파일을 444로 바꿉니다.
+6. [guard-global-skill-files.sh:140](../../scripts/guard-global-skill-files.sh#L140) 역할: 성공을 출력합니다.
 
 따라서 최종 상태 “444 두 개 + 상태 없음 + lock 성공”은 원본 명령의 합법적인 실행 순서입니다. `sleep 2`는 그 사이를 넓혔지만 상태 전이 자체를 바꾸지는 않았습니다.
 
@@ -158,28 +158,28 @@ error connecting to api.github.com
 
 반영된 내용은 분명합니다.
 
-- [판정문:270](/Users/kangsangmo/Desktop/Valuehire_v6/docs/engineering/chatgpt-verify-feedback-verdict-2026-08-20.md:270) 역할: R2 영수증 원안을 폐기합니다.
-- [판정문:273](/Users/kangsangmo/Desktop/Valuehire_v6/docs/engineering/chatgpt-verify-feedback-verdict-2026-08-20.md:273) 역할: R3를 1순위로 올리고 동시 실행 통제를 포함합니다.
-- [판정문:275](/Users/kangsangmo/Desktop/Valuehire_v6/docs/engineering/chatgpt-verify-feedback-verdict-2026-08-20.md:275) 역할: 라벨 기각을 부분 철회합니다.
-- [판정문:267](/Users/kangsangmo/Desktop/Valuehire_v6/docs/engineering/chatgpt-verify-feedback-verdict-2026-08-20.md:267) 역할: 검사 기록 조회 권한·시점·대상 이름 조건을 보강합니다.
-- [판정문:277](/Users/kangsangmo/Desktop/Valuehire_v6/docs/engineering/chatgpt-verify-feedback-verdict-2026-08-20.md:277) 역할: 큰 변경량을 규칙 위반 증거로 삼은 서술을 철회합니다.
-- [판정문:278](/Users/kangsangmo/Desktop/Valuehire_v6/docs/engineering/chatgpt-verify-feedback-verdict-2026-08-20.md:278) 역할: 검증 코드 변경을 별도 절차로 다루라는 요구를 추가 채택합니다.
+- [판정문:270](../../docs/engineering/chatgpt-verify-feedback-verdict-2026-08-20.md#L270) 역할: R2 영수증 원안을 폐기합니다.
+- [판정문:273](../../docs/engineering/chatgpt-verify-feedback-verdict-2026-08-20.md#L273) 역할: R3를 1순위로 올리고 동시 실행 통제를 포함합니다.
+- [판정문:275](../../docs/engineering/chatgpt-verify-feedback-verdict-2026-08-20.md#L275) 역할: 라벨 기각을 부분 철회합니다.
+- [판정문:267](../../docs/engineering/chatgpt-verify-feedback-verdict-2026-08-20.md#L267) 역할: 검사 기록 조회 권한·시점·대상 이름 조건을 보강합니다.
+- [판정문:277](../../docs/engineering/chatgpt-verify-feedback-verdict-2026-08-20.md#L277) 역할: 큰 변경량을 규칙 위반 증거로 삼은 서술을 철회합니다.
+- [판정문:278](../../docs/engineering/chatgpt-verify-feedback-verdict-2026-08-20.md#L278) 역할: 검증 코드 변경을 별도 절차로 다루라는 요구를 추가 채택합니다.
 
 하지만 앞부분은 여전히 반대 결정을 말합니다.
 
-- [판정문:14](/Users/kangsangmo/Desktop/Valuehire_v6/docs/engineering/chatgpt-verify-feedback-verdict-2026-08-20.md:14) 역할: 라벨 5종을 기각합니다.
-- [판정문:21](/Users/kangsangmo/Desktop/Valuehire_v6/docs/engineering/chatgpt-verify-feedback-verdict-2026-08-20.md:21) 역할: 우선순위를 `R2 → R1 → R3`로 권고합니다.
+- [판정문:14](../../docs/engineering/chatgpt-verify-feedback-verdict-2026-08-20.md#L14) 역할: 라벨 5종을 기각합니다.
+- [판정문:21](../../docs/engineering/chatgpt-verify-feedback-verdict-2026-08-20.md#L21) 역할: 우선순위를 `R2 → R1 → R3`로 권고합니다.
 - 뒷부분은 R2 폐기, R3 1순위, 라벨 부분 철회입니다.
 
 아직 반영되지 않은 새 지적은 다음과 같습니다.
 
 1. 현재 23줄의 `8/15` 실측과 변조별 차이.
 2. 자연 경합 `0/200`.
-3. 문서는 `chmod` 가로채기로 순서를 고정했다고 적지만 [판정문:285](/Users/kangsangmo/Desktop/Valuehire_v6/docs/engineering/chatgpt-verify-feedback-verdict-2026-08-20.md:285) 역할: 재현 방법 기록, 이번 제출은 상태 확정 뒤 `sleep 2` 주입이라고 합니다. 어느 재현이 최종 증거인지 일치시켜야 합니다.
+3. 문서는 `chmod` 가로채기로 순서를 고정했다고 적지만 [판정문:285](../../docs/engineering/chatgpt-verify-feedback-verdict-2026-08-20.md#L285) 역할: 재현 방법 기록, 이번 제출은 상태 확정 뒤 `sleep 2` 주입이라고 합니다. 어느 재현이 최종 증거인지 일치시켜야 합니다.
 4. `cat 대상스크립트 | bash`가 실제 실행 문법이라는 구분.
-5. 모든 안전장치의 본문 변조를 채택할지는 [판정문:287](/Users/kangsangmo/Desktop/Valuehire_v6/docs/engineering/chatgpt-verify-feedback-verdict-2026-08-20.md:287) 역할: 명시적 미결정으로 남아 있습니다.
+5. 모든 안전장치의 본문 변조를 채택할지는 [판정문:287](../../docs/engineering/chatgpt-verify-feedback-verdict-2026-08-20.md#L287) 역할: 명시적 미결정으로 남아 있습니다.
 6. 문서 생성·증거 식별값 요구와 “모델이 병합 가능 판정을 내리지 못하게 한다”는 요구는 대체 설계가 없습니다.
-7. “옛 커밋의 성공을 새 커밋에 실제 사용한 일이 있었다”는 [판정문:56](/Users/kangsangmo/Desktop/Valuehire_v6/docs/engineering/chatgpt-verify-feedback-verdict-2026-08-20.md:56) 역할: R1 필요성을 정당화하는 역사 주장에 독립 근거가 여전히 없습니다.
+7. “옛 커밋의 성공을 새 커밋에 실제 사용한 일이 있었다”는 [판정문:56](../../docs/engineering/chatgpt-verify-feedback-verdict-2026-08-20.md#L56) 역할: R1 필요성을 정당화하는 역사 주장에 독립 근거가 여전히 없습니다.
 
 **결함 — 심각도 높음**
 

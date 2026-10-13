@@ -1,5 +1,7 @@
 VERDICT: PASS
 
+> 후속 상태 (2026-08-25): 아래 KNOWN_DEFECT는 판정 당시의 상태다. 이후 관측기 URL 파싱 수정으로 해소됐다.
+
 ## 결론
 
 현재 작업트리 기준 `c59bad7b160c473cda5545e76e6fa6bcc711a7ea`에서 V2-C 재검증은 PASS입니다. 공유 트리는 수정하지 않았고, 격리 임시 사본(`/tmp/valuehire-v2c-anchor.V7tLrd`)에서만 변이 검증했습니다. 라이브 포털 접속은 수행하지 않았습니다.
