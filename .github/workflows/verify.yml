@@ -236,6 +236,11 @@ jobs:
         # 것이 아니다. 여기서는 판정기의 진리표(9종)와 fail-closed 를 검증한다.
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-verified-sha.sh
 
+      - name: 인수 검사 pr-triage (PR 관제 🔴/🟡/🟢 분류 규칙)
+        # 관제가 CI 실패·충돌·뒤처진 PR 을 🟢 로 띄우면 "봐야 할 PR" 목록이 거짓이 된다.
+        # 픽스처로 분류 19건·제목 주입 무력화·판정 거부(종료값 2) 16건을 검사한다. 네트워크 없음.
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-pr-triage.sh
+
       - name: 인수 검사 ci-step-integrity (스텝을 조용히 끄지 못하는가)
         # pre-push 는 워크플로를 문자열로 훑어 `if: false` 만 잡는다. `if: ${{ false }}`,
         # 항상-거짓 조건, `continue-on-error: true` 는 그대로 통과했다(2026-08-12 V1 D4:

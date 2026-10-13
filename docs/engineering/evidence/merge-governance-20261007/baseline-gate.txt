@@ -1,0 +1,26 @@
+# captured_at_utc: 2026-10-06T16:16:36Z
+# origin/main: 55240f77ff52bb240ab1205e46ad2567c7f0b7ae
+## branch protection (main)
+{"message":"Branch not protected","documentation_url":"https://docs.github.com/rest/branches/branch-protection#get-branch-protection","status":"404"}gh: Branch not protected (HTTP 404)
+
+## rulesets
+{"bypass_actors":[],"conditions":{"ref_name":{"exclude":[],"include":["refs/heads/main"]}},"current_user_can_bypass":"never","enforcement":"active","id":23568184,"name":"acceptance-independent-gate","rules":[{"parameters":{"required_deployment_environments":["acceptance"]},"type":"required_deployments"}]}
+## rules/branches/main
+[{"type":"required_deployments","parameters":{"required_deployment_environments":["acceptance"]},"ruleset_source_type":"Repository","ruleset_source":"sangmokang/Valuehire_v6","ruleset_id":23568184}]
+## environment acceptance
+{"can_admins_bypass":true,"deployment_branch_policy":{"custom_branch_policies":false,"protected_branches":true},"name":"acceptance","protection_rules":[{"prevent_self_review":true,"reviewers":["sangmokang"],"type":"required_reviewers"},{"prevent_self_review":null,"reviewers":[],"type":"branch_policy"}]}
+## deployments(all)
+0
+## main activity (push/merge after ruleset 2026-09-16T22:22Z)
+2026-10-02T01:36:47Z	pr_merge	sangmokang	f764a41	55240f7
+2026-09-28T12:54:30Z	push	sangmokang	f1f7a01	f764a41
+2026-09-25T11:51:56Z	push	sangmokang	fc6beed	f1f7a01
+2026-09-10T01:13:20Z	pr_merge	sangmokang	4379b2f	fc6beed
+2026-09-09T20:17:43Z	pr_merge	sangmokang	3de3633	4379b2f
+2026-09-09T20:02:51Z	pr_merge	sangmokang	01495b3	3de3633
+## main verify runs
+55240f7	push	success	2026-10-02T01:36:51Z
+f764a41	push	failure	2026-09-28T12:54:33Z
+f1f7a01	push	failure	2026-09-25T11:51:58Z
+fc6beed	push	success	2026-09-10T01:13:23Z
+4379b2f	push	success	2026-09-09T20:17:46Z
