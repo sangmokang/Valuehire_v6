@@ -54,10 +54,14 @@ git -C "$CLONE" fetch -q --prune origin || { log "FAIL: fetch"; exit 2; }
 #   Claude 폴더 신뢰 확인: 전용 clone(우리 저장소)이므로 '신뢰'를 고른다
 #   Codex 훅 신뢰 확인   : 훅을 신뢰하지 않고 닫는다(esc)
 start_agent() {
-  local name=$1 kind=$2 pane=$3; shift 3
-  if herdr agent start "$name" --kind "$kind" --pane "$pane" --timeout 60000 -- "$@" | jq -e '.result.agent' >/dev/null; then
-    return 0
-  fi
+  local name=$1 kind=$2 pane=$3 res i; shift 3
+  # 새 창은 셸이 뜨기 전·앞 명령(unset)이 끝나기 전에는 agent_pane_busy 로 거절된다(2026-10-13 실측)
+  for i in $(seq 1 60); do
+    res=$(herdr agent start "$name" --kind "$kind" --pane "$pane" --timeout 60000 -- "$@")
+    printf '%s' "$res" | grep -q '"agent_pane_busy"' || break
+    sleep 1
+  done
+  printf '%s' "$res" | jq -e '.result.agent' >/dev/null && return 0
   if herdr agent read "$name" --source visible | grep -q 'trust this folder'; then
     herdr agent send-keys "$name" down > /dev/null; herdr agent send-keys "$name" enter > /dev/null
   else
