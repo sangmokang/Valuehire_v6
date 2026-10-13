@@ -10,7 +10,7 @@
 ## 현재 상태 (file:line, 2026-09-07 실행 확인)
 
 - `~/.claude/skills/strict/SKILL.md:8` — "정본 계약 = `docs/sot/30-strict-mode-contract.md`" → 이 저장소 히스토리 전체에 이 경로가 존재한 적 없음(`git log --all -- docs/sot/30-strict-mode-contract.md` 결과 0건)
-- `~/.claude/skills/strict/SKILL.md:29` — "이 레포에서는 **`npm run wt -- <issue>-<slug>`**(규약 `../wt/…`, SOT-19 §4)만 쓴다" → 이 저장소엔 `package.json`이 없음(`find . -maxdepth 2 -iname package.json` 0건), `docs/sot/verification-commands.md`(2026-09-02 갱신판)가 이미 "이 저장소는 make 레포도 npm 레포도 아니다"라고 명시. `SOT-19`도 `docs/sot/INDEX.md`에 없음(이 저장소 SOT는 번호가 아니라 주제명 파일)
+- `~/.claude/skills/strict/SKILL.md:29` — "이 레포에서는 **`npm run wt -- <issue>-<slug>`**(규약 `../wt/…`, SOT-19 §4)만 쓴다" → 당시 트리에는 `package.json`이 없음(`find . -maxdepth 2 -iname package.json` 0건), `docs/sot/verification-commands.md`(2026-09-02 갱신판)가 이미 "이 저장소는 make 레포도 npm 레포도 아니다"라고 명시. `SOT-19`도 `docs/sot/INDEX.md`에 없음(이 저장소 SOT는 번호가 아니라 주제명 파일)
 - `~/.claude/skills/strict/SKILL.md:48` — R4 "착수 시 `docs/sot/31-strict-recurrence-ledger.md`를 읽고" → 이번 커밋 전까지 이 파일 없음
 - `~/.claude/skills/strict/SKILL.md:113` — "`tools/install-strict-skill.sh`를 실행" → 저장소 전체에 이 경로 없음(`find . -iname install-strict-skill.sh` 0건)
 - 반면 이 저장소는 실제로 잘 도는 자기 완결 SOT를 이미 갖고 있다: `docs/sot/git-workflow.md`(워크트리 규약 = `git worktree add worktrees/<name> -b task/<name>`), `docs/sot/verification-commands.md`(게이트별 실제 명령 24개 CI 스텝까지 표로), `docs/sot/coding-principles.md`(P1~P24)
@@ -55,8 +55,8 @@ core 본문에 그대로 하드코딩했다. 이 값들은 Valuehire_v6가 아�
 ## 비범위
 
 - SOT 참조 무결성을 매 PR마다 자동으로 막는 CI 검사기(러너/훅) 신설은 이번 범위 밖 —
-  원장(L1행)에 부채로 남기고 별도 GitHub 이슈로 추적한다(R4가 요구하는 "2회째 승격"은
-  아직 임계 미도달 상태로 판단, 3회째부터 강제).
+  원장(L1행)에 부채로 남기고 별도 GitHub 이슈로 추적한다. 원장의 승격 기준은 2회째이며
+  L1은 이미 그 기준에 도달했다.
 - `docs/sot/30-strict-mode-contract.md`라는 이름의 파일을 새로 만들지 않는다 — 이 저장소는
   번호 기반 SOT 파일명 관행이 없고(`docs/sot/INDEX.md` 확인), 새 이름을 추가하면 오히려
   SOT 중복이 생긴다(이미 있는 `coding-principles.md`+`verification-commands.md`+
@@ -112,7 +112,7 @@ phantom이었다 — 원장 L3로 편입, 문단에 "hook 파일 없으면 미�
    31-strict-recurrence-ledger 어느 것도 그 파일에 없다(0건) — 애초에 이번 결함군과
    무관한 별개 문서였다.
 
-2차 수정 후 AC-1 재실행(`docs/sot/30-strict-mode-contract.md`, `tools/install-strict-skill.sh`
-2건만 남고 둘 다 조건부/역사적 서술 문맥임을 `grep -n`으로 직접 확인, 정본 주장으로 쓰인
-곳은 0건) — 나머지 4개 경로(`31-ledger`, `git-workflow.md`, `INDEX.md`,
-`verification-commands.md`)는 전부 PASS.
+2차 수정 후 기록된 검사에서는 `docs/sot/30-strict-mode-contract.md`,
+`tools/install-strict-skill.sh` 2건이 여전히 추출됐다. 둘이 조건부/역사적 서술 문맥이라는
+해석과 별개로, 위에 고정한 AC-1 명령의 `git ls-files --error-unmatch`는 실패하므로
+AC-1은 **FAIL**이다. 정본 주장만 별도로 확인한 결과를 AC-1 PASS로 대체할 수 없다.
