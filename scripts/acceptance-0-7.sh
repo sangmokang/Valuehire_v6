@@ -7,7 +7,7 @@
 # 0-7 인수 스크립트 — 로컬 강제 장치(git hook)가 실제로 위반을 차단하는가.
 #
 # 계약: docs/sot/hook-contracts.md
-#   출력  : exit 0 (위반 8종 전부 BLOCKED + 정상 편집 2종 통과) | exit 1 (하나라도 통과·위양성·오탐·셋업 실패)
+#   출력  : exit 0 (위반 9종 전부 BLOCKED + 정상 편집 2종 통과) | exit 1 (하나라도 통과·위양성·오탐·셋업 실패)
 #   불변식: 모든 시연은 mktemp -d 안의 clone 에서 수행한다. 원본 저장소를 건드리지 않는다.
 #          검사를 실행하지 못한 경우도 실패로 판정한다(fail-closed).
 #
@@ -44,7 +44,7 @@ if [ -n "${VH_PREPUSH_DEPTH:-}" ]; then
   exit 1
 fi
 
-TOTAL=8
+TOTAL=9
 fail=0
 step=0
 
@@ -206,6 +206,14 @@ demo "워크플로 파일 삭제" \
   'git rm -q .github/workflows/verify.yml
    test ! -e .github/workflows/verify.yml' \
   'git commit -m "ci: drop workflow"'
+
+# 9. 워크플로를 스텝이 빠진 사본의 심볼릭 링크로 교체 — git 은 D 도 M 도 아닌 T(타입
+#    변경)로 분류한다. 변경 종류를 나열해 고르면 이런 종류가 빠진다(Codex 적대 리뷰 실측).
+demo "워크플로 심볼릭 링크 교체" \
+  'perl -0pe "s/\n      - name: 억제 만료 스캔.*?(?=\n      - name: )//s" .github/workflows/verify.yml > .github/verify-muted.yml
+   rm .github/workflows/verify.yml && ln -s ../verify-muted.yml .github/workflows/verify.yml
+   test -L .github/workflows/verify.yml && ! grep -q "억제 만료 스캔" .github/verify-muted.yml' \
+  'git add .github/workflows/verify.yml .github/verify-muted.yml && git commit -m "ci: swap to symlink"'
 
 # --- 음성 대조: 정상 편집은 통과해야 한다 ------------------------------------
 # 차단만 시험하면 "워크플로를 건드리면 전부 막는" 규칙도 초록이 된다. 같은 파일의
