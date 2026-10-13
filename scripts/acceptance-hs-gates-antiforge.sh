@@ -19,7 +19,9 @@ WF=".github/workflows/verify.yml"
 for required in "$GATES" "$WF" "humansearch/pyproject.toml" "humansearch/uv.lock" \
   "humansearch/.python-version" "humansearch/src/humansearch/__init__.py" "humansearch/tests" \
   "contracts/admin-weekly-dashboard/metric-contract-v1.json" \
-  "contracts/admin-weekly-dashboard/source-contract-v1.json" "apps/admin"; do
+  "contracts/admin-weekly-dashboard/source-contract-v1.json" "apps/admin" \
+  "contracts/humansearch/brief-policy.json" "contracts/humansearch/team-recipients.json" \
+  "contracts/humansearch/schools-tier.json"; do
   [ -e "$required" ] || { echo "FAIL: required for antiforge missing: $required"; exit 2; }
 done
 
@@ -40,6 +42,10 @@ cp contracts/admin-weekly-dashboard/metric-contract-v1.json \
   "$SANDBOX/contracts/admin-weekly-dashboard/"
 cp contracts/admin-weekly-dashboard/source-contract-v1.json \
   "$SANDBOX/contracts/admin-weekly-dashboard/"
+# HS-13 브리프 계약(P22)도 같은 상대 경계에서 읽는다 — 없으면 policy() 가 수집 단계에서 fail-fast 한다.
+mkdir -p "$SANDBOX/contracts/humansearch"
+cp contracts/humansearch/brief-policy.json contracts/humansearch/team-recipients.json \
+  contracts/humansearch/schools-tier.json "$SANDBOX/contracts/humansearch/"
 mkdir -p "$SANDBOX/apps"
 cp -R apps/admin "$SANDBOX/apps/"
 

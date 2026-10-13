@@ -1,0 +1,312 @@
+#!/usr/bin/env bash
+# acceptance-hs-1300.sh — HS-13.00: 포지션 브리프·서치 패킷 스펙이 구현 지시서의 필수 구조를 갖췄는가
+#
+# 계약: docs/engineering/humansearch-hs13-position-brief-goal-2026-09-10.md §9 HS-13.00
+#   출력 : 항목마다 PASS:/FAIL: 전부 출력, 마지막 줄 `CHECKED: <검사 수>`
+#   exit : 0 = PASS | 1 = FAIL | 2 = NOT_RUN
+#   불변식: CHECKED 는 정확히 EXPECTED_CHECKED 여야 한다 — 검사가 사라져도 초록이면 가짜다(P20)
+#
+# 무엇을 판정하나 (문서 WU 라서 "구조가 지시서 자격을 갖췄는가"만 본다 — 내용의 적합성은 보증하지 않는다):
+#   1  문서 실존·비어있지 않음
+#   2  §4 입력 영역 표의 catch-all 행("그 외 전부" + "명시적 거부")
+#   3  §7 결정 목록 D1~D8 전부 존재 (8건 각각 1검사)
+#   11 §8 예외 표의 catch-all 행("그 외 전부" + "명시적 중단")
+#   12 §9 WU 카드 26건(HS-13.00~12 + 01b·01c·02c·04b·09c·09d·09e·09f·10b) 각각: 행 존재 + 5셀 전부 비어있지 않음 + 명령 셀이 실행 형식
+#      (`cd humansearch && uv run --no-sync pytest|python -m humansearch.brief` 또는 `bash scripts/verify/run-acceptance.sh`) + 상태 셀이 허용값
+#   26 §7 결정 D1~D9 각각 기본값 셀 10자 이상 (9건) — 위 3~10 의 "행 존재"와 별개 검사
+#   35 §5 계약의 공개 타입 이름 12개가 코드 펜스 안에 존재 (각각 1검사)
+#   47 "## 적대 검증 로그" 절 존재
+#   48 §2 지시 9단계 검토 표에 9행
+#   49 §9 WU 카드 수 == 26 (행 수 정확) · 75 verification-commands.md 행의 카드/결정 개수 == 실제 루프 수 (Codex 7차)
+#   50 §7 D9 행 존재 (발송 멱등 — 2026-09-10 Codex V1 편입)
+#   51~55 §4 입력 영역 표에 이미지·합본·언어·ClickUp 공백·시계 행 (5건)
+#   56~63 §5 계약 함수 8개 펜스 안 존재 · 64 §6·§10 절 실존(record_intent) · 65~66 D10·D11 (Codeaudit 2026-09-10)
+#   67 전 행 PLANNED 금지 · 68~70 D9 at-most-once 문구 3개 (Codex 2차 2026-09-10)
+#   WU 행 검사(12~25)는 토큰 경계 정확 파일명·행동 6자·양성/음성 각 10자+없음/반복 거부·PLANNED/BLOCKED 외 상태는 참조 파일이 **이 트리**에 실존 (Codex 2·3·4차)
+#   형제 브랜치·refs 조회는 하지 않는다 — CI clean checkout 에는 형제 브랜치가 없어 거짓 FAIL 이 났다(Codex 7차). 기대출력 백틱은 셸 메타문자 0 문법만
+#   71~74 §5 13.02b·position_count·Approval 결합 토큰 (Codex 4차)
+#   경계: 산문의 의미 적합성은 판정하지 않는다 — Codeaudit·사장님 검토의 몫(스펙 §9 머리 문단)
+#
+# 2026-09-10 Codex V1: 이전 판은 ID·토큰 존재만 봐서 빈 셀 문서가 통과했다(높음). 위 12·26·35 가 그 반례를 막는다.
+#
+# HS_1300_DOC 는 자기 변이 검사(acceptance-hs-1300-mutations.sh)가 고장 사본을 먹일 때만 재지정한다.
+set -uo pipefail
+
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY \
+      GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_PREFIX GIT_QUARANTINE_PATH
+
+REPO=$(git rev-parse --show-toplevel 2>/dev/null) || { echo "NOT_RUN: git 저장소가 아니다"; echo "CHECKED: 0"; exit 2; }
+cd "$REPO" || { echo "NOT_RUN: 저장소 루트로 이동 실패"; echo "CHECKED: 0"; exit 2; }
+
+DOC="${HS_1300_DOC:-docs/engineering/humansearch-hs13-position-brief-goal-2026-09-10.md}"
+VC="${HS_1300_VC:-docs/sot/verification-commands.md}"
+EXPECTED_CHECKED=98
+
+fail=0
+checked=0
+
+pass() { checked=$((checked + 1)); printf 'PASS: %s\n' "$1"; }
+failed() { checked=$((checked + 1)); printf 'FAIL: %s\n' "$1"; fail=1; }
+
+# grep 은 ugrep 으로 가려져 있을 수 있다 — 절대경로로 고정한다(2026-08-25 실측).
+G=/usr/bin/grep
+
+# 1) 문서 실존
+if [ -s "$DOC" ]; then
+  pass "문서 실존·비어있지 않음 — $DOC"
+else
+  failed "문서 없음/빈 파일 — $DOC (기대 동작이 아직 없다)"
+  echo "CHECKED: $checked"
+  exit 1
+fi
+
+# 절 단위로 자르는 도우미: 시작 헤더(정규식)부터 다음 '## ' 헤더 직전까지
+section() {
+  awk -v start="$1" '
+    $0 ~ start { on=1; print; next }
+    on && /^## / { exit }
+    on { print }
+  ' "$DOC"
+}
+
+# 2) §4 catch-all — 부정어 반전("명시적 거부 안 함"·"하지 않") 금지 (2026-09-10 Codeaudit D-2)
+if section '^## 4\. 입력 영역 표' | $G -E '그 외 전부' | $G '명시적 거부' | $G -Ev '안 ?함|하지 ?않|않는다|금지 ?안' >/dev/null; then
+  pass "§4 입력 영역 표 catch-all 행(그 외 전부 → 명시적 거부)"
+else
+  failed "§4 입력 영역 표에 catch-all 행이 없다"
+fi
+
+# 3~10) §7 결정 D1~D8
+# 큰 절은 파일로 두고 grep 한다 — `printf | grep -q` 는 grep 이 먼저 닫으면 printf 가 SIGPIPE 를 받아 pipefail 로 거짓 FAIL 이 난다
+# (2026-09-10 PR #83 push 이벤트 CI 실측: "printf: write error: Broken pipe" → 토큰 '없음' 오판).
+SECD=$(mktemp -d) || { echo "NOT_RUN: mktemp 실패"; echo "CHECKED: 0"; exit 2; }
+trap 'rm -rf "$SECD"' EXIT
+sec7=$(section '^## 7\. 결정 목록')
+printf '%s\n' "$sec7" > "$SECD/sec7"
+for d in D1 D2 D3 D4 D5 D6 D7 D8; do
+  if printf '%s\n' "$sec7" | $G -Eq "^\| *$d *\|"; then
+    pass "§7 결정 $d 행 존재"
+  else
+    failed "§7 결정 $d 행 없음"
+  fi
+done
+
+# 11) §8 catch-all — 부정어 반전 금지
+if section '^## 8\. 예외 표' | $G -E '그 외 전부' | $G '명시적 중단' | $G -Ev '안 ?함|하지 ?않|않는다|금지 ?안' >/dev/null; then
+  pass "§8 예외 표 catch-all 행(그 외 전부 → 명시적 중단)"
+else
+  failed "§8 예외 표에 catch-all 행이 없다"
+fi
+
+# 12~25) §9 WU 카드 14건 — 행 존재 + 5셀 내용 + 명령 형식 + 상태값
+sec9=$(section '^## 9\. Issue HS-13')
+printf '%s\n' "$sec9" > "$SECD/sec9"
+# 표의 한 행을 셀 배열로 쪼갠다(선행·후행 '|' 제거). 백틱 안의 '|' 는 표에 쓰지 않는다는 전제.
+# 2~6자 조각이 바로 이어서 3회 이상 반복되면 무의미 반복으로 본다 (Codex 4차 '통과통과통과…'). 정상 문장의 흩어진 재등장은 허용.
+no_repeat() {
+  # 글자(\p{L}) 2~6개 조각의 연속 3회 반복만 본다 — 숫자·기호(40/20/20/20)는 정상. BSD grep 은 다바이트 역참조를
+  # 놓치므로 perl 을 쓴다(macOS·ubuntu 공통 탑재)
+  if printf '%s' "$1" | perl -CS -ne 'exit(/(\p{L}{2,6})\1\1/ ? 0 : 1)'; then return 1; fi
+  return 0
+}
+nospace_chars() {
+  # wc -m 은 LC_ALL=C 에서 한글 바이트를 문자로 세지 못한다. perl -CS 로 UTF-8 문자 수를 센다.
+  printf '%s' "$1" | perl -CS -Mutf8 -0777 -ne 's/\s+//g; print length($_)'
+}
+
+wu_row_ok() {
+  local row="$1" cells n cmd state
+  row="${row#|}"; row="${row%|}"
+  IFS='|' read -r -a cells <<< "$row"
+  n=${#cells[@]}
+  [ "$n" -eq 5 ] || return 1
+  for c in "${cells[@]}"; do
+    [ -n "$(printf '%s' "$c" | tr -d '[:space:]')" ] || return 1
+  done
+  cmd="${cells[2]}"
+  local id="${cells[0]//[[:space:]]/}"; id="${id#HS-13.}"
+  # 백틱 안 명령 전부를 ID 별 문법으로 고정 (Codex 5차: `true # cd humansearch && …` 가 부분문자열 검사를 통과했다).
+  # 제어 연산자 # ; | & 금지(&& 는 'cd humansearch && ' 접두 1회만). CLI 는 HS-13.10 행에만.
+  # 백틱 밖 텍스트에 제어 연산자가 있으면 거부 (Codex 6차: 백틱 뒤 '; true')
+  printf '%s' "$cmd" | sed -E 's/`[^`]*`//g' | $G -Eq '[#;|&]' && return 1
+  # 홀수 백틱 = 닫히지 않은 조각이 백틱 밖 검사와 안 검사 사이로 빠진다 (Codex 7차)
+  local n_bt; n_bt=$(printf '%s' "$cmd" | tr -cd '`' | wc -c | tr -d ' ')
+  [ $((n_bt % 2)) -eq 0 ] || return 1
+  local n_cmd=0 c coupled=0
+  while IFS= read -r c; do
+    [ -n "$c" ] || continue
+    # 모든 백틱 조각을 분류한다: 명령 문법 | 기대 출력 문법(`CHECKED: n`·`n+ passed`·`VERIFIED packet_id=ID body_sha256=HEX`·`KEY=value`) | 그 외 → 거부 (Codex 6차)
+    # 기대 출력의 값 문자는 [A-Za-z0-9_.:/-] 뿐 — `$ ( ) < > \ ; | &` 가 하나라도 있으면 실행 가능한 조각이므로 거부 (Codex 7차: `RESULT=$(id)`)
+    case "$c" in
+      "cd humansearch "*|"bash scripts/"*) ;;
+      *) printf '%s' "$c" | $G -Eq '^(CHECKED: [0-9]+|[0-9]+\+ passed|(VERIFIED|SENT_UNVERIFIED) packet_id=[A-Za-z0-9_-]+( body_sha256=[A-Za-z0-9]+)?( recipients_sha256=[A-Za-z0-9]+)?|[A-Z_]+=[A-Za-z0-9_.:/-]+)$' && continue; return 1 ;;
+    esac
+    n_cmd=$((n_cmd + 1))
+    # ID 결합은 검증된 명령의 인자에서만 센다
+    printf '%s' "$c" | $G -Eq "tests/test_hs_13${id}\.py( |$)|scripts/acceptance-hs-13${id}(-[a-z]+)*\.sh( |$)" && coupled=1
+    if [ "$id" = "10" ]; then
+      printf '%s' "$c" | $G -Eq '^cd humansearch && uv run --no-sync python -m humansearch\.brief verify( --[a-z-]+ <[^<>#;|&]+>)+$' || return 1
+    else
+      printf '%s' "$c" | $G -Eq "^cd humansearch && uv run --no-sync pytest -q( tests/test_hs_13${id}[a-z]?\.py)+$|^bash scripts/verify/run-acceptance\.sh scripts/acceptance-hs-13${id}(-[a-z]+)*\.sh$" || return 1
+    fi
+  done < <(printf '%s' "$cmd" | $G -Eo '`[^`]+`' | tr -d '`')
+  [ "$n_cmd" -ge 1 ] || return 1
+  # 정확한 정본 파일명 결합(비-CLI 행은 검증된 명령 안에 결합 파일 1개 이상, Codex 2·3·6차)
+  if [ "$id" != "10" ]; then [ "$coupled" -eq 1 ] || return 1; fi
+  # 13.02 행은 13.02b 시험 파일도 정확히 참조해야 한다 (Codex 4차)
+  if [ "$id" = "02" ]; then printf '%s' "$cmd" | $G -Eq 'tests/test_hs_1302b\.py( |`|$)' || return 1; fi
+  # 행동 셀 최소 6자, 정상/반례 셀에 양성·음성 둘 다 + 각각 내용 10자 이상 + 없음/N/A/x 거부
+  [ "$(nospace_chars "${cells[1]}")" -ge 6 ] || return 1
+  local pos neg
+  pos="$(printf '%s' "${cells[3]}" | $G -Eo '양성[:：][^.]*' | head -1 | tr -d '[:space:]')"
+  neg="$(printf '%s' "${cells[3]}" | $G -Eo '음성[:：][^.]*' | head -1 | tr -d '[:space:]')"
+  [ "$(nospace_chars "$pos")" -ge 13 ] || return 1
+  [ "$(nospace_chars "$neg")" -ge 13 ] || return 1
+  # 무의미 반복 거부: 같은 3자 이상 조각이 3회 이상 (Codex 4차 '통과통과통과…')
+  no_repeat "$pos" || return 1
+  no_repeat "$neg" || return 1
+  printf '%s' "${cells[3]}" | $G -Eq '(양성|음성)[:：] *(없음|N/A|n/a|해당 ?없음|-|x|X)( |$|·|,|\.)' && return 1
+  state="$(printf '%s' "${cells[4]}" | tr -d '[:space:]')"
+  # 괄호는 BLOCKED(사유) 만 허용. IMPLEMENTED(x)·LOCAL_COMMITTED(task/x) 같은 회피 금지 (Codex 3·7차)
+  printf '%s' "$state" | $G -Eq '^(PLANNED|RED|IMPLEMENTED|LOCAL_COMMITTED|AUDITED|PR_OPEN|VERIFIED|MERGED)$|^BLOCKED\(.+\)$' || return 1
+  # PLANNED/BLOCKED 가 아니면 참조 파일이 **이 트리**에 실존해야 한다 — 형제 브랜치 조회 없음(CI clean checkout 동일 판정)
+  case "$state" in
+    PLANNED|BLOCKED*) ;;
+    *)
+      for f in $(printf '%s' "$cmd" | $G -Eo 'tests/test_hs_13[0-9a-z_]+\.py|scripts/acceptance-hs-13[0-9a-z-]+\.sh'); do
+        case "$f" in tests/*) [ -f "humansearch/$f" ] || return 1 ;; *) [ -f "$f" ] || return 1 ;; esac
+      done ;;
+  esac
+  return 0
+}
+WU_IDS=(00 01 01b 01c 02 02c 03 04 04b 04c 05 05b 06 07 08 09 09c 09d 09e 09f 09g 10 10b 10c 11 12)
+D_IDS=(D1 D2 D3 D4 D5 D6 D7 D8 D9 D10 D11 D12 D13)
+for n in "${WU_IDS[@]}"; do
+  row=$(printf '%s\n' "$sec9" | $G -E "^\| *HS-13\.$n *\|" | head -1)
+  if [ -n "$row" ] && wu_row_ok "$row"; then
+    pass "§9 WU 카드 HS-13.$n 존재·5셀 내용·명령 형식·상태값"
+  else
+    failed "§9 WU 카드 HS-13.$n 없음 또는 셀 비어있음/명령 형식·상태값 위반"
+  fi
+done
+
+# 26~34) §7 D1~D9 기본값 셀 내용(10자 이상)
+for d in "${D_IDS[@]}"; do
+  row=$(printf '%s\n' "$sec7" | $G -E "^\| *$d *\|" | head -1)
+  row="${row#|}"; row="${row%|}"
+  IFS='|' read -r -a cells <<< "$row"
+  val="$(printf '%s' "${cells[2]:-}" | tr -d '[:space:]')"
+  distinct=$(printf '%s' "$val" | $G -o . | LC_ALL=C sort -u | wc -l | tr -d ' ')
+  # 한글 단어 계수는 로케일에 기대지 않는다 — CI(ubuntu, LANG=C)에서 grep '[가-힣]' 은 0건이었다(2026-09-10 PR #83 실측). perl -CS 는 로케일 무관.
+  words=$(printf '%s' "${cells[2]:-}" | perl -CS -ne 'print "$&\n" while /\p{Hangul}{2,}/g' | wc -l | tr -d ' ')
+  uniq_words=$(printf '%s' "${cells[2]:-}" | perl -CS -ne 'print "$&\n" while /\p{Hangul}{2,}/g' | LC_ALL=C sort -u | wc -l | tr -d ' ')
+  if [ "${#val}" -ge 10 ] && [ "$distinct" -ge 3 ] && [ "$words" -ge 2 ] && [ "$uniq_words" -ge 2 ] && no_repeat "$val"; then
+    pass "§7 결정 $d 기본값 셀 내용 있음(${#val}자·문자 ${distinct}종·한글 단어 ${words}개)"
+  else
+    failed "§7 결정 $d 기본값 셀이 비었거나 10자 미만이거나 무의미(문자 ${distinct}종·한글 단어 ${words}개)"
+  fi
+done
+
+# 35~46) §5 공개 타입 이름 12개 — 코드 펜스 안에서만 센다
+sec5_fenced=$(section '^## 5\. 계약' | awk '/^```/{f=!f; next} f{print}')
+printf '%s\n' "$sec5_fenced" > "$SECD/sec5_fenced"
+for t in BriefInputError SourceRef Claim PositionSpec JdSource CompanyBrief \
+         EmailContact CandidateEvidence ScoreBreakdown CandidateLead JdPacket SearchPacket; do
+  if $G -Eq "class $t\b" "$SECD/sec5_fenced"; then
+    pass "§5 타입 $t 선언이 코드 펜스 안에 존재"
+  else
+    failed "§5 타입 $t 선언이 코드 펜스 안에 없음"
+  fi
+done
+
+# 47) 적대 검증 로그 절
+if $G -Eq '^## 적대 검증 로그' "$DOC"; then
+  pass "'## 적대 검증 로그' 절 존재"
+else
+  failed "'## 적대 검증 로그' 절 없음"
+fi
+
+# 48) §2 지시 9단계 검토 표 = 9행 (표 헤더·구분선 제외, 첫 열이 1~9)
+rows=$(section '^## 2\. 사장님 지시' | $G -Ec '^\| *[1-9] *\|')
+if [ "$rows" -eq 9 ]; then
+  pass "§2 지시 9단계 검토 표 9행"
+else
+  failed "§2 지시 검토 표 행 수 $rows (기대 9)"
+fi
+
+# 49) §9 WU 카드 수 정확히 ${#WU_IDS[@]}
+wu_rows=$(printf '%s\n' "$sec9" | $G -Ec '^\| *HS-13\.[0-9]{2}[a-z]? *\|')
+if [ "$wu_rows" -eq "${#WU_IDS[@]}" ]; then
+  pass "§9 WU 카드 수 ${#WU_IDS[@]}"
+else
+  failed "§9 WU 카드 수 $wu_rows (기대 ${#WU_IDS[@]})"
+fi
+
+# 75) 정본 verification-commands.md 의 hs-1300 행이 적은 카드 수·결정 범위 == 실제 루프 수 (Codex 7차: 14·D1~D9 로 남아 있었다)
+vc_row=$($G -E 'acceptance-hs-1300\.sh' "$VC" 2>/dev/null | head -1)
+if printf '%s' "$vc_row" | $G -q "WU 카드 ${#WU_IDS[@]} " && printf '%s' "$vc_row" | $G -q "D1~D${#D_IDS[@]} "; then
+  pass "verification-commands.md hs-1300 행: 카드 ${#WU_IDS[@]}·D1~D${#D_IDS[@]} 가 검사기 루프와 일치"
+else
+  failed "verification-commands.md hs-1300 행의 카드/결정 개수가 검사기 루프(${#WU_IDS[@]}·D${#D_IDS[@]})와 다르거나 행 없음"
+fi
+
+# 71~74) 13.02b·position_count 계약 토큰 (Codex 4차 — 문서에서 사라지면 exit 1)
+for k in 'position_count: int' 'extra_lines: tuple' 'def extract_block' 'from_attempt: int' 'search_filters: SearchFilters' 'multi_position_hint: tuple' 'created_on: date' '날짜 없음' 'allowed_search_locations'; do
+  if $G -qF -- "$k" "$SECD/sec5_fenced"; then pass "§5 계약 토큰 '$k'"; else failed "§5 계약 토큰 '$k' 없음"; fi
+done
+
+# 67) 전 행 PLANNED 금지 — 착수된 WU 가 최소 1개
+if $G -E '^\| *HS-13\.' "$SECD/sec9" | $G -Ev '\| *PLANNED *\|$' >/dev/null; then
+  pass "§9 PLANNED 가 아닌 WU 카드 1개 이상"
+else
+  failed "§9 모든 WU 가 PLANNED — 착수 상태를 표시하지 않는 문서"
+fi
+# 68~70) D9 at-most-once 핵심 문구 3개 (Codex 2차 상충 지적)
+sec5_all=$(section '^## 5\. 계약')
+printf '%s\n' "$sec5_all" > "$SECD/sec5_all"
+for k in 'O_CREAT' 'O_EXCL' 'def open_new_attempt'; do
+  if $G -qF -- "$k" "$SECD/sec5_all"; then pass "§5 D9 at-most-once 문구 '$k'"; else failed "§5 D9 문구 '$k' 없음"; fi
+done
+
+# 50) D9 발송 멱등 결정 존재
+if $G -E '^\| *D9 *\|' "$SECD/sec7" | $G 'at-most-once' >/dev/null; then
+  pass "§7 D9 발송 멱등 결정 존재"
+else
+  failed "§7 D9 발송 멱등 결정 없음"
+fi
+
+# 56~63) §5 계약 함수 8개 + CLI 계약 (Codeaudit 최소 보강 ②)
+for f in verify_fidelity check_linkedin split_two_field compose_brief_mail load_recipients score_candidate build_boolean_queries build_inmail; do
+  if $G -Eq "def $f\(" "$SECD/sec5_fenced"; then
+    pass "§5 함수 $f 계약 존재"
+  else
+    failed "§5 함수 $f 계약 없음"
+  fi
+done
+# 64) §6 출력 계약·§10 러너 절차 절 실존 (껍데기 문서 차단)
+if $G -Eq '^### 6\. 출력 계약' "$DOC" && $G -Eq '^## 10\. HS-13\.10 러너 절차' "$DOC" && section '^## 10\. HS-13\.10 러너 절차' | $G 'record_intent' >/dev/null; then
+  pass "§6 출력 계약·§10 러너 절차(D9 record_intent 포함) 실존"
+else
+  failed "§6 출력 계약 또는 §10 러너 절차(record_intent) 없음"
+fi
+# 65~66) D10 매력도·D11 어미 축약 결정 (Codeaudit D-3)
+for d in D10 D11 D12 D13; do
+  if printf '%s\n' "$sec7" | $G -Eq "^\| *$d *\|"; then pass "§7 결정 $d 존재"; else failed "§7 결정 $d 없음"; fi
+done
+
+# 51~55) §4 현실 입력 행 5종
+sec4=$(section '^## 4\. 입력 영역 표')
+for k in '이미지' '합본' '언어' 'ClickUp description' '시계'; do
+  if printf '%s\n' "$sec4" | $G -Eq "^\| *[^|]*$k"; then
+    pass "§4 입력 행 '$k' 존재"
+  else
+    failed "§4 입력 행 '$k' 없음"
+  fi
+done
+
+echo "CHECKED: $checked"
+if [ "$checked" -ne "$EXPECTED_CHECKED" ]; then
+  echo "FAIL: CHECKED $checked ≠ 기대 $EXPECTED_CHECKED — 검사가 사라지거나 늘었다"
+  exit 1
+fi
+exit "$fail"
