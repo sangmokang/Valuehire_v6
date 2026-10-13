@@ -264,7 +264,7 @@ $ bash scripts/acceptance-hs-gates.sh
 PASS: ruff clean in 42 python files
 PASS: mypy strict clean in 42 source files
 PASS: pytest collected 221 and passed
-PASS: runtime import proof /Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-cdp-handshake-proof/humansearch/src/humansearch/__init__.py
+PASS: runtime import proof <로컬 사용자 경로>/humansearch/src/humansearch/__init__.py
 COLLECTED: 221
 ```
 

@@ -182,9 +182,9 @@ class _LocalCdpServer:
                 connection, _ = self._listener.accept()
                 with connection:
                     connection.settimeout(1.0)
+                    self._receive_request(connection)
                     if self.accept_mode == "close-before-headers":
                         return
-                    self._receive_request(connection)
                     accept = self._accept_header()
                     if self.accept_mode == "wrong":
                         accept = "SGVsbG8gdGhlcmUgZnJpZW5k"
@@ -295,7 +295,5 @@ def test_observe_markers_refuses_a_local_socket_that_closes_mid_handshake() -> N
     ):
         _observe_from(server)
 
-    assert str(caught.value) in {
-        "DevTools websocket handshake ended early",
-        "DevTools read failed",
-    }
+    assert b"GET /devtools/page/SYNTHETIC HTTP/1.1\r\n" in bytes(server.request)
+    assert str(caught.value) == "DevTools websocket handshake ended early"
