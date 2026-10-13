@@ -137,11 +137,23 @@ review_one() {
   if [ "$rc" -ne 0 ]; then ledger "$n" "$sha" FAILED "${note:-에이전트 실패}"; return 1; fi
   note=""
 
+  # Codex 샌드박스는 .git 쓰기를 막아 커밋할 수 없다(2026-10-13 실측 PR #37 — 수정이 작업 트리에만 남고
+  # 사라졌다). Codex 가 남긴 '고친 파일 목록'에 있는 것만 이 스크립트가 커밋한다. 목록 밖 찌꺼기는 안 들어간다.
+  if [ -s "$out/changed-files.txt" ]; then
+    files=()
+    while IFS= read -r f; do [ -n "$f" ] && files+=("$f"); done < "$out/changed-files.txt"
+    [ -s "$out/commit-msg.txt" ] || echo "PR #${n} 자동 리뷰 수정" > "$out/commit-msg.txt"
+    if ! { git -C "$CLONE" add -A -- "${files[@]}" && git -C "$CLONE" commit -q -F "$out/commit-msg.txt"; } > "$out/commit.log" 2>&1; then
+      note="수정 커밋이 거부됐다(훅 차단 등). 수정은 반영되지 않았다."
+      git -C "$CLONE" reset -q --hard "$sha"
+    fi
+  fi
+
   new=$(git -C "$CLONE" rev-parse HEAD)
   if [ "$new" != "$sha" ]; then
     if git -C "$CLONE" merge-base --is-ancestor "$sha" "$new" &&
        git -C "$CLONE" push -q origin "HEAD:refs/heads/$branch" > "$out/push.log" 2>&1; then
-      pushed=$new
+      pushed=$new; note="자동 수정 커밋: ${new:0:7} (리뷰에서 확인된 문제를 이 PR 브랜치에 반영)"
     else
       note="수정 커밋을 push 하지 못했다(브랜치가 그사이 바뀌었거나 pre-push 차단). 수정은 반영되지 않았다."
     fi

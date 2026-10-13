@@ -91,7 +91,12 @@ case "$1 $2" in
                    *) if [ "$kind" = claude ]; then
                         printf '## Claude 1차 리뷰 PR #%s\n- 발견: 없음\n' "$n" > "$out/claude.md"
                       else
-                        [ "$mode" = fix ] && (cd "$dir" && echo fixed > fix.txt && git add fix.txt && git commit -qm fix)
+                        # 실제 Codex 샌드박스는 .git 쓰기를 막는다(2026-10-13 실측) — 작업 트리만 고치고
+                        # 고친 파일 목록·커밋 메시지를 결과 폴더에 남긴다. 목록 밖 찌꺼기도 하나 만든다.
+                        if [ "$mode" = fix ]; then
+                          (cd "$dir" && echo fixed > fix.txt && echo junk > junk.tmp)
+                          echo fix.txt > "$out/changed-files.txt"; echo "가짜 수정" > "$out/commit-msg.txt"
+                        fi
                         if [ "$mode" = pii ]; then v="연락처 someone@example.com"; else v="발견 없음"; fi
                         printf '## 자동 리뷰 PR #%s\n- %s\n판정: 병합 가능\n' "$n" "$v" > "$out/verdict.md"
                       fi ;;
@@ -134,6 +139,10 @@ NB2=$(sha b2)
 if [ "$NB2" != "$B2" ] && git --git-dir="$T/remote.git" cat-file -e "$NB2:fix.txt" 2>/dev/null; then
   ok "#2 수정 커밋이 PR 브랜치로 push 됨"; else bad "#2 수정 커밋이 원격 b2 에 없다"; fi
 expect "#2 수정 후 SHA 도 장부 REVIEWED" "$(led 2 "$NB2" REVIEWED)" 1
+if git --git-dir="$T/remote.git" cat-file -e "$NB2:junk.tmp" 2>/dev/null; then
+  bad "목록에 없는 파일(junk.tmp)까지 커밋됐다"; else ok "고친 파일 목록에 있는 것만 커밋"; fi
+if grep -q "자동 수정 커밋: ${NB2:0:7}" "$F"/comments/2.*; then
+  ok "댓글에 실제 수정 커밋 해시가 있다"; else bad "댓글에 수정 커밋 해시가 없다"; fi
 
 prs 1:b1 2:b2
 run >/dev/null
