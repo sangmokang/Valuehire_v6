@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const RUNNER_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(RUNNER_DIR, "..", "..");
+const REPRO_TIMEOUT_MS = 60_000;
 const SOURCES = new Set(["contract", "adversarial", "runtime"]);
 const SEVERITIES = new Set(["high", "medium", "low"]);
 const STATUSES = new Set([
@@ -130,15 +131,26 @@ function collectProcess(child) {
     const stdout = [];
     const stderr = [];
     let spawnError;
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      try {
+        process.kill(-child.pid, "SIGKILL");
+      } catch (error) {
+        if (error.code !== "ESRCH") spawnError = error;
+      }
+    }, REPRO_TIMEOUT_MS);
     child.stdout.on("data", (chunk) => stdout.push(chunk));
     child.stderr.on("data", (chunk) => stderr.push(chunk));
     child.on("error", (error) => {
       spawnError = error;
     });
     child.on("close", (code, signal) => {
+      clearTimeout(timer);
       resolve({
         code,
         signal,
+        timedOut,
         error: spawnError,
         stdout: Buffer.concat(stdout).toString("utf8"),
         stderr: Buffer.concat(stderr).toString("utf8"),
@@ -155,6 +167,7 @@ async function executeRepro(finding) {
     child = spawn("/bin/sh", ["-c", finding.repro.cmd], {
       cwd,
       env: process.env,
+      detached: true,
       stdio: ["ignore", "pipe", "pipe"],
     });
   } catch (error) {
@@ -164,7 +177,8 @@ async function executeRepro(finding) {
 }
 
 function statusFromExecution(finding, execution) {
-  if (execution.error || execution.signal || execution.code === 126 || execution.code === 127) {
+  if (execution.error || execution.signal || execution.timedOut || execution.code === 126
+    || execution.code === 127 || (execution.code >= 129 && execution.code <= 159)) {
     return "BLOCKED";
   }
   const { expect } = finding.repro;
@@ -179,8 +193,10 @@ function printExecution(finding, execution, status) {
   if (execution.stderr) process.stderr.write(execution.stderr);
   const exit = execution.code === null ? "none" : execution.code;
   const signal = execution.signal ? ` signal=${execution.signal}` : "";
-  const error = execution.error ? ` error=${execution.error.code ?? execution.error.message}` : "";
-  process.stdout.write(`[${finding.id}] exit=${exit}${signal}${error} status=${status}\n`);
+  const error = execution.error
+    ? ` error=${execution.error.code ? execution.error.code : execution.error.message}` : "";
+  const timeout = execution.timedOut ? " timeout=yes" : "";
+  process.stdout.write(`[${finding.id}] exit=${exit}${signal}${error}${timeout} status=${status}\n`);
 }
 
 async function runSelected(findings, only) {
@@ -200,7 +216,13 @@ async function writeAtomically(file, data, mode) {
     await writeFile(temp, `${JSON.stringify(data, null, 2)}\n`, { flag: "wx", mode });
     await rename(temp, file);
   } catch (error) {
-    await unlink(temp).catch(() => {});
+    try {
+      await unlink(temp);
+    } catch (cleanupError) {
+      if (cleanupError.code !== "ENOENT") {
+        throw new AggregateError([error, cleanupError], "write and temporary file cleanup failed");
+      }
+    }
     throw error;
   }
 }

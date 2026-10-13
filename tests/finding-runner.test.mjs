@@ -152,3 +152,47 @@ test("계약 오류나 없는 --only ID는 파일을 수정하지 않고 exit 2�
   assert.equal(await readFile(file, "utf8"), original);
   assert.match(result.stderr, /F-404/);
 });
+
+test("잘못된 계약은 명령을 실행하거나 파일을 수정하지 않고 exit 2이다", async (t) => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "finding-runner-contract-"));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const marker = path.join(dir, "executed.marker");
+  const base = finding({
+    id: "F-10",
+    cmd: `node -e "require('node:fs').writeFileSync('${marker}', 'ran')"`,
+    expect: { exit_not: 0 },
+  });
+  const cases = [
+    { ...base, severity: "critical" },
+    { ...base, repro: { ...base.repro, cwd: "../outside" } },
+    { ...base, repro: { ...base.repro, expect: { exit_not: 0, stdout_contains: "x" } } },
+  ];
+  for (const [index, invalid] of cases.entries()) {
+    const file = path.join(dir, `invalid-${index}.json`);
+    const original = `${JSON.stringify({ findings: [invalid] }, null, 2)}\n`;
+    await writeFile(file, original);
+    const result = invoke(file);
+    assert.equal(result.status, 2, result.stderr);
+    assert.equal(await readFile(file, "utf8"), original);
+    await assert.rejects(readFile(marker), { code: "ENOENT" });
+  }
+});
+
+test("셸이 감싼 자식의 신호 종료는 결함 재현이 아니라 BLOCKED이다", async (t) => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "finding-runner-signal-"));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const file = path.join(dir, "signal.json");
+  const data = { findings: [finding({
+    id: "F-11",
+    cmd: "sh -c 'kill -9 $$'; exit $?",
+    expect: { exit_not: 0 },
+    severity: "high",
+  })] };
+  await writeFile(file, `${JSON.stringify(data, null, 2)}\n`);
+
+  const result = invoke(file);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal((await readFinding(file)).status, "BLOCKED");
+  assert.match(result.stdout, /병합 차단: 아니오/);
+});

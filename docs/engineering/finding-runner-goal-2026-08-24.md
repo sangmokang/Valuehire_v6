@@ -11,7 +11,7 @@ Finding 재현 러너는 완료됐습니다. 세 fixture는 실제 명령 실행
 ## 2층 판단 근거
 
 - `scripts/verify/check-strict-verdict-ledger.sh`는 YAML의 `g/v1/v2/t` 역할별 `status`, `command`, `exit`, `output`, `artifact`, `artifact_hash`, `session_id`를 검사합니다. 상태도 `PASS|FAIL|NOT_RUN`으로, finding의 다섯 상태와 목적이 다릅니다.
-- `/Users/kangsangmo/.codex/skills/strict/SKILL.md:135`는 개별 Finding 상태를 `REPRODUCED|BLOCKED|NOT_REPRODUCIBLE|NOT_TESTED|UNRESOLVED` 다섯 값으로 이미 고정합니다. 새 러너는 이 기존 의미를 그대로 실행 코드로 옮깁니다.
+- `~/.codex/skills/strict/SKILL.md:135`는 개별 Finding 상태를 `REPRODUCED|BLOCKED|NOT_REPRODUCIBLE|NOT_TESTED|UNRESOLVED` 다섯 값으로 이미 고정합니다. 새 러너는 이 기존 의미를 그대로 실행 코드로 옮깁니다.
 - 모델의 claim·기존 status는 실행 증거가 아닙니다. 선택한 finding마다 셸 명령을 실제 시작한 뒤 종료값 또는 표준 출력 기대값으로만 상태를 새로 계산합니다.
 - 실행 파일 없음, 권한 거부, 유효하지 않은 작업 폴더처럼 명령을 시작하거나 완료할 환경이 없으면 `BLOCKED`입니다. 현상이 나타나지 않은 `NOT_REPRODUCIBLE`과 섞지 않습니다.
 - 병합 차단은 사용자 계약 그대로 `high + (REPRODUCED|UNRESOLVED)`만 참입니다. 명령 오류나 잘못된 입력은 finding 판정과 다른 러너 오류로 분리합니다.
@@ -43,7 +43,7 @@ role_keys = %w[status command exit output artifact artifact_hash session_id]
 
 ### Strict 정본 직접 로드 장부
 
-- 세션: `01a030c0-873c-7891-83db-8079de9fd8bb`
+- 세션: `<검증 세션 ID>`
 - 시작 commit: `c59bad7b160c473cda5545e76e6fa6bcc711a7ea`
 - 코딩 정본 직접 읽기: `sed -n '1,180p' docs/sot/coding-principles.md && sed -n '181,360p' docs/sot/coding-principles.md`, `2026-08-24T07:35:25+09:00`, exit `0`, 74줄, SHA-256 `5402cb3f05d03e35db79158e9933e13c3fe17db4d63c8a7a808db10c80151dcb` — `PASS`.
 - 기계 장부 직접 읽기: `sed -n '1,220p' docs/sot/principles.yaml && sed -n '221,500p' docs/sot/principles.yaml`, `2026-08-24T07:35:25+09:00`, exit `0`, 345줄, SHA-256 `a19b29abaf6c61e403d2f1df5720b55ff477942dc9257cb2513043b20855ef22` — `PASS`.
@@ -65,7 +65,7 @@ CHECKED: 34
 ## 현재 상태와 근본 원인
 
 - `docs/sot/coding-principles.md:60` — 외부 모델 의견은 로컬 실행으로 재현되기 전까지 결함이 아니라는 V-4 원칙이 있습니다.
-- `/Users/kangsangmo/.codex/skills/strict/SKILL.md:147` — 모델 자기 서술은 상태를 승격하지 못하며 독립 재현만 증거로 센다고 고정합니다.
+- `~/.codex/skills/strict/SKILL.md:147` — 모델 자기 서술은 상태를 승격하지 못하며 독립 재현만 증거로 센다고 고정합니다.
 - 현재 `tools/strict/finding-runner.mjs`와 이를 실행하는 테스트는 없습니다.
 
 근본 원인은 개별 지적에 실행 가능한 `repro` 계약은 제안됐지만, 그 명령을 실행하고 다섯 상태로 환원하는 판정기가 없다는 점입니다. 따라서 지금은 사람이 모델 서술을 읽고 임의로 병합 차단 여부를 정할 수 있습니다.
@@ -159,7 +159,7 @@ CHECKED: 34
 | GREEN | PASS | 같은 명령 | `2026-08-24T07:39:02+09:00`, exit `0`, 7/7 통과 |
 | R2 mutation | PASS | 실행 호출 제거 사본 + 같은 테스트 | `2026-08-24T07:39:55+09:00`, exit `1`, 3건이 고장 사본 차단 |
 | 저장소 검사 | PASS | Node check·`verify.sh`·SOT·diff·줄수 | `2026-08-24T07:40:40+09:00`, 전부 exit `0` |
-| V1 Claude | PASS | goal·산출물·실행 증거 격리 검토 | 재시도 session `005b4341-b263-40bf-8989-995ae991d30c`, exit `0`, `VERDICT: PASS` |
+| V1 Claude | PASS | goal·산출물·실행 증거 격리 검토 | 재시도 session `<검증 세션 ID>`, exit `0`, `VERDICT: PASS` |
 | V2 Codex | PASS | V1 finding 직접 재현 | 재심 뒤 `PASS`, V1 과장 0건·누락 0건 |
 
 ## 적대 검증 로그
@@ -171,7 +171,7 @@ RED 원명령과 출력:
 ```text
 timestamp=2026-08-24T07:37:42+09:00
 $ node --test tests/finding-runner.test.mjs
-Error: Cannot find module '/Users/kangsangmo/Desktop/Valuehire_v6/tools/strict/finding-runner.mjs'
+Error: Cannot find module '<저장소>/tools/strict/finding-runner.mjs'
 1..7
 # tests 7
 # pass 0
@@ -264,17 +264,17 @@ largest function/test callback: 23/100 LOC PASS
 
 ### V1 — Claude
 
-첫 실행은 session `e0a4ebb8-3452-4a26-a8a1-9c149ad8b086`에서 `dontAsk` 권한 모드가 `node --test`와 임시 사본 생성을 8회 거부했습니다. Claude는 실행 0건을 PASS로 세지 않고 판정을 유보했습니다. 권한 원인을 제거하기 전 상태는 `NOT_RUN`입니다.
+첫 실행은 session `<검증 세션 ID>`에서 `dontAsk` 권한 모드가 `node --test`와 임시 사본 생성을 8회 거부했습니다. Claude는 실행 0건을 PASS로 세지 않고 판정을 유보했습니다. 권한 원인을 제거하기 전 상태는 `NOT_RUN`입니다.
 
 재시도 명령 신원:
 
 ```text
 timestamp=2026-08-24T07:47:09+09:00
 commit=c59bad7b160c473cda5545e76e6fa6bcc711a7ea
-session=005b4341-b263-40bf-8989-995ae991d30c
+session=<검증 세션 ID>
 $ env -u ANTHROPIC_API_KEY claude --safe-mode --tools Read,Grep,Glob,Bash \
   --dangerously-skip-permissions --no-session-persistence --effort high \
-  --output-format json --session-id 005b4341-b263-40bf-8989-995ae991d30c -p
+  --output-format json --session-id <검증 세션 ID> -p
 exit=0
 permission_denials=[]
 ```
