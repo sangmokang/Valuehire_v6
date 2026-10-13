@@ -68,7 +68,7 @@ Supabase는 SQLite 원본에서 생성된 파생 저장이다. Supabase write �
 검사 명령:
 
 ```bash
-rg -n '단일 원본|SQLite|Supabase|파생|outbox|로컬 저장 완료를 대신하지 않는다|저장 상태와 열람 완전성은 독립|partial.*complete' docs/sot/humansearch-storage-contract.md
+(for pattern in '단일 원본' 'SQLite' 'Supabase' '파생' 'outbox' '로컬 저장 완료를 대신하지 않는다' '저장 상태와 열람 완전성은 독립' 'partial.*complete'; do sed '/^```/,/^```/d' docs/sot/humansearch-storage-contract.md | rg -q "$pattern" || exit 1; done)
 ```
 
 ### 3. 보호 저장 위치와 권한
@@ -93,7 +93,7 @@ OS 권한 분리는 같은 사용자 안의 에이전트 분리와 다르다. �
 검사 명령:
 
 ```bash
-rg -n 'Git 밖|0700|0600|umask|쓰기 직전에|대상 파일 경로 자체|WAL|SHM|journal|temp|백업|EACCES|symlink|같은 UID|NOT_RUN' docs/sot/humansearch-storage-contract.md
+(for pattern in 'Git 밖' '0700' '0600' 'umask' '쓰기 직전에' '대상 파일 경로 자체' 'WAL' 'SHM' 'journal' 'temp' '백업' 'EACCES' 'symlink' '같은 UID' 'NOT_RUN'; do sed '/^```/,/^```/d' docs/sot/humansearch-storage-contract.md | rg -q "$pattern" || exit 1; done)
 ```
 
 ### 4. 암호화와 키 경계
@@ -112,7 +112,7 @@ SQLite/Supabase 동기화 코드이며 HumanSearch 후보 원문 암호화 구�
 검사 명령:
 
 ```bash
-rg -n '암호화|현재 HumanSearch 코드에는 재사용 가능한 암호화 저장 구현이 없다|새 crypto 라이브러리|키 원본|키 없음|잘못된 키|손상 암호문' docs/sot/humansearch-storage-contract.md
+(for pattern in '암호화' '현재 HumanSearch 코드에는 재사용 가능한 암호화 저장 구현이 없다' '새 crypto 라이브러리' '키 원본' '키 없음' '잘못된 키' '손상 암호문'; do sed '/^```/,/^```/d' docs/sot/humansearch-storage-contract.md | rg -q "$pattern" || exit 1; done)
 ```
 
 ### 5. 입력 계약
@@ -132,17 +132,17 @@ rg -n '암호화|현재 HumanSearch 코드에는 재사용 가능한 암호화 �
 
 토큰, 쿠키, Playwright storageState, CDP cookie dump, 세션 헤더, bearer 값은 저장 입력이 아니다. 입력 어댑터가
 이 값을 발견하면 후보 저장을 계속하지 말고 금지 입력 오류를 기록해야 한다. 이미 열람한 후보 원문이 있다면
-세션 비밀값을 제거한 암호화 recovery 격리로만 보존하고 intent 상태를 `forbidden_input`으로 남긴다. 세션 토큰,
+세션 비밀값과 미승인 연락처를 제거한 암호화 recovery 격리로만 보존하고 intent 상태를 `forbidden_input`으로 남긴다. 세션 토큰,
 쿠키, bearer, storageState 원문은 영구 격리 대상이 아니며 즉시 폐기하고 비밀값 제거 여부와 실패 사유만 기록한다.
 
-LinkedIn/RPS 연락처는 화면에 표시된 1촌 연락처만 `observed_contact_fields`에 남긴다. 보이지 않는 이메일,
+LinkedIn/RPS 연락처는 화면에 표시된 1촌 연락처만 `observed_contact_fields`와 보존 원문에 남긴다. 1촌으로 확인되지 않은 연락처가 원문에 포함되면 해당 값을 제거한 뒤에만 암호화 recovery 격리에 보존한다. 제거 여부를 확인할 수 없으면 격리도 완료로 보고하지 않고 사람 확인이 필요한 상태로 남긴다. 보이지 않는 이메일,
 전화번호, 주소, 메신저 ID를 추정하거나 외부 lookup으로 보강하지 않는다. 연락처 공유는 저장과 별도 계약이
 승인한 출력 경로에서만 가능하다.
 
 검사 명령:
 
 ```bash
-rg -n '`candidate_key`|`evidence_manifest`|`encrypted_payload_refs`|토큰|쿠키|storageState|recovery 격리|비밀값 제거|1촌|추정' docs/sot/humansearch-storage-contract.md
+(for pattern in '`candidate_key`' '`evidence_manifest`' '`encrypted_payload_refs`' '토큰' '쿠키' 'storageState' 'recovery 격리' '비밀값 제거' '1촌' '추정'; do sed '/^```/,/^```/d' docs/sot/humansearch-storage-contract.md | rg -q "$pattern" || exit 1; done)
 ```
 
 ### 6. 출력 계약
@@ -152,9 +152,9 @@ rg -n '`candidate_key`|`evidence_manifest`|`encrypted_payload_refs`|토큰|쿠�
 | 상태 | 의미 | 다음 동작 |
 |---|---|---|
 | `confirmed` | SQLite intent, 암호화 파일 write, 독립 readback hash가 모두 일치했다. | 다음 후보 진행 가능 |
-| `partial` | intent나 일부 파일은 남았지만 readback 또는 manifest 연결이 끝나지 않았다. | 순회 중단, 재시도 가능 상태로 남김 |
+| `partial` | intent와 암호화 recovery 원본이 남았으나 evidence 필수 필드·coverage 검증, readback 또는 manifest 연결이 끝나지 않았다. | 순회 중단, 재시도 가능 상태로 남김 |
 | `failed` | 저장 전에 실패했거나 복구 가능한 원본을 남기지 못했다. | 순회 중단 |
-| `forbidden_input` | 토큰·쿠키·세션 값·미승인 연락처 등 금지 입력이 있었다. | 순회 중단, 비밀값 제거 후 후보 원문만 암호화 recovery 격리 |
+| `forbidden_input` | 토큰·쿠키·세션 값·미승인 연락처 등 금지 입력이 있었다. | 순회 중단, 세션 비밀값과 미승인 연락처 제거 후 후보 원문만 암호화 recovery 격리 |
 | `recovery_required` | purge, 권한, 파일 손상, 중간 종료 뒤 사람이 확인해야 한다. | 자동 성공 보고 금지 |
 
 `confirmed`가 아니면 저장 완료가 아니다. 저장 실패나 readback 실패 상태에서 실행기는 다음 후보 상세를 열거나
@@ -168,7 +168,7 @@ coverage 상태, candidate key 관계를 다시 읽어 일치해야 한다. read
 검사 명령:
 
 ```bash
-rg -n '`confirmed`|`partial`|`failed`|`forbidden_input`|`recovery_required`|다음 후보|독립 readback|복호화 payload|writer의 메모리' docs/sot/humansearch-storage-contract.md
+(for pattern in '`confirmed`' '`partial`' '`failed`' '`forbidden_input`' '`recovery_required`' '다음 후보' '독립 readback' '복호화 payload' 'writer의 메모리'; do sed '/^```/,/^```/d' docs/sot/humansearch-storage-contract.md | rg -q "$pattern" || exit 1; done)
 ```
 
 ### 7. 오류 계약
@@ -177,15 +177,15 @@ rg -n '`confirmed`|`partial`|`failed`|`forbidden_input`|`recovery_required`|다�
 
 | 오류 | 판정 |
 |---|---|
-| 필수 evidence 필드 누락 | 저장 거부, 순회 중단 |
-| coverage/readback 상태 불일치 | 저장 거부, 순회 중단 |
+| 필수 evidence 필드 누락 | 정상 저장 거부, 원문이 남으면 `partial`과 암호화 recovery 격리, 순회 중단 |
+| coverage 상태 오류 | 정상 저장 거부, 원문이 남으면 `partial`과 암호화 recovery 격리, 순회 중단 |
+| readback 상태 불일치 | `partial` 또는 복구 가능한 원문이 없으면 `failed`, 순회 중단 |
 | 암호화 파일 쓰기 실패 | `partial` 또는 `failed`, 순회 중단 |
-| 권한 mode가 0700/0600보다 넓음 | 저장 실패, 순회 중단 |
+| 권한 mode가 0700/0600보다 넓음 | 기존 보호 원본이 있으면 `recovery_required`로 사람 확인, 원본이 없으면 `failed`; 저장 중단 |
 | 키 없음·잘못된 키·복호화 실패 | readback 실패, 순회 중단 |
 | 토큰·쿠키·세션 값 입력 | 비밀값 즉시 폐기, 후보 원문은 비밀값 제거 뒤 암호화 recovery 격리, 순회 중단 |
 | Supabase write 실패 | outbox 미확정, 로컬 저장 상태는 별도 유지 |
 | purge 일부 실패 | `recovery_required`, PII 없는 영수증 |
-| evidence 필수 필드 또는 coverage 오류 | intent와 암호화 recovery 격리 상태 보존, 순회 중단 |
 
 오류는 빈 값, 성공, `None`, 기본값으로 접지 않는다. 상태와 실패 사유를 SQLite 원본에 기록하되 후보 원문 PII는
 일반 로그에 쓰지 않는다.
@@ -193,14 +193,14 @@ rg -n '`confirmed`|`partial`|`failed`|`forbidden_input`|`recovery_required`|다�
 검사 명령:
 
 ```bash
-rg -n '필수 evidence|coverage 오류|recovery 격리|0700/0600|키 없음|forbidden_input|Supabase write 실패|purge 일부 실패|PII 없는 영수증' docs/sot/humansearch-storage-contract.md
+(for pattern in '필수 evidence' 'coverage 상태 오류' 'recovery 격리' '0700/0600' '키 없음' 'forbidden_input' 'Supabase write 실패' 'purge 일부 실패' 'PII 없는 영수증'; do sed '/^```/,/^```/d' docs/sot/humansearch-storage-contract.md | rg -q "$pattern" || exit 1; done)
 ```
 
 ### 8. 보존과 purge
 
 보존 기간은 무기한이다. 자동 만료 삭제는 현재 계약에 없다. 삭제는 명시적 purge 요청으로만 실행한다.
 
-purge는 대상 후보 또는 실행 범위가 모호하면 실행하지 않는다. 성공한 purge는 SQLite 원본에 tombstone,
+purge는 대상 후보 또는 실행 범위가 모호하면 실행하지 않는다. 사람 단위 삭제 요청은 포지션별 `candidate_key` 하나로 완료 처리하지 않는다. 확인된 동일인 연결 근거로 전 포지션·채널의 관련 키와 보호 참조, 파생 row, outbox를 찾아 범위를 확정해야 한다. 동일인 연결이나 전체 범위를 확인할 수 없으면 성공 영수증을 내지 않고 `recovery_required`로 사람 확인을 요구한다. 성공한 purge는 SQLite 원본에 tombstone,
 대상 비민감 지문, 삭제 시각, 삭제한 보호 참조 수, 실패 참조 수를 기록한다. purge 영수증에는 이름, 이메일,
 전화번호, 이력서 본문, 원본 URL 경로, 세션 값, 암호화 키를 넣지 않는다.
 
@@ -216,7 +216,7 @@ tombstone은 후속 export가 같은 후보 PII를 다시 만들지 못하게 �
 검사 명령:
 
 ```bash
-rg -n '무기한|자동 만료 삭제|명시적 purge|모호|PII|recovery_required|멱등|tombstone|outbox|Supabase|재생성|단순 DB 삭제' docs/sot/humansearch-storage-contract.md
+(for pattern in '무기한' '자동 만료 삭제' '명시적 purge' '모호' 'PII' 'recovery_required' '멱등' 'tombstone' 'outbox' 'Supabase' '재생성' '단순 DB 삭제'; do sed '/^```/,/^```/d' docs/sot/humansearch-storage-contract.md | rg -q "$pattern" || exit 1; done)
 ```
 
 ### 9. Git과 운영 프로젝트 입력 금지
@@ -231,7 +231,7 @@ rg -n '무기한|자동 만료 삭제|명시적 purge|모호|PII|recovery_requir
 검사 명령:
 
 ```bash
-rg -n 'Git에 넣지 않는다|운영 프로젝트 입력|PR 본문|비민감 지문|합성 fixture' docs/sot/humansearch-storage-contract.md
+(for pattern in 'Git에 넣지 않는다' '운영 프로젝트 입력' 'PR 본문' '비민감 지문' '합성 fixture'; do sed '/^```/,/^```/d' docs/sot/humansearch-storage-contract.md | rg -q "$pattern" || exit 1; done)
 ```
 
 ### 10. counter-AC
@@ -255,7 +255,7 @@ rg -n 'Git에 넣지 않는다|운영 프로젝트 입력|PR 본문|비민감 �
 검사 명령:
 
 ```bash
-rg -n '평문 원본 저장|readback 없는 성공|저장 실패 뒤 순회 지속|Supabase 원본화|자동 만료 삭제|PII 영수증|같은 UID|쿠키|보이지 않는 연락처|Git fixture|partial 승격|readback 캐시|purge 파생' docs/sot/humansearch-storage-contract.md
+(for pattern in '평문 원본 저장' 'readback 없는 성공' '저장 실패 뒤 순회 지속' 'Supabase 원본화' '자동 만료 삭제' 'PII 영수증' '같은 UID' '쿠키' '보이지 않는 연락처' 'Git fixture' 'partial 승격' 'readback 캐시' 'purge 파생'; do sed '/^```/,/^```/d' docs/sot/humansearch-storage-contract.md | rg -q "$pattern" || exit 1; done)
 ```
 
 ### 11. 후속 구현 경계

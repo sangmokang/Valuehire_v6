@@ -57,7 +57,7 @@ When 후보 열람 증거를 저장할 때 시스템은 단일 SQLite 원본에 
 검증 명령:
 
 ```bash
-rg -n '단일 원본|SQLite|Supabase|파생|outbox|로컬 저장 완료를 대신하지 않는다|저장 상태와 열람 완전성은 독립|partial.*complete' docs/sot/humansearch-storage-contract.md
+(for pattern in '단일 원본' 'SQLite' 'Supabase' '파생' 'outbox' '로컬 저장 완료를 대신하지 않는다' '저장 상태와 열람 완전성은 독립' 'partial.*complete'; do sed '/^```/,/^```/d' docs/sot/humansearch-storage-contract.md | rg -q "$pattern" || exit 1; done)
 ```
 
 counter-AC: Supabase readback 성공을 SQLite 원본 저장 성공으로 대체한다. 부분 열람 원문을 성공 저장했다는 이유로 evidence를 complete로 승격한다.
@@ -69,31 +69,31 @@ When 후보 원문, 캡처, 추출물, 연락처, 민감 URL 원문을 저장할
 검증 명령:
 
 ```bash
-rg -n '암호화|readback|confirmed|저장 완료가 아니다|복호화 payload|writer의 메모리|현재 HumanSearch 코드에는 재사용 가능한 암호화 저장 구현이 없다|새 crypto 라이브러리|임의 선택' docs/sot/humansearch-storage-contract.md
+(for pattern in '암호화' 'readback' 'confirmed' '저장 완료가 아니다' '복호화 payload' 'writer의 메모리' '현재 HumanSearch 코드에는 재사용 가능한 암호화 저장 구현이 없다' '새 crypto 라이브러리' '임의 선택'; do sed '/^```/,/^```/d' docs/sot/humansearch-storage-contract.md | rg -q "$pattern" || exit 1; done)
 ```
 
 counter-AC: 파일 write만 성공하고 `confirmed`로 처리한다.
 
 ### AC-3 실패 시 순회 중단
 
-If 저장, 권한, 암호화, readback, evidence 필수 필드/coverage, 금지 입력 검사 중 하나가 실패하면 시스템은 다음 후보나 다음 채널 순회를 시작하지 않아야 하며, 이미 열람한 후보 원문은 비밀값 제거 뒤 암호화 recovery 격리와 intent 상태로 보존해야 한다.
+If 저장, 권한, 암호화, readback, evidence 필수 필드/coverage, 금지 입력 검사 중 하나가 실패하면 시스템은 다음 후보나 다음 채널 순회를 시작하지 않아야 하며, 이미 열람한 후보 원문은 세션 비밀값과 미승인 연락처 제거 뒤 암호화 recovery 격리와 intent 상태로 보존해야 한다.
 
 검증 명령:
 
 ```bash
-rg -n '순회 중단|다음 후보|forbidden_input|partial|failed|recovery_required|coverage 오류|recovery 격리|비밀값 제거' docs/sot/humansearch-storage-contract.md
+(for pattern in '순회 중단' '다음 후보' 'forbidden_input' 'partial' 'failed' 'recovery_required' 'coverage 상태 오류' 'recovery 격리' '비밀값 제거'; do sed '/^```/,/^```/d' docs/sot/humansearch-storage-contract.md | rg -q "$pattern" || exit 1; done)
 ```
 
 counter-AC: 저장 실패 뒤 다음 후보 상세를 연다.
 
 ### AC-4 보존과 삭제
 
-Where 저장된 후보 증거가 존재할 때 시스템은 무기한 보존하고 명시적 purge 요청으로만 삭제해야 하며, purge 영수증에는 후보자 PII가 없어야 하고 SQLite 원본, 암호화 파일, recovery 격리, Supabase 파생 row, pending outbox 재생성 방지를 tombstone으로 묶어야 한다.
+Where 저장된 후보 증거가 존재할 때 시스템은 무기한 보존하고 명시적 purge 요청으로만 삭제해야 하며, 사람 단위 삭제에서는 확인된 동일인 연결의 전 포지션·채널 범위를 확인해야 한다. purge 영수증에는 후보자 PII가 없어야 하고 SQLite 원본, 암호화 파일, recovery 격리, Supabase 파생 row, pending outbox 재생성 방지를 tombstone으로 묶어야 한다.
 
 검증 명령:
 
 ```bash
-rg -n '무기한|명시적 purge|자동 만료 삭제|PII 없는 영수증|recovery_required|멱등|tombstone|outbox|Supabase|재생성|단순 DB 삭제' docs/sot/humansearch-storage-contract.md
+(for pattern in '무기한' '명시적 purge' '자동 만료 삭제' 'PII 없는 영수증' 'recovery_required' '멱등' 'tombstone' 'outbox' 'Supabase' '재생성' '단순 DB 삭제'; do sed '/^```/,/^```/d' docs/sot/humansearch-storage-contract.md | rg -q "$pattern" || exit 1; done)
 ```
 
 counter-AC: 보존기간 만료로 자동 삭제하거나 purge 영수증에 이름·연락처·원본 URL 경로를 쓴다.
@@ -105,19 +105,19 @@ When 원본 DB와 암호화 파일을 쓸 때 시스템은 Git 밖 보호 위치
 검증 명령:
 
 ```bash
-rg -n 'Git 밖|0700|0600|umask|쓰기 직전에|대상 파일 경로 자체|WAL|SHM|journal|temp|백업|EACCES|symlink|같은 UID|Git에 넣지 않는다|운영 프로젝트 입력' docs/sot/humansearch-storage-contract.md
+(for pattern in 'Git 밖' '0700' '0600' 'umask' '쓰기 직전에' '대상 파일 경로 자체' 'WAL' 'SHM' 'journal' 'temp' '백업' 'EACCES' 'symlink' '같은 UID' 'Git에 넣지 않는다' '운영 프로젝트 입력'; do sed '/^```/,/^```/d' docs/sot/humansearch-storage-contract.md | rg -q "$pattern" || exit 1; done)
 ```
 
 counter-AC: 같은 UID에서 작성한 검토 파일을 독립 실행기 영수증으로 인정한다.
 
 ### AC-6 토큰·쿠키·연락처 경계
 
-If 저장 입력에 토큰, 쿠키, storageState, 세션 헤더가 포함되면 시스템은 금지 입력으로 중단하고 해당 비밀값 원문은 영구 격리하지 않아야 하며 LinkedIn/RPS 연락처는 표시된 1촌 연락처만 관측 상태로 남겨야 한다.
+If 저장 입력에 토큰, 쿠키, storageState, 세션 헤더가 포함되면 시스템은 금지 입력으로 중단하고 해당 비밀값 원문은 영구 격리하지 않아야 하며 LinkedIn/RPS 연락처는 표시된 1촌 연락처만 보존해야 한다. 미승인 연락처는 recovery 원문에서도 제거해야 한다.
 
 검증 명령:
 
 ```bash
-rg -n '토큰|쿠키|storageState|세션|forbidden_input|비밀값 제거|1촌|보이지 않는|추정' docs/sot/humansearch-storage-contract.md
+(for pattern in '토큰' '쿠키' 'storageState' '세션' 'forbidden_input' '비밀값 제거' '1촌' '보이지 않는' '추정'; do sed '/^```/,/^```/d' docs/sot/humansearch-storage-contract.md | rg -q "$pattern" || exit 1; done)
 ```
 
 counter-AC: 보이지 않는 이메일·전화번호를 추정하거나 CDP cookie dump를 저장 payload에 넣는다.
@@ -131,7 +131,7 @@ counter-AC: 보이지 않는 이메일·전화번호를 추정하거나 CDP cook
 
 오류는 필수 evidence 누락, coverage/readback 불일치, 암호화 파일 쓰기 실패, 권한 완화, 키 없음, 잘못된 키,
 복호화 실패, 금지 입력, Supabase write 실패, purge 일부 실패를 구분한다. 이미 열람한 후보 원문은 비밀값 제거 뒤
-암호화 recovery 격리와 intent 상태로 남기고, 세션 비밀값 원문은 영구 격리하지 않는다.
+암호화 recovery 격리와 intent 상태로 남기고, 세션 비밀값과 미승인 연락처 원문은 영구 격리하지 않는다.
 
 ## 비범위
 
@@ -150,20 +150,20 @@ root가 `docs/sot/humansearch-browser-contract.md` §12 조건 6/7과 C1 seriali
 검증 명령:
 
 ```bash
-rg -n 'humansearch-storage-contract|무기한 보존|명시적 purge|파생 삭제|저장 실패 시 순회 중단|독립 readback|실제 시험을 대신하지 않는다' docs/sot/humansearch-browser-contract.md
+(for pattern in 'humansearch-storage-contract' '무기한 보존' '명시적 purge' '파생 삭제' '저장 실패 시 순회 중단' '독립 readback' '실제 시험을 대신하지 않는다'; do sed '/^```/,/^```/d' docs/sot/humansearch-browser-contract.md | rg -q "$pattern" || exit 1; done)
 ```
 
 ## 검증 계획
 
 ```bash
 bash scripts/acceptance-principles-check.sh
-rg -n '단일 원본|SQLite|Supabase|파생|outbox|로컬 저장 완료를 대신하지 않는다|저장 상태와 열람 완전성은 독립|partial.*complete' docs/sot/humansearch-storage-contract.md
-rg -n '암호화|readback|confirmed|저장 완료가 아니다|복호화 payload|writer의 메모리|현재 HumanSearch 코드에는 재사용 가능한 암호화 저장 구현이 없다|새 crypto 라이브러리|임의 선택' docs/sot/humansearch-storage-contract.md
-rg -n '순회 중단|다음 후보|forbidden_input|partial|failed|recovery_required|coverage 오류|recovery 격리|비밀값 제거' docs/sot/humansearch-storage-contract.md
-rg -n '무기한|명시적 purge|자동 만료 삭제|PII 없는 영수증|recovery_required|멱등|tombstone|outbox|Supabase|재생성|단순 DB 삭제' docs/sot/humansearch-storage-contract.md
-rg -n 'Git 밖|0700|0600|umask|쓰기 직전에|대상 파일 경로 자체|WAL|SHM|journal|temp|백업|EACCES|symlink|같은 UID|Git에 넣지 않는다|운영 프로젝트 입력' docs/sot/humansearch-storage-contract.md
-rg -n '토큰|쿠키|storageState|세션|forbidden_input|비밀값 제거|1촌|보이지 않는|추정' docs/sot/humansearch-storage-contract.md
-rg -n 'humansearch-storage-contract|무기한 보존|명시적 purge|파생 삭제|저장 실패 시 순회 중단|독립 readback|실제 시험을 대신하지 않는다' docs/sot/humansearch-browser-contract.md
+(for pattern in '단일 원본' 'SQLite' 'Supabase' '파생' 'outbox' '로컬 저장 완료를 대신하지 않는다' '저장 상태와 열람 완전성은 독립' 'partial.*complete'; do sed '/^```/,/^```/d' docs/sot/humansearch-storage-contract.md | rg -q "$pattern" || exit 1; done)
+(for pattern in '암호화' 'readback' 'confirmed' '저장 완료가 아니다' '복호화 payload' 'writer의 메모리' '현재 HumanSearch 코드에는 재사용 가능한 암호화 저장 구현이 없다' '새 crypto 라이브러리' '임의 선택'; do sed '/^```/,/^```/d' docs/sot/humansearch-storage-contract.md | rg -q "$pattern" || exit 1; done)
+(for pattern in '순회 중단' '다음 후보' 'forbidden_input' 'partial' 'failed' 'recovery_required' 'coverage 상태 오류' 'recovery 격리' '비밀값 제거'; do sed '/^```/,/^```/d' docs/sot/humansearch-storage-contract.md | rg -q "$pattern" || exit 1; done)
+(for pattern in '무기한' '명시적 purge' '자동 만료 삭제' 'PII 없는 영수증' 'recovery_required' '멱등' 'tombstone' 'outbox' 'Supabase' '재생성' '단순 DB 삭제'; do sed '/^```/,/^```/d' docs/sot/humansearch-storage-contract.md | rg -q "$pattern" || exit 1; done)
+(for pattern in 'Git 밖' '0700' '0600' 'umask' '쓰기 직전에' '대상 파일 경로 자체' 'WAL' 'SHM' 'journal' 'temp' '백업' 'EACCES' 'symlink' '같은 UID' 'Git에 넣지 않는다' '운영 프로젝트 입력'; do sed '/^```/,/^```/d' docs/sot/humansearch-storage-contract.md | rg -q "$pattern" || exit 1; done)
+(for pattern in '토큰' '쿠키' 'storageState' '세션' 'forbidden_input' '비밀값 제거' '1촌' '보이지 않는' '추정'; do sed '/^```/,/^```/d' docs/sot/humansearch-storage-contract.md | rg -q "$pattern" || exit 1; done)
+(for pattern in 'humansearch-storage-contract' '무기한 보존' '명시적 purge' '파생 삭제' '저장 실패 시 순회 중단' '독립 readback' '실제 시험을 대신하지 않는다'; do sed '/^```/,/^```/d' docs/sot/humansearch-browser-contract.md | rg -q "$pattern" || exit 1; done)
 git diff --check
 bash verify.sh
 ```
