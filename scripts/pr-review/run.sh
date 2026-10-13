@@ -70,12 +70,13 @@ start_agent() {
   herdr agent wait "$name" --until idle --timeout 30000 | jq -e '.result.agent' >/dev/null
 }
 
-# ask <이름> <지시 파일> — 지시 파일을 읽고 따르게 한 뒤 끝날 때까지 기다린다. 0 끝남 / 1 실패 / 3 사용량 한도
+# ask <이름> <지시 파일> — 지시 파일을 읽고 따르게 한 뒤 끝날 때까지 기다린다. 0 끝남 / 1 실패 / 3 사용량 한도·수용량 초과
+#   (2026-10-13 실측: Codex 가 'Selected model is at capacity' 로 아무것도 안 하고 끝났다 — 같은 회차의 다음 PR 도 같으므로 멈춘다)
 ask() {
   local name=$1 file=$2 st
   st=$(herdr agent prompt "$name" "Read $file and follow it exactly. 끝나면 지시 파일이 말한 결과 파일만 남기고 멈춰라." \
          --wait --timeout "$WAIT_MS" | jq -r '.result.agent.agent_status // .error.code')
-  if herdr agent read "$name" --source recent-unwrapped --lines 80 | grep -qiE 'usage limit|rate limit|limit reached'; then
+  if herdr agent read "$name" --source recent-unwrapped --lines 80 | grep -qiE 'usage limit|rate limit|limit reached|at capacity'; then
     return 3
   fi
   case "$st" in idle|done) return 0 ;; *) return 1 ;; esac

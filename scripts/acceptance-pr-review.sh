@@ -86,7 +86,8 @@ case "$1 $2" in
                  mode=ok; [ -f "$F/mode.$kind.$n" ] && mode=$(cat "$F/mode.$kind.$n")
                  case "$mode" in
                    fail)  ;;
-                   usage) touch "$H/usage.$name" ;;
+                   usage) echo "ERROR: You've hit your usage limit." > "$H/usage.$name" ;;
+                   capacity) echo "■ Selected model is at capacity. Please try a different model." > "$H/usage.$name" ;;
                    *) if [ "$kind" = claude ]; then
                         printf '## Claude 1차 리뷰 PR #%s\n- 발견: 없음\n' "$n" > "$out/claude.md"
                       else
@@ -96,7 +97,7 @@ case "$1 $2" in
                       fi ;;
                  esac
                  echo '{"result":{"agent":{"agent_status":"done"}}}' ;;
-  "agent read")  [ -f "$H/usage.$3" ] && echo "ERROR: You've hit your usage limit." ;;
+  "agent read")  [ -f "$H/usage.$3" ] && cat "$H/usage.$3" ;;
   "agent send-keys"|"agent wait") echo '{"result":{"agent":{"agent_status":"idle"}}}' ;;
   *) echo "fake herdr: unsupported $*" >&2; exit 1 ;;
 esac
@@ -167,6 +168,11 @@ echo usage > "$F/mode.codex.5"; prs 5:b5 6:b6
 before=$(calls); run >/dev/null
 expect "사용량 한도 뒤 같은 회차 중단" "$(( $(calls) - before ))" 1
 expect "#6 은 이번 회차에 리뷰 안 됨" "$(comments 6)" 0
+
+# 6a'. 모델 수용량 초과도 같은 회차를 멈춘다(실측 문구)
+echo capacity > "$F/mode.codex.5"; prs 5:b5 6:b6
+before=$(calls); run >/dev/null
+expect "수용량 초과 뒤 같은 회차 중단" "$(( $(calls) - before ))" 1
 
 # 6b. 1회 상한 — 상한에 걸려도 회차는 정상 종료한다
 rm -f "$F/mode.codex.5"; prs 5:b5 6:b6 7:b7
