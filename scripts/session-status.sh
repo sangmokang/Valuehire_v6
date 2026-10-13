@@ -6,7 +6,7 @@
 #
 # 계약: docs/sot/hook-contracts.md
 #   출력  : stdout 3줄 + exit 0
-#   불변식: git 조회 실패 시 해당 줄에 UNKNOWN 을 출력하고 exit 1 (조용한 성공 금지)
+#   불변식: git 조회·검사기 수 계산 실패 또는 실행 횟수 불일치 시 UNKNOWN + exit 1
 set -uo pipefail
 
 rc=0
@@ -48,6 +48,13 @@ checks=$(find . -maxdepth 2 \( -name 'verify.sh' -o -name 'acceptance-*.sh' \) \
          -not -path './worktrees/*' -not -path './.git/*' | LC_ALL=C sort)
 total=$(printf '%s\n' "$checks" | awk 'NF{c++} END{print c+0}')
 
+# 검사기 수 계산이 실패하면 숫자 비교가 오류를 내고 거짓으로 처리될 수 있다.
+case "$total" in
+  ''|*[!0-9]*)
+    printf 'RED: UNKNOWN (검사기 수 계산 실패)\n'
+    exit 1 ;;
+esac
+
 # 0건은 "깨끗함"이 아니라 "검사기를 못 찾음"이다 (P20 · fail-closed)
 if [ "$total" -eq 0 ]; then
   printf 'RED: UNKNOWN (검사 스크립트 0개 — 탐색 실패)\n'
@@ -68,14 +75,14 @@ while IFS= read -r c; do
   # SECRET_PATTERNS_FILE 을 비워 고정한다. 상속하면 환경변수 하나로 세션 브리핑이
   # 실패 건수를 축소 보고한다 — AC-5 의 존재 이유가 정직한 보고이고, P14 는 판정
   # 수치를 코드가 만들 것을 요구한다. 훅 2종에 넣은 것과 같은 한 줄이다.
-  SECRET_PATTERNS_FILE= bash "$c" >/dev/null 2>&1 || red=$((red + 1))
+  SECRET_PATTERNS_FILE= bash "$c" </dev/null >/dev/null 2>&1 || red=$((red + 1))
 done <<< "$checks"
 
 # 찾은 개수와 돌린 개수가 다르면 수치를 내지 않는다. 수치를 내면 읽는 사람은 그것을
 # 판정으로 받아들인다 — 게이트 0 은 시작 자격 판정이므로 모르는 것을 0 으로 적으면 안 된다.
 # 부분 실행도 같다. 0회만 잡으면 1개만 돌고 끊긴 경우가 그대로 통과한다.
 if [ "$ran" -ne "$total" ]; then
-  printf 'RED: UNKNOWN (검사기 %d개를 찾았으나 %d개만 실행됐다 — 루프 입력 생성 실패 의심)\n' "$total" "$ran"
+  printf 'RED: UNKNOWN (검사기 %d개를 찾았으나 %d개만 실행됐다)\n' "$total" "$ran"
   exit 1
 fi
 

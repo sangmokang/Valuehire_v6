@@ -167,6 +167,40 @@ else
   record 1 "session-status.sh 가 실행 횟수를 세어 total 과 대조한다 (배선)" "실행 횟수를 세는 코드가 없다 — 입력 방식만 바꾸면 같은 fail-open 이 다시 난다"
 fi
 
+# --- 시연 6 (양성) 검사기 수 계산이 실패해 빈 값이 된 경우 ----------------------
+restore
+if ! sed -i.bak 's#^total=$(printf.*#total=""#' "$CLONE/$TARGET"; then
+  record 1 "검사기 수가 비면 UNKNOWN 으로 닫는다" "변조 주입 실패 — 시연 무효"
+else
+  rm -f "$CLONE/$TARGET.bak"
+  if ! grep -qx 'total=""' "$CLONE/$TARGET"; then
+    record 1 "검사기 수가 비면 UNKNOWN 으로 닫는다" "변조가 반영되지 않았다 — 시연 무효"
+  else
+    rc=$(run_target)
+    if [ "$rc" -eq 0 ] || grep -qE '^RED: [0-9]+/[0-9]+' "$SANDBOX/out" || ! grep -q '^RED: UNKNOWN' "$SANDBOX/out"; then
+      record 1 "검사기 수가 비면 UNKNOWN 으로 닫는다" "종료값 $rc — $(grep '^RED:' "$SANDBOX/out" | head -1)"
+    else
+      record 0 "검사기 수가 비면 UNKNOWN 으로 닫는다"
+    fi
+  fi
+fi
+
+# --- 시연 7 (음성) 검사기가 stdin 을 읽어도 나머지를 모두 실행한다 --------------
+restore
+victim=$(cd "$CLONE" && find . -maxdepth 2 -name 'acceptance-*.sh' -not -path './worktrees/*' | LC_ALL=C sort | head -1)
+if [ -z "$victim" ]; then
+  record 1 "검사기가 stdin 을 읽어도 나머지를 모두 실행한다" "희생 대상 없음 — 시연 무효"
+else
+  printf '#!/usr/bin/env bash\ncat >/dev/null\nexit 0\n' > "$CLONE/$victim"
+  rc=$(run_target)
+  line=$(grep '^RED:' "$SANDBOX/out" | head -1)
+  if [ "$rc" -ne 0 ] || ! printf '%s' "$line" | grep -qE "^RED: 0/${EXPECT_TOTAL}[[:space:]]"; then
+    record 1 "검사기가 stdin 을 읽어도 나머지를 모두 실행한다" "종료값 $rc — ${line:-<없음>}"
+  else
+    record 0 "검사기가 stdin 을 읽어도 나머지를 모두 실행한다"
+  fi
+fi
+
 echo
 echo "총 검사기 ${EXPECT_TOTAL:-?}개 · 스텁 ${stub_count}개"
 echo "CHECKED: $checked"

@@ -50,7 +50,8 @@
         HEAD: <sha> (<origin 대비: synced|ahead N|behind N>)
         ORIGIN: <sha>
         RED: <실패한 acceptance 스크립트 수>/<전체 수>
-불변식: git 조회 실패 시 해당 줄에 "UNKNOWN" 을 출력하고 exit 1 (조용한 성공 금지)
+불변식: git 조회 실패 또는 검사기 수 계산 실패·실행 횟수 불일치 시
+        해당 줄에 "UNKNOWN" 을 출력하고 exit 1 (조용한 성공 금지)
 ```
 
 ### `scripts/acceptance-0-7.sh`
