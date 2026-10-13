@@ -43,7 +43,7 @@ Work Unit 안에서 찾는 것은 “이 주장 하나가 참인가?”이고, P
 
 - 위험등급: **L3** — SOT 두 파일의 개발·검증 흐름을 바꿉니다.
 - 변경 범위: `docs/sot/git-workflow.md`, `docs/sot/verification-commands.md`, 구조화된 Work Unit 정책·생성 문서·검사기·반례, 기존 `scripts/acceptance-principles-*.sh`, 이 goal 문서.
-- 비범위: GitHub Pro 결제, branch protection, CODEOWNERS, 새 Agent 런타임, 새 CI 실행 줄·새 외부 의존성 추가, 기존 P0 결함 구현.
+- 비범위: GitHub Pro 결제, branch protection, CODEOWNERS, 새 Agent 런타임, Work Unit 정책 검사 외의 CI 실행 줄·새 외부 의존성 추가, 기존 P0 결함 구현.
 - 영향 반경: 이후 모든 코드·제품 작업의 분해, 커밋, 검증 순서. 제품 런타임과 후보자 데이터에는 직접 영향이 없습니다.
 
 ## 입출력·오류·경계 계약
@@ -80,7 +80,7 @@ Work Unit 안에서 찾는 것은 “이 주장 하나가 참인가?”이고, P
 **When** 하나의 목표가 여러 독립 주장을 포함하면, 시스템은 목표를 Work Unit 1~5개로 나누고 각 Work Unit을 하나의 주장과 완료 커밋 경계로 기록해야 합니다.
 
 - 검증 명령: `bash scripts/acceptance-work-unit-policy.sh`
-- 기대값: 종료값 0, `POLICY_CHECKED: 19`, `DOCUMENT_SYNC: PASS`. 하나의 주장, 완료 커밋, PR 상한, 브랜치 수명, 검토 보정, squash 경계가 구조화된 정책으로 직접 검사됩니다.
+- 기대값: 종료값 0, `PASS: structured policy and generated document`, `CHECKED: 5`, `VERDICT: PASS`. `POLICY_CHECKED: 19`와 `DOCUMENT_SYNC: PASS`는 이 스크립트가 내부에서 실행하는 Ruby 검사기의 출력이며, 정책 파일의 값과 생성 문서 일치를 검사합니다.
 - counter-AC: Work Unit을 파일 단위로 정의, 여러 Work Unit을 한 완료 커밋에 혼합, squash 뒤 개별 커밋 revert 가능하다고 기록.
 
 ### AC-2 — 두 층의 검증
@@ -88,7 +88,7 @@ Work Unit 안에서 찾는 것은 “이 주장 하나가 참인가?”이고, P
 **When** Work Unit 구현이 끝나면, 시스템은 해당 AC와 작은 반증을 먼저 실행하고, 모든 Work Unit 뒤에는 strict·codeaudit·전체 적대검증·CI를 별도로 실행해야 합니다.
 
 - 검증 명령: `bash scripts/acceptance-work-unit-policy.sh`
-- 기대값: 종료값 0, `POLICY_CHECKED: 19`, `DOCUMENT_SYNC: PASS`. Work Unit과 PR 전체 검사의 순서, 고위험 검토 등급·비용·롤백 경계가 구조화된 정책으로 직접 검사됩니다.
+- 기대값: 종료값 0, `PASS: structured policy and generated document`, `CHECKED: 5`, `VERDICT: PASS`. `POLICY_CHECKED: 19`와 `DOCUMENT_SYNC: PASS`는 내부 Ruby 검사기의 출력이며, Work Unit과 PR 전체 검사 순서의 정책 파일 정의를 검사합니다.
 - counter-AC: Work Unit마다 full codeaudit 강제, 최종 통합 검사를 삭제, CI 초록을 로컬 PASS로 대체.
 
 ### AC-3 — 구조화 정책과 생성 문서 변조 차단
@@ -320,7 +320,7 @@ V1이 잡은 결함은 C1/M1의 OR 검사, C2의 미갱신 장부·로그, M2의
 
 ```text
 verifier: PASS
-pwd: /Users/kangsangmo/Desktop/Valuehire_v6/worktrees/work-unit-methodology
+pwd: worktrees/work-unit-methodology (저장소 기준 경로)
 branch: task/work-unit-methodology
 HEAD: cbe3d6b
 principles: WORK_UNIT_METHOD 28/28
