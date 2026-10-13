@@ -18,7 +18,9 @@ out of sync with it.
 
 from __future__ import annotations
 
+import http.client
 import json
+import re
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -31,7 +33,7 @@ from .source_contract import EXPECTED_SUPABASE_SOURCES
 _TABLE, _FIELDS, _ = EXPECTED_SUPABASE_SOURCES["position_cards"]
 _SCHEMA, _, _TABLE_NAME = _TABLE.partition(".")
 
-HttpGet = Callable[[str, float, str], "tuple[int, bytes]"]
+HttpGet = Callable[[str, float, str], "tuple[int, bytes, str | None]"]
 
 
 @dataclass(frozen=True, init=False)
@@ -112,7 +114,7 @@ def fetch_position_cards(
     url = _build_url(base_url)
 
     try:
-        status_code, body = getter(url, timeout, api_key)
+        status_code, body, content_range = getter(url, timeout, api_key)
     except TimeoutError:
         return _fail(SourceFailureReason.SOURCE_TIMEOUT)
     except urllib.error.URLError as error:
@@ -122,7 +124,7 @@ def fetch_position_cards(
         if isinstance(error.reason, TimeoutError):
             return _fail(SourceFailureReason.SOURCE_TIMEOUT)
         return _fail(SourceFailureReason.SOURCE_UNAVAILABLE)
-    except OSError:
+    except (OSError, http.client.HTTPException):
         return _fail(SourceFailureReason.SOURCE_UNAVAILABLE)
 
     if status_code == 401 or status_code == 403:
@@ -131,7 +133,7 @@ def fetch_position_cards(
         return _fail(SourceFailureReason.SOURCE_TIMEOUT)
     if status_code == 429 or 500 <= status_code <= 599:
         return _fail(SourceFailureReason.SOURCE_UNAVAILABLE)
-    if status_code != 200:
+    if status_code not in (200, 206):
         return _fail(SourceFailureReason.CONTRACT_MISMATCH)
 
     try:
@@ -141,6 +143,12 @@ def fetch_position_cards(
 
     if not isinstance(payload, list):
         return _fail(SourceFailureReason.CONTRACT_MISMATCH)
+    if content_range == "*/0" and not payload:
+        pass
+    else:
+        match = re.fullmatch(r"0-(\d+)/(\d+)", content_range or "")
+        if match is None or int(match[1]) + 1 != len(payload) or int(match[2]) != len(payload):
+            return _fail(SourceFailureReason.COLLECTION_INCOMPLETE)
 
     expected_keys = set(_FIELDS)
     rows: list[PositionCardRow] = []
@@ -173,13 +181,17 @@ def _build_url(base_url: str) -> str:
     return f"{base_url.rstrip('/')}/rest/v1/{_TABLE_NAME}?{query}"
 
 
-def _urllib_get(url: str, timeout: float, api_key: str) -> tuple[int, bytes]:
+def _urllib_get(url: str, timeout: float, api_key: str) -> tuple[int, bytes, str | None]:
     request = urllib.request.Request(
         url,
-        headers={"apikey": api_key, "Authorization": f"Bearer {api_key}"},
+        headers={
+            "apikey": api_key,
+            "Authorization": f"Bearer {api_key}",
+            "Prefer": "count=exact",
+        },
     )
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
-            return response.status, response.read()
+            return response.status, response.read(), response.headers.get("Content-Range")
     except urllib.error.HTTPError as error:
-        return error.code, error.read()
+        return error.code, error.read(), None

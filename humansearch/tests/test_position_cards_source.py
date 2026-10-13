@@ -8,8 +8,11 @@ collapsed into the same "PASS + empty list" outcome.
 
 from __future__ import annotations
 
+import http.client
 import json
 import urllib.error
+from email.message import Message
+from io import BytesIO
 from unittest.mock import patch
 
 import pytest
@@ -36,14 +39,16 @@ def _fixture_api_key() -> str:
     return "not-a-real-supabase-service-role-key"
 
 
-def _ok_get(body: object, *, status: int = 200) -> HttpGet:
+def _ok_get(body: object, *, status: int = 200, content_range: str | None = None) -> HttpGet:
     encoded = json.dumps(body).encode("utf-8")
     expected_key = _fixture_api_key()
+    if content_range is None and isinstance(body, list):
+        content_range = f"0-{len(body) - 1}/{len(body)}" if body else "*/0"
 
-    def _http_get(url: str, timeout: float, api_key: str) -> tuple[int, bytes]:
+    def _http_get(url: str, timeout: float, api_key: str) -> tuple[int, bytes, str | None]:
         assert "select=id%2Ccompany_name%2Cimported_at%2Clast_updated_at" in url
         assert api_key == expected_key
-        return status, encoded
+        return status, encoded, content_range
 
     return _http_get
 
@@ -97,7 +102,7 @@ def test_fetch_position_cards_rejects_a_row_missing_a_contract_field() -> None:
 
 
 def test_fetch_position_cards_network_error_is_fail_not_pass_with_empty_rows() -> None:
-    def _raising_get(url: str, timeout: float, api_key: str) -> tuple[int, bytes]:
+    def _raising_get(url: str, timeout: float, api_key: str) -> tuple[int, bytes, str | None]:
         raise ConnectionError("connection refused")
 
     result = fetch_position_cards(
@@ -112,7 +117,7 @@ def test_fetch_position_cards_network_error_is_fail_not_pass_with_empty_rows() -
 
 
 def test_fetch_position_cards_timeout_is_fail_not_pass_with_empty_rows() -> None:
-    def _timeout_get(url: str, timeout: float, api_key: str) -> tuple[int, bytes]:
+    def _timeout_get(url: str, timeout: float, api_key: str) -> tuple[int, bytes, str | None]:
         raise TimeoutError("timed out")
 
     result = fetch_position_cards(
@@ -133,7 +138,7 @@ def test_fetch_position_cards_wrapped_urlerror_timeout_is_source_timeout() -> No
     never exercises the real network path. This reproduces the actual shape.
     """
 
-    def _wrapped_timeout_get(url: str, timeout: float, api_key: str) -> tuple[int, bytes]:
+    def _wrapped_timeout_get(url: str, timeout: float, api_key: str) -> tuple[int, bytes, str | None]:
         raise urllib.error.URLError(TimeoutError("timed out"))
 
     result = fetch_position_cards(
@@ -148,7 +153,7 @@ def test_fetch_position_cards_wrapped_urlerror_timeout_is_source_timeout() -> No
 
 
 def test_fetch_position_cards_wrapped_urlerror_connection_refused_is_source_unavailable() -> None:
-    def _wrapped_refused_get(url: str, timeout: float, api_key: str) -> tuple[int, bytes]:
+    def _wrapped_refused_get(url: str, timeout: float, api_key: str) -> tuple[int, bytes, str | None]:
         raise urllib.error.URLError(ConnectionRefusedError("connection refused"))
 
     result = fetch_position_cards(
@@ -194,6 +199,95 @@ def test_default_http_get_adapter_classifies_a_real_urlopen_timeout() -> None:
     assert result.state.status is MetricStatus.FAIL
     assert result.state.reason is SourceFailureReason.SOURCE_TIMEOUT
     assert result.rows == ()
+
+
+@pytest.mark.parametrize(
+    ("status", "reason"),
+    [
+        (400, SourceFailureReason.CONTRACT_MISMATCH),
+        (401, SourceFailureReason.PERMISSION_DENIED),
+        (503, SourceFailureReason.SOURCE_UNAVAILABLE),
+    ],
+)
+def test_default_http_get_adapter_classifies_http_error(
+    status: int, reason: SourceFailureReason
+) -> None:
+    error = urllib.error.HTTPError(
+        "https://example.supabase.co/rest/v1/pipeline_position_cards",
+        status,
+        "HTTP error",
+        Message(),
+        BytesIO(b'{"message":"error"}'),
+    )
+    with patch(
+        "humansearch.admin_weekly_dashboard.position_cards_source.urllib.request.urlopen",
+        side_effect=error,
+    ):
+        result = fetch_position_cards(
+            base_url="https://example.supabase.co", api_key=_fixture_api_key()
+        )
+
+    assert result.state.status is MetricStatus.FAIL
+    assert result.state.reason is reason
+
+
+def test_default_http_get_adapter_requests_exact_count() -> None:
+    with patch(
+        "humansearch.admin_weekly_dashboard.position_cards_source.urllib.request.urlopen"
+    ) as mock_urlopen:
+        response = mock_urlopen.return_value.__enter__.return_value
+        response.status = 200
+        response.read.return_value = json.dumps([VALID_ROW]).encode()
+        response.headers.get.return_value = "0-0/1"
+        result = fetch_position_cards(
+            base_url="https://example.supabase.co", api_key=_fixture_api_key()
+        )
+
+    request = mock_urlopen.call_args.args[0]
+    assert request.get_header("Prefer") == "count=exact"
+    assert result.state.status is MetricStatus.PASS
+    assert len(result.rows) == 1
+
+
+def test_fetch_position_cards_incomplete_http_read_is_source_unavailable() -> None:
+    def _incomplete_get(url: str, timeout: float, api_key: str) -> tuple[int, bytes, str | None]:
+        raise http.client.IncompleteRead(b"")
+
+    result = fetch_position_cards(
+        base_url="https://example.supabase.co",
+        api_key=_fixture_api_key(),
+        http_get=_incomplete_get,
+    )
+
+    assert result.state.status is MetricStatus.FAIL
+    assert result.state.reason is SourceFailureReason.SOURCE_UNAVAILABLE
+    assert result.rows == ()
+
+
+def test_fetch_position_cards_truncated_response_is_collection_incomplete() -> None:
+    result = fetch_position_cards(
+        base_url="https://example.supabase.co",
+        api_key=_fixture_api_key(),
+        http_get=_ok_get([VALID_ROW] * 1000, content_range="0-999/1500"),
+    )
+
+    assert result.state.status is MetricStatus.FAIL
+    assert result.state.reason is SourceFailureReason.COLLECTION_INCOMPLETE
+    assert result.rows == ()
+
+
+def test_fetch_position_cards_missing_content_range_is_collection_incomplete() -> None:
+    def _without_range(url: str, timeout: float, api_key: str) -> tuple[int, bytes, str | None]:
+        return 200, json.dumps([VALID_ROW]).encode(), None
+
+    result = fetch_position_cards(
+        base_url="https://example.supabase.co",
+        api_key=_fixture_api_key(),
+        http_get=_without_range,
+    )
+
+    assert result.state.status is MetricStatus.FAIL
+    assert result.state.reason is SourceFailureReason.COLLECTION_INCOMPLETE
 
 
 def test_fetch_position_cards_408_is_source_timeout() -> None:
