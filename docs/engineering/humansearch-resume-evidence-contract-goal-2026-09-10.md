@@ -193,23 +193,25 @@ HS-02.01 최소 열람 증거 계약으로 회수했다. 이번 범위는 `docs/
 9. 화면에 보인 연락처 관측 필드와 연락처 수집·패킷 사용의 후속 소유권.
 10. 8개 counter-AC와 각 항목의 `검사 명령:`.
 
-검증 명령:
+필드와 반례의 존재 판정에는 SOT 각 절의 범위 제한된 `검사 명령:` 15개를 각각 실행해
+모두 종료값 0인지 확인하고, 명령이 가리킨 본문을 대조한다. 하나라도 실패하면 인수 실패다.
+
+기존 저장소 게이트:
 
 ```bash
-rg -n '`source_url`|`observed_at`|`document_height_px`|`height_state`|`segments`|`coverage_status`|`coverage_reason`|`last_observed_y_px`|observed_empty|not_observed|not_available|`company_duties`|`company_duties_state`|`company_aliases`|`observed_contact_fields`|`search_condition_ref`|`readback_status`' docs/sot/humansearch-evidence-contract.md
-rg -n '구간 무누락 manifest|마지막 화면|NULL 구분|회사별 duty|검색 조건 보존|원격 경로 금지|readback|회사 별칭' docs/sot/humansearch-evidence-contract.md
-rg -n '조건부|observed_changed|`segment_status=observed`|추정하지 않는다|후속 저장·패킷 계약' docs/sot/humansearch-evidence-contract.md
-rg -c '검사 명령:' docs/sot/humansearch-evidence-contract.md
 bash scripts/acceptance-principles-check.sh
 git diff --check
 ```
 
-기대값: 첫 두 `rg` 명령은 필요한 필드와 8개 반례를 모두 찾고, `rg -c`는 8 이상을 출력한다.
 Strict 원칙 검사는 `VERDICT: PASS`, `CHECKED: 34`를 출력한다. `git diff --check`는 출력 없이 종료값 0이어야 한다.
 
 ### 현재 제한
 
 - `docs/sot/strict-workflow.md`는 이 워크트리에 없어 직접 로드하지 못했다. strict 스킬의 저장소 SOT
   우선 요구는 `NOT_RUN`으로 기록한다.
+- 이 goal 앞부분의 미병합 브랜치 경로 확인과 팬텀 0건은 작성 당시 기록이다. 현재 HEAD에는
+  `docs/engineering/goal-prompts/humansearch-journey-kickoff-2026-09-07.md`, `docs/engineering/history/`,
+  `docs/sot/31-strict-recurrence-ledger.md`가 없으므로 현재 체크아웃에서 그 근거를 재현할 수 없다.
+- 최신 지시 원문은 저장소 밖 로컬 파일을 인용한 기록이므로 이 PR의 재현 가능한 인수 근거로 삼지 않는다.
 - 최신 v5 문서는 main 병합 전 로컬 stacked 작업을 허용하지만, main 병합 조건을 충족했다고 주장하지 않는다.
 - 실제 브라우저 조작, 후보 개인정보 저장, RPS 프로젝트 쓰기, merge는 이번 WU에서 하지 않는다.

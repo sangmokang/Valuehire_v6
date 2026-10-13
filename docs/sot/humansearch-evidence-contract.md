@@ -39,9 +39,9 @@ readback 시험을 함께 되돌려야 한다.
 이 계약은 채용 포털 목록, 후보 상세, 이력서, LinkedIn Recruiter 상세처럼 후보 판단의 원문 근거가 되는
 화면을 대상으로 한다. 채널은 `saramin`, `jobkorea`, `linkedin_rps` 중 하나로 적는다.
 
-브라우저 선택, Aside 전용 자동화, Chrome 비간섭, 사용권, 목표 탭 선택, 사람 입력 회수는
+브라우저 선택, 채널별 프로필, 사용권, 목표 탭 선택, 사람 입력 회수는
 `docs/sot/humansearch-browser-contract.md`가 소유한다. 이 문서는 화면을 열람한 뒤 저장해야 할 증거의 모양만
-소유한다.
+소유한다. Aside 전용 자동화와 Chrome 비간섭은 별도 후속 계약이 확정할 사항이다.
 
 ### 2. 증거 한 건의 필드
 
@@ -56,25 +56,25 @@ readback 시험을 함께 되돌려야 한다.
 | `channel` | 예 | enum | `saramin`, `jobkorea`, `linkedin_rps` 중 하나다. |
 | `candidate_ref` | 조건부 | string 또는 null | `candidate_ref_state=observed`이면 비어 있지 않은 문자열이다. 그 밖의 상태이면 null이다. |
 | `candidate_ref_state` | 예 | enum | `observed`, `not_observed`, `not_available` 중 하나다. |
-| `source_url` | 예 | URL string | query 안의 계정·세션·후보 민감값은 보호 저장소 원문에만 두고 보고용에는 정규화 URL을 둔다. |
-| `source_url_hash` | 예 | sha256 hex | 민감 URL 원문을 일반 로그에 쓰지 않고도 동일 출처를 대조하는 지문이다. |
+| `source_url` | 예 | URL string | 증거에는 계정·세션·후보 식별값이 든 경로와 query를 제거한 정규화 URL만 둔다. 민감 URL 원문은 증거·로그에 남기지 않는다. |
+| `source_url_hash` | 예 | sha256 hex | `source_url`의 정규화 URL을 해시한 지문이다. 후보 구분에는 `candidate_ref`를 함께 사용한다. |
 | `observed_at` | 예 | RFC3339 timestamp | 화면을 관측한 시각이다. 저장 시각과 다를 수 있다. |
-| `browser_context_ref` | 예 | string | Aside 앱·프로필·탭 증거의 참조다. Chrome 탭이나 전역 입력을 가리키면 안 된다. |
+| `browser_context_ref` | 예 | string | 브라우저 정본의 채널별 프로필·목표 탭 증거를 가리킨다. |
 | `search_condition_ref` | 예 | string | 어떤 검색 조건에서 나온 후보인지 가리킨다. 검색 조건 본문은 §5 형식을 따른다. |
 | `document_height_px` | 조건부 | integer >= 0 또는 null | `height_state=observed_stable`이면 최종 안정화 뒤 문서 전체 높이다. 그 밖의 상태이면 null이다. |
 | `height_state` | 예 | enum | `observed_stable`, `observed_changed`, `not_observed`, `not_applicable` 중 하나다. |
 | `height_observation_note` | 조건부 | string | 높이가 바뀌었거나 관측되지 않았을 때 필수다. |
 | `viewport_width_px` | 예 | integer >= 0 | 캡처 구간 좌표 해석에 필요한 화면 폭이다. |
 | `viewport_height_px` | 예 | integer >= 0 | 캡처 구간 좌표 해석에 필요한 화면 높이다. |
-| `segments` | 예 | array | §3의 캡처 구간 목록이다. 1개 이상이어야 한다. |
+| `segments` | 예 | array | §3의 캡처 구간 목록이다. `coverage_status=failed`이고 관측 구간이 없으면 빈 배열이다. 그 밖에는 1개 이상이다. |
 | `coverage_status` | 예 | enum | `complete`, `partial`, `failed` 중 하나다. |
 | `coverage_reason` | 예 | string | `partial` 또는 `failed`일 때 사람이 이해할 수 있는 이유다. `complete`이면 `all_segments_observed`를 적는다. |
-| `last_observed_y_px` | 예 | integer >= 0 | 마지막으로 관측한 세로 위치다. 어디까지 봤는지 복원하는 경계다. |
+| `last_observed_y_px` | 조건부 | integer >= 0 또는 null | 관측 구간이 있으면 마지막으로 관측한 세로 위치다. 관측 구간이 없으면 null이다. |
 | `extracted_fields` | 예 | object | §4의 NULL/미관측 구분 규칙을 따르는 추출 결과다. |
-| `company_duties` | 조건부 | array | `company_duties_state=observed`이면 1개 이상이다. 그 밖의 상태이면 빈 배열이어도 된다. |
+| `company_duties` | 조건부 | array | `company_duties_state=observed`이면 1개 이상이다. 그 밖의 상태이면 빈 배열이어야 한다. |
 | `company_duties_state` | 예 | enum | `observed`, `observed_empty`, `not_observed`, `not_available`, `redacted` 중 하나다. |
 | `company_aliases` | 예 | array | §7의 회사 별칭 목록이다. 표준명 추정만 있고 근거가 없으면 별칭으로 확정하지 않는다. |
-| `observed_contact_fields` | 예 | object | 화면에 보인 연락처 필드의 관측 상태만 남긴다. 연락처 수집 허용과 패킷 사용은 후속 계약이 소유한다. |
+| `observed_contact_fields` | 예 | object | 화면에 보인 연락처 필드의 관측 상태만 남긴다. 원값은 이 증거에 남기지 않는다. 연락처 수집 허용과 패킷 사용은 후속 계약이 소유한다. |
 | `readback_status` | 예 | enum | `not_run`, `matched`, `mismatch`, `blocked` 중 하나다. |
 | `readback_at` | 조건부 | RFC3339 timestamp | 재조회가 실행됐을 때 필수다. |
 | `readback_failure_reason` | 조건부 | string | `mismatch` 또는 `blocked`일 때 필수다. |
@@ -84,7 +84,10 @@ readback 시험을 함께 되돌려야 한다.
 검사 명령:
 
 ```bash
-rg -n '`candidate_ref`.*조건부|`document_height_px`.*조건부|`company_duties_state`|`observed_contact_fields`|`source_url`|`observed_at`|`segments`|`coverage_status`|`coverage_reason`|`readback_status`' docs/sot/humansearch-evidence-contract.md
+section=$(awk '/^### 2[.] 증거 한 건의 필드$/{found=1;next} found && /^### [0-9]+[.] /{exit} found && /^```bash$/{code=1;next} found && code && /^```$/{code=0;next} found && !code{print}' docs/sot/humansearch-evidence-contract.md)
+for term in '| `candidate_ref` |' '| `document_height_px` |' '| `company_duties_state` |' '| `observed_contact_fields` |' '| `source_url` |' '| `observed_at` |' '| `segments` |' '| `coverage_status` |' '| `coverage_reason` |' '| `readback_status` |'; do
+  printf '%s\n' "$section" | rg -Fq -- "$term" || exit 1
+done
 ```
 
 → 이 명령은 증거의 출처, 시각, 조건부 후보 식별자와 높이, 구간, 전체/부분/실패 판정, 연락처 관측 상태, 재조회 상태 필드가 문서에 있는지 확인한다.
@@ -98,9 +101,9 @@ rg -n '`candidate_ref`.*조건부|`document_height_px`.*조건부|`company_dutie
 | `segment_index` | 예 | integer >= 0 | 같은 증거 안에서 0부터 증가한다. |
 | `top_y_px` | 예 | integer >= 0 | 문서 기준 구간 시작 좌표다. |
 | `bottom_y_px` | 예 | integer >= 0 | 문서 기준 구간 끝 좌표다. `top_y_px`보다 커야 한다. |
-| `capture_sha256` | 예 | sha256 hex | 캡처 파일의 지문이다. |
+| `capture_sha256` | 조건부 | sha256 hex 또는 null | 캡처 파일이 있으면 그 지문이다. 캡처가 생성되지 않은 `failed` 구간이면 null이다. |
 | `text_sha256` | 조건부 | sha256 hex | OCR 또는 텍스트 추출 결과가 있을 때 필수다. |
-| `capture_ref` | 예 | string | 보호 저장소 안의 캡처 참조다. Git 경로나 외부 원격 URL이 아니다. |
+| `capture_ref` | 조건부 | string 또는 null | 캡처 파일이 있으면 보호 저장소 안의 참조다. Git 경로나 외부 원격 URL이 아니다. 캡처가 생성되지 않은 `failed` 구간이면 null이다. |
 | `segment_status` | 예 | enum | `observed`, `failed`, `redacted` 중 하나다. |
 | `failure_reason` | 조건부 | string | `failed`일 때 필수다. |
 
@@ -115,7 +118,10 @@ rg -n '`candidate_ref`.*조건부|`document_height_px`.*조건부|`company_dutie
 검사 명령:
 
 ```bash
-rg -n '`top_y_px`|`bottom_y_px`|`capture_sha256`|`failure_reason`|`segment_status=observed`|`observed_changed`|누락 없이|`partial`' docs/sot/humansearch-evidence-contract.md
+section=$(awk '/^### 3[.] 캡처 구간 manifest$/{found=1;next} found && /^### [0-9]+[.] /{exit} found && /^```bash$/{code=1;next} found && code && /^```$/{code=0;next} found && !code{print}' docs/sot/humansearch-evidence-contract.md)
+for term in '| `top_y_px` |' '| `bottom_y_px` |' '| `capture_sha256` |' '| `failure_reason` |' '`segment_status=observed`' 'height_state=observed_changed' '누락 없이' '`partial`'; do
+  printf '%s\n' "$section" | rg -Fq -- "$term" || exit 1
+done
 ```
 
 → 이 명령은 구간 좌표, 해시, 실패 사유, 동적 높이 처리와 전체/부분 판정 기준이 문서에 있는지 확인한다.
@@ -139,14 +145,18 @@ rg -n '`top_y_px`|`bottom_y_px`|`capture_sha256`|`failure_reason`|`segment_statu
 `not_available`은 포털이 제공하지 않는 항목임을 확인했다는 뜻이다. 세 상태를 모두 빈 문자열이나 NULL 하나로
 합치면 안 된다.
 
-`observed_contact_fields`도 이 모양을 따른다. 화면에 보인 연락처만 `observed_value`로 남기며, 보이지 않는
-이메일·전화번호·메신저 주소를 추정하지 않는다. 연락처를 수집해도 되는 채널 조건, 저장 암호화, 패킷 사용 여부는
+`observed_contact_fields`는 각 연락처 필드의 `state`, `source_segment_indexes`, `evidence_note`만 남기고
+`value`는 넣지 않는다. 화면에 보인 연락처만 `observed_value` 상태로 남기며, 보이지 않는
+연락처를 추정하지 않는다. 원값 수집을 허용하는 채널 조건, 저장 암호화, 패킷 사용 여부는
 후속 저장·패킷 계약이 소유한다.
 
 검사 명령:
 
 ```bash
-rg -n 'observed_empty|not_observed|not_available|redacted|source_segment_indexes|observed_contact_fields|추정하지 않는다' docs/sot/humansearch-evidence-contract.md
+section=$(awk '/^### 4[.] NULL, 빈 값, 미관측 구분$/{found=1;next} found && /^### [0-9]+[.] /{exit} found && /^```bash$/{code=1;next} found && code && /^```$/{code=0;next} found && !code{print}' docs/sot/humansearch-evidence-contract.md)
+for term in '`observed_empty`' '`not_observed`' '`not_available`' '"source_segment_indexes"' '`observed_contact_fields`' '추정하지 않는다'; do
+  printf '%s\n' "$section" | rg -Fq -- "$term" || exit 1
+done
 ```
 
 → 이 명령은 값 없음과 미관측이 서로 다른 상태로 남고, 연락처가 보이는 값 관측으로만 제한되는지 확인한다.
@@ -175,7 +185,10 @@ RPS 프로젝트가 없으면 만들고 있으면 필터를 업데이트한다�
 검사 명령:
 
 ```bash
-rg -n '`search_condition_ref`|`filters_json`|`applied_result_proof`|RPS 프로젝트|재조회 증거' docs/sot/humansearch-evidence-contract.md
+section=$(awk '/^### 5[.] 검색 조건 보존$/{found=1;next} found && /^### [0-9]+[.] /{exit} found && /^```bash$/{code=1;next} found && code && /^```$/{code=0;next} found && !code{print}' docs/sot/humansearch-evidence-contract.md)
+for term in '`search_condition_ref`' '| `filters_json` |' '| `applied_result_proof` |' 'RPS 프로젝트' '재조회 증거'; do
+  printf '%s\n' "$section" | rg -Fq -- "$term" || exit 1
+done
 ```
 
 → 이 명령은 후보가 어떤 검색에서 나왔는지와 RPS 필터 재조회 증거를 연결하는 필드가 있는지 확인한다.
@@ -184,7 +197,7 @@ rg -n '`search_condition_ref`|`filters_json`|`applied_result_proof`|RPS 프로�
 
 경력 항목은 회사 단위로 나눠 저장한다. 여러 회사의 담당 업무를 하나의 긴 문자열로 합치면 안 된다.
 `company_duties_state=observed`인데 `company_duties`가 빈 배열이면 계약 위반이다. 반대로 경력 구간을
-관측하지 못했으면 `company_duties_state=not_observed`와 빈 배열을 함께 쓸 수 있다.
+관측하지 못했으면 `company_duties_state=not_observed`와 빈 배열을 함께 써야 한다.
 
 `company_duties`의 각 항목은 아래 필드를 가진다.
 
@@ -203,7 +216,10 @@ rg -n '`search_condition_ref`|`filters_json`|`applied_result_proof`|RPS 프로�
 검사 명령:
 
 ```bash
-rg -n '`company_duties`|`company_duties_state`|`company_observed_name`|`duty_text`|`duty_state`|`source_segment_indexes`|빈 배열' docs/sot/humansearch-evidence-contract.md
+section=$(awk '/^### 6[.] 회사별 담당 업무$/{found=1;next} found && /^### [0-9]+[.] /{exit} found && /^```bash$/{code=1;next} found && code && /^```$/{code=0;next} found && !code{print}' docs/sot/humansearch-evidence-contract.md)
+for term in '`company_duties`' '`company_duties_state=observed`' '| `company_observed_name` |' '| `duty_text` |' '| `duty_state` |' '| `source_segment_indexes` |' '빈 배열을 함께 써야 한다'; do
+  printf '%s\n' "$section" | rg -Fq -- "$term" || exit 1
+done
 ```
 
 → 이 명령은 담당 업무가 후보 전체가 아니라 회사별 경력 항목에 붙고, 배열과 상태값의 조합이 판정 가능하게 적혔는지 확인한다.
@@ -229,7 +245,10 @@ rg -n '`company_duties`|`company_duties_state`|`company_observed_name`|`duty_tex
 검사 명령:
 
 ```bash
-rg -n '`company_aliases`|`alias_text`|`canonical_company_ref`|`alias_basis`|`not_confirmed`' docs/sot/humansearch-evidence-contract.md
+section=$(awk '/^### 7[.] 회사 별칭$/{found=1;next} found && /^### [0-9]+[.] /{exit} found && /^```bash$/{code=1;next} found && code && /^```$/{code=0;next} found && !code{print}' docs/sot/humansearch-evidence-contract.md)
+for term in '`company_aliases`' '| `alias_text` |' '| `canonical_company_ref` |' '| `alias_basis` |' '`not_confirmed` 별칭은 중복 병합에 쓰지 않는다'; do
+  printf '%s\n' "$section" | rg -Fq -- "$term" || exit 1
+done
 ```
 
 → 이 명령은 별칭을 추정 병합과 구분해 저장하는지 확인한다.
@@ -244,7 +263,10 @@ rg -n '`company_aliases`|`alias_text`|`canonical_company_ref`|`alias_basis`|`not
 검사 명령:
 
 ```bash
-rg -n '`readback_status`|`matched`|`mismatch`|`blocked`|저장 완료가 아니다|중단 사유' docs/sot/humansearch-evidence-contract.md
+section=$(awk '/^### 8[.] readback과 저장 실패$/{found=1;next} found && /^### [0-9]+[.] /{exit} found && /^```bash$/{code=1;next} found && code && /^```$/{code=0;next} found && !code{print}' docs/sot/humansearch-evidence-contract.md)
+for term in '`readback_status=matched`가 아니면 저장 완료가 아니다' '`readback_status=blocked`' '중단 사유'; do
+  printf '%s\n' "$section" | rg -Fq -- "$term" || exit 1
+done
 ```
 
 → 이 명령은 저장 성공 주장과 독립 재조회 성공을 분리하는지 확인한다.
@@ -268,7 +290,10 @@ rg -n '`readback_status`|`matched`|`mismatch`|`blocked`|저장 완료가 아니�
 1. 구간 무누락 manifest 검사 명령:
 
 ```bash
-rg -n '누락 없이|0..document_height_px|구간 사이' docs/sot/humansearch-evidence-contract.md
+section=$(awk '/^### 3[.] 캡처 구간 manifest$/{found=1;next} found && /^### [0-9]+[.] /{exit} found && /^```bash$/{code=1;next} found && code && /^```$/{code=0;next} found && !code{print}' docs/sot/humansearch-evidence-contract.md)
+for term in '`0..document_height_px`' '누락 없이' '구간 사이'; do
+  printf '%s\n' "$section" | rg -Fq -- "$term" || exit 1
+done
 ```
 
 → 이 명령은 전체 열람 판정이 문서 높이와 구간 연속성 조건에 묶였는지 확인한다.
@@ -276,7 +301,10 @@ rg -n '누락 없이|0..document_height_px|구간 사이' docs/sot/humansearch-e
 2. 마지막 화면 검사 명령:
 
 ```bash
-rg -n '`last_observed_y_px`|마지막으로 관측한' docs/sot/humansearch-evidence-contract.md
+section=$(awk '/^### 2[.] 증거 한 건의 필드$/{found=1;next} found && /^### [0-9]+[.] /{exit} found && /^```bash$/{code=1;next} found && code && /^```$/{code=0;next} found && !code{print}' docs/sot/humansearch-evidence-contract.md)
+for term in '| `last_observed_y_px` |'; do
+  printf '%s\n' "$section" | rg -Fq -- "$term" || exit 1
+done
 ```
 
 → 이 명령은 마지막 관측 위치가 별도 필드와 설명으로 남는지 확인한다.
@@ -284,7 +312,10 @@ rg -n '`last_observed_y_px`|마지막으로 관측한' docs/sot/humansearch-evid
 3. NULL 구분 검사 명령:
 
 ```bash
-rg -n 'observed_empty|not_observed|not_available' docs/sot/humansearch-evidence-contract.md
+section=$(awk '/^### 4[.] NULL, 빈 값, 미관측 구분$/{found=1;next} found && /^### [0-9]+[.] /{exit} found && /^```bash$/{code=1;next} found && code && /^```$/{code=0;next} found && !code{print}' docs/sot/humansearch-evidence-contract.md)
+for term in '`observed_empty`' '`not_observed`' '`not_available`'; do
+  printf '%s\n' "$section" | rg -Fq -- "$term" || exit 1
+done
 ```
 
 → 이 명령은 빈 값, 미관측, 제공 안 됨을 서로 다른 상태로 쓰는지 확인한다.
@@ -292,7 +323,10 @@ rg -n 'observed_empty|not_observed|not_available' docs/sot/humansearch-evidence-
 4. 회사별 duty 검사 명령:
 
 ```bash
-rg -n '`company_duties`|`duty_text`|회사 단위' docs/sot/humansearch-evidence-contract.md
+section=$(awk '/^### 6[.] 회사별 담당 업무$/{found=1;next} found && /^### [0-9]+[.] /{exit} found && /^```bash$/{code=1;next} found && code && /^```$/{code=0;next} found && !code{print}' docs/sot/humansearch-evidence-contract.md)
+for term in '`company_duties`' '| `duty_text` |' '회사 단위'; do
+  printf '%s\n' "$section" | rg -Fq -- "$term" || exit 1
+done
 ```
 
 → 이 명령은 담당 업무가 회사별 경력 구조에 연결되는지 확인한다.
@@ -300,7 +334,10 @@ rg -n '`company_duties`|`duty_text`|회사 단위' docs/sot/humansearch-evidence
 5. 검색 조건 보존 검사 명령:
 
 ```bash
-rg -n '`search_condition_ref`|`filters_json`' docs/sot/humansearch-evidence-contract.md
+section=$(awk '/^### 5[.] 검색 조건 보존$/{found=1;next} found && /^### [0-9]+[.] /{exit} found && /^```bash$/{code=1;next} found && code && /^```$/{code=0;next} found && !code{print}' docs/sot/humansearch-evidence-contract.md)
+for term in '`search_condition_ref`' '| `filters_json` |'; do
+  printf '%s\n' "$section" | rg -Fq -- "$term" || exit 1
+done
 ```
 
 → 이 명령은 후보 증거가 검색 조건 참조와 실제 필터 본문을 잃지 않는지 확인한다.
@@ -308,7 +345,10 @@ rg -n '`search_condition_ref`|`filters_json`' docs/sot/humansearch-evidence-cont
 6. 원격 경로 금지 검사 명령:
 
 ```bash
-rg -n '보호 저장소|Git 경로나 외부 원격 URL이 아니다' docs/sot/humansearch-evidence-contract.md
+section=$(awk '/^### 3[.] 캡처 구간 manifest$/{found=1;next} found && /^### [0-9]+[.] /{exit} found && /^```bash$/{code=1;next} found && code && /^```$/{code=0;next} found && !code{print}' docs/sot/humansearch-evidence-contract.md)
+for term in '| `capture_ref` |' 'Git 경로나 외부 원격 URL이 아니다'; do
+  printf '%s\n' "$section" | rg -Fq -- "$term" || exit 1
+done
 ```
 
 → 이 명령은 캡처 원본 참조가 통제 밖 원격 URL이나 Git 경로로만 남지 않도록 하는 문구를 확인한다.
@@ -316,7 +356,10 @@ rg -n '보호 저장소|Git 경로나 외부 원격 URL이 아니다' docs/sot/h
 7. readback 검사 명령:
 
 ```bash
-rg -n '`readback_status`|독립 재조회' docs/sot/humansearch-evidence-contract.md
+section=$(awk '/^### 8[.] readback과 저장 실패$/{found=1;next} found && /^### [0-9]+[.] /{exit} found && /^```bash$/{code=1;next} found && code && /^```$/{code=0;next} found && !code{print}' docs/sot/humansearch-evidence-contract.md)
+for term in '`readback_status=matched`가 아니면 저장 완료가 아니다' '독립 재조회 상태'; do
+  printf '%s\n' "$section" | rg -Fq -- "$term" || exit 1
+done
 ```
 
 → 이 명령은 저장 성공 주장이 독립 재조회 상태와 분리돼 있는지 확인한다.
@@ -324,7 +367,10 @@ rg -n '`readback_status`|독립 재조회' docs/sot/humansearch-evidence-contrac
 8. 회사 별칭 검사 명령:
 
 ```bash
-rg -n '`company_aliases`|`alias_basis`|`not_confirmed`' docs/sot/humansearch-evidence-contract.md
+section=$(awk '/^### 7[.] 회사 별칭$/{found=1;next} found && /^### [0-9]+[.] /{exit} found && /^```bash$/{code=1;next} found && code && /^```$/{code=0;next} found && !code{print}' docs/sot/humansearch-evidence-contract.md)
+for term in '`company_aliases`' '| `alias_basis` |' '`not_confirmed` 별칭은 중복 병합에 쓰지 않는다'; do
+  printf '%s\n' "$section" | rg -Fq -- "$term" || exit 1
+done
 ```
 
 → 이 명령은 별칭 근거 상태와 확인되지 않은 별칭의 제한이 남아 있는지 확인한다.
