@@ -35,7 +35,7 @@
         차단 시 stderr: "BLOCKED: <스크립트경로> exit=<code>"
 불변식: 스크립트가 0개 발견되면 exit 1 (fail-closed — "검사할 게 없어서 통과"를 금지)
         미추적 파일(??) 존재 시 exit 1 (P15)
-한계  : git push --no-verify 로 우회 가능. CI 가 최종 방어선 (문서에 명시)
+한계  : git push --no-verify 로 우회 가능. CI는 실패를 알리지만 현재 기록된 저장소 설정에서는 병합을 강제하지 못한다.
 ```
 
 ### `scripts/session-status.sh`
@@ -62,12 +62,13 @@
 ```
 입력  : 없음
 동작  : git config core.hooksPath hooks && chmod +x hooks/*
-        linked worktree에서 실행하고 primary worktree의 `.secret-patterns`가 비어 있지 않으면,
-        현재 worktree에 같은 이름이 없을 때만 primary의 물리 절대 경로를 가리키는 심볼릭 링크를 만든다.
+        linked worktree에서 실행하고 primary worktree의 `.secret-patterns` 파일이 존재하면,
+        현재 worktree에 같은 이름이 없을 때만 primary에서 계산한 논리 절대 경로를 가리키는 심볼릭 링크를 만든다.
         기존 파일·링크는 덮어쓰지 않고, 실제 규칙 내용을 복사·출력·Git 추적하지 않는다.
 출력  : exit 0 + 설치된 훅 목록
 불변식: 실행 후 core.hooksPath 를 재조회해 실제로 설정됐는지 확인(readback). 불일치 시 exit 1
-        호출자는 링크 여부·정확한 대상·원본과 링크의 내용 존재·Git 비추적·무시 규칙을 재조회하고,
+        설치기는 빈 파일과 경로의 물리적 동일성까지 보장하지 않는다.
+        호출자는 링크 여부·물리 경로와 일치하는 정확한 대상·원본과 링크의 내용 존재·Git 비추적·무시 규칙을 재조회하고,
         하나라도 다르면 다음 검사를 실행하지 않는다.
 ```
 
@@ -78,4 +79,4 @@
 ## 비범위 / 한계
 
 - 6종 위반 시연의 실제 실행 결과·적대검증 판정(V1 조건부 REJECT→승인까지 5차 판정)은 `docs/engineering/hook-enforcement-goal-2026-08-07.md` 실행 결과·적대 검증 로그 절에 있다. 이 문서는 재현하지 않는다.
-- `git push --no-verify` 우회는 구조적으로 탐지 불가(2026-08-07 확정) — CI가 최종 방어선이라는 전제가 깨지면 이 문서 전체가 무효하다.
+- `git push --no-verify` 우회는 로컬 훅에서 탐지할 수 없다. 2026-08-15 실측 기록은 개인 비공개 저장소의 required status check 설정이 403으로 거부됐음을 보여 준다. CI 실패는 관측 신호이며, 병합 강제력은 별도 보호 설정 확인 전까지 주장하지 않는다.

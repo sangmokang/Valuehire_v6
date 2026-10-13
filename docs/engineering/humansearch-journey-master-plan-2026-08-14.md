@@ -1,5 +1,7 @@
 # 밸류커넥트 일감 여정 전체 기획 — Gmail 접수부터 후보 보고까지 (Claude 버전)
 
+> 과거 기획 기록 — 현재 실행 지시가 아니다. 자동 발송은 별도 예외 계약과 책임자 승인 전까지 금지한다. 브라우저 진단 포트와 탭 열거만 확인됐으며, 무인 후보 처리·재시작 복구·로그인 복구는 미검증이다. 현재 판단은 `docs/engineering/humansearch-journey-alternative-plan-2026-08-15.md`를 따른다.
+
 > 작성: 2026-08-14, Claude(Fable 5) / 위험 등급 L1(기획 문서, 코드 변경 없음)
 > 대조: codex 독립 기획(`.claude/private-reviews/codex-humansearch-journey-plan-2026-08-14.md`)과 상호 비판 — 결과는 §10 적대 검증 로그.
 > 이 문서는 기존 클린룸 재구축 계약(`worktrees/humansearch-clean-room-plan/docs/engineering/humansearch-v6-clean-room-rebuild-goal-2026-08-12.md`)을 **대체하지 않는다.** 그 계약의 상류(일감 접수·등록)와 하류(지휘·보고·저장)를 덧붙이는 상위 지도다.

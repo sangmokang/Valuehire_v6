@@ -14,7 +14,7 @@
 - `docs/sot/verification-commands.md:1-35`는 이 저장소의 실제 검사 명령과 서버 검사 목록을 정한다. 존재하지 않는 명령은 인수 기준으로 쓰지 않는다.
 - `docs/engineering/humansearch-journey-master-plan-2026-08-14.md:71,122,253`은 Aside 실측을 완료와 예정으로 동시에 적어 모순된다.
 - 같은 문서 `:234`는 v1~v5 의존 0을 선언하지만 `:98`은 1차 등록에 v5 스킬을 쓴다고 적어 모순된다.
-- `worktrees/humansearch-clean-room-plan/docs/engineering/humansearch-v6-clean-room-rebuild-goal-2026-08-12.md:181-191`은 사람이 선택한 현재 탭만 허용하고 디버깅 포트 직접 제어를 금지한다. 따라서 무인 실행은 현 계약의 연장이 아니라 별도 계약 변경안이다.
+- `docs/engineering/humansearch-v6-clean-room-rebuild-goal-2026-08-12.md:181-191`은 사람이 선택한 현재 탭만 허용하고 디버깅 포트 직접 제어를 금지한다. 따라서 무인 실행은 현 계약의 연장이 아니라 별도 계약 변경안이다.
 - 같은 후속 문서 `:289-298`은 SQLite를 유일한 저장 원본으로 정한다.
 - `docs/engineering/humansearch-v6-founding-spec-2026-08-07.md:153-160`은 발송 자동 클릭을 금지한다. 사람인·잡코리아 자동 발송 실험은 별도 예외 승인 전까지 구현할 수 없다.
 
@@ -49,7 +49,7 @@
 - [x] `README.md`
 - [x] `humansearch/pyproject.toml`
 - [x] `docs/engineering/humansearch-v6-founding-spec-2026-08-07.md`
-- [x] `worktrees/humansearch-clean-room-plan/docs/engineering/humansearch-v6-clean-room-rebuild-goal-2026-08-12.md`
+- [x] `docs/engineering/humansearch-v6-clean-room-rebuild-goal-2026-08-12.md`
 - [x] 기존 기획서와 독립 Codex 기획서
 
 ## 비범위

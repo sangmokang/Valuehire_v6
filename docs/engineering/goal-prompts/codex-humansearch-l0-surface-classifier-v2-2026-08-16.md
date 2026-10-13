@@ -143,7 +143,7 @@ CI green만으로 병합을 추정하지 않는다.
 각 PR에 대해 GitHub가 주는 merge commit을 읽고, 그 commit이 fresh `origin/main`의 조상인지 확인한다.
 이 저장소는 squash merge를 쓰므로 원래 head commit의 ancestry를 요구하면 안 된다.
 
-다음 읽기 전용 script로 세 번호를 모두 검사한다.
+다음 읽기 전용 script로 네 번호를 모두 검사한다.
 
 ```bash
 set -euo pipefail
@@ -186,7 +186,7 @@ fi
 3. “PR을 직접 merge하지 않았다”를 명시한다.
 4. 실행을 종료한다. polling하거나 auto-merge하지 않는다.
 
-세 개가 모두 통과하면 `origin/main`에서 아래 추적 파일을 읽는다.
+네 개가 모두 통과하면 `origin/main`에서 아래 추적 파일을 읽는다.
 
 ```bash
 git show origin/main:docs/sot/INDEX.md
@@ -340,6 +340,10 @@ fi
 0건인지 읽는다. 실행 불가, 출력 누락, 실패 1건 이상은 모두 23으로 중단한다. `.secret-patterns`는 앞선
 설치기가 기본 작업 공간의 파일을 가리키게 할 뿐 복사하거나 Git에 추가하지 않는다. 회수 가능한 Git
 객체를 자동 삭제해 이 관문을 억지로 통과시키지도 않는다.
+`session-status.sh`의 `acceptance-0-5.sh`는 작업 위치와 관계없이 로컬 `main`과 `origin/main`이
+같은 commit인지 검사한다. 선행 PR 병합 후에도 두 참조가 다르면 Gate 0은 실패한다. 실행자는
+기본 `main` 작업 공간을 수정하거나 검사를 우회하지 말고, 동기화가 필요한 선행 조건과 실패 출력을
+`BLOCKED` 보고에 명시한다.
 재개라면 아래 checkpoint 규칙으로 이미 끝난 단계와 변경의 소유권을 증명해야 한다.
 
 ### 7. 재개와 checkpoint 규칙

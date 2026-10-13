@@ -2,6 +2,8 @@
 
 VERDICT: PASS
 
+> 재현 경로 안내: 아래 검증 명령의 `worktrees/humansearch-clean-room-plan/` 접두사는 당시 작업 공간 기록이다. 현재 체크아웃의 추적 문서는 `docs/engineering/humansearch-v6-clean-room-rebuild-goal-2026-08-12.md`에 있다. 과거 실행 명령은 변경하지 않았다.
+
 ## 결론
 
 대안 기획서는 오너 검토용 문서로 제출할 수 있습니다. 이 판정은 문서의 사실·제안 분리와 설계 일관성에 대한 합격이며, 제품 구현이나 무인 운영·자동 발송의 합격이 아닙니다.
