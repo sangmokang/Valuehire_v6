@@ -14,6 +14,10 @@
 # 한도  : 회차당 PR_REVIEW_MAX_PER_RUN(기본 3)건. 사용량 한도 문구가 보이면 그 회차를 멈춘다.
 set -uo pipefail
 
+# git 훅(pre-push 등) 안에서 불리면 GIT_DIR 등이 넘어온다. 그대로 두면 이 스크립트의 git 명령이
+# 대상 clone 이 아니라 훅을 부른 저장소에 쓴다(2026-10-13 실측: 가짜 커밋·브랜치 8개·core.bare=true 오염).
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_PREFIX
+
 STATE=${PR_REVIEW_STATE:-$HOME/.valuehire-pr-review}
 REPO=${PR_REVIEW_REPO:-sangmokang/Valuehire_v6}
 REMOTE=${PR_REVIEW_REMOTE:-https://github.com/$REPO.git}

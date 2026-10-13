@@ -12,6 +12,10 @@
 # 출력: PASS 한 줄 + CHECKED: <n> (run-acceptance.sh 계약) · 하나라도 어기면 exit 1
 set -uo pipefail
 
+# git 훅(pre-push 등) 안에서 불리면 GIT_DIR 등이 넘어온다. 그대로 두면 이 스크립트의 git 명령이
+# 대상 clone 이 아니라 훅을 부른 저장소에 쓴다(2026-10-13 실측: 가짜 커밋·브랜치 8개·core.bare=true 오염).
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_PREFIX
+
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 RUN="$ROOT/scripts/pr-review/run.sh"
 fail=0; checked=0
@@ -198,6 +202,15 @@ kill "$holder" 2>/dev/null; wait "$holder" 2>/dev/null
 # 잠금 주인이 죽었으면 넘겨받는다(재부팅·강제종료 뒤 영구 정지 방지)
 run >/dev/null
 if [ "$(calls)" -gt "$before" ]; then ok "죽은 잠금은 넘겨받음"; else bad "죽은 잠금 때문에 영구 정지"; fi
+
+# 7. git 훅 안처럼 GIT_DIR 이 넘어와도 run.sh 가 그 저장소에 쓰지 않는다(2026-10-13 오염 실측)
+git init -q "$T/sentinel"; git -C "$T/sentinel" commit -q --allow-empty -m init
+git -C "$T/sentinel" remote add origin "$T/remote.git"   # 실제 저장소처럼 origin 이 있어야 끝까지 간다
+echo fix > "$F/mode.codex.7"; git --git-dir="$T/remote.git" update-ref refs/heads/b7 "$(sha b7)"
+prs 7:b7; rm -f "$T/state/ledger.jsonl"
+GIT_DIR="$T/sentinel/.git" PR_REVIEW_MAX_PER_RUN=1 bash "$RUN" > /dev/null 2>&1
+expect "GIT_DIR 이 넘어와도 그 저장소 브랜치 불변" "$(git -C "$T/sentinel" for-each-ref refs/heads | wc -l | tr -d ' ')" 1
+expect "GIT_DIR 이 넘어와도 그 저장소 참조 불변" "$(git -C "$T/sentinel" for-each-ref | wc -l | tr -d ' ')" 1
 
 echo "CHECKED: $checked"
 if [ "$fail" -eq 0 ]; then echo "PASS: PR 자동 리뷰 약속 ${checked}건 전부 충족"; exit 0; fi
