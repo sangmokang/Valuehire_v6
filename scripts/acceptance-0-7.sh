@@ -44,7 +44,7 @@ if [ -n "${VH_PREPUSH_DEPTH:-}" ]; then
   exit 1
 fi
 
-TOTAL=12
+TOTAL=14
 fail=0
 step=0
 
@@ -108,7 +108,7 @@ reset_tree() {
 
 # demo <이름> <셋업코드> <행위코드>
 demo() {
-  local name="$1" setup="$2" action="$3"
+  local name="$1" setup="$2" action="$3" expected="${4:-}"
   step=$((step + 1))
   local sON sOFF aON aOFF
 
@@ -133,7 +133,8 @@ demo() {
       "$step" "$TOTAL" "$name" "$sON" "$sOFF"
     sed 's/^/         /' "$outdir/setup.on.$step" | head -3
     fail=1
-  elif [ "$aON" -ne 0 ] && [ "$aOFF" -eq 0 ]; then
+  elif [ "$aON" -ne 0 ] && [ "$aOFF" -eq 0 ] &&
+       { [ -z "$expected" ] || grep -qF "$expected" "$outdir/act.on.$step"; }; then
     printf '[%d/%d] %s → BLOCKED (훅ON=%d · 훅OFF=%d) ✓ 훅이 원인\n' \
       "$step" "$TOTAL" "$name" "$aON" "$aOFF"
     awk '/BLOCKED/{print "         " $0; exit}' "$outdir/act.on.$step"
@@ -141,6 +142,9 @@ demo() {
     printf '[%d/%d] %s → 위양성 ← 훅 없이도 실패한다 (훅ON=%d · 훅OFF=%d)\n' \
       "$step" "$TOTAL" "$name" "$aON" "$aOFF"
     sed 's/^/         /' "$outdir/act.off.$step" | head -3
+    fail=1
+  elif [ "$aON" -ne 0 ] && [ -n "$expected" ]; then
+    printf '[%d/%d] %s → WRONG BLOCK (기대 사유 없음)\n' "$step" "$TOTAL" "$name"
     fail=1
   else
     printf '[%d/%d] %s → PASSED ← 결함, 차단되지 않음 (훅ON=%d · 훅OFF=%d)\n' \
@@ -245,7 +249,18 @@ demo "워크플로 검사 실행 줄 삭제" \
   'edit_once "$TARGET_WF" "$TARGET_RUN" ""
    edit_once "$TARGET_WF" "$TARGET_NAME" "      - name: bash scripts/verify/run-acceptance.sh scripts/acceptance-principles-check.sh"
    ! grep -qF "$TARGET_RUN" "$TARGET_WF"' \
-  'git add "$TARGET_WF" && git commit -m "weaken: delete acceptance run"'
+  'git add "$TARGET_WF" && git commit -m "weaken: delete acceptance run"' \
+  '워크플로 인수 검사 실행 줄 삭제'
+
+demo "워크플로 파일 전체 삭제" \
+  'test -f "$TARGET_WF"' \
+  'git rm -q "$TARGET_WF" && git commit -m "weaken: delete workflow"' \
+  '워크플로 인수 검사 실행 줄 삭제'
+
+demo "워크플로를 하위 디렉터리로 이동" \
+  'mkdir -p .github/workflows/off && test -f "$TARGET_WF"' \
+  'git mv "$TARGET_WF" .github/workflows/off/verify.yml && git commit -m "weaken: move workflow out of scope"' \
+  '워크플로 인수 검사 실행 줄 삭제'
 
 # 다음 다섯 건은 #71 방어가 막으면 안 되는 정상 변경이다.
 allow "워크플로 주석 변경" \
@@ -288,7 +303,7 @@ fi
 
 echo
 if [ "$fail" -eq 0 ]; then
-  echo "PASS: #71 차단 1건·기존 차단 6건·정상 변경 5건 판별 (훅 OFF 대조 통과)"
+  echo "PASS: #71 차단 3건·기존 차단 6건·정상 변경 5건 판별 (훅 OFF 대조 통과)"
   exit 0
 fi
 echo "RESULT: 차단되지 않았거나 시연이 무효인 항목이 있다. exit 1"
