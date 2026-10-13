@@ -28,11 +28,11 @@
 
 - **AC-1**: `verify.yml:18`의 `uses:` 값이 `actions/checkout@<40자 SHA> # v7.0.1` 형태여야 한다.
   검증 명령(초안): `/usr/bin/grep -E "uses: actions/checkout@[0-9a-f]{40}" .github/workflows/verify.yml` → 매치 1건.
-  **검증 명령(V1 반례 반영 후 authoritative)**: 초안 패턴은 행 시작·SHA 뒤 경계·버전 주석·유일성을 강제하지 않아 41자 SHA·주석 처리된 줄·중복 checkout 행을 모두 거짓 통과시킨다(아래 "적대 검증 로그" M-1). 대신 아래 두 명령을 함께 쓴다.
-  1. `/usr/bin/grep -cE '^[[:space:]]*-[[:space:]]+uses:[[:space:]]+actions/checkout@[0-9a-f]{40}[[:space:]]+# v7\.0\.1[[:space:]]*$' .github/workflows/verify.yml` → `1`
+  **검증 명령(V1 반례 반영 후 authoritative)**: 초안 패턴은 행 시작·SHA 뒤 경계·버전 주석·유일성을 강제하지 않아 41자 SHA·주석 처리된 줄·중복 checkout 행을 모두 거짓 통과시킨다(아래 "적대 검증 로그" M-1). 임의의 40자 SHA도 v7.0.1로 오인하지 않도록 실제 커밋값을 대조한다. 아래 두 명령을 함께 쓴다.
+  1. `/usr/bin/grep -cE '^[[:space:]]*-[[:space:]]+uses:[[:space:]]+actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1[[:space:]]+# v7\.0\.1[[:space:]]*$' .github/workflows/verify.yml` → `1`
   2. `git grep -n -I -i -E 'actions/checkout@' -- '*.yml' '*.yaml'` → 저장소 전체 workflow YAML 중 `.github/workflows/verify.yml:18` 단 한 줄만 출력
 - **AC-2**: 이 변경 뒤 CI(verify job)가 checkout 스텝을 포함해 처음부터 끝까지 성공해야 한다(로컬 재현 불가 — PR을 올려 실제 GitHub Actions 러너로 확인).
-  검증 명령: `gh api repos/sangmokang/Valuehire_v6/commits/<head-sha>/check-runs --jq '.check_runs[] | "\(.name) \(.status) \(.conclusion)"'` — `push`·`pull_request` 두 이벤트 모두 `completed success`여야 한다(이벤트 종류를 구분해서 봐야 하는 이유는 "적대 검증 로그" 참고).
+  검증 명령: `gh api 'repos/sangmokang/Valuehire_v6/actions/runs?head_sha=<head-sha>&per_page=100' --jq '.workflow_runs[] | select(.name == "verify" and (.event == "push" or .event == "pull_request")) | [.id, .event, .head_sha, .status, .conclusion] | @tsv'` — 대상 HEAD와 일치하는 `push`·`pull_request` 실행이 각각 `completed success`여야 한다. 각 실행 ID의 `gh api repos/sangmokang/Valuehire_v6/actions/runs/<run-id>/jobs`에서 `verify` job과 checkout 스텝 성공도 확인한다. `check-runs` 응답의 이름·상태·결론만으로는 이벤트를 구분할 수 없다.
 - **counter-AC**: SHA 대신 `@v4`나 `@v7`(태그) 같은 가변 참조로 되돌리면 AC-1 검증 명령이 매치 0건으로 실패해야 한다.
 
 ## 계약 (입출력 모양)
