@@ -224,7 +224,7 @@ pre-commit 카나리가 의도대로 차단하므로, 해시된 artifact가 이 
 - 스킬 고정: `humanreview` SHA-256
   `a18f19f86794da142781e72da2e165d058881c76b69a21fc9df4640ba822a955`
 - 핵심: 스캐너·인수 검사가 CI에 미배선, 인라인 구 판정기와 거짓 초록, WU-4·pre-push·명부·SOT 누락.
-- 원문: `/Users/kangsangmo/Desktop/Valuehire_v6/.omx/artifacts/claude-claude-v1-pr-29-git-pr-pr-29-origin-main-users-kangsangmo-de-2026-08-25T12-26-11-806Z.md`
+- 원문: 로컬 `.omx/artifacts/`의 Claude V1-0 산출물(아래 해시로 식별)
 - 크기/해시: `27060 bytes` /
   `f23acd629bba6f5379d0e463da44eb2fa43bcbfe68ec4349b904d4cad354ff44`
 

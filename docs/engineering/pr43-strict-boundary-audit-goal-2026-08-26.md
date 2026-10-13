@@ -172,7 +172,7 @@ V1은 Claude가 정본 추출 실패, 600/601, 검사기·시험 동시 약화, 
 
 | 검토 | 산출물 | SHA256 | 로컬 코드 | 원격 SHIP |
 |---|---|---|---|---|
-| Claude V1 최초 호출 | `.omx/artifacts/claude-claude-v1-push-users-kangsangmo-desktop-valuehire-v6-worktre-2026-08-26T00-45-48-071Z.md` | `e8a81281382762eef6dfac1035fc04aeeaf9c4bbdf8f720161ad270ac8b3a297` | INVALID — 명령을 실행하지 않고 허가를 요청했으며 요구 판정 형식을 지키지 않음 | NOT_RUN |
+| Claude V1 최초 호출 | 로컬 `.omx/artifacts/`의 Claude V1 산출물(해시로 식별) | `e8a81281382762eef6dfac1035fc04aeeaf9c4bbdf8f720161ad270ac8b3a297` | INVALID — 명령을 실행하지 않고 허가를 요청했으며 요구 판정 형식을 지키지 않음 | NOT_RUN |
 | Claude V1 고유 재시도 | `.omx/artifacts/claude-pr43-boundary-v1-retry-2026-08-26.md` | `06dc0992fdd0badfc1e4d694b3f918055c851bb7b0d96638c8ea3f8d15a6bf34` | APPROVE — 34/44/14/10/18과 blob 1369 재현 | NOT_RUN — 첫 줄 형식 위반, `all contracts` 과장, 저장소에 없는 `make ship` 권고 |
 | Codex V2 새 맥락 | `.omx/artifacts/codex-pr43-boundary-v2-2026-08-26.md` | `b4efa6ef0042d38a0935dcf7ba0423ffe8b3c98411bc95d7cd123f1ea71e424e` | APPROVE — V1 핵심 근거 독립 재현 | REQUEST_CHANGES — 로컬 HEAD와 원격 PR head 불일치 |
 

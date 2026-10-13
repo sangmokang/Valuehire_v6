@@ -15,7 +15,7 @@
 - 검증 결과를 요약하지 마라. 명령과 종료값과 출력을 그대로 남겨라.
 
 ## 작업 위치
-격리 워크트리: /Users/kangsangmo/Desktop/Valuehire_v6/.claude/worktrees/history-scan-failclosed
+격리 워크트리: .claude/worktrees/history-scan-failclosed
 브랜치: task/history-scan-failclosed (origin/main 29ce9da 기준)
 이 워크트리 밖으로 나가지 마라. 메인 작업트리와 다른 워크트리를 건드리지 마라.
 
