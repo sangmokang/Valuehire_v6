@@ -13,3 +13,11 @@
 - [invoice-storage.md](invoice-storage.md) — V4 Supabase 원장 재사용, 고객사·포지션별 수수료 계약, SQLite 미러·동기화 상태 계약
 
 새 SOT 파일을 추가하는 유일한 트리거: 스크립트/훅/CI/다음 세션이 이 문서를 **답으로 참조**해야 하는가? 아니면 `docs/engineering/`에 남긴다.
+
+- [candidate-search.md](candidate-search.md) — 후보자 검색·근거·저장 계약
+- [company-intelligence.md](company-intelligence.md) — 회사·조직 조사 계약
+- [jd-connected-registration.md](jd-connected-registration.md) — JD 공통 등록 흐름
+- [jd-aside-operations.md](jd-aside-operations.md) — Aside 등록 조작·재조회
+- [jd-channel-registration-packets.md](jd-channel-registration-packets.md) — 채널별 패킷
+- [jobkorea-jd-registration.md](jobkorea-jd-registration.md) — 잡코리아 필드 계약
+- [linkedin-rps-inmail.md](linkedin-rps-inmail.md) — RPS 문안 계약

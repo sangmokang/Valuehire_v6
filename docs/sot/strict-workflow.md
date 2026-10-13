@@ -1,8 +1,8 @@
 # Strict 공통 실행 계약 (SOT)
 
-최종 갱신: 2026-09-10
+최종 갱신: 2026-09-18
 
-이 문서는 `$strict`가 Codex와 Claude에서 동일한 판정·순서·승인 경계를 사용하도록 고정하는 운영 정본입니다. 원칙의 수치와 Work Unit의 필드는 각각 `coding-principles.md`, `principles.yaml`, `work-unit-policy.yaml`이 소유합니다. 이 문서는 그 값을 복제하지 않고 실행 순서와 플랫폼 공통 의미만 소유합니다.
+이 문서는 `$strict`가 Codex와 Claude에서 동일한 실행 순서와 승인 경계를 사용하도록 고정합니다. 원칙의 수치와 검증 상태 의미는 `coding-principles.md`가 소유하고, `principles.yaml`은 그 정본 경로와 검사기 연결만 기록합니다.
 
 ## 1. 플랫폼 패리티
 
@@ -39,6 +39,8 @@ Codex와 Claude는 같은 입력 계약, EARS acceptance criteria(AC), counter-A
 
 RED는 로컬 증거이며 원격 PR의 완료 증거가 아닙니다. 현재 `pre-push`가 acceptance 실패를 차단하므로 RED 직후 push/PR을 위해 `--no-verify`를 사용하지 않습니다.
 
+1인 개발의 기본 로컬 흐름은 구현 → 자동 테스트 → 새 맥락 LLM 적대검토 → 재현된 finding 수정 → 회귀 테스트 → 세 검증 상태 기록입니다. 원격 보호 규칙이나 인간 reviewer 부재는 이 로컬 흐름의 일반 완료 조건이 아닙니다.
+
 ## 4. 코드량과 변경 크기
 
 파일·함수·PR 크기 한도는 `docs/sot/coding-principles.md`의 P11만 읽습니다. `$strict` 프롬프트나 이 문서에 숫자를 복제하지 않으며, 초과 시 분할·삭제·기존 유틸 재사용을 먼저 검토하고 우회하지 않습니다.
@@ -46,6 +48,8 @@ RED는 로컬 증거이며 원격 PR의 완료 증거가 아닙니다. 현재 `p
 ## 5. 자동화와 사람 승인
 
 자동 실행은 로컬 검증과 되돌릴 수 있는 checkpoint까지입니다. push, PR 생성, merge, deploy, 외부 데이터 쓰기는 현재 정본상 수동 승인 경계이며 자동화했다고 주장하지 않습니다. 원격 CI는 반드시 PR의 최종 SHA를 읽어 귀속합니다.
+
+검증 상태의 의미와 완료 차단 여부는 `docs/sot/coding-principles.md`의 **검증 결과 분리** 절을 참조하며 이 문서에서 다시 정의하지 않습니다.
 
 ## 6. LLMOps와 운영 증거
 
@@ -57,4 +61,4 @@ RED는 로컬 증거이며 원격 PR의 완료 증거가 아닙니다. 현재 `p
 
 ## 8. 드리프트 검증
 
-Strict 실행 시작 시 `docs/sot/coding-principles.md`, `docs/sot/principles.yaml`, `docs/sot/work-unit-policy.yaml`, 이 문서를 직접 읽고 관련 acceptance/hook/CI 배선을 실행합니다. Codex와 Claude의 전역 `SKILL.md`는 이 공통 계약을 읽는 동일한 사본이어야 하며, 동기화 후 `cmp`와 `skill-creator`의 `quick_validate.py`로 각각 검증합니다.
+Strict 실행 시작 시 `docs/sot/coding-principles.md`, `docs/sot/principles.yaml`, 이 문서를 직접 읽고 관련 acceptance/hook/CI 배선을 실행합니다. Codex와 Claude의 전역 `SKILL.md`는 이 공통 계약을 읽는 동일한 사본이어야 하며, 동기화 후 `cmp`와 `skill-creator`의 `quick_validate.py`로 각각 검증합니다.

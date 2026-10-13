@@ -112,6 +112,26 @@ else
   record 1 "정상 인수 검사 통과" "표본 없음 — $sample"
 fi
 
+# 하위 명령이 exit 0으로 끝나도 출력에 실제 실패가 있으면 래퍼가 실패시켜야 한다.
+partial_probes=(fail-line verdict-fail verdict-not-run duplicate-pass)
+printf '#!/usr/bin/env bash\necho "PASS: early"\necho "FAIL: partial"\nexit 0\n' > "$TMP/fail-line.sh"
+printf '#!/usr/bin/env bash\necho "PASS: early"\necho "VERDICT: FAIL"\nexit 0\n' > "$TMP/verdict-fail.sh"
+printf '#!/usr/bin/env bash\necho "PASS: early"\necho "VERDICT: NOT_RUN"\nexit 0\n' > "$TMP/verdict-not-run.sh"
+printf '#!/usr/bin/env bash\necho "VERDICT: PASS"\necho "VERDICT: PASS"\nexit 0\n' > "$TMP/duplicate-pass.sh"
+partial_blocked=0
+for probe in "${partial_probes[@]}"; do
+  probe_rc=0
+  bash "$RUNNER" "$TMP/$probe.sh" >/dev/null 2>&1 || probe_rc=$?
+  if [ "$probe_rc" -ne 0 ]; then
+    partial_blocked=$((partial_blocked + 1))
+  fi
+done
+if [ "$partial_blocked" -eq "${#partial_probes[@]}" ]; then
+  record 0 "부분 실패 출력 전파" "${partial_blocked}/${#partial_probes[@]} probe 비정상 종료"
+else
+  record 1 "부분 실패 출력 전파" "${partial_blocked}/${#partial_probes[@]}만 차단"
+fi
+
 # Invoice acceptance가 실제 unittest를 실행하지 않고 "Ran 1 test / OK"만
 # 출력해도 기존 stdout 판정은 속는다. 전용 배선 판정기가 그 수술 변이를 거부해야 한다.
 invoice_mutant="$TMP/acceptance-invoice-fake-tests.sh"

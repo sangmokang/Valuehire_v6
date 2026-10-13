@@ -1,0 +1,75 @@
+name: Windows WSL handoff smoke
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/windows-handoff-smoke.yml'
+      - '.agents/skills/**'
+      - '.codex/skills/**'
+      - '.claude/skills/**'
+      - 'hooks/**'
+      - 'scripts/install-hooks.sh'
+      - 'verify.sh'
+      - '.secret-patterns.default'
+      - 'docs/engineering/development-setup.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  wsl-handoff:
+    runs-on: windows-2025
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Ubuntu in WSL
+        shell: pwsh
+        run: |
+          wsl --install Ubuntu --no-launch --web-download
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          wsl --list --verbose
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          wsl -d Ubuntu --user root -- bash -c 'command -v git || (apt-get update && apt-get install -y git)'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Clone into WSL filesystem and verify handoff
+        shell: pwsh
+        run: |
+          $drive = $env:GITHUB_WORKSPACE.Substring(0, 1).ToLowerInvariant()
+          $rest = $env:GITHUB_WORKSPACE.Substring(2).Replace('\', '/')
+          $source = "/mnt/$drive$rest"
+          wsl -d Ubuntu --user root -- test -d $source
+          if ($LASTEXITCODE -ne 0) { throw "WSL source path unavailable: $source" }
+          $smoke = @'
+          set -euxo pipefail
+          git clone --no-hardlinks "__SOURCE__" "$HOME/valuehire-v6"
+          cd "$HOME/valuehire-v6"
+          for entrypoint in .codex .claude; do
+            for skill in jd jd-channels position-register; do
+              link="$entrypoint/skills/$skill"
+              test -L "$link"
+              test "$(readlink "$link")" = "../../.agents/skills/$skill"
+              test -f "$link/SKILL.md"
+            done
+          done
+          bash scripts/install-hooks.sh
+          test "$(git config --get core.hooksPath)" = hooks
+          bash verify.sh
+          status=$(git status --short)
+          if [ -n "$status" ]; then
+            printf 'Dirty WSL checkout after setup:\n%s\n' "$status"
+            exit 1
+          fi
+          '@
+          $smoke = $smoke.Replace("`r", '').Replace('__SOURCE__', $source)
+          [System.IO.File]::WriteAllText(
+            (Join-Path $env:GITHUB_WORKSPACE '.wsl-handoff-smoke.sh'),
+            $smoke,
+            [System.Text.UTF8Encoding]::new($false)
+          )
+          wsl -d Ubuntu --user root -- bash "$source/.wsl-handoff-smoke.sh"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

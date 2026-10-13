@@ -86,6 +86,9 @@ jobs:
           bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-gates-mutations.sh
           bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-gates-antiforge.sh
 
+      - name: JD·채용 도구 회귀 (공유 스킬·이식 가능한 fixture)
+        run: uv run --project humansearch --no-sync python -m unittest discover -s tests -v
+
       - name: 히스토리 전량 스캔 (도달 가능한 모든 blob)
         # verify.sh는 현재 체크아웃의 추적 파일만 본다. 과거 커밋에 들어갔다가 지워진 비밀은
         # 그것만으로는 잡히지 않으므로, reflog 포함 도달 가능한 모든 blob을 직접 열어 검사한다.

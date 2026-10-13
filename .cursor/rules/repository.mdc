@@ -1,0 +1,33 @@
+---
+description: Valuehire v6 repository rules for Cursor and AI coding agents
+alwaysApply: true
+---
+
+# Valuehire v6 Cursor Rules
+
+Before editing, read the repository SOT:
+
+- `README.md`
+- `docs/sot/INDEX.md`
+- `docs/sot/verification-commands.md`
+- `docs/sot/git-workflow.md`
+- `docs/sot/coding-principles.md`
+
+Follow these rules:
+
+- Treat `docs/sot/` as the source of truth. Put dated investigation or handoff records under `docs/engineering/`.
+- Do not push directly to `main`. Use a short `task/<name>` branch or worktree, then PR.
+- Do not commit `.env`, `.secret-patterns`, browser sessions, Aside state, MCP connector login state, candidate data, DB files, or generated run outputs.
+- Use `uv sync --locked --project humansearch` for the Python environment.
+- For HumanSearch changes, verify with `bash scripts/acceptance-hs-gates.sh`.
+- For root secret scanning, run `bash verify.sh`.
+- For current repo health, run `bash scripts/session-status.sh`.
+- If root `tests/` helper tests are affected, run `python3 -m unittest discover -s tests`.
+- Do not guess model-specific behavior. Cursor/Grok/Codex/Claude must follow this repository's SOT, hooks, and CI contracts.
+- Never revert user or teammate changes unless explicitly instructed.
+
+Local-only setup reminders:
+
+- `.secret-patterns.default` is committed and used by default secret scanning.
+- `.secret-patterns` is local-only; it is required for direct `scripts/acceptance-0-2.sh` execution, but normal `verify.sh` and pre-push have a committed baseline via `.secret-patterns.default`.
+- Browser login, Aside, and MCP/connector authentication must be recreated per machine.
