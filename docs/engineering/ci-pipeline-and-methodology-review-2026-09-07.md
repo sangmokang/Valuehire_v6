@@ -7,7 +7,7 @@ Claude(Sonnet 5)가 사장님 질의에 답하며 실행 확인한 내용을 기
 
 로컬 검증(사람/AI의 자기 신고)과 GitHub Actions의 원격 재실행(제3자 판정)을 분리하는
 장치. 워크플로 자체 주석: "로컬 검증은 실행자가 주장하는 것이고, 이 워크플로우는 GitHub이
-판정하는 것이다." 2026-09-07 기준 origin/main(`01495b3`)의 워크플로는 32개 스텝이며,
+판정하는 것이다." 2026-09-07 기준 origin/main(`01495b3`)의 워크플로는 이름 붙은 검사 스텝 27개와 `actions/checkout` 1개이며,
 전체 표는 `docs/sot/verification-commands.md`의 "CI가 실제로 돌리는 것" 절이 정본이다
 (이 문서에 다시 베끼지 않는다 — 두 곳에 같은 표를 적으면 갈라진다는 게 그 문서 자체의
 경고).
@@ -41,18 +41,15 @@ GitHub 이슈(인수 기준 1개)
 저장소 자신의 매뉴얼(`docs/sot/`)은 "우리는 그 두 개 다 아니고, 그냥 `git worktree add`를
 직접 쓴다"라고 이미 8월 초부터 적어 놨다. 즉 문제는 "두 매뉴얼이 다르다"가 아니라
 "**두 매뉴얼 다 이 저장소 현실과 안 맞는다**"였다. 해결은 두 매뉴얼을 통일하는 게 아니라,
-전역 매뉴얼이 레포별 실제 규약(`docs/sot/`)을 인용하도록 고치는 것 — 자세한 조치는
-`docs/engineering/strict-sot-phantom-reference-fix-goal-2026-09-07.md` 참고.
+전역 매뉴얼이 레포별 실제 규약(`docs/sot/`)을 인용하도록 고치는 것. 이 조치는 별도 PR #63의 범위다.
 
 ## 4. SOT-30/31/19 phantom 참조 — 실행으로 확인한 사실
 
 `~/.claude/skills/strict/SKILL.md`가 "이 저장소의 유일 정본"이라고 지목한 파일 3개 중
 2개(`docs/sot/30-strict-mode-contract.md`, `docs/sot/31-strict-recurrence-ledger.md`)와
-도구 1개(`tools/install-strict-skill.sh`)가 이 저장소에 존재한 적이 없었다(`git log --all`
-0건, `find` 0건). 이 중 30번 phantom은 2026-08-27에 한 번 발견됐던 것과 **동일 사건의
-재발**(메모리 `feedback-verify-skill-sot-reference-exists`). 조치는
-`docs/engineering/strict-sot-phantom-reference-fix-goal-2026-09-07.md` + 신설
-`docs/sot/31-strict-recurrence-ledger.md`에 기록.
+도구 1개(`tools/install-strict-skill.sh`)가 이 브랜치에 없다. 30번 phantom은
+2026-08-25와 08-27 문서에서 이미 발견됐고, 31번 phantom은 09-05 문서에도 다시 기록됐다.
+수정과 재발 원장 신설은 별도 PR #63의 범위이며, 이 브랜치에는 포함되지 않았다.
 
 **추가 기록(2026-09-07, `/codex:rescue` 1차 검토가 FAIL 판정)**: 최초 수정(3~4곳)은
 불완전했다 — `SOT-30`이라는 라벨 자체가 프론트매터·본문 7곳에 근거 없이 남아 있었고,
@@ -60,7 +57,7 @@ Full Strict 절(§5)의 `npm run strict:gate`/`npm run check`가 여전히 무�
 재발 원장이 "2회 이상만 기록"이라 선언해놓고 스스로 1회짜리 행(L2/L3)을 올려 자기모순이었고,
 "이 저장소엔 `package.json`이 없다"는 문구도 과거 이력(admin 워크스페이스용으로 한때 존재)을
 빼먹어 부정확했다. 2차 수정에서 SOT-30 라벨 제거·조건부 문구 일괄 적용·원장 기록 기준 재정의·
-`package.json` 문구 정밀화까지 마쳤다 — 근거는 같은 goal 문서의 적대 검증 로그.
+`package.json` 문구 정밀화까지 진행했다 — 근거는 별도 PR #63의 goal 문서에 있다.
 
 ## 5. 로컬 main 지연 — 실행으로 확인한 사실
 
