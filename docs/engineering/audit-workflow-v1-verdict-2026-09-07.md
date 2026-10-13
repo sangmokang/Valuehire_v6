@@ -2,7 +2,7 @@
 
 ## 대상
 
-- 워크트리: `/Users/kangsangmo/Desktop/Valuehire_v6/worktrees/audit-workflow-20260907`
+- 워크트리: `worktrees/audit-workflow-20260907`
 - 브랜치: `task/audit-workflow-20260907`
 - 커밋(HEAD): `921923c47a523ffa3d1a6be2403f1a4c6298e8bf`
 - PR: `sangmokang/Valuehire_v6#68` — `headRefOid=921923c...`(로컬 HEAD와 일치 확인), `baseRefName=main`, `state=OPEN`, `mergeable=MERGEABLE`

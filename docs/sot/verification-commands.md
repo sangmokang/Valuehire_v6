@@ -17,7 +17,7 @@
 
 ### CI(`​.github/workflows/verify.yml`)가 실제로 돌리는 것
 
-**워크플로 스텝 26개 전부**를 적는다(2026-08-12 V1 D6: 이전 판은 `bash ...` 직접 명령만 적어 인라인 본문 스텝이 목록에서 빠졌고, 운영자가 실제로 무엇이 도는지 잘못 판단할 수 있었다). 아래는 `verify.yml` 의 `- name:` 스텝 순서 그대로다.
+**워크플로 스텝 28개 전부**를 적는다(2026-08-12 V1 D6: 이전 판은 `bash ...` 직접 명령만 적어 인라인 본문 스텝이 목록에서 빠졌고, 운영자가 실제로 무엇이 도는지 잘못 판단할 수 있었다). 아래는 `verify.yml` 의 `- name:` 스텝 순서 그대로다.
 
 | # | 스텝 이름 | 실행 내용 |
 |---|---|---|
@@ -33,7 +33,7 @@
 | 10 | 인수 검사 0-6 | `bash scripts/acceptance-0-6.sh` |
 | 11 | 인수 검사 0-7 | `bash scripts/acceptance-0-7.sh` — 훅 위반 6종 시연 |
 | 12 | 인수 검사 0-5 | `bash scripts/acceptance-0-5.sh` — **`main` 브랜치에서만** (`if: github.ref == 'refs/heads/main'`) |
-| 13 | 억제 만료 스캔 | 인라인 — `suppressions.yaml` 의 expiry 형식·경과 |
+| 13 | 억제 만료 스캔 | `bash scripts/check-suppression-expiry.sh` — `suppressions.yaml` 의 expiry 형식·경과(KST 날짜) |
 | 14 | 강제 장치 존재 검사 | 인라인 — `hooks/pre-commit`·`pre-push` 존재·실행권한 |
 | 15 | 셸 스크립트 문법 검사 | 인라인 — `git ls-files '*.sh'` 전부 `bash -n` |
 | 16 | 패턴 파일 자체 실값 검사 | 인라인 — `.secret-patterns.default` 에 값 리터럴 없는지 |
@@ -43,10 +43,12 @@
 | 20 | 인수 검사 secret-webhook-vendor | `bash scripts/acceptance-secret-webhook-vendor.sh` — 웹훅·벤더 키 (AC-S1) |
 | 21 | 인수 검사 verified-sha | `bash scripts/acceptance-verified-sha.sh` — 현재 SHA 귀속 진리표(P23) |
 | 22 | 인수 검사 ci-step-integrity | `bash scripts/acceptance-ci-step-integrity.sh` — 조건부·오류무시·echo 대체 차단 |
-| 23 | 인수 검사 semantic-mutations | `bash scripts/acceptance-semantic-mutations.sh` — 인수 검사 무력화 5종 전량 차단 |
-| 24 | 인수 검사 verify-ac-m | `bash scripts/acceptance-verify-ac-m.sh` — mechanism 명부 대조 (AC-M) |
-| 25 | 인수 검사 invoice | `bash scripts/acceptance-invoice.sh` — 채용 수수료 계산·기한·계약 변조·Codex/Claude 스킬 동등성 |
-| 26 | Invoice 독립 런타임 게이트 | 게이트 배선 검사 + Python 단위시험 직접 실행 + 임시 PostgreSQL에서 마이그레이션·수수료 동시성·저장/전달 RPC 검증 |
+| 23 | 인수 검사 action-sha-drift | `bash scripts/acceptance-action-sha-drift.sh` — 고정·가변·주석·Docker·따옴표 fixture |
+| 24 | 인수 검사 semantic-mutations | `bash scripts/acceptance-semantic-mutations.sh` — 인수 검사 무력화 5종 전량 차단 |
+| 25 | 인수 검사 verify-ac-m | `bash scripts/acceptance-verify-ac-m.sh` — mechanism 명부 대조 (AC-M) |
+| 26 | PostgreSQL 서버 준비 | 러너에 PostgreSQL 서버 도구가 없으면 설치하고 경로 확인 |
+| 27 | 인수 검사 invoice | `bash scripts/acceptance-invoice.sh` — 채용 수수료 계산·기한·계약 변조·Codex/Claude 스킬 동등성 |
+| 28 | Invoice 독립 런타임 게이트 | 게이트 배선 검사 + Python 단위시험 직접 실행 + 임시 PostgreSQL에서 마이그레이션·수수료 동시성·저장/전달 RPC 검증 |
 
 *(1번 앞에 `actions/checkout` 이 있고 `fetch-depth: 0` 이다 — 8번이 과거 blob 을 열려면 필요하다.)*
 

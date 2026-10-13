@@ -7,7 +7,8 @@ set -u
 
 [ -f suppressions.yaml ] || { echo "PASS: 억제 없음"; exit 0; }
 
-today=$(date +%Y-%m-%d); fail=0; n=0
+# audit.yml은 UTC 20:00에 실행되므로 KST 날짜로 비교해야 만료를 하루 늦게 잡지 않는다.
+today=$(TZ=Asia/Seoul date +%Y-%m-%d); fail=0; n=0
 while IFS= read -r e; do
   n=$((n+1))
   if ! printf '%s' "$e" | grep -qE '^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$'; then

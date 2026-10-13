@@ -29,15 +29,14 @@ done < <(
   find "$target" -type f \( -name '*.yml' -o -name '*.yaml' \) -print0 2>/dev/null |
   xargs -0 awk '
     {
-      line = $0
-      trimmed = line
-      sub(/^[[:space:]]+/, "", trimmed)
-      if (trimmed ~ /^#/) next
-      if (match(line, /uses:[[:space:]]*[^.\/#[:space:]][^[:space:]]*\/[^[:space:]]+@[^[:space:]#]+/)) {
-        m = substr(line, RSTART, RLENGTH)
-        sub(/^uses:[[:space:]]*/, "", m)
-        print m
-      }
+      value = $0
+      if (value !~ /^[[:space:]]*(-[[:space:]]*)?uses:[[:space:]]*/) next
+      sub(/^[[:space:]]*(-[[:space:]]*)?uses:[[:space:]]*/, "", value)
+      sub(/[[:space:]]+#.*$/, "", value)
+      sub(/[[:space:]]+$/, "", value)
+      gsub(/^["\047]|["\047]$/, "", value)
+      if (value ~ /^(\.\/|docker:\/\/)/) next
+      if (value ~ /^[^[:space:]]+\/[^[:space:]]+$/) print value
     }
   '
 )
