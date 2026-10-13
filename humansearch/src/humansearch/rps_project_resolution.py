@@ -203,6 +203,13 @@ def _resolve_mapped_project(
             None,
             "mapped project id was required for mapped resolution",
         )
+    if any(project.project_id != mapped_project_id for project in projects):
+        return _result(
+            RpsProjectStatus.QUERY_FAILED,
+            target.position_id,
+            None,
+            "direct project lookup contained a different project id",
+        )
     by_id = {project.project_id: project for project in projects}
     mapped = by_id.get(mapped_project_id)
     if mapped is None or not _has_target_id_evidence(mapped, target):
@@ -283,7 +290,7 @@ def _resolve_unmapped_projects(
             RpsProjectStatus.AMBIGUOUS,
             target.position_id,
             None,
-            "at least one observed project lacked customer, position, and visible name evidence",
+            "at least one observed project lacked stable customer and position id evidence",
         )
     return RpsProjectResolution(
         status=RpsProjectStatus.CREATE_REQUIRED,
@@ -477,13 +484,14 @@ def _query_failed(observation: _Observation) -> bool:
 
 
 def _has_conflicting_duplicate_ids(projects: Sequence[_Project]) -> bool:
-    seen: dict[str, tuple[str | None, str | None, str | None, str | None]] = {}
+    seen: dict[str, tuple[str | None, str | None, str | None, str | None, str | None]] = {}
     for project in projects:
         signature = (
             project.customer_id,
             project.position_id,
             project.customer_name,
             project.position_title,
+            project.name,
         )
         existing = seen.get(project.project_id)
         if existing is not None and existing != signature:
@@ -544,13 +552,7 @@ def _has_partial_target_id_evidence(project: _Project, target: _Target) -> bool:
 
 
 def _lacks_identity_evidence(project: _Project) -> bool:
-    return (
-        project.customer_id is None
-        and project.position_id is None
-        and project.customer_name is None
-        and project.position_title is None
-        and project.name is None
-    )
+    return project.customer_id is None and project.position_id is None
 
 
 def _required_text(mapping: Mapping[str, object], key: str) -> str | None:

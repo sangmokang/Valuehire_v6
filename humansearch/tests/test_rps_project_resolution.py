@@ -243,6 +243,25 @@ def test_project_without_identity_evidence_blocks_create_required() -> None:
     assert result.project_id is None
 
 
+@pytest.mark.parametrize(
+    "unresolved_project",
+    [
+        {"project_id": "existing", "name": "acme backend engineer"},
+        {"project_id": "existing", "name": "Acme - Backend Engineer"},
+        {"project_id": "existing", "customer_name": "Acme Corp"},
+    ],
+)
+@pytest.mark.parametrize("include_exact", [False, True])
+def test_unidentified_project_with_different_display_blocks_resolution(
+    unresolved_project: dict[str, object], include_exact: bool
+) -> None:
+    projects = [_project("exact")] if include_exact else []
+    result = resolve_rps_project(_payload(projects=[*projects, unresolved_project]))
+
+    assert result.status is RpsProjectStatus.AMBIGUOUS
+    assert result.project_id is None
+
+
 def test_partial_stable_customer_evidence_blocks_create_required() -> None:
     result = resolve_rps_project(
         _payload(projects=[{"project_id": "existing", "customer_id": "cust-1"}])
@@ -294,7 +313,7 @@ def test_mapped_matching_project_is_reused() -> None:
     result = resolve_rps_project(
         _payload(
             mapped_project_id="rps-1",
-            projects=[_project("rps-1"), _project("rps-2", position_id="pos-2")],
+            projects=[_project("rps-1")],
         )
     )
 
@@ -304,11 +323,23 @@ def test_mapped_matching_project_is_reused() -> None:
     assert result.allows_write is False
 
 
-def test_mapping_conflict_does_not_fall_back_to_matching_name() -> None:
+def test_mapped_direct_lookup_rejects_another_project_id() -> None:
+    result = resolve_rps_project(
+        _payload(
+            mapped_project_id="rps-1",
+            projects=[_project("rps-1"), _project("rps-2", position_id="pos-2")],
+        )
+    )
+
+    assert result.status is RpsProjectStatus.QUERY_FAILED
+    assert result.project_id is None
+
+
+def test_missing_mapped_project_is_mapping_conflict() -> None:
     result = resolve_rps_project(
         _payload(
             mapped_project_id="missing",
-            projects=[_project("rps-2", name="Acme Backend Engineer")],
+            projects=[],
         )
     )
 
@@ -400,6 +431,15 @@ def test_duplicate_project_id_with_conflicting_target_evidence_fails_query() -> 
                 _project("rps-1", position_id="pos-2"),
             ]
         )
+    )
+
+    assert result.status is RpsProjectStatus.QUERY_FAILED
+    assert result.project_id is None
+
+
+def test_duplicate_project_id_with_conflicting_name_fails_query() -> None:
+    result = resolve_rps_project(
+        _payload(projects=[_project("rps-1"), _project("rps-1", name="Other Project")])
     )
 
     assert result.status is RpsProjectStatus.QUERY_FAILED
