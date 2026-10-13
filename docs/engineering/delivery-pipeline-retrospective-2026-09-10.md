@@ -19,7 +19,7 @@
 
 출처: `docs/engineering/work-unit-process-adoption-2026-08-21.md`
 
-| 지표 | 8/21 | 2026-09-10 19:20 UTC | 판정 |
+| 지표 | 8/21 | 2026-09-09 19:20 UTC | 판정 |
 |---|---|---|---|
 | 열린 PR | 9건 | **23건** | 나빠짐 |
 | 워크트리 | 43개 | **93개** (`git worktree list` 94줄 − 메인 1) | 나빠짐 |
@@ -62,11 +62,11 @@ git diff --numstat main...origin/task/p13-patterns-scope | awk '{a+=$1;d+=$2} EN
   (Pro 전환 / public 전환)를 직접 알려준다. "구조"라고 부르면 "돈으로 못 푸는 문제"로
   잘못 읽히고, 방어를 전부 로컬 훅에 의존하는 현 상태가 정당화된다.
 - **merge = 사람 1명** — strict 계약 `USER_MERGE_ONLY`. 안전 규칙으로는 옳으나 현재 유일한 병목.
-- **N-1 껍데기 CI 우회가 살아 있다** — `verify.yml:136` 의
-  `if: github.ref == 'refs/heads/main'` 때문에 `인수 검사 0-5 (push · CI 연결)` 스텝이
-  **병합 전 어떤 PR 에서도 돌지 않는다.** PR #79 의 두 실행(push·pull_request) 모두
-  31스텝 중 이 1건이 `skipped`였다. main 에 들어간 **뒤에야** 돈다.
-  → 기존 미해결 항목 `project_n1_shell_ci_bypass_open` 의 실물 증거.
+- **`인수 검사 0-5`는 main 전용이다** — `verify.yml:136` 의
+  `if: github.ref == 'refs/heads/main'` 때문에 PR #79 의 두 실행(push·pull_request) 모두
+  31스텝 중 이 1건이 `skipped`였다. 이 검사의 5번 항목은 로컬 `main` 과 `origin/main` 의
+  일치를 확인하므로 병합 전 PR 에서는 성립하지 않는다. 건너뜀은 의도된 배선이며,
+  이 사실만으로 PR CI 우회나 검증 실패를 판정할 수 없다.
 
 ## 4. 자동화 수준 실측
 
@@ -111,8 +111,9 @@ git show origin/deliver/finding-runner:tools/strict/finding-runner.mjs \
 
 - `.omx/metrics.json`: `total_turns 1518`, 토큰 3필드 전부 `0`. 비용·토큰 관측 없음.
 - 판정 42건이 gitignore 돼 저장소 밖 → "적대검증이 실제로 결함을 잡고 있는가"에 숫자로 답할 수 없다.
-- `scripts/verify/check-strict-verdict-ledger.sh` 는 대상이
-  `strict-principles-verdict-2026-08-20.yaml` **1개 파일로 고정** — 한 번의 판정만 장부화된다.
+- `scripts/verify/check-strict-verdict-ledger.sh` 의 기본 대상은
+  `strict-principles-verdict-2026-08-20.yaml` 1개다. 인자로 다른 장부를 검사할 수 있지만,
+  판정을 자동으로 누적하는 배선은 없다.
 - strict `SKILL.md` 는 `~/.claude/skills/` 에 유일 사본 → 버전관리·회귀시험 밖.
 
 ## 6. 레슨런
@@ -157,22 +158,21 @@ git show origin/deliver/finding-runner:tools/strict/finding-runner.mjs \
 1. **적체 23건 처분표** — 병합/폐기/보류 3분류. 8월산 충돌 PR 6건(#13·#15·#29·#37·#43·#48)은
    폐기 후보였으나 **#37 은 WU 정책 정본을 담고 있어 회수 대상**이다(§4).
    폐기 시 SHA를 원장에 남기면 무손실.
-2. **`인수 검사 0-5` 의 `if: github.ref == 'refs/heads/main'` 제거** — 병합 전 PR 에서
-   돌지 않는 검사는 검사가 아니다. 작업량 작고 효과 즉시.
-3. **CI 정지 감지 관측** — "main 최신 커밋에 24시간 내 성공 실행이 없으면 알린다".
-4. **미병합 실행체 2건 회수** — `deliver/finding-runner` 와 PR #37. 새로 만들기 전에 이것부터.
-5. **strict 오케스트레이터** — 위가 끝난 뒤. 적체를 안 줄인 채 자동 생산을 켜면 적체만 늘어난다.
+2. **CI 정지 감지 관측** — "main 최신 커밋에 24시간 내 성공 실행이 없으면 알린다".
+3. **미병합 실행체 2건 회수** — `deliver/finding-runner` 와 PR #37. 새로 만들기 전에 이것부터.
+4. **strict 오케스트레이터** — 위가 끝난 뒤. 적체를 안 줄인 채 자동 생산을 켜면 적체만 늘어난다.
 
 ## 8. 적대 검증 로그
 
 **V1 (Codex, 읽기 전용, 2026-09-10)** — 주장 9건(C1~C9) 중 **5건에서 유효 반례**.
-판정 원문: `scratchpad/verdict.md`. 반례를 이 PR 에 그대로 편입해 위 본문을 정정했다(R9).
+판정 원문은 저장소에 보존되지 않았다. 아래 표는 이 PR 에 편입된 반례 요약이며,
+원문 대조는 할 수 없다.
 
 | 반례 | 초안 | 정정 | 편입 위치 |
 |---|---|---|---|
 | C3 생존 편향 + 측정자 불일치 | "12배 축소" | **4.8배** (+ 배율표 4행) | §2 |
 | C5 검색 3중 실명 | "전수 검색 0건 / tools 엔 invoice 뿐" | 근거 무효 · 미병합 실행체 2건 명시 | §4 · L9 |
-| C9 skipped 스텝 | "PR #79 verify pass" | 31스텝 중 1건 skipped, N-1 우회 | §3 |
+| C9 skipped 스텝 | "PR #79 verify pass" | 31스텝 중 1건 skipped, main 전용 검사로 확인 | §3 |
 | C7 스텝 산술 | "정의 27 → 실행 29" | 정의 **28**(`- uses:` 누락) / 실행 31 | §4 |
 | C4 숫자 | "PR 22건" | **23건** (측정 시각 명기) | §2 |
 

@@ -3,20 +3,20 @@
 이 문서는 "다음 세션이 답으로 참조해야 하는" 것만 담는다. 측정 근거와 사건 경위는
 `docs/engineering/delivery-pipeline-retrospective-2026-09-10.md`(적대검증 정정 2판).
 
-## 1. 사슬의 빈 칸 3개 (현재 상태)
+## 1. 사슬의 현재 상태
 
 | 칸 | 상태 | 근거 |
 |---|---|---|
 | Issue → PR | **정상.** 1:1 연결 관행 정착 | `#71→#74` · `#72→#77` · `#73→#75` · `#76→#78` |
-| PR → CI | **부분 무효.** `인수 검사 0-5 (push · CI 연결)` 이 병합 전 PR 에서 안 돈다 | `verify.yml:136` `if: github.ref == 'refs/heads/main'` |
+| PR → CI | **PR 검사 실행.** `인수 검사 0-5 (push · CI 연결)` 는 main 배송 확인용이라 PR 에서 건너뛴다 | `verify.yml:136` `if: github.ref == 'refs/heads/main'`, `acceptance-0-5.sh` 5번 항목 |
 | CI → Merge | **강제 없음.** required check 를 걸 수 없다 | rulesets·branch protection 둘 다 `403 Upgrade to GitHub Pro` |
 | Merge | **사람 1명.** `USER_MERGE_ONLY` | strict 계약 §5 |
 
 **required check 403 은 "구조적 제약"이 아니라 요금제 선택이다.** 403 응답이 해제 조건
 두 개(Pro 전환 / public 전환)를 직접 명시한다. "구조"라고 부르면 대체 방어를 안 만들게 된다.
 
-**병합 전 검증이 완전하지 않다는 사실을 전제로 판단한다.** PR 이 초록이어도
-31스텝 중 1건은 건너뛴 상태다. `READY TO MERGE` 를 보고할 때는
+**PR 초록에는 main 배송 확인이 포함되지 않는다.** PR #79 의 31스텝 중 1건은
+main 전용 조건으로 건너뛰었다. `READY TO MERGE` 를 보고할 때는
 "N스텝 중 M 통과, 건너뜀 K건(사유)"를 함께 적는다.
 
 ## 2. 지표를 낼 때 지키는 규칙
