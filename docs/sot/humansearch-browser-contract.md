@@ -15,11 +15,9 @@ HumanSearch는 사람인·잡코리아·LinkedIn Recruiter의 준비된 정상 �
 `docs/sot/features/automation/humansearch-browser-access.yaml`, endpoint·origin·selector 데이터는
 `contracts/humansearch/saramin-markers.json`이 소유한다.
 
-알려진 구현 결함이 하나 있다. 진단 target 목록의 URL이 `urllib.parse.urlsplit` 자체를 실패시키는
-형태면 현재 `select_single_target`이 그 `ValueError`를 관측 실패로 정규화하지 못한다. 이 경로는
-PII 제거 한 줄 대신 malformed URL의 호스트 조각 등이 포함된 traceback과 종료값 1을 낼 수 있다. 이는 허용된 동작이 아니라
-현재 제한이며, 회귀 시험과 제품 수정이 같은 변경에 들어오기 전에는 “모든 관측 실패가 안전한 한 줄로
-닫힌다”고 주장하지 않는다.
+진단 target 목록의 URL이 `urllib.parse.urlsplit` 자체를 실패시키는 형태여도 현재 `select_single_target`은
+그 target을 후보에서 제외한다. 해당 경로는 traceback 대신 계약된 한 줄 DRIFTED 결과와 종료값 2로
+정규화되며, malformed URL의 쿼리·fragment·후보자 식별자 모양 경로는 출력하지 않는다.
 
 이 정본은 전체 브라우저 자동 운영을 완료했다고 선언하지 않는다. 후속 단계가 증명해야 할 접근 권한,
 사용권, 사람 개입, 개인정보와 채널별 허용 범위를 고정한다.
@@ -370,7 +368,7 @@ C1은 로그인 만료, 보안문자, 2단계 인증, 세션 충돌, 사람 입�
 |---|---|---|
 | 사람인 L1 endpoint·exact-origin·marker 데이터 계약 | IMPLEMENTED_LOCAL | `contracts/humansearch/saramin-markers.json`과 관측 경계 시험 |
 | 사람인 L1 단일 target·marker 관측·L0 분류 | IMPLEMENTED_LOCAL | `humansearch/src/humansearch/observe.py`, `_cdp.py`, `humansearch/tests/test_observe*.py` |
-| malformed target URL의 실패 정규화 | KNOWN_DEFECT | 현재 `urlsplit`의 `ValueError`가 traceback·URL 조각·exit 1로 샐 수 있음; 회귀 시험 + 좁은 예외 정규화 필요 |
+| malformed target URL의 실패 정규화 | IMPLEMENTED_LOCAL | `_split()`이 `urlsplit`의 `ValueError`를 후보 제외로 정규화하고 `test_observe_url_parse_failure.py`, `test_observe_url_parse_property.py`가 출력 비누출을 회귀 시험 |
 | 자동 운영 exact-origin 목록과 현재 포털 공식 근거 | NOT_RUN | D1 정본·중립 시험·오너 검토 |
 | 포트 번호·프로필 경로 자동 발견과 재확인 | NOT_RUN | D1 중립 실증 |
 | 포트 로컬 바인딩과 원격 접근 차단 | NOT_RUN | D1 네트워크 경계 시험 |

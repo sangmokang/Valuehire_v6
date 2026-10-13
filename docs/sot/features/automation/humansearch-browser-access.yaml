@@ -87,22 +87,12 @@
         "type": "integer",
         "allowed_values": [0, 2],
         "constraint": "0 only for AUTHENTICATED; every handled classified or observation-failure state returns 2"
-      },
-      {
-        "name": "known_unhandled_exit",
-        "type": "integer",
-        "observed_value": 1,
-        "constraint": "a malformed target URL that makes urllib.parse.urlsplit raise ValueError currently escapes before normalization; see boundaries and errors"
       }
     ],
     "errors": [
       {
         "condition": "contract, loopback endpoint, approved port, target list, exact target count, WebSocket or marker payload is invalid",
-        "behavior": "normalize to a DRIFTED one-line result and exit 2 without traceback, except for the separately documented malformed-target-URL defect"
-      },
-      {
-        "condition": "a target item contains a URL for which urllib.parse.urlsplit raises ValueError, such as an invalid IPv6 URL",
-        "behavior": "known current defect: ValueError can escape, print a traceback that may expose malformed URL fragments and exit 1; this is not an accepted safe behavior and must be fixed before treating all observation failures as normalized"
+        "behavior": "normalize to a DRIFTED one-line result and exit 2 without traceback; malformed target URLs are treated as non-matching targets"
       },
       {
         "condition": "CLI arguments are syntactically invalid",
@@ -127,8 +117,8 @@
       },
       {
         "id": "HBA-INV-4",
-        "rule": "Handled output retains no query, fragment, credential, candidate identifier or unapproved path and fits one line; malformed target URL parsing is a documented open violation.",
-        "evidence": "humansearch/tests/test_observe_adversarial_output.py"
+        "rule": "Handled output retains no query, fragment, credential, candidate identifier or unapproved path and fits one line, including when target URL parsing fails.",
+        "evidence": "humansearch/tests/test_observe_url_parse_failure.py"
       },
       {
         "id": "HBA-INV-5",
@@ -147,7 +137,7 @@
       "No browser launch, shutdown, profile discovery, tab creation, navigation, activation or closure.",
       "No login, credential, cookie, token, storage, raw DOM, screenshot, candidate search, save, registration or message access.",
       "The tracked marker contract is configuration authority, not proof that a local browser or authenticated session currently exists.",
-      "Known defect: malformed target URL parsing can bypass the one-line privacy-reduced failure path, expose URL fragments in a traceback and exit 1."
+      "Malformed target URLs are refused without echoing query, fragment, credential or candidate-like path details."
     ],
     "non_goals": [
       "operating a full browser automation workflow",
@@ -160,13 +150,8 @@
     "verification": [
       {
         "id": "HBA-V1",
-        "command": "cd humansearch && uv run --no-sync pytest -q tests/test_observe.py tests/test_observe_adversarial_output.py tests/test_observe_boundary.py tests/test_observe_contract_failure.py tests/test_observe_output.py tests/test_observe_port_contract.py tests/test_observe_transport_failure.py",
-        "expected": "exit 0 for target-count, contract, port, transport, marker, privacy output and capability-boundary tests"
-      },
-      {
-        "id": "HBA-V1-GAP",
-        "command": "cd humansearch && uv run --no-sync python -c 'from humansearch.observe import select_single_target; select_single_target([{\"type\":\"page\",\"url\":\"https://[oops\"}], frozenset({\"https://hiring.saramin.co.kr\"}))'",
-        "expected": "known current failure: uncaught ValueError and exit 1; after the product fix this expectation and the known-gap statements must be removed together"
+        "command": "cd humansearch && uv run --no-sync pytest -q tests/test_observe.py tests/test_observe_adversarial_output.py tests/test_observe_boundary.py tests/test_observe_contract_failure.py tests/test_observe_output.py tests/test_observe_port_contract.py tests/test_observe_transport_failure.py tests/test_observe_url_parse_failure.py tests/test_observe_url_parse_property.py",
+        "expected": "exit 0 for target-count, contract, port, transport, marker, privacy output, malformed-url handling and capability-boundary tests"
       },
       {
         "id": "HBA-V2",
@@ -190,6 +175,8 @@
       "humansearch/tests/test_observe_output.py",
       "humansearch/tests/test_observe_port_contract.py",
       "humansearch/tests/test_observe_transport_failure.py",
+      "humansearch/tests/test_observe_url_parse_failure.py",
+      "humansearch/tests/test_observe_url_parse_property.py",
       "docs/sot/humansearch-browser-contract.md"
     ],
     "change_protocol": {
@@ -206,7 +193,7 @@
         "search, persistence, message sending or any external write",
         "automatic retry or resume after human authentication"
       ],
-      "rollback": "Revert the observer, narrow CDP transport, marker contract, exports, tests and both affected SOT documents together; do not leave a callable wider transport behind. The malformed-target-URL gap may be removed only with a regression test and code fix in the same change."
+      "rollback": "Revert the observer, narrow CDP transport, marker contract, exports, tests and both affected SOT documents together; do not leave a callable wider transport behind."
     }
   }
 }

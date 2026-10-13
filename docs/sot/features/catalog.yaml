@@ -125,7 +125,6 @@
   "known_gaps": [
     "No product feature in this catalog is documented as production-deployed.",
     "HumanSearch browser access is limited to one-shot read-only Saramin authentication-surface observation; search, input, retry, browser lifecycle and other channels remain unimplemented.",
-    "HumanSearch target selection does not currently normalize ValueError from a malformed target URL; that path can emit a traceback exposing URL fragments and exit 1 instead of the handled one-line exit 2 result.",
     "Feature SOT structure validation is manual and is not wired to pre-push or CI.",
     "Remote main branch protection is declared by SOT but was not reverified as part of this catalog."
   ]

@@ -3,7 +3,8 @@
 #
 # 계약:
 #   - docs/engineering/docs-sot-restructure-goal-2026-08-08.md
-#   - docs/engineering/feature-sot-catalog-goal-2026-08-21.md
+#   - docs/sot/features/INDEX.md
+#   - docs/sot/verification-commands.md
 #   출력  : exit 0 (AC 전부 충족) | exit 1 (하나라도 위반, 위반 내용을 stderr에 출력)
 #   불변식: 조용한 통과 금지 — 각 검사 항목의 PASS/FAIL을 전부 stdout에 출력한다.
 #
