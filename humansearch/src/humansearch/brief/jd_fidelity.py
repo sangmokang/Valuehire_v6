@@ -59,9 +59,9 @@ EXTRA_CONDITION_PATTERNS: tuple[str, ...] = (
 #   Codex V1 3차: `경\ufe0f력 5년 이\ufe0f상`(U+FE0F 는 Cf 가 아니라 Mn 이다) · `경[력]() 5년 이[상]()`
 _EMPHASIS = re.compile(r"\*\*|__|~~|[*_`]")
 
-# `[표시](주소)` · `![표시](주소)` · `[표시]()` 를 표시 문자열로 되돌린다. 주소는 판정에서 뺀다 —
-# 사람이 화면에서 읽는 것은 표시 문자열뿐이기 때문이다.
-_MARKDOWN_LINK = re.compile(r"!?\[([^\]\[]*)\]\([^()]*\)")
+# `[표시](주소)` · `![표시](주소)` · `[표시]()` 를 표시 문자열로 되돌린다.
+# 다만 주소 자리에 채용 조건을 숨기면 평문 메일에서는 괄호 안 조건도 보이므로 판정 사본에 남긴다.
+_MARKDOWN_LINK = re.compile(r"!?\[([^\]\[]*)\]\(([^()]*)\)")
 
 # 기본적으로 보이지 않는데 Cf 가 아닌 것들: 변이 선택자와 결합 격리(전부 Mn 범주).
 _INVISIBLE_MARKS = frozenset(
@@ -87,12 +87,24 @@ def judgement_form(text: str) -> str:
     """
     current = unicodedata.normalize("NFKC", text)
     while True:
-        without_links = _MARKDOWN_LINK.sub(r"\1", current)
+        without_links = _MARKDOWN_LINK.sub(_markdown_link_judgement, current)
         visible = "".join(ch for ch in without_links if not _is_invisible(ch))
         shorter = _EMPHASIS.sub("", visible)
         if shorter == current:
             return current
         current = shorter
+
+
+def _markdown_link_judgement(match: re.Match[str]) -> str:
+    display = match.group(1)
+    target = match.group(2)
+    probe = judgement_form(target) if target else ""
+    if target and (
+        any(re.compile(pattern).search(probe) for pattern in EXTRA_CONDITION_PATTERNS)
+        or any(_is_foreign(char) for char in probe)
+    ):
+        return f"{display} {target}"
+    return display
 
 
 # 한글과 섞이면 거부할 문자 체계. NFKC 는 키릴 `а` 를 한글로 바꾸지 않으므로 정규화로는
@@ -188,6 +200,12 @@ def content_lines(text: str) -> tuple[str, ...]:
     """정규화 후 남는 내용 줄만 순서·중복 그대로 돌려준다."""
     normalized = (normalize_line(raw) for raw in text.splitlines())
     return tuple(line for line in normalized if line)
+
+
+def _report_line(line: str) -> str:
+    text = line.replace("　", " ").replace("\t", " ")
+    text = _strip_bullets(text)
+    return _WHITESPACE_RUN.sub(" ", text).strip()
 
 
 @dataclass(frozen=True)
@@ -305,12 +323,17 @@ def verify_fidelity(
         raise BriefInputError("verify_fidelity 의 rendered 는 공백만일 수 없다")
     allowed = _normalized_allowlist(allowed_extra)
     jd_lines = content_lines(jd.text)
-    rendered_lines = content_lines(rendered)
+    rendered_pairs = tuple(
+        (report, normalized)
+        for raw in rendered.splitlines()
+        if (normalized := normalize_line(raw)) and (report := _report_line(raw))
+    )
+    rendered_lines = tuple(normalized for _, normalized in rendered_pairs)
     jd_seen = frozenset(jd_lines)
     rendered_seen = frozenset(rendered_lines)
     missing = tuple(line for line in jd_lines if line not in rendered_seen)
     extra_lines = tuple(
-        line for line in rendered_lines if line not in jd_seen and line not in allowed
+        report for report, line in rendered_pairs if line not in jd_seen and line not in allowed
     )
     extra_condition = tuple(line for line in extra_lines if _matches_condition(line))
     return FidelityReport(

@@ -484,11 +484,11 @@ def test_ledger_writes_fsync_file_and_directory(
 
 def test_intent_and_reopen_docstrings_do_not_grant_send_permission() -> None:
     """발송 권한 문구는 claim_send 에만 있어야 한다 — record_intent/open_new_attempt 의 True 는 감사용 생성 결과다."""
-    for fn in (record_intent, open_new_attempt):
+    for fn in (record_intent, _raw_open_new_attempt):
         doc = fn.__doc__ or ""
         assert "발송할 수 있다" not in doc, fn.__name__
         assert "claim_send" in doc, fn.__name__
-    assert "발송" in (claim_send.__doc__ or "")
+    assert "발송" in (_raw_claim_send.__doc__ or "")
 
 
 def test_channel_lock_is_reentrant_for_the_same_thread(tmp_path: Path) -> None:

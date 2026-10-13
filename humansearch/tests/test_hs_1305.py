@@ -15,6 +15,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from dataclasses import replace
 from datetime import date
 from pathlib import Path
 
@@ -32,6 +33,7 @@ from humansearch.brief.mail import (
     load_recipients,
     render_brief_body,
 )
+from humansearch.brief.scoring import score_candidate
 from humansearch.brief.two_field import split_two_field
 from humansearch.brief.types import (
     BriefInputError,
@@ -154,7 +156,7 @@ def _lead(index: int, *, email: EmailContact | None = None) -> CandidateLead:
         match_reasons=("검색 랭킹 운영 경험이 있다",),
         check_points=("이직 의향을 확인해야 한다",),
         evidence=EVIDENCE,
-        score=ScoreBreakdown(role=32, education=15, stability=16, profile=18),
+        score=score_candidate(EVIDENCE),
         email=email,
         degree=ConnectionDegree.UNKNOWN,
         source_note="공개 검색 스니펫에서 소속·직무 일치 확인",
@@ -319,9 +321,17 @@ def test_body_carries_attraction_points_with_source_ids() -> None:
     assert "- 영업이익: 미확인" in body
     assert "Email Contact: holder@example.com (출처 https://example.com/lab-page)" in body
     assert "Email Contact: 공개 이메일 미확인" in body
-    assert "잠정 매칭: 81/100 (역할 32 / 학력 15 / 안정성 16 / 프로필 18)" in body
+    assert "잠정 매칭: 80/100 (역할 27 / 학력 15 / 안정성 20 / 프로필 18)" in body
     assert "[C1] 합성상사 회사 소개 (2026-09-10) https://example.com/company" in body
     assert "지역 필터: South Korea" in body
+
+
+def test_candidate_score_in_mail_is_computed_from_evidence() -> None:
+    inflated = replace(CANDIDATES[0], score=ScoreBreakdown(40, 20, 20, 20))
+    assert inflated.score == score_candidate(inflated.evidence)
+    body = render_brief_body(_draft(candidates=(inflated,)), TODAY)
+    assert "잠정 매칭: 80/100 (역할 27 / 학력 15 / 안정성 20 / 프로필 18)" in body
+    assert "잠정 매칭: 100/100" not in body
 
 
 def test_check_linkedin_length_matches_fixture_count() -> None:

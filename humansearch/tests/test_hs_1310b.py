@@ -408,6 +408,7 @@ def test_verify_and_mark_rejects_packet_changed_after_send_claim(tmp_path: Path)
     directory = _ledger(tmp_path)
     record_intent(directory, _intent(_mail_body(_JP, original)))
     _claim(directory, _mail_body(_JP, original))
+    mark(directory, _PACKET_ID, "gmail", 1, SendState.SENT_UNVERIFIED, "msg-1", _moment(5), "발송함 id")
     packet_path, sent_path = _write_packet_and_receipt(
         tmp_path, changed, f"{changed}\npacket-id: {_PACKET_ID}", store_dir=directory
     )
@@ -460,7 +461,7 @@ def test_verify_and_mark_rejects_packet_recipients_changed_after_send_claim(tmp_
         tmp_path, body, f"{body}\npacket-id: {_PACKET_ID}", store_dir=directory
     )
     payload = json.loads(packet_path.read_text(encoding="utf-8"))
-    payload["mail"]["to"] = ["other@example.org"]
+    payload["mail"]["cc"] = ["rogan@valueconnect.kr"]
     packet_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
 
     with pytest.raises(BriefInputError):

@@ -18,8 +18,8 @@ from test_hs_1310b import (
     _mail_body,
     _moment,
     _packet,
+    _write_current_packet,
     _write_packet_and_receipt,
-    _write_packet_and_sent,
 )
 
 from humansearch.brief import (
@@ -45,8 +45,26 @@ def test_verify_and_mark_rejects_packet_recipients_changed_after_send_claim(tmp_
         tmp_path, body, f"{body}\npacket-id: {_PACKET_ID}", store_dir=directory
     )
     payload = json.loads(packet_path.read_text(encoding="utf-8"))
-    payload["mail"]["to"] = ["other@example.org"]
+    payload["mail"]["cc"] = ["rogan@valueconnect.kr"]
     packet_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+    with pytest.raises(BriefInputError):
+        cli_module.verify_and_mark(directory, packet_path, sent_path, "msg-1", _moment(6))
+
+
+def test_verify_and_mark_rejects_receipt_recipients_changed_after_send_claim(tmp_path: Path) -> None:
+    body = "정상 본문"
+    directory = _ledger(tmp_path)
+    record_intent(directory, _intent(_mail_body(_JP, body)))
+    _claim(directory, _mail_body(_JP, body))
+    mark(directory, _PACKET_ID, "gmail", 1, SendState.SENT_UNVERIFIED, "msg-1", _moment(5), "발송함 id")
+    packet_path, sent_path = _write_packet_and_receipt(
+        tmp_path,
+        body,
+        f"{body}\npacket-id: {_PACKET_ID}",
+        cc=("rogan@valueconnect.kr",),
+        store_dir=directory,
+    )
 
     with pytest.raises(BriefInputError):
         cli_module.verify_and_mark(directory, packet_path, sent_path, "msg-1", _moment(6))
@@ -111,12 +129,13 @@ def test_verify_and_mark_rejects_previous_attempt_readback_on_approved_retry(tmp
         recipients_sha256=first.recipients_sha256,
         body_sha256=first.body_sha256,
     )
+    mark(directory, _PACKET_ID, "gmail", 2, SendState.SENT_UNVERIFIED, "msg-a2", _moment(7), "발송함 id")
     packet_path, sent_path = _write_packet_and_receipt(
-        tmp_path, body, f"{body}\npacket-id: {_PACKET_ID}", attempt=1, message_id="msg-a1", store_dir=directory
+        tmp_path, body, f"{body}\npacket-id: {_PACKET_ID}", attempt=1, message_id="msg-a2", store_dir=directory
     )
 
     with pytest.raises(BriefInputError):
-        cli_module.verify_and_mark(directory, packet_path, sent_path, "msg-a1", _moment(7))
+        cli_module.verify_and_mark(directory, packet_path, sent_path, "msg-a2", _moment(8))
 
 
 def test_verify_and_mark_rejects_plain_old_readback_even_with_latest_message_id(tmp_path: Path) -> None:
@@ -145,9 +164,9 @@ def test_verify_and_mark_rejects_plain_old_readback_even_with_latest_message_id(
         body_sha256=first.body_sha256,
     )
     mark(directory, _PACKET_ID, "gmail", 2, SendState.SENT_UNVERIFIED, "msg-a2", _moment(7), "발송함 id")
-    packet_path, plain_old_readback = _write_packet_and_sent(
-        tmp_path, body, f"{body}\npacket-id: {_PACKET_ID}"
-    )
+    packet_path = _write_current_packet(directory, _mail_body(_JP, body))
+    plain_old_readback = tmp_path / "sent.txt"
+    plain_old_readback.write_text(_mail_body(_JP, f"{body}\npacket-id: {_PACKET_ID}"), encoding="utf-8")
 
     with pytest.raises(BriefInputError):
         cli_module.verify_and_mark(directory, packet_path, plain_old_readback, "msg-a2", _moment(8))

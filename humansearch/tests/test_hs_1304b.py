@@ -365,7 +365,11 @@ def test_omitting_every_section_cannot_yield_an_empty_linkedin_body() -> None:
 def test_core_sections_from_the_contract_cannot_be_omitted() -> None:
     jd = _jd()
     for core in ("주요업무", "자격요건"):
-        stripped = jd.text
+        lines = jd.text.splitlines()
+        start = lines.index(core)
+        next_indexes = [lines.index(marker) for marker in _MARKERS if marker in lines and lines.index(marker) > start]
+        end = min(next_indexes) if next_indexes else len(lines)
+        stripped = "\n".join((*lines[:start], *lines[end:]))
         with pytest.raises(BriefInputError):
             _packet(
                 jd_packet=_jd_packet(jd, linkedin_body=stripped, linkedin_omitted_sections=(core,))

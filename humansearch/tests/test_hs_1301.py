@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import hashlib
 import re
 from dataclasses import FrozenInstanceError
@@ -369,6 +370,19 @@ def test_candidate_lead_accepts_profile_urls(good_url: str) -> None:
     assert _lead(linkedin_url=good_url).linkedin_url == good_url
 
 
+@pytest.mark.parametrize(
+    "bad_url",
+    [
+        "https://www.linkedin.com/in/\u200b",
+        "https://www.linkedin.com/in/\ufeff",
+        "https://www.linkedin.com/in/\ufe0f",
+    ],
+)
+def test_candidate_lead_rejects_invisible_only_profile_slugs(bad_url: str) -> None:
+    with pytest.raises(BriefInputError):
+        _lead(linkedin_url=bad_url)
+
+
 _LINKEDIN_PROFILE = re.compile(r"https://(?:www\.|kr\.)?linkedin\.com/in/\S+")
 _URL_PREFIXES = (
     "",
@@ -706,3 +720,62 @@ def test_brief_package_has_no_clock_or_network_access(token: str) -> None:
     assert modules
     for module in modules:
         assert token not in module.read_text(encoding="utf-8"), module.name
+
+
+def test_brief_package_has_no_clock_or_network_alias_calls() -> None:
+    modules = sorted(_BRIEF_DIR.glob("*.py"))
+    assert modules
+    banned_call_aliases = {"datetime.now", "date.today", "time.time"}
+    banned_import_roots = {"requests", "socket", "smtplib"}
+    banned_from_imports = {("urllib", "request"), ("urllib.request", None)}
+    for module in modules:
+        tree = ast.parse(module.read_text(encoding="utf-8"), filename=str(module))
+        imported_calls: set[str] = set()
+        datetime_aliases = {"datetime"}
+        date_aliases = {"date"}
+        time_module_aliases = {"time"}
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    root = alias.name.split(".", 1)[0]
+                    assert root not in banned_import_roots, module.name
+                    if alias.name == "urllib.request":
+                        raise AssertionError(module.name)
+                    if alias.name in banned_call_aliases:
+                        imported_calls.add(alias.asname or alias.name.rsplit(".", 1)[-1])
+                    if alias.name == "datetime":
+                        datetime_aliases.add(f"{alias.asname or alias.name}.datetime")
+                        date_aliases.add(f"{alias.asname or alias.name}.date")
+                    if alias.name == "time":
+                        time_module_aliases.add(alias.asname or alias.name)
+            elif isinstance(node, ast.ImportFrom):
+                root = (node.module or "").split(".", 1)[0]
+                assert root not in banned_import_roots, module.name
+                imported = {(node.module, alias.name) for alias in node.names}
+                assert not (imported & banned_from_imports), module.name
+                for alias in node.names:
+                    dotted = f"{node.module}.{alias.name}" if node.module else alias.name
+                    if dotted in banned_call_aliases:
+                        imported_calls.add(alias.asname or alias.name)
+                    if node.module == "datetime" and alias.name == "datetime":
+                        datetime_aliases.add(alias.asname or alias.name)
+                    if node.module == "datetime" and alias.name == "date":
+                        date_aliases.add(alias.asname or alias.name)
+                    if node.module == "time" and alias.name == "time":
+                        imported_calls.add(alias.asname or alias.name)
+            elif isinstance(node, ast.Call):
+                name = _call_name(node.func)
+                assert name not in banned_call_aliases, module.name
+                assert name not in imported_calls, module.name
+                assert not any(name == f"{alias}.now" for alias in datetime_aliases), module.name
+                assert not any(name == f"{alias}.today" for alias in date_aliases), module.name
+                assert not any(name == f"{alias}.time" for alias in time_module_aliases), module.name
+
+
+def _call_name(node: ast.AST) -> str:
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        prefix = _call_name(node.value)
+        return f"{prefix}.{node.attr}" if prefix else node.attr
+    return ""

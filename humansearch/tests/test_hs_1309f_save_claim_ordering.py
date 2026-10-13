@@ -56,6 +56,37 @@ def _take_claim(directory: Path) -> bool:
     return won
 
 
+def test_missing_packet_cannot_be_replaced_after_claim(tmp_path: Path) -> None:
+    directory = _ledger(tmp_path)
+    store = PacketStore(directory)
+    path = store.save(_current_packet())
+    assert _take_claim(directory)
+    path.unlink()
+
+    with pytest.raises(BriefInputError, match="발송 intent"):
+        store.save(_other_packet())
+    assert not path.exists()
+
+
+def test_clickup_id_case_alias_cannot_create_another_packet(tmp_path: Path) -> None:
+    directory = _ledger(tmp_path)
+    store = PacketStore(directory)
+    lower = _current_packet()
+    upper_id = lower.position.clickup_task_id.upper()
+    upper = replace(
+        lower,
+        packet_id=lower.packet_id.replace(lower.position.clickup_task_id, upper_id, 1),
+        position=replace(lower.position, clickup_task_id=upper_id),
+    )
+    store.save(lower)
+    with pytest.raises(BriefInputError, match="대소문자"):
+        store.save(upper)
+    assert _take_claim(directory)
+    store.path_for(lower.packet_id).unlink()
+    with pytest.raises(BriefInputError, match="발송 intent"):
+        store.save(upper)
+
+
 # ---------------------------------------------------------------- ① 결정적: 순서 뒤집기
 
 

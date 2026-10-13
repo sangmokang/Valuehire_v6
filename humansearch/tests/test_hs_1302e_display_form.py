@@ -153,11 +153,24 @@ def test_a_link_split_condition_cannot_reach_the_company_section(variant: str) -
 
 
 def test_a_link_keeps_its_display_text_for_judgement() -> None:
-    """환원은 표시 문자열만 남긴다 — 주소는 판정에서 사라진다."""
+    """정상 URL 은 표시 문자열만 남기지만, 주소에 숨긴 조건은 판정 사본에 남긴다."""
     from humansearch.brief.jd_fidelity import judgement_form
 
     assert judgement_form("경[력](https://example.com) 5년") == "경력 5년"
     assert judgement_form("![그림](x.png) 뒤") == "그림 뒤"
+    assert judgement_form("[300억 원](경력 5년 이상)") == "300억 원 경력 5년 이상"
+
+
+@pytest.mark.parametrize("name", ["[담당](경력 5년 이상)", "[담당](연**봉**)"])
+def test_condition_in_link_target_cannot_become_a_contact(name: str) -> None:
+    with pytest.raises(BriefInputError):
+        _contact_packet(name)
+
+
+def test_condition_in_link_target_cannot_become_a_company_amount() -> None:
+    company = replace(COMPANY, revenue=Claim("[300억 원](경력 5년 이상)", ("I1",)))
+    with pytest.raises(BriefInputError):
+        _company_packet(company)
 
 
 # ---------------------------------------------------------------- ② 보이지 않는 문자

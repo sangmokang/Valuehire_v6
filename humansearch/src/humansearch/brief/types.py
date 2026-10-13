@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass
 from datetime import date
 from typing import NoReturn
@@ -68,7 +69,12 @@ def _require_profile_url(value: str, field: str) -> None:
 
     prefixes = policy().profile_url_prefixes
     for prefix in prefixes:
-        if value.startswith(prefix) and _PROFILE_TAIL.fullmatch(value[len(prefix) :]):
+        tail = value[len(prefix) :]
+        if (
+            value.startswith(prefix)
+            and _PROFILE_TAIL.fullmatch(tail)
+            and any(unicodedata.category(char) not in {"Cf", "Mn"} for char in tail)
+        ):
             return
     _reject(f"{field} 는 계약이 정한 프로필 URL 접두 {prefixes} 뒤에 식별자가 와야 한다")
 

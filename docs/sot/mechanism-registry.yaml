@@ -159,3 +159,9 @@
   stage: "ci"
   ci_mirror_job: "verify"
   required: true
+- id: "hs-1305-pii-mutations-ci"
+  path: ".github/workflows/verify.yml"
+  target: "bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-1305-pii-mutations.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true

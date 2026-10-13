@@ -153,8 +153,8 @@ def _claim_with_digest(
         1,
         at=_CLAIM_AT,
         evidence="러너가 발송 직전 청구",
-        recipients_sha256=recipients_sha256 or _sha256("sangmokang@valueconnect.kr"),
-        body_sha256=body_sha256 or _sha256("본문"),
+        recipients_sha256=recipients_sha256 or _current_recipients_sha256(),
+        body_sha256=body_sha256 or _current_body_sha256(),
     )
 
 

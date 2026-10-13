@@ -13,12 +13,15 @@ Codex 13차 반례: 렌더러가 CompanyBrief 에서 만든 정상 줄 `- 매출
 from __future__ import annotations
 
 import hashlib
+from dataclasses import replace
 
 import pytest
 from test_hs_1305 import TODAY, _draft, _recipients
 
 from humansearch.brief import (
+    BriefDraft,
     BriefInputError,
+    Claim,
     SearchPacket,
     TeamMail,
     from_json,
@@ -42,8 +45,9 @@ def _mail_body() -> str:
     return compose_brief_mail(draft, _recipients(), TODAY, first_live=False).body
 
 
-def _packet(body: str | None = None) -> SearchPacket:
-    draft = _draft()
+def _packet(body: str | None = None, draft: BriefDraft | None = None) -> SearchPacket:
+    if draft is None:
+        draft = _draft()
     mail = compose_brief_mail(draft, _recipients(), TODAY, first_live=False)
     text = mail.body if body is None else body
     return SearchPacket(
@@ -80,6 +84,18 @@ def test_a_normal_draft_becomes_a_packet_and_survives_json_roundtrip() -> None:
     restored = from_json(to_json(packet))
     assert RENDERED_AMOUNT_LINE in restored.mail.body.splitlines()
     assert restored.mail.body_sha256 == packet.mail.body_sha256
+
+
+@pytest.mark.parametrize("placement", ["attraction", "news"])
+def test_sourced_company_amount_in_free_text_is_accepted(placement: str) -> None:
+    amount = Claim("누적 투자 300억 원 유치", ("I1",))
+    draft = _draft()
+    if placement == "attraction":
+        draft = replace(draft, attraction_points=(amount, *draft.attraction_points[1:]))
+    else:
+        draft = replace(draft, company=replace(draft.company, news=(amount,)))
+    packet = _packet(draft=draft)
+    assert amount.value in packet.mail.body
 
 
 # ---------------------------------------------------------------- 음성 대조군

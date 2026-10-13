@@ -173,6 +173,22 @@ def test_dropping_a_number_changes_tokens() -> None:
     )
 
 
+@pytest.mark.parametrize(
+    ("original", "changed"),
+    [
+        ("연간 2천만 건의 로그를 다뤄 본 이력이 있습니다", "연간 2천 건의 로그를 다뤄 본 이력"),
+        ("야근이 없습니다", "야근이 있습니다"),
+    ],
+)
+def test_amount_or_negation_change_is_not_an_ending_contraction(
+    original: str, changed: str
+) -> None:
+    jd = _jd(f"[자격요건]\n• {original}\n")
+    report = _verify(jd, _body(f"[자격요건]\n• {changed}\n"))
+    assert not report.ok
+    assert report.missing
+
+
 def test_sentence_punctuation_is_stripped_around_endings() -> None:
     assert core_tokens("생각합니다.") == core_tokens("생각")
     assert core_tokens("[자격요건]") == core_tokens("자격요건")

@@ -44,6 +44,7 @@ from humansearch.brief import (
     from_json,
     packet_id,
     to_json,
+    verify_fidelity,
 )
 from humansearch.brief.mail import compose_brief_mail
 
@@ -160,17 +161,9 @@ def test_an_email_exactly_at_the_length_boundary_is_accepted(email: str) -> None
 
 
 def test_a_malformed_email_cannot_reach_the_packet() -> None:
-    """잘못된 주소가 렌더 줄을 타고 패킷 경계를 넘지 못한다."""
-    jd = _jd()
+    """잘못된 주소는 Contact 값으로 만들 수 없어 렌더 줄 자체가 생기지 않는다."""
     with pytest.raises(BriefInputError):
-        contact = Contact(name="홍길동", email="holder@b..com")
-        _packet(
-            jd_packet=_jd_packet(
-                jd,
-                linkedin_body=f"{jd.text}\n{contact.rendered_line()}",
-                linkedin_contact=contact,
-            )
-        )
+        Contact(name="홍길동", email="holder@b..com")
 
 
 # ---------------------------------------------------------------- ② 판정 전 정규화
@@ -207,8 +200,9 @@ def test_an_invisible_or_marked_up_condition_in_the_linkedin_body_is_rejected(
     variant: str,
 ) -> None:
     jd = _jd()
-    with pytest.raises(BriefInputError):
-        _packet(jd_packet=_jd_packet(jd, linkedin_body=f"{jd.text}\n문의: {variant}"))
+    report = verify_fidelity(jd, f"{jd.text}\n{variant}")
+
+    assert report.extra_condition == (variant,)
 
 
 def test_normal_lines_still_pass_after_normalization() -> None:

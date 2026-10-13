@@ -315,7 +315,7 @@ def require_channel(value: object) -> str:
 
 
 def _lock_path(directory: Path, packet_id: str, channel: str) -> Path:
-    return directory / f"{require_packet_id(packet_id)}.{require_channel(channel)}.lock"
+    return directory / f"{require_packet_id(packet_id).casefold()}.{require_channel(channel)}.lock"
 
 
 _held = threading.local()
@@ -388,12 +388,20 @@ class PacketStore:
         text = to_json(packet)
         target = self.path_for(packet.packet_id)
         with _channel_lock(self.dir, packet.packet_id, PACKET_LOCK_CHANNEL):
+            if any(
+                entry.name != target.name
+                and entry.name.casefold() == target.name.casefold()
+                for entry in self.dir.iterdir()
+            ):
+                _reject("packet_id 대소문자만 다른 패킷 파일이 이미 있다")
             if target.is_file() and read_store_file(target) == text:
                 return target
             # 잠금은 다른 스레드·다른 프로세스를 막는다. 같은 스레드가 확인 도중 청구를 끼워 넣는
             # 재진입 경로는 잠금이 막지 못하므로, 확인 전후로 장부가 그대로인지도 본다.
             before = self._send_intent_files(packet.packet_id)
-            if target.is_file() and self._has_send_intent(packet.packet_id):
+            if self._has_send_intent(packet.packet_id) and (
+                target.is_file() or not self._matches_existing_intent(packet)
+            ):
                 _reject("발송 intent 가 있는 packet_id 는 다른 패킷 내용으로 저장할 수 없다")
             if self._send_intent_files(packet.packet_id) != before:
                 _reject("저장을 확인하는 동안 발송 intent 가 생겼다 — 이 패킷은 저장하지 않는다")
@@ -406,12 +414,31 @@ class PacketStore:
             entry.name
             for entry in self.dir.iterdir()
             if entry.is_file()
-            and entry.name.startswith(prefix)
+            and entry.name.casefold().startswith(prefix.casefold())
             and entry.name.endswith(".sent.json")
         )
 
     def _has_send_intent(self, packet_id: str) -> bool:
         return bool(self._send_intent_files(packet_id))
+
+    def _matches_existing_intent(self, packet: SearchPacket) -> bool:
+        from .send_ledger import load_intent, recipients_digest
+
+        expected_recipients = recipients_digest(packet.mail.to, packet.mail.cc)
+        expected_body = packet.mail.body_sha256
+        prefix = f"{require_packet_id(packet.packet_id)}."
+        for name in self._send_intent_files(packet.packet_id):
+            if not name.startswith(prefix):
+                return False
+            channel = name.removeprefix(prefix).split(".a", 1)[0]
+            intent = load_intent(self.dir, packet.packet_id, channel)
+            if (
+                intent is None
+                or intent.recipients_sha256 != expected_recipients
+                or intent.body_sha256 != expected_body
+            ):
+                return False
+        return True
 
     def load(self, packet_id: str) -> SearchPacket:
         """저장된 패킷을 복원한다. 파일 부재·손상 JSON 은 전부 거부."""

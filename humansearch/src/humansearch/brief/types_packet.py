@@ -418,13 +418,21 @@ class SearchPacket:
         )
         jd_line_indexes.update(range(lines.index("[필드 2: JD 내용]") + 1, end))
         research_indexes = _company_research_indexes(lines)
+        attraction_start = next(
+            (i for i, line in enumerate(lines) if line == "[회사 매력 포인트]"), None
+        )
+        attraction_indexes: set[int] = set()
+        if attraction_start is not None:
+            for index in range(attraction_start + 1, len(lines)):
+                if not lines[index]:
+                    break
+                attraction_indexes.add(index)
         rendered = self._rendered_company_lines() if research_indexes else frozenset[str]()
         for index, line in enumerate(lines):
             if index in jd_line_indexes:
                 continue
             if index in research_indexes and line in rendered:
-                # 회사 리서치 절에서 면제받는 줄은 **금액 필드에서 렌더한 금액 모양** 하나뿐이다.
-                # (F83-3: `- 매출: 300억 원 [I1]` 오탐을 풀되, `- 매출: 경력 5년 이상 [I1]` 은 막는다)
+                # 회사 금액 필드와 출처가 있는 자유 서술은 렌더 결과와 대조한 뒤 면제한다.
                 continue
             mixed = mixed_script_word(line)
             if mixed is not None:
@@ -434,22 +442,22 @@ class SearchPacket:
                 )
             has_condition = (
                 _has_company_field_condition(line)
-                if index in company_line_indexes
+                if index in company_line_indexes or index in attraction_indexes
                 else _has_extra_condition(line)
             )
             if has_condition:
                 _reject(f"TeamMail.body 의 JD 블록 밖에 채용 조건이 끼었다: {line!r}")
 
     def _rendered_company_lines(self) -> frozenset[str]:
-        """조건 검사를 면제할 회사 절 줄 — **금액 필드에서 렌더한 금액 모양 줄**만.
+        """조건 검사를 면제할 회사 절 줄 — 검증된 금액 필드와 자유 서술만.
 
         `mail_sections` 가 `types_packet` 을 import 하므로 최상단 import 는 순환이다 —
         렌더러를 복제해 줄 모양이 갈라지느니 호출 시점에 한 번 불러온다(정본은 한 곳뿐).
         렌더러가 실제로 내보내는 줄인지도 교차 확인한다 — 라벨이 갈라지면 면제가
         조용히 넓어지는 대신 좁아지고, 정상 경로 시험이 곧바로 깨진다.
-        `open_items`·제품·연혁·뉴스 같은 자유 문구는 여기 없다 — 계속 조건 검사를 받는다.
+        `open_items` 같은 러너 자유 문구는 여기 없다 — 계속 조건 검사를 받는다.
         """
-        from .mail_sections import _claim_line, render_company_research
+        from .mail_sections import _claim_bullets, _claim_line, render_company_research
 
         rendered = frozenset(render_company_research(self.company, (), self.created_on))
         allowed: set[str] = set()
@@ -465,5 +473,9 @@ class SearchPacket:
                 )
             line = _claim_line(label, claim)
             if line in rendered:
+                allowed.add(line)
+        for claim in (*self.company.history, *self.company.products, *self.company.news):
+            line = _claim_bullets((claim,))[0]
+            if line in rendered and mixed_script_word(line) is None and not _has_company_field_condition(line):
                 allowed.add(line)
         return frozenset(allowed)

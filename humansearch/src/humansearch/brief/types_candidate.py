@@ -125,3 +125,6 @@ class CandidateLead:
         _require_text(self.source_note, "CandidateLead.source_note")
         if not isinstance(self.degree, ConnectionDegree):
             _reject("CandidateLead.degree 는 ConnectionDegree 여야 한다")
+        from .scoring import score_candidate
+
+        object.__setattr__(self, "score", score_candidate(self.evidence))

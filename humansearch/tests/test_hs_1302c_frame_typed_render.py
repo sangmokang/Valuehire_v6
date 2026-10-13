@@ -130,7 +130,11 @@ def test_a_condition_line_without_a_matching_rendered_source_is_rejected(hidden:
         )
 
 
-@pytest.mark.xfail(strict=True, reason="구조 변경 결정 대기 — §7-5 카드(담당자를 운영자 설정에서 조회)")
+@pytest.mark.xfail(
+    strict=True,
+    raises=pytest.fail.Exception,
+    reason="구조 변경 결정 대기 — §7-5 카드(담당자를 운영자 설정에서 조회)",
+)
 def test_an_unknown_condition_as_contact_name_passes_with_the_real_rendered_line() -> None:
     """**현재 계약에서는 통과하는 잔여 구멍.** 실제 렌더 줄을 그대로 쓴 반례다.
 
