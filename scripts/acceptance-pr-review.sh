@@ -76,7 +76,7 @@ case "$1 $2" in
   "agent start") name=$3; kind=$(opt --kind "$@"); pane=$(opt --pane "$@")
                  # 실제 herdr 실측(2026-10-13): 새 창의 셸이 준비되기 전에는 첫 시도가 거절된다
                  if [ ! -f "$H/ready.$pane" ]; then touch "$H/ready.$pane"
-                   echo '{"error":{"code":"agent_pane_busy"}}'; exit 1; fi
+                   echo '{"error":{"code":"agent_pane_busy"}}' >&2; exit 1; fi   # 실제 herdr 처럼 stderr 로
                  echo "$kind $pane" > "$H/agent.$name"; echo "$kind $name" >> "$F/starts.log"
                  echo '{"result":{"agent":{"agent_status":"idle"}}}' ;;
   "agent prompt") name=$3; text=$4; read -r kind pane < "$H/agent.$name"; dir=$(cat "$H/pane.$pane.cwd")

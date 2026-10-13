@@ -57,7 +57,7 @@ start_agent() {
   local name=$1 kind=$2 pane=$3 res i; shift 3
   # 새 창은 셸이 뜨기 전·앞 명령(unset)이 끝나기 전에는 agent_pane_busy 로 거절된다(2026-10-13 실측)
   for i in $(seq 1 60); do
-    res=$(herdr agent start "$name" --kind "$kind" --pane "$pane" --timeout 60000 -- "$@")
+    res=$(herdr agent start "$name" --kind "$kind" --pane "$pane" --timeout 60000 -- "$@" 2>&1)   # 오류 JSON 은 stderr 로 온다
     printf '%s' "$res" | grep -q '"agent_pane_busy"' || break
     sleep 1
   done
