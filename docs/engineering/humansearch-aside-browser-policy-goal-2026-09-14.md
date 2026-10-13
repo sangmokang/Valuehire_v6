@@ -24,7 +24,7 @@
 
 ### 입력
 
-- 사용자 최신 지시: `/Users/kangsangmo/Desktop/hs-next-prompt-v5-20260914.md`
+- 사용자 최신 결정: PR #86 본문과 이 goal의 계약 항목
 - 적용 정본: `docs/sot/humansearch-browser-contract.md`
 - 신규 기계 계약: `contracts/humansearch/browser-policy.yaml`
 

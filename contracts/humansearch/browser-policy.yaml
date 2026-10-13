@@ -1,6 +1,6 @@
 # HumanSearch browser policy machine contract.
 # Source SOT: docs/sot/humansearch-browser-contract.md
-# Source prompt: /Users/kangsangmo/Desktop/hs-next-prompt-v5-20260914.md
+# Source decision: docs/engineering/humansearch-aside-browser-policy-goal-2026-09-14.md
 version: "2026-09-14.aside-policy"
 automation_app: Aside
 forbidden_app: Chrome

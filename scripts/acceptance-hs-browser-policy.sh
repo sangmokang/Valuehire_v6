@@ -189,6 +189,8 @@ require_text "$SOT" "대상 앱·프로필·탭에 귀속" "SOT가 입력 신호
 require_text "$SOT" "Chrome 입력을 Aside 사용자 개입으로 해석하지 않는다" "SOT가 Chrome 입력 오인을 금지"
 require_text "$SOT" "새 관측과 새 사용권" "SOT가 새 관측·새 lease 재개 조건을 명시"
 require_text "$SOT" "명시적 STOP은 새 사용자 해제 없이는 자동 해제하지 않는다" "SOT가 STOP 해제 경계를 명시"
+require_text "$SOT" "사용자가 직접 내린 STOP과 이 절에 열거한 중단은 명시적 STOP이다" "SOT가 인증·보안 중단의 STOP 경계를 명시"
+require_text "$SOT" "별도 승인된 재확인 절차가 마련되기 전까지 재개는" "SOT가 보안 중단의 재확인 승인 게이트를 명시"
 require_text "$SOT" "AppleScript 실행 가능성과 CDP 인증 필요는 라이브 권한 충족 증거가 아니다" "SOT가 현재 Aside 실측의 한계를 명시"
 forbid_text "$SOT" "자동 재개하지 않는다." "일반 사람 입력 뒤 영구 재개 금지 문구 제거"
 

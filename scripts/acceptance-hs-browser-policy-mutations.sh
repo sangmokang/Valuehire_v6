@@ -150,6 +150,34 @@ else
   record 1 "주석만 남긴 no-op 계약 차단" "실제 값 없는 계약이 통과"
 fi
 
+security_stop=$(make_case security-stop)
+ruby -e '
+  path = ARGV[0]
+  text = File.read(path)
+  text = text.sub("사용자가 직접 내린 STOP과 이 절에 열거한 중단은 명시적 STOP이다.", "인증·보안 중단 뒤에는 새 증거를 확인한다.")
+  File.write(path, text)
+' "$security_stop/docs/sot/humansearch-browser-contract.md"
+rc=$(run_case "$security_stop")
+if [ "$rc" -ne 0 ]; then
+  record 0 "인증·보안 중단의 STOP 경계 누락 차단" "exit=$rc"
+else
+  record 1 "인증·보안 중단의 STOP 경계 누락 차단" "§11 경계가 없어도 통과"
+fi
+
+security_approval=$(make_case security-approval)
+ruby -e '
+  path = ARGV[0]
+  text = File.read(path)
+  text = text.sub("별도 승인된 재확인 절차가 마련되기 전까지 재개는\n`NOT_RUN`이다.", "재개 전에 새 증거를 확인한다.")
+  File.write(path, text)
+' "$security_approval/docs/sot/humansearch-browser-contract.md"
+rc=$(run_case "$security_approval")
+if [ "$rc" -ne 0 ]; then
+  record 0 "보안 중단의 재확인 승인 게이트 누락 차단" "exit=$rc"
+else
+  record 1 "보안 중단의 재확인 승인 게이트 누락 차단" "§11 승인 게이트가 없어도 통과"
+fi
+
 SNAP1=$(git status --porcelain)
 if [ "$SNAPSHOT" = "$SNAP1" ]; then
   record 0 "원본 저장소 상태 불변" "before/after 동일"
@@ -157,7 +185,7 @@ else
   record 1 "원본 저장소 상태 불변" "상태 변경 발생"
 fi
 
-if [ "$checked" -lt 8 ]; then
+if [ "$checked" -lt 10 ]; then
   echo "VERDICT: NOT_RUN"
   echo "CHECKED: $checked"
   exit 2
