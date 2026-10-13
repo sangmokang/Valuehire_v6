@@ -29,6 +29,8 @@ staged=$(git diff --cached --name-only --diff-filter=ACMR)
 # 패턴에도 걸리지 않는다. 그래서 워크플로 파일마다 HEAD 와 인덱스의 스텝 수를 YAML 로
 # 세어, 줄었으면 막는다(이름 변경·내용 수정은 수가 같아 통과). 파일 삭제는 0개로 센다.
 # 삭제만 있는 커밋은 아래 조기 종료에 걸리므로 그보다 먼저 돈다. rename 은 D+A 로 본다.
+# 변경 종류는 "추가(A) 빼고 전부"로 뒤집어 고른다. D·M 만 나열했을 때 심볼릭 링크 교체(T)가
+# 빠져나갔다(#131 Codex 적대 리뷰 실측). 링크의 인덱스 blob 은 경로 문자열이라 0개로 센다.
 # 막지 못하는 것: 스텝을 지우고 무의미한 스텝을 같은 수만큼 새로 넣는 것 — 추가된 줄은
 # §3 과 ci-step-integrity 가 본다. 범위는 원장 합의대로 워크플로 파일로 한정한다.
 count_steps() {
@@ -53,7 +55,7 @@ if git rev-parse --verify -q HEAD >/dev/null; then
            block "CI 워크플로 스텝 삭제 ${old}→${new} — $f (P13). 정당하면 suppressions.yaml 에 expiry 와 함께 등록하라"
          fi ;;
     esac
-  done < <(git diff --cached --no-renames --name-only --diff-filter=DM -- '.github/workflows/*.yml' '.github/workflows/*.yaml')
+  done < <(git diff --cached --no-renames --name-only --diff-filter=a -- '.github/workflows/*.yml' '.github/workflows/*.yaml')
 fi
 
 if [ -z "$staged" ]; then exit "$fail"; fi
