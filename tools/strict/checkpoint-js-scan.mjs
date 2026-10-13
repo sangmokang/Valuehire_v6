@@ -483,11 +483,11 @@ function closesBeforeBlock(tokens, open) {
   return true;
 }
 function isAssertionCall(tokens, index) {
-  const next = tokens[index + 1]?.value;
-  if (next === "(") return !closesBeforeBlock(tokens, index + 1);
-  if (next === "?." && tokens[index + 2]?.value === "(") return !closesBeforeBlock(tokens, index + 2);
-  return [".", "?."].includes(next) && tokens[index + 2]?.type === "identifier" &&
-    tokens[index + 3]?.value === "(" && !closesBeforeBlock(tokens, index + 3);
+  let cursor = index + 1;
+  while ([".", "?."].includes(tokens[cursor]?.value) && tokens[cursor + 1]?.type === "identifier") {
+    cursor += 2;
+  }
+  return tokens[cursor]?.value === "(" && !closesBeforeBlock(tokens, cursor);
 }
 function collectAssertionShadows(tokens, bindings) {
   const shadows = new Set();
@@ -520,9 +520,14 @@ export function countJavaScriptWeakening(source) {
   const aliases = collectAliases(tokens);
   const assertionBindings = collectAssertionBindings(tokens);
   const assertionShadows = collectAssertionShadows(tokens, assertionBindings);
+  counts.skip += assertionShadows.size;
   for (let index = 0; index < tokens.length; index += 1) {
     const token = tokens[index];
     const next = tokens[index + 1];
+    if (token.value === "=>" && next?.value === "{" &&
+      tokens[index + 2]?.value === "return" && tokens[index + 3]?.value === ";") {
+      counts.skip += 1;
+    }
     if (token.type === "identifier" && DISABLED_ALIASES.has(token.value) && next?.value === "(") {
       counts.skip += 1;
     }
@@ -563,8 +568,7 @@ export function countJavaScriptWeakening(source) {
     ) {
       counts[marker] += 1;
     }
-    if (token.type === "identifier" && assertionBindings.has(token.value) &&
-      !assertionShadows.has(token.value) && isAssertionCall(tokens, index)) {
+    if (token.type === "identifier" && assertionBindings.has(token.value) && isAssertionCall(tokens, index)) {
       counts.assertions += 1;
     }
   }

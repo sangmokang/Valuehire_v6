@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { countJavaScriptWeakening } from "../tools/strict/checkpoint-js-scan.mjs";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const SELF = fileURLToPath(import.meta.url);
@@ -64,10 +65,10 @@ function makeRepo(bundle, { baseSecret = false } = {}) {
   return { cwd, base: git(cwd, "rev-parse", "HEAD") };
 }
 
-function runGate(cwd, base) {
+function runGate(cwd, base, ...extraScopes) {
   const result = spawnSync(
     process.execPath,
-    [join(cwd, "tools/strict/checkpoint-gate.mjs"), "--base", base, "--json", "--scope", "src/**", "--scope", "tests/**"],
+    [join(cwd, "tools/strict/checkpoint-gate.mjs"), "--base", base, "--json", "--scope", "src/**", "--scope", "tests/**", ...extraScopes.flatMap((scope) => ["--scope", scope])],
     { cwd, encoding: "utf8", env: isolatedEnv() },
   );
   let body;
@@ -161,6 +162,68 @@ if (VALIDATE_ROOT) {
 } else {
   test.after(() => {
     for (const directory of cleanups) rmSync(directory, { recursive: true, force: true });
+  });
+
+  test("shell acceptance cannot bypass unchanged assertions", () => {
+    const { cwd, base } = makeRepo(makeBundle("original"));
+    write(cwd, "scripts/acceptance-check.sh", 'grep -q "value" src/app.mjs\ntest -s src/app.mjs\n');
+    git(cwd, "add", "scripts/acceptance-check.sh");
+    git(cwd, "commit", "-qm", "add acceptance check");
+    const before = git(cwd, "rev-parse", "HEAD");
+    for (const bypass of ['exit 0\n', 'grep -q "value" src/app.mjs || true\n']) {
+      write(cwd, "scripts/acceptance-check.sh", `${bypass}grep -q "value" src/app.mjs\ntest -s src/app.mjs\n`);
+      git(cwd, "add", "scripts/acceptance-check.sh");
+      expectViolation(runGate(cwd, before, "scripts/**"), "test-weakening", "scripts/acceptance-check.sh");
+    }
+    assert.ok(base);
+  });
+
+  test("Python module skip and xfail are rejected", () => {
+    const { cwd } = makeRepo(makeBundle("original"));
+    write(cwd, "tests/test_gate.py", "def test_gate():\n    assert True\n");
+    git(cwd, "add", "tests/test_gate.py");
+    git(cwd, "commit", "-qm", "add python check");
+    const base = git(cwd, "rev-parse", "HEAD");
+    for (const marker of ["skip", "xfail"]) {
+      write(cwd, "tests/test_gate.py", `import pytest\npytestmark = pytest.mark.${marker}(reason="later")\ndef test_gate():\n    assert True\n`);
+      git(cwd, "add", "tests/test_gate.py");
+      expectViolation(runGate(cwd, base), "test-weakening", "tests/test_gate.py");
+    }
+  });
+
+  test("trusted assertion member chain is counted without shadowing", () => {
+    const counts = countJavaScriptWeakening('import assert from "node:assert/strict"; assert.strict.equal(1, 1); assert.ok(true);');
+    assert.equal(counts.assertions, 2);
+  });
+
+  test("an existing assertion reference cannot hide later assertion deletion", () => {
+    const { cwd } = makeRepo(makeBundle("original"));
+    const baseBody = 'import assert from "node:assert/strict"; helper(assert); assert.ok(true); assert.equal(1, 1);\n';
+    write(cwd, "tests/unit.test.mjs", baseBody);
+    git(cwd, "add", "tests/unit.test.mjs");
+    git(cwd, "commit", "-qm", "add assertion reference");
+    const base = git(cwd, "rev-parse", "HEAD");
+    write(cwd, "tests/unit.test.mjs", baseBody.replace(" assert.equal(1, 1);", ""));
+    git(cwd, "add", "tests/unit.test.mjs");
+    expectViolation(runGate(cwd, base), "test-weakening", "tests/unit.test.mjs");
+  });
+
+  test("overwriting an assertion method remains a weakening marker", () => {
+    const counts = countJavaScriptWeakening('import assert from "node:assert/strict"; assert.ok = () => {}; assert.ok(true);');
+    assert.equal(counts.skip, 1);
+  });
+
+  test("early return in a JavaScript test is treated as weakening", () => {
+    const counts = countJavaScriptWeakening('test("value", () => { return; assert.ok(true); });');
+    assert.equal(counts.skip, 1);
+  });
+
+  test("staged SOT cannot raise its own size limit", () => {
+    const { cwd, base } = makeRepo(makeBundle("original"));
+    write(cwd, "docs/sot/coding-principles.md", "| **P11** | budget | hard 9999 LOC |\n");
+    write(cwd, "src/app.mjs", `${"export const value = 1;\n".repeat(601)}`);
+    git(cwd, "add", "docs/sot/coding-principles.md", "src/app.mjs");
+    expectViolation(runGate(cwd, base, "docs/**"), "size-limit", "src/app.mjs");
   });
 
   test("trusted original bundle makes independent validation exit zero", () => {

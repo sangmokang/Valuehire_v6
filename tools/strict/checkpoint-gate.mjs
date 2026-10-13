@@ -311,13 +311,21 @@ function countWeakeningMarkersForFile(path, content) {
   if (/\.py$/.test(path)) {
     counts.skip +=
       (stripped.match(/@(?:pytest\.mark\.)?skip(?:if)?\b/g) ?? []).length +
+      (stripped.match(/\bpytestmark\s*=\s*pytest\.mark\.skip(?:if)?\s*\(/g) ?? []).length +
       (stripped.match(/\bpytest\.skip\s*\(/g) ?? []).length +
-      (stripped.match(/@unittest\.skip(?:If|Unless)?\b/g) ?? []).length;
+      (stripped.match(/\bpytest\.importorskip\s*\(/g) ?? []).length +
+      (stripped.match(/@unittest\.skip(?:If|Unless)?\b/g) ?? []).length +
+      (stripped.match(/@unittest\.expectedFailure\b/g) ?? []).length +
+      (stripped.match(/@pytest\.mark\.xfail\b/g) ?? []).length +
+      (stripped.match(/\bpytestmark\s*=\s*pytest\.mark\.xfail\s*\(/g) ?? []).length;
     counts.assertions +=
       (stripped.match(/^\s*assert\b/gm) ?? []).length +
       (stripped.match(/\bself\.assert[A-Za-z_]*\s*\(/g) ?? []).length;
   }
   if (/\.(?:sh|bash|zsh)$/.test(path)) {
+    counts.skip +=
+      (stripped.match(/(?:^|[;&]\s*)exit\s+0(?:\s|$)/gm) ?? []).length +
+      (stripped.match(/\|\|\s*true\b/g) ?? []).length;
     counts.assertions +=
       (stripped.match(/^\s*(?:test|\[\[?)(?:\s|$)/gm) ?? []).length +
       (stripped.match(/\bgrep\s+(?:-[A-Za-z]*q[A-Za-z]*|-[A-Za-z]+\s+-q|-q)\b/g) ?? []).length +
@@ -388,11 +396,11 @@ function checkTestWeakening(base, changes) {
   return violations;
 }
 
-function parseHardLimit() {
+function parseHardLimit(base) {
   const fallback = 500;
   const sotPath = "docs/sot/coding-principles.md";
-  if (splitZ(git(["ls-files", "-z", "--", sotPath])).length === 0) return fallback;
-  const text = readIndex(sotPath);
+  if (splitZ(git(["ls-tree", "-z", "--name-only", base, "--", sotPath])).length === 0) return fallback;
+  const text = readBase(base, sotPath);
   const p11 = text.match(/P11[\s\S]*?(?=\n\| \*\*P\d+|\n### |\n## |$)/);
   if (!p11) return fallback;
   const haystack = p11[0];
@@ -421,10 +429,10 @@ function loc(content) {
   return content.endsWith("\n") ? content.split("\n").length - 1 : content.split("\n").length;
 }
 
-function checkSizeLimit(changes) {
+function checkSizeLimit(base, changes) {
   let hardLimit;
   try {
-    hardLimit = parseHardLimit();
+    hardLimit = parseHardLimit(base);
   } catch (error) {
     return [
       {
@@ -497,7 +505,7 @@ function main() {
         ...runCheck(CHECKS.SCOPE, ".strict/run-ledger", () => checkScope(changes, args.scopes)),
         ...runCheck(CHECKS.LEAKS, "", () => checkSecrets(changes)),
         ...runCheck(CHECKS.TEST_WEAKENING, "", () => checkTestWeakening(args.base, changes)),
-        ...runCheck(CHECKS.SIZE_LIMIT, "docs/sot/coding-principles.md", () => checkSizeLimit(changes)),
+        ...runCheck(CHECKS.SIZE_LIMIT, "docs/sot/coding-principles.md", () => checkSizeLimit(args.base, changes)),
       );
     }
   }
