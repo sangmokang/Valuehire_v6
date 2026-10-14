@@ -27,25 +27,44 @@ NON_LOOPBACK_HOSTS_PATH = (
 
 
 def non_loopback_host_samples() -> list[str]:
-    if not NON_LOOPBACK_HOSTS_PATH.exists():
-        return []
     raw = json.loads(NON_LOOPBACK_HOSTS_PATH.read_text(encoding="utf-8"))
     assert isinstance(raw, dict)
     samples = raw["must_reject"]
     assert isinstance(samples, list)
+    assert samples
     assert all(isinstance(sample, str) for sample in samples)
     return samples
 
 
 def test_non_loopback_rejection_samples_are_loaded_from_contract() -> None:
-    if not NON_LOOPBACK_HOSTS_PATH.exists():
-        pytest.skip("isolated gate mutation harness does not copy this product contract")
     samples = non_loopback_host_samples()
     routed_sample = next(sample for sample in samples if sample.startswith("192."))
 
     assert "" in samples
     assert routed_sample.startswith("192.")
     assert routed_sample not in inspect.getsource(sys.modules[__name__])
+
+
+def test_missing_non_loopback_samples_contract_fails_closed(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(
+        sys.modules[__name__], "NON_LOOPBACK_HOSTS_PATH", tmp_path / "missing.json"
+    )
+
+    with pytest.raises(FileNotFoundError):
+        non_loopback_host_samples()
+
+
+def test_empty_non_loopback_samples_contract_fails_closed(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    path = tmp_path / "empty.json"
+    path.write_text('{"must_reject":[]}', encoding="utf-8")
+    monkeypatch.setattr(sys.modules[__name__], "NON_LOOPBACK_HOSTS_PATH", path)
+
+    with pytest.raises(AssertionError):
+        non_loopback_host_samples()
 
 
 @contextmanager

@@ -18,7 +18,9 @@ for required in "$GATES" "scripts/hs_import_spy.py" "humansearch/pyproject.toml"
   "humansearch/uv.lock" "humansearch/.python-version" \
   "humansearch/src/humansearch/__init__.py" "humansearch/tests" \
   "contracts/admin-weekly-dashboard/metric-contract-v1.json" \
-  "contracts/admin-weekly-dashboard/source-contract-v1.json" "apps/admin"; do
+  "contracts/admin-weekly-dashboard/source-contract-v1.json" \
+  "contracts/admin-weekly-dashboard/non-loopback-host-samples.json" \
+  "contracts/humansearch/cdp-protocol.json" "apps/admin"; do
   if [ ! -e "$required" ]; then
     echo "FAIL: required G2 implementation missing: $required"
     exit 1
@@ -49,6 +51,10 @@ cp contracts/admin-weekly-dashboard/metric-contract-v1.json \
   "$SANDBOX/contracts/admin-weekly-dashboard/"
 cp contracts/admin-weekly-dashboard/source-contract-v1.json \
   "$SANDBOX/contracts/admin-weekly-dashboard/"
+cp contracts/admin-weekly-dashboard/non-loopback-host-samples.json \
+  "$SANDBOX/contracts/admin-weekly-dashboard/"
+mkdir -p "$SANDBOX/contracts/humansearch"
+cp contracts/humansearch/cdp-protocol.json "$SANDBOX/contracts/humansearch/"
 mkdir -p "$SANDBOX/apps"
 cp -R apps/admin "$SANDBOX/apps/"
 

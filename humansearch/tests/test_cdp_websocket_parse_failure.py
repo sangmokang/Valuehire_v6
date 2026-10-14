@@ -9,6 +9,10 @@
 """
 
 import inspect
+import json
+import socket
+from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -44,9 +48,51 @@ def test_unparseable_websocket_url_is_a_closed_read_failure(
         assert marker not in message
 
 
-def test_runtime_evaluate_method_is_loaded_from_contract() -> None:
-    if not _cdp._CDP_PROTOCOL_CONTRACT_PATH.exists():
-        pytest.skip("isolated gate mutation harness does not copy the repository contract tree")
-    assert _cdp._CDP_PROTOCOL_CONTRACT_PATH.exists()
-    assert _cdp._runtime_evaluate_method() == "Runtime.evaluate"
-    assert "Runtime.evaluate" not in inspect.getsource(_cdp)
+def test_packaged_cdp_protocol_contract_matches_canonical_contract() -> None:
+    assert _cdp._load_runtime_evaluate_method(
+        _cdp._CDP_PROTOCOL_CONTRACT_PATH
+    ) == _cdp._load_runtime_evaluate_method(_cdp._PACKAGED_CDP_PROTOCOL_CONTRACT_PATH)
+
+
+@pytest.mark.parametrize("use_packaged_contract", [False, True])
+def test_runtime_evaluate_method_is_loaded_from_contract(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, use_packaged_contract: bool
+) -> None:
+    method = _cdp._load_runtime_evaluate_method(_cdp._CDP_PROTOCOL_CONTRACT_PATH)
+    assert method not in inspect.getsource(_cdp)
+    expected = method + ".contract-probe"
+    path = tmp_path / "cdp-protocol.json"
+    path.write_text(json.dumps({"evaluate_method": expected}), encoding="utf-8")
+    mirror = tmp_path / "packaged-cdp-protocol.json"
+    mirror_method = expected if use_packaged_contract else method + ".mirror-probe"
+    mirror.write_text(json.dumps({"evaluate_method": mirror_method}), encoding="utf-8")
+    monkeypatch.setattr(
+        _cdp, "_CDP_PROTOCOL_CONTRACT_PATH",
+        tmp_path / "missing.json" if use_packaged_contract else path,
+    )
+    monkeypatch.setattr(_cdp, "_PACKAGED_CDP_PROTOCOL_CONTRACT_PATH", mirror)
+
+    sent: list[dict[str, object]] = []
+    monkeypatch.setattr(socket, "create_connection", lambda *args, **kwargs: MagicMock())
+    monkeypatch.setattr(_cdp, "_handshake", lambda *args: None)
+    monkeypatch.setattr(
+        _cdp, "_send_frame", lambda connection, payload: sent.append(json.loads(payload))
+    )
+    monkeypatch.setattr(
+        _cdp, "_receive_frame",
+        lambda connection: (0x1, b'{"id":1,"result":{"result":{"value":true}}}'),
+    )
+    _cdp._runtime_evaluate_method.cache_clear()
+    try:
+        assert _cdp._runtime_evaluate_method() == expected
+        assert _cdp.observe_markers(
+            "ws://127.0.0.1:9225/" + "dev" + "tools/page/SYNTHETIC",
+            ("header",),
+            _ROLE_MARKERS,
+            expected_host="127.0.0.1",
+            expected_port=9225,
+        ) is True
+        assert len(sent) == 1
+        assert sent[0]["method"] == expected
+    finally:
+        _cdp._runtime_evaluate_method.cache_clear()
