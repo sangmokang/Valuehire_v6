@@ -43,7 +43,7 @@ curl -s -I "$URL/rest/v1/profile_archives?select=id&structured_json=not.is.null&
 python3 scripts/llm_wiki/backfill_structured_profiles.py --db … --env … --apply
 python3 scripts/llm_wiki/field_audit.py --env ~/Desktop/Valuehire_v4/.env.local   # profile_archives.structured_json filled≈65%
 ```
-음성 대조군: 같은 명령을 두 번 돌리면 두 번째는 `"written": 0, "skipped_filled": ≥13600`. 되돌리기: 장부의 local_id 를 `structured_json=null` 로 PATCH 한 뒤 감사기가 2.4%로 돌아오는지 확인.
+음성 대조군: 같은 명령을 두 번 돌리면 두 번째는 `"written": 0, "skipped_filled": ≥13600`. 되돌리기는 **장부의 local_id 를 일괄 null 로 PATCH 하지 않는다**(다른 주체가 그 사이 쓴 값까지 지운다 — Codex 2026-10-14 지적으로 폐기). 반드시 `--rollback`(dry-run 으로 `would_revert`·`changed_elsewhere`·`local_changed` 건수 확인) → 검토 → `--rollback --apply` 순서로만 하며, 도구가 장부 지문 일치·스냅샷 md5 서버 필터로 우리가 쓴 값만 되돌린다. 적용 뒤 감사기가 2.4%로 돌아오는지 확인.
 
 ## WU-② 동기화 코드 보강 (v4)
 

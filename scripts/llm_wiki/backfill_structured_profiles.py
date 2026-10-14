@@ -5,8 +5,9 @@
   - 원격에 같은 local_id 행이 없으면 보내지 않는다(부분 행 INSERT 금지).
   - 원격 structured_json 이 이미 있으면 보내지 않는다. 서버측에도 structured_json=is.null 을 붙여
     계획 이후 다른 주체가 채운 행을 덮어쓰지 않는다(매치 0행이면 "쓰지 않음"으로 센다).
-  - 쓰기 1건마다 장부 2줄(intent → done|error; local_id, sha256, matched)을 남긴다.
-  - 되돌리기(--rollback)는 done·matched=1 행 중 원격 현재 값이 우리가 보낸 값과 같은(정규화 지문 일치) 행만 null 로 한다.
+  - 쓰기 1건마다 장부 2줄(intent → done|error; local_id, sha256(원문), canonical(정규화 지문), matched)을 남긴다.
+  - 되돌리기(--rollback)는 done·matched=1 행 중 원격 현재 값이 장부에 기록된 우리 값과 같은(정규화 지문 일치) 행만,
+    읽은 스냅샷의 md5 를 서버 필터(계산 칼럼 llm_wiki_structured_md5, v4 마이그레이션 20261014160000)로 붙여 null 로 한다.
   - 자격증명이 없으면 rc 2(NOT_RUN). 조용히 0건 성공으로 접지 않는다.
 사용:
   python3 scripts/llm_wiki/backfill_structured_profiles.py --db <archive.db> --env <.env.local> [--apply] [--limit N]
@@ -91,15 +92,16 @@ def apply_plan(transport, plan: Plan, ledger_path: Path, *, apply: bool) -> Appl
 
         for row in plan.to_fill:
             query = f"local_id=eq.{urllib.parse.quote(row.local_id, safe='')}&structured_json=is.null"
-            digest = hashlib.sha256(row.structured_json.encode("utf-8")).hexdigest()
+            # sha256 = 로컬 원문 지문(쓰기 당시 소유권 증거), canonical = 정규화 지문(원격 text 저장값과 대조용)
+            stamp = {"local_id": row.local_id, "sha256": _sha256(row.structured_json), "canonical": canonical_digest(row.structured_json)}
             # 쓰기 전 intent 를 먼저 남긴다. 응답을 못 받은 행은 intent 만 남아 readback 대조 대상이 된다.
-            record({"local_id": row.local_id, "sha256": digest, "phase": "intent"})
+            record({**stamp, "phase": "intent"})
             try:
                 matched = transport.patch(query, {"structured_json": json.loads(row.structured_json)})
             except Exception as exc:  # 어떤 전송 오류든 장부에 남기고 그대로 전파한다(은폐 금지)
-                record({"local_id": row.local_id, "sha256": digest, "phase": "error", "error": f"{type(exc).__name__}: {exc}"})
+                record({**stamp, "phase": "error", "error": f"{type(exc).__name__}: {exc}"})
                 raise
-            record({"local_id": row.local_id, "sha256": digest, "phase": "done", "matched": matched})
+            record({**stamp, "phase": "done", "matched": matched})
             if matched == 1:
                 result.written += 1
             else:
@@ -114,6 +116,11 @@ class RollbackResult:
     changed_elsewhere: list[str] = field(default_factory=list)
     already_null: list[str] = field(default_factory=list)
     not_ours: list[str] = field(default_factory=list)
+    local_changed: list[str] = field(default_factory=list)  # 장부 지문 ≠ 현재 로컬 원문 → 소유권을 증명 못 해 손대지 않음
+
+
+def _sha256(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def canonical_digest(text: str) -> str:
@@ -122,38 +129,58 @@ def canonical_digest(text: str) -> str:
     return hashlib.sha256(json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")).hexdigest()
 
 
-def rollback_from_ledger(transport, ledger_path: Path, local_by_id: dict[str, str], *, apply: bool) -> RollbackResult:
-    """되돌리기(Codex 2026-10-14 결함 2 반영). 장부의 done·matched=1 행만 대상으로 하고, 그중 원격 현재 값의 정규화 지문이
-    로컬(우리가 보낸) 값과 같은 행만 서버 보호 조건(structured_json=not.is.null)을 붙여 null 로 한다.
-    matched=0(경쟁 쓰기)·intent 만 남은 행(응답 유실)은 not_ours 로 보고만 한다."""
-    result = RollbackResult()
-    ours: list[str] = []
-    seen: set[str] = set()
+def _owned_from_ledger(ledger_path: Path) -> tuple[dict[str, dict], list[str]]:
+    """done·matched=1 의 첫 장부 행(쓰기 당시 지문 포함)과, 그 밖의 local_id(경쟁 쓰기·응답 유실) 목록."""
+    ours: dict[str, dict] = {}
     others: list[str] = []
     for line in ledger_path.read_text(encoding="utf-8").splitlines():
         entry = json.loads(line)
         lid = entry["local_id"]
         if entry.get("phase") == "done" and entry.get("matched") == 1:
-            if lid not in seen:
-                seen.add(lid)
-                ours.append(lid)
+            ours.setdefault(lid, entry)
         elif lid not in others:
             others.append(lid)
-    result.not_ours = [lid for lid in others if lid not in seen]
-    remote_values = transport.get_remote_values(ours) if ours else {}
-    for lid in ours:
+    return ours, [lid for lid in others if lid not in ours]
+
+
+def _expected_canonical(entry: dict, local: str | None) -> str | None:
+    """우리가 보낸 값의 정규화 지문. 신규 장부는 canonical 을 직접 갖고, 구 장부는 현재 로컬 원문의 sha256 이
+    기록값과 같을 때만 로컬 원문에서 계산한다(재추출로 바뀐 로컬 값은 소유권 증거가 아니다)."""
+    if entry.get("canonical"):
+        return entry["canonical"]
+    if local is None or _sha256(local) != entry.get("sha256"):
+        return None
+    return canonical_digest(local)
+
+
+def rollback_from_ledger(transport, ledger_path: Path, local_by_id: dict[str, str], *, apply: bool) -> RollbackResult:
+    """되돌리기(Codex 2026-10-14 1차 결함 2·2차 결함 1·2 반영).
+    - 대상: 장부 done·matched=1 행. matched=0(경쟁 쓰기)·intent 만 남은 행(응답 유실)은 not_ours 로 보고만 한다.
+    - 소유권: 장부에 기록된 쓰기 당시 지문(canonical, 또는 sha256 이 현재 로컬 원문과 일치할 때의 로컬 값)과
+      원격 현재 값의 정규화 지문이 같을 때만. 로컬이 재추출돼 지문이 다르면 local_changed.
+    - 원자성: PATCH 에 읽은 스냅샷의 md5 를 서버 필터(계산 칼럼 llm_wiki_structured_md5)로 붙여 읽기 이후의
+      경쟁 갱신은 0행 매치 → changed_elsewhere. 서버 조건 없이 null 로 쓰는 경로는 없다."""
+    result = RollbackResult()
+    ours, result.not_ours = _owned_from_ledger(ledger_path)
+    remote_values = transport.get_remote_values(list(ours)) if ours else {}
+    for lid, entry in ours.items():
         remote = remote_values.get(lid)
-        local = local_by_id.get(lid)
         if remote is None:
             result.already_null.append(lid)
             continue
-        if local is None or canonical_digest(remote) != canonical_digest(local):
+        expected = _expected_canonical(entry, local_by_id.get(lid))
+        if expected is None:
+            result.local_changed.append(lid)
+            continue
+        if canonical_digest(remote) != expected:
             result.changed_elsewhere.append(lid)
             continue
         if not apply:
             result.would_revert.append(lid)
             continue
-        query = f"local_id=eq.{urllib.parse.quote(lid, safe='')}&structured_json=not.is.null"
+        snapshot_md5 = hashlib.md5(remote.encode("utf-8")).hexdigest()
+        query = (f"local_id=eq.{urllib.parse.quote(lid, safe='')}&structured_json=not.is.null"
+                 f"&llm_wiki_structured_md5=eq.{snapshot_md5}")
         if transport.patch(query, {"structured_json": None}) == 1:
             result.reverted.append(lid)
         else:
@@ -241,7 +268,8 @@ def main(argv: list[str]) -> int:
         rb = rollback_from_ledger(transport, ledger, {r.local_id: r.structured_json for r in rows}, apply=args.apply)
         print(json.dumps({"mode": "rollback-apply" if args.apply else "rollback-dry-run", "reverted": len(rb.reverted),
                           "would_revert": len(rb.would_revert), "changed_elsewhere": len(rb.changed_elsewhere),
-                          "already_null": len(rb.already_null), "not_ours": len(rb.not_ours), "ledger": str(ledger)}, ensure_ascii=False))
+                          "already_null": len(rb.already_null), "not_ours": len(rb.not_ours),
+                          "local_changed": len(rb.local_changed), "ledger": str(ledger)}, ensure_ascii=False))
         return 0
     remote = transport.get_remote_state([r.local_id for r in rows])
     plan = plan_backfill(rows, remote)

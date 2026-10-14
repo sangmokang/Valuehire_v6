@@ -2,12 +2,12 @@
 # LLM 위키 필드 복구·감사기 인수 검사.
 # ① 단위시험(네트워크 없음) — 건너뜀(skip) 0건·최소 건수 ② 보호 조건 변조가 "기대한 시험의 단언 실패"로 빨개지는지
 #   (문법·import 오류 종료는 차단 증거로 세지 않음, 전체 출력 보존) ③ SOT 문턱 표의 필수 필드 집합.
-# 종료값 0 = PASS, 1 = FAIL. V1 2026-10-14 결함 2·6 반영.
+# 종료값 0 = PASS, 1 = FAIL. V1 2026-10-14 결함 2·6, Codex 1차·2차 적대 검토(롤백 원자성·장부 지문) 반영.
 set -u
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || { echo "VERDICT: FAIL (root 진입 실패)"; exit 1; }
 fail=0
-MIN_TESTS=45
+MIN_TESTS=49
 LOGDIR="$(mktemp -d)"
 MODULES="scripts.llm_wiki.test_backfill_structured_profiles scripts.llm_wiki.test_field_audit scripts.llm_wiki.test_anon_exposure"
 
@@ -45,7 +45,9 @@ mutate duplicate_threshold field_audit.py 's/if key in found:/if False:/' test_d
 mutate anon_exposed_pass anon_exposure_audit.py 's/elif stat.count:/elif False:/' test_exposed_count_is_fail
 mutate anon_nonzero_allow anon_exposure_audit.py 's/if raw != "0":/if False:/' test_non_zero_allowance_is_rejected
 mutate anon_bad_key_as_blocked anon_exposure_audit.py 's/ and body\.get\("code"\) == "42501":/:/' test_invalid_api_key_401_is_error_not_blocked
-mutate rollback_ignores_digest backfill_structured_profiles.py 's/if local is None or canonical_digest\(remote\) != canonical_digest\(local\):/if local is None:/' test_rollback_nulls_only_rows_we_wrote_and_still_hold_our_value
+mutate rollback_ignores_digest backfill_structured_profiles.py 's/if canonical_digest\(remote\) != expected:/if False:/' test_rollback_nulls_only_rows_we_wrote_and_still_hold_our_value
+mutate rollback_no_md5_guard backfill_structured_profiles.py 's/&llm_wiki_structured_md5=eq\.\{snapshot_md5\}//' test_rollback_patch_carries_snapshot_md5_so_write_after_read_is_kept
+mutate rollback_ignores_ledger_sha backfill_structured_profiles.py 's/if local is None or _sha256\(local\) != entry.get\("sha256"\):/if local is None:/' test_rollback_ownership_comes_from_ledger_digest_not_current_local_value
 
 # SOT 문턱 표·anon 표: 필수 집합이 그대로 있어야 한다(개수만 세지 않음).
 # V1(Codex 2026-10-14) 결함 3: 이전에는 heredoc 뒤의 </dev/null 이 stdin 을 덮어 Python 이 빈 프로그램을 실행했다(항상 PASS).

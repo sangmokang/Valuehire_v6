@@ -63,7 +63,7 @@ LLM 위키는 새 저장소가 아니다. 운영 Supabase(v4 프로젝트)의 �
 | # | 작업 | 선행 조건 | 도구 | 되돌리기 |
 |---|---|---|---|---|
 | ⓪ | **익명(anon) 읽기 차단** — `profile_archives`·`gmail_messages`·`pipeline_candidates_active`(뷰) | 운영 권한 변경 승인 | 마이그레이션(RLS/`security_invoker`/GRANT 회수) + HTTP 재검증 | 마이그레이션 down |
-| ① | `profile_archives.structured_json` 12,932건 채움 | ⓪ 완료, HTTP 로 anon 0건 확인 | `backfill_structured_profiles.py --apply` | `--rollback --apply`: 장부 `done·matched=1` 행 중 **원격 현재 값의 정규화 지문이 우리가 보낸 값과 같은 행만** null. 경쟁 쓰기(`matched=0`)·응답 유실(`intent`만) 행은 손대지 않고 보고 |
+| ① | `profile_archives.structured_json` 12,932건 채움 | ⓪ 완료, HTTP 로 anon 0건 확인 | `backfill_structured_profiles.py --apply` | `--rollback --apply`: 장부 `done·matched=1` 행 중 **원격 현재 값의 정규화 지문이 장부에 기록된 우리 값과 같은 행만**, 읽은 스냅샷의 md5 를 서버 필터(계산 칼럼 `llm_wiki_structured_md5`, v4 마이그레이션 20261014160000)로 붙여 null. 경쟁 쓰기(`matched=0`)·응답 유실(`intent`만)·로컬 재추출로 장부 지문과 달라진 행(`local_changed`)은 손대지 않고 보고 |
 | ② | 아카이버 동기화에 `structured_json`·`career_companies_json`·`salary_man` 추가 | ① 과 같은 PR 권장 | v4 `tools/profile-archiver/server/index.js` `syncToSupabase` | 코드 revert |
 | ③ | `gmail_derived_events` → 후보·포지션 연결 | 식별 규칙 §3 | 신규 goal | 연결 컬럼 null |
 | ④ | `pipeline_stage_history` 를 ClickUp 미러에서도 기록 + `on delete cascade` 제거 | 신규 goal | v4 미러·마이그레이션 | — |
@@ -72,8 +72,8 @@ LLM 위키는 새 저장소가 아니다. 운영 Supabase(v4 프로젝트)의 �
 
 ## 6. 유지보수 — 다음 세션이 할 일
 
-1. `python3 -m unittest scripts.llm_wiki.test_backfill_structured_profiles scripts.llm_wiki.test_field_audit scripts.llm_wiki.test_anon_exposure`(45건, skip 0)가 CI(`bash scripts/acceptance-llm-wiki-fields.sh`)에서 돈다. 보호 조건 변조 10종(서버 is.null 제거·원격 부재 행 채움·0건 통과·HTTP 오류 은폐·해시 검사 삭제·문턱 중복 허용·anon 노출 통과·0 아닌 허용값·무효 키를 차단으로 계수·지문 무시 롤백)은 **기대한 시험 이름의 단언 실패**로만 차단으로 인정하고, 문법·import 오류 종료는 불합격이다. SOT 검사기는 양성(원본)·음성(필수 행 삭제·백틱 변조) 한 쌍으로 자기 생존을 증명한다.
-1-b. 복구 장부는 쓰기당 `intent → done|error` 2줄이다. `intent`만 남은 `local_id`는 응답을 잃은 행이므로 `structured_json=not.is.null` readback 으로 대조한 뒤 재시도·되돌리기를 정한다. **장부의 `local_id` 를 일괄 null 로 되돌리지 않는다** — 다른 주체가 그 사이 쓴 값을 지운다. 되돌리기는 `--rollback`(지문 일치 행만)으로만 한다.
+1. `python3 -m unittest scripts.llm_wiki.test_backfill_structured_profiles scripts.llm_wiki.test_field_audit scripts.llm_wiki.test_anon_exposure`(49건, skip 0)가 CI(`bash scripts/acceptance-llm-wiki-fields.sh`)에서 돈다. 보호 조건 변조 12종(서버 is.null 제거·원격 부재 행 채움·0건 통과·HTTP 오류 은폐·해시 검사 삭제·문턱 중복 허용·anon 노출 통과·0 아닌 허용값·무효 키를 차단으로 계수·지문 무시 롤백·스냅샷 md5 필터 제거·장부 sha256 무시)은 **기대한 시험 이름의 단언 실패**로만 차단으로 인정하고, 문법·import 오류 종료는 불합격이다. SOT 검사기는 양성(원본)·음성(필수 행 삭제·백틱 변조) 한 쌍으로 자기 생존을 증명한다.
+1-b. 복구 장부는 쓰기당 `intent → done|error` 2줄이다. `intent`만 남은 `local_id`는 응답을 잃은 행이므로 `structured_json=not.is.null` readback 으로 대조한 뒤 재시도·되돌리기를 정한다. **장부의 `local_id` 를 일괄 null 로 되돌리지 않는다** — 다른 주체가 그 사이 쓴 값을 지운다. 되돌리기는 `--rollback`(지문 일치 행만)으로만 한다. 소유권의 근거는 **장부에 기록된 쓰기 당시 지문**(`canonical`, 구 장부는 `sha256` 이 현재 로컬 원문과 일치할 때만)이지 "지금 로컬 값"이 아니며, PATCH 는 읽은 스냅샷의 md5 를 서버 필터로 붙여 읽기와 쓰기 사이의 경쟁 갱신을 지우지 않는다(Codex 2차 2026-10-14).
 1-c. anon 감사기는 먼저 anon 키가 인증을 통과하는지(탐침 객체에 2xx 또는 권한 거부 42501; "Invalid API key" 401 이면 NOT_RUN) 양성 대조군을 확인하고, 권한 거부(Postgres `42501`) 응답만 차단으로 센다. 무효 키의 401 은 NOT_RUN 이다. §4-b 표는 머리글 아래 모든 행이 `| 식별자 | 0 |` 이어야 하며 필수 7객체가 빠지면 정본 오류로 거부된다.
 1-d. `pipeline_candidates_active`·`_archive` 뷰를 재정의할 때는 반드시 `with (security_invoker = true)` 를 붙인다. 옵션 없이 `create or replace view` 하면 옵션이 사라진다. anon 의 뷰 SELECT grant 는 회수돼 있어(2026-10-14 후속 마이그레이션) 옵션이 사라져도 anon 은 막히지만, 로그인 사용자의 테넌트 격리는 옵션에 의존한다.
 2. 복구를 한 번 돌릴 때마다 `field_audit.py` 를 실행해 출력 전체를 `docs/engineering/evidence/` 에 날짜로 남기고 §4 하한을 올린다.
