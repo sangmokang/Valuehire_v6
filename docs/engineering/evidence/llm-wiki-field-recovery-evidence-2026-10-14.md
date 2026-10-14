@@ -414,3 +414,36 @@ readback: structured_json=not.is.null&local_id=in.(7개) → content-range: 0-6/
 전체 structured_json not null: 0-520/521 (적용 전 514 + 7)
 ```
 → `--limit` 은 로컬 앞 10행을 자르므로 그중 내용 없는 3건은 규약대로 제외됐다. 쓴 7건 전부 원격에서 읽힌다.
+
+## O. Codex 적대 검토(`/codex:adversarial-review`, 13:55 시작, 14:0x 완료) — 원문은 `private-reviews/llm-wiki/codex-adv-{v6,v4}-20261014.md`
+
+| 대상 | Verdict | 결함 | 심각도 | 재현(제가 확인) | 조치 |
+|---|---|---|---|---|---|
+| v6 도구 | needs-attention | 무효 anon 키의 401 을 차단 성공(0건)으로 센다 | high | 재현: bogus 키로 감사 → 7객체 0건 PASS | 키 양성 대조군 + `42501` 만 차단 계수 + HEAD 무본문은 GET 재조회. 무효 키 → NOT_RUN rc 2 (14:10 실측) |
+| v6 도구 | | 장부 local_id 일괄 롤백이 경쟁 쓰기 값을 지운다 | high | 재현: `matched=0` 행도 `done` 으로 기록됨 | `--rollback`: done·matched=1 행 중 정규화 지문 일치 행만 null. SOT §5 ①·§6 1-b 갱신 |
+| v6 도구 | | 인수 검사의 SOT 검사기가 heredoc 뒤 `</dev/null` 때문에 빈 프로그램을 실행(항상 PASS) | medium | 재현: 본문에 `raise` 를 넣어도 PASS | `</dev/null` 을 명령 밖으로 옮기고 음성 대조군 3종(필수 필드 삭제·anon 행 백틱·anon 행 삭제) 추가 |
+| v6 도구 | | §4-b 행 형식이 깨지면 조용히 검사 대상에서 빠진다 | medium | 재현: 백틱 행 → 6객체 PASS | 표 머리글 아래 전 행 엄격 파싱, 필수 7객체 집합 검사 |
+| v4 마이그레이션 | needs-attention | B2C 가입 authenticated 세션이 자료형 뷰 전체 이력을 직접 읽는다 | high | 재현: 역할 시뮬레이션 authenticated(외부) uchv=34036 (M-6) | 후속 마이그레이션 `20261014150000` 으로 authenticated grant 회수 → 외부·구성원 모두 42501, 읽기 코드는 service_role 뿐 |
+| v4 마이그레이션 | | 뷰 재정의 시 `security_invoker` 가 사라져 anon 재노출 | medium | 정적 확인(phase1 schema 의 `create or replace view` 에 옵션 없음) | 두 뷰의 anon grant 회수(두 겹) + SOT §6 1-d 에 재정의 규칙 |
+| v4 마이그레이션 | | `candidates` 테이블이 없는 환경에서 전체 트랜잭션 롤백 | medium | 운영엔 존재(308건). v4 에 로컬 DB·테스트 DB 없음 | **수용(미수정)**: 그 환경에서는 통째로 실패해 멈추므로(fail-closed) 조용한 부분 적용보다 낫다. 적용된 파일은 바꾸지 않는다 |
+
+### O-1. 후속 마이그레이션 적용 (14:05:19)
+```
+== 적용 == []  HTTP 201
+== 장부 == [{"version":"20261014150000"}]
+ACL: pipeline_candidates_active/_archive {postgres,authenticated,service_role} / unified_candidate_history_view {postgres,service_role}
+authenticated(@valueconnect.kr) → matview: ERROR 42501 permission denied
+authenticated(외부) → 두 뷰: a=0 b=0
+anon → pipeline_candidates_active: ERROR 42501 permission denied for view
+service: unified_candidate_history_view */34036, pipeline_candidates_active */21771, pipeline_candidates_archive */1142
+```
+→ 자료형 뷰는 이제 service_role 만 읽는다(앱의 유일한 읽기 경로 `app/api/admin/candidate-timeline/route.ts` 가 service 키). v4 커밋 88e45deb.
+
+### O-2. 재검증 (14:10:47)
+```
+Ran 45 tests OK (skip 0)
+acceptance: UNIT 45 / MUTATION 10종 전부 "기대 시험 실패로 차단" / SOT_THRESHOLDS PASS / SOT_NEGATIVE 3종 차단 / VERDICT: PASS
+운영 anon 감사: anon key probe: authenticated (probe=profile_archives) → 7객체 count=0 → VERDICT PASS rc=0
+무효 키: VERDICT NOT_RUN rc=2 ("Invalid API key")
+```
+RED f8ce20f → GREEN (다음 커밋). 중간에 잡힌 제 실수 2건: ① 탐침을 `/rest/v1/` 로 두었더니 Supabase 가 anon 키에 401 을 돌려 정상 키도 NOT_RUN(14:08) → 탐침을 첫 객체로 변경. ② HEAD 401 엔 본문이 없어 뷰 3개가 "조회 오류"(14:09) → GET 재조회로 분류. 둘 다 운영에서 실측으로 잡혔다.
