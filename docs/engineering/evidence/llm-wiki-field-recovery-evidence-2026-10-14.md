@@ -320,3 +320,97 @@ VERDICT: PASS
 
 ## L. 2차 게이트 (12:21:46)
 verify.sh rc 0 PASS / silent-failure-lint rc 0 PASS / run-acceptance 래퍼 rc 0 판정 11건 / bash -n OK
+
+## M. WU-⓪ anon 읽기 차단 (사장님 승인 2026-10-14 13:4x "네, anon 차단부터 순서대로 진행해")
+
+### M-1. 적용 전 재측정 (13:45:48, anon 키 HEAD, 값 미조회)
+```
+anon profile_archives: 206 content-range: */21651
+anon gmail_messages: 206 content-range: */35506
+anon pipeline_candidates_active: 206 content-range: */21771
+anon pipeline_candidates: 200 content-range: */0
+anon pipeline_candidates_archive: HTTP/2 206  content-range: */1142
+anon unified_candidate_history_view: HTTP/2 206  content-range: */34036
+anon gmail_sync_state: HTTP/2 206  content-range: */76
+anon candidates: HTTP/2 206  content-range: */308
+anon sourcing_results / gmail_derived_events / customer_ontology_documents: 200 */0
+```
+→ 승인 대상 3개 외에 같은 종류 노출 4개(archive 뷰·자료형 뷰·구 잡코리아 candidates·Gmail 동기화 상태)를 추가로 확인. 전부 한 마이그레이션에 포함했다(범위 확장, 보고서에 명시).
+
+### M-2. 원인 조회 (관리 API `POST /v1/projects/sjld…/database/query`, 읽기 전용, 13:47)
+```
+candidates                      r  rls=false policies=null   grants: anon ALL
+gmail_messages                  r  rls=false policies=null   grants: anon ALL
+gmail_sync_state                r  rls=false policies=null   grants: anon ALL
+pipeline_candidates             r  rls=true  policies: candidates_select_own_auth_user:{authenticated}:SELECT ; valueconnect_members_read_pipeline_candidates:{authenticated}:SELECT ; service_all_candidates:{service_role}:ALL
+pipeline_candidates_active      v  reloptions=null (security_invoker 없음)
+pipeline_candidates_archive     v  reloptions=null
+profile_archives                r  rls=true  policies: service_all_profile_archives:{public}:ALL qual=true with_check=null
+unified_candidate_history_view  m  relacl: anon=arwdDxtm/postgres
+```
+→ `profile_archives` 는 RLS 가 **켜져 있었다**(goal 3층의 "RLS 자체가 없다"는 마이그레이션 파일 기준 서술이며 운영과 다름 — 정정). 뚫린 이유는 역할 `public` 에 ALL 을 주는 정책이 마이그레이션 밖에서 만들어졌기 때문(`git log --all -S service_all_profile_archives` 0건). Gmail 두 테이블과 candidates 는 RLS 꺼짐 + 기본 grant. 두 뷰는 `security_invoker` 없음. 자료형 뷰는 anon 에 grant.
+
+### M-3. 역할 시뮬레이션 (관리 API 트랜잭션 안에서 `set local role` + `request.jwt.claims`, 적용 전 13:49)
+```
+anon:                         pa=21651 gm=35506 pca=21771 pc=0 uchv=34036 cand=308
+authenticated(@valueconnect.kr): pa=21651 pc=21771 pca=21771
+authenticated(x@example.com):    pa=21651 pc=0     pca=21771
+```
+→ 외부 도메인 로그인 사용자도 프로필 전체와 활성 후보 뷰를 읽을 수 있었다(기본 테이블은 0 — 뷰가 RLS 우회).
+
+### M-4. 마이그레이션 사전 검증 (13:52:25, `commit;`→`rollback;` 치환 후 실행)
+```
+[]  HTTP 201
+profile_archives content-range: */21651   (롤백 뒤 불변)
+```
+### M-5. 적용 (13:53:15~17)
+```
+== 적용 == []  HTTP 201
+== 마이그레이션 장부 기록 == [{"version":"20261014140000","name":"llm_wiki_anon_lockdown"}]  HTTP 201
+supabase migration list --linked:  20261014140000 | 20261014140000 | 2026-10-14 14:00:00
+```
+→ v4 워크트리 `task/llm-wiki-anon-lockdown` 커밋 06a65482 의 SQL 을 그대로 실행했고 CLI 장부에도 같은 버전이 양쪽에 보인다. 로컬에만 있는 0928 두 건과 원격에만 있는 4건(0726100000·0901×3)의 기존 드리프트는 손대지 않았다.
+
+### M-6. 적용 후 (13:53:23~)
+```
+$ python3 scripts/llm_wiki/anon_exposure_audit.py --env ~/Desktop/Valuehire_v4/.env.local
+anon profile_archives                 count=0
+anon gmail_messages                   count=0
+anon gmail_sync_state                 count=0
+anon candidates                       count=0
+anon pipeline_candidates_active       count=0
+anon pipeline_candidates_archive      count=0
+anon unified_candidate_history_view   count=0
+{"VERDICT": "PASS", "failures": []}        rc=0   (적용 전 같은 명령: VERDICT FAIL 7건, rc=1)
+
+service 키: profile_archives */21651, gmail_messages */35506, gmail_sync_state */76, candidates */308, pipeline_candidates_active */21771, pipeline_candidates_archive */1142, unified_candidate_history_view */34036   (전부 불변)
+anon 키 HTTP: profile_archives 200(0행), unified_candidate_history_view 401
+역할 시뮬레이션: anon 전부 0 / authenticated(@valueconnect.kr) pa=21651 gm=35506 gss=76 cand=308 pc=21771 pca=21771 pcar=1142 uchv=34036 / authenticated(외부) 전부 0
+anon → matview: ERROR 42501 permission denied for materialized view
+정책: 4테이블 × (tenant_read_*:{authenticated}:SELECT, tenant_service_all_*:{service_role}:ALL); 두 뷰 reloptions=["security_invoker=true"]
+```
+→ 음성 대조군(anon·외부 로그인) 0, 양성 대조군(service·구성원 로그인) 불변. WU-⓪ GREEN.
+
+### M-7. 인수 검사 (13:52:52, anon 감사기 추가 후)
+```
+UNIT: PASS ran=36 / UNIT_COUNT: PASS ran=36 / UNIT_SKIP: PASS skipped=0
+MUTATION[is_null_guard|absent_row_fill|zero_total_pass|swallow_http_error|drop_hash_check|duplicate_threshold|anon_exposed_pass|anon_nonzero_allow]: PASS (8종 전부 기대 시험 실패로 차단)
+SOT_THRESHOLDS: PASS
+VERDICT: PASS
+```
+RED 커밋 ec820cc(11건 중 8 FAIL·1 ERROR, import 오류 0) → GREEN fd33340.
+
+## N. WU-① 구조화 프로필 업서트
+
+### N-1. dry-run 재확인 (13:54:07)
+```
+{"mode": "dry-run", "local_rows": 13633, "remote_rows_found": 13633, "to_fill": 12932, "skipped_absent": 0, "skipped_filled": 33, "skipped_invalid": 668, "written": 0, "unmatched": 0}
+```
+### N-2. 표본 적용 (13:54:21, `--apply --limit 10`)
+```
+{"mode": "apply", "local_rows": 10, "remote_rows_found": 10, "to_fill": 7, "skipped_absent": 0, "skipped_filled": 0, "skipped_invalid": 3, "written": 7, "unmatched": 0}
+장부 14줄 = intent 7 + done 7, matched==1 7건, distinct local_id 7
+readback: structured_json=not.is.null&local_id=in.(7개) → content-range: 0-6/7
+전체 structured_json not null: 0-520/521 (적용 전 514 + 7)
+```
+→ `--limit` 은 로컬 앞 10행을 자르므로 그중 내용 없는 3건은 규약대로 제외됐다. 쓴 7건 전부 원격에서 읽힌다.
