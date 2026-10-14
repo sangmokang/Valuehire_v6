@@ -298,3 +298,25 @@ sourcing_results.fit_reason total=1436 null=191 filled=86.7%
 
 ## H. 인수 검사 (11:55:45) bash scripts/acceptance-llm-wiki-fields.sh
 UNIT: PASS ran=14 / UNIT_COUNT: PASS ran=14 / MUTATION[is_null_guard]: PASS / MUTATION[zero_total_pass]: PASS / SOT_THRESHOLDS: PASS / VERDICT: PASS rc=0
+
+## I. 2차 dry-run (12:20:43, V1 결함 5 반영 규약)
+{"mode": "dry-run", "local_rows": 13633, "remote_rows_found": 13633, "to_fill": 12932, "skipped_absent": 0, "skipped_filled": 33, "skipped_invalid": 668, "written": 0, "unmatched": 0}
+
+## J. 인수 검사 2차 (12:20:17)
+UNIT: PASS ran=25
+UNIT_COUNT: PASS ran=25
+UNIT_SKIP: PASS skipped=0
+MUTATION[is_null_guard]: PASS (test_apply_guards_every_write_with_is_null_and_writes_ledger 실패로 차단)
+MUTATION[absent_row_fill]: PASS (test_selects_only_present_and_empty_remote_rows 실패로 차단)
+MUTATION[zero_total_pass]: PASS (test_zero_total_is_fail_not_pass 실패로 차단)
+MUTATION[swallow_http_error]: PASS (test_intent_is_written_before_patch_and_error_is_recorded 실패로 차단)
+MUTATION[drop_hash_check]: PASS (test_non_string_or_empty_hash_is_invalid 실패로 차단)
+MUTATION[duplicate_threshold]: PASS (test_duplicate_field_row_is_rejected 실패로 차단)
+SOT_THRESHOLDS: PASS
+VERDICT: PASS
+
+## K. 규약 미달 668건 사유 (12:21, 로컬 SQLite 분류, 값 출력 없음)
+전부 all_content_null(_meta 외 모든 값이 null — 추출 실패 객체): linkedin_recruiter 310, linkedin_recruiter_search 163, other 89, linkedin 48, saramin 38, jobkorea 10, saramin_hiring 6, jobkorea_corp 3, outstanding 1
+
+## L. 2차 게이트 (12:21:46)
+verify.sh rc 0 PASS / silent-failure-lint rc 0 PASS / run-acceptance 래퍼 rc 0 판정 11건 / bash -n OK

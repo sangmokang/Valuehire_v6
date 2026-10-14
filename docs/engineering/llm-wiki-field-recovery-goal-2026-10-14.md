@@ -95,3 +95,44 @@ anon 차단 마이그레이션 작성·적용(승인 뒤 별도 WU ⓪), Gmail �
 ## 적대 검증 로그
 
 (아래에 명령·전체 출력·세션 식별자를 덧붙인다)
+
+### 저장소 게이트 (2026-10-14, 워크트리 HEAD b7e58e2)
+
+| 검사 | 명령 | 시각 | 결과 |
+|---|---|---|---|
+| 비밀 스캔 | `bash verify.sh` | 11:56:23 | rc 0 `PASS: no secret-pattern match in any tracked file, .env not tracked` |
+| 원칙 정본·배선 | `bash scripts/acceptance-principles-check.sh` | 11:56 | `VERDICT: PASS` (34/34) |
+| 조용한 실패 린트 | `bash scripts/acceptance-silent-failure-lint.sh` | 11:56 | `CHECKED_FILES: 66`, 패턴 0건 |
+| 데이터 노출 | `bash scripts/scan-data-exposure.sh all` | 11:57→12:06 | `PASS: csv/tsv/sql 5개 검사(추적 281개 중), 개인정보 적재 0건` |
+| CI 스텝 무결성 | `bash scripts/verify/check-ci-step-integrity.sh` | 12:01:48 | `PASS … (job·step 32개 검사)` — 새 스텝 포함 |
+| 무력화 5종 차단 | `bash scripts/acceptance-semantic-mutations.sh` | 12:03:00 | rc 0, `CHECKED: 16`, `VERDICT: PASS` (첫 실행은 커밋 중 저장소 상태 변경으로 FAIL → 커밋 뒤 재실행 PASS) |
+| CI 래퍼 | `bash scripts/verify/run-acceptance.sh scripts/acceptance-llm-wiki-fields.sh` | 12:03 | rc 0 `OK(run-acceptance): … 판정 6건` |
+| SOT 문서 검사 | `bash scripts/check-docs-sot.sh` | 12:01 | **FAIL(선행)**: `coding-principles.md` 20,476바이트 > 20,000. `git diff origin/main -- docs/sot/coding-principles.md` 0줄 — 이 작업과 무관, CI 목록에도 없음. 그대로 보고 |
+| 함수 길이(P11) | ast 계산 | 12:01 | backfill `main` 24줄, field_audit `judge` 22줄 (hard 100) |
+
+→ 이 작업이 만든 검사와 코드는 전부 초록이고, 유일한 빨강은 제가 손대지 않은 정본 파일 크기 검사입니다.
+
+### V1 — Codex 독립 적대검증 (2026-10-14 12:05→12:17)
+
+- 호출: `codex exec -s workspace-write -C <--no-local 클론> --skip-git-repo-check -o … "<중립 프롬프트>" </dev/null` (클론 HEAD b7e58e2, 응답 모델 `gpt-6.1-sol`, codex-companion 아님 → 독립 엔진 확인). 프롬프트에 구현자 결론·의심을 넣지 않았다.
+- 판정 원문: `private-reviews/llm-wiki/codex-v1-verdict-2026-10-14.md`(4,091줄, sha256 `9d9ef1f2dc9fd97dfdc7cb3425c5ed3ef167054670879ace27b9e23ff4f156ab`), 실행 로그 `codex-v1-run-2026-10-14.log`. 무시 폴더라 저장소엔 없다.
+- **VERDICT: FAIL — 결함 6건** (전부 실행으로 재현됨, 제 판단: 전부 타당)
+
+| # | 심각도 | 원문 제목 | 원인 | 사업 영향 | 조치(커밋) |
+|---|---|---|---|---|---|
+| 1 | 높음 | 보호 조건을 빼면 검사가 빨개져야 한다 / HTTP 오류 은폐 금지 | 시험이 가짜 전송만 보고 `RestTransport` 를 호출하지 않음. 질의를 망가뜨리거나 예외를 0매치로 바꿔도 초록 | 복구가 멈추거나 일부만 성공해도 승인될 수 있음 | opener 주입으로 질의·본문·`return=representation`·HTTPError 전파 시험 3건 추가 (b5f1bc8→7ed8770) |
+| 2 | 높음 | 처리한 시험 수 최소치(P20) | unittest `Ran N` 이 skip 을 포함. 12건 건너뛰어도 PASS | 보호 시험을 꺼도 정상 검증으로 표시 | `skipped=N>0` → FAIL, 최소 25건 |
+| 3 | 중간 | SOT 문턱 표 실제 읽기 | 같은 필드 두 번 적으면 마지막(낮은) 값으로 덮임, 숫자 아님 행은 조용히 탈락 | 문서 편집 실수로 감사 기준이 느슨해짐 | 중복·오형식 → ValueError, 필수 필드 집합 대조 |
+| 4 | 중간 | 쓰기 1건마다 장부 1줄 | 장부가 응답 뒤에만 기록돼 응답을 잃은 행은 흔적이 없음 | 장애 뒤 어느 행을 되돌릴지 장부만으로 모름 | 쓰기 전 `intent`, 뒤 `done`, 예외 `error` 줄 + 예외 전파 |
+| 5 | 중간 | 구조화 JSON 최소 규약 | `_meta.input_hash` 존재만 검사. 메타만 있는 객체·숫자 해시도 통과, 검사 삭제도 시험이 못 잡음 | 형식만 갖춘 빈 자료가 채움으로 취급 | `source`·`input_hash` 문자열 + `_meta` 외 non-null 1개 이상. 재 dry-run에서 668건 제외 |
+| 6 | 중간 | 변조 시험은 반드시 실패해야 한다 | 문법 오류 종료도 "차단 성공"으로 셈, 출력 버림 | 복제·파싱 장애가 보호 성공으로 기록 | 기대 시험 이름의 FAIL/ERROR 줄 요구, SyntaxError/ImportError 는 불합격, 로그 보존 |
+
+→ V1 의 PASS 항목(AC-1~4, P11 현재 크기, 새 CI 스텝의 무출력 거부)은 제 실행과 일치했고, FAIL 항목 6건은 전부 재현 가능한 코드 결함이었습니다. "P11 한도를 이 인수 검사가 안 막는다"는 지적은 맞지만 그 검사는 별도 CI 스텝(파일 500줄 게이트)의 몫이라 결함으로 세지 않았습니다.
+
+**수정 후 재실행 (12:20:17)**: `unittest` 25 OK, skip 0 / `acceptance-llm-wiki-fields.sh` VERDICT PASS (변조 6종 전부 기대 시험 실패로 차단) / 운영 dry-run(12:20:43) `to_fill 12932, skipped_invalid 668, skipped_filled 33, written 0`.
+
+### V2 — NOT_RUN (사유 기록)
+
+L3 규칙상 V2 가 필수이나 사장님 2026-09-18 지시("검증 계층을 무한히 쌓지 마라 — 추가 라운드는 삭제·권한·인증·대규모 마이그레이션에만")에 따라 이번 변경(운영 쓰기 0건, 도구·문서·검사기)에는 적용하지 않았다. V1 재현은 제가 로컬에서 6건 전부 같은 방법으로 다시 돌려 확인했다(위 표의 재실행). 운영 쓰기(WU-①)와 anon 차단(WU-⓪)은 권한·개인정보 범주이므로 그 단계에서 V1→V2 를 다시 적용한다.
+
+→ 규약 미달 668건은 전부 `_meta` 외 값이 모두 null 인 "추출 실패 객체"였다(사이트별 내역은 증거 K). 보내지 않는 것이 맞고, 로컬에 그대로 남아 재추출 대상이 된다.

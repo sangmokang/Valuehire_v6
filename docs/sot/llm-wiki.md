@@ -58,7 +58,8 @@ LLM 위키는 새 저장소가 아니다. 운영 Supabase(v4 프로젝트)의 �
 
 ## 6. 유지보수 — 다음 세션이 할 일
 
-1. `python3 -m unittest scripts.llm_wiki.test_backfill_structured_profiles scripts.llm_wiki.test_field_audit` 가 CI(`bash scripts/acceptance-llm-wiki-fields.sh`)에서 돈다. 보호 조건을 빼면 빨개져야 한다(검사기 자체의 변조 시험 포함).
+1. `python3 -m unittest scripts.llm_wiki.test_backfill_structured_profiles scripts.llm_wiki.test_field_audit`(25건, skip 0)가 CI(`bash scripts/acceptance-llm-wiki-fields.sh`)에서 돈다. 보호 조건 변조 6종(서버 is.null 제거·원격 부재 행 채움·0건 통과·HTTP 오류 은폐·해시 검사 삭제·문턱 중복 허용)은 **기대한 시험 이름의 단언 실패**로만 차단으로 인정하고, 문법·import 오류 종료는 불합격이다.
+1-b. 복구 장부는 쓰기당 `intent → done|error` 2줄이다. `intent`만 남은 `local_id`는 응답을 잃은 행이므로 `structured_json=not.is.null` readback 으로 대조한 뒤 재시도·되돌리기를 정한다.
 2. 복구를 한 번 돌릴 때마다 `field_audit.py` 를 실행해 출력 전체를 `docs/engineering/evidence/` 에 날짜로 남기고 §4 하한을 올린다.
 3. 새 필드를 위키에 쓰려면 §2 표에 정본·쓰기 주체를 먼저 적고 §4 에 하한을 넣는다. 표에 없는 필드는 위키 필드가 아니다.
 4. 이 문서는 `docs/sot/INDEX.md` 에 등재된다. 스크립트가 참조하는 유일한 답이므로 `docs/engineering/` 로 내리지 않는다.
