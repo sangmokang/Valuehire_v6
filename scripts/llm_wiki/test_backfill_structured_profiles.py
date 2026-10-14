@@ -88,9 +88,10 @@ class ApplyTests(unittest.TestCase):
             self.assertIn("structured_json=is.null", url_query)
             self.assertEqual(set(body), {"structured_json"})
         lines = [json.loads(l) for l in self.ledger.read_text().splitlines()]
-        self.assertEqual(len(lines), 2)
-        self.assertEqual({l["local_id"] for l in lines}, {"a", "b"})
-        self.assertTrue(all(len(l["sha256"]) == 64 and l["matched"] == 1 for l in lines))
+        done = [l for l in lines if l["phase"] == "done"]
+        self.assertEqual(len(done), 2)  # 쓰기 1건 = intent 1줄 + done 1줄
+        self.assertEqual({l["local_id"] for l in done}, {"a", "b"})
+        self.assertTrue(all(len(l["sha256"]) == 64 and l["matched"] == 1 for l in done))
         self.assertEqual(result.written, 2)
 
     def test_apply_reports_zero_match_as_not_written(self):
@@ -110,6 +111,7 @@ class LedgerDurabilityTests(unittest.TestCase):
         class Boom(FakeTransport):
             def patch(self, url_query, body):
                 if "local_id=eq.b" in url_query:
+                    self.writes.append((url_query, body))  # 시도는 했으나 응답을 잃은 경우
                     raise OSError("connection lost")
                 return super().patch(url_query, body)
 
