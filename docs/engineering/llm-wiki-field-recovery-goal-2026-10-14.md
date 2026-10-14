@@ -11,7 +11,7 @@
 - Codex 적대 검토(`/codex:adversarial-review`) 2건: v6 도구 결함 4건·v4 마이그레이션 결함 3건 → 6건 수정, 1건 수용(사유 기록). 재검증 통과.
 - **push 직전 Codex 적대 검토 2차(19:08→19:27, 사장님 지시 "적대 검증 거쳐서 push·PR")**: v6 3건(되돌리기가 읽기 뒤 경쟁 쓰기를 지움 high·장부 지문 대신 현재 로컬 값으로 소유권 판정 high·실행 프롬프트의 폐기된 일괄 null 지시 medium)·v4 2건(두 뷰 authenticated 권한 잔존으로 옵션 없는 재정의 시 외부 로그인 전체 조회 high·되돌리기 역순 보호 없음 medium) → **5건 전부 수정**. 되돌리기는 이제 장부에 기록된 쓰기 당시 지문으로 소유권을 가리고, 읽은 값의 md5 를 서버 필터(v4 마이그레이션 20261014160000 의 계산 칼럼)로 붙여 한 UPDATE 안에서 대조한다. 160000 은 19:39:33 운영 적용·검증 완료(V1-3 표).
 - 다른 세션이 같은 날 같은 주제의 감사 문서 3개를 먼저 만들었다(미커밋). 중복 제작하지 않고 참조했다.
-- 사장님이 결정할 것: ① v6 `task/llm-wiki-field-recovery`·v4 `task/llm-wiki-anon-lockdown` push·PR 승인 ② WU-②(아카이버 동기화 코드)를 Codex 에 넘길지 — 프롬프트는 `goal-prompts/llm-wiki-wu2-archiver-sync-codex-2026-10-14.md`.
+- ~~사장님이 결정할 것: ① push·PR 승인 ② WU-② 를 Codex 에 넘길지~~ → **둘 다 결정됨(19:0x 지시 "적대 검증 후 push·PR 진행해", WU-② 는 사장님이 직접 Codex 로 진행)**. 2차 적대 검토 반영 뒤 v4 PR #799(CI 초록)·v6 PR #137 을 열었다(검증 장부 끝 3행). 남은 결정은 두 PR 의 **병합 승인** 하나다. 병합은 운영 DB 를 바꾸지 않는다(이미 적용된 변경의 보존).
 
 ## 2층 판단 근거
 
@@ -80,7 +80,7 @@ counter-AC: 시험이 FakeTransport만 보고 실제 PostgREST 질의 문법을 
 
 ## 배송 상태
 
-`PRODUCTION_VERIFIED`(DB 권한 변경·데이터 채움에 한함). 운영 URL: Supabase 프로젝트 `sjld…`(v4). 적용 SHA: v4 `06a65482`·`88e45deb`·`f83f4a14` 의 SQL 을 관리 API 로 실행, `schema_migrations` 20261014140000·20261014150000·20261014160000. readback: anon 감사기 PASS·역할 시뮬레이션·service 키 건수 불변·표본 7건 readback 7/7. 롤백: `supabase/rollback/*.down.sql`(미실행). 제품 화면 변경 없음(SKELETON 해당 없음). `BUSINESS_USED` 는 주장하지 않는다. push·PR 은 승인 뒤 수동.
+`PRODUCTION_VERIFIED`(DB 권한 변경·데이터 채움에 한함). 운영 URL: Supabase 프로젝트 `sjld…`(v4). 적용 SHA: v4 `06a65482`·`88e45deb`·`f83f4a14` 의 SQL 을 관리 API 로 실행, `schema_migrations` 20261014140000·20261014150000·20261014160000. readback: anon 감사기 PASS·역할 시뮬레이션·service 키 건수 불변·표본 7건 readback 7/7. 롤백: `supabase/rollback/*.down.sql`(미실행). 제품 화면 변경 없음(SKELETON 해당 없음). `BUSINESS_USED` 는 주장하지 않는다. push·PR 은 승인(19:0x) 뒤 수동 실행: v4 `task/llm-wiki-anon-lockdown` → PR #799(CI 초록), v6 `task/llm-wiki-field-recovery` 97226c7 → PR #137(2026-10-14 23:07, 원격 본문 §8-8 5절 재확인). 병합은 사장님 승인 뒤.
 
 ## 검증 장부 (T)
 
@@ -125,6 +125,9 @@ counter-AC: 시험이 FakeTransport만 보고 실제 PostgREST 질의 문법을 
 | v4 160000 적용 | 관리 API query + schema_migrations 기록 | 19:39:33 / 19:39:34 | `[]` / version 반환 | PASS, 커밋 f83f4a14 |
 | 160000 검증 | ACL·함수 속성·역할 시뮬레이션·REST 계산 칼럼·틀린 md5 PATCH·anon | 19:39:53→19:40:33 | 외부 authenticated 두 뷰 42501, valueconnect authenticated profile_archives 21651, 틀린 md5 0행·행 유지, anon 42501 | PASS (증거 R-3) |
 | 롤백 dry-run(새 로직) | `--rollback` 실제 장부·archive.db | 19:40:10 | 0, would_revert 12932, local_changed 0, changed_elsewhere 0 | PASS |
+| 저장소 게이트(3차, HEAD 97226c7 dirty 0) | verify·원칙 34/34·조용한 실패 68·CI 스텝 32·데이터 노출(csv/tsv/sql 5개, 개인정보 0)·run-acceptance 래퍼(판정 20건)·무력화 16·P11(최장 파일 351줄) | 19:50→22:08 | 전부 PASS 줄 확인(로그 `~/valuehire-private/llm-wiki/gates3-20261014.log`, 끝 `GATES_DONE`) | PASS |
+| v6 push | `git push -u origin task/llm-wiki-field-recovery`(pre-push 훅: 인수 검사 전량 ok) | 22:1x→23:04:45 | 0, 원격 SHA 97226c75 = 로컬 HEAD | PASS |
+| v6 PR | `gh pr create` → `gh pr view 137 --json title,body,url,headRefOid` | 23:07:51 | PR #137, 본문 5,154자 §8-8 5절, headRefOid 97226c75 | 생성 완료, CI 는 아래 추가 행 |
 
 ## 비범위
 
