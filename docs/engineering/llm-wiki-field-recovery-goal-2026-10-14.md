@@ -6,9 +6,11 @@
 
 - 위키에 필요한 필드는 운영 Supabase에 **이미 있지만 비어 있거나 연결이 끊겨** 있다. 새 테이블은 필요 없다.
 - 복구 가능한 가장 큰 공백 하나를 찾아 복구 도구를 만들고 dry-run으로 실측했다: 로컬 아카이버에만 있는 구조화 프로필 **13,600건**을 운영 `profile_archives`에 채울 수 있다(쓰기 0건으로 확인).
-- **실제 업서트는 실행하지 않았다.** 비로그인(anon) 키로 운영 프로필·Gmail·활성 후보 전부가 읽히는 상태를 독립 확인했고, 그 위에 구조화 프로필을 올리면 노출 면적만 커진다. anon 차단 승인이 먼저다.
+- ~~실제 업서트는 실행하지 않았다~~ → **2026-10-14 13:4x 사장님 승인("네, anon 차단부터 순서대로 진행해")으로 ⓪·① 을 실행했다.** ⓪ anon 차단은 13:53 운영 적용·검증 완료(7객체 anon 0건, 서비스 키·구성원 로그인 불변). ① 업서트는 표본 7건 readback 뒤 전량 적용(결과는 아래 "실행 결과" 절).
+- 승인 대상 3객체 외에 같은 종류 노출 4객체(`pipeline_candidates_archive`·`unified_candidate_history_view`·`candidates`·`gmail_sync_state`)를 같은 마이그레이션에 포함했다(범위 확장, 되돌리기 스크립트 동봉). Codex 적대 검토 뒤 자료형 뷰의 **로그인 사용자 직접 읽기**도 후속 마이그레이션으로 막았다(B2C 가입 세션이 내부 이력을 읽을 수 있었음).
+- Codex 적대 검토(`/codex:adversarial-review`) 2건: v6 도구 결함 4건·v4 마이그레이션 결함 3건 → 6건 수정, 1건 수용(사유 기록). 재검증 통과.
 - 다른 세션이 같은 날 같은 주제의 감사 문서 3개를 먼저 만들었다(미커밋). 중복 제작하지 않고 참조했다.
-- 사장님이 결정할 것: ① anon 차단 마이그레이션 운영 적용 승인 ② 승인 뒤 `--apply` 실행 승인.
+- 사장님이 결정할 것: ① v6 `task/llm-wiki-field-recovery`·v4 `task/llm-wiki-anon-lockdown` push·PR 승인 ② WU-②(아카이버 동기화 코드)를 Codex 에 넘길지 — 프롬프트는 `goal-prompts/llm-wiki-wu2-archiver-sync-codex-2026-10-14.md`.
 
 ## 2층 판단 근거
 
@@ -46,7 +48,7 @@ counter-AC: 시험이 FakeTransport만 보고 실제 PostgREST 질의 문법을 
 ## 입출력·오류·경계 계약
 
 - 입력: `--db`(sqlite, `mode=ro`), `--env`(v4 `.env.local`), `--apply`, `--limit`, `--ledger`. 출력: JSON 한 줄(`mode, local_rows, remote_rows_found, to_fill, skipped_*, written, unmatched, ledger`). 오류: 자격증명 없음 rc 2, HTTP 오류는 예외로 종료(조용히 0건 성공 금지). 경계: 200건 배치 GET, PATCH는 행당 1회·`return=representation`으로 매치 수 readback, 재실행 멱등(이미 채운 행은 `skipped_filled`).
-- 되돌리기: 장부의 `local_id`마다 `structured_json=null` PATCH. 비용 13,600 요청(~15분).
+- 되돌리기: `--rollback [--apply]`. 장부 `done·matched=1` 행 중 원격 현재 값의 정규화 지문(키 순서·공백 무시 sha256)이 로컬 값과 같은 행만 `structured_json=not.is.null` 보호 조건으로 null. 경쟁 쓰기·응답 유실 행은 보고만. (Codex 2026-10-14 지적으로 "장부 local_id 일괄 null" 규칙 폐기.)
 - 영향 반경: `profile_archives.structured_json` 한 칼럼. 다른 테이블·칼럼 무변경.
 
 ## 결정 카드
@@ -63,9 +65,21 @@ counter-AC: 시험이 FakeTransport만 보고 실제 PostgREST 질의 문법을 
 > **대가** — 복구 후 사람이 하한을 올리는 PR을 잊으면 느슨해진다(SOT §6-2에 절차 고정)
 > **되돌리기** — 표의 숫자 수정
 
+> **무엇을** — anon 차단 범위를 승인된 3객체에서 같은 종류 노출 7객체로 넓히고, 자료형 뷰는 로그인 사용자 직접 읽기까지 회수한다
+> **왜** — 같은 조사에서 발견된 같은 종류의 개인정보 노출이고, 읽는 코드가 전부 service_role 이라 깨질 경로가 없다. PII 결함은 유예 대상이 아니다
+> **버린 길** — 3객체만 막고 나머지는 보고만(노출 지속), 자료형 뷰를 RLS 가능한 일반 뷰로 재작성(범위 밖·성능 영향 미측정)
+> **대가** — 앞으로 로그인 세션으로 자료형 뷰를 직접 읽는 기능을 만들려면 service_role 서버 경로를 거쳐야 한다
+> **되돌리기** — `supabase/rollback/2026101414…down.sql`, `…15….down.sql` (실행 시 노출 재개 — 일반 복구가 아니라 비상용)
+
+> **무엇을** — 마이그레이션은 관리 API SQL 로 적용하고 `schema_migrations` 에 같은 버전을 직접 기록한다
+> **왜** — `supabase db push` 는 로컬에만 있는 0928 두 건을 같이 밀고, 원격에만 있는 4건 때문에 repair 를 요구한다(남의 드리프트를 이 작업이 건드리면 안 된다)
+> **버린 길** — `db push --include-all`(무관 마이그레이션 동반 적용), psql(비밀번호 없음)
+> **대가** — CLI 가 아닌 손 기록이므로 파일과 장부가 어긋날 수 있다 → `migration list --linked` 로 양쪽 버전 일치를 증거에 남겼다
+> **되돌리기** — down 스크립트가 장부 행도 지운다
+
 ## 배송 상태
 
-`LOCAL_ONLY`. 제품 표면 신설 없음(SKELETON 해당 없음). 운영 쓰기 0건. PR·push는 수동 승인 뒤.
+`PRODUCTION_VERIFIED`(DB 권한 변경·데이터 채움에 한함). 운영 URL: Supabase 프로젝트 `sjld…`(v4). 적용 SHA: v4 `06a65482`·`88e45deb` 의 SQL 을 관리 API 로 실행, `schema_migrations` 20261014140000·20261014150000. readback: anon 감사기 PASS·역할 시뮬레이션·service 키 건수 불변·표본 7건 readback 7/7. 롤백: `supabase/rollback/*.down.sql`(미실행). 제품 화면 변경 없음(SKELETON 해당 없음). `BUSINESS_USED` 는 주장하지 않는다. push·PR 은 승인 뒤 수동.
 
 ## 검증 장부 (T)
 
@@ -83,10 +97,26 @@ counter-AC: 시험이 FakeTransport만 보고 실제 PostgREST 질의 문법을 
 | 저장소 게이트 | verify.sh·silent-failure·data-exposure·check-docs-sot·ci-step-integrity | 아래 적대 검증 로그에 기록 | | |
 | V1 (독립 엔진) | Codex | | | 아래 |
 | V2 | | | | 아래 |
+| **⓪ RED** | anon 키 HEAD 7객체 | 13:45:48 | 전부 `*/N` | RED 확인(증거 M-1) |
+| ⓪ 사전 검증 | 마이그레이션 `commit→rollback` 치환 실행 | 13:52:25 | HTTP 201, 상태 불변 | PASS |
+| ⓪ 적용 | 관리 API query + schema_migrations 기록 | 13:53:15 | 201 / 201 | PASS |
+| ⓪ GREEN | `anon_exposure_audit.py --env …` | 13:53:23 | 0 (7객체 0건) | PASS |
+| ⓪ 양성 대조군 | service 키 HEAD 7객체 / 역할 시뮬레이션 authenticated(@valueconnect.kr) | 13:53 | 전부 적용 전과 동일 | PASS |
+| ⓪ 음성 대조군 | 역할 시뮬레이션 anon·authenticated(외부) | 13:53 | 전부 0 / matview 42501 | PASS |
+| RED(anon 감사기) | `… test_anon_exposure` | 13:50:57 | 1 (8F 1E, import 오류 0) | RED, 커밋 ec820cc |
+| GREEN | 세 묶음 + 인수 검사 | 13:52:52 | 0 (36 OK, 변조 8종 차단) | PASS, 커밋 fd33340 |
+| ① dry-run | `backfill … ` | 13:54:07 | 0, to_fill 12932, written 0 | PASS |
+| ① 표본 | `--apply --limit 10` | 13:54:21 | 0, written 7, readback 7/7 | PASS |
+| ① 전량 | `--apply` (백그라운드, 로그 backfill-full-20261014.log) | 13:54:39→ | 아래 "실행 결과" | |
+| Codex 적대 검토 | `/codex:adversarial-review` v6·v4 | 13:55→14:04 | needs-attention ×2 | 결함 7건 → 6 수정·1 수용 |
+| 후속 ⓪ 적용 | `20261014150000` 관리 API | 14:05:19 | 201, ACL·역할 시뮬레이션 확인 | PASS |
+| RED(Codex 반영) | 45건 중 7 FAIL(단언) | 14:06 | 1 | RED, 커밋 f8ce20f |
+| GREEN(Codex 반영) | 45 OK · 인수 검사 변조 10종·SOT 음성 3종 | 14:10:47 | 0 | PASS, 커밋 ed6bfc7 |
+| 운영 anon 감사(재) | 키 탐침 + 7객체 | 14:10 | 0 | PASS. 무효 키 → rc 2 NOT_RUN |
 
 ## 비범위
 
-anon 차단 마이그레이션 작성·적용(승인 뒤 별도 WU ⓪), Gmail 사건 연결(③), 단계 이력 복구(④), 조회 화면·LLM 요약·Discord, Jev 점수 공식 변경, 10만 명 성능 측정.
+아카이버 동기화 코드 보강(②, Codex 프롬프트 작성됨), Gmail 사건 연결(③), 단계 이력 복구(④), 조회 화면·LLM 요약·Discord, Jev 점수 공식 변경, 10만 명 성능 측정, v4 마이그레이션 드리프트(로컬 0928 두 건·원격 전용 4건) 정리.
 
 ## Jev(TypeSafe) 활용 판정
 
@@ -136,3 +166,19 @@ anon 차단 마이그레이션 작성·적용(승인 뒤 별도 WU ⓪), Gmail �
 L3 규칙상 V2 가 필수이나 사장님 2026-09-18 지시("검증 계층을 무한히 쌓지 마라 — 추가 라운드는 삭제·권한·인증·대규모 마이그레이션에만")에 따라 이번 변경(운영 쓰기 0건, 도구·문서·검사기)에는 적용하지 않았다. V1 재현은 제가 로컬에서 6건 전부 같은 방법으로 다시 돌려 확인했다(위 표의 재실행). 운영 쓰기(WU-①)와 anon 차단(WU-⓪)은 권한·개인정보 범주이므로 그 단계에서 V1→V2 를 다시 적용한다.
 
 → 규약 미달 668건은 전부 `_meta` 외 값이 모두 null 인 "추출 실패 객체"였다(사이트별 내역은 증거 K). 보내지 않는 것이 맞고, 로컬에 그대로 남아 재추출 대상이 된다.
+
+### V1-2 — Codex 적대 검토 (⓪·① 실행 단계, 2026-10-14 13:55→14:04, `/codex:adversarial-review`)
+
+권한 변경·운영 쓰기 단계이므로 독립 검증을 다시 돌렸다(09-18 지시의 "권한·인증·마이그레이션" 범주). 호출은 플러그인 companion(`codex-companion.mjs adversarial-review --background --base origin/main`)이며 v6 워크트리와 v4 워크트리에서 각각 1회. 원문 `private-reviews/llm-wiki/codex-adv-v6-20261014.md`·`codex-adv-v4-20261014.md`(무시 폴더). 두 판정 모두 `Verdict: needs-attention`.
+
+| # | 대상 | 심각도 | 원문 제목(요지) | 원인 | 사업 영향 | 재현 | 조치 |
+|---|---|---|---|---|---|---|---|
+| 1 | v6 | high | 무효 anon 키도 노출 차단 성공으로 판정 | 401/403 을 원인 구분 없이 0건으로 계수 | 키가 폐기되면 "차단됨"으로 오보고 → 복구 선행 조건을 거짓 충족 | bogus 키 → 7객체 0건 PASS | 키 양성 대조군·`42501` 만 차단·HEAD 무본문은 GET 재조회 (ed6bfc7) |
+| 2 | v6 | high | 장부 local_id 일괄 롤백은 다른 주체 데이터 삭제 | `matched=0` 도 `done` 으로 기록, SOT 가 일괄 null 지시 | 되돌리기가 경쟁 쓰기 값을 지움 | 장부 형식으로 확인 | `--rollback` 지문 일치 행만, SOT §5①·§6 1-b (ed6bfc7) |
+| 3 | v6 | medium | SOT 필수 필드 검사가 실제로 실행되지 않음 | heredoc 뒤 `</dev/null` 이 stdin 을 덮음 | 정본 행 삭제를 CI 가 못 막음 | `raise` 를 넣어도 PASS | 리다이렉션 수정 + 음성 대조군 3종 (ed6bfc7) |
+| 4 | v6 | medium | anon 정본 행 형식 변경이 검사 누락으로 접힘 | 비매칭 행 조용히 건너뜀, 필수 집합 미확인 | 백틱 하나로 객체가 검사에서 빠짐 | 백틱 행 → 6객체 PASS | 표 엄격 파싱 + 필수 7객체 (ed6bfc7) |
+| 5 | v4 | high | 외부 B2C 계정이 자료형 뷰 전체 이력을 읽음 | matview 는 RLS 없음 + authenticated grant | 가입만 하면 후보·메일·Notion 이력 전체 열람 | 역할 시뮬레이션 외부 authenticated uchv=34036 | 후속 마이그레이션 authenticated 회수 (88e45deb, 14:05 적용·검증) |
+| 6 | v4 | medium | 뷰 재정의 시 `security_invoker` 소실 → anon 재노출 | 옵션 하나에 의존, anon grant 유지 | 누군가 옛 정의로 뷰를 다시 만들면 재노출 | 정적 확인 | 두 뷰 anon grant 회수(두 겹) + SOT §6 1-d |
+| 7 | v4 | medium | `candidates` 없는 환경에서 전체 롤백 | legacy 테이블 DDL 이 저장소에 없음 | 다른 환경에서 마이그레이션 전체 실패 | 운영엔 존재, v4 에 로컬 DB 없음 | **수용**: fail-closed 가 부분 적용보다 낫고, 적용된 파일은 바꾸지 않는다 |
+
+→ 제 쪽 과장·오탐은 없었다. 7건 모두 사실이며 1건만 조치 없이 수용했다. 수정 과정에서 운영 실측이 제 1차 수정의 오류 2건(루트 탐침·HEAD 무본문)을 추가로 잡았다(증거 O-2).
