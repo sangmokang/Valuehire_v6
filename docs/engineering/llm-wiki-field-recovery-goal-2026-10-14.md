@@ -107,7 +107,10 @@ counter-AC: 시험이 FakeTransport만 보고 실제 PostgREST 질의 문법을 
 | GREEN | 세 묶음 + 인수 검사 | 13:52:52 | 0 (36 OK, 변조 8종 차단) | PASS, 커밋 fd33340 |
 | ① dry-run | `backfill … ` | 13:54:07 | 0, to_fill 12932, written 0 | PASS |
 | ① 표본 | `--apply --limit 10` | 13:54:21 | 0, written 7, readback 7/7 | PASS |
-| ① 전량 | `--apply` (백그라운드, 로그 backfill-full-20261014.log) | 13:54:39→ | 아래 "실행 결과" | |
+| ① 전량 | `--apply` (백그라운드, 로그 backfill-full-20261014.log) | 13:54:39→14:28:13 | 0, written 12925, unmatched 0 | PASS (증거 P) |
+| ① 사후 | 장부 1:1·readback 13,446·멱등 dry-run written 0·롤백 dry-run changed_elsewhere 0 | 14:29→14:33 | 0 | PASS |
+| 운영 감사기(재) | `field_audit.py --env …` | 14:33 | 0, structured_json 62.1% | PASS, SOT 하한 2→60 |
+| 저장소 게이트(재) | verify·원칙 34·조용한 실패 68·CI 스텝 32·무력화 16·래퍼 18 | 14:12→14:28 | 전부 0 | PASS (증거 Q) |
 | Codex 적대 검토 | `/codex:adversarial-review` v6·v4 | 13:55→14:04 | needs-attention ×2 | 결함 7건 → 6 수정·1 수용 |
 | 후속 ⓪ 적용 | `20261014150000` 관리 API | 14:05:19 | 201, ACL·역할 시뮬레이션 확인 | PASS |
 | RED(Codex 반영) | 45건 중 7 FAIL(단언) | 14:06 | 1 | RED, 커밋 f8ce20f |
