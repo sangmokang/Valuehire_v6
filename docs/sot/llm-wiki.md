@@ -35,7 +35,7 @@ LLM 위키는 새 저장소가 아니다. 운영 Supabase(v4 프로젝트)의 �
 
 | 객체.필드 | 최소 채움률 | 2026-10-14 실측 | 목표 | 비고 |
 |---|---|---|---|---|
-| profile_archives.structured_json | 2 | 2.4% | 60 | 로컬 13,600건 복구 대기(§5 ①) |
+| profile_archives.structured_json | 60 | 62.1% (10-14 14:33, ① 완료 후; 적용 전 2.4%) | 70 | 나머지 38% 는 로컬에도 구조화가 없는 행(아카이버 재추출 대상) |
 | pipeline_candidates.ai_assessment | 75 | 77.6% | 90 | AI Search 유입 행의 점수 근거 |
 | pipeline_candidates.resume_data | 35 | 38.7% | 70 | 이력서 구조화 |
 | pipeline_candidates.email | 3 | 3.1% | — | 자동 병합 키로 쓰기엔 부족 |

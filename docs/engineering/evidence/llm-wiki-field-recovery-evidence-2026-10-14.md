@@ -447,3 +447,32 @@ acceptance: UNIT 45 / MUTATION 10종 전부 "기대 시험 실패로 차단" / S
 무효 키: VERDICT NOT_RUN rc=2 ("Invalid API key")
 ```
 RED f8ce20f → GREEN (다음 커밋). 중간에 잡힌 제 실수 2건: ① 탐침을 `/rest/v1/` 로 두었더니 Supabase 가 anon 키에 401 을 돌려 정상 키도 NOT_RUN(14:08) → 탐침을 첫 객체로 변경. ② HEAD 401 엔 본문이 없어 뷰 3개가 "조회 오류"(14:09) → GET 재조회로 분류. 둘 다 운영에서 실측으로 잡혔다.
+
+## P. WU-① 전량 업서트 결과 (13:54:39 → 14:28:13, 약 34분, 백그라운드 로그 `~/valuehire-private/llm-wiki/backfill-full-20261014.log`)
+```
+{"mode": "apply", "local_rows": 13633, "remote_rows_found": 13633, "to_fill": 12925, "skipped_absent": 0, "skipped_filled": 40, "skipped_invalid": 668, "written": 12925, "unmatched": 0}
+rc=0
+```
+→ 계획 12,925건 전부 서버 보호 조건(`structured_json=is.null`)에 1행씩 매치돼 기록됐고, 0행 매치(경쟁 쓰기)·오류는 없었다. `skipped_filled 40` = 적용 전 33 + 표본 7.
+
+### P-1. 사후 검증 (14:29:53 → 14:33:08)
+```
+장부: phases {'intent': 12932, 'done': 12932}, done matched=1 distinct 12932, matched!=1 0, intent without done 0
+readback: structured_json=not.is.null → content-range: 0-999/13446    (적용 전 514 + 표본 7 + 전량 12,925 = 13,446)
+멱등 재실행 dry-run: to_fill 0, skipped_filled 12965, written 0
+롤백 dry-run(전량, 쓰기 0): would_revert 12932, changed_elsewhere 0, already_null 0, not_ours 0
+field_audit: profile_archives.structured_json total=21651 null=8205 filled=62.1% / 나머지 5필드 적용 전과 동일 / VERDICT PASS rc=0
+```
+→ 장부의 intent·done 이 1:1 로 닫혔고, 원격 건수가 산술적으로 맞으며, 두 번째 실행은 아무것도 쓰지 않는다(음성 대조군). 롤백 dry-run 의 `changed_elsewhere 0` 은 우리가 보낸 값의 정규화 지문이 원격 저장값(text 칼럼) 12,932건 전부와 일치한다는 뜻이라, 되돌리기가 가능함과 저장 형식이 깨지지 않았음을 동시에 증명한다. SOT §4 하한 2 → 60 으로 상향(실측 62.1%).
+
+## Q. 저장소 게이트 재실행 (HEAD 589250d 기준, 14:12 → 14:28)
+```
+verify.sh: PASS: no secret-pattern match in any tracked file, .env not tracked (rc 0)
+acceptance-principles-check.sh: WIRING: PASS pre-push=1 ci=1 / CHECKED: 34 (rc 0)
+acceptance-silent-failure-lint.sh: CHECKED_FILES: 68 / PASS 패턴 0건
+verify/check-ci-step-integrity.sh: PASS (job·step 32개 검사)
+acceptance-semantic-mutations.sh: 1차 FAIL "원본 저장소 상태 불변 — 변경 발생"(제가 goal 문서를 편집 중이었음) → 트리 깨끗이 한 뒤 재실행 14:20:53→14:28:33 PASS, CHECKED 16
+verify/run-acceptance.sh scripts/acceptance-llm-wiki-fields.sh: VERDICT PASS, 판정 18건
+P11 함수 길이: backfill 262줄(최장 rollback_from_ledger 37), anon_exposure_audit 177줄(최장 27), field_audit 132줄(최장 22) — hard 500/100 이하
+```
+→ 전부 초록. `check-docs-sot.sh` 는 이전과 같은 선행 결함(coding-principles.md 크기)이라 재실행하지 않았다.
