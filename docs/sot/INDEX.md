@@ -8,6 +8,7 @@
 - [verification-commands.md](verification-commands.md) — 이 저장소의 실제 게이트 명령(make 레포 아님, 실행 확인됨)
 - [humansearch-l0-surface-contract.md](humansearch-l0-surface-contract.md) — HumanSearch L0 인증 화면 분류의 입력·출력·경계
 - [humansearch-browser-contract.md](humansearch-browser-contract.md) — HumanSearch 상주 브라우저 진단 접속·단일 탭·사용권·사람 개입·채널별 경계
+- [humansearch-channel-order-contract.md](humansearch-channel-order-contract.md) — 사람인 완주와 분리한 잡코리아 우선 순서·공통 선행·채널별 NOT_RUN 경계
 - [invoice.md](invoice.md) — 밸류커넥트 채용 수수료 인보이스의 입력·계산·PDF·개인정보·Gmail 발송 승인 계약
 - [invoice-storage.md](invoice-storage.md) — V4 Supabase 원장 재사용, 고객사·포지션별 수수료 계약, SQLite 미러·동기화 상태 계약
 
