@@ -257,6 +257,11 @@ jobs:
         # 글로브와 CI 가 같은 인수 스크립트로 실행한다 (판정기 2벌 금지 · P16).
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-verify-ac-m.sh
 
+      - name: 인수 검사 llm-wiki-fields (구조화 프로필 복구 보호 조건·감사기 판정 변조 차단)
+        # docs/sot/llm-wiki.md 의 문턱 표를 읽는 감사기와 backfill 의 쓰기 보호 계약.
+        # 네트워크 없이 단위시험 14건 + 보호 조건 변조 2종이 빨개지는지 확인한다 (P13⑥).
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-llm-wiki-fields.sh
+
       - name: PostgreSQL 서버 준비 (Invoice 런타임 검사용)
         # 러너에는 psql·pg_config 만 PATH 에 있고 initdb·pg_ctl 은
         # /usr/lib/postgresql/<ver>/bin 에 있다. 없으면 설치해서 BLOCKED 를 없앤다.
