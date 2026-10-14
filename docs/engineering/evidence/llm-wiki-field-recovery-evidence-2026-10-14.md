@@ -476,3 +476,46 @@ verify/run-acceptance.sh scripts/acceptance-llm-wiki-fields.sh: VERDICT PASS, �
 P11 함수 길이: backfill 262줄(최장 rollback_from_ledger 37), anon_exposure_audit 177줄(최장 27), field_audit 132줄(최장 22) — hard 500/100 이하
 ```
 → 전부 초록. `check-docs-sot.sh` 는 이전과 같은 선행 결함(coding-principles.md 크기)이라 재실행하지 않았다.
+
+## R. Codex 적대 검토 2차 반영 (push 직전, 19:08 → 19:40) — 원문은 `private-reviews/llm-wiki/codex-adv2-{v6,v4}-20261014.md`
+
+### R-1. RED → GREEN (v6, 커밋 30b3788 → 636efff)
+```
+RED  python3 -m unittest scripts.llm_wiki.test_backfill_structured_profiles → Ran 22, FAILED (failures=3, errors=1)
+     FAIL test_rollback_patch_carries_snapshot_md5_so_write_after_read_is_kept: 'llm_wiki_structured_md5=eq.207bb0cd…' not found in 'local_id=eq.a&structured_json=not.is.null'
+     FAIL test_rollback_ownership_comes_from_ledger_digest_not_current_local_value: None != '{"salary_man": 7000, …}'   (재추출 값이 지워짐)
+     FAIL test_ledger_canonical_digest_lets_rollback_run_without_local_copy: [] != ['a']
+     ERROR test_apply_ledger_records_canonical_digest: KeyError: 'canonical'
+GREEN bash scripts/acceptance-llm-wiki-fields.sh
+     UNIT: PASS ran=49 / UNIT_COUNT: PASS ran=49 / UNIT_SKIP: PASS skipped=0
+     MUTATION 12/12 PASS (… rollback_ignores_digest, rollback_no_md5_guard, rollback_ignores_ledger_sha 각각 기대한 시험 실패로 차단)
+     SOT_CHECK thresholds=6 anon_objects=7 / SOT_THRESHOLDS: PASS / SOT_NEGATIVE[missing-field|backtick-anon|missing-anon]: PASS (차단)
+     VERDICT: PASS
+```
+→ 새 시험 4건이 빠진 동작(md5 필터 없음·재추출 값 삭제·canonical 없음) 때문에 빨갰고, 구현 뒤 49건 전부 초록이며 보호 조건 12종을 하나씩 빼면 그 시험이 빨개진다.
+
+### R-2. v4 160000 사전 검증·적용 (관리 API, 19:39)
+```
+19:39:01  160000 본문 commit→rollback 치환 실행 → []            (문법·권한 OK, 상태 불변)
+19:39:02  140000 down commit→rollback 치환 실행(보호 추가 후) → ERROR P0001: 되돌리기 순서 위반: 20261014150000·20261014160000 이 아직 적용돼 있다. 역순으로 먼저 되돌려라.
+19:39:33  160000 적용 → []
+19:39:34  schema_migrations insert → [{"version":"20261014160000"}]
+```
+→ 음성 대조군(잘못된 순서의 되돌리기)이 실제로 예외로 거부됐고, 적용·장부 기록이 됐다.
+
+### R-3. 160000 검증 (19:39:53 → 19:40:33)
+```
+ACL  pipeline_candidates_active  {postgres=arwdDxtm,service_role=arwdDxtm}     (authenticated 제거됨; 적용 전 authenticated=arwdDxtm)
+     pipeline_candidates_archive {postgres=arwdDxtm,service_role=arwdDxtm}
+     fn:llm_wiki_structured_md5 secdef=false vol=s  {postgres=X,service_role=X}   (security invoker·stable·service_role 전용)
+     mig: 20261014140000 llm_wiki_anon_lockdown / 150000 llm_wiki_lockdown_followup / 160000 llm_wiki_rollback_guard_and_view_acl
+역할 시뮬레이션  authenticated x@example.com → pipeline_candidates_active: 42501 / _archive: 42501
+                authenticated someone@valueconnect.kr → profile_archives count 21651 (유지)
+REST(service)   GET select=local_id,llm_wiki_structured_md5&limit=1 → http 200, keys ['llm_wiki_structured_md5','local_id'], md5 32자
+                PATCH 존재하지 않는 local_id + 틀린 md5 → [] http 200
+                PATCH 실제 행 1건 + 틀린 md5 → [] http 200 ; 그 행 structured_json=not.is.null count → 0-0/1 (그대로 채워져 있음)
+REST(anon)      GET select=…,llm_wiki_structured_md5 → http 401 {"code":"42501","message":"permission denied for function llm_wiki_structured_md5"}
+v6 --rollback dry-run (실제 장부 12,932행·archive.db) → would_revert 12932, changed_elsewhere 0, already_null 0, not_ours 0, local_changed 0
+anon_exposure_audit → {"VERDICT": "PASS", "failures": []}
+```
+→ 계산 칼럼이 REST 필터로 동작하고(틀린 지문이면 0행, 행은 그대로), anon 은 함수조차 못 부르며, 새 소유권 규칙으로도 12,932행 전부가 여전히 "우리가 쓴 값 그대로"다.

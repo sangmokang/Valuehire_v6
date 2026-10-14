@@ -9,6 +9,7 @@
 - ~~실제 업서트는 실행하지 않았다~~ → **2026-10-14 13:4x 사장님 승인("네, anon 차단부터 순서대로 진행해")으로 ⓪·① 을 실행했다.** ⓪ anon 차단은 13:53 운영 적용·검증 완료(7객체 anon 0건, 서비스 키·구성원 로그인 불변). ① 업서트는 표본 7건 readback 뒤 전량 적용(결과는 아래 "실행 결과" 절).
 - 승인 대상 3객체 외에 같은 종류 노출 4객체(`pipeline_candidates_archive`·`unified_candidate_history_view`·`candidates`·`gmail_sync_state`)를 같은 마이그레이션에 포함했다(범위 확장, 되돌리기 스크립트 동봉). Codex 적대 검토 뒤 자료형 뷰의 **로그인 사용자 직접 읽기**도 후속 마이그레이션으로 막았다(B2C 가입 세션이 내부 이력을 읽을 수 있었음).
 - Codex 적대 검토(`/codex:adversarial-review`) 2건: v6 도구 결함 4건·v4 마이그레이션 결함 3건 → 6건 수정, 1건 수용(사유 기록). 재검증 통과.
+- **push 직전 Codex 적대 검토 2차(19:08→19:27, 사장님 지시 "적대 검증 거쳐서 push·PR")**: v6 3건(되돌리기가 읽기 뒤 경쟁 쓰기를 지움 high·장부 지문 대신 현재 로컬 값으로 소유권 판정 high·실행 프롬프트의 폐기된 일괄 null 지시 medium)·v4 2건(두 뷰 authenticated 권한 잔존으로 옵션 없는 재정의 시 외부 로그인 전체 조회 high·되돌리기 역순 보호 없음 medium) → **5건 전부 수정**. 되돌리기는 이제 장부에 기록된 쓰기 당시 지문으로 소유권을 가리고, 읽은 값의 md5 를 서버 필터(v4 마이그레이션 20261014160000 의 계산 칼럼)로 붙여 한 UPDATE 안에서 대조한다. 160000 은 19:39:33 운영 적용·검증 완료(V1-3 표).
 - 다른 세션이 같은 날 같은 주제의 감사 문서 3개를 먼저 만들었다(미커밋). 중복 제작하지 않고 참조했다.
 - 사장님이 결정할 것: ① v6 `task/llm-wiki-field-recovery`·v4 `task/llm-wiki-anon-lockdown` push·PR 승인 ② WU-②(아카이버 동기화 코드)를 Codex 에 넘길지 — 프롬프트는 `goal-prompts/llm-wiki-wu2-archiver-sync-codex-2026-10-14.md`.
 
@@ -79,7 +80,7 @@ counter-AC: 시험이 FakeTransport만 보고 실제 PostgREST 질의 문법을 
 
 ## 배송 상태
 
-`PRODUCTION_VERIFIED`(DB 권한 변경·데이터 채움에 한함). 운영 URL: Supabase 프로젝트 `sjld…`(v4). 적용 SHA: v4 `06a65482`·`88e45deb` 의 SQL 을 관리 API 로 실행, `schema_migrations` 20261014140000·20261014150000. readback: anon 감사기 PASS·역할 시뮬레이션·service 키 건수 불변·표본 7건 readback 7/7. 롤백: `supabase/rollback/*.down.sql`(미실행). 제품 화면 변경 없음(SKELETON 해당 없음). `BUSINESS_USED` 는 주장하지 않는다. push·PR 은 승인 뒤 수동.
+`PRODUCTION_VERIFIED`(DB 권한 변경·데이터 채움에 한함). 운영 URL: Supabase 프로젝트 `sjld…`(v4). 적용 SHA: v4 `06a65482`·`88e45deb`·`f83f4a14` 의 SQL 을 관리 API 로 실행, `schema_migrations` 20261014140000·20261014150000·20261014160000. readback: anon 감사기 PASS·역할 시뮬레이션·service 키 건수 불변·표본 7건 readback 7/7. 롤백: `supabase/rollback/*.down.sql`(미실행). 제품 화면 변경 없음(SKELETON 해당 없음). `BUSINESS_USED` 는 주장하지 않는다. push·PR 은 승인 뒤 수동.
 
 ## 검증 장부 (T)
 
@@ -116,6 +117,14 @@ counter-AC: 시험이 FakeTransport만 보고 실제 PostgREST 질의 문법을 
 | RED(Codex 반영) | 45건 중 7 FAIL(단언) | 14:06 | 1 | RED, 커밋 f8ce20f |
 | GREEN(Codex 반영) | 45 OK · 인수 검사 변조 10종·SOT 음성 3종 | 14:10:47 | 0 | PASS, 커밋 ed6bfc7 |
 | 운영 anon 감사(재) | 키 탐침 + 7객체 | 14:10 | 0 | PASS. 무효 키 → rc 2 NOT_RUN |
+| 운영 재측정(세션 재개) | `anon_exposure_audit.py`·`field_audit.py` | 19:0x | 0 / 0 (anon 7객체 0, structured_json 62.1%) | PASS |
+| Codex 적대 검토 2차 | `/codex:adversarial-review --background --base origin/main` v6→v4 순차 | 19:08→19:27 | needs-attention ×2 (v6 3건·v4 2건) | 5건 전부 수정 (V1-3) |
+| RED(2차 반영) | `… test_backfill_structured_profiles` 새 시험 4건 | 19:3x | 1 (3F 1E, 단언·누락 필드) | RED, 커밋 30b3788 |
+| GREEN(2차 반영) | `bash scripts/acceptance-llm-wiki-fields.sh` | 19:3x | 0 (49 OK, 변조 12종 차단, SOT 양성 1·음성 3) | PASS, 커밋 636efff |
+| v4 160000 사전 검증 | `commit→rollback` 치환 실행 / 140000 down 음성 대조군 | 19:39:01 / 19:39:02 | `[]` / P0001 "되돌리기 순서 위반" | PASS (보호가 실제로 거부) |
+| v4 160000 적용 | 관리 API query + schema_migrations 기록 | 19:39:33 / 19:39:34 | `[]` / version 반환 | PASS, 커밋 f83f4a14 |
+| 160000 검증 | ACL·함수 속성·역할 시뮬레이션·REST 계산 칼럼·틀린 md5 PATCH·anon | 19:39:53→19:40:33 | 외부 authenticated 두 뷰 42501, valueconnect authenticated profile_archives 21651, 틀린 md5 0행·행 유지, anon 42501 | PASS (증거 R-3) |
+| 롤백 dry-run(새 로직) | `--rollback` 실제 장부·archive.db | 19:40:10 | 0, would_revert 12932, local_changed 0, changed_elsewhere 0 | PASS |
 
 ## 비범위
 
@@ -185,3 +194,24 @@ L3 규칙상 V2 가 필수이나 사장님 2026-09-18 지시("검증 계층을 �
 | 7 | v4 | medium | `candidates` 없는 환경에서 전체 롤백 | legacy 테이블 DDL 이 저장소에 없음 | 다른 환경에서 마이그레이션 전체 실패 | 운영엔 존재, v4 에 로컬 DB 없음 | **수용**: fail-closed 가 부분 적용보다 낫고, 적용된 파일은 바꾸지 않는다 |
 
 → 제 쪽 과장·오탐은 없었다. 7건 모두 사실이며 1건만 조치 없이 수용했다. 수정 과정에서 운영 실측이 제 1차 수정의 오류 2건(루트 탐침·HEAD 무본문)을 추가로 잡았다(증거 O-2).
+
+### V1-3 — Codex 적대 검토 2차 (push 직전, 2026-10-14 19:08→19:27, `/codex:adversarial-review --background --base origin/main`)
+
+사장님 지시("1. Codex 적대 검증 거쳐서 실시해 … 적대 검증 후 push·PR 진행해")로 두 워크트리를 순차로 다시 돌렸다. 원문 `private-reviews/llm-wiki/codex-adv2-v6-20261014.md`·`codex-adv2-v4-20261014.md`(무시 폴더), 로그 `~/valuehire-private/llm-wiki/codex-adv2-{v6,v4}-20261014.log`. 두 판정 모두 `Verdict: needs-attention`. 추가 Codex 라운드는 돌리지 않는다(09-18 지시: 적대 1회 → PR → CI → merge).
+
+| # | 대상 | 심각도 | 원문 제목(요지) | 원인 | 사업 영향 | 재현 | 조치 |
+|---|---|---|---|---|---|---|---|
+| 1 | v6 | high | 롤백의 서버 조건이 읽기 이후 경쟁 쓰기를 보호하지 못함 (`backfill_structured_profiles.py:156-157`, PATCH 가 `not.is.null` 만 붙이는 줄) | GET 스냅샷으로 지문을 비교하고 PATCH 는 값 무관 | 되돌리는 사이 다른 주체가 쓴 새 값이 지워짐 | Codex 메모리 재현(GET 직후 값 교체 → null) + 제 시험 `test_rollback_patch_carries_snapshot_md5_so_write_after_read_is_kept` RED | PATCH 에 읽은 값의 md5 를 계산 칼럼 `llm_wiki_structured_md5=eq.` 로 붙임(v4 160000) — 한 UPDATE 안에서 대조, 바뀌면 0행 (636efff) |
+| 2 | v6 | high | 장부 지문을 무시하고 현재 SQLite 값을 쓰기 소유권으로 사용 (`:143-150`, 장부에서 ID 만 모으는 줄) | 장부 sha256 미대조, 비교 대상이 재추출 가능한 로컬 값 | 로컬·원격이 같이 B 로 바뀐 행을 우리 것으로 오인해 삭제 | Codex 재현(장부 A·로컬 B·원격 B → 삭제) + 제 시험 `test_rollback_ownership_comes_from_ledger_digest_not_current_local_value` RED | 소유권 = 장부 `canonical`(신규) 또는 `sha256` 이 현재 로컬 원문과 같을 때의 로컬 값; 다르면 `local_changed` 보고만. 신규 장부 행에 `canonical` 기록 (636efff) |
+| 3 | v6 | medium | 실행 프롬프트가 폐기된 일괄 롤백을 지시 (`exec-prompt…:46`) | 1차 수정 때 도구·SOT 만 고치고 복붙용 문서는 남김 | 문서대로 하면 경쟁 쓰기·응답 유실 행까지 삭제 | 정적 확인 | `--rollback` dry-run → 검토 → apply 절차로 교체, 일괄 PATCH 금지 명시 (636efff) |
+| 4 | v4 | high | 뷰 재정의 방어가 authenticated 에는 적용되지 않음 (`20261014150000…:13-14`, anon 만 회수하는 줄) | 두 뷰 ACL 에 authenticated=arwdDxtm 잔존 | phase1 정의로 옵션 없이 재정의하면 외부 B2C 로그인이 postgres 권한으로 후보 전체 조회(anon 감사기는 계속 PASS) | 운영 ACL 조회로 확인 | 160000: 두 뷰 authenticated 회수(읽는 코드는 전부 service_role — `app/(admin)/admin/page.tsx` countRows 가 `createServerSupabaseClient`=serviceKey 임을 확인). 역할 시뮬레이션 외부 authenticated → 42501 (f83f4a14, 19:39 적용) |
+| 5 | v4 | medium | 선행 롤백이 후속 마이그레이션을 적용된 상태로 남김 (`…140000….down.sql:21-26`) | down 에 순서 검사 없음 | 140000 down 을 먼저 돌리면 권한은 풀리고 장부엔 150000 이 남아 상태·장부 불일치 | 운영에서 `commit→rollback` 치환 실행 → 보호 추가 후 P0001 예외로 거부됨(음성 대조군) | 140000·150000 down 머리에 뒤 마이그레이션 존재 시 `raise exception` (f83f4a14) |
+
+→ 5건 모두 사실이며 과장·오탐 없음. 제 쪽에서 추가로 바로잡은 것: 1차 때 넣은 변조 `rollback_ignores_digest` 의 sed 대상 줄이 이번 수정으로 사라져 "변조가 적용되지 않음" FAIL 이 될 뻔했고, 새 비교 줄(`if canonical_digest(remote) != expected:` → `if False:`)로 옮겼다. Codex 가 미실행이라 밝힌 것(운영 API·전체 셸 인수 검사·SQL 실실행)은 제가 운영에서 실행해 증거 R 에 남겼다.
+
+**결정 카드 — 되돌리기 원자성을 계산 칼럼으로**
+> **무엇을** — v4 에 `llm_wiki_structured_md5(profile_archives)` 계산 칼럼 함수를 두고, v6 되돌리기 PATCH 가 `&llm_wiki_structured_md5=eq.<읽은 값 md5>` 를 붙인다.
+> **왜** — PostgREST 는 PATCH 필터에 행 타입 인자 함수를 쓸 수 있어 "현재 값이 내가 읽은 값일 때만 null" 이 한 UPDATE 안에서 원자적으로 된다. 운영 최대 길이 1,593자라 값 자체를 `eq.` 로 넣는 것도 가능하지만 쉼표·괄호·따옴표 이스케이프가 깨지기 쉽다.
+> **버린 길** — (a) 값 전체를 URL 필터로: 이스케이프 오류가 "0행 매치"로 접혀 되돌리기가 조용히 안 됨. (b) `updated_at` 조건: 우리 PATCH 도 그 칼럼을 안 올리므로 경쟁 쓰기를 못 잡음. (c) RPC 함수: 되돌리기 전용 쓰기 경로가 하나 더 생겨 권한 면적이 커짐.
+> **대가** — v4 마이그레이션 1건·운영 함수 1개가 늘고, 함수가 없는 환경에서는 되돌리기가 PostgREST 오류로 멈춘다(안전 쪽 실패).
+> **되돌리기** — `supabase/rollback/20261014160000_….down.sql`(함수 drop + 두 뷰 authenticated 복원). 실행 시 v6 `--rollback --apply` 는 오류로 멈춘다.
