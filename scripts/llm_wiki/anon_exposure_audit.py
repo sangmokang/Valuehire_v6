@@ -13,6 +13,7 @@ import json
 import re
 import sys
 import urllib.error
+import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -85,6 +86,10 @@ def collect(base: str, key: str, objects: list[str], counter=_count) -> list[Obj
         except (OSError, ValueError) as exc:
             stats.append(ObjectStat(name, None, error=str(exc)[:120]))
     return stats
+
+
+def key_is_valid(base: str, key: str, opener=urllib.request.urlopen) -> bool:
+    return False  # RED 골격
 
 
 def load_anon_creds(env_path: Path) -> tuple[str, str]:

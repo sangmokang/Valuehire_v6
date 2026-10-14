@@ -196,6 +196,68 @@ class RestTransportTests(unittest.TestCase):
             t.patch("local_id=eq.a&structured_json=is.null", {"structured_json": {}})
 
 
+class RollbackTests(unittest.TestCase):
+    """Codex 2026-10-14 결함 2: 장부의 local_id 를 일괄 null 로 되돌리면 다른 주체의 값을 지운다.
+    되돌리기는 done·matched=1 행 중 현재 원격 값이 우리가 보낸 값과 같은(정규화 지문 일치) 행만 null 로 한다."""
+
+    class RollbackFake(FakeTransport):
+        def __init__(self, remote_values: dict[str, str | None]):
+            super().__init__({k: (v is not None) for k, v in remote_values.items()})
+            self.values = remote_values
+
+        def get_remote_values(self, local_ids):
+            return {i: self.values[i] for i in local_ids if i in self.values}
+
+        def patch(self, url_query, body):
+            self.writes.append((url_query, body))
+            local_id = url_query.split("local_id=eq.")[1].split("&")[0]
+            if "structured_json=not.is.null" in url_query and self.values.get(local_id) is not None and body == {"structured_json": None}:
+                self.values[local_id] = None
+                return 1
+            return 0
+
+    def _ledger(self, entries):
+        d = tempfile.TemporaryDirectory(); self.addCleanup(d.cleanup)
+        p = Path(d.name) / "l.jsonl"
+        p.write_text("".join(json.dumps(e) + "\n" for e in entries))
+        return p
+
+    def test_canonical_digest_ignores_key_order_and_whitespace(self):
+        self.assertEqual(bf.canonical_digest('{"a": 1, "b": {"c": 2}}'), bf.canonical_digest('{"b":{"c":2},"a":1}'))
+        self.assertNotEqual(bf.canonical_digest('{"a": 1}'), bf.canonical_digest('{"a": 2}'))
+
+    def test_rollback_nulls_only_rows_we_wrote_and_still_hold_our_value(self):
+        local = {"a": VALID, "b": VALID, "c": VALID, "d": VALID}
+        remote = {"a": '{"_meta":{"source":"t","input_hash":"h1"},"salary_man":8000,"total_years":7}',  # 우리 값(키 순서만 다름)
+                  "b": '{"salary_man": 9999, "_meta": {"source": "other", "input_hash": "zz"}}',  # 다른 주체가 갱신
+                  "c": None,  # 이미 null
+                  "d": VALID}  # matched=0 였던 행(경쟁 쓰기) — 손대면 안 된다
+        t = self.RollbackFake(remote)
+        ledger = self._ledger([
+            {"local_id": "a", "phase": "intent"}, {"local_id": "a", "phase": "done", "matched": 1},
+            {"local_id": "b", "phase": "intent"}, {"local_id": "b", "phase": "done", "matched": 1},
+            {"local_id": "c", "phase": "intent"}, {"local_id": "c", "phase": "done", "matched": 1},
+            {"local_id": "d", "phase": "intent"}, {"local_id": "d", "phase": "done", "matched": 0},
+            {"local_id": "e", "phase": "intent"},  # 응답 유실 — 대상 아님(수동 대조)
+        ])
+        r = bf.rollback_from_ledger(t, ledger, local, apply=True)
+        self.assertEqual(r.reverted, ["a"])
+        self.assertEqual(r.changed_elsewhere, ["b"])
+        self.assertEqual(r.already_null, ["c"])
+        self.assertEqual(r.not_ours, ["d", "e"])
+        self.assertEqual(len(t.writes), 1)
+        self.assertIn("structured_json=not.is.null", t.writes[0][0])
+        self.assertEqual(t.values["b"], remote["b"])
+
+    def test_rollback_dry_run_writes_nothing(self):
+        t = self.RollbackFake({"a": VALID})
+        ledger = self._ledger([{"local_id": "a", "phase": "done", "matched": 1}])
+        r = bf.rollback_from_ledger(t, ledger, {"a": VALID}, apply=False)
+        self.assertEqual(r.reverted, [])
+        self.assertEqual(r.would_revert, ["a"])
+        self.assertEqual(t.writes, [])
+
+
 class CredsTests(unittest.TestCase):
     def test_missing_creds_is_not_run_exit_2(self):
         with tempfile.NamedTemporaryFile("w", suffix=".env", delete=False) as f:

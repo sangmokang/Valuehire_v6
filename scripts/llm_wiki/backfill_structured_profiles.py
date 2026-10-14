@@ -105,6 +105,23 @@ def apply_plan(transport, plan: Plan, ledger_path: Path, *, apply: bool) -> Appl
     return result
 
 
+@dataclass
+class RollbackResult:
+    reverted: list[str] = field(default_factory=list)
+    would_revert: list[str] = field(default_factory=list)
+    changed_elsewhere: list[str] = field(default_factory=list)
+    already_null: list[str] = field(default_factory=list)
+    not_ours: list[str] = field(default_factory=list)
+
+
+def canonical_digest(text: str) -> str:
+    return ""  # RED 골격
+
+
+def rollback_from_ledger(transport, ledger_path: Path, local_by_id: dict[str, str], *, apply: bool) -> RollbackResult:
+    return RollbackResult()  # RED 골격
+
+
 def load_creds(env_path: Path) -> tuple[str, str]:
     values: dict[str, str] = {}
     for line in env_path.read_text(encoding="utf-8").splitlines():

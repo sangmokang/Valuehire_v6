@@ -9,6 +9,7 @@
 """
 from __future__ import annotations
 
+import io
 import tempfile
 import unittest
 import urllib.error
@@ -16,6 +17,8 @@ from pathlib import Path
 
 from scripts.llm_wiki import anon_exposure_audit as ax
 
+OBJECTS = ["profile_archives", "gmail_messages", "gmail_sync_state", "candidates",
+           "pipeline_candidates_active", "pipeline_candidates_archive", "unified_candidate_history_view"]
 SOT = """
 ## 4. 최소 채움률
 | 객체.필드 | 최소 채움률 | 실측 |
@@ -25,15 +28,27 @@ SOT = """
 ### 4-b. 익명(anon) 키 허용 건수
 | 객체 | anon 허용 건수 |
 |---|---|
-| profile_archives | 0 |
-| gmail_messages | 0 |
-| pipeline_candidates_active | 0 |
+""" + "".join(f"| {o} | 0 |\n" for o in OBJECTS) + """
+## 5. 다음 절
+| ⓪ | 다른 표 | x |
 """
 
 
 class ParseTests(unittest.TestCase):
     def test_parses_object_names_in_order(self):
-        self.assertEqual(ax.parse_anon_zero_objects(SOT), ["profile_archives", "gmail_messages", "pipeline_candidates_active"])
+        self.assertEqual(ax.parse_anon_zero_objects(SOT), OBJECTS)
+
+    def test_malformed_row_inside_table_is_rejected(self):
+        # Codex 2026-10-14 결함 4: 백틱·오타 행이 조용히 빠져 검사 대상이 줄어든다
+        with self.assertRaises(ValueError):
+            ax.parse_anon_zero_objects(SOT.replace("| profile_archives | 0 |", "| `profile_archives` | 0 |"))
+
+    def test_required_object_removed_is_rejected(self):
+        with self.assertRaises(ValueError):
+            ax.parse_anon_zero_objects(SOT.replace("| gmail_messages | 0 |\n", ""))
+
+    def test_rows_outside_the_anon_table_are_ignored(self):
+        self.assertNotIn("x", ax.parse_anon_zero_objects(SOT))
 
     def test_field_rows_with_dot_are_not_objects(self):
         self.assertNotIn("profile_archives.structured_json", ax.parse_anon_zero_objects(SOT))
@@ -65,23 +80,48 @@ class JudgeTests(unittest.TestCase):
         self.assertEqual(ax.judge([], []).status, "FAIL")
 
 
+DENIED = (401, b'{"code":"42501","message":"permission denied for materialized view x"}')
+BAD_KEY = (401, b'{"message":"Invalid API key"}')
+
+
 class CollectTests(unittest.TestCase):
     def _counter(self, mapping):
         def counter(base, key, table, filt):
             r = mapping[table]
-            if isinstance(r, int) and r >= 400:
-                raise urllib.error.HTTPError(f"{base}/{table}", r, "x", {}, None)
+            if isinstance(r, tuple):
+                raise urllib.error.HTTPError(f"{base}/{table}", r[0], "x", {}, io.BytesIO(r[1]))
             return r
         return counter
 
-    def test_401_and_403_count_as_blocked_zero(self):
-        stats = ax.collect("https://x", "k", ["a", "b", "c"], counter=self._counter({"a": 401, "b": 403, "c": 7}))
+    def test_permission_denied_counts_as_blocked_zero(self):
+        stats = ax.collect("https://x", "k", ["a", "b", "c"], counter=self._counter({"a": DENIED, "b": (403, DENIED[1]), "c": 7}))
         self.assertEqual([(s.name, s.count, s.error) for s in stats], [("a", 0, None), ("b", 0, None), ("c", 7, None)])
 
+    def test_invalid_api_key_401_is_error_not_blocked(self):
+        # Codex 2026-10-14 결함 1: 무효 키의 401 을 차단 성공으로 세면 안 된다
+        stats = ax.collect("https://x", "k", ["a"], counter=self._counter({"a": BAD_KEY}))
+        self.assertEqual(stats[0].count, None)
+        self.assertIn("Invalid API key", stats[0].error)
+
     def test_other_http_error_is_error(self):
-        stats = ax.collect("https://x", "k", ["a"], counter=self._counter({"a": 500}))
+        stats = ax.collect("https://x", "k", ["a"], counter=self._counter({"a": (500, b"boom")}))
         self.assertEqual(stats[0].count, None)
         self.assertIn("500", stats[0].error)
+
+
+class KeyProbeTests(unittest.TestCase):
+    """anon 키가 살아 있는지 양성 대조군: PostgREST 루트(/rest/v1/)는 유효 키면 200, 무효 키면 401."""
+
+    def test_valid_key_probe_true_and_invalid_false(self):
+        class OK:
+            status = 200
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+        self.assertTrue(ax.key_is_valid("https://x", "k", opener=lambda req, timeout: OK()))
+
+        def bad(req, timeout):
+            raise urllib.error.HTTPError(req.full_url, 401, "x", {}, io.BytesIO(BAD_KEY[1]))
+        self.assertFalse(ax.key_is_valid("https://x", "k", opener=bad))
 
 
 class CredsTests(unittest.TestCase):
