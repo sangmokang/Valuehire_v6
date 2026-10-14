@@ -11,6 +11,7 @@
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import tempfile
 import unittest
@@ -19,6 +20,7 @@ from pathlib import Path
 from scripts.llm_wiki import backfill_structured_profiles as bf
 
 VALID = json.dumps({"salary_man": 8000, "total_years": 7, "_meta": {"source": "t", "input_hash": "h1"}})
+SHA_VALID = hashlib.sha256(VALID.encode("utf-8")).hexdigest()  # 장부에 기록되는 쓰기 당시 원문 지문
 
 
 def _local(local_id: str, body: str = VALID) -> bf.LocalRow:
@@ -234,10 +236,10 @@ class RollbackTests(unittest.TestCase):
                   "d": VALID}  # matched=0 였던 행(경쟁 쓰기) — 손대면 안 된다
         t = self.RollbackFake(remote)
         ledger = self._ledger([
-            {"local_id": "a", "phase": "intent"}, {"local_id": "a", "phase": "done", "matched": 1},
-            {"local_id": "b", "phase": "intent"}, {"local_id": "b", "phase": "done", "matched": 1},
-            {"local_id": "c", "phase": "intent"}, {"local_id": "c", "phase": "done", "matched": 1},
-            {"local_id": "d", "phase": "intent"}, {"local_id": "d", "phase": "done", "matched": 0},
+            {"local_id": "a", "phase": "intent"}, {"local_id": "a", "phase": "done", "matched": 1, "sha256": SHA_VALID},
+            {"local_id": "b", "phase": "intent"}, {"local_id": "b", "phase": "done", "matched": 1, "sha256": SHA_VALID},
+            {"local_id": "c", "phase": "intent"}, {"local_id": "c", "phase": "done", "matched": 1, "sha256": SHA_VALID},
+            {"local_id": "d", "phase": "intent"}, {"local_id": "d", "phase": "done", "matched": 0, "sha256": SHA_VALID},
             {"local_id": "e", "phase": "intent"},  # 응답 유실 — 대상 아님(수동 대조)
         ])
         r = bf.rollback_from_ledger(t, ledger, local, apply=True)
@@ -251,11 +253,89 @@ class RollbackTests(unittest.TestCase):
 
     def test_rollback_dry_run_writes_nothing(self):
         t = self.RollbackFake({"a": VALID})
-        ledger = self._ledger([{"local_id": "a", "phase": "done", "matched": 1}])
+        ledger = self._ledger([{"local_id": "a", "phase": "done", "matched": 1, "sha256": SHA_VALID}])
         r = bf.rollback_from_ledger(t, ledger, {"a": VALID}, apply=False)
         self.assertEqual(r.reverted, [])
         self.assertEqual(r.would_revert, ["a"])
         self.assertEqual(t.writes, [])
+
+
+class RollbackAtomicityTests(unittest.TestCase):
+    """Codex 2차(2026-10-14 19:1x) 결함 1·2: 읽기 뒤 경쟁 쓰기와 장부 지문 무시.
+    - PATCH 는 읽은 스냅샷의 md5 를 서버 필터(llm_wiki_structured_md5=eq.)로 붙여 읽기 이후 바뀐 값을 지우지 않는다.
+    - 소유권은 "지금 로컬 값"이 아니라 장부에 기록된 쓰기 당시 지문으로 판정한다."""
+
+    class RacingFake(RollbackTests.RollbackFake):
+        """get_remote_values 직후 다른 주체가 값을 바꾼다. patch 는 서버처럼 md5 필터를 현재 값과 대조한다."""
+
+        def __init__(self, remote_values, race: dict[str, str]):
+            super().__init__(remote_values)
+            self.race = race
+
+        def get_remote_values(self, local_ids):
+            snapshot = super().get_remote_values(local_ids)
+            self.values.update(self.race)  # 읽기 뒤 경쟁 갱신
+            return snapshot
+
+        def patch(self, url_query, body):
+            self.writes.append((url_query, body))
+            local_id = url_query.split("local_id=eq.")[1].split("&")[0]
+            current = self.values.get(local_id)
+            if current is None or body != {"structured_json": None} or "structured_json=not.is.null" not in url_query:
+                return 0
+            if "llm_wiki_structured_md5=eq." in url_query:
+                expected = url_query.split("llm_wiki_structured_md5=eq.")[1].split("&")[0]
+                if expected != hashlib.md5(current.encode("utf-8")).hexdigest():
+                    return 0
+            self.values[local_id] = None
+            return 1
+
+    def _ledger(self, entries):
+        d = tempfile.TemporaryDirectory(); self.addCleanup(d.cleanup)
+        p = Path(d.name) / "l.jsonl"
+        p.write_text("".join(json.dumps(e) + "\n" for e in entries))
+        return p
+
+    def test_rollback_patch_carries_snapshot_md5_so_write_after_read_is_kept(self):
+        other = '{"salary_man": 9999, "_meta": {"source": "other", "input_hash": "zz"}}'
+        t = self.RacingFake({"a": VALID}, race={"a": other})
+        ledger = self._ledger([{"local_id": "a", "phase": "done", "matched": 1, "sha256": SHA_VALID}])
+        r = bf.rollback_from_ledger(t, ledger, {"a": VALID}, apply=True)
+        self.assertEqual(len(t.writes), 1)
+        self.assertIn("llm_wiki_structured_md5=eq." + hashlib.md5(VALID.encode("utf-8")).hexdigest(), t.writes[0][0])
+        self.assertEqual(r.reverted, [])
+        self.assertEqual(r.changed_elsewhere, ["a"])
+        self.assertEqual(t.values["a"], other)  # 경쟁 쓰기 값이 살아 있다
+
+    def test_rollback_ownership_comes_from_ledger_digest_not_current_local_value(self):
+        re_extracted = '{"salary_man": 7000, "total_years": 9, "_meta": {"source": "t", "input_hash": "h2"}}'
+        # 장부 지문은 A(VALID) 인데 로컬은 재추출로 B 가 됐고 원격도 B(다른 주체가 씀). B 를 우리 것으로 오인하면 안 된다.
+        t = RollbackTests.RollbackFake({"a": re_extracted, "b": VALID})
+        ledger = self._ledger([
+            {"local_id": "a", "phase": "done", "matched": 1, "sha256": SHA_VALID},
+            {"local_id": "b", "phase": "done", "matched": 1, "sha256": SHA_VALID},
+        ])
+        r = bf.rollback_from_ledger(t, ledger, {"a": re_extracted, "b": VALID}, apply=True)
+        self.assertEqual(t.values["a"], re_extracted)  # 장부 지문과 다른 값은 우리 것이 아니다 — 지우지 않는다
+        self.assertEqual(r.reverted, ["b"])
+        self.assertEqual(r.local_changed, ["a"])
+
+    def test_ledger_canonical_digest_lets_rollback_run_without_local_copy(self):
+        # 신규 장부는 정규화 지문을 함께 기록한다 → 로컬 사본이 사라져도 원격 현재 값과 대조할 수 있다.
+        t = RollbackTests.RollbackFake({"a": VALID})
+        ledger = self._ledger([{"local_id": "a", "phase": "done", "matched": 1, "sha256": SHA_VALID, "canonical": bf.canonical_digest(VALID)}])
+        r = bf.rollback_from_ledger(t, ledger, {}, apply=False)
+        self.assertEqual(r.would_revert, ["a"])
+        self.assertEqual(r.local_changed, [])
+
+    def test_apply_ledger_records_canonical_digest(self):
+        t = FakeTransport({"a": False})
+        plan = bf.plan_backfill([_local("a")], t.get_remote_state(["a"]))
+        with tempfile.TemporaryDirectory() as d:
+            ledger = Path(d) / "l.jsonl"
+            bf.apply_plan(t, plan, ledger, apply=True)
+            done = [json.loads(l) for l in ledger.read_text().splitlines() if '"done"' in l]
+        self.assertEqual(done[0]["canonical"], bf.canonical_digest(VALID))
 
 
 class CredsTests(unittest.TestCase):
