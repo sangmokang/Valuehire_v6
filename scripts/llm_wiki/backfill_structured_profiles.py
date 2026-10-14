@@ -47,12 +47,20 @@ class ApplyResult:
 
 
 def _valid_structured(text: str) -> bool:
+    """최소 내용 규약: dict, _meta.source·_meta.input_hash 가 비어 있지 않은 문자열, _meta 외 non-null 값 1개 이상."""
     try:
         obj = json.loads(text)
     except (ValueError, TypeError):
         return False
-    meta = obj.get("_meta") if isinstance(obj, dict) else None
-    return isinstance(meta, dict) and bool(meta.get("input_hash"))
+    if not isinstance(obj, dict):
+        return False
+    meta = obj.get("_meta")
+    if not isinstance(meta, dict):
+        return False
+    for key in ("source", "input_hash"):
+        if not isinstance(meta.get(key), str) or not meta[key]:
+            return False
+    return any(v is not None for k, v in obj.items() if k != "_meta")
 
 
 def plan_backfill(local_rows: list[LocalRow], remote_state: dict[str, bool]) -> Plan:
@@ -75,11 +83,21 @@ def apply_plan(transport, plan: Plan, ledger_path: Path, *, apply: bool) -> Appl
     if not apply:
         return result
     with ledger_path.open("a", encoding="utf-8") as ledger:
+        def record(entry: dict) -> None:
+            ledger.write(json.dumps(entry, ensure_ascii=False) + "\n")
+            ledger.flush()
+
         for row in plan.to_fill:
             query = f"local_id=eq.{urllib.parse.quote(row.local_id, safe='')}&structured_json=is.null"
-            matched = transport.patch(query, {"structured_json": json.loads(row.structured_json)})
             digest = hashlib.sha256(row.structured_json.encode("utf-8")).hexdigest()
-            ledger.write(json.dumps({"local_id": row.local_id, "sha256": digest, "matched": matched}) + "\n")
+            # 쓰기 전 intent 를 먼저 남긴다. 응답을 못 받은 행은 intent 만 남아 readback 대조 대상이 된다.
+            record({"local_id": row.local_id, "sha256": digest, "phase": "intent"})
+            try:
+                matched = transport.patch(query, {"structured_json": json.loads(row.structured_json)})
+            except Exception as exc:  # 어떤 전송 오류든 장부에 남기고 그대로 전파한다(은폐 금지)
+                record({"local_id": row.local_id, "sha256": digest, "phase": "error", "error": f"{type(exc).__name__}: {exc}"})
+                raise
+            record({"local_id": row.local_id, "sha256": digest, "phase": "done", "matched": matched})
             if matched == 1:
                 result.written += 1
             else:
@@ -112,14 +130,15 @@ def load_local_rows(db_path: Path, limit: int | None) -> list[LocalRow]:
 class RestTransport:
     """PostgREST 전송. 읽기는 GET, 쓰기는 PATCH(return=representation 으로 매치 행 수 readback)."""
 
-    def __init__(self, url: str, key: str):
+    def __init__(self, url: str, key: str, opener=urllib.request.urlopen):
         self.base = url.rstrip("/") + "/rest/v1/profile_archives"
         self.headers = {"apikey": key, "Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+        self._open = opener  # 시험에서 표준 라이브러리 요청 객체를 받아 응답을 바꿔 끼운다
 
     def _call(self, method: str, query: str, body: dict | None, extra: dict[str, str]) -> list:
         data = json.dumps(body).encode("utf-8") if body is not None else None
         req = urllib.request.Request(f"{self.base}?{query}", data=data, method=method, headers={**self.headers, **extra})
-        with urllib.request.urlopen(req, timeout=60) as resp:
+        with self._open(req, timeout=60) as resp:
             raw = resp.read().decode("utf-8")
         return json.loads(raw) if raw else []
 

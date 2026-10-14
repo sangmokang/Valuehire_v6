@@ -15,7 +15,8 @@ import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
 
-ROW_RE = re.compile(r"^\|\s*([a-z_]+)\.([a-z_]+)\s*\|\s*([0-9]+(?:\.[0-9]+)?)\s*\|")
+FIELD_ROW_RE = re.compile(r"^\|\s*([a-z_]+)\.([a-z_]+)\s*\|\s*([^|]*)\|")
+NUMBER_RE = re.compile(r"^[0-9]+(?:\.[0-9]+)?$")
 
 
 @dataclass(frozen=True)
@@ -36,9 +37,15 @@ class Verdict:
 def parse_thresholds(markdown: str) -> dict[tuple[str, str], float]:
     found: dict[tuple[str, str], float] = {}
     for line in markdown.splitlines():
-        m = ROW_RE.match(line.strip())
-        if m:
-            found[(m.group(1), m.group(2))] = float(m.group(3))
+        m = FIELD_ROW_RE.match(line.strip())
+        if not m:
+            continue
+        key, raw = (m.group(1), m.group(2)), m.group(3).strip()
+        if not NUMBER_RE.match(raw):
+            raise ValueError(f"{key[0]}.{key[1]}: 최소 채움률이 숫자가 아니다: {raw!r}")
+        if key in found:
+            raise ValueError(f"{key[0]}.{key[1]}: 문턱 행이 중복된다")
+        found[key] = float(raw)
     if not found:
         raise ValueError("최소 채움률 표(| 객체.필드 | 숫자 |)를 찾지 못했다")
     return found
