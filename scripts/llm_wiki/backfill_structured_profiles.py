@@ -5,10 +5,12 @@
   - 원격에 같은 local_id 행이 없으면 보내지 않는다(부분 행 INSERT 금지).
   - 원격 structured_json 이 이미 있으면 보내지 않는다. 서버측에도 structured_json=is.null 을 붙여
     계획 이후 다른 주체가 채운 행을 덮어쓰지 않는다(매치 0행이면 "쓰지 않음"으로 센다).
-  - 쓰기 1건마다 장부 1줄(local_id, sha256, matched)을 남긴다. 되돌리기는 장부의 local_id 를 null 로.
+  - 쓰기 1건마다 장부 2줄(intent → done|error; local_id, sha256, matched)을 남긴다.
+  - 되돌리기(--rollback)는 done·matched=1 행 중 원격 현재 값이 우리가 보낸 값과 같은(정규화 지문 일치) 행만 null 로 한다.
   - 자격증명이 없으면 rc 2(NOT_RUN). 조용히 0건 성공으로 접지 않는다.
 사용:
   python3 scripts/llm_wiki/backfill_structured_profiles.py --db <archive.db> --env <.env.local> [--apply] [--limit N]
+  python3 scripts/llm_wiki/backfill_structured_profiles.py --db … --env … --rollback [--apply]
 """
 from __future__ import annotations
 
@@ -115,11 +117,48 @@ class RollbackResult:
 
 
 def canonical_digest(text: str) -> str:
-    return ""  # RED 골격
+    """키 순서·공백을 정규화한 JSON 지문. 원격(text 칼럼에 저장된 직렬화)과 로컬 원문을 비교할 때 쓴다."""
+    obj = json.loads(text) if isinstance(text, str) else text
+    return hashlib.sha256(json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")).hexdigest()
 
 
 def rollback_from_ledger(transport, ledger_path: Path, local_by_id: dict[str, str], *, apply: bool) -> RollbackResult:
-    return RollbackResult()  # RED 골격
+    """되돌리기(Codex 2026-10-14 결함 2 반영). 장부의 done·matched=1 행만 대상으로 하고, 그중 원격 현재 값의 정규화 지문이
+    로컬(우리가 보낸) 값과 같은 행만 서버 보호 조건(structured_json=not.is.null)을 붙여 null 로 한다.
+    matched=0(경쟁 쓰기)·intent 만 남은 행(응답 유실)은 not_ours 로 보고만 한다."""
+    result = RollbackResult()
+    ours: list[str] = []
+    seen: set[str] = set()
+    others: list[str] = []
+    for line in ledger_path.read_text(encoding="utf-8").splitlines():
+        entry = json.loads(line)
+        lid = entry["local_id"]
+        if entry.get("phase") == "done" and entry.get("matched") == 1:
+            if lid not in seen:
+                seen.add(lid)
+                ours.append(lid)
+        elif lid not in others:
+            others.append(lid)
+    result.not_ours = [lid for lid in others if lid not in seen]
+    remote_values = transport.get_remote_values(ours) if ours else {}
+    for lid in ours:
+        remote = remote_values.get(lid)
+        local = local_by_id.get(lid)
+        if remote is None:
+            result.already_null.append(lid)
+            continue
+        if local is None or canonical_digest(remote) != canonical_digest(local):
+            result.changed_elsewhere.append(lid)
+            continue
+        if not apply:
+            result.would_revert.append(lid)
+            continue
+        query = f"local_id=eq.{urllib.parse.quote(lid, safe='')}&structured_json=not.is.null"
+        if transport.patch(query, {"structured_json": None}) == 1:
+            result.reverted.append(lid)
+        else:
+            result.changed_elsewhere.append(lid)
+    return result
 
 
 def load_creds(env_path: Path) -> tuple[str, str]:
@@ -169,6 +208,17 @@ class RestTransport:
                 state[str(r["local_id"])] = r["structured_json"] is not None
         return state
 
+    def get_remote_values(self, local_ids: list[str]) -> dict[str, str | None]:
+        """되돌리기 대조용. 값은 지문 계산에만 쓰고 출력하지 않는다."""
+        values: dict[str, str | None] = {}
+        for i in range(0, len(local_ids), BATCH):
+            chunk = local_ids[i:i + BATCH]
+            ids = ",".join(urllib.parse.quote(f'"{x}"', safe='"') for x in chunk)
+            for r in self._call("GET", f"select=local_id,structured_json&local_id=in.({ids})", None, {}):
+                v = r["structured_json"]
+                values[str(r["local_id"])] = None if v is None else (v if isinstance(v, str) else json.dumps(v, ensure_ascii=False))
+        return values
+
     def patch(self, query: str, body: dict) -> int:
         rows = self._call("PATCH", f"{query}&select=local_id", body, {"Prefer": "return=representation"})
         return len(rows)
@@ -181,10 +231,18 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--apply", action="store_true")
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--ledger", type=Path, default=None)
+    ap.add_argument("--rollback", action="store_true", help="장부 기준 되돌리기(--apply 없으면 대상만 센다)")
     args = ap.parse_args(argv)
     url, key = load_creds(args.env)
     rows = load_local_rows(args.db, args.limit)
     transport = RestTransport(url, key)
+    if args.rollback:
+        ledger = args.ledger or Path.home() / "valuehire-private" / "llm-wiki" / "backfill-ledger.jsonl"
+        rb = rollback_from_ledger(transport, ledger, {r.local_id: r.structured_json for r in rows}, apply=args.apply)
+        print(json.dumps({"mode": "rollback-apply" if args.apply else "rollback-dry-run", "reverted": len(rb.reverted),
+                          "would_revert": len(rb.would_revert), "changed_elsewhere": len(rb.changed_elsewhere),
+                          "already_null": len(rb.already_null), "not_ours": len(rb.not_ours), "ledger": str(ledger)}, ensure_ascii=False))
+        return 0
     remote = transport.get_remote_state([r.local_id for r in rows])
     plan = plan_backfill(rows, remote)
     ledger = args.ledger or Path.home() / "valuehire-private" / "llm-wiki" / "backfill-ledger.jsonl"

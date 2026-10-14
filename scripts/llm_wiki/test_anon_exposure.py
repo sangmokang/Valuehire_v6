@@ -97,6 +97,12 @@ class CollectTests(unittest.TestCase):
         stats = ax.collect("https://x", "k", ["a", "b", "c"], counter=self._counter({"a": DENIED, "b": (403, DENIED[1]), "c": 7}))
         self.assertEqual([(s.name, s.count, s.error) for s in stats], [("a", 0, None), ("b", 0, None), ("c", 7, None)])
 
+    def test_head_without_body_is_classified_by_get_lookup(self):
+        # 운영 실측(2026-10-14 14:09): HEAD 의 401 은 본문이 없다. GET 재조회로 42501 이면 차단, 아니면 오류.
+        stats = ax.collect("https://x", "k", ["a", "b"], counter=self._counter({"a": (401, b""), "b": (401, b"")}),
+                           denial_lookup=lambda base, key, name: {"code": "42501"} if name == "a" else {"message": "Invalid API key"})
+        self.assertEqual([(s.name, s.count) for s in stats], [("a", 0), ("b", None)])
+
     def test_invalid_api_key_401_is_error_not_blocked(self):
         # Codex 2026-10-14 결함 1: 무효 키의 401 을 차단 성공으로 세면 안 된다
         stats = ax.collect("https://x", "k", ["a"], counter=self._counter({"a": BAD_KEY}))
@@ -110,7 +116,7 @@ class CollectTests(unittest.TestCase):
 
 
 class KeyProbeTests(unittest.TestCase):
-    """anon 키가 살아 있는지 양성 대조군: PostgREST 루트(/rest/v1/)는 유효 키면 200, 무효 키면 401."""
+    """anon 키가 살아 있는지 양성 대조군: 탐침 객체에 2xx 또는 권한 거부(42501)면 인증됨, "Invalid API key" 401 이면 죽은 키."""
 
     def test_valid_key_probe_true_and_invalid_false(self):
         class OK:
@@ -118,6 +124,10 @@ class KeyProbeTests(unittest.TestCase):
             def __enter__(self): return self
             def __exit__(self, *a): return False
         self.assertTrue(ax.key_is_valid("https://x", "k", opener=lambda req, timeout: OK()))
+
+        def denied(req, timeout):
+            raise urllib.error.HTTPError(req.full_url, 401, "x", {}, io.BytesIO(DENIED[1]))
+        self.assertTrue(ax.key_is_valid("https://x", "k", opener=denied))
 
         def bad(req, timeout):
             raise urllib.error.HTTPError(req.full_url, 401, "x", {}, io.BytesIO(BAD_KEY[1]))

@@ -7,7 +7,7 @@ set -u
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || { echo "VERDICT: FAIL (root 진입 실패)"; exit 1; }
 fail=0
-MIN_TESTS=36
+MIN_TESTS=45
 LOGDIR="$(mktemp -d)"
 MODULES="scripts.llm_wiki.test_backfill_structured_profiles scripts.llm_wiki.test_field_audit scripts.llm_wiki.test_anon_exposure"
 
@@ -44,17 +44,39 @@ mutate drop_hash_check backfill_structured_profiles.py 's/for key in \("source",
 mutate duplicate_threshold field_audit.py 's/if key in found:/if False:/' test_duplicate_field_row_is_rejected
 mutate anon_exposed_pass anon_exposure_audit.py 's/elif stat.count:/elif False:/' test_exposed_count_is_fail
 mutate anon_nonzero_allow anon_exposure_audit.py 's/if raw != "0":/if False:/' test_non_zero_allowance_is_rejected
+mutate anon_bad_key_as_blocked anon_exposure_audit.py 's/ and body\.get\("code"\) == "42501":/:/' test_invalid_api_key_401_is_error_not_blocked
+mutate rollback_ignores_digest backfill_structured_profiles.py 's/if local is None or canonical_digest\(remote\) != canonical_digest\(local\):/if local is None:/' test_rollback_nulls_only_rows_we_wrote_and_still_hold_our_value
 
-# SOT 문턱 표: 필수 필드 집합이 그대로 있어야 한다(개수만 세지 않음)
-if python3 - <<'PY' </dev/null
+# SOT 문턱 표·anon 표: 필수 집합이 그대로 있어야 한다(개수만 세지 않음).
+# V1(Codex 2026-10-14) 결함 3: 이전에는 heredoc 뒤의 </dev/null 이 stdin 을 덮어 Python 이 빈 프로그램을 실행했다(항상 PASS).
+# 그래서 검사기 자체를 양성(원본 PASS)·음성(필수 행 삭제 → FAIL) 한 쌍으로 재어 검사기가 살아 있음을 증명한다.
+sot_check() { # $1 SOT 경로 → rc 0 통과 / 1 위반
+  python3 - "$1" <<'PY'
+import sys
 from pathlib import Path
 from scripts.llm_wiki.field_audit import parse_thresholds
-t = parse_thresholds(Path("docs/sot/llm-wiki.md").read_text(encoding="utf-8"))
+from scripts.llm_wiki.anon_exposure_audit import parse_anon_zero_objects, REQUIRED_OBJECTS
+text = Path(sys.argv[1]).read_text(encoding="utf-8")
+t = parse_thresholds(text)
 required = {("profile_archives", "structured_json"), ("pipeline_candidates", "ai_assessment"), ("pipeline_candidates", "resume_data"),
             ("pipeline_candidates", "email"), ("sourcing_results", "fit_reason"), ("gmail_derived_events", "candidate_id")}
 missing = required - set(t)
 assert not missing, f"필수 필드 누락: {sorted(missing)}"
+objs = parse_anon_zero_objects(text)  # 필수 7객체·형식은 파서가 거부한다
+assert set(objs) >= REQUIRED_OBJECTS, objs
+print(f"SOT_CHECK thresholds={len(t)} anon_objects={len(objs)}")
 PY
-then echo "SOT_THRESHOLDS: PASS"; else echo "SOT_THRESHOLDS: FAIL"; fail=1; fi
+}
+if sot_check docs/sot/llm-wiki.md </dev/null; then echo "SOT_THRESHOLDS: PASS"; else echo "SOT_THRESHOLDS: FAIL"; fail=1; fi
+sot_tmp="$(mktemp -d)"
+sed '/^| gmail_derived_events.candidate_id |/d' docs/sot/llm-wiki.md > "$sot_tmp/missing-field.md"
+sed 's/^| gmail_messages | 0 |$/| `gmail_messages` | 0 |/' docs/sot/llm-wiki.md > "$sot_tmp/backtick-anon.md"
+sed '/^| candidates | 0 |$/d' docs/sot/llm-wiki.md > "$sot_tmp/missing-anon.md"
+for neg in missing-field backtick-anon missing-anon; do
+  if cmp -s "$sot_tmp/$neg.md" docs/sot/llm-wiki.md; then echo "SOT_NEGATIVE[$neg]: FAIL (변조가 적용되지 않음)"; fail=1
+  elif sot_check "$sot_tmp/$neg.md" </dev/null >/dev/null 2>&1; then echo "SOT_NEGATIVE[$neg]: FAIL (필수 행을 지워도 통과 — 검사기가 죽어 있다)"; fail=1
+  else echo "SOT_NEGATIVE[$neg]: PASS (차단)"; fi
+done
+rm -rf "$sot_tmp"
 
 if [ "$fail" -eq 0 ]; then echo "VERDICT: PASS"; rm -rf "$LOGDIR"; exit 0; else echo "VERDICT: FAIL (logs: $LOGDIR)"; exit 1; fi
