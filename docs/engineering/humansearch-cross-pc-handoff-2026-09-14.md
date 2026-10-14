@@ -132,7 +132,7 @@ docs/engineering/humansearch-cross-pc-handoff-2026-09-14.md와
 docs/engineering/humansearch-execution-prompt-v5-2026-09-14.md를 끝까지 읽고 이어서 실행하라.
 docs/engineering/humansearch-hs13-followup-source-2026-09-12.md는 과거 원문이다.
 9월 14일 최신 사용자 결정과 후속 지시가 충돌하는 과거 제한·작성자·절대경로·SHA보다 우선한다.
-과거 /Users/kangsangmo/Desktop/Valuehire_v6 경로는 현재 clone 루트로 치환하라.
+과거 사용자 홈 아래 Desktop/Valuehire_v6 경로는 현재 clone 루트로 치환하라.
 Desktop의 두 프롬프트는 위 저장소 문서로 회수하라.
 HS00~12 장부와 kickoff는 이 안내 브랜치의 docs/engineering/ 경로에서 회수하라.
 나머지 goal/SOT는 담당 원격 브랜치에서 확인하라.

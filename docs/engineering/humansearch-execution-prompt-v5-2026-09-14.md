@@ -20,14 +20,14 @@ HumanSearch 후속 구현을 진행하라. 목표는 기존 HS-13 결함을 해�
 
 ## 2. 먼저 회수할 자료
 
-기준 작업 디렉터리는 /Users/kangsangmo/Desktop/Valuehire_v6 이다. 아래는 회수 포인터이며 현재 상태를 고정하는 값이 아니다.
+작성 당시 기준 작업 디렉터리는 사용자 홈 아래 Desktop/Valuehire_v6이었다. 아래는 회수 포인터이며 현재 상태를 고정하는 값이 아니다.
 
 1. AGENTS.md 및 현재 적용되는 docs/sot/git-workflow.md, coding-principles.md, verification-commands.md, humansearch-browser-contract.md, humansearch-l0-surface-contract.md.
-2. /Users/kangsangmo/Desktop/hs13-followup-prompt.md — 9월 12일 결함 6건·불변식·수신자 정규화·심각도별 처리 지시.
+2. `humansearch-hs13-followup-source-2026-09-12.md` — 9월 12일 결함 6건·불변식·수신자 정규화·심각도별 처리 지시.
 3. worktrees/hs-13-stack-20260910/docs/engineering/humansearch-hs13-position-brief-goal-2026-09-10.md — HS-13 요구·계약·작업 장부.
 4. worktrees/hs-0004-recovery-20260910/docs/engineering/humansearch-next-issues-wu-2026-09-10.md — HS-00~12의 인수 기준과 의존성.
 5. 같은 워크트리의 docs/engineering/goal-prompts/humansearch-journey-kickoff-2026-09-07.md — 9월 8일 결정이 반영된 v7.
-6. 필요하면 /Users/kangsangmo/.claude/projects/-Users-kangsangmo-Desktop-Valuehire-v6/memory/ 안의 project_hs13_brief_spec_state_20260910.md, project_humansearch_owner_decisions_20260908.md를 회수한다. 메모리는 탐색 보조이며 코드·사용자 원문보다 우선하지 않는다.
+6. 필요하면 현재 계정의 Claude 프로젝트 메모리에서 project_hs13_brief_spec_state_20260910.md, project_humansearch_owner_decisions_20260908.md를 회수한다. 메모리는 탐색 보조이며 코드·사용자 원문보다 우선하지 않는다.
 
 파일이 없으면 관련 Git 브랜치·커밋에서 회수한다. 오래된 절대경로·CLI 버전·모델명·커밋 SHA를 그대로 실행하지 말고 현재 환경에 맞게 확인한다. 적용되는 strict 스킬을 읽고 사용하되, 과거 실행자 이름을 현재 검토자나 커밋 작성자로 가장하지 않는다.
 

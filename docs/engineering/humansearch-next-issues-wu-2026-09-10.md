@@ -368,4 +368,4 @@ AC 명령·결과 / Codeaudit / 적대 검증 / live·CI·SHA 상태:
 → 숫자 하나의 전체 진행률 대신 검증·병합된 WU 수와 실제 사용자 여정 성공 여부를 함께 보고한다.
 GitHub Issue 등록은 별도 게시 작업이다. 이 로컬 문서 저장만으로 등록됐다고 말하지 않는다.
 
-운영용 복사 프롬프트는 [실행 프롬프트](goal-prompts/humansearch-next-execution-2026-09-10.md)다.
+운영용 복사 프롬프트는 [현행 실행 프롬프트](humansearch-execution-prompt-v5-2026-09-14.md)다.

@@ -1,7 +1,7 @@
 /strict HS-13 PR #83 후속 — 사장님 결정 B: 발송 무결성 결함을 전부 고친 뒤에만 merge 가능 상태로 만든다. 나는 자리를 비우니 웬만한 판단은 네가 하고, 파괴적 작업·외부 발송·후보 접촉만 멈춰라. "CI 초록 = 안전"이 아니다 — 이 PR은 CI 초록 상태에서 적대 검토가 S1 2건을 찾은 반례다. 이전 기록의 "코드 자체는 합격" 표현은 뒤집혔으니 PR·Issue 갱신 때 지워라.
 
 ## 대상·상태
-- 워크트리 /Users/kangsangmo/Desktop/Valuehire_v6/worktrees/hs-13-stack-20260910 (브랜치 task/hs-13-stack-20260910, HEAD 767d027 = 원격 = PR #83). 이 워크트리에서만. main 직접 수정 금지.
+- 워크트리 `worktrees/hs-13-stack-20260910` (브랜치 task/hs-13-stack-20260910, HEAD 767d027 = 원격 = PR #83). 이 워크트리에서만. main 직접 수정 금지.
 - 정본 스펙 docs/engineering/humansearch-hs13-position-brief-goal-2026-09-10.md, 검사기 scripts/acceptance-hs-1300.sh(+-mutations.sh), 코드 humansearch/src/humansearch/brief/, 시험 humansearch/tests/test_hs_13*.py, 계약 contracts/humansearch/*.json. Issue #82. 메모리 project_hs13_brief_spec_state_20260910.md 를 먼저 읽어라.
 
 ## 이번 작업이 지켜야 할 불변식 3개 (코드 + 시험으로 박는다)
@@ -20,11 +20,11 @@ S2-6) 카드 13.10 VERIFIED·PR 본문 "PRODUCTION_VERIFIED" → "legacy artifac
 낮음(같은 PR, 시간이 남으면): 검사기 글자 수 wc -m·${#var} 를 perl -CS 로 통일 + LC_ALL=C 변이 · LINKEDIN_FRAME_LINES 를 "제목:"·"문의:" 만 접두, 나머지는 완전 일치 · 한계②·카드 13.09 "(정적 검사)" 문구 정정 · 카드 13.05 "절 누락 거부" 시험 · §5 시그니처 6곳 갱신 · 카드 수 "18"→22 · registry 에 hs-1305-pii-mutations 추가 · scripts/verify/check-mechanism-registry.sh 를 CI 스텝으로 배선(+verification-commands·registry 동기화) · may_send 가 장부를 쓰는 사실 문서화 · git diff --check 빈 줄.
 
 ## 규칙
-- L3. 후보 PII·실 URL·실 이메일은 git·PR·판정 파일·로그에 0(fixture 는 example-·holder@valueconnect.kr·@example.com 만). 후보 발송 절대 금지. 라이브·재발송은 사장님 지시 없이는 하지 않는다. linkedin.com 직접 열람 금지.
+- L3. 후보 PII·실 URL·실 이메일은 git·PR·판정 파일·로그에 0(fixture 는 example-·holder@example.com 만). 후보 발송 절대 금지. 라이브·재발송은 사장님 지시 없이는 하지 않는다. linkedin.com 직접 열람 금지.
 - 워크트리 1개=PR 1개. 결함마다 RED 시험 커밋 → GREEN 커밋(이 저장소 하네스 게이트 2 규칙 — 실패 증거를 이력에 남긴다). 시험 약화 금지(P13), CHECKED 불변식(P20), 운영 상수는 계약 파일(P22), 파일 300줄 soft(P11).
 - 검사기는 커밋 전에 UTF-8 과 LC_ALL=C LANG=C 양쪽으로 돌려라. printf|grep -q 금지.
 - 커밋 메시지 한국어, 끝에 Co-Authored-By: Claude 줄. merge 는 사용자만(USER_MERGE_ONLY).
-- Codex 적대 검토: 프롬프트에 백틱 금지. node /Users/kangsangmo/.claude/plugins/cache/openai-codex/codex/1.0.2/scripts/codex-companion.mjs adversarial-review --background --base fc6beed --scope branch '<프롬프트>' ; 결과는 같은 디렉터리에서 codex-companion.mjs result. 명시된 한계 4종(승인 재발송 at-least-once·같은 UID 파일 삭제/위조·산문 의미 적합성·core_tokens 형태소 경계)은 차단 아님. **triage 규칙: 최대 2회 검토 뒤 남은 지적은 하나씩 등급을 매긴다. S1(발송 권한·PII·검증 무결성)은 라운드 수와 무관하게 merge 차단으로 유지하고 고친다. S2 이하만, 사유를 적고 Issue #82 부채로 넘긴다.**
+- Codex 적대 검토: 프롬프트에 백틱 금지. 설치된 codex-companion.mjs에서 adversarial-review --background --base fc6beed --scope branch '<프롬프트>'를 실행하고 result로 회수한다. 명시된 한계 4종(승인 재발송 at-least-once·같은 UID 파일 삭제/위조·산문 의미 적합성·core_tokens 형태소 경계)은 차단 아님. **triage 규칙: 최대 2회 검토 뒤 남은 지적은 하나씩 등급을 매긴다. S1(발송 권한·PII·검증 무결성)은 라운드 수와 무관하게 merge 차단으로 유지하고 고친다. S2 이하만, 사유를 적고 Issue #82 부채로 넘긴다.**
 
 ## 완료 조건 (전부 fresh 실행 증거)
 - I1: 본문/수신자/둘 다 변경 시 claim 거부 RED→GREEN.
