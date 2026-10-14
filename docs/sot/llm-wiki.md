@@ -44,6 +44,20 @@ LLM 위키는 새 저장소가 아니다. 운영 Supabase(v4 프로젝트)의 �
 
 판정: 하한 미달·검사 대상 0건·표에 있는데 집계 없음 → FAIL, 조회 오류 → NOT_RUN(rc 2). 자격증명이 없어도 PASS 가 아니다. 값(개인정보)은 읽지 않는다.
 
+### 4-b. 익명(anon) 키 허용 건수 — 전부 0
+
+`scripts/llm_wiki/anon_exposure_audit.py --env <v4 .env.local>` 가 이 표를 읽어 **비로그인 anon 키**로 각 객체의 건수를 HEAD 로 센다. 허용 건수는 0 만 쓸 수 있다(다른 숫자는 정본 오류로 거부). 1건이라도 보이면 FAIL, 401/403 은 차단된 것이므로 0 으로 센다. 2026-10-14 13:45 실측은 아래 전부 노출(§5 ⓪ 적용 전).
+
+| 객체 | anon 허용 건수 |
+|---|---|
+| profile_archives | 0 |
+| gmail_messages | 0 |
+| gmail_sync_state | 0 |
+| candidates | 0 |
+| pipeline_candidates_active | 0 |
+| pipeline_candidates_archive | 0 |
+| unified_candidate_history_view | 0 |
+
 ## 5. 복구 절차와 순서 (고정)
 
 | # | 작업 | 선행 조건 | 도구 | 되돌리기 |
