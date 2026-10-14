@@ -7,10 +7,11 @@ set -u
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || { echo "VERDICT: FAIL (root 진입 실패)"; exit 1; }
 fail=0
-MIN_TESTS=25
+MIN_TESTS=36
 LOGDIR="$(mktemp -d)"
+MODULES="scripts.llm_wiki.test_backfill_structured_profiles scripts.llm_wiki.test_field_audit scripts.llm_wiki.test_anon_exposure"
 
-run_tests() { env -u GIT_DIR -u GIT_WORK_TREE python3 -m unittest scripts.llm_wiki.test_backfill_structured_profiles scripts.llm_wiki.test_field_audit 2>&1 </dev/null; }
+run_tests() { env -u GIT_DIR -u GIT_WORK_TREE python3 -m unittest $MODULES 2>&1 </dev/null; }
 
 out="$(run_tests)"; rc=$?
 ran="$(printf '%s\n' "$out" | sed -nE 's/^Ran ([0-9]+) tests?.*/\1/p' | tail -1)"
@@ -26,7 +27,7 @@ mutate() { # $1 라벨, $2 파일, $3 sed 식, $4 기대 실패 시험 이름
   find "$tmp" -name __pycache__ -type d -prune -exec rm -rf {} +
   sed -i.bak -E "$3" "$tmp/scripts/llm_wiki/$2" && rm -f "$tmp/scripts/llm_wiki/$2.bak"
   if cmp -s "$tmp/scripts/llm_wiki/$2" "$ROOT/scripts/llm_wiki/$2"; then echo "MUTATION[$1]: FAIL (변조가 적용되지 않음)"; fail=1; rm -rf "$tmp"; return; fi
-  (cd "$tmp" && env -u GIT_DIR -u GIT_WORK_TREE python3 -m unittest scripts.llm_wiki.test_backfill_structured_profiles scripts.llm_wiki.test_field_audit </dev/null) > "$log" 2>&1
+  (cd "$tmp" && env -u GIT_DIR -u GIT_WORK_TREE python3 -m unittest $MODULES </dev/null) > "$log" 2>&1
   local mrc=$?
   if [ "$mrc" -eq 0 ]; then echo "MUTATION[$1]: FAIL (변조가 살아남음)"; fail=1
   elif /usr/bin/grep -qE "SyntaxError|ImportError|ModuleNotFoundError|IndentationError" "$log"; then echo "MUTATION[$1]: FAIL (실행 오류로 종료 — 차단 증거 아님)"; tail -5 "$log"; fail=1
@@ -41,6 +42,8 @@ mutate zero_total_pass field_audit.py 's/if not stat.total:/if stat.total is Non
 mutate swallow_http_error backfill_structured_profiles.py 's/^([[:space:]]+)raise$/\1matched = 0/' test_intent_is_written_before_patch_and_error_is_recorded
 mutate drop_hash_check backfill_structured_profiles.py 's/for key in \("source", "input_hash"\):/for key in ("source",):/' test_non_string_or_empty_hash_is_invalid
 mutate duplicate_threshold field_audit.py 's/if key in found:/if False:/' test_duplicate_field_row_is_rejected
+mutate anon_exposed_pass anon_exposure_audit.py 's/elif stat.count:/elif False:/' test_exposed_count_is_fail
+mutate anon_nonzero_allow anon_exposure_audit.py 's/if raw != "0":/if False:/' test_non_zero_allowance_is_rejected
 
 # SOT 문턱 표: 필수 필드 집합이 그대로 있어야 한다(개수만 세지 않음)
 if python3 - <<'PY' </dev/null
