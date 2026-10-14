@@ -1,0 +1,9 @@
+{
+  "purpose": "Local shadow dashboard host samples that must be rejected as non-loopback bind targets.",
+  "must_reject": [
+    "",
+    "0.0.0.0",
+    "192.168.0.10",
+    "::"
+  ]
+}

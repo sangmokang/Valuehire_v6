@@ -1,0 +1,4 @@
+{
+  "purpose": "Chrome DevTools Protocol read-only method names consumed by HumanSearch transport tests and implementation.",
+  "evaluate_method": "Runtime.evaluate"
+}
