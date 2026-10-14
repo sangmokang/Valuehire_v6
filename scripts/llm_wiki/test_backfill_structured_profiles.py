@@ -103,6 +103,97 @@ class ApplyTests(unittest.TestCase):
         self.assertEqual(result.unmatched, ["a"])
 
 
+class LedgerDurabilityTests(unittest.TestCase):
+    """V1 결함 4: 응답을 못 받은 행도 장부로 추적할 수 있어야 한다."""
+
+    def test_intent_is_written_before_patch_and_error_is_recorded(self):
+        class Boom(FakeTransport):
+            def patch(self, url_query, body):
+                if "local_id=eq.b" in url_query:
+                    raise OSError("connection lost")
+                return super().patch(url_query, body)
+
+        t = Boom({"a": False, "b": False, "c": False})
+        plan = bf.plan_backfill([_local("a"), _local("b"), _local("c")], t.get_remote_state(["a", "b", "c"]))
+        with tempfile.TemporaryDirectory() as d:
+            ledger = Path(d) / "l.jsonl"
+            with self.assertRaises(OSError):
+                bf.apply_plan(t, plan, ledger, apply=True)
+            lines = [json.loads(l) for l in ledger.read_text().splitlines()]
+        phases = [(l["local_id"], l["phase"]) for l in lines]
+        self.assertEqual(phases, [("a", "intent"), ("a", "done"), ("b", "intent"), ("b", "error")])
+        self.assertIn("connection lost", lines[-1]["error"])
+        self.assertEqual(len(t.writes), 2)  # c 는 시도되지 않았다
+
+
+class StructuredValidityTests(unittest.TestCase):
+    """V1 결함 5: 표식 존재가 아니라 최소 내용 규약을 본다."""
+
+    def _plan_one(self, body):
+        return bf.plan_backfill([_local("x", body)], {"x": False})
+
+    def test_meta_only_object_is_invalid(self):
+        self.assertEqual(self._plan_one(json.dumps({"_meta": {"source": "t", "input_hash": "h1"}})).to_fill, [])
+
+    def test_non_string_or_empty_hash_is_invalid(self):
+        for h in (123, True, "", None):
+            self.assertEqual(self._plan_one(json.dumps({"salary_man": 1, "_meta": {"source": "t", "input_hash": h}})).to_fill, [], h)
+
+    def test_missing_source_is_invalid(self):
+        self.assertEqual(self._plan_one(json.dumps({"salary_man": 1, "_meta": {"input_hash": "h1"}})).to_fill, [])
+
+    def test_all_fields_null_is_invalid(self):
+        self.assertEqual(self._plan_one(json.dumps({"salary_man": None, "major": None, "_meta": {"source": "t", "input_hash": "h1"}})).to_fill, [])
+
+
+class RestTransportTests(unittest.TestCase):
+    """V1 결함 1: 실제 전송 객체의 질의·본문·반환 조건·오류 전파를 고정한다."""
+
+    def _transport(self, responder):
+        calls = []
+
+        def opener(req, timeout):
+            calls.append(req)
+            return responder(req)
+
+        return bf.RestTransport("https://x.supabase.co", "k", opener=opener), calls
+
+    def test_get_remote_state_query_and_mapping(self):
+        class R:
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def read(self): return json.dumps([{"local_id": "a", "structured_json": None}, {"local_id": "b", "structured_json": {"k": 1}}]).encode()
+        t, calls = self._transport(lambda req: R())
+        state = t.get_remote_state(["a", "b"])
+        self.assertEqual(state, {"a": False, "b": True})
+        self.assertEqual(calls[0].get_method(), "GET")
+        self.assertIn("select=local_id,structured_json", calls[0].full_url)
+        self.assertIn("local_id=in.(", calls[0].full_url)
+
+    def test_patch_sends_guard_body_and_representation(self):
+        class R:
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def read(self): return json.dumps([{"local_id": "a"}]).encode()
+        t, calls = self._transport(lambda req: R())
+        n = t.patch("local_id=eq.a&structured_json=is.null", {"structured_json": {"k": 1}})
+        self.assertEqual(n, 1)
+        req = calls[0]
+        self.assertEqual(req.get_method(), "PATCH")
+        self.assertIn("structured_json=is.null", req.full_url)
+        self.assertEqual(req.get_header("Prefer"), "return=representation")
+        self.assertEqual(json.loads(req.data), {"structured_json": {"k": 1}})
+
+    def test_http_error_propagates_not_zero(self):
+        import urllib.error
+
+        def boom(req):
+            raise urllib.error.HTTPError(req.full_url, 401, "unauthorized", {}, None)
+        t, _ = self._transport(boom)
+        with self.assertRaises(urllib.error.HTTPError):
+            t.patch("local_id=eq.a&structured_json=is.null", {"structured_json": {}})
+
+
 class CredsTests(unittest.TestCase):
     def test_missing_creds_is_not_run_exit_2(self):
         with tempfile.NamedTemporaryFile("w", suffix=".env", delete=False) as f:

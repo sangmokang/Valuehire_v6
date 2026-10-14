@@ -41,6 +41,23 @@ class JudgeTests(unittest.TestCase):
         self.assertEqual(got[("profile_archives", "structured_json")], 60.0)
         self.assertEqual(got[("gmail_derived_events", "candidate_id")], 0.0)
 
+    def test_duplicate_field_row_is_rejected(self):
+        # V1 결함 3: 같은 필드를 두 번 적으면 낮은 값으로 덮이지 않고 거부한다
+        md = "| 객체.필드 | 최소 채움률 |\n|---|---|\n| t.c | 75 |\n| t.c | 0 |\n"
+        with self.assertRaises(ValueError):
+            fa.parse_thresholds(md)
+
+    def test_unparseable_number_row_is_rejected_not_dropped(self):
+        md = "| 객체.필드 | 최소 채움률 |\n|---|---|\n| t.c | 50% |\n| t.d | 10 |\n"
+        with self.assertRaises(ValueError):
+            fa.parse_thresholds(md)
+
+    def test_decimal_threshold_is_not_truncated(self):
+        md = "| 객체.필드 | 최소 채움률 |\n|---|---|\n| t.c | 2.4 |\n"
+        self.assertEqual(fa.parse_thresholds(md)[("t", "c")], 2.4)
+        rows = [fa.FieldStat("t", "c", total=1000, nulls=977)]  # 2.3% < 2.4
+        self.assertEqual(fa.judge(rows, {("t", "c"): 2.4}).status, "FAIL")
+
     def test_empty_threshold_table_is_rejected(self):
         with self.assertRaises(ValueError):
             fa.parse_thresholds("# 아무 표 없음\n")
