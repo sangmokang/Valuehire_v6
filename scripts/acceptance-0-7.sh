@@ -7,7 +7,7 @@
 # 0-7 인수 스크립트 — 로컬 강제 장치(git hook)가 실제로 위반을 차단하는가.
 #
 # 계약: docs/sot/hook-contracts.md
-#   출력  : exit 0 (6종 전부 BLOCKED) | exit 1 (하나라도 통과·위양성·셋업 실패)
+#   출력  : exit 0 (위반 11종 전부 BLOCKED + 정상 편집 2종 통과) | exit 1 (하나라도 통과·위양성·오탐·셋업 실패)
 #   불변식: 모든 시연은 mktemp -d 안의 clone 에서 수행한다. 원본 저장소를 건드리지 않는다.
 #          검사를 실행하지 못한 경우도 실패로 판정한다(fail-closed).
 #
@@ -44,7 +44,7 @@ if [ -n "${VH_PREPUSH_DEPTH:-}" ]; then
   exit 1
 fi
 
-TOTAL=6
+TOTAL=11
 fail=0
 step=0
 
@@ -191,6 +191,81 @@ demo "가짜 외부효과 모듈" \
    test -s src/portal-login.js' \
   'git add src/portal-login.js && git commit -m "feat: portal login"'
 
+# 7. CI 워크플로에서 검사 스텝을 삭제 (p13-deletion-blindspot · 이슈 #131)
+#
+#    P13 약화 탐지(§3)는 추가된 줄만 본다. 스텝 블록을 통째로 지우면 추가 줄이 0줄이라
+#    어떤 패턴에도 걸리지 않는다. 지우는 대상은 억제 만료 스캔 — 지워지면 만료된 억제가
+#    CI 에서 영구히 통과한다.
+demo "워크플로 스텝 삭제" \
+  'perl -0pi -e "s/\n      - name: 억제 만료 스캔.*?(?=\n      - name: )//s" .github/workflows/verify.yml
+   ! grep -q "억제 만료 스캔" .github/workflows/verify.yml' \
+  'git add .github/workflows/verify.yml && git commit -m "ci: drop step"'
+
+# 8. CI 워크플로 파일 자체를 삭제 — 삭제만 있는 커밋도 훅을 지나야 한다
+demo "워크플로 파일 삭제" \
+  'git rm -q .github/workflows/verify.yml
+   test ! -e .github/workflows/verify.yml' \
+  'git commit -m "ci: drop workflow"'
+
+# 9. 워크플로를 스텝이 빠진 사본의 심볼릭 링크로 교체 — git 은 D 도 M 도 아닌 T(타입
+#    변경)로 분류한다. 변경 종류를 나열해 고르면 이런 종류가 빠진다(Codex 적대 리뷰 실측).
+demo "워크플로 심볼릭 링크 교체" \
+  'perl -0pe "s/\n      - name: 억제 만료 스캔.*?(?=\n      - name: )//s" .github/workflows/verify.yml > .github/verify-muted.yml
+   rm .github/workflows/verify.yml && ln -s ../verify-muted.yml .github/workflows/verify.yml
+   test -L .github/workflows/verify.yml && ! grep -q "억제 만료 스캔" .github/verify-muted.yml' \
+  'git add .github/workflows/verify.yml .github/verify-muted.yml && git commit -m "ci: swap to symlink"'
+
+# 10. YAML 파서를 실행하지 못해도 스텝 삭제가 통과하면 안 된다.
+# shim 은 추적 트리 밖에 두어 Ruby 실패만 커밋 훅에 주입한다.
+demo "Ruby 실행 실패 중 워크플로 스텝 삭제" \
+  'perl -0pi -e "s/\n      - name: 억제 만료 스캔.*?(?=\n      - name: )//s" .github/workflows/verify.yml
+   ! grep -q "억제 만료 스캔" .github/workflows/verify.yml
+   mkdir -p "$sandbox/ruby-shim"
+   printf "#!/bin/sh\nexit 1\n" > "$sandbox/ruby-shim/ruby"
+   chmod +x "$sandbox/ruby-shim/ruby"' \
+  'git add .github/workflows/verify.yml && PATH="$sandbox/ruby-shim:$PATH" git commit -m "ci: drop step without parser"'
+
+# 11. Git 이 따옴표·이스케이프로 출력하는 경로도 실제 HEAD blob 에 도달해야 한다.
+# 기존 워크플로를 한글 이름으로 옮긴 fixture 를 먼저 만들고, 그 파일을 삭제한다.
+demo "한글 이름 워크플로 파일 삭제" \
+  'git mv .github/workflows/verify.yml .github/workflows/검사.yml
+   git -c core.hooksPath=/dev/null commit -qm "fixture: unicode workflow"
+   git rm -q .github/workflows/검사.yml
+   test ! -e .github/workflows/검사.yml' \
+  'git commit -m "ci: drop unicode workflow"'
+
+# --- 음성 대조: 정상 편집은 통과해야 한다 ------------------------------------
+# 차단만 시험하면 "워크플로를 건드리면 전부 막는" 규칙도 초록이 된다. 같은 파일의
+# 스텝 이름 변경과, 워크플로 밖의 줄 삭제는 훅 ON 에서도 커밋되어야 한다.
+allowed() {
+  local name="$1" setup="$2" action="$3" s a
+  reset_tree; git config core.hooksPath hooks
+  set +e
+  ( eval "$setup" )  >"$outdir/setup.allow" 2>&1; s=$?
+  ( eval "$action" ) >"$outdir/act.allow"   2>&1; a=$?
+  set -e
+  reset_tree
+  if [ "$s" -ne 0 ]; then
+    printf '[대조] %s → SETUP FAILED (%d) ← 시연 무효\n' "$name" "$s"; fail=1
+  elif [ "$a" -eq 0 ]; then
+    printf '[대조] %s → 통과 ✓ 오탐 없음\n' "$name"
+  else
+    printf '[대조] %s → 오탐 ← 정상 편집이 막혔다 (exit=%d)\n' "$name" "$a"
+    sed 's/^/         /' "$outdir/act.allow" | head -3
+    fail=1
+  fi
+}
+
+allowed "워크플로 스텝 이름 변경" \
+  'perl -pi -e "s/- name: 억제 만료 스캔 /- name: 억제 만료일 스캔 /" .github/workflows/verify.yml
+   grep -q "억제 만료일 스캔" .github/workflows/verify.yml' \
+  'git add .github/workflows/verify.yml && git commit -m "ci: rename step"'
+
+allowed "워크플로 밖 줄 삭제" \
+  'perl -ni -e "print unless \$. == 3" docs/sot/hook-contracts.md
+   ! git diff --quiet -- docs/sot/hook-contracts.md' \
+  'git add docs/sot/hook-contracts.md && git commit -m "docs: trim"'
+
 # --- 원본 오염 검사 -----------------------------------------------------------
 echo
 ORIG_AFTER=$(orig_state)
@@ -203,7 +278,7 @@ fi
 
 echo
 if [ "$fail" -eq 0 ]; then
-  echo "PASS: 위반 $TOTAL 종이 전부 차단됨 (각 건 훅 OFF 대조 통과)"
+  echo "PASS: 위반 $TOTAL 종이 전부 차단됨 (각 건 훅 OFF 대조 통과) · 정상 편집 2종 통과"
   exit 0
 fi
 echo "RESULT: 차단되지 않았거나 시연이 무효인 항목이 있다. exit 1"
