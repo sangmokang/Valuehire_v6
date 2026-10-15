@@ -1,0 +1,114 @@
+name: verification-integrity
+
+# Bootstrap required: this definition AND the checker must first be reviewed on
+# the trusted default/base branch. A named status check alone does not pin this
+# workflow's identity; see docs/sot/verification-commands.md before enabling it.
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review, edited]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  verification-integrity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # No checkout, candidate helper, cache, artifact, or candidate code execution.
+      - name: Compare with the trusted base and require current review for core changes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          import subprocess
+          import tempfile
+          from pathlib import Path
+
+          def api(path):
+              return json.loads(subprocess.check_output(
+                  ['gh', 'api', '--hostname', 'github.com', path], text=True))
+
+          def approved(repo, number, base, head):
+              # GitHub, not commit metadata or a local review list, decides who
+              # may approve. In particular the last pusher cannot approve themself.
+              query = """query($owner:String!,$name:String!,$number:Int!){
+                repository(owner:$owner,name:$name){pullRequest(number:$number){
+                  headRefOid baseRefOid reviewDecision baseRef{branchProtectionRule{
+                    requiresApprovingReviews requiredApprovingReviewCount
+                    dismissesStaleReviews requireLastPushApproval isAdminEnforced
+                  }}
+                }}
+              }"""
+              owner, name = repo.split('/')
+              result = json.loads(subprocess.check_output([
+                  'gh', 'api', '--hostname', 'github.com', 'graphql', '-f', f'query={query}',
+                  '-f', f'owner={owner}', '-f', f'name={name}', '-F', f'number={number}'
+              ], text=True))
+              pr = result['data']['repository']['pullRequest']
+              policy = pr['baseRef']['branchProtectionRule']
+              if not policy:
+                  return False
+              return (pr['headRefOid'] == head and pr['baseRefOid'] == base
+                      and pr['reviewDecision'] == 'APPROVED'
+                      and policy['requiresApprovingReviews'] is True
+                      and policy['requiredApprovingReviewCount'] >= 1
+                      and policy['dismissesStaleReviews'] is True
+                      and policy['requireLastPushApproval'] is True
+                      and policy['isAdminEnforced'] is True)
+
+          def main():
+              if os.environ['GITHUB_EVENT_NAME'] != 'pull_request_target':
+                  raise ValueError('Only a trusted pull_request_target event is supported')
+              event = json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text())
+              repo = os.environ['GITHUB_REPOSITORY']
+              if not re.fullmatch(r'[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+', repo):
+                  raise ValueError('Invalid repository')
+              pr = event['pull_request']
+              number = event['number']
+              if type(number) is not int or number < 1:
+                  raise ValueError('Invalid PR number')
+              if event['repository']['full_name'] != repo or pr['base']['repo']['full_name'] != repo:
+                  raise ValueError('Unexpected base repository')
+              if pr['base']['ref'] != 'main':
+                  raise ValueError('Only the protected main base is trusted')
+              base, head = pr['base']['sha'], pr['head']['sha']
+              if any(not re.fullmatch(r'[0-9a-f]{40}', sha) for sha in (base, head)) or base == head:
+                  raise ValueError('Invalid or identical event commits')
+              current = api(f'repos/{repo}/pulls/{number}')
+              if (current['state'] != 'open' or current['base']['sha'] != base
+                      or current['head']['sha'] != head or current['base']['repo']['full_name'] != repo
+                      or current['base']['ref'] != 'main'):
+                  raise ValueError('PR moved since this event; use the new event run')
+              print(f'TRUSTED_EVENT base={base} head={head}', flush=True)
+              with tempfile.TemporaryDirectory() as temp:
+                  bare = Path(temp) / 'objects.git'
+                  subprocess.run(['git', 'init', '--bare', '--quiet', str(bare)], check=True)
+                  for sha in (base, head):
+                      subprocess.run(['git', 'fetch', '--quiet', '--no-tags', '--depth=1',
+                                      f'https://github.com/{repo}.git', sha], cwd=bare, check=True)
+                  # Never fall back to the candidate's helper if the base lacks it.
+                  source = subprocess.check_output(
+                      ['git', 'show', f'{base}:scripts/verify/check-verification-core.sh'], cwd=bare)
+                  checker = Path(temp) / 'trusted-checker.sh'
+                  checker.write_bytes(source)
+                  result = subprocess.run(['bash', str(checker), base, head], cwd=bare)
+              if result.returncode == 0:
+                  return 0
+              if result.returncode != 20:
+                  return result.returncode
+              # Reuse GitHub's existing reviews, never a PR label or PASS text.
+              if approved(repo, number, base, head):
+                  print('VERIFICATION_CORE_REVIEWED: GitHub required review approved for this base/head')
+                  return 0
+              print('VERIFICATION_CORE_CHANGED: GitHub required review pending; rerun after review')
+              return 20
+
+          if __name__ == '__main__':
+              raise SystemExit(main())
+          PY

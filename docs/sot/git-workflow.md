@@ -18,6 +18,9 @@
 
 - `main` 보호. 직접 push 금지. **오너 본인도 예외 없음**
 - 작업 브랜치 `task/<name>`, 위치 `worktrees/<name>/`, **수명 24~48시간 상한**. 초과 = 인수 기준이 너무 크다는 신호(v4: 워크트리 77개·미병합 브랜치 113개가 방치된 실측 사례)
+- 세션이 둘 이상이면 `main`에서 개발하지 않는다. 세션마다 별도 `worktrees/<name>/`와
+  `task/<name>` 브랜치를 만들고, main에 있는 tracked/untracked 변경은 소유자가 확인하기
+  전까지 checkout, reset, stash, 삭제, 덮어쓰기로 정리하지 않는다.
 - PR = 인수 기준 1개. **squash merge**, 머지 후 브랜치 삭제
 - 릴리스 = `main` 의 어노테이트 태그 `v6.YYYY.MM.DD-N` → CI가 artifact 빌드 → digest 산출 → `releases/<digest>/` 설치
 - **자동 병합 금지.** 오너가 diff를 실제로 읽는 것이 P11(코드 예산)의 존재 이유
@@ -25,6 +28,9 @@
 ## 시행 지점
 
 - 워크트리 생성: `git worktree add worktrees/<name> -b task/<name>` (이 저장소엔 아직 `make task`가 없다 — `docs/sot/verification-commands.md` 참고)
+- 원격 PR 병합과 로컬 main 갱신은 별도 사건이다. GitHub에서 PR이 병합돼도 로컬 main의
+  미커밋 파일이 즉시 바뀌지는 않는다. 로컬 파일이 바뀌는 시점은 해당 작업트리에서 사람이
+  `fetch`, `pull`, `merge`, `rebase`, `checkout`, `reset` 같은 갱신 명령을 실행할 때다.
 - `main` 보호(직접 push 금지)는 아직 GitHub 브랜치 보호 규칙으로 기계 강제되어 있는지 실행으로 재확인 필요 — 이 문서 갱신 시점 기준 미확인.
 
 ## 비범위 / 한계

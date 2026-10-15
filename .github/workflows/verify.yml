@@ -50,6 +50,11 @@ jobs:
       - name: Strict 전역 스킬 잠금 장치 격리 회귀
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-guard-global-skill-files.sh
 
+      - name: RPS InMail 골든 구조 인수 검사
+        # 골든 2건(양성 대조군) 통과 + AI 티 원고·산문 일색 원고(음성 대조군) 차단을
+        # 한 쌍으로 잰다. 2026-09-22 에 검사기가 골든을 불합격시킨 사고의 회귀 방지.
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-rps-inmail.sh
+
       - name: P3 조용한 실패 문법·오탐 회귀
         run: |
           bash scripts/verify/run-acceptance.sh scripts/acceptance-silent-failure-lint.sh
