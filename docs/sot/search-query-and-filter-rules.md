@@ -25,18 +25,23 @@
 
 1. **예산은 계정 합산이다.** Claude·Codex·아카이버 등 모든 세션과 엔진이 같은 사람인 기업계정을 쓴다. 이력서 페이지 열람, 요약 API, 파일 API는 모두 "이력서 조회 1건"이다. 인재풀 목록 페이지도 같은 간격 규칙을 따른다.
 2. **잠정 상한(다시 측정하기 전까지).** 계정 전체 합산으로 분당 2건, 연속한 2분 동안 3건, 시간당 60건, 하루 300건을 넘지 않는다. 이 수치는 사람인 이용 한도 **안에** 머물기 위한 상한이다. 탐지를 피해 더 많이 조회하려는 목표가 아니다.
-3. **간격은 무작위다. 고정 간격 루프를 금지한다.** 요청 사이는 25~75초 사이의 무작위 값으로 두되, 대부분 30~50초로 하고 가끔 60~120초로 길게 쉰다. 12~20건마다 3~8분 무작위 휴식을 넣는다. `time.sleep(4)`나 `sleep(6)`처럼 매번 같은 값은 금지한다.
+3. **간격은 무작위다. 고정 간격 루프를 금지한다.** 요청 사이는 보통 25~75초 사이의 무작위 값으로 두되, 대부분 30~50초로 하고 가끔 60~120초로 길게 쉰다. 12~20건마다 3~8분 무작위 휴식을 넣는다. **무작위 간격보다 규칙 2의 상한이 우선한다.** 매 요청 직전에 모든 세션의 로그를 합산하여 해당 요청을 포함한 최근 60초·120초·60분·당일 조회량을 확인하고, 어느 상한이든 넘게 되면 예산이 돌아올 때까지 추가로 기다린다. `time.sleep(4)`나 `sleep(6)`처럼 매번 같은 값은 금지한다.
 4. **스크롤도 무작위다.** 한 번에 내리는 거리는 화면 높이의 55~90% 사이에서 매번 바꾸고, 멈춤은 0.8~3.5초로 바꾸며, 가끔 조금 위로 되돌린다. 스크롤 횟수를 고정하지 않는다. 고정 step·고정 sleep 스크롤을 금지한다.
 5. **시작 전에 동시 실행을 확인한다.** 사람인 조회를 시작하기 전에 최근 10분의 Aside 방문 기록(아래 명령)과 실행 중인 드라이버를 확인한다. 다른 세션이 사람인 이력서를 조회 중이면 새 조회를 시작하지 않는다. 두 세션의 합계가 상한을 넘기 때문이다.
-6. **캡차·경고를 감지하면 즉시 전면 정지한다.** URL에 `/recaptcha`가 있거나, API 응답이 `captcha:true`이거나, 본문에 "반복적인 이력서 조회가 감지"가 보이면 그 드라이버를 즉시 멈추고 `BLOCKED_CAPTCHA`로 기록한다. 캡차를 자동으로 풀거나 우회하지 않는다. 사장님이 직접 인증한 뒤 **최소 30분**을 쉬고, 그 뒤에는 절반 속도로 재개한다.
-7. **캡차 화면을 성공으로 기록하지 않는다.** 본문 높이 0, 캡처 0장, 캡차 URL 중 하나라도 해당하면 `ok:false`로 기록하고 재시도 대상에 남긴다. 2026-09-30 드라이버는 캡차에 막힌 31065864를 `ok:true`로 기록해 영구 누락시켰다.
+6. **캡차·경고를 감지하면 즉시 전면 정지한다.** URL에 `/recaptcha`가 있거나, API 응답이 `captcha:true`이거나, 본문에 "반복적인 이력서 조회가 감지"가 보이면 같은 계정을 쓰는 모든 세션·드라이버의 조회를 즉시 멈추고 `BLOCKED_CAPTCHA`로 기록한다. 캡차를 자동으로 풀거나 우회하지 않는다. 해당 계정은 사장님이 직접 인증한 뒤 **최소 30분**을 쉬고, 그 뒤에는 절반 속도로 재개한다.
+7. **캡차 화면을 성공으로 기록하지 않는다.** 본문 높이 0, 캡처 0장, 캡차 URL 중 하나라도 해당하면 `ok:false`로 기록하고 재시도 대상에 남긴다. 2026-09-30 드라이버는 캡차에 막힌 이력서 1건을 `ok:true`로 기록해 영구 누락시켰다.
 8. **조회량을 기록한다.** 드라이버는 요청마다 시각·종류(page/api/list)·residx를 실행 로그에 남기고, 종료 보고에 시간당 건수와 최대 2분 건수를 적는다.
 
-측정 명령(Aside 방문 기록 사본을 읽는다. 원본은 브라우저가 잠그므로 복사해서 연다):
+측정 명령(브라우저의 잠금·저널을 존중하는 SQLite 백업으로 일관된 방문 기록 사본을 만든다. 사본은 전용 임시 디렉터리 안에서만 읽고 종료 시 삭제한다. 백업·조회가 실패하면 0건으로 해석하지 말고 조회를 시작하지 않는다):
 
 ```bash
-cp "$HOME/Library/Application Support/Aside/Default/History" /tmp/aside_h.db
-sqlite3 /tmp/aside_h.db "select substr(datetime(v.visit_time/1000000-11644473600,'unixepoch','+9 hours'),1,16) m, count(*) from visits v join urls u on u.id=v.url where u.url like '%hiring.saramin.co.kr/applicant-view%' and v.visit_time/1000000-11644473600 > cast(strftime('%s','now','-10 minutes') as int) group by m;"
+(
+  set -eu
+  saramin_history_tmp=$(mktemp -d)
+  trap 'rm -rf "$saramin_history_tmp"' EXIT
+  sqlite3 -readonly -cmd '.timeout 5000' "$HOME/Library/Application Support/Aside/Default/History" ".backup \"$saramin_history_tmp/History\""
+  sqlite3 "$saramin_history_tmp/History" "select substr(datetime(v.visit_time/1000000-11644473600,'unixepoch','+9 hours'),1,16) m, count(*) from visits v join urls u on u.id=v.url where u.url like '%hiring.saramin.co.kr/applicant-view%' and v.visit_time/1000000-11644473600 > cast(strftime('%s','now','-10 minutes') as int) group by m;"
+)
 ```
 
 → 이 명령은 최근 10분 동안 분 단위로 몇 건의 사람인 이력서 페이지가 열렸는지 보여 준다. 한 줄이라도 나오면 다른 세션이 조회 중이라는 뜻이다. `strftime`은 문자열을 돌려주므로 `cast(... as int)`를 빼면 비교가 항상 거짓이 되어 0건으로 보인다. API 호출은 방문 기록에 남지 않으므로 드라이버 로그로 따로 센다.
