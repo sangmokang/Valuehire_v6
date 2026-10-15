@@ -7,7 +7,7 @@
 # 0-7 인수 스크립트 — 로컬 강제 장치(git hook)가 실제로 위반을 차단하는가.
 #
 # 계약: docs/sot/hook-contracts.md
-#   출력  : exit 0 (위반 9종 전부 BLOCKED + 정상 편집 2종 통과) | exit 1 (하나라도 통과·위양성·오탐·셋업 실패)
+#   출력  : exit 0 (위반 11종 전부 BLOCKED + 정상 편집 2종 통과) | exit 1 (하나라도 통과·위양성·오탐·셋업 실패)
 #   불변식: 모든 시연은 mktemp -d 안의 clone 에서 수행한다. 원본 저장소를 건드리지 않는다.
 #          검사를 실행하지 못한 경우도 실패로 판정한다(fail-closed).
 #
@@ -44,7 +44,7 @@ if [ -n "${VH_PREPUSH_DEPTH:-}" ]; then
   exit 1
 fi
 
-TOTAL=9
+TOTAL=11
 fail=0
 step=0
 
@@ -214,6 +214,25 @@ demo "워크플로 심볼릭 링크 교체" \
    rm .github/workflows/verify.yml && ln -s ../verify-muted.yml .github/workflows/verify.yml
    test -L .github/workflows/verify.yml && ! grep -q "억제 만료 스캔" .github/verify-muted.yml' \
   'git add .github/workflows/verify.yml .github/verify-muted.yml && git commit -m "ci: swap to symlink"'
+
+# 10. YAML 파서를 실행하지 못해도 스텝 삭제가 통과하면 안 된다.
+# shim 은 추적 트리 밖에 두어 Ruby 실패만 커밋 훅에 주입한다.
+demo "Ruby 실행 실패 중 워크플로 스텝 삭제" \
+  'perl -0pi -e "s/\n      - name: 억제 만료 스캔.*?(?=\n      - name: )//s" .github/workflows/verify.yml
+   ! grep -q "억제 만료 스캔" .github/workflows/verify.yml
+   mkdir -p "$sandbox/ruby-shim"
+   printf "#!/bin/sh\nexit 1\n" > "$sandbox/ruby-shim/ruby"
+   chmod +x "$sandbox/ruby-shim/ruby"' \
+  'git add .github/workflows/verify.yml && PATH="$sandbox/ruby-shim:$PATH" git commit -m "ci: drop step without parser"'
+
+# 11. Git 이 따옴표·이스케이프로 출력하는 경로도 실제 HEAD blob 에 도달해야 한다.
+# 기존 워크플로를 한글 이름으로 옮긴 fixture 를 먼저 만들고, 그 파일을 삭제한다.
+demo "한글 이름 워크플로 파일 삭제" \
+  'git mv .github/workflows/verify.yml .github/workflows/검사.yml
+   git -c core.hooksPath=/dev/null commit -qm "fixture: unicode workflow"
+   git rm -q .github/workflows/검사.yml
+   test ! -e .github/workflows/검사.yml' \
+  'git commit -m "ci: drop unicode workflow"'
 
 # --- 음성 대조: 정상 편집은 통과해야 한다 ------------------------------------
 # 차단만 시험하면 "워크플로를 건드리면 전부 막는" 규칙도 초록이 된다. 같은 파일의

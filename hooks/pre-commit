@@ -40,10 +40,15 @@ count_steps() {
     puts jobs.sum { |j| j.is_a?(Hash) && j["steps"].is_a?(Array) ? j["steps"].size : 0 }'
 }
 if git rev-parse --verify -q HEAD >/dev/null; then
-  while IFS= read -r f; do
+  while IFS= read -r -d '' f; do
     [ -n "$f" ] || continue
     old=$(git show "HEAD:$f" 2>/dev/null | count_steps 2>/dev/null) || old=""
-    case "$old" in ''|*[!0-9]*) continue ;; esac   # HEAD 에 없었거나 원래 깨진 파일
+    # 추가 파일은 목록에서 제외했으므로 HEAD 조회·파서 실패는 검사 생략 사유가 아니다.
+    case "$old" in
+      ''|*[!0-9]*)
+        block "HEAD 워크플로 스텝을 셀 수 없다 — $f (조회·YAML 파싱 실패 · fail-closed)"
+        continue ;;
+    esac
     if git cat-file -e ":$f" 2>/dev/null; then
       new=$(git show ":$f" | count_steps 2>/dev/null) || new=""
     else
@@ -55,7 +60,7 @@ if git rev-parse --verify -q HEAD >/dev/null; then
            block "CI 워크플로 스텝 삭제 ${old}→${new} — $f (P13). 정당하면 suppressions.yaml 에 expiry 와 함께 등록하라"
          fi ;;
     esac
-  done < <(git diff --cached --no-renames --name-only --diff-filter=a -- '.github/workflows/*.yml' '.github/workflows/*.yaml')
+  done < <(git diff --cached --no-renames --name-only -z --diff-filter=a -- '.github/workflows/*.yml' '.github/workflows/*.yaml')
 fi
 
 if [ -z "$staged" ]; then exit "$fail"; fi
