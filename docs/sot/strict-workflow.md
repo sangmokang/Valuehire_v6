@@ -2,7 +2,7 @@
 
 최종 갱신: 2026-09-10
 
-이 문서는 `$strict`가 Codex와 Claude에서 동일한 판정·순서·승인 경계를 사용하도록 고정하는 운영 정본입니다. 원칙의 수치와 Work Unit의 필드는 각각 `coding-principles.md`, `principles.yaml`, `work-unit-policy.yaml`이 소유합니다. 이 문서는 그 값을 복제하지 않고 실행 순서와 플랫폼 공통 의미만 소유합니다.
+이 문서는 `$strict`가 Codex와 Claude에서 동일한 판정·순서·승인 경계를 사용하도록 고정하는 운영 정본입니다. 원칙의 수치는 `coding-principles.md`와 `principles.yaml`이 소유합니다. Work Unit의 필드는 `work-unit-policy.yaml`이 `docs/sot/`에 실존하고 INDEX에 등재된 경우에만 그 파일이 소유하며, 병합 전까지는 git-workflow.md 의 "작업 1개 = worktree 1개 = 브랜치 1개 = 인수 기준 1개" 규약이 Work Unit 경계의 정본입니다. 이 문서는 그 값을 복제하지 않고 실행 순서와 플랫폼 공통 의미만 소유합니다.
 
 ## 1. 플랫폼 패리티
 
@@ -57,4 +57,4 @@ RED는 로컬 증거이며 원격 PR의 완료 증거가 아닙니다. 현재 `p
 
 ## 8. 드리프트 검증
 
-Strict 실행 시작 시 `docs/sot/coding-principles.md`, `docs/sot/principles.yaml`, `docs/sot/work-unit-policy.yaml`, 이 문서를 직접 읽고 관련 acceptance/hook/CI 배선을 실행합니다. Codex와 Claude의 전역 `SKILL.md`는 이 공통 계약을 읽는 동일한 사본이어야 하며, 동기화 후 `cmp`와 `skill-creator`의 `quick_validate.py`로 각각 검증합니다.
+Strict 실행 시작 시 `docs/sot/coding-principles.md`, `docs/sot/principles.yaml`, 이 문서를 직접 읽고, `docs/sot/work-unit-policy.yaml`은 INDEX에 등재된 경우에만 함께 읽으며(병합 전까지는 git-workflow.md 의 작업 단위 규약을 대신 읽는다), 관련 acceptance/hook/CI 배선을 실행합니다. Codex와 Claude의 전역 `SKILL.md`는 이 공통 계약을 읽는 동일한 사본이어야 하며, 동기화 후 `cmp`와 `skill-creator`의 `quick_validate.py`로 각각 검증합니다.
