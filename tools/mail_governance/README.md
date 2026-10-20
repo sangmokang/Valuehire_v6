@@ -191,6 +191,25 @@ or assumed receiver label IDs does not meet that operational requirement. SQLite
 append-only triggers prevent ordinary updates/deletes; they do not secure the journal
 against a malicious database owner who can drop tables or replace the file.
 
+## Pure MIME transport builder
+
+`mime.mjs` constructs a Gmail API raw payload without credentials, filesystem access,
+or network effects. The recipient is fixed to `dev@valueconnect.kr`; it rejects header
+injection, invalid source/operation IDs and oversized encoded payloads. It includes a
+readable text/HTML body, a unique operation marker, and `original.zip` containing the
+unchanged `original.eml`. The ZIP uses STORE and CRC32 without dependencies.
+
+Live pilot readback found that a `message/rfc822` attachment and an octet-stream
+attachment named `.eml` could arrive as expanded body parts without the original file.
+The archive avoids relying on that representation. Construction tests prove payload
+properties only; a live adapter must download the received ZIP and compare the inner
+RFC bytes with the original provider raw bytes. Delivery and recipient labels remain
+separate checks. No live Gmail adapter is shipped in this directory.
+
+```sh
+node --test tools/mail_governance/test_mime.mjs
+```
+
 ## Coverage
 
 `coverage` accepts `{account, query, cursor, next_cursor, count, outcome, capped}`;
