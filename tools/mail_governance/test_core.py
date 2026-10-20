@@ -1,9 +1,12 @@
 import copy
+import hashlib
+import io
 import itertools
 import os
 import sqlite3
 import tempfile
 import unittest
+import zipfile
 
 from tools.mail_governance.core import classify, content_hash, validate
 from tools.mail_governance.journal import Journal
@@ -27,6 +30,40 @@ def fixture():
 
 
 class ClassificationTests(unittest.TestCase):
+    def test_confirmed_event_company_matches_verified_message_company(self):
+        message, review = fixture()
+        review["ontology_events"] = [dict(
+            actor="client", event_type="position_update", stage="unknown", reason_quote=None,
+            company_id="company-1", position_id="position-1", candidate_id=None, application_id=None,
+            review_status="confirmed", evidence=review["golden_axes"]["role"]["evidence"])]
+        for company_id in (None, "company-2"):
+            with self.subTest(company_id=company_id):
+                message["company_id"] = company_id
+                self.assertEqual(classify(message, review)["events"][0]["review_status"], "unresolved")
+        message["company_id"] = "company-1"
+        self.assertEqual(classify(message, review)["events"][0]["review_status"], "confirmed")
+
+    def test_candidate_events_can_confirm_from_candidate_original(self):
+        message, review = fixture()
+        event = dict(actor="candidate", event_type="candidate_withdrawal", stage="document", reason_quote=None,
+                     company_id="company-1", position_id="position-1", candidate_id="candidate-1",
+                     application_id="application-1", review_status="confirmed",
+                     evidence=review["golden_axes"]["role"]["evidence"])
+        review["ontology_events"] = [event]
+        for event_type in ("candidate_withdrawal", "candidate_no_response"):
+            event["event_type"] = event_type
+            message["source_kind"] = "candidate"
+            self.assertEqual(classify(message, review)["events"][0]["review_status"], "confirmed")
+            message["source_kind"] = "internal"
+            self.assertEqual(classify(message, review)["events"][0]["review_status"], "unresolved")
+            message["source_kind"] = "direct_customer"
+            event["actor"] = "client"
+            self.assertEqual(classify(message, review)["events"][0]["review_status"], "confirmed")
+            event["actor"] = "candidate"
+        message["source_kind"] = "candidate"
+        event["event_type"] = "client_rejection"
+        self.assertEqual(classify(message, review)["events"][0]["review_status"], "unresolved")
+
     def test_golden_truth_table(self):
         message, base = fixture()
         for statuses in itertools.product(("met", "missing", "unknown"), repeat=4):
@@ -117,6 +154,8 @@ class JournalTests(unittest.TestCase):
         self.path = os.path.join(self.tmp.name, "journal.sqlite")
         self.db = Journal(self.path)
         self.message, self.review = fixture()
+        self.original = b"Message-ID: <one@example.test>\r\n\r\nSynthetic original with attachment\x00\xff"
+        self.original_sha256 = hashlib.sha256(self.original).hexdigest()
 
     def tearDown(self):
         self.db.close()
@@ -134,6 +173,80 @@ class JournalTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.db.import_review(self.message, altered)
         self.assertEqual(self.db.db.execute("PRAGMA foreign_key_check").fetchall(), [])
+
+    def test_reobservation_retains_immutable_review_and_additive_plan(self):
+        first = self.db.import_review(self.message, self.review)
+        operations = self.db.plan(first)["operations"]
+        self.message["observed_at"] = "2026-10-21T11:00:00+09:00"
+        self.assertEqual(self.db.import_review(self.message, self.review), first)
+        self.message["existing_labels"] += ["01JD", "NEW-LABEL"]
+        self.assertEqual(self.db.import_review(self.message, self.review), first)
+        self.assertEqual(self.db.plan(first)["operations"], operations)
+        stored = self.db.review(first)
+        self.assertEqual(stored["message"]["observed_at"], "2026-10-21T10:00:00+09:00")
+        self.assertEqual(stored["message"]["existing_labels"], ["KEEP"])
+        self.assertEqual(self.db.db.execute("SELECT count(*) FROM reviews").fetchone()[0], 1)
+        self.message["company_id"] = "different-company"
+        with self.assertRaises(ValueError):
+            self.db.import_review(self.message, self.review)
+
+    def test_known_recipient_reserves_scope_and_prevents_cross_mailbox_resend(self):
+        self.message["to_addresses"] = ["dev@valueconnect.kr"]
+        first = self.db.import_review(self.message, self.review)
+        self.assertEqual(self.db.plan(first)["sharing"], "already_recipient_label_pending")
+        self.message.update(account="other@example.test", message_id="other-m1", to_addresses=[])
+        same = self.db.import_review(self.message, self.review)
+        plan = self.db.plan(same)
+        self.assertEqual(plan["sharing"], "already_recipient_label_pending")
+        self.assertFalse(any(o["kind"] == "share" for o in plan["operations"]))
+        self.message.update(message_id="variant", html="<p>Variant</p>")
+        self.message["source_hash"] = self.review["content_hash"] = content_hash(self.message["authored_text"], self.message["html"])
+        variant = self.db.import_review(self.message, self.review)
+        self.assertEqual(self.db.plan(variant)["sharing"], "rfc_variant_review_required")
+        self.db.db.execute("DROP TABLE share_scopes")
+        self.db.db.commit()
+        self.db.close()
+        self.db = Journal(self.path)
+        self.assertEqual(self.db.plan(variant)["sharing"], "rfc_variant_review_required")
+
+    def test_later_known_recipient_suppresses_pending_share_on_future_plans(self):
+        first = self.db.import_review(self.message, self.review)
+        pending = next(o for o in self.db.plan(first)["operations"] if o["kind"] == "share")
+        self.message.update(account="other@example.test", message_id="other-m1", to_addresses=["dev@valueconnect.kr"])
+        known = self.db.import_review(self.message, self.review)
+        self.assertEqual(self.db.plan(known)["sharing"], "already_recipient_label_pending")
+        self.message.update(account="third@example.test", message_id="third-m1", to_addresses=[])
+        third = self.db.import_review(self.message, self.review)
+        for key in (first, third):
+            plan = self.db.plan(key)
+            self.assertEqual(plan["sharing"], "already_recipient_label_pending")
+            self.assertFalse(any(o["kind"] == "share" for o in plan["operations"]))
+        self.assertEqual(self.db.operation(pending["id"])["state"], "PLANNED")
+
+    def test_receiver_labels_cannot_reuse_readback_for_another_original(self):
+        self.message["to_addresses"] = ["dev@valueconnect.kr"]
+        first = self.db.import_review(self.message, self.review)
+        self.db.plan(first)
+        self.message.update(message_id="different", rfc_message_id="<different@example.test>")
+        second = self.db.import_review(self.message, self.review)
+        op = next(o for o in self.db.plan(second)["operations"] if o["kind"] == "receiver_labels")
+        self.db.receipt(op["id"], "SENDING", {})
+        self.db.receipt(op["id"], "SENT_UNVERIFIED", {})
+        body = dict(account="dev@valueconnect.kr", message_id="receiver1", content_hash=self.message["source_hash"],
+                    source_identity=["rfc", "<one@example.test>"])
+        labels = dict(account="dev@valueconnect.kr", message_id="receiver1", labels=op["payload"]["labels"])
+        with self.assertRaises(ValueError):
+            self.db.receipt(op["id"], "VERIFIED", dict(receiver_observation=body, label_observation=labels))
+        body["source_identity"] = ["rfc", self.message["rfc_message_id"]]
+        self.assertEqual(self.db.receipt(op["id"], "VERIFIED", dict(receiver_observation=body, label_observation=labels))["state"], "VERIFIED")
+
+    def test_share_send_intent_requires_original_rfc_hash(self):
+        key = self.db.import_review(self.message, self.review)
+        op = next(o for o in self.db.plan(key)["operations"] if o["kind"] == "share")
+        for receipt in ({}, {"original_sha256": "wrong"}, {"original_sha256": 42}):
+            with self.assertRaises(ValueError):
+                self.db.receipt(op["id"], "SENDING", receipt)
+            self.assertEqual(self.db.operation(op["id"])["state"], "PLANNED")
 
     def test_minimizes_raw_body_except_direct_customer_ontology(self):
         key = self.db.import_review(self.message, self.review)
@@ -197,18 +310,30 @@ class JournalTests(unittest.TestCase):
         op = next(o for o in self.db.plan(key)["operations"] if o["kind"] == "share")
         with self.assertRaises(ValueError):
             self.db.receipt(op["id"], "VERIFIED", {})
-        self.db.receipt(op["id"], "SENDING", {})
+        self.db.receipt(op["id"], "SENDING", {"original_sha256": self.original_sha256})
         with self.assertRaises(ValueError):
             self.db.receipt(op["id"], "SENDING", {})
         self.db.receipt(op["id"], "SENT_UNVERIFIED", {"sender_message_id": "sent1"})
-        body = dict(account="dev@valueconnect.kr", message_id="receiver1", content_hash=self.message["source_hash"])
+        body = dict(account="dev@valueconnect.kr", message_id="receiver1", content_hash=self.message["source_hash"],
+                    source_identity=["rfc", self.message["rfc_message_id"]])
         labels = dict(account="dev@valueconnect.kr", message_id="receiver1", labels=op["payload"]["labels"])
+        received_zip = io.BytesIO()
+        with zipfile.ZipFile(received_zip, "w") as archive:
+            archive.writestr("original.eml", self.original)
+        with zipfile.ZipFile(io.BytesIO(received_zip.getvalue())) as archive:
+            received_sha256 = hashlib.sha256(archive.read("original.eml")).hexdigest()
+        original = dict(account=body["account"], message_id=body["message_id"], original_sha256=received_sha256)
         for receipt in ({"receiver_observation": body},
-                        {"receiver_observation": body, "label_observation": dict(labels, account="fake@example.test")},
-                        {"receiver_observation": dict(body, content_hash="0" * 64), "label_observation": labels}):
+                        {"receiver_observation": body, "label_observation": dict(labels, account="fake@example.test"), "archive_observation": original},
+                        {"receiver_observation": body, "label_observation": dict(labels, message_id="other-message"), "archive_observation": original},
+                        {"receiver_observation": body, "label_observation": dict(labels, labels=[]), "archive_observation": original},
+                        {"receiver_observation": dict(body, content_hash="0" * 64), "label_observation": labels, "archive_observation": original},
+                        {"receiver_observation": body, "label_observation": labels},
+                        {"receiver_observation": body, "label_observation": labels, "archive_observation": dict(original, original_sha256=hashlib.sha256(self.original + b"changed attachment").hexdigest())},
+                        {"receiver_observation": body, "label_observation": labels, "archive_observation": dict(original, message_id="other-message")}):
             with self.assertRaises(ValueError):
                 self.db.receipt(op["id"], "VERIFIED", receipt)
-        self.db.receipt(op["id"], "VERIFIED", dict(receiver_observation=body, label_observation=labels))
+        self.db.receipt(op["id"], "VERIFIED", dict(receiver_observation=body, label_observation=labels, archive_observation=original))
         self.assertEqual(self.db.operation(op["id"])["state"], "VERIFIED")
 
     def test_multiple_events_survive_and_coverage_cannot_fake_complete(self):

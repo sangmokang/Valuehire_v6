@@ -52,7 +52,7 @@ class Journal:
         self.db.close()
 
     def _seed_share_scopes(self):
-        rows = self.db.execute("SELECT o.review_id,o.payload_json,r.payload_json AS review_json FROM operations o JOIN reviews r ON r.id=o.review_id WHERE o.kind='share'").fetchall()
+        rows = self.db.execute("SELECT o.review_id,o.payload_json,r.payload_json AS review_json FROM operations o JOIN reviews r ON r.id=o.review_id WHERE o.kind IN ('share','receiver_labels')").fetchall()
         for row in rows:
             message = json.loads(row["review_json"])["message"]
             payload = json.loads(row["payload_json"])
@@ -60,7 +60,7 @@ class Journal:
                 scope = digest([message["rfc_message_id"], payload["account"]])
                 self.db.execute("INSERT OR IGNORE INTO share_scopes VALUES(?,?,?)", (scope, message["source_hash"], row["review_id"]))
 
-    def _claim_share_scope(self, message, review_id, reserve):
+    def _claim_share_scope(self, message, review_id):
         if message["rfc_message_id"] is None:
             return True
         scope = digest([message["rfc_message_id"], DESTINATION])
@@ -69,8 +69,7 @@ class Journal:
             rows = self.db.execute("SELECT content_hash FROM share_scopes WHERE scope=?", (scope,)).fetchall()
             if any(row[0] != message["source_hash"] for row in rows):
                 return False
-            if reserve:
-                self.db.execute("INSERT OR IGNORE INTO share_scopes VALUES(?,?,?)", (scope, message["source_hash"], review_id))
+            self.db.execute("INSERT OR IGNORE INTO share_scopes VALUES(?,?,?)", (scope, message["source_hash"], review_id))
         return True
 
     def import_review(self, message, review):
@@ -83,7 +82,11 @@ class Journal:
         payload = canonical(dict(message=stored_message, review=review, result=result))
         previous = self.db.execute("SELECT payload_json FROM reviews WHERE id=?", (key,)).fetchone()
         if previous:
-            require(previous[0] == payload, "immutable review conflict: use a new rule_version")
+            first = json.loads(previous[0])
+            for field in ("observed_at", "existing_labels"):
+                stored_message[field] = first["message"][field]
+            result["resulting_labels"] = first["result"]["resulting_labels"]
+            require(previous[0] == canonical(dict(message=stored_message, review=review, result=result)), "immutable review conflict: use a new rule_version")
             return key
         with self.db:
             self.db.execute("INSERT INTO reviews VALUES(?,?,?,?,?,?)", (key, message["account"], message["message_id"], message["source_hash"], review["rule_version"], payload))
@@ -123,9 +126,15 @@ class Journal:
         source = ["rfc", message["rfc_message_id"]] if message["rfc_message_id"] else ["local", message["account"], message["message_id"]]
         global_key = digest([source, message["source_hash"], DESTINATION])
         already_recipient = DESTINATION in [address.casefold() for address in message["to_addresses"]]
-        if not self._claim_share_scope(message, review_id, reserve=not already_recipient):
+        if not self._claim_share_scope(message, review_id):
             return dict(operations=ops, sharing="rfc_variant_review_required")
-        receiver = dict(common, account=DESTINATION, source_review_id=review_id, mirror_marker=MIRROR_MARKER)
+        if message["rfc_message_id"] and not already_recipient:
+            for row in self.db.execute("SELECT payload_json FROM reviews WHERE content_hash=?", (message["source_hash"],)):
+                known = json.loads(row[0])["message"]
+                if known["rfc_message_id"] == message["rfc_message_id"] and DESTINATION in [address.casefold() for address in known["to_addresses"]]:
+                    already_recipient = True
+                    break
+        receiver = dict(common, account=DESTINATION, source_review_id=review_id, mirror_marker=MIRROR_MARKER, source_identity=source)
         ops.append(self._plan_operation(review_id, "receiver_labels", "receiver:" + digest([global_key, result["labels"]]), receiver))
         if already_recipient:
             return dict(operations=ops, sharing="already_recipient_label_pending")
@@ -149,13 +158,15 @@ class Journal:
             self.db.execute("BEGIN IMMEDIATE")
             operation = self.operation(key)
             require(state in TRANSITIONS.get(operation["state"], set()), "unsafe or invalid state transition")
+            if state == "SENDING" and operation["kind"] == "share":
+                original_hash = receipt.get("original_sha256")
+                require(type(original_hash) is str and len(original_hash) == 64 and all(c in "0123456789abcdef" for c in original_hash), "source RFC SHA-256 required before sending")
             if state == "VERIFIED":
                 self._verify_readback(operation, receipt)
             self._append_receipt(key, state, receipt)
         return self.operation(key)
 
-    @staticmethod
-    def _verify_readback(operation, receipt):
+    def _verify_readback(self, operation, receipt):
         expected = operation["payload"]
         observed = receipt.get("receiver_observation")
         labels = receipt.get("label_observation")
@@ -164,6 +175,15 @@ class Journal:
         require(type(observed.get("message_id")) is str and bool(observed["message_id"]), "receiver message id missing")
         if operation["kind"] == "source_labels":
             require(observed["message_id"] == expected["message_id"], "source message mismatch")
+        else:
+            require(expected.get("source_identity") is not None and observed.get("source_identity") == expected["source_identity"], "receiver original identity mismatch")
+        if operation["kind"] == "share":
+            intent = self.db.execute("SELECT payload_json FROM receipts WHERE operation_id=? AND state='SENDING' ORDER BY id LIMIT 1", (operation["id"],)).fetchone()
+            original_hash = json.loads(intent[0]).get("original_sha256") if intent else None
+            archive = receipt.get("archive_observation")
+            require(type(original_hash) is str and len(original_hash) == 64, "source RFC SHA-256 intent missing")
+            require(type(archive) is dict and archive.get("account") == observed["account"] and archive.get("message_id") == observed["message_id"], "receiver archive identity mismatch")
+            require(archive.get("original_sha256") == original_hash, "received original RFC bytes mismatch")
         require(labels.get("account") == observed["account"] and labels.get("message_id") == observed["message_id"], "label readback identity mismatch")
         strings(labels.get("labels"), "readback labels")
         require(set(expected["labels"]) <= set(labels["labels"]), "required labels not observed")

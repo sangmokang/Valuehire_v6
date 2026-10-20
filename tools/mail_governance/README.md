@@ -19,6 +19,11 @@ python3 -m tools.mail_governance --db /private/path/mail.sqlite plan --input rev
 `--input -` reads JSON from stdin. Exit 1 and `status: FAIL` means an invalid input,
 hash mismatch, conflicting immutable review, or unsafe state transition. Keep private
 mail outside git. The database is mode 0600; its directory must also be private.
+Re-importing an unchanged review after observation time or existing labels change
+returns the same review ID and retains the first observation snapshot. Those later
+observation fields are not appended to this review journal. Other message/review
+changes still conflict. Plans remain additive; adapters must add labels to the current
+provider state rather than replace that state with the first snapshot.
 
 ## Input contract
 
@@ -115,8 +120,13 @@ it is not itself a rejection outcome. The reviewer must choose the evidenced eve
 the core does not infer a negative hiring outcome from either event.
 
 Confirmed customer events require `source_kind: direct_customer`, client actor, and
-non-null verified company/position IDs. Candidate-related events additionally require
-candidate/application IDs. An assertion lacking those prerequisites becomes unresolved.
+non-null verified company/position IDs. The event company must match the verified
+`message.company_id`; a missing or conflicting message company prevents confirmation.
+Candidate-related events additionally require candidate/application IDs. Candidate
+withdrawal/no-response events can also be confirmed from `source_kind: candidate`
+with candidate actor and the same verified entity prerequisites. Internal reports and
+candidate assertions of customer decisions remain unresolved. An assertion lacking
+those prerequisites becomes unresolved.
 `source_kind: direct_customer` is only the importer's declaration. The core does not
 authenticate the sender, verify a customer-contact mapping, check SPF/DKIM, inspect
 forwarded provenance, or prove the actor identity. `confirmed` here means all local
@@ -142,6 +152,9 @@ States are append-only:
 blind retries, and retries from `FAILED` are rejected. The adapter must claim SENDING
 before an external effect; opening an existing SENDING/AMBIGUOUS operation is a
 reconciliation task, not permission to resend.
+For a share operation, the SENDING receipt must include `original_sha256`, the
+lowercase SHA-256 of the original provider RFC bytes fetched before sending. It is
+immutable send-intent evidence, separate from the authored-content hash.
 
 The only sharing destination is `dev@valueconnect.kr`, for supported types. Plans
 contain source additive-label work, receiver additive-label work, and (when needed)
@@ -155,28 +168,45 @@ sets can generate new receiver-label operations without generating another send.
 The content hash is representation-sensitive: extracting quoted text differently,
 changing HTML rendering/escaping, or even changing whitespace can change the hash of
 the same underlying email across mailboxes. Therefore an RFC-ID+destination scope is
-reserved transactionally before planning a share. If the same scope has any different
+reserved transactionally before planning receiver work, including known recipients.
+A known-recipient observation in any reviewed mailbox suppresses sending on future
+plans for the same RFC ID and content, even if their recipient headers omit that
+destination. Existing pending intents remain recorded; adapters must reconcile them
+and refresh the plan before acting. If the same scope has any different
 content hash, `plan` returns `sharing: rfc_variant_review_required` and creates neither
 a new share nor a receiver-label intent for that variant. Source-mailbox label work
-can still proceed. Existing share intents seed this guard when an older journal is
-opened. Genuine revised content reusing a Message-ID also requires review; the core
+can still proceed. Existing share and receiver-label intents seed this guard when an
+older journal is opened. Genuine revised content reusing a Message-ID also requires review; the core
 never silently declares the two variants equivalent. A reservation left by an
 interrupted plan is conservatively retained. The adapter must reconcile variants
 against original provider content before deciding how to share them. Without an RFC
 Message-ID, cross-mailbox identity cannot be established by the fallback key; callers
 must supply a separate reconciliation decision rather than claim global deduplication.
 
-VERIFIED requires separate body and label observations, for example:
+VERIFIED requires separate body and label observations. Share work additionally
+requires a received ZIP observation, for example:
 
 ```json
 {
-  "receiver_observation": {"account": "dev@valueconnect.kr", "message_id": "received-id", "content_hash": "EXPECTED_SOURCE_HASH"},
-  "label_observation": {"account": "dev@valueconnect.kr", "message_id": "received-id", "labels": ["01JD", "06온톨로지"]}
+  "receiver_observation": {"account": "dev@valueconnect.kr", "message_id": "received-id", "content_hash": "EXPECTED_SOURCE_HASH", "source_identity": ["rfc", "<original@example.test>"]},
+  "label_observation": {"account": "dev@valueconnect.kr", "message_id": "received-id", "labels": ["01JD", "06온톨로지"]},
+  "archive_observation": {"account": "dev@valueconnect.kr", "message_id": "received-id", "original_sha256": "SHA256_OF_RECEIVED_ZIP_ORIGINAL_EML"}
 }
 ```
 
-Both observations must refer to the same actual receiver message. Source-label work
-must refer to the original account/message and preserve prior labels. A sender's SENT
+All observations must refer to the same actual receiver message. Receiver body
+observations must match the planned `source_identity`: `["rfc", rfc_message_id]`,
+or `["local", source_account, source_message_id]` when the RFC ID is absent. The
+adapter must establish that match from original message metadata or the unique mirror
+marker and its stored source mapping, rather than matching body text alone.
+The adapter must download `original.zip`, extract `original.eml`, and hash those
+received bytes for `archive_observation.original_sha256`. The journal compares that
+hash with the original RFC hash recorded at SENDING; a sender header or authored-body
+hash cannot substitute for this observation. Source/receiver label operations do not
+require an archive, including messages already delivered directly to the destination.
+Old share intents without a source RFC hash, or receiver intents without source
+identity, cannot be verified under this contract; they require reconciliation.
+Source-label work must refer to the original account/message and preserve prior labels. A sender's SENT
 receipt alone never verifies receiver delivery or receiver labels. The live adapter
 must recover the same authored representations from the forwarded content before
 hashing; hashing an outer forward wrapper will correctly fail. No claim about Gmail

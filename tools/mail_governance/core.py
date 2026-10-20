@@ -125,8 +125,11 @@ def classify(message, review):
     for source_event in review["ontology_events"]:
         event = dict(source_event)
         needed = ("company_id", "position_id") if event["event_type"] == "position_update" else ("company_id", "position_id", "candidate_id", "application_id")
-        verified_client = message["source_kind"] == "direct_customer" and event["actor"] == "client" and all(event[k] for k in needed)
-        if not all(event[k] for k in needed) or (event["review_status"] == "confirmed" and not verified_client):
+        verified_client = message["source_kind"] == "direct_customer" and event["actor"] == "client"
+        verified_candidate = (event["event_type"] in ("candidate_withdrawal", "candidate_no_response")
+                              and message["source_kind"] == "candidate" and event["actor"] == "candidate")
+        matching_company = message.get("company_id") is not None and message["company_id"] == event["company_id"]
+        if not all(event[k] for k in needed) or (event["review_status"] == "confirmed" and not (matching_company and (verified_client or verified_candidate))):
             event["review_status"] = "unresolved"
         event["reason_status"] = "reason_known" if event["reason_quote"] is not None else "reason_unknown"
         events.append(event)
