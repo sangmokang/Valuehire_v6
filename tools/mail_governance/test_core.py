@@ -13,14 +13,16 @@ from tools.mail_governance.journal import Journal
 
 
 def fixture():
-    text = "회사: 매출 성장과 신규 사업\n\n역할: 제품 API와 핵심 지표\n\n개인화: 김님 결제 경험\n\n지원 안내: 정돈된 안내"
+    intro = "김님, 결제 API 장애를 줄이고 정산 서비스를 확장하신 경험이 이번 백엔드 플랫폼 과제와 연결되어 연락드립니다."
+    company = "회사: 합성 커머스는 판매자 정산 서비스를 제공하며 매출 120억과 투자 80억을 바탕으로 해외 결제 사업을 시작합니다."
+    role = "역할: 결제 API와 정산 서비스를 설계하고 실패율을 개선합니다. Python 분산 트랜잭션 경험이 필수이며 제품팀과 협업합니다."
+    text = "\n\n".join((intro, company, role, "지원 안내: 전형은 두 차례 면접이며 보상은 협의합니다. 관심이 있으시면 이 메일로 회신해 주세요."))
     message = dict(account="owner@valueconnect.kr", message_id="m1", rfc_message_id="<one@example.test>",
                    source_hash=content_hash(text, None), from_address="hr@example.test",
                    to_addresses=["owner@valueconnect.kr"], subject="백엔드 채용", authored_text=text,
                    observed_at="2026-10-21T10:00:00+09:00", occurred_at=None, existing_labels=["KEEP"],
                    source_kind="direct_customer", company_id="company-1")
-    quotes = dict(company="회사: 매출 성장과 신규 사업", role="역할: 제품 API와 핵심 지표",
-                  personalization="개인화: 김님 결제 경험", layout=text)
+    quotes = dict(company=company, role=role, personalization=intro, layout=text)
     axes = {key: dict(status="met", evidence=dict(representation="authored_text", start=text.index(q),
                                                  end=text.index(q) + len(q), quote=q)) for key, q in quotes.items()}
     review = dict(content_hash=message["source_hash"], rule_version="2026-10-21.v1", reviewer="reviewer:test",
@@ -39,11 +41,11 @@ class ClassificationTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     classify(message, altered)
 
-    def test_mailbox_addresses_must_be_normalized_addr_specs(self):
+    def test_mailbox_addresses_require_one_unambiguous_mailbox(self):
         message, review = fixture()
         for field in ("account", "from_address", "to_addresses"):
-            for address in ("Dev <dev@valueconnect.kr>", " dev@valueconnect.kr", "dev@valueconnect.kr ",
-                            "dev@valueconnect.kr\n", "dev", "dev@", '"dev"@valueconnect.kr'):
+            for address in (" dev@valueconnect.kr", "dev@valueconnect.kr ",
+                            "dev@valueconnect.kr\n", "dev", "dev@", "dev@example.test, other@example.test"):
                 with self.subTest(field=field, address=address):
                     altered = copy.deepcopy(message)
                     altered[field] = [address] if field == "to_addresses" else address
@@ -51,8 +53,9 @@ class ClassificationTests(unittest.TestCase):
                         classify(altered, review)
         message.update(from_address="DEV@VALUECONNECT.KR", to_addresses=["DEV@VALUECONNECT.KR"])
         classify(message, review)
-        message["to_addresses"] = ['"two words"@example.test']
-        classify(message, review)
+        for address in ('"two words"@example.test', '"dev"@valueconnect.kr', "Dev <dev@valueconnect.kr>"):
+            message["to_addresses"] = [address]
+            classify(message, review)
 
     def test_each_met_axis_requires_its_own_evidence(self):
         message, base = fixture()
@@ -142,7 +145,7 @@ class ClassificationTests(unittest.TestCase):
         message, review = fixture()
         review["golden_axes"]["layout"]["evidence"] = review["golden_axes"]["company"]["evidence"]
         self.assertFalse(classify(message, review)["is_golden_sample"])
-        message["html"] = "<article><p>회사 소개</p><p>역할과 지원 안내</p></article>"
+        message["html"] = "<article>" + "".join("<p>" + block + "</p>" for block in message["authored_text"].split("\n\n")) + "</article>"
         message["source_hash"] = review["content_hash"] = content_hash(message["authored_text"], message["html"])
         review["golden_axes"]["layout"]["evidence"] = dict(representation="html", start=0,
             end=len(message["html"]), quote=message["html"])

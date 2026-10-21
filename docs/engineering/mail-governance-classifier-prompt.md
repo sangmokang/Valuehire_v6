@@ -19,6 +19,10 @@ personalization: 상단에 해당 후보자의 구체 경력/관심과 이 역�
 layout: 실제 확인한 HTML 또는 읽기 좋은 plain text의 섹션/단락/목록.
 이름만 바꾸기, 긴 본문, 기술명 나열, 유명 기업/학교만으로 통과 금지.
 각 축 met|missing|unknown, met이면 정확한 quote와 representation/start/end를 제공한다.
+회사/직무/개인화는 해당 내용 전체를 설명하는 실제 인용을 고른다. 레이아웃 인용은
+그 세 인용과 상단 개인화의 실제 배치를 포함한다. 코드의 구조 하한을 채우려고
+무관한 문장을 늘리거나 같은 전체 본문을 세 축에 반복해 인용하지 않는다.
+길이·HTML 태그·인용 일치가 의미 검토를 대신하지 않는다.
 candidate_ready, internal_confidential은 true|false|null이다. 미확인을 false로 채우지 않는다.
 비공개 포지션 자체는 탈락 사유가 아니다. 비공개 약속 위반/다른 후보 평가/공유금지
 내부 메모가 후보자 본문에 남아 있으면 candidate_ready=false 또는 internal_confidential=true.
@@ -34,6 +38,7 @@ client_rejection은 직접 고객사 메시지+client actor+명시적 거절 근
 출력은 실행 코드의 review 스키마를 따르는 JSON 객체 하나다.
 content_hash, rule_version, reviewer, mail_types, golden_axes,
 candidate_ready, internal_confidential, ontology_events를 포함한다.
+rule_version은 실행 코드가 제공한 2026-10-21.v1을 그대로 사용한다.
 평가 근거는 해당 메시지의 정확한 원문 span만 사용한다.
 ```
 

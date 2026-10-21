@@ -3,7 +3,10 @@ import hashlib
 import json
 from datetime import datetime
 from email.errors import HeaderParseError
-from email.headerregistry import Address
+from email.headerregistry import Address, HeaderRegistry
+from email.utils import getaddresses, parseaddr
+
+from .quality import golden_structure
 
 LABELS = {"jd": "01JD", "interview": "05인터뷰메일", "daily_weekly": "04dailyweekly", "ontology": "06온톨로지"}
 DESTINATION = "dev@valueconnect.kr"
@@ -40,6 +43,26 @@ def strings(value, name):
     require(len(value) == len(set(value)), name + " contains duplicates")
 
 
+def normalize_address(value):
+    """Parse exactly one mailbox, retaining no display name in canonical identity."""
+    string(value, "mailbox address")
+    require(value == value.strip() and not any(ord(character) < 32 or ord(character) == 127 for character in value),
+            "mailbox address contains padding or control characters")
+    try:
+        header = HeaderRegistry()("To", value)
+        require(not header.defects and len(header.addresses) == 1
+                and all(group.display_name is None for group in header.groups), "ambiguous or malformed mailbox address")
+        addresses = getaddresses([value])
+        parsed_address = parseaddr(value)[1]
+        require(len(addresses) == 1 and addresses[0][1] == parsed_address, "exactly one mailbox required")
+        parsed = Address(addr_spec=parsed_address)
+        require(parsed.username and parsed.domain and parsed.addr_spec == header.addresses[0].addr_spec,
+                "mailbox address needs a complete addr-spec")
+    except (ValueError, HeaderParseError, IndexError) as exc:
+        raise ValueError("ambiguous or malformed mailbox address") from exc
+    return parsed.addr_spec.casefold()
+
+
 def timestamp(value, name, nullable=False):
     if nullable and value is None:
         return
@@ -73,11 +96,7 @@ def validate(message, review):
     for key in ("to_addresses", "existing_labels"):
         strings(message[key], key)
     for address in [message["account"], message["from_address"], *message["to_addresses"]]:
-        try:
-            parsed = Address(addr_spec=address)
-        except (ValueError, HeaderParseError) as exc:
-            raise ValueError("mailbox addresses must be normalized addr-specs") from exc
-        require(parsed.username and parsed.domain and parsed.addr_spec == address, "mailbox addresses must be normalized addr-specs")
+        normalize_address(address)
     timestamp(message["observed_at"], "observed_at")
     timestamp(message["occurred_at"], "occurred_at", nullable=True)
     require(message["source_kind"] in ("direct_customer", "internal", "candidate", "unknown"), "invalid source_kind")
@@ -124,9 +143,7 @@ def validate_event(message, event):
 def classify(message, review):
     validate(message, review)
     axes = review["golden_axes"]
-    layout = axes["layout"]["evidence"]
-    readable = bool(layout) and (layout["representation"] == "html" or len([line for line in layout["quote"].splitlines() if line.strip()]) >= 3)
-    golden = ("jd" in review["mail_types"] and all(a["status"] == "met" for a in axes.values()) and readable
+    golden = ("jd" in review["mail_types"] and all(a["status"] == "met" for a in axes.values()) and golden_structure(axes)
               and review["candidate_ready"] is True and review["internal_confidential"] is False)
     labels = {LABELS[k] for k in review["mail_types"]}
     if golden:
