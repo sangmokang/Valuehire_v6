@@ -5,8 +5,8 @@
 ```text
 밸류커넥트 메일 분류·공유 PR을 읽기 전용 적대 검수해라. 코드를 고치거나 커밋·발송·레이블 변경·운영 DB 변경·권한 설정을 하지 마라. 합성 입력과 임시 DB에서만 실행 시험을 해라. 기존 로그인과 작업자의 변경을 보존해라.
 
-저장소: /Users/kangsangmo/Desktop/Valuehire_v6
-worktree: /Users/kangsangmo/Desktop/Valuehire_v6/worktrees/mail-governance-20261021
+저장소: /path/to/Valuehire_v6
+worktree: /path/to/Valuehire_v6/worktrees/mail-governance-20261021
 PR: https://github.com/sangmokang/Valuehire_v6/pull/139
 Issue: https://github.com/sangmokang/Valuehire_v6/issues/138
 
@@ -23,7 +23,7 @@ docs/engineering/evidence/mail-governance-pr139-current-review-2026-10-21.md는 
 6. 수신 ZIP의 실제 original.eml 바이트·SHA·RFC identity를 독립 검증하는가? 발신 payload를 수신 관측으로 복사하지 않았는가? 다른 메시지/계정/해시/레이블을 넣으면 거절하는가? 레이블 추가 후 독립 GET이 있는가? 최초 실패 2건과 보완 공유가 정직하게 구별되는가?
 7. 전사 명단·계정별 접근·query/cursor 끝·cap/429/오류·미확정·스케줄러/운영 어댑터 배포가 실제 근거로 확인되는가? 정상 빈 검색을 무조건 결함으로, 혹은 검사하지 않은 범위를 완료로 판단하지 마라.
 
-운영 증거는 필요할 때 /Users/kangsangmo/Desktop/Valuehire_v6/artifacts/mail-governance-20261021/에서 읽기 전용으로 보아라. Git 밖에 있어도 본문·이름·실제 메시지 ID·명단·토큰을 보고서나 공개 Git에 복사하지 마라. pilot.sqlite는 mode=ro로만 열어라. auth-after-modify.private.json은 두 계정의 토큰·프로필·레이블 조회 200을 보여주며 모든 계정 메시지 변경 성공을 입증하지 않는다. 과거 401을 현재 원인으로 단정하지 마라. receiver-label-apply*.private.json, dev-label-before.private.json, 현재 장부를 교차 확인해라. 접근할 수 없으면 운영 주장은 미확인으로 표시하고 합성 코드 검수는 계속해라.
+운영 증거는 필요할 때 /path/to/Valuehire_v6/artifacts/mail-governance-20261021/에서 읽기 전용으로 보아라. Git 밖에 있어도 본문·이름·실제 메시지 ID·명단·토큰을 보고서나 공개 Git에 복사하지 마라. pilot.sqlite는 mode=ro로만 열어라. auth-after-modify.private.json은 두 계정의 토큰·프로필·레이블 조회 200을 보여주며 모든 계정 메시지 변경 성공을 입증하지 않는다. 과거 401을 현재 원인으로 단정하지 마라. receiver-label-apply*.private.json, dev-label-before.private.json, 현재 장부를 교차 확인해라. 접근할 수 없으면 운영 주장은 미확인으로 표시하고 합성 코드 검수는 계속해라.
 
 과거 상태를 그대로 인용하지 마라. 인계 시점 장부는 source_labels 7 VERIFIED, receiver_labels 7 SENDING, share 7와 share_repair 2 SENT_UNVERIFIED였다. receiver 레이블 사전 검사 두 번은 변경 시도/추가 발송 0이었다. 이후 구현자가 복구했다면 최신 provider 관측과 append-only 장부로 반증해라. 과거 share 6 SENDING과 혼동하지 마라.
 
@@ -37,5 +37,5 @@ Python/Node 정상 시험을 직접 실행하고 필요한 합성 반례·방어
 - 수정 전 지적별 FIXED / STILL_REPRODUCIBLE / CONTRACT_TRADEOFF / NOT_VERIFIED 표를 제시해라.
 - 정상 시험 및 변이 결과, 운영 관측 시각, 현재 코드/표본/전사 상태, 아직 검증 못한 점을 밝혀라.
 - 코드 검수 추천과 설계 CLEAR/WATCH/BLOCK을 별도로 적고, BLOCK이나 HIGH 미해결이면 REQUEST_CHANGES로 종합해라.
-- 보고서는 /Users/kangsangmo/Desktop/Valuehire_v6/artifacts/mail-governance-20261021/ 아래 새 이름으로 0600 저장하고 경로를 알려라. 기존 근거를 덮어쓰지 마라. 공개용 요약은 개인 식별 정보를 제거해라.
+- 보고서는 /path/to/Valuehire_v6/artifacts/mail-governance-20261021/ 아래 새 이름으로 0600 저장하고 경로를 알려라. 기존 근거를 덮어쓰지 마라. 공개용 요약은 개인 식별 정보를 제거해라.
 ```

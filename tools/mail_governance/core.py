@@ -2,10 +2,13 @@
 import hashlib
 import json
 from datetime import datetime
+from email.errors import HeaderParseError
+from email.headerregistry import Address
 
 LABELS = {"jd": "01JD", "interview": "05인터뷰메일", "daily_weekly": "04dailyweekly", "ontology": "06온톨로지"}
 DESTINATION = "dev@valueconnect.kr"
 MIRROR_MARKER = "[VC-MIRROR:v1]"
+RULE_VERSION = "2026-10-21.v1"
 AXES = {"company", "role", "personalization", "layout"}
 EVENT_TYPES = ("position_update", "client_rejection", "client_hold", "feedback_clarification",
                "interview_scheduled", "candidate_withdrawal", "candidate_no_response", "feedback")
@@ -69,6 +72,12 @@ def validate(message, review):
         string(message.get(key), key, nullable=True)
     for key in ("to_addresses", "existing_labels"):
         strings(message[key], key)
+    for address in [message["account"], message["from_address"], *message["to_addresses"]]:
+        try:
+            parsed = Address(addr_spec=address)
+        except (ValueError, HeaderParseError) as exc:
+            raise ValueError("mailbox addresses must be normalized addr-specs") from exc
+        require(parsed.username and parsed.domain and parsed.addr_spec == address, "mailbox addresses must be normalized addr-specs")
     timestamp(message["observed_at"], "observed_at")
     timestamp(message["occurred_at"], "occurred_at", nullable=True)
     require(message["source_kind"] in ("direct_customer", "internal", "candidate", "unknown"), "invalid source_kind")
@@ -77,6 +86,7 @@ def validate(message, review):
     require(type(review) is dict and set(review) == fields, "invalid review fields")
     for key in ("content_hash", "rule_version", "reviewer"):
         string(review[key], key)
+    require(review["rule_version"] == RULE_VERSION, "unsupported rule_version: use the code-owned version")
     require(review["content_hash"] == message["source_hash"], "review content_hash mismatch")
     strings(review["mail_types"], "mail_types")
     require(set(review["mail_types"]) <= set(LABELS), "unsupported mail type")

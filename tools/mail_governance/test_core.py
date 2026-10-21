@@ -23,13 +23,46 @@ def fixture():
                   personalization="개인화: 김님 결제 경험", layout=text)
     axes = {key: dict(status="met", evidence=dict(representation="authored_text", start=text.index(q),
                                                  end=text.index(q) + len(q), quote=q)) for key, q in quotes.items()}
-    review = dict(content_hash=message["source_hash"], rule_version="20261021-v1", reviewer="reviewer:test",
+    review = dict(content_hash=message["source_hash"], rule_version="2026-10-21.v1", reviewer="reviewer:test",
                   mail_types=["jd", "ontology"], golden_axes=axes, candidate_ready=True,
                   internal_confidential=False, ontology_events=[])
     return message, review
 
 
 class ClassificationTests(unittest.TestCase):
+    def test_rule_version_is_owned_by_the_running_code(self):
+        message, review = fixture()
+        for version in (review["rule_version"] + " ", "arbitrary-version", "20261021-v1"):
+            with self.subTest(version=version):
+                altered = copy.deepcopy(review)
+                altered["rule_version"] = version
+                with self.assertRaises(ValueError):
+                    classify(message, altered)
+
+    def test_mailbox_addresses_must_be_normalized_addr_specs(self):
+        message, review = fixture()
+        for field in ("account", "from_address", "to_addresses"):
+            for address in ("Dev <dev@valueconnect.kr>", " dev@valueconnect.kr", "dev@valueconnect.kr ",
+                            "dev@valueconnect.kr\n", "dev", "dev@", '"dev"@valueconnect.kr'):
+                with self.subTest(field=field, address=address):
+                    altered = copy.deepcopy(message)
+                    altered[field] = [address] if field == "to_addresses" else address
+                    with self.assertRaises(ValueError):
+                        classify(altered, review)
+        message.update(from_address="DEV@VALUECONNECT.KR", to_addresses=["DEV@VALUECONNECT.KR"])
+        classify(message, review)
+        message["to_addresses"] = ['"two words"@example.test']
+        classify(message, review)
+
+    def test_each_met_axis_requires_its_own_evidence(self):
+        message, base = fixture()
+        for name in base["golden_axes"]:
+            with self.subTest(axis=name):
+                review = copy.deepcopy(base)
+                review["golden_axes"][name]["evidence"] = None
+                with self.assertRaises(ValueError):
+                    classify(message, review)
+
     def test_confirmed_event_company_matches_verified_message_company(self):
         message, review = fixture()
         review["ontology_events"] = [dict(
@@ -174,6 +207,72 @@ class JournalTests(unittest.TestCase):
             self.db.import_review(self.message, altered)
         self.assertEqual(self.db.db.execute("PRAGMA foreign_key_check").fetchall(), [])
 
+    def test_review_version_cannot_bypass_an_existing_decision(self):
+        self.review["candidate_ready"] = False
+        first = self.db.import_review(self.message, self.review)
+        altered = copy.deepcopy(self.review)
+        altered["candidate_ready"] = True
+        for version in (altered["rule_version"] + " ", "arbitrary-version", "20261021-v1"):
+            altered["rule_version"] = version
+            with self.subTest(version=version), self.assertRaises(ValueError):
+                self.db.import_review(self.message, altered)
+        self.assertEqual(self.db.db.execute("SELECT count(*) FROM reviews").fetchone()[0], 1)
+        self.assertFalse(self.db.review(first)["result"]["is_golden_sample"])
+
+    def test_append_only_blocks_replace_on_every_table_and_connection(self):
+        self.review["ontology_events"] = [dict(
+            actor="client", event_type="position_update", stage="unknown", reason_quote=None,
+            company_id="company-1", position_id="position-1", candidate_id=None, application_id=None,
+            review_status="confirmed", evidence=self.review["golden_axes"]["role"]["evidence"])]
+        key = self.db.import_review(self.message, self.review)
+        self.db.plan(key)
+        self.db.coverage("mailbox", "query", None, None, 1, "ok", False)
+        for connection_kind in ("journal", "plain", "reopened"):
+            if connection_kind == "reopened":
+                self.db.close()
+                self.db = Journal(self.path)
+            connection = sqlite3.connect(self.path) if connection_kind == "plain" else self.db.db
+            try:
+                for table in ("reviews", "events", "operations", "receipts", "coverage", "share_scopes"):
+                    row = tuple(connection.execute(f"SELECT * FROM {table} LIMIT 1").fetchone())
+                    marks = ",".join("?" for _ in row)
+                    for insert in ("INSERT OR REPLACE", "REPLACE"):
+                        with self.subTest(connection=connection_kind, table=table, insert=insert):
+                            try:
+                                with self.assertRaisesRegex(sqlite3.IntegrityError, "append-only journal"):
+                                    connection.execute(f"{insert} INTO {table} VALUES({marks})", row)
+                            finally:
+                                connection.rollback()
+                            self.assertEqual(tuple(connection.execute(f"SELECT * FROM {table} LIMIT 1").fetchone()), row)
+                    if table in ("reviews", "operations"):
+                        alternate = ("different-primary-key",) + row[1:]
+                        with self.subTest(connection=connection_kind, table=table, alternate_unique=True):
+                            try:
+                                with self.assertRaisesRegex(sqlite3.IntegrityError, "append-only journal"):
+                                    connection.execute(f"INSERT OR REPLACE INTO {table} VALUES({marks})", alternate)
+                            finally:
+                                connection.rollback()
+                    if table in ("reviews", "events", "operations", "share_scopes"):
+                        rowid = connection.execute(f"SELECT rowid FROM {table} LIMIT 1").fetchone()[0]
+                        alternate = list(row)
+                        alternate[0] = "different-key"
+                        if table == "reviews":
+                            alternate[1:3] = ["different-account", "different-message"]
+                        if table == "operations":
+                            alternate[3] = "different-dedup-key"
+                        with self.subTest(connection=connection_kind, table=table, rowid=True):
+                            columns = ",".join(c[1] for c in connection.execute(f"PRAGMA table_info({table})"))
+                            try:
+                                with self.assertRaisesRegex(sqlite3.IntegrityError, "append-only journal"):
+                                    connection.execute(f"INSERT OR REPLACE INTO {table}(rowid,{columns}) VALUES(?,{marks})", [rowid, *alternate])
+                            finally:
+                                connection.rollback()
+            finally:
+                if connection_kind == "plain":
+                    connection.close()
+        self.assertEqual(self.db.import_review(self.message, self.review), key)
+        self.assertEqual(self.db.plan(key), self.db.plan(key))
+
     def test_reobservation_retains_immutable_review_and_additive_plan(self):
         first = self.db.import_review(self.message, self.review)
         operations = self.db.plan(first)["operations"]
@@ -275,9 +374,27 @@ class JournalTests(unittest.TestCase):
         for n, fields in enumerate((dict(account="dev@valueconnect.kr"),
                                     dict(subject="[VC-MIRROR:v1] source"),
                                     dict(from_address="dev@valueconnect.kr"))):
-            self.message.update(fields, message_id=str(n), rfc_message_id=str(n))
-            key = self.db.import_review(self.message, self.review)
+            message = dict(self.message, **fields)
+            message.update(message_id=str(n), rfc_message_id=str(n))
+            key = self.db.import_review(message, self.review)
             self.assertEqual(self.db.plan(key)["sharing"], "mirror_or_dev_source")
+
+    def test_source_labels_require_original_message_id_with_valid_other_observations(self):
+        key = self.db.import_review(self.message, self.review)
+        op = next(o for o in self.db.plan(key)["operations"] if o["kind"] == "source_labels")
+        body = dict(account=self.message["account"], message_id=self.message["message_id"],
+                    content_hash=self.message["source_hash"])
+        labels = dict(account=body["account"], message_id=body["message_id"], labels=op["payload"]["labels"])
+        receipt = dict(receiver_observation=body, label_observation=labels)
+        with self.assertRaises(ValueError):
+            self.db.receipt(op["id"], "VERIFIED", receipt)
+        self.db.receipt(op["id"], "SENDING", {})
+        self.db.receipt(op["id"], "SENT_UNVERIFIED", {})
+        body["message_id"] = labels["message_id"] = "different-message"
+        with self.assertRaises(ValueError):
+            self.db.receipt(op["id"], "VERIFIED", receipt)
+        body["message_id"] = labels["message_id"] = self.message["message_id"]
+        self.assertEqual(self.db.receipt(op["id"], "VERIFIED", receipt)["state"], "VERIFIED")
 
     def test_same_rfc_different_representation_is_quarantined(self):
         first_key = self.db.import_review(self.message, self.review)

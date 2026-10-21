@@ -6,8 +6,8 @@
 밸류커넥트 메일 분류·공유 작업을 이어서 실행해라. 계획 제안으로 끝내지 말고, 이미 허가된 가역적 수정·시험·검증·의미 단위 커밋을 진행해라.
 
 작업 위치
-- 저장소: /Users/kangsangmo/Desktop/Valuehire_v6
-- 작업 worktree: /Users/kangsangmo/Desktop/Valuehire_v6/worktrees/mail-governance-20261021
+- 저장소: /path/to/Valuehire_v6
+- 작업 worktree: /path/to/Valuehire_v6/worktrees/mail-governance-20261021
 - 브랜치: task/mail-governance-20261021
 - Issue: https://github.com/sangmokang/Valuehire_v6/issues/138
 - PR: https://github.com/sangmokang/Valuehire_v6/pull/139
@@ -34,7 +34,7 @@
 4. 내부 메일 전문이 layout evidence quote로 그대로 저장되는 문제와 SQLite INSERT OR REPLACE로 기존 행이 바뀌는 문제를 재현 후 수정해라. 합법적인 정확한 인용·Ontology 보존·동시 선점·재접속 계약은 유지해라. 악의적 DB 소유자까지 보호한다고 과장하지 마라.
 
 운영 복구는 코드 계약과 맞춘 뒤 진행해라.
-- private 근거 위치: /Users/kangsangmo/Desktop/Valuehire_v6/artifacts/mail-governance-20261021/ (Git 제외).
+- private 근거 위치: /path/to/Valuehire_v6/artifacts/mail-governance-20261021/ (Git 제외).
 - pilot.sqlite를 먼저 read-only 집계해라. 인계 시점 source_labels 7 VERIFIED, receiver_labels 7 SENDING, share 7와 share_repair 2는 SENT_UNVERIFIED다. 새 Golden 0, Ontology 2 미확정, coverage 페이지 0이다.
 - receiver-label-apply.private.json과 receiver-label-apply-v2.private.json은 사전 원본 식별 검사에서 중단했다. 두 기록의 provider 변경 시도와 추가 발송은 모두 0이다. 이 SENDING 7건을 과거 Claude의 share SENDING 6건과 혼동하지 마라.
 - dev의 고유 원문 7개는 앞선 독립 수신 ZIP 바이트 검증을 통과했다. 이미 도착한 메일에 레이블을 붙이기 위해 재발송하지 마라. 최초 첨부 실패 2건과 별도 보완 작업을 유지해라.

@@ -59,7 +59,7 @@ Review example (`N` offsets must be actual offsets, not literal placeholders):
 ```json
 {
   "content_hash": "SHA256_OF_THE_MESSAGE_REPRESENTATIONS",
-  "rule_version": "20261021-v1",
+  "rule_version": "2026-10-21.v1",
   "reviewer": "claude:review-run-id",
   "mail_types": ["jd", "ontology"],
   "golden_axes": {
@@ -82,6 +82,13 @@ Layout requires an exact authored HTML span reviewed by the reviewer, or plainte
 evidence containing at least three nonempty lines. The core cannot judge visual quality
 or understand company/role substance: the named reviewer is responsible for these
 semantic assertions. Unknown confidentiality or candidate readiness prevents golden.
+
+`rule_version` must exactly match the running code's `RULE_VERSION`, currently
+`2026-10-21.v1`. Whitespace, alternate spellings, and reviewer-chosen versions are
+rejected. A rule change requires a code release and explicit migration; existing
+reviews and operations remain in the journal. Changing imported JSON is not migration.
+Mailbox account, sender, and recipient values must be normalized addr-specs without
+display names or surrounding whitespace. Invalid values are rejected before planning.
 
 Golden requires JD + all four axes `met` + qualifying layout evidence +
 `candidate_ready: true` + `internal_confidential: false`. Financial amounts are not
@@ -218,7 +225,9 @@ itself. The adapter must capture receiver identity/body and independent label re
 from authenticated provider calls and preserve their provider request/message references
 in the receipt. A sender SENT response, an outbound payload copied into receiver fields,
 or assumed receiver label IDs does not meet that operational requirement. SQLite
-append-only triggers prevent ordinary updates/deletes; they do not secure the journal
+append-only triggers prevent ordinary updates/deletes and duplicate-key INSERT/REPLACE,
+including from a separate SQLite connection; idempotent application inserts skip rows
+that already exist. They do not secure the journal
 against a malicious database owner who can drop tables or replace the file.
 
 ## Pure MIME transport builder

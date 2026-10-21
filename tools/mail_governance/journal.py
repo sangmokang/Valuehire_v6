@@ -40,9 +40,18 @@ class Journal:
         self.db.row_factory = sqlite3.Row
         self.db.execute("PRAGMA foreign_keys=ON")
         self.db.executescript(SCHEMA)
-        for table in ("reviews", "events", "operations", "receipts", "coverage", "share_scopes"):
+        immutable_keys = {
+            "reviews": "id=NEW.id OR (account=NEW.account AND message_id=NEW.message_id AND content_hash=NEW.content_hash AND rule_version=NEW.rule_version)",
+            "events": "id=NEW.id",
+            "operations": "id=NEW.id OR dedup_key=NEW.dedup_key",
+            "receipts": "id=NEW.id",
+            "coverage": "id=NEW.id",
+            "share_scopes": "scope=NEW.scope AND content_hash=NEW.content_hash",
+        }
+        for table, keys in immutable_keys.items():
             for action in ("UPDATE", "DELETE"):
                 self.db.execute(f"CREATE TRIGGER IF NOT EXISTS immutable_{table}_{action} BEFORE {action} ON {table} BEGIN SELECT RAISE(ABORT,'append-only journal'); END")
+            self.db.execute(f"CREATE TRIGGER IF NOT EXISTS immutable_{table}_INSERT BEFORE INSERT ON {table} WHEN EXISTS(SELECT 1 FROM {table} WHERE rowid=NEW.rowid OR ({keys})) BEGIN SELECT RAISE(ABORT,'append-only journal'); END")
         self._seed_share_scopes()
         require(self.db.execute("PRAGMA integrity_check").fetchone()[0] == "ok", "SQLite integrity failure")
         require(not self.db.execute("PRAGMA foreign_key_check").fetchall(), "SQLite foreign key failure")
@@ -58,7 +67,7 @@ class Journal:
             payload = json.loads(row["payload_json"])
             if message["rfc_message_id"]:
                 scope = digest([message["rfc_message_id"], payload["account"]])
-                self.db.execute("INSERT OR IGNORE INTO share_scopes VALUES(?,?,?)", (scope, message["source_hash"], row["review_id"]))
+                self.db.execute("INSERT INTO share_scopes SELECT ?,?,? WHERE NOT EXISTS(SELECT 1 FROM share_scopes WHERE scope=? AND content_hash=?)", (scope, message["source_hash"], row["review_id"], scope, message["source_hash"]))
 
     def _claim_share_scope(self, message, review_id):
         if message["rfc_message_id"] is None:
@@ -69,7 +78,7 @@ class Journal:
             rows = self.db.execute("SELECT content_hash FROM share_scopes WHERE scope=?", (scope,)).fetchall()
             if any(row[0] != message["source_hash"] for row in rows):
                 return False
-            self.db.execute("INSERT OR IGNORE INTO share_scopes VALUES(?,?,?)", (scope, message["source_hash"], review_id))
+            self.db.execute("INSERT INTO share_scopes SELECT ?,?,? WHERE NOT EXISTS(SELECT 1 FROM share_scopes WHERE scope=? AND content_hash=?)", (scope, message["source_hash"], review_id, scope, message["source_hash"]))
         return True
 
     def import_review(self, message, review):
@@ -86,13 +95,13 @@ class Journal:
             for field in ("observed_at", "existing_labels"):
                 stored_message[field] = first["message"][field]
             result["resulting_labels"] = first["result"]["resulting_labels"]
-            require(previous[0] == canonical(dict(message=stored_message, review=review, result=result)), "immutable review conflict: use a new rule_version")
+            require(previous[0] == canonical(dict(message=stored_message, review=review, result=result)), "immutable review conflict: explicit rule migration required")
             return key
         with self.db:
             self.db.execute("INSERT INTO reviews VALUES(?,?,?,?,?,?)", (key, message["account"], message["message_id"], message["source_hash"], review["rule_version"], payload))
             for event in result["events"]:
                 event_id = digest([key, event])
-                self.db.execute("INSERT OR IGNORE INTO events VALUES(?,?,?)", (event_id, key, canonical(event)))
+                self.db.execute("INSERT INTO events SELECT ?,?,? WHERE NOT EXISTS(SELECT 1 FROM events WHERE id=?)", (event_id, key, canonical(event), event_id))
         return key
 
     def review(self, key):
@@ -103,7 +112,7 @@ class Journal:
     def _plan_operation(self, review_id, kind, dedup_key, payload):
         key = digest([kind, dedup_key])
         with self.db:
-            self.db.execute("INSERT OR IGNORE INTO operations VALUES(?,?,?,?,?)", (key, review_id, kind, dedup_key, canonical(payload)))
+            self.db.execute("INSERT INTO operations SELECT ?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM operations WHERE id=? OR dedup_key=?)", (key, review_id, kind, dedup_key, canonical(payload), key, dedup_key))
             if not self.db.execute("SELECT 1 FROM receipts WHERE operation_id=?", (key,)).fetchone():
                 self._append_receipt(key, "PLANNED", {})
         return self.operation(key)
