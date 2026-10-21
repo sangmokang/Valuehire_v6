@@ -66,6 +66,14 @@ class LabelPreflightRecoveryTests(unittest.TestCase):
         self.assertEqual(self.states(self.original["id"]), ["PLANNED", "SENDING", "FAILED"])
         self.assertEqual(self.states(successor["id"]), ["PLANNED"])
 
+    def test_failed_after_provider_result_cannot_claim_zero_effect(self):
+        self.journal.receipt(self.original["id"], "SENT_UNVERIFIED", {})
+        self.journal.receipt(self.original["id"], "FAILED", self.proof)
+        before = self.snapshot()
+        with self.assertRaises(ValueError):
+            recover_label_preflight(self.journal, self.original["id"], self.proof)
+        self.assertEqual(self.snapshot(), before)
+
     def test_conflicting_proof_does_not_create_another_successor(self):
         recover_label_preflight(self.journal, self.original["id"], self.proof)
         before = self.snapshot()
