@@ -111,9 +111,25 @@ class LabelPreflightRecoveryTests(unittest.TestCase):
         proof = dict(self.proof, legacy_original_observation=observation)
         before = self.journal.operation(legacy["id"])["payload"]
         successor = recover_label_preflight(self.journal, legacy["id"], proof)
-        self.assertEqual(successor["payload"], dict(before, source_identity=observation["source_identity"], supersedes_operation_id=legacy["id"]))
+        self.assertEqual(successor["payload"], dict(before, source_identity=observation["source_identity"],
+                         bound_receiver_message_id=observation["receiver_message_id"], supersedes_operation_id=legacy["id"]))
         self.assertEqual(self.journal.operation(legacy["id"])["payload"], before)
         self.assertEqual(recover_label_preflight(self.journal, legacy["id"], proof), successor)
+
+    def test_legacy_receiver_binding_rejects_another_copy_with_otherwise_valid_readbacks(self):
+        legacy = self.legacy_operation()
+        observation = self.legacy_observation()
+        successor = recover_label_preflight(self.journal, legacy["id"], dict(self.proof, legacy_original_observation=observation))
+        self.journal.receipt(successor["id"], "SENDING", {})
+        self.journal.receipt(successor["id"], "SENT_UNVERIFIED", {})
+        def receipt(message_id):
+            return dict(receiver_observation=dict(account="dev@valueconnect.kr", message_id=message_id,
+                        content_hash=observation["content_hash"], source_identity=observation["source_identity"]),
+                        label_observation=dict(account="dev@valueconnect.kr", message_id=message_id,
+                                               labels=successor["payload"]["labels"]))
+        with self.assertRaises(ValueError):
+            self.journal.receipt(successor["id"], "VERIFIED", receipt("another-dev-copy"))
+        self.assertEqual(self.journal.receipt(successor["id"], "VERIFIED", receipt(observation["receiver_message_id"]))["state"], "VERIFIED")
 
     def test_wrong_kind_and_unproven_zero_effect_are_rejected_without_append(self):
         for operation in (op for op in self.operations if op["kind"] != "receiver_labels"):
