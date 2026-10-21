@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import * as mirrorMime from './mime.mjs';
 import { buildMirrorMime, buildOriginalZip, extractOriginalEml, MAX_TRANSPORT_BYTES, MIRROR_MARKER, MIRROR_RECIPIENT } from './mime.mjs';
 
 function sample(overrides = {}) {
@@ -117,4 +119,86 @@ test('ZIP corruption, duplicate entries, traversal names, and trailing data are 
   const traversal = Buffer.from(zip); traversal.write('../evil.eml', 30);
   assert.throws(() => extractOriginalEml(traversal), /Invalid original ZIP/);
   assert.throws(() => extractOriginalEml(Buffer.concat([zip, Buffer.from('extra')])), /Invalid original ZIP/);
+});
+
+function sha256(bytes) {
+  return createHash('sha256').update(bytes).digest('hex');
+}
+
+function receivedVerifier() {
+  assert.equal(typeof mirrorMime.verifyReceivedOriginal, 'function');
+  return mirrorMime.verifyReceivedOriginal;
+}
+
+test('received original identity comes from exact archived RFC bytes for CRLF, LF and folded headers', () => {
+  const verify = receivedVerifier();
+  for (const headers of [
+    'From: sender@example.test\r\nMessage-ID: <original@example.test>\r\n\r\n',
+    'From: sender@example.test\nmessage-id: original@example.test\n\n',
+    'Message-ID:\r\n \t<original@example.test>\r\nSubject: synthetic\r\n\r\n',
+  ]) {
+    const original = Buffer.concat([Buffer.from(headers), Buffer.from([0, 255, 128, 10])]);
+    for (const expected of ['<original@example.test>', 'original@example.test']) {
+      assert.deepEqual(verify(original, sha256(original), expected), {
+        original_sha256: sha256(original), rfc_message_id: '<original@example.test>',
+      });
+    }
+  }
+});
+
+test('received original supports a Uint8Array view and exact 20 MiB bound', () => {
+  const verify = receivedVerifier();
+  const original = sample().originalBytes;
+  const padded = Buffer.concat([Buffer.from('junk'), original, Buffer.from('tail')]);
+  const view = new Uint8Array(padded.buffer, padded.byteOffset + 4, original.length);
+  assert.equal(verify(view, sha256(original), '<original@example.test>').original_sha256, sha256(original));
+  const limit = Buffer.alloc(MAX_TRANSPORT_BYTES, 120);
+  Buffer.from('Message-ID: <original@example.test>\r\n\r\n').copy(limit);
+  assert.equal(verify(limit, sha256(limit), '<original@example.test>').original_sha256, sha256(limit));
+});
+
+test('received original rejects invalid source bytes and SHA claims', () => {
+  const verify = receivedVerifier();
+  const original = sample().originalBytes;
+  for (const bytes of ['', null, undefined, [], Buffer.alloc(0), Buffer.alloc(MAX_TRANSPORT_BYTES + 1)]) {
+    assert.throws(() => verify(bytes, sha256(original), '<original@example.test>'));
+  }
+  for (const sha of [null, 42, '', 'A'.repeat(64), 'a'.repeat(63), 'g'.repeat(64), sha256(original) + '\n']) {
+    assert.throws(() => verify(original, sha, '<original@example.test>'));
+  }
+  const changed = Buffer.concat([original, Buffer.from('changed body')]);
+  assert.throws(() => verify(changed, sha256(original), '<original@example.test>'), /SHA|hash|bytes/i);
+});
+
+test('received original rejects missing, duplicate, mismatched or body-spoofed Message-ID', () => {
+  const verify = receivedVerifier();
+  const invalid = [
+    'Subject: synthetic\r\n\r\nMessage-ID: <original@example.test>\r\n',
+    'Message-ID: <original@example.test>\r\nMessage-ID: <original@example.test>\r\n\r\nBody',
+    'Message-ID: <other@example.test>\nmessage-id: <original@example.test>\n\nBody',
+    'Message-ID: <other@example.test>\r\n\r\nMessage-ID: <original@example.test>',
+    'X-Claim:\r\n Message-ID: <original@example.test>\r\n\r\nBody',
+    'Message-ID: <original@example.test>',
+    'not a header\nMessage-ID: <original@example.test>\n\nBody',
+    'Message-ID : <original@example.test>\r\n\r\nBody',
+    'Message-ID: <original@example.test> <other@example.test>\r\n\r\nBody',
+    'Message-ID: <original@example.test\r\n\r\nBody',
+    'Message-ID: <original@example.test>\rX-Injected: value\r\n\r\nBody',
+  ];
+  for (const raw of invalid) {
+    const original = Buffer.from(raw);
+    assert.throws(() => verify(original, sha256(original), '<original@example.test>'));
+  }
+  const original = sample().originalBytes;
+  assert.throws(() => verify(original, sha256(original), '<Original@example.test>'));
+});
+
+test('received original rejects malformed, ambiguous and injected expected RFC identities', () => {
+  const verify = receivedVerifier();
+  const original = sample().originalBytes;
+  for (const expected of [null, 42, '', ' ', '<>', '<original@example.test', 'original@example.test>',
+    '<original@example.test> <other@example.test>', '<original@example.test>,other@example.test',
+    'original @example.test', 'original@example.test\r\nX-Injected: value', 'original@example.test\u0000']) {
+    assert.throws(() => verify(original, sha256(original), expected));
+  }
 });
