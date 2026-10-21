@@ -82,6 +82,14 @@ class JournalGuardRegressions(unittest.TestCase):
         self.assertEqual(self.journal.plan(key), first_plan)
         self.assertEqual(self.journal.db.execute("SELECT count(*) FROM share_scopes").fetchone()[0], 1)
 
+    def test_source_operation_uses_address_spec_without_replacing_legacy_intent(self):
+        self.message["account"] = "Owner <OWNER@EXAMPLE.TEST>"
+        key = self.journal.import_review(self.message, self.review)
+        source = next(op for op in self.journal.plan(key)["operations"] if op["kind"] == "source_labels")
+        self.assertEqual(source["payload"]["account"], "owner@example.test")
+        self.assertEqual(self.journal.review(key)["message"]["account"], self.message["account"])
+        self.assertEqual(self.journal.plan(key)["operations"][0], source)
+
     def test_internal_full_layout_quote_is_hashed_not_an_extra_body_copy(self):
         self.message["source_kind"] = "internal"
         original = copy.deepcopy(self.review)

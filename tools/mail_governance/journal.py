@@ -1,10 +1,11 @@
 """Append-only intent/observation journal. Imported receipts are not provider attestation."""
+import hashlib
 import json
 import os
 import sqlite3
 from datetime import datetime, timezone
 
-from .core import DESTINATION, MIRROR_MARKER, canonical, classify, digest, require, strings
+from .core import DESTINATION, MIRROR_MARKER, canonical, classify, digest, normalize_address, require, strings
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS reviews (
@@ -29,6 +30,19 @@ CREATE TABLE IF NOT EXISTS share_scopes (
 TRANSITIONS = {"PLANNED": {"SENDING"}, "SENDING": {"SENT_UNVERIFIED", "AMBIGUOUS", "FAILED"},
                "SENT_UNVERIFIED": {"VERIFIED", "AMBIGUOUS", "FAILED"}, "AMBIGUOUS": {"VERIFIED"},
                "VERIFIED": set(), "FAILED": set()}
+
+
+def stored_payload(message, review, result):
+    """Minimize Golden evidence without losing exact ontology event evidence."""
+    payload = json.loads(canonical(dict(message=message, review=review, result=result)))
+    if not (message["source_kind"] == "direct_customer" and "ontology" in review["mail_types"]):
+        payload["message"].pop("authored_text", None)
+        payload["message"].pop("html", None)
+        for axis in payload["review"]["golden_axes"].values():
+            item = axis["evidence"]
+            if item is not None and "quote" in item:
+                item["quote_sha256"] = hashlib.sha256(item.pop("quote").encode("utf-8")).hexdigest()
+    return payload
 
 
 class Journal:
@@ -84,21 +98,18 @@ class Journal:
     def import_review(self, message, review):
         result = classify(message, review)
         key = digest([message["account"], message["message_id"], message["source_hash"], review["rule_version"]])
-        stored_message = dict(message)
-        if not (message["source_kind"] == "direct_customer" and "ontology" in review["mail_types"]):
-            stored_message.pop("authored_text")
-            stored_message.pop("html", None)
-        payload = canonical(dict(message=stored_message, review=review, result=result))
+        payload = stored_payload(message, review, result)
         previous = self.db.execute("SELECT payload_json FROM reviews WHERE id=?", (key,)).fetchone()
         if previous:
             first = json.loads(previous[0])
             for field in ("observed_at", "existing_labels"):
-                stored_message[field] = first["message"][field]
-            result["resulting_labels"] = first["result"]["resulting_labels"]
-            require(previous[0] == canonical(dict(message=stored_message, review=review, result=result)), "immutable review conflict: explicit rule migration required")
+                payload["message"][field] = first["message"][field]
+            payload["result"]["resulting_labels"] = first["result"]["resulting_labels"]
+            # Older rows retain their original bytes; compare equivalent minimized views.
+            require(stored_payload(**first) == payload, "immutable review conflict: explicit rule migration required")
             return key
         with self.db:
-            self.db.execute("INSERT INTO reviews VALUES(?,?,?,?,?,?)", (key, message["account"], message["message_id"], message["source_hash"], review["rule_version"], payload))
+            self.db.execute("INSERT INTO reviews VALUES(?,?,?,?,?,?)", (key, message["account"], message["message_id"], message["source_hash"], review["rule_version"], canonical(payload)))
             for event in result["events"]:
                 event_id = digest([key, event])
                 self.db.execute("INSERT INTO events SELECT ?,?,? WHERE NOT EXISTS(SELECT 1 FROM events WHERE id=?)", (event_id, key, canonical(event), event_id))
@@ -123,24 +134,27 @@ class Journal:
         common = dict(content_hash=message["source_hash"], labels=result["labels"], mode="additive")
         ops = []
         if result["labels"]:
-            payload = dict(common, account=message["account"], message_id=message["message_id"],
+            payload = dict(common, account=normalize_address(message["account"]), message_id=message["message_id"],
                            labels=result["resulting_labels"], add_labels=sorted(set(result["labels"]) - set(message["existing_labels"])))
             ops.append(self._plan_operation(review_id, "source_labels", "source:" + review_id, payload))
-        mirror = (MIRROR_MARKER in message["subject"] or message["account"].casefold() == DESTINATION
-                  or message["from_address"].casefold() == DESTINATION)
+        mirror = (MIRROR_MARKER in message["subject"] or normalize_address(message["account"]) == DESTINATION
+                  or normalize_address(message["from_address"]) == DESTINATION)
         if mirror:
             return dict(operations=ops, sharing="mirror_or_dev_source")
         if not result["labels"]:
             return dict(operations=ops, sharing="not_shareable_type")
         source = ["rfc", message["rfc_message_id"]] if message["rfc_message_id"] else ["local", message["account"], message["message_id"]]
+        if message["rfc_message_id"] is None:
+            return dict(operations=ops, sharing="local_identity_reconciliation_required",
+                        source_identity=source, duplicate_risk=True)
         global_key = digest([source, message["source_hash"], DESTINATION])
-        already_recipient = DESTINATION in [address.casefold() for address in message["to_addresses"]]
+        already_recipient = DESTINATION in [normalize_address(address) for address in message["to_addresses"]]
         if not self._claim_share_scope(message, review_id):
             return dict(operations=ops, sharing="rfc_variant_review_required")
         if message["rfc_message_id"] and not already_recipient:
             for row in self.db.execute("SELECT payload_json FROM reviews WHERE content_hash=?", (message["source_hash"],)):
                 known = json.loads(row[0])["message"]
-                if known["rfc_message_id"] == message["rfc_message_id"] and DESTINATION in [address.casefold() for address in known["to_addresses"]]:
+                if known["rfc_message_id"] == message["rfc_message_id"] and DESTINATION in [normalize_address(address) for address in known["to_addresses"]]:
                     already_recipient = True
                     break
         receiver = dict(common, account=DESTINATION, source_review_id=review_id, mirror_marker=MIRROR_MARKER, source_identity=source)

@@ -10,7 +10,8 @@ The live adapter must obtain those observations from the respective authenticate
 Run from repository root:
 
 ```sh
-python3 -m unittest tools.mail_governance.test_core -v
+python3 -m unittest discover -s tools/mail_governance -p 'test_*.py' -v
+python3 -m tools.mail_governance.mutation_check
 python3 -m compileall -q tools/mail_governance
 python3 -m tools.mail_governance --db /private/path/mail.sqlite import-review --input review.json
 python3 -m tools.mail_governance --db /private/path/mail.sqlite plan --input review-id.json
@@ -35,9 +36,9 @@ Message fields:
 | Field | Type / meaning |
 |---|---|
 | `account`, `message_id` | Authenticated mailbox identity and provider-local ID |
-| `rfc_message_id` | RFC Message-ID string or null; null uses account/local-ID fallback |
+| `rfc_message_id` | RFC Message-ID string or null; null retains local identity and blocks automatic sharing |
 | `source_hash` | `content_hash(authored_text, html)` defined below |
-| `from_address` | Normalized sender address; no display name |
+| `from_address` | One unambiguous mailbox; a valid display name is accepted |
 | `to_addresses` | All **observed** recipient addresses; include known Cc/Bcc, never infer hidden Bcc |
 | `subject`, `authored_text` | Current authored subject/body, with quoted earlier mail excluded upstream |
 | `html` | Optional authored HTML string or null, excluding quoted earlier mail upstream |
@@ -78,17 +79,26 @@ Review example (`N` offsets must be actual offsets, not literal placeholders):
 `ontology`; empty means no supported type. Four golden axes are always required,
 each `met|missing|unknown` plus `evidence` object or null. A `met` assertion must cite
 an exact, nonempty source span. Every non-null span is verified, regardless of status.
-Layout requires an exact authored HTML span reviewed by the reviewer, or plaintext
-evidence containing at least three nonempty lines. The core cannot judge visual quality
-or understand company/role substance: the named reviewer is responsible for these
-semantic assertions. Unknown confidentiality or candidate readiness prevents golden.
+Layout must cite an authored HTML/plaintext span containing the cited company, role,
+and introductory personalization. The static check requires at least three visible
+blocks of 12 alphanumeric characters each. Company/role/personalization evidence must
+contain at least 40/40/24 visible alphanumeric characters respectively, and the intro
+must precede company and role. Empty tags, comments, script/style and statically hidden
+nodes do not qualify. These conservative floors reject trivial citations; they do not
+prove substantive company facts, complete responsibilities, person-fit, or browser
+computed CSS quality. The named reviewer owns those semantic assertions. Unknown
+confidentiality or candidate readiness prevents golden; no human approval gate is added.
 
 `rule_version` must exactly match the running code's `RULE_VERSION`, currently
 `2026-10-21.v1`. Whitespace, alternate spellings, and reviewer-chosen versions are
 rejected. A rule change requires a code release and explicit migration; existing
 reviews and operations remain in the journal. Changing imported JSON is not migration.
-Mailbox account, sender, and recipient values must be normalized addr-specs without
-display names or surrounding whitespace. Invalid values are rejected before planning.
+Mailbox account, sender, and recipient values must each parse as exactly one mailbox.
+`normalize_address` strips valid display names and casefolds canonical addr-specs for
+comparisons. Quoted display names and local parts are accepted; malformed addresses,
+groups, multiple mailboxes in one item, control characters and outer padding are rejected.
+Parsing does not authenticate the sender or mailbox. Legacy review keys stay unchanged;
+new source-label operation payloads use the canonical account.
 
 Golden requires JD + all four axes `met` + qualifying layout evidence +
 `candidate_ready: true` + `internal_confidential: false`. Financial amounts are not
@@ -145,7 +155,10 @@ quoted customer text is insufficient.
 Uniqueness/entity resolution must be established upstream; a string ID alone is not
 proof of that work. Multiple event payloads yield separate deterministic IDs. Complete
 authored representations are stored only for direct-customer ontology mail. Other
-mail retains metadata and reviewer evidence quotes rather than an extra raw-body copy.
+mail retains metadata and Golden-axis evidence offsets/SHA-256 rather than another body
+copy. Exact ontology event evidence and reason quotes remain available. Legacy rows are
+compared through the same minimization but never rewritten. Minimized stored review
+objects are audit records, not fresh classifier inputs; obtain original evidence to rerun.
 
 ## Plans, observations, and sharing
 
@@ -168,8 +181,10 @@ contain source additive-label work, receiver additive-label work, and (when need
 one global share intent. The send adapter must add `[VC-MIRROR:v1]` to the subject;
 dev sources, dev senders, and that marker never relay again. Known dev recipients skip
 forwarding while **receiver label work remains PLANNED**. Unknown hidden Bcc is not
-proof of delivery. Global send dedup uses RFC Message-ID + content hash + destination,
-falling back to account/local-ID only when RFC Message-ID is absent. Additional label
+proof of delivery. Global send dedup uses RFC Message-ID + content hash + destination.
+Absent RFC IDs return `local_identity_reconciliation_required`, `duplicate_risk: true`,
+and the local `source_identity`; only source-label work is planned until reconciliation.
+There is no automatic cross-mailbox equivalence or send permission from a local ID. Additional label
 sets can generate new receiver-label operations without generating another send.
 
 The content hash is representation-sensitive: extracting quoted text differently,
