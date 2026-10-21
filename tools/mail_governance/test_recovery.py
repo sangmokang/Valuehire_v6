@@ -73,6 +73,48 @@ class LabelPreflightRecoveryTests(unittest.TestCase):
             recover_label_preflight(self.journal, self.original["id"], dict(self.proof, report_sha256s=["3" * 64]))
         self.assertEqual(self.snapshot(), before)
 
+    def legacy_operation(self):
+        payload = dict(self.original["payload"])
+        payload.pop("source_identity")
+        legacy = self.journal._plan_operation(self.original["review_id"], "receiver_labels", "legacy-label-intent", payload)
+        self.journal.receipt(legacy["id"], "SENDING", {})
+        return legacy
+
+    def legacy_observation(self):
+        return dict(source_identity=["rfc", self.message["rfc_message_id"]],
+                    content_hash=self.message["source_hash"], original_sha256="a" * 64,
+                    receiver_message_id="existing-legacy-dev-copy")
+
+    def test_legacy_missing_identity_requires_explicit_original_observation(self):
+        legacy = self.legacy_operation()
+        before = self.snapshot()
+        with self.assertRaises(ValueError):
+            recover_label_preflight(self.journal, legacy["id"], self.proof)
+        self.assertEqual(self.snapshot(), before)
+
+    def test_legacy_observation_must_match_source_metadata_and_be_complete(self):
+        legacy = self.legacy_operation()
+        observed = self.legacy_observation()
+        invalid = [dict(observed, source_identity=["rfc", "<other@example.test>"]),
+                   dict(observed, content_hash="0" * 64), dict(observed, original_sha256="bad"),
+                   dict(observed, receiver_message_id="")]
+        for observation in invalid:
+            with self.subTest(observation=observation):
+                before = self.snapshot()
+                with self.assertRaises(ValueError):
+                    recover_label_preflight(self.journal, legacy["id"], dict(self.proof, legacy_original_observation=observation))
+                self.assertEqual(self.snapshot(), before)
+
+    def test_legacy_identity_migrates_only_through_bound_observation_without_rewrite(self):
+        legacy = self.legacy_operation()
+        observation = self.legacy_observation()
+        proof = dict(self.proof, legacy_original_observation=observation)
+        before = self.journal.operation(legacy["id"])["payload"]
+        successor = recover_label_preflight(self.journal, legacy["id"], proof)
+        self.assertEqual(successor["payload"], dict(before, source_identity=observation["source_identity"], supersedes_operation_id=legacy["id"]))
+        self.assertEqual(self.journal.operation(legacy["id"])["payload"], before)
+        self.assertEqual(recover_label_preflight(self.journal, legacy["id"], proof), successor)
+
     def test_wrong_kind_and_unproven_zero_effect_are_rejected_without_append(self):
         for operation in (op for op in self.operations if op["kind"] != "receiver_labels"):
             with self.subTest(kind=operation["kind"]):
