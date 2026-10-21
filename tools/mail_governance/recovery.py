@@ -65,6 +65,10 @@ def recover_label_preflight(journal, old_operation_id, evidence):
     original = journal.operation(old_operation_id)
     require(original["kind"] == "receiver_labels", "only receiver-label operations can be recovered")
     require(original["state"] in ("SENDING", "FAILED"), "operation is not an eligible preflight failure")
+    history = [row[0] for row in journal.db.execute(
+        "SELECT state FROM receipts WHERE operation_id=? ORDER BY id", (old_operation_id,))]
+    expected = ["PLANNED", "SENDING"] + (["FAILED"] if original["state"] == "FAILED" else [])
+    require(history == expected, "provider result history contradicts zero-effect preflight failure")
     identity = source_identity(journal, original, proof)
     if original["state"] == "SENDING":
         journal.receipt(old_operation_id, "FAILED", proof)

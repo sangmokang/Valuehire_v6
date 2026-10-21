@@ -65,6 +65,17 @@ MUTATIONS = (
     mutation("required_label_subset", "journal.py",
              '        require(set(expected["labels"]) <= set(labels["labels"]), "required labels not observed")\n', '',
              "test_receipts_fail_closed_and_readback_separate"),
+    mutation("checker_runtime_error_rejection", "mutation_check.py",
+             '            or any(problem["kind"] == "error" for problem in result["problems"])\n', '',
+             "test_runtime_errors_are_invalid_even_in_designated_test"),
+    mutation("complete_html_visibility_context", "quality.py",
+             '        parser = VisibleBlocks(source, evidence["start"], evidence["end"])',
+             '        parser = VisibleBlocks(evidence["quote"], 0, len(evidence["quote"]))',
+             "test_hidden_ancestor_cannot_be_omitted_from_all_html_citations"),
+    mutation("zero_effect_recovery_history", "recovery.py",
+             '    require(history == expected, "provider result history contradicts zero-effect preflight failure")\n',
+             '    require(True, "provider result history contradicts zero-effect preflight failure")\n',
+             "test_failed_after_provider_result_cannot_claim_zero_effect"),
 )
 
 
@@ -150,6 +161,7 @@ def test_matches(identifier, method):
 def invalid_result(result):
     forbidden = {"SyntaxError", "IndentationError", "TabError", "ImportError", "ModuleNotFoundError"}
     return (result["skipped"] or result["expected_failures"] or result["unexpected_successes"]
+            or any(problem["kind"] == "error" for problem in result["problems"])
             or any(problem["exception"] in forbidden or "_FailedTest" in problem["test"]
                    for problem in result["problems"]))
 
@@ -196,9 +208,10 @@ def check():
                 evidence["tests_run"] = result["tests_run"]
                 evidence["problems"] = result["problems"]
                 matching = [problem for problem in result["problems"]
-                            if test_matches(problem["test"], item["expected"])]
+                            if test_matches(problem["test"], item["expected"])
+                            and problem["kind"] == "failure" and problem["exception"] == "AssertionError"]
                 if invalid_result(result) or result["methods"] != baseline["methods"]:
-                    raise ValueError("invalid mutant test run: import, syntax, skipped, or changed discovery")
+                    raise ValueError("invalid mutant test run: runtime error, skipped, or changed discovery")
                 if result["success"]:
                     evidence["status"] = "survived"
                 elif matching:
