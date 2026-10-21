@@ -84,7 +84,9 @@ and introductory personalization. The static check requires at least three visib
 blocks of 12 alphanumeric characters each. Company/role/personalization evidence must
 contain at least 40/40/24 visible alphanumeric characters respectively, and the intro
 must precede company and role. Empty tags, comments, script/style and statically hidden
-nodes do not qualify. These conservative floors reject trivial citations; they do not
+nodes do not qualify. HTML is parsed in its full source context before citation offsets
+filter visible text; an omitted ancestor, comment, or attribute cannot make a hidden
+fragment visible. These conservative floors reject trivial citations; they do not
 prove substantive company facts, complete responsibilities, person-fit, or browser
 computed CSS quality. The named reviewer owns those semantic assertions. Unknown
 confidentiality or candidate readiness prevents golden; no human approval gate is added.
@@ -178,7 +180,8 @@ immutable send-intent evidence, separate from the authored-content hash.
 
 The only sharing destination is `dev@valueconnect.kr`, for supported types. Plans
 contain source additive-label work, receiver additive-label work, and (when needed)
-one global share intent. The send adapter must add `[VC-MIRROR:v1]` to the subject;
+one global share intent. The send adapter must add the exact, case-sensitive reserved
+token `[VC-MIRROR:v1]` to the subject;
 dev sources, dev senders, and that marker never relay again. Known dev recipients skip
 forwarding while **receiver label work remains PLANNED**. Unknown hidden Bcc is not
 proof of delivery. Global send dedup uses RFC Message-ID + content hash + destination.
@@ -273,6 +276,9 @@ It appends FAILED to an eligible old receiver-label SENDING intent and plans exa
 distinct receiver-label successor. Same-proof replay is idempotent, including interruption
 between failure and successor creation; it never reopens the original intent or sends mail.
 Uncertain effects, another failure reason, differing proof, and share operations are rejected.
+The complete old receipt history must be exactly PLANNED→SENDING, optionally followed
+by its matching FAILED proof. An earlier provider-result receipt contradicts zero effects
+and prevents recovery even when the latest state and imported proof look eligible.
 
 A legacy intent missing `source_identity` requires explicit original archive observation
 matching its immutable review's RFC identity and content hash, plus received original SHA
