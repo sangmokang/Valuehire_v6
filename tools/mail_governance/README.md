@@ -260,6 +260,28 @@ properties only; a live adapter must download the received ZIP and compare the i
 RFC bytes with the original provider raw bytes. Delivery and recipient labels remain
 separate checks. No live Gmail adapter is shipped in this directory.
 
+`verifyReceivedOriginal` verifies the actual extracted RFC bytes against their expected
+SHA-256, then parses exactly one Message-ID before the header/body boundary. Displayed
+mirror text is not original-identity authority. It accepts CRLF/LF and legacy mixed CR
+header separators without changing hashed bytes; ambiguous IDs fail closed.
+
+## Label preflight recovery
+
+`recovery.recover_label_preflight` is a local, label-only reconciliation helper. A trusted
+adapter must first establish zero provider mutation attempts from durable private reports.
+It appends FAILED to an eligible old receiver-label SENDING intent and plans exactly one
+distinct receiver-label successor. Same-proof replay is idempotent, including interruption
+between failure and successor creation; it never reopens the original intent or sends mail.
+Uncertain effects, another failure reason, differing proof, and share operations are rejected.
+
+A legacy intent missing `source_identity` requires explicit original archive observation
+matching its immutable review's RFC identity and content hash, plus received original SHA
+and actual receiver message ID. The successor retains this receiver binding for readback.
+Old payloads remain untouched. Report hashes and observation JSON are adapter assertions;
+they do not authenticate Gmail. The live adapter must collect source/receiver observations
+and independent post-modification GETs. Historical shares missing an original-byte send
+intent cannot be retroactively declared VERIFIED through this helper.
+
 ```sh
 node --test tools/mail_governance/test_mime.mjs
 ```

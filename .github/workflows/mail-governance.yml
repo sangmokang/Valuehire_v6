@@ -24,6 +24,8 @@ jobs:
           node-version: '22'
       - name: Mail decisions, immutable journal and coverage regressions
         run: python3 -m unittest discover -s tools/mail_governance -p 'test_*.py' -v
+      - name: Independent guard deletion regressions
+        run: python3 -m tools.mail_governance.mutation_check
       - name: Compile mail governance modules
         run: python3 -m compileall -q tools/mail_governance
       - name: Original email MIME bytes and destination boundary

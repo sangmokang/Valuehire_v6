@@ -53,6 +53,54 @@ export function extractOriginalEml(zipBytes) {
   return Buffer.from(original);
 }
 
+function normalizedMessageId(value) {
+  if (typeof value !== 'string' || value.length === 0 || /[\s\u0000-\u0020\u007f-\uffff]/u.test(value)) throw new Error('Invalid RFC Message-ID');
+  const id = value.startsWith('<') && value.endsWith('>') ? value.slice(1, -1) : value;
+  const atom = "[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+";
+  const dotAtom = `${atom}(?:\\.${atom})*`;
+  const literal = '\\[[\\x21-\\x5a\\x5e-\\x7e]+\\]';
+  if (!new RegExp(`^${dotAtom}@(?:${dotAtom}|${literal})$`).test(id)) throw new Error('Invalid RFC Message-ID');
+  return `<${id}>`;
+}
+
+export function verifyReceivedOriginal(originalBytes, expectedSha256, expectedRfcMessageId) {
+  if (!(originalBytes instanceof Uint8Array) || originalBytes.length === 0) throw new Error('Original RFC bytes must not be empty');
+  if (originalBytes.length > MAX_TRANSPORT_BYTES) throw new Error('20 MiB transport limit exceeded');
+  if (typeof expectedSha256 !== 'string' || expectedSha256.length !== 64 || !/^[a-f0-9]{64}$/.test(expectedSha256)) throw new Error('Invalid expected RFC SHA-256');
+  const expectedId = normalizedMessageId(expectedRfcMessageId);
+  // Snapshot the exact received bytes once so hashing and parsing share authority.
+  const bytes = Buffer.from(originalBytes);
+  const actualSha256 = createHash('sha256').update(bytes).digest('hex');
+  if (actualSha256 !== expectedSha256) throw new Error('Received original RFC bytes SHA-256 mismatch');
+  const crlfBoundary = bytes.indexOf('\r\n\r\n');
+  const lfBoundary = bytes.indexOf('\n\n');
+  const boundaries = [crlfBoundary, lfBoundary].filter(index => index >= 0);
+  if (boundaries.length === 0) throw new Error('Original RFC header/body boundary missing');
+  const headers = bytes.subarray(0, Math.min(...boundaries)).toString('latin1');
+  if (/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(headers)) throw new Error('Invalid original RFC headers');
+  const messageIds = [];
+  let current = null;
+  const finish = () => {
+    if (current?.name.toLowerCase() === 'message-id') messageIds.push(current.value.replace(/^[ \t]+|[ \t]+$/g, ''));
+  };
+  for (const line of headers.split(/\r\n|\n|\r/)) {
+    if (/^[ \t]/.test(line)) {
+      if (!current) throw new Error('Invalid original RFC header folding');
+      current.value += ` ${line.replace(/^[ \t]+/, '')}`;
+      continue;
+    }
+    finish();
+    const matched = /^([\x21-\x39\x3b-\x7e]+):(.*)$/.exec(line);
+    if (!matched) throw new Error('Invalid original RFC header field');
+    current = { name: matched[1], value: matched[2] };
+  }
+  finish();
+  if (messageIds.length !== 1) throw new Error('Exactly one original RFC Message-ID required');
+  const actualId = normalizedMessageId(messageIds[0]);
+  if (actualId !== expectedId) throw new Error('Received original RFC Message-ID mismatch');
+  return { original_sha256: actualSha256, rfc_message_id: actualId };
+}
+
 export function assertHeaderValue(value) {
   if (typeof value !== 'string' || /[\r\n\u0000]/.test(value)) throw new Error('Invalid MIME header value');
   return value;

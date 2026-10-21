@@ -186,7 +186,7 @@ test('received original rejects missing, duplicate, mismatched or body-spoofed M
     'Message-ID : <original@example.test>\r\n\r\nBody',
     'Message-ID: <original@example.test> <other@example.test>\r\n\r\nBody',
     'Message-ID: <original@example.test\r\n\r\nBody',
-    'Message-ID: <original@example.test>\rX-Injected: value\r\n\r\nBody',
+    'Message-ID: <original@example.test>\rMessage-ID: <other@example.test>\r\n\r\nBody',
   ];
   for (const raw of invalid) {
     const original = Buffer.from(raw);

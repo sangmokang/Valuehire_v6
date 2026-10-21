@@ -196,6 +196,8 @@ class Journal:
         require(type(observed) is dict and type(labels) is dict, "independent body and label readbacks required")
         require(observed.get("account") == expected["account"] and observed.get("content_hash") == expected["content_hash"], "receiver identity/body mismatch")
         require(type(observed.get("message_id")) is str and bool(observed["message_id"]), "receiver message id missing")
+        if "bound_receiver_message_id" in expected:
+            require(observed["message_id"] == expected["bound_receiver_message_id"], "bound receiver message mismatch")
         if operation["kind"] == "source_labels":
             require(observed["message_id"] == expected["message_id"], "source message mismatch")
         else:
