@@ -29,7 +29,9 @@ def hidden_node(tag, attrs):
     attrs = dict(attrs)
     style = re.sub(r"/\*.*?\*/", "", attrs.get("style") or "", flags=re.S)
     style = re.sub(r"\s+", "", style).casefold()
-    invisible_style = re.search(r"(?:^|;)(?:display:none|visibility:(?:hidden|collapse)|opacity:0(?:\.0*)?|font-size:0(?:px|em|rem|pt)?)(?:!important)?(?:;|$)", style)
+    zero = r"[+-]?(?:0+(?:\.0+)?|\.0+)(?:e[+-]?[0-9]+)?"
+    invisible_style = re.search(r"(?:^|;)(?:display:none|visibility:(?:hidden|collapse)|opacity:" + zero
+                               + r"%?|font-size:" + zero + r"(?:px|cm|mm|q|in|pt|pc|r?(?:em|ex|cap|ch|ic|lh)|[sld]?v(?:w|h|i|b|min|max)|%)?)(?:!important)?(?:;|$)", style)
     return (tag in INVISIBLE_TAGS or "hidden" in attrs or "inert" in attrs
             or (attrs.get("aria-hidden") or "").casefold() == "true" or bool(invisible_style))
 

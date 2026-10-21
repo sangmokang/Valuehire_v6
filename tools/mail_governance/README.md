@@ -101,6 +101,9 @@ comparisons. Quoted display names and local parts are accepted; malformed addres
 groups, multiple mailboxes in one item, control characters and outer padding are rejected.
 Parsing does not authenticate the sender or mailbox. Legacy review keys stay unchanged;
 new source-label operation payloads use the canonical account.
+Equivalent account display names/case cannot create a second immutable review for
+the same provider message, content and rule version. Existing raw IDs and row bytes
+are preserved; conflicting legacy aliases require reconciliation.
 
 Golden requires JD + all four axes `met` + qualifying layout evidence +
 `candidate_ready: true` + `internal_confidential: false`. Financial amounts are not
@@ -177,6 +180,11 @@ reconciliation task, not permission to resend.
 For a share operation, the SENDING receipt must include `original_sha256`, the
 lowercase SHA-256 of the original provider RFC bytes fetched before sending. It is
 immutable send-intent evidence, separate from the authored-content hash.
+`sharing` reflects the existing share state: `forward_planned`, `forward_sending`,
+`forward_sent_unverified`, or `forward_verified`. Failed/ambiguous shares return
+`forward_failed_reconciliation_required` / `forward_ambiguous_reconciliation_required`;
+these statuses do not grant a retry or create a new send intent. A separate safe
+share-recovery contract remains unimplemented.
 
 The only sharing destination is `dev@valueconnect.kr`, for supported types. Plans
 contain source additive-label work, receiver additive-label work, and (when needed)
@@ -189,6 +197,13 @@ Absent RFC IDs return `local_identity_reconciliation_required`, `duplicate_risk:
 and the local `source_identity`; only source-label work is planned until reconciliation.
 There is no automatic cross-mailbox equivalence or send permission from a local ID. Additional label
 sets can generate new receiver-label operations without generating another send.
+RFC identity matching ignores optional angle brackets and outer whitespace while
+preserving the ID's case. Existing share/receiver intents reuse their original dedup
+keys; legacy scope reservations also seed canonical scopes without rewriting history.
+Multiple conflicting legacy identity groups return `rfc_identity_reconciliation_required`
+and do not plan receiver/send work. Readback compares RFC identities using the same
+normalization; local identities still require an exact match. The received RFC verifier
+separately validates actual original header syntax.
 
 The content hash is representation-sensitive: extracting quoted text differently,
 changing HTML rendering/escaping, or even changing whitespace can change the hash of

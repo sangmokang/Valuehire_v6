@@ -32,6 +32,12 @@ TRANSITIONS = {"PLANNED": {"SENDING"}, "SENDING": {"SENT_UNVERIFIED", "AMBIGUOUS
                "VERIFIED": set(), "FAILED": set()}
 
 
+def normalize_rfc_message_id(value):
+    """Use the same bracket-independent identity as the received RFC verifier."""
+    value = value.strip()
+    return value if value.startswith("<") and value.endswith(">") else "<" + value + ">"
+
+
 def stored_payload(message, review, result):
     """Minimize Golden evidence without losing exact ontology event evidence."""
     payload = json.loads(canonical(dict(message=message, review=review, result=result)))
@@ -75,18 +81,17 @@ class Journal:
         self.db.close()
 
     def _seed_share_scopes(self):
-        rows = self.db.execute("SELECT o.review_id,o.payload_json,r.payload_json AS review_json FROM operations o JOIN reviews r ON r.id=o.review_id WHERE o.kind IN ('share','receiver_labels')").fetchall()
+        rows = self.db.execute("SELECT r.id AS review_id,r.payload_json AS review_json FROM reviews r WHERE r.id IN (SELECT review_id FROM share_scopes UNION SELECT review_id FROM operations WHERE kind IN ('share','receiver_labels'))").fetchall()
         for row in rows:
             message = json.loads(row["review_json"])["message"]
-            payload = json.loads(row["payload_json"])
             if message["rfc_message_id"]:
-                scope = digest([message["rfc_message_id"], payload["account"]])
+                scope = digest([normalize_rfc_message_id(message["rfc_message_id"]), DESTINATION])
                 self.db.execute("INSERT INTO share_scopes SELECT ?,?,? WHERE NOT EXISTS(SELECT 1 FROM share_scopes WHERE scope=? AND content_hash=?)", (scope, message["source_hash"], row["review_id"], scope, message["source_hash"]))
 
     def _claim_share_scope(self, message, review_id):
         if message["rfc_message_id"] is None:
             return True
-        scope = digest([message["rfc_message_id"], DESTINATION])
+        scope = digest([normalize_rfc_message_id(message["rfc_message_id"]), DESTINATION])
         with self.db:
             self.db.execute("BEGIN IMMEDIATE")
             rows = self.db.execute("SELECT content_hash FROM share_scopes WHERE scope=?", (scope,)).fetchall()
@@ -99,16 +104,26 @@ class Journal:
         result = classify(message, review)
         key = digest([message["account"], message["message_id"], message["source_hash"], review["rule_version"]])
         payload = stored_payload(message, review, result)
-        previous = self.db.execute("SELECT payload_json FROM reviews WHERE id=?", (key,)).fetchone()
-        if previous:
-            first = json.loads(previous[0])
-            for field in ("observed_at", "existing_labels"):
-                payload["message"][field] = first["message"][field]
-            payload["result"]["resulting_labels"] = first["result"]["resulting_labels"]
-            # Older rows retain their original bytes; compare equivalent minimized views.
-            require(stored_payload(**first) == payload, "immutable review conflict: explicit rule migration required")
-            return key
         with self.db:
+            if not self.db.in_transaction:
+                self.db.execute("BEGIN IMMEDIATE")
+            previous = self.db.execute("SELECT id,payload_json FROM reviews WHERE message_id=? AND content_hash=? AND rule_version=? ORDER BY rowid",
+                                       (message["message_id"], message["source_hash"], review["rule_version"])).fetchall()
+            existing_key = None
+            for row in previous:
+                first = json.loads(row["payload_json"])
+                if normalize_address(first["message"]["account"]) != normalize_address(message["account"]):
+                    continue
+                payload["message"]["account"] = first["message"]["account"]
+                for field in ("observed_at", "existing_labels"):
+                    payload["message"][field] = first["message"][field]
+                payload["result"]["resulting_labels"] = first["result"]["resulting_labels"]
+                # Compare every legacy alias, retaining the first ID and original bytes.
+                require(stored_payload(**first) == payload, "immutable review conflict: explicit rule migration required")
+                if existing_key is None:
+                    existing_key = row["id"]
+            if existing_key is not None:
+                return existing_key
             self.db.execute("INSERT INTO reviews VALUES(?,?,?,?,?,?)", (key, message["account"], message["message_id"], message["source_hash"], review["rule_version"], canonical(payload)))
             for event in result["events"]:
                 event_id = digest([key, event])
@@ -143,7 +158,7 @@ class Journal:
             return dict(operations=ops, sharing="mirror_or_dev_source")
         if not result["labels"]:
             return dict(operations=ops, sharing="not_shareable_type")
-        source = ["rfc", message["rfc_message_id"]] if message["rfc_message_id"] else ["local", message["account"], message["message_id"]]
+        source = ["rfc", normalize_rfc_message_id(message["rfc_message_id"])] if message["rfc_message_id"] else ["local", message["account"], message["message_id"]]
         if message["rfc_message_id"] is None:
             return dict(operations=ops, sharing="local_identity_reconciliation_required",
                         source_identity=source, duplicate_risk=True)
@@ -151,18 +166,36 @@ class Journal:
         already_recipient = DESTINATION in [normalize_address(address) for address in message["to_addresses"]]
         if not self._claim_share_scope(message, review_id):
             return dict(operations=ops, sharing="rfc_variant_review_required")
+        existing_keys = set()
+        for row in self.db.execute("SELECT o.payload_json,r.payload_json AS review_json FROM operations o JOIN reviews r ON r.id=o.review_id WHERE o.kind IN ('share','receiver_labels') AND r.content_hash=? ORDER BY o.rowid", (message["source_hash"],)):
+            known = json.loads(row["review_json"])["message"]
+            previous = json.loads(row["payload_json"])
+            if (known["rfc_message_id"] and previous["account"] == DESTINATION
+                    and normalize_rfc_message_id(known["rfc_message_id"]) == normalize_rfc_message_id(message["rfc_message_id"])):
+                # Reuse legacy dedup keys, including intents with an unbracketed ID.
+                source = previous.get("source_identity") or ["rfc", known["rfc_message_id"]]
+                existing_keys.add(digest([source, message["source_hash"], DESTINATION]))
+        if len(existing_keys) > 1:
+            return dict(operations=ops, sharing="rfc_identity_reconciliation_required")
+        if existing_keys:
+            global_key = existing_keys.pop()
         if message["rfc_message_id"] and not already_recipient:
             for row in self.db.execute("SELECT payload_json FROM reviews WHERE content_hash=?", (message["source_hash"],)):
                 known = json.loads(row[0])["message"]
-                if known["rfc_message_id"] == message["rfc_message_id"] and DESTINATION in [normalize_address(address) for address in known["to_addresses"]]:
+                if (known["rfc_message_id"] and normalize_rfc_message_id(known["rfc_message_id"]) == normalize_rfc_message_id(message["rfc_message_id"])
+                        and DESTINATION in [normalize_address(address) for address in known["to_addresses"]]):
                     already_recipient = True
                     break
         receiver = dict(common, account=DESTINATION, source_review_id=review_id, mirror_marker=MIRROR_MARKER, source_identity=source)
         ops.append(self._plan_operation(review_id, "receiver_labels", "receiver:" + digest([global_key, result["labels"]]), receiver))
         if already_recipient:
             return dict(operations=ops, sharing="already_recipient_label_pending")
-        ops.append(self._plan_operation(review_id, "share", "share:" + global_key, receiver))
-        return dict(operations=ops, sharing="forward_planned")
+        share = self._plan_operation(review_id, "share", "share:" + global_key, receiver)
+        ops.append(share)
+        sharing = "forward_" + share["state"].lower()
+        if share["state"] in ("FAILED", "AMBIGUOUS"):
+            sharing += "_reconciliation_required"
+        return dict(operations=ops, sharing=sharing)
 
     def operation(self, key):
         row = self.db.execute("SELECT * FROM operations WHERE id=?", (key,)).fetchone()
@@ -201,7 +234,14 @@ class Journal:
         if operation["kind"] == "source_labels":
             require(observed["message_id"] == expected["message_id"], "source message mismatch")
         else:
-            require(expected.get("source_identity") is not None and observed.get("source_identity") == expected["source_identity"], "receiver original identity mismatch")
+            source_identity = expected.get("source_identity")
+            observed_identity = observed.get("source_identity")
+            if (type(source_identity) is list and len(source_identity) == 2 and source_identity[0] == "rfc"
+                    and type(observed_identity) is list and len(observed_identity) == 2 and observed_identity[0] == "rfc"
+                    and type(source_identity[1]) is str and type(observed_identity[1]) is str):
+                source_identity = ["rfc", normalize_rfc_message_id(source_identity[1])]
+                observed_identity = ["rfc", normalize_rfc_message_id(observed_identity[1])]
+            require(source_identity is not None and observed_identity == source_identity, "receiver original identity mismatch")
         if operation["kind"] == "share":
             intent = self.db.execute("SELECT payload_json FROM receipts WHERE operation_id=? AND state='SENDING' ORDER BY id LIMIT 1", (operation["id"],)).fetchone()
             original_hash = json.loads(intent[0]).get("original_sha256") if intent else None

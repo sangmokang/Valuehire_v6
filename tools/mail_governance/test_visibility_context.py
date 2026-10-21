@@ -22,6 +22,24 @@ def html_review(prefix="", suffix="", *, entity_intro=False):
 
 
 class VisibilityContextRegressions(unittest.TestCase):
+    def test_numeric_zero_inline_styles_cannot_make_hidden_evidence_golden(self):
+        for property_name, values in (
+            ("font-size", ("0", "0.0px", "0%", ".0em", "00.000rem", "+0pt", "-0.0px",
+                           "0cm", "0in", "0pc", "0vw", "0vh", "0ch", "0ex", "0rlh", "0dvb")),
+            ("opacity", ("0", "0.0", ".0", "0%", "00.00%", "+0.0", "-0%")),
+        ):
+            for value in values:
+                with self.subTest(property=property_name, value=value):
+                    message, review, _ = html_review(
+                        f"<div style='{property_name}:{value}!important'>", "</div><p>hello</p>")
+                    self.assertFalse(classify(message, review)["is_golden_sample"])
+
+    def test_nonzero_inline_styles_keep_visible_evidence_golden(self):
+        for style in ("font-size:0.1px", "font-size:10px", "font-size:0.1cm", "opacity:.01", "opacity:1", "opacity:10%"):
+            with self.subTest(style=style):
+                message, review, _ = html_review(f"<div style='{style}'>", "</div><p>hello</p>")
+                self.assertTrue(classify(message, review)["is_golden_sample"])
+
     def test_hidden_ancestor_cannot_be_omitted_from_all_html_citations(self):
         wrappers = (("<div hidden>", "</div>"),
                     ("<div style='display:none'>", "</div>"),
