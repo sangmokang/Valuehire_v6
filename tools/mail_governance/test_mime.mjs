@@ -136,6 +136,7 @@ test('received original identity comes from exact archived RFC bytes for CRLF, L
     'From: sender@example.test\r\nMessage-ID: <original@example.test>\r\n\r\n',
     'From: sender@example.test\nmessage-id: original@example.test\n\n',
     'Message-ID:\r\n \t<original@example.test>\r\nSubject: synthetic\r\n\r\n',
+    'Received: local\rMessage-ID: <original@example.test>\r\nSubject: synthetic\r\n\r\n',
   ]) {
     const original = Buffer.concat([Buffer.from(headers), Buffer.from([0, 255, 128, 10])]);
     for (const expected of ['<original@example.test>', 'original@example.test']) {
@@ -144,6 +145,8 @@ test('received original identity comes from exact archived RFC bytes for CRLF, L
       });
     }
   }
+  const bodyClaim = Buffer.from('Message-ID: <original@example.test>\r\n\r\nMessage-ID: <unrelated@example.test>\r\n');
+  assert.equal(verify(bodyClaim, sha256(bodyClaim), '<original@example.test>').rfc_message_id, '<original@example.test>');
 });
 
 test('received original supports a Uint8Array view and exact 20 MiB bound', () => {
