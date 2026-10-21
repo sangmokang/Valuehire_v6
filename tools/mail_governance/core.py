@@ -143,7 +143,7 @@ def validate_event(message, event):
 def classify(message, review):
     validate(message, review)
     axes = review["golden_axes"]
-    golden = ("jd" in review["mail_types"] and all(a["status"] == "met" for a in axes.values()) and golden_structure(axes)
+    golden = ("jd" in review["mail_types"] and all(a["status"] == "met" for a in axes.values()) and golden_structure(message, axes)
               and review["candidate_ready"] is True and review["internal_confidential"] is False)
     labels = {LABELS[k] for k in review["mail_types"]}
     if golden:

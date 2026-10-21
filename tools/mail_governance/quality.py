@@ -5,6 +5,7 @@ for the factual company briefing, complete role and substantive candidate fit.
 This static parser does not substitute for a browser's computed CSS/layout.
 """
 import re
+from html import unescape
 from html.parser import HTMLParser
 
 
@@ -34,8 +35,11 @@ def hidden_node(tag, attrs):
 
 
 class VisibleBlocks(HTMLParser):
-    def __init__(self):
-        super().__init__(convert_charrefs=True)
+    def __init__(self, source, start, end):
+        super().__init__(convert_charrefs=False)
+        self.source = source
+        self.start, self.end = start, end
+        self.line_starts = [0] + [match.end() for match in re.finditer("\n", source)]
         self.stack = []
         self.current = []
         self.blocks = []
@@ -71,27 +75,50 @@ class VisibleBlocks(HTMLParser):
 
     def handle_data(self, data):
         if not self.blocked():
-            self.current.append(data)
+            offset = self.absolute_offset()
+            start, end = max(offset, self.start), min(offset + len(data), self.end)
+            if start < end:
+                self.current.append(data[start - offset:end - offset])
+
+    def absolute_offset(self):
+        line, column = self.getpos()
+        return self.line_starts[line - 1] + column
+
+    def reference(self, prefix, name):
+        offset = self.absolute_offset()
+        end = offset + len(prefix) + len(name)
+        if self.source[end:end + 1] == ";":
+            end += 1
+        if not self.blocked() and self.start <= offset and end <= self.end:
+            self.current.append(unescape(self.source[offset:end]))
+
+    def handle_entityref(self, name):
+        self.reference("&", name)
+
+    def handle_charref(self, name):
+        self.reference("&#", name)
 
 
-def visible_content(quote, representation):
-    if representation == "authored_text":
-        blocks = [compact(line) for line in quote.splitlines() if line.strip()]
+def visible_content(message, evidence):
+    source = message[evidence["representation"]]
+    if evidence["representation"] == "authored_text":
+        blocks = [compact(line) for line in evidence["quote"].splitlines() if line.strip()]
     else:
-        parser = VisibleBlocks()
-        parser.feed(quote)
+        # Citation offsets restrict emitted text, never the surrounding DOM.
+        parser = VisibleBlocks(source, evidence["start"], evidence["end"])
+        parser.feed(parser.source)
         parser.close()
         parser.flush()
         blocks = parser.blocks
     return compact(" ".join(blocks)), blocks
 
 
-def golden_structure(axes):
+def golden_structure(message, axes):
     """Reject trivial/invisible evidence and introductions below the JD body."""
     layout = axes["layout"]["evidence"]
     if not layout:
         return False
-    visible_layout, blocks = visible_content(layout["quote"], layout["representation"])
+    visible_layout, blocks = visible_content(message, layout)
     if sum(character_count(block) >= 12 for block in blocks) < 3:
         return False
     positions = {}
@@ -99,7 +126,7 @@ def golden_structure(axes):
         evidence = axes[axis]["evidence"]
         if not evidence:
             return False
-        quote, _ = visible_content(evidence["quote"], evidence["representation"])
+        quote, _ = visible_content(message, evidence)
         if character_count(quote) < floor or quote not in visible_layout:
             return False
         positions[axis] = visible_layout.index(quote)
