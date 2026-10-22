@@ -68,6 +68,8 @@ def _repair_parent(journal, repair):
     require(payload.get("prior_sender_message_id") == parent["sender"]
             and payload.get("prior_receiver_message_id") == parent["receiver"], "repair prior delivery IDs mismatch")
     require(payload.get("source_message_id") == parent["message"]["message_id"], "repair source message mismatch")
+    require(repair["sender"] != parent["sender"] and repair["receiver"] != parent["receiver"],
+            "repair must have distinct sender and receiver")
     return parent
 
 

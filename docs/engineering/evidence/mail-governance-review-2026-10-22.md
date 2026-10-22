@@ -1,83 +1,60 @@
-# PR #139 수정 검증 — 2026-10-22
+# PR #139 수정 검증 — 2026-10-22~23
 
-## 결론
+기존 CE1·CE2·CE5·CE7·CE12와 마커 누적 시험 결함을 수정한 뒤, 남아 있던 HTML·공통 CI·과거 발송 미해소를 추가로 검증했다. 자동 병합하지 않으며 [Issue #138](https://github.com/sangmokang/Valuehire_v6/issues/138)은 전사 수집 배포까지 열린 상태로 둔다. [PR #139](https://github.com/sangmokang/Valuehire_v6/pull/139).
 
-기존 우회 반례를 RED 커밋으로 고정하고 수정했다. Python 65개·Node 16개와 지정 변이 16개가 통과했다. 원본·dev 각 7건의 같은 레이블 이름을 독립 조회했으며 추가 발송은 0건이다. 전사 자동화는 미배포다.
+첫 추가 수정은 `02321732`이며 후속 검수 반례는 `09d81565`, `e4d9b15f` RED로 먼저 고정했다. 최종 Git HEAD의 고정 코드 파일 SHA256와 별도 검수 입력을 대조하며, 원격 실행 결과는 PR checks와 후속 검증 댓글에서 정확한 SHA로 대조한다. 이전 SHA의 성공을 현재 코드의 성공으로 대체하지 않는다.
 
-검증 코드: `a255c8bb5ac61bd69f7407469fecbe12b460541f`. 이 문서 이후 코드가 바뀌면 해당 SHA에서 재검증한다. 추적: [PR #139](https://github.com/sangmokang/Valuehire_v6/pull/139), [Issue #138](https://github.com/sangmokang/Valuehire_v6/issues/138). 자동 병합하지 않고 Issue를 닫지 않는다.
+## 보존한 수정과 새 반례
 
-## 반례와 변경
+- 원격 `400a9558`의 계정/RFC 동치 식별자·숨김 수치 표현 보강을 fast-forward로 보존했다.
+- `eaeee74c`, `70b6e199`에서 교차 종료·비 void 자기종료·중복 속성·CI 실행 증거·과거 해소·P13 삭제/범위 반례를 먼저 RED로 커밋했다.
+- `ba4a9702`는 모호한 HTML을 골든 근거에서 제외한다. 지원하는 생략 문단/목록, 실제 void 태그, 엔티티와 부분 인용의 정상 대조군은 유지한다.
+- 별도 검수는 기본 닫힌 `details`의 본문이 실제 Chromium에서 모두 보이지 않는데 골든이 되는 반례를 재현했다. 닫힘·중첩 반례와 명시적 `open` 정상 대조군을 추가해 `082ebd44` RED 뒤 수정했다. `open="false"`도 boolean 속성이 있으므로 열린 상태다.
+- 구조 하한은 사소한 인용과 숨김 우회를 거절한다. 회사 사실·직무 충실도·개인화 의미나 완전한 HTML5/CSS 렌더링을 증명하지 않는다. 사람 승인 단계를 새로 추가하지 않았으며 기존 Golden 레이블은 자동 삭제하지 않는다.
 
-| 항목 | 현재 계약·근거 |
+## 역사적 발송 해소 — 실제 실행
+
+기존 share 7건에는 이전 형식 `raw_sha256`가 있었다. 이전 보고의 “원문 SHA가 없다”는 표현은 부정확했다. 새 계약 필드 `original_sha256`와 구별해 기존 값을 대조했으며 영수증을 바꾸지 않았다. 보완 전송 2건에는 자체 발송 전 해시가 없어 현재 원본과 parent의 기존 해시를 대조했다.
+
+- 별도 인증한 원본·보낸편지함·dev 수신본 **9건**을 readonly로 다시 조회했다. 기존 송수신 ID·작업 marker·현재 원본 RFC 바이트와 실제 수신 ZIP 내부 원문 SHA를 대조했다.
+- **5개 기존 원본 + 2개 기존 보완본 = 7개**의 ZIP 원문 일치와 필수 레이블을 확인했다. 처음 실패한 2개 복사본은 원문 보존 실패를 계속 명시한다. 이 2개를 양호한 ZIP으로 세지 않는다.
+- 복제 장부에서 먼저 해소한 뒤 운영 장부에 불변 `delivery_resolutions` **9행**을 추가했다. 결과는 `ARCHIVE_CONFIRMED_AFTER_DELIVERY` **7건**, `REPAIRED_BY_CONFIRMED_DELIVERY` **2건**, 고유 원본 **7건**이다.
+- 이전 여섯 테이블의 모든 행·열 값·순서를 전수 비교해 보존했다. 기존 발송 상태는 여전히 `SENT_UNVERIFIED`; 별도 해소 결과를 새 계약의 `VERIFIED` 영수증으로 소급 표시하지 않는다. 새 발송 **0건**, 이번 관측·해소 과정의 provider 변경 **0건**이다.
+- 앞선 레이블 복구에서는 원본 7건·유효 dev 수신본 7건의 요청한 동일 레이블 이름을 독립 조회했다(**14/14**). 이번 재조회도 유효 수신본 7건의 레이블을 확인했다. 실패 복사본 2건의 레이블까지 일치한다고 주장하지 않는다.
+
+해소 API는 source/RFC/내용 해시, 실제 송수신 ID, 원문 SHA, marker, 독립 레이블, 보완 prior 연결을 검증한다. 관측 JSON과 보고서 해시는 신뢰된 어댑터 주장이지 Gmail의 암호학적 증명은 아니다. SQLite 방어는 일반 UPDATE/DELETE/INSERT OR REPLACE를 막지만 DB 소유자의 테이블 삭제/파일 교체를 막는다고 주장하지 않는다.
+
+## 공통 CI의 실제 원인 수정
+
+만료일 연장이나 검사 비활성화 없이 아래 세 억제의 원인을 수정했다. 해당 회귀의 통과 근거를 확인하고 활성 억제를 원장에서 제거했다.
+
+| 기존 억제 | 수정과 검증 |
 |---|---|
-| CE1 | 한 글자 인용·빈 HTML·숨긴 HTML·이름 치환·뒤쪽 개인화는 Golden 실패. 풍부한 plain/HTML 정상 예시 유지 |
-| CE2 | 코드 소유 버전 `2026-10-21.v1`만 허용. 공백·임의 버전 거절. upstream 수정을 보존 |
-| CE5 | RFC-ID 부재 시 로컬 identity·중복 위험을 명시하고 자동 공유 보류. 원본 레이블만 계획 |
-| CE7 | 여섯 테이블의 INSERT/REPLACE·UPDATE/DELETE 방어를 일반·별도 연결에서 검증. DB 소유자의 파일 교체까지 보호한다는 주장은 없음 |
-| CE12 | 유효한 표시명 주소를 엄격 파싱·정규화. 기존 dev 수신자·발신자·계정은 재전달하지 않음. 여러 주소·깨진 주소는 거절 |
-| 마커 시험 | marker/dev-source/dev-sender 각각 새 fixture. 마커 방어만 제거해도 지정 시험 실패 |
-| 최소 보존 | 일반 메일의 Golden 인용은 offset/SHA로 저장. Ontology 사건 인용·이유·직접 고객 원문 유지. 과거 행은 재작성하지 않음 |
-| 표본 복구 | 원문 SHA/RFC를 실제 ZIP에서 검증. zero-effect 사전 실패를 기록하고 수신본 ID에 묶인 별도 레이블 작업만 생성 |
+| `ci-transfer-guarantee` | 성공한 실제 wrapper가 경로/SHA 마커를 남기고 **같은 run/attempt**의 마지막 단계에서 현재 파일과 전량 대조한다. 직전 성공 run은 현재 SHA의 증거가 아니다. verify.sh도 포함하고 CI 기대 목록 축소를 거절한다. 0-2 로컬 전용·0-5 main 조건 면제 이유는 코드에 명시한다. |
+| `p13-deletion-blindspot` | HEAD와 staged workflow 전체의 실행 명령/uses multiset을 비교한다. 스텝/파일/명령 삭제, no-op 치환, Actions 밖 이동, symlink 교체를 거절하고 이름 변경/Actions 안 이동은 허용한다. |
+| `gate-scope-gaps` | workflow/skill 자기제외를 검사한다. 파일명 대신 명시된 외부효과 entry의 지원되는 정적 import/호출 경로를 검사하며 순수 타입을 오탐하지 않는다. 선언 삭제/축소·그림자 함수·동적/분석 불가 경로를 거절한다. |
 
-Claude의 1차 독립 검수(`ac293550`)는 원래 CE가 닫혔음을 확인했지만 숨김 상위 태그를 인용에서 제외하는 새 MEDIUM 반례와 복구 이력·변이 오류 판정 LOW를 찾았다. `501bda33`에서 RED로 고정한 뒤 전체 HTML 문맥 파싱(`33988333`), 발송 결과 이력 제외·런타임 오류 invalid 판정(`a255c8bb`)으로 수정했다. 새 세 방어의 제거 변이도 모두 지정 단언으로 적발했다. 두 번째 독립 검수는 고정 코드 SHA를 대상으로 별도 실행한다.
+외부효과 검사는 제한된 문법의 호출 경로 증거다. 선언되지 않은 의도, 조건 분기의 실제 실행, 인증·응답·전달 성공은 추론하지 않는다. 마커도 workflow 편집 권한자의 위조를 암호학적으로 막지 않는다. 삭제/약화 검사와 오너의 diff 검토를 함께 적용한다. [선언 및 분석 범위](../../../scripts/verify/external-effect-contract.md).
 
-→ 구조 하한은 사소한 인용과 빈 HTML을 막는다. 회사 사실·직무 충실도·경력 적합성의 의미 판단이나 브라우저 computed CSS를 증명하지 않는다. 검토자의 축별 판단·후보자 적합성 선언이 필요하며 사람 승인 단계를 새로 추가하지 않았다. 기존 Golden 레이블은 추가 방식 계약에 따라 자동 삭제하지 않는다.
+## 실행 증거와 남은 범위
 
-## 새 실행 증거
+- 현재 확인된 Python **102/102**, MIME/ZIP Node **16/16**.
+- 방어 제거 변이 **30 killed / 0 survived / 0 invalid**. 전체 discovered 정상 baseline을 한 번 실행하고 각 변이는 새 사본에서 지정 회귀와 정상 대조 시험을 수행한다. 지정 회귀의 `AssertionError`만 적발로 인정하며 runtime/import/setup 오류는 무효다. 전 가능한 변이의 coverage 수치가 아니다. 닫힌 `details`·`dialog`, UA 숨김 5종, 보완 송수신 ID 방어 및 정상 대조군을 포함해 재실행했다.
+- CI 실행 증명 **CHECKED 18**, workflow 우회 8종 차단, 구조 검사 **35**, mechanism 명부 **24**. P13 경계 **30/30**과 실제 선언 **3개** 확인. 실제 JS 바인딩 호환 변경 뒤 영향받는 4건과 실제 선언 3개도 재검증했다. 기존 0-7은 행동 6종이 모두 통과했으나 당시 동시 편집으로 원본 상태 보존 검사에서 실패했으므로, 최종 고정 트리에서 전체 exit 0을 다시 확인해야 한다. 이 이전 결과를 최종 성공으로 세지 않으며, 고정 트리의 pre-push·0-7·원격 CI를 별도 SHA 귀속 증거로 남긴다. 억제 0건 정상 입력과 실제 억제의 날짜 필수·빈 값·잘못된 값·만료·미래 날짜 회귀 3개도 통과했다.
+- 현재 명단 9계정 모두 `gmail.readonly`·`gmail.modify` scope token과 일치하는 profile/label-list 조회가 성공했다. 일시적인 한 계정의 429는 별도 재시도로 성공했고 첫 실패 관측도 보존했다. scope 인증은 모든 계정의 실제 label modify 성공과 다르다. 실제 변경 검증은 기존 원본·dev 표본 범위다.
+- **coverage 페이지 0, Ontology entity 미확정 2건, 전사 backfill/수집 어댑터/스케줄러 미배포**다. 전체 멤버 과거·신규 메일 정리가 완료됐다고 주장하지 않는다.
+- 실제 메일·명단·ID·원문·인증 정보는 Git 제외 private 근거만 사용한다. private 파일/디렉터리는 0600/0700으로 점검했다. 후보자 발송·자동 병합은 없다.
 
-- Python discovery: **65/65**, Node MIME/ZIP: **16/16**. compileall, Node 구문 검사, diff 공백 검사, `verify.sh` 통과.
-- 변이: **16 killed / 0 survived / 0 invalid**. 각 변이는 별도 합성 사본·새 interpreter에서 실행하며 지정 회귀 시험의 assertion 실패를 확인했다. 전체 가능한 변이의 커버리지 수치가 아니다.
-- 필수 다섯 변이: 마커 단독, met 근거 필수, PLANNED→VERIFIED, source message ID, 표시명 정규화 제거 모두 적발. 기존 추가 여덟 개는 버전·레이아웃 단락·RFC 부재·INSERT 방어·최소 보존·인용 하한·개인화 순서·레이블 부분집합이다.
-- RED 커밋: `e7f43d94` 입력 반례, `14804937` 장부 반례, `25637b5a` 복구 계약, `bfc28b23` 수신 RFC 검사, `633f5757` legacy 관측, `14362eab` 수신본 바꿔치기, `30db337f` 옛 원문의 혼합 줄바꿈, `501bda33` 숨김 문맥·검증기·복구 이력.
+Claude의 최초 32파일 도구 기반 검수는 600초 시간 초과로 판정을 받지 못했다. 이를 승인으로 표시하지 않는다. 읽기 전용 코드 본문 검수 재시도와 최종 SHA의 실행 검증 결과는 PR 후속 댓글에 구분해 남긴다. 코드 스냅샷과 Git blob의 SHA256를 대조해 검수 대상의 일치를 확인한다.
 
-## 실제 표본과 남은 범위
 
-2026-10-22 별도 인증한 원본·dev GET에서 원문 7건의 실제 RFC 바이트·SHA·Message-ID와 공유 작업 마커를 대조했다. 과거 plain 본문에 없고 HTML에만 있던 RFC 선언 때문에 멈춘 사전 검사를 실제 ZIP 원문 검증으로 교체했다. 기존 두 사전 실패 기록은 provider 변경 시도·추가 발송 모두 0이다.
+## Claude 후속 반례와 수정
 
-기존 receiver-label 작업 7건에 사전 실패 근거를 append하여 `FAILED`로 남기고, 별도 후속 작업 7건을 `VERIFIED`로 완료했다. 레이블은 이름으로 계정별 조회·생성하고 추가만 적용했으며 실제 같은 수신본의 후속 GET으로 검증했다. 복구 전 존재한 여섯 테이블의 모든 행이 그대로 보존됨을 비교했고 SQLite integrity는 `ok`였다. 최종 양쪽 조회 중 원본 2건이 영문 `06ontology`만 가진 것을 발견해, 옛 VERIFIED를 보존하고 별도 원본 레이블 보완 작업 2건을 추가·VERIFIED했다. 원본 레이블 작업은 총 9 VERIFIED이며 대상 고유 원본은 7건이다. 최종 readonly GET에서 원본 7건·dev 7건 모두 요청한 같은 레이블 이름을 가졌다(14/14). 보완 전 여섯 테이블의 기존 108행은 모든 열 값·행 순서가 그대로 보존됐다. 이번 실행의 발송은 0건이다.
+코드 본문 17파일 정적 검수는 `REQUEST_CHANGES`였다. Claude는 코드를 실행하지 않았고, 실행 증거는 별도 로컬 시험이다.
 
-이전 share 7건과 share_repair 2건은 `SENT_UNVERIFIED`를 유지한다. 옛 send intent에 원문 SHA가 없어 새 코드의 공유 VERIFIED로 소급 승격하지 않았다. 원문 보존·수신 레이블의 실제 관측과 옛 발송 장부 상태를 구별한다. coverage 페이지 0·Ontology 미확정 2건·전사 backfill/수집 어댑터/스케줄러 미배포 상태도 유지한다.
+- **H1:** job 수준 `env`에서 허용되지 않는 `runner.temp` 참조를 제거했다. checkout 뒤 첫 wrapper 이전에 runner 셸의 `RUNNER_TEMP`와 run/attempt로 경로를 만들고 `GITHUB_ENV`에 전달한다. 새 단위 3건 RED 뒤 전체 6/6 GREEN이며 공백 경로와 attempt 격리도 확인했다. [GitHub context availability](https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#context-availability).
+- **M1:** 보완 발송이 원본과 같은 송신/수신 ID를 재사용하지 못하게 했다. sender만 동일·receiver만 동일·둘 다 동일한 3개 독립 회귀를 RED 후 수정했다. 역사적 발송 14/14 시험을 통과했고 기존 운영 해소 9건도 readonly로 재검증했다. 실제 보완 2건은 송신/수신 ID가 각각 구분되며 DB 바이트는 불변이었다.
+- **M2:** Chromium에서 기본 숨김인 `dialog`, `datalist`, `rp`, `noembed`, `noframes`, `iframe` 본문을 확인했다. 숨김 인용과 보이는 중복 layout을 분리한 반례까지 6종을 RED 후 막았다. 열린 dialog/일반 본문을 포함한 visibility 18/18은 통과했다.
+- **빈 억제 원장:** here-string이 항목 0건에도 빈 행을 만들어 오류로 처리하던 훅을 process substitution으로 수정했다. 실제 빈 expiry를 거절하는 방어는 유지했다. 만료일을 추가하거나 연장한 것이 아니다.
 
-현재 인증·읽기 근거는 원본 계정과 dev에서 직접 확인한 범위다. 전사 명단 관측은 계정별 전체 읽기·쓰기 성공을 뜻하지 않는다. 다른 계정의 readonly 성공을 근거 없이 주장하지 않는다. 실제 메일·ID·명단·원문·자격증명은 Git 제외 private 근거에만 보존한다.
-
-일반 `verify` CI는 변경하지 않은 `suppressions.yaml`의 기존 세 항목이 2026-10-20에 만료되어 실패한다. 만료를 연장하거나 게이트를 끄지 않았다. mail-governance CI는 새 discovery와 변이 실행을 포함하며 원격 실행 결과는 PR checks에서 확인한다. 독립 Claude 검수 결과와 병합 판단도 PR에 별도로 기록한다.
-
-## 방어 제거 실측
-
-각 행은 별도 합성 사본의 전체 65개 Python 시험을 실행했다. 적발은 지정 회귀의 `failure:AssertionError`이며 runtime error는 invalid로 분리한다.
-
-| 방어 | 결과 | 지정 회귀 |
-|---|---|---|
-| `subject_mirror_marker` | killed | `test_mirror_and_dev_source_do_not_relay` |
-| `met_axis_evidence` | killed | `test_each_met_axis_requires_its_own_evidence` |
-| `planned_to_verified` | killed | `test_source_labels_require_original_message_id_with_valid_other_observations` |
-| `source_message_identity` | killed | `test_source_labels_require_original_message_id_with_valid_other_observations` |
-| `display_address_normalization` | killed | `test_ce12_display_recipient_prevents_dev_resend` |
-| `code_owned_rule_version` | killed | `test_ce2_modified_version_cannot_create_a_new_golden_review` |
-| `visible_layout_block_count` | killed | `test_layout_requires_visible_content_in_multiple_readable_blocks` |
-| `missing_rfc_no_share` | killed | `test_missing_rfc_stays_local_without_automatic_duplicate_delivery` |
-| `append_only_duplicate_insert` | killed | `test_replace_cannot_overwrite_any_journal_table_even_on_fresh_connection` |
-| `golden_quote_minimization` | killed | `test_internal_full_layout_quote_is_hashed_not_an_extra_body_copy` |
-| `substantive_citation_floor` | killed | `test_each_content_axis_rejects_a_single_character_independently` |
-| `personalization_precedes_jd` | killed | `test_personalized_message_must_precede_company_and_role` |
-| `required_label_subset` | killed | `test_receipts_fail_closed_and_readback_separate` |
-| `checker_runtime_error_rejection` | killed | `test_runtime_errors_are_invalid_even_in_designated_test` |
-| `complete_html_visibility_context` | killed | `test_hidden_ancestor_cannot_be_omitted_from_all_html_citations` |
-| `zero_effect_recovery_history` | killed | `test_failed_after_provider_result_cannot_claim_zero_effect` |
-
-## 이번 의미 단위 커밋
-
-- `e7f43d94` 골든 판정과 표시명 수신자의 남은 반례를 먼저 재현한다
-- `14804937` 원본 식별자 부재와 본문 중복 보존의 회귀를 먼저 드러낸다
-- `b1094a62` 빈 HTML과 형식뿐인 근거가 우수 JD로 승격되지 않게 한다
-- `d19438dc` 불확실한 원본의 중복 전달과 장부의 본문 중복을 막는다
-- `25637b5a` 효과 없는 사전 실패를 기존 작업 재실행과 구별하는 시험을 고정한다
-- `bfc28b23` 본문의 식별자 선언 없이도 수신 원문을 검증하는 반례를 고정한다
-- `633f5757` 옛 레이블 작업의 출처를 명시적 관측 없이 보완하지 못하게 한다
-- `14362eab` 복구 근거에 묶인 실제 수신본을 다른 복사본으로 바꾸지 못하게 한다
-- `30db337f` 옛 수신 원문의 혼합 줄바꿈도 바이트 변경 없이 식별하도록 시험한다
-- `ac293550` 검증된 원문에 묶인 별도 레이블 작업으로 사전 실패를 복구한다
-- `ae0f8722` 수정된 반례와 실제 레이블 복구를 전사 배포 상태와 구별해 남긴다
-- `501bda33` 독립 검수에서 드러난 숨김 문맥과 검증기 허점을 회귀로 고정한다
-- `33988333` 인용 범위 밖 숨김 문맥도 골든 판정에 반영한다
-- `a255c8bb` 검증기 오류와 발송 이력이 복구 성공으로 오인되지 않게 한다
+후속 Claude 정적 재검수는 고정 코드 본문으로 다시 요청했고, 실제 판정과 최종 SHA의 CI 결과를 PR 댓글에 별도 기록한다. 이는 전사 수집 배포 완료를 뜻하지 않는다.

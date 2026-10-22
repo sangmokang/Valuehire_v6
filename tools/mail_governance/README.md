@@ -92,7 +92,9 @@ computed CSS quality. The named reviewer owns those semantic assertions. Unknown
 confidentiality or candidate readiness prevents golden; no human approval gate is added.
 Ambiguous crossing closes, nonvoid self-closing tags, and duplicate attributes cannot
 establish visible HTML evidence. Closed `details` content is also excluded; an
-explicit `open` attribute permits it. Supported omitted paragraph/list endings and real
+explicit `open` attribute permits it. Closed `dialog` and UA-hidden `datalist`, `rp`,
+`noembed`, `noframes`, and `iframe` text cannot establish evidence either. Supported
+omitted paragraph/list endings and real
 void elements remain accepted; this is not a complete HTML5 tree-repair algorithm.
 
 `rule_version` must exactly match the running code's `RULE_VERSION`, currently
@@ -322,7 +324,8 @@ content hash, mirror/operation markers, and a separate required-label readback.
 Existing legacy `raw_sha256` intent fields are crosschecked without renaming them.
 `REPAIRED_BY_CONFIRMED_DELIVERY` keeps the original archive failure explicit and
 links its exact prior sender/receiver/source references to an archive-confirmed
-repair. Repair labels must also satisfy the original label set.
+repair. The repair must have distinct actual sender and receiver IDs; copying either
+original delivery ID is rejected. Repair labels must also satisfy the original label set.
 
 Status exposes both `historical_state` and the separate resolution. A resolved old
 `SENT_UNVERIFIED` row remains that state; resolution is not a current-contract

@@ -101,13 +101,39 @@ MUTATIONS = (
     mutation("closed_details_visibility", "quality.py",
              '            or (tag == "details" and "open" not in attrs)\n', '',
              "test_closed_details_body_is_not_visible_including_nested_disclosures"),
+    mutation("historical_distinct_repair_sender", "historical_delivery.py",
+             '    require(repair["sender"] != parent["sender"] and repair["receiver"] != parent["receiver"],\n'
+             '            "repair must have distinct sender and receiver")',
+             '    require(repair["receiver"] != parent["receiver"],\n'
+             '            "repair must have distinct sender and receiver")',
+             "test_repair_cannot_reuse_original_sender_message_id"),
+    mutation("historical_distinct_repair_receiver", "historical_delivery.py",
+             '    require(repair["sender"] != parent["sender"] and repair["receiver"] != parent["receiver"],\n'
+             '            "repair must have distinct sender and receiver")',
+             '    require(repair["sender"] != parent["sender"],\n'
+             '            "repair must have distinct sender and receiver")',
+             "test_repair_cannot_reuse_original_receiver_message_id"),
+    mutation("closed_dialog_visibility", "quality.py",
+             '            or (tag == "dialog" and "open" not in attrs)\n', '',
+             "test_default_hidden_html_elements_cannot_establish_visible_evidence"),
+    mutation("hidden_datalist_visibility", "quality.py", '"datalist", ', '',
+             "test_default_hidden_html_elements_cannot_establish_visible_evidence"),
+    mutation("hidden_rp_visibility", "quality.py", '"rp", ', '',
+             "test_default_hidden_html_elements_cannot_establish_visible_evidence"),
+    mutation("hidden_noembed_visibility", "quality.py", '"noembed", ', '',
+             "test_hidden_raw_text_citations_reject_even_with_visible_duplicate_layout"),
+    mutation("hidden_noframes_visibility", "quality.py", '"noframes", ', '',
+             "test_hidden_raw_text_citations_reject_even_with_visible_duplicate_layout"),
+    mutation("hidden_iframe_visibility", "quality.py", ', "iframe"', '',
+             "test_hidden_raw_text_citations_reject_even_with_visible_duplicate_layout"),
 )
 
 POSITIVE_CONTROLS = {
     "core.py": ("test_rich_plaintext_and_structured_html_remain_golden",),
     "quality.py": ("test_rich_plaintext_and_structured_html_remain_golden",
                    "test_visible_partial_html_citations_preserve_parent_context_and_entities",
-                   "test_explicitly_open_details_body_remains_visible"),
+                   "test_explicitly_open_details_body_remains_visible",
+                   "test_explicitly_open_dialog_and_ordinary_content_remain_visible"),
     "journal.py": ("test_journal_append_only_idempotent_and_private",
                    "test_rich_plaintext_and_structured_html_remain_golden"),
     "recovery.py": ("test_recovery_appends_failure_and_distinct_label_intent_without_rewriting",),
