@@ -1,7 +1,6 @@
 """Exercise staged hook boundaries without changing the source repository."""
 import json
 from pathlib import Path
-import shutil
 import subprocess
 import tempfile
 import unittest

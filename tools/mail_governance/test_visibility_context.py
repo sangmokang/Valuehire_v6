@@ -113,6 +113,15 @@ class VisibilityContextRegressions(unittest.TestCase):
             "<article><img hidden src='synthetic.png'/><br/>", "</article>", entity_intro=True)
         self.assertTrue(classify(message, review)["is_golden_sample"])
 
+    def test_duplicate_attributes_make_html_visibility_ambiguous(self):
+        for attributes in ("STYLE='display:none' style='display:block'",
+                           "style='opacity:0' style='opacity:1'",
+                           "aria-hidden='true' aria-hidden='false'",
+                           "class='first' class='second'"):
+            with self.subTest(attributes=attributes):
+                message, review, _ = html_review("<div " + attributes + ">", "</div>")
+                self.assertFalse(classify(message, review)["is_golden_sample"])
+
 
 if __name__ == "__main__":
     unittest.main()
