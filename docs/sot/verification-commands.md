@@ -2,7 +2,7 @@
 
 `$strict`의 Codex·Claude 공통 순서와 패리티 계약은 [strict-workflow.md](strict-workflow.md)를 정본으로 읽는다. 원칙 수치는 `coding-principles.md`, Work Unit 값은 `work-unit-policy.yaml`이 소유하며 이 문서에 복제하지 않는다.
 
-최종 갱신: 2026-09-02 (Invoice 독립 단위·PostgreSQL 런타임 게이트 추가)
+최종 갱신: 2026-10-22 (동일 실행 마커 검수·P13 경계 회귀 추가)
 근거: `docs/engineering/docs-sot-restructure-goal-2026-08-08.md`
 
 ## 현재 규칙
@@ -19,11 +19,11 @@
 
 ### CI(`​.github/workflows/verify.yml`)가 실제로 돌리는 것
 
-**워크플로 스텝 26개 전부**를 적는다(2026-08-12 V1 D6: 이전 판은 `bash ...` 직접 명령만 적어 인라인 본문 스텝이 목록에서 빠졌고, 운영자가 실제로 무엇이 도는지 잘못 판단할 수 있었다). 아래는 `verify.yml` 의 `- name:` 스텝 순서 그대로다.
+**이름 있는 워크플로 스텝 30개 전부**를 적는다(2026-08-12 V1 D6: 이전 판은 `bash ...` 직접 명령만 적어 인라인 본문 스텝이 목록에서 빠졌고, 운영자가 실제로 무엇이 도는지 잘못 판단할 수 있었다). 아래는 `verify.yml` 의 `- name:` 스텝 순서 그대로다.
 
 | # | 스텝 이름 | 실행 내용 |
 |---|---|---|
-| 1 | 비밀 스캔 (verify.sh) | `bash verify.sh` — 추적 파일 전체 |
+| 1 | 비밀 스캔 (verify.sh) | `bash scripts/verify/run-acceptance.sh verify.sh` — 추적 파일 전체·성공 후 경로/SHA 마커 |
 | 2 | Strict 원칙 정본·장부·배선 검사 | `bash scripts/acceptance-principles-check.sh` — 34개 정본 문구·장치·명시적 pre-push/CI 배선 |
 | 3 | Strict 원칙 적대 fixture·500/501 경계 | `bash scripts/acceptance-principles-mutations.sh` — 정상 fixture와 반례 41건·500/501 경계 |
 | 4 | Strict 전역 스킬 잠금 장치 격리 회귀 | `bash scripts/acceptance-guard-global-skill-files.sh` — lock/check/unlock/recover와 동일 UID 한계 |
@@ -46,9 +46,15 @@
 | 21 | 인수 검사 verified-sha | `bash scripts/acceptance-verified-sha.sh` — 현재 SHA 귀속·모든 verify 실행 집계·조회 오류 및 순서 반례 52건(P23) |
 | 22 | 인수 검사 ci-step-integrity | `bash scripts/acceptance-ci-step-integrity.sh` — 조건부·오류무시·echo 대체 차단 및 main 실행별 그룹·이벤트/ref 분리·30분 상한 회귀 24건 |
 | 23 | 인수 검사 semantic-mutations | `bash scripts/acceptance-semantic-mutations.sh` — 인수 검사 무력화 5종 전량 차단 |
-| 24 | 인수 검사 verify-ac-m | `bash scripts/acceptance-verify-ac-m.sh` — mechanism 명부 대조 (AC-M) |
-| 25 | 인수 검사 invoice | `bash scripts/acceptance-invoice.sh` — 채용 수수료 계산·기한·계약 변조·Codex/Claude 스킬 동등성 |
-| 26 | Invoice 독립 런타임 게이트 | 게이트 배선 검사 + Python 단위시험 직접 실행 + 임시 PostgreSQL에서 마이그레이션·수수료 동시성·저장/전달 RPC 검증 |
+| 24 | CI 실행 증명 우회·동일 실행 검수 회귀 | `bash scripts/verify/run-acceptance.sh scripts/acceptance-ci-execution-proof.sh` — 실행 없는 성공·마커 누락/해시 불일치·주석/조건/가짜 bash 호출을 합성 fixture에서 차단 |
+| 25 | P13 검사 삭제·자기제외·외부효과 경계 회귀 | `bash scripts/verify/run-acceptance.sh scripts/acceptance-p13-gate-boundaries.sh` — 실제 staged hook의 독립 합성 반례·정상 대조군 |
+| 26 | 인수 검사 verify-ac-m | `bash scripts/acceptance-verify-ac-m.sh` — mechanism 명부 대조 (AC-M) |
+| 27 | PostgreSQL 서버 준비 | 임시 Invoice 런타임용 PostgreSQL 준비·접속 확인 |
+| 28 | 인수 검사 invoice | `bash scripts/acceptance-invoice.sh` — 채용 수수료 계산·기한·계약 변조·Codex/Claude 스킬 동등성 |
+| 29 | Invoice 게이트 자가시험 | 게이트 배선 검사 + Python 단위시험 직접 실행 + 임시 PostgreSQL에서 마이그레이션·수수료 동시성·저장/전달 RPC 검증 |
+| 30 | 동일 CI 실행의 검사 경로·해시 전량 대조 | `bash scripts/verify/check-acceptance-markers.sh` — 같은 run/attempt의 성공 마커를 현재 스크립트 SHA와 대조 |
+
+인수 스크립트는 모두 `scripts/verify/run-acceptance.sh`를 통해 실행하며, 표의 직접 명령 표기는 검사 본체를 나타낸다. 마지막 마커 검수는 같은 실행에서 수행한다. 직전 성공 run을 현재 SHA의 실행 증거로 사용하지 않는다. CI에서 기대 목록을 축소하는 환경 변수는 거절한다.
 
 *(1번 앞에 `actions/checkout` 이 있고 `fetch-depth: 0` 이다 — 8번이 과거 blob 을 열려면 필요하다.)*
 
@@ -78,4 +84,4 @@
 ## 비범위 / 한계
 
 - `main` 브랜치 GitHub 보호 규칙의 실제 활성화 여부는 확인하지 않았다(`docs/sot/git-workflow.md` 한계와 동일).
-- 이 표는 2026-08-22 실행 결과의 스냅샷이다. 스크립트가 추가/삭제되면 다시 확인해야 한다.
+- 이 표는 2026-10-22 workflow와 실행 검증의 스냅샷이다. 스크립트가 추가/삭제되면 다시 확인해야 한다.
