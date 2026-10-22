@@ -122,6 +122,25 @@ class VisibilityContextRegressions(unittest.TestCase):
                 message, review, _ = html_review("<div " + attributes + ">", "</div>")
                 self.assertFalse(classify(message, review)["is_golden_sample"])
 
+    def test_closed_details_body_is_not_visible_including_nested_disclosures(self):
+        wrappers = (("<details>", "</details>"),
+                    ("<details open><details>", "</details></details>"),
+                    ("<details><details open>", "</details></details>"))
+        for opening, closing in wrappers:
+            with self.subTest(wrapper=opening):
+                message, review, _ = html_review(opening + "<summary>채용 안내</summary>", closing)
+                self.assertFalse(classify(message, review)["is_golden_sample"])
+
+    def test_explicitly_open_details_body_remains_visible(self):
+        for opening, closing in (("<details open>", "</details>"),
+                                 ("<details open=''>", "</details>"),
+                                 ("<details open='false'>", "</details>"),
+                                 ("<details open><details open>", "</details></details>")):
+            with self.subTest(wrapper=opening):
+                message, review, _ = html_review(opening + "<summary>채용 안내</summary>", closing,
+                                               entity_intro=True)
+                self.assertTrue(classify(message, review)["is_golden_sample"])
+
 
 if __name__ == "__main__":
     unittest.main()
