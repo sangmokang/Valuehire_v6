@@ -78,6 +78,41 @@ class VisibilityContextRegressions(unittest.TestCase):
                     entity_intro=entity_intro)
                 self.assertTrue(classify(message, review)["is_golden_sample"])
 
+    def test_crossing_inline_close_cannot_release_a_hidden_block_ancestor(self):
+        for block in ("div", "section", "article", "ul", "p"):
+            with self.subTest(block=block):
+                opening = "<span style='display:none'><" + block + "></span>"
+                message, review, _ = html_review(opening, "</" + block + ">")
+                self.assertFalse(classify(message, review)["is_golden_sample"])
+
+    def test_nested_crossing_closes_cannot_release_hidden_inline_context(self):
+        opening = "<span hidden><section><div></span>"
+        message, review, _ = html_review(opening, "</div></section>")
+        self.assertFalse(classify(message, review)["is_golden_sample"])
+
+    def test_ordinary_omitted_paragraph_ends_remain_visible_with_partial_entity_citations(self):
+        message, review, fragment = html_review("<article>", "</article>", entity_intro=True)
+        html = message["html"].replace("</p>", "")
+        message["html"] = html
+        message["source_hash"] = review["content_hash"] = content_hash(message["authored_text"], html)
+        for axis in ("personalization", "company", "role"):
+            quote = review["golden_axes"][axis]["evidence"]["quote"]
+            review["golden_axes"][axis]["evidence"] = citation(html, quote, "html")
+        review["golden_axes"]["layout"]["evidence"] = citation(html, fragment.replace("</p>", ""), "html")
+        self.assertTrue(classify(message, review)["is_golden_sample"])
+
+    def test_nonvoid_self_closing_tags_cannot_release_hidden_context(self):
+        for tag, attributes in (("span", " hidden"), ("div", " style='display:none'"),
+                                ("section", " hidden"), ("script", ""), ("style", "")):
+            with self.subTest(tag=tag):
+                message, review, _ = html_review("<" + tag + attributes + "/>", "</" + tag + ">")
+                self.assertFalse(classify(message, review)["is_golden_sample"])
+
+    def test_void_self_closing_images_and_breaks_do_not_hide_later_evidence(self):
+        message, review, _ = html_review(
+            "<article><img hidden src='synthetic.png'/><br/>", "</article>", entity_intro=True)
+        self.assertTrue(classify(message, review)["is_golden_sample"])
+
 
 if __name__ == "__main__":
     unittest.main()
