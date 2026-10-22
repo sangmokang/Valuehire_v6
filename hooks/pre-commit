@@ -23,7 +23,27 @@ block() { printf 'BLOCKED: %s\n' "$1" >&2; fail=1; }
 # R(rename)을 넣지 않으면 `git mv notes.txt leak.db` 가 staged 목록에서 빠져
 # 훅을 그대로 통과한다(2026-08-09 실측). 이름만 바꿔도 내용은 그대로다.
 staged=$(git diff --cached --name-only --diff-filter=ACMR)
-if [ -z "$staged" ]; then exit 0; fi
+staged_any=$(git diff --cached --no-renames --name-only)
+if [ -z "$staged_any" ]; then exit 0; fi
+
+# Read each checker from the same staged blobs it inspects. A clean worktree copy
+# cannot replace a missing or changed checker in the commit under review.
+run_index_gate() {
+  local path="$1" label="$2" temporary rc=0
+  temporary=$(mktemp) || { block "$label 임시 공간 생성 실패 (fail-closed)"; return; }
+  if ! git show ":$path" > "$temporary" 2>/dev/null; then
+    block "$label 검사기가 인덱스에 없다 (fail-closed) — $path"
+  else
+    python3 "$temporary" || rc=$?
+    if [ "$rc" -ne 0 ]; then block "$label 검사 실패 (exit=$rc) — $path"; fi
+  fi
+  rm -f "$temporary"
+}
+
+# Deletion-only and type-change commits reach this gate before content-only checks.
+if printf '%s\n' "$staged_any" | grep -qE '^(.github/workflows/|scripts/verify/check-workflow-deletion.py$)'; then
+  run_index_gate scripts/verify/check-workflow-deletion.py "워크플로 삭제"
+fi
 
 # scan <설명> <파일> <grep 인자...>
 #   반환 0 = 매칭됨 / 1 = 매칭 없음 또는 실행오류(이 경우 block 이 이미 걸림)
@@ -79,7 +99,7 @@ fi
 # ── 2) 검사기 자기 제외 (P13 ④ · §0 E1 재현 방지) ────────────────────────────
 while IFS= read -r f; do
   case "$f" in
-    verify.sh|scripts/*.sh|hooks/*)
+    verify.sh|scripts/*.sh|scripts/verify/*.py|hooks/*|.github/workflows/*.yml|.github/workflows/*.yaml|.claude/skills/*/local-checks.sh|.codex/skills/*/local-checks.sh)
       base=$(basename "$f")
       # ERE 메타문자 이스케이프. ']' 는 문자 클래스 맨 앞에 와야 한다.
       esc=$(printf '%s' "$base" | sed 's/[].[*^$+?(){}|\\]/\\&/g')
@@ -131,7 +151,7 @@ if printf '%s\n' "$staged" | grep -qx 'suppressions.yaml'; then
     elif [ "$e" \< "$today" ]; then
       block "만료된 억제가 남아 있다 (expiry: $e < 오늘 $today) — 유예는 기한이 지나면 해제되어야 한다 (P13)"
     fi
-  done <<< "$(printf '%s\n' "$sup" | awk '/^ *expiry:/{sub(/^ *expiry: */,""); gsub(/["\x27]/,""); print}')"
+  done < <(printf '%s\n' "$sup" | awk '/^ *expiry:/{sub(/^ *expiry: */,""); gsub(/["\x27]/,""); print}')
 fi
 
 # ── 5) LLM 출력 숫자를 판정 필드에 (P14 · v4 QA-094 재현 방지) ────────────────
@@ -147,21 +167,11 @@ while IFS= read -r f; do
   esac
 done <<< "$staged"
 
-# ── 6) 외부 효과 모듈에 네트워크 호출 0건 (P4 · §0 E5 gptreview.js 재현 방지) ──
-NET='fetch\(|axios|https?\.|requests\.|urllib|playwright|puppeteer|page\.goto|XMLHttpRequest|WebSocket|subprocess|execSync'
-while IFS= read -r f; do
-  case "$f" in
-    *login*|*portal*|*scrap*|*crawl*|*gptreview*|*fetch*|*api*)
-      case "$f" in
-        *.js|*.mjs|*.ts|*.tsx|*.py)
-          if ! scan "외부효과-네트워크" "$f" -iE "$NET"; then
-            block "외부 효과를 표방하는데 네트워크 호출이 0건 — $f. 시뮬레이션 의심 (P4)"
-          fi
-          ;;
-      esac
-      ;;
-  esac
-done <<< "$staged"
+# ── 6) 선언된 외부 효과 entry의 정적 호출 경로 (P4) ────────────────────────
+# Filenames are not intent. The versioned contract declares expected effect entries;
+# the checker follows supported static imports/calls from those exact functions.
+# Dynamic/unsupported declared entries fail closed. Actual execution/readback is separate.
+run_index_gate scripts/verify/check-external-effect-graph.py "외부 효과"
 
 # ── 7) 대용량 파일 · 산출물 경로 (P21 · AC-A4) ────────────────────────────────
 #

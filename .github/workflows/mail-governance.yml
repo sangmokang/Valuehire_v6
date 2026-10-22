@@ -1,0 +1,32 @@
+name: mail-governance
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Mail decisions, immutable journal and coverage regressions
+        run: python3 -m unittest discover -s tools/mail_governance -p 'test_*.py' -v
+      - name: Independent guard deletion regressions
+        run: python3 -m tools.mail_governance.mutation_check
+      - name: Compile mail governance modules
+        run: python3 -m compileall -q tools/mail_governance
+      - name: Original email MIME bytes and destination boundary
+        run: node --test tools/mail_governance/test_mime.mjs

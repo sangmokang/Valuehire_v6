@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 
 import pytest
-from hypothesis import example, given
+from hypothesis import example, given, settings
 from hypothesis import strategies as st
 
 from humansearch import observe
@@ -72,6 +72,9 @@ _ADDRESSES = st.builds(
 _ANY_ADDRESS = st.one_of(st.text(), _ADDRESSES)
 
 
+# These properties check parsing/privacy, not latency. Scheduler pauses under a
+# loaded hook must not turn correct explicit examples into timing failures.
+@settings(deadline=None)
 @given(url=_ANY_ADDRESS)
 @example(url=_NFKC_BROKEN_URL)
 @example(url="https://[::1/home")
@@ -86,6 +89,7 @@ def test_no_text_input_can_make_address_parsing_raise(url: str) -> None:
     assert "#" not in reduced
 
 
+@settings(deadline=None)
 @given(url=_ANY_ADDRESS)
 @example(url=_NFKC_BROKEN_URL)
 @example(url="https://[::1/home")
