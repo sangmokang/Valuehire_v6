@@ -155,7 +155,7 @@ class VisibilityContextRegressions(unittest.TestCase):
         # rectangles; fallback/raw-text contents of the others are not rendered.
         for opening, closing in (("<dialog>", "</dialog>"),
                                  ("<datalist>", "</datalist>"),
-                                 ("<ruby><rp>", "</rp></ruby>"),
+                                 ("<rp>", "</rp>"),
                                  ("<noembed>", "</noembed>"),
                                  ("<noframes>", "</noframes>"),
                                  ("<iframe>", "</iframe>")):
@@ -203,9 +203,10 @@ class VisibilityContextRegressions(unittest.TestCase):
 
     def test_unsupported_elements_outside_citations_make_source_ambiguous(self):
         for tag in ("unknown", "candidate-card", "svg", "math", "canvas", "select", "object"):
-            with self.subTest(tag=tag):
-                message, review, _ = html_review("<" + tag + "></" + tag + ">")
-                self.assertFalse(classify(message, review)["is_golden_sample"])
+            for prefix in ("<" + tag + "></" + tag + ">", "</" + tag + ">"):
+                with self.subTest(prefix=prefix):
+                    message, review, _ = html_review(prefix)
+                    self.assertFalse(classify(message, review)["is_golden_sample"])
 
     def test_table_foster_parenting_cannot_move_intro_below_the_jd(self):
         message, review, _ = html_review()
@@ -232,12 +233,44 @@ class VisibilityContextRegressions(unittest.TestCase):
             with self.subTest(wrapper=opening):
                 message, review, _ = html_review(opening, closing)
                 self.assertFalse(classify(message, review)["is_golden_sample"])
+        message, review, _ = html_review()
+        intro, company, role = [review["golden_axes"][axis]["evidence"]["quote"]
+                                for axis in ("personalization", "company", "role")]
+        for html in (
+            "<table><tr><td><p>" + intro + "</p></td></tr><caption><p>" + company
+            + "</p></caption><tr><td><p>" + role + "</p></td></tr></table>",
+            "<table><tbody><tr><td><p>" + intro + "</p></td></tr></tbody><thead><tr><th><p>"
+            + company + "</p></th></tr></thead><tbody><tr><td><p>" + role
+            + "</p></td></tr></tbody></table>",
+            "<table><tfoot><tr><td><p>" + intro + "</p></td></tr></tfoot><tbody><tr><td><p>"
+            + company + "</p><p>" + role + "</p></td></tr></tbody></table>",
+        ):
+            with self.subTest(html=html):
+                replace_review_html(message, review, html)
+                self.assertFalse(classify(message, review)["is_golden_sample"])
+
+    def test_direct_table_entities_and_non_ascii_spaces_are_not_html_whitespace(self):
+        for text in ("&#65;", "&amp;", "&nbsp;", "\u00a0", "\u2003", "\v"):
+            with self.subTest(text=text):
+                message, review, _ = html_review("<table>" + text + "<tr><td>", "</td></tr></table>")
+                self.assertFalse(classify(message, review)["is_golden_sample"])
+
+    def test_table_elements_require_supported_parent_child_relationships(self):
+        for opening, closing in (("<table><td>", "</td></table>"),
+                                 ("<table><tbody><td>", "</td></tbody></table>"),
+                                 ("<table><tr><section>", "</section></tr></table>"),
+                                 ("<tbody><tr><td>", "</td></tr></tbody>"),
+                                 ("<tr><td>", "</td></tr>"),
+                                 ("<td>", "</td>")):
+            with self.subTest(wrapper=opening):
+                message, review, _ = html_review(opening, closing)
+                self.assertFalse(classify(message, review)["is_golden_sample"])
 
     def test_normal_table_body_preserves_intro_order_and_partial_entity_citations(self):
         for body_start, body_end in (("", ""), ("<tbody>", "</tbody>")):
             with self.subTest(tbody=body_start):
                 message, review, fragment = html_review(entity_intro=True)
-                html = ("<table>\n" + body_start + fragment.replace("<p>", "<tr><td><p>")
+                html = ("<table> \t\n\r\f" + body_start + fragment.replace("<p>", "<tr><td><p>")
                         .replace("</p>", "</p></td></tr>\n") + body_end + "</table>")
                 replace_review_html(message, review, html)
                 self.assertTrue(classify(message, review)["is_golden_sample"])

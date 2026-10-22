@@ -3,6 +3,9 @@
 The character floors only reject trivial citations. Reviewers remain responsible
 for the factual company briefing, complete role and substantive candidate fit.
 This static parser does not substitute for a browser's computed CSS/layout.
+Its supported dialect excludes foreign/custom elements, media fallbacks, ruby,
+and table captions/header/footer groups. Tables require explicit rows/cells
+(optionally a tbody); unsupported source context rejects HTML evidence.
 """
 import re
 from html import unescape
@@ -16,6 +19,21 @@ VOID_TAGS = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link",
              "meta", "param", "source", "track", "wbr"}
 INVISIBLE_TAGS = {"script", "style", "template", "head", "title", "noscript",
                   "datalist", "rp", "noembed", "noframes", "iframe"}
+# Support and visibility are separate decisions: known hidden elements remain
+# supported so their bodies are suppressed, while unknown syntax fails closed.
+SUPPORTED_TAGS = {
+    "html", "head", "title", "body", "base", "link", "meta", "style", "script",
+    "noscript", "template", "datalist", "rp", "noembed", "noframes", "iframe",
+    "article", "section", "main", "aside", "nav", "header", "footer", "address",
+    "blockquote", "div", "p", "pre", "h1", "h2", "h3", "h4", "h5", "h6",
+    "a", "abbr", "b", "bdi", "bdo", "br", "cite", "code", "data", "del", "dfn",
+    "em", "i", "ins", "kbd", "mark", "q", "s", "samp", "small", "span", "strong",
+    "sub", "sup", "time", "u", "var", "wbr", "font", "center", "img", "hr",
+    "ul", "ol", "li", "dl", "dt", "dd", "menu", "details", "summary", "dialog",
+    "table", "tbody", "tr", "td", "th",
+}
+TABLE_CHILDREN = {"table": {"tbody", "tr"}, "tbody": {"tr"}, "tr": {"td", "th"}}
+TABLE_PARENTS = {"tbody": {"table"}, "tr": {"table", "tbody"}, "td": {"tr"}, "th": {"tr"}}
 # Only these ordinary omitted paragraph/list endings are accepted across a
 # closing ancestor. Other crossing closes need browser tree repair we do not
 # implement, so they cannot establish visible Golden evidence.
@@ -66,6 +84,13 @@ class VisibleBlocks(HTMLParser):
         self.current = []
 
     def handle_starttag(self, tag, attrs):
+        if tag not in SUPPORTED_TAGS:
+            self.ambiguous_structure = True
+        parent = self.stack[-1][0] if self.stack else None
+        if parent in TABLE_CHILDREN and tag not in TABLE_CHILDREN[parent]:
+            self.ambiguous_structure = True
+        if tag in TABLE_PARENTS and parent not in TABLE_PARENTS[tag]:
+            self.ambiguous_structure = True
         if len({name for name, _ in attrs}) != len(attrs):
             self.ambiguous_structure = True
         suppressed = self.blocked() or hidden_node(tag, attrs)
@@ -83,6 +108,8 @@ class VisibleBlocks(HTMLParser):
             self.handle_endtag(tag)
 
     def handle_endtag(self, tag):
+        if tag not in SUPPORTED_TAGS:
+            self.ambiguous_structure = True
         for index in range(len(self.stack) - 1, -1, -1):
             if self.stack[index][0] == tag:
                 allowed = {"p"} if tag in PARAGRAPH_CONTAINERS else set()
@@ -98,11 +125,17 @@ class VisibleBlocks(HTMLParser):
                 return
 
     def handle_data(self, data):
+        self.check_table_text(data)
         if not self.blocked():
             offset = self.absolute_offset()
             start, end = max(offset, self.start), min(offset + len(data), self.end)
             if start < end:
                 self.current.append(data[start - offset:end - offset])
+
+    def check_table_text(self, data):
+        # HTML's table whitespace excludes NBSP and other Unicode spaces.
+        if self.stack and self.stack[-1][0] in TABLE_CHILDREN and data.strip(" \t\n\r\f"):
+            self.ambiguous_structure = True
 
     def absolute_offset(self):
         line, column = self.getpos()
@@ -113,8 +146,10 @@ class VisibleBlocks(HTMLParser):
         end = offset + len(prefix) + len(name)
         if self.source[end:end + 1] == ";":
             end += 1
+        text = unescape(self.source[offset:end])
+        self.check_table_text(text)
         if not self.blocked() and self.start <= offset and end <= self.end:
-            self.current.append(unescape(self.source[offset:end]))
+            self.current.append(text)
 
     def handle_entityref(self, name):
         self.reference("&", name)

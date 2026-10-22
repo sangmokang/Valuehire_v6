@@ -32,6 +32,18 @@ def _reports(value):
             and len(value) == len(set(value)), "private independent readback report hashes required")
 
 
+def _send_result(encoded):
+    receipt = json.loads(encoded)
+    sender = receipt.get("sender_message_id")
+    receivers = [receipt[key] for key in ("receiver_message_id", "dev_message_id") if key in receipt]
+    require(type(sender) is str and bool(sender.strip()), "recorded sender message ID required")
+    require(bool(receivers) and all(type(value) is str and value.strip() and value == receivers[0] for value in receivers),
+            "unambiguous recorded receiver message ID required")
+    if "receiver_account" in receipt:
+        require(normalize_address(receipt["receiver_account"]) == DESTINATION, "recorded receiver account mismatch")
+    return sender, receivers[0]
+
+
 def _delivery(journal, operation_id):
     operation = journal.operation(operation_id)
     require(operation["kind"] in ("share", "share_repair"), "only historical deliveries can be resolved")
@@ -43,19 +55,21 @@ def _delivery(journal, operation_id):
     message = journal.review(operation["review_id"])["message"]
     require(payload.get("content_hash") == message["source_hash"], "historical source content mismatch")
     identity = _identity(["rfc", message.get("rfc_message_id")])
-    row = journal.db.execute(
-        "SELECT payload_json FROM receipts WHERE operation_id=? AND state='SENT_UNVERIFIED' ORDER BY id DESC LIMIT 1",
-        (operation_id,)).fetchone()
-    require(row is not None, "historical send result missing")
-    receipt = json.loads(row[0])
-    sender = receipt.get("sender_message_id")
-    receivers = [receipt[key] for key in ("receiver_message_id", "dev_message_id") if key in receipt]
-    require(type(sender) is str and bool(sender.strip()), "recorded sender message ID required")
-    require(bool(receivers) and all(type(value) is str and value.strip() and value == receivers[0] for value in receivers),
-            "unambiguous recorded receiver message ID required")
-    if "receiver_account" in receipt:
-        require(normalize_address(receipt["receiver_account"]) == DESTINATION, "recorded receiver account mismatch")
-    return dict(operation=operation, message=message, identity=identity, sender=sender, receiver=receivers[0])
+    rows = journal.db.execute(
+        "SELECT receipts.operation_id,receipts.payload_json,reviews.account FROM receipts "
+        "JOIN operations ON operations.id=receipts.operation_id JOIN reviews ON reviews.id=operations.review_id "
+        "WHERE operations.kind IN ('share','share_repair') AND receipts.state='SENT_UNVERIFIED'").fetchall()
+    own = [_send_result(row["payload_json"]) for row in rows if row["operation_id"] == operation_id]
+    require(bool(own), "historical send result missing")
+    require(len(set(own)) == 1, "conflicting historical send results")
+    sender, receiver = own[0]
+    source_account = normalize_address(message["account"])
+    for row in rows:
+        if row["operation_id"] != operation_id:
+            other_sender, other_receiver = _send_result(row["payload_json"])
+            require((source_account != normalize_address(row["account"]) or sender != other_sender)
+                    and receiver != other_receiver, "historical delivery message ID collision")
+    return dict(operation=operation, message=message, identity=identity, sender=sender, receiver=receiver)
 
 
 def _repair_parent(journal, repair):
