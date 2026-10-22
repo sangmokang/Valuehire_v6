@@ -268,15 +268,17 @@ class HistoricalDeliveryTests(unittest.TestCase):
                 sender_message_id="later-sender", receiver_message_id="later-receiver", receiver_account=DESTINATION))
         self.assert_delivery_collision_rejected(original)
 
-    def assert_conflicting_own_receipts_rejected(self, field):
+    def assert_conflicting_own_receipts_rejected(self, field, *, use_latest_proof=False):
         original = self.legacy_delivery()
+        original_proof = self.proof(original)
         record = dict(sender_message_id="sender-0", receiver_message_id="receiver-0", receiver_account=DESTINATION)
         record[field] = "conflicting-message-id"
         with self.journal.db:
             self.journal._append_receipt(original["id"], "SENT_UNVERIFIED", record)
+        proof = self.proof(original) if use_latest_proof else original_proof
         before = self.snapshot()
         with self.assertRaisesRegex(ValueError, "conflicting historical send results"):
-            resolve_delivery_archive(self.journal, original["id"], self.proof(original))
+            resolve_delivery_archive(self.journal, original["id"], proof)
         self.assertEqual(self.snapshot(), before)
 
     def test_own_sender_receipt_contradiction_is_rejected(self):
@@ -284,6 +286,12 @@ class HistoricalDeliveryTests(unittest.TestCase):
 
     def test_own_receiver_receipt_contradiction_is_rejected(self):
         self.assert_conflicting_own_receipts_rejected("receiver_message_id")
+
+    def test_own_sender_receipt_contradiction_is_rejected_with_latest_proof(self):
+        self.assert_conflicting_own_receipts_rejected("sender_message_id", use_latest_proof=True)
+
+    def test_own_receiver_receipt_contradiction_is_rejected_with_latest_proof(self):
+        self.assert_conflicting_own_receipts_rejected("receiver_message_id", use_latest_proof=True)
 
     def test_sender_message_ids_are_local_to_source_account(self):
         original = self.legacy_delivery()

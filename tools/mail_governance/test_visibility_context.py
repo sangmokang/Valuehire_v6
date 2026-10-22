@@ -302,6 +302,24 @@ class VisibilityContextRegressions(unittest.TestCase):
                 message, review, _ = html_review(opening, closing, entity_intro=True)
                 self.assertTrue(classify(message, review)["is_golden_sample"])
 
+    def test_script_double_escape_cannot_release_hidden_script_body(self):
+        for closing in ("</script>", ""):
+            with self.subTest(closing=closing):
+                message, review, _ = html_review("<script><!--<script></script>", closing)
+                self.assertFalse(classify(message, review)["is_golden_sample"])
+
+    def test_normal_nonempty_script_style_and_table_remain_visible(self):
+        for opening, closing in (
+            ('<script>const label = "synthetic";</script>', ""),
+            ('<style>p { color: black; }</style>', ""),
+            ('<script>const first = "<!";</script><script>const second = "--";</script>', ""),
+            ('<script>const label = "synthetic";</script><style>p { color: black; }</style><table><tbody><tr><td>',
+             '</td></tr></tbody></table>'),
+        ):
+            with self.subTest(wrapper=opening):
+                message, review, _ = html_review(opening, closing, entity_intro=True)
+                self.assertTrue(classify(message, review)["is_golden_sample"])
+
 
 if __name__ == "__main__":
     unittest.main()
