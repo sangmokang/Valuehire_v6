@@ -1,0 +1,176 @@
+{
+  "worktree": "/Users/kangsangmo/Desktop/Valuehire_jd_three_sections_20260922",
+  "branch": "task/jd-three-sections-20260922",
+  "base_head": "eaaee6219ed63d8ed4be1d52a3977216a15e5a03",
+  "source_worktree": "/Users/kangsangmo/Desktop/Valuehire_v6",
+  "imported_files": [
+    {
+      "path": ".agents/skills/jd/SKILL.md",
+      "sha256": "f49c1e895707ccf7f4f1d4251e31dda6b442d6cfa5aeffea8828fb6b67762173",
+      "source_uncommitted_change": true
+    },
+    {
+      "path": "contracts/jd-registration.json",
+      "sha256": "ace34e907c317de36f02ae136382419d844559431260a9b6b0e3d1e8c408ccc8",
+      "source_uncommitted_change": true
+    },
+    {
+      "path": "docs/sot/jd-aside-operations.md",
+      "sha256": "59c850553e79a8f0fefcaeb91808dc6d68b1c555b7d9c7ecae15ff40f6ac15c1",
+      "source_uncommitted_change": true
+    },
+    {
+      "path": "docs/sot/jd-connected-registration.md",
+      "sha256": "46a9b01b4da36ac5cf1a605a300fb5543abbfd7ecadf8c491bf13da07b341d98",
+      "source_uncommitted_change": true
+    },
+    {
+      "path": "scripts/jd_channels/registration.py",
+      "sha256": "5e586502cd06f850feaa97f1fdcedb3841da008e0209e0350e65efab86889e04",
+      "source_uncommitted_change": true
+    },
+    {
+      "path": "scripts/jd_channels/units.py",
+      "sha256": "43f67649b2a11e95761c7cfb1624038f8b6e3fef0dd6562e709aa3a256d3ee58",
+      "source_uncommitted_change": true
+    },
+    {
+      "path": "tests/test_jd_registration.py",
+      "sha256": "213fc305a95c039300ec8ff75ea4ee2a0e69b63ebb28ae4e600afc3c256f7fe1",
+      "source_uncommitted_change": true
+    },
+    {
+      "path": "outputs/_golden/rps_bunjang_golden.txt",
+      "sha256": "1e24960fd83980040ade925c1b013fddb03755a9eff64ccb831809da87b02966",
+      "source_uncommitted_change": false
+    },
+    {
+      "path": "outputs/_golden/rps_wrtn_golden.txt",
+      "sha256": "7002d70c0a75ad960d873d94637dedd8a78317ed265c9811ae4d5e104ede2cae",
+      "source_uncommitted_change": false
+    },
+    {
+      "path": "artifacts/jd-connected-20260922/revision-bullets/official-jd.json",
+      "sha256": "be3884952e677f98c09df7a29e1674a34fe59de7a0f878354102d68155bcfb65",
+      "source_uncommitted_change": false
+    },
+    {
+      "path": "artifacts/jd-connected-20260922/revision-bullets/saramin-before.json",
+      "sha256": "9164ae751ef1990e2015beed2996e5b64f52d2676951ace710ccfbe3bcd24a34",
+      "source_uncommitted_change": false
+    },
+    {
+      "path": "artifacts/jd-connected-20260922/revision-bullets/saramin-final-observed.json",
+      "sha256": "fbde638458e5f73d0e6e4cfa1315a01703880a3563f16cb0c2e53bc6fa2a59be",
+      "source_uncommitted_change": false
+    },
+    {
+      "path": "artifacts/jd-connected-20260922/revision-bullets/saramin-final-readback.json",
+      "sha256": "94f1522f01da763102d987ed60f004252bec81c65ef5f6fca3c1136228ace298",
+      "source_uncommitted_change": false
+    },
+    {
+      "path": "artifacts/jd-connected-20260922/revision-bullets/jobkorea-final-observed.json",
+      "sha256": "ed6d2be26a6785a23f2d340baf484f96867db97e088bfc3b6537ab2095155a0a",
+      "source_uncommitted_change": false
+    },
+    {
+      "path": "artifacts/jd-connected-20260922/revision-bullets/jobkorea-final-readback.json",
+      "sha256": "ef8bbac66015b3f932790273c081cb68537e43959dfe52af995bf8e9feade9dc",
+      "source_uncommitted_change": false
+    },
+    {
+      "path": "artifacts/jd-connected-20260922/revision-bullets/revision-summary.json",
+      "sha256": "b504f91497d3dad389e074a14f1dec089e24d203b81ef79a31693f00f3f717c2",
+      "source_uncommitted_change": false
+    },
+    {
+      "path": "artifacts/jd-connected-20260922/revision-bullets/FINAL-RESULT.md",
+      "sha256": "a3eece46688076c4669c751dbe3070bb8aba93cb7879e3b2a3e22d1c4d306b0f",
+      "source_uncommitted_change": false
+    },
+    {
+      "path": "artifacts/jd-connected-20260922/revision-bullets/final-mail-verification.json",
+      "sha256": "81fe47f2bdfb007160ffa553ae07e8ca60bb979a13ff78caaeb56ac33b2f5b51",
+      "source_uncommitted_change": false
+    },
+    {
+      "path": "artifacts/jd-connected-20260922/revision-bullets/org-briefing.md",
+      "sha256": "0584ddf612328efc4b8251a146c4de90a31837cdf8651c4eb79bbe378d850bc9",
+      "source_uncommitted_change": false
+    },
+    {
+      "path": "artifacts/jd-connected-20260922/revision-bullets/org-briefing.json",
+      "sha256": "34ba4a73ef57f33f28e4397c4d25d2fb73eb06cf8ae55fb0da91e5b48d78da79",
+      "source_uncommitted_change": false
+    },
+    {
+      "path": "artifacts/jd-connected-20260922/revision-bullets/org-intelligence-input.json",
+      "sha256": "ab45afa9a39f991ae37553160673ee7a9982c53787f43b8baaf74124e660e3ed",
+      "source_uncommitted_change": false
+    },
+    {
+      "path": "artifacts/jd-connected-20260922/revision-bullets/org-intelligence-load.json",
+      "sha256": "577fbb7f7934b0796c69b37a92e24c54ca732b3a5216fc85f7764f67b33e3f27",
+      "source_uncommitted_change": false
+    },
+    {
+      "path": "artifacts/jd-connected-20260922/revision-bullets/org-intelligence-persist-summary.json",
+      "sha256": "f9946a0c2b7578231b4116cc6578e52b82b07f1473371d936edf803adba32331",
+      "source_uncommitted_change": false
+    },
+    {
+      "path": "artifacts/jd-connected-20260922/revision-bullets/linkedin-company.json",
+      "sha256": "7068bebc4c8ce1311ef684c39a196a0bdb7a420a0d3af8028fa0ada738ed1cac",
+      "source_uncommitted_change": false
+    },
+    {
+      "path": "artifacts/jd-connected-20260922/revision-bullets/linkedin-people.json",
+      "sha256": "c9c4e536ec34b471eb483def7f8acdb5c59d6f6186f5efc7b2cc08e55c3334f4",
+      "source_uncommitted_change": false
+    },
+    {
+      "path": "artifacts/jd-connected-20260922/revision-bullets/rps-saemi-org.json",
+      "sha256": "83d34a5862dc20737d0e59547171c301c6b72832bda0867224c2892ee0100f8e",
+      "source_uncommitted_change": false
+    },
+    {
+      "path": "artifacts/jd-connected-20260922/revision-bullets/rps-yoohyeon-org.json",
+      "sha256": "70982aa3ef830507702d087629a6f13ef28a193894f6c9114ae4985946a23402",
+      "source_uncommitted_change": false
+    },
+    {
+      "path": "artifacts/jd-connected-20260922/revision-bullets/rps-siyeon-org.json",
+      "sha256": "bbe293742659d776551cdf0dc9bfecaffaae29cdf9e5c8bba9ef0ca8d08fa9c2",
+      "source_uncommitted_change": false
+    },
+    {
+      "path": "artifacts/jd-connected-20260922/revision-bullets/packets/saramin-packet.json",
+      "sha256": "83d05134edfb566201933c0e346082a7bcb2869e123c82afe1afbf6c6c27f9e2",
+      "source_uncommitted_change": false
+    },
+    {
+      "path": "artifacts/jd-connected-20260922/revision-bullets/packets/jobkorea-packet.json",
+      "sha256": "bd6f0d6df67c44f25efcfbddfadd653f4d44e76dfc0e723c2393f7fbbff041ac",
+      "source_uncommitted_change": false
+    },
+    {
+      "path": "artifacts/jd-connected-20260922/revision-bullets/units/bunjang__global-team-lead__revision-bullets.json",
+      "sha256": "4a6f99b2cc45018b79966f8fcb0db83f83dea02f0b03afb744adc9d93a54ff56",
+      "source_uncommitted_change": false
+    },
+    {
+      "path": "artifacts/jd-connected-20260922/revision-bullets/golden-comparison/bunjang__global-team-lead__copy-style-spec.json",
+      "sha256": "07c93c0daa4e202f9371410fc2f99b30c7bfca3085e381625d0878be753b46bb",
+      "source_uncommitted_change": false
+    },
+    {
+      "path": "artifacts/jd-connected-20260922/revision-bullets/golden-comparison/bunjang__global-team-lead__revision-bullets.md",
+      "sha256": "652d8c2baa13652f5edd7a977d876848fe0f55fe1456f4354d9fd81fa2c79053",
+      "source_uncommitted_change": false
+    }
+  ],
+  "prompt": "/Users/kangsangmo/Desktop/Valuehire_jd_three_sections_20260922/docs/engineering/goal-prompts/jd-three-sections-correction-2026-09-22.md",
+  "scope": "Handoff preparation only; no live portal mutation or email in this preparation turn",
+  "credentials_copied": false
+}
