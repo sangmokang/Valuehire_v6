@@ -15,6 +15,11 @@ BLOCK_TAGS = {"p", "div", "section", "article", "header", "footer", "blockquote"
 VOID_TAGS = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link",
              "meta", "param", "source", "track", "wbr"}
 INVISIBLE_TAGS = {"script", "style", "template", "head", "title", "noscript"}
+# Only these ordinary omitted paragraph/list endings are accepted across a
+# closing ancestor. Other crossing closes need browser tree repair we do not
+# implement, so they cannot establish visible Golden evidence.
+PARAGRAPH_CONTAINERS = {"address", "article", "aside", "blockquote", "div", "footer",
+                        "header", "li", "main", "nav", "section", "td", "th"}
 
 
 def compact(text):
@@ -45,6 +50,7 @@ class VisibleBlocks(HTMLParser):
         self.stack = []
         self.current = []
         self.blocks = []
+        self.ambiguous_structure = False
 
     def blocked(self):
         return bool(self.stack and self.stack[-1][1])
@@ -56,6 +62,8 @@ class VisibleBlocks(HTMLParser):
         self.current = []
 
     def handle_starttag(self, tag, attrs):
+        if len({name for name, _ in attrs}) != len(attrs):
+            self.ambiguous_structure = True
         suppressed = self.blocked() or hidden_node(tag, attrs)
         if not suppressed and (tag in BLOCK_TAGS or tag in {"br", "hr"}):
             self.flush()
@@ -65,11 +73,21 @@ class VisibleBlocks(HTMLParser):
     def handle_startendtag(self, tag, attrs):
         self.handle_starttag(tag, attrs)
         if tag not in VOID_TAGS:
+            # HTML ignores the self-closing flag on ordinary nonvoid elements.
+            # Foreign-content handling is outside this conservative parser.
+            self.ambiguous_structure = True
             self.handle_endtag(tag)
 
     def handle_endtag(self, tag):
         for index in range(len(self.stack) - 1, -1, -1):
             if self.stack[index][0] == tag:
+                allowed = {"p"} if tag in PARAGRAPH_CONTAINERS else set()
+                if tag in {"ul", "ol", "menu"}:
+                    allowed = {"li", "p"}
+                elif tag == "dl":
+                    allowed = {"dt", "dd", "p"}
+                if any(open_tag not in allowed for open_tag, _ in self.stack[index + 1:]):
+                    self.ambiguous_structure = True
                 if tag in BLOCK_TAGS and not self.blocked():
                     self.flush()
                 del self.stack[index:]
@@ -111,7 +129,7 @@ def visible_content(message, evidence):
         parser.feed(parser.source)
         parser.close()
         parser.flush()
-        blocks = parser.blocks
+        blocks = [] if parser.ambiguous_structure else parser.blocks
     return compact(" ".join(blocks)), blocks
 
 
