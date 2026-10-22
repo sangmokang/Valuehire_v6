@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "entries": [
+    {"path": "apps/admin/app.js", "export": "loadDashboard"},
+    {"path": "tools/invoice/storage_remote.py", "export": "remote_request"},
+    {"path": "tools/invoice/storage_remote.py", "export": "readback_rows"}
+  ]
+}
