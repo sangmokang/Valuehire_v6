@@ -1,6 +1,7 @@
 """Exercise staged hook boundaries without changing the source repository."""
 import json
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -24,30 +25,38 @@ jobs:
 
 
 class GateBoundaries(unittest.TestCase):
-    def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(prefix="p13-gate-boundary-")
-        self.addCleanup(self.temp.cleanup)
-        self.repo = Path(self.temp.name)
-        self.run_git("init", "-q")
-        self.run_git("config", "user.email", "synthetic@example.test")
-        self.run_git("config", "user.name", "Synthetic gate regression")
+    @classmethod
+    def setUpClass(cls):
+        cls.baseline = tempfile.TemporaryDirectory(prefix="p13-gate-baseline-")
+        cls.addClassCleanup(cls.baseline.cleanup)
+        fixture = cls()
+        fixture.repo = Path(cls.baseline.name)
+        fixture.run_git("init", "-q")
+        fixture.run_git("config", "user.email", "synthetic@example.test")
+        fixture.run_git("config", "user.name", "Synthetic gate regression")
         for name in ("hooks/pre-commit", "verify.sh", ".secret-patterns.default",
                      ".check-weakening-patterns", "scripts/acceptance-silent-failure-lint.sh"):
-            self.write(name, (ROOT / name).read_text())
+            fixture.write(name, (ROOT / name).read_text())
         # Copy helper implementations if present, so the same tests cover the repaired hook.
         for name in ("check-workflow-deletion.py", "check-external-effect-graph.py"):
             source = ROOT / "scripts/verify" / name
             if source.is_file():
-                self.write("scripts/verify/" + name, source.read_text())
-        self.write(WORKFLOW, BASE_WORKFLOW)
-        self.write("scripts/first.py", "print('synthetic')\n")
-        self.write("scripts/second.mjs", "console.log('synthetic');\n")
-        self.write("scripts/third.mjs", "console.log('synthetic');\n")
-        self.write(".claude/skills/verify/local-checks.sh", "#!/usr/bin/env bash\nprintf 'synthetic\\n'\n")
-        self.write("README.md", "synthetic fixture\nretained note\n")
-        self.run_git("add", ".")
+                fixture.write("scripts/verify/" + name, source.read_text())
+        fixture.write(WORKFLOW, BASE_WORKFLOW)
+        fixture.write("scripts/first.py", "print('synthetic')\n")
+        fixture.write("scripts/second.mjs", "console.log('synthetic');\n")
+        fixture.write("scripts/third.mjs", "console.log('synthetic');\n")
+        fixture.write(".claude/skills/verify/local-checks.sh", "#!/usr/bin/env bash\nprintf 'synthetic\\n'\n")
+        fixture.write("README.md", "synthetic fixture\nretained note\n")
+        fixture.run_git("add", ".")
         # This fresh fixture has no installed hook; the real hook is invoked explicitly below.
-        self.run_git("commit", "-qm", "Synthetic baseline")
+        fixture.run_git("commit", "-qm", "Synthetic baseline")
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix="p13-gate-boundary-")
+        self.addCleanup(self.temp.cleanup)
+        self.repo = Path(self.temp.name)
+        shutil.copytree(self.baseline.name, self.repo, dirs_exist_ok=True)
 
     def run_git(self, *args):
         result = subprocess.run(["git", *args], cwd=self.repo, capture_output=True, text=True)
@@ -62,8 +71,9 @@ class GateBoundaries(unittest.TestCase):
     def stage(self):
         self.run_git("add", "-A")
 
-    def hook(self):
-        self.stage()
+    def hook(self, stage=True):
+        if stage:
+            self.stage()
         result = subprocess.run(["bash", "hooks/pre-commit"], cwd=self.repo,
                                 capture_output=True, text=True)
         return result.returncode, result.stdout + result.stderr
@@ -114,6 +124,20 @@ class GateBoundaries(unittest.TestCase):
     def test_workflow_step_name_change_is_allowed(self):
         self.write(WORKFLOW, BASE_WORKFLOW.replace("First decision", "Renamed decision"))
         self.allowed()
+
+    def test_exact_acceptance_wrapper_preserves_the_check(self):
+        self.write(WORKFLOW, BASE_WORKFLOW.replace("run: python3 scripts/first.py",
+                   "run: bash verify.sh"))
+        self.stage()
+        self.run_git("commit", "-qm", "Synthetic wrapper baseline")
+        self.write(WORKFLOW, (self.repo / WORKFLOW).read_text().replace("run: bash verify.sh",
+                   "run: bash scripts/verify/run-acceptance.sh verify.sh"))
+        self.allowed()
+
+    def test_arbitrary_wrapper_does_not_preserve_the_check(self):
+        self.write(WORKFLOW, BASE_WORKFLOW.replace("run: python3 scripts/first.py",
+                   "run: bash /dev/null scripts/first.py"))
+        self.blocked("워크플로")
 
     def test_workflow_file_move_with_same_checks_is_allowed(self):
         (self.repo / WORKFLOW).rename(self.repo / ".github/workflows/renamed.yaml")
@@ -170,6 +194,79 @@ class GateBoundaries(unittest.TestCase):
                    "  return module.request('/session');\n}\n")
         self.write("src/transport.js", "export function request(url) { return fetch(url); }\n")
         self.blocked("외부 효과")
+
+    def commit_declared_effect(self):
+        self.declare_effect()
+        self.write("src/authenticate.js", "export function authenticate() { return fetch('/session'); }\n")
+        self.stage()
+        self.run_git("commit", "-qm", "Synthetic effect declaration")
+
+    def test_effect_manifest_cannot_be_removed(self):
+        self.commit_declared_effect()
+        (self.repo / "scripts/verify/external-effect-contract.json").unlink()
+        self.blocked("외부 효과")
+
+    def test_effect_manifest_cannot_be_shrunk(self):
+        self.commit_declared_effect()
+        self.write("scripts/verify/external-effect-contract.json", '{"version":1,"entries":[]}')
+        self.blocked("외부 효과")
+
+    def test_shadowed_network_function_is_not_proof(self):
+        self.declare_effect()
+        self.write("src/authenticate.js", "const fetch = function () { return { ok: true }; };\n"
+                   "export function authenticate() { return fetch('/session'); }\n")
+        self.blocked("외부 효과")
+
+    def test_network_text_in_a_string_is_not_proof(self):
+        self.declare_effect()
+        self.write("src/authenticate.js", "export function authenticate() { return \"fetch('/session')\"; }\n")
+        self.blocked("외부 효과")
+
+    def test_network_text_in_a_regex_is_not_proof(self):
+        self.declare_effect()
+        self.write("src/authenticate.js", "export function authenticate() { return /fetch('session')/; }\n")
+        self.blocked("외부 효과")
+
+    def test_nested_template_does_not_invent_a_function(self):
+        self.declare_effect()
+        self.write("src/authenticate.js", "const decoy = `outer ${`function authenticate() { return fetch('session'); }`}`;\n")
+        self.blocked("외부 효과")
+
+    def test_positional_only_python_import_shadow_is_not_proof(self):
+        self.declare_effect("src/authenticate.py")
+        self.write("src/authenticate.py", "from urllib.request import urlopen\n"
+                   "def authenticate(urlopen, /):\n    return urlopen('synthetic')\n")
+        self.blocked("외부 효과")
+
+    def test_default_import_cannot_shadow_network_primitive(self):
+        self.declare_effect()
+        self.write("src/authenticate.js", "import fetch from './fake.js';\n"
+                   "export function authenticate() { return fetch('session'); }\n")
+        self.write("src/fake.js", "export default function fake() { return {ok:true}; }\n")
+        self.blocked("외부 효과")
+
+    def test_destructured_binding_cannot_shadow_network_primitive(self):
+        self.declare_effect()
+        self.write("src/authenticate.js", "const {fetch} = {fetch: () => ({ok:true})};\n"
+                   "export function authenticate() { return fetch('session'); }\n")
+        self.blocked("외부 효과")
+
+    def test_staged_fake_source_cannot_use_clean_worktree(self):
+        self.declare_effect()
+        self.write("src/authenticate.js", "export function authenticate() { return { ok: true }; }\n")
+        self.stage()
+        self.write("src/authenticate.js", "export function authenticate() { return fetch('/session'); }\n")
+        status, output = self.hook(stage=False)
+        self.assertNotEqual(status, 0, output)
+        self.assertIn("외부 효과", output)
+
+    def test_staged_workflow_deletion_cannot_use_clean_worktree(self):
+        (self.repo / WORKFLOW).unlink()
+        self.stage()
+        self.write(WORKFLOW, BASE_WORKFLOW)
+        status, output = self.hook(stage=False)
+        self.assertNotEqual(status, 0, output)
+        self.assertIn("워크플로", output)
 
 
 if __name__ == "__main__":

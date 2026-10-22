@@ -86,6 +86,16 @@ cd "$sandbox/repo"
 git remote add sandbox "$sandbox/remote.git"
 git config user.email "acceptance@local"
 git config user.name "acceptance"
+# Test the current hook/helper implementation, including an uncommitted GREEN pass.
+# Copies and this fixture commit affect only the disposable clone, never the source.
+for f in hooks/pre-commit scripts/verify/check-workflow-deletion.py scripts/verify/check-external-effect-graph.py scripts/verify/external-effect-contract.json; do
+  if [ -f "$REPO_ROOT/$f" ]; then
+    mkdir -p "$(dirname "$f")"
+    cp "$REPO_ROOT/$f" "$f"
+    git add "$f"
+  fi
+done
+if ! git diff --cached --quiet; then git commit -qm "Synthetic current gate fixture"; fi
 bash scripts/install-hooks.sh >/dev/null 2>&1 || { echo "FAIL: install-hooks.sh 실패"; exit 1; }
 
 hp=$(git config --get core.hooksPath) || hp=""
@@ -188,8 +198,9 @@ demo "미커밋 상태로 push" \
 demo "가짜 외부효과 모듈" \
   'mkdir -p src
    printf "async function fetchProfile() {\n  console.log(\"fetching...\");\n  return { ok: true };\n}\n" > src/portal-login.js
+   python3 -c '\''import json; from pathlib import Path; p=Path("scripts/verify/external-effect-contract.json"); d=json.loads(p.read_text()); d["entries"].append({"path":"src/portal-login.js","export":"fetchProfile"}); p.write_text(json.dumps(d))'\''
    test -s src/portal-login.js' \
-  'git add src/portal-login.js && git commit -m "feat: portal login"'
+  'git add src/portal-login.js scripts/verify/external-effect-contract.json && git commit -m "feat: portal login"'
 
 # --- 원본 오염 검사 -----------------------------------------------------------
 echo
