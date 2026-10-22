@@ -7,7 +7,7 @@
   required: true
 - id: "ci-secret-scan"
   path: ".github/workflows/verify.yml"
-  target: "run: bash verify.sh"
+  target: "run: bash scripts/verify/run-acceptance.sh verify.sh"
   stage: "ci"
   ci_mirror_job: "verify"
   required: true
