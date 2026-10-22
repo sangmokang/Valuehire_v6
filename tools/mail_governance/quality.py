@@ -34,6 +34,8 @@ SUPPORTED_TAGS = {
 }
 TABLE_CHILDREN = {"table": {"tbody", "tr"}, "tbody": {"tr"}, "tr": {"td", "th"}}
 TABLE_PARENTS = {"tbody": {"table"}, "tr": {"table", "tbody"}, "td": {"tr"}, "th": {"tr"}}
+DOCUMENT_PARENTS = {"html": {None}, "head": {None, "html"}, "body": {None, "html"}}
+LEADING_METADATA_TAGS = {"base", "link", "meta", "title", "style", "script", "noscript", "template"}
 # Only these ordinary omitted paragraph/list endings are accepted across a
 # closing ancestor. Other crossing closes need browser tree repair we do not
 # implement, so they cannot establish visible Golden evidence.
@@ -73,6 +75,9 @@ class VisibleBlocks(HTMLParser):
         self.current = []
         self.blocks = []
         self.ambiguous_structure = False
+        self.document_tags = set()
+        self.body_started = False
+        self.script_tail = ""
 
     def blocked(self):
         return bool(self.stack and self.stack[-1][1])
@@ -86,7 +91,18 @@ class VisibleBlocks(HTMLParser):
     def handle_starttag(self, tag, attrs):
         if tag not in SUPPORTED_TAGS:
             self.ambiguous_structure = True
+        if tag == "script":
+            self.script_tail = ""
         parent = self.stack[-1][0] if self.stack else None
+        if tag in DOCUMENT_PARENTS:
+            # Browsers merge late html/body attributes into earlier ancestors.
+            # Support each wrapper once, before body content, in its normal scope.
+            if tag in self.document_tags or self.body_started or parent not in DOCUMENT_PARENTS[tag]:
+                self.ambiguous_structure = True
+            self.document_tags.add(tag)
+            self.body_started = self.body_started or tag == "body"
+        elif tag not in LEADING_METADATA_TAGS:
+            self.body_started = True
         if parent in TABLE_CHILDREN and tag not in TABLE_CHILDREN[parent]:
             self.ambiguous_structure = True
         if tag in TABLE_PARENTS and parent not in TABLE_PARENTS[tag]:
@@ -125,8 +141,17 @@ class VisibleBlocks(HTMLParser):
                 return
 
     def handle_data(self, data):
+        if self.stack and self.stack[-1][0] == "script":
+            # Script escaping changes browser end-tag handling; it is outside
+            # this dialect. Keep the delimiter prefix across raw-data callbacks.
+            raw = self.script_tail + data
+            if "<!--" in raw:
+                self.ambiguous_structure = True
+            self.script_tail = raw[-3:]
         self.check_table_text(data)
         if not self.blocked():
+            if data.strip(" \t\n\r\f"):
+                self.body_started = True
             offset = self.absolute_offset()
             start, end = max(offset, self.start), min(offset + len(data), self.end)
             if start < end:
@@ -148,6 +173,8 @@ class VisibleBlocks(HTMLParser):
             end += 1
         text = unescape(self.source[offset:end])
         self.check_table_text(text)
+        if not self.blocked() and text.strip(" \t\n\r\f"):
+            self.body_started = True
         if not self.blocked() and self.start <= offset and end <= self.end:
             self.current.append(text)
 

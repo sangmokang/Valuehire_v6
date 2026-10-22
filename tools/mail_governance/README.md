@@ -96,6 +96,16 @@ explicit `open` attribute permits it. Closed `dialog` and UA-hidden `datalist`, 
 `noembed`, `noframes`, and `iframe` text cannot establish evidence either. Supported
 omitted paragraph/list endings and real
 void elements remain accepted; this is not a complete HTML5 tree-repair algorithm.
+HTML evidence uses an explicit supported dialect. Unknown/foreign/custom elements,
+media fallback, ruby, and table `caption`/`thead`/`tfoot` make the full source
+ambiguous, including outside the cited span. Supported tables require explicit
+`table -> tbody? -> tr -> td/th` relationships; direct structural-node text must
+contain only HTML whitespace (space, tab, LF, CR, FF), including decoded references.
+Normal table bodies, lists, paragraphs, inline formatting and partial/entity citations
+remain supported. Document wrappers must precede body content and cannot repeat;
+late `html`/`body` attributes can otherwise hide earlier content in a browser.
+Script raw data containing `<!--` is ambiguous because browser escape states can
+change end-tag handling; ordinary nonempty script/style metadata remains supported.
 
 `rule_version` must exactly match the running code's `RULE_VERSION`, currently
 `2026-10-21.v1`. Whitespace, alternate spellings, and reviewer-chosen versions are
@@ -326,6 +336,12 @@ Existing legacy `raw_sha256` intent fields are crosschecked without renaming the
 links its exact prior sender/receiver/source references to an archive-confirmed
 repair. The repair must have distinct actual sender and receiver IDs; copying either
 original delivery ID is rejected. Repair labels must also satisfy the original label set.
+All past `SENT_UNVERIFIED` receipts of every share/repair are checked, rather than
+only the latest receipt or the parent pair. Sender identity is scoped to the
+normalized source account; receiver identity is scoped to the fixed dev destination.
+Cross-operation reuse and contradictory own receipt pairs fail closed. Consistent
+legacy aliases/repeated observations and the same sender ID in different accounts
+remain valid.
 
 Status exposes both `historical_state` and the separate resolution. A resolved old
 `SENT_UNVERIFIED` row remains that state; resolution is not a current-contract

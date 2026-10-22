@@ -13,8 +13,17 @@ import sys
 import tempfile
 
 
-def mutation(name, file, before, after, expected):
-    return dict(name=name, file=file, before=before, after=after, expected=expected)
+def mutation(name, file, before, after, expected, *additional):
+    return dict(name=name, file=file, before=before, after=after, expected=expected,
+                additional=additional)
+
+
+HIDDEN_TAGS_DECLARATION = ('INVISIBLE_TAGS = {"script", "style", "template", "head", "title", "noscript",\n'
+                           '                  "datalist", "rp", "noembed", "noframes", "iframe"}')
+
+GLOBAL_DELIVERY_COLLISION = (
+    '            require((source_account != normalize_address(row["account"]) or sender != other_sender)\n'
+    '                    and receiver != other_receiver, "historical delivery message ID collision")')
 
 
 MUTATIONS = (
@@ -101,31 +110,113 @@ MUTATIONS = (
     mutation("closed_details_visibility", "quality.py",
              '            or (tag == "details" and "open" not in attrs)\n', '',
              "test_closed_details_body_is_not_visible_including_nested_disclosures"),
-    mutation("historical_distinct_repair_sender", "historical_delivery.py",
+    # The global scan now also protects parent IDs. Delete both comparisons to
+    # model the sender invariant; deleting only the parent check is redundant.
+    mutation("historical_distinct_repair_sender_parent_and_global", "historical_delivery.py",
+             '    require(repair["sender"] != parent["sender"] and repair["receiver"] != parent["receiver"],\n'
+             '            "repair must have distinct sender and receiver")',
+             '    require(repair["receiver"] != parent["receiver"],\n'
+             '            "repair must have distinct sender and receiver")',
+             "test_repair_cannot_reuse_original_sender_message_id",
+             (GLOBAL_DELIVERY_COLLISION,
+              '            require(receiver != other_receiver, "historical delivery message ID collision")')),
+    mutation("historical_distinct_repair_receiver_parent_and_global", "historical_delivery.py",
+             '    require(repair["sender"] != parent["sender"] and repair["receiver"] != parent["receiver"],\n'
+             '            "repair must have distinct sender and receiver")',
+             '    require(repair["sender"] != parent["sender"],\n'
+             '            "repair must have distinct sender and receiver")',
+             "test_repair_cannot_reuse_original_receiver_message_id",
+             (GLOBAL_DELIVERY_COLLISION,
+              '            require(source_account != normalize_address(row["account"]) or sender != other_sender,\n'
+              '                    "historical delivery message ID collision")')),
+    mutation("closed_dialog_visibility", "quality.py",
+             '            or (tag == "dialog" and "open" not in attrs)\n', '',
+             "test_default_hidden_html_elements_cannot_establish_visible_evidence"),
+    mutation("hidden_datalist_visibility", "quality.py", HIDDEN_TAGS_DECLARATION,
+             HIDDEN_TAGS_DECLARATION.replace('"datalist", ', ''),
+             "test_default_hidden_html_elements_cannot_establish_visible_evidence"),
+    mutation("hidden_rp_visibility", "quality.py", HIDDEN_TAGS_DECLARATION,
+             HIDDEN_TAGS_DECLARATION.replace('"rp", ', ''),
+             "test_default_hidden_html_elements_cannot_establish_visible_evidence"),
+    mutation("hidden_noembed_visibility", "quality.py", HIDDEN_TAGS_DECLARATION,
+             HIDDEN_TAGS_DECLARATION.replace('"noembed", ', ''),
+             "test_hidden_raw_text_citations_reject_even_with_visible_duplicate_layout"),
+    mutation("hidden_noframes_visibility", "quality.py", HIDDEN_TAGS_DECLARATION,
+             HIDDEN_TAGS_DECLARATION.replace('"noframes", ', ''),
+             "test_hidden_raw_text_citations_reject_even_with_visible_duplicate_layout"),
+    mutation("hidden_iframe_visibility", "quality.py", HIDDEN_TAGS_DECLARATION,
+             HIDDEN_TAGS_DECLARATION.replace(', "iframe"', ''),
+             "test_hidden_raw_text_citations_reject_even_with_visible_duplicate_layout"),
+    mutation("historical_global_sender_collision", "historical_delivery.py", GLOBAL_DELIVERY_COLLISION,
+             '            require(receiver != other_receiver, "historical delivery message ID collision")',
+             "test_originals_cannot_share_sender_message_id_in_same_normalized_account"),
+    mutation("historical_global_receiver_collision", "historical_delivery.py", GLOBAL_DELIVERY_COLLISION,
+             '            require(source_account != normalize_address(row["account"]) or sender != other_sender,\n'
+             '                    "historical delivery message ID collision")',
+             "test_originals_cannot_share_dev_receiver_even_from_different_sender_accounts"),
+    mutation("historical_all_prior_receipts", "historical_delivery.py",
+             '        "WHERE operations.kind IN (\'share\',\'share_repair\') AND receipts.state=\'SENT_UNVERIFIED\'").fetchall()',
+             '        "WHERE operations.kind IN (\'share\',\'share_repair\') AND receipts.state=\'SENT_UNVERIFIED\' "\n'
+             '        "AND receipts.rowid IN (SELECT MAX(rowid) FROM receipts WHERE state=\'SENT_UNVERIFIED\' GROUP BY operation_id)").fetchall()',
+             "test_older_foreign_receiver_receipt_cannot_be_hidden_by_latest_result"),
+    mutation("historical_own_receipt_consistency", "historical_delivery.py",
+             '    require(len(set(own)) == 1, "conflicting historical send results")\n', '',
+             "test_own_sender_receipt_contradiction_is_rejected"),
+    mutation("historical_foreign_legacy_alias_coverage", "historical_delivery.py",
+             '        if row["operation_id"] != operation_id:\n',
+             '        if row["operation_id"] != operation_id and "receiver_message_id" in json.loads(row["payload_json"]):\n',
+             "test_foreign_legacy_dev_message_id_alias_is_checked_for_collision"),
+    mutation("supported_html_open_and_close_context", "quality.py",
+             '    def handle_starttag(self, tag, attrs):\n'
+             '        if tag not in SUPPORTED_TAGS:\n            self.ambiguous_structure = True\n',
+             '    def handle_starttag(self, tag, attrs):\n',
+             "test_unsupported_media_foreign_and_custom_elements_are_not_golden_evidence",
+             ('    def handle_endtag(self, tag):\n'
+              '        if tag not in SUPPORTED_TAGS:\n            self.ambiguous_structure = True\n',
+              '    def handle_endtag(self, tag):\n')),
+    mutation("unsupported_html_closing_context", "quality.py",
+             '    def handle_endtag(self, tag):\n'
+             '        if tag not in SUPPORTED_TAGS:\n            self.ambiguous_structure = True\n',
+             '    def handle_endtag(self, tag):\n',
+             "test_unsupported_elements_outside_citations_make_source_ambiguous"),
+    mutation("table_child_relationship", "quality.py",
+             '        if parent in TABLE_CHILDREN and tag not in TABLE_CHILDREN[parent]:\n'
+             '            self.ambiguous_structure = True\n', '',
+             "test_table_foster_parenting_cannot_move_intro_below_the_jd"),
+    mutation("table_parent_relationship", "quality.py",
+             '        if tag in TABLE_PARENTS and parent not in TABLE_PARENTS[tag]:\n'
+             '            self.ambiguous_structure = True\n', '',
+             "test_table_elements_require_supported_parent_child_relationships"),
+    mutation("table_direct_text_path", "quality.py", '        self.check_table_text(data)\n', '',
+             "test_nonwhitespace_data_directly_inside_table_cannot_be_fostered"),
+    mutation("table_entity_text_path", "quality.py", '        self.check_table_text(text)\n', '',
+             "test_direct_table_entities_and_non_ascii_spaces_are_not_html_whitespace"),
+    mutation("table_html_whitespace_definition", "quality.py",
+             '        if self.stack and self.stack[-1][0] in TABLE_CHILDREN and data.strip(" \\t\\n\\r\\f"):',
+             '        if self.stack and self.stack[-1][0] in TABLE_CHILDREN and data.strip():',
+             "test_direct_table_entities_and_non_ascii_spaces_are_not_html_whitespace"),
+    mutation("late_or_repeated_document_wrapper", "quality.py",
+             '            if tag in self.document_tags or self.body_started or parent not in DOCUMENT_PARENTS[tag]:\n'
+             '                self.ambiguous_structure = True\n', '',
+             "test_late_or_repeated_document_tags_cannot_retroactively_hide_evidence"),
+    mutation("script_double_escape_ambiguity", "quality.py",
+             '            if "<!--" in raw:\n                self.ambiguous_structure = True\n', '',
+             "test_script_double_escape_cannot_release_hidden_script_body"),
+)
+
+REDUNDANCY_CHECKS = (
+    mutation("redundancy_parent_sender_check_only", "historical_delivery.py",
              '    require(repair["sender"] != parent["sender"] and repair["receiver"] != parent["receiver"],\n'
              '            "repair must have distinct sender and receiver")',
              '    require(repair["receiver"] != parent["receiver"],\n'
              '            "repair must have distinct sender and receiver")',
              "test_repair_cannot_reuse_original_sender_message_id"),
-    mutation("historical_distinct_repair_receiver", "historical_delivery.py",
+    mutation("redundancy_parent_receiver_check_only", "historical_delivery.py",
              '    require(repair["sender"] != parent["sender"] and repair["receiver"] != parent["receiver"],\n'
              '            "repair must have distinct sender and receiver")',
              '    require(repair["sender"] != parent["sender"],\n'
              '            "repair must have distinct sender and receiver")',
              "test_repair_cannot_reuse_original_receiver_message_id"),
-    mutation("closed_dialog_visibility", "quality.py",
-             '            or (tag == "dialog" and "open" not in attrs)\n', '',
-             "test_default_hidden_html_elements_cannot_establish_visible_evidence"),
-    mutation("hidden_datalist_visibility", "quality.py", '"datalist", ', '',
-             "test_default_hidden_html_elements_cannot_establish_visible_evidence"),
-    mutation("hidden_rp_visibility", "quality.py", '"rp", ', '',
-             "test_default_hidden_html_elements_cannot_establish_visible_evidence"),
-    mutation("hidden_noembed_visibility", "quality.py", '"noembed", ', '',
-             "test_hidden_raw_text_citations_reject_even_with_visible_duplicate_layout"),
-    mutation("hidden_noframes_visibility", "quality.py", '"noframes", ', '',
-             "test_hidden_raw_text_citations_reject_even_with_visible_duplicate_layout"),
-    mutation("hidden_iframe_visibility", "quality.py", ', "iframe"', '',
-             "test_hidden_raw_text_citations_reject_even_with_visible_duplicate_layout"),
 )
 
 POSITIVE_CONTROLS = {
@@ -133,13 +224,18 @@ POSITIVE_CONTROLS = {
     "quality.py": ("test_rich_plaintext_and_structured_html_remain_golden",
                    "test_visible_partial_html_citations_preserve_parent_context_and_entities",
                    "test_explicitly_open_details_body_remains_visible",
-                   "test_explicitly_open_dialog_and_ordinary_content_remain_visible"),
+                   "test_explicitly_open_dialog_and_ordinary_content_remain_visible",
+                   "test_normal_table_body_preserves_intro_order_and_partial_entity_citations",
+                   "test_normal_document_wrappers_and_leading_metadata_remain_visible",
+                   "test_normal_nonempty_script_style_and_table_remain_visible"),
     "journal.py": ("test_journal_append_only_idempotent_and_private",
                    "test_rich_plaintext_and_structured_html_remain_golden"),
     "recovery.py": ("test_recovery_appends_failure_and_distinct_label_intent_without_rewriting",),
     "historical_delivery.py": (
         "test_confirmed_archive_is_separate_immutable_resolution_not_a_rewritten_intent",
-        "test_repair_requires_confirmed_archive_and_exact_prior_delivery_links"),
+        "test_repair_requires_confirmed_archive_and_exact_prior_delivery_links",
+        "test_sender_message_ids_are_local_to_source_account",
+        "test_repeated_identical_delivery_ids_with_legacy_alias_are_idempotent_observations"),
     "mutation_check.py": ("test_legitimate_assertion_failure_is_valid_kill_evidence",),
 }
 
@@ -244,9 +340,11 @@ def copy_package(source, destination):
 
 def check():
     source = Path(__file__).resolve().parent
-    summary = dict(status="invalid", scope=f"{len(MUTATIONS)} explicit guard deletions; not exhaustive mutation coverage",
+    summary = dict(status="invalid", scope=f"{len(MUTATIONS)} explicit guard bypasses, including named compound removals; not exhaustive mutation coverage",
                    execution="Full discovered baseline once; fresh designated regression and positive controls per mutant",
-                   baseline=None, mutants=[], killed=0, survived=0, invalid=0)
+                   baseline=None, mutants=[], killed=0, survived=0, invalid=0,
+                   redundancy_controls=[],
+                   redundancy_reason="Parent-only ID guards may be removed without a bypass because the global ledger scan independently rejects reused delivery IDs.")
     with tempfile.TemporaryDirectory(prefix="mail-guard-mutations-") as temporary:
         directory = Path(temporary)
         baseline_directory = directory / "baseline"
@@ -256,15 +354,21 @@ def check():
         if (not baseline["success"] or not baseline["tests_run"] or invalid_result(baseline)):
             summary["status"] = "baseline_failed"
             return summary
-        for item in MUTATIONS:
+        for item in (*MUTATIONS, *REDUNDANCY_CHECKS):
+            redundant = item in REDUNDANCY_CHECKS
             evidence = dict(name=item["name"], file=item["file"], expected_test=item["expected"], status="invalid")
-            summary["mutants"].append(evidence)
+            evidence["expected_status"] = "survived" if redundant else "killed"
+            summary["redundancy_controls" if redundant else "mutants"].append(evidence)
             try:
                 original = (baseline_package / item["file"]).read_text(encoding="utf-8")
-                matches = original.count(item["before"])
-                if matches != 1:
-                    raise ValueError("anchor must match exactly once; found " + str(matches))
-                changed = original.replace(item["before"], item["after"], 1)
+                changed = original
+                edits = ((item["before"], item["after"]), *item["additional"])
+                evidence["guard_edits"] = len(edits)
+                for before, after in edits:
+                    matches = changed.count(before)
+                    if matches != 1:
+                        raise ValueError("anchor must match exactly once; found " + str(matches))
+                    changed = changed.replace(before, after, 1)
                 ast.parse(changed, filename=item["file"])
                 compile(changed, item["file"], "exec")
                 controls = POSITIVE_CONTROLS[item["file"]]
@@ -301,8 +405,10 @@ def check():
             except (OSError, ValueError, RuntimeError, SyntaxError, subprocess.TimeoutExpired) as exc:
                 evidence["status"] = "invalid"
                 evidence["error"] = str(exc)
-            summary[evidence["status"]] += 1
-        summary["status"] = "pass" if summary["killed"] == len(MUTATIONS) else "fail"
+            if not redundant:
+                summary[evidence["status"]] += 1
+        summary["status"] = "pass" if (summary["killed"] == len(MUTATIONS)
+            and all(item["status"] == "survived" for item in summary["redundancy_controls"])) else "fail"
     return summary
 
 
