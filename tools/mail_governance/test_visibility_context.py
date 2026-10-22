@@ -141,6 +141,43 @@ class VisibilityContextRegressions(unittest.TestCase):
                                                entity_intro=True)
                 self.assertTrue(classify(message, review)["is_golden_sample"])
 
+    def test_default_hidden_html_elements_cannot_establish_visible_evidence(self):
+        # Chromium 155 local synthetic rendering: the first three have no text
+        # rectangles; fallback/raw-text contents of the others are not rendered.
+        for opening, closing in (("<dialog>", "</dialog>"),
+                                 ("<datalist>", "</datalist>"),
+                                 ("<ruby><rp>", "</rp></ruby>"),
+                                 ("<noembed>", "</noembed>"),
+                                 ("<noframes>", "</noframes>"),
+                                 ("<iframe>", "</iframe>")):
+            with self.subTest(wrapper=opening):
+                message, review, _ = html_review(opening, closing)
+                self.assertFalse(classify(message, review)["is_golden_sample"])
+
+    def test_explicitly_open_dialog_and_ordinary_content_remain_visible(self):
+        for opening, closing in (("<dialog open>", "</dialog>"),
+                                 ("<dialog open=''>", "</dialog>"),
+                                 ("<dialog open='false'>", "</dialog>"),
+                                 ("<section>", "</section>")):
+            with self.subTest(wrapper=opening):
+                message, review, _ = html_review(opening, closing, entity_intro=True)
+                self.assertTrue(classify(message, review)["is_golden_sample"])
+
+    def test_hidden_raw_text_citations_reject_even_with_visible_duplicate_layout(self):
+        # The visible duplicate supplies three real blocks; hidden evidence
+        # cannot rely on the block-count check to reject fallback text.
+        for tag in ("noembed", "noframes", "iframe"):
+            with self.subTest(tag=tag):
+                _, _, fragment = html_review()
+                prefix = "<" + tag + ">" + fragment + "</" + tag + ">"
+                message, review, _ = html_review(prefix)
+                start = len(prefix)
+                review["golden_axes"]["layout"]["evidence"] = {
+                    "representation": "html", "start": start,
+                    "end": start + len(fragment), "quote": fragment,
+                }
+                self.assertFalse(classify(message, review)["is_golden_sample"])
+
 
 if __name__ == "__main__":
     unittest.main()
