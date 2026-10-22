@@ -80,6 +80,22 @@ else
 fi
 
 # ── 3) pre-commit 이 실제로 차단하는가 (임시 저장소에서 실행) ────────────────
+stage_hook_gate_fixture() {
+  # 실제 훅은 검사기를 staged blob 에서 읽는다. 이 tiny fixture에는 외부 효과
+  # entry가 없으므로 제품 선언 대신 명시적인 빈 synthetic 계약을 준비한다.
+  local fixture="$1"
+  mkdir -p "$fixture/scripts/verify" || return 1
+  cp "$REPO/scripts/verify/check-external-effect-graph.py" "$fixture/scripts/verify/" || return 1
+  # Python 검사기를 stage하므로 P3의 실제 staged 린터도 함께 필요하다.
+  cp "$REPO/scripts/acceptance-silent-failure-lint.sh" "$fixture/scripts/" || return 1
+  printf '{"version":1,"entries":[]}\n' > "$fixture/scripts/verify/external-effect-contract.json" || return 1
+  (
+    cd "$fixture" || exit 9
+    git add -f scripts/verify/check-external-effect-graph.py scripts/verify/external-effect-contract.json \
+      scripts/acceptance-silent-failure-lint.sh
+  )
+}
+
 run_hook_case() {
   # run_hook_case <설명> <파일경로> <내용생성함수> <기대 차단사유 정규식>
   #
@@ -110,6 +126,7 @@ run_hook_case() {
     git config core.hooksPath hooks
     git config user.email a@b.c
     git config user.name t
+    stage_hook_gate_fixture "$tmp" || exit 9
     mkdir -p "$(dirname "$path")"
     "$maker" "$path"
     git add -f "$path" >/dev/null 2>&1
@@ -162,6 +179,7 @@ if [ -n "$tmp" ] && [ -d "$tmp" ]; then
   out=$(
     cd "$tmp" || exit 9
     git config core.hooksPath hooks; git config user.email a@b.c; git config user.name t
+    stage_hook_gate_fixture "$tmp" || exit 9
     dd if=/dev/zero of=payload.bin bs=1024 count=1200 status=none
     git add -f payload.bin >/dev/null 2>&1
     printf 'x\n' > payload.bin          # 작업트리만 작게 덮어쓴다
@@ -187,6 +205,7 @@ if [ -n "$tmp" ] && [ -d "$tmp" ]; then
   out=$(
     cd "$tmp" || exit 9
     git config user.email a@b.c; git config user.name t
+    stage_hook_gate_fixture "$tmp" || exit 9
     # 씨앗 커밋은 훅을 붙이기 **전에** 만든다. 훅 우회 옵션을 쓰면 그 리터럴 자체가
     # 검사 약화 패턴이라 이 스크립트가 커밋되지 않는다(2026-08-09 실측 — 훅이 나를 막았다).
     printf 'notes\n' > notes.txt
@@ -228,6 +247,7 @@ rc=0
   git config core.hooksPath hooks
   git config user.email a@b.c
   git config user.name t
+  stage_hook_gate_fixture "$tmp" || exit 9
   printf '# hello\n' > README.md
   git add README.md >/dev/null 2>&1
   bash hooks/pre-commit
