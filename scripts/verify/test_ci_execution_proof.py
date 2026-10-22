@@ -1,7 +1,9 @@
 """Synthetic regression checks for same-run CI execution evidence."""
 import hashlib
+import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import tempfile
@@ -9,6 +11,74 @@ import unittest
 
 
 SOURCE = Path(__file__).resolve().parents[2]
+
+
+class WorkflowContractTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        # Ruby/Psych is already the repository's workflow YAML parser.
+        parsed = subprocess.run(
+            ["ruby", "-rpsych", "-rdate", "-rjson", "-e",
+             "puts JSON.generate(Psych.safe_load(File.read(ARGV[0]), "
+             "aliases: true, permitted_classes: [Date, Time]))",
+             str(SOURCE / ".github/workflows/verify.yml")],
+            check=True, capture_output=True, text=True, timeout=20)
+        cls.job = json.loads(parsed.stdout)["jobs"]["verify"]
+
+    def test_job_environment_uses_only_available_contexts(self):
+        # GitHub's context availability table excludes runner at jobs.<job_id>.env.
+        # https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#context-availability
+        allowed = {"github", "needs", "strategy", "matrix", "vars", "secrets", "inputs"}
+        for key, value in self.job.get("env", {}).items():
+            if not isinstance(value, str):
+                continue
+            for expression in re.findall(r"\$\{\{(.*?)\}\}", value, re.S):
+                expression = re.sub(r"'(?:[^']|'')*'|\"(?:[^\"\\]|\\.)*\"", "", expression)
+                contexts = set(re.findall(r"\b([A-Za-z_]\w*)\s*(?=[.\[])", expression))
+                self.assertLessEqual(contexts, allowed, f"unavailable job env context in {key}")
+
+    def marker_initialization(self):
+        steps = self.job["steps"]
+        selected = [(index, step) for index, step in enumerate(steps)
+                    if step.get("id") == "acceptance-marker-init"]
+        self.assertEqual(len(selected), 1, "one runner-side marker initialization step is required")
+        index, step = selected[0]
+        first_wrapper = next(i for i, item in enumerate(steps)
+                             if "run-acceptance.sh" in item.get("run", ""))
+        self.assertLess(index, first_wrapper, "marker environment must exist before any wrapper")
+        self.assertNotIn("if", step)
+        self.assertFalse(step.get("continue-on-error", False))
+        return step["run"]
+
+    def initialize(self, script, root, attempt):
+        environment_file = root / f"environment-{attempt}"
+        environment_file.touch()
+        env = dict(os.environ, RUNNER_TEMP=str(root / "runner temp"),
+                   GITHUB_RUN_ID="12345", GITHUB_RUN_ATTEMPT=str(attempt),
+                   GITHUB_ENV=str(environment_file))
+        result = subprocess.run(["bash", "-eo", "pipefail", "-c", script], env=env,
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        exported = dict(line.split("=", 1) for line in environment_file.read_text().splitlines())
+        marker = Path(exported["ACCEPTANCE_MARKER_DIR"])
+        self.assertEqual(marker, root / "runner temp" / f"acceptance-markers-12345-{attempt}")
+        self.assertTrue(marker.is_dir())
+        return marker
+
+    def test_runner_initialization_exports_marker_to_following_steps(self):
+        script = self.marker_initialization()
+        with tempfile.TemporaryDirectory() as temporary:
+            self.initialize(script, Path(temporary), 2)
+
+    def test_new_attempt_does_not_reuse_previous_marker_file(self):
+        script = self.marker_initialization()
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            previous = self.initialize(script, root, 2)
+            (previous / "markers.tsv").write_text("stale evidence\n")
+            current = self.initialize(script, root, 3)
+            self.assertNotEqual(previous, current)
+            self.assertFalse((current / "markers.tsv").exists())
 
 
 class ExecutionProofTests(unittest.TestCase):

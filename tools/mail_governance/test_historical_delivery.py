@@ -31,7 +31,8 @@ class HistoricalDeliveryTests(unittest.TestCase):
         return {table: [tuple(row) for row in self.journal.db.execute(f"SELECT * FROM {table} ORDER BY rowid")]
                 for table in tables}
 
-    def legacy_delivery(self, index=0, *, original=None, current_identity=False):
+    def legacy_delivery(self, index=0, *, original=None, current_identity=False,
+                        sender_message_id=None, receiver_message_id=None):
         if original is None:
             message = dict(self.message, message_id=f"source-{index}", rfc_message_id=f"<{index}@example.test>")
             review_id = self.journal.import_review(message, self.review)
@@ -55,7 +56,8 @@ class HistoricalDeliveryTests(unittest.TestCase):
             intent = {"prior_operation_id": original["id"]} if original else {"raw_sha256": original_sha}
             self.journal._append_receipt(operation["id"], "SENDING", intent)
             self.journal._append_receipt(operation["id"], "SENT_UNVERIFIED", dict(
-                sender_message_id=f"sender-{index}{suffix}", receiver_message_id=f"receiver-{index}{suffix}",
+                sender_message_id=sender_message_id or f"sender-{index}{suffix}",
+                receiver_message_id=receiver_message_id or f"receiver-{index}{suffix}",
                 receiver_account=DESTINATION))
         return self.journal.operation(operation["id"])
 
@@ -165,6 +167,9 @@ class HistoricalDeliveryTests(unittest.TestCase):
     def test_repair_requires_confirmed_archive_and_exact_prior_delivery_links(self):
         original = self.legacy_delivery()
         repair = self.legacy_delivery(original=original)
+        self.assertNotEqual(self.proof(original)["sender_message_id"], self.proof(repair)["sender_message_id"])
+        self.assertNotEqual(self.proof(original)["receiver_observation"]["message_id"],
+                            self.proof(repair)["receiver_observation"]["message_id"])
         before = self.snapshot()
         with self.assertRaises(ValueError):
             resolve_delivery_repair(self.journal, original["id"], repair["id"], self.failure_proof(original))
@@ -175,6 +180,31 @@ class HistoricalDeliveryTests(unittest.TestCase):
         self.assertFalse(result["original_archive_preserved"])
         self.assertEqual(result["repair_operation_id"], repair["id"])
         self.assertEqual(result["historical_state"], "SENT_UNVERIFIED")
+
+    def assert_reused_delivery_ids_rejected(self, *, reuse_sender, reuse_receiver):
+        original = self.legacy_delivery()
+        original_proof = self.proof(original)
+        repair = self.legacy_delivery(
+            original=original,
+            sender_message_id=original_proof["sender_message_id"] if reuse_sender else None,
+            receiver_message_id=original_proof["receiver_observation"]["message_id"] if reuse_receiver else None)
+        repair_proof = self.proof(repair)
+        self.assertEqual(original_proof["sender_message_id"] == repair_proof["sender_message_id"], reuse_sender)
+        self.assertEqual(original_proof["receiver_observation"]["message_id"] ==
+                         repair_proof["receiver_observation"]["message_id"], reuse_receiver)
+        before = self.snapshot()
+        with self.assertRaisesRegex(ValueError, "repair must have distinct sender and receiver"):
+            resolve_delivery_archive(self.journal, repair["id"], repair_proof)
+        self.assertEqual(self.snapshot(), before)
+
+    def test_repair_cannot_reuse_original_sender_message_id(self):
+        self.assert_reused_delivery_ids_rejected(reuse_sender=True, reuse_receiver=False)
+
+    def test_repair_cannot_reuse_original_receiver_message_id(self):
+        self.assert_reused_delivery_ids_rejected(reuse_sender=False, reuse_receiver=True)
+
+    def test_repair_cannot_reuse_both_original_delivery_message_ids(self):
+        self.assert_reused_delivery_ids_rejected(reuse_sender=True, reuse_receiver=True)
 
     def test_existing_nonarchive_repair_resolution_cannot_confirm_original(self):
         original = self.legacy_delivery()

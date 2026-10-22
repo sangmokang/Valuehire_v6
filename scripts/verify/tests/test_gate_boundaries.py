@@ -92,6 +92,26 @@ class GateBoundaries(unittest.TestCase):
             "version": 1, "entries": [{"path": path, "export": export}]
         }))
 
+    def test_zero_active_suppressions_are_allowed(self):
+        for content in ("", "# All suppressions resolved; no active exceptions.\n"):
+            with self.subTest(content=content):
+                self.write("suppressions.yaml", content)
+                self.allowed()
+
+    def test_actual_suppression_requires_valid_nonempty_unexpired_date(self):
+        for expiry, reason in ((None, "expiry 가"), ("", "expiry 형식"),
+                               ("never", "expiry 형식"), ("1999-01-01", "만료된 억제")):
+            with self.subTest(expiry=expiry):
+                content = "- check: synthetic\n"
+                if expiry is not None:
+                    content += "  expiry: " + expiry + "\n"
+                self.write("suppressions.yaml", content)
+                self.blocked(reason)
+
+    def test_actual_suppression_with_future_date_remains_allowed(self):
+        self.write("suppressions.yaml", "- check: synthetic\n  expiry: 2999-01-01\n")
+        self.allowed()
+
     def test_workflow_step_deletion(self):
         self.write(WORKFLOW, BASE_WORKFLOW.replace(
             "      - name: First decision\n        run: python3 scripts/first.py\n", ""))
