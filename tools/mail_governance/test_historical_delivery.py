@@ -32,9 +32,11 @@ class HistoricalDeliveryTests(unittest.TestCase):
                 for table in tables}
 
     def legacy_delivery(self, index=0, *, original=None, current_identity=False,
-                        sender_message_id=None, receiver_message_id=None):
+                        sender_message_id=None, receiver_message_id=None, source_account=None):
         if original is None:
             message = dict(self.message, message_id=f"source-{index}", rfc_message_id=f"<{index}@example.test>")
+            if source_account is not None:
+                message["account"] = source_account
             review_id = self.journal.import_review(message, self.review)
             payload = dict(account=DESTINATION, content_hash=message["source_hash"], labels=["01JD", "06온톨로지"],
                            mirror_marker=MIRROR_MARKER, mode="additive", source_review_id=review_id)
@@ -193,7 +195,7 @@ class HistoricalDeliveryTests(unittest.TestCase):
         self.assertEqual(original_proof["receiver_observation"]["message_id"] ==
                          repair_proof["receiver_observation"]["message_id"], reuse_receiver)
         before = self.snapshot()
-        with self.assertRaisesRegex(ValueError, "repair must have distinct sender and receiver"):
+        with self.assertRaisesRegex(ValueError, "historical delivery message ID collision|repair must have distinct sender and receiver"):
             resolve_delivery_archive(self.journal, repair["id"], repair_proof)
         self.assertEqual(self.snapshot(), before)
 
@@ -205,6 +207,99 @@ class HistoricalDeliveryTests(unittest.TestCase):
 
     def test_repair_cannot_reuse_both_original_delivery_message_ids(self):
         self.assert_reused_delivery_ids_rejected(reuse_sender=True, reuse_receiver=True)
+
+    def assert_delivery_collision_rejected(self, operation):
+        before = self.snapshot()
+        with self.assertRaisesRegex(ValueError, "historical delivery message ID collision"):
+            resolve_delivery_archive(self.journal, operation["id"], self.proof(operation))
+        self.assertEqual(self.snapshot(), before)
+
+    def test_originals_cannot_share_dev_receiver_even_from_different_sender_accounts(self):
+        original = self.legacy_delivery()
+        other = self.legacy_delivery(1, source_account="other@valueconnect.kr", receiver_message_id="receiver-0")
+        for operation in (original, other):
+            with self.subTest(operation=operation["id"]):
+                self.assert_delivery_collision_rejected(operation)
+
+    def test_originals_cannot_share_sender_message_id_in_same_normalized_account(self):
+        original = self.legacy_delivery()
+        other = self.legacy_delivery(1, source_account="Owner <OWNER@VALUECONNECT.KR>", sender_message_id="sender-0")
+        for operation in (original, other):
+            with self.subTest(operation=operation["id"]):
+                self.assert_delivery_collision_rejected(operation)
+
+    def assert_repair_unrelated_collision_rejected(self, field):
+        original = self.legacy_delivery()
+        other = self.legacy_delivery(1)
+        repair = self.legacy_delivery(original=original, **{field: "sender-1" if field == "sender_message_id" else "receiver-1"})
+        for operation in (repair, other):
+            with self.subTest(operation=operation["id"]):
+                self.assert_delivery_collision_rejected(operation)
+
+    def test_repair_cannot_reuse_unrelated_share_sender_message_id(self):
+        self.assert_repair_unrelated_collision_rejected("sender_message_id")
+
+    def test_repair_cannot_reuse_unrelated_share_receiver_message_id(self):
+        self.assert_repair_unrelated_collision_rejected("receiver_message_id")
+
+    def assert_old_foreign_receipt_collision_rejected(self, field):
+        original = self.legacy_delivery()
+        other = self.legacy_delivery(1, **{field: "sender-0" if field == "sender_message_id" else "receiver-0"})
+        with self.journal.db:
+            self.journal._append_receipt(other["id"], "SENT_UNVERIFIED", dict(
+                sender_message_id="later-sender", dev_message_id="later-receiver", receiver_account=DESTINATION))
+        # Resolve the nonconflicting single-receipt operation: inspecting only
+        # the other operation's latest receipt would conceal its older clash.
+        self.assert_delivery_collision_rejected(original)
+
+    def test_older_foreign_sender_receipt_cannot_be_hidden_by_latest_result(self):
+        self.assert_old_foreign_receipt_collision_rejected("sender_message_id")
+
+    def test_older_foreign_receiver_receipt_cannot_be_hidden_by_latest_result(self):
+        self.assert_old_foreign_receipt_collision_rejected("receiver_message_id")
+
+    def test_foreign_legacy_dev_message_id_alias_is_checked_for_collision(self):
+        original = self.legacy_delivery()
+        other = self.legacy_delivery(1)
+        with self.journal.db:
+            self.journal._append_receipt(other["id"], "SENT_UNVERIFIED", dict(
+                sender_message_id="other-sender", dev_message_id="receiver-0", receiver_account=DESTINATION))
+            self.journal._append_receipt(other["id"], "SENT_UNVERIFIED", dict(
+                sender_message_id="later-sender", receiver_message_id="later-receiver", receiver_account=DESTINATION))
+        self.assert_delivery_collision_rejected(original)
+
+    def assert_conflicting_own_receipts_rejected(self, field):
+        original = self.legacy_delivery()
+        record = dict(sender_message_id="sender-0", receiver_message_id="receiver-0", receiver_account=DESTINATION)
+        record[field] = "conflicting-message-id"
+        with self.journal.db:
+            self.journal._append_receipt(original["id"], "SENT_UNVERIFIED", record)
+        before = self.snapshot()
+        with self.assertRaisesRegex(ValueError, "conflicting historical send results"):
+            resolve_delivery_archive(self.journal, original["id"], self.proof(original))
+        self.assertEqual(self.snapshot(), before)
+
+    def test_own_sender_receipt_contradiction_is_rejected(self):
+        self.assert_conflicting_own_receipts_rejected("sender_message_id")
+
+    def test_own_receiver_receipt_contradiction_is_rejected(self):
+        self.assert_conflicting_own_receipts_rejected("receiver_message_id")
+
+    def test_sender_message_ids_are_local_to_source_account(self):
+        original = self.legacy_delivery()
+        other = self.legacy_delivery(1, source_account="Other <OTHER@VALUECONNECT.KR>", sender_message_id="sender-0")
+        for operation in (original, other):
+            with self.subTest(operation=operation["id"]):
+                self.assertTrue(resolve_delivery_archive(self.journal, operation["id"], self.proof(operation))["resolved"])
+
+    def test_repeated_identical_delivery_ids_with_legacy_alias_are_idempotent_observations(self):
+        original = self.legacy_delivery()
+        proof = self.proof(original)
+        with self.journal.db:
+            self.journal._append_receipt(original["id"], "SENT_UNVERIFIED", dict(
+                sender_message_id="sender-0", dev_message_id="receiver-0", receiver_account="Dev <DEV@VALUECONNECT.KR>"))
+        result = resolve_delivery_archive(self.journal, original["id"], proof)
+        self.assertTrue(result["resolved"])
 
     def test_existing_nonarchive_repair_resolution_cannot_confirm_original(self):
         original = self.legacy_delivery()

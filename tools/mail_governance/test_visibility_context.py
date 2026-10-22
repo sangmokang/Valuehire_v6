@@ -21,6 +21,15 @@ def html_review(prefix="", suffix="", *, entity_intro=False):
     return message, review, fragment
 
 
+def replace_review_html(message, review, html):
+    message["html"] = html
+    message["source_hash"] = review["content_hash"] = content_hash(message["authored_text"], html)
+    for axis in ("personalization", "company", "role"):
+        quote = review["golden_axes"][axis]["evidence"]["quote"]
+        review["golden_axes"][axis]["evidence"] = citation(html, quote, "html")
+    review["golden_axes"]["layout"]["evidence"] = citation(html, html, "html")
+
+
 class VisibilityContextRegressions(unittest.TestCase):
     def test_numeric_zero_inline_styles_cannot_make_hidden_evidence_golden(self):
         for property_name, values in (
@@ -177,6 +186,61 @@ class VisibilityContextRegressions(unittest.TestCase):
                     "end": start + len(fragment), "quote": fragment,
                 }
                 self.assertFalse(classify(message, review)["is_golden_sample"])
+
+    def test_unsupported_media_foreign_and_custom_elements_are_not_golden_evidence(self):
+        for opening, closing in (("<audio>", "</audio>"),
+                                 ("<audio controls>", "</audio>"),
+                                 ("<video controls>", "</video>"),
+                                 ("<canvas>", "</canvas>"), ("<object>", "</object>"),
+                                 ("<select>", "</select>"), ("<svg>", "</svg>"),
+                                 ("<math>", "</math>"), ("<unknown>", "</unknown>"),
+                                 ("<candidate-card>", "</candidate-card>")):
+            with self.subTest(wrapper=opening):
+                message, review, fragment = html_review()
+                html = opening + fragment.replace("<p>", "<section>").replace("</p>", "</section>") + closing
+                replace_review_html(message, review, html)
+                self.assertFalse(classify(message, review)["is_golden_sample"])
+
+    def test_unsupported_elements_outside_citations_make_source_ambiguous(self):
+        for tag in ("unknown", "candidate-card", "svg", "math", "canvas", "select", "object"):
+            with self.subTest(tag=tag):
+                message, review, _ = html_review("<" + tag + "></" + tag + ">")
+                self.assertFalse(classify(message, review)["is_golden_sample"])
+
+    def test_table_foster_parenting_cannot_move_intro_below_the_jd(self):
+        message, review, _ = html_review()
+        intro, company, role = [review["golden_axes"][axis]["evidence"]["quote"]
+                                for axis in ("personalization", "company", "role")]
+        html = ("<table><tr><td><p>" + intro + "</p></td></tr><p>" + company
+                + "</p><p>" + role + "</p></table>")
+        replace_review_html(message, review, html)
+        self.assertFalse(classify(message, review)["is_golden_sample"])
+
+    def test_nonwhitespace_data_directly_inside_table_cannot_be_fostered(self):
+        message, review, _ = html_review()
+        intro, company, role = [review["golden_axes"][axis]["evidence"]["quote"]
+                                for axis in ("personalization", "company", "role")]
+        html = ("<table><tbody><tr><td><p>" + intro + "</p></td></tr>" + company
+                + "<tr><td><p>" + role + "</p></td></tr></tbody></table>")
+        replace_review_html(message, review, html)
+        self.assertFalse(classify(message, review)["is_golden_sample"])
+
+    def test_table_sections_that_reorder_rendering_are_outside_supported_dialect(self):
+        for opening, closing in (("<table><caption>표 안내</caption><tr><td>", "</td></tr></table>"),
+                                 ("<table><thead><tr><th>", "</th></tr></thead></table>"),
+                                 ("<table><tfoot><tr><td>", "</td></tr></tfoot></table>")):
+            with self.subTest(wrapper=opening):
+                message, review, _ = html_review(opening, closing)
+                self.assertFalse(classify(message, review)["is_golden_sample"])
+
+    def test_normal_table_body_preserves_intro_order_and_partial_entity_citations(self):
+        for body_start, body_end in (("", ""), ("<tbody>", "</tbody>")):
+            with self.subTest(tbody=body_start):
+                message, review, fragment = html_review(entity_intro=True)
+                html = ("<table>\n" + body_start + fragment.replace("<p>", "<tr><td><p>")
+                        .replace("</p>", "</p></td></tr>\n") + body_end + "</table>")
+                replace_review_html(message, review, html)
+                self.assertTrue(classify(message, review)["is_golden_sample"])
 
 
 if __name__ == "__main__":
