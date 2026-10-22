@@ -29,12 +29,15 @@ class WorkflowContractTests(unittest.TestCase):
         # GitHub's context availability table excludes runner at jobs.<job_id>.env.
         # https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#context-availability
         allowed = {"github", "needs", "strategy", "matrix", "vars", "secrets", "inputs"}
+        references = r"\b([A-Za-z_]\w*)(?:\s*\.\s*(?:[A-Za-z_]\w*|\*)|\s*\[[^]]*\])+"
+        self.assertEqual(set(re.findall(references, "github.event.repository.name + vars['mail']")),
+                         {"github", "vars"})
         for key, value in self.job.get("env", {}).items():
             if not isinstance(value, str):
                 continue
             for expression in re.findall(r"\$\{\{(.*?)\}\}", value, re.S):
                 expression = re.sub(r"'(?:[^']|'')*'|\"(?:[^\"\\]|\\.)*\"", "", expression)
-                contexts = set(re.findall(r"\b([A-Za-z_]\w*)\s*(?=[.\[])", expression))
+                contexts = set(re.findall(references, expression))
                 self.assertLessEqual(contexts, allowed, f"unavailable job env context in {key}")
 
     def marker_initialization(self):

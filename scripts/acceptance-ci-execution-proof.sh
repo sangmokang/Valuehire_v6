@@ -52,9 +52,9 @@ record() {
 }
 
 if python3 scripts/verify/test_ci_execution_proof.py; then
-  record 0 "wrapper 성공·실패와 실행 생략의 독립 회귀 3건"
+  record 0 "wrapper·workflow context·run/attempt 격리 독립 회귀 6건"
 else
-  record 1 "wrapper 성공·실패와 실행 생략의 독립 회귀 3건" "독립 단위 검사 실패"
+  record 1 "wrapper·workflow context·run/attempt 격리 독립 회귀 6건" "독립 단위 검사 실패"
 fi
 
 CLONE="$SANDBOX/clone"

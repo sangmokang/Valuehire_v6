@@ -151,7 +151,7 @@ if printf '%s\n' "$staged" | grep -qx 'suppressions.yaml'; then
     elif [ "$e" \< "$today" ]; then
       block "만료된 억제가 남아 있다 (expiry: $e < 오늘 $today) — 유예는 기한이 지나면 해제되어야 한다 (P13)"
     fi
-  done <<< "$(printf '%s\n' "$sup" | awk '/^ *expiry:/{sub(/^ *expiry: */,""); gsub(/["\x27]/,""); print}')"
+  done < <(printf '%s\n' "$sup" | awk '/^ *expiry:/{sub(/^ *expiry: */,""); gsub(/["\x27]/,""); print}')
 fi
 
 # ── 5) LLM 출력 숫자를 판정 필드에 (P14 · v4 QA-094 재현 방지) ────────────────

@@ -27,9 +27,6 @@ jobs:
     # (check-invoice-gate.py CANARY_TIMEOUT=900) 가 900초를 다 쓰고 나머지 게이트가
     # 실측 최댓값(최근 성공 15회 3.2~4.8분)을 써도 약 20분이다. 30분은 그 위 여유다.
     timeout-minutes: 30
-    env:
-      # 같은 run/attempt에서 성공한 검사만 마지막 단계에서 대조한다.
-      ACCEPTANCE_MARKER_DIR: ${{ runner.temp }}/acceptance-markers-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -37,6 +34,14 @@ jobs:
           # 이 job 은 읽기만 한다. 기본값(true)은 인증 토큰을 러너의 git 설정에 남겨
           # 뒤따르는 스크립트가 인증된 git 명령을 쓸 수 있게 만든다 — 여기서는 필요 없다.
           persist-credentials: false
+
+      - name: 실행 증명 마커 경로 초기화
+        id: acceptance-marker-init
+        run: |
+          # runner 환경은 실행 단계에서 읽고 같은 run/attempt의 후속 검사에 전달한다.
+          marker_dir="${RUNNER_TEMP:?}/acceptance-markers-${GITHUB_RUN_ID:?}-${GITHUB_RUN_ATTEMPT:?}"
+          mkdir -p "$marker_dir"
+          printf 'ACCEPTANCE_MARKER_DIR=%s\n' "$marker_dir" >> "${GITHUB_ENV:?}"
 
       - name: 비밀 스캔 (verify.sh)
         # 패턴은 커밋된 .secret-patterns.default 를 쓴다.
