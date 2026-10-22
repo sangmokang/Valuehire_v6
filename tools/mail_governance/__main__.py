@@ -5,12 +5,14 @@ import sys
 
 from .core import canonical, content_hash
 from .journal import Journal
+from .historical_delivery import delivery_status, resolve_delivery_archive, resolve_delivery_repair
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--db", required=True)
-    parser.add_argument("command", choices=("hash", "import-review", "plan", "receipt", "operation", "coverage", "coverage-status"))
+    parser.add_argument("command", choices=("hash", "import-review", "plan", "receipt", "operation", "coverage", "coverage-status",
+                                            "delivery-status", "resolve-delivery-archive", "resolve-delivery-repair"))
     parser.add_argument("--input", default="-", help="JSON file, or - for stdin")
     args = parser.parse_args()
     source = sys.stdin if args.input == "-" else open(args.input, encoding="utf-8")
@@ -34,6 +36,12 @@ def main():
             result = journal.operation(data["operation_id"])
         elif args.command == "coverage":
             result = journal.coverage(**data)
+        elif args.command == "delivery-status":
+            result = delivery_status(journal, data["operation_id"])
+        elif args.command == "resolve-delivery-archive":
+            result = resolve_delivery_archive(journal, data["operation_id"], data["proof"])
+        elif args.command == "resolve-delivery-repair":
+            result = resolve_delivery_repair(journal, data["operation_id"], data["repair_operation_id"], data["proof"])
         else:
             result = journal.coverage_status(data["account"], data["query"])
         print(canonical(result))

@@ -37,7 +37,9 @@ def hidden_node(tag, attrs):
     zero = r"[+-]?(?:0+(?:\.0+)?|\.0+)(?:e[+-]?[0-9]+)?"
     invisible_style = re.search(r"(?:^|;)(?:display:none|visibility:(?:hidden|collapse)|opacity:" + zero
                                + r"%?|font-size:" + zero + r"(?:px|cm|mm|q|in|pt|pc|r?(?:em|ex|cap|ch|ic|lh)|[sld]?v(?:w|h|i|b|min|max)|%)?)(?:!important)?(?:;|$)", style)
+    # Closed disclosures cannot establish visible body evidence without interaction.
     return (tag in INVISIBLE_TAGS or "hidden" in attrs or "inert" in attrs
+            or (tag == "details" and "open" not in attrs)
             or (attrs.get("aria-hidden") or "").casefold() == "true" or bool(invisible_style))
 
 

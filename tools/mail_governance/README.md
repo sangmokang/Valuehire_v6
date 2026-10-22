@@ -90,6 +90,10 @@ fragment visible. These conservative floors reject trivial citations; they do no
 prove substantive company facts, complete responsibilities, person-fit, or browser
 computed CSS quality. The named reviewer owns those semantic assertions. Unknown
 confidentiality or candidate readiness prevents golden; no human approval gate is added.
+Ambiguous crossing closes, nonvoid self-closing tags, and duplicate attributes cannot
+establish visible HTML evidence. Closed `details` content is also excluded; an
+explicit `open` attribute permits it. Supported omitted paragraph/list endings and real
+void elements remain accepted; this is not a complete HTML5 tree-repair algorithm.
 
 `rule_version` must exactly match the running code's `RULE_VERSION`, currently
 `2026-10-21.v1`. Whitespace, alternate spellings, and reviewer-chosen versions are
@@ -300,8 +304,30 @@ matching its immutable review's RFC identity and content hash, plus received ori
 and actual receiver message ID. The successor retains this receiver binding for readback.
 Old payloads remain untouched. Report hashes and observation JSON are adapter assertions;
 they do not authenticate Gmail. The live adapter must collect source/receiver observations
-and independent post-modification GETs. Historical shares missing an original-byte send
-intent cannot be retroactively declared VERIFIED through this helper.
+and independent post-modification GETs. Historical shares missing the current
+original-byte send-intent field cannot be retroactively declared VERIFIED through
+this helper.
+
+## Historical delivery findings
+
+`historical_delivery` records separate immutable `delivery_resolutions`; it never
+changes an old operation or receipt, creates a send intent, or fabricates a pre-send
+hash. CLI commands `resolve-delivery-archive` and `resolve-delivery-repair` accept
+`{operation_id, proof}` and `{operation_id, repair_operation_id, proof}` respectively;
+`delivery-status` accepts `{operation_id}`. Invalid or conflicting proof fails closed.
+
+`ARCHIVE_CONFIRMED_AFTER_DELIVERY` requires independently obtained source bytes,
+the actual receiver ZIP's original bytes, recorded sender/receiver IDs, RFC identity,
+content hash, mirror/operation markers, and a separate required-label readback.
+Existing legacy `raw_sha256` intent fields are crosschecked without renaming them.
+`REPAIRED_BY_CONFIRMED_DELIVERY` keeps the original archive failure explicit and
+links its exact prior sender/receiver/source references to an archive-confirmed
+repair. Repair labels must also satisfy the original label set.
+
+Status exposes both `historical_state` and the separate resolution. A resolved old
+`SENT_UNVERIFIED` row remains that state; resolution is not a current-contract
+`VERIFIED` receipt. Proof JSON/report hashes are trusted adapter assertions, not
+cryptographic Gmail attestation. The live adapter must independently obtain them.
 
 ```sh
 node --test tools/mail_governance/test_mime.mjs

@@ -26,6 +26,10 @@ CREATE TABLE IF NOT EXISTS coverage (
 CREATE TABLE IF NOT EXISTS share_scopes (
  scope TEXT NOT NULL, content_hash TEXT NOT NULL, review_id TEXT NOT NULL REFERENCES reviews(id),
  PRIMARY KEY(scope,content_hash));
+CREATE TABLE IF NOT EXISTS delivery_resolutions (
+ operation_id TEXT PRIMARY KEY NOT NULL REFERENCES operations(id),
+ outcome TEXT NOT NULL CHECK(outcome IN ('ARCHIVE_CONFIRMED_AFTER_DELIVERY','REPAIRED_BY_CONFIRMED_DELIVERY')),
+ payload_json TEXT NOT NULL, recorded_at TEXT NOT NULL);
 """
 TRANSITIONS = {"PLANNED": {"SENDING"}, "SENDING": {"SENT_UNVERIFIED", "AMBIGUOUS", "FAILED"},
                "SENT_UNVERIFIED": {"VERIFIED", "AMBIGUOUS", "FAILED"}, "AMBIGUOUS": {"VERIFIED"},
@@ -67,6 +71,7 @@ class Journal:
             "receipts": "id=NEW.id",
             "coverage": "id=NEW.id",
             "share_scopes": "scope=NEW.scope AND content_hash=NEW.content_hash",
+            "delivery_resolutions": "operation_id=NEW.operation_id",
         }
         for table, keys in immutable_keys.items():
             for action in ("UPDATE", "DELETE"):

@@ -176,6 +176,20 @@ class HistoricalDeliveryTests(unittest.TestCase):
         self.assertEqual(result["repair_operation_id"], repair["id"])
         self.assertEqual(result["historical_state"], "SENT_UNVERIFIED")
 
+    def test_existing_nonarchive_repair_resolution_cannot_confirm_original(self):
+        original = self.legacy_delivery()
+        repair = self.legacy_delivery(original=original)
+        # An imported row can contain a valid archive proof but the wrong outcome.
+        # Reject that outcome before considering the independently valid proof.
+        with self.journal.db:
+            self.journal.db.execute("INSERT INTO delivery_resolutions VALUES(?,?,?,?)", (
+                repair["id"], "REPAIRED_BY_CONFIRMED_DELIVERY",
+                json.dumps(dict(proof=self.proof(repair))), "2026-10-22T00:00:00+00:00"))
+        before = self.snapshot()
+        with self.assertRaisesRegex(ValueError, "repair archive must be confirmed first"):
+            resolve_delivery_repair(self.journal, original["id"], repair["id"], self.failure_proof(original))
+        self.assertEqual(self.snapshot(), before)
+
     def test_repair_cannot_be_applied_to_a_different_original_or_unproven_failure(self):
         original = self.legacy_delivery()
         other = self.legacy_delivery(1)
