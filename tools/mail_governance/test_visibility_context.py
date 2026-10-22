@@ -275,6 +275,33 @@ class VisibilityContextRegressions(unittest.TestCase):
                 replace_review_html(message, review, html)
                 self.assertTrue(classify(message, review)["is_golden_sample"])
 
+    def test_late_or_repeated_document_tags_cannot_retroactively_hide_evidence(self):
+        for opening, closing in (
+            ("<html><body>", "<body hidden></body></body></html>"),
+            ("<html><body>", "<body style='display:none'></body></body></html>"),
+            ("<html><body>", "<html hidden></html></body></html>"),
+            ("", "<body hidden></body>"),
+            ("", "<body style='display:none'></body>"),
+            ("", "<html hidden></html>"),
+            ("<body></body><body>", "</body>"),
+            ("<html><head></head><body>", "<head></head></body></html>"),
+        ):
+            with self.subTest(opening=opening, closing=closing):
+                message, review, _ = html_review(opening, closing)
+                self.assertFalse(classify(message, review)["is_golden_sample"])
+
+    def test_normal_document_wrappers_and_leading_metadata_remain_visible(self):
+        metadata = "<meta charset='utf-8'><title>채용 제안</title><style></style>"
+        for opening, closing in (
+            ("<!doctype html><html lang='ko'><head>" + metadata + "</head><body>", "</body></html>"),
+            ("<html>" + metadata + "<body>", "</body></html>"),
+            (metadata + "<body>", "</body>"),
+            ("<html><head>" + metadata + "</head>", "</html>"),
+        ):
+            with self.subTest(wrapper=opening):
+                message, review, _ = html_review(opening, closing, entity_intro=True)
+                self.assertTrue(classify(message, review)["is_golden_sample"])
+
 
 if __name__ == "__main__":
     unittest.main()
