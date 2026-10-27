@@ -6,6 +6,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from humansearch.admin_ai_search import (
+    AiSearchPayload,
     AiSearchRun,
     CandidateEvidence,
     build_ai_search_payload,
@@ -29,7 +30,7 @@ EVIDENCE_CONTRACT_PATH = (
 KST = ZoneInfo("Asia/Seoul")
 
 
-def _gmail_payload() -> dict[str, object]:
+def _gmail_payload() -> AiSearchPayload:
     evidence_contract = load_evidence_contract(EVIDENCE_CONTRACT_PATH)
     run = AiSearchRun(
         actor="CHATGPT",
