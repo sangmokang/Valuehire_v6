@@ -13,10 +13,13 @@ from .scoring import ScoreComponents, calculate_candidate_score, score_input_has
 
 _URL_PATTERN = re.compile(r"https?://[^\s<>\"']+", re.IGNORECASE)
 _CANDIDATE_HEADING = re.compile(
-    r"(?im)^\s*(?:(?:\[\[VH_HEADING\]\]|[#>*•-]+)\s*)?(?:"
+    r"(?im)^\s*(?:"
+    r"(?:(?:\[\[VH_HEADING\]\]|[#>*•-]+)\s*)?(?:"
     r"(?:후보|후보자|candidate)\s*(?:#|no\.?|번호)?\s*\d+|"
     r"\d+\s*(?:번|번째)?\s*(?:후보|후보자|candidate))\b|"
-    r"^\s*(?:\[\[VH_HEADING\]\]|#{1,6})\s*\d+[.)]?\s+\S+"
+    r"\[\[VH_HEADING\]\]\s*(?:후보|후보자|candidate)\s+"
+    r"(?!(?:결과|목록|추천|검색|없음|요약|현황|분석)\b)\S+|"
+    r"(?:\[\[VH_HEADING\]\]|#{1,6})\s*\d+[.)]?\s+\S+)"
 )
 _EXCLUDED_HEADING = re.compile(
     r"(?im)^\s*(?:(?:\[\[VH_HEADING\]\]|[#>*•-]+)\s*)?"
