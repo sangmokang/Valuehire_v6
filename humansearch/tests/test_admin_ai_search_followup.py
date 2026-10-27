@@ -294,6 +294,38 @@ def test_multiple_named_headings_count_candidate_without_profile_as_unparsed() -
     }
 
 
+def test_profile_before_named_headings_is_not_silently_dropped() -> None:
+    contract = load_evidence_contract(CONTRACT_PATH)
+    body = """
+      <a href="https://www.linkedin.com/in/redacted-a">REDACTED A</a>
+      <h2>후보 B</h2>
+      <a href="https://www.linkedin.com/in/redacted-b">REDACTED B</a>
+      <h2>후보 C</h2>
+      <a href="https://www.linkedin.com/in/redacted-c">REDACTED C</a>
+    """
+
+    payload = build_ai_search_payload_from_gmail_snapshot(
+        _snapshot(
+            _message(
+                "gmail-real",
+                "[ChatGPT-AISearch] [aisearch] REDACTED_CLIENT Data Analyst — 판정",
+                body,
+            )
+        ),
+        contract,
+    )
+
+    batch = payload["batches"][0]
+    assert len(batch["candidates"]) == 3
+    assert batch["candidate_counts"] == {
+        "raw": 3,
+        "parsed": 3,
+        "duplicate": 0,
+        "unparsed": 0,
+        "excluded": 0,
+    }
+
+
 def test_conflicting_explicit_run_ids_are_not_grouped() -> None:
     contract = load_evidence_contract(CONTRACT_PATH)
     subject = (
