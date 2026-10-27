@@ -154,7 +154,7 @@ def test_redacted_live_shape_preserves_count_equation_and_unknown_score() -> Non
     assert batch["unique_candidates"] == 1
     assert batch["score_buckets"] == {"90_plus": None, "80s": None, "70s": None}
     assert batch["score_status"] == "NOT_RUN"
-    assert batch["score_reason"] == "v5_score_contract_evidence_missing"
+    assert batch["score_reason"] == "score_contract_evidence_missing"
     assert batch["actual_fu"] is None
     assert batch["actual_fu_status"] == "NOT_RUN"
     assert batch["search_period"] == {

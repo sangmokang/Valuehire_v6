@@ -1,6 +1,7 @@
 """Acceptance tests for the read-only AI Search evidence surface."""
 
 import json
+import hashlib
 import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -40,6 +41,20 @@ def candidate(
     channel: str = "SARAMIN",
     label: str = "후보 A",
 ) -> CandidateEvidence:
+    score_components = {
+        "education": score,
+        "job_fit": score,
+        "difficult_work": score,
+        "job_description_logic": score,
+    }
+    score_contract_version = "admin-ai-search-score/v2"
+    score_input_hash = hashlib.sha256(
+        json.dumps(
+            {"components": score_components, "version": score_contract_version},
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+    ).hexdigest()
     return CandidateEvidence(
         canonical_key=key * 64,
         display_name=label,
@@ -48,6 +63,9 @@ def candidate(
         education="대학교 졸업",
         experience="관련 경력 7년",
         score=score,
+        score_contract_version=score_contract_version,
+        score_components=score_components,
+        score_input_hash=score_input_hash,
         why_fit=("필수 역량 근거 확인",),
         reverse_match_position="인접 포지션",
         reverse_match_score=81,
