@@ -29,6 +29,7 @@
   }
 
   function valueOrNotRun(value, reason) {
+    if (typeof value === "number") return value.toLocaleString("ko-KR");
     if (known(value)) return String(value);
     return reason ? `미확인 · ${reasonLabel(reason)}` : "미확인";
   }
@@ -77,7 +78,9 @@
     const fu = sumKnown(payload.batches, (batch) => batch.actual_fu);
     byId("cadence").textContent = payload.cadence === "DAILY" ? "매일" : payload.cadence;
     byId("evidence-status").replaceChildren(statusBadge(payload.status));
-    byId("batch-count").textContent = hasEvidence ? String(payload.batches.length) : "확인하지 않음";
+    byId("batch-count").textContent = hasEvidence
+      ? payload.batches.length.toLocaleString("ko-KR")
+      : "확인하지 않음";
     byId("candidate-count").textContent = hasEvidence ? valueOrNotRun(candidates) : "확인하지 않음";
     byId("strong-count").textContent = hasEvidence ? valueOrNotRun(strong) : "확인하지 않음";
     byId("fu-count").textContent = hasEvidence ? valueOrNotRun(fu) : "확인하지 않음";
