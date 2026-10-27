@@ -19,8 +19,7 @@
   function latestCollectedWeek(dashboard) {
     const collected = dashboard.weeks.filter((week) => week.snapshot);
     const currentWeek = collected[collected.length - 1];
-    if (!currentWeek) throw new Error("current_snapshot_missing");
-    return currentWeek;
+    return currentWeek || dashboard.weeks.at(-1);
   }
 
   function reasonLabel(reason) {
@@ -176,12 +175,14 @@
       renderHeatmap(dashboard, currentWeek);
       byId("dashboard").setAttribute("aria-busy", "false");
       document.body.dataset.ready = "true";
-      state.dataset.status = "PASS";
-      state.textContent = "Gmail에서 확인한 주간 데이터를 불러왔습니다.";
+      state.dataset.status = dashboard.source_summary.status;
+      state.textContent = dashboard.source_summary.status === "PASS"
+        ? "Gmail에서 확인한 주간 데이터를 불러왔습니다."
+        : "Gmail 자료를 아직 확인하지 못했습니다.";
     } catch (_error) {
       byId("dashboard").setAttribute("aria-busy", "false");
       state.dataset.status = "FAIL";
-      state.textContent = "대시보드 미집계 · dashboard_load_failed";
+      state.textContent = "대시보드 자료를 불러오지 못했습니다.";
     }
   }
 

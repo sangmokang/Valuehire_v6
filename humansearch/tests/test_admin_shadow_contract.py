@@ -1,5 +1,6 @@
 """Runtime acceptance tests for the Gmail-backed weekly dashboard payload."""
 
+import copy
 import json
 from datetime import date, datetime
 from pathlib import Path
@@ -155,6 +156,31 @@ def test_shadow_metrics_are_derived_from_the_gmail_ai_search_payload() -> None:
     assert metrics["sourcing_global_unique_candidates"]["reason"] == (
         "identity_link_contract_missing"
     )
+
+
+def test_unknown_company_and_position_are_not_counted_as_real_search_targets() -> None:
+    payload = _gmail_payload()
+    first = copy.deepcopy(payload["batches"][0])
+    first["batch_id"] = "VHAI-UNKNOWN-1"
+    first["company"] = "NOT_RUN:company_not_found"
+    first["position"] = "NOT_RUN:position_not_found"
+    second = copy.deepcopy(first)
+    second["batch_id"] = "VHAI-UNKNOWN-2"
+    payload["batches"] = [first, second]
+
+    dashboard = build_shadow_dashboard(
+        load_metric_contract(CONTRACT_PATH),
+        payload,
+        as_of_date=date(2026, 10, 28),
+    )
+    snapshot = dashboard["weeks"][-1]["snapshot"]
+
+    assert snapshot is not None
+    assert snapshot["metrics"]["sourcing_positions"]["value"] == 0
+    position_metric = next(
+        item for item in dashboard["metric_catalog"] if item["id"] == "sourcing_positions"
+    )
+    assert position_metric["display_label"] == "고객사·포지션이 확인된 검색 대상"
 
 
 def test_shadow_payload_contains_no_personal_data_or_external_action() -> None:

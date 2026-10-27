@@ -61,12 +61,12 @@
     },
     {
       "id": "sourcing_positions",
-      "display_label": "후보가 확인된 검색 대상",
-      "description": "후보 프로필을 확인한 고객사·포지션·채널 묶음 수",
+      "display_label": "고객사·포지션이 확인된 검색 대상",
+      "description": "메일에서 고객사와 포지션을 모두 확인한 채널별 검색 대상 수",
       "group": "sourcing",
       "unit": "개",
       "source_collection": "candidate_discoveries",
-      "event_type": "candidate_discovery",
+      "event_type": "candidate_discovery_known_position",
       "aggregation": "distinct",
       "distinct_fields": ["source_system", "position_source_id"]
     },

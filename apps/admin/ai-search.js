@@ -14,7 +14,11 @@
     requirements_evidence_missing: "필수요건 근거가 메일에 없습니다.",
     why_fit_evidence_missing: "적합 근거가 메일에 없습니다.",
     contact_opinion_evidence_missing: "컨택 의견 근거가 메일에 없습니다.",
+    better_position_evidence_missing: "더 적합한 포지션을 판단할 근거가 없습니다.",
+    reverse_match_contract_evidence_missing: "역매칭에 필요한 근거가 없습니다.",
     required_sources_not_checked: "필요한 채용사이트를 아직 확인하지 않았습니다.",
+    ai_search_load_failed: "AI Search 자료를 불러오지 못했습니다.",
+    batch_detail_failed: "검색 상세를 불러오지 못했습니다.",
   };
 
   function element(tag, className, text) {
@@ -35,13 +39,20 @@
   }
 
   function reasonLabel(reason) {
-    return REASON_LABELS[reason] || "확인할 근거가 없습니다.";
+    const normalized = typeof reason === "string" ? reason.replace(/^NOT_RUN:/, "") : reason;
+    return REASON_LABELS[normalized] || "확인할 근거가 없습니다.";
   }
 
   function statusLabel(status) {
     if (status === "PASS") return "확인 완료";
     if (status === "FAIL") return "오류";
     return "확인 필요";
+  }
+
+  function contactRecommendationLabel(value) {
+    if (value === "RECOMMEND") return "연락 추천";
+    if (value === "DO_NOT_CONTACT") return "연락 비추천";
+    return statusLabel(value);
   }
 
   function statusBadge(status) {
@@ -66,6 +77,11 @@
     return new Intl.DateTimeFormat("ko-KR", { month: "long", day: "numeric" }).format(date);
   }
 
+  function entityLabel(value, label) {
+    if (known(value) && !value.startsWith("NOT_RUN:")) return value;
+    return `${label} 미확인 (메일 제목에서 구분 못함)`;
+  }
+
   function sumKnown(batches, select) {
     const values = batches.map(select);
     return values.every(known) ? values.reduce((sum, value) => sum + value, 0) : null;
@@ -88,7 +104,10 @@
 
   function accountCell(batch) {
     const cell = element("td");
-    cell.append(element("strong", "", batch.company), element("small", "", batch.position));
+    cell.append(
+      element("strong", "", entityLabel(batch.company, "고객사")),
+      element("small", "", entityLabel(batch.position, "포지션")),
+    );
     return cell;
   }
 
@@ -104,7 +123,7 @@
 
   function numberCell(value, detail) {
     const cell = element("td", "number-cell", valueOrNotRun(value));
-    if (detail) cell.append(element("small", "", detail));
+    if (detail) cell.append(element("small", "", reasonLabel(detail)));
     return cell;
   }
 
@@ -123,7 +142,10 @@
       const row = element("tr", "clickable-row");
       row.tabIndex = 0;
       row.setAttribute("role", "button");
-      row.setAttribute("aria-label", `${batch.batch_id} 상세 열기`);
+      row.setAttribute(
+        "aria-label",
+        `${batch.actor_label} ${entityLabel(batch.company, "고객사")} ${entityLabel(batch.position, "포지션")} 상세 열기`,
+      );
       row.append(
         batchCell(batch),
         accountCell(batch),
@@ -174,8 +196,10 @@
     if (candidate.better_position_exists === null) {
       return `미확인 · ${reasonLabel(candidate.better_position_reason)}`;
     }
-    if (!candidate.better_position_exists) return `없음 · ${candidate.better_position_reason}`;
-    return `있음 · ${candidate.better_position} · ${candidate.better_position_reason}`;
+    if (!candidate.better_position_exists) {
+      return `없음 · ${reasonLabel(candidate.better_position_reason)}`;
+    }
+    return `있음 · ${candidate.better_position} · ${reasonLabel(candidate.better_position_reason)}`;
   }
 
   function renderCandidate(candidate) {
@@ -196,7 +220,10 @@
       detailItem("학력", candidate.education),
       detailItem("전체 경력", candidate.experience),
       detailItem("핵심 경력", candidate.key_experience),
-      detailItem("컨택 상태", `${candidate.contact_status} · ${candidate.contact_recommendation}`),
+      detailItem(
+        "컨택 상태",
+        `${statusLabel(candidate.contact_status)} · ${contactRecommendationLabel(candidate.contact_recommendation)}`,
+      ),
       detailItem("컨택 출처", candidate.contact_source),
       detailItem("컨택 확인시각", known(candidate.contact_checked_at)
         ? formatDate(candidate.contact_checked_at) : null),
@@ -211,7 +238,7 @@
     better.append(
       element("h4", "", "더 적합한 포지션 존재 여부"),
       element("p", "", betterPositionLabel(candidate)),
-      element("p", "evidence-meta", `기존 역매칭: ${candidate.reverse_match_reason || "확인하지 않음"}`),
+      element("p", "evidence-meta", `기존 역매칭: ${reasonLabel(candidate.reverse_match_reason)}`),
     );
     article.append(
       heading,
@@ -258,10 +285,10 @@
     byId("fu-count").textContent = "확인하지 않음";
     byId("empty-state").hidden = true;
     byId("error-state").hidden = false;
-    byId("error-reason").textContent = reason;
+    byId("error-reason").textContent = reasonLabel(reason);
     const state = byId("load-state");
     state.dataset.status = "FAIL";
-    state.textContent = `AI Search 증빙 미집계 · ${reason}`;
+    state.textContent = `AI Search 증빙 미집계 · ${reasonLabel(reason)}`;
   }
 
   async function openDetail(batchId) {
@@ -272,7 +299,7 @@
       if (!response.ok) throw new Error("batch_detail_failed");
       const batch = await response.json();
       byId("dialog-batch").textContent = `${batch.actor_label} · Gmail ${batch.batch_grouping.message_count}건`;
-      byId("dialog-title").textContent = `${batch.company} · ${batch.position}`;
+      byId("dialog-title").textContent = `${entityLabel(batch.company, "고객사")} · ${entityLabel(batch.position, "포지션")}`;
       const counts = batch.candidate_counts;
       const summary = byId("dialog-summary");
       summary.replaceChildren(

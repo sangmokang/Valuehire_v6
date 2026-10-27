@@ -288,13 +288,28 @@ def test_ai_search_assets_expose_required_detail_and_error_states() -> None:
         "contact_opinion_evidence",
     ):
         assert field in script
+    assert 'element("small", "", reasonLabel(detail))' in script
+    assert '`${batch.batch_id} 상세 열기`' not in script
+    assert 'candidate.reverse_match_reason || "확인하지 않음"' not in script
+    assert 'entityLabel(batch.company, "고객사")' in script
+    assert 'entityLabel(batch.position, "포지션")' in script
 
 
 def test_weekly_page_hides_internal_provenance_and_uses_plain_korean() -> None:
     page = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
+    script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
     contract = json.loads(METRIC_CONTRACT_PATH.read_text(encoding="utf-8"))
 
     assert "판정 근거" not in page
     assert 'id="provenance"' not in page
     assert "신원 연결 제한" not in json.dumps(contract, ensure_ascii=False)
     assert "전체 후보 중복 확인" in json.dumps(contract, ensure_ascii=False)
+    assert "대시보드 자료를 불러오지 못했습니다." in script
+    assert "대시보드 미집계 · dashboard_load_failed" not in script
+
+
+def test_weekly_page_treats_all_not_run_weeks_as_empty_not_load_failure() -> None:
+    script = (ASSET_DIR / "app.js").read_text(encoding="utf-8")
+
+    assert "return currentWeek || dashboard.weeks.at(-1);" in script
+    assert 'throw new Error("current_snapshot_missing")' not in script

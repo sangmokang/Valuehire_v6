@@ -191,7 +191,7 @@ def _ai_search_events(batches: Sequence[Mapping[str, object]]) -> list[MetricEve
             raise ValueError("AI Search batch executed_at must be timezone-aware")
         company = cast(str, batch["company"])
         position = cast(str, batch["position"])
-        position_key = _position_key(company, position, batch_id)
+        position_key = _position_key(company, position)
         events.append(
             MetricEvent(
                 source_collection="sourcing_runs",
@@ -215,16 +215,26 @@ def _ai_search_events(batches: Sequence[Mapping[str, object]]) -> list[MetricEve
                     source_primary_key=f"{batch_id}:{index}",
                     event_type="candidate_discovery",
                     occurred_at=occurred_at,
-                    position_source_id=position_key,
                     candidate_source_key_hmac=cast(str, candidate["canonical_key"]),
                 )
             )
+            if position_key is not None:
+                events.append(
+                    MetricEvent(
+                        source_collection="candidate_discoveries",
+                        source_system=cast(str, candidate["source_channel"]),
+                        source_primary_key=f"{batch_id}:position:{index}",
+                        event_type="candidate_discovery_known_position",
+                        occurred_at=occurred_at,
+                        position_source_id=position_key,
+                    )
+                )
     return events
 
 
-def _position_key(company: str, position: str, batch_id: str) -> str:
+def _position_key(company: str, position: str) -> str | None:
     if company.startswith("NOT_RUN:") or position.startswith("NOT_RUN:"):
-        return hashlib.sha256(f"unparsed:{batch_id}".encode()).hexdigest()
+        return None
     return hashlib.sha256(f"{company}\0{position}".encode()).hexdigest()
 
 
