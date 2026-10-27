@@ -32,7 +32,8 @@ def classify_actor(subject: str, sender: str) -> tuple[str, str]:
         return "OTHER", "ai_search_prefix_not_found"
     actor_region = prefix.replace("aisearch", "", 1)
     if prefix == "aisearch":
-        actor_region = re.sub(r"[\s_-]+", "", remainder.split("[", 1)[0].lower())
+        without_metadata = _strip_metadata_tags(remainder.strip())
+        actor_region = re.sub(r"[\s_-]+", "", without_metadata.split("[", 1)[0].lower())
     markers: list[tuple[str, str]] = []
     for marker, actor, reason in (
         ("grok", "GROK", "grok"),
@@ -59,8 +60,7 @@ def subject_context(subject: str) -> tuple[str, str]:
     if subject_parts is None:
         return _missing_context()
     _, remainder = subject_parts
-    remainder = _ACTOR_TOKEN.sub("", remainder.strip()).strip()
-    remainder = _strip_metadata_tags(remainder)
+    remainder = _strip_actor_and_metadata(remainder)
 
     bracket_pair = re.search(r"\[([^\]]+)\]\s*\[([^\]]+)\]", remainder)
     if bracket_pair is not None:
@@ -91,6 +91,16 @@ def _strip_metadata_tags(value: str) -> str:
         if not is_known_metadata and not is_single_leading_tag:
             return remainder
         remainder = following
+
+
+def _strip_actor_and_metadata(value: str) -> str:
+    remainder = value.strip()
+    while True:
+        normalized = _strip_metadata_tags(remainder)
+        normalized = _ACTOR_TOKEN.sub("", normalized).strip()
+        if normalized == remainder:
+            return remainder
+        remainder = normalized
 
 
 def _subject_parts(subject: str) -> tuple[str, str] | None:
