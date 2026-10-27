@@ -141,6 +141,39 @@ def test_labels_after_profile_url_fill_candidate_detail() -> None:
     assert candidate["why_fit"] == ["REDACTED FIT EVIDENCE"]
 
 
+def test_conflicting_explicit_run_ids_are_not_grouped() -> None:
+    contract = load_evidence_contract(CONTRACT_PATH)
+    subject = (
+        "[ChatGPT-AISearch] [aisearch] REDACTED_CLIENT Data Analyst "
+        "— run ID: run-A"
+    )
+    first = _message(
+        "gmail-a",
+        subject,
+        """
+          <p>run ID: run-B</p>
+          <a href="https://www.linkedin.com/in/redacted-a">REDACTED A</a>
+        """,
+    )
+    second = _message(
+        "gmail-b",
+        subject,
+        """
+          <p>run ID: run-A</p>
+          <a href="https://www.linkedin.com/in/redacted-b">REDACTED B</a>
+        """,
+    )
+
+    payload = build_ai_search_payload_from_gmail_snapshot(_snapshot(first, second), contract)
+
+    assert len(payload["batches"]) == 2
+    conflict = next(
+        batch for batch in payload["batches"] if batch["actor_evidence"]["message_id"] == "gmail-a"
+    )
+    assert conflict["batch_grouping"]["status"] == "NOT_RUN"
+    assert conflict["batch_grouping"]["reason"] == "conflicting_explicit_run_ids"
+
+
 @given(
     education=st.integers(min_value=0, max_value=100),
     job_fit=st.integers(min_value=0, max_value=100),
