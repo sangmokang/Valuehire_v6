@@ -54,20 +54,25 @@ message: {
 - 동일 입력 비교는 최초 화면에 있던 immutable message ID 342개만 사용했다. 수정 전에는 Batch
   342개, 고객사 파싱 239개(69.9%), 상세 근거가 하나라도 채워진 후보 10/8,243명이었다.
 - 수정 후 동일 342개 입력에서는 실행 메일 340통과 테스트 메일 2통을 구분했고 Batch 296개,
-  고객사 파싱 284개(95.9%), 상세 근거 보유 후보 16/8,242명이 됐다. 14개 Batch가 후보별 알림
-  58통을 근거 있는 실행 단위로 묶었고 가장 큰 Batch는 8통이다.
+  고객사 파싱 281개(94.9%), 상세 근거 보유 후보 18/8,259명(0.22%)이 됐다. 수정 전 상세
+  채움률은 10/8,243명(0.12%)이었다. 14개 Batch가 후보별 알림 58통을 근거 있는 실행 단위로
+  묶었고 가장 큰 Batch는 8통이다.
 - 동일 입력에서 후보 count가 확정된 234 Batch는
-  `raw 8,714 = parsed 8,242 + duplicate 256 + unparsed 216 + excluded 0`이다. 테스트 메일 2통은
+  `raw 8,735 = parsed 8,259 + duplicate 259 + unparsed 217 + excluded 0`이다. 테스트 메일 2통은
   후보 count ledger 밖의 message-level excluded이며 사유는 `subject_test_marker`다.
 - 최신 Gmail query는 4페이지를 끝까지 읽었고 마지막 `next_page_token=null` 및 전체 page token
   chain을 검증했다. 총 345통 중 실행 메일 343통, 테스트 메일 2통, Batch 299개다.
-- 최신 Batch 실행 주체는 `GROK 21`, `CLAUDE_CODE 99`, `CHATGPT 97`, `AI_SEARCH 30`,
-  `OTHER 52`다. 각 Batch에 제목·발신자·thread/message ID·수신시각·판정 사유가 있다.
+- 최신 Batch 실행 주체는 `GROK 22`, `CLAUDE_CODE 100`, `CHATGPT 98`, `AI_SEARCH 30`,
+  `OTHER 49`다. 고객사·포지션 파싱은 284/299개다. 각 Batch에 제목·발신자·thread/message
+  ID·수신시각·판정 사유가 있다.
 - 최신 후보 count가 확정된 236 Batch는
-  `raw 8,940 = parsed 8,378 + duplicate 338 + unparsed 224 + excluded 0`이다.
+  `raw 8,961 = parsed 8,395 + duplicate 341 + unparsed 225 + excluded 0`이다.
 - 최근 메일 10통의 본문을 표본 검사했다. 명시적 학력 라벨은 3통, 경력 라벨은 3통에 있었고
   적합 근거·핵심 경력 라벨은 없었다. 후보 경계를 확정할 수 있는 값은 학력 2건, 경력 3건을
   파싱했고, 서로 다른 후보 URL 2개 뒤의 학력 1건은 귀속 근거가 없어 `NOT_RUN`으로 유지했다.
+- 번호 없는 후보 제목과 URL 없는 다음 후보를 적대 재현해, 다음 후보의 경력·4축 점수가 앞
+  후보에게 붙지 않도록 단일 URL fallback 경계를 제한했다. `후보 검색결과` 같은 집계 제목은
+  개인 경계로 취급하지 않아 실제 raw 후보 건수가 줄지 않는다.
 - 4축 점수 계약 입력이 전부 있는 후보는 없었다. 따라서 최신 202개 후보 보유 Batch는
   `NOT_RUN:score_contract_evidence_missing`, 후보가 없는 97개 Batch는
   `NOT_RUN:no_parsed_candidates`이며 메일의 총점으로 대신하지 않았다.
@@ -211,7 +216,7 @@ bash scripts/acceptance-hs-gates.sh
 - [x] 실제 Gmail pagination 4페이지 token chain 및 exhausted 증거
 - [x] 외부 발송/채용사이트 변경/원격 DB write 0건 확인
 - [x] 테스트 skip/only/todo 추가 0건, 삭제/약화 0건
-- [x] V1 다른 엔진 CLEAN + V2 직접 재현
+- [x] Claude CLI 미인증 원문 확인 후 Codex V1 적대검증 PASS + V2 직접 재현
 - [ ] 최종 HEAD/원격/CI SHA 귀속 확인
 
 ## 스펙 공격 질문
