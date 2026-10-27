@@ -13,13 +13,14 @@ from .scoring import ScoreComponents, calculate_candidate_score, score_input_has
 
 _URL_PATTERN = re.compile(r"https?://[^\s<>\"']+", re.IGNORECASE)
 _CANDIDATE_HEADING = re.compile(
-    r"(?im)^\s*(?:"
-    r"(?:(?:\[\[VH_HEADING\]\]|[#>*•-]+)\s*)?(?:"
+    r"(?im)^\s*(?:(?:\[\[VH_HEADING\]\]|[#>*•-]+)\s*)?(?:"
     r"(?:후보|후보자|candidate)\s*(?:#|no\.?|번호)?\s*\d+|"
     r"\d+\s*(?:번|번째)?\s*(?:후보|후보자|candidate))\b|"
-    r"\[\[VH_HEADING\]\]\s*(?:후보|후보자|candidate)\s+"
-    r"(?!(?:결과|목록|추천|검색|없음|요약|현황|분석)\b)\S+|"
-    r"(?:\[\[VH_HEADING\]\]|#{1,6})\s*\d+[.)]?\s+\S+)"
+    r"^\s*(?:\[\[VH_HEADING\]\]|#{1,6})\s*\d+[.)]?\s+\S+"
+)
+_NAMED_CANDIDATE_HEADING = re.compile(
+    r"(?im)^\s*\[\[VH_HEADING\]\]\s*(?:후보|후보자|candidate)\s+"
+    r"(?!(?:검색\s*결과|결과|목록|추천|검색|없음|요약|현황|분석)\b)\S+"
 )
 _EXCLUDED_HEADING = re.compile(
     r"(?im)^\s*(?:(?:\[\[VH_HEADING\]\]|[#>*•-]+)\s*)?"
@@ -80,6 +81,22 @@ def candidate_records(
 
     occurrences = _candidate_occurrences(body_text, links)
     if occurrences:
+        if len(occurrences) == 1:
+            url, label, line_index = occurrences[0]
+            named_boundaries = [
+                index for index, line in enumerate(lines) if _NAMED_CANDIDATE_HEADING.match(line)
+            ]
+            if named_boundaries:
+                owner = next(
+                    (index for index in reversed(named_boundaries) if index <= line_index), None
+                )
+                end = next(
+                    (index for index in named_boundaries if index > line_index), len(lines)
+                )
+                start = line_index if owner is None else owner
+                unparsed = len(named_boundaries) - (owner is not None)
+                candidate = _candidate_from_context(url, label, lines[start:end], contract)
+                return (candidate,), unparsed, 0, True
         candidates = []
         for url, label, line_index in occurrences:
             context_end = len(lines) if len(occurrences) == 1 else line_index + 1
