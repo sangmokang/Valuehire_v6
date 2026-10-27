@@ -73,8 +73,8 @@ message: {
 - 번호 없는 후보 제목과 URL 없는 다음 후보를 적대 재현해, 다음 후보의 경력·4축 점수가 앞
   후보에게 붙지 않도록 단일 URL fallback 경계를 제한했다. `후보 검색결과` 같은 집계 제목은
   개인 경계로 취급하지 않아 실제 raw 후보 건수가 줄지 않는다.
-- 4축 점수 계약 입력이 전부 있는 후보는 없었다. 따라서 최신 202개 후보 보유 Batch는
-  `NOT_RUN:score_contract_evidence_missing`, 후보가 없는 97개 Batch는
+- 4축 점수 계약 입력이 전부 있는 후보는 없었다. 따라서 최신 203개 후보 보유 Batch는
+  `NOT_RUN:score_contract_evidence_missing`, 후보가 없는 96개 Batch는
   `NOT_RUN:no_parsed_candidates`이며 메일의 총점으로 대신하지 않았다.
 - 검색 기간은 최신 299개 Batch 모두 `NOT_RUN:search_period_not_found`, 실제 FU도 비범위이므로
   `NOT_RUN:fu_portal_verification_not_run`이다.
