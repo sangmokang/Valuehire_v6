@@ -4,17 +4,22 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from collections.abc import Mapping, Sequence
 from datetime import date, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import TypedDict, cast
+from typing import TextIO, TypedDict, cast
 from zoneinfo import ZoneInfo
 
 from humansearch.admin_ai_search.evidence import (
     AiSearchPayload,
+    EvidenceContract,
     build_ai_search_payload,
     load_evidence_contract,
+)
+from humansearch.admin_ai_search.gmail_source import (
+    build_ai_search_payload_from_gmail_snapshot,
 )
 
 from .contracts import (
@@ -188,9 +193,7 @@ def create_shadow_server(
     dashboard_payload = build_shadow_dashboard(contract)
     if ai_search_payload is None:
         evidence_contract_path = (
-            contract_path.parents[1]
-            / "admin-ai-search"
-            / "evidence-contract-v1.json"
+            contract_path.parents[1] / "admin-ai-search" / "evidence-contract-v1.json"
         )
         evidence_contract = load_evidence_contract(evidence_contract_path)
         ai_search_payload = build_ai_search_payload((), evidence_contract)
@@ -199,6 +202,23 @@ def create_shadow_server(
     server.ai_search_payload = ai_search_payload
     server.asset_routes = routes
     return server
+
+
+def load_ai_search_payload_from_stream(
+    stream: TextIO, evidence_contract: EvidenceContract
+) -> AiSearchPayload:
+    """Read exactly one JSON snapshot line without persisting Gmail data."""
+
+    raw = stream.readline()
+    if not raw.strip():
+        raise ValueError("Gmail snapshot stream is empty")
+    snapshot = json.loads(raw)
+    if not isinstance(snapshot, Mapping):
+        raise TypeError("Gmail snapshot must be a JSON object")
+    return build_ai_search_payload_from_gmail_snapshot(
+        cast(Mapping[str, object], snapshot),
+        evidence_contract,
+    )
 
 
 def _load_assets(assets: Path) -> Mapping[str, tuple[str, bytes]]:
@@ -329,12 +349,25 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--contract", type=Path, required=True)
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument(
+        "--ai-search-gmail-stdin",
+        action="store_true",
+        help="read one v1 Gmail snapshot JSON line from stdin without persisting it",
+    )
     arguments = parser.parse_args(argv)
+    ai_search_payload = None
+    if arguments.ai_search_gmail_stdin:
+        evidence_contract_path = (
+            arguments.contract.parents[1] / "admin-ai-search" / "evidence-contract-v1.json"
+        )
+        evidence_contract = load_evidence_contract(evidence_contract_path)
+        ai_search_payload = load_ai_search_payload_from_stream(sys.stdin, evidence_contract)
     server = create_shadow_server(
         assets=arguments.assets,
         contract_path=arguments.contract,
         host=cast(str, arguments.host),
         port=cast(int, arguments.port),
+        ai_search_payload=ai_search_payload,
     )
     bound_host, bound_port = cast(tuple[str, int], server.server_address)
     print(f"LOCAL SHADOW · 운영 아님 · http://{bound_host}:{bound_port}")
