@@ -200,3 +200,33 @@ def test_four_explicit_score_axes_are_calculated_by_code() -> None:
     }
     assert candidate["score_input_hash"] is not None
     assert len(candidate["score_input_hash"]) == 64
+
+
+def test_conflicting_score_axis_evidence_is_not_silently_accepted() -> None:
+    contract = load_evidence_contract(CONTRACT_PATH)
+    body = """
+      <a href="https://www.linkedin.com/in/redacted-a">REDACTED A</a>
+      <p>학력 점수: 90</p>
+      <p>학력 점수: 10</p>
+      <p>직무 적합성 점수: 80</p>
+      <p>고난도 업무 점수: 70</p>
+      <p>직무 기술 논리성 점수: 60</p>
+    """
+
+    payload = build_ai_search_payload_from_gmail_snapshot(
+        _snapshot(
+            _message(
+                "gmail-real",
+                "[ChatGPT-AISearch] [aisearch] REDACTED_CLIENT Data Analyst — 판정",
+                body,
+            )
+        ),
+        contract,
+    )
+
+    candidate = payload["batches"][0]["candidates"][0]
+    assert candidate["score"] is None
+    assert candidate["score_status"] == "NOT_RUN"
+    assert candidate["score_reason"] == "score_contract_evidence_conflict"
+    assert candidate["score_components"] is None
+    assert candidate["score_input_hash"] is None
