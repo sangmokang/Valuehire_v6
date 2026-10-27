@@ -314,15 +314,15 @@ def _message_body(payload: Mapping[str, object]) -> tuple[str, list[tuple[str, s
     parts = list(_walk_parts(payload))
     plain = [content for mime, content in parts if mime == "text/plain" and content.strip()]
     html_parts = [content for mime, content in parts if mime == "text/html" and content.strip()]
-    if plain:
-        text = "\n".join(plain)
-        links = [(match.group(0), match.group(0)) for match in _URL_PATTERN.finditer(text)]
-        return text, links
     if html_parts:
         parser = _HtmlTextExtractor()
         parser.feed("\n".join(html_parts))
         parser.close()
         return parser.result(), parser.links
+    if plain:
+        text = "\n".join(plain)
+        links = [(match.group(0), match.group(0)) for match in _URL_PATTERN.finditer(text)]
+        return text, links
     raise ValueError("Gmail message has no readable text body")
 
 
