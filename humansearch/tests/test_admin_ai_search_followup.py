@@ -102,6 +102,19 @@ def test_reply_prefix_preserves_actor_and_customer_context() -> None:
     assert subject_context(subject) == ("REDACTED_CLIENT", "Data Analyst")
 
 
+def test_actor_token_before_metadata_tag_never_becomes_customer_context() -> None:
+    subject = (
+        "[aisearch]chatgpt [태그] REDACTED_CLIENT Data Analyst "
+        "— REDACTED CANDIDATE 90점 판정"
+    )
+
+    assert classify_actor(subject, "AI Search <sender@valueconnect.kr>") == (
+        "CHATGPT",
+        "subject_marker:chatgpt",
+    )
+    assert subject_context(subject) == ("REDACTED_CLIENT", "Data Analyst")
+
+
 def test_labels_after_profile_url_fill_candidate_detail() -> None:
     contract = load_evidence_contract(CONTRACT_PATH)
     body = """
