@@ -22,9 +22,11 @@ def grouping_evidence(run: AiSearchRun, subject: str, body_text: str) -> tuple[s
 
     if not _is_candidate_alert(run):
         return None, "not_candidate_alert"
-    run_id = _explicit_run_id(subject, body_text)
-    if run_id is not None:
-        return f"run:{run.actor}:{run_id}", "explicit_run_id"
+    run_ids = _explicit_run_ids(subject, body_text)
+    if len(run_ids) > 1:
+        return None, "conflicting_explicit_run_ids"
+    if run_ids:
+        return f"run:{run.actor}:{run_ids[0]}", "explicit_run_id"
     if run.company.startswith("NOT_RUN:") or run.position.startswith("NOT_RUN:"):
         return None, "missing_batch_group_evidence"
     received_date = run.executed_at.astimezone(_KST).date().isoformat()
@@ -52,9 +54,8 @@ def group_gmail_runs(runs: Sequence[AiSearchRun]) -> tuple[AiSearchRun, ...]:
     return tuple(ungrouped)
 
 
-def _explicit_run_id(subject: str, body_text: str) -> str | None:
-    match = _RUN_ID.search(f"{subject}\n{body_text}")
-    return match.group(1) if match is not None else None
+def _explicit_run_ids(subject: str, body_text: str) -> tuple[str, ...]:
+    return tuple(dict.fromkeys(_RUN_ID.findall(f"{subject}\n{body_text}")))
 
 
 def _is_candidate_alert(run: AiSearchRun) -> bool:

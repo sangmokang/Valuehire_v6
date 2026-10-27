@@ -168,7 +168,9 @@ def test_conflicting_explicit_run_ids_are_not_grouped() -> None:
 
     assert len(payload["batches"]) == 2
     conflict = next(
-        batch for batch in payload["batches"] if batch["actor_evidence"]["message_id"] == "gmail-a"
+        batch
+        for batch in payload["batches"]
+        if batch["batch_grouping"]["reason"] == "conflicting_explicit_run_ids"
     )
     assert conflict["batch_grouping"]["status"] == "NOT_RUN"
     assert conflict["batch_grouping"]["reason"] == "conflicting_explicit_run_ids"
