@@ -56,6 +56,13 @@ def candidate_records(
         elif _CANDIDATE_HEADING.match(line):
             boundaries.append((index, False))
     if boundaries:
+        known_indexes = {index for index, _ in boundaries}
+        boundaries.extend(
+            (index, False)
+            for index, line in enumerate(lines)
+            if index not in known_indexes and _NAMED_CANDIDATE_HEADING.match(line)
+        )
+        boundaries.sort()
         candidates: list[CandidateEvidence] = []
         unparsed = 0
         excluded = 0
