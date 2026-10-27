@@ -334,13 +334,13 @@ def test_candidate_sections_do_not_leak_evidence_between_people() -> None:
         contract,
     )
 
-    candidates = payload["batches"][0]["candidates"]
-    assert candidates[0]["experience"] == "REDACTED A CAREER"
-    assert candidates[0]["requirements_evidence"] == ["REDACTED A REQUIREMENT"]
-    assert candidates[0]["contact_opinion_evidence"] == "REDACTED A OPINION"
-    assert candidates[1]["experience"] == "REDACTED B CAREER"
-    assert candidates[1]["requirements_evidence"] == ["REDACTED B REQUIREMENT"]
-    assert candidates[1]["contact_opinion_evidence"] == "REDACTED B OPINION"
+    candidates = {item["display_name"]: item for item in payload["batches"][0]["candidates"]}
+    assert candidates["REDACTED A"]["experience"] == "REDACTED A CAREER"
+    assert candidates["REDACTED A"]["requirements_evidence"] == ["REDACTED A REQUIREMENT"]
+    assert candidates["REDACTED A"]["contact_opinion_evidence"] == "REDACTED A OPINION"
+    assert candidates["REDACTED B"]["experience"] == "REDACTED B CAREER"
+    assert candidates["REDACTED B"]["requirements_evidence"] == ["REDACTED B REQUIREMENT"]
+    assert candidates["REDACTED B"]["contact_opinion_evidence"] == "REDACTED B OPINION"
 
 
 def test_duplicate_sections_and_excluded_profiles_are_mutually_exclusive() -> None:
@@ -366,10 +366,7 @@ def test_duplicate_sections_and_excluded_profiles_are_mutually_exclusive() -> No
         "unparsed": 0,
         "excluded": 1,
     }
-    assert all(
-        "redacted-excluded" not in item["profile_url"]
-        for item in batch["candidates"]
-    )
+    assert all("redacted-excluded" not in item["profile_url"] for item in batch["candidates"])
 
 
 def test_candidate_url_identity_rejects_lookalikes_and_preserves_query_keys() -> None:

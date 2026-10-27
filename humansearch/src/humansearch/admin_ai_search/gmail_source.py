@@ -10,7 +10,7 @@ from collections.abc import Mapping, Sequence
 from datetime import UTC, date, datetime
 from html.parser import HTMLParser
 from typing import ClassVar, cast
-from urllib.parse import parse_qs, unquote, urlsplit, urlunsplit
+from urllib.parse import parse_qs, parse_qsl, unquote, urlencode, urlsplit, urlunsplit
 
 from .evidence import (
     ActorEvidencePayload,
@@ -28,9 +28,11 @@ _SNAPSHOT_FIELDS = {
     "query",
     "page_count",
     "pagination_exhausted",
+    "pages",
     "message_ids",
     "messages",
 }
+_PAGE_FIELDS = {"request_page_token", "message_ids", "next_page_token"}
 _URL_PATTERN = re.compile(r"https?://[^\s<>\"']+", re.IGNORECASE)
 _CANDIDATE_HEADING = re.compile(
     r"(?im)^\s*(?:[#>*•-]+\s*)?(?:"
@@ -146,6 +148,7 @@ def _validate_snapshot(
     pagination_exhausted = snapshot["pagination_exhausted"]
     raw_ids = snapshot["message_ids"]
     raw_messages = snapshot["messages"]
+    raw_pages = snapshot["pages"]
     if not isinstance(query, str) or not query.strip():
         raise ValueError("Gmail query must be non-blank")
     if isinstance(page_count, bool) or not isinstance(page_count, int) or page_count < 1:
@@ -156,6 +159,7 @@ def _validate_snapshot(
         raise ValueError("Gmail message_ids must be non-blank strings")
     if len(raw_ids) != len(set(raw_ids)):
         raise ValueError("Gmail message_ids must be unique")
+    _validate_pages(raw_pages, raw_ids, page_count, pagination_exhausted)
     if not isinstance(raw_messages, list) or not all(
         isinstance(item, Mapping) for item in raw_messages
     ):
@@ -165,6 +169,48 @@ def _validate_snapshot(
     if raw_ids != response_ids:
         raise ValueError("Gmail message_ids do not match message responses")
     return messages, query, page_count, pagination_exhausted
+
+
+def _validate_pages(
+    raw_pages: object,
+    raw_ids: list[object],
+    page_count: int,
+    pagination_exhausted: bool,
+) -> None:
+    if not isinstance(raw_pages, list) or not all(isinstance(page, Mapping) for page in raw_pages):
+        raise TypeError("Gmail pages must be objects")
+    pages = cast(list[Mapping[str, object]], raw_pages)
+    if len(pages) != page_count:
+        raise ValueError("Gmail pagination page_count does not match pages")
+    expected_request_token: str | None = None
+    seen_request_tokens: set[str] = set()
+    collected_ids: list[str] = []
+    for page in pages:
+        if set(page) != _PAGE_FIELDS:
+            raise ValueError("Gmail pagination page fields do not match the v1 contract")
+        request_token = page["request_page_token"]
+        next_token = page["next_page_token"]
+        page_ids = page["message_ids"]
+        if request_token is not None and (not isinstance(request_token, str) or not request_token):
+            raise ValueError("Gmail pagination request token is invalid")
+        if next_token is not None and (not isinstance(next_token, str) or not next_token):
+            raise ValueError("Gmail pagination next token is invalid")
+        if request_token != expected_request_token:
+            raise ValueError("Gmail pagination token chain is broken")
+        if request_token is not None:
+            if request_token in seen_request_tokens:
+                raise ValueError("Gmail pagination token cycle detected")
+            seen_request_tokens.add(request_token)
+        if not isinstance(page_ids, list) or not all(
+            isinstance(item, str) and item for item in page_ids
+        ):
+            raise ValueError("Gmail pagination message_ids are invalid")
+        collected_ids.extend(cast(list[str], page_ids))
+        expected_request_token = next_token
+    if collected_ids != raw_ids:
+        raise ValueError("Gmail pagination message_ids do not match snapshot message_ids")
+    if pagination_exhausted != (expected_request_token is None):
+        raise ValueError("Gmail pagination completion evidence is inconsistent")
 
 
 def _message_to_run(message: Mapping[str, object], contract: EvidenceContract) -> AiSearchRun:
@@ -177,14 +223,7 @@ def _message_to_run(message: Mapping[str, object], contract: EvidenceContract) -
     actor, actor_reason = _classify_actor(subject, sender)
     company, position = _subject_context(subject)
     body_text, links = _message_body(payload)
-    candidates = _candidate_evidence(body_text, links)
-    parsed_keys = {candidate.canonical_key for candidate in candidates}
-    candidate_headings = len(_CANDIDATE_HEADING.findall(body_text))
-    excluded = len(_EXCLUDED_HEADING.findall(body_text))
-    unparsed = max(0, candidate_headings - len(parsed_keys))
-    counts_complete = bool(
-        candidates or candidate_headings or excluded or _EXPLICIT_NO_CANDIDATES.search(body_text)
-    )
+    candidates, unparsed, excluded, counts_complete = _candidate_records(body_text, links)
     period_start, period_end, period_reason = _search_period(body_text)
     actor_evidence: ActorEvidencePayload = {
         "subject": subject,
@@ -264,16 +303,15 @@ def _header(payload: Mapping[str, object], wanted: str) -> str:
 
 def _classify_actor(subject: str, sender: str) -> tuple[str, str]:
     del sender
-    prefix_match = re.match(r"^\s*\[([^\]]+)\]\s*", subject)
-    if prefix_match is None:
+    subject_parts = _subject_parts(subject)
+    if subject_parts is None:
         return "OTHER", "ai_search_prefix_not_found"
-    prefix = re.sub(r"[\s_-]+", "", prefix_match.group(1).lower())
+    prefix, remainder = subject_parts
     if "aisearch" not in prefix:
         return "OTHER", "ai_search_prefix_not_found"
-    actor_region = prefix
+    actor_region = prefix.replace("aisearch", "", 1)
     if prefix == "aisearch":
-        remainder = subject[prefix_match.end() :]
-        actor_region += re.sub(r"[\s_-]+", "", remainder.split("[", 1)[0].lower())
+        actor_region = re.sub(r"[\s_-]+", "", remainder.split("[", 1)[0].lower())
     markers: list[tuple[str, str]] = []
     if "grok" in actor_region:
         markers.append(("GROK", "grok"))
@@ -283,6 +321,8 @@ def _classify_actor(subject: str, sender: str) -> tuple[str, str]:
         markers.append(("CHATGPT", "chatgpt"))
     if "codex" in actor_region:
         markers.append(("OTHER", "codex"))
+    if "gemini" in actor_region:
+        markers.append(("OTHER", "gemini"))
     unique = {actor for actor, _ in markers}
     if len(markers) > 1 or len(unique) > 1:
         return "OTHER", "actor_markers_conflict"
@@ -290,17 +330,19 @@ def _classify_actor(subject: str, sender: str) -> tuple[str, str]:
         actor, marker = markers[0]
         prefix = "unsupported_marker" if actor == "OTHER" else "subject_marker"
         return actor, f"{prefix}:{marker}"
+    if actor_region:
+        return "OTHER", "unsupported_actor_marker"
     return "AI_SEARCH", "subject_marker:ai_search"
 
 
 def _subject_context(subject: str) -> tuple[str, str]:
-    remainder = re.sub(r"^\s*\[aisearch\]\s*", "", subject, flags=re.IGNORECASE)
-    remainder = re.sub(
-        r"^(?:grok|claude[\s_-]*code|claudecode|chat[\s_-]*gpt|chatgpt|codex)\s*",
-        "",
-        remainder,
-        flags=re.IGNORECASE,
-    )
+    subject_parts = _subject_parts(subject)
+    if subject_parts is None:
+        return "NOT_RUN:company_not_parsed", "NOT_RUN:position_not_parsed"
+    _, remainder = subject_parts
+    first_context = remainder.find("[")
+    if first_context >= 0:
+        remainder = remainder[first_context:]
     bracketed = [item.strip() for item in re.findall(r"\[([^\]]+)\]", remainder) if item.strip()]
     if len(bracketed) >= 2:
         return bracketed[0], bracketed[1]
@@ -308,6 +350,14 @@ def _subject_context(subject: str) -> tuple[str, str]:
         tail = re.sub(r"^\s*\[[^\]]+\]\s*", "", remainder).strip(" —-·")
         return bracketed[0], tail or "NOT_RUN:position_not_parsed"
     return "NOT_RUN:company_not_parsed", "NOT_RUN:position_not_parsed"
+
+
+def _subject_parts(subject: str) -> tuple[str, str] | None:
+    prefix_match = re.match(r"^\s*\[([^\]]+)\]\s*", subject)
+    if prefix_match is None:
+        return None
+    prefix = re.sub(r"[\s_-]+", "", prefix_match.group(1).lower())
+    return prefix, subject[prefix_match.end() :]
 
 
 def _message_body(payload: Mapping[str, object]) -> tuple[str, list[tuple[str, str]]]:
@@ -347,94 +397,144 @@ def _walk_parts(part: Mapping[str, object]) -> Sequence[tuple[str, str]]:
     return result
 
 
-def _candidate_evidence(
+def _candidate_records(
     body_text: str, links: Sequence[tuple[str, str]]
-) -> tuple[CandidateEvidence, ...]:
-    occurrences: list[tuple[str, str]] = []
+) -> tuple[tuple[CandidateEvidence, ...], int, int, bool]:
+    lines = [line.strip() for line in body_text.splitlines() if line.strip()]
+    boundaries: list[tuple[int, bool]] = []
+    for index, line in enumerate(lines):
+        if _EXCLUDED_HEADING.match(line):
+            boundaries.append((index, True))
+        elif _CANDIDATE_HEADING.match(line):
+            boundaries.append((index, False))
+    if boundaries:
+        candidates: list[CandidateEvidence] = []
+        unparsed = 0
+        excluded = 0
+        for boundary_index, (start, is_excluded) in enumerate(boundaries):
+            end = (
+                boundaries[boundary_index + 1][0]
+                if boundary_index + 1 < len(boundaries)
+                else len(lines)
+            )
+            context = lines[start:end]
+            if is_excluded:
+                excluded += 1
+                continue
+            occurrences = _candidate_occurrences("\n".join(context), links)
+            identities = list(dict.fromkeys(url for url, _, _ in occurrences))
+            if len(identities) != 1:
+                unparsed += 1
+                continue
+            url = identities[0]
+            label = next(label for item_url, label, _ in occurrences if item_url == url)
+            candidates.append(_candidate_from_context(url, label, context))
+        return tuple(candidates), unparsed, excluded, True
+
+    occurrences = _candidate_occurrences(body_text, links)
+    if occurrences:
+        candidates = []
+        for occurrence_index, (url, label, line_index) in enumerate(occurrences):
+            later_lines = [
+                item[2] for item in occurrences[occurrence_index + 1 :] if item[2] > line_index
+            ]
+            end = min(later_lines) if later_lines else len(lines)
+            context = lines[line_index : max(line_index + 1, end)]
+            candidates.append(_candidate_from_context(url, label, context))
+        return tuple(candidates), 0, 0, True
+    if _EXPLICIT_NO_CANDIDATES.search(body_text):
+        return (), 0, 0, True
+    return (), 0, 0, False
+
+
+def _candidate_occurrences(
+    text: str, links: Sequence[tuple[str, str]]
+) -> list[tuple[str, str, int]]:
+    labels: dict[str, list[str]] = {}
     for raw_url, label in links:
         normalized = _candidate_url(raw_url)
         if normalized is not None:
-            occurrences.append((normalized, label))
-    if not occurrences:
-        for match in _URL_PATTERN.finditer(body_text):
+            labels.setdefault(normalized, []).append(label)
+    label_offsets: dict[str, int] = {}
+    occurrences: list[tuple[str, str, int]] = []
+    for line_index, line in enumerate(line.strip() for line in text.splitlines() if line.strip()):
+        for match in _URL_PATTERN.finditer(line):
             normalized = _candidate_url(match.group(0))
-            if normalized is not None:
-                occurrences.append((normalized, normalized))
-    lines = [line.strip() for line in body_text.splitlines() if line.strip()]
-    result: list[CandidateEvidence] = []
-    for url, label in occurrences:
-        context = _context_lines(lines, url)
-        channel = _channel_for_url(url)
-        display_name = _candidate_label(label, url)
-        requirements = _label_values(context, (r"필수\s*요건(?:별)?\s*근거", r"필수\s*요건"))
-        contact_opinion = _first_label_value(
+            if normalized is None:
+                continue
+            offset = label_offsets.get(normalized, 0)
+            choices = labels.get(normalized, ())
+            label = choices[offset] if offset < len(choices) else normalized
+            label_offsets[normalized] = offset + 1
+            occurrences.append((normalized, label, line_index))
+    return occurrences
+
+
+def _candidate_from_context(url: str, label: str, context: Sequence[str]) -> CandidateEvidence:
+    requirements = _label_values(context, (r"필수\s*요건(?:별)?\s*근거", r"필수\s*요건"))
+    contact_opinion = _first_label_value(
+        context,
+        (r"컨택\s*의견(?:\s*근거)?", r"추천\s*근거"),
+    )
+    better_exists, better_position, better_reason = _better_position(context)
+    return CandidateEvidence(
+        canonical_key=hashlib.sha256(url.encode("utf-8")).hexdigest(),
+        display_name=_candidate_label(label, url),
+        source_channel=_channel_for_url(url),
+        profile_url=url,
+        education=_first_label_value(context, (r"학력", r"education")),
+        experience=_first_label_value(
             context,
-            (r"컨택\s*의견(?:\s*근거)?", r"추천\s*근거"),
-        )
-        better_exists, better_position, better_reason = _better_position(context)
-        result.append(
-            CandidateEvidence(
-                canonical_key=hashlib.sha256(url.encode("utf-8")).hexdigest(),
-                display_name=display_name,
-                source_channel=channel,
-                profile_url=url,
-                education=_first_label_value(context, (r"학력", r"education")),
-                experience=_first_label_value(
-                    context,
-                    (r"총\s*경력", r"전체\s*경력", r"career\s*summary"),
-                ),
-                key_experience=_first_label_value(
-                    context,
-                    (r"핵심\s*경력", r"주요\s*경력", r"핵심\s*업무"),
-                ),
-                score=None,
-                score_reason="v5_score_contract_evidence_missing",
-                why_fit=tuple(
-                    _label_values(context, (r"적합\s*근거", r"추천\s*이유", r"why\s*fit"))
-                ),
-                requirements_evidence=tuple(requirements),
-                reverse_match_position=None,
-                reverse_match_score=None,
-                reverse_match_reason="NOT_RUN:reverse_match_contract_evidence_missing",
-                contact_recommendation="NOT_RUN",
-                contact_opinion_evidence=contact_opinion,
-                better_position_exists=better_exists,
-                better_position=better_position,
-                better_position_reason=better_reason,
-            )
-        )
-    return tuple(result)
+            (r"총\s*경력", r"전체\s*경력", r"career\s*summary"),
+        ),
+        key_experience=_first_label_value(
+            context,
+            (r"핵심\s*경력", r"주요\s*경력", r"핵심\s*업무"),
+        ),
+        score=None,
+        score_reason="v5_score_contract_evidence_missing",
+        why_fit=tuple(_label_values(context, (r"적합\s*근거", r"추천\s*이유", r"why\s*fit"))),
+        requirements_evidence=tuple(requirements),
+        reverse_match_position=None,
+        reverse_match_score=None,
+        reverse_match_reason="NOT_RUN:reverse_match_contract_evidence_missing",
+        contact_recommendation="NOT_RUN",
+        contact_opinion_evidence=contact_opinion,
+        better_position_exists=better_exists,
+        better_position=better_position,
+        better_position_reason=better_reason,
+    )
 
 
 def _candidate_url(raw_url: str) -> str | None:
     cleaned = html.unescape(raw_url).rstrip(".,);]}")
     parsed = urlsplit(cleaned)
-    host = parsed.netloc.lower().removeprefix("www.")
+    if parsed.scheme.lower() not in {"http", "https"} or not parsed.hostname:
+        return None
+    if parsed.username or parsed.password or parsed.port:
+        return None
+    host = parsed.hostname.lower().removeprefix("www.")
     if host in {"google.com", "google.co.kr"} and parsed.path == "/url":
         target = parse_qs(parsed.query).get("q", [None])[0]
         if target is None:
             return None
         return _candidate_url(unquote(target))
     path = re.sub(r"/{2,}", "/", parsed.path).rstrip("/")
-    supported = (
-        (host.endswith("linkedin.com") and (path.startswith("/in/") or "/talent/profile/" in path))
-        or (host.endswith("saramin.co.kr") and "/applicant-view/position/resume" in path)
-        or (host.endswith("jobkorea.co.kr") and "/resume/" in path.lower())
-    )
-    if not supported:
-        return None
-    return urlunsplit((parsed.scheme.lower() or "https", host, path, "", ""))
+    if _host_is(host, "linkedin.com") and (path.startswith("/in/") or "/talent/profile/" in path):
+        return urlunsplit((parsed.scheme.lower(), host, path, "", ""))
+    if _host_is(host, "saramin.co.kr") and "/applicant-view/position/resume" in path:
+        return urlunsplit((parsed.scheme.lower(), host, path, _identity_query(parsed.query), ""))
+    if _host_is(host, "jobkorea.co.kr") and "/resume/" in path.lower():
+        return urlunsplit((parsed.scheme.lower(), host, path, _identity_query(parsed.query), ""))
+    return None
 
 
-def _context_lines(lines: Sequence[str], url: str) -> list[str]:
-    path = urlsplit(url).path
-    index = next(
-        (index for index, line in enumerate(lines) if url in line or path in line),
-        0,
-    )
-    start = max(0, index - 8)
-    end = min(len(lines), index + 12)
-    return list(lines[start:end])
+def _identity_query(query: str) -> str:
+    return urlencode(sorted(parse_qsl(query, keep_blank_values=True)), doseq=True)
+
+
+def _host_is(host: str, domain: str) -> bool:
+    return host == domain or host.endswith(f".{domain}")
 
 
 def _candidate_label(label: str, url: str) -> str:
@@ -488,11 +588,11 @@ def _search_period(body_text: str) -> tuple[str | None, str | None, str | None]:
 
 def _channel_for_url(url: str) -> str:
     host = urlsplit(url).netloc
-    if host.endswith("linkedin.com"):
+    if _host_is(host, "linkedin.com"):
         return "LINKEDIN"
-    if host.endswith("saramin.co.kr"):
+    if _host_is(host, "saramin.co.kr"):
         return "SARAMIN"
-    if host.endswith("jobkorea.co.kr"):
+    if _host_is(host, "jobkorea.co.kr"):
         return "JOBKOREA"
     return "OTHER"
 
