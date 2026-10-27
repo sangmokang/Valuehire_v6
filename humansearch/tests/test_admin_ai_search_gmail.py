@@ -42,12 +42,20 @@ def _message(subject: str, body: str, *, message_id: str = "gmail-message-1") ->
 def _snapshot(
     *messages: Mapping[str, object], pagination_exhausted: bool = True
 ) -> dict[str, object]:
+    message_ids = [message["id"] for message in messages]
     return {
         "version": GMAIL_SNAPSHOT_VERSION,
         "query": "subject:aisearch -in:spam -in:trash",
         "page_count": 1,
         "pagination_exhausted": pagination_exhausted,
-        "message_ids": [message["id"] for message in messages],
+        "pages": [
+            {
+                "request_page_token": None,
+                "message_ids": message_ids,
+                "next_page_token": None if pagination_exhausted else "next-page-token",
+            }
+        ],
+        "message_ids": message_ids,
         "messages": list(messages),
     }
 
@@ -114,13 +122,13 @@ def test_redacted_live_shape_preserves_count_equation_and_unknown_score() -> Non
 
     batch = payload["batches"][0]
     assert batch["candidate_counts"] == {
-        "raw": 4,
+        "raw": 3,
         "parsed": 1,
-        "duplicate": 1,
+        "duplicate": 0,
         "unparsed": 1,
         "excluded": 1,
     }
-    assert batch["raw_candidates"] == 4
+    assert batch["raw_candidates"] == 3
     assert batch["unique_candidates"] == 1
     assert batch["score_buckets"] == {"90_plus": None, "80s": None, "70s": None}
     assert batch["score_status"] == "NOT_RUN"
@@ -180,6 +188,41 @@ def test_unidentifiable_candidate_records_are_not_reported_as_zero() -> None:
     assert batch["candidate_counts_reason"] == "candidate_records_not_identifiable"
 
 
+def test_multipart_message_uses_html_candidate_evidence_before_plain_fallback() -> None:
+    contract = load_evidence_contract(EVIDENCE_CONTRACT_PATH)
+    message = _message(
+        "[aisearch]chatgpt [REDACTED CLIENT][REDACTED ROLE]",
+        "",
+    )
+    payload = message["payload"]
+    assert isinstance(payload, dict)
+    payload["mime_type"] = "multipart/alternative"
+    payload["body"] = {"content": ""}
+    payload["parts"] = [
+        {
+            "mime_type": "text/plain",
+            "body": {"content": "후보 URL 미확인"},
+            "parts": [],
+        },
+        {
+            "mime_type": "text/html",
+            "body": {
+                "content": (
+                    '<a href="https://www.linkedin.com/in/redacted-html">'
+                    "REDACTED HTML CANDIDATE</a>"
+                )
+            },
+            "parts": [],
+        },
+    ]
+
+    result = build_ai_search_payload_from_gmail_snapshot(_snapshot(message), contract)
+
+    batch = result["batches"][0]
+    assert batch["unique_candidates"] == 1
+    assert batch["candidates"][0]["display_name"] == "REDACTED HTML CANDIDATE"
+
+
 def test_conflicting_actor_markers_fail_closed_to_other() -> None:
     contract = load_evidence_contract(EVIDENCE_CONTRACT_PATH)
     payload = build_ai_search_payload_from_gmail_snapshot(
@@ -197,6 +240,35 @@ def test_conflicting_actor_markers_fail_closed_to_other() -> None:
     actor_evidence = batch["actor_evidence"]
     assert actor_evidence is not None
     assert actor_evidence["reason"] == "actor_markers_conflict"
+
+
+def test_unknown_explicit_actor_is_other_and_compound_prefix_keeps_context() -> None:
+    contract = load_evidence_contract(EVIDENCE_CONTRACT_PATH)
+    unknown = build_ai_search_payload_from_gmail_snapshot(
+        _snapshot(
+            _message(
+                "[aisearch]gemini [REDACTED CLIENT][REDACTED ROLE]",
+                "<p>후보 결과 없음</p>",
+            )
+        ),
+        contract,
+    )["batches"][0]
+    compound = build_ai_search_payload_from_gmail_snapshot(
+        _snapshot(
+            _message(
+                "[AI Search Grok] [REDACTED CLIENT][REDACTED ROLE]",
+                "<p>후보 결과 없음</p>",
+            )
+        ),
+        contract,
+    )["batches"][0]
+
+    assert unknown["actor"] == "OTHER"
+    assert unknown["actor_evidence"] is not None
+    assert unknown["actor_evidence"]["reason"] == "unsupported_marker:gemini"
+    assert compound["actor"] == "GROK"
+    assert compound["company"] == "REDACTED CLIENT"
+    assert compound["position"] == "REDACTED ROLE"
 
 
 def test_incomplete_pagination_can_never_be_pass() -> None:
@@ -227,6 +299,94 @@ def test_snapshot_rejects_unknown_fields_and_response_id_mismatch() -> None:
     mismatch["message_ids"] = ["different-message"]
     with pytest.raises(ValueError, match="message_ids"):
         build_ai_search_payload_from_gmail_snapshot(mismatch, contract)
+
+
+def test_snapshot_rejects_broken_pagination_token_chain() -> None:
+    contract = load_evidence_contract(EVIDENCE_CONTRACT_PATH)
+    message = _message("[aisearch] [REDACTED][REDACTED]", "<p>후보 결과 없음</p>")
+    snapshot = _snapshot(message)
+    pages = snapshot["pages"]
+    assert isinstance(pages, list)
+    first_page = pages[0]
+    assert isinstance(first_page, dict)
+    first_page["next_page_token"] = "unconsumed-token"
+
+    with pytest.raises(ValueError, match="pagination"):
+        build_ai_search_payload_from_gmail_snapshot(snapshot, contract)
+
+
+def test_candidate_sections_do_not_leak_evidence_between_people() -> None:
+    contract = load_evidence_contract(EVIDENCE_CONTRACT_PATH)
+    body = """
+      <h2>후보 1</h2>
+      <a href="https://www.linkedin.com/in/redacted-a">REDACTED A</a>
+      <p>총경력: REDACTED A CAREER</p>
+      <p>필수요건 근거: REDACTED A REQUIREMENT</p>
+      <p>추천 근거: REDACTED A OPINION</p>
+      <h2>후보 2</h2>
+      <a href="https://www.linkedin.com/in/redacted-b">REDACTED B</a>
+      <p>총경력: REDACTED B CAREER</p>
+      <p>필수요건 근거: REDACTED B REQUIREMENT</p>
+      <p>추천 근거: REDACTED B OPINION</p>
+    """
+    payload = build_ai_search_payload_from_gmail_snapshot(
+        _snapshot(_message("[aisearch]chatgpt [REDACTED][REDACTED]", body)),
+        contract,
+    )
+
+    candidates = payload["batches"][0]["candidates"]
+    assert candidates[0]["experience"] == "REDACTED A CAREER"
+    assert candidates[0]["requirements_evidence"] == ["REDACTED A REQUIREMENT"]
+    assert candidates[0]["contact_opinion_evidence"] == "REDACTED A OPINION"
+    assert candidates[1]["experience"] == "REDACTED B CAREER"
+    assert candidates[1]["requirements_evidence"] == ["REDACTED B REQUIREMENT"]
+    assert candidates[1]["contact_opinion_evidence"] == "REDACTED B OPINION"
+
+
+def test_duplicate_sections_and_excluded_profiles_are_mutually_exclusive() -> None:
+    contract = load_evidence_contract(EVIDENCE_CONTRACT_PATH)
+    body = """
+      <h2>후보 1</h2>
+      <a href="https://www.linkedin.com/in/redacted-same">REDACTED SAME</a>
+      <h2>후보 2</h2>
+      <a href="https://www.linkedin.com/in/redacted-same">REDACTED SAME</a>
+      <h2>제외 후보: 3</h2>
+      <a href="https://www.linkedin.com/in/redacted-excluded">REDACTED EXCLUDED</a>
+    """
+    payload = build_ai_search_payload_from_gmail_snapshot(
+        _snapshot(_message("[aisearch]chatgpt [REDACTED][REDACTED]", body)),
+        contract,
+    )
+
+    batch = payload["batches"][0]
+    assert batch["candidate_counts"] == {
+        "raw": 3,
+        "parsed": 1,
+        "duplicate": 1,
+        "unparsed": 0,
+        "excluded": 1,
+    }
+    assert all(
+        "redacted-excluded" not in item["profile_url"]
+        for item in batch["candidates"]
+    )
+
+
+def test_candidate_url_identity_rejects_lookalikes_and_preserves_query_keys() -> None:
+    contract = load_evidence_contract(EVIDENCE_CONTRACT_PATH)
+    body = """
+      <a href="https://evil-linkedin.com/in/redacted">LOOKALIKE</a>
+      <a href="https://www.jobkorea.co.kr/corp/person/find/resume/view?No=100">A</a>
+      <a href="https://www.jobkorea.co.kr/corp/person/find/resume/view?No=200">B</a>
+    """
+    payload = build_ai_search_payload_from_gmail_snapshot(
+        _snapshot(_message("[aisearch]chatgpt [REDACTED][REDACTED]", body)),
+        contract,
+    )
+
+    batch = payload["batches"][0]
+    assert batch["unique_candidates"] == 2
+    assert all("evil-linkedin.com" not in item["profile_url"] for item in batch["candidates"])
 
 
 def test_runtime_stream_loads_real_shape_without_writing_a_snapshot_file() -> None:
