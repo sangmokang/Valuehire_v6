@@ -414,7 +414,8 @@ def _candidate_records(
     if occurrences:
         candidates = []
         for url, label, line_index in occurrences:
-            context = lines[line_index : line_index + 1]
+            context_end = len(lines) if len(occurrences) == 1 else line_index + 1
+            context = lines[line_index:context_end]
             candidates.append(_candidate_from_context(url, label, context))
         return tuple(candidates), 0, 0, True
     if _EXPLICIT_NO_CANDIDATES.search(body_text):
@@ -460,7 +461,7 @@ def _candidate_from_context(url: str, label: str, context: Sequence[str]) -> Can
         education=_first_label_value(context, (r"학력", r"education")),
         experience=_first_label_value(
             context,
-            (r"총\s*경력", r"전체\s*경력", r"career\s*summary"),
+            (r"총\s*경력", r"전체\s*경력", r"경력", r"experience", r"career\s*summary"),
         ),
         key_experience=_first_label_value(
             context,
