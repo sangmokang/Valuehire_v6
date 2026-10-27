@@ -41,10 +41,10 @@ class SearchPeriodPayload(TypedDict):
 
 
 class CandidateCountsPayload(TypedDict):
-    raw: int
+    raw: int | None
     parsed: int
     duplicate: int
-    unparsed: int
+    unparsed: int | None
     excluded: int
 
 
@@ -94,7 +94,9 @@ class BatchPayload(TypedDict):
     executed_at: str
     search_period: SearchPeriodPayload
     candidate_counts: CandidateCountsPayload
-    raw_candidates: int
+    candidate_counts_status: EvidenceStatus
+    candidate_counts_reason: str | None
+    raw_candidates: int | None
     unique_candidates: int
     score_buckets: dict[str, int | None]
     score_status: EvidenceStatus
@@ -228,6 +230,8 @@ class AiSearchRun:
     search_period_reason: str | None = "search_period_not_found"
     unparsed_candidates: int = 0
     excluded_candidates: int = 0
+    candidate_counts_complete: bool = True
+    candidate_counts_reason: str | None = None
 
     def __post_init__(self) -> None:
         for field in ("actor", "source_run_id", "company", "position"):
@@ -238,6 +242,8 @@ class AiSearchRun:
             raise ValueError("executed_at must be timezone-aware")
         if self.unparsed_candidates < 0 or self.excluded_candidates < 0:
             raise ValueError("candidate count components must be non-negative")
+        if not self.candidate_counts_complete and not self.candidate_counts_reason:
+            raise ValueError("incomplete candidate counts require a reason")
         if (self.search_period_start is None) != (self.search_period_end is None):
             raise ValueError("search period requires both start and end")
         if self.search_period_start is None and not self.search_period_reason:
@@ -339,14 +345,19 @@ def build_ai_search_batch(search_run: AiSearchRun, contract: EvidenceContract) -
         + search_run.excluded_candidates
     )
     candidate_counts: CandidateCountsPayload = {
-        "raw": raw_count,
+        "raw": raw_count if search_run.candidate_counts_complete else None,
         "parsed": len(candidates),
         "duplicate": duplicate_count,
-        "unparsed": search_run.unparsed_candidates,
+        "unparsed": (
+            search_run.unparsed_candidates if search_run.candidate_counts_complete else None
+        ),
         "excluded": search_run.excluded_candidates,
     }
-    if raw_count != sum(
-        candidate_counts[key] for key in ("parsed", "duplicate", "unparsed", "excluded")
+    if search_run.candidate_counts_complete and raw_count != (
+        len(candidates)
+        + duplicate_count
+        + search_run.unparsed_candidates
+        + search_run.excluded_candidates
     ):
         raise AssertionError("candidate count ledger is inconsistent")
     score_status, score_reason = _score_state(candidates)
@@ -380,7 +391,11 @@ def build_ai_search_batch(search_run: AiSearchRun, contract: EvidenceContract) -
         "executed_at": search_run.executed_at.isoformat(),
         "search_period": search_period,
         "candidate_counts": candidate_counts,
-        "raw_candidates": raw_count,
+        "candidate_counts_status": ("PASS" if search_run.candidate_counts_complete else "NOT_RUN"),
+        "candidate_counts_reason": (
+            None if search_run.candidate_counts_complete else search_run.candidate_counts_reason
+        ),
+        "raw_candidates": raw_count if search_run.candidate_counts_complete else None,
         "unique_candidates": len(candidates),
         "score_buckets": (
             {

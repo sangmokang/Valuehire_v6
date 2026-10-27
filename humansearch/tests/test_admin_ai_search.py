@@ -232,7 +232,7 @@ def test_server_exposes_ai_search_list_detail_and_page() -> None:
     assert json.loads(detail_body) == payload["batches"][0]
     assert page_status == 200
     assert page_type == "text/html; charset=utf-8"
-    assert "04 · AI SEARCH" in page_body.decode("utf-8")
+    assert "AI Search Evidence" in page_body.decode("utf-8")
     assert script_status == 200
     assert b"/api/ai-search" in script_body
 

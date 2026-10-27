@@ -4,37 +4,26 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="light">
+    <link rel="icon" href="data:,">
     <title>AI Search Evidence · ValueConnect Ops</title>
     <link rel="stylesheet" href="/styles.css">
     <script src="/ai-search.js" defer></script>
   </head>
   <body data-mode="local-shadow">
-    <header class="site-header">
-      <a class="brand" href="/" aria-label="ValueConnect 운영 홈">
-        <span class="brand-mark" aria-hidden="true">V</span>
-        <span>VALUECONNECT <small>OPS</small></span>
-      </a>
-      <nav aria-label="관리자 영역">
-        <a class="muted-link" href="/">운영</a>
-        <a href="/ai-search" aria-current="page">04 · AI SEARCH</a>
-        <span>System</span>
-      </nav>
-      <p class="environment">LOCAL SHADOW · 운영 아님</p>
+    <header class="topbar">
+      <div>
+        <p class="environment">LOCAL SHADOW · READ ONLY</p>
+        <h1 id="page-title">AI Search Evidence</h1>
+        <p class="lede">실제 Gmail 실행 결과와 확인된 근거만 표시합니다.</p>
+        <a class="ai-search-link" href="/">← WEEKLY DASHBOARD</a>
+      </div>
+      <dl class="window-summary" aria-label="검증 상태">
+        <div><dt>검증 주기</dt><dd id="cadence">—</dd></div>
+        <div><dt>자료 상태</dt><dd id="evidence-status">불러오는 중</dd></div>
+      </dl>
     </header>
 
     <main id="ai-search" aria-busy="true">
-      <section class="hero ai-hero" aria-labelledby="page-title">
-        <div>
-          <p class="eyebrow">Evidence ledger</p>
-          <h1 id="page-title">AI Search</h1>
-          <p class="lede">실행 주체, 중복 제거 후보, 점수대와 실제 FU 증빙을 한 곳에서 확인합니다.</p>
-        </div>
-        <dl class="window-summary" aria-label="검증 상태">
-          <div><dt>검증 주기</dt><dd id="cadence">—</dd></div>
-          <div><dt>자료 상태</dt><dd id="evidence-status">불러오는 중</dd></div>
-        </dl>
-      </section>
-
       <section class="ai-summary" aria-label="AI Search 집계">
         <dl>
           <div><dt>Batch</dt><dd id="batch-count">—</dd></div>
@@ -47,21 +36,26 @@
       <section class="panel-section" aria-labelledby="batch-heading">
         <div class="section-heading">
           <div><p class="section-kicker">Daily batches</p><h2 id="batch-heading">실행 증빙</h2></div>
-          <p>행을 선택하면 후보별 학력·경력·적합 근거·역매칭·컨택 검증을 엽니다.</p>
+          <p>행을 선택하면 후보별 필수요건·핵심 경력·컨택 근거를 엽니다.</p>
         </div>
         <div class="ledger-panel ai-ledger">
           <table>
             <thead>
               <tr>
                 <th>실행주체 / Batch</th><th>고객사 · 포지션</th><th>채널</th>
-                <th>후보</th><th>90+</th><th>80대</th><th>70대</th><th>FU</th><th>실행일시</th><th>검증</th>
+                <th>원시</th><th>중복 제거</th><th>90+</th><th>80대</th><th>70대</th>
+                <th>실제 FU</th><th>검색 기간</th><th>실행 일시</th><th>검증</th>
               </tr>
             </thead>
             <tbody id="batch-rows"></tbody>
           </table>
           <div id="empty-state" class="empty-state" hidden>
-            <strong>실데이터 연결 전입니다.</strong>
-            <p>자료가 없다는 뜻의 0이 아닙니다. Gmail·채용사이트 검증이 연결될 때까지 NOT_RUN으로 유지합니다.</p>
+            <strong>수집된 AI Search Batch가 없습니다.</strong>
+            <p>자료 없음은 0이나 PASS로 바꾸지 않습니다. 수집 사유를 아래 상태에서 확인하세요.</p>
+          </div>
+          <div id="error-state" class="empty-state error-state" role="alert" hidden>
+            <strong>AI Search 증빙을 불러오지 못했습니다.</strong>
+            <p id="error-reason">ai_search_load_failed</p>
           </div>
         </div>
       </section>
@@ -78,6 +72,10 @@
         <button aria-label="상세 닫기">닫기</button>
       </form>
       <div id="dialog-summary" class="dialog-summary"></div>
+      <section class="evidence-section" aria-labelledby="actor-evidence-heading">
+        <h3 id="actor-evidence-heading">실행 주체 판단 근거</h3>
+        <dl id="actor-evidence" class="evidence-grid"></dl>
+      </section>
       <div id="candidate-details" class="candidate-details"></div>
       <section class="verification-section" aria-labelledby="verification-heading">
         <h3 id="verification-heading">일일 검증 상태</h3>

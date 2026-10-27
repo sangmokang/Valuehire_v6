@@ -160,6 +160,26 @@ def test_same_gmail_message_always_builds_the_same_batch_id() -> None:
     assert first["batches"][0]["batch_id"] == second["batches"][0]["batch_id"]
 
 
+def test_unidentifiable_candidate_records_are_not_reported_as_zero() -> None:
+    contract = load_evidence_contract(EVIDENCE_CONTRACT_PATH)
+    payload = build_ai_search_payload_from_gmail_snapshot(
+        _snapshot(
+            _message(
+                "[aisearch]chatgpt [REDACTED CLIENT][REDACTED ROLE]",
+                "<p>후보 요약은 별도 원문에 있습니다.</p>",
+            )
+        ),
+        contract,
+    )
+
+    batch = payload["batches"][0]
+    assert batch["raw_candidates"] is None
+    assert batch["candidate_counts"]["raw"] is None
+    assert batch["candidate_counts"]["unparsed"] is None
+    assert batch["candidate_counts_status"] == "NOT_RUN"
+    assert batch["candidate_counts_reason"] == "candidate_records_not_identifiable"
+
+
 def test_conflicting_actor_markers_fail_closed_to_other() -> None:
     contract = load_evidence_contract(EVIDENCE_CONTRACT_PATH)
     payload = build_ai_search_payload_from_gmail_snapshot(

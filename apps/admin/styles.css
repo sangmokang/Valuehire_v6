@@ -155,7 +155,7 @@ main { padding-block: 24px 64px; }
 }
 
 .ai-ledger { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); }
-.ai-ledger table { width: 100%; min-width: 1180px; border-collapse: collapse; }
+.ai-ledger table { width: 100%; min-width: 1540px; border-collapse: collapse; }
 .ai-ledger th,
 .ai-ledger td { padding: 15px 18px; border-bottom: 1px solid var(--line); text-align: left; }
 .ai-ledger th { background: #e8e6de; color: var(--muted); font: 700 9px/1 ui-monospace, monospace; letter-spacing: .05em; }
@@ -177,7 +177,7 @@ main { padding-block: 24px 64px; }
 .ai-summary div { padding: 22px 26px; border-right: 1px solid #383d37; }
 .ai-summary div:last-child { border-right: 0; }
 .ai-summary dt { color: #9ca39a; font-size: 10px; }
-.ai-summary dd { margin: 3px 0 0; font: 600 38px/1.2 "Iowan Old Style", Georgia, serif; }
+.ai-summary dd { margin: 3px 0 0; font: 600 clamp(18px, 3vw, 38px)/1.2 "Iowan Old Style", Georgia, serif; overflow-wrap: anywhere; }
 .ai-ledger .number-cell { font: 600 18px/1 "Iowan Old Style", Georgia, serif; text-align: right; }
 .ai-ledger .number-cell small { font: 400 9px/1 sans-serif; }
 .batch-code { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -186,6 +186,8 @@ main { padding-block: 24px 64px; }
 .empty-state { padding: 54px 24px; text-align: center; }
 .empty-state strong { font: 600 22px/1.2 "Iowan Old Style", Georgia, serif; }
 .empty-state p { max-width: 560px; margin: 10px auto 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.error-state { border-top: 1px solid #d6a69d; background: var(--fail-soft); color: var(--fail); }
+.error-state p { color: var(--fail); font-family: ui-monospace, monospace; }
 
 .evidence-dialog { width: min(1040px, calc(100% - 32px)); max-height: calc(100vh - 40px); padding: 0; border: 1px solid var(--ink); border-radius: var(--radius); background: var(--bg); color: var(--ink); box-shadow: 0 28px 90px rgb(0 0 0 / 28%); }
 .evidence-dialog::backdrop { background: rgb(18 20 17 / 58%); backdrop-filter: blur(3px); }
@@ -193,7 +195,7 @@ main { padding-block: 24px 64px; }
 .dialog-bar p { margin-bottom: 5px; }
 .dialog-bar h2 { margin: 0; font: 600 25px/1.1 "Iowan Old Style", Georgia, serif; }
 .dialog-bar button { padding: 8px 12px; border: 1px solid var(--ink); border-radius: 999px; background: transparent; cursor: pointer; font-weight: 700; }
-.dialog-summary { display: grid; grid-template-columns: repeat(4, 1fr); border-bottom: 1px solid var(--line); background: #e8e6de; }
+.dialog-summary { display: grid; grid-template-columns: repeat(3, 1fr); border-bottom: 1px solid var(--line); background: #e8e6de; }
 .dialog-summary div { padding: 15px 20px; border-right: 1px solid var(--line); }
 .dialog-summary div:last-child { border-right: 0; }
 .dialog-summary dt,
@@ -204,8 +206,9 @@ main { padding-block: 24px 64px; }
 .candidate-card { border: 1px solid var(--ink); border-radius: var(--radius); background: var(--surface); }
 .candidate-card > header { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid var(--line); }
 .candidate-card h3 { margin: 0; font-size: 18px; }
-.candidate-score { font: 600 27px/1 "Iowan Old Style", Georgia, serif; }
-.candidate-facts { display: grid; grid-template-columns: repeat(4, 1fr); margin: 0; border-bottom: 1px solid var(--line); }
+.profile-reference { max-width: 680px; margin: 5px 0 0; color: var(--muted); font: 10px/1.4 ui-monospace, monospace; overflow-wrap: anywhere; }
+.candidate-score { max-width: 280px; color: var(--not-run); font: 600 16px/1.25 "Iowan Old Style", Georgia, serif; text-align: right; }
+.candidate-facts { display: grid; grid-template-columns: repeat(3, 1fr); margin: 0; border-bottom: 1px solid var(--line); }
 .candidate-facts div { padding: 13px 20px; border-right: 1px solid var(--line); }
 .candidate-facts div:last-child { border-right: 0; }
 .candidate-copy { padding: 16px 20px; }
@@ -213,6 +216,7 @@ main { padding-block: 24px 64px; }
 .candidate-copy h4 { margin: 0 0 8px; font-size: 11px; }
 .candidate-copy p,
 .candidate-copy ul { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.candidate-copy .evidence-meta { margin-top: 8px; font: 10px/1.5 ui-monospace, monospace; overflow-wrap: anywhere; }
 .candidate-copy ul { padding-left: 17px; }
 .reverse-match { background: #f3f5d6; }
 .verification-section { margin: 0 20px 20px; border: 1px solid var(--ink); background: var(--surface); }
@@ -222,8 +226,15 @@ main { padding-block: 24px 64px; }
 .verification-row span:last-child { color: var(--muted); text-align: right; }
 .empty-copy { margin: 0; padding: 18px; color: var(--muted); font-size: 12px; }
 
+.evidence-section { margin: 20px 20px 0; border: 1px solid var(--ink); background: var(--surface); }
+.evidence-section h3 { margin: 0; padding: 15px 18px; border-bottom: 1px solid var(--line); font-size: 14px; }
+.evidence-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; }
+.evidence-grid div { padding: 12px 18px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.evidence-grid dt { margin-bottom: 4px; color: var(--muted); font-size: 9px; text-transform: uppercase; }
+.evidence-grid dd { margin: 0; font: 11px/1.45 ui-monospace, monospace; overflow-wrap: anywhere; }
+
 .audit-footer { margin-top: 48px; padding-top: 20px; border-top: 1px solid var(--ink); color: var(--muted); font: 9px/1.4 ui-monospace, monospace; }
-.audit-footer dl { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin: 0; }
+.audit-footer dl { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin: 0; }
 .audit-footer dt { margin-bottom: 5px; }
 .audit-footer dd { margin: 0; color: var(--ink); overflow-wrap: anywhere; font-weight: 700; }
 .load-state { margin: 18px 0 0; }
@@ -329,6 +340,7 @@ body[data-ready="true"] .panel-section:nth-of-type(3) { animation-delay: 70ms; }
   .ai-summary div:nth-child(-n + 2),
   .dialog-summary div:nth-child(-n + 2),
   .candidate-facts div:nth-child(-n + 2) { border-bottom: 1px solid var(--line); }
+  .evidence-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 520px) {

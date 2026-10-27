@@ -32,8 +32,20 @@ _SNAPSHOT_FIELDS = {
     "messages",
 }
 _URL_PATTERN = re.compile(r"https?://[^\s<>\"']+", re.IGNORECASE)
-_CANDIDATE_HEADING = re.compile(r"(?im)^\s*(?:후보|candidate)\s*#?\s*\d+\b")
-_EXCLUDED_HEADING = re.compile(r"(?im)^\s*(?:제외\s*후보|excluded\s+candidate)\b")
+_CANDIDATE_HEADING = re.compile(
+    r"(?im)^\s*(?:[#>*•-]+\s*)?(?:"
+    r"(?:후보|후보자|candidate)\s*(?:#|no\.?|번호)?\s*\d+|"
+    r"\d+\s*(?:번|번째)?\s*(?:후보|후보자|candidate))\b"
+)
+_EXCLUDED_HEADING = re.compile(
+    r"(?im)^\s*(?:[#>*•-]+\s*)?(?:제외(?:된)?\s*후보|excluded\s+candidate)\b"
+)
+_EXPLICIT_NO_CANDIDATES = re.compile(
+    r"후보\s*(?:결과\s*)?(?:없음|없습니다)|"
+    r"적합한\s*후보.{0,20}(?:없음|찾지|발견하지)|"
+    r"no\s+(?:suitable\s+)?candidates?",
+    re.IGNORECASE,
+)
 _PERIOD_PATTERN = re.compile(
     r"검색\s*기간\s*[:：]\s*(\d{4}-\d{2}-\d{2})\s*(?:~|–|—|to)\s*(\d{4}-\d{2}-\d{2})",
     re.IGNORECASE,
@@ -170,6 +182,9 @@ def _message_to_run(message: Mapping[str, object], contract: EvidenceContract) -
     candidate_headings = len(_CANDIDATE_HEADING.findall(body_text))
     excluded = len(_EXCLUDED_HEADING.findall(body_text))
     unparsed = max(0, candidate_headings - len(parsed_keys))
+    counts_complete = bool(
+        candidates or candidate_headings or excluded or _EXPLICIT_NO_CANDIDATES.search(body_text)
+    )
     period_start, period_end, period_reason = _search_period(body_text)
     actor_evidence: ActorEvidencePayload = {
         "subject": subject,
@@ -203,6 +218,8 @@ def _message_to_run(message: Mapping[str, object], contract: EvidenceContract) -
         search_period_reason=period_reason,
         unparsed_candidates=unparsed,
         excluded_candidates=excluded,
+        candidate_counts_complete=counts_complete,
+        candidate_counts_reason=(None if counts_complete else "candidate_records_not_identifiable"),
     )
 
 
