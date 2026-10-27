@@ -2,6 +2,7 @@
 
 import json
 import threading
+from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import datetime
 from http.client import HTTPConnection
@@ -11,6 +12,7 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from humansearch.admin_ai_search import (
+    AiSearchPayload,
     AiSearchRun,
     CandidateEvidence,
     ContactEvidence,
@@ -20,10 +22,7 @@ from humansearch.admin_ai_search import (
     load_evidence_contract,
     stable_batch_id,
 )
-from humansearch.admin_weekly_dashboard.shadow_server import (
-    ShadowServer,
-    create_shadow_server,
-)
+from humansearch.admin_weekly_dashboard.shadow_server import ShadowServer, create_shadow_server
 
 REPO_ROOT = Path(__file__).parents[2]
 ASSET_DIR = REPO_ROOT / "apps" / "admin"
@@ -169,7 +168,7 @@ def test_empty_live_input_is_not_reported_as_zero_activity() -> None:
 
     payload = build_ai_search_payload((), contract)
 
-    assert payload == {
+    expected: dict[str, object] = {
         "mode": "LOCAL_SHADOW",
         "contract_version": "admin-ai-search-evidence/v1",
         "status": "NOT_RUN",
@@ -178,6 +177,7 @@ def test_empty_live_input_is_not_reported_as_zero_activity() -> None:
         "batches": [],
         "external_effects": contract.external_effects,
     }
+    assert dict(payload) == expected
 
 
 def test_invalid_candidate_score_fails_closed() -> None:
@@ -186,7 +186,7 @@ def test_invalid_candidate_score_fails_closed() -> None:
 
 
 @contextmanager
-def running_server(payload: dict[str, object]):
+def running_server(payload: AiSearchPayload) -> Iterator[tuple[ShadowServer, int]]:
     server = create_shadow_server(
         assets=ASSET_DIR,
         contract_path=METRIC_CONTRACT_PATH,

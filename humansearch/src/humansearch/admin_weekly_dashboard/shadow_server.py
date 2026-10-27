@@ -11,6 +11,12 @@ from pathlib import Path
 from typing import TypedDict, cast
 from zoneinfo import ZoneInfo
 
+from humansearch.admin_ai_search.evidence import (
+    AiSearchPayload,
+    build_ai_search_payload,
+    load_evidence_contract,
+)
+
 from .contracts import (
     MetricCatalogPayload,
     MetricContract,
@@ -158,6 +164,7 @@ class ShadowServer(ThreadingHTTPServer):
     daemon_threads = True
 
     dashboard_payload: DashboardPayload
+    ai_search_payload: AiSearchPayload
     asset_routes: Mapping[str, tuple[str, bytes]]
 
 
@@ -167,6 +174,7 @@ def create_shadow_server(
     contract_path: Path,
     host: str,
     port: int,
+    ai_search_payload: AiSearchPayload | None = None,
 ) -> ShadowServer:
     """Validate all local inputs before opening a loopback socket."""
 
@@ -178,8 +186,17 @@ def create_shadow_server(
     routes = _load_assets(assets)
     contract = load_metric_contract(contract_path)
     dashboard_payload = build_shadow_dashboard(contract)
+    if ai_search_payload is None:
+        evidence_contract_path = (
+            contract_path.parents[1]
+            / "admin-ai-search"
+            / "evidence-contract-v1.json"
+        )
+        evidence_contract = load_evidence_contract(evidence_contract_path)
+        ai_search_payload = build_ai_search_payload((), evidence_contract)
     server = ShadowServer((normalized_host, port), _ShadowRequestHandler)
     server.dashboard_payload = dashboard_payload
+    server.ai_search_payload = ai_search_payload
     server.asset_routes = routes
     return server
 
@@ -190,8 +207,10 @@ def _load_assets(assets: Path) -> Mapping[str, tuple[str, bytes]]:
         raise NotADirectoryError("shadow asset root must be a directory")
     route_files = {
         "/": ("text/html; charset=utf-8", "index.html"),
+        "/ai-search": ("text/html; charset=utf-8", "ai-search.html"),
         "/styles.css": ("text/css; charset=utf-8", "styles.css"),
         "/app.js": ("text/javascript; charset=utf-8", "app.js"),
+        "/ai-search.js": ("text/javascript; charset=utf-8", "ai-search.js"),
     }
     loaded: dict[str, tuple[str, bytes]] = {}
     for route, (content_type, filename) in route_files.items():
@@ -213,6 +232,24 @@ class _ShadowRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         if self.path == "/api/dashboard":
             self._send_json(200, self.server.dashboard_payload)
+            return
+        if self.path == "/api/ai-search":
+            self._send_json(200, self.server.ai_search_payload)
+            return
+        if self.path.startswith("/api/ai-search/"):
+            batch_id = self.path.removeprefix("/api/ai-search/")
+            batch = next(
+                (
+                    item
+                    for item in self.server.ai_search_payload["batches"]
+                    if item["batch_id"] == batch_id
+                ),
+                None,
+            )
+            if batch is None:
+                self._send_json(404, {"status": "FAIL", "reason": "batch_not_found"})
+            else:
+                self._send_json(200, batch)
             return
         if self.path == "/healthz":
             self._send_json(200, {"status": "PASS", "mode": "LOCAL_SHADOW"})

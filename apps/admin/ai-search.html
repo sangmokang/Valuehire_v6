@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <title>AI Search Evidence · ValueConnect Ops</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/ai-search.js" defer></script>
+  </head>
+  <body data-mode="local-shadow">
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="ValueConnect 운영 홈">
+        <span class="brand-mark" aria-hidden="true">V</span>
+        <span>VALUECONNECT <small>OPS</small></span>
+      </a>
+      <nav aria-label="관리자 영역">
+        <a class="muted-link" href="/">운영</a>
+        <a href="/ai-search" aria-current="page">04 · AI SEARCH</a>
+        <span>System</span>
+      </nav>
+      <p class="environment">LOCAL SHADOW · 운영 아님</p>
+    </header>
+
+    <main id="ai-search" aria-busy="true">
+      <section class="hero ai-hero" aria-labelledby="page-title">
+        <div>
+          <p class="eyebrow">Evidence ledger</p>
+          <h1 id="page-title">AI Search</h1>
+          <p class="lede">실행 주체, 중복 제거 후보, 점수대와 실제 FU 증빙을 한 곳에서 확인합니다.</p>
+        </div>
+        <dl class="window-summary" aria-label="검증 상태">
+          <div><dt>검증 주기</dt><dd id="cadence">—</dd></div>
+          <div><dt>자료 상태</dt><dd id="evidence-status">불러오는 중</dd></div>
+        </dl>
+      </section>
+
+      <section class="ai-summary" aria-label="AI Search 집계">
+        <dl>
+          <div><dt>Batch</dt><dd id="batch-count">—</dd></div>
+          <div><dt>중복 제거 후보</dt><dd id="candidate-count">—</dd></div>
+          <div><dt>90점 이상</dt><dd id="strong-count">—</dd></div>
+          <div><dt>실제 FU</dt><dd id="fu-count">—</dd></div>
+        </dl>
+      </section>
+
+      <section class="panel-section" aria-labelledby="batch-heading">
+        <div class="section-heading">
+          <div><p class="section-kicker">Daily batches</p><h2 id="batch-heading">실행 증빙</h2></div>
+          <p>행을 선택하면 후보별 학력·경력·적합 근거·역매칭·컨택 검증을 엽니다.</p>
+        </div>
+        <div class="ledger-panel ai-ledger">
+          <table>
+            <thead>
+              <tr>
+                <th>실행주체 / Batch</th><th>고객사 · 포지션</th><th>채널</th>
+                <th>후보</th><th>90+</th><th>80대</th><th>70대</th><th>FU</th><th>실행일시</th><th>검증</th>
+              </tr>
+            </thead>
+            <tbody id="batch-rows"></tbody>
+          </table>
+          <div id="empty-state" class="empty-state" hidden>
+            <strong>실데이터 연결 전입니다.</strong>
+            <p>자료가 없다는 뜻의 0이 아닙니다. Gmail·채용사이트 검증이 연결될 때까지 NOT_RUN으로 유지합니다.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="audit-footer" aria-label="자료 상태">
+        <dl id="audit-items"></dl>
+        <p id="load-state" class="load-state" role="status" aria-live="polite">AI Search 증빙을 불러오는 중입니다.</p>
+      </section>
+    </main>
+
+    <dialog id="batch-dialog" class="evidence-dialog" aria-labelledby="dialog-title">
+      <form method="dialog" class="dialog-bar">
+        <div><p id="dialog-batch" class="section-kicker"></p><h2 id="dialog-title">Batch 상세</h2></div>
+        <button aria-label="상세 닫기">닫기</button>
+      </form>
+      <div id="dialog-summary" class="dialog-summary"></div>
+      <div id="candidate-details" class="candidate-details"></div>
+      <section class="verification-section" aria-labelledby="verification-heading">
+        <h3 id="verification-heading">일일 검증 상태</h3>
+        <div id="verification-checks"></div>
+      </section>
+    </dialog>
+  </body>
+</html>
