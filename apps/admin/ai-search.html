@@ -5,17 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="light">
     <link rel="icon" href="data:,">
-    <title>AI Search Evidence · ValueConnect Ops</title>
+    <title>AI Search 실행 결과 · ValueHire</title>
     <link rel="stylesheet" href="/styles.css">
     <script src="/ai-search.js" defer></script>
   </head>
   <body data-mode="local-shadow">
     <header class="topbar">
       <div>
-        <p class="environment">LOCAL SHADOW · READ ONLY</p>
-        <h1 id="page-title">AI Search Evidence</h1>
+        <p class="environment">로컬 화면 · Gmail 읽기 전용</p>
+        <h1 id="page-title">AI Search 실행 결과</h1>
         <p class="lede">실제 Gmail 실행 결과와 확인된 근거만 표시합니다.</p>
-        <a class="ai-search-link" href="/">← WEEKLY DASHBOARD</a>
+        <a class="ai-search-link" href="/">← 주간 현황 보기</a>
       </div>
       <dl class="window-summary" aria-label="검증 상태">
         <div><dt>검증 주기</dt><dd id="cadence">—</dd></div>
@@ -26,31 +26,31 @@
     <main id="ai-search" aria-busy="true">
       <section class="ai-summary" aria-label="AI Search 집계">
         <dl>
-          <div><dt>Batch</dt><dd id="batch-count">—</dd></div>
-          <div><dt>중복 제거 후보 (Batch별 합계)</dt><dd id="candidate-count">—</dd></div>
+          <div><dt>검색 실행</dt><dd id="batch-count">—</dd></div>
+          <div><dt>확인 가능한 후보 (검색별 합계)</dt><dd id="candidate-count">—</dd></div>
           <div><dt>90점 이상</dt><dd id="strong-count">—</dd></div>
-          <div><dt>실제 FU</dt><dd id="fu-count">—</dd></div>
+          <div><dt>실제 후속 연락</dt><dd id="fu-count">—</dd></div>
         </dl>
       </section>
 
       <section class="panel-section" aria-labelledby="batch-heading">
         <div class="section-heading">
-          <div><p class="section-kicker">Daily batches</p><h2 id="batch-heading">실행 증빙</h2></div>
+          <div><p class="section-kicker">Gmail 검색 기록</p><h2 id="batch-heading">검색 실행 목록</h2></div>
           <p>행을 선택하면 후보별 필수요건·핵심 경력·컨택 근거를 엽니다.</p>
         </div>
         <div class="ledger-panel ai-ledger">
           <table>
             <thead>
               <tr>
-                <th>실행주체 / Batch</th><th>고객사 · 포지션</th><th>채널</th>
-                <th>원시</th><th>중복 제거</th><th>90+</th><th>80대</th><th>70대</th>
-                <th>실제 FU</th><th>검색 기간</th><th>실행 일시</th><th>검증</th>
+                <th scope="col">실행 주체 / 검색 묶음</th><th scope="col">고객사 · 포지션</th><th scope="col">채널</th>
+                <th scope="col">메일에 적힌 후보 수</th><th scope="col">확인된 후보 수</th><th scope="col">90점 이상</th><th scope="col">80~89점</th><th scope="col">70~79점</th>
+                <th scope="col">실제 후속 연락</th><th scope="col">검색 기간</th><th scope="col">실행 일시</th><th scope="col">확인 상태</th>
               </tr>
             </thead>
             <tbody id="batch-rows"></tbody>
           </table>
           <div id="empty-state" class="empty-state" hidden>
-            <strong>수집된 AI Search Batch가 없습니다.</strong>
+            <strong>수집된 AI Search 실행 결과가 없습니다.</strong>
             <p>자료 없음은 0이나 PASS로 바꾸지 않습니다. 수집 사유를 아래 상태에서 확인하세요.</p>
           </div>
           <div id="error-state" class="empty-state error-state" role="alert" hidden>
@@ -68,14 +68,10 @@
 
     <dialog id="batch-dialog" class="evidence-dialog" aria-labelledby="dialog-title">
       <form method="dialog" class="dialog-bar">
-        <div><p id="dialog-batch" class="section-kicker"></p><h2 id="dialog-title">Batch 상세</h2></div>
+        <div><p id="dialog-batch" class="section-kicker"></p><h2 id="dialog-title">검색 상세</h2></div>
         <button aria-label="상세 닫기">닫기</button>
       </form>
       <div id="dialog-summary" class="dialog-summary"></div>
-      <section class="evidence-section" aria-labelledby="actor-evidence-heading">
-        <h3 id="actor-evidence-heading">실행 주체 판단 근거</h3>
-        <dl id="actor-evidence" class="evidence-grid"></dl>
-      </section>
       <div id="candidate-details" class="candidate-details"></div>
       <section class="verification-section" aria-labelledby="verification-heading">
         <h3 id="verification-heading">일일 검증 상태</h3>

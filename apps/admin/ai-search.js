@@ -2,6 +2,20 @@
   "use strict";
 
   const byId = (id) => document.getElementById(id);
+  const REASON_LABELS = {
+    daily_verification_incomplete: "일일 재검증은 아직 하지 않았습니다.",
+    search_period_not_found: "메일에 검색 기간이 없습니다.",
+    fu_portal_verification_not_run: "채용사이트 후속 연락 확인은 아직 하지 않았습니다.",
+    fu_portal_verification_out_of_scope: "이번 화면에서는 채용사이트를 확인하지 않습니다.",
+    score_contract_evidence_missing: "점수 계산에 필요한 근거가 부족합니다.",
+    score_contract_evidence_conflict: "메일 안의 점수 근거가 서로 다릅니다.",
+    no_parsed_candidates: "확인 가능한 후보 프로필이 없습니다.",
+    candidate_records_not_identifiable: "메일 본문에서 후보 수를 확정할 수 없습니다.",
+    requirements_evidence_missing: "필수요건 근거가 메일에 없습니다.",
+    why_fit_evidence_missing: "적합 근거가 메일에 없습니다.",
+    contact_opinion_evidence_missing: "컨택 의견 근거가 메일에 없습니다.",
+    required_sources_not_checked: "필요한 채용사이트를 아직 확인하지 않았습니다.",
+  };
 
   function element(tag, className, text) {
     const node = document.createElement(tag);
@@ -16,22 +30,39 @@
 
   function valueOrNotRun(value, reason) {
     if (known(value)) return String(value);
-    return reason ? `NOT_RUN · ${reason}` : "NOT_RUN";
+    return reason ? `미확인 · ${reasonLabel(reason)}` : "미확인";
+  }
+
+  function reasonLabel(reason) {
+    return REASON_LABELS[reason] || "확인할 근거가 없습니다.";
+  }
+
+  function statusLabel(status) {
+    if (status === "PASS") return "확인 완료";
+    if (status === "FAIL") return "오류";
+    return "확인 필요";
   }
 
   function statusBadge(status) {
     const value = status || "NOT_RUN";
-    return element("span", `status-badge status-${value.toLowerCase()}`, value);
+    return element("span", `status-badge status-${value.toLowerCase()}`, statusLabel(value));
   }
 
   function formatDate(value) {
-    if (!known(value)) return "NOT_RUN";
+    if (!known(value)) return "미확인";
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return String(value);
     return new Intl.DateTimeFormat("ko-KR", {
       year: "numeric", month: "2-digit", day: "2-digit",
       hour: "2-digit", minute: "2-digit", hour12: false,
     }).format(date);
+  }
+
+  function shortDate(value) {
+    if (!known(value)) return "날짜 미확인";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "날짜 미확인";
+    return new Intl.DateTimeFormat("ko-KR", { month: "long", day: "numeric" }).format(date);
   }
 
   function sumKnown(batches, select) {
@@ -44,12 +75,12 @@
     const candidates = sumKnown(payload.batches, (batch) => batch.unique_candidates);
     const strong = sumKnown(payload.batches, (batch) => batch.score_buckets["90_plus"]);
     const fu = sumKnown(payload.batches, (batch) => batch.actual_fu);
-    byId("cadence").textContent = payload.cadence;
+    byId("cadence").textContent = payload.cadence === "DAILY" ? "매일" : payload.cadence;
     byId("evidence-status").replaceChildren(statusBadge(payload.status));
-    byId("batch-count").textContent = hasEvidence ? String(payload.batches.length) : "NOT_RUN";
-    byId("candidate-count").textContent = hasEvidence ? valueOrNotRun(candidates) : "NOT_RUN";
-    byId("strong-count").textContent = hasEvidence ? valueOrNotRun(strong) : "NOT_RUN";
-    byId("fu-count").textContent = hasEvidence ? valueOrNotRun(fu) : "NOT_RUN";
+    byId("batch-count").textContent = hasEvidence ? String(payload.batches.length) : "확인하지 않음";
+    byId("candidate-count").textContent = hasEvidence ? valueOrNotRun(candidates) : "확인하지 않음";
+    byId("strong-count").textContent = hasEvidence ? valueOrNotRun(strong) : "확인하지 않음";
+    byId("fu-count").textContent = hasEvidence ? valueOrNotRun(fu) : "확인하지 않음";
   }
 
   function accountCell(batch) {
@@ -60,7 +91,11 @@
 
   function batchCell(batch) {
     const cell = element("td");
-    cell.append(element("strong", "", batch.actor_label), element("small", "batch-code", batch.batch_id));
+    const messageCount = batch.batch_grouping.message_count;
+    cell.append(
+      element("strong", "", batch.actor_label),
+      element("small", "batch-code", `${shortDate(batch.executed_at)} · Gmail ${messageCount}건`),
+    );
     return cell;
   }
 
@@ -73,7 +108,7 @@
   function periodLabel(period) {
     return period.status === "PASS"
       ? `${period.start} ~ ${period.end}`
-      : `NOT_RUN · ${period.reason}`;
+      : `미확인 · ${reasonLabel(period.reason)}`;
   }
 
   function renderRows(payload) {
@@ -134,7 +169,7 @@
 
   function betterPositionLabel(candidate) {
     if (candidate.better_position_exists === null) {
-      return `NOT_RUN · ${candidate.better_position_reason}`;
+      return `미확인 · ${reasonLabel(candidate.better_position_reason)}`;
     }
     if (!candidate.better_position_exists) return `없음 · ${candidate.better_position_reason}`;
     return `있음 · ${candidate.better_position} · ${candidate.better_position_reason}`;
@@ -151,7 +186,7 @@
     );
     const score = candidate.score_status === "PASS"
       ? `${candidate.score}점`
-      : `NOT_RUN · ${candidate.score_reason}`;
+      : `미확인 · ${reasonLabel(candidate.score_reason)}`;
     heading.append(title, element("strong", "candidate-score", score));
     const facts = element("dl", "candidate-facts");
     facts.append(
@@ -167,13 +202,13 @@
     contact.append(
       element("h4", "", "컨택 의견 근거"),
       element("p", "", valueOrNotRun(candidate.contact_opinion_evidence, "contact_opinion_evidence_missing")),
-      element("p", "evidence-meta", `contacted_at=${valueOrNotRun(candidate.contacted_at)} · reference=${valueOrNotRun(candidate.contact_reference)}`),
+      element("p", "evidence-meta", `연락 시각 ${valueOrNotRun(candidate.contacted_at)} · 확인 자료 ${valueOrNotRun(candidate.contact_reference)}`),
     );
     const better = element("div", "candidate-copy reverse-match");
     better.append(
       element("h4", "", "더 적합한 포지션 존재 여부"),
       element("p", "", betterPositionLabel(candidate)),
-      element("p", "evidence-meta", `기존 역매칭: ${candidate.reverse_match_reason || "NOT_RUN"}`),
+      element("p", "evidence-meta", `기존 역매칭: ${candidate.reverse_match_reason || "확인하지 않음"}`),
     );
     article.append(
       heading,
@@ -181,9 +216,13 @@
       evidenceList(
         "필수요건별 근거",
         candidate.requirements_evidence,
-        "NOT_RUN · requirements_evidence_missing",
+        `미확인 · ${reasonLabel("requirements_evidence_missing")}`,
       ),
-      evidenceList("적합 근거", candidate.why_fit, "NOT_RUN · why_fit_evidence_missing"),
+      evidenceList(
+        "적합 근거",
+        candidate.why_fit,
+        `미확인 · ${reasonLabel("why_fit_evidence_missing")}`,
+      ),
       contact,
       better,
     );
@@ -194,41 +233,26 @@
     const root = byId("verification-checks");
     root.replaceChildren();
     if (!checks.length) {
-      root.append(element("p", "empty-copy", "NOT_RUN · required_sources_not_checked"));
+      root.append(element("p", "empty-copy", reasonLabel("required_sources_not_checked")));
       return;
     }
     checks.forEach((check) => {
       const row = element("div", "verification-row");
       row.append(element("strong", "", check.source), statusBadge(check.status));
-      row.append(element("span", "", check.checked_at ? formatDate(check.checked_at) : check.reason));
+      row.append(
+        element("span", "", check.checked_at ? formatDate(check.checked_at) : reasonLabel(check.reason)),
+      );
       root.append(row);
     });
-  }
-
-  function renderActorEvidence(evidence) {
-    const root = byId("actor-evidence");
-    root.replaceChildren();
-    if (!evidence) {
-      root.append(detailItem("판정 근거", "NOT_RUN · actor_evidence_missing"));
-      return;
-    }
-    root.append(
-      detailItem("제목", evidence.subject),
-      detailItem("발신자", evidence.sender),
-      detailItem("Thread ID", evidence.thread_id),
-      detailItem("Message ID", evidence.message_id),
-      detailItem("수신 시각", formatDate(evidence.received_at)),
-      detailItem("판정", evidence.reason),
-    );
   }
 
   function showError(reason) {
     byId("ai-search").setAttribute("aria-busy", "false");
     byId("evidence-status").replaceChildren(statusBadge("FAIL"));
-    byId("batch-count").textContent = "NOT_RUN";
-    byId("candidate-count").textContent = "NOT_RUN";
-    byId("strong-count").textContent = "NOT_RUN";
-    byId("fu-count").textContent = "NOT_RUN";
+    byId("batch-count").textContent = "확인하지 않음";
+    byId("candidate-count").textContent = "확인하지 않음";
+    byId("strong-count").textContent = "확인하지 않음";
+    byId("fu-count").textContent = "확인하지 않음";
     byId("empty-state").hidden = true;
     byId("error-state").hidden = false;
     byId("error-reason").textContent = reason;
@@ -244,7 +268,7 @@
       });
       if (!response.ok) throw new Error("batch_detail_failed");
       const batch = await response.json();
-      byId("dialog-batch").textContent = batch.batch_id;
+      byId("dialog-batch").textContent = `${batch.actor_label} · Gmail ${batch.batch_grouping.message_count}건`;
       byId("dialog-title").textContent = `${batch.company} · ${batch.position}`;
       const counts = batch.candidate_counts;
       const summary = byId("dialog-summary");
@@ -253,22 +277,21 @@
         detailItem("실행 일시", formatDate(batch.executed_at)),
         detailItem("검색 기간", periodLabel(batch.search_period)),
         detailItem(
-          "원시 → 파싱",
+          "메일 표기 → 확인 가능",
           `${valueOrNotRun(counts.raw, batch.candidate_counts_reason)} → ${counts.parsed}`,
         ),
         detailItem(
-          "중복 / 미파싱 / 제외",
+          "중복 / 확인 불가 / 제외",
           `${counts.duplicate} / ${valueOrNotRun(counts.unparsed, batch.candidate_counts_reason)} / ${counts.excluded}`,
         ),
-        detailItem("실제 FU", valueOrNotRun(batch.actual_fu, batch.actual_fu_reason)),
+        detailItem("실제 후속 연락", valueOrNotRun(batch.actual_fu, batch.actual_fu_reason)),
       );
-      renderActorEvidence(batch.actor_evidence);
       const candidates = byId("candidate-details");
       candidates.replaceChildren();
       if (batch.candidates.length) {
         candidates.append(...batch.candidates.map(renderCandidate));
       } else {
-        candidates.append(element("p", "empty-copy", "파싱된 후보가 없습니다. count ledger를 확인하세요."));
+        candidates.append(element("p", "empty-copy", "메일에서 확인 가능한 후보 프로필이 없습니다."));
       }
       renderChecks(batch.verification_checks);
       byId("batch-dialog").showModal();
@@ -282,14 +305,14 @@
     const gmailStatus = known(gmail.status) ? gmail.status : "NOT_RUN";
     const gmailMessageCount = known(gmail.message_count)
       ? gmail.message_count
-      : "NOT_RUN";
+      : "확인하지 않음";
     const items = [
-      ["MODE", payload.mode],
-      ["CONTRACT", payload.contract_version],
-      ["GMAIL", `${gmailStatus} · ${gmailMessageCount} messages`],
-      ["PAGINATION", gmail.pagination_exhausted === true ? "EXHAUSTED" : "NOT_RUN"],
-      ["REMOTE DB WRITES", payload.external_effects.database_writes],
-      ["OUTREACH SENDS", payload.external_effects.outreach_sends],
+      ["자료 출처", "Gmail AI Search"],
+      ["확인한 메일", `${gmailMessageCount}건`],
+      ["Gmail 상태", statusLabel(gmailStatus)],
+      ["전체 페이지 확인", gmail.pagination_exhausted === true ? "완료" : "확인하지 않음"],
+      ["원격 DB 저장", payload.external_effects.database_writes === "DISABLED" ? "없음" : "확인 필요"],
+      ["외부 발송", payload.external_effects.outreach_sends === "DISABLED" ? "없음" : "확인 필요"],
     ];
     const root = byId("audit-items");
     root.replaceChildren();
@@ -316,7 +339,7 @@
       state.dataset.status = payload.status;
       state.textContent = payload.status === "PASS"
         ? "일일 검증이 완료되었습니다."
-        : `미집계 · ${payload.reason || "evidence_not_ready"}`;
+        : `확인 필요 · ${reasonLabel(payload.reason)}`;
     } catch (_error) {
       showError("ai_search_load_failed");
     }

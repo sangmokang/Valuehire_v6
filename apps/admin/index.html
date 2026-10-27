@@ -4,21 +4,21 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="light">
-    <title>ValueHire Admin Weekly Dashboard · Local Shadow</title>
+    <title>ValueHire 주간 AI Search 현황</title>
     <link rel="stylesheet" href="/styles.css">
     <script src="/app.js" defer></script>
   </head>
-  <body data-mode="local-shadow">
+  <body data-mode="local-shadow" data-runtime="LOCAL SHADOW · 운영 아님">
     <header class="topbar">
       <div>
-        <p class="environment">LOCAL SHADOW · 운영 아님</p>
-        <h1>Admin Weekly Dashboard</h1>
-        <p class="lede">한 주의 숫자보다, 숫자가 어디서 왔는지 먼저 봅니다.</p>
-        <a class="ai-search-link" href="/ai-search">04 · AI SEARCH</a>
+        <p class="environment">로컬 화면 · 읽기 전용</p>
+        <h1>주간 AI Search 현황</h1>
+        <p class="lede">Gmail에서 실제로 확인한 AI Search 결과를 주별로 보여줍니다.</p>
+        <a class="ai-search-link" href="/ai-search">AI Search 상세 보기 →</a>
       </div>
       <dl class="window-summary" aria-label="집계 기간">
-        <div><dt>실적 창</dt><dd id="window-range">불러오는 중</dd></div>
-        <div><dt>회의 주차</dt><dd id="week-label">—</dd></div>
+        <div><dt>집계 기간</dt><dd id="window-range">불러오는 중</dd></div>
+        <div><dt>선택한 주</dt><dd id="week-label">—</dd></div>
       </dl>
     </header>
 
@@ -30,35 +30,27 @@
 
       <section class="panel-section" aria-labelledby="heatmap-heading">
         <div class="section-heading">
-          <div><p class="section-kicker">History</p><h2 id="heatmap-heading">12주 집계 상태</h2></div>
-          <p>실제 수집하지 않은 주는 비워 둡니다.</p>
+          <div><p class="section-kicker">주간 기록</p><h2 id="heatmap-heading">최근 12주 Gmail 집계</h2></div>
+          <p>주차를 누르면 해당 주의 실제 집계로 바뀝니다.</p>
         </div>
         <div class="heatmap-panel">
           <ol id="heatmap" class="heatmap" aria-label="최근 12주 집계 상태"></ol>
           <p id="heatmap-detail" class="heatmap-detail" aria-live="polite">
-            주차를 선택하면 집계 상태를 확인할 수 있습니다.
+            주차를 선택하면 해당 기간과 집계 숫자를 확인할 수 있습니다.
           </p>
           <div class="legend" aria-label="상태 범례">
-            <span><i class="legend-swatch is-empty"></i>미집계</span>
-            <span><i class="legend-swatch is-collected"></i>수집됨</span>
+            <span><i class="legend-swatch is-empty"></i>확인하지 못함</span>
+            <span><i class="legend-swatch is-collected"></i>Gmail 확인 완료</span>
           </div>
         </div>
       </section>
 
       <section class="panel-section" aria-labelledby="metrics-heading">
         <div class="section-heading">
-          <div><p class="section-kicker">Weekly ledger</p><h2 id="metrics-heading">이번 주 원자료</h2></div>
-          <p>실행 · 포지션 · 후보 · 메일을 한 숫자로 섞지 않습니다.</p>
+          <div><p class="section-kicker">주간 숫자</p><h2 id="metrics-heading">선택한 주의 실제 집계</h2></div>
+          <p>검색 실행·후보·메일을 서로 다른 숫자로 표시합니다.</p>
         </div>
         <div id="metric-groups" class="metric-groups"></div>
-      </section>
-
-      <section class="panel-section" aria-labelledby="provenance-heading">
-        <div class="section-heading">
-          <div><p class="section-kicker">Provenance</p><h2 id="provenance-heading">판정 근거</h2></div>
-          <p>화면 값과 같은 snapshot의 지문입니다.</p>
-        </div>
-        <div class="provenance-panel"><dl id="provenance"></dl></div>
       </section>
 
       <p id="load-state" class="load-state" role="status" aria-live="polite">대시보드를 불러오는 중입니다.</p>

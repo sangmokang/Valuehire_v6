@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from collections.abc import Mapping, Sequence
@@ -66,29 +67,58 @@ class DashboardPayload(TypedDict):
     metric_groups: list[MetricGroupPayload]
     metric_catalog: list[MetricCatalogPayload]
     weeks: list[HistoryWeekPayload]
+    source_summary: DashboardSourceSummary
     external_effects: dict[str, str]
 
 
-def build_shadow_dashboard(metric_contract: MetricContract) -> DashboardPayload:
-    """Build a deterministic one-week shadow and eleven explicit history gaps."""
+class DashboardSourceSummary(TypedDict):
+    status: str
+    query: str | None
+    message_count: int | None
+    included_message_count: int | None
+    excluded_message_count: int | None
+    pagination_exhausted: bool
+    latest_received_at: str | None
 
-    meeting_date = date(2026, 8, 17)
-    current_snapshot = build_weekly_snapshot(
-        meeting_date_kst=meeting_date.isoformat(),
-        events=_shadow_events(),
-        source_states={
-            "mail_events": SourceState(
-                status=MetricStatus.NOT_RUN,
-                reason=SourceFailureReason.RETENTION_POLICY_MISSING,
-            ),
-            "sourcing_runs": SourceState(status=MetricStatus.PASS),
-            "candidate_discoveries": SourceState(status=MetricStatus.PASS),
-        },
-        metric_contract=metric_contract,
+
+def build_shadow_dashboard(
+    metric_contract: MetricContract,
+    ai_search_payload: AiSearchPayload,
+    *,
+    as_of_date: date | None = None,
+) -> DashboardPayload:
+    """Build twelve weekly snapshots from one exhaustive Gmail AI Search read."""
+
+    batches = ai_search_payload["batches"]
+    source_summary = _dashboard_source_summary(ai_search_payload)
+    reference_date = as_of_date or datetime.now(tz=KST).date()
+    meeting_date = _next_meeting_monday(reference_date)
+    events = _ai_search_events(batches)
+    source_states = {
+        "mail_events": SourceState(
+            status=MetricStatus.NOT_RUN,
+            reason=SourceFailureReason.RETENTION_POLICY_MISSING,
+        ),
+        "sourcing_runs": SourceState(status=MetricStatus.PASS),
+        "candidate_discoveries": SourceState(status=MetricStatus.PASS),
+    }
+    collection_complete = (
+        source_summary["status"] == MetricStatus.PASS.value
+        and source_summary["pagination_exhausted"]
     )
     weeks: list[HistoryWeekPayload] = []
-    for weeks_ago in range(11, 0, -1):
+    for weeks_ago in range(11, -1, -1):
         historical_window = weekly_window((meeting_date - timedelta(weeks=weeks_ago)).isoformat())
+        snapshot = (
+            build_weekly_snapshot(
+                meeting_date_kst=historical_window.meeting_instance_date_kst,
+                events=events,
+                source_states=source_states,
+                metric_contract=metric_contract,
+            )
+            if collection_complete
+            else None
+        )
         weeks.append(
             {
                 "meeting_iso_week": historical_window.meeting_iso_week,
@@ -97,66 +127,105 @@ def build_shadow_dashboard(metric_contract: MetricContract) -> DashboardPayload:
                 "event_end_inclusive_date_kst": _inclusive_end_date(
                     historical_window.event_end_exclusive_kst
                 ),
-                "status": MetricStatus.NOT_RUN.value,
-                "reason": SourceFailureReason.HISTORY_NOT_COLLECTED.value,
-                "snapshot": None,
+                "status": (
+                    MetricStatus.PASS.value if snapshot is not None else MetricStatus.NOT_RUN.value
+                ),
+                "reason": None if snapshot is not None else "gmail_collection_incomplete",
+                "snapshot": snapshot.to_api_dict() if snapshot is not None else None,
             }
         )
-    weeks.append(
-        {
-            "meeting_iso_week": current_snapshot.window.meeting_iso_week,
-            "event_start_kst": current_snapshot.window.event_start_kst,
-            "event_end_exclusive_kst": current_snapshot.window.event_end_exclusive_kst,
-            "event_end_inclusive_date_kst": _inclusive_end_date(
-                current_snapshot.window.event_end_exclusive_kst
-            ),
-            "status": MetricStatus.PASS.value,
-            "reason": None,
-            "snapshot": current_snapshot.to_api_dict(),
-        }
-    )
     return {
         "mode": "LOCAL_SHADOW",
         "metric_contract_version": metric_contract.version,
         "metric_groups": metric_contract.group_catalog(),
         "metric_catalog": metric_contract.metric_catalog(),
         "weeks": weeks,
+        "source_summary": source_summary,
         "external_effects": dict(sorted(metric_contract.external_effects.items())),
     }
 
 
-def _shadow_events() -> list[MetricEvent]:
-    occurred_at = datetime(2026, 8, 12, 12, 0, tzinfo=KST)
-    events = [
-        MetricEvent(
-            source_collection="sourcing_runs",
-            source_system="aisearch",
-            source_primary_key=f"run-{index}",
-            event_type="sourcing_run",
-            occurred_at=occurred_at,
+def _dashboard_source_summary(payload: AiSearchPayload) -> DashboardSourceSummary:
+    collection = payload.get("gmail_collection")
+    if not isinstance(collection, Mapping):
+        return {
+            "status": MetricStatus.NOT_RUN.value,
+            "query": None,
+            "message_count": None,
+            "included_message_count": None,
+            "excluded_message_count": None,
+            "pagination_exhausted": False,
+            "latest_received_at": None,
+        }
+    executed_at = [batch["executed_at"] for batch in payload["batches"]]
+    return {
+        "status": _optional_string_value(collection.get("status")) or MetricStatus.NOT_RUN.value,
+        "query": _optional_string_value(collection.get("query")),
+        "message_count": _optional_count(collection.get("message_count")),
+        "included_message_count": _optional_count(collection.get("included_message_count")),
+        "excluded_message_count": _optional_count(collection.get("excluded_message_count")),
+        "pagination_exhausted": collection.get("pagination_exhausted") is True,
+        "latest_received_at": max(executed_at) if executed_at else None,
+    }
+
+
+def _optional_string_value(value: object) -> str | None:
+    return value if isinstance(value, str) and value else None
+
+
+def _optional_count(value: object) -> int | None:
+    return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else None
+
+
+def _next_meeting_monday(reference_date: date) -> date:
+    return reference_date + timedelta(days=7 - reference_date.weekday())
+
+
+def _ai_search_events(batches: Sequence[Mapping[str, object]]) -> list[MetricEvent]:
+    events: list[MetricEvent] = []
+    for batch in batches:
+        batch_id = cast(str, batch["batch_id"])
+        actor = cast(str, batch["actor"])
+        occurred_at = datetime.fromisoformat(cast(str, batch["executed_at"]))
+        if occurred_at.tzinfo is None or occurred_at.utcoffset() is None:
+            raise ValueError("AI Search batch executed_at must be timezone-aware")
+        company = cast(str, batch["company"])
+        position = cast(str, batch["position"])
+        position_key = _position_key(company, position, batch_id)
+        events.append(
+            MetricEvent(
+                source_collection="sourcing_runs",
+                source_system=actor,
+                source_primary_key=batch_id,
+                event_type="sourcing_run",
+                occurred_at=occurred_at,
+            )
         )
-        for index in range(1, 3)
-    ]
-    discovery_rows = [
-        ("discovery-1", "position-1", "a" * 64),
-        ("discovery-2", "position-1", "a" * 64),
-        ("discovery-3", "position-2", "b" * 64),
-        ("discovery-4", "position-2", "c" * 64),
-        ("discovery-5", "position-3", "d" * 64),
-    ]
-    events.extend(
-        MetricEvent(
-            source_collection="candidate_discoveries",
-            source_system="aisearch",
-            source_primary_key=primary_key,
-            event_type="candidate_discovery",
-            occurred_at=occurred_at,
-            position_source_id=position_id,
-            candidate_source_key_hmac=candidate_key,
-        )
-        for primary_key, position_id, candidate_key in discovery_rows
-    )
+        candidates = batch["candidates"]
+        if not isinstance(candidates, list):
+            raise TypeError("AI Search batch candidates must be a list")
+        for index, candidate_value in enumerate(candidates):
+            if not isinstance(candidate_value, Mapping):
+                raise TypeError("AI Search candidate must be an object")
+            candidate = cast(Mapping[str, object], candidate_value)
+            events.append(
+                MetricEvent(
+                    source_collection="candidate_discoveries",
+                    source_system=cast(str, candidate["source_channel"]),
+                    source_primary_key=f"{batch_id}:{index}",
+                    event_type="candidate_discovery",
+                    occurred_at=occurred_at,
+                    position_source_id=position_key,
+                    candidate_source_key_hmac=cast(str, candidate["canonical_key"]),
+                )
+            )
     return events
+
+
+def _position_key(company: str, position: str, batch_id: str) -> str:
+    if company.startswith("NOT_RUN:") or position.startswith("NOT_RUN:"):
+        return hashlib.sha256(f"unparsed:{batch_id}".encode()).hexdigest()
+    return hashlib.sha256(f"{company}\0{position}".encode()).hexdigest()
 
 
 def _inclusive_end_date(event_end_exclusive_kst: str) -> str:
@@ -190,13 +259,13 @@ def create_shadow_server(
     normalized_host = "127.0.0.1"
     routes = _load_assets(assets)
     contract = load_metric_contract(contract_path)
-    dashboard_payload = build_shadow_dashboard(contract)
     if ai_search_payload is None:
         evidence_contract_path = (
             contract_path.parents[1] / "admin-ai-search" / "evidence-contract-v1.json"
         )
         evidence_contract = load_evidence_contract(evidence_contract_path)
         ai_search_payload = build_ai_search_payload((), evidence_contract)
+    dashboard_payload = build_shadow_dashboard(contract, ai_search_payload)
     server = ShadowServer((normalized_host, port), _ShadowRequestHandler)
     server.dashboard_payload = dashboard_payload
     server.ai_search_payload = ai_search_payload
