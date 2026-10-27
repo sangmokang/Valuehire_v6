@@ -21,6 +21,7 @@ from .evidence import (
     VerificationCheck,
     build_ai_search_payload,
 )
+from .gmail_subject import classify_actor, subject_context
 
 GMAIL_SNAPSHOT_VERSION = "admin-ai-search-gmail-snapshot/v1"
 _SNAPSHOT_FIELDS = {
@@ -231,8 +232,8 @@ def _message_to_run(message: Mapping[str, object], contract: EvidenceContract) -
     payload = _required_mapping(message, "payload")
     subject = _header(payload, "subject")
     sender = _header(payload, "from")
-    actor, actor_reason = _classify_actor(subject, sender)
-    company, position = _subject_context(subject)
+    actor, actor_reason = classify_actor(subject, sender)
+    company, position = subject_context(subject)
     body_text, links = _message_body(payload)
     candidates, unparsed, excluded, counts_complete = _candidate_records(body_text, links)
     period_start, period_end, period_reason = _search_period(body_text)
@@ -310,63 +311,6 @@ def _header(payload: Mapping[str, object], wanted: str) -> str:
         ):
             return value
     raise ValueError(f"Gmail {wanted} header is missing")
-
-
-def _classify_actor(subject: str, sender: str) -> tuple[str, str]:
-    del sender
-    subject_parts = _subject_parts(subject)
-    if subject_parts is None:
-        return "OTHER", "ai_search_prefix_not_found"
-    prefix, remainder = subject_parts
-    if "aisearch" not in prefix:
-        return "OTHER", "ai_search_prefix_not_found"
-    actor_region = prefix.replace("aisearch", "", 1)
-    if prefix == "aisearch":
-        actor_region = re.sub(r"[\s_-]+", "", remainder.split("[", 1)[0].lower())
-    markers: list[tuple[str, str]] = []
-    if "grok" in actor_region:
-        markers.append(("GROK", "grok"))
-    if "claudecode" in actor_region:
-        markers.append(("CLAUDE_CODE", "claude_code"))
-    if "chatgpt" in actor_region:
-        markers.append(("CHATGPT", "chatgpt"))
-    if "codex" in actor_region:
-        markers.append(("OTHER", "codex"))
-    if "gemini" in actor_region:
-        markers.append(("OTHER", "gemini"))
-    unique = {actor for actor, _ in markers}
-    if len(markers) > 1 or len(unique) > 1:
-        return "OTHER", "actor_markers_conflict"
-    if markers:
-        actor, marker = markers[0]
-        prefix = "unsupported_marker" if actor == "OTHER" else "subject_marker"
-        return actor, f"{prefix}:{marker}"
-    return "AI_SEARCH", "subject_marker:ai_search"
-
-
-def _subject_context(subject: str) -> tuple[str, str]:
-    subject_parts = _subject_parts(subject)
-    if subject_parts is None:
-        return "NOT_RUN:company_not_parsed", "NOT_RUN:position_not_parsed"
-    _, remainder = subject_parts
-    first_context = remainder.find("[")
-    if first_context >= 0:
-        remainder = remainder[first_context:]
-    bracketed = [item.strip() for item in re.findall(r"\[([^\]]+)\]", remainder) if item.strip()]
-    if len(bracketed) >= 2:
-        return bracketed[0], bracketed[1]
-    if len(bracketed) == 1:
-        tail = re.sub(r"^\s*\[[^\]]+\]\s*", "", remainder).strip(" —-·")
-        return bracketed[0], tail or "NOT_RUN:position_not_parsed"
-    return "NOT_RUN:company_not_parsed", "NOT_RUN:position_not_parsed"
-
-
-def _subject_parts(subject: str) -> tuple[str, str] | None:
-    prefix_match = re.match(r"^\s*\[([^\]]+)\]\s*", subject)
-    if prefix_match is None:
-        return None
-    prefix = re.sub(r"[\s_-]+", "", prefix_match.group(1).lower())
-    return prefix, subject[prefix_match.end() :]
 
 
 def _message_body(payload: Mapping[str, object]) -> tuple[str, list[tuple[str, str]]]:
