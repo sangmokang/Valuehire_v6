@@ -49,24 +49,31 @@ message: {
 검색은 `next_page_token`이 없을 때까지 계속한다. 토큰 반복, 페이지 오류, 메시지 읽기 오류,
 요청 ID와 응답 ID 불일치는 조용히 건너뛰지 않는다.
 
-## 최종 실측 결과
+## 실제 Gmail 실측과 후속 수정 비교
 
-- Gmail query 4페이지를 끝까지 읽었고 마지막 `next_page_token=null` 및 전체 페이지 token chain을
-  검증했다. 메시지/Batch는 342건이다.
-- 실행 주체는 `GROK 19`, `CLAUDE_CODE 99`, `CHATGPT 143`, `AI_SEARCH 30`,
-  `OTHER 51`이다. 각 Batch에 제목·발신자·thread/message ID·수신시각·판정 사유가 있다.
-- 후보 count가 확정된 278 Batch는
-  `raw 8,714 = parsed 8,243 + duplicate 255 + unparsed 216 + excluded 0`이다.
-  나머지 64 Batch는 후보 레코드 경계를 확정할 수 없어 raw/unparsed를
-  `NOT_RUN:candidate_records_not_identifiable`로 둔다.
-- v5 D1~D8 계약 입력이 없는 메일이므로 점수/점수대 342건은 모두
-  `NOT_RUN:v5_score_contract_evidence_missing`이다. 검색 기간도 명시 근거가 없어 342건 모두
-  `NOT_RUN:search_period_not_found`다.
-- FU 채용사이트 검증은 비범위이므로 실제 FU 342건은 모두
+- 동일 입력 비교는 최초 화면에 있던 immutable message ID 342개만 사용했다. 수정 전에는 Batch
+  342개, 고객사 파싱 239개(69.9%), 상세 근거가 하나라도 채워진 후보 10/8,243명이었다.
+- 수정 후 동일 342개 입력에서는 실행 메일 340통과 테스트 메일 2통을 구분했고 Batch 296개,
+  고객사 파싱 284개(95.9%), 상세 근거 보유 후보 16/8,242명이 됐다. 14개 Batch가 후보별 알림
+  58통을 근거 있는 실행 단위로 묶었고 가장 큰 Batch는 8통이다.
+- 동일 입력에서 후보 count가 확정된 234 Batch는
+  `raw 8,714 = parsed 8,242 + duplicate 256 + unparsed 216 + excluded 0`이다. 테스트 메일 2통은
+  후보 count ledger 밖의 message-level excluded이며 사유는 `subject_test_marker`다.
+- 최신 Gmail query는 4페이지를 끝까지 읽었고 마지막 `next_page_token=null` 및 전체 page token
+  chain을 검증했다. 총 345통 중 실행 메일 343통, 테스트 메일 2통, Batch 299개다.
+- 최신 Batch 실행 주체는 `GROK 21`, `CLAUDE_CODE 99`, `CHATGPT 97`, `AI_SEARCH 30`,
+  `OTHER 52`다. 각 Batch에 제목·발신자·thread/message ID·수신시각·판정 사유가 있다.
+- 최신 후보 count가 확정된 236 Batch는
+  `raw 8,940 = parsed 8,378 + duplicate 338 + unparsed 224 + excluded 0`이다.
+- 최근 메일 10통의 본문을 표본 검사했다. 명시적 학력 라벨은 3통, 경력 라벨은 3통에 있었고
+  적합 근거·핵심 경력 라벨은 없었다. 후보 경계를 확정할 수 있는 값은 학력 2건, 경력 3건을
+  파싱했고, 서로 다른 후보 URL 2개 뒤의 학력 1건은 귀속 근거가 없어 `NOT_RUN`으로 유지했다.
+- 4축 점수 계약 입력이 전부 있는 후보는 없었다. 따라서 최신 202개 후보 보유 Batch는
+  `NOT_RUN:score_contract_evidence_missing`, 후보가 없는 97개 Batch는
+  `NOT_RUN:no_parsed_candidates`이며 메일의 총점으로 대신하지 않았다.
+- 검색 기간은 최신 299개 Batch 모두 `NOT_RUN:search_period_not_found`, 실제 FU도 비범위이므로
   `NOT_RUN:fu_portal_verification_not_run`이다.
 - Gmail에는 검색/읽기만 수행했다. 외부 발송 0건, 채용사이트 변경 0건, 원격 DB 쓰기 0건이다.
-- 브라우저에서 실제 목록 342행, 후보 상세, 빈 상태, API 404 오류 상태를 각각 확인했고 실제/빈
-  화면의 console/page error는 0건이다.
 
 ### Batch output additions
 
@@ -83,7 +90,7 @@ message: {
 - 전체 경력과 분리된 핵심 경력
 - 더 적합한 포지션 존재 여부와 근거
 - 컨택 출처, 컨택 확인시각, 컨택 의견 근거
-- 점수 계약 버전과 결정론적 D1~D8 breakdown 또는 `NOT_RUN` 사유
+- 점수 계약 버전과 결정론적 4축 breakdown 또는 `NOT_RUN` 사유
 
 ### API / 상태 전이
 
@@ -116,7 +123,7 @@ malformed runtime snapshot -> server start fail-fast or explicit FAIL response; 
 | Candidate block | 같은 canonical identity | duplicate 증가, 최고 근거 레코드만 유지 |
 | Candidate block | 후보로 보이나 필수 필드 파싱 실패 | unparsed 증가, 원문은 Git/API에 노출하지 않음 |
 | Candidate block | 메일이 명시적으로 제외 | excluded 증가 + 사유 |
-| Score | v5 계약 버전 + D1~D8 정수 입력 | 코드가 합계/캡/밴드 계산 |
+| Score | 학력·직무적합성·고난도 업무·직무기술 논리성 정수 입력 | 코드가 40/40/10/10 가중 합계와 밴드 계산 |
 | Score | 총점만 있거나 계약 입력 누락 | `NOT_RUN:score_contract_evidence_missing` |
 | Contacts | Gmail 자체의 컨택 증거 | 출처/확인시각/의견 근거 저장 |
 | Contacts | 채용사이트 검증 | 이번 범위 밖, `NOT_RUN:not_in_scope` |
@@ -132,8 +139,8 @@ malformed runtime snapshot -> server start fail-fast or explicit FAIL response; 
    발신자, thread/message ID, 수신시각, 판정 사유를 모두 남긴다.
 3. `raw`는 메일에서 후보 레코드로 식별된 전체 개수이고 `parsed`는 최종 유지 후보 수다.
    `duplicate`, `unparsed`, `excluded`는 서로 배타적이며 등식 불일치는 예외다.
-4. Gmail의 LLM/사람이 쓴 총점은 판정 수치 입력이 아니다. v5 계약 버전과 D1~D8 입력이 없으면
-   점수·점수대는 `NOT_RUN`이다.
+4. Gmail의 LLM/사람이 쓴 총점은 판정 수치 입력이 아니다. 학력 40%, 직무적합성 40%,
+   고난도 업무 10%, 직무기술 논리성 10%의 네 축이 모두 없으면 점수·점수대는 `NOT_RUN`이다.
 5. FU 채용사이트 검증과 Daily 재검증은 비범위다. 따라서 실제 증거가 없는 FU는 0이 아니라
    `NOT_RUN`이다.
 6. Gmail/브라우저/채용사이트에는 쓰지 않는다. 허용 원격 쓰기는 owner가 명시한 branch push와
@@ -158,7 +165,7 @@ malformed runtime snapshot -> server start fail-fast or explicit FAIL response; 
 | 검색 페이지 일부만 조회 | `NOT_RUN:gmail_pagination_incomplete`; PASS 금지 |
 | 메시지 본문 MIME/HTML만 존재 | text 추출 근거가 없으면 message unparsed |
 | 한 메일에 여러 포지션 | 명시 경계별 Batch 분할 근거가 없으면 한 Batch + NOT_RUN 사유 |
-| 점수 범위/축 누락/비정수 | 점수 NOT_RUN; 메일 총점 fallback 금지 |
+| 4축 점수 범위/축 누락/비정수 | 점수 NOT_RUN; 메일 총점 fallback 금지 |
 | 후보 URL 없음 | unparsed 또는 excluded 근거에 따라 배타 분류 |
 | 상세 후보 0명인 실제 메일 | Batch는 표시하되 원시 count ledger와 NOT_RUN 사유 표시 |
 | 런타임 파일에 실제 후보 PII | Git 추적 금지; 0600 임시 파일만 사용 후 삭제 |
@@ -171,7 +178,7 @@ malformed runtime snapshot -> server start fail-fast or explicit FAIL response; 
 - actor 행: 각 5분류, 상충, 미지 actor 테스트.
 - period 행: 정상/부분/역전 테스트.
 - candidate 행: parsed/duplicate/unparsed/excluded 각각과 등식 property 테스트.
-- score 행: v5 D1~D8 정상/축 누락/비정수/총점-only 테스트.
+- score 행: 40/40/10/10 4축 정상/축 누락/비정수/총점-only 테스트.
 - runtime 행: 정상 schema/list/detail와 version/field 오류 테스트.
 - UI 행: PASS가 아닌 Gmail-only Batch, empty, injected error 화면 브라우저 확인.
 
@@ -212,7 +219,7 @@ bash scripts/acceptance-hs-gates.sh
 - `subject:aisearch` 밖의 실제 결과 메일이 존재하는가?
 - MIME 본문/첨부에 후보가 있고 snippet에는 없는 형식이 존재하는가?
 - 한 후보가 채널별 다른 URL로 반복되어 canonical identity가 갈리는가?
-- 기존 메일의 점수가 v5 D1~D8 입력 없이 숫자만 제공되는가?
+- 기존 메일의 점수가 40/40/10/10 네 축 입력 없이 숫자만 제공되는가?
 - 검색 페이지 완료 후 메시지 batch read가 일부만 반환되는가?
 - 수신시각과 메일 본문의 실행일시가 다른 경우 Batch ID와 실행일시를 무엇으로 구분해야 하는가?
 
