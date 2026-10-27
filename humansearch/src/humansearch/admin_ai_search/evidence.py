@@ -48,6 +48,13 @@ class CandidateCountsPayload(TypedDict):
     excluded: int
 
 
+class BatchGroupingPayload(TypedDict):
+    status: EvidenceStatus
+    reason: str
+    message_count: int
+    message_ids: list[str]
+
+
 class CandidatePayload(TypedDict):
     canonical_key: str
     display_name: str
@@ -92,6 +99,7 @@ class BatchPayload(TypedDict):
     position: str
     channels: list[str]
     executed_at: str
+    batch_grouping: BatchGroupingPayload
     search_period: SearchPeriodPayload
     candidate_counts: CandidateCountsPayload
     candidate_counts_status: EvidenceStatus
@@ -232,6 +240,9 @@ class AiSearchRun:
     excluded_candidates: int = 0
     candidate_counts_complete: bool = True
     candidate_counts_reason: str | None = None
+    batch_group_key: str | None = None
+    source_message_ids: tuple[str, ...] = ()
+    batch_grouping_reason: str = "source_run_is_single_batch"
 
     def __post_init__(self) -> None:
         for field in ("actor", "source_run_id", "company", "position"):
@@ -244,6 +255,13 @@ class AiSearchRun:
             raise ValueError("candidate count components must be non-negative")
         if not self.candidate_counts_complete and not self.candidate_counts_reason:
             raise ValueError("incomplete candidate counts require a reason")
+        if self.batch_group_key is not None:
+            _nonblank(self.batch_group_key, "batch_group_key")
+        if len(self.source_message_ids) != len(set(self.source_message_ids)):
+            raise ValueError("source_message_ids must be unique")
+        for message_id in self.source_message_ids:
+            _nonblank(message_id, "source_message_id")
+        _nonblank(self.batch_grouping_reason, "batch_grouping_reason")
         if (self.search_period_start is None) != (self.search_period_end is None):
             raise ValueError("search period requires both start and end")
         if self.search_period_start is None and not self.search_period_reason:
@@ -378,6 +396,7 @@ def build_ai_search_batch(search_run: AiSearchRun, contract: EvidenceContract) -
         if search_run.search_period_start is not None
         else search_run.search_period_reason,
     }
+    source_message_ids = search_run.source_message_ids or (search_run.source_run_id,)
     return {
         "batch_id": stable_batch_id(
             search_run.actor, search_run.source_run_id, search_run.executed_at
@@ -389,6 +408,12 @@ def build_ai_search_batch(search_run: AiSearchRun, contract: EvidenceContract) -
         "position": search_run.position,
         "channels": sorted(set(search_run.channels)),
         "executed_at": search_run.executed_at.isoformat(),
+        "batch_grouping": {
+            "status": "PASS" if len(source_message_ids) > 1 else "NOT_RUN",
+            "reason": search_run.batch_grouping_reason,
+            "message_count": len(source_message_ids),
+            "message_ids": list(source_message_ids),
+        },
         "search_period": search_period,
         "candidate_counts": candidate_counts,
         "candidate_counts_status": ("PASS" if search_run.candidate_counts_complete else "NOT_RUN"),

@@ -7,6 +7,7 @@ import hashlib
 import html
 import re
 from collections.abc import Mapping, Sequence
+from dataclasses import replace
 from datetime import UTC, date, datetime
 from html.parser import HTMLParser
 from typing import ClassVar, cast
@@ -21,6 +22,7 @@ from .evidence import (
     VerificationCheck,
     build_ai_search_payload,
 )
+from .gmail_batching import group_gmail_runs, grouping_evidence
 from .gmail_subject import classify_actor, subject_context
 
 GMAIL_SNAPSHOT_VERSION = "admin-ai-search-gmail-snapshot/v1"
@@ -120,7 +122,7 @@ def build_ai_search_payload_from_gmail_snapshot(
     """Validate an exhaustive Gmail snapshot and project one Batch per message."""
 
     messages, query, page_count, pagination_exhausted = _validate_snapshot(snapshot)
-    runs = tuple(_message_to_run(message, contract) for message in messages)
+    runs = group_gmail_runs(tuple(_message_to_run(message, contract) for message in messages))
     payload = build_ai_search_payload(runs, contract)
     collection_status = "PASS" if pagination_exhausted else "NOT_RUN"
     collection_reason = None if pagination_exhausted else "gmail_pagination_incomplete"
@@ -254,7 +256,7 @@ def _message_to_run(message: Mapping[str, object], contract: EvidenceContract) -
         )
         for source in contract.required_verification_sources
     )
-    return AiSearchRun(
+    run = AiSearchRun(
         actor=actor,
         source_run_id=message_id,
         company=company,
@@ -271,6 +273,13 @@ def _message_to_run(message: Mapping[str, object], contract: EvidenceContract) -
         excluded_candidates=excluded,
         candidate_counts_complete=counts_complete,
         candidate_counts_reason=(None if counts_complete else "candidate_records_not_identifiable"),
+        source_message_ids=(message_id,),
+    )
+    group_key, grouping_reason = grouping_evidence(run, subject, body_text)
+    return replace(
+        run,
+        batch_group_key=group_key,
+        batch_grouping_reason=grouping_reason,
     )
 
 
