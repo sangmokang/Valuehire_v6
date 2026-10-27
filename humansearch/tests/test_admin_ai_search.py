@@ -246,3 +246,22 @@ def test_unknown_batch_detail_fails_closed() -> None:
 
     assert status == 404
     assert json.loads(body) == {"status": "FAIL", "reason": "batch_not_found"}
+
+
+def test_ai_search_assets_expose_required_detail_and_error_states() -> None:
+    page = (ASSET_DIR / "ai-search.html").read_text(encoding="utf-8")
+    script = (ASSET_DIR / "ai-search.js").read_text(encoding="utf-8")
+
+    assert 'id="error-state"' in page
+    assert "검색 기간" in page
+    for field in (
+        "actor_evidence",
+        "candidate_counts",
+        "key_experience",
+        "requirements_evidence",
+        "better_position_exists",
+        "contact_source",
+        "contact_checked_at",
+        "contact_opinion_evidence",
+    ):
+        assert field in script
