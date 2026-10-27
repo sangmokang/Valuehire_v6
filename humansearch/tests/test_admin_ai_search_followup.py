@@ -74,3 +74,29 @@ def test_non_run_test_mail_is_excluded_with_a_reason() -> None:
     assert collection["excluded_messages"] == [
         {"message_id": "gmail-test", "reason": "subject_test_marker"}
     ]
+
+
+def test_labels_after_profile_url_fill_candidate_detail() -> None:
+    contract = load_evidence_contract(CONTRACT_PATH)
+    body = """
+      <a href="https://www.linkedin.com/in/redacted-a">REDACTED A</a>
+      <p>경력: REDACTED FULL CAREER</p>
+      <p>학력: REDACTED EDUCATION</p>
+      <p>적합 근거: REDACTED FIT EVIDENCE</p>
+    """
+
+    payload = build_ai_search_payload_from_gmail_snapshot(
+        _snapshot(
+            _message(
+                "gmail-real",
+                "[ChatGPT-AISearch] [aisearch] REDACTED_CLIENT Data Analyst — 판정",
+                body,
+            )
+        ),
+        contract,
+    )
+
+    candidate = payload["batches"][0]["candidates"][0]
+    assert candidate["experience"] == "REDACTED FULL CAREER"
+    assert candidate["education"] == "REDACTED EDUCATION"
+    assert candidate["why_fit"] == ["REDACTED FIT EVIDENCE"]
