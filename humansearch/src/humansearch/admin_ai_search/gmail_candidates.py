@@ -69,7 +69,13 @@ def candidate_records(
     elif len(named_boundaries) >= 2:
         boundaries = [(index, False) for index in named_boundaries]
     if boundaries:
-        candidates: list[CandidateEvidence] = []
+        prefix_occurrences = _candidate_occurrences(
+            "\n".join(lines[: boundaries[0][0]]), links
+        )
+        candidates = [
+            _candidate_from_context(url, label, lines[line_index : line_index + 1], contract)
+            for url, label, line_index in prefix_occurrences
+        ]
         unparsed = 0
         excluded = 0
         for boundary_index, (start, is_excluded) in enumerate(boundaries):
