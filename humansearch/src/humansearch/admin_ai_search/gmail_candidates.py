@@ -49,6 +49,9 @@ def candidate_records(
     contract: EvidenceContract,
 ) -> tuple[tuple[CandidateEvidence, ...], int, int, bool]:
     lines = [line.strip() for line in body_text.splitlines() if line.strip()]
+    named_boundaries = [
+        index for index, line in enumerate(lines) if _NAMED_CANDIDATE_HEADING.match(line)
+    ]
     boundaries: list[tuple[int, bool]] = []
     for index, line in enumerate(lines):
         if _EXCLUDED_HEADING.match(line):
@@ -59,10 +62,13 @@ def candidate_records(
         known_indexes = {index for index, _ in boundaries}
         boundaries.extend(
             (index, False)
-            for index, line in enumerate(lines)
-            if index not in known_indexes and _NAMED_CANDIDATE_HEADING.match(line)
+            for index in named_boundaries
+            if index not in known_indexes
         )
         boundaries.sort()
+    elif len(named_boundaries) >= 2:
+        boundaries = [(index, False) for index in named_boundaries]
+    if boundaries:
         candidates: list[CandidateEvidence] = []
         unparsed = 0
         excluded = 0
@@ -90,9 +96,6 @@ def candidate_records(
     if occurrences:
         if len(occurrences) == 1:
             url, label, line_index = occurrences[0]
-            named_boundaries = [
-                index for index, line in enumerate(lines) if _NAMED_CANDIDATE_HEADING.match(line)
-            ]
             if named_boundaries:
                 owner = next(
                     (index for index in reversed(named_boundaries) if index <= line_index), None
