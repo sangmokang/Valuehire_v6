@@ -98,6 +98,22 @@ def test_actor_is_classified_from_evidence_and_unknown_is_other(
     }
 
 
+def test_subject_context_ignores_tags_and_candidate_score_suffix() -> None:
+    contract = load_evidence_contract(EVIDENCE_CONTRACT_PATH)
+    subject = (
+        "[ChatGPT-AISearch] [aisearch] REDACTED_CLIENT Business Data Analyst "
+        "— REDACTED CANDIDATE 83점 판정"
+    )
+
+    payload = build_ai_search_payload_from_gmail_snapshot(
+        _snapshot(_message(subject, "<p>후보 결과 없음</p>")), contract
+    )
+
+    batch = payload["batches"][0]
+    assert batch["company"] == "REDACTED_CLIENT"
+    assert batch["position"] == "Business Data Analyst"
+
+
 def test_redacted_live_shape_preserves_count_equation_and_unknown_score() -> None:
     contract = load_evidence_contract(EVIDENCE_CONTRACT_PATH)
     body = """
