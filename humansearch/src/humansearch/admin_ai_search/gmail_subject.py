@@ -12,6 +12,11 @@ _ACTOR_TOKEN = re.compile(
     r"^(?:grok(?:bot|\d+(?:\.\d+)?)?|claude\s*code|claudecode|chatgpt|codex|gemini)\s+",
     re.IGNORECASE,
 )
+_NON_RUN_SUBJECT = re.compile(
+    r"(?:\[(?:test|테스트(?:\s*메일)?|dry[- ]?run|smoke(?:\s*test)?|fixture)\]|"
+    r"\b테스트\s*메일\b|\bdry[- ]?run\b|\bsmoke\s*test\b)",
+    re.IGNORECASE,
+)
 
 
 def classify_actor(subject: str, sender: str) -> tuple[str, str]:
@@ -65,6 +70,12 @@ def subject_context(subject: str) -> tuple[str, str]:
     if not separator or not company.strip() or not position.strip():
         return _missing_context()
     return company.strip(), position.strip()
+
+
+def non_run_reason(subject: str) -> str | None:
+    """Classify explicit test/dry-run mail before it can become a Batch."""
+
+    return "subject_test_marker" if _NON_RUN_SUBJECT.search(subject) is not None else None
 
 
 def _strip_metadata_tags(value: str) -> str:

@@ -23,7 +23,7 @@ from .evidence import (
     build_ai_search_payload,
 )
 from .gmail_batching import group_gmail_runs, grouping_evidence
-from .gmail_subject import classify_actor, subject_context
+from .gmail_subject import classify_actor, non_run_reason, subject_context
 
 GMAIL_SNAPSHOT_VERSION = "admin-ai-search-gmail-snapshot/v1"
 _SNAPSHOT_FIELDS = {
@@ -122,7 +122,19 @@ def build_ai_search_payload_from_gmail_snapshot(
     """Validate an exhaustive Gmail snapshot and project one Batch per message."""
 
     messages, query, page_count, pagination_exhausted = _validate_snapshot(snapshot)
-    runs = group_gmail_runs(tuple(_message_to_run(message, contract) for message in messages))
+    included_messages: list[Mapping[str, object]] = []
+    excluded_messages: list[dict[str, str]] = []
+    for message in messages:
+        message_id = _required_string(message, "id")
+        message_payload = _required_mapping(message, "payload")
+        reason = non_run_reason(_header(message_payload, "subject"))
+        if reason is None:
+            included_messages.append(message)
+        else:
+            excluded_messages.append({"message_id": message_id, "reason": reason})
+    runs = group_gmail_runs(
+        tuple(_message_to_run(message, contract) for message in included_messages)
+    )
     payload = build_ai_search_payload(runs, contract)
     collection_status = "PASS" if pagination_exhausted else "NOT_RUN"
     collection_reason = None if pagination_exhausted else "gmail_pagination_incomplete"
@@ -130,6 +142,9 @@ def build_ai_search_payload_from_gmail_snapshot(
         "query": query,
         "page_count": page_count,
         "message_count": len(messages),
+        "included_message_count": len(included_messages),
+        "excluded_message_count": len(excluded_messages),
+        "excluded_messages": excluded_messages,
         "pagination_exhausted": pagination_exhausted,
         "status": collection_status,
         "reason": collection_reason,
@@ -138,9 +153,11 @@ def build_ai_search_payload_from_gmail_snapshot(
     if not pagination_exhausted:
         payload["status"] = "NOT_RUN"
         payload["reason"] = "gmail_pagination_incomplete"
-    elif not messages:
+    elif not included_messages:
         payload["status"] = "NOT_RUN"
-        payload["reason"] = "no_ai_search_messages"
+        payload["reason"] = (
+            "no_ai_search_messages" if not messages else "no_executable_ai_search_messages"
+        )
     return payload
 
 
