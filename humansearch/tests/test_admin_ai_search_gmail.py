@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
+from io import StringIO
 from pathlib import Path
 
 import pytest
@@ -11,6 +13,9 @@ from humansearch.admin_ai_search import load_evidence_contract
 from humansearch.admin_ai_search.gmail_source import (
     GMAIL_SNAPSHOT_VERSION,
     build_ai_search_payload_from_gmail_snapshot,
+)
+from humansearch.admin_weekly_dashboard.shadow_server import (
+    load_ai_search_payload_from_stream,
 )
 
 REPO_ROOT = Path(__file__).parents[2]
@@ -202,3 +207,29 @@ def test_snapshot_rejects_unknown_fields_and_response_id_mismatch() -> None:
     mismatch["message_ids"] = ["different-message"]
     with pytest.raises(ValueError, match="message_ids"):
         build_ai_search_payload_from_gmail_snapshot(mismatch, contract)
+
+
+def test_runtime_stream_loads_real_shape_without_writing_a_snapshot_file() -> None:
+    contract = load_evidence_contract(EVIDENCE_CONTRACT_PATH)
+    snapshot = _snapshot(
+        _message(
+            "[aisearch]chatgpt [REDACTED CLIENT][REDACTED ROLE]",
+            '<a href="https://www.linkedin.com/in/redacted">REDACTED</a>',
+        )
+    )
+
+    payload = load_ai_search_payload_from_stream(
+        StringIO(json.dumps(snapshot, ensure_ascii=False) + "\n"),
+        contract,
+    )
+
+    assert payload["gmail_collection"]["message_count"] == 1
+    assert payload["external_effects"]["gmail"] == "READ_ONLY"
+    assert len(payload["batches"]) == 1
+
+
+def test_runtime_stream_rejects_non_object_json() -> None:
+    contract = load_evidence_contract(EVIDENCE_CONTRACT_PATH)
+
+    with pytest.raises(TypeError, match="JSON object"):
+        load_ai_search_payload_from_stream(StringIO("[]\n"), contract)
