@@ -201,6 +201,8 @@ def _validate_pages(
             if request_token in seen_request_tokens:
                 raise ValueError("Gmail pagination token cycle detected")
             seen_request_tokens.add(request_token)
+        if next_token is not None and next_token in seen_request_tokens:
+            raise ValueError("Gmail pagination token cycle detected")
         if not isinstance(page_ids, list) or not all(
             isinstance(item, str) and item for item in page_ids
         ):
@@ -330,8 +332,6 @@ def _classify_actor(subject: str, sender: str) -> tuple[str, str]:
         actor, marker = markers[0]
         prefix = "unsupported_marker" if actor == "OTHER" else "subject_marker"
         return actor, f"{prefix}:{marker}"
-    if actor_region:
-        return "OTHER", "unsupported_actor_marker"
     return "AI_SEARCH", "subject_marker:ai_search"
 
 
