@@ -22,11 +22,17 @@ REPO_ROOT = Path(__file__).parents[2]
 EVIDENCE_CONTRACT_PATH = REPO_ROOT / "contracts" / "admin-ai-search" / "evidence-contract-v1.json"
 
 
-def _message(subject: str, body: str, *, message_id: str = "gmail-message-1") -> dict[str, object]:
+def _message(
+    subject: str,
+    body: str,
+    *,
+    message_id: str = "gmail-message-1",
+    internal_date: str = "1793061000000",
+) -> dict[str, object]:
     return {
         "id": message_id,
         "thread_id": f"thread-{message_id}",
-        "internal_date": "1793061000000",
+        "internal_date": internal_date,
         "payload": {
             "mime_type": "text/html",
             "headers": [
@@ -235,6 +241,41 @@ def test_candidate_alerts_without_run_or_context_evidence_are_not_grouped() -> N
     assert {batch["batch_grouping"]["reason"] for batch in payload["batches"]} == {
         "missing_batch_group_evidence"
     }
+
+
+def test_explicit_run_id_groups_candidate_alerts_across_received_dates() -> None:
+    contract = load_evidence_contract(EVIDENCE_CONTRACT_PATH)
+    first_body = """
+      <p>실행 ID: run-redacted-1</p>
+      <h2>후보 1</h2>
+      <a href="https://www.linkedin.com/in/redacted-a">REDACTED A</a>
+    """
+    second_body = """
+      <p>실행 ID: run-redacted-1</p>
+      <h2>후보 1</h2>
+      <a href="https://www.linkedin.com/in/redacted-b">REDACTED B</a>
+    """
+
+    payload = build_ai_search_payload_from_gmail_snapshot(
+        _snapshot(
+            _message(
+                "[aisearch]chatgpt [aisearch]",
+                first_body,
+                message_id="gmail-message-a",
+                internal_date="1793061000000",
+            ),
+            _message(
+                "[aisearch]chatgpt [aisearch]",
+                second_body,
+                message_id="gmail-message-b",
+                internal_date="1793147400000",
+            ),
+        ),
+        contract,
+    )
+
+    assert len(payload["batches"]) == 1
+    assert payload["batches"][0]["batch_grouping"]["reason"] == "explicit_run_id"
 
 
 def test_unidentifiable_candidate_records_are_not_reported_as_zero() -> None:
