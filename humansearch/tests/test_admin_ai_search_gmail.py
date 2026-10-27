@@ -315,6 +315,25 @@ def test_snapshot_rejects_broken_pagination_token_chain() -> None:
         build_ai_search_payload_from_gmail_snapshot(snapshot, contract)
 
 
+def test_snapshot_rejects_page_appended_after_terminal_token() -> None:
+    contract = load_evidence_contract(EVIDENCE_CONTRACT_PATH)
+    message = _message("[aisearch] [REDACTED][REDACTED]", "<p>후보 결과 없음</p>")
+    snapshot = _snapshot(message)
+    pages = snapshot["pages"]
+    assert isinstance(pages, list)
+    pages.append(
+        {
+            "request_page_token": None,
+            "message_ids": [],
+            "next_page_token": None,
+        }
+    )
+    snapshot["page_count"] = 2
+
+    with pytest.raises(ValueError, match="pagination"):
+        build_ai_search_payload_from_gmail_snapshot(snapshot, contract)
+
+
 def test_candidate_sections_do_not_leak_evidence_between_people() -> None:
     contract = load_evidence_contract(EVIDENCE_CONTRACT_PATH)
     body = """
@@ -367,6 +386,46 @@ def test_duplicate_sections_and_excluded_profiles_are_mutually_exclusive() -> No
         "excluded": 1,
     }
     assert all("redacted-excluded" not in item["profile_url"] for item in batch["candidates"])
+
+
+def test_numbered_heading_without_profile_is_counted_as_unparsed() -> None:
+    contract = load_evidence_contract(EVIDENCE_CONTRACT_PATH)
+    body = """
+      <h2>1. REDACTED A</h2>
+      <a href="https://www.linkedin.com/in/redacted-a">REDACTED A</a>
+      <h2>2. REDACTED B</h2>
+      <p>프로필 URL 미확인</p>
+    """
+    payload = build_ai_search_payload_from_gmail_snapshot(
+        _snapshot(_message("[aisearch]chatgpt [REDACTED][REDACTED]", body)),
+        contract,
+    )
+
+    assert payload["batches"][0]["candidate_counts"] == {
+        "raw": 2,
+        "parsed": 1,
+        "duplicate": 0,
+        "unparsed": 1,
+        "excluded": 0,
+    }
+
+
+def test_unstructured_pre_url_evidence_is_not_assigned_to_previous_candidate() -> None:
+    contract = load_evidence_contract(EVIDENCE_CONTRACT_PATH)
+    body = """
+      <a href="https://www.linkedin.com/in/redacted-a">REDACTED A</a>
+      <p>총경력: REDACTED B CAREER</p>
+      <p>추천 근거: REDACTED B OPINION</p>
+      <a href="https://www.linkedin.com/in/redacted-b">REDACTED B</a>
+    """
+    payload = build_ai_search_payload_from_gmail_snapshot(
+        _snapshot(_message("[aisearch]chatgpt [REDACTED][REDACTED]", body)),
+        contract,
+    )
+
+    candidates = payload["batches"][0]["candidates"]
+    assert all(item["experience"] is None for item in candidates)
+    assert all(item["contact_opinion_evidence"] is None for item in candidates)
 
 
 def test_candidate_url_identity_rejects_lookalikes_and_preserves_query_keys() -> None:
