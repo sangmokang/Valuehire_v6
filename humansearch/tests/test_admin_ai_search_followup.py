@@ -223,6 +223,44 @@ def test_candidate_results_heading_does_not_erase_multiple_profile_urls() -> Non
     }
 
 
+def test_numbered_then_named_candidate_headings_do_not_share_evidence() -> None:
+    contract = load_evidence_contract(CONTRACT_PATH)
+    body = """
+      <h2>후보 1</h2>
+      <a href="https://www.linkedin.com/in/redacted-a">REDACTED A</a>
+      <h2>후보 B</h2>
+      <p>프로필 URL 미확인</p>
+      <p>경력: REDACTED B CAREER</p>
+      <p>학력 점수: 90</p>
+      <p>직무 적합성 점수: 80</p>
+      <p>고난도 업무 점수: 70</p>
+      <p>직무 기술 논리성 점수: 60</p>
+    """
+
+    payload = build_ai_search_payload_from_gmail_snapshot(
+        _snapshot(
+            _message(
+                "gmail-real",
+                "[ChatGPT-AISearch] [aisearch] REDACTED_CLIENT Data Analyst — 판정",
+                body,
+            )
+        ),
+        contract,
+    )
+
+    batch = payload["batches"][0]
+    candidate = batch["candidates"][0]
+    assert candidate["experience"] is None
+    assert candidate["score"] is None
+    assert batch["candidate_counts"] == {
+        "raw": 2,
+        "parsed": 1,
+        "duplicate": 0,
+        "unparsed": 1,
+        "excluded": 0,
+    }
+
+
 def test_conflicting_explicit_run_ids_are_not_grouped() -> None:
     contract = load_evidence_contract(CONTRACT_PATH)
     subject = (
