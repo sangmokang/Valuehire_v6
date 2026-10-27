@@ -184,6 +184,59 @@ def test_same_gmail_message_always_builds_the_same_batch_id() -> None:
     assert first["batches"][0]["batch_id"] == second["batches"][0]["batch_id"]
 
 
+def test_candidate_alerts_from_the_same_daily_run_are_one_batch() -> None:
+    contract = load_evidence_contract(EVIDENCE_CONTRACT_PATH)
+    subject = "[ChatGPT-AISearch] [aisearch] REDACTED_CLIENT Business Data Analyst — 판정"
+    first_body = (
+        '<h2>후보 1</h2><a href="https://www.linkedin.com/in/redacted-a">REDACTED A</a>'
+    )
+    second_body = (
+        '<h2>후보 1</h2><a href="https://www.linkedin.com/in/redacted-b">REDACTED B</a>'
+    )
+
+    payload = build_ai_search_payload_from_gmail_snapshot(
+        _snapshot(
+            _message(subject, first_body, message_id="gmail-message-a"),
+            _message(subject, second_body, message_id="gmail-message-b"),
+        ),
+        contract,
+    )
+
+    assert len(payload["batches"]) == 1
+    batch = payload["batches"][0]
+    assert batch["candidate_counts"] == {
+        "raw": 2,
+        "parsed": 2,
+        "duplicate": 0,
+        "unparsed": 0,
+        "excluded": 0,
+    }
+    assert batch["batch_grouping"] == {
+        "status": "PASS",
+        "reason": "same_actor_company_position_date",
+        "message_count": 2,
+        "message_ids": ["gmail-message-a", "gmail-message-b"],
+    }
+
+
+def test_candidate_alerts_without_run_or_context_evidence_are_not_grouped() -> None:
+    contract = load_evidence_contract(EVIDENCE_CONTRACT_PATH)
+    body = '<h2>후보 1</h2><a href="https://www.linkedin.com/in/redacted">REDACTED</a>'
+
+    payload = build_ai_search_payload_from_gmail_snapshot(
+        _snapshot(
+            _message("[aisearch]chatgpt [aisearch]", body, message_id="gmail-message-a"),
+            _message("[aisearch]chatgpt [aisearch]", body, message_id="gmail-message-b"),
+        ),
+        contract,
+    )
+
+    assert len(payload["batches"]) == 2
+    assert {batch["batch_grouping"]["reason"] for batch in payload["batches"]} == {
+        "missing_batch_group_evidence"
+    }
+
+
 def test_unidentifiable_candidate_records_are_not_reported_as_zero() -> None:
     contract = load_evidence_contract(EVIDENCE_CONTRACT_PATH)
     payload = build_ai_search_payload_from_gmail_snapshot(
