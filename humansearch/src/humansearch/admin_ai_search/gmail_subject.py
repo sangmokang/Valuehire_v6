@@ -59,8 +59,8 @@ def subject_context(subject: str) -> tuple[str, str]:
     if subject_parts is None:
         return _missing_context()
     _, remainder = subject_parts
-    remainder = _strip_metadata_tags(remainder.strip())
-    remainder = _ACTOR_TOKEN.sub("", remainder).strip()
+    remainder = _ACTOR_TOKEN.sub("", remainder.strip()).strip()
+    remainder = _strip_metadata_tags(remainder)
 
     bracket_pair = re.search(r"\[([^\]]+)\]\s*\[([^\]]+)\]", remainder)
     if bracket_pair is not None:
