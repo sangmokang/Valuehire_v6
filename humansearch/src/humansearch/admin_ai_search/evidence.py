@@ -11,17 +11,19 @@ from pathlib import Path
 from typing import Literal, NotRequired, TypedDict, cast
 from zoneinfo import ZoneInfo
 
+from .scoring import (
+    ScoreComponents,
+    load_score_contract,
+    validate_score_provenance,
+)
+from .scoring import calculate_candidate_score as _calculate_candidate_score
+
 EvidenceStatus = Literal["PASS", "FAIL", "NOT_RUN"]
 ContactRecommendation = Literal["STRONG", "NORMAL", "HOLD", "NOT_RUN"]
 KST = ZoneInfo("Asia/Seoul")
 
 
-class ScoreBuckets(TypedDict):
-    """Mutually exclusive score bands displayed in the batch list."""
-
-    score_90_plus: int | None
-    score_80s: int | None
-    score_70s: int | None
+calculate_candidate_score = _calculate_candidate_score
 
 
 class ActorEvidencePayload(TypedDict):
@@ -67,6 +69,9 @@ class CandidatePayload(TypedDict):
     score: int | None
     score_status: EvidenceStatus
     score_reason: str | None
+    score_contract_version: str | None
+    score_components: ScoreComponents | None
+    score_input_hash: str | None
     why_fit: list[str]
     reverse_match_position: str | None
     reverse_match_score: int | None
@@ -160,6 +165,9 @@ class CandidateEvidence:
     better_position: str | None = None
     better_position_reason: str | None = None
     contact_opinion_evidence: str | None = None
+    score_contract_version: str | None = None
+    score_components: ScoreComponents | None = None
+    score_input_hash: str | None = None
 
     def __post_init__(self) -> None:
         if len(self.canonical_key) != 64 or any(
@@ -184,6 +192,22 @@ class CandidateEvidence:
             raise ValueError("requirements_evidence must contain non-blank evidence")
         if self.score is None and not self.score_reason:
             raise ValueError("missing score requires score_reason")
+        score_provenance = (
+            self.score_contract_version,
+            self.score_components,
+            self.score_input_hash,
+        )
+        if self.score is not None and any(value is None for value in score_provenance):
+            raise ValueError(
+                "calculated score requires contract version, components, and input hash"
+            )
+        if self.score is None and any(value is not None for value in score_provenance):
+            raise ValueError("missing score cannot carry partial score provenance")
+        if self.score_input_hash is not None and (
+            len(self.score_input_hash) != 64
+            or any(char not in "0123456789abcdef" for char in self.score_input_hash)
+        ):
+            raise ValueError("score_input_hash must be a lowercase SHA-256 hex digest")
         if self.reverse_match_score is not None and not 0 <= self.reverse_match_score <= 100:
             raise ValueError("reverse_match_score must be between 0 and 100")
         if self.contact_recommendation not in {"STRONG", "NORMAL", "HOLD", "NOT_RUN"}:
@@ -279,6 +303,8 @@ class EvidenceContract:
     score_bands: Mapping[str, Mapping[str, int]]
     required_verification_sources: tuple[str, ...]
     external_effects: dict[str, str]
+    score_contract_version: str
+    score_weights: Mapping[str, int]
 
 
 def load_evidence_contract(path: Path) -> EvidenceContract:
@@ -293,11 +319,11 @@ def load_evidence_contract(path: Path) -> EvidenceContract:
     actors = raw.get("actors")
     bands = raw.get("score_bands")
     effects = raw.get("external_effects")
+    score_contract_version, score_weights = load_score_contract(raw.get("score_contract"))
     if not isinstance(actors, dict) or not isinstance(bands, dict) or not isinstance(effects, dict):
         raise TypeError("AI Search evidence contract has invalid mappings")
     expected_bands = {
-        "90_plus": {"min": 90, "max": 100},
-        "80s": {"min": 80, "max": 89},
+        "90_plus": {"min": 90, "max": 100}, "80s": {"min": 80, "max": 89},
         "70s": {"min": 70, "max": 79},
     }
     if bands != expected_bands:
@@ -309,6 +335,8 @@ def load_evidence_contract(path: Path) -> EvidenceContract:
         score_bands=cast(dict[str, dict[str, int]], bands),
         required_verification_sources=required,
         external_effects=cast(dict[str, str], effects),
+        score_contract_version=score_contract_version,
+        score_weights=score_weights,
     )
 
 
@@ -335,6 +363,15 @@ def build_ai_search_batch(search_run: AiSearchRun, contract: EvidenceContract) -
 
     if search_run.actor not in contract.actors:
         raise ValueError(f"unsupported actor {search_run.actor!r}")
+    for candidate in search_run.candidates:
+        validate_score_provenance(
+            candidate.score,
+            candidate.score_contract_version,
+            candidate.score_components,
+            candidate.score_input_hash,
+            contract.score_contract_version,
+            contract.score_weights,
+        )
     deduplicated: dict[str, CandidateEvidence] = {}
     for item in sorted(
         search_run.candidates,
@@ -504,7 +541,7 @@ def _score_state(candidates: Sequence[CandidatePayload]) -> tuple[EvidenceStatus
         return "NOT_RUN", "no_parsed_candidates"
     missing = next((item for item in candidates if item["score"] is None), None)
     if missing is not None:
-        return "NOT_RUN", missing["score_reason"] or "v5_score_contract_evidence_missing"
+        return "NOT_RUN", missing["score_reason"] or "score_contract_evidence_missing"
     return "PASS", None
 
 
@@ -531,6 +568,9 @@ def _candidate_payload(
         "score": item.score,
         "score_status": "PASS" if item.score is not None else "NOT_RUN",
         "score_reason": None if item.score is not None else item.score_reason,
+        "score_contract_version": item.score_contract_version,
+        "score_components": item.score_components,
+        "score_input_hash": item.score_input_hash,
         "why_fit": list(item.why_fit),
         "reverse_match_position": item.reverse_match_position,
         "reverse_match_score": item.reverse_match_score,

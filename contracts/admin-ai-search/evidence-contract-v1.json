@@ -13,6 +13,15 @@
     "80s": {"min": 80, "max": 89},
     "70s": {"min": 70, "max": 79}
   },
+  "score_contract": {
+    "version": "admin-ai-search-score/v2",
+    "weights": {
+      "education": 40,
+      "job_fit": 40,
+      "difficult_work": 10,
+      "job_description_logic": 10
+    }
+  },
   "required_verification_sources": [
     "SARAMIN_BILLING",
     "SARAMIN_MESSENGER",

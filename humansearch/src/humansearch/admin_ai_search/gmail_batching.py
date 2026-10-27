@@ -17,9 +17,7 @@ _RUN_ID = re.compile(
 )
 
 
-def grouping_evidence(
-    run: AiSearchRun, subject: str, body_text: str
-) -> tuple[str | None, str]:
+def grouping_evidence(run: AiSearchRun, subject: str, body_text: str) -> tuple[str | None, str]:
     """Return a grouping key only when a per-candidate alert has run evidence."""
 
     if not _is_candidate_alert(run):
