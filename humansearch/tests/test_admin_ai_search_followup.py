@@ -13,6 +13,7 @@ from humansearch.admin_ai_search.gmail_source import (
     GMAIL_SNAPSHOT_VERSION,
     build_ai_search_payload_from_gmail_snapshot,
 )
+from humansearch.admin_ai_search.gmail_subject import classify_actor, subject_context
 
 REPO_ROOT = Path(__file__).parents[2]
 CONTRACT_PATH = REPO_ROOT / "contracts" / "admin-ai-search" / "evidence-contract-v1.json"
@@ -77,6 +78,28 @@ def test_non_run_test_mail_is_excluded_with_a_reason() -> None:
     assert collection["excluded_messages"] == [
         {"message_id": "gmail-test", "reason": "subject_test_marker"}
     ]
+
+
+def test_single_metadata_tag_never_becomes_the_customer() -> None:
+    subject = (
+        "[ChatGPT-AISearch] [긴급] REDACTED_CLIENT Data Analyst "
+        "— REDACTED CANDIDATE 90점 판정"
+    )
+
+    assert subject_context(subject) == ("REDACTED_CLIENT", "Data Analyst")
+
+
+def test_reply_prefix_preserves_actor_and_customer_context() -> None:
+    subject = (
+        "Re: [ChatGPT-AISearch] [aisearch] REDACTED_CLIENT Data Analyst "
+        "— REDACTED CANDIDATE 90점 판정"
+    )
+
+    assert classify_actor(subject, "AI Search <sender@valueconnect.kr>") == (
+        "CHATGPT",
+        "subject_marker:chatgpt",
+    )
+    assert subject_context(subject) == ("REDACTED_CLIENT", "Data Analyst")
 
 
 def test_labels_after_profile_url_fill_candidate_detail() -> None:
