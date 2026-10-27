@@ -175,4 +175,5 @@ def test_four_explicit_score_axes_are_calculated_by_code() -> None:
         "difficult_work": 70,
         "job_description_logic": 60,
     }
+    assert candidate["score_input_hash"] is not None
     assert len(candidate["score_input_hash"]) == 64

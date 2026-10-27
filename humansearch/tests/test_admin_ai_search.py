@@ -1,7 +1,7 @@
 """Acceptance tests for the read-only AI Search evidence surface."""
 
-import json
 import hashlib
+import json
 import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
