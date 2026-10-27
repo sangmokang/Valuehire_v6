@@ -17,6 +17,7 @@ _NON_RUN_SUBJECT = re.compile(
     r"\b테스트\s*메일\b|\bdry[- ]?run\b|\bsmoke\s*test\b)",
     re.IGNORECASE,
 )
+_REPLY_PREFIX = re.compile(r"^\s*(?:(?:re|fw|fwd)\s*:\s*)+", re.IGNORECASE)
 
 
 def classify_actor(subject: str, sender: str) -> tuple[str, str]:
@@ -82,17 +83,23 @@ def _strip_metadata_tags(value: str) -> str:
     remainder = value
     while True:
         match = re.match(r"^\[([^\]]+)\]\s*", remainder)
-        if match is None or _METADATA_TAG.search(match.group(1)) is None:
+        if match is None:
             return remainder
-        remainder = remainder[match.end() :].strip()
+        following = remainder[match.end() :].strip()
+        is_known_metadata = _METADATA_TAG.search(match.group(1)) is not None
+        is_single_leading_tag = re.match(r"^\[[^\]]+\]", following) is None
+        if not is_known_metadata and not is_single_leading_tag:
+            return remainder
+        remainder = following
 
 
 def _subject_parts(subject: str) -> tuple[str, str] | None:
-    prefix_match = re.match(r"^\s*\[([^\]]+)\]\s*", subject)
+    normalized = _REPLY_PREFIX.sub("", subject)
+    prefix_match = re.match(r"^\s*\[([^\]]+)\]\s*", normalized)
     if prefix_match is None:
         return None
     prefix = re.sub(r"[\s_-]+", "", prefix_match.group(1).lower())
-    return prefix, subject[prefix_match.end() :]
+    return prefix, normalized[prefix_match.end() :]
 
 
 def _missing_context() -> tuple[str, str]:
