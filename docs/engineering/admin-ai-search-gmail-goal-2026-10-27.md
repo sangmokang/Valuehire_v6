@@ -31,7 +31,11 @@ AI Search Batch를 만들고, `GET /api/ai-search` 목록과
 
 ```text
 query: "subject:aisearch -in:spam -in:trash"
-page: {message_ids: list[str], next_page_token: str | null}
+page: {
+  request_page_token: str | null,
+  message_ids: list[str],
+  next_page_token: str | null
+}
 message: {
   message_id: str,
   thread_id: str,
@@ -44,6 +48,25 @@ message: {
 
 검색은 `next_page_token`이 없을 때까지 계속한다. 토큰 반복, 페이지 오류, 메시지 읽기 오류,
 요청 ID와 응답 ID 불일치는 조용히 건너뛰지 않는다.
+
+## 최종 실측 결과
+
+- Gmail query 4페이지를 끝까지 읽었고 마지막 `next_page_token=null` 및 전체 페이지 token chain을
+  검증했다. 메시지/Batch는 342건이다.
+- 실행 주체는 `GROK 19`, `CLAUDE_CODE 99`, `CHATGPT 143`, `AI_SEARCH 30`,
+  `OTHER 51`이다. 각 Batch에 제목·발신자·thread/message ID·수신시각·판정 사유가 있다.
+- 후보 count가 확정된 278 Batch는
+  `raw 8,714 = parsed 8,243 + duplicate 255 + unparsed 216 + excluded 0`이다.
+  나머지 64 Batch는 후보 레코드 경계를 확정할 수 없어 raw/unparsed를
+  `NOT_RUN:candidate_records_not_identifiable`로 둔다.
+- v5 D1~D8 계약 입력이 없는 메일이므로 점수/점수대 342건은 모두
+  `NOT_RUN:v5_score_contract_evidence_missing`이다. 검색 기간도 명시 근거가 없어 342건 모두
+  `NOT_RUN:search_period_not_found`다.
+- FU 채용사이트 검증은 비범위이므로 실제 FU 342건은 모두
+  `NOT_RUN:fu_portal_verification_not_run`이다.
+- Gmail에는 검색/읽기만 수행했다. 외부 발송 0건, 채용사이트 변경 0건, 원격 DB 쓰기 0건이다.
+- 브라우저에서 실제 목록 342행, 후보 상세, 빈 상태, API 404 오류 상태를 각각 확인했고 실제/빈
+  화면의 console/page error는 0건이다.
 
 ### Batch output additions
 
@@ -178,10 +201,10 @@ bash scripts/acceptance-hs-gates.sh
 - [x] strict 원칙 검사 `PASS 34/34`
 - [x] recurrence ledger 부재 확인
 - [x] 기존 worktree 재사용, ops-dashboard branch 무변경
-- [ ] 실제 Gmail pagination exhausted 증거
-- [ ] 외부 발송/원격 DB write 0건 readback
-- [ ] 테스트 skip/only/todo 추가 0건, 삭제/약화 0건
-- [ ] V1 다른 엔진 + V2 직접 재현
+- [x] 실제 Gmail pagination 4페이지 token chain 및 exhausted 증거
+- [x] 외부 발송/채용사이트 변경/원격 DB write 0건 확인
+- [x] 테스트 skip/only/todo 추가 0건, 삭제/약화 0건
+- [x] V1 다른 엔진 CLEAN + V2 직접 재현
 - [ ] 최종 HEAD/원격/CI SHA 귀속 확인
 
 ## 스펙 공격 질문
