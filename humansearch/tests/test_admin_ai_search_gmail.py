@@ -14,9 +14,7 @@ from humansearch.admin_ai_search.gmail_source import (
 )
 
 REPO_ROOT = Path(__file__).parents[2]
-EVIDENCE_CONTRACT_PATH = (
-    REPO_ROOT / "contracts" / "admin-ai-search" / "evidence-contract-v1.json"
-)
+EVIDENCE_CONTRACT_PATH = REPO_ROOT / "contracts" / "admin-ai-search" / "evidence-contract-v1.json"
 
 
 def _message(subject: str, body: str, *, message_id: str = "gmail-message-1") -> dict[str, object]:
@@ -52,7 +50,7 @@ def _snapshot(
 @pytest.mark.parametrize(
     ("subject", "actor", "reason"),
     [
-        ("[aisearch]grok [REDACTED][REDACTED]", "GROK", "subject_marker:grok"),
+        ("[aisearch]grok3.0 [REDACTED][REDACTED]", "GROK", "subject_marker:grok"),
         (
             "[aisearch]claudecode [REDACTED][REDACTED]",
             "CLAUDE_CODE",
@@ -105,9 +103,7 @@ def test_redacted_live_shape_preserves_count_equation_and_unknown_score() -> Non
     """
 
     payload = build_ai_search_payload_from_gmail_snapshot(
-        _snapshot(
-            _message("[aisearch]chatgpt [REDACTED CLIENT][REDACTED ROLE] — 결과", body)
-        ),
+        _snapshot(_message("[aisearch]chatgpt [REDACTED CLIENT][REDACTED ROLE] — 결과", body)),
         contract,
     )
 
@@ -157,6 +153,25 @@ def test_same_gmail_message_always_builds_the_same_batch_id() -> None:
     second = build_ai_search_payload_from_gmail_snapshot(snapshot, contract)
 
     assert first["batches"][0]["batch_id"] == second["batches"][0]["batch_id"]
+
+
+def test_conflicting_actor_markers_fail_closed_to_other() -> None:
+    contract = load_evidence_contract(EVIDENCE_CONTRACT_PATH)
+    payload = build_ai_search_payload_from_gmail_snapshot(
+        _snapshot(
+            _message(
+                "[aisearch]chatgpt-grok [REDACTED][REDACTED]",
+                "<p>후보 결과 없음</p>",
+            )
+        ),
+        contract,
+    )
+
+    batch = payload["batches"][0]
+    assert batch["actor"] == "OTHER"
+    actor_evidence = batch["actor_evidence"]
+    assert actor_evidence is not None
+    assert actor_evidence["reason"] == "actor_markers_conflict"
 
 
 def test_incomplete_pagination_can_never_be_pass() -> None:

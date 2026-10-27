@@ -8,20 +8,44 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Literal, TypedDict, cast
+from typing import Literal, NotRequired, TypedDict, cast
 from zoneinfo import ZoneInfo
 
 EvidenceStatus = Literal["PASS", "FAIL", "NOT_RUN"]
-ContactRecommendation = Literal["STRONG", "NORMAL", "HOLD"]
+ContactRecommendation = Literal["STRONG", "NORMAL", "HOLD", "NOT_RUN"]
 KST = ZoneInfo("Asia/Seoul")
 
 
 class ScoreBuckets(TypedDict):
     """Mutually exclusive score bands displayed in the batch list."""
 
-    score_90_plus: int
-    score_80s: int
-    score_70s: int
+    score_90_plus: int | None
+    score_80s: int | None
+    score_70s: int | None
+
+
+class ActorEvidencePayload(TypedDict):
+    subject: str
+    sender: str
+    thread_id: str
+    message_id: str
+    received_at: str
+    reason: str
+
+
+class SearchPeriodPayload(TypedDict):
+    start: str | None
+    end: str | None
+    status: EvidenceStatus
+    reason: str | None
+
+
+class CandidateCountsPayload(TypedDict):
+    raw: int
+    parsed: int
+    duplicate: int
+    unparsed: int
+    excluded: int
 
 
 class CandidatePayload(TypedDict):
@@ -29,15 +53,27 @@ class CandidatePayload(TypedDict):
     display_name: str
     source_channel: str
     profile_url: str
-    education: str
-    experience: str
-    score: int
+    education: str | None
+    experience: str | None
+    key_experience: str | None
+    requirements_evidence: list[str]
+    score: int | None
+    score_status: EvidenceStatus
+    score_reason: str | None
     why_fit: list[str]
     reverse_match_position: str | None
     reverse_match_score: int | None
     reverse_match_reason: str
     contact_recommendation: str
     contact_status: EvidenceStatus
+    contact_source: str | None
+    contacted_at: str | None
+    contact_checked_at: str | None
+    contact_reference: str | None
+    contact_opinion_evidence: str | None
+    better_position_exists: bool | None
+    better_position: str | None
+    better_position_reason: str | None
 
 
 class VerificationPayload(TypedDict):
@@ -51,14 +87,21 @@ class BatchPayload(TypedDict):
     batch_id: str
     actor: str
     actor_label: str
+    actor_evidence: ActorEvidencePayload | None
     company: str
     position: str
     channels: list[str]
     executed_at: str
+    search_period: SearchPeriodPayload
+    candidate_counts: CandidateCountsPayload
     raw_candidates: int
     unique_candidates: int
-    score_buckets: dict[str, int]
-    actual_fu: int
+    score_buckets: dict[str, int | None]
+    score_status: EvidenceStatus
+    score_reason: str | None
+    actual_fu: int | None
+    actual_fu_status: EvidenceStatus
+    actual_fu_reason: str | None
     verification_status: EvidenceStatus
     verification_reason: str | None
     candidates: list[CandidatePayload]
@@ -73,6 +116,7 @@ class AiSearchPayload(TypedDict):
     cadence: str
     batches: list[BatchPayload]
     external_effects: dict[str, str]
+    gmail_collection: NotRequired[dict[str, object]]
 
 
 def _nonblank(value: str, field: str) -> None:
@@ -91,27 +135,48 @@ class CandidateEvidence:
     display_name: str
     source_channel: str
     profile_url: str
-    education: str
-    experience: str
-    score: int
+    education: str | None
+    experience: str | None
+    score: int | None
     why_fit: tuple[str, ...]
     reverse_match_position: str | None
     reverse_match_score: int | None
     reverse_match_reason: str
     contact_recommendation: ContactRecommendation
+    key_experience: str | None = None
+    requirements_evidence: tuple[str, ...] = ()
+    score_reason: str | None = None
+    better_position_exists: bool | None = None
+    better_position: str | None = None
+    better_position_reason: str | None = None
+    contact_opinion_evidence: str | None = None
 
     def __post_init__(self) -> None:
-        if len(self.canonical_key) != 64 or any(char not in "0123456789abcdef" for char in self.canonical_key):
+        if len(self.canonical_key) != 64 or any(
+            char not in "0123456789abcdef" for char in self.canonical_key
+        ):
             raise ValueError("canonical_key must be a lowercase SHA-256 hex digest")
-        for field in ("display_name", "source_channel", "profile_url", "education", "experience"):
+        for field in ("display_name", "source_channel", "profile_url"):
             _nonblank(cast(str, getattr(self, field)), field)
-        if isinstance(self.score, bool) or not isinstance(self.score, int) or not 0 <= self.score <= 100:
+        for field in ("education", "experience", "key_experience"):
+            value = cast(str | None, getattr(self, field))
+            if value is not None:
+                _nonblank(value, field)
+        if self.score is not None and (
+            isinstance(self.score, bool)
+            or not isinstance(self.score, int)
+            or not 0 <= self.score <= 100
+        ):
             raise ValueError("score must be an integer from 0 to 100")
-        if not self.why_fit or any(not item.strip() for item in self.why_fit):
-            raise ValueError("why_fit must contain evidence")
+        if any(not item.strip() for item in self.why_fit):
+            raise ValueError("why_fit must contain non-blank evidence")
+        if any(not item.strip() for item in self.requirements_evidence):
+            raise ValueError("requirements_evidence must contain non-blank evidence")
+        if self.score is None and not self.score_reason:
+            raise ValueError("missing score requires score_reason")
         if self.reverse_match_score is not None and not 0 <= self.reverse_match_score <= 100:
             raise ValueError("reverse_match_score must be between 0 and 100")
-        if self.contact_recommendation not in {"STRONG", "NORMAL", "HOLD"}:
+        if self.contact_recommendation not in {"STRONG", "NORMAL", "HOLD", "NOT_RUN"}:
             raise ValueError("contact_recommendation is invalid")
 
 
@@ -157,6 +222,12 @@ class AiSearchRun:
     candidates: tuple[CandidateEvidence, ...]
     contacts: tuple[ContactEvidence, ...] = ()
     verification_checks: tuple[VerificationCheck, ...] = ()
+    actor_evidence: ActorEvidencePayload | None = None
+    search_period_start: str | None = None
+    search_period_end: str | None = None
+    search_period_reason: str | None = "search_period_not_found"
+    unparsed_candidates: int = 0
+    excluded_candidates: int = 0
 
     def __post_init__(self) -> None:
         for field in ("actor", "source_run_id", "company", "position"):
@@ -165,6 +236,12 @@ class AiSearchRun:
             raise ValueError("channels must contain non-blank values")
         if self.executed_at.tzinfo is None or self.executed_at.utcoffset() is None:
             raise ValueError("executed_at must be timezone-aware")
+        if self.unparsed_candidates < 0 or self.excluded_candidates < 0:
+            raise ValueError("candidate count components must be non-negative")
+        if (self.search_period_start is None) != (self.search_period_end is None):
+            raise ValueError("search period requires both start and end")
+        if self.search_period_start is None and not self.search_period_reason:
+            raise ValueError("missing search period requires a reason")
         check_sources = [check.source for check in self.verification_checks]
         if len(check_sources) != len(set(check_sources)):
             raise ValueError("verification source must be unique per run")
@@ -237,30 +314,87 @@ def build_ai_search_batch(search_run: AiSearchRun, contract: EvidenceContract) -
     deduplicated: dict[str, CandidateEvidence] = {}
     for item in sorted(
         search_run.candidates,
-        key=lambda candidate: (-candidate.score, candidate.source_channel, candidate.profile_url),
+        key=lambda candidate: (
+            -(candidate.score if candidate.score is not None else -1),
+            candidate.source_channel,
+            candidate.profile_url,
+        ),
     ):
         deduplicated.setdefault(item.canonical_key, item)
-    contacts = _contact_statuses(search_run.contacts, search_run.verification_checks)
+    contacts = _contact_evidence(search_run.contacts)
+    checks = {check.source: check for check in search_run.verification_checks}
     candidates = [
-        _candidate_payload(item, contacts.get(item.canonical_key, "NOT_RUN"))
-        for item in sorted(deduplicated.values(), key=lambda item: (-item.score, item.canonical_key))
+        _candidate_payload(item, contacts.get(item.canonical_key), checks)
+        for item in sorted(
+            deduplicated.values(),
+            key=lambda item: (-(item.score if item.score is not None else -1), item.canonical_key),
+        )
     ]
     verification_status, verification_reason = _verification_state(search_run, contract)
+    duplicate_count = len(search_run.candidates) - len(candidates)
+    raw_count = (
+        len(candidates)
+        + duplicate_count
+        + search_run.unparsed_candidates
+        + search_run.excluded_candidates
+    )
+    candidate_counts: CandidateCountsPayload = {
+        "raw": raw_count,
+        "parsed": len(candidates),
+        "duplicate": duplicate_count,
+        "unparsed": search_run.unparsed_candidates,
+        "excluded": search_run.excluded_candidates,
+    }
+    if raw_count != sum(
+        candidate_counts[key] for key in ("parsed", "duplicate", "unparsed", "excluded")
+    ):
+        raise AssertionError("candidate count ledger is inconsistent")
+    score_status, score_reason = _score_state(candidates)
+    all_sources_checked = all(
+        checks.get(source) is not None and checks[source].status == "PASS"
+        for source in contract.required_verification_sources
+    )
+    passed_contacts = sum(item["contact_status"] == "PASS" for item in candidates)
+    has_passed_contact = passed_contacts > 0
+    actual_fu = passed_contacts if all_sources_checked or has_passed_contact else None
+    actual_fu_status: EvidenceStatus = "PASS" if all_sources_checked else "NOT_RUN"
+    actual_fu_reason = None if all_sources_checked else "fu_portal_verification_not_run"
+    search_period: SearchPeriodPayload = {
+        "start": search_run.search_period_start,
+        "end": search_run.search_period_end,
+        "status": "PASS" if search_run.search_period_start is not None else "NOT_RUN",
+        "reason": None
+        if search_run.search_period_start is not None
+        else search_run.search_period_reason,
+    }
     return {
-        "batch_id": stable_batch_id(search_run.actor, search_run.source_run_id, search_run.executed_at),
+        "batch_id": stable_batch_id(
+            search_run.actor, search_run.source_run_id, search_run.executed_at
+        ),
         "actor": search_run.actor,
         "actor_label": contract.actors[search_run.actor],
+        "actor_evidence": search_run.actor_evidence,
         "company": search_run.company,
         "position": search_run.position,
         "channels": sorted(set(search_run.channels)),
         "executed_at": search_run.executed_at.isoformat(),
-        "raw_candidates": len(search_run.candidates),
+        "search_period": search_period,
+        "candidate_counts": candidate_counts,
+        "raw_candidates": raw_count,
         "unique_candidates": len(candidates),
-        "score_buckets": {
-            band: _count_score_band(candidates, contract.score_bands[band])
-            for band in ("90_plus", "80s", "70s")
-        },
-        "actual_fu": sum(item["contact_status"] == "PASS" for item in candidates),
+        "score_buckets": (
+            {
+                band: _count_score_band(candidates, contract.score_bands[band])
+                for band in ("90_plus", "80s", "70s")
+            }
+            if score_status == "PASS"
+            else {"90_plus": None, "80s": None, "70s": None}
+        ),
+        "score_status": score_status,
+        "score_reason": score_reason,
+        "actual_fu": actual_fu,
+        "actual_fu_status": actual_fu_status,
+        "actual_fu_reason": actual_fu_reason,
         "verification_status": verification_status,
         "verification_reason": verification_reason,
         "candidates": candidates,
@@ -306,35 +440,45 @@ def build_ai_search_payload(
     }
 
 
-def _contact_statuses(
-    contacts: Sequence[ContactEvidence], checks: Sequence[VerificationCheck]
-) -> dict[str, EvidenceStatus]:
-    source_checks = {check.source: check.status for check in checks}
-    grouped: dict[str, list[EvidenceStatus]] = {}
+def _contact_evidence(contacts: Sequence[ContactEvidence]) -> dict[str, ContactEvidence]:
+    grouped: dict[str, list[ContactEvidence]] = {}
     for contact in contacts:
-        source_status = source_checks.get(contact.source, "NOT_RUN")
-        status = contact.status if source_status == "PASS" else source_status
-        grouped.setdefault(contact.canonical_key, []).append(status)
-    result: dict[str, EvidenceStatus] = {}
-    for key, statuses in grouped.items():
-        if "PASS" in statuses:
-            result[key] = "PASS"
-        elif "FAIL" in statuses:
-            result[key] = "FAIL"
-        else:
-            result[key] = "NOT_RUN"
-    return result
+        grouped.setdefault(contact.canonical_key, []).append(contact)
+    priority = {"PASS": 0, "FAIL": 1, "NOT_RUN": 2}
+    return {
+        key: min(items, key=lambda item: (priority[item.status], item.source))
+        for key, items in grouped.items()
+    }
 
 
-def _count_score_band(
-    candidates: Sequence[CandidatePayload], bounds: Mapping[str, int]
-) -> int:
+def _count_score_band(candidates: Sequence[CandidatePayload], bounds: Mapping[str, int]) -> int:
     minimum = bounds["min"]
     maximum = bounds["max"]
-    return sum(minimum <= item["score"] <= maximum for item in candidates)
+    return sum(
+        item["score"] is not None and minimum <= item["score"] <= maximum for item in candidates
+    )
 
 
-def _candidate_payload(item: CandidateEvidence, contact_status: EvidenceStatus) -> CandidatePayload:
+def _score_state(candidates: Sequence[CandidatePayload]) -> tuple[EvidenceStatus, str | None]:
+    if not candidates:
+        return "NOT_RUN", "no_parsed_candidates"
+    missing = next((item for item in candidates if item["score"] is None), None)
+    if missing is not None:
+        return "NOT_RUN", missing["score_reason"] or "v5_score_contract_evidence_missing"
+    return "PASS", None
+
+
+def _candidate_payload(
+    item: CandidateEvidence,
+    contact: ContactEvidence | None,
+    checks: Mapping[str, VerificationCheck],
+) -> CandidatePayload:
+    check = checks.get(contact.source) if contact is not None else None
+    contact_status: EvidenceStatus = "NOT_RUN"
+    if contact is not None:
+        contact_status = (
+            contact.status if check is not None and check.status == "PASS" else "NOT_RUN"
+        )
     return {
         "canonical_key": item.canonical_key,
         "display_name": item.display_name,
@@ -342,13 +486,25 @@ def _candidate_payload(item: CandidateEvidence, contact_status: EvidenceStatus) 
         "profile_url": item.profile_url,
         "education": item.education,
         "experience": item.experience,
+        "key_experience": item.key_experience,
+        "requirements_evidence": list(item.requirements_evidence),
         "score": item.score,
+        "score_status": "PASS" if item.score is not None else "NOT_RUN",
+        "score_reason": None if item.score is not None else item.score_reason,
         "why_fit": list(item.why_fit),
         "reverse_match_position": item.reverse_match_position,
         "reverse_match_score": item.reverse_match_score,
         "reverse_match_reason": item.reverse_match_reason,
         "contact_recommendation": item.contact_recommendation,
         "contact_status": contact_status,
+        "contact_source": contact.source if contact is not None else None,
+        "contacted_at": contact.contacted_at if contact is not None else None,
+        "contact_checked_at": check.checked_at if check is not None else None,
+        "contact_reference": contact.evidence_reference if contact is not None else None,
+        "contact_opinion_evidence": item.contact_opinion_evidence,
+        "better_position_exists": item.better_position_exists,
+        "better_position": item.better_position,
+        "better_position_reason": item.better_position_reason,
     }
 
 

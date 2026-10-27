@@ -29,9 +29,7 @@ ASSET_DIR = REPO_ROOT / "apps" / "admin"
 METRIC_CONTRACT_PATH = (
     REPO_ROOT / "contracts" / "admin-weekly-dashboard" / "metric-contract-v1.json"
 )
-EVIDENCE_CONTRACT_PATH = (
-    REPO_ROOT / "contracts" / "admin-ai-search" / "evidence-contract-v1.json"
-)
+EVIDENCE_CONTRACT_PATH = REPO_ROOT / "contracts" / "admin-ai-search" / "evidence-contract-v1.json"
 KST = ZoneInfo("Asia/Seoul")
 
 
@@ -121,7 +119,9 @@ def test_batch_deduplicates_candidates_and_counts_score_bands() -> None:
     assert batch["unique_candidates"] == 4
     assert batch["score_buckets"] == {"90_plus": 1, "80s": 1, "70s": 1}
     assert [item["score"] for item in batch["candidates"]] == [94, 88, 73, 69]
-    assert batch["actual_fu"] == 0
+    assert batch["actual_fu"] is None
+    assert batch["actual_fu_status"] == "NOT_RUN"
+    assert batch["actual_fu_reason"] == "fu_portal_verification_not_run"
     assert batch["verification_status"] == "NOT_RUN"
 
 
