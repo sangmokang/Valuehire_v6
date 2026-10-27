@@ -169,9 +169,14 @@ def _candidate_from_context(
 def _score_evidence(
     context: Sequence[str], contract: EvidenceContract
 ) -> tuple[int | None, str | None, ScoreComponents | None, str | None]:
-    raw_values = {key: _first_label_value(context, labels) for key, labels in _SCORE_LABELS.items()}
-    if any(value is None for value in raw_values.values()):
+    matched_values = {
+        key: _label_values(context, labels) for key, labels in _SCORE_LABELS.items()
+    }
+    if any(not values for values in matched_values.values()):
         return None, "score_contract_evidence_missing", None, None
+    if any(len(values) != 1 for values in matched_values.values()):
+        return None, "score_contract_evidence_conflict", None, None
+    raw_values = {key: values[0] for key, values in matched_values.items()}
     if any(re.fullmatch(r"\d{1,3}", value or "") is None for value in raw_values.values()):
         return None, "score_contract_evidence_invalid", None, None
     components: ScoreComponents = {key: int(value or "") for key, value in raw_values.items()}
