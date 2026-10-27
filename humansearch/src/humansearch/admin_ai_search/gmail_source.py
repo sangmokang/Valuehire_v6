@@ -35,12 +35,14 @@ _SNAPSHOT_FIELDS = {
 _PAGE_FIELDS = {"request_page_token", "message_ids", "next_page_token"}
 _URL_PATTERN = re.compile(r"https?://[^\s<>\"']+", re.IGNORECASE)
 _CANDIDATE_HEADING = re.compile(
-    r"(?im)^\s*(?:[#>*•-]+\s*)?(?:"
+    r"(?im)^\s*(?:(?:\[\[VH_HEADING\]\]|[#>*•-]+)\s*)?(?:"
     r"(?:후보|후보자|candidate)\s*(?:#|no\.?|번호)?\s*\d+|"
-    r"\d+\s*(?:번|번째)?\s*(?:후보|후보자|candidate))\b"
+    r"\d+\s*(?:번|번째)?\s*(?:후보|후보자|candidate))\b|"
+    r"^\s*(?:\[\[VH_HEADING\]\]|#{1,6})\s*\d+[.)]?\s+\S+"
 )
 _EXCLUDED_HEADING = re.compile(
-    r"(?im)^\s*(?:[#>*•-]+\s*)?(?:제외(?:된)?\s*후보|excluded\s+candidate)\b"
+    r"(?im)^\s*(?:(?:\[\[VH_HEADING\]\]|[#>*•-]+)\s*)?"
+    r"(?:제외(?:된)?\s*후보|excluded\s+candidate)\b"
 )
 _EXPLICIT_NO_CANDIDATES = re.compile(
     r"후보\s*(?:결과\s*)?(?:없음|없습니다)|"
@@ -72,6 +74,7 @@ class _HtmlTextExtractor(HTMLParser):
         "th",
         "tr",
     }
+    _HEADING_TAGS: ClassVar[set[str]] = {"h1", "h2", "h3", "h4"}
 
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
@@ -83,6 +86,8 @@ class _HtmlTextExtractor(HTMLParser):
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         if tag in self._BLOCK_TAGS:
             self.fragments.append("\n")
+        if tag in self._HEADING_TAGS:
+            self.fragments.append("[[VH_HEADING]] ")
         if tag == "a":
             href = next((value for name, value in attrs if name == "href"), None)
             self._anchor_href = href
@@ -185,7 +190,7 @@ def _validate_pages(
     expected_request_token: str | None = None
     seen_request_tokens: set[str] = set()
     collected_ids: list[str] = []
-    for page in pages:
+    for page_index, page in enumerate(pages):
         if set(page) != _PAGE_FIELDS:
             raise ValueError("Gmail pagination page fields do not match the v1 contract")
         request_token = page["request_page_token"]
@@ -197,6 +202,10 @@ def _validate_pages(
             raise ValueError("Gmail pagination next token is invalid")
         if request_token != expected_request_token:
             raise ValueError("Gmail pagination token chain is broken")
+        if page_index > 0 and request_token is None:
+            raise ValueError("Gmail pagination continued after a terminal page")
+        if page_index + 1 < len(pages) and next_token is None:
+            raise ValueError("Gmail pagination terminated before the final page")
         if request_token is not None:
             if request_token in seen_request_tokens:
                 raise ValueError("Gmail pagination token cycle detected")
@@ -434,12 +443,8 @@ def _candidate_records(
     occurrences = _candidate_occurrences(body_text, links)
     if occurrences:
         candidates = []
-        for occurrence_index, (url, label, line_index) in enumerate(occurrences):
-            later_lines = [
-                item[2] for item in occurrences[occurrence_index + 1 :] if item[2] > line_index
-            ]
-            end = min(later_lines) if later_lines else len(lines)
-            context = lines[line_index : max(line_index + 1, end)]
+        for url, label, line_index in occurrences:
+            context = lines[line_index : line_index + 1]
             candidates.append(_candidate_from_context(url, label, context))
         return tuple(candidates), 0, 0, True
     if _EXPLICIT_NO_CANDIDATES.search(body_text):
