@@ -250,8 +250,12 @@ def test_server_exposes_ai_search_list_detail_and_page() -> None:
     assert json.loads(detail_body) == payload["batches"][0]
     assert page_status == 200
     assert page_type == "text/html; charset=utf-8"
-    assert "AI Search Evidence" in page_body.decode("utf-8")
-    assert "중복 제거 후보 (Batch별 합계)" in page_body.decode("utf-8")
+    assert "AI Search 실행 결과" in page_body.decode("utf-8")
+    assert "확인 가능한 후보 (검색별 합계)" in page_body.decode("utf-8")
+    assert "메일에 적힌 후보 수" in page_body.decode("utf-8")
+    assert "90점 이상" in page_body.decode("utf-8")
+    assert "80~89점" in page_body.decode("utf-8")
+    assert "70~79점" in page_body.decode("utf-8")
     assert script_status == 200
     assert b"/api/ai-search" in script_body
 
@@ -273,8 +277,8 @@ def test_ai_search_assets_expose_required_detail_and_error_states() -> None:
 
     assert 'id="error-state"' in page
     assert "검색 기간" in page
+    assert "실행 주체 판단 근거" not in page
     for field in (
-        "actor_evidence",
         "candidate_counts",
         "key_experience",
         "requirements_evidence",
@@ -284,3 +288,13 @@ def test_ai_search_assets_expose_required_detail_and_error_states() -> None:
         "contact_opinion_evidence",
     ):
         assert field in script
+
+
+def test_weekly_page_hides_internal_provenance_and_uses_plain_korean() -> None:
+    page = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
+    contract = json.loads(METRIC_CONTRACT_PATH.read_text(encoding="utf-8"))
+
+    assert "판정 근거" not in page
+    assert 'id="provenance"' not in page
+    assert "신원 연결 제한" not in json.dumps(contract, ensure_ascii=False)
+    assert "전체 후보 중복 확인" in json.dumps(contract, ensure_ascii=False)
