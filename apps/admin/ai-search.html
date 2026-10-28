@@ -29,9 +29,17 @@
           <div><dt>검색 실행</dt><dd id="batch-count">—</dd></div>
           <div><dt>고유 후보 프로필</dt><dd id="candidate-count">—</dd></div>
           <div><dt>후보·포지션 배치 연결</dt><dd id="assignment-count">—</dd></div>
-          <div><dt>90점 이상</dt><dd id="strong-count">—</dd></div>
+          <div><dt>점수 확인 후보</dt><dd id="scored-count">—</dd></div>
           <div><dt>Gmail 직접 컨택</dt><dd id="fu-count">—</dd></div>
         </dl>
+      </section>
+
+      <section id="data-quality" class="panel-section evidence-coverage" aria-labelledby="coverage-heading">
+        <div class="section-heading">
+          <div><p class="section-kicker">실데이터 채움 현황</p><h2 id="coverage-heading">후보 상세 자료 완성도</h2></div>
+          <p>메일에서 후보에게 안전하게 귀속한 값만 셉니다. 없는 값은 0점이 아니라 미확인입니다.</p>
+        </div>
+        <dl id="coverage-grid" class="coverage-grid"></dl>
       </section>
 
       <section class="panel-section" aria-labelledby="candidate-ledger-heading">
@@ -100,12 +108,25 @@
       </section>
     </main>
 
+    <dialog id="candidate-dialog" class="evidence-dialog candidate-dialog" aria-labelledby="candidate-dialog-title">
+      <form method="dialog" class="dialog-bar">
+        <div><p class="section-kicker">고유 후보 상세</p><h2 id="candidate-dialog-title">후보 상세</h2></div>
+        <button aria-label="후보 상세 닫기">닫기</button>
+      </form>
+      <div id="candidate-dialog-summary" class="dialog-summary"></div>
+      <div id="candidate-dialog-body" class="candidate-details"></div>
+    </dialog>
+
     <dialog id="batch-dialog" class="evidence-dialog" aria-labelledby="dialog-title">
       <form method="dialog" class="dialog-bar">
         <div><p id="dialog-batch" class="section-kicker"></p><h2 id="dialog-title">검색 상세</h2></div>
         <button aria-label="상세 닫기">닫기</button>
       </form>
       <div id="dialog-summary" class="dialog-summary"></div>
+      <section class="evidence-section" aria-labelledby="mail-evidence-heading">
+        <h3 id="mail-evidence-heading">실행 메일 정보</h3>
+        <dl id="mail-evidence" class="evidence-grid"></dl>
+      </section>
       <div id="candidate-details" class="candidate-details"></div>
       <section class="verification-section" aria-labelledby="verification-heading">
         <h3 id="verification-heading">일일 검증 상태</h3>

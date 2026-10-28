@@ -4,6 +4,7 @@
   const byId = (id) => document.getElementById(id);
   let candidateLedger = [];
   let candidateLimit = 200;
+  let contactCollection = null;
   const REASON_LABELS = {
     daily_verification_incomplete: "일일 재검증은 아직 하지 않았습니다.",
     search_period_not_found: "메일에 검색 기간이 없습니다.",
@@ -16,6 +17,9 @@
     requirements_evidence_missing: "필수요건 근거가 메일에 없습니다.",
     why_fit_evidence_missing: "적합 근거가 메일에 없습니다.",
     contact_opinion_evidence_missing: "컨택 의견 근거가 메일에 없습니다.",
+    education_evidence_missing: "학력 정보가 메일에 없습니다.",
+    experience_evidence_missing: "전체 경력 정보가 메일에 없습니다.",
+    key_experience_evidence_missing: "핵심 경력 정보가 메일에 없습니다.",
     no_candidate_scores_verified: "v5 점수 계약으로 확인된 후보 점수가 없습니다.",
     some_candidate_scores_unverified: "일부 후보만 v5 점수 계약으로 확인됐습니다.",
     cross_channel_identity_not_verified: "채널이 다른 프로필의 동일인 여부는 확인하지 않았습니다.",
@@ -26,6 +30,7 @@
     required_sources_not_checked: "필요한 채용사이트를 아직 확인하지 않았습니다.",
     ai_search_load_failed: "AI Search 자료를 불러오지 못했습니다.",
     batch_detail_failed: "검색 상세를 불러오지 못했습니다.",
+    candidate_detail_failed: "후보 상세를 불러오지 못했습니다.",
   };
 
   function element(tag, className, text) {
@@ -95,17 +100,11 @@
     return `${label} 미확인 (메일 제목에서 구분 못함)`;
   }
 
-  function sumKnown(batches, select) {
-    const values = batches.map(select);
-    return values.every(known) ? values.reduce((sum, value) => sum + value, 0) : null;
-  }
-
   function renderSummary(payload) {
     const hasEvidence = payload.batches.length > 0;
     const summary = payload.candidate_summary;
     const candidates = summary.unique_profiles;
     const assignments = summary.known_position_assignments + summary.unknown_position_assignments;
-    const strong = sumKnown(payload.batches, (batch) => batch.score_buckets["90_plus"]);
     const contacts = payload.contact_collection;
     byId("cadence").textContent = payload.cadence === "DAILY" ? "매일" : payload.cadence;
     byId("evidence-status").replaceChildren(statusBadge(payload.status));
@@ -114,10 +113,45 @@
       : "확인하지 않음";
     byId("candidate-count").textContent = hasEvidence ? valueOrNotRun(candidates) : "확인하지 않음";
     byId("assignment-count").textContent = hasEvidence ? valueOrNotRun(assignments) : "확인하지 않음";
-    byId("strong-count").textContent = hasEvidence ? valueOrNotRun(strong) : "확인하지 않음";
-    byId("fu-count").textContent = contacts && contacts.status === "PASS"
-      ? `${contacts.direct_contact_count.toLocaleString("ko-KR")}건\nAI ${contacts.ai_sent_count} · 직접 ${contacts.owner_sent_count} · 미확인 ${contacts.unknown_sent_count}`
+    byId("scored-count").textContent = hasEvidence
+      ? `${summary.score_known_profiles.toLocaleString("ko-KR")} / ${candidates.toLocaleString("ko-KR")}명`
       : "확인하지 않음";
+    byId("fu-count").textContent = contacts && contacts.status === "PASS"
+      ? `${contacts.direct_contact_count.toLocaleString("ko-KR")}건 · 후보 연결 ${contacts.linked_contact_count}건\nAI ${contacts.ai_sent_count} · 직접 ${contacts.owner_sent_count} · 미확인 ${contacts.unknown_sent_count}`
+      : "확인하지 않음";
+  }
+
+  function renderCoverage(payload) {
+    const summary = payload.candidate_summary;
+    const total = summary.unique_profiles;
+    const coverage = summary.detail_coverage;
+    const fields = [
+      ["학력", coverage.education_profiles],
+      ["전체 경력", coverage.experience_profiles],
+      ["핵심 경력", coverage.key_experience_profiles],
+      ["필수요건별 근거", coverage.requirements_evidence_profiles],
+      ["적합 근거", coverage.why_fit_profiles],
+      ["더 적합한 포지션", coverage.better_position_profiles],
+      ["컨택 의견 근거", coverage.contact_opinion_profiles],
+      ["후보 연결 컨택", coverage.linked_contact_profiles],
+    ];
+    const root = byId("coverage-grid");
+    root.replaceChildren();
+    fields.forEach(([label, count]) => {
+      const item = element("div", count === 0 ? "coverage-item is-empty" : "coverage-item");
+      item.append(
+        element("dt", "", label),
+        element("dd", "", `${count.toLocaleString("ko-KR")} / ${total.toLocaleString("ko-KR")}명`),
+      );
+      root.append(item);
+    });
+  }
+
+  function candidateDisplayName(candidate) {
+    if (/^https?:\/\//i.test(candidate.display_name)) {
+      return `${candidate.source_channels.join(" · ")} 후보 프로필`;
+    }
+    return candidate.display_name;
   }
 
   function scoreHistoryLabel(candidate) {
@@ -144,6 +178,7 @@
 
   function renderCandidateLedger(payload) {
     candidateLedger = payload.candidate_ledger;
+    contactCollection = payload.contact_collection || null;
     candidateLimit = 200;
     renderCandidateLedgerRows();
   }
@@ -163,10 +198,13 @@
       : candidateLedger;
     root.replaceChildren();
     filtered.slice(0, candidateLimit).forEach((candidate) => {
-      const row = element("tr");
+      const row = element("tr", "clickable-row");
+      row.tabIndex = 0;
+      row.setAttribute("role", "button");
+      row.setAttribute("aria-label", `${candidateDisplayName(candidate)} 후보 상세 열기`);
       const profile = element("td");
       profile.append(
-        element("strong", "", candidate.display_name),
+        element("strong", "", candidateDisplayName(candidate)),
         element("small", "", candidate.source_channels.join(" · ")),
         element("small", "profile-reference", candidate.profile_urls[0]),
       );
@@ -176,6 +214,13 @@
         element("td", "", searchHistoryLabel(candidate.search_history)),
         element("td", "", contactHistoryLabel(candidate.contact_history)),
       );
+      row.addEventListener("click", () => openCandidate(candidate.canonical_key));
+      row.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          openCandidate(candidate.canonical_key);
+        }
+      });
       root.append(row);
     });
     const visible = Math.min(candidateLimit, filtered.length);
@@ -386,6 +431,78 @@
     return article;
   }
 
+  function profileBetterPositionLabel(profile) {
+    if (profile.better_position_exists === null) {
+      return `미확인 · ${reasonLabel(profile.better_position_reason)}`;
+    }
+    if (!profile.better_position_exists) return "없음";
+    const reason = known(profile.better_position_reason)
+      ? ` · ${profile.better_position_reason}` : "";
+    return `있음 · ${valueOrNotRun(profile.better_position)}${reason}`;
+  }
+
+  function renderCandidateLedgerDetail(candidate) {
+    const profile = candidate.profile_evidence;
+    const article = element("article", "candidate-card candidate-ledger-detail");
+    const facts = element("dl", "candidate-facts");
+    facts.append(
+      detailItem("학력", valueOrNotRun(profile.education, "education_evidence_missing")),
+      detailItem("전체 경력", valueOrNotRun(profile.experience, "experience_evidence_missing")),
+      detailItem("핵심 경력", valueOrNotRun(profile.key_experience, "key_experience_evidence_missing")),
+      detailItem("확인된 점수", scoreHistoryLabel(candidate)),
+      detailItem("후보 연결 컨택", contactHistoryLabel(candidate.contact_history)),
+      detailItem("더 적합한 포지션", profileBetterPositionLabel(profile)),
+    );
+    const searches = evidenceList(
+      "포지션·검색 묶음 전체 이력",
+      candidate.search_history.map((item) => (
+        `${entityLabel(item.company, "고객사")} · ${entityLabel(item.position, "포지션")} · ${item.actor_label} · ${item.score_status === "PASS" ? `${item.score}점` : "점수 미확인"} · ${formatDate(item.executed_at)} · ${item.batch_id}`
+      )),
+      "확인된 검색 묶음이 없습니다.",
+    );
+    const contacts = evidenceList(
+      "이 후보와 연결된 직접 컨택",
+      candidate.contact_history.map((item) => (
+        `${contactActorLabel(item.actor)} · ${item.source} · ${formatDate(item.contacted_at)} · ${statusLabel(item.status)} · ${valueOrNotRun(item.evidence_reference)}`
+      )),
+      "이 후보의 프로필 정본키와 연결된 직접 컨택은 없습니다.",
+    );
+    const contactGap = element("div", "candidate-copy contact-gap");
+    const unlinked = contactCollection?.unlinked_contact_count || 0;
+    contactGap.append(
+      element("h4", "", "Gmail 직접 제안과 후보 연결 상태"),
+      element(
+        "p",
+        "",
+        unlinked
+          ? `Gmail에서 직접 제안 ${contactCollection.direct_contact_count}건을 확인했지만 ${unlinked}건은 후보 프로필 URL이 없어 특정 후보에게 연결하지 않았습니다.`
+          : "후보에게 연결하지 못한 Gmail 직접 제안은 없습니다.",
+      ),
+    );
+    article.append(
+      facts,
+      searches,
+      contacts,
+      evidenceList(
+        "필수요건별 근거",
+        profile.requirements_evidence,
+        `미확인 · ${reasonLabel("requirements_evidence_missing")}`,
+      ),
+      evidenceList(
+        "적합 근거",
+        profile.why_fit,
+        `미확인 · ${reasonLabel("why_fit_evidence_missing")}`,
+      ),
+      evidenceList(
+        "컨택 의견 근거",
+        profile.contact_opinion_evidence ? [profile.contact_opinion_evidence] : [],
+        `미확인 · ${reasonLabel("contact_opinion_evidence_missing")}`,
+      ),
+      contactGap,
+    );
+    return article;
+  }
+
   function renderChecks(checks) {
     const root = byId("verification-checks");
     root.replaceChildren();
@@ -403,13 +520,28 @@
     });
   }
 
+  function renderMailEvidence(batch) {
+    const evidence = batch.actor_evidence;
+    const root = byId("mail-evidence");
+    root.replaceChildren();
+    const items = evidence ? [
+      ["메일 제목", evidence.subject],
+      ["발신자", evidence.sender],
+      ["Gmail message ID", evidence.message_id],
+      ["Gmail thread ID", evidence.thread_id],
+      ["수신시각", formatDate(evidence.received_at)],
+      ["실행 주체", batch.actor_label],
+    ] : [["실행 메일", "미확인"]];
+    items.forEach(([label, value]) => root.append(detailItem(label, value)));
+  }
+
   function showError(reason) {
     byId("ai-search").setAttribute("aria-busy", "false");
     byId("evidence-status").replaceChildren(statusBadge("FAIL"));
     byId("batch-count").textContent = "확인하지 않음";
     byId("candidate-count").textContent = "확인하지 않음";
     byId("assignment-count").textContent = "확인하지 않음";
-    byId("strong-count").textContent = "확인하지 않음";
+    byId("scored-count").textContent = "확인하지 않음";
     byId("fu-count").textContent = "확인하지 않음";
     byId("empty-state").hidden = true;
     byId("error-state").hidden = false;
@@ -417,6 +549,32 @@
     const state = byId("load-state");
     state.dataset.status = "FAIL";
     state.textContent = `AI Search 증빙 미집계 · ${reasonLabel(reason)}`;
+  }
+
+  async function openCandidate(canonicalKey) {
+    try {
+      const response = await fetch(
+        `/api/ai-search/candidates/${encodeURIComponent(canonicalKey)}`,
+        { cache: "no-store", headers: { Accept: "application/json" } },
+      );
+      if (!response.ok) throw new Error("candidate_detail_failed");
+      const candidate = await response.json();
+      byId("candidate-dialog-title").textContent = candidateDisplayName(candidate);
+      const scores = candidate.search_history.filter((item) => item.score_status === "PASS");
+      const positions = new Set(candidate.search_history.map((item) => `${item.company}\u0000${item.position}`));
+      byId("candidate-dialog-summary").replaceChildren(
+        detailItem("검색된 포지션", `${positions.size.toLocaleString("ko-KR")}개`),
+        detailItem("검색 묶음", `${candidate.search_history.length.toLocaleString("ko-KR")}개`),
+        detailItem("확인된 점수", `${scores.length.toLocaleString("ko-KR")}개`),
+        detailItem("후보 연결 컨택", `${candidate.contact_history.length.toLocaleString("ko-KR")}건`),
+        detailItem("채널", candidate.source_channels.join(" · ")),
+        detailItem("프로필", candidate.profile_urls[0]),
+      );
+      byId("candidate-dialog-body").replaceChildren(renderCandidateLedgerDetail(candidate));
+      byId("candidate-dialog").showModal();
+    } catch (_error) {
+      showError("candidate_detail_failed");
+    }
   }
 
   async function openDetail(batchId) {
@@ -431,6 +589,7 @@
       const counts = batch.candidate_counts;
       const summary = byId("dialog-summary");
       summary.replaceChildren(
+        detailItem("Batch ID", batch.batch_id),
         detailItem("실행 주체", batch.actor_label),
         detailItem("실행 일시", formatDate(batch.executed_at)),
         detailItem("검색 기간", periodLabel(batch.search_period)),
@@ -444,6 +603,7 @@
         ),
         detailItem("실제 후속 연락", valueOrNotRun(batch.actual_fu, batch.actual_fu_reason)),
       );
+      renderMailEvidence(batch);
       const candidates = byId("candidate-details");
       candidates.replaceChildren();
       if (batch.candidates.length) {
@@ -464,6 +624,18 @@
     const gmailMessageCount = known(gmail.message_count)
       ? gmail.message_count
       : "확인하지 않음";
+    const countedBatches = payload.batches.filter(
+      (batch) => batch.candidate_counts_status === "PASS",
+    );
+    const countTotals = countedBatches.reduce(
+      (totals, batch) => {
+        Object.keys(totals).forEach((key) => {
+          totals[key] += batch.candidate_counts[key];
+        });
+        return totals;
+      },
+      { raw: 0, parsed: 0, duplicate: 0, unparsed: 0, excluded: 0 },
+    );
     const items = [
       ["자료 출처", "Gmail AI Search"],
       ["확인한 메일", `${gmailMessageCount}건`],
@@ -473,6 +645,11 @@
       ["후보 연결 / 미연결", payload.contact_collection?.status === "PASS"
         ? `${payload.contact_collection.linked_contact_count} / ${payload.contact_collection.unlinked_contact_count}`
         : "확인하지 않음"],
+      ["후보 수가 확정된 검색", `${countedBatches.length} / ${payload.batches.length}개`],
+      [
+        "확정 검색 후보 수식",
+        `${countTotals.raw.toLocaleString("ko-KR")} = 확인 ${countTotals.parsed.toLocaleString("ko-KR")} + 중복 ${countTotals.duplicate.toLocaleString("ko-KR")} + 확인 불가 ${countTotals.unparsed.toLocaleString("ko-KR")} + 제외 ${countTotals.excluded.toLocaleString("ko-KR")}`,
+      ],
       ["원격 DB 저장", payload.external_effects.database_writes === "DISABLED" ? "없음" : "확인 필요"],
       ["외부 발송", payload.external_effects.outreach_sends === "DISABLED" ? "없음" : "확인 필요"],
     ];
@@ -494,6 +671,7 @@
       if (!response.ok) throw new Error("ai_search_request_failed");
       const payload = await response.json();
       renderSummary(payload);
+      renderCoverage(payload);
       renderCandidateLedger(payload);
       renderContactLedger(payload);
       renderRows(payload);

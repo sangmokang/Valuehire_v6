@@ -25,8 +25,8 @@ body {
   margin: 0;
   min-width: 320px;
   font-family: Pretendard, "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
-  font-size: 16px;
-  line-height: 1.5;
+  font-size: 17px;
+  line-height: 1.58;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -73,7 +73,7 @@ main {
 .environment {
   margin: 0;
   color: var(--not-run);
-  font-size: 14px;
+  font-size: 15px;
 }
 
 h1,
@@ -105,7 +105,7 @@ h1 {
 }
 
 .window-summary div { display: grid; gap: 3px; }
-.window-summary dt { color: var(--muted); font-size: 14px; }
+.window-summary dt { color: var(--muted); font-size: 15px; }
 .window-summary dd { margin: 0; font-family: Georgia, serif; font-size: 20px; font-weight: 600; }
 
 main { padding-block: 24px 64px; }
@@ -138,7 +138,7 @@ main { padding-block: 24px 64px; }
   margin-bottom: 14px;
 }
 
-.section-kicker { margin-bottom: 4px !important; color: var(--pass) !important; font-size: 14px; }
+.section-kicker { margin-bottom: 4px !important; color: var(--pass) !important; font-size: 15px; }
 .section-heading h2 { margin: 0; font-size: 25px; font-weight: 600; }
 .section-heading > p { max-width: 520px; text-align: right; }
 
@@ -165,16 +165,16 @@ main { padding-block: 24px 64px; }
 .ai-ledger table { width: 100%; min-width: 1900px; border-collapse: collapse; }
 .ai-ledger th,
 .ai-ledger td { padding: 15px 18px; border-bottom: 1px solid var(--line); text-align: left; }
-.ai-ledger th { background: #e8e6de; color: #34443c; font-size: 14px; font-weight: 750; line-height: 1.35; }
-.ai-ledger td { font-size: 15px; line-height: 1.45; vertical-align: top; }
+.ai-ledger th { background: #e8e6de; color: #34443c; font-size: 16px; font-weight: 750; line-height: 1.4; }
+.ai-ledger td { font-size: 16px; line-height: 1.52; vertical-align: top; }
 .ai-ledger tbody tr:last-child td { border-bottom: 0; }
 .ai-ledger tbody tr:hover { background: #f7f6ef; }
 .ai-ledger td strong,
 .ai-ledger td small { display: block; }
-.ai-ledger td small { margin-top: 5px; color: var(--muted); font-size: 14px; line-height: 1.4; }
+.ai-ledger td small { margin-top: 5px; color: var(--muted); font-size: 15px; line-height: 1.45; }
 .candidate-cell { font-weight: 700; }
-.date-cell { color: var(--muted); font-size: 14px !important; line-height: 1.45 !important; }
-.status-badge { display: inline-block; padding: 6px 10px; border: 1px solid #a9b7a8; border-radius: 999px; background: var(--pass-soft); color: #245b49; font-size: 14px; font-weight: 750; white-space: nowrap; }
+.date-cell { color: var(--muted); font-size: 15px !important; line-height: 1.5 !important; }
+.status-badge { display: inline-block; padding: 6px 10px; border: 1px solid #a9b7a8; border-radius: 999px; background: var(--pass-soft); color: #245b49; font-size: 15px; font-weight: 750; white-space: nowrap; }
 .status-not_run { border-color: #b9b5a8; background: #efede5; color: #605e57; }
 .status-fail { border-color: #d6a69d; background: #fff0ed; color: var(--fail); }
 
@@ -183,7 +183,7 @@ main { padding-block: 24px 64px; }
 .ai-summary dl { display: grid; grid-template-columns: repeat(5, 1fr); margin: 0; }
 .ai-summary div { padding: 22px 26px; border-right: 1px solid #383d37; }
 .ai-summary div:last-child { border-right: 0; }
-.ai-summary dt { color: #ccd6cf; font-size: 14px; line-height: 1.4; }
+.ai-summary dt { color: #ccd6cf; font-size: 16px; line-height: 1.4; }
 .ai-summary dd { margin: 3px 0 0; font: 600 clamp(18px, 3vw, 38px)/1.2 "Iowan Old Style", Georgia, serif; overflow-wrap: anywhere; }
 #fu-count { white-space: pre-line; font-size: clamp(16px, 2vw, 28px); }
 .ai-ledger .number-cell { font: 600 20px/1.25 "Iowan Old Style", Georgia, serif; text-align: right; }
@@ -194,6 +194,12 @@ main { padding-block: 24px 64px; }
 .candidate-ledger td:nth-child(1) { width: 24%; }
 .candidate-ledger td:nth-child(2) { width: 20%; }
 .candidate-ledger td:nth-child(3) { width: 38%; }
+.coverage-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; margin: 0; overflow: hidden; border: 1px solid var(--ink); border-radius: var(--radius); background: var(--line); box-shadow: var(--shadow); }
+.coverage-item { min-height: 112px; padding: 20px; background: var(--surface); }
+.coverage-item.is-empty { background: #f2f0e8; }
+.coverage-item dt { color: var(--muted); font-size: 16px; font-weight: 750; }
+.coverage-item dd { margin: 12px 0 0; font: 600 24px/1.25 "Iowan Old Style", Georgia, serif; }
+.coverage-item.is-empty dd { color: #6f6650; }
 .ledger-limit { margin: 0; padding: 15px 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 15px; }
 .ledger-controls { display: flex; align-items: center; gap: 14px; margin: -2px 0 14px; }
 .ledger-controls label { font-size: 16px; font-weight: 750; }
@@ -209,7 +215,7 @@ main { padding-block: 24px 64px; }
 .error-state { border-top: 1px solid #d6a69d; background: var(--fail-soft); color: var(--fail); }
 .error-state p { color: var(--fail); font-family: ui-monospace, monospace; }
 
-.evidence-dialog { width: min(1040px, calc(100% - 32px)); max-height: calc(100vh - 40px); padding: 0; border: 1px solid var(--ink); border-radius: var(--radius); background: var(--bg); color: var(--ink); box-shadow: 0 28px 90px rgb(0 0 0 / 28%); }
+.evidence-dialog { width: min(1120px, calc(100% - 32px)); max-height: calc(100vh - 40px); padding: 0; border: 1px solid var(--ink); border-radius: var(--radius); background: var(--bg); color: var(--ink); box-shadow: 0 28px 90px rgb(0 0 0 / 28%); }
 .evidence-dialog::backdrop { background: rgb(18 20 17 / 58%); backdrop-filter: blur(3px); }
 .dialog-bar { position: sticky; z-index: 2; top: 0; display: flex; align-items: center; justify-content: space-between; padding: 22px 26px; border-bottom: 1px solid var(--ink); background: var(--surface); }
 .dialog-bar p { margin-bottom: 5px; }
@@ -219,14 +225,14 @@ main { padding-block: 24px 64px; }
 .dialog-summary div { padding: 15px 20px; border-right: 1px solid var(--line); }
 .dialog-summary div:last-child { border-right: 0; }
 .dialog-summary dt,
-.candidate-facts dt { margin-bottom: 4px; color: var(--muted); font-size: 14px; }
+.candidate-facts dt { margin-bottom: 4px; color: var(--muted); font-size: 15px; }
 .dialog-summary dd,
-.candidate-facts dd { margin: 0; font-size: 15px; font-weight: 700; line-height: 1.45; }
+.candidate-facts dd { margin: 0; font-size: 16px; font-weight: 700; line-height: 1.5; }
 .candidate-details { display: grid; gap: 12px; padding: 20px; }
 .candidate-card { border: 1px solid var(--ink); border-radius: var(--radius); background: var(--surface); }
 .candidate-card > header { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid var(--line); }
 .candidate-card h3 { margin: 0; font-size: 18px; }
-.profile-reference { max-width: 680px; margin: 5px 0 0; color: var(--muted); font: 14px/1.45 ui-monospace, monospace; overflow-wrap: anywhere; }
+.profile-reference { max-width: 680px; margin: 5px 0 0; color: var(--muted); font: 15px/1.5 ui-monospace, monospace; overflow-wrap: anywhere; }
 .candidate-score { max-width: 280px; color: var(--not-run); font: 600 16px/1.25 "Iowan Old Style", Georgia, serif; text-align: right; }
 .candidate-facts { display: grid; grid-template-columns: repeat(3, 1fr); margin: 0; border-bottom: 1px solid var(--line); }
 .candidate-facts div { padding: 13px 20px; border-right: 1px solid var(--line); }
@@ -235,7 +241,8 @@ main { padding-block: 24px 64px; }
 .candidate-copy + .candidate-copy { border-top: 1px solid var(--line); }
 .candidate-copy h4 { margin: 0 0 8px; font-size: 16px; }
 .candidate-copy p,
-.candidate-copy ul { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.6; }
+.candidate-copy ul { margin: 0; color: var(--muted); font-size: 16px; line-height: 1.65; }
+.contact-gap { border-left: 5px solid var(--not-run); background: var(--not-run-soft); }
 .candidate-copy .evidence-meta { margin-top: 8px; font: 14px/1.55 ui-monospace, monospace; overflow-wrap: anywhere; }
 .candidate-copy ul { padding-left: 17px; }
 .reverse-match { background: #f3f5d6; }
@@ -253,7 +260,7 @@ main { padding-block: 24px 64px; }
 .evidence-grid dt { margin-bottom: 4px; color: var(--muted); font-size: 14px; }
 .evidence-grid dd { margin: 0; font: 14px/1.5 ui-monospace, monospace; overflow-wrap: anywhere; }
 
-.audit-footer { margin-top: 48px; padding-top: 20px; border-top: 1px solid var(--ink); color: var(--muted); font-size: 14px; line-height: 1.5; }
+.audit-footer { margin-top: 48px; padding-top: 20px; border-top: 1px solid var(--ink); color: var(--muted); font-size: 15px; line-height: 1.55; }
 .audit-footer dl { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin: 0; }
 .audit-footer dt { margin-bottom: 5px; }
 .audit-footer dd { margin: 0; color: var(--ink); overflow-wrap: anywhere; font-weight: 700; }
@@ -350,6 +357,7 @@ body[data-ready="true"] .panel-section:nth-of-type(3) { animation-delay: 70ms; }
   .ai-summary dl,
   .dialog-summary,
   .candidate-facts { grid-template-columns: repeat(2, 1fr); }
+  .coverage-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .ai-summary div:nth-child(2),
   .dialog-summary div:nth-child(2),
   .candidate-facts div:nth-child(2) { border-right: 0; }
@@ -364,4 +372,5 @@ body[data-ready="true"] .panel-section:nth-of-type(3) { animation-delay: 70ms; }
   .topbar { padding-top: 28px; }
   .audit-strip dl, .metric-grid { grid-template-columns: 1fr; }
   .heatmap-panel { padding: 16px; }
+  .coverage-grid { grid-template-columns: 1fr; }
 }
