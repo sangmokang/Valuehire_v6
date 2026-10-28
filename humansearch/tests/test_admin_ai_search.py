@@ -201,6 +201,16 @@ def test_empty_live_input_is_not_reported_as_zero_activity() -> None:
             "score_known_profiles": 0,
             "score_status": "NOT_RUN",
             "score_reason": "no_candidate_scores_verified",
+            "detail_coverage": {
+                "education_profiles": 0,
+                "experience_profiles": 0,
+                "key_experience_profiles": 0,
+                "requirements_evidence_profiles": 0,
+                "why_fit_profiles": 0,
+                "better_position_profiles": 0,
+                "contact_opinion_profiles": 0,
+                "linked_contact_profiles": 0,
+            },
         },
         "candidate_ledger": [],
         "external_effects": contract.external_effects,
@@ -247,10 +257,14 @@ def test_server_exposes_ai_search_list_detail_and_page() -> None:
     contract = load_evidence_contract(EVIDENCE_CONTRACT_PATH)
     payload = build_ai_search_payload((run(candidates=(candidate("a", 91),)),), contract)
     batch_id = payload["batches"][0]["batch_id"]
+    candidate_key = payload["candidate_ledger"][0]["canonical_key"]
 
     with running_server(payload) as (_, port):
         list_status, _, list_body = request(port, "/api/ai-search")
         detail_status, _, detail_body = request(port, f"/api/ai-search/{batch_id}")
+        candidate_status, _, candidate_body = request(
+            port, f"/api/ai-search/candidates/{candidate_key}"
+        )
         page_status, page_type, page_body = request(port, "/ai-search")
         script_status, _, script_body = request(port, "/ai-search.js")
 
@@ -258,6 +272,8 @@ def test_server_exposes_ai_search_list_detail_and_page() -> None:
     assert json.loads(list_body) == payload
     assert detail_status == 200
     assert json.loads(detail_body) == payload["batches"][0]
+    assert candidate_status == 200
+    assert json.loads(candidate_body) == payload["candidate_ledger"][0]
     assert page_status == 200
     assert page_type == "text/html; charset=utf-8"
     assert "AI Search 실행 결과" in page_body.decode("utf-8")
@@ -281,12 +297,25 @@ def test_unknown_batch_detail_fails_closed() -> None:
     assert status == 404
     assert json.loads(body) == {"status": "FAIL", "reason": "batch_not_found"}
 
+    with running_server(payload) as (_, port):
+        candidate_status, _, candidate_body = request(
+            port, "/api/ai-search/candidates/not-a-candidate"
+        )
+
+    assert candidate_status == 404
+    assert json.loads(candidate_body) == {
+        "status": "FAIL",
+        "reason": "candidate_not_found",
+    }
+
 
 def test_ai_search_assets_expose_required_detail_and_error_states() -> None:
     page = (ASSET_DIR / "ai-search.html").read_text(encoding="utf-8")
     script = (ASSET_DIR / "ai-search.js").read_text(encoding="utf-8")
 
     assert 'id="error-state"' in page
+    assert 'id="candidate-dialog"' in page
+    assert 'id="data-quality"' in page
     assert "검색 기간" in page
     assert "실행 주체 판단 근거" not in page
     for field in (
@@ -303,6 +332,9 @@ def test_ai_search_assets_expose_required_detail_and_error_states() -> None:
         "contact_source",
         "contact_checked_at",
         "contact_opinion_evidence",
+        "detail_coverage",
+        "profile_evidence",
+        "/api/ai-search/candidates/",
     ):
         assert field in script
     assert 'element("small", "", reasonLabel(detail))' in script

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Mapping
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -65,7 +66,18 @@ def _run(
 
 def test_global_candidate_ledger_keeps_all_position_scores_and_contact_actors() -> None:
     contract = load_evidence_contract(CONTRACT_PATH)
-    shared = _candidate("https://linkedin.com/in/shared", "공유 후보")
+    shared = replace(
+        _candidate("https://linkedin.com/in/shared", "공유 후보"),
+        education="서울대학교 컴퓨터공학",
+        experience="전체 8년",
+        key_experience="결제 플랫폼 4년",
+        requirements_evidence=("Python 대규모 트래픽 운영",),
+        why_fit=("결제 도메인과 백엔드 운영 경험",),
+        contact_opinion_evidence="확인된 경력 근거로 컨택 추천",
+        better_position_exists=True,
+        better_position="결제 플랫폼 리드",
+        better_position_reason="리드 경험 명시",
+    )
     other = _candidate("https://linkedin.com/in/other", "다른 후보")
     ai_contact = ContactEvidence(
         canonical_key=shared.canonical_key,
@@ -102,6 +114,16 @@ def test_global_candidate_ledger_keeps_all_position_scores_and_contact_actors() 
         "score_known_profiles": 0,
         "score_status": "NOT_RUN",
         "score_reason": "no_candidate_scores_verified",
+        "detail_coverage": {
+            "education_profiles": 1,
+            "experience_profiles": 1,
+            "key_experience_profiles": 1,
+            "requirements_evidence_profiles": 1,
+            "why_fit_profiles": 1,
+            "better_position_profiles": 1,
+            "contact_opinion_profiles": 1,
+            "linked_contact_profiles": 1,
+        },
     }
     ledger = {item["canonical_key"]: item for item in payload["candidate_ledger"]}
     shared_row = ledger[shared.canonical_key]
@@ -115,6 +137,17 @@ def test_global_candidate_ledger_keeps_all_position_scores_and_contact_actors() 
         "AI",
     ]
     assert shared_row["contact_status"] == "PASS"
+    assert shared_row["profile_evidence"] == {
+        "education": "서울대학교 컴퓨터공학",
+        "experience": "전체 8년",
+        "key_experience": "결제 플랫폼 4년",
+        "requirements_evidence": ["Python 대규모 트래픽 운영"],
+        "why_fit": ["결제 도메인과 백엔드 운영 경험"],
+        "contact_opinion_evidence": "확인된 경력 근거로 컨택 추천",
+        "better_position_exists": True,
+        "better_position": "결제 플랫폼 리드",
+        "better_position_reason": "리드 경험 명시",
+    }
     assert payload["batches"][0]["candidates"][0]["search_history"] == shared_row[
         "search_history"
     ]
