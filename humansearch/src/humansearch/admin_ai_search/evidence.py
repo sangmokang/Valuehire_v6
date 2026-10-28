@@ -122,6 +122,18 @@ class SearchHistoryPayload(TypedDict):
     score_reason: str | None
 
 
+class CandidateProfileEvidencePayload(TypedDict):
+    education: str | None
+    experience: str | None
+    key_experience: str | None
+    requirements_evidence: list[str]
+    why_fit: list[str]
+    contact_opinion_evidence: str | None
+    better_position_exists: bool | None
+    better_position: str | None
+    better_position_reason: str | None
+
+
 class CandidateLedgerPayload(TypedDict):
     canonical_key: str
     display_name: str
@@ -131,6 +143,18 @@ class CandidateLedgerPayload(TypedDict):
     contact_status: EvidenceStatus
     search_history: list[SearchHistoryPayload]
     contact_history: list[ContactHistoryPayload]
+    profile_evidence: CandidateProfileEvidencePayload
+
+
+class CandidateDetailCoveragePayload(TypedDict):
+    education_profiles: int
+    experience_profiles: int
+    key_experience_profiles: int
+    requirements_evidence_profiles: int
+    why_fit_profiles: int
+    better_position_profiles: int
+    contact_opinion_profiles: int
+    linked_contact_profiles: int
 
 
 class CandidateSummaryPayload(TypedDict):
@@ -141,6 +165,7 @@ class CandidateSummaryPayload(TypedDict):
     score_known_profiles: int
     score_status: EvidenceStatus
     score_reason: str | None
+    detail_coverage: CandidateDetailCoveragePayload
 
 
 class SentContactEventPayload(TypedDict):
@@ -751,6 +776,16 @@ def _candidate_ledger(
     known_assignments = 0
     unknown_assignments = 0
     score_known_profiles = 0
+    detail_coverage: CandidateDetailCoveragePayload = {
+        "education_profiles": 0,
+        "experience_profiles": 0,
+        "key_experience_profiles": 0,
+        "requirements_evidence_profiles": 0,
+        "why_fit_profiles": 0,
+        "better_position_profiles": 0,
+        "contact_opinion_profiles": 0,
+        "linked_contact_profiles": 0,
+    }
     for canonical_key, appearances in grouped.items():
         search_history = [
             _search_history_payload(batch, candidate) for batch, candidate in appearances
@@ -791,6 +826,25 @@ def _candidate_ledger(
         )
         score_known_profiles += score_status == "PASS"
         latest_candidate = appearances[0][1]
+        profile_evidence = _profile_evidence(appearances)
+        detail_coverage["education_profiles"] += profile_evidence["education"] is not None
+        detail_coverage["experience_profiles"] += profile_evidence["experience"] is not None
+        detail_coverage["key_experience_profiles"] += (
+            profile_evidence["key_experience"] is not None
+        )
+        detail_coverage["requirements_evidence_profiles"] += bool(
+            profile_evidence["requirements_evidence"]
+        )
+        detail_coverage["why_fit_profiles"] += bool(profile_evidence["why_fit"])
+        detail_coverage["better_position_profiles"] += (
+            profile_evidence["better_position_exists"] is not None
+        )
+        detail_coverage["contact_opinion_profiles"] += (
+            profile_evidence["contact_opinion_evidence"] is not None
+        )
+        detail_coverage["linked_contact_profiles"] += any(
+            item["status"] == "PASS" for item in contact_history
+        )
         ledger.append(
             {
                 "canonical_key": canonical_key,
@@ -809,6 +863,7 @@ def _candidate_ledger(
                 ),
                 "search_history": search_history,
                 "contact_history": contact_history,
+                "profile_evidence": profile_evidence,
             }
         )
     ledger.sort(
@@ -834,9 +889,76 @@ def _candidate_ledger(
             else "no_candidate_scores_verified"
             if score_known_profiles == 0
             else "some_candidate_scores_unverified",
+            "detail_coverage": detail_coverage,
         },
         ledger,
     )
+
+
+def _profile_evidence(
+    appearances: Sequence[tuple[BatchPayload, CandidatePayload]],
+) -> CandidateProfileEvidencePayload:
+    education = next(
+        (candidate["education"] for _, candidate in appearances if candidate["education"]),
+        None,
+    )
+    experience = next(
+        (candidate["experience"] for _, candidate in appearances if candidate["experience"]),
+        None,
+    )
+    key_experience = next(
+        (
+            candidate["key_experience"]
+            for _, candidate in appearances
+            if candidate["key_experience"]
+        ),
+        None,
+    )
+    contact_opinion = next(
+        (
+            candidate["contact_opinion_evidence"]
+            for _, candidate in appearances
+            if candidate["contact_opinion_evidence"]
+        ),
+        None,
+    )
+    better = next(
+        (
+            candidate
+            for _, candidate in appearances
+            if candidate["better_position_exists"] is not None
+        ),
+        None,
+    )
+    return {
+        "education": education,
+        "experience": experience,
+        "key_experience": key_experience,
+        "requirements_evidence": list(
+            dict.fromkeys(
+                evidence
+                for _, candidate in appearances
+                for evidence in candidate["requirements_evidence"]
+            )
+        ),
+        "why_fit": list(
+            dict.fromkeys(
+                evidence
+                for _, candidate in appearances
+                for evidence in candidate["why_fit"]
+            )
+        ),
+        "contact_opinion_evidence": contact_opinion,
+        "better_position_exists": (
+            better["better_position_exists"] if better is not None else None
+        ),
+        "better_position": better["better_position"] if better is not None else None,
+        "better_position_reason": (
+            better["better_position_reason"]
+            if better is not None
+            else "better_position_evidence_missing"
+        ),
+    }
 
 
 def _search_history_payload(

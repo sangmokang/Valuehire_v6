@@ -98,6 +98,10 @@ def _apply_sent_snapshot(
         "events": events,
     }
     _attach_sent_contacts(payload, events)
+    payload["candidate_summary"]["detail_coverage"]["linked_contact_profiles"] = sum(
+        candidate["contact_status"] == "PASS"
+        for candidate in payload["candidate_ledger"]
+    )
     if not pagination_exhausted:
         payload["status"] = "NOT_RUN"
         payload["reason"] = "gmail_sent_pagination_incomplete"

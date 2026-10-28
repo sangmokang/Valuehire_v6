@@ -341,6 +341,21 @@ class _ShadowRequestHandler(BaseHTTPRequestHandler):
         if self.path == "/api/ai-search":
             self._send_json(200, self.server.ai_search_payload)
             return
+        if self.path.startswith("/api/ai-search/candidates/"):
+            canonical_key = self.path.removeprefix("/api/ai-search/candidates/")
+            candidate = next(
+                (
+                    item
+                    for item in self.server.ai_search_payload["candidate_ledger"]
+                    if item["canonical_key"] == canonical_key
+                ),
+                None,
+            )
+            if candidate is None:
+                self._send_json(404, {"status": "FAIL", "reason": "candidate_not_found"})
+            else:
+                self._send_json(200, candidate)
+            return
         if self.path.startswith("/api/ai-search/"):
             batch_id = self.path.removeprefix("/api/ai-search/")
             batch = next(

@@ -280,6 +280,7 @@ def test_gmail_sent_ledger_splits_ai_owner_and_never_guesses_candidate_link() ->
     assert [event["actor"] for event in collection["events"]] == ["AI", "OWNER"]
     candidate = payload["candidate_ledger"][0]
     assert [event["actor"] for event in candidate["contact_history"]] == ["AI"]
+    assert payload["candidate_summary"]["detail_coverage"]["linked_contact_profiles"] == 1
     assert collection["events"][1]["link_status"] == "NOT_RUN"
     assert collection["events"][1]["link_reason"] == "candidate_profile_not_in_sent_message"
 
