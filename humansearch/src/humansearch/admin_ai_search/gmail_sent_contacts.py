@@ -5,13 +5,15 @@ from __future__ import annotations
 import hashlib
 import re
 from collections.abc import Mapping, Sequence
-from typing import Literal, TypedDict, cast
+from typing import cast
 
 from .evidence import (
     AiSearchPayload,
     ContactActor,
     ContactHistoryPayload,
     EvidenceContract,
+    EvidenceStatus,
+    SentContactEventPayload,
 )
 from .gmail_candidates import canonical_candidate_url
 from .gmail_source import (
@@ -38,20 +40,6 @@ _LABELED_PROFILE_URL = re.compile(
 _CLIENT_PATTERN = re.compile(
     r"from\s+(\d+)\s+named unknown by gmailapi\.google\.com", re.IGNORECASE
 )
-
-
-class SentContactEventPayload(TypedDict):
-    message_id: str
-    thread_id: str
-    subject: str
-    actor: ContactActor
-    actor_reason: str
-    contacted_at: str
-    source: Literal["GMAIL"]
-    evidence_reference: str
-    canonical_keys: list[str]
-    link_status: Literal["PASS", "NOT_RUN"]
-    link_reason: str | None
 
 
 def build_ai_search_payload_from_gmail_evidence(
@@ -92,7 +80,7 @@ def _apply_sent_snapshot(
         else:
             events.append(event)
     linked = sum(event["link_status"] == "PASS" for event in events)
-    status = "PASS" if pagination_exhausted else "NOT_RUN"
+    status: EvidenceStatus = "PASS" if pagination_exhausted else "NOT_RUN"
     payload["contact_collection"] = {
         "query": query,
         "page_count": page_count,

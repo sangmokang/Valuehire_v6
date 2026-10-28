@@ -143,6 +143,37 @@ class CandidateSummaryPayload(TypedDict):
     score_reason: str | None
 
 
+class SentContactEventPayload(TypedDict):
+    message_id: str
+    thread_id: str
+    subject: str
+    actor: ContactActor
+    actor_reason: str
+    contacted_at: str
+    source: Literal["GMAIL"]
+    evidence_reference: str
+    canonical_keys: list[str]
+    link_status: Literal["PASS", "NOT_RUN"]
+    link_reason: str | None
+
+
+class ContactCollectionPayload(TypedDict):
+    query: str
+    page_count: int
+    message_count: int
+    pagination_exhausted: bool
+    status: EvidenceStatus
+    reason: str | None
+    direct_contact_count: int
+    ai_sent_count: int
+    owner_sent_count: int
+    unknown_sent_count: int
+    linked_contact_count: int
+    unlinked_contact_count: int
+    excluded_message_count: int
+    events: list[SentContactEventPayload]
+
+
 class BatchPayload(TypedDict):
     batch_id: str
     actor: str
@@ -182,7 +213,7 @@ class AiSearchPayload(TypedDict):
     candidate_ledger: list[CandidateLedgerPayload]
     external_effects: dict[str, str]
     gmail_collection: NotRequired[dict[str, object]]
-    contact_collection: NotRequired[dict[str, object]]
+    contact_collection: NotRequired[ContactCollectionPayload]
 
 
 def _nonblank(value: str, field: str) -> None:
