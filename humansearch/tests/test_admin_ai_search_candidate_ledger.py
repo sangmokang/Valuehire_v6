@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -13,6 +14,12 @@ from humansearch.admin_ai_search import (
     ContactEvidence,
     build_ai_search_payload,
     load_evidence_contract,
+)
+from humansearch.admin_ai_search.gmail_source import GMAIL_SNAPSHOT_VERSION
+from humansearch.admin_ai_search.gmail_sent_contacts import (
+    GMAIL_EVIDENCE_ENVELOPE_VERSION,
+    GMAIL_SENT_SNAPSHOT_VERSION,
+    build_ai_search_payload_from_gmail_evidence,
 )
 
 REPO_ROOT = Path(__file__).parents[2]
@@ -136,4 +143,110 @@ def test_unique_profile_identity_normalizes_tracking_but_not_cross_channel_peopl
     assert complete is True
     assert candidates[0].canonical_key == candidates[1].canonical_key
     assert candidates[2].canonical_key == candidates[3].canonical_key
+
+
+def _gmail_message(
+    message_id: str,
+    subject: str,
+    body: str,
+    *,
+    client_id: str = "77377267392",
+    to: str = "candidate@example.com",
+) -> dict[str, object]:
+    return {
+        "id": message_id,
+        "thread_id": f"thread-{message_id}",
+        "internal_date": "1793160000000",
+        "label_ids": ["SENT"],
+        "payload": {
+            "mime_type": "text/html",
+            "headers": [
+                {"name": "Subject", "value": subject},
+                {"name": "From", "value": "ValueConnect <sender@valueconnect.kr>"},
+                {"name": "To", "value": to},
+                {
+                    "name": "Received",
+                    "value": (
+                        f"from {client_id} named unknown by gmailapi.google.com "
+                        "with HTTPREST; Wed, 28 Oct 2026 01:00:00 -0400"
+                    ),
+                },
+            ],
+            "body": {"content": body},
+            "parts": [],
+        },
+    }
+
+
+def _gmail_snapshot(
+    version: str, query: str, *messages: Mapping[str, object]
+) -> dict[str, object]:
+    ids = [str(message["id"]) for message in messages]
+    return {
+        "version": version,
+        "query": query,
+        "page_count": 1,
+        "pagination_exhausted": True,
+        "pages": [
+            {"request_page_token": None, "message_ids": ids, "next_page_token": None}
+        ],
+        "message_ids": ids,
+        "messages": list(messages),
+    }
+
+
+def test_gmail_sent_ledger_splits_ai_owner_and_never_guesses_candidate_link() -> None:
+    contract = load_evidence_contract(CONTRACT_PATH)
+    profile = "https://linkedin.com/in/contacted"
+    search = _gmail_snapshot(
+        GMAIL_SNAPSHOT_VERSION,
+        "subject:aisearch -in:spam -in:trash",
+        _gmail_message(
+            "search-message",
+            "[aisearch]claudecode [고객사][백엔드]",
+            f'<h2>후보 1</h2><a href="{profile}">연결 후보</a>',
+            to="sender@valueconnect.kr",
+        ),
+    )
+    sent = _gmail_snapshot(
+        GMAIL_SENT_SNAPSHOT_VERSION,
+        'in:sent {subject:"이직 제안" subject:"포지션 제안"}',
+        _gmail_message(
+            "sent-ai",
+            "[고객사] 백엔드 포지션 제안",
+            f'<p>안녕하세요.</p><a href="{profile}">후보 프로필</a>',
+        ),
+        _gmail_message(
+            "sent-owner",
+            "[고객사] 데이터 포지션 제안",
+            "<p>후보님, 안녕하세요. 프로필 링크는 메일에 없습니다.</p>",
+            client_id="224054973946",
+        ),
+        _gmail_message(
+            "sent-qa",
+            "백엔드 채용 제안",
+            "<p>QA-476 검증 메일입니다.</p>",
+            client_id="402185046281",
+        ),
+    )
+
+    payload = build_ai_search_payload_from_gmail_evidence(
+        {"version": GMAIL_EVIDENCE_ENVELOPE_VERSION, "search": search, "sent": sent},
+        contract,
+    )
+
+    collection = payload["contact_collection"]
+    assert collection["status"] == "PASS"
+    assert collection["direct_contact_count"] == 2
+    assert collection["ai_sent_count"] == 1
+    assert collection["owner_sent_count"] == 1
+    assert collection["unknown_sent_count"] == 0
+    assert collection["linked_contact_count"] == 1
+    assert collection["unlinked_contact_count"] == 1
+    assert collection["excluded_message_count"] == 1
+    assert [event["actor"] for event in collection["events"]] == ["AI", "OWNER"]
+    candidate = payload["candidate_ledger"][0]
+    assert [event["actor"] for event in candidate["contact_history"]] == ["AI"]
+    assert collection["events"][1]["link_status"] == "NOT_RUN"
+    assert collection["events"][1]["link_reason"] == "candidate_profile_not_in_sent_message"
 
