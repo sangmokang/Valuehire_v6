@@ -19,7 +19,9 @@ for required in "$GATES" "scripts/hs_import_spy.py" "humansearch/pyproject.toml"
   "humansearch/src/humansearch/__init__.py" "humansearch/tests" \
   "contracts/admin-ai-search/evidence-contract-v1.json" \
   "contracts/admin-weekly-dashboard/metric-contract-v1.json" \
-  "contracts/admin-weekly-dashboard/source-contract-v1.json" "apps/admin"; do
+  "contracts/admin-weekly-dashboard/source-contract-v1.json" "apps/admin" \
+  "docs/sot/INDEX.md" "docs/sot/admin-ai-search-evidence.md" \
+  "docs/engineering/admin-ai-search-evidence-spec-2026-10-29.md"; do
   if [ ! -e "$required" ]; then
     echo "FAIL: required G2 implementation missing: $required"
     exit 1
@@ -55,6 +57,10 @@ cp contracts/admin-ai-search/evidence-contract-v1.json \
   "$SANDBOX/contracts/admin-ai-search/"
 mkdir -p "$SANDBOX/apps"
 cp -R apps/admin "$SANDBOX/apps/"
+mkdir -p "$SANDBOX/docs/sot" "$SANDBOX/docs/engineering"
+cp docs/sot/INDEX.md docs/sot/admin-ai-search-evidence.md "$SANDBOX/docs/sot/"
+cp docs/engineering/admin-ai-search-evidence-spec-2026-10-29.md \
+  "$SANDBOX/docs/engineering/"
 
 total=0
 blocked=0

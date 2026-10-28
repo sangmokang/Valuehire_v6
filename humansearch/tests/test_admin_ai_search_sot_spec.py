@@ -1,7 +1,8 @@
 """The owner-approved AI Search admin contract must remain discoverable and testable."""
 
-from pathlib import Path
+from __future__ import annotations
 
+from pathlib import Path
 
 REPO_ROOT = Path(__file__).parents[2]
 SOT_PATH = REPO_ROOT / "docs" / "sot" / "admin-ai-search-evidence.md"
