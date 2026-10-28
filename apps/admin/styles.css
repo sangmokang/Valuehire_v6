@@ -180,14 +180,27 @@ main { padding-block: 24px 64px; }
 
 .ai-hero { padding-bottom: 22px; }
 .ai-summary { overflow: hidden; border: 1px solid var(--ink); border-radius: var(--radius); background: var(--dark); color: white; box-shadow: var(--shadow); }
-.ai-summary dl { display: grid; grid-template-columns: repeat(4, 1fr); margin: 0; }
+.ai-summary dl { display: grid; grid-template-columns: repeat(5, 1fr); margin: 0; }
 .ai-summary div { padding: 22px 26px; border-right: 1px solid #383d37; }
 .ai-summary div:last-child { border-right: 0; }
 .ai-summary dt { color: #ccd6cf; font-size: 14px; line-height: 1.4; }
 .ai-summary dd { margin: 3px 0 0; font: 600 clamp(18px, 3vw, 38px)/1.2 "Iowan Old Style", Georgia, serif; overflow-wrap: anywhere; }
+#fu-count { white-space: pre-line; font-size: clamp(16px, 2vw, 28px); }
 .ai-ledger .number-cell { font: 600 20px/1.25 "Iowan Old Style", Georgia, serif; text-align: right; }
 .ai-ledger .number-cell small { font: 400 14px/1.35 Pretendard, "Apple SD Gothic Neo", sans-serif; }
 .batch-code { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.candidate-ledger table { min-width: 1250px; }
+.contact-ledger table { min-width: 1050px; }
+.candidate-ledger td:nth-child(1) { width: 24%; }
+.candidate-ledger td:nth-child(2) { width: 20%; }
+.candidate-ledger td:nth-child(3) { width: 38%; }
+.ledger-limit { margin: 0; padding: 15px 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 15px; }
+.ledger-controls { display: flex; align-items: center; gap: 14px; margin: -2px 0 14px; }
+.ledger-controls label { font-size: 16px; font-weight: 750; }
+.ledger-controls input { width: min(520px, 100%); padding: 11px 13px; border: 1px solid var(--ink); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; }
+.ledger-controls input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.ledger-more { display: block; width: calc(100% - 36px); margin: 0 18px 18px; padding: 12px 16px; border: 1px solid var(--ink); border-radius: 8px; background: var(--surface); cursor: pointer; font-weight: 750; }
+.ledger-more[hidden] { display: none; }
 .clickable-row { cursor: pointer; }
 .clickable-row:focus-visible { outline: 3px solid var(--focus); outline-offset: -3px; }
 .empty-state { padding: 54px 24px; text-align: center; }

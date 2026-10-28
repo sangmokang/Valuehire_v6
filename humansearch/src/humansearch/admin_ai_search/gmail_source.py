@@ -144,11 +144,11 @@ def build_ai_search_payload_from_gmail_snapshot(
 
 
 def _validate_snapshot(
-    snapshot: Mapping[str, object],
+    snapshot: Mapping[str, object], expected_version: str = GMAIL_SNAPSHOT_VERSION,
 ) -> tuple[list[Mapping[str, object]], str, int, bool]:
     if set(snapshot) != _SNAPSHOT_FIELDS:
         raise ValueError("Gmail snapshot fields do not match the v1 contract")
-    if snapshot["version"] != GMAIL_SNAPSHOT_VERSION:
+    if snapshot["version"] != expected_version:
         raise ValueError("unsupported Gmail snapshot version")
     query = snapshot["query"]
     page_count = snapshot["page_count"]

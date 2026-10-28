@@ -15,12 +15,12 @@ from humansearch.admin_ai_search import (
     build_ai_search_payload,
     load_evidence_contract,
 )
-from humansearch.admin_ai_search.gmail_source import GMAIL_SNAPSHOT_VERSION
 from humansearch.admin_ai_search.gmail_sent_contacts import (
     GMAIL_EVIDENCE_ENVELOPE_VERSION,
     GMAIL_SENT_SNAPSHOT_VERSION,
     build_ai_search_payload_from_gmail_evidence,
 )
+from humansearch.admin_ai_search.gmail_source import GMAIL_SNAPSHOT_VERSION
 
 REPO_ROOT = Path(__file__).parents[2]
 CONTRACT_PATH = REPO_ROOT / "contracts" / "admin-ai-search" / "evidence-contract-v1.json"

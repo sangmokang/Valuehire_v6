@@ -27,10 +27,44 @@
       <section class="ai-summary" aria-label="AI Search 집계">
         <dl>
           <div><dt>검색 실행</dt><dd id="batch-count">—</dd></div>
-          <div><dt>확인 가능한 후보 (검색별 합계)</dt><dd id="candidate-count">—</dd></div>
+          <div><dt>고유 후보 프로필</dt><dd id="candidate-count">—</dd></div>
+          <div><dt>후보·포지션 배치 연결</dt><dd id="assignment-count">—</dd></div>
           <div><dt>90점 이상</dt><dd id="strong-count">—</dd></div>
-          <div><dt>실제 후속 연락</dt><dd id="fu-count">—</dd></div>
+          <div><dt>Gmail 직접 컨택</dt><dd id="fu-count">—</dd></div>
         </dl>
+      </section>
+
+      <section class="panel-section" aria-labelledby="candidate-ledger-heading">
+        <div class="section-heading">
+          <div><p class="section-kicker">프로필 정본키 기준</p><h2 id="candidate-ledger-heading">고유 후보 목록</h2></div>
+          <p>같은 프로필은 한 번만 세고, 후보가 거친 모든 포지션·검색 묶음과 확인된 점수를 함께 표시합니다.</p>
+        </div>
+        <div class="ledger-controls">
+          <label for="candidate-filter">후보·고객사·포지션 검색</label>
+          <input id="candidate-filter" type="search" placeholder="이름, 프로필 URL, 고객사 또는 포지션 입력" autocomplete="off">
+        </div>
+        <div class="ledger-panel ai-ledger candidate-ledger">
+          <table>
+            <thead><tr><th scope="col">후보 프로필</th><th scope="col">확인된 점수</th><th scope="col">포지션·검색 묶음</th><th scope="col">직접 컨택</th></tr></thead>
+            <tbody id="candidate-ledger-rows"></tbody>
+          </table>
+          <p id="candidate-ledger-limit" class="ledger-limit"></p>
+          <button id="candidate-more" class="ledger-more" type="button" hidden>후보 200명 더 보기</button>
+        </div>
+      </section>
+
+      <section class="panel-section" aria-labelledby="contact-ledger-heading">
+        <div class="section-heading">
+          <div><p class="section-kicker">Gmail 보낸편지 · 읽기 전용</p><h2 id="contact-ledger-heading">직접 컨택 이력</h2></div>
+          <p>AI 발송, 직접 발송, 주체 미확인을 분리합니다. 프로필 URL이 없는 메일은 후보에게 추정 연결하지 않습니다.</p>
+        </div>
+        <div class="ledger-panel ai-ledger contact-ledger">
+          <table>
+            <thead><tr><th scope="col">발송 주체</th><th scope="col">발송일</th><th scope="col">제안 메일 제목</th><th scope="col">후보 연결</th></tr></thead>
+            <tbody id="contact-ledger-rows"></tbody>
+          </table>
+          <div id="contact-empty-state" class="empty-state" hidden><strong>확인된 Gmail 직접 컨택이 없습니다.</strong><p>보낸편지 전체 확인이 끝나지 않았으면 0건으로 판정하지 않습니다.</p></div>
+        </div>
       </section>
 
       <section class="panel-section" aria-labelledby="batch-heading">

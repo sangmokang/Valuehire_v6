@@ -2,6 +2,8 @@
   "use strict";
 
   const byId = (id) => document.getElementById(id);
+  let candidateLedger = [];
+  let candidateLimit = 200;
   const REASON_LABELS = {
     daily_verification_incomplete: "일일 재검증은 아직 하지 않았습니다.",
     search_period_not_found: "메일에 검색 기간이 없습니다.",
@@ -14,7 +16,12 @@
     requirements_evidence_missing: "필수요건 근거가 메일에 없습니다.",
     why_fit_evidence_missing: "적합 근거가 메일에 없습니다.",
     contact_opinion_evidence_missing: "컨택 의견 근거가 메일에 없습니다.",
+    no_candidate_scores_verified: "v5 점수 계약으로 확인된 후보 점수가 없습니다.",
+    some_candidate_scores_unverified: "일부 후보만 v5 점수 계약으로 확인됐습니다.",
+    cross_channel_identity_not_verified: "채널이 다른 프로필의 동일인 여부는 확인하지 않았습니다.",
     better_position_evidence_missing: "더 적합한 포지션을 판단할 근거가 없습니다.",
+    candidate_profile_not_in_sent_message: "제안 메일에 후보 프로필 URL이 없어 후보 원장에 연결하지 못했습니다.",
+    gmail_sent_pagination_incomplete: "Gmail 보낸편지의 마지막 페이지까지 확인하지 못했습니다.",
     reverse_match_contract_evidence_missing: "역매칭에 필요한 근거가 없습니다.",
     required_sources_not_checked: "필요한 채용사이트를 아직 확인하지 않았습니다.",
     ai_search_load_failed: "AI Search 자료를 불러오지 못했습니다.",
@@ -55,6 +62,12 @@
     return statusLabel(value);
   }
 
+  function contactActorLabel(value) {
+    if (value === "AI") return "AI 발송";
+    if (value === "OWNER") return "직접 발송";
+    return "발송 주체 미확인";
+  }
+
   function statusBadge(status) {
     const value = status || "NOT_RUN";
     return element("span", `status-badge status-${value.toLowerCase()}`, statusLabel(value));
@@ -89,17 +102,113 @@
 
   function renderSummary(payload) {
     const hasEvidence = payload.batches.length > 0;
-    const candidates = sumKnown(payload.batches, (batch) => batch.unique_candidates);
+    const summary = payload.candidate_summary;
+    const candidates = summary.unique_profiles;
+    const assignments = summary.known_position_assignments + summary.unknown_position_assignments;
     const strong = sumKnown(payload.batches, (batch) => batch.score_buckets["90_plus"]);
-    const fu = sumKnown(payload.batches, (batch) => batch.actual_fu);
+    const contacts = payload.contact_collection;
     byId("cadence").textContent = payload.cadence === "DAILY" ? "매일" : payload.cadence;
     byId("evidence-status").replaceChildren(statusBadge(payload.status));
     byId("batch-count").textContent = hasEvidence
       ? payload.batches.length.toLocaleString("ko-KR")
       : "확인하지 않음";
     byId("candidate-count").textContent = hasEvidence ? valueOrNotRun(candidates) : "확인하지 않음";
+    byId("assignment-count").textContent = hasEvidence ? valueOrNotRun(assignments) : "확인하지 않음";
     byId("strong-count").textContent = hasEvidence ? valueOrNotRun(strong) : "확인하지 않음";
-    byId("fu-count").textContent = hasEvidence ? valueOrNotRun(fu) : "확인하지 않음";
+    byId("fu-count").textContent = contacts && contacts.status === "PASS"
+      ? `${contacts.direct_contact_count.toLocaleString("ko-KR")}건\nAI ${contacts.ai_sent_count} · 직접 ${contacts.owner_sent_count} · 미확인 ${contacts.unknown_sent_count}`
+      : "확인하지 않음";
+  }
+
+  function scoreHistoryLabel(candidate) {
+    const knownScores = candidate.search_history.filter((item) => item.score_status === "PASS");
+    if (!knownScores.length) return `미확인 · ${reasonLabel("no_candidate_scores_verified")}`;
+    return knownScores
+      .map((item) => `${entityLabel(item.company, "고객사")} ${entityLabel(item.position, "포지션")} ${item.score}점`)
+      .join(" · ");
+  }
+
+  function searchHistoryLabel(history) {
+    return history.map((item) => (
+      `${entityLabel(item.company, "고객사")} · ${entityLabel(item.position, "포지션")} · ${item.actor_label} · ${shortDate(item.executed_at)}`
+    )).join(" / ");
+  }
+
+  function contactHistoryLabel(history) {
+    const confirmed = history.filter((item) => item.status === "PASS");
+    if (!confirmed.length) return "확인된 직접 컨택 없음";
+    const counts = { AI: 0, OWNER: 0, UNKNOWN: 0 };
+    confirmed.forEach((item) => { counts[item.actor] += 1; });
+    return `AI ${counts.AI}건 · 직접 ${counts.OWNER}건 · 주체 미확인 ${counts.UNKNOWN}건`;
+  }
+
+  function renderCandidateLedger(payload) {
+    candidateLedger = payload.candidate_ledger;
+    candidateLimit = 200;
+    renderCandidateLedgerRows();
+  }
+
+  function renderCandidateLedgerRows() {
+    const root = byId("candidate-ledger-rows");
+    const query = byId("candidate-filter").value.trim().toLocaleLowerCase("ko-KR");
+    const filtered = query
+      ? candidateLedger.filter((candidate) => {
+        const text = [
+          candidate.display_name,
+          ...candidate.profile_urls,
+          ...candidate.search_history.flatMap((item) => [item.company, item.position, item.actor_label]),
+        ].join(" ").toLocaleLowerCase("ko-KR");
+        return text.includes(query);
+      })
+      : candidateLedger;
+    root.replaceChildren();
+    filtered.slice(0, candidateLimit).forEach((candidate) => {
+      const row = element("tr");
+      const profile = element("td");
+      profile.append(
+        element("strong", "", candidate.display_name),
+        element("small", "", candidate.source_channels.join(" · ")),
+        element("small", "profile-reference", candidate.profile_urls[0]),
+      );
+      row.append(
+        profile,
+        element("td", "", scoreHistoryLabel(candidate)),
+        element("td", "", searchHistoryLabel(candidate.search_history)),
+        element("td", "", contactHistoryLabel(candidate.contact_history)),
+      );
+      root.append(row);
+    });
+    const visible = Math.min(candidateLimit, filtered.length);
+    byId("candidate-ledger-limit").textContent = query
+      ? `검색 결과 ${filtered.length.toLocaleString("ko-KR")}명 중 ${visible.toLocaleString("ko-KR")}명을 표시합니다.`
+      : `전체 ${candidateLedger.length.toLocaleString("ko-KR")}명 중 최근 검색된 ${visible.toLocaleString("ko-KR")}명을 표시합니다.`;
+    byId("candidate-more").hidden = visible >= filtered.length;
+  }
+
+  function renderContactLedger(payload) {
+    const collection = payload.contact_collection;
+    const root = byId("contact-ledger-rows");
+    root.replaceChildren();
+    const events = collection && Array.isArray(collection.events) ? collection.events : [];
+    byId("contact-empty-state").hidden = events.length !== 0;
+    events.forEach((event) => {
+      const row = element("tr");
+      const actor = element("td");
+      actor.append(
+        element("strong", "", contactActorLabel(event.actor)),
+        element("small", "", event.source),
+      );
+      const link = event.link_status === "PASS"
+        ? `연결 완료 · ${event.canonical_keys.length}개 프로필`
+        : `미연결 · ${reasonLabel(event.link_reason)}`;
+      row.append(
+        actor,
+        element("td", "date-cell", formatDate(event.contacted_at)),
+        element("td", "", event.subject),
+        element("td", "", link),
+      );
+      root.append(row);
+    });
   }
 
   function accountCell(batch) {
@@ -225,6 +334,8 @@
         `${statusLabel(candidate.contact_status)} · ${contactRecommendationLabel(candidate.contact_recommendation)}`,
       ),
       detailItem("컨택 출처", candidate.contact_source),
+      detailItem("컨택 발송 주체", candidate.contact_actor
+        ? contactActorLabel(candidate.contact_actor) : null),
       detailItem("컨택 확인시각", known(candidate.contact_checked_at)
         ? formatDate(candidate.contact_checked_at) : null),
     );
@@ -240,9 +351,25 @@
       element("p", "", betterPositionLabel(candidate)),
       element("p", "evidence-meta", `기존 역매칭: ${reasonLabel(candidate.reverse_match_reason)}`),
     );
+    const searches = evidenceList(
+      "이 후보의 포지션·검색 묶음 이력",
+      candidate.search_history.map((item) => (
+        `${entityLabel(item.company, "고객사")} · ${entityLabel(item.position, "포지션")} · ${item.actor_label} · ${item.score_status === "PASS" ? `${item.score}점` : "점수 미확인"} · ${formatDate(item.executed_at)}`
+      )),
+      "확인된 검색 묶음이 없습니다.",
+    );
+    const contacts = evidenceList(
+      "직접 컨택 이력",
+      candidate.contact_history.map((item) => (
+        `${contactActorLabel(item.actor)} · ${item.source} · ${valueOrNotRun(item.contacted_at)} · ${statusLabel(item.status)}`
+      )),
+      "확인된 직접 컨택 이력이 없습니다.",
+    );
     article.append(
       heading,
       facts,
+      searches,
+      contacts,
       evidenceList(
         "필수요건별 근거",
         candidate.requirements_evidence,
@@ -281,6 +408,7 @@
     byId("evidence-status").replaceChildren(statusBadge("FAIL"));
     byId("batch-count").textContent = "확인하지 않음";
     byId("candidate-count").textContent = "확인하지 않음";
+    byId("assignment-count").textContent = "확인하지 않음";
     byId("strong-count").textContent = "확인하지 않음";
     byId("fu-count").textContent = "확인하지 않음";
     byId("empty-state").hidden = true;
@@ -341,6 +469,10 @@
       ["확인한 메일", `${gmailMessageCount}건`],
       ["Gmail 상태", statusLabel(gmailStatus)],
       ["전체 페이지 확인", gmail.pagination_exhausted === true ? "완료" : "확인하지 않음"],
+      ["보낸편지 확인", payload.contact_collection?.pagination_exhausted === true ? "완료" : "확인하지 않음"],
+      ["후보 연결 / 미연결", payload.contact_collection?.status === "PASS"
+        ? `${payload.contact_collection.linked_contact_count} / ${payload.contact_collection.unlinked_contact_count}`
+        : "확인하지 않음"],
       ["원격 DB 저장", payload.external_effects.database_writes === "DISABLED" ? "없음" : "확인 필요"],
       ["외부 발송", payload.external_effects.outreach_sends === "DISABLED" ? "없음" : "확인 필요"],
     ];
@@ -362,6 +494,8 @@
       if (!response.ok) throw new Error("ai_search_request_failed");
       const payload = await response.json();
       renderSummary(payload);
+      renderCandidateLedger(payload);
+      renderContactLedger(payload);
       renderRows(payload);
       renderAudit(payload);
       byId("ai-search").setAttribute("aria-busy", "false");
@@ -375,5 +509,13 @@
     }
   }
 
+  byId("candidate-filter").addEventListener("input", () => {
+    candidateLimit = 200;
+    renderCandidateLedgerRows();
+  });
+  byId("candidate-more").addEventListener("click", () => {
+    candidateLimit += 200;
+    renderCandidateLedgerRows();
+  });
   loadAiSearch();
 }());

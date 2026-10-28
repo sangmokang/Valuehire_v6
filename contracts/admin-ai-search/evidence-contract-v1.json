@@ -35,6 +35,11 @@
     "jobkorea_position": "https://www.jobkorea.co.kr/corp/person/position",
     "linkedin_inmail": "https://www.linkedin.com/talent/home"
   },
+  "gmail_contact_actor_clients": {
+    "AI": ["77377267392"],
+    "OWNER": ["224054973946"],
+    "EXCLUDED": ["402185046281"]
+  },
   "external_effects": {
     "gmail": "READ_ONLY_NOT_CONNECTED",
     "saramin": "READ_ONLY_NOT_CONNECTED",

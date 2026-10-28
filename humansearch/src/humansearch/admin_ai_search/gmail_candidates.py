@@ -146,14 +146,14 @@ def _candidate_occurrences(
 ) -> list[tuple[str, str, int]]:
     labels: dict[str, list[str]] = {}
     for raw_url, label in links:
-        normalized = _candidate_url(raw_url)
+        normalized = canonical_candidate_url(raw_url)
         if normalized is not None:
             labels.setdefault(normalized, []).append(label)
     label_offsets: dict[str, int] = {}
     occurrences: list[tuple[str, str, int]] = []
     for line_index, line in enumerate(line.strip() for line in text.splitlines() if line.strip()):
         for match in _URL_PATTERN.finditer(line):
-            normalized = _candidate_url(match.group(0))
+            normalized = canonical_candidate_url(match.group(0))
             if normalized is None:
                 continue
             offset = label_offsets.get(normalized, 0)
@@ -223,7 +223,7 @@ def _score_evidence(
     return score, None, components, score_input_hash(contract.score_contract_version, components)
 
 
-def _candidate_url(raw_url: str) -> str | None:
+def canonical_candidate_url(raw_url: str) -> str | None:
     cleaned = html.unescape(raw_url).rstrip(".,);]}")
     parsed = urlsplit(cleaned)
     if parsed.scheme.lower() not in {"http", "https"} or not parsed.hostname:
@@ -233,19 +233,28 @@ def _candidate_url(raw_url: str) -> str | None:
     host = parsed.hostname.lower().removeprefix("www.")
     if host in {"google.com", "google.co.kr"} and parsed.path == "/url":
         target = parse_qs(parsed.query).get("q", [None])[0]
-        return None if target is None else _candidate_url(unquote(target))
+        return None if target is None else canonical_candidate_url(unquote(target))
     path = re.sub(r"/{2,}", "/", parsed.path).rstrip("/")
     if _host_is(host, "linkedin.com") and (path.startswith("/in/") or "/talent/profile/" in path):
-        return urlunsplit((parsed.scheme.lower(), host, path, "", ""))
+        if path.startswith("/in/"):
+            path = "/".join(path.split("/")[:3])
+        return urlunsplit((parsed.scheme.lower(), "linkedin.com", path, "", ""))
     if _host_is(host, "saramin.co.kr") and "/applicant-view/position/resume" in path:
-        return urlunsplit((parsed.scheme.lower(), host, path, _identity_query(parsed.query), ""))
+        return urlunsplit((parsed.scheme.lower(), "hiring.saramin.co.kr", path, "", ""))
     if _host_is(host, "jobkorea.co.kr") and "/resume/" in path.lower():
-        return urlunsplit((parsed.scheme.lower(), host, path, _identity_query(parsed.query), ""))
+        return urlunsplit(
+            (parsed.scheme.lower(), "jobkorea.co.kr", path, _jobkorea_identity_query(parsed.query), "")
+        )
     return None
 
 
-def _identity_query(query: str) -> str:
-    return urlencode(sorted(parse_qsl(query, keep_blank_values=True)), doseq=True)
+def _jobkorea_identity_query(query: str) -> str:
+    for key, value in parse_qsl(query):
+        if key.lower() == "rno":
+            return urlencode((("rNo", value),))
+        if key.lower() == "no":
+            return urlencode((("No", value),))
+    return ""
 
 
 def _host_is(host: str, domain: str) -> bool:

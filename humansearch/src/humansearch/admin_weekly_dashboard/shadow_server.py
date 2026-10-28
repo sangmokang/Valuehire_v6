@@ -19,6 +19,10 @@ from humansearch.admin_ai_search.evidence import (
     build_ai_search_payload,
     load_evidence_contract,
 )
+from humansearch.admin_ai_search.gmail_sent_contacts import (
+    GMAIL_EVIDENCE_ENVELOPE_VERSION,
+    build_ai_search_payload_from_gmail_evidence,
+)
 from humansearch.admin_ai_search.gmail_source import (
     build_ai_search_payload_from_gmail_snapshot,
 )
@@ -294,10 +298,12 @@ def load_ai_search_payload_from_stream(
     snapshot = json.loads(raw)
     if not isinstance(snapshot, Mapping):
         raise TypeError("Gmail snapshot must be a JSON object")
-    return build_ai_search_payload_from_gmail_snapshot(
-        cast(Mapping[str, object], snapshot),
-        evidence_contract,
-    )
+    typed_snapshot = cast(Mapping[str, object], snapshot)
+    if snapshot.get("version") == GMAIL_EVIDENCE_ENVELOPE_VERSION:
+        return build_ai_search_payload_from_gmail_evidence(
+            typed_snapshot, evidence_contract
+        )
+    return build_ai_search_payload_from_gmail_snapshot(typed_snapshot, evidence_contract)
 
 
 def _load_assets(assets: Path) -> Mapping[str, tuple[str, bytes]]:

@@ -20,6 +20,7 @@ from .scoring import calculate_candidate_score as _calculate_candidate_score
 
 EvidenceStatus = Literal["PASS", "FAIL", "NOT_RUN"]
 ContactRecommendation = Literal["STRONG", "NORMAL", "HOLD", "NOT_RUN"]
+ContactActor = Literal["AI", "OWNER", "UNKNOWN"]
 KST = ZoneInfo("Asia/Seoul")
 
 
@@ -82,6 +83,10 @@ class CandidatePayload(TypedDict):
     contacted_at: str | None
     contact_checked_at: str | None
     contact_reference: str | None
+    contact_actor: ContactActor | None
+    contact_actor_reason: str | None
+    contact_history: list[ContactHistoryPayload]
+    search_history: list[SearchHistoryPayload]
     contact_opinion_evidence: str | None
     better_position_exists: bool | None
     better_position: str | None
@@ -93,6 +98,49 @@ class VerificationPayload(TypedDict):
     status: EvidenceStatus
     checked_at: str | None
     reason: str | None
+
+
+class ContactHistoryPayload(TypedDict):
+    actor: ContactActor
+    actor_reason: str
+    source: str
+    status: EvidenceStatus
+    contacted_at: str | None
+    checked_at: str | None
+    evidence_reference: str | None
+
+
+class SearchHistoryPayload(TypedDict):
+    batch_id: str
+    actor: str
+    actor_label: str
+    company: str
+    position: str
+    executed_at: str
+    score: int | None
+    score_status: EvidenceStatus
+    score_reason: str | None
+
+
+class CandidateLedgerPayload(TypedDict):
+    canonical_key: str
+    display_name: str
+    source_channels: list[str]
+    profile_urls: list[str]
+    score_status: EvidenceStatus
+    contact_status: EvidenceStatus
+    search_history: list[SearchHistoryPayload]
+    contact_history: list[ContactHistoryPayload]
+
+
+class CandidateSummaryPayload(TypedDict):
+    unique_profiles: int
+    batch_appearances: int
+    known_position_assignments: int
+    unknown_position_assignments: int
+    score_known_profiles: int
+    score_status: EvidenceStatus
+    score_reason: str | None
 
 
 class BatchPayload(TypedDict):
@@ -130,8 +178,11 @@ class AiSearchPayload(TypedDict):
     reason: str | None
     cadence: str
     batches: list[BatchPayload]
+    candidate_summary: CandidateSummaryPayload
+    candidate_ledger: list[CandidateLedgerPayload]
     external_effects: dict[str, str]
     gmail_collection: NotRequired[dict[str, object]]
+    contact_collection: NotRequired[dict[str, object]]
 
 
 def _nonblank(value: str, field: str) -> None:
@@ -221,10 +272,15 @@ class ContactEvidence:
     status: EvidenceStatus
     contacted_at: str | None
     evidence_reference: str | None
+    actor: ContactActor = "UNKNOWN"
+    actor_reason: str = "contact_actor_not_recorded"
 
     def __post_init__(self) -> None:
         _nonblank(self.source, "source")
         _status(self.status, "status")
+        if self.actor not in {"AI", "OWNER", "UNKNOWN"}:
+            raise ValueError("contact actor is invalid")
+        _nonblank(self.actor_reason, "actor_reason")
         if self.status == "PASS" and (not self.contacted_at or not self.evidence_reference):
             raise ValueError("PASS contact evidence requires time and reference")
 
@@ -305,6 +361,7 @@ class EvidenceContract:
     external_effects: dict[str, str]
     score_contract_version: str
     score_weights: Mapping[str, int]
+    gmail_contact_actor_clients: Mapping[str, tuple[str, ...]]
 
 
 def load_evidence_contract(path: Path) -> EvidenceContract:
@@ -319,9 +376,28 @@ def load_evidence_contract(path: Path) -> EvidenceContract:
     actors = raw.get("actors")
     bands = raw.get("score_bands")
     effects = raw.get("external_effects")
+    contact_clients = raw.get("gmail_contact_actor_clients")
     score_contract_version, score_weights = load_score_contract(raw.get("score_contract"))
-    if not isinstance(actors, dict) or not isinstance(bands, dict) or not isinstance(effects, dict):
+    if (
+        not isinstance(actors, dict)
+        or not isinstance(bands, dict)
+        or not isinstance(effects, dict)
+        or not isinstance(contact_clients, dict)
+    ):
         raise TypeError("AI Search evidence contract has invalid mappings")
+    expected_contact_actors = {"AI", "OWNER", "EXCLUDED"}
+    if set(contact_clients) != expected_contact_actors or any(
+        not isinstance(values, list)
+        or not values
+        or any(not isinstance(value, str) or not value for value in values)
+        for values in contact_clients.values()
+    ):
+        raise ValueError("Gmail contact actor clients do not match the v1 contract")
+    flat_contact_clients = [
+        value for values in contact_clients.values() for value in cast(list[str], values)
+    ]
+    if len(flat_contact_clients) != len(set(flat_contact_clients)):
+        raise ValueError("Gmail contact actor client IDs must be unique")
     expected_bands = {
         "90_plus": {"min": 90, "max": 100}, "80s": {"min": 80, "max": 89},
         "70s": {"min": 70, "max": 79},
@@ -337,6 +413,9 @@ def load_evidence_contract(path: Path) -> EvidenceContract:
         external_effects=cast(dict[str, str], effects),
         score_contract_version=score_contract_version,
         score_weights=score_weights,
+        gmail_contact_actor_clients={
+            key: tuple(cast(list[str], values)) for key, values in contact_clients.items()
+        },
     )
 
 
@@ -385,7 +464,7 @@ def build_ai_search_batch(search_run: AiSearchRun, contract: EvidenceContract) -
     contacts = _contact_evidence(search_run.contacts)
     checks = {check.source: check for check in search_run.verification_checks}
     candidates = [
-        _candidate_payload(item, contacts.get(item.canonical_key), checks)
+        _candidate_payload(item, contacts.get(item.canonical_key, ()), checks)
         for item in sorted(
             deduplicated.values(),
             key=lambda item: (-(item.score if item.score is not None else -1), item.canonical_key),
@@ -497,6 +576,8 @@ def build_ai_search_payload(
         key=lambda item: (item["executed_at"], item["batch_id"]),
         reverse=True,
     )
+    candidate_summary, candidate_ledger = _candidate_ledger(batches)
+    _attach_candidate_history(batches, candidate_ledger)
     if not batches:
         status: EvidenceStatus = "NOT_RUN"
         reason = "live_sources_not_connected"
@@ -513,17 +594,30 @@ def build_ai_search_payload(
         "reason": reason,
         "cadence": contract.cadence,
         "batches": batches,
+        "candidate_summary": candidate_summary,
+        "candidate_ledger": candidate_ledger,
         "external_effects": dict(contract.external_effects),
     }
 
 
-def _contact_evidence(contacts: Sequence[ContactEvidence]) -> dict[str, ContactEvidence]:
+def _contact_evidence(
+    contacts: Sequence[ContactEvidence],
+) -> dict[str, tuple[ContactEvidence, ...]]:
     grouped: dict[str, list[ContactEvidence]] = {}
     for contact in contacts:
         grouped.setdefault(contact.canonical_key, []).append(contact)
-    priority = {"PASS": 0, "FAIL": 1, "NOT_RUN": 2}
     return {
-        key: min(items, key=lambda item: (priority[item.status], item.source))
+        key: tuple(
+            sorted(
+                items,
+                key=lambda item: (
+                    item.contacted_at or "",
+                    item.evidence_reference or "",
+                    item.source,
+                ),
+                reverse=True,
+            )
+        )
         for key, items in grouped.items()
     }
 
@@ -547,15 +641,17 @@ def _score_state(candidates: Sequence[CandidatePayload]) -> tuple[EvidenceStatus
 
 def _candidate_payload(
     item: CandidateEvidence,
-    contact: ContactEvidence | None,
+    contacts: Sequence[ContactEvidence],
     checks: Mapping[str, VerificationCheck],
 ) -> CandidatePayload:
-    check = checks.get(contact.source) if contact is not None else None
-    contact_status: EvidenceStatus = "NOT_RUN"
-    if contact is not None:
-        contact_status = (
-            contact.status if check is not None and check.status == "PASS" else "NOT_RUN"
-        )
+    history = [_contact_history_payload(contact, checks) for contact in contacts]
+    contact_status: EvidenceStatus = (
+        "PASS" if any(event["status"] == "PASS" for event in history) else "NOT_RUN"
+    )
+    selected = next(
+        (event for event in history if event["status"] == "PASS"),
+        history[0] if history else None,
+    )
     return {
         "canonical_key": item.canonical_key,
         "display_name": item.display_name,
@@ -577,15 +673,166 @@ def _candidate_payload(
         "reverse_match_reason": item.reverse_match_reason,
         "contact_recommendation": item.contact_recommendation,
         "contact_status": contact_status,
-        "contact_source": contact.source if contact is not None else None,
-        "contacted_at": contact.contacted_at if contact is not None else None,
-        "contact_checked_at": check.checked_at if check is not None else None,
-        "contact_reference": contact.evidence_reference if contact is not None else None,
+        "contact_source": selected["source"] if selected is not None else None,
+        "contacted_at": selected["contacted_at"] if selected is not None else None,
+        "contact_checked_at": selected["checked_at"] if selected is not None else None,
+        "contact_reference": (
+            selected["evidence_reference"] if selected is not None else None
+        ),
+        "contact_actor": selected["actor"] if selected is not None else None,
+        "contact_actor_reason": selected["actor_reason"] if selected is not None else None,
+        "contact_history": history,
+        "search_history": [],
         "contact_opinion_evidence": item.contact_opinion_evidence,
         "better_position_exists": item.better_position_exists,
         "better_position": item.better_position,
         "better_position_reason": item.better_position_reason,
     }
+
+
+def _contact_history_payload(
+    contact: ContactEvidence, checks: Mapping[str, VerificationCheck]
+) -> ContactHistoryPayload:
+    check = checks.get(contact.source)
+    independently_verified = contact.source == "GMAIL"
+    status: EvidenceStatus = contact.status
+    if not independently_verified and (check is None or check.status != "PASS"):
+        status = "NOT_RUN"
+    return {
+        "actor": contact.actor,
+        "actor_reason": contact.actor_reason,
+        "source": contact.source,
+        "status": status,
+        "contacted_at": contact.contacted_at,
+        "checked_at": check.checked_at if check is not None else None,
+        "evidence_reference": contact.evidence_reference,
+    }
+
+
+def _candidate_ledger(
+    batches: Sequence[BatchPayload],
+) -> tuple[CandidateSummaryPayload, list[CandidateLedgerPayload]]:
+    grouped: dict[str, list[tuple[BatchPayload, CandidatePayload]]] = {}
+    for batch in batches:
+        for candidate in batch["candidates"]:
+            grouped.setdefault(candidate["canonical_key"], []).append((batch, candidate))
+    ledger: list[CandidateLedgerPayload] = []
+    known_assignments = 0
+    unknown_assignments = 0
+    score_known_profiles = 0
+    for canonical_key, appearances in grouped.items():
+        search_history = [
+            _search_history_payload(batch, candidate) for batch, candidate in appearances
+        ]
+        search_history.sort(
+            key=lambda item: (item["executed_at"], item["batch_id"]), reverse=True
+        )
+        known_assignments += sum(
+            not item["company"].startswith("NOT_RUN:")
+            and not item["position"].startswith("NOT_RUN:")
+            for item in search_history
+        )
+        unknown_assignments += sum(
+            item["company"].startswith("NOT_RUN:")
+            or item["position"].startswith("NOT_RUN:")
+            for item in search_history
+        )
+        contact_by_reference: dict[tuple[str, str | None, str, str], ContactHistoryPayload] = {}
+        for _, candidate in appearances:
+            for contact in candidate["contact_history"]:
+                key = (
+                    contact["source"],
+                    contact["evidence_reference"],
+                    contact["contacted_at"] or "",
+                    contact["actor"],
+                )
+                contact_by_reference.setdefault(key, contact)
+        contact_history = sorted(
+            contact_by_reference.values(),
+            key=lambda item: (
+                item["contacted_at"] or "",
+                item["evidence_reference"] or "",
+            ),
+            reverse=True,
+        )
+        score_status: EvidenceStatus = (
+            "PASS" if any(item["score_status"] == "PASS" for item in search_history) else "NOT_RUN"
+        )
+        score_known_profiles += score_status == "PASS"
+        latest_candidate = appearances[0][1]
+        ledger.append(
+            {
+                "canonical_key": canonical_key,
+                "display_name": latest_candidate["display_name"],
+                "source_channels": sorted(
+                    {candidate["source_channel"] for _, candidate in appearances}
+                ),
+                "profile_urls": sorted(
+                    {candidate["profile_url"] for _, candidate in appearances}
+                ),
+                "score_status": score_status,
+                "contact_status": (
+                    "PASS"
+                    if any(item["status"] == "PASS" for item in contact_history)
+                    else "NOT_RUN"
+                ),
+                "search_history": search_history,
+                "contact_history": contact_history,
+            }
+        )
+    ledger.sort(
+        key=lambda item: (
+            item["search_history"][0]["executed_at"] if item["search_history"] else "",
+            item["canonical_key"],
+        ),
+        reverse=True,
+    )
+    aggregate_score_status: EvidenceStatus = (
+        "PASS" if ledger and score_known_profiles == len(ledger) else "NOT_RUN"
+    )
+    return (
+        {
+            "unique_profiles": len(ledger),
+            "batch_appearances": sum(len(items) for items in grouped.values()),
+            "known_position_assignments": known_assignments,
+            "unknown_position_assignments": unknown_assignments,
+            "score_known_profiles": score_known_profiles,
+            "score_status": aggregate_score_status,
+            "score_reason": None
+            if aggregate_score_status == "PASS"
+            else "no_candidate_scores_verified"
+            if score_known_profiles == 0
+            else "some_candidate_scores_unverified",
+        },
+        ledger,
+    )
+
+
+def _search_history_payload(
+    batch: BatchPayload, candidate: CandidatePayload
+) -> SearchHistoryPayload:
+    return {
+        "batch_id": batch["batch_id"],
+        "actor": batch["actor"],
+        "actor_label": batch["actor_label"],
+        "company": batch["company"],
+        "position": batch["position"],
+        "executed_at": batch["executed_at"],
+        "score": candidate["score"],
+        "score_status": candidate["score_status"],
+        "score_reason": candidate["score_reason"],
+    }
+
+
+def _attach_candidate_history(
+    batches: Sequence[BatchPayload], ledger: Sequence[CandidateLedgerPayload]
+) -> None:
+    by_key = {item["canonical_key"]: item for item in ledger}
+    for batch in batches:
+        for candidate in batch["candidates"]:
+            row = by_key[candidate["canonical_key"]]
+            candidate["search_history"] = list(row["search_history"])
+            candidate["contact_history"] = list(row["contact_history"])
 
 
 def _verification_state(

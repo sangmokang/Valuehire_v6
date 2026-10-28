@@ -193,6 +193,16 @@ def test_empty_live_input_is_not_reported_as_zero_activity() -> None:
         "reason": "live_sources_not_connected",
         "cadence": "DAILY",
         "batches": [],
+        "candidate_summary": {
+            "unique_profiles": 0,
+            "batch_appearances": 0,
+            "known_position_assignments": 0,
+            "unknown_position_assignments": 0,
+            "score_known_profiles": 0,
+            "score_status": "NOT_RUN",
+            "score_reason": "no_candidate_scores_verified",
+        },
+        "candidate_ledger": [],
         "external_effects": contract.external_effects,
     }
     assert dict(payload) == expected
@@ -251,7 +261,8 @@ def test_server_exposes_ai_search_list_detail_and_page() -> None:
     assert page_status == 200
     assert page_type == "text/html; charset=utf-8"
     assert "AI Search 실행 결과" in page_body.decode("utf-8")
-    assert "확인 가능한 후보 (검색별 합계)" in page_body.decode("utf-8")
+    assert "고유 후보 프로필" in page_body.decode("utf-8")
+    assert "후보·포지션 배치 연결" in page_body.decode("utf-8")
     assert "메일에 적힌 후보 수" in page_body.decode("utf-8")
     assert "90점 이상" in page_body.decode("utf-8")
     assert "80~89점" in page_body.decode("utf-8")
@@ -284,6 +295,7 @@ def test_ai_search_assets_expose_required_detail_and_error_states() -> None:
         "search_history",
         "contact_history",
         "contact_actor",
+        "contact_collection",
         "candidate_counts",
         "key_experience",
         "requirements_evidence",
