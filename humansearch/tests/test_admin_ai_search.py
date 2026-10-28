@@ -279,6 +279,11 @@ def test_ai_search_assets_expose_required_detail_and_error_states() -> None:
     assert "검색 기간" in page
     assert "실행 주체 판단 근거" not in page
     for field in (
+        "candidate_summary",
+        "candidate_ledger",
+        "search_history",
+        "contact_history",
+        "contact_actor",
         "candidate_counts",
         "key_experience",
         "requirements_evidence",
