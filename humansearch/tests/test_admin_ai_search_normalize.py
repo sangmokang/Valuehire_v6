@@ -62,3 +62,12 @@ def test_explicit_execution_time_is_separate_from_received_time(tmp_path: Path) 
     assert batch["executed_at"] == "2026-10-17T15:05:00+00:00"
     assert batch["executed_at"] != batch["received_at"]
     assert batch["execution_time_source"] == "explicit_source_timestamp"
+
+
+def test_source_score_does_not_cross_the_next_candidate_boundary(tmp_path: Path) -> None:
+    registry = Registry(tmp_path / "private.sqlite")
+    normalize_message(registry, message("two", "후보 1\nhttps://linkedin.com/in/a\n메일 점수: 97\n후보 2\nhttps://linkedin.com/in/b"), CONTRACT)
+    rows = registry.documents("candidate_position_evaluations")
+    assert {r["profile_url"]: r["source_reported_score"] for r in rows} == {
+        "https://linkedin.com/in/a": 97, "https://linkedin.com/in/b": None,
+    }
