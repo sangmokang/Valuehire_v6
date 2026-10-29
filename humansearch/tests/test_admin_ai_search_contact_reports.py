@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from humansearch.admin_ai_search.contact_reports import ingest_report, ingest_gmail_sent
+from humansearch.admin_ai_search.contact_reports import ingest_gmail_sent, ingest_report
 from humansearch.admin_ai_search.evidence import load_evidence_contract
 from humansearch.admin_ai_search.normalize import key
 from humansearch.admin_ai_search.registry import Registry
@@ -72,3 +72,24 @@ def test_position_mail_with_external_bcc_is_preserved_but_intent_is_not_assumed(
     assert contacts[0]["status"] == "REVIEW_REQUIRED"
     assert contacts[0]["actor"] == "UNKNOWN"
     assert contacts[0]["event_type"] == "POSITION_MAIL_SENT"
+
+
+def test_invalid_contact_timestamp_is_preserved_only_as_raw_evidence(tmp_path: Path) -> None:
+    store = registry(tmp_path)
+    invalid = {**event(), "sent_at": "not-a-date"}
+    ingest_report(store, "report-mail", {"version": "ai-search-contact-report/v1", "events": [invalid]})
+    contact = store.documents("contact_events")[0]
+    assert contact["status"] == "REVIEW_REQUIRED"
+    assert contact["sent_at"] is None
+    assert store.documents("contact_evidence")[0]["report"]["events"][0]["sent_at"] == "not-a-date"
+
+
+def test_negative_contact_proof_cannot_contain_a_send_timestamp(tmp_path: Path) -> None:
+    store = registry(tmp_path)
+    negative = {**event(), "status": "CONFIRMED_NOT_CONTACTED", "pagination_exhausted": True,
+                "scope": {"complete_for_candidate_position": True, "candidate_profile_url": event()["candidate_profile_url"],
+                          "company": "Client", "position": "Engineer", "channel": "LINKEDIN"}}
+    ingest_report(store, "report-mail", {"version": "ai-search-contact-report/v1", "events": [negative]})
+    contact = store.documents("contact_events")[0]
+    assert contact["status"] == "REVIEW_REQUIRED"
+    assert contact["reason"] == "contact_negative_contradicts_send_evidence"
