@@ -56,5 +56,12 @@ DO $$ DECLARE response jsonb; BEGIN
     RAISE EXCEPTION 'AI filter used an evaluation or batch outside its scope';
   END IF;
 END $$;
+UPDATE public.admin_ai_search_batch_source_messages SET document=document||'{"counts_status":"NOT_RUN","unparsed":1}' WHERE id='fixture-batch-source';
+DO $$ DECLARE response jsonb; BEGIN
+  response:=public.admin_ai_search_read('weekly','{"week":"2000-W44","actor":"GROK"}');
+  IF response->'summary'->'candidates'<>'null'::jsonb OR response->'summary'->>'observed_candidates'<>'1' THEN
+    RAISE EXCEPTION 'incomplete parsing was presented as an exact candidate total';
+  END IF;
+END $$;
 ROLLBACK;
 SELECT 'number identity, row merging, zero-candidate batch, filters, fail-closed scores, RLS: PASS' AS runtime_checks;
