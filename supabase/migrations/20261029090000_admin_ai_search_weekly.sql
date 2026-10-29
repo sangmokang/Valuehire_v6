@@ -1,0 +1,205 @@
+-- Additive module; existing administrator tables and policies are untouched.
+-- JSON documents belong to separate entities; indexed generated keys enforce relations.
+CREATE TABLE public.admin_ai_search_collection_runs (id text PRIMARY KEY, document jsonb NOT NULL);
+CREATE TABLE public.admin_ai_search_source_messages (id text PRIMARY KEY, document jsonb NOT NULL);
+CREATE TABLE public.admin_ai_search_collection_checkpoints (id text PRIMARY KEY, document jsonb NOT NULL);
+CREATE TABLE public.admin_ai_search_settings (id text PRIMARY KEY, document jsonb NOT NULL);
+CREATE TABLE public.admin_ai_search_positions (id text PRIMARY KEY, document jsonb NOT NULL);
+CREATE TABLE public.admin_ai_search_candidates (id text PRIMARY KEY, document jsonb NOT NULL);
+CREATE TABLE public.admin_ai_search_batches (
+  id text PRIMARY KEY, week_year integer NOT NULL, week_number integer NOT NULL CHECK(week_number BETWEEN 1 AND 53),
+  sequence integer, provisional_sequence integer,
+  grouping_status text NOT NULL CHECK(grouping_status IN ('CONFIRMED','PROVISIONAL')),
+  display_number text NOT NULL, document jsonb NOT NULL,
+  UNIQUE(week_year,week_number,sequence), UNIQUE(week_year,week_number,provisional_sequence),
+  CHECK ((grouping_status='CONFIRMED' AND sequence>0 AND provisional_sequence IS NULL) OR
+         (grouping_status='PROVISIONAL' AND sequence IS NULL AND provisional_sequence>0))
+);
+CREATE TABLE public.admin_ai_search_source_attachments (
+  id text PRIMARY KEY, document jsonb NOT NULL,
+  source_message_id text GENERATED ALWAYS AS(document->>'source_message_id') STORED
+    REFERENCES public.admin_ai_search_source_messages(id)
+);
+CREATE TABLE public.admin_ai_search_batch_source_messages (
+  id text PRIMARY KEY, document jsonb NOT NULL,
+  source_message_id text GENERATED ALWAYS AS(document->>'source_message_id') STORED
+    REFERENCES public.admin_ai_search_source_messages(id),
+  batch_id text GENERATED ALWAYS AS(document->>'batch_id') STORED REFERENCES public.admin_ai_search_batches(id)
+);
+CREATE TABLE public.admin_ai_search_candidate_batches (
+  id text PRIMARY KEY, document jsonb NOT NULL,
+  candidate_id text GENERATED ALWAYS AS(document->>'candidate_id') STORED REFERENCES public.admin_ai_search_candidates(id),
+  position_id text GENERATED ALWAYS AS(document->>'position_id') STORED REFERENCES public.admin_ai_search_positions(id),
+  batch_id text GENERATED ALWAYS AS(document->>'batch_id') STORED REFERENCES public.admin_ai_search_batches(id),
+  UNIQUE(candidate_id,position_id,batch_id)
+);
+CREATE TABLE public.admin_ai_search_candidate_position_evaluations (
+  id text PRIMARY KEY, document jsonb NOT NULL,
+  candidate_id text GENERATED ALWAYS AS(document->>'candidate_id') STORED REFERENCES public.admin_ai_search_candidates(id),
+  position_id text GENERATED ALWAYS AS(document->>'position_id') STORED REFERENCES public.admin_ai_search_positions(id),
+  batch_id text GENERATED ALWAYS AS(document->>'batch_id') STORED REFERENCES public.admin_ai_search_batches(id),
+  source_message_id text GENERATED ALWAYS AS(document->>'source_message_id') STORED REFERENCES public.admin_ai_search_source_messages(id),
+  CHECK(document->>'score_status' IN ('PASS','NOT_RUN')),
+  CHECK(document->>'score_status'<>'PASS' OR COALESCE((
+    document->>'score' IS NOT NULL AND jsonb_typeof(document->'score_components')='object'
+    AND document->'score_components' ?& ARRAY['education','job_fit','difficult_work','job_description_logic']
+    AND document->>'score_input_hash' IS NOT NULL),false))
+);
+CREATE INDEX admin_ai_search_evaluation_week ON public.admin_ai_search_candidate_position_evaluations((document->>'week_id'),candidate_id,position_id);
+CREATE TABLE public.admin_ai_search_score_components (
+  id text PRIMARY KEY, document jsonb NOT NULL,
+  evaluation_id text GENERATED ALWAYS AS(document->>'evaluation_id') STORED REFERENCES public.admin_ai_search_candidate_position_evaluations(id),
+  CHECK((document->>'score')::numeric BETWEEN 0 AND 100)
+);
+CREATE UNIQUE INDEX admin_ai_search_component_axis ON public.admin_ai_search_score_components(evaluation_id,(document->>'axis'));
+CREATE TABLE public.admin_ai_search_contact_events (
+  id text PRIMARY KEY, document jsonb NOT NULL,
+  candidate_id text GENERATED ALWAYS AS(document->>'candidate_id') STORED REFERENCES public.admin_ai_search_candidates(id),
+  position_id text GENERATED ALWAYS AS(document->>'position_id') STORED REFERENCES public.admin_ai_search_positions(id),
+  CHECK(document->>'channel' IN ('SARAMIN','JOBKOREA','LINKEDIN','GMAIL')),
+  CHECK(document->>'actor' IN ('AI','OWNER','UNKNOWN')),
+  CHECK(document->>'status' IN ('CONTACTED','REPLIED','CONFIRMED_NOT_CONTACTED','NOT_RUN','REVIEW_REQUIRED','FAILED')),
+  CHECK(document->>'status'<>'CONFIRMED_NOT_CONTACTED' OR COALESCE((
+    document->'pagination_exhausted'='true'::jsonb AND document->>'scope' IS NOT NULL
+    AND document->>'checked_at' IS NOT NULL AND candidate_id IS NOT NULL AND position_id IS NOT NULL),false))
+);
+CREATE INDEX admin_ai_search_contact_pair ON public.admin_ai_search_contact_events(candidate_id,position_id);
+CREATE TABLE public.admin_ai_search_contact_evidence (id text PRIMARY KEY, document jsonb NOT NULL);
+CREATE TABLE public.admin_ai_search_review_queue (id text PRIMARY KEY, document jsonb NOT NULL);
+
+-- Allocation is serialized for a week; rediscovery never renumbers an existing ID.
+CREATE FUNCTION public.admin_ai_search_register_batch(p_batch jsonb)
+RETURNS jsonb LANGUAGE plpgsql SET search_path=public,pg_temp AS $$
+DECLARE existing public.admin_ai_search_batches; n integer; provisional boolean;
+BEGIN
+  PERFORM pg_advisory_xact_lock(hashtext('admin_ai_search_batch'),
+    (p_batch->>'week_year')::integer*100+(p_batch->>'week_number')::integer);
+  SELECT * INTO existing FROM admin_ai_search_batches WHERE id=p_batch->>'id' FOR UPDATE;
+  IF FOUND THEN
+    UPDATE admin_ai_search_batches SET document=existing.document || p_batch->'document' WHERE id=existing.id;
+    RETURN to_jsonb(existing);
+  END IF;
+  provisional := p_batch->>'grouping_status'='PROVISIONAL';
+  SELECT COALESCE(MAX(CASE WHEN provisional THEN provisional_sequence ELSE sequence END),0)+1 INTO n
+    FROM admin_ai_search_batches WHERE week_year=(p_batch->>'week_year')::integer
+    AND week_number=(p_batch->>'week_number')::integer;
+  INSERT INTO admin_ai_search_batches VALUES (
+    p_batch->>'id',(p_batch->>'week_year')::integer,(p_batch->>'week_number')::integer,
+    CASE WHEN NOT provisional THEN n END,CASE WHEN provisional THEN n END,p_batch->>'grouping_status',
+    'W'||lpad(p_batch->>'week_number',2,'0')||'-'||CASE WHEN provisional THEN 'P' ELSE '' END||lpad(n::text,2,'0'),
+    p_batch->'document') RETURNING * INTO existing;
+  RETURN to_jsonb(existing);
+END $$;
+
+CREATE VIEW public.admin_ai_search_weekly_rows WITH(security_invoker=true) AS
+WITH ranked AS (
+  SELECT e.*,row_number() OVER(PARTITION BY document->>'week_id',candidate_id,position_id
+    ORDER BY document->>'evaluated_at' DESC,id DESC) AS ranking
+  FROM public.admin_ai_search_candidate_position_evaluations e
+)
+SELECT e.id,e.candidate_id,e.position_id,e.document->>'week_id' AS week_id,
+  p.document->>'company' AS company,p.document->>'title' AS position,
+  p.document->>'status' AS position_status,e.document AS evaluation,
+  (SELECT jsonb_agg(to_jsonb(b) ORDER BY b.display_number) FROM admin_ai_search_candidate_batches cb
+   JOIN admin_ai_search_batches b ON b.id=cb.batch_id WHERE cb.candidate_id=e.candidate_id
+   AND cb.position_id=e.position_id AND b.document->>'week_id'=e.document->>'week_id') AS batches,
+  (SELECT COALESCE(jsonb_agg(c.document),'[]'::jsonb) FROM admin_ai_search_contact_events c
+   WHERE c.candidate_id=e.candidate_id AND c.position_id=e.position_id) AS contacts
+FROM ranked e JOIN admin_ai_search_positions p ON p.id=e.position_id WHERE ranking=1;
+
+CREATE FUNCTION public.admin_ai_search_read(p_action text,p_args jsonb DEFAULT '{}')
+RETURNS jsonb LANGUAGE plpgsql STABLE SET search_path=public,pg_temp AS $$
+DECLARE result jsonb; run jsonb; rows jsonb; total integer; summary jsonb;
+  limit_n integer := least(200,greatest(1,COALESCE((p_args->>'limit')::integer,50)));
+  offset_n integer := greatest(0,COALESCE((p_args->>'offset')::integer,0));
+  threshold integer; complete boolean;
+BEGIN
+  SELECT document INTO run FROM admin_ai_search_collection_runs ORDER BY document->>'started_at' DESC LIMIT 1;
+  SELECT (document->>'high_score_threshold')::integer INTO threshold FROM admin_ai_search_settings WHERE id='contract';
+  complete := COALESCE(run->>'status'='SUCCEEDED' AND run->'normalization_complete'='true'::jsonb,false);
+  IF p_action='collection-status' THEN
+    RETURN jsonb_build_object('run',run-'error','complete',complete,
+      'review_count',(SELECT count(*) FROM admin_ai_search_review_queue WHERE document->>'status'='OPEN'),
+      'failed_count',(SELECT count(*) FROM admin_ai_search_source_messages WHERE document->>'processing_status'='FAILED'));
+  ELSIF p_action='weeks' THEN
+    SELECT jsonb_agg(jsonb_build_object('week_id',to_char(sunday+8,'IYYY-"W"IW'),
+      'start_date',sunday,'end_date',sunday+6) ORDER BY sunday DESC) INTO result
+    FROM (SELECT (date_trunc('week',(now() AT TIME ZONE 'Asia/Seoul')+interval '1 day')::date-1 - g*7) AS sunday
+      FROM generate_series(0,3) g) w;
+    RETURN jsonb_build_object('weeks',result,'collection_complete',complete,'high_score_threshold',threshold);
+  ELSIF p_action='review-queue' THEN
+    SELECT count(*) INTO total FROM admin_ai_search_review_queue WHERE document->>'status'='OPEN';
+    SELECT COALESCE(jsonb_agg(document),'[]') INTO rows FROM (
+      SELECT document FROM admin_ai_search_review_queue WHERE document->>'status'='OPEN' ORDER BY id LIMIT limit_n OFFSET offset_n) q;
+    RETURN jsonb_build_object('total',total,'rows',rows);
+  ELSIF p_action='batches' THEN
+    SELECT to_jsonb(b) INTO result FROM admin_ai_search_batches b WHERE id=p_args->>'id';
+    RETURN result;
+  ELSIF p_action='candidates' THEN
+    SELECT jsonb_build_object('candidate',c.document,
+      'evaluations',(SELECT jsonb_agg(e.document ORDER BY e.document->>'evaluated_at' DESC) FROM admin_ai_search_candidate_position_evaluations e WHERE e.candidate_id=c.id),
+      'positions',(SELECT jsonb_agg(p.document) FROM admin_ai_search_positions p WHERE p.id IN (SELECT position_id FROM admin_ai_search_candidate_position_evaluations WHERE candidate_id=c.id)),
+      'batches',(SELECT jsonb_agg(to_jsonb(b)) FROM admin_ai_search_batches b WHERE b.id IN (SELECT batch_id FROM admin_ai_search_candidate_batches WHERE candidate_id=c.id)),
+      'contacts',(SELECT COALESCE(jsonb_agg(document),'[]') FROM admin_ai_search_contact_events WHERE candidate_id=c.id),
+      'source_messages',(SELECT jsonb_agg(m.document) FROM admin_ai_search_source_messages m WHERE m.id IN (SELECT source_message_id FROM admin_ai_search_candidate_position_evaluations WHERE candidate_id=c.id)),
+      'review_queue',(SELECT COALESCE(jsonb_agg(document),'[]') FROM admin_ai_search_review_queue WHERE document->>'source_message_id' IN (SELECT source_message_id FROM admin_ai_search_candidate_position_evaluations WHERE candidate_id=c.id)))
+      INTO result FROM admin_ai_search_candidates c WHERE id=p_args->>'id';
+    RETURN result;
+  ELSIF p_action NOT IN ('weekly','high-score-uncontacted') THEN
+    RAISE EXCEPTION 'unknown read action';
+  END IF;
+  -- All predicates apply before both summary and pagination; no client-side counting.
+  WITH filtered AS (
+    SELECT w.*,NOT EXISTS(SELECT 1 FROM admin_ai_search_review_queue WHERE document->>'reason' IN
+      ('unlinked_sent_contact','contact_report_binding_pending') AND document->>'status'='OPEN')
+      AND (SELECT count(DISTINCT c->>'channel')=4 FROM jsonb_array_elements(w.contacts) c
+           WHERE c->>'status'='CONFIRMED_NOT_CONTACTED')
+      AND NOT EXISTS(SELECT 1 FROM jsonb_array_elements(w.contacts) c WHERE c->>'status' IN ('CONTACTED','REPLIED','FAILED','REVIEW_REQUIRED'))
+      AS confirmed_uncontacted
+    FROM admin_ai_search_weekly_rows w
+    WHERE w.week_id=p_args->>'week'
+      AND (COALESCE(p_args->>'q','')='' OR concat_ws(' ',w.company,w.position,w.evaluation->>'candidate_name') ILIKE '%'||(p_args->>'q')||'%')
+      AND (COALESCE(p_args->>'company','')='' OR w.company=p_args->>'company')
+      AND (COALESCE(p_args->>'position','')='' OR w.position=p_args->>'position')
+      AND (COALESCE(p_args->>'actor','')='' OR EXISTS(SELECT 1 FROM jsonb_array_elements(w.batches) b WHERE b->'document'->>'actor'=p_args->>'actor'))
+      AND (COALESCE(p_args->>'channel','')='' OR EXISTS(SELECT 1 FROM jsonb_array_elements(w.contacts) c
+        WHERE c->>'channel'=p_args->>'channel' AND c->>'status'=p_args->>'contact_status')
+        OR (p_args->>'contact_status'='NOT_RUN' AND NOT EXISTS(SELECT 1 FROM jsonb_array_elements(w.contacts) c WHERE c->>'channel'=p_args->>'channel')))
+  ), selected AS (
+    SELECT * FROM filtered WHERE p_action='weekly' OR (confirmed_uncontacted AND evaluation->>'score_status'='PASS'
+      AND (evaluation->>'score')::integer>=threshold)
+  ), page AS (
+    SELECT * FROM selected ORDER BY
+      CASE WHEN p_args->>'sort'='score' THEN (evaluation->>'score')::integer END DESC NULLS LAST,
+      company,position,candidate_id LIMIT limit_n OFFSET offset_n
+  )
+  SELECT jsonb_build_object('rows',(SELECT COALESCE(jsonb_agg(to_jsonb(page)),'[]') FROM page),
+    'total',(SELECT count(*) FROM selected),'complete',complete,'week',p_args->>'week',
+    'summary',jsonb_build_object(
+      'batches',CASE WHEN complete THEN (SELECT count(DISTINCT b->>'id') FROM filtered f CROSS JOIN LATERAL jsonb_array_elements(f.batches) b WHERE b->>'grouping_status'='CONFIRMED') END,
+      'positions',CASE WHEN complete THEN (SELECT count(DISTINCT position_id) FROM filtered WHERE position_status='PASS') END,
+      'candidates',CASE WHEN complete THEN (SELECT count(DISTINCT candidate_id) FROM filtered) END,
+      'jd_sent',NULL,
+      'high_score_uncontacted',CASE WHEN complete AND threshold IS NOT NULL
+        AND NOT EXISTS(SELECT 1 FROM filtered WHERE evaluation->>'score_status'<>'PASS' OR NOT confirmed_uncontacted)
+        THEN (SELECT count(*) FROM filtered WHERE confirmed_uncontacted AND (evaluation->>'score')::integer>=threshold) END,
+      'reason',CASE WHEN NOT complete THEN 'collection_or_normalization_incomplete' ELSE 'contact_or_score_verification_incomplete' END))
+    INTO result;
+  RETURN result;
+END $$;
+
+-- Only the server's existing service role can access this module. Session guards
+-- in the host app authorize every page/API request before using that role.
+DO $$ DECLARE t text; BEGIN
+  FOR t IN SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename LIKE 'admin_ai_search_%' LOOP
+    EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY',t);
+    EXECUTE format('REVOKE ALL ON public.%I FROM anon,authenticated',t);
+    EXECUTE format('GRANT SELECT,INSERT,UPDATE ON public.%I TO service_role',t);
+  END LOOP;
+END $$;
+REVOKE ALL ON public.admin_ai_search_weekly_rows FROM PUBLIC,anon,authenticated;
+GRANT SELECT ON public.admin_ai_search_weekly_rows TO service_role;
+REVOKE ALL ON FUNCTION public.admin_ai_search_register_batch(jsonb) FROM PUBLIC,anon,authenticated;
+REVOKE ALL ON FUNCTION public.admin_ai_search_read(text,jsonb) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_ai_search_register_batch(jsonb) TO service_role;
+GRANT EXECUTE ON FUNCTION public.admin_ai_search_read(text,jsonb) TO service_role;

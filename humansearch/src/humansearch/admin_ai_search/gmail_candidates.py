@@ -248,10 +248,14 @@ def _score_evidence(
 
 def canonical_candidate_url(raw_url: str) -> str | None:
     cleaned = html.unescape(raw_url).rstrip(".,);]}")
-    parsed = urlsplit(cleaned)
+    try:
+        parsed = urlsplit(cleaned)
+        invalid_authority = bool(parsed.username or parsed.password or parsed.port)
+    except ValueError:
+        return None
     if parsed.scheme.lower() not in {"http", "https"} or not parsed.hostname:
         return None
-    if parsed.username or parsed.password or parsed.port:
+    if invalid_authority:
         return None
     host = parsed.hostname.lower().removeprefix("www.")
     if host in {"google.com", "google.co.kr"} and parsed.path == "/url":
