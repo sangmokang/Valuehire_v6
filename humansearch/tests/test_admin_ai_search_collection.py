@@ -80,3 +80,23 @@ def test_missing_live_label_fails_closed(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="02aisearch"):
         collect_mailbox(CollectionStore(tmp_path / "private.sqlite"), Missing())
+
+
+def test_resume_retains_the_listed_page_when_body_download_is_interrupted(tmp_path: Path) -> None:
+    class Interrupted(Mailbox):
+        body_failure = True
+
+        def request(self, operation: str, args: dict[str, object]) -> object:
+            if operation == "messages" and self.body_failure:
+                raise RuntimeError("body download interrupted")
+            return super().request(operation, args)
+
+    store = CollectionStore(tmp_path / "private.sqlite")
+    mailbox = Interrupted()
+    with pytest.raises(RuntimeError, match="body download interrupted"):
+        collect_mailbox(store, mailbox, run_id="body-resume")
+    mailbox.body_failure = False
+    mailbox.requests.clear()
+    result = collect_mailbox(store, mailbox, run_id="body-resume")
+    assert ("label-live", None) not in mailbox.requests
+    assert result["union_count"] == 4
