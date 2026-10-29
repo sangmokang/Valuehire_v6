@@ -26,6 +26,12 @@ from humansearch.admin_ai_search.gmail_sent_contacts import (
 from humansearch.admin_ai_search.gmail_source import (
     build_ai_search_payload_from_gmail_snapshot,
 )
+from humansearch.admin_ai_search.weekly_view import (
+    WeeklyAiSearchIndexPayload,
+    WeeklyAiSearchViewPayload,
+    build_weekly_ai_search_index,
+    build_weekly_ai_search_view,
+)
 
 from .contracts import (
     MetricCatalogPayload,
@@ -253,6 +259,8 @@ class ShadowServer(ThreadingHTTPServer):
 
     dashboard_payload: DashboardPayload
     ai_search_payload: AiSearchPayload
+    ai_search_weekly_view: WeeklyAiSearchViewPayload
+    ai_search_weekly_index: WeeklyAiSearchIndexPayload
     asset_routes: Mapping[str, tuple[str, bytes]]
 
 
@@ -283,6 +291,10 @@ def create_shadow_server(
     server = ShadowServer((normalized_host, port), _ShadowRequestHandler)
     server.dashboard_payload = dashboard_payload
     server.ai_search_payload = ai_search_payload
+    server.ai_search_weekly_view = build_weekly_ai_search_view(ai_search_payload)
+    server.ai_search_weekly_index = build_weekly_ai_search_index(
+        server.ai_search_weekly_view
+    )
     server.asset_routes = routes
     return server
 
@@ -340,6 +352,27 @@ class _ShadowRequestHandler(BaseHTTPRequestHandler):
             return
         if self.path == "/api/ai-search":
             self._send_json(200, self.server.ai_search_payload)
+            return
+        if self.path == "/api/ai-search/weekly":
+            self._send_json(200, self.server.ai_search_weekly_index)
+            return
+        if self.path.startswith("/api/ai-search/weekly/"):
+            week_id = self.path.removeprefix("/api/ai-search/weekly/")
+            week = next(
+                (
+                    item
+                    for item in self.server.ai_search_weekly_view["weeks"]
+                    if item["week_id"] == week_id
+                ),
+                None,
+            )
+            if week is None:
+                self._send_json(
+                    404,
+                    {"status": "FAIL", "reason": "ai_search_week_not_found"},
+                )
+            else:
+                self._send_json(200, week)
             return
         if self.path.startswith("/api/ai-search/candidates/"):
             canonical_key = self.path.removeprefix("/api/ai-search/candidates/")
