@@ -18,11 +18,18 @@ db = sqlite3.connect(args.database)
 root = Path(__file__).parents[2]
 
 
+def fail_private(error: str) -> None:
+    db.execute("CREATE TABLE IF NOT EXISTS load_errors (created_at TEXT, original_error TEXT)")
+    db.execute("INSERT INTO load_errors VALUES (datetime('now'),?)", (error,))
+    db.commit()
+    raise RuntimeError("PostgreSQL load failed; original error saved in private staging DB")
+
+
 def sql(statement: str) -> str:
     result = subprocess.run(["psql", args.dsn, "-X", "-A", "-t", "-q",
                              "-v", "ON_ERROR_STOP=1"], input=statement, text=True, capture_output=True)
     if result.returncode:
-        raise RuntimeError(result.stderr)
+        fail_private(result.stderr)
     return result.stdout
 
 
@@ -31,7 +38,7 @@ def load(table: str, records: list[dict[str, object]]) -> None:
     if table not in allowed:
         raise ValueError("Module table required")
     buffer = io.StringIO()
-    writer = csv.writer(buffer)
+    writer = csv.writer(buffer, lineterminator="\n")
     for document in records:
         writer.writerow([document["id"], json.dumps(document, ensure_ascii=False)])
     target = "public.admin_ai_search_" + table
@@ -53,7 +60,7 @@ for row in db.execute("SELECT id,week_year,week_number,grouping_status,document 
                             input="SELECT public.admin_ai_search_register_batch(:'batch'::jsonb);",
                             text=True, capture_output=True)
     if result.returncode:
-        raise RuntimeError(result.stderr)
+        fail_private(result.stderr)
 for table in TABLES:
     if table not in {"positions", "candidates"}:
         load(table, [json.loads(row[0]) for row in db.execute(f"SELECT document FROM {table}")])

@@ -94,7 +94,7 @@ END $$;
 CREATE VIEW public.admin_ai_search_weekly_rows WITH(security_invoker=true) AS
 WITH ranked AS (
   SELECT e.*,row_number() OVER(PARTITION BY document->>'week_id',candidate_id,position_id
-    ORDER BY document->>'evaluated_at' DESC,id DESC) AS ranking
+    ORDER BY document->>'evaluated_at' DESC,document->>'evaluation_version' DESC,id DESC) AS ranking
   FROM public.admin_ai_search_candidate_position_evaluations e
 )
 SELECT e.id,e.candidate_id,e.position_id,e.document->>'week_id' AS week_id,
@@ -122,7 +122,10 @@ BEGIN
   SELECT (document->>'high_score_threshold')::integer INTO threshold FROM admin_ai_search_settings WHERE id='contract';
   complete := COALESCE(run->>'status'='SUCCEEDED' AND run->'normalization_complete'='true'::jsonb,false);
   IF p_action='collection-status' THEN
-    RETURN jsonb_build_object('run',run-'error','complete',complete,
+    RETURN jsonb_build_object('run',(run-'error'-'scopes') || jsonb_build_object('scopes',
+      (SELECT jsonb_object_agg(k,(v-'message_ids'-'page_history'-'next_page_token') ||
+        jsonb_build_object('message_count',jsonb_array_length(v->'message_ids'))) FROM jsonb_each(run->'scopes') AS s(k,v))),
+      'complete',complete,
       'review_count',(SELECT count(*) FROM admin_ai_search_review_queue WHERE document->>'status'='OPEN'),
       'failed_count',(SELECT count(*) FROM admin_ai_search_source_messages WHERE document->>'processing_status'='FAILED'));
   ELSIF p_action='weeks' THEN
@@ -137,7 +140,19 @@ BEGIN
       SELECT document FROM admin_ai_search_review_queue WHERE document->>'status'='OPEN' ORDER BY id LIMIT limit_n OFFSET offset_n) q;
     RETURN jsonb_build_object('total',total,'rows',rows);
   ELSIF p_action='batches' THEN
-    SELECT to_jsonb(b) INTO result FROM admin_ai_search_batches b WHERE id=p_args->>'id';
+    SELECT to_jsonb(b) || jsonb_build_object(
+      'sources',(SELECT jsonb_agg(s.document) FROM admin_ai_search_batch_source_messages s WHERE s.batch_id=b.id),
+      'candidate_counts',(SELECT jsonb_build_object(
+        'status',CASE WHEN bool_and(s.document->>'counts_status'='PASS') THEN 'PASS' ELSE 'NOT_RUN' END,
+        'raw',CASE WHEN bool_and(s.document->>'counts_status'='PASS') THEN sum((s.document->>'raw')::integer) END,
+        'parsed',(SELECT count(DISTINCT candidate_id) FROM admin_ai_search_candidate_batches WHERE batch_id=b.id),
+        'unparsed',CASE WHEN bool_and(s.document->>'counts_status'='PASS') THEN sum((s.document->>'unparsed')::integer) END,
+        'excluded',sum((s.document->>'excluded')::integer),
+        'duplicate',CASE WHEN bool_and(s.document->>'counts_status'='PASS') THEN
+          sum((s.document->>'raw')::integer-(s.document->>'unparsed')::integer-(s.document->>'excluded')::integer)
+          -(SELECT count(DISTINCT candidate_id) FROM admin_ai_search_candidate_batches WHERE batch_id=b.id) END)
+        FROM admin_ai_search_batch_source_messages s WHERE s.batch_id=b.id))
+      INTO result FROM admin_ai_search_batches b WHERE id=p_args->>'id';
     RETURN result;
   ELSIF p_action='candidates' THEN
     SELECT jsonb_build_object('candidate',c.document,
@@ -167,9 +182,23 @@ BEGIN
       AND (COALESCE(p_args->>'company','')='' OR w.company=p_args->>'company')
       AND (COALESCE(p_args->>'position','')='' OR w.position=p_args->>'position')
       AND (COALESCE(p_args->>'actor','')='' OR EXISTS(SELECT 1 FROM jsonb_array_elements(w.batches) b WHERE b->'document'->>'actor'=p_args->>'actor'))
-      AND (COALESCE(p_args->>'channel','')='' OR EXISTS(SELECT 1 FROM jsonb_array_elements(w.contacts) c
-        WHERE c->>'channel'=p_args->>'channel' AND c->>'status'=p_args->>'contact_status')
-        OR (p_args->>'contact_status'='NOT_RUN' AND NOT EXISTS(SELECT 1 FROM jsonb_array_elements(w.contacts) c WHERE c->>'channel'=p_args->>'channel')))
+      AND (COALESCE(p_args->>'contact_status','')='' OR EXISTS(SELECT 1 FROM jsonb_array_elements(w.contacts) c
+        WHERE (COALESCE(p_args->>'channel','')='' OR c->>'channel'=p_args->>'channel') AND c->>'status'=p_args->>'contact_status')
+        OR (p_args->>'contact_status'='NOT_RUN' AND EXISTS(SELECT 1 FROM unnest(ARRAY['SARAMIN','JOBKOREA','LINKEDIN','GMAIL']) ch
+          WHERE (COALESCE(p_args->>'channel','')='' OR ch=p_args->>'channel') AND NOT EXISTS(
+            SELECT 1 FROM jsonb_array_elements(w.contacts) c WHERE c->>'channel'=ch))))
+  ), targets AS (
+    SELECT DISTINCT b.id AS batch_id,b.grouping_status,s.document->>'position_id' AS position_id,p.document->>'status' AS position_status
+    FROM admin_ai_search_batches b JOIN admin_ai_search_batch_source_messages s ON s.batch_id=b.id
+    JOIN admin_ai_search_positions p ON p.id=s.document->>'position_id'
+    WHERE b.document->>'week_id'=p_args->>'week'
+      AND (COALESCE(p_args->>'actor','')='' OR b.document->>'actor'=p_args->>'actor')
+      AND (COALESCE(p_args->>'company','')='' OR p.document->>'company'=p_args->>'company')
+      AND (COALESCE(p_args->>'position','')='' OR p.document->>'title'=p_args->>'position')
+      AND (COALESCE(p_args->>'q','')='' OR concat_ws(' ',p.document->>'company',p.document->>'title') ILIKE '%'||(p_args->>'q')||'%'
+        OR EXISTS(SELECT 1 FROM filtered f WHERE f.position_id=p.id AND EXISTS(SELECT 1 FROM jsonb_array_elements(f.batches) fb WHERE fb->>'id'=b.id)))
+      AND (COALESCE(p_args->>'contact_status','')='' OR EXISTS(SELECT 1 FROM filtered f WHERE f.position_id=p.id AND EXISTS(
+        SELECT 1 FROM jsonb_array_elements(f.batches) fb WHERE fb->>'id'=b.id)))
   ), selected AS (
     SELECT * FROM filtered WHERE p_action='weekly' OR (confirmed_uncontacted AND evaluation->>'score_status'='PASS'
       AND (evaluation->>'score')::integer>=threshold)
@@ -181,8 +210,8 @@ BEGIN
   SELECT jsonb_build_object('rows',(SELECT COALESCE(jsonb_agg(to_jsonb(page)),'[]') FROM page),
     'total',(SELECT count(*) FROM selected),'complete',complete,'week',p_args->>'week',
     'summary',jsonb_build_object(
-      'batches',CASE WHEN complete THEN (SELECT count(DISTINCT b->>'id') FROM filtered f CROSS JOIN LATERAL jsonb_array_elements(f.batches) b WHERE b->>'grouping_status'='CONFIRMED') END,
-      'positions',CASE WHEN complete THEN (SELECT count(DISTINCT position_id) FROM filtered WHERE position_status='PASS') END,
+      'batches',CASE WHEN complete THEN (SELECT count(DISTINCT batch_id) FROM targets WHERE grouping_status='CONFIRMED') END,
+      'positions',CASE WHEN complete THEN (SELECT count(DISTINCT position_id) FROM targets WHERE position_status='PASS') END,
       'candidates',CASE WHEN complete THEN (SELECT count(DISTINCT candidate_id) FROM filtered) END,
       'jd_sent',CASE WHEN complete AND run->'contact_scopes_complete'='true'::jsonb THEN
         (SELECT count(*) FROM filtered f WHERE EXISTS(SELECT 1 FROM jsonb_array_elements(f.weekly_contacts) c

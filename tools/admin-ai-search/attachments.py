@@ -15,7 +15,9 @@ registry = Registry(args.database)
 reader = ExistingGmailReader()
 counts = {"parsed": 0, "review_required": 0}
 try:
-    for row in registry.db.execute("SELECT document FROM source_attachments").fetchall():
+    for row in registry.db.execute("SELECT a.document FROM source_attachments a JOIN normalized_sources s "
+        "ON s.id=json_extract(a.document,'$.source_message_id') WHERE "
+        "json_extract(s.document,'$.processing_status') IN ('PROCESSED','REVIEW_REQUIRED')").fetchall():
         attachment = json.loads(row[0])
         if attachment["status"] == "PARSED":
             continue
@@ -29,7 +31,8 @@ try:
             })
             if extracted.get("status") == "textified":
                 attachment.update(status="PARSED", reason=None, extracted_text=extracted["text"],
-                                  extraction_parser=extracted["parser"], checksum=extracted.get("content_sha256"))
+                                  extraction_parser=extracted["parser"], checksum=extracted.get("content_sha256"),
+                                  original_html=extracted.get("original_html"))
                 counts["parsed"] += 1
                 for review_row in registry.db.execute("SELECT document FROM review_queue").fetchall():
                     pending = json.loads(review_row[0])

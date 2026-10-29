@@ -3,6 +3,7 @@
 import https from 'node:https';
 
 const cache = new Map();
+const nativeFetch = globalThis.fetch;
 async function address(hostname) {
   const cached = cache.get(hostname);
   if (cached && cached.until > Date.now()) return cached.ip;
@@ -35,8 +36,9 @@ function request(url, options, ip) {
   });
 }
 export async function readTransport(url, options = {}) {
-  if (process.env.AI_SEARCH_DOH !== '1') return fetch(url, options);
+  if (process.env.AI_SEARCH_DOH !== '1') return nativeFetch(url, options);
   const target = new URL(url);
+  if (['localhost','127.0.0.1'].includes(target.hostname)) return nativeFetch(url, options);
   if (target.protocol !== 'https:') throw new Error('HTTPS required');
   return request(target, options, await address(target.hostname));
 }

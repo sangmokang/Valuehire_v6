@@ -167,7 +167,13 @@ def _collect_page(
     store: CollectionStore, reader: GmailReader, run_id: str, scope: str, state: dict[str, Any],
 ) -> None:
     token = state["next_page_token"]
-    page = _object(reader.request("list", {"label_id": state["label_id"], "page_token": token}))
+    pending = state.get("pending_page")
+    if pending is None:
+        page = _object(reader.request("list", {"label_id": state["label_id"], "page_token": token}))
+        state["pending_page"] = dict(page)
+        store.save_checkpoint(run_id, scope, state)
+    else:
+        page = _object(pending)
     ids = [item["id"] for item in page.get("messages", [])]
     for offset in range(0, len(ids), 50):
         chunk = ids[offset:offset + 50]
@@ -191,6 +197,7 @@ def _collect_page(
     state["message_ids"] = list(dict.fromkeys([*state["message_ids"], *ids]))
     state.update(pages=state["pages"] + 1, exhausted=next_token is None,
                  next_page_token=next_token, last_success_at=now())
+    state.pop("pending_page", None)
     store.save_checkpoint(run_id, scope, state)
 
 

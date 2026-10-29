@@ -193,7 +193,7 @@ export default function AiSearchWeekly() {
         <p>검증 점수 {row.evaluation.score} · 전체 채널 조회 범위 종료 및 미발송 근거 확인</p>
         {CHANNELS.map(c => <p key={c}>{LABELS[c]}: {value(row.contacts.filter(e => e.channel === c))}</p>)}
         <button onClick={() => void raw(row.candidate_id)}>후보 상세 이동</button></section>)}
-      {modal?.rows?.length === 0 && <p>확정된 고점수 미컨택자가 없습니다. 미확인 자료는 집계에 포함하지 않습니다.</p>}
+      {modal?.rows?.length === 0 && <p>{modal.error ? '미확인 자료가 있어 미컨택자를 확정할 수 없습니다.' : '선택 범위에 확정된 고점수 미컨택자가 없습니다.'}</p>}
     </dialog>
   </main>;
 }

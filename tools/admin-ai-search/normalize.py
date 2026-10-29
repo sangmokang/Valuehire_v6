@@ -45,13 +45,16 @@ for identity, checksum, encoded in cursor:
         registry.db.execute("INSERT INTO normalized_sources VALUES (?,?,?) ON CONFLICT(id) DO UPDATE SET "
                             "checksum=excluded.checksum,document=excluded.document", (identity,checksum,json.dumps(document,ensure_ascii=False)))
     counts[document["processing_status"]] += 1
-for encoded, in registry.db.execute("SELECT document FROM source_messages").fetchall():
+for encoded, in sqlite3.connect(args.database).execute("SELECT document FROM source_messages"):
     raw = json.loads(encoded)
+    subject = headers(raw).get("subject", "")
+    if not ("SENT" in raw.get("labelIds", []) or raw["id"] in label_ids
+            or re.search(r"컨택|발송|contact", subject, re.IGNORECASE)):
+        continue
     try:
         text, _ = _message_body(adapt_mime(raw.get("payload", {})))
     except (ValueError, UnicodeError):
         continue
-    subject = headers(raw).get("subject", "")
     if "SENT" in raw.get("labelIds", []):
         try:
             ingest_gmail_sent(registry, raw, contract, text)

@@ -37,7 +37,8 @@ export async function GET(request: Request, context: { params: Promise<{ path: s
     args[field] = field === 'limit' ? Math.min(200,value) : value;
   }
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/rpc/admin_ai_search_read`, {
+    const base = process.env.AI_SEARCH_REST_BASE_URL === undefined ? process.env.NEXT_PUBLIC_SUPABASE_URL : process.env.AI_SEARCH_REST_BASE_URL;
+    const response = await fetch(`${base}/rest/v1/rpc/admin_ai_search_read`, {
       method: 'POST', cache: 'no-store', signal: AbortSignal.timeout(30000),
       headers: { apikey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
         authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`, 'content-type': 'application/json' },

@@ -72,8 +72,11 @@ async function dispatch(operation, args) {
       const supported = /\.(txt|csv|json|html?|pdf|docx?|rtf|odt)$/i.test(args.filename);
       if (!supported) return { status: 'unsupported', reason: 'unsupported_attachment_format' };
       const raw = await readApi(`messages/${encodeURIComponent(args.message_id)}/attachments/${encodeURIComponent(args.attachment_id)}`);
-      const { attachmentBufferToText } = await import(moduleUrl('lib/textify.mjs'));
-      return attachmentBufferToText({ buffer: Buffer.from(raw.data, 'base64url'), filename: args.filename, mimeType: args.mime_type });
+      const { attachmentBufferToText, sha256 } = await import(moduleUrl('lib/textify.mjs'));
+      const buffer = Buffer.from(raw.data, 'base64url');
+      const extracted = await attachmentBufferToText({ buffer, filename: args.filename, mimeType: args.mime_type });
+      return { ...extracted, content_sha256: sha256(buffer),
+        ...(/\.html?$/i.test(args.filename) ? { original_html: buffer.toString('utf8') } : {}) };
     }
     default: throw new Error('Read operation not allowed');
   }

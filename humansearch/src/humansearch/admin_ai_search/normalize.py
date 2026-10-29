@@ -12,19 +12,26 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from .evidence import CandidateEvidence, EvidenceContract, stable_batch_id
-from .gmail_candidates import candidate_records, canonical_candidate_url
+from .gmail_candidates import (
+    _CANDIDATE_HEADING,
+    _NAMED_CANDIDATE_HEADING,
+    _REPORT_CANDIDATE_HEADING,
+    _SUMMARY_CANDIDATE_HEADING,
+    candidate_records,
+    canonical_candidate_url,
+)
 from .gmail_sent_contacts import _contact_actor
-from .gmail_source import _message_body
+from .gmail_source import _HtmlTextExtractor, _message_body
 from .gmail_subject import classify_actor, non_run_reason, subject_context
 from .registry import Registry, operation_week
 from .weekly_view import _verified_candidate_name
 
-PARSER_VERSION = "admin-ai-search-normalizer/2026-10-29.2"
+PARSER_VERSION = "admin-ai-search-normalizer/2026-10-29.3"
 RUN_ID = re.compile(r"(?:run\s*id|실행\s*ID)\s*[:：#]\s*([\w.:-]{3,128})", re.IGNORECASE)
-SECTION = re.compile(r"^(?:#+\s*)?고객사\s*[:：]\s*(.+?)\s*[/|·]\s*포지션\s*[:：]\s*(.+)$", re.MULTILINE)
+SECTION = re.compile(r"^(?:(?:#+|\[\[VH_HEADING\]\])\s*)?고객사\s*[:：]\s*(.+?)\s*[/|·]\s*포지션\s*[:：]\s*(.+)$", re.MULTILINE)
 RELATED = re.compile(r"ai\s*[-_]?\s*search|ai\s*서치|후보.{0,12}(?:서치|검색)|grok.{0,15}컨택", re.IGNORECASE)
 PROFILE = re.compile(r"https?://[^\s<>\"']+", re.IGNORECASE)
-REPORTED = re.compile(r"(?:메일\s*점수|총점|종합\s*점수|점수|score)\s*[:：]\s*(\d{1,3})(?:\s*/\s*100)?", re.IGNORECASE)
+REPORTED = re.compile(r"^\s*(?:[-*]\s*)?(?:메일\s*(?:원본\s*)?점수|총점|종합\s*점수|점수|score)\s*[:：]\s*(\d{1,3})(?:\s*/\s*100)?", re.IGNORECASE | re.MULTILINE)
 EXECUTED = re.compile(r"(?:실행\s*(?:시각|일시)|executed_at)\s*[:：]\s*(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:\d{2})?)", re.IGNORECASE)
 
 
@@ -69,10 +76,17 @@ def normalize_message(
         review(registry, message_id, "body_unreadable", error_type=type(error).__name__)
     attachments = _attachments(registry, message_id, message.get("payload", {}))
     source.update(body_status="PARSED" if text else "REVIEW_REQUIRED",
-                  attachment_status="REVIEW_REQUIRED" if attachments else "NONE")
+                  attachment_status=("REVIEW_REQUIRED" if any(a["status"] != "PARSED" for a in attachments)
+                                     else "PARSED" if attachments else "NONE"))
     # An attachment extraction job can append verified text, without changing MIME.
     for attachment in attachments:
-        if attachment.get("extracted_text"):
+        if attachment.get("original_html"):
+            parser = _HtmlTextExtractor()
+            parser.feed(attachment["original_html"])
+            parser.close()
+            text += "\n" + parser.result()
+            links.extend(parser.links)
+        elif attachment.get("extracted_text"):
             text += "\n" + attachment["extracted_text"]
     source["body_text"] = text
     if non_run_reason(subject):
@@ -84,6 +98,13 @@ def normalize_message(
             review(registry, message_id, "potential_ai_search_requires_review")
             return source
         source.update(processing_status="EXCLUDED", reason="not_ai_search_after_full_body_read")
+        source.update(body_text=None, raw_body_storage="private_collection_by_message_id")
+        for attachment in attachments:
+            identity = key(message_id, attachment.get("reason") or "attachment_extraction_pending", attachment["id"])
+            old = registry.db.execute("SELECT document FROM review_queue WHERE id=?", (identity,)).fetchone()
+            if old:
+                registry.put("review_queue", {**json.loads(old[0]), "status": "EXCLUDED",
+                    "exclusion_reason": "parent_message_not_ai_search"})
         return source
     actor, actor_reason = classify_actor(subject, meta.get("from", ""))
     actor_evidence = {"subject": subject, "sender": meta.get("from"), "message_id": message_id,
@@ -176,6 +197,10 @@ def _store_candidate(
                                 "cross_channel_link": "NOT_RUN"})
     evaluation_id = key(identity, position_id, source["id"], str(index), PARSER_VERSION)
     reported = REPORTED.search(section)
+    heading_score = re.search(r"\s[—–]\s*(\d{1,3})\s*점|^\s*[-•].+?\s+(\d{1,3})\s*[—–]", section, re.MULTILINE)
+    original_score = int(reported[1]) if reported else (
+        int(heading_score[1] or heading_score[2]) if heading_score else None
+    )
     missing = [axis for axis in contract.score_weights
                if candidate.score_components is None or axis not in candidate.score_components]
     name, name_reason = _verified_candidate_name(candidate.display_name)
@@ -187,9 +212,10 @@ def _store_candidate(
                   "candidate_name_reason": name_reason,
                   "profile_url": raw_urls[0] if raw_urls else candidate.profile_url,
                   "score_status": "PASS" if candidate.score is not None else "NOT_RUN",
-                  "missing_components": missing, "source_reported_score": int(reported[1]) if reported else None,
-                  "source_score_label": reported[0] if reported else None,
-                  "source_score_rubric": "SOURCE_REPORTED_NOT_CONTRACT_VERIFIED" if reported else None,
+                  "missing_components": missing, "source_reported_score": original_score,
+                  "source_score_label": reported[0] if reported else heading_score[0] if heading_score else None,
+                  "source_score_rubric": None,
+                  "source_score_validation": "NOT_RUN:source_rubric_not_verified" if original_score is not None else None,
                   "evaluated_at": source["received_at"], "evaluation_version": PARSER_VERSION,
                   "calculation_version": contract.score_contract_version,
                   "source_segment": section, "human_followup": None,
@@ -208,16 +234,24 @@ def _store_candidate(
 
 
 def _candidate_section(text: str, url: str) -> str:
-    lines = text.splitlines()
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
     locations = [i for i, line in enumerate(lines) if any(
         canonical_candidate_url(m.group(0)) == url for m in PROFILE.finditer(line)
     )]
     if not locations:
         return text
-    start = locations[0]
-    previous = max((i for i in range(start) if PROFILE.search(lines[i])), default=-1)
-    end = next((i for i in range(start + 1, len(lines)) if PROFILE.search(lines[i])), len(lines))
-    return "\n".join(lines[max(previous + 1, start - 2):end])
+    at = locations[0]
+    patterns = (_CANDIDATE_HEADING, _NAMED_CANDIDATE_HEADING,
+                _REPORT_CANDIDATE_HEADING, _SUMMARY_CANDIDATE_HEADING)
+    boundaries = [i for i, line in enumerate(lines) if any(p.match(line) for p in patterns)]
+    start = max((i for i in boundaries if i <= at), default=at)
+    end = next((i for i in boundaries if i > at), len(lines))
+    other_profiles = [i for i, line in enumerate(lines) if i != at and PROFILE.search(line)]
+    if not boundaries and other_profiles:
+        return lines[at]
+    if not boundaries:
+        start = 0
+    return "\n".join(lines[start:end])
 
 
 def _attachments(registry: Registry, message_id: str, part: dict[str, Any]) -> list[dict[str, Any]]:
