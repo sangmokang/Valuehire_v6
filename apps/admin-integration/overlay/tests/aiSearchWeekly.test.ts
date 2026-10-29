@@ -1,36 +1,38 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  guard: vi.fn(), user: vi.fn(), rpc: vi.fn(),
+  guard: vi.fn(), user: vi.fn(), fetch: vi.fn(),
 }));
 vi.mock('@/src/auth/internalApiGuard', () => ({ requireInternalOpsAccess: mocks.guard }));
-vi.mock('@/src/lib/supabase', () => ({ getRequestUser: mocks.user, createServerSupabaseClient: () => ({ rpc: mocks.rpc }) }));
+vi.mock('@/src/lib/supabase', () => ({ getRequestUser: mocks.user }));
 import { GET } from '../app/api/admin/ai-search/[...path]/route';
 import { safeEvidenceUrl } from '../src/admin/aiSearchWeeklyUrl';
 
 describe('AI Search administrator boundary', () => {
-  beforeEach(() => { vi.resetAllMocks(); mocks.guard.mockResolvedValue(null); });
+  beforeEach(() => { vi.resetAllMocks(); mocks.guard.mockResolvedValue(null); vi.stubGlobal('fetch', mocks.fetch); vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL','https://db.example.invalid'); });
   it('requires a real session even when the existing development guard bypasses auth', async () => {
     mocks.user.mockResolvedValue(null);
     const response = await GET(new Request('http://localhost/api/admin/ai-search/candidates/secret'), { params: Promise.resolve({ path: ['candidates','secret'] }) });
-    expect(response.status).toBe(401); expect(mocks.rpc).not.toHaveBeenCalled();
+    expect(response.status).toBe(401); expect(mocks.fetch).not.toHaveBeenCalled();
   });
   it('forbids authenticated external customers from reading candidate raw data', async () => {
     mocks.user.mockResolvedValue({ email: 'customer@example.invalid' });
     const response = await GET(new Request('http://localhost/api/admin/ai-search/candidates/secret'), { params: Promise.resolve({ path: ['candidates','secret'] }) });
-    expect(response.status).toBe(403); expect(mocks.rpc).not.toHaveBeenCalled();
+    expect(response.status).toBe(403); expect(mocks.fetch).not.toHaveBeenCalled();
   });
   it('passes bound filter and pagination arguments to the module RPC after auth', async () => {
     mocks.user.mockResolvedValue({ email: 'operator@valueconnect.kr' });
-    mocks.rpc.mockResolvedValue({ data: { rows: [], total: 0 }, error: null });
+    mocks.fetch.mockResolvedValue(Response.json({ rows: [], total: 0 }));
     const response = await GET(new Request('http://localhost/api/admin/ai-search/weekly/2026-W44?q=O%27Reilly&limit=1000&offset=50'), { params: Promise.resolve({ path: ['weekly','2026-W44'] }) });
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toBe('private, no-store');
-    expect(mocks.rpc).toHaveBeenCalledWith('admin_ai_search_read', { p_action: 'weekly', p_args: { week: '2026-W44', q: "O'Reilly", limit: 200, offset: 50 } });
+    expect(mocks.fetch).toHaveBeenCalledWith('https://db.example.invalid/rest/v1/rpc/admin_ai_search_read', expect.objectContaining({
+      method: 'POST', body: JSON.stringify({ p_action: 'weekly', p_args: { week: '2026-W44', q: "O'Reilly", limit: 200, offset: 50 } }),
+    }));
   });
   it('returns an explicit failure when the database read fails', async () => {
     mocks.user.mockResolvedValue({ email: 'operator@valueconnect.kr' });
-    mocks.rpc.mockResolvedValue({ data: null, error: { message: 'private database details' } });
+    mocks.fetch.mockResolvedValue(Response.json({ message: 'private database details' }, { status: 500 }));
     const response = await GET(new Request('http://localhost/api/admin/ai-search/weeks'), { params: Promise.resolve({ path: ['weeks'] }) });
     expect(response.status).toBe(503);
     expect(await response.text()).not.toContain('private database details');
