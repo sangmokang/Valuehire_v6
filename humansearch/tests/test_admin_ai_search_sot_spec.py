@@ -31,6 +31,10 @@ def test_ai_search_admin_sot_and_spec_fix_the_owner_contract() -> None:
         "NOT_RUN",
         "발송 0건",
         "원격 DB 쓰기 0건",
+        "일요일 00:00",
+        "(batch_id, canonical_key)",
+        "후보 서치 원장",
+        "주간 컨택 원장",
     ):
         assert required in sot
 
@@ -41,6 +45,9 @@ def test_ai_search_admin_sot_and_spec_fix_the_owner_contract() -> None:
         "AI 7 / OWNER 1 / UNKNOWN 0",
         "후보 연결 0 / 미연결 8",
         "GET /api/ai-search/candidates/{canonical_key}",
+        "GET /api/ai-search/weekly",
+        "GET /api/ai-search/weekly/{week_id}",
+        "한 행 = 한 Batch의 중복 제거 후보 1명",
         "목록 상태",
         "상세 상태",
         "빈 상태",
