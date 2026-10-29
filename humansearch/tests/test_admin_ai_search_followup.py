@@ -170,6 +170,14 @@ def test_real_report_candidate_sections_fill_name_profile_facts_but_not_legacy_s
       - 학력: 동아대 기계공학 학사(2002), 부산대 MBA(2020~22)
       - 경력: KUKA 14년 / TOX Korea V. Managing Director
       - 추천 이유: 로봇 제조사에서 영업·PM·CS를 모두 경험
+
+      [P1 60점 미만 — 요약]
+      - Stanley (Yoonshik) Ha 58 — KUKA VP·삼성 Global KAM, 영어 근거 강함.
+      https://www.linkedin.com/talent/profile/redacted-c
+      JD: 학사 확인 필요 | 자동차 4 + 기술영업 22
+      - 송진용 55 — TI 현대모비스 반도체 영업, 인하대 전기공학.
+      https://www.linkedin.com/talent/profile/redacted-d
+      JD: 경력 해당성 확인 필요 | 자동차 18 + 기술영업 15
     """
 
     payload = build_ai_search_payload_from_gmail_snapshot(
@@ -184,20 +192,27 @@ def test_real_report_candidate_sections_fill_name_profile_facts_but_not_legacy_s
     )
 
     candidates = payload["batches"][0]["candidates"]
-    assert [candidate["display_name"] for candidate in candidates] == [
+    by_name = {candidate["display_name"]: candidate for candidate in candidates}
+    assert set(by_name) == {
         "jangheon kim",
         "Dongwoo Kim",
-    ]
-    assert candidates[0]["education"] == "한국산업기술대학교 (전공·학위 확인 필요)"
-    assert candidates[0]["experience"] == (
+        "Stanley (Yoonshik) Ha",
+        "송진용",
+    }
+    assert by_name["jangheon kim"]["education"] == (
+        "한국산업기술대학교 (전공·학위 확인 필요)"
+    )
+    assert by_name["jangheon kim"]["experience"] == (
         "SICK Korea 2023.05~현재 / TOX Korea 2018.11~2023.05 / "
         "Festo Automotive Tier1 KAM 2014.04~2018.11"
     )
-    assert candidates[0]["why_fit"] == [
+    assert by_name["jangheon kim"]["why_fit"] == [
         "완성차·Tier1 라인 영업 12년 이상 / 수치로 확인되는 수주 실적"
     ]
-    assert candidates[0]["score"] is None
-    assert candidates[0]["score_reason"] == "score_contract_evidence_missing"
+    assert by_name["jangheon kim"]["score"] is None
+    assert by_name["jangheon kim"]["score_reason"] == (
+        "score_contract_evidence_missing"
+    )
 
 
 def test_candidate_evaluation_heading_supplies_name_and_recent_experience() -> None:
