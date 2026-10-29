@@ -19,6 +19,11 @@ def test_saramin_candidate_identity_parameter_is_not_tracking() -> None:
     assert first != second
 
 
+def test_template_or_malformed_profile_url_is_rejected_without_parser_crash() -> None:
+    assert canonical_candidate_url("https://linkedin.com:{채널포트}/in/candidate") is None
+    assert canonical_candidate_url("https://[invalid/in/candidate") is None
+
+
 def test_week_is_half_open_kst_and_uses_existing_meeting_iso_label() -> None:
     kst = ZoneInfo("Asia/Seoul")
     assert operation_week(datetime(2026, 10, 24, 23, 59, tzinfo=kst))[0] == "2026-W44"

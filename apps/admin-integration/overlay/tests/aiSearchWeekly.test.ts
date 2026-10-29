@@ -26,9 +26,10 @@ describe('AI Search administrator boundary', () => {
     const response = await GET(new Request('http://localhost/api/admin/ai-search/weekly/2026-W44?q=O%27Reilly&limit=1000&offset=50'), { params: Promise.resolve({ path: ['weekly','2026-W44'] }) });
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toBe('private, no-store');
-    expect(mocks.fetch).toHaveBeenCalledWith('https://db.example.invalid/rest/v1/rpc/admin_ai_search_read', expect.objectContaining({
-      method: 'POST', body: JSON.stringify({ p_action: 'weekly', p_args: { week: '2026-W44', q: "O'Reilly", limit: 200, offset: 50 } }),
-    }));
+    const [url, options] = mocks.fetch.mock.calls[0]!;
+    expect(url).toBe('https://db.example.invalid/rest/v1/rpc/admin_ai_search_read');
+    expect(options.method).toBe('POST');
+    expect(JSON.parse(options.body)).toEqual({ p_action: 'weekly', p_args: { week: '2026-W44', q: "O'Reilly", limit: 200, offset: 50 } });
   });
   it('returns an explicit failure when the database read fails', async () => {
     mocks.user.mockResolvedValue({ email: 'operator@valueconnect.kr' });
