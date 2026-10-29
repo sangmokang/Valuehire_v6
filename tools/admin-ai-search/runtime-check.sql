@@ -18,7 +18,7 @@ DO $$ BEGIN
 END $$;
 -- A completed collection can include a genuine zero-candidate execution.
 INSERT INTO public.admin_ai_search_collection_runs VALUES('fixture-run','{"id":"fixture-run","started_at":"9999-01-01","status":"SUCCEEDED","normalization_complete":true,"contact_scopes_complete":false,"scopes":{}}');
-INSERT INTO public.admin_ai_search_source_messages VALUES('fixture-message','{"id":"fixture-message"}');
+INSERT INTO public.admin_ai_search_source_messages VALUES('fixture-message','{"id":"fixture-message","parser_version":"fixture-new","processing_status":"PROCESSED"}');
 INSERT INTO public.admin_ai_search_positions VALUES('fixture-position','{"id":"fixture-position","company":"Fixture Client","title":"Fixture Engineer","status":"PASS"}');
 SELECT public.admin_ai_search_register_batch('{"id":"fixture-batch","week_year":2000,"week_number":44,"grouping_status":"CONFIRMED","document":{"id":"fixture-batch","week_id":"2000-W44","actor":"GROK"}}');
 INSERT INTO public.admin_ai_search_batch_source_messages VALUES('fixture-batch-source','{"id":"fixture-batch-source","batch_id":"fixture-batch","source_message_id":"fixture-message","position_id":"fixture-position","raw":0,"parsed":0,"duplicate":0,"unparsed":0,"excluded":0,"counts_status":"PASS"}');
@@ -30,7 +30,10 @@ DO $$ DECLARE response jsonb; BEGIN
 END $$;
 INSERT INTO public.admin_ai_search_candidates VALUES('fixture-candidate','{"id":"fixture-candidate"}');
 INSERT INTO public.admin_ai_search_candidate_batches VALUES('fixture-cb','{"id":"fixture-cb","candidate_id":"fixture-candidate","position_id":"fixture-position","batch_id":"fixture-batch"}');
-INSERT INTO public.admin_ai_search_candidate_position_evaluations VALUES('fixture-eval','{"id":"fixture-eval","candidate_id":"fixture-candidate","position_id":"fixture-position","batch_id":"fixture-batch","source_message_id":"fixture-message","week_id":"2000-W44","score_status":"NOT_RUN","score":null,"candidate_name":"Fixture Candidate","evaluated_at":"2000-10-22T00:00:00+09:00"}');
+INSERT INTO public.admin_ai_search_candidate_position_evaluations VALUES('fixture-eval','{"id":"fixture-eval","candidate_id":"fixture-candidate","position_id":"fixture-position","batch_id":"fixture-batch","source_message_id":"fixture-message","week_id":"2000-W44","score_status":"NOT_RUN","score":null,"candidate_name":"Fixture Candidate","evaluated_at":"2000-10-22T00:00:00+09:00","evaluation_version":"fixture-new"}');
+UPDATE public.admin_ai_search_batch_source_messages SET document=document||'{"raw":1,"parsed":1}' WHERE id='fixture-batch-source';
+INSERT INTO public.admin_ai_search_candidates VALUES('fixture-old-candidate','{"id":"fixture-old-candidate"}');
+INSERT INTO public.admin_ai_search_candidate_position_evaluations VALUES('fixture-old-eval','{"id":"fixture-old-eval","candidate_id":"fixture-old-candidate","position_id":"fixture-position","batch_id":"fixture-batch","source_message_id":"fixture-message","week_id":"2000-W44","score_status":"NOT_RUN","score":null,"candidate_name":"Fixture Old Interpretation","evaluated_at":"2000-10-22T00:00:00+09:00","evaluation_version":"fixture-old"}');
 DO $$ DECLARE response jsonb; BEGIN
   response:=public.admin_ai_search_read('high-score-uncontacted','{"week":"2000-W44"}');
   IF response->'summary'->'high_score_uncontacted'<>'null'::jsonb OR response->>'total'<>'0' THEN
