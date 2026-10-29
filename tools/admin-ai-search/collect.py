@@ -11,6 +11,7 @@ from humansearch.admin_ai_search.collection import CollectionStore, collect_mail
 
 class ExistingGmailReader:
     def __init__(self) -> None:
+        self.retry_count = 0
         self.process = subprocess.Popen(
             ["node", str(Path(__file__).with_name("gmail-reader.mjs"))],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True,
@@ -25,6 +26,7 @@ class ExistingGmailReader:
         if not response:
             raise RuntimeError("Gmail reader exited before response")
         result = json.loads(response)
+        self.retry_count = result["retry_count"]
         if not result["ok"]:
             raise RuntimeError(result["error"])
         return result["value"]
@@ -39,10 +41,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--database", type=Path, required=True)
     parser.add_argument("--run-id")
+    parser.add_argument("--include-sent", action="store_true")
     args = parser.parse_args()
     reader = ExistingGmailReader()
     try:
-        run = collect_mailbox(CollectionStore(args.database), reader, run_id=args.run_id)
+        run = collect_mailbox(CollectionStore(args.database), reader, run_id=args.run_id, include_sent=args.include_sent)
         # Counts only. No subjects, recipients, names or raw error text in logs.
         print(json.dumps({key: run[key] for key in (
             "id", "status", "union_count", "overlap_count", "new", "updated", "unchanged",

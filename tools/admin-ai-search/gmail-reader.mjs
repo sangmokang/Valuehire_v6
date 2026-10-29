@@ -39,7 +39,7 @@ async function readApi(resource, query = {}) {
     for (const [key, value] of Object.entries(query)) if (value !== null) url.searchParams.set(key, value);
     const response = await readTransport(url, { headers: { authorization: `Bearer ${await accessToken()}` }, signal: AbortSignal.timeout(30000) });
     if (!response.ok) {
-      const error = new Error(`Gmail GET failed: HTTP ${response.status}`);
+      const error = new Error(`Gmail GET failed: HTTP ${response.status}: ${await response.text()}`);
       error.status = response.status;
       throw error;
     }
@@ -54,20 +54,35 @@ async function dispatch(operation, args) {
     case 'list': return readApi('messages', { labelIds: args.label_id, maxResults: '500', pageToken: args.page_token });
     case 'messages': {
       const output = [];
-      for (let i = 0; i < args.ids.length; i += 10) {
-        output.push(...await Promise.all(args.ids.slice(i, i + 10).map(id => readApi(`messages/${encodeURIComponent(id)}`, { format: 'full' }))));
+      for (let i = 0; i < args.ids.length; i += 25) {
+        output.push(...await Promise.all(args.ids.slice(i, i + 25).map(async id => {
+          try { return await readApi(`messages/${encodeURIComponent(id)}`, { format: 'full' }); }
+          catch (error) {
+            let metadata = { id };
+            try { metadata = await readApi(`messages/${encodeURIComponent(id)}`, { format: 'metadata' }); }
+            catch (metadataError) { metadata.metadata_error = metadataError.message; }
+            return { ...metadata, collection_error: error.message, collection_status: 'FAILED' };
+          }
+        })));
       }
       return output;
     }
     case 'attachment': return readApi(`messages/${encodeURIComponent(args.message_id)}/attachments/${encodeURIComponent(args.attachment_id)}`);
+    case 'attachment_text': {
+      const supported = /\.(txt|csv|json|html?|pdf|docx?|rtf|odt)$/i.test(args.filename);
+      if (!supported) return { status: 'unsupported', reason: 'unsupported_attachment_format' };
+      const raw = await readApi(`messages/${encodeURIComponent(args.message_id)}/attachments/${encodeURIComponent(args.attachment_id)}`);
+      const { attachmentBufferToText } = await import(moduleUrl('lib/textify.mjs'));
+      return attachmentBufferToText({ buffer: Buffer.from(raw.data, 'base64url'), filename: args.filename, mimeType: args.mime_type });
+    }
     default: throw new Error('Read operation not allowed');
   }
 }
 for await (const line of createInterface({ input: process.stdin })) {
   try {
     const input = JSON.parse(line);
-    process.stdout.write(JSON.stringify({ ok: true, value: await dispatch(input.operation, input.args) }) + '\n');
+    process.stdout.write(JSON.stringify({ ok: true, value: await dispatch(input.operation, input.args), retry_count: retries }) + '\n');
   } catch (error) {
-    process.stdout.write(JSON.stringify({ ok: false, error: error.message, type: error.name }) + '\n');
+    process.stdout.write(JSON.stringify({ ok: false, error: error.message, type: error.name, retry_count: retries }) + '\n');
   }
 }

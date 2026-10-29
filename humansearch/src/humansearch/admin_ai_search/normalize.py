@@ -9,6 +9,7 @@ import re
 from dataclasses import asdict
 from datetime import UTC, datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from .evidence import CandidateEvidence, EvidenceContract, stable_batch_id
 from .gmail_candidates import candidate_records, canonical_candidate_url
@@ -16,13 +17,15 @@ from .gmail_sent_contacts import _contact_actor
 from .gmail_source import _message_body
 from .gmail_subject import classify_actor, non_run_reason, subject_context
 from .registry import Registry, operation_week
+from .weekly_view import _verified_candidate_name
 
-PARSER_VERSION = "admin-ai-search-normalizer/2026-10-29.1"
+PARSER_VERSION = "admin-ai-search-normalizer/2026-10-29.2"
 RUN_ID = re.compile(r"(?:run\s*id|실행\s*ID)\s*[:：#]\s*([\w.:-]{3,128})", re.IGNORECASE)
 SECTION = re.compile(r"^(?:#+\s*)?고객사\s*[:：]\s*(.+?)\s*[/|·]\s*포지션\s*[:：]\s*(.+)$", re.MULTILINE)
 RELATED = re.compile(r"ai\s*[-_]?\s*search|ai\s*서치|후보.{0,12}(?:서치|검색)|grok.{0,15}컨택", re.IGNORECASE)
 PROFILE = re.compile(r"https?://[^\s<>\"']+", re.IGNORECASE)
 REPORTED = re.compile(r"(?:메일\s*점수|총점|종합\s*점수|점수|score)\s*[:：]\s*(\d{1,3})(?:\s*/\s*100)?", re.IGNORECASE)
+EXECUTED = re.compile(r"(?:실행\s*(?:시각|일시)|executed_at)\s*[:：]\s*(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:\d{2})?)", re.IGNORECASE)
 
 
 def key(*parts: str) -> str:
@@ -75,7 +78,11 @@ def normalize_message(
     if non_run_reason(subject):
         source.update(processing_status="EXCLUDED", reason=non_run_reason(subject))
         return source
-    if not RELATED.search(subject + "\n" + text):
+    if not RELATED.search(subject + "\n" + text) and not message.get("_in_ai_search_label"):
+        if any(canonical_candidate_url(m.group(0)) for m in PROFILE.finditer(text)) or (attachments and not text):
+            source.update(processing_status="REVIEW_REQUIRED", reason="potential_ai_search_requires_review")
+            review(registry, message_id, "potential_ai_search_requires_review")
+            return source
         source.update(processing_status="EXCLUDED", reason="not_ai_search_after_full_body_read")
         return source
     actor, actor_reason = classify_actor(subject, meta.get("from", ""))
@@ -102,6 +109,17 @@ def _normalize_section(
     received: datetime, actor: str, actor_evidence: dict[str, Any],
 ) -> None:
     message_id = source["id"]
+    executed, time_source = received, "received_at_fallback"
+    timestamps = set(EXECUTED.findall(text))
+    if len(timestamps) == 1:
+        try:
+            parsed = datetime.fromisoformat(next(iter(timestamps)))
+            executed = (parsed if parsed.tzinfo else parsed.replace(tzinfo=ZoneInfo("Asia/Seoul"))).astimezone(UTC)
+            time_source = "explicit_source_timestamp"
+        except ValueError:
+            review(registry, message_id, "invalid_execution_timestamp")
+    elif len(timestamps) > 1:
+        review(registry, message_id, "conflicting_execution_timestamps")
     position_known = not (company.startswith("NOT_RUN:") or position.startswith("NOT_RUN:"))
     position_id = key(company, position) if position_known else key(message_id, str(index), "unknown")
     registry.put("positions", {"id": position_id, "company": company, "title": position,
@@ -111,16 +129,17 @@ def _normalize_section(
     batch_id = key(actor, "explicit-run", next(iter(run_ids))) if confirmed else stable_batch_id(
         actor, f"{message_id}:section:{index}", received,
     )
-    week_id, year, week = operation_week(received)
+    week_id, year, week = operation_week(executed)
     batch = registry.register_batch({
         "id": batch_id, "week_year": year, "week_number": week,
         "grouping_status": "CONFIRMED" if confirmed else "PROVISIONAL", "document": {
             "id": batch_id, "week_id": week_id, "actor": actor,
             "grouping_reason": "explicit_run_id" if confirmed else "execution_identity_not_proven",
             "source_message_ids": [message_id], "actor_evidence": [actor_evidence],
-            "executed_at": received.isoformat(), "received_at": received.isoformat(),
-            "execution_time_source": "received_at_fallback", "execution_time_confidence": "LOW",
-            "execution_time_reason": "explicit_execution_timestamp_not_found",
+            "executed_at": executed.isoformat(), "received_at": received.isoformat(),
+            "execution_time_source": time_source,
+            "execution_time_confidence": "HIGH" if time_source == "explicit_source_timestamp" else "LOW",
+            "execution_time_reason": None if time_source == "explicit_source_timestamp" else "explicit_execution_timestamp_not_found",
             "search_period_status": "NOT_RUN", "validation_status": "NOT_RUN",
         },
     })
@@ -159,12 +178,13 @@ def _store_candidate(
     reported = REPORTED.search(section)
     missing = [axis for axis in contract.score_weights
                if candidate.score_components is None or axis not in candidate.score_components]
+    name, name_reason = _verified_candidate_name(candidate.display_name)
     evaluation = {**asdict(candidate), "id": evaluation_id, "candidate_id": identity,
                   "position_id": position_id, "batch_id": batch["id"],
                   "source_message_id": source["id"], "week_id": batch["document"]["week_id"],
-                  "candidate_name": candidate.display_name,
-                  "candidate_name_status": "UNKNOWN" if candidate.display_name == "후보명 미확인" else "PASS",
-                  "candidate_name_reason": "candidate_name_not_present_in_source" if candidate.display_name == "후보명 미확인" else None,
+                  "candidate_name": name,
+                  "candidate_name_status": "UNKNOWN" if name is None else "PASS",
+                  "candidate_name_reason": name_reason,
                   "profile_url": raw_urls[0] if raw_urls else candidate.profile_url,
                   "score_status": "PASS" if candidate.score is not None else "NOT_RUN",
                   "missing_components": missing, "source_reported_score": int(reported[1]) if reported else None,

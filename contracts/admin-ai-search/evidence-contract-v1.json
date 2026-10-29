@@ -1,6 +1,13 @@
 {
   "version": "admin-ai-search-evidence/v1",
   "cadence": "DAILY",
+  "weekly_contract": {
+    "version": "admin-ai-search-weekly/v2",
+    "high_score_threshold": 90,
+    "high_score_basis": "existing_90_plus_score_band",
+    "required_contact_channels": ["SARAMIN", "JOBKOREA", "LINKEDIN", "GMAIL"],
+    "row_identity": ["week_id", "canonical_candidate", "position_id"]
+  },
   "actors": {
     "GROK": "Grok",
     "CLAUDE_CODE": "Claude Code",

@@ -8,7 +8,7 @@ type Evidence = Record<string, unknown>;
 type Batch = { id: string; display_number: string; grouping_status: string; document: Evidence };
 type Contact = { channel: string; status: string; actor: string; checked_at?: string; sent_at?: string; replied_at?: string; evidence_url?: string; evidence_reference?: string; cumulative_count?: number; reason?: string };
 type Evaluation = Evidence & { candidate_name?: string; candidate_name_reason?: string; education?: string; experience?: string; key_experience?: string; profile_url?: string; score?: number; score_status: string; why_fit?: string[]; human_followup?: string; source_reported_score?: number; source_message_id: string };
-type Row = { candidate_id: string; position_id: string; week_id: string; company: string; position: string; evaluation: Evaluation; batches: Batch[]; contacts: Contact[]; confirmed_uncontacted?: boolean };
+type Row = { candidate_id: string; position_id: string; week_id: string; company: string; position: string; evaluation: Evaluation; batches: Batch[]; contacts: Contact[]; weekly_contacts: Contact[]; confirmed_uncontacted?: boolean };
 type Weekly = { rows: Row[]; total: number; complete: boolean; summary: Record<string, number | string | null> };
 type Week = { week_id: string; start_date: string; end_date: string };
 type Index = { weeks: Week[]; high_score_threshold: number | null };
@@ -42,7 +42,8 @@ function ContactCell({ row, channel }: { row: Row; channel: string }) {
   const positives = events.filter(e => ['CONTACTED','REPLIED'].includes(e.status));
   return <td data-status={last.status}>
     {LABELS[last.status]} · {last.actor === 'OWNER' ? '대표님' : last.actor}
-    <small>확인 {date(last.checked_at)}</small><small>발송 {date(last.sent_at)} · 누적 {positives.length}건</small>
+    <small>확인 {date(last.checked_at)}</small><small>발송 {date(last.sent_at)}</small>
+    <small>주간 {row.weekly_contacts.filter(c => c.channel === channel && ['CONTACTED','REPLIED'].includes(c.status)).length}건 · 누적 {positives.length}건</small>
     {last.evidence_url && <EvidenceLink href={last.evidence_url}>근거 ↗</EvidenceLink>}
     <small>{last.evidence_reference}</small>
   </td>;
@@ -52,10 +53,12 @@ function RawDetail({ detail }: { detail: Evidence }) {
   const evaluations = detail.evaluations as Evaluation[] | null;
   const contacts = detail.contacts as Contact[] | null;
   const messages = detail.source_messages as Evidence[] | null;
+  const positions = detail.positions as Evidence[] | null;
+  const components = detail.score_components as Evidence[] | null;
   return <div className="raw-content">
     <h3>후보 식별과 정규화</h3><pre>{value(detail.candidate)}</pre>
     {evaluations?.map((e,i) => <section key={i}>
-      <h3>포지션별 평가 · {value(e.position_id)}</h3>
+      <h3>포지션별 평가 · {value(positions?.find(p => p.id === e.position_id)?.company)} · {value(positions?.find(p => p.id === e.position_id)?.title)}</h3>
       <dl className="raw-fields">{[
         ['후보명 상태',e.candidate_name_status],['후보명',e.candidate_name],['후보명 사유',e.candidate_name_reason],
         ['학력',e.education],['전체 경력',e.experience],['핵심 경력',e.key_experience],
@@ -72,6 +75,7 @@ function RawDetail({ detail }: { detail: Evidence }) {
       <h4>계약 점수 구성 4개</h4>
       <dl className="raw-fields">{['education','job_fit','difficult_work','job_description_logic'].map(axis =>
         <div key={axis}><dt>{axis}</dt><dd>{value((e.score_components as Evidence | null)?.[axis])}</dd></div>)}</dl>
+      <h4>구성 점수별 기준·근거·출처·버전</h4><pre>{value(components?.filter(c => c.evaluation_id === e.id))}</pre>
       <h4>후보 관련 원문 구간</h4><pre>{value(e.source_segment)}</pre>
     </section>)}
     <h3>모든 고객사·포지션 이력</h3><pre>{value(detail.positions)}</pre>

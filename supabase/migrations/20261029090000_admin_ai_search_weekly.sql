@@ -104,7 +104,11 @@ SELECT e.id,e.candidate_id,e.position_id,e.document->>'week_id' AS week_id,
    JOIN admin_ai_search_batches b ON b.id=cb.batch_id WHERE cb.candidate_id=e.candidate_id
    AND cb.position_id=e.position_id AND b.document->>'week_id'=e.document->>'week_id') AS batches,
   (SELECT COALESCE(jsonb_agg(c.document),'[]'::jsonb) FROM admin_ai_search_contact_events c
-   WHERE c.candidate_id=e.candidate_id AND c.position_id=e.position_id) AS contacts
+   WHERE c.candidate_id=e.candidate_id AND c.position_id=e.position_id) AS contacts,
+  (SELECT COALESCE(jsonb_agg(c.document),'[]'::jsonb) FROM admin_ai_search_contact_events c
+   WHERE c.candidate_id=e.candidate_id AND c.position_id=e.position_id
+   AND (c.document->>'sent_at')::timestamptz >= ((to_date(e.document->>'week_id','IYYY-"W"IW')-8)::timestamp AT TIME ZONE 'Asia/Seoul')
+   AND (c.document->>'sent_at')::timestamptz < ((to_date(e.document->>'week_id','IYYY-"W"IW')-1)::timestamp AT TIME ZONE 'Asia/Seoul')) AS weekly_contacts
 FROM ranked e JOIN admin_ai_search_positions p ON p.id=e.position_id WHERE ranking=1;
 
 CREATE FUNCTION public.admin_ai_search_read(p_action text,p_args jsonb DEFAULT '{}')
@@ -141,6 +145,7 @@ BEGIN
       'positions',(SELECT jsonb_agg(p.document) FROM admin_ai_search_positions p WHERE p.id IN (SELECT position_id FROM admin_ai_search_candidate_position_evaluations WHERE candidate_id=c.id)),
       'batches',(SELECT jsonb_agg(to_jsonb(b)) FROM admin_ai_search_batches b WHERE b.id IN (SELECT batch_id FROM admin_ai_search_candidate_batches WHERE candidate_id=c.id)),
       'contacts',(SELECT COALESCE(jsonb_agg(document),'[]') FROM admin_ai_search_contact_events WHERE candidate_id=c.id),
+      'score_components',(SELECT COALESCE(jsonb_agg(s.document),'[]') FROM admin_ai_search_score_components s WHERE s.evaluation_id IN (SELECT id FROM admin_ai_search_candidate_position_evaluations WHERE candidate_id=c.id)),
       'source_messages',(SELECT jsonb_agg(m.document) FROM admin_ai_search_source_messages m WHERE m.id IN (SELECT source_message_id FROM admin_ai_search_candidate_position_evaluations WHERE candidate_id=c.id)),
       'review_queue',(SELECT COALESCE(jsonb_agg(document),'[]') FROM admin_ai_search_review_queue WHERE document->>'source_message_id' IN (SELECT source_message_id FROM admin_ai_search_candidate_position_evaluations WHERE candidate_id=c.id)))
       INTO result FROM admin_ai_search_candidates c WHERE id=p_args->>'id';
@@ -179,9 +184,13 @@ BEGIN
       'batches',CASE WHEN complete THEN (SELECT count(DISTINCT b->>'id') FROM filtered f CROSS JOIN LATERAL jsonb_array_elements(f.batches) b WHERE b->>'grouping_status'='CONFIRMED') END,
       'positions',CASE WHEN complete THEN (SELECT count(DISTINCT position_id) FROM filtered WHERE position_status='PASS') END,
       'candidates',CASE WHEN complete THEN (SELECT count(DISTINCT candidate_id) FROM filtered) END,
-      'jd_sent',NULL,
+      'jd_sent',CASE WHEN complete AND run->'contact_scopes_complete'='true'::jsonb THEN
+        (SELECT count(*) FROM filtered f WHERE EXISTS(SELECT 1 FROM jsonb_array_elements(f.weekly_contacts) c
+          WHERE c->>'status' IN ('CONTACTED','REPLIED') AND c->>'event_type' IN ('JD_SENT','PROPOSAL_SENT','INMAIL_SENT'))) END,
       'high_score_uncontacted',CASE WHEN complete AND threshold IS NOT NULL
-        AND NOT EXISTS(SELECT 1 FROM filtered WHERE evaluation->>'score_status'<>'PASS' OR NOT confirmed_uncontacted)
+        AND NOT EXISTS(SELECT 1 FROM filtered WHERE evaluation->>'score_status'<>'PASS' OR
+          ((evaluation->>'score')::integer>=threshold AND NOT confirmed_uncontacted AND NOT EXISTS(
+            SELECT 1 FROM jsonb_array_elements(contacts) c WHERE c->>'status' IN ('CONTACTED','REPLIED'))))
         THEN (SELECT count(*) FROM filtered WHERE confirmed_uncontacted AND (evaluation->>'score')::integer>=threshold) END,
       'reason',CASE WHEN NOT complete THEN 'collection_or_normalization_incomplete' ELSE 'contact_or_score_verification_incomplete' END))
     INTO result;

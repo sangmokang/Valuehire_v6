@@ -95,6 +95,7 @@ class CollectionStore:
 
 def collect_mailbox(
     store: CollectionStore, reader: GmailReader, *, run_id: str | None = None,
+    include_sent: bool = False,
 ) -> dict[str, Any]:
     """Inbox UNION the live label, never a keyword-limited intersection.
 
@@ -110,6 +111,7 @@ def collect_mailbox(
         "retry_count": 0, "scopes": {},
     }
     run.update(status="RUNNING", finished_at=None, error=None)
+    retry_base = run["retry_count"]
     store.save_run(run)
     try:
         labels = _object(reader.request("labels", {})).get("labels", [])
@@ -117,6 +119,8 @@ def collect_mailbox(
         if len(matching) != 1:
             raise ValueError("02aisearch label must be resolved uniquely from current account")
         scopes = {"02aisearch": matching[0]["id"], "INBOX": "INBOX"}
+        if include_sent:
+            scopes["SENT"] = "SENT"
         for scope, label_id in scopes.items():
             state = store.checkpoint(run_id, scope)
             if state.get("label_id", label_id) != label_id:
@@ -125,9 +129,11 @@ def collect_mailbox(
             while not state["exhausted"]:
                 _collect_page(store, reader, run_id, scope, state)
                 run["scopes"][scope] = state
+                run["retry_count"] = retry_base + int(getattr(reader, "retry_count", 0))
                 store.save_run(run)
             run["scopes"][scope] = state
-        all_ids = [set(state["message_ids"]) for state in run["scopes"].values()]
+        all_ids = [set(state["message_ids"]) for scope, state in run["scopes"].items()
+                   if scope in {"INBOX", "02aisearch"}]
         run["union_count"] = len(set.union(*all_ids))
         run["overlap_count"] = sum(map(len, all_ids)) - run["union_count"]
         for outcome in ("new", "updated", "unchanged"):
@@ -135,9 +141,18 @@ def collect_mailbox(
                 "SELECT count(*) FROM collection_run_messages WHERE run_id=? AND outcome=?",
                 (run_id, outcome),
             ).fetchone()[0]
-        if sum(run[key] for key in ("new", "updated", "unchanged")) != run["union_count"]:
+        total = len(set().union(*(set(state["message_ids"]) for state in run["scopes"].values())))
+        run["total_message_count"] = total
+        if sum(run[key] for key in ("new", "updated", "unchanged")) != total:
             raise ValueError("collection union/body reconciliation failed")
-        run.update(status="SUCCEEDED", finished_at=now(), last_success_at=now())
+        failed = store.db.execute(
+            "SELECT count(*) FROM collection_run_messages rm JOIN source_messages m "
+            "ON m.id=rm.message_id WHERE rm.run_id=? AND "
+            "json_extract(m.document,'$.collection_status')='FAILED'", (run_id,),
+        ).fetchone()[0]
+        run.update(status="PARTIAL" if failed else "SUCCEEDED", failed=failed, finished_at=now())
+        if not failed:
+            run["last_success_at"] = now()
         store.save_run(run)
         return cast(dict[str, Any], run)
     except Exception as error:

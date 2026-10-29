@@ -7,8 +7,10 @@ import json
 from datetime import datetime
 from typing import Any
 
+from .evidence import EvidenceContract
 from .gmail_candidates import canonical_candidate_url
-from .normalize import key, review
+from .gmail_sent_contacts import _sent_contact_event
+from .normalize import SECTION, adapt_mime, key, review
 from .registry import Registry
 
 CHANNELS = {"SARAMIN", "JOBKOREA", "LINKEDIN", "GMAIL"}
@@ -41,7 +43,9 @@ def ingest_report(registry: Registry, message_id: str, report: dict[str, Any]) -
 
 
 def _ingest_event(registry: Registry, message_id: str, event: dict[str, Any], index: int) -> None:
-    identity = key(message_id, str(event.get("event_id", index)))
+    identity = key(str(event.get("channel")), str(event.get("evidence_reference", message_id)),
+                   str(event.get("candidate_profile_url")), str(event.get("company")),
+                   str(event.get("position")), str(event.get("sent_at", event.get("checked_at", index))))
     url = canonical_candidate_url(str(event.get("candidate_profile_url", "")))
     candidate_id = hashlib.sha256(url.encode()).hexdigest() if url else None
     position_id = key(str(event.get("company", "")), str(event.get("position", "")))
@@ -78,6 +82,9 @@ def _ingest_event(registry: Registry, message_id: str, event: dict[str, Any], in
                 "link_reason": reason, "evidence_reference": event.get("evidence_reference"),
                 "source_reference": f"gmail:{message_id}", "reason": reason,
                 "weekly_and_cumulative_basis": "event_timestamp"}
+    previous_event = registry.db.execute("SELECT document FROM contact_events WHERE id=?", (identity,)).fetchone()
+    source_ids = json.loads(previous_event[0]).get("source_message_ids", []) if previous_event else []
+    document["source_message_ids"] = list(dict.fromkeys([*source_ids, message_id]))
     registry.put("contact_events", document)
     if reason:
         review(registry, message_id, reason, reference=identity, contact_event_id=identity)
@@ -86,3 +93,31 @@ def _ingest_event(registry: Registry, message_id: str, event: dict[str, Any], in
             previous = json.loads(row[1])
             if previous.get("source_message_id") == message_id and previous.get("reference") == identity:
                 registry.put("review_queue", {**previous, "status": "RESOLVED"})
+
+
+def ingest_gmail_sent(registry: Registry, message: dict[str, Any], contract: EvidenceContract, text: str) -> None:
+    known = {row[0] for row in registry.db.execute("SELECT id FROM candidates")}
+    adapted = {"id": message["id"], "thread_id": message.get("threadId"),
+               "internal_date": message.get("internalDate"), "payload": adapt_mime(message["payload"])}
+    event = _sent_contact_event(adapted, contract, known)
+    if event is None:
+        return
+    registry.put("contact_evidence", {"id": key(message["id"], "sent"), **event,
+                                     "source_message_id": message["id"], "source_body": text})
+    contexts = list(SECTION.finditer(text))
+    company, position = (contexts[0][1], contexts[0][2]) if len(contexts) == 1 else ("", "")
+    profiles = event["canonical_keys"]
+    if not profiles:
+        review(registry, message["id"], "unlinked_sent_contact", reference=message["id"])
+        registry.put("contact_events", {"id": key(message["id"], "unlinked"),
+            "candidate_id": None, "position_id": None, "channel": "GMAIL", "actor": event["actor"],
+            "status": "REVIEW_REQUIRED", "source_message_id": message["id"], "sent_at": event["contacted_at"],
+            "event_type": "PROPOSAL_SENT", "evidence_reference": event["evidence_reference"],
+            "link_reason": event["link_reason"], "checked_at": None})
+    for identity in profiles:
+        row = registry.db.execute("SELECT document FROM candidates WHERE id=?", (identity,)).fetchone()
+        profile = json.loads(row[0])["canonical_url"]
+        _ingest_event(registry, message["id"], {"candidate_profile_url": profile,
+            "company": company, "position": position, "channel": "GMAIL", "actor": event["actor"],
+            "actor_reason": event["actor_reason"], "status": "CONTACTED", "sent_at": event["contacted_at"],
+            "evidence_reference": event["evidence_reference"], "event_type": "PROPOSAL_SENT"}, 0)

@@ -58,6 +58,11 @@ class Registry:
             if old is not None:
                 result = dict(old)
                 previous = json.loads(result["document"])
+                if previous.get("execution_time_source") == "explicit_source_timestamp":
+                    for field in ("executed_at", "execution_time_source", "execution_time_confidence", "execution_time_reason"):
+                        batch.setdefault("document", {})[field] = previous[field]
+                if "week_id" in previous:
+                    batch.setdefault("document", {})["week_id"] = previous["week_id"]
                 # Keep all source references and first execution anchor on rediscovery.
                 for key in ("source_message_ids", "actor_evidence"):
                     values = [*previous.get(key, []), *batch.get("document", {}).get(key, [])]

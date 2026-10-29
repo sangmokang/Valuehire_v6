@@ -19,13 +19,13 @@ function request(url, options, ip) {
   return new Promise((resolve, reject) => {
     const req = https.request(url, {
       method: options.method === undefined ? 'GET' : options.method,
-      headers: options.headers, signal: options.signal,
+      headers: Object.fromEntries(new Headers(options.headers).entries()), signal: options.signal,
       ...(ip ? { lookup: (_host, _options, callback) => callback(null, [{ address: ip, family: 4 }]) } : {}),
     }, response => {
       const chunks = [];
       response.on('data', chunk => chunks.push(chunk));
       response.on('error', reject);
-      response.on('end', () => resolve(new Response(Buffer.concat(chunks), {
+      response.on('end', () => resolve(new Response([204,205,304].includes(response.statusCode) ? null : Buffer.concat(chunks), {
         status: response.statusCode, headers: response.headers,
       })));
     });
