@@ -89,5 +89,5 @@ def test_exact_execution_timestamp_and_completion_is_execution_evidence(tmp_path
     normalize_message(store, message("two", body), CONTRACT)
     rows = store.db.execute("SELECT grouping_status,display_number FROM batches").fetchall()
     assert [tuple(row) for row in rows] == [("CONFIRMED", "W44-01")]
-    normalize_message(store, message("another", body.replace("09:00", "09:01")), CONTRACT)
+    normalize_message(store, message("another", body.replace("T09:00:00", "T09:01:00")), CONTRACT)
     assert len(store.documents("batches")) == 2
