@@ -22,6 +22,9 @@ _NAMED_CANDIDATE_HEADING = re.compile(
     r"(?im)^\s*\[\[VH_HEADING\]\]\s*(?:후보|후보자|candidate)\s+"
     r"(?!(?:검색\s*결과|결과|목록|추천|검색|없음|요약|현황|분석)\b)\S+"
 )
+_REPORT_CANDIDATE_HEADING = re.compile(
+    r"(?im)^\s*\[(?:P\d+|[A-Z]{1,4}\d*)-\d+\]\s+\S+"
+)
 _EXCLUDED_HEADING = re.compile(
     r"(?im)^\s*(?:(?:\[\[VH_HEADING\]\]|[#>*•-]+)\s*)?"
     r"(?:제외(?:된)?\s*후보|excluded\s+candidate)\b"
@@ -56,7 +59,7 @@ def candidate_records(
     for index, line in enumerate(lines):
         if _EXCLUDED_HEADING.match(line):
             boundaries.append((index, True))
-        elif _CANDIDATE_HEADING.match(line):
+        elif _CANDIDATE_HEADING.match(line) or _REPORT_CANDIDATE_HEADING.match(line):
             boundaries.append((index, False))
     if boundaries:
         known_indexes = {index for index, _ in boundaries}
@@ -173,13 +176,20 @@ def _candidate_from_context(
     better_exists, better_position, better_reason = _better_position(context)
     return CandidateEvidence(
         canonical_key=hashlib.sha256(url.encode("utf-8")).hexdigest(),
-        display_name=_candidate_label(label, url),
+        display_name=_candidate_label(label, url, context),
         source_channel=_channel_for_url(url),
         profile_url=url,
         education=_first_label_value(context, (r"학력", r"education")),
         experience=_first_label_value(
             context,
-            (r"총\s*경력", r"전체\s*경력", r"경력", r"experience", r"career\s*summary"),
+            (
+                r"총\s*경력",
+                r"전체\s*경력",
+                r"최근\s*경력",
+                r"경력",
+                r"experience",
+                r"career\s*summary",
+            ),
         ),
         key_experience=_first_label_value(
             context, (r"핵심\s*경력", r"주요\s*경력", r"핵심\s*업무")
@@ -189,7 +199,12 @@ def _candidate_from_context(
         score_contract_version=(contract.score_contract_version if score is not None else None),
         score_components=components,
         score_input_hash=input_hash,
-        why_fit=tuple(_label_values(context, (r"적합\s*근거", r"추천\s*이유", r"why\s*fit"))),
+        why_fit=tuple(
+            _label_values(
+                context,
+                (r"적합\s*근거", r"적합점", r"추천\s*이유", r"why\s*fit"),
+            )
+        ),
         requirements_evidence=tuple(requirements),
         reverse_match_position=None,
         reverse_match_score=None,
@@ -261,7 +276,10 @@ def _host_is(host: str, domain: str) -> bool:
     return host == domain or host.endswith(f".{domain}")
 
 
-def _candidate_label(label: str, url: str) -> str:
+def _candidate_label(label: str, url: str, context: Sequence[str]) -> str:
+    heading_name = _candidate_name_from_context(context)
+    if heading_name is not None:
+        return heading_name
     normalized = " ".join(label.split())
     return (
         url
@@ -270,15 +288,73 @@ def _candidate_label(label: str, url: str) -> str:
     )
 
 
+def _candidate_name_from_context(context: Sequence[str]) -> str | None:
+    report_heading = re.compile(
+        r"^\s*\[(?:P\d+|[A-Z]{1,4}\d*)-\d+\]\s+"
+        r"(.+?)(?:\s+[—–-]\s*\d+(?:\.\d+)?\s*점.*)?$",
+        re.IGNORECASE,
+    )
+    named_heading = re.compile(
+        r"^\s*(?:\[\[VH_HEADING\]\]\s*)?후보(?:자)?\s*"
+        r"(?:평가\s*)?(?:[:：—–-]\s*)?(.+?)\s*$",
+        re.IGNORECASE,
+    )
+    for line in context:
+        match = report_heading.match(line) or named_heading.match(line)
+        if match is None:
+            continue
+        candidate_name = match.group(1).strip(" #*_-—–")
+        normalized = candidate_name.casefold()
+        if not candidate_name or candidate_name.isdigit() or normalized in {
+            "검색 결과",
+            "결과",
+            "목록",
+            "추천",
+            "검색",
+            "없음",
+            "요약",
+            "현황",
+            "분석",
+            "평가",
+        }:
+            continue
+        return candidate_name
+    return None
+
+
 def _label_values(lines: Sequence[str], labels: Sequence[str]) -> list[str]:
     values: list[str] = []
-    for line in lines:
+    for line_index, line in enumerate(lines):
         for label in labels:
-            match = re.match(rf"^\s*(?:{label})\s*[:：]\s*(.+?)\s*$", line, re.IGNORECASE)
+            match = re.match(
+                rf"^\s*(?:[-*•]\s*)?(?:\*\*)?(?:{label})(?:\*\*)?"
+                rf"\s*[:：]\s*(.+?)\s*$",
+                line,
+                re.IGNORECASE,
+            )
             if match and match.group(1).strip():
-                values.append(match.group(1).strip())
+                values.append(
+                    _continued_label_value(lines, line_index, match.group(1).strip())
+                )
                 break
     return list(dict.fromkeys(values))
+
+
+def _continued_label_value(
+    lines: Sequence[str], line_index: int, first_value: str
+) -> str:
+    parts = [first_value]
+    for continuation in lines[line_index + 1 :]:
+        if (
+            continuation.startswith("[[VH_HEADING]]")
+            or _CANDIDATE_HEADING.match(continuation)
+            or _REPORT_CANDIDATE_HEADING.match(continuation)
+            or re.match(r"^\s*[-*•]\s+", continuation)
+            or re.match(r"^\s*[^:：]{1,30}\s*[:：]", continuation)
+        ):
+            break
+        parts.append(continuation.strip())
+    return " ".join(part for part in parts if part)
 
 
 def _first_label_value(lines: Sequence[str], labels: Sequence[str]) -> str | None:

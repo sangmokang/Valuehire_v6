@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from datetime import date, datetime, timedelta
-from typing import Literal, TypedDict, cast
+from typing import Literal, TypedDict
 from zoneinfo import ZoneInfo
 
 from humansearch.admin_weekly_dashboard.weekly_window import weekly_window
@@ -13,7 +13,6 @@ from .evidence import (
     AiSearchPayload,
     BatchPayload,
     CandidateLedgerPayload,
-    CandidatePayload,
     ContactActor,
     EvidenceStatus,
     SentContactEventPayload,
@@ -157,7 +156,7 @@ def build_weekly_ai_search_view(payload: AiSearchPayload) -> WeeklyAiSearchViewP
             for raw_event in raw_events:
                 if not isinstance(raw_event, Mapping):
                     raise TypeError("AI Search contact event must be an object")
-                event = cast(SentContactEventPayload, raw_event)
+                event = raw_event
                 week_id, start, end, label = _week_identity(event["contacted_at"])
                 events_by_week.setdefault(week_id, []).append(event)
                 windows[week_id] = (start, end, label)
