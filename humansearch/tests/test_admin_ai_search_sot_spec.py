@@ -39,8 +39,8 @@ def test_ai_search_admin_sot_and_spec_fix_the_owner_contract() -> None:
         assert required in sot
 
     for required in (
-        "고유 후보 프로필 6,831",
-        "후보–Batch 등장 8,648",
+        "고유 후보 프로필 6,830",
+        "후보–Batch 등장 8,646",
         "직접 제안 8",
         "AI 7 / OWNER 1 / UNKNOWN 0",
         "후보 연결 0 / 미연결 8",

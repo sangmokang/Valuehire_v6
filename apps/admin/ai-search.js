@@ -95,10 +95,13 @@
     const select = byId("week-select");
     select.replaceChildren();
     [...payload.weeks].reverse().forEach((week) => {
+      const countLabel = week.status === "PASS"
+        ? `Batch ${week.batch_count}개`
+        : "수집 미완료";
       const option = element(
         "option",
         "",
-        `${week.week_id} · ${week.period_label} · Batch ${week.batch_count}개`,
+        `${week.week_id} · ${week.period_label} · ${countLabel}`,
       );
       option.value = week.week_id;
       select.append(option);
@@ -109,6 +112,17 @@
   function renderSummary(week) {
     setText("selected-week", week.week_id);
     setText("week-period", `${week.period_label} · 일요일 00:00부터 토요일 23:59까지`);
+    if (week.status !== "PASS") {
+      [
+        "summary-batches",
+        "summary-candidates",
+        "summary-rows",
+        "summary-ai-contact",
+        "summary-owner-contact",
+        "summary-contact-link",
+      ].forEach((id) => setText(id, "확인 필요"));
+      return;
+    }
     setText("summary-batches", `${week.batch_count.toLocaleString("ko-KR")}개`);
     setText("summary-candidates", `${week.unique_candidate_count.toLocaleString("ko-KR")}명`);
     setText("summary-rows", `${week.candidate_row_count.toLocaleString("ko-KR")}행`);
