@@ -2,6 +2,7 @@
 
 import sqlite3
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -18,7 +19,7 @@ class Mailbox:
             return {"labels": [{"id": "label-live", "name": "02aisearch"}]}
         if operation == "list":
             scope = str(args["label_id"])
-            token = args.get("page_token")
+            token = cast(str | None, args.get("page_token"))
             self.requests.append((scope, str(token) if token else None))
             if self.fail and token:
                 raise RuntimeError("temporary read failure")
@@ -34,7 +35,7 @@ class Mailbox:
                  "labelIds": [], "snippet": "ordinary mail",
                  "payload": {"mimeType": "text/plain", "headers": [],
                              "body": {"data": "aGVsbG8="}}}
-                for i in args["ids"]  # type: ignore[union-attr]
+                for i in cast(list[str], args["ids"])
             ]
         raise AssertionError(operation)
 
