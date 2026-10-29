@@ -25,6 +25,9 @@ _NAMED_CANDIDATE_HEADING = re.compile(
 _REPORT_CANDIDATE_HEADING = re.compile(
     r"(?im)^\s*\[(?:P\d+|[A-Z]{1,4}\d*)-\d+\]\s+\S+"
 )
+_SUMMARY_CANDIDATE_HEADING = re.compile(
+    r"(?im)^\s*[-•]\s+.+?\s+\d+(?:\.\d+)?\s*[—–]\s+\S+"
+)
 _EXCLUDED_HEADING = re.compile(
     r"(?im)^\s*(?:(?:\[\[VH_HEADING\]\]|[#>*•-]+)\s*)?"
     r"(?:제외(?:된)?\s*후보|excluded\s+candidate)\b"
@@ -59,7 +62,11 @@ def candidate_records(
     for index, line in enumerate(lines):
         if _EXCLUDED_HEADING.match(line):
             boundaries.append((index, True))
-        elif _CANDIDATE_HEADING.match(line) or _REPORT_CANDIDATE_HEADING.match(line):
+        elif (
+            _CANDIDATE_HEADING.match(line)
+            or _REPORT_CANDIDATE_HEADING.match(line)
+            or _SUMMARY_CANDIDATE_HEADING.match(line)
+        ):
             boundaries.append((index, False))
     if boundaries:
         known_indexes = {index for index, _ in boundaries}
@@ -299,8 +306,16 @@ def _candidate_name_from_context(context: Sequence[str]) -> str | None:
         r"(?:평가\s*)?(?:[:：—–-]\s*)?(.+?)\s*$",
         re.IGNORECASE,
     )
+    summary_heading = re.compile(
+        r"^\s*[-•]\s+(.+?)\s+\d+(?:\.\d+)?\s*[—–]\s+\S+",
+        re.IGNORECASE,
+    )
     for line in context:
-        match = report_heading.match(line) or named_heading.match(line)
+        match = (
+            report_heading.match(line)
+            or summary_heading.match(line)
+            or named_heading.match(line)
+        )
         if match is None:
             continue
         candidate_name = match.group(1).strip(" #*_-—–")
@@ -349,6 +364,7 @@ def _continued_label_value(
             continuation.startswith("[[VH_HEADING]]")
             or _CANDIDATE_HEADING.match(continuation)
             or _REPORT_CANDIDATE_HEADING.match(continuation)
+            or _SUMMARY_CANDIDATE_HEADING.match(continuation)
             or re.match(r"^\s*[-*•]\s+", continuation)
             or re.match(r"^\s*[^:：]{1,30}\s*[:：]", continuation)
         ):
