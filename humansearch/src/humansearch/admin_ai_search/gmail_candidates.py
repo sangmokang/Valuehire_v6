@@ -262,6 +262,12 @@ def canonical_candidate_url(raw_url: str) -> str | None:
         if path.startswith("/in/"):
             path = "/".join(path.split("/")[:3])
         return urlunsplit((parsed.scheme.lower(), "linkedin.com", path, "", ""))
+    if _host_is(host, "saramin.co.kr") and any(
+        key.lower() == "res_idx" for key, _ in parse_qsl(parsed.query)
+    ):
+        identity = urlencode([(key, value) for key, value in parse_qsl(parsed.query)
+                              if key.lower() == "res_idx"])
+        return urlunsplit((parsed.scheme.lower(), "saramin.co.kr", path, identity, ""))
     if _host_is(host, "saramin.co.kr") and "/applicant-view/position/resume" in path:
         return urlunsplit((parsed.scheme.lower(), "hiring.saramin.co.kr", path, "", ""))
     if _host_is(host, "jobkorea.co.kr") and "/resume/" in path.lower():
