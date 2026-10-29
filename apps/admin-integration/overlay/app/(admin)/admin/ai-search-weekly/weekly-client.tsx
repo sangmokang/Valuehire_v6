@@ -158,6 +158,7 @@ export default function AiSearchWeekly() {
         <strong>{typeof data?.summary.high_score_uncontacted === 'number' ? data.summary.high_score_uncontacted.toLocaleString() : '미확인'} ↗</strong></button>
     </div>
     {data?.summary.reason && <p className="status-note">NOT_RUN · {data.summary.reason}</p>}
+    {data?.summary.candidates === null && <p className="status-note">현재 원문에서 연결된 후보 {data.summary.observed_candidates}명 · 검토 완료 전 전체 후보 수 미확인</p>}
     <form className="ai-filters" onSubmit={filter}>
       <input name="q" aria-label="후보 고객사 포지션 검색" placeholder="후보·고객사·포지션 검색" />
       <select name="actor" aria-label="검색 AI"><option value="">전체 AI</option>{['GROK','CLAUDE_CODE','CHATGPT','AI_SEARCH','OTHER'].map(a => <option key={a}>{a}</option>)}</select>

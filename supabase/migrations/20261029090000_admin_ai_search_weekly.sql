@@ -245,7 +245,13 @@ BEGIN
       AND (COALESCE(p_args->>'contact_status','')='' OR EXISTS(SELECT 1 FROM filtered f WHERE f.position_id=p.id AND EXISTS(
         SELECT 1 FROM jsonb_array_elements(f.batches) fb WHERE fb->>'id'=b.id)))
   ), readiness AS (
-    SELECT complete AND NOT EXISTS(SELECT 1 FROM filtered WHERE NOT jd_sent_verified AND NOT contact_scope_complete)
+    SELECT complete AND NOT EXISTS(SELECT 1 FROM targets t JOIN admin_ai_search_active_batch_sources s ON s.batch_id=t.batch_id
+        WHERE s.document->>'counts_status'<>'PASS' OR COALESCE((s.document->>'unparsed')::integer,0)>0)
+      AND NOT EXISTS(SELECT 1 FROM admin_ai_search_source_messages m WHERE m.document->>'processing_status'='REVIEW_REQUIRED'
+        AND m.document->>'reason' IN ('potential_ai_search_requires_review','ai_search_result_identity_not_proven')
+        AND (m.document->>'received_at')::timestamptz >= ((to_date(p_args->>'week','IYYY-"W"IW')-8)::timestamp AT TIME ZONE 'Asia/Seoul')
+        AND (m.document->>'received_at')::timestamptz < ((to_date(p_args->>'week','IYYY-"W"IW')-1)::timestamp AT TIME ZONE 'Asia/Seoul')) AS candidate_ready,
+      complete AND NOT EXISTS(SELECT 1 FROM filtered WHERE NOT jd_sent_verified AND NOT contact_scope_complete)
       AND NOT EXISTS(SELECT 1 FROM admin_ai_search_review_queue WHERE document->>'status'='OPEN'
         AND document->>'reason' IN ('unlinked_sent_contact','contact_report_binding_pending')) AS jd_ready,
       complete AND threshold IS NOT NULL
@@ -267,11 +273,14 @@ BEGIN
     'summary',jsonb_build_object(
       'batches',CASE WHEN complete THEN (SELECT count(DISTINCT batch_id) FROM targets WHERE grouping_status='CONFIRMED') END,
       'positions',CASE WHEN complete THEN (SELECT count(DISTINCT position_id) FROM targets WHERE position_status='PASS') END,
-      'candidates',CASE WHEN complete THEN (SELECT count(DISTINCT candidate_id) FROM filtered) END,
+      'candidates',CASE WHEN (SELECT candidate_ready FROM readiness) THEN (SELECT count(DISTINCT candidate_id) FROM filtered) END,
+      'observed_candidates',(SELECT count(DISTINCT candidate_id) FROM filtered),
+      'provisional_batches',(SELECT count(DISTINCT batch_id) FROM targets WHERE grouping_status='PROVISIONAL'),
       'jd_sent',CASE WHEN (SELECT jd_ready FROM readiness) THEN (SELECT count(*) FROM filtered WHERE jd_sent_verified) END,
       'high_score_uncontacted',CASE WHEN (SELECT high_ready FROM readiness)
         THEN (SELECT count(*) FROM filtered WHERE confirmed_uncontacted AND (evaluation->>'score')::integer>=threshold) END,
       'reason',CASE WHEN NOT complete THEN 'collection_or_normalization_incomplete'
+        WHEN (SELECT NOT candidate_ready FROM readiness) THEN 'candidate_parsing_or_source_review_incomplete'
         WHEN (SELECT NOT jd_ready OR NOT high_ready FROM readiness) THEN 'contact_or_score_verification_incomplete' ELSE NULL END))
     INTO result;
   RETURN result;
