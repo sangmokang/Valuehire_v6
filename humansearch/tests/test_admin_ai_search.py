@@ -276,13 +276,12 @@ def test_server_exposes_ai_search_list_detail_and_page() -> None:
     assert json.loads(candidate_body) == payload["candidate_ledger"][0]
     assert page_status == 200
     assert page_type == "text/html; charset=utf-8"
-    assert "AI Search 실행 결과" in page_body.decode("utf-8")
-    assert "고유 후보 프로필" in page_body.decode("utf-8")
-    assert "후보·포지션 배치 연결" in page_body.decode("utf-8")
-    assert "메일에 적힌 후보 수" in page_body.decode("utf-8")
-    assert "90점 이상" in page_body.decode("utf-8")
-    assert "80~89점" in page_body.decode("utf-8")
-    assert "70~79점" in page_body.decode("utf-8")
+    assert "AI Search 주간 후보·컨택 원장" in page_body.decode("utf-8")
+    assert "고유 후보" in page_body.decode("utf-8")
+    assert "후보·포지션 행" in page_body.decode("utf-8")
+    assert "후보 서치 원장" in page_body.decode("utf-8")
+    assert "주간 컨택 원장" in page_body.decode("utf-8")
+    assert "점수·적합 이유" in page_body.decode("utf-8")
     assert script_status == 200
     assert b"/api/ai-search" in script_body
 
@@ -309,39 +308,38 @@ def test_unknown_batch_detail_fails_closed() -> None:
     }
 
 
-def test_ai_search_assets_expose_required_detail_and_error_states() -> None:
+def test_ai_search_assets_expose_required_weekly_sheet_empty_and_error_states() -> None:
     page = (ASSET_DIR / "ai-search.html").read_text(encoding="utf-8")
     script = (ASSET_DIR / "ai-search.js").read_text(encoding="utf-8")
 
     assert 'id="error-state"' in page
-    assert 'id="candidate-dialog"' in page
-    assert 'id="data-quality"' in page
-    assert "검색 기간" in page
+    assert 'id="candidate-empty"' in page
+    assert 'id="contact-empty"' in page
+    assert 'id="candidate-sheet"' in page
+    assert 'id="contact-sheet"' in page
+    assert "실행 일시" in page
+    assert "프로필 URL" in page
+    assert "점수·적합 이유" in page
     assert "실행 주체 판단 근거" not in page
     for field in (
-        "candidate_summary",
-        "candidate_ledger",
-        "search_history",
-        "contact_history",
-        "contact_actor",
-        "contact_collection",
-        "candidate_counts",
+        "candidate_rows",
+        "contact_rows",
+        "contact_summary",
+        "candidate_name",
+        "profile_url",
+        "education",
+        "experience",
         "key_experience",
-        "requirements_evidence",
-        "better_position_exists",
-        "contact_source",
-        "contact_checked_at",
-        "contact_opinion_evidence",
-        "detail_coverage",
-        "profile_evidence",
-        "/api/ai-search/candidates/",
+        "score_components",
+        "score_evidence",
+        "weekly_contact",
+        "/api/ai-search/weekly",
     ):
         assert field in script
-    assert 'element("small", "", reasonLabel(detail))' in script
-    assert '`${batch.batch_id} 상세 열기`' not in script
-    assert 'candidate.reverse_match_reason || "확인하지 않음"' not in script
-    assert 'entityLabel(batch.company, "고객사")' in script
-    assert 'entityLabel(batch.position, "포지션")' in script
+    assert "후보 연결 제안 없음" in script
+    assert "candidate_profile_not_in_sent_message" in script
+    assert "outreach_sends" in script
+    assert "database_writes" in script
 
 
 def test_weekly_page_hides_internal_provenance_and_uses_plain_korean() -> None:
