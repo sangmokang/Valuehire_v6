@@ -26,7 +26,8 @@ _REPORT_CANDIDATE_HEADING = re.compile(
     r"(?im)^\s*\[(?:P\d+|[A-Z]{1,4}\d*)-\d+\]\s+\S+"
 )
 _SUMMARY_CANDIDATE_HEADING = re.compile(
-    r"(?im)^\s*[-•]\s+.+?\s+\d+(?:\.\d+)?\s*[—–]\s+\S+"
+    r"(?im)^\s*[-•]\s+[A-Z가-힣○][A-Z가-힣○().,'’ -]{0,79}?\s+"
+    r"(?:100|[1-9]?\d)(?:\.\d+)?\s*(?:점)?\s*[—–]\s+\S+"
 )
 _EXCLUDED_HEADING = re.compile(
     r"(?im)^\s*(?:(?:\[\[VH_HEADING\]\]|[#>*•-]+)\s*)?"
@@ -307,7 +308,8 @@ def _candidate_name_from_context(context: Sequence[str]) -> str | None:
         re.IGNORECASE,
     )
     summary_heading = re.compile(
-        r"^\s*[-•]\s+(.+?)\s+\d+(?:\.\d+)?\s*[—–]\s+\S+",
+        r"^\s*[-•]\s+([A-Z가-힣○][A-Z가-힣○().,'’ -]{0,79}?)\s+"
+        r"(?:100|[1-9]?\d)(?:\.\d+)?\s*(?:점)?\s*[—–]\s+\S+",
         re.IGNORECASE,
     )
     for line in context:
