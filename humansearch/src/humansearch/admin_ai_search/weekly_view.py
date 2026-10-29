@@ -45,7 +45,8 @@ class WeeklyCandidateRowPayload(TypedDict):
     actor_label: str
     source_channel: str
     canonical_key: str
-    candidate_name: str
+    candidate_name: str | None
+    candidate_name_reason: str | None
     profile_url: str
     education: str | None
     experience: str | None
@@ -60,7 +61,7 @@ class WeeklyCandidateRowPayload(TypedDict):
 
 class WeeklyLinkedCandidatePayload(TypedDict):
     canonical_key: str
-    candidate_name: str
+    candidate_name: str | None
     profile_url: str | None
 
 
@@ -317,6 +318,9 @@ def _candidate_rows(
                     [*candidate["why_fit"], *candidate["requirements_evidence"]]
                 )
             )
+            candidate_name, candidate_name_reason = _verified_candidate_name(
+                candidate["display_name"]
+            )
             rows.append(
                 {
                     "week_id": week_id,
@@ -328,7 +332,8 @@ def _candidate_rows(
                     "actor_label": batch["actor_label"],
                     "source_channel": candidate["source_channel"],
                     "canonical_key": candidate["canonical_key"],
-                    "candidate_name": candidate["display_name"],
+                    "candidate_name": candidate_name,
+                    "candidate_name_reason": candidate_name_reason,
                     "profile_url": candidate["profile_url"],
                     "education": candidate["education"],
                     "experience": candidate["experience"],
@@ -393,12 +398,13 @@ def _contact_rows(
         linked_candidates: list[WeeklyLinkedCandidatePayload] = []
         for canonical_key in event["canonical_keys"]:
             candidate = candidate_index.get(canonical_key)
+            candidate_name, _ = _verified_candidate_name(
+                candidate["display_name"] if candidate is not None else ""
+            )
             linked_candidates.append(
                 {
                     "canonical_key": canonical_key,
-                    "candidate_name": (
-                        candidate["display_name"] if candidate is not None else "후보 미확인"
-                    ),
+                    "candidate_name": candidate_name,
                     "profile_url": (
                         candidate["profile_urls"][0]
                         if candidate is not None and candidate["profile_urls"]
@@ -423,6 +429,21 @@ def _contact_rows(
             }
         )
     return rows
+
+
+def _verified_candidate_name(value: str) -> tuple[str | None, str | None]:
+    normalized = " ".join(value.split())
+    if normalized.lower().startswith(("http://", "https://")) or normalized.casefold() in {
+        "profile",
+        "candidate profile",
+        "프로필",
+        "후보 프로필",
+        "linkedin 프로필",
+        "linkedin recruiter 프로필",
+        "recruiter 프로필",
+    }:
+        return None, "candidate_name_not_present_in_gmail"
+    return normalized, None
 
 
 def _contact_summary(

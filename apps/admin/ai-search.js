@@ -12,6 +12,7 @@
     no_candidate_linked_contact_in_week: "이 주차에 후보 프로필로 연결된 제안이 없습니다.",
     candidate_linked_but_batch_attribution_not_verified: "후보 연결은 확인했지만 어느 Batch의 후속 연락인지는 확인하지 못했습니다.",
     candidate_profile_not_in_sent_message: "제안 메일에 후보 프로필 URL이 없어 후보를 특정하지 않았습니다.",
+    candidate_name_not_present_in_gmail: "Gmail 원문에 후보 이름이 없어 프로필 URL만 표시합니다.",
     ai_search_week_not_found: "선택한 주차 자료가 없습니다.",
     weekly_index_load_failed: "주차 목록을 불러오지 못했습니다.",
     weekly_detail_load_failed: "선택한 주차 자료를 불러오지 못했습니다.",
@@ -219,7 +220,10 @@
         element("small", "batch-label", batchLabel(row.batch_id)),
       );
       const candidate = element("td", "candidate-name-cell");
-      candidate.append(element("strong", "", row.candidate_name));
+      candidate.append(element("strong", "", row.candidate_name || "후보명 미확인"));
+      if (!row.candidate_name) {
+        candidate.append(element("small", "", reasonLabel(row.candidate_name_reason)));
+      }
       tr.append(
         executed,
         plainCell(entityLabel(row.company, "고객사")),
@@ -257,13 +261,13 @@
     }
     row.linked_candidates.forEach((candidate) => {
       if (candidate.profile_url) {
-        const link = element("a", "profile-link", candidate.candidate_name);
+        const link = element("a", "profile-link", candidate.candidate_name || "후보명 미확인");
         link.href = candidate.profile_url;
         link.target = "_blank";
         link.rel = "noopener noreferrer";
         cell.append(link);
       } else {
-        cell.append(element("span", "", candidate.candidate_name));
+        cell.append(element("span", "", candidate.candidate_name || "후보명 미확인"));
       }
     });
     return cell;
