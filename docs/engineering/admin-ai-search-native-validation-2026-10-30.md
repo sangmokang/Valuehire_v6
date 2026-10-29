@@ -134,11 +134,12 @@ HTML 표, 첨부, 테스트, 후보 0명, 과거 parser 실패 후 재처리, AI
 - `bash verify.sh`: `PASS: no secret-pattern match in any tracked file, .env not tracked`.
 - 기존 acceptance-hs, mutation/antiforge, Invoice 57 단위 및 실제 PostgreSQL integrity PASS.
 - 실제 PostgreSQL migration/check PASS. 100 이상 번호, provisional 확정 후 P번호 예약, 현재/과거 parser 분리,
-  0명 Batch, 필터·집계 범위, 고점수 fail-closed, RLS와 익명 권한을 SQL로 검증했다.
+  0명 Batch, 필터·집계 범위, 오래된 미발송 근거 배제, 완전한 양성 고점수 미컨택 fixture, RLS와 익명 권한을 SQL로 검증했다.
+- 실제 service-role RPC 7종과 비인가 RPC 403, 원문 이력·Gmail 링크·빈 결과·고점수 미확인 readback PASS.
 - 실제 Next 익명 API **401**, 익명 페이지는 로그인 redirect를 스트리밍하고 보호 표를 렌더링하지 않음을 확인했다.
   인증 성공 분기는 기존 세션 guard 단위 테스트와 실제 service-role PostgreSQL readback으로 확인했다.
 - pre-push 27개 검사 중 semantic mutation은 검사 중 문서가 변경돼 한 차례 실패했다. 변경 없이 재실행한
-  semantic mutation **16 checks PASS**. 최종 전체 pre-push 결과는 후속 확인한다.
+  semantic mutation **16 checks PASS**. 최종 정상 push에서 전체 **27개 검사 PASS**. 훅 우회 없이 기존 브랜치에 push했다.
 
 Playwright는 페이지 진입 전에 Chromium이 종료됐다. 실패 원문은 private `browser-validation.log`에 저장했다.
 

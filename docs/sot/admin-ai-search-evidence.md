@@ -32,7 +32,8 @@
 - 각 후보+포지션의 SARAMIN / JOBKOREA / LINKEDIN / GMAIL 상태는 독립적이다. 허용 상태는
   CONTACTED / REPLIED / CONFIRMED_NOT_CONTACTED / NOT_RUN / REVIEW_REQUIRED / FAILED다.
   부재만으로 미발송을 확정하지 않는다. 후보 식별자·포지션·조회 범위·pagination 종료·확인시각·근거가
-  있어야 음성 증거가 된다. 시각이 잘못되거나 미발송과 발송 근거가 상충하면 검토 대기다.
+  있어야 음성 증거가 된다. 주간 미컨택 확정에는 해당 운영기간 종료 이후의 확인시각도 필요하다.
+  시각이 잘못되거나 미발송과 발송 근거가 상충하면 검토 대기다.
 - Grok 등의 Gmail 총계 보고서는 원문과 reported totals로 보존한다. 총계를 후보에게 나누어 귀속하지
   않는다. 개별 근거가 연결되지 않은 발송은 review queue다. 주간 활동과 누적 상태를 구분한다.
 - 고점수 미컨택자는 점수 PASS·기준 이상·필요 네 채널 확인 완료·양성 컨택 없음·미연결 발송 없음일

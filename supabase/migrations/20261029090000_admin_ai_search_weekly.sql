@@ -211,7 +211,10 @@ BEGIN
     SELECT w.*,NOT EXISTS(SELECT 1 FROM admin_ai_search_review_queue WHERE document->>'reason' IN
       ('unlinked_sent_contact','contact_report_binding_pending') AND document->>'status'='OPEN')
       AND (SELECT count(DISTINCT c->>'channel')=4 FROM jsonb_array_elements(w.contacts) c
-           WHERE c->>'status'='CONFIRMED_NOT_CONTACTED')
+           WHERE c->>'status'='CONFIRMED_NOT_CONTACTED'
+             AND c->'pagination_exhausted'='true'::jsonb
+             AND c->'scope'->'complete_for_candidate_position'='true'::jsonb
+             AND (c->>'checked_at')::timestamptz >= ((to_date(w.week_id,'IYYY-"W"IW')-1)::timestamp AT TIME ZONE 'Asia/Seoul'))
       AND NOT EXISTS(SELECT 1 FROM jsonb_array_elements(w.contacts) c WHERE c->>'status' IN ('CONTACTED','REPLIED','FAILED','REVIEW_REQUIRED'))
       AS confirmed_uncontacted,
       EXISTS(SELECT 1 FROM jsonb_array_elements(w.weekly_contacts) c WHERE c->>'status' IN ('CONTACTED','REPLIED')
@@ -276,8 +279,8 @@ BEGIN
       'candidates',CASE WHEN (SELECT candidate_ready FROM readiness) THEN (SELECT count(DISTINCT candidate_id) FROM filtered) END,
       'observed_candidates',(SELECT count(DISTINCT candidate_id) FROM filtered),
       'provisional_batches',(SELECT count(DISTINCT batch_id) FROM targets WHERE grouping_status='PROVISIONAL'),
-      'jd_sent',CASE WHEN (SELECT jd_ready FROM readiness) THEN (SELECT count(*) FROM filtered WHERE jd_sent_verified) END,
-      'high_score_uncontacted',CASE WHEN (SELECT high_ready FROM readiness)
+      'jd_sent',CASE WHEN (SELECT jd_ready AND candidate_ready FROM readiness) THEN (SELECT count(*) FROM filtered WHERE jd_sent_verified) END,
+      'high_score_uncontacted',CASE WHEN (SELECT high_ready AND candidate_ready FROM readiness)
         THEN (SELECT count(*) FROM filtered WHERE confirmed_uncontacted AND (evaluation->>'score')::integer>=threshold) END,
       'reason',CASE WHEN NOT complete THEN 'collection_or_normalization_incomplete'
         WHEN (SELECT NOT candidate_ready FROM readiness) THEN 'candidate_parsing_or_source_review_incomplete'
