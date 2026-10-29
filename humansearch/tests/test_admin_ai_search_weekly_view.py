@@ -93,7 +93,7 @@ def _run(
 def _payload() -> AiSearchPayload:
     contract = load_evidence_contract(EVIDENCE_CONTRACT_PATH)
     shared = _candidate("https://linkedin.com/in/shared", "공유 후보", 92)
-    other = _candidate("https://linkedin.com/in/other", "다른 후보", 84)
+    other = _candidate("https://linkedin.com/in/other", "Recruiter 프로필", 84)
     payload = build_ai_search_payload(
         (
             _run(
@@ -217,6 +217,12 @@ def test_weekly_view_is_a_batch_candidate_sheet_with_weekly_contact_ledger() -> 
     assert first["contact_rows"][0]["link_status"] == "NOT_RUN"
     assert first["contact_rows"][0]["link_reason"] == (
         "candidate_profile_not_in_sent_message"
+    )
+
+    second = view["weeks"][1]
+    assert second["candidate_rows"][0]["candidate_name"] is None
+    assert second["candidate_rows"][0]["candidate_name_reason"] == (
+        "candidate_name_not_present_in_gmail"
     )
 
 
