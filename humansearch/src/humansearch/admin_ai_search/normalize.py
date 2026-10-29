@@ -24,14 +24,15 @@ from .gmail_sent_contacts import _contact_actor
 from .gmail_source import _HtmlTextExtractor, _message_body
 from .gmail_subject import classify_actor, non_run_reason, subject_context
 from .registry import Registry, operation_week
+from .scoring import source_reported_number
 from .weekly_view import _verified_candidate_name
 
-PARSER_VERSION = "admin-ai-search-normalizer/2026-10-29.3"
+PARSER_VERSION = "admin-ai-search-normalizer/2026-10-29.5"
 RUN_ID = re.compile(r"(?:run\s*id|실행\s*ID)\s*[:：#]\s*([\w.:-]{3,128})", re.IGNORECASE)
 SECTION = re.compile(r"^(?:(?:#+|\[\[VH_HEADING\]\])\s*)?고객사\s*[:：]\s*(.+?)\s*[/|·]\s*포지션\s*[:：]\s*(.+)$", re.MULTILINE)
 RELATED = re.compile(r"ai\s*[-_]?\s*search|ai\s*서치|후보.{0,12}(?:서치|검색)|grok.{0,15}컨택", re.IGNORECASE)
 PROFILE = re.compile(r"https?://[^\s<>\"']+", re.IGNORECASE)
-REPORTED = re.compile(r"^\s*(?:[-*]\s*)?(?:메일\s*(?:원본\s*)?점수|총점|종합\s*점수|점수|score)\s*[:：]\s*(\d{1,3})(?:\s*/\s*100)?", re.IGNORECASE | re.MULTILINE)
+REPORTED = re.compile(r"^\s*(?:[-*]\s*)?(?:메일\s*(?:원본\s*)?점수|총점|종합\s*점수|점수|score)\s*[:：]\s*(\d+(?:\.\d+)?)(?![\d.,])(?:\s*/\s*\d+(?:\.\d+)?)?", re.IGNORECASE | re.MULTILINE)
 EXECUTED = re.compile(r"(?:실행\s*(?:시각|일시)|executed_at)\s*[:：]\s*(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:\d{2})?)", re.IGNORECASE)
 
 
@@ -93,7 +94,7 @@ def normalize_message(
         source.update(processing_status="EXCLUDED", reason=non_run_reason(subject))
         return source
     if not RELATED.search(subject + "\n" + text) and not message.get("_in_ai_search_label"):
-        if any(canonical_candidate_url(m.group(0)) for m in PROFILE.finditer(text)) or (attachments and not text):
+        if any(canonical_candidate_url(m.group(0)) for m in PROFILE.finditer(text)) or not text:
             source.update(processing_status="REVIEW_REQUIRED", reason="potential_ai_search_requires_review")
             review(registry, message_id, "potential_ai_search_requires_review")
             return source
@@ -107,6 +108,17 @@ def normalize_message(
                     "exclusion_reason": "parent_message_not_ai_search"})
         return source
     actor, actor_reason = classify_actor(subject, meta.get("from", ""))
+    strong_marker = re.search(r"\[[^\]]*ai[\s_-]*search[^\]]*\]", subject, re.IGNORECASE) is not None
+    explicit_target = SECTION.search(text) is not None
+    report_title = RELATED.search(subject) is not None and re.search(
+        r"후보자|인재|소싱|candidate|sourcing|후보\s*\d+\s*명", subject, re.IGNORECASE,
+    ) is not None
+    if not (message.get("_in_ai_search_label") or strong_marker or explicit_target or report_title):
+        source.update(processing_status="REVIEW_REQUIRED", source_kind="POTENTIAL_AI_SEARCH_RELATED",
+                      reason="ai_search_result_identity_not_proven")
+        review(registry, message_id, "ai_search_result_identity_not_proven")
+        return source
+    source["source_kind"] = "AI_SEARCH_RESULT"
     actor_evidence = {"subject": subject, "sender": meta.get("from"), "message_id": message_id,
                       "thread_id": message.get("threadId"), "received_at": received.isoformat(),
                       "rule": actor_reason}
@@ -147,15 +159,24 @@ def _normalize_section(
                                "status": "PASS" if position_known else "NOT_RUN"})
     run_ids = set(RUN_ID.findall(source["subject"] + "\n" + text))
     confirmed = len(run_ids) == 1
-    batch_id = key(actor, "explicit-run", next(iter(run_ids))) if confirmed else stable_batch_id(
+    grouping_key = f"run:{actor}:{next(iter(run_ids))}" if confirmed else None
+    grouping_reason = "explicit_run_id" if confirmed else "execution_identity_not_proven"
+    if not run_ids and position_known and actor != "OTHER" and time_source == "explicit_source_timestamp" and re.search(
+        r"(?:실행|서치|검색)\s*(?:완료|결과)|(?:run|search)\s*(?:completed|finished)", text, re.IGNORECASE,
+    ):
+        confirmed = True
+        grouping_key = key(actor, company, position, executed.isoformat(), "completed-execution")
+        grouping_reason = "same_actor_company_position_explicit_execution_timestamp_and_completion"
+    preferred_id = key(actor, "explicit-run", grouping_key) if grouping_key is not None else stable_batch_id(
         actor, f"{message_id}:section:{index}", received,
     )
+    batch_id = registry.resolve_batch_id(grouping_key, preferred_id, message_id, index)
     week_id, year, week = operation_week(executed)
     batch = registry.register_batch({
         "id": batch_id, "week_year": year, "week_number": week,
         "grouping_status": "CONFIRMED" if confirmed else "PROVISIONAL", "document": {
             "id": batch_id, "week_id": week_id, "actor": actor,
-            "grouping_reason": "explicit_run_id" if confirmed else "execution_identity_not_proven",
+            "grouping_reason": grouping_reason, "grouping_key": grouping_key,
             "source_message_ids": [message_id], "actor_evidence": [actor_evidence],
             "executed_at": executed.isoformat(), "received_at": received.isoformat(),
             "execution_time_source": time_source,
@@ -169,6 +190,7 @@ def _normalize_section(
     registry.put("batch_source_messages", {
         "id": key(batch_id, message_id, str(index)), "batch_id": batch_id,
         "source_message_id": message_id, "position_id": position_id, "section_index": index,
+        "parser_version": PARSER_VERSION,
         "raw": len(candidates) + unparsed + excluded if complete else None,
         "parsed": len(unique), "duplicate": len(candidates) - len(unique),
         "unparsed": unparsed if complete else None, "excluded": excluded,
@@ -197,10 +219,11 @@ def _store_candidate(
                                 "cross_channel_link": "NOT_RUN"})
     evaluation_id = key(identity, position_id, source["id"], str(index), PARSER_VERSION)
     reported = REPORTED.search(section)
-    heading_score = re.search(r"\s[—–]\s*(\d{1,3})\s*점|^\s*[-•].+?\s+(\d{1,3})\s*[—–]", section, re.MULTILINE)
-    original_score = int(reported[1]) if reported else (
-        int(heading_score[1] or heading_score[2]) if heading_score else None
+    heading_score = re.search(r"\s[—–]\s*(\d+(?:\.\d+)?)\s*점|^\s*[-•].+?\s+(\d+(?:\.\d+)?)\s*[—–]", section, re.MULTILINE)
+    original_text = reported[1] if reported else (
+        heading_score[1] or heading_score[2] if heading_score else None
     )
+    original_score = source_reported_number(original_text)
     missing = [axis for axis in contract.score_weights
                if candidate.score_components is None or axis not in candidate.score_components]
     name, name_reason = _verified_candidate_name(candidate.display_name)

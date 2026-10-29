@@ -96,6 +96,7 @@ class CollectionStore:
 def collect_mailbox(
     store: CollectionStore, reader: GmailReader, *, run_id: str | None = None,
     include_sent: bool = False,
+    refresh_since_start: bool = False,
 ) -> dict[str, Any]:
     """Inbox UNION the live label, never a keyword-limited intersection.
 
@@ -111,6 +112,9 @@ def collect_mailbox(
         "retry_count": 0, "scopes": {},
     }
     run.update(status="RUNNING", finished_at=None, error=None)
+    run.pop("error_type", None)
+    run.setdefault("errors", [])
+    run["attempt_count"] = run.get("attempt_count", 0) + 1
     retry_base = run["retry_count"]
     store.save_run(run)
     try:
@@ -121,21 +125,30 @@ def collect_mailbox(
         scopes = {"02aisearch": matching[0]["id"], "INBOX": "INBOX"}
         if include_sent:
             scopes["SENT"] = "SENT"
+        if refresh_since_start:
+            scopes.update({f"{name}_DELTA": label for name, label in list(scopes.items())})
         for scope, label_id in scopes.items():
+            run["active_scope"] = scope
             state = store.checkpoint(run_id, scope)
             if state.get("label_id", label_id) != label_id:
                 raise ValueError("live label identity changed during resumed collection")
-            state.update(label_id=label_id, query=None)
+            query = (f"after:{int(datetime.fromisoformat(run['started_at']).timestamp())}"
+                     if scope.endswith("_DELTA") and not scope.startswith("02aisearch") else None)
+            state.update(label_id=label_id, query=query)
             while not state["exhausted"]:
                 _collect_page(store, reader, run_id, scope, state)
                 run["scopes"][scope] = state
                 run["retry_count"] = retry_base + int(getattr(reader, "retry_count", 0))
                 store.save_run(run)
             run["scopes"][scope] = state
-        all_ids = [set(state["message_ids"]) for scope, state in run["scopes"].items()
-                   if scope in {"INBOX", "02aisearch"}]
+        all_ids = [set().union(*(set(state["message_ids"]) for scope, state in run["scopes"].items()
+                                if scope in {base, base + "_DELTA"}))
+                   for base in ("INBOX", "02aisearch")]
         run["union_count"] = len(set.union(*all_ids))
         run["overlap_count"] = sum(map(len, all_ids)) - run["union_count"]
+        run["scope_unique_counts"] = dict(zip(("INBOX", "02aisearch"), map(len, all_ids), strict=True))
+        if any(not state["exhausted"] for state in run["scopes"].values()):
+            raise ValueError("a prior scope is incomplete; resume with the original scope flags")
         for outcome in ("new", "updated", "unchanged"):
             run[outcome] = store.db.execute(
                 "SELECT count(*) FROM collection_run_messages WHERE run_id=? AND outcome=?",
@@ -159,6 +172,10 @@ def collect_mailbox(
         # Original error lives only in the private job DB, never the API or PII logs.
         run.update(status="PARTIAL", finished_at=now(), error=str(error),
                    error_type=type(error).__name__)
+        run["retry_count"] = retry_base + int(getattr(reader, "retry_count", 0))
+        run["errors"].append({"message": str(error), "type": type(error).__name__,
+                              "occurred_at": now(), "scope": run.get("active_scope"),
+                              "attempt": run["attempt_count"]})
         store.save_run(run)
         raise
 
@@ -169,7 +186,7 @@ def _collect_page(
     token = state["next_page_token"]
     pending = state.get("pending_page")
     if pending is None:
-        page = _object(reader.request("list", {"label_id": state["label_id"], "page_token": token}))
+        page = _object(reader.request("list", {"label_id": state["label_id"], "page_token": token, "query": state["query"]}))
         state["pending_page"] = dict(page)
         store.save_checkpoint(run_id, scope, state)
     else:

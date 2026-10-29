@@ -60,7 +60,8 @@ function RawDetail({ detail }: { detail: Evidence }) {
     {evaluations?.map((e,i) => <section key={i}>
       <h3>포지션별 평가 · {value(positions?.find(p => p.id === e.position_id)?.company)} · {value(positions?.find(p => p.id === e.position_id)?.title)}</h3>
       <dl className="raw-fields">{[
-        ['후보명 상태',e.candidate_name_status],['후보명',e.candidate_name],['후보명 사유',e.candidate_name_reason],
+        ['후보명 상태',e.candidate_name_status],['후보명',e.candidate_name?.match(/^https?:/i) ? '후보명 미확인' : e.candidate_name],['후보명 사유',e.candidate_name_reason],
+        ['현재 집계 반영',messages?.find(m => m.id === e.source_message_id)?.parser_version === e.evaluation_version ? '현재 원문 해석' : '과거 해석 · 집계 제외'],
         ['학력',e.education],['전체 경력',e.experience],['핵심 경력',e.key_experience],
         ['필수요건별 근거',e.requirements_evidence],['적합 근거',e.why_fit],
         ['더 적합한 포지션 검토',e.better_position_exists],['대안 포지션',e.better_position],
@@ -137,9 +138,9 @@ export default function AiSearchWeekly() {
         ...(!result.complete || result.summary.high_score_uncontacted === null ? { error: 'NOT_RUN · 점수 또는 채널별 이력 확인이 완료되지 않았습니다.' } : {}) });
     } catch(e) { setModal({ title: '고점수 미컨택자', error: e instanceof Error ? e.message : '조회 실패' }); }
   }
-  return <main className="ai-weekly" aria-busy={loading}>
+  return <section className="ai-weekly" aria-labelledby="ai-weekly-title" aria-busy={loading}>
     <header className="ai-weekly-heading"><div><p className="eyebrow">WEEKLY OPERATIONS / ASIA·SEOUL</p>
-      <h1>AI Search 주간 운영표</h1><p>실행과 후보, 채널별 컨택을 원문 근거로 확인합니다.</p></div>
+      <h1 id="ai-weekly-title">AI Search 주간 운영표</h1><p>실행과 후보, 채널별 컨택을 원문 근거로 확인합니다.</p></div>
       <div className="collection-note"><strong>{collection?.complete ? '수집 완료' : '수집 확인 필요'}</strong>
         <span>마지막 성공 {date(collection?.run?.last_success_at)}</span>
         <span>Inbox ∪ 02aisearch · 검토 {collection?.review_count === undefined ? '미확인' : collection.review_count} · 실패 {collection?.failed_count === undefined ? '미확인' : collection.failed_count}</span>
@@ -171,7 +172,7 @@ export default function AiSearchWeekly() {
       <thead><tr>{['주차','Batch','고객사','포지션','후보자 이름','학력','경력','프로필','검증 점수','잘 맞는 이유','사람인 컨택','잡코리아 컨택','LinkedIn 컨택','Gmail/JD 발송','사람 후속 조치','상세 Raw'].map(h => <th key={h}>{h}</th>)}</tr></thead>
       <tbody>{data?.rows.map(row => <tr key={`${row.candidate_id}:${row.position_id}`}>
         <td>{row.week_id}</td><td><details><summary>{row.batches.map(b => b.display_number).join(', ')}</summary>
-          {row.batches.map(b => <div key={b.id}>{b.display_number} · {value(b.document.actor)}<small>실행 {value(b.document.executed_at)}</small><small>수신 {value(b.document.received_at)}</small><small>{value(b.document.execution_time_source)}</small></div>)}</details></td>
+          {row.batches.map(b => <div key={b.id}>{b.display_number} · {value(b.document.actor)}<small>실행 {date(b.document.executed_at as string)}</small><small>수신 {date(b.document.received_at as string)}</small><small>{value(b.document.execution_time_source)}</small></div>)}</details></td>
         <td>{row.company}</td><td>{row.position}</td><td>{row.evaluation.candidate_name || '후보명 미확인'}<small>{row.evaluation.candidate_name_reason}</small></td>
         <td>{row.evaluation.education || '미확인'}</td><td>{row.evaluation.experience || '미확인'}</td>
         <td><EvidenceLink href={row.evaluation.profile_url}>프로필 ↗</EvidenceLink></td>
@@ -195,5 +196,5 @@ export default function AiSearchWeekly() {
         <button onClick={() => void raw(row.candidate_id)}>후보 상세 이동</button></section>)}
       {modal?.rows?.length === 0 && <p>{modal.error ? '미확인 자료가 있어 미컨택자를 확정할 수 없습니다.' : '선택 범위에 확정된 고점수 미컨택자가 없습니다.'}</p>}
     </dialog>
-  </main>;
+  </section>;
 }

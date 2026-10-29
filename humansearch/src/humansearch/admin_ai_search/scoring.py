@@ -22,6 +22,13 @@ EXPECTED_SCORE_WEIGHTS = {
 }
 
 
+def source_reported_number(text: str | None) -> int | float | None:
+    """Preserve a mail's own number; this never contributes to verified scores."""
+    if text is None:
+        return None
+    return float(text) if "." in text else int(text)
+
+
 type ScoreComponents = dict[str, int]
 
 

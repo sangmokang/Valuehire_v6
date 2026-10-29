@@ -25,7 +25,10 @@ async function retry(read) {
   for (let attempt = 0; ; attempt++) {
     try { return await read(); }
     catch (error) {
-      if (attempt >= 6 || ![401,403,408,429,500,502,503,504].includes(error.status)) throw error;
+      const networkError = ['ECONNRESET','ETIMEDOUT','EAI_AGAIN','ENETUNREACH','UND_ERR_CONNECT_TIMEOUT'].includes(error.code || error.cause?.code)
+        || ['TimeoutError','AbortError'].includes(error.name);
+      const quotaError = error.status === 403 && /rateLimit|quota/i.test(error.message);
+      if (attempt >= 6 || !(networkError || quotaError || [401,408,429,500,502,503,504].includes(error.status))) throw error;
       if (error.status === 401) { token = undefined; }
       retries++;
       await new Promise(resolve => setTimeout(resolve, Math.min(60000, 1000 * 2 ** attempt) + Math.random() * 500));
@@ -51,7 +54,8 @@ async function dispatch(operation, args) {
     case 'labels': return readApi('labels');
     case 'profile': return readApi('profile');
     case 'stats': return { retries };
-    case 'list': return readApi('messages', { labelIds: args.label_id, maxResults: '500', pageToken: args.page_token });
+    case 'list': return readApi('messages', { labelIds: args.label_id, maxResults: '500', pageToken: args.page_token,
+      q: args.query === undefined ? null : args.query });
     case 'messages': {
       const output = [];
       for (let i = 0; i < args.ids.length; i += 25) {

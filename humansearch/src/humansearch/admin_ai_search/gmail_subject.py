@@ -105,6 +105,10 @@ def _strip_actor_and_metadata(value: str) -> str:
 
 def _subject_parts(subject: str) -> tuple[str, str] | None:
     normalized = _REPLY_PREFIX.sub("", subject)
+    while (metadata := re.match(r"^\s*\[([^\]]+)\]\s*", normalized)) is not None:
+        if metadata[1].strip().casefold() not in {"검토용", "검토", "리뷰", "review", "참고", "보고"}:
+            break
+        normalized = normalized[metadata.end():]
     prefix_match = re.match(r"^\s*\[([^\]]+)\]\s*", normalized)
     if prefix_match is None:
         return None

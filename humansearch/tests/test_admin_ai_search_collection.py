@@ -102,3 +102,15 @@ def test_resume_retains_the_listed_page_when_body_download_is_interrupted(tmp_pa
     result = collect_mailbox(store, mailbox, run_id="body-resume")
     assert ("label-live", None) not in mailbox.requests
     assert result["union_count"] == 4
+
+
+def test_finishing_refresh_keeps_scope_union_counts_and_exhausts_new_queries(tmp_path: Path) -> None:
+    store = CollectionStore(tmp_path / "private.sqlite")
+    mailbox = Mailbox()
+    collect_mailbox(store, mailbox, run_id="refresh")
+    refreshed = collect_mailbox(store, mailbox, run_id="refresh", refresh_since_start=True)
+    assert refreshed["union_count"] == 4
+    assert refreshed["overlap_count"] == 1
+    assert refreshed["scopes"]["INBOX_DELTA"]["query"].startswith("after:")
+    assert refreshed["scopes"]["02aisearch_DELTA"]["query"] is None
+    assert all(scope["exhausted"] for scope in refreshed["scopes"].values())

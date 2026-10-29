@@ -111,6 +111,7 @@ def _sent_contact_event(
     message: Mapping[str, object],
     contract: EvidenceContract,
     known_keys: set[str],
+    *, include_position_mail: bool = False, include_cc_bcc: bool = False,
 ) -> SentContactEventPayload | None:
     message_id = _required_string(message, "id")
     thread_id = _required_string(message, "thread_id")
@@ -118,12 +119,18 @@ def _sent_contact_event(
     payload = _required_mapping(message, "payload")
     subject = _header(payload, "subject")
     body_text, links = _message_body(payload)
+    position_mail = include_position_mail and re.match(r"^\s*\[포지션\]", subject) is not None and re.search(
+        r"주요\s*업무|자격\s*요건|입사\s*후\s*업무", body_text
+    ) is not None
+    recipients = _header(payload, "to")
+    if include_cc_bcc:
+        recipients += " " + _optional_header(payload, "cc") + " " + _optional_header(payload, "bcc")
     if (
-        not _PROPOSAL_SUBJECT.search(subject)
+        not (_PROPOSAL_SUBJECT.search(subject) or position_mail)
         or _REPLY_OR_FORWARD.search(subject)
         or _optional_header(payload, "in-reply-to")
         or _TEST_MESSAGE.search(f"{subject}\n{body_text}")
-        or not _has_external_recipient(_header(payload, "to"))
+        or not _has_external_recipient(recipients)
     ):
         return None
     actor, actor_reason = _contact_actor(payload, contract)

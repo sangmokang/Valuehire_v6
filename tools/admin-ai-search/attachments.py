@@ -17,7 +17,9 @@ counts = {"parsed": 0, "review_required": 0}
 try:
     for row in registry.db.execute("SELECT a.document FROM source_attachments a JOIN normalized_sources s "
         "ON s.id=json_extract(a.document,'$.source_message_id') WHERE "
-        "json_extract(s.document,'$.processing_status') IN ('PROCESSED','REVIEW_REQUIRED')").fetchall():
+        "(json_extract(s.document,'$.processing_status')='PROCESSED' OR "
+        "(json_extract(s.document,'$.processing_status')='REVIEW_REQUIRED' AND "
+        "json_extract(s.document,'$.body_status')='REVIEW_REQUIRED'))").fetchall():
         attachment = json.loads(row[0])
         if attachment["status"] == "PARSED":
             continue

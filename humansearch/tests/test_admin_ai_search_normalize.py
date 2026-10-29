@@ -2,6 +2,7 @@
 
 import base64
 from pathlib import Path
+from typing import cast
 
 from humansearch.admin_ai_search.evidence import load_evidence_contract
 from humansearch.admin_ai_search.normalize import normalize_message
@@ -91,3 +92,28 @@ def test_exact_execution_timestamp_and_completion_is_execution_evidence(tmp_path
     assert [tuple(row) for row in rows] == [("CONFIRMED", "W44-01")]
     normalize_message(store, message("another", body.replace("T09:00:00", "T09:01:00")), CONTRACT)
     assert len(store.documents("batches")) == 2
+
+
+def test_ai_search_mention_in_a_newsletter_is_not_a_verified_candidate_report(tmp_path: Path) -> None:
+    store = Registry(tmp_path / "private.sqlite")
+    raw = message("newsletter", "AI Search 서비스 소개\nhttps://linkedin.com/in/example")
+    payload = cast(dict[str, object], raw["payload"])
+    for header in cast(list[dict[str, str]], payload["headers"]):
+        if header["name"] == "Subject":
+            header["value"] = "산업 뉴스"
+    source = normalize_message(store, raw, CONTRACT)
+    assert source["processing_status"] == "REVIEW_REQUIRED"
+    assert store.documents("candidates") == []
+
+
+def test_review_tag_does_not_hide_the_explicit_ai_actor_and_target(tmp_path: Path) -> None:
+    store = Registry(tmp_path / "private.sqlite")
+    raw = message("review", "https://linkedin.com/in/a")
+    payload = cast(dict[str, object], raw["payload"])
+    for header in cast(list[dict[str, str]], payload["headers"]):
+        if header["name"] == "Subject":
+            header["value"] = "[검토용] [aisearch_grok] [Client][Engineer]"
+    source = normalize_message(store, raw, CONTRACT)
+    assert source["processing_status"] == "PROCESSED"
+    assert store.documents("batches")[0]["actor"] == "GROK"
+    assert store.documents("positions")[0]["company"] == "Client"

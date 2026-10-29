@@ -30,6 +30,7 @@ class Registry:
     def __init__(self, path: Path) -> None:
         self.db = sqlite3.connect(path)
         self.db.row_factory = sqlite3.Row
+        self._candidate_keys: set[str] | None = None
         for table in TABLES:
             self.db.execute(f"CREATE TABLE IF NOT EXISTS {table} "
                             "(id TEXT PRIMARY KEY, document TEXT NOT NULL)")
@@ -39,6 +40,14 @@ class Registry:
             display_number TEXT NOT NULL, document TEXT NOT NULL,
             UNIQUE(week_year,week_number,sequence),
             UNIQUE(week_year,week_number,provisional_sequence))""")
+        self.db.execute("CREATE INDEX IF NOT EXISTS evaluation_pair ON candidate_position_evaluations "
+                        "(json_extract(document,'$.candidate_id'),json_extract(document,'$.position_id'))")
+        self.db.execute("CREATE INDEX IF NOT EXISTS review_source ON review_queue "
+                        "(json_extract(document,'$.source_message_id'))")
+        self.db.execute("CREATE INDEX IF NOT EXISTS batch_source_identity ON batch_source_messages "
+                        "(json_extract(document,'$.source_message_id'),json_extract(document,'$.section_index'))")
+        self.db.execute("CREATE INDEX IF NOT EXISTS batch_group_identity ON batches "
+                        "(json_extract(document,'$.grouping_key'))")
         self.db.commit()
 
     def put(self, table: str, document: dict[str, Any]) -> None:
@@ -50,6 +59,32 @@ class Registry:
                 "DO UPDATE SET document=excluded.document",
                 (document["id"], json.dumps(document, ensure_ascii=False)),
             )
+        if table == "candidates" and self._candidate_keys is not None:
+            self._candidate_keys.add(document["id"])
+
+    def candidate_keys(self) -> set[str]:
+        if self._candidate_keys is None:
+            self._candidate_keys = {row[0] for row in self.db.execute("SELECT id FROM candidates")}
+        return self._candidate_keys
+
+    def resolve_batch_id(self, grouping_key: str | None, preferred: str,
+                         message_id: str, section_index: int) -> str:
+        prior = self.db.execute("SELECT document FROM batch_source_messages WHERE "
+            "json_extract(document,'$.source_message_id')=? AND json_extract(document,'$.section_index')=? "
+            "ORDER BY rowid DESC LIMIT 1", (message_id, section_index)).fetchone()
+        prior_id = json.loads(prior[0])["batch_id"] if prior else None
+        grouped = self.db.execute("SELECT id FROM batches WHERE json_extract(document,'$.grouping_key')=? "
+            "AND json_extract(document,'$.superseded_by') IS NULL LIMIT 1", (grouping_key,)).fetchone() if grouping_key else None
+        identity = grouped[0] if grouped else prior_id or preferred
+        if prior_id and prior_id != identity:
+            old = self.db.execute("SELECT grouping_status,document FROM batches WHERE id=?", (prior_id,)).fetchone()
+            if old[0] == "CONFIRMED":
+                raise ValueError("conflicting confirmed batch identities require review")
+            with self.db:
+                self.db.execute("UPDATE batches SET document=? WHERE id=?", (
+                    json.dumps({**json.loads(old[1]), "superseded_by": identity,
+                                "superseded_reason": "explicit_execution_evidence"}), prior_id))
+        return str(identity)
 
     def register_batch(self, batch: dict[str, Any]) -> dict[str, Any]:
         with self.db:
@@ -58,6 +93,16 @@ class Registry:
             if old is not None:
                 result = dict(old)
                 previous = json.loads(result["document"])
+                if old["grouping_status"] == "PROVISIONAL" and batch["grouping_status"] == "CONFIRMED":
+                    number = self.db.execute("SELECT COALESCE(MAX(sequence),0)+1 FROM batches "
+                        "WHERE week_year=? AND week_number=?", (old["week_year"],old["week_number"])).fetchone()[0]
+                    previous["display_number_history"] = [*previous.get("display_number_history", []), old["display_number"]]
+                    result.update(sequence=number, grouping_status="CONFIRMED",
+                                  display_number=f"W{old['week_number']:02d}-{number:02d}")
+                if batch.get("document", {}).get("execution_time_source") == "received_at_fallback":
+                    for field in ("executed_at", "execution_time_source", "execution_time_confidence", "execution_time_reason"):
+                        if field in previous:
+                            batch.setdefault("document", {})[field] = previous[field]
                 if previous.get("execution_time_source") == "explicit_source_timestamp":
                     for field in ("executed_at", "execution_time_source", "execution_time_confidence", "execution_time_reason"):
                         batch.setdefault("document", {})[field] = previous[field]
@@ -70,8 +115,11 @@ class Registry:
                         json.dumps(value, sort_keys=True): value for value in values
                     }.values())
                 result["document"] = {**previous, **batch.get("document", {})}
-                self.db.execute("UPDATE batches SET document=? WHERE id=?",
-                                (json.dumps(result["document"]), batch["id"]))
+                if previous.get("grouping_key") and not result["document"].get("grouping_key"):
+                    result["document"]["grouping_key"] = previous["grouping_key"]
+                self.db.execute("UPDATE batches SET document=?,sequence=?,grouping_status=?,display_number=? WHERE id=?",
+                                (json.dumps(result["document"]),result["sequence"],result["grouping_status"],
+                                 result["display_number"],batch["id"]))
                 return result
             provisional = batch["grouping_status"] == "PROVISIONAL"
             sequence_column = "provisional_sequence" if provisional else "sequence"

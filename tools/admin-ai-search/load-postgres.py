@@ -9,6 +9,7 @@ import subprocess
 from pathlib import Path
 
 from humansearch.admin_ai_search.registry import TABLES
+from humansearch.admin_ai_search.storage_encoding import postgres_document
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--database", type=Path, required=True)
@@ -40,7 +41,7 @@ def load(table: str, records: list[dict[str, object]]) -> None:
     buffer = io.StringIO()
     writer = csv.writer(buffer, lineterminator="\n")
     for document in records:
-        writer.writerow([document["id"], json.dumps(document, ensure_ascii=False)])
+        writer.writerow([document["id"], json.dumps(postgres_document(document), ensure_ascii=False)])
     target = "public.admin_ai_search_" + table
     statement = (f"BEGIN; CREATE TEMP TABLE stage (id text,document jsonb); "
                  "COPY stage FROM STDIN WITH(FORMAT csv);\n" + buffer.getvalue() + "\\.\n" +
@@ -56,7 +57,7 @@ for row in db.execute("SELECT id,week_year,week_number,grouping_status,document 
     batch = {"id": row[0], "week_year": row[1], "week_number": row[2], "grouping_status": row[3], "document": json.loads(row[4])}
     # Quoted psql variables bind the entire JSON document, avoiding SQL interpolation.
     result = subprocess.run(["psql", args.dsn, "-XAtq", "-v", "ON_ERROR_STOP=1",
-                             "--set=batch=" + json.dumps(batch)],
+                             "--set=batch=" + json.dumps(postgres_document(batch))],
                             input="SELECT public.admin_ai_search_register_batch(:'batch'::jsonb);",
                             text=True, capture_output=True)
     if result.returncode:
@@ -68,9 +69,10 @@ runs = [json.loads(row[0]) for row in db.execute("SELECT document FROM collectio
 source_count = db.execute("SELECT count(*) FROM source_messages").fetchone()[0]
 normalized_count = db.execute("SELECT count(*) FROM normalized_sources").fetchone()[0]
 for run in runs:
-    run["normalization_complete"] = source_count == normalized_count and run["status"] == "SUCCEEDED"
+    failures = db.execute("SELECT count(*) FROM normalized_sources WHERE "
+                          "json_extract(document,'$.processing_status')='FAILED'").fetchone()[0]
+    run["normalization_complete"] = source_count == normalized_count and failures == 0 and run["status"] == "SUCCEEDED"
     run["normalization_source_count"] = normalized_count
-    run["contact_scopes_complete"] = False
 load("collection_runs", runs)
 load("collection_checkpoints", [{"id": run + ":" + scope, **json.loads(document)}
     for run, scope, document in db.execute("SELECT run_id,scope,document FROM collection_checkpoints")])

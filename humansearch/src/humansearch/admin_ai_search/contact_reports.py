@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime
+import re
+from datetime import UTC, datetime
 from typing import Any
 
 from .evidence import EvidenceContract
 from .gmail_candidates import canonical_candidate_url
-from .gmail_sent_contacts import _sent_contact_event
-from .normalize import SECTION, adapt_mime, key, review
+from .gmail_sent_contacts import _PROPOSAL_SUBJECT, _sent_contact_event
+from .normalize import SECTION, adapt_mime, headers, key, review
 from .registry import Registry
 
 CHANNELS = {"SARAMIN", "JOBKOREA", "LINKEDIN", "GMAIL"}
@@ -75,6 +76,10 @@ def _ingest_event(registry: Registry, message_id: str, event: dict[str, Any], in
                 and scope.get("position") == event.get("position")
                 and scope.get("channel") == channel and event.get("evidence_reference")):
             status, reason = "NOT_RUN", "contact_scope_incomplete"
+        elif event.get("sent_at") or event.get("replied_at"):
+            status, reason = "REVIEW_REQUIRED", "contact_negative_contradicts_send_evidence"
+    elif status == "REVIEW_REQUIRED":
+        reason = str(event.get("reason", "contact_intent_requires_review"))
     document = {**event, "id": identity, "candidate_id": candidate_id if linked else None,
                 "position_id": position_id if linked else None, "status": status,
                 "event_type": event.get("event_type", "CONTACT_CHECK"),
@@ -82,6 +87,10 @@ def _ingest_event(registry: Registry, message_id: str, event: dict[str, Any], in
                 "link_reason": reason, "evidence_reference": event.get("evidence_reference"),
                 "source_reference": f"gmail:{message_id}", "reason": reason,
                 "weekly_and_cumulative_basis": "event_timestamp"}
+    for field in ("sent_at", "replied_at", "checked_at"):
+        raw_time = event.get(field)
+        document[field] = (datetime.fromisoformat(str(raw_time)).astimezone(UTC).isoformat()
+                           if _aware(raw_time) else None)
     previous_event = registry.db.execute("SELECT document FROM contact_events WHERE id=?", (identity,)).fetchone()
     source_ids = json.loads(previous_event[0]).get("source_message_ids", []) if previous_event else []
     document["source_message_ids"] = list(dict.fromkeys([*source_ids, message_id]))
@@ -89,21 +98,26 @@ def _ingest_event(registry: Registry, message_id: str, event: dict[str, Any], in
     if reason:
         review(registry, message_id, reason, reference=identity, contact_event_id=identity)
     else:
-        for row in registry.db.execute("SELECT id,document FROM review_queue").fetchall():
+        for row in registry.db.execute("SELECT id,document FROM review_queue WHERE "
+            "json_extract(document,'$.source_message_id')=?", (message_id,)).fetchall():
             previous = json.loads(row[1])
             if previous.get("source_message_id") == message_id and previous.get("reference") == identity:
                 registry.put("review_queue", {**previous, "status": "RESOLVED"})
 
 
 def ingest_gmail_sent(registry: Registry, message: dict[str, Any], contract: EvidenceContract, text: str) -> None:
-    known = {row[0] for row in registry.db.execute("SELECT id FROM candidates")}
+    explicit_proposal = _PROPOSAL_SUBJECT.search(headers(message).get("subject", "")) is not None
+    if not explicit_proposal and re.match(r"^\s*\[포지션\]", headers(message).get("subject", "")) is None:
+        return
+    known = registry.candidate_keys()
     adapted = {"id": message["id"], "thread_id": message.get("threadId"),
                "internal_date": message.get("internalDate"), "payload": adapt_mime(message["payload"])}
-    event = _sent_contact_event(adapted, contract, known)
+    event = _sent_contact_event(adapted, contract, known, include_position_mail=True, include_cc_bcc=True)
     if event is None:
         return
     registry.put("contact_evidence", {"id": key(message["id"], "sent"), **event,
-                                     "source_message_id": message["id"], "source_body": text})
+                                     "source_message_id": message["id"], "source_body": text,
+                                     "intent_status": "EXPLICIT_PROPOSAL" if explicit_proposal else "POSITION_MAIL_REVIEW_REQUIRED"})
     contexts = list(SECTION.finditer(text))
     company, position = (contexts[0][1], contexts[0][2]) if len(contexts) == 1 else ("", "")
     profiles = event["canonical_keys"]
@@ -112,12 +126,13 @@ def ingest_gmail_sent(registry: Registry, message: dict[str, Any], contract: Evi
         registry.put("contact_events", {"id": key(message["id"], "unlinked"),
             "candidate_id": None, "position_id": None, "channel": "GMAIL", "actor": event["actor"],
             "status": "REVIEW_REQUIRED", "source_message_id": message["id"], "sent_at": event["contacted_at"],
-            "event_type": "PROPOSAL_SENT", "evidence_reference": event["evidence_reference"],
+            "event_type": "PROPOSAL_SENT" if explicit_proposal else "POSITION_MAIL_SENT", "evidence_reference": event["evidence_reference"],
             "link_reason": event["link_reason"], "checked_at": None})
     for identity in profiles:
         row = registry.db.execute("SELECT document FROM candidates WHERE id=?", (identity,)).fetchone()
         profile = json.loads(row[0])["canonical_url"]
         _ingest_event(registry, message["id"], {"candidate_profile_url": profile,
             "company": company, "position": position, "channel": "GMAIL", "actor": event["actor"],
-            "actor_reason": event["actor_reason"], "status": "CONTACTED", "sent_at": event["contacted_at"],
-            "evidence_reference": event["evidence_reference"], "event_type": "PROPOSAL_SENT"}, 0)
+            "actor_reason": event["actor_reason"], "status": "CONTACTED" if explicit_proposal else "REVIEW_REQUIRED", "sent_at": event["contacted_at"],
+            "reason": "contact_intent_requires_review" if not explicit_proposal else None,
+            "evidence_reference": event["evidence_reference"], "event_type": "PROPOSAL_SENT" if explicit_proposal else "POSITION_MAIL_SENT"}, 0)
