@@ -154,6 +154,80 @@ def test_labels_after_profile_url_fill_candidate_detail() -> None:
     assert candidate["why_fit"] == ["REDACTED FIT EVIDENCE"]
 
 
+def test_real_report_candidate_sections_fill_name_profile_facts_but_not_legacy_score() -> None:
+    contract = load_evidence_contract(CONTRACT_PATH)
+    body = """
+      [P1-1] jangheon kim — 85점
+      - URL: https://www.linkedin.com/talent/profile/redacted-a
+      - 학력: 한국산업기술대학교 (전공·학위 확인 필요)
+      - 경력: SICK Korea 2023.05~현재 / TOX Korea 2018.11~2023.05 /
+      Festo Automotive Tier1 KAM 2014.04~2018.11
+      - 추천 이유: 완성차·Tier1 라인 영업 12년 이상 / 수치로 확인되는 수주 실적
+      - 검증 질문: 영어 업무 수준은?
+
+      [P1-2] Dongwoo Kim — 81점
+      - URL: https://www.linkedin.com/talent/profile/redacted-b
+      - 학력: 동아대 기계공학 학사(2002), 부산대 MBA(2020~22)
+      - 경력: KUKA 14년 / TOX Korea V. Managing Director
+      - 추천 이유: 로봇 제조사에서 영업·PM·CS를 모두 경험
+    """
+
+    payload = build_ai_search_payload_from_gmail_snapshot(
+        _snapshot(
+            _message(
+                "gmail-real",
+                "[AIsearch-Grokbot] ABB Robotics Korea 4개 포지션 정밀 소싱 결과",
+                body,
+            )
+        ),
+        contract,
+    )
+
+    candidates = payload["batches"][0]["candidates"]
+    assert [candidate["display_name"] for candidate in candidates] == [
+        "jangheon kim",
+        "Dongwoo Kim",
+    ]
+    assert candidates[0]["education"] == "한국산업기술대학교 (전공·학위 확인 필요)"
+    assert candidates[0]["experience"] == (
+        "SICK Korea 2023.05~현재 / TOX Korea 2018.11~2023.05 / "
+        "Festo Automotive Tier1 KAM 2014.04~2018.11"
+    )
+    assert candidates[0]["why_fit"] == [
+        "완성차·Tier1 라인 영업 12년 이상 / 수치로 확인되는 수주 실적"
+    ]
+    assert candidates[0]["score"] is None
+    assert candidates[0]["score_reason"] == "score_contract_evidence_missing"
+
+
+def test_candidate_evaluation_heading_supplies_name_and_recent_experience() -> None:
+    contract = load_evidence_contract(CONTRACT_PATH)
+    body = """
+      <h3>후보 평가 — HanYul Jung(정한얼)</h3>
+      <p><strong>최근 경력:</strong> SOCAR Data Analyst, Product DA 약 1.5년</p>
+      <p><strong>학력:</strong> 한양대학교(2014–2020)</p>
+      <p><strong>적합점:</strong> 준실험·DID/CUPED·A/B와 퍼널 분석</p>
+      <p><strong>Source:</strong> <a href="https://kr.linkedin.com/in/hanyul-jung">프로필</a></p>
+    """
+
+    payload = build_ai_search_payload_from_gmail_snapshot(
+        _snapshot(
+            _message(
+                "gmail-real",
+                "[ChatGPT-AISearch] [aisearch] 고객사 Data Analyst — 후보 판정",
+                body,
+            )
+        ),
+        contract,
+    )
+
+    candidate = payload["batches"][0]["candidates"][0]
+    assert candidate["display_name"] == "HanYul Jung(정한얼)"
+    assert candidate["experience"] == "SOCAR Data Analyst, Product DA 약 1.5년"
+    assert candidate["education"] == "한양대학교(2014–2020)"
+    assert candidate["why_fit"] == ["준실험·DID/CUPED·A/B와 퍼널 분석"]
+
+
 def test_named_candidate_heading_prevents_cross_candidate_evidence_leak() -> None:
     contract = load_evidence_contract(CONTRACT_PATH)
     body = """
