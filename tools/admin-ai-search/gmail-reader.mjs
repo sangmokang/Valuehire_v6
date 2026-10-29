@@ -2,6 +2,7 @@
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createInterface } from 'node:readline';
+import { readTransport } from './read-transport.mjs';
 
 const hostApp = process.env.AI_SEARCH_HOST_APP;
 if (!hostApp) throw new Error('AI_SEARCH_HOST_APP is required');
@@ -9,7 +10,7 @@ process.loadEnvFile(path.join(hostApp, '.env.local'));
 const moduleUrl = (file) => pathToFileURL(path.join(hostApp, 'tools/gmail-resume-clickup-match', file));
 const { gmailDependencies } = await import(moduleUrl('backfill-ingestion.mjs'));
 const { resolveGmailMemberAccounts } = await import(moduleUrl('lib/gmail-accounts.mjs'));
-const deps = gmailDependencies(fetch, 30000);
+const deps = gmailDependencies(readTransport, 30000);
 const account = resolveGmailMemberAccounts().find(a => a.email === process.env.AI_SEARCH_MAILBOX);
 if (!account) throw new Error('Configured mailbox not found in existing Gmail account registry');
 let token, tokenAt = 0, retries = 0;
@@ -36,7 +37,7 @@ async function readApi(resource, query = {}) {
   return retry(async () => {
     const url = new URL(`https://gmail.googleapis.com/gmail/v1/users/me/${resource}`);
     for (const [key, value] of Object.entries(query)) if (value !== null) url.searchParams.set(key, value);
-    const response = await fetch(url, { headers: { authorization: `Bearer ${await accessToken()}` }, signal: AbortSignal.timeout(30000) });
+    const response = await readTransport(url, { headers: { authorization: `Bearer ${await accessToken()}` }, signal: AbortSignal.timeout(30000) });
     if (!response.ok) {
       const error = new Error(`Gmail GET failed: HTTP ${response.status}`);
       error.status = response.status;
