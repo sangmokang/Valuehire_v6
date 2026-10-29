@@ -1,6 +1,49 @@
 # AI Search 관리자 증거 계약 (SOT)
 
-최종 갱신: 2026-10-29
+최종 갱신: 2026-10-30
+
+## 현재 제품 계약 — 기존 관리자 모듈 v2
+
+현재 제품은 기존 관리자 앱의 `/admin/ai-search-weekly` 및 `/api/admin/ai-search/*`다.
+기존 관리자 세션·내부 권한 검사를 재사용하며 로컬과 preview에서도 익명 접근을 허용하지 않는다.
+아래의 `/ai-search` shadow 계약과 2026-10-29 수치는 이력이다. 현재 집계 기준은 본 절과
+[실제 통합 명세](../engineering/admin-ai-search-native-spec-2026-10-30.md)가 우선한다.
+
+- Gmail Inbox 전체와 현재 계정에서 확인한 `02aisearch` 라벨 전체의 **합집합**을 message ID로
+  중복 제거한다. Sent 전체는 별도 컨택 근거 범위다. ID·메타데이터·본문을 끝까지 읽으며
+  마지막 토큰이 없는 체크포인트만 수집 완료다. 중간 페이지 ID를 먼저 저장해 재개한다.
+- 원본 MIME는 비공개 수집 저장소에 보존한다. DB에는 메일·첨부·실행·포지션·후보·평가·구성점수·
+  컨택·근거·검토·체크포인트를 분리한다. 공개 정적 JSON과 클라이언트 자격증명을 금지한다.
+- 내부 Batch ID는 영구다. 확정은 `W44-01`, provisional은 `W44-P01`이다. `(week_year,
+  week_number, sequence)`와 provisional 예약을 DB에서 유일하게 보장한다. 확정 전환에도 내부 ID와
+  과거 표시번호를 보존하고 번호를 재사용하지 않는다. 도착시각 근접만으로 실행을 합치지 않는다.
+- 실행시각을 찾지 못하면 `received_at_fallback`과 사유를 표시한다. 명시적 run ID 또는 정확한
+  실행시각·실행 완료 근거가 없는 묶음은 provisional이다. 과거 일자 기반 shadow 묶음을 승격하지 않는다.
+- 주차는 Asia/Seoul 일요일 00:00 이상~다음 일요일 00:00 미만이다. 표시 W번호는 기존 주간 회의
+  ISO 라벨을 재사용한다. 따라서 `2026 W44`는 `10.18~10.24`다. 실제 기간을 항상 함께 표시한다.
+- 기본 행은 `(week_id, canonical_candidate_id, position_id)`다. 모든 Batch와 과거 평가를 별도로
+  보존한다. 현재 parser version과 일치하는 PROCESSED 원문 해석만 현재 집계에 사용한다.
+- Saramin `res_idx`, Jobkorea `rNo`, LinkedIn public/Recruiter 식별자를 보존한다. 이름이나 서로 다른
+  채널만으로 병합하지 않는다. 프로필 링크는 http/https만 허용한다.
+- 검증 점수는 40/40/10/10 계약의 네 구성 점수와 근거가 모두 있을 때만 계산한다. 메일 원본 점수는
+  별도 필드다. 구성 점수가 없으면 NOT_RUN이며 역산하지 않는다.
+- 고점수 기준은 `contracts/admin-ai-search/evidence-contract-v1.json`의 `weekly_contract`가 소유한다.
+  기존 `90_plus` 구간의 하한 90을 v2 기준으로 명시했다. 화면·SQL은 저장된 설정을 읽는다.
+- 각 후보+포지션의 SARAMIN / JOBKOREA / LINKEDIN / GMAIL 상태는 독립적이다. 허용 상태는
+  CONTACTED / REPLIED / CONFIRMED_NOT_CONTACTED / NOT_RUN / REVIEW_REQUIRED / FAILED다.
+  부재만으로 미발송을 확정하지 않는다. 후보 식별자·포지션·조회 범위·pagination 종료·확인시각·근거가
+  있어야 음성 증거가 된다. 시각이 잘못되거나 미발송과 발송 근거가 상충하면 검토 대기다.
+- Grok 등의 Gmail 총계 보고서는 원문과 reported totals로 보존한다. 총계를 후보에게 나누어 귀속하지
+  않는다. 개별 근거가 연결되지 않은 발송은 review queue다. 주간 활동과 누적 상태를 구분한다.
+- 고점수 미컨택자는 점수 PASS·기준 이상·필요 네 채널 확인 완료·양성 컨택 없음·미연결 발송 없음일
+  때만 확정한다. 불완전한 점수·컨택·후보 해석은 0으로 표시하지 않는다. 관찰된 후보 수는 별도다.
+- 이 모듈의 외부 효과는 Gmail/채용사이트 읽기 전용과 모듈 테이블 upsert뿐이다. 발송·라벨 변경·보관·
+  삭제·채용사이트 수정은 금지한다. 배포와 머지는 현재 작업 범위에 없다.
+
+## 과거 shadow 계약 — 호환성 및 감사 이력
+
+아래는 초기 로컬 증거 화면의 계약을 보존한 것이다. 현재 제품 경로·행 정체성·수집 기준·수치는 위
+v2 계약으로 대체된다. 과거 숫자는 현재 DB 기본값이나 정답이 아니다.
 
 이 문서는 `/ai-search` 관리자 화면과 `/api/ai-search`가 무엇을 사실로 표시할 수 있는지 정한다.
 AI Search 실행 절차 자체가 아니라, Gmail에서 이미 생성된 결과와 보낸편지를 읽어 운영자가 검증하는
