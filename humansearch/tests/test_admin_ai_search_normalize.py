@@ -53,3 +53,12 @@ def test_sections_keep_two_positions_and_evaluations_for_one_candidate(tmp_path:
     evaluations = registry.documents("candidate_position_evaluations")
     assert {e["source_reported_score"] for e in evaluations} == {97, 82}
     assert len({e["position_id"] for e in evaluations}) == 2
+
+
+def test_explicit_execution_time_is_separate_from_received_time(tmp_path: Path) -> None:
+    registry = Registry(tmp_path / "private.sqlite")
+    normalize_message(registry, message("timed", "실행시각: 2026-10-18T00:05:00+09:00\nhttps://linkedin.com/in/a"), CONTRACT)
+    batch = registry.documents("batches")[0]
+    assert batch["executed_at"] == "2026-10-17T15:05:00+00:00"
+    assert batch["executed_at"] != batch["received_at"]
+    assert batch["execution_time_source"] == "explicit_source_timestamp"
