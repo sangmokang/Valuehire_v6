@@ -80,3 +80,14 @@ def test_fractional_source_score_is_preserved_without_becoming_verified(tmp_path
     assert row["source_reported_score"] == 97.5
     assert row["score_status"] == "NOT_RUN"
     assert row["score"] is None
+
+
+def test_exact_execution_timestamp_and_completion_is_execution_evidence(tmp_path: Path) -> None:
+    store = Registry(tmp_path / "private.sqlite")
+    body = "실행시각: 2026-10-18T09:00:00+09:00\n서치 완료\nhttps://linkedin.com/in/a"
+    normalize_message(store, message("one", body), CONTRACT)
+    normalize_message(store, message("two", body), CONTRACT)
+    rows = store.db.execute("SELECT grouping_status,display_number FROM batches").fetchall()
+    assert [tuple(row) for row in rows] == [("CONFIRMED", "W44-01")]
+    normalize_message(store, message("another", body.replace("09:00", "09:01")), CONTRACT)
+    assert len(store.documents("batches")) == 2
