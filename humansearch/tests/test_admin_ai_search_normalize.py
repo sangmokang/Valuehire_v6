@@ -71,3 +71,12 @@ def test_source_score_does_not_cross_the_next_candidate_boundary(tmp_path: Path)
     assert {r["profile_url"]: r["source_reported_score"] for r in rows} == {
         "https://linkedin.com/in/a": 97, "https://linkedin.com/in/b": None,
     }
+
+
+def test_fractional_source_score_is_preserved_without_becoming_verified(tmp_path: Path) -> None:
+    store = Registry(tmp_path / "private.sqlite")
+    normalize_message(store, message("fraction", "https://linkedin.com/in/a\n메일 점수: 97.5"), CONTRACT)
+    row = store.documents("candidate_position_evaluations")[0]
+    assert row["source_reported_score"] == 97.5
+    assert row["score_status"] == "NOT_RUN"
+    assert row["score"] is None
