@@ -21,7 +21,7 @@ INSERT INTO public.admin_ai_search_collection_runs VALUES('fixture-run','{"id":"
 INSERT INTO public.admin_ai_search_source_messages VALUES('fixture-message','{"id":"fixture-message","parser_version":"fixture-new","processing_status":"PROCESSED"}');
 INSERT INTO public.admin_ai_search_positions VALUES('fixture-position','{"id":"fixture-position","company":"Fixture Client","title":"Fixture Engineer","status":"PASS"}');
 SELECT public.admin_ai_search_register_batch('{"id":"fixture-batch","week_year":2000,"week_number":44,"grouping_status":"CONFIRMED","document":{"id":"fixture-batch","week_id":"2000-W44","actor":"GROK"}}');
-INSERT INTO public.admin_ai_search_batch_source_messages VALUES('fixture-batch-source','{"id":"fixture-batch-source","batch_id":"fixture-batch","source_message_id":"fixture-message","position_id":"fixture-position","raw":0,"parsed":0,"duplicate":0,"unparsed":0,"excluded":0,"counts_status":"PASS"}');
+INSERT INTO public.admin_ai_search_batch_source_messages VALUES('fixture-batch-source','{"id":"fixture-batch-source","batch_id":"fixture-batch","source_message_id":"fixture-message","position_id":"fixture-position","raw":0,"parsed":0,"duplicate":0,"unparsed":0,"excluded":0,"counts_status":"PASS","parser_version":"fixture-new"}');
 DO $$ DECLARE response jsonb; BEGIN
   response:=public.admin_ai_search_read('weekly','{"week":"2000-W44"}');
   IF response->'summary'->>'batches'<>'1' OR response->'summary'->>'positions'<>'1' OR response->'summary'->>'candidates'<>'0' THEN
@@ -45,6 +45,16 @@ DO $$ DECLARE response jsonb; BEGIN
   END IF;
   response:=public.admin_ai_search_read('weekly','{"week":"2000-W44","contact_status":"NOT_RUN","channel":"LINKEDIN"}');
   IF response->>'total'<>'1' THEN RAISE EXCEPTION 'unverified channel filter incorrect'; END IF;
+END $$;
+INSERT INTO public.admin_ai_search_source_messages VALUES('fixture-other-message','{"id":"fixture-other-message","parser_version":"fixture-new","processing_status":"PROCESSED"}');
+SELECT public.admin_ai_search_register_batch('{"id":"fixture-other-batch","week_year":2000,"week_number":44,"grouping_status":"CONFIRMED","document":{"id":"fixture-other-batch","week_id":"2000-W44","actor":"CHATGPT"}}');
+INSERT INTO public.admin_ai_search_batch_source_messages VALUES('fixture-other-source','{"id":"fixture-other-source","batch_id":"fixture-other-batch","source_message_id":"fixture-other-message","position_id":"fixture-position","raw":1,"parsed":1,"duplicate":0,"unparsed":0,"excluded":0,"counts_status":"PASS","parser_version":"fixture-new"}');
+INSERT INTO public.admin_ai_search_candidate_position_evaluations VALUES('fixture-other-eval','{"id":"fixture-other-eval","candidate_id":"fixture-candidate","position_id":"fixture-position","batch_id":"fixture-other-batch","source_message_id":"fixture-other-message","week_id":"2000-W44","score_status":"NOT_RUN","score":null,"candidate_name":"Fixture Candidate","evaluated_at":"2000-10-23T00:00:00+09:00","evaluation_version":"fixture-new"}');
+DO $$ DECLARE response jsonb; BEGIN
+  response:=public.admin_ai_search_read('weekly','{"week":"2000-W44","actor":"GROK"}');
+  IF response->'rows'->0->'evaluation'->>'id'<>'fixture-eval' OR jsonb_array_length(response->'rows'->0->'batches')<>1 THEN
+    RAISE EXCEPTION 'AI filter used an evaluation or batch outside its scope';
+  END IF;
 END $$;
 ROLLBACK;
 SELECT 'number identity, row merging, zero-candidate batch, filters, fail-closed scores, RLS: PASS' AS runtime_checks;
