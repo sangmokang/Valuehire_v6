@@ -69,6 +69,8 @@ def test_failed_page_resumes_checkpoint_instead_of_claiming_success(tmp_path: Pa
     assert resumed["status"] == "SUCCEEDED"
     assert mailbox.requests == [("INBOX", "page-2")]
     assert resumed["union_count"] == 4
+    assert resumed["errors"][0]["message"] == "temporary read failure"
+    assert resumed["attempt_count"] == 2
 
 
 def test_missing_live_label_fails_closed(tmp_path: Path) -> None:
