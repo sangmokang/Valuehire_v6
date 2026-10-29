@@ -56,6 +56,32 @@ DO $$ DECLARE response jsonb; BEGIN
     RAISE EXCEPTION 'AI filter used an evaluation or batch outside its scope';
   END IF;
 END $$;
+-- Negative checks from before the operating week do not establish current absence.
+UPDATE public.admin_ai_search_review_queue SET document=document||'{"status":"RESOLVED"}';
+INSERT INTO public.admin_ai_search_settings VALUES('contract','{"high_score_threshold":90}')
+  ON CONFLICT(id) DO UPDATE SET document=excluded.document;
+UPDATE public.admin_ai_search_candidate_position_evaluations SET document=document||
+  '{"score_status":"PASS","score":95,"score_input_hash":"fixture-hash","score_components":{"education":95,"job_fit":95,"difficult_work":95,"job_description_logic":95}}'
+  WHERE id='fixture-eval';
+INSERT INTO public.admin_ai_search_contact_events(id,document)
+SELECT 'fixture-negative-'||channel,jsonb_build_object('candidate_id','fixture-candidate','position_id','fixture-position',
+  'channel',channel,'actor','UNKNOWN','status','CONFIRMED_NOT_CONTACTED','checked_at','1999-01-01T00:00:00Z',
+  'pagination_exhausted',true,'scope',jsonb_build_object('complete_for_candidate_position',true),
+  'evidence_reference','fixture:full-history') FROM unnest(ARRAY['SARAMIN','JOBKOREA','LINKEDIN','GMAIL']) channel;
+DO $$ DECLARE response jsonb; BEGIN
+  response:=public.admin_ai_search_read('high-score-uncontacted','{"week":"2000-W44","actor":"GROK"}');
+  IF response->>'total'<>'0' OR response->'summary'->'high_score_uncontacted'<>'null'::jsonb THEN
+    RAISE EXCEPTION 'stale negative checks became a confirmed uncontacted candidate';
+  END IF;
+END $$;
+UPDATE public.admin_ai_search_contact_events SET document=document||'{"checked_at":"2001-01-01T00:00:00Z"}'
+  WHERE id LIKE 'fixture-negative-%';
+DO $$ DECLARE response jsonb; BEGIN
+  response:=public.admin_ai_search_read('high-score-uncontacted','{"week":"2000-W44","actor":"GROK"}');
+  IF response->>'total'<>'1' OR response->'summary'->>'high_score_uncontacted'<>'1' THEN
+    RAISE EXCEPTION 'fully proven high-score uncontacted candidate was lost';
+  END IF;
+END $$;
 UPDATE public.admin_ai_search_batch_source_messages SET document=document||'{"counts_status":"NOT_RUN","unparsed":1}' WHERE id='fixture-batch-source';
 DO $$ DECLARE response jsonb; BEGIN
   response:=public.admin_ai_search_read('weekly','{"week":"2000-W44","actor":"GROK"}');
