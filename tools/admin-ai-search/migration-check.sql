@@ -15,6 +15,10 @@ DO $$ DECLARE a jsonb; b jsonb; c jsonb; i integer; denied boolean:=false; BEGIN
     INSERT INTO public.admin_ai_search_batches VALUES('migration-test-legacy',2000,44,NULL,9,'CONFIRMED','W44-P09','{}');
     RAISE EXCEPTION 'batch without shared weekly number accepted';
   EXCEPTION WHEN not_null_violation OR check_violation THEN NULL; END;
+  BEGIN
+    INSERT INTO public.admin_ai_search_batches VALUES('migration-test-bad-label',2000,46,5,NULL,'PROVISIONAL','W46-P99','{}');
+    RAISE EXCEPTION 'display number not derived from the shared sequence accepted';
+  EXCEPTION WHEN check_violation THEN NULL; END;
   c:=public.admin_ai_search_register_batch('{"id":"migration-test-p4","week_year":2000,"week_number":44,"grouping_status":"PROVISIONAL","document":{"id":"migration-test-p4"}}');
   IF c->>'display_number'<>'W44-04' THEN RAISE EXCEPTION 'shared number skipped'; END IF;
   FOR i IN 6..100 LOOP

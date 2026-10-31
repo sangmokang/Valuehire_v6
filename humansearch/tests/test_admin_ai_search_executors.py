@@ -173,3 +173,17 @@ def test_company_names_that_start_with_a_tool_name_are_not_executors(subject: st
 def test_hyphenated_claude_code_token_never_becomes_customer() -> None:
     assert classify_actor("[aisearch] claude-code 번개 리드", OWNER)[0] == "CLAUDE_CODE"
     assert subject_context("[aisearch] claude-code 번개 리드") == ("번개", "리드")
+
+
+@pytest.mark.parametrize("subject", [
+    "[aisearch] Aside-Korea 백엔드", "[aisearch] Codex-랩 엔지니어",
+    "[aisearch] Grok_Labs 리드", "[aisearch-codexis] 번개 리드",
+])
+def test_joined_names_with_unknown_parts_are_not_executors(subject: str) -> None:
+    assert classify_actor(subject, OWNER) == ("AI_SEARCH", "subject_marker:ai_search")
+
+
+@pytest.mark.parametrize("subject", ["[aisearch] codex: 번개 리드", "[aisearch] Codex, 번개 리드"])
+def test_executor_token_punctuation_is_ignored(subject: str) -> None:
+    assert classify_actor(subject, OWNER) == ("CODEX", "subject_marker:codex")
+    assert subject_context(subject) == ("번개", "리드")
