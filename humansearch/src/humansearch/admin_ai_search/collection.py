@@ -97,6 +97,7 @@ def collect_mailbox(
     store: CollectionStore, reader: GmailReader, *, run_id: str | None = None,
     include_sent: bool = False,
     refresh_since_start: bool = False,
+    incremental: bool = False,
 ) -> dict[str, Any]:
     """Inbox UNION the live label, never a keyword-limited intersection.
 
@@ -107,10 +108,35 @@ def collect_mailbox(
     existing = store.db.execute(
         "SELECT document FROM collection_runs WHERE id=?", (run_id,)
     ).fetchone()
+    baseline = None
+    if incremental and not existing:
+        required = {"INBOX", "02aisearch", *({"SENT"} if include_sent else set())}
+        completed = [json.loads(row[0]) for row in store.db.execute(
+            "SELECT document FROM collection_runs WHERE json_extract(document,'$.status')='SUCCEEDED'")]
+        eligible = [r for r in completed if required <= r["scopes"].keys()
+                    and all(s["exhausted"] for s in r["scopes"].values())]
+        if not eligible:
+            raise ValueError("incremental collection requires a complete baseline for every scope")
+        baseline = max(eligible, key=lambda r: r["started_at"])
     run = json.loads(existing[0]) if existing else {
         "id": run_id, "started_at": now(), "last_success_at": None,
         "retry_count": 0, "scopes": {},
     }
+    if existing and incremental != bool(run.get("incremental_since")):
+        raise ValueError("resumed collection mode differs from its checkpoint")
+    saved_scopes = set(run["scopes"]) | {row[0] for row in store.db.execute(
+        "SELECT scope FROM collection_checkpoints WHERE run_id=?", (run_id,))}
+    if run.get("active_scope"):
+        saved_scopes.add(run["active_scope"])
+    if existing and include_sent != run.get("include_sent", "SENT" in saved_scopes):
+        raise ValueError("resumed collection scope differs from its checkpoint")
+    if (existing and not refresh_since_start
+            and run.get("refresh_since_start", any(s.endswith("_DELTA") for s in saved_scopes))):
+        raise ValueError("resumed collection refresh scope differs from its checkpoint")
+    run["include_sent"] = include_sent
+    run["refresh_since_start"] = refresh_since_start
+    if baseline:
+        run.update(parent_run_id=baseline["id"], incremental_since=baseline["started_at"])
     run.update(status="RUNNING", finished_at=None, error=None)
     run.pop("error_type", None)
     run.setdefault("errors", [])
@@ -132,11 +158,14 @@ def collect_mailbox(
             state = store.checkpoint(run_id, scope)
             if state.get("label_id", label_id) != label_id:
                 raise ValueError("live label identity changed during resumed collection")
-            query = (f"after:{int(datetime.fromisoformat(run['started_at']).timestamp())}"
-                     if scope.endswith("_DELTA") and not scope.startswith("02aisearch") else None)
+            since = run.get("incremental_since")
+            if scope.endswith("_DELTA"):
+                since = run["started_at"]
+            query = (f"after:{int(datetime.fromisoformat(since).timestamp())}"
+                     if since and not scope.startswith("02aisearch") else None)
             state.update(label_id=label_id, query=query)
             while not state["exhausted"]:
-                _collect_page(store, reader, run_id, scope, state)
+                _collect_page(store, reader, run_id, scope, state, reuse_cached=incremental)
                 run["scopes"][scope] = state
                 run["retry_count"] = retry_base + int(getattr(reader, "retry_count", 0))
                 store.save_run(run)
@@ -182,6 +211,7 @@ def collect_mailbox(
 
 def _collect_page(
     store: CollectionStore, reader: GmailReader, run_id: str, scope: str, state: dict[str, Any],
+    *, reuse_cached: bool = False,
 ) -> None:
     token = state["next_page_token"]
     pending = state.get("pending_page")
@@ -200,6 +230,15 @@ def _collect_page(
         ).fetchone() is None]
         if not fresh:
             continue
+        if reuse_cached:
+            for identity in fresh.copy():
+                saved = store.db.execute("SELECT document FROM source_messages WHERE id=?",
+                                         (identity,)).fetchone()
+                if saved and json.loads(saved[0]).get("collection_status") != "FAILED":
+                    store.upsert(run_id, json.loads(saved[0]))
+                    fresh.remove(identity)
+            if not fresh:
+                continue
         messages = reader.request("messages", {"ids": fresh})
         if not isinstance(messages, list) or [m.get("id") for m in messages] != fresh:
             raise ValueError("Gmail body response IDs differ from requested IDs")

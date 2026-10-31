@@ -141,7 +141,7 @@ HTML 표, 첨부, 테스트, 후보 0명, 과거 parser 실패 후 재처리, AI
 - pre-push 27개 검사 중 semantic mutation은 검사 중 문서가 변경돼 한 차례 실패했다. 변경 없이 재실행한
   semantic mutation **16 checks PASS**. 최종 정상 push에서 전체 **27개 검사 PASS**. 훅 우회 없이 기존 브랜치에 push했다.
 
-Playwright는 페이지 진입 전에 Chromium이 종료됐다. 실패 원문은 private `browser-validation.log`에 저장했다.
+2026-10-30 과거 검증에서는 페이지 진입 전에 Chromium이 종료됐다. 실패 원문은 private `browser-validation.log`에 저장했다.
 
 ```text
 browserType.launch: Target page, context or browser has been closed
@@ -150,7 +150,8 @@ Check failed: kr == KERN_SUCCESS.
 bootstrap_check_in org.chromium.Chromium.MachPortRendezvousServer: unknown error code (141)
 ```
 
-따라서 로그인 후 목록·Raw·고점수 모달·빈/오류·모바일 가로 스크롤의 **직접 브라우저 확인은 NOT_RUN**이다.
+따라서 당시 로그인 후 목록·Raw·고점수 모달·빈/오류·모바일 가로 스크롤의 **직접 브라우저 확인은 NOT_RUN**이었다.
+이번 직접 확인 결과는 §16에서 구분한다.
 정적 코드·API 테스트를 브라우저 성공으로 대체하지 않았다. 참고 사이트 열기도 도구 오류로 실패해 숫자·후보를 복제하지 않았다.
 
 ## 10. 외부 변경
@@ -219,8 +220,8 @@ PROCESSED 437 / EXCLUDED 79,400 / REVIEW_REQUIRED 20,248 / FAILED 0 — 처리 �
 - W44 실행 주체 Codex 필터 17행(요약 Codex 7), Batch 번호 `W44-88` 필터 14행 전부 해당 번호 포함.
 - 상세 Raw: 포지션별 평가·메일 원본 점수·계약 점수 구성 4개·Gmail 원문 링크·검토 대기 사유 표시.
 - 고점수 미컨택: 'NOT_RUN · 점수 또는 채널별 이력 확인이 완료되지 않았습니다.'
-- 390px 폭에서 페이지 가로 넘침이 있다. 기존 `/admin`, `/weekly`도 동일해 공통 사이드바 레이아웃 문제로
-  판단하고 이번 범위에서 고치지 않았다.
+- 이전 세션의 390px 확인에서는 페이지 가로 넘침이 있었다. 당시에는 공통 레이아웃 문제로 남겼다.
+  이번 후속에서는 이 페이지에 한정해 수정했고 §16에 실제 측정값을 남긴다.
 
 로컬 Google 로그인 콜백은 `127.0.0.1:8767`에서 세션을 발급했다. `localhost:8767`로 시작하면 운영
 로그인 화면으로 이동해 즉시 중단했다(운영 쪽 조작 0건).
@@ -235,3 +236,73 @@ PROCESSED 437 / EXCLUDED 79,400 / REVIEW_REQUIRED 20,248 / FAILED 0 — 처리 �
 - 남은 하 등급: 적재 실패 시 Batch보다 먼저 적재된 원문·포지션·후보 테이블은 남는다(번호 무관).
   본문 라벨이 `Codex (검증 완료)`처럼 부가어가 붙으면 OTHER로 보수 처리한다.
 - CI `verify`는 `suppressions.yaml` 억제 3건의 기한(2026-10-20) 경과로 실패한다. 지시대로 연장하지 않았다.
+
+## 16. 2026-10-31 후속 재개 — Gmail 증분과 실제 모바일 수정
+
+시작 HEAD f509ca98dd1248c988acc10b1dbb02f279acf8c8. 위 §1~15의 수치는 이전 세션 이력이다.
+기존 관리자와 사용자 변경을 비교한 뒤 같은 CSS/표시 수정만 반영했다. 호스트 migration에 누락됐던
+표시번호 CHECK 한 줄을 PR의 migration과 맞췄다. next-env.d.ts·메뉴 등 기존 사용자 변경은 보존했다.
+
+### 실제 새 수집과 정규화
+
+- 수집 run `incremental-20261031`, 마지막 성공 **2026-10-31 21:36:46 KST**.
+- Inbox/Sent query `after:1793279541`(이전 성공 run 시작시각), AI 라벨은 전체 ID 재확인.
+  Inbox 102 / 02aisearch 408 / Sent 27, 각 1페이지, 모두 마지막 토큰 없음.
+- 세 범위 ID 합집합 531. 새 본문 **128**, 정상 저장 본문 재사용 **403**, 본문 갱신 0.
+  도구명 검색 0, 기존 100,085건 전수 본문 재다운로드 0. 원문 총 **100,213**.
+- PROCESSED **449** / EXCLUDED **79,492** / REVIEW_REQUIRED **20,272** / FAILED **0**.
+  새 원문 128건은 12 / 92 / 24 / 0이며, 새 결과는 일반 AI Search·Grokbot·OTHER로 분류됐다.
+  Claude Code·Codex·ChatGPT·Aside도 같은 전 범위 수집/분류 경로를 유지한다. 이번 신규분이 없다고
+  과거 해당 도구 결과를 제외하지 않는다.
+- 파서 `.6`은 증분 run의 531건부터 적용했다. 나머지 저장 원문을 모두 재정규화하지 않았다.
+  맹그로브·코드잇·토트의 다중 고객사 제목을 단일 고객사로 확정하지 않는다. ABB Robotics Korea
+  라운드 보고는 회사 전체 이름을 보존하고 개별 포지션은 NOT_RUN이다. 일반 브리핑 제목을
+  고객사/포지션으로 분해하지 않는다. 세 실제 제목을 회귀 입력으로 사용했다.
+- 기존 **895**개 Batch의 내부 ID·표시번호 전부 보존. 총 **907**, 모두 provisional,
+  연도·주차·순번 중복 **0**. 과거 번호를 메우거나 다시 정렬하지 않았다.
+- 격리 로컬 PostgreSQL `127.0.0.1:6544` 적재 PASS. source/normalized 각각 100,213.
+
+### 실제 컨택 근거의 한계
+
+Gmail 이벤트는 **30**건이며 모두 후보+포지션 연결 대기다. 네 채널의 확정 양성/완전 음성은
+새로 입증하지 못했다. 사람인·잡코리아 응답 알림의 이름/수신자만으로 연결하지 않았다.
+비스텔리전스 보고의 발송 주장 **42**(사람인 6 / 잡코리아 36), 토트 보고의 사람인 발송 주장 2,
+두나무 보고의 LinkedIn 개별 컨택 주장은 원문 증거로 보존한다. 플랫폼 발송 reference 또는
+정확한 후보+포지션 연결이 부족해 검증 컨택 수로 승격하지 않는다. `sent_log.md` 언급만으로
+그 파일을 확인했다고 주장하지 않는다. 새로운 보고도 contact_evidence/review queue에 남긴다.
+지원하지 않는 새 보고 첨부(xlsx/markdown 4개)는 검토 대기다. 네 점수 축은 생성하지 않는다.
+
+### 이번 직접 브라우저 확인
+
+기존 CDP **127.0.0.1:9333**과 기존 로그인 세션을 사용했다. 전용 임시 탭만 사용 후 닫았고
+기존 창·탭·세션을 보존했다. 접속 URL은 **http://127.0.0.1:8767/admin/ai-search-weekly**.
+
+- 최근 4주 W45~W42와 실제 일~토 기간, W45 **718행**, 다음 페이지 **51~100**, 이전 이동.
+- W44 Codex 필터 **17행**, `W44-88` Batch 필터 **14행**, 전체 Batch/과거 번호 표시.
+- 상세 Raw의 포지션별 평가·메일 점수·네 구성 점수·전체 이력·검토 사유와 Gmail 링크 확인.
+- 네 독립 채널, LinkedIn/NOT_RUN 필터, 미확인 점수·고점수 미컨택 모달, 검색 빈 결과 확인.
+- 실제 정상 관리자 API 응답 **17건 200**. 오류 표시는 브라우저에서 의도적으로 503을 주입한
+  **통제 시나리오 1건**이며 실제 서버 장애였다고 주장하지 않는다. pageerror 0.
+- 390px: 문서 scrollWidth **375**, 표 clientWidth **326** / scrollWidth **2450**,
+  scrollLeft **400**. 페이지 전체 가로 넘침 없이 표 내부 가로 스크롤. 사이드바 접힘 높이 0.
+  CSS는 이 페이지를 포함한 shell에만 적용하고 기존 관리자 공통 소스는 수정하지 않았다.
+- 첫 시도는 DB 적재 도중 부분 상태를 읽었다. 이후 적재 성공 후 확인했다. 추가 자동 검증에서는
+  React 반영/전환 완료 전에 측정한 문제를 응답·geometry 대기로 교정했고, 통과한 시나리오는 반복하지 않았다.
+
+### 이번 변경 검증
+
+collection/정규화/컨택/실제 제목 focused **42 passed**, 재개·빈 ID 반례 수정 후 collection **13 passed**.
+ruff PASS, mypy strict **14 source files PASS**. 관리자 Vitest **21 passed / 3 files**.
+TypeScript는 기존 `.next/dev/types/app/weekly/page.ts:37`의 **TS2344 1건**이 현재 재현되며
+이번 변경 파일 오류는 없다. `bash verify.sh` PASS. 캐시 재사용을 끈 수동 mutant는 회귀 테스트가 차단했다.
+Claude CLI 적대검증은 미로그인 exit 1로 실행 불가였고, fresh Codex V1/V2로 대체한다.
+V1의 Sent 범위 추가 반례, V2의 pending refresh 누락·빈 run ID 전수 fallback을 각각
+임시 DB에서 RED로 재현한 뒤 최소 수정했다. 같은 범위/refresh 재개는 저장된 본문부터 복구한다.
+옵션 필드가 없던 기존 run도 checkpoint/active scope로 첫 pending delta를 감지하는 legacy 회귀를 통과했다.
+최종 fresh Codex V1/V2 PASS. V2는 collection/followup 31 tests와 임시 16개 중단·재개 사례를
+독립 확인했다. 별도 엔진의 검토를 실제 Gmail/브라우저 확인으로 확대해 주장하지 않는다.
+기존 suppressions.yaml 만료 3건은 그대로이며 만료일을 연장하지 않았다.
+필수 배송 게이트·교차 판정의 최종 결과는 기존 PR #140의 최신 본문에도 기록한다.
+
+외부 발송·Gmail/채용사이트 변경·프로덕션 DB 적용·merge/deploy는 수행하지 않았다.
+UI 구현·직접 브라우저 확인과 실제 전 채널 컨택/점수 근거 확보를 구분한다. 후자는 여전히 미완료다.

@@ -43,11 +43,14 @@ if __name__ == "__main__":
     parser.add_argument("--run-id")
     parser.add_argument("--include-sent", action="store_true")
     parser.add_argument("--refresh-since-start", action="store_true")
+    parser.add_argument("--incremental", action="store_true",
+                        help="Reuse the last complete run and cached MIME; read only new bodies")
     args = parser.parse_args()
     reader = ExistingGmailReader()
     try:
         run = collect_mailbox(CollectionStore(args.database), reader, run_id=args.run_id,
-                             include_sent=args.include_sent, refresh_since_start=args.refresh_since_start)
+                             include_sent=args.include_sent, refresh_since_start=args.refresh_since_start,
+                             incremental=args.incremental)
         # Counts only. No subjects, recipients, names or raw error text in logs.
         print(json.dumps({key: run[key] for key in (
             "id", "status", "union_count", "overlap_count", "new", "updated", "unchanged",

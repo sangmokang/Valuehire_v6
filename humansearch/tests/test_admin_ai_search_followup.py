@@ -19,6 +19,15 @@ REPO_ROOT = Path(__file__).parents[2]
 CONTRACT_PATH = REPO_ROOT / "contracts" / "admin-ai-search" / "evidence-contract-v1.json"
 
 
+def test_real_multi_customer_and_round_report_titles_do_not_invent_a_position() -> None:
+    assert subject_context("[AI Search] 맹그로브·코드잇·토트 백엔드 엔지니어 — 검색 결과 (2026-10-30)") == (
+        "NOT_RUN:company_not_parsed", "NOT_RUN:position_not_parsed")
+    assert subject_context("[AIsearch-Grokbot] ABB Robotics Korea 2차 서치 – 비자동차 FA·로봇 영업 결과 (2026-10-30)") == (
+        "ABB Robotics Korea", "NOT_RUN:position_not_parsed")
+    assert subject_context("[주간 지표] AI Search 실행 vs 실제 발송 — 최초 실행주 ~ W44") == (
+        "NOT_RUN:company_not_parsed", "NOT_RUN:position_not_parsed")
+
+
 def _message(message_id: str, subject: str, body: str) -> dict[str, object]:
     return {
         "id": message_id,

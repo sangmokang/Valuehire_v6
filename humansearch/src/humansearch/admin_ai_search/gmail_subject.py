@@ -117,7 +117,9 @@ def subject_context(subject: str) -> tuple[str, str]:
     subject_parts = _subject_parts(subject)
     if subject_parts is None:
         return _missing_context()
-    _, remainder = subject_parts
+    prefix, remainder = subject_parts
+    if "aisearch" not in prefix:
+        return _missing_context()
     remainder = _strip_actor_and_metadata(remainder)
 
     bracket_pair = re.search(r"\[([^\]]+)\]\s*\[([^\]]+)\]", remainder)
@@ -125,7 +127,12 @@ def subject_context(subject: str) -> tuple[str, str]:
         return bracket_pair.group(1).strip(), bracket_pair.group(2).strip()
 
     core = re.split(r"\s+(?:—|–|\|)\s+", remainder, maxsplit=1)[0].strip(" -·")
+    round_report = re.fullmatch(r"(.+?)\s+(?:\d+차\s+서치|\d+개\s+포지션.*)", core)
+    if round_report:
+        return round_report[1].strip(), "NOT_RUN:position_not_parsed"
     company, separator, position = core.partition(" ")
+    if re.search(r"[·/]", company):
+        return _missing_context()
     if not separator or not company.strip() or not position.strip():
         return _missing_context()
     return company.strip(), position.strip()

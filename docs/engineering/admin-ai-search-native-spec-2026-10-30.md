@@ -41,6 +41,10 @@ PYTHONPATH=humansearch/src humansearch/.venv/bin/python tools/admin-ai-search/lo
 ```
 
 `--refresh-since-start`는 같은 run의 마무리 delta를 추가한다. 신규 전수 수집은 새 run ID로 실행한다.
+후속 운영은 새 run ID와 `--incremental --include-sent`를 사용한다. 이전 성공 run의 시작시각을
+Inbox/Sent 경계로 재사용하고, AI 라벨 전체 ID에서 정상 MIME 캐시를 재사용한다. `--run-id`만 바꾸고
+증분 옵션을 생략하면 전수 수집이므로 후속 작업에 사용하지 않는다. 재개 시 Sent 범위 변경은 거부한다.
+정규화의 `--run-id`는 해당 수집 run에 기록된 원문만 처리한다. 파서 수정 시 관련 run부터 검증한다.
 정규화 캐시는 원문 checksum·parser version·AI 라벨 포함 여부를 모두 비교한다. 지원 가능한 첨부만
 기존 textify로 읽고, 나머지 형식과 미분류 메일은 review queue에 남긴다.
 실제 JSONB가 거부한 NUL은 DB 표현에서 `\\u0000`으로 표시하며 원본 MIME와 raw checksum은 유지한다.
@@ -68,7 +72,7 @@ Batch allocator는 DB transaction/advisory lock을 사용한다. 기존 ID를 �
 원문 HTML을 실행하지 않는다. 필터와 pagination은 바인딩한 JSON RPC 인자로 전달한다.
 상태 변경 API와 화면의 데이터 가져오기 버튼은 없다. 인증된 읽기 API도 private/no-store다.
 
-## 그록 컨택 보고 연결
+## 모든 실행 주체의 컨택 보고 연결
 
 자유 형식 총계는 contact_evidence.reported_totals와 원문을 보존하고 개별 후보에게 배분하지 않는다.
 정밀 보고는 아래 형식을 지원한다. 기존 메일이 이 형식이 아니라면 review queue에서 원문을 확인한다.
@@ -89,4 +93,5 @@ localhost RPC 어댑터는 실제 PostgreSQL을 service role로 읽으며 기존
 UID 501의 passwd 조회가 실패해 격리된 로컬 PostgreSQL 프로세스에만 사용자 조회 interpose를 적용했다.
 OS 계정·인증·프로덕션 DB는 변경하지 않았다. 이 임시 도구와 PII DB는 ignored artifacts 안에만 있다.
 
-브라우저 UI 실증, 실제 개별 채널 연락 이력 완료, 프로덕션 schema 적용·머지·배포는 완료로 보고하지 않는다.
+브라우저의 이번 직접 확인은 검증 보고 §16을 따른다. 실제 개별 채널 연락 이력 완료,
+프로덕션 schema 적용·머지·배포는 완료로 보고하지 않는다.

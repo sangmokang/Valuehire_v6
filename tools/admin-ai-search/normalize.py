@@ -16,7 +16,10 @@ import re
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--database", type=Path, required=True)
+parser.add_argument("--run-id", help="Normalize only messages observed in this collection run")
 args = parser.parse_args()
+if args.run_id is not None and not args.run_id.strip():
+    parser.error("--run-id must be non-empty")
 registry = Registry(args.database)
 registry.db.execute("CREATE TABLE IF NOT EXISTS normalized_sources (id TEXT PRIMARY KEY, checksum TEXT, document TEXT)")
 registry.db.commit()
@@ -29,7 +32,14 @@ for scope, encoded in registry.db.execute("SELECT scope,document FROM collection
     label_ids.update(found)
     if scope == "02aisearch":
         original_label_ids.update(found)
-cursor = sqlite3.connect(args.database).execute("SELECT id,checksum,document FROM source_messages ORDER BY id")
+source_query = "SELECT id,checksum,document FROM source_messages"
+source_params = (args.run_id,) if args.run_id else ()
+if args.run_id:
+    if not registry.db.execute("SELECT 1 FROM collection_runs WHERE id=?", source_params).fetchone():
+        raise SystemExit("Collection run required")
+    source_query += " WHERE id IN (SELECT message_id FROM collection_run_messages WHERE run_id=?)"
+source_query += " ORDER BY id"
+cursor = sqlite3.connect(args.database).execute(source_query, source_params)
 for identity, checksum, encoded in cursor:
     old = registry.db.execute("SELECT checksum,document FROM normalized_sources WHERE id=?", (identity,)).fetchone()
     prior = json.loads(old[1]) if old else {}
@@ -60,7 +70,7 @@ for identity, checksum, encoded in cursor:
     counts[document["processing_status"]] += 1
 report_eligible = {row[0] for row in registry.db.execute(
     "SELECT id FROM normalized_sources WHERE json_extract(document,'$.processing_status')='PROCESSED'")}
-for encoded, in sqlite3.connect(args.database).execute("SELECT document FROM source_messages"):
+for _, _, encoded in sqlite3.connect(args.database).execute(source_query, source_params):
     raw = json.loads(encoded)
     subject = headers(raw).get("subject", "")
     if non_run_reason(subject):
@@ -93,7 +103,7 @@ for encoded, in sqlite3.connect(args.database).execute("SELECT document FROM sou
             found = [{"reported_count": int(match[1]), "source_label": match[0], "status": "REVIEW_REQUIRED"} for match in matches]
             if found:
                 totals[channel] = found
-        if totals or re.search(r"(?:컨택|발송).*(?:보고|집계|이력)", subject):
+        if totals or re.search(r"(?:컨택|발송|제안).*(?:보고|집계|이력|리포트)", subject):
             ingest_report(registry, raw["id"], {"text": text, "subject": subject, "totals": totals},
                           classify_actor(subject, headers(raw).get("from", ""), text))
 print(json.dumps(counts))
