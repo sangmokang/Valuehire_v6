@@ -187,3 +187,22 @@ def test_joined_names_with_unknown_parts_are_not_executors(subject: str) -> None
 def test_executor_token_punctuation_is_ignored(subject: str) -> None:
     assert classify_actor(subject, OWNER) == ("CODEX", "subject_marker:codex")
     assert subject_context(subject) == ("번개", "리드")
+
+
+@pytest.mark.parametrize(("subject", "expected", "context"), [
+    ("[aisearch] Claude Code: 번개 리드", "CLAUDE_CODE", ("번개", "리드")),
+    ("[aisearch] grok-4 모벤 기술영업", "GROK", ("모벤", "기술영업")),
+])
+def test_executor_variants_never_leak_into_customer(
+    subject: str, expected: str, context: tuple[str, str],
+) -> None:
+    assert classify_actor(subject, OWNER)[0] == expected
+    assert subject_context(subject) == context
+
+
+@pytest.mark.parametrize(("subject", "expected"), [
+    ("[ChatGPT AI Search 결과] 번개 리드", "CHATGPT"),
+    ("[Grok AISearch 결과] 번개 리드", "GROK"),
+])
+def test_prefix_tag_with_korean_suffix_keeps_executor(subject: str, expected: str) -> None:
+    assert classify_actor(subject, OWNER)[0] == expected

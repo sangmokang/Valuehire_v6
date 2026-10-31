@@ -28,3 +28,9 @@ def test_loader_numbers_legacy_rows_and_compares_before_publishing(tmp_path: Pat
     assert result.returncode != 0
     numbers = dict(sqlite3.connect(path).execute("SELECT id,display_number FROM batches").fetchall())
     assert numbers == {"a": "W45-01", "legacy": "W45-02"}
+
+
+def test_batch_registration_and_number_check_share_one_transaction() -> None:
+    source = LOADER.read_text()
+    batch_block = source[source.index("admin_ai_search_register_batch"):source.index("for table in TABLES:")]
+    assert "BEGIN" in batch_block and "RAISE EXCEPTION" in batch_block and "COMMIT" in batch_block
