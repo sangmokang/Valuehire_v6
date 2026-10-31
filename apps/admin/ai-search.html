@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <link rel="icon" href="data:,">
+    <title>AI Search 주간 후보·컨택 원장 · ValueHire</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/ai-search.js" defer></script>
+  </head>
+  <body data-mode="local-shadow" class="weekly-ai-search-page">
+    <header class="topbar weekly-ai-header">
+      <div>
+        <p class="environment">GMAIL 실데이터 · 읽기 전용</p>
+        <h1>AI Search 주간 후보·컨택 원장</h1>
+        <p class="lede">주차별 실행 Batch와 중복 제거 후보, AI·사람 직접 컨택을 표로 확인합니다.</p>
+        <a class="ai-search-link" href="/">← 전체 주간 현황</a>
+      </div>
+      <dl class="window-summary" aria-label="현재 자료 상태">
+        <div><dt>선택 주차</dt><dd id="selected-week">—</dd></div>
+        <div><dt>Gmail 수집</dt><dd id="collection-status">불러오는 중</dd></div>
+      </dl>
+    </header>
+
+    <main id="ai-search" aria-busy="true">
+      <section class="week-toolbar" aria-labelledby="week-toolbar-heading">
+        <div>
+          <label id="week-toolbar-heading" for="week-select">조회 주차</label>
+          <select id="week-select" disabled>
+            <option>주차를 불러오는 중입니다</option>
+          </select>
+        </div>
+        <p id="week-period">일요일부터 토요일까지의 실행과 발송을 한 주로 봅니다.</p>
+      </section>
+
+      <section class="weekly-fact-summary" aria-label="선택 주차 사실 집계">
+        <dl>
+          <div><dt>실행 Batch</dt><dd id="summary-batches">—</dd></div>
+          <div><dt>고유 후보</dt><dd id="summary-candidates">—</dd></div>
+          <div><dt>후보·포지션 행</dt><dd id="summary-rows">—</dd></div>
+          <div><dt>AI 제안 발송</dt><dd id="summary-ai-contact">—</dd></div>
+          <div><dt>사람 직접 발송</dt><dd id="summary-owner-contact">—</dd></div>
+          <div><dt>후보 연결 / 미연결</dt><dd id="summary-contact-link">—</dd></div>
+        </dl>
+      </section>
+
+      <section id="notice-state" class="evidence-notice" role="status" hidden>
+        <strong id="notice-title">확인이 필요한 자료가 있습니다.</strong>
+        <p id="notice-copy"></p>
+      </section>
+
+      <div class="sheet-tabs" role="tablist" aria-label="주간 원장 선택">
+        <button id="candidate-tab" type="button" role="tab" aria-selected="true" aria-controls="candidate-sheet">후보 서치 원장</button>
+        <button id="contact-tab" type="button" role="tab" aria-selected="false" aria-controls="contact-sheet">주간 컨택 원장</button>
+      </div>
+
+      <section id="candidate-sheet" class="weekly-sheet" role="tabpanel" aria-labelledby="candidate-tab">
+        <div class="sheet-heading">
+          <div>
+            <p class="section-kicker">한 행 = 한 Batch의 중복 제거 후보 1명</p>
+            <h2>후보 서치 원장</h2>
+          </div>
+          <label for="candidate-filter">표 안에서 찾기
+            <input id="candidate-filter" type="search" placeholder="고객사, 포지션, 후보자, AI 검색" autocomplete="off">
+          </label>
+        </div>
+        <p class="sheet-explanation">같은 후보가 여러 포지션 Batch에 검색되면 각 포지션 이력을 보존하기 위해 행이 나뉩니다. 주간 고유 후보 수는 위 집계에서 한 번만 셉니다.</p>
+        <div class="spreadsheet-wrap" tabindex="0" aria-label="주간 AI Search 후보 표, 가로 스크롤 가능">
+          <table class="spreadsheet candidate-sheet-table">
+            <thead>
+              <tr>
+                <th scope="col">실행 일시</th>
+                <th scope="col">고객사</th>
+                <th scope="col">포지션</th>
+                <th scope="col">검색 AI</th>
+                <th scope="col">후보자</th>
+                <th scope="col">프로필 URL</th>
+                <th scope="col">채널</th>
+                <th scope="col">학력</th>
+                <th scope="col">경력</th>
+                <th scope="col">점수</th>
+                <th scope="col">점수·적합 이유</th>
+                <th scope="col">주간 컨택</th>
+              </tr>
+            </thead>
+            <tbody id="candidate-rows"></tbody>
+          </table>
+          <div id="candidate-empty" class="sheet-empty" hidden>
+            <strong>이 주차에 확인된 후보가 없습니다.</strong>
+            <p>수집이 끝나지 않은 경우에는 0명으로 판정하지 않고 확인 필요 상태를 표시합니다.</p>
+          </div>
+        </div>
+        <div class="sheet-footer">
+          <p id="candidate-row-count">후보 행을 불러오는 중입니다.</p>
+          <button id="candidate-more" type="button" hidden>200행 더 보기</button>
+        </div>
+      </section>
+
+      <section id="contact-sheet" class="weekly-sheet" role="tabpanel" aria-labelledby="contact-tab" hidden>
+        <div class="sheet-heading">
+          <div>
+            <p class="section-kicker">Gmail 보낸편지 · 후보 추정 연결 금지</p>
+            <h2>주간 컨택 원장</h2>
+          </div>
+        </div>
+        <p class="sheet-explanation">AI가 보낸 제안과 사람이 직접 보낸 제안을 분리합니다. 메일에 후보 프로필 URL이 없으면 실제 발송 건은 남기되 특정 후보에게 연결하지 않습니다.</p>
+        <div class="spreadsheet-wrap" tabindex="0" aria-label="주간 Gmail 컨택 표, 가로 스크롤 가능">
+          <table class="spreadsheet contact-sheet-table">
+            <thead>
+              <tr>
+                <th scope="col">발송 일시</th>
+                <th scope="col">발송 주체</th>
+                <th scope="col">제안 메일 제목</th>
+                <th scope="col">연결 후보</th>
+                <th scope="col">후보 연결 상태</th>
+                <th scope="col">Gmail 근거</th>
+              </tr>
+            </thead>
+            <tbody id="contact-rows"></tbody>
+          </table>
+          <div id="contact-empty" class="sheet-empty" hidden>
+            <strong>이 주차에 확인된 제안 발송이 없습니다.</strong>
+            <p>보낸편지 페이지 확인이 끝난 주차만 0건으로 판단합니다.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="error-state" class="sheet-error" role="alert" hidden>
+        <strong>AI Search 주간 원장을 불러오지 못했습니다.</strong>
+        <p id="error-reason">요청을 다시 시도해 주세요.</p>
+        <button id="retry-load" type="button">다시 불러오기</button>
+      </section>
+
+      <footer class="weekly-audit-footer" aria-label="외부 효과 확인">
+        <p id="load-state" role="status" aria-live="polite">Gmail 자료를 불러오는 중입니다.</p>
+        <dl>
+          <div><dt>외부 발송</dt><dd id="external-send-state">확인 중</dd></div>
+          <div><dt>원격 DB 쓰기</dt><dd id="remote-write-state">확인 중</dd></div>
+          <div><dt>기준 시간대</dt><dd>Asia/Seoul</dd></div>
+        </dl>
+      </footer>
+    </main>
+  </body>
+</html>

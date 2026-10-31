@@ -88,6 +88,27 @@ def test_snapshot_keeps_business_units_separate() -> None:
             position_id="position-2",
             candidate_key_hmac="b" * 64,
         ),
+        event(
+            collection="candidate_discoveries",
+            system="aisearch",
+            primary_key="known-position-1",
+            event_type="candidate_discovery_known_position",
+            position_id="position-1",
+        ),
+        event(
+            collection="candidate_discoveries",
+            system="aisearch",
+            primary_key="known-position-2",
+            event_type="candidate_discovery_known_position",
+            position_id="position-1",
+        ),
+        event(
+            collection="candidate_discoveries",
+            system="aisearch",
+            primary_key="known-position-3",
+            event_type="candidate_discovery_known_position",
+            position_id="position-2",
+        ),
         *[
             event(
                 collection="mail_events",

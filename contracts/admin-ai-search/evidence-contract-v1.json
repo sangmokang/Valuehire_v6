@@ -1,0 +1,60 @@
+{
+  "version": "admin-ai-search-evidence/v1",
+  "cadence": "DAILY",
+  "weekly_contract": {
+    "version": "admin-ai-search-weekly/v2",
+    "high_score_threshold": 90,
+    "high_score_basis": "existing_90_plus_score_band",
+    "required_contact_channels": ["SARAMIN", "JOBKOREA", "LINKEDIN", "GMAIL"],
+    "row_identity": ["week_id", "canonical_candidate", "position_id"]
+  },
+  "actors": {
+    "GROK": "Grokbot",
+    "CLAUDE_CODE": "Claude Code",
+    "CODEX": "Codex",
+    "CHATGPT": "ChatGPT",
+    "ASIDE": "Aside 브라우저",
+    "AI_SEARCH": "일반 AI Search",
+    "OTHER": "기타·검토 필요"
+  },
+  "score_bands": {
+    "90_plus": {"min": 90, "max": 100},
+    "80s": {"min": 80, "max": 89},
+    "70s": {"min": 70, "max": 79}
+  },
+  "score_contract": {
+    "version": "admin-ai-search-score/v2",
+    "weights": {
+      "education": 40,
+      "job_fit": 40,
+      "difficult_work": 10,
+      "job_description_logic": 10
+    }
+  },
+  "required_verification_sources": [
+    "SARAMIN_BILLING",
+    "SARAMIN_MESSENGER",
+    "JOBKOREA_POSITION",
+    "LINKEDIN_INMAIL"
+  ],
+  "source_urls": {
+    "gmail": "https://mail.google.com/",
+    "saramin_billing": "https://billing.saramin.co.kr/manage/8097387?svcAypdTgtNos=32464077",
+    "saramin_messenger": "https://www.saramin.co.kr/zf_user/messenger/?ut=c",
+    "jobkorea_position": "https://www.jobkorea.co.kr/corp/person/position",
+    "linkedin_inmail": "https://www.linkedin.com/talent/home"
+  },
+  "gmail_contact_actor_clients": {
+    "AI": ["77377267392"],
+    "OWNER": ["224054973946"],
+    "EXCLUDED": ["402185046281"]
+  },
+  "external_effects": {
+    "gmail": "READ_ONLY_NOT_CONNECTED",
+    "saramin": "READ_ONLY_NOT_CONNECTED",
+    "jobkorea": "READ_ONLY_NOT_CONNECTED",
+    "linkedin": "READ_ONLY_NOT_CONNECTED",
+    "database_writes": "DISABLED",
+    "outreach_sends": "DISABLED"
+  }
+}
