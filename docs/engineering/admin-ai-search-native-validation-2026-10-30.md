@@ -303,6 +303,9 @@ V1의 Sent 범위 추가 반례, V2의 pending refresh 누락·빈 run ID 전수
 독립 확인했다. 별도 엔진의 검토를 실제 Gmail/브라우저 확인으로 확대해 주장하지 않는다.
 기존 suppressions.yaml 만료 3건은 그대로이며 만료일을 연장하지 않았다.
 필수 배송 게이트·교차 판정의 최종 결과는 기존 PR #140의 최신 본문에도 기록한다.
+최초 pre-push에서 격리 mutation fixture의 normalize CLI 미복사와 기존 macOS UID501 조회 문제가
+드러났다. 실제 CLI를 fixture에 추가했고, PostgreSQL은 기존 artifacts/pg-bin wrapper를
+`PG_BINDIR`로 지정해 원래 검사를 실행했다(Invoice 8항목 PASS). 검사·assertion은 약화하지 않았다.
 
 외부 발송·Gmail/채용사이트 변경·프로덕션 DB 적용·merge/deploy는 수행하지 않았다.
 UI 구현·직접 브라우저 확인과 실제 전 채널 컨택/점수 근거 확보를 구분한다. 후자는 여전히 미완료다.

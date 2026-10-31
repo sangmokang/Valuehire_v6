@@ -65,6 +65,8 @@ cp docs/engineering/admin-ai-search-evidence-spec-2026-10-29.md \
 # The staging-number loader test executes the repository-level PostgreSQL loader.
 mkdir -p "$SANDBOX/tools/admin-ai-search"
 cp tools/admin-ai-search/load-postgres.py "$SANDBOX/tools/admin-ai-search/"
+# Run-scoped normalization tests execute the real CLI from this same repository boundary.
+cp tools/admin-ai-search/normalize.py "$SANDBOX/tools/admin-ai-search/"
 
 total=0
 blocked=0

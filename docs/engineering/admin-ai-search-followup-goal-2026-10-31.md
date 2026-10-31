@@ -95,3 +95,6 @@ strict:exit-gate script는 host package에 없으므로 존재 검사와 실제 
   active_scope까지 확인해 첫 pending delta가 성공으로 누락되지 않는다. legacy/현재 shape 회귀 모두 PASS.
 - 실제 수집/검증의 비공개 로그·스크린샷은 artifacts/*20261031*에 보존한다.
   상세 최신 수치는 기존 native-validation §16, 최종 배송 결과는 기존 PR/Issue 본문에 기록한다.
+- 배송 게이트 재현: HS mutation 사본에 새로 호출되는 normalize CLI가 없어 테스트가 잘못된
+  이유로 실패했다. 기존 fixture에 실제 CLI 한 파일을 더 복사한다. Invoice의 기존 UID501 조회
+  문제는 기존 PG_BINDIR wrapper로 검사 실행(8항목 PASS), OS·검사 의미는 바꾸지 않는다.
