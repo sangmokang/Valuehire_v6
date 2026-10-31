@@ -27,7 +27,7 @@ from .registry import Registry, operation_week
 from .scoring import source_reported_number
 from .weekly_view import _verified_candidate_name
 
-PARSER_VERSION = "admin-ai-search-normalizer/2026-10-31.1"
+PARSER_VERSION = "admin-ai-search-normalizer/2026-10-31.2"
 RUN_ID = re.compile(r"(?:run\s*id|실행\s*ID)\s*[:：#]\s*([\w.:-]{3,128})", re.IGNORECASE)
 SECTION = re.compile(r"^(?:(?:#+|\[\[VH_HEADING\]\])\s*)?고객사\s*[:：]\s*(.+?)\s*[/|·]\s*포지션\s*[:：]\s*(.+)$", re.MULTILINE)
 RELATED = re.compile(r"ai\s*[-_]?\s*search|ai\s*서치|후보.{0,12}(?:서치|검색)|grok.{0,15}컨택", re.IGNORECASE)

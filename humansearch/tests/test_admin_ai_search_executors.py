@@ -138,6 +138,7 @@ def test_spaced_claude_code_subject_marker_is_preserved(subject: str) -> None:
     ("executor: Codex\nexecutor: Aside\n", ("OTHER", "body_label_conflict")),
     ("실행 주체: Gemini\n", ("OTHER", "unsupported_body_label")),
     ("실행 주체: Cursor\n", ("OTHER", "unsupported_body_label")),
+    ("실행 주체: Gemini\n실행 주체: Cursor\n", ("OTHER", "unsupported_body_label")),
 ])
 def test_body_label_conflicts_or_unknown_tools_fail_closed(
     body: str, expected: tuple[str, str],

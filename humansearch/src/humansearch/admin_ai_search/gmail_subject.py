@@ -30,7 +30,7 @@ _MARKERS = (
     (re.compile(r"gemini"), "OTHER", "gemini"),
 )
 _BODY_LABEL = re.compile(
-    r"^\s*(?:[-*]\s*)?(?:실행\s*(?:주체|AI|도구)|executor)\s*[:：]\s*([^\s,/|]+)",
+    r"^\s*(?:[-*]\s*)?(?:실행\s*(?:주체|AI|도구)|executor)\s*[:：]\s*([^\n,/|(]+)",
     re.IGNORECASE | re.MULTILINE,
 )
 _OPENAI_TASK_SENDER = re.compile(r"<noreply@tm\.openai\.com>\s*$", re.IGNORECASE)
@@ -44,12 +44,19 @@ def classify_actor(subject: str, sender: str, body: str = "") -> tuple[str, str]
         return actor, reason
     if _OPENAI_TASK_SENDER.search(sender.strip()) is not None:
         return "CHATGPT", "sender:openai_chatgpt_task"
-    labels = {found for match in _BODY_LABEL.finditer(body)
-              if (found := _token_actor(match.group(1))) is not None}
-    if reason == "subject_marker:ai_search" and len(labels) == 1:
-        (label_actor, marker), = labels
-        if label_actor != "OTHER":
-            return label_actor, f"body_label:{marker}"
+    if reason != "subject_marker:ai_search":
+        return actor, reason
+    # Unknown labels stay in the set so conflicts and unsupported tools fail closed.
+    labels = {_token_actor(match.group(1)) or ("OTHER", "unknown")
+              for match in _BODY_LABEL.finditer(body)}
+    actors = {label[0] for label in labels}
+    if len(actors) > 1:
+        return "OTHER", "body_label_conflict"
+    if actors == {"OTHER"}:
+        return "OTHER", "unsupported_body_label"
+    if labels:
+        label_actor, marker = min(labels)
+        return label_actor, f"body_label:{marker}"
     return actor, reason
 
 
@@ -71,8 +78,10 @@ def _subject_actor(subject: str) -> tuple[str, str]:
     region = prefix.replace("aisearch", "", 1)
     if prefix == "aisearch":
         # Only the first token names the tool; later words may mention other tools.
-        first = _strip_metadata_tags(remainder.strip()).split("[", 1)[0].split()
-        region = re.sub(r"[\s_-]+", "", first[0].lower()) if first else ""
+        first = _strip_metadata_tags(remainder.strip()).split("[", 1)[0].lower().split()
+        region = re.sub(r"[_-]+", "", first[0]) if first else ""
+        if region == "claude" and first[1:2] == ["code"]:
+            region = "claudecode"
     markers = [(actor, marker) for pattern, actor, marker in _MARKERS if pattern.search(region)]
     if len(markers) > 1:
         return "OTHER", "actor_markers_conflict"
