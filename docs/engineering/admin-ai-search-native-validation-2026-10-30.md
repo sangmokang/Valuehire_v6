@@ -185,7 +185,7 @@ https://github.com/sangmokang/Valuehire_v6/pull/140 — 기존 브랜치·Draft�
 
 ## 15. 2026-10-31 후속 — 실행 주체 전체 분류와 주차 공통 Batch 번호
 
-Gmail을 다시 내려받지 않았다. 저장된 원문 100,085건을 parser `2026-10-31.2`로 재정규화했다(8분 58초,
+Gmail을 다시 내려받지 않았다. 저장된 원문 100,085건을 parser `2026-10-31.5`로 재정규화했다(7분 38초,
 PROCESSED 437 / EXCLUDED 79,400 / REVIEW_REQUIRED 20,248 / FAILED 0 — 처리 상태 수치는 이전과 동일).
 
 - 실행 주체: 제목 첫 실행 토큰 → 발신자(OpenAI 작업 알림) → 본문 `실행 주체:` 라벨 순으로 명시 근거만 쓴다.
@@ -198,8 +198,10 @@ PROCESSED 437 / EXCLUDED 79,400 / REVIEW_REQUIRED 20,248 / FAILED 0 — 처리 �
   유지한 채 한 번만 새 번호를 받았고 이전 번호는 `display_number_history`에 남았다(남은 P번호 0,
   연도+주차+순번 중복 0). 확정 Batch는 여전히 0이다. 과거 parser 해석의 비활성 Batch도 번호를
   보존하므로 활성 목록에는 빈 번호가 있다(예: W45-02).
-- SQLite 등록기와 PostgreSQL `admin_ai_search_register_batch`의 ID별 표시번호 비교 차이 0줄.
-  migration-check(공통 순번·확정 시 번호 유지·레거시 1회 전환·W45-100 무잘림) 및 runtime-check PASS.
+- PostgreSQL은 `sequence NOT NULL`이고 표시번호는 주차+순번에서 파생됨을 CHECK로 강제한다. 레거시 P 전환은
+  적재 전 SQLite 등록기에서만 한다. 적재기는 Batch 등록과 SQLite 표시번호 대조를 한 트랜잭션으로 수행하며
+  하나라도 다르면 Batch 쓰기 전체를 되돌린다(스크래치 DB에서 불일치 시 롤백 실증). 실데이터 895건 대조 통과,
+  migration-check(공통 순번·확정 시 번호 유지·NULL 순번 거부·W45-100 무잘림) 및 runtime-check PASS.
 - 주차별 실행 주체별 Batch(활성 원문 기준): W45 Grokbot 26 · ChatGPT 10 · 일반 7 · 기타 4 /
   W44 ChatGPT 73 · Aside 11 · Codex 7 · Claude Code 7 · Grokbot 4 · 일반 13 · 기타 5 /
   W43 ChatGPT 54 · Claude Code 23 · Codex 12 · 일반 3 · 기타 18 / W42 Claude Code 44 · Codex 12 · ChatGPT 1 · 기타 2.
@@ -225,8 +227,11 @@ PROCESSED 437 / EXCLUDED 79,400 / REVIEW_REQUIRED 20,248 / FAILED 0 — 처리 �
 
 ### 검증
 
-- HumanSearch pytest 324 passed, ruff PASS, mypy strict 27 source files PASS.
+- HumanSearch pytest 345 passed, ruff PASS, mypy strict 27 source files PASS.
 - 관리자 Vitest 17 passed(2 files). `tsc --noEmit`: AI Search 관련 오류 0. 단, dev 서버가 생성한
   기존 `/weekly` 페이지 타입에서 TS2344 1건이 나온다(이번에 수정하지 않은 기존 파일).
-- `bash verify.sh` PASS. Codex 적대 검증 V1: 결함 2건 지적 → RED→수정 후 회귀 테스트 통과.
+- `bash verify.sh` PASS. Codex 적대 검증 V1(needs-attention 2건) → 수정. 리셋 컨텍스트 V2는 3회 FAIL
+  (본문 다중 도구 라벨, PG NULL 제약, 적재 번호 대조·원자성, 부분 일치 토큰 등) → 매번 RED→수정, 4회차 PASS.
+- 남은 하 등급: 적재 실패 시 Batch보다 먼저 적재된 원문·포지션·후보 테이블은 남는다(번호 무관).
+  본문 라벨이 `Codex (검증 완료)`처럼 부가어가 붙으면 OTHER로 보수 처리한다.
 - CI `verify`는 `suppressions.yaml` 억제 3건의 기한(2026-10-20) 경과로 실패한다. 지시대로 연장하지 않았다.
