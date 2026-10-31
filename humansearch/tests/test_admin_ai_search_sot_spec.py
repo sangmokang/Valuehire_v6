@@ -22,7 +22,8 @@ def test_ai_search_admin_sot_and_spec_fix_the_owner_contract() -> None:
     assert "admin-ai-search-evidence.md" in index
     for required in (
         "raw = parsed + duplicate + unparsed + excluded",
-        "GROK | CLAUDE_CODE | CHATGPT | AI_SEARCH | OTHER",
+        "GROK | CLAUDE_CODE | CODEX | CHATGPT | ASIDE | AI_SEARCH | OTHER",
+        "W45-01",
         "학력 40%",
         "직무적합성 40%",
         "고난도 업무 10%",

@@ -9,13 +9,16 @@ type Batch = { id: string; display_number: string; grouping_status: string; docu
 type Contact = { channel: string; status: string; actor: string; checked_at?: string; sent_at?: string; replied_at?: string; evidence_url?: string; evidence_reference?: string; cumulative_count?: number; reason?: string };
 type Evaluation = Evidence & { candidate_name?: string; candidate_name_reason?: string; education?: string; experience?: string; key_experience?: string; profile_url?: string; score?: number; score_status: string; why_fit?: string[]; human_followup?: string; source_reported_score?: number; source_message_id: string };
 type Row = { candidate_id: string; position_id: string; week_id: string; company: string; position: string; evaluation: Evaluation; batches: Batch[]; contacts: Contact[]; weekly_contacts: Contact[]; confirmed_uncontacted?: boolean };
-type Weekly = { rows: Row[]; total: number; complete: boolean; summary: Record<string, number | string | null> };
+type Weekly = { rows: Row[]; total: number; complete: boolean; summary: Record<string, number | string | null | Record<string, number>> };
 type Week = { week_id: string; start_date: string; end_date: string };
 type Index = { weeks: Week[]; high_score_threshold: number | null };
 type Collection = { complete: boolean; run: { last_success_at?: string; scopes?: Record<string, { pages: number; exhausted: boolean; message_ids?: string[] }> } | null; review_count: number; failed_count: number };
 const CHANNELS = ['SARAMIN','JOBKOREA','LINKEDIN','GMAIL'] as const;
 const LABELS: Record<string,string> = { SARAMIN: '사람인', JOBKOREA: '잡코리아', LINKEDIN: 'LinkedIn', GMAIL: 'Gmail/JD', CONTACTED: '발송 확인', REPLIED: '회신 확인', CONFIRMED_NOT_CONTACTED: '미발송 확인', NOT_RUN: '확인 필요', REVIEW_REQUIRED: '연결 대기', FAILED: '조회 실패' };
 const API = '/api/admin/ai-search/';
+const EXECUTORS: Record<string,string> = { GROK: 'Grokbot', CLAUDE_CODE: 'Claude Code', CODEX: 'Codex', CHATGPT: 'ChatGPT', ASIDE: 'Aside 브라우저', AI_SEARCH: '일반 AI Search', OTHER: '기타·검토 필요' };
+const GROUPING: Record<string,string> = { CONFIRMED: '확정', PROVISIONAL: 'provisional · 실행 근거 부족' };
+function executor(actor: unknown) { return typeof actor === 'string' ? EXECUTORS[actor] || actor : '기타·검토 필요'; }
 
 async function read<T>(path: string, signal?: AbortSignal): Promise<T> {
   const response = await fetch(API + path, { cache: 'no-store', ...(signal ? { signal } : {}) });
@@ -157,11 +160,14 @@ export default function AiSearchWeekly() {
       <button type="button" onClick={() => void highScore()}><span>고점수 미컨택자{index?.high_score_threshold ? ` · ${index.high_score_threshold}점 이상` : ''}</span>
         <strong>{typeof data?.summary.high_score_uncontacted === 'number' ? data.summary.high_score_uncontacted.toLocaleString() : '미확인'} ↗</strong></button>
     </div>
-    {data?.summary.reason && <p className="status-note">NOT_RUN · {data.summary.reason}</p>}
-    {data?.summary.candidates === null && <p className="status-note">현재 원문에서 연결된 후보 {data.summary.observed_candidates}명 · 검토 완료 전 전체 후보 수 미확인</p>}
+    <p className="status-note">provisional Batch {typeof data?.summary.provisional_batches === 'number' ? data.summary.provisional_batches : '미확인'}개 · 실행 주체별 {data?.summary.executor_batches && typeof data.summary.executor_batches === 'object'
+      ? Object.entries(data.summary.executor_batches as Record<string, number>).map(([a,n]) => `${executor(a)} ${n}`).join(' · ') || '없음' : '미확인'}</p>
+    {data?.summary.reason && <p className="status-note">NOT_RUN · {String(data.summary.reason)}</p>}
+    {data?.summary.candidates === null && <p className="status-note">현재 원문에서 연결된 후보 {String(data.summary.observed_candidates)}명 · 검토 완료 전 전체 후보 수 미확인</p>}
     <form className="ai-filters" onSubmit={filter}>
       <input name="q" aria-label="후보 고객사 포지션 검색" placeholder="후보·고객사·포지션 검색" />
-      <select name="actor" aria-label="검색 AI"><option value="">전체 AI</option>{['GROK','CLAUDE_CODE','CHATGPT','AI_SEARCH','OTHER'].map(a => <option key={a}>{a}</option>)}</select>
+      <select name="actor" aria-label="검색 실행 주체"><option value="">전체 실행 주체</option>{Object.entries(EXECUTORS).map(([a,label]) => <option value={a} key={a}>{label}</option>)}</select>
+      <input name="batch" aria-label="Batch 번호 필터" placeholder="Batch 예: W45-01" pattern="W\d{2}-\d{2,3}" />
       <input name="company" aria-label="고객사 필터" placeholder="고객사" /><input name="position" aria-label="포지션 필터" placeholder="포지션" />
       <select name="channel" aria-label="컨택 채널"><option value="">전체 채널</option>{CHANNELS.map(c => <option value={c} key={c}>{LABELS[c]}</option>)}</select>
       <select name="contact_status" aria-label="컨택 상태"><option value="">전체 상태</option>{['CONTACTED','REPLIED','CONFIRMED_NOT_CONTACTED','NOT_RUN','REVIEW_REQUIRED','FAILED'].map(s => <option value={s} key={s}>{LABELS[s]}</option>)}</select>
@@ -172,8 +178,9 @@ export default function AiSearchWeekly() {
     <div className="weekly-scroll" tabIndex={0} aria-label="후보 표, 가로 스크롤 가능"><table>
       <thead><tr>{['주차','Batch','고객사','포지션','후보자 이름','학력','경력','프로필','검증 점수','잘 맞는 이유','사람인 컨택','잡코리아 컨택','LinkedIn 컨택','Gmail/JD 발송','사람 후속 조치','상세 Raw'].map(h => <th key={h}>{h}</th>)}</tr></thead>
       <tbody>{data?.rows.map(row => <tr key={`${row.candidate_id}:${row.position_id}`}>
-        <td>{row.week_id}</td><td><details><summary>{row.batches.map(b => b.display_number).join(', ')}</summary>
-          {row.batches.map(b => <div key={b.id}>{b.display_number} · {value(b.document.actor)}<small>실행 {date(b.document.executed_at as string)}</small><small>수신 {date(b.document.received_at as string)}</small><small>{value(b.document.execution_time_source)}</small></div>)}</details></td>
+        <td>{row.week_id}</td><td><details><summary>{row.batches.map(b => `${b.display_number}${b.grouping_status === 'CONFIRMED' ? '' : ' (provisional)'}`).join(', ')}</summary>
+          {row.batches.map(b => <div key={b.id}>{b.display_number} · {GROUPING[b.grouping_status] || b.grouping_status} · {executor(b.document.actor)}<small>근거 {value((b.document.actor_evidence as Evidence[] | undefined)?.map(e => e.rule).join(', '))}</small>
+            {Array.isArray(b.document.display_number_history) && <small>이전 표시번호 {(b.document.display_number_history as string[]).join(', ')}</small>}<small>실행 {date(b.document.executed_at as string)}</small><small>수신 {date(b.document.received_at as string)}</small><small>{value(b.document.execution_time_source)}</small></div>)}</details></td>
         <td>{row.company}</td><td>{row.position}</td><td>{row.evaluation.candidate_name || '후보명 미확인'}<small>{row.evaluation.candidate_name_reason}</small></td>
         <td>{row.evaluation.education || '미확인'}</td><td>{row.evaluation.experience || '미확인'}</td>
         <td><EvidenceLink href={row.evaluation.profile_url}>프로필 ↗</EvidenceLink></td>

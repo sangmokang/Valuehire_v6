@@ -27,7 +27,7 @@ from .registry import Registry, operation_week
 from .scoring import source_reported_number
 from .weekly_view import _verified_candidate_name
 
-PARSER_VERSION = "admin-ai-search-normalizer/2026-10-29.5"
+PARSER_VERSION = "admin-ai-search-normalizer/2026-10-31.1"
 RUN_ID = re.compile(r"(?:run\s*id|실행\s*ID)\s*[:：#]\s*([\w.:-]{3,128})", re.IGNORECASE)
 SECTION = re.compile(r"^(?:(?:#+|\[\[VH_HEADING\]\])\s*)?고객사\s*[:：]\s*(.+?)\s*[/|·]\s*포지션\s*[:：]\s*(.+)$", re.MULTILINE)
 RELATED = re.compile(r"ai\s*[-_]?\s*search|ai\s*서치|후보.{0,12}(?:서치|검색)|grok.{0,15}컨택", re.IGNORECASE)
@@ -93,6 +93,8 @@ def normalize_message(
     if non_run_reason(subject):
         source.update(processing_status="EXCLUDED", reason=non_run_reason(subject))
         return source
+    actor, actor_reason = classify_actor(subject, meta.get("from", ""), text)
+    source.update(executor=actor, executor_reason=actor_reason)
     if not RELATED.search(subject + "\n" + text) and not message.get("_in_ai_search_label"):
         if any(canonical_candidate_url(m.group(0)) for m in PROFILE.finditer(text)) or not text:
             source.update(processing_status="REVIEW_REQUIRED", reason="potential_ai_search_requires_review")
@@ -107,7 +109,6 @@ def normalize_message(
                 registry.put("review_queue", {**json.loads(old[0]), "status": "EXCLUDED",
                     "exclusion_reason": "parent_message_not_ai_search"})
         return source
-    actor, actor_reason = classify_actor(subject, meta.get("from", ""))
     strong_marker = re.search(r"\[[^\]]*ai[\s_-]*search[^\]]*\]", subject, re.IGNORECASE) is not None
     explicit_target = SECTION.search(text) is not None
     report_title = RELATED.search(subject) is not None and re.search(

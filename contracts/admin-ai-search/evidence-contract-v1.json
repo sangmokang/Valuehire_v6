@@ -9,11 +9,13 @@
     "row_identity": ["week_id", "canonical_candidate", "position_id"]
   },
   "actors": {
-    "GROK": "Grok",
+    "GROK": "Grokbot",
     "CLAUDE_CODE": "Claude Code",
+    "CODEX": "Codex",
     "CHATGPT": "ChatGPT",
-    "AI_SEARCH": "AI Search",
-    "OTHER": "기타"
+    "ASIDE": "Aside 브라우저",
+    "AI_SEARCH": "일반 AI Search",
+    "OTHER": "기타·검토 필요"
   },
   "score_bands": {
     "90_plus": {"min": 90, "max": 100},

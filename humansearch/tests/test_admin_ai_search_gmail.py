@@ -81,7 +81,7 @@ def _snapshot(
             "subject_marker:chatgpt",
         ),
         ("[aisearch] [REDACTED][REDACTED]", "AI_SEARCH", "subject_marker:ai_search"),
-        ("[aisearch]codex [REDACTED][REDACTED]", "OTHER", "unsupported_marker:codex"),
+        ("[aisearch]codex [REDACTED][REDACTED]", "CODEX", "subject_marker:codex"),
     ],
 )
 def test_actor_is_classified_from_evidence_and_unknown_is_other(

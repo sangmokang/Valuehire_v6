@@ -26,6 +26,10 @@ def operation_week(instant: datetime) -> tuple[str, int, int]:
     return f"{year}-W{week:02d}", year, week
 
 
+def _display(week: int, sequence: int) -> str:
+    return f"W{week:02d}-{sequence:02d}"
+
+
 class Registry:
     def __init__(self, path: Path) -> None:
         self.db = sqlite3.connect(path)
@@ -49,6 +53,27 @@ class Registry:
         self.db.execute("CREATE INDEX IF NOT EXISTS batch_group_identity ON batches "
                         "(json_extract(document,'$.grouping_key'))")
         self.db.commit()
+        self._number_legacy_provisional_batches()
+
+    def _number_legacy_provisional_batches(self) -> None:
+        """Give old W..-P.. Batches one shared weekly number, once, keeping the old label."""
+        with self.db:
+            self.db.execute("BEGIN IMMEDIATE")
+            legacy = self.db.execute("SELECT * FROM batches WHERE sequence IS NULL "
+                                     "ORDER BY week_year,week_number,provisional_sequence,id").fetchall()
+            for row in legacy:
+                number = self._next_sequence(row["week_year"], row["week_number"])
+                document = json.loads(row["document"])
+                history = document.get("display_number_history", [])
+                if row["display_number"] not in history:
+                    history = [*history, row["display_number"]]
+                document["display_number_history"] = history
+                self.db.execute("UPDATE batches SET sequence=?,display_number=?,document=? WHERE id=?", (
+                    number, _display(row["week_number"], number), json.dumps(document), row["id"]))
+
+    def _next_sequence(self, year: int, week: int) -> int:
+        return int(self.db.execute("SELECT COALESCE(MAX(sequence),0)+1 FROM batches "
+                                   "WHERE week_year=? AND week_number=?", (year, week)).fetchone()[0])
 
     def put(self, table: str, document: dict[str, Any]) -> None:
         if table not in TABLES:
@@ -94,11 +119,8 @@ class Registry:
                 result = dict(old)
                 previous = json.loads(result["document"])
                 if old["grouping_status"] == "PROVISIONAL" and batch["grouping_status"] == "CONFIRMED":
-                    number = self.db.execute("SELECT COALESCE(MAX(sequence),0)+1 FROM batches "
-                        "WHERE week_year=? AND week_number=?", (old["week_year"],old["week_number"])).fetchone()[0]
-                    previous["display_number_history"] = [*previous.get("display_number_history", []), old["display_number"]]
-                    result.update(sequence=number, grouping_status="CONFIRMED",
-                                  display_number=f"W{old['week_number']:02d}-{number:02d}")
+                    # Confirmation changes only the status; the shared number stays.
+                    result["grouping_status"] = "CONFIRMED"
                 if batch.get("document", {}).get("execution_time_source") == "received_at_fallback":
                     for field in ("executed_at", "execution_time_source", "execution_time_confidence", "execution_time_reason"):
                         if field in previous:
@@ -121,15 +143,9 @@ class Registry:
                                 (json.dumps(result["document"]),result["sequence"],result["grouping_status"],
                                  result["display_number"],batch["id"]))
                 return result
-            provisional = batch["grouping_status"] == "PROVISIONAL"
-            sequence_column = "provisional_sequence" if provisional else "sequence"
-            number = self.db.execute(
-                f"SELECT COALESCE(MAX({sequence_column}),0)+1 FROM batches "
-                "WHERE week_year=? AND week_number=?", (batch["week_year"], batch["week_number"]),
-            ).fetchone()[0]
-            result = {**batch, "sequence": None if provisional else number,
-                      "provisional_sequence": number if provisional else None,
-                      "display_number": f"W{batch['week_number']:02d}-{'P' if provisional else ''}{number:02d}"}
+            number = self._next_sequence(batch["week_year"], batch["week_number"])
+            result = {**batch, "sequence": number, "provisional_sequence": None,
+                      "display_number": _display(batch["week_number"], number)}
             self.db.execute("INSERT INTO batches VALUES (?,?,?,?,?,?,?,?)", (
                 result["id"], result["week_year"], result["week_number"], result["sequence"],
                 result["provisional_sequence"], result["grouping_status"], result["display_number"],

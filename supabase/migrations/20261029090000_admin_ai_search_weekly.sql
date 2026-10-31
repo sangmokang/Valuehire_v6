@@ -12,8 +12,9 @@ CREATE TABLE public.admin_ai_search_batches (
   grouping_status text NOT NULL CHECK(grouping_status IN ('CONFIRMED','PROVISIONAL')),
   display_number text NOT NULL, document jsonb NOT NULL,
   UNIQUE(week_year,week_number,sequence), UNIQUE(week_year,week_number,provisional_sequence),
-  CHECK ((grouping_status='CONFIRMED' AND sequence>0 AND (provisional_sequence IS NULL OR provisional_sequence>0)) OR
-         (grouping_status='PROVISIONAL' AND sequence IS NULL AND provisional_sequence>0))
+  -- sequence is one weekly number shared by every executor and status; provisional_sequence
+  -- only keeps old W..-P.. labels until register_batch converts them once.
+  CHECK (sequence>0 OR (grouping_status='PROVISIONAL' AND sequence IS NULL AND provisional_sequence>0))
 );
 CREATE TABLE public.admin_ai_search_source_attachments (
   id text PRIMARY KEY, document jsonb NOT NULL,
@@ -73,34 +74,34 @@ CREATE INDEX admin_ai_search_contact_evidence_source ON public.admin_ai_search_c
 -- Allocation is serialized for a week; rediscovery never renumbers an existing ID.
 CREATE FUNCTION public.admin_ai_search_register_batch(p_batch jsonb)
 RETURNS jsonb LANGUAGE plpgsql SET search_path=public,pg_temp AS $$
-DECLARE existing public.admin_ai_search_batches; n integer; provisional boolean; history jsonb;
+DECLARE existing public.admin_ai_search_batches; n integer; history jsonb;
 BEGIN
   PERFORM pg_advisory_xact_lock(hashtext('admin_ai_search_batch_registry'));
   SELECT * INTO existing FROM admin_ai_search_batches WHERE id=p_batch->>'id' FOR UPDATE;
   IF FOUND THEN
-    IF existing.grouping_status='PROVISIONAL' AND p_batch->>'grouping_status'='CONFIRMED' THEN
+    IF existing.sequence IS NULL THEN
       SELECT COALESCE(MAX(sequence),0)+1 INTO n FROM admin_ai_search_batches
         WHERE week_year=existing.week_year AND week_number=existing.week_number;
-      history:=COALESCE(p_batch->'document'->'display_number_history',existing.document->'display_number_history','[]'::jsonb);
+      history:=COALESCE(existing.document->'display_number_history','[]'::jsonb);
       IF NOT history ? existing.display_number THEN history:=history||jsonb_build_array(existing.display_number); END IF;
-      UPDATE admin_ai_search_batches SET sequence=n,grouping_status='CONFIRMED',
+      UPDATE admin_ai_search_batches SET sequence=n,
         display_number='W'||lpad(existing.week_number::text,2,'0')||'-'||CASE WHEN n<10 THEN '0' ELSE '' END||n::text,
-        document=existing.document||p_batch->'document'||jsonb_build_object('display_number_history',history)
+        document=document||jsonb_build_object('display_number_history',history)
         WHERE id=existing.id RETURNING * INTO existing;
-      RETURN to_jsonb(existing);
     END IF;
-    UPDATE admin_ai_search_batches SET document=existing.document || p_batch->'document' WHERE id=existing.id;
+    history:=existing.document->'display_number_history';
+    UPDATE admin_ai_search_batches SET
+      grouping_status=CASE WHEN p_batch->>'grouping_status'='CONFIRMED' THEN 'CONFIRMED' ELSE grouping_status END,
+      document=existing.document||(p_batch->'document')||
+        CASE WHEN history IS NULL THEN '{}'::jsonb ELSE jsonb_build_object('display_number_history',history) END
+      WHERE id=existing.id RETURNING * INTO existing;
     RETURN to_jsonb(existing);
   END IF;
-  provisional := p_batch->>'grouping_status'='PROVISIONAL';
-  SELECT COALESCE(MAX(CASE WHEN provisional THEN provisional_sequence ELSE sequence END),0)+1 INTO n
-    FROM admin_ai_search_batches WHERE week_year=(p_batch->>'week_year')::integer
-    AND week_number=(p_batch->>'week_number')::integer;
+  SELECT COALESCE(MAX(sequence),0)+1 INTO n FROM admin_ai_search_batches
+    WHERE week_year=(p_batch->>'week_year')::integer AND week_number=(p_batch->>'week_number')::integer;
   INSERT INTO admin_ai_search_batches VALUES (
-    p_batch->>'id',(p_batch->>'week_year')::integer,(p_batch->>'week_number')::integer,
-    CASE WHEN NOT provisional THEN n END,CASE WHEN provisional THEN n END,p_batch->>'grouping_status',
-    'W'||lpad(p_batch->>'week_number',2,'0')||'-'||CASE WHEN provisional THEN 'P' ELSE '' END||
-      CASE WHEN n<10 THEN '0' ELSE '' END||n::text,
+    p_batch->>'id',(p_batch->>'week_year')::integer,(p_batch->>'week_number')::integer,n,NULL,
+    p_batch->>'grouping_status','W'||lpad(p_batch->>'week_number',2,'0')||'-'||CASE WHEN n<10 THEN '0' ELSE '' END||n::text,
     p_batch->'document') RETURNING * INTO existing;
   RETURN to_jsonb(existing);
 END $$;
@@ -198,13 +199,15 @@ BEGIN
   WITH scoped AS (
     SELECT chosen.id,w.candidate_id,w.position_id,w.week_id,w.company,w.position,w.position_status,
       chosen.document AS evaluation,
-      (SELECT jsonb_agg(b) FROM jsonb_array_elements(w.batches) b WHERE COALESCE(p_args->>'actor','')=''
-        OR b->'document'->>'actor'=p_args->>'actor') AS batches,w.contacts,w.weekly_contacts
+      (SELECT jsonb_agg(b) FROM jsonb_array_elements(w.batches) b WHERE (COALESCE(p_args->>'actor','')=''
+        OR b->'document'->>'actor'=p_args->>'actor') AND (COALESCE(p_args->>'batch','')='' OR b->>'display_number'=p_args->>'batch'))
+        AS batches,w.contacts,w.weekly_contacts
     FROM admin_ai_search_weekly_rows w CROSS JOIN LATERAL (
       SELECT e.id,e.document FROM admin_ai_search_active_evaluations e
       JOIN admin_ai_search_batches b ON b.id=e.batch_id WHERE e.candidate_id=w.candidate_id
         AND e.position_id=w.position_id AND e.document->>'week_id'=w.week_id
         AND (COALESCE(p_args->>'actor','')='' OR b.document->>'actor'=p_args->>'actor')
+        AND (COALESCE(p_args->>'batch','')='' OR b.display_number=p_args->>'batch')
       ORDER BY e.document->>'evaluated_at' DESC,e.document->>'evaluation_version' DESC,e.id DESC LIMIT 1
     ) chosen
   ), filtered AS (
@@ -230,17 +233,19 @@ BEGIN
       AND (COALESCE(p_args->>'company','')='' OR w.company=p_args->>'company')
       AND (COALESCE(p_args->>'position','')='' OR w.position=p_args->>'position')
       AND (COALESCE(p_args->>'actor','')='' OR EXISTS(SELECT 1 FROM jsonb_array_elements(w.batches) b WHERE b->'document'->>'actor'=p_args->>'actor'))
+      AND (COALESCE(p_args->>'batch','')='' OR EXISTS(SELECT 1 FROM jsonb_array_elements(w.batches) b WHERE b->>'display_number'=p_args->>'batch'))
       AND (COALESCE(p_args->>'contact_status','')='' OR EXISTS(SELECT 1 FROM jsonb_array_elements(w.contacts) c
         WHERE (COALESCE(p_args->>'channel','')='' OR c->>'channel'=p_args->>'channel') AND c->>'status'=p_args->>'contact_status')
         OR (p_args->>'contact_status'='NOT_RUN' AND EXISTS(SELECT 1 FROM unnest(ARRAY['SARAMIN','JOBKOREA','LINKEDIN','GMAIL']) ch
           WHERE (COALESCE(p_args->>'channel','')='' OR ch=p_args->>'channel') AND NOT EXISTS(
             SELECT 1 FROM jsonb_array_elements(w.contacts) c WHERE c->>'channel'=ch))))
   ), targets AS (
-    SELECT DISTINCT b.id AS batch_id,b.grouping_status,s.document->>'position_id' AS position_id,p.document->>'status' AS position_status
+    SELECT DISTINCT b.id AS batch_id,b.grouping_status,b.document->>'actor' AS actor,s.document->>'position_id' AS position_id,p.document->>'status' AS position_status
     FROM admin_ai_search_batches b JOIN admin_ai_search_active_batch_sources s ON s.batch_id=b.id
     JOIN admin_ai_search_positions p ON p.id=s.document->>'position_id'
     WHERE b.document->>'week_id'=p_args->>'week'
       AND (COALESCE(p_args->>'actor','')='' OR b.document->>'actor'=p_args->>'actor')
+      AND (COALESCE(p_args->>'batch','')='' OR b.display_number=p_args->>'batch')
       AND (COALESCE(p_args->>'company','')='' OR p.document->>'company'=p_args->>'company')
       AND (COALESCE(p_args->>'position','')='' OR p.document->>'title'=p_args->>'position')
       AND (COALESCE(p_args->>'q','')='' OR concat_ws(' ',p.document->>'company',p.document->>'title') ILIKE '%'||(p_args->>'q')||'%'
@@ -279,6 +284,8 @@ BEGIN
       'candidates',CASE WHEN (SELECT candidate_ready FROM readiness) THEN (SELECT count(DISTINCT candidate_id) FROM filtered) END,
       'observed_candidates',(SELECT count(DISTINCT candidate_id) FROM filtered),
       'provisional_batches',(SELECT count(DISTINCT batch_id) FROM targets WHERE grouping_status='PROVISIONAL'),
+      'executor_batches',(SELECT COALESCE(jsonb_object_agg(actor,n),'{}') FROM (
+        SELECT COALESCE(actor,'OTHER') AS actor,count(DISTINCT batch_id) AS n FROM targets GROUP BY 1) e),
       'jd_sent',CASE WHEN (SELECT jd_ready AND candidate_ready FROM readiness) THEN (SELECT count(*) FROM filtered WHERE jd_sent_verified) END,
       'high_score_uncontacted',CASE WHEN (SELECT high_ready AND candidate_ready FROM readiness)
         THEN (SELECT count(*) FROM filtered WHERE confirmed_uncontacted AND (evaluation->>'score')::integer>=threshold) END,

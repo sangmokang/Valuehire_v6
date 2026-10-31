@@ -11,7 +11,7 @@ from humansearch.admin_ai_search.registry import Registry
 from humansearch.admin_ai_search.contact_reports import ingest_report, ingest_gmail_sent
 from humansearch.admin_ai_search.normalize import adapt_mime, headers
 from humansearch.admin_ai_search.gmail_source import _message_body
-from humansearch.admin_ai_search.gmail_subject import non_run_reason
+from humansearch.admin_ai_search.gmail_subject import classify_actor, non_run_reason
 import re
 
 parser = argparse.ArgumentParser()
@@ -85,14 +85,15 @@ for encoded, in sqlite3.connect(args.database).execute("SELECT document FROM sou
             review(registry, raw["id"], "contact_report_json_invalid")
             continue
         if isinstance(report, dict):
-            ingest_report(registry, raw["id"], report)
+            ingest_report(registry, raw["id"], report, classify_actor(subject, headers(raw).get("from", ""), text))
     else:
         totals: dict[str, list[dict[str, object]]] = {}
         for channel, label in (("SARAMIN", "사람인"), ("JOBKOREA", "잡코리아"), ("LINKEDIN", "(?:LinkedIn|링크드인)")):
-            matches = re.finditer(label + r".{0,40}?(?<!미)발송\s*(?:성공)?\s*[:：]?\s*(\d+)\s*(?:건|명)", text, re.IGNORECASE)
+            matches = re.finditer(label + r".{0,40}?(?<!미)(?:발송|제안|InMail)\s*(?:성공)?\s*[:：]?\s*(\d+)\s*(?:건|명)", text, re.IGNORECASE)
             found = [{"reported_count": int(match[1]), "source_label": match[0], "status": "REVIEW_REQUIRED"} for match in matches]
             if found:
                 totals[channel] = found
         if totals or re.search(r"(?:컨택|발송).*(?:보고|집계|이력)", subject):
-            ingest_report(registry, raw["id"], {"text": text, "subject": subject, "totals": totals})
+            ingest_report(registry, raw["id"], {"text": text, "subject": subject, "totals": totals},
+                          classify_actor(subject, headers(raw).get("from", ""), text))
 print(json.dumps(counts))

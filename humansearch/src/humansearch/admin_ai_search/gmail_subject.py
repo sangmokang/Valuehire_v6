@@ -9,7 +9,7 @@ _METADATA_TAG = re.compile(
     re.IGNORECASE,
 )
 _ACTOR_TOKEN = re.compile(
-    r"^(?:grok(?:bot|\d+(?:\.\d+)?)?|claude\s*code|claudecode|chatgpt|codex|gemini)\s+",
+    r"^(?:grok(?:bot|\d+(?:\.\d+)?)?|claude\s*code|claudecode|claude-win|chatgpt|codex|aside|gemini)\s+",
     re.IGNORECASE,
 )
 _NON_RUN_SUBJECT = re.compile(
@@ -20,30 +20,60 @@ _NON_RUN_SUBJECT = re.compile(
 _REPLY_PREFIX = re.compile(r"^\s*(?:(?:re|fw|fwd)\s*:\s*)+", re.IGNORECASE)
 
 
-def classify_actor(subject: str, sender: str) -> tuple[str, str]:
-    """Classify only explicit subject markers and preserve fail-closed OTHER."""
+_MARKERS = (
+    (re.compile(r"grok(?:bot|\d+(?:\.\d+)?)?"), "GROK", "grok"),
+    (re.compile(r"claudecode"), "CLAUDE_CODE", "claude_code"),
+    (re.compile(r"chatgpt"), "CHATGPT", "chatgpt"),
+    (re.compile(r"codex"), "CODEX", "codex"),
+    (re.compile(r"aside"), "ASIDE", "aside"),
+    (re.compile(r"claudewin"), "OTHER", "claude_win"),
+    (re.compile(r"gemini"), "OTHER", "gemini"),
+)
+_BODY_LABEL = re.compile(
+    r"^\s*(?:[-*]\s*)?(?:실행\s*(?:주체|AI|도구)|executor)\s*[:：]\s*([^\s,/|]+)",
+    re.IGNORECASE | re.MULTILINE,
+)
+_OPENAI_TASK_SENDER = re.compile(r"<noreply@tm\.openai\.com>\s*$", re.IGNORECASE)
 
-    del sender
+
+def classify_actor(subject: str, sender: str, body: str = "") -> tuple[str, str]:
+    """Classify explicit subject, sender or body evidence; otherwise fail closed."""
+
+    actor, reason = _subject_actor(subject)
+    if actor not in {"AI_SEARCH", "OTHER"} or reason.startswith(("unsupported_marker", "actor_markers")):
+        return actor, reason
+    if _OPENAI_TASK_SENDER.search(sender.strip()) is not None:
+        return "CHATGPT", "sender:openai_chatgpt_task"
+    labels = {found for match in _BODY_LABEL.finditer(body)
+              if (found := _token_actor(match.group(1))) is not None}
+    if reason == "subject_marker:ai_search" and len(labels) == 1:
+        (label_actor, marker), = labels
+        if label_actor != "OTHER":
+            return label_actor, f"body_label:{marker}"
+    return actor, reason
+
+
+def _token_actor(token: str) -> tuple[str, str] | None:
+    normalized = re.sub(r"[\s_-]+", "", token.lower())
+    for pattern, actor, marker in _MARKERS:
+        if pattern.fullmatch(normalized):
+            return actor, marker
+    return None
+
+
+def _subject_actor(subject: str) -> tuple[str, str]:
     subject_parts = _subject_parts(subject)
     if subject_parts is None:
         return "OTHER", "ai_search_prefix_not_found"
     prefix, remainder = subject_parts
     if "aisearch" not in prefix:
         return "OTHER", "ai_search_prefix_not_found"
-    actor_region = prefix.replace("aisearch", "", 1)
+    region = prefix.replace("aisearch", "", 1)
     if prefix == "aisearch":
-        without_metadata = _strip_metadata_tags(remainder.strip())
-        actor_region = re.sub(r"[\s_-]+", "", without_metadata.split("[", 1)[0].lower())
-    markers: list[tuple[str, str]] = []
-    for marker, actor, reason in (
-        ("grok", "GROK", "grok"),
-        ("claudecode", "CLAUDE_CODE", "claude_code"),
-        ("chatgpt", "CHATGPT", "chatgpt"),
-        ("codex", "OTHER", "codex"),
-        ("gemini", "OTHER", "gemini"),
-    ):
-        if marker in actor_region:
-            markers.append((actor, reason))
+        # Only the first token names the tool; later words may mention other tools.
+        first = _strip_metadata_tags(remainder.strip()).split("[", 1)[0].split()
+        region = re.sub(r"[\s_-]+", "", first[0].lower()) if first else ""
+    markers = [(actor, marker) for pattern, actor, marker in _MARKERS if pattern.search(region)]
     if len(markers) > 1:
         return "OTHER", "actor_markers_conflict"
     if markers:

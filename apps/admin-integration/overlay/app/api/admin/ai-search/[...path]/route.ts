@@ -11,7 +11,7 @@ export async function GET(request: Request, context: { params: Promise<{ path: s
   }
   const query = new URL(request.url).searchParams;
   const args: Record<string, string | number> = {};
-  for (const field of ['q','actor','company','position','channel','contact_status','sort']) {
+  for (const field of ['q','actor','batch','company','position','channel','contact_status','sort']) {
     const value = query.get(field);
     if (value !== null) args[field] = value.slice(0, 200);
   }

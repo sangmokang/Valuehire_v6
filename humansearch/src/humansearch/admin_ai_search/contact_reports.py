@@ -28,9 +28,12 @@ def _aware(value: object) -> bool:
         return False
 
 
-def ingest_report(registry: Registry, message_id: str, report: dict[str, Any]) -> None:
+def ingest_report(registry: Registry, message_id: str, report: dict[str, Any],
+                  executor: tuple[str, str] = ("OTHER", "reporter_not_classified")) -> None:
+    """Store the reporting tool separately from each event's AI/OWNER/UNKNOWN sender."""
     registry.put("contact_evidence", {"id": key(message_id, "report"),
         "source_message_id": message_id, "report": report,
+        "reporter_executor": executor[0], "reporter_executor_reason": executor[1],
         "reported_totals": report.get("totals"), "source_reference": f"gmail:{message_id}"})
     events = report.get("events")
     if report.get("version") != "ai-search-contact-report/v1" or not isinstance(events, list):

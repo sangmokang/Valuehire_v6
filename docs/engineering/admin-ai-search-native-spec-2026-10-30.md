@@ -54,9 +54,11 @@ PYTHONPATH=humansearch/src humansearch/.venv/bin/python tools/admin-ai-search/lo
 주차별 표시번호 uniqueness, 점수/상태 check, RLS 및 anon/authenticated 권한 차단을 적용한다.
 원본은 비공개 SQLite에도 유지하며 정규화 메일에는 Gmail 링크·checksum·parser·처리 사유를 보존한다.
 
-Batch allocator는 DB transaction/advisory lock을 사용한다. 기존 ID를 재사용하고 confirmed/provisional
-순번을 별도 배정한다. provisional 확정 후에도 이전 P번호를 예약해 두며 과거 표시번호를 보존한다.
-새 원문은 과거 번호를 다시 정렬하지 않는다. 근거가 부족한 실제 메일은 모두 provisional로 유지했다.
+Batch allocator는 DB transaction/advisory lock을 사용한다. 기존 ID를 재사용하고 모든 실행 주체와
+상태가 한 주차의 공통 순번(`W45-01`…)을 공유한다. 확정 전환은 상태만 바꾼다. 과거 P번호 Batch는
+SQLite 등록기 시작 시 또는 PostgreSQL `register_batch` 재등록 시 한 번만 다음 미사용 번호를 받고,
+이전 번호는 `display_number_history`에 남는다. 새 원문은 과거 번호를 다시 정렬하지 않는다.
+근거가 부족한 실제 메일은 provisional로 유지한다.
 
 서버가 최근 4개 주차와 동일 필터 범위의 집계·행을 만든다. 행은 후보+포지션 단위이며 모든 Batch와
 평가 이력은 별도로 남는다. 현재 parser와 일치하지 않는 과거 해석은 Raw에 남고 현재 집계에서 제외한다.
