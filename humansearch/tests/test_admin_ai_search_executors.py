@@ -9,7 +9,7 @@ import pytest
 
 from humansearch.admin_ai_search.contact_reports import ingest_report
 from humansearch.admin_ai_search.evidence import load_evidence_contract
-from humansearch.admin_ai_search.gmail_subject import classify_actor
+from humansearch.admin_ai_search.gmail_subject import classify_actor, subject_context
 from humansearch.admin_ai_search.normalize import normalize_message
 from humansearch.admin_ai_search.registry import Registry
 
@@ -152,3 +152,24 @@ def test_conflicting_body_labels_never_create_a_named_executor_batch(tmp_path: P
         "conflict", "[aisearch] [Client][Engineer]", OWNER,
         "executor: Codex\nexecutor: Cursor\nhttps://linkedin.com/in/candidate-a"), CONTRACT)
     assert registry.documents("batches")[0]["actor"] == "OTHER"
+
+
+@pytest.mark.parametrize("body", [
+    "실행 주체 : Codex/Aside\n", "실행 주체: Codex, Aside\n",
+    "실행 주체: Codex | Aside\n", "실행 주체: Codex (Aside 보조)\n",
+])
+def test_multiple_tools_on_one_label_line_fail_closed(body: str) -> None:
+    assert classify_actor("[aisearch] 번개장터 리드", OWNER, body)[0] == "OTHER"
+
+
+@pytest.mark.parametrize("subject", [
+    "[aisearch] Asidehub 백엔드", "[aisearch] Codexis 엔지니어",
+    "[aisearch] Grokking 리드", "[aisearch] chatgptlab PM",
+])
+def test_company_names_that_start_with_a_tool_name_are_not_executors(subject: str) -> None:
+    assert classify_actor(subject, OWNER) == ("AI_SEARCH", "subject_marker:ai_search")
+
+
+def test_hyphenated_claude_code_token_never_becomes_customer() -> None:
+    assert classify_actor("[aisearch] claude-code 번개 리드", OWNER)[0] == "CLAUDE_CODE"
+    assert subject_context("[aisearch] claude-code 번개 리드") == ("번개", "리드")

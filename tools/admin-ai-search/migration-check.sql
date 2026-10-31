@@ -11,13 +11,12 @@ DO $$ DECLARE a jsonb; b jsonb; c jsonb; i integer; denied boolean:=false; BEGIN
   IF c->>'display_number'<>'W44-03' OR c->>'grouping_status'<>'CONFIRMED' THEN
     RAISE EXCEPTION 'confirmation changed the permanent display number';
   END IF;
-  INSERT INTO public.admin_ai_search_batches VALUES('migration-test-legacy',2000,44,NULL,9,'PROVISIONAL','W44-P09','{"id":"migration-test-legacy"}');
-  c:=public.admin_ai_search_register_batch('{"id":"migration-test-legacy","week_year":2000,"week_number":44,"grouping_status":"PROVISIONAL","document":{"id":"migration-test-legacy"}}');
-  IF c->>'display_number'<>'W44-04' OR NOT (c->'document'->'display_number_history') ? 'W44-P09' THEN
-    RAISE EXCEPTION 'legacy provisional number not converted once with history';
-  END IF;
-  c:=public.admin_ai_search_register_batch('{"id":"migration-test-legacy","week_year":2000,"week_number":44,"grouping_status":"PROVISIONAL","document":{"id":"migration-test-legacy"}}');
-  IF c->>'display_number'<>'W44-04' THEN RAISE EXCEPTION 'legacy number reassigned twice'; END IF;
+  BEGIN
+    INSERT INTO public.admin_ai_search_batches VALUES('migration-test-legacy',2000,44,NULL,9,'CONFIRMED','W44-P09','{}');
+    RAISE EXCEPTION 'batch without shared weekly number accepted';
+  EXCEPTION WHEN not_null_violation OR check_violation THEN NULL; END;
+  c:=public.admin_ai_search_register_batch('{"id":"migration-test-p4","week_year":2000,"week_number":44,"grouping_status":"PROVISIONAL","document":{"id":"migration-test-p4"}}');
+  IF c->>'display_number'<>'W44-04' THEN RAISE EXCEPTION 'shared number skipped'; END IF;
   FOR i IN 6..100 LOOP
     c:=public.admin_ai_search_register_batch(jsonb_build_object('id','migration-test-n'||i,'week_year',2000,'week_number',45,'grouping_status','PROVISIONAL','document','{}'::jsonb));
   END LOOP;
