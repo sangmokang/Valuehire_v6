@@ -40,11 +40,11 @@ def test_batch_numbers_never_renumber_when_older_evidence_arrives(tmp_path: Path
     older = registry.register_batch(batch("stable-older", "CONFIRMED"))
     repeated = registry.register_batch(batch("stable-first", "CONFIRMED"))
     assert first["display_number"] == repeated["display_number"] == "W44-01"
-    assert older["display_number"] == "W44-02"
-    assert provisional["display_number"] == "W44-P01"
+    assert provisional["display_number"] == "W44-02"
+    assert older["display_number"] == "W44-03"
 
 
-def test_confirmation_preserves_internal_identity_and_reserves_provisional_number(tmp_path: Path) -> None:
+def test_confirmation_preserves_internal_identity_and_display_number(tmp_path: Path) -> None:
     registry = Registry(tmp_path / "registry.sqlite")
     batch = {"id": "permanent", "week_year": 2026, "week_number": 44,
              "grouping_status": "PROVISIONAL", "document": {"id": "permanent"}}
@@ -52,6 +52,6 @@ def test_confirmation_preserves_internal_identity_and_reserves_provisional_numbe
     confirmed = registry.register_batch({**batch, "grouping_status": "CONFIRMED"})
     later = registry.register_batch({**batch, "id": "later"})
     assert provisional["id"] == confirmed["id"] == "permanent"
-    assert confirmed["display_number"] == "W44-01"
-    assert later["display_number"] == "W44-P02"
-    assert confirmed["document"]["display_number_history"] == ["W44-P01"]
+    assert provisional["display_number"] == confirmed["display_number"] == "W44-01"
+    assert confirmed["grouping_status"] == "CONFIRMED"
+    assert later["display_number"] == "W44-02"
