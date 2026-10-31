@@ -56,8 +56,8 @@ PYTHONPATH=humansearch/src humansearch/.venv/bin/python tools/admin-ai-search/lo
 
 Batch allocator는 DB transaction/advisory lock을 사용한다. 기존 ID를 재사용하고 모든 실행 주체와
 상태가 한 주차의 공통 순번(`W45-01`…)을 공유한다. 확정 전환은 상태만 바꾼다. 과거 P번호 Batch는
-SQLite 등록기 시작 시 또는 PostgreSQL `register_batch` 재등록 시 한 번만 다음 미사용 번호를 받고,
-이전 번호는 `display_number_history`에 남는다. 새 원문은 과거 번호를 다시 정렬하지 않는다.
+적재 전 SQLite 등록기 시작 시 한 번만 다음 미사용 번호를 받고 이전 번호는 `display_number_history`에
+남는다. PostgreSQL은 `sequence NOT NULL`이라 공통 번호 없는 Batch를 받지 않는다. 새 원문은 과거 번호를 다시 정렬하지 않는다.
 근거가 부족한 실제 메일은 provisional로 유지한다.
 
 서버가 최근 4개 주차와 동일 필터 범위의 집계·행을 만든다. 행은 후보+포지션 단위이며 모든 Batch와

@@ -8,13 +8,13 @@ CREATE TABLE public.admin_ai_search_positions (id text PRIMARY KEY, document jso
 CREATE TABLE public.admin_ai_search_candidates (id text PRIMARY KEY, document jsonb NOT NULL);
 CREATE TABLE public.admin_ai_search_batches (
   id text PRIMARY KEY, week_year integer NOT NULL, week_number integer NOT NULL CHECK(week_number BETWEEN 1 AND 53),
-  sequence integer, provisional_sequence integer,
+  sequence integer NOT NULL CHECK(sequence>0), provisional_sequence integer,
   grouping_status text NOT NULL CHECK(grouping_status IN ('CONFIRMED','PROVISIONAL')),
   display_number text NOT NULL, document jsonb NOT NULL,
   UNIQUE(week_year,week_number,sequence), UNIQUE(week_year,week_number,provisional_sequence),
-  -- sequence is one weekly number shared by every executor and status; provisional_sequence
-  -- only keeps old W..-P.. labels until register_batch converts them once.
-  CHECK (sequence>0 OR (grouping_status='PROVISIONAL' AND sequence IS NULL AND provisional_sequence>0))
+  -- sequence is one weekly number shared by every executor and status. Old W..-P.. labels are
+  -- converted once by the staging registry before load and kept in display_number_history.
+  CHECK (provisional_sequence IS NULL OR provisional_sequence>0)
 );
 CREATE TABLE public.admin_ai_search_source_attachments (
   id text PRIMARY KEY, document jsonb NOT NULL,
@@ -79,16 +79,6 @@ BEGIN
   PERFORM pg_advisory_xact_lock(hashtext('admin_ai_search_batch_registry'));
   SELECT * INTO existing FROM admin_ai_search_batches WHERE id=p_batch->>'id' FOR UPDATE;
   IF FOUND THEN
-    IF existing.sequence IS NULL THEN
-      SELECT COALESCE(MAX(sequence),0)+1 INTO n FROM admin_ai_search_batches
-        WHERE week_year=existing.week_year AND week_number=existing.week_number;
-      history:=COALESCE(existing.document->'display_number_history','[]'::jsonb);
-      IF NOT history ? existing.display_number THEN history:=history||jsonb_build_array(existing.display_number); END IF;
-      UPDATE admin_ai_search_batches SET sequence=n,
-        display_number='W'||lpad(existing.week_number::text,2,'0')||'-'||CASE WHEN n<10 THEN '0' ELSE '' END||n::text,
-        document=document||jsonb_build_object('display_number_history',history)
-        WHERE id=existing.id RETURNING * INTO existing;
-    END IF;
     history:=existing.document->'display_number_history';
     UPDATE admin_ai_search_batches SET
       grouping_status=CASE WHEN p_batch->>'grouping_status'='CONFIRMED' THEN 'CONFIRMED' ELSE grouping_status END,

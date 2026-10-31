@@ -9,7 +9,7 @@ _METADATA_TAG = re.compile(
     re.IGNORECASE,
 )
 _ACTOR_TOKEN = re.compile(
-    r"^(?:grok(?:bot|\d+(?:\.\d+)?)?|claude\s*code|claudecode|claude-win|chatgpt|codex|aside|gemini)\s+",
+    r"^(?:grok(?:bot|\d+(?:\.\d+)?)?|claude[\s_-]*code|claude-win|chatgpt|codex|aside|gemini)\s+",
     re.IGNORECASE,
 )
 _NON_RUN_SUBJECT = re.compile(
@@ -30,7 +30,7 @@ _MARKERS = (
     (re.compile(r"gemini"), "OTHER", "gemini"),
 )
 _BODY_LABEL = re.compile(
-    r"^\s*(?:[-*]\s*)?(?:실행\s*(?:주체|AI|도구)|executor)\s*[:：]\s*([^\n,/|(]+)",
+    r"^\s*(?:[-*]\s*)?(?:실행\s*(?:주체|AI|도구)|executor)\s*[:：]\s*([^\n]+)",
     re.IGNORECASE | re.MULTILINE,
 )
 _OPENAI_TASK_SENDER = re.compile(r"<noreply@tm\.openai\.com>\s*$", re.IGNORECASE)
@@ -47,8 +47,9 @@ def classify_actor(subject: str, sender: str, body: str = "") -> tuple[str, str]
     if reason != "subject_marker:ai_search":
         return actor, reason
     # Unknown labels stay in the set so conflicts and unsupported tools fail closed.
-    labels = {_token_actor(match.group(1)) or ("OTHER", "unknown")
-              for match in _BODY_LABEL.finditer(body)}
+    labels = {_token_actor(part) or ("OTHER", "unknown")
+              for match in _BODY_LABEL.finditer(body)
+              for part in re.split(r"[,/|()+&·]", match.group(1)) if part.strip()}
     actors = {label[0] for label in labels}
     if len(actors) > 1:
         return "OTHER", "body_label_conflict"
@@ -76,13 +77,17 @@ def _subject_actor(subject: str) -> tuple[str, str]:
     if "aisearch" not in prefix:
         return "OTHER", "ai_search_prefix_not_found"
     region = prefix.replace("aisearch", "", 1)
+    markers: list[tuple[str, str]]
     if prefix == "aisearch":
         # Only the first token names the tool; later words may mention other tools.
         first = _strip_metadata_tags(remainder.strip()).split("[", 1)[0].lower().split()
-        region = re.sub(r"[_-]+", "", first[0]) if first else ""
-        if region == "claude" and first[1:2] == ["code"]:
-            region = "claudecode"
-    markers = [(actor, marker) for pattern, actor, marker in _MARKERS if pattern.search(region)]
+        token = " ".join(first[:2]) if first[:2] == ["claude", "code"] else (first[0] if first else "")
+        # Whole token first (claude-win, claude-code), then each joined part (chatgpt-grok).
+        whole = _token_actor(token)
+        parts = [found for part in re.split(r"[-_+/]", token) if (found := _token_actor(part))]
+        markers = [whole] if whole else parts
+    else:
+        markers = [(actor, marker) for pattern, actor, marker in _MARKERS if pattern.search(region)]
     if len(markers) > 1:
         return "OTHER", "actor_markers_conflict"
     if markers:
