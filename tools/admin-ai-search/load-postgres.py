@@ -55,21 +55,26 @@ def load(table: str, records: list[dict[str, object]]) -> None:
 
 for table, source in [("source_messages", "normalized_sources"), ("positions", "positions"), ("candidates", "candidates")]:
     load(table, [json.loads(row[0]) for row in db.execute(f"SELECT document FROM {source}")])
-for row in db.execute("SELECT id,week_year,week_number,grouping_status,document FROM batches ORDER BY week_year,week_number,sequence,provisional_sequence"):
-    batch = {"id": row[0], "week_year": row[1], "week_number": row[2], "grouping_status": row[3], "document": json.loads(row[4])}
-    # Quoted psql variables bind the entire JSON document, avoiding SQL interpolation.
-    result = subprocess.run(["psql", args.dsn, "-XAtq", "-v", "ON_ERROR_STOP=1",
-                             "--set=batch=" + json.dumps(postgres_document(batch))],
-                            input="SELECT public.admin_ai_search_register_batch(:'batch'::jsonb);",
-                            text=True, capture_output=True)
-    if result.returncode:
-        fail_private(result.stderr)
-staged = dict(db.execute("SELECT id,display_number FROM batches"))
-published = dict(line.split("|", 1) for line in sql(
-    "SELECT id||'|'||display_number FROM public.admin_ai_search_batches;").splitlines() if line)
-mismatched = sorted(identity for identity, number in staged.items() if published.get(identity) != number)
-if mismatched:
-    fail_private("display_number mismatch between staging and PostgreSQL: " + ",".join(mismatched[:20]))
+# Register every Batch and compare its number with staging in one transaction:
+# any mismatch rolls back all Batch writes of this load.
+batch_rows = io.StringIO()
+batch_writer = csv.writer(batch_rows, lineterminator="\n")
+for order, row in enumerate(db.execute("SELECT id,week_year,week_number,grouping_status,document,display_number "
+                                       "FROM batches ORDER BY week_year,week_number,sequence")):
+    batch = {"id": row[0], "week_year": row[1], "week_number": row[2], "grouping_status": row[3],
+             "document": json.loads(row[4])}
+    batch_writer.writerow([order, row[5], json.dumps(postgres_document(batch), ensure_ascii=False)])
+sql("BEGIN; CREATE TEMP TABLE staged_batches (ord integer, display_number text, batch jsonb); "
+    "COPY staged_batches FROM STDIN WITH(FORMAT csv);\n" + batch_rows.getvalue() + "\\.\n" +
+    "DO $$ DECLARE r record; registered jsonb; BEGIN\n"
+    "  FOR r IN SELECT * FROM staged_batches ORDER BY ord LOOP\n"
+    "    registered := public.admin_ai_search_register_batch(r.batch);\n"
+    "    IF registered->>'display_number' IS DISTINCT FROM r.display_number THEN\n"
+    "      RAISE EXCEPTION 'display_number mismatch between staging and PostgreSQL: % staged % published %',\n"
+    "        r.batch->>'id', r.display_number, registered->>'display_number';\n"
+    "    END IF;\n"
+    "  END LOOP;\n"
+    "END $$; COMMIT;")
 for table in TABLES:
     if table not in {"positions", "candidates"}:
         load(table, [json.loads(row[0]) for row in db.execute(f"SELECT document FROM {table}")])

@@ -9,7 +9,7 @@ _METADATA_TAG = re.compile(
     re.IGNORECASE,
 )
 _ACTOR_TOKEN = re.compile(
-    r"^(?:grok(?:bot|\d+(?:\.\d+)?)?|claude[\s_-]*code|claude-win|chatgpt|codex|aside|gemini)[:,.;]?\s+",
+    r"^(?:grok(?:bot|[-_]?\d+(?:\.\d+)?)?|claude[\s_-]*code|claude-win|chatgpt|codex|aside|gemini)[:,.;]?\s+",
     re.IGNORECASE,
 )
 _NON_RUN_SUBJECT = re.compile(
@@ -96,10 +96,12 @@ def _subject_actor(subject: str) -> tuple[str, str]:
     if prefix == "aisearch":
         # Only the first token names the tool; later words may mention other tools.
         first = _strip_metadata_tags(remainder.strip()).split("[", 1)[0].lower().split()
-        token = " ".join(first[:2]) if first[:2] == ["claude", "code"] else (first[0] if first else "")
-        markers = _joined_markers(token.rstrip(":,.;"))
+        words = [word.rstrip(":,.;") for word in first[:2]]
+        lead = "claude code" if words == ["claude", "code"] else (first[0] if first else "")
+        markers = _joined_markers(lead.rstrip(":,.;"))
     else:
-        markers = _joined_markers(region)
+        # Prefix tags may add Korean words, e.g. [ChatGPT AI Search 결과].
+        markers = _joined_markers(re.sub(r"[^a-z0-9.]", "", region))
     if len(markers) > 1:
         return "OTHER", "actor_markers_conflict"
     if markers:
