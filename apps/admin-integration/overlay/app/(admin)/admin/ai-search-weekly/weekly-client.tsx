@@ -155,7 +155,7 @@ export default function AiSearchWeekly() {
       </button>)}</nav>
     <p className="week-range">{selected && `${selected.week_id} · ${selected.start_date}~${selected.end_date} · 일요일 00:00 이상, 다음 일요일 00:00 미만`}</p>
     <div className="weekly-summary" aria-label="선택 범위 집계">
-      {([['batches','Batch'],['positions','포지션'],['candidates','총 후보'],['jd_sent','JD 발송']] as const).map(([key,label]) =>
+      {([['batches','확정 Batch'],['positions','포지션'],['candidates','총 후보'],['jd_sent','JD 발송']] as const).map(([key,label]) =>
         <div key={key}><span>{label}</span><strong>{typeof data?.summary[key] === 'number' ? data.summary[key].toLocaleString() : '미확인'}</strong></div>)}
       <button type="button" onClick={() => void highScore()}><span>고점수 미컨택자{index?.high_score_threshold ? ` · ${index.high_score_threshold}점 이상` : ''}</span>
         <strong>{typeof data?.summary.high_score_uncontacted === 'number' ? data.summary.high_score_uncontacted.toLocaleString() : '미확인'} ↗</strong></button>
