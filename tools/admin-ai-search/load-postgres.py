@@ -8,13 +8,15 @@ import sqlite3
 import subprocess
 from pathlib import Path
 
-from humansearch.admin_ai_search.registry import TABLES
+from humansearch.admin_ai_search.registry import TABLES, Registry
 from humansearch.admin_ai_search.storage_encoding import postgres_document
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--database", type=Path, required=True)
 parser.add_argument("--dsn", required=True)
 args = parser.parse_args()
+# Opening the registry gives any legacy W..-P.. Batch its shared weekly number before load.
+Registry(args.database).db.close()
 db = sqlite3.connect(args.database)
 root = Path(__file__).parents[2]
 
@@ -62,6 +64,12 @@ for row in db.execute("SELECT id,week_year,week_number,grouping_status,document 
                             text=True, capture_output=True)
     if result.returncode:
         fail_private(result.stderr)
+staged = dict(db.execute("SELECT id,display_number FROM batches"))
+published = dict(line.split("|", 1) for line in sql(
+    "SELECT id||'|'||display_number FROM public.admin_ai_search_batches;").splitlines() if line)
+mismatched = sorted(identity for identity, number in staged.items() if published.get(identity) != number)
+if mismatched:
+    fail_private("display_number mismatch between staging and PostgreSQL: " + ",".join(mismatched[:20]))
 for table in TABLES:
     if table not in {"positions", "candidates"}:
         load(table, [json.loads(row[0]) for row in db.execute(f"SELECT document FROM {table}")])

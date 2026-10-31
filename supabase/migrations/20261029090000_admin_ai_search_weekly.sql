@@ -14,7 +14,8 @@ CREATE TABLE public.admin_ai_search_batches (
   UNIQUE(week_year,week_number,sequence), UNIQUE(week_year,week_number,provisional_sequence),
   -- sequence is one weekly number shared by every executor and status. Old W..-P.. labels are
   -- converted once by the staging registry before load and kept in display_number_history.
-  CHECK (provisional_sequence IS NULL OR provisional_sequence>0)
+  CHECK (provisional_sequence IS NULL OR provisional_sequence>0),
+  CHECK (display_number='W'||lpad(week_number::text,2,'0')||'-'||CASE WHEN sequence<10 THEN '0' ELSE '' END||sequence::text)
 );
 CREATE TABLE public.admin_ai_search_source_attachments (
   id text PRIMARY KEY, document jsonb NOT NULL,

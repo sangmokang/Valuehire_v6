@@ -9,7 +9,7 @@ _METADATA_TAG = re.compile(
     re.IGNORECASE,
 )
 _ACTOR_TOKEN = re.compile(
-    r"^(?:grok(?:bot|\d+(?:\.\d+)?)?|claude[\s_-]*code|claude-win|chatgpt|codex|aside|gemini)\s+",
+    r"^(?:grok(?:bot|\d+(?:\.\d+)?)?|claude[\s_-]*code|claude-win|chatgpt|codex|aside|gemini)[:,.;]?\s+",
     re.IGNORECASE,
 )
 _NON_RUN_SUBJECT = re.compile(
@@ -69,6 +69,21 @@ def _token_actor(token: str) -> tuple[str, str] | None:
     return None
 
 
+def _joined_markers(token: str) -> list[tuple[str, str]]:
+    """A token names tools only when it is one tool or made entirely of tool names."""
+    whole = _token_actor(token)
+    if whole:
+        return [whole]
+    parts = [part for part in re.split(r"[-_+/]", token) if part]
+    found = [_token_actor(part) for part in parts]
+    if len(parts) > 1 and all(found):
+        return [marker for marker in found if marker]
+    pieces = re.findall("|".join(f"(?:{p.pattern})" for p, _, _ in _MARKERS), token)
+    if len(pieces) > 1 and "".join(pieces) == token:
+        return [marker for piece in pieces if (marker := _token_actor(piece))]
+    return []
+
+
 def _subject_actor(subject: str) -> tuple[str, str]:
     subject_parts = _subject_parts(subject)
     if subject_parts is None:
@@ -82,12 +97,9 @@ def _subject_actor(subject: str) -> tuple[str, str]:
         # Only the first token names the tool; later words may mention other tools.
         first = _strip_metadata_tags(remainder.strip()).split("[", 1)[0].lower().split()
         token = " ".join(first[:2]) if first[:2] == ["claude", "code"] else (first[0] if first else "")
-        # Whole token first (claude-win, claude-code), then each joined part (chatgpt-grok).
-        whole = _token_actor(token)
-        parts = [found for part in re.split(r"[-_+/]", token) if (found := _token_actor(part))]
-        markers = [whole] if whole else parts
+        markers = _joined_markers(token.rstrip(":,.;"))
     else:
-        markers = [(actor, marker) for pattern, actor, marker in _MARKERS if pattern.search(region)]
+        markers = _joined_markers(region)
     if len(markers) > 1:
         return "OTHER", "actor_markers_conflict"
     if markers:
