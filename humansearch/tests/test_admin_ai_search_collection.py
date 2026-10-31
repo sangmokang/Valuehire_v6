@@ -9,6 +9,44 @@ import pytest
 from humansearch.admin_ai_search.collection import CollectionStore, collect_mailbox
 
 
+def test_incremental_reuses_bodies_and_checks_the_entire_live_label(tmp_path: Path) -> None:
+    store = CollectionStore(tmp_path / "private.sqlite")
+    baseline = collect_mailbox(store, Mailbox(), run_id="baseline")
+
+    class Delta(Mailbox):
+        def request(self, operation: str, args: dict[str, object]) -> object:
+            if operation == "list":
+                scope = args["label_id"]
+                if scope == "label-live":
+                    assert args["query"] is None  # Includes late labels on older mail.
+                    ids = ["a", "old-labelled"]
+                else:
+                    from datetime import datetime
+                    assert args["query"] == f"after:{int(datetime.fromisoformat(baseline['started_at']).timestamp())}"
+                    ids = ["b", "new-result"]
+                return {"messages": [{"id": i} for i in ids]}
+            if operation == "messages":
+                assert not {"a", "b", "c", "d"}.intersection(cast(list[str], args["ids"]))
+            return super().request(operation, args)
+
+    result = collect_mailbox(store, Delta(), run_id="delta", incremental=True)
+    assert result["status"] == "SUCCEEDED"
+    assert result["parent_run_id"] == "baseline"
+    assert result["new"] == 2 and result["unchanged"] == 2
+    assert result["union_count"] == 4
+    assert all(s["exhausted"] for s in result["scopes"].values())
+    assert collect_mailbox(store, Delta(), run_id="delta", incremental=True)["new"] == 2
+
+
+@pytest.mark.parametrize("include_sent", [False, True])
+def test_incremental_requires_a_complete_baseline(tmp_path: Path, include_sent: bool) -> None:
+    store = CollectionStore(tmp_path / "private.sqlite")
+    if include_sent:
+        collect_mailbox(store, Mailbox(), run_id="inbox-only")
+    with pytest.raises(ValueError, match="baseline"):
+        collect_mailbox(store, Mailbox(), incremental=True, include_sent=include_sent)
+
+
 class Mailbox:
     def __init__(self) -> None:
         self.fail = False
