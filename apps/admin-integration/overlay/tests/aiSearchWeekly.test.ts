@@ -31,6 +31,12 @@ describe('AI Search administrator boundary', () => {
     expect(options.method).toBe('POST');
     expect(JSON.parse(options.body)).toEqual({ p_action: 'weekly', p_args: { week: '2026-W44', q: "O'Reilly", limit: 200, offset: 50 } });
   });
+  it('passes executor and shared weekly Batch number filters to the RPC', async () => {
+    mocks.user.mockResolvedValue({ email: 'operator@valueconnect.kr' });
+    mocks.fetch.mockResolvedValue(Response.json({ rows: [], total: 0 }));
+    await GET(new Request('http://localhost/api/admin/ai-search/weekly/2026-W45?actor=CODEX&batch=W45-03'), { params: Promise.resolve({ path: ['weekly','2026-W45'] }) });
+    expect(JSON.parse(mocks.fetch.mock.calls[0]![1].body).p_args).toEqual({ week: '2026-W45', actor: 'CODEX', batch: 'W45-03', limit: 50, offset: 0 });
+  });
   it('returns an explicit failure when the database read fails', async () => {
     mocks.user.mockResolvedValue({ email: 'operator@valueconnect.kr' });
     mocks.fetch.mockResolvedValue(Response.json({ message: 'private database details' }, { status: 500 }));

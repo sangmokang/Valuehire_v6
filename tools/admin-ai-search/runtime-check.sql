@@ -1,8 +1,7 @@
 BEGIN;
 DO $$ BEGIN
-  IF EXISTS(SELECT 1 FROM public.admin_ai_search_batches WHERE display_number<>
-    'W'||lpad(week_number::text,2,'0')||'-'||CASE WHEN grouping_status='PROVISIONAL' THEN 'P' ELSE '' END||
-    CASE WHEN COALESCE(sequence,provisional_sequence)<10 THEN '0' ELSE '' END||COALESCE(sequence,provisional_sequence)::text) THEN
+  IF EXISTS(SELECT 1 FROM public.admin_ai_search_batches WHERE sequence IS NULL OR display_number<>
+    'W'||lpad(week_number::text,2,'0')||'-'||CASE WHEN sequence<10 THEN '0' ELSE '' END||sequence::text) THEN
     RAISE EXCEPTION 'batch number truncated or reassigned';
   END IF;
   IF EXISTS(SELECT 1 FROM public.admin_ai_search_weekly_rows GROUP BY week_id,candidate_id,position_id HAVING count(*)<>1) THEN
