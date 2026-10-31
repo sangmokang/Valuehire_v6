@@ -122,3 +122,32 @@ def test_contact_report_keeps_reporter_executor_separate_from_sender_actor(tmp_p
     assert (evidence["reporter_executor"], evidence["reporter_executor_reason"]) == (
         "ASIDE", "subject_marker:aside")
     assert registry.documents("contact_events") == []
+
+
+@pytest.mark.parametrize("subject", [
+    "[aisearch] Claude Code [Client][Engineer]",
+    "[aisearch]claude code 번개장터 리드",
+])
+def test_spaced_claude_code_subject_marker_is_preserved(subject: str) -> None:
+    assert classify_actor(subject, OWNER) == ("CLAUDE_CODE", "subject_marker:claude_code")
+
+
+@pytest.mark.parametrize(("body", "expected"), [
+    ("실행 주체: Claude Code\n", ("CLAUDE_CODE", "body_label:claude_code")),
+    ("executor: Codex\nexecutor: Cursor\n", ("OTHER", "body_label_conflict")),
+    ("executor: Codex\nexecutor: Aside\n", ("OTHER", "body_label_conflict")),
+    ("실행 주체: Gemini\n", ("OTHER", "unsupported_body_label")),
+    ("실행 주체: Cursor\n", ("OTHER", "unsupported_body_label")),
+])
+def test_body_label_conflicts_or_unknown_tools_fail_closed(
+    body: str, expected: tuple[str, str],
+) -> None:
+    assert classify_actor("[aisearch] 번개장터 리드", OWNER, body) == expected
+
+
+def test_conflicting_body_labels_never_create_a_named_executor_batch(tmp_path: Path) -> None:
+    registry = Registry(tmp_path / "private.sqlite")
+    normalize_message(registry, _message(
+        "conflict", "[aisearch] [Client][Engineer]", OWNER,
+        "executor: Codex\nexecutor: Cursor\nhttps://linkedin.com/in/candidate-a"), CONTRACT)
+    assert registry.documents("batches")[0]["actor"] == "OTHER"
