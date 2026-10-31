@@ -21,7 +21,8 @@ for required in "$GATES" "scripts/hs_import_spy.py" "humansearch/pyproject.toml"
   "contracts/admin-weekly-dashboard/metric-contract-v1.json" \
   "contracts/admin-weekly-dashboard/source-contract-v1.json" "apps/admin" \
   "docs/sot/INDEX.md" "docs/sot/admin-ai-search-evidence.md" \
-  "docs/engineering/admin-ai-search-evidence-spec-2026-10-29.md"; do
+  "docs/engineering/admin-ai-search-evidence-spec-2026-10-29.md" \
+  "tools/admin-ai-search/load-postgres.py"; do
   if [ ! -e "$required" ]; then
     echo "FAIL: required G2 implementation missing: $required"
     exit 1
@@ -61,6 +62,9 @@ mkdir -p "$SANDBOX/docs/sot" "$SANDBOX/docs/engineering"
 cp docs/sot/INDEX.md docs/sot/admin-ai-search-evidence.md "$SANDBOX/docs/sot/"
 cp docs/engineering/admin-ai-search-evidence-spec-2026-10-29.md \
   "$SANDBOX/docs/engineering/"
+# The staging-number loader test executes the repository-level PostgreSQL loader.
+mkdir -p "$SANDBOX/tools/admin-ai-search"
+cp tools/admin-ai-search/load-postgres.py "$SANDBOX/tools/admin-ai-search/"
 
 total=0
 blocked=0
