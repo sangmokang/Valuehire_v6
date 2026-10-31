@@ -33,7 +33,7 @@
 - 결론: **"증명이 가능해졌다"는 참, "범용적으로 실용화됐다"는 아직 투영**. 2026년 기준 채택 조건은 C/C++/Rust/Go/Python + 퍼즈 하네스 + riscv64 정적 빌드.
 
 ### A-3. v6에 포멀 검증이 직접 적용되는가
-- **직접 적용 불가**: v6 제품 코드는 Python(humansearch 592줄)·JS(apps/admin 458줄)·bash 인수 스크립트이며, 바이너리 수준 RISC-V 증명 대상이 아니다. Python은 OSS Verify에서 atheris 퍼즈 하네스로 지원하나, v6의 위험은 메모리 안전이 아니라 **외부 사이트 드리프트·조용한 실패·개인정보 노출**이다.
+- **직접 적용 불가**: v6 제품 코드는 Python(humansearch/src 2,525줄)·JS/HTML(apps/admin 462줄)·bash 인수 스크립트이며, 바이너리 수준 RISC-V 증명 대상이 아니다. Python은 OSS Verify에서 atheris 퍼즈 하네스로 지원하나, v6의 위험은 메모리 안전이 아니라 **외부 사이트 드리프트·조용한 실패·개인정보 노출**이다.
 - **이전 가능한 방법론 5개** (PART C-5에 통합):
   1. "테스트를 스펙으로 바꾼다" → v6 P5②·P14③(순수 판정 함수 속성 기반 테스트 필수)의 상위 버전. `hypothesis` + **CrossHair**(Python 계약 기호실행, Z3) 로 `status_codes`·`weekly_window`·채점 함수에 `icontract` 사전/사후조건을 걸고 CI에서 반례 탐색. 비용 낮음, 즉시 가능.
   2. "증명기와 검사기 분리(Rocq 커널만 신뢰)" → v6 P17(증거는 만든 자가 쓸 수 없다)·P23(초록불은 SHA 귀속)과 동일 구조. 유지.
@@ -50,7 +50,7 @@ v6 현재 병목(2026-08-27 진단): 제품 코드 2,156줄 대비 검증 인프
 | 글 | 핵심 교훈 | v6 현 상태 | 적용점 | 우선 |
 |---|---|---|---|---|
 | 1 Redesigning source control | 사람 규모 워크플로(머지 큐·라인 리뷰)는 에이전트 규모에서 깨진다. 리뷰는 "의도" 단위, 툴이 comment-only vs 민감 로직을 구분해 승인 규칙 차등, post-merge 자동 테스트 | git-workflow.md:23 "자동 병합 금지 — 오너가 diff를 읽는다", 모든 PR 동일 게이트 → 34,511줄 적체 | **병합 티어링**: 경로 기반 자동 분류(docs/evidence/fixture-only → CI 초록 시 자동 병합 허용, contracts·hooks·scripts/verify·P19 외부경계 → 오너 필독). P11의 존재 이유는 "제품 diff를 읽는 것"이지 판정서 읽기가 아님 | ★★★ |
-| 6 Harness design (long-running apps) | 생성자/평가자 분리, 평가자는 회의적으로 튜닝, **하네스 부품은 한 번에 하나씩 제거하며 load-bearing 검증**, 평가자는 Playwright로 앱을 직접 사용 | G→V1→V2 분리 있음. 인수 스크립트 29개·억제 2건. 어떤 게이트가 실제로 결함을 잡았는지 집계 없음 | **게이트 회수 감사**: 각 acceptance-*.sh가 실PR에서 RED를 낸 횟수를 git log로 집계, 0회 게이트는 P12 회수 후보. admin 대시보드 V-3는 Playwright로 사용자처럼 클릭하는 평가자로 | ★★★ |
+| 6 Harness design (long-running apps) | 생성자/평가자 분리, 평가자는 회의적으로 튜닝, **하네스 부품은 한 번에 하나씩 제거하며 load-bearing 검증**, 평가자는 Playwright로 앱을 직접 사용 | G→V1→V2 분리 있음. 인수 스크립트 29개·억제 3건. 어떤 게이트가 실제로 결함을 잡았는지 집계 없음 | **게이트 회수 감사**: 각 acceptance-*.sh가 실PR에서 RED를 낸 횟수를 git log로 집계, 0회 게이트는 P12 회수 후보. admin 대시보드 V-3는 Playwright로 사용자처럼 클릭하는 평가자로 | ★★★ |
 | 12 Effective harnesses (long-running agents) | `features.json`(passes만 변경 가능)·`init.sh`·`claude-progress.txt`·세션마다 클린 종료·브라우저 e2e 자기검증 | session-status.sh(HEAD·RED 출력)만 존재. 저니 마스터플랜은 산문 문서. 워크트리 69개가 "반쯤 만든 미문서화 기능" | **features.json 도입**: HumanSearch·Dashboard 기능 목록을 JSON으로(category/description/steps/passes), 코딩 에이전트는 passes만 변경(P5와 동일 규칙). 워크트리마다 `init.sh`·progress 파일 필수, `make red-ledger`가 48h 초과 워크트리를 함께 출력(AC-3) | ★★★ |
 | 11 Demystifying evals | 실제 실패에서 뽑은 20~50 과제, 결정적 채점기 우선, pass^k, 트랜스크립트 정독, 균형 세트(해야/하지 말아야) | strict §6 "실행 가능한 평가셋 없으면 NOT_IMPLEMENTED". contracts/humansearch/saramin-markers.json·fixtures 존재하나 평가셋 아님 | **HumanSearch L0 회귀 평가셋**: 실캡처 화면 20~50개 + 기대 라벨(인증/비인증/캡차/점유) → pass^3 측정. 균형: "제안 보내야 함/보내면 안 됨" 양쪽 포함. 결과를 verify.sh 숫자로 | ★★★ |
 | 17 Context engineering · 16 Agent Skills | 최소 고신호 토큰, 점진적 공개(name/description→본문→참조파일), 서브에이전트는 1~2k 요약만 | 전역 CLAUDE.md(oh-my-claudecode 포함)+원칙 24개+SOT 11파일이 세션 시작에 로드. docs 28,457줄 | **세션 시작 토큰 예산 측정**(session-status.sh에 출력 추가) → SOT INDEX만 선적재, 원칙 상세는 참조 로드. strict/harness/verify SKILL.md의 description을 트리거 관점으로 재작성, 본문 분할 | ★★ |
@@ -107,6 +107,6 @@ v6 현재 병목(2026-08-27 진단): 제품 코드 2,156줄 대비 검증 인프
 6. `contracts-crosshair`: status_codes/weekly_window 계약 + CrossHair 레인 — AC: CI에서 반례 0건 또는 반례 1건을 RED로 보고.
 
 ## 출처
-- 24편 요약: scratchpad/eng_articles_A.md, _B.md, _C.md (아티클별 원문 인용 포함)
+- 24편 요약: `evidence/harness-audit-20261031/anthropic-articles-{01-08,09-16,17-24}.md` (아티클별 원문 인용 포함)
 - 포멀 검증: anthropic.com/research/formal-verification · 부록 PDF(www-cdn.anthropic.com/files/4zrzovbb/website/6867eadf760258fa8b42a504600cd3c036d16358.pdf) · github.com/theorem-labs/oss-verify-proofs · github.com/theorem-labs/oss-verify (.claude/skills/add-project/SKILL.md) · theorem.dev/blog/verified-software-stack · theorem.dev/oss-verify · github.com/libexpat/libexpat/pull/1272 · lwn.net/Articles/1097401
 - v6 실측: docs/sot/coding-principles.md, strict-workflow.md, principles.yaml, docs/engineering/throughput-architecture-diagnosis-goal-2026-08-27.md, scripts/, humansearch/src
