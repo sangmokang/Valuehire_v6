@@ -182,3 +182,51 @@ https://github.com/sangmokang/Valuehire_v6/pull/140 — 기존 브랜치·Draft�
 3. 대량 review queue를 원문 근거로 정리하고 지원 본문·첨부 형식을 늘린다. 점수 네 축은 정본 근거가 생길 때만 계산한다.
 4. Chromium 실행이 가능한 환경에서 실제 관리자 로그인 후 필수 브라우저 시나리오를 수행한다.
 5. 운영 적용은 별도의 검토 대상이다. 기존 관리자 호스트 소스 통합과 추가 migration을 검토한 뒤 승인된 절차로 적용한다. 이번 작업에서 merge/deploy하지 않는다.
+
+## 15. 2026-10-31 후속 — 실행 주체 전체 분류와 주차 공통 Batch 번호
+
+Gmail을 다시 내려받지 않았다. 저장된 원문 100,085건을 parser `2026-10-31.2`로 재정규화했다(8분 58초,
+PROCESSED 437 / EXCLUDED 79,400 / REVIEW_REQUIRED 20,248 / FAILED 0 — 처리 상태 수치는 이전과 동일).
+
+- 실행 주체: 제목 첫 실행 토큰 → 발신자(OpenAI 작업 알림) → 본문 `실행 주체:` 라벨 순으로 명시 근거만 쓴다.
+  충돌·미지원·판단 불가는 OTHER와 사유를 남긴다. `CODEX`, `ASIDE`를 추가했다.
+- 결과 메일(PROCESSED 437): ChatGPT 143 · Claude Code 109 · Codex 39 · Grokbot 30 · Aside 11 ·
+  일반 AI Search 29 · OTHER 76(제목에 도구 표시 없음 60, `Claude-win` 16 — Claude Code 여부 원문상 미확정).
+- 검토 대기 원문에도 분류를 기록한다. ChatGPT 작업 알림 138건은 발신자 근거로 CHATGPT지만
+  후보 프로필 링크가 없어 Batch를 만들지 않고 검토 대기로 둔다.
+- Batch 번호: 실행 주체·확정 여부와 무관하게 주차 공통 순번이다. 기존 895개 P번호 Batch는 내부 ID를
+  유지한 채 한 번만 새 번호를 받았고 이전 번호는 `display_number_history`에 남았다(남은 P번호 0,
+  연도+주차+순번 중복 0). 확정 Batch는 여전히 0이다. 과거 parser 해석의 비활성 Batch도 번호를
+  보존하므로 활성 목록에는 빈 번호가 있다(예: W45-02).
+- SQLite 등록기와 PostgreSQL `admin_ai_search_register_batch`의 ID별 표시번호 비교 차이 0줄.
+  migration-check(공통 순번·확정 시 번호 유지·레거시 1회 전환·W45-100 무잘림) 및 runtime-check PASS.
+- 주차별 실행 주체별 Batch(활성 원문 기준): W45 Grokbot 26 · ChatGPT 10 · 일반 7 · 기타 4 /
+  W44 ChatGPT 73 · Aside 11 · Codex 7 · Claude Code 7 · Grokbot 4 · 일반 13 · 기타 5 /
+  W43 ChatGPT 54 · Claude Code 23 · Codex 12 · 일반 3 · 기타 18 / W42 Claude Code 44 · Codex 12 · ChatGPT 1 · 기타 2.
+- 컨택 보고서 41건에 보고 실행 주체를 컨택 발송 주체와 따로 기록했다(Claude Code 7 · 일반 3 · Aside 2 ·
+  ChatGPT 1 · Codex 1 · Grokbot 1 · OTHER 26). 총계만 있는 보고는 후보에게 배분하지 않는다.
+  Sent 직접 제안 29건(AI 7 / OWNER 20 / UNKNOWN 2)은 후보+포지션 안전 연결이 없어 모두 REVIEW_REQUIRED다.
+  개별 후보에 귀속된 양성·완전 음성 컨택은 네 채널 모두 0건 → 화면은 '확인 필요(NOT_RUN)'.
+
+### 브라우저 직접 확인 (기존 CDP 127.0.0.1:9333, 새 탭 1개만 사용 후 닫음)
+
+로그인 후 http://127.0.0.1:8767/admin/ai-search-weekly 에서 확인했다. 관리자 API 응답 10건 모두 200.
+
+- 최근 4주 2026 W45(10.25~10.31)~W42(10.04~10.10), 일~토 기간 표시. W45 595행, 2페이지 51~100 이동.
+- Batch 칸: `W45-55 (provisional)` · Grokbot · 근거 `subject_marker:grok` · 이전 표시번호 `W45-P55`.
+- W44 실행 주체 Codex 필터 17행(요약 Codex 7), Batch 번호 `W44-88` 필터 14행 전부 해당 번호 포함.
+- 상세 Raw: 포지션별 평가·메일 원본 점수·계약 점수 구성 4개·Gmail 원문 링크·검토 대기 사유 표시.
+- 고점수 미컨택: 'NOT_RUN · 점수 또는 채널별 이력 확인이 완료되지 않았습니다.'
+- 390px 폭에서 페이지 가로 넘침이 있다. 기존 `/admin`, `/weekly`도 동일해 공통 사이드바 레이아웃 문제로
+  판단하고 이번 범위에서 고치지 않았다.
+
+로컬 Google 로그인 콜백은 `127.0.0.1:8767`에서 세션을 발급했다. `localhost:8767`로 시작하면 운영
+로그인 화면으로 이동해 즉시 중단했다(운영 쪽 조작 0건).
+
+### 검증
+
+- HumanSearch pytest 324 passed, ruff PASS, mypy strict 27 source files PASS.
+- 관리자 Vitest 17 passed(2 files). `tsc --noEmit`: AI Search 관련 오류 0. 단, dev 서버가 생성한
+  기존 `/weekly` 페이지 타입에서 TS2344 1건이 나온다(이번에 수정하지 않은 기존 파일).
+- `bash verify.sh` PASS. Codex 적대 검증 V1: 결함 2건 지적 → RED→수정 후 회귀 테스트 통과.
+- CI `verify`는 `suppressions.yaml` 억제 3건의 기한(2026-10-20) 경과로 실패한다. 지시대로 연장하지 않았다.
