@@ -89,7 +89,8 @@ PERSONAL: family, childcare, school enrollment, health, leisure, unrelated frien
 CONSULTANT: ANY discussion about the other ValueConnect consultants listed below, including their
 performance, disputes, pay, personal matters, and indirect/anaphoric continuation of that discussion.
 Do not merely remove their names: label the entire related discussion and surrounding referential turns.
-The user's own business and Kim Choongsoo/Dragon conversations remain eligible except excluded discussions.
+The user's own business and conversations with explicitly exempted people remain eligible
+except for the excluded discussions described by this policy.
 NEUTRAL: greetings/acknowledgments that belong to a clear business exchange. UNCERTAIN: genuinely ambiguous.
 A business-looking filename is not evidence of business content. A callback with no business content
 does not become business evidence just because the recipient works at a company.
