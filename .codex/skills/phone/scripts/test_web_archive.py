@@ -45,6 +45,11 @@ class WebArchiveAcceptance(unittest.TestCase):
         self.decision['excluded'] *= 2
         with self.assertRaisesRegex(ValueError, 'OVERLAP'):
             web_archive.stage(self.capture, self.decision, self.policy)
+        self.capture['messages'][1]['text'] = '고객사. ExampleColleague 논의. 다음 고객사.'
+        self.decision['source_sha256'] = review.digest(self.capture['messages'])
+        self.decision['excluded'] = []
+        with self.assertRaisesRegex(ValueError, 'PRECISE_REVIEW'):
+            web_archive.stage(self.capture, self.decision, self.policy)
 
     def test_summary_only_capture_is_not_presented_as_an_audio_transcript(self):
         self.decision['source_content_kind'] = 'SUMMARY_ONLY'
@@ -60,11 +65,6 @@ class WebArchiveAcceptance(unittest.TestCase):
         self.assertEqual(verdict['source_recording_filenames'], ['recording_261106_140350.m4a'])
         self.decision['excluded_attachment_names'] = ['unknown.m4a']
         with self.assertRaisesRegex(ValueError, 'ATTACHMENT'):
-            web_archive.stage(self.capture, self.decision, self.policy)
-        self.capture['messages'][1]['text'] = '고객사. ExampleColleague 논의. 다음 고객사.'
-        self.decision['source_sha256'] = review.digest(self.capture['messages'])
-        self.decision['excluded'] = []
-        with self.assertRaisesRegex(ValueError, 'PRECISE_REVIEW'):
             web_archive.stage(self.capture, self.decision, self.policy)
 
 

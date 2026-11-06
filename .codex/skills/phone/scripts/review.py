@@ -283,13 +283,21 @@ def ontology_identity(source_sha256, namespace):
 
 
 def source_local_time(path):
-    match = re.search(r'_(\d{6})_(\d{6})\.[^.]+$', Path(path).name)
+    match = re.search(r'_(\d{6})_(\d{6})(?: \(\d+\))?\.[^.]+$', Path(path).name)
     if not match:
         return None
     try:
         return phone.dt.datetime.strptime(match[1] + match[2], '%y%m%d%H%M%S').isoformat()
     except ValueError:
         return None
+
+
+def web_recording_metadata(verdict):
+    names = verdict['source_recording_filenames']
+    recordings = [{'filename': name, 'recorded_local_time': source_local_time(name)} for name in names]
+    return {'recordings': recordings,
+            'recorded_local_time': recordings[0]['recorded_local_time'] if len(recordings) == 1 else None,
+            'recording_time_source': 'source_filename' if len(recordings) == 1 else 'multiple_source_filenames'}
 
 
 def assert_anonymous_denied(url, headers):
@@ -403,6 +411,9 @@ def sync_ontology(out, policy, env_file):
                      'capture_verification': verdict['capture_verification'],
                      'audio_accuracy': 'not_reverified_against_original_audio',
                      'generated_analysis': 'retained_as_attributed_model_output_not_verified_facts'})
+        if 'source_content_kind' in verdict:
+            data['source_content_kind'] = verdict['source_content_kind']
+            data.update(web_recording_metadata(verdict))
     def assert_clean(value):
         if isinstance(value, str) and alias_hits(value, policy['excluded_consultant_aliases'], policy, verdict['source_sha256']):
             raise ValueError('FORBIDDEN_PERSON_IN_SERIALIZED_PAYLOAD')

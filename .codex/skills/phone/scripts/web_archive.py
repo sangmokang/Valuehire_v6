@@ -30,6 +30,17 @@ def stage(capture, decision, policy):
             or not capture.get('attachment_names')):
         raise ValueError('WEB_CAPTURE_INCOMPLETE_OR_AUDIO_ORIGIN_UNCONFIRMED')
     excluded = decision.get('excluded', [])
+    attachments = capture['attachment_names']
+    excluded_attachments = decision.get('excluded_attachment_names', [])
+    if (not isinstance(excluded_attachments, list) or len(set(excluded_attachments)) != len(excluded_attachments)
+            or any(name not in attachments for name in excluded_attachments)):
+        raise ValueError('WEB_EXCLUDED_ATTACHMENT_NOT_IN_SOURCE')
+    retained_attachments = [name for name in attachments if name not in excluded_attachments]
+    if not retained_attachments:
+        raise ValueError('WEB_NO_BUSINESS_AUDIO_ATTACHMENT_REMAINS')
+    content_kind = decision.get('source_content_kind', 'TRANSCRIPT_PRESENT')
+    if content_kind not in ['TRANSCRIPT_PRESENT', 'SUMMARY_ONLY']:
+        raise ValueError('WEB_UNKNOWN_SOURCE_CONTENT_KIND')
     grouped = {i: [] for i in range(len(messages))}
     for item in excluded:
         index = item['message_index']
@@ -38,13 +49,15 @@ def stage(capture, decision, policy):
         text = messages[index]['text']
         start, end = item['start'], item['end']
         if (type(start) is not int or type(end) is not int or not 0 <= start < end <= len(text)
-                or item['reason'] not in ['PERSONAL', 'CONSULTANT', 'MODEL_EXECUTION_ARTIFACT']
+                or item['reason'] not in ['PERSONAL', 'CONSULTANT', 'MODEL_EXECUTION_ARTIFACT', 'NONBUSINESS_CALL']
                 or review.digest(text[start:end]) != item['text_sha256']):
             raise ValueError('WEB_EXCLUSION_NOT_BOUND_TO_EXACT_SOURCE_RANGE')
         grouped[index].append(item)
+    source_note = ('Gemini에 저장된 통화 요약과 후속 업무 대화를 보존한 검수본입니다. '
+                   '이 대화에는 발화별 통화 전문이 없습니다. ' if content_kind == 'SUMMARY_ONLY'
+                   else 'Gemini에 저장된 통화 전문과 후속 업무 대화를 보존한 검수본입니다. ')
     header = (decision['title'] + '\n\n출처: ' + capture['url'] + '\n'
-              '첨부 녹음: ' + ', '.join(capture['attachment_names']) + '\n'
-              'Gemini에 저장된 통화 전문과 후속 업무 대화를 보존한 검수본입니다. '
+              '첨부 녹음: ' + ', '.join(retained_attachments) + '\n' + source_note +
               '원음과의 재대조는 수행하지 않았습니다. Gemini의 요약·분석은 당시 생성된 답변으로 보존합니다.\n'
               '사용자가 제외하도록 지정한 사담·타 컨설턴트 논의 및 모델 실행 흔적은 구간별로 제외했습니다.\n\n')
     parts = [header]
@@ -67,12 +80,14 @@ def stage(capture, decision, policy):
     text = ''.join(parts)
     if review.alias_hits(text, policy['excluded_consultant_aliases'], policy, source_sha):
         raise ValueError('WEB_FORBIDDEN_PERSON_REQUIRES_PRECISE_REVIEW')
+    if any(name in text for name in excluded_attachments):
+        raise ValueError('WEB_EXCLUDED_ATTACHMENT_STILL_IN_BUSINESS_TEXT')
     omitted = sum(s['end'] - s['start'] for s in excluded)
     if source_chars != retained_chars + omitted:
         raise ValueError('WEB_SOURCE_CHARACTER_ACCOUNTING_FAILED')
     verdict = {'status': 'BUSINESS_REVIEWED', 'source_kind': 'gemini_web_conversation',
         'source_sha256': source_sha, 'source_path': capture['url'], 'source_url': capture['url'],
-        'source_recording_filename': capture['attachment_names'][0],
+        'source_recording_filename': retained_attachments[0],
         'policy_sha256': review.digest(policy), 'excluded': excluded,
         'review_strategy': 'codex_full_conversation_review_with_exact_character_accounting',
         'capture_verification': {'method': capture['verification'], 'messages': len(messages),
@@ -81,6 +96,9 @@ def stage(capture, decision, policy):
                          'retained_characters': retained_chars, 'excluded_characters': omitted,
                          'all_source_turns_accounted': True, 'audio_reverified': False},
         'text_sha256': review.digest(text)}
+    # Preserve old staged verdicts byte for byte; new decisions opt into richer provenance.
+    if 'source_content_kind' in decision or 'excluded_attachment_names' in decision:
+        verdict.update(source_content_kind=content_kind, source_recording_filenames=retained_attachments)
     return text, verdict
 
 
