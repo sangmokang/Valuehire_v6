@@ -1,0 +1,4 @@
+interface:
+  display_name: "Phone · 폰"
+  short_description: "통화 녹음을 Gemini로 전문 전사해 Google Docs에 저장"
+  default_prompt: "$phone 이 통화 파일 목록을 Gemini로 빠짐없이 전문 전사하고 Google Docs로 만들어줘."
