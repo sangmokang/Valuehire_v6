@@ -113,6 +113,21 @@ class PhoneAcceptance(unittest.TestCase):
             self.assertEqual(requests[0]['insertText']['text'], (output / 'transcript.txt').read_text())
             self.assertEqual(manifest['document_status'], 'NOT_CREATED')
 
+    def test_large_audio_splits_and_keeps_both_halves(self):
+        record = {'number': 1, 'path': 'unused.m4a', 'sha256': 'hash', 'duration_seconds': 60}
+        class Media:
+            stdout = b'audio'
+        with tempfile.TemporaryDirectory() as directory, \
+             patch.object(self.phone, 'run_media', return_value=Media()), \
+             patch.object(self.phone, 'active_ranges', return_value=[(0, 60)]), \
+             patch.object(self.phone, 'request_transcript', side_effect=[
+                 ValueError('INLINE_AUDIO_TOO_LARGE'), self.response(), self.response()]) as request:
+            result = self.phone.transcribe_one(record, Path(directory), 'model', 60)
+        self.assertEqual(request.call_count, 3)
+        self.assertEqual(result['chunks'][0]['start'], 0)
+        self.assertEqual(result['chunks'][-1]['end'], 60)
+        self.assertEqual(result['status'], 'REVIEW_REQUIRED')
+
 
 if __name__ == '__main__':
     unittest.main()

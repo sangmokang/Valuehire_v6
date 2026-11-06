@@ -190,7 +190,13 @@ def transcribe_one(record, output, model, size):
             audio = run_media(['ffmpeg', '-nostdin', '-v', 'error', '-ss', str(clip_start),
                 '-i', str(path), '-t', str(clip_end - clip_start), '-ac', '1', '-ar', '16000',
                 '-f', 'flac', 'pipe:1']).stdout
-            response = request_transcript(audio, model)
+            try:
+                response = request_transcript(audio, model)
+            except ValueError as error:
+                if str(error).startswith('INLINE_AUDIO_TOO_LARGE') and size > 30:
+                    print(f'SPLIT_AUDIO file={record["number"]} chunk_seconds={size // 2}', flush=True)
+                    return transcribe_one(record, output, model, size // 2)
+                raise
             save_json(cache, {'identity': identity, 'response': response})
         raw_text, clip_words = parse_response(response, clip_end - clip_start)
         kept = []
