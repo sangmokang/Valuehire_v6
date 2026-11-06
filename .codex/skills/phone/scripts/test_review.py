@@ -137,6 +137,17 @@ class ReviewAcceptance(unittest.TestCase):
         unsafe = {**safe, 'storage_path': '../other-private-object'}
         with self.assertRaisesRegex(ValueError, 'OPAQUE'):
             review.assert_safe_pointer(unsafe)
+
+    def test_recording_time_comes_from_source_filename_without_inventing_timezone(self):
+        self.assertEqual(review.source_local_time('/recordings/example_241206_172538.m4a'), '2024-12-06T17:25:38')
+        self.assertIsNone(review.source_local_time('/recordings/no-date.m4a'))
+        self.assertIsNone(review.source_local_time('/recordings/example_241332_999999.m4a'))
+
+    def test_private_object_keys_change_with_content_but_not_json_key_order(self):
+        first = review.private_evidence_path('a' * 64, {'text': 'original', 'date': None})
+        self.assertEqual(first, review.private_evidence_path('a' * 64, {'date': None, 'text': 'original'}))
+        self.assertNotEqual(first, review.private_evidence_path('a' * 64, {'text': 'revised', 'date': None}))
+        self.assertTrue(first.startswith('a' * 64 + '/'))
         with patch.object(review.urllib.request, 'urlopen', side_effect=HTTPError(
                 'https://example.invalid', 403, 'denied', {}, None)):
             review.assert_anonymous_denied('https://example.invalid/object', {})

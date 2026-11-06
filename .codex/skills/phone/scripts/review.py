@@ -260,6 +260,16 @@ def ontology_identity(source_sha256, namespace):
     return identifier, namespace + ':' + source_sha256
 
 
+def source_local_time(path):
+    match = re.search(r'_(\d{6})_(\d{6})\.[^.]+$', Path(path).name)
+    if not match:
+        return None
+    try:
+        return phone.dt.datetime.strptime(match[1] + match[2], '%y%m%d%H%M%S').isoformat()
+    except ValueError:
+        return None
+
+
 def assert_anonymous_denied(url, headers):
     request = urllib.request.Request(url, headers=headers)
     try:
@@ -277,10 +287,19 @@ def assert_safe_pointer(pointer):
         raise ValueError('PUBLIC_INDEX_CONTAINS_UNAPPROVED_FIELDS')
     if (pointer['status'] != 'PRIVATE_BUSINESS_EVIDENCE_VERIFIED'
             or pointer['storage_bucket'] != 'phone-business-evidence'
-            or not re.fullmatch(r'[0-9a-f]{64}\.json', pointer['storage_path'])
+            or not re.fullmatch(r'(?:[0-9a-f]{64}/)?[0-9a-f]{64}\.json', pointer['storage_path'])
             or not re.fullmatch(r'[0-9a-f]{64}', pointer['evidence_sha256'])
             or not re.fullmatch(r'[0-9a-f]{64}', pointer['redaction_policy_sha256'])):
         raise ValueError('PUBLIC_INDEX_IS_NOT_AN_OPAQUE_PRIVATE_REFERENCE')
+    if '/' in pointer['storage_path'] and pointer['storage_path'].split('/')[1] != pointer['evidence_sha256'] + '.json':
+        raise ValueError('PRIVATE_OBJECT_PATH_HASH_MISMATCH')
+
+
+def private_evidence_path(source_sha256, data):
+    if not re.fullmatch(r'[0-9a-f]{64}', source_sha256):
+        raise ValueError('INVALID_SOURCE_SHA256')
+    # Immutable content keys prevent readback from seeing an older cached upload.
+    return source_sha256 + '/' + digest(data) + '.json'
 
 
 def store_private_evidence(env, data, source_sha256):
@@ -316,7 +335,7 @@ def store_private_evidence(env, data, source_sha256):
             assert_anonymous_denied(base + route + probe, anon_headers)
     finally:
         request('/object/' + bucket, {'prefixes': [probe]}, 'DELETE')
-    path = source_sha256 + '.json'
+    path = private_evidence_path(source_sha256, data)
     request('/object/' + bucket + '/' + path, data, 'POST', {'x-upsert': 'true'})
     if request('/object/' + bucket + '/' + path) != data:
         raise ValueError('PRIVATE_EVIDENCE_FULL_READBACK_MISMATCH')
@@ -344,6 +363,8 @@ def sync_ontology(out, policy, env_file):
     identifier, domain = ontology_identity(verdict['source_sha256'], policy['supabase_domain'])
     data = {'schema_version': 1, 'knowledge_state': 'source_evidence', 'body_text': text,
         'google_docs_url': receipt['url'], 'body_sha256': digest(text),
+        'recorded_local_time': source_local_time(verdict['source_path']),
+        'recording_time_source': 'source_filename', 'recording_timezone': 'not_encoded_in_filename',
         'source_sha256': verdict['source_sha256'], 'business_review': 'PASS',
         'completeness': {'source_words': verdict['source_word_count'],
                          'retained_words': len(verdict['kept_word_indices']),
@@ -362,16 +383,29 @@ def sync_ontology(out, policy, env_file):
                 assert_clean(item)
     assert_clean(data)
     env = load_env(env_file)
+    key = env['SUPABASE_SERVICE_ROLE_KEY']
+    base = env['NEXT_PUBLIC_SUPABASE_URL'].rstrip('/') + '/rest/v1/ontology_meta'
+    headers = {'apikey': key, 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json',
+               'Prefer': 'resolution=merge-duplicates,return=representation'}
+    peek = urllib.request.Request(base + '?id=eq.' + identifier + '&select=id,source_type,source_id,data', headers=headers)
+    with urllib.request.urlopen(peek, timeout=30) as response:
+        previous_rows = json.load(response)
+    previous = None
+    if previous_rows:
+        row = previous_rows[0]
+        if row['source_type'] != 'phone_transcript' or row['source_id'] != verdict['source_sha256']:
+            raise ValueError('EXISTING_ONTOLOGY_ROW_IDENTITY_MISMATCH')
+        previous = row['data']
+        assert_safe_pointer(previous)
+        if not (previous['storage_path'] == verdict['source_sha256'] + '.json'
+                or previous['storage_path'].startswith(verdict['source_sha256'] + '/')):
+            raise ValueError('PREVIOUS_PRIVATE_OBJECT_OUTSIDE_SOURCE_SCOPE')
     pointer = store_private_evidence(env, data, verdict['source_sha256'])
     assert_safe_pointer(pointer)
     # ontology_meta is publicly readable in the deployed app: index opaque hashes/pointers only.
     payload = {'id': identifier, 'domain': domain, 'data': pointer,
                'source_type': 'phone_transcript', 'source_id': verdict['source_sha256']}
     assert_clean(payload)
-    key = env['SUPABASE_SERVICE_ROLE_KEY']
-    base = env['NEXT_PUBLIC_SUPABASE_URL'].rstrip('/') + '/rest/v1/ontology_meta'
-    headers = {'apikey': key, 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json',
-               'Prefer': 'resolution=merge-duplicates,return=representation'}
     req = urllib.request.Request(base + '?on_conflict=id', data=json.dumps(payload).encode(), headers=headers, method='POST')
     try:
         with urllib.request.urlopen(req, timeout=30) as response:
@@ -391,6 +425,12 @@ def sync_ontology(out, policy, env_file):
         raise ValueError('ONTOLOGY_ERROR ' + json.dumps(diagnostic)) from None
     if len(written) != 1 or len(rows) != 1 or any(rows[0].get(k) != v for k, v in payload.items()):
         raise ValueError('ONTOLOGY_READBACK_MISMATCH')
+    if previous and previous['storage_path'] != pointer['storage_path']:
+        cleanup = urllib.request.Request(env['NEXT_PUBLIC_SUPABASE_URL'].rstrip('/')
+            + '/storage/v1/object/' + previous['storage_bucket'],
+            data=json.dumps({'prefixes': [previous['storage_path']]}).encode(), headers=headers, method='DELETE')
+        with urllib.request.urlopen(cleanup, timeout=30) as response:
+            response.read()
     phone.save_json(out / 'supabase-receipt.json', {'status': 'SUPABASE_VERIFIED',
         'table': 'ontology_meta', 'id': identifier, 'domain': domain, 'source_sha256': verdict['source_sha256'],
         'body_sha256': digest(text), 'storage_bucket': pointer['storage_bucket'],
@@ -417,6 +457,8 @@ def read_ontology_evidence(identifier, policy, env_file):
         raise ValueError('EVIDENCE_IDENTITY_MISMATCH')
     pointer = row['data']
     assert_safe_pointer(pointer)
+    if not (pointer['storage_path'] == row['source_id'] + '.json' or pointer['storage_path'].startswith(row['source_id'] + '/')):
+        raise ValueError('PRIVATE_OBJECT_SOURCE_MISMATCH')
     request = urllib.request.Request(base + '/storage/v1/object/' + pointer['storage_bucket']
                                      + '/' + pointer['storage_path'], headers=headers)
     with urllib.request.urlopen(request, timeout=30) as response:
