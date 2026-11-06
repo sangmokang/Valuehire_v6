@@ -75,6 +75,8 @@ def stage(capture, decision, policy):
         kept.append(original[cursor:])
         content = ''.join(kept)
         retained_chars += len(content)
+        if not content and decision.get('omit_empty_messages', False):
+            continue
         role = '사용자' if message['role'] == 'user' else 'Gemini'
         parts.append(f'대화 {index + 1} · {role}\n{content}\n\n')
     text = ''.join(parts)
