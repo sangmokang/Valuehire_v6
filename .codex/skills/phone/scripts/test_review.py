@@ -1,5 +1,6 @@
 import copy
 import json
+import io
 from pathlib import Path
 import tempfile
 import unittest
@@ -148,6 +149,42 @@ class ReviewAcceptance(unittest.TestCase):
         self.assertEqual(first, review.private_evidence_path('a' * 64, {'date': None, 'text': 'original'}))
         self.assertNotEqual(first, review.private_evidence_path('a' * 64, {'text': 'revised', 'date': None}))
         self.assertTrue(first.startswith('a' * 64 + '/'))
+
+    def test_only_excluded_words_are_removed_when_one_turn_has_two_topics(self):
+        source = record(['고객사', '채용', 'ExampleColleague', '정산', '그분', '사생활', '다음', '포지션'])
+        for word in source['words']:
+            word['speaker'] = 'spk:0'
+        self.assertEqual(len(review.turns(source)), 1)
+        decision = result(['BUSINESS', 'BUSINESS', 'CONSULTANT', 'CONSULTANT',
+                           'CONSULTANT', 'CONSULTANT', 'BUSINESS', 'BUSINESS'], 'MIXED')
+        decision['unit'] = 'WORD'
+        value = review.filter_record(source, self.policy, [decision, decision])
+        self.assertEqual(value['kept_word_indices'], [0, 1, 6, 7])
+        self.assertEqual([w['text'] for w in value['record']['words']], ['고객사', '채용', '다음', '포지션'])
+
+    def test_missed_consultant_topic_requires_review_instead_of_dropping_whole_turn(self):
+        source = record(['채용', 'ExampleColleague', '다음업무'])
+        for word in source['words']:
+            word['speaker'] = 'spk:0'
+        decision = result(['BUSINESS'] * 3)
+        decision['unit'] = 'WORD'
+        with self.assertRaisesRegex(ValueError, 'PRECISE_REVIEW'):
+            review.filter_record(source, self.policy, [decision, decision])
+
+    def test_review_input_preserves_annotations_that_contain_spaces(self):
+        source = record(['두 단어', '다음 발언'])
+        for word in source['words']:
+            word['speaker'] = 'spk:0'
+        decision = result(['BUSINESS', 'BUSINESS'])
+        decision['unit'] = 'WORD'
+        response = {'candidates': [{'finishReason': 'STOP', 'content': {'parts': [
+            {'text': json.dumps(decision)}]}}]}
+        with patch.object(review.os, 'getenv', return_value='test'), patch.object(
+                review.urllib.request, 'urlopen', return_value=io.BytesIO(json.dumps(response).encode())) as network:
+            review.model_review(review.turns(source), self.policy, 'test-model')
+        sent = json.loads(network.call_args.args[0].data)['contents'][0]['parts'][0]['text']
+        dialogue = json.loads(sent.split('\nDIALOGUE:\n')[1])
+        self.assertEqual(dialogue[0]['words'], [{'id': 1, 'text': '두 단어'}, {'id': 2, 'text': '다음 발언'}])
         with patch.object(review.urllib.request, 'urlopen', side_effect=HTTPError(
                 'https://example.invalid', 403, 'denied', {}, None)):
             review.assert_anonymous_denied('https://example.invalid/object', {})
