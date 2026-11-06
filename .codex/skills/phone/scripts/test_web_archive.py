@@ -41,6 +41,16 @@ class WebArchiveAcceptance(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'INCOMPLETE'):
                 web_archive.stage(changed, self.decision, self.policy)
 
+    def test_fully_excluded_execution_prompt_has_no_empty_business_section(self):
+        self.decision['omit_empty_messages'] = True
+        text = self.capture['messages'][0]['text']
+        self.decision['excluded'].append({'message_index': 0, 'start': 0, 'end': len(text),
+            'reason': 'MODEL_EXECUTION_ARTIFACT', 'text_sha256': review.digest(text)})
+        body, verdict = web_archive.stage(self.capture, self.decision, self.policy)
+        self.assertNotIn('대화 1 · 사용자', body)
+        self.assertEqual(verdict['completeness']['source_characters'],
+                         sum(len(m['text']) for m in self.capture['messages']))
+
     def test_overlapping_exclusions_fail_and_missed_consultant_is_not_published(self):
         self.decision['excluded'] *= 2
         with self.assertRaisesRegex(ValueError, 'OVERLAP'):
