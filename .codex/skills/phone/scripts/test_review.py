@@ -93,6 +93,10 @@ class ReviewAcceptance(unittest.TestCase):
         self.assertEqual(review.alias_hits('sleeve', ['Lee']), [])
         self.assertEqual(review.alias_hits('LEE 관련 내용', ['Lee']), ['Lee'])
 
+    def test_korean_alias_inside_unrelated_word_is_not_a_person(self):
+        self.assertEqual(review.alias_hits('국민수당 안내', ['민수']), [])
+        self.assertEqual(review.alias_hits('민수님의 내용', ['민수']), ['민수'])
+
     def test_same_name_external_person_exception_is_source_and_quote_bound(self):
         policy = copy.deepcopy(self.policy)
         policy['nonconsultant_identity_exceptions'] = [{'source_sha256': 'source-one', 'alias': 'ExampleColleague',

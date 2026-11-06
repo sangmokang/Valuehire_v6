@@ -60,7 +60,9 @@ def alias_hits(text, aliases, policy=None, source_sha256=None):
         if name.isascii():
             matched = re.search(r'(?i)(?<![a-z])' + re.escape(name) + r'(?![a-z])', text)
         else:
-            matched = name in text
+            # Korean names may take particles, but a suffix of a different word
+            # (for example a name occurring inside a slogan) is not that person.
+            matched = re.search(r'(?<![가-힣A-Za-z])' + re.escape(name), text)
         if matched:
             found.append(name)
     return found
@@ -381,17 +383,26 @@ def sync_ontology(out, policy, env_file):
     if alias_hits(text, policy['excluded_consultant_aliases'], policy, verdict['source_sha256']):
         raise ValueError('FORBIDDEN_PERSON_IN_ONTOLOGY_PAYLOAD')
     identifier, domain = ontology_identity(verdict['source_sha256'], policy['supabase_domain'])
+    web_source = verdict.get('source_kind') == 'gemini_web_conversation'
+    if web_source:
+        import web_archive
+        web_archive.verify_staged(out, policy)
     data = {'schema_version': 1, 'knowledge_state': 'source_evidence', 'body_text': text,
         'google_docs_url': receipt['url'], 'body_sha256': digest(text),
-        'recorded_local_time': source_local_time(verdict['source_path']),
+        'recorded_local_time': source_local_time(verdict.get('source_recording_filename', verdict['source_path'])),
         'recording_time_source': 'source_filename', 'recording_timezone': 'not_encoded_in_filename',
         'source_sha256': verdict['source_sha256'], 'business_review': 'PASS',
-        'completeness': {'source_words': verdict['source_word_count'],
+        'completeness': verdict['completeness'] if web_source else {'source_words': verdict['source_word_count'],
                          'retained_words': len(verdict['kept_word_indices']),
                          'excluded_words': verdict['source_word_count'] - len(verdict['kept_word_indices']),
                          'all_source_turns_accounted': True},
         'redaction_policy_sha256': verdict['policy_sha256'],
         'review_strategy': verdict.get('review_strategy', 'two_model_review')}
+    if web_source:
+        data.update({'source_kind': 'gemini_web_conversation', 'source_url': verdict['source_url'],
+                     'capture_verification': verdict['capture_verification'],
+                     'audio_accuracy': 'not_reverified_against_original_audio',
+                     'generated_analysis': 'retained_as_attributed_model_output_not_verified_facts'})
     def assert_clean(value):
         if isinstance(value, str) and alias_hits(value, policy['excluded_consultant_aliases'], policy, verdict['source_sha256']):
             raise ValueError('FORBIDDEN_PERSON_IN_SERIALIZED_PAYLOAD')
