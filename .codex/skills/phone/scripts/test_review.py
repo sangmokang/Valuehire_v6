@@ -147,6 +147,15 @@ class ReviewAcceptance(unittest.TestCase):
         self.assertEqual(review.source_local_time('/recordings/example_241206_172538.m4a'), '2024-12-06T17:25:38')
         self.assertIsNone(review.source_local_time('/recordings/no-date.m4a'))
         self.assertIsNone(review.source_local_time('/recordings/example_241332_999999.m4a'))
+        self.assertEqual(review.source_local_time('/recordings/example_261106_140350 (1).m4a'), '2026-11-06T14:03:50')
+
+    def test_multi_recording_web_source_does_not_invent_one_recording_time(self):
+        value = review.web_recording_metadata({'source_recording_filenames': [
+            'example_261106_140350 (1).m4a', 'example_261107_090000.m4a']})
+        self.assertIsNone(value['recorded_local_time'])
+        self.assertEqual(value['recording_time_source'], 'multiple_source_filenames')
+        self.assertEqual([r['recorded_local_time'] for r in value['recordings']],
+                         ['2026-11-06T14:03:50', '2026-11-07T09:00:00'])
 
     def test_private_object_keys_change_with_content_but_not_json_key_order(self):
         first = review.private_evidence_path('a' * 64, {'text': 'original', 'date': None})
