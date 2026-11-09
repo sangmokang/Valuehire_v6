@@ -30,7 +30,7 @@ for url in \
   fi
 done
 
-for phrase in '같은 기간' 'cutoff' '공통 ID' '미검증' 'W45는 원형' 'W46은 live'; do
+for phrase in '같은 기간' 'cutoff' '공통 ID' '미검증' 'W45는 원형' 'live 형식 사례'; do
   if ! grep -Fq "$phrase" "$PROMPT"; then
     echo "FAIL: 공용 프롬프트에 대사/역할 조건이 없음: $phrase"
     fail=1
