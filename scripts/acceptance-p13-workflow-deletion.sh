@@ -211,6 +211,20 @@ demo block "V1e-1 중첩 따옴표 뒤 게이트 명령 삭제" \
   "seed_probe \"\$NESTED_WF\" && perl -pi -e 's/; bash scripts\/acceptance-0-6\.sh\$//' $PW && ! grep -q 'acceptance-0-6' $PW" \
   "git add $PW && git commit -qm 'ci: drop gate after nested quotes'"
 
+# ── V1 6차(Codex thread 01a1d021-89de-7a60-bb44-e934fabfd943) 반례 — extglob 안의 # ──
+EXTGLOB_WF='on: push
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: gate
+        run: |
+          shopt -s extglob
+          echo @(#|foo); bash scripts/acceptance-0-6.sh'
+demo block "V1f-1 extglob 패턴 안 # 뒤 게이트 명령 삭제" \
+  "seed_probe \"\$EXTGLOB_WF\" && perl -pi -e 's/; bash scripts\/acceptance-0-6\.sh\$//' $PW && ! grep -q 'acceptance-0-6' $PW" \
+  "git add $PW && git commit -qm 'ci: drop gate after extglob'"
+
 if [ "$(orig_state)" != "$ORIG_BEFORE" ]; then
   echo "FAIL: 시연이 원본 저장소를 변경했다"; fail=1
 fi
