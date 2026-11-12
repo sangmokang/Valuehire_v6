@@ -84,6 +84,15 @@ demo pass "스킬 local-checks 정상 추가(counter)" \
   "printf '\necho probe\n' >> $LC && tail -1 $LC | grep -q probe" \
   "git add $LC && git commit -qm 'skill: add probe'"
 
+# ── V1(Codex 2026-11-12) 반례 — 파일명 점을 이스케이프·문자클래스로 쓴 자기제외 ──
+demo block "V1-4a 이스케이프한 점(local-checks\\.sh)" \
+  "printf '%s\n' '' 'keep=\$(git ls-files | grep -v '\''local-checks\\.sh'\'')' >> $LC && grep -qF 'local-checks\\.sh' $LC" \
+  "git add $LC && git commit -qm 'weaken: escaped self-exempt'"
+
+demo block "V1-4b 문자클래스 점(verify[.]yml)" \
+  "printf '      - name: probe\n        run: git ls-files | grep -v \"verify[.]yml\"\n' >> $WF && grep -qF 'verify[.]yml' $WF" \
+  "git add $WF && git commit -qm 'weaken: bracket self-exempt'"
+
 if [ "$(orig_state)" != "$ORIG_BEFORE" ]; then
   echo "FAIL: 시연이 원본 저장소를 변경했다"; fail=1
 fi

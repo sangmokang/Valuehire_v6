@@ -97,6 +97,57 @@ demo pass "워크플로 밖 경로의 줄 삭제(counter · 리팩터링 오탐 
   "perl -ni -e 'print unless /echo \"OK: docs\/sot 재구성 AC 전부 충족\"/' scripts/check-docs-sot.sh && ! grep -q 'OK: docs/sot 재구성 AC 전부 충족' scripts/check-docs-sot.sh" \
   "git add scripts/check-docs-sot.sh && git commit -qm 'refactor: drop echo'"
 
+# ── V1(Codex 2026-11-12 thread 01a1cffa) 반례 — 텍스트 판정기를 YAML 구조 판정으로 바꾼 근거 ──
+PW=.github/workflows/probe.yml
+seed_probe() { # 시드 워크플로를 먼저 커밋한다(추가만이므로 훅 ON/OFF 모두 통과해야 한다)
+  printf '%s\n' "$1" > $PW && git add $PW && git commit -qm 'seed probe workflow'
+}
+
+demo block "V1-1 삭제한 스텝 문구를 env 문자열에 미끼로 남김" \
+  "perl -ni -e 'print unless /name: 인수 검사 hs-a4 |run: bash scripts\/verify\/run-acceptance\.sh scripts\/acceptance-hs-a4\.sh\$/' $WF && printf 'env:\n  DECOY: |\n    - name: 인수 검사 hs-a4 (대용량·산출물 차단이 실제로 도는가)\n    run: bash scripts/verify/run-acceptance.sh scripts/acceptance-hs-a4.sh\n' >> $WF && ! grep -q '^      - name: 인수 검사 hs-a4 ' $WF" \
+  "git add $WF && git commit -qm 'ci: hide hs-a4 in env'"
+
+ANCHOR_WF='on: push
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: gate
+        run: &checks |
+          bash scripts/acceptance-0-6.sh
+          bash scripts/acceptance-hs-a4.sh'
+demo block "V1-2a 앵커 run 블록 안 명령 1줄 삭제" \
+  "seed_probe \"\$ANCHOR_WF\" && perl -ni -e 'print unless /bash scripts\/acceptance-hs-a4\.sh/' $PW && ! grep -q hs-a4 $PW" \
+  "git add $PW && git commit -qm 'ci: drop anchored line'"
+
+FLOW_WF='on: push
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - {name: keep, run: echo keep}
+      - {name: gate, run: bash scripts/acceptance-0-6.sh}'
+demo block "V1-2b flow 형식 스텝 삭제" \
+  "seed_probe \"\$FLOW_WF\" && perl -ni -e 'print unless /name: gate/' $PW && ! grep -q 'name: gate' $PW" \
+  "git add $PW && git commit -qm 'ci: drop flow step'"
+
+RUNFIRST_WF='on: push
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          bash scripts/acceptance-0-6.sh
+        env:
+          LABEL: old'
+demo pass "V1-3 run 이 첫 키인 스텝의 형제 env 값 변경(counter)" \
+  "seed_probe \"\$RUNFIRST_WF\" && perl -pi -e 's/LABEL: old/LABEL: new/' $PW && grep -q 'LABEL: new' $PW" \
+  "git add $PW && git commit -qm 'ci: relabel'"
+
+demo pass "스텝 순서 이동(counter)" \
+  "seed_probe \"\$FLOW_WF\" && printf '%s\n' 'on: push' 'jobs:' '  probe:' '    runs-on: ubuntu-latest' '    steps:' '      - {name: gate, run: bash scripts/acceptance-0-6.sh}' '      - {name: keep, run: echo keep}' > $PW" \
+  "git add $PW && git commit -qm 'ci: reorder'"
+
 if [ "$(orig_state)" != "$ORIG_BEFORE" ]; then
   echo "FAIL: 시연이 원본 저장소를 변경했다"; fail=1
 fi
