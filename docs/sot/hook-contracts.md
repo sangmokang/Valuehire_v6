@@ -1,6 +1,6 @@
 # Valuehire v6 — 로컬 강제 장치(git hook) 계약 (SOT)
 
-최종 갱신: 2026-08-22
+최종 갱신: 2026-11-12
 근거(도입 배경·적대검증·6종 위반 시연): `docs/engineering/hook-enforcement-goal-2026-08-07.md`
 
 ## 현재 규칙 — 입출력 계약
@@ -12,8 +12,15 @@
 출력  : exit 0 (통과) | exit 1 (차단)
         차단 시 stderr: "BLOCKED: <검사이름> — <파일경로> (패턴: <패턴이름>)"
         ※ 매칭된 실제 값은 절대 출력하지 않는다
-검사  : ① 비밀 스캔(verify.sh 위임, VERIFY_SCAN_SOURCE=index) ② 검사기 자기 제외
-        ③ 검사 약화 패턴 ④ 만료 없는/지난 억제 ⑤ LLM 출력→판정 수치 ⑥ 외부효과 모듈 네트워크 0건
+검사  : ⓪ CI 워크플로(.github/workflows/*)의 스텝·검사 줄 삭제 — D·M 을 --no-renames 로 따로
+          구해 HEAD 판 검사 줄(스텝 키 줄 · run 블록 본문) 중 인덱스 판에서 사라진 줄을 삭제로
+          본다. 파일 삭제·밖으로 rename·주석화·명령 수정 = 차단, 이동·재들여쓰기·주석 삭제 = 통과.
+          워크플로 밖 경로의 삭제는 보지 않는다(리팩터링 오탐 방지). 삭제 줄 내용은 출력하지 않는다.
+          회귀: scripts/acceptance-p13-workflow-deletion.sh (2026-11-12)
+        ① 비밀 스캔(verify.sh 위임, VERIFY_SCAN_SOURCE=index)
+        ② 검사기 자기 제외 — 대상: verify.sh · scripts/*.sh · hooks/* · .github/workflows/* ·
+          .claude/skills/*/local-checks.sh (회귀: scripts/acceptance-gate-scope-selfexempt.sh)
+        ③ 검사 약화 패턴(추가된 줄만) ④ 만료 없는/지난 억제 ⑤ LLM 출력→판정 수치 ⑥ 외부효과 모듈 네트워크 0건
         ⑦ 대용량 파일(1,048,576 바이트 초과) · 산출물 경로(artifacts/·data/·private-reviews/·
           *.db·*.sqlite·*.sqlite3) 차단 — P21. gitignore 가 `git add -f` 로 우회되므로
           차단 지점을 훅에도 둔다. 크기는 작업트리가 아니라 **인덱스 blob**에서 잰다
