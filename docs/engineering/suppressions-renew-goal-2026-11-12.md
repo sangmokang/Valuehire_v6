@@ -172,3 +172,18 @@ R7(같은 지점 반복 정정) 판단: 인라인 주석 제거라는 오탐 축
 - [low] 같은 run 안 따옴표 감싸기 무력화 → 추가형 무력화(비범위) 행에 명시.
 - [low] verdict.json·goal 계약 문구 낡음 → 갱신.
 - 확인: HEAD 훅은 origin/main 훅의 상위집합(입력 8종 대조), V2 2차 한계 과장 없이 기재, 범위 밖 약화 없음.
+
+### V1 8차 — Codex · thread `01a1d02c-b207-7953-a3d7-c050007bcaaf` · HEAD `e7de5d3`
+
+판정: **approve** — "No concrete high/critical undocumented single-commit bypass or out-of-scope weakening found against origin/main."
+
+### V2 4차(최종) — Claude critic 리셋 컨텍스트 · HEAD `572b28c`
+
+판정: **PASS** (high 0 · medium 0 · low 1 · info 1)
+- [low] 워크플로 이름에 glob 문자(`x?.yml`)가 있으면 `git ls-files -s -- "$f"` 가 pathspec 으로 다른 파일 mode 를 읽어 symlink T 를 놓침 → RED(`367e62f`) → GREEN(`fdef259`, `:(literal)`).
+- [info] `${esc//./$dotpat}` 는 bash 3.2 에서만 확인. bash 5.2 patsub_replacement 는 `&` 에만 작용하고 dotpat 에 `&` 없음 — CI(ubuntu) 초록으로 확인할 것.
+- 확인: 상위집합(약화 없음), 원장 연장 2건·해소, 주장 과장 없음.
+
+### 종합 (G → V1 → V2)
+
+V1 최종 approve(e7de5d3) · V2 최종 PASS(572b28c, low 1건은 fdef259 로 반영) · G 검증 전부 exit 0 → 3자 일치. 판정 파일: `docs/engineering/verdicts/suppressions-renew.verdict.json`.

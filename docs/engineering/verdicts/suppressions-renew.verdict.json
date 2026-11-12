@@ -4,31 +4,182 @@
   "goal": "docs/engineering/suppressions-renew-goal-2026-11-12.md",
   "generator": {
     "role": "G",
-    "red_commits": ["a17aef4", "9253469", "1c03ba3", "9afec36", "8da3e1b", "34bff75"],
-    "green_commits": ["0feb1e0", "f5976c9", "8178735", "5db49de", "db3449e"],
+    "red_commits": [
+      "a17aef4",
+      "9253469",
+      "1c03ba3",
+      "9afec36",
+      "8da3e1b",
+      "34bff75",
+      "26072d1",
+      "f652d94",
+      "03ddab4",
+      "4471e65",
+      "367e62f"
+    ],
+    "green_commits": [
+      "0feb1e0",
+      "f5976c9",
+      "8178735",
+      "5db49de",
+      "db3449e",
+      "0be00b3",
+      "6eadd6c",
+      "cdb12e0",
+      "c0a8119",
+      "fdef259"
+    ],
+    "regression_only_commits": [
+      "624c3bb",
+      "572b28c"
+    ],
     "evidence": [
-      {"command": "./verify.sh", "exit_code": 0, "artifact": "PASS: no secret-pattern match in any tracked file, .env not tracked"},
-      {"command": "CI '억제 만료 스캔' 스텝 run 본문(yaml 추출) bash -eo pipefail", "exit_code": 0, "artifact": "PASS: 억제 2건 전부 유효 기한 내"},
-      {"command": "bash scripts/verify/run-acceptance.sh scripts/acceptance-gate-scope-selfexempt.sh", "exit_code": 0, "artifact": "판정 10건, CHECKED 9"},
-      {"command": "bash scripts/verify/run-acceptance.sh scripts/acceptance-p13-workflow-deletion.sh", "exit_code": 0, "artifact": "판정 19건, CHECKED 18"},
-      {"command": "manual mutants A~F (스크래치 클론, 원본 무변경)", "exit_code": 1, "artifact": "6종 전부 사멸. F 는 초판에서 생존 → fail-closed 시연(624c3bb) 추가 후 사멸"}
+      {
+        "command": "./verify.sh",
+        "exit_code": 0,
+        "artifact": "PASS: no secret-pattern match in any tracked file, .env not tracked (e7de5d3, 작업트리 무변경 실행)"
+      },
+      {
+        "command": "CI '억제 만료 스캔' 스텝 run 본문(yaml 추출) bash -eo pipefail",
+        "exit_code": 0,
+        "artifact": "PASS: 억제 2건 전부 유효 기한 내"
+      },
+      {
+        "command": "run-acceptance acceptance-gate-scope-selfexempt.sh",
+        "exit_code": 0,
+        "artifact": "판정 10건, CHECKED 9"
+      },
+      {
+        "command": "run-acceptance acceptance-p13-workflow-deletion.sh",
+        "exit_code": 0,
+        "artifact": "판정 26건, CHECKED 25 (fdef259)"
+      },
+      {
+        "command": "관련 기존 인수 10종(0-7·ci-step-integrity·verify-ac-m·principles-check·principles-mutations·0-6·hs-a4·silent-failure-lint·guard-global-skill-files·semantic-mutations)",
+        "exit_code": 0,
+        "artifact": "e7de5d3 에서 status-before/after 모두 빈 값, 전부 OK"
+      },
+      {
+        "command": "manual mutants A~F (스크래치 클론)",
+        "exit_code": 1,
+        "artifact": "6종 전부 사멸(F 는 624c3bb 추가 후)"
+      }
     ]
   },
   "v1": {
     "engine": "codex adversarial-review --base origin/main (fresh, read-only)",
     "rounds": [
-      {"thread": "01a1cffa-ad63-7011-8ab4-18b1d3fb08e7", "verdict": "needs-attention", "findings": 4, "resolved_by": ["9afec36", "8178735"]},
-      {"thread": "01a1d002-8dc8-74f2-b89f-591f265a63db", "verdict": "needs-attention", "findings": 2, "resolved_by": ["8da3e1b", "5db49de"]},
-      {"thread": "01a1d009-b161-7741-b96d-07c8457fe416", "verdict": "needs-attention", "findings": 2, "resolved_by": ["34bff75", "db3449e"]},
-      {"thread": "01a1d00f-eac1-7541-a650-14d12d49890e", "verdict": "approve", "findings": 0}
+      {
+        "round": 1,
+        "thread": "01a1cffa-ad63-7011-8ab4-18b1d3fb08e7",
+        "verdict": "needs-attention",
+        "findings": 4
+      },
+      {
+        "round": 2,
+        "thread": "01a1d002-8dc8-74f2-b89f-591f265a63db",
+        "verdict": "needs-attention",
+        "findings": 2
+      },
+      {
+        "round": 3,
+        "thread": "01a1d009-b161-7741-b96d-07c8457fe416",
+        "verdict": "needs-attention",
+        "findings": 2
+      },
+      {
+        "round": 4,
+        "thread": "01a1d00f-eac1-7541-a650-14d12d49890e",
+        "verdict": "approve",
+        "findings": 0
+      },
+      {
+        "round": 5,
+        "thread": "01a1d01b-f71e-7011-9738-005693a8907c",
+        "verdict": "needs-attention",
+        "findings": 1
+      },
+      {
+        "round": 6,
+        "thread": "01a1d021-89de-7a60-bb44-e934fabfd943",
+        "verdict": "needs-attention",
+        "findings": 1
+      },
+      {
+        "round": 7,
+        "thread": "01a1d026-9a27-7f30-8329-1e57631125d9",
+        "verdict": "needs-attention",
+        "findings": 1
+      },
+      {
+        "round": 8,
+        "thread": "01a1d02c-b207-7953-a3d7-c050007bcaaf",
+        "verdict": "approve",
+        "findings": 0,
+        "head": "e7de5d3"
+      }
     ]
   },
-  "v2": null,
+  "v2": {
+    "engine": "Claude critic, reset context, read-only (goal + verdict.json 입력)",
+    "rounds": [
+      {
+        "round": 1,
+        "head": "7d531b3",
+        "verdict": "FAIL",
+        "findings": "high2 medium1 low1"
+      },
+      {
+        "round": 2,
+        "head": "700a98a",
+        "verdict": "FAIL",
+        "findings": "medium1(문서화로 해소) low2"
+      },
+      {
+        "round": 3,
+        "head": "d37392f",
+        "verdict": "FAIL",
+        "findings": "medium1(c0a8119 로 이미 해소) low3"
+      },
+      {
+        "round": 4,
+        "head": "572b28c",
+        "verdict": "PASS",
+        "findings": "low1(fdef259 로 수정) info1(bash 5.2 patsub — CI 로 확인)"
+      }
+    ]
+  },
   "failed_attempts": [
-    {"what": "줄 텍스트 기반 삭제 판정기(f5976c9)", "why": "V1 1차: env 미끼·앵커·flow 우회, 형제 키 오탐"},
-    {"what": "awk 로 만든 선택적 백슬래시 패턴", "why": "생성 결과가 \\? 로 모호. 브래킷 [\\] 은 ugrep 오류 → (\\\\)? 로 교체"},
-    {"what": "mutant F 생존", "why": "판정 불가 경로 시연 부재 → 624c3bb 로 보강"}
+    {
+      "what": "줄 텍스트 기반 삭제 판정기(f5976c9)",
+      "why": "V1 1차: env 미끼·앵커·flow 우회, 형제 키 오탐"
+    },
+    {
+      "what": "파일명 경계(db3449e)",
+      "why": "V2 1차: 기존 scripts/*.sh 자기제외 약화 → 0be00b3 에서 철회"
+    },
+    {
+      "what": "인덱스 판 판정기 실행",
+      "why": "V2 1차: 같은 커밋 변조 → HEAD 판"
+    },
+    {
+      "what": "셸 인라인 주석 제거(따옴표 추적 → 블랙리스트 → 화이트리스트)",
+      "why": "V1 2·3·5·6·7차 연속 우회(R7) → c0a8119 에서 기능 제거"
+    },
+    {
+      "what": "mutant F 생존",
+      "why": "판정 불가 경로 시연 부재 → 624c3bb"
+    }
   ],
-  "three_way_agree": null,
-  "status": "pending-v2"
+  "post_verdict_delta": "V1 8차(e7de5d3) 이후: 회귀 시연 2건 + 문서 + fdef259(literal pathspec 1줄, V2 4차 권고 반영)",
+  "three_way_agree": true,
+  "status": "PASS — CI 초록·merge 전까지 완료 아님",
+  "documented_limits": [
+    "판정기 변조 후 2커밋/--amend 삭제(로컬 훅 근본 한계)",
+    "추가형 무력화(shell·defaults·exit 0·따옴표 감싸기·트리거 필터)",
+    "실행되지 않는 run 으로 이동",
+    "임의 정규식·-Fv 자기제외",
+    "run 안 셸 주석 변경 보수적 오탐",
+    "더 긴 다른 파일명 제외의 자기제외 오탐(기존부터)"
+  ]
 }
