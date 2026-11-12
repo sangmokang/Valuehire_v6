@@ -144,6 +144,14 @@ jobs:
       - name: 인수 검사 0-7 (훅이 위반 6종을 실제로 차단하는가)
         run: bash scripts/verify/run-acceptance.sh scripts/acceptance-0-7.sh
 
+      - name: 인수 검사 gate-scope-selfexempt (워크플로·스킬 local-checks 자기제외 차단)
+        # suppressions.yaml gate-scope-gaps (1) 을 해소한 근거. 억제를 지운 대신 이 회귀가 CI 에 남는다.
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-gate-scope-selfexempt.sh
+
+      - name: 인수 검사 p13-workflow-deletion (워크플로 스텝·검사 줄 삭제 차단)
+        # suppressions.yaml p13-deletion-blindspot 을 해소한 근거. 워크플로 밖 삭제는 통과(오탐 방지)도 함께 본다.
+        run: bash scripts/verify/run-acceptance.sh scripts/acceptance-p13-workflow-deletion.sh
+
       - name: 인수 검사 0-5 (push · CI 연결)
         # origin/main==main 을 검사하므로 main 참조가 유효한 경우에만 의미가 있다.
         if: github.ref == 'refs/heads/main'
