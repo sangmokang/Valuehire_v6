@@ -24,6 +24,8 @@ description: "고객사 회사소개(SOT-client)를 외부 배포용 브리프�
 4. **검증**: Grok 결과는 단서다. LinkedIn URL은 Grok 응답의 실제 링크나 공개 검색 결과에 있는 것만 쓰고, 이름·회사가 맞지 않으면 버린다. URL을 조합해 만들지 않는다. 핵심 수치는 원문 페이지를 열어 대조한다.
 5. **데이터 작성**: `examples/wrtn.json` 형식으로 `data/<slug>.json`을 만든다. 없는 항목은 키를 비우거나 `확인 불가`로 둔다(그래프는 데이터가 있을 때만 그려진다).
 5-1. **병합**: 조사 초안 `data/<slug>.json` + 볼타 `bolta/<slug>.json` + Grok `grok/<slug>.json`을 `python merge.py <작업폴더> <slug>`로 합쳐 `final/<slug>.json`을 만든다. LinkedIn은 `https://…linkedin.com/in/<id>` 형식만 통과시킨다. 볼타가 429로 막혀 Grok이 대신 읽은 수치는 `"via":"grok"`으로 저장하고 문서 출처에 "Grok 경유 조회, 원문 대조 전"이 붙는다(다음 실행에서 볼타 원문으로 교체).
+   - **웹 검색 우선 (오너 지시 2026-11-12)**: 4대보험은 브라우저로 볼타를 열지 말고 WebSearch("<법인명> 국민연금 가입자")로 찾는다. 결과를 `webnp/<slug>.json` `{np,npd,ei,sa,source_url,source_title,matches_grok}`로 저장하면 merge가 Grok 경유 값을 대체하고 출처를 그 페이지로 단다.
+   - **LinkedIn 웹 검색**: Grok 링크가 없는 인물은 WebSearch("<이름> <회사> linkedin")로 찾고, 결과에 실제로 나온 `linkedin.com/in/` URL 중 제목·스니펫에 이름과 회사가 함께 있는 것만 `li/found_*.json` `[{slug,name,linkedin}]`에 넣는다. merge가 빈 칸에만 채운다.
    - 볼타는 연속 조회 시 429가 난다. 회사 간 6초 이상 간격, 막히면 Grok 경유로 넘기고 나중에 원문 대조.
    - Grok 답은 스트리밍 중에 읽으면 잘린다. 답 끝의 "N개의 소스" 표시가 JSON 뒤에 나온 뒤에 수집한다. 줄바꿈이 섞인 JSON은 공백으로 바꿔 파싱한다.
 6. **렌더·업로드**: `python render.py final/<slug>.json out/<slug>.docx` → Drive `create_file`(contentMimeType docx, 회사 폴더 parentId)로 올리면 Google Docs로 변환된다.
