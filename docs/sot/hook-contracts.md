@@ -16,9 +16,9 @@
           (인덱스 판이 일반 파일이 아니면 — symlink 등 — 즉시 차단)
           scripts/verify/check-workflow-deletion.sh(**HEAD 판** — 같은 커밋 변조 차단, HEAD 에 없으면 차단)로
           판정한다. YAML 을 파싱해 on 트리거 이벤트 이름과
-          jobs.*.steps[*] 의 name·uses·run 줄(주석·빈 줄 제외. 인라인 주석은 # 앞이 평범한 단어 문자·공백·;&| 뿐일 때만 뗀다 — 화이트리스트)과 job uses 를 다중집합 비교 —
+          jobs.*.steps[*] 의 name·uses·run 줄(빈 줄만 제외. 셸 주석은 판별하지 않는다 — run 안 주석 변경도 삭제로 본다, 보수적)과 job uses 를 다중집합 비교 —
           HEAD 에 있고 인덱스에 없는 단위 = 삭제. 파일 삭제·밖으로 rename·주석화·명령 수정·
-          env 미끼·앵커/flow 형식 = 차단, 순서 이동·형제 키(env 등)·주석 변경 = 통과.
+          env 미끼·앵커/flow 형식·run 안 셸 주석 변경 = 차단, 순서 이동·형제 키(env 등)·run 밖 YAML 주석 = 통과.
           파싱 실패 = 차단(fail-closed). 워크플로 밖 경로의 삭제는 보지 않는다(리팩터링 오탐 방지).
           삭제 내용은 출력하지 않는다(job/step 위치만). 회귀: scripts/acceptance-p13-workflow-deletion.sh
           한계: 같은 명령 줄을 실행되지 않는 다른 run(heredoc 본문 등)으로 옮기는 것, 추가형 무력화
