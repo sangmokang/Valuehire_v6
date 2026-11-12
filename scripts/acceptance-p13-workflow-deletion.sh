@@ -167,7 +167,9 @@ jobs:
         run: |
           bash scripts/acceptance-0-6.sh # explain gate
           echo "keep # quoted hash"'
-demo pass "V1b-2 run 줄 인라인 주석만 삭제(counter)" \
+# V1 7차 이후: run 블록 안 셸 주석은 텍스트로 판별할 수 없어(5회 연속 우회) 주석 처리를 없앴다.
+# 그래서 run 안 주석 변경은 **의도된 보수적 차단**이다(goal 입력 영역 표).
+demo block "V1b-2 run 줄 인라인 주석 변경 = 보수적 차단" \
   "seed_probe \"\$INLINE_WF\" && perl -pi -e 's/ # explain gate\$//' $PW && ! grep -q 'explain gate' $PW" \
   "git add $PW && git commit -qm 'ci: drop inline comment'"
 
@@ -184,7 +186,7 @@ jobs:
       - name: gate
         run: |
           bash scripts/acceptance-0-6.sh;# explain gate'
-demo pass "V1c-1 연산자 뒤 붙은 주석(;#)만 삭제(counter)" \
+demo block "V1c-1 연산자 뒤 주석(;#) 변경 = 보수적 차단" \
   "seed_probe \"\$OPCOMMENT_WF\" && perl -pi -e 's/;# explain gate\$/;/' $PW && ! grep -q 'explain gate' $PW" \
   "git add $PW && git commit -qm 'ci: drop op comment'"
 
@@ -224,6 +226,21 @@ jobs:
 demo block "V1f-1 extglob 패턴 안 # 뒤 게이트 명령 삭제" \
   "seed_probe \"\$EXTGLOB_WF\" && perl -pi -e 's/; bash scripts\/acceptance-0-6\.sh\$//' $PW && ! grep -q 'acceptance-0-6' $PW" \
   "git add $PW && git commit -qm 'ci: drop gate after extglob'"
+
+# ── V1 7차(Codex thread 01a1d026-9a27-7f30-8329-1e57631125d9) 반례 — 줄 이어짐 뒤 # 줄이 실제로 실행됨 ──
+CONT_WF='on: push
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: gate
+        run: |
+          echo keep\
+          #; bash scripts/acceptance-0-6.sh
+          echo done'
+demo block "V1g-1 줄 이어짐으로 실행되는 #; 게이트 줄 삭제" \
+  "seed_probe \"\$CONT_WF\" && grep -qF 'echo keep\\' $PW && perl -ni -e 'print unless /^ *#; bash scripts\/acceptance-0-6\.sh\$/' $PW && ! grep -q 'acceptance-0-6' $PW" \
+  "git add $PW && git commit -qm 'ci: drop continued gate'"
 
 if [ "$(orig_state)" != "$ORIG_BEFORE" ]; then
   echo "FAIL: 시연이 원본 저장소를 변경했다"; fail=1
