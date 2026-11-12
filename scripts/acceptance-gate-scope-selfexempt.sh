@@ -44,19 +44,19 @@ demo() {
     echo "FAIL: [$name] 셋업 실패(on=$sON off=$sOFF) — 위반을 만들지 못해 시연 무효"; fail=1; return
   fi
   if [ "$aOFF" -ne 0 ]; then
-    echo "FAIL: [$name] 훅 OFF 에서도 실패(exit=$aOFF) — 대조군 무효"; sed 's/^/    /' "$outdir/a.off" | head -3; fail=1; return
+    echo "FAIL: [$name] 훅 OFF 에서도 실패(exit=$aOFF) — 대조군 무효"; awk 'NR<=3{print "    " $0}' "$outdir/a.off"; fail=1; return
   fi
   if [ "$expect" = block ]; then
     if [ "$aON" -ne 0 ] && grep -q '자기 제외' "$outdir/a.on"; then
       echo "PASS: [$name] 차단됨 (훅ON=$aON · 훅OFF=$aOFF)"
     else
-      echo "FAIL: [$name] 차단되지 않음 (훅ON=$aON · 훅OFF=$aOFF)"; sed 's/^/    /' "$outdir/a.on" | grep BLOCKED | head -3; fail=1
+      echo "FAIL: [$name] 차단되지 않음 (훅ON=$aON · 훅OFF=$aOFF)"; awk '/BLOCKED/{print "    " $0; if (++n == 3) exit}' "$outdir/a.on"; fail=1
     fi
   else
     if [ "$aON" -eq 0 ]; then
       echo "PASS: [$name] 오탐 없음 (훅ON=0 · 훅OFF=0)"
     else
-      echo "FAIL: [$name] 오탐 — 정상 변경이 차단됨 (훅ON=$aON)"; sed 's/^/    /' "$outdir/a.on" | grep BLOCKED | head -3; fail=1
+      echo "FAIL: [$name] 오탐 — 정상 변경이 차단됨 (훅ON=$aON)"; awk '/BLOCKED/{print "    " $0; if (++n == 3) exit}' "$outdir/a.on"; fail=1
     fi
   fi
 }
