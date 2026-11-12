@@ -198,6 +198,19 @@ demo block "V2-3 pull_request 트리거 삭제" \
   "perl -ni -e 'print unless /^  pull_request:\$/' $WF && ! grep -q '^  pull_request:' $WF" \
   "git add $WF && git commit -qm 'ci: drop pr trigger'"
 
+# ── V1 5차(Codex thread 01a1d01b-f71e-7011-9738-005693a8907c) 반례 — 중첩 따옴표로 주석 위장 ──
+NESTED_WF='on: push
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: gate
+        run: |
+          echo "$(printf " #")"; bash scripts/acceptance-0-6.sh'
+demo block "V1e-1 중첩 따옴표 뒤 게이트 명령 삭제" \
+  "seed_probe \"\$NESTED_WF\" && perl -pi -e 's/; bash scripts\/acceptance-0-6\.sh\$//' $PW && ! grep -q 'acceptance-0-6' $PW" \
+  "git add $PW && git commit -qm 'ci: drop gate after nested quotes'"
+
 if [ "$(orig_state)" != "$ORIG_BEFORE" ]; then
   echo "FAIL: 시연이 원본 저장소를 변경했다"; fail=1
 fi
