@@ -20,15 +20,25 @@ def num(s):
     return int(m.group(0).replace(",", "").replace("−", "-")) if m else None
 
 
+def ym(npd):
+    m = re.search(r"(\d{4})년\s*(\d{1,2})월", npd or "")
+    return f"{m.group(1)}.{int(m.group(2)):02d}" if m else None
+
+
 def headcount(b, slug_url):
     ser = []
     for part in (b.get("ser") or "").split(","):
         if ":" in part:
-            ym, n = part.split(":")
-            ser.append({"month": "20" + ym, "count": int(n)})
-    npn = num(b.get("np"))
+            k, n = part.split(":")
+            ser.append({"month": "20" + k.strip(), "count": int(n)})
+    ser.sort(key=lambda x: x["month"])
+    npn, npm = num(b.get("np")), ym(b.get("npd"))
+    mismatch = False
+    if ser and npn is not None and ser[-1]["count"] != npn:
+        mismatch = True  # 시계열 최신값과 공표 최신값이 다르면 시계열을 쓰지 않는다
+        ser = [{"month": npm or ser[-1]["month"], "count": npn}]
     if not ser and npn is not None:
-        ser = [{"month": "2026.09", "count": npn}]
+        ser = [{"month": npm or "기준월 확인 불가", "count": npn}]
     if not ser:
         return None
     other = []
@@ -44,15 +54,35 @@ def headcount(b, slug_url):
         if b.get("h") and b.get("q"):
             body += f' 최근 12개월 입사 {b["h"]}, 퇴사 {b["q"]}입니다.'
         pts.append({"head": "1년 증감", "body": body})
+    if mismatch:
+        pts.append({"head": "추이 생략", "body": "월별 추이의 최신값이 공표 최신값과 달라 추이 그래프를 싣지 않았습니다."})
     pts.append({"head": "기준별 차이", "body": "국민연금에는 대표자가 포함되고, 고용·산재보험은 대표 사업장의 상시근로자 수만 집계해 수치가 다를 수 있습니다."})
     via = " · Grok 경유 조회, 원문 대조 전" if b.get("via") == "grok" else ""
     return {"basis": "국민연금 가입자", "series": ser, "other": other, "points": pts,
             "source": {"title": f'볼타 · {b.get("t", "")} 사업자정보 (국민연금공단·근로복지공단 공공데이터{via})', "url": slug_url}}
 
 
+def is_ceo_title(t):
+    t = t or ""
+    return bool(re.search(r"대표|CEO", t)) and not re.search(r"(전|前)\s*대표|前|former", t, re.I)
+
+
+def pick_top(d, b):
+    if b and b.get("ceo"):
+        names = [x.strip() for x in re.split(r"[,·]", b["ceo"]) if x.strip()]
+        if names:
+            return {"title": "공동대표" if len(names) > 1 else "대표이사", "name": " · ".join(names)}
+    exs = d.get("executives", [])
+    ceo = next((e for e in exs if is_ceo_title(e.get("title"))), None)
+    if ceo:
+        return {"title": "대표이사", "name": ceo["name"]}
+    return {"title": "대표", "name": "확인 불가"}
+
+
 def main(root, slug):
     d = json.load(open(os.path.join(root, "data", slug + ".json"), encoding="utf-8"))
     bp, gp = os.path.join(root, "bolta", slug + ".json"), os.path.join(root, "grok", slug + ".json")
+    b = None
     if os.path.exists(bp):
         b = json.load(open(bp, encoding="utf-8"))
         url = f'https://bolta.io/biz/{b["biz"]}'
@@ -60,7 +90,8 @@ def main(root, slug):
         if hc:
             d["headcount"] = hc
             last = hc["series"][-1]
-            kp = {"value": f'{last["count"]}명', "label": f'국민연금 가입자 ({last["month"][2:]})'}
+            mark = " · 대조 전" if b.get("via") == "grok" else ""
+            kp = {"value": f'{last["count"]}명', "label": f'국민연금 가입자 ({last["month"][2:]}{mark})'}
             ks = d.setdefault("kpis", [])
             idx = next((i for i, k in enumerate(ks) if any(w in k.get("label", "") for w in ("임직원", "직원", "인원", "국민연금", "4대보험"))), None)
             if idx is None and len(ks) >= 4:
@@ -100,22 +131,27 @@ def main(root, slug):
             d["key_talent"] = kt
         units = [{"title": u[0], "name": u[1] or "책임자 확인 불가"} for u in g.get("org", []) if u and u[0]]
         if units:
-            exs = d.get("executives", [])
-            ceo = next((e for e in exs if "대표" in (e.get("title") or "") or "CEO" in (e.get("title") or "")), exs[0] if exs else {})
-            title = "대표이사" if "대표" in (ceo.get("title") or "") or "CEO" in (ceo.get("title") or "") else (ceo.get("title") or "대표")
-            d["org"] = {"top": {"title": title, "name": ceo.get("name", "")}, "units": units[:6],
+            d["org"] = {"top": pick_top(d, b), "units": units[:6],
                         "note": "공식 조직도가 공개되지 않아 Grok 조사(2026.11.12)와 공개 자료에서 확인된 조직·책임자로 구성했습니다(보고선 미확인)."}
-        d["talent_note"] = "핵심 인재는 Grok 조사(2026.11.12)로 수집한 공개 프로필·보도 자료입니다. LinkedIn 은 실제 URL 이 확인된 경우에만 연결했습니다."
+        d["talent_note"] = "핵심 인재는 Grok 조사(2026.11.12)로 수집한 공개 프로필·보도 자료이며, 개별 재직 여부와 LinkedIn 프로필은 원문 대조 전입니다."
     d.setdefault("key_talent", [])
+    if d.get("org"):
+        d["org"]["top"] = pick_top(d, b)
     # 상태 재계산: 4대보험을 채웠으면 해당 미완 항목을 지운다
     st = d.get("status") or ""
-    if d.get("headcount") and st.startswith("부분 완료"):
-        items = [x.strip() for x in re.split(r"[,·、]\s*(?![^()]*\))", st.split(":", 1)[-1]) if x.strip()]
-        items = [x for x in items if not re.search(r"4대보험|국민연금|사업자번호|월별 (인원|추이)", x)]
+    if st.startswith("보류"):
+        pass
+    else:
+        items = [x.strip() for x in re.split(r"[,·、]\s*(?![^()]*\))", st.split(":", 1)[-1]) if x.strip()] if st.startswith("부분 완료") else []
+        if d.get("headcount"):
+            items = [x for x in items if not re.search(r"4대보험|국민연금|사업자번호|월별 (인원|추이)", x)]
+            if b and b.get("via") == "grok":
+                items.append("4대보험 수치 원문 대조(Grok 경유 조회)")
         if d.get("org"):
             items = [x for x in items if not re.fullmatch(r"조직도", x)]
         if d.get("key_talent"):
             items = [x for x in items if not re.fullmatch(r"핵심 인재(\s*단계 미실시)?", x)]
+            items.append("핵심 인재 재직·LinkedIn 원문 대조(Grok 조사)")
         if any(p.get("linkedin") for p in d.get("executives", []) + d.get("key_talent", [])):
             items = [x for x in items if x != "LinkedIn"]
         d["status"] = "부분 완료: " + ", ".join(items) if items else "완료"

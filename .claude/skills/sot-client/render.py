@@ -1,7 +1,7 @@
 """회사소개 브리프 렌더러: company JSON -> 서식 .docx (Google Docs 변환용).
 usage: python render.py data/<slug>.json out/<file>.docx
 """
-import json, sys, os, io
+import json, sys, os, io, re
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -195,10 +195,10 @@ def chart_funding(doc, rounds):
     fig, ax = plt.subplots(figsize=(7.2, 3.2))
     bars = ax.bar(labels, amts, color="#" + TEAL, width=0.55, label="라운드 금액")
     ax2 = ax.twinx()
-    ax2.plot(labels, cum, color="#" + NAVY, marker="o", linewidth=2, label="누적")
+    ax2.plot(labels, cum, color="#" + NAVY, marker="o", linewidth=2, label="공개 금액 누계")
     for b, v in zip(bars, amts):
         ax.annotate(f"{v:,.0f}", (b.get_x() + b.get_width() / 2, v), ha="center", va="bottom", fontsize=8.5, xytext=(0, 3), textcoords="offset points")
-    ax2.annotate(f"누적 {cum[-1]:,.0f}억", (len(cum) - 1, cum[-1]), fontsize=9, color="#" + NAVY, xytext=(-60, 8), textcoords="offset points", fontweight="bold")
+    ax2.annotate(f"공개 금액 합계 {cum[-1]:,.0f}억", (len(cum) - 1, cum[-1]), fontsize=9, color="#" + NAVY, xytext=(-60, 8), textcoords="offset points", fontweight="bold")
     style_ax(ax); ax2.set_ylim(0, max(cum) * 1.2); ax.set_ylim(0, max(cum) * 1.2)
     for s_ in ("top", "right", "left"):
         ax2.spines[s_].set_visible(False)
@@ -304,7 +304,8 @@ def build(d, out):
         last = hc["series"][-1]
         p = para(doc); run(p, f'{hc["basis"]} ', 10.5, True, NAVY); run(p, f'{last["count"]}명', 10.5, True, NAVY); run(p, f'  ({last["month"]} 기준)', 10.5, False, GRAY)
         bullets(doc, hc.get("points", []))
-        chart_headcount(doc, hc)
+        if len(hc["series"]) >= 2:
+            chart_headcount(doc, hc)
         if hc.get("other"):
             table(doc, ["구분", "인원", "기준일"], hc["other"], widths=[8.0, 3.6, 5.0])
         p = para(doc, 8); run(p, "출처 · ", 8, False, GRAY); link(p, hc["source"]["title"], hc["source"]["url"], 8)
@@ -349,6 +350,13 @@ def build(d, out):
           [[x["date"], {"text": x["headline"], "url": x["url"]}, x["outlet"]] for x in d["news"]],
           widths=[2.4, 11.4, 2.8])
 
+    st = d.get("status") or ""
+    if st.startswith("부분 완료") or st.startswith("보류"):
+        heading(doc, n, "자료 범위와 확인할 사항"); n += 1
+        items = [x.strip() for x in re.split(r"[,、]\s*(?![^()]*\))", st.split(":", 1)[-1]) if x.strip()]
+        bullets(doc, [{"head": "공개 자료 미확인·대조 전", "body": x} for x in items])
+        if d.get("rounds"):
+            p = para(doc, 4); run(p, "투자 그래프의 합계는 표에 실린 공개 금액만 더한 값으로, 전체 누적 투자액과 다를 수 있습니다.", 9, False, GRAY)
     heading(doc, n, "참고 자료"); n += 1
     for s in d["sources"]:
         p = para(doc, 2); run(p, "· ", 9, False, GRAY); link(p, s["title"], s["url"], 9)
