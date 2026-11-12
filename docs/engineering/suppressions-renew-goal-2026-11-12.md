@@ -48,6 +48,8 @@
 | 워크플로 M — 앵커·flow 형식 스텝의 삭제 | 차단 (V1-2) |
 | 워크플로 M — run 이 첫 키인 스텝의 형제 키 변경 | 통과 (V1-3) |
 | 워크플로 M — YAML 파싱 실패 | 차단 (fail-closed) |
+| 워크플로 T — 일반 파일 → symlink 등 타입 변경 | 차단 (V1 2차) |
+| 워크플로 M — run 줄 인라인 주석만 변경 | 통과 (V1 2차) |
 | 워크플로 A(신규) / 추가만 | 통과 (추가 줄은 기존 ③ 약화 패턴이 본다) |
 | 워크플로 밖 경로의 삭제 | 통과 (오너 지시: 리팩터링 오탐 방지) |
 | HEAD 없음(최초 커밋) | 삭제 개념 없음 → 통과 |
@@ -93,3 +95,12 @@ RED1 커밋 → GREEN1 커밋 → RED2 커밋 → GREEN2 커밋 → 원장 정�
 조치: 4건 전부 수용. 반례 6개를 RED(`9afec36`)로 고정 → GREEN(`8178735`): YAML 구조 판정기 + 점 3표기 대조.
 잔여 한계(주장하지 않음): 같은 명령 줄을 실행되지 않는 run(heredoc 등)으로 옮기기, 임의 정규식 자기제외.
 
+
+### V1 2차 — Codex adversarial-review (fresh, read-only) · thread `01a1d002-8dc8-74f2-b89f-591f265a63db`
+
+판정: **needs-attention** — "workflow type changes bypass the hook, and comment-only edits can be falsely blocked. suppressions.yaml correctly retains only the two approved items, both expiring 2026-11-26."
+- [high] 워크플로를 symlink 로 바꾸면(T) DM·ACMR 어느 목록에도 없어 훅이 검사 없이 exit 0.
+- [medium] run 줄 인라인 주석 삭제를 실행 단위 삭제로 오탐.
+
+조치: 2건 수용. RED(`8da3e1b`) → GREEN(`5db49de`): `--diff-filter=DMT` + 인덱스 mode 검사, 따옴표 인식 인라인 주석 제거.
+자체 mutant F(판정 불가 → 통과)가 생존해 fail-closed 시연 추가(`624c3bb`) 후 사멸 확인.

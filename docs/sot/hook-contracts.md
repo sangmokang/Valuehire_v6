@@ -12,9 +12,10 @@
 출력  : exit 0 (통과) | exit 1 (차단)
         차단 시 stderr: "BLOCKED: <검사이름> — <파일경로> (패턴: <패턴이름>)"
         ※ 매칭된 실제 값은 절대 출력하지 않는다
-검사  : ⓪ CI 워크플로(.github/workflows/*)의 스텝·검사 삭제 — D·M 을 --no-renames 로 따로 구해
+검사  : ⓪ CI 워크플로(.github/workflows/*)의 스텝·검사 삭제 — D·M·T 를 --no-renames 로 따로 구해
+          (인덱스 판이 일반 파일이 아니면 — symlink 등 — 즉시 차단)
           scripts/verify/check-workflow-deletion.sh(인덱스 판)로 판정한다. YAML 을 파싱해
-          jobs.*.steps[*] 의 name·uses·run 줄(주석·빈 줄 제외)과 job uses 를 다중집합 비교 —
+          jobs.*.steps[*] 의 name·uses·run 줄(주석·빈 줄·따옴표 밖 인라인 주석 제외)과 job uses 를 다중집합 비교 —
           HEAD 에 있고 인덱스에 없는 단위 = 삭제. 파일 삭제·밖으로 rename·주석화·명령 수정·
           env 미끼·앵커/flow 형식 = 차단, 순서 이동·형제 키(env 등)·주석 변경 = 통과.
           파싱 실패 = 차단(fail-closed). 워크플로 밖 경로의 삭제는 보지 않는다(리팩터링 오탐 방지).
