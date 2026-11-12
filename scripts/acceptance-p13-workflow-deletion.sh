@@ -175,6 +175,19 @@ demo block "V1b-3 따옴표 안 # 뒤를 바꾸는 것은 명령 변경(삭제)"
   "seed_probe \"\$INLINE_WF\" && perl -pi -e 's/quoted hash/changed/' $PW && grep -q 'keep # changed' $PW" \
   "git add $PW && git commit -qm 'ci: change quoted text'"
 
+# ── V1 3차(Codex thread 01a1d009-b161-7741-b96d-07c8457fe416) 반례 ──
+OPCOMMENT_WF='on: push
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: gate
+        run: |
+          bash scripts/acceptance-0-6.sh;# explain gate'
+demo pass "V1c-1 연산자 뒤 붙은 주석(;#)만 삭제(counter)" \
+  "seed_probe \"\$OPCOMMENT_WF\" && perl -pi -e 's/;# explain gate\$/;/' $PW && ! grep -q 'explain gate' $PW" \
+  "git add $PW && git commit -qm 'ci: drop op comment'"
+
 if [ "$(orig_state)" != "$ORIG_BEFORE" ]; then
   echo "FAIL: 시연이 원본 저장소를 변경했다"; fail=1
 fi

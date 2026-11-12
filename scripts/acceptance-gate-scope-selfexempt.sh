@@ -93,6 +93,15 @@ demo block "V1-4b 문자클래스 점(verify[.]yml)" \
   "printf '      - name: probe\n        run: git ls-files | grep -v \"verify[.]yml\"\n' >> $WF && grep -qF 'verify[.]yml' $WF" \
   "git add $WF && git commit -qm 'weaken: bracket self-exempt'"
 
+# ── V1 3차 반례 — 더 긴 다른 파일명(archived-verify.yml)을 빼는 것은 자기제외가 아니다 ──
+demo pass "V1c-2 다른 파일 archived-verify.yml 제외(counter)" \
+  "printf '      - name: probe\n        run: git ls-files | grep -v archived-verify.yml\n' >> $WF && grep -q 'grep -v archived-verify.yml' $WF" \
+  "git add $WF && git commit -qm 'ci: skip archived'"
+
+demo block "V1c-3 경로째 쓴 자기제외(workflows/verify.yml\$)" \
+  "printf '      - name: probe\n        run: git ls-files | grep -v \"workflows/verify.yml\$\"\n' >> $WF && grep -q 'workflows/verify.yml' $WF" \
+  "git add $WF && git commit -qm 'weaken: path self-exempt'"
+
 if [ "$(orig_state)" != "$ORIG_BEFORE" ]; then
   echo "FAIL: 시연이 원본 저장소를 변경했다"; fail=1
 fi
