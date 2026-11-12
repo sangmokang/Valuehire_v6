@@ -185,6 +185,8 @@ def chart_financials(doc, fin):
 
 def chart_funding(doc, rounds):
     rs = [r for r in rounds if r.get("amount")]
+    if not rs:  # 금액이 모두 비공개면 그래프 없이 표만
+        return
     labels = [f'{r["round"]}\n{r["date"]}' for r in rs]
     amts = [r["amount"] for r in rs]
     cum, s = [], 0
