@@ -34,7 +34,7 @@ reset_tree() { git reset -q --hard "$BASE"; git clean -qfd; }
 
 # demo <block|pass> <이름> <셋업> <행위>
 demo() {
-  local expect="$1" name="$2" setup="$3" action="$4" sON sOFF aON aOFF
+  local expect="$1" name="$2" setup="$3" action="$4" key="${5:-스텝·검사 줄 삭제}" sON sOFF aON aOFF
   checked=$((checked + 1))
   reset_tree; git config core.hooksPath hooks
   set +e; ( eval "$setup" ) >"$outdir/s.on" 2>&1; sON=$?; ( eval "$action" ) >"$outdir/a.on" 2>&1; aON=$?; set -e
@@ -49,7 +49,7 @@ demo() {
     echo "FAIL: [$name] 훅 OFF 에서도 실패(exit=$aOFF) — 대조군 무효"; awk 'NR<=3{print "    " $0}' "$outdir/a.off"; fail=1; return
   fi
   if [ "$expect" = block ]; then
-    if [ "$aON" -ne 0 ] && grep -q '스텝·검사 줄 삭제' "$outdir/a.on"; then
+    if [ "$aON" -ne 0 ] && grep -qF "$key" "$outdir/a.on"; then
       echo "PASS: [$name] 차단됨 (훅ON=$aON · 훅OFF=$aOFF)"
     else
       echo "FAIL: [$name] 차단되지 않음 (훅ON=$aON · 훅OFF=$aOFF)"; awk '/BLOCKED/{print "    " $0; if (++n == 3) exit}' "$outdir/a.on"; fail=1
@@ -147,6 +147,11 @@ demo pass "V1-3 run 이 첫 키인 스텝의 형제 env 값 변경(counter)" \
 demo pass "스텝 순서 이동(counter)" \
   "seed_probe \"\$FLOW_WF\" && printf '%s\n' 'on: push' 'jobs:' '  probe:' '    runs-on: ubuntu-latest' '    steps:' '      - {name: gate, run: bash scripts/acceptance-0-6.sh}' '      - {name: keep, run: echo keep}' > $PW" \
   "git add $PW && git commit -qm 'ci: reorder'"
+
+# fail-closed: 판정기가 판정하지 못하면(YAML 파싱 실패) 통과가 아니라 차단이다(mutant F 회귀).
+demo block "YAML 파싱 불가 워크플로 커밋(fail-closed)" \
+  "printf 'jobs: [\\n' >> $WF && tail -1 $WF | grep -qF 'jobs: ['" \
+  "git add $WF && git commit -qm 'ci: broken yaml'" "워크플로 삭제 판정 실패"
 
 if [ "$(orig_state)" != "$ORIG_BEFORE" ]; then
   echo "FAIL: 시연이 원본 저장소를 변경했다"; fail=1
