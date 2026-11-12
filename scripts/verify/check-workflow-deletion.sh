@@ -11,6 +11,7 @@
 #   그래서 실제 실행 단위만 센다: jobs.*.steps[*] 의 name · uses · run(줄 단위, 주석·빈 줄 제외)
 #   와 job 수준 uses. env·with·주석·다른 키의 문자열은 "남아 있는 검사"로 치지 않는다.
 #   다중집합 비교라 순서 이동은 삭제가 아니고, 명령 수정은 옛 줄이 사라지므로 삭제다.
+#   run 줄의 인라인 셸 주석(따옴표 밖 공백 뒤 #)은 떼고 비교한다 — 주석만 바꾼 것은 삭제가 아니다.
 #
 # 막지 못하는 것: 같은 명령 줄을 실행되지 않는 다른 run 안(heredoc 본문 등)이나 조건부 스텝으로
 #   옮기는 것. 조건부·오류무시 스텝은 check-ci-step-integrity.sh 가 CI 에서 본다.
@@ -22,6 +23,29 @@ if [ "$#" -ne 2 ] || [ ! -f "$1" ] || [ ! -f "$2" ]; then
 fi
 
 ruby -rpsych -rdate -e '
+# 셸 인라인 주석 제거 — 따옴표 밖, 공백 뒤의 # 부터 끝까지만 뗀다(V1 2차: 주석만 지워도 삭제로 오탐).
+# 따옴표 안의 #, ${#x}, a#b 는 명령의 일부라 남긴다. 줄 전체 주석은 호출 전에 이미 걸러진다.
+def strip_inline_comment(s)
+  q = nil
+  i = 0
+  while i < s.length
+    c = s[i]
+    if c == "\\" && q != "\x27"
+      i += 2
+      next
+    end
+    if q
+      q = nil if c == q
+    elsif c == "\x27" || c == "\""
+      q = c
+    elsif c == "#" && (i == 0 || s[i - 1] =~ /\s/)
+      return s[0...i].rstrip
+    end
+    i += 1
+  end
+  s
+end
+
 def units(path)
   text = File.read(path)
   return [] if text.strip.empty?
@@ -45,6 +69,8 @@ def units(path)
         st["run"].to_s.each_line do |l|
           s = l.strip
           next if s.empty? || s.start_with?("#")
+          s = strip_inline_comment(s)
+          next if s.empty?
           out << [where, "run", s]
         end
       end

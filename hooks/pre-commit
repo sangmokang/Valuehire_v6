@@ -37,7 +37,9 @@ staged=$(git diff --cached --name-only --diff-filter=ACMR)
 # 삭제된 내용은 출력하지 않는다(job/step 위치만).
 if git rev-parse -q --verify HEAD >/dev/null; then
   wf_rc=0
-  wf_changed=$(git diff --cached --no-renames --name-only --diff-filter=DM -- .github/workflows/) || wf_rc=$?
+  # T(타입 변경 — 일반 파일 → symlink 등)도 본다. 빼면 symlink 로 바꾼 워크플로가 DM·ACMR 어디에도
+  # 잡히지 않아 훅이 아무 검사 없이 통과했다(V1 2차 2026-11-12).
+  wf_changed=$(git diff --cached --no-renames --name-only --diff-filter=DMT -- .github/workflows/) || wf_rc=$?
   if [ "$wf_rc" -ne 0 ]; then
     block "워크플로 변경 목록을 읽지 못했다 (git diff exit=$wf_rc · fail-closed)"
     wf_changed=""
@@ -55,6 +57,13 @@ if git rev-parse -q --verify HEAD >/dev/null; then
         block "워크플로 HEAD 판을 읽지 못했다 — $f (fail-closed)"
         continue
       fi
+      # 인덱스에 남은 판이 일반 파일(100644/100755)이 아니면 실행 가능한 워크플로가 아니다.
+      wf_mode=$(git ls-files -s -- "$f" | awk 'NR==1{print $1}')
+      case "$wf_mode" in
+        ''|100644|100755) ;;
+        *) block "워크플로가 일반 파일이 아니다(mode $wf_mode) — $f. symlink 등으로 바꾸는 것은 검사 삭제와 같다 (P13)"
+           continue ;;
+      esac
       # 인덱스에 없으면(D) new 는 빈 파일 = 모든 실행 단위가 삭제된 것으로 본다.
       if git cat-file -e ":$f" 2>/dev/null && ! git show ":$f" > "$wf_dir/new" 2>/dev/null; then
         block "워크플로 인덱스 판을 읽지 못했다 — $f (fail-closed)"
