@@ -149,7 +149,9 @@ while IFS= read -r f; do
       esc=$(printf '%s' "$base" | sed 's/[][*^$+?(){}|\\]/\\&/g')
       dotpat='((\\)?[.]|\[[.]\])'
       esc=${esc//./$dotpat}
-      if scan "자기제외" "$f" -E "grep -v[^|]*${esc}"; then
+      # 파일명 앞뒤에 경계를 요구한다 — archived-verify.yml·verify.yml.bak 같은 다른 파일을 빼는 것은
+      # 자기제외가 아니다(V1 3차 오탐). 경로째(workflows/verify.yml) 쓴 경우는 '/' 가 경계라 잡힌다.
+      if scan "자기제외" "$f" -E "grep -v[^|]*[^|A-Za-z0-9_-]${esc}([^A-Za-z0-9_.-]|\$)"; then
         block "검사기 자기 제외 — $f 가 자기 자신을 검사 대상에서 뺀다 (P13)"
       fi
       ;;
