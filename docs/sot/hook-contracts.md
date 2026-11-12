@@ -16,7 +16,7 @@
           (인덱스 판이 일반 파일이 아니면 — symlink 등 — 즉시 차단)
           scripts/verify/check-workflow-deletion.sh(**HEAD 판** — 같은 커밋 변조 차단, HEAD 에 없으면 차단)로
           판정한다. YAML 을 파싱해 on 트리거 이벤트 이름과
-          jobs.*.steps[*] 의 name·uses·run 줄(주석·빈 줄·따옴표 밖 공백/;&|() 뒤 인라인 주석 제외)과 job uses 를 다중집합 비교 —
+          jobs.*.steps[*] 의 name·uses·run 줄(주석·빈 줄 제외. 인라인 주석은 공백/;&|() 뒤이고 앞부분에 따옴표·백틱·$·\ 가 없을 때만 뗀다)과 job uses 를 다중집합 비교 —
           HEAD 에 있고 인덱스에 없는 단위 = 삭제. 파일 삭제·밖으로 rename·주석화·명령 수정·
           env 미끼·앵커/flow 형식 = 차단, 순서 이동·형제 키(env 등)·주석 변경 = 통과.
           파싱 실패 = 차단(fail-closed). 워크플로 밖 경로의 삭제는 보지 않는다(리팩터링 오탐 방지).

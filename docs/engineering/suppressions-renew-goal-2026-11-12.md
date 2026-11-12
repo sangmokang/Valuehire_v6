@@ -49,7 +49,8 @@
 | 워크플로 M — run 이 첫 키인 스텝의 형제 키 변경 | 통과 (V1-3) |
 | 워크플로 M — YAML 파싱 실패 | 차단 (fail-closed) |
 | 워크플로 T — 일반 파일 → symlink 등 타입 변경 | 차단 (V1 2차) |
-| 워크플로 M — run 줄 인라인 주석만 변경 | 통과 (V1 2차) |
+| 워크플로 M — run 줄 인라인 주석만 변경(앞부분에 따옴표·백틱·$·\ 없음) | 통과 (V1 2·3차) |
+| 워크플로 M — 앞부분에 따옴표·백틱·$·\ 가 있는 줄의 주석 변경 | 차단 — 보수적 오탐(V1 5차 중첩 따옴표 우회 방지) |
 | 워크플로 A(신규) / 추가만 | 통과 (추가 줄은 기존 ③ 약화 패턴이 본다) |
 | 워크플로 밖 경로의 삭제 | 통과 (오너 지시: 리팩터링 오탐 방지) |
 | HEAD 없음(최초 커밋) | 삭제 개념 없음 → 통과 |
@@ -129,3 +130,10 @@ RED1 커밋 → GREEN1 커밋 → RED2 커밋 → GREEN2 커밋 → 원장 정�
 - 유지된 것: suppressions.yaml 2건·2026-11-26, 인수 스크립트 vacuous pass 경로 없음, ruby 부재 시 차단.
 
 조치: RED(`26072d1`) → GREEN(`0be00b3`): 경계 철회(V1 3차 archived-verify.yml 오탐은 기존 한계로 문서화, 해당 통과 시연은 기존 차단 유지 시연으로 대체), 판정기 HEAD 판 실행, 트리거 이벤트 포함, 추가형 무력화를 표에 비범위로 명시.
+
+### V1 5차 — Codex adversarial-review (fresh, read-only) · thread `01a1d01b-f71e-7011-9738-005693a8907c`
+
+판정: **needs-attention** — "V2 fixes hold, and the self-exclusion pattern preserves and extends origin/main coverage. One undocumented deletion bypass remains."
+- [high] `echo "$(printf " #")"; bash gate.sh` → `echo "$(printf " #")"` 로 게이트를 지워도 평면 따옴표 스캐너가 안쪽 `#` 을 주석으로 오인해 exit 0.
+
+조치: RED(`f652d94`) → GREEN(`6eadd6c`): 따옴표 추적을 버리고, `#` 앞부분에 따옴표·백틱·$·백슬래시가 있으면 주석을 떼지 않는다(보수적 — 그 경우 주석만 바꿔도 차단되는 오탐을 감수).
