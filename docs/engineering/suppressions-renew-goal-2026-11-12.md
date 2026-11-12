@@ -29,8 +29,9 @@
 ## 계약
 
 - 입력: 스테이징 인덱스 vs HEAD. 출력: 기존 계약 그대로 `BLOCKED: <사유> — <경로>` (stderr), exit 1. 삭제된 줄 내용은 출력하지 않고 HEAD 기준 행 번호만 출력한다.
-- "스텝·검사 줄" 정의: 주석·빈 줄을 뺀 줄 중 ① `- name:` / `- uses:` / `- run:` / `run:` / `uses:` 키 줄 ② `run: |`·`run: >` 블록 본문 줄.
-- "삭제" 정의: HEAD 판의 검사 줄(앞뒤 공백 정규화) 다중집합에서 인덱스 판에 남은 줄을 뺀 나머지. 이동·들여쓰기 변경은 삭제가 아니다.
+- "실행 단위" 정의(V1 반영 후): YAML 파싱 결과의 `jobs.*.steps[*]` 의 `name`·`uses`·`run` 줄(앞뒤 공백 제거, 주석·빈 줄 제외)과 job 수준 `uses`. env·with 등 다른 키의 문자열은 세지 않는다. (초판은 줄 텍스트 판정이었고 V1 에서 뚫렸다.)
+- "삭제" 정의: HEAD 판 실행 단위 다중집합에서 인덱스 판에 남은 단위를 뺀 나머지. 순서 이동은 삭제가 아니다.
+- 판정기: `scripts/verify/check-workflow-deletion.sh <old> <new>` → exit 0 OK / 1 DELETED / 2 판정 불가(훅은 차단).
 
 ## 입력 영역 표 (AC-2)
 
@@ -42,7 +43,11 @@
 | 워크플로 D(파일 삭제) / 워크플로 밖으로 rename | 차단 (`--no-renames` 로 D 로 본다) |
 | 워크플로 M — 주석·빈 줄 삭제 | 통과 |
 | 워크플로 M — 비검사 스칼라 변경(`timeout-minutes` 등) | 통과 (범위 밖, 비범위 참조) |
-| 워크플로 M — 줄 이동·재들여쓰기 | 통과 |
+| 워크플로 M — 스텝 순서 이동 | 통과 |
+| 워크플로 M — 삭제한 스텝 문구를 env 등 비실행 문자열에 남김 | 차단 (V1-1) |
+| 워크플로 M — 앵커·flow 형식 스텝의 삭제 | 차단 (V1-2) |
+| 워크플로 M — run 이 첫 키인 스텝의 형제 키 변경 | 통과 (V1-3) |
+| 워크플로 M — YAML 파싱 실패 | 차단 (fail-closed) |
 | 워크플로 A(신규) / 추가만 | 통과 (추가 줄은 기존 ③ 약화 패턴이 본다) |
 | 워크플로 밖 경로의 삭제 | 통과 (오너 지시: 리팩터링 오탐 방지) |
 | HEAD 없음(최초 커밋) | 삭제 개념 없음 → 통과 |
@@ -77,4 +82,14 @@ RED1 커밋 → GREEN1 커밋 → RED2 커밋 → GREEN2 커밋 → 원장 정�
 
 ## 적대 검증 로그
 
-(후기록)
+### V1 1차 — Codex adversarial-review (fresh, read-only, `--base origin/main`) · thread `01a1cffa-ad63-7011-8ab4-18b1d3fb08e7`
+
+판정: **needs-attention** — "Do not ship: read-only repros demonstrate deletion bypasses, a legitimate-change false positive, and an AC-1 self-exclusion bypass."
+- [high] 비실행 YAML 텍스트(top-level env 블록 스칼라)에 삭제한 스텝 문구를 남기면 줄 판정기가 삭제 0건.
+- [high] `run: &checks |` 앵커 블록, `- {name:, run:}` flow 형식 스텝의 삭제를 못 잡음.
+- [medium] `- run: |` 이 첫 키인 스텝에서 형제 `env: LABEL` 변경을 삭제로 오탐(runind 가 대시 들여쓰기).
+- [medium] `grep -v 'local-checks\.sh'` 처럼 점을 이스케이프하면 자기제외 탐지 우회.
+
+조치: 4건 전부 수용. 반례 6개를 RED(`9afec36`)로 고정 → GREEN(`8178735`): YAML 구조 판정기 + 점 3표기 대조.
+잔여 한계(주장하지 않음): 같은 명령 줄을 실행되지 않는 run(heredoc 등)으로 옮기기, 임의 정규식 자기제외.
+
