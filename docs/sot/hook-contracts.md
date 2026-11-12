@@ -16,14 +16,15 @@
           (인덱스 판이 일반 파일이 아니면 — symlink 등 — 즉시 차단)
           scripts/verify/check-workflow-deletion.sh(**HEAD 판** — 같은 커밋 변조 차단, HEAD 에 없으면 차단)로
           판정한다. YAML 을 파싱해 on 트리거 이벤트 이름과
-          jobs.*.steps[*] 의 name·uses·run 줄(주석·빈 줄 제외. 인라인 주석은 공백/;&|() 뒤이고 앞부분에 따옴표·백틱·$·\ 가 없을 때만 뗀다)과 job uses 를 다중집합 비교 —
+          jobs.*.steps[*] 의 name·uses·run 줄(주석·빈 줄 제외. 인라인 주석은 # 앞이 평범한 단어 문자·공백·;&| 뿐일 때만 뗀다 — 화이트리스트)과 job uses 를 다중집합 비교 —
           HEAD 에 있고 인덱스에 없는 단위 = 삭제. 파일 삭제·밖으로 rename·주석화·명령 수정·
           env 미끼·앵커/flow 형식 = 차단, 순서 이동·형제 키(env 등)·주석 변경 = 통과.
           파싱 실패 = 차단(fail-closed). 워크플로 밖 경로의 삭제는 보지 않는다(리팩터링 오탐 방지).
           삭제 내용은 출력하지 않는다(job/step 위치만). 회귀: scripts/acceptance-p13-workflow-deletion.sh
           한계: 같은 명령 줄을 실행되지 않는 다른 run(heredoc 본문 등)으로 옮기는 것, 추가형 무력화
           (defaults.run.shell 교체, 트리거 필터 변경)는 못 잡는다. job/step if·continue-on-error 추가는
-          CI check-ci-step-integrity.sh 가 본다.
+          CI check-ci-step-integrity.sh 가 본다. 판정기는 HEAD 판이라 단일 커밋 변조는 막지만, 판정기를
+          먼저 바꾼 커밋 뒤의 삭제(2커밋·--amend)는 로컬 훅의 근본 한계로 못 막는다.
         ① 비밀 스캔(verify.sh 위임, VERIFY_SCAN_SOURCE=index)
         ② 검사기 자기 제외 — 대상: verify.sh · scripts/*.sh · hooks/* · .github/workflows/* ·
           .claude/skills/*/local-checks.sh. 파일명의 점은 그대로·\.·[.] 세 표기를 모두 받는다.

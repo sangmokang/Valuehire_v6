@@ -49,16 +49,17 @@
 | 워크플로 M — run 이 첫 키인 스텝의 형제 키 변경 | 통과 (V1-3) |
 | 워크플로 M — YAML 파싱 실패 | 차단 (fail-closed) |
 | 워크플로 T — 일반 파일 → symlink 등 타입 변경 | 차단 (V1 2차) |
-| 워크플로 M — run 줄 인라인 주석만 변경(앞부분에 따옴표·백틱·$·\ 없음) | 통과 (V1 2·3차) |
-| 워크플로 M — 앞부분에 따옴표·백틱·$·\ 가 있는 줄의 주석 변경 | 차단 — 보수적 오탐(V1 5차 중첩 따옴표 우회 방지) |
+| 워크플로 M — run 줄 인라인 주석만 변경(# 앞이 평범한 단어 문자·공백·;&| 뿐) | 통과 (V1 2·3차) |
+| 워크플로 M — 그 밖의 줄(따옴표·$·백틱·괄호·glob 등 포함)의 주석 변경 | 차단 — 보수적 오탐(화이트리스트, V1 5·6차) |
 | 워크플로 A(신규) / 추가만 | 통과 (추가 줄은 기존 ③ 약화 패턴이 본다) |
 | 워크플로 밖 경로의 삭제 | 통과 (오너 지시: 리팩터링 오탐 방지) |
 | HEAD 없음(최초 커밋) | 삭제 개념 없음 → 통과 |
 | HEAD/인덱스 blob 읽기 실패, awk 실행 실패 | 차단 (fail-closed) |
 | 워크플로 M — on 트리거 이벤트 삭제(pull_request 등) | 차단 (V2) |
-| 같은 커밋에서 판정기 변조 + 스텝 삭제 | 차단 (판정기는 HEAD 판, V2) |
+| 단일 커밋에서 판정기 변조 + 스텝 삭제 | 차단 (판정기는 HEAD 판, V2 1차) |
+| 판정기 변조 커밋 → 다음 커밋(또는 --amend)에서 스텝 삭제 | 통과 — **로컬 훅의 근본 한계**(훅 파일 자체 수정·--no-verify 와 동급, V2 2차). 판정기 변조 시 CI 의 acceptance-p13 이 FAIL 을 낸다(그 스텝이 남아 있는 한). CI 측 삭제 탐지는 비범위 D-2 |
 | HEAD 에 판정기 없음 | 차단 (fail-closed) |
-| 추가형 무력화: defaults.run.shell 교체 · 트리거 필터 변경 | 통과 — **비범위 한계**(삭제가 아님). 후속 과제 |
+| 추가형 무력화: defaults.run.shell·스텝 shell 교체 · run 첫 줄 exit 0 추가 · 트리거 필터 변경 | 통과 — **비범위 한계**(삭제가 아님, origin/main 도 동일). 후속 과제 |
 | 추가형 무력화: job/step if · continue-on-error | 이 훅은 통과 — CI check-ci-step-integrity.sh 가 차단 |
 | 그 외 전부 | 차단 (fail-closed) |
 
@@ -137,3 +138,18 @@ RED1 커밋 → GREEN1 커밋 → RED2 커밋 → GREEN2 커밋 → 원장 정�
 - [high] `echo "$(printf " #")"; bash gate.sh` → `echo "$(printf " #")"` 로 게이트를 지워도 평면 따옴표 스캐너가 안쪽 `#` 을 주석으로 오인해 exit 0.
 
 조치: RED(`f652d94`) → GREEN(`6eadd6c`): 따옴표 추적을 버리고, `#` 앞부분에 따옴표·백틱·$·백슬래시가 있으면 주석을 떼지 않는다(보수적 — 그 경우 주석만 바꿔도 차단되는 오탐을 감수).
+
+### V1 6차 — Codex (fresh, read-only) · thread `01a1d021-89de-7a60-bb44-e934fabfd943`
+
+판정: **needs-attention** — "round 5's nested-quote fix holds, but another reproducible comment-stripping bypass hides gate deletion."
+- [high] `shopt -s extglob` 하에서 `echo @(#|foo); bash gate.sh` → `echo @(#|foo)` 삭제를 미탐.
+
+조치: RED(`03ddab4`) → GREEN(이 커밋 직전 fix 커밋): 블랙리스트 → 화이트리스트. 같은 기능(인라인 주석 제거)에 4회 연속 지적(R7 신호) — 근본 원인은 "애매한 입력을 허용하는 방향의 정규화"였고, 기본 거부로 뒤집었다.
+
+### V2 2차 — 리셋 컨텍스트 재공격 (Claude critic) · 대상 HEAD `700a98a`
+
+판정: **FAIL**(medium 1) — "Fixing the docs alone would turn this into a PASS."
+- [medium] 판정기 변조 커밋 → `--amend`/다음 커밋으로 스텝 삭제 시 통과(HEAD 가 이미 변조됨). → 표에 로컬 훅 근본 한계로 명시.
+- [low] run 첫 줄 `exit 0`, 스텝 `shell: true {0}` 추가형 무력화(origin/main 도 동일) → 비범위 행에 명시.
+- [low/info] `grep -Fv`·`--invert-match` 미탐 — 기존부터, "임의 정규식" 한계에 포함.
+- 확인: V2 1차 3건 재현 차단, 자기제외는 origin/main 의 상위집합(범위 밖 약화 없음), 원장 2건·2026-11-26.
