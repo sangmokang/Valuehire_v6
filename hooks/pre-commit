@@ -60,7 +60,8 @@ if git rev-parse -q --verify HEAD >/dev/null; then
         continue
       fi
       # 인덱스에 남은 판이 일반 파일(100644/100755)이 아니면 실행 가능한 워크플로가 아니다.
-      wf_mode=$(git ls-files -s -- "$f" | awk 'NR==1{print $1}')
+      # :(literal) — 이름의 glob 문자(?*[)가 pathspec 으로 해석돼 다른 파일의 mode 를 읽지 않게 한다(V2 4차).
+      wf_mode=$(git ls-files -s -- ":(literal)$f" | awk 'NR==1{print $1}')
       case "$wf_mode" in
         ''|100644|100755) ;;
         *) block "워크플로가 일반 파일이 아니다(mode $wf_mode) — $f. symlink 등으로 바꾸는 것은 검사 삭제와 같다 (P13)"
