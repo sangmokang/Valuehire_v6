@@ -242,6 +242,20 @@ demo block "V1g-1 줄 이어짐으로 실행되는 #; 게이트 줄 삭제" \
   "seed_probe \"\$CONT_WF\" && grep -qF 'echo keep\\' $PW && perl -ni -e 'print unless /^ *#; bash scripts\/acceptance-0-6\.sh\$/' $PW && ! grep -q 'acceptance-0-6' $PW" \
   "git add $PW && git commit -qm 'ci: drop continued gate'"
 
+# ── V2 3차 반례 — 여러 줄 따옴표 안의 # (c0a8119 로 이미 해소된 계열을 회귀로 고정) ──
+MLQ_WF='on: push
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: gate
+        run: |
+          printf "%s\\n" "x
+          y # " ; bash scripts/acceptance-0-6.sh'
+demo block "V2c-1 여러 줄 따옴표 뒤 게이트 명령 삭제" \
+  "seed_probe \"\$MLQ_WF\" && perl -pi -e 's/ ; bash scripts\/acceptance-0-6\.sh\$//' $PW && ! grep -q 'acceptance-0-6' $PW" \
+  "git add $PW && git commit -qm 'ci: drop gate after multiline quote'"
+
 if [ "$(orig_state)" != "$ORIG_BEFORE" ]; then
   echo "FAIL: 시연이 원본 저장소를 변경했다"; fail=1
 fi
