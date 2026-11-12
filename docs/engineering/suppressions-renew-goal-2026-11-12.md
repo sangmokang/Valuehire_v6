@@ -144,7 +144,7 @@ RED1 커밋 → GREEN1 커밋 → RED2 커밋 → GREEN2 커밋 → 원장 정�
 판정: **needs-attention** — "round 5's nested-quote fix holds, but another reproducible comment-stripping bypass hides gate deletion."
 - [high] `shopt -s extglob` 하에서 `echo @(#|foo); bash gate.sh` → `echo @(#|foo)` 삭제를 미탐.
 
-조치: RED(`03ddab4`) → GREEN(이 커밋 직전 fix 커밋): 블랙리스트 → 화이트리스트. 같은 기능(인라인 주석 제거)에 4회 연속 지적(R7 신호) — 근본 원인은 "애매한 입력을 허용하는 방향의 정규화"였고, 기본 거부로 뒤집었다.
+조치: RED(`03ddab4`) → GREEN(`cdb12e0`): 블랙리스트 → 화이트리스트. 같은 기능(인라인 주석 제거)에 4회 연속 지적(R7 신호) — 근본 원인은 "애매한 입력을 허용하는 방향의 정규화"였고, 기본 거부로 뒤집었다.
 
 ### V2 2차 — 리셋 컨텍스트 재공격 (Claude critic) · 대상 HEAD `700a98a`
 
