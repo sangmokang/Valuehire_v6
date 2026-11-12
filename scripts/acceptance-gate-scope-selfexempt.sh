@@ -93,10 +93,12 @@ demo block "V1-4b 문자클래스 점(verify[.]yml)" \
   "printf '      - name: probe\n        run: git ls-files | grep -v \"verify[.]yml\"\n' >> $WF && grep -qF 'verify[.]yml' $WF" \
   "git add $WF && git commit -qm 'weaken: bracket self-exempt'"
 
-# ── V1 3차 반례 — 더 긴 다른 파일명(archived-verify.yml)을 빼는 것은 자기제외가 아니다 ──
-demo pass "V1c-2 다른 파일 archived-verify.yml 제외(counter)" \
-  "printf '      - name: probe\n        run: git ls-files | grep -v archived-verify.yml\n' >> $WF && grep -q 'grep -v archived-verify.yml' $WF" \
-  "git add $WF && git commit -qm 'ci: skip archived'"
+# ── V2(2026-11-12) 반례 — 기존 scripts/*.sh 자기제외 중 origin/main 이 막던 것은 계속 막혀야 한다 ──
+# (V1 3차의 archived-verify.yml 오탐 해소용 경계가 'foo.sh.*' 를 통과시켜 기존 검사를 약화했다 → 경계 철회.
+#  archived-verify.yml 같은 더 긴 다른 파일명 제외의 오탐은 origin/main 부터 있던 한계로 문서화한다.)
+demo block "V2-1 기존 범위 정규식 꼬리(acceptance-0-6.sh.*)" \
+  "printf '%s\n' '' 'keep=\$(git ls-files | grep -v '\''acceptance-0-6.sh.*'\'')' >> scripts/acceptance-0-6.sh && grep -qF 'acceptance-0-6.sh.*' scripts/acceptance-0-6.sh" \
+  "git add scripts/acceptance-0-6.sh && git commit -qm 'weaken: regex tail self-exempt'"
 
 demo block "V1c-3 경로째 쓴 자기제외(workflows/verify.yml\$)" \
   "printf '      - name: probe\n        run: git ls-files | grep -v \"workflows/verify.yml\$\"\n' >> $WF && grep -q 'workflows/verify.yml' $WF" \

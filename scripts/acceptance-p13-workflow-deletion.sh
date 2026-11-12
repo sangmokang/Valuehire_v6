@@ -188,6 +188,16 @@ demo pass "V1c-1 연산자 뒤 붙은 주석(;#)만 삭제(counter)" \
   "seed_probe \"\$OPCOMMENT_WF\" && perl -pi -e 's/;# explain gate\$/;/' $PW && ! grep -q 'explain gate' $PW" \
   "git add $PW && git commit -qm 'ci: drop op comment'"
 
+# ── V2(2026-11-12) 반례 ──
+CHK=scripts/verify/check-workflow-deletion.sh
+demo block "V2-2 같은 커밋에서 판정기를 exit 0 으로 바꾸고 스텝 삭제" \
+  "perl -0pi -e 's/set -uo pipefail\\n/set -uo pipefail\\necho \"OK: 0\"; exit 0\\n/' $CHK && grep -q '^echo \"OK: 0\"; exit 0' $CHK && perl -ni -e 'print unless /run: bash scripts\/verify\/run-acceptance\.sh scripts\/acceptance-hs-a4\.sh\$/' $WF && ! grep -q 'acceptance-hs-a4.sh\$' $WF" \
+  "git add -A && git commit -qm 'ci: tamper checker and drop step'"
+
+demo block "V2-3 pull_request 트리거 삭제" \
+  "perl -ni -e 'print unless /^  pull_request:\$/' $WF && ! grep -q '^  pull_request:' $WF" \
+  "git add $WF && git commit -qm 'ci: drop pr trigger'"
+
 if [ "$(orig_state)" != "$ORIG_BEFORE" ]; then
   echo "FAIL: 시연이 원본 저장소를 변경했다"; fail=1
 fi
