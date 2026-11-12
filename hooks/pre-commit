@@ -23,7 +23,60 @@ block() { printf 'BLOCKED: %s\n' "$1" >&2; fail=1; }
 # R(rename)을 넣지 않으면 `git mv notes.txt leak.db` 가 staged 목록에서 빠져
 # 훅을 그대로 통과한다(2026-08-09 실측). 이름만 바꿔도 내용은 그대로다.
 staged=$(git diff --cached --name-only --diff-filter=ACMR)
-if [ -z "$staged" ]; then exit 0; fi
+
+# ── 0) CI 워크플로의 스텝·검사 줄 삭제 (P13 · suppressions p13-deletion-blindspot 해소, 2026-11-12)
+#
+# ③ 약화 탐지는 추가된 줄(+)만 본다. 검사 줄을 지우는 약화는 원리적으로 못 잡는다.
+# 범위는 .github/workflows/* 로 한정한다 — 그 파일에서 스텝 삭제는 거의 항상 약화이고,
+# 다른 경로까지 넓히면 리팩터링마다 오탐이 난다(오너 지시 2026-11-12).
+# 위 staged 목록(ACMR)은 파일 삭제(D)를 보지 않고 rename 은 새 경로만 보이므로
+# --no-renames 로 D·M 을 따로 구한다. 그래서 이 검사는 "staged 비면 종료"보다 앞에 있다.
+# 판정: HEAD 판의 검사 줄(스텝 키 줄 · run 블록 본문) 다중집합에서 인덱스 판에 남은 줄을
+# 뺀 나머지 = 삭제. 이동·재들여쓰기는 삭제가 아니고, 주석화·명령 수정은 삭제다.
+# 삭제된 줄 내용은 출력하지 않는다(행 번호만).
+if git rev-parse -q --verify HEAD >/dev/null; then
+  wf_rc=0
+  wf_changed=$(git diff --cached --no-renames --name-only --diff-filter=DM -- .github/workflows/) || wf_rc=$?
+  if [ "$wf_rc" -ne 0 ]; then
+    block "워크플로 변경 목록을 읽지 못했다 (git diff exit=$wf_rc · fail-closed)"
+    wf_changed=""
+  fi
+  while IFS= read -r f; do
+    if [ -z "$f" ]; then continue; fi
+    wf_old=$(mktemp); wf_new=$(mktemp)
+    if ! git show "HEAD:$f" > "$wf_old" 2>/dev/null; then
+      block "워크플로 HEAD 판을 읽지 못했다 — $f (fail-closed)"
+    elif git cat-file -e ":$f" 2>/dev/null && ! git show ":$f" > "$wf_new" 2>/dev/null; then
+      block "워크플로 인덱스 판을 읽지 못했다 — $f (fail-closed)"
+    else
+      # 인덱스에 없으면(D) wf_new 는 빈 파일 = 모든 검사 줄이 삭제된 것으로 본다.
+      wf_rc=0
+      wf_lines=$(awk -v NEWF="$wf_new" '
+        function norm(s) { sub(/^[ \t]+/, "", s); sub(/[ \t\r]+$/, "", s); return s }
+        FILENAME == NEWF { n = norm($0); if (n != "" && n !~ /^#/) cnt[n]++; next }
+        {
+          n = norm($0)
+          if (n == "" || n ~ /^#/) next
+          match($0, /^[ \t]*/); ind = RLENGTH
+          if (inrun && ind <= runind) inrun = 0
+          ischeck = inrun || n ~ /^-[ \t]*(name|uses|run)[ \t]*:/ || n ~ /^(run|uses)[ \t]*:/
+          if (n ~ /^(-[ \t]*)?run[ \t]*:[ \t]*[|>]/) { inrun = 1; runind = ind }
+          if (!ischeck) next
+          if (cnt[n] > 0) cnt[n]--; else out = out (out == "" ? "" : ",") FNR
+        }
+        END { print out }
+      ' "$wf_new" "$wf_old") || wf_rc=$?
+      if [ "$wf_rc" -ne 0 ]; then
+        block "워크플로 삭제 판정 실행 실패 — $f (awk exit=$wf_rc · fail-closed)"
+      elif [ -n "$wf_lines" ]; then
+        block "CI 워크플로에서 스텝·검사 줄 삭제 — $f (HEAD 기준 행: $wf_lines). 약화다(P13). 정당하면 suppressions.yaml 에 expiry 와 함께 등록하라"
+      fi
+    fi
+    rm -f "$wf_old" "$wf_new"
+  done <<< "$wf_changed"
+fi
+
+if [ -z "$staged" ]; then exit "$fail"; fi
 
 # scan <설명> <파일> <grep 인자...>
 #   반환 0 = 매칭됨 / 1 = 매칭 없음 또는 실행오류(이 경우 block 이 이미 걸림)
