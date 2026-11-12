@@ -256,6 +256,11 @@ demo block "V2c-1 여러 줄 따옴표 뒤 게이트 명령 삭제" \
   "seed_probe \"\$MLQ_WF\" && perl -pi -e 's/ ; bash scripts\/acceptance-0-6\.sh\$//' $PW && ! grep -q 'acceptance-0-6' $PW" \
   "git add $PW && git commit -qm 'ci: drop gate after multiline quote'"
 
+# ── V2 4차 반례 — glob 문자가 든 워크플로 이름의 symlink 타입 변경(pathspec 해석으로 mode 오독) ──
+demo block "V2d-1 glob 이름(x?.yml) 워크플로의 symlink 타입 변경" \
+  "cp $WF '.github/workflows/x?.yml' && cp $WF .github/workflows/x-.yml && git add .github/workflows && git commit -qm 'seed glob names' && b=\$(git rev-parse 'HEAD:.github/workflows/x?.yml') && git update-index --cacheinfo 120000,\$b,'.github/workflows/x?.yml' && git diff --cached --name-status | grep -q '^T'" \
+  "git commit -qm 'ci: symlink glob-named workflow'" "일반 파일이 아니다"
+
 if [ "$(orig_state)" != "$ORIG_BEFORE" ]; then
   echo "FAIL: 시연이 원본 저장소를 변경했다"; fail=1
 fi
