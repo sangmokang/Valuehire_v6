@@ -54,6 +54,11 @@
 | 워크플로 밖 경로의 삭제 | 통과 (오너 지시: 리팩터링 오탐 방지) |
 | HEAD 없음(최초 커밋) | 삭제 개념 없음 → 통과 |
 | HEAD/인덱스 blob 읽기 실패, awk 실행 실패 | 차단 (fail-closed) |
+| 워크플로 M — on 트리거 이벤트 삭제(pull_request 등) | 차단 (V2) |
+| 같은 커밋에서 판정기 변조 + 스텝 삭제 | 차단 (판정기는 HEAD 판, V2) |
+| HEAD 에 판정기 없음 | 차단 (fail-closed) |
+| 추가형 무력화: defaults.run.shell 교체 · 트리거 필터 변경 | 통과 — **비범위 한계**(삭제가 아님). 후속 과제 |
+| 추가형 무력화: job/step if · continue-on-error | 이 훅은 통과 — CI check-ci-step-integrity.sh 가 차단 |
 | 그 외 전부 | 차단 (fail-closed) |
 
 ## 결정 목록
@@ -113,3 +118,14 @@ RED1 커밋 → GREEN1 커밋 → RED2 커밋 → GREEN2 커밋 → 원장 정�
 
 조치: RED(`34bff75`) → GREEN(`db3449e`): `;&|()` 뒤 `#` 인식, 파일명 앞뒤 경계(경로째 자기제외 차단 유지 시연 포함).
 잔여 한계(보수적 방향 = 오탐): 여러 줄에 걸친 따옴표 문자열 뒤 주석 변경은 삭제로 본다.
+
+### V2 1차 — 리셋 컨텍스트 재공격 (Claude critic, read-only, goal + verdict.json 만 입력) · 대상 HEAD `7d531b3`
+
+판정: **FAIL** (V1 4차 approve 와 갈림 → 결론 보류, 원인 회수)
+- [high] V1 3차 대응으로 넣은 파일명 경계가 `grep -v 'foo.sh.*'` 를 통과시켜 **기존 scripts/*.sh 자기제외를 약화**(origin/main 은 차단). counter-AC 위반이자 "범위 밖 약화 금지" 위반.
+- [high] 판정기를 인덱스 판으로 실행 → 같은 커밋에서 판정기를 `exit 0` 으로 바꾸고 스텝 삭제 시 exit 0.
+- [medium] `on:` 트리거(pull_request·push) 삭제 통과 — 입력 표 "그 외 전부 → 차단" 과 모순(과장).
+- [low] defaults.run.shell `true {0}` / job `if: ${{ false }}` 추가형 무력화 미탐 — 표에 미기재.
+- 유지된 것: suppressions.yaml 2건·2026-11-26, 인수 스크립트 vacuous pass 경로 없음, ruby 부재 시 차단.
+
+조치: RED(`26072d1`) → GREEN(`0be00b3`): 경계 철회(V1 3차 archived-verify.yml 오탐은 기존 한계로 문서화, 해당 통과 시연은 기존 차단 유지 시연으로 대체), 판정기 HEAD 판 실행, 트리거 이벤트 포함, 추가형 무력화를 표에 비범위로 명시.

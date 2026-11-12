@@ -1,0 +1,34 @@
+{
+  "slug": "suppressions-renew",
+  "base_sha": "bb12d8662b534f1ea6978dc2c7b2400910ee3471",
+  "goal": "docs/engineering/suppressions-renew-goal-2026-11-12.md",
+  "generator": {
+    "role": "G",
+    "red_commits": ["a17aef4", "9253469", "1c03ba3", "9afec36", "8da3e1b", "34bff75"],
+    "green_commits": ["0feb1e0", "f5976c9", "8178735", "5db49de", "db3449e"],
+    "evidence": [
+      {"command": "./verify.sh", "exit_code": 0, "artifact": "PASS: no secret-pattern match in any tracked file, .env not tracked"},
+      {"command": "CI '억제 만료 스캔' 스텝 run 본문(yaml 추출) bash -eo pipefail", "exit_code": 0, "artifact": "PASS: 억제 2건 전부 유효 기한 내"},
+      {"command": "bash scripts/verify/run-acceptance.sh scripts/acceptance-gate-scope-selfexempt.sh", "exit_code": 0, "artifact": "판정 10건, CHECKED 9"},
+      {"command": "bash scripts/verify/run-acceptance.sh scripts/acceptance-p13-workflow-deletion.sh", "exit_code": 0, "artifact": "판정 19건, CHECKED 18"},
+      {"command": "manual mutants A~F (스크래치 클론, 원본 무변경)", "exit_code": 1, "artifact": "6종 전부 사멸. F 는 초판에서 생존 → fail-closed 시연(624c3bb) 추가 후 사멸"}
+    ]
+  },
+  "v1": {
+    "engine": "codex adversarial-review --base origin/main (fresh, read-only)",
+    "rounds": [
+      {"thread": "01a1cffa-ad63-7011-8ab4-18b1d3fb08e7", "verdict": "needs-attention", "findings": 4, "resolved_by": ["9afec36", "8178735"]},
+      {"thread": "01a1d002-8dc8-74f2-b89f-591f265a63db", "verdict": "needs-attention", "findings": 2, "resolved_by": ["8da3e1b", "5db49de"]},
+      {"thread": "01a1d009-b161-7741-b96d-07c8457fe416", "verdict": "needs-attention", "findings": 2, "resolved_by": ["34bff75", "db3449e"]},
+      {"thread": "01a1d00f-eac1-7541-a650-14d12d49890e", "verdict": "approve", "findings": 0}
+    ]
+  },
+  "v2": null,
+  "failed_attempts": [
+    {"what": "줄 텍스트 기반 삭제 판정기(f5976c9)", "why": "V1 1차: env 미끼·앵커·flow 우회, 형제 키 오탐"},
+    {"what": "awk 로 만든 선택적 백슬래시 패턴", "why": "생성 결과가 \\? 로 모호. 브래킷 [\\] 은 ugrep 오류 → (\\\\)? 로 교체"},
+    {"what": "mutant F 생존", "why": "판정 불가 경로 시연 부재 → 624c3bb 로 보강"}
+  ],
+  "three_way_agree": null,
+  "status": "pending-v2"
+}

@@ -14,17 +14,21 @@
         ※ 매칭된 실제 값은 절대 출력하지 않는다
 검사  : ⓪ CI 워크플로(.github/workflows/*)의 스텝·검사 삭제 — D·M·T 를 --no-renames 로 따로 구해
           (인덱스 판이 일반 파일이 아니면 — symlink 등 — 즉시 차단)
-          scripts/verify/check-workflow-deletion.sh(인덱스 판)로 판정한다. YAML 을 파싱해
+          scripts/verify/check-workflow-deletion.sh(**HEAD 판** — 같은 커밋 변조 차단, HEAD 에 없으면 차단)로
+          판정한다. YAML 을 파싱해 on 트리거 이벤트 이름과
           jobs.*.steps[*] 의 name·uses·run 줄(주석·빈 줄·따옴표 밖 공백/;&|() 뒤 인라인 주석 제외)과 job uses 를 다중집합 비교 —
           HEAD 에 있고 인덱스에 없는 단위 = 삭제. 파일 삭제·밖으로 rename·주석화·명령 수정·
           env 미끼·앵커/flow 형식 = 차단, 순서 이동·형제 키(env 등)·주석 변경 = 통과.
           파싱 실패 = 차단(fail-closed). 워크플로 밖 경로의 삭제는 보지 않는다(리팩터링 오탐 방지).
           삭제 내용은 출력하지 않는다(job/step 위치만). 회귀: scripts/acceptance-p13-workflow-deletion.sh
-          한계: 같은 명령 줄을 실행되지 않는 다른 run(heredoc 본문 등)으로 옮기는 것은 못 잡는다.
+          한계: 같은 명령 줄을 실행되지 않는 다른 run(heredoc 본문 등)으로 옮기는 것, 추가형 무력화
+          (defaults.run.shell 교체, 트리거 필터 변경)는 못 잡는다. job/step if·continue-on-error 추가는
+          CI check-ci-step-integrity.sh 가 본다.
         ① 비밀 스캔(verify.sh 위임, VERIFY_SCAN_SOURCE=index)
         ② 검사기 자기 제외 — 대상: verify.sh · scripts/*.sh · hooks/* · .github/workflows/* ·
-          .claude/skills/*/local-checks.sh. 파일명의 점은 그대로·\.·[.] 세 표기를 모두 받고,
-          파일명 앞뒤 경계를 요구한다(archived-verify.yml 제외는 자기제외가 아니다)
+          .claude/skills/*/local-checks.sh. 파일명의 점은 그대로·\.·[.] 세 표기를 모두 받는다.
+          경계는 두지 않는다(기존 'foo.sh.*' 차단 유지) — archived-verify.yml 같은 더 긴 다른 파일명
+          제외도 차단되는 보수적 오탐은 기존부터 있던 한계다
           (회귀: scripts/acceptance-gate-scope-selfexempt.sh). 한계: 파일명 텍스트 대조라
           임의 정규식(예: local-checks.s.)으로 쓴 자기제외는 못 잡는다
         ③ 검사 약화 패턴(추가된 줄만) ④ 만료 없는/지난 억제 ⑤ LLM 출력→판정 수치 ⑥ 외부효과 모듈 네트워크 0건
