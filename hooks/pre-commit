@@ -149,9 +149,9 @@ while IFS= read -r f; do
       # 그대로만 받으면 grep -v 'local-checks\.sh' / "verify[.]yml" 로 우회됐다(V1 2026-11-12).
       # 점 이외의 ERE 메타문자는 이스케이프하고, 점은 (\\)?[.] 또는 \[[.]\] 로 받는다
       # (브래킷 안 백슬래시 [\] 는 grep 구현마다 해석이 갈려 쓰지 않는다 — ugrep 은 오류를 냈다).
-      esc=$(printf '%s' "$base" | sed 's/[][*^$+?(){}|\\]/\\&/g')
-      dotpat='((\\)?[.]|\[[.]\])'
-      esc=${esc//./$dotpat}
+      # 패턴 생성은 sed 한 곳에서 한다. bash 의 ${var//./$rep} 는 bash 5.2(patsub_replacement)에서
+      # 치환문 안 백슬래시를 처리해 (\\)? 가 (\)? 로 깨졌고 GNU grep 이 exit 2 를 냈다(CI run 43242937237).
+      esc=$(printf '%s' "$base" | sed -e 's/[][*^$+?(){}|\\]/\\&/g' -e 's/\./((\\\\)?[.]|\\[[.]\\])/g')
       # 파일명 앞뒤 경계는 두지 않는다. V1 3차 오탐(archived-verify.yml 제외)을 없애려 경계를 넣었더니
       # 'foo.sh.*' 같은 기존 scripts/*.sh 자기제외가 통과해 범위 밖 검사가 약화됐다(V2 2026-11-12).
       # 더 긴 다른 파일명을 빼는 경우의 오탐은 origin/main 부터 있던 보수적 한계로 남긴다.
