@@ -8,10 +8,9 @@
 # 왜 YAML 구조인가 (V1 Codex 2026-11-12, thread 01a1cffa-ad63-7011-8ab4-18b1d3fb08e7):
 #   줄 텍스트로 세면 ① 삭제한 스텝 문구를 env 문자열에 남기는 미끼 ② 앵커(run: &a |)·
 #   flow 형식(- {name:, run:}) ③ run 이 첫 키인 스텝의 형제 키 오탐 — 셋 다 뚫리거나 오탐한다.
-#   그래서 실제 실행 단위만 센다: jobs.*.steps[*] 의 name · uses · run(줄 단위, 주석·빈 줄 제외)
+#   그래서 실제 실행 단위만 센다: jobs.*.steps[*] 의 name · uses · run(줄 단위, 빈 줄만 제외)
 #   와 job 수준 uses, 그리고 on 트리거 이벤트 이름. env·with·주석·다른 키의 문자열은 "남아 있는 검사"로 치지 않는다.
 #   다중집합 비교라 순서 이동은 삭제가 아니고, 명령 수정은 옛 줄이 사라지므로 삭제다.
-#   run 줄의 인라인 셸 주석(따옴표 밖 공백 뒤 #)은 떼고 비교한다 — 주석만 바꾼 것은 삭제가 아니다.
 #
 # 막지 못하는 것(삭제가 아닌 추가형 무력화 — 범위 밖): defaults.run.shell 교체, job/step if·continue-on-error 추가
 #   (if·continue-on-error 는 CI 의 check-ci-step-integrity.sh 가 본다), 트리거 필터(branches 등) 변경.
@@ -25,19 +24,10 @@ if [ "$#" -ne 2 ] || [ ! -f "$1" ] || [ ! -f "$2" ]; then
 fi
 
 ruby -rpsych -rdate -e '
-# 셸 인라인 주석 제거 — **화이트리스트**로만 뗀다(V1 2·3·5·6차).
-# # 앞부분이 평범한 단어 문자(영숫자 _ . / = : , + -)·공백·; & | 로만 되어 있고 # 바로 앞이 공백이나
-# ; & | 일 때만 주석으로 본다. 그 밖(따옴표·$·백틱·백슬래시·괄호·glob·extglob·중괄호 등)은 전부
-# 떼지 않고 줄 전체로 비교한다. 블랙리스트는 중첩 따옴표(5차)·extglob @(#|x)(6차)로 연달아 뚫렸다.
-# 대가: 그런 줄은 주석만 바꿔도 삭제로 본다(보수적 오탐).
-def strip_inline_comment(s)
-  i = s.index("#")
-  return s if i.nil?
-  prefix = s[0...i]
-  return s unless prefix =~ /\A[A-Za-z0-9_.\/=:,+\- \t;&|]*\z/
-  return s unless i == 0 || s[i - 1] =~ /[ \t;&|]/
-  prefix.rstrip
-end
+# run 블록 안에서는 셸 주석을 판별하지 않는다 — 비어 있지 않은 모든 줄이 실행 단위다.
+# 텍스트로 셸 주석을 가리려던 시도는 V1 2·3·5·6·7차에서 연달아 뚫렸다(인라인 주석·중첩 따옴표·
+# extglob @(#|x)·줄 이어짐 뒤 # 줄이 실제로 실행됨). 판별할 수 없는 것을 판별하지 않는다.
+# 대가: run 안 주석만 바꿔도 삭제로 본다(보수적 오탐). run 밖 YAML 주석은 파서가 버리므로 통과한다.
 
 def units(path)
   text = File.read(path)
@@ -72,8 +62,6 @@ def units(path)
       if st.key?("run")
         st["run"].to_s.each_line do |l|
           s = l.strip
-          next if s.empty? || s.start_with?("#")
-          s = strip_inline_comment(s)
           next if s.empty?
           out << [where, "run", s]
         end
