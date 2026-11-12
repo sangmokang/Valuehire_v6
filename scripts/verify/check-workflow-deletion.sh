@@ -25,19 +25,18 @@ if [ "$#" -ne 2 ] || [ ! -f "$1" ] || [ ! -f "$2" ]; then
 fi
 
 ruby -rpsych -rdate -e '
-# 셸 인라인 주석 제거 — 보수적으로만 뗀다(V1 2·3·5차).
-# 공백 또는 ;&|() 바로 뒤의 # 를 찾되, 그 앞부분에 따옴표·백틱·$·백슬래시가 하나라도 있으면
-# 떼지 않고 줄 전체로 비교한다. 따옴표 상태를 추적하는 스캐너는 중첩 따옴표("$(printf " #")")에
-# 속아 뒤따르는 실제 명령까지 주석으로 지웠다(V1 5차 실측). 판단이 애매하면 오탐 쪽을 택한다.
+# 셸 인라인 주석 제거 — **화이트리스트**로만 뗀다(V1 2·3·5·6차).
+# # 앞부분이 평범한 단어 문자(영숫자 _ . / = : , + -)·공백·; & | 로만 되어 있고 # 바로 앞이 공백이나
+# ; & | 일 때만 주석으로 본다. 그 밖(따옴표·$·백틱·백슬래시·괄호·glob·extglob·중괄호 등)은 전부
+# 떼지 않고 줄 전체로 비교한다. 블랙리스트는 중첩 따옴표(5차)·extglob @(#|x)(6차)로 연달아 뚫렸다.
+# 대가: 그런 줄은 주석만 바꿔도 삭제로 본다(보수적 오탐).
 def strip_inline_comment(s)
-  i = 0
-  while (i = s.index("#", i))
-    prefix = s[0...i]
-    return s if prefix =~ /[\x27"`$\\]/
-    return prefix.rstrip if i == 0 || s[i - 1] =~ /[\s;&|()]/
-    i += 1
-  end
-  s
+  i = s.index("#")
+  return s if i.nil?
+  prefix = s[0...i]
+  return s unless prefix =~ /\A[A-Za-z0-9_.\/=:,+\- \t;&|]*\z/
+  return s unless i == 0 || s[i - 1] =~ /[ \t;&|]/
+  prefix.rstrip
 end
 
 def units(path)
