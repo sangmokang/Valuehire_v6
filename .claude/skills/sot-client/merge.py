@@ -57,9 +57,12 @@ def headcount(b, slug_url):
     if mismatch:
         pts.append({"head": "추이 생략", "body": "월별 추이의 최신값이 공표 최신값과 달라 추이 그래프를 싣지 않았습니다."})
     pts.append({"head": "기준별 차이", "body": "국민연금에는 대표자가 포함되고, 고용·산재보험은 대표 사업장의 상시근로자 수만 집계해 수치가 다를 수 있습니다."})
-    via = " · Grok 경유 조회, 원문 대조 전" if b.get("via") == "grok" else ""
-    return {"basis": "국민연금 가입자", "series": ser, "other": other, "points": pts,
-            "source": {"title": f'볼타 · {b.get("t", "")} 사업자정보 (국민연금공단·근로복지공단 공공데이터{via})', "url": slug_url}}
+    if b.get("via") == "web":
+        src = {"title": f'{b.get("web_title") or "공개 웹 자료"} · {b.get("t", "")} 국민연금 가입자', "url": b["web_url"]}
+    else:
+        via = " · Grok 경유 조회, 원문 대조 전" if b.get("via") == "grok" else ""
+        src = {"title": f'볼타 · {b.get("t", "")} 사업자정보 (국민연금공단·근로복지공단 공공데이터{via})', "url": slug_url}
+    return {"basis": "국민연금 가입자", "series": ser, "other": other, "points": pts, "source": src}
 
 
 def is_ceo_title(t):
@@ -87,6 +90,15 @@ def main(root, slug):
     b = None
     if os.path.exists(bp):
         b = json.load(open(bp, encoding="utf-8"))
+        wp = os.path.join(root, "webnp", slug + ".json")
+        w = json.load(open(wp, encoding="utf-8")) if os.path.exists(wp) else None
+        if w and w.get("np") and w.get("source_url") and b.get("via") == "grok":
+            # 웹 검색으로 확인한 공개 수치가 Grok 경유 값을 대체한다. 확인 안 된 고용·산재·추이는 버린다.
+            b.update({"np": w["np"], "npd": w.get("npd") or b.get("npd"), "ei": w.get("ei"), "sa": w.get("sa"),
+                      "ser": "" if not w.get("matches_grok") else b.get("ser", ""), "via": "web",
+                      "web_url": w["source_url"], "web_title": w.get("source_title")})
+            if not w.get("ei") and not w.get("sa"):
+                b.pop("eid", None)
         url = f'https://bolta.io/biz/{b["biz"]}'
         hc = headcount(b, url)
         if hc:
@@ -102,8 +114,8 @@ def main(root, slug):
                 ks.append(kp)
             else:
                 ks[idx] = kp
-            src = {"title": "볼타 · 4대보험 가입 인원 (공공데이터)", "url": url}
-            if all(s.get("url") != url for s in d.get("sources", [])):
+            src = {"title": hc["source"]["title"] if b.get("via") == "web" else "볼타 · 4대보험 가입 인원 (공공데이터)", "url": hc["source"]["url"]}
+            if all(s.get("url") != src["url"] for s in d.get("sources", [])):
                 d.setdefault("sources", []).insert(0, src)
         d["biz_no"] = b["biz"]
     if os.path.exists(gp):
@@ -131,12 +143,24 @@ def main(root, slug):
             kt.append(item)
         if kt:
             d["key_talent"] = kt
-        units = [{"title": u[0], "name": u[1] or "책임자 확인 불가"} for u in g.get("org", []) if u and u[0]]
+        dropped = [p[0].split("(")[0].strip() for p in g.get("people", []) if p and p[0] and p[0].split("(")[0].strip() in excluded and p[0] not in names]
+        units = [{"title": u[0], "name": "책임자 확인 불가" if not u[1] or any(n in u[1] for n in dropped) else u[1]}
+                 for u in g.get("org", []) if u and u[0]]
         if units:
             d["org"] = {"top": pick_top(d, b), "units": units[:6],
                         "note": "공식 조직도가 공개되지 않아 Grok 조사(2026.11.12)와 공개 자료에서 확인된 조직·책임자로 구성했습니다(보고선 미확인)."}
         d["talent_note"] = "핵심 인재는 Grok 조사(2026.11.12)로 수집한 공개 프로필·보도 자료이며, 개별 재직 여부와 LinkedIn 프로필은 원문 대조 전입니다."
     d.setdefault("key_talent", [])
+    # 웹 검색으로 찾은 LinkedIn (li/*.json: [{slug,name,linkedin}]) 을 빈 칸에만 채운다
+    import glob
+    found = {}
+    for fp in sorted(glob.glob(os.path.join(root, "li", "*.json"))):
+        for r in json.load(open(fp, encoding="utf-8")):
+            if r.get("slug") == slug and li_ok(r.get("linkedin")):
+                found.setdefault(r["name"], r["linkedin"].strip())
+    for p in d.get("executives", []) + d["key_talent"]:
+        if not p.get("linkedin") and p.get("name") in found:
+            p["linkedin"] = found[p["name"]]
     if d.get("org"):
         d["org"]["top"] = pick_top(d, b)
     # 상태 재계산: 4대보험을 채웠으면 해당 미완 항목을 지운다
