@@ -84,9 +84,12 @@ def main(root, slug):
             if e.get("linkedin") and not li_ok(e["linkedin"]):
                 e.pop("linkedin")
         kt = []
+        excluded = d.get("exec_note") or ""
         for p in g.get("people", []):
             name, title, org, bg, edu, li = (list(p) + [None] * 6)[:6]
             if not name or name in names:
+                continue
+            if name.split("(")[0].strip() in excluded:  # 조사 단계에서 일부러 뺀 인물은 다시 넣지 않는다
                 continue
             bio = "; ".join(x for x in (bg, edu) if x) or "공개 이력 확인 불가"
             item = {"name": name, "title": title or "확인 불가", "org": org or "확인 불가", "bio": bio}
@@ -97,8 +100,10 @@ def main(root, slug):
             d["key_talent"] = kt
         units = [{"title": u[0], "name": u[1] or "책임자 확인 불가"} for u in g.get("org", []) if u and u[0]]
         if units:
-            ceo = d.get("executives", [{}])[0]
-            d["org"] = {"top": {"title": "대표이사", "name": ceo.get("name", "")}, "units": units[:6],
+            exs = d.get("executives", [])
+            ceo = next((e for e in exs if "대표" in (e.get("title") or "") or "CEO" in (e.get("title") or "")), exs[0] if exs else {})
+            title = "대표이사" if "대표" in (ceo.get("title") or "") or "CEO" in (ceo.get("title") or "") else (ceo.get("title") or "대표")
+            d["org"] = {"top": {"title": title, "name": ceo.get("name", "")}, "units": units[:6],
                         "note": "공식 조직도가 공개되지 않아 Grok 조사(2026.11.12)와 공개 자료에서 확인된 조직·책임자로 구성했습니다(보고선 미확인)."}
         d["talent_note"] = "핵심 인재는 Grok 조사(2026.11.12)로 수집한 공개 프로필·보도 자료입니다. LinkedIn 은 실제 URL 이 확인된 경우에만 연결했습니다."
     d.setdefault("key_talent", [])

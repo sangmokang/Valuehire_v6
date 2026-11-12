@@ -338,6 +338,8 @@ def build(d, out):
             run(p, "└ ", 10, False, GRAY); run(p, u["title"], 10, True); run(p, f'  {u.get("name", "")}', 10, False, GRAY)
         if d["org"].get("note"):
             source_note(doc, d["org"]["note"])
+    else:
+        p = para(doc); run(p, "공개된 조직 정보 없음. 사업부·팀 구성과 책임자를 공개 자료로 확인하지 못했습니다.", 10.5, False, GRAY)
 
     heading(doc, n, "제품과 서비스"); n += 1
     bullets(doc, d["products"])
