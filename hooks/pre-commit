@@ -79,7 +79,8 @@ fi
 # ── 2) 검사기 자기 제외 (P13 ④ · §0 E1 재현 방지) ────────────────────────────
 while IFS= read -r f; do
   case "$f" in
-    verify.sh|scripts/*.sh|hooks/*)
+    # .github/workflows/* · 스킬 local-checks.sh 도 검사기다(suppressions gate-scope-gaps (1) 해소, 2026-11-12).
+    verify.sh|scripts/*.sh|hooks/*|.github/workflows/*|.claude/skills/*/local-checks.sh)
       base=$(basename "$f")
       # ERE 메타문자 이스케이프. ']' 는 문자 클래스 맨 앞에 와야 한다.
       esc=$(printf '%s' "$base" | sed 's/[].[*^$+?(){}|\\]/\\&/g')
