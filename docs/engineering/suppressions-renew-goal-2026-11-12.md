@@ -104,3 +104,12 @@ RED1 커밋 → GREEN1 커밋 → RED2 커밋 → GREEN2 커밋 → 원장 정�
 
 조치: 2건 수용. RED(`8da3e1b`) → GREEN(`5db49de`): `--diff-filter=DMT` + 인덱스 mode 검사, 따옴표 인식 인라인 주석 제거.
 자체 mutant F(판정 불가 → 통과)가 생존해 fail-closed 시연 추가(`624c3bb`) 후 사멸 확인.
+
+### V1 3차 — Codex adversarial-review (fresh, read-only) · thread `01a1d009-b161-7741-b96d-07c8457fe416`
+
+판정: **needs-attention** — 우회(bypass) 지적 0건, 오탐 2건.
+- [medium] `echo keep;# 설명` 처럼 연산자 뒤 붙은 주석 삭제를 실행 단위 삭제로 오탐. (여러 줄 따옴표 뒤 주석도 동일)
+- [medium] `grep -v archived-verify.yml` 을 자기제외로 오탐(파일명 경계 없음 — 기존 scripts/*.sh 대조에도 있던 결함).
+
+조치: RED(`34bff75`) → GREEN(`db3449e`): `;&|()` 뒤 `#` 인식, 파일명 앞뒤 경계(경로째 자기제외 차단 유지 시연 포함).
+잔여 한계(보수적 방향 = 오탐): 여러 줄에 걸친 따옴표 문자열 뒤 주석 변경은 삭제로 본다.
