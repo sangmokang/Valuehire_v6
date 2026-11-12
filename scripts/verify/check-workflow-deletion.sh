@@ -9,11 +9,13 @@
 #   줄 텍스트로 세면 ① 삭제한 스텝 문구를 env 문자열에 남기는 미끼 ② 앵커(run: &a |)·
 #   flow 형식(- {name:, run:}) ③ run 이 첫 키인 스텝의 형제 키 오탐 — 셋 다 뚫리거나 오탐한다.
 #   그래서 실제 실행 단위만 센다: jobs.*.steps[*] 의 name · uses · run(줄 단위, 주석·빈 줄 제외)
-#   와 job 수준 uses. env·with·주석·다른 키의 문자열은 "남아 있는 검사"로 치지 않는다.
+#   와 job 수준 uses, 그리고 on 트리거 이벤트 이름. env·with·주석·다른 키의 문자열은 "남아 있는 검사"로 치지 않는다.
 #   다중집합 비교라 순서 이동은 삭제가 아니고, 명령 수정은 옛 줄이 사라지므로 삭제다.
 #   run 줄의 인라인 셸 주석(따옴표 밖 공백 뒤 #)은 떼고 비교한다 — 주석만 바꾼 것은 삭제가 아니다.
 #
-# 막지 못하는 것: 같은 명령 줄을 실행되지 않는 다른 run 안(heredoc 본문 등)이나 조건부 스텝으로
+# 막지 못하는 것(삭제가 아닌 추가형 무력화 — 범위 밖): defaults.run.shell 교체, job/step if·continue-on-error 추가
+#   (if·continue-on-error 는 CI 의 check-ci-step-integrity.sh 가 본다), 트리거 필터(branches 등) 변경.
+#   그리고 같은 명령 줄을 실행되지 않는 다른 run 안(heredoc 본문 등)이나 조건부 스텝으로
 #   옮기는 것. 조건부·오류무시 스텝은 check-ci-step-integrity.sh 가 CI 에서 본다.
 set -uo pipefail
 
@@ -56,6 +58,17 @@ def units(path)
   return [] if jobs.nil?
   raise "jobs 가 매핑이 아니다" unless jobs.is_a?(Hash)
   out = []
+  # 트리거 이벤트도 실행 단위다 — pull_request 를 지우면 PR 에서 CI 가 아예 돌지 않는다(V2 2026-11-12).
+  # YAML 1.1 에서 키 on 은 true 로 읽힌다.
+  trig = doc.key?("on") ? doc["on"] : doc[true]
+  events = case trig
+           when String then [trig]
+           when Array then trig.map(&:to_s)
+           when Hash then trig.keys.map(&:to_s)
+           when nil then []
+           else raise "on 형식을 알 수 없다"
+           end
+  events.each { |e| out << ["on", "event", e] }
   jobs.each do |jid, job|
     raise "job #{jid} 가 매핑이 아니다" unless job.is_a?(Hash)
     out << ["#{jid}", "job-uses", job["uses"].to_s] if job.key?("uses")
