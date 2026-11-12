@@ -98,6 +98,33 @@ def main():
         fails.append("partial status not shown in document")
     if "Grok" not in txt or "대조 전" not in txt:
         fails.append("talent provenance not marked as unverified")
+    # (f) exec_note 로 뺀 인물은 조직도 노드에서도 빠진다
+    f, root = run(base(), g)
+    if any("남재무" in u["name"] for u in f["org"]["units"]):
+        fails.append(f"excluded person still in org units: {f['org']['units']}")
+    # (g) 웹 검색으로 확인한 4대보험 값(webnp)이 있으면 Grok 경유 표시를 웹 출처로 바꾼다
+    root = tempfile.mkdtemp()
+    for sub in ("data", "grok", "bolta", "webnp", "li"):
+        os.makedirs(os.path.join(root, sub))
+    dd = base(); dd["status"] = "부분 완료: 4대보험(볼타 차단)"
+    json.dump(dd, open(os.path.join(root, "data", "t.json"), "w", encoding="utf-8"), ensure_ascii=False)
+    json.dump(g, open(os.path.join(root, "grok", "t.json"), "w", encoding="utf-8"), ensure_ascii=False)
+    json.dump({"biz": "1", "t": "T", "np": "10명", "npd": "2026년 9월 자료 기준", "ceo": "오대표", "ser": "", "via": "grok"},
+              open(os.path.join(root, "bolta", "t.json"), "w", encoding="utf-8"), ensure_ascii=False)
+    json.dump({"slug": "t", "np": "11명", "npd": "2026년 10월 자료 기준", "source_url": "https://example.com/t", "source_title": "원티드 인사이트 · T", "matches_grok": False},
+              open(os.path.join(root, "webnp", "t.json"), "w", encoding="utf-8"), ensure_ascii=False)
+    json.dump([{"slug": "t", "name": "오대표", "linkedin": "https://kr.linkedin.com/in/oh-ceo"}, {"slug": "t", "name": "김인재", "linkedin": "https://bad.example/in/x"}],
+              open(os.path.join(root, "li", "found_1.json"), "w", encoding="utf-8"), ensure_ascii=False)
+    f = merge.main(root, "t")
+    if f["headcount"]["series"][-1]["count"] != 11 or "example.com/t" not in f["headcount"]["source"]["url"]:
+        fails.append(f"web headcount not applied: {f['headcount']['series']} {f['headcount']['source']}")
+    if any("대조 전" in k["label"] for k in f["kpis"]) or "4대보험 수치 원문 대조" in f["status"]:
+        fails.append("web-verified headcount still marked unverified")
+    ex = {e["name"]: e for e in f["executives"]}
+    if ex["오대표"].get("linkedin") != "https://kr.linkedin.com/in/oh-ceo":
+        fails.append("web LinkedIn not applied to executive")
+    if any(k.get("linkedin") == "https://bad.example/in/x" for k in f["key_talent"]):
+        fails.append("invalid web LinkedIn accepted")
     print("\n".join(fails) if fails else "PASS")
     return 1 if fails else 0
 
