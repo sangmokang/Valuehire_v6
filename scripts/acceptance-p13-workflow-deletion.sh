@@ -153,6 +153,28 @@ demo block "YAML 파싱 불가 워크플로 커밋(fail-closed)" \
   "printf 'jobs: [\\n' >> $WF && tail -1 $WF | grep -qF 'jobs: ['" \
   "git add $WF && git commit -qm 'ci: broken yaml'" "워크플로 삭제 판정 실패"
 
+# ── V1 2차(Codex thread 01a1d002-8dc8-74f2-b89f-591f265a63db) 반례 ──
+demo block "V1b-1 워크플로를 symlink 로 타입 변경(T)" \
+  "mv $WF docs/verify.yml.bak && ln -s ../../docs/verify.yml.bak $WF && test -L $WF" \
+  "git add $WF && git commit -qm 'ci: symlink workflow'" "일반 파일이 아니다"
+
+INLINE_WF='on: push
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: gate
+        run: |
+          bash scripts/acceptance-0-6.sh # explain gate
+          echo "keep # quoted hash"'
+demo pass "V1b-2 run 줄 인라인 주석만 삭제(counter)" \
+  "seed_probe \"\$INLINE_WF\" && perl -pi -e 's/ # explain gate\$//' $PW && ! grep -q 'explain gate' $PW" \
+  "git add $PW && git commit -qm 'ci: drop inline comment'"
+
+demo block "V1b-3 따옴표 안 # 뒤를 바꾸는 것은 명령 변경(삭제)" \
+  "seed_probe \"\$INLINE_WF\" && perl -pi -e 's/quoted hash/changed/' $PW && grep -q 'keep # changed' $PW" \
+  "git add $PW && git commit -qm 'ci: change quoted text'"
+
 if [ "$(orig_state)" != "$ORIG_BEFORE" ]; then
   echo "FAIL: 시연이 원본 저장소를 변경했다"; fail=1
 fi
