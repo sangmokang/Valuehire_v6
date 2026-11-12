@@ -73,9 +73,11 @@ def pick_top(d, b):
         if names:
             return {"title": "공동대표" if len(names) > 1 else "대표이사", "name": " · ".join(names)}
     exs = d.get("executives", [])
-    ceo = next((e for e in exs if is_ceo_title(e.get("title"))), None)
-    if ceo:
-        return {"title": "대표이사", "name": ceo["name"]}
+    cands = [e for e in exs if is_ceo_title(e.get("title"))]
+    if cands:
+        co = [cands[0]] + [e for e in cands[1:] if re.search(r"공동|각자", e.get("title") or "")]
+        co = co[:3]
+        return {"title": "공동대표" if len(co) > 1 else "대표이사", "name": " · ".join(e["name"] for e in co)}
     return {"title": "대표", "name": "확인 불가"}
 
 

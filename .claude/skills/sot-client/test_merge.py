@@ -70,6 +70,11 @@ def main():
     f, root = run_b(d, g, {"biz": "1", "t": "주식회사 T", "np": "10명", "npd": "2026년 9월 자료 기준", "ceo": "이현대", "ser": "26.08:9,26.09:10"})
     if f["org"]["top"]["name"] != "이현대":
         fails.append(f"bolta ceo not used: {f['org']['top']}")
+    # (a2) 볼타 대표자 없으면 공동/각자 대표만 함께, 자회사 대표는 제외
+    d = base(); d["executives"] = [{"name": "김공동", "title": "공동대표", "bio": "x"}, {"name": "이공동", "title": "공동대표", "bio": "y"}, {"name": "박자회사", "title": "에이사 대표", "bio": "z"}]
+    f, root = run_b(d, g, {"biz": "1", "t": "T", "np": "10명", "npd": "2026년 9월 자료 기준", "ser": "", "via": "grok"})
+    if f["org"]["top"]["name"] != "김공동 · 이공동":
+        fails.append(f"co-CEO handling wrong: {f['org']['top']}")
     # (b) Grok 경유 보험 수치는 완료로 승격하지 않고 KPI 에 대조 전 표시
     d = base(); d["status"] = "부분 완료: 4대보험(볼타 차단), 매출"
     f, root = run_b(d, g, {"biz": "1", "t": "T", "np": "10명", "npd": "2026년 9월 자료 기준", "ceo": "오대표", "ser": "26.08:9,26.09:10", "via": "grok"})
