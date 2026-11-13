@@ -7,6 +7,21 @@ description: "사용자가 준 통화 녹음 파일 목록을 Gemini에 맡겨 �
 
 사용자가 지정한 모든 녹음을 Gemini로 **처음부터 끝까지 전문 전사**하고 Google Docs 본문에 저장한다. 기본 결과는 입력 순서대로 파일별 구분을 넣은 문서 한 개다. 사용자가 통화별 문서를 원하면 각 파일에 같은 절차를 적용한다. 요약을 추가하더라도 전문을 대체하거나 줄이지 않는다.
 
+## 일일 Galaxy 수집
+
+- 착수 시 최근 통화 녹음의 실제 저장 위치를 Android MediaStore와 해당 파일의 존재·메타데이터로 대조한다. 내부 `/storage/emulated/0/Recordings/Call`만 보지 않는다. 녹음이 SD카드의 `/storage/<카드ID>/Recordings/Call`에 저장된 것이 확인되면 수집기 잠금 하에 설정 경로를 바로잡고, 요청된 파일부터 복사·해시 검증한다. 통화 이력만으로 음성이 저장됐다고 보고하지 않는다.
+- `PhoneIngest/requested-calls.json`의 오너 지정 통화를 먼저 처리한다. 그 외 신규 전사는 기존 체크포인트 순서를 따른다. 이름만으로 못 찾으면 연결된 연락처/해당 업무 메일의 검증된 번호, 통화 이력과 MediaStore를 대조한다. 파일이 없으면 `WAITING_SOURCE`로 남기고 가짜 음성 해시나 작업 큐 항목을 만들지 않는다.
+
+- `scripts/device_ingest_runner.py`는 macOS LaunchAgent가 5분마다 호출한다. Samsung USB ADB 연결과 HDD 볼륨 UUID를 확인한 뒤 설정의 `android_call_folder`에 있는 안정된 `.m4a`를 현재 HDD 통화 폴더로 **복사**한다. 휴대폰 원본은 그대로 둔다.
+- 복사 전·후 원본 크기·수정 시각·SHA-256과 HDD 복사본 SHA-256이 일치할 때만 `work-queue.json`에 추가한다. 같은 SHA-256은 중복 등록하지 않는다. 파일명 충돌·기기 미인증·HDD 분리·파일 쓰기 중·크기 초과는 덮어쓰거나 건너뛴 성공으로 표시하지 말고 체크포인트/오류로 남긴다.
+- 설정은 `~/Library/Application Support/Valuehire/phone-ingest.json`, 진행 상태와 큐는 같은 `PhoneIngest/`에 권한 600으로 보관한다. 비밀번호·ADB 기기 일련번호·통화 내용은 로그에 쓰지 않는다. 정책 JSON에 등록된 명시적 개인 연락처 패턴이 파일명에 있는 음성은 HDD 업무 큐에 복사·등록하지 않는다.
+- `/phone`을 시작할 때 먼저 미완료 작업과 대기열을 확인한다. 기존 Gemini 요청이 제출됐으면 같은 대화를 먼저 열어 상태를 읽고, 새 요청을 중복 전송하지 않는다. 가장 오래된 `COPIED_PENDING_TRANSCRIPTION`부터 순차 처리한다.
+- LaunchAgent는 로컬 수집기다. Google Drive/Gmail 연결 도구가 붙은 `/phone` 실행이 있어야 전사 검수, 네이티브 Docs, 확인 메일과 Supabase 단계가 진행된다. 대기열을 Docs/메일 완료로 표시하지 않는다. 현재 실행기에서 Drive/Gmail 도구가 없다면 그 단계는 `PENDING_CONNECTED_AGENT`로 남기고 문서를 만들었다고 보고하지 않는다.
+
+### LaunchAgent 설치·확인
+
+`assets/com.valueconnect.phone-ingest.plist`를 `~/Library/LaunchAgents/`에 설치한다. `launchctl bootstrap gui/$(id -u) ...`로 시작하고 `launchctl print gui/$(id -u)/com.valueconnect.phone-ingest`로 등록을 확인한다. 수집 로그는 `~/Library/Application Support/Valuehire/PhoneIngest/run-history.jsonl`이다. LaunchAgent는 전화 파일을 삭제하지 않는다.
+
 ## 입력과 실행
 
 - 인자는 로컬 녹음 파일 경로 목록이다. 인용된 공백, shell의 `\ `, 한글 NFC/NFD를 보존해 실제 파일로 해석한다. 사용자 경로 문자열을 `eval`로 실행하지 않는다. 지정한 목록 밖의 통화는 가져오지 않는다.
