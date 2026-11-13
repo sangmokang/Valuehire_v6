@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Phone business story analysis",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "source_sha256",
+    "classification",
+    "business_decision",
+    "story_title",
+    "summary",
+    "evidence",
+    "excluded_source_spans",
+    "owner_approval"
+  ],
+  "properties": {
+    "source_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "classification": {"enum": ["CLIENT_STORY", "CANDIDATE_STORY", "MIXED", "NO_BUSINESS_STORY", "UNCERTAIN"]},
+    "business_decision": {"enum": ["BUSINESS_REVIEWED", "NONBUSINESS", "MIXED_REDACTED", "REVIEW_REQUIRED"]},
+    "story_title": {"type": ["string", "null"]},
+    "client": {"type": ["string", "null"]},
+    "candidate": {"type": ["string", "null"]},
+    "summary": {"type": ["string", "null"]},
+    "situation": {"type": ["string", "null"]},
+    "need_or_strength": {"type": ["string", "null"]},
+    "decision_or_progress": {"type": ["string", "null"]},
+    "follow_up": {"type": ["string", "null"]},
+    "uncertainties": {"type": "array", "items": {"type": "string"}},
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["quote", "speaker", "transcript_start", "transcript_end"],
+        "properties": {
+          "quote": {"type": "string", "minLength": 1},
+          "speaker": {"type": ["string", "null"]},
+          "transcript_start": {"type": "integer", "minimum": 0},
+          "transcript_end": {"type": "integer", "minimum": 1}
+        }
+      }
+    },
+    "excluded_source_spans": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["transcript_start", "transcript_end", "reason"],
+        "properties": {
+          "transcript_start": {"type": "integer", "minimum": 0},
+          "transcript_end": {"type": "integer", "minimum": 1},
+          "reason": {"enum": ["PERSONAL", "CONSULTANT", "NONBUSINESS", "UNCERTAIN"]}
+        }
+      }
+    },
+    "owner_approval": {"enum": ["PENDING_OWNER_CONFIRMATION", "APPROVED", "REJECTED"]}
+  }
+}
