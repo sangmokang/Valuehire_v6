@@ -7,6 +7,13 @@ description: "Galaxy 통화 녹음을 HDD에 순차 수집하고 Gemini로 전�
 
 사용자가 지정하거나 일일 Galaxy 수집기가 대기열에 넣은 녹음을 Gemini로 **처음부터 끝까지 전문 전사**하고 Google Docs 본문에 저장한다. 각 파일을 따로 검수하고, 사업 통화에는 전문과 고객사·후보자 스토리 분석을 함께 기록한다. 분석 요약이 전문을 대체하거나 줄이지 않는다.
 
+## 화면 점유 없는 일일 이어가기
+
+- 사용자 Chrome에는 AppleScript/JXA 또는 CDP로 접근하거나 탭 전환·포커스·키보드 입력을 하지 않는다. 기존 로그인 창/탭/프로필은 종료·재시작하지 않는다. 전용 백그라운드/헤드리스 Gemini 인증이 없으면 `AUTH_REQUIRED`로 남기고 사용자 Chrome으로 폴백하지 않는다. API 경로 자동 전환과 쿠키·토큰·프로필 복제도 하지 않는다.
+- USB 수집 LaunchAgent는 5분마다 백업을 점검한다. 별도 `com.valueconnect.phone-daily` LaunchAgent는 매일 09:00 Asia/Tokyo에 기존 연결 스레드로 `$phone` 이어가기 요청을 전달한다. 설정은 `~/Library/Application Support/Valuehire/PhoneDaily/settings.json`이며 기존 thread/model을 사용한다. 승인 대기 문서는 재생성하거나 확인 메일을 다시 보내지 않는다.
+- 일일 작업은 기존 전문 정제·누락/오류 검수와 Docs 확인부터 진행한다. 전용 Gemini 인증이 없더라도 로컬 검수와 연결 도구 작업은 계속한다. 신규 전사는 한 실행에 3파일·합계1800초·파일당90MB·요청3회·재시도0회 이하이며 실제 계정 한도가 더 낮으면 그 전에 멈춘다.
+- `codex queue --resume`는 재개에 실패해도 exit0일 수 있다. 로그의 경고와 `PhoneDaily/last-completion.json`을 구분해 확인한다. 예약 등록·요청 전달만으로 실제 전사/문서화 완료를 주장하지 않는다. Mac 로그인·Codex 데몬·연결 도구·전용 브라우저 인증이 필요한 실행 조건이다.
+
 ## 일일 Galaxy 수집
 
 - 착수 시 최근 통화 녹음의 실제 저장 위치를 Android MediaStore와 해당 파일의 존재·메타데이터로 대조한다. 내부 `/storage/emulated/0/Recordings/Call`만 보지 않는다. 녹음이 SD카드의 `/storage/<카드ID>/Recordings/Call`에 저장된 것이 확인되면 수집기 잠금 하에 설정 경로를 바로잡고, 요청된 파일부터 복사·해시 검증한다. 통화 이력만으로 음성이 저장됐다고 보고하지 않는다.
