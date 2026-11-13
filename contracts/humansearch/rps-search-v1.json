@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "allowed_origin": "https://www.linkedin.com",
+  "fields": {
+    "keywords": {
+      "labels": ["Keywords"]
+    },
+    "job_titles": {
+      "labels": ["Job titles", "Job title"]
+    },
+    "network": {
+      "labels": ["Network relationships"]
+    },
+    "seniority": {
+      "labels": ["Seniority level", "Seniority"]
+    },
+    "locations": {
+      "labels": ["Locations", "Location"]
+    }
+  },
+  "submit_labels": ["Search", "Show results"],
+  "authenticated_selectors": [
+    "[data-test-search-filters]",
+    "[data-test-profile-list-num-custom]",
+    "[aria-label='Project navigation']"
+  ],
+  "human_auth_selectors": [
+    "form[action*='login']",
+    "input[name='session_key']"
+  ],
+  "challenge_selectors": [
+    "#captcha-internal",
+    "form[action*='checkpoint']",
+    "[data-test-id='challenge-page']"
+  ],
+  "session_conflict_text": [
+    "multiple sign-ins",
+    "signed in from another location"
+  ],
+  "result_count_selectors": [
+    "[data-test-profile-list-num-custom]"
+  ],
+  "loading_selectors": [
+    "[aria-busy='true']",
+    "[data-test-search-results-loader]"
+  ]
+}

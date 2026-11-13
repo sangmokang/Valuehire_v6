@@ -33,6 +33,7 @@ worktrees/
 # 조용히 무시돼 사라진다(P3 조용한 실패). 하위 경로의 산출물은 훅/CI 가 '소리 내어' 막는다.
 # 근거: docs/engineering/humansearch-v6-implementation-plan-2026-08-08.md §4-2·§8
 /artifacts/
+/.artifacts/
 /data/
 /supabase/.temp/
 *.db
