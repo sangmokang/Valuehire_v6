@@ -1,0 +1,49 @@
+{
+  "generator": "Codex /root",
+  "scope": "AI Search admin incremental and UI followup, not complete contact evidence",
+  "v1": {
+    "reviewer": "fresh Codex /root/adversarial_v1",
+    "status": "PASS",
+    "claude_fallback_reason": "Claude CLI not logged in, exit 1"
+  },
+  "v2": {
+    "reviewer": "fresh Codex /root/adversarial_v2",
+    "status": "PASS",
+    "focused_tests": 31,
+    "temporary_resume_cases": 16,
+    "independent_browser_verification": false
+  },
+  "failed_attempts": [
+    "V1: adding Sent during incremental resume bypassed baseline; fixed and regression added",
+    "V2: dropping refresh after first delta body failure hid pending checkpoint; fixed",
+    "V2: empty run ID normalized unrelated historical sources; rejected before opening DB",
+    "V2 legacy reattack: missing refresh field plus pending checkpoint; infer from checkpoint and active scopes"
+  ],
+  "three_way_agree": true,
+  "status": "CODE_CHECKED_EVIDENCE_INCOMPLETE",
+  "command": "humansearch/.venv/bin/pytest -q humansearch/tests/test_admin_ai_search_collection.py",
+  "exit_code": 0,
+  "focused_collection_tests": 13,
+  "mutation": "cached MIME reuse disabled in tempfile source copy -> test exit 1, KILLED",
+  "source_sha256": {
+    "humansearch/src/humansearch/admin_ai_search/collection.py": "80a5255a69f98c5f4400f227c17869eeaf8f4b7fe691194c825153966936b306",
+    "humansearch/src/humansearch/admin_ai_search/gmail_subject.py": "5e6d908544054176b74d35d8eec7bb7b3bbe022e544778e5f9b5b7cbc9ee8186",
+    "humansearch/src/humansearch/admin_ai_search/normalize.py": "5c97861387959d7ac957ffc01e17900d643a54cb379124f8e80737a775f8d291",
+    "tools/admin-ai-search/collect.py": "83480bc766c977ce79e02acf31afdb30b23de5b56f4160793ed9f0979fc469ab",
+    "tools/admin-ai-search/normalize.py": "06d3ff2375204bdc573d3e5fa9663367274a1f0a3d84ea53d42a4bd942aa1577",
+    "apps/admin-integration/overlay/app/(admin)/admin/ai-search-weekly/weekly.css": "939536ab64e8966ea4c4ab8f7d9bb72dd386d100c6911b3ed560e11844a808b3",
+    "apps/admin-integration/overlay/app/(admin)/admin/ai-search-weekly/weekly-client.tsx": "f5e77c982eab5db87faa39f543b3c00beceffbf50940235e424f27359752d691"
+  },
+  "artifact_sha256": {
+    "artifacts/browser-followup-20261031.json": "e9ddbff12217723f55cd96a7b0a6c76b80b75b82c6361d9c612309cece7a9485",
+    "artifacts/incremental-mutation-20261031.log": "f7ff96fd5a84c320fed3be80e249d5c1671a7074d4f582e5141156d978d07673",
+    "artifacts/incremental-20261031.log": "8b5ef3a7b7cf71cb737e2b7546bf0bdcdc7b85847019429288128c0e14caaa2e",
+    "artifacts/v2-legacy-red-20261031.log": "7c5cf802a73c249a783fb2b085643362569ab2a3335577be4d2df107d201899a"
+  },
+  "remaining": [
+    "30 Gmail events unlinked to candidate+position",
+    "No complete four-channel negative evidence or four-axis verified score evidence",
+    "Existing weekly generated TS2344 and three expired suppressions"
+  ],
+  "unnecessary_questions": 0
+}

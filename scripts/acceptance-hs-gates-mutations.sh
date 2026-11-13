@@ -17,8 +17,12 @@ GATES="scripts/acceptance-hs-gates.sh"
 for required in "$GATES" "scripts/hs_import_spy.py" "humansearch/pyproject.toml" \
   "humansearch/uv.lock" "humansearch/.python-version" \
   "humansearch/src/humansearch/__init__.py" "humansearch/tests" \
+  "contracts/admin-ai-search/evidence-contract-v1.json" \
   "contracts/admin-weekly-dashboard/metric-contract-v1.json" \
-  "contracts/admin-weekly-dashboard/source-contract-v1.json" "apps/admin"; do
+  "contracts/admin-weekly-dashboard/source-contract-v1.json" "apps/admin" \
+  "docs/sot/INDEX.md" "docs/sot/admin-ai-search-evidence.md" \
+  "docs/engineering/admin-ai-search-evidence-spec-2026-10-29.md" \
+  "tools/admin-ai-search/load-postgres.py"; do
   if [ ! -e "$required" ]; then
     echo "FAIL: required G2 implementation missing: $required"
     exit 1
@@ -49,8 +53,20 @@ cp contracts/admin-weekly-dashboard/metric-contract-v1.json \
   "$SANDBOX/contracts/admin-weekly-dashboard/"
 cp contracts/admin-weekly-dashboard/source-contract-v1.json \
   "$SANDBOX/contracts/admin-weekly-dashboard/"
+mkdir -p "$SANDBOX/contracts/admin-ai-search"
+cp contracts/admin-ai-search/evidence-contract-v1.json \
+  "$SANDBOX/contracts/admin-ai-search/"
 mkdir -p "$SANDBOX/apps"
 cp -R apps/admin "$SANDBOX/apps/"
+mkdir -p "$SANDBOX/docs/sot" "$SANDBOX/docs/engineering"
+cp docs/sot/INDEX.md docs/sot/admin-ai-search-evidence.md "$SANDBOX/docs/sot/"
+cp docs/engineering/admin-ai-search-evidence-spec-2026-10-29.md \
+  "$SANDBOX/docs/engineering/"
+# The staging-number loader test executes the repository-level PostgreSQL loader.
+mkdir -p "$SANDBOX/tools/admin-ai-search"
+cp tools/admin-ai-search/load-postgres.py "$SANDBOX/tools/admin-ai-search/"
+# Run-scoped normalization tests execute the real CLI from this same repository boundary.
+cp tools/admin-ai-search/normalize.py "$SANDBOX/tools/admin-ai-search/"
 
 total=0
 blocked=0
