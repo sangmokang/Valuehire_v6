@@ -43,6 +43,7 @@ is_forbidden_path() {
   local lf; lf=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
   case "$lf" in
     artifacts/*|*/artifacts/*|data/*|*/data/*|private-reviews/*|*/private-reviews/*|\
+    audit_work/*|.playwright-mcp/*|\
     *.db|*.db-*|*.sqlite|*.sqlite-*|*.sqlite3|*.sqlite3-*|*.jsonl|*.ndjson|*.parquet)
       return 0 ;;
   esac

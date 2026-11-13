@@ -18,7 +18,8 @@
 ## 인수 기준 (EARS, 1개)
 
 - AC: WHEN 최상위 `audit_work/` 또는 `.playwright-mcp/` 아래에 파일이 생기면, git SHALL 그 파일을 무시한다.
-- counter-AC: 하위 경로의 같은 이름(`docs/audit_work/…`, `humansearch/.playwright-mcp/…`)은 무시하지 않는다(최상위 앵커, P3 조용한 실패 방지).
+- counter-AC: **새 규칙은** 하위 동명 폴더(`docs/audit_work/…`, `humansearch/.playwright-mcp/…`)를 무시하지 않는다(최상위 앵커, P3 조용한 실패 방지). 기존 `*.log` 같은 확장자 규칙이 하위 경로를 무시하는 것은 이 AC의 범위 밖이다.
+- AC-2 (V1 지적 반영): WHEN 두 경로의 파일을 `git add -f`로 강제 추가하면, pre-commit 훅과 공용 판정기(`scan-data-exposure.sh tracked`, CI 실행)가 SHALL 차단한다. 두 금지 목록의 동치는 `acceptance-hs-a4.sh`(CI)가 검사한다.
 - 검증 명령: `bash scripts/acceptance-ignore-local-scratch.sh` (RED: 변경 전 FAIL, GREEN: 변경 후 PASS).
 
 ## 결정
