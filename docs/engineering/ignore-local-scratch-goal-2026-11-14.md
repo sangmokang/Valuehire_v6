@@ -39,3 +39,15 @@
 ## 적대 검증 로그
 
 (아래에 V1·V2 결과를 추가)
+
+### V1-a (Codex read-only, session 01a1d6af-7d18-7b22-a3bd-715d3f454cf8) — FAIL
+- 지적: ① `git add -f` 강제 추가 우회 ② 훅·판정기 금지 목록 누락 ③ CI 배선 없음 ④ counter-AC 문구 모호.
+- 조치: RED 11dc5ee(훅·판정기 실행 검증 4건 FAIL 재현) → GREEN e94dbf9(금지 목록 2곳 + hs-a4 동치 패턴). mutation: 훅에서만 패턴 제거 시 새 인수검사 exit=1, hs-a4 "경로 패턴이 갈렸다" FAIL → 복원.
+
+### V1-b (Codex read-only, session 01a1d6ba-c6e3-7470-869d-12101ff25b0a) — FAIL (잔여 2건)
+- 기존 4건 해소 확인.
+- F2 개행 포함 파일명 훅 우회 → **반증**: 임시 저장소 실행 시 훅이 `스테이지된 blob 크기를 읽지 못했다 (fail-closed)`로 rc=1 차단, 판정기 tracked rc=1.
+- F1 히스토리에서 동일 blob 을 다른 경로로 옮기면 과거 금지 경로를 놓침 → **재현됨**. 단 `artifacts/` 에서도 동일하게 놓치는 기존 공용 판정기 결함(이번 변경 이전부터 존재). 두 폴더는 `git log --all` 이력 0건이라 현재 노출 없음. → 비범위, 후속 작업으로 분리.
+
+## 후속 (비범위)
+- `scan-data-exposure.sh history` 가 blob 당 경로 1개만 보아, 같은 내용이 금지 경로→정상 경로로 이동한 이력을 놓친다(기존 `artifacts/`·`data/` 공통). 별도 AC 로 처리.
