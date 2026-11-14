@@ -1,21 +1,86 @@
 {
   "slug": "ignore-local-scratch",
   "risk": "L3",
-  "generator": {"engine": "claude-opus-5-5", "commits": ["ba3e35c RED", "e76640d GREEN", "11dc5ee RED", "e94dbf9 GREEN"],
+  "generator": {
+    "engine": "claude-opus-5-5",
+    "commits": [
+      "ba3e35c RED",
+      "e76640d GREEN",
+      "11dc5ee RED",
+      "e94dbf9 GREEN",
+      "8e496bc RED (CI 등록)",
+      "GREEN (verify.yml 스텝 + SOT 19a)"
+    ],
     "evidence": [
-      {"command": "bash scripts/acceptance-ignore-local-scratch.sh", "exit_code": 0},
-      {"command": "bash scripts/acceptance-hs-a4.sh", "exit_code": 0, "artifact": "CHECKED: 33"},
-      {"command": "bash verify.sh", "exit_code": 0},
-      {"command": "mutation: hooks/pre-commit 에서 새 패턴 제거", "exit_code": 1, "artifact": "새 인수검사 FAIL + hs-a4 동치 FAIL, 복원 후 PASS"}
-    ]},
+      {
+        "command": "bash scripts/acceptance-ignore-local-scratch.sh",
+        "exit_code": 0
+      },
+      {
+        "command": "bash scripts/acceptance-hs-a4.sh",
+        "exit_code": 0,
+        "artifact": "CHECKED: 33"
+      },
+      {
+        "command": "bash verify.sh",
+        "exit_code": 0
+      },
+      {
+        "command": "mutation: hooks/pre-commit 에서 새 패턴 제거",
+        "exit_code": 1,
+        "artifact": "새 인수검사 FAIL + hs-a4 동치 FAIL, 복원 후 PASS"
+      }
+    ]
+  },
   "v1": [
-    {"engine": "codex-cli 0.167.0 read-only", "session": "01a1d6af-7d18-7b22-a3bd-715d3f454cf8", "verdict": "FAIL", "resolved": true},
-    {"engine": "codex-cli 0.167.0 read-only", "session": "01a1d6ba-c6e3-7470-869d-12101ff25b0a", "verdict": "FAIL",
-     "residual": [{"id": "F2", "status": "refuted", "evidence": "pre-commit rc=1 fail-closed"},
-                  {"id": "F1", "status": "confirmed-preexisting-out-of-scope"}]}
+    {
+      "engine": "codex-cli 0.167.0 read-only",
+      "session": "01a1d6af-7d18-7b22-a3bd-715d3f454cf8",
+      "verdict": "FAIL",
+      "resolved": true
+    },
+    {
+      "engine": "codex-cli 0.167.0 read-only",
+      "session": "01a1d6ba-c6e3-7470-869d-12101ff25b0a",
+      "verdict": "FAIL",
+      "residual": [
+        {
+          "id": "F2",
+          "status": "refuted",
+          "evidence": "pre-commit rc=1 fail-closed"
+        },
+        {
+          "id": "F1",
+          "status": "confirmed-preexisting-out-of-scope"
+        }
+      ]
+    }
   ],
-  "v2": null,
-  "failed_attempts": [{"what": "첫 GREEN(e76640d)은 .gitignore 만 변경 — git add -f 우회 미차단", "found_by": "V1-a"}],
-  "three_way_agree": null,
-  "status": "PENDING_V2"
+  "v2": {
+    "engine": "claude reset-context (goal+verdict only)",
+    "verdict": "PASS",
+    "invalid_first_attempt": "본문 없는 PASS 반복 → 무효",
+    "residual_risks_handled": {
+      "2_ci_registration": "fixed",
+      "3_ci_scan_all_baseline": "origin/main CI run 43246890265 success"
+    },
+    "residual_risks_out_of_scope": [
+      "hook name-only without -z (fail-closed only)",
+      "history blob single-path + space truncation",
+      "SOT table drift",
+      "nested .playwright-mcp"
+    ]
+  },
+  "failed_attempts": [
+    {
+      "what": "첫 GREEN(e76640d)은 .gitignore 만 변경 — git add -f 우회 미차단",
+      "found_by": "V1-a"
+    },
+    {
+      "what": "새 인수검사가 CI 고정 목록에 없음(P15③)",
+      "found_by": "V2"
+    }
+  ],
+  "three_way_agree": true,
+  "status": "PASS_PENDING_CI"
 }

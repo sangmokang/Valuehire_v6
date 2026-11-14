@@ -51,3 +51,17 @@
 
 ## 후속 (비범위)
 - `scan-data-exposure.sh history` 가 blob 당 경로 1개만 보아, 같은 내용이 금지 경로→정상 경로로 이동한 이력을 놓친다(기존 `artifacts/`·`data/` 공통). 별도 AC 로 처리.
+
+### V2 (리셋 컨텍스트 Claude, goal+verdict 만 입력) — PASS
+- 1번 기본 실행 rc 0/0. 2번 mutation(훅 한 줄 삭제) → 새 인수검사 rc 1, hs-a4 rc 1, 복원 후 git status 깨끗.
+- 3번 F2 반증 재현: 훅 rc 1 `BLOCKED: 스테이지된 blob 크기를 읽지 못했다 (fail-closed)`, 판정기 tracked rc 1. 막는 근거는 경로 규칙이 아니라 fail-closed 분기.
+- 4번 F1: `scan-data-exposure.sh:95` blob당 경로 1개(origin/main 부터 존재), artifacts/ 동일 결함 → 비범위 분리 타당. 추가 발견: 공백 포함 경로를 `$2` 로 잘라 읽음(기존 결함).
+- 5번 고아: 추적 279개 위반 0, 오차단 0.
+- 처리: 남은 위험 2(새 인수검사 CI 미등록, P15③) → RED 8e496bc → GREEN(verify.yml 스텝 + SOT 표 19a). 위험 3(CI scan all 기존 적색 여부) → origin/main bbb3490 CI verify.yml run 43246890265 success 확인, 로컬 FAIL 은 원격 feat 브랜치 이력.
+- 첫 V2 시도는 판정 본문 없이 "PASS" 만 반복 → 무효 처리 후 재실행.
+
+## 후속 (비범위, 추가)
+- 훅이 `git diff --cached --name-only` 를 `-z` 없이 읽음(특수문자 파일명은 fail-closed 분기에만 의존, 비밀 스캔도 건너뜀) — 기존 공용 결함.
+- `scan-data-exposure.sh history` 공백 포함 경로 절단 — 기존 공용 결함.
+- `docs/sot/verification-commands.md` 표(26행)와 실제 CI 스텝(29+1개) 불일치, `check-docs-sot.sh` 는 origin/main 에서도 FAIL(coding-principles.md 20476바이트).
+- 하위 경로 `*/.playwright-mcp/` 산출물은 counter-AC 상 무시·차단하지 않음.
