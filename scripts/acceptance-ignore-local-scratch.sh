@@ -6,6 +6,7 @@
 # 3) git add -f 로 강제 추가해도 pre-commit 훅이 막는다(실행 검증)
 # 4) 공용 판정기(CI 가 실행하는 scan-data-exposure.sh tracked)도 추적된 경우를 막는다(실행 검증)
 # 5) 현재 저장소에 두 경로가 추적되어 있지 않다
+# 6) CI 고정 목록에 이 검사가 등록되어 있다
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 fail=0
@@ -76,6 +77,11 @@ judge docs/audit_work/note.md pass
 # 5)
 if [ -n "$(git ls-files -- audit_work .playwright-mcp)" ]; then
   echo "FAIL: audit_work/ 또는 .playwright-mcp/ 가 이미 추적되고 있음"; fail=1
+fi
+
+# 6) CI 고정 목록에 이 검사가 등록되어 있다 (P15③ — 로컬에만 있는 검사는 없는 것으로 친다)
+if ! grep -qE '^[[:space:]]+run: bash scripts/verify/run-acceptance\.sh scripts/acceptance-ignore-local-scratch\.sh[[:space:]]*$' .github/workflows/verify.yml; then
+  echo "FAIL: .github/workflows/verify.yml 에 acceptance-ignore-local-scratch.sh 스텝이 없음 (로컬 전용 검사)"; fail=1
 fi
 
 [ "$fail" -eq 0 ] && echo "PASS: acceptance-ignore-local-scratch"
