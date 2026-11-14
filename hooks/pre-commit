@@ -259,6 +259,7 @@ while IFS= read -r f; do
   lf=$(printf '%s' "$f" | tr '[:upper:]' '[:lower:]')
   case "$lf" in
     artifacts/*|*/artifacts/*|data/*|*/data/*|private-reviews/*|*/private-reviews/*|\
+    audit_work/*|.playwright-mcp/*|\
     *.db|*.db-*|*.sqlite|*.sqlite-*|*.sqlite3|*.sqlite3-*|*.jsonl|*.ndjson|*.parquet)
       block "산출물·데이터 경로는 커밋하지 않는다 — $f (P21 · 후보자 PII)"
       continue

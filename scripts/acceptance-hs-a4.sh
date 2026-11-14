@@ -250,7 +250,7 @@ else
   # 대조는 필요 없다 — 같은 파일이다. 남은 갈림길은 **훅 ↔ 판정기** 한 곳뿐이다.
   # 훅은 '스테이지된 것'만 보므로 별도 코드로 남아 있고, 그래서 목록이 갈라질 수 있다.
   miss=""
-  for pat in '\*/artifacts/\*' '\*/data/\*' '\*\.db-\*' '\*\.jsonl' '\*/private-reviews/\*' '\*\.parquet'; do
+  for pat in '\*/artifacts/\*' '\*/data/\*' '\*\.db-\*' '\*\.jsonl' '\*/private-reviews/\*' '\*\.parquet' 'audit_work/\*' '\.playwright-mcp/\*'; do
     if ! grep -q -- "$pat" scripts/scan-data-exposure.sh; then miss="${miss} ${pat}(판정기)"; fi
     if ! grep -q -- "$pat" hooks/pre-commit;              then miss="${miss} ${pat}(훅)"; fi
   done

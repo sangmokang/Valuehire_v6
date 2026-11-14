@@ -35,6 +35,10 @@ worktrees/
 /artifacts/
 /data/
 /supabase/.temp/
+# 로컬 감사 산출물(후보자 ID·메일 링크)과 Playwright MCP 도구 스냅샷 — 저장소가 PUBLIC 이므로 커밋 금지.
+# 근거: docs/engineering/ignore-local-scratch-goal-2026-11-14.md
+/audit_work/
+/.playwright-mcp/
 *.db
 *.sqlite
 *.sqlite3
