@@ -65,3 +65,12 @@
 - `scan-data-exposure.sh history` 공백 포함 경로 절단 — 기존 공용 결함.
 - `docs/sot/verification-commands.md` 표(26행)와 실제 CI 스텝(29+1개) 불일치, `check-docs-sot.sh` 는 origin/main 에서도 FAIL(coding-principles.md 20476바이트).
 - 하위 경로 `*/.playwright-mcp/` 산출물은 counter-AC 상 무시·차단하지 않음.
+
+### CI 적색 원인 회수 (2026-11-14, PR #155 run 43549231608 · 43549214687)
+- 실패 스텝: 데이터 노출 스캔 history — `tools/codeitsearch/data/codeit_positions_2026-09-28.json` blob 2개(08d5017…, e93ea58…).
+- 원인: 원격 `feat/codeitsearch-aisearch-module`(PR #113 CLOSED, 끝 5832f91)이 2026-11-13T01:51Z 원격에 재생성됨(GitHub activity `branch_creation`). main 마지막 초록(11-12 15:21Z) 이후라 그 뒤 모든 PR 이 같은 스텝에서 적색. 이 PR diff 무관.
+- 내용 확인: 공개 채용공고 목록(posting_id·title·job·exp·status), 이메일·전화 0건 — 후보자 PII 아님. 단 P21 경로 규칙(`*/data/*`) 위반.
+- 반증 시뮬레이션: 그 브랜치 제외 시 history PASS(blob 6119개, 위반 0) / 포함 시 FAIL 2건 → 유일 원인.
+- 조치: 백업 bundle `.git/backup-bundles/feat-codeitsearch-aisearch-module-5832f91-2026-11-14.bundle`(sha256 ae3cb9da…) 검증 후 원격 브랜치 삭제. 복원: `git push origin 5832f91:refs/heads/feat/codeitsearch-aisearch-module`.
+- 판정기 약화(history 범위 축소)는 하지 않음.
+- 잔여: 커밋은 GitHub `refs/pull/113/head` 로 계속 공개 접근 가능(내용은 공개 채용공고). 완전 삭제는 GitHub 지원 요청 필요.
