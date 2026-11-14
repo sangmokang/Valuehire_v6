@@ -8,9 +8,14 @@
 # 5) 현재 저장소에 두 경로가 추적되어 있지 않다
 # 6) CI 고정 목록에 이 검사가 등록되어 있다
 set -euo pipefail
+# pre-push 훅은 GIT_DIR·GIT_INDEX_FILE 등을 넘긴다. 지우지 않으면 임시 저장소의 git add 가
+# 실제 저장소 인덱스를 오염시킨다(2026-11-14 push 차단 실측). 다른 인수검사와 같은 방식.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY \
+      GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_PREFIX GIT_QUARANTINE_PATH
 cd "$(git rev-parse --show-toplevel)"
 fail=0
 ROOT=$PWD
+SNAPSHOT=$(git status --porcelain)
 
 # 1)
 for p in audit_work/candidates_raw.csv audit_work/progress.json .playwright-mcp/page-x.yml .playwright-mcp/console-x.log; do
@@ -82,6 +87,11 @@ fi
 # 6) CI 고정 목록에 이 검사가 등록되어 있다 (P15③ — 로컬에만 있는 검사는 없는 것으로 친다)
 if ! grep -qE '^[[:space:]]+run: bash scripts/verify/run-acceptance\.sh scripts/acceptance-ignore-local-scratch\.sh[[:space:]]*$' .github/workflows/verify.yml; then
   echo "FAIL: .github/workflows/verify.yml 에 acceptance-ignore-local-scratch.sh 스텝이 없음 (로컬 전용 검사)"; fail=1
+fi
+
+# 7) 이 검사 자체가 실제 저장소를 오염시키지 않았다
+if [ "$(git status --porcelain)" != "$SNAPSHOT" ]; then
+  echo "FAIL: 검사 실행 후 git status 가 바뀜 — 임시 저장소 조작이 실제 저장소로 샜다"; fail=1
 fi
 
 [ "$fail" -eq 0 ] && echo "PASS: acceptance-ignore-local-scratch"
