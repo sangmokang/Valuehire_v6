@@ -1,8 +1,18 @@
-"""Runtime acceptance tests for the local shadow dashboard payload."""
+"""Runtime acceptance tests for the Gmail-backed weekly dashboard payload."""
 
+import copy
 import json
+from datetime import date, datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
+from humansearch.admin_ai_search import (
+    AiSearchPayload,
+    AiSearchRun,
+    CandidateEvidence,
+    build_ai_search_payload,
+    load_evidence_contract,
+)
 from humansearch.admin_weekly_dashboard import load_metric_contract
 from humansearch.admin_weekly_dashboard.shadow_server import build_shadow_dashboard
 
@@ -12,11 +22,65 @@ CONTRACT_PATH = (
     / "admin-weekly-dashboard"
     / "metric-contract-v1.json"
 )
+EVIDENCE_CONTRACT_PATH = (
+    Path(__file__).parents[2]
+    / "contracts"
+    / "admin-ai-search"
+    / "evidence-contract-v1.json"
+)
+KST = ZoneInfo("Asia/Seoul")
+
+
+def _gmail_payload() -> AiSearchPayload:
+    evidence_contract = load_evidence_contract(EVIDENCE_CONTRACT_PATH)
+    run = AiSearchRun(
+        actor="CHATGPT",
+        source_run_id="gmail-message-1",
+        company="REDACTED_CLIENT",
+        position="Data Analyst",
+        channels=("LINKEDIN",),
+        executed_at=datetime(2026, 10, 27, 9, 30, tzinfo=KST),
+        candidates=(
+            CandidateEvidence(
+                canonical_key="a" * 64,
+                display_name="REDACTED CANDIDATE",
+                source_channel="LINKEDIN",
+                profile_url="https://example.invalid/redacted",
+                education=None,
+                experience=None,
+                score=None,
+                score_reason="score_contract_evidence_missing",
+                why_fit=(),
+                reverse_match_position=None,
+                reverse_match_score=None,
+                reverse_match_reason="reverse_match_not_run",
+                contact_recommendation="NOT_RUN",
+            ),
+        ),
+        source_message_ids=("gmail-message-1",),
+    )
+    payload = build_ai_search_payload((run,), evidence_contract)
+    payload["gmail_collection"] = {
+        "query": "subject:aisearch -in:spam -in:trash",
+        "page_count": 1,
+        "message_count": 1,
+        "included_message_count": 1,
+        "excluded_message_count": 0,
+        "excluded_messages": [],
+        "pagination_exhausted": True,
+        "status": "PASS",
+        "reason": None,
+    }
+    return payload
 
 
 def test_metric_catalog_and_snapshot_have_the_same_ids() -> None:
     contract = load_metric_contract(CONTRACT_PATH)
-    dashboard = build_shadow_dashboard(contract)
+    dashboard = build_shadow_dashboard(
+        contract,
+        _gmail_payload(),
+        as_of_date=date(2026, 10, 28),
+    )
     current_week = dashboard["weeks"][-1]
     snapshot = current_week["snapshot"]
 
@@ -30,37 +94,56 @@ def test_metric_catalog_and_snapshot_have_the_same_ids() -> None:
         assert metric["unit"] in {"건", "명", "회", "개"}
 
 
-def test_shadow_history_has_one_collected_week_and_eleven_not_run_weeks() -> None:
-    dashboard = build_shadow_dashboard(load_metric_contract(CONTRACT_PATH))
+def test_history_uses_twelve_current_weeks_from_the_exhaustive_gmail_read() -> None:
+    dashboard = build_shadow_dashboard(
+        load_metric_contract(CONTRACT_PATH),
+        _gmail_payload(),
+        as_of_date=date(2026, 10, 28),
+    )
 
     assert len(dashboard["weeks"]) == 12
-    assert sum(week["snapshot"] is not None for week in dashboard["weeks"]) == 1
-    for week in dashboard["weeks"][:-1]:
-        assert week["status"] == "NOT_RUN"
-        assert week["reason"] == "history_not_collected"
-        assert week["snapshot"] is None
-    assert dashboard["weeks"][-1]["status"] == "PASS"
+    assert dashboard["weeks"][0]["meeting_iso_week"] == "2026-W34"
+    assert dashboard["weeks"][-1]["meeting_iso_week"] == "2026-W45"
+    assert all(week["status"] == "PASS" for week in dashboard["weeks"])
+    assert all(week["snapshot"] is not None for week in dashboard["weeks"])
+    assert dashboard["source_summary"] == {
+        "status": "PASS",
+        "query": "subject:aisearch -in:spam -in:trash",
+        "message_count": 1,
+        "included_message_count": 1,
+        "excluded_message_count": 0,
+        "pagination_exhausted": True,
+        "latest_received_at": "2026-10-27T09:30:00+09:00",
+    }
 
 
 def test_shadow_view_model_exposes_the_inclusive_saturday_end_date() -> None:
-    dashboard = build_shadow_dashboard(load_metric_contract(CONTRACT_PATH))
+    dashboard = build_shadow_dashboard(
+        load_metric_contract(CONTRACT_PATH),
+        _gmail_payload(),
+        as_of_date=date(2026, 10, 28),
+    )
     current_week = dashboard["weeks"][-1]
 
-    assert current_week["event_start_kst"].startswith("2026-08-09T00:00:00")
-    assert current_week["event_end_exclusive_kst"].startswith("2026-08-16T00:00:00")
-    assert current_week["event_end_inclusive_date_kst"] == "2026-08-15"
+    assert current_week["event_start_kst"].startswith("2026-10-25T00:00:00")
+    assert current_week["event_end_exclusive_kst"].startswith("2026-11-01T00:00:00")
+    assert current_week["event_end_inclusive_date_kst"] == "2026-10-31"
 
 
-def test_shadow_metrics_keep_units_and_failure_states_truthful() -> None:
-    dashboard = build_shadow_dashboard(load_metric_contract(CONTRACT_PATH))
+def test_shadow_metrics_are_derived_from_the_gmail_ai_search_payload() -> None:
+    dashboard = build_shadow_dashboard(
+        load_metric_contract(CONTRACT_PATH),
+        _gmail_payload(),
+        as_of_date=date(2026, 10, 28),
+    )
     snapshot = dashboard["weeks"][-1]["snapshot"]
 
     assert snapshot is not None
     metrics = snapshot["metrics"]
-    assert metrics["sourcing_runs"]["value"] == 2
-    assert metrics["sourcing_positions"]["value"] == 3
-    assert metrics["sourcing_raw_discoveries"]["value"] == 5
-    assert metrics["sourcing_source_unique_candidates"]["value"] == 4
+    assert metrics["sourcing_runs"]["value"] == 1
+    assert metrics["sourcing_positions"]["value"] == 1
+    assert metrics["sourcing_raw_discoveries"]["value"] == 1
+    assert metrics["sourcing_source_unique_candidates"]["value"] == 1
     assert metrics["recommendation_mail_events"] == {
         **metrics["recommendation_mail_events"],
         "status": "NOT_RUN",
@@ -75,8 +158,37 @@ def test_shadow_metrics_keep_units_and_failure_states_truthful() -> None:
     )
 
 
+def test_unknown_company_and_position_are_not_counted_as_real_search_targets() -> None:
+    payload = _gmail_payload()
+    first = copy.deepcopy(payload["batches"][0])
+    first["batch_id"] = "VHAI-UNKNOWN-1"
+    first["company"] = "NOT_RUN:company_not_found"
+    first["position"] = "NOT_RUN:position_not_found"
+    second = copy.deepcopy(first)
+    second["batch_id"] = "VHAI-UNKNOWN-2"
+    payload["batches"] = [first, second]
+
+    dashboard = build_shadow_dashboard(
+        load_metric_contract(CONTRACT_PATH),
+        payload,
+        as_of_date=date(2026, 10, 28),
+    )
+    snapshot = dashboard["weeks"][-1]["snapshot"]
+
+    assert snapshot is not None
+    assert snapshot["metrics"]["sourcing_positions"]["value"] == 0
+    position_metric = next(
+        item for item in dashboard["metric_catalog"] if item["id"] == "sourcing_positions"
+    )
+    assert position_metric["display_label"] == "고객사·포지션이 확인된 검색 대상"
+
+
 def test_shadow_payload_contains_no_personal_data_or_external_action() -> None:
-    dashboard = build_shadow_dashboard(load_metric_contract(CONTRACT_PATH))
+    dashboard = build_shadow_dashboard(
+        load_metric_contract(CONTRACT_PATH),
+        _gmail_payload(),
+        as_of_date=date(2026, 10, 28),
+    )
     encoded = json.dumps(dashboard, ensure_ascii=False, sort_keys=True)
 
     assert "@" not in encoded
