@@ -178,6 +178,15 @@ class InvoiceGeneratorTest(unittest.TestCase):
         protected = invoice_generator.render_html(result, changed_contract)
         self.assertIn("&#123;draft_notice&#125;", protected)
 
+    def test_html_omits_payment_reminder_in_draft_and_final(self) -> None:
+        for draft in (True, False):
+            with self.subTest(draft=draft):
+                result = self.calculate(draft=draft)
+                html = invoice_generator.render_html(result, self.contract)
+                self.assertNotIn("입금 부탁드립니다", html)
+                self.assertIn("계약서에 따른 입금 Due Date", html)
+                self.assertIn("2026.09.15", html)
+
     def test_generates_three_outputs_and_refuses_overwrite(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
