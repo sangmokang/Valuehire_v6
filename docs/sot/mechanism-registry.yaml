@@ -122,3 +122,9 @@
   stage: "ci"
   ci_mirror_job: "verify"
   required: true
+- id: "grok-review-coverage-ci"
+  path: ".github/workflows/verify.yml"
+  target: "run: bash scripts/verify/run-acceptance.sh scripts/acceptance-grok-review.sh"
+  stage: "ci"
+  ci_mirror_job: "verify"
+  required: true

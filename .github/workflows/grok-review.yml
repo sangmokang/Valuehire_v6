@@ -1,0 +1,396 @@
+name: grok-review
+
+# PR이 열리거나 갱신되면 기본 브랜치의 review.py 가 변경 줄을 xAI 에 보내고,
+# 게시 잡이 코멘트 하나만 만들거나 갱신한다.
+# 체크가 초록인 것은 파이프라인이 끝까지 돌았다는 뜻이다. 품질 점수가 아니다.
+# 이 워크플로는 required check 로 등록하지 않는다.
+#
+# pull_request_target 인 이유: 시크릿을 받는 워크플로는 기본 브랜치의 것이어야 한다.
+# 스크립트와 설정은 reviewer/ (base) 에서만 읽고, PR 트리는 compare API 의 diff 텍스트로만 받는다.
+# PR 체크아웃은 하지 않으므로 PR 쪽 훅과 설치 명령은 돌지 않는다.
+#
+# gate 는 코멘트를 읽기만 한다. review 의 모델 스텝에는 토큰을 넣지 않는다.
+# 결과 파일은 artifact 로만 넘긴다. artifact 를 올리고 받으려면 actions 권한이 필요하다.
+# 그 권한은 저장소 내용을 쓰거나 모델을 부르지 않는다.
+#
+# 일정은 매일 09:00 KST 한 번이다. GitHub cron 은 UTC 이므로 00:00 이다.
+# 한국은 서머타임을 쓰지 않는다. draft 는 이벤트와 일정 모두 건너뛴다.
+# 증분 diff 와 PR 번호 동시실행 취소는 pull_request_target 에만 적용한다.
+# 청크 실패나 규모 초과는 리뷰 표식을 남기지 않고, fail-closed 잡이 워크플로를 실패로 끝낸다.
+on:
+  schedule:
+    - cron: "0 0 * * *"
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: "pr = 변경 줄, full = 추적된 텍스트의 모든 줄"
+        type: choice
+        options: [pr, full]
+        default: pr
+      pr_number:
+        description: "workflow_dispatch 에서 코멘트를 달 PR 번호. full 이고 비우면 리포트만 만든다."
+        required: false
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.event_name == 'pull_request_target' && format('grok-review-{0}', github.event.pull_request.number) || format('grok-review-{0}-{1}', github.event_name, github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request_target' }}
+
+jobs:
+  gate:
+    if: ${{ github.event_name != 'pull_request_target' || github.event.pull_request.draft == false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: read
+    outputs:
+      skip: ${{ steps.mark.outputs.skip }}
+      mode: ${{ steps.mark.outputs.mode }}
+      pr_number: ${{ steps.mark.outputs.pr_number }}
+      head_sha: ${{ steps.mark.outputs.head_sha }}
+      base_sha: ${{ steps.mark.outputs.base_sha }}
+      previous_sha: ${{ steps.mark.outputs.previous_sha }}
+      pr_body: ${{ steps.mark.outputs.pr_body }}
+      queue: ${{ steps.mark.outputs.queue }}
+    steps:
+      - name: 표식 판정
+        id: mark
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_ACTION: ${{ github.event.action }}
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          DISPATCH_SCOPE: ${{ github.event.inputs.scope }}
+        run: |
+          python3 - <<'PY'
+          #!/usr/bin/env python3
+          """같은 head SHA 표식이 있으면 리뷰를 건너뛰고, synchronize 면 직전 표식 SHA 를 고른다.
+
+          이 파일은 네트워크 없이 판정 함수를 시험할 수 있어야 한다.
+          워크플로의 gate 잡은 저장소를 체크아웃하지 않으므로, 이 파일 본문을 워크플로에 그대로 넣는다.
+          """
+          from __future__ import annotations
+
+          import json
+          import os
+          import re
+          import urllib.error
+          import urllib.request
+
+          MARKER_RE = re.compile(r"<!-- grok-review sha=([0-9a-f]{40}) -->")
+          SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+          REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+          BODY_CAP = 4000
+
+
+          def marker(sha: str) -> str:
+              return f"<!-- grok-review sha={sha.lower()} -->"
+
+
+          def is_draft(item: dict) -> bool:
+              return item.get("draft") is True
+
+
+          def decide(comments_newest_first: list[tuple[str, str]], head: str, event: str) -> tuple[bool, str]:
+              """(skip, previous_sha). previous_sha 는 synchronize 이고 표식이 있을 때만 채운다."""
+              if not SHA_RE.fullmatch(head):
+                  raise ValueError("head SHA 가 없다")
+              head = head.lower()
+              found: list[str] = []
+              for _updated, body in comments_newest_first:
+                  found.extend(MARKER_RE.findall(body or ""))
+              if head in found:
+                  return True, ""
+              if event != "synchronize":
+                  return False, ""
+              for sha in found:
+                  if sha != head:
+                      return False, sha
+              return False, ""
+
+
+          def _headers(token: str) -> dict[str, str]:
+              return {
+                  "Authorization": f"Bearer {token}",
+                  "Accept": "application/vnd.github+json",
+                  "X-GitHub-Api-Version": "2022-11-28",
+                  "User-Agent": "valuehire-grok-review",
+              }
+
+
+          def _get(url: str, token: str) -> object:
+              request = urllib.request.Request(url, headers=_headers(token), method="GET")
+              try:
+                  with urllib.request.urlopen(request, timeout=30) as response:
+                      raw = response.read()
+              except urllib.error.HTTPError as error:
+                  detail = error.read().decode("utf-8", "replace")[:300]
+                  raise SystemExit(f"FAIL: HTTP {error.code} — {detail}")
+              except urllib.error.URLError as error:
+                  raise SystemExit(f"FAIL: 네트워크 오류 — {error.reason}")
+              try:
+                  return json.loads(raw.decode("utf-8"))
+              except (UnicodeError, json.JSONDecodeError) as error:
+                  raise SystemExit("FAIL: GitHub 응답 JSON 을 읽지 못했다") from error
+
+
+          def _paged(url: str, token: str) -> list:
+              pages: list = []
+              for page in range(1, 21):
+                  joiner = "&" if "?" in url else "?"
+                  payload = _get(f"{url}{joiner}per_page=100&page={page}", token)
+                  if not isinstance(payload, list):
+                      raise SystemExit("FAIL: GitHub 목록 응답이 배열이 아니다")
+                  pages.extend(payload)
+                  if len(payload) < 100:
+                      return pages
+              raise SystemExit("FAIL: GitHub 목록이 20페이지를 넘었다")
+
+
+          def _clip(text: object) -> str:
+              if not isinstance(text, str):
+                  return ""
+              if len(text) <= BODY_CAP:
+                  return text
+              return text[: BODY_CAP - 1] + "…"
+
+
+          def comment_pairs(repo: str, number: str, token: str) -> list[tuple[str, str]]:
+              issue_url = f"https://api.github.com/repos/{repo}/issues/{number}/comments"
+              review_url = f"https://api.github.com/repos/{repo}/pulls/{number}/reviews"
+              rows: list[tuple[str, str]] = []
+              for payload in (_paged(issue_url, token), _paged(review_url, token)):
+                  for item in payload:
+                      if not isinstance(item, dict):
+                          raise SystemExit("FAIL: 코멘트 항목이 객체가 아니다")
+                      updated = item.get("updated_at") or item.get("submitted_at") or ""
+                      body = item.get("body") or ""
+                      if not isinstance(updated, str) or not isinstance(body, str):
+                          raise SystemExit("FAIL: 코멘트 본문이 문자열이 아니다")
+                      rows.append((updated, body))
+              rows.sort(key=lambda item: item[0], reverse=True)
+              return rows
+
+
+          def _sha(value: object, label: str) -> str:
+              if not isinstance(value, str) or not SHA_RE.fullmatch(value):
+                  raise SystemExit(f"FAIL: {label} SHA 가 없다")
+              return value.lower()
+
+
+          def _pull(item: dict) -> dict:
+              number = item.get("number")
+              base = item.get("base") if isinstance(item.get("base"), dict) else {}
+              head = item.get("head") if isinstance(item.get("head"), dict) else {}
+              if isinstance(number, bool) or not isinstance(number, int) or number < 1:
+                  raise SystemExit("FAIL: PR 번호가 없다")
+              return {
+                  "pr": str(number),
+                  "base": _sha(base.get("sha"), "base"),
+                  "head": _sha(head.get("sha"), "head"),
+                  "body": _clip(item.get("body")),
+                  "previous": "",
+              }
+
+
+          def _write(skip: str, mode: str, pr: str, head: str, base: str, previous: str, body: str, queue: list[dict]) -> None:
+              path = os.environ.get("GITHUB_OUTPUT", "").strip()
+              lines = [
+                  f"skip={skip}",
+                  f"mode={mode}",
+                  f"pr_number={pr}",
+                  f"head_sha={head}",
+                  f"base_sha={base}",
+                  f"previous_sha={previous}",
+                  f"pr_body={body.replace(chr(10), ' ').replace(chr(13), ' ')}",
+                  f"queue={json.dumps(queue, ensure_ascii=False)}",
+              ]
+              text = "\n".join(lines) + "\n"
+              if not path:
+                  print(text, end="")
+                  return
+              with open(path, "a", encoding="utf-8") as handle:
+                  handle.write(text)
+
+
+          def main() -> int:
+              repo = os.environ.get("GITHUB_REPOSITORY", "").strip()
+              token = os.environ.get("GH_TOKEN", "").strip() or os.environ.get("GITHUB_TOKEN", "").strip()
+              event = os.environ.get("EVENT_NAME", "").strip()
+              if not REPO_RE.fullmatch(repo) or not token:
+                  raise SystemExit("FAIL: GITHUB_REPOSITORY 또는 토큰이 없다")
+              if event == "schedule":
+                  payload = _paged(f"https://api.github.com/repos/{repo}/pulls?state=open", token)
+                  queue: list[dict] = []
+                  for item in payload:
+                      if not isinstance(item, dict):
+                          raise SystemExit("FAIL: PR 항목이 객체가 아니다")
+                      if is_draft(item):
+                          print(f"DRAFT {item.get('number')}", flush=True)
+                          continue
+                      pull = _pull(item)
+                      pairs = comment_pairs(repo, pull["pr"], token)
+                      skip, _previous = decide(pairs, pull["head"], "schedule")
+                      if skip:
+                          print(f"ALREADY {pull['pr']} {pull['head']}", flush=True)
+                          continue
+                      queue.append(pull)
+                  if not queue:
+                      print("PASS: schedule 리뷰할 PR 없음", flush=True)
+                      _write("true", "queue", "", "", "", "", "", [])
+                      return 0
+                  print(f"PASS: schedule queue={len(queue)}", flush=True)
+                  _write("false", "queue", "", "", "", "", "", queue)
+                  return 0
+
+              number = os.environ.get("PR_NUMBER", "").strip()
+              if number in {"", "null", "0"}:
+                  number = ""
+              scope = os.environ.get("DISPATCH_SCOPE", "").strip() or "pr"
+              if event == "workflow_dispatch" and scope == "full":
+                  if number and not number.isdecimal():
+                      raise SystemExit("FAIL: PR 번호가 정수가 아니다")
+                  print("PASS: dispatch full", flush=True)
+                  _write("false", "full", number, "", "", "", "", [])
+                  return 0
+              if not number:
+                  raise SystemExit("FAIL: PR 번호가 없다")
+              if not number.isdecimal():
+                  raise SystemExit("FAIL: PR 번호가 정수가 아니다")
+
+              if event == "workflow_dispatch":
+                  item = _get(f"https://api.github.com/repos/{repo}/pulls/{number}", token)
+                  if not isinstance(item, dict):
+                      raise SystemExit("FAIL: PR 응답이 객체가 아니다")
+                  pull = _pull(item)
+                  head, base, body = pull["head"], pull["base"], pull["body"]
+                  decision_event = "workflow_dispatch"
+              else:
+                  head = _sha(os.environ.get("HEAD_SHA", ""), "head")
+                  base = _sha(os.environ.get("BASE_SHA", ""), "base")
+                  body = _clip(os.environ.get("PR_BODY", ""))
+                  # pull_request_target 의 동작 이름은 action 이다. synchronize 만 증분 diff 다.
+                  decision_event = os.environ.get("EVENT_ACTION", "").strip()
+
+              skip, previous = decide(comment_pairs(repo, number, token), head, decision_event)
+              if skip:
+                  print(f"PASS: skip {number} {head}", flush=True)
+                  _write("true", "diff", number, head, base, "", body, [])
+                  return 0
+              print(f"PASS: review {number} {base}..{head} previous={previous or '-'}", flush=True)
+              _write("false", "diff", number, head, base, previous, body, [])
+              return 0
+
+
+          if __name__ == "__main__":
+              raise SystemExit(main())
+          PY
+
+  review:
+    needs: gate
+    if: ${{ needs.gate.result == 'success' && needs.gate.outputs.skip != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: write
+    outputs:
+      code: ${{ steps.grok.outputs.code }}
+      has_result: ${{ steps.grok.outputs.has_result }}
+    steps:
+      - name: 신뢰된 리뷰 스크립트
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.base.sha || (github.event_name == 'workflow_dispatch' && github.event.repository.default_branch || github.sha) }}
+          persist-credentials: false
+          path: reviewer
+          fetch-depth: 1
+
+      - name: diff 수집
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          MODE: ${{ needs.gate.outputs.mode }}
+          OUT_DIR: ${{ github.workspace }}/pr-data
+          PR_NUMBER: ${{ needs.gate.outputs.pr_number }}
+          BASE_SHA: ${{ needs.gate.outputs.base_sha }}
+          HEAD_SHA: ${{ needs.gate.outputs.head_sha }}
+          PREVIOUS_SHA: ${{ needs.gate.outputs.previous_sha }}
+          PR_BODY: ${{ needs.gate.outputs.pr_body }}
+          QUEUE: ${{ needs.gate.outputs.queue }}
+        run: python3 "$GITHUB_WORKSPACE/reviewer/scripts/grok_review/fetch_diff.py"
+
+      - name: Grok 호출
+        id: grok
+        working-directory: reviewer
+        env:
+          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+          XAI_MODEL: ${{ vars.XAI_MODEL }}
+          GROK_REASONING_EFFORT: ${{ vars.GROK_REASONING_EFFORT }}
+          OUT_DIR: ${{ github.workspace }}/pr-data
+          PR_NUMBER: ${{ needs.gate.outputs.pr_number }}
+        run: |
+          set +e
+          python3 "$GITHUB_WORKSPACE/reviewer/scripts/grok_review/run_diff.py"
+          code=$?
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          if [ -f "$GITHUB_WORKSPACE/pr-data/result.json" ]; then
+            echo "has_result=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_result=false" >> "$GITHUB_OUTPUT"
+          fi
+          exit 0
+
+      - name: 게시 스크립트 동봉
+        if: steps.grok.outputs.has_result == 'true'
+        run: cp "$GITHUB_WORKSPACE/reviewer/scripts/grok_review/post_comment.py" "$GITHUB_WORKSPACE/pr-data/post_comment.py"
+
+      - name: 결과 업로드
+        if: steps.grok.outputs.has_result == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: grok-review-result
+          path: |
+            pr-data/result.json
+            pr-data/post_comment.py
+          if-no-files-found: error
+          retention-days: 7
+
+  fail-closed:
+    needs: [gate, review]
+    if: ${{ always() && needs.gate.result == 'success' && needs.review.result == 'success' && needs.review.outputs.code != '0' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: 리뷰가 끝나지 않으면 워크플로를 실패로 남긴다
+        run: exit 1
+
+  post:
+    needs: [gate, review]
+    if: ${{ needs.gate.result == 'success' && needs.gate.outputs.skip != 'true' && needs.review.result == 'success' && needs.review.outputs.has_result == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      pull-requests: write
+    steps:
+      - name: 결과 받기
+        uses: actions/download-artifact@v4
+        with:
+          name: grok-review-result
+          path: result
+
+      - name: 코멘트 게시
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          RESULT_PATH: result/result.json
+        run: python3 result/post_comment.py
