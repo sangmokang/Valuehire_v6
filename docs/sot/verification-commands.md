@@ -1,6 +1,6 @@
 # Valuehire v6 — 이 저장소의 실제 게이트 명령 (SOT)
 
-`$strict`의 Codex·Claude 공통 순서와 패리티 계약은 [strict-workflow.md](strict-workflow.md)를 정본으로 읽는다. 원칙 수치는 `coding-principles.md`, Work Unit 값은 `work-unit-policy.yaml`이 소유하며 이 문서에 복제하지 않는다.
+`$strict`의 Codex·Claude 공통 순서와 패리티 계약은 [strict-workflow.md](strict-workflow.md)를 정본으로 읽는다. 원칙 수치는 `coding-principles.md`가 소유하고, Work Unit 값은 `work-unit-policy.yaml`이 INDEX에 등재된 경우에만 그 파일이 소유한다(병합 전까지는 git-workflow.md 의 작업 단위 규약이 정본). 이 문서에는 어느 쪽도 복제하지 않는다.
 
 최종 갱신: 2026-09-02 (Invoice 독립 단위·PostgreSQL 런타임 게이트 추가)
 근거: `docs/engineering/docs-sot-restructure-goal-2026-08-08.md`
