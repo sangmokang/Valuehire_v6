@@ -1,0 +1,2773 @@
+object	field	json_type	format	required	primary_key	foreign_key_reference
+account_locks	account_key	string	text	true	true	
+account_locks	holder_machine	string	text	true	false	
+account_locks	job_id	integer	bigint	true	false	table='jobs' column='id'/
+account_locks	acquired_at	string	timestamp with time zone	true	false	
+admin_client_notes	id	string	uuid	true	true	
+admin_client_notes	client_slug	string	text	true	false	
+admin_client_notes	client_name	string	text	false	false	
+admin_client_notes	body	string	text	true	false	
+admin_client_notes	author	string	text	false	false	
+admin_client_notes	created_at	string	timestamp with time zone	true	false	
+admin_client_notes	updated_at	string	timestamp with time zone	true	false	
+alembic_version	version_num	string	character varying	true	true	
+app_kv	key	string	text	true	true	
+app_kv	value	string	text	true	false	
+app_kv	updated_at	string	timestamp with time zone	false	false	
+b2b_v2_audit_logs	id	string	text	true	true	
+b2b_v2_audit_logs	actor_id	string	text	true	false	
+b2b_v2_audit_logs	action	string	text	true	false	
+b2b_v2_audit_logs	resource_type	string	text	true	false	
+b2b_v2_audit_logs	resource_id	string	text	true	false	
+b2b_v2_audit_logs	occurred_at	string	timestamp with time zone	true	false	
+b2b_v2_audit_logs	reason	string	text	true	false	
+b2b_v2_audit_logs	metadata		jsonb	true	false	
+b2b_v2_terms_acceptances	id	string	text	true	true	
+b2b_v2_terms_acceptances	company_id	string	text	true	false	
+b2b_v2_terms_acceptances	actor_id	string	text	true	false	
+b2b_v2_terms_acceptances	terms_version	string	text	true	false	
+b2b_v2_terms_acceptances	status	string	text	true	false	
+b2b_v2_terms_acceptances	accepted_at	string	timestamp with time zone	false	false	
+b2b_v2_terms_acceptances	created_at	string	timestamp with time zone	true	false	
+b2c_1chon_pool	id	string	text	true	true	
+b2c_1chon_pool	name	string	text	true	false	
+b2c_1chon_pool	email	string	text	false	false	
+b2c_1chon_pool	headline	string	text	false	false	
+b2c_1chon_pool	company	string	text	false	false	
+b2c_1chon_pool	role	string	text	false	false	
+b2c_1chon_pool	linkedin_url	string	text	false	false	
+b2c_1chon_pool	matched_keywords		jsonb	false	false	
+b2c_1chon_pool	collected_by	string	text	true	false	
+b2c_1chon_pool	collected_at	string	timestamp with time zone	true	false	
+b2c_1chon_pool	synced_at	string	timestamp with time zone	false	false	
+b2c_intake_terms_acceptances	id	string	text	true	true	
+b2c_intake_terms_acceptances	auth_user_id	string	uuid	false	false	
+b2c_intake_terms_acceptances	candidate_email	string	text	false	false	
+b2c_intake_terms_acceptances	invite_token	string	text	false	false	
+b2c_intake_terms_acceptances	terms_version	string	text	true	false	
+b2c_intake_terms_acceptances	source	string	text	true	false	
+b2c_intake_terms_acceptances	accepted_at	string	timestamp with time zone	true	false	
+b2c_intake_terms_acceptances	request_user_agent	string	text	false	false	
+b2c_intake_terms_acceptances	created_at	string	timestamp with time zone	true	false	
+b2c_invite_campaign	id	string	uuid	true	true	
+b2c_invite_campaign	pool_id	string	text	false	false	
+b2c_invite_campaign	campaign_tag	string	text	true	false	
+b2c_invite_campaign	sender_id	string	text	false	false	
+b2c_invite_campaign	sender_email	string	text	true	false	
+b2c_invite_campaign	sender_name	string	text	true	false	
+b2c_invite_campaign	sender_role	string	text	false	false	
+b2c_invite_campaign	collected_by	string	text	false	false	
+b2c_invite_campaign	recipient_email	string	text	true	false	
+b2c_invite_campaign	recipient_name	string	text	true	false	
+b2c_invite_campaign	recipient_headline	string	text	false	false	
+b2c_invite_campaign	recipient_company	string	text	false	false	
+b2c_invite_campaign	recipient_role	string	text	false	false	
+b2c_invite_campaign	recipient_linkedin_url	string	text	false	false	
+b2c_invite_campaign	subject	string	text	true	false	
+b2c_invite_campaign	hook	string	text	false	false	
+b2c_invite_campaign	body_paragraphs		jsonb	false	false	
+b2c_invite_campaign	cta	string	text	false	false	
+b2c_invite_campaign	cta_url	string	text	false	false	
+b2c_invite_campaign	body_html	string	text	false	false	
+b2c_invite_campaign	generated_at	string	timestamp with time zone	true	false	
+b2c_invite_campaign	sent_at	string	timestamp with time zone	false	false	
+b2c_invite_campaign	resend_message_id	string	text	false	false	
+b2c_invite_campaign	status	string	text	true	false	
+b2c_invite_campaign	opened_at	string	timestamp with time zone	false	false	
+b2c_invite_campaign	clicked_at	string	timestamp with time zone	false	false	
+b2c_invite_campaign	signup_at	string	timestamp with time zone	false	false	
+b2c_invite_campaign	unsub_at	string	timestamp with time zone	false	false	
+b2c_invite_campaign	unsub_token	string	text	false	false	
+b2c_invite_campaign	ai_job_id	string	text	false	false	
+b2c_invite_campaign	ai_raw_response	string	text	false	false	
+b2c_invite_campaign	ai_latency_ms	integer	integer	false	false	
+b2c_invite_campaign	ai_generated_at	string	timestamp with time zone	false	false	
+b2c_invite_campaign	dedupe_key	string	text	false	false	
+b2c_invite_campaign	error	string	text	false	false	
+b2c_invite_campaign	meta		jsonb	false	false	
+b2c_invite_feedback	id	string	uuid	true	true	
+b2c_invite_feedback	campaign_id	string	uuid	false	false	table='b2c_invite_campaign' column='id'/
+b2c_invite_feedback	feedback_token	string	text	true	false	
+b2c_invite_feedback	recipient_email	string	text	false	false	
+b2c_invite_feedback	recipient_name	string	text	false	false	
+b2c_invite_feedback	rating	integer	integer	false	false	
+b2c_invite_feedback	category	string	text	false	false	
+b2c_invite_feedback	body	string	text	true	false	
+b2c_invite_feedback	contact_back	boolean	boolean	true	false	
+b2c_invite_feedback	status	string	text	true	false	
+b2c_invite_feedback	reviewed_by	string	text	false	false	
+b2c_invite_feedback	reviewed_at	string	timestamp with time zone	false	false	
+b2c_invite_feedback	applied_note	string	text	false	false	
+b2c_invite_feedback	created_at	string	timestamp with time zone	true	false	
+b2c_invite_feedback	ip_address	string	text	false	false	
+b2c_invite_feedback	user_agent	string	text	false	false	
+b2c_user_profiles	user_id	string	uuid	true	true	table='b2c_users' column='id'/
+b2c_user_profiles	education_level	integer	integer	false	false	
+b2c_user_profiles	career_history		jsonb	true	false	
+b2c_user_profiles	skills	array	text[]	true	false	
+b2c_user_profiles	top_employer	string	text	false	false	
+b2c_user_profiles	recent_role	string	text	false	false	
+b2c_user_profiles	domain	string	text	false	false	
+b2c_user_profiles	raw_resume_text	string	text	false	false	
+b2c_user_profiles	updated_at	string	timestamp with time zone	true	false	
+b2c_users	id	string	uuid	true	true	
+b2c_users	email	string	text	true	false	
+b2c_users	pseudonym_id	string	text	true	false	
+b2c_users	created_at	string	timestamp with time zone	true	false	
+b2c_users	updated_at	string	timestamp with time zone	true	false	
+billing_history	id	string	uuid	true	true	
+billing_history	user_id	string	uuid	false	false	
+billing_history	user_email	string	text	false	false	
+billing_history	description	string	text	true	false	
+billing_history	amount_krw	integer	integer	true	false	
+billing_history	tokens_used	integer	bigint	false	false	
+billing_history	provider	string	text	false	false	
+billing_history	pg	string	text	false	false	
+billing_history	pg_transaction_id	string	text	false	false	
+billing_history	status	string	text	true	false	
+billing_history	paid_at	string	timestamp with time zone	false	false	
+billing_history	created_at	string	timestamp with time zone	true	false	
+candidate_activity_log	id	string	uuid	true	true	
+candidate_activity_log	candidate_id	string	uuid	true	false	table='pipeline_candidates' column='id'/
+candidate_activity_log	ts	string	timestamp with time zone	true	false	
+candidate_activity_log	actor_email	string	text	true	false	
+candidate_activity_log	event_type	string	text	true	false	
+candidate_activity_log	payload		jsonb	true	false	
+candidate_activity_log	sync_origin	string	text	true	false	
+candidate_activity_log	clickup_event_id	string	text	false	false	
+candidate_market_profiles	id	string	uuid	true	true	
+candidate_market_profiles	candidate_id	string	uuid	true	false	table='pipeline_candidates' column='id'/
+candidate_market_profiles	resume_upload_id	string	uuid	false	false	table='resume_uploads' column='id'/
+candidate_market_profiles	keywords	array	text[]	true	false	
+candidate_market_profiles	segments		jsonb	true	false	
+candidate_market_profiles	market_fit		jsonb	true	false	
+candidate_market_profiles	model	string	text	true	false	
+candidate_market_profiles	created_at	string	timestamp with time zone	true	false	
+candidate_market_profiles	updated_at	string	timestamp with time zone	true	false	
+candidate_match_feedback	id	string	uuid	true	true	
+candidate_match_feedback	user_id	string	uuid	false	false	
+candidate_match_feedback	profile_id	string	uuid	false	false	table='resume_profiles' column='id'/
+candidate_match_feedback	subscription_id	string	uuid	false	false	table='job_match_subscriptions' column='id'/
+candidate_match_feedback	feedback_text	string	text	true	false	
+candidate_match_feedback	target_companies		jsonb	true	false	
+candidate_match_feedback	target_segments		jsonb	true	false	
+candidate_match_feedback	match_position_ids		jsonb	true	false	
+candidate_match_feedback	source	string	text	true	false	
+candidate_match_feedback	created_at	string	timestamp with time zone	true	false	
+candidate_mentions	id	string	uuid	true	true	
+candidate_mentions	activity_log_id	string	uuid	true	false	table='candidate_activity_log' column='id'/
+candidate_mentions	mentioned_email	string	text	true	false	
+candidate_mentions	notified_at	string	timestamp with time zone	false	false	
+candidate_mentions	notification_channel	string	text	true	false	
+candidate_mentions	retry_count	integer	integer	true	false	
+candidate_mentions	last_error	string	text	false	false	
+candidate_messages	id	string	text	true	true	
+candidate_messages	candidate_id	string	uuid	true	false	table='pipeline_candidates' column='id'/
+candidate_messages	jd_id	string	text	false	false	
+candidate_messages	template_id	string	text	true	false	
+candidate_messages	channel	string	text	true	false	
+candidate_messages	to_email	string	text	false	false	
+candidate_messages	scheduled_at	string	timestamp with time zone	false	false	
+candidate_messages	sent_at	string	timestamp with time zone	false	false	
+candidate_messages	status	string	text	true	false	
+candidate_messages	body_snapshot	string	text	true	false	
+candidate_messages	consent_confirmed	boolean	boolean	true	false	
+candidate_messages	sent_by_user_email	string	text	true	false	
+candidate_messages	sent_by_user_role	string	text	true	false	
+candidate_messages	created_at	string	timestamp with time zone	true	false	
+candidate_outcomes	id	integer	bigint	true	true	
+candidate_outcomes	fy	string	text	true	false	
+candidate_outcomes	clickup_task_id	string	text	true	false	
+candidate_outcomes	client_name	string	text	true	false	
+candidate_outcomes	position	string	text	true	false	
+candidate_outcomes	candidate_name	string	text	true	false	
+candidate_outcomes	status	string	text	true	false	
+candidate_outcomes	outcome	string	text	true	false	
+candidate_outcomes	outcome_stage	string	text	false	false	
+candidate_outcomes	assignee	string	text	false	false	
+candidate_outcomes	created_at	string	timestamp with time zone	false	false	
+candidate_outcomes	clickup_created_at	integer	bigint	false	false	
+candidate_outcomes	scraped_profile_path	string	text	false	false	
+candidate_outcomes	metadata		jsonb	false	false	
+candidates	id	integer	bigint	true	true	
+candidates	client_company	string	text	true	false	
+candidates	position_title	string	text	true	false	
+candidates	candidate_name	string	text	false	false	
+candidates	source_platform	string	text	true	false	
+candidates	profile_id	string	text	false	false	
+candidates	profile_url	string	text	false	false	
+candidates	raw_profile		jsonb	false	false	
+candidates	score	number	numeric	false	false	
+candidates	score_breakdown		jsonb	false	false	
+candidates	passed	boolean	boolean	false	false	
+candidates	cutoff	number	numeric	false	false	
+candidates	search_job_id	integer	bigint	false	false	table='search_jobs' column='id'/
+candidates	search_tracker_id	string	text	false	false	
+candidates	discord_sent_at	string	timestamp with time zone	false	false	
+candidates	proposal_sent_at	string	timestamp with time zone	false	false	
+candidates	notion_page_id	string	text	false	false	
+candidates	created_at	string	timestamp with time zone	true	false	
+candidates	updated_at	string	timestamp with time zone	true	false	
+card_registrations	id	string	uuid	true	true	
+card_registrations	user_id	string	uuid	false	false	
+card_registrations	user_email	string	text	false	false	
+card_registrations	pg	string	text	true	false	
+card_registrations	pg_billing_key	string	text	false	false	
+card_registrations	card_brand	string	text	false	false	
+card_registrations	card_last4	string	text	false	false	
+card_registrations	is_default	boolean	boolean	true	false	
+card_registrations	status	string	text	true	false	
+card_registrations	registered_at	string	timestamp with time zone	true	false	
+card_registrations	expires_at	string	timestamp with time zone	false	false	
+career_company_edges	id	integer	bigint	true	true	
+career_company_edges	period_id	string	text	true	false	table='career_periods' column='id'/
+career_company_edges	source_company	string	text	true	false	
+career_company_edges	dest_company	string	text	true	false	
+career_company_edges	edge_count	integer	integer	true	false	
+career_company_edges	source_segment	string	text	false	false	
+career_company_edges	dest_segment	string	text	false	false	
+career_company_edges	source_tier	string	text	false	false	
+career_company_edges	dest_tier	string	text	false	false	
+career_company_edges	source_product		jsonb	true	false	
+career_company_edges	dest_product		jsonb	true	false	
+career_company_edges	top_roles		jsonb	true	false	
+career_company_edges	top_education		jsonb	true	false	
+career_company_edges	signals		jsonb	true	false	
+career_company_edges	source_json_version	string	text	false	false	
+career_company_edges	created_at	string	timestamp with time zone	true	false	
+career_company_segments	id	integer	bigint	true	true	
+career_company_segments	company	string	text	true	false	
+career_company_segments	macro_segment	string	text	false	false	
+career_company_segments	wanted_categories		jsonb	true	false	
+career_company_segments	product_names		jsonb	true	false	
+career_company_segments	dart_families		jsonb	true	false	
+career_company_segments	refined_segments		jsonb	true	false	
+career_company_segments	services		jsonb	true	false	
+career_company_segments	value_chain		jsonb	true	false	
+career_company_segments	source_json_version	string	text	false	false	
+career_company_segments	created_at	string	timestamp with time zone	true	false	
+career_company_segments	updated_at	string	timestamp with time zone	true	false	
+career_discovery_log	id	integer	bigint	true	true	
+career_discovery_log	target_id	integer	bigint	false	false	table='career_targets' column='id'/
+career_discovery_log	query	string	text	false	false	
+career_discovery_log	provider	string	text	false	false	
+career_discovery_log	results		jsonb	false	false	
+career_discovery_log	picked_url	string	text	false	false	
+career_discovery_log	picked_reason	string	text	false	false	
+career_discovery_log	created_at	string	timestamp with time zone	true	false	
+career_failures	id	integer	bigint	true	true	
+career_failures	run_id	integer	bigint	false	false	table='career_runs' column='id'/
+career_failures	target_id	integer	bigint	false	false	
+career_failures	stage	string	text	false	false	
+career_failures	url	string	text	false	false	
+career_failures	http_status	integer	integer	false	false	
+career_failures	message	string	text	false	false	
+career_failures	created_at	string	timestamp with time zone	true	false	
+career_jobs	id	integer	bigint	true	true	
+career_jobs	target_id	integer	bigint	false	false	table='career_targets' column='id'/
+career_jobs	external_url	string	text	false	false	
+career_jobs	title	string	text	true	false	
+career_jobs	location	string	text	false	false	
+career_jobs	department	string	text	false	false	
+career_jobs	posted_at	string	date	false	false	
+career_jobs	first_seen_at	string	timestamp with time zone	true	false	
+career_jobs	last_seen_at	string	timestamp with time zone	true	false	
+career_jobs	removed_at	string	timestamp with time zone	false	false	
+career_jobs	raw		jsonb	false	false	
+career_jobs	job_hash	string	text	true	false	
+career_jobs	description	string	text	false	false	
+career_jobs	employment_type	string	text	false	false	
+career_jobs	salary_range	string	text	false	false	
+career_jobs	requirements	string	text	false	false	
+career_jobs	page_title	string	text	false	false	
+career_jobs	detail_fetched_at	string	timestamp with time zone	false	false	
+career_jobs	quality_score	integer	integer	false	false	
+career_jobs	extraction_method	string	text	false	false	
+career_jobs	detail_fetch_method	string	text	false	false	
+career_jobs	is_official_posting	boolean	boolean	true	false	
+career_jobs	posting_status	string	text	true	false	
+career_jobs	last_seen_alive_at	string	timestamp with time zone	false	false	
+career_periods	id	string	text	true	true	
+career_periods	start_year	integer	integer	true	false	
+career_periods	end_year	integer	integer	true	false	
+career_periods	source_label	string	text	false	false	
+career_periods	created_at	string	timestamp with time zone	true	false	
+career_runs	id	integer	bigint	true	true	
+career_runs	job	string	text	true	false	
+career_runs	started_at	string	timestamp with time zone	true	false	
+career_runs	ended_at	string	timestamp with time zone	false	false	
+career_runs	ok_count	integer	integer	false	false	
+career_runs	fail_count	integer	integer	false	false	
+career_runs	error	string	text	false	false	
+career_runs	meta		jsonb	false	false	
+career_targets	id	integer	bigint	true	true	
+career_targets	source	string	text	true	false	
+career_targets	corp_code	string	text	true	false	
+career_targets	ontology_id	string	text	true	false	
+career_targets	company_name	string	text	true	false	
+career_targets	homepage_url	string	text	false	false	
+career_targets	career_url	string	text	false	false	
+career_targets	career_url_status	string	text	false	false	
+career_targets	consecutive_failures	integer	integer	true	false	
+career_targets	last_discovered_at	string	timestamp with time zone	false	false	
+career_targets	last_scraped_at	string	timestamp with time zone	false	false	
+career_targets	created_at	string	timestamp with time zone	true	false	
+career_targets	updated_at	string	timestamp with time zone	true	false	
+career_targets	known_portals	array	text[]	false	false	
+career_targets	latest_portal_seen_at	string	date	false	false	
+career_targets	positions_count	integer	integer	true	false	
+career_targets	last_health_checked_at	string	timestamp with time zone	false	false	
+career_targets	last_health_status	string	text	false	false	
+clickup_comments	id	string	uuid	true	true	
+clickup_comments	tenant_id	string	text	true	false	
+clickup_comments	list_id	string	text	true	false	
+clickup_comments	list_name	string	text	false	false	
+clickup_comments	task_id	string	text	true	false	
+clickup_comments	task_url	string	text	false	false	
+clickup_comments	task_name	string	text	false	false	
+clickup_comments	candidate_name	string	text	false	false	
+clickup_comments	company_name	string	text	false	false	
+clickup_comments	position_title	string	text	false	false	
+clickup_comments	status	string	text	false	false	
+clickup_comments	author_email	string	text	false	false	
+clickup_comments	body	string	text	false	false	
+clickup_comments	source_payload		jsonb	true	false	
+clickup_comments	occurred_at	string	timestamp with time zone	true	false	
+clickup_comments	collected_at	string	timestamp with time zone	true	false	
+clickup_comments	embedding	string	public.vector(1536)	false	false	
+clickup_sync_state	id	string	uuid	true	true	
+clickup_sync_state	tenant_id	string	text	true	false	
+clickup_sync_state	list_id	string	text	true	false	
+clickup_sync_state	list_name	string	text	false	false	
+clickup_sync_state	cursor_value	string	text	false	false	
+clickup_sync_state	last_synced_at	string	timestamp with time zone	false	false	
+clickup_sync_state	last_success_at	string	timestamp with time zone	false	false	
+clickup_sync_state	last_error	string	text	false	false	
+clickup_sync_state	source_payload		jsonb	true	false	
+clickup_sync_state	created_at	string	timestamp with time zone	true	false	
+clickup_sync_state	updated_at	string	timestamp with time zone	true	false	
+client_billing_statements	id	string	uuid	true	true	
+client_billing_statements	tenant_id	string	text	true	false	
+client_billing_statements	statement_no	string	text	true	false	
+client_billing_statements	recipient_name	string	text	true	false	
+client_billing_statements	issue_date	string	date	true	false	
+client_billing_statements	due_date	string	date	false	false	
+client_billing_statements	title	string	text	true	false	
+client_billing_statements	service_label	string	text	true	false	
+client_billing_statements	line_items		jsonb	true	false	
+client_billing_statements	total_amount	integer	bigint	true	false	
+client_billing_statements	bank_info		jsonb	true	false	
+client_billing_statements	issuer_name	string	text	true	false	
+client_billing_statements	signer_name	string	text	true	false	
+client_billing_statements	linked_invoice_id	string	uuid	false	false	table='revenue_invoices' column='id'/
+client_billing_statements	status	string	text	true	false	
+client_billing_statements	pdf_storage_path	string	text	false	false	
+client_billing_statements	created_at	string	timestamp with time zone	true	false	
+client_billing_statements	updated_at	string	timestamp with time zone	true	false	
+client_billing_statements	placement_set_id	string	uuid	false	false	
+client_billing_statements	pdf_sha256	string	text	false	false	
+client_billing_statements	payload_sha256	string	text	false	false	
+client_companies	id	string	uuid	true	true	
+client_companies	slug	string	text	true	false	
+client_companies	company_name	string	text	true	false	
+client_companies	company_type	string	text	true	false	
+client_companies	source_origin	string	text	true	false	
+client_companies	manual_type_override	boolean	boolean	true	false	
+client_companies	stage	string	text	false	false	
+client_companies	owner	string	text	false	false	
+client_companies	next_action	string	text	false	false	
+client_companies	last_contact	string	date	false	false	
+client_companies	source	string	text	false	false	
+client_companies	consent_marketing	boolean	boolean	false	false	
+client_companies	industry	string	text	false	false	
+client_companies	size	string	text	false	false	
+client_companies	founded	string	text	false	false	
+client_companies	ceo	string	text	false	false	
+client_companies	hq_address	string	text	false	false	
+client_companies	homepage	string	text	false	false	
+client_companies	linkedin	string	text	false	false	
+client_companies	funding_stage	string	text	false	false	
+client_companies	contact_count	integer	integer	false	false	
+client_companies	recruiter_count	integer	integer	false	false	
+client_companies	jobseeker_count	integer	integer	false	false	
+client_companies	enriched_at	string	date	false	false	
+client_companies	enrichment_confidence	string	text	false	false	
+client_companies	raw_frontmatter		jsonb	false	false	
+client_companies	created_at	string	timestamp with time zone	true	false	
+client_companies	updated_at	string	timestamp with time zone	true	false	
+client_ontology	id	integer	bigint	true	true	
+client_ontology	client_name	string	text	true	false	
+client_ontology	position_category	string	text	false	false	
+client_ontology	total_candidates	integer	integer	false	false	
+client_ontology	pass_count	integer	integer	false	false	
+client_ontology	fail_doc_count	integer	integer	false	false	
+client_ontology	fail_interview_count	integer	integer	false	false	
+client_ontology	fail_test_count	integer	integer	false	false	
+client_ontology	drop_count	integer	integer	false	false	
+client_ontology	pass_rate	number	numeric	false	false	
+client_ontology	doc_pass_rate	number	numeric	false	false	
+client_ontology	interview_pass_rate	number	numeric	false	false	
+client_ontology	difficulty_level	string	text	false	false	
+client_ontology	preferred_traits		jsonb	false	false	
+client_ontology	avoid_traits		jsonb	false	false	
+client_ontology	ideal_profile	string	text	false	false	
+client_ontology	pass_examples		jsonb	false	false	
+client_ontology	fail_patterns		jsonb	false	false	
+client_ontology	scoring_modifier		jsonb	false	false	
+client_ontology	updated_at	string	timestamp with time zone	false	false	
+commission_payouts	id	string	uuid	true	true	
+commission_payouts	tenant_id	string	text	true	false	
+commission_payouts	invoice_id	string	uuid	true	false	table='revenue_invoices' column='id'/
+commission_payouts	payee_role	string	text	true	false	
+commission_payouts	payee_name	string	text	false	false	
+commission_payouts	payee_email	string	text	false	false	
+commission_payouts	split_rate	number	numeric	true	false	
+commission_payouts	gross_amount	integer	bigint	true	false	
+commission_payouts	withholding_rate	number	numeric	true	false	
+commission_payouts	withholding_amount	integer	bigint	true	false	
+commission_payouts	net_amount	integer	bigint	true	false	
+commission_payouts	status	string	text	true	false	
+commission_payouts	paid_at	string	timestamp with time zone	false	false	
+commission_payouts	created_at	string	timestamp with time zone	true	false	
+commission_payouts	updated_at	string	timestamp with time zone	true	false	
+companies	corp_code	string	text	true	true	
+companies	corp_name	string	text	true	false	
+companies	corp_name_eng	string	text	false	false	
+companies	stock_code	string	text	false	false	
+companies	corp_cls	string	character	false	false	
+companies	ceo_nm	string	text	false	false	
+companies	jurir_no	string	text	false	false	
+companies	bizr_no	string	text	false	false	
+companies	adres	string	text	false	false	
+companies	induty_code	string	text	false	false	
+companies	est_dt	string	date	false	false	
+companies	acc_mt	string	text	false	false	
+companies	hm_url	string	text	false	false	
+companies	modify_date	string	date	false	false	
+companies	last_synced_at	string	timestamp with time zone	true	false	
+company_audit_contracts	corp_code	string	text	true	true	table='companies' column='corp_code'/
+company_audit_contracts	bsns_year	integer	integer	true	true	
+company_audit_contracts	reprt_code	string	text	true	true	
+company_audit_contracts	bsns_year_row	string	text	true	true	
+company_audit_contracts	adt_nm	string	text	true	true	
+company_audit_contracts	adt_qy	string	text	false	false	
+company_audit_contracts	adt_hrs	string	text	false	false	
+company_audit_contracts	adt_fee	string	text	false	false	
+company_audit_contracts	non_adt_svc	string	text	false	false	
+company_audit_contracts	non_adt_fee	string	text	false	false	
+company_audit_contracts	stlm_dt	string	text	false	false	
+company_audit_contracts	fetched_at	string	timestamp with time zone	false	false	
+company_audit_opinions	corp_code	string	text	true	true	table='companies' column='corp_code'/
+company_audit_opinions	bsns_year	integer	integer	true	true	
+company_audit_opinions	reprt_code	string	text	true	true	
+company_audit_opinions	adt_de	string	text	true	true	
+company_audit_opinions	adt_nm	string	text	false	false	
+company_audit_opinions	adt_qy	string	text	false	false	
+company_audit_opinions	adt_opinion	string	text	false	false	
+company_audit_opinions	emp_cntn_qy	string	text	false	false	
+company_audit_opinions	sm	string	text	false	false	
+company_audit_opinions	stlm_dt	string	text	false	false	
+company_audit_opinions	fetched_at	string	timestamp with time zone	false	false	
+company_business_narrative	corp_code	string	text	true	true	table='companies' column='corp_code'/
+company_business_narrative	bsns_year	integer	integer	false	false	
+company_business_narrative	rcept_no	string	text	false	false	
+company_business_narrative	overview	string	text	false	false	
+company_business_narrative	products		jsonb	false	false	
+company_business_narrative	markets		jsonb	false	false	
+company_business_narrative	strategy	string	text	false	false	
+company_business_narrative	input_tokens	integer	integer	false	false	
+company_business_narrative	section_char_count	integer	integer	false	false	
+company_business_narrative	source_model	string	text	false	false	
+company_business_narrative	generated_at	string	timestamp with time zone	false	false	
+company_business_narrative	supply_chain		jsonb	false	false	
+company_business_narrative_raw	corp_code	string	text	true	true	
+company_business_narrative_raw	bsns_year	integer	integer	false	false	
+company_business_narrative_raw	rcept_no	string	text	false	false	
+company_business_narrative_raw	section_label	string	text	true	true	
+company_business_narrative_raw	section_text	string	text	true	false	
+company_business_narrative_raw	char_count	integer	integer	true	false	
+company_business_narrative_raw	extracted_at	string	timestamp with time zone	false	false	
+company_business_narrative_raw	source_file	string	text	false	false	
+company_business_sections	corp_code	string	text	true	true	table='companies' column='corp_code'/
+company_business_sections	rcept_no	string	text	true	true	
+company_business_sections	bsns_year	integer	integer	false	false	
+company_business_sections	raw_text	string	text	false	false	
+company_business_sections	sections		jsonb	false	false	
+company_business_sections	char_count	integer	integer	false	false	
+company_business_sections	has_tables	boolean	boolean	false	false	
+company_business_sections	fetched_at	string	timestamp with time zone	false	false	
+company_business_term_evidence	id	string	text	true	true	
+company_business_term_evidence	business_term_id	string	text	true	false	table='company_business_terms' column='id'/
+company_business_term_evidence	source_chunk_id	string	text	true	false	table='company_source_chunks' column='id'/
+company_business_term_evidence	evidence_text	string	text	true	false	
+company_business_term_evidence	evidence_rank	integer	integer	false	false	
+company_business_term_evidence	created_at	string	timestamp with time zone	false	false	
+company_business_terms	id	string	text	true	true	
+company_business_terms	company_id	string	text	true	false	table='company_identity_links' column='company_id'/
+company_business_terms	normalized_term	string	text	true	false	
+company_business_terms	display_term	string	text	true	false	
+company_business_terms	category	string	text	true	false	
+company_business_terms	confidence	number	double precision	false	false	
+company_business_terms	extraction_method	string	text	true	false	
+company_business_terms	first_seen_at	string	timestamp with time zone	false	false	
+company_business_terms	last_seen_at	string	timestamp with time zone	false	false	
+company_business_terms	metadata		jsonb	true	false	
+company_capital_changes	corp_code	string	text	true	true	table='companies' column='corp_code'/
+company_capital_changes	bsns_year	integer	integer	true	true	
+company_capital_changes	reprt_code	string	text	true	true	
+company_capital_changes	isu_dcrs_de	string	text	true	true	
+company_capital_changes	isu_dcrs_stle	string	text	true	true	
+company_capital_changes	isu_dcrs_stock_knd	string	text	true	true	
+company_capital_changes	isu_dcrs_qy	string	text	false	false	
+company_capital_changes	isu_dcrs_mstvdv_fval_amount	string	text	false	false	
+company_capital_changes	isu_dcrs_mstvdv_amount	string	text	false	false	
+company_capital_changes	stlm_dt	string	text	false	false	
+company_capital_changes	fetched_at	string	timestamp with time zone	false	false	
+company_clusters	corp_code	string	text	true	true	table='companies' column='corp_code'/
+company_clusters	method	string	text	true	true	
+company_clusters	cluster_id	string	text	true	false	
+company_clusters	cluster_label	string	text	false	false	
+company_clusters	confidence	number	real	false	false	
+company_clusters	version	string	text	true	true	
+company_clusters	computed_at	string	timestamp with time zone	true	false	
+company_commercial_paper_balance	corp_code	string	text	true	true	table='companies' column='corp_code'/
+company_commercial_paper_balance	bsns_year	integer	integer	true	true	
+company_commercial_paper_balance	reprt_code	string	text	true	true	
+company_commercial_paper_balance	remndr_stock_knd	string	text	true	true	
+company_commercial_paper_balance	se	string	text	true	true	
+company_commercial_paper_balance	lstde_dltm_de	string	text	false	false	
+company_commercial_paper_balance	lstde_invstpd	string	text	false	false	
+company_commercial_paper_balance	lstde_fval_amount	string	text	false	false	
+company_commercial_paper_balance	lstde_blce_nomamt	string	text	false	false	
+company_commercial_paper_balance	nxtyr_rdmpt_amount	string	text	false	false	
+company_commercial_paper_balance	ovr2yr_rdmpt_amount	string	text	false	false	
+company_commercial_paper_balance	tot_isu_amount	string	text	false	false	
+company_commercial_paper_balance	stlm_dt	string	text	false	false	
+company_commercial_paper_balance	fetched_at	string	timestamp with time zone	false	false	
+company_contingent_capital_balance	corp_code	string	text	true	true	table='companies' column='corp_code'/
+company_contingent_capital_balance	bsns_year	integer	integer	true	true	
+company_contingent_capital_balance	reprt_code	string	text	true	true	
+company_contingent_capital_balance	stock_knd	string	text	true	true	
+company_contingent_capital_balance	se	string	text	true	true	
+company_contingent_capital_balance	lstde_dltm_de	string	text	false	false	
+company_contingent_capital_balance	lstde_invstpd	string	text	false	false	
+company_contingent_capital_balance	lstde_fval_amount	string	text	false	false	
+company_contingent_capital_balance	lstde_blce_nomamt	string	text	false	false	
+company_contingent_capital_balance	nxtyr_rdmpt_amount	string	text	false	false	
+company_contingent_capital_balance	ovr2yr_rdmpt_amount	string	text	false	false	
+company_contingent_capital_balance	tot_isu_amount	string	text	false	false	
+company_contingent_capital_balance	stlm_dt	string	text	false	false	
+company_contingent_capital_balance	fetched_at	string	timestamp with time zone	false	false	
+company_corporate_bond_balance	corp_code	string	text	true	true	table='companies' column='corp_code'/
+company_corporate_bond_balance	bsns_year	integer	integer	true	true	
+company_corporate_bond_balance	reprt_code	string	text	true	true	
+company_corporate_bond_balance	stock_knd	string	text	true	true	
+company_corporate_bond_balance	se	string	text	true	true	
+company_corporate_bond_balance	lstde_dltm_de	string	text	false	false	
+company_corporate_bond_balance	lstde_invstpd	string	text	false	false	
+company_corporate_bond_balance	lstde_fval_amount	string	text	false	false	
+company_corporate_bond_balance	lstde_blce_nomamt	string	text	false	false	
+company_corporate_bond_balance	nxtyr_rdmpt_amount	string	text	false	false	
+company_corporate_bond_balance	ovr2yr_rdmpt_amount	string	text	false	false	
+company_corporate_bond_balance	tot_isu_amount	string	text	false	false	
+company_corporate_bond_balance	stlm_dt	string	text	false	false	
+company_corporate_bond_balance	fetched_at	string	timestamp with time zone	false	false	
+company_debt_issuance	corp_code	string	text	true	true	table='companies' column='corp_code'/
+company_debt_issuance	bsns_year	integer	integer	true	true	
+company_debt_issuance	reprt_code	string	text	true	true	
+company_debt_issuance	isu_de	string	text	true	true	
+company_debt_issuance	se	string	text	true	true	
+company_debt_issuance	isu_amount	string	text	false	false	
+company_debt_issuance	fval_amount	string	text	false	false	
+company_debt_issuance	isstc_pd	string	text	false	false	
+company_debt_issuance	istrk_rt	string	text	false	false	
+company_debt_issuance	clsg_de	string	text	false	false	
+company_debt_issuance	stlm_dt	string	text	false	false	
+company_debt_issuance	fetched_at	string	timestamp with time zone	false	false	
+company_disclosures	rcept_no	string	text	true	true	
+company_disclosures	corp_code	string	text	false	false	table='companies' column='corp_code'/
+company_disclosures	corp_cls	string	character	false	false	
+company_disclosures	report_nm	string	text	false	false	
+company_disclosures	rcept_dt	string	date	false	false	
+company_disclosures	flr_nm	string	text	false	false	
+company_disclosures	rm	string	text	false	false	
+company_disclosures	fetched_at	string	timestamp with time zone	false	false	
+company_dividends	corp_code	string	text	true	true	table='companies' column='corp_code'/
+company_dividends	bsns_year	integer	integer	true	true	
+company_dividends	reprt_code	string	text	true	true	
+company_dividends	se	string	text	true	true	
+company_dividends	stock_knd	string	text	true	true	
+company_dividends	thstrm	string	text	false	false	
+company_dividends	frmtrm	string	text	false	false	
+company_dividends	lwfr	string	text	false	false	
+company_dividends	stlm_dt	string	text	false	false	
+company_dividends	fetched_at	string	timestamp with time zone	false	false	
+company_embeddings	corp_code	string	text	true	true	table='companies' column='corp_code'/
+company_embeddings	embedding	string	public.vector(1024)	false	false	
+company_embeddings	method	string	text	true	true	
+company_embeddings	source_model	string	text	false	false	
+company_embeddings	text_hash	string	text	false	false	
+company_embeddings	updated_at	string	timestamp with time zone	true	false	
+company_exec_compensation_all	corp_code	string	text	true	true	table='companies' column='corp_code'/
+company_exec_compensation_all	bsns_year	integer	integer	true	true	
+company_exec_compensation_all	reprt_code	string	text	true	true	
+company_exec_compensation_all	nmpr	string	text	false	false	
+company_exec_compensation_all	mendng_totamt	string	text	false	false	
+company_exec_compensation_all	jan_avrg_mendng_am	string	text	false	false	
+company_exec_compensation_all	rm	string	text	false	false	
+company_exec_compensation_all	stlm_dt	string	text	false	false	
+company_exec_compensation_all	ord	integer	integer	true	true	
+company_exec_compensation_all	fetched_at	string	timestamp with time zone	false	false	
+company_exec_compensation_approved	corp_code	string	text	true	true	table='companies' column='corp_code'/
+company_exec_compensation_approved	bsns_year	integer	integer	true	true	
+company_exec_compensation_approved	reprt_code	string	text	true	true	
+company_exec_compensation_approved	se	string	text	true	true	
+company_exec_compensation_approved	nmpr	string	text	false	false	
+company_exec_compensation_approved	gmtsck_confm_amount	string	text	false	false	
+company_exec_compensation_approved	mendng_totamt	string	text	false	false	
+company_exec_compensation_approved	jan_avrg_mendng_am	string	text	false	false	
+company_exec_compensation_approved	rm	string	text	false	false	
+company_exec_compensation_approved	stlm_dt	string	text	false	false	
+company_exec_compensation_approved	fetched_at	string	timestamp with time zone	false	false	
+company_exec_compensation_by_type	corp_code	string	text	true	true	table='companies' column='corp_code'/
+company_exec_compensation_by_type	bsns_year	integer	integer	true	true	
+company_exec_compensation_by_type	reprt_code	string	text	true	true	
+company_exec_compensation_by_type	se	string	text	true	true	
+company_exec_compensation_by_type	nmpr	string	text	false	false	
+company_exec_compensation_by_type	mendng_totamt	string	text	false	false	
+company_exec_compensation_by_type	jan_avrg_mendng_am	string	text	false	false	
+company_exec_compensation_by_type	rm	string	text	false	false	
+company_exec_compensation_by_type	stlm_dt	string	text	false	false	
+company_exec_compensation_by_type	fetched_at	string	timestamp with time zone	false	false	
+company_exec_compensation_individual	corp_code	string	text	true	true	table='companies' column='corp_code'/
+company_exec_compensation_individual	bsns_year	integer	integer	true	true	
+company_exec_compensation_individual	reprt_code	string	text	true	true	
+company_exec_compensation_individual	nm	string	text	true	true	
+company_exec_compensation_individual	ofcps	string	text	true	true	
+company_exec_compensation_individual	mendng_totamt	string	text	false	false	
+company_exec_compensation_individual	mendng_totamt_ct_incls_mendng	string	text	false	false	
+company_exec_compensation_individual	stlm_dt	string	text	false	false	
+company_exec_compensation_individual	fetched_at	string	timestamp with time zone	false	false	
+company_executives	corp_code	string	text	true	true	table='companies' column='corp_code'/
+company_executives	bsns_year	integer	integer	true	true	
+company_executives	reprt_code	string	text	true	true	
+company_executives	nm	string	text	true	true	
+company_executives	sexdstn	string	text	false	false	
+company_executives	birth_ym	string	text	false	false	
+company_executives	ofcps	string	text	true	true	
+company_executives	rgist_exctv_at	string	text	false	false	
+company_executives	fte_at	string	text	false	false	
+company_executives	chrg_job	string	text	false	false	
+company_executives	main_career	string	text	false	false	
+company_executives	mxmm_shrholdr_relate	string	text	false	false	
+company_executives	hffc_pd	string	text	false	false	
+company_executives	tenure_end_on	string	text	false	false	
+company_executives	stlm_dt	string	text	false	false	
+company_executives	fetched_at	string	timestamp with time zone	false	false	
+company_financial_indicators	corp_code	string	text	true	true	table='companies' column='corp_code'/
+company_financial_indicators	bsns_year	integer	integer	true	true	
+company_financial_indicators	reprt_code	string	text	true	true	
+company_financial_indicators	idx_cl_code	string	text	true	false	
+company_financial_indicators	idx_code	string	text	true	true	
+company_financial_indicators	idx_cl_nm	string	text	false	false	
+company_financial_indicators	idx_nm	string	text	false	false	
+company_financial_indicators	idx_val	number	numeric	false	false	
+company_financial_indicators	stock_code	string	text	false	false	
+company_financial_indicators	stlm_dt	string	date	false	false	
+company_financial_indicators	fetched_at	string	timestamp with time zone	false	false	
+company_financials	corp_code	string	text	true	true	table='companies' column='corp_code'/
+company_financials	bsns_year	integer	integer	true	true	
+company_financials	reprt_code	string	text	true	true	
+company_financials	fs_div	string	character	true	true	
+company_financials	sj_div	string	text	true	true	
+company_financials	account_id	string	text	true	true	
+company_financials	account_nm	string	text	false	false	
+company_financials	account_detail	string	text	false	false	
+company_financials	thstrm_amount	number	numeric	false	false	
+company_financials	thstrm_add_amount	number	numeric	false	false	
+company_financials	frmtrm_amount	number	numeric	false	false	
+company_financials	bfefrmtrm_amount	number	numeric	false	false	
+company_financials	ord	integer	integer	true	true	
+company_financials	currency	string	text	false	false	
+company_financials	fetched_at	string	timestamp with time zone	false	false	
+company_financials	rcept_no	string	text	false	false	
+company_financials	sj_nm	string	text	false	false	
+company_financials	thstrm_nm	string	text	false	false	
+company_financials	thstrm_dt	string	text	false	false	
+company_financials	frmtrm_nm	string	text	false	false	
+company_financials	frmtrm_dt	string	text	false	false	
+company_financials	frmtrm_add_amount	number	numeric	false	false	
+company_financials	frmtrm_q_amount	number	numeric	false	false	
+company_financials	bfefrmtrm_nm	string	text	false	false	
+company_financials	bfefrmtrm_dt	string	text	false	false	
+company_financials_multi	corp_code	string	text	true	true	
+company_financials_multi	bsns_year	integer	integer	true	true	
+company_financials_multi	reprt_code	string	text	true	true	
+company_financials_multi	fs_div	string	text	true	true	
+company_financials_multi	sj_div	string	text	true	true	
+company_financials_multi	account_nm	string	text	true	true	
+company_financials_multi	thstrm_amount	number	numeric	false	false	
+company_financials_multi	frmtrm_amount	number	numeric	false	false	
+company_financials_multi	currency	string	text	false	false	
+company_financials_multi	created_at	string	timestamp with time zone	true	false	
+company_goals	id	string	uuid	true	true	
+company_goals	tenant_id	string	text	true	false	
+company_goals	period_type	string	text	true	false	
+company_goals	period_key	string	text	true	false	
+company_goals	target_revenue	integer	bigint	true	false	
+company_goals	target_placements	integer	integer	false	false	
+company_goals	memo	string	text	false	false	
+company_goals	created_at	string	timestamp with time zone	true	false	
+company_goals	updated_at	string	timestamp with time zone	true	false	
+company_identity_links	id	integer	bigint	true	true	
+company_identity_links	company_id	string	text	true	false	
+company_identity_links	canonical_name	string	text	true	false	
+company_identity_links	legal_name	string	text	false	false	
+company_identity_links	brand_name	string	text	false	false	
+company_identity_links	wanted_company_id	string	text	false	false	
+company_identity_links	homepage_domain	string	text	false	false	
+company_identity_links	aliases		jsonb	true	false	
+company_identity_links	wanted_keywords		jsonb	true	false	
+company_identity_links	source	string	text	true	false	
+company_identity_links	confidence	number	double precision	false	false	
+company_identity_links	metadata		jsonb	true	false	
+company_identity_links	collected_at	string	timestamp with time zone	false	false	
+company_identity_links	created_at	string	timestamp with time zone	false	false	
+company_identity_links	updated_at	string	timestamp with time zone	false	false	
+company_identity_links	corp_code	string	text	false	false	
+company_identity_links	stock_code	string	text	false	false	
+company_identity_links	corp_cls	string	text	false	false	
+company_identity_links	last_postings_collected_at	string	timestamp with time zone	false	false	
+company_identity_links	consecutive_failures	integer	integer	false	false	
+company_identity_links	homepage_url	string	text	false	false	
+company_identity_links	careers_url	string	text	false	false	
+company_identity_links	careers_url_status	string	text	false	false	
+company_identity_links	careers_url_reason	string	text	false	false	
+company_identity_links	careers_url_checked_at	string	timestamp with time zone	false	false	
+company_identity_links	product_service_collected_at	string	timestamp with time zone	false	false	
+company_identity_links	product_service_status	string	text	false	false	
+company_identity_links	product_service_reason	string	text	false	false	
+company_job_postings	id	string	text	true	true	
+company_job_postings	company_id	string	text	true	false	table='company_identity_links' column='company_id'/
+company_job_postings	corp_code	string	text	false	false	
+company_job_postings	title	string	text	true	false	
+company_job_postings	posting_url	string	text	true	false	
+company_job_postings	source_url	string	text	false	false	
+company_job_postings	snapshot_date	string	date	true	false	
+company_job_postings	first_seen_at	string	timestamp with time zone	false	false	
+company_job_postings	last_seen_at	string	timestamp with time zone	false	false	
+company_job_postings	status	string	text	false	false	
+company_job_postings	metadata		jsonb	true	false	
+company_job_postings	core_keywords_json		jsonb	true	false	
+company_job_postings	key_phrases_json		jsonb	true	false	
+company_job_postings	preferred_keywords_json		jsonb	true	false	
+company_job_postings	jd_keyword_analysis_source	string	text	false	false	
+company_job_postings	jd_keyword_analysis_version	string	text	false	false	
+company_job_postings	jd_keyword_analyzed_at	string	timestamp with time zone	false	false	
+company_linkedin	company	string	text	true	true	
+company_linkedin	linkedin_url	string	text	false	false	
+company_linkedin	hr_contacts		jsonb	false	false	
+company_linkedin	updated_at	string	timestamp with time zone	false	false	
+company_material_events	rcept_no	string	text	true	true	
+company_material_events	corp_code	string	text	false	false	table='companies' column='corp_code'/
+company_material_events	event_type	string	text	false	false	
+company_material_events	rcept_dt	string	date	false	false	
+company_material_events	summary	string	text	false	false	
+company_material_events	fetched_at	string	timestamp with time zone	false	false	
+company_minority_shareholders	corp_code	string	text	true	true	table='companies' column='corp_code'/
+company_minority_shareholders	bsns_year	integer	integer	true	true	
+company_minority_shareholders	reprt_code	string	text	true	true	
+company_minority_shareholders	se	string	text	true	true	
+company_minority_shareholders	shrholdr_co	integer	bigint	false	false	
+company_minority_shareholders	shrholdr_tot_co	integer	bigint	false	false	
+company_minority_shareholders	shrholdr_rate	number	numeric	false	false	
+company_minority_shareholders	hold_stock_co	integer	bigint	false	false	
+company_minority_shareholders	stock_tot_co	integer	bigint	false	false	
+company_minority_shareholders	hold_stock_rate	number	numeric	false	false	
+company_minority_shareholders	stlm_dt	string	text	false	false	
+company_minority_shareholders	fetched_at	string	timestamp with time zone	false	false	
+company_new_capital_balance	corp_code	string	text	true	true	table='companies' column='corp_code'/
+company_new_capital_balance	bsns_year	integer	integer	true	true	
+company_new_capital_balance	reprt_code	string	text	true	true	
+company_new_capital_balance	stock_knd	string	text	true	true	
+company_new_capital_balance	se	string	text	true	true	
+company_new_capital_balance	lstde_dltm_de	string	text	false	false	
+company_new_capital_balance	lstde_invstpd	string	text	false	false	
+company_new_capital_balance	lstde_fval_amount	string	text	false	false	
+company_new_capital_balance	lstde_blce_nomamt	string	text	false	false	
+company_new_capital_balance	nxtyr_rdmpt_amount	string	text	false	false	
+company_new_capital_balance	ovr2yr_rdmpt_amount	string	text	false	false	
+company_new_capital_balance	tot_isu_amount	string	text	false	false	
+company_new_capital_balance	stlm_dt	string	text	false	false	
+company_new_capital_balance	fetched_at	string	timestamp with time zone	false	false	
+company_news	id	string	text	true	true	
+company_news	company_name	string	text	true	false	
+company_news	article_url	string	text	true	false	
+company_news	article_title	string	text	false	false	
+company_news	summary	string	text	false	false	
+company_news	full_text	string	text	false	false	
+company_news	screenshot_paths		jsonb	false	false	
+company_news	scraped_at	string	timestamp with time zone	true	false	
+company_news	source	string	text	false	false	
+company_news	collection_method	string	text	false	false	
+company_news	content_blocks		jsonb	true	false	
+company_news	summary_bullets	array	text[]	true	false	
+company_news	hiring_implication	string	text	false	false	
+company_news	mentioned_companies	array	text[]	true	false	
+company_news	ai_summary_generated_at	string	timestamp with time zone	false	false	
+company_news	ai_summary_model	string	text	false	false	
+company_non_audit_services	corp_code	string	text	true	true	table='companies' column='corp_code'/
+company_non_audit_services	bsns_year	integer	integer	true	true	
+company_non_audit_services	reprt_code	string	text	true	true	
+company_non_audit_services	adt_nm	string	text	false	false	
+company_non_audit_services	cnttk_de	string	text	true	true	
+company_non_audit_services	svc_cn	string	text	true	true	
+company_non_audit_services	svc_fee	string	text	false	false	
+company_non_audit_services	stlm_dt	string	text	false	false	
+company_non_audit_services	fetched_at	string	timestamp with time zone	false	false	
+company_outside_directors	corp_code	string	text	true	true	table='companies' column='corp_code'/
+company_outside_directors	bsns_year	integer	integer	true	true	
+company_outside_directors	reprt_code	string	text	true	true	
+company_outside_directors	drctr_co	integer	bigint	false	false	
+company_outside_directors	otcmpny_drctr_co	integer	bigint	false	false	
+company_outside_directors	chng_reason	string	text	false	false	
+company_outside_directors	stlm_dt	string	text	false	false	
+company_outside_directors	ord	integer	integer	true	true	
+company_outside_directors	fetched_at	string	timestamp with time zone	false	false	
+company_private_offering_use	corp_code	string	text	true	true	table='companies' column='corp_code'/
+company_private_offering_use	bsns_year	integer	integer	true	true	
+company_private_offering_use	reprt_code	string	text	true	true	
+company_private_offering_use	se	string	text	true	true	
+company_private_offering_use	isu_de	string	text	true	true	
+company_private_offering_use	isu_amount	string	text	false	false	
+company_private_offering_use	isstc_pd	string	text	false	false	
+company_private_offering_use	istrk_rt	string	text	false	false	
+company_private_offering_use	clsg_de	string	text	false	false	
+company_private_offering_use	iru_purps	string	text	false	false	
+company_private_offering_use	use_dtls	string	text	false	false	
+company_private_offering_use	oss_at	string	text	false	false	
+company_private_offering_use	riss_at	string	text	false	false	
+company_private_offering_use	stlm_dt	string	text	false	false	
+company_private_offering_use	fetched_at	string	timestamp with time zone	false	false	
+company_product_segments	corp_code	string	text	true	true	
+company_product_segments	bsns_year	integer	integer	true	true	
+company_product_segments	rcept_no	string	text	false	false	
+company_product_segments	row_index	integer	integer	true	true	
+company_product_segments	segment_name	string	text	false	false	
+company_product_segments	sales_type	string	text	false	false	
+company_product_segments	product_name	string	text	false	false	
+company_product_segments	usage_detail	string	text	false	false	
+company_product_segments	brand_name	string	text	false	false	
+company_product_segments	sales_amount	number	numeric	false	false	
+company_product_segments	sales_ratio	number	numeric	false	false	
+company_product_segments	raw_row		jsonb	false	false	
+company_product_segments	extracted_at	string	timestamp with time zone	false	false	
+company_product_segments	is_subtotal	boolean	boolean	false	false	
+company_products	corp_code	string	text	true	true	table='companies' column='corp_code'/
+company_products	source	string	text	true	false	
+company_products	raw_text	string	text	false	false	
+company_products	product_list		jsonb	false	false	
+company_products	categories		jsonb	false	false	
+company_products	crawled_url	string	text	false	false	
+company_products	crawled_at	string	timestamp with time zone	false	false	
+company_products	version	integer	integer	false	false	
+company_public_offering_use	corp_code	string	text	true	true	table='companies' column='corp_code'/
+company_public_offering_use	bsns_year	integer	integer	true	true	
+company_public_offering_use	reprt_code	string	text	true	true	
+company_public_offering_use	se	string	text	true	true	
+company_public_offering_use	isu_de	string	text	true	true	
+company_public_offering_use	isu_amount	string	text	false	false	
+company_public_offering_use	isstc_pd	string	text	false	false	
+company_public_offering_use	istrk_rt	string	text	false	false	
+company_public_offering_use	clsg_de	string	text	false	false	
+company_public_offering_use	iru_purps	string	text	false	false	
+company_public_offering_use	use_dtls	string	text	false	false	
+company_public_offering_use	oss_at	string	text	false	false	
+company_public_offering_use	riss_at	string	text	false	false	
+company_public_offering_use	stlm_dt	string	text	false	false	
+company_public_offering_use	fetched_at	string	timestamp with time zone	false	false	
+company_research	company_name	string	text	true	true	
+company_research	research		jsonb	true	false	
+company_research	updated_at	string	timestamp with time zone	true	false	
+company_short_term_bond_balance	corp_code	string	text	true	true	table='companies' column='corp_code'/
+company_short_term_bond_balance	bsns_year	integer	integer	true	true	
+company_short_term_bond_balance	reprt_code	string	text	true	true	
+company_short_term_bond_balance	remndr_stock_knd	string	text	true	true	
+company_short_term_bond_balance	se	string	text	true	true	
+company_short_term_bond_balance	lstde_dltm_de	string	text	false	false	
+company_short_term_bond_balance	lstde_invstpd	string	text	false	false	
+company_short_term_bond_balance	lstde_fval_amount	string	text	false	false	
+company_short_term_bond_balance	lstde_blce_nomamt	string	text	false	false	
+company_short_term_bond_balance	nxtyr_rdmpt_amount	string	text	false	false	
+company_short_term_bond_balance	ovr2yr_rdmpt_amount	string	text	false	false	
+company_short_term_bond_balance	tot_isu_amount	string	text	false	false	
+company_short_term_bond_balance	stlm_dt	string	text	false	false	
+company_short_term_bond_balance	fetched_at	string	timestamp with time zone	false	false	
+company_similarity_edges	src_corp_code	string	text	true	true	table='companies' column='corp_code'/
+company_similarity_edges	dst_corp_code	string	text	true	true	table='companies' column='corp_code'/
+company_similarity_edges	score	number	real	true	false	
+company_similarity_edges	rank	integer	integer	true	false	
+company_similarity_edges	method	string	text	true	true	
+company_similarity_edges	computed_at	string	timestamp with time zone	true	false	
+company_source_chunks	id	string	text	true	true	
+company_source_chunks	source_document_id	string	text	true	false	table='company_source_documents' column='id'/
+company_source_chunks	section_label	string	text	false	false	
+company_source_chunks	heading	string	text	false	false	
+company_source_chunks	chunk_index	integer	integer	true	false	
+company_source_chunks	text	string	text	true	false	
+company_source_chunks	text_hash	string	text	true	false	
+company_source_chunks	metadata		jsonb	true	false	
+company_source_chunks	created_at	string	timestamp with time zone	false	false	
+company_source_chunks	chapter_no	integer	integer	false	false	
+company_source_documents	id	string	text	true	true	
+company_source_documents	company_id	string	text	true	false	table='company_identity_links' column='company_id'/
+company_source_documents	source_type	string	text	true	false	
+company_source_documents	source_url	string	text	false	false	
+company_source_documents	title	string	text	false	false	
+company_source_documents	document_date	string	date	false	false	
+company_source_documents	fetched_at	string	timestamp with time zone	false	false	
+company_source_documents	source_hash	string	text	true	false	
+company_source_documents	raw_text	string	text	false	false	
+company_source_documents	raw_html_size	integer	integer	false	false	
+company_source_documents	status	string	text	false	false	
+company_source_documents	error	string	text	false	false	
+company_source_documents	metadata		jsonb	true	false	
+company_source_documents	bsns_year	string	text	false	false	
+company_source_documents	rcept_no	string	text	false	false	
+company_top5_compensation	corp_code	string	text	true	true	table='companies' column='corp_code'/
+company_top5_compensation	bsns_year	integer	integer	true	true	
+company_top5_compensation	reprt_code	string	text	true	true	
+company_top5_compensation	nm	string	text	true	true	
+company_top5_compensation	ofcps	string	text	true	true	
+company_top5_compensation	mendng_totamt	string	text	false	false	
+company_top5_compensation	mendng_totamt_ct_incls_mendng	string	text	false	false	
+company_top5_compensation	stlm_dt	string	text	false	false	
+company_top5_compensation	fetched_at	string	timestamp with time zone	false	false	
+company_top_shareholder_changes	corp_code	string	text	true	true	table='companies' column='corp_code'/
+company_top_shareholder_changes	bsns_year	integer	integer	true	true	
+company_top_shareholder_changes	reprt_code	string	text	true	true	
+company_top_shareholder_changes	change_on	string	text	true	true	
+company_top_shareholder_changes	mxmm_shrholdr_nm	string	text	true	true	
+company_top_shareholder_changes	posesn_stock_co	integer	bigint	false	false	
+company_top_shareholder_changes	qota_rt	number	numeric	false	false	
+company_top_shareholder_changes	change_cause	string	text	false	false	
+company_top_shareholder_changes	rm	string	text	false	false	
+company_top_shareholder_changes	stlm_dt	string	text	false	false	
+company_top_shareholder_changes	fetched_at	string	timestamp with time zone	false	false	
+company_top_shareholders	corp_code	string	text	true	true	table='companies' column='corp_code'/
+company_top_shareholders	bsns_year	integer	integer	true	true	
+company_top_shareholders	reprt_code	string	text	true	true	
+company_top_shareholders	nm	string	text	true	true	
+company_top_shareholders	relate	string	text	false	false	
+company_top_shareholders	stock_knd	string	text	true	true	
+company_top_shareholders	bsis_posesn_stock_co	integer	bigint	false	false	
+company_top_shareholders	bsis_posesn_stock_qota_rt	number	numeric	false	false	
+company_top_shareholders	trmend_posesn_stock_co	integer	bigint	false	false	
+company_top_shareholders	trmend_posesn_stock_qota_rt	number	numeric	false	false	
+company_top_shareholders	rm	string	text	false	false	
+company_top_shareholders	stlm_dt	string	text	false	false	
+company_top_shareholders	fetched_at	string	timestamp with time zone	false	false	
+company_total_shares	corp_code	string	text	true	true	table='companies' column='corp_code'/
+company_total_shares	bsns_year	integer	integer	true	true	
+company_total_shares	reprt_code	string	text	true	true	
+company_total_shares	se	string	text	true	true	
+company_total_shares	isu_stock_totqy	string	text	false	false	
+company_total_shares	now_to_isu_stock_totqy	string	text	false	false	
+company_total_shares	now_to_dcrs_stock_totqy	string	text	false	false	
+company_total_shares	tesstk_co	string	text	false	false	
+company_total_shares	distb_stock_co	string	text	false	false	
+company_total_shares	stlm_dt	string	text	false	false	
+company_total_shares	fetched_at	string	timestamp with time zone	false	false	
+company_treasury_stock	corp_code	string	text	true	true	table='companies' column='corp_code'/
+company_treasury_stock	bsns_year	integer	integer	true	true	
+company_treasury_stock	reprt_code	string	text	true	true	
+company_treasury_stock	acqs_mth1	string	text	true	true	
+company_treasury_stock	acqs_mth2	string	text	true	true	
+company_treasury_stock	acqs_mth3	string	text	true	true	
+company_treasury_stock	stock_knd	string	text	true	true	
+company_treasury_stock	bsis_qy	string	text	false	false	
+company_treasury_stock	change_qy_acqs	string	text	false	false	
+company_treasury_stock	change_qy_dsps	string	text	false	false	
+company_treasury_stock	trmend_qy	string	text	false	false	
+company_treasury_stock	stlm_dt	string	text	false	false	
+company_treasury_stock	fetched_at	string	timestamp with time zone	false	false	
+company_unregistered_exec_comp	corp_code	string	text	true	true	table='companies' column='corp_code'/
+company_unregistered_exec_comp	bsns_year	integer	integer	true	true	
+company_unregistered_exec_comp	reprt_code	string	text	true	true	
+company_unregistered_exec_comp	ofcps	string	text	true	true	
+company_unregistered_exec_comp	nmpr	string	text	false	false	
+company_unregistered_exec_comp	mendng_totamt	string	text	false	false	
+company_unregistered_exec_comp	jan_avrg_mendng_am	string	text	false	false	
+company_unregistered_exec_comp	rm	string	text	false	false	
+company_unregistered_exec_comp	stlm_dt	string	text	false	false	
+company_unregistered_exec_comp	fetched_at	string	timestamp with time zone	false	false	
+company_weekly	snapshot_date	string	date	true	true	
+company_weekly	company	string	text	true	true	
+company_weekly	total_unique	integer	integer	true	false	
+company_weekly	seg_dev_server	integer	integer	false	false	
+company_weekly	seg_dev_frontend	integer	integer	false	false	
+company_weekly	seg_dev_devops	integer	integer	false	false	
+company_weekly	seg_dev_mlai	integer	integer	false	false	
+company_weekly	seg_dev_java	integer	integer	false	false	
+company_weekly	seg_dev_cto	integer	integer	false	false	
+company_weekly	seg_design	integer	integer	false	false	
+company_weekly	seg_pm_po	integer	integer	false	false	
+company_weekly	seg_marketing	integer	integer	false	false	
+company_weekly	seg_hr	integer	integer	false	false	
+company_weekly	seg_cfo_finance	integer	integer	false	false	
+company_weekly	seg_sales	integer	integer	false	false	
+company_weekly	seg_strategy	integer	integer	false	false	
+company_weekly	platforms	array	text[]	false	false	
+company_weekly	weeks_consecutive	integer	integer	false	false	
+company_weekly	opp_score	number	numeric	false	false	
+company_workforce	corp_code	string	text	true	true	table='companies' column='corp_code'/
+company_workforce	bsns_year	integer	integer	true	true	
+company_workforce	reprt_code	string	text	true	true	
+company_workforce	sexdstn	string	text	true	true	
+company_workforce	fo_bbm	string	text	true	true	
+company_workforce	rgllbr_co	integer	bigint	false	false	
+company_workforce	rgllbr_abacpt_labrr_co	integer	bigint	false	false	
+company_workforce	cnttk_co	integer	bigint	false	false	
+company_workforce	cnttk_abacpt_labrr_co	integer	bigint	false	false	
+company_workforce	sm	integer	bigint	false	false	
+company_workforce	avrg_cnwk_sdytrn	number	numeric	false	false	
+company_workforce	fyer_salary_totamt	integer	bigint	false	false	
+company_workforce	jan_salary_am	integer	bigint	false	false	
+company_workforce	rm	string	text	false	false	
+company_workforce	stlm_dt	string	date	false	false	
+company_workforce	fetched_at	string	timestamp with time zone	false	false	
+company_workforce	reform_bfe_emp_co_rgllbr	integer	bigint	false	false	
+company_workforce	reform_bfe_emp_co_cnttk	integer	bigint	false	false	
+company_workforce	reform_bfe_emp_co_etc	integer	bigint	false	false	
+consultant_weekly_goals	id	integer	bigint	true	true	
+consultant_weekly_goals	consultant	string	text	true	false	
+consultant_weekly_goals	week_iso	string	text	true	false	
+consultant_weekly_goals	goal_key	string	text	true	false	
+consultant_weekly_goals	target_value	number	numeric	true	false	
+consultant_weekly_goals	actual_value	number	numeric	true	false	
+consultant_weekly_goals	achievement_pct	number	numeric	false	false	
+consultant_weekly_goals	updated_at	string	timestamp with time zone	true	false	
+consultant_weekly_metrics	id	string	uuid	true	true	
+consultant_weekly_metrics	tenant_id	string	text	true	false	
+consultant_weekly_metrics	consultant_id	string	uuid	true	false	table='owner_consultants' column='id'/
+consultant_weekly_metrics	week_start	string	date	true	false	
+consultant_weekly_metrics	contact_count	integer	integer	true	false	
+consultant_weekly_metrics	recommend_count	integer	integer	true	false	
+consultant_weekly_metrics	interview_count	integer	integer	true	false	
+consultant_weekly_metrics	final_pass_count	integer	integer	true	false	
+consultant_weekly_metrics	join_count	integer	integer	true	false	
+consultant_weekly_metrics	memo	string	text	false	false	
+consultant_weekly_metrics	created_at	string	timestamp with time zone	true	false	
+consultant_weekly_metrics	updated_at	string	timestamp with time zone	true	false	
+consultants	id	integer	bigint	true	true	
+consultants	name	string	text	true	false	
+consultants	clickup_user_id	string	text	false	false	
+consultants	discord_user_id	string	text	false	false	
+consultants	active	boolean	boolean	true	false	
+consultants	created_at	string	timestamp with time zone	true	false	
+customer_ontology_clients	id	string	text	true	true	
+customer_ontology_clients	tenant_id	string	text	true	false	
+customer_ontology_clients	slug	string	text	true	false	
+customer_ontology_clients	customer_name	string	text	true	false	
+customer_ontology_clients	aliases		jsonb	true	false	
+customer_ontology_clients	wiki_path	string	text	false	false	
+customer_ontology_clients	record_count	integer	integer	true	false	
+customer_ontology_clients	clickup_records	integer	integer	true	false	
+customer_ontology_clients	notion_records	integer	integer	true	false	
+customer_ontology_clients	position_records	integer	integer	true	false	
+customer_ontology_clients	candidate_flow_records	integer	integer	true	false	
+customer_ontology_clients	client_info_records	integer	integer	true	false	
+customer_ontology_clients	earliest_activity_at	string	timestamp with time zone	false	false	
+customer_ontology_clients	latest_activity_at	string	timestamp with time zone	false	false	
+customer_ontology_clients	quality_note	string	text	false	false	
+customer_ontology_clients	payload		jsonb	true	false	
+customer_ontology_clients	content_hash	string	text	true	false	
+customer_ontology_clients	staged_at	string	timestamp with time zone	true	false	
+customer_ontology_clients	pushed_at	string	timestamp with time zone	false	false	
+customer_ontology_clients	updated_at	string	timestamp with time zone	true	false	
+customer_ontology_documents	tenant_id	string	text	true	true	
+customer_ontology_documents	company_key	string	text	true	true	
+customer_ontology_documents	company_name	string	text	true	false	
+customer_ontology_documents	document_markdown	string	text	true	false	
+customer_ontology_documents	interview_case_count	integer	integer	true	false	
+customer_ontology_documents	source_checked_at	string	timestamp with time zone	false	false	
+customer_ontology_documents	source_hash	string	text	true	false	
+customer_ontology_documents	metadata		jsonb	true	false	
+customer_ontology_documents	updated_at	string	timestamp with time zone	true	false	
+customer_ontology_documents	source_author	string	text	false	false	
+customer_ontology_documents	source_created_at	string	timestamp with time zone	false	false	
+customer_ontology_documents	source_updated_at	string	timestamp with time zone	false	false	
+customer_ontology_documents	owner	string	text	false	false	
+customer_ontology_documents	lifecycle_stage	string	text	true	false	
+customer_ontology_documents	metadata_fields		jsonb	true	false	
+customer_ontology_sources	id	string	text	true	true	
+customer_ontology_sources	tenant_id	string	text	true	false	
+customer_ontology_sources	customer_slug	string	text	true	false	
+customer_ontology_sources	customer_name	string	text	true	false	
+customer_ontology_sources	source	string	text	true	false	
+customer_ontology_sources	source_id	string	text	false	false	
+customer_ontology_sources	source_url	string	text	false	false	
+customer_ontology_sources	source_ref	string	text	false	false	
+customer_ontology_sources	title	string	text	false	false	
+customer_ontology_sources	status	string	text	false	false	
+customer_ontology_sources	flow_kind	string	text	false	false	
+customer_ontology_sources	body_text	string	text	false	false	
+customer_ontology_sources	comments		jsonb	true	false	
+customer_ontology_sources	occurred_at	string	timestamp with time zone	false	false	
+customer_ontology_sources	payload		jsonb	true	false	
+customer_ontology_sources	content_hash	string	text	true	false	
+customer_ontology_sources	staged_at	string	timestamp with time zone	true	false	
+customer_ontology_sources	pushed_at	string	timestamp with time zone	false	false	
+customer_ontology_sources	updated_at	string	timestamp with time zone	true	false	
+daily_briefs	id	integer	bigint	true	true	
+daily_briefs	date_kst	string	date	true	false	
+daily_briefs	recipient	string	text	true	false	
+daily_briefs	html_body	string	text	true	false	
+daily_briefs	kpi_jsonb		jsonb	false	false	
+daily_briefs	nudge_count	integer	integer	true	false	
+daily_briefs	sent_at	string	timestamp with time zone	false	false	
+daily_briefs	opened_at	string	timestamp with time zone	false	false	
+daily_briefs	created_at	string	timestamp with time zone	true	false	
+daily_health_metrics	id	string	uuid	true	true	
+daily_health_metrics	metric_date	string	date	true	false	
+daily_health_metrics	new_jobs_count	integer	integer	true	false	
+daily_health_metrics	new_jobs_ratio	number	numeric	false	false	
+daily_health_metrics	fresh_crawled_ratio	number	numeric	false	false	
+daily_health_metrics	live_url_ratio	number	numeric	false	false	
+daily_health_metrics	official_posting_ratio	number	numeric	false	false	
+daily_health_metrics	alert_level	string	text	false	false	
+daily_health_metrics	alert_reason	string	text	false	false	
+daily_health_metrics	created_at	string	timestamp with time zone	true	false	
+dart_career_discovery_runs	id	string	text	true	true	
+dart_career_discovery_runs	job	string	text	true	false	
+dart_career_discovery_runs	started_at	string	timestamp with time zone	true	false	
+dart_career_discovery_runs	finished_at	string	timestamp with time zone	false	false	
+dart_career_discovery_runs	duration_sec	integer	integer	false	false	
+dart_career_discovery_runs	processed	integer	integer	false	false	
+dart_career_discovery_runs	verified	integer	integer	false	false	
+dart_career_discovery_runs	homepage_only	integer	integer	false	false	
+dart_career_discovery_runs	no_homepage	integer	integer	false	false	
+dart_career_discovery_runs	unreachable	integer	integer	false	false	
+dart_career_discovery_runs	inserted	integer	integer	false	false	
+dart_career_discovery_runs	errors	integer	integer	false	false	
+dart_career_discovery_runs	exit_code	integer	integer	false	false	
+dart_career_discovery_runs	report_path	string	text	false	false	
+dart_career_discovery_runs	meta		jsonb	true	false	
+discord_gateway_killswitches	token_fingerprint	string	text	true	true	
+discord_gateway_killswitches	engaged	boolean	boolean	true	false	
+discord_gateway_killswitches	engaged_by	string	text	true	false	
+discord_gateway_killswitches	engaged_at	string	timestamp with time zone	false	false	
+discord_gateway_killswitches	note	string	text	true	false	
+discord_gateway_leases	bot_id	string	text	false	false	
+discord_gateway_leases	lease_id	string	uuid	true	false	
+discord_gateway_leases	instance_id	string	uuid	false	false	
+discord_gateway_leases	acquired_at	string	timestamp with time zone	true	false	
+discord_gateway_leases	renewed_at	string	timestamp with time zone	true	false	
+discord_gateway_leases	expires_at	string	timestamp with time zone	true	false	
+discord_gateway_leases	token_fingerprint	string	text	true	true	
+discord_gateway_leases	holder_identity	string	text	true	false	
+discord_gateway_leases	holder_pid	integer	integer	true	false	
+discord_gateway_leases	target_machine	string	text	true	false	
+discord_gateway_leases	generation	integer	bigint	true	false	
+discord_gateway_leases	released_at	string	timestamp with time zone	false	false	
+discord_gateway_leases	target_worker_pid	integer	integer	false	false	
+error_logs	id	string	uuid	true	true	
+error_logs	created_at	string	timestamp with time zone	true	false	
+error_logs	fingerprint	string	text	true	false	
+error_logs	level	string	text	true	false	
+error_logs	message	string	text	true	false	
+error_logs	stack	string	text	false	false	
+error_logs	source	string	text	true	false	
+error_logs	url	string	text	false	false	
+error_logs	user_agent	string	text	false	false	
+error_logs	release	string	text	false	false	
+error_logs	env	string	text	false	false	
+error_logs	user_id	string	uuid	false	false	
+error_logs	context		jsonb	true	false	
+evaluation_notes	id	string	uuid	true	true	
+evaluation_notes	candidate_id	string	uuid	true	false	table='pipeline_candidates' column='id'/
+evaluation_notes	author_email	string	text	true	false	
+evaluation_notes	author_role	string	text	true	false	
+evaluation_notes	body	string	text	true	false	
+evaluation_notes	created_at	string	timestamp with time zone	true	false	
+expenses	id	string	uuid	true	true	
+expenses	tenant_id	string	text	true	false	
+expenses	expense_date	string	date	false	false	
+expenses	category	string	text	true	false	
+expenses	subcategory	string	text	false	false	
+expenses	amount	integer	bigint	true	false	
+expenses	payer	string	text	true	false	
+expenses	counterparty	string	text	false	false	
+expenses	is_member_loan	boolean	boolean	true	false	
+expenses	member_name	string	text	false	false	
+expenses	memo	string	text	false	false	
+expenses	created_at	string	timestamp with time zone	true	false	
+expenses	updated_at	string	timestamp with time zone	true	false	
+gmail_candidate_feedback	id	string	uuid	true	true	
+gmail_candidate_feedback	tenant_id	string	text	true	false	
+gmail_candidate_feedback	derived_event_id	string	uuid	true	false	table='gmail_derived_events' column='id'/
+gmail_candidate_feedback	feedback_type	string	text	true	false	
+gmail_candidate_feedback	candidate_id	string	text	false	false	
+gmail_candidate_feedback	position_id	string	text	false	false	
+gmail_candidate_feedback	company_id	string	text	false	false	
+gmail_candidate_feedback	confidence	number	numeric	false	false	
+gmail_candidate_feedback	classifier_version	string	text	true	false	
+gmail_candidate_feedback	feedback_body	string	text	false	false	
+gmail_candidate_feedback	clickup_task_id	string	text	false	false	
+gmail_candidate_feedback	clickup_task_url	string	text	false	false	
+gmail_candidate_feedback	created_at	string	timestamp with time zone	true	false	
+gmail_candidate_feedback	updated_at	string	timestamp with time zone	true	false	
+gmail_candidate_feedback	status	string	text	true	false	
+gmail_candidate_feedback	needs_review_reason	string	text	false	false	
+gmail_derived_events	id	string	uuid	true	true	
+gmail_derived_events	tenant_id	string	text	true	false	
+gmail_derived_events	source_member_email	string	text	true	false	
+gmail_derived_events	gmail_message_id	string	text	true	false	
+gmail_derived_events	gmail_thread_id	string	text	false	false	
+gmail_derived_events	event_type	string	text	true	false	
+gmail_derived_events	event_version	integer	integer	true	false	
+gmail_derived_events	classifier_version	string	text	true	false	
+gmail_derived_events	confidence	number	numeric	false	false	
+gmail_derived_events	status	string	text	true	false	
+gmail_derived_events	needs_review_reason	string	text	false	false	
+gmail_derived_events	candidate_id	string	text	false	false	
+gmail_derived_events	position_id	string	text	false	false	
+gmail_derived_events	company_id	string	text	false	false	
+gmail_derived_events	source_provenance		jsonb	true	false	
+gmail_derived_events	classified_payload		jsonb	true	false	
+gmail_derived_events	occurred_at	string	timestamp with time zone	false	false	
+gmail_derived_events	created_at	string	timestamp with time zone	true	false	
+gmail_derived_events	updated_at	string	timestamp with time zone	true	false	
+gmail_ingestion_runs	run_id	string	text	true	true	
+gmail_ingestion_runs	tenant_id	string	text	true	false	
+gmail_ingestion_runs	mode	string	text	true	false	
+gmail_ingestion_runs	status	string	text	true	false	
+gmail_ingestion_runs	account_results		jsonb	true	false	
+gmail_ingestion_runs	pagination_exhausted	boolean	boolean	true	false	
+gmail_ingestion_runs	next_checkpoint		jsonb	true	false	
+gmail_ingestion_runs	counts		jsonb	true	false	
+gmail_ingestion_runs	started_at	string	timestamp with time zone	true	false	
+gmail_ingestion_runs	finished_at	string	timestamp with time zone	false	false	
+gmail_ingestion_runs	last_success_at	string	timestamp with time zone	false	false	
+gmail_ingestion_runs	error_samples		jsonb	true	false	
+gmail_ingestion_runs	report_hash	string	text	false	false	
+gmail_messages	id	string	uuid	true	true	
+gmail_messages	tenant_id	string	text	true	false	
+gmail_messages	thread_id	string	text	true	false	
+gmail_messages	message_id	string	text	true	false	
+gmail_messages	subject	string	text	false	false	
+gmail_messages	from_email	string	text	false	false	
+gmail_messages	to_email	string	text	false	false	
+gmail_messages	snippet	string	text	false	false	
+gmail_messages	body_text	string	text	false	false	
+gmail_messages	label_ids	array	text[]	false	false	
+gmail_messages	company_name	string	text	false	false	
+gmail_messages	position_title	string	text	false	false	
+gmail_messages	candidate_name	string	text	false	false	
+gmail_messages	sent_at	string	timestamp with time zone	false	false	
+gmail_messages	collected_at	string	timestamp with time zone	true	false	
+gmail_messages	embedding	string	public.vector(1536)	false	false	
+gmail_messages	notion_urls	array	text[]	true	false	
+gmail_messages	source_member_email	string	text	true	false	
+gmail_messages	gmail_message_id	string	text	true	false	
+gmail_position_requests	id	string	uuid	true	true	
+gmail_position_requests	tenant_id	string	text	true	false	
+gmail_position_requests	derived_event_id	string	uuid	true	false	table='gmail_derived_events' column='id'/
+gmail_position_requests	normalized_company	string	text	false	false	
+gmail_position_requests	normalized_position	string	text	false	false	
+gmail_position_requests	position_fingerprint	string	text	false	false	
+gmail_position_requests	confidence	number	numeric	false	false	
+gmail_position_requests	status	string	text	true	false	
+gmail_position_requests	needs_review_reason	string	text	false	false	
+gmail_position_requests	position_runner_invoked	boolean	boolean	true	false	
+gmail_position_requests	supabase_position_id	string	text	false	false	
+gmail_position_requests	clickup_task_id	string	text	false	false	
+gmail_position_requests	clickup_task_url	string	text	false	false	
+gmail_position_requests	runner_payload_hash	string	text	false	false	
+gmail_position_requests	created_at	string	timestamp with time zone	true	false	
+gmail_position_requests	updated_at	string	timestamp with time zone	true	false	
+gmail_position_requests	duplicate_of_position_request_id	string	uuid	false	false	table='gmail_position_requests' column='id'/
+gmail_reconciliation_ledger	id	string	uuid	true	true	
+gmail_reconciliation_ledger	tenant_id	string	text	true	false	
+gmail_reconciliation_ledger	run_id	string	text	true	false	table='gmail_ingestion_runs' column='run_id'/
+gmail_reconciliation_ledger	derived_event_id	string	uuid	false	false	table='gmail_derived_events' column='id'/
+gmail_reconciliation_ledger	source_member_email	string	text	true	false	
+gmail_reconciliation_ledger	gmail_message_id	string	text	true	false	
+gmail_reconciliation_ledger	event_type	string	text	true	false	
+gmail_reconciliation_ledger	event_version	integer	integer	true	false	
+gmail_reconciliation_ledger	source_id	string	text	true	false	
+gmail_reconciliation_ledger	target_system	string	text	true	false	
+gmail_reconciliation_ledger	target_id	string	text	false	false	
+gmail_reconciliation_ledger	target_url	string	text	false	false	
+gmail_reconciliation_ledger	source_hash	string	text	false	false	
+gmail_reconciliation_ledger	target_hash	string	text	false	false	
+gmail_reconciliation_ledger	status	string	text	true	false	
+gmail_reconciliation_ledger	error_code	string	text	false	false	
+gmail_reconciliation_ledger	readback_verified_at	string	timestamp with time zone	false	false	
+gmail_reconciliation_ledger	created_at	string	timestamp with time zone	true	false	
+gmail_reconciliation_ledger	updated_at	string	timestamp with time zone	true	false	
+gmail_resume_attachments	id	string	text	true	true	
+gmail_resume_attachments	tenant_id	string	text	true	false	
+gmail_resume_attachments	source_member_email	string	text	true	false	
+gmail_resume_attachments	gmail_message_id	string	text	true	false	
+gmail_resume_attachments	gmail_thread_id	string	text	false	false	
+gmail_resume_attachments	gmail_attachment_id	string	text	true	false	
+gmail_resume_attachments	filename	string	text	true	false	
+gmail_resume_attachments	mime_type	string	text	false	false	
+gmail_resume_attachments	size_bytes	integer	bigint	false	false	
+gmail_resume_attachments	content_sha256	string	text	false	false	
+gmail_resume_attachments	storage_path	string	text	false	false	
+gmail_resume_attachments	received_at	string	timestamp with time zone	false	false	
+gmail_resume_attachments	from_email	string	text	false	false	
+gmail_resume_attachments	to_emails		jsonb	true	false	
+gmail_resume_attachments	subject	string	text	false	false	
+gmail_resume_attachments	snippet	string	text	false	false	
+gmail_resume_attachments	extracted_text	string	text	false	false	
+gmail_resume_attachments	text_status	string	text	true	false	
+gmail_resume_attachments	text_error	string	text	false	false	
+gmail_resume_attachments	metadata		jsonb	true	false	
+gmail_resume_attachments	created_at	string	timestamp with time zone	true	false	
+gmail_resume_attachments	updated_at	string	timestamp with time zone	true	false	
+gmail_resume_attachments	duplicate_of_attachment_id	string	text	false	false	table='gmail_resume_attachments' column='id'/
+gmail_sync_state	id	string	uuid	true	true	
+gmail_sync_state	tenant_id	string	text	true	false	
+gmail_sync_state	scope_key	string	text	true	false	
+gmail_sync_state	page_token	string	text	false	false	
+gmail_sync_state	last_message_id	string	text	false	false	
+gmail_sync_state	processed_count	integer	integer	true	false	
+gmail_sync_state	last_synced_at	string	timestamp with time zone	false	false	
+gmail_sync_state	last_success_at	string	timestamp with time zone	false	false	
+gmail_sync_state	last_error	string	text	false	false	
+gmail_sync_state	created_at	string	timestamp with time zone	true	false	
+gmail_sync_state	updated_at	string	timestamp with time zone	true	false	
+gmail_threads	id	string	uuid	true	true	
+gmail_threads	tenant_id	string	text	true	false	
+gmail_threads	label_key	string	text	true	false	
+gmail_threads	label_name	string	text	true	false	
+gmail_threads	thread_id	string	text	true	false	
+gmail_threads	message_id	string	text	false	false	
+gmail_threads	subject	string	text	false	false	
+gmail_threads	from_email	string	text	false	false	
+gmail_threads	to_emails	array	text[]	true	false	
+gmail_threads	snippet	string	text	false	false	
+gmail_threads	thread_url	string	text	false	false	
+gmail_threads	candidate_name	string	text	false	false	
+gmail_threads	company_name	string	text	false	false	
+gmail_threads	position_title	string	text	false	false	
+gmail_threads	sent_at	string	timestamp with time zone	false	false	
+gmail_threads	collected_at	string	timestamp with time zone	true	false	
+gmail_threads	metadata		jsonb	true	false	
+gmail_threads	embedding	string	public.vector(1536)	false	false	
+gmail_threads	source_member_email	string	text	true	false	
+gmail_threads	gmail_thread_id	string	text	true	false	
+gmail_threads	classification_key	string	text	true	false	
+industry_company_source_profiles	run_id	string	text	true	true	table='industry_micro_segment_runs' column='run_id'/
+industry_company_source_profiles	company_key	string	text	true	true	
+industry_company_source_profiles	company_id	string	text	false	false	
+industry_company_source_profiles	company_name	string	text	true	false	
+industry_company_source_profiles	corp_code	string	text	false	false	
+industry_company_source_profiles	stock_code	string	text	false	false	
+industry_company_source_profiles	sources_json		jsonb	true	false	
+industry_company_source_profiles	wanted_job_count	integer	integer	false	false	
+industry_company_source_profiles	org_members	integer	integer	false	false	
+industry_company_source_profiles	org_score	number	double precision	false	false	
+industry_company_source_profiles	org_avg_tenure_months	number	double precision	false	false	
+industry_company_source_profiles	term_count	integer	integer	false	false	
+industry_company_source_profiles	segment_count	integer	integer	false	false	
+industry_company_source_profiles	is_listed	integer	integer	false	false	
+industry_company_source_profiles	is_wanted	integer	integer	false	false	
+industry_company_source_profiles	updated_at	string	timestamp with time zone	false	false	
+industry_micro_segment_evidence	id	string	text	true	true	
+industry_micro_segment_evidence	run_id	string	text	true	false	table='industry_micro_segment_runs' column='run_id'/
+industry_micro_segment_evidence	segment_id	string	text	true	false	
+industry_micro_segment_evidence	company_key	string	text	true	false	
+industry_micro_segment_evidence	company_id	string	text	false	false	
+industry_micro_segment_evidence	company_name	string	text	true	false	
+industry_micro_segment_evidence	corp_code	string	text	false	false	
+industry_micro_segment_evidence	source_type	string	text	true	false	
+industry_micro_segment_evidence	source_ref	string	text	false	false	
+industry_micro_segment_evidence	category	string	text	false	false	
+industry_micro_segment_evidence	term	string	text	true	false	
+industry_micro_segment_evidence	normalized_term	string	text	true	false	
+industry_micro_segment_evidence	confidence	number	double precision	false	false	
+industry_micro_segment_evidence	excerpt	string	text	false	false	
+industry_micro_segment_evidence	created_at	string	timestamp with time zone	false	false	
+industry_micro_segment_members	run_id	string	text	true	true	table='industry_micro_segment_runs' column='run_id'/
+industry_micro_segment_members	segment_id	string	text	true	true	
+industry_micro_segment_members	company_key	string	text	true	true	
+industry_micro_segment_members	company_id	string	text	false	false	
+industry_micro_segment_members	company_name	string	text	true	false	
+industry_micro_segment_members	corp_code	string	text	false	false	
+industry_micro_segment_members	stock_code	string	text	false	false	
+industry_micro_segment_members	source_types_json		jsonb	true	false	
+industry_micro_segment_members	evidence_terms_json		jsonb	true	false	
+industry_micro_segment_members	evidence_categories_json		jsonb	true	false	
+industry_micro_segment_members	evidence_count	integer	integer	false	false	
+industry_micro_segment_members	wanted_job_count	integer	integer	false	false	
+industry_micro_segment_members	org_members	integer	integer	false	false	
+industry_micro_segment_members	org_score	number	double precision	false	false	
+industry_micro_segment_members	org_avg_tenure_months	number	double precision	false	false	
+industry_micro_segment_members	is_listed	integer	integer	false	false	
+industry_micro_segment_members	is_wanted	integer	integer	false	false	
+industry_micro_segment_members	confidence	number	double precision	false	false	
+industry_micro_segment_members	created_at	string	timestamp with time zone	false	false	
+industry_micro_segment_members	updated_at	string	timestamp with time zone	false	false	
+industry_micro_segment_runs	run_id	string	text	true	true	
+industry_micro_segment_runs	status	string	text	true	false	
+industry_micro_segment_runs	started_at	string	timestamp with time zone	true	false	
+industry_micro_segment_runs	finished_at	string	timestamp with time zone	false	false	
+industry_micro_segment_runs	source_files_json		jsonb	true	false	
+industry_micro_segment_runs	parameters_json		jsonb	true	false	
+industry_micro_segment_runs	stats_json		jsonb	true	false	
+industry_micro_segment_runs	error	string	text	false	false	
+industry_micro_segments	run_id	string	text	true	true	table='industry_micro_segment_runs' column='run_id'/
+industry_micro_segments	segment_id	string	text	true	true	
+industry_micro_segments	segment_key	string	text	true	false	
+industry_micro_segments	segment_label	string	text	true	false	
+industry_micro_segments	segment_family	string	text	false	false	
+industry_micro_segments	segment_subfamily	string	text	false	false	
+industry_micro_segments	signal_category	string	text	false	false	
+industry_micro_segments	representative_terms_json		jsonb	true	false	
+industry_micro_segments	company_count	integer	integer	false	false	
+industry_micro_segments	listed_company_count	integer	integer	false	false	
+industry_micro_segments	wanted_company_count	integer	integer	false	false	
+industry_micro_segments	career_company_count	integer	integer	false	false	
+industry_micro_segments	org_company_count	integer	integer	false	false	
+industry_micro_segments	evidence_count	integer	integer	false	false	
+industry_micro_segments	source_counts_json		jsonb	true	false	
+industry_micro_segments	avg_confidence	number	double precision	false	false	
+industry_micro_segments	notes	string	text	false	false	
+industry_micro_segments	created_at	string	timestamp with time zone	false	false	
+industry_micro_segments	updated_at	string	timestamp with time zone	false	false	
+ingest_failures	id	integer	bigint	true	true	
+ingest_failures	run_id	integer	bigint	false	false	table='ingest_runs' column='id'/
+ingest_failures	corp_code	string	text	false	false	
+ingest_failures	endpoint	string	text	false	false	
+ingest_failures	http_status	integer	integer	false	false	
+ingest_failures	dart_status	string	text	false	false	
+ingest_failures	message	string	text	false	false	
+ingest_failures	created_at	string	timestamp with time zone	false	false	
+ingest_runs	id	integer	bigint	true	true	
+ingest_runs	job	string	text	true	false	
+ingest_runs	started_at	string	timestamp with time zone	true	false	
+ingest_runs	ended_at	string	timestamp with time zone	false	false	
+ingest_runs	ok_count	integer	integer	false	false	
+ingest_runs	fail_count	integer	integer	false	false	
+ingest_runs	error	string	text	false	false	
+ingest_runs	meta		jsonb	false	false	
+inmail_records	id	string	uuid	true	true	
+inmail_records	tenant_id	string	text	true	false	
+inmail_records	candidate_id	string	uuid	false	false	
+inmail_records	candidate_name	string	text	false	false	
+inmail_records	profile_url	string	text	false	false	
+inmail_records	thread_url	string	text	false	false	
+inmail_records	direction	string	text	false	false	
+inmail_records	subject	string	text	false	false	
+inmail_records	body	string	text	false	false	
+inmail_records	response_received	boolean	boolean	false	false	
+inmail_records	sent_at	string	timestamp with time zone	false	false	
+inmail_records	collected_at	string	timestamp with time zone	true	false	
+inmail_records	metadata		jsonb	true	false	
+interview_position_libraries	id	string	uuid	true	true	
+interview_position_libraries	tenant_id	string	text	true	false	
+interview_position_libraries	position_title	string	text	true	false	
+interview_position_libraries	normalized_title	string	text	true	false	
+interview_position_libraries	industry	string	text	false	false	
+interview_position_libraries	seniority	string	text	false	false	
+interview_position_libraries	source_position_ids	array	uuid[]	true	false	
+interview_position_libraries	step1_wanted_jds		jsonb	false	false	
+interview_position_libraries	step2_competencies		jsonb	false	false	
+interview_position_libraries	step3_global_pool		jsonb	false	false	
+interview_position_libraries	step4_library		jsonb	false	false	
+interview_position_libraries	step5_model_answers		jsonb	false	false	
+interview_position_libraries	runner_model		jsonb	false	false	
+interview_position_libraries	runner_duration_seconds	integer	integer	false	false	
+interview_position_libraries	status	string	text	true	false	
+interview_position_libraries	error_log		jsonb	false	false	
+interview_position_libraries	created_at	string	timestamp with time zone	true	false	
+interview_position_libraries	updated_at	string	timestamp with time zone	true	false	
+interview_position_libraries	refreshed_at	string	timestamp with time zone	false	false	
+interview_prep_jobs	id	string	uuid	true	true	
+interview_prep_jobs	tenant_id	string	text	true	false	
+interview_prep_jobs	job_type	string	text	true	false	
+interview_prep_jobs	library_id	string	uuid	false	false	table='interview_position_libraries' column='id'/
+interview_prep_jobs	session_id	string	uuid	false	false	table='interview_prep_sessions' column='id'/
+interview_prep_jobs	position_id	string	uuid	false	false	
+interview_prep_jobs	payload		jsonb	false	false	
+interview_prep_jobs	priority	integer	integer	true	false	
+interview_prep_jobs	status	string	text	true	false	
+interview_prep_jobs	attempts	integer	integer	true	false	
+interview_prep_jobs	last_error	string	text	false	false	
+interview_prep_jobs	enqueued_at	string	timestamp with time zone	true	false	
+interview_prep_jobs	started_at	string	timestamp with time zone	false	false	
+interview_prep_jobs	finished_at	string	timestamp with time zone	false	false	
+interview_prep_sessions	id	string	uuid	true	true	
+interview_prep_sessions	tenant_id	string	text	true	false	
+interview_prep_sessions	library_id	string	uuid	true	false	table='interview_position_libraries' column='id'/
+interview_prep_sessions	candidate_id	string	uuid	false	false	
+interview_prep_sessions	candidate_resume_text	string	text	false	false	
+interview_prep_sessions	personalized_library		jsonb	false	false	
+interview_prep_sessions	personalized_model_answers		jsonb	false	false	
+interview_prep_sessions	interview_notes		jsonb	false	false	
+interview_prep_sessions	overall_evaluation	string	text	false	false	
+interview_prep_sessions	decision	string	text	false	false	
+interview_prep_sessions	status	string	text	true	false	
+interview_prep_sessions	created_at	string	timestamp with time zone	true	false	
+interview_prep_sessions	updated_at	string	timestamp with time zone	true	false	
+invite_tokens	id	string	uuid	true	true	
+invite_tokens	token	string	text	true	false	
+invite_tokens	consultant_id	string	uuid	true	false	
+invite_tokens	position_id	string	uuid	false	false	table='pipeline_position_cards' column='id'/
+invite_tokens	candidate_email	string	text	true	false	
+invite_tokens	candidate_name	string	text	false	false	
+invite_tokens	status	string	text	true	false	
+invite_tokens	expires_at	string	timestamp with time zone	true	false	
+invite_tokens	created_at	string	timestamp with time zone	true	false	
+invite_tokens	used_at	string	timestamp with time zone	false	false	
+invite_tokens	revoked_at	string	timestamp with time zone	false	false	
+invite_tokens	revoke_reason	string	text	false	false	
+invite_tokens	used_by_candidate_id	string	uuid	false	false	table='pipeline_candidates' column='id'/
+invite_tokens_public	token	string	text	false	false	
+invite_tokens_public	candidate_name	string	text	false	false	
+invite_tokens_public	candidate_email	string	text	false	false	
+invite_tokens_public	position_id	string	uuid	false	false	table='pipeline_position_cards' column='id'/
+invite_tokens_public	status	string	text	false	false	
+invite_tokens_public	expires_at	string	timestamp with time zone	false	false	
+invoice_settlement_details	id	string	uuid	true	true	
+invoice_settlement_details	tenant_id	string	text	true	false	
+invoice_settlement_details	invoice_id	string	uuid	true	false	table='revenue_invoices' column='id'/
+invoice_settlement_details	settlement_number	string	text	true	false	
+invoice_settlement_details	placement_set_id	string	uuid	true	false	
+invoice_settlement_details	guarantee_months	integer	integer	true	false	
+invoice_settlement_details	rps_status	string	text	true	false	
+invoice_settlement_details	rps_advance_krw	integer	bigint	false	false	
+invoice_settlement_details	rps_bearer	string	text	false	false	
+invoice_settlement_details	settlement_pdf_sha256	string	text	true	false	
+invoice_settlement_details	payload_sha256	string	text	true	false	
+invoice_settlement_details	source_payload		jsonb	true	false	
+invoice_settlement_details	created_at	string	timestamp with time zone	true	false	
+invoice_settlement_details	updated_at	string	timestamp with time zone	true	false	
+jd_analyses	id	integer	bigint	true	true	
+jd_analyses	position_id	integer	bigint	false	false	table='positions' column='id'/
+jd_analyses	jd_text_hash	string	text	true	false	
+jd_analyses	parsed		jsonb	true	false	
+jd_analyses	model	string	text	true	false	
+jd_analyses	created_at	string	timestamp with time zone	true	false	
+job_match_results	id	string	uuid	true	true	
+job_match_results	subscription_id	string	uuid	false	false	table='job_match_subscriptions' column='id'/
+job_match_results	user_id	string	uuid	true	false	
+job_match_results	legacy_position_id	string	uuid	false	false	
+job_match_results	jd_analysis_id	string	uuid	false	false	
+job_match_results	match_score	number	numeric	true	false	
+job_match_results	skill_overlap		jsonb	false	false	
+job_match_results	match_reasons		jsonb	false	false	
+job_match_results	is_read	boolean	boolean	true	false	
+job_match_results	is_saved	boolean	boolean	true	false	
+job_match_results	created_at	string	timestamp with time zone	true	false	
+job_match_results	position_id	integer	bigint	false	false	table='positions' column='id'/
+job_match_subscriptions	id	string	uuid	true	true	
+job_match_subscriptions	user_id	string	uuid	true	false	
+job_match_subscriptions	profile_id	string	uuid	true	false	table='resume_profiles' column='id'/
+job_match_subscriptions	target_segments		jsonb	false	false	
+job_match_subscriptions	min_match_score	number	numeric	true	false	
+job_match_subscriptions	salary_min	integer	integer	false	false	
+job_match_subscriptions	experience_max	integer	integer	false	false	
+job_match_subscriptions	company_sizes		jsonb	false	false	
+job_match_subscriptions	excluded_companies		jsonb	false	false	
+job_match_subscriptions	notify_email	boolean	boolean	true	false	
+job_match_subscriptions	notify_frequency	string	character varying	true	false	
+job_match_subscriptions	is_active	boolean	boolean	true	false	
+job_match_subscriptions	last_notified_at	string	timestamp with time zone	false	false	
+job_match_subscriptions	created_at	string	timestamp with time zone	true	false	
+job_match_subscriptions	updated_at	string	timestamp with time zone	true	false	
+jobmarket_company_aggregates	snapshot_date	string	date	true	true	
+jobmarket_company_aggregates	company	string	text	true	true	
+jobmarket_company_aggregates	company_norm	string	text	false	false	
+jobmarket_company_aggregates	total_unique	integer	integer	false	false	
+jobmarket_company_aggregates	segments_json		jsonb	false	false	
+jobmarket_company_aggregates	platforms_csv	string	text	false	false	
+jobmarket_company_aggregates	source_file	string	text	true	true	
+jobmarket_company_aggregates	loaded_at	string	timestamp with time zone	false	false	
+jobmarket_positions	id	integer	bigint	true	true	
+jobmarket_positions	snapshot_date	string	date	true	false	
+jobmarket_positions	platform	string	text	true	false	
+jobmarket_positions	segment	string	text	false	false	
+jobmarket_positions	keyword	string	text	false	false	
+jobmarket_positions	title	string	text	false	false	
+jobmarket_positions	company	string	text	true	false	
+jobmarket_positions	company_norm	string	text	false	false	
+jobmarket_positions	location	string	text	false	false	
+jobmarket_positions	url	string	text	false	false	
+jobmarket_positions	posting_id	string	text	false	false	
+jobmarket_positions	annual_from	integer	integer	false	false	
+jobmarket_positions	annual_to	integer	integer	false	false	
+jobmarket_positions	platforms_csv	string	text	false	false	
+jobmarket_positions	raw_titles_json		jsonb	false	false	
+jobmarket_positions	source_file	string	text	true	false	
+jobmarket_positions	loaded_at	string	timestamp with time zone	false	false	
+jobmarket_positions	core_keywords_json		jsonb	true	false	
+jobmarket_positions	key_phrases_json		jsonb	true	false	
+jobmarket_positions	preferred_keywords_json		jsonb	true	false	
+jobmarket_positions	jd_keyword_analysis_source	string	text	false	false	
+jobmarket_positions	jd_keyword_analysis_version	string	text	false	false	
+jobmarket_positions	jd_keyword_analyzed_at	string	timestamp with time zone	false	false	
+jobmarket_snapshots	snapshot_date	string	date	true	true	
+jobmarket_snapshots	source_file	string	text	true	true	
+jobmarket_snapshots	platform_label	string	text	false	false	
+jobmarket_snapshots	total_positions	integer	integer	false	false	
+jobmarket_snapshots	total_companies	integer	integer	false	false	
+jobmarket_snapshots	per_platform_json		jsonb	true	false	
+jobmarket_snapshots	per_segment_json		jsonb	true	false	
+jobmarket_snapshots	loaded_at	string	timestamp with time zone	false	false	
+jobs	id	integer	bigint	true	true	
+jobs	machine	string	text	true	false	
+jobs	skill	string	text	true	false	
+jobs	position_url	string	text	true	false	
+jobs	params		jsonb	true	false	
+jobs	requested_by	string	text	true	false	
+jobs	role	string	text	true	false	
+jobs	status	string	text	true	false	
+jobs	discord_thread_id	string	text	true	false	
+jobs	account_key	string	text	true	false	
+jobs	created_at	string	timestamp with time zone	true	false	
+jobs	started_at	string	timestamp with time zone	false	false	
+jobs	finished_at	string	timestamp with time zone	false	false	
+jobs	result_summary	string	text	true	false	
+jobs	error	string	text	true	false	
+ledger_closings	id	string	uuid	true	true	
+ledger_closings	tenant_id	string	text	true	false	
+ledger_closings	period_type	string	text	true	false	
+ledger_closings	period_key	string	text	true	false	
+ledger_closings	snapshot		jsonb	true	false	
+ledger_closings	closed_by	string	text	false	false	
+ledger_closings	closed_at	string	timestamp with time zone	false	false	
+ledger_closings	is_locked	boolean	boolean	true	false	
+ledger_closings	created_at	string	timestamp with time zone	true	false	
+ledger_closings	updated_at	string	timestamp with time zone	true	false	
+machine_heartbeats	machine	string	text	true	true	
+machine_heartbeats	beat_at	string	timestamp with time zone	true	false	
+machine_heartbeats	worker_pid	integer	integer	true	false	
+machine_heartbeats	linkedin_rps_logged_in	boolean	boolean	true	false	
+machine_heartbeats	claude_ready	boolean	boolean	true	false	
+machine_heartbeats	codex_ready	boolean	boolean	true	false	
+market_intel	id	string	uuid	true	true	
+market_intel	tenant_id	string	text	true	false	
+market_intel	source_type	string	text	true	false	
+market_intel	source_url	string	text	false	false	
+market_intel	company_name	string	text	false	false	
+market_intel	title	string	text	false	false	
+market_intel	summary	string	text	false	false	
+market_intel	body	string	text	false	false	
+market_intel	published_at	string	timestamp with time zone	false	false	
+market_intel	collected_at	string	timestamp with time zone	true	false	
+market_intel	metadata		jsonb	true	false	
+market_intel	embedding	string	public.vector(1536)	false	false	
+member_loans	id	string	uuid	true	true	
+member_loans	tenant_id	string	text	true	false	
+member_loans	member_name	string	text	true	false	
+member_loans	member_email	string	text	false	false	
+member_loans	loan_date	string	date	false	false	
+member_loans	amount	integer	bigint	true	false	
+member_loans	purpose	string	text	false	false	
+member_loans	repaid_amount	integer	bigint	true	false	
+member_loans	status	string	text	true	false	
+member_loans	memo	string	text	false	false	
+member_loans	created_at	string	timestamp with time zone	true	false	
+member_loans	updated_at	string	timestamp with time zone	true	false	
+monitors	id	integer	bigint	true	true	
+monitors	platform	string	text	true	false	
+monitors	keyword	string	text	true	false	
+monitors	filters		jsonb	false	false	
+monitors	schedule_cron	string	text	true	false	
+monitors	last_run_at	string	timestamp with time zone	false	false	
+monitors	last_seen_ids		jsonb	false	false	
+monitors	enabled	boolean	boolean	true	false	
+monitors	created_by	string	text	false	false	
+monitors	created_at	string	timestamp with time zone	true	false	
+monitors	updated_at	string	timestamp with time zone	true	false	
+newsletters	id	string	text	true	true	
+newsletters	issue_label	string	text	true	false	
+newsletters	category	string	text	true	false	
+newsletters	published_at	string	date	true	false	
+newsletters	persona	string	text	false	false	
+newsletters	title	string	text	true	false	
+newsletters	deck	string	text	true	false	
+newsletters	tags	array	text[]	true	false	
+newsletters	html_path	string	text	false	false	
+newsletters	body	string	text	false	false	
+newsletters	quote	string	text	false	false	
+newsletters	source_name	string	text	false	false	
+newsletters	external_url	string	text	false	false	
+newsletters	original_title	string	text	false	false	
+newsletters	created_at	string	timestamp with time zone	true	false	
+notion_client_sub_pages	id	string	uuid	true	true	
+notion_client_sub_pages	tenant_id	string	text	true	false	
+notion_client_sub_pages	root_database_id	string	text	false	false	
+notion_client_sub_pages	client_page_id	string	text	false	false	
+notion_client_sub_pages	parent_page_id	string	text	false	false	
+notion_client_sub_pages	notion_page_id	string	text	true	false	
+notion_client_sub_pages	depth	integer	integer	true	false	
+notion_client_sub_pages	source_url	string	text	true	false	
+notion_client_sub_pages	title	string	text	false	false	
+notion_client_sub_pages	body_markdown	string	text	false	false	
+notion_client_sub_pages	blocks		jsonb	true	false	
+notion_client_sub_pages	embedded_databases		jsonb	true	false	
+notion_client_sub_pages	comments		jsonb	true	false	
+notion_client_sub_pages	path		jsonb	true	false	
+notion_client_sub_pages	last_edited_at	string	timestamp with time zone	false	false	
+notion_client_sub_pages	fetched_at	string	timestamp with time zone	true	false	
+notion_client_sub_pages	created_at	string	timestamp with time zone	true	false	
+notion_client_sub_pages	updated_at	string	timestamp with time zone	true	false	
+notion_clients	id	string	uuid	true	true	
+notion_clients	tenant_id	string	text	true	false	
+notion_clients	notion_page_id	string	text	true	false	
+notion_clients	source_url	string	text	false	false	
+notion_clients	name	string	text	false	false	
+notion_clients	status	string	text	false	false	
+notion_clients	position_title	string	text	false	false	
+notion_clients	body_markdown	string	text	false	false	
+notion_clients	blocks		jsonb	true	false	
+notion_clients	embedded_databases		jsonb	true	false	
+notion_clients	last_edited_at	string	timestamp with time zone	false	false	
+notion_clients	fetched_at	string	timestamp with time zone	true	false	
+notion_clients	metadata		jsonb	true	false	
+notion_clients	embedding	string	public.vector(1536)	false	false	
+notion_coffeechats	id	string	uuid	true	true	
+notion_coffeechats	tenant_id	string	text	true	false	
+notion_coffeechats	notion_page_id	string	text	true	false	
+notion_coffeechats	source_url	string	text	false	false	
+notion_coffeechats	candidate_name	string	text	false	false	
+notion_coffeechats	company_name	string	text	false	false	
+notion_coffeechats	position_title	string	text	false	false	
+notion_coffeechats	body_markdown	string	text	false	false	
+notion_coffeechats	blocks		jsonb	true	false	
+notion_coffeechats	last_edited_at	string	timestamp with time zone	false	false	
+notion_coffeechats	fetched_at	string	timestamp with time zone	true	false	
+notion_coffeechats	metadata		jsonb	true	false	
+notion_coffeechats	embedding	string	public.vector(1536)	false	false	
+notion_golden_captures	tenant_id	string	text	true	true	
+notion_golden_captures	root_page_id	string	text	true	true	
+notion_golden_captures	capture_hash	string	text	true	false	
+notion_golden_captures	semantic_hash	string	text	true	false	
+notion_golden_captures	captured_at	string	timestamp with time zone	true	false	
+notion_golden_captures	notion_version	string	text	true	false	
+notion_golden_captures	counts		jsonb	true	false	
+notion_golden_captures	raw_json		jsonb	true	false	
+notion_golden_captures	audit_json		jsonb	true	false	
+notion_golden_captures	created_at	string	timestamp with time zone	true	false	
+notion_golden_captures	updated_at	string	timestamp with time zone	true	false	
+ontology_companies	id	string	uuid	true	true	
+ontology_companies	name	string	text	true	false	
+ontology_companies	notion_id	string	text	false	false	
+ontology_companies	notion_url	string	text	false	false	
+ontology_companies	status	string	text	false	false	
+ontology_companies	hiring_positions	string	text	false	false	
+ontology_companies	owner		jsonb	false	false	
+ontology_companies	last_edited_at	string	text	false	false	
+ontology_companies	page_text	string	text	false	false	
+ontology_companies	child_items		jsonb	false	false	
+ontology_companies	active_positions		jsonb	false	false	
+ontology_companies	success_patterns		jsonb	false	false	
+ontology_companies	obsidian_notes		jsonb	false	false	
+ontology_companies	synced_at	string	text	false	false	
+ontology_companies	source_type	string	text	false	false	
+ontology_companies	source_id	string	text	false	false	
+ontology_companies	created_at	string	timestamp with time zone	false	false	
+ontology_companies	updated_at	string	timestamp with time zone	false	false	
+ontology_meetings	id	string	uuid	true	true	
+ontology_meetings	notion_id	string	text	false	false	
+ontology_meetings	notion_url	string	text	false	false	
+ontology_meetings	title	string	text	false	false	
+ontology_meetings	date	string	text	false	false	
+ontology_meetings	status	string	text	false	false	
+ontology_meetings	participants		jsonb	false	false	
+ontology_meetings	summary	string	text	false	false	
+ontology_meetings	last_edited_at	string	text	false	false	
+ontology_meetings	source_type	string	text	false	false	
+ontology_meetings	source_id	string	text	false	false	
+ontology_meetings	created_at	string	timestamp with time zone	false	false	
+ontology_meetings	updated_at	string	timestamp with time zone	false	false	
+ontology_meta	id	string	uuid	true	true	
+ontology_meta	domain	string	text	true	false	
+ontology_meta	data		jsonb	true	false	
+ontology_meta	source_type	string	text	false	false	
+ontology_meta	source_id	string	text	false	false	
+ontology_meta	created_at	string	timestamp with time zone	false	false	
+ontology_meta	updated_at	string	timestamp with time zone	false	false	
+ontology_positions	id	string	uuid	true	true	
+ontology_positions	name	string	text	true	false	
+ontology_positions	required_skills		jsonb	false	false	
+ontology_positions	preferred_yoe		jsonb	false	false	
+ontology_positions	success_patterns		jsonb	false	false	
+ontology_positions	source_type	string	text	false	false	
+ontology_positions	source_id	string	text	false	false	
+ontology_positions	created_at	string	timestamp with time zone	false	false	
+ontology_positions	updated_at	string	timestamp with time zone	false	false	
+ontology_version	id	integer	integer	true	true	
+ontology_version	version	string	text	true	false	
+ontology_version	updated_at	string	text	false	false	
+ontology_version	last_analyzed	string	timestamp with time zone	false	false	
+org_collection_log	id	integer	bigint	true	true	
+org_collection_log	session_id	string	text	true	false	
+org_collection_log	snapshot_date	string	date	true	false	
+org_collection_log	company	string	text	true	false	
+org_collection_log	phase	string	text	true	false	
+org_collection_log	status	string	text	false	false	
+org_collection_log	profiles_collected	integer	integer	false	false	
+org_collection_log	pages_scraped	integer	integer	false	false	
+org_collection_log	error_message	string	text	false	false	
+org_collection_log	started_at	string	timestamp with time zone	false	false	
+org_collection_log	completed_at	string	timestamp with time zone	false	false	
+org_collection_log	inserted_at	string	timestamp with time zone	false	false	
+org_company_mapping	id	integer	bigint	true	true	
+org_company_mapping	company	string	text	true	false	
+org_company_mapping	linkedin_entity_name	string	text	false	false	
+org_company_mapping	linkedin_entity_id	string	text	false	false	
+org_company_mapping	rps_search_url	string	text	false	false	
+org_company_mapping	ti_company_mapping_id	integer	bigint	false	false	
+org_company_mapping	search_query_used	string	text	false	false	
+org_company_mapping	search_variants_tried		jsonb	false	false	
+org_company_mapping	talent_density	integer	integer	false	false	
+org_company_mapping	status	string	text	false	false	
+org_company_mapping	verified_at	string	timestamp with time zone	false	false	
+org_company_mapping	last_collected_at	string	timestamp with time zone	false	false	
+org_company_mapping	notes	string	text	false	false	
+org_company_mapping	inserted_at	string	timestamp with time zone	false	false	
+org_company_mapping	updated_at	string	timestamp with time zone	false	false	
+org_company_mapping	last_collected_page	integer	integer	false	false	
+org_company_mapping	profiles_collected	integer	integer	false	false	
+org_company_mapping	total_pages	integer	integer	false	false	
+org_company_mapping	collection_status	string	text	false	false	
+org_members	id	integer	bigint	true	true	
+org_members	snapshot_date	string	date	true	false	
+org_members	company	string	text	true	false	
+org_members	candidate_name	string	text	true	false	
+org_members	current_title	string	text	false	false	
+org_members	current_company	string	text	false	false	
+org_members	location	string	text	false	false	
+org_members	connection_degree	string	text	false	false	
+org_members	experience		jsonb	false	false	
+org_members	education		jsonb	false	false	
+org_members	interest_signals		jsonb	false	false	
+org_members	target_company_tenure_months	integer	integer	false	false	
+org_members	seniority_level	string	text	false	false	
+org_members	linkedin_profile_url	string	text	false	false	
+org_members	inserted_at	string	timestamp with time zone	false	false	
+org_members	updated_at	string	timestamp with time zone	false	false	
+org_members	is_open_to_work	boolean	boolean	false	false	
+org_members	previous_company	string	text	false	false	
+org_members	previous_title	string	text	false	false	
+org_members	bachelor_school	string	text	false	false	
+org_members	bachelor_field	string	text	false	false	
+org_members	master_school	string	text	false	false	
+org_members	master_field	string	text	false	false	
+org_members	has_master	boolean	boolean	false	false	
+org_members	collection_complete	boolean	boolean	false	false	
+org_role_salary_stats	company	string	text	false	false	
+org_role_salary_stats	role	string	text	false	false	
+org_role_salary_stats	years_bucket	string	text	false	false	
+org_role_salary_stats	n	integer	integer	false	false	
+org_role_salary_stats	median_salary_man	integer	integer	false	false	
+org_role_salary_stats	min_salary_man	integer	integer	false	false	
+org_role_salary_stats	max_salary_man	integer	integer	false	false	
+org_talent_flow	id	integer	bigint	true	true	
+org_talent_flow	snapshot_date	string	date	true	false	
+org_talent_flow	company	string	text	true	false	
+org_talent_flow	related_company	string	text	true	false	
+org_talent_flow	inflow_count	integer	integer	false	false	
+org_talent_flow	outflow_count	integer	integer	false	false	
+org_talent_flow	net_flow	integer	integer	false	false	
+org_talent_flow	sample_profiles		jsonb	false	false	
+org_talent_flow	inserted_at	string	timestamp with time zone	false	false	
+org_talent_flow	updated_at	string	timestamp with time zone	false	false	
+organization_analysis	position_id	string	text	true	true	
+organization_analysis	company_name	string	text	true	false	
+organization_analysis	role_title	string	text	true	false	
+organization_analysis	company_size	string	text	true	false	
+organization_analysis	industry_segment	string	text	true	false	
+organization_analysis	investment_stage	string	text	true	false	
+organization_analysis	organization_analysis	string	text	true	false	
+organization_analysis	talent_density_notes	string	text	true	false	
+organization_analysis	org_fit_target	string	text	true	false	
+organization_analysis	updated_at	string	timestamp with time zone	true	false	
+organization_members	id	string	uuid	true	true	
+organization_members	organization_id	string	uuid	true	false	table='organizations' column='id'/
+organization_members	user_id	string	uuid	true	false	table='user_profiles' column='id'/
+organization_members	org_role	string	character varying	true	false	
+organization_members	joined_at	string	timestamp with time zone	false	false	
+organizations	id	string	uuid	true	true	
+organizations	name	string	character varying	true	false	
+organizations	type	string	character varying	true	false	
+organizations	plan	string	character varying	true	false	
+organizations	billing_email	string	character varying	false	false	
+organizations	max_seats	integer	integer	true	false	
+organizations	active_seats	integer	integer	true	false	
+organizations	settings		jsonb	false	false	
+organizations	created_at	string	timestamp with time zone	false	false	
+organizations	updated_at	string	timestamp with time zone	false	false	
+outstanding_articles	id	integer	bigint	true	true	
+outstanding_articles	company	string	text	true	false	
+outstanding_articles	title	string	text	false	false	
+outstanding_articles	url	string	text	false	false	
+outstanding_articles	author	string	text	false	false	
+outstanding_articles	published_date	string	text	false	false	
+outstanding_articles	content	string	text	false	false	
+outstanding_articles	summary	string	text	false	false	
+outstanding_articles	screenshot_path	string	text	false	false	
+outstanding_articles	scraped_at	string	text	false	false	
+outstanding_articles	created_at	string	timestamp with time zone	false	false	
+owner_capital_ledger	id	string	uuid	true	true	
+owner_capital_ledger	tenant_id	string	text	true	false	
+owner_capital_ledger	entry_date	string	date	false	false	
+owner_capital_ledger	direction	string	text	true	false	
+owner_capital_ledger	entry_type	string	text	true	false	
+owner_capital_ledger	amount	integer	bigint	true	false	
+owner_capital_ledger	related_expense_id	string	uuid	false	false	table='expenses' column='id'/
+owner_capital_ledger	memo	string	text	false	false	
+owner_capital_ledger	created_at	string	timestamp with time zone	true	false	
+owner_capital_ledger	updated_at	string	timestamp with time zone	true	false	
+owner_consultants	id	string	uuid	true	true	
+owner_consultants	tenant_id	string	text	true	false	
+owner_consultants	name	string	text	true	false	
+owner_consultants	display_name	string	text	false	false	
+owner_consultants	email	string	text	false	false	
+owner_consultants	code	string	text	false	false	
+owner_consultants	role	string	text	true	false	
+owner_consultants	is_active	boolean	boolean	true	false	
+owner_consultants	weekly_targets		jsonb	true	false	
+owner_consultants	created_at	string	timestamp with time zone	true	false	
+owner_consultants	updated_at	string	timestamp with time zone	true	false	
+owner_consultants	bank_name	string	text	false	false	
+owner_consultants	bank_account	string	text	false	false	
+owner_consultants	bank_holder	string	text	false	false	
+page_snapshots	id	integer	bigint	true	true	
+page_snapshots	search_job_id	integer	bigint	false	false	table='search_jobs' column='id'/
+page_snapshots	platform	string	text	false	false	
+page_snapshots	step_index	integer	integer	false	false	
+page_snapshots	action	string	text	false	false	
+page_snapshots	url	string	text	false	false	
+page_snapshots	page_title	string	text	false	false	
+page_snapshots	body_text	string	text	false	false	
+page_snapshots	interactive_elements		jsonb	false	false	
+page_snapshots	captured_at	string	timestamp with time zone	true	false	
+pipeline_boards	id	string	text	true	true	
+pipeline_boards	display_name	string	text	true	false	
+pipeline_boards	board_type	string	text	true	false	
+pipeline_boards	fiscal_year	integer	integer	true	false	
+pipeline_boards	workspace_id	string	uuid	false	false	table='workspaces' column='id'/
+pipeline_boards	sort_order	integer	integer	true	false	
+pipeline_boards	is_archived	boolean	boolean	true	false	
+pipeline_boards	columns		jsonb	true	false	
+pipeline_boards	created_at	string	timestamp with time zone	true	false	
+pipeline_boards	tenant_id	string	text	true	false	
+pipeline_candidate_resume_quarantine	candidate_id	string	uuid	true	true	
+pipeline_candidate_resume_quarantine	resume_data		jsonb	true	false	
+pipeline_candidate_resume_quarantine	resume_data_converted_at	string	timestamp with time zone	false	false	
+pipeline_candidate_resume_quarantine	quarantined_at	string	timestamp with time zone	true	false	
+pipeline_candidate_resume_quarantine	reason	string	text	true	false	
+pipeline_candidate_resume_quarantine	resume_data_source		jsonb	false	false	
+pipeline_candidates	id	string	uuid	true	true	
+pipeline_candidates	name	string	text	true	false	
+pipeline_candidates	jd_id	string	text	false	false	
+pipeline_candidates	jd_title	string	text	false	false	
+pipeline_candidates	stage	string	text	true	false	
+pipeline_candidates	match_score	integer	integer	false	false	
+pipeline_candidates	skills	array	text[]	false	false	
+pipeline_candidates	memo	string	text	false	false	
+pipeline_candidates	source	string	text	false	false	
+pipeline_candidates	file_name	string	text	false	false	
+pipeline_candidates	created_at	string	timestamp with time zone	false	false	
+pipeline_candidates	updated_at	string	timestamp with time zone	false	false	
+pipeline_candidates	email	string	text	false	false	
+pipeline_candidates	board_id	string	text	false	false	table='pipeline_boards' column='id'/
+pipeline_candidates	description	string	text	false	false	
+pipeline_candidates	tags	array	text[]	true	false	
+pipeline_candidates	clickup_task_id	string	text	false	false	
+pipeline_candidates	clickup_created_at	string	timestamp with time zone	false	false	
+pipeline_candidates	clickup_updated_at	string	timestamp with time zone	false	false	
+pipeline_candidates	clickup_closed_at	string	timestamp with time zone	false	false	
+pipeline_candidates	clickup_assignees		jsonb	true	false	
+pipeline_candidates	clickup_creator		jsonb	false	false	
+pipeline_candidates	status_history		jsonb	true	false	
+pipeline_candidates	ai_assessment		jsonb	false	false	
+pipeline_candidates	sync_origin	string	text	false	false	
+pipeline_candidates	last_synced_at	string	timestamp with time zone	false	false	
+pipeline_candidates	client_company	string	text	false	false	
+pipeline_candidates	auth_user_id	string	uuid	false	false	
+pipeline_candidates	intake_status	string	text	false	false	
+pipeline_candidates	intake_submitted_at	string	timestamp with time zone	false	false	
+pipeline_candidates	intake_resume_storage_path	string	text	false	false	
+pipeline_candidates	intake_report_sent_at	string	timestamp with time zone	false	false	
+pipeline_candidates	intake_admin_notes	string	text	false	false	
+pipeline_candidates	client_lead_email	string	text	false	false	
+pipeline_candidates	candidate_consultant_email	string	text	false	false	
+pipeline_candidates	tenant_id	string	text	true	false	
+pipeline_candidates	embedding	string	public.vector(1536)	false	false	
+pipeline_candidates	intake_assignee_email	string	text	false	false	
+pipeline_candidates	resume_data		jsonb	false	false	
+pipeline_candidates	resume_data_converted_at	string	timestamp with time zone	false	false	
+pipeline_candidates	resume_data_source		jsonb	false	false	
+pipeline_candidates_active	id	string	uuid	false	true	
+pipeline_candidates_active	name	string	text	false	false	
+pipeline_candidates_active	jd_id	string	text	false	false	
+pipeline_candidates_active	jd_title	string	text	false	false	
+pipeline_candidates_active	stage	string	text	false	false	
+pipeline_candidates_active	match_score	integer	integer	false	false	
+pipeline_candidates_active	skills	array	text[]	false	false	
+pipeline_candidates_active	memo	string	text	false	false	
+pipeline_candidates_active	source	string	text	false	false	
+pipeline_candidates_active	file_name	string	text	false	false	
+pipeline_candidates_active	created_at	string	timestamp with time zone	false	false	
+pipeline_candidates_active	updated_at	string	timestamp with time zone	false	false	
+pipeline_candidates_active	email	string	text	false	false	
+pipeline_candidates_active	board_id	string	text	false	false	table='pipeline_boards' column='id'/
+pipeline_candidates_active	description	string	text	false	false	
+pipeline_candidates_active	tags	array	text[]	false	false	
+pipeline_candidates_active	clickup_task_id	string	text	false	false	
+pipeline_candidates_active	clickup_created_at	string	timestamp with time zone	false	false	
+pipeline_candidates_active	clickup_updated_at	string	timestamp with time zone	false	false	
+pipeline_candidates_active	clickup_closed_at	string	timestamp with time zone	false	false	
+pipeline_candidates_active	clickup_assignees		jsonb	false	false	
+pipeline_candidates_active	clickup_creator		jsonb	false	false	
+pipeline_candidates_active	status_history		jsonb	false	false	
+pipeline_candidates_active	ai_assessment		jsonb	false	false	
+pipeline_candidates_active	sync_origin	string	text	false	false	
+pipeline_candidates_active	last_synced_at	string	timestamp with time zone	false	false	
+pipeline_candidates_active	client_company	string	text	false	false	
+pipeline_candidates_active	auth_user_id	string	uuid	false	false	
+pipeline_candidates_active	intake_status	string	text	false	false	
+pipeline_candidates_active	intake_submitted_at	string	timestamp with time zone	false	false	
+pipeline_candidates_active	intake_resume_storage_path	string	text	false	false	
+pipeline_candidates_active	intake_report_sent_at	string	timestamp with time zone	false	false	
+pipeline_candidates_active	intake_admin_notes	string	text	false	false	
+pipeline_candidates_active	client_lead_email	string	text	false	false	
+pipeline_candidates_active	candidate_consultant_email	string	text	false	false	
+pipeline_candidates_active	tenant_id	string	text	false	false	
+pipeline_candidates_active	embedding	string	public.vector(1536)	false	false	
+pipeline_candidates_archive	id	string	uuid	false	true	
+pipeline_candidates_archive	name	string	text	false	false	
+pipeline_candidates_archive	jd_id	string	text	false	false	
+pipeline_candidates_archive	jd_title	string	text	false	false	
+pipeline_candidates_archive	stage	string	text	false	false	
+pipeline_candidates_archive	match_score	integer	integer	false	false	
+pipeline_candidates_archive	skills	array	text[]	false	false	
+pipeline_candidates_archive	memo	string	text	false	false	
+pipeline_candidates_archive	source	string	text	false	false	
+pipeline_candidates_archive	file_name	string	text	false	false	
+pipeline_candidates_archive	created_at	string	timestamp with time zone	false	false	
+pipeline_candidates_archive	updated_at	string	timestamp with time zone	false	false	
+pipeline_candidates_archive	email	string	text	false	false	
+pipeline_candidates_archive	board_id	string	text	false	false	table='pipeline_boards' column='id'/
+pipeline_candidates_archive	description	string	text	false	false	
+pipeline_candidates_archive	tags	array	text[]	false	false	
+pipeline_candidates_archive	clickup_task_id	string	text	false	false	
+pipeline_candidates_archive	clickup_created_at	string	timestamp with time zone	false	false	
+pipeline_candidates_archive	clickup_updated_at	string	timestamp with time zone	false	false	
+pipeline_candidates_archive	clickup_closed_at	string	timestamp with time zone	false	false	
+pipeline_candidates_archive	clickup_assignees		jsonb	false	false	
+pipeline_candidates_archive	clickup_creator		jsonb	false	false	
+pipeline_candidates_archive	status_history		jsonb	false	false	
+pipeline_candidates_archive	ai_assessment		jsonb	false	false	
+pipeline_candidates_archive	sync_origin	string	text	false	false	
+pipeline_candidates_archive	last_synced_at	string	timestamp with time zone	false	false	
+pipeline_candidates_archive	client_company	string	text	false	false	
+pipeline_candidates_archive	auth_user_id	string	uuid	false	false	
+pipeline_candidates_archive	intake_status	string	text	false	false	
+pipeline_candidates_archive	intake_submitted_at	string	timestamp with time zone	false	false	
+pipeline_candidates_archive	intake_resume_storage_path	string	text	false	false	
+pipeline_candidates_archive	intake_report_sent_at	string	timestamp with time zone	false	false	
+pipeline_candidates_archive	intake_admin_notes	string	text	false	false	
+pipeline_candidates_archive	client_lead_email	string	text	false	false	
+pipeline_candidates_archive	candidate_consultant_email	string	text	false	false	
+pipeline_candidates_archive	tenant_id	string	text	false	false	
+pipeline_candidates_archive	embedding	string	public.vector(1536)	false	false	
+pipeline_comments	id	string	uuid	true	true	
+pipeline_comments	candidate_id	string	uuid	false	false	table='pipeline_candidates' column='id'/
+pipeline_comments	author_email	string	text	true	false	
+pipeline_comments	content	string	text	false	false	
+pipeline_comments	mentions	array	text[]	false	false	
+pipeline_comments	draft	string	text	false	false	
+pipeline_comments	created_at	string	timestamp with time zone	false	false	
+pipeline_members	id	string	uuid	true	true	
+pipeline_members	user_email	string	text	true	false	
+pipeline_members	role	string	text	true	false	
+pipeline_members	invited_by	string	text	false	false	
+pipeline_members	created_at	string	timestamp with time zone	false	false	
+pipeline_members	workspace_id	string	uuid	true	false	table='workspaces' column='id'/
+pipeline_position_cards	id	string	uuid	true	true	
+pipeline_position_cards	board_id	string	text	true	false	table='pipeline_boards' column='id'/
+pipeline_position_cards	company_name	string	text	true	false	
+pipeline_position_cards	position_title	string	text	true	false	
+pipeline_position_cards	stage	string	text	true	false	
+pipeline_position_cards	job_category	string	text	false	false	
+pipeline_position_cards	source	string	text	false	false	
+pipeline_position_cards	source_url	string	text	false	false	
+pipeline_position_cards	assignee_email	string	text	false	false	
+pipeline_position_cards	jd_text	string	text	false	false	
+pipeline_position_cards	difficulty	string	text	false	false	
+pipeline_position_cards	imported_at	string	timestamp with time zone	true	false	
+pipeline_position_cards	last_updated_at	string	timestamp with time zone	true	false	
+pipeline_position_cards	raw_clickup_payload		jsonb	false	false	
+pipeline_position_cards	tags	array	text[]	true	false	
+pipeline_position_cards	client_lead_email	string	text	false	false	
+pipeline_position_cards	candidate_consultant_email	string	text	false	false	
+pipeline_position_cards	tenant_id	string	text	true	false	
+pipeline_position_cards	embedding	string	public.vector(1536)	false	false	
+pipeline_position_cards	company_brief	string	text	false	false	
+pipeline_position_cards	clickup_seen_at	string	timestamp with time zone	false	false	
+pipeline_stage_history	id	string	uuid	true	true	
+pipeline_stage_history	candidate_id	string	uuid	false	false	table='pipeline_candidates' column='id'/
+pipeline_stage_history	from_stage	string	text	false	false	
+pipeline_stage_history	to_stage	string	text	true	false	
+pipeline_stage_history	changed_by	string	text	false	false	
+pipeline_stage_history	changed_at	string	timestamp with time zone	false	false	
+position_batch_runs	run_id	string	text	true	true	
+position_batch_runs	triggered_by	string	text	true	false	
+position_batch_runs	triggered_at	string	timestamp with time zone	true	false	
+position_batch_runs	finished_at	string	timestamp with time zone	false	false	
+position_batch_runs	status	string	text	true	false	
+position_batch_runs	total_positions	integer	integer	false	false	
+position_batch_runs	steps_summary		jsonb	false	false	
+position_batch_runs	options		jsonb	false	false	
+position_batch_steps	id	integer	bigint	true	true	
+position_batch_steps	run_id	string	text	true	false	table='position_batch_runs' column='run_id'/
+position_batch_steps	position_id	string	text	true	false	
+position_batch_steps	company	string	text	false	false	
+position_batch_steps	title	string	text	false	false	
+position_batch_steps	step	string	text	true	false	
+position_batch_steps	status	string	text	true	false	
+position_batch_steps	attempt	integer	integer	true	false	
+position_batch_steps	error	string	text	false	false	
+position_batch_steps	output_ref	string	text	false	false	
+position_batch_steps	duration_sec	integer	integer	false	false	
+position_batch_steps	created_at	string	timestamp with time zone	true	false	
+position_details	id	integer	bigint	true	true	
+position_details	position_url	string	text	true	false	
+position_details	platform	string	text	true	false	
+position_details	rec_id	string	text	false	false	
+position_details	jd_raw_text	string	text	false	false	
+position_details	scraped_at	string	timestamp with time zone	false	false	
+position_details	created_at	string	timestamp with time zone	false	false	
+position_embeddings	position_id	integer	bigint	true	true	table='positions' column='id'/
+position_embeddings	embedding	string	public.vector(1536)	true	false	
+position_embeddings	created_at	string	timestamp with time zone	false	false	
+position_offer_bodies	position_id	string	text	true	true	
+position_offer_bodies	company_name	string	text	false	false	
+position_offer_bodies	position_title	string	text	false	false	
+position_offer_bodies	body_json		jsonb	true	false	
+position_offer_bodies	source	string	text	false	false	
+position_offer_bodies	generated_at	string	timestamp with time zone	true	false	
+positions	id	integer	bigint	true	true	
+positions	snapshot_date	string	date	true	false	
+positions	company	string	text	true	false	
+positions	title	string	text	true	false	
+positions	raw_titles	array	text[]	false	false	
+positions	segment	string	text	true	false	
+positions	platforms	array	text[]	false	false	
+positions	position_url	string	text	false	false	
+positions	is_new_this_week	boolean	boolean	false	false	
+positions	inserted_at	string	timestamp with time zone	false	false	
+priority_positions	id	integer	bigint	true	true	
+priority_positions	position_label	string	text	true	false	
+priority_positions	search_query	string	text	true	false	
+priority_positions	client_company	string	text	false	false	
+priority_positions	platforms	array	text[]	true	false	
+priority_positions	consultant_id	integer	bigint	false	false	table='consultants' column='id'/
+priority_positions	cron_schedule	string	text	true	false	
+priority_positions	enabled	boolean	boolean	true	false	
+priority_positions	last_run_at	string	timestamp with time zone	false	false	
+priority_positions	source_note	string	text	false	false	
+priority_positions	created_by	string	text	false	false	
+priority_positions	created_at	string	timestamp with time zone	true	false	
+profile_archives	id	string	uuid	true	true	
+profile_archives	local_id	string	uuid	false	false	
+profile_archives	url	string	text	true	false	
+profile_archives	site	string	text	true	false	
+profile_archives	page_title	string	text	false	false	
+profile_archives	captured_at	string	timestamp with time zone	true	false	
+profile_archives	text_content	string	text	false	false	
+profile_archives	text_length	integer	integer	false	false	
+profile_archives	screenshot_count	integer	integer	false	false	
+profile_archives	screenshot_paths	array	text[]	false	false	
+profile_archives	doc_height	integer	integer	false	false	
+profile_archives	viewport_height	integer	integer	false	false	
+profile_archives	created_at	string	timestamp with time zone	false	false	
+profile_archives	ocr_text	string	text	false	false	
+profile_archives	run_id	string	text	false	false	
+profile_archives	salary_man	integer	integer	false	false	
+profile_archives	career_companies_json	string	text	false	false	
+profile_archives	structured_json	string	text	false	false	
+recruitment_fee_agreements	id	string	uuid	true	true	
+recruitment_fee_agreements	tenant_id	string	text	true	false	
+recruitment_fee_agreements	agreement_ref	string	text	true	false	
+recruitment_fee_agreements	client_key	string	text	true	false	
+recruitment_fee_agreements	client_name	string	text	true	false	
+recruitment_fee_agreements	position_key	string	text	true	false	
+recruitment_fee_agreements	position_name	string	text	true	false	
+recruitment_fee_agreements	fee_rate	number	numeric	true	false	
+recruitment_fee_agreements	effective_from	string	date	true	false	
+recruitment_fee_agreements	effective_to	string	date	false	false	
+recruitment_fee_agreements	source_reference	string	text	true	false	
+recruitment_fee_agreements	status	string	text	true	false	
+recruitment_fee_agreements	created_at	string	timestamp with time zone	true	false	
+recruitment_fee_agreements	updated_at	string	timestamp with time zone	true	false	
+resume_optimizations	id	string	uuid	true	true	
+resume_optimizations	profile_id	string	uuid	true	false	table='resume_profiles' column='id'/
+resume_optimizations	user_id	string	uuid	true	false	
+resume_optimizations	target_segment	string	character varying	true	false	
+resume_optimizations	optimized_summary	string	text	false	false	
+resume_optimizations	optimized_experiences		jsonb	false	false	
+resume_optimizations	optimized_skills		jsonb	false	false	
+resume_optimizations	keyword_additions		jsonb	false	false	
+resume_optimizations	improvement_notes		jsonb	false	false	
+resume_optimizations	keyword_coverage_before	number	numeric	false	false	
+resume_optimizations	keyword_coverage_after	number	numeric	false	false	
+resume_optimizations	estimated_match_improvement	number	numeric	false	false	
+resume_optimizations	optimization_model	string	character varying	false	false	
+resume_optimizations	status	string	character varying	true	false	
+resume_optimizations	created_at	string	timestamp with time zone	true	false	
+resume_optimizations	updated_at	string	timestamp with time zone	true	false	
+resume_position_matches	id	string	text	true	true	
+resume_position_matches	tenant_id	string	text	true	false	
+resume_position_matches	source_attachment_id	string	text	true	false	table='gmail_resume_attachments' column='id'/
+resume_position_matches	run_id	string	text	true	false	
+resume_position_matches	candidate_name	string	text	false	false	
+resume_position_matches	position_id	string	text	false	false	
+resume_position_matches	company_name	string	text	false	false	
+resume_position_matches	position_title	string	text	false	false	
+resume_position_matches	position_source_list_id	string	text	true	false	
+resume_position_matches	target_clickup_list_id	string	text	true	false	
+resume_position_matches	score	integer	integer	true	false	
+resume_position_matches	reasons		jsonb	true	false	
+resume_position_matches	gaps		jsonb	true	false	
+resume_position_matches	clickup_task_name	string	text	true	false	
+resume_position_matches	clickup_description	string	text	true	false	
+resume_position_matches	clickup_task_id	string	text	false	false	
+resume_position_matches	clickup_task_url	string	text	false	false	
+resume_position_matches	metadata		jsonb	true	false	
+resume_position_matches	created_at	string	timestamp with time zone	true	false	
+resume_position_matches	updated_at	string	timestamp with time zone	true	false	
+resume_profiles	id	string	uuid	true	true	
+resume_profiles	user_id	string	uuid	true	false	
+resume_profiles	resume_id	string	uuid	false	false	table='resumes' column='id'/
+resume_profiles	version	integer	integer	true	false	
+resume_profiles	summary	string	text	false	false	
+resume_profiles	experiences		jsonb	false	false	
+resume_profiles	education		jsonb	false	false	
+resume_profiles	skills		jsonb	false	false	
+resume_profiles	projects		jsonb	false	false	
+resume_profiles	certifications		jsonb	false	false	
+resume_profiles	languages		jsonb	false	false	
+resume_profiles	tds_score	number	numeric	false	false	
+resume_profiles	tds_grade	string	character varying	false	false	
+resume_profiles	market_fit_score	number	numeric	false	false	
+resume_profiles	target_segment	string	character varying	false	false	
+resume_profiles	is_primary	boolean	boolean	true	false	
+resume_profiles	created_at	string	timestamp with time zone	true	false	
+resume_profiles	updated_at	string	timestamp with time zone	true	false	
+resume_profiles	target_companies		jsonb	false	false	
+resume_share_links	id	string	uuid	true	true	
+resume_share_links	token_hash	string	text	true	false	
+resume_share_links	resume_id	string	text	false	false	
+resume_share_links	profile_id	string	text	false	false	
+resume_share_links	owner_email	string	text	false	false	
+resume_share_links	title	string	text	false	false	
+resume_share_links	status	string	text	true	false	
+resume_share_links	expires_at	string	timestamp with time zone	false	false	
+resume_share_links	created_at	string	timestamp with time zone	true	false	
+resume_uploads	id	string	uuid	true	true	
+resume_uploads	storage_path	string	text	true	false	
+resume_uploads	original_filename	string	text	true	false	
+resume_uploads	size_bytes	integer	bigint	true	false	
+resume_uploads	content_type	string	text	false	false	
+resume_uploads	uploaded_by	string	text	false	false	
+resume_uploads	uploaded_at	string	timestamp with time zone	true	false	
+resume_uploads	pushed_to_kanban	boolean	boolean	true	false	
+resume_uploads	pushed_at	string	timestamp with time zone	false	false	
+resume_uploads	candidate_id	string	uuid	false	false	table='pipeline_candidates' column='id'/
+resume_uploads	candidate_name	string	text	false	false	
+resume_uploads	job_title	string	text	false	false	
+resume_uploads	content_hash	string	text	false	false	
+resume_uploads	version	integer	integer	true	false	
+resume_uploads	version_group	string	uuid	false	false	
+resume_uploads	is_latest	boolean	boolean	true	false	
+resume_uploads	superseded_by	string	uuid	false	false	table='resume_uploads' column='id'/
+resume_uploads	source_type	string	text	true	false	
+resume_uploads	source_url	string	text	false	false	
+resume_uploads	parsed_text	string	text	false	false	
+resume_uploads	parsed_profile		jsonb	false	false	
+resume_uploads	parsed_at	string	timestamp with time zone	false	false	
+resume_uploads	match_results		jsonb	false	false	
+resume_uploads	match_status	string	text	true	false	
+resume_uploads	matched_at	string	timestamp with time zone	false	false	
+resume_uploads	invite_token_id	string	uuid	false	false	table='invite_tokens' column='id'/
+resume_uploads	match_error	string	text	false	false	
+resume_uploads	analysis		jsonb	false	false	
+resume_uploads	analyzed_at	string	timestamp with time zone	false	false	
+resume_view_consents	id	string	uuid	true	true	
+resume_view_consents	share_link_id	string	uuid	true	false	table='resume_share_links' column='id'/
+resume_view_consents	viewer_email	string	text	true	false	
+resume_view_consents	viewer_email_domain	string	text	false	false	
+resume_view_consents	consent_text_version	string	text	true	false	
+resume_view_consents	consent_text_snapshot	string	text	true	false	
+resume_view_consents	consented_at	string	timestamp with time zone	true	false	
+resume_view_consents	viewed_at	string	timestamp with time zone	true	false	
+resume_view_consents	retention_until	string	timestamp with time zone	false	false	
+resume_view_consents	ip_hash	string	text	false	false	
+resume_view_consents	user_agent_hash	string	text	false	false	
+resumes	id	string	uuid	true	true	
+resumes	user_id	string	uuid	true	false	
+resumes	file_name	string	character varying	true	false	
+resumes	file_type	string	character varying	true	false	
+resumes	file_size_bytes	integer	integer	true	false	
+resumes	storage_path	string	character varying	true	false	
+resumes	extracted_text	string	text	false	false	
+resumes	extraction_status	string	character varying	true	false	
+resumes	extraction_error	string	character varying	false	false	
+resumes	metadata_json		jsonb	false	false	
+resumes	source_type	string	character varying	true	false	
+resumes	created_at	string	timestamp with time zone	true	false	
+resumes	updated_at	string	timestamp with time zone	true	false	
+revenue_invoices	id	string	uuid	true	true	
+revenue_invoices	tenant_id	string	text	true	false	
+revenue_invoices	write_date	string	date	false	false	
+revenue_invoices	issue_date	string	date	false	false	
+revenue_invoices	send_date	string	date	false	false	
+revenue_invoices	client_biz_no	string	text	false	false	
+revenue_invoices	client_name	string	text	false	false	
+revenue_invoices	client_ceo	string	text	false	false	
+revenue_invoices	item_name	string	text	false	false	
+revenue_invoices	supply_amount	integer	bigint	true	false	
+revenue_invoices	vat_amount	integer	bigint	true	false	
+revenue_invoices	approval_no	string	text	false	false	
+revenue_invoices	invoice_type	string	text	true	false	
+revenue_invoices	position_id	string	uuid	false	false	
+revenue_invoices	candidate_name	string	text	false	false	
+revenue_invoices	candidate_salary	integer	bigint	false	false	
+revenue_invoices	commission_rate	number	numeric	true	false	
+revenue_invoices	status	string	text	true	false	
+revenue_invoices	source	string	text	true	false	
+revenue_invoices	memo	string	text	false	false	
+revenue_invoices	created_at	string	timestamp with time zone	true	false	
+revenue_invoices	updated_at	string	timestamp with time zone	true	false	
+revenue_invoices	document_number	string	text	false	false	
+revenue_invoices	position_name	string	text	false	false	
+revenue_invoices	start_date	string	date	false	false	
+revenue_invoices	due_date	string	date	false	false	
+revenue_invoices	fee_agreement_id	string	uuid	false	false	table='recruitment_fee_agreements' column='id'/
+revenue_invoices	placement_set_id	string	uuid	false	false	
+revenue_invoices	invoice_pdf_sha256	string	text	false	false	
+revenue_invoices	payload_sha256	string	text	false	false	
+search_jobs	id	integer	bigint	true	true	
+search_jobs	command	string	text	true	false	
+search_jobs	params		jsonb	true	false	
+search_jobs	status	string	text	true	false	
+search_jobs	requested_by	string	text	false	false	
+search_jobs	requested_at	string	timestamp with time zone	true	false	
+search_jobs	started_at	string	timestamp with time zone	false	false	
+search_jobs	finished_at	string	timestamp with time zone	false	false	
+search_jobs	error_message	string	text	false	false	
+search_jobs	result_summary		jsonb	false	false	
+search_jobs	retry_count	integer	integer	true	false	
+similarity_runs	id	integer	bigint	true	true	
+similarity_runs	method	string	text	true	false	
+similarity_runs	source_count	integer	integer	false	false	
+similarity_runs	edge_count	integer	integer	false	false	
+similarity_runs	cluster_count	integer	integer	false	false	
+similarity_runs	params		jsonb	false	false	
+similarity_runs	started_at	string	timestamp with time zone	true	false	
+similarity_runs	ended_at	string	timestamp with time zone	false	false	
+similarity_runs	status	string	text	false	false	
+similarity_runs	notes	string	text	false	false	
+sourcing_results	id	string	text	true	true	
+sourcing_results	run_id	string	text	true	false	table='sourcing_runs' column='id'/
+sourcing_results	position_id	string	text	true	false	
+sourcing_results	position_title	string	text	false	false	
+sourcing_results	channel	string	text	true	false	
+sourcing_results	value_type	string	text	true	false	
+sourcing_results	value	string	text	true	false	
+sourcing_results	candidate_name	string	text	false	false	
+sourcing_results	match_score	integer	integer	true	false	
+sourcing_results	match_points		jsonb	true	false	
+sourcing_results	mismatch_points		jsonb	true	false	
+sourcing_results	created_at	string	timestamp with time zone	true	false	
+sourcing_results	pushed_at	string	timestamp with time zone	true	false	
+sourcing_results	education_summary	string	text	false	false	
+sourcing_results	education_periods		jsonb	true	false	
+sourcing_results	career_summary	string	text	false	false	
+sourcing_results	career_periods		jsonb	true	false	
+sourcing_results	fit_reason	string	text	false	false	
+sourcing_results	candidate_briefing	string	text	false	false	
+sourcing_results	evidence_urls		jsonb	true	false	
+sourcing_results	risk_notes		jsonb	true	false	
+sourcing_results	resume_data		jsonb	false	false	
+sourcing_results	resume_data_converted_at	string	timestamp with time zone	false	false	
+sourcing_results	resume_data_source		jsonb	false	false	
+sourcing_runs	id	string	text	true	true	
+sourcing_runs	triggered_at	string	timestamp with time zone	true	false	
+sourcing_runs	position_count	integer	integer	true	false	
+sourcing_runs	status	string	text	true	false	
+sourcing_runs	notes	string	text	false	false	
+sourcing_runs	pushed_at	string	timestamp with time zone	true	false	
+supply_snapshot	snapshot_date	string	date	true	true	
+supply_snapshot	segment	string	text	true	true	
+supply_snapshot	total_pool	integer	integer	true	false	
+supply_snapshot	otw_count	integer	integer	true	false	
+supply_snapshot	otw_rate	number	numeric	false	false	
+supply_snapshot	wow_total	integer	integer	false	false	
+supply_snapshot	wow_otw	integer	integer	false	false	
+supply_snapshot	ma_4w_total	number	numeric	false	false	
+supply_snapshot	ma_4w_otw	number	numeric	false	false	
+supply_snapshot	boolean_query	string	text	false	false	
+supply_snapshot	saramin_pool	integer	integer	false	false	
+supply_snapshot	saramin_match	integer	integer	false	false	
+supply_snapshot	saramin_match_rate	number	numeric	false	false	
+supply_snapshot	jobkorea_pool	integer	integer	false	false	
+supply_snapshot	jobkorea_match	integer	integer	false	false	
+supply_snapshot	jobkorea_match_rate	number	numeric	false	false	
+supply_snapshot	strong_otw_count	integer	integer	false	false	
+supply_snapshot	likely_otw_count	integer	integer	false	false	
+supply_snapshot	cross_platform_otw_rate	number	numeric	false	false	
+ti_collection_log	id	integer	bigint	true	true	
+ti_collection_log	session_id	string	text	true	false	
+ti_collection_log	snapshot_date	string	date	true	false	
+ti_collection_log	company	string	text	true	false	
+ti_collection_log	phase	string	text	true	false	
+ti_collection_log	status	string	text	false	false	
+ti_collection_log	error_message	string	text	false	false	
+ti_collection_log	companies_processed	integer	integer	false	false	
+ti_collection_log	page_load_time_ms	integer	integer	false	false	
+ti_collection_log	started_at	string	timestamp with time zone	false	false	
+ti_collection_log	completed_at	string	timestamp with time zone	false	false	
+ti_collection_log	inserted_at	string	timestamp with time zone	false	false	
+ti_company_mapping	id	integer	bigint	true	true	
+ti_company_mapping	company	string	text	true	false	
+ti_company_mapping	linkedin_company_id	string	text	false	false	
+ti_company_mapping	linkedin_company_name	string	text	false	false	
+ti_company_mapping	linkedin_url	string	text	false	false	
+ti_company_mapping	search_query_used	string	text	false	false	
+ti_company_mapping	status	string	text	false	false	
+ti_company_mapping	verified_at	string	timestamp with time zone	false	false	
+ti_company_mapping	last_used_at	string	timestamp with time zone	false	false	
+ti_company_mapping	notes	string	text	false	false	
+ti_company_mapping	inserted_at	string	timestamp with time zone	false	false	
+ti_company_mapping	updated_at	string	timestamp with time zone	false	false	
+ti_overview	id	integer	bigint	true	true	
+ti_overview	snapshot_date	string	date	true	false	
+ti_overview	company	string	text	true	false	
+ti_overview	company_linkedin_name	string	text	false	false	
+ti_overview	linkedin_employees	integer	integer	false	false	
+ti_overview	industry	string	text	false	false	
+ti_overview	headquarters	string	text	false	false	
+ti_overview	employee_growth_6m	number	numeric	false	false	
+ti_overview	employee_growth_12m	number	numeric	false	false	
+ti_overview	median_tenure_months	number	numeric	false	false	
+ti_overview	total_hires_12m	integer	integer	false	false	
+ti_overview	total_departures_12m	integer	integer	false	false	
+ti_overview	net_headcount_change	integer	integer	false	false	
+ti_overview	attrition_rate	number	numeric	false	false	
+ti_overview	top_functions		jsonb	false	false	
+ti_overview	fastest_growing_functions		jsonb	false	false	
+ti_overview	top_skills		jsonb	false	false	
+ti_overview	fast_growing_skills		jsonb	false	false	
+ti_overview	top_schools		jsonb	false	false	
+ti_overview	top_fields_of_study		jsonb	false	false	
+ti_overview	function_breakdown		jsonb	false	false	
+ti_overview	seniority_breakdown		jsonb	false	false	
+ti_overview	raw_overview_text	string	text	false	false	
+ti_overview	inserted_at	string	timestamp with time zone	false	false	
+ti_talent_flow_detail	id	integer	bigint	true	true	
+ti_talent_flow_detail	snapshot_date	string	date	true	false	
+ti_talent_flow_detail	company	string	text	true	false	
+ti_talent_flow_detail	related_company	string	text	true	false	
+ti_talent_flow_detail	departures	integer	integer	false	false	
+ti_talent_flow_detail	hires	integer	integer	false	false	
+ti_talent_flow_detail	ratio	string	text	false	false	
+ti_talent_flow_detail	net_change	integer	integer	false	false	
+ti_talent_flow_detail	related_company_info		jsonb	false	false	
+ti_talent_flow_detail	inserted_at	string	timestamp with time zone	false	false	
+ti_talent_flow_summary	id	integer	bigint	true	true	
+ti_talent_flow_summary	snapshot_date	string	date	true	false	
+ti_talent_flow_summary	company	string	text	true	false	
+ti_talent_flow_summary	period	string	text	false	false	
+ti_talent_flow_summary	total_hires	integer	integer	false	false	
+ti_talent_flow_summary	total_departures	integer	integer	false	false	
+ti_talent_flow_summary	net_change	integer	integer	false	false	
+ti_talent_flow_summary	top_hire_sources		jsonb	false	false	
+ti_talent_flow_summary	top_departure_dests		jsonb	false	false	
+ti_talent_flow_summary	flow_company_count	integer	integer	false	false	
+ti_talent_flow_summary	monthly_trend		jsonb	false	false	
+ti_talent_flow_summary	monthly_employees		jsonb	false	false	
+ti_talent_flow_summary	industry_flow		jsonb	false	false	
+ti_talent_flow_summary	geographic_flow		jsonb	false	false	
+ti_talent_flow_summary	inserted_at	string	timestamp with time zone	false	false	
+unified_candidate_history_view	tenant_id	string	text	false	false	
+unified_candidate_history_view	candidate_id	string	uuid	false	false	
+unified_candidate_history_view	source	string	text	false	false	
+unified_candidate_history_view	source_id	string	text	false	false	
+unified_candidate_history_view	title	string	text	false	false	
+unified_candidate_history_view	body	string	text	false	false	
+unified_candidate_history_view	occurred_at	string	timestamp with time zone	false	false	
+unified_candidate_history_view	metadata		jsonb	false	false	
+user_discord_mapping	email	string	text	true	true	
+user_discord_mapping	discord_user_id	string	text	true	false	
+user_discord_mapping	registered_at	string	timestamp with time zone	true	false	
+user_discord_mapping	notes	string	text	false	false	
+user_profiles	id	string	uuid	true	true	
+user_profiles	organization_id	string	uuid	false	false	table='organizations' column='id'/
+user_profiles	name	string	character varying	false	false	
+user_profiles	phone	string	character varying	false	false	
+user_profiles	company	string	character varying	false	false	
+user_profiles	job_title	string	character varying	false	false	
+user_profiles	profile_image_url	string	character varying	false	false	
+user_profiles	role	string	character varying	true	false	
+user_profiles	category	string	character varying	false	false	
+user_profiles	status	string	character varying	true	false	
+user_profiles	auth_provider	string	character varying	false	false	
+user_profiles	blocked_at	string	timestamp with time zone	false	false	
+user_profiles	blocked_reason	string	character varying	false	false	
+user_profiles	blocked_until	string	timestamp with time zone	false	false	
+user_profiles	blocked_by	string	uuid	false	false	
+user_profiles	delete_requested_at	string	timestamp with time zone	false	false	
+user_profiles	delete_scheduled_at	string	timestamp with time zone	false	false	
+user_profiles	delete_reason	string	character varying	false	false	
+user_profiles	last_login_at	string	timestamp with time zone	false	false	
+user_profiles	login_count	integer	integer	true	false	
+user_profiles	created_at	string	timestamp with time zone	false	false	
+user_profiles	updated_at	string	timestamp with time zone	false	false	
+user_profiles	plan	string	character varying	true	false	
+user_profiles	notification_preferences		jsonb	false	false	
+user_profiles	usage_stats		jsonb	false	false	
+v_cluster_position_density	method	string	text	false	false	
+v_cluster_position_density	cluster_id	string	text	false	false	
+v_cluster_position_density	cluster_label	string	text	false	false	
+v_cluster_position_density	open_positions	integer	bigint	false	false	
+v_cluster_position_density	companies_in_cluster	integer	bigint	false	false	
+v_company_dashboard	company	string	text	false	false	
+v_company_dashboard	linkedin_employees	integer	integer	false	false	
+v_company_dashboard	employee_growth_12m	number	numeric	false	false	
+v_company_dashboard	median_tenure_months	number	numeric	false	false	
+v_company_dashboard	net_headcount_change	integer	integer	false	false	
+v_company_dashboard	top_functions		jsonb	false	false	
+v_company_dashboard	total_hires	integer	integer	false	false	
+v_company_dashboard	total_departures	integer	integer	false	false	
+v_company_dashboard	flow_company_count	integer	integer	false	false	
+v_company_dashboard	top_hire_sources		jsonb	false	false	
+v_company_dashboard	top_departure_dests		jsonb	false	false	
+v_company_dashboard	opp_score	number	numeric	false	false	
+v_company_dashboard	active_positions	integer	integer	false	false	
+v_company_dashboard	weeks_consecutive	integer	integer	false	false	
+v_company_similarity_summary	corp_code	string	text	false	true	
+v_company_similarity_summary	corp_name	string	text	false	false	
+v_company_similarity_summary	stock_code	string	text	false	false	
+v_company_similarity_summary	induty_code	string	text	false	false	
+v_company_similarity_summary	primary_cluster	string	text	false	false	
+v_company_similarity_summary	primary_cluster_label	string	text	false	false	
+v_company_similarity_summary	cluster_method	string	text	false	false	
+v_company_similarity_summary	edge_method	string	text	false	false	
+v_company_similarity_summary	top_similar		jsonb	false	false	
+v_latest_positions	company	string	text	false	false	
+v_latest_positions	title	string	text	false	false	
+v_latest_positions	segment	string	text	false	false	
+v_latest_positions	platforms	array	text[]	false	false	
+v_latest_positions	position_url	string	text	false	false	
+v_latest_positions	is_new_this_week	boolean	boolean	false	false	
+v_latest_positions	opp_score	number	numeric	false	false	
+v_latest_positions	weeks_consecutive	integer	integer	false	false	
+v_market_index	snapshot_date	string	date	false	true	
+v_market_index	segment	string	text	false	true	
+v_market_index	demand	integer	integer	false	false	
+v_market_index	supply_pool	integer	integer	false	false	
+v_market_index	active_supply	integer	integer	false	false	
+v_market_index	otw_rate	number	numeric	false	false	
+v_market_index	sd_ratio_total	number	numeric	false	false	
+v_market_index	sd_ratio_active	number	numeric	false	false	
+v_market_index	market_status	string	text	false	false	
+v_market_index	demand_ma_4w	number	numeric	false	false	
+v_market_index	demand_ma_52w	number	numeric	false	false	
+v_market_index	supply_ma_4w	number	numeric	false	false	
+v_mlai_positions	company	string	text	false	false	
+v_mlai_positions	title	string	text	false	false	
+v_mlai_positions	platforms	array	text[]	false	false	
+v_mlai_positions	position_url	string	text	false	false	
+v_mlai_positions	opp_score	number	numeric	false	false	
+v_mlai_positions	weeks_consecutive	integer	integer	false	false	
+v_org_talent_density	company	string	text	false	false	
+v_org_talent_density	linkedin_entity_name	string	text	false	false	
+v_org_talent_density	talent_density	integer	integer	false	false	
+v_org_talent_density	status	string	text	false	false	
+v_org_talent_density	last_collected_at	string	timestamp with time zone	false	false	
+v_org_talent_density	collected_profiles	integer	bigint	false	false	
+v_org_talent_density	flow_companies_count	integer	bigint	false	false	
+v_org_talent_density	rps_search_url	string	text	false	false	
+v_org_talent_network	source_company	string	text	false	false	
+v_org_talent_network	target_company	string	text	false	false	
+v_org_talent_network	inflow_count	integer	integer	false	false	
+v_org_talent_network	outflow_count	integer	integer	false	false	
+v_org_talent_network	net_flow	integer	integer	false	false	
+v_org_talent_network	snapshot_date	string	date	false	false	
+v_position_corp_match	position_id	integer	bigint	false	true	
+v_position_corp_match	position_company	string	text	false	false	
+v_position_corp_match	corp_code	string	text	false	true	
+v_position_corp_match	corp_name	string	text	false	false	
+v_position_corp_match	sim	number	real	false	false	
+v_position_similar_companies	position_id	integer	bigint	false	true	
+v_position_similar_companies	position_company	string	text	false	false	
+v_position_similar_companies	anchor_corp_code	string	text	false	true	
+v_position_similar_companies	anchor_corp_name	string	text	false	false	
+v_position_similar_companies	similar_corp_code	string	text	false	false	table='companies' column='corp_code'/
+v_position_similar_companies	similar_corp_name	string	text	false	false	
+v_position_similar_companies	score	number	real	false	false	
+v_position_similar_companies	rank	integer	integer	false	false	
+v_position_similar_companies	method	string	text	false	false	
+v_position_similar_companies	cluster_id	string	text	false	false	
+v_position_similar_companies	cluster_label	string	text	false	false	
+vcx_ceo_coffee_sessions	id	string	uuid	true	true	
+vcx_ceo_coffee_sessions	host_id	string	uuid	true	false	table='vcx_corporate_users' column='id'/
+vcx_ceo_coffee_sessions	title	string	text	true	false	
+vcx_ceo_coffee_sessions	description	string	text	true	false	
+vcx_ceo_coffee_sessions	session_date	string	timestamp with time zone	true	false	
+vcx_ceo_coffee_sessions	duration_minutes	integer	integer	true	false	
+vcx_ceo_coffee_sessions	max_participants	integer	integer	true	false	
+vcx_ceo_coffee_sessions	location_type	string	text	true	false	
+vcx_ceo_coffee_sessions	location_detail	string	text	false	false	
+vcx_ceo_coffee_sessions	status	string	text	true	false	
+vcx_ceo_coffee_sessions	target_tier	string	text	false	false	
+vcx_ceo_coffee_sessions	tags	array	text[]	true	false	
+vcx_ceo_coffee_sessions	created_at	string	timestamp with time zone	true	false	
+vcx_ceo_coffee_sessions	updated_at	string	timestamp with time zone	true	false	
+vcx_coffee_applications	id	string	uuid	true	true	
+vcx_coffee_applications	session_id	string	uuid	true	false	table='vcx_ceo_coffee_sessions' column='id'/
+vcx_coffee_applications	applicant_id	string	uuid	true	false	table='vcx_members' column='id'/
+vcx_coffee_applications	message	string	text	false	false	
+vcx_coffee_applications	status	string	text	true	false	
+vcx_coffee_applications	reviewed_at	string	timestamp with time zone	false	false	
+vcx_coffee_applications	created_at	string	timestamp with time zone	true	false	
+vcx_corporate_users	id	string	uuid	true	true	
+vcx_corporate_users	name	string	text	true	false	
+vcx_corporate_users	email	string	text	true	false	
+vcx_corporate_users	company	string	text	true	false	
+vcx_corporate_users	role	string	text	true	false	
+vcx_corporate_users	title	string	text	false	false	
+vcx_corporate_users	is_verified	boolean	boolean	false	false	
+vcx_corporate_users	created_at	string	timestamp with time zone	false	false	
+vcx_corporate_users	updated_at	string	timestamp with time zone	false	false	
+vcx_invites	id	string	uuid	true	true	
+vcx_invites	email	string	text	true	false	
+vcx_invites	invited_by	string	uuid	true	false	
+vcx_invites	invited_by_name	string	text	true	false	
+vcx_invites	member_tier	string	text	true	false	
+vcx_invites	status	string	text	true	false	
+vcx_invites	token_hash	string	text	true	false	
+vcx_invites	expires_at	string	timestamp with time zone	true	false	
+vcx_invites	accepted_at	string	timestamp with time zone	false	false	
+vcx_invites	recommendation_id	string	uuid	false	false	table='vcx_recommendations' column='id'/
+vcx_invites	created_at	string	timestamp with time zone	false	false	
+vcx_members	id	string	uuid	true	true	
+vcx_members	name	string	text	true	false	
+vcx_members	email	string	text	true	false	
+vcx_members	current_company	string	text	false	false	
+vcx_members	title	string	text	false	false	
+vcx_members	professional_fields	array	text[]	false	false	
+vcx_members	years_of_experience	integer	integer	false	false	
+vcx_members	bio	string	text	false	false	
+vcx_members	linkedin_url	string	text	false	false	
+vcx_members	member_tier	string	text	true	false	
+vcx_members	system_role	string	text	true	false	
+vcx_members	join_date	string	timestamp with time zone	false	false	
+vcx_members	endorsed_by	string	uuid	false	false	table='vcx_members' column='id'/
+vcx_members	endorsed_by_name	string	text	false	false	
+vcx_members	avatar_url	string	text	false	false	
+vcx_members	is_active	boolean	boolean	false	false	
+vcx_members	created_at	string	timestamp with time zone	false	false	
+vcx_members	updated_at	string	timestamp with time zone	false	false	
+vcx_members	industry	string	text	false	false	
+vcx_members	location	string	text	false	false	
+vcx_members	is_open_to_chat	boolean	boolean	false	false	
+vcx_members	profile_visibility	string	text	false	false	
+vcx_members	fts	string	tsvector	false	false	
+vcx_recommendations	id	string	uuid	true	true	
+vcx_recommendations	recommender_id	string	uuid	true	false	table='vcx_members' column='id'/
+vcx_recommendations	recommended_email	string	text	true	false	
+vcx_recommendations	recommended_name	string	text	true	false	
+vcx_recommendations	reason	string	text	false	false	
+vcx_recommendations	member_tier	string	text	true	false	
+vcx_recommendations	status	string	text	true	false	
+vcx_recommendations	reviewed_by	string	uuid	false	false	table='vcx_members' column='id'/
+vcx_recommendations	reviewed_at	string	timestamp with time zone	false	false	
+vcx_recommendations	created_at	string	timestamp with time zone	false	false	
+weekly_growth_metrics	id	integer	bigint	true	true	
+weekly_growth_metrics	week_iso	string	text	true	false	
+weekly_growth_metrics	metric_key	string	text	true	false	
+weekly_growth_metrics	value	number	numeric	true	false	
+weekly_growth_metrics	comparison_jsonb		jsonb	true	false	
+weekly_growth_metrics	computed_at	string	timestamp with time zone	true	false	
+weekly_growth_nudges	id	integer	bigint	true	true	
+weekly_growth_nudges	week_iso	string	text	true	false	
+weekly_growth_nudges	nudge_type	string	text	true	false	
+weekly_growth_nudges	target_id	string	text	true	false	
+weekly_growth_nudges	target_name	string	text	true	false	
+weekly_growth_nudges	payload_jsonb		jsonb	true	false	
+weekly_growth_nudges	priority	integer	smallint	true	false	
+weekly_growth_nudges	sent_at	string	timestamp with time zone	false	false	
+weekly_growth_nudges	acknowledged_at	string	timestamp with time zone	false	false	
+weekly_growth_nudges	created_at	string	timestamp with time zone	true	false	
+weekly_growth_snapshots	id	integer	bigint	true	true	
+weekly_growth_snapshots	week_iso	string	text	true	false	
+weekly_growth_snapshots	snapshot_date	string	date	true	false	
+weekly_growth_snapshots	source	string	text	true	false	
+weekly_growth_snapshots	kpi_jsonb		jsonb	true	false	
+weekly_growth_snapshots	html_url	string	text	false	false	
+weekly_growth_snapshots	notion_page_url	string	text	false	false	
+weekly_growth_snapshots	generated_at	string	timestamp with time zone	true	false	
+weekly_meeting_note_entries	id	string	uuid	true	true	
+weekly_meeting_note_entries	doc_slug	string	text	true	false	
+weekly_meeting_note_entries	tenant_id	string	text	true	false	
+weekly_meeting_note_entries	author_email	string	text	false	false	
+weekly_meeting_note_entries	author_name	string	text	false	false	
+weekly_meeting_note_entries	body_markdown	string	text	true	false	
+weekly_meeting_note_entries	created_at	string	timestamp with time zone	true	false	
+weekly_meeting_notes	doc_slug	string	text	true	true	
+weekly_meeting_notes	tenant_id	string	text	true	false	
+weekly_meeting_notes	body_markdown	string	text	true	false	
+weekly_meeting_notes	updated_at	string	timestamp with time zone	true	false	
+weekly_meeting_notes	updated_by	string	text	false	false	
+weekly_meetings	id	string	uuid	true	true	
+weekly_meetings	tenant_id	string	text	true	false	
+weekly_meetings	notion_page_id	string	text	false	false	
+weekly_meetings	source_url	string	text	false	false	
+weekly_meetings	title	string	text	false	false	
+weekly_meetings	body_markdown	string	text	false	false	
+weekly_meetings	meeting_at	string	timestamp with time zone	false	false	
+weekly_meetings	fetched_at	string	timestamp with time zone	true	false	
+weekly_meetings	action_items		jsonb	true	false	
+weekly_meetings	metadata		jsonb	true	false	
+weekly_meetings	embedding	string	public.vector(1536)	false	false	
+weekly_snapshot	snapshot_date	string	date	true	true	
+weekly_snapshot	segment	string	text	true	true	
+weekly_snapshot	unique_count	integer	integer	true	false	
+weekly_snapshot	raw_wanted	integer	integer	false	false	
+weekly_snapshot	raw_linkedin	integer	integer	false	false	
+weekly_snapshot	raw_saramin	integer	integer	false	false	
+weekly_snapshot	raw_jobkorea	integer	integer	false	false	
+weekly_snapshot	raw_remember	integer	integer	false	false	
+weekly_snapshot	raw_total	integer	integer	false	false	
+weekly_snapshot	dedup_rate	number	numeric	false	false	
+weekly_snapshot	ma_4w	number	numeric	false	false	
+weekly_snapshot	ma_52w	number	numeric	false	false	
+weekly_snapshot	wow_change	integer	integer	false	false	
+workspaces	id	string	uuid	true	true	
+workspaces	slug	string	text	true	false	
+workspaces	display_name	string	text	true	false	
+workspaces	workspace_type	string	text	true	false	
+workspaces	created_at	string	timestamp with time zone	true	false	
+workspaces	created_by_email	string	text	false	false	
+xbrl_taxonomy	sj_div	string	text	true	true	
+xbrl_taxonomy	account_id	string	text	true	true	
+xbrl_taxonomy	bsns_de	string	date	true	true	
+xbrl_taxonomy	account_nm	string	text	false	false	
+xbrl_taxonomy	label_kor	string	text	false	false	
+xbrl_taxonomy	label_eng	string	text	false	false	
+xbrl_taxonomy	data_tp	string	text	false	false	
+xbrl_taxonomy	ifrs_ref	string	text	false	false	
+xbrl_taxonomy	fetched_at	string	timestamp with time zone	false	false	
