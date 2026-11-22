@@ -1,0 +1,6 @@
+VERDICT: PASS
+SOT_LOAD: PASS docs/sot/coding-principles.md
+LEDGER_LOAD: PASS docs/sot/principles.yaml
+MECHANISMS: PASS 34/34 strict-contract-bindings
+WIRING: PASS pre-push=1 ci=1
+CHECKED: 34

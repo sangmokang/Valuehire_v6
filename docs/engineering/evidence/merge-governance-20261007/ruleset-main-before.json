@@ -1,0 +1,24 @@
+{
+  "id": 23568184,
+  "name": "acceptance-independent-gate",
+  "enforcement": "active",
+  "conditions": {
+    "ref_name": {
+      "exclude": [],
+      "include": [
+        "refs/heads/main"
+      ]
+    }
+  },
+  "rules": [
+    {
+      "type": "required_deployments",
+      "parameters": {
+        "required_deployment_environments": [
+          "acceptance"
+        ]
+      }
+    }
+  ],
+  "bypass_actors": []
+}
