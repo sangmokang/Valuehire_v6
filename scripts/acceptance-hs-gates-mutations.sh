@@ -41,14 +41,10 @@ trap 'cleanup; trap - EXIT; exit 143' TERM
 trap 'cleanup; trap - EXIT; exit 130' INT
 trap 'cleanup; trap - EXIT; exit 129' HUP
 
-# Dashboard tests load their product contract from the repository-level contracts tree.
-# Every isolated project lives one directory below SANDBOX, so this preserves the same
-# relative boundary without letting a mutation case read files from the real worktree.
-mkdir -p "$SANDBOX/contracts/admin-weekly-dashboard"
-cp contracts/admin-weekly-dashboard/metric-contract-v1.json \
-  "$SANDBOX/contracts/admin-weekly-dashboard/"
-cp contracts/admin-weekly-dashboard/source-contract-v1.json \
-  "$SANDBOX/contracts/admin-weekly-dashboard/"
+# Dashboard and Jev shadow tests load their contracts from the repository-level contracts
+# tree. Every isolated project lives one directory below SANDBOX, so a copy there preserves
+# the same relative boundary without letting a mutation case read the real worktree.
+cp -R contracts "$SANDBOX/"
 mkdir -p "$SANDBOX/apps"
 cp -R apps/admin "$SANDBOX/apps/"
 

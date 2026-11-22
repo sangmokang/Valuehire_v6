@@ -1,0 +1,108 @@
+{
+  "schema_version": "jev-org-reference-shadow-config-v1",
+  "model_version": "jev-1.13.0",
+  "question_version": "org-shadow-questions-v1",
+  "threshold_version": "org-shadow-thresholds-v1",
+  "pattern_version": "org-reference-pattern-v1",
+  "timeout_seconds": 10.0,
+  "pattern": {
+    "minimum_cohort_size": 3,
+    "minimum_distinct_people": 2,
+    "stale_after_days": 90
+  },
+  "thresholds": {
+    "score_low_max": 0.99,
+    "score_high_min": 2.0,
+    "confidence_floor": 0.6,
+    "direct_evidence_present": 0.7,
+    "requires_human_verification": 0.5
+  },
+  "questions": {
+    "primary_role_family": {
+      "type": "choice",
+      "instructions": "Compare only evidenced responsibilities and problems. Which role-family relationship best describes the candidate and this reference cohort?",
+      "criteria": {
+        "same_role_family": "The core responsibilities and owned problems substantially match.",
+        "adjacent_transferable": "The role differs but the evidenced responsibilities and ownership transfer directly.",
+        "different_role_family": "The evidenced work belongs to a materially different role family.",
+        "insufficient_evidence": "The supplied evidence is not enough to decide."
+      }
+    },
+    "ownership_scope_similarity": {
+      "type": "score",
+      "instructions": "Rate similarity of ownership scope using only direct role evidence.",
+      "criteria": [
+        "No comparable ownership evidence",
+        "Limited overlap in task ownership",
+        "Comparable end-to-end ownership",
+        "Highly similar scope, autonomy, and accountability"
+      ]
+    },
+    "production_operating_similarity": {
+      "type": "score",
+      "instructions": "Rate similarity of production operation responsibilities.",
+      "criteria": [
+        "No production operation evidence",
+        "Some operational exposure",
+        "Comparable production responsibility",
+        "Highly similar reliability and operational ownership"
+      ]
+    },
+    "product_stage_similarity": {
+      "type": "score",
+      "instructions": "Rate similarity of product-stage experience without using employer identity.",
+      "criteria": [
+        "No comparable product-stage evidence",
+        "Weak stage overlap",
+        "Comparable product stage and constraints",
+        "Highly similar stage, pace, and constraints"
+      ]
+    },
+    "domain_problem_similarity": {
+      "type": "score",
+      "instructions": "Rate similarity of the actual domain problems solved, not company or industry prestige.",
+      "criteria": [
+        "No comparable problem evidence",
+        "Adjacent problem exposure",
+        "Comparable problem class",
+        "Highly similar user and business problems"
+      ]
+    },
+    "technical_environment_similarity": {
+      "type": "score",
+      "instructions": "Rate similarity of technical constraints and operating environment; do not reward brand-name technologies alone.",
+      "criteria": [
+        "No comparable environment evidence",
+        "Some transferable technical constraints",
+        "Comparable environment and constraints",
+        "Highly similar environment, scale, and constraints"
+      ]
+    },
+    "transferable_experience_strength": {
+      "type": "score",
+      "instructions": "Rate how strongly the candidate's evidenced role, problems, and ownership transfer even when technologies or employers differ.",
+      "criteria": [
+        "No supported transfer path",
+        "Plausible but weakly evidenced transfer",
+        "Strong transferable experience",
+        "Directly transferable ownership and problem-solving evidence"
+      ]
+    },
+    "direct_evidence_present": {
+      "type": "noul",
+      "instructions": "Is there direct evidence for the role and experience comparisons rather than identity, employer, school, or demographic proxies?",
+      "criteria": {
+        "true": "Concrete responsibilities, problems, outcomes, or ownership are supplied.",
+        "false": "The comparison relies on missing evidence or identity and prestige proxies."
+      }
+    },
+    "requires_human_verification": {
+      "type": "noul",
+      "instructions": "Does this comparison require human verification because evidence is missing, conflicting, stale, or the cohort is limited?",
+      "criteria": {
+        "true": "A person should verify material uncertainty before using the observation.",
+        "false": "The supplied evidence is direct, current, consistent, and sufficiently scoped."
+      }
+    }
+  }
+}
