@@ -12,4 +12,6 @@
 - [invoice.md](invoice.md) — 밸류커넥트 채용 수수료 인보이스의 입력·계산·PDF·개인정보·Gmail 발송 승인 계약
 - [invoice-storage.md](invoice-storage.md) — V4 Supabase 원장 재사용, 고객사·포지션별 수수료 계약, SQLite 미러·동기화 상태 계약
 
+- [llm-wiki.md](llm-wiki.md) — LLM 위키의 데이터 성격별 정본·식별 규칙·최소 채움률 문턱(`scripts/llm_wiki/field_audit.py` 가 읽음)·복구 순서(anon 차단 → 구조화 프로필 채움)
+
 새 SOT 파일을 추가하는 유일한 트리거: 스크립트/훅/CI/다음 세션이 이 문서를 **답으로 참조**해야 하는가? 아니면 `docs/engineering/`에 남긴다.
