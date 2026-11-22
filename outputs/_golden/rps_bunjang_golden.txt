@@ -1,0 +1,36 @@
+안녕하세요. 테크 전문 서치펌 밸류커넥트의 헤드헌터 강상모입니다.
+
+현재 **번개장터 Product Manager (Core Product)** 포지션을 제안드립니다.
+
+번개장터 Core Product팀은 **탐색 → 등록 → 거래 → 정산**까지 중고거래의 전체 고객 여정을 설계하고 개선합니다.
+누적 가입자 **2천만+, DAU 100만+** 규모의 C2C 플랫폼에서 단순 기능 기획을 넘어 **고객 문제 정의 → 구조/정책 설계 → 실험 → 검증 → 개선**까지 리드하는 역할입니다.
+
+■ Position | Product Manager, Core Product
+
+**Mission**
+중고거래 특유의 1개성 Inventory, Long-tail Discovery, 구매자/판매자 간 복잡한 Transaction 구조를 이해하고 더 나은 거래 경험을 설계합니다.
+
+■ Key Responsibilities
+• 검색/탐색/거래 전반의 고객 문제 정의 및 개선
+• 신규 Feature 기획·출시 및 Data 기반 실험/고도화
+• 기능·정책·시스템 간 위계/규칙/정합성 설계
+• OKR 기반 MVP 및 실험 설계, 성과 검증
+• Designer/Engineer 등 Cross-functional 협업 리드
+
+■ Looking for
+• Feature 자체보다 **Outcome/문제 해결** 중심으로 사고하시는 분
+• 가설 → MVP → 실험 → 학습의 반복에 익숙한 분
+• 복잡한 문제를 인과·제약·Flow로 구조화할 수 있는 분
+• 기능/정책/시스템 변화가 전체 Product에 미치는 영향을 고려할 수 있는 분
+
+■ Preferred
+• 통계/실험설계/Data 분석 기반 의사결정 경험
+• 검색·추천·인증·결제·정산 등 Product Domain 이해
+• Cross-functional 프로젝트 리딩 경험
+
+※ 중고거래 경험 자체보다 **구조적 문제 해결 및 실험 역량**을 더 중요하게 봅니다.
+
+■ Process
+서류 → Screening(20분) → 1차 → 2차 → 처우협의 → 최종
+
+관심 있으시면 LinkedIn 수락 또는 간단한 회신 주시면 상세 JD와 조직 관련 내용을 공유드리겠습니다.

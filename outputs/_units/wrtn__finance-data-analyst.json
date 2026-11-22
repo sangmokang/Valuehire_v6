@@ -1,0 +1,304 @@
+{
+  "company": "뤼튼테크놀로지스",
+  "position": "Finance Data Analyst (FP&A)",
+  "source_url": "https://career.wrtn.io/ko/o/199492",
+  "captured_at": "2026-09-21T10:00:00+00:00",
+  "source_status": "FETCHED_VERBATIM",
+  "jd_id": "199492",
+  "company_slug": "wrtn",
+  "position_slug": "finance-data-analyst",
+  "role_label": "Finance Data Analyst",
+  "notes": [
+    "회사 수치는 2026-09-22 웹 검증 완료: 기업가치 1조(시리즈C 1,000억, 2026-08-26), 누적 약 2,300억, 2025년 매출 471억·영업손실 588억, MAU 700만(2026-04)",
+    "채용공고 원문의 '500만 명이 매일 사용'은 공개 보도의 MAU 700만과 다른 지표이며 독립 확인되지 않아 후보자용 본문에서 제외",
+    "JD 본문 1,859자 축자 확보, 2026-09-21 수집본과 본문 변경 0건",
+    "고용형태·경력·근무지는 공고 메타영역 출처"
+  ],
+  "units": [
+    {
+      "id": "WC1",
+      "section": "company",
+      "kind": "company",
+      "meaning": "대표자",
+      "full": "- 대표: 이세영",
+      "compact": "- 대표: 이세영",
+      "source": "보도 2026-08-26 서울신문·유니콘팩토리·와우테일 / 2026-04-14 플래텀·AI타임스·한국경제",
+      "rps_drop": true
+    },
+    {
+      "id": "WC2",
+      "section": "company",
+      "kind": "company",
+      "meaning": "2025년 매출과 영업손실",
+      "full": "- 실적: 2025년 매출 471억원 / 영업손실 588억원 (전년 매출 31억원 대비 약 15배 성장)",
+      "compact": "- 2025년 매출 471억원 / 영업손실 588억원 (전년比 약 15배)",
+      "source": "보도 2026-08-26 서울신문·유니콘팩토리·와우테일 / 2026-04-14 플래텀·AI타임스·한국경제",
+      "rps_order": 4,
+      "rps": "2025년 매출 **471억원**에서 올해 총매출 **2,000억원+**를 목표로 빠르게 성장하고 있습니다."
+    },
+    {
+      "id": "WC3",
+      "section": "company",
+      "kind": "company",
+      "meaning": "시리즈C와 기업가치·누적투자",
+      "full": "- 투자: 2026년 8월 시리즈C 1,000억원 유치로 기업가치 1조원 돌파(국내 AI 서비스 최초) / 누적 약 2,300억원",
+      "compact": "- 2026년 8월 시리즈C 1,000억원, 기업가치 1조원 돌파 / 누적 약 2,300억원",
+      "source": "보도 2026-08-26 서울신문·유니콘팩토리·와우테일 / 2026-04-14 플래텀·AI타임스·한국경제",
+      "rps_order": 2,
+      "rps": "2026년 8월 시리즈C **1,000억원** 유치로 기업가치 **1조원+**를 달성했고, 누적 투자는 약 **2,300억원**입니다."
+    },
+    {
+      "id": "WC4",
+      "section": "company",
+      "kind": "company",
+      "meaning": "사용자 규모",
+      "full": "- 사용자: 월간 활성 사용자(MAU) 700만 명 돌파(2026년 4월 기준)",
+      "compact": "- MAU 700만 명 돌파(2026년 4월)",
+      "source": "보도 2026-08-26 서울신문·유니콘팩토리·와우테일 / 2026-04-14 플래텀·AI타임스·한국경제",
+      "rps_drop": true
+    },
+    {
+      "id": "WC5",
+      "section": "company",
+      "kind": "company",
+      "meaning": "제품 라인",
+      "full": "- 제품: AI 플랫폼 뤼튼, AI 캐릭터 서비스 크랙(일본 '캬라푸'·북미 'OOC'), 기업 업무를 재정의하는 에이전트 AX",
+      "compact": "- AI 플랫폼 뤼튼, AI 캐릭터 크랙(일본 캬라푸·북미 OOC), 엔터프라이즈 에이전트 AX",
+      "source": "jd:openingsInfo.detail",
+      "rps_order": 1,
+      "rps": "뤼튼은 AI 플랫폼 **뤼튼**, AI 캐릭터 서비스 **크랙**(일본 캬라푸·북미 OOC), Enterprise **AX** 사업을 전개하며 **MAU 700만+**(2026년 4월 기준)를 보유한 AI Tech 기업입니다."
+    },
+    {
+      "id": "WC6",
+      "section": "company",
+      "kind": "company",
+      "meaning": "글로벌 성과",
+      "full": "- 글로벌: 북미 OOC는 2026년 5월 출시 3개월 만에 월 매출 100억원을 돌파했고, 해외 매출이 국내 매출을 넘어섰습니다",
+      "compact": "- 북미 OOC 출시 3개월 만에 월 매출 100억원, 해외>국내",
+      "source": "보도 2026-08-26 서울신문·유니콘팩토리·와우테일 / 2026-04-14 플래텀·AI타임스·한국경제",
+      "rps_order": 3,
+      "rps": "북미 서비스 **OOC**는 출시 3개월 만에 월 매출 **100억원+**를 기록하며 해외 매출이 국내를 넘어섰습니다."
+    },
+    {
+      "id": "WC7",
+      "section": "company",
+      "kind": "company",
+      "meaning": "올해 매출 목표",
+      "full": "- 올해 목표: 총매출 2,000억원 이상(회사 전망)",
+      "compact": "- 올해 총매출 2,000억원 이상 목표",
+      "source": "보도 2026-08-26 서울신문·유니콘팩토리·와우테일 / 2026-04-14 플래텀·AI타임스·한국경제",
+      "drop_rank": 2,
+      "rps_drop": true
+    },
+    {
+      "id": "WT1",
+      "section": "team",
+      "kind": "core",
+      "meaning": "Finance팀은 전략 방향성을 숫자로 구체화하고 회계·세무·자금·FP&A 기능이 시너지를 내는 조직",
+      "full": "Finance팀은 회사의 전략적 방향성을 숫자로 구체화하고 관리하며, 성장 속도에 맞는 책임과 의무를 다함으로써 회사의 안정적인 성장을 뒷받침하는 조직입니다. 회계, 세무, 자금, FP&A 등 세분화된 기능이 각자의 역할에 충실하면서도 서로 시너지를 낼 수 있는 팀을 만들어 가고 있습니다.",
+      "compact": "Finance팀은 전략 방향성을 숫자로 구체화하며, 회계·세무·자금·FP&A 기능이 시너지를 내는 조직입니다.",
+      "source": "jd:openingsInfo.detail",
+      "heading": "Finance팀",
+      "rps_order": 5,
+      "rps": "Finance팀은 회사의 전략 방향성을 숫자로 구체화하고, 회계·세무·자금·FP&A 기능이 서로 시너지를 내는 조직입니다."
+    },
+    {
+      "id": "WR1",
+      "section": "role",
+      "kind": "core",
+      "meaning": "핵심 지표 정의·운영 고도화로 FP&A/IR 의사결정과 대내외 보고 신뢰도를 높임",
+      "full": "회사가 Tracking해야 하는 핵심 지표(KPI/Metric)를 정의하고 운영 체계를 고도화하여, FP&A/IR의 의사결정과 대내외 보고의 신뢰도를 높이는 역할입니다.",
+      "compact": "핵심 지표(KPI/Metric)를 정의·고도화해 FP&A/IR 의사결정과 보고 신뢰도를 높이고,",
+      "source": "jd:openingsInfo.detail",
+      "merge_group": "wrole",
+      "rps": "Finance 관점에서 회사가 Tracking해야 할 **KPI/Metric**을 정의하고, **정의 → 수집 → 정합성 검증 → 변경관리 → Reporting** 체계를 구축하는 역할입니다."
+    },
+    {
+      "id": "WR2",
+      "section": "role",
+      "kind": "core",
+      "meaning": "지표 변경·추가가 잦은 성장 단계에서 정의–수집–정합성–변경 관리 전 과정 수행",
+      "full": "또한 지표의 변경·추가가 잦은 성장 단계에서 지표의 \"정의-수집-정합성-변경 관리\" 전 과정을 수행합니다.",
+      "compact": "변경·추가가 잦은 성장 단계에서 지표의 정의-수집-정합성-변경 관리 전 과정을 수행합니다.",
+      "source": "jd:openingsInfo.detail",
+      "merge_group": "wrole",
+      "rps": "단순 재무분석보다는 **Finance Domain + SQL/Query + BI/Data Governance** 역량이 중요한 포지션입니다."
+    },
+    {
+      "id": "WW1",
+      "section": "duties",
+      "kind": "core",
+      "meaning": "핵심 지표와 데이터 Metric 설정",
+      "full": "- 핵심 지표의 설정 및 관련된 데이터 Metric을 설정합니다.",
+      "compact": "- 핵심 지표·데이터 Metric 설정",
+      "source": "jd:openingsInfo.detail",
+      "rps": "핵심 **KPI** 및 Finance/Data **Metric** 정의"
+    },
+    {
+      "id": "WW2",
+      "section": "duties",
+      "kind": "core",
+      "meaning": "데이터 파이프라인 설정과 정합성 검증",
+      "full": "- 지표 수집을 위한 데이터 파이프라인을 설정하고, 정합성을 검증합니다.",
+      "compact": "- 지표 수집 파이프라인 설정·정합성 검증",
+      "source": "jd:openingsInfo.detail",
+      "rps": "데이터 추출·수집 Pipeline 설계 및 정합성 검증"
+    },
+    {
+      "id": "WW3",
+      "section": "duties",
+      "kind": "core",
+      "meaning": "FP&A Manager와 협력한 지표 변동 분석·보고",
+      "full": "- FP&A Manager와 협력해서 지표 변동 분석 및 보고를 수행합니다.",
+      "compact": "- FP&A Manager와 협력한 지표 변동 분석·보고",
+      "source": "jd:openingsInfo.detail",
+      "rps": "FP&A Manager와 KPI 변동 분석 및 Reporting"
+    },
+    {
+      "id": "WW4",
+      "section": "duties",
+      "kind": "core",
+      "meaning": "BI툴 기반 지표 visualization 구축",
+      "full": "- BI툴을 활용한 지표 visualization을 구축합니다.",
+      "compact": "- BI툴 기반 지표 visualization 구축",
+      "source": "jd:openingsInfo.detail",
+      "rps": "**BI Tool** 기반 Dashboard / Visualization 구축"
+    },
+    {
+      "id": "WQ1",
+      "section": "requirements",
+      "kind": "core",
+      "meaning": "Finance 유관 Data 관리·리포팅 5년 이상 또는 이에 준하는 경험",
+      "full": "- FP&A, IR 등 Finance 유관 영역에서 Data 관리 및 리포팅을 5년 이상 수행하신 분(또는 이에 준하는 경험)",
+      "compact": "- FP&A·IR 등 Finance 유관 Data 관리·리포팅 5년 이상(또는 이에 준하는 경험)",
+      "source": "jd:openingsInfo.detail",
+      "rps": "FP&A / IR 등 Finance 관련 Data 관리·Reporting **5년+**(또는 이에 준하는 경험)"
+    },
+    {
+      "id": "WQ2",
+      "section": "requirements",
+      "kind": "core",
+      "meaning": "Query 기반 데이터 추출·검증 가능",
+      "full": "- Query를 활용한 데이터 추출/검증이 가능하신 분",
+      "compact": "- Query 기반 데이터 추출·검증 가능",
+      "source": "jd:openingsInfo.detail",
+      "rps": "**SQL** 등 Query 기반 데이터 추출/검증 가능"
+    },
+    {
+      "id": "WQ3",
+      "section": "requirements",
+      "kind": "core",
+      "meaning": "Finance domain 이해 기반 지표 해석 가능",
+      "full": "- Finance domain에 대한 이해를 기반으로 지표를 해석할 수 있으신 분",
+      "compact": "- Finance domain 이해 기반 지표 해석",
+      "source": "jd:openingsInfo.detail",
+      "rps": "Finance Domain 기반 **KPI** 해석 및 분석 역량"
+    },
+    {
+      "id": "WP1",
+      "section": "preferred",
+      "kind": "core",
+      "meaning": "DW/BI 환경 지표 운영 경험 (예: dbt, Airflow 협업 포함)",
+      "full": "- 데이터 웨어하우스/BI 환경에서 지표 운영 경험(예: dbt, Airflow 등과의 협업 경험 포함)이 있으신 분",
+      "compact": "- DW/BI 환경 지표 운영 경험(예: dbt, Airflow 협업 포함)",
+      "source": "jd:openingsInfo.detail",
+      "rps": "**DW/BI** 환경 및 dbt·Airflow 협업 경험"
+    },
+    {
+      "id": "WP2",
+      "section": "preferred",
+      "kind": "core",
+      "meaning": "SaaS·LLM Model cost 관련 FinOps 프로젝트 경험",
+      "full": "- SaaS / LLM Model cost 등과 관련한 FinOps 프로젝트 경험이 있으신 분",
+      "compact": "- SaaS·LLM Model cost 관련 FinOps 프로젝트 경험",
+      "source": "jd:openingsInfo.detail",
+      "rps": "SaaS / LLM Model Cost 등 **FinOps** 경험"
+    },
+    {
+      "id": "WP3",
+      "section": "preferred",
+      "kind": "core",
+      "meaning": "IR 자료 또는 투자자·이사회 보고용 수치 관리 경험",
+      "full": "- IR 자료(Deck/Factbook) 또는 투자자/이사회 보고용 수치 관리 경험이 있으신 분",
+      "compact": "- IR 자료(Deck/Factbook)·투자자/이사회 보고용 수치 관리 경험",
+      "source": "jd:openingsInfo.detail",
+      "rps": "IR Deck / Factbook / 이사회·투자자 Reporting 경험"
+    },
+    {
+      "id": "WP4",
+      "section": "preferred",
+      "kind": "core",
+      "meaning": "내부통제 관점(근거자료·재현성·감사대응) 지표 운영 경험",
+      "full": "- 재무/성과 데이터의 내부통제 관점(근거 자료, 재현성, 감사 대응)을 갖춘 지표 운영 경험이 있으신 분",
+      "compact": "- 내부통제 관점(근거자료·재현성·감사대응) 지표 운영 경험",
+      "source": "jd:openingsInfo.detail",
+      "rps": "재무 데이터 내부통제, **Audit Trail**, 재현성 관리 경험"
+    },
+    {
+      "id": "WN1",
+      "section": "conditions",
+      "kind": "core",
+      "meaning": "고용형태·경력·근무지 (출처가 JD 본문과 다름)",
+      "full": "- 정규직 / 경력 5년 이상 / 서울 서초구 서초대로77길 17",
+      "compact": "- 정규직 / 경력 5년 이상 / 서울 서초",
+      "source": "career.wrtn.io 공고 메타영역(본문 detail 아님, 2026-09-21·2026-09-21 재확인)",
+      "rps": "정규직 · 경력 5년 이상 · 서울 서초",
+      "rps_order": 1
+    },
+    {
+      "id": "WS1",
+      "section": "process",
+      "kind": "core",
+      "meaning": "전형 6단계와 일부 절차 조정 가능성",
+      "full": "- 서류 전형 → 실무 인터뷰 → 컬처핏 인터뷰 → 대표 인터뷰 → 레퍼런스 체크 → 최종 합격으로 진행되며, 필요에 따라 일부 절차는 조정될 수 있습니다.",
+      "compact": "- 서류→실무→컬처핏→대표 인터뷰→레퍼런스 체크→최종 합격(일부 절차 조정 가능)",
+      "source": "jd:openingsInfo.detail",
+      "rps": "서류 → 실무 인터뷰 → Culture Fit → 대표 인터뷰 → Reference Check → Offer"
+    },
+    {
+      "id": "WS2",
+      "section": "process",
+      "kind": "core",
+      "meaning": "최종 합격 시 수습 3개월",
+      "full": "- 최종 합격 시 3개월의 수습 기간이 적용됩니다.",
+      "compact": "- 최종 합격 시 수습 3개월",
+      "source": "jd:openingsInfo.detail",
+      "rps_block": "conditions",
+      "rps_order": 2,
+      "rps": "수습 3개월"
+    },
+    {
+      "id": "WS3",
+      "section": "process",
+      "kind": "core",
+      "meaning": "취업 보호 대상자 법령상 우대",
+      "full": "- 국가유공자 및 장애인 등 취업 보호 대상자는 관계 법령에 따라 우대합니다.",
+      "compact": "- 취업 보호 대상자 관계 법령에 따라 우대",
+      "source": "jd:openingsInfo.detail",
+      "rps_block": "footnote",
+      "rps": "취업 보호 대상자 법령상 우대"
+    },
+    {
+      "id": "WS4",
+      "section": "process",
+      "kind": "core",
+      "meaning": "처우 협의·입사 일정은 최종 합격 이후 진행",
+      "full": "- 처우 협의 및 입사 일정 조율은 최종 합격 이후 별도로 진행됩니다.",
+      "compact": "- 처우 협의·입사 일정은 최종 합격 이후 별도 진행",
+      "source": "jd:openingsInfo.detail",
+      "rps_block": "footnote",
+      "rps": "처우 협의·입사 일정은 최종 합격 이후 별도 진행"
+    },
+    {
+      "id": "WS5",
+      "section": "process",
+      "kind": "core",
+      "meaning": "허위 사실 발견 시 합격 이후라도 채용 취소 가능",
+      "full": "- 지원 서류에 허위 사실이 발견될 경우, 합격 이후라도 채용이 취소될 수 있습니다.",
+      "compact": "- 허위 사실 발견 시 합격 이후라도 채용 취소 가능",
+      "source": "jd:openingsInfo.detail",
+      "rps_block": "footnote",
+      "rps": "허위 사실 발견 시 합격 취소 가능"
+    }
+  ]
+}
