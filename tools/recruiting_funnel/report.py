@@ -101,6 +101,22 @@ def report(src, dest, cutoff):
             summary.append([kind,k,len(rec),len(set(r["client"] for r in rec)),sum(r["stage"]=="offer" for r in rows),
                             top[0][0] if top else None,mix.most_common(1)[0][0][1] if mix else None])
             for row in cohort_rates(rows,hist,coverage): matrix.append([kind,k,*row])
+    seat_file = src / "inmail.csv"
+    if seat_file.exists():
+        seats = wb.create_sheet("LinkedIn 좌석 원장")
+        seats.append(["시작일 UTC", "종료일 UTC", "좌석", "발송", "회신", "수락", "미회신", "회신율", "수락률", "보고서 출처"])
+        with seat_file.open(encoding="utf-8-sig") as handle:
+            for item in csv.DictReader(handle):
+                start, end = (date.fromisoformat(item[k]) for k in ("start", "end"))
+                sent, replied, accepted = (int(item[k]) for k in ("sent", "replied", "accepted"))
+                if start > end or not 0 <= accepted <= replied <= sent or not item["source"]:
+                    raise ValueError("Invalid InMail report interval or counts")
+                if end <= cutoff:
+                    seats.append([str(start), str(end), item["seat"], sent, replied, accepted,
+                                  sent - replied, replied / sent if sent else None,
+                                  accepted / sent if sent else None, item["source"]])
+                    for cell in seats[seats.max_row][7:9]:
+                        cell.number_format = "0.0%"
     issues_file = src / "issues.csv"
     if issues_file.exists():
         issues = wb.create_sheet("근거가 있는 주차별 현안")

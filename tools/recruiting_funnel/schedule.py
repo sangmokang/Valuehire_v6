@@ -27,7 +27,7 @@ def run(source, output, start, today, refresh=None):
                 missing.append(day_key)
             else:
                 digest = hashlib.sha256()
-                for path in [*files, *snapshot.glob("issues.csv"), Path(__file__).with_name("report.py")]:
+                for path in [*files, *snapshot.glob("issues.csv"), *snapshot.glob("inmail.csv"), Path(__file__).with_name("report.py")]:
                     digest.update(hashlib.sha256(path.read_bytes()).digest())
                 version = digest.hexdigest()
                 for kind in closing:
