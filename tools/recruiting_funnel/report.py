@@ -101,6 +101,16 @@ def report(src, dest, cutoff):
             summary.append([kind,k,len(rec),len(set(r["client"] for r in rec)),sum(r["stage"]=="offer" for r in rows),
                             top[0][0] if top else None,mix.most_common(1)[0][0][1] if mix else None])
             for row in cohort_rates(rows,hist,coverage): matrix.append([kind,k,*row])
+    issues_file = src / "issues.csv"
+    if issues_file.exists():
+        issues = wb.create_sheet("근거가 있는 주차별 현안")
+        issues.append(["주 시작", "확인일", "고객사", "직무", "현안", "출처"])
+        with issues_file.open(encoding="utf-8-sig") as handle:
+            for item in csv.DictReader(handle):
+                observed = date.fromisoformat(item["date"])
+                if observed <= cutoff and item["source"]:
+                    issues.append([period(observed, "week"), observed.isoformat(), item["client"],
+                                   item["role"], item["issue"], item["source"]])
     for cell in list(matrix.columns)[5][1:]:cell.number_format="0.0%"
     for ws in wb:
         ws.freeze_panes="C2";ws.auto_filter.ref=ws.dimensions

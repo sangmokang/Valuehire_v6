@@ -3,13 +3,14 @@ import argparse
 import hashlib
 import json
 import os
+import subprocess
 from datetime import date, timedelta
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from report import KINDS, period, report
 
 
-def run(source, output, start, today):
+def run(source, output, start, today, refresh=None):
     day = start
     missing = []
     while day < today:
@@ -19,11 +20,14 @@ def run(source, output, start, today):
         snapshot = source / day_key
         if closing:
             files = [snapshot / f for f in ("events.csv", "coverage.json")]
+            if refresh and not all(p.is_file() for p in files):
+                snapshot.mkdir(parents=True, exist_ok=True)
+                subprocess.run([*refresh, day_key, str(snapshot.resolve())], check=True)
             if not all(p.is_file() for p in files) or json.loads(files[1].read_text()).get("verified_through") != day_key:
                 missing.append(day_key)
             else:
                 digest = hashlib.sha256()
-                for path in [*files, Path(__file__).with_name("report.py")]:
+                for path in [*files, *snapshot.glob("issues.csv"), Path(__file__).with_name("report.py")]:
                     digest.update(hashlib.sha256(path.read_bytes()).digest())
                 version = digest.hexdigest()
                 for kind in closing:
@@ -47,7 +51,8 @@ if __name__ == "__main__":
     p.add_argument("output", type=Path)
     p.add_argument("--start", required=True, type=date.fromisoformat)
     p.add_argument("--today", type=date.fromisoformat)
+    p.add_argument("--refresh", nargs="+", help="Optional local collector command; appended arguments are cutoff date and snapshot directory")
     args = p.parse_args()
     from datetime import datetime, timezone
     os.umask(0o077)
-    run(args.source, args.output, args.start, args.today or datetime.now(timezone(timedelta(hours=9))).date())
+    run(args.source, args.output, args.start, args.today or datetime.now(timezone(timedelta(hours=9))).date(), args.refresh)

@@ -27,3 +27,5 @@ python tools/recruiting_funnel/schedule.py PRIVATE_SNAPSHOTS PRIVATE_OUTPUT --st
 events.csv의 헤더는 date,case,stage,source,client,role이다. 날짜는 서울 현지 YYYY-MM-DD, case는 채널 간 검증된 동일 지원 건 식별자, source는 원문 고유 식별자다. 단계 값은 offer, accepted, awaiting, resume, referral, pass, placed, ai_origin이다. awaiting은 기준일 현재 상태로 재확인한다. coverage.json은 scope(조사 범위 설명), verified_through(기준일), complete(단계별 완결 여부), joins_complete(전체 연결 검증 여부), slides(제목과 본문 문자열 목록의 쌍)를 담는다. 주차별 고민과 AI 관여 방식은 날짜가 있는 근거로 추가 슬라이드에 명시한다.
 
 정기 실행은 로컬 일정 관리자에서 매일 서울 시간 기준 전날까지의 마감을 확인한다. 종료일별 PRIVATE_SNAPSHOTS/YYYY-MM-DD 아래에 해당 날의 상태로 검증한 두 입력 파일을 놓는다. 누락된 마감일은 schedule.py가 종료 오류에 명시한다. 주간은 일요일, 나머지는 해당 달력 기간 말일 마감이다. 기간별 폴더에 기준일 누적 덱과 해당 기간을 포함한 상세표가 함께 저장된다. 입력이 바뀌면 새 버전을 보존한다.
+
+인증된 PC의 수집 명령이 있으면 schedule.py 마지막에 `--refresh python LOCAL_COLLECTOR.py`를 붙인다. 수집기는 기준일과 스냅샷 경로를 인수로 받는다. 날짜별 업무 이슈를 근거와 함께 남기려면 선택 파일 issues.csv(date,client,role,issue,source)를 준비한다. Windows 작업 스케줄러, macOS launchd 또는 Linux cron에 동일한 Python 명령을 매일 등록한다. 각 기기의 비공개 입력 경로와 승인된 계정 연결은 현지에서 설정한다.
