@@ -27,7 +27,9 @@ def run(source, output, start, today, refresh=None):
                 missing.append(day_key)
             else:
                 digest = hashlib.sha256()
-                for path in [*files, *snapshot.glob("issues.csv"), *snapshot.glob("inmail.csv"), Path(__file__).with_name("report.py")]:
+                optional = [snapshot / name for name in ("issues.csv", "inmail.csv", "journal.csv")]
+                renderers = [Path(__file__).with_name(name) for name in ("report.py", "narrative.py")]
+                for path in [*files, *(p for p in optional if p.is_file()), *renderers]:
                     digest.update(hashlib.sha256(path.read_bytes()).digest())
                 version = digest.hexdigest()
                 for kind in closing:
@@ -37,7 +39,7 @@ def run(source, output, start, today, refresh=None):
                     if not target.is_dir():
                         with TemporaryDirectory(dir=folder) as tmp:
                             staging = Path(tmp) / "bundle"
-                            report(snapshot, staging, day)
+                            report(snapshot, staging, day, kind)
                             staging.rename(target)
                     print(kind, day_key, target)
         day = following

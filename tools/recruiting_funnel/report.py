@@ -1,4 +1,4 @@
-"""Generate an aggregate deck and an auditable period workbook from a private evidence ledger."""
+"""Generate a narrative report, deck and period workbook from a private evidence ledger."""
 import argparse
 import csv
 import json
@@ -12,6 +12,11 @@ from openpyxl.styles import Font, PatternFill
 from pptx import Presentation
 from pptx.dml.color import RGBColor
 from pptx.util import Inches, Pt
+
+if __package__:
+    from .narrative import write_narrative
+else:
+    from narrative import write_narrative
 
 KINDS = ("week", "month", "quarter", "half", "year")
 METRICS = [
@@ -37,16 +42,17 @@ def period(d, kind):
 
 def read_events(path, cutoff):
     by_id = {}
-    for r in csv.DictReader(path.open(encoding="utf-8-sig")):
-        if not all(r.get(k) for k in ("date", "case", "stage", "source")):
-            raise ValueError("Missing date, case, stage or source")
-        r["date"] = date.fromisoformat(r["date"])
-        if r["date"] > cutoff:
-            continue
-        key = r["stage"], r["source"], r["case"]
-        if key in by_id and by_id[key] != r:
-            raise ValueError("Conflicting evidence rows")
-        by_id[key] = r
+    with path.open(encoding="utf-8-sig") as handle:
+        for r in csv.DictReader(handle):
+            if not all(r.get(k) for k in ("date", "case", "stage", "source")):
+                raise ValueError("Missing date, case, stage or source")
+            r["date"] = date.fromisoformat(r["date"])
+            if r["date"] > cutoff:
+                continue
+            key = r["stage"], r["source"], r["case"]
+            if key in by_id and by_id[key] != r:
+                raise ValueError("Conflicting evidence rows")
+            by_id[key] = r
     return sorted(by_id.values(), key=lambda r: r["date"])
 
 
@@ -67,7 +73,7 @@ def cohort_rates(anchors, histories, coverage):
     return values
 
 
-def report(src, dest, cutoff):
+def report(src, dest, cutoff, focus="year"):
     coverage = json.loads((src/"coverage.json").read_text())
     events = read_events(src/"events.csv", cutoff)
     hist, first = defaultdict(list), {}
@@ -117,6 +123,7 @@ def report(src, dest, cutoff):
                                   accepted / sent if sent else None, item["source"]])
                     for cell in seats[seats.max_row][7:9]:
                         cell.number_format = "0.0%"
+    issue_rows = []
     issues_file = src / "issues.csv"
     if issues_file.exists():
         issues = wb.create_sheet("근거가 있는 주차별 현안")
@@ -125,8 +132,15 @@ def report(src, dest, cutoff):
             for item in csv.DictReader(handle):
                 observed = date.fromisoformat(item["date"])
                 if observed <= cutoff and item["source"]:
+                    issue_rows.append(item)
                     issues.append([period(observed, "week"), observed.isoformat(), item["client"],
                                    item["role"], item["issue"], item["source"]])
+    references = write_narrative(dest/"report.md", cutoff, focus, facts, hist, coverage,
+                                 issue_rows, cohort_rates, src/"journal.csv")
+    sources = wb.create_sheet("보고서 근거")
+    sources.append(["본문 출처 키", "원문 식별자 (비공개)"])
+    for ref, original in references.items():
+        sources.append([ref, original])
     for cell in list(matrix.columns)[5][1:]:cell.number_format="0.0%"
     for ws in wb:
         ws.freeze_panes="C2";ws.auto_filter.ref=ws.dimensions
@@ -181,4 +195,5 @@ if __name__=="__main__":
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("source",type=Path);parser.add_argument("output",type=Path)
     parser.add_argument("--through",type=date.fromisoformat,required=True)
-    args=parser.parse_args();os.umask(0o077);report(args.source,args.output,args.through)
+    parser.add_argument("--period", choices=KINDS, default="year", help="Focus of the standalone narrative")
+    args=parser.parse_args();os.umask(0o077);report(args.source,args.output,args.through,args.period)
